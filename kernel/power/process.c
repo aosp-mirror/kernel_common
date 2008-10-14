@@ -16,6 +16,7 @@
 #include <linux/freezer.h>
 #include <linux/delay.h>
 #include <linux/workqueue.h>
+#include <linux/wakelock.h>
 
 /* 
  * Timeout for stopping processes
@@ -70,6 +71,10 @@ static int try_to_freeze_tasks(bool user_only)
 			todo += wq_busy;
 		}
 
+		if (todo && has_wake_lock(WAKE_LOCK_SUSPEND)) {
+			wakeup = 1;
+			break;
+		}
 		if (!todo || time_after(jiffies, end_time))
 			break;
 
@@ -91,12 +96,24 @@ static int try_to_freeze_tasks(bool user_only)
 	elapsed_csecs = elapsed_csecs64;
 
 	if (todo) {
-		printk("\n");
-		printk(KERN_ERR "Freezing of tasks %s after %d.%02d seconds "
-		       "(%d tasks refusing to freeze, wq_busy=%d):\n",
-		       wakeup ? "aborted" : "failed",
-		       elapsed_csecs / 100, elapsed_csecs % 100,
-		       todo - wq_busy, wq_busy);
+		/* This does not unfreeze processes that are already frozen
+		 * (we have slightly ugly calling convention in that respect,
+		 * and caller must call thaw_processes() if something fails),
+		 * but it cleans up leftover PF_FREEZE requests.
+		 */
+		if(wakeup) {
+			printk("\n");
+			printk(KERN_ERR "Freezing of %s aborted\n",
+					user_only ? "user space " : "tasks ");
+		}
+		else {
+			printk("\n");
+			printk(KERN_ERR "Freezing of tasks %s after %d.%02d seconds "
+			       "(%d tasks refusing to freeze, wq_busy=%d):\n",
+			       wakeup ? "aborted" : "failed",
+			       elapsed_csecs / 100, elapsed_csecs % 100,
+			       todo - wq_busy, wq_busy);
+		}
 
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
