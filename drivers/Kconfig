@@ -92,6 +92,8 @@ source "drivers/leds/Kconfig"
 
 source "drivers/nfc/Kconfig"
 
+source "drivers/switch/Kconfig"
+
 source "drivers/accessibility/Kconfig"
 
 source "drivers/infiniband/Kconfig"
