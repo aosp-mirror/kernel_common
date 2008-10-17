@@ -163,6 +163,9 @@ struct input_mask {
 /* HACK: disable conflicting EVIOCREVOKE until Android userspace stops using EVIOCSSUSPENDBLOCK */
 /*#define EVIOCREVOKE		_IOW('E', 0x91, int)*/			/* Revoke device access */
 
+#define EVIOCGSUSPENDBLOCK	_IOR('E', 0x91, int)			/* get suspend block enable */
+#define EVIOCSSUSPENDBLOCK	_IOW('E', 0x91, int)			/* set suspend block enable */
+
 /**
  * EVIOCGMASK - Retrieve current event mask
  *
