@@ -1151,7 +1151,7 @@ static inline void hci_cs_create_conn(struct hci_dev *hdev, __u8 status)
 		}
 	} else {
 		if (!conn) {
-			conn = hci_conn_add(hdev, ACL_LINK, &cp->bdaddr);
+			conn = hci_conn_add(hdev, ACL_LINK, 0, &cp->bdaddr);
 			if (conn) {
 				conn->out = 1;
 				conn->link_mode |= HCI_LM_MASTER;
@@ -1475,7 +1475,7 @@ static void hci_cs_le_create_conn(struct hci_dev *hdev, __u8 status)
 		}
 	} else {
 		if (!conn) {
-			conn = hci_conn_add(hdev, LE_LINK, &cp->peer_addr);
+			conn = hci_conn_add(hdev, LE_LINK, 0, &cp->peer_addr);
 			if (conn) {
 				conn->dst_type = cp->peer_addr_type;
 				conn->out = 1;
@@ -1645,7 +1645,8 @@ static inline void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *sk
 
 		conn = hci_conn_hash_lookup_ba(hdev, ev->link_type, &ev->bdaddr);
 		if (!conn) {
-			conn = hci_conn_add(hdev, ev->link_type, &ev->bdaddr);
+			/* pkt_type not yet used for incoming connections */
+			conn = hci_conn_add(hdev, ev->link_type, 0, &ev->bdaddr);
 			if (!conn) {
 				BT_ERR("No memory for new connection");
 				hci_dev_unlock(hdev);
@@ -3002,7 +3003,7 @@ static inline void hci_le_conn_complete_evt(struct hci_dev *hdev, struct sk_buff
 
 	conn = hci_conn_hash_lookup_ba(hdev, LE_LINK, &ev->bdaddr);
 	if (!conn) {
-		conn = hci_conn_add(hdev, LE_LINK, &ev->bdaddr);
+		conn = hci_conn_add(hdev, LE_LINK, 0, &ev->bdaddr);
 		if (!conn) {
 			BT_ERR("No memory for new connection");
 			hci_dev_unlock(hdev);

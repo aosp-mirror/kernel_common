@@ -1550,11 +1550,11 @@ static int pair_device(struct sock *sk, u16 index, unsigned char *data, u16 len)
 		auth_type = HCI_AT_DEDICATED_BONDING_MITM;
 
 	if (cp->addr.type == MGMT_ADDR_BREDR)
-		conn = hci_connect(hdev, ACL_LINK, &cp->addr.bdaddr, sec_level,
-								auth_type);
+		conn = hci_connect(hdev, ACL_LINK, 0, &cp->addr.bdaddr,
+							sec_level, auth_type);
 	else
-		conn = hci_connect(hdev, LE_LINK, &cp->addr.bdaddr, sec_level,
-								auth_type);
+		conn = hci_connect(hdev, LE_LINK, 0, &cp->addr.bdaddr,
+							sec_level, auth_type);
 
 	memset(&rp, 0, sizeof(rp));
 	bacpy(&rp.addr.bdaddr, &cp->addr.bdaddr);
