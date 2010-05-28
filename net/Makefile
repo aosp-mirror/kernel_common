@@ -74,3 +74,4 @@ obj-$(CONFIG_HSR)		+= hsr/
 ifneq ($(CONFIG_NET_SWITCHDEV),)
 obj-y				+= switchdev/
 endif
+obj-$(CONFIG_NET_ACTIVITY_STATS)		+= activity_stats.o
