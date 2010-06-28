@@ -536,7 +536,7 @@ static int set_config(struct usb_composite_dev *cdev,
 done:
 	usb_gadget_vbus_draw(gadget, power);
 
-	switch_set_state(&cdev->sdev, number);
+	schedule_work(&cdev->switch_work);
 	return result;
 }
 
@@ -1094,7 +1094,7 @@ static void composite_disconnect(struct usb_gadget *gadget)
 		composite->disconnect(cdev);
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
-	switch_set_state(&cdev->sdev, 0);
+	schedule_work(&cdev->switch_work);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1175,6 +1175,19 @@ static u8 override_id(struct usb_composite_dev *cdev, u8 *desc)
 	return *desc;
 }
 
+static void
+composite_switch_work(struct work_struct *data)
+{
+	struct usb_composite_dev	*cdev =
+		container_of(data, struct usb_composite_dev, switch_work);
+	struct usb_configuration *config = cdev->config;
+
+	if (config)
+		switch_set_state(&cdev->sdev, config->bConfigurationValue);
+	else
+		switch_set_state(&cdev->sdev, 0);
+}
+
 static int composite_bind(struct usb_gadget *gadget)
 {
 	struct usb_composite_dev	*cdev;
@@ -1228,6 +1241,7 @@ static int composite_bind(struct usb_gadget *gadget)
 	status = switch_dev_register(&cdev->sdev);
 	if (status < 0)
 		goto fail;
+	INIT_WORK(&cdev->switch_work, composite_switch_work);
 
 	cdev->desc = *composite->dev;
 	cdev->desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
