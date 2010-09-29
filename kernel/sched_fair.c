@@ -1046,6 +1046,8 @@ static void clear_buddies(struct cfs_rq *cfs_rq, struct sched_entity *se)
 static void
 dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
+	u64 min_vruntime;
+
 	/*
 	 * Update run-time statistics of the 'current'.
 	 */
@@ -1072,6 +1074,8 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	se->on_rq = 0;
 	update_cfs_load(cfs_rq, 0);
 	account_entity_dequeue(cfs_rq, se);
+
+	min_vruntime = cfs_rq->min_vruntime;
 	update_min_vruntime(cfs_rq);
 	update_cfs_shares(cfs_rq);
 
@@ -1081,7 +1085,7 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	 * movement in our normalized position.
 	 */
 	if (!(flags & DEQUEUE_SLEEP))
-		se->vruntime -= cfs_rq->min_vruntime;
+		se->vruntime -= min_vruntime;
 }
 
 /*
