@@ -338,6 +338,8 @@ void l2cap_send_cmd(struct l2cap_conn *conn, u8 ident, u8 code, u16 len, void *d
 	else
 		flags = ACL_START;
 
+	bt_cb(skb)->force_active = BT_POWER_FORCE_ACTIVE_ON;
+
 	hci_send_acl(conn->hcon, skb, flags);
 }
 
@@ -390,6 +392,7 @@ static inline void l2cap_send_sframe(struct l2cap_pinfo *pi, u16 control)
 	else
 		flags = ACL_START;
 
+	bt_cb(skb)->force_active = pi->force_active;
 	hci_send_acl(pi->conn->hcon, skb, flags);
 }
 
@@ -999,6 +1002,7 @@ void l2cap_do_send(struct sock *sk, struct sk_buff *skb)
 	else
 		flags = ACL_START;
 
+	bt_cb(skb)->force_active = pi->force_active;
 	hci_send_acl(hcon, skb, flags);
 }
 

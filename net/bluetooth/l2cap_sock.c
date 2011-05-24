@@ -468,6 +468,7 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 {
 	struct sock *sk = sock->sk;
 	struct bt_security sec;
+	struct bt_power pwr;
 	int len, err = 0;
 
 	BT_DBG("sk %p", sk);
@@ -512,6 +513,21 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 
 	case BT_FLUSHABLE:
 		if (put_user(l2cap_pi(sk)->flushable, (u32 __user *) optval))
+			err = -EFAULT;
+
+		break;
+
+	case BT_POWER:
+		if (sk->sk_type != SOCK_SEQPACKET && sk->sk_type != SOCK_STREAM
+				&& sk->sk_type != SOCK_RAW) {
+			err = -EINVAL;
+			break;
+		}
+
+		pwr.force_active = l2cap_pi(sk)->force_active;
+
+		len = min_t(unsigned int, len, sizeof(pwr));
+		if (copy_to_user(optval, (char *) &pwr, len))
 			err = -EFAULT;
 
 		break;
@@ -614,6 +630,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 {
 	struct sock *sk = sock->sk;
 	struct bt_security sec;
+	struct bt_power pwr;
 	int len, err = 0;
 	u32 opt;
 
@@ -688,6 +705,23 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 		}
 
 		l2cap_pi(sk)->flushable = opt;
+		break;
+
+	case BT_POWER:
+		if (sk->sk_type != SOCK_SEQPACKET && sk->sk_type != SOCK_STREAM
+				&& sk->sk_type != SOCK_RAW) {
+			err = -EINVAL;
+			break;
+		}
+
+		pwr.force_active = BT_POWER_FORCE_ACTIVE_ON;
+
+		len = min_t(unsigned int, sizeof(pwr), optlen);
+		if (copy_from_user((char *) &pwr, optval, len)) {
+			err = -EFAULT;
+			break;
+		}
+		l2cap_pi(sk)->force_active = pwr.force_active;
 		break;
 
 	default:
@@ -1016,6 +1050,7 @@ void l2cap_sock_init(struct sock *sk, struct sock *parent)
 		pi->role_switch = l2cap_pi(parent)->role_switch;
 		pi->force_reliable = l2cap_pi(parent)->force_reliable;
 		pi->flushable = l2cap_pi(parent)->flushable;
+		pi->force_active = l2cap_pi(parent)->force_active;
 	} else {
 		pi->imtu = L2CAP_DEFAULT_MTU;
 		pi->omtu = 0;
@@ -1032,6 +1067,7 @@ void l2cap_sock_init(struct sock *sk, struct sock *parent)
 		pi->role_switch = 0;
 		pi->force_reliable = 0;
 		pi->flushable = BT_FLUSHABLE_OFF;
+		pi->force_active = BT_POWER_FORCE_ACTIVE_ON;
 	}
 
 	/* Default config options */
