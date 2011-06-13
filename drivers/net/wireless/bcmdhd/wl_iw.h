@@ -43,9 +43,8 @@
 #define GET_HOME_DWELL  		"HOME="
 #define GET_SCAN_TYPE			"TYPE="
 
-
-#define BAND_GET_CMD				"BANDGET"
-#define BAND_SET_CMD				"BANDSET"
+#define BAND_GET_CMD				"GETBAND"
+#define BAND_SET_CMD				"SETBAND"
 #define DTIM_SKIP_GET_CMD			"DTIMSKIPGET"
 #define DTIM_SKIP_SET_CMD			"DTIMSKIPSET"
 #define SETSUSPEND_CMD				"SETSUSPENDOPT"
@@ -69,7 +68,6 @@ struct cntry_locales_custom {
 	char custom_locale[WLC_CNTRY_BUF_SZ];	
 	int32 custom_locale_rev;		
 };
-#define SOFTAP 1
 
 
 #define	WL_IW_RSSI_MINVAL		-200	
