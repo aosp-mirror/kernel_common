@@ -155,10 +155,9 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 	gfp_t flags;
 
 	flags = (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL;
-	osh = kmalloc(sizeof(osl_t), flags);
+	osh = kzalloc(sizeof(osl_t), flags);
 	ASSERT(osh);
 
-	bzero(osh, sizeof(osl_t));
 
 	
 	ASSERT(ABS(BCME_LAST) == (ARRAYSIZE(linuxbcmerrormap) - 1));
