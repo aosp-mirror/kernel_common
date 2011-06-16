@@ -90,7 +90,7 @@ static histo_t vi_d1, vi_d2, vi_d3, vi_d4;
 #endif /* WLMEDIA_HTSF */
 
 #if defined(SOFTAP)
-extern bool	ap_cfg_running;
+extern bool ap_cfg_running;
 #endif
 
 /* enable HOSTIP cache update from the host side when an eth0:N is up */
@@ -171,6 +171,7 @@ int wifi_get_mac_addr(unsigned char *buf)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39))
 void *wifi_get_country_code(char *ccode)
 {
 	DHD_TRACE(("%s\n", __FUNCTION__));
@@ -181,6 +182,7 @@ void *wifi_get_country_code(char *ccode)
 	}
 	return NULL;
 }
+#endif
 
 static int wifi_probe(struct platform_device *pdev)
 {
@@ -437,6 +439,7 @@ char nvram_path[MOD_PARAM_PATHLEN];
 
 extern int wl_control_wl_start(struct net_device *dev);
 extern int net_os_send_hang_message(struct net_device *dev);
+extern int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
 struct semaphore dhd_registration_sem;
 #define DHD_REGISTRATION_TIMEOUT  12000  /* msec : allowed time to finished dhd registration */
@@ -459,7 +462,7 @@ module_param(dhd_watchdog_ms, uint, 0);
 
 #if defined(DHD_DEBUG)
 /* Console poll interval */
-uint dhd_console_ms = 250;
+uint dhd_console_ms = 0;
 module_param(dhd_console_ms, uint, 0);
 #endif /* defined(DHD_DEBUG) */
 
@@ -1251,7 +1254,6 @@ _dhd_sysioc_thread(void *data)
 
 		DHD_OS_WAKE_UNLOCK(&dhd->pub);
 		dhd_os_start_unlock(&dhd->pub);
-
 	}
 	DHD_TRACE(("%s: stopped\n", __FUNCTION__));
 	complete_and_exit(&tsk->completed, 0);
@@ -2150,6 +2152,12 @@ dhd_ioctl_entry(struct net_device *net, struct ifreq *ifr, int cmd)
 		return ret;
 	}
 #endif /* LINUX_VERSION_CODE > KERNEL_VERSION(2, 4, 2) */
+
+	if (cmd == SIOCDEVPRIVATE+1) {
+		ret = wl_android_priv_cmd(net, ifr, cmd);
+		DHD_OS_WAKE_UNLOCK(&dhd->pub);
+		return ret;
+	}
 
 	if (cmd != SIOCDEVPRIVATE) {
 		DHD_OS_WAKE_UNLOCK(&dhd->pub);
@@ -3986,7 +3994,6 @@ void dhd_os_start_unlock(dhd_pub_t *pub)
 		mutex_unlock(&dhd->wl_start_lock);
 #endif
 }
-
 
 #ifdef SOFTAP
 unsigned long dhd_os_spin_lock(dhd_pub_t *pub)
