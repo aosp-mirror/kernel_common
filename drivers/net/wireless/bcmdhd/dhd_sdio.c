@@ -4961,8 +4961,6 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 	if (dhdp->busstate == DHD_BUS_DOWN)
 		return FALSE;
 
-	dhd_os_sdlock(bus->dhd);
-
 	/* Poll period: check device if appropriate. */
 	if (bus->poll && (++bus->polltick >= bus->pollrate)) {
 		uint32 intstatus = 0;
@@ -5031,8 +5029,6 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 			}
 		}
 	}
-
-	dhd_os_sdunlock(bus->dhd);
 
 	return bus->ipend;
 }
@@ -6182,7 +6178,7 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					/* Restore flow control  */
 					dhd_txflowcontrol(bus->dhd, ALL_INTERFACES, OFF);
 #endif 
-						dhd_os_wd_timer(dhdp, dhd_watchdog_ms);
+					dhd_os_wd_timer(dhdp, dhd_watchdog_ms);
 
 					DHD_TRACE(("%s: WLAN ON DONE\n", __FUNCTION__));
 					} else {

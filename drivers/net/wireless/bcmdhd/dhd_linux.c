@@ -1765,6 +1765,7 @@ dhd_watchdog_thread(void *data)
 				break;
 			}
 
+			dhd_os_sdlock(&dhd->pub);
 			if (dhd->pub.dongle_reset == FALSE) {
 				DHD_TIMER(("%s:\n", __FUNCTION__));
 
@@ -1778,6 +1779,7 @@ dhd_watchdog_thread(void *data)
 					mod_timer(&dhd->timer,
 					jiffies + dhd_watchdog_ms * HZ / 1000);
 			}
+			dhd_os_sdunlock(&dhd->pub);
 			DHD_OS_WAKE_UNLOCK(&dhd->pub);
 		} else {
 			break;
@@ -1804,6 +1806,7 @@ static void dhd_watchdog(ulong data)
 	}
 #endif /* DHDTHREAD */
 
+	dhd_os_sdlock(&dhd->pub);
 	/* Call the bus module watchdog */
 	dhd_bus_watchdog(&dhd->pub);
 
@@ -1813,6 +1816,7 @@ static void dhd_watchdog(ulong data)
 	/* Reschedule the watchdog */
 	if (dhd->wd_timer_valid)
 		mod_timer(&dhd->timer, jiffies + dhd_watchdog_ms * HZ / 1000);
+	dhd_os_sdunlock(&dhd->pub);
 	DHD_OS_WAKE_UNLOCK(&dhd->pub);
 }
 
@@ -3444,53 +3448,38 @@ void
 dhd_os_wd_timer(void *bus, uint wdtick)
 {
 	dhd_pub_t *pub = bus;
-	static uint save_dhd_watchdog_ms = 0;
 	dhd_info_t *dhd = (dhd_info_t *)pub->info;
+	unsigned long flags;
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
+	flags = dhd_os_spin_lock(pub);
+
 	/* don't start the wd until fw is loaded */
-	if (pub->busstate == DHD_BUS_DOWN)
+	if (pub->busstate == DHD_BUS_DOWN) {
+		dhd_os_spin_unlock(pub, flags);
 		return;
+	}
 
 	/* Totally stop the timer */
 	if (!wdtick && dhd->wd_timer_valid == TRUE) {
+		dhd->wd_timer_valid = FALSE;
+		dhd_os_spin_unlock(pub, flags);
 #ifdef DHDTHREAD
 		del_timer_sync(&dhd->timer);
 #else
 		del_timer(&dhd->timer);
 #endif /* DHDTHREAD */
-		dhd->wd_timer_valid = FALSE;
-		save_dhd_watchdog_ms = wdtick;
 		return;
 	}
 
 	if (wdtick) {
-	dhd_watchdog_ms = (uint)wdtick;
-		if (save_dhd_watchdog_ms != dhd_watchdog_ms) {
-
-			if (dhd->wd_timer_valid == TRUE)
-				/* Stop timer and restart at new value */
-#ifdef DHDTHREAD
-				del_timer_sync(&dhd->timer);
-#else
-				del_timer(&dhd->timer);
-#endif /* DHDTHREAD */
-
-			/* Create timer again when watchdog period is
-			   dynamically changed or in the first instance
-			*/
-	dhd->timer.expires = jiffies + dhd_watchdog_ms * HZ / 1000;
-	add_timer(&dhd->timer);
-		} else {
-			/* Re arm the timer, at last watchdog period */
-			mod_timer(&dhd->timer, jiffies + dhd_watchdog_ms * HZ / 1000);
-		}
-
-	dhd->wd_timer_valid = TRUE;
-
-		save_dhd_watchdog_ms = wdtick;
+		dhd_watchdog_ms = (uint)wdtick;
+		/* Re arm the timer, at last watchdog period */
+		mod_timer(&dhd->timer, jiffies + dhd_watchdog_ms * HZ / 1000);
+		dhd->wd_timer_valid = TRUE;
 	}
+	dhd_os_spin_unlock(pub, flags);
 }
 
 void *
@@ -3832,19 +3821,12 @@ dhd_dev_reset(struct net_device *dev, uint8 flag)
 
 	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
 
-	/* Turning off watchdog */
-	if (flag)
-		dhd_os_wd_timer(&dhd->pub, 0);
-
 	ret = dhd_bus_devreset(&dhd->pub, flag);
 	if (ret) {
 		DHD_ERROR(("%s: dhd_bus_devreset: %d\n", __FUNCTION__, ret));
 		return ret;
 	}
-	/* Turning on watchdog back */
-	if (!flag)
-		dhd_os_wd_timer(&dhd->pub, dhd_watchdog_ms);
-	DHD_ERROR(("%s:  WLAN OFF DONE\n", __FUNCTION__));
+	DHD_ERROR(("%s: WLAN %s DONE\n", __FUNCTION__, flag ? "OFF" : "ON"));
 
 	return ret;
 }
@@ -3999,7 +3981,6 @@ void dhd_os_start_unlock(dhd_pub_t *pub)
 #endif
 }
 
-#ifdef SOFTAP
 unsigned long dhd_os_spin_lock(dhd_pub_t *pub)
 {
 	dhd_info_t *dhd = (dhd_info_t *)(pub->info);
@@ -4018,7 +3999,6 @@ void dhd_os_spin_unlock(dhd_pub_t *pub, unsigned long flags)
 	if (dhd)
 		spin_unlock_irqrestore(&dhd->dhd_lock, flags);
 }
-#endif /* SOFTAP */
 
 static int
 dhd_get_pend_8021x_cnt(dhd_info_t *dhd)
