@@ -24,8 +24,12 @@
  * $Id: wldev_common.c,v 1.1.4.1.2.14 2011-02-09 01:40:07 Exp $
  */
 
-#include <wlioctl.h>
+#include <linux/module.h>
+#include <linux/netdevice.h>
+
+#include <wldev_common.h>
 #include <bcmutils.h>
+#include <dhd_dbg.h>
 
 #define htod32(i) i
 #define htod16(i) i
@@ -67,7 +71,7 @@ s32 wldev_ioctl(
  * taken care of in dhd_ioctl_entry. Internal use only, not exposed to
  * wl_iw, wl_cfg80211 and wl_cfgp2p
  */
-s32 wldev_mkiovar(
+static s32 wldev_mkiovar(
 	s8 *iovar_name, s8 *param, s32 paramlen,
 	s8 *iovar_buf, u32 buflen)
 {
@@ -156,7 +160,7 @@ s32 wldev_mkiovar_bsscfg(
 
 	if (buflen < 0 || iolen > (u32)buflen)
 	{
-		printk("wldev_mkiovar_bsscfg buffer is too short\n");
+		DHD_ERROR(("%s: buffer is too short\n", __FUNCTION__));
 		return BCME_BUFTOOSHORT;
 	}
 
@@ -235,4 +239,52 @@ s32 wldev_iovar_getint_bsscfg(
 		*pval = dtoh32(*pval);
 	}
 	return err;
+}
+
+int wldev_get_link_speed(
+	struct net_device *dev, int *plink_speed)
+{
+	int error;
+
+	if (!plink_speed)
+		return -ENOMEM;
+	error = wldev_ioctl(dev, WLC_GET_RATE, plink_speed, sizeof(int), 0);
+	if (unlikely(error))
+		return error;
+
+	/* Convert internal 500Kbps to Kbps */
+	*plink_speed *= 500;
+	return error;
+}
+
+int wldev_get_rssi(
+	struct net_device *dev, int *prssi)
+{
+	scb_val_t scb_val;
+	int error;
+
+	if (!prssi)
+		return -ENOMEM;
+	bzero(&scb_val, sizeof(scb_val_t));
+
+	error = wldev_ioctl(dev, WLC_GET_RSSI, &scb_val, sizeof(scb_val_t), 0);
+	if (unlikely(error))
+		return error;
+
+	*prssi = dtoh32(scb_val.val);
+	return error;
+}
+
+int wldev_get_ssid(
+	struct net_device *dev, wlc_ssid_t *pssid)
+{
+	int error;
+
+	if (!pssid)
+		return -ENOMEM;
+	error = wldev_ioctl(dev, WLC_GET_SSID, pssid, sizeof(wlc_ssid_t), 0);
+	if (unlikely(error))
+		return error;
+	pssid->SSID_len = dtoh32(pssid->SSID_len);
+	return error;
 }

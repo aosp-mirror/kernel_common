@@ -161,7 +161,8 @@ osl_error(int bcmerror)
 	return linuxbcmerrormap[-bcmerror];
 }
 
-void * dhd_os_prealloc(int section, unsigned long size);
+extern uint8* dhd_os_prealloc(void *osh, int section, int size);
+
 osl_t *
 osl_attach(void *pdev, uint bustype, bool pkttag)
 {
@@ -201,9 +202,9 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 			break;
 	}
 
-#ifdef DHD_USE_STATIC_BUF
+#if defined(DHD_USE_STATIC_BUF)
 	if (!bcm_static_buf) {
-		if (!(bcm_static_buf = (bcm_static_buf_t *)dhd_os_prealloc(3, STATIC_BUF_SIZE+
+		if (!(bcm_static_buf = (bcm_static_buf_t *)dhd_os_prealloc(osh, 3, STATIC_BUF_SIZE+
 			STATIC_BUF_TOTAL_LEN))) {
 			printk("can not alloc static buf!\n");
 		}
@@ -223,7 +224,7 @@ osl_attach(void *pdev, uint bustype, bool pkttag)
 		int i;
 		void *skb_buff_ptr = 0;
 		bcm_static_skb = (bcm_static_pkt_t *)((char *)bcm_static_buf + 2048);
-		skb_buff_ptr = dhd_os_prealloc(4, 0);
+		skb_buff_ptr = dhd_os_prealloc(osh, 4, 0);
 
 		bcopy(skb_buff_ptr, bcm_static_skb, sizeof(struct sk_buff *)*16);
 		for (i = 0; i < MAX_STATIC_PKT_NUM*2; i++)
@@ -248,9 +249,13 @@ osl_detach(osl_t *osh)
 
 struct sk_buff *osl_alloc_skb(unsigned int len)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
 	gfp_t flags = (in_atomic()) ? GFP_ATOMIC : GFP_KERNEL;
 
 	return __dev_alloc_skb(len, flags);
+#else
+	return dev_alloc_skb(len);
+#endif
 }
 
 #ifdef CTFPOOL
@@ -598,7 +603,7 @@ osl_pktfree_static(osl_t *osh, void *p, bool send)
 {
 	int i;
 
-	for (i = 0; i < MAX_STATIC_PKT_NUM*2; i++)
+	for (i = 0; i < MAX_STATIC_PKT_NUM; i++)
 	{
 		if (p == bcm_static_skb->skb_4k[i])
 		{
@@ -606,10 +611,22 @@ osl_pktfree_static(osl_t *osh, void *p, bool send)
 			bcm_static_skb->pkt_use[i] = 0;
 			up(&bcm_static_skb->osl_pkt_sem);
 
+			return;
+		}
+	}
+
+	for (i = 0; i < MAX_STATIC_PKT_NUM; i++)
+	{
+		if (p == bcm_static_skb->skb_8k[i])
+		{
+			down(&bcm_static_skb->osl_pkt_sem);
+			bcm_static_skb->pkt_use[i + MAX_STATIC_PKT_NUM] = 0;
+			up(&bcm_static_skb->osl_pkt_sem);
 
 			return;
 		}
 	}
+
 	return osl_pktfree(osh, p, send);
 }
 #endif 

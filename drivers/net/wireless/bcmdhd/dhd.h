@@ -93,9 +93,21 @@ enum dhd_prealloc_index {
 	DHD_PREALLOC_DATABUF,
 	DHD_PREALLOC_OSL_BUF
 };
-#ifdef DHD_USE_STATIC_BUF
-extern void * dhd_os_prealloc(int section, unsigned long size);
-#endif
+
+#if defined(DHD_USE_STATIC_BUF)
+
+uint8* dhd_os_prealloc(void *osh, int section, uint size);
+void dhd_os_prefree(void *osh, void *addr, uint size);
+#define DHD_OS_PREALLOC(osh, section, size) dhd_os_prealloc(osh, section, size)
+#define DHD_OS_PREFREE(osh, addr, size) dhd_os_prefree(osh, addr, size)
+
+#else
+
+#define DHD_OS_PREALLOC(osh, section, size) MALLOC(osh, size)
+#define DHD_OS_PREFREE(osh, addr, size) MFREE(osh, addr, size)
+
+#endif /* defined(DHD_USE_STATIC_BUF) */
+
 /* Common structure for module and instance linkage */
 typedef struct dhd_pub {
 	/* Linkage ponters */
@@ -236,6 +248,9 @@ typedef struct dhd_cmn {
 #endif /* DHDTHREAD */
 #define DHD_IF_VIF	0x01	/* Virtual IF (Hidden from user) */
 
+unsigned long dhd_os_spin_lock(dhd_pub_t *pub);
+void dhd_os_spin_unlock(dhd_pub_t *pub, unsigned long flags);
+
 /*  Wakelock Functions */
 extern int dhd_os_wake_lock(dhd_pub_t *pub);
 extern int dhd_os_wake_unlock(dhd_pub_t *pub);
@@ -268,12 +283,12 @@ inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
 #define DHD_OS_WAKE_LOCK_TIMEOUT(pub)		dhd_os_wake_lock_timeout(pub)
 #define DHD_OS_WAKE_LOCK_TIMEOUT_ENABLE(pub)	dhd_os_wake_lock_timeout_enable(pub)
 
-extern void dhd_os_start_lock(dhd_pub_t *pub);
-extern void dhd_os_start_unlock(dhd_pub_t *pub);
 
-extern unsigned long dhd_os_spin_lock(dhd_pub_t *pub);
-extern void dhd_os_spin_unlock(dhd_pub_t *pub, unsigned long flags);
-
+/* interface operations (register, remove) should be atomic, use this lock to prevent race
+ * condition among wifi on/off and interface operation functions
+ */
+void dhd_net_if_lock(struct net_device *dev);
+void dhd_net_if_unlock(struct net_device *dev);
 
 typedef struct dhd_if_event {
 	uint8 ifidx;
@@ -363,6 +378,18 @@ extern int	   dhd_custom_get_mac_address(unsigned char *buf);
 extern void dhd_os_sdunlock_sndup_rxq(dhd_pub_t * pub);
 extern void dhd_os_sdlock_eventq(dhd_pub_t * pub);
 extern void dhd_os_sdunlock_eventq(dhd_pub_t * pub);
+extern int dhd_pno_enable(dhd_pub_t *dhd, int pfn_enabled);
+extern int dhd_pno_clean(dhd_pub_t *dhd);
+extern int dhd_pno_set(dhd_pub_t *dhd, wlc_ssid_t* ssids_local, int nssid,
+                       ushort  scan_fr, int pno_repeat, int pno_freq_expo_max);
+extern int dhd_pno_get_status(dhd_pub_t *dhd);
+extern int dhd_dev_pno_reset(struct net_device *dev);
+extern int dhd_dev_pno_set(struct net_device *dev, wlc_ssid_t* ssids_local,
+                           int nssid, ushort  scan_fr, int pno_repeat, int pno_freq_expo_max);
+extern int dhd_dev_pno_enable(struct net_device *dev,  int pfn_enabled);
+extern int dhd_dev_get_pno_status(struct net_device *dev);
+extern int dhd_get_dtim_skip(dhd_pub_t *dhd);
+
 #ifdef DHD_DEBUG
 extern int write_to_file(dhd_pub_t *dhd, uint8 *buf, int size);
 #endif /* DHD_DEBUG */
@@ -506,6 +533,9 @@ extern char nv_path[MOD_PARAM_PATHLEN];
 #ifdef SOFTAP
 extern char fw_path2[MOD_PARAM_PATHLEN];
 #endif
+
+/* Flag to indicate if we should download firmware on driver load */
+extern uint dhd_download_fw_on_driverload;
 
 /* For supporting multiple interfaces */
 #define DHD_MAX_IFS	16

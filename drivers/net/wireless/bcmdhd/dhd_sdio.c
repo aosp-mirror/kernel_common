@@ -359,6 +359,9 @@ static const uint retry_limit = 2;
 /* Force even SD lengths (some host controllers mess up on odd bytes) */
 static bool forcealign;
 
+/* Flag to indicate if we should download firmware on driver load */
+uint dhd_download_fw_on_driverload = TRUE;
+
 #define ALIGNMENT  4
 
 #if defined(OOB_INTR_ONLY) && defined(HW_OOB)
@@ -479,7 +482,8 @@ static bool dhdsdio_probe_attach(dhd_bus_t *bus, osl_t *osh, void *sdh,
                                  void * regsva, uint16  devid);
 static bool dhdsdio_probe_malloc(dhd_bus_t *bus, osl_t *osh, void *sdh);
 static bool dhdsdio_probe_init(dhd_bus_t *bus, osl_t *osh, void *sdh);
-static void dhdsdio_release_dongle(dhd_bus_t *bus, osl_t *osh, bool dongle_isolation);
+static void dhdsdio_release_dongle(dhd_bus_t *bus, osl_t *osh, bool dongle_isolation,
+	bool reset_flag);
 
 static void dhd_dongle_setmemsize(struct dhd_bus *bus, int mem_size);
 static int dhd_bcmsdh_recv_buf(dhd_bus_t *bus, uint32 addr, uint fn, uint flags,
@@ -4961,8 +4965,6 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 	if (dhdp->busstate == DHD_BUS_DOWN)
 		return FALSE;
 
-	dhd_os_sdlock(bus->dhd);
-
 	/* Poll period: check device if appropriate. */
 	if (bus->poll && (++bus->polltick >= bus->pollrate)) {
 		uint32 intstatus = 0;
@@ -5031,8 +5033,6 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 			}
 		}
 	}
-
-	dhd_os_sdunlock(bus->dhd);
 
 	return bus->ipend;
 }
@@ -5160,6 +5160,9 @@ dhdsdio_probe(uint16 venid, uint16 devid, uint16 bus_no, uint16 slot,
 	int ret;
 	dhd_bus_t *bus;
 	dhd_cmn_t *cmn;
+#ifdef GET_CUSTOM_MAC_ENABLE
+	struct ether_addr ea_addr;
+#endif /* GET_CUSTOM_MAC_ENABLE */
 
 	/* Init global variables at run-time, not as part of the declaration.
 	 * This is required to support init/de-init of the driver. Initialization
@@ -5300,11 +5303,20 @@ dhdsdio_probe(uint16 venid, uint16 devid, uint16 bus_no, uint16 slot,
 
 	DHD_INFO(("%s: completed!!\n", __FUNCTION__));
 
+#ifdef GET_CUSTOM_MAC_ENABLE
+	/* Read MAC address from external customer place 	*/
+	memset(&ea_addr, 0, sizeof(ea_addr));
+	ret = dhd_custom_get_mac_address(ea_addr.octet);
+	if (!ret) {
+		memcpy(bus->dhd->mac.octet, (void *)&ea_addr, ETHER_ADDR_LEN);
+	}
+#endif /* GET_CUSTOM_MAC_ENABLE */
 
 	/* if firmware path present try to download and bring up bus */
-	if ((ret = dhd_bus_start(bus->dhd)) != 0) {
-		DHD_ERROR(("%s: failed\n", __FUNCTION__));
-		goto fail;
+	if (dhd_download_fw_on_driverload && (ret = dhd_bus_start(bus->dhd)) != 0) {
+		DHD_ERROR(("%s: dhd_bus_start failed\n", __FUNCTION__));
+		if (ret == BCME_NOTUP)
+			goto fail;
 	}
 	/* Ok, have the per-port tell the stack we're open for business */
 	if (dhd_net_attach(bus->dhd, 0) != 0) {
@@ -5488,40 +5500,23 @@ dhdsdio_probe_malloc(dhd_bus_t *bus, osl_t *osh, void *sdh)
 {
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
-#ifndef DHD_USE_STATIC_BUF
 	if (bus->dhd->maxctl) {
 		bus->rxblen = ROUNDUP((bus->dhd->maxctl + SDPCM_HDRLEN), ALIGNMENT) + DHD_SDALIGN;
-		if (!(bus->rxbuf = MALLOC(osh, bus->rxblen))) {
+		if (!(bus->rxbuf = DHD_OS_PREALLOC(osh, DHD_PREALLOC_RXBUF, bus->rxblen))) {
 			DHD_ERROR(("%s: MALLOC of %d-byte rxbuf failed\n",
 			           __FUNCTION__, bus->rxblen));
 			goto fail;
 		}
 	}
-
 	/* Allocate buffer to receive glomed packet */
-	if (!(bus->databuf = MALLOC(osh, MAX_DATA_BUF))) {
+	if (!(bus->databuf = DHD_OS_PREALLOC(osh, DHD_PREALLOC_DATABUF, MAX_DATA_BUF))) {
 		DHD_ERROR(("%s: MALLOC of %d-byte databuf failed\n",
 			__FUNCTION__, MAX_DATA_BUF));
 		/* release rxbuf which was already located as above */
-		if (!bus->rxblen) MFREE(osh, bus->rxbuf, bus->rxblen);
+		if (!bus->rxblen)
+			DHD_OS_PREFREE(osh, bus->rxbuf, bus->rxblen);
 		goto fail;
 	}
-#else
-	if (bus->dhd->maxctl) {
-		bus->rxblen = ROUNDUP((bus->dhd->maxctl + SDPCM_HDRLEN), ALIGNMENT) + DHD_SDALIGN;
-		if (!(bus->rxbuf = dhd_os_prealloc(DHD_PREALLOC_RXBUF, bus->rxblen))) {
-			DHD_ERROR(("%s: MALLOC of %d-byte rxbuf failed\n",
-			           __FUNCTION__, bus->rxblen));
-			goto fail;
-		}
-	}
-	/* Allocate buffer to receive glomed packet */
-	if (!(bus->databuf = dhd_os_prealloc(DHD_PREALLOC_DATABUF, MAX_DATA_BUF))) {
-		DHD_ERROR(("%s: MALLOC of %d-byte databuf failed\n",
-			__FUNCTION__, MAX_DATA_BUF));
-		goto fail;
-	}
-#endif /* DHD_USE_STATIC_BUF */
 
 	/* Align the buffer */
 	if ((uintptr)bus->databuf % DHD_SDALIGN)
@@ -5656,7 +5651,7 @@ dhdsdio_release(dhd_bus_t *bus, osl_t *osh)
 			dhd_common_deinit(bus->dhd, NULL);
 			dongle_isolation = bus->dhd->dongle_isolation;
 			dhd_detach(bus->dhd);
-			dhdsdio_release_dongle(bus, osh, dongle_isolation);
+			dhdsdio_release_dongle(bus, osh, dongle_isolation, TRUE);
 			dhd_free(bus->dhd);
 			bus->dhd = NULL;
 		}
@@ -5709,12 +5704,12 @@ dhdsdio_release_malloc(dhd_bus_t *bus, osl_t *osh)
 
 
 static void
-dhdsdio_release_dongle(dhd_bus_t *bus, osl_t *osh, bool dongle_isolation)
+dhdsdio_release_dongle(dhd_bus_t *bus, osl_t *osh, bool dongle_isolation, bool reset_flag)
 {
 	DHD_TRACE(("%s: Enter bus->dhd %p bus->dhd->dongle_reset %d \n", __FUNCTION__,
 		bus->dhd, bus->dhd->dongle_reset));
 
-	if (bus->dhd && bus->dhd->dongle_reset)
+	if ((bus->dhd && bus->dhd->dongle_reset) && reset_flag)
 		return;
 
 	if (bus->sih) {
@@ -5791,7 +5786,8 @@ dhdsdio_download_code_array(struct dhd_bus *bus)
 
 	/* Download image */
 	while ((offset + MEMBLOCK) < sizeof(dlarray)) {
-		bcmerror = dhdsdio_membytes(bus, TRUE, offset, (uint8 *) (dlarray + offset), MEMBLOCK);
+		bcmerror = dhdsdio_membytes(bus, TRUE, offset,
+			(uint8 *) (dlarray + offset), MEMBLOCK);
 		if (bcmerror) {
 			DHD_ERROR(("%s: error %d on writing %d membytes at 0x%08x\n",
 			        __FUNCTION__, bcmerror, MEMBLOCK, offset));
@@ -6137,7 +6133,7 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 #endif /* defined(OOB_INTR_ONLY) */
 
 			/* Clean tx/rx buffer pointers, detach from the dongle */
-			dhdsdio_release_dongle(bus, bus->dhd->osh, TRUE);
+			dhdsdio_release_dongle(bus, bus->dhd->osh, TRUE, TRUE);
 
 			bus->dhd->dongle_reset = TRUE;
 			bus->dhd->up = FALSE;
@@ -6182,12 +6178,13 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 					/* Restore flow control  */
 					dhd_txflowcontrol(bus->dhd, ALL_INTERFACES, OFF);
 #endif 
-						dhd_os_wd_timer(dhdp, dhd_watchdog_ms);
+					dhd_os_wd_timer(dhdp, dhd_watchdog_ms);
 
 					DHD_TRACE(("%s: WLAN ON DONE\n", __FUNCTION__));
 					} else {
 						dhd_bus_stop(bus, FALSE);
-						dhdsdio_release_dongle(bus, bus->dhd->osh, TRUE);
+						dhdsdio_release_dongle(bus, bus->dhd->osh,
+							TRUE, FALSE);
 					}
 				} else
 					bcmerror = BCME_SDIO_ERROR;
