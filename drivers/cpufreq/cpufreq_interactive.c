@@ -141,7 +141,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 		cpu_load = 100 * (delta_time - delta_idle) / delta_time;
 
 	delta_idle = (unsigned int) cputime64_sub(now_idle,
-						 pcpu->freq_change_time_in_idle);
+						pcpu->freq_change_time_in_idle);
 	delta_time = (unsigned int) cputime64_sub(pcpu->timer_run_time,
 						  pcpu->freq_change_time);
 
@@ -182,8 +182,8 @@ static void cpufreq_interactive_timer(unsigned long data)
 	 * minimum sample time.
 	 */
 	if (new_freq < pcpu->target_freq) {
-		if (cputime64_sub(pcpu->timer_run_time, pcpu->freq_change_time) <
-		    min_sample_time)
+		if (cputime64_sub(pcpu->timer_run_time, pcpu->freq_change_time)
+		    < min_sample_time)
 			goto rearm;
 	}
 
@@ -240,9 +240,8 @@ static void cpufreq_interactive_idle_start(void)
 		&per_cpu(cpuinfo, smp_processor_id());
 	int pending;
 
-	if (!pcpu->governor_enabled) {
+	if (!pcpu->governor_enabled)
 		return;
-	}
 
 	pcpu->idling = 1;
 	smp_wmb();
@@ -630,7 +629,7 @@ static int __init cpufreq_interactive_init(void)
 	   warm cache (probably doesn't matter much). */
 	down_wq = alloc_workqueue("knteractive_down", 0, 1);
 
-	if (! down_wq)
+	if (!down_wq)
 		goto err_freeuptask;
 
 	INIT_WORK(&freq_scale_down_work,
