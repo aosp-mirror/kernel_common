@@ -83,11 +83,28 @@ s32 wldev_iovar_getint_bsscfg(
 s32 wldev_iovar_setint_bsscfg(
 	struct net_device *dev, s8 *iovar, s32 val, s32 bssidx);
 
+extern void get_customized_country_code(char *country_iso_code, wl_country_t *cspec);
+extern void dhd_bus_country_set(struct net_device *dev, wl_country_t *cspec);
+extern int wldev_set_country(struct net_device *dev, char *country_code);
+extern int net_os_wake_lock(struct net_device *dev);
+extern int net_os_wake_unlock(struct net_device *dev);
+extern int net_os_wake_lock_timeout(struct net_device *dev);
+extern int net_os_wake_lock_timeout_enable(struct net_device *dev);
+extern int net_os_set_dtim_skip(struct net_device *dev, int val);
+extern int net_os_set_suspend_disable(struct net_device *dev, int val);
+extern int net_os_set_suspend(struct net_device *dev, int val);
+extern int wl_iw_parse_ssid_list_tlv(char** list_str, wlc_ssid_t* ssid,
+					int max, int *bytes_left);
+
 /* Get the link speed from dongle, speed is in kpbs */
 int wldev_get_link_speed(struct net_device *dev, int *plink_speed);
 
 int wldev_get_rssi(struct net_device *dev, int *prssi);
 
 int wldev_get_ssid(struct net_device *dev, wlc_ssid_t *pssid);
+
+int wldev_get_band(struct net_device *dev, uint *pband);
+
+int wldev_set_band(struct net_device *dev, uint band);
 
 #endif /* __WLDEV_COMMON_H__ */

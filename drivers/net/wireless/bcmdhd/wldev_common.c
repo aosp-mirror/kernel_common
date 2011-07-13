@@ -288,3 +288,57 @@ int wldev_get_ssid(
 	pssid->SSID_len = dtoh32(pssid->SSID_len);
 	return error;
 }
+
+int wldev_get_band(
+	struct net_device *dev, uint *pband)
+{
+	int error;
+
+	error = wldev_ioctl(dev, WLC_GET_BAND, pband, sizeof(uint), 0);
+	return error;
+}
+
+int wldev_set_band(
+	struct net_device *dev, uint band)
+{
+	int error = -1;
+
+	if ((band == WLC_BAND_AUTO) || (band == WLC_BAND_5G) || (band == WLC_BAND_2G)) {
+		error = wldev_ioctl(dev, WLC_SET_BAND, &band, sizeof(band), 1);
+	}
+	return error;
+}
+
+int wldev_set_country(
+	struct net_device *dev, char *country_code)
+{
+	int error = -1;
+	wl_country_t cspec = {{0}, 0, {0}};
+	scb_val_t scbval;
+	char smbuf[WLC_IOCTL_SMLEN];
+
+	if (!country_code)
+		return error;
+
+	bzero(&scbval, sizeof(scb_val_t));
+	error = wldev_ioctl(dev, WLC_DISASSOC, &scbval, sizeof(scb_val_t), 1);
+	if (error < 0) {
+		DHD_ERROR(("%s: set country failed due to Disassoc error\n", __FUNCTION__));
+		return error;
+	}
+	cspec.rev = -1;
+	memcpy(cspec.country_abbrev, country_code, WLC_CNTRY_BUF_SZ);
+	memcpy(cspec.ccode, country_code, WLC_CNTRY_BUF_SZ);
+	get_customized_country_code((char *)&cspec.country_abbrev, &cspec);
+	error = wldev_iovar_setbuf(dev, "country", &cspec, sizeof(cspec),
+					smbuf, sizeof(smbuf));
+	if (error < 0) {
+		DHD_ERROR(("%s: set country for %s as %s rev %d failed\n",
+			__FUNCTION__, country_code, cspec.ccode, cspec.rev));
+		return error;
+	}
+	dhd_bus_country_set(dev, &cspec);
+	DHD_INFO(("%s: set country for %s as %s rev %d\n",
+		__FUNCTION__, country_code, cspec.ccode, cspec.rev));
+	return 0;
+}
