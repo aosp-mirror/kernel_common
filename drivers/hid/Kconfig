@@ -327,6 +327,7 @@ config HID_MULTITOUCH
 	  - 'Sensing Win7-TwoFinger' panel by GeneralTouch
           - eGalax dual-touch panels, including the
 	    Joojoo and Wetab tablets
+	  - LG Display panels (Dell ST2220Tc)
 
 	  If unsure, say N.
 
