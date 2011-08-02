@@ -967,13 +967,17 @@ dhd_op_if(dhd_if_t *ifp)
 		}
 		if (ret == 0) {
 			strncpy(ifp->net->name, ifp->name, IFNAMSIZ);
-#ifdef WL_CFG80211
-			if (dhd->dhd_state & DHD_ATTACH_STATE_CFG80211)
-				wl_cfg80211_notify_ifadd(ifp->net);
-#endif
-
 			ifp->net->name[IFNAMSIZ - 1] = '\0';
 			memcpy(netdev_priv(ifp->net), &dhd, sizeof(dhd));
+#ifdef WL_CFG80211
+			if (dhd->dhd_state & DHD_ATTACH_STATE_CFG80211)
+				if (!wl_cfg80211_notify_ifadd(ifp->net, ifp->idx, dhd_net_attach)) {
+					ifp->state = 0;
+					return;
+			}
+
+#endif
+
 			if ((err = dhd_net_attach(&dhd->pub, ifp->idx)) != 0) {
 				DHD_ERROR(("%s: dhd_net_attach failed, err %d\n",
 					__FUNCTION__, err));
@@ -2808,7 +2812,7 @@ void aoe_update_host_ipv4_table(dhd_pub_t *dhd_pub, u32 ipa, bool add)
 	/* display what we've got */
 	dhd_arp_get_arp_hostip_table(dhd_pub, ipv4_buf, sizeof(ipv4_buf));
 	DHD_ARPOE(("%s: hostip table read from Dongle:\n", __FUNCTION__));
-	dhd_print_buf(ipv4_buf, 32, 4); /* max 8 IPs 4b each */
+	/* dhd_print_buf(ipv4_buf, 32, 4); */ /* max 8 IPs 4b each */
 
 	/* now we saved hoste_ip table, clr it in the dongle AOE */
 	dhd_aoe_hostip_clr(dhd_pub);
