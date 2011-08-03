@@ -2804,20 +2804,27 @@ int dhd_change_mtu(dhd_pub_t *dhdp, int new_mtu, int ifidx)
 /* add or remove AOE host ip(s) (up to 8 IPs on the interface)  */
 void aoe_update_host_ipv4_table(dhd_pub_t *dhd_pub, u32 ipa, bool add)
 {
-	u32 ipv4_buf[8]; /* temp save for AOE host_ip table */
+	u32 ipv4_buf[MAX_IPV4_ENTRIES]; /* temp save for AOE host_ip table */
 	int i;
+	int ret;
 
 	bzero(ipv4_buf, sizeof(ipv4_buf));
 
 	/* display what we've got */
-	dhd_arp_get_arp_hostip_table(dhd_pub, ipv4_buf, sizeof(ipv4_buf));
+	ret = dhd_arp_get_arp_hostip_table(dhd_pub, ipv4_buf, sizeof(ipv4_buf));
 	DHD_ARPOE(("%s: hostip table read from Dongle:\n", __FUNCTION__));
-	/* dhd_print_buf(ipv4_buf, 32, 4); */ /* max 8 IPs 4b each */
-
+#ifdef AOE_DBG
+	dhd_print_buf(ipv4_buf, 32, 4); /* max 8 IPs 4b each */
+#endif
 	/* now we saved hoste_ip table, clr it in the dongle AOE */
 	dhd_aoe_hostip_clr(dhd_pub);
 
-	for (i = 0; i < 8; i++) {
+	if (ret) {
+		DHD_ERROR(("%s failed\n", __FUNCTION__));
+		return;
+	}
+
+	for (i = 0; i < MAX_IPV4_ENTRIES; i++) {
 
 		if (add && (ipv4_buf[i] == 0)) {
 
@@ -4123,6 +4130,30 @@ int net_os_wake_unlock(struct net_device *dev)
 	return ret;
 }
 
+int dhd_ioctl_entry_local(struct net_device *net, wl_ioctl_t *ioc, int cmd)
+{
+	int ifidx;
+	int ret = 0;
+	dhd_info_t *dhd = NULL;
+
+	if (!net || !netdev_priv(net)) {
+		DHD_ERROR(("%s invalid parameter\n", __FUNCTION__));
+		return -EINVAL;
+	}
+
+	dhd = *(dhd_info_t **)netdev_priv(net);
+	ifidx = dhd_net2idx(dhd, net);
+	if (ifidx == DHD_BAD_IF) {
+		DHD_ERROR(("%s bad ifidx\n", __FUNCTION__));
+		return -ENODEV;
+	}
+
+	DHD_OS_WAKE_LOCK(&dhd->pub);
+	ret = dhd_wl_ioctl(&dhd->pub, ifidx, ioc, ioc->buf, ioc->len);
+	DHD_OS_WAKE_UNLOCK(&dhd->pub);
+
+	return ret;
+}
 
 #ifdef PROP_TXSTATUS
 extern int dhd_wlfc_interface_entry_update(void* state,	ewlfc_mac_entry_action_t action, uint8 ifid,
