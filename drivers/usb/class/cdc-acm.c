@@ -946,7 +946,7 @@ static int acm_probe(struct usb_interface *intf,
 	u8 ac_management_function = 0;
 	u8 call_management_function = 0;
 	int call_interface_num = -1;
-	int data_interface_num;
+	int data_interface_num = -1;
 	unsigned long quirks;
 	int num_rx_buf;
 	int i;
@@ -1030,7 +1030,11 @@ next_desc:
 	if (!union_header) {
 		if (call_interface_num > 0) {
 			dev_dbg(&intf->dev, "No union descriptor, using call management descriptor\n");
-			data_interface = usb_ifnum_to_if(usb_dev, (data_interface_num = call_interface_num));
+			/* quirks for Droids MuIn LCD */
+			if (quirks & NO_DATA_INTERFACE)
+				data_interface = usb_ifnum_to_if(usb_dev, 0);
+			else
+				data_interface = usb_ifnum_to_if(usb_dev, (data_interface_num = call_interface_num));
 			control_interface = intf;
 		} else {
 			if (intf->cur_altsetting->desc.bNumEndpoints != 3) {
@@ -1613,6 +1617,8 @@ static const struct usb_device_id acm_ids[] = {
 	{ NOKIA_PCSUITE_ACM_INFO(0x04ce), }, /* Nokia E90 */
 	{ NOKIA_PCSUITE_ACM_INFO(0x01d4), }, /* Nokia E55 */
 	{ NOKIA_PCSUITE_ACM_INFO(0x0302), }, /* Nokia N8 */
+	{ NOKIA_PCSUITE_ACM_INFO(0x0335), }, /* Nokia E7 */
+	{ NOKIA_PCSUITE_ACM_INFO(0x03cd), }, /* Nokia C7 */
 	{ SAMSUNG_PCSUITE_ACM_INFO(0x6651), }, /* Samsung GTi8510 (INNOV8) */
 
 	/* NOTE: non-Nokia COMM/ACM/0xff is likely MSFT RNDIS... NOT a modem! */
@@ -1620,6 +1626,11 @@ static const struct usb_device_id acm_ids[] = {
 	/* Support Lego NXT using pbLua firmware */
 	{ USB_DEVICE(0x0694, 0xff00),
 	.driver_info = NOT_A_MODEM,
+	},
+
+	/* Support for Droids MuIn LCD */
+	{ USB_DEVICE(0x04d8, 0x000b),
+	.driver_info = NO_DATA_INTERFACE,
 	},
 
 	/* control interfaces without any protocol set */

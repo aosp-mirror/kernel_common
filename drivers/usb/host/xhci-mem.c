@@ -207,14 +207,13 @@ void xhci_free_or_cache_endpoint_ring(struct xhci_hcd *xhci,
 
 	rings_cached = virt_dev->num_rings_cached;
 	if (rings_cached < XHCI_MAX_RINGS_CACHED) {
-		virt_dev->num_rings_cached++;
-		rings_cached = virt_dev->num_rings_cached;
 		virt_dev->ring_cache[rings_cached] =
 			virt_dev->eps[ep_index].ring;
+		virt_dev->num_rings_cached++;
 		xhci_dbg(xhci, "Cached old ring, "
 				"%d ring%s cached\n",
-				rings_cached,
-				(rings_cached > 1) ? "s" : "");
+				virt_dev->num_rings_cached,
+				(virt_dev->num_rings_cached > 1) ? "s" : "");
 	} else {
 		xhci_ring_free(xhci, virt_dev->eps[ep_index].ring);
 		xhci_dbg(xhci, "Ring cache full (%d rings), "
@@ -987,9 +986,19 @@ static unsigned int xhci_parse_exponent_interval(struct usb_device *udev,
 	interval = clamp_val(ep->desc.bInterval, 1, 16) - 1;
 	if (interval != ep->desc.bInterval - 1)
 		dev_warn(&udev->dev,
-			 "ep %#x - rounding interval to %d microframes\n",
+			 "ep %#x - rounding interval to %d %sframes\n",
 			 ep->desc.bEndpointAddress,
-			 1 << interval);
+			 1 << interval,
+			 udev->speed == USB_SPEED_FULL ? "" : "micro");
+
+	if (udev->speed == USB_SPEED_FULL) {
+		/*
+		 * Full speed isoc endpoints specify interval in frames,
+		 * not microframes. We are using microframes everywhere,
+		 * so adjust accordingly.
+		 */
+		interval += 3;	/* 1 frame = 2^3 uframes */
+	}
 
 	return interval;
 }
@@ -1046,12 +1055,12 @@ static unsigned int xhci_get_endpoint_interval(struct usb_device *udev,
 		break;
 
 	case USB_SPEED_FULL:
-		if (usb_endpoint_xfer_int(&ep->desc)) {
+		if (usb_endpoint_xfer_isoc(&ep->desc)) {
 			interval = xhci_parse_exponent_interval(udev, ep);
 			break;
 		}
 		/*
-		 * Fall through for isochronous endpoint interval decoding
+		 * Fall through for interrupt endpoint interval decoding
 		 * since it uses the same rules as low speed interrupt
 		 * endpoints.
 		 */

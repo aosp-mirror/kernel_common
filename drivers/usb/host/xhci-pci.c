@@ -28,6 +28,9 @@
 #define PCI_VENDOR_ID_FRESCO_LOGIC	0x1b73
 #define PCI_DEVICE_ID_FRESCO_LOGIC_PDK	0x1000
 
+#define PCI_VENDOR_ID_ETRON		0x1b6f
+#define PCI_DEVICE_ID_ASROCK_P67	0x7023
+
 static const char hcd_name[] = "xhci_hcd";
 
 /* called after powerup, by probe or system-pm "wakeup" */
@@ -105,12 +108,27 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
 
 	/* Look for vendor-specific quirks */
 	if (pdev->vendor == PCI_VENDOR_ID_FRESCO_LOGIC &&
-			pdev->device == PCI_DEVICE_ID_FRESCO_LOGIC_PDK &&
-			pdev->revision == 0x0) {
+			pdev->device == PCI_DEVICE_ID_FRESCO_LOGIC_PDK) {
+		if (pdev->revision == 0x0) {
 			xhci->quirks |= XHCI_RESET_EP_QUIRK;
 			xhci_dbg(xhci, "QUIRK: Fresco Logic xHC needs configure"
 					" endpoint cmd after reset endpoint\n");
+		}
+		/* Fresco Logic confirms: all revisions of this chip do not
+		 * support MSI, even though some of them claim to in their PCI
+		 * capabilities.
+		 */
+		xhci->quirks |= XHCI_BROKEN_MSI;
+		xhci_dbg(xhci, "QUIRK: Fresco Logic revision %u "
+				"has broken MSI implementation\n",
+				pdev->revision);
 	}
+	if (pdev->vendor == PCI_VENDOR_ID_ETRON &&
+			pdev->device == PCI_DEVICE_ID_ASROCK_P67) {
+		xhci->quirks |= XHCI_RESET_ON_RESUME;
+		xhci_dbg(xhci, "QUIRK: Resetting on resume\n");
+	}
+
 	if (pdev->vendor == PCI_VENDOR_ID_NEC)
 		xhci->quirks |= XHCI_NEC_HOST;
 

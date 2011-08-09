@@ -430,12 +430,19 @@ int xhci_run(struct usb_hcd *hcd)
 		free_irq(hcd->irq, hcd);
 	hcd->irq = -1;
 
+	/* Some Fresco Logic host controllers advertise MSI, but fail to
+	 * generate interrupts.  Don't even try to enable MSI.
+	 */
+	if (xhci->quirks & XHCI_BROKEN_MSI)
+		goto legacy_irq;
+
 	ret = xhci_setup_msix(xhci);
 	if (ret)
 		/* fall back to msi*/
 		ret = xhci_setup_msi(xhci);
 
 	if (ret) {
+legacy_irq:
 		/* fall back to legacy interrupt*/
 		ret = request_irq(pdev->irq, &usb_hcd_irq, IRQF_SHARED,
 					hcd->irq_descr, hcd);
@@ -752,6 +759,8 @@ int xhci_resume(struct xhci_hcd *xhci, bool hibernated)
 		msleep(100);
 
 	spin_lock_irq(&xhci->lock);
+	if (xhci->quirks & XHCI_RESET_ON_RESUME)
+		hibernated = true;
 
 	if (!hibernated) {
 		/* step 1: restore register */
@@ -1389,6 +1398,7 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 	u32 added_ctxs;
 	unsigned int last_ctx;
 	u32 new_add_flags, new_drop_flags, new_slot_info;
+	struct xhci_virt_device *virt_dev;
 	int ret = 0;
 
 	ret = xhci_check_args(hcd, udev, ep, 1, true, __func__);
@@ -1411,11 +1421,25 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		return 0;
 	}
 
-	in_ctx = xhci->devs[udev->slot_id]->in_ctx;
-	out_ctx = xhci->devs[udev->slot_id]->out_ctx;
+	virt_dev = xhci->devs[udev->slot_id];
+	in_ctx = virt_dev->in_ctx;
+	out_ctx = virt_dev->out_ctx;
 	ctrl_ctx = xhci_get_input_control_ctx(xhci, in_ctx);
 	ep_index = xhci_get_endpoint_index(&ep->desc);
 	ep_ctx = xhci_get_ep_ctx(xhci, out_ctx, ep_index);
+
+	/* If this endpoint is already in use, and the upper layers are trying
+	 * to add it again without dropping it, reject the addition.
+	 */
+	if (virt_dev->eps[ep_index].ring &&
+			!(le32_to_cpu(ctrl_ctx->drop_flags) &
+				xhci_get_endpoint_flag(&ep->desc))) {
+		xhci_warn(xhci, "Trying to add endpoint 0x%x "
+				"without dropping it.\n",
+				(unsigned int) ep->desc.bEndpointAddress);
+		return -EINVAL;
+	}
+
 	/* If the HCD has already noted the endpoint is enabled,
 	 * ignore this request.
 	 */
@@ -1430,8 +1454,7 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 	 * process context, not interrupt context (or so documenation
 	 * for usb_set_interface() and usb_set_configuration() claim).
 	 */
-	if (xhci_endpoint_init(xhci, xhci->devs[udev->slot_id],
-				udev, ep, GFP_NOIO) < 0) {
+	if (xhci_endpoint_init(xhci, virt_dev, udev, ep, GFP_NOIO) < 0) {
 		dev_dbg(&udev->dev, "%s - could not initialize ep %#x\n",
 				__func__, ep->desc.bEndpointAddress);
 		return -ENOMEM;
@@ -1692,8 +1715,17 @@ int xhci_check_bandwidth(struct usb_hcd *hcd, struct usb_device *udev)
 	xhci_dbg_ctx(xhci, virt_dev->out_ctx,
 			LAST_CTX_TO_EP_NUM(slot_ctx->dev_info));
 
+	/* Free any rings that were dropped, but not changed. */
+	for (i = 1; i < 31; ++i) {
+		if ((ctrl_ctx->drop_flags & (1 << (i + 1))) &&
+				!(ctrl_ctx->add_flags & (1 << (i + 1))))
+			xhci_free_or_cache_endpoint_ring(xhci, virt_dev, i);
+	}
 	xhci_zero_in_ctx(xhci, virt_dev);
-	/* Install new rings and free or cache any old rings */
+	/*
+	 * Install any rings for completely new endpoints or changed endpoints,
+	 * and free or cache any old rings from changed endpoints.
+	 */
 	for (i = 1; i < 31; ++i) {
 		if (!virt_dev->eps[i].new_ring)
 			continue;
@@ -2275,6 +2307,7 @@ int xhci_discover_or_reset_device(struct usb_hcd *hcd, struct usb_device *udev)
 	struct xhci_command *reset_device_cmd;
 	int timeleft;
 	int last_freed_endpoint;
+	struct xhci_slot_ctx *slot_ctx;
 
 	ret = xhci_check_args(hcd, udev, NULL, 0, false, __func__);
 	if (ret <= 0)
@@ -2306,6 +2339,12 @@ int xhci_discover_or_reset_device(struct usb_hcd *hcd, struct usb_device *udev)
 		else
 			return -EINVAL;
 	}
+
+	/* If device is not setup, there is no point in resetting it */
+	slot_ctx = xhci_get_slot_ctx(xhci, virt_dev->out_ctx);
+	if (GET_SLOT_STATE(le32_to_cpu(slot_ctx->dev_state)) ==
+						SLOT_STATE_DISABLED)
+		return 0;
 
 	xhci_dbg(xhci, "Resetting device with slot ID %u\n", slot_id);
 	/* Allocate the command structure that holds the struct completion.

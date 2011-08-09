@@ -572,6 +572,12 @@ static void rv770_program_channel_remap(struct radeon_device *rdev)
 	else
 		tcp_chan_steer = 0x00fac688;
 
+	/* RV770 CE has special chremap setup */
+	if (rdev->pdev->device == 0x944e) {
+		tcp_chan_steer = 0x00b08b08;
+		mc_shared_chremap = 0x00b08b08;
+	}
+
 	WREG32(TCP_CHAN_STEER, tcp_chan_steer);
 	WREG32(MC_SHARED_CHREMAP, mc_shared_chremap);
 }
@@ -1359,6 +1365,7 @@ void rv770_fini(struct radeon_device *rdev)
 	r700_cp_fini(rdev);
 	r600_irq_fini(rdev);
 	radeon_wb_fini(rdev);
+	radeon_ib_pool_fini(rdev);
 	radeon_irq_kms_fini(rdev);
 	rv770_pcie_gart_fini(rdev);
 	rv770_vram_scratch_fini(rdev);
