@@ -115,6 +115,20 @@ static unsigned long ftrace_gen_branch(unsigned long pc, unsigned long addr,
 }
 #endif
 
+int ftrace_arch_code_modify_prepare(void)
+{
+	set_kernel_text_rw();
+	set_all_modules_text_rw();
+	return 0;
+}
+
+int ftrace_arch_code_modify_post_process(void)
+{
+	set_all_modules_text_ro();
+	set_kernel_text_ro();
+	return 0;
+}
+
 static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
 {
 	return ftrace_gen_branch(pc, addr, true);
