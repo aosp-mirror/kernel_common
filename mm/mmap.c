@@ -1343,7 +1343,8 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 			if (path_noexec(&file->f_path)) {
 				if (vm_flags & VM_EXEC)
 					return -EPERM;
-				vm_flags &= ~VM_MAYEXEC;
+				if (sysctl_mmap_noexec_taint)
+					vm_flags &= ~VM_MAYEXEC;
 			}
 
 			if (!file->f_op->mmap)
