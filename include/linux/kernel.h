@@ -768,4 +768,7 @@ struct sysinfo {
 	char _f[20-2*sizeof(long)-sizeof(int)];	/* Padding: libc5 uses this.. */
 };
 
+/* To identify board information in panic logs, set this */
+extern char *mach_panic_string;
+
 #endif
