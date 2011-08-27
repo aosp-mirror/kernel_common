@@ -9,3 +9,6 @@ obj-$(CONFIG_ANDROID_LOW_MEMORY_KILLER)	+= lowmemorykiller.o
 obj-$(CONFIG_ANDROID_PMEM)		+= pmem.o
 obj-$(CONFIG_ANDROID_SWITCH)		+= switch/
 obj-$(CONFIG_ANDROID_INTF_ALARM_DEV)	+= alarm-dev.o
+obj-$(CONFIG_PERSISTENT_TRACER)		+= trace_persistent.o
+
+CFLAGS_REMOVE_trace_persistent.o = -pg
