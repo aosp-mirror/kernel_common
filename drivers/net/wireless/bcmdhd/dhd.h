@@ -52,6 +52,9 @@
 #include <linux/wakelock.h>
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
 /* The kernel threading is sdio-specific */
+struct task_struct;
+struct sched_param;
+int setScheduler(struct task_struct *p, int policy, struct sched_param *param);
 
 #define ALL_INTERFACES	0xff
 
@@ -114,6 +117,10 @@ void dhd_os_prefree(void *osh, void *addr, uint size);
 
 #endif /* defined(DHD_USE_STATIC_BUF) */
 
+/* Packet alignment for most efficient SDIO (can change based on platform) */
+#ifndef DHD_SDALIGN
+#define DHD_SDALIGN	32
+#endif
 /* Common structure for module and instance linkage */
 typedef struct dhd_pub {
 	/* Linkage ponters */
@@ -262,7 +269,7 @@ void dhd_os_spin_unlock(dhd_pub_t *pub, unsigned long flags);
 extern int dhd_os_wake_lock(dhd_pub_t *pub);
 extern int dhd_os_wake_unlock(dhd_pub_t *pub);
 extern int dhd_os_wake_lock_timeout(dhd_pub_t *pub);
-extern int dhd_os_wake_lock_timeout_enable(dhd_pub_t *pub);
+extern int dhd_os_wake_lock_timeout_enable(dhd_pub_t *pub, int val);
 
 inline static void MUTEX_LOCK_SOFTAP_SET_INIT(dhd_pub_t * dhdp)
 {
@@ -288,8 +295,9 @@ inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
 #define DHD_OS_WAKE_LOCK(pub) 			dhd_os_wake_lock(pub)
 #define DHD_OS_WAKE_UNLOCK(pub) 		dhd_os_wake_unlock(pub)
 #define DHD_OS_WAKE_LOCK_TIMEOUT(pub)		dhd_os_wake_lock_timeout(pub)
-#define DHD_OS_WAKE_LOCK_TIMEOUT_ENABLE(pub)	dhd_os_wake_lock_timeout_enable(pub)
-
+#define DHD_OS_WAKE_LOCK_TIMEOUT_ENABLE(pub, val)	dhd_os_wake_lock_timeout_enable(pub, val)
+#define DHD_PACKET_TIMEOUT	1
+#define DHD_EVENT_TIMEOUT	2
 
 /* interface operations (register, remove) should be atomic, use this lock to prevent race
  * condition among wifi on/off and interface operation functions
@@ -413,12 +421,6 @@ extern int dhd_customer_oob_irq_map(unsigned long *irq_flags_ptr);
 extern void dhd_os_sdtxlock(dhd_pub_t * pub);
 extern void dhd_os_sdtxunlock(dhd_pub_t * pub);
 
-#if defined(DHDTHREAD)
-struct task_struct;
-struct sched_param;
-int setScheduler(struct task_struct *p, int policy, struct sched_param *param);
-#endif /* DHDTHREAD && DHD_GPL */
-
 typedef struct {
 	uint32 limit;		/* Expiration time (usec) */
 	uint32 increment;	/* Current expiration increment (usec) */
@@ -466,6 +468,14 @@ extern uint dhd_bus_status(dhd_pub_t *dhdp);
 extern int  dhd_bus_start(dhd_pub_t *dhdp);
 extern int dhd_bus_membytes(dhd_pub_t *dhdp, bool set, uint32 address, uint8 *data, uint size);
 extern void dhd_print_buf(void *pbuf, int len, int bytes_per_line);
+#if defined(KEEP_ALIVE)
+extern int dhd_keep_alive_onoff(dhd_pub_t *dhd);
+#endif /* KEEP_ALIVE */
+
+#ifdef ARP_OFFLOAD_SUPPORT
+extern void dhd_arp_offload_set(dhd_pub_t * dhd, int arp_mode);
+extern void dhd_arp_offload_enable(dhd_pub_t * dhd, int arp_enable);
+#endif /* ARP_OFFLOAD_SUPPORT */
 
 
 typedef enum cust_gpio_modes {
