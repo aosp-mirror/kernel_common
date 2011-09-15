@@ -89,6 +89,7 @@ typedef struct histo_ {
 #if !ISPOWEROF2(DHD_SDALIGN)
 #error DHD_SDALIGN is not a power of 2!
 #endif
+
 static histo_t vi_d1, vi_d2, vi_d3, vi_d4;
 #endif /* WLMEDIA_HTSF */
 
@@ -1412,7 +1413,6 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 			continue;
 		}
 
-
 		pnext = PKTNEXT(dhdp->osh, pktbuf);
 		PKTSETNEXT(wl->sh.osh, pktbuf, NULL);
 
@@ -2000,6 +2000,14 @@ dhd_ioctl_entry(struct net_device *net, struct ifreq *ifr, int cmd)
 
 	DHD_OS_WAKE_LOCK(&dhd->pub);
 
+	/* send to dongle only if we are not waiting for reload already */
+	if (dhd->pub.hang_was_sent) {
+		DHD_ERROR(("%s: HANG was sent up earlier\n", __FUNCTION__));
+		DHD_OS_WAKE_LOCK_TIMEOUT_ENABLE(&dhd->pub, DHD_EVENT_TIMEOUT);
+		DHD_OS_WAKE_UNLOCK(&dhd->pub);
+		return OSL_ERROR(BCME_DONGLE_DOWN);
+	}
+
 	ifidx = dhd_net2idx(dhd, net);
 	DHD_TRACE(("%s: ifidx %d, cmd 0x%04x\n", __FUNCTION__, ifidx, cmd));
 
@@ -2075,14 +2083,6 @@ dhd_ioctl_entry(struct net_device *net, struct ifreq *ifr, int cmd)
 
 	if (!capable(CAP_NET_ADMIN)) {
 		bcmerror = -BCME_EPERM;
-		goto done;
-	}
-
-	/* send to dongle only if we are not waiting for reload already */
-	if (dhd->pub.hang_was_sent) {
-		DHD_ERROR(("%s: HANG was sent up earlier. Not talking to the chip\n",
-			__FUNCTION__));
-		bcmerror = BCME_DONGLE_DOWN;
 		goto done;
 	}
 
@@ -2192,6 +2192,7 @@ done:
 	return OSL_ERROR(bcmerror);
 }
 
+#ifdef WL_CFG80211
 static int
 dhd_cleanup_virt_ifaces(dhd_info_t *dhd)
 {
@@ -2226,6 +2227,7 @@ dhd_cleanup_virt_ifaces(dhd_info_t *dhd)
 
 	return 0;
 }
+#endif /* WL_CFG80211 */
 
 static int
 dhd_stop(struct net_device *net)
@@ -2267,7 +2269,7 @@ dhd_stop(struct net_device *net)
 	if (ifidx == 0)
 		wl_android_wifi_off(net);
 #endif
-
+	dhd->pub.hang_was_sent = 0;
 	OLD_MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -2317,7 +2319,6 @@ dhd_open(struct net_device *net)
 #if defined(WL_CFG80211)
 		DHD_ERROR(("\n%s\n", dhd_version));
 		wl_android_wifi_on(net);
-		dhd->pub.hang_was_sent = 0;
 #endif
 
 		if (dhd->pub.busstate != DHD_BUS_DATA) {
@@ -2667,7 +2668,9 @@ dhd_bus_start(dhd_pub_t *dhdp)
 
 	DHD_TRACE(("Enter %s:\n", __FUNCTION__));
 
+#ifdef DHDTHREAD
 	dhd_os_sdlock(dhdp);
+#endif /* DHDTHREAD */
 
 	/* try to download image and nvram to the dongle */
 	if  ((dhd->pub.busstate == DHD_BUS_DOWN) &&
@@ -2678,12 +2681,16 @@ dhd_bus_start(dhd_pub_t *dhdp)
 		                                fw_path, nv_path))) {
 			DHD_ERROR(("%s: dhdsdio_probe_download failed. firmware = %s nvram = %s\n",
 			           __FUNCTION__, fw_path, nv_path));
+#ifdef DHDTHREAD
 			dhd_os_sdunlock(dhdp);
+#endif /* DHDTHREAD */
 			return -1;
 		}
 	}
 	if (dhd->pub.busstate != DHD_BUS_LOAD) {
+#ifdef DHDTHREAD
 		dhd_os_sdunlock(dhdp);
+#endif /* DHDTHREAD */
 		return -ENETDOWN;
 	}
 
@@ -2693,21 +2700,27 @@ dhd_bus_start(dhd_pub_t *dhdp)
 
 	/* Bring up the bus */
 	if ((ret = dhd_bus_init(&dhd->pub, FALSE)) != 0) {
+
 		DHD_ERROR(("%s, dhd_bus_init failed %d\n", __FUNCTION__, ret));
+#ifdef DHDTHREAD
 		dhd_os_sdunlock(dhdp);
+#endif /* DHDTHREAD */
 		return ret;
 	}
 #if defined(OOB_INTR_ONLY)
 	/* Host registration for OOB interrupt */
 	if (bcmsdh_register_oob_intr(dhdp)) {
 		/* deactivate timer and wait for the handler to finish */
+
 		flags = dhd_os_spin_lock(&dhd->pub);
 		dhd->wd_timer_valid = FALSE;
 		dhd_os_spin_unlock(&dhd->pub, flags);
 		del_timer_sync(&dhd->timer);
 
 		DHD_ERROR(("%s Host failed to register for OOB\n", __FUNCTION__));
+#ifdef DHDTHREAD
 		dhd_os_sdunlock(dhdp);
+#endif /* DHDTHREAD */
 		return -ENODEV;
 	}
 
@@ -2722,11 +2735,15 @@ dhd_bus_start(dhd_pub_t *dhdp)
 		dhd_os_spin_unlock(&dhd->pub, flags);
 		del_timer_sync(&dhd->timer);
 		DHD_ERROR(("%s failed bus is not ready\n", __FUNCTION__));
+#ifdef DHDTHREAD
 		dhd_os_sdunlock(dhdp);
+#endif /* DHDTHREAD */
 		return -ENODEV;
 	}
 
+#ifdef DHDTHREAD
 	dhd_os_sdunlock(dhdp);
+#endif /* DHDTHREAD */
 
 #ifdef READ_MACADDR
 	dhd_read_macaddr(dhd);
@@ -2961,6 +2978,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	setbit(eventmask, WLC_E_AUTH);
 	setbit(eventmask, WLC_E_REASSOC);
 	setbit(eventmask, WLC_E_REASSOC_IND);
+	setbit(eventmask, WLC_E_DEAUTH);
 	setbit(eventmask, WLC_E_DEAUTH_IND);
 	setbit(eventmask, WLC_E_DISASSOC_IND);
 	setbit(eventmask, WLC_E_DISASSOC);
@@ -3196,6 +3214,12 @@ static int dhd_device_event(struct notifier_block *this,
 			DHD_ARPOE(("%s: [%s] Up IP: 0x%x\n",
 				__FUNCTION__, ifa->ifa_label, ifa->ifa_address));
 
+			/* firmware not downloaded, do nothing */
+			if (dhd->pub.busstate == DHD_BUS_DOWN) {
+				DHD_ERROR(("%s: bus is down, exit\n", __FUNCTION__));
+				break;
+			}
+
 #ifdef AOE_IP_ALIAS_SUPPORT
 			if (ifa->ifa_label[strlen(ifa->ifa_label)-2] == 0x3a) {
 				DHD_ARPOE(("%s:add aliased IP to AOE hostip cache\n",
@@ -3416,10 +3440,16 @@ void dhd_detach(dhd_pub_t *dhdp)
 
 	/* delete all interfaces, start with virtual  */
 	if (dhd->dhd_state & DHD_ATTACH_STATE_ADD_IF) {
+		int i = 1;
 		dhd_if_t *ifp;
 
-		/* Cleanup all virtual Interfaces */
-		dhd_cleanup_virt_ifaces(dhd);
+		/* Cleanup virtual interfaces */
+		for (i = 1; i < DHD_MAX_IFS; i++)
+			if (dhd->iflist[i]) {
+				dhd->iflist[i]->state = WLC_E_IF_DEL;
+				dhd->iflist[i]->idx = i;
+				dhd_op_if(dhd->iflist[i]);
+			}
 
 		/*  delete primary interface 0 */
 		ifp = dhd->iflist[0];
@@ -4349,7 +4379,7 @@ int dhd_os_wake_lock_timeout(dhd_pub_t *pub)
 #ifdef CONFIG_HAS_WAKELOCK
 		if (dhd->wakelock_timeout_enable)
 			wake_lock_timeout(&dhd->wl_rxwake,
-					  dhd->wakelock_timeout_enable * HZ);
+				dhd->wakelock_timeout_enable * HZ);
 #endif
 		dhd->wakelock_timeout_enable = 0;
 		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
