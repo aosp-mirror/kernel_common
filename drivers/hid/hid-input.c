@@ -1206,7 +1206,7 @@ int hidinput_connect(struct hid_device *hid, unsigned int force)
 		goto out_unwind;
 	}
 
-	if (hid->driver->input_register &&
+	if (hidinput && hid->driver->input_register &&
 			hid->driver->input_register(hid, hidinput))
 		goto out_cleanup;
 
