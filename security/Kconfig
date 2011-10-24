@@ -194,11 +194,13 @@ source "security/yama/Kconfig"
 source "security/safesetid/Kconfig"
 source "security/lockdown/Kconfig"
 source "security/landlock/Kconfig"
+source "security/chromiumos/Kconfig"
 
 source "security/integrity/Kconfig"
 
 choice
 	prompt "First legacy 'major LSM' to be initialized"
+	default DEFAULT_SECURITY_CHROMIUMOS if SECURITY_CHROMIUMOS
 	default DEFAULT_SECURITY_SELINUX if SECURITY_SELINUX
 	default DEFAULT_SECURITY_SMACK if SECURITY_SMACK
 	default DEFAULT_SECURITY_TOMOYO if SECURITY_TOMOYO
@@ -213,6 +215,9 @@ choice
 
 	  Selects the legacy "major security module" that will be
 	  initialized first. Overridden by non-default CONFIG_LSM.
+
+	config DEFAULT_SECURITY_CHROMIUMOS
+		bool "Chromium OS" if SECURITY_CHROMIUMOS=y
 
 	config DEFAULT_SECURITY_SELINUX
 		bool "SELinux" if SECURITY_SELINUX=y
@@ -237,6 +242,7 @@ config LSM
 	default "landlock,lockdown,yama,loadpin,safesetid,apparmor,selinux,smack,tomoyo,bpf" if DEFAULT_SECURITY_APPARMOR
 	default "landlock,lockdown,yama,loadpin,safesetid,tomoyo,bpf" if DEFAULT_SECURITY_TOMOYO
 	default "landlock,lockdown,yama,loadpin,safesetid,bpf" if DEFAULT_SECURITY_DAC
+	default "landlock,lockdown,yama,loadpin,safesetid,chromiumos,selinux,bpf" if DEFAULT_SECURITY_CHROMIUMOS
 	default "landlock,lockdown,yama,loadpin,safesetid,selinux,smack,tomoyo,apparmor,bpf"
 	help
 	  A comma-separated list of LSMs, in initialization order.

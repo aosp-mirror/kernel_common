@@ -133,7 +133,7 @@ struct keyring_index_key {
 
 union key_payload {
 	void __rcu		*rcu_data0;
-	void			*data[4];
+	void			*data[5];
 };
 
 /*****************************************************************************/

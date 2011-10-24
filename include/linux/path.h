@@ -5,9 +5,14 @@
 struct dentry;
 struct vfsmount;
 
+#define PATH_LINK_COUNT_VALID 0x80000000
+
 struct path {
 	struct vfsmount *mnt;
 	struct dentry *dentry;
+#ifdef CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
+	int link_count;
+#endif /* CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT */
 } __randomize_layout;
 
 extern void path_get(const struct path *);
