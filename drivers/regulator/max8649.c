@@ -68,14 +68,19 @@ static inline int max8649_read_device(struct i2c_client *i2c,
 {
 	unsigned char data;
 	int ret;
+	struct i2c_msg msgs[] = {
+		{.addr = i2c->addr, .flags = 0, .len = 1, .buf = &data },
+		{.addr = i2c->addr, .flags = I2C_M_RD, .len = bytes, .buf = dest},
+	};
 
 	data = (unsigned char)reg;
-	ret = i2c_master_send(i2c, &data, 1);
+
+	ret = i2c_transfer(i2c->adapter, msgs, 2);
 	if (ret < 0)
 		return ret;
-	ret = i2c_master_recv(i2c, dest, bytes);
-	if (ret < 0)
-		return ret;
+	if (ret < 2)
+		return -EIO;
+
 	return 0;
 }
 
