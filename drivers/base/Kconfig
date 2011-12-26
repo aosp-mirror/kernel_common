@@ -177,6 +177,16 @@ config SYNC
 	  drivers.  Sync implementations can take advantage of hardware
 	  synchronization built into devices like GPUs.
 
+config DMA_SHARED_BUFFER
+	bool "Buffer framework to be shared between drivers"
+	default n
+	select ANON_INODES
+	help
+	  This option enables the framework for buffer-sharing between
+	  multiple drivers. A buffer is associated with a file using driver
+	  APIs extension; the file's descriptor can then be passed on to other
+	  driver.
+
 config SW_SYNC
 	bool "Software synchronization objects"
 	default n
