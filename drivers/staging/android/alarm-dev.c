@@ -21,7 +21,6 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <linux/sysdev.h>
 #include <linux/uaccess.h>
 #include <linux/alarmtimer.h>
 #include "android_alarm.h"
