@@ -29,11 +29,6 @@ config ANDROID_RAM_CONSOLE
 	bool "Android RAM buffer console"
 	default n
 
-config ANDROID_RAM_CONSOLE_ENABLE_VERBOSE
-	bool "Enable verbose console messages on Android RAM console"
-	default y
-	depends on ANDROID_RAM_CONSOLE
-
 menuconfig ANDROID_RAM_CONSOLE_ERROR_CORRECTION
 	bool "Android RAM Console Enable error correction"
 	default n
