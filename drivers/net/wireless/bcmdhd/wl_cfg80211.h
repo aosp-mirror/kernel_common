@@ -442,6 +442,10 @@ struct wl_priv {
 	bool p2p_supported;
 	struct btcoex_info *btcoex_info;
 	struct timer_list scan_timeout;   /* Timer for catch scan event timeout */
+#ifdef WL_SCHED_SCAN
+	struct cfg80211_sched_scan_request *sched_scan_req;	/* scheduled scan req */
+#endif /* WL_SCHED_SCAN */
+	bool sched_scan_running;	/* scheduled scan req status */
 };
 
 static inline struct wl_bss_info *next_bss(struct wl_scan_results *list, struct wl_bss_info *bss)
@@ -654,9 +658,5 @@ extern int wl_cfg80211_hang(struct net_device *dev, u16 reason);
 extern s32 wl_mode_to_nl80211_iftype(s32 mode);
 int wl_cfg80211_do_driver_init(struct net_device *net);
 void wl_cfg80211_enable_trace(int level);
-
-/* do scan abort */
-extern s32 wl_cfg80211_scan_abort(struct wl_priv *wl, struct net_device *ndev);
-
 extern s32 wl_cfg80211_if_is_group_owner(void);
 #endif				/* _wl_cfg80211_h_ */
