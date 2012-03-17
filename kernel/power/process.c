@@ -118,8 +118,7 @@ static int try_to_freeze_tasks(bool user_only)
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
 			if (!wakeup && !freezer_should_skip(p) &&
-			    p != current && freezing(p) && !frozen(p) &&
-			    elapsed_csecs > 100)
+			    p != current && freezing(p) && !frozen(p))
 				sched_show_task(p);
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
