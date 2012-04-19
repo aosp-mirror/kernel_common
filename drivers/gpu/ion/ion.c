@@ -407,7 +407,7 @@ void ion_free(struct ion_client *client, struct ion_handle *handle)
 	mutex_unlock(&client->lock);
 
 	if (!valid_handle) {
-		WARN("%s: invalid handle passed to free.\n", __func__);
+		WARN(1, "%s: invalid handle passed to free.\n", __func__);
 		return;
 	}
 	ion_handle_put(handle);
@@ -905,7 +905,7 @@ int ion_share_dma_buf(struct ion_client *client, struct ion_handle *handle)
 	valid_handle = ion_handle_validate(client, handle);
 	mutex_unlock(&client->lock);
 	if (!valid_handle) {
-		WARN("%s: invalid handle passed to share.\n", __func__);
+		WARN(1, "%s: invalid handle passed to share.\n", __func__);
 		return -EINVAL;
 	}
 
