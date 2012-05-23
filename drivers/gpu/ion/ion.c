@@ -615,8 +615,8 @@ void ion_client_destroy(struct ion_client *client)
 	kfree(client);
 }
 
-struct sg_table *ion_map_dma(struct ion_client *client,
-			     struct ion_handle *handle)
+struct sg_table *ion_sg_table(struct ion_client *client,
+			      struct ion_handle *handle)
 {
 	struct ion_buffer *buffer;
 	struct sg_table *table;
@@ -632,10 +632,6 @@ struct sg_table *ion_map_dma(struct ion_client *client,
 	table = buffer->sg_table;
 	mutex_unlock(&client->lock);
 	return table;
-}
-
-void ion_unmap_dma(struct ion_client *client, struct ion_handle *handle)
-{
 }
 
 static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
