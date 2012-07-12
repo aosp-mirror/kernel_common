@@ -136,6 +136,12 @@ do {									\
 
 #define WL_INVALID 		-1
 
+
+/* Bring down SCB Timeout to 20secs from 60secs default */
+#ifndef WL_SCB_TIMEOUT
+#define WL_SCB_TIMEOUT 20
+#endif
+
 /* driver status */
 enum wl_status {
 	WL_STATUS_READY = 0,
@@ -450,6 +456,7 @@ struct wl_priv {
 	bool sched_scan_running;	/* scheduled scan req status */
 	u16 hostapd_chan;            /* remember chan requested by framework for hostapd  */
 	u16 deauth_reason;           /* Place holder to save deauth/disassoc reasons */
+	u16 scan_busy_count;
 };
 
 static inline struct wl_bss_info *next_bss(struct wl_scan_results *list, struct wl_bss_info *bss)
@@ -662,5 +669,6 @@ extern int wl_cfg80211_hang(struct net_device *dev, u16 reason);
 extern s32 wl_mode_to_nl80211_iftype(s32 mode);
 int wl_cfg80211_do_driver_init(struct net_device *net);
 void wl_cfg80211_enable_trace(int level);
+extern s32 wl_update_wiphybands(struct wl_priv *wl);
 extern s32 wl_cfg80211_if_is_group_owner(void);
 #endif				/* _wl_cfg80211_h_ */
