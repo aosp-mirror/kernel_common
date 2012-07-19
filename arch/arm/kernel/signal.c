@@ -588,12 +588,13 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
  * the kernel can handle, and then we build all the user-level signal handling
  * stack-frames in one go after that.
  */
-static void do_signal(struct pt_regs *regs, int syscall)
+static int do_signal(struct pt_regs *regs, int syscall)
 {
 	unsigned int retval = 0, continue_addr = 0, restart_addr = 0;
 	struct k_sigaction ka;
 	siginfo_t info;
 	int signr;
+	int restart = 0;
 
 	/*
 	 * If we were from a system call, check for system call restarting...
@@ -608,10 +609,12 @@ static void do_signal(struct pt_regs *regs, int syscall)
 		 * debugger will see the already changed PSW.
 		 */
 		switch (retval) {
+		case -ERESTART_RESTARTBLOCK:
+			restart++;
 		case -ERESTARTNOHAND:
 		case -ERESTARTSYS:
 		case -ERESTARTNOINTR:
-		case -ERESTART_RESTARTBLOCK:
+			restart++;
 			regs->ARM_r0 = regs->ARM_ORIG_r0;
 			regs->ARM_pc = restart_addr;
 			break;
@@ -623,15 +626,17 @@ static void do_signal(struct pt_regs *regs, int syscall)
 	 * point the debugger may change all our registers ...
 	 */
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+	/*
+	 * Depending on the signal settings we may need to revert the
+	 * decision to restart the system call.  But skip this if a
+	 * debugger has chosen to restart at a different PC.
+	 */
+	if (regs->ARM_pc != restart_addr)
+		restart = 0;
 	if (signr > 0) {
 		sigset_t *oldset;
 
-		/*
-		 * Depending on the signal settings we may need to revert the
-		 * decision to restart the system call.  But skip this if a
-		 * debugger has chosen to restart at a different PC.
-		 */
-		if (regs->ARM_pc == restart_addr) {
+		if (unlikely(restart)) {
 			if (retval == -ERESTARTNOHAND ||
 			    retval == -ERESTART_RESTARTBLOCK
 			    || (retval == -ERESTARTSYS
@@ -639,7 +644,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
 				regs->ARM_r0 = -EINTR;
 				regs->ARM_pc = continue_addr;
 			}
-			clear_thread_flag(TIF_SYSCALL_RESTARTSYS);
 		}
 
 		if (test_thread_flag(TIF_RESTORE_SIGMASK))
@@ -656,18 +660,13 @@ static void do_signal(struct pt_regs *regs, int syscall)
 			if (test_thread_flag(TIF_RESTORE_SIGMASK))
 				clear_thread_flag(TIF_RESTORE_SIGMASK);
 		}
-		return;
+		return 0;
 	}
 
-	if (syscall) {
-		/*
-		 * Handle restarting a different system call.  As above,
-		 * if a debugger has chosen to restart at a different PC,
-		 * ignore the restart.
-		 */
-		if (retval == -ERESTART_RESTARTBLOCK
-		    && regs->ARM_pc == restart_addr)
+	if (unlikely(restart)) {
+		if (restart > 1)
 			set_thread_flag(TIF_SYSCALL_RESTARTSYS);
+		regs->ARM_pc = continue_addr;
 	}
 
 	/* If there's no signal to deliver, we just put the saved sigmask
@@ -675,9 +674,10 @@ static void do_signal(struct pt_regs *regs, int syscall)
 	 */
 	if (test_and_clear_thread_flag(TIF_RESTORE_SIGMASK))
 		set_current_blocked(&current->saved_sigmask);
+	return restart;
 }
 
-asmlinkage void
+asmlinkage int
 do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
 {
 	do {
@@ -685,10 +685,17 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
 			schedule();
 		} else {
 			if (unlikely(!user_mode(regs)))
-				return;
+				return 0;
 			local_irq_enable();
 			if (thread_flags & _TIF_SIGPENDING) {
-				do_signal(regs, syscall);
+				if (unlikely(do_signal(regs, syscall))) {
+					/*
+					 * Restart without handlers.
+					 * Deal with it without leaving
+					 * the kernel space.
+					 */
+					return 1;
+				}
 				syscall = 0;
 			} else {
 				clear_thread_flag(TIF_NOTIFY_RESUME);
@@ -700,4 +707,5 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
 		local_irq_disable();
 		thread_flags = current_thread_info()->flags;
 	} while (thread_flags & _TIF_WORK_MASK);
+	return 0;
 }
