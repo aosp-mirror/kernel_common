@@ -2112,6 +2112,16 @@ static int zram_open(struct gendisk *disk, blk_mode_t mode)
 
 	WARN_ON(!mutex_is_locked(&disk->open_mutex));
 
+	/*
+	 * Chromium OS specific behavior:
+	 * sys_swapon opens the device once to populate its swapinfo->swap_file
+	 * and once when it claims the block device (blkdev_get).  By limiting
+	 * the maximum number of opens to 2, we ensure there are no prior open
+	 * references before swap is enabled.
+	 */
+	if (disk_openers(disk) > 1)
+		return -EBUSY;
+
 	/* zram was claimed to reset so open request fails */
 	if (zram->claim)
 		return -EBUSY;
