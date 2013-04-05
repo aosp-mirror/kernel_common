@@ -125,14 +125,8 @@ struct cpufreq_governor cpufreq_gov_interactive = {
 static void cpufreq_interactive_timer_resched(
 	struct cpufreq_interactive_cpuinfo *pcpu)
 {
-	unsigned long expires = jiffies + usecs_to_jiffies(timer_rate);
+	unsigned long expires;
 	unsigned long flags;
-
-	mod_timer_pinned(&pcpu->cpu_timer, expires);
-	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
-		expires += usecs_to_jiffies(timer_slack_val);
-		mod_timer_pinned(&pcpu->cpu_slack_timer, expires);
-	}
 
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->time_in_idle =
@@ -140,6 +134,14 @@ static void cpufreq_interactive_timer_resched(
 				     &pcpu->time_in_idle_timestamp);
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
+	expires = jiffies + usecs_to_jiffies(timer_rate);
+	mod_timer_pinned(&pcpu->cpu_timer, expires);
+
+	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
+		expires += usecs_to_jiffies(timer_slack_val);
+		mod_timer_pinned(&pcpu->cpu_slack_timer, expires);
+	}
+
 	spin_unlock_irqrestore(&pcpu->load_lock, flags);
 }
 
