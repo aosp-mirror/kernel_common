@@ -251,6 +251,7 @@ int __init early_lookup_bdev(const char *name, dev_t *devt)
 		return devt_from_devname(name + 5, devt);
 	return devt_from_devnum(name, devt);
 }
+EXPORT_SYMBOL_GPL(early_lookup_bdev);
 
 static char __init *bdevt_str(dev_t devt, char *buf)
 {
