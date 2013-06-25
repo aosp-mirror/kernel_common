@@ -290,6 +290,13 @@ static int gic_irq_get_irqchip_state(struct irq_data *d,
 	return 0;
 }
 
+static int gic_irq_retrigger(struct irq_data *d)
+{
+	gic_poke_irq(d, GIC_DIST_PENDING_SET);
+
+	return 1;
+}
+
 static int gic_set_type(struct irq_data *d, unsigned int type)
 {
 	void __iomem *base = gic_dist_base(d);
@@ -414,6 +421,7 @@ static struct irq_chip gic_chip = {
 	.irq_mask		= gic_mask_irq,
 	.irq_unmask		= gic_unmask_irq,
 	.irq_eoi		= gic_eoi_irq,
+	.irq_retrigger		= gic_irq_retrigger,
 	.irq_set_type		= gic_set_type,
 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
