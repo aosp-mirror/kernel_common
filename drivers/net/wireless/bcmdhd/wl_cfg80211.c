@@ -289,7 +289,7 @@ static void wl_ch_to_chanspec(int ch,
  */
 static void wl_rst_ie(struct wl_priv *wl);
 static __used s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v);
-static void wl_update_hidden_ap_ie(struct wl_bss_info *bi, u8 *ie_stream, u16 ie_size);
+static void wl_update_hidden_ap_ie(struct wl_bss_info *bi, u8 *ie_stream, u32 *ie_size);
 static s32 wl_mrg_ie(struct wl_priv *wl, u8 *ie_stream, u16 ie_size);
 static s32 wl_cp_ie(struct wl_priv *wl, u8 *dst, u16 dst_size);
 static u32 wl_get_ielen(struct wl_priv *wl);
@@ -4790,7 +4790,7 @@ static s32 wl_inform_single_bss(struct wl_priv *wl, struct wl_bss_info *bi)
 	beacon_proberesp->capab_info = cpu_to_le16(bi->capability);
 	wl_rst_ie(wl);
 
-	wl_update_hidden_ap_ie(bi, ((u8 *) bi) + bi->ie_offset, bi->ie_length);
+	wl_update_hidden_ap_ie(bi, ((u8 *) bi) + bi->ie_offset, &bi->ie_length);
 	wl_mrg_ie(wl, ((u8 *) bi) + bi->ie_offset, bi->ie_length);
 	wl_cp_ie(wl, beacon_proberesp->variable, WL_BSS_INFO_MAX -
 		offsetof(struct wl_cfg80211_bss_info, frame_buf));
@@ -7611,19 +7611,26 @@ static __used s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v)
 	return err;
 }
 
-static void wl_update_hidden_ap_ie(struct wl_bss_info *bi, u8 *ie_stream, u16 ie_size)
+static void wl_update_hidden_ap_ie(struct wl_bss_info *bi, u8 *ie_stream, u32 *ie_size)
 {
-	const u8 *ssidie;
+	u8 *ssidie;
 
-	ssidie = cfg80211_find_ie(WLAN_EID_SSID, ie_stream, ie_size);
+	ssidie = (u8 *)cfg80211_find_ie(WLAN_EID_SSID, ie_stream, *ie_size);
 	if (!ssidie)
 		return;
 	if (ssidie[1] != bi->SSID_len) {
-		WL_ERR(("%s: Wrong SSID len: %d != %d\n", __func__, ssidie[1], bi->SSID_len));
+		if (ssidie[1]) {
+			WL_ERR(("%s: Wrong SSID len: %d != %d\n", __func__, ssidie[1], bi->SSID_len));
+			return;
+		}
+		memmove(ssidie + bi->SSID_len + 2, ssidie + 2, *ie_size - (ssidie + 2 - ie_stream));
+		memcpy(ssidie + 2, bi->SSID, bi->SSID_len);
+		*ie_size = *ie_size + bi->SSID_len;
+		ssidie[1] = bi->SSID_len;
 		return;
 	}
 	if (*(ssidie + 2) == '\0')
-		memcpy((void *)(ssidie + 2), bi->SSID, bi->SSID_len);
+		memcpy(ssidie + 2, bi->SSID, bi->SSID_len);
 	return;
 }
 
