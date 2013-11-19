@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Trusty driver
+#
+
+menu "Trusty driver"
+
+config TRUSTY
+	tristate "Trusty core driver"
+	depends on ARM || ARM64
+	help
+	  Trusty is a secure OS that provides a Trusted Execution Environment
+	  (TEE) for Android.  Trusty runs on the same processor as Linux but is
+	  isolated from the rest of the system by both hardware and software.
+
+	  This option enables the core part of the Linux kernel driver for
+	  Trusty.  This doesn't do much by itself; you'll need to enable some of
+	  the sub-modules too.
+
+	  If you build this as a module, it will be called trusty-core.
+
+endmenu
