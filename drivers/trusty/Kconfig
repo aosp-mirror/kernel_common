@@ -19,4 +19,20 @@ config TRUSTY
 
 	  If you build this as a module, it will be called trusty-core.
 
+if TRUSTY
+
+config TRUSTY_IRQ
+	tristate "Trusty IRQ support"
+	default y
+	help
+	  Enable forwarding of IRQs from Linux to Trusty.  This module retrieves
+	  from Trusty a list of IRQs that Trusty uses, and it registers handlers
+	  for them which notify Trusty that the IRQ has been received.
+
+	  If you build this as a module, it will be called trusty-irq.
+
+	  Usually this is needed for Trusty to work, so say 'y' or 'm'.
+
+endif # TRUSTY
+
 endmenu
