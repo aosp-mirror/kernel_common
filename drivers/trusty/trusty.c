@@ -23,6 +23,7 @@
 
 struct trusty_state {
 	struct mutex smc_lock;
+	struct atomic_notifier_head notifier;
 };
 
 static inline u32 smc(u32 r0, u32 r1, u32 r2, u32 r3)
@@ -69,23 +70,52 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 
 	mutex_lock(&s->smc_lock);
 
+	local_irq_disable();
 	dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) started\n",
 		__func__, smcnr, a0, a1, a2);
+
+	atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_PREPARE, NULL);
 	ret = smc(smcnr, a0, a1, a2);
+	atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_RETURNED, NULL);
 
 	while (ret == SM_ERR_INTERRUPTED) {
 		dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) interrupted\n",
 			__func__, smcnr, a0, a1, a2);
+		local_irq_enable();
+		local_irq_disable();
+		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_PREPARE,
+					   NULL);
 		ret = smc(SMC_SC_RESTART_LAST, 0, 0, 0);
+		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_RETURNED,
+					   NULL);
 	}
 	dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) returned 0x%x\n",
 		__func__, smcnr, a0, a1, a2, ret);
+
+	local_irq_enable();
 
 	mutex_unlock(&s->smc_lock);
 
 	return ret;
 }
 EXPORT_SYMBOL(trusty_std_call32);
+
+int trusty_call_notifier_register(struct device *dev, struct notifier_block *n)
+{
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	return atomic_notifier_chain_register(&s->notifier, n);
+}
+EXPORT_SYMBOL(trusty_call_notifier_register);
+
+int trusty_call_notifier_unregister(struct device *dev,
+				    struct notifier_block *n)
+{
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	return atomic_notifier_chain_unregister(&s->notifier, n);
+}
+EXPORT_SYMBOL(trusty_call_notifier_unregister);
 
 static int trusty_remove_child(struct device *dev, void *data)
 {
@@ -110,6 +140,7 @@ static int trusty_probe(struct platform_device *pdev)
 		goto err_allocate_state;
 	}
 	mutex_init(&s->smc_lock);
+	ATOMIC_INIT_NOTIFIER_HEAD(&s->notifier);
 	platform_set_drvdata(pdev, s);
 
 	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
