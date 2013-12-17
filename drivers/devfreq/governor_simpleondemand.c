@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/devfreq.h>
 #include <linux/math64.h>
+#include <linux/msm_adreno_devfreq.h>
 #include "governor.h"
 
 /* Default constants for DevFreq-Simple-Ondemand (DFSO) */
@@ -23,7 +24,9 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 					u32 *flag)
 {
 	struct devfreq_dev_status stat;
-	int err = df->profile->get_dev_status(df->dev.parent, &stat);
+	struct devfreq_msm_adreno_tz_data *priv = df->data;
+	struct xstats xs;
+	int err;
 	unsigned long long a, b;
 	unsigned int dfso_upthreshold = DFSO_UPTHRESHOLD;
 	unsigned int dfso_downdifferential = DFSO_DOWNDIFFERENCTIAL;
@@ -31,6 +34,12 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
 	unsigned long max = (df->max_freq) ? df->max_freq : UINT_MAX;
 	unsigned long min = (df->min_freq) ? df->min_freq : 0;
 
+	if (priv->bus.num)
+		stat.private_data = &xs;
+	else
+		stat.private_data = NULL;
+
+	err = df->profile->get_dev_status(df->dev.parent, &stat);
 	if (err)
 		return err;
 
