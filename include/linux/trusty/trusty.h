@@ -15,9 +15,23 @@
 #define __LINUX_TRUSTY_TRUSTY_H
 
 #include <linux/kernel.h>
+#include <linux/trusty/sm_err.h>
 
+#ifdef CONFIG_TRUSTY
 s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2);
 s32 trusty_fast_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2);
+#else
+static inline s32 trusty_std_call32(struct device *dev, u32 smcnr,
+				    u32 a0, u32 a1, u32 a2)
+{
+	return SM_ERR_UNDEFINED_SMC;
+}
+static inline s32 trusty_fast_call32(struct device *dev, u32 smcnr,
+				     u32 a0, u32 a1, u32 a2)
+{
+	return SM_ERR_UNDEFINED_SMC;
+}
+#endif
 
 struct notifier_block;
 enum {
