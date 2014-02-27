@@ -44,10 +44,13 @@ struct mnt_namespace;
 #define MNT_SHARED_MASK	(MNT_UNBINDABLE)
 #define MNT_PROPAGATION_MASK	(MNT_SHARED | MNT_UNBINDABLE)
 
+#define MNT_INTERNAL_FLAGS (MNT_SHARED | MNT_WRITE_HOLD | MNT_INTERNAL | \
+			    MNT_MARKED)
 
 #define MNT_INTERNAL	0x4000
 
 #define MNT_LOCK_READONLY	0x400000
+#define MNT_MARKED		0x4000000
 
 struct vfsmount {
 	struct dentry *mnt_root;	/* root of the mounted tree */
