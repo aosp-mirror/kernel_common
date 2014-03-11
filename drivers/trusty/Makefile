@@ -4,4 +4,4 @@
 
 obj-$(CONFIG_TRUSTY)		+= trusty.o
 obj-$(CONFIG_TRUSTY)		+= trusty-irq.o
-obj-$(CONFIG_TRUSTY)		+= trusty-fiq.o
+obj-$(CONFIG_TRUSTY_FIQ)	+= trusty-fiq.o
