@@ -8,4 +8,10 @@ config TRUSTY
 	tristate "Trusty"
 	default n
 
+config TRUSTY_FIQ
+	tristate
+	depends on TRUSTY
+	depends on FIQ
+	default y
+
 endmenu

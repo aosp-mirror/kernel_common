@@ -12,6 +12,7 @@
  *
  */
 
+#include <asm/compiler.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
@@ -26,27 +27,44 @@ struct trusty_state {
 	struct atomic_notifier_head notifier;
 };
 
+#if CONFIG_ARM64
+#define SMC_ARG0		"x0"
+#define SMC_ARG1		"x1"
+#define SMC_ARG2		"x2"
+#define SMC_ARG3		"x3"
+#define SMC_ARCH_EXTENSION	""
+#define SMC_REGISTERS_TRASHED	"x4","x5","x6","x7","x8","x9","x10","x11", \
+				"x12","x13","x14","x15","x16","x17"
+#else
+#define SMC_ARG0		"r0"
+#define SMC_ARG1		"r1"
+#define SMC_ARG2		"r2"
+#define SMC_ARG3		"r3"
+#define SMC_ARCH_EXTENSION	".arch_extension sec\n"
+#define SMC_REGISTERS_TRASHED	"ip"
+#endif
+
 static inline u32 smc(u32 r0, u32 r1, u32 r2, u32 r3)
 {
-	register u32 _r0 asm("r0") = r0;
-	register u32 _r1 asm("r1") = r1;
-	register u32 _r2 asm("r2") = r2;
-	register u32 _r3 asm("r3") = r3;
+	register u32 _r0 asm(SMC_ARG0) = r0;
+	register u32 _r1 asm(SMC_ARG1) = r1;
+	register u32 _r2 asm(SMC_ARG2) = r2;
+	register u32 _r3 asm(SMC_ARG3) = r3;
 
 	asm volatile(
-		__asmeq("%0", "r0")
-		__asmeq("%1", "r1")
-		__asmeq("%2", "r2")
-		__asmeq("%3", "r3")
-		__asmeq("%4", "r0")
-		__asmeq("%5", "r1")
-		__asmeq("%6", "r2")
-		__asmeq("%7", "r3")
-		".arch_extension sec\n"
-		"smc	#0	@ switch to secure world\n"
+		__asmeq("%0", SMC_ARG0)
+		__asmeq("%1", SMC_ARG1)
+		__asmeq("%2", SMC_ARG2)
+		__asmeq("%3", SMC_ARG3)
+		__asmeq("%4", SMC_ARG0)
+		__asmeq("%5", SMC_ARG1)
+		__asmeq("%6", SMC_ARG2)
+		__asmeq("%7", SMC_ARG3)
+		SMC_ARCH_EXTENSION
+		"smc	#0"	/* switch to secure world */
 		: "=r" (_r0), "=r" (_r1), "=r" (_r2), "=r" (_r3)
 		: "r" (_r0), "r" (_r1), "r" (_r2), "r" (_r3)
-		: "ip");
+		: SMC_REGISTERS_TRASHED);
 	return _r0;
 }
 
