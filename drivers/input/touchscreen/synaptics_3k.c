@@ -171,7 +171,7 @@ struct synaptics_ts_data {
 	uint8_t config_table[SYN_CONFIG_SIZE_35XX];
 	uint8_t x_channel;
 	uint8_t y_channel;
-	uint8_t config[SYN_CONFIG_SIZE_35XX];
+	uint8_t *config;
 	uint32_t config_version;
 	uint16_t package_id;
 	uint32_t packrat_number;
@@ -208,8 +208,6 @@ struct synaptics_ts_data {
 	struct work_struct  psensor_work;
 	struct workqueue_struct *syn_psensor_wq;
 	struct workqueue_struct *syn_att_wq;
-	struct work_struct  cover_work;
-	struct workqueue_struct *syn_cover_wq;
 	struct delayed_work work_att;
 	struct synaptics_virtual_key *button;
 	char *vkey_buf;
@@ -217,26 +215,13 @@ struct synaptics_ts_data {
 	uint8_t ctrl_10_offset;
 	uint8_t ctrl_15_offset;
 	uint8_t ctrl_23_offset;
-	uint8_t cover_setting[9];
-	uint8_t uncover_setting[9];
+	uint8_t *cover_setting;
+	uint8_t uncover_setting[7];
 	uint8_t cover_enable;
 	uint8_t hover_mode;
 	uint8_t i2c_to_mcu;
-	uint8_t f12_ctrl10[2];
-	uint8_t f12_ctrl15[2];
 	uint8_t f54_ctrl89[8];
 	uint8_t f54_ctrl91[5];
-	uint16_t hall_block_touch_time;
-	uint8_t hall_block_touch_event;
-	bool suspended;
-	int prev_NS;
-	int prev_Freq;
-#if defined(CONFIG_SECURE_TOUCH)
-    atomic_t st_enabled;
-    atomic_t st_pending_irqs;
-    struct completion st_powerdown;
-    struct completion st_irq_processed;
-#endif
 };
 
 #if defined(CONFIG_FB)
@@ -246,9 +231,7 @@ static int fb_notifier_callback(struct notifier_block *self,
 static void synaptics_ts_early_suspend(struct early_suspend *h);
 static void synaptics_ts_late_resume(struct early_suspend *h);
 #endif
-#if defined(CONFIG_SYNC_TOUCH_STATUS)
-static void switch_sensor_hub(struct synaptics_ts_data* ts, int mode);
-#endif
+
 static DECLARE_WAIT_QUEUE_HEAD(syn_data_ready_wq);
 static DEFINE_MUTEX(syn_mutex);
 
@@ -259,40 +242,98 @@ static uint8_t vk_press;
 static int i2c_syn_write_byte_data(struct i2c_client *client, uint16_t addr, uint8_t value);
 static int syn_pdt_scan(struct synaptics_ts_data *ts, int num_page);
 static int synaptics_init_panel(struct synaptics_ts_data *ts);
+#if defined(CONFIG_SYNC_TOUCH_STATUS)
 static int i2c_syn_reset_handler(struct synaptics_ts_data *ts, uint8_t reset, char *reason, const char *fun_name);
+#endif
 
 static irqreturn_t synaptics_irq_thread(int irq, void *ptr);
 
 extern unsigned int get_tamper_sf(void);
 
-static DEFINE_MUTEX(syn_block_mutex);
-static void syn_block_touch(struct synaptics_ts_data *ts, int enable)
-{
-       mutex_lock(&syn_block_mutex);
-       ts->hall_block_touch_event = enable;
-       mutex_unlock(&syn_block_mutex);
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+#define S2W_Y_MAX 2880
+#define S2W_X_MAX 1920
+#define S2W_Y_LIMIT S2W_Y_MAX-180
+#define S2W_X_B1 700
+#define S2W_X_B2 1200
+#define S2W_X_FINAL 400
+#define S2W_PWRKEY_DUR 60
+
+static int last_touch_position_x = 0;
+static int last_touch_position_y = 0;
+static bool exec_count = true;
+static bool scr_on_touch = false, barrier[2] = {false, false};
+static bool scr_suspended = false;
+static int s2w_switch = 1;
+
+static struct input_dev * sweep2wake_pwrdev;
+static DEFINE_MUTEX(pwrkeyworklock);
+
+static void sweep2wake_presspwr(struct work_struct * sweep2wake_presspwr_work) {
+	if (!mutex_trylock(&pwrkeyworklock))
+		return;
+	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
+	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
+	msleep(S2W_PWRKEY_DUR);
+	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
+	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
+	msleep(S2W_PWRKEY_DUR);
+   	mutex_unlock(&pwrkeyworklock);
+	return;
 }
 
-static void syn_block_touch_work_func(struct work_struct *dummy)
-{
-       struct synaptics_ts_data *ts = gl_ts;
-       syn_block_touch(ts, 0);
-}
-static DECLARE_DELAYED_WORK(syn_block_touch_work, syn_block_touch_work_func);
+static DECLARE_WORK(sweep2wake_presspwr_work, sweep2wake_presspwr);
 
-static void syn_handle_block_touch(struct synaptics_ts_data *ts, int enable)
-{
-       int ret;
-       if (ts->hall_block_touch_event) {
-               ret = __cancel_delayed_work(&syn_block_touch_work);
-               syn_block_touch(ts, 0);
-       }
-       if (enable) {
-               pr_info("[TP][HL] %s: %d\n", __func__, ts->hall_block_touch_time);
-               ret = schedule_delayed_work(&syn_block_touch_work, HZ*ts->hall_block_touch_time/1000);
-               syn_block_touch(ts, 1);
-       }
+static void sweep2wake_pwrtrigger(void) {
+	schedule_work(&sweep2wake_presspwr_work);
+    return;
 }
+
+static void reset_s2w(void)
+{
+	exec_count = true;
+	barrier[0] = false;
+	barrier[1] = false;
+	scr_on_touch = false;
+}
+
+static void detect_sweep2wake(int x, int y)
+{
+	int prevx = 0, nextx = 0;
+
+	if (scr_suspended == false && s2w_switch > 0) {
+		scr_on_touch=true;
+		prevx = (S2W_X_MAX - S2W_X_FINAL);
+		nextx = S2W_X_B2;
+		if ((barrier[0] == true) ||
+		   ((x < prevx) &&
+		    (x > nextx) &&
+		    (y > S2W_Y_LIMIT))) {
+			prevx = nextx;
+			nextx = S2W_X_B1;
+			barrier[0] = true;
+			if ((barrier[1] == true) ||
+			   ((x < prevx) &&
+			    (x > nextx) &&
+			    (y > S2W_Y_LIMIT))) {
+				prevx = nextx;
+				barrier[1] = true;
+				if ((x < prevx) &&
+				    (y > S2W_Y_LIMIT)) {
+					if (x < S2W_X_FINAL) {
+						if (exec_count) {
+							pr_debug("s2w: OFF\n");
+							sweep2wake_pwrtrigger();
+							exec_count = false;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+#endif
+
 
 static void syn_page_select(struct i2c_client *client, uint8_t page)
 {
@@ -495,6 +536,7 @@ static int i2c_syn_error_handler(struct synaptics_ts_data *ts, uint8_t reset, ch
 	return -EIO;
 }
 
+#if defined(CONFIG_SYNC_TOUCH_STATUS)
 static int i2c_syn_reset_handler(struct synaptics_ts_data *ts, uint8_t reset, char *reason, const char *fun_name)
 {
 	int ret;
@@ -526,6 +568,7 @@ static int i2c_syn_reset_handler(struct synaptics_ts_data *ts, uint8_t reset, ch
 
 	return -EIO;
 }
+#endif
 
 static int get_address_base(struct synaptics_ts_data *ts, uint8_t command, uint8_t type)
 {
@@ -594,7 +637,7 @@ static int wait_flash_interrupt(struct synaptics_ts_data *ts, int attr, int fw)
 			ret = i2c_syn_read(ts->client,
 				get_address_base(ts, 0x01, DATA_BASE) + 1, &data, 1);
 			if (ret < 0)
-				return i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "r:1", __func__);
+				return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:1", __func__);
 			if ((data & 0x01) == 0x01) {
 #ifdef SYN_FLASH_PROGRAMMING_LOG
 				pr_info("[TP] ATT: %d, status: %x\n", gpio_get_value(attr), data);
@@ -914,250 +957,56 @@ static int syn_get_tw_vendor(struct synaptics_ts_data *ts, int attr)
 	return 0;
 }
 
-static void syn_set_cover_func(struct work_struct *work)
+static int syn_set_cover_func(struct synaptics_ts_data *ts, int enable)
 {
 	int ret;
-	struct synaptics_ts_data *ts = container_of(work, struct synaptics_ts_data, cover_work);
+	pr_info("[TP] %s: %d\n", __func__, enable);
+	if (enable) {
+		ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_10_offset, ts->cover_setting, 2);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:1", __func__);
 
-	if (!ts)
-	{
-		pr_info("[TP] %s null\n", __func__);
-		return;
-	}
-	else
-	{
-		pr_info("[TP] %s: %d\n", __func__, ts->cover_enable);
-	}
+		ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, &ts->cover_setting[2], 2);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:2", __func__);
 
-	if (ts->cover_enable) {
-		if (ts->package_id == 3528 )
-		{
-			if (ts->packrat_number >= SYNAPTICS_FW_35_COVER) {
-				ts->f12_ctrl10[1] = ts->cover_setting[0];
-				ts->f12_ctrl10[0] = ts->cover_setting[5];
-				ret = i2c_syn_write(ts->client, get_address_base(ts, 0x12, CONTROL_BASE) + ts->ctrl_10_offset, ts->f12_ctrl10, 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:1", __func__);
-					return;
-				}
+		ts->f54_ctrl89[4] = ts->cover_setting[4];
+		ret = i2c_syn_write(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 26, ts->f54_ctrl89, 5);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:3", __func__);
 
-				ts->f12_ctrl15[1] = ts->cover_setting[7];
-				ts->f12_ctrl15[0] = ts->cover_setting[1];
-				ret = i2c_syn_write(ts->client, get_address_base(ts, 0x12, CONTROL_BASE) + ts->ctrl_15_offset, ts->f12_ctrl15, 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:2", __func__);
-					return;
-				}
+		ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, ts->cover_setting[5]);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:4", __func__);
 
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 2, ts->cover_setting[2]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:3", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 3, ts->cover_setting[3]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:4", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 4, ts->cover_setting[4]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:5", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, ts->cover_setting[6]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:6", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x01, CONTROL_BASE) + 3, ts->cover_setting[8]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:7", __func__);
-					return;
-				}
-			}else {
-				ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_10_offset, ts->cover_setting, 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:1", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, &ts->cover_setting[2], 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:2", __func__);
-					return;
-				}
-
-				ts->f54_ctrl89[4] = ts->cover_setting[4];
-				ret = i2c_syn_write(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 26, ts->f54_ctrl89, 5);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:3", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, ts->cover_setting[5]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:4", __func__);
-					return;
-				}
-
-				ts->f54_ctrl91[4] = ts->cover_setting[6];
-				ret = i2c_syn_write(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 27, ts->f54_ctrl91, 5);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:5", __func__);
-					return;
-				}
-			}
-		}
-		else if (ts->package_id == 3508)
-		{
-			if (ts->packrat_number >= SYNAPTICS_FW_3508_COVER) {
-				ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, ts->cover_setting, 1);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:1", __func__);
-				}
-			} else {
-				ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, ts->cover_setting, 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:1", __func__);
-				}
-			}
-		}
+		ts->f54_ctrl91[4] = ts->cover_setting[6];
+		ret = i2c_syn_write(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 27, ts->f54_ctrl91, 5);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:5", __func__);
 	} else {
-		if (ts->package_id == 3528 )
-		{
-			if (ts->packrat_number >= SYNAPTICS_FW_35_COVER) {
-				ts->f12_ctrl10[1] = ts->uncover_setting[0];
-				ts->f12_ctrl10[0] = ts->uncover_setting[5];
-				ret = i2c_syn_write(ts->client, get_address_base(ts, 0x12, CONTROL_BASE) + ts->ctrl_10_offset, ts->f12_ctrl10, 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:1", __func__);
-					return;
-				}
+		ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_10_offset, ts->uncover_setting, 2);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:11", __func__);
 
-				ts->f12_ctrl15[1] = ts->uncover_setting[7];
-				ts->f12_ctrl15[0] = ts->uncover_setting[1];
-				ret = i2c_syn_write(ts->client, get_address_base(ts, 0x12, CONTROL_BASE) + ts->ctrl_15_offset, ts->f12_ctrl15, 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:2", __func__);
-					return;
-				}
+		ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, &ts->uncover_setting[2], 2);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:12", __func__);
 
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 2, ts->uncover_setting[2]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:3", __func__);
-					return;
-				}
+		ts->f54_ctrl89[4] = ts->uncover_setting[4];
+		ret = i2c_syn_write(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 26, ts->f54_ctrl89, 5);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:13", __func__);
 
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 3, ts->uncover_setting[3]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:4", __func__);
-					return;
-				}
+		ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, ts->uncover_setting[5]);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:14", __func__);
 
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 4, ts->uncover_setting[4]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:5", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, ts->uncover_setting[6]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:6", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x01, CONTROL_BASE) + 3, ts->uncover_setting[8]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:6", __func__);
-					return;
-				}
-			}else {
-
-				if (ts->hall_block_touch_time > 1)
-					syn_handle_block_touch(ts, 0);
-
-				ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_10_offset, ts->uncover_setting, 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:11", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, &ts->uncover_setting[2], 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:12", __func__);
-					return;
-				}
-
-				ts->f54_ctrl89[4] = ts->uncover_setting[4];
-				ret = i2c_syn_write(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 26, ts->f54_ctrl89, 5);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:13", __func__);
-					return;
-				}
-
-				ret = i2c_syn_write_byte_data(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, ts->uncover_setting[5]);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:14", __func__);
-					return;
-				}
-
-				ts->f54_ctrl91[4] = ts->uncover_setting[6];
-				ret = i2c_syn_write(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 27, ts->f54_ctrl91, 5);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:15", __func__);
-					return;
-				}
-			}
-		}
-		else if (ts->package_id == 3508)
-		{
-			if (ts->packrat_number >= SYNAPTICS_FW_3508_COVER) {
-				ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, ts->uncover_setting, 1);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:1", __func__);
-				}
-			} else {
-				ret = i2c_syn_write(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, ts->uncover_setting, 2);
-				if (ret < 0)
-				{
-					i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "w:2", __func__);
-					return;
-				}
-			}
-		}
+		ts->f54_ctrl91[4] = ts->uncover_setting[6];
+		ret = i2c_syn_write(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 27, ts->f54_ctrl91, 5);
+		if (ret < 0)
+			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w:15", __func__);
 	}
-	return;
+	return 0;
 }
 
 
@@ -1206,12 +1055,6 @@ static int synaptics_input_register(struct synaptics_ts_data *ts)
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION,
 		0, ((1 << 31) | (ts->layout[1] << 16) | ts->layout[3]), 0, 0);
 
-#if defined(CONFIG_SECURE_TOUCH)
-    ts->input_dev->id.bustype = BUS_I2C;
-    ts->input_dev->dev.parent = &ts->client->dev;
-    input_set_drvdata(ts->input_dev, ts);
-#endif
-
 	return input_register_device(ts->input_dev);
 }
 
@@ -1255,34 +1098,23 @@ static ssize_t gpio_show(struct device *dev,
 
 static DEVICE_ATTR(gpio, S_IRUGO, gpio_show, NULL);
 
-static uint16_t syn_reg_addr = 0;
-static uint8_t syn_reg_leng_data = 1;
+static uint16_t syn_reg_addr;
 
 static ssize_t register_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	int ret = 0, i = 0;
-	uint8_t *data;
+	int ret = 0;
+	uint8_t data = 0;
 	struct synaptics_ts_data *ts;
 	ts = gl_ts;
 
-	data = kzalloc(sizeof(uint8_t) * syn_reg_leng_data, GFP_KERNEL);
-
-	ret = i2c_syn_read(ts->client, syn_reg_addr, data, syn_reg_leng_data);
+	ret = i2c_syn_read(ts->client, syn_reg_addr, &data, 1);
 	if (ret < 0) {
 		i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r", __func__);
 		ret += snprintf(buf, PAGE_SIZE, "addr: 0x , data: 0x \n");
 	} else {
-		ret += snprintf(buf, PAGE_SIZE, "addr: 0x%X, data: 0x\n", syn_reg_addr);
-		for (i = 0; i < syn_reg_leng_data; i++) {
-			ret += snprintf(buf + ret, PAGE_SIZE, "%2.2X ", data[i]);
-			if ((i % 16) == (16 - 1))
-				ret += snprintf(buf + ret, PAGE_SIZE, "\n");
-		}
-		ret += snprintf(buf + ret, PAGE_SIZE, "\n");
+		ret += snprintf(buf, PAGE_SIZE, "addr: 0x%X, data: 0x%X\n", syn_reg_addr, data);
 	}
-
-	kfree(data);
 	return ret;
 }
 
@@ -1292,47 +1124,31 @@ static ssize_t register_store(struct device *dev,
 	int ret = 0;
 	struct synaptics_ts_data *ts;
 	char buf_tmp[4];
-	unsigned long first_field, second_field;
+	uint8_t write_da;
+	unsigned long addr;
 
 	ts = gl_ts;
 	memset(buf_tmp, 0x0, sizeof(buf_tmp));
 	if ((buf[0] == 'r' || buf[0] == 'w') && buf[1] == ':' &&
-		(buf[5] == ':' && buf[9] == '\n')) {
+		(buf[5] == ':' || buf[5] == '\n')) {
 		memcpy(buf_tmp, buf + 2, 3);
-		ret = strict_strtoul(buf_tmp, 16, &first_field);
-		if (ret < 0) {
-			printk(KERN_DEBUG "[TP] 1st_field: 0x \n");
-			return ret;
-		}
-
-		memcpy(buf_tmp, buf + 6, 3);
-		ret = strict_strtoul(buf_tmp, 16, &second_field);
-		if (ret < 0) {
-			printk(KERN_DEBUG "[TP] 2st_field: 0x \n");
-			return ret;
-		}
-
-		syn_reg_addr = first_field;
-		syn_reg_leng_data = second_field;
-
-		if (buf[0] == 'w') {
+		ret = strict_strtoul(buf_tmp, 16, &addr);
+		syn_reg_addr = addr;
+		printk(KERN_DEBUG "[TP] %s: set syn_reg_addr is: 0x%X\n",
+						__func__, syn_reg_addr);
+		if (buf[0] == 'w' && buf[5] == ':' && buf[9] == '\n') {
+			memcpy(buf_tmp, buf + 6, 3);
+			ret = strict_strtoul(buf_tmp, 16, &addr);
+			write_da = addr;
 			printk(KERN_DEBUG "[TP] write addr: 0x%X, data: 0x%X\n",
-						syn_reg_addr, syn_reg_leng_data);
+						syn_reg_addr, write_da);
 			ret = i2c_syn_write_byte_data(ts->client,
-					syn_reg_addr, syn_reg_leng_data);
+					syn_reg_addr, write_da);
 			if (ret < 0) {
 				i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "w", __func__);
 			}
-			syn_reg_leng_data = 1;
-		} else if (buf[0] == 'r') {
-			if(syn_reg_leng_data < 1)
-				syn_reg_leng_data = 1;
-
-			printk(KERN_DEBUG "[TP] read addr: 0x%X, length: %u\n",
-						syn_reg_addr, syn_reg_leng_data);
 		}
-	}else
-		printk(KERN_DEBUG "[TP] Command Format Error!\n");
+	}
 
 	return count;
 }
@@ -1889,17 +1705,19 @@ static ssize_t syn_cover_store(struct device *dev,
 {
 
 	struct synaptics_ts_data *ts = gl_ts;
+	int ret;
 
-	if (( (ts->package_id == 3528) || (ts->package_id == 3508)) && ts->cover_setting[0]) {
+	if ((ts->package_id == 3528) && ts->cover_setting[0]) {
 		if (sysfs_streq(buf, "0"))
 			ts->cover_enable = 0;
 		else if (sysfs_streq(buf, "1"))
 			ts->cover_enable = 1;
 		else
 			return -EINVAL;
-		if (ts->syn_cover_wq)
-			queue_work(ts->syn_cover_wq, &ts->cover_work);
 
+		ret = syn_set_cover_func(ts, ts->cover_enable);
+		if (ret < 0)
+			return -EINVAL;
 		pr_info("[TP] %s: cover_enable = %d.\n", __func__, ts->cover_enable);
 	}
 
@@ -1910,16 +1728,42 @@ static DEVICE_ATTR(cover, (S_IWUSR|S_IRUGO),
 	syn_cover_show, syn_cover_store);
 
 
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+static ssize_t synaptics_sweep2wake_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	size_t count = 0;
+	count += sprintf(buf, "%d\n", s2w_switch);
+	return count;
+}
+
+static ssize_t synaptics_sweep2wake_dump(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	if (buf[0] >= '0' && buf[0] <= '1' && buf[1] == '\n')
+                if (s2w_switch != buf[0] - '0')
+		        s2w_switch = buf[0] - '0';
+	return count;
+}
+
+static DEVICE_ATTR(sweep2wake, 0666,
+	synaptics_sweep2wake_show, synaptics_sweep2wake_dump);
+#endif	
+	
 enum SR_REG_STATE{
 	ALLOCATE_DEV_FAIL = -2,
 	REGISTER_DEV_FAIL,
 	SUCCESS,
 };
 
+static char *vk_name = "virtualkeys.sr_touchscreen";
+static struct kobj_attribute vk_dev;
 
 static int register_sr_touch_device(void)
 {
 	struct synaptics_ts_data *ts = gl_ts;
+	struct synaptics_i2c_rmi_platform_data *pdata = ts->client->dev.platform_data;
+	int ret = 0;
 
 	ts->sr_input_dev = input_allocate_device();
 
@@ -1928,6 +1772,11 @@ static int register_sr_touch_device(void)
 		return ALLOCATE_DEV_FAIL;
 	}
 
+	if (pdata->vk_obj) {
+		memcpy(&vk_dev, pdata->vk2Use, sizeof(struct kobj_attribute));
+		vk_dev.attr.name = vk_name;
+		ret = sysfs_create_file(pdata->vk_obj, &(vk_dev.attr));
+	}
 
 	ts->sr_input_dev->name = "sr_touchscreen";
 	set_bit(EV_SYN, ts->sr_input_dev->evbit);
@@ -1967,25 +1816,7 @@ static int register_sr_touch_device(void)
 	return SUCCESS;
 }
 
-static ssize_t syn_get_en_sr(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct synaptics_ts_data *ts = gl_ts;
-	size_t count = 0;
-
-	if (ts->sr_input_dev)
-	{
-		count += snprintf(buf + count, PAGE_SIZE, "%s ", ts->sr_input_dev->name);
-		count += snprintf(buf + count, PAGE_SIZE, "\n");
-	}
-	else
-		count += snprintf(buf + count, PAGE_SIZE, "0\n");
-
-
-	return count;
-}
-
-static ssize_t syn_set_en_sr(struct device *dev, struct device_attribute *attr,
+static ssize_t set_en_sr(struct device *dev, struct device_attribute *attr,
 						const char *buf, size_t count)
 {
 	struct synaptics_ts_data *ts = gl_ts;
@@ -1998,117 +1829,9 @@ static ssize_t syn_set_en_sr(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static DEVICE_ATTR(sr_en, (S_IWUSR|S_IRUGO), syn_get_en_sr, syn_set_en_sr);
+static DEVICE_ATTR(sr_en, S_IWUSR, 0, set_en_sr);
 
 static struct kobject *android_touch_kobj;
-
-#if defined(CONFIG_SECURE_TOUCH)
-static void syn_secure_touch_notify(struct synaptics_ts_data *data)
-{
-	sysfs_notify(android_touch_kobj, NULL, "secure_touch");
-}
-
-static irqreturn_t syn_filter_interrupt(struct synaptics_ts_data *data)
-{
-	if (atomic_read(&data->st_enabled)) {
-		if (atomic_cmpxchg(&data->st_pending_irqs, 0, 1) == 0)
-		{
-			syn_secure_touch_notify(data);
-			wait_for_completion_interruptible(&data->st_irq_processed);
-		}
-		return IRQ_HANDLED;
-	}
-	return IRQ_NONE;
-}
-
-static ssize_t syn_secure_touch_enable_show(struct device *dev,
-				    struct device_attribute *attr, char *buf)
-{
-	struct synaptics_ts_data *data = gl_ts;
-
-	return scnprintf(buf, PAGE_SIZE, "%d", atomic_read(&data->st_enabled));
-}
-static ssize_t syn_secure_touch_enable_store(struct device *dev,
-				    struct device_attribute *attr,
-				    const char *buf, size_t count)
-{
-	struct synaptics_ts_data *data = gl_ts;
-	unsigned long value;
-	int err = 0;
-
-	if (count > 2)
-		return -EINVAL;
-
-	err = kstrtoul(buf, 10, &value);
-	if (err != 0)
-		return err;
-
-	err = count;
-
-	switch (value) {
-	case 0:
-		if (atomic_read(&data->st_enabled) == 0)
-			break;
-
-		pm_runtime_put(data->client->adapter->dev.parent);
-		atomic_set(&data->st_enabled, 0);
-		syn_secure_touch_notify(data);
-		complete(&data->st_irq_processed);
-		synaptics_irq_thread(data->client->irq, data);
-		complete(&data->st_powerdown);
-		break;
-	case 1:
-		if (atomic_read(&data->st_enabled)) {
-			err = -EBUSY;
-			break;
-		}
-
-		if (pm_runtime_get(data->client->adapter->dev.parent) < 0) {
-			dev_err(&data->client->dev, "pm_runtime_get failed\n");
-			err = -EIO;
-			break;
-		}
-		INIT_COMPLETION(data->st_powerdown);
-		INIT_COMPLETION(data->st_irq_processed);
-		atomic_set(&data->st_enabled, 1);
-		synchronize_irq(data->client->irq);
-		atomic_set(&data->st_pending_irqs, 0);
-		break;
-	default:
-		dev_err(&data->client->dev, "unsupported value: %lu\n", value);
-		err = -EINVAL;
-		break;
-	}
-
-	return err;
-}
-
-static ssize_t syn_secure_touch_show(struct device *dev,
-				    struct device_attribute *attr, char *buf)
-{
-	struct synaptics_ts_data *data = gl_ts;
-	int val = 0;
-
-	if (atomic_read(&data->st_enabled) == 0)
-		return -EBADF;
-
-	if (atomic_cmpxchg(&data->st_pending_irqs, -1, 0) == -1)
-		return -EINVAL;
-
-	if (atomic_cmpxchg(&data->st_pending_irqs, 1, 0) == 1)
-		val = 1;
-	else
-		complete(&data->st_irq_processed);
-
-	return scnprintf(buf, PAGE_SIZE, "%u", val);
-}
-
-static DEVICE_ATTR(secure_touch_enable, S_IRUGO | S_IWUSR | S_IWGRP ,
-			 syn_secure_touch_enable_show,
-			 syn_secure_touch_enable_store);
-static DEVICE_ATTR(secure_touch, S_IRUGO, syn_secure_touch_show, NULL);
-#endif
-
 
 static int synaptics_touch_sysfs_init(void)
 {
@@ -2123,14 +1846,10 @@ static int synaptics_touch_sysfs_init(void)
 		ret = -ENOMEM;
 		return ret;
 	}
-
+	syn_reg_addr = 0;
 	if (sysfs_create_file(android_touch_kobj, &dev_attr_vendor.attr) ||
 		sysfs_create_file(android_touch_kobj, &dev_attr_gpio.attr) ||
 		sysfs_create_file(android_touch_kobj, &dev_attr_debug_level.attr) ||
-#if defined(CONFIG_SECURE_TOUCH)
-        sysfs_create_file(android_touch_kobj, &dev_attr_secure_touch_enable.attr) ||
-        sysfs_create_file(android_touch_kobj, &dev_attr_secure_touch.attr) ||
-#endif
 		sysfs_create_file(android_touch_kobj, &dev_attr_register.attr) ||
 		sysfs_create_file(android_touch_kobj, &dev_attr_unlock.attr) ||
 		sysfs_create_file(android_touch_kobj, &dev_attr_config.attr) ||
@@ -2149,6 +1868,14 @@ static int synaptics_touch_sysfs_init(void)
 		if (sysfs_create_file(android_touch_kobj, &dev_attr_diag.attr))
 			return -ENOMEM;
 
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+	ret = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
+	if (ret) {
+		printk(KERN_ERR "%s: sysfs_create_file failed\n", __func__);
+		return ret;
+	}
+#endif			
+			
 #ifdef SYN_WIRELESS_DEBUG
 	ret= gpio_request(ts->gpio_irq, "synaptics_attn");
 	if (ret) {
@@ -2185,10 +1912,6 @@ static void synaptics_touch_sysfs_remove(void)
 	sysfs_remove_file(android_touch_kobj, &dev_attr_vendor.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_gpio.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_debug_level.attr);
-#if defined(CONFIG_SECURE_TOUCH)
-    sysfs_remove_file(android_touch_kobj, &dev_attr_secure_touch_enable.attr);
-    sysfs_remove_file(android_touch_kobj, &dev_attr_secure_touch.attr);
-#endif
 	if (get_address_base(gl_ts, 0x54, FUNCTION))
 		sysfs_remove_file(android_touch_kobj, &dev_attr_diag.attr);
 	sysfs_remove_file(android_touch_kobj, &dev_attr_register.attr);
@@ -2202,6 +1925,9 @@ static void synaptics_touch_sysfs_remove(void)
 	sysfs_remove_file(android_touch_kobj, &dev_attr_cover.attr);
 #ifdef SYN_WIRELESS_DEBUG
 	sysfs_remove_file(android_touch_kobj, &dev_attr_enabled.attr);
+#endif
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+	sysfs_remove_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
 #endif
 	kobject_del(android_touch_kobj);
 }
@@ -2405,15 +2131,6 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 		temp_im = (noise_index[1] <<8) | noise_index[0];
 		temp_cidim = (noise_index[6] <<8) | noise_index[5];
 	}
-
-	if((noise_index[9] != ts->prev_Freq) || (noise_index[4] != ts->prev_NS))
-	{
-		pr_info("[TP][NS]Finger Pressed:%d, IM:%d, CIDIM:%d, Freq:%d, NS:%d\n",
-		ts->finger_pressed, temp_im, temp_cidim, noise_index[9], noise_index[4]);
-	}
-	ts->prev_NS = noise_index[4];
-	ts->prev_Freq = noise_index[9];
-
 	if (ret < 0) {
 		i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:1", __func__);
 	} else {
@@ -2560,6 +2277,12 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 				pr_info("[TP] Finger leave\n");
 		}
 
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+		if ((((ts->finger_count > 0)?1:0) == 0) && (s2w_switch > 0)) {
+			reset_s2w();
+		}
+#endif		
+
 		if (ts->pre_finger_data[0][0] < 2 || finger_pressed) {
 			base = ((ts->package_id < 3400) ? ((ts->finger_support + 3) / 4): 0);
 
@@ -2646,7 +2369,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 #endif
 
 					if ((finger_pressed & BIT(i)) == BIT(i)) {
-					if (ts->hall_block_touch_event == 0) {
+
 						if (ts->htc_event == SYN_AND_REPORT_TYPE_A) {
 							if (ts->support_htc_event) {
 								input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE,
@@ -2655,7 +2378,6 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 									(finger_pressed == 0) << 31 |
 									finger_data[i][0] << 16 | finger_data[i][1]);
 							}
-
 							input_report_key(ts->input_dev, BTN_TOUCH, 1);
 							input_report_abs(ts->input_dev, ABS_MT_TRACKING_ID, i);
 							input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
@@ -2670,6 +2392,11 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 								finger_data[i][1]);
 							input_mt_sync(ts->input_dev);
 						} else if (ts->htc_event == SYN_AND_REPORT_TYPE_B) {
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+							last_touch_position_x = finger_data[i][0];
+							last_touch_position_y = finger_data[i][1];
+#endif
+						
 							if (ts->support_htc_event) {
 								input_report_abs(ts->input_dev, ABS_MT_AMPLITUDE,
 									finger_data[i][3] << 16 | finger_data[i][2]);
@@ -2698,11 +2425,14 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 							input_report_abs(ts->input_dev, ABS_MT_POSITION,
 								(finger_pressed == 0) << 31 |
 								finger_data[i][0] << 16 | finger_data[i][1]);
-							}
 						}
 						x_pos[i] = finger_data[i][0];
 						y_pos[i] = finger_data[i][1];
 						finger_pressed &= ~BIT(i);
+						
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+						detect_sweep2wake(x_pos[i], y_pos[i]);
+#endif
 
 						if ((finger_press_changed & BIT(i)) && ts->debug_log_level & BIT(3)) {
 							if(ts->width_factor && ts->height_factor){
@@ -2802,7 +2532,6 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 #endif
 		}
 	}
-
 	input_sync(ts->input_dev);
 
 }
@@ -2937,11 +2666,13 @@ static void synaptics_ts_status_func(struct synaptics_ts_data *ts)
 			ret = synaptics_init_panel(ts);
 			if (ret < 0)
 				pr_info("[TP]%s: synaptics_init_panel fail\n", __func__);
+
 			
-			if (((ts->package_id == 3528 ) || (ts->package_id == 3508)) && ts->cover_setting[0]) {
+			if ((ts->package_id == 3528) && ts->cover_setting[0]) {
 				if (!ts->i2c_to_mcu && ts->cover_enable) {
-					if (ts->syn_cover_wq)
-						queue_work(ts->syn_cover_wq, &ts->cover_work);
+					ret = syn_set_cover_func(ts, ts->cover_enable);
+					if (ret < 0)
+						return;
 					pr_info("[TP] %s: cover_enable = %d.\n", __func__, ts->cover_enable);
 				}
 			}
@@ -2977,11 +2708,6 @@ static irqreturn_t synaptics_irq_thread(int irq, void *ptr)
 	int ret;
 	uint8_t buf = 0;
 	struct timespec timeStart, timeEnd, timeDelta;
-
-#if defined(CONFIG_SECURE_TOUCH)
-    if(IRQ_HANDLED == syn_filter_interrupt(ts))
-        return IRQ_HANDLED;
-#endif
 
 	if (ts->debug_log_level & BIT(2)) {
 			getnstimeofday(&timeStart);
@@ -3118,28 +2844,24 @@ static int hallsensor_hover_status_handler_func(struct notifier_block *this,
 {
 	int pole = 0, pole_value = 0;
 	struct synaptics_ts_data *ts = gl_ts;
+	int ret;
 
 	pole_value = 0x1 & status;
 	pole = (0x2 & status) >> 1;
 	pr_info("[TP][HL] %s[%s]", pole? "att_s" : "att_n", pole_value ? "Near" : "Far");
 
-	if (pole == 1 && (ts->package_id == 3528 || ts->package_id == 3508 ) && ts->cover_setting[0]) {
+	if (pole == 1 && ts->package_id == 3528 && ts->cover_setting[0]) {
 		if (pole_value == 0)
 			ts->cover_enable = 0;
 		else
-		{
 			ts->cover_enable = 1;
-			if (ts->hall_block_touch_time > 0)
-				syn_handle_block_touch(ts, 1);
-		}
 
 		if (!ts->i2c_to_mcu) {
-			if (ts->syn_cover_wq)
-			{
-				queue_work(ts->syn_cover_wq, &ts->cover_work);
-			}
+			ret = syn_set_cover_func(ts, ts->cover_enable);
+			if (ret < 0)
+				return ret;
 		}
-		pr_info("[TP][HL] %s: cover_enable = %d.\n", __func__, ts->cover_enable);
+		pr_info("[TP] %s: cover_enable = %d.\n", __func__, ts->cover_enable);
 	}
 
 	return NOTIFY_OK;
@@ -3160,9 +2882,7 @@ static int syn_pdt_scan(struct synaptics_ts_data *ts, int num_page)
 		for (j = (0xEE | (i << 8)); j >= (0xBE | (i << 8)); j -= 6) {
 			ret = i2c_syn_read(ts->client, j, data, 1);
 			if (ret < 0)
-			{
 				return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r1", __func__);
-			}
 			if (data[0] == 0)
 				break;
 			else
@@ -3306,94 +3026,37 @@ static int syn_get_information(struct synaptics_ts_data *ts)
 			return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:1", __func__);
 		ts->finger_support = data[1];
 
-		if ((ts->package_id == 3528) && ts->cover_setting[0]) {
-			if (ts->packrat_number >= SYNAPTICS_FW_35_COVER) {
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x12, CONTROL_BASE) + ts->ctrl_10_offset, data, 2);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:4", __func__);
-				memcpy(ts->f12_ctrl10, data, 2);
-				ts->uncover_setting[0] = data[1];
-				ts->uncover_setting[5] = data[0];
+		if ((ts->package_id == 3528) & ts->cover_setting[0]) {
+			ret = i2c_syn_read(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_10_offset, data, 2);
+			if (ret < 0)
+				return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:2", __func__);
+			ts->uncover_setting[0] = data[0];
+			ts->uncover_setting[1] = data[1];
+			ret = i2c_syn_read(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, data, 2);
+			if (ret < 0)
+				return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:3", __func__);
+			ts->uncover_setting[2] = data[0];
+			ts->uncover_setting[3] = data[1];
 
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x12, CONTROL_BASE) + ts->ctrl_15_offset, data, 2);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:5", __func__);
-				memcpy(ts->f12_ctrl15, data, 2);
-				ts->uncover_setting[1] = data[0];
-				ts->uncover_setting[7] = data[1];
+			ret = i2c_syn_read(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 26, data, 8);
+			if (ret < 0)
+				return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:4", __func__);
+			memcpy(ts->f54_ctrl89, data, 8);
+			ts->uncover_setting[4] = data[4];
 
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 2, data, 1);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:6", __func__);
-				ts->uncover_setting[2] = data[0];
+			ret = i2c_syn_read(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, data, 1);
+			if (ret < 0)
+				return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:5", __func__);
+			ts->uncover_setting[5] = data[0];
 
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 3, data, 1);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:7", __func__);
-				ts->uncover_setting[3] = data[0];
+			ret = i2c_syn_read(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 27, data, 5);
+			if (ret < 0)
+				return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:6", __func__);
+			memcpy(ts->f54_ctrl91, data, 5);
+			ts->uncover_setting[6] = data[4];
 
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x51, CONTROL_BASE) + 4, data, 1);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:8", __func__);
-				ts->uncover_setting[4] = data[0];
-
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, data, 8);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:3", __func__);
-				ts->uncover_setting[6] = data[0];
-
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x01, CONTROL_BASE) + 3, data, 1);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:9", __func__);
-				ts->uncover_setting[8] = data[0];
-			} else {
-				ret = i2c_syn_read(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_10_offset, data, 2);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:2", __func__);
-				ts->uncover_setting[0] = data[0];
-				ts->uncover_setting[1] = data[1];
-				ret = i2c_syn_read(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, data, 2);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:3", __func__);
-				ts->uncover_setting[2] = data[0];
-				ts->uncover_setting[3] = data[1];
-
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 26, data, 8);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:4", __func__);
-				memcpy(ts->f54_ctrl89, data, 8);
-				ts->uncover_setting[4] = data[4];
-
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 28, data, 1);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:5", __func__);
-				ts->uncover_setting[5] = data[0];
-
-				ret = i2c_syn_read(ts->client, get_address_base(ts, 0x54, CONTROL_BASE) + 27, data, 5);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:6", __func__);
-				memcpy(ts->f54_ctrl91, data, 5);
-				ts->uncover_setting[6] = data[4];
-			}
 			
 			ts->cover_enable = 0;
-		}else if ((ts->package_id == 3508) && ts->cover_setting[0]) {
-			if (ts->packrat_number >= SYNAPTICS_FW_3508_COVER) {
-				ret = i2c_syn_read(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, data, 1);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:3", __func__);
-				ts->uncover_setting[0] = data[0];
-
-			} else {
-				ret = i2c_syn_read(ts->client, get_address_base(ts, ts->finger_func_idx, CONTROL_BASE) + ts->ctrl_15_offset, data, 2);
-				if (ret < 0)
-					return i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "r:3", __func__);
-				ts->uncover_setting[0] = data[0];
-				ts->uncover_setting[1] = data[1];
-			}
-
-			ts->cover_enable = 0;
-
 		}
 
 	}
@@ -3604,7 +3267,7 @@ static int synaptics_parse_config(struct synaptics_ts_data *ts, struct synaptics
 	struct property *prop;
 	uint8_t cnt = 0, i = 0;
 	u32 data = 0;
-	uint32_t coords[4] = {0}, cover[9] = {0};
+	uint32_t coords[4] = {0}, cover[7] = {0};
 	int len = 0, ret = 0;
 
 	node = ts->client->dev.of_node;
@@ -3621,10 +3284,7 @@ static int synaptics_parse_config(struct synaptics_ts_data *ts, struct synaptics
 
 	cfg_table = kzalloc(cnt * (sizeof *cfg_table), GFP_KERNEL);
 	if (!cfg_table)
-	{
-		kfree(cfg_table);
 		return -ENOMEM;
-	}
 
 	pp = NULL;
 	while ((pp = of_get_next_child(node, pp))) {
@@ -3633,11 +3293,6 @@ static int synaptics_parse_config(struct synaptics_ts_data *ts, struct synaptics
 
 		if (of_property_read_u32(pp, "sensor_id", &data) == 0)
 			cfg_table[i].sensor_id = (data | SENSOR_ID_CHECKING_EN);
-
-		if (of_property_read_bool(pp, "mfgconfig")) {
-			cfg_table[i].mfgconfig = 1;
-		} else
-			cfg_table[i].mfgconfig = 0;
 
 		if (of_property_read_u32(pp, "pr_number", &data) == 0)
 			cfg_table[i].pr_number = data;
@@ -3650,56 +3305,24 @@ static int synaptics_parse_config(struct synaptics_ts_data *ts, struct synaptics
 		if (of_property_read_u32(pp, "vkey_setting", &data) == 0)
 			cfg_table[i].vkey_setting = data;
 
-		if (ts->package_id == 3528 )
-		{
-			if (ts->packrat_number >= SYNAPTICS_FW_35_COVER) {
-				if (of_property_read_u32_array(pp, "cover_setting", cover, 9) == 0) {
-					cfg_table[i].cover_setting[0] = cover[0];
-					cfg_table[i].cover_setting[1] = cover[1];
-					cfg_table[i].cover_setting[2] = cover[2];
-					cfg_table[i].cover_setting[3] = cover[3];
-					cfg_table[i].cover_setting[4] = cover[4];
-					cfg_table[i].cover_setting[5] = cover[5];
-					cfg_table[i].cover_setting[6] = cover[6];
-					cfg_table[i].cover_setting[7] = cover[7];
-					cfg_table[i].cover_setting[8] = cover[8];
-				}
-			} else {
-				if (of_property_read_u32_array(pp, "cover_setting", cover, 7) == 0) {
-					cfg_table[i].cover_setting[0] = cover[0];
-					cfg_table[i].cover_setting[1] = cover[1];
-					cfg_table[i].cover_setting[2] = cover[2];
-					cfg_table[i].cover_setting[3] = cover[3];
-					cfg_table[i].cover_setting[4] = cover[4];
-					cfg_table[i].cover_setting[5] = cover[5];
-					cfg_table[i].cover_setting[6] = cover[6];
-				}
-			}
-		}
-		else if (ts->package_id == 3508)
-		{
-			if (ts->packrat_number >= SYNAPTICS_FW_3508_COVER) {
-				if (of_property_read_u32_array(pp, "cover_setting", cover, 1) == 0) {
-					cfg_table[i].cover_setting[0] = cover[0];
-				}
-			} else {
-				if (of_property_read_u32_array(pp, "cover_setting", cover, 2) == 0) {
-					cfg_table[i].cover_setting[0] = cover[0];
-					cfg_table[i].cover_setting[1] = cover[1];
-				}
-			}
+		if (of_property_read_u32_array(pp, "cover_setting", cover, 7) == 0) {
+			cfg_table[i].cover_setting[0] = cover[0];
+			cfg_table[i].cover_setting[1] = cover[1];
+			cfg_table[i].cover_setting[2] = cover[2];
+			cfg_table[i].cover_setting[3] = cover[3];
+			cfg_table[i].cover_setting[4] = cover[4];
+			cfg_table[i].cover_setting[5] = cover[5];
+			cfg_table[i].cover_setting[6] = cover[6];
 		}
 
 		prop = of_find_property(pp, "config", &len);
 		if (!prop) {
 			pr_debug( "[TP] %s:Looking up %s property in node %s failed",
 					__func__, "config", pp->full_name);
-			kfree(cfg_table);
 			return -ENODEV;
 		} else if (!len) {
 			pr_debug("[TP] %s:Invalid length of configuration data\n",
 					__func__);
-			kfree(cfg_table);
 			return -EINVAL;
 		}
 
@@ -3730,24 +3353,21 @@ static int synaptics_parse_config(struct synaptics_ts_data *ts, struct synaptics
 			}
 			i++;
 		}
-		memcpy(ts->config, cfg_table[i].config, sizeof(cfg_table[i].config));
+		ts->config = cfg_table[i].config;
 		ret = syn_config_update(ts, pdata->gpio_irq);
 		if (ret < 0) {
 			pr_err("[TP] TOUCH_ERR: syn_config_update fail\n");
-			kfree(cfg_table);
 			return -EINVAL;
 		} else if (ret == 0) {
 			pr_info("[TP] BL reocver_config_update success\n");
 			ts->blmode = false;
 			if (syn_get_version(ts) < 0) {
 				pr_err("[TP] BLmode re-read pr number err\n");
-				kfree(cfg_table);
 				return -EINVAL;
 			}
 		} else
 			pr_info("[TP]%s:the same config version and CRC but touch controller\
 				always stay in bootloader mode\n", __func__);
-		kfree(cfg_table);
 		return 0;
 	}
 
@@ -3755,15 +3375,6 @@ static int synaptics_parse_config(struct synaptics_ts_data *ts, struct synaptics
 	while (cfg_table[i].pr_number > ts->packrat_number) {
 		i++;
 	}
-
-	if (board_build_flag() != BUILD_MODE_MFG) {
-		while (cfg_table[i].mfgconfig == 1) {
-			if (i < cnt)
-				i++;
-		}
-		pr_info("[TP] not mfg config\n");
-	}
-
 	while (cfg_table[i].sensor_id > 0 && (cfg_table[i].sensor_id != (SENSOR_ID_CHECKING_EN | ts->tw_vendor))) {
 		pr_info("[TP] id:%#x!=%#x, (i++)",cfg_table[i].sensor_id, (SENSOR_ID_CHECKING_EN | ts->tw_vendor));
 		i++;
@@ -3777,11 +3388,7 @@ static int synaptics_parse_config(struct synaptics_ts_data *ts, struct synaptics
 			pdata->abs_x_min = cfg_table[i].pl_x_min, pdata->abs_x_max = cfg_table[i].pl_x_max;
 			pdata->abs_y_min = cfg_table[i].pl_y_min, pdata->abs_y_max = cfg_table[i].pl_y_max;
 		}
-		if (ts->packrat_number >= SYNAPTICS_FW_35_COVER) {
-			memcpy(pdata->cover_setting, cfg_table[i].cover_setting, 9);
-		} else {
-			memcpy(pdata->cover_setting, cfg_table[i].cover_setting, 7);
-		}
+		memcpy(pdata->cover_setting, cfg_table[i].cover_setting, 7);
 		memcpy(pdata->config, cfg_table[i].config,(ts->package_id > 3500 ? SYN_CONFIG_SIZE_35XX : SYN_CONFIG_SIZE));
 		pr_info("[TP] DT#%d-def_cfg:%d,id:%05x, pr:%d, len:%d,", i,
 			cfg_table[i].default_cfg, cfg_table[i].sensor_id,
@@ -3805,10 +3412,9 @@ static int synaptics_parse_config(struct synaptics_ts_data *ts, struct synaptics
 		}
 	} else {
 		pr_err("[TP] DT-%s cfg idx(%d) > cnt(%d)", __func__, i, cnt);
-		kfree(cfg_table);
 		return -EINVAL;
 	}
-	kfree(cfg_table);
+
 	return 0;
 }
 
@@ -3864,9 +3470,13 @@ static int synaptics_parse_dt(struct synaptics_ts_data *ts,
 	pdata->gpio_i2c = of_get_named_gpio(dt, "synaptics,i2c-gpio", 0);
 	if (!gpio_is_valid(pdata->gpio_i2c)) {
 		pr_info("[TP] DT:gpio_i2c value is not valid\n");
+		pdata->gpio_i2c = of_get_named_gpio(dt, "synaptics,i2c-gpio-ulj", 0);
+		if (!gpio_is_valid(pdata->gpio_i2c)) {
+			pr_info("[TP] DT:gpio_i2c-ulj value is not valid\n");
+		}
 	}
 	ts->gpio_i2c = pdata->gpio_i2c;
-	if (ts->gpio_i2c >= 0) {
+	if (ts->gpio_i2c) {
 		rc = gpio_request(ts->gpio_i2c, "synaptics_i2c_gpio");
 		if (rc)
 			pr_info("[TP]%s: Failed to obtain i2c_gpio pin: %d. Code: %d.", __func__, ts->gpio_i2c, rc);
@@ -3901,11 +3511,6 @@ static int synaptics_parse_dt(struct synaptics_ts_data *ts,
 	if (of_property_read_u32(dt, "support_htc_event", &data) == 0) {
 		pdata->support_htc_event = data;
 		pr_info("[TP] DT:support_htc_event=%d", pdata->support_htc_event);
-	}
-
-	if (of_property_read_u32(dt, "hall_block_touch_time", &data) == 0) {
-		pdata->hall_block_touch_time = data;
-		pr_info("[TP] DT:hall_block_touch_time=%d", pdata->hall_block_touch_time);
 	}
 
 	if (ts->tw_pin_mask) {
@@ -4159,15 +3764,9 @@ static int __devinit synaptics_ts_probe(
 		#ifdef SYN_CABLE_CONTROL
 		ts->cable_support                  = pdata->cable_support; 
 		#endif
-		memcpy(ts->config, pdata->config, sizeof(pdata->config));
-		memcpy(ts->cover_setting, pdata->cover_setting, sizeof(pdata->cover_setting));
+		ts->config                         = pdata->config;
+		ts->cover_setting                  = pdata->cover_setting;
 		ts->hover_mode                     = 0;
-		ts->suspended                      = false;
-		ts->hall_block_touch_event         = 0;
-		ts->hall_block_touch_time          = pdata->hall_block_touch_time;
-		ts->prev_NS                        = -1;
-		ts->prev_Freq                      = -1;
-
 		if (pdata->virtual_key) {
 			uint8_t pos = 0;
  			ts->button = pdata->virtual_key;
@@ -4279,14 +3878,6 @@ static int __devinit synaptics_ts_probe(
 			goto err_create_wq_failed;
 	}
 
-	if (ts->cover_setting[0])
-	{
-		INIT_WORK(&ts->cover_work, syn_set_cover_func);
-		ts->syn_cover_wq = create_singlethread_workqueue("synaptics_cover_wq");
-		if (!ts->syn_cover_wq)
-			goto err_create_wq_failed;
-	}
-
 	ret = synaptics_input_register(ts);
 	if (ret) {
 		printk(KERN_ERR "[TP] TOUCH_ERR: synaptics_ts_probe: "
@@ -4378,15 +3969,27 @@ static int __devinit synaptics_ts_probe(
 		pr_info("[TP] %s: error register char device", __func__);
 #endif
 
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+	sweep2wake_pwrdev = input_allocate_device();
+	if (!sweep2wake_pwrdev) {
+		pr_err("Can't allocate suspend autotest power button\n");
+		goto err_alloc_dev;
+	}
+
+	input_set_capability(sweep2wake_pwrdev, EV_KEY, KEY_POWER);
+	sweep2wake_pwrdev->name = "s2w_pwrkey";
+	sweep2wake_pwrdev->phys = "s2w_pwrkey/input0";
+
+	ret = input_register_device(sweep2wake_pwrdev);
+	if (ret) {
+		pr_err("%s: input_register_device err=%d\n", __func__, ret);
+		goto err_input_dev;
+	}
+#endif
+
 	pr_info("[TP] synaptics_ts_probe: Start touchscreen %s in %s mode\n",
 			ts->input_dev->name, ts->use_irq ? "interrupt" : "polling");
-#ifdef CONFIG_OF
-	kfree(pdata);
-#endif
-#if defined(CONFIG_SECURE_TOUCH)
-    init_completion(&ts->st_powerdown);
-    init_completion(&ts->st_irq_processed);
-#endif
+
 	return 0;
 
 #ifdef SYN_CABLE_CONTROL
@@ -4395,6 +3998,13 @@ err_get_cable_config_failed:
 		free_irq(client->irq, ts);
 	else
 		destroy_workqueue(ts->syn_wq);
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+err_input_dev:
+	input_free_device(sweep2wake_pwrdev);
+err_alloc_dev:
+	pr_info("s2w: %s done\n", __func__);
 #endif
 
 err_create_wq_failed:
@@ -4448,6 +4058,11 @@ static int __devexit synaptics_ts_remove(struct i2c_client *client)
 		input_unregister_device(ts->sr_input_dev);
 	input_unregister_device(ts->input_dev);
 
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+	input_unregister_device(sweep2wake_pwrdev);
+	input_free_device(sweep2wake_pwrdev);
+#endif
+	
 	synaptics_touch_sysfs_remove();
 
 	if (ts->report_data != NULL)
@@ -4460,30 +4075,16 @@ static int __devexit synaptics_ts_remove(struct i2c_client *client)
 	return 0;
 }
 
-static int synaptics_ts_suspend(struct device *dev)
+static int synaptics_ts_suspend(struct i2c_client *client)
 {
 	int ret;
 	uint16_t reg = 0;
-	struct synaptics_ts_data *ts = dev_get_drvdata(dev);
-
-	if(ts->suspended)
-	{
-		pr_info("[TP] %s: Already suspended. Skipped. FW:%d;%d;%x;%x\n",
-		__func__, ts->package_id, ts->packrat_number, syn_panel_version, ts->config_version);
-		return 0;
-	}
-	else
-	{
-		ts->suspended = true;
-		pr_info("[TP] %s: enter. FW:%d;%d;%x;%x\n",
-		__func__, ts->package_id, ts->packrat_number, syn_panel_version, ts->config_version);
-	}
+	struct synaptics_ts_data *ts = i2c_get_clientdata(client);
+	pr_info("[TP] %s: enter\n", __func__);
 
 	if (ts->use_irq) {
-		if (ts->irq_enabled) {
-			disable_irq(ts->client->irq);
-			ts->irq_enabled = 0;
-		}
+		disable_irq(client->irq);
+		ts->irq_enabled = 0;
 	} else {
 		hrtimer_cancel(&ts->timer);
 		ret = cancel_work_sync(&ts->work);
@@ -4583,49 +4184,37 @@ static int synaptics_ts_suspend(struct device *dev)
 	else {
 		if (ts->packrat_number >= SYNAPTICS_FW_NOCAL_PACKRAT) {
 #if defined(CONFIG_SYNC_TOUCH_STATUS)
-			if(ts->gpio_i2c < 0) {
-				pr_info("[TP] %s: sleep: 0x01\n", __func__);
-				ret = i2c_syn_write_byte_data(ts->client,
-					get_address_base(ts, 0x01, CONTROL_BASE), 0x01); 
-				if (ret < 0)
-					i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "sleep: 0x01", __func__);
-			}
 #else
-			ret = i2c_syn_write_byte_data(ts->client,
+			ret = i2c_syn_write_byte_data(client,
 					get_address_base(ts, 0x01, CONTROL_BASE), 0x01); 
 			if (ret < 0)
 				i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "sleep: 0x01", __func__);
 #endif
 		} else {
 			if (ts->psensor_status > 0 ) {
-				ret = i2c_syn_write_byte_data(ts->client,
+				ret = i2c_syn_write_byte_data(client,
 					get_address_base(ts, 0x01, CONTROL_BASE), 0x02); 
 				if (ret < 0)
 					i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "sleep: 0x02", __func__);
 			} else {
-				ret = i2c_syn_write_byte_data(ts->client,
+				ret = i2c_syn_write_byte_data(client,
 					get_address_base(ts, 0x01, CONTROL_BASE), 0x01); 
 				if (ret < 0)
 					i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "sleep: 0x01", __func__);
 			}
 		}
 	}
-#if defined(CONFIG_SYNC_TOUCH_STATUS)
-	switch_sensor_hub(ts, 1);
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+	scr_suspended = true;
 #endif
 	return 0;
 }
 
-static int synaptics_ts_resume(struct device *dev)
+static int synaptics_ts_resume(struct i2c_client *client)
 {
 	int ret, i;
-	struct synaptics_ts_data *ts = dev_get_drvdata(dev);
-	pr_info("[TP] %s: enter. FW:%d;%d;%x;%x\n",
-	__func__, ts->package_id, ts->packrat_number, syn_panel_version, ts->config_version);
-
-#if defined(CONFIG_SYNC_TOUCH_STATUS)
-	switch_sensor_hub(ts, 0);
-#endif
+	struct synaptics_ts_data *ts = i2c_get_clientdata(client);
+	pr_info("[TP] %s: enter\n", __func__);
 
 	if (ts->power) {
 		ts->power(1);
@@ -4638,7 +4227,7 @@ static int synaptics_ts_resume(struct device *dev)
 		}
 #endif
 	} else {
-		ret = i2c_syn_write_byte_data(ts->client,
+		ret = i2c_syn_write_byte_data(client,
 			get_address_base(ts, 0x01, CONTROL_BASE), 0x00); 
 		if (ret < 0)
 			i2c_syn_error_handler(ts, ts->i2c_err_handler_en, "wake up", __func__);
@@ -4683,41 +4272,16 @@ static int synaptics_ts_resume(struct device *dev)
 	}
 
 	if (ts->use_irq) {
-		if (!ts->irq_enabled) {
-			enable_irq(ts->client->irq);
+		enable_irq(client->irq);
 			ts->irq_enabled = 1;
-		}
 	}
 	else
 		hrtimer_start(&ts->timer, ktime_set(1, 0), HRTIMER_MODE_REL);
-
-	ts->suspended = false;
+#ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
+    scr_suspended = false;
+#endif 
 	return 0;
 }
-
-#if defined(CONFIG_SYNC_TOUCH_STATUS)
-static void switch_sensor_hub(struct synaptics_ts_data* ts, int mode)
-{
-	if(ts->gpio_i2c >= 0) {
-		switch(mode)
-		{
-		case 0:
-			touch_status(0);
-			gpio_direction_output(ts->gpio_i2c, 0);
-			ts->i2c_to_mcu = 0;
-			printk("[TP][SensorHub] Switch touch i2c to CPU\n");
-			i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "resume from MCU", __func__); 
-			break;
-		case 1:
-			gpio_direction_output(ts->gpio_i2c, 1);
-			ts->i2c_to_mcu = 1;
-			printk("[TP][SensorHub] Switch touch i2c to MCU\n");
-			touch_status(1);
-			break;
-		}
-	}
-}
-#endif
 
 #if defined(CONFIG_FB)
 static int fb_notifier_callback(struct notifier_block *self,
@@ -4734,18 +4298,37 @@ static int fb_notifier_callback(struct notifier_block *self,
 		blank = evdata->data;
 		switch (*blank) {
 		case FB_BLANK_UNBLANK:
-			synaptics_ts_resume(&ts->client->dev);
+#if defined(CONFIG_SYNC_TOUCH_STATUS)
+			touch_status(0);
+
+			if(gpio_is_valid(ts->gpio_i2c))
+			{
+				gpio_direction_output(ts->gpio_i2c, 0);
+				ts->i2c_to_mcu = 0;
+				printk("[TP][SensorHub] Switch touch i2c to CPU\n");
+				i2c_syn_reset_handler(ts, ts->i2c_err_handler_en, "resume from MCU", __func__); 
+			}
+#endif
+			synaptics_ts_resume(ts->client);
 			break;
 		case FB_BLANK_POWERDOWN:
 		case FB_BLANK_HSYNC_SUSPEND:
 		case FB_BLANK_VSYNC_SUSPEND:
 		case FB_BLANK_NORMAL:
-            if (ts->syn_cover_wq)
+#if defined(CONFIG_SYNC_TOUCH_STATUS)
+#endif
+
+			synaptics_ts_suspend(ts->client);
+
+#if defined(CONFIG_SYNC_TOUCH_STATUS)
+			if(gpio_is_valid(ts->gpio_i2c))
 			{
-				printk("[TP] Suspend , Flush cover workqueue");
-				flush_workqueue( ts->syn_cover_wq );
+				gpio_direction_output(ts->gpio_i2c, 1);
+				ts->i2c_to_mcu = 1;
+				printk("[TP][SensorHub] Switch touch i2c to MCU\n");
 			}
-			synaptics_ts_suspend(&ts->client->dev);
+			touch_status(1);
+#endif
 			break;
 		}
 	}
@@ -4757,14 +4340,14 @@ static void synaptics_ts_early_suspend(struct early_suspend *h)
 {
 	struct synaptics_ts_data *ts;
 	ts = container_of(h, struct synaptics_ts_data, early_suspend);
-	synaptics_ts_suspend(ts->client->dev);
+	synaptics_ts_suspend(ts->client);
 }
 
 static void synaptics_ts_late_resume(struct early_suspend *h)
 {
 	struct synaptics_ts_data *ts;
 	ts = container_of(h, struct synaptics_ts_data, early_suspend);
-	synaptics_ts_resume(ts->client->dev);
+	synaptics_ts_resume(ts->client);
 }
 #endif
 
@@ -4772,8 +4355,6 @@ static const struct dev_pm_ops synaptics_pm_ops = {
 #if (!defined(CONFIG_FB) && !defined(CONFIG_HAS_EARLYSUSPEND))
 	.suspend = synaptics_ts_suspend,
 	.resume  = synaptics_ts_resume,
-#else
-	.suspend = synaptics_ts_suspend,
 #endif
 };
 
