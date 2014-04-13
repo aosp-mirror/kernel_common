@@ -57,7 +57,7 @@ struct qpnp_vib {
 	u8 enlarge_vib_diff_value;
 };
 
-static struct qpnp_vib *vib_dev;
+struct qpnp_vib *vib_dev;
 
 static struct of_device_id spmi_match_table[];
 
