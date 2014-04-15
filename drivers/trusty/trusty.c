@@ -44,12 +44,12 @@ struct trusty_state {
 #define SMC_REGISTERS_TRASHED	"ip"
 #endif
 
-static inline u32 smc(u32 r0, u32 r1, u32 r2, u32 r3)
+static inline ulong smc(ulong r0, ulong r1, ulong r2, ulong r3)
 {
-	register u32 _r0 asm(SMC_ARG0) = r0;
-	register u32 _r1 asm(SMC_ARG1) = r1;
-	register u32 _r2 asm(SMC_ARG2) = r2;
-	register u32 _r3 asm(SMC_ARG3) = r3;
+	register ulong _r0 asm(SMC_ARG0) = r0;
+	register ulong _r1 asm(SMC_ARG1) = r1;
+	register ulong _r2 asm(SMC_ARG2) = r2;
+	register ulong _r3 asm(SMC_ARG3) = r3;
 
 	asm volatile(
 		__asmeq("%0", SMC_ARG0)
@@ -74,10 +74,24 @@ s32 trusty_fast_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 
 	BUG_ON(!s);
 	BUG_ON(!SMC_IS_FASTCALL(smcnr));
+	BUG_ON(SMC_IS_SMC64(smcnr));
 
 	return smc(smcnr, a0, a1, a2);
 }
 EXPORT_SYMBOL(trusty_fast_call32);
+
+#ifdef CONFIG_64BIT
+s64 trusty_fast_call64(struct device *dev, u64 smcnr, u64 a0, u64 a1, u64 a2)
+{
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	BUG_ON(!s);
+	BUG_ON(!SMC_IS_FASTCALL(smcnr));
+	BUG_ON(!SMC_IS_SMC64(smcnr));
+
+	return smc(smcnr, a0, a1, a2);
+}
+#endif
 
 s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 {
@@ -85,6 +99,7 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
 	BUG_ON(SMC_IS_FASTCALL(smcnr));
+	BUG_ON(SMC_IS_SMC64(smcnr));
 
 	mutex_lock(&s->smc_lock);
 
