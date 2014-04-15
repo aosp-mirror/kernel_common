@@ -11,7 +11,13 @@ config TRUSTY
 config TRUSTY_FIQ
 	tristate
 	depends on TRUSTY
-	depends on FIQ
+
+config TRUSTY_FIQ_ARM
+	tristate
+	depends on TRUSTY
+	depends on ARM
+	select FIQ_GLUE
+	select TRUSTY_FIQ
 	default y
 
 endmenu

@@ -12,23 +12,12 @@
  *
  */
 
-#include <asm/fiq_glue.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/trusty/smcall.h>
 #include <linux/trusty/trusty.h>
 
-#define _STRINGIFY(x) #x
-#define STRINGIFY(x) _STRINGIFY(x)
-
-static void __naked trusty_fiq_return(void)
-{
-	asm volatile(
-		".arch_extension sec\n"
-		"mov	r12, r0\n"
-		"ldr	r0, =" STRINGIFY(SMC_FC_FIQ_EXIT) "\n"
-		"smc	#0");
-}
+#include "trusty-fiq.h"
 
 static int trusty_fiq_remove_child(struct device *dev, void *data)
 {
@@ -40,7 +29,7 @@ static int trusty_fiq_probe(struct platform_device *pdev)
 {
 	int ret;
 
-	ret = fiq_glue_set_return_handler(trusty_fiq_return);
+	ret = trusty_fiq_arch_probe(pdev);
 	if (ret)
 		goto err_set_fiq_return;
 
@@ -54,6 +43,7 @@ static int trusty_fiq_probe(struct platform_device *pdev)
 
 err_add_children:
 	device_for_each_child(&pdev->dev, NULL, trusty_fiq_remove_child);
+	trusty_fiq_arch_remove(pdev);
 err_set_fiq_return:
 	return ret;
 }
@@ -61,7 +51,7 @@ err_set_fiq_return:
 static int trusty_fiq_remove(struct platform_device *pdev)
 {
 	device_for_each_child(&pdev->dev, NULL, trusty_fiq_remove_child);
-	fiq_glue_clear_return_handler(trusty_fiq_return);
+	trusty_fiq_arch_remove(pdev);
 	return 0;
 }
 
