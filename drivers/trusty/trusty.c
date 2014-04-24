@@ -27,7 +27,7 @@ struct trusty_state {
 	struct atomic_notifier_head notifier;
 };
 
-#if CONFIG_ARM64
+#ifdef CONFIG_ARM64
 #define SMC_ARG0		"x0"
 #define SMC_ARG1		"x1"
 #define SMC_ARG2		"x2"
