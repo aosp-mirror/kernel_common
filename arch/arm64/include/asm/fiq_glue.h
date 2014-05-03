@@ -15,6 +15,7 @@
 #define __ASM_FIQ_GLUE_H
 
 struct fiq_glue_handler {
+	struct fiq_glue_handler *next;
 	void (*fiq)(struct fiq_glue_handler *h, const struct pt_regs *regs,
 		    void *svc_sp);
 	void (*resume)(struct fiq_glue_handler *h);
