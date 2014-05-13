@@ -70,4 +70,15 @@ static struct platform_driver trusty_fiq_driver = {
 	},
 };
 
-module_platform_driver(trusty_fiq_driver);
+static int __init trusty_fiq_driver_init(void)
+{
+	return platform_driver_register(&trusty_fiq_driver);
+}
+
+static void __exit trusty_fiq_driver_exit(void)
+{
+	platform_driver_unregister(&trusty_fiq_driver);
+}
+
+subsys_initcall(trusty_fiq_driver_init);
+module_exit(trusty_fiq_driver_exit);
