@@ -217,4 +217,15 @@ static struct platform_driver trusty_driver = {
 	},
 };
 
-module_platform_driver(trusty_driver);
+static int __init trusty_driver_init(void)
+{
+	return platform_driver_register(&trusty_driver);
+}
+
+static void __exit trusty_driver_exit(void)
+{
+	platform_driver_unregister(&trusty_driver);
+}
+
+subsys_initcall(trusty_driver_init);
+module_exit(trusty_driver_exit);
