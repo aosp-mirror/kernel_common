@@ -90,6 +90,12 @@ config DEVFREQ_GOV_MSM_CPUBW_HWMON
 	  with existing profiling tools.  This governor is unlikely to be
 	  useful for other devices.
 
+config SIMPLE_GPU_ALGORITHM
+	bool "Simple GPU algorithm"
+	depends on DEVFREQ_GOV_MSM_ADRENO_TZ
+	help
+	  Simple user configurable GPU controlling algorithm
+
 comment "DEVFREQ Drivers"
 
 config ARM_EXYNOS4_BUS_DEVFREQ
