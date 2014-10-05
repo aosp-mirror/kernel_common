@@ -13,6 +13,7 @@
  */
 
 #include <asm/compiler.h>
+#include <linux/delay.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
@@ -93,6 +94,67 @@ s64 trusty_fast_call64(struct device *dev, u64 smcnr, u64 a0, u64 a1, u64 a2)
 }
 #endif
 
+static ulong trusty_std_call_inner(struct device *dev, ulong smcnr,
+				   ulong a0, ulong a1, ulong a2)
+{
+	ulong ret;
+	int retry = 5;
+
+	dev_dbg(dev, "%s(0x%lx 0x%lx 0x%lx 0x%lx)\n",
+		__func__, smcnr, a0, a1, a2);
+	while (true) {
+		ret = smc(smcnr, a0, a1, a2);
+		if ((int)ret != SM_ERR_BUSY || !retry)
+			break;
+
+		dev_dbg(dev, "%s(0x%lx 0x%lx 0x%lx 0x%lx) returned busy, retry\n",
+			__func__, smcnr, a0, a1, a2);
+		retry--;
+	}
+
+	return ret;
+}
+
+static ulong trusty_std_call_helper(struct device *dev, ulong smcnr,
+				    ulong a0, ulong a1, ulong a2)
+{
+	ulong ret;
+	int sleep_time = 1;
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	while (true) {
+		local_irq_disable();
+		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_PREPARE,
+					   NULL);
+		ret = trusty_std_call_inner(dev, smcnr, a0, a1, a2);
+		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_RETURNED,
+					   NULL);
+		local_irq_enable();
+
+		if ((int)ret != SM_ERR_BUSY)
+			break;
+
+		if (sleep_time == 256)
+			dev_warn(dev, "%s(0x%lx 0x%lx 0x%lx 0x%lx) returned busy\n",
+				 __func__, smcnr, a0, a1, a2);
+		dev_dbg(dev, "%s(0x%lx 0x%lx 0x%lx 0x%lx) returned busy, wait %d ms\n",
+			__func__, smcnr, a0, a1, a2, sleep_time);
+
+		msleep(sleep_time);
+		if (sleep_time < 1000)
+			sleep_time <<= 1;
+
+		dev_dbg(dev, "%s(0x%lx 0x%lx 0x%lx 0x%lx) retry\n",
+			__func__, smcnr, a0, a1, a2);
+	}
+
+	if (sleep_time > 256)
+		dev_warn(dev, "%s(0x%lx 0x%lx 0x%lx 0x%lx) busy cleared\n",
+			 __func__, smcnr, a0, a1, a2);
+
+	return ret;
+}
+
 s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 {
 	int ret;
@@ -103,29 +165,17 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 
 	mutex_lock(&s->smc_lock);
 
-	local_irq_disable();
 	dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) started\n",
 		__func__, smcnr, a0, a1, a2);
 
-	atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_PREPARE, NULL);
-	ret = smc(smcnr, a0, a1, a2);
-	atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_RETURNED, NULL);
-
+	ret = trusty_std_call_helper(dev, smcnr, a0, a1, a2);
 	while (ret == SM_ERR_INTERRUPTED) {
 		dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) interrupted\n",
 			__func__, smcnr, a0, a1, a2);
-		local_irq_enable();
-		local_irq_disable();
-		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_PREPARE,
-					   NULL);
-		ret = smc(SMC_SC_RESTART_LAST, 0, 0, 0);
-		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_RETURNED,
-					   NULL);
+		ret = trusty_std_call_helper(dev, SMC_SC_RESTART_LAST, 0, 0, 0);
 	}
 	dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) returned 0x%x\n",
 		__func__, smcnr, a0, a1, a2, ret);
-
-	local_irq_enable();
 
 	mutex_unlock(&s->smc_lock);
 
