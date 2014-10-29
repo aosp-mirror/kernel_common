@@ -75,6 +75,7 @@ struct blk_shadow {
 	struct blkif_request req;
 	struct request *request;
 	struct grant *grants_used[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+	struct scatterlist sg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 };
 
 static DEFINE_MUTEX(blkfront_mutex);
@@ -98,13 +99,12 @@ struct blkfront_info
 	enum blkif_state connected;
 	int ring_ref;
 	struct blkif_front_ring ring;
-	struct scatterlist sg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	unsigned int evtchn, irq;
 	struct request_queue *rq;
 	struct work_struct work;
 	struct gnttab_free_callback callback;
 	struct blk_shadow shadow[BLK_RING_SIZE];
-	struct list_head persistent_gnts;
+	struct list_head grants;
 	unsigned int persistent_gnts_c;
 	unsigned long shadow_free;
 	unsigned int feature_flush;
@@ -175,15 +175,17 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
 		if (!gnt_list_entry)
 			goto out_of_memory;
 
-		granted_page = alloc_page(GFP_NOIO);
-		if (!granted_page) {
-			kfree(gnt_list_entry);
-			goto out_of_memory;
+		if (info->feature_persistent) {
+			granted_page = alloc_page(GFP_NOIO);
+			if (!granted_page) {
+				kfree(gnt_list_entry);
+				goto out_of_memory;
+			}
+			gnt_list_entry->pfn = page_to_pfn(granted_page);
 		}
 
-		gnt_list_entry->pfn = page_to_pfn(granted_page);
 		gnt_list_entry->gref = GRANT_INVALID_REF;
-		list_add(&gnt_list_entry->node, &info->persistent_gnts);
+		list_add(&gnt_list_entry->node, &info->grants);
 		i++;
 	}
 
@@ -191,9 +193,10 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
 
 out_of_memory:
 	list_for_each_entry_safe(gnt_list_entry, n,
-	                         &info->persistent_gnts, node) {
+	                         &info->grants, node) {
 		list_del(&gnt_list_entry->node);
-		__free_page(pfn_to_page(gnt_list_entry->pfn));
+		if (info->feature_persistent)
+			__free_page(pfn_to_page(gnt_list_entry->pfn));
 		kfree(gnt_list_entry);
 		i--;
 	}
@@ -202,14 +205,14 @@ out_of_memory:
 }
 
 static struct grant *get_grant(grant_ref_t *gref_head,
+                               unsigned long pfn,
                                struct blkfront_info *info)
 {
 	struct grant *gnt_list_entry;
 	unsigned long buffer_mfn;
 
-	BUG_ON(list_empty(&info->persistent_gnts));
-	gnt_list_entry = list_first_entry(&info->persistent_gnts, struct grant,
-	                                  node);
+	BUG_ON(list_empty(&info->grants));
+	gnt_list_entry = list_first_entry(&info->grants, struct grant, node);
 	list_del(&gnt_list_entry->node);
 
 	if (gnt_list_entry->gref != GRANT_INVALID_REF) {
@@ -220,6 +223,10 @@ static struct grant *get_grant(grant_ref_t *gref_head,
 	/* Assign a gref to this page */
 	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
 	BUG_ON(gnt_list_entry->gref == -ENOSPC);
+	if (!info->feature_persistent) {
+		BUG_ON(!pfn);
+		gnt_list_entry->pfn = pfn;
+	}
 	buffer_mfn = pfn_to_mfn(gnt_list_entry->pfn);
 	gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
 	                                info->xbdev->otherend_id,
@@ -422,20 +429,20 @@ static int blkif_queue_request(struct request *req)
 			ring_req->u.discard.flag = 0;
 	} else {
 		ring_req->u.rw.nr_segments = blk_rq_map_sg(req->q, req,
-							   info->sg);
+							   info->shadow[id].sg);
 		BUG_ON(ring_req->u.rw.nr_segments >
 		       BLKIF_MAX_SEGMENTS_PER_REQUEST);
 
-		for_each_sg(info->sg, sg, ring_req->u.rw.nr_segments, i) {
+		for_each_sg(info->shadow[id].sg, sg, ring_req->u.rw.nr_segments, i) {
 			fsect = sg->offset >> 9;
 			lsect = fsect + (sg->length >> 9) - 1;
 
-			gnt_list_entry = get_grant(&gref_head, info);
+			gnt_list_entry = get_grant(&gref_head, page_to_pfn(sg_page(sg)), info);
 			ref = gnt_list_entry->gref;
 
 			info->shadow[id].grants_used[i] = gnt_list_entry;
 
-			if (rq_data_dir(req)) {
+			if (rq_data_dir(req) && info->feature_persistent) {
 				char *bvec_data;
 				void *shared_data;
 
@@ -828,16 +835,17 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 		blk_stop_queue(info->rq);
 
 	/* Remove all persistent grants */
-	if (!list_empty(&info->persistent_gnts)) {
+	if (!list_empty(&info->grants)) {
 		list_for_each_entry_safe(persistent_gnt, n,
-		                         &info->persistent_gnts, node) {
+		                         &info->grants, node) {
 			list_del(&persistent_gnt->node);
 			if (persistent_gnt->gref != GRANT_INVALID_REF) {
 				gnttab_end_foreign_access(persistent_gnt->gref,
 				                          0, 0UL);
 				info->persistent_gnts_c--;
 			}
-			__free_page(pfn_to_page(persistent_gnt->pfn));
+			if (info->feature_persistent)
+				__free_page(pfn_to_page(persistent_gnt->pfn));
 			kfree(persistent_gnt);
 		}
 	}
@@ -867,39 +875,57 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
 			     struct blkif_response *bret)
 {
 	int i = 0;
-	struct bio_vec *bvec;
-	struct req_iterator iter;
-	unsigned long flags;
+	struct scatterlist *sg;
 	char *bvec_data;
 	void *shared_data;
-	unsigned int offset = 0;
+	int nseg;
 
-	if (bret->operation == BLKIF_OP_READ) {
+	nseg = s->req.u.rw.nr_segments;
+
+	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
 		/*
 		 * Copy the data received from the backend into the bvec.
 		 * Since bv_offset can be different than 0, and bv_len different
 		 * than PAGE_SIZE, we have to keep track of the current offset,
 		 * to be sure we are copying the data from the right shared page.
 		 */
-		rq_for_each_segment(bvec, s->request, iter) {
-			BUG_ON((bvec->bv_offset + bvec->bv_len) > PAGE_SIZE);
-			if (bvec->bv_offset < offset)
-				i++;
-			BUG_ON(i >= s->req.u.rw.nr_segments);
+		for_each_sg(s->sg, sg, nseg, i) {
+			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
 			shared_data = kmap_atomic(
 				pfn_to_page(s->grants_used[i]->pfn));
-			bvec_data = bvec_kmap_irq(bvec, &flags);
-			memcpy(bvec_data, shared_data + bvec->bv_offset,
-				bvec->bv_len);
-			bvec_kunmap_irq(bvec_data, &flags);
+			bvec_data = kmap_atomic(sg_page(sg));
+			memcpy(bvec_data   + sg->offset,
+			       shared_data + sg->offset,
+			       sg->length);
+			kunmap_atomic(bvec_data);
 			kunmap_atomic(shared_data);
-			offset = bvec->bv_offset + bvec->bv_len;
 		}
 	}
 	/* Add the persistent grant into the list of free grants */
-	for (i = 0; i < s->req.u.rw.nr_segments; i++) {
-		list_add(&s->grants_used[i]->node, &info->persistent_gnts);
-		info->persistent_gnts_c++;
+	for (i = 0; i < nseg; i++) {
+		if (gnttab_query_foreign_access(s->grants_used[i]->gref)) {
+			/*
+			 * If the grant is still mapped by the backend (the
+			 * backend has chosen to make this grant persistent)
+			 * we add it at the head of the list, so it will be
+			 * reused first.
+			 */
+			if (!info->feature_persistent)
+				pr_alert_ratelimited("backed has not unmapped grant: %u\n",
+						     s->grants_used[i]->gref);
+			list_add(&s->grants_used[i]->node, &info->grants);
+			info->persistent_gnts_c++;
+		} else {
+			/*
+			 * If the grant is not mapped by the backend we end the
+			 * foreign access and add it to the tail of the list,
+			 * so it will not be picked again unless we run out of
+			 * persistent grants.
+			 */
+			gnttab_end_foreign_access(s->grants_used[i]->gref, 0, 0UL);
+			s->grants_used[i]->gref = GRANT_INVALID_REF;
+			list_add_tail(&s->grants_used[i]->node, &info->grants);
+		}
 	}
 }
 
@@ -1022,7 +1048,7 @@ static int setup_blkring(struct xenbus_device *dev,
 			 struct blkfront_info *info)
 {
 	struct blkif_sring *sring;
-	int err;
+	int err, i;
 
 	info->ring_ref = GRANT_INVALID_REF;
 
@@ -1034,13 +1060,8 @@ static int setup_blkring(struct xenbus_device *dev,
 	SHARED_RING_INIT(sring);
 	FRONT_RING_INIT(&info->ring, sring, PAGE_SIZE);
 
-	sg_init_table(info->sg, BLKIF_MAX_SEGMENTS_PER_REQUEST);
-
-	/* Allocate memory for grants */
-	err = fill_grant_buffer(info, BLK_RING_SIZE *
-	                              BLKIF_MAX_SEGMENTS_PER_REQUEST);
-	if (err)
-		goto fail;
+	for (i = 0; i < BLK_RING_SIZE; i++)
+		sg_init_table(info->shadow[i].sg, BLKIF_MAX_SEGMENTS_PER_REQUEST);
 
 	err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
 	if (err < 0) {
@@ -1200,7 +1221,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	spin_lock_init(&info->io_lock);
 	info->xbdev = dev;
 	info->vdevice = vdevice;
-	INIT_LIST_HEAD(&info->persistent_gnts);
+	INIT_LIST_HEAD(&info->grants);
 	info->persistent_gnts_c = 0;
 	info->connected = BLKIF_STATE_DISCONNECTED;
 	INIT_WORK(&info->work, blkif_restart_queue);
@@ -1229,7 +1250,8 @@ static int blkif_recover(struct blkfront_info *info)
 	int i;
 	struct blkif_request *req;
 	struct blk_shadow *copy;
-	int j;
+	unsigned int persistent;
+	int j, rc;
 
 	/* Stage 1: Make a safe copy of the shadow state. */
 	copy = kmemdup(info->shadow, sizeof(info->shadow),
@@ -1243,6 +1265,24 @@ static int blkif_recover(struct blkfront_info *info)
 		info->shadow[i].req.u.rw.id = i+1;
 	info->shadow_free = info->ring.req_prod_pvt;
 	info->shadow[BLK_RING_SIZE-1].req.u.rw.id = 0x0fffffff;
+
+	/* Check if the backend supports persistent grants */
+	rc = xenbus_gather(XBT_NIL, info->xbdev->otherend,
+			   "feature-persistent", "%u", &persistent,
+			   NULL);
+	if (rc)
+		info->feature_persistent = 0;
+	else
+		info->feature_persistent = persistent;
+
+	/* Allocate memory for grants */
+	rc = fill_grant_buffer(info, BLK_RING_SIZE *
+	                             BLKIF_MAX_SEGMENTS_PER_REQUEST);
+	if (rc) {
+		xenbus_dev_fatal(info->xbdev, rc, "setting grant buffer failed");
+		kfree(copy);
+		return rc;
+	}
 
 	/* Stage 3: Find pending requests and requeue them. */
 	for (i = 0; i < BLK_RING_SIZE; i++) {
@@ -1308,8 +1348,12 @@ static int blkfront_resume(struct xenbus_device *dev)
 	blkif_free(info, info->connected == BLKIF_STATE_CONNECTED);
 
 	err = talk_to_blkback(dev, info);
-	if (info->connected == BLKIF_STATE_SUSPENDED && !err)
-		err = blkif_recover(info);
+
+	/*
+	 * We have to wait for the backend to switch to
+	 * connected state, since we want to read which
+	 * features it supports.
+	 */
 
 	return err;
 }
@@ -1413,9 +1457,16 @@ static void blkfront_connect(struct blkfront_info *info)
 		       sectors);
 		set_capacity(info->gd, sectors);
 		revalidate_disk(info->gd);
+		return;
 
-		/* fall through */
 	case BLKIF_STATE_SUSPENDED:
+		/*
+		 * If we are recovering from suspension, we need to wait
+		 * for the backend to announce it's features before
+		 * reconnecting, we need to know if the backend supports
+		 * persistent grants.
+		 */
+		blkif_recover(info);
 		return;
 
 	default:
@@ -1483,6 +1534,14 @@ static void blkfront_connect(struct blkfront_info *info)
 	else
 		info->feature_persistent = persistent;
 
+	/* Allocate memory for grants */
+	err = fill_grant_buffer(info, BLK_RING_SIZE *
+	                              BLKIF_MAX_SEGMENTS_PER_REQUEST);
+	if (err) {
+		xenbus_dev_fatal(info->xbdev, err, "setting grant buffer failed");
+		return;
+	}
+
 	err = xlvbd_alloc_gendisk(sectors, info, binfo, sector_size);
 	if (err) {
 		xenbus_dev_fatal(info->xbdev, err, "xlvbd_add at %s",
@@ -1520,13 +1579,16 @@ static void blkback_changed(struct xenbus_device *dev,
 	case XenbusStateReconfiguring:
 	case XenbusStateReconfigured:
 	case XenbusStateUnknown:
-	case XenbusStateClosed:
 		break;
 
 	case XenbusStateConnected:
 		blkfront_connect(info);
 		break;
 
+	case XenbusStateClosed:
+		if (dev->state == XenbusStateClosed)
+			break;
+		/* Missed the backend's Closing state -- fallthrough */
 	case XenbusStateClosing:
 		blkfront_closing(info);
 		break;
