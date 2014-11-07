@@ -43,7 +43,7 @@ static s32 ixgbe_clock_out_i2c_bit(struct ixgbe_hw *hw, bool data);
 static void ixgbe_raise_i2c_clk(struct ixgbe_hw *hw, u32 *i2cctl);
 static void ixgbe_lower_i2c_clk(struct ixgbe_hw *hw, u32 *i2cctl);
 static s32 ixgbe_set_i2c_data(struct ixgbe_hw *hw, u32 *i2cctl, bool data);
-static bool ixgbe_get_i2c_data(u32 *i2cctl);
+static bool ixgbe_get_i2c_data(struct ixgbe_hw *hw, u32 *i2cctl);
 static void ixgbe_i2c_bus_clear(struct ixgbe_hw *hw);
 static enum ixgbe_phy_type ixgbe_get_phy_type_from_id(u32 phy_id);
 static s32 ixgbe_get_phy_id(struct ixgbe_hw *hw);
@@ -576,6 +576,10 @@ s32 ixgbe_get_copper_link_capabilities_generic(struct ixgbe_hw *hw,
 			*speed |= IXGBE_LINK_SPEED_100_FULL;
 	}
 
+	/* Internal PHY does not support 100 Mbps */
+	if (hw->mac.type == ixgbe_mac_X550EM_x)
+		*speed &= ~IXGBE_LINK_SPEED_100_FULL;
+
 	return status;
 }
 
@@ -632,6 +636,9 @@ s32 ixgbe_check_phy_link_tnx(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
  *	@hw: pointer to hardware structure
  *
  *	Restart autonegotiation and PHY and waits for completion.
+ *      This function always returns success, this is nessary since
+ *	it is called via a function pointer that could call other
+ *	functions that could return an error.
  **/
 s32 ixgbe_setup_phy_link_tnx(struct ixgbe_hw *hw)
 {
@@ -1610,7 +1617,7 @@ fail:
  **/
 static void ixgbe_i2c_start(struct ixgbe_hw *hw)
 {
-	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
+	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
 
 	/* Start condition must begin with data and clock high */
 	ixgbe_set_i2c_data(hw, &i2cctl, 1);
@@ -1639,7 +1646,7 @@ static void ixgbe_i2c_start(struct ixgbe_hw *hw)
  **/
 static void ixgbe_i2c_stop(struct ixgbe_hw *hw)
 {
-	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
+	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
 
 	/* Stop condition must begin with data low and clock high */
 	ixgbe_set_i2c_data(hw, &i2cctl, 0);
@@ -1697,9 +1704,9 @@ static s32 ixgbe_clock_out_i2c_byte(struct ixgbe_hw *hw, u8 data)
 	}
 
 	/* Release SDA line (set high) */
-	i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
-	i2cctl |= IXGBE_I2C_DATA_OUT;
-	IXGBE_WRITE_REG(hw, IXGBE_I2CCTL, i2cctl);
+	i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
+	i2cctl |= IXGBE_I2C_DATA_OUT_BY_MAC(hw);
+	IXGBE_WRITE_REG(hw, IXGBE_I2CCTL_BY_MAC(hw), i2cctl);
 	IXGBE_WRITE_FLUSH(hw);
 
 	return status;
@@ -1715,7 +1722,7 @@ static s32 ixgbe_get_i2c_ack(struct ixgbe_hw *hw)
 {
 	s32 status = 0;
 	u32 i = 0;
-	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
+	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
 	u32 timeout = 10;
 	bool ack = true;
 
@@ -1728,8 +1735,8 @@ static s32 ixgbe_get_i2c_ack(struct ixgbe_hw *hw)
 	/* Poll for ACK.  Note that ACK in I2C spec is
 	 * transition from 1 to 0 */
 	for (i = 0; i < timeout; i++) {
-		i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
-		ack = ixgbe_get_i2c_data(&i2cctl);
+		i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
+		ack = ixgbe_get_i2c_data(hw, &i2cctl);
 
 		udelay(1);
 		if (ack == 0)
@@ -1758,15 +1765,15 @@ static s32 ixgbe_get_i2c_ack(struct ixgbe_hw *hw)
  **/
 static s32 ixgbe_clock_in_i2c_bit(struct ixgbe_hw *hw, bool *data)
 {
-	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
+	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
 
 	ixgbe_raise_i2c_clk(hw, &i2cctl);
 
 	/* Minimum high period of clock is 4us */
 	udelay(IXGBE_I2C_T_HIGH);
 
-	i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
-	*data = ixgbe_get_i2c_data(&i2cctl);
+	i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
+	*data = ixgbe_get_i2c_data(hw, &i2cctl);
 
 	ixgbe_lower_i2c_clk(hw, &i2cctl);
 
@@ -1786,7 +1793,7 @@ static s32 ixgbe_clock_in_i2c_bit(struct ixgbe_hw *hw, bool *data)
 static s32 ixgbe_clock_out_i2c_bit(struct ixgbe_hw *hw, bool data)
 {
 	s32 status;
-	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
+	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
 
 	status = ixgbe_set_i2c_data(hw, &i2cctl, data);
 	if (status == 0) {
@@ -1822,14 +1829,14 @@ static void ixgbe_raise_i2c_clk(struct ixgbe_hw *hw, u32 *i2cctl)
 	u32 i2cctl_r = 0;
 
 	for (i = 0; i < timeout; i++) {
-		*i2cctl |= IXGBE_I2C_CLK_OUT;
-		IXGBE_WRITE_REG(hw, IXGBE_I2CCTL, *i2cctl);
+		*i2cctl |= IXGBE_I2C_CLK_OUT_BY_MAC(hw);
+		IXGBE_WRITE_REG(hw, IXGBE_I2CCTL_BY_MAC(hw), *i2cctl);
 		IXGBE_WRITE_FLUSH(hw);
 		/* SCL rise time (1000ns) */
 		udelay(IXGBE_I2C_T_RISE);
 
-		i2cctl_r = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
-		if (i2cctl_r & IXGBE_I2C_CLK_IN)
+		i2cctl_r = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
+		if (i2cctl_r & IXGBE_I2C_CLK_IN_BY_MAC(hw))
 			break;
 	}
 }
@@ -1844,9 +1851,9 @@ static void ixgbe_raise_i2c_clk(struct ixgbe_hw *hw, u32 *i2cctl)
 static void ixgbe_lower_i2c_clk(struct ixgbe_hw *hw, u32 *i2cctl)
 {
 
-	*i2cctl &= ~IXGBE_I2C_CLK_OUT;
+	*i2cctl &= ~IXGBE_I2C_CLK_OUT_BY_MAC(hw);
 
-	IXGBE_WRITE_REG(hw, IXGBE_I2CCTL, *i2cctl);
+	IXGBE_WRITE_REG(hw, IXGBE_I2CCTL_BY_MAC(hw), *i2cctl);
 	IXGBE_WRITE_FLUSH(hw);
 
 	/* SCL fall time (300ns) */
@@ -1864,19 +1871,19 @@ static void ixgbe_lower_i2c_clk(struct ixgbe_hw *hw, u32 *i2cctl)
 static s32 ixgbe_set_i2c_data(struct ixgbe_hw *hw, u32 *i2cctl, bool data)
 {
 	if (data)
-		*i2cctl |= IXGBE_I2C_DATA_OUT;
+		*i2cctl |= IXGBE_I2C_DATA_OUT_BY_MAC(hw);
 	else
-		*i2cctl &= ~IXGBE_I2C_DATA_OUT;
+		*i2cctl &= ~IXGBE_I2C_DATA_OUT_BY_MAC(hw);
 
-	IXGBE_WRITE_REG(hw, IXGBE_I2CCTL, *i2cctl);
+	IXGBE_WRITE_REG(hw, IXGBE_I2CCTL_BY_MAC(hw), *i2cctl);
 	IXGBE_WRITE_FLUSH(hw);
 
 	/* Data rise/fall (1000ns/300ns) and set-up time (250ns) */
 	udelay(IXGBE_I2C_T_RISE + IXGBE_I2C_T_FALL + IXGBE_I2C_T_SU_DATA);
 
 	/* Verify data was set correctly */
-	*i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
-	if (data != ixgbe_get_i2c_data(i2cctl)) {
+	*i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
+	if (data != ixgbe_get_i2c_data(hw, i2cctl)) {
 		hw_dbg(hw, "Error - I2C data was not set to %X.\n", data);
 		return IXGBE_ERR_I2C;
 	}
@@ -1891,9 +1898,9 @@ static s32 ixgbe_set_i2c_data(struct ixgbe_hw *hw, u32 *i2cctl, bool data)
  *
  *  Returns the I2C data bit value
  **/
-static bool ixgbe_get_i2c_data(u32 *i2cctl)
+static bool ixgbe_get_i2c_data(struct ixgbe_hw *hw, u32 *i2cctl)
 {
-	if (*i2cctl & IXGBE_I2C_DATA_IN)
+	if (*i2cctl & IXGBE_I2C_DATA_IN_BY_MAC(hw))
 		return true;
 	return false;
 }
@@ -1907,7 +1914,7 @@ static bool ixgbe_get_i2c_data(u32 *i2cctl)
  **/
 static void ixgbe_i2c_bus_clear(struct ixgbe_hw *hw)
 {
-	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL);
+	u32 i2cctl = IXGBE_READ_REG(hw, IXGBE_I2CCTL_BY_MAC(hw));
 	u32 i;
 
 	ixgbe_i2c_start(hw);
