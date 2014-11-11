@@ -109,6 +109,18 @@ config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 	  loading your cpufreq low-level hardware driver, using the
 	  'interactive' governor for latency-sensitive workloads.
 
+config CPU_FREQ_DEFAULT_GOV_ONDEMANDPLUS
+	bool "ondemandplus"
+	select CPU_FREQ_GOV_ONDEMANDPLUS
+	select CPU_FREQ_GOV_PERFORMANCE
+	---help---
+	 Use the CPUFreq governor 'ondemandplus' as default. This allows
+	 you to get a full dynamic frequency capable system by simply
+	 loading your cpufreq low-level hardware driver.
+	 Be aware that not all cpufreq drivers support the ondemandplus
+	 governor. If unsure have a look at the help section of the
+	 driver. Fallback governor will be the performance governor.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -213,6 +225,24 @@ config CPU_FREQ_GOV_CONSERVATIVE
 	  For details, take a look at linux/Documentation/cpu-freq.
 
 	  If in doubt, say N.
+
+config CPU_FREQ_GOV_ONDEMANDPLUS
+	tristate "'ondemandplus' cpufreq policy governor"
+	select CPU_FREQ_TABLE
+	---help---
+	 'ondemandplus' - This driver adds a dynamic cpufreq policy
+	 governor. The governor does a periodic polling and
+	 changes frequency based on the CPU utilization.
+	 The support for this governor depends on CPU capability to
+	 do fast frequency switching (i.e, very low latency frequency
+	 transitions).
+
+	 To compile this driver as a module, choose M here: the
+	 module will be called cpufreq_ondemandplus.
+
+	 For details, take a look at linux/Documentation/cpu-freq.
+
+	 If in doubt, say N.
 
 menu "x86 CPU frequency scaling drivers"
 depends on X86
