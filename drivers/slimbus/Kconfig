@@ -12,7 +12,7 @@ menuconfig SLIMBUS
 if SLIMBUS
 config SLIMBUS_MSM_CTRL
 	tristate "Qualcomm Slimbus Master Component"
-	default n
+	default Y
 	help
 	  Select driver for Qualcomm's Slimbus Master Component.
 
