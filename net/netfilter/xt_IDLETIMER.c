@@ -188,7 +188,7 @@ static ssize_t idletimer_tg_show(struct kobject *kobj, struct attribute *attr,
 		return sprintf(buf, "%u\n",
 			       jiffies_to_msecs(expires - now) / 1000);
 
-	if (timer->send_nl_msg)
+	if (timer && timer->send_nl_msg)
 		return sprintf(buf, "0 %d\n",
 			jiffies_to_msecs(now - expires) / 1000);
 	else
