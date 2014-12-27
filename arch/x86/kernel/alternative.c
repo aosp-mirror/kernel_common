@@ -269,7 +269,6 @@ void __init_or_module apply_alternatives(struct alt_instr *start,
 	for (a = start; a < end; a++) {
 		instr = (u8 *)&a->instr_offset + a->instr_offset;
 		replacement = (u8 *)&a->repl_offset + a->repl_offset;
-		BUG_ON(a->replacementlen > a->instrlen);
 		BUG_ON(a->instrlen > sizeof(insnbuf));
 		BUG_ON(a->cpuid >= (NCAPINTS + NBUGINTS) * 32);
 		if (!boot_cpu_has(a->cpuid))
@@ -281,8 +280,9 @@ void __init_or_module apply_alternatives(struct alt_instr *start,
 		if (*insnbuf == 0xe8 && a->replacementlen == 5)
 		    *(s32 *)(insnbuf + 1) += replacement - instr;
 
-		add_nops(insnbuf + a->replacementlen,
-			 a->instrlen - a->replacementlen);
+		if (a->instrlen > a->replacementlen)
+			add_nops(insnbuf + a->replacementlen,
+				 a->instrlen - a->replacementlen);
 
 		text_poke_early(instr, insnbuf, a->instrlen);
 	}
