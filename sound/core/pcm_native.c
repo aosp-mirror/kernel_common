@@ -416,7 +416,9 @@ int snd_pcm_hw_refine(struct snd_pcm_substream *substream,
 
 	hw = &substream->runtime->hw;
 	if (!params->info)
-		params->info = hw->info & ~SNDRV_PCM_INFO_FIFO_IN_FRAMES;
+		params->info = hw->info & ~(SNDRV_PCM_INFO_FIFO_IN_FRAMES |
+					    SNDRV_PCM_INFO_DRAIN_TRIGGER);
+
 	if (!params->fifo_size) {
 		m = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
 		i = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
@@ -1607,6 +1609,13 @@ static int snd_pcm_do_drain_init(struct snd_pcm_substream *substream, int state)
 			snd_pcm_post_stop(substream, new_state);
 		}
 	}
+
+	if (runtime->status->state == SNDRV_PCM_STATE_DRAINING &&
+	    runtime->trigger_master == substream &&
+	    (runtime->hw.info & SNDRV_PCM_INFO_DRAIN_TRIGGER))
+		return substream->ops->trigger(substream,
+					       SNDRV_PCM_TRIGGER_DRAIN);
+
 	return 0;
 }
 
