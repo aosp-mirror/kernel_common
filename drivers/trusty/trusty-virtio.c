@@ -8,6 +8,8 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 
+#include <linux/dma-map-ops.h>
+#include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
@@ -18,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/trusty/smcall.h>
 #include <linux/trusty/trusty.h>
+#include <linux/trusty/trusty_ipc.h>
 
 #include <linux/virtio.h>
 #include <linux/virtio_config.h>
@@ -218,15 +221,23 @@ static u64 trusty_virtio_get_features(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
 
-	return tvdev->vdev_descr->dfeatures;
+	return tvdev->vdev_descr->dfeatures |
+		(1ULL << VIRTIO_F_ACCESS_PLATFORM);
 }
 
 static int trusty_virtio_finalize_features(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
+	u64 features = vdev->features;
+
+	/*
+	 * We set VIRTIO_F_ACCESS_PLATFORM to enable the dma mapping hooks.
+	 * The other side does not need to know.
+	 */
+	features &= ~(1ULL << VIRTIO_F_ACCESS_PLATFORM);
 
 	/* Make sure we don't have any features > 32 bits! */
-	if (WARN_ON((u32)vdev->features != vdev->features))
+	if (WARN_ON((u32)vdev->features != features))
 		return -EINVAL;
 
 	tvdev->vdev_descr->gfeatures = vdev->features;
@@ -692,6 +703,21 @@ err_share_memory:
 	return ret;
 }
 
+static dma_addr_t trusty_virtio_dma_map_page(struct device *dev,
+					     struct page *page,
+					     unsigned long offset, size_t size,
+					     enum dma_data_direction dir,
+					     unsigned long attrs)
+{
+	struct tipc_msg_buf *buf = page_to_virt(page) + offset;
+
+	return buf->buf_id;
+}
+
+static const struct dma_map_ops trusty_virtio_dma_map_ops = {
+	.map_page = trusty_virtio_dma_map_page,
+};
+
 static int trusty_virtio_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -708,6 +734,8 @@ static int trusty_virtio_probe(struct platform_device *pdev)
 	INIT_WORK(&tctx->check_vqs, check_all_vqs);
 	INIT_WORK(&tctx->kick_vqs, kick_vqs);
 	platform_set_drvdata(pdev, tctx);
+
+	set_dma_ops(&pdev->dev, &trusty_virtio_dma_map_ops);
 
 	tctx->check_wq = alloc_workqueue("trusty-check-wq", WQ_UNBOUND, 0);
 	if (!tctx->check_wq) {
@@ -804,3 +832,10 @@ module_platform_driver(trusty_virtio_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Trusty virtio driver");
+/*
+ * TODO(b/168322325): trusty-virtio and trusty-ipc should be independent.
+ * However, trusty-virtio is not completely generic and is aware of trusty-ipc.
+ * See header includes. Particularly, trusty-virtio.ko can't be loaded before
+ * trusty-ipc.ko.
+ */
+MODULE_SOFTDEP("pre: trusty-ipc");

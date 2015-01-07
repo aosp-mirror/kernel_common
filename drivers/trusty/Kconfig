@@ -56,6 +56,15 @@ config TRUSTY_VIRTIO
 
 	  If you build this as a module, it will be called trusty-virtio.
 
+config TRUSTY_VIRTIO_IPC
+	tristate "Trusty Virtio IPC driver"
+	depends on TRUSTY_VIRTIO
+	default y
+	help
+	  Enable support for communicating with Trusty services.
+
+	  If you build this as a module, it will be called trusty-ipc.
+
 endif # TRUSTY
 
 endmenu
