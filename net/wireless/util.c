@@ -253,12 +253,36 @@ int cfg80211_validate_key_settings(struct cfg80211_registered_device *rdev,
 		if (params->key_len != WLAN_KEY_LEN_CCMP)
 			return -EINVAL;
 		break;
+	case WLAN_CIPHER_SUITE_CCMP_256:
+		if (params->key_len != WLAN_KEY_LEN_CCMP_256)
+			return -EINVAL;
+		break;
+	case WLAN_CIPHER_SUITE_GCMP:
+		if (params->key_len != WLAN_KEY_LEN_GCMP)
+			return -EINVAL;
+		break;
+	case WLAN_CIPHER_SUITE_GCMP_256:
+		if (params->key_len != WLAN_KEY_LEN_GCMP_256)
+			return -EINVAL;
+		break;
 	case WLAN_CIPHER_SUITE_WEP104:
 		if (params->key_len != WLAN_KEY_LEN_WEP104)
 			return -EINVAL;
 		break;
 	case WLAN_CIPHER_SUITE_AES_CMAC:
 		if (params->key_len != WLAN_KEY_LEN_AES_CMAC)
+			return -EINVAL;
+		break;
+	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+		if (params->key_len != WLAN_KEY_LEN_BIP_CMAC_256)
+			return -EINVAL;
+		break;
+	case WLAN_CIPHER_SUITE_BIP_GMAC_128:
+		if (params->key_len != WLAN_KEY_LEN_BIP_GMAC_128)
+			return -EINVAL;
+		break;
+	case WLAN_CIPHER_SUITE_BIP_GMAC_256:
+		if (params->key_len != WLAN_KEY_LEN_BIP_GMAC_256)
 			return -EINVAL;
 		break;
 	default:
@@ -280,7 +304,13 @@ int cfg80211_validate_key_settings(struct cfg80211_registered_device *rdev,
 			return -EINVAL;
 		case WLAN_CIPHER_SUITE_TKIP:
 		case WLAN_CIPHER_SUITE_CCMP:
+		case WLAN_CIPHER_SUITE_CCMP_256:
+		case WLAN_CIPHER_SUITE_GCMP:
+		case WLAN_CIPHER_SUITE_GCMP_256:
 		case WLAN_CIPHER_SUITE_AES_CMAC:
+		case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+		case WLAN_CIPHER_SUITE_BIP_GMAC_128:
+		case WLAN_CIPHER_SUITE_BIP_GMAC_256:
 			if (params->seq_len != 6)
 				return -EINVAL;
 			break;
