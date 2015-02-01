@@ -33,12 +33,6 @@
 #include <trace/events/block.h>
 
 #include "blk.h"
-#ifdef CONFIG_MMC_MUST_PREVENT_WP_VIOLATION
-#include <linux/mmc/card.h>
-#include <mach/devices_cmdline.h>
-extern int get_partition_num_by_name(char *name);
-#endif	
-
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_remap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_rq_remap);
@@ -1168,27 +1162,8 @@ generic_make_request_checks(struct bio *bio)
 	int err = -EIO;
 	char b[BDEVNAME_SIZE];
 	struct hd_struct *part;
-#ifdef CONFIG_MMC_MUST_PREVENT_WP_VIOLATION
-	unsigned char wp_ptn[64];
-#endif
 
 	might_sleep();
-
-#ifdef CONFIG_MMC_MUST_PREVENT_WP_VIOLATION
-	sprintf(wp_ptn, "mmcblk0p%d", get_partition_num_by_name("system"));
-	if (!strcmp(bdevname(bio->bi_bdev, b), wp_ptn) && !board_mfg_mode() &&
-			(get_tamper_sf() == 1) && (get_atsdebug() != 1) && (bio->bi_rw & WRITE)) {
-		pr_info("blk-core: Attempt to write protected partition %s block %Lu \n",
-				bdevname(bio->bi_bdev, b), (unsigned long long)bio->bi_sector);
-		err = 0;
-		goto wp_end_io;
-	} else if (atomic_read(&emmc_reboot) && (bio->bi_rw & WRITE)) {
-		pr_info("%s: Attempt to write eMMC, %s block %Lu \n", current->comm,
-				bdevname(bio->bi_bdev, b), (unsigned long long)bio->bi_sector);
-		err = -EROFS;
-		goto wp_end_io;
-	}
-#endif
 
 	if (bio_check_eod(bio, nr_sectors))
 		goto end_io;
@@ -1259,12 +1234,6 @@ generic_make_request_checks(struct bio *bio)
 end_io:
 	bio_endio(bio, err);
 	return false;
-
-#ifdef CONFIG_MMC_MUST_PREVENT_WP_VIOLATION
-wp_end_io:
-	bio_endio(bio, err);
-	return 0;
-#endif
 }
 
 void generic_make_request(struct bio *bio)
