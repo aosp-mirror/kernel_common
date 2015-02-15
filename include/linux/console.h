@@ -22,9 +22,6 @@ struct console_font;
 struct module;
 struct tty_struct;
 
-/*
- * this is what the terminal answers to a ESC-Z or csi0c query.
- */
 #define VT100ID "\033[?1;2c"
 #define VT102ID "\033[?6c"
 
@@ -55,31 +52,21 @@ struct consw {
 	void	(*con_invert_region)(struct vc_data *, u16 *, int);
 	u16    *(*con_screen_pos)(struct vc_data *, int);
 	unsigned long (*con_getxy)(struct vc_data *, unsigned long, int *, int *);
-	/*
-	 * Prepare the console for the debugger.  This includes, but is not
-	 * limited to, unblanking the console, loading an appropriate
-	 * palette, and allowing debugger generated output.
-	 */
 	int	(*con_debug_enter)(struct vc_data *);
-	/*
-	 * Restore the console to its pre-debug state as closely as possible.
-	 */
 	int	(*con_debug_leave)(struct vc_data *);
 };
 
 extern const struct consw *conswitchp;
 
-extern const struct consw dummy_con;	/* dummy console buffer */
-extern const struct consw vga_con;	/* VGA text console */
-extern const struct consw newport_con;	/* SGI Newport console  */
-extern const struct consw prom_con;	/* SPARC PROM console */
+extern const struct consw dummy_con;	
+extern const struct consw vga_con;	
+extern const struct consw newport_con;	
+extern const struct consw prom_con;	
 
 int con_is_bound(const struct consw *csw);
 int register_con_driver(const struct consw *csw, int first, int last);
 int unregister_con_driver(const struct consw *csw);
-int do_unregister_con_driver(const struct consw *csw);
 int take_over_console(const struct consw *sw, int first, int last, int deflt);
-int do_take_over_console(const struct consw *sw, int first, int last, int deflt);
 void give_up_console(const struct consw *sw);
 #ifdef CONFIG_HW_CONSOLE
 int con_debug_enter(struct vc_data *vc);
@@ -89,29 +76,20 @@ int con_debug_leave(void);
 #define con_debug_leave() (0)
 #endif
 
-/* scroll */
 #define SM_UP       (1)
 #define SM_DOWN     (2)
 
-/* cursor */
 #define CM_DRAW     (1)
 #define CM_ERASE    (2)
 #define CM_MOVE     (3)
 
-/*
- * The interface for a console, or any other device that wants to capture
- * console messages (printer driver?)
- *
- * If a console driver is marked CON_BOOT then it will be auto-unregistered
- * when the first real console is registered.  This is for early-printk drivers.
- */
 
 #define CON_PRINTBUFFER	(1)
-#define CON_CONSDEV	(2) /* Last on the command line */
+#define CON_CONSDEV	(2) 
 #define CON_ENABLED	(4)
 #define CON_BOOT	(8)
-#define CON_ANYTIME	(16) /* Safe to call when cpu is offline */
-#define CON_BRL		(32) /* Used for a braille device */
+#define CON_ANYTIME	(16) 
+#define CON_BRL		(32) 
 
 struct console {
 	char	name[16];
@@ -128,9 +106,6 @@ struct console {
 	struct	 console *next;
 };
 
-/*
- * for_each_console() allows you to iterate on each console
- */
 #define for_each_console(con) \
 	for (con = console_drivers; con != NULL; con = con->next)
 
@@ -156,9 +131,9 @@ extern int braille_unregister_console(struct console *);
 extern void console_sysfs_notify(void);
 extern bool console_suspend_enabled;
 
-/* Suspend and resume console messages over PM events */
 extern void suspend_console(void);
 extern void resume_console(void);
+extern int suspend_console_deferred;
 
 int mda_console_init(void);
 void prom_con_init(void);
@@ -166,14 +141,12 @@ void prom_con_init(void);
 void vcs_make_sysfs(int index);
 void vcs_remove_sysfs(int index);
 
-/* Some debug stub to catch some of the obvious races in the VT code */
 #if 1
 #define WARN_CONSOLE_UNLOCKED()	WARN_ON(!is_console_locked() && !oops_in_progress)
 #else
 #define WARN_CONSOLE_UNLOCKED()
 #endif
 
-/* VESA Blanking Levels */
 #define VESA_NO_BLANKING        0
 #define VESA_VSYNC_SUSPEND      1
 #define VESA_HSYNC_SUSPEND      2
@@ -183,4 +156,4 @@ void vcs_remove_sysfs(int index);
 extern bool vgacon_text_force(void);
 #endif
 
-#endif /* _LINUX_CONSOLE_H */
+#endif 

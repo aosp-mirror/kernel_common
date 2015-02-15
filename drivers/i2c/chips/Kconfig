@@ -1,0 +1,260 @@
+#
+# Miscellaneous I2C chip drivers configuration
+#
+# *** DEPRECATED! Do not add new entries! See Makefile ***
+#
+
+menu "Miscellaneous I2C Chip support"
+
+config INPUT_CWSTM32
+       tristate "CyWee CWSTM32 Sensor HUB"
+       depends on I2C && INPUT
+       select INPUT_POLLDEV
+       help
+         This driver provides support for CWSTM32 Sensor HUB.
+
+config SENSORS_AKM8975
+        tristate "AKM8973 Compass Driver"
+        depends on I2C
+        help
+         AKM8975 Compass Driver implemented by HTC.
+
+config SENSORS_AKM8975_PANA_GYRO
+        tristate "AKM8973 Compass Driver for Pana Gyro"
+        depends on I2C
+        help
+         AKM8975 Compass Driver implemented by HTC.
+
+config SENSORS_AK8963
+        tristate "AK8963 compass support"
+        default n
+        depends on I2C
+        help
+          If you say yes here you get support for Asahi Kasei's
+          orientation sensor AK8963.
+
+config SENSORS_PANASONIC_GYRO
+	tristate "PANASONIC GYRO sensor support"
+	depends on I2C=y
+	help
+
+config SENSORS_AK8963_DOE_PLUS
+	tristate "AK8963 compass support with DOE Plus"
+	default n
+	depends on I2C
+	help
+	  If you say yes here you get support for Asahi Kasei's
+	  orientation sensor with DOE Plus.
+
+
+config SENSORS_R3GD20
+	tristate "ST R3GD20 3-axis gyroscope"
+	depends on I2C=y
+	default n
+	help
+          This driver provides support for the R3Gd20 chip which is a
+          3-axis gyroscope.
+
+          This driver can also be built as modules.  If so, the module for
+          accelerometer will be called r3gd20.
+
+          Say Y here if you have a device containing r3gd20 chip.
+
+config SENSORS_LSM330_ACC
+        tristate "ST LSM330 3-axis accelerometer"
+        depends on I2C=y
+        default n
+        help
+          This driver provides support for the LSM330 chip which is a
+          3-axis accelerometer.
+
+          This driver can also be built as modules.  If so, the module for
+          accelerometer will be called lsm330.
+
+          Say Y here if you have a device containing lsm330 chip.
+
+config SENSORS_LSM330_GYRO
+        tristate "ST LSM330 3-axis gyroscope"
+        depends on I2C=y
+        default n
+        help
+          This driver provides support for the LSM330 chip which is a
+          3-axis gyroscope.
+
+          This driver can also be built as modules.  If so, the module for
+          accelerometer will be called LSM330.
+
+          Say Y here if you have a device containing LSM330 chip.
+
+
+config TPS65200
+        tristate "tps65200 Driver"
+        depends on I2C
+        help
+         TPS65200 Switch charger implemented by HTC.
+         This could enable battery driver to set
+         Charging current 100mA~500mA or 500mA~1000mA
+         by GPIO or Register
+
+	  PANASONIC GYR Driver implemented by HTC.
+
+config BOSCH_BMA250
+        tristate "BMA250 acceleration sensor support"
+	depends on I2C=y
+	help
+	  If you say yes here you get support for Bosch Sensortec's
+	  acceleration sensors BMA250.
+
+config BOSCH_BMA250_ENABLE_INT1
+	tristate "BMA250 acceleration sensor interrupt INT1 support"
+	depends on BOSCH_BMA250=y
+        help
+	  If you say yes here you get INT1 support for Bosch Sensortec's
+	  acceleration sensors BMA250.
+
+config BOSCH_BMA250_ENABLE_INT2
+	tristate "BMA250 acceleration sensor interrupt INT2 support"
+	depends on BOSCH_BMA250=y
+	help
+	  If you say yes here you get INT2 support for Bosch Sensortec's
+	  acceleration sensors BMA250.
+
+config SENSORS_BMA250
+	tristate "BMA250 acceleration sensor support"
+	depends on I2C=y
+	help
+	  BMA250 G-sensor Driver implemented by HTC.
+
+config INPUT_YAS_MAGNETOMETER
+	tristate "YAS Geomagnetic Sensor"
+	depends on I2C
+
+
+config SENSORS_NFC_PN544
+	tristate "PN544 NFC sensor support"
+	depends on I2C=y
+	help
+	PN544 NFC Driver implemented.
+
+config SENSORS_NFC_IRQ_WORKAROUND
+	tristate "PN544 NFC sensor IRQ workaround"
+	depends on SENSORS_NFC_PN544=y
+	help
+	PN547 NFC Driver IRQ workaround.
+
+config INPUT_CAPELLA_CM3628
+	tristate "CM3628 proximity and light sensor"
+	help
+	  Say Y here to enable the CM3628 Short Distance Proximity
+	  Sensor with Ambient Light Sensor.
+
+config INPUT_CAPELLA_CM3629
+	tristate "CM3629 proximity and light sensor"
+	help
+	  Say Y here to enable the CM3629 Short Distance Proximity
+	  Sensor with Ambient Light Sensor.
+
+config INPUT_CAPELLA_CM36686
+        tristate "CM36686 proximity and light sensor"
+	help
+	  Say Y here to enable the CM36686 Short Distance Proximity
+	  Sensor with Ambient Light Sensor.
+
+config INPUT_CAPELLA_CM32181
+        tristate "CM32181 light sensor"
+        help
+          Say Y here to enable the CM32181 Ambient Light Sensor.
+
+config VP_A1026
+	tristate "A1026 Voice Processor Driver"
+	depends on I2C
+	help
+	  A1026 Voice Processor Driver implemented by HTC.
+
+config VP_A1028
+	tristate "A1028 Voice Processor Driver"
+	depends on I2C=y
+	default n
+	help
+	 A1028 Voice Processor Driver implemented by HTC.
+
+config AMP_TPA2051D3
+        tristate "TI TPA2051D3 Speaker AMP Driver"
+	depends on I2C=y
+        help
+         TI TPA2051D3 Speaker AMP Driver implemented by HTC.
+
+config AMP_TPA6185
+        tristate "TI TPA6185 AMP Driver"
+	depends on I2C=y
+        help
+          TI TPA6185 AMP Driver implemented by HTC.
+
+config AMP_RT5501
+        tristate "Richtek RT5501 AMP Driver"
+	depends on I2C=y
+        help
+          Richtek RT5501 AMP Driver implemented by HTC.
+
+config AMP_RT5501_EVM
+        tristate "Richtek RT5501 EVM AMP Driver"
+	depends on I2C=y
+        help
+          Richtek RT5501 EVM AMP Driver implemented by HTC.
+
+config AMP_RT5506
+        tristate "Richtek RT5506 AMP Driver"
+	depends on I2C=y
+        help
+          Richtek RT5506 AMP Driver implemented by HTC.
+
+
+config AMP_TFA9887
+        tristate "NXP TFA9887 Speaker AMP Driver"
+	depends on I2C=y
+        help
+         NXP TFA9887 Speaker AMP Driver implemented by HTC.
+
+config AMP_TFA9887L
+        tristate "NXP TFA9887L Speaker AMP Driver"
+	depends on I2C=y
+        help
+         NXP TFA9887L Speaker AMP Driver implemented by HTC.
+
+config INPUT_ISL29028
+	tristate "ISL29028 proximity and light sensor"
+	help
+	  Say Y here to enable the ISL29028 Short Distance Proximity
+	  Sensor with Ambient Light Sensor.
+
+config INPUT_ISL29029
+	tristate "ISL29029 proximity and light sensor"
+	help
+	 Say Y here to enable the ISL29029 Short Distance Proximity
+	 Sensor with Ambient Light Sensor.
+
+config AMP_TPA2051D3_ON_GPIO
+	tristate "TI TPA2051D3 Speaker AMP Driver on gpio"
+	depends on AMP_TPA2051D3
+	default n
+	help
+	 TI TPA2051D3_ON_GPIO Speaker AMP Driver implemented by HTC.
+
+config CIR_ALWAYS_READY
+        bool "BMA250 CIR Always Ready"
+	default n
+	help
+	  Enable CIR Always Ready
+
+config SYNC_TOUCH_STATUS
+        bool "Sync touch i2c switch status to sensor hub"
+	default n
+	help
+	  Sync touch i2c switch status to sensor hub
+config LIGHTSENSOR_EPL88051
+	bool "enable EPL88051"
+	depends on I2C
+	help
+	  Say Y here to enable the EPL88051.
+
+endmenu

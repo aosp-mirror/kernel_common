@@ -19,7 +19,7 @@
 /*
  * Tunable constants
  */
-#define ENDIO_HOOK_POOL_SIZE 1024
+#define ENDIO_HOOK_POOL_SIZE 10240
 #define DEFERRED_SET_SIZE 64
 #define MAPPING_POOL_SIZE 1024
 #define PRISON_CELLS 1024
@@ -855,7 +855,7 @@ static void process_prepared_mapping(struct new_mapping *m)
 
 	if (m->err) {
 		cell_error(m->cell);
-		goto out;
+		return;
 	}
 
 	/*
@@ -867,7 +867,7 @@ static void process_prepared_mapping(struct new_mapping *m)
 	if (r) {
 		DMERR("dm_thin_insert_block() failed");
 		cell_error(m->cell);
-		goto out;
+		return;
 	}
 
 	/*
@@ -882,7 +882,6 @@ static void process_prepared_mapping(struct new_mapping *m)
 	} else
 		cell_defer(tc, m->cell, m->data_block);
 
-out:
 	list_del(&m->list);
 	mempool_free(m, tc->pool->mapping_pool);
 }
@@ -1241,10 +1240,7 @@ static void process_discard(struct thin_c *tc, struct bio *bio)
 
 			cell_release_singleton(cell, bio);
 			cell_release_singleton(cell2, bio);
-			if ((!lookup_result.shared) && pool->pf.discard_passdown)
-				remap_and_issue(tc, bio, lookup_result.block);
-			else
-				bio_endio(bio, 0);
+			remap_and_issue(tc, bio, lookup_result.block);
 		}
 		break;
 
@@ -2027,7 +2023,6 @@ static int pool_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		 * thin devices' discard limits consistent).
 		 */
 		ti->discards_supported = 1;
-		ti->discard_zeroes_data_unsupported = 1;
 	}
 	ti->private = pt;
 
@@ -2444,6 +2439,7 @@ static void set_discard_limits(struct pool *pool, struct queue_limits *limits)
 	 * bios that overlap 2 blocks.
 	 */
 	limits->discard_granularity = pool->sectors_per_block << SECTOR_SHIFT;
+	limits->discard_zeroes_data = pool->pf.zero_new_blocks;
 }
 
 static void pool_io_hints(struct dm_target *ti, struct queue_limits *limits)
@@ -2579,7 +2575,6 @@ static int thin_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	if (tc->pool->pf.discard_enabled) {
 		ti->discards_supported = 1;
 		ti->num_discard_requests = 1;
-		ti->discard_zeroes_data_unsupported = 1;
 	}
 
 	dm_put(pool_md);

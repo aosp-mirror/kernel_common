@@ -79,6 +79,23 @@ static inline void buffer_size_add(struct persistent_ram_zone *prz, size_t a)
 	} while (atomic_cmpxchg(&prz->buffer->size, old, new) != old);
 }
 
+/* increase the size counter, retuning an error if it hits the max size */
+static inline ssize_t buffer_size_add_clamp(struct persistent_ram_zone *prz,
+	size_t a)
+{
+	size_t old;
+	size_t new;
+
+	do {
+		old = atomic_read(&prz->buffer->size);
+		new = old + a;
+		if (new > prz->buffer_size)
+			return -ENOMEM;
+	} while (atomic_cmpxchg(&prz->buffer->size, old, new) != old);
+
+	return 0;
+}
+
 static void notrace persistent_ram_encode_rs8(struct persistent_ram_zone *prz,
 	uint8_t *data, size_t len, uint8_t *ecc)
 {
@@ -284,7 +301,7 @@ int notrace persistent_ram_write(struct persistent_ram_zone *prz,
 		c = prz->buffer_size;
 	}
 
-	buffer_size_add(prz, c);
+	buffer_size_add_clamp(prz, c);
 
 	start = buffer_start_add(prz, c);
 
@@ -382,7 +399,7 @@ static int __devinit persistent_ram_buffer_init(const char *name,
 }
 
 static  __devinit
-struct persistent_ram_zone *__persistent_ram_init(struct device *dev, bool ecc)
+struct persistent_ram_zone *__persistent_ram_init(const char *name, bool ecc)
 {
 	struct persistent_ram *ram;
 	struct persistent_ram_zone *prz;
@@ -396,7 +413,7 @@ struct persistent_ram_zone *__persistent_ram_init(struct device *dev, bool ecc)
 
 	INIT_LIST_HEAD(&prz->node);
 
-	ret = persistent_ram_buffer_init(dev_name(dev), prz, &ram);
+	ret = persistent_ram_buffer_init(name, prz, &ram);
 	if (ret) {
 		pr_err("persistent_ram: failed to initialize buffer\n");
 		goto err;
@@ -437,7 +454,13 @@ err:
 struct persistent_ram_zone * __devinit
 persistent_ram_init_ringbuffer(struct device *dev, bool ecc)
 {
-	return __persistent_ram_init(dev, ecc);
+	return persistent_ram_init_ringbuffer_by_name(dev_name(dev), ecc);
+}
+
+struct persistent_ram_zone * __devinit
+persistent_ram_init_ringbuffer_by_name(const char *name, bool ecc)
+{
+	return __persistent_ram_init(name, ecc);
 }
 
 int __init persistent_ram_early_init(struct persistent_ram *ram)

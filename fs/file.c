@@ -21,6 +21,8 @@
 #include <linux/spinlock.h>
 #include <linux/rcupdate.h>
 #include <linux/workqueue.h>
+#include <linux/crc32c.h>
+#include <linux/rtc.h>
 
 struct fdtable_defer {
 	spinlock_t lock;
@@ -30,22 +32,12 @@ struct fdtable_defer {
 
 int sysctl_nr_open __read_mostly = 1024*1024;
 int sysctl_nr_open_min = BITS_PER_LONG;
-int sysctl_nr_open_max = 1024 * 1024; /* raised later */
+int sysctl_nr_open_max = 1024 * 1024; 
 
-/*
- * We use this list to defer free fdtables that have vmalloced
- * sets/arrays. By keeping a per-cpu list, we avoid having to embed
- * the work_struct in fdtable itself which avoids a 64 byte (i386) increase in
- * this per-task structure.
- */
 static DEFINE_PER_CPU(struct fdtable_defer, fdtable_defer_list);
 
 static void *alloc_fdmem(size_t size)
 {
-	/*
-	 * Very large allocations can stress page reclaim, so fall back to
-	 * vmalloc() if the allocation size will be considered "large" by the VM.
-	 */
 	if (size <= (PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER)) {
 		void *data = kmalloc(size, GFP_KERNEL|__GFP_NOWARN);
 		if (data != NULL)
@@ -63,6 +55,7 @@ static void __free_fdtable(struct fdtable *fdt)
 {
 	free_fdmem(fdt->fd);
 	free_fdmem(fdt->open_fds);
+	free_fdmem(fdt->user);
 	kfree(fdt);
 }
 
@@ -92,34 +85,28 @@ void free_fdtable_rcu(struct rcu_head *rcu)
 	BUG_ON(!fdt);
 
 	if (fdt->max_fds <= NR_OPEN_DEFAULT) {
-		/*
-		 * This fdtable is embedded in the files structure and that
-		 * structure itself is getting destroyed.
-		 */
 		kmem_cache_free(files_cachep,
 				container_of(fdt, struct files_struct, fdtab));
 		return;
 	}
-	if (!is_vmalloc_addr(fdt->fd) && !is_vmalloc_addr(fdt->open_fds)) {
+	if (!is_vmalloc_addr(fdt->fd) && !is_vmalloc_addr(fdt->open_fds)
+		    && !is_vmalloc_addr(fdt->user)) {
 		kfree(fdt->fd);
 		kfree(fdt->open_fds);
+		kfree(fdt->user);
 		kfree(fdt);
 	} else {
 		fddef = &get_cpu_var(fdtable_defer_list);
 		spin_lock(&fddef->lock);
 		fdt->next = fddef->next;
 		fddef->next = fdt;
-		/* vmallocs are handled from the workqueue context */
+		
 		schedule_work(&fddef->wq);
 		spin_unlock(&fddef->lock);
 		put_cpu_var(fdtable_defer_list);
 	}
 }
 
-/*
- * Expand the fdset in the files_struct.  Called with the files spinlock
- * held for write.
- */
 static void copy_fdtable(struct fdtable *nfdt, struct fdtable *ofdt)
 {
 	unsigned int cpy, set;
@@ -137,6 +124,10 @@ static void copy_fdtable(struct fdtable *nfdt, struct fdtable *ofdt)
 	memset((char *)(nfdt->open_fds) + cpy, 0, set);
 	memcpy(nfdt->close_on_exec, ofdt->close_on_exec, cpy);
 	memset((char *)(nfdt->close_on_exec) + cpy, 0, set);
+	memcpy(nfdt->user, ofdt->user,
+		ofdt->max_fds * sizeof(*nfdt->user));
+	memset(nfdt->user + ofdt->max_fds, 0,
+		(nfdt->max_fds - ofdt->max_fds) * sizeof(*nfdt->user));
 }
 
 static struct fdtable * alloc_fdtable(unsigned int nr)
@@ -144,24 +135,9 @@ static struct fdtable * alloc_fdtable(unsigned int nr)
 	struct fdtable *fdt;
 	void *data;
 
-	/*
-	 * Figure out how many fds we actually want to support in this fdtable.
-	 * Allocation steps are keyed to the size of the fdarray, since it
-	 * grows far faster than any of the other dynamic data. We try to fit
-	 * the fdarray into comfortable page-tuned chunks: starting at 1024B
-	 * and growing in powers of two from there on.
-	 */
 	nr /= (1024 / sizeof(struct file *));
 	nr = roundup_pow_of_two(nr + 1);
 	nr *= (1024 / sizeof(struct file *));
-	/*
-	 * Note that this can drive nr *below* what we had passed if sysctl_nr_open
-	 * had been set lower between the check in expand_files() and here.  Deal
-	 * with that in caller, it's cheaper that way.
-	 *
-	 * We make sure that nr remains a multiple of BITS_PER_LONG - otherwise
-	 * bitmaps handling below becomes unpleasant, to put it mildly...
-	 */
 	if (unlikely(nr > sysctl_nr_open))
 		nr = ((sysctl_nr_open - 1) | (BITS_PER_LONG - 1)) + 1;
 
@@ -182,9 +158,15 @@ static struct fdtable * alloc_fdtable(unsigned int nr)
 	data += nr / BITS_PER_BYTE;
 	fdt->close_on_exec = data;
 	fdt->next = NULL;
+	data = alloc_fdmem(sizeof(*fdt->user) * nr);
+	if (!data)
+		goto out_open;
+	fdt->user = (struct fdt_user*) data;
 
 	return fdt;
 
+out_open:
+	free_fdmem(fdt->open_fds);
 out_arr:
 	free_fdmem(fdt->fd);
 out_fdt:
@@ -193,13 +175,6 @@ out:
 	return NULL;
 }
 
-/*
- * Expand the file descriptor table.
- * This function will allocate a new fdtable and both fd array and fdset, of
- * the given size.
- * Return <0 error code on error; 1 on successful completion.
- * The files->file_lock should be held on entry, and will be held on exit.
- */
 static int expand_fdtable(struct files_struct *files, int nr)
 	__releases(files->file_lock)
 	__acquires(files->file_lock)
@@ -211,62 +186,42 @@ static int expand_fdtable(struct files_struct *files, int nr)
 	spin_lock(&files->file_lock);
 	if (!new_fdt)
 		return -ENOMEM;
-	/*
-	 * extremely unlikely race - sysctl_nr_open decreased between the check in
-	 * caller and alloc_fdtable().  Cheaper to catch it here...
-	 */
 	if (unlikely(new_fdt->max_fds <= nr)) {
 		__free_fdtable(new_fdt);
 		return -EMFILE;
 	}
-	/*
-	 * Check again since another task may have expanded the fd table while
-	 * we dropped the lock
-	 */
 	cur_fdt = files_fdtable(files);
 	if (nr >= cur_fdt->max_fds) {
-		/* Continue as planned */
+		
 		copy_fdtable(new_fdt, cur_fdt);
 		rcu_assign_pointer(files->fdt, new_fdt);
 		if (cur_fdt->max_fds > NR_OPEN_DEFAULT)
 			free_fdtable(cur_fdt);
 	} else {
-		/* Somebody else expanded, so undo our attempt */
+		
 		__free_fdtable(new_fdt);
 	}
 	return 1;
 }
 
-/*
- * Expand files.
- * This function will expand the file structures, if the requested size exceeds
- * the current capacity and there is room for expansion.
- * Return <0 error code on error; 0 when nothing done; 1 when files were
- * expanded and execution may have blocked.
- * The files->file_lock should be held on entry, and will be held on exit.
- */
 int expand_files(struct files_struct *files, int nr)
 {
 	struct fdtable *fdt;
 
 	fdt = files_fdtable(files);
 
-	/*
-	 * N.B. For clone tasks sharing a files structure, this test
-	 * will limit the total number of files that can be opened.
-	 */
 	if (nr >= rlimit(RLIMIT_NOFILE))
 		return -EMFILE;
 
-	/* Do we need to expand? */
+	
 	if (nr < fdt->max_fds)
 		return 0;
 
-	/* Can we expand? */
+	
 	if (nr >= sysctl_nr_open)
 		return -EMFILE;
 
-	/* All good, so we try */
+	
 	return expand_fdtable(files, nr);
 }
 
@@ -275,7 +230,7 @@ static int count_open_files(struct fdtable *fdt)
 	int size = fdt->max_fds;
 	int i;
 
-	/* Find the last open fd */
+	
 	for (i = size / BITS_PER_LONG; i > 0; ) {
 		if (fdt->open_fds[--i])
 			break;
@@ -284,11 +239,6 @@ static int count_open_files(struct fdtable *fdt)
 	return i;
 }
 
-/*
- * Allocate a new files structure and copy contents from the
- * passed in files structure.
- * errorp will be valid only when the returned files_struct is NULL.
- */
 struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 {
 	struct files_struct *newf;
@@ -311,14 +261,12 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 	new_fdt->open_fds = newf->open_fds_init;
 	new_fdt->fd = &newf->fd_array[0];
 	new_fdt->next = NULL;
+	new_fdt->user = &newf->user_array[0];
 
 	spin_lock(&oldf->file_lock);
 	old_fdt = files_fdtable(oldf);
 	open_files = count_open_files(old_fdt);
 
-	/*
-	 * Check whether we need to allocate a larger fd array and fd set.
-	 */
 	while (unlikely(open_files > new_fdt->max_fds)) {
 		spin_unlock(&oldf->file_lock);
 
@@ -331,18 +279,13 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 			goto out_release;
 		}
 
-		/* beyond sysctl_nr_open; nothing to do */
+		
 		if (unlikely(new_fdt->max_fds < open_files)) {
 			__free_fdtable(new_fdt);
 			*errorp = -EMFILE;
 			goto out_release;
 		}
 
-		/*
-		 * Reacquire the oldf lock and a pointer to its fd table
-		 * who knows it may have a new bigger fd table. We need
-		 * the latest pointer.
-		 */
 		spin_lock(&oldf->file_lock);
 		old_fdt = files_fdtable(oldf);
 		open_files = count_open_files(old_fdt);
@@ -353,28 +296,24 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 
 	memcpy(new_fdt->open_fds, old_fdt->open_fds, open_files / 8);
 	memcpy(new_fdt->close_on_exec, old_fdt->close_on_exec, open_files / 8);
+	memset(new_fdt->user, 0,
+		open_files * sizeof(*old_fdt->user));
 
 	for (i = open_files; i != 0; i--) {
 		struct file *f = *old_fds++;
 		if (f) {
 			get_file(f);
 		} else {
-			/*
-			 * The fd may be claimed in the fd bitmap but not yet
-			 * instantiated in the files array if a sibling thread
-			 * is partway through open().  So make sure that this
-			 * fd is available to the new process.
-			 */
 			__clear_open_fd(open_files - i, new_fdt);
 		}
 		rcu_assign_pointer(*new_fds++, f);
 	}
 	spin_unlock(&oldf->file_lock);
 
-	/* compute the remainder to be cleared */
+	
 	size = (new_fdt->max_fds - open_files) * sizeof(struct file *);
 
-	/* This is long word aligned thus could use a optimized version */
+	
 	memset(new_fds, 0, size);
 
 	if (new_fdt->max_fds > open_files) {
@@ -383,6 +322,8 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 
 		memset(&new_fdt->open_fds[start], 0, left);
 		memset(&new_fdt->close_on_exec[start], 0, left);
+		memset(&new_fdt->user[open_files], 0,
+			(new_fdt->max_fds - open_files) * sizeof(*new_fdt->user));
 	}
 
 	rcu_assign_pointer(newf->fdt, new_fdt);
@@ -420,13 +361,66 @@ struct files_struct init_files = {
 		.fd		= &init_files.fd_array[0],
 		.close_on_exec	= init_files.close_on_exec_init,
 		.open_fds	= init_files.open_fds_init,
+		.user		= &init_files.user_array[0],
 	},
 	.file_lock	= __SPIN_LOCK_UNLOCKED(init_task.file_lock),
 };
 
-/*
- * allocate a file descriptor, mark it busy.
- */
+static void fdtable_usage_dump(struct fdtable *fdt)
+{
+	int i;
+	char* buf;
+	struct timespec ts;
+	struct rtc_time tm;
+
+	buf = (char*) kmalloc(PATH_MAX, GFP_ATOMIC);
+	if (!buf) {
+		pr_err("%s: fail to alloc buffer\n", __func__);
+		return;
+	}
+
+	rcu_read_lock();
+	for (i = 0; i < fdt->max_fds; i++) {
+		struct file* file;
+		struct task_struct* user = NULL;
+		int pid;
+		char* path;
+
+		file = fdt->fd[i];
+		if (!file)
+			continue;
+
+		pid = fdt->user[i].installer;
+		ts = fdt->user[i].open_time;
+		rtc_time_to_tm(ts.tv_sec - (sys_tz.tz_minuteswest * 60), &tm);
+
+		user = find_task_by_vpid(pid);
+		if (user)
+			get_task_struct(user);
+
+		path = d_path(&file->f_path, buf, PATH_MAX);
+
+		if (IS_ERR(path))
+			path = "<unknown>";
+		else {
+			char* spath = strstr(path, ":[");
+			if (spath) spath[0] = '\0';
+		}
+
+		pr_warn("%d->fd[%d] file: %s, user: %d (%s %d:%d), (%02d-%02d %02d:%02d:%02d)\n",
+				current->tgid, i, path, pid,
+				user ? user->comm : "<unknown>",
+				user ? user->tgid : -1,
+				user ? user->pid  : -1,
+				tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+		if (user)
+			put_task_struct(user);
+	}
+	rcu_read_unlock();
+	kfree(buf);
+}
+
 int alloc_fd(unsigned start, unsigned flags)
 {
 	struct files_struct *files = current->files;
@@ -448,10 +442,6 @@ repeat:
 	if (error < 0)
 		goto out;
 
-	/*
-	 * If we needed to expand the fs array we
-	 * might have blocked - try again.
-	 */
 	if (error)
 		goto repeat;
 
@@ -463,9 +453,10 @@ repeat:
 		__set_close_on_exec(fd, fdt);
 	else
 		__clear_close_on_exec(fd, fdt);
+	memset(&fdt->user[fd], 0, sizeof(*fdt->user));
 	error = fd;
 #if 1
-	/* Sanity check */
+	
 	if (rcu_dereference_raw(fdt->fd[fd]) != NULL) {
 		printk(KERN_WARNING "alloc_fd: slot %d not NULL!\n", fd);
 		rcu_assign_pointer(fdt->fd[fd], NULL);
@@ -473,9 +464,24 @@ repeat:
 #endif
 
 out:
+	if (unlikely(error == -EMFILE)) {
+		static unsigned long debugging_ratelimit = 0;
+		const unsigned long debugging_delay_ms = 30000;
+
+		if (jiffies > debugging_ratelimit) {
+			debugging_ratelimit = jiffies + msecs_to_jiffies(debugging_delay_ms);
+
+			pr_warn("[%s] Too many open files (%d/%u), dump all fdt users:\n",
+					__func__, count_open_files(fdt), fdt->max_fds);
+			dump_stack();
+			fdtable_usage_dump(fdt);
+			pr_warn("[%s] end of dump\n", __func__);
+		}
+	}
 	spin_unlock(&files->file_lock);
 	return error;
 }
+EXPORT_SYMBOL(alloc_fd);
 
 int get_unused_fd(void)
 {

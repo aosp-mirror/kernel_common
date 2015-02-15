@@ -55,10 +55,10 @@ struct suspend_stats suspend_stats;
 static DEFINE_MUTEX(dpm_list_mtx);
 static pm_message_t pm_transition;
 
-struct dpm_watchdog {
-	struct device		*dev;
-	struct task_struct	*tsk;
-	struct timer_list	timer;
+static void dpm_drv_timeout(unsigned long data);
+struct dpm_drv_wd_data {
+	struct device *dev;
+	struct task_struct *tsk;
 };
 
 static int async_error;
@@ -174,9 +174,11 @@ static ktime_t initcall_debug_start(struct device *dev)
 	ktime_t calltime = ktime_set(0, 0);
 
 	if (initcall_debug) {
-		pr_info("calling  %s+ @ %i, parent: %s\n",
-			dev_name(dev), task_pid_nr(current),
-			dev->parent ? dev_name(dev->parent) : "none");
+		if (initcall_debug == 1)
+			pr_info("calling  %s+ @ %i, parent: %s\n",
+				dev_name(dev), task_pid_nr(current),
+				dev->parent ? dev_name(dev->parent) : "none");
+
 		calltime = ktime_get();
 	}
 
@@ -189,10 +191,15 @@ static void initcall_debug_report(struct device *dev, ktime_t calltime,
 	ktime_t delta, rettime;
 
 	if (initcall_debug) {
+		unsigned long long duration;
+
 		rettime = ktime_get();
 		delta = ktime_sub(rettime, calltime);
-		pr_info("call %s+ returned %d after %Ld usecs\n", dev_name(dev),
-			error, (unsigned long long)ktime_to_ns(delta) >> 10);
+		duration = (unsigned long long)ktime_to_ns(delta) >> 10;
+
+		if (initcall_debug == 1 || duration >= initcall_debug)
+			pr_info("call %s+ returned %d after %Ld usecs\n", dev_name(dev),
+				error, duration);
 	}
 }
 
@@ -396,56 +403,6 @@ static int dpm_run_callback(pm_callback_t cb, struct device *dev,
 	return error;
 }
 
-/**
- * dpm_wd_handler - Driver suspend / resume watchdog handler.
- *
- * Called when a driver has timed out suspending or resuming.
- * There's not much we can do here to recover so BUG() out for
- * a crash-dump
- */
-static void dpm_wd_handler(unsigned long data)
-{
-	struct dpm_watchdog *wd = (void *)data;
-	struct device *dev      = wd->dev;
-	struct task_struct *tsk = wd->tsk;
-
-	dev_emerg(dev, "**** DPM device timeout ****\n");
-	show_stack(tsk, NULL);
-
-	BUG();
-}
-
-/**
- * dpm_wd_set - Enable pm watchdog for given device.
- * @wd: Watchdog. Must be allocated on the stack.
- * @dev: Device to handle.
- */
-static void dpm_wd_set(struct dpm_watchdog *wd, struct device *dev)
-{
-	struct timer_list *timer = &wd->timer;
-
-	wd->dev = dev;
-	wd->tsk = get_current();
-
-	init_timer_on_stack(timer);
-	timer->expires = jiffies + HZ * 12;
-	timer->function = dpm_wd_handler;
-	timer->data = (unsigned long)wd;
-	add_timer(timer);
-}
-
-/**
- * dpm_wd_clear - Disable pm watchdog.
- * @wd: Watchdog to disable.
- */
-static void dpm_wd_clear(struct dpm_watchdog *wd)
-{
-	struct timer_list *timer = &wd->timer;
-
-	del_timer_sync(timer);
-	destroy_timer_on_stack(timer);
-}
-
 /*------------------------- Resume routines -------------------------*/
 
 /**
@@ -621,8 +578,6 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 	pm_callback_t callback = NULL;
 	char *info = NULL;
 	int error = 0;
-	bool put = false;
-	struct dpm_watchdog wd;
 
 	TRACE_DEVICE(dev);
 	TRACE_RESUME(0);
@@ -635,13 +590,11 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 	 * a resumed device, even if the device hasn't been completed yet.
 	 */
 	dev->power.is_prepared = false;
-	dpm_wd_set(&wd, dev);
 
 	if (!dev->power.is_suspended)
 		goto Unlock;
 
 	pm_runtime_enable(dev);
-	put = true;
 
 	if (dev->pm_domain) {
 		info = "power domain ";
@@ -690,13 +643,9 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 
  Unlock:
 	device_unlock(dev);
-	dpm_wd_clear(&wd);
 	complete_all(&dev->power.completion);
 
 	TRACE_RESUME(error);
-
-	if (put)
-		pm_runtime_put_sync(dev);
 
 	return error;
 }
@@ -716,6 +665,30 @@ static bool is_async(struct device *dev)
 {
 	return dev->power.async_suspend && pm_async_enabled
 		&& !pm_trace_is_enabled();
+}
+
+/**
+ *	dpm_drv_timeout - Driver suspend / resume watchdog handler
+ *	@data: struct device which timed out
+ *
+ * 	Called when a driver has timed out suspending or resuming.
+ * 	There's not much we can do here to recover so
+ * 	BUG() out for a crash-dump
+ *
+ */
+static void dpm_drv_timeout(unsigned long data)
+{
+	struct dpm_drv_wd_data *wd_data = (void *)data;
+	struct device *dev = wd_data->dev;
+	struct task_struct *tsk = wd_data->tsk;
+
+	printk(KERN_EMERG "**** DPM device timeout: %s (%s)\n", dev_name(dev),
+	       (dev->driver ? dev->driver->name : "no driver"));
+
+	printk(KERN_EMERG "dpm suspend stack:\n");
+	show_stack(tsk, NULL);
+
+	BUG();
 }
 
 /**
@@ -808,6 +781,8 @@ static void device_complete(struct device *dev, pm_message_t state)
 	}
 
 	device_unlock(dev);
+
+	pm_runtime_put_sync(dev);
 }
 
 /**
@@ -1054,7 +1029,7 @@ int dpm_suspend_end(pm_message_t state)
 
 	error = dpm_suspend_noirq(state);
 	if (error) {
-		dpm_resume_early(resume_event(state));
+		dpm_resume_early(state);
 		return error;
 	}
 
@@ -1095,24 +1070,35 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 	pm_callback_t callback = NULL;
 	char *info = NULL;
 	int error = 0;
-	struct dpm_watchdog wd;
+	struct timer_list timer;
+	struct dpm_drv_wd_data data;
 
 	dpm_wait_for_children(dev, async);
 
 	if (async_error)
 		goto Complete;
 
-	pm_runtime_get_noresume(dev);
+	/*
+	 * If a device configured to wake up the system from sleep states
+	 * has been suspended at run time and there's a resume request pending
+	 * for it, this is equivalent to the device signaling wakeup, so the
+	 * system suspend operation should be aborted.
+	 */
 	if (pm_runtime_barrier(dev) && device_may_wakeup(dev))
 		pm_wakeup_event(dev, 0);
 
 	if (pm_wakeup_pending()) {
-		pm_runtime_put_sync(dev);
 		async_error = -EBUSY;
 		goto Complete;
 	}
 
-	dpm_wd_set(&wd, dev);
+	data.dev = dev;
+	data.tsk = get_current();
+	init_timer_on_stack(&timer);
+	timer.expires = jiffies + HZ * 12;
+	timer.function = dpm_drv_timeout;
+	timer.data = (unsigned long)&data;
+	add_timer(&timer);
 
 	device_lock(dev);
 
@@ -1169,17 +1155,16 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 
 	device_unlock(dev);
 
-	dpm_wd_clear(&wd);
+	del_timer_sync(&timer);
+	destroy_timer_on_stack(&timer);
 
  Complete:
 	complete_all(&dev->power.completion);
 
-	if (error) {
-		pm_runtime_put_sync(dev);
+	if (error)
 		async_error = error;
-	} else if (dev->power.is_suspended) {
+	else if (dev->power.is_suspended)
 		__pm_runtime_disable(dev, false);
-	}
 
 	return error;
 }
@@ -1271,6 +1256,14 @@ static int device_prepare(struct device *dev, pm_message_t state)
 	int (*callback)(struct device *) = NULL;
 	char *info = NULL;
 	int error = 0;
+
+	/*
+	 * If a device's parent goes into runtime suspend at the wrong time,
+	 * it won't be possible to resume the device.  To prevent this we
+	 * block runtime suspend here, during the prepare phase, and allow
+	 * it again during the complete phase.
+	 */
+	pm_runtime_get_noresume(dev);
 
 	device_lock(dev);
 

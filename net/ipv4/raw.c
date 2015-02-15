@@ -120,43 +120,31 @@ static struct sock *__raw_v4_lookup(struct net *net, struct sock *sk,
 		    !(inet->inet_daddr && inet->inet_daddr != raddr) 	&&
 		    !(inet->inet_rcv_saddr && inet->inet_rcv_saddr != laddr) &&
 		    !(sk->sk_bound_dev_if && sk->sk_bound_dev_if != dif))
-			goto found; /* gotcha */
+			goto found; 
 	}
 	sk = NULL;
 found:
 	return sk;
 }
 
-/*
- *	0 - deliver
- *	1 - block
- */
-static int icmp_filter(const struct sock *sk, const struct sk_buff *skb)
+static __inline__ int icmp_filter(struct sock *sk, struct sk_buff *skb)
 {
-	struct icmphdr _hdr;
-	const struct icmphdr *hdr;
+	int type;
 
-	hdr = skb_header_pointer(skb, skb_transport_offset(skb),
-				 sizeof(_hdr), &_hdr);
-	if (!hdr)
+	if (!pskb_may_pull(skb, sizeof(struct icmphdr)))
 		return 1;
 
-	if (hdr->type < 32) {
+	type = icmp_hdr(skb)->type;
+	if (type < 32) {
 		__u32 data = raw_sk(sk)->filter.data;
 
-		return ((1U << hdr->type) & data) != 0;
+		return ((1 << type) & data) != 0;
 	}
 
-	/* Do not block unknown ICMP types */
+	
 	return 0;
 }
 
-/* IP input processing comes here for RAW socket delivery.
- * Caller owns SKB, so we must make clones.
- *
- * RFC 1122: SHOULD pass TOS value up to the transport layer.
- * -> It does. And not only TOS, but all IP header.
- */
 static int raw_v4_input(struct sk_buff *skb, const struct iphdr *iph, int hash)
 {
 	struct sock *sk;
@@ -179,7 +167,7 @@ static int raw_v4_input(struct sk_buff *skb, const struct iphdr *iph, int hash)
 		if (iph->protocol != IPPROTO_ICMP || !icmp_filter(sk, skb)) {
 			struct sk_buff *clone = skb_clone(skb, GFP_ATOMIC);
 
-			/* Not releasing hash table! */
+			
 			if (clone)
 				raw_rcv(sk, clone);
 		}
@@ -200,9 +188,6 @@ int raw_local_deliver(struct sk_buff *skb, int protocol)
 	hash = protocol & (RAW_HTABLE_SIZE - 1);
 	raw_sk = sk_head(&raw_v4_hashinfo.ht[hash]);
 
-	/* If there maybe a raw socket we must check - if not we
-	 * don't care less
-	 */
 	if (raw_sk && !raw_v4_input(skb, ip_hdr(skb), hash))
 		raw_sk = NULL;
 
@@ -218,11 +203,6 @@ static void raw_err(struct sock *sk, struct sk_buff *skb, u32 info)
 	int err = 0;
 	int harderr = 0;
 
-	/* Report error on raw socket, if:
-	   1. User requested ip_recverr.
-	   2. Socket is connected (otherwise the error indication
-	      is useless without ip_recverr and error is hard.
-	 */
 	if (!inet->recverr && sk->sk_state != TCP_ESTABLISHED)
 		return;
 
@@ -292,7 +272,7 @@ void raw_icmp_error(struct sk_buff *skb, int protocol, u32 info)
 
 static int raw_rcv_skb(struct sock * sk, struct sk_buff * skb)
 {
-	/* Charge it to the socket. */
+	
 
 	ipv4_pktinfo_prepare(skb);
 	if (sock_queue_rcv_skb(sk, skb) < 0) {
@@ -367,13 +347,6 @@ static int raw_send_hdrinc(struct sock *sk, struct flowi4 *fl4,
 
 	iphlen = iph->ihl * 4;
 
-	/*
-	 * We don't want to modify the ip header, but we do need to
-	 * be sure that it won't cause problems later along the network
-	 * stack.  Specifically we want to make sure that iph->ihl is a
-	 * sane value.  If ihl points beyond the length of the buffer passed
-	 * in, reject the frame as invalid
-	 */
 	err = -EINVAL;
 	if (iphlen > length)
 		goto error_free;
@@ -384,7 +357,7 @@ static int raw_send_hdrinc(struct sock *sk, struct flowi4 *fl4,
 		iph->check   = 0;
 		iph->tot_len = htons(length);
 		if (!iph->id)
-			ip_select_ident(skb, &rt->dst, NULL);
+			ip_select_ident(iph, &rt->dst, NULL);
 
 		iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
 	}
@@ -428,13 +401,13 @@ static int raw_probe_proto_opt(struct flowi4 *fl4, struct msghdr *msg)
 
 		switch (fl4->flowi4_proto) {
 		case IPPROTO_ICMP:
-			/* check if one-byte field is readable or not. */
+			
 			if (iov->iov_base && iov->iov_len < 1)
 				break;
 
 			if (!type) {
 				type = iov->iov_base;
-				/* check if code field is readable or not. */
+				
 				if (iov->iov_len > 1)
 					code = type + 1;
 			} else if (!code)
@@ -475,17 +448,11 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	if (len > 0xFFFF)
 		goto out;
 
-	/*
-	 *	Check the flags.
-	 */
 
 	err = -EOPNOTSUPP;
-	if (msg->msg_flags & MSG_OOB)	/* Mirror BSD error message */
-		goto out;               /* compatibility */
+	if (msg->msg_flags & MSG_OOB)	
+		goto out;               
 
-	/*
-	 *	Get and verify the address.
-	 */
 
 	if (msg->msg_namelen) {
 		struct sockaddr_in *usin = (struct sockaddr_in *)msg->msg_name;
@@ -500,10 +467,6 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				goto out;
 		}
 		daddr = usin->sin_addr.s_addr;
-		/* ANK: I did not forget to get protocol from port field.
-		 * I just do not know, who uses this weirdness.
-		 * IP_HDRINCL is much more convenient.
-		 */
 	} else {
 		err = -EDESTADDRREQ;
 		if (sk->sk_state != TCP_ESTABLISHED)
@@ -542,9 +505,6 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	if (ipc.opt) {
 		err = -EINVAL;
-		/* Linux does not mangle headers on raw sockets,
-		 * so that IP options + IP_HDRINCL is non-sense.
-		 */
 		if (inet->hdrincl)
 			goto done;
 		if (ipc.opt->opt.srr) {
@@ -634,9 +594,6 @@ do_confirm:
 
 static void raw_close(struct sock *sk, long timeout)
 {
-	/*
-	 * Raw sockets may have direct kernel references. Kill them.
-	 */
 	ip_ra_control(sk, 0, NULL);
 
 	sk_common_release(sk);
@@ -649,7 +606,6 @@ static void raw_destroy(struct sock *sk)
 	release_sock(sk);
 }
 
-/* This gets rid of all the nasties in af_inet. -DaveM */
 static int raw_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	struct inet_sock *inet = inet_sk(sk);
@@ -666,16 +622,12 @@ static int raw_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		goto out;
 	inet->inet_rcv_saddr = inet->inet_saddr = addr->sin_addr.s_addr;
 	if (chk_addr_ret == RTN_MULTICAST || chk_addr_ret == RTN_BROADCAST)
-		inet->inet_saddr = 0;  /* Use device */
+		inet->inet_saddr = 0;  
 	sk_dst_reset(sk);
 	ret = 0;
 out:	return ret;
 }
 
-/*
- *	This should be easy, if there is something there
- *	we return it, otherwise we block.
- */
 
 static int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		       size_t len, int noblock, int flags, int *addr_len)
@@ -713,7 +665,7 @@ static int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	sock_recv_ts_and_drops(msg, sk, skb);
 
-	/* Copy the address. */
+	
 	if (sin) {
 		sin->sin_family = AF_INET;
 		sin->sin_addr.s_addr = ip_hdr(skb)->saddr;
@@ -1068,4 +1020,4 @@ void __init raw_proc_exit(void)
 {
 	unregister_pernet_subsys(&raw_net_ops);
 }
-#endif /* CONFIG_PROC_FS */
+#endif 

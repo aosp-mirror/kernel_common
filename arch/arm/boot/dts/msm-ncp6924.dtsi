@@ -1,0 +1,87 @@
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	i2c@f9928000 {
+		ncp6924-regulator@10 {
+			compatible = "htc,ncp6924-regulator";
+			reg = <0x10>;
+			ncp,enable-gpio = <&msmgpio 82 0>;
+
+			ncp6924_dcdc1: regulator-dcdc1 {
+				regulator-name = "ncp6924_dcdc1";
+				regulator-min-microvolt = <600000>;
+				regulator-max-microvolt = <3300000>;
+				ncp,resource-id = <1>;
+				ncp,regulator-type = <0>;
+				ncp,enable-addr = <0x14>;
+				ncp,enable-bit = <1>;
+				ncp,base-addr = <0x20>;
+			};
+
+			ncp6924_dcdc2: regulator-dcdc2 {
+				regulator-name = "ncp6924_dcdc2";
+				regulator-min-microvolt = <600000>;
+				regulator-max-microvolt = <3300000>;
+				ncp,resource-id = <2>;
+				ncp,regulator-type = <0>;
+				ncp,enable-addr = <0x14>;
+				ncp,enable-bit = <3>;
+				ncp,base-addr = <0x22>;
+			};
+
+			ncp6924_ldo1: regulator-ldo1 {
+				regulator-name = "ncp6924_ldo1";
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3300000>;
+				ncp,resource-id = <3>;
+				ncp,regulator-type = <1>;
+				ncp,enable-addr = <0x14>;
+				ncp,enable-bit = <4>;
+				ncp,base-addr = <0x24>;
+			};
+
+			ncp6924_ldo2: regulator-ldo2 {
+				regulator-name = "ncp6924_ldo2";
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3300000>;
+				ncp,resource-id = <4>;
+				ncp,regulator-type = <1>;
+				ncp,enable-addr = <0x14>;
+				ncp,enable-bit = <5>;
+				ncp,base-addr = <0x25>;
+			};
+
+			ncp6924_ldo3: regulator-ldo3 {
+				regulator-name = "ncp6924_ldo3";
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3300000>;
+				ncp,resource-id = <5>;
+				ncp,regulator-type = <1>;
+				ncp,enable-addr = <0x14>;
+				ncp,enable-bit = <6>;
+				ncp,base-addr = <0x26>;
+			};
+
+			ncp6924_ldo4: regulator-ldo4 {
+				regulator-name = "ncp6924_ldo4";
+				regulator-min-microvolt = <1000000>;
+				regulator-max-microvolt = <3300000>;
+				ncp,resource-id = <6>;
+				ncp,regulator-type = <1>;
+				ncp,enable-addr = <0x14>;
+				ncp,enable-bit = <7>;
+				ncp,base-addr = <0x27>;
+			};
+		};
+	};
+};

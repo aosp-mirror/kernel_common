@@ -14,5 +14,5 @@
 struct mmc_host;
 int mmc_cd_gpio_request(struct mmc_host *host, unsigned int gpio);
 void mmc_cd_gpio_free(struct mmc_host *host);
-
+int mmc_cd_get_status(struct mmc_host *host);
 #endif

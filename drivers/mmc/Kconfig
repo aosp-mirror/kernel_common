@@ -19,6 +19,28 @@ config MMC_DEBUG
 	  This is an option for use by developers; most people should
 	  say N here.  This enables MMC core and driver debugging.
 
+config MMC_PERF_PROFILING
+	bool "MMC performance profiling"
+	depends on MMC != n
+	default n
+	help
+	  If you say Y here, support will be added for collecting
+	  performance numbers at the MMC Queue and Host layers.
+
+# 2012-07-16 Workaround to prevent eMMC WP violation error
+config MMC_MUST_PREVENT_WP_VIOLATION
+	bool "Enable workaround for eMMC WP violation error"
+	depends on MMC != n
+	help
+	  This is an option to enable workaround for eMMC WP violation error.
+
+config MMC_NEED_BKOPS_IN_SUSPEND
+	bool "do bkops during suspend time if necessary"
+	depends on MMC != n
+	default n
+	help
+	  This is an option to enable bkops during device suspend time.
+
 if MMC
 
 source "drivers/mmc/core/Kconfig"

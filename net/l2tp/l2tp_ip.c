@@ -251,15 +251,8 @@ static int l2tp_ip_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	struct inet_sock *inet = inet_sk(sk);
 	struct sockaddr_l2tpip *addr = (struct sockaddr_l2tpip *) uaddr;
-	int ret;
+	int ret = -EINVAL;
 	int chk_addr_ret;
-
-	if (!sock_flag(sk, SOCK_ZAPPED))
-		return -EINVAL;
-	if (addr_len < sizeof(struct sockaddr_l2tpip))
-		return -EINVAL;
-	if (addr->l2tp_family != AF_INET)
-		return -EINVAL;
 
 	ret = -EADDRINUSE;
 	read_lock_bh(&l2tp_ip_lock);
@@ -291,8 +284,6 @@ static int l2tp_ip_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	sk_del_node_init(sk);
 	write_unlock_bh(&l2tp_ip_lock);
 	ret = 0;
-	sock_reset_flag(sk, SOCK_ZAPPED);
-
 out:
 	release_sock(sk);
 
@@ -313,14 +304,13 @@ static int l2tp_ip_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len
 	__be32 saddr;
 	int oif, rc;
 
-	if (sock_flag(sk, SOCK_ZAPPED)) /* Must bind first - autobinding does not work */
-		return -EINVAL;
-
+	rc = -EINVAL;
 	if (addr_len < sizeof(*lsa))
-		return -EINVAL;
+		goto out;
 
+	rc = -EAFNOSUPPORT;
 	if (lsa->l2tp_family != AF_INET)
-		return -EAFNOSUPPORT;
+		goto out;
 
 	lock_sock(sk);
 
@@ -372,14 +362,6 @@ static int l2tp_ip_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len
 out:
 	release_sock(sk);
 	return rc;
-}
-
-static int l2tp_ip_disconnect(struct sock *sk, int flags)
-{
-	if (sock_flag(sk, SOCK_ZAPPED))
-		return 0;
-
-	return udp_disconnect(sk, flags);
 }
 
 static int l2tp_ip_getname(struct socket *sock, struct sockaddr *uaddr,
@@ -516,12 +498,10 @@ static int l2tp_ip_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *m
 					   sk->sk_bound_dev_if);
 		if (IS_ERR(rt))
 			goto no_route;
-		if (connected) {
+		if (connected)
 			sk_setup_caps(sk, &rt->dst);
-		} else {
-			skb_dst_set(skb, &rt->dst);
-			goto xmit;
-		}
+		else
+			dst_release(&rt->dst); /* safe since we hold rcu_read_lock */
 	}
 
 	/* We dont need to clone dst here, it is guaranteed to not disappear.
@@ -529,7 +509,6 @@ static int l2tp_ip_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *m
 	 */
 	skb_dst_set_noref(skb, &rt->dst);
 
-xmit:
 	/* Queue the packet to IP for output */
 	rc = ip_queue_xmit(skb, &inet->cork.fl);
 	rcu_read_unlock();
@@ -620,7 +599,7 @@ static struct proto l2tp_ip_prot = {
 	.close		   = l2tp_ip_close,
 	.bind		   = l2tp_ip_bind,
 	.connect	   = l2tp_ip_connect,
-	.disconnect	   = l2tp_ip_disconnect,
+	.disconnect	   = udp_disconnect,
 	.ioctl		   = udp_ioctl,
 	.destroy	   = l2tp_ip_destroy_sock,
 	.setsockopt	   = ip_setsockopt,

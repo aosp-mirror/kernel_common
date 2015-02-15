@@ -135,21 +135,29 @@
 #define  SDHCI_INT_DATA_CRC	0x00200000
 #define  SDHCI_INT_DATA_END_BIT	0x00400000
 #define  SDHCI_INT_BUS_POWER	0x00800000
-#define  SDHCI_INT_ACMD12ERR	0x01000000
+#define  SDHCI_INT_AUTO_CMD_ERR	0x01000000
 #define  SDHCI_INT_ADMA_ERROR	0x02000000
 
 #define  SDHCI_INT_NORMAL_MASK	0x00007FFF
 #define  SDHCI_INT_ERROR_MASK	0xFFFF8000
 
 #define  SDHCI_INT_CMD_MASK	(SDHCI_INT_RESPONSE | SDHCI_INT_TIMEOUT | \
-		SDHCI_INT_CRC | SDHCI_INT_END_BIT | SDHCI_INT_INDEX)
+		SDHCI_INT_CRC | SDHCI_INT_END_BIT | SDHCI_INT_INDEX | \
+				 SDHCI_INT_AUTO_CMD_ERR)
+
 #define  SDHCI_INT_DATA_MASK	(SDHCI_INT_DATA_END | SDHCI_INT_DMA_END | \
 		SDHCI_INT_DATA_AVAIL | SDHCI_INT_SPACE_AVAIL | \
 		SDHCI_INT_DATA_TIMEOUT | SDHCI_INT_DATA_CRC | \
 		SDHCI_INT_DATA_END_BIT | SDHCI_INT_ADMA_ERROR)
 #define SDHCI_INT_ALL_MASK	((unsigned int)-1)
 
-#define SDHCI_ACMD12_ERR	0x3C
+#define SDHCI_AUTO_CMD_ERR		0x3C
+#define SDHCI_AUTO_CMD12_NOT_EXEC	0x0001
+#define SDHCI_AUTO_CMD_TIMEOUT_ERR	0x0002
+#define SDHCI_AUTO_CMD_CRC_ERR		0x0004
+#define SDHCI_AUTO_CMD_ENDBIT_ERR	0x0008
+#define SDHCI_AUTO_CMD_INDEX_ERR	0x0010
+#define SDHCI_AUTO_CMD12_NOT_ISSUED	0x0080
 
 #define SDHCI_HOST_CONTROL2		0x3E
 #define  SDHCI_CTRL_UHS_MASK		0x0007
@@ -167,6 +175,7 @@
 #define   SDHCI_CTRL_DRV_TYPE_D		0x0030
 #define  SDHCI_CTRL_EXEC_TUNING		0x0040
 #define  SDHCI_CTRL_TUNED_CLK		0x0080
+#define  SDHCI_CTRL_ASYNC_INT_ENABLE	0x4000
 #define  SDHCI_CTRL_PRESET_VAL_ENABLE	0x8000
 
 #define SDHCI_CAPABILITIES	0x40
@@ -187,6 +196,7 @@
 #define  SDHCI_CAN_VDD_300	0x02000000
 #define  SDHCI_CAN_VDD_180	0x04000000
 #define  SDHCI_CAN_64BIT	0x10000000
+#define  SDHCI_ASYNC_INTR	0x20000000
 
 #define  SDHCI_SUPPORT_SDR50	0x00000001
 #define  SDHCI_SUPPORT_SDR104	0x00000002
@@ -271,12 +281,24 @@ struct sdhci_ops {
 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
 					     u8 power_mode);
 	unsigned int    (*get_ro)(struct sdhci_host *host);
+	int    (*get_cd)(struct sdhci_host *host);
 	void	(*platform_reset_enter)(struct sdhci_host *host, u8 mask);
 	void	(*platform_reset_exit)(struct sdhci_host *host, u8 mask);
 	int	(*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
 	void	(*hw_reset)(struct sdhci_host *host);
 	void	(*platform_suspend)(struct sdhci_host *host);
 	void	(*platform_resume)(struct sdhci_host *host);
+	void	(*check_power_status)(struct sdhci_host *host, u32 req_type);
+#define REQ_BUS_OFF	(1 << 0)
+#define REQ_BUS_ON	(1 << 1)
+#define REQ_IO_LOW	(1 << 2)
+#define REQ_IO_HIGH	(1 << 3)
+	int	(*execute_tuning)(struct sdhci_host *host, u32 opcode);
+	void	(*toggle_cdr)(struct sdhci_host *host, bool enable);
+	unsigned int	(*get_max_segments)(void);
+	void	(*platform_bus_voting)(struct sdhci_host *host, u32 enable);
+	void    (*disable_data_xfer)(struct sdhci_host *host);
+	int	(*enable_controller_clock)(struct sdhci_host *host);
 };
 
 #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS

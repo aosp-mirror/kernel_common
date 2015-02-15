@@ -1,0 +1,192 @@
+Qualcomm GPU
+
+Qualcomm Adreno GPU
+
+Required properties:
+- label:		A string used as a descriptive name for the device.
+- compatible:		Must be "qcom,kgsl-3d0" and "qcom,kgsl-3d"
+- reg:			Specifies the register base address and size. The second interval
+			specifies the shader memory base address and size.
+- reg-names:		Resource names used for the physical address of device registers
+			and shader memory. "kgsl_3d0_reg_memory" gives the physical address
+			and length of device registers while "kgsl_3d0_shader_memory" gives
+			physical address and length of device shader memory.
+- interrupts:		Interrupt mapping for GPU IRQ.
+- interrupt-names:	String property to describe the name of the interrupt.
+- qcom,id:		An integer used as an identification number for the device.
+
+- qcom,clk-map:		A bit map value for clocks controlled by kgsl.
+				KGSL_CLK_SRC    0x00000001
+				KGSL_CLK_CORE   0x00000002
+				KGSL_CLK_IFACE  0x00000004
+				KGSL_CLK_MEM    0x00000008
+				KGSL_CLK_MEM_IFACE 0x00000010
+				KGSL_CLK_AXI    0x00000020
+
+Bus Scaling Data:
+- qcom,msm-bus,name: String property to describe the name of the 3D graphics processor.
+- qcom,msm-bus,num-cases: This is the the number of Bus Scaling use cases defined in the vectors property.
+- qcom,msm-bus,active-only: A boolean flag indicating if it is active only.
+- qcom,msm-bus,num-paths: This represents the number of paths in each Bus Scaling Usecase.
+- qcom,msm-bus,vectors-KBps: A series of 4 cell properties, format of which is:
+						<src dst ab ib>, <src dst ab ib>, // For Bus Scaling Usecase 1
+						<src dst ab ib>, <src dst ab ib>, // For Bus Scaling Usecase 2
+						<..  ..  .. ..>, <..  ..  .. ..>; // For Bus Scaling Usecase n
+						This property is a series of all vectors for all Bus Scaling Usecases.
+						Each set of vectors for each usecase describes bandwidth votes for a combination
+						of src/dst ports.  The driver will set the desired use case based on the selected
+						power level and the desired bandwidth vote will be registered for the port pairs.
+					Current values of src are:
+						0 = MSM_BUS_MASTER_GRAPHICS_3D
+						1 = MSM_BUS_MASTER_GRAPHICS_3D_PORT1
+						2 = MSM_BUS_MASTER_V_OCMEM_GFX3D
+					Current values of dst are:
+						0 = MSM_BUS_SLAVE_EBI_CH0
+						1 = MSM_BUS_SLAVE_OCMEM
+					ab: Represents aggregated bandwidth. This value is 0 for Graphics.
+					ib: Represents instantaneous bandwidth. This value has a range <0 8000 MB/s>
+
+GDSC Oxili Regulators:
+- vddcx-supply:			Phandle for vddcx regulator device node.
+- vdd-supply:			Phandle for vdd regulator device node.
+
+IOMMU Data:
+- iommu:			Phandle for the KGSL IOMMU device node
+
+GPU Power levels:
+- qcom,gpu-pwrlevels:		Container for the GPU Power Levels (see
+				adreno-pwrlevels.txt)
+
+DCVS Core info
+- qcom,dcvs-core-info		Container for the DCVS core info (see
+				dcvs-core-info.txt)
+
+Optional Properties:
+- qcom,initial-powerlevel: This value indicates which qcom,gpu-pwrlevel should be used at start time
+			   and when coming back out of resume
+- qcom,bus-control:	   Boolean. Enables an independent bus vote from the gpu frequency
+- qcom,idle-timeout:	   This property represents the time in microseconds for idle timeout.
+- qcom,chipid:		   If it exists this property is used to replace
+			   the chip identification read from the GPU hardware.
+			   This is used to override faulty hardware readings.
+- qcom,strtstp-sleepwake:  Boolean. Enables use of GPU SLUMBER instead of SLEEP for power savings
+
+- qcom,pm-qos-latency:		Every time GPU wakes up from sleep, driver votes for
+				acceptable maximum latency to the pm-qos driver. This
+				voting demands that *CPU* can not go into a power save
+				state *if* the latency to bring CPU back into normal
+				state is more than this value.
+				Value is in microseconds.
+
+The following properties are optional as collecting data via coresight might
+not be supported for every chipset. The documentation for coresight
+properties can be found in:
+Documentation/devicetree/bindings/coresight/coresight.txt
+
+- coresight-id           Unique integer identifier for the bus.
+- coresight-name         Unique descriptive name of the bus.
+- coresight-nr-inports   Number of input ports on the bus.
+- coresight-outports     List of output port numbers on the bus.
+- coresight-child-list   List of phandles pointing to the children of this
+                         component.
+- coresight-child-ports  List of input port numbers of the children.
+
+
+Example of A330 GPU in MSM8974:
+
+/ {
+	qcom,kgsl-3d0@fdb00000 {
+		label = "kgsl-3d0";
+		compatible = "qcom,kgsl-3d0", "qcom,kgsl-3d";
+		reg = <0xfdb00000 0x10000
+		       0xfdb20000 0x10000>;
+		reg-names = "kgsl_3d0_reg_memory", "kgsl_3d0_shader_memory";
+		interrupts = <0 33 0>;
+		interrupt-names = "kgsl_3d0_irq";
+		qcom,id = <0>;
+
+		qcom,chipid = <0x03030000>;
+
+		/* Power Settings */
+
+		qcom,initial-pwrlevel = <1>;
+		qcom,idle-timeout = <83>; //<HZ/12>
+		qcom,clk-map = <0x00000016>; //KGSL_CLK_CORE | KGSL_CLK_IFACE | KGSL_CLK_MEM_IFACE
+
+		/* Bus Scale Settings */
+		qcom,msm-bus,name = "grp3d";
+		qcom,msm-bus,num-cases = <6>;
+		qcom,msm-bus,num-paths = <2>;
+		qcom,msm-bus,vectors-KBps =
+				<26 512 0 0>, <89 604 0 0>,
+				<26 512 0 2200000>, <89 604 0 3000000>,
+				<26 512 0 4000000>, <89 604 0 3000000>,
+				<26 512 0 4000000>, <89 604 0 4500000>,
+				<26 512 0 6400000>, <89 604 0 4500000>,
+				<26 512 0 6400000>, <89 604 0 7600000>;
+
+		/* GDSC oxili regulators */
+		vddcx-supply = <&gdsc_oxili_cx>;
+		vdd-supply = <&gdsc_oxili_gx>;
+
+		/* IOMMU Data */
+		iommu = <&kgsl>;
+
+		qcom,gpu-pwrlevels {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			compatible = "qcom,gpu-pwrlevels";
+
+			qcom,gpu-pwrlevel@0 {
+				reg = <0>;
+				qcom,gpu-freq = <5000000000>;
+				qcom,bus-freq = <3>;
+				qcom,io-fraction = <0>;
+			};
+		};
+
+		qcom,dcvs-core-info {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			compatible = "qcom,dcvs-core-info";
+
+			qcom,core-max-time-us = <100000>;
+			qcom,algo-slack-time-us = <39000>;
+			qcom,algo-disable-pc-threshold = <86000>;
+			qcom,algo-ss-window-size = <1000000>;
+			qcom,algo-ss-util-pct = <95>;
+			qcom,algo-em-max-util-pct = <97>;
+			qcom,algo-ss-no-corr-below-freq = <0>;
+
+			qcom,dcvs-freq@0 {
+				reg = <0>;
+				qcom,freq = <0>;
+				qcom,idle-energy = <0>;
+				qcom,active-energy = <333932>;
+			};
+
+			qcom,dcvs-freq@1 {
+				reg = <1>;
+				qcom,freq = <0>;
+				qcom,idle-energy = <0>;
+				qcom,active-energy = <497532>;
+			};
+
+			qcom,dcvs-freq@2 {
+				reg = <2>;
+				qcom,freq = <0>;
+				qcom,idle-energy = <0>;
+				qcom,active-energy = <707610>;
+			};
+
+			qcom,dcvs-freq@3 {
+				reg = <3>;
+				qcom,freq = <0>;
+				qcom,idle-energy = <0>;
+				qcom,active-energy = <844545>;
+			};
+		};
+	};
+};

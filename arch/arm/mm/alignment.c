@@ -750,6 +750,7 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	unsigned long instr = 0, instrptr;
 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
 	unsigned int type;
+	mm_segment_t fs;
 	unsigned int fault;
 	u16 tinstr = 0;
 	int isize = 4;
@@ -760,15 +761,16 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 
 	instrptr = instruction_pointer(regs);
 
+	fs = get_fs();
+	set_fs(KERNEL_DS);
 	if (thumb_mode(regs)) {
-		u16 *ptr = (u16 *)(instrptr & ~1);
-		fault = probe_kernel_address(ptr, tinstr);
+		fault = __get_user(tinstr, (u16 *)(instrptr & ~1));
 		if (!fault) {
 			if (cpu_architecture() >= CPU_ARCH_ARMv7 &&
 			    IS_T32(tinstr)) {
 				/* Thumb-2 32-bit */
 				u16 tinst2 = 0;
-				fault = probe_kernel_address(ptr + 1, tinst2);
+				fault = __get_user(tinst2, (u16 *)(instrptr+2));
 				instr = (tinstr << 16) | tinst2;
 				thumb2_32b = 1;
 			} else {
@@ -777,7 +779,8 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 			}
 		}
 	} else
-		fault = probe_kernel_address(instrptr, instr);
+		fault = __get_user(instr, (u32 *)instrptr);
+	set_fs(fs);
 
 	if (fault) {
 		type = TYPE_FAULT;
@@ -853,8 +856,10 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	case 0x08000000:	/* ldm or stm, or thumb-2 32bit instruction */
 		if (thumb2_32b)
 			handler = do_alignment_t32_to_handler(&instr, regs, &offset);
-		else
+		else {
 			handler = do_alignment_ldmstm;
+			offset.un = 0;
+		}
 		break;
 
 	default:

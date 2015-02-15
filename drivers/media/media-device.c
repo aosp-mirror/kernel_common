@@ -29,9 +29,6 @@
 #include <media/media-devnode.h>
 #include <media/media-entity.h>
 
-/* -----------------------------------------------------------------------------
- * Userspace API
- */
 
 static int media_device_open(struct file *filp)
 {
@@ -140,6 +137,8 @@ static long media_device_enum_links(struct media_device *mdev,
 
 		for (p = 0; p < entity->num_pads; p++) {
 			struct media_pad_desc pad;
+
+			memset(&pad, 0, sizeof(pad));
 			media_device_kpad_to_upad(&entity->pads[p], &pad);
 			if (copy_to_user(&links.pads[p], &pad, sizeof(pad)))
 				return -EFAULT;
@@ -153,10 +152,11 @@ static long media_device_enum_links(struct media_device *mdev,
 		for (l = 0, ulink = links.links; l < entity->num_links; l++) {
 			struct media_link_desc link;
 
-			/* Ignore backlinks. */
+			
 			if (entity->links[l].source->entity != entity)
 				continue;
 
+			memset(&link, 0, sizeof(link));
 			media_device_kpad_to_upad(entity->links[l].source,
 						  &link.source);
 			media_device_kpad_to_upad(entity->links[l].sink,
@@ -184,8 +184,6 @@ static long media_device_setup_link(struct media_device *mdev,
 	if (copy_from_user(&ulink, _ulink, sizeof(ulink)))
 		return -EFAULT;
 
-	/* Find the source and sink entities and link.
-	 */
 	source = find_entity(mdev, ulink.source.entity);
 	sink = find_entity(mdev, ulink.sink.entity);
 
@@ -201,7 +199,7 @@ static long media_device_setup_link(struct media_device *mdev,
 	if (link == NULL)
 		return -EINVAL;
 
-	/* Setup the link on both entities. */
+	
 	ret = __media_entity_setup_link(link, ulink.flags);
 
 	if (copy_to_user(_ulink, &ulink, sizeof(ulink)))
@@ -256,9 +254,6 @@ static const struct media_file_operations media_device_fops = {
 	.release = media_device_close,
 };
 
-/* -----------------------------------------------------------------------------
- * sysfs
- */
 
 static ssize_t show_model(struct device *cd,
 			  struct device_attribute *attr, char *buf)
@@ -270,24 +265,11 @@ static ssize_t show_model(struct device *cd,
 
 static DEVICE_ATTR(model, S_IRUGO, show_model, NULL);
 
-/* -----------------------------------------------------------------------------
- * Registration/unregistration
- */
 
 static void media_device_release(struct media_devnode *mdev)
 {
 }
 
-/**
- * media_device_register - register a media device
- * @mdev:	The media device
- *
- * The caller is responsible for initializing the media device before
- * registration. The following fields must be set:
- *
- * - dev must point to the parent device
- * - model must be filled with the device model name
- */
 int __must_check media_device_register(struct media_device *mdev)
 {
 	int ret;
@@ -300,7 +282,7 @@ int __must_check media_device_register(struct media_device *mdev)
 	spin_lock_init(&mdev->lock);
 	mutex_init(&mdev->graph_mutex);
 
-	/* Register the device node. */
+	
 	mdev->devnode.fops = &media_device_fops;
 	mdev->devnode.parent = mdev->dev;
 	mdev->devnode.release = media_device_release;
@@ -318,11 +300,6 @@ int __must_check media_device_register(struct media_device *mdev)
 }
 EXPORT_SYMBOL_GPL(media_device_register);
 
-/**
- * media_device_unregister - unregister a media device
- * @mdev:	The media device
- *
- */
 void media_device_unregister(struct media_device *mdev)
 {
 	struct media_entity *entity;
@@ -336,15 +313,10 @@ void media_device_unregister(struct media_device *mdev)
 }
 EXPORT_SYMBOL_GPL(media_device_unregister);
 
-/**
- * media_device_register_entity - Register an entity with a media device
- * @mdev:	The media device
- * @entity:	The entity
- */
 int __must_check media_device_register_entity(struct media_device *mdev,
 					      struct media_entity *entity)
 {
-	/* Warn if we apparently re-register an entity */
+	
 	WARN_ON(entity->parent != NULL);
 	entity->parent = mdev;
 
@@ -360,13 +332,6 @@ int __must_check media_device_register_entity(struct media_device *mdev,
 }
 EXPORT_SYMBOL_GPL(media_device_register_entity);
 
-/**
- * media_device_unregister_entity - Unregister an entity
- * @entity:	The entity
- *
- * If the entity has never been registered this function will return
- * immediately.
- */
 void media_device_unregister_entity(struct media_entity *entity)
 {
 	struct media_device *mdev = entity->parent;

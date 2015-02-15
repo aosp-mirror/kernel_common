@@ -150,7 +150,7 @@ void scsi_proc_host_add(struct Scsi_Host *shost)
 	if (!sht->proc_dir)
 		return;
 
-	sprintf(name,"%d", shost->host_no);
+	snprintf(name, sizeof(name) - 1, "%d", shost->host_no);
 	p = create_proc_read_entry(name, S_IFREG | S_IRUGO | S_IWUSR,
 			sht->proc_dir, proc_scsi_read, shost);
 	if (!p) {
@@ -174,7 +174,7 @@ void scsi_proc_host_rm(struct Scsi_Host *shost)
 	if (!shost->hostt->proc_dir)
 		return;
 
-	sprintf(name,"%d", shost->host_no);
+	snprintf(name, sizeof(name) - 1, "%d", shost->host_no);
 	remove_proc_entry(name, shost->hostt->proc_dir);
 }
 /**

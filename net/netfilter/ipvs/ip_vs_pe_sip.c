@@ -37,9 +37,13 @@ static int get_callid(const char *dptr, unsigned int dataoff,
 		if (ret > 0)
 			break;
 		if (!ret)
-			return -EINVAL;
+			return 0;
 		dataoff += *matchoff;
 	}
+
+	/* Empty callid is useless */
+	if (!*matchlen)
+		return -EINVAL;
 
 	/* Too large is useless */
 	if (*matchlen > IP_VS_PEDATA_MAXLEN)

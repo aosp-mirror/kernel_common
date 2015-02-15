@@ -927,7 +927,7 @@ static void dss_ovl_setup_fifo(struct omap_overlay *ovl,
 	dssdev = ovl->manager->device;
 
 	dispc_ovl_compute_fifo_thresholds(ovl->id, &fifo_low, &fifo_high,
-			use_fifo_merge, ovl_manual_update(ovl));
+			use_fifo_merge);
 
 	dss_apply_ovl_fifo_thresholds(ovl, fifo_low, fifo_high);
 }

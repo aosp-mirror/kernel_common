@@ -322,7 +322,7 @@ int snd_hdmi_get_eld(struct hdmi_eld *eld,
 		     struct hda_codec *codec, hda_nid_t nid)
 {
 	int i;
-	int ret = 0;
+	int ret;
 	int size;
 	unsigned char *buf;
 

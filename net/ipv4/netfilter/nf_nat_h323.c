@@ -105,6 +105,11 @@ static int set_sig_addr(struct sk_buff *skb, struct nf_conn *ct,
 	__be16 port;
 	union nf_inet_addr addr;
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(info) || (!info))
+		printk(KERN_ERR "[NET] info is NULL in %s!\n", __func__);
+#endif
+
 	for (i = 0; i < count; i++) {
 		if (get_h225_addr(ct, *data, &taddr[i], &addr, &port)) {
 			if (addr.ip == ct->tuplehash[dir].tuple.src.u3.ip &&
@@ -186,6 +191,11 @@ static int nat_rtp_rtcp(struct sk_buff *skb, struct nf_conn *ct,
 	int dir = CTINFO2DIR(ctinfo);
 	int i;
 	u_int16_t nated_port;
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(info) || (!info))
+		printk(KERN_ERR "[NET] info is NULL in %s!\n", __func__);
+#endif
 
 	/* Set expectations for NAT */
 	rtp_exp->saved_proto.udp.port = rtp_exp->tuple.dst.u.udp.port;
@@ -341,6 +351,11 @@ static int nat_h245(struct sk_buff *skb, struct nf_conn *ct,
 	int dir = CTINFO2DIR(ctinfo);
 	u_int16_t nated_port = ntohs(port);
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(info) || (!info))
+		printk(KERN_ERR "[NET] info is NULL in %s!\n", __func__);
+#endif
+
 	/* Set expectations for NAT */
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;
 	exp->expectfn = nf_nat_follow_master;
@@ -431,6 +446,11 @@ static int nat_q931(struct sk_buff *skb, struct nf_conn *ct,
 	int dir = CTINFO2DIR(ctinfo);
 	u_int16_t nated_port = ntohs(port);
 	union nf_inet_addr addr;
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(info) || (!info))
+		printk(KERN_ERR "[NET] info is NULL in %s!\n", __func__);
+#endif
 
 	/* Set expectations for NAT */
 	exp->saved_proto.tcp.port = exp->tuple.dst.u.tcp.port;

@@ -157,13 +157,7 @@
 	.bInterfaceSubClass = USB_SUBCLASS_AUDIOCONTROL
 },
 {
-	.match_flags = USB_DEVICE_ID_MATCH_DEVICE |
-		       USB_DEVICE_ID_MATCH_INT_CLASS |
-		       USB_DEVICE_ID_MATCH_INT_SUBCLASS,
-	.idVendor = 0x046d,
-	.idProduct = 0x0990,
-	.bInterfaceClass = USB_CLASS_AUDIO,
-	.bInterfaceSubClass = USB_SUBCLASS_AUDIOCONTROL,
+	USB_DEVICE(0x046d, 0x0990),
 	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
 		.vendor_name = "Logitech, Inc.",
 		.product_name = "QuickCam Pro 9000",
@@ -1628,11 +1622,7 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0108),
 	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
 		.ifnum = 0,
-		.type = QUIRK_MIDI_FIXED_ENDPOINT,
-		.data = & (const struct snd_usb_midi_endpoint_info) {
-			.out_cables = 0x0007,
-			.in_cables  = 0x0007
-		}
+		.type = QUIRK_MIDI_STANDARD_INTERFACE
 	}
 },
 {
@@ -1668,7 +1658,7 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 	.driver_info = (unsigned long) & (const struct snd_usb_audio_quirk) {
 		/* .vendor_name = "Roland", */
 		/* .product_name = "A-PRO", */
-		.ifnum = 0,
+		.ifnum = 1,
 		.type = QUIRK_MIDI_FIXED_ENDPOINT,
 		.data = & (const struct snd_usb_midi_endpoint_info) {
 			.out_cables = 0x0003,
@@ -2758,59 +2748,6 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 			}
 		}
 
-	}
-},
-
-/* Microsoft XboxLive Headset/Xbox Communicator */
-{
-	USB_DEVICE(0x045e, 0x0283),
-	.bInterfaceClass = USB_CLASS_PER_INTERFACE,
-	.driver_info = (unsigned long) &(const struct snd_usb_audio_quirk) {
-		.vendor_name = "Microsoft",
-		.product_name = "XboxLive Headset/Xbox Communicator",
-		.ifnum = QUIRK_ANY_INTERFACE,
-		.type = QUIRK_COMPOSITE,
-		.data = &(const struct snd_usb_audio_quirk[]) {
-			{
-				/* playback */
-				.ifnum = 0,
-				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
-				.data = &(const struct audioformat) {
-					.formats = SNDRV_PCM_FMTBIT_S16_LE,
-					.channels = 1,
-					.iface = 0,
-					.altsetting = 0,
-					.altset_idx = 0,
-					.attributes = 0,
-					.endpoint = 0x04,
-					.ep_attr = 0x05,
-					.rates = SNDRV_PCM_RATE_CONTINUOUS,
-					.rate_min = 22050,
-					.rate_max = 22050
-				}
-			},
-			{
-				/* capture */
-				.ifnum = 1,
-				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
-				.data = &(const struct audioformat) {
-					.formats = SNDRV_PCM_FMTBIT_S16_LE,
-					.channels = 1,
-					.iface = 1,
-					.altsetting = 0,
-					.altset_idx = 0,
-					.attributes = 0,
-					.endpoint = 0x85,
-					.ep_attr = 0x05,
-					.rates = SNDRV_PCM_RATE_CONTINUOUS,
-					.rate_min = 16000,
-					.rate_max = 16000
-				}
-			},
-			{
-				.ifnum = -1
-			}
-		}
 	}
 },
 

@@ -47,6 +47,7 @@ EXPORT_SYMBOL_GPL(unregister_syscore_ops);
 int syscore_suspend(void)
 {
 	struct syscore_ops *ops;
+	ktime_t calltime, delta, rettime;
 	int ret = 0;
 
 	pr_debug("Checking wakeup interrupts\n");
@@ -61,11 +62,25 @@ int syscore_suspend(void)
 
 	list_for_each_entry_reverse(ops, &syscore_ops_list, node)
 		if (ops->suspend) {
-			if (initcall_debug)
+			if (initcall_debug == 1)
 				pr_info("PM: Calling %pF\n", ops->suspend);
+			else if (initcall_debug > 1) {
+				calltime =  ktime_get();
+			}
 			ret = ops->suspend();
 			if (ret)
 				goto err_out;
+			if (initcall_debug > 1) {
+				unsigned long long duration;
+
+				rettime = ktime_get();
+				delta = ktime_sub(rettime, calltime);
+				duration = (unsigned long long)ktime_to_ns(delta) >> 10;
+
+				if (duration >= initcall_debug)
+					pr_info("call %pF+ returned after %Ld usecs\n", ops->suspend,
+						duration);
+			}
 			WARN_ONCE(!irqs_disabled(),
 				"Interrupts enabled after %pF\n", ops->suspend);
 		}
@@ -91,15 +106,30 @@ EXPORT_SYMBOL_GPL(syscore_suspend);
 void syscore_resume(void)
 {
 	struct syscore_ops *ops;
+	ktime_t calltime, delta, rettime;
 
 	WARN_ONCE(!irqs_disabled(),
 		"Interrupts enabled before system core resume.\n");
 
 	list_for_each_entry(ops, &syscore_ops_list, node)
 		if (ops->resume) {
-			if (initcall_debug)
+			if (initcall_debug == 1)
 				pr_info("PM: Calling %pF\n", ops->resume);
+			else if (initcall_debug > 1) {
+				calltime =  ktime_get();
+			}
 			ops->resume();
+			if (initcall_debug > 1) {
+				unsigned long long duration;
+
+				rettime = ktime_get();
+				delta = ktime_sub(rettime, calltime);
+				duration = (unsigned long long)ktime_to_ns(delta) >> 10;
+
+				if (duration >= initcall_debug)
+					pr_info("call %pF+ returned after %Ld usecs\n", ops->resume,
+						duration);
+			}
 			WARN_ONCE(!irqs_disabled(),
 				"Interrupts enabled after %pF\n", ops->resume);
 		}
@@ -118,7 +148,7 @@ void syscore_shutdown(void)
 
 	list_for_each_entry_reverse(ops, &syscore_ops_list, node)
 		if (ops->shutdown) {
-			if (initcall_debug)
+			if (initcall_debug == 1)
 				pr_info("PM: Calling %pF\n", ops->shutdown);
 			ops->shutdown();
 		}

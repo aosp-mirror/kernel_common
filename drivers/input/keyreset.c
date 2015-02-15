@@ -21,7 +21,14 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/syscalls.h>
-
+#include <mach/board.h>
+/*#include <mach/msm_watchdog.h>*/
+#include <mach/devices_cmdline.h>
+#include <mach/board_htc.h>
+#ifdef CONFIG_OF
+#include <linux/of_gpio.h>
+#endif
+#define KEYRESET_DELAY 3*HZ
 
 struct keyreset_state {
 	struct input_handler input_handler;
@@ -36,7 +43,9 @@ struct keyreset_state {
 	int (*reset_fn)(void);
 };
 
-int restart_requested;
+static int restart_requested;
+static unsigned long restart_timeout;
+
 static void deferred_restart(struct work_struct *dummy)
 {
 	restart_requested = 2;
@@ -44,7 +53,7 @@ static void deferred_restart(struct work_struct *dummy)
 	restart_requested = 3;
 	kernel_restart(NULL);
 }
-static DECLARE_WORK(restart_work, deferred_restart);
+static DECLARE_DELAYED_WORK(restart_work, deferred_restart);
 
 static void keyreset_event(struct input_handle *handle, unsigned int type,
 			   unsigned int code, int value)
@@ -86,15 +95,35 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 	if (value && !state->restart_disabled &&
 	    state->key_down == state->key_down_target) {
 		state->restart_disabled = 1;
-		if (restart_requested)
-			panic("keyboard reset failed, %d", restart_requested);
+		if (restart_requested) {
+			//msm_watchdog_suspend(NULL);
+			/* show blocked processes to debug hang problems */
+			printk(KERN_INFO "\n### Show Blocked State ###\n");
+			show_state_filter(TASK_UNINTERRUPTIBLE);
+			//msm_watchdog_resume(NULL);
+			if (time_after(jiffies, restart_timeout))
+				panic("keyboard reset failed, %d", restart_requested);
+			return;
+		}
 		if (state->reset_fn) {
 			restart_requested = state->reset_fn();
 		} else {
 			pr_info("keyboard reset\n");
-			schedule_work(&restart_work);
+			schedule_delayed_work(&restart_work, KEYRESET_DELAY);
 			restart_requested = 1;
+			restart_timeout = jiffies + 20 * HZ;
+			//msm_watchdog_suspend(NULL);
+			/* show blocked processes to debug hang problems */
+			printk(KERN_INFO "\n### Show Blocked State ###\n");
+			show_state_filter(TASK_UNINTERRUPTIBLE);
+			//msm_watchdog_resume(NULL);
 		}
+	} else if (restart_requested == 1) {
+		if (cancel_delayed_work(&restart_work)) {
+			pr_info("%s: cancel restart work\n", __func__);
+			restart_requested = 0;
+		} else
+			pr_info("%s: cancel failed\n", __func__);
 	}
 done:
 	spin_unlock_irqrestore(&state->lock, flags);
@@ -161,12 +190,66 @@ static const struct input_device_id keyreset_ids[] = {
 };
 MODULE_DEVICE_TABLE(input, keyreset_ids);
 
+static struct keyreset_platform_data reset_key_pdata = {
+	.keys_down = {
+		KEY_POWER,
+		KEY_VOLUMEDOWN,
+		KEY_VOLUMEUP,
+		0
+	},
+};
+
+#ifdef CONFIG_OF
+static bool keyreset_dt_parser(struct device *dev)
+{
+	const char *parser = {"keyreset,driver_state"}, *drstate;
+	struct device_node *node = dev->of_node;
+
+	pr_info("[KEYRESET] %s", __func__);
+
+	if (of_property_read_string(node, parser, &drstate) == 0) {
+		if (!strncmp(drstate, "enable", 6))
+			return true;
+		else
+			pr_info("[KEYRESET] driver state parser failed(%s)", drstate);
+	} else
+		pr_info("[KEYRESET] dt parser faile, can't find driver state");
+	return false;
+}
+#endif
+
 static int keyreset_probe(struct platform_device *pdev)
 {
-	int ret;
+	int ret = 0;
 	int key, *keyp;
 	struct keyreset_state *state;
+#ifndef CONFIG_OF
 	struct keyreset_platform_data *pdata = pdev->dev.platform_data;
+#else
+	uint8_t idx = 0;
+	struct keyreset_platform_data *pdata;
+	pr_info("[KEYRESET] ++%s++", __func__);
+#endif
+	if (!board_build_flag()) {
+		pr_info("[KEYRESET] Ship code, disable key reset");
+		return 0;
+	}
+	if (pdev->dev.of_node) {
+		pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+		if (pdata == NULL)
+			pr_err("[KEYRESET] alloc memory fail");
+		if (keyreset_dt_parser(&pdev->dev)) {
+			while (reset_key_pdata.keys_down[idx] != 0)
+				idx++;
+			pr_info("[KEYRESET] idx=%d ", idx);
+
+			memcpy(pdata->keys_down, &reset_key_pdata.keys_down,
+				sizeof(int)*(idx+1));
+		} else {
+			ret = -ENOMEM;
+			goto err_driver_state;
+		}
+	}
 
 	if (!pdata)
 		return -EINVAL;
@@ -207,22 +290,36 @@ static int keyreset_probe(struct platform_device *pdev)
 		return ret;
 	}
 	platform_set_drvdata(pdev, state);
+	pr_info("[KEYRESET] --%s--", __func__);
 	return 0;
+err_driver_state:
+	kfree(pdata);
+	return ret;
 }
 
 int keyreset_remove(struct platform_device *pdev)
 {
 	struct keyreset_state *state = platform_get_drvdata(pdev);
-	input_unregister_handler(&state->input_handler);
-	kfree(state);
+	if (board_build_flag()) {
+		input_unregister_handler(&state->input_handler);
+		kfree(state);
+	}
 	return 0;
 }
 
+static const struct of_device_id keyreset_mttable[] = {
+	{ .compatible = "keyreset_driver" },
+	{ },
+};
 
 struct platform_driver keyreset_driver = {
 	.driver.name = KEYRESET_NAME,
 	.probe = keyreset_probe,
 	.remove = keyreset_remove,
+	.driver = {
+		.name = KEYRESET_NAME,
+		.of_match_table = keyreset_mttable,
+	},
 };
 
 static int __init keyreset_init(void)
@@ -237,3 +334,6 @@ static void __exit keyreset_exit(void)
 
 module_init(keyreset_init);
 module_exit(keyreset_exit);
+
+MODULE_DESCRIPTION("KEYRESET Driver");
+MODULE_LICENSE("GPL");

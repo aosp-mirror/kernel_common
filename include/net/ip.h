@@ -34,7 +34,7 @@
 struct sock;
 
 struct inet_skb_parm {
-	struct ip_options	opt;		/* Compiled IP options		*/
+	struct ip_options	opt;		
 	unsigned char		flags;
 
 #define IPSKB_FORWARDED		1
@@ -70,13 +70,12 @@ struct ip_ra_chain {
 
 extern struct ip_ra_chain __rcu *ip_ra_chain;
 
-/* IP flags. */
-#define IP_CE		0x8000		/* Flag: "Congestion"		*/
-#define IP_DF		0x4000		/* Flag: "Don't Fragment"	*/
-#define IP_MF		0x2000		/* Flag: "More Fragments"	*/
-#define IP_OFFSET	0x1FFF		/* "Fragment Offset" part	*/
+#define IP_CE		0x8000		
+#define IP_DF		0x4000		
+#define IP_MF		0x2000		
+#define IP_OFFSET	0x1FFF		
 
-#define IP_FRAG_TIME	(30 * HZ)		/* fragment lifetime	*/
+#define IP_FRAG_TIME	(30 * HZ)		
 
 struct msghdr;
 struct net_device;
@@ -86,9 +85,6 @@ struct sockaddr;
 
 extern int		igmp_mc_proc_init(void);
 
-/*
- *	Functions provided by ip.c
- */
 
 extern int		ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 					      __be32 saddr, __be32 daddr,
@@ -137,16 +133,9 @@ static inline struct sk_buff *ip_finish_skb(struct sock *sk, struct flowi4 *fl4)
 	return __ip_make_skb(sk, fl4, &sk->sk_write_queue, &inet_sk(sk)->cork.base);
 }
 
-/* datagram.c */
 extern int		ip4_datagram_connect(struct sock *sk, 
 					     struct sockaddr *uaddr, int addr_len);
 
-/*
- *	Map a multicast IP onto multicast MAC for type Token Ring.
- *      This conforms to RFC1469 Option 2 Multicasting i.e.
- *      using a functional address to transmit / receive 
- *      multicast packets.
- */
 
 static inline void ip_tr_mc_map(__be32 addr, char *buf)
 {
@@ -162,8 +151,8 @@ struct ip_reply_arg {
 	struct kvec iov[1];   
 	int	    flags;
 	__wsum 	    csum;
-	int	    csumoffset; /* u16 offset of csum in iov[0].iov_base */
-				/* -1 if not needed */ 
+	int	    csumoffset; 
+				 
 	int	    bound_dev_if;
 	u8  	    tos;
 	uid_t	    uid;
@@ -226,12 +215,10 @@ extern int sysctl_ip_nonlocal_bind;
 extern struct ctl_path net_core_path[];
 extern struct ctl_path net_ipv4_ctl_path[];
 
-/* From inetpeer.c */
 extern int inet_peer_threshold;
 extern int inet_peer_minttl;
 extern int inet_peer_maxttl;
 
-/* From ip_output.c */
 extern int sysctl_ip_dynaddr;
 
 extern void ipfrag_init(void);
@@ -249,8 +236,6 @@ static inline bool ip_is_fragment(const struct iphdr *iph)
 #ifdef CONFIG_INET
 #include <net/dst.h>
 
-/* The function in 2.2 was invalid, producing wrong result for
- * check=0xFEFF. It was noticed by Arthur Skawina _year_ ago. --ANK(000625) */
 static inline
 int ip_decrease_ttl(struct iphdr *iph)
 {
@@ -270,27 +255,18 @@ int ip_dont_fragment(struct sock *sk, struct dst_entry *dst)
 
 extern void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst, int more);
 
-static inline void ip_select_ident(struct sk_buff *skb, struct dst_entry *dst, struct sock *sk)
+static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst, struct sock *sk)
 {
-	struct iphdr *iph = ip_hdr(skb);
-
-	if ((iph->frag_off & htons(IP_DF)) && !skb->local_df) {
-		/* This is only to work around buggy Windows95/2000
-		 * VJ compression implementations.  If the ID field
-		 * does not change, they drop every other packet in
-		 * a TCP stream using header compression.
-		 */
+	if (iph->frag_off & htons(IP_DF)) {
 		iph->id = (sk && inet_sk(sk)->inet_daddr) ?
 					htons(inet_sk(sk)->inet_id++) : 0;
 	} else
 		__ip_select_ident(iph, dst, 0);
 }
 
-static inline void ip_select_ident_more(struct sk_buff *skb, struct dst_entry *dst, struct sock *sk, int more)
+static inline void ip_select_ident_more(struct iphdr *iph, struct dst_entry *dst, struct sock *sk, int more)
 {
-	struct iphdr *iph = ip_hdr(skb);
-
-	if ((iph->frag_off & htons(IP_DF)) && !skb->local_df) {
+	if (iph->frag_off & htons(IP_DF)) {
 		if (sk && inet_sk(sk)->inet_daddr) {
 			iph->id = htons(inet_sk(sk)->inet_id);
 			inet_sk(sk)->inet_id += 1 + more;
@@ -300,9 +276,6 @@ static inline void ip_select_ident_more(struct sk_buff *skb, struct dst_entry *d
 		__ip_select_ident(iph, dst, more);
 }
 
-/*
- *	Map a multicast IP onto multicast MAC for type ethernet.
- */
 
 static inline void ip_eth_mc_map(__be32 naddr, char *buf)
 {
@@ -317,26 +290,22 @@ static inline void ip_eth_mc_map(__be32 naddr, char *buf)
 	buf[3]=addr&0x7F;
 }
 
-/*
- *	Map a multicast IP onto multicast MAC for type IP-over-InfiniBand.
- *	Leave P_Key as 0 to be filled in by driver.
- */
 
 static inline void ip_ib_mc_map(__be32 naddr, const unsigned char *broadcast, char *buf)
 {
 	__u32 addr;
 	unsigned char scope = broadcast[5] & 0xF;
 
-	buf[0]  = 0;		/* Reserved */
-	buf[1]  = 0xff;		/* Multicast QPN */
+	buf[0]  = 0;		
+	buf[1]  = 0xff;		
 	buf[2]  = 0xff;
 	buf[3]  = 0xff;
 	addr    = ntohl(naddr);
 	buf[4]  = 0xff;
-	buf[5]  = 0x10 | scope;	/* scope from broadcast address */
-	buf[6]  = 0x40;		/* IPv4 signature */
+	buf[5]  = 0x10 | scope;	
+	buf[6]  = 0x40;		
 	buf[7]  = 0x1b;
-	buf[8]  = broadcast[8];		/* P_Key */
+	buf[8]  = broadcast[8];		
 	buf[9]  = broadcast[9];
 	buf[10] = 0;
 	buf[11] = 0;
@@ -398,9 +367,6 @@ static inline int sk_mc_loop(struct sock *sk)
 
 extern bool ip_call_ra_chain(struct sk_buff *skb);
 
-/*
- *	Functions provided by ip_fragment.c
- */
 
 enum ip_defrag_users {
 	IP_DEFRAG_LOCAL_DELIVER,
@@ -430,15 +396,9 @@ static inline struct sk_buff *ip_check_defrag(struct sk_buff *skb, u32 user)
 int ip_frag_mem(struct net *net);
 int ip_frag_nqueues(struct net *net);
 
-/*
- *	Functions provided by ip_forward.c
- */
  
 extern int ip_forward(struct sk_buff *skb);
  
-/*
- *	Functions provided by ip_options.c
- */
  
 extern void ip_options_build(struct sk_buff *skb, struct ip_options *opt,
 			     __be32 daddr, struct rtable *rt, int is_frag);
@@ -454,9 +414,6 @@ extern void ip_options_undo(struct ip_options * opt);
 extern void ip_forward_options(struct sk_buff *skb);
 extern int ip_options_rcv_srr(struct sk_buff *skb);
 
-/*
- *	Functions provided by ip_sockglue.c
- */
 
 extern void	ipv4_pktinfo_prepare(struct sk_buff *skb);
 extern void	ip_cmsg_recv(struct msghdr *msg, struct sk_buff *skb);
@@ -480,4 +437,4 @@ extern void	ip_local_error(struct sock *sk, int err, __be32 daddr, __be16 dport,
 extern int ip_misc_proc_init(void);
 #endif
 
-#endif	/* _IP_H */
+#endif	

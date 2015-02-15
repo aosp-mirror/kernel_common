@@ -19,13 +19,13 @@
 #include <linux/kref.h>
 #include <linux/ktime.h>
 #include <linux/list.h>
-#include <linux/seq_file.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 
 struct sync_timeline;
 struct sync_pt;
 struct sync_fence;
+struct seq_file;
 
 /**
  * struct sync_timeline_ops - sync object implementation ops
@@ -84,6 +84,9 @@ struct sync_timeline_ops {
 
 	/* optional */
 	void (*pt_value_str)(struct sync_pt *pt, char *str, int size);
+
+	/* optional */
+	void (*pt_log)(struct sync_pt *pt);
 };
 
 /**
@@ -101,7 +104,7 @@ struct sync_timeline_ops {
 struct sync_timeline {
 	struct kref		kref;
 	const struct sync_timeline_ops	*ops;
-	char			name[32];
+	char			name[64];
 
 	/* protected by child_list_lock */
 	bool			destroyed;
@@ -341,6 +344,15 @@ int sync_fence_cancel_async(struct sync_fence *fence,
  * if @timeout < 0
  */
 int sync_fence_wait(struct sync_fence *fence, long timeout);
+
+/**
+ * sync_fence_log() - log the details of the fence in the kernel log
+ * @fence:	fence to log
+ *
+ * Log the details of the fence and the associated sync points in the kernel
+ * log.
+ */
+void sync_fence_log(struct sync_fence *fence);
 
 #endif /* __KERNEL__ */
 

@@ -246,11 +246,11 @@ show_shost_active_mode(struct device *dev,
 
 static DEVICE_ATTR(active_mode, S_IRUGO | S_IWUSR, show_shost_active_mode, NULL);
 
-static int check_reset_type(const char *str)
+static int check_reset_type(char *str)
 {
-	if (sysfs_streq(str, "adapter"))
+	if (strncmp(str, "adapter", 10) == 0)
 		return SCSI_ADAPTER_RESET;
-	else if (sysfs_streq(str, "firmware"))
+	else if (strncmp(str, "firmware", 10) == 0)
 		return SCSI_FIRMWARE_RESET;
 	else
 		return 0;
@@ -263,9 +263,12 @@ store_host_reset(struct device *dev, struct device_attribute *attr,
 	struct Scsi_Host *shost = class_to_shost(dev);
 	struct scsi_host_template *sht = shost->hostt;
 	int ret = -EINVAL;
+	char str[10];
 	int type;
 
-	type = check_reset_type(buf);
+	sscanf(buf, "%s", str);
+	type = check_reset_type(str);
+
 	if (!type)
 		goto exit_store_host_reset;
 
@@ -882,7 +885,8 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	device_enable_async_suspend(&sdev->sdev_gendev);
 	scsi_autopm_get_target(starget);
 	pm_runtime_set_active(&sdev->sdev_gendev);
-	pm_runtime_forbid(&sdev->sdev_gendev);
+	if (!sdev->use_rpm_auto)
+		pm_runtime_forbid(&sdev->sdev_gendev);
 	pm_runtime_enable(&sdev->sdev_gendev);
 	scsi_autopm_put_target(starget);
 
@@ -968,8 +972,11 @@ void __scsi_remove_device(struct scsi_device *sdev)
 		sdev->host->hostt->slave_destroy(sdev);
 	transport_destroy_device(dev);
 
+	/* cause the request function to reject all I/O requests */
+	sdev->request_queue->queuedata = NULL;
+
 	/* Freeing the queue signals to block that we're done */
-	blk_cleanup_queue(sdev->request_queue);
+	scsi_free_queue(sdev->request_queue);
 	put_device(dev);
 }
 
@@ -994,6 +1001,7 @@ static void __scsi_remove_target(struct scsi_target *starget)
 	struct scsi_device *sdev;
 
 	spin_lock_irqsave(shost->host_lock, flags);
+	starget->reap_ref++;
  restart:
 	list_for_each_entry(sdev, &shost->__devices, siblings) {
 		if (sdev->channel != starget->channel ||
@@ -1007,6 +1015,14 @@ static void __scsi_remove_target(struct scsi_target *starget)
 		goto restart;
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
+	scsi_target_reap(starget);
+}
+
+static int __remove_child (struct device * dev, void * data)
+{
+	if (scsi_is_target_device(dev))
+		__scsi_remove_target(to_scsi_target(dev));
+	return 0;
 }
 
 /**
@@ -1019,32 +1035,14 @@ static void __scsi_remove_target(struct scsi_target *starget)
  */
 void scsi_remove_target(struct device *dev)
 {
-	struct Scsi_Host *shost = dev_to_shost(dev->parent);
-	struct scsi_target *starget, *last = NULL;
-	unsigned long flags;
-
-	/* remove targets being careful to lookup next entry before
-	 * deleting the last
-	 */
-	spin_lock_irqsave(shost->host_lock, flags);
-	list_for_each_entry(starget, &shost->__targets, siblings) {
-		if (starget->state == STARGET_DEL)
-			continue;
-		if (starget->dev.parent == dev || &starget->dev == dev) {
-			/* assuming new targets arrive at the end */
-			starget->reap_ref++;
-			spin_unlock_irqrestore(shost->host_lock, flags);
-			if (last)
-				scsi_target_reap(last);
-			last = starget;
-			__scsi_remove_target(starget);
-			spin_lock_irqsave(shost->host_lock, flags);
-		}
+	if (scsi_is_target_device(dev)) {
+		__scsi_remove_target(to_scsi_target(dev));
+		return;
 	}
-	spin_unlock_irqrestore(shost->host_lock, flags);
 
-	if (last)
-		scsi_target_reap(last);
+	get_device(dev);
+	device_for_each_child(dev, NULL, __remove_child);
+	put_device(dev);
 }
 EXPORT_SYMBOL(scsi_remove_target);
 

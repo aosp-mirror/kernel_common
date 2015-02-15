@@ -82,7 +82,7 @@ static int fat12_ent_bread(struct super_block *sb, struct fat_entry *fatent,
 	if ((offset + 1) < sb->s_blocksize)
 		fatent->nr_bhs = 1;
 	else {
-		/* This entry is block boundary, it needs the next block */
+		
 		blocknr++;
 		bhs[1] = sb_bread(sb, blocknr);
 		if (!bhs[1])
@@ -316,18 +316,18 @@ static inline int fat_ent_update_ptr(struct super_block *sb,
 	struct fatent_operations *ops = sbi->fatent_ops;
 	struct buffer_head **bhs = fatent->bhs;
 
-	/* Is this fatent's blocks including this entry? */
+	
 	if (!fatent->nr_bhs || bhs[0]->b_blocknr != blocknr)
 		return 0;
 	if (sbi->fat_bits == 12) {
 		if ((offset + 1) < sb->s_blocksize) {
-			/* This entry is on bhs[0]. */
+			
 			if (fatent->nr_bhs == 2) {
 				brelse(bhs[1]);
 				fatent->nr_bhs = 1;
 			}
 		} else {
-			/* This entry needs the next block. */
+			
 			if (fatent->nr_bhs != 2)
 				return 0;
 			if (bhs[1]->b_blocknr != (blocknr + 1))
@@ -364,8 +364,7 @@ int fat_ent_read(struct inode *inode, struct fat_entry *fatent, int entry)
 	return ops->ent_get(fatent);
 }
 
-/* FIXME: We can write the blocks as more big chunk. */
-static int fat_mirror_bhs(struct super_block *sb, struct buffer_head **bhs,
+int fat_mirror_bhs(struct super_block *sb, struct buffer_head **bhs,
 			  int nr_bhs)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
@@ -461,7 +460,7 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 	struct buffer_head *bhs[MAX_BUF_PER_PAGE];
 	int i, count, err, nr_bhs, idx_clus;
 
-	BUG_ON(nr_cluster > (MAX_BUF_PER_PAGE / 2));	/* fixed limit */
+	BUG_ON(nr_cluster > (MAX_BUF_PER_PAGE / 2));	
 
 	lock_fat(sbi);
 	if (sbi->free_clusters != -1 && sbi->free_clus_valid &&
@@ -483,12 +482,12 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 		if (err)
 			goto out;
 
-		/* Find the free entries in a block */
+		
 		do {
 			if (ops->ent_get(&fatent) == FAT_ENT_FREE) {
 				int entry = fatent.entry;
 
-				/* make the cluster chain */
+				
 				ops->ent_put(&fatent, FAT_ENT_EOF);
 				if (prev_ent.nr_bhs)
 					ops->ent_put(&prev_ent, entry);
@@ -505,10 +504,6 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 				if (idx_clus == nr_cluster)
 					goto out;
 
-				/*
-				 * fat_collect_bhs() gets ref-count of bhs,
-				 * so we can still use the prev_ent.
-				 */
 				prev_ent = fatent;
 			}
 			count++;
@@ -517,7 +512,7 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 		} while (fat_ent_next(sbi, &fatent));
 	}
 
-	/* Couldn't allocate the free entries */
+	
 	sbi->free_clusters = 0;
 	sbi->free_clus_valid = 1;
 	sb->s_dirt = 1;
@@ -567,11 +562,6 @@ int fat_free_clusters(struct inode *inode, int cluster)
 		}
 
 		if (sbi->options.discard) {
-			/*
-			 * Issue discard for the sectors we no longer
-			 * care about, batching contiguous clusters
-			 * into one request
-			 */
 			if (cluster != fatent.entry + 1) {
 				int nr_clus = fatent.entry - first_cl + 1;
 
@@ -623,7 +613,6 @@ error:
 
 EXPORT_SYMBOL_GPL(fat_free_clusters);
 
-/* 128kb is the whole sectors for FAT12 and FAT16 */
 #define FAT_READA_SIZE		(128 * 1024)
 
 static void fat_ent_reada(struct super_block *sb, struct fat_entry *fatent,
@@ -659,7 +648,7 @@ int fat_count_free_clusters(struct super_block *sb)
 	fatent_init(&fatent);
 	fatent_set_entry(&fatent, FAT_START_ENT);
 	while (fatent.entry < sbi->max_cluster) {
-		/* readahead of fat blocks */
+		
 		if ((cur_block & reada_mask) == 0) {
 			unsigned long rest = sbi->fat_length - cur_block;
 			fat_ent_reada(sb, &fatent, min(reada_blocks, rest));

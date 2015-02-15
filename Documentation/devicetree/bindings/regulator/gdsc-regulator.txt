@@ -1,0 +1,31 @@
+Qualcomm Global Distributed Switch Controller (GDSC) Regulator Driver
+
+The GDSC driver, implemented under the regulator framework, is responsible for
+safely collapsing and restoring power to peripheral cores on chipsets like
+msm8974 for power savings.
+
+Required properties:
+ - compatible:      Must be "qcom,gdsc"
+ - regulator-name:  A string used as a descriptive name for regulator outputs
+ - reg:             The address of the GDSCR register
+
+Optional properties:
+ - parent-supply:   phandle to the parent supply/regulator node
+ - qcom,clock-names: List of string names for core clocks
+ - qcom,retain-mem:  Presence denotes a hardware requirement to leave the
+		     forced core memory retention signals in the core's clock
+		     branch control registers asserted.
+ - qcom,retain-periph: Presence denotes a hardware requirement to leave the
+		     forced periph memory retention signal in the core's clock
+		     branch control registers asserted.
+ - qcom,skip-logic-collapse: Presence denotes a requirement to leave power to
+                             the core's logic enabled.
+
+Example:
+	gdsc_oxili_gx: qcom,gdsc@fd8c4024 {
+		compatible = "qcom,gdsc";
+		regulator-name = "gdsc_oxili_gx";
+		parent-supply = <&pm8841_s4>;
+		reg = <0xfd8c4024 0x4>;
+		qcom,clock-names = "core_clk";
+	};

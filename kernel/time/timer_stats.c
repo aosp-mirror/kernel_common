@@ -356,6 +356,96 @@ static void sync_access(void)
 	}
 }
 
+#ifdef CONFIG_HTC_POWER_DEBUG
+void htc_prink_name_offset(unsigned long addr)
+{
+        char symname[KSYM_NAME_LEN];
+
+        if (lookup_symbol_name(addr, symname) < 0)
+                printk("<%p>", (void *)addr);
+        else
+                printk("%s", symname);
+}
+
+void htc_timer_stats_show(u16 water_mark)
+{
+        struct timespec period;
+        struct entry *entry;
+        unsigned long ms;
+        long events = 0;
+        ktime_t time;
+        int i;
+
+        mutex_lock(&show_mutex);
+        /*
+         * If still active then calculate up to now:
+         */
+        if (timer_stats_active)
+                time_stop = ktime_get();
+
+        time = ktime_sub(time_stop, time_start);
+
+        period = ktime_to_timespec(time);
+        ms = period.tv_nsec / 1000000;
+        for (i = 0; i < nr_entries; i++) {
+                entry = entries + i;
+                events += entry->count;
+                if (entry->count < water_mark)
+                        continue;
+                if (entry->timer_flag & TIMER_STATS_FLAG_DEFERRABLE) {
+                        printk("%4luD, %5d %-16s ",
+                                entry->count, entry->pid, entry->comm);
+                } else {
+                        printk(" %4lu, %5d %-16s ",
+                                entry->count, entry->pid, entry->comm);
+                }
+
+                htc_prink_name_offset((unsigned long)entry->start_func);
+                printk(" (");
+                htc_prink_name_offset((unsigned long)entry->expire_func);
+                printk(")\n");
+        }
+
+        ms += period.tv_sec * 1000;
+        if (!ms)
+                ms = 1;
+
+        if (events && period.tv_sec)
+                printk("%ld total events, %ld.%03ld events/sec\n",
+                           events, events * 1000 / ms,
+                           (events * 1000000 / ms) % 1000);
+        else
+                printk("%ld total events\n", events);
+
+        mutex_unlock(&show_mutex);
+}
+
+void htc_timer_stats_onoff(char onoff)
+{
+	mutex_lock(&show_mutex);
+	switch (onoff) {
+	case '0':
+		if (timer_stats_active) {
+			timer_stats_active = 0;
+                        time_stop = ktime_get();
+                        sync_access();
+                }
+                break;
+        case '1':
+                if (!timer_stats_active) {
+                        reset_entries();
+                        time_start = ktime_get();
+                        smp_mb();
+                        timer_stats_active = 1;
+                }
+                break;
+        default:
+                break;
+        }
+	mutex_unlock(&show_mutex);
+}
+#endif
+
 static ssize_t tstats_write(struct file *file, const char __user *buf,
 			    size_t count, loff_t *offs)
 {

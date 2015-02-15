@@ -378,6 +378,7 @@ enum ieee80211_sta_flags {
 	IEEE80211_STA_UAPSD_ENABLED	= BIT(7),
 	IEEE80211_STA_NULLFUNC_ACKED	= BIT(8),
 	IEEE80211_STA_RESET_SIGNAL_AVE	= BIT(9),
+	IEEE80211_STA_DISABLE_VHT	= BIT(11),
 };
 
 struct ieee80211_mgd_auth_data {
@@ -1233,9 +1234,9 @@ void ieee80211_mesh_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 
 /* scan/BSS handling */
 void ieee80211_scan_work(struct work_struct *work);
-int ieee80211_request_ibss_scan(struct ieee80211_sub_if_data *sdata,
-				const u8 *ssid, u8 ssid_len,
-				struct ieee80211_channel *chan);
+int ieee80211_request_internal_scan(struct ieee80211_sub_if_data *sdata,
+				    const u8 *ssid, u8 ssid_len,
+				    struct ieee80211_channel *chan);
 int ieee80211_request_scan(struct ieee80211_sub_if_data *sdata,
 			   struct cfg80211_scan_request *req);
 void ieee80211_scan_cancel(struct ieee80211_local *local);
@@ -1264,8 +1265,10 @@ int ieee80211_request_sched_scan_stop(struct ieee80211_sub_if_data *sdata);
 void ieee80211_sched_scan_stopped_work(struct work_struct *work);
 
 /* off-channel helpers */
-void ieee80211_offchannel_stop_vifs(struct ieee80211_local *local);
-void ieee80211_offchannel_return(struct ieee80211_local *local);
+void ieee80211_offchannel_stop_vifs(struct ieee80211_local *local,
+				    bool offchannel_ps_enable);
+void ieee80211_offchannel_return(struct ieee80211_local *local,
+				 bool offchannel_ps_disable);
 void ieee80211_hw_roc_setup(struct ieee80211_local *local);
 
 /* interface handling */
@@ -1295,8 +1298,6 @@ netdev_tx_t ieee80211_monitor_start_xmit(struct sk_buff *skb,
 					 struct net_device *dev);
 netdev_tx_t ieee80211_subif_start_xmit(struct sk_buff *skb,
 				       struct net_device *dev);
-void ieee80211_purge_tx_queue(struct ieee80211_hw *hw,
-			      struct sk_buff_head *skbs);
 
 /* HT */
 bool ieee80111_cfg_override_disables_ht40(struct ieee80211_sub_if_data *sdata);
@@ -1474,6 +1475,8 @@ u8 *ieee80211_ie_build_ht_info(u8 *pos,
 				struct ieee80211_sta_ht_cap *ht_cap,
 				struct ieee80211_channel *channel,
 				enum nl80211_channel_type channel_type);
+u8 *ieee80211_ie_build_vht_cap(u8 *pos, struct ieee80211_sta_vht_cap *vht_cap,
+			       u32 cap);
 
 /* internal work items */
 void ieee80211_work_init(struct ieee80211_local *local);

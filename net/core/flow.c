@@ -245,6 +245,11 @@ flow_cache_lookup(struct net *net, const struct flowi *key, u16 family, u8 dir,
 		}
 	}
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(fle))
+		printk(KERN_ERR "[CORE] fle is NULL in %s!\n", __func__);
+#endif
+
 	if (unlikely(!fle)) {
 		if (fcp->hash_count > fc->high_watermark)
 			flow_cache_shrink(fc, fcp);
@@ -375,6 +380,11 @@ static int __cpuinit flow_cache_cpu_prepare(struct flow_cache *fc, int cpu)
 	struct flow_cache_percpu *fcp = per_cpu_ptr(fc->percpu, cpu);
 	size_t sz = sizeof(struct hlist_head) * flow_cache_hash_size(fc);
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(fcp) || (!fcp))
+		printk(KERN_ERR "[CORE] fcp is NULL in %s!\n", __func__);
+#endif
+
 	if (!fcp->hash_table) {
 		fcp->hash_table = kzalloc_node(sz, GFP_KERNEL, cpu_to_node(cpu));
 		if (!fcp->hash_table) {
@@ -423,6 +433,7 @@ static int __init flow_cache_init(struct flow_cache *fc)
 	if (!fc->percpu)
 		return -ENOMEM;
 
+	get_online_cpus();
 	for_each_online_cpu(i) {
 		if (flow_cache_cpu_prepare(fc, i))
 			goto err;
@@ -431,6 +442,7 @@ static int __init flow_cache_init(struct flow_cache *fc)
 		.notifier_call = flow_cache_cpu,
 	};
 	register_hotcpu_notifier(&fc->hotcpu_notifier);
+	put_online_cpus();
 
 	setup_timer(&fc->rnd_timer, flow_cache_new_hashrnd,
 		    (unsigned long) fc);
@@ -440,6 +452,7 @@ static int __init flow_cache_init(struct flow_cache *fc)
 	return 0;
 
 err:
+	put_online_cpus();
 	for_each_possible_cpu(i) {
 		struct flow_cache_percpu *fcp = per_cpu_ptr(fc->percpu, i);
 		kfree(fcp->hash_table);

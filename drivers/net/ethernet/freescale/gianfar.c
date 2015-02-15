@@ -394,13 +394,7 @@ static void gfar_init_mac(struct net_device *ndev)
 	if (ndev->features & NETIF_F_IP_CSUM)
 		tctrl |= TCTRL_INIT_CSUM;
 
-	if (priv->prio_sched_en)
-		tctrl |= TCTRL_TXSCHED_PRIO;
-	else {
-		tctrl |= TCTRL_TXSCHED_WRRS;
-		gfar_write(&regs->tr03wt, DEFAULT_WRRS_WEIGHT);
-		gfar_write(&regs->tr47wt, DEFAULT_WRRS_WEIGHT);
-	}
+	tctrl |= TCTRL_TXSCHED_PRIO;
 
 	gfar_write(&regs->tctrl, tctrl);
 
@@ -1043,7 +1037,7 @@ static int gfar_probe(struct platform_device *ofdev)
 
 	if (priv->device_flags & FSL_GIANFAR_DEV_HAS_VLAN) {
 		dev->hw_features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
-		dev->features |= NETIF_F_HW_VLAN_RX;
+		dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 	}
 
 	if (priv->device_flags & FSL_GIANFAR_DEV_HAS_EXTENDED_HASH) {
@@ -1159,9 +1153,6 @@ static int gfar_probe(struct platform_device *ofdev)
 	priv->rx_filer_enable = 1;
 	/* Enable most messages by default */
 	priv->msg_enable = (NETIF_MSG_IFUP << 1 ) - 1;
-	/* use pritority h/w tx queue scheduling for single queue devices */
-	if (priv->num_tx_queues == 1)
-		priv->prio_sched_en = 1;
 
 	/* Carrier starts down, phylib will bring it up */
 	netif_carrier_off(dev);
@@ -2074,9 +2065,10 @@ static int gfar_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			return NETDEV_TX_OK;
 		}
 
-		if (skb->sk)
-			skb_set_owner_w(skb_new, skb->sk);
-		consume_skb(skb);
+		/* Steal sock reference for processing TX time stamps */
+		swap(skb_new->sk, skb->sk);
+		swap(skb_new->destructor, skb->destructor);
+		kfree_skb(skb);
 		skb = skb_new;
 	}
 

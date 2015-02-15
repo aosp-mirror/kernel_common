@@ -13,5 +13,6 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
 unsigned mmc_sd_get_max_clock(struct mmc_card *card);
 int mmc_sd_switch_hs(struct mmc_card *card);
 void mmc_sd_go_highspeed(struct mmc_card *card);
+extern void remove_card(struct mmc_host *host);
 
 #endif

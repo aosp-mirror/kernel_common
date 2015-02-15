@@ -1169,15 +1169,9 @@ static int nr_recvmsg(struct kiocb *iocb, struct socket *sock,
 		msg->msg_flags |= MSG_TRUNC;
 	}
 
-	er = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
-	if (er < 0) {
-		skb_free_datagram(sk, skb);
-		release_sock(sk);
-		return er;
-	}
+	skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 
 	if (sax != NULL) {
-		memset(sax, 0, sizeof(*sax));
 		sax->sax25_family = AF_NETROM;
 		skb_copy_from_linear_data_offset(skb, 7, sax->sax25_call.ax25_call,
 			      AX25_ADDR_LEN);

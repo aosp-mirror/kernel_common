@@ -1229,6 +1229,11 @@ ctnetlink_change_timeout(struct nf_conn *ct, const struct nlattr * const cda[])
 	ct->timeout.expires = jiffies + timeout * HZ;
 	add_timer(&ct->timeout);
 
+/* Refresh the NAT type entry. */
+#if defined(CONFIG_IP_NF_TARGET_NATTYPE_MODULE)
+	(void)nattype_refresh_timer(ct->nattype_entry, ct->timeout.expires);
+#endif
+
 	return 0;
 }
 
@@ -2031,6 +2036,12 @@ ctnetlink_del_expect(struct sock *ctnl, struct sk_buff *skb,
 						  &net->ct.expect_hash[i],
 						  hnode) {
 				m_help = nfct_help(exp->master);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+				if (IS_ERR(m_help) || (!m_help))
+					printk(KERN_ERR "[NET] m_help is NULL in %s!\n", __func__);
+#endif
+
 				if (!strcmp(m_help->helper->name, name) &&
 				    del_timer(&exp->timeout)) {
 					nf_ct_unlink_expect_report(exp,

@@ -1115,7 +1115,7 @@ static void __exit ab8500_btemp_exit(void)
 	platform_driver_unregister(&ab8500_btemp_driver);
 }
 
-device_initcall(ab8500_btemp_init);
+subsys_initcall_sync(ab8500_btemp_init);
 module_exit(ab8500_btemp_exit);
 
 MODULE_LICENSE("GPL v2");

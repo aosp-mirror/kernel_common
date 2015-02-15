@@ -1,0 +1,58 @@
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+/include/ "msm8974pro-ac-pm8941.dtsi"
+/include/ "msm8974-mtp.dtsi"
+
+/ {
+	model = "Qualcomm MSM 8974Pro-AC MTP";
+	compatible = "qcom,msm8974-mtp", "qcom,msm8974", "qcom,mtp";
+	qcom,board-id = <8 0>;
+};
+
+&sdhc_1 {
+	qcom,pad-pull-on = <0x0 0x3 0x3 0x1>; /* no-pull, pull-up, pull-up, pull-down */
+	qcom,pad-pull-off = <0x0 0x3 0x3 0x1>; /* no-pull, pull-up, pull-up, pull-down */
+};
+
+&ehci {
+	status = "ok";
+	qcom,usb2-enable-uicc;
+};
+
+&soc {
+	i2c@f9928000 { /* BLSP1 QUP6 */
+		nfc-nci@e {
+			compatible = "qcom,nfc-nci";
+			reg = <0x0e>;
+			qcom,irq-gpio = <&msmgpio 57 0x00>;
+			qcom,dis-gpio = <&msmgpio 13 0x00>;
+			qcom,clk-src = "BBCLK2";
+			interrupt-parent = <&msmgpio>;
+			interrupts = <57 0>;
+			qcom,clk-gpio = <&pm8941_gpios 32 0>;
+		};
+	};
+};
+
+&pm8941_gpios {
+	gpio@df00 {
+		/* NFC clk request */
+		qcom,mode = <0>;                /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <5>;                /* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <2>;             /* QPNP_PIN_VIN2 */
+		qcom,src-sel = <2>;             /* QPNP_PIN_SEL_FUNC_1 */
+		qcom,master-en = <1>;
+	};
+};

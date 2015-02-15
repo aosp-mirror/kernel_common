@@ -2,7 +2,7 @@
  * Broadcom SDIO/PCMCIA
  * Software-specific definitions shared between device and host side
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2012, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -22,7 +22,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: bcmsdpcm.h 364353 2012-10-23 20:31:46Z $
+ * $Id: bcmsdpcm.h 291086 2011-10-21 01:17:24Z $
  */
 
 #ifndef	_bcmsdpcm_h_
@@ -146,23 +146,16 @@
 #define SDPCM_GLOMDESC(p)	(((uint8 *)p)[1] & 0x80)
 
 /* For TEST_CHANNEL packets, define another 4-byte header */
-#define SDPCM_TEST_HDRLEN		4	/* Generally: Cmd(1), Ext(1), Len(2);
-						 * Semantics of Ext byte depend on command.
-						 * Len is current or requested frame length, not
-						 * including test header; sent little-endian.
-						 */
-#define SDPCM_TEST_PKT_CNT_FLD_LEN	4	/* Packet count filed legth */
-#define SDPCM_TEST_DISCARD		0x01	/* Receiver discards. Ext is a pattern id. */
-#define SDPCM_TEST_ECHOREQ		0x02	/* Echo request. Ext is a pattern id. */
-#define SDPCM_TEST_ECHORSP		0x03	/* Echo response. Ext is a pattern id. */
-#define SDPCM_TEST_BURST		0x04	/* Receiver to send a burst. Ext is a frame count
-						 * (Backward compatabilty) Set frame count in a
-						 * 4 byte filed adjacent to the HDR
-						 */
-#define SDPCM_TEST_SEND			0x05	/* Receiver sets send mode. Ext is boolean on/off
-						 * Set frame count in a 4 byte filed adjacent to
-						 * the HDR
-						 */
+#define SDPCM_TEST_HDRLEN	4	/* Generally: Cmd(1), Ext(1), Len(2);
+					 * Semantics of Ext byte depend on command.
+					 * Len is current or requested frame length, not
+					 * including test header; sent little-endian.
+					 */
+#define SDPCM_TEST_DISCARD	0x01	/* Receiver discards. Ext is a pattern id. */
+#define SDPCM_TEST_ECHOREQ	0x02	/* Echo request. Ext is a pattern id. */
+#define SDPCM_TEST_ECHORSP	0x03	/* Echo response. Ext is a pattern id. */
+#define SDPCM_TEST_BURST	0x04	/* Receiver to send a burst. Ext is a frame count */
+#define SDPCM_TEST_SEND		0x05	/* Receiver sets send mode. Ext is boolean on/off */
 
 /* Handy macro for filling in datagen packets with a pattern */
 #define SDPCM_TEST_FILL(byteno, id)	((uint8)(id + byteno))

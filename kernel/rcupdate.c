@@ -45,11 +45,35 @@
 #include <linux/mutex.h>
 #include <linux/export.h>
 #include <linux/hardirq.h>
+#include <linux/module.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/rcu.h>
 
 #include "rcu.h"
+
+module_param(rcu_expedited, int, 0);
+#ifdef CONFIG_PREEMPT_RCU
+
+void exit_rcu(void)
+{
+	struct task_struct *t = current;
+
+	if (likely(list_empty(&current->rcu_node_entry)))
+		return;
+	t->rcu_read_lock_nesting = 1;
+	barrier();
+	t->rcu_read_unlock_special = RCU_READ_UNLOCK_BLOCKED;
+	__rcu_read_unlock();
+}
+
+#else 
+
+void exit_rcu(void)
+{
+}
+
+#endif 
 
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 static struct lock_class_key rcu_lock_key;
@@ -77,21 +101,6 @@ int debug_lockdep_rcu_enabled(void)
 }
 EXPORT_SYMBOL_GPL(debug_lockdep_rcu_enabled);
 
-/**
- * rcu_read_lock_bh_held() - might we be in RCU-bh read-side critical section?
- *
- * Check for bottom half being disabled, which covers both the
- * CONFIG_PROVE_RCU and not cases.  Note that if someone uses
- * rcu_read_lock_bh(), but then later enables BH, lockdep (if enabled)
- * will show the situation.  This is useful for debug checks in functions
- * that require that they be called within an RCU read-side critical
- * section.
- *
- * Check debug_lockdep_rcu_enabled() to prevent false positives during boot.
- *
- * Note that rcu_read_lock() is disallowed if the CPU is either idle or
- * offline from an RCU perspective, so check for those as well.
- */
 int rcu_read_lock_bh_held(void)
 {
 	if (!debug_lockdep_rcu_enabled())
@@ -104,17 +113,13 @@ int rcu_read_lock_bh_held(void)
 }
 EXPORT_SYMBOL_GPL(rcu_read_lock_bh_held);
 
-#endif /* #ifdef CONFIG_DEBUG_LOCK_ALLOC */
+#endif 
 
 struct rcu_synchronize {
 	struct rcu_head head;
 	struct completion completion;
 };
 
-/*
- * Awaken the corresponding synchronize_rcu() instance now that a
- * grace period has elapsed.
- */
 static void wakeme_after_rcu(struct rcu_head  *head)
 {
 	struct rcu_synchronize *rcu;
@@ -129,24 +134,21 @@ void wait_rcu_gp(call_rcu_func_t crf)
 
 	init_rcu_head_on_stack(&rcu.head);
 	init_completion(&rcu.completion);
-	/* Will wake me after RCU finished. */
+	
 	crf(&rcu.head, wakeme_after_rcu);
-	/* Wait for it. */
+	
 	wait_for_completion(&rcu.completion);
 	destroy_rcu_head_on_stack(&rcu.head);
 }
 EXPORT_SYMBOL_GPL(wait_rcu_gp);
 
 #ifdef CONFIG_PROVE_RCU
-/*
- * wrapper function to avoid #include problems.
- */
 int rcu_my_thread_group_empty(void)
 {
 	return thread_group_empty(current);
 }
 EXPORT_SYMBOL_GPL(rcu_my_thread_group_empty);
-#endif /* #ifdef CONFIG_PROVE_RCU */
+#endif 
 
 #ifdef CONFIG_DEBUG_OBJECTS_RCU_HEAD
 static inline void debug_init_rcu_head(struct rcu_head *head)
@@ -159,24 +161,12 @@ static inline void debug_rcu_head_free(struct rcu_head *head)
 	debug_object_free(head, &rcuhead_debug_descr);
 }
 
-/*
- * fixup_init is called when:
- * - an active object is initialized
- */
 static int rcuhead_fixup_init(void *addr, enum debug_obj_state state)
 {
 	struct rcu_head *head = addr;
 
 	switch (state) {
 	case ODEBUG_STATE_ACTIVE:
-		/*
-		 * Ensure that queued callbacks are all executed.
-		 * If we detect that we are nested in a RCU read-side critical
-		 * section, we should simply fail, otherwise we would deadlock.
-		 * In !PREEMPT configurations, there is no way to tell if we are
-		 * in a RCU read-side critical section or not, so we never
-		 * attempt any fixup and just print a warning.
-		 */
 #ifndef CONFIG_PREEMPT
 		WARN_ON_ONCE(1);
 		return 0;
@@ -196,12 +186,6 @@ static int rcuhead_fixup_init(void *addr, enum debug_obj_state state)
 	}
 }
 
-/*
- * fixup_activate is called when:
- * - an active object is activated
- * - an unknown object is activated (might be a statically initialized object)
- * Activation is performed internally by call_rcu().
- */
 static int rcuhead_fixup_activate(void *addr, enum debug_obj_state state)
 {
 	struct rcu_head *head = addr;
@@ -209,23 +193,11 @@ static int rcuhead_fixup_activate(void *addr, enum debug_obj_state state)
 	switch (state) {
 
 	case ODEBUG_STATE_NOTAVAILABLE:
-		/*
-		 * This is not really a fixup. We just make sure that it is
-		 * tracked in the object tracker.
-		 */
 		debug_object_init(head, &rcuhead_debug_descr);
 		debug_object_activate(head, &rcuhead_debug_descr);
 		return 0;
 
 	case ODEBUG_STATE_ACTIVE:
-		/*
-		 * Ensure that queued callbacks are all executed.
-		 * If we detect that we are nested in a RCU read-side critical
-		 * section, we should simply fail, otherwise we would deadlock.
-		 * In !PREEMPT configurations, there is no way to tell if we are
-		 * in a RCU read-side critical section or not, so we never
-		 * attempt any fixup and just print a warning.
-		 */
 #ifndef CONFIG_PREEMPT
 		WARN_ON_ONCE(1);
 		return 0;
@@ -245,24 +217,12 @@ static int rcuhead_fixup_activate(void *addr, enum debug_obj_state state)
 	}
 }
 
-/*
- * fixup_free is called when:
- * - an active object is freed
- */
 static int rcuhead_fixup_free(void *addr, enum debug_obj_state state)
 {
 	struct rcu_head *head = addr;
 
 	switch (state) {
 	case ODEBUG_STATE_ACTIVE:
-		/*
-		 * Ensure that queued callbacks are all executed.
-		 * If we detect that we are nested in a RCU read-side critical
-		 * section, we should simply fail, otherwise we would deadlock.
-		 * In !PREEMPT configurations, there is no way to tell if we are
-		 * in a RCU read-side critical section or not, so we never
-		 * attempt any fixup and just print a warning.
-		 */
 #ifndef CONFIG_PREEMPT
 		WARN_ON_ONCE(1);
 		return 0;
@@ -282,33 +242,12 @@ static int rcuhead_fixup_free(void *addr, enum debug_obj_state state)
 	}
 }
 
-/**
- * init_rcu_head_on_stack() - initialize on-stack rcu_head for debugobjects
- * @head: pointer to rcu_head structure to be initialized
- *
- * This function informs debugobjects of a new rcu_head structure that
- * has been allocated as an auto variable on the stack.  This function
- * is not required for rcu_head structures that are statically defined or
- * that are dynamically allocated on the heap.  This function has no
- * effect for !CONFIG_DEBUG_OBJECTS_RCU_HEAD kernel builds.
- */
 void init_rcu_head_on_stack(struct rcu_head *head)
 {
 	debug_object_init_on_stack(head, &rcuhead_debug_descr);
 }
 EXPORT_SYMBOL_GPL(init_rcu_head_on_stack);
 
-/**
- * destroy_rcu_head_on_stack() - destroy on-stack rcu_head for debugobjects
- * @head: pointer to rcu_head structure to be initialized
- *
- * This function informs debugobjects that an on-stack rcu_head structure
- * is about to go out of scope.  As with init_rcu_head_on_stack(), this
- * function is not required for rcu_head structures that are statically
- * defined or that are dynamically allocated on the heap.  Also as with
- * init_rcu_head_on_stack(), this function has no effect for
- * !CONFIG_DEBUG_OBJECTS_RCU_HEAD kernel builds.
- */
 void destroy_rcu_head_on_stack(struct rcu_head *head)
 {
 	debug_object_free(head, &rcuhead_debug_descr);
@@ -322,7 +261,7 @@ struct debug_obj_descr rcuhead_debug_descr = {
 	.fixup_free = rcuhead_fixup_free,
 };
 EXPORT_SYMBOL_GPL(rcuhead_debug_descr);
-#endif /* #ifdef CONFIG_DEBUG_OBJECTS_RCU_HEAD */
+#endif 
 
 #if defined(CONFIG_TREE_RCU) || defined(CONFIG_TREE_PREEMPT_RCU) || defined(CONFIG_RCU_TRACE)
 void do_trace_rcu_torture_read(char *rcutorturename, struct rcu_head *rhp)

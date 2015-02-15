@@ -505,7 +505,7 @@ static int journal_clean_one_cp_list(struct journal_head *jh, int *released)
 		 */
 		if (need_resched())
 			return freed;
-	} while (jh != last_jh);
+	} while (jh != last_jh && next_jh != NULL);
 
 	return freed;
 }

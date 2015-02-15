@@ -194,7 +194,6 @@ static __be32
 do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
 	struct svc_fh *resfh;
-	int accmode;
 	__be32 status;
 
 	resfh = kmalloc(sizeof(struct svc_fh), GFP_KERNEL);
@@ -254,10 +253,9 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 	/* set reply cache */
 	fh_copy_shallow(&open->op_openowner->oo_owner.so_replay.rp_openfh,
 			&resfh->fh_handle);
-	accmode = NFSD_MAY_NOP;
-	if (open->op_created)
-		accmode |= NFSD_MAY_OWNER_OVERRIDE;
-	status = do_open_permission(rqstp, resfh, open, accmode);
+	if (!open->op_created)
+		status = do_open_permission(rqstp, resfh, open,
+					    NFSD_MAY_NOP);
 	set_change_info(&open->op_cinfo, current_fh);
 	fh_dup2(current_fh, resfh);
 out:
@@ -270,7 +268,6 @@ static __be32
 do_open_fhandle(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
 	__be32 status;
-	int accmode = 0;
 
 	/* We don't know the target directory, and therefore can not
 	* set the change info
@@ -284,19 +281,9 @@ do_open_fhandle(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_
 
 	open->op_truncate = (open->op_iattr.ia_valid & ATTR_SIZE) &&
 		(open->op_iattr.ia_size == 0);
-	/*
-	 * In the delegation case, the client is telling us about an
-	 * open that it *already* performed locally, some time ago.  We
-	 * should let it succeed now if possible.
-	 *
-	 * In the case of a CLAIM_FH open, on the other hand, the client
-	 * may be counting on us to enforce permissions (the Linux 4.1
-	 * client uses this for normal opens, for example).
-	 */
-	if (open->op_claim_type == NFS4_OPEN_CLAIM_DELEG_CUR_FH)
-		accmode = NFSD_MAY_OWNER_OVERRIDE;
 
-	status = do_open_permission(rqstp, current_fh, open, accmode);
+	status = do_open_permission(rqstp, current_fh, open,
+				    NFSD_MAY_OWNER_OVERRIDE);
 
 	return status;
 }

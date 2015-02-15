@@ -319,6 +319,12 @@ nf_nat_setup_info(struct nf_conn *ct,
 		spin_lock_bh(&nf_nat_lock);
 		/* nf_conntrack_alter_reply might re-allocate extension area */
 		nat = nfct_nat(ct);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(nat) || (!nat))
+		printk(KERN_ERR "[NET] nat is NULL in %s!\n", __func__);
+#endif
+
 		nat->ct = ct;
 		hlist_add_head_rcu(&nat->bysource,
 				   &net->ipv4.nat_bysource[srchash]);

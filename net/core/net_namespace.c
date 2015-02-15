@@ -25,9 +25,7 @@ static DEFINE_MUTEX(net_mutex);
 LIST_HEAD(net_namespace_list);
 EXPORT_SYMBOL_GPL(net_namespace_list);
 
-struct net init_net = {
-	.dev_base_head = LIST_HEAD_INIT(init_net.dev_base_head),
-};
+struct net init_net;
 EXPORT_SYMBOL(init_net);
 
 #define INITIAL_NET_GEN_PTRS	13 /* +1 for len +2 for rcu_head */

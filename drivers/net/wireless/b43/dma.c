@@ -409,10 +409,7 @@ static inline
 				struct b43_dmadesc_meta *meta)
 {
 	if (meta->skb) {
-		if (ring->tx)
-			ieee80211_free_txskb(ring->dev->wl->hw, meta->skb);
-		else
-			dev_kfree_skb_any(meta->skb);
+		dev_kfree_skb_any(meta->skb);
 		meta->skb = NULL;
 	}
 }
@@ -1457,7 +1454,7 @@ int b43_dma_tx(struct b43_wldev *dev, struct sk_buff *skb)
 	if (unlikely(err == -ENOKEY)) {
 		/* Drop this packet, as we don't have the encryption key
 		 * anymore and must not transmit it unencrypted. */
-		ieee80211_free_txskb(dev->wl->hw, skb);
+		dev_kfree_skb_any(skb);
 		err = 0;
 		goto out;
 	}
@@ -1487,12 +1484,8 @@ void b43_dma_handle_txstatus(struct b43_wldev *dev,
 	const struct b43_dma_ops *ops;
 	struct b43_dmaring *ring;
 	struct b43_dmadesc_meta *meta;
-	static const struct b43_txstatus fake; /* filled with 0 */
-	const struct b43_txstatus *txstat;
 	int slot, firstused;
 	bool frame_succeed;
-	int skip;
-	static u8 err_out1, err_out2;
 
 	ring = parse_cookie(dev, status->cookie, &slot);
 	if (unlikely(!ring))
@@ -1505,36 +1498,13 @@ void b43_dma_handle_txstatus(struct b43_wldev *dev,
 	firstused = ring->current_slot - ring->used_slots + 1;
 	if (firstused < 0)
 		firstused = ring->nr_slots + firstused;
-
-	skip = 0;
 	if (unlikely(slot != firstused)) {
 		/* This possibly is a firmware bug and will result in
-		 * malfunction, memory leaks and/or stall of DMA functionality.
-		 */
-		if (slot == next_slot(ring, next_slot(ring, firstused))) {
-			/* If a single header/data pair was missed, skip over
-			 * the first two slots in an attempt to recover.
-			 */
-			slot = firstused;
-			skip = 2;
-			if (!err_out1) {
-				/* Report the error once. */
-				b43dbg(dev->wl,
-				       "Skip on DMA ring %d slot %d.\n",
-				       ring->index, slot);
-				err_out1 = 1;
-			}
-		} else {
-			/* More than a single header/data pair were missed.
-			 * Report this error once.
-			 */
-			if (!err_out2)
-				b43dbg(dev->wl,
-				       "Out of order TX status report on DMA ring %d. Expected %d, but got %d\n",
-				       ring->index, firstused, slot);
-			err_out2 = 1;
-			return;
-		}
+		 * malfunction, memory leaks and/or stall of DMA functionality. */
+		b43dbg(dev->wl, "Out of order TX status report on DMA ring %d. "
+		       "Expected %d, but got %d\n",
+		       ring->index, firstused, slot);
+		return;
 	}
 
 	ops = ring->ops;
@@ -1549,13 +1519,11 @@ void b43_dma_handle_txstatus(struct b43_wldev *dev,
 			       slot, firstused, ring->index);
 			break;
 		}
-
 		if (meta->skb) {
 			struct b43_private_tx_info *priv_info =
-			     b43_get_priv_tx_info(IEEE80211_SKB_CB(meta->skb));
+				b43_get_priv_tx_info(IEEE80211_SKB_CB(meta->skb));
 
-			unmap_descbuffer(ring, meta->dmaaddr,
-					 meta->skb->len, 1);
+			unmap_descbuffer(ring, meta->dmaaddr, meta->skb->len, 1);
 			kfree(priv_info->bouncebuffer);
 			priv_info->bouncebuffer = NULL;
 		} else {
@@ -1567,9 +1535,8 @@ void b43_dma_handle_txstatus(struct b43_wldev *dev,
 			struct ieee80211_tx_info *info;
 
 			if (unlikely(!meta->skb)) {
-				/* This is a scatter-gather fragment of a frame,
-				 * so the skb pointer must not be NULL.
-				 */
+				/* This is a scatter-gather fragment of a frame, so
+				 * the skb pointer must not be NULL. */
 				b43dbg(dev->wl, "TX status unexpected NULL skb "
 				       "at slot %d (first=%d) on ring %d\n",
 				       slot, firstused, ring->index);
@@ -1580,18 +1547,9 @@ void b43_dma_handle_txstatus(struct b43_wldev *dev,
 
 			/*
 			 * Call back to inform the ieee80211 subsystem about
-			 * the status of the transmission. When skipping over
-			 * a missed TX status report, use a status structure
-			 * filled with zeros to indicate that the frame was not
-			 * sent (frame_count 0) and not acknowledged
+			 * the status of the transmission.
 			 */
-			if (unlikely(skip))
-				txstat = &fake;
-			else
-				txstat = status;
-
-			frame_succeed = b43_fill_txstatus_report(dev, info,
-								 txstat);
+			frame_succeed = b43_fill_txstatus_report(dev, info, status);
 #ifdef CONFIG_B43_DEBUG
 			if (frame_succeed)
 				ring->nr_succeed_tx_packets++;
@@ -1619,14 +1577,12 @@ void b43_dma_handle_txstatus(struct b43_wldev *dev,
 		/* Everything unmapped and free'd. So it's not used anymore. */
 		ring->used_slots--;
 
-		if (meta->is_last_fragment && !skip) {
+		if (meta->is_last_fragment) {
 			/* This is the last scatter-gather
 			 * fragment of the frame. We are done. */
 			break;
 		}
 		slot = next_slot(ring, slot);
-		if (skip > 0)
-			--skip;
 	}
 	if (ring->stopped) {
 		B43_WARN_ON(free_slots(ring) < TX_SLOTS_PER_FRAME);
@@ -1731,25 +1687,6 @@ drop_recycle_buffer:
 	/* Poison and recycle the RX buffer. */
 	b43_poison_rx_buffer(ring, skb);
 	sync_descbuffer_for_device(ring, dmaaddr, ring->rx_buffersize);
-}
-
-void b43_dma_handle_rx_overflow(struct b43_dmaring *ring)
-{
-	int current_slot, previous_slot;
-
-	B43_WARN_ON(ring->tx);
-
-	/* Device has filled all buffers, drop all packets and let TCP
-	 * decrease speed.
-	 * Decrement RX index by one will let the device to see all slots
-	 * as free again
-	 */
-	/*
-	*TODO: How to increase rx_drop in mac80211?
-	*/
-	current_slot = ring->ops->get_current_rxslot(ring);
-	previous_slot = prev_slot(ring, current_slot);
-	ring->ops->set_current_rxslot(ring, previous_slot);
 }
 
 void b43_dma_rx(struct b43_dmaring *ring)

@@ -159,12 +159,6 @@ static int debug_arch_supported(void)
 		arch >= ARM_DEBUG_ARCH_V7_1;
 }
 
-/* Can we determine the watchpoint access type from the fsr? */
-static int debug_exception_updates_fsr(void)
-{
-	return 0;
-}
-
 /* Determine number of WRP registers available. */
 static int get_num_wrp_resources(void)
 {
@@ -222,6 +216,20 @@ static int get_num_brps(void)
 	return core_has_mismatch_brps() ? brps - 1 : brps;
 }
 
+/* Determine if halting mode is enabled */
+static int halting_mode_enabled(void)
+{
+	u32 dscr;
+
+	ARM_DBG_READ(c1, 0, dscr);
+
+	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
+		      "halting debug mode enabled. "
+		      "Unable to access hardware resources.\n"))
+		return -EPERM;
+	return 0;
+}
+
 /*
  * In order to access the breakpoint/watchpoint control registers,
  * we must be running in debug monitor mode. Unfortunately, we can
@@ -231,16 +239,14 @@ static int get_num_brps(void)
 static int enable_monitor_mode(void)
 {
 	u32 dscr;
-	int ret = 0;
+	int ret;
 
 	ARM_DBG_READ(c1, 0, dscr);
 
 	/* Ensure that halting mode is disabled. */
-	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
-		"halting debug mode enabled. Unable to access hardware resources.\n")) {
-		ret = -EPERM;
+	ret = halting_mode_enabled();
+	if (ret)
 		goto out;
-	}
 
 	/* If monitor mode is already enabled, just return. */
 	if (dscr & ARM_DSCR_MDBGEN)
@@ -625,35 +631,18 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
 	info->address &= ~alignment_mask;
 	info->ctrl.len <<= offset;
 
-	if (!bp->overflow_handler) {
-		/*
-		 * Mismatch breakpoints are required for single-stepping
-		 * breakpoints.
-		 */
-		if (!core_has_mismatch_brps())
-			return -EINVAL;
-
-		/* We don't allow mismatch breakpoints in kernel space. */
-		if (arch_check_bp_in_kernelspace(bp))
-			return -EPERM;
-
-		/*
-		 * Per-cpu breakpoints are not supported by our stepping
-		 * mechanism.
-		 */
-		if (!bp->hw.bp_target)
-			return -EINVAL;
-
-		/*
-		 * We only support specific access types if the fsr
-		 * reports them.
-		 */
-		if (!debug_exception_updates_fsr() &&
-		    (info->ctrl.type == ARM_BREAKPOINT_LOAD ||
-		     info->ctrl.type == ARM_BREAKPOINT_STORE))
-			return -EINVAL;
+	/*
+	 * Currently we rely on an overflow handler to take
+	 * care of single-stepping the breakpoint when it fires.
+	 * In the case of userspace breakpoints on a core with V7 debug,
+	 * we can use the mismatch feature as a poor-man's hardware
+	 * single-step, but this only works for per-task breakpoints.
+	 */
+	if (!bp->overflow_handler && (arch_check_bp_in_kernelspace(bp) ||
+	    !core_has_mismatch_brps() || !bp->hw.bp_target)) {
+		pr_warning("overflow handler required but none found\n");
+		ret = -EINVAL;
 	}
-
 out:
 	return ret;
 }
@@ -729,12 +718,10 @@ static void watchpoint_handler(unsigned long addr, unsigned int fsr,
 				goto unlock;
 
 			/* Check that the access type matches. */
-			if (debug_exception_updates_fsr()) {
-				access = (fsr & ARM_FSR_ACCESS_MASK) ?
-					  HW_BREAKPOINT_W : HW_BREAKPOINT_R;
-				if (!(access & hw_breakpoint_type(wp)))
-					goto unlock;
-			}
+			access = (fsr & ARM_FSR_ACCESS_MASK) ? HW_BREAKPOINT_W :
+				 HW_BREAKPOINT_R;
+			if (!(access & hw_breakpoint_type(wp)))
+				goto unlock;
 
 			/* We have a winner. */
 			info->trigger = addr;
@@ -960,7 +947,7 @@ static void reset_ctrl_regs(void *unused)
 	isb();
 
 reset_regs:
-	if (enable_monitor_mode())
+	if (halting_mode_enabled())
 		return;
 
 	/* We must also reset any reserved registers. */
@@ -974,6 +961,7 @@ reset_regs:
 		write_wb_reg(ARM_BASE_WCR + i, 0UL);
 		write_wb_reg(ARM_BASE_WVR + i, 0UL);
 	}
+	enable_monitor_mode();
 }
 
 static int __cpuinit dbg_reset_notify(struct notifier_block *self,

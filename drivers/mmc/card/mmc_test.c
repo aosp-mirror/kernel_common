@@ -2119,10 +2119,10 @@ static int mmc_test_rw_multiple(struct mmc_test_card *test,
 	/* prepare test area */
 	if (mmc_can_erase(test->card) &&
 	    tdata->prepare & MMC_TEST_PREP_ERASE) {
-		ret = mmc_erase(test->card, dev_addr,
+		/* ret = mmc_erase(test->card, dev_addr,
 				size / 512, MMC_SECURE_ERASE_ARG);
-		if (ret)
-			ret = mmc_erase(test->card, dev_addr,
+		if (ret) */
+		ret = mmc_erase(test->card, dev_addr,
 					size / 512, MMC_ERASE_ARG);
 		if (ret)
 			goto err;
@@ -2695,6 +2695,7 @@ static void mmc_test_run(struct mmc_test_card *test, int testcase)
 	pr_info("%s: Starting tests of card %s...\n",
 		mmc_hostname(test->card->host), mmc_card_id(test->card));
 
+	mmc_rpm_hold(test->card->host, &test->card->dev);
 	mmc_claim_host(test->card->host);
 
 	for (i = 0;i < ARRAY_SIZE(mmc_test_cases);i++) {
@@ -2778,6 +2779,7 @@ static void mmc_test_run(struct mmc_test_card *test, int testcase)
 	}
 
 	mmc_release_host(test->card->host);
+	mmc_rpm_release(test->card->host, &test->card->dev);
 
 	pr_info("%s: Tests completed.\n",
 		mmc_hostname(test->card->host));
@@ -2890,7 +2892,8 @@ static ssize_t mtf_test_write(struct file *file, const char __user *buf,
 	}
 
 #ifdef CONFIG_HIGHMEM
-	__free_pages(test->highmem, BUFFER_ORDER);
+	if (test->highmem)
+		__free_pages(test->highmem, BUFFER_ORDER);
 #endif
 	kfree(test->buffer);
 	kfree(test);

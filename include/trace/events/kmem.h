@@ -214,7 +214,7 @@ TRACE_EVENT(mm_page_alloc,
 
 	TP_printk("page=%p pfn=%lu order=%d migratetype=%d gfp_flags=%s",
 		__entry->page,
-		__entry->page ? page_to_pfn(__entry->page) : 0,
+		page_to_pfn(__entry->page),
 		__entry->order,
 		__entry->migratetype,
 		show_gfp_flags(__entry->gfp_flags))
@@ -240,7 +240,7 @@ DECLARE_EVENT_CLASS(mm_page,
 
 	TP_printk("page=%p pfn=%lu order=%u migratetype=%d percpu_refill=%d",
 		__entry->page,
-		__entry->page ? page_to_pfn(__entry->page) : 0,
+		page_to_pfn(__entry->page),
 		__entry->order,
 		__entry->migratetype,
 		__entry->order == 0)
@@ -301,6 +301,303 @@ TRACE_EVENT(mm_page_alloc_extfrag,
 		__entry->fallback_order < pageblock_order,
 		__entry->alloc_migratetype == __entry->fallback_migratetype)
 );
+
+
+DECLARE_EVENT_CLASS(ion_alloc,
+
+	TP_PROTO(const char *client_name,
+		 const char *heap_name,
+		 size_t len,
+		 unsigned int mask,
+		 unsigned int flags),
+
+	TP_ARGS(client_name, heap_name, len, mask, flags),
+
+	TP_STRUCT__entry(
+		__array(char,		client_name, 64)
+		__field(const char *,	heap_name)
+		__field(size_t,		len)
+		__field(unsigned int,	mask)
+		__field(unsigned int,	flags)
+	),
+
+	TP_fast_assign(
+		strlcpy(__entry->client_name, client_name, 64);
+		__entry->heap_name	= heap_name;
+		__entry->len		= len;
+		__entry->mask		= mask;
+		__entry->flags		= flags;
+	),
+
+	TP_printk("client_name=%s heap_name=%s len=%zu mask=0x%x flags=0x%x",
+		__entry->client_name,
+		__entry->heap_name,
+		__entry->len,
+		__entry->mask,
+		__entry->flags)
+);
+
+DEFINE_EVENT(ion_alloc, ion_alloc_buffer_start,
+
+	TP_PROTO(const char *client_name,
+		 const char *heap_name,
+		 size_t len,
+		 unsigned int mask,
+		 unsigned int flags),
+
+	TP_ARGS(client_name, heap_name, len, mask, flags)
+);
+
+DEFINE_EVENT(ion_alloc, ion_alloc_buffer_end,
+
+	TP_PROTO(const char *client_name,
+		 const char *heap_name,
+		 size_t len,
+		 unsigned int mask,
+		 unsigned int flags),
+
+	TP_ARGS(client_name, heap_name, len, mask, flags)
+);
+
+DECLARE_EVENT_CLASS(ion_alloc_error,
+
+	TP_PROTO(const char *client_name,
+		 const char *heap_name,
+		 size_t len,
+		 unsigned int mask,
+		 unsigned int flags,
+		 long error),
+
+	TP_ARGS(client_name, heap_name, len, mask, flags, error),
+
+	TP_STRUCT__entry(
+		__field(const char *,	client_name)
+		__field(const char *,	heap_name)
+		__field(size_t,		len)
+		__field(unsigned int,	mask)
+		__field(unsigned int,	flags)
+		__field(long,		error)
+	),
+
+	TP_fast_assign(
+		__entry->client_name	= client_name;
+		__entry->heap_name	= heap_name;
+		__entry->len		= len;
+		__entry->mask		= mask;
+		__entry->flags		= flags;
+		__entry->error		= error;
+	),
+
+	TP_printk(
+	"client_name=%s heap_name=%s len=%zu mask=0x%x flags=0x%x error=%ld",
+		__entry->client_name,
+		__entry->heap_name,
+		__entry->len,
+		__entry->mask,
+		__entry->flags,
+		__entry->error)
+);
+
+
+DEFINE_EVENT(ion_alloc_error, ion_alloc_buffer_fallback,
+
+	TP_PROTO(const char *client_name,
+		 const char *heap_name,
+		 size_t len,
+		 unsigned int mask,
+		 unsigned int flags,
+		 long error),
+
+	TP_ARGS(client_name, heap_name, len, mask, flags, error)
+);
+
+DEFINE_EVENT(ion_alloc_error, ion_alloc_buffer_fail,
+
+	TP_PROTO(const char *client_name,
+		 const char *heap_name,
+		 size_t len,
+		 unsigned int mask,
+		 unsigned int flags,
+		 long error),
+
+	TP_ARGS(client_name, heap_name, len, mask, flags, error)
+);
+
+
+DECLARE_EVENT_CLASS(alloc_retry,
+
+	TP_PROTO(int tries),
+
+	TP_ARGS(tries),
+
+	TP_STRUCT__entry(
+		__field(int, tries)
+	),
+
+	TP_fast_assign(
+		__entry->tries = tries;
+	),
+
+	TP_printk("tries=%d",
+		__entry->tries)
+);
+
+DEFINE_EVENT(alloc_retry, ion_cp_alloc_retry,
+
+	TP_PROTO(int tries),
+
+	TP_ARGS(tries)
+);
+
+DEFINE_EVENT(alloc_retry, migrate_retry,
+
+	TP_PROTO(int tries),
+
+	TP_ARGS(tries)
+);
+
+DEFINE_EVENT(alloc_retry, dma_alloc_contiguous_retry,
+
+	TP_PROTO(int tries),
+
+	TP_ARGS(tries)
+);
+
+DECLARE_EVENT_CLASS(migrate_pages,
+
+	TP_PROTO(int mode),
+
+	TP_ARGS(mode),
+
+	TP_STRUCT__entry(
+		__field(int, mode)
+	),
+
+	TP_fast_assign(
+		__entry->mode = mode;
+	),
+
+	TP_printk("mode=%d",
+		__entry->mode)
+);
+
+DEFINE_EVENT(migrate_pages, migrate_pages_start,
+
+	TP_PROTO(int mode),
+
+	TP_ARGS(mode)
+);
+
+DEFINE_EVENT(migrate_pages, migrate_pages_end,
+
+	TP_PROTO(int mode),
+
+	TP_ARGS(mode)
+);
+
+DECLARE_EVENT_CLASS(ion_alloc_pages,
+
+	TP_PROTO(gfp_t gfp_flags,
+		unsigned int order),
+
+	TP_ARGS(gfp_flags, order),
+
+	TP_STRUCT__entry(
+		__field(gfp_t, gfp_flags)
+		__field(unsigned int, order)
+		),
+
+	TP_fast_assign(
+		__entry->gfp_flags = gfp_flags;
+		__entry->order = order;
+		),
+
+	TP_printk("gfp_flags=%s order=%d",
+		show_gfp_flags(__entry->gfp_flags),
+		__entry->order)
+	);
+
+DEFINE_EVENT(ion_alloc_pages, alloc_pages_iommu_start,
+	TP_PROTO(gfp_t gfp_flags,
+		unsigned int order),
+
+	TP_ARGS(gfp_flags, order)
+	);
+
+DEFINE_EVENT(ion_alloc_pages, alloc_pages_iommu_end,
+	TP_PROTO(gfp_t gfp_flags,
+		unsigned int order),
+
+	TP_ARGS(gfp_flags, order)
+	);
+
+DEFINE_EVENT(ion_alloc_pages, alloc_pages_iommu_fail,
+	TP_PROTO(gfp_t gfp_flags,
+		unsigned int order),
+
+	TP_ARGS(gfp_flags, order)
+	);
+
+DEFINE_EVENT(ion_alloc_pages, alloc_pages_sys_start,
+	TP_PROTO(gfp_t gfp_flags,
+		unsigned int order),
+
+	TP_ARGS(gfp_flags, order)
+	);
+
+DEFINE_EVENT(ion_alloc_pages, alloc_pages_sys_end,
+	TP_PROTO(gfp_t gfp_flags,
+		unsigned int order),
+
+	TP_ARGS(gfp_flags, order)
+	);
+
+DEFINE_EVENT(ion_alloc_pages, alloc_pages_sys_fail,
+	TP_PROTO(gfp_t gfp_flags,
+		unsigned int order),
+
+	TP_ARGS(gfp_flags, order)
+
+	);
+
+DECLARE_EVENT_CLASS(smmu_map,
+
+	TP_PROTO(unsigned int va,
+		phys_addr_t pa,
+		unsigned int chunk_size,
+		size_t len),
+
+	TP_ARGS(va, pa, chunk_size, len),
+
+	TP_STRUCT__entry(
+		__field(unsigned int, va)
+		__field(phys_addr_t, pa)
+		__field(unsigned int, chunk_size)
+		__field(size_t, len)
+		),
+
+	TP_fast_assign(
+		__entry->va = va;
+		__entry->pa = pa;
+		__entry->chunk_size = chunk_size;
+		__entry->len = len;
+		),
+
+	TP_printk("v_addr=%p p_addr=%pa chunk_size=0x%x len=%zu",
+		(void *)__entry->va,
+		&__entry->pa,
+		__entry->chunk_size,
+		__entry->len)
+	);
+
+DEFINE_EVENT(smmu_map, iommu_map_range,
+	TP_PROTO(unsigned int va,
+		phys_addr_t pa,
+		unsigned int chunk_size,
+		size_t len),
+
+	TP_ARGS(va, pa, chunk_size, len)
+	);
 
 #endif /* _TRACE_KMEM_H */
 

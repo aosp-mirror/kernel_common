@@ -177,6 +177,11 @@ static void pptp_destroy_siblings(struct nf_conn *ct)
 	const struct nf_conn_help *help = nfct_help(ct);
 	struct nf_conntrack_tuple t;
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
+
 	nf_ct_gre_keymap_destroy(ct);
 
 	/* try original (pns->pac) tuple */
@@ -401,6 +406,11 @@ pptp_outbound_pkt(struct sk_buff *skb,
 	__be16 cid = 0, pcid = 0;
 	typeof(nf_nat_pptp_hook_outbound) nf_nat_pptp_outbound;
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(info) || (!info))
+		printk(KERN_ERR "[NET] info is NULL in %s!\n", __func__);
+#endif
+
 	msg = ntohs(ctlh->messageType);
 	pr_debug("outbound control message %s\n", pptp_msg_name[msg]);
 
@@ -518,6 +528,11 @@ conntrack_pptp_help(struct sk_buff *skb, unsigned int protoff,
 	int oldsstate, oldcstate;
 	int ret;
 	u_int16_t msg;
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(info) || (!info))
+		printk(KERN_ERR "[NET] info is NULL in %s!\n", __func__);
+#endif
 
 	/* don't do any tracking before tcp handshake complete */
 	if (ctinfo != IP_CT_ESTABLISHED && ctinfo != IP_CT_ESTABLISHED_REPLY)

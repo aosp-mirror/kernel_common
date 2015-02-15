@@ -9,6 +9,7 @@ typedef struct {
 	raw_spinlock_t id_lock;
 #endif
 	unsigned int kvm_seq;
+	unsigned long	sigpage;
 } mm_context_t;
 
 #ifdef CONFIG_CPU_HAS_ASID
@@ -33,5 +34,12 @@ typedef struct {
 } mm_context_t;
 
 #endif
+
+/*
+ * switch_mm() may do a full cache flush over the context switch,
+ * so enable interrupts over the context switch to avoid high
+ * latency.
+ */
+#define __ARCH_WANT_INTERRUPTS_ON_CTXSW
 
 #endif

@@ -926,13 +926,7 @@ static int __devinit sht15_probe(struct platform_device *pdev)
 		if (voltage)
 			data->supply_uV = voltage;
 
-		ret = regulator_enable(data->reg);
-		if (ret != 0) {
-			dev_err(&pdev->dev,
-				"failed to enable regulator: %d\n", ret);
-			goto err_free_data;
-		}
-
+		regulator_enable(data->reg);
 		/*
 		 * Setup a notifier block to update this if another device
 		 * causes the voltage to change

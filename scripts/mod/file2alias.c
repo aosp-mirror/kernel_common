@@ -98,13 +98,14 @@ extern struct devtable *__start___devtable[], *__stop___devtable[];
 do {                                                            \
         strcat(str, sep);                                       \
         if (cond)                                               \
-                sprintf(str + strlen(str),                      \
+                snprintf(str + strlen(str),                      \
+                        sizeof(str) - strlen(str) - 1,          \
                         sizeof(field) == 1 ? "%02X" :           \
                         sizeof(field) == 2 ? "%04X" :           \
                         sizeof(field) == 4 ? "%08X" : "",       \
                         field);                                 \
         else                                                    \
-                sprintf(str + strlen(str), "*");                \
+                snprintf(str + strlen(str), sizeof(str) - strlen(str) - 1, "*");    \
 } while(0)
 
 /* Always end in a wildcard, for future extension */
@@ -156,7 +157,7 @@ static void device_id_check(const char *modname, const char *device_id,
 }
 
 /* USB is special because the bcdDevice can be matched against a numeric range */
-/* Looks like "usb:vNpNdNdcNdscNdpNicNiscNipN" */
+/* Looks like "usb:vNpNdNdcNdscNdpNicNiscNipNinN" */
 static void do_usb_entry(struct usb_device_id *id,
 			 unsigned int bcdDevice_initial, int bcdDevice_initial_digits,
 			 unsigned char range_lo, unsigned char range_hi,
@@ -177,15 +178,18 @@ static void do_usb_entry(struct usb_device_id *id,
 		sprintf(alias + strlen(alias), "%X", range_lo);
 	else if (range_lo > 0 || range_hi < max) {
 		if (range_lo > 0x9 || range_hi < 0xA)
-			sprintf(alias + strlen(alias),
+			snprintf(alias + strlen(alias),
+                sizeof(alias) - strlen(alias) - 1,
 				"[%X-%X]",
 				range_lo,
 				range_hi);
 		else {
-			sprintf(alias + strlen(alias),
+			snprintf(alias + strlen(alias),
+                sizeof(alias) - strlen(alias) - 1,
 				range_lo < 0x9 ? "[%X-9" : "[%X",
 				range_lo);
-			sprintf(alias + strlen(alias),
+			snprintf(alias + strlen(alias),
+                sizeof(alias) - strlen(alias) - 1,
 				range_hi > 0xA ? "a-%X]" : "%X]",
 				range_lo);
 		}
@@ -210,6 +214,9 @@ static void do_usb_entry(struct usb_device_id *id,
 	ADD(alias, "ip",
 	    id->match_flags&USB_DEVICE_ID_MATCH_INT_PROTOCOL,
 	    id->bInterfaceProtocol);
+	ADD(alias, "in",
+	    id->match_flags&USB_DEVICE_ID_MATCH_INT_NUMBER,
+	    id->bInterfaceNumber);
 
 	add_wildcard(alias);
 	buf_printf(&mod->dev_table_buf,

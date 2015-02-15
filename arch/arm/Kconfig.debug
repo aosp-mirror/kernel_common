@@ -63,26 +63,28 @@ config DEBUG_USER
 	      8 - SIGSEGV faults
 	     16 - SIGBUS faults
 
-config DEBUG_RODATA
-	bool "Write protect kernel text section"
-	default n
-	depends on DEBUG_KERNEL && MMU
-	---help---
-	  Mark the kernel text section as write-protected in the pagetables,
-	  in order to catch accidental (and incorrect) writes to such const
-	  data. This will cause the size of the kernel, plus up to 4MB, to
-	  be mapped as pages instead of sections, which will increase TLB
-	  pressure.
-	  If in doubt, say "N".
+config FORCE_PAGES
+	bool "Force lowmem to be mapped with 4K pages"
+        help
+          There are some advanced debug features that can only be done when
+          memory is mapped with pages instead of sections. Enable this option
+          to always map lowmem pages with pages. This may have a performance
+          cost due to increased TLB pressure.
 
-config DEBUG_RODATA_TEST
-	bool "Testcase for the DEBUG_RODATA feature"
-	depends on DEBUG_RODATA
-	default n
-	---help---
-	  This option enables a testcase for the DEBUG_RODATA
-	  feature.
-	  If in doubt, say "N"
+          If unsure say N.
+
+config FREE_PAGES_RDONLY
+	bool "Set pages as read only while on the buddy list"
+	select FORCE_PAGES
+	select PAGE_POISONING
+	help
+          Pages are always mapped in the kernel. This means that anyone
+          can write to the page if they have the address. Enable this option
+          to mark pages as read only to trigger a fault if any code attempts
+          to write to a page on the buddy list. This may have a performance
+          impact.
+
+          If unsure, say N.
 
 # These options are only for real kernel hackers who want to get their hands dirty.
 config DEBUG_LL
@@ -208,43 +210,6 @@ choice
 		  Say Y here if you want kernel low-level debugging support
 		  on i.MX6Q UART4.
 
-	config DEBUG_MSM_UART1
-		bool "Kernel low-level debugging messages via MSM UART1"
-		depends on ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50
-		help
-		  Say Y here if you want the debug print routines to direct
-		  their output to the first serial port on MSM devices.
-
-	config DEBUG_MSM_UART2
-		bool "Kernel low-level debugging messages via MSM UART2"
-		depends on ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50
-		help
-		  Say Y here if you want the debug print routines to direct
-		  their output to the second serial port on MSM devices.
-
-	config DEBUG_MSM_UART3
-		bool "Kernel low-level debugging messages via MSM UART3"
-		depends on ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50
-		help
-		  Say Y here if you want the debug print routines to direct
-		  their output to the third serial port on MSM devices.
-
-	config DEBUG_MSM8660_UART
-		bool "Kernel low-level debugging messages via MSM 8660 UART"
-		depends on ARCH_MSM8X60
-		select MSM_HAS_DEBUG_UART_HS
-		help
-		  Say Y here if you want the debug print routines to direct
-		  their output to the serial port on MSM 8660 devices.
-
-	config DEBUG_MSM8960_UART
-		bool "Kernel low-level debugging messages via MSM 8960 UART"
-		depends on ARCH_MSM8960
-		select MSM_HAS_DEBUG_UART_HS
-		help
-		  Say Y here if you want the debug print routines to direct
-		  their output to the serial port on MSM 8960 devices.
-
 	config DEBUG_REALVIEW_STD_PORT
 		bool "RealView Default UART"
 		depends on ARCH_REALVIEW
@@ -352,5 +317,25 @@ config ARM_KPROBES_TEST
 	depends on KPROBES && MODULES
 	help
 	  Perform tests of kprobes API and instruction set simulation.
+
+config PID_IN_CONTEXTIDR
+	bool "Write the current PID to the CONTEXTIDR register"
+	depends on CPU_COPY_V6
+	help
+	  Enabling this option causes the kernel to write the current PID to
+	  the PROCID field of the CONTEXTIDR register, at the expense of some
+	  additional instructions during context switch. Say Y here only if you
+	  are planning to use hardware trace tools with this kernel.
+
+config DEBUG_SET_MODULE_RONX
+	bool "Set loadable kernel module data as NX and text as RO"
+	depends on MODULES
+	---help---
+	  This option helps catch unintended modifications to loadable
+	  kernel module's text and read-only data. It also prevents execution
+	  of module data. Such protection may interfere with run-time code
+	  patching and dynamic kernel tracing - and they might also protect
+	  against certain classes of kernel exploits.
+	  If in doubt, say "N".
 
 endmenu

@@ -472,9 +472,14 @@ static void ibmveth_cleanup(struct ibmveth_adapter *adapter)
 	}
 
 	if (adapter->rx_queue.queue_addr != NULL) {
-		dma_free_coherent(dev, adapter->rx_queue.queue_len,
-				  adapter->rx_queue.queue_addr,
-				  adapter->rx_queue.queue_dma);
+		if (!dma_mapping_error(dev, adapter->rx_queue.queue_dma)) {
+			dma_unmap_single(dev,
+					adapter->rx_queue.queue_dma,
+					adapter->rx_queue.queue_len,
+					DMA_BIDIRECTIONAL);
+			adapter->rx_queue.queue_dma = DMA_ERROR_CODE;
+		}
+		kfree(adapter->rx_queue.queue_addr);
 		adapter->rx_queue.queue_addr = NULL;
 	}
 
@@ -551,13 +556,10 @@ static int ibmveth_open(struct net_device *netdev)
 		goto err_out;
 	}
 
-	dev = &adapter->vdev->dev;
-
 	adapter->rx_queue.queue_len = sizeof(struct ibmveth_rx_q_entry) *
 						rxq_entries;
-	adapter->rx_queue.queue_addr =
-	    dma_alloc_coherent(dev, adapter->rx_queue.queue_len,
-			       &adapter->rx_queue.queue_dma, GFP_KERNEL);
+	adapter->rx_queue.queue_addr = kmalloc(adapter->rx_queue.queue_len,
+						GFP_KERNEL);
 
 	if (!adapter->rx_queue.queue_addr) {
 		netdev_err(netdev, "unable to allocate rx queue pages\n");
@@ -565,13 +567,19 @@ static int ibmveth_open(struct net_device *netdev)
 		goto err_out;
 	}
 
+	dev = &adapter->vdev->dev;
+
 	adapter->buffer_list_dma = dma_map_single(dev,
 			adapter->buffer_list_addr, 4096, DMA_BIDIRECTIONAL);
 	adapter->filter_list_dma = dma_map_single(dev,
 			adapter->filter_list_addr, 4096, DMA_BIDIRECTIONAL);
+	adapter->rx_queue.queue_dma = dma_map_single(dev,
+			adapter->rx_queue.queue_addr,
+			adapter->rx_queue.queue_len, DMA_BIDIRECTIONAL);
 
 	if ((dma_mapping_error(dev, adapter->buffer_list_dma)) ||
-	    (dma_mapping_error(dev, adapter->filter_list_dma))) {
+	    (dma_mapping_error(dev, adapter->filter_list_dma)) ||
+	    (dma_mapping_error(dev, adapter->rx_queue.queue_dma))) {
 		netdev_err(netdev, "unable to map filter or buffer list "
 			   "pages\n");
 		rc = -ENOMEM;
@@ -1327,7 +1335,7 @@ static const struct net_device_ops ibmveth_netdev_ops = {
 static int __devinit ibmveth_probe(struct vio_dev *dev,
 				   const struct vio_device_id *id)
 {
-	int rc, i, mac_len;
+	int rc, i;
 	struct net_device *netdev;
 	struct ibmveth_adapter *adapter;
 	unsigned char *mac_addr_p;
@@ -1337,17 +1345,9 @@ static int __devinit ibmveth_probe(struct vio_dev *dev,
 		dev->unit_address);
 
 	mac_addr_p = (unsigned char *)vio_get_attribute(dev, VETH_MAC_ADDR,
-							&mac_len);
+							NULL);
 	if (!mac_addr_p) {
 		dev_err(&dev->dev, "Can't find VETH_MAC_ADDR attribute\n");
-		return -EINVAL;
-	}
-	/* Workaround for old/broken pHyp */
-	if (mac_len == 8)
-		mac_addr_p += 2;
-	else if (mac_len != 6) {
-		dev_err(&dev->dev, "VETH_MAC_ADDR attribute wrong len %d\n",
-			mac_len);
 		return -EINVAL;
 	}
 
@@ -1373,6 +1373,17 @@ static int __devinit ibmveth_probe(struct vio_dev *dev,
 	adapter->pool_config = 0;
 
 	netif_napi_add(netdev, &adapter->napi, ibmveth_poll, 16);
+
+	/*
+	 * Some older boxes running PHYP non-natively have an OF that returns
+	 * a 8-byte local-mac-address field (and the first 2 bytes have to be
+	 * ignored) while newer boxes' OF return a 6-byte field. Note that
+	 * IEEE 1275 specifies that local-mac-address must be a 6-byte field.
+	 * The RPA doc specifies that the first byte must be 10b, so we'll
+	 * just look for it to solve this 8 vs. 6 byte field issue
+	 */
+	if ((*mac_addr_p & 0x3) != 0x02)
+		mac_addr_p += 2;
 
 	adapter->mac_addr = 0;
 	memcpy(&adapter->mac_addr, mac_addr_p, 6);

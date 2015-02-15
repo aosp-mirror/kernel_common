@@ -46,6 +46,11 @@ adjust_tcp_sequence(u32 seq,
 	struct nf_conn_nat *nat = nfct_nat(ct);
 	struct nf_nat_seq *this_way = &nat->seq[dir];
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(this_way) || (!this_way))
+		printk(KERN_ERR "[NET] this_way is NULL in %s!\n", __func__);
+#endif
+
 	pr_debug("adjust_tcp_sequence: seq = %u, sizediff = %d\n",
 		 seq, sizediff);
 
@@ -387,6 +392,11 @@ nf_nat_seq_adjust(struct sk_buff *skb,
 
 	this_way = &nat->seq[dir];
 	other_way = &nat->seq[!dir];
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(this_way) || (!this_way))
+		printk(KERN_ERR "[NET] this_way is NULL in %s!\n", __func__);
+#endif
 
 	if (!skb_make_writable(skb, ip_hdrlen(skb) + sizeof(*tcph)))
 		return 0;

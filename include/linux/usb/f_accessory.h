@@ -27,6 +27,10 @@
 
 /* Product ID to use when in accessory mode and adb is enabled */
 #define USB_ACCESSORY_ADB_PRODUCT_ID 0x2D01
+#define USB_AUDIO_PRODUCT_ID 0x2D02
+#define USB_AUDIO_ADB_PRODUCT_ID 0x2D03
+#define USB_ACCESSORY_AUDIO_PRODUCT_ID 0x2D04
+#define USB_ACCESSORY_AUDIO_ADB_PRODUCT_ID 0x2D05
 
 /* Indexes for strings sent by the host via ACCESSORY_SEND_STRING */
 #define ACCESSORY_STRING_MANUFACTURER   0

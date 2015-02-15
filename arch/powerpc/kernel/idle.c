@@ -113,9 +113,6 @@ void cpu_idle(void)
 	}
 }
 
-static void do_nothing(void *unused)
-{
-}
 
 /*
  * cpu_idle_wait - Used to ensure that all the CPUs come out of the old
@@ -126,9 +123,16 @@ static void do_nothing(void *unused)
  */
 void cpu_idle_wait(void)
 {
+	int cpu;
 	smp_mb();
-	/* kick all the CPUs so that they exit out of pm_idle */
-	smp_call_function(do_nothing, NULL, 1);
+
+	/* kick all the CPUs so that they exit out of old idle routine */
+	get_online_cpus();
+	for_each_online_cpu(cpu) {
+		if (cpu != smp_processor_id())
+			smp_send_reschedule(cpu);
+	}
+	put_online_cpus();
 }
 EXPORT_SYMBOL_GPL(cpu_idle_wait);
 

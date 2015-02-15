@@ -344,10 +344,6 @@ static void md_make_request(struct request_queue *q, struct bio *bio)
 		bio_io_error(bio);
 		return;
 	}
-	if (mddev->ro == 1 && unlikely(rw == WRITE)) {
-		bio_endio(bio, bio_sectors(bio) == 0 ? 0 : -EROFS);
-		return;
-	}
 	smp_rmb(); /* Ensure implications of  'active' are visible */
 	rcu_read_lock();
 	if (mddev->suspended) {
@@ -456,7 +452,7 @@ static void submit_flushes(struct work_struct *ws)
 			atomic_inc(&rdev->nr_pending);
 			atomic_inc(&rdev->nr_pending);
 			rcu_read_unlock();
-			bi = bio_alloc_mddev(GFP_NOIO, 0, mddev);
+			bi = bio_alloc_mddev(GFP_KERNEL, 0, mddev);
 			bi->bi_end_io = md_end_flush;
 			bi->bi_private = rdev;
 			bi->bi_bdev = rdev->bdev;
@@ -1147,11 +1143,8 @@ static int super_90_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor
 			ret = 0;
 	}
 	rdev->sectors = rdev->sb_start;
-	/* Limit to 4TB as metadata cannot record more than that.
-	 * (not needed for Linear and RAID0 as metadata doesn't
-	 * record this size)
-	 */
-	if (rdev->sectors >= (2ULL << 32) && sb->level >= 1)
+	/* Limit to 4TB as metadata cannot record more than that */
+	if (rdev->sectors >= (2ULL << 32))
 		rdev->sectors = (2ULL << 32) - 2;
 
 	if (rdev->sectors < ((sector_t)sb->size) * 2 && sb->level >= 1)
@@ -1433,7 +1426,7 @@ super_90_rdev_size_change(struct md_rdev *rdev, sector_t num_sectors)
 	/* Limit to 4TB as metadata cannot record more than that.
 	 * 4TB == 2^32 KB, or 2*2^32 sectors.
 	 */
-	if (num_sectors >= (2ULL << 32) && rdev->mddev->level >= 1)
+	if (num_sectors >= (2ULL << 32))
 		num_sectors = (2ULL << 32) - 2;
 	md_super_write(rdev->mddev, rdev, rdev->sb_start, rdev->sb_size,
 		       rdev->sb_page);
@@ -1587,8 +1580,8 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 					     sector, count, 1) == 0)
 				return -EINVAL;
 		}
-	} else if (sb->bblog_offset != 0)
-		rdev->badblocks.shift = 0;
+	} else if (sb->bblog_offset == 0)
+		rdev->badblocks.shift = -1;
 
 	if (!refdev) {
 		ret = 1;
@@ -1809,10 +1802,10 @@ retry:
 			memset(bbp, 0xff, PAGE_SIZE);
 
 			for (i = 0 ; i < bb->count ; i++) {
-				u64 internal_bb = p[i];
+				u64 internal_bb = *p++;
 				u64 store_bb = ((BB_OFFSET(internal_bb) << 10)
 						| BB_LEN(internal_bb));
-				bbp[i] = cpu_to_le64(store_bb);
+				*bbp++ = cpu_to_le64(store_bb);
 			}
 			bb->changed = 0;
 			if (read_seqretry(&bb->lock, seq))
@@ -2886,9 +2879,6 @@ rdev_size_store(struct md_rdev *rdev, const char *buf, size_t len)
 		} else if (!sectors)
 			sectors = (i_size_read(rdev->bdev->bd_inode) >> 9) -
 				rdev->data_offset;
-		if (!my_mddev->pers->resize)
-			/* Cannot change size for RAID0 or Linear etc */
-			return -EINVAL;
 	}
 	if (sectors < my_mddev->dev_sectors)
 		return -EINVAL; /* component must fit device */
@@ -3107,7 +3097,7 @@ int md_rdev_init(struct md_rdev *rdev)
 	 * be used - I wonder if that matters
 	 */
 	rdev->badblocks.count = 0;
-	rdev->badblocks.shift = -1; /* disabled until explicitly enabled */
+	rdev->badblocks.shift = 0;
 	rdev->badblocks.page = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	seqlock_init(&rdev->badblocks.lock);
 	if (rdev->badblocks.page == NULL)
@@ -3179,6 +3169,9 @@ static struct md_rdev *md_import_device(dev_t newdev, int super_format, int supe
 			goto abort_free;
 		}
 	}
+	if (super_format == -1)
+		/* hot-add for 0.90, or non-persistent: so no badblocks */
+		rdev->badblocks.shift = -1;
 
 	return rdev;
 
@@ -3751,8 +3744,8 @@ array_state_show(struct mddev *mddev, char *page)
 	return sprintf(page, "%s\n", array_states[st]);
 }
 
-static int do_md_stop(struct mddev * mddev, int ro, struct block_device *bdev);
-static int md_set_readonly(struct mddev * mddev, struct block_device *bdev);
+static int do_md_stop(struct mddev * mddev, int ro, int is_open);
+static int md_set_readonly(struct mddev * mddev, int is_open);
 static int do_md_run(struct mddev * mddev);
 static int restart_array(struct mddev *mddev);
 
@@ -3768,14 +3761,14 @@ array_state_store(struct mddev *mddev, const char *buf, size_t len)
 		/* stopping an active array */
 		if (atomic_read(&mddev->openers) > 0)
 			return -EBUSY;
-		err = do_md_stop(mddev, 0, NULL);
+		err = do_md_stop(mddev, 0, 0);
 		break;
 	case inactive:
 		/* stopping an active array */
 		if (mddev->pers) {
 			if (atomic_read(&mddev->openers) > 0)
 				return -EBUSY;
-			err = do_md_stop(mddev, 2, NULL);
+			err = do_md_stop(mddev, 2, 0);
 		} else
 			err = 0; /* already inactive */
 		break;
@@ -3783,7 +3776,7 @@ array_state_store(struct mddev *mddev, const char *buf, size_t len)
 		break; /* not supported yet */
 	case readonly:
 		if (mddev->pers)
-			err = md_set_readonly(mddev, NULL);
+			err = md_set_readonly(mddev, 0);
 		else {
 			mddev->ro = 1;
 			set_disk_ro(mddev->gendisk, 1);
@@ -3793,7 +3786,7 @@ array_state_store(struct mddev *mddev, const char *buf, size_t len)
 	case read_auto:
 		if (mddev->pers) {
 			if (mddev->ro == 0)
-				err = md_set_readonly(mddev, NULL);
+				err = md_set_readonly(mddev, 0);
 			else if (mddev->ro == 1)
 				err = restart_array(mddev);
 			if (err == 0) {
@@ -5131,17 +5124,15 @@ void md_stop(struct mddev *mddev)
 }
 EXPORT_SYMBOL_GPL(md_stop);
 
-static int md_set_readonly(struct mddev *mddev, struct block_device *bdev)
+static int md_set_readonly(struct mddev *mddev, int is_open)
 {
 	int err = 0;
 	mutex_lock(&mddev->open_mutex);
-	if (atomic_read(&mddev->openers) > !!bdev) {
+	if (atomic_read(&mddev->openers) > is_open) {
 		printk("md: %s still in use.\n",mdname(mddev));
 		err = -EBUSY;
 		goto out;
 	}
-	if (bdev)
-		sync_blockdev(bdev);
 	if (mddev->pers) {
 		__md_stop_writes(mddev);
 
@@ -5163,26 +5154,18 @@ out:
  *   0 - completely stop and dis-assemble array
  *   2 - stop but do not disassemble array
  */
-static int do_md_stop(struct mddev * mddev, int mode,
-		      struct block_device *bdev)
+static int do_md_stop(struct mddev * mddev, int mode, int is_open)
 {
 	struct gendisk *disk = mddev->gendisk;
 	struct md_rdev *rdev;
 
 	mutex_lock(&mddev->open_mutex);
-	if (atomic_read(&mddev->openers) > !!bdev ||
+	if (atomic_read(&mddev->openers) > is_open ||
 	    mddev->sysfs_active) {
 		printk("md: %s still in use.\n",mdname(mddev));
 		mutex_unlock(&mddev->open_mutex);
 		return -EBUSY;
 	}
-	if (bdev)
-		/* It is possible IO was issued on some other
-		 * open file which was closed before we took ->open_mutex.
-		 * As that was not the last close __blkdev_put will not
-		 * have called sync_blockdev, so we must.
-		 */
-		sync_blockdev(bdev);
 
 	if (mddev->pers) {
 		if (mddev->ro)
@@ -5256,7 +5239,7 @@ static void autorun_array(struct mddev *mddev)
 	err = do_md_run(mddev);
 	if (err) {
 		printk(KERN_WARNING "md: do_md_run() returned %d\n", err);
-		do_md_stop(mddev, 0, NULL);
+		do_md_stop(mddev, 0, 0);
 	}
 }
 
@@ -6254,11 +6237,11 @@ static int md_ioctl(struct block_device *bdev, fmode_t mode,
 			goto done_unlock;
 
 		case STOP_ARRAY:
-			err = do_md_stop(mddev, 0, bdev);
+			err = do_md_stop(mddev, 0, 1);
 			goto done_unlock;
 
 		case STOP_ARRAY_RO:
-			err = md_set_readonly(mddev, bdev);
+			err = md_set_readonly(mddev, 1);
 			goto done_unlock;
 
 		case BLKROSET:
@@ -7424,8 +7407,6 @@ static int remove_and_add_spares(struct mddev *mddev)
 			}
 		}
 	}
-	if (removed)
-		set_bit(MD_CHANGE_DEVS, &mddev->flags);
 	return spares;
 }
 
@@ -7439,11 +7420,9 @@ static void reap_sync_thread(struct mddev *mddev)
 	    !test_bit(MD_RECOVERY_REQUESTED, &mddev->recovery)) {
 		/* success...*/
 		/* activate any spares */
-		if (mddev->pers->spare_active(mddev)) {
+		if (mddev->pers->spare_active(mddev))
 			sysfs_notify(&mddev->kobj, NULL,
 				     "degraded");
-			set_bit(MD_CHANGE_DEVS, &mddev->flags);
-		}
 	}
 	if (test_bit(MD_RECOVERY_RESHAPE, &mddev->recovery) &&
 	    mddev->pers->finish_reshape)
@@ -7698,9 +7677,9 @@ int md_is_badblock(struct badblocks *bb, sector_t s, int sectors,
 		   sector_t *first_bad, int *bad_sectors)
 {
 	int hi;
-	int lo;
+	int lo = 0;
 	u64 *p = bb->page;
-	int rv;
+	int rv = 0;
 	sector_t target = s + sectors;
 	unsigned seq;
 
@@ -7715,8 +7694,7 @@ int md_is_badblock(struct badblocks *bb, sector_t s, int sectors,
 
 retry:
 	seq = read_seqbegin(&bb->lock);
-	lo = 0;
-	rv = 0;
+
 	hi = bb->count;
 
 	/* Binary search between lo and hi for 'target'

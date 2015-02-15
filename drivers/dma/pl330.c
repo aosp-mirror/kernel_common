@@ -393,8 +393,6 @@ struct pl330_req {
 	struct pl330_reqcfg *cfg;
 	/* Pointer to first xfer in the request. */
 	struct pl330_xfer *x;
-	/* Hook to attach to DMAC's list of reqs with due callback */
-	struct list_head rqd;
 };
 
 /*
@@ -464,6 +462,8 @@ struct _pl330_req {
 	/* Number of bytes taken to setup MC for the req */
 	u32 mc_len;
 	struct pl330_req *r;
+	/* Hook to attach to DMAC's list of reqs with due callback */
+	struct list_head rqd;
 };
 
 /* ToBeDone for tasklet */
@@ -1568,19 +1568,17 @@ static int pl330_submit_req(void *ch_id, struct pl330_req *r)
 		goto xfer_exit;
 	}
 
+	/* Prefer Secure Channel */
+	if (!_manager_ns(thrd))
+		r->cfg->nonsecure = 0;
+	else
+		r->cfg->nonsecure = 1;
 
 	/* Use last settings, if not provided */
-	if (r->cfg) {
-		/* Prefer Secure Channel */
-		if (!_manager_ns(thrd))
-			r->cfg->nonsecure = 0;
-		else
-			r->cfg->nonsecure = 1;
-
+	if (r->cfg)
 		ccr = _prepare_ccr(r->cfg);
-	} else {
+	else
 		ccr = readl(regs + CC(thrd->id));
-	}
 
 	/* If this req doesn't have valid xfer settings */
 	if (!_is_valid(ccr)) {
@@ -1686,7 +1684,7 @@ static void pl330_dotask(unsigned long data)
 /* Returns 1 if state was updated, 0 otherwise */
 static int pl330_update(const struct pl330_info *pi)
 {
-	struct pl330_req *rqdone, *tmp;
+	struct _pl330_req *rqdone;
 	struct pl330_dmac *pl330;
 	unsigned long flags;
 	void __iomem *regs;
@@ -1753,10 +1751,7 @@ static int pl330_update(const struct pl330_info *pi)
 			if (active == -1) /* Aborted */
 				continue;
 
-			/* Detach the req */
-			rqdone = thrd->req[active].r;
-			thrd->req[active].r = NULL;
-
+			rqdone = &thrd->req[active];
 			mark_free(thrd, active);
 
 			/* Get going again ASAP */
@@ -1768,11 +1763,20 @@ static int pl330_update(const struct pl330_info *pi)
 	}
 
 	/* Now that we are in no hurry, do the callbacks */
-	list_for_each_entry_safe(rqdone, tmp, &pl330->req_done, rqd) {
-		list_del(&rqdone->rqd);
+	while (!list_empty(&pl330->req_done)) {
+		struct pl330_req *r;
+
+		rqdone = container_of(pl330->req_done.next,
+					struct _pl330_req, rqd);
+
+		list_del_init(&rqdone->rqd);
+
+		/* Detach the req */
+		r = rqdone->r;
+		rqdone->r = NULL;
 
 		spin_unlock_irqrestore(&pl330->lock, flags);
-		_callback(rqdone, PL330_ERR_NONE);
+		_callback(r, PL330_ERR_NONE);
 		spin_lock_irqsave(&pl330->lock, flags);
 	}
 
@@ -2318,7 +2322,7 @@ static void pl330_tasklet(unsigned long data)
 	/* Pick up ripe tomatoes */
 	list_for_each_entry_safe(desc, _dt, &pch->work_list, node)
 		if (desc->status == DONE) {
-			if (!pch->cyclic)
+			if (pch->cyclic)
 				dma_cookie_complete(&desc->txd);
 			list_move_tail(&desc->node, &list);
 		}
@@ -2463,9 +2467,9 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
 	struct dma_pl330_chan *pch = to_pchan(chan);
 	unsigned long flags;
 
-	tasklet_kill(&pch->task);
-
 	spin_lock_irqsave(&pch->lock, flags);
+
+	tasklet_kill(&pch->task);
 
 	pl330_release_channel(pch->pl330_chid);
 	pch->pl330_chid = NULL;
@@ -2931,11 +2935,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 		num_chan = max_t(int, pi->pcfg.num_peri, pi->pcfg.num_chan);
 
 	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
-	if (!pdmac->peripherals) {
-		ret = -ENOMEM;
-		dev_err(&adev->dev, "unable to allocate pdmac->peripherals\n");
-		goto probe_err5;
-	}
 
 	for (i = 0; i < num_chan; i++) {
 		pch = &pdmac->peripherals[i];

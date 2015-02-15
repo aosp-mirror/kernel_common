@@ -38,7 +38,7 @@
 int copy_siginfo_to_user32(compat_siginfo_t __user *to, siginfo_t *from)
 {
 	int err = 0;
-	bool ia32 = test_thread_flag(TIF_IA32);
+	bool ia32 = is_ia32_task();
 
 	if (!access_ok(VERIFY_WRITE, to, sizeof(compat_siginfo_t)))
 		return -EFAULT;
@@ -66,10 +66,6 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, siginfo_t *from)
 					  &to->_sifields._pad[0]);
 			switch (from->si_code >> 16) {
 			case __SI_FAULT >> 16:
-				break;
-			case __SI_SYS >> 16:
-				put_user_ex(from->si_syscall, &to->si_syscall);
-				put_user_ex(from->si_arch, &to->si_arch);
 				break;
 			case __SI_CHLD >> 16:
 				if (ia32) {

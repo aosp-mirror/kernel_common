@@ -93,7 +93,7 @@ vcs_poll_data_free(struct vcs_poll_data *poll)
 static struct vcs_poll_data *
 vcs_poll_data_get(struct file *file)
 {
-	struct vcs_poll_data *poll = file->private_data, *kill = NULL;
+	struct vcs_poll_data *poll = file->private_data;
 
 	if (poll)
 		return poll;
@@ -122,12 +122,10 @@ vcs_poll_data_get(struct file *file)
 		file->private_data = poll;
 	} else {
 		/* someone else raced ahead of us */
-		kill = poll;
+		vcs_poll_data_free(poll);
 		poll = file->private_data;
 	}
 	spin_unlock(&file->f_lock);
-	if (kill)
-		vcs_poll_data_free(kill);
 
 	return poll;
 }

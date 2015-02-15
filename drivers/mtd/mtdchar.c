@@ -35,6 +35,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/uaccess.h>
 
@@ -968,6 +969,9 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 
 	case ECCGETSTATS:
 	{
+#ifdef CONFIG_MTD_LAZYECCSTATS
+		part_fill_badblockstats(mtd);
+#endif
 		if (copy_to_user(argp, &mtd->ecc_stats,
 				 sizeof(struct mtd_ecc_stats)))
 			return -EFAULT;
@@ -1159,17 +1163,41 @@ static int mtdchar_mmap(struct file *file, struct vm_area_struct *vma)
 	struct mtd_file_info *mfi = file->private_data;
 	struct mtd_info *mtd = mfi->mtd;
 	struct map_info *map = mtd->priv;
+	resource_size_t start, off;
+	unsigned long len, vma_len;
 
-        /* This is broken because it assumes the MTD device is map-based
-	   and that mtd->priv is a valid struct map_info.  It should be
-	   replaced with something that uses the mtd_get_unmapped_area()
-	   operation properly. */
-	if (0 /*mtd->type == MTD_RAM || mtd->type == MTD_ROM*/) {
+	if (mtd->type == MTD_RAM || mtd->type == MTD_ROM) {
+		off = get_vm_offset(vma);
+		start = map->phys;
+		len = PAGE_ALIGN((start & ~PAGE_MASK) + map->size);
+		start &= PAGE_MASK;
+		vma_len = get_vm_size(vma);
+
+		/* Overflow in off+len? */
+		if (vma_len + off < off)
+			return -EINVAL;
+		/* Does it fit in the mapping? */
+		if (vma_len + off > len)
+			return -EINVAL;
+
+		off += start;
+		/* Did that overflow? */
+		if (off < start)
+			return -EINVAL;
+		if (set_vm_offset(vma, off) < 0)
+			return -EINVAL;
+		vma->vm_flags |= VM_IO | VM_RESERVED;
+
 #ifdef pgprot_noncached
-		if (file->f_flags & O_DSYNC || map->phys >= __pa(high_memory))
+		if (file->f_flags & O_DSYNC || off >= __pa(high_memory))
 			vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 #endif
-		return vm_iomap_memory(vma, map->phys, map->size);
+		if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
+				       vma->vm_end - vma->vm_start,
+				       vma->vm_page_prot))
+			return -EAGAIN;
+
+		return 0;
 	}
 	return -ENOSYS;
 #else

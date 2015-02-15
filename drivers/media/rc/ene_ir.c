@@ -1018,8 +1018,6 @@ static int ene_probe(struct pnp_dev *pnp_dev, const struct pnp_device_id *id)
 
 	spin_lock_init(&dev->hw_lock);
 
-	dev->hw_io = pnp_port_start(pnp_dev, 0);
-
 	pnp_set_drvdata(pnp_dev, dev);
 	dev->pnp_dev = pnp_dev;
 
@@ -1074,6 +1072,7 @@ static int ene_probe(struct pnp_dev *pnp_dev, const struct pnp_device_id *id)
 
 	/* claim the resources */
 	error = -EBUSY;
+	dev->hw_io = pnp_port_start(pnp_dev, 0);
 	if (!request_region(dev->hw_io, ENE_IO_SIZE, ENE_DRIVER_NAME)) {
 		dev->hw_io = -1;
 		dev->irq = -1;

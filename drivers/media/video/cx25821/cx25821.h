@@ -187,7 +187,7 @@ enum port {
 };
 
 struct cx25821_board {
-	const char *name;
+	char *name;
 	enum port porta;
 	enum port portb;
 	enum port portc;

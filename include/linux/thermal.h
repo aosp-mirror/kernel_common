@@ -37,11 +37,19 @@ enum thermal_device_mode {
 	THERMAL_DEVICE_ENABLED,
 };
 
+enum thermal_trip_activation_mode {
+	THERMAL_TRIP_ACTIVATION_DISABLED = 0,
+	THERMAL_TRIP_ACTIVATION_ENABLED,
+};
+
 enum thermal_trip_type {
 	THERMAL_TRIP_ACTIVE = 0,
 	THERMAL_TRIP_PASSIVE,
 	THERMAL_TRIP_HOT,
 	THERMAL_TRIP_CRITICAL,
+	THERMAL_TRIP_CONFIGURABLE_HI,
+	THERMAL_TRIP_CONFIGURABLE_LOW,
+	THERMAL_TRIP_CRITICAL_LOW,
 };
 
 struct thermal_zone_device_ops {
@@ -49,16 +57,20 @@ struct thermal_zone_device_ops {
 		     struct thermal_cooling_device *);
 	int (*unbind) (struct thermal_zone_device *,
 		       struct thermal_cooling_device *);
-	int (*get_temp) (struct thermal_zone_device *, unsigned long *);
+	int (*get_temp) (struct thermal_zone_device *, long *);
 	int (*get_mode) (struct thermal_zone_device *,
 			 enum thermal_device_mode *);
 	int (*set_mode) (struct thermal_zone_device *,
 		enum thermal_device_mode);
 	int (*get_trip_type) (struct thermal_zone_device *, int,
 		enum thermal_trip_type *);
+	int (*activate_trip_type) (struct thermal_zone_device *, int,
+		enum thermal_trip_activation_mode);
 	int (*get_trip_temp) (struct thermal_zone_device *, int,
-			      unsigned long *);
-	int (*get_crit_temp) (struct thermal_zone_device *, unsigned long *);
+			      long *);
+	int (*set_trip_temp) (struct thermal_zone_device *, int,
+			      long);
+	int (*get_crit_temp) (struct thermal_zone_device *, long *);
 	int (*notify) (struct thermal_zone_device *, int,
 		       enum thermal_trip_type);
 };
@@ -85,6 +97,28 @@ struct thermal_cooling_device {
 				((long)t-2732+5)/10 : ((long)t-2732-5)/10)
 #define CELSIUS_TO_KELVIN(t)	((t)*10+2732)
 
+struct sensor_threshold {
+	long temp;
+	enum thermal_trip_type trip;
+	int (*notify)(enum thermal_trip_type type, int temp, void *data);
+	void *data;
+	uint8_t active;
+	struct list_head list;
+};
+
+struct sensor_info {
+	uint32_t sensor_id;
+	struct thermal_zone_device *tz;
+	long threshold_min;
+	long threshold_max;
+	int max_idx;
+	int min_idx;
+	struct list_head sensor_list;
+	struct list_head threshold_list;
+	struct mutex lock;
+	struct work_struct work;
+};
+
 struct thermal_zone_device {
 	int id;
 	char type[THERMAL_NAME_LENGTH];
@@ -101,14 +135,15 @@ struct thermal_zone_device {
 	const struct thermal_zone_device_ops *ops;
 	struct list_head cooling_devices;
 	struct idr idr;
-	struct mutex lock;	/* protect cooling devices list */
+	struct mutex lock;	
 	struct list_head node;
 	struct delayed_work poll_queue;
+	struct sensor_threshold tz_threshold[2];
+	struct sensor_info sensor;
 };
-/* Adding event notification support elements */
 #define THERMAL_GENL_FAMILY_NAME                "thermal_event"
 #define THERMAL_GENL_VERSION                    0x01
-#define THERMAL_GENL_MCAST_GROUP_NAME           "thermal_mc_grp"
+#define THERMAL_GENL_MCAST_GROUP_NAME           "thermal_mc_group"
 
 enum events {
 	THERMAL_AUX0,
@@ -121,7 +156,6 @@ struct thermal_genl_event {
 	u32 orig;
 	enum events event;
 };
-/* attributes of thermal_genl_family */
 enum {
 	THERMAL_GENL_ATTR_UNSPEC,
 	THERMAL_GENL_ATTR_EVENT,
@@ -129,7 +163,6 @@ enum {
 };
 #define THERMAL_GENL_ATTR_MAX (__THERMAL_GENL_ATTR_MAX - 1)
 
-/* commands supported by the thermal_genl_family */
 enum {
 	THERMAL_GENL_CMD_UNSPEC,
 	THERMAL_GENL_CMD_EVENT,
@@ -151,6 +184,14 @@ struct thermal_cooling_device *thermal_cooling_device_register(char *, void *,
 		const struct thermal_cooling_device_ops *);
 void thermal_cooling_device_unregister(struct thermal_cooling_device *);
 
+int sensor_get_id(char *name);
+int sensor_set_trip(uint32_t sensor_id, struct sensor_threshold *threshold);
+int sensor_cancel_trip(uint32_t sensor_id, struct sensor_threshold *threshold);
+int sensor_activate_trip(uint32_t sensor_id, struct sensor_threshold *threshold,
+			bool enable);
+int thermal_sensor_trip(struct thermal_zone_device *tz,
+		enum thermal_trip_type trip, long temp);
+
 #ifdef CONFIG_NET
 extern int thermal_generate_netlink_event(u32 orig, enum events event);
 #else
@@ -160,4 +201,4 @@ static inline int thermal_generate_netlink_event(u32 orig, enum events event)
 }
 #endif
 
-#endif /* __THERMAL_H__ */
+#endif 

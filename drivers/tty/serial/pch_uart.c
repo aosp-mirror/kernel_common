@@ -252,9 +252,6 @@ struct eg20t_port {
 	dma_addr_t			rx_buf_dma;
 
 	struct dentry	*debugfs;
-
-	/* protect the eg20t_port private structure and io access to membase */
-	spinlock_t lock;
 };
 
 /**
@@ -757,8 +754,7 @@ static void pch_dma_rx_complete(void *arg)
 		tty_flip_buffer_push(tty);
 	tty_kref_put(tty);
 	async_tx_ack(priv->desc_rx);
-	pch_uart_hal_enable_interrupt(priv, PCH_UART_HAL_RX_INT |
-					    PCH_UART_HAL_RX_ERR_INT);
+	pch_uart_hal_enable_interrupt(priv, PCH_UART_HAL_RX_INT);
 }
 
 static void pch_dma_tx_complete(void *arg)
@@ -813,8 +809,7 @@ static int handle_rx_to(struct eg20t_port *priv)
 	int rx_size;
 	int ret;
 	if (!priv->start_rx) {
-		pch_uart_hal_disable_interrupt(priv, PCH_UART_HAL_RX_INT |
-						     PCH_UART_HAL_RX_ERR_INT);
+		pch_uart_hal_disable_interrupt(priv, PCH_UART_HAL_RX_INT);
 		return 0;
 	}
 	buf = &priv->rxbuf;
@@ -1034,37 +1029,22 @@ static unsigned int dma_handle_tx(struct eg20t_port *priv)
 static void pch_uart_err_ir(struct eg20t_port *priv, unsigned int lsr)
 {
 	u8 fcr = ioread8(priv->membase + UART_FCR);
-	struct uart_port *port = &priv->port;
-	struct tty_struct *tty = tty_port_tty_get(&port->state->port);
-	char   *error_msg[5] = {};
-	int    i = 0;
 
 	/* Reset FIFO */
 	fcr |= UART_FCR_CLEAR_RCVR;
 	iowrite8(fcr, priv->membase + UART_FCR);
 
 	if (lsr & PCH_UART_LSR_ERR)
-		error_msg[i++] = "Error data in FIFO\n";
+		dev_err(&priv->pdev->dev, "Error data in FIFO\n");
 
-	if (lsr & UART_LSR_FE) {
-		port->icount.frame++;
-		error_msg[i++] = "  Framing Error\n";
-	}
+	if (lsr & UART_LSR_FE)
+		dev_err(&priv->pdev->dev, "Framing Error\n");
 
-	if (lsr & UART_LSR_PE) {
-		port->icount.parity++;
-		error_msg[i++] = "  Parity Error\n";
-	}
+	if (lsr & UART_LSR_PE)
+		dev_err(&priv->pdev->dev, "Parity Error\n");
 
-	if (lsr & UART_LSR_OE) {
-		port->icount.overrun++;
-		error_msg[i++] = "  Overrun Error\n";
-	}
-
-	if (tty == NULL) {
-		for (i = 0; error_msg[i] != NULL; i++)
-			dev_err(&priv->pdev->dev, error_msg[i]);
-	}
+	if (lsr & UART_LSR_OE)
+		dev_err(&priv->pdev->dev, "Overrun Error\n");
 }
 
 static irqreturn_t pch_uart_interrupt(int irq, void *dev_id)
@@ -1076,7 +1056,7 @@ static irqreturn_t pch_uart_interrupt(int irq, void *dev_id)
 	unsigned int iid;
 	unsigned long flags;
 
-	spin_lock_irqsave(&priv->lock, flags);
+	spin_lock_irqsave(&priv->port.lock, flags);
 	handled = 0;
 	while ((iid = pch_uart_hal_get_iid(priv)) > 1) {
 		switch (iid) {
@@ -1091,13 +1071,11 @@ static irqreturn_t pch_uart_interrupt(int irq, void *dev_id)
 		case PCH_UART_IID_RDR:	/* Received Data Ready */
 			if (priv->use_dma) {
 				pch_uart_hal_disable_interrupt(priv,
-						PCH_UART_HAL_RX_INT |
-						PCH_UART_HAL_RX_ERR_INT);
+							PCH_UART_HAL_RX_INT);
 				ret = dma_handle_rx(priv);
 				if (!ret)
 					pch_uart_hal_enable_interrupt(priv,
-						PCH_UART_HAL_RX_INT |
-						PCH_UART_HAL_RX_ERR_INT);
+							PCH_UART_HAL_RX_INT);
 			} else {
 				ret = handle_rx(priv);
 			}
@@ -1129,7 +1107,7 @@ static irqreturn_t pch_uart_interrupt(int irq, void *dev_id)
 			priv->int_dis_flag = 0;
 	}
 
-	spin_unlock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&priv->port.lock, flags);
 	return IRQ_RETVAL(handled);
 }
 
@@ -1221,8 +1199,7 @@ static void pch_uart_stop_rx(struct uart_port *port)
 	struct eg20t_port *priv;
 	priv = container_of(port, struct eg20t_port, port);
 	priv->start_rx = 0;
-	pch_uart_hal_disable_interrupt(priv, PCH_UART_HAL_RX_INT |
-					     PCH_UART_HAL_RX_ERR_INT);
+	pch_uart_hal_disable_interrupt(priv, PCH_UART_HAL_RX_INT);
 	priv->int_dis_flag = 1;
 }
 
@@ -1241,9 +1218,9 @@ static void pch_uart_break_ctl(struct uart_port *port, int ctl)
 	unsigned long flags;
 
 	priv = container_of(port, struct eg20t_port, port);
-	spin_lock_irqsave(&priv->lock, flags);
+	spin_lock_irqsave(&port->lock, flags);
 	pch_uart_hal_set_break(priv, ctl);
-	spin_unlock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 /* Grab any interrupt resources and initialise any low level driver state. */
@@ -1278,7 +1255,6 @@ static int pch_uart_startup(struct uart_port *port)
 		break;
 	case 16:
 		fifo_size = PCH_UART_HAL_FIFO16;
-		break;
 	case 1:
 	default:
 		fifo_size = PCH_UART_HAL_FIFO_DIS;
@@ -1316,8 +1292,7 @@ static int pch_uart_startup(struct uart_port *port)
 		pch_request_dma(port);
 
 	priv->start_rx = 1;
-	pch_uart_hal_enable_interrupt(priv, PCH_UART_HAL_RX_INT |
-					    PCH_UART_HAL_RX_ERR_INT);
+	pch_uart_hal_enable_interrupt(priv, PCH_UART_HAL_RX_INT);
 	uart_update_timeout(port, CS8, default_baud);
 
 	return 0;
@@ -1375,7 +1350,7 @@ static void pch_uart_set_termios(struct uart_port *port,
 		stb = PCH_UART_HAL_STB1;
 
 	if (termios->c_cflag & PARENB) {
-		if (termios->c_cflag & PARODD)
+		if (!(termios->c_cflag & PARODD))
 			parity = PCH_UART_HAL_PARITY_ODD;
 		else
 			parity = PCH_UART_HAL_PARITY_EVEN;
@@ -1393,8 +1368,7 @@ static void pch_uart_set_termios(struct uart_port *port,
 
 	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
 
-	spin_lock_irqsave(&priv->lock, flags);
-	spin_lock(&port->lock);
+	spin_lock_irqsave(&port->lock, flags);
 
 	uart_update_timeout(port, termios->c_cflag, baud);
 	rtn = pch_uart_hal_set_line(priv, baud, parity, bits, stb);
@@ -1407,8 +1381,7 @@ static void pch_uart_set_termios(struct uart_port *port,
 		tty_termios_encode_baud_rate(termios, baud, baud);
 
 out:
-	spin_unlock(&port->lock);
-	spin_unlock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static const char *pch_uart_type(struct uart_port *port)
@@ -1558,9 +1531,8 @@ pch_console_write(struct console *co, const char *s, unsigned int count)
 {
 	struct eg20t_port *priv;
 	unsigned long flags;
-	int priv_locked = 1;
-	int port_locked = 1;
 	u8 ier;
+	int locked = 1;
 
 	priv = pch_uart_ports[co->index];
 
@@ -1568,16 +1540,12 @@ pch_console_write(struct console *co, const char *s, unsigned int count)
 
 	local_irq_save(flags);
 	if (priv->port.sysrq) {
-		spin_lock(&priv->lock);
-		/* serial8250_handle_port() already took the port lock */
-		port_locked = 0;
+		/* serial8250_handle_port() already took the lock */
+		locked = 0;
 	} else if (oops_in_progress) {
-		priv_locked = spin_trylock(&priv->lock);
-		port_locked = spin_trylock(&priv->port.lock);
-	} else {
-		spin_lock(&priv->lock);
+		locked = spin_trylock(&priv->port.lock);
+	} else
 		spin_lock(&priv->port.lock);
-	}
 
 	/*
 	 *	First save the IER then disable the interrupts
@@ -1595,10 +1563,8 @@ pch_console_write(struct console *co, const char *s, unsigned int count)
 	wait_for_xmitr(priv, BOTH_EMPTY);
 	iowrite8(ier, priv->membase + UART_IER);
 
-	if (port_locked)
+	if (locked)
 		spin_unlock(&priv->port.lock);
-	if (priv_locked)
-		spin_unlock(&priv->lock);
 	local_irq_restore(flags);
 }
 
@@ -1695,8 +1661,6 @@ static struct eg20t_port *pch_uart_init_port(struct pci_dev *pdev,
 
 	pci_enable_msi(pdev);
 	pci_set_master(pdev);
-
-	spin_lock_init(&priv->lock);
 
 	iobase = pci_resource_start(pdev, 0);
 	mapbase = pci_resource_start(pdev, 1);

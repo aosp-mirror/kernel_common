@@ -458,6 +458,36 @@ enum {
 	SNDRV_PCM_TSTAMP_TYPE_LAST = SNDRV_PCM_TSTAMP_TYPE_MONOTONIC,
 };
 
+/* channel positions */
+enum {
+	SNDRV_CHMAP_UNKNOWN = 0,
+	SNDRV_CHMAP_FL,		/* front left */
+	SNDRV_CHMAP_FC,		/* front center */
+	SNDRV_CHMAP_FR,		/* front right */
+	SNDRV_CHMAP_FLC,	/* front left center */
+	SNDRV_CHMAP_FRC,	/* front right center */
+	SNDRV_CHMAP_RL,		/* rear left */
+	SNDRV_CHMAP_RC,		/* rear center */
+	SNDRV_CHMAP_RR,		/* rear right */
+	SNDRV_CHMAP_RLC,	/* rear left center */
+	SNDRV_CHMAP_RRC,	/* rear right center */
+	SNDRV_CHMAP_SL,		/* side left */
+	SNDRV_CHMAP_SR,		/* side right */
+	SNDRV_CHMAP_LFE,	/* LFE */
+	SNDRV_CHMAP_FLW,	/* front left wide */
+	SNDRV_CHMAP_FRW,	/* front right wide */
+	SNDRV_CHMAP_FLH,	/* front left high */
+	SNDRV_CHMAP_FCH,	/* front center high */
+	SNDRV_CHMAP_FRH,	/* front right high */
+	SNDRV_CHMAP_TC,		/* top center */
+	SNDRV_CHMAP_NA,		/* N/A, silent */
+	SNDRV_CHMAP_LAST = SNDRV_CHMAP_NA,
+};
+
+#define SNDRV_CHMAP_POSITION_MASK	0xffff
+#define SNDRV_CHMAP_PHASE_INVERSE	(0x01 << 16)
+#define SNDRV_CHMAP_DRIVER_SPEC		(0x02 << 16)
+
 #define SNDRV_PCM_IOCTL_PVERSION	_IOR('A', 0x00, int)
 #define SNDRV_PCM_IOCTL_INFO		_IOR('A', 0x01, struct snd_pcm_info)
 #define SNDRV_PCM_IOCTL_TSTAMP		_IOW('A', 0x02, int)
@@ -487,7 +517,9 @@ enum {
 #define SNDRV_PCM_IOCTL_READN_FRAMES	_IOR('A', 0x53, struct snd_xfern)
 #define SNDRV_PCM_IOCTL_LINK		_IOW('A', 0x60, int)
 #define SNDRV_PCM_IOCTL_UNLINK		_IO('A', 0x61)
-
+//htc audio ++
+#define SNDRV_PCM_IOCTL_ENABLE_EFFECT	_IOW('A', 0x70, int)
+//htc audio --
 /*****************************************************************************
  *                                                                           *
  *                            MIDI v1.0 interface                            *

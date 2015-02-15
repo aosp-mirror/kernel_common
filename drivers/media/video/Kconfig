@@ -66,6 +66,12 @@ config VIDEOBUF2_DMA_SG
 	select VIDEOBUF2_CORE
 	select VIDEOBUF2_MEMOPS
 	tristate
+
+config VIDEOBUF2_MSM_MEM
+	tristate "MSM videobuf2 extensions"
+	select VIDEOBUF2_DMA_SG
+	select VIDEOBUF2_DMA_CONTIG
+	select VIDEOBUF2_VMALLOC
 #
 # Multimedia Video device configuration
 #
@@ -885,6 +891,13 @@ source "drivers/media/video/omap/Kconfig"
 
 source "drivers/media/video/blackfin/Kconfig"
 
+source "drivers/media/video/nmi/Kconfig"
+
+#++ DTV_PCN1000005_HTC_PANASONIC_KCONFIG
+# [HTC]  Panasonic Kconfig 
+source "drivers/media/video/panasonic/Kconfig"
+#-- DTV_PCN1000005_HTC_PANASONIC_KCONFIG
+
 config VIDEO_SH_VOU
 	tristate "SuperH VOU video output driver"
 	depends on VIDEO_DEV && ARCH_SHMOBILE
@@ -1159,6 +1172,8 @@ config VIDEO_S5P_MIPI_CSIS
 	  module will be called s5p-csis.
 
 source "drivers/media/video/s5p-tv/Kconfig"
+
+
 
 endif # V4L_PLATFORM_DRIVERS
 endif # VIDEO_CAPTURE_DRIVERS

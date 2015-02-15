@@ -183,7 +183,7 @@ struct key *request_key_auth_new(struct key *target, const void *callout_info,
 	rka->callout_len = callout_len;
 
 	/* allocate the auth key */
-	sprintf(desc, "%x", target->serial);
+	snprintf(desc, sizeof(desc), "%x", target->serial);
 
 	authkey = key_alloc(&key_type_request_key_auth, desc,
 			    cred->fsuid, cred->fsgid, cred,

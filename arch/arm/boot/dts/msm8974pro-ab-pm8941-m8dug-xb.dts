@@ -1,0 +1,99 @@
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+/include/ "msm8974pro-ab-pm8941.dtsi"
+/include/ "msm8974-m8-common.dtsi"
+/include/ "msm8974-camera-sensor-m8-ver-b.dtsi"
+/include/ "msm8974-m8dug-pmicgpio.dtsi"
+/include/ "msm8974-touch-fw-0key-config.dtsi"
+/include/ "msm8974-m8dug-storage.dtsi"
+
+/ {
+	model = "M8 DUG XB";
+	compatible = "htc,msm8974", "htc,m8dug", "qcom,msm8974-mtp", "qcom,msm8974", "qcom,mtp";
+	htc,project-id = <299 1 0x10000>,
+              <300 1 0x10000>,
+              <319 1 0x10000>,
+              <269 1 0x10000>;
+};
+
+&pm8941_lsid1 {
+	pwm@b200 {
+		qcom,lpg {
+			cell-index = <1>;
+			label = "lpg";
+			linux,name = "button-backlight";
+			qcom,channel-id = <1>;
+			qcom,lut_coefficient = <20>;
+			qcom,duty-percents = <00 15 30 45 60 75 100>; //Use percents in decimal, not in hex like in LED duty-pcts array
+			qcom,lpg-lut-ramp-direction = <0>;
+			qcom,lpg-lut-ramp-toggle = <0>;
+			qcom,lpg-lut-pause-hi = <320>;
+			qcom,lpg-lut-pause-lo = <320>;
+			qcom,ramp-step-duration = <64>;
+			qcom,lpg-lut-enable-pause-hi = <1>;
+			qcom,lpg-lut-enable-pause-lo = <1>;
+		};
+	};
+	qcom,leds@d000 {
+		status = "okay";
+		qcom,rgb_0 {
+			label = "rgb";
+			linux,name = "amber";
+			qcom,mode = "pwm";
+			qcom,pwm-channel = <6>;
+			qcom,pwm-us = <2000000>;
+			qcom,duty-ms = <1000>;
+			qcom,max-current = <12>;
+			qcom,default-state = "off";
+			qcom,id = <3>;
+			qcom,pwm_coefficient = <4>;
+		};
+
+		qcom,rgb_1 {
+			label = "rgb";
+			linux,name = "green";
+			qcom,mode = "pwm";
+			qcom,pwm-channel = <5>;
+			qcom,pwm-us = <1000>;
+			qcom,max-current = <12>;
+			qcom,default-state = "off";
+			qcom,id = <4>;
+			qcom,pwm_coefficient = <3>;
+		};
+
+		qcom,rgb_2 {
+			label = "rgb";
+			linux,name = "led:rgb_blue";
+			qcom,mode = "pwm";
+			qcom,pwm-channel = <4>;
+			qcom,pwm-us = <1000>;
+			qcom,max-current = <12>;
+			qcom,id = <5>;
+			status = "disabled";
+		};
+	};
+};
+
+&soc {
+	i2c@f9928000 {
+		sii8240_8558@72 {
+			mhl-dpdn-gpio = <&msmgpio 129 0>;
+		};
+	};
+
+	sound {
+		wcd-intr-gpio-dir = <0>; //input
+	};
+};

@@ -30,7 +30,7 @@ if PM_DEVFREQ
 comment "DEVFREQ Governors"
 
 config DEVFREQ_GOV_SIMPLE_ONDEMAND
-	bool "Simple Ondemand"
+	tristate "Simple Ondemand"
 	help
 	  Chooses frequency based on the recent load on the device. Works
 	  similar as ONDEMAND governor of CPUFREQ does. A device with
@@ -39,7 +39,7 @@ config DEVFREQ_GOV_SIMPLE_ONDEMAND
 	  values to the governor with data field at devfreq_add_device().
 
 config DEVFREQ_GOV_PERFORMANCE
-	bool "Performance"
+	tristate "Performance"
 	help
 	  Sets the frequency at the maximum available frequency.
 	  This governor always returns UINT_MAX as frequency so that
@@ -47,7 +47,7 @@ config DEVFREQ_GOV_PERFORMANCE
 	  at any time.
 
 config DEVFREQ_GOV_POWERSAVE
-	bool "Powersave"
+	tristate "Powersave"
 	help
 	  Sets the frequency at the minimum available frequency.
 	  This governor always returns 0 as frequency so that
@@ -55,13 +55,40 @@ config DEVFREQ_GOV_POWERSAVE
 	  at any time.
 
 config DEVFREQ_GOV_USERSPACE
-	bool "Userspace"
+	tristate "Userspace"
 	help
 	  Sets the frequency at the user specified one.
 	  This governor returns the user configured frequency if there
 	  has been an input to /sys/devices/.../power/devfreq_set_freq.
 	  Otherwise, the governor does not change the frequnecy
 	  given at the initialization.
+
+config DEVFREQ_GOV_MSM_ADRENO_TZ
+	tristate "MSM Adreno Trustzone"
+	depends on MSM_KGSL && MSM_SCM
+	help
+	  Trustzone based governor for the Adreno GPU.
+	  Sets the frequency using a "on-demand" algorithm.
+	  This governor is unlikely to be useful for other devices.
+
+config DEVFREQ_GOV_MSM_CPUFREQ
+	bool "MSM CPUfreq"
+	depends on CPU_FREQ_MSM
+	help
+	  MSM CPUfreq based governor for CPU bandwidth voting.  Sets the CPU
+	  to DDR BW vote based on the current CPU frequency.  This governor
+	  is unlikely to be useful for non-MSM devices.
+
+config DEVFREQ_GOV_MSM_CPUBW_HWMON
+	tristate "HW monitor based governor for CPUBW"
+	depends on ARCH_MSM_KRAIT
+	help
+	  HW monitor based governor for CPU to DDR bandwidth voting. This
+	  goveror currently supports only Krait L2 PM counters.  Sets the CPU
+	  BW vote by using L2 PM counters to monitor the Krait's use of DDR.
+	  Since this governor uses some of the PM counters it can conflict
+	  with existing profiling tools.  This governor is unlikely to be
+	  useful for other devices.
 
 comment "DEVFREQ Drivers"
 

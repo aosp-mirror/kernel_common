@@ -71,6 +71,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/slab.h>
+#include <linux/prefetch.h>
 #include <linux/export.h>
 #include <net/net_namespace.h>
 #include <net/ip.h>
@@ -80,6 +81,9 @@
 #include <net/sock.h>
 #include <net/ip_fib.h>
 #include "fib_lookup.h"
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+#include <linux/uaccess.h>
+#endif
 
 #define MAX_STAT_DEPTH 32
 
@@ -110,7 +114,7 @@ struct leaf {
 struct leaf_info {
 	struct hlist_node hlist;
 	int plen;
-	u32 mask_plen; /* ntohl(inet_make_mask(plen)) */
+	u32 mask_plen; 
 	struct list_head falh;
 	struct rcu_head rcu;
 };
@@ -118,10 +122,10 @@ struct leaf_info {
 struct tnode {
 	unsigned long parent;
 	t_key key;
-	unsigned char pos;		/* 2log(KEYLENGTH) bits needed */
-	unsigned char bits;		/* 2log(KEYLENGTH) bits needed */
-	unsigned int full_children;	/* KEYLENGTH bits needed */
-	unsigned int empty_children;	/* KEYLENGTH bits needed */
+	unsigned char pos;		
+	unsigned char bits;		
+	unsigned int full_children;	
+	unsigned int empty_children;	
 	union {
 		struct rcu_head rcu;
 		struct work_struct work;
@@ -164,23 +168,14 @@ static void tnode_put_child_reorg(struct tnode *tn, int i, struct rt_trie_node *
 static struct rt_trie_node *resize(struct trie *t, struct tnode *tn);
 static struct tnode *inflate(struct trie *t, struct tnode *tn);
 static struct tnode *halve(struct trie *t, struct tnode *tn);
-/* tnodes to free after resize(); protected by RTNL */
 static struct tnode *tnode_free_head;
 static size_t tnode_free_size;
 
-/*
- * synchronize_rcu after call_rcu for that many pages; it should be especially
- * useful before resizing the root node with PREEMPT_NONE configs; the value was
- * obtained experimentally, aiming to avoid visible slowdown.
- */
 static const int sync_pages = 128;
 
 static struct kmem_cache *fn_alias_kmem __read_mostly;
 static struct kmem_cache *trie_leaf_kmem __read_mostly;
 
-/*
- * caller must hold RTNL
- */
 static inline struct tnode *node_parent(const struct rt_trie_node *node)
 {
 	unsigned long parent;
@@ -190,9 +185,6 @@ static inline struct tnode *node_parent(const struct rt_trie_node *node)
 	return (struct tnode *)(parent & ~NODE_TYPE_MASK);
 }
 
-/*
- * caller must hold RCU read lock or RTNL
- */
 static inline struct tnode *node_parent_rcu(const struct rt_trie_node *node)
 {
 	unsigned long parent;
@@ -203,18 +195,12 @@ static inline struct tnode *node_parent_rcu(const struct rt_trie_node *node)
 	return (struct tnode *)(parent & ~NODE_TYPE_MASK);
 }
 
-/* Same as rcu_assign_pointer
- * but that macro() assumes that value is a pointer.
- */
 static inline void node_set_parent(struct rt_trie_node *node, struct tnode *ptr)
 {
 	smp_wmb();
 	node->parent = (unsigned long)ptr | NODE_TYPE(node);
 }
 
-/*
- * caller must hold RTNL
- */
 static inline struct rt_trie_node *tnode_get_child(const struct tnode *tn, unsigned int i)
 {
 	BUG_ON(i >= 1U << tn->bits);
@@ -222,9 +208,6 @@ static inline struct rt_trie_node *tnode_get_child(const struct tnode *tn, unsig
 	return rtnl_dereference(tn->child[i]);
 }
 
-/*
- * caller must hold RCU read lock or RTNL
- */
 static inline struct rt_trie_node *tnode_get_child_rcu(const struct tnode *tn, unsigned int i)
 {
 	BUG_ON(i >= 1U << tn->bits);
@@ -275,68 +258,6 @@ static inline int tkey_mismatch(t_key a, int offset, t_key b)
 	return i;
 }
 
-/*
-  To understand this stuff, an understanding of keys and all their bits is
-  necessary. Every node in the trie has a key associated with it, but not
-  all of the bits in that key are significant.
-
-  Consider a node 'n' and its parent 'tp'.
-
-  If n is a leaf, every bit in its key is significant. Its presence is
-  necessitated by path compression, since during a tree traversal (when
-  searching for a leaf - unless we are doing an insertion) we will completely
-  ignore all skipped bits we encounter. Thus we need to verify, at the end of
-  a potentially successful search, that we have indeed been walking the
-  correct key path.
-
-  Note that we can never "miss" the correct key in the tree if present by
-  following the wrong path. Path compression ensures that segments of the key
-  that are the same for all keys with a given prefix are skipped, but the
-  skipped part *is* identical for each node in the subtrie below the skipped
-  bit! trie_insert() in this implementation takes care of that - note the
-  call to tkey_sub_equals() in trie_insert().
-
-  if n is an internal node - a 'tnode' here, the various parts of its key
-  have many different meanings.
-
-  Example:
-  _________________________________________________________________
-  | i | i | i | i | i | i | i | N | N | N | S | S | S | S | S | C |
-  -----------------------------------------------------------------
-    0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
-
-  _________________________________________________________________
-  | C | C | C | u | u | u | u | u | u | u | u | u | u | u | u | u |
-  -----------------------------------------------------------------
-   16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31
-
-  tp->pos = 7
-  tp->bits = 3
-  n->pos = 15
-  n->bits = 4
-
-  First, let's just ignore the bits that come before the parent tp, that is
-  the bits from 0 to (tp->pos-1). They are *known* but at this point we do
-  not use them for anything.
-
-  The bits from (tp->pos) to (tp->pos + tp->bits - 1) - "N", above - are the
-  index into the parent's child array. That is, they will be used to find
-  'n' among tp's children.
-
-  The bits from (tp->pos + tp->bits) to (n->pos - 1) - "S" - are skipped bits
-  for the node n.
-
-  All the bits we have seen so far are significant to the node n. The rest
-  of the bits are really not needed or indeed known in n->key.
-
-  The bits from (n->pos) to (n->pos + n->bits - 1) - "C" - are the index into
-  n's child array, and will of course be different for each child.
-
-
-  The rest of the bits, from (n->pos + n->bits) onward, are completely unknown
-  at this point.
-
-*/
 
 static inline void check_tnode(const struct tnode *tn)
 {
@@ -367,7 +288,7 @@ static void __leaf_free_rcu(struct rcu_head *head)
 
 static inline void free_leaf(struct leaf *l)
 {
-	call_rcu_bh(&l->rcu, __leaf_free_rcu);
+	call_rcu(&l->rcu, __leaf_free_rcu);
 }
 
 static inline void free_leaf_info(struct leaf_info *leaf)
@@ -476,10 +397,6 @@ static struct tnode *tnode_new(t_key key, int pos, int bits)
 	return tn;
 }
 
-/*
- * Check whether a tnode 'n' is "full", i.e. it is an internal node
- * and no bits are skipped. See discussion in dyntree paper p. 6
- */
 
 static inline int tnode_full(const struct tnode *tn, const struct rt_trie_node *n)
 {
@@ -495,10 +412,6 @@ static inline void put_child(struct trie *t, struct tnode *tn, int i,
 	tnode_put_child_reorg(tn, i, n, -1);
 }
 
- /*
-  * Add a child at position i overwriting the old value.
-  * Update the value of full_children and empty_children.
-  */
 
 static void tnode_put_child_reorg(struct tnode *tn, int i, struct rt_trie_node *n,
 				  int wasfull)
@@ -508,13 +421,13 @@ static void tnode_put_child_reorg(struct tnode *tn, int i, struct rt_trie_node *
 
 	BUG_ON(i >= 1<<tn->bits);
 
-	/* update emptyChildren */
+	
 	if (n == NULL && chi != NULL)
 		tn->empty_children++;
 	else if (n != NULL && chi == NULL)
 		tn->empty_children--;
 
-	/* update fullChildren */
+	
 	if (wasfull == -1)
 		wasfull = tnode_full(tn, chi);
 
@@ -545,81 +458,19 @@ static struct rt_trie_node *resize(struct trie *t, struct tnode *tn)
 	pr_debug("In tnode_resize %p inflate_threshold=%d threshold=%d\n",
 		 tn, inflate_threshold, halve_threshold);
 
-	/* No children */
+	
 	if (tn->empty_children == tnode_child_length(tn)) {
 		tnode_free_safe(tn);
 		return NULL;
 	}
-	/* One child */
+	
 	if (tn->empty_children == tnode_child_length(tn) - 1)
 		goto one_child;
-	/*
-	 * Double as long as the resulting node has a number of
-	 * nonempty nodes that are above the threshold.
-	 */
 
-	/*
-	 * From "Implementing a dynamic compressed trie" by Stefan Nilsson of
-	 * the Helsinki University of Technology and Matti Tikkanen of Nokia
-	 * Telecommunications, page 6:
-	 * "A node is doubled if the ratio of non-empty children to all
-	 * children in the *doubled* node is at least 'high'."
-	 *
-	 * 'high' in this instance is the variable 'inflate_threshold'. It
-	 * is expressed as a percentage, so we multiply it with
-	 * tnode_child_length() and instead of multiplying by 2 (since the
-	 * child array will be doubled by inflate()) and multiplying
-	 * the left-hand side by 100 (to handle the percentage thing) we
-	 * multiply the left-hand side by 50.
-	 *
-	 * The left-hand side may look a bit weird: tnode_child_length(tn)
-	 * - tn->empty_children is of course the number of non-null children
-	 * in the current node. tn->full_children is the number of "full"
-	 * children, that is non-null tnodes with a skip value of 0.
-	 * All of those will be doubled in the resulting inflated tnode, so
-	 * we just count them one extra time here.
-	 *
-	 * A clearer way to write this would be:
-	 *
-	 * to_be_doubled = tn->full_children;
-	 * not_to_be_doubled = tnode_child_length(tn) - tn->empty_children -
-	 *     tn->full_children;
-	 *
-	 * new_child_length = tnode_child_length(tn) * 2;
-	 *
-	 * new_fill_factor = 100 * (not_to_be_doubled + 2*to_be_doubled) /
-	 *      new_child_length;
-	 * if (new_fill_factor >= inflate_threshold)
-	 *
-	 * ...and so on, tho it would mess up the while () loop.
-	 *
-	 * anyway,
-	 * 100 * (not_to_be_doubled + 2*to_be_doubled) / new_child_length >=
-	 *      inflate_threshold
-	 *
-	 * avoid a division:
-	 * 100 * (not_to_be_doubled + 2*to_be_doubled) >=
-	 *      inflate_threshold * new_child_length
-	 *
-	 * expand not_to_be_doubled and to_be_doubled, and shorten:
-	 * 100 * (tnode_child_length(tn) - tn->empty_children +
-	 *    tn->full_children) >= inflate_threshold * new_child_length
-	 *
-	 * expand new_child_length:
-	 * 100 * (tnode_child_length(tn) - tn->empty_children +
-	 *    tn->full_children) >=
-	 *      inflate_threshold * tnode_child_length(tn) * 2
-	 *
-	 * shorten again:
-	 * 50 * (tn->full_children + tnode_child_length(tn) -
-	 *    tn->empty_children) >= inflate_threshold *
-	 *    tnode_child_length(tn)
-	 *
-	 */
 
 	check_tnode(tn);
 
-	/* Keep root node larger  */
+	
 
 	if (!node_parent((struct rt_trie_node *)tn)) {
 		inflate_threshold_use = inflate_threshold_root;
@@ -649,14 +500,10 @@ static struct rt_trie_node *resize(struct trie *t, struct tnode *tn)
 
 	check_tnode(tn);
 
-	/* Return if at least one inflate is run */
+	
 	if (max_work != MAX_WORK)
 		return (struct rt_trie_node *) tn;
 
-	/*
-	 * Halve as long as the number of empty children in this
-	 * node is above threshold.
-	 */
 
 	max_work = MAX_WORK;
 	while (tn->bits > 1 &&  max_work-- &&
@@ -675,7 +522,7 @@ static struct rt_trie_node *resize(struct trie *t, struct tnode *tn)
 	}
 
 
-	/* Only one child remains */
+	
 	if (tn->empty_children == tnode_child_length(tn) - 1) {
 one_child:
 		for (i = 0; i < tnode_child_length(tn); i++) {
@@ -685,7 +532,7 @@ one_child:
 			if (!n)
 				continue;
 
-			/* compress one level */
+			
 
 			node_set_parent(n, NULL);
 			tnode_free_safe(tn);
@@ -722,12 +569,6 @@ static struct tnode *inflate(struct trie *t, struct tnode *tn)
 	if (!tn)
 		return ERR_PTR(-ENOMEM);
 
-	/*
-	 * Preallocate and store tnodes before the actual work so we
-	 * don't get into an inconsistent state if memory allocation
-	 * fails. In case of failure we return the oldnode and  inflate
-	 * of tnode is ignored.
-	 */
 
 	for (i = 0; i < olen; i++) {
 		struct tnode *inode;
@@ -764,11 +605,11 @@ static struct tnode *inflate(struct trie *t, struct tnode *tn)
 		struct tnode *left, *right;
 		int size, j;
 
-		/* An empty child */
+		
 		if (node == NULL)
 			continue;
 
-		/* A leaf or an internal node with skipped bits */
+		
 
 		if (IS_LEAF(node) || ((struct tnode *) node)->pos >
 		   tn->pos + tn->bits - 1) {
@@ -781,7 +622,7 @@ static struct tnode *inflate(struct trie *t, struct tnode *tn)
 			continue;
 		}
 
-		/* An internal node with two children */
+		
 		inode = (struct tnode *) node;
 
 		if (inode->bits == 1) {
@@ -792,28 +633,9 @@ static struct tnode *inflate(struct trie *t, struct tnode *tn)
 			continue;
 		}
 
-		/* An internal node with more than two children */
+		
 
-		/* We will replace this node 'inode' with two new
-		 * ones, 'left' and 'right', each with half of the
-		 * original children. The two new nodes will have
-		 * a position one bit further down the key and this
-		 * means that the "significant" part of their keys
-		 * (see the discussion near the top of this file)
-		 * will differ by one bit, which will be "0" in
-		 * left's key and "1" in right's key. Since we are
-		 * moving the key position by one step, the bit that
-		 * we are moving away from - the bit at position
-		 * (inode->pos) - is the one that will differ between
-		 * left and right. So... we synthesize that bit in the
-		 * two  new keys.
-		 * The mask 'm' below will be a single "one" bit at
-		 * the position (inode->pos)
-		 */
 
-		/* Use the old key, but set the new significant
-		 *   bit to zero.
-		 */
 
 		left = (struct tnode *) tnode_get_child(tn, 2*i);
 		put_child(t, tn, 2*i, NULL);
@@ -856,18 +678,12 @@ static struct tnode *halve(struct trie *t, struct tnode *tn)
 	if (!tn)
 		return ERR_PTR(-ENOMEM);
 
-	/*
-	 * Preallocate and store tnodes before the actual work so we
-	 * don't get into an inconsistent state if memory allocation
-	 * fails. In case of failure we return the oldnode and halve
-	 * of tnode is ignored.
-	 */
 
 	for (i = 0; i < olen; i += 2) {
 		left = tnode_get_child(oldtnode, i);
 		right = tnode_get_child(oldtnode, i+1);
 
-		/* Two nonempty children */
+		
 		if (left && right) {
 			struct tnode *newn;
 
@@ -887,9 +703,9 @@ static struct tnode *halve(struct trie *t, struct tnode *tn)
 		left = tnode_get_child(oldtnode, i);
 		right = tnode_get_child(oldtnode, i+1);
 
-		/* At least one of the children is empty */
+		
 		if (left == NULL) {
-			if (right == NULL)    /* Both are empty */
+			if (right == NULL)    
 				continue;
 			put_child(t, tn, i/2, right);
 			continue;
@@ -900,7 +716,7 @@ static struct tnode *halve(struct trie *t, struct tnode *tn)
 			continue;
 		}
 
-		/* Two nonempty children */
+		
 		newBinNode = (struct tnode *) tnode_get_child(tn, i/2);
 		put_child(t, tn, i/2, NULL);
 		put_child(t, newBinNode, 0, left);
@@ -914,8 +730,6 @@ nomem:
 	return ERR_PTR(-ENOMEM);
 }
 
-/* readside must use rcu_read_lock currently dump routines
- via get_fa_head and dump */
 
 static struct leaf_info *find_leaf_info(struct leaf *l, int plen)
 {
@@ -961,7 +775,6 @@ static void insert_leaf_info(struct hlist_head *head, struct leaf_info *new)
 	}
 }
 
-/* rcu_read_lock needs to be hold by caller from readside */
 
 static struct leaf *
 fib_find_node(struct trie *t, u32 key)
@@ -987,7 +800,7 @@ fib_find_node(struct trie *t, u32 key)
 		} else
 			break;
 	}
-	/* Case we have found a leaf. Compare prefixes */
+	
 
 	if (n != NULL && IS_LEAF(n) && tkey_equals(key, n->key))
 		return (struct leaf *)n;
@@ -1021,7 +834,7 @@ static void trie_rebalance(struct trie *t, struct tnode *tn)
 		tn = tp;
 	}
 
-	/* Handle last (top) tnode */
+	
 	if (IS_TNODE(tn))
 		tn = (struct tnode *)resize(t, (struct tnode *)tn);
 
@@ -1029,7 +842,6 @@ static void trie_rebalance(struct trie *t, struct tnode *tn)
 	tnode_free_flush();
 }
 
-/* only used from updater-side */
 
 static struct list_head *fib_insert_node(struct trie *t, u32 key, int plen)
 {
@@ -1045,23 +857,6 @@ static struct list_head *fib_insert_node(struct trie *t, u32 key, int plen)
 	pos = 0;
 	n = rtnl_dereference(t->trie);
 
-	/* If we point to NULL, stop. Either the tree is empty and we should
-	 * just put a new leaf in if, or we have reached an empty child slot,
-	 * and we should just put our new leaf in that.
-	 * If we point to a T_TNODE, check if it matches our key. Note that
-	 * a T_TNODE might be skipping any number of bits - its 'pos' need
-	 * not be the parent's 'pos'+'bits'!
-	 *
-	 * If it does match the current key, get pos/bits from it, extract
-	 * the index from our key, push the T_TNODE and walk the tree.
-	 *
-	 * If it doesn't, we have to replace it with a new T_TNODE.
-	 *
-	 * If we point to a T_LEAF, it might or might not have the same key
-	 * as we do. If it does, just change the value, update the T_LEAF's
-	 * value, and return it.
-	 * If it doesn't, we need to replace it with a T_TNODE.
-	 */
 
 	while (n != NULL &&  NODE_TYPE(n) == T_TNODE) {
 		tn = (struct tnode *) n;
@@ -1081,15 +876,10 @@ static struct list_head *fib_insert_node(struct trie *t, u32 key, int plen)
 			break;
 	}
 
-	/*
-	 * n  ----> NULL, LEAF or TNODE
-	 *
-	 * tp is n's (parent) ----> NULL or TNODE
-	 */
 
 	BUG_ON(tp && IS_LEAF(tp));
 
-	/* Case 1: n is a leaf. Compare prefixes */
+	
 
 	if (n != NULL && IS_LEAF(n) && tkey_equals(key, n->key)) {
 		l = (struct leaf *) n;
@@ -1119,18 +909,14 @@ static struct list_head *fib_insert_node(struct trie *t, u32 key, int plen)
 	insert_leaf_info(&l->list, li);
 
 	if (t->trie && n == NULL) {
-		/* Case 2: n is NULL, and will just insert a new leaf */
+		
 
 		node_set_parent((struct rt_trie_node *)l, tp);
 
 		cindex = tkey_extract_bits(key, tp->pos, tp->bits);
 		put_child(t, (struct tnode *)tp, cindex, (struct rt_trie_node *)l);
 	} else {
-		/* Case 3: n is a LEAF or a TNODE and the key doesn't match. */
-		/*
-		 *  Add a new tnode here
-		 *  first tnode need some special handling
-		 */
+		
 
 		if (tp)
 			pos = tp->pos+tp->bits;
@@ -1142,7 +928,7 @@ static struct list_head *fib_insert_node(struct trie *t, u32 key, int plen)
 			tn = tnode_new(n->key, newpos, 1);
 		} else {
 			newpos = 0;
-			tn = tnode_new(key, newpos, 1); /* First tnode */
+			tn = tnode_new(key, newpos, 1); 
 		}
 
 		if (!tn) {
@@ -1171,16 +957,13 @@ static struct list_head *fib_insert_node(struct trie *t, u32 key, int plen)
 		pr_warn("fib_trie tp=%p pos=%d, bits=%d, key=%0x plen=%d\n",
 			tp, tp->pos, tp->bits, key, plen);
 
-	/* Rebalance the trie */
+	
 
 	trie_rebalance(t, tp);
 done:
 	return fa_head;
 }
 
-/*
- * Caller must hold RTNL.
- */
 int fib_table_insert(struct fib_table *tb, struct fib_config *cfg)
 {
 	struct trie *t = (struct trie *) tb->tb_data;
@@ -1199,6 +982,9 @@ int fib_table_insert(struct fib_table *tb, struct fib_config *cfg)
 	key = ntohl(cfg->fc_dst);
 
 	pr_debug("Insert table=%u %08x/%d\n", tb->tb_id, key, plen);
+#ifdef CONFIG_HTC_FIB_RULE_DEBUG
+	printk(KERN_DEBUG "[NET][CORE][RULE] %s Insert table=%u %08x/%d\n", __func__,tb->tb_id,key, plen);
+#endif
 
 	mask = ntohl(inet_make_mask(plen));
 
@@ -1221,16 +1007,6 @@ int fib_table_insert(struct fib_table *tb, struct fib_config *cfg)
 		fa = fib_find_alias(fa_head, tos, fi->fib_priority);
 	}
 
-	/* Now fa, if non-NULL, points to the first fib alias
-	 * with the same keys [prefix,tos,priority], if such key already
-	 * exists or to the node before which we will insert new one.
-	 *
-	 * If fa is NULL, we will need to allocate a new one and
-	 * insert to the head of f.
-	 *
-	 * If f is NULL, no fib node matched the destination key
-	 * and we need to allocate a new one of those as well.
-	 */
 
 	if (fa && fa->fa_tos == tos &&
 	    fa->fa_info->fib_priority == fi->fib_priority) {
@@ -1240,11 +1016,6 @@ int fib_table_insert(struct fib_table *tb, struct fib_config *cfg)
 		if (cfg->fc_nlflags & NLM_F_EXCL)
 			goto out;
 
-		/* We have 2 goals:
-		 * 1. Find exact match for type, scope, fib_info to avoid
-		 * duplicate routes
-		 * 2. Find next 'fa' (or head), NLM_F_APPEND inserts before it
-		 */
 		fa_match = NULL;
 		fa_first = fa;
 		fa = list_entry(fa->fa_list.prev, struct fib_alias, fa_list);
@@ -1293,10 +1064,6 @@ int fib_table_insert(struct fib_table *tb, struct fib_config *cfg)
 
 			goto succeeded;
 		}
-		/* Error if we find a perfect match which
-		 * uses the same scope, type, and nexthop
-		 * information.
-		 */
 		if (fa_match)
 			goto out;
 
@@ -1316,9 +1083,6 @@ int fib_table_insert(struct fib_table *tb, struct fib_config *cfg)
 	new_fa->fa_tos = tos;
 	new_fa->fa_type = cfg->fc_type;
 	new_fa->fa_state = 0;
-	/*
-	 * Insert new entry to the list.
-	 */
 
 	if (!fa_head) {
 		fa_head = fib_insert_node(t, key, plen);
@@ -1348,7 +1112,6 @@ err:
 	return err;
 }
 
-/* should be called with rcu_read_lock */
 static int check_leaf(struct fib_table *tb, struct trie *t, struct leaf *l,
 		      t_key key,  const struct flowi4 *flp,
 		      struct fib_result *res, int fib_flags)
@@ -1440,7 +1203,7 @@ int fib_table_lookup(struct fib_table *tb, const struct flowi4 *flp,
 	t->stats.gets++;
 #endif
 
-	/* Just a leaf? */
+	
 	if (IS_LEAF(n)) {
 		ret = check_leaf(tb, t, (struct leaf *)n, key, flp, res, fib_flags);
 		goto found;
@@ -1475,34 +1238,8 @@ int fib_table_lookup(struct fib_table *tb, const struct flowi4 *flp,
 
 		cn = (struct tnode *)n;
 
-		/*
-		 * It's a tnode, and we can do some extra checks here if we
-		 * like, to avoid descending into a dead-end branch.
-		 * This tnode is in the parent's child array at index
-		 * key[p_pos..p_pos+p_bits] but potentially with some bits
-		 * chopped off, so in reality the index may be just a
-		 * subprefix, padded with zero at the end.
-		 * We can also take a look at any skipped bits in this
-		 * tnode - everything up to p_pos is supposed to be ok,
-		 * and the non-chopped bits of the index (se previous
-		 * paragraph) are also guaranteed ok, but the rest is
-		 * considered unknown.
-		 *
-		 * The skipped bits are key[pos+bits..cn->pos].
-		 */
 
-		/* If current_prefix_length < pos+bits, we are already doing
-		 * actual prefix  matching, which means everything from
-		 * pos+(bits-chopped_off) onward must be zero along some
-		 * branch of this subtree - otherwise there is *no* valid
-		 * prefix present. Here we can only check the skipped
-		 * bits. Remember, since we have already indexed into the
-		 * parent's child array, we know that the bits we chopped of
-		 * *are* zero.
-		 */
 
-		/* NOTA BENE: Checking only skipped bits
-		   for the new node here */
 
 		if (current_prefix_length < pos+bits) {
 			if (tkey_extract_bits(cn->key, current_prefix_length,
@@ -1511,45 +1248,11 @@ int fib_table_lookup(struct fib_table *tb, const struct flowi4 *flp,
 				goto backtrace;
 		}
 
-		/*
-		 * If chopped_off=0, the index is fully validated and we
-		 * only need to look at the skipped bits for this, the new,
-		 * tnode. What we actually want to do is to find out if
-		 * these skipped bits match our key perfectly, or if we will
-		 * have to count on finding a matching prefix further down,
-		 * because if we do, we would like to have some way of
-		 * verifying the existence of such a prefix at this point.
-		 */
 
-		/* The only thing we can do at this point is to verify that
-		 * any such matching prefix can indeed be a prefix to our
-		 * key, and if the bits in the node we are inspecting that
-		 * do not match our key are not ZERO, this cannot be true.
-		 * Thus, find out where there is a mismatch (before cn->pos)
-		 * and verify that all the mismatching bits are zero in the
-		 * new tnode's key.
-		 */
 
-		/*
-		 * Note: We aren't very concerned about the piece of
-		 * the key that precede pn->pos+pn->bits, since these
-		 * have already been checked. The bits after cn->pos
-		 * aren't checked since these are by definition
-		 * "unknown" at this point. Thus, what we want to see
-		 * is if we are about to enter the "prefix matching"
-		 * state, and in that case verify that the skipped
-		 * bits that will prevail throughout this subtree are
-		 * zero, as they have to be if we are to find a
-		 * matching prefix.
-		 */
 
 		pref_mismatch = mask_pfx(cn->key ^ key, cn->pos);
 
-		/*
-		 * In short: If skipped bits in this node do not match
-		 * the search key, enter the "prefix matching"
-		 * state.directly.
-		 */
 		if (pref_mismatch) {
 			int mp = KEYLENGTH - fls(pref_mismatch);
 
@@ -1560,27 +1263,23 @@ int fib_table_lookup(struct fib_table *tb, const struct flowi4 *flp,
 				current_prefix_length = mp;
 		}
 
-		pn = (struct tnode *)n; /* Descend */
+		pn = (struct tnode *)n; 
 		chopped_off = 0;
 		continue;
 
 backtrace:
 		chopped_off++;
 
-		/* As zero don't change the child key (cindex) */
+		
 		while ((chopped_off <= pn->bits)
 		       && !(cindex & (1<<(chopped_off-1))))
 			chopped_off++;
 
-		/* Decrease current_... with bits chopped off */
+		
 		if (current_prefix_length > pn->pos + pn->bits - chopped_off)
 			current_prefix_length = pn->pos + pn->bits
 				- chopped_off;
 
-		/*
-		 * Either we do the actual chop off according or if we have
-		 * chopped off all bits in this tnode walk up to our parent.
-		 */
 
 		if (chopped_off <= pn->bits) {
 			cindex &= ~(1 << (chopped_off-1));
@@ -1589,7 +1288,7 @@ backtrace:
 			if (!parent)
 				goto failed;
 
-			/* Get Child's index */
+			
 			cindex = tkey_extract_bits(pn->key, parent->pos, parent->bits);
 			pn = parent;
 			chopped_off = 0;
@@ -1608,9 +1307,6 @@ found:
 }
 EXPORT_SYMBOL_GPL(fib_table_lookup);
 
-/*
- * Remove the leaf and return parent.
- */
 static void trie_leaf_remove(struct trie *t, struct leaf *l)
 {
 	struct tnode *tp = node_parent((struct rt_trie_node *) l);
@@ -1627,9 +1323,6 @@ static void trie_leaf_remove(struct trie *t, struct leaf *l)
 	free_leaf(l);
 }
 
-/*
- * Caller must hold RTNL.
- */
 int fib_table_delete(struct fib_table *tb, struct fib_config *cfg)
 {
 	struct trie *t = (struct trie *) tb->tb_data;
@@ -1663,6 +1356,9 @@ int fib_table_delete(struct fib_table *tb, struct fib_config *cfg)
 		return -ESRCH;
 
 	pr_debug("Deleting %08x/%d tos=%d t=%p\n", key, plen, tos, t);
+#ifdef CONFIG_HTC_FIB_RULE_DEBUG
+	printk(KERN_DEBUG "[NET][CORE][RULE] %s Deleting %08x/%d tos=%d t=%p\n", __func__, key, plen, tos, t);
+#endif
 
 	fa_to_delete = NULL;
 	fa = list_entry(fa->fa_list.prev, struct fib_alias, fa_list);
@@ -1752,38 +1448,65 @@ static int trie_flush_leaf(struct leaf *l)
 	return found;
 }
 
-/*
- * Scan for the next right leaf starting at node p->child[idx]
- * Since we have back pointer, no recursion necessary.
- */
 static struct leaf *leaf_walk_rcu(struct tnode *p, struct rt_trie_node *c)
 {
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	void *pq;
+	if ((!p) || (IS_ERR(p)) || (probe_kernel_address(p,pq))) {
+		pr_err("[NET][WARN] p is illegal in %s \n", __func__);
+		return NULL; 
+	}
+#endif
+
 	do {
 		t_key idx;
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+		void *q;
+#endif
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+		if ((c) && (!IS_ERR(c)))
+#else
 		if (c)
+#endif
 			idx = tkey_extract_bits(c->key, p->pos, p->bits) + 1;
 		else
 			idx = 0;
 
 		while (idx < 1u << p->bits) {
 			c = tnode_get_child_rcu(p, idx++);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+			if ((!c) || (IS_ERR(c))) {
+				pr_err("[NET] c is NULL in %s , idx=%d\n", __func__,idx);
+				continue;
+			}
+
+			if (probe_kernel_address(c,q)) {
+				pr_err("[NET] c is in %s illegal, going to next round,idx = %d\n", __func__,idx);
+				continue;
+			}
+#else
 			if (!c)
 				continue;
+#endif
 
-			if (IS_LEAF(c))
+			if (IS_LEAF(c)) {
+				prefetch(rcu_dereference_rtnl(p->child[idx]));
 				return (struct leaf *) c;
+			}
 
-			/* Rescan start scanning in new node */
+			
 			p = (struct tnode *) c;
 			idx = 0;
 		}
 
-		/* Node empty, walk back up to parent */
+		
 		c = (struct rt_trie_node *) p;
 	} while ((p = node_parent_rcu(c)) != NULL);
 
-	return NULL; /* Root of trie */
+	return NULL; 
 }
 
 static struct leaf *trie_firstleaf(struct trie *t)
@@ -1793,7 +1516,7 @@ static struct leaf *trie_firstleaf(struct trie *t)
 	if (!n)
 		return NULL;
 
-	if (IS_LEAF(n))          /* trie is just a leaf */
+	if (IS_LEAF(n))          
 		return (struct leaf *) n;
 
 	return leaf_walk_rcu(n, NULL);
@@ -1804,8 +1527,12 @@ static struct leaf *trie_nextleaf(struct leaf *l)
 	struct rt_trie_node *c = (struct rt_trie_node *) l;
 	struct tnode *p = node_parent_rcu(c);
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if ((!p) || (IS_ERR(p)))
+#else
 	if (!p)
-		return NULL;	/* trie with just one leaf */
+#endif
+		return NULL;	
 
 	return leaf_walk_rcu(p, c);
 }
@@ -1821,15 +1548,14 @@ static struct leaf *trie_leafindex(struct trie *t, int index)
 }
 
 
-/*
- * Caller must hold RTNL.
- */
 int fib_table_flush(struct fib_table *tb)
 {
 	struct trie *t = (struct trie *) tb->tb_data;
 	struct leaf *l, *ll = NULL;
 	int found = 0;
-
+#ifdef CONFIG_HTC_FIB_RULE_DEBUG
+	printk(KERN_DEBUG  "[NET][CORE][RULE]%s+\n", __func__);
+#endif
 	for (l = trie_firstleaf(t); l; l = trie_nextleaf(l)) {
 		found += trie_flush_leaf(l);
 
@@ -1842,6 +1568,9 @@ int fib_table_flush(struct fib_table *tb)
 		trie_leaf_remove(t, ll);
 
 	pr_debug("trie_flush found=%d\n", found);
+#ifdef CONFIG_HTC_FIB_RULE_DEBUG
+	printk(KERN_DEBUG "[NET][CORE][RULE] %s-; trie_flush found=%d\n", __func__, found);
+#endif
 	return found;
 }
 
@@ -1861,7 +1590,7 @@ static int fn_trie_dump_fa(t_key key, int plen, struct list_head *fah,
 	s_i = cb->args[5];
 	i = 0;
 
-	/* rcu_read_lock is hold by caller */
+	
 
 	list_for_each_entry_rcu(fa, fah, fa_list) {
 		if (i < s_i) {
@@ -1897,7 +1626,7 @@ static int fn_trie_dump_leaf(struct leaf *l, struct fib_table *tb,
 	s_i = cb->args[4];
 	i = 0;
 
-	/* rcu_read_lock is hold by caller */
+	
 	hlist_for_each_entry_rcu(li, node, &l->list, hlist) {
 		if (i < s_i) {
 			i++;
@@ -1929,16 +1658,14 @@ int fib_table_dump(struct fib_table *tb, struct sk_buff *skb,
 	t_key key = cb->args[2];
 	int count = cb->args[3];
 
+#ifdef CONFIG_HTC_FIB_RULE_DEBUG
+	printk(KERN_DEBUG  "[NET][CORE][RULE]%s\n", __func__);
+#endif
+
 	rcu_read_lock();
-	/* Dump starting at last key.
-	 * Note: 0.0.0.0/0 (ie default) is first key.
-	 */
 	if (count == 0)
 		l = trie_firstleaf(t);
 	else {
-		/* Normally, continue from last key, but if that is missing
-		 * fallback to using slow rescan
-		 */
 		l = fib_find_node(t, key);
 		if (!l)
 			l = trie_leafindex(t, count);
@@ -1997,7 +1724,6 @@ struct fib_table *fib_trie_table(u32 id)
 }
 
 #ifdef CONFIG_PROC_FS
-/* Depth first Trie walk iterator */
 struct fib_trie_iter {
 	struct seq_net_private p;
 	struct fib_table *tb;
@@ -2012,7 +1738,7 @@ static struct rt_trie_node *fib_trie_get_next(struct fib_trie_iter *iter)
 	unsigned int cindex = iter->index;
 	struct tnode *p;
 
-	/* A single entry routing table */
+	
 	if (!tn)
 		return NULL;
 
@@ -2027,7 +1753,7 @@ rescan:
 				iter->tnode = tn;
 				iter->index = cindex + 1;
 			} else {
-				/* push down one level */
+				
 				iter->tnode = (struct tnode *) n;
 				iter->index = 0;
 				++iter->depth;
@@ -2038,7 +1764,7 @@ rescan:
 		++cindex;
 	}
 
-	/* Current node exhausted, pop back up */
+	
 	p = node_parent_rcu((struct rt_trie_node *)tn);
 	if (p) {
 		cindex = tkey_extract_bits(tn->key, p->pos, p->bits)+1;
@@ -2047,7 +1773,7 @@ rescan:
 		goto rescan;
 	}
 
-	/* got root? */
+	
 	return NULL;
 }
 
@@ -2113,9 +1839,6 @@ static void trie_collect_stats(struct trie *t, struct trie_stat *s)
 	rcu_read_unlock();
 }
 
-/*
- *	This outputs /proc/net/fib_triestats
- */
 static void trie_show_stats(struct seq_file *seq, struct trie_stat *stat)
 {
 	unsigned int i, max, pointers, bytes, avdepth;
@@ -2171,7 +1894,7 @@ static void trie_show_usage(struct seq_file *seq,
 	seq_printf(seq, "skipped node resize = %u\n\n",
 		   stats->resize_node_skipped);
 }
-#endif /*  CONFIG_IP_FIB_TRIE_STATS */
+#endif 
 
 static void fib_table_print(struct seq_file *seq, struct fib_table *tb)
 {
@@ -2277,12 +2000,12 @@ static void *fib_trie_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct rt_trie_node *n;
 
 	++*pos;
-	/* next node in same table */
+	
 	n = fib_trie_get_next(iter);
 	if (n)
 		return n;
 
-	/* walk rest of this hash chain */
+	
 	h = tb->tb_id & (FIB_TABLE_HASHSZ - 1);
 	while ((tb_node = rcu_dereference(hlist_next_rcu(&tb->tb_hlist)))) {
 		tb = hlist_entry(tb_node, struct fib_table, tb_hlist);
@@ -2291,7 +2014,7 @@ static void *fib_trie_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 			goto found;
 	}
 
-	/* new hash chain */
+	
 	while (++h < FIB_TABLE_HASHSZ) {
 		struct hlist_head *head = &net->ipv4.fib_table_hash[h];
 		hlist_for_each_entry_rcu(tb, tb_node, head, tb_hlist) {
@@ -2356,7 +2079,6 @@ static inline const char *rtn_type(char *buf, size_t len, unsigned int t)
 	return buf;
 }
 
-/* Pretty print the trie */
 static int fib_trie_seq_show(struct seq_file *seq, void *v)
 {
 	const struct fib_trie_iter *iter = seq->private;
@@ -2438,7 +2160,7 @@ static struct leaf *fib_route_get_idx(struct fib_route_iter *iter, loff_t pos)
 	struct leaf *l = NULL;
 	struct trie *t = iter->main_trie;
 
-	/* use cache location of last found key */
+	
 	if (iter->pos > 0 && pos >= iter->pos && (l = fib_find_node(t, iter->key)))
 		pos -= iter->pos;
 	else {
@@ -2452,9 +2174,9 @@ static struct leaf *fib_route_get_idx(struct fib_route_iter *iter, loff_t pos)
 	}
 
 	if (l)
-		iter->key = pos;	/* remember it */
+		iter->key = pos;	
 	else
-		iter->pos = 0;		/* forget it */
+		iter->pos = 0;		
 
 	return l;
 }
@@ -2518,12 +2240,6 @@ static unsigned int fib_flag_trans(int type, __be32 mask, const struct fib_info 
 	return flags;
 }
 
-/*
- *	This outputs /proc/net/route.
- *	The format of the file is not supposed to be changed
- *	and needs to be same as fib_hash output to avoid breaking
- *	legacy utilities
- */
 static int fib_route_seq_show(struct seq_file *seq, void *v)
 {
 	struct leaf *l = v;
@@ -2541,22 +2257,33 @@ static int fib_route_seq_show(struct seq_file *seq, void *v)
 		struct fib_alias *fa;
 		__be32 mask, prefix;
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+		if (( !li)  ||  IS_ERR(li)) {
+			printk(KERN_ERR "[NET] li is NULL in %s!\n", __func__);
+			return 0;
+
+		}
+#endif
 		mask = inet_make_mask(li->plen);
 		prefix = htonl(l->key);
 
 		list_for_each_entry_rcu(fa, &li->falh, fa_list) {
 			const struct fib_info *fi = fa->fa_info;
 			unsigned int flags = fib_flag_trans(fa->fa_type, mask, fi);
-			int len;
 
 			if (fa->fa_type == RTN_BROADCAST
 			    || fa->fa_type == RTN_MULTICAST)
 				continue;
 
+			seq_setwidth(seq, 127);
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+			if ((fi) && (!IS_ERR(fi)))
+#else
 			if (fi)
+#endif
 				seq_printf(seq,
 					 "%s\t%08X\t%08X\t%04X\t%d\t%u\t"
-					 "%d\t%08X\t%d\t%u\t%u%n",
+					 "%d\t%08X\t%d\t%u\t%u",
 					 fi->fib_dev ? fi->fib_dev->name : "*",
 					 prefix,
 					 fi->fib_nh->nh_gw, flags, 0, 0,
@@ -2565,15 +2292,15 @@ static int fib_route_seq_show(struct seq_file *seq, void *v)
 					 (fi->fib_advmss ?
 					  fi->fib_advmss + 40 : 0),
 					 fi->fib_window,
-					 fi->fib_rtt >> 3, &len);
+					 fi->fib_rtt >> 3);
 			else
 				seq_printf(seq,
 					 "*\t%08X\t%08X\t%04X\t%d\t%u\t"
-					 "%d\t%08X\t%d\t%u\t%u%n",
+					 "%d\t%08X\t%d\t%u\t%u",
 					 prefix, 0, flags, 0, 0, 0,
-					 mask, 0, 0, 0, &len);
+					 mask, 0, 0, 0);
 
-			seq_printf(seq, "%*s\n", 127 - len, "");
+			seq_pad(seq, '\n');
 		}
 	}
 
@@ -2630,4 +2357,4 @@ void __net_exit fib_proc_exit(struct net *net)
 	proc_net_remove(net, "route");
 }
 
-#endif /* CONFIG_PROC_FS */
+#endif 

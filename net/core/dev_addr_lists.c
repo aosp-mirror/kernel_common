@@ -57,7 +57,7 @@ static int __hw_addr_add_ex(struct netdev_hw_addr_list *list,
 	ha->type = addr_type;
 	ha->refcount = 1;
 	ha->global_use = global;
-	ha->synced = 0;
+	ha->synced = false;
 	list_add_tail_rcu(&ha->list, &list->list);
 	list->count++;
 	return 0;
@@ -155,7 +155,7 @@ int __hw_addr_sync(struct netdev_hw_addr_list *to_list,
 					    addr_len, ha->type);
 			if (err)
 				break;
-			ha->synced++;
+			ha->synced = true;
 			ha->refcount++;
 		} else if (ha->refcount == 1) {
 			__hw_addr_del(to_list, ha->addr, addr_len, ha->type);
@@ -176,7 +176,7 @@ void __hw_addr_unsync(struct netdev_hw_addr_list *to_list,
 		if (ha->synced) {
 			__hw_addr_del(to_list, ha->addr,
 				      addr_len, ha->type);
-			ha->synced--;
+			ha->synced = false;
 			__hw_addr_del(from_list, ha->addr,
 				      addr_len, ha->type);
 		}
@@ -308,8 +308,7 @@ int dev_addr_del(struct net_device *dev, unsigned char *addr,
 	 */
 	ha = list_first_entry(&dev->dev_addrs.list,
 			      struct netdev_hw_addr, list);
-	if (!memcmp(ha->addr, addr, dev->addr_len) &&
-	    ha->type == addr_type && ha->refcount == 1)
+	if (ha->addr == dev->dev_addr && ha->refcount == 1)
 		return -ENOENT;
 
 	err = __hw_addr_del(&dev->dev_addrs, addr, dev->addr_len,

@@ -30,6 +30,34 @@
 #define SDIO_DEVICE_ID_STE_CW1200	0x2280
 #endif
 
+#ifndef SDIO_VENDOR_ID_MSM
+#define SDIO_VENDOR_ID_MSM		0x0070
+#endif
+
+#ifndef SDIO_DEVICE_ID_MSM_WCN1314
+#define SDIO_DEVICE_ID_MSM_WCN1314	0x2881
+#endif
+
+#ifndef SDIO_VENDOR_ID_MSM_QCA
+#define SDIO_VENDOR_ID_MSM_QCA		0x271
+#endif
+
+#ifndef SDIO_DEVICE_ID_MSM_QCA_AR6003_1
+#define SDIO_DEVICE_ID_MSM_QCA_AR6003_1	0x300
+#endif
+
+#ifndef SDIO_DEVICE_ID_MSM_QCA_AR6003_2
+#define SDIO_DEVICE_ID_MSM_QCA_AR6003_2	0x301
+#endif
+
+#ifndef SDIO_DEVICE_ID_MSM_QCA_AR6004_1
+#define SDIO_DEVICE_ID_MSM_QCA_AR6004_1	0x400
+#endif
+
+#ifndef SDIO_DEVICE_ID_MSM_QCA_AR6004_2
+#define SDIO_DEVICE_ID_MSM_QCA_AR6004_2	0x401
+#endif
+
 /*
  * This hook just adds a quirk for all sdio devices
  */
@@ -47,6 +75,21 @@ static const struct mmc_fixup mmc_fixup_methods[] = {
 		   MMC_QUIRK_BROKEN_CLK_GATING),
 
 	SDIO_FIXUP(SDIO_VENDOR_ID_TI, SDIO_DEVICE_ID_TI_WL1271,
+		   remove_quirk, MMC_QUIRK_BROKEN_CLK_GATING),
+
+	SDIO_FIXUP(SDIO_VENDOR_ID_MSM, SDIO_DEVICE_ID_MSM_WCN1314,
+		   remove_quirk, MMC_QUIRK_BROKEN_CLK_GATING),
+
+	SDIO_FIXUP(SDIO_VENDOR_ID_MSM_QCA, SDIO_DEVICE_ID_MSM_QCA_AR6003_1,
+		   remove_quirk, MMC_QUIRK_BROKEN_CLK_GATING),
+
+	SDIO_FIXUP(SDIO_VENDOR_ID_MSM_QCA, SDIO_DEVICE_ID_MSM_QCA_AR6003_2,
+		   remove_quirk, MMC_QUIRK_BROKEN_CLK_GATING),
+
+	SDIO_FIXUP(SDIO_VENDOR_ID_MSM_QCA, SDIO_DEVICE_ID_MSM_QCA_AR6004_1,
+		   remove_quirk, MMC_QUIRK_BROKEN_CLK_GATING),
+
+	SDIO_FIXUP(SDIO_VENDOR_ID_MSM_QCA, SDIO_DEVICE_ID_MSM_QCA_AR6004_2,
 		   remove_quirk, MMC_QUIRK_BROKEN_CLK_GATING),
 
 	SDIO_FIXUP(SDIO_VENDOR_ID_TI, SDIO_DEVICE_ID_TI_WL1271,
@@ -78,6 +121,8 @@ void mmc_fixup_device(struct mmc_card *card, const struct mmc_fixup *table)
 		    (f->name == CID_NAME_ANY ||
 		     !strncmp(f->name, card->cid.prod_name,
 			      sizeof(card->cid.prod_name))) &&
+		    (f->ext_csd_rev == EXT_CSD_REV_ANY ||
+		     f->ext_csd_rev == card->ext_csd.rev) &&
 		    (f->cis_vendor == card->cis.vendor ||
 		     f->cis_vendor == (u16) SDIO_ANY_ID) &&
 		    (f->cis_device == card->cis.device ||

@@ -2,10 +2,15 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <htc_debug/stability/dirty_file_detector.h>
 
 static int cmdline_proc_show(struct seq_file *m, void *v)
 {
+#ifdef CONFIG_DIRTY_SYSTEM_DETECTOR
+	seq_printf(m, "%s system_dirty=%d\n", saved_command_line, is_system_dirty());
+#else
 	seq_printf(m, "%s\n", saved_command_line);
+#endif
 	return 0;
 }
 

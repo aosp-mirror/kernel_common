@@ -49,10 +49,7 @@ ecryptfs_miscdev_poll(struct file *file, poll_table *pt)
 	mutex_lock(&ecryptfs_daemon_hash_mux);
 	/* TODO: Just use file->private_data? */
 	rc = ecryptfs_find_daemon_by_euid(&daemon, euid, current_user_ns());
-	if (rc || !daemon) {
-		mutex_unlock(&ecryptfs_daemon_hash_mux);
-		return -EINVAL;
-	}
+	BUG_ON(rc || !daemon);
 	mutex_lock(&daemon->mux);
 	mutex_unlock(&ecryptfs_daemon_hash_mux);
 	if (daemon->flags & ECRYPTFS_DAEMON_ZOMBIE) {
@@ -125,7 +122,6 @@ ecryptfs_miscdev_open(struct inode *inode, struct file *file)
 		goto out_unlock_daemon;
 	}
 	daemon->flags |= ECRYPTFS_DAEMON_MISCDEV_OPEN;
-	file->private_data = daemon;
 	atomic_inc(&ecryptfs_num_miscdev_opens);
 out_unlock_daemon:
 	mutex_unlock(&daemon->mux);
@@ -156,9 +152,9 @@ ecryptfs_miscdev_release(struct inode *inode, struct file *file)
 
 	mutex_lock(&ecryptfs_daemon_hash_mux);
 	rc = ecryptfs_find_daemon_by_euid(&daemon, euid, current_user_ns());
-	if (rc || !daemon)
-		daemon = file->private_data;
+	BUG_ON(rc || !daemon);
 	mutex_lock(&daemon->mux);
+	BUG_ON(daemon->pid != task_pid(current));
 	BUG_ON(!(daemon->flags & ECRYPTFS_DAEMON_MISCDEV_OPEN));
 	daemon->flags &= ~ECRYPTFS_DAEMON_MISCDEV_OPEN;
 	atomic_dec(&ecryptfs_num_miscdev_opens);
@@ -195,32 +191,31 @@ int ecryptfs_send_miscdev(char *data, size_t data_size,
 			  struct ecryptfs_msg_ctx *msg_ctx, u8 msg_type,
 			  u16 msg_flags, struct ecryptfs_daemon *daemon)
 {
-	struct ecryptfs_message *msg;
-
-	msg = kmalloc((sizeof(*msg) + data_size), GFP_KERNEL);
-	if (!msg) {
-		printk(KERN_ERR "%s: Out of memory whilst attempting "
-		       "to kmalloc(%zd, GFP_KERNEL)\n", __func__,
-		       (sizeof(*msg) + data_size));
-		return -ENOMEM;
-	}
+	int rc = 0;
 
 	mutex_lock(&msg_ctx->mux);
-	msg_ctx->msg = msg;
+	msg_ctx->msg = kmalloc((sizeof(*msg_ctx->msg) + data_size),
+			       GFP_KERNEL);
+	if (!msg_ctx->msg) {
+		rc = -ENOMEM;
+		printk(KERN_ERR "%s: Out of memory whilst attempting "
+		       "to kmalloc(%zd, GFP_KERNEL)\n", __func__,
+		       (sizeof(*msg_ctx->msg) + data_size));
+		goto out_unlock;
+	}
 	msg_ctx->msg->index = msg_ctx->index;
 	msg_ctx->msg->data_len = data_size;
 	msg_ctx->type = msg_type;
 	memcpy(msg_ctx->msg->data, data, data_size);
 	msg_ctx->msg_size = (sizeof(*msg_ctx->msg) + data_size);
-	list_add_tail(&msg_ctx->daemon_out_list, &daemon->msg_ctx_out_queue);
-	mutex_unlock(&msg_ctx->mux);
-
 	mutex_lock(&daemon->mux);
+	list_add_tail(&msg_ctx->daemon_out_list, &daemon->msg_ctx_out_queue);
 	daemon->num_queued_msg_ctx++;
 	wake_up_interruptible(&daemon->wait);
 	mutex_unlock(&daemon->mux);
-
-	return 0;
+out_unlock:
+	mutex_unlock(&msg_ctx->mux);
+	return rc;
 }
 
 /*
@@ -274,16 +269,8 @@ ecryptfs_miscdev_read(struct file *file, char __user *buf, size_t count,
 	mutex_lock(&ecryptfs_daemon_hash_mux);
 	/* TODO: Just use file->private_data? */
 	rc = ecryptfs_find_daemon_by_euid(&daemon, euid, current_user_ns());
-	if (rc || !daemon) {
-		mutex_unlock(&ecryptfs_daemon_hash_mux);
-		return -EINVAL;
-	}
+	BUG_ON(rc || !daemon);
 	mutex_lock(&daemon->mux);
-	if (task_pid(current) != daemon->pid) {
-		mutex_unlock(&daemon->mux);
-		mutex_unlock(&ecryptfs_daemon_hash_mux);
-		return -EPERM;
-	}
 	if (daemon->flags & ECRYPTFS_DAEMON_ZOMBIE) {
 		rc = 0;
 		mutex_unlock(&ecryptfs_daemon_hash_mux);
@@ -320,6 +307,9 @@ check_list:
 		 * message from the queue; try again */
 		goto check_list;
 	}
+	BUG_ON(euid != daemon->euid);
+	BUG_ON(current_user_ns() != daemon->user_ns);
+	BUG_ON(task_pid(current) != daemon->pid);
 	msg_ctx = list_first_entry(&daemon->msg_ctx_out_queue,
 				   struct ecryptfs_msg_ctx, daemon_out_list);
 	BUG_ON(!msg_ctx);

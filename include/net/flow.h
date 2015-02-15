@@ -1,8 +1,3 @@
-/*
- *
- *	Generic internet FLOW.
- *
- */
 
 #ifndef _NET_FLOW_H
 #define _NET_FLOW_H
@@ -62,7 +57,7 @@ struct flowi4 {
 #define flowi4_secid		__fl_common.flowic_secid
 #define flowi4_uid		__fl_common.flowic_uid
 
-	/* (saddr,daddr) must be grouped, same order as in IP header */
+	
 	__be32			saddr;
 	__be32			daddr;
 
@@ -98,7 +93,6 @@ static inline void flowi4_init_output(struct flowi4 *fl4, int oif,
 	fl4->fl4_sport = sport;
 }
 
-/* Reset some input parameters after previous lookup */
 static inline void flowi4_update_output(struct flowi4 *fl4, int oif, __u8 tos,
 					__be32 daddr, __be32 saddr)
 {

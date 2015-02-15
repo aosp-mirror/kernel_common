@@ -27,15 +27,12 @@ extern struct console *bfin_jc_early_init(void);
 
 static struct console *early_console;
 
-/* Default console */
 #define DEFAULT_PORT 0
 #define DEFAULT_CFLAG CS8|B57600
 
-/* Default console for early crashes */
 #define DEFAULT_EARLY_PORT "serial,uart0,57600"
 
 #ifdef CONFIG_SERIAL_CORE
-/* What should get here is "0,57600" */
 static struct console * __init earlyserial_init(char *buf)
 {
 	int baud, bit;
@@ -112,9 +109,6 @@ static struct console * __init earlyserial_init(char *buf)
 int __init setup_early_printk(char *buf)
 {
 
-	/* Crashing in here would be really bad, so check both the var
-	   and the pointer before we start using it
-	 */
 	if (!buf)
 		return 0;
 
@@ -125,7 +119,7 @@ int __init setup_early_printk(char *buf)
 		return 0;
 
 #ifdef CONFIG_SERIAL_BFIN
-	/* Check for Blackfin Serial */
+	
 	if (!strncmp(buf, "serial,uart", 11)) {
 		buf += 11;
 		early_console = earlyserial_init(buf);
@@ -133,7 +127,7 @@ int __init setup_early_printk(char *buf)
 #endif
 
 #ifdef CONFIG_BFIN_JTAG_COMM
-	/* Check for Blackfin JTAG */
+	
 	if (!strncmp(buf, "jtag", 4)) {
 		buf += 4;
 		early_console = bfin_jc_early_init();
@@ -141,7 +135,7 @@ int __init setup_early_printk(char *buf)
 #endif
 
 #ifdef CONFIG_FB
-		/* TODO: add framebuffer console support */
+		
 #endif
 
 	if (likely(early_console)) {
@@ -156,21 +150,12 @@ int __init setup_early_printk(char *buf)
 	return 0;
 }
 
-/*
- * Set up a temporary Event Vector Table, so if something bad happens before
- * the kernel is fully started, it doesn't vector off into somewhere we don't
- * know
- */
 
 asmlinkage void __init init_early_exception_vectors(void)
 {
 	u32 evt;
 	SSYNC();
 
-	/*
-	 * This starts up the shadow buffer, incase anything crashes before
-	 * setup arch
-	 */
 	mark_shadow_error();
 	early_shadow_puts(linux_banner);
 	early_shadow_stamp();
@@ -183,19 +168,10 @@ asmlinkage void __init init_early_exception_vectors(void)
 		early_shadow_puts("\n");
 	}
 
-	/* cannot program in software:
-	 * evt0 - emulation (jtag)
-	 * evt1 - reset
-	 */
 	for (evt = EVT2; evt <= EVT15; evt += 4)
 		bfin_write32(evt, early_trap);
 	CSYNC();
 
-	/* Set all the return from interrupt, exception, NMI to a known place
-	 * so if we do a RETI, RETX or RETN by mistake - we go somewhere known
-	 * Note - don't change RETS - we are in a subroutine, or
-	 * RETE - since it might screw up if emulator is attached
-	 */
 	asm("\tRETI = %0; RETX = %0; RETN = %0;\n"
 		: : "p"(early_trap));
 
@@ -204,17 +180,11 @@ asmlinkage void __init init_early_exception_vectors(void)
 __attribute__((__noreturn__))
 asmlinkage void __init early_trap_c(struct pt_regs *fp, void *retaddr)
 {
-	/* This can happen before the uart is initialized, so initialize
-	 * the UART now (but only if we are running on the processor we think
-	 * we are compiled for - otherwise we write to MMRs that don't exist,
-	 * and cause other problems. Nothing comes out the UART, but it does
-	 * end up in the __buf_log.
-	 */
 	if (likely(early_console == NULL) && CPUID == bfin_cpuid())
 		setup_early_printk(DEFAULT_EARLY_PORT);
 
 	if (!shadow_console_enabled()) {
-		/* crap - we crashed before setup_arch() */
+		
 		early_shadow_puts("panic before setup_arch\n");
 		early_shadow_puts("IPEND:");
 		early_shadow_reg(fp->ipend, 16);
@@ -245,12 +215,6 @@ asmlinkage void __init early_trap_c(struct pt_regs *fp, void *retaddr)
 #endif
 		early_shadow_puts("\nUse bfin-elf-addr2line to determine "
 			"function names\n");
-		/*
-		 * We should panic(), but we can't - since panic calls printk,
-		 * and printk uses memcpy.
-		 * we want to reboot, but if the machine type is different,
-		 * can't due to machine specific reboot sequences
-		 */
 		if (CPUID == bfin_cpuid()) {
 			early_shadow_puts("Trying to restart\n");
 			machine_restart("");

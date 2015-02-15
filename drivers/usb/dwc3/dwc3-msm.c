@@ -1,0 +1,3291 @@
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/platform_device.h>
+#include <linux/dma-mapping.h>
+#include <linux/pm_runtime.h>
+#include <linux/ratelimit.h>
+#include <linux/interrupt.h>
+#include <linux/ioport.h>
+#include <linux/clk.h>
+#include <linux/io.h>
+#include <linux/module.h>
+#include <linux/types.h>
+#include <linux/delay.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
+#include <linux/list.h>
+#include <linux/debugfs.h>
+#include <linux/uaccess.h>
+#include <linux/usb/ch9.h>
+#include <linux/usb/gadget.h>
+#include <linux/qpnp-misc.h>
+#include <linux/usb/msm_hsusb.h>
+#include <linux/usb/msm_ext_chg.h>
+#include <linux/regulator/consumer.h>
+#include <linux/pm_wakeup.h>
+#include <linux/power_supply.h>
+#include <linux/qpnp/qpnp-adc.h>
+#include <linux/cdev.h>
+#include <linux/completion.h>
+
+#include <mach/rpm-regulator.h>
+#include <mach/rpm-regulator-smd.h>
+#include <mach/msm_bus.h>
+#include <mach/clk.h>
+#include <mach/cable_detect.h>
+
+#include "dwc3_otg.h"
+#include "core.h"
+#include "gadget.h"
+#include "debug.h"
+
+static int adc_low_threshold = 700;
+module_param(adc_low_threshold, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(adc_low_threshold, "ADC ID Low voltage threshold");
+
+static int adc_high_threshold = 950;
+module_param(adc_high_threshold, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(adc_high_threshold, "ADC ID High voltage threshold");
+
+static int adc_meas_interval = ADC_MEAS1_INTERVAL_1S;
+module_param(adc_meas_interval, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(adc_meas_interval, "ADC ID polling period");
+
+static int override_phy_init;
+module_param(override_phy_init, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(override_phy_init, "Override HSPHY Init Seq");
+
+static int ss_phy_override_deemphasis;
+module_param(ss_phy_override_deemphasis, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(ss_phy_override_deemphasis, "Override SSPHY demphasis value");
+
+static bool prop_chg_detect;
+module_param(prop_chg_detect, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(prop_chg_detect, "Enable Proprietary charger detection");
+
+#define DBM_BASE		0x000F8000
+#define DBM_EP_CFG(n)		(DBM_BASE + (0x00 + 4 * (n)))
+#define DBM_DATA_FIFO(n)	(DBM_BASE + (0x10 + 4 * (n)))
+#define DBM_DATA_FIFO_SIZE(n)	(DBM_BASE + (0x20 + 4 * (n)))
+#define DBM_DATA_FIFO_EN	(DBM_BASE + (0x30))
+#define DBM_GEVNTADR		(DBM_BASE + (0x34))
+#define DBM_GEVNTSIZ		(DBM_BASE + (0x38))
+#define DBM_DBG_CNFG		(DBM_BASE + (0x3C))
+#define DBM_HW_TRB0_EP(n)	(DBM_BASE + (0x40 + 4 * (n)))
+#define DBM_HW_TRB1_EP(n)	(DBM_BASE + (0x50 + 4 * (n)))
+#define DBM_HW_TRB2_EP(n)	(DBM_BASE + (0x60 + 4 * (n)))
+#define DBM_HW_TRB3_EP(n)	(DBM_BASE + (0x70 + 4 * (n)))
+#define DBM_PIPE_CFG		(DBM_BASE + (0x80))
+#define DBM_SOFT_RESET		(DBM_BASE + (0x84))
+#define DBM_GEN_CFG		(DBM_BASE + (0x88))
+
+#define DBM_EN_EP		0x00000001
+#define USB3_EPNUM		0x0000003E
+#define DBM_BAM_PIPE_NUM	0x000000C0
+#define DBM_PRODUCER		0x00000100
+#define DBM_DISABLE_WB		0x00000200
+#define DBM_INT_RAM_ACC		0x00000400
+
+#define DBM_DATA_FIFO_SIZE_MASK	0x0000ffff
+
+#define DBM_GEVNTSIZ_MASK	0x0000ffff
+
+#define DBM_ENABLE_IOC_MASK	0x0000000f
+
+#define DBM_SFT_RST_EP0		0x00000001
+#define DBM_SFT_RST_EP1		0x00000002
+#define DBM_SFT_RST_EP2		0x00000004
+#define DBM_SFT_RST_EP3		0x00000008
+#define DBM_SFT_RST_EPS_MASK	0x0000000F
+#define DBM_SFT_RST_MASK	0x80000000
+#define DBM_EN_MASK		0x00000002
+
+#define DBM_MAX_EPS		4
+
+#define DBM_TRB_BIT		0x80000000
+#define DBM_TRB_DATA_SRC	0x40000000
+#define DBM_TRB_DMA		0x20000000
+#define DBM_TRB_EP_NUM(ep)	(ep<<24)
+
+#define USB3_PORTSC		(0x430)
+#define PORT_PE			(0x1 << 1)
+#define QSCRATCH_REG_OFFSET	(0x000F8800)
+#define QSCRATCH_CTRL_REG      (QSCRATCH_REG_OFFSET + 0x04)
+#define QSCRATCH_GENERAL_CFG	(QSCRATCH_REG_OFFSET + 0x08)
+#define QSCRATCH_RAM1_REG	(QSCRATCH_REG_OFFSET + 0x0C)
+#define HS_PHY_CTRL_REG		(QSCRATCH_REG_OFFSET + 0x10)
+#define PARAMETER_OVERRIDE_X_REG (QSCRATCH_REG_OFFSET + 0x14)
+#define CHARGING_DET_CTRL_REG	(QSCRATCH_REG_OFFSET + 0x18)
+#define CHARGING_DET_OUTPUT_REG	(QSCRATCH_REG_OFFSET + 0x1C)
+#define ALT_INTERRUPT_EN_REG	(QSCRATCH_REG_OFFSET + 0x20)
+#define HS_PHY_IRQ_STAT_REG	(QSCRATCH_REG_OFFSET + 0x24)
+#define CGCTL_REG		(QSCRATCH_REG_OFFSET + 0x28)
+#define SS_PHY_CTRL_REG		(QSCRATCH_REG_OFFSET + 0x30)
+#define SS_PHY_PARAM_CTRL_1	(QSCRATCH_REG_OFFSET + 0x34)
+#define SS_PHY_PARAM_CTRL_2	(QSCRATCH_REG_OFFSET + 0x38)
+#define SS_CR_PROTOCOL_DATA_IN_REG  (QSCRATCH_REG_OFFSET + 0x3C)
+#define SS_CR_PROTOCOL_DATA_OUT_REG (QSCRATCH_REG_OFFSET + 0x40)
+#define SS_CR_PROTOCOL_CAP_ADDR_REG (QSCRATCH_REG_OFFSET + 0x44)
+#define SS_CR_PROTOCOL_CAP_DATA_REG (QSCRATCH_REG_OFFSET + 0x48)
+#define SS_CR_PROTOCOL_READ_REG     (QSCRATCH_REG_OFFSET + 0x4C)
+#define SS_CR_PROTOCOL_WRITE_REG    (QSCRATCH_REG_OFFSET + 0x50)
+#define PWR_EVNT_IRQ_STAT_REG    (QSCRATCH_REG_OFFSET + 0x58)
+#define PWR_EVNT_IRQ_MASK_REG    (QSCRATCH_REG_OFFSET + 0x5C)
+
+struct dwc3_msm_req_complete {
+	struct list_head list_item;
+	struct usb_request *req;
+	void (*orig_complete)(struct usb_ep *ep,
+			      struct usb_request *req);
+};
+
+struct dwc3_msm {
+	struct device *dev;
+	void __iomem *base;
+	struct resource *io_res;
+	int dbm_num_eps;
+	u8 ep_num_mapping[DBM_MAX_EPS];
+	const struct usb_ep_ops *original_ep_ops[DWC3_ENDPOINTS_NUM];
+	struct list_head req_complete_list;
+	struct clk		*xo_clk;
+	struct clk		*ref_clk;
+	struct clk		*core_clk;
+	struct clk		*iface_clk;
+	struct clk		*sleep_clk;
+	struct clk		*hsphy_sleep_clk;
+	struct clk		*utmi_clk;
+	unsigned int		utmi_clk_rate;
+	struct clk		*utmi_clk_src;
+	struct regulator	*hsusb_3p3;
+	struct regulator	*hsusb_1p8;
+	struct regulator	*hsusb_vddcx;
+	struct regulator	*ssusb_1p8;
+	struct regulator	*ssusb_vddcx;
+	struct regulator	*dwc3_gdsc;
+	struct wake_lock	cable_detect_wlock;
+
+	
+	struct regulator	*vbus_otg;
+	struct dwc3_ext_xceiv	ext_xceiv;
+	bool			resume_pending;
+	atomic_t                pm_suspended;
+	atomic_t		in_lpm;
+	int			hs_phy_irq;
+	int			hsphy_init_seq;
+	int			deemphasis_val;
+	bool			lpm_irq_seen;
+	struct delayed_work	resume_work;
+	struct work_struct	restart_usb_work;
+	struct work_struct	usb_block_reset_work;
+	struct dwc3_charger	charger;
+	struct usb_phy		*otg_xceiv;
+	struct delayed_work	chg_work;
+	enum usb_chg_state	chg_state;
+	int			pmic_id_irq;
+	struct work_struct	id_work;
+	struct qpnp_adc_tm_btm_param	adc_param;
+	struct qpnp_adc_tm_chip *adc_tm_dev;
+	struct delayed_work	init_adc_work;
+	bool			id_adc_detect;
+	struct qpnp_vadc_chip	*vadc_dev;
+	u8			dcd_retries;
+	u32			bus_perf_client;
+	struct msm_bus_scale_pdata	*bus_scale_table;
+	struct power_supply	usb_psy;
+	struct power_supply	*ext_vbus_psy;
+	unsigned int		online;
+	unsigned int		host_mode;
+	unsigned int		voltage_max;
+	unsigned int		current_max;
+	unsigned int		vdd_no_vol_level;
+	unsigned int		vdd_low_vol_level;
+	unsigned int		vdd_high_vol_level;
+	unsigned int		tx_fifo_size;
+	unsigned int		qdss_tx_fifo_size;
+	bool			vbus_active;
+	bool			ext_inuse;
+	enum dwc3_id_state	id_state;
+	unsigned long		lpm_flags;
+#define MDWC3_PHY_REF_AND_CORECLK_OFF	BIT(0)
+#define MDWC3_TCXO_SHUTDOWN		BIT(1)
+#define MDWC3_ASYNC_IRQ_WAKE_CAPABILITY	BIT(2)
+
+	u32 qscratch_ctl_val;
+	dev_t ext_chg_dev;
+	struct cdev ext_chg_cdev;
+	struct class *ext_chg_class;
+	struct device *ext_chg_device;
+	bool ext_chg_opened;
+	bool ext_chg_active;
+	struct completion ext_chg_wait;
+	struct qpnp_vadc_chip *vadc_chip;
+};
+
+#define USB_HSPHY_3P3_VOL_MIN		3050000 
+#define USB_HSPHY_3P3_VOL_MAX		3300000 
+#define USB_HSPHY_3P3_HPM_LOAD		16000	
+
+#define USB_HSPHY_1P8_VOL_MIN		1800000 
+#define USB_HSPHY_1P8_VOL_MAX		1800000 
+#define USB_HSPHY_1P8_HPM_LOAD		19000	
+
+#define USB_SSPHY_1P8_VOL_MIN		1800000 
+#define USB_SSPHY_1P8_VOL_MAX		1800000 
+#define USB_SSPHY_1P8_HPM_LOAD		23000	
+
+static struct dwc3_msm *context = NULL;
+
+static struct usb_ext_notification *usb_ext;
+static int htc_usb_disable;
+static int htc_vbus_backup;
+static int htc_id_backup;
+
+static inline u32 dwc3_msm_read_reg(void *base, u32 offset)
+{
+	u32 val = ioread32(base + offset);
+	return val;
+}
+
+static inline u32 dwc3_msm_read_reg_field(void *base,
+					  u32 offset,
+					  const u32 mask)
+{
+	u32 shift = find_first_bit((void *)&mask, 32);
+	u32 val = ioread32(base + offset);
+	val &= mask;		
+	val >>= shift;
+	return val;
+}
+
+static inline void dwc3_msm_write_reg(void *base, u32 offset, u32 val)
+{
+	iowrite32(val, base + offset);
+}
+
+static inline void dwc3_msm_write_reg_field(void *base, u32 offset,
+					    const u32 mask, u32 val)
+{
+	u32 shift = find_first_bit((void *)&mask, 32);
+	u32 tmp = ioread32(base + offset);
+
+	tmp &= ~mask;		/* clear written bits */
+	val = tmp | (val << shift);
+	iowrite32(val, base + offset);
+}
+
+/**
+ * Write register and read back masked value to confirm it is written
+ *
+ * @base - DWC3 base virtual address.
+ * @offset - register offset.
+ * @mask - register bitmask specifying what should be updated
+ * @val - value to write.
+ *
+ */
+static inline void dwc3_msm_write_readback(void *base, u32 offset,
+					    const u32 mask, u32 val)
+{
+	u32 write_val, tmp = ioread32(base + offset);
+
+	tmp &= ~mask;		
+	write_val = tmp | val;
+
+	iowrite32(write_val, base + offset);
+
+	/* Read back to see if val was written */
+	tmp = ioread32(base + offset);
+	tmp &= mask;		
+
+	if (tmp != val)
+		pr_err("%s: write: %x to QSCRATCH: %x FAILED\n",
+			__func__, val, offset);
+}
+
+static void dwc3_msm_ssusb_write_phycreg(void *base, u32 addr, u32 val)
+{
+	iowrite32(addr, base + SS_CR_PROTOCOL_DATA_IN_REG);
+	iowrite32(0x1, base + SS_CR_PROTOCOL_CAP_ADDR_REG);
+	while (ioread32(base + SS_CR_PROTOCOL_CAP_ADDR_REG))
+		cpu_relax();
+
+	iowrite32(val, base + SS_CR_PROTOCOL_DATA_IN_REG);
+	iowrite32(0x1, base + SS_CR_PROTOCOL_CAP_DATA_REG);
+	while (ioread32(base + SS_CR_PROTOCOL_CAP_DATA_REG))
+		cpu_relax();
+
+	iowrite32(0x1, base + SS_CR_PROTOCOL_WRITE_REG);
+	while (ioread32(base + SS_CR_PROTOCOL_WRITE_REG))
+		cpu_relax();
+}
+
+static u32 dwc3_msm_ssusb_read_phycreg(void *base, u32 addr)
+{
+	bool first_read = true;
+
+	iowrite32(addr, base + SS_CR_PROTOCOL_DATA_IN_REG);
+	iowrite32(0x1, base + SS_CR_PROTOCOL_CAP_ADDR_REG);
+	while (ioread32(base + SS_CR_PROTOCOL_CAP_ADDR_REG))
+		cpu_relax();
+
+retry:
+	iowrite32(0x1, base + SS_CR_PROTOCOL_READ_REG);
+	while (ioread32(base + SS_CR_PROTOCOL_READ_REG))
+		cpu_relax();
+
+	if (first_read) {
+		ioread32(base + SS_CR_PROTOCOL_DATA_OUT_REG);
+		first_read = false;
+		goto retry;
+	}
+
+	return ioread32(base + SS_CR_PROTOCOL_DATA_OUT_REG);
+}
+
+static void dwc3_msm_dump_phy_info(struct dwc3_msm *mdwc)
+{
+
+	dbg_print_reg("SSPHY_CTRL_REG", dwc3_msm_read_reg(mdwc->base,
+						SS_PHY_CTRL_REG));
+	dbg_print_reg("HSPHY_CTRL_REG", dwc3_msm_read_reg(mdwc->base,
+						HS_PHY_CTRL_REG));
+	dbg_print_reg("QSCRATCH_CTRL_REG", dwc3_msm_read_reg(mdwc->base,
+						QSCRATCH_CTRL_REG));
+	dbg_print_reg("QSCRATCH_GENERAL_CFG", dwc3_msm_read_reg(mdwc->base,
+						QSCRATCH_GENERAL_CFG));
+	dbg_print_reg("PARAMETER_OVERRIDE_X_REG", dwc3_msm_read_reg(mdwc->base,
+						PARAMETER_OVERRIDE_X_REG));
+	dbg_print_reg("HS_PHY_IRQ_STAT_REG", dwc3_msm_read_reg(mdwc->base,
+						HS_PHY_IRQ_STAT_REG));
+	dbg_print_reg("SS_PHY_PARAM_CTRL_1", dwc3_msm_read_reg(mdwc->base,
+						SS_PHY_PARAM_CTRL_1));
+	dbg_print_reg("SS_PHY_PARAM_CTRL_2", dwc3_msm_read_reg(mdwc->base,
+						SS_PHY_PARAM_CTRL_2));
+	dbg_print_reg("QSCRATCH_RAM1_REG", dwc3_msm_read_reg(mdwc->base,
+						QSCRATCH_RAM1_REG));
+	dbg_print_reg("PWR_EVNT_IRQ_STAT_REG", dwc3_msm_read_reg(mdwc->base,
+						PWR_EVNT_IRQ_STAT_REG));
+	dbg_print_reg("PWR_EVNT_IRQ_MASK_REG", dwc3_msm_read_reg(mdwc->base,
+						PWR_EVNT_IRQ_MASK_REG));
+}
+
+static int dwc3_msm_find_matching_dbm_ep(struct dwc3_msm *mdwc, u8 usb_ep)
+{
+	int i;
+
+	for (i = 0; i < mdwc->dbm_num_eps; i++)
+		if (mdwc->ep_num_mapping[i] == usb_ep)
+			return i;
+
+	return -ENODEV; 
+}
+
+static int dwc3_msm_configured_dbm_ep_num(struct dwc3_msm *mdwc)
+{
+	int i;
+	int count = 0;
+
+	for (i = 0; i < mdwc->dbm_num_eps; i++)
+		if (mdwc->ep_num_mapping[i])
+			count++;
+
+	return count;
+}
+
+static int dwc3_msm_event_buffer_config(struct dwc3_msm *mdwc,
+					u32 addr, u16 size)
+{
+	dev_dbg(mdwc->dev, "%s\n", __func__);
+
+	dwc3_msm_write_reg(mdwc->base, DBM_GEVNTADR, addr);
+	dwc3_msm_write_reg_field(mdwc->base, DBM_GEVNTSIZ,
+		DBM_GEVNTSIZ_MASK, size);
+
+	return 0;
+}
+
+static int dwc3_msm_dbm_soft_reset(struct dwc3_msm *mdwc, int enter_reset)
+{
+	dev_dbg(mdwc->dev, "%s\n", __func__);
+	if (enter_reset) {
+		dev_dbg(mdwc->dev, "enter DBM reset\n");
+		dwc3_msm_write_reg_field(mdwc->base, DBM_SOFT_RESET,
+			DBM_SFT_RST_MASK, 1);
+	} else {
+		dev_dbg(mdwc->dev, "exit DBM reset\n");
+		dwc3_msm_write_reg_field(mdwc->base, DBM_SOFT_RESET,
+			DBM_SFT_RST_MASK, 0);
+		
+		dwc3_msm_write_reg_field(mdwc->base, QSCRATCH_GENERAL_CFG,
+			DBM_EN_MASK, 0x1);
+	}
+
+	return 0;
+}
+
+static int dwc3_msm_dbm_ep_soft_reset(struct dwc3_msm *mdwc,
+					u8 dbm_ep, bool enter_reset)
+{
+	dev_dbg(mdwc->dev, "%s\n", __func__);
+
+	if (dbm_ep >= mdwc->dbm_num_eps) {
+		dev_err(mdwc->dev, "%s: Invalid DBM ep index\n", __func__);
+		return -ENODEV;
+	}
+
+	if (enter_reset) {
+		dwc3_msm_write_reg_field(mdwc->base, DBM_SOFT_RESET,
+			DBM_SFT_RST_EPS_MASK & 1 << dbm_ep, 1);
+	} else {
+		dwc3_msm_write_reg_field(mdwc->base, DBM_SOFT_RESET,
+			DBM_SFT_RST_EPS_MASK & 1 << dbm_ep, 0);
+	}
+
+	return 0;
+}
+
+static int dwc3_msm_dbm_ep_config(struct dwc3_msm *mdwc, u8 usb_ep, u8 bam_pipe,
+				  bool producer, bool disable_wb,
+				  bool internal_mem, bool ioc)
+{
+	u8 dbm_ep;
+	u32 ep_cfg;
+
+	dev_dbg(mdwc->dev, "%s\n", __func__);
+
+	dbm_ep = dwc3_msm_find_matching_dbm_ep(mdwc, usb_ep);
+
+	if (dbm_ep < 0) {
+		dev_err(mdwc->dev,
+				"%s: Invalid usb ep index\n", __func__);
+		return -ENODEV;
+	}
+	
+	dwc3_msm_dbm_ep_soft_reset(mdwc, dbm_ep, 0);
+
+	
+	dwc3_msm_write_reg_field(mdwc->base, DBM_DBG_CNFG,
+		DBM_ENABLE_IOC_MASK & 1 << dbm_ep, ioc ? 1 : 0);
+
+	ep_cfg = (producer ? DBM_PRODUCER : 0) |
+		(disable_wb ? DBM_DISABLE_WB : 0) |
+		(internal_mem ? DBM_INT_RAM_ACC : 0);
+
+	dwc3_msm_write_reg_field(mdwc->base, DBM_EP_CFG(dbm_ep),
+		DBM_PRODUCER | DBM_DISABLE_WB | DBM_INT_RAM_ACC, ep_cfg >> 8);
+
+	dwc3_msm_write_reg_field(mdwc->base, DBM_EP_CFG(dbm_ep), USB3_EPNUM,
+		usb_ep);
+	dwc3_msm_write_reg_field(mdwc->base, DBM_EP_CFG(dbm_ep),
+		DBM_BAM_PIPE_NUM, bam_pipe);
+	dwc3_msm_write_reg_field(mdwc->base, DBM_PIPE_CFG, 0x000000ff,
+		0xe4);
+	dwc3_msm_write_reg_field(mdwc->base, DBM_EP_CFG(dbm_ep), DBM_EN_EP,
+		1);
+
+	return dbm_ep;
+}
+
+static int dwc3_msm_dbm_ep_unconfig(struct dwc3_msm *mdwc, u8 usb_ep)
+{
+	u8 dbm_ep;
+	u32 data;
+
+	dev_dbg(mdwc->dev, "%s\n", __func__);
+
+	dbm_ep = dwc3_msm_find_matching_dbm_ep(mdwc, usb_ep);
+
+	if (dbm_ep < 0) {
+		dev_err(mdwc->dev, "%s: Invalid usb ep index\n", __func__);
+		return -ENODEV;
+	}
+
+	mdwc->ep_num_mapping[dbm_ep] = 0;
+
+	data = dwc3_msm_read_reg(mdwc->base, DBM_EP_CFG(dbm_ep));
+	data &= (~0x1);
+	dwc3_msm_write_reg(mdwc->base, DBM_EP_CFG(dbm_ep), data);
+
+	
+	dwc3_msm_dbm_ep_soft_reset(mdwc, dbm_ep, true);
+	udelay(10);
+	dwc3_msm_dbm_ep_soft_reset(mdwc, dbm_ep, false);
+
+	return 0;
+}
+
+int msm_data_fifo_config(struct usb_ep *ep, u32 addr, u32 size, u8 dst_pipe_idx)
+{
+	u8 dbm_ep;
+	struct dwc3_ep *dep = to_dwc3_ep(ep);
+	struct dwc3 *dwc = dep->dwc;
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
+	u8 bam_pipe = dst_pipe_idx;
+
+	dev_dbg(mdwc->dev, "%s\n", __func__);
+
+	dbm_ep = bam_pipe;
+	mdwc->ep_num_mapping[dbm_ep] = dep->number;
+
+	dwc3_msm_write_reg(mdwc->base, DBM_DATA_FIFO(dbm_ep), addr);
+	dwc3_msm_write_reg_field(mdwc->base, DBM_DATA_FIFO_SIZE(dbm_ep),
+		DBM_DATA_FIFO_SIZE_MASK, size);
+
+	return 0;
+}
+
+static void dwc3_msm_req_complete_func(struct usb_ep *ep,
+				       struct usb_request *request)
+{
+	struct dwc3_ep *dep = to_dwc3_ep(ep);
+	struct dwc3 *dwc = dep->dwc;
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
+	struct dwc3_msm_req_complete *req_complete = NULL;
+
+	
+	list_for_each_entry(req_complete, &mdwc->req_complete_list, list_item) {
+		if (req_complete->req == request)
+			break;
+	}
+	if (!req_complete || req_complete->req != request) {
+		dev_err(dep->dwc->dev, "%s: could not find the request\n",
+					__func__);
+		return;
+	}
+	list_del(&req_complete->list_item);
+
+	dep->busy_slot++;
+
+	
+	dwc3_msm_dbm_ep_unconfig(mdwc, dep->number);
+
+	if (0 == dwc3_msm_configured_dbm_ep_num(mdwc))
+		dwc3_msm_event_buffer_config(mdwc, 0, 0);
+
+	request->complete = req_complete->orig_complete;
+	if (request->complete)
+		request->complete(ep, request);
+
+	kfree(req_complete);
+}
+
+static int __dwc3_msm_ep_queue(struct dwc3_ep *dep, struct dwc3_request *req)
+{
+	struct dwc3_trb *trb;
+	struct dwc3_trb *trb_link;
+	struct dwc3_gadget_ep_cmd_params params;
+	u32 cmd;
+	int ret = 0;
+
+	req->queued = true;
+	list_add_tail(&req->list, &dep->req_queued);
+
+	
+	trb = &dep->trb_pool[dep->free_slot & DWC3_TRB_MASK];
+	dep->free_slot++;
+	memset(trb, 0, sizeof(*trb));
+
+	req->trb = trb;
+	trb->bph = DBM_TRB_BIT | DBM_TRB_DMA | DBM_TRB_EP_NUM(dep->number);
+	trb->size = DWC3_TRB_SIZE_LENGTH(req->request.length);
+	trb->ctrl = DWC3_TRBCTL_NORMAL | DWC3_TRB_CTRL_HWO | DWC3_TRB_CTRL_CHN;
+	req->trb_dma = dwc3_trb_dma_offset(dep, trb);
+
+	
+	trb_link = &dep->trb_pool[dep->free_slot & DWC3_TRB_MASK];
+	dep->free_slot++;
+	memset(trb_link, 0, sizeof *trb_link);
+
+	trb_link->bpl = lower_32_bits(req->trb_dma);
+	trb_link->bph = DBM_TRB_BIT |
+			DBM_TRB_DMA | DBM_TRB_EP_NUM(dep->number);
+	trb_link->size = 0;
+	trb_link->ctrl = DWC3_TRBCTL_LINK_TRB | DWC3_TRB_CTRL_HWO;
+
+	memset(&params, 0, sizeof(params));
+	params.param0 = 0; 
+	params.param1 = lower_32_bits(req->trb_dma); 
+
+	
+	cmd = DWC3_DEPCMD_STARTTRANSFER | DWC3_DEPCMD_CMDIOC;
+	ret = dwc3_send_gadget_ep_cmd(dep->dwc, dep->number, cmd, &params);
+	if (ret < 0) {
+		dev_dbg(dep->dwc->dev,
+			"%s: failed to send STARTTRANSFER command\n",
+			__func__);
+
+		list_del(&req->list);
+		return ret;
+	}
+	dep->flags |= DWC3_EP_BUSY;
+
+	return ret;
+}
+
+static int dwc3_msm_ep_queue(struct usb_ep *ep,
+			     struct usb_request *request, gfp_t gfp_flags)
+{
+	struct dwc3_request *req = to_dwc3_request(request);
+	struct dwc3_ep *dep = to_dwc3_ep(ep);
+	struct dwc3 *dwc = dep->dwc;
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
+	struct dwc3_msm_req_complete *req_complete;
+	unsigned long flags;
+	int ret = 0;
+	u8 bam_pipe;
+	bool producer;
+	bool disable_wb;
+	bool internal_mem;
+	bool ioc;
+	u8 speed;
+
+	if (!(request->udc_priv & MSM_SPS_MODE)) {
+		
+		dev_vdbg(mdwc->dev, "%s: not sps mode, use regular queue\n",
+					__func__);
+
+		return (mdwc->original_ep_ops[dep->number])->queue(ep,
+								request,
+								gfp_flags);
+	}
+
+	if (!dep->endpoint.desc) {
+		dev_err(mdwc->dev,
+			"%s: trying to queue request %p to disabled ep %s\n",
+			__func__, request, ep->name);
+		return -EPERM;
+	}
+
+	if (dep->number == 0 || dep->number == 1) {
+		dev_err(mdwc->dev,
+			"%s: trying to queue dbm request %p to control ep %s\n",
+			__func__, request, ep->name);
+		return -EPERM;
+	}
+
+
+	if (dep->busy_slot != dep->free_slot || !list_empty(&dep->request_list)
+					 || !list_empty(&dep->req_queued)) {
+		dev_err(mdwc->dev,
+			"%s: trying to queue dbm request %p tp ep %s\n",
+			__func__, request, ep->name);
+		return -EPERM;
+	} else {
+		dep->busy_slot = 0;
+		dep->free_slot = 0;
+	}
+
+	req_complete = kzalloc(sizeof(*req_complete), GFP_KERNEL);
+	if (!req_complete) {
+		dev_err(mdwc->dev, "%s: not enough memory\n", __func__);
+		return -ENOMEM;
+	}
+	req_complete->req = request;
+	req_complete->orig_complete = request->complete;
+	list_add_tail(&req_complete->list_item, &mdwc->req_complete_list);
+	request->complete = dwc3_msm_req_complete_func;
+
+	bam_pipe = request->udc_priv & MSM_PIPE_ID_MASK;
+	producer = ((request->udc_priv & MSM_PRODUCER) ? true : false);
+	disable_wb = ((request->udc_priv & MSM_DISABLE_WB) ? true : false);
+	internal_mem = ((request->udc_priv & MSM_INTERNAL_MEM) ? true : false);
+	ioc = ((request->udc_priv & MSM_ETD_IOC) ? true : false);
+
+	ret = dwc3_msm_dbm_ep_config(mdwc, dep->number,
+					bam_pipe, producer,
+					disable_wb, internal_mem, ioc);
+	if (ret < 0) {
+		dev_err(mdwc->dev,
+			"error %d after calling dwc3_msm_dbm_ep_config\n",
+			ret);
+		return ret;
+	}
+
+	dev_vdbg(dwc->dev, "%s: queing request %p to ep %s length %d\n",
+			__func__, request, ep->name, request->length);
+
+	spin_lock_irqsave(&dwc->lock, flags);
+	ret = __dwc3_msm_ep_queue(dep, req);
+	spin_unlock_irqrestore(&dwc->lock, flags);
+	if (ret < 0) {
+		dev_err(mdwc->dev,
+			"error %d after calling __dwc3_msm_ep_queue\n", ret);
+		return ret;
+	}
+
+	speed = dwc3_readl(dwc->regs, DWC3_DSTS) & DWC3_DSTS_CONNECTSPD;
+	dwc3_msm_write_reg(mdwc->base, DBM_GEN_CFG, speed >> 2);
+
+	return 0;
+}
+
+int msm_ep_config(struct usb_ep *ep)
+{
+	struct dwc3_ep *dep = to_dwc3_ep(ep);
+	struct dwc3 *dwc = dep->dwc;
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
+	struct usb_ep_ops *new_ep_ops;
+
+	dwc3_msm_event_buffer_config(mdwc,
+			dwc3_msm_read_reg(mdwc->base, DWC3_GEVNTADRLO(0)),
+			dwc3_msm_read_reg(mdwc->base, DWC3_GEVNTSIZ(0)));
+
+	
+	if (mdwc->original_ep_ops[dep->number]) {
+		dev_err(mdwc->dev,
+			"ep [%s,%d] already configured as msm endpoint\n",
+			ep->name, dep->number);
+		return -EPERM;
+	}
+	mdwc->original_ep_ops[dep->number] = ep->ops;
+
+	
+	new_ep_ops = kzalloc(sizeof(struct usb_ep_ops), GFP_KERNEL);
+	if (!new_ep_ops) {
+		dev_err(mdwc->dev,
+			"%s: unable to allocate mem for new usb ep ops\n",
+			__func__);
+		return -ENOMEM;
+	}
+	(*new_ep_ops) = (*ep->ops);
+	new_ep_ops->queue = dwc3_msm_ep_queue;
+	new_ep_ops->disable = ep->ops->disable;
+
+	ep->ops = new_ep_ops;
+
+
+	return 0;
+}
+EXPORT_SYMBOL(msm_ep_config);
+
+int msm_ep_unconfig(struct usb_ep *ep)
+{
+	struct dwc3_ep *dep = to_dwc3_ep(ep);
+	struct dwc3 *dwc = dep->dwc;
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
+	struct usb_ep_ops *old_ep_ops;
+
+	
+	if (!mdwc->original_ep_ops[dep->number]) {
+		dev_err(mdwc->dev,
+			"ep [%s,%d] was not configured as msm endpoint\n",
+			ep->name, dep->number);
+		return -EINVAL;
+	}
+	old_ep_ops = (struct usb_ep_ops	*)ep->ops;
+	ep->ops = mdwc->original_ep_ops[dep->number];
+	mdwc->original_ep_ops[dep->number] = NULL;
+	kfree(old_ep_ops);
+
+
+	return 0;
+}
+EXPORT_SYMBOL(msm_ep_unconfig);
+
+void dwc3_tx_fifo_resize_request(struct usb_ep *ep, bool qdss_enabled)
+{
+	struct dwc3_ep *dep = to_dwc3_ep(ep);
+	struct dwc3 *dwc = dep->dwc;
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
+
+	if (qdss_enabled) {
+		dwc->tx_fifo_reduced = true;
+		dwc->tx_fifo_size = mdwc->qdss_tx_fifo_size;
+	} else {
+		dwc->tx_fifo_reduced = false;
+		dwc->tx_fifo_size = mdwc->tx_fifo_size;
+	}
+}
+EXPORT_SYMBOL(dwc3_tx_fifo_resize_request);
+
+static void dwc3_restart_usb_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
+						restart_usb_work);
+
+	dev_dbg(mdwc->dev, "%s\n", __func__);
+
+	if (atomic_read(&mdwc->in_lpm) || !mdwc->otg_xceiv) {
+		dev_err(mdwc->dev, "%s failed!!!\n", __func__);
+		return;
+	}
+
+	if (!mdwc->ext_xceiv.bsv) {
+		dev_dbg(mdwc->dev, "%s bailing out in disconnect\n", __func__);
+		return;
+	}
+
+	
+	mdwc->ext_xceiv.bsv = false;
+	queue_delayed_work(system_nrt_wq, &mdwc->resume_work, 0);
+	
+	flush_delayed_work(&mdwc->resume_work);
+
+	mdwc->ext_xceiv.bsv = true;
+	queue_delayed_work(system_nrt_wq, &mdwc->resume_work, 0);
+}
+
+void msm_dwc3_restart_usb_session(struct usb_gadget *gadget)
+{
+	struct dwc3 *dwc = container_of(gadget, struct dwc3, gadget);
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
+
+	if (!mdwc)
+		return;
+	if (mdwc)
+		dev_dbg(mdwc->dev, "%s\n", __func__);
+	queue_work(system_nrt_wq, &mdwc->restart_usb_work);
+}
+EXPORT_SYMBOL(msm_dwc3_restart_usb_session);
+
+int msm_register_usb_ext_notification(struct usb_ext_notification *info)
+{
+	pr_debug("%s usb_ext: %p\n", __func__, info);
+
+	if (info) {
+		if (usb_ext) {
+			pr_err("%s: already registered\n", __func__);
+			return -EEXIST;
+		}
+
+		if (!info->notify) {
+			pr_err("%s: notify is NULL\n", __func__);
+			return -EINVAL;
+		}
+	}
+
+	usb_ext = info;
+	return 0;
+}
+EXPORT_SYMBOL(msm_register_usb_ext_notification);
+
+static int dwc3_hsusb_config_vddcx(struct dwc3_msm *dwc, int high)
+{
+	int min_vol, max_vol, ret;
+
+	max_vol = dwc->vdd_high_vol_level;
+	min_vol = high ? dwc->vdd_low_vol_level : dwc->vdd_no_vol_level;
+	ret = regulator_set_voltage(dwc->hsusb_vddcx, min_vol, max_vol);
+	if (ret) {
+		dev_err(dwc->dev, "unable to set voltage for HSUSB_VDDCX\n");
+		return ret;
+	}
+
+	dev_dbg(dwc->dev, "%s: min_vol:%d max_vol:%d\n", __func__,
+							min_vol, max_vol);
+
+	return ret;
+}
+
+static int dwc3_hsusb_ldo_init(struct dwc3_msm *dwc, int init)
+{
+	int rc = 0;
+
+	if (!init) {
+		regulator_set_voltage(dwc->hsusb_1p8, 0, USB_HSPHY_1P8_VOL_MAX);
+		regulator_set_voltage(dwc->hsusb_3p3, 0, USB_HSPHY_3P3_VOL_MAX);
+		return 0;
+	}
+
+	dwc->hsusb_3p3 = devm_regulator_get(dwc->dev, "HSUSB_3p3");
+	if (IS_ERR(dwc->hsusb_3p3)) {
+		dev_err(dwc->dev, "unable to get hsusb 3p3\n");
+		return PTR_ERR(dwc->hsusb_3p3);
+	}
+
+	rc = regulator_set_voltage(dwc->hsusb_3p3,
+			USB_HSPHY_3P3_VOL_MIN, USB_HSPHY_3P3_VOL_MAX);
+	if (rc) {
+		dev_err(dwc->dev, "unable to set voltage for hsusb 3p3\n");
+		return rc;
+	}
+	dwc->hsusb_1p8 = devm_regulator_get(dwc->dev, "HSUSB_1p8");
+	if (IS_ERR(dwc->hsusb_1p8)) {
+		dev_err(dwc->dev, "unable to get hsusb 1p8\n");
+		rc = PTR_ERR(dwc->hsusb_1p8);
+		goto devote_3p3;
+	}
+	rc = regulator_set_voltage(dwc->hsusb_1p8,
+			USB_HSPHY_1P8_VOL_MIN, USB_HSPHY_1P8_VOL_MAX);
+	if (rc) {
+		dev_err(dwc->dev, "unable to set voltage for hsusb 1p8\n");
+		goto devote_3p3;
+	}
+
+	return 0;
+
+devote_3p3:
+	regulator_set_voltage(dwc->hsusb_3p3, 0, USB_HSPHY_3P3_VOL_MAX);
+
+	return rc;
+}
+
+static int dwc3_hsusb_ldo_enable(struct dwc3_msm *dwc, int on)
+{
+	int rc = 0;
+	static int l24_keep = 0;
+
+	dev_dbg(dwc->dev, "reg (%s)\n", on ? "HPM" : "LPM");
+
+	if (!on)
+		goto disable_regulators;
+
+
+	rc = regulator_set_optimum_mode(dwc->hsusb_1p8, USB_HSPHY_1P8_HPM_LOAD);
+	if (rc < 0) {
+		dev_err(dwc->dev, "Unable to set HPM of regulator HSUSB_1p8\n");
+		return rc;
+	}
+
+	rc = regulator_enable(dwc->hsusb_1p8);
+	if (rc) {
+		dev_err(dwc->dev, "Unable to enable HSUSB_1p8\n");
+		goto put_1p8_lpm;
+	}
+
+	rc = regulator_set_optimum_mode(dwc->hsusb_3p3,	USB_HSPHY_3P3_HPM_LOAD);
+	if (rc < 0) {
+		dev_err(dwc->dev, "Unable to set HPM of regulator HSUSB_3p3\n");
+		goto disable_1p8;
+	}
+
+	if (l24_keep == 0) {
+		l24_keep = 1;
+
+		rc = regulator_enable(dwc->hsusb_3p3);
+		if (rc) {
+			dev_err(dwc->dev, "Unable to enable HSUSB_3p3\n");
+			goto put_3p3_lpm;
+		}
+	}
+
+	return 0;
+
+disable_regulators:
+put_3p3_lpm:
+	rc = regulator_set_optimum_mode(dwc->hsusb_3p3, 0);
+	if (rc < 0)
+		dev_err(dwc->dev, "Unable to set LPM of regulator HSUSB_3p3\n");
+
+disable_1p8:
+	rc = regulator_disable(dwc->hsusb_1p8);
+	if (rc)
+		dev_err(dwc->dev, "Unable to disable HSUSB_1p8\n");
+
+put_1p8_lpm:
+	rc = regulator_set_optimum_mode(dwc->hsusb_1p8, 0);
+	if (rc < 0)
+		dev_err(dwc->dev, "Unable to set LPM of regulator HSUSB_1p8\n");
+
+	return rc < 0 ? rc : 0;
+}
+
+static int dwc3_ssusb_config_vddcx(struct dwc3_msm *dwc, int high)
+{
+	int min_vol, max_vol, ret;
+
+	max_vol = dwc->vdd_high_vol_level;
+	min_vol = high ? dwc->vdd_low_vol_level : dwc->vdd_no_vol_level;
+	ret = regulator_set_voltage(dwc->ssusb_vddcx, min_vol, max_vol);
+	if (ret) {
+		dev_err(dwc->dev, "unable to set voltage for SSUSB_VDDCX\n");
+		return ret;
+	}
+
+	dev_dbg(dwc->dev, "%s: min_vol:%d max_vol:%d\n", __func__,
+							min_vol, max_vol);
+	return ret;
+}
+
+static int dwc3_ssusb_ldo_init(struct dwc3_msm *dwc, int init)
+{
+	int rc = 0;
+
+	if (!init) {
+		regulator_set_voltage(dwc->ssusb_1p8, 0, USB_SSPHY_1P8_VOL_MAX);
+		return 0;
+	}
+
+	dwc->ssusb_1p8 = devm_regulator_get(dwc->dev, "SSUSB_1p8");
+	if (IS_ERR(dwc->ssusb_1p8)) {
+		dev_err(dwc->dev, "unable to get ssusb 1p8\n");
+		return PTR_ERR(dwc->ssusb_1p8);
+	}
+	rc = regulator_set_voltage(dwc->ssusb_1p8,
+			USB_SSPHY_1P8_VOL_MIN, USB_SSPHY_1P8_VOL_MAX);
+	if (rc)
+		dev_err(dwc->dev, "unable to set voltage for ssusb 1p8\n");
+
+	return rc;
+}
+
+static int dwc3_ssusb_ldo_enable(struct dwc3_msm *dwc, int on)
+{
+	int rc = 0;
+
+	dev_dbg(dwc->dev, "reg (%s)\n", on ? "HPM" : "LPM");
+
+	if (!on)
+		goto disable_regulators;
+
+
+	rc = regulator_set_optimum_mode(dwc->ssusb_1p8, USB_SSPHY_1P8_HPM_LOAD);
+	if (rc < 0) {
+		dev_err(dwc->dev, "Unable to set HPM of SSUSB_1p8\n");
+		return rc;
+	}
+
+	rc = regulator_enable(dwc->ssusb_1p8);
+	if (rc) {
+		dev_err(dwc->dev, "Unable to enable SSUSB_1p8\n");
+		goto put_1p8_lpm;
+	}
+
+	return 0;
+
+disable_regulators:
+	rc = regulator_disable(dwc->ssusb_1p8);
+	if (rc)
+		dev_err(dwc->dev, "Unable to disable SSUSB_1p8\n");
+
+put_1p8_lpm:
+	rc = regulator_set_optimum_mode(dwc->ssusb_1p8, 0);
+	if (rc < 0)
+		dev_err(dwc->dev, "Unable to set LPM of SSUSB_1p8\n");
+
+	return rc < 0 ? rc : 0;
+}
+
+static int dwc3_msm_config_gdsc(struct dwc3_msm *mdwc, int on)
+{
+	int ret = 0;
+
+	if (IS_ERR(mdwc->dwc3_gdsc))
+		return 0;
+
+	if (!mdwc->dwc3_gdsc) {
+		mdwc->dwc3_gdsc = devm_regulator_get(mdwc->dev,
+			"USB3_GDSC");
+		if (IS_ERR(mdwc->dwc3_gdsc))
+			return 0;
+	}
+
+	if (on) {
+		ret = regulator_enable(mdwc->dwc3_gdsc);
+		if (ret) {
+			dev_err(mdwc->dev, "unable to enable usb3 gdsc\n");
+			return ret;
+		}
+	} else {
+		regulator_disable(mdwc->dwc3_gdsc);
+	}
+
+	return 0;
+}
+
+static int dwc3_msm_link_clk_reset(struct dwc3_msm *mdwc, bool assert)
+{
+	int ret = 0;
+
+	if (assert) {
+		
+		dev_dbg(mdwc->dev, "block_reset ASSERT\n");
+		clk_disable_unprepare(mdwc->ref_clk);
+		clk_disable_unprepare(mdwc->iface_clk);
+		clk_disable_unprepare(mdwc->core_clk);
+		ret = clk_reset(mdwc->core_clk, CLK_RESET_ASSERT);
+		if (ret)
+			dev_err(mdwc->dev, "dwc3 core_clk assert failed\n");
+	} else {
+		dev_dbg(mdwc->dev, "block_reset DEASSERT\n");
+		ret = clk_reset(mdwc->core_clk, CLK_RESET_DEASSERT);
+		ndelay(200);
+		clk_prepare_enable(mdwc->core_clk);
+		clk_prepare_enable(mdwc->ref_clk);
+		clk_prepare_enable(mdwc->iface_clk);
+		if (ret)
+			dev_err(mdwc->dev, "dwc3 core_clk deassert failed\n");
+	}
+
+	return ret;
+}
+
+static void dwc3_msm_ss_phy_reg_init(struct dwc3_msm *mdwc)
+{
+	u32 data = 0;
+
+	return;
+
+	data = dwc3_msm_ssusb_read_phycreg(mdwc->base, 0x102D);
+	data |= (1 << 7);
+	dwc3_msm_ssusb_write_phycreg(mdwc->base, 0x102D, data);
+
+	data = dwc3_msm_ssusb_read_phycreg(mdwc->base, 0x1010);
+	data &= ~0xFF0;
+	data |= 0x20;
+	dwc3_msm_ssusb_write_phycreg(mdwc->base, 0x1010, data);
+
+	data = dwc3_msm_ssusb_read_phycreg(mdwc->base, 0x1006);
+	data &= ~(1 << 6);
+	data |= (1 << 7);
+	data &= ~(0x7 << 8);
+	data |= (0x3 << 8);
+	data |= (0x1 << 11);
+	dwc3_msm_ssusb_write_phycreg(mdwc->base, 0x1006, data);
+
+	data = dwc3_msm_ssusb_read_phycreg(mdwc->base, 0x1002);
+	data &= ~0x3F80;
+	if (ss_phy_override_deemphasis)
+		mdwc->deemphasis_val = ss_phy_override_deemphasis;
+	if (mdwc->deemphasis_val)
+		data |= (mdwc->deemphasis_val << 7);
+	else
+		data |= (0x16 << 7);
+	data &= ~0x7F;
+	data |= (0x7F | (1 << 14));
+	dwc3_msm_ssusb_write_phycreg(mdwc->base, 0x1002, data);
+
+	dwc3_msm_write_readback(mdwc->base, SS_PHY_PARAM_CTRL_1,
+				0x07f03f07, 0x07f01605);
+}
+
+static void dwc3_msm_update_ref_clk(struct dwc3_msm *mdwc)
+{
+	u32 guctl, gfladj = 0;
+
+	guctl = dwc3_msm_read_reg(mdwc->base, DWC3_GUCTL);
+	guctl &= ~DWC3_GUCTL_REFCLKPER;
+
+	
+	if (dwc3_msm_read_reg(mdwc->base, DWC3_GSNPSID) >= DWC3_REVISION_250A) {
+		gfladj = dwc3_msm_read_reg(mdwc->base, DWC3_GFLADJ);
+		gfladj &= ~DWC3_GFLADJ_REFCLK_240MHZDECR_PLS1;
+		gfladj &= ~DWC3_GFLADJ_REFCLK_240MHZ_DECR;
+		gfladj &= ~DWC3_GFLADJ_REFCLK_LPM_SEL;
+		gfladj &= ~DWC3_GFLADJ_REFCLK_FLADJ;
+	}
+
+	
+	switch (mdwc->utmi_clk_rate) {
+	case 19200000:
+		guctl |= 52 << __ffs(DWC3_GUCTL_REFCLKPER);
+		gfladj |= 12 << __ffs(DWC3_GFLADJ_REFCLK_240MHZ_DECR);
+		gfladj |= DWC3_GFLADJ_REFCLK_240MHZDECR_PLS1;
+		gfladj |= DWC3_GFLADJ_REFCLK_LPM_SEL;
+		gfladj |= 200 << __ffs(DWC3_GFLADJ_REFCLK_FLADJ);
+		break;
+	case 24000000:
+		guctl |= 41 << __ffs(DWC3_GUCTL_REFCLKPER);
+		gfladj |= 10 << __ffs(DWC3_GFLADJ_REFCLK_240MHZ_DECR);
+		gfladj |= DWC3_GFLADJ_REFCLK_LPM_SEL;
+		gfladj |= 2032 << __ffs(DWC3_GFLADJ_REFCLK_FLADJ);
+		break;
+	default:
+		dev_warn(mdwc->dev, "Unsupported utmi_clk_rate: %u\n",
+				mdwc->utmi_clk_rate);
+		break;
+	}
+
+	dwc3_msm_write_reg(mdwc->base, DWC3_GUCTL, guctl);
+	if (gfladj)
+		dwc3_msm_write_reg(mdwc->base, DWC3_GFLADJ, gfladj);
+}
+
+static void dwc3_msm_qscratch_reg_init(struct dwc3_msm *mdwc,
+						unsigned event_status)
+{
+	if (event_status == DWC3_CONTROLLER_POST_RESET_EVENT) {
+		dwc3_msm_ss_phy_reg_init(mdwc);
+		return;
+	}
+
+	
+	dwc3_msm_write_reg(mdwc->base, SS_PHY_CTRL_REG, 0x10210002);
+	msleep(30);
+	
+	dwc3_msm_write_reg(mdwc->base, SS_PHY_CTRL_REG, 0x10210082);
+	usleep_range(2000, 2200);
+	
+	dwc3_msm_write_reg(mdwc->base, SS_PHY_CTRL_REG, 0x10210002);
+	usleep_range(2000, 2200);
+	
+	dwc3_msm_write_reg(mdwc->base, SS_PHY_CTRL_REG, 0x11210102);
+	usleep_range(2000, 2200);
+	dwc3_msm_write_reg(mdwc->base, HS_PHY_CTRL_REG, 0x5220bb2);
+	usleep_range(2000, 2200);
+	
+	dwc3_msm_write_reg(mdwc->base, QSCRATCH_GENERAL_CFG, 0x4);
+	if (override_phy_init)
+		mdwc->hsphy_init_seq = override_phy_init;
+	if (mdwc->hsphy_init_seq)
+		dwc3_msm_write_readback(mdwc->base,
+					PARAMETER_OVERRIDE_X_REG, 0x03FFFFFF,
+					mdwc->hsphy_init_seq & 0x03FFFFFF);
+
+	dwc3_msm_write_reg(mdwc->base, CGCTL_REG,
+		dwc3_msm_read_reg(mdwc->base, CGCTL_REG) | 0x18);
+
+	mdwc->qscratch_ctl_val =
+		dwc3_msm_read_reg(mdwc->base, QSCRATCH_CTRL_REG);
+}
+
+static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned event)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
+
+	if (dwc->revision < DWC3_REVISION_230A)
+		return;
+
+	switch (event) {
+	case DWC3_CONTROLLER_ERROR_EVENT:
+		dev_info(mdwc->dev, "DWC3_CONTROLLER_ERROR_EVENT received\n");
+		dwc3_msm_dump_phy_info(mdwc);
+		dwc3_msm_write_reg(mdwc->base, DWC3_DEVTEN, 0);
+		queue_work(system_nrt_wq, &mdwc->usb_block_reset_work);
+		break;
+	case DWC3_CONTROLLER_RESET_EVENT:
+		dev_dbg(mdwc->dev, "DWC3_CONTROLLER_RESET_EVENT received\n");
+		dwc3_msm_qscratch_reg_init(mdwc, DWC3_CONTROLLER_RESET_EVENT);
+		break;
+	case DWC3_CONTROLLER_POST_RESET_EVENT:
+		dev_dbg(mdwc->dev,
+				"DWC3_CONTROLLER_POST_RESET_EVENT received\n");
+		dwc3_msm_qscratch_reg_init(mdwc,
+					DWC3_CONTROLLER_POST_RESET_EVENT);
+		dwc3_msm_update_ref_clk(mdwc);
+		dwc->tx_fifo_size = mdwc->tx_fifo_size;
+		break;
+	case DWC3_CONTROLLER_POST_INITIALIZATION_EVENT:
+		
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 24),
+									0x0);
+	default:
+		dev_dbg(mdwc->dev, "unknown dwc3 event\n");
+		break;
+	}
+}
+
+static void dwc3_msm_block_reset(struct dwc3_ext_xceiv *xceiv, bool core_reset)
+{
+	struct dwc3_msm *mdwc = container_of(xceiv, struct dwc3_msm, ext_xceiv);
+	int ret  = 0;
+
+	if (core_reset) {
+		ret = dwc3_msm_link_clk_reset(mdwc, 1);
+		if (ret)
+			return;
+
+		usleep_range(1000, 1200);
+		ret = dwc3_msm_link_clk_reset(mdwc, 0);
+		if (ret)
+			return;
+
+		usleep_range(10000, 12000);
+	}
+
+	
+	dwc3_msm_dbm_soft_reset(mdwc, 1);
+	usleep_range(1000, 1200);
+	dwc3_msm_dbm_soft_reset(mdwc, 0);
+}
+
+static void dwc3_block_reset_usb_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
+						usb_block_reset_work);
+	u32 reg;
+
+	dev_dbg(mdwc->dev, "%s\n", __func__);
+
+	dwc3_msm_block_reset(&mdwc->ext_xceiv, true);
+
+	reg = (DWC3_DEVTEN_EVNTOVERFLOWEN |
+			DWC3_DEVTEN_CMDCMPLTEN |
+			DWC3_DEVTEN_ERRTICERREN |
+			DWC3_DEVTEN_WKUPEVTEN |
+			DWC3_DEVTEN_ULSTCNGEN |
+			DWC3_DEVTEN_CONNECTDONEEN |
+			DWC3_DEVTEN_USBRSTEN |
+			DWC3_DEVTEN_DISCONNEVTEN);
+	dwc3_msm_write_reg(mdwc->base, DWC3_DEVTEN, reg);
+
+
+}
+
+static void dwc3_chg_enable_secondary_det(struct dwc3_msm *mdwc)
+{
+	u32 chg_ctrl;
+
+	
+	dwc3_msm_write_reg(mdwc->base, CHARGING_DET_CTRL_REG, 0x0);
+	msleep(20);
+
+	
+	chg_ctrl = dwc3_msm_read_reg(mdwc->base, CHARGING_DET_CTRL_REG);
+	if (chg_ctrl & 0x3F)
+		dev_err(mdwc->dev, "%s Unable to reset chg_det block: %x\n",
+						 __func__, chg_ctrl);
+	dwc3_msm_write_readback(mdwc->base, CHARGING_DET_CTRL_REG, 0x3F, 0x34);
+}
+
+static bool dwc3_chg_det_check_linestate(struct dwc3_msm *mdwc)
+{
+	u32 chg_det;
+
+	if (!prop_chg_detect)
+		return false;
+
+	chg_det = dwc3_msm_read_reg(mdwc->base, CHARGING_DET_OUTPUT_REG);
+
+	return chg_det & (3 << 8);
+}
+
+int htc_dwc3_chg_det_check_linestate(void *raw)
+{
+	u32 chg_det;
+	struct dwc3_msm *mdwc = (struct dwc3_msm *)raw;
+
+	if (!atomic_read(&mdwc->in_lpm))
+		chg_det = dwc3_msm_read_reg(mdwc->base, CHARGING_DET_OUTPUT_REG);
+	else {
+		pr_info("%s: Already suspended, can't get linestate\n", __func__);
+		chg_det = 0;
+	}
+	return (chg_det & (3 << 8));
+}
+
+static bool dwc3_chg_det_check_output(struct dwc3_msm *mdwc)
+{
+	u32 chg_det;
+	bool ret = false;
+
+	chg_det = dwc3_msm_read_reg(mdwc->base, CHARGING_DET_OUTPUT_REG);
+	ret = chg_det & 1;
+
+	return ret;
+}
+
+static void dwc3_chg_enable_primary_det(struct dwc3_msm *mdwc)
+{
+	dwc3_msm_write_readback(mdwc->base, CHARGING_DET_CTRL_REG, 0x3F, 0x30);
+}
+
+static inline bool dwc3_chg_check_dcd(struct dwc3_msm *mdwc)
+{
+	u32 chg_state;
+	bool ret = false;
+
+	chg_state = dwc3_msm_read_reg(mdwc->base, CHARGING_DET_OUTPUT_REG);
+	ret = chg_state & 2;
+
+	return ret;
+}
+
+static inline void dwc3_chg_disable_dcd(struct dwc3_msm *mdwc)
+{
+	dwc3_msm_write_readback(mdwc->base, CHARGING_DET_CTRL_REG, 0x3F, 0x0);
+}
+
+static inline void dwc3_chg_enable_dcd(struct dwc3_msm *mdwc)
+{
+	
+	dwc3_msm_write_readback(mdwc->base, CHARGING_DET_CTRL_REG, 0x3F, 0x2);
+}
+
+static void dwc3_chg_block_reset(struct dwc3_msm *mdwc)
+{
+	u32 chg_ctrl;
+
+	dwc3_msm_write_reg(mdwc->base, QSCRATCH_CTRL_REG,
+			mdwc->qscratch_ctl_val);
+	
+	dwc3_msm_write_reg(mdwc->base, CHARGING_DET_CTRL_REG, 0x0);
+
+	
+	dwc3_msm_write_reg(mdwc->base, HS_PHY_IRQ_STAT_REG, 0xFFF);
+	dwc3_msm_write_reg(mdwc->base, ALT_INTERRUPT_EN_REG, 0x0);
+
+	udelay(100);
+
+	
+	chg_ctrl = dwc3_msm_read_reg(mdwc->base, CHARGING_DET_CTRL_REG);
+	if (chg_ctrl & 0x3F)
+		dev_err(mdwc->dev, "%s Unable to reset chg_det block: %x\n",
+						 __func__, chg_ctrl);
+}
+
+static const char *chg_to_string(enum dwc3_chg_type chg_type)
+{
+	switch (chg_type) {
+	case DWC3_SDP_CHARGER:		return "USB_SDP_CHARGER";
+	case DWC3_DCP_CHARGER:		return "USB_DCP_CHARGER";
+	case DWC3_CDP_CHARGER:		return "USB_CDP_CHARGER";
+	case DWC3_PROPRIETARY_CHARGER:	return "USB_PROPRIETARY_CHARGER";
+	case DWC3_FLOATED_CHARGER:	return "USB_FLOATED_CHARGER";
+	default:			return "UNKNOWN_CHARGER";
+	}
+}
+
+#define DWC3_CHG_DCD_POLL_TIME		(100 * HZ/1000) 
+#define DWC3_CHG_DCD_MAX_RETRIES	6 
+#define DWC3_CHG_PRIMARY_DET_TIME	(50 * HZ/1000) 
+#define DWC3_CHG_SECONDARY_DET_TIME	(50 * HZ/1000) 
+
+static void dwc3_chg_detect_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm, chg_work.work);
+	bool is_dcd = false, tmout, vout;
+	static bool dcd;
+	unsigned long delay;
+
+	dev_dbg(mdwc->dev, "chg detection work\n");
+	switch (mdwc->chg_state) {
+	case USB_CHG_STATE_UNDEFINED:
+		dwc3_chg_block_reset(mdwc);
+		dwc3_chg_enable_dcd(mdwc);
+		mdwc->chg_state = USB_CHG_STATE_WAIT_FOR_DCD;
+		mdwc->dcd_retries = 0;
+		delay = DWC3_CHG_DCD_POLL_TIME;
+		break;
+	case USB_CHG_STATE_WAIT_FOR_DCD:
+		is_dcd = dwc3_chg_check_dcd(mdwc);
+		tmout = ++mdwc->dcd_retries == DWC3_CHG_DCD_MAX_RETRIES;
+		if (is_dcd || tmout) {
+			if (is_dcd)
+				dcd = true;
+			else
+				dcd = false;
+			dwc3_chg_disable_dcd(mdwc);
+			usleep_range(1000, 1200);
+			if (dwc3_chg_det_check_linestate(mdwc)) {
+				mdwc->charger.chg_type =
+						DWC3_PROPRIETARY_CHARGER;
+				mdwc->chg_state = USB_CHG_STATE_DETECTED;
+				delay = 0;
+				break;
+			}
+			dwc3_chg_enable_primary_det(mdwc);
+			delay = DWC3_CHG_PRIMARY_DET_TIME;
+			mdwc->chg_state = USB_CHG_STATE_DCD_DONE;
+		} else {
+			delay = DWC3_CHG_DCD_POLL_TIME;
+		}
+		break;
+	case USB_CHG_STATE_DCD_DONE:
+		vout = dwc3_chg_det_check_output(mdwc);
+		if (vout) {
+			dwc3_chg_enable_secondary_det(mdwc);
+			delay = DWC3_CHG_SECONDARY_DET_TIME;
+			mdwc->chg_state = USB_CHG_STATE_PRIMARY_DONE;
+		} else {
+			if (!dcd && prop_chg_detect)
+				mdwc->charger.chg_type =
+						DWC3_FLOATED_CHARGER;
+			else {
+				mdwc->charger.chg_type = DWC3_SDP_CHARGER;
+			}
+			mdwc->chg_state = USB_CHG_STATE_DETECTED;
+			delay = 0;
+		}
+		break;
+	case USB_CHG_STATE_PRIMARY_DONE:
+		vout = dwc3_chg_det_check_output(mdwc);
+		if (vout)
+			mdwc->charger.chg_type = DWC3_DCP_CHARGER;
+		else
+			mdwc->charger.chg_type = DWC3_CDP_CHARGER;
+		mdwc->chg_state = USB_CHG_STATE_SECONDARY_DONE;
+		
+	case USB_CHG_STATE_SECONDARY_DONE:
+		mdwc->chg_state = USB_CHG_STATE_DETECTED;
+		
+	case USB_CHG_STATE_DETECTED:
+		dwc3_chg_block_reset(mdwc);
+		
+		if (mdwc->charger.chg_type == DWC3_DCP_CHARGER) {
+			dwc3_msm_write_readback(mdwc->base,
+					CHARGING_DET_CTRL_REG, 0x1F, 0x10);
+			if (mdwc->ext_chg_opened) {
+				init_completion(&mdwc->ext_chg_wait);
+				mdwc->ext_chg_active = true;
+			}
+		}
+		dev_dbg(mdwc->dev, "chg_type = %s\n",
+			chg_to_string(mdwc->charger.chg_type));
+		pr_info("[USB] %s: chg_type = %s\n",__func__,chg_to_string(mdwc->charger.chg_type));
+		mdwc->charger.notify_detection_complete(mdwc->otg_xceiv->otg,
+								&mdwc->charger);
+		return;
+	default:
+		return;
+	}
+
+	queue_delayed_work(system_nrt_wq, &mdwc->chg_work, delay);
+}
+
+static void dwc3_start_chg_det(struct dwc3_charger *charger, bool start)
+{
+	struct dwc3_msm *mdwc = container_of(charger, struct dwc3_msm, charger);
+
+	if (start == false) {
+		dev_dbg(mdwc->dev, "canceling charging detection work\n");
+		cancel_delayed_work_sync(&mdwc->chg_work);
+		mdwc->chg_state = USB_CHG_STATE_UNDEFINED;
+		charger->chg_type = DWC3_INVALID_CHARGER;
+		return;
+	}
+
+	
+	if (mdwc->chg_state == USB_CHG_STATE_DETECTED &&
+		charger->chg_type != DWC3_INVALID_CHARGER)
+		return;
+
+	mdwc->chg_state = USB_CHG_STATE_UNDEFINED;
+	charger->chg_type = DWC3_INVALID_CHARGER;
+	queue_delayed_work(system_nrt_wq, &mdwc->chg_work, 0);
+}
+
+static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
+{
+	int ret;
+	bool dcp;
+	bool host_bus_suspend;
+	bool host_ss_active;
+	bool host_ss_suspend;
+	bool device_bus_suspend;
+
+	dev_dbg(mdwc->dev, "%s: entering lpm\n", __func__);
+
+	if (atomic_read(&mdwc->in_lpm)) {
+		dev_dbg(mdwc->dev, "%s: Already suspended\n", __func__);
+		printk("%s: Already suspended\n", __func__);
+		return 0;
+	}
+
+	host_ss_active = dwc3_msm_read_reg(mdwc->base, USB3_PORTSC) & PORT_PE;
+	if (mdwc->hs_phy_irq)
+		disable_irq(mdwc->hs_phy_irq);
+
+	if (cancel_delayed_work_sync(&mdwc->chg_work))
+		dev_dbg(mdwc->dev, "%s: chg_work was pending\n", __func__);
+	if (mdwc->chg_state != USB_CHG_STATE_DETECTED) {
+		
+		mdwc->chg_state = USB_CHG_STATE_UNDEFINED;
+		mdwc->charger.chg_type = DWC3_INVALID_CHARGER;
+		dwc3_msm_write_readback(mdwc->base, CHARGING_DET_CTRL_REG,
+								0x37, 0x0);
+	}
+
+	dcp = ((mdwc->charger.chg_type == DWC3_DCP_CHARGER) ||
+	      (mdwc->charger.chg_type == DWC3_PROPRIETARY_CHARGER) ||
+	      (mdwc->charger.chg_type == DWC3_FLOATED_CHARGER));
+	host_bus_suspend = mdwc->host_mode == 1;
+	host_ss_suspend = host_bus_suspend && host_ss_active;
+	device_bus_suspend = ((mdwc->charger.chg_type == DWC3_SDP_CHARGER) ||
+				 (mdwc->charger.chg_type == DWC3_CDP_CHARGER));
+
+	if (!dcp && !host_bus_suspend)
+		dwc3_msm_write_reg(mdwc->base, QSCRATCH_CTRL_REG,
+			mdwc->qscratch_ctl_val);
+
+	if (!host_ss_suspend) {
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 8),
+									0x0);
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 28),
+									0x0);
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 26),
+								(1 << 26));
+	}
+	usleep_range(1000, 1200);
+	if (!host_ss_suspend)
+		clk_disable_unprepare(mdwc->ref_clk);
+
+	if (host_bus_suspend) {
+		dwc3_msm_write_reg(mdwc->base, DWC3_GUSB2PHYCFG(0),
+			dwc3_msm_read_reg(mdwc->base, DWC3_GUSB2PHYCFG(0)) |
+								0x00000140);
+		dwc3_msm_write_reg(mdwc->base, HS_PHY_IRQ_STAT_REG, 0xFFF);
+		if (mdwc->otg_xceiv && (!mdwc->ext_xceiv.otg_capability))
+			dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG,
+							 0x18000, 0x18000);
+		dwc3_msm_write_reg(mdwc->base, ALT_INTERRUPT_EN_REG, 0xFC0);
+		udelay(5);
+	} else {
+		dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG, 0x1000,
+									0x1000);
+		dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG,
+							0xC00000, 0x800000);
+		dwc3_msm_write_reg(mdwc->base, HS_PHY_IRQ_STAT_REG, 0xFFF);
+		if (mdwc->otg_xceiv && (!mdwc->ext_xceiv.otg_capability))
+			dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG,
+							0x18000, 0x18000);
+		if (!dcp)
+			dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG,
+								0x2, 0x0);
+	}
+
+	
+	wmb();
+
+	
+	if (!host_bus_suspend)
+		dwc3_msm_config_gdsc(mdwc, 0);
+
+	if (!host_ss_suspend) {
+		clk_disable_unprepare(mdwc->core_clk);
+		mdwc->lpm_flags |= MDWC3_PHY_REF_AND_CORECLK_OFF;
+	}
+	clk_disable_unprepare(mdwc->iface_clk);
+
+	if (!host_bus_suspend)
+		clk_disable_unprepare(mdwc->utmi_clk);
+
+	if (!host_bus_suspend) {
+		
+		clk_disable_unprepare(mdwc->xo_clk);
+		mdwc->lpm_flags |= MDWC3_TCXO_SHUTDOWN;
+	}
+
+	if (mdwc->bus_perf_client) {
+		ret = msm_bus_scale_client_update_request(
+						mdwc->bus_perf_client, 0);
+		if (ret)
+			dev_err(mdwc->dev, "Failed to reset bus bw vote\n");
+	}
+
+	if (mdwc->otg_xceiv && mdwc->ext_xceiv.otg_capability && !dcp &&
+							!host_bus_suspend)
+		dwc3_hsusb_ldo_enable(mdwc, 0);
+
+	dwc3_ssusb_ldo_enable(mdwc, 0);
+	dwc3_ssusb_config_vddcx(mdwc, 0);
+	if (!host_bus_suspend && !dcp)
+		dwc3_hsusb_config_vddcx(mdwc, 0);
+	pm_relax(mdwc->dev);
+	atomic_set(&mdwc->in_lpm, 1);
+
+	dev_info(mdwc->dev, "DWC3 in low power mode\n");
+
+	if (mdwc->hs_phy_irq) {
+		if (host_bus_suspend || device_bus_suspend) {
+			enable_irq_wake(mdwc->hs_phy_irq);
+			mdwc->lpm_flags |= MDWC3_ASYNC_IRQ_WAKE_CAPABILITY;
+		}
+		enable_irq(mdwc->hs_phy_irq);
+	}
+
+	return 0;
+}
+
+static int dwc3_msm_resume(struct dwc3_msm *mdwc)
+{
+	int ret;
+	bool dcp;
+	bool host_bus_suspend;
+	bool resume_from_core_clk_off = false;
+
+	dev_dbg(mdwc->dev, "%s: exiting lpm\n", __func__);
+
+	if (!atomic_read(&mdwc->in_lpm)) {
+		dev_dbg(mdwc->dev, "%s: Already resumed\n", __func__);
+		printk("%s: Already resumed\n", __func__);
+		return 0;
+	}
+
+	pm_stay_awake(mdwc->dev);
+
+	if (mdwc->lpm_flags & MDWC3_PHY_REF_AND_CORECLK_OFF)
+		resume_from_core_clk_off = true;
+
+	if (mdwc->bus_perf_client) {
+		ret = msm_bus_scale_client_update_request(
+						mdwc->bus_perf_client, 1);
+		if (ret)
+			dev_err(mdwc->dev, "Failed to vote for bus scaling\n");
+	}
+
+	dcp = ((mdwc->charger.chg_type == DWC3_DCP_CHARGER) ||
+	      (mdwc->charger.chg_type == DWC3_PROPRIETARY_CHARGER) ||
+	      (mdwc->charger.chg_type == DWC3_FLOATED_CHARGER));
+	host_bus_suspend = mdwc->host_mode == 1;
+
+	if (mdwc->lpm_flags & MDWC3_TCXO_SHUTDOWN) {
+		
+		ret = clk_prepare_enable(mdwc->xo_clk);
+		if (ret)
+			dev_err(mdwc->dev, "%s failed to vote TCXO buffer%d\n",
+						__func__, ret);
+		mdwc->lpm_flags &= ~MDWC3_TCXO_SHUTDOWN;
+	}
+
+	
+	if (!host_bus_suspend)
+		dwc3_msm_config_gdsc(mdwc, 1);
+
+	if (!host_bus_suspend)
+		clk_prepare_enable(mdwc->utmi_clk);
+
+	if (mdwc->otg_xceiv && mdwc->ext_xceiv.otg_capability && !dcp &&
+							!host_bus_suspend)
+		dwc3_hsusb_ldo_enable(mdwc, 1);
+
+	dwc3_ssusb_ldo_enable(mdwc, 1);
+	dwc3_ssusb_config_vddcx(mdwc, 1);
+
+	if (!host_bus_suspend && !dcp)
+		dwc3_hsusb_config_vddcx(mdwc, 1);
+
+	if (mdwc->lpm_flags & MDWC3_PHY_REF_AND_CORECLK_OFF)
+		clk_prepare_enable(mdwc->ref_clk);
+	usleep_range(1000, 1200);
+
+	clk_prepare_enable(mdwc->iface_clk);
+	if (mdwc->lpm_flags & MDWC3_PHY_REF_AND_CORECLK_OFF) {
+		clk_prepare_enable(mdwc->core_clk);
+		mdwc->lpm_flags &= ~MDWC3_PHY_REF_AND_CORECLK_OFF;
+	}
+
+	if (host_bus_suspend) {
+		
+		if (mdwc->otg_xceiv && (!mdwc->ext_xceiv.otg_capability))
+			dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG,
+							0x18000, 0x0);
+		
+		dwc3_msm_write_reg(mdwc->base, HS_PHY_IRQ_STAT_REG, 0x000);
+
+		
+		dwc3_msm_write_reg(mdwc->base, ALT_INTERRUPT_EN_REG, 0x000);
+	} else {
+		
+		if (mdwc->otg_xceiv && (!mdwc->ext_xceiv.otg_capability))
+			dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG,
+								0x18000, 0x0);
+		
+		dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG, 0x2, 0x2);
+
+		dwc3_msm_write_reg(mdwc->base, DWC3_GUSB2PHYCFG(0),
+			dwc3_msm_read_reg(mdwc->base, DWC3_GUSB2PHYCFG(0)) |
+								 0xF0000000);
+		
+		udelay(10);
+		dwc3_msm_write_reg(mdwc->base, DWC3_GUSB2PHYCFG(0),
+		      dwc3_msm_read_reg(mdwc->base, DWC3_GUSB2PHYCFG(0)) &
+								0x7FFFFFFF);
+
+		
+		dwc3_msm_write_readback(mdwc->base, HS_PHY_CTRL_REG, 0xC00000,
+									0x0);
+
+	}
+
+	if (resume_from_core_clk_off) {
+		
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 7),
+								(1 << 7));
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 28),
+								(1 << 28));
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 8),
+								(1 << 8));
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 26),
+									0x0);
+		
+		udelay(10);
+		dwc3_msm_write_readback(mdwc->base, SS_PHY_CTRL_REG, (1 << 7),
+									0x0);
+
+		dwc3_msm_ss_phy_reg_init(mdwc);
+	}
+	atomic_set(&mdwc->in_lpm, 0);
+
+	
+	if (mdwc->lpm_irq_seen && mdwc->hs_phy_irq) {
+		enable_irq(mdwc->hs_phy_irq);
+		mdwc->lpm_irq_seen = false;
+	}
+	
+	if (mdwc->hs_phy_irq &&
+			(mdwc->lpm_flags & MDWC3_ASYNC_IRQ_WAKE_CAPABILITY)) {
+			disable_irq_wake(mdwc->hs_phy_irq);
+			mdwc->lpm_flags &= ~MDWC3_ASYNC_IRQ_WAKE_CAPABILITY;
+	}
+
+	dev_info(mdwc->dev, "DWC3 exited from low power mode\n");
+
+	return 0;
+}
+
+static void dwc3_wait_for_ext_chg_done(struct dwc3_msm *mdwc)
+{
+	unsigned long t;
+
+
+	if (mdwc->ext_chg_active && (mdwc->ext_xceiv.bsv ||
+				!mdwc->ext_xceiv.id)) {
+
+		dev_dbg(mdwc->dev, "before ext chg wait\n");
+
+		t = wait_for_completion_timeout(&mdwc->ext_chg_wait,
+				msecs_to_jiffies(3000));
+		if (!t)
+			dev_err(mdwc->dev, "ext chg wait timeout\n");
+		else
+			dev_dbg(mdwc->dev, "ext chg wait done\n");
+	}
+
+}
+
+static void dwc3_resume_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
+							resume_work.work);
+
+	dev_dbg(mdwc->dev, "%s: dwc3 resume work\n", __func__);
+	
+	if (!atomic_read(&mdwc->in_lpm)) {
+		dev_dbg(mdwc->dev, "%s: notifying xceiv event\n", __func__);
+		if (mdwc->otg_xceiv) {
+			dwc3_wait_for_ext_chg_done(mdwc);
+			mdwc->ext_xceiv.notify_ext_events(mdwc->otg_xceiv->otg,
+							DWC3_EVENT_XCEIV_STATE);
+		}
+		return;
+	}
+
+	
+	if (atomic_read(&mdwc->pm_suspended)) {
+		mdwc->resume_pending = true;
+	} else {
+		pm_runtime_get_sync(mdwc->dev);
+		if (mdwc->otg_xceiv)
+			mdwc->ext_xceiv.notify_ext_events(mdwc->otg_xceiv->otg,
+							DWC3_EVENT_PHY_RESUME);
+		pm_runtime_put_noidle(mdwc->dev);
+		if (mdwc->otg_xceiv && (mdwc->ext_xceiv.otg_capability)) {
+			dwc3_wait_for_ext_chg_done(mdwc);
+			mdwc->ext_xceiv.notify_ext_events(mdwc->otg_xceiv->otg,
+							DWC3_EVENT_XCEIV_STATE);
+		}
+	}
+}
+
+static u32 debug_id = true, debug_bsv, debug_connect;
+
+static int dwc3_connect_show(struct seq_file *s, void *unused)
+{
+	if (debug_connect)
+		seq_printf(s, "true\n");
+	else
+		seq_printf(s, "false\n");
+
+	return 0;
+}
+
+static int dwc3_connect_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, dwc3_connect_show, inode->i_private);
+}
+
+static ssize_t dwc3_connect_write(struct file *file, const char __user *ubuf,
+				size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct dwc3_msm *mdwc = s->private;
+	char buf[8];
+
+	memset(buf, 0x00, sizeof(buf));
+
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (!strncmp(buf, "enable", 6) || !strncmp(buf, "true", 4)) {
+		debug_connect = true;
+	} else {
+		debug_connect = debug_bsv = false;
+		debug_id = true;
+	}
+
+	mdwc->ext_xceiv.bsv = debug_bsv;
+	mdwc->ext_xceiv.id = debug_id ? DWC3_ID_FLOAT : DWC3_ID_GROUND;
+
+	if (atomic_read(&mdwc->in_lpm)) {
+		dev_dbg(mdwc->dev, "%s: calling resume_work\n", __func__);
+		dwc3_resume_work(&mdwc->resume_work.work);
+	} else {
+		dev_dbg(mdwc->dev, "%s: notifying xceiv event\n", __func__);
+		if (mdwc->otg_xceiv)
+			mdwc->ext_xceiv.notify_ext_events(mdwc->otg_xceiv->otg,
+							DWC3_EVENT_XCEIV_STATE);
+	}
+
+	return count;
+}
+
+const struct file_operations dwc3_connect_fops = {
+	.open = dwc3_connect_open,
+	.read = seq_read,
+	.write = dwc3_connect_write,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static struct dentry *dwc3_debugfs_root;
+
+static void dwc3_msm_debugfs_init(struct dwc3_msm *mdwc)
+{
+	dwc3_debugfs_root = debugfs_create_dir("msm_dwc3", NULL);
+
+	if (!dwc3_debugfs_root || IS_ERR(dwc3_debugfs_root))
+		return;
+
+	if (!debugfs_create_bool("id", S_IRUGO | S_IWUSR, dwc3_debugfs_root,
+				 &debug_id))
+		goto error;
+
+	if (!debugfs_create_bool("bsv", S_IRUGO | S_IWUSR, dwc3_debugfs_root,
+				 &debug_bsv))
+		goto error;
+
+	if (!debugfs_create_file("connect", S_IRUGO | S_IWUSR,
+				dwc3_debugfs_root, mdwc, &dwc3_connect_fops))
+		goto error;
+
+	return;
+
+error:
+	debugfs_remove_recursive(dwc3_debugfs_root);
+}
+
+static irqreturn_t msm_dwc3_irq(int irq, void *data)
+{
+	struct dwc3_msm *mdwc = data;
+
+	if (atomic_read(&mdwc->in_lpm)) {
+		dev_dbg(mdwc->dev, "%s received in LPM\n", __func__);
+		mdwc->lpm_irq_seen = true;
+		disable_irq_nosync(irq);
+		queue_delayed_work(system_nrt_wq, &mdwc->resume_work, 0);
+	} else {
+		pr_info_ratelimited("%s: IRQ outside LPM\n", __func__);
+	}
+
+	return IRQ_HANDLED;
+}
+
+void htc_dwc3_disable_usb(int state)
+{
+	struct dwc3_msm *mdwc = context;
+	printk(KERN_INFO "[USB] %s state : %d\n",__func__,state);
+
+	if (state == 1) {
+		htc_usb_disable = 1;
+		mdwc->charger.usb_disable = htc_usb_disable;
+		flush_delayed_work_sync(&mdwc->resume_work);
+		if (!atomic_read(&mdwc->in_lpm)) {
+			mdwc->ext_xceiv.bsv = 0;
+			mdwc->ext_xceiv.id = DWC3_ID_FLOAT;
+			if (mdwc->otg_xceiv)
+				mdwc->ext_xceiv.notify_ext_events(mdwc->otg_xceiv->otg, DWC3_EVENT_XCEIV_STATE);
+		}
+	} else {
+		htc_usb_disable = 0;
+		mdwc->charger.usb_disable = htc_usb_disable;
+		mdwc->ext_xceiv.bsv = htc_vbus_backup;
+		mdwc->ext_xceiv.id = htc_id_backup;
+		queue_delayed_work(system_nrt_wq, &mdwc->resume_work, 20);
+	}
+}
+
+void htc_dwc3_msm_otg_set_vbus_state(int online)
+{
+	struct dwc3_msm *mdwc = context;
+	struct dwc3_otg *dotg;
+	dev_dbg(mdwc->dev, "%s: notify xceiv event\n", __func__);
+	printk(KERN_INFO "[USB] %s:%d\n", __func__, online);
+
+	if (mdwc->otg_xceiv) {
+		dotg = container_of(mdwc->otg_xceiv->otg, struct dwc3_otg, otg);
+		mdwc->ext_xceiv.bsv = online;
+		htc_vbus_backup = online;
+		queue_delayed_work(system_nrt_wq, &mdwc->resume_work, 20);
+	}
+	if (dotg && dotg->connect_type == 0 && online == 1) {
+		dotg->connect_type = CONNECT_TYPE_NOTIFY;
+		queue_work(dotg->usb_wq, &dotg->notifier_work);
+	}
+	mdwc->vbus_active = online;
+
+	wake_lock_timeout(&mdwc->cable_detect_wlock, 3*HZ);
+}
+
+static int __maybe_unused get_prop_usbin_voltage_now(struct dwc3_msm *mdwc)
+{
+	int rc = 0;
+	struct qpnp_vadc_result results;
+
+	if (IS_ERR_OR_NULL(mdwc->vadc_dev)) {
+		mdwc->vadc_dev = qpnp_get_vadc(mdwc->dev, "usbin");
+		if (IS_ERR(mdwc->vadc_dev))
+			return PTR_ERR(mdwc->vadc_dev);
+	}
+
+	rc = qpnp_vadc_read(mdwc->vadc_dev, USBIN, &results);
+	if (rc) {
+		pr_err("Unable to read usbin rc=%d\n", rc);
+		return 0;
+	} else {
+		return results.physical;
+	}
+}
+
+#if !(defined(CONFIG_HTC_BATT_8960))
+static int dwc3_msm_power_get_property_usb(struct power_supply *psy,
+				  enum power_supply_property psp,
+				  union power_supply_propval *val)
+{
+	struct dwc3_msm *mdwc = container_of(psy, struct dwc3_msm,
+								usb_psy);
+	switch (psp) {
+	case POWER_SUPPLY_PROP_SCOPE:
+		val->intval = mdwc->host_mode;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		val->intval = mdwc->voltage_max;
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		val->intval = mdwc->current_max;
+		break;
+	case POWER_SUPPLY_PROP_PRESENT:
+		val->intval = mdwc->vbus_active;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = mdwc->online;
+		break;
+	case POWER_SUPPLY_PROP_TYPE:
+		val->intval = psy->type;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		val->intval = get_prop_usbin_voltage_now(mdwc);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
+				  enum power_supply_property psp,
+				  const union power_supply_propval *val)
+{
+	static bool init;
+	struct dwc3_msm *mdwc = container_of(psy, struct dwc3_msm,
+								usb_psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_SCOPE:
+		mdwc->host_mode = val->intval;
+		break;
+	
+	case POWER_SUPPLY_PROP_PRESENT:
+		dev_dbg(mdwc->dev, "%s: notify xceiv event\n", __func__);
+		if (mdwc->otg_xceiv && !mdwc->ext_inuse &&
+		    (mdwc->ext_xceiv.otg_capability || !init)) {
+			mdwc->ext_xceiv.bsv = val->intval;
+			queue_delayed_work(system_nrt_wq,
+							&mdwc->resume_work, 12);
+
+			if (!init)
+				init = true;
+		}
+		mdwc->vbus_active = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		mdwc->online = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		mdwc->voltage_max = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		mdwc->current_max = val->intval;
+		break;
+	case POWER_SUPPLY_PROP_TYPE:
+		psy->type = val->intval;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	power_supply_changed(&mdwc->usb_psy);
+	return 0;
+}
+
+static void dwc3_msm_external_power_changed(struct power_supply *psy)
+{
+	struct dwc3_msm *mdwc = container_of(psy, struct dwc3_msm, usb_psy);
+	union power_supply_propval ret = {0,};
+
+	if (!mdwc->ext_vbus_psy)
+		mdwc->ext_vbus_psy = power_supply_get_by_name("ext-vbus");
+
+	if (!mdwc->ext_vbus_psy) {
+		pr_err("%s: Unable to get ext_vbus power_supply\n", __func__);
+		return;
+	}
+
+	mdwc->ext_vbus_psy->get_property(mdwc->ext_vbus_psy,
+					POWER_SUPPLY_PROP_ONLINE, &ret);
+	if (ret.intval) {
+		dwc3_start_chg_det(&mdwc->charger, false);
+		mdwc->ext_vbus_psy->get_property(mdwc->ext_vbus_psy,
+					POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
+		power_supply_set_current_limit(&mdwc->usb_psy, ret.intval);
+	}
+
+	power_supply_set_online(&mdwc->usb_psy, ret.intval);
+	power_supply_changed(&mdwc->usb_psy);
+}
+
+static int
+dwc3_msm_property_is_writeable(struct power_supply *psy,
+				enum power_supply_property psp)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		return 1;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+
+static char *dwc3_msm_pm_power_supplied_to[] = {
+	"battery",
+};
+
+static enum power_supply_property dwc3_msm_pm_power_props_usb[] = {
+	POWER_SUPPLY_PROP_PRESENT,
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_TYPE,
+	POWER_SUPPLY_PROP_SCOPE,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+};
+#endif 
+
+static void dwc3_init_adc_work(struct work_struct *w);
+
+static void dwc3_ext_notify_online(void *ctx, int on)
+{
+	struct dwc3_msm *mdwc = ctx;
+	bool notify_otg = false;
+
+	if (!mdwc) {
+		pr_err("%s: DWC3 driver already removed\n", __func__);
+		return;
+	}
+
+	dev_dbg(mdwc->dev, "notify %s%s\n", on ? "" : "dis", "connected");
+
+	if (!mdwc->ext_vbus_psy)
+		mdwc->ext_vbus_psy = power_supply_get_by_name("ext-vbus");
+
+	mdwc->ext_inuse = on;
+	if (on) {
+		
+		mdwc->ext_xceiv.bsv = false;
+		notify_otg = true;
+		dwc3_start_chg_det(&mdwc->charger, false);
+	} else {
+		
+		if (mdwc->ext_xceiv.id != mdwc->id_state) {
+			mdwc->ext_xceiv.id = mdwc->id_state;
+			notify_otg = true;
+		}
+
+		mdwc->ext_xceiv.bsv = mdwc->vbus_active;
+		notify_otg |= mdwc->vbus_active;
+	}
+
+	if (mdwc->ext_vbus_psy)
+		power_supply_set_present(mdwc->ext_vbus_psy, on);
+
+	if (notify_otg)
+		queue_delayed_work(system_nrt_wq, &mdwc->resume_work, 0);
+}
+
+static void dwc3_id_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm, id_work);
+	int ret;
+
+	
+	if (!mdwc->ext_inuse && usb_ext) {
+		if (mdwc->pmic_id_irq)
+			disable_irq(mdwc->pmic_id_irq);
+
+		ret = usb_ext->notify(usb_ext->ctxt, mdwc->id_state,
+				      dwc3_ext_notify_online, mdwc);
+		dev_dbg(mdwc->dev, "%s: external handler returned %d\n",
+			__func__, ret);
+
+		if (mdwc->pmic_id_irq) {
+			unsigned long flags;
+			local_irq_save(flags);
+			
+			mdwc->id_state = !!irq_read_line(mdwc->pmic_id_irq);
+			local_irq_restore(flags);
+			enable_irq(mdwc->pmic_id_irq);
+		}
+
+		mdwc->ext_inuse = (ret == 0);
+	}
+
+	if (!mdwc->ext_inuse) { 
+		mdwc->ext_xceiv.id = mdwc->id_state;
+		dwc3_resume_work(&mdwc->resume_work.work);
+	}
+}
+
+static irqreturn_t dwc3_pmic_id_irq(int irq, void *data)
+{
+	struct dwc3_msm *mdwc = data;
+	enum dwc3_id_state id;
+
+	
+	id = !!irq_read_line(irq);
+	printk(KERN_INFO "[USB] %s id = %d\n",__func__,id);
+	if (mdwc->id_state != id) {
+		mdwc->id_state = id;
+		queue_work(system_nrt_wq, &mdwc->id_work);
+	}
+
+	return IRQ_HANDLED;
+}
+
+static void dwc3_adc_notification(enum qpnp_tm_state state, void *ctx)
+{
+	struct dwc3_msm *mdwc = ctx;
+
+	if (state >= ADC_TM_STATE_NUM) {
+		pr_err("%s: invalid notification %d\n", __func__, state);
+		return;
+	}
+
+	dev_dbg(mdwc->dev, "%s: state = %s\n", __func__,
+			state == ADC_TM_HIGH_STATE ? "high" : "low");
+
+	
+	if (state == ADC_TM_HIGH_STATE) {
+		mdwc->id_state = DWC3_ID_FLOAT;
+		mdwc->adc_param.state_request = ADC_TM_LOW_THR_ENABLE;
+	} else {
+		mdwc->id_state = DWC3_ID_GROUND;
+		mdwc->adc_param.state_request = ADC_TM_HIGH_THR_ENABLE;
+	}
+
+	dwc3_id_work(&mdwc->id_work);
+
+	
+	qpnp_adc_tm_usbid_configure(mdwc->adc_tm_dev, &mdwc->adc_param);
+}
+
+static void dwc3_init_adc_work(struct work_struct *w)
+{
+	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
+							init_adc_work.work);
+	int ret;
+	mdwc->adc_tm_dev = qpnp_get_adc_tm(mdwc->dev, "dwc_usb3-adc_tm");
+	if (IS_ERR(mdwc->adc_tm_dev)) {
+		if (PTR_ERR(mdwc->adc_tm_dev) == -EPROBE_DEFER)
+			queue_delayed_work(system_nrt_wq, to_delayed_work(w),
+					msecs_to_jiffies(100));
+		else
+			mdwc->adc_tm_dev = NULL;
+
+		return;
+	}
+
+	mdwc->adc_param.low_thr = adc_low_threshold;
+	mdwc->adc_param.high_thr = adc_high_threshold;
+	mdwc->adc_param.timer_interval = adc_meas_interval;
+	mdwc->adc_param.state_request = ADC_TM_HIGH_LOW_THR_ENABLE;
+	mdwc->adc_param.btm_ctx = mdwc;
+	mdwc->adc_param.threshold_notification = dwc3_adc_notification;
+
+	ret = qpnp_adc_tm_usbid_configure(mdwc->adc_tm_dev, &mdwc->adc_param);
+	if (ret) {
+		dev_err(mdwc->dev, "%s: request ADC error %d\n", __func__, ret);
+		return;
+	}
+
+	mdwc->id_adc_detect = true;
+}
+
+int64_t  htc_qpnp_adc_get_usbid_adc(void)
+{
+
+	struct dwc3_msm *mdwc = context;
+	struct qpnp_vadc_result result;
+	int err = 0, adc = 0;
+
+	if (!context)
+		return -EAGAIN;
+
+	if(!mdwc->vadc_chip) {
+		mdwc->vadc_chip = qpnp_get_vadc(mdwc->dev, "dwc_usb3");
+		if (IS_ERR(mdwc->vadc_chip)) {
+			err = PTR_ERR(mdwc->vadc_chip);
+			printk(KERN_INFO "[USB] %s : qpnp_get_vadc return error code %d\n",__func__,err);
+			mdwc->vadc_chip = NULL;
+			return -EAGAIN;
+		}
+	}
+
+	printk(KERN_INFO "[USB] %s : vadc_chip %x\n",__func__,(unsigned int)mdwc->vadc_chip);
+
+	err = qpnp_vadc_read(mdwc->vadc_chip, LR_MUX10_USB_ID_LV, &result);
+	if (err < 0) {
+		pr_info("[CABLE] %s: get adc fail, err %d\n", __func__, err);
+		return err;
+	}
+
+	adc = result.physical;
+	adc /= 1000;
+	pr_info("[CABLE] chan=%d, adc_code=%d, measurement=%lld, \
+			physical=%lld translate voltage %d\n", result.chan, result.adc_code,
+			result.measurement, result.physical, adc);
+	return adc;
+}
+
+static ssize_t adc_enable_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	if (!mdwc)
+		return -EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", mdwc->id_adc_detect ?
+						"enabled" : "disabled");
+}
+
+static ssize_t adc_enable_store(struct device *dev,
+		struct device_attribute *attr, const char
+		*buf, size_t size)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	if (!mdwc)
+		return -EINVAL;
+
+	if (!strnicmp(buf, "enable", 6)) {
+		if (!mdwc->id_adc_detect)
+			dwc3_init_adc_work(&mdwc->init_adc_work.work);
+		return size;
+	} else if (!strnicmp(buf, "disable", 7)) {
+		qpnp_adc_tm_usbid_end(mdwc->adc_tm_dev);
+		mdwc->id_adc_detect = false;
+		return size;
+	}
+
+	return -EINVAL;
+}
+
+static DEVICE_ATTR(adc_enable, S_IRUGO | S_IWUSR, adc_enable_show,
+		adc_enable_store);
+
+void dwc3_otg_set_id_state(int id)
+{
+	struct dwc3_msm *dwc3_msm = context;
+
+	if (!id) {
+		printk("[USB] PMIC: ID set\n");
+		dwc3_msm->id_state = DWC3_ID_GROUND;
+		htc_id_backup = DWC3_ID_GROUND;
+	} else {
+		printk("[USB] PMIC: ID clear\n");
+		dwc3_msm->id_state = DWC3_ID_FLOAT;
+		htc_id_backup = DWC3_ID_FLOAT;
+	}
+
+	wake_lock_timeout(&dwc3_msm->cable_detect_wlock, 3*HZ);
+	queue_work(system_nrt_wq, &dwc3_msm->id_work);
+}
+
+static void usb_host_cable_detect(bool cable_in)
+{
+	if (cable_in)
+		dwc3_otg_set_id_state(0);
+	else
+		dwc3_otg_set_id_state(1);
+}
+
+static struct t_usb_host_status_notifier usb_host_status_notifier = {
+	.name = "usb_host",
+	.func = usb_host_cable_detect,
+};
+
+
+static int dwc3_msm_ext_chg_open(struct inode *inode, struct file *file)
+{
+	struct dwc3_msm *mdwc =
+		container_of(inode->i_cdev, struct dwc3_msm, ext_chg_cdev);
+
+	pr_debug("dwc3-msm ext chg open\n");
+	file->private_data = mdwc;
+	mdwc->ext_chg_opened = true;
+
+	return 0;
+}
+
+static long
+dwc3_msm_ext_chg_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct dwc3_msm *mdwc = file->private_data;
+	struct msm_usb_chg_info info = {0};
+	int ret = 0, val;
+
+	switch (cmd) {
+	case MSM_USB_EXT_CHG_INFO:
+		info.chg_block_type = USB_CHG_BLOCK_QSCRATCH;
+		info.page_offset = (mdwc->io_res->start +
+				QSCRATCH_REG_OFFSET) & ~PAGE_MASK;
+		info.length = PAGE_SIZE;
+
+		if (copy_to_user((void __user *)arg, &info, sizeof(info))) {
+			pr_err("%s: copy to user failed\n\n", __func__);
+			ret = -EFAULT;
+		}
+		break;
+	case MSM_USB_EXT_CHG_BLOCK_LPM:
+		if (get_user(val, (int __user *)arg)) {
+			pr_err("%s: get_user failed\n\n", __func__);
+			ret = -EFAULT;
+			break;
+		}
+		pr_debug("%s: LPM block request %d\n", __func__, val);
+		if (val) { 
+			if (mdwc->charger.chg_type == DWC3_DCP_CHARGER) {
+				pm_runtime_get_sync(mdwc->dev);
+			} else {
+				mdwc->ext_chg_active = false;
+				complete(&mdwc->ext_chg_wait);
+				ret = -ENODEV;
+			}
+		} else {
+			mdwc->ext_chg_active = false;
+			complete(&mdwc->ext_chg_wait);
+			pm_runtime_put(mdwc->dev);
+		}
+		break;
+	case MSM_USB_EXT_CHG_VOLTAGE_INFO:
+		if (get_user(val, (int __user *)arg)) {
+			pr_err("%s: get_user failed\n\n", __func__);
+			ret = -EFAULT;
+			break;
+		}
+
+		if (val == USB_REQUEST_5V)
+			pr_debug("%s:voting 5V voltage request\n", __func__);
+		else if (val == USB_REQUEST_9V)
+			pr_debug("%s:voting 9V voltage request\n", __func__);
+		break;
+	case MSM_USB_EXT_CHG_RESULT:
+		if (get_user(val, (int __user *)arg)) {
+			pr_err("%s: get_user failed\n\n", __func__);
+			ret = -EFAULT;
+			break;
+		}
+
+		if (!val)
+			pr_debug("%s:voltage request successful\n", __func__);
+		else
+			pr_debug("%s:voltage request failed\n", __func__);
+		break;
+	case MSM_USB_EXT_CHG_TYPE:
+		if (get_user(val, (int __user *)arg)) {
+			pr_err("%s: get_user failed\n\n", __func__);
+			ret = -EFAULT;
+			break;
+		}
+
+		if (val)
+			pr_debug("%s:charger is external charger\n", __func__);
+		else
+			pr_debug("%s:charger is not ext charger\n", __func__);
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+static int dwc3_msm_ext_chg_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct dwc3_msm *mdwc = file->private_data;
+	unsigned long vsize = vma->vm_end - vma->vm_start;
+	int ret;
+
+	if (vma->vm_pgoff != 0 || vsize > PAGE_SIZE)
+		return -EINVAL;
+
+	vma->vm_pgoff = __phys_to_pfn(mdwc->io_res->start +
+				QSCRATCH_REG_OFFSET);
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+	ret = io_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+				 vsize, vma->vm_page_prot);
+	if (ret < 0)
+		pr_err("%s: failed with return val %d\n", __func__, ret);
+
+	return ret;
+}
+
+static int dwc3_msm_ext_chg_release(struct inode *inode, struct file *file)
+{
+	struct dwc3_msm *mdwc = file->private_data;
+
+	pr_debug("dwc3-msm ext chg release\n");
+
+	mdwc->ext_chg_opened = false;
+
+	return 0;
+}
+
+static const struct file_operations dwc3_msm_ext_chg_fops = {
+	.owner = THIS_MODULE,
+	.open = dwc3_msm_ext_chg_open,
+	.unlocked_ioctl = dwc3_msm_ext_chg_ioctl,
+	.mmap = dwc3_msm_ext_chg_mmap,
+	.release = dwc3_msm_ext_chg_release,
+};
+
+static int dwc3_msm_setup_cdev(struct dwc3_msm *mdwc)
+{
+	int ret;
+
+	ret = alloc_chrdev_region(&mdwc->ext_chg_dev, 0, 1, "usb_ext_chg");
+	if (ret < 0) {
+		pr_err("Fail to allocate usb ext char dev region\n");
+		return ret;
+	}
+	mdwc->ext_chg_class = class_create(THIS_MODULE, "dwc_ext_chg");
+	if (ret < 0) {
+		pr_err("Fail to create usb ext chg class\n");
+		goto unreg_chrdev;
+	}
+	cdev_init(&mdwc->ext_chg_cdev, &dwc3_msm_ext_chg_fops);
+	mdwc->ext_chg_cdev.owner = THIS_MODULE;
+
+	ret = cdev_add(&mdwc->ext_chg_cdev, mdwc->ext_chg_dev, 1);
+	if (ret < 0) {
+		pr_err("Fail to add usb ext chg cdev\n");
+		goto destroy_class;
+	}
+	mdwc->ext_chg_device = device_create(mdwc->ext_chg_class,
+					NULL, mdwc->ext_chg_dev, NULL,
+					"usb_ext_chg");
+	if (IS_ERR(mdwc->ext_chg_device)) {
+		pr_err("Fail to create usb ext chg device\n");
+		ret = PTR_ERR(mdwc->ext_chg_device);
+		mdwc->ext_chg_device = NULL;
+		goto del_cdev;
+	}
+
+	pr_debug("dwc3 msm ext chg cdev setup success\n");
+	return 0;
+
+del_cdev:
+	cdev_del(&mdwc->ext_chg_cdev);
+destroy_class:
+	class_destroy(mdwc->ext_chg_class);
+unreg_chrdev:
+	unregister_chrdev_region(mdwc->ext_chg_dev, 1);
+
+	return ret;
+}
+
+extern int rom_stockui;
+static int __devinit dwc3_msm_probe(struct platform_device *pdev)
+{
+	struct device_node *node = pdev->dev.of_node;
+	struct dwc3_msm *mdwc;
+	struct resource *res;
+	void __iomem *tcsr;
+	unsigned long flags;
+	int ret = 0;
+	int len = 0;
+	u32 tmp[3];
+	htc_usb_disable = 0;
+	htc_vbus_backup = 0;
+	htc_id_backup = 1;
+	pr_info("%s: ++\n", __func__);
+	mdwc = devm_kzalloc(&pdev->dev, sizeof(*mdwc), GFP_KERNEL);
+	if (!mdwc) {
+		dev_err(&pdev->dev, "not enough memory\n");
+		return -ENOMEM;
+	}
+
+	platform_set_drvdata(pdev, mdwc);
+	context = mdwc;
+	mdwc->dev = &pdev->dev;
+
+	wake_lock_init(&mdwc->cable_detect_wlock, WAKE_LOCK_SUSPEND, "msm_usb_cable");
+	INIT_LIST_HEAD(&mdwc->req_complete_list);
+	INIT_DELAYED_WORK(&mdwc->chg_work, dwc3_chg_detect_work);
+	INIT_DELAYED_WORK(&mdwc->resume_work, dwc3_resume_work);
+	INIT_WORK(&mdwc->restart_usb_work, dwc3_restart_usb_work);
+	INIT_WORK(&mdwc->usb_block_reset_work, dwc3_block_reset_usb_work);
+	INIT_WORK(&mdwc->id_work, dwc3_id_work);
+	INIT_DELAYED_WORK(&mdwc->init_adc_work, dwc3_init_adc_work);
+	init_completion(&mdwc->ext_chg_wait);
+
+	ret = dwc3_msm_config_gdsc(mdwc, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to configure usb3 gdsc\n");
+		goto destroy_wlock;
+	}
+
+	mdwc->xo_clk = clk_get(&pdev->dev, "xo");
+	if (IS_ERR(mdwc->xo_clk)) {
+		dev_err(&pdev->dev, "%s unable to get TCXO buffer handle\n",
+								__func__);
+		ret = PTR_ERR(mdwc->xo_clk);
+		goto disable_dwc3_gdsc;
+	}
+
+	ret = clk_prepare_enable(mdwc->xo_clk);
+	if (ret) {
+		dev_err(&pdev->dev, "%s failed to vote for TCXO buffer%d\n",
+						__func__, ret);
+		goto put_xo;
+	}
+
+	mdwc->core_clk = devm_clk_get(&pdev->dev, "core_clk");
+	if (IS_ERR(mdwc->core_clk)) {
+		dev_err(&pdev->dev, "failed to get core_clk\n");
+		ret = PTR_ERR(mdwc->core_clk);
+		goto disable_xo;
+	}
+	clk_set_rate(mdwc->core_clk, 125000000);
+	clk_prepare_enable(mdwc->core_clk);
+
+	mdwc->iface_clk = devm_clk_get(&pdev->dev, "iface_clk");
+	if (IS_ERR(mdwc->iface_clk)) {
+		dev_err(&pdev->dev, "failed to get iface_clk\n");
+		ret = PTR_ERR(mdwc->iface_clk);
+		goto disable_core_clk;
+	}
+	clk_prepare_enable(mdwc->iface_clk);
+
+	mdwc->sleep_clk = devm_clk_get(&pdev->dev, "sleep_clk");
+	if (IS_ERR(mdwc->sleep_clk)) {
+		dev_err(&pdev->dev, "failed to get sleep_clk\n");
+		ret = PTR_ERR(mdwc->sleep_clk);
+		goto disable_iface_clk;
+	}
+	clk_prepare_enable(mdwc->sleep_clk);
+
+	mdwc->hsphy_sleep_clk = devm_clk_get(&pdev->dev, "sleep_a_clk");
+	if (IS_ERR(mdwc->hsphy_sleep_clk)) {
+		dev_err(&pdev->dev, "failed to get sleep_a_clk\n");
+		ret = PTR_ERR(mdwc->hsphy_sleep_clk);
+		goto disable_sleep_clk;
+	}
+	clk_prepare_enable(mdwc->hsphy_sleep_clk);
+
+	ret = of_property_read_u32(node, "qcom,utmi-clk-rate",
+				   (u32 *)&mdwc->utmi_clk_rate);
+	if (ret)
+		mdwc->utmi_clk_rate = 60000000;
+
+	mdwc->utmi_clk = devm_clk_get(&pdev->dev, "utmi_clk");
+	if (IS_ERR(mdwc->utmi_clk)) {
+		dev_err(&pdev->dev, "failed to get utmi_clk\n");
+		ret = PTR_ERR(mdwc->utmi_clk);
+		goto disable_sleep_a_clk;
+	}
+
+	if (mdwc->utmi_clk_rate == 24000000) {
+		mdwc->utmi_clk_src = devm_clk_get(&pdev->dev, "utmi_clk_src");
+		if (IS_ERR(mdwc->utmi_clk_src)) {
+			dev_err(&pdev->dev, "failed to get utmi_clk_src\n");
+			ret = PTR_ERR(mdwc->utmi_clk_src);
+			goto disable_sleep_a_clk;
+		}
+		clk_set_rate(mdwc->utmi_clk_src, 48000000);
+		
+		clk_set_rate(mdwc->utmi_clk, 1);
+	} else {
+		clk_set_rate(mdwc->utmi_clk, mdwc->utmi_clk_rate);
+	}
+	clk_prepare_enable(mdwc->utmi_clk);
+
+	mdwc->ref_clk = devm_clk_get(&pdev->dev, "ref_clk");
+	if (IS_ERR(mdwc->ref_clk)) {
+		dev_err(&pdev->dev, "failed to get ref_clk\n");
+		ret = PTR_ERR(mdwc->ref_clk);
+		goto disable_utmi_clk;
+	}
+	clk_prepare_enable(mdwc->ref_clk);
+
+	of_get_property(node, "qcom,vdd-voltage-level", &len);
+	if (len == sizeof(tmp)) {
+		of_property_read_u32_array(node, "qcom,vdd-voltage-level",
+							tmp, len/sizeof(*tmp));
+		mdwc->vdd_no_vol_level = tmp[0];
+		mdwc->vdd_low_vol_level = tmp[1];
+		mdwc->vdd_high_vol_level = tmp[2];
+	} else {
+		dev_err(&pdev->dev, "no qcom,vdd-voltage-level property\n");
+		ret = -EINVAL;
+		goto disable_ref_clk;
+	}
+
+	
+	mdwc->ssusb_vddcx = devm_regulator_get(&pdev->dev, "ssusb_vdd_dig");
+	if (IS_ERR(mdwc->ssusb_vddcx)) {
+		dev_err(&pdev->dev, "unable to get ssusb vddcx\n");
+		ret = PTR_ERR(mdwc->ssusb_vddcx);
+		goto disable_ref_clk;
+	}
+
+	ret = dwc3_ssusb_config_vddcx(mdwc, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "ssusb vddcx configuration failed\n");
+		goto disable_ref_clk;
+	}
+
+	ret = regulator_enable(mdwc->ssusb_vddcx);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to enable the ssusb vddcx\n");
+		goto unconfig_ss_vddcx;
+	}
+
+	ret = dwc3_ssusb_ldo_init(mdwc, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "ssusb vreg configuration failed\n");
+		goto disable_ss_vddcx;
+	}
+
+	ret = dwc3_ssusb_ldo_enable(mdwc, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "ssusb vreg enable failed\n");
+		goto free_ss_ldo_init;
+	}
+
+	
+	mdwc->hsusb_vddcx = devm_regulator_get(&pdev->dev, "hsusb_vdd_dig");
+	if (IS_ERR(mdwc->hsusb_vddcx)) {
+		dev_err(&pdev->dev, "unable to get hsusb vddcx\n");
+		ret = PTR_ERR(mdwc->hsusb_vddcx);
+		goto disable_ss_ldo;
+	}
+
+	ret = dwc3_hsusb_config_vddcx(mdwc, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "hsusb vddcx configuration failed\n");
+		goto disable_ss_ldo;
+	}
+
+	ret = regulator_enable(mdwc->hsusb_vddcx);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to enable the hsusb vddcx\n");
+		goto unconfig_hs_vddcx;
+	}
+
+	ret = dwc3_hsusb_ldo_init(mdwc, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "hsusb vreg configuration failed\n");
+		goto disable_hs_vddcx;
+	}
+
+	ret = dwc3_hsusb_ldo_enable(mdwc, 1);
+	if (ret) {
+		dev_err(&pdev->dev, "hsusb vreg enable failed\n");
+		goto free_hs_ldo_init;
+	}
+
+	mdwc->id_state = mdwc->ext_xceiv.id = DWC3_ID_FLOAT;
+	mdwc->ext_xceiv.otg_capability = of_property_read_bool(node,
+				"qcom,otg-capability");
+	mdwc->charger.charging_disabled = of_property_read_bool(node,
+				"qcom,charging-disabled");
+
+	mdwc->charger.skip_chg_detect = of_property_read_bool(node,
+				"qcom,skip-charger-detection");
+	mdwc->hs_phy_irq = platform_get_irq_byname(pdev, "hs_phy_irq");
+	if (mdwc->hs_phy_irq < 0) {
+		dev_dbg(&pdev->dev, "pget_irq for hs_phy_irq failed\n");
+		mdwc->hs_phy_irq = 0;
+	} else {
+		ret = devm_request_irq(&pdev->dev, mdwc->hs_phy_irq,
+				msm_dwc3_irq, IRQF_TRIGGER_RISING,
+			       "msm_dwc3", mdwc);
+		if (ret) {
+			dev_err(&pdev->dev, "irqreq HSPHYINT failed\n");
+			goto disable_hs_ldo;
+		}
+	}
+	
+	if (0) {
+		mdwc->pmic_id_irq =
+			platform_get_irq_byname(pdev, "pmic_id_irq");
+		if (mdwc->pmic_id_irq > 0) {
+			
+			ret = qpnp_misc_irqs_available(&pdev->dev);
+
+			if (ret == -EPROBE_DEFER) {
+				
+				goto disable_hs_ldo;
+			} else if (ret == 0) {
+				mdwc->pmic_id_irq = 0;
+			} else {
+				ret = devm_request_irq(&pdev->dev,
+						       mdwc->pmic_id_irq,
+						       dwc3_pmic_id_irq,
+						       IRQF_TRIGGER_RISING |
+						       IRQF_TRIGGER_FALLING,
+						       "dwc3_msm_pmic_id",
+						       mdwc);
+				if (ret) {
+					dev_err(&pdev->dev, "irqreq IDINT failed\n");
+					goto disable_hs_ldo;
+				}
+
+				local_irq_save(flags);
+				
+				mdwc->id_state =
+					!!irq_read_line(mdwc->pmic_id_irq);
+				if (mdwc->id_state == DWC3_ID_GROUND)
+					queue_work(system_nrt_wq,
+							&mdwc->id_work);
+				local_irq_restore(flags);
+				enable_irq_wake(mdwc->pmic_id_irq);
+			}
+		}
+
+		if (mdwc->pmic_id_irq <= 0) {
+			
+			queue_work(system_nrt_wq, &mdwc->init_adc_work.work);
+			device_create_file(&pdev->dev, &dev_attr_adc_enable);
+			mdwc->pmic_id_irq = 0;
+		}
+	}
+	printk(KERN_INFO "[USB] otg_capability : %d qct  pmic_idirq %d\n",mdwc->ext_xceiv.otg_capability,mdwc->pmic_id_irq);
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res) {
+		dev_dbg(&pdev->dev, "missing TCSR memory resource\n");
+	} else {
+		tcsr = devm_ioremap_nocache(&pdev->dev, res->start,
+			resource_size(res));
+		if (!tcsr) {
+			dev_dbg(&pdev->dev, "tcsr ioremap failed\n");
+		} else {
+			
+			writel_relaxed(0x1, tcsr);
+			mb();
+		}
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "missing memory base resource\n");
+		ret = -ENODEV;
+		goto disable_hs_ldo;
+	}
+
+	mdwc->base = devm_ioremap_nocache(&pdev->dev, res->start,
+		resource_size(res));
+	if (!mdwc->base) {
+		dev_err(&pdev->dev, "ioremap failed\n");
+		ret = -ENODEV;
+		goto disable_hs_ldo;
+	}
+
+	mdwc->io_res = res; 
+
+	if (of_property_read_u32(node, "usb_stock_ui_check",
+						&rom_stockui))
+		printk(KERN_INFO "unable to read rom type\n");
+
+	if (of_property_read_u32(node, "qcom,dwc-hsphy-init",
+						&mdwc->hsphy_init_seq))
+		dev_dbg(&pdev->dev, "unable to read hsphy init seq\n");
+	else if (!mdwc->hsphy_init_seq)
+		dev_warn(&pdev->dev, "incorrect hsphyinitseq.Using PORvalue\n");
+
+	printk(KERN_INFO "[USB] hsphy_init_seq 0x%x\n",mdwc->hsphy_init_seq);
+
+	if (of_property_read_u32(node, "qcom,dwc-ssphy-deemphasis-value",
+						&mdwc->deemphasis_val))
+		dev_dbg(&pdev->dev, "unable to read ssphy deemphasis value\n");
+
+	pm_runtime_set_active(mdwc->dev);
+	pm_runtime_enable(mdwc->dev);
+
+	if (of_property_read_u32(node, "qcom,dwc-usb3-msm-dbm-eps",
+				 &mdwc->dbm_num_eps)) {
+		dev_err(&pdev->dev,
+			"unable to read platform data num of dbm eps\n");
+		mdwc->dbm_num_eps = DBM_MAX_EPS;
+	}
+
+	if (mdwc->dbm_num_eps > DBM_MAX_EPS) {
+		dev_err(&pdev->dev,
+			"Driver doesn't support number of DBM EPs. "
+			"max: %d, dbm_num_eps: %d\n",
+			DBM_MAX_EPS, mdwc->dbm_num_eps);
+		ret = -ENODEV;
+		goto disable_hs_ldo;
+	}
+
+	if (of_property_read_u32(node, "qcom,dwc-usb3-msm-tx-fifo-size",
+				 &mdwc->tx_fifo_size))
+		dev_err(&pdev->dev,
+			"unable to read platform data tx fifo size\n");
+
+	if (of_property_read_u32(node, "qcom,dwc-usb3-msm-qdss-tx-fifo-size",
+				 &mdwc->qdss_tx_fifo_size))
+		dev_err(&pdev->dev,
+			"unable to read platform data qdss tx fifo size\n");
+
+	dwc3_set_notifier(&dwc3_msm_notify_event);
+#if !(defined(CONFIG_HTC_BATT_8960))
+	
+	if (mdwc->ext_xceiv.otg_capability ||
+			!mdwc->charger.charging_disabled) {
+		mdwc->usb_psy.name = "usb";
+		mdwc->usb_psy.type = POWER_SUPPLY_TYPE_USB;
+		mdwc->usb_psy.supplied_to = dwc3_msm_pm_power_supplied_to;
+		mdwc->usb_psy.num_supplicants = ARRAY_SIZE(
+						dwc3_msm_pm_power_supplied_to);
+		mdwc->usb_psy.properties = dwc3_msm_pm_power_props_usb;
+		mdwc->usb_psy.num_properties =
+					ARRAY_SIZE(dwc3_msm_pm_power_props_usb);
+		mdwc->usb_psy.get_property = dwc3_msm_power_get_property_usb;
+		mdwc->usb_psy.set_property = dwc3_msm_power_set_property_usb;
+		mdwc->usb_psy.external_power_changed =
+					dwc3_msm_external_power_changed;
+		mdwc->usb_psy.property_is_writeable =
+				dwc3_msm_property_is_writeable;
+
+		ret = power_supply_register(&pdev->dev, &mdwc->usb_psy);
+		if (ret < 0) {
+			dev_err(&pdev->dev,
+					"%s:power_supply_register usb failed\n",
+						__func__);
+			goto disable_hs_ldo;
+		}
+	}
+#endif 
+
+	if (node) {
+		ret = of_platform_populate(node, NULL, NULL, &pdev->dev);
+		if (ret) {
+			dev_err(&pdev->dev,
+				"failed to add create dwc3 core\n");
+			goto put_psupply;
+		}
+	}
+
+	mdwc->bus_scale_table = msm_bus_cl_get_pdata(pdev);
+	if (!mdwc->bus_scale_table) {
+		dev_err(&pdev->dev, "bus scaling is disabled\n");
+	} else {
+		mdwc->bus_perf_client =
+			msm_bus_scale_register_client(mdwc->bus_scale_table);
+		ret = msm_bus_scale_client_update_request(
+						mdwc->bus_perf_client, 1);
+		if (ret)
+			dev_err(&pdev->dev, "Failed to vote for bus scaling\n");
+	}
+
+	mdwc->otg_xceiv = usb_get_transceiver();
+	
+	if (mdwc->otg_xceiv &&
+			!(mdwc->otg_xceiv->flags & ENABLE_SECONDARY_PHY)) {
+		
+		if (!mdwc->charger.skip_chg_detect) {
+			mdwc->charger.start_detection = dwc3_start_chg_det;
+			ret = dwc3_set_charger(mdwc->otg_xceiv->otg,
+					&mdwc->charger);
+			if (ret || !mdwc->charger.notify_detection_complete) {
+				dev_err(&pdev->dev,
+					"failed to register charger: %d\n",
+					ret);
+				goto put_xcvr;
+			}
+		}
+
+		if (mdwc->ext_xceiv.otg_capability)
+			mdwc->ext_xceiv.ext_block_reset = dwc3_msm_block_reset;
+		ret = dwc3_set_ext_xceiv(mdwc->otg_xceiv->otg,
+						&mdwc->ext_xceiv);
+		if (ret || !mdwc->ext_xceiv.notify_ext_events) {
+			dev_err(&pdev->dev, "failed to register xceiver: %d\n",
+									ret);
+			goto put_xcvr;
+		}
+	} else {
+		dev_dbg(&pdev->dev, "No OTG, DWC3 running in host only mode\n");
+		mdwc->host_mode = 1;
+		mdwc->vbus_otg = devm_regulator_get(&pdev->dev, "vbus_dwc3");
+		if (IS_ERR(mdwc->vbus_otg)) {
+			dev_dbg(&pdev->dev, "Failed to get vbus regulator\n");
+			mdwc->vbus_otg = 0;
+		} else {
+			ret = regulator_enable(mdwc->vbus_otg);
+			if (ret) {
+				mdwc->vbus_otg = 0;
+				dev_err(&pdev->dev, "Failed to enable vbus_otg\n");
+			}
+		}
+		mdwc->otg_xceiv = NULL;
+	}
+	if (mdwc->ext_xceiv.otg_capability && mdwc->charger.start_detection) {
+		ret = dwc3_msm_setup_cdev(mdwc);
+		if (ret)
+			dev_err(&pdev->dev, "Fail to setup dwc3 setup cdev\n");
+	}
+
+	device_init_wakeup(mdwc->dev, 1);
+	pm_stay_awake(mdwc->dev);
+	dwc3_msm_debugfs_init(mdwc);
+	usb_host_detect_register_notifier(&usb_host_status_notifier);
+
+	mdwc->charger.usb_disable = htc_usb_disable;
+	pr_info("%s: ++\n", __func__);
+	return 0;
+
+put_xcvr:
+	usb_put_transceiver(mdwc->otg_xceiv);
+put_psupply:
+	if (mdwc->usb_psy.dev)
+		power_supply_unregister(&mdwc->usb_psy);
+disable_hs_ldo:
+	dwc3_hsusb_ldo_enable(mdwc, 0);
+free_hs_ldo_init:
+	dwc3_hsusb_ldo_init(mdwc, 0);
+disable_hs_vddcx:
+	regulator_disable(mdwc->hsusb_vddcx);
+unconfig_hs_vddcx:
+	dwc3_hsusb_config_vddcx(mdwc, 0);
+disable_ss_ldo:
+	dwc3_ssusb_ldo_enable(mdwc, 0);
+free_ss_ldo_init:
+	dwc3_ssusb_ldo_init(mdwc, 0);
+disable_ss_vddcx:
+	regulator_disable(mdwc->ssusb_vddcx);
+unconfig_ss_vddcx:
+	dwc3_ssusb_config_vddcx(mdwc, 0);
+disable_ref_clk:
+	clk_disable_unprepare(mdwc->ref_clk);
+disable_utmi_clk:
+	clk_disable_unprepare(mdwc->utmi_clk);
+disable_sleep_a_clk:
+	clk_disable_unprepare(mdwc->hsphy_sleep_clk);
+disable_sleep_clk:
+	clk_disable_unprepare(mdwc->sleep_clk);
+disable_iface_clk:
+	clk_disable_unprepare(mdwc->iface_clk);
+disable_core_clk:
+	clk_disable_unprepare(mdwc->core_clk);
+disable_xo:
+	clk_disable_unprepare(mdwc->xo_clk);
+put_xo:
+	clk_put(mdwc->xo_clk);
+disable_dwc3_gdsc:
+	dwc3_msm_config_gdsc(mdwc, 0);
+destroy_wlock:
+	wake_lock_destroy(&mdwc->cable_detect_wlock);
+	return ret;
+}
+
+static int __devexit dwc3_msm_remove(struct platform_device *pdev)
+{
+	struct dwc3_msm	*mdwc = platform_get_drvdata(pdev);
+
+	if (!mdwc->ext_chg_device) {
+		device_destroy(mdwc->ext_chg_class, mdwc->ext_chg_dev);
+		cdev_del(&mdwc->ext_chg_cdev);
+		class_destroy(mdwc->ext_chg_class);
+		unregister_chrdev_region(mdwc->ext_chg_dev, 1);
+	}
+
+	if (mdwc->id_adc_detect)
+		qpnp_adc_tm_usbid_end(mdwc->adc_tm_dev);
+	if (dwc3_debugfs_root)
+		debugfs_remove_recursive(dwc3_debugfs_root);
+	if (mdwc->otg_xceiv) {
+		dwc3_start_chg_det(&mdwc->charger, false);
+		usb_put_transceiver(mdwc->otg_xceiv);
+	}
+	if (mdwc->usb_psy.dev)
+		power_supply_unregister(&mdwc->usb_psy);
+	if (mdwc->vbus_otg)
+		regulator_disable(mdwc->vbus_otg);
+
+	pm_runtime_disable(mdwc->dev);
+	device_init_wakeup(mdwc->dev, 0);
+	wake_lock_destroy(&mdwc->cable_detect_wlock);
+
+	dwc3_hsusb_ldo_enable(mdwc, 0);
+	dwc3_hsusb_ldo_init(mdwc, 0);
+	regulator_disable(mdwc->hsusb_vddcx);
+	dwc3_hsusb_config_vddcx(mdwc, 0);
+	dwc3_ssusb_ldo_enable(mdwc, 0);
+	dwc3_ssusb_ldo_init(mdwc, 0);
+	regulator_disable(mdwc->ssusb_vddcx);
+	dwc3_ssusb_config_vddcx(mdwc, 0);
+	clk_disable_unprepare(mdwc->core_clk);
+	clk_disable_unprepare(mdwc->iface_clk);
+	clk_disable_unprepare(mdwc->sleep_clk);
+	clk_disable_unprepare(mdwc->hsphy_sleep_clk);
+	clk_disable_unprepare(mdwc->ref_clk);
+	clk_disable_unprepare(mdwc->xo_clk);
+	clk_put(mdwc->xo_clk);
+
+	dwc3_msm_config_gdsc(mdwc, 0);
+
+	return 0;
+}
+
+static int dwc3_msm_pm_suspend(struct device *dev)
+{
+	int ret = 0;
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	printk(KERN_INFO "[USB] %s\n",__func__);
+
+	flush_delayed_work_sync(&mdwc->resume_work);
+	if (!atomic_read(&mdwc->in_lpm)) {
+		dev_err(mdwc->dev, "Abort PM suspend!! (USB is outside LPM)\n");
+		return -EBUSY;
+	}
+
+	ret = dwc3_msm_suspend(mdwc);
+	if (!ret)
+		atomic_set(&mdwc->pm_suspended, 1);
+
+	return ret;
+}
+
+static int dwc3_msm_pm_resume(struct device *dev)
+{
+	int ret = 0;
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	printk(KERN_INFO "[USB] %s\n",__func__);
+
+	atomic_set(&mdwc->pm_suspended, 0);
+	if (mdwc->resume_pending) {
+		mdwc->resume_pending = false;
+
+		ret = dwc3_msm_resume(mdwc);
+		
+		pm_runtime_disable(dev);
+		pm_runtime_set_active(dev);
+		pm_runtime_enable(dev);
+
+		
+		if (mdwc->otg_xceiv) {
+			mdwc->ext_xceiv.notify_ext_events(mdwc->otg_xceiv->otg,
+							DWC3_EVENT_PHY_RESUME);
+			if (mdwc->ext_xceiv.otg_capability)
+				mdwc->ext_xceiv.notify_ext_events(
+							mdwc->otg_xceiv->otg,
+							DWC3_EVENT_XCEIV_STATE);
+		}
+	}
+
+	return ret;
+}
+
+static int dwc3_msm_runtime_idle(struct device *dev)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+	printk(KERN_INFO "[USB] %s\n",__func__);
+
+	if (mdwc->ext_chg_active) {
+		dev_dbg(dev, "Deferring LPM\n");
+		pm_schedule_suspend(dev, 3000);
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+static int dwc3_msm_runtime_suspend(struct device *dev)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	printk(KERN_INFO "[USB] %s\n",__func__);
+
+	return dwc3_msm_suspend(mdwc);
+}
+
+static int dwc3_msm_runtime_resume(struct device *dev)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	printk(KERN_INFO "[USB] %s\n",__func__);
+
+	return dwc3_msm_resume(mdwc);
+}
+
+static const struct dev_pm_ops dwc3_msm_dev_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(dwc3_msm_pm_suspend, dwc3_msm_pm_resume)
+	SET_RUNTIME_PM_OPS(dwc3_msm_runtime_suspend, dwc3_msm_runtime_resume,
+				dwc3_msm_runtime_idle)
+};
+
+static const struct of_device_id of_dwc3_matach[] = {
+	{
+		.compatible = "qcom,dwc-usb3-msm",
+	},
+	{ },
+};
+MODULE_DEVICE_TABLE(of, of_dwc3_matach);
+
+static struct platform_driver dwc3_msm_driver = {
+	.probe		= dwc3_msm_probe,
+	.remove		= __devexit_p(dwc3_msm_remove),
+	.driver		= {
+		.name	= "msm-dwc3",
+		.pm	= &dwc3_msm_dev_pm_ops,
+		.of_match_table	= of_dwc3_matach,
+	},
+};
+
+MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("DesignWare USB3 MSM Glue Layer");
+
+static int __devinit dwc3_msm_init(void)
+{
+	return platform_driver_register(&dwc3_msm_driver);
+}
+module_init(dwc3_msm_init);
+
+static void __exit dwc3_msm_exit(void)
+{
+	platform_driver_unregister(&dwc3_msm_driver);
+}
+module_exit(dwc3_msm_exit);

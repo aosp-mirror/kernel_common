@@ -76,7 +76,6 @@
 #include <net/route.h>
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
-#include <net/pkt_sched.h>
 #include "bonding.h"
 #include "bond_3ad.h"
 #include "bond_alb.h"
@@ -382,6 +381,8 @@ struct vlan_entry *bond_next_vlan(struct bonding *bond, struct vlan_entry *curr)
 	return next;
 }
 
+#define bond_queue_mapping(skb) (*(u16 *)((skb)->cb))
+
 /**
  * bond_dev_queue_xmit - Prepare skb for xmit.
  *
@@ -394,9 +395,7 @@ int bond_dev_queue_xmit(struct bonding *bond, struct sk_buff *skb,
 {
 	skb->dev = slave_dev;
 
-	BUILD_BUG_ON(sizeof(skb->queue_mapping) !=
-		     sizeof(qdisc_skb_cb(skb)->bond_queue_mapping));
-	skb->queue_mapping = qdisc_skb_cb(skb)->bond_queue_mapping;
+	skb->queue_mapping = bond_queue_mapping(skb);
 
 	if (unlikely(netpoll_tx_running(slave_dev)))
 		bond_netpoll_send_skb(bond_get_slave_by_dev(bond, slave_dev), skb);
@@ -1383,8 +1382,6 @@ static void bond_compute_features(struct bonding *bond)
 	struct net_device *bond_dev = bond->dev;
 	netdev_features_t vlan_features = BOND_VLAN_FEATURES;
 	unsigned short max_hard_header_len = ETH_HLEN;
-	unsigned int gso_max_size = GSO_MAX_SIZE;
-	u16 gso_max_segs = GSO_MAX_SEGS;
 	int i;
 
 	read_lock(&bond->lock);
@@ -1398,16 +1395,11 @@ static void bond_compute_features(struct bonding *bond)
 
 		if (slave->dev->hard_header_len > max_hard_header_len)
 			max_hard_header_len = slave->dev->hard_header_len;
-
-		gso_max_size = min(gso_max_size, slave->dev->gso_max_size);
-		gso_max_segs = min(gso_max_segs, slave->dev->gso_max_segs);
 	}
 
 done:
 	bond_dev->vlan_features = vlan_features;
 	bond_dev->hard_header_len = max_hard_header_len;
-	bond_dev->gso_max_segs = gso_max_segs;
-	netif_set_gso_max_size(bond_dev, gso_max_size);
 
 	read_unlock(&bond->lock);
 
@@ -1737,8 +1729,6 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 
 	bond_compute_features(bond);
 
-	bond_update_speed_duplex(new_slave);
-
 	read_lock(&bond->lock);
 
 	new_slave->last_arp_rx = jiffies;
@@ -1781,6 +1771,8 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev)
 		pr_debug("Initial state of slave_dev is BOND_LINK_DOWN\n");
 		new_slave->link  = BOND_LINK_DOWN;
 	}
+
+	bond_update_speed_duplex(new_slave);
 
 	if (USES_PRIMARY(bond->params.mode) && bond->params.primary[0]) {
 		/* if there is a primary slave, remember it */
@@ -1888,7 +1880,6 @@ err_detach:
 	write_unlock_bh(&bond->lock);
 
 err_close:
-	slave_dev->priv_flags &= ~IFF_BONDING;
 	dev_close(slave_dev);
 
 err_unset_master:
@@ -1933,7 +1924,6 @@ int bond_release(struct net_device *bond_dev, struct net_device *slave_dev)
 	struct bonding *bond = netdev_priv(bond_dev);
 	struct slave *slave, *oldcurrent;
 	struct sockaddr addr;
-	int old_flags = bond_dev->flags;
 	netdev_features_t old_features = bond_dev->features;
 
 	/* slave is not a slave or master is not master of this slave */
@@ -1958,11 +1948,12 @@ int bond_release(struct net_device *bond_dev, struct net_device *slave_dev)
 		return -EINVAL;
 	}
 
-	write_unlock_bh(&bond->lock);
 	/* unregister rx_handler early so bond_handle_frame wouldn't be called
 	 * for this slave anymore.
 	 */
 	netdev_rx_handler_unregister(slave_dev);
+	write_unlock_bh(&bond->lock);
+	synchronize_net();
 	write_lock_bh(&bond->lock);
 
 	if (!bond->params.fail_over_mac) {
@@ -2067,18 +2058,12 @@ int bond_release(struct net_device *bond_dev, struct net_device *slave_dev)
 	 * already taken care of above when we detached the slave
 	 */
 	if (!USES_PRIMARY(bond->params.mode)) {
-		/* unset promiscuity level from slave
-		 * NOTE: The NETDEV_CHANGEADDR call above may change the value
-		 * of the IFF_PROMISC flag in the bond_dev, but we need the
-		 * value of that flag before that change, as that was the value
-		 * when this slave was attached, so we cache at the start of the
-		 * function and use it here. Same goes for ALLMULTI below
-		 */
-		if (old_flags & IFF_PROMISC)
+		/* unset promiscuity level from slave */
+		if (bond_dev->flags & IFF_PROMISC)
 			dev_set_promiscuity(slave_dev, -1);
 
 		/* unset allmulti level from slave */
-		if (old_flags & IFF_ALLMULTI)
+		if (bond_dev->flags & IFF_ALLMULTI)
 			dev_set_allmulti(slave_dev, -1);
 
 		/* flush master's mc_list from slave */
@@ -2468,6 +2453,8 @@ static void bond_miimon_commit(struct bonding *bond)
 				/* prevent it from being the active one */
 				bond_set_backup_slave(slave);
 			}
+
+			bond_update_speed_duplex(slave);
 
 			pr_info("%s: link status definitely up for interface %s, %u Mbps %s duplex.\n",
 				bond->dev->name, slave->dev->name,
@@ -3230,12 +3217,6 @@ static int bond_master_netdev_event(unsigned long event,
 	switch (event) {
 	case NETDEV_CHANGENAME:
 		return bond_event_changename(event_bond);
-	case NETDEV_UNREGISTER:
-		bond_remove_proc_entry(event_bond);
-		break;
-	case NETDEV_REGISTER:
-		bond_create_proc_entry(event_bond);
-		break;
 	default:
 		break;
 	}
@@ -3405,28 +3386,6 @@ static int bond_xmit_hash_policy_l2(struct sk_buff *skb, int count)
 
 /*-------------------------- Device entry points ----------------------------*/
 
-static void bond_work_init_all(struct bonding *bond)
-{
-	INIT_DELAYED_WORK(&bond->mcast_work,
-			  bond_resend_igmp_join_requests_delayed);
-	INIT_DELAYED_WORK(&bond->alb_work, bond_alb_monitor);
-	INIT_DELAYED_WORK(&bond->mii_work, bond_mii_monitor);
-	if (bond->params.mode == BOND_MODE_ACTIVEBACKUP)
-		INIT_DELAYED_WORK(&bond->arp_work, bond_activebackup_arp_mon);
-	else
-		INIT_DELAYED_WORK(&bond->arp_work, bond_loadbalance_arp_mon);
-	INIT_DELAYED_WORK(&bond->ad_work, bond_3ad_state_machine_handler);
-}
-
-static void bond_work_cancel_all(struct bonding *bond)
-{
-	cancel_delayed_work_sync(&bond->mii_work);
-	cancel_delayed_work_sync(&bond->arp_work);
-	cancel_delayed_work_sync(&bond->alb_work);
-	cancel_delayed_work_sync(&bond->ad_work);
-	cancel_delayed_work_sync(&bond->mcast_work);
-}
-
 static int bond_open(struct net_device *bond_dev)
 {
 	struct bonding *bond = netdev_priv(bond_dev);
@@ -3449,27 +3408,41 @@ static int bond_open(struct net_device *bond_dev)
 	}
 	read_unlock(&bond->lock);
 
-	bond_work_init_all(bond);
+	INIT_DELAYED_WORK(&bond->mcast_work, bond_resend_igmp_join_requests_delayed);
 
 	if (bond_is_lb(bond)) {
 		/* bond_alb_initialize must be called before the timer
 		 * is started.
 		 */
-		if (bond_alb_initialize(bond, (bond->params.mode == BOND_MODE_ALB)))
+		if (bond_alb_initialize(bond, (bond->params.mode == BOND_MODE_ALB))) {
+			/* something went wrong - fail the open operation */
 			return -ENOMEM;
+		}
+
+		INIT_DELAYED_WORK(&bond->alb_work, bond_alb_monitor);
 		queue_delayed_work(bond->wq, &bond->alb_work, 0);
 	}
 
-	if (bond->params.miimon)  /* link check interval, in milliseconds. */
+	if (bond->params.miimon) {  /* link check interval, in milliseconds. */
+		INIT_DELAYED_WORK(&bond->mii_work, bond_mii_monitor);
 		queue_delayed_work(bond->wq, &bond->mii_work, 0);
+	}
 
 	if (bond->params.arp_interval) {  /* arp interval, in milliseconds. */
+		if (bond->params.mode == BOND_MODE_ACTIVEBACKUP)
+			INIT_DELAYED_WORK(&bond->arp_work,
+					  bond_activebackup_arp_mon);
+		else
+			INIT_DELAYED_WORK(&bond->arp_work,
+					  bond_loadbalance_arp_mon);
+
 		queue_delayed_work(bond->wq, &bond->arp_work, 0);
 		if (bond->params.arp_validate)
 			bond->recv_probe = bond_arp_rcv;
 	}
 
 	if (bond->params.mode == BOND_MODE_8023AD) {
+		INIT_DELAYED_WORK(&bond->ad_work, bond_3ad_state_machine_handler);
 		queue_delayed_work(bond->wq, &bond->ad_work, 0);
 		/* register to receive LACPDUs */
 		bond->recv_probe = bond_3ad_lacpdu_recv;
@@ -3484,10 +3457,34 @@ static int bond_close(struct net_device *bond_dev)
 	struct bonding *bond = netdev_priv(bond_dev);
 
 	write_lock_bh(&bond->lock);
+
 	bond->send_peer_notif = 0;
+
 	write_unlock_bh(&bond->lock);
 
-	bond_work_cancel_all(bond);
+	if (bond->params.miimon) {  /* link check interval, in milliseconds. */
+		cancel_delayed_work_sync(&bond->mii_work);
+	}
+
+	if (bond->params.arp_interval) {  /* arp interval, in milliseconds. */
+		cancel_delayed_work_sync(&bond->arp_work);
+	}
+
+	switch (bond->params.mode) {
+	case BOND_MODE_8023AD:
+		cancel_delayed_work_sync(&bond->ad_work);
+		break;
+	case BOND_MODE_TLB:
+	case BOND_MODE_ALB:
+		cancel_delayed_work_sync(&bond->alb_work);
+		break;
+	default:
+		break;
+	}
+
+	if (delayed_work_pending(&bond->mcast_work))
+		cancel_delayed_work_sync(&bond->mcast_work);
+
 	if (bond_is_lb(bond)) {
 		/* Must be called only after all
 		 * slaves have been released
@@ -3757,17 +3754,11 @@ static int bond_neigh_init(struct neighbour *n)
  * The bonding ndo_neigh_setup is called at init time beofre any
  * slave exists. So we must declare proxy setup function which will
  * be used at run time to resolve the actual slave neigh param setup.
- *
- * It's also called by master devices (such as vlans) to setup their
- * underlying devices. In that case - do nothing, we're already set up from
- * our init.
  */
 static int bond_neigh_setup(struct net_device *dev,
 			    struct neigh_parms *parms)
 {
-	/* modify only our neigh_parms */
-	if (parms->dev == dev)
-		parms->neigh_setup = bond_neigh_init;
+	parms->neigh_setup   = bond_neigh_init;
 
 	return 0;
 }
@@ -4171,7 +4162,7 @@ static u16 bond_select_queue(struct net_device *dev, struct sk_buff *skb)
 	/*
 	 * Save the original txq to restore before passing to the driver
 	 */
-	qdisc_skb_cb(skb)->bond_queue_mapping = skb->queue_mapping;
+	bond_queue_mapping(skb) = skb->queue_mapping;
 
 	if (unlikely(txq >= dev->real_num_tx_queues)) {
 		do {
@@ -4372,6 +4363,26 @@ static void bond_setup(struct net_device *bond_dev)
 	bond_dev->features |= bond_dev->hw_features;
 }
 
+static void bond_work_cancel_all(struct bonding *bond)
+{
+	if (bond->params.miimon && delayed_work_pending(&bond->mii_work))
+		cancel_delayed_work_sync(&bond->mii_work);
+
+	if (bond->params.arp_interval && delayed_work_pending(&bond->arp_work))
+		cancel_delayed_work_sync(&bond->arp_work);
+
+	if (bond->params.mode == BOND_MODE_ALB &&
+	    delayed_work_pending(&bond->alb_work))
+		cancel_delayed_work_sync(&bond->alb_work);
+
+	if (bond->params.mode == BOND_MODE_8023AD &&
+	    delayed_work_pending(&bond->ad_work))
+		cancel_delayed_work_sync(&bond->ad_work);
+
+	if (delayed_work_pending(&bond->mcast_work))
+		cancel_delayed_work_sync(&bond->mcast_work);
+}
+
 /*
 * Destroy a bonding device.
 * Must be under rtnl_lock when this function is called.
@@ -4389,6 +4400,8 @@ static void bond_uninit(struct net_device *bond_dev)
 	list_del(&bond->bond_list);
 
 	bond_work_cancel_all(bond);
+
+	bond_remove_proc_entry(bond);
 
 	bond_debug_unregister(bond);
 
@@ -4791,6 +4804,7 @@ static int bond_init(struct net_device *bond_dev)
 
 	bond_set_lockdep_class(bond_dev);
 
+	bond_create_proc_entry(bond);
 	list_add_tail(&bond->bond_list, &bn->dev_list);
 
 	bond_prepare_sysfs_group(bond);
@@ -4878,18 +4892,9 @@ static int __net_init bond_net_init(struct net *net)
 static void __net_exit bond_net_exit(struct net *net)
 {
 	struct bond_net *bn = net_generic(net, bond_net_id);
-	struct bonding *bond, *tmp_bond;
-	LIST_HEAD(list);
 
 	bond_destroy_sysfs(bn);
 	bond_destroy_proc_dir(bn);
-
-	/* Kill off any bonds created after unregistering bond rtnl ops */
-	rtnl_lock();
-	list_for_each_entry_safe(bond, tmp_bond, &bn->dev_list, bond_list)
-		unregister_netdevice_queue(bond->dev, &list);
-	unregister_netdevice_many(&list);
-	rtnl_unlock();
 }
 
 static struct pernet_operations bond_net_ops = {

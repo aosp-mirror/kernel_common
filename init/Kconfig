@@ -1037,6 +1037,20 @@ config PRINTK
 	  very difficult to diagnose system problems, saying N here is
 	  strongly discouraged.
 
+config PRINTK_CPU_ID
+	depends on PRINTK
+	default y
+	bool "Enable support for Print working core no. in dmesg" if EXPERT
+	help
+	  Print working core no. in dmesg
+
+config PRINTK_PID
+	depends on PRINTK
+	default y
+	bool "Enable support for Print working task id in dmesg" if EXPERT
+	help
+	  Print working core no. in dmesg
+
 config BUG
 	bool "BUG() support" if EXPERT
 	default y
@@ -1270,6 +1284,7 @@ config SLAB
 	  per cpu and per node queues.
 
 config SLUB
+	depends on BROKEN || NUMA || !DISCONTIGMEM
 	bool "SLUB (Unqueued Allocator)"
 	help
 	   SLUB is a slab allocator that minimizes cache line usage

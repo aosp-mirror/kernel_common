@@ -83,8 +83,6 @@ static struct iommu_ops amd_iommu_ops;
 static ATOMIC_NOTIFIER_HEAD(ppr_notifier);
 int amd_iommu_max_glx_val = -1;
 
-static struct dma_map_ops amd_iommu_dma_ops;
-
 /*
  * general struct to manage commands send to an IOMMU
  */
@@ -452,27 +450,12 @@ static void dump_command(unsigned long phys_addr)
 
 static void iommu_print_event(struct amd_iommu *iommu, void *__evt)
 {
-	int type, devid, domid, flags;
-	volatile u32 *event = __evt;
-	int count = 0;
-	u64 address;
-
-retry:
-	type    = (event[1] >> EVENT_TYPE_SHIFT)  & EVENT_TYPE_MASK;
-	devid   = (event[0] >> EVENT_DEVID_SHIFT) & EVENT_DEVID_MASK;
-	domid   = (event[1] >> EVENT_DOMID_SHIFT) & EVENT_DOMID_MASK;
-	flags   = (event[1] >> EVENT_FLAGS_SHIFT) & EVENT_FLAGS_MASK;
-	address = (u64)(((u64)event[3]) << 32) | event[2];
-
-	if (type == 0) {
-		/* Did we hit the erratum? */
-		if (++count == LOOP_TIMEOUT) {
-			pr_err("AMD-Vi: No event written to event log\n");
-			return;
-		}
-		udelay(1);
-		goto retry;
-	}
+	u32 *event = __evt;
+	int type  = (event[1] >> EVENT_TYPE_SHIFT)  & EVENT_TYPE_MASK;
+	int devid = (event[0] >> EVENT_DEVID_SHIFT) & EVENT_DEVID_MASK;
+	int domid = (event[1] >> EVENT_DOMID_SHIFT) & EVENT_DOMID_MASK;
+	int flags = (event[1] >> EVENT_FLAGS_SHIFT) & EVENT_FLAGS_MASK;
+	u64 address = (u64)(((u64)event[3]) << 32) | event[2];
 
 	printk(KERN_ERR "AMD-Vi: Event logged [");
 
@@ -525,28 +508,14 @@ retry:
 	default:
 		printk(KERN_ERR "UNKNOWN type=0x%02x]\n", type);
 	}
-
-	memset(__evt, 0, 4 * sizeof(u32));
 }
 
 static void iommu_poll_events(struct amd_iommu *iommu)
 {
-	u32 head, tail, status;
+	u32 head, tail;
 	unsigned long flags;
 
 	spin_lock_irqsave(&iommu->lock, flags);
-
-	/* enable event interrupts again */
-	do {
-		/*
-		 * Workaround for Erratum ERBT1312
-		 * Clearing the EVT_INT bit may race in the hardware, so read
-		 * it again and make sure it was really cleared
-		 */
-		status = readl(iommu->mmio_base + MMIO_STATUS_OFFSET);
-		writel(MMIO_STATUS_EVT_INT_MASK,
-		       iommu->mmio_base + MMIO_STATUS_OFFSET);
-	} while (status & MMIO_STATUS_EVT_INT_MASK);
 
 	head = readl(iommu->mmio_base + MMIO_EVT_HEAD_OFFSET);
 	tail = readl(iommu->mmio_base + MMIO_EVT_TAIL_OFFSET);
@@ -561,11 +530,25 @@ static void iommu_poll_events(struct amd_iommu *iommu)
 	spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void iommu_handle_ppr_entry(struct amd_iommu *iommu, u64 *raw)
+static void iommu_handle_ppr_entry(struct amd_iommu *iommu, u32 head)
 {
 	struct amd_iommu_fault fault;
+	volatile u64 *raw;
+	int i;
 
 	INC_STATS_COUNTER(pri_requests);
+
+	raw = (u64 *)(iommu->ppr_log + head);
+
+	/*
+	 * Hardware bug: Interrupt may arrive before the entry is written to
+	 * memory. If this happens we need to wait for the entry to arrive.
+	 */
+	for (i = 0; i < LOOP_TIMEOUT; ++i) {
+		if (PPR_REQ_TYPE(raw[0]) != 0)
+			break;
+		udelay(1);
+	}
 
 	if (PPR_REQ_TYPE(raw[0]) != PPR_REQ_FAULT) {
 		pr_err_ratelimited("AMD-Vi: Unknown PPR request received\n");
@@ -578,81 +561,41 @@ static void iommu_handle_ppr_entry(struct amd_iommu *iommu, u64 *raw)
 	fault.tag       = PPR_TAG(raw[0]);
 	fault.flags     = PPR_FLAGS(raw[0]);
 
+	/*
+	 * To detect the hardware bug we need to clear the entry
+	 * to back to zero.
+	 */
+	raw[0] = raw[1] = 0;
+
 	atomic_notifier_call_chain(&ppr_notifier, 0, &fault);
 }
 
 static void iommu_poll_ppr_log(struct amd_iommu *iommu)
 {
 	unsigned long flags;
-	u32 head, tail, status;
+	u32 head, tail;
 
 	if (iommu->ppr_log == NULL)
 		return;
 
 	spin_lock_irqsave(&iommu->lock, flags);
 
-	/* enable ppr interrupts again */
-	do {
-		/*
-		 * Workaround for Erratum ERBT1312
-		 * Clearing the PPR_INT bit may race in the hardware, so read
-		 * it again and make sure it was really cleared
-		 */
-		status = readl(iommu->mmio_base + MMIO_STATUS_OFFSET);
-		writel(MMIO_STATUS_PPR_INT_MASK,
-		       iommu->mmio_base + MMIO_STATUS_OFFSET);
-	} while (status & MMIO_STATUS_PPR_INT_MASK);
-
 	head = readl(iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
 	tail = readl(iommu->mmio_base + MMIO_PPR_TAIL_OFFSET);
 
 	while (head != tail) {
-		volatile u64 *raw;
-		u64 entry[2];
-		int i;
-
-		raw = (u64 *)(iommu->ppr_log + head);
-
-		/*
-		 * Hardware bug: Interrupt may arrive before the entry is
-		 * written to memory. If this happens we need to wait for the
-		 * entry to arrive.
-		 */
-		for (i = 0; i < LOOP_TIMEOUT; ++i) {
-			if (PPR_REQ_TYPE(raw[0]) != 0)
-				break;
-			udelay(1);
-		}
-
-		/* Avoid memcpy function-call overhead */
-		entry[0] = raw[0];
-		entry[1] = raw[1];
-
-		/*
-		 * To detect the hardware bug we need to clear the entry
-		 * back to zero.
-		 */
-		raw[0] = raw[1] = 0UL;
-
-		/* Update head pointer of hardware ring-buffer */
-		head = (head + PPR_ENTRY_SIZE) % PPR_LOG_SIZE;
-		writel(head, iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
-
-		/*
-		 * Release iommu->lock because ppr-handling might need to
-		 * re-aquire it
-		 */
-		spin_unlock_irqrestore(&iommu->lock, flags);
 
 		/* Handle PPR entry */
-		iommu_handle_ppr_entry(iommu, entry);
+		iommu_handle_ppr_entry(iommu, head);
 
-		spin_lock_irqsave(&iommu->lock, flags);
-
-		/* Refresh ring-buffer information */
-		head = readl(iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
+		/* Update and refresh ring-buffer state*/
+		head = (head + PPR_ENTRY_SIZE) % PPR_LOG_SIZE;
+		writel(head, iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
 		tail = readl(iommu->mmio_base + MMIO_PPR_TAIL_OFFSET);
 	}
+
+	/* enable ppr interrupts again */
+	writel(MMIO_STATUS_PPR_INT_MASK, iommu->mmio_base + MMIO_STATUS_OFFSET);
 
 	spin_unlock_irqrestore(&iommu->lock, flags);
 }
@@ -1309,10 +1252,6 @@ static unsigned long iommu_unmap_page(struct protection_domain *dom,
 
 			/* Large PTE found which maps this address */
 			unmap_size = PTE_PAGE_SIZE(*pte);
-
-			/* Only unmap from the first pte in the page */
-			if ((unmap_size - 1) & bus_addr)
-				break;
 			count      = PAGE_SIZE_PTE_COUNT(unmap_size);
 			for (i = 0; i < count; i++)
 				pte[i] = 0ULL;
@@ -1322,7 +1261,7 @@ static unsigned long iommu_unmap_page(struct protection_domain *dom,
 		unmapped += unmap_size;
 	}
 
-	BUG_ON(unmapped && !is_power_of_2(unmapped));
+	BUG_ON(!is_power_of_2(unmapped));
 
 	return unmapped;
 }
@@ -2096,20 +2035,20 @@ out_err:
 }
 
 /* FIXME: Move this to PCI code */
-#define PCI_PRI_TLP_OFF		(1 << 15)
+#define PCI_PRI_TLP_OFF		(1 << 2)
 
 bool pci_pri_tlp_required(struct pci_dev *pdev)
 {
-	u16 status;
+	u16 control;
 	int pos;
 
 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
 	if (!pos)
 		return false;
 
-	pci_read_config_word(pdev, pos + PCI_PRI_STATUS, &status);
+	pci_read_config_word(pdev, pos + PCI_PRI_CTRL, &control);
 
-	return (status & PCI_PRI_TLP_OFF) ? true : false;
+	return (control & PCI_PRI_TLP_OFF) ? true : false;
 }
 
 /*
@@ -2279,34 +2218,20 @@ static int device_change_notifier(struct notifier_block *nb,
 
 		iommu_init_device(dev);
 
-		/*
-		 * dev_data is still NULL and
-		 * got initialized in iommu_init_device
-		 */
-		dev_data = get_dev_data(dev);
-
-		if (iommu_pass_through || dev_data->iommu_v2) {
-			dev_data->passthrough = true;
-			attach_device(dev, pt_domain);
-			break;
-		}
-
 		domain = domain_for_device(dev);
 
 		/* allocate a protection domain if a device is added */
 		dma_domain = find_protection_domain(devid);
-		if (!dma_domain) {
-			dma_domain = dma_ops_domain_alloc();
-			if (!dma_domain)
-				goto out;
-			dma_domain->target_dev = devid;
+		if (dma_domain)
+			goto out;
+		dma_domain = dma_ops_domain_alloc();
+		if (!dma_domain)
+			goto out;
+		dma_domain->target_dev = devid;
 
-			spin_lock_irqsave(&iommu_pd_list_lock, flags);
-			list_add_tail(&dma_domain->list, &iommu_pd_list);
-			spin_unlock_irqrestore(&iommu_pd_list_lock, flags);
-		}
-
-		dev->archdata.dma_ops = &amd_iommu_dma_ops;
+		spin_lock_irqsave(&iommu_pd_list_lock, flags);
+		list_add_tail(&dma_domain->list, &iommu_pd_list);
+		spin_unlock_irqrestore(&iommu_pd_list_lock, flags);
 
 		break;
 	case BUS_NOTIFY_DEL_DEVICE:
@@ -3268,26 +3193,6 @@ static int amd_iommu_domain_has_cap(struct iommu_domain *domain,
 	return 0;
 }
 
-static int amd_iommu_device_group(struct device *dev, unsigned int *groupid)
-{
-	struct iommu_dev_data *dev_data = dev->archdata.iommu;
-	struct pci_dev *pdev = to_pci_dev(dev);
-	u16 devid;
-
-	if (!dev_data)
-		return -ENODEV;
-
-	if (pdev->is_virtfn || !iommu_group_mf)
-		devid = dev_data->devid;
-	else
-		devid = calc_devid(pdev->bus->number,
-				   PCI_DEVFN(PCI_SLOT(pdev->devfn), 0));
-
-	*groupid = amd_iommu_alias_table[devid];
-
-	return 0;
-}
-
 static struct iommu_ops amd_iommu_ops = {
 	.domain_init = amd_iommu_domain_init,
 	.domain_destroy = amd_iommu_domain_destroy,
@@ -3297,7 +3202,6 @@ static struct iommu_ops amd_iommu_ops = {
 	.unmap = amd_iommu_unmap,
 	.iova_to_phys = amd_iommu_iova_to_phys,
 	.domain_has_cap = amd_iommu_domain_has_cap,
-	.device_group = amd_iommu_device_group,
 	.pgsize_bitmap	= AMD_IOMMU_PGSIZES,
 };
 

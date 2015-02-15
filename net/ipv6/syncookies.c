@@ -24,10 +24,9 @@
 extern int sysctl_tcp_syncookies;
 extern __u32 syncookie_secret[2][16-4+SHA_DIGEST_WORDS];
 
-#define COOKIEBITS 24	/* Upper bits store count */
+#define COOKIEBITS 24	
 #define COOKIEMASK (((__u32)1 << COOKIEBITS) - 1)
 
-/* Table must be sorted. */
 static __u16 const msstab[] = {
 	64,
 	512,
@@ -39,12 +38,6 @@ static __u16 const msstab[] = {
 	9000 - 60,
 };
 
-/*
- * This (misnamed) value is the age of syncookie which is permitted.
- * Its ideal value should be dependent on TCP_TIMEOUT_INIT and
- * sysctl_tcp_retries1. It's a rather complicated formula (exponential
- * backoff) to compute at runtime so it's currently hardcoded here.
- */
 #define COUNTER_TRIES 4
 
 static inline struct sock *get_cookie_sock(struct sock *sk, struct sk_buff *skb,
@@ -71,11 +64,6 @@ static u32 cookie_hash(const struct in6_addr *saddr, const struct in6_addr *dadd
 {
 	__u32 *tmp = __get_cpu_var(ipv6_cookie_scratch);
 
-	/*
-	 * we have 320 bits of information to hash, copy in the remaining
-	 * 192 bits required for sha_transform, from the syncookie_secret
-	 * and overwrite the digest with the secret
-	 */
 	memcpy(tmp + 10, syncookie_secret[c], 44);
 	memcpy(tmp, saddr, 16);
 	memcpy(tmp + 4, daddr, 16);
@@ -178,7 +166,7 @@ struct sock *cookie_v6_check(struct sock *sk, struct sk_buff *skb)
 
 	NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_SYNCOOKIESRECV);
 
-	/* check for timestamp cookie support */
+	
 	memset(&tcp_opt, 0, sizeof(tcp_opt));
 	tcp_parse_options(skb, &tcp_opt, &hash_location, 0);
 
@@ -210,7 +198,7 @@ struct sock *cookie_v6_check(struct sock *sk, struct sk_buff *skb)
 	}
 
 	ireq6->iif = sk->sk_bound_dev_if;
-	/* So that link locals have meaning */
+	
 	if (!sk->sk_bound_dev_if &&
 	    ipv6_addr_type(&ireq6->rmt_addr) & IPV6_ADDR_LINKLOCAL)
 		ireq6->iif = inet6_iif(skb);
@@ -229,11 +217,6 @@ struct sock *cookie_v6_check(struct sock *sk, struct sk_buff *skb)
 	treq->rcv_isn = ntohl(th->seq) - 1;
 	treq->snt_isn = cookie;
 
-	/*
-	 * We need to lookup the dst_entry to get the correct window size.
-	 * This is taken from tcp_v6_syn_recv_sock.  Somebody please enlighten
-	 * me if there is a preferred way.
-	 */
 	{
 		struct in6_addr *final_p, final;
 		struct flowi6 fl6;

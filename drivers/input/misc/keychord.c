@@ -27,6 +27,8 @@
 
 #define KEYCHORD_NAME		"keychord"
 #define BUFFER_SIZE			16
+#define MATCH_COUNT		3
+#define KEYCHORD_TIMEOUT	5*HZ
 
 MODULE_AUTHOR("Mike Lockwood <lockwood@android.com>");
 MODULE_DESCRIPTION("Key chord input driver");
@@ -60,7 +62,21 @@ struct keychord_device {
 	unsigned char		head;
 	unsigned char		tail;
 	__u16			buff[BUFFER_SIZE];
+	struct delayed_work	keychord_delayed_work;
+	struct work_struct	keychord_checkwork;
+	struct workqueue_struct *keychord_wq;
+	int8_t			keychord_match_count;
 };
+
+static void keychord_timeout(struct work_struct *work)
+{
+	struct keychord_device *kdev =
+		container_of(work, struct keychord_device, keychord_delayed_work.work);
+
+	pr_info("%s: match_count=%d\n", __func__, kdev->keychord_match_count);
+	if (kdev->keychord_match_count)
+		kdev->keychord_match_count = 0;
+}
 
 static int check_keychord(struct keychord_device *kdev,
 		struct input_keychord *keychord)
@@ -75,8 +91,45 @@ static int check_keychord(struct keychord_device *kdev,
 			return 0;
 	}
 
-	/* we have a match */
-	return 1;
+	if (kdev->keychord_match_count++ == 0)
+		schedule_delayed_work(&kdev->keychord_delayed_work, KEYCHORD_TIMEOUT);
+
+	if (kdev->keychord_match_count == MATCH_COUNT) {
+		if (cancel_delayed_work(&kdev->keychord_delayed_work)) {
+			kdev->keychord_match_count = 0;
+			return 1;
+		} else
+			pr_info("%s: timeout already started\n", __func__);
+	}
+
+	return 0;
+}
+
+static void keychord_check_work(struct work_struct *work)
+{
+	int i, got_chord;
+	struct input_keychord *keychord;
+	struct keychord_device *kdev =
+		container_of(work, struct keychord_device, keychord_checkwork);
+
+	keychord = kdev->keychords;
+	got_chord = 0;
+
+	for (i = 0; i < kdev->keychord_count; i++) {
+		if (check_keychord(kdev, keychord)) {
+			kdev->buff[kdev->head] = keychord->id;
+			kdev->head = (kdev->head + 1) % BUFFER_SIZE;
+			got_chord = 1;
+			printk(KERN_INFO "[KEY]%s: Keychord get triggered!\n", __func__);
+			break;
+		}
+		/* skip to next keychord */
+		keychord = NEXT_KEYCHORD(keychord);
+	}
+
+	if (got_chord)
+		wake_up_interruptible(&kdev->waitq);
+
 }
 
 static void keychord_event(struct input_handle *handle, unsigned int type,
@@ -85,7 +138,6 @@ static void keychord_event(struct input_handle *handle, unsigned int type,
 	struct keychord_device *kdev = handle->private;
 	struct input_keychord *keychord;
 	unsigned long flags;
-	int i, got_chord = 0;
 
 	if (type != EV_KEY || code >= KEY_MAX)
 		return;
@@ -108,30 +160,35 @@ static void keychord_event(struct input_handle *handle, unsigned int type,
 		goto done;
 
 	keychord = kdev->keychords;
+
 	if (!keychord)
 		goto done;
 
+#if 0	/* move to queue for timer checking */
 	/* check to see if the keyboard state matches any keychords */
 	for (i = 0; i < kdev->keychord_count; i++) {
 		if (check_keychord(kdev, keychord)) {
 			kdev->buff[kdev->head] = keychord->id;
 			kdev->head = (kdev->head + 1) % BUFFER_SIZE;
 			got_chord = 1;
+			printk(KERN_INFO "[KEY] Keychord get triggered!\n");
 			break;
 		}
 		/* skip to next keychord */
 		keychord = NEXT_KEYCHORD(keychord);
 	}
+#endif
+	queue_work(kdev->keychord_wq, &kdev->keychord_checkwork);
 
 done:
 	spin_unlock_irqrestore(&kdev->lock, flags);
 
+#if 0 /* move to queue for timer checking */
 	if (got_chord) {
-		pr_info("keychord: got keychord id %d. Any tasks: %d\n",
-			keychord->id,
-			!list_empty_careful(&kdev->waitq.task_list));
 		wake_up_interruptible(&kdev->waitq);
+		printk(KERN_INFO "[KEY] wakeup!\n");
 	}
+#endif
 }
 
 static int keychord_connect(struct input_handler *handler,
@@ -347,13 +404,17 @@ static int keychord_open(struct inode *inode, struct file *file)
 	__set_bit(EV_KEY, kdev->device_ids[0].evbit);
 
 	file->private_data = kdev;
-
+	kdev->keychord_wq = create_singlethread_workqueue("keychord");
+	INIT_DELAYED_WORK(&kdev->keychord_delayed_work, keychord_timeout);
+	INIT_WORK(&kdev->keychord_checkwork, keychord_check_work);
 	return 0;
 }
 
 static int keychord_release(struct inode *inode, struct file *file)
 {
 	struct keychord_device *kdev = file->private_data;
+
+	destroy_workqueue(kdev->keychord_wq);
 
 	if (kdev->registered)
 		input_unregister_handler(&kdev->input_handler);

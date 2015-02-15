@@ -20,7 +20,8 @@
 #include <linux/init.h>
 #include <linux/uaccess.h>
 #include <linux/user.h>
-#include <linux/export.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/cp15.h>
 #include <asm/cputype.h>
@@ -84,8 +85,14 @@ static void vfp_force_reload(unsigned int cpu, struct thread_info *thread)
 	}
 #ifdef CONFIG_SMP
 	thread->vfpstate.hard.cpu = NR_CPUS;
+	vfp_current_hw_state[cpu] = NULL;
 #endif
 }
+
+/*
+ * Used for reporting emulation statistics via /proc
+ */
+static atomic64_t vfp_bounce_count = ATOMIC64_INIT(0);
 
 /*
  * Per-thread VFP initialization.
@@ -338,6 +345,7 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
 	u32 fpscr, orig_fpscr, fpsid, exceptions;
 
 	pr_debug("VFP: bounce: trigger %08x fpexc %08x\n", trigger, fpexc);
+	atomic64_inc(&vfp_bounce_count);
 
 	/*
 	 * At this point, FPEXC can have the following configuration:
@@ -414,7 +422,7 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
 	 * If there isn't a second FP instruction, exit now. Note that
 	 * the FPEXC.FP2V bit is valid only if FPEXC.EX is 1.
 	 */
-	if ((fpexc & (FPEXC_EX | FPEXC_FP2V)) != (FPEXC_EX | FPEXC_FP2V))
+	if (fpexc ^ (FPEXC_EX | FPEXC_FP2V))
 		goto exit;
 
 	/*
@@ -446,7 +454,7 @@ static void vfp_enable(void *unused)
 }
 
 #ifdef CONFIG_CPU_PM
-static int vfp_pm_suspend(void)
+int vfp_pm_suspend(void)
 {
 	struct thread_info *ti = current_thread_info();
 	u32 fpexc = fmrx(FPEXC);
@@ -472,7 +480,7 @@ static int vfp_pm_suspend(void)
 	return 0;
 }
 
-static void vfp_pm_resume(void)
+void vfp_pm_resume(void)
 {
 	/* ensure we have access to the vfp */
 	vfp_enable(NULL);
@@ -649,51 +657,25 @@ static int vfp_hotplug(struct notifier_block *b, unsigned long action,
 	return NOTIFY_OK;
 }
 
-#ifdef CONFIG_KERNEL_MODE_NEON
-
-/*
- * Kernel-side NEON support functions
- */
-void kernel_neon_begin(void)
+#ifdef CONFIG_PROC_FS
+static int vfp_bounce_show(struct seq_file *m, void *v)
 {
-	struct thread_info *thread = current_thread_info();
-	unsigned int cpu;
-	u32 fpexc;
+	seq_printf(m, "%llu\n", atomic64_read(&vfp_bounce_count));
+	return 0;
+}
 
-	/*
-	 * Kernel mode NEON is only allowed outside of interrupt context
-	 * with preemption disabled. This will make sure that the kernel
-	 * mode NEON register contents never need to be preserved.
-	 */
-	BUG_ON(in_interrupt());
-	cpu = get_cpu();
+static int vfp_bounce_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, vfp_bounce_show, NULL);
+}
 
-	fpexc = fmrx(FPEXC) | FPEXC_EN;
-	fmxr(FPEXC, fpexc);
-
-	/*
-	 * Save the userland NEON/VFP state. Under UP,
-	 * the owner could be a task other than 'current'
-	 */
-	if (vfp_state_in_hw(cpu, thread))
-		vfp_save_state(&thread->vfpstate, fpexc);
-#ifndef CONFIG_SMP
-	else if (vfp_current_hw_state[cpu] != NULL)
-		vfp_save_state(vfp_current_hw_state[cpu], fpexc);
+static const struct file_operations vfp_bounce_fops = {
+	.open		= vfp_bounce_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 #endif
-	vfp_current_hw_state[cpu] = NULL;
-}
-EXPORT_SYMBOL(kernel_neon_begin);
-
-void kernel_neon_end(void)
-{
-	/* Disable the NEON/VFP unit. */
-	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-	put_cpu();
-}
-EXPORT_SYMBOL(kernel_neon_end);
-
-#endif /* CONFIG_KERNEL_MODE_NEON */
 
 /*
  * VFP support code initialisation.
@@ -702,7 +684,9 @@ static int __init vfp_init(void)
 {
 	unsigned int vfpsid;
 	unsigned int cpu_arch = cpu_architecture();
-
+#ifdef CONFIG_PROC_FS
+	static struct proc_dir_entry *procfs_entry;
+#endif
 	if (cpu_arch >= CPU_ARCH_ARMv6)
 		on_each_cpu(vfp_enable, NULL, 1);
 
@@ -748,14 +732,11 @@ static int __init vfp_init(void)
 			elf_hwcap |= HWCAP_VFPv3;
 
 			/*
-			 * Check for VFPv3 D16 and VFPv4 D16.  CPUs in
-			 * this configuration only have 16 x 64bit
-			 * registers.
+			 * Check for VFPv3 D16. CPUs in this configuration
+			 * only have 16 x 64bit registers.
 			 */
 			if (((fmrx(MVFR0) & MVFR0_A_SIMD_MASK)) == 1)
-				elf_hwcap |= HWCAP_VFPv3D16; /* also v4-D16 */
-			else
-				elf_hwcap |= HWCAP_VFPD32;
+				elf_hwcap |= HWCAP_VFPv3D16;
 		}
 #endif
 		/*
@@ -769,13 +750,20 @@ static int __init vfp_init(void)
 			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
 				elf_hwcap |= HWCAP_NEON;
 #endif
-#ifdef CONFIG_VFPv3
-			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
+			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000 ||
+			    (read_cpuid_id() & 0xff00fc00) == 0x51000400)
 				elf_hwcap |= HWCAP_VFPv4;
-#endif
 		}
 	}
+
+#ifdef CONFIG_PROC_FS
+	procfs_entry = proc_create("cpu/vfp_bounce", S_IRUGO, NULL,
+			&vfp_bounce_fops);
+	if (!procfs_entry)
+		pr_err("Failed to create procfs node for VFP bounce reporting\n");
+#endif
+
 	return 0;
 }
 
-core_initcall(vfp_init);
+late_initcall(vfp_init);

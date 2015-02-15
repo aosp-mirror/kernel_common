@@ -749,10 +749,7 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 	/* clear the pages coming from the pool if requested */
 	if (flags & TTM_PAGE_FLAG_ZERO_ALLOC) {
 		list_for_each_entry(p, &plist, lru) {
-			if (PageHighMem(p))
-				clear_highpage(p);
-			else
-				clear_page(page_address(p));
+			clear_page(page_address(p));
 		}
 	}
 

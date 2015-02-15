@@ -905,7 +905,7 @@ static int jr3_pci_attach(struct comedi_device *dev,
 	}
 
 	/*  Reset DSP card */
-	writel(0, &devpriv->iobase->channel[0].reset);
+	devpriv->iobase->channel[0].reset = 0;
 
 	result = comedi_load_firmware(dev, "jr3pci.idm", jr3_download_firmware);
 	dev_dbg(dev->hw_dev, "Firmare load %d\n", result);

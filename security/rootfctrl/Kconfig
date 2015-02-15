@@ -1,0 +1,8 @@
+config SECURITY_ROOTFCTRL
+	bool "HTC Root File Control Support"
+	depends on SECURITY
+    select SECURITY_PATH
+	default n
+	help
+	  This selects HTC root file control mechanism.
+	  If you are unsure how to answer this question, answer N.

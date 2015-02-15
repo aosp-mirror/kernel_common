@@ -19,6 +19,71 @@ config THERMAL_HWMON
 	depends on HWMON=y || HWMON=THERMAL
 	default y
 
+config THERMAL_MSM_POPMEM
+	tristate "Qualcomm MSM POP memory temperature sensor"
+	depends on THERMAL
+	default n
+	help
+	  This enables a thermal sysfs driver for MSM POP memory. It shows up in
+	  sysfs as a thermal zone with one trip point. Due to hardware
+	  limitations, the temperatures are reported as "Low Temperature" (20 C)
+	  "Normal Temperature" (50 C) and "Out of Spec High Temperature" (85 C).
+	  This driver is designed to be used in conjunction with a user space
+	  application to make all policy decisions.
+
+config THERMAL_TSENS
+	tristate "Qualcomm Tsens Temperature Alarm"
+	depends on THERMAL
+	default n
+	help
+	  This enables the thermal sysfs driver for the Tsens device. It shows
+	  up in Sysfs as a thermal zone with mutiple trip points. Disabling the
+	  thermal zone device via the mode file results in disabling the sensor.
+	  Also able to set threshold temperature for both hot and cold and update
+	  when a threshold is reached.
+
+config THERMAL_TSENS8960
+	tristate "Qualcomm 8960 Tsens Temperature Alarm"
+	depends on THERMAL
+	help
+	  This enables the thermal sysfs driver for the Tsens device. It shows
+	  up in Sysfs as a thermal zone with mutiple trip points. Disabling the
+	  thermal zone device via the mode file results in disabling the sensor.
+	  Also able to set threshold temperature for both hot and cold and update
+	  when a threshold is reached.
+
+config THERMAL_TSENS8974
+	tristate "Qualcomm 8974 TSENS Temperature driver"
+	depends on THERMAL
+	help
+	  This enables the thermal sysfs driver for the TSENS device. It shows
+	  up in Sysfs as a thermal zone with multiple trip points. Also able
+	  to set threshold temperature for both warm and cool and update
+	  thermal userspace client when a threshold is reached. Warm/Cool
+	  temperature thresholds can be set independently for each sensor.
+
+config THERMAL_PM8XXX
+	tristate "Qualcomm PMIC PM8xxx Temperature Alarm"
+	depends on THERMAL
+	depends on MFD_PM8XXX
+	help
+	  This enables a thermal Sysfs driver for the PMIC PM8xxx devices. It
+	  shows up in Sysfs as a thermal zone with multiple trip points.
+	  Enabling the thermal zone device via the mode file results in
+	  shifting over temperature shutdown control of the PMIC from hardware
+	  to software.
+
+config THERMAL_MONITOR
+	bool "Monitor thermal state and limit CPU Frequency"
+	depends on THERMAL_TSENS8960 || THERMAL_TSENS8974
+	depends on CPU_FREQ_MSM
+	default n
+	help
+	  This enables thermal monitoring capability in the kernel in the
+	  absence of a system wide thermal monitoring entity or until such an
+	  entity starts running in the userspace. Monitors TSENS temperature
+	  and limits the max frequency of the cores.
+
 config SPEAR_THERMAL
 	bool "SPEAr thermal sensor driver"
 	depends on THERMAL
@@ -26,3 +91,54 @@ config SPEAR_THERMAL
 	help
 	  Enable this to plug the SPEAr thermal sensor driver into the Linux
 	  thermal framework
+
+config THERMAL_QPNP
+	tristate "Qualcomm Plug-and-Play PMIC Temperature Alarm"
+	depends on THERMAL
+	depends on OF
+	depends on SPMI
+	depends on OF_SPMI
+	help
+	  This enables a thermal Sysfs driver for Qualcomm plug-and-play (QPNP)
+	  PMIC devices. It shows up in Sysfs as a thermal zone with multiple
+	  trip points. The temperature reported by the thermal zone reflects the
+	  real time die temperature if an ADC is present or an estimate of the
+	  temperature based upon the over temperature stage value if no ADC is
+	  available. If allowed via compile time configuration; enabling the
+	  thermal zone device via the mode file results in shifting PMIC over
+	  temperature shutdown control from hardware to software.
+
+config THERMAL_QPNP_ADC_TM
+	tristate "Qualcomm 8974 Thermal Monitor ADC Driver"
+	depends on THERMAL && SPMI
+	help
+	  This enables the thermal Sysfs driver for the ADC thermal monitoring
+	  device. It shows up in Sysfs as a thermal zone with multiple trip points.
+	  Disabling the thermal zone device via the mode file results in disabling
+	  the sensor. Also able to set threshold temperature for both hot and cold
+	  and update when a threshold is reached.
+
+config THERMAL_MAX_TEMP_PROTECT
+       bool "Max temperature protection support"
+       depends on THERMAL
+       default n
+       help
+         This enable the protection under critical high temperature enviroment.
+         Device would auto shutdown when thermal sensor senses the temperature
+         is higher than the critical high temperature.
+
+config THERMAL_MIN_TEMP_PROTECT
+       bool "Min temperature protection support"
+       depends on THERMAL
+       default n
+       help
+         This enable the protection under critical low temperature enviroment.
+         Device would auto shutdown when thermal sensor senses the temperature
+         is lower than the critical low temperature.
+
+config THERMAL_DELTA
+	bool "HTC THERMAL TUNER"
+	default n
+	help
+		This module export a paramter for thermal tuning.
+

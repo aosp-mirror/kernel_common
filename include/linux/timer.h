@@ -299,4 +299,8 @@ unsigned long __round_jiffies_up_relative(unsigned long j, int cpu);
 unsigned long round_jiffies_up(unsigned long j);
 unsigned long round_jiffies_up_relative(unsigned long j);
 
+#ifdef CONFIG_HTC_POWER_DEBUG
+void htc_timer_stats_show(u16 water_mark);
+void htc_timer_stats_onoff(char onoff);
+#endif
 #endif

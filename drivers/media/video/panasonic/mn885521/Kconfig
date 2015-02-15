@@ -1,0 +1,14 @@
+#
+# Configuration for panasonic_hw (ISDB-T)
+#
+
+config ISDBT_PANASONIC
+	bool "ISDB-T PANASONIC Driver" 
+	default y
+	---help---
+	  This is a ISDB-T for PANASONIC chipset Driver.
+
+config ISDBT_PANASONIC_DEBUG
+	bool "print ISDB-T PANASONIC debug message"
+	depends on ISDBT_PANASONIC
+	default n

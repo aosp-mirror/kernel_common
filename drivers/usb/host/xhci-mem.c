@@ -205,12 +205,7 @@ static int xhci_alloc_segments_for_ring(struct xhci_hcd *xhci,
 
 		next = xhci_segment_alloc(xhci, cycle_state, flags);
 		if (!next) {
-			prev = *first;
-			while (prev) {
-				next = prev->next;
-				xhci_segment_free(xhci, prev);
-				prev = next;
-			}
+			xhci_free_segments_for_ring(xhci, *first);
 			return -ENOMEM;
 		}
 		xhci_link_segments(xhci, prev, next, type);
@@ -263,7 +258,7 @@ static struct xhci_ring *xhci_ring_alloc(struct xhci_hcd *xhci,
 	return ring;
 
 fail:
-	kfree(ring);
+	xhci_ring_free(xhci, ring);
 	return NULL;
 }
 
@@ -369,10 +364,6 @@ static struct xhci_container_ctx *xhci_alloc_container_ctx(struct xhci_hcd *xhci
 		ctx->size += CTX_SIZE(xhci->hcc_params);
 
 	ctx->bytes = dma_pool_alloc(xhci->device_pool, flags, &ctx->dma);
-	if (!ctx->bytes) {
-		kfree(ctx);
-		return NULL;
-	}
 	memset(ctx->bytes, 0, ctx->size);
 	return ctx;
 }
@@ -802,9 +793,10 @@ static void xhci_free_tt_info(struct xhci_hcd *xhci,
 		struct xhci_virt_device *virt_dev,
 		int slot_id)
 {
+	struct list_head *tt;
 	struct list_head *tt_list_head;
-	struct xhci_tt_bw_info *tt_info, *next;
-	bool slot_found = false;
+	struct list_head *tt_next;
+	struct xhci_tt_bw_info *tt_info;
 
 	/* If the device never made it past the Set Address stage,
 	 * it may not have the real_port set correctly.
@@ -816,16 +808,34 @@ static void xhci_free_tt_info(struct xhci_hcd *xhci,
 	}
 
 	tt_list_head = &(xhci->rh_bw[virt_dev->real_port - 1].tts);
-	list_for_each_entry_safe(tt_info, next, tt_list_head, tt_list) {
-		/* Multi-TT hubs will have more than one entry */
-		if (tt_info->slot_id == slot_id) {
-			slot_found = true;
-			list_del(&tt_info->tt_list);
-			kfree(tt_info);
-		} else if (slot_found) {
+	if (list_empty(tt_list_head))
+		return;
+
+	list_for_each(tt, tt_list_head) {
+		tt_info = list_entry(tt, struct xhci_tt_bw_info, tt_list);
+		if (tt_info->slot_id == slot_id)
 			break;
-		}
 	}
+	/* Cautionary measure in case the hub was disconnected before we
+	 * stored the TT information.
+	 */
+	if (tt_info->slot_id != slot_id)
+		return;
+
+	tt_next = tt->next;
+	tt_info = list_entry(tt, struct xhci_tt_bw_info,
+			tt_list);
+	/* Multi-TT hubs will have more than one entry */
+	do {
+		list_del(tt);
+		kfree(tt_info);
+		tt = tt_next;
+		if (list_empty(tt_list_head))
+			break;
+		tt_next = tt->next;
+		tt_info = list_entry(tt, struct xhci_tt_bw_info,
+				tt_list);
+	} while (tt_info->slot_id == slot_id);
 }
 
 int xhci_alloc_tt_info(struct xhci_hcd *xhci,
@@ -1254,8 +1264,6 @@ static unsigned int xhci_microframes_to_exponent(struct usb_device *udev,
 static unsigned int xhci_parse_microframe_interval(struct usb_device *udev,
 		struct usb_host_endpoint *ep)
 {
-	if (ep->desc.bInterval == 0)
-		return 0;
 	return xhci_microframes_to_exponent(udev, ep,
 			ep->desc.bInterval, 0, 15);
 }
@@ -1341,7 +1349,7 @@ static u32 xhci_get_endpoint_type(struct usb_device *udev,
 		struct usb_host_endpoint *ep)
 {
 	int in;
-	u32 type;
+	u32 type = 0;
 
 	in = usb_endpoint_dir_in(&ep->desc);
 	if (usb_endpoint_xfer_control(&ep->desc)) {
@@ -1447,17 +1455,15 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	ep_ctx->ep_info2 |= cpu_to_le32(xhci_get_endpoint_type(udev, ep));
 
 	/* Set the max packet size and max burst */
-	max_packet = GET_MAX_PACKET(usb_endpoint_maxp(&ep->desc));
-	max_burst = 0;
 	switch (udev->speed) {
 	case USB_SPEED_SUPER:
+		max_packet = usb_endpoint_maxp(&ep->desc);
+		ep_ctx->ep_info2 |= cpu_to_le32(MAX_PACKET(max_packet));
 		/* dig out max burst from ep companion desc */
-		max_burst = ep->ss_ep_comp.bMaxBurst;
+		max_packet = ep->ss_ep_comp.bMaxBurst;
+		ep_ctx->ep_info2 |= cpu_to_le32(MAX_BURST(max_packet));
 		break;
 	case USB_SPEED_HIGH:
-		/* Some devices get this wrong */
-		if (usb_endpoint_xfer_bulk(&ep->desc))
-			max_packet = 512;
 		/* bits 11:12 specify the number of additional transaction
 		 * opportunities per microframe (USB 2.0, section 9.6.6)
 		 */
@@ -1465,16 +1471,17 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 				usb_endpoint_xfer_int(&ep->desc)) {
 			max_burst = (usb_endpoint_maxp(&ep->desc)
 				     & 0x1800) >> 11;
+			ep_ctx->ep_info2 |= cpu_to_le32(MAX_BURST(max_burst));
 		}
-		break;
+		/* Fall through */
 	case USB_SPEED_FULL:
 	case USB_SPEED_LOW:
+		max_packet = GET_MAX_PACKET(usb_endpoint_maxp(&ep->desc));
+		ep_ctx->ep_info2 |= cpu_to_le32(MAX_PACKET(max_packet));
 		break;
 	default:
 		BUG();
 	}
-	ep_ctx->ep_info2 |= cpu_to_le32(MAX_PACKET(max_packet) |
-			MAX_BURST(max_burst));
 	max_esit_payload = xhci_get_max_esit_payload(xhci, udev, ep);
 	ep_ctx->tx_info = cpu_to_le32(MAX_ESIT_PAYLOAD_FOR_EP(max_esit_payload));
 
@@ -1784,10 +1791,9 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 {
 	struct pci_dev	*pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
 	struct dev_info	*dev_info, *next;
-	struct xhci_cd  *cur_cd, *next_cd;
 	unsigned long	flags;
 	int size;
-	int i, j, num_ports;
+	int i;
 
 	/* Free the Event Ring Segment Table and the actual Event Ring */
 	size = sizeof(struct xhci_erst_entry)*(xhci->erst.num_entries);
@@ -1801,16 +1807,10 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 	xhci->event_ring = NULL;
 	xhci_dbg(xhci, "Freed event ring\n");
 
-	xhci->cmd_ring_reserved_trbs = 0;
 	if (xhci->cmd_ring)
 		xhci_ring_free(xhci, xhci->cmd_ring);
 	xhci->cmd_ring = NULL;
 	xhci_dbg(xhci, "Freed command ring\n");
-	list_for_each_entry_safe(cur_cd, next_cd,
-			&xhci->cancel_cmd_list, cancel_cmd_list) {
-		list_del(&cur_cd->cancel_cmd_list);
-		kfree(cur_cd);
-	}
 
 	for (i = 1; i < MAX_HC_SLOTS; ++i)
 		xhci_free_virt_device(xhci, i);
@@ -1849,31 +1849,8 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 	}
 	spin_unlock_irqrestore(&xhci->lock, flags);
 
-	if (!xhci->rh_bw)
-		goto no_bw;
-
-	num_ports = HCS_MAX_PORTS(xhci->hcs_params1);
-	for (i = 0; i < num_ports; i++) {
-		struct xhci_interval_bw_table *bwt = &xhci->rh_bw[i].bw_table;
-		for (j = 0; j < XHCI_MAX_INTERVAL; j++) {
-			struct list_head *ep = &bwt->interval_bw[j].endpoints;
-			while (!list_empty(ep))
-				list_del_init(ep->next);
-		}
-	}
-
-	for (i = 0; i < num_ports; i++) {
-		struct xhci_tt_bw_info *tt, *n;
-		list_for_each_entry_safe(tt, n, &xhci->rh_bw[i].tts, tt_list) {
-			list_del(&tt->tt_list);
-			kfree(tt);
-		}
-	}
-
-no_bw:
 	xhci->num_usb2_ports = 0;
 	xhci->num_usb3_ports = 0;
-	xhci->num_active_eps = 0;
 	kfree(xhci->usb2_ports);
 	kfree(xhci->usb3_ports);
 	kfree(xhci->port_array);
@@ -2282,9 +2259,6 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	u32 page_size, temp;
 	int i;
 
-	INIT_LIST_HEAD(&xhci->lpm_failed_devs);
-	INIT_LIST_HEAD(&xhci->cancel_cmd_list);
-
 	page_size = xhci_readl(xhci, &xhci->op_regs->page_size);
 	xhci_dbg(xhci, "Supported page size register = 0x%x\n", page_size);
 	for (i = 0; i < 16; i++) {
@@ -2462,6 +2436,8 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 		goto fail;
 	if (xhci_setup_port_arrays(xhci, flags))
 		goto fail;
+
+	INIT_LIST_HEAD(&xhci->lpm_failed_devs);
 
 	/* Enable USB 3.0 device notifications for function remote wake, which
 	 * is necessary for allowing USB 3.0 devices to do remote wakeup from

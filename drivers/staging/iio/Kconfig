@@ -104,4 +104,10 @@ config IIO_SIMPLE_DUMMY_BUFFER
 
 endif # IIO_SIMPLE_DUMMY
 
+config IIO_SENSORS_YAS53X
+    tristate "Yamaha 3-Axis Magnetometer"
+    depends on I2C && SYSFS && IIO && IIO_SW_RING && IIO_TRIGGER
+    help
+    Say Y here to add support for the Yamaha 3-Axis Magnetometer.
+
 endif # IIO

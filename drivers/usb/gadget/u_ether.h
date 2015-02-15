@@ -53,6 +53,10 @@ struct gether {
 	bool				is_fixed;
 	u32				fixed_out_len;
 	u32				fixed_in_len;
+
+	unsigned			ul_max_pkts_per_xfer;
+	unsigned			dl_max_pkts_per_xfer;
+	bool				multi_pkt_xfer;
 	struct sk_buff			*(*wrap)(struct gether *port,
 						struct sk_buff *skb);
 	int				(*unwrap)(struct gether *port,
@@ -62,6 +66,8 @@ struct gether {
 	/* called on network open/close */
 	void				(*open)(struct gether *);
 	void				(*close)(struct gether *);
+	struct rndis_packet_msg_type	*header;
+
 };
 
 #define	DEFAULT_FILTER	(USB_CDC_PACKET_TYPE_BROADCAST \
@@ -76,6 +82,7 @@ void gether_cleanup(void);
 /* variant of gether_setup that allows customizing network device name */
 int gether_setup_name(struct usb_gadget *g, u8 ethaddr[ETH_ALEN],
 		const char *netname);
+int gether_change_mtu(int new_mtu);
 
 /* connect/disconnect is handled by individual functions */
 struct net_device *gether_connect(struct gether *);

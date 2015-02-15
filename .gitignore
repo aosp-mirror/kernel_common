@@ -83,4 +83,7 @@ GTAGS
 
 *.orig
 *~
+
+#.img files, when producing dt.img
+*.img
 \#*#

@@ -968,7 +968,6 @@ static struct uart_ops sunsu_pops = {
 #define UART_NR	4
 
 static struct uart_sunsu_port sunsu_ports[UART_NR];
-static int nr_inst; /* Number of already registered ports */
 
 #ifdef CONFIG_SERIO
 
@@ -1338,8 +1337,13 @@ static int __init sunsu_console_setup(struct console *co, char *options)
 	printk("Console: ttyS%d (SU)\n",
 	       (sunsu_reg.minor - 64) + co->index);
 
-	if (co->index > nr_inst)
-		return -ENODEV;
+	/*
+	 * Check whether an invalid uart number has been specified, and
+	 * if so, search for the first available port that does have
+	 * console support.
+	 */
+	if (co->index >= UART_NR)
+		co->index = 0;
 	port = &sunsu_ports[co->index].port;
 
 	/*
@@ -1404,6 +1408,7 @@ static enum su_type __devinit su_get_type(struct device_node *dp)
 
 static int __devinit su_probe(struct platform_device *op)
 {
+	static int inst;
 	struct device_node *dp = op->dev.of_node;
 	struct uart_sunsu_port *up;
 	struct resource *rp;
@@ -1413,16 +1418,16 @@ static int __devinit su_probe(struct platform_device *op)
 
 	type = su_get_type(dp);
 	if (type == SU_PORT_PORT) {
-		if (nr_inst >= UART_NR)
+		if (inst >= UART_NR)
 			return -EINVAL;
-		up = &sunsu_ports[nr_inst];
+		up = &sunsu_ports[inst];
 	} else {
 		up = kzalloc(sizeof(*up), GFP_KERNEL);
 		if (!up)
 			return -ENOMEM;
 	}
 
-	up->port.line = nr_inst;
+	up->port.line = inst;
 
 	spin_lock_init(&up->port.lock);
 
@@ -1456,8 +1461,6 @@ static int __devinit su_probe(struct platform_device *op)
 		}
 		dev_set_drvdata(&op->dev, up);
 
-		nr_inst++;
-
 		return 0;
 	}
 
@@ -1485,7 +1488,7 @@ static int __devinit su_probe(struct platform_device *op)
 
 	dev_set_drvdata(&op->dev, up);
 
-	nr_inst++;
+	inst++;
 
 	return 0;
 

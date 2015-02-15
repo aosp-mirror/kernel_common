@@ -1,0 +1,7 @@
+config VIDEO_PANASONIC
+        bool "PANASONIC Multimedia Devices"
+        default n
+        ---help---
+          This is a representative video4linux configuration for PANASONIC multimedia devices.
+
+source "drivers/media/video/panasonic/mn885521/Kconfig"

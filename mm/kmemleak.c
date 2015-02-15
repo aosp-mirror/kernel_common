@@ -102,6 +102,8 @@
 #include <linux/kmemleak.h>
 #include <linux/memory_hotplug.h>
 
+#include <mach/devices_dtb.h>
+
 /*
  * Kmemleak configuration and common defines.
  */
@@ -160,6 +162,8 @@ struct kmemleak_object {
 	unsigned long jiffies;		/* creation timestamp */
 	pid_t pid;			/* pid of the current task */
 	char comm[TASK_COMM_LEN];	/* executable name */
+        unsigned long long ktime;       /* printk time */
+        unsigned long nanosec_rem;      /* printk nanosec */
 };
 
 /* flag representing the memory block allocation status */
@@ -355,9 +359,10 @@ static void print_unreferenced(struct seq_file *seq,
 
 	seq_printf(seq, "unreferenced object 0x%08lx (size %zu):\n",
 		   object->pointer, object->size);
-	seq_printf(seq, "  comm \"%s\", pid %d, jiffies %lu (age %d.%03ds)\n",
+	seq_printf(seq, "  comm \"%s\", pid %d, jiffies %lu (age %d.%03ds) [%5lu.%06lu]\n",
 		   object->comm, object->pid, object->jiffies,
-		   msecs_age / 1000, msecs_age % 1000);
+                   msecs_age / 1000, msecs_age % 1000,
+                   (unsigned long) object->ktime, object->nanosec_rem / 1000);
 	hex_dump_object(seq, object);
 	seq_printf(seq, "  backtrace:\n");
 
@@ -538,6 +543,8 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 	object->count = 0;			/* white color initially */
 	object->jiffies = jiffies;
 	object->checksum = 0;
+        object->ktime = cpu_clock(UINT_MAX);
+        object->nanosec_rem = do_div(object->ktime, 1000000000);
 
 	/* task information */
 	if (in_irq()) {
@@ -1755,13 +1762,15 @@ void __init kmemleak_init(void)
 	int i;
 	unsigned long flags;
 
-#ifdef CONFIG_DEBUG_KMEMLEAK_DEFAULT_OFF
+        /* Switch kmemleak by kernelflag */
+        if (get_kernel_flag() & KERNEL_FLAG_KMEMLEAK)
+                kmemleak_skip_disable = 1;
+
 	if (!kmemleak_skip_disable) {
 		atomic_set(&kmemleak_early_log, 0);
 		kmemleak_disable();
 		return;
 	}
-#endif
 
 	jiffies_min_age = msecs_to_jiffies(MSECS_MIN_AGE);
 	jiffies_scan_wait = msecs_to_jiffies(SECS_SCAN_WAIT * 1000);
@@ -1839,8 +1848,6 @@ static int __init kmemleak_late_init(void)
 {
 	struct dentry *dentry;
 
-	atomic_set(&kmemleak_initialized, 1);
-
 	if (atomic_read(&kmemleak_error)) {
 		/*
 		 * Some error occurred and kmemleak was disabled. There is a
@@ -1861,6 +1868,7 @@ static int __init kmemleak_late_init(void)
 	mutex_unlock(&scan_mutex);
 
 	pr_info("Kernel memory leak detector initialized\n");
+	atomic_set(&kmemleak_initialized, 1);
 
 	return 0;
 }

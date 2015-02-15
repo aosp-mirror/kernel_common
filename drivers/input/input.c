@@ -223,8 +223,6 @@ static void input_handle_event(struct input_dev *dev,
 	case EV_SYN:
 		switch (code) {
 		case SYN_CONFIG:
-		case SYN_TIME_SEC:
-		case SYN_TIME_NSEC:
 			disposition = INPUT_PASS_TO_ALL;
 			break;
 
@@ -1571,14 +1569,18 @@ void input_reset_device(struct input_dev *dev)
 
 	if (dev->users) {
 		input_dev_toggle(dev, true);
-
+/* Remove this because conflict with hTC quickboot	*/
+#if 0
 		/*
 		 * Keys that have been pressed at suspend time are unlikely
 		 * to be still pressed when we resume.
 		 */
-		spin_lock_irq(&dev->event_lock);
-		input_dev_release_keys(dev);
-		spin_unlock_irq(&dev->event_lock);
+		if (!test_bit(INPUT_PROP_NO_DUMMY_RELEASE, dev->propbit)) {
+			spin_lock_irq(&dev->event_lock);
+			input_dev_release_keys(dev);
+			spin_unlock_irq(&dev->event_lock);
+		}
+#endif
 	}
 
 	mutex_unlock(&dev->mutex);

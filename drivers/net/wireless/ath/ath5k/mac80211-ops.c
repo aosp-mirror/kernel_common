@@ -59,7 +59,7 @@ ath5k_tx(struct ieee80211_hw *hw, struct sk_buff *skb)
 	u16 qnum = skb_get_queue_mapping(skb);
 
 	if (WARN_ON(qnum >= ah->ah_capabilities.cap_queues.q_tx_num)) {
-		ieee80211_free_txskb(hw, skb);
+		dev_kfree_skb_any(skb);
 		return;
 	}
 

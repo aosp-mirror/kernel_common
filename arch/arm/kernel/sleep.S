@@ -4,6 +4,11 @@
 #include <asm/assembler.h>
 #include <asm/glue-cache.h>
 #include <asm/glue-proc.h>
+
+#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
+#include <mach/htc_footprint.h>
+#endif
+
 	.text
 
 /*
@@ -81,6 +86,41 @@ ENDPROC(cpu_resume_after_mmu)
 	.data
 	.align
 ENTRY(cpu_resume)
+
+#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
+#ifdef CONFIG_SMP
+	ALT_SMP(mrc p15, 0, r0, c0, c0, 5) /* MPIDR */
+	ALT_UP(mov r0, #0)
+	ands    r0, r0, #15             /* What CPU am I */
+#else
+	mov r0, #0                      /* What CPU am I */
+#endif
+	ldr     r1, =mnemosyne_phys
+	ldr     r2, =cpu_resume
+	adr     r3, cpu_resume
+	add     r1, r1, r3
+	sub     r1, r1, r2              /* translate virt to phys */
+	ldr     r1, [r1]                /* Keep mnemosyne_phys in R1 */
+
+	cmp     r1, #0
+	beq     1f                                              /* if base is NULL, skip it. */
+
+	ldr     r2, =mnemosyne_kernel_exit_counter_from_cpu     /* Get the offset of an element */
+	add     r2, r1, r2                                      /* Get the address of an element */
+	ldr     r3, [r2, r0, LSL #2]
+	add     r3, r3, #1
+	str     r3, [r2, r0, LSL #2]
+	dsb
+
+	ldr     r2, =mnemosyne_kernel_footprint_cpu             /* Get the offset of an element */
+	add     r2, r1, r2                                      /* Get the address of an element */
+	mov     r3, #4
+	strb    r3, [r2, r0, LSL #2]                            /* write footprint 4 */
+	dsb
+
+	1:
+#endif
+
 #ifdef CONFIG_SMP
 	adr	r0, sleep_save_sp
 	ALT_SMP(mrc p15, 0, r1, c0, c0, 5)

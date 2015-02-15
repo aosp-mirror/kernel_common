@@ -86,8 +86,10 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 	pte_t *pte;
 
 	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
-	if (pte)
+	if (pte) {
 		clean_pte_table(pte);
+		inc_zone_page_state(virt_to_page(pte), NR_PAGETABLE);
+	}
 
 	return pte;
 }
@@ -116,8 +118,10 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
  */
 static inline void pte_free_kernel(struct mm_struct *mm, pte_t *pte)
 {
-	if (pte)
+	if (pte) {
+		dec_zone_page_state(virt_to_page(pte), NR_PAGETABLE);
 		free_page((unsigned long)pte);
+	}
 }
 
 static inline void pte_free(struct mm_struct *mm, pgtable_t pte)

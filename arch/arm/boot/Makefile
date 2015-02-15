@@ -31,7 +31,7 @@ DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES))
 ifneq ($(DTB_NAMES),)
 DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
 else
-DTB_LIST := $(dtb-y)
+DTB_LIST := $(htc_dtb-y)
 endif
 DTB_OBJS := $(addprefix $(obj)/,$(DTB_LIST))
 

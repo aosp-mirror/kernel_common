@@ -362,23 +362,22 @@ EXPORT_SYMBOL(netpoll_send_skb_on_dev);
 
 void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
 {
-	int total_len, ip_len, udp_len;
+	int total_len, eth_len, ip_len, udp_len;
 	struct sk_buff *skb;
 	struct udphdr *udph;
 	struct iphdr *iph;
 	struct ethhdr *eth;
 
 	udp_len = len + sizeof(*udph);
-	ip_len = udp_len + sizeof(*iph);
-	total_len = ip_len + LL_RESERVED_SPACE(np->dev);
+	ip_len = eth_len = udp_len + sizeof(*iph);
+	total_len = eth_len + ETH_HLEN + NET_IP_ALIGN;
 
-	skb = find_skb(np, total_len + np->dev->needed_tailroom,
-		       total_len - len);
+	skb = find_skb(np, total_len, total_len - len);
 	if (!skb)
 		return;
 
 	skb_copy_to_linear_data(skb, msg, len);
-	skb_put(skb, len);
+	skb->len += len;
 
 	skb_push(skb, sizeof(*udph));
 	skb_reset_transport_header(skb);
@@ -920,14 +919,15 @@ EXPORT_SYMBOL_GPL(__netpoll_cleanup);
 
 void netpoll_cleanup(struct netpoll *np)
 {
-	rtnl_lock();
 	if (!np->dev)
-		goto out;
+		return;
+
+	rtnl_lock();
 	__netpoll_cleanup(np);
+	rtnl_unlock();
+
 	dev_put(np->dev);
 	np->dev = NULL;
-out:
-	rtnl_unlock();
 }
 EXPORT_SYMBOL(netpoll_cleanup);
 

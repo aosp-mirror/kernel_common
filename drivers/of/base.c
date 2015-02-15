@@ -24,32 +24,15 @@
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
 
-/**
- * struct alias_prop - Alias property in 'aliases' node
- * @link:	List node to link the structure in aliases_lookup list
- * @alias:	Alias property name
- * @np:		Pointer to device_node that the alias stands for
- * @id:		Index value from end of alias name
- * @stem:	Alias string without the index
- *
- * The structure represents one alias property of 'aliases' node as
- * an entry in aliases_lookup list.
- */
-struct alias_prop {
-	struct list_head link;
-	const char *alias;
-	struct device_node *np;
-	int id;
-	char stem[0];
-};
+#include "of_private.h"
 
-static LIST_HEAD(aliases_lookup);
+LIST_HEAD(aliases_lookup);
 
 struct device_node *allnodes;
 struct device_node *of_chosen;
 struct device_node *of_aliases;
 
-static DEFINE_MUTEX(of_aliases_mutex);
+DEFINE_MUTEX(of_aliases_mutex);
 
 /* use when traversing tree through the allnext, child, sibling,
  * or parent members of struct device_node.
@@ -245,6 +228,28 @@ int of_device_is_compatible(const struct device_node *device,
 	return 0;
 }
 EXPORT_SYMBOL(of_device_is_compatible);
+
+int of_machine_projectid(int index) {
+	struct device_node *root;
+	static int isRead = 0;
+	static u32 array[3];
+	int ret = 0;
+
+	if (!isRead) {
+		root = of_find_node_by_path("/");
+		if (root) {
+			ret = of_property_read_u32_array(root, "htc,project-id", array, 3);
+
+			if (ret < 0)
+				return -1;
+
+			isRead = 1;
+		}
+	}
+
+	return array[index];
+}
+EXPORT_SYMBOL(of_machine_projectid);
 
 /**
  * of_machine_is_compatible - Test root of device tree for a given compatible value
@@ -1227,7 +1232,6 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
 		ap = dt_alloc(sizeof(*ap) + len + 1, 4);
 		if (!ap)
 			continue;
-		memset(ap, 0, sizeof(*ap) + len + 1);
 		ap->alias = start;
 		of_alias_add(ap, np, id, start, len);
 	}

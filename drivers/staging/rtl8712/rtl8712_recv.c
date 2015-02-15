@@ -1126,9 +1126,6 @@ static void recv_tasklet(void *priv)
 		recvbuf2recvframe(padapter, pskb);
 		skb_reset_tail_pointer(pskb);
 		pskb->len = 0;
-		if (!skb_cloned(pskb))
-			skb_queue_tail(&precvpriv->free_recv_skb_queue, pskb);
-		else
-			consume_skb(pskb);
+		skb_queue_tail(&precvpriv->free_recv_skb_queue, pskb);
 	}
 }

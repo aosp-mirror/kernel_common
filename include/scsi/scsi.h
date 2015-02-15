@@ -10,6 +10,7 @@
 
 #include <linux/types.h>
 #include <linux/scatterlist.h>
+#include <linux/device.h>
 
 struct scsi_cmnd;
 
@@ -133,6 +134,7 @@ struct scsi_cmnd;
 #define SECURITY_PROTOCOL_OUT 0xb5
 #define READ_ELEMENT_STATUS   0xb8
 #define SEND_VOLUME_TAG       0xb6
+#define READ_CD               0xbe
 #define WRITE_LONG_2          0xea
 #define EXTENDED_COPY         0x83
 #define RECEIVE_COPY_RESULTS  0x84
@@ -561,5 +563,7 @@ static inline __u32 scsi_to_u32(__u8 *ptr)
 {
 	return (ptr[0]<<24) + (ptr[1]<<16) + (ptr[2]<<8) + ptr[3];
 }
+
+struct scsi_disk *scsi_disk_get_from_dev(struct device *dev);
 
 #endif /* _SCSI_SCSI_H */

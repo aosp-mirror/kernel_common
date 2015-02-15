@@ -1,0 +1,143 @@
+menu "Qualcomm MSM specific device drivers"
+	depends on ARCH_MSM
+
+config MSM_SSBI
+	bool "Qualcomm Single-wire Serial Bus Interface (SSBI)"
+	help
+	  If you say yes to this option, support will be included for the
+	  built-in SSBI interface on Qualcomm MSM family processors.
+
+	  This is required for communicating with Qualcomm PMICs and
+	  other devices that have the SSBI interface.
+
+config SPS
+	bool "SPS support"
+	select GENERIC_ALLOCATOR
+	help
+	  The SPS (Smart Peripheral Switch) is a DMA engine.
+	  It can move data in the following modes:
+		1. Peripheral-to-Peripheral.
+		2. Peripheral-to-Memory.
+		3. Memory-to-Memory.
+
+config USB_BAM
+	boolean "USB BAM Driver"
+	depends on SPS && USB_GADGET
+	help
+	  Enabling this option adds USB BAM Driver.
+	  USB BAM driver was added to supports SPS Peripheral-to-Peripheral
+	  transfers between the USB and other peripheral.
+
+config SPS_SUPPORT_BAMDMA
+	bool "SPS support BAM DMA"
+	depends on SPS
+	default n
+	help
+	  The BAM-DMA is used for Memory-to-Memory transfers.
+	  The main use cases is RPC between processors.
+	  The BAM-DMA hardware has 2 registers sets:
+		1. A BAM HW like all the peripherals.
+		2. A DMA channel configuration (i.e. channel priority).
+
+config SPS_SUPPORT_NDP_BAM
+	bool "SPS support NDP BAM"
+	depends on SPS
+	default n
+	help
+	  No-Data-Path BAM is used to improve BAM performance.
+
+config QPNP_PWM
+	depends on SPMI
+	depends on OF_SPMI
+        tristate "Qualcomm QPNP LPG/PWM support"
+        help
+          This driver supports PWM/LPG devices in Qualcomm PMIC chips which
+          comply with QPNP.  QPNP is a SPMI based PMIC implementation.  These
+          devices support Pulse Width Modulation output with user generated
+          patterns. They share a lookup table with size of 64 entries.
+
+config QPNP_POWER_ON
+	tristate "QPNP PMIC POWER-ON Driver"
+	depends on OF_SPMI && SPMI && MSM_QPNP_INT
+	help
+	  This driver supports the power-on functionality on Qualcomm
+	  PNP PMIC. It currently supports reporting the change in status of
+	  the KPDPWR_N line (connected to the power-key).
+
+config QPNP_CLKDIV
+	tristate "QPNP PMIC clkdiv driver"
+	depends on OF_SPMI && SPMI
+	help
+	  This driver supports the clkdiv functionality on the Qualcomm
+	  PNP PMIC. It configures the frequency of clkdiv outputs on the
+	  PMIC. These clocks are typically wired through alternate functions
+	  on gpio pins.
+
+config QPNP_VIBRATOR
+	tristate "Vibrator support for QPNP PMIC"
+	depends on OF_SPMI
+	help
+	  This option enables device driver support for the vibrator
+	  on the Qualcomm's QPNP PMICs. The vibrator is connected on the
+	  VIB_DRV_N line and can be controlled manually or by the DTEST lines.
+	  It uses the android timed-output framework.
+
+config QPNP_REVID
+	tristate "QPNP Revision ID Peripheral"
+	depends on SPMI
+	help
+	  Say 'y' here to include support for the Qualcomm QPNP REVID
+	  peripheral. REVID prints out the PMIC type and revision numbers
+	  in the kernel log along with the PMIC option status. The PMIC
+	  type is mapped to a Qualcomm chip part number and logged as well.
+
+config QPNP_COINCELL
+	tristate "Qualcomm QPNP coincell charger support"
+	depends on SPMI && OF_SPMI
+	help
+	  This driver supports the QPNP coincell peripheral found inside of
+	  Qualcomm QPNP PMIC devices.  The coincell charger provides a means to
+	  charge a coincell battery or backup capacitor which is used to
+	  maintain PMIC register state when the main battery is removed from the
+	  mobile device.
+
+config IPA
+	tristate "IPA support"
+	depends on SPS
+	help
+	  This driver supports the Internet Packet Accelerator (IPA) core.
+	  IPA is a programmable protocol processor HW block.
+	  It is designed to support generic HW processing of UL/DL IP packets
+	  for various use cases independent of radio technology.
+	  The driver support client connection and configuration
+	  for the IPA core.
+	  Kernel and user-space processes can call the IPA driver
+	  to configure IPA core.
+config MSM_AVTIMER
+	tristate "Avtimer Driver"
+	depends on MSM_QDSP6_APRV2
+	help
+		This driver gets the Q6 out of power collapsed state and
+		exposes ioctl control to read avtimer tick.
+
+config PFT
+	bool "Per-File-Tagger driver"
+	default n
+	help
+		This driver is used for tagging enterprise files.
+		It is part of the Per-File-Encryption (PFE) feature.
+		The driver is tagging files when created by
+		registered application.
+		Tagged files are encrypted using the dm-req-crypt driver.
+
+config SSM
+	tristate "Qualcomm Secure Service Module"
+	depends on QSEECOM
+	depends on MSM_SMD
+	help
+	  Provides an interface for OEM driver to communicate with Trustzone
+	  and modem for key exchange and mode change.
+	  This driver uses Secure Channel Manager interface for trustzone
+	  communication and communicates with modem over SMD channel.
+
+endmenu

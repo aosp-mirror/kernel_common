@@ -8,6 +8,9 @@ amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
 apm	Applied Micro Circuits Corporation (APM)
 arm	ARM Ltd.
 atmel	Atmel Corporation
+avago	Avago Technologies
+bosch	Bosch Sensortec GmbH
+capella	Capella Microsystems, Inc.
 cavium	Cavium, Inc.
 chrp	Common Hardware Reference Platform
 cortina	Cortina Systems, Inc.
@@ -15,14 +18,20 @@ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
 denx	Denx Software Engineering
 epson	Seiko Epson Corp.
 est	ESTeem Wireless Modems
+fairchild	Fairchild Semiconductor International, Inc.
+focaltech Focaltech systems
 fsl	Freescale Semiconductor
 GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+goodix	Goodix. Ltd.
 gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
 hp	Hewlett Packard
 ibm	International Business Machines (IBM)
 idt	Integrated Device Technologies, Inc.
 intercontrol	Inter Control Group
+invn	InvenSense Inc.
+lattice	Lattice Semiconductor.
 linux	Linux-specific binding
+kionix	Kionix Inc.
 marvell	Marvell Technology Group Ltd.
 maxim	Maxim Integrated Products
 mosaixtech	Mosaix Technologies, Inc.
@@ -30,6 +39,7 @@ national	National Semiconductor
 nintendo	Nintendo
 nvidia	NVIDIA
 nxp	NXP Semiconductors
+ovti	OmniVision Technologies, Inc.
 picochip	Picochip Ltd
 powervr	Imagination Technologies
 qcom	Qualcomm, Inc.
@@ -38,6 +48,9 @@ realtek Realtek Semiconductor Corp.
 samsung	Samsung Semiconductor
 sbs	Smart Battery System
 schindler	Schindler
+sne	Sony
+stk	Sensortek Technology Corporation.(formerly Sitronix Technology Co., Ltd.)
+shinetech	Shine Tech Corporation, Ltd.
 sil	Silicon Image
 simtek
 sirf	SiRF Technology, Inc.

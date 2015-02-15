@@ -1,0 +1,229 @@
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+/include/ "msm8226-v2.dtsi"
+/include/ "dsi-panel-sony-nt-720p-cmd.dtsi"
+/include/ "msm8226-720p-mtp.dtsi"
+/include/ "msm8226-camera-sensor-evm.dtsi"
+
+/ {
+	model = "MSM 8226 EVM";
+	compatible = "htc,msm8226-evm", "qcom,msm8226-mtp", "qcom,msm8226", "qcom,mtp";
+	htc,project-id = <1 0 0>;  /* <pid hw-version reserve> */
+	qcom,msm-id = <145 8 0>,
+		      <158 8 0>,
+		      <159 8 0>,
+		      <198 8 0>,
+		      <205 8 0>;
+};
+
+&cci {
+	/* Rotate rear camera to 0 degrees */
+	qcom,camera@6f {
+	qcom,mount-angle = <0>;
+	};
+};
+
+&soc {
+	i2c@f9927000 { /* BLSP1 QUP5 */
+		synaptics@20 {
+			compatible               = "synaptics,3201";
+			reg                      = <0x20>;
+			interrupt-parent         = <&msmgpio>;
+			interrupts               = <17 0x2>;
+			synaptics,panel-coords   = <0 1088 0 1770>;
+			synaptics,display-coords = <0 720 0 1280>;
+			synaptics,irq-gpio       = <&msmgpio 17 0x00>;
+			synaptics,rst-gpio       = <&msmgpio 16 0x00>;
+			synaptics,i2c_err_hlr    = <1>;
+			tw_pin_mask              = <2>;
+			synaptics,i2c_pull;
+			vcc_i2c-supply 		 = <&pm8226_lvs1>;
+
+			config0 {
+				default_cfg = <1>;
+				pr_number   = <1293981>;
+				config = [
+					70 70 00 05 40 7F 03 1E
+					05 89 00 01 01 00 10 4C
+					04 75 07 02 14 41 05 50
+					AE 27 04 03 01 3C 19 01
+					1E 01 66 4E 00 50 46 BA
+					1B C1 00 C8 00 00 00 00
+					0A 04 BC 00 00 00 00 00
+					00 19 01 00 0A 16 0C 0A
+					00 14 0A 40 64 07 56 C8
+					BE 43 2A 05 00 00 00 00
+					4C 75 74 3C 32 00 00 00
+					4C 75 74 1E 05 00 02 FA
+					00 80 03 0E 1F 12 64 00
+					13 04 1B 00 10 0A 60 60
+					68 68 60 68 60 48 32 31
+					2F 2D 2C 2A 29 27 00 00
+					00 00 00 00 00 02 00 A0
+					0F 00 3C 00 C8 00 CD 0A
+					C0 A0 0F 00 C0 19 03 03
+					0B 04 03 03 03 09 20 20
+					70 20 20 20 20 50 58 5C
+					5B 4A 66 6A 6E 5F 00 78
+					00 10 28 00 00 00 05 0A
+					0F 14 1A 20 24 00 31 04
+					00 00 00 00 00 00 00 00
+					00 00 00 00 00 FF FF FF
+					FF FF FF FF FF FF FF FF
+					FF FF FF FF FF 51 51 51
+					51 51 51 51 51 CD 0D 04
+					00 06 0C 0D 0B 15 17 16
+					18 19 1A 1B 11 14 12 0F
+					0E 09 0A 07 02 01 00 FF
+					FF FF FF FF 04 05 02 06
+					01 0C 07 08 0E 10 0F 12
+					FF FF FF FF 00 10 00 10
+					00 10 CD 0C 80 80 80 80
+					80 80 80 80 80 80 80 7A
+					7C 80 80 80 80 80 80 80
+					80 80 80 80 80 80 80 80
+					80 80 80 80 80 80 80 80
+					80 80 80 80 80 80 80 00
+					0F 01 83 53
+				];
+			};
+		};
+	};
+
+	i2c@f9924000 {
+		cm3629@60 {
+			compatible = "CM3629";
+			reg = <0x60>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <65 0x02>;
+			interrupt-names = "cm3629";
+			cm3629,irq-gpio = <&msmgpio 65 0x00>;
+			cm3629,model = <0>;
+			cm3629,ps_select = <1>;
+			cm3629,levels = <13 50 76 392 771 3850 6153 6964 18536 65535>;
+			cm3629,golden_adc = <0x1>;
+			cm3629,cm3629_slave_address = <0x60>;
+			cm3629,ps1_thd_set = <0x15>;
+			cm3629,ps1_thd_no_cal = <0x5f>;
+			cm3629,ps1_thd_with_cal = <0xD>;
+			cm3629,ps_calibration_rule = <1>;
+			cm3629,dynamical_threshold = <1>;
+			cm3629,dark_level = <3>;
+			cm3629,ps_duty = <0>;
+			cm3629,ps_it = <2>;
+			cm3629,ps_pers = <1>;
+			cm3629,ps_itb = <1>;
+			cm3629,ps_itr = <0>;
+			SR_2v85-supply = <&pm8226_l19>;
+		};
+	};
+
+	i2c@f9924000 {
+		compass_akm8963@d {
+			compatible = "htc_compass,akm8963";
+			reg = <0xd>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <66 0x0>;
+			SR_1v8-supply = <&pm8226_lvs1>;
+			SR_2v85-supply = <&pm8226_l19>;
+			compass_akm8963,layout     = <5>;
+			compass_akm8963,outbit     = <1>;
+			compass_akm8963,gpio_DRDY  = <&msmgpio 66 0x00>;
+			compass_akm8963,gpio_RST   = <0>;
+		};
+	};
+
+	i2c@f9924000 {
+		g_sensor_bma250@18 {
+			compatible = "htc_g_sensor,bma250_bosch";
+			reg = <0x18>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <63 0x0>;
+			SR_1v8-supply = <&pm8226_lvs1>;
+			SR_2v85-supply = <&pm8226_l19>;
+			g_sensor_bma250,intr        = <&msmgpio 63 0x00>;
+			g_sensor_bma250,chip_layout = <0>;
+			g_sensor_bma250,axis_map_x  = <0>;
+			g_sensor_bma250,axis_map_y  = <1>;
+			g_sensor_bma250,axis_map_z  = <2>;
+			g_sensor_bma250,negate_x    = <1>;
+			g_sensor_bma250,negate_y    = <0>;
+			g_sensor_bma250,negate_z    = <1>;
+		};
+	};
+
+/*Audio config start*/
+	sound {
+		qcom,audio-routing =
+			"Lineout_1 amp", "LINEOUT1",
+			"Lineout_2 amp", "LINEOUT2",
+			"RX_BIAS", "MCLK",
+			"LDO_H", "MCLK",
+			"SPK_OUT", "MCLK",
+			"SPK_OUT", "EXT_VDD_SPKR",
+			"AMIC1", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Handset Mic",
+			"AMIC2", "MIC BIAS2 External",
+			"MIC BIAS2 External", "Headset Mic",
+			"AMIC3", "MIC BIAS2 External",
+			"MIC BIAS2 External", "Handset Mic",
+			"AMIC4", "MIC BIAS2 External",
+			"MIC BIAS2 External", "ANCRight Headset Mic",
+			"AMIC5", "MIC BIAS2 External",
+			"MIC BIAS2 External", "ANCLeft Headset Mic";
+
+		qcom,cdc-mclk-gpios = <&pm8226_gpios 1 0>;
+		qcom,cdc-vdd-spkr-gpios = <>;
+
+		qcom,prim-auxpcm-gpio-clk  = <>;
+		qcom,prim-auxpcm-gpio-sync = <>;
+		qcom,prim-auxpcm-gpio-din  = <>;
+		qcom,prim-auxpcm-gpio-dout = <>;
+		qcom,sec-auxpcm-gpio-clk  = <>;
+		qcom,sec-auxpcm-gpio-sync = <>;
+		qcom,sec-auxpcm-gpio-din  = <>;
+		qcom,sec-auxpcm-gpio-dout = <>;
+
+		mi2s-gpio-sck   = <&msmgpio 49 0>;
+		mi2s-gpio-ws    = <&msmgpio 50 0>;
+		mi2s-gpio-sda0  = <&msmgpio 51 0>;
+		mi2s-gpio-sda1  = <&msmgpio 52 0>;
+		mi2s-afe-portid = <0x1004>;
+
+		rcv-gpio-sel    = <&msmgpio 56 0>;
+		rcv-gpio-en     = <&msmgpio 69 0>;
+	};
+
+	i2c@f9926000 {
+		nxp_tfa9887_amp@34 {
+			compatible = "nxp,tfa9887-amp";
+			reg = <0x34>;
+		};
+		nxp_tfa9887l_amp@35 {
+			compatible = "nxp,tfa9887l-amp";
+			reg = <0x35>;
+		};
+	};
+
+	qcom,msm-dai-mi2s {
+		compatible = "qcom,msm-dai-mi2s";
+		qcom,msm-dai-q6-mi2s-quat {
+			compatible = "qcom,msm-dai-q6-mi2s";
+			qcom,msm-dai-q6-mi2s-dev-id = <2>;
+			qcom,msm-mi2s-rx-lines = <1>;
+			qcom,msm-mi2s-tx-lines = <2>;
+		};
+	};
+/*Audio config end*/
+};

@@ -12,6 +12,8 @@
 #include <linux/debug_locks.h>
 #include <linux/delay.h>
 #include <linux/export.h>
+#include <linux/bug.h>
+#include <linux/reboot.h>
 
 void __raw_spin_lock_init(raw_spinlock_t *lock, const char *name,
 			  struct lock_class_key *key)
@@ -49,6 +51,26 @@ void __rwlock_init(rwlock_t *lock, const char *name,
 
 EXPORT_SYMBOL(__rwlock_init);
 
+static int spin_dump_panic_call(struct notifier_block *this,
+		unsigned long event, void *ptr)
+{
+#if defined(CONFIG_HTC_DEBUG_WATCHDOG)
+	void msm_watchdog_bark(void);
+	static int barked = 0;
+	if (!barked) {
+		barked = 1;
+
+		pr_info("%s: Force Watchdog bark ...\r\n", __func__);
+		msm_watchdog_bark();
+
+		mdelay(10000);
+		pr_info("%s: Force Watchdog bark does not work, "
+				"falling back to normal process.\r\n", __func__);
+	}
+#endif
+	return NOTIFY_DONE;
+}
+
 static void spin_dump(raw_spinlock_t *lock, const char *msg)
 {
 	struct task_struct *owner = NULL;
@@ -58,12 +80,20 @@ static void spin_dump(raw_spinlock_t *lock, const char *msg)
 	printk(KERN_EMERG "BUG: spinlock %s on CPU#%d, %s/%d\n",
 		msg, raw_smp_processor_id(),
 		current->comm, task_pid_nr(current));
-	printk(KERN_EMERG " lock: %p, .magic: %08x, .owner: %s/%d, "
+	printk(KERN_EMERG " lock: %pS, .magic: %08x, .owner: %s/%d, "
 			".owner_cpu: %d\n",
 		lock, lock->magic,
 		owner ? owner->comm : "<none>",
 		owner ? task_pid_nr(owner) : -1,
 		lock->owner_cpu);
+
+	if (PANIC_CORRUPTION) {
+		static struct notifier_block panic_block = {
+			.notifier_call	= spin_dump_panic_call,
+		};
+		atomic_notifier_chain_register(&panic_notifier_list, &panic_block);
+		BUG();
+	}
 	dump_stack();
 }
 
@@ -106,24 +136,28 @@ static inline void debug_spin_unlock(raw_spinlock_t *lock)
 static void __spin_lock_debug(raw_spinlock_t *lock)
 {
 	u64 i;
-	u64 loops = loops_per_jiffy * HZ;
-	int print_once = 1;
+	u64 loops = (loops_per_jiffy * HZ);
 
-	for (;;) {
-		for (i = 0; i < loops; i++) {
-			if (arch_spin_trylock(&lock->raw_lock))
-				return;
-			__delay(1);
-		}
-		/* lockup suspected: */
-		if (print_once) {
-			print_once = 0;
-			spin_dump(lock, "lockup");
-#ifdef CONFIG_SMP
-			trigger_all_cpu_backtrace();
-#endif
-		}
+	for (i = 0; i < loops; i++) {
+		if (arch_spin_trylock(&lock->raw_lock))
+			return;
+		__delay(1);
 	}
+	/* lockup suspected: */
+	spin_dump(lock, "lockup");
+#ifdef CONFIG_SMP
+	trigger_all_cpu_backtrace();
+#endif
+
+	/*
+	 * The trylock above was causing a livelock.  Give the lower level arch
+	 * specific lock code a chance to acquire the lock. We have already
+	 * printed a warning/backtrace at this point. The non-debug arch
+	 * specific code might actually succeed in acquiring the lock.  If it is
+	 * not successful, the end-result is the same - there is no forward
+	 * progress.
+	 */
+	arch_spin_lock(&lock->raw_lock);
 }
 
 void do_raw_spin_lock(raw_spinlock_t *lock)

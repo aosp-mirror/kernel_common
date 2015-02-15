@@ -83,6 +83,17 @@ config SATA_AHCI_PLATFORM
 
 	  If unsure, say N.
 
+config SATA_AHCI_MSM
+	tristate "Qualcomm MSM AHCI SATA support"
+	depends on ARCH_MSM
+	select SATA_AHCI_PLATFORM
+	help
+	  This option enables support for AHCI SATA controller
+	  integrated into Qualcomm MSM chipsets. For more
+	  information please refer to http://www.qualcomm.com/chipsets.
+
+	  If unsure, say N.
+
 config SATA_FSL
 	tristate "Freescale 3.0Gbps SATA support"
 	depends on FSL_SOC
@@ -93,7 +104,7 @@ config SATA_FSL
 	  If unsure, say N.
 
 config SATA_INIC162X
-	tristate "Initio 162x SATA support (Very Experimental)"
+	tristate "Initio 162x SATA support"
 	depends on PCI
 	help
 	  This option enables support for Initio 162x Serial ATA.

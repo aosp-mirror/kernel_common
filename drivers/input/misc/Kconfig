@@ -73,6 +73,14 @@ config INPUT_BMA150
 	  To compile this driver as a module, choose M here: the
 	  module will be called bma150.
 
+config INPUT_HBTP_INPUT
+	tristate "HBTP input driver support"
+	help
+	  Say Y to enable HBTP input driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hbtp_input.
+
 config INPUT_PCSPKR
 	tristate "PC Speaker support"
 	depends on PCSPKR_PLATFORM
@@ -423,6 +431,18 @@ config INPUT_GPIO
 	help
 	  Say Y here if you want to support gpio based keys, wheels etc...
 
+config INPUT_ISA1200_FF_MEMLESS
+	tristate "ISA1200 haptic ff-memless support"
+	depends on I2C
+	select INPUT_FF_MEMLESS
+	help
+	  ISA1200 is a high performance enhanced haptic chip.
+	  Say Y here if you want to support ISA1200 connected via I2C,
+	  and select N if you are unsure.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called isa1200-ff-memless.
+
 config HP_SDC_RTC
 	tristate "HP SDC Real Time Clock"
 	depends on (GSC || HP300) && SERIO
@@ -605,5 +625,146 @@ config INPUT_XEN_KBDDEV_FRONTEND
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
+
+config PMIC8058_OTHC
+        tristate "Qualcomm PMIC8058 OTHC support"
+        default n
+        depends on PMIC8058
+        help
+          Say Y here if you want support PMIC8058 OTHC.
+
+          To compile this driver as a module, choose M here: the
+          module will be called pmic8058-othc.
+
+config INPUT_PMIC8058_VIBRA_MEMLESS
+	tristate "Qualcomm PM8058 vibrator support (ff-memless)"
+	depends on PMIC8058 && INPUT_FF_MEMLESS
+	default n
+	help
+	  This option enables device driver support for the vibrator
+	  on Qualcomm PM8058 chip. This driver supports ff-memless interface
+	  from input framework.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called pmic8058-vib-memless.
+
+config BOSCH_BMA150
+        tristate "SMB380/BMA150 acceleration sensor support"
+        depends on I2C=y
+        help
+          If you say yes here you get support for Bosch Sensortec's
+          acceleration sensors SMB380/BMA150.
+
+config STM_LIS3DH
+        tristate "STM LIS3DH acceleration sensor support"
+        depends on I2C=y
+        help
+          If you say yes here you get support for STMicroelectronics's
+          acceleration sensors LIS3DH.
+
+config HIMAX_PROXIMITY
+        tristate "himax proximity sensor support"
+	default n
+        help
+          if you say yes here, you get support for himax proximity sensor
+
+config BMP18X
+       tristate "BMP18X digital pressure sensor"
+       depends on (I2C ) && SYSFS
+       help
+         If you say yes here you get support for Bosch Sensortec
+	 digital pressure sensors BMP085, BMP180.
+
+         To compile this driver as a module, choose M here: the
+         module will be called bmp18x-core.
+
+config BMP18X_I2C
+       tristate "support I2C bus connection"
+       depends on BMP18X && I2C
+       help
+         Say Y here if you want to support Bosch Sensortec digital pressure
+         sensor hooked to an I2C bus.
+
+         To compile this driver as a module, choose M here: the
+         module will be called bmp18x-i2c.
+
+config SENSORS_MMA8X5X
+	tristate "MMA8451/MMA8452/MMA8453/MMA8652/MMA8653 device driver"
+	depends on I2C && SYSFS
+	select INPUT_POLLDEV
+	default n
+	help
+	  If you say yes here you get support for the Freescale MMA8451/
+	  MMA8452/MMA8453/MMA8652/MMA8653  sensors.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mma8x5x.
+
+config SENSORS_MMA_POSITION
+	int "MMA8x5x Accelerate Sensor Position Setting"
+	depends on SENSORS_MMA8X5X
+	default "0"
+	help
+	  this provide the sensor position setting , value is between 0~7
+
+config SENSORS_STK3X1X
+	tristate "STK3X1X device driver"
+	depends on I2C
+	default n
+	help
+	  Say Y here you want to enable for the sitronix stk3x1x
+	  light and proximity sensors driver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called stk3x1x.
+
+config AK8789_HALLSENSOR
+	tristate "ak8789 hall sensor support"
+	help
+	  if you say yes here, you get support for ak8789 hall sensor
+
+config INPUT_DUMMY_KEYPAD
+       tristate "Dummy Keypad driver support"
+       help
+         Say Y here if you want to support dummy keypad driver, wheels etc...
+
+config POWER_KEY_LED
+	tristate "Power key LED"
+	help
+	  Say Y here if you want to support power key LED.
+
+config POWER_KEY_CLR_RESET
+	tristate "Power key clear reset"
+	help
+	  Say Y here if you want to support power key LED.
+
+config POWER_VOLUP_RESET
+	tristate "(power+volup) reset"
+	depends on POWER_KEY_CLR_RESET
+	help
+	  Say Y here if you want to support power key LED.
+
+config KPDPWR_S2_DVDD_RESET
+	tristate "Power key stage 2 reset while SW gets stuck"
+	depends on POWER_VOLUP_RESET
+	help
+	  Say Y here if you would like to support power key stage 2 dVdd reset when SW gets stuck.
+
+config PWRKEY_WAKESRC_LOG
+	tristate "Power key wake up source log"
+	default n
+	help
+	  Say Y here if you want to check power key wake up source log.
+
+config SENSORS_CAPELLA_CM36283
+	tristate "CM36283 proximity and light sensor"
+	depends on I2C
+	default n
+	help
+	  Say Y here to enable the CM36283 Proximity
+	  Sensor with Ambient Light Sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called CM36283.
 
 endif

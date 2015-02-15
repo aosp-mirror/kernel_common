@@ -55,12 +55,6 @@
 
 #define DMIF_ADDR_CONFIG  				0xBD4
 
-#define DMIF_ADDR_CALC  				0xC00
-
-#define	PIPE0_DMIF_BUFFER_CONTROL			  0x0ca0
-#       define DMIF_BUFFERS_ALLOCATED(x)                  ((x) << 0)
-#       define DMIF_BUFFERS_ALLOCATED_COMPLETED           (1 << 4)
-
 #define	SRBM_STATUS				        0xE50
 
 #define	CC_SYS_RB_BACKEND_DISABLE			0xe80
@@ -419,7 +413,6 @@
 #       define RDERR_INT_ENABLE                         (1 << 0)
 #       define GUI_IDLE_INT_ENABLE                      (1 << 19)
 
-#define	CP_STRMOUT_CNTL					0x84FC
 #define	SCRATCH_REG0					0x8500
 #define	SCRATCH_REG1					0x8504
 #define	SCRATCH_REG2					0x8508

@@ -106,7 +106,7 @@ static void kvp_acquire_lock(int pool)
 
 	if (fcntl(kvp_file_info[pool].fd, F_SETLKW, &fl) == -1) {
 		syslog(LOG_ERR, "Failed to acquire the lock pool: %d", pool);
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
 }
 
@@ -118,7 +118,7 @@ static void kvp_release_lock(int pool)
 	if (fcntl(kvp_file_info[pool].fd, F_SETLK, &fl) == -1) {
 		perror("fcntl");
 		syslog(LOG_ERR, "Failed to release the lock pool: %d", pool);
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
 }
 
@@ -137,19 +137,14 @@ static void kvp_update_file(int pool)
 	if (!filep) {
 		kvp_release_lock(pool);
 		syslog(LOG_ERR, "Failed to open file, pool: %d", pool);
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
 
 	bytes_written = fwrite(kvp_file_info[pool].records,
 				sizeof(struct kvp_record),
 				kvp_file_info[pool].num_records, filep);
 
-	if (ferror(filep) || fclose(filep)) {
-		kvp_release_lock(pool);
-		syslog(LOG_ERR, "Failed to write file, pool: %d", pool);
-		exit(EXIT_FAILURE);
-	}
-
+	fflush(filep);
 	kvp_release_lock(pool);
 }
 
@@ -168,18 +163,13 @@ static void kvp_update_mem_state(int pool)
 	if (!filep) {
 		kvp_release_lock(pool);
 		syslog(LOG_ERR, "Failed to open file, pool: %d", pool);
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
-	for (;;) {
+	while (!feof(filep)) {
 		readp = &record[records_read];
 		records_read += fread(readp, sizeof(struct kvp_record),
 					ENTRIES_PER_BLOCK * num_blocks,
 					filep);
-
-		if (ferror(filep)) {
-			syslog(LOG_ERR, "Failed to read file, pool: %d", pool);
-			exit(EXIT_FAILURE);
-		}
 
 		if (!feof(filep)) {
 			/*
@@ -190,7 +180,7 @@ static void kvp_update_mem_state(int pool)
 
 			if (record == NULL) {
 				syslog(LOG_ERR, "malloc failed");
-				exit(EXIT_FAILURE);
+				exit(-1);
 			}
 			continue;
 		}
@@ -201,7 +191,6 @@ static void kvp_update_mem_state(int pool)
 	kvp_file_info[pool].records = record;
 	kvp_file_info[pool].num_records = records_read;
 
-	fclose(filep);
 	kvp_release_lock(pool);
 }
 static int kvp_file_init(void)
@@ -219,7 +208,7 @@ static int kvp_file_init(void)
 	if (access("/var/opt/hyperv", F_OK)) {
 		if (mkdir("/var/opt/hyperv", S_IRUSR | S_IWUSR | S_IROTH)) {
 			syslog(LOG_ERR, " Failed to create /var/opt/hyperv");
-			exit(EXIT_FAILURE);
+			exit(-1);
 		}
 	}
 
@@ -243,17 +232,11 @@ static int kvp_file_init(void)
 			fclose(filep);
 			return 1;
 		}
-		for (;;) {
+		while (!feof(filep)) {
 			readp = &record[records_read];
 			records_read += fread(readp, sizeof(struct kvp_record),
 					ENTRIES_PER_BLOCK,
 					filep);
-
-			if (ferror(filep)) {
-				syslog(LOG_ERR, "Failed to read file, pool: %d",
-				       i);
-				exit(EXIT_FAILURE);
-			}
 
 			if (!feof(filep)) {
 				/*
@@ -674,13 +657,13 @@ int main(void)
 
 	if (kvp_file_init()) {
 		syslog(LOG_ERR, "Failed to initialize the pools");
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
 
 	fd = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_CONNECTOR);
 	if (fd < 0) {
 		syslog(LOG_ERR, "netlink socket creation failed; error:%d", fd);
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
 	addr.nl_family = AF_NETLINK;
 	addr.nl_pad = 0;
@@ -692,7 +675,7 @@ int main(void)
 	if (error < 0) {
 		syslog(LOG_ERR, "bind failed; error:%d", error);
 		close(fd);
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
 	sock_opt = addr.nl_groups;
 	setsockopt(fd, 270, 1, &sock_opt, sizeof(sock_opt));
@@ -712,32 +695,22 @@ int main(void)
 	if (len < 0) {
 		syslog(LOG_ERR, "netlink_send failed; error:%d", len);
 		close(fd);
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
 
 	pfd.fd = fd;
 
 	while (1) {
-		struct sockaddr *addr_p = (struct sockaddr *) &addr;
-		socklen_t addr_l = sizeof(addr);
 		pfd.events = POLLIN;
 		pfd.revents = 0;
 		poll(&pfd, 1, -1);
 
-		len = recvfrom(fd, kvp_recv_buffer, sizeof(kvp_recv_buffer), 0,
-				addr_p, &addr_l);
+		len = recv(fd, kvp_recv_buffer, sizeof(kvp_recv_buffer), 0);
 
 		if (len < 0) {
-			syslog(LOG_ERR, "recvfrom failed; pid:%u error:%d %s",
-					addr.nl_pid, errno, strerror(errno));
+			syslog(LOG_ERR, "recv failed; error:%d", len);
 			close(fd);
 			return -1;
-		}
-
-		if (addr.nl_pid) {
-			syslog(LOG_WARNING, "Received packet from untrusted pid:%u",
-					addr.nl_pid);
-			continue;
 		}
 
 		incoming_msg = (struct nlmsghdr *)kvp_recv_buffer;
@@ -886,7 +859,7 @@ kvp_done:
 		len = netlink_send(fd, incoming_cn_msg);
 		if (len < 0) {
 			syslog(LOG_ERR, "net_link send failed; error:%d", len);
-			exit(EXIT_FAILURE);
+			exit(-1);
 		}
 	}
 

@@ -1,0 +1,10 @@
+config FELICA_DD
+	tristate "FELICA driver support"
+	help
+	  Say Y here if you want to support felica feature...
+
+config FELICA_CXD2235_DD
+	tristate "FELICA_CXD2235 driver support"
+	help
+	  Say Y here if you want to support felica cxd2235 feature...
+

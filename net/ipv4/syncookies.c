@@ -19,7 +19,6 @@
 #include <net/tcp.h>
 #include <net/route.h>
 
-/* Timestamps: lowest bits store TCP options */
 #define TSBITS 6
 #define TSMASK (((__u32)1 << TSBITS) - 1)
 
@@ -35,7 +34,7 @@ static __init int init_syncookies(void)
 }
 __initcall(init_syncookies);
 
-#define COOKIEBITS 24	/* Upper bits store count */
+#define COOKIEBITS 24	
 #define COOKIEMASK (((__u32)1 << COOKIEBITS) - 1)
 
 static DEFINE_PER_CPU(__u32 [16 + 5 + SHA_WORKSPACE_WORDS],
@@ -57,13 +56,6 @@ static u32 cookie_hash(__be32 saddr, __be32 daddr, __be16 sport, __be16 dport,
 }
 
 
-/*
- * when syncookies are in effect and tcp timestamps are enabled we encode
- * tcp options in the lower bits of the timestamp value that will be
- * sent in the syn-ack.
- * Since subsequent timestamps use the normal tcp_time_stamp value, we
- * must make sure that the resulting initial timestamp is <= tcp_time_stamp.
- */
 __u32 cookie_init_timestamp(struct request_sock *req)
 {
 	struct inet_request_sock *ireq;
@@ -92,16 +84,6 @@ static __u32 secure_tcp_syn_cookie(__be32 saddr, __be32 daddr, __be16 sport,
 				   __be16 dport, __u32 sseq, __u32 count,
 				   __u32 data)
 {
-	/*
-	 * Compute the secure sequence number.
-	 * The output should be:
-	 *   HASH(sec1,saddr,sport,daddr,dport,sec1) + sseq + (count * 2^24)
-	 *      + (HASH(sec2,saddr,sport,daddr,dport,count,sec2) % 2^24).
-	 * Where sseq is their sequence number and count increases every
-	 * minute by 1.
-	 * As an extra hack, we add a small "data" value that encodes the
-	 * MSS into the second hash value.
-	 */
 
 	return (cookie_hash(saddr, daddr, sport, dport, 0, 0) +
 		sseq + (count << COOKIEBITS) +
@@ -109,42 +91,25 @@ static __u32 secure_tcp_syn_cookie(__be32 saddr, __be32 daddr, __be16 sport,
 		 & COOKIEMASK));
 }
 
-/*
- * This retrieves the small "data" value from the syncookie.
- * If the syncookie is bad, the data returned will be out of
- * range.  This must be checked by the caller.
- *
- * The count value used to generate the cookie must be within
- * "maxdiff" if the current (passed-in) "count".  The return value
- * is (__u32)-1 if this test fails.
- */
 static __u32 check_tcp_syn_cookie(__u32 cookie, __be32 saddr, __be32 daddr,
 				  __be16 sport, __be16 dport, __u32 sseq,
 				  __u32 count, __u32 maxdiff)
 {
 	__u32 diff;
 
-	/* Strip away the layers from the cookie */
+	
 	cookie -= cookie_hash(saddr, daddr, sport, dport, 0, 0) + sseq;
 
-	/* Cookie is now reduced to (count * 2^24) ^ (hash % 2^24) */
+	
 	diff = (count - (cookie >> COOKIEBITS)) & ((__u32) - 1 >> COOKIEBITS);
 	if (diff >= maxdiff)
 		return (__u32)-1;
 
 	return (cookie -
 		cookie_hash(saddr, daddr, sport, dport, count - diff, 1))
-		& COOKIEMASK;	/* Leaving the data behind */
+		& COOKIEMASK;	
 }
 
-/*
- * MSS Values are taken from the 2009 paper
- * 'Measuring TCP Maximum Segment Size' by S. Alcock and R. Nelson:
- *  - values 1440 to 1460 accounted for 80% of observed mss values
- *  - values outside the 536-1460 range are rare (<0.2%).
- *
- * Table must be sorted.
- */
 static __u16 const msstab[] = {
 	64,
 	512,
@@ -156,10 +121,6 @@ static __u16 const msstab[] = {
 	8960,
 };
 
-/*
- * Generate a syncookie.  mssp points to the mss, which is returned
- * rounded down to the value encoded in the cookie.
- */
 __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb, __u16 *mssp)
 {
 	const struct iphdr *iph = ip_hdr(skb);
@@ -181,17 +142,7 @@ __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb, __u16 *mssp)
 				     jiffies / (HZ * 60), mssind);
 }
 
-/*
- * This (misnamed) value is the age of syncookie which is permitted.
- * Its ideal value should be dependent on TCP_TIMEOUT_INIT and
- * sysctl_tcp_retries1. It's a rather complicated formula (exponential
- * backoff) to compute at runtime so it's currently hardcoded here.
- */
 #define COUNTER_TRIES 4
-/*
- * Check if a ack sequence number is a valid syncookie.
- * Return the decoded mss if it is, or 0 if not.
- */
 static inline int cookie_check(struct sk_buff *skb, __u32 cookie)
 {
 	const struct iphdr *iph = ip_hdr(skb);
@@ -222,19 +173,9 @@ static inline struct sock *get_cookie_sock(struct sock *sk, struct sk_buff *skb,
 }
 
 
-/*
- * when syncookies are in effect and tcp timestamps are enabled we stored
- * additional tcp options in the timestamp.
- * This extracts these options from the timestamp echo.
- *
- * The lowest 4 bits store snd_wscale.
- * next 2 bits indicate SACK and ECN support.
- *
- * return false if we decode an option that should not be.
- */
 bool cookie_check_timestamp(struct tcp_options_received *tcp_opt, bool *ecn_ok)
 {
-	/* echoed timestamp, lowest bits contain options */
+	
 	u32 options = tcp_opt->rcv_tsecr & TSMASK;
 
 	if (!tcp_opt->saw_tstamp)  {
@@ -254,7 +195,7 @@ bool cookie_check_timestamp(struct tcp_options_received *tcp_opt, bool *ecn_ok)
 		return false;
 
 	if ((options & 0xf) == 0xf)
-		return true; /* no window scaling */
+		return true; 
 
 	tcp_opt->wscale_ok = 1;
 	tcp_opt->snd_wscale = options & 0xf;
@@ -291,7 +232,7 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 
 	NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_SYNCOOKIESRECV);
 
-	/* check for timestamp cookie support */
+	
 	memset(&tcp_opt, 0, sizeof(tcp_opt));
 	tcp_parse_options(skb, &tcp_opt, &hash_location, 0);
 
@@ -299,7 +240,7 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 		goto out;
 
 	ret = NULL;
-	req = inet_reqsk_alloc(&tcp_request_sock_ops); /* for safety */
+	req = inet_reqsk_alloc(&tcp_request_sock_ops); 
 	if (!req)
 		goto out;
 
@@ -321,9 +262,6 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 	req->ts_recent		= tcp_opt.saw_tstamp ? tcp_opt.rcv_tsval : 0;
 	treq->snt_synack	= tcp_opt.saw_tstamp ? tcp_opt.rcv_tsecr : 0;
 
-	/* We throwed the options of the initial SYN away, so we hope
-	 * the ACK carries the same options again (see RFC1122 4.2.3.8)
-	 */
 	if (opt && opt->optlen) {
 		int opt_size = sizeof(struct ip_options_rcu) + opt->optlen;
 
@@ -342,14 +280,8 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 	req->expires	= 0UL;
 	req->retrans	= 0;
 
-	/*
-	 * We need to lookup the route here to get at the correct
-	 * window size. We should better make sure that the window size
-	 * hasn't changed since we received the original syn, but I see
-	 * no easy way to do this.
-	 */
-	flowi4_init_output(&fl4, sk->sk_bound_dev_if, ireq->ir_mark,
-			   RT_CONN_FLAGS(sk), RT_SCOPE_UNIVERSE, IPPROTO_TCP,
+	flowi4_init_output(&fl4, 0, ireq->ir_mark, RT_CONN_FLAGS(sk),
+			   RT_SCOPE_UNIVERSE, IPPROTO_TCP,
 			   inet_sk_flowi_flags(sk),
 			   (opt && opt->srr) ? opt->faddr : ireq->rmt_addr,
 			   ireq->loc_addr, th->source, th->dest,
@@ -361,7 +293,7 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 		goto out;
 	}
 
-	/* Try to redo what tcp_v4_send_synack did. */
+	
 	req->window_clamp = tp->window_clamp ? :dst_metric(&rt->dst, RTAX_WINDOW);
 
 	tcp_select_initial_window(tcp_full_space(sk), req->mss,
@@ -372,9 +304,6 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 	ireq->rcv_wscale  = rcv_wscale;
 
 	ret = get_cookie_sock(sk, skb, req, &rt->dst);
-	/* ip_queue_xmit() depends on our flow being setup
-	 * Normal sockets get it right from inet_csk_route_child_sock()
-	 */
 	if (ret)
 		inet_sk(ret)->cork.fl.u.ip4 = fl4;
 out:	return ret;

@@ -617,21 +617,6 @@ static int pci_pm_prepare(struct device *dev)
 	int error = 0;
 
 	/*
-	 * If a PCI device configured to wake up the system from sleep states
-	 * has been suspended at run time and there's a resume request pending
-	 * for it, this is equivalent to the device signaling wakeup, so the
-	 * system suspend operation should be aborted.
-	 */
-	pm_runtime_get_noresume(dev);
-	if (pm_runtime_barrier(dev) && device_may_wakeup(dev))
-		pm_wakeup_event(dev, 0);
-
-	if (pm_wakeup_pending()) {
-		pm_runtime_put_sync(dev);
-		return -EBUSY;
-	}
-
-	/*
 	 * PCI devices suspended at run time need to be resumed at this
 	 * point, because in general it is necessary to reconfigure them for
 	 * system suspend.  Namely, if the device is supposed to wake up the
@@ -654,8 +639,6 @@ static void pci_pm_complete(struct device *dev)
 
 	if (drv && drv->pm && drv->pm->complete)
 		drv->pm->complete(dev);
-
-	pm_runtime_put_sync(dev);
 }
 
 #else /* !CONFIG_PM_SLEEP */
@@ -741,18 +724,6 @@ static int pci_pm_suspend_noirq(struct device *dev)
 	}
 
 	pci_pm_set_unknown_state(pci_dev);
-
-	/*
-	 * Some BIOSes from ASUS have a bug: If a USB EHCI host controller's
-	 * PCI COMMAND register isn't 0, the BIOS assumes that the controller
-	 * hasn't been quiesced and tries to turn it off.  If the controller
-	 * is already in D3, this can hang or cause memory corruption.
-	 *
-	 * Since the value of the COMMAND register doesn't matter once the
-	 * device has been suspended, we can safely set it to 0 here.
-	 */
-	if (pci_dev->class == PCI_CLASS_SERIAL_USB_EHCI)
-		pci_write_config_word(pci_dev, PCI_COMMAND, 0);
 
 	return 0;
 }
@@ -951,13 +922,6 @@ static int pci_pm_poweroff_noirq(struct device *dev)
 
 	if (!pci_dev->state_saved && !pci_is_bridge(pci_dev))
 		pci_prepare_to_sleep(pci_dev);
-
-	/*
-	 * The reason for doing this here is the same as for the analogous code
-	 * in pci_pm_suspend_noirq().
-	 */
-	if (pci_dev->class == PCI_CLASS_SERIAL_USB_EHCI)
-		pci_write_config_word(pci_dev, PCI_COMMAND, 0);
 
 	return 0;
 }

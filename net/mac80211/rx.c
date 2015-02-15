@@ -513,11 +513,6 @@ ieee80211_rx_mesh_check(struct ieee80211_rx_data *rx)
 
 		if (ieee80211_is_action(hdr->frame_control)) {
 			u8 category;
-
-			/* make sure category field is present */
-			if (rx->skb->len < IEEE80211_MIN_ACTION_SIZE)
-				return RX_DROP_MONITOR;
-
 			mgmt = (struct ieee80211_mgmt *)hdr;
 			category = mgmt->u.action.category;
 			if (category != WLAN_CATEGORY_MESH_ACTION &&
@@ -831,14 +826,8 @@ ieee80211_rx_h_check(struct ieee80211_rx_data *rx)
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)rx->skb->data;
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(rx->skb);
 
-	/*
-	 * Drop duplicate 802.11 retransmissions
-	 * (IEEE 802.11-2012: 9.3.2.10 "Duplicate detection and recovery")
-	 */
-	if (rx->skb->len >= 24 && rx->sta &&
-	    !ieee80211_is_ctl(hdr->frame_control) &&
-	    !ieee80211_is_qos_nullfunc(hdr->frame_control) &&
-	    !is_multicast_ether_addr(hdr->addr1)) {
+	/* Drop duplicate 802.11 retransmissions (IEEE 802.11 Chap. 9.2.9) */
+	if (rx->sta && !is_multicast_ether_addr(hdr->addr1)) {
 		if (unlikely(ieee80211_has_retry(hdr->frame_control) &&
 			     rx->sta->last_seq_ctrl[rx->seqno_idx] ==
 			     hdr->seq_ctrl)) {
@@ -880,16 +869,14 @@ ieee80211_rx_h_check(struct ieee80211_rx_data *rx)
 		 */
 		if (rx->sta && rx->sdata->vif.type == NL80211_IFTYPE_STATION &&
 		    ieee80211_is_data_present(hdr->frame_control)) {
-			unsigned int hdrlen;
-			__be16 ethertype;
+			u16 ethertype;
+			u8 *payload;
 
-			hdrlen = ieee80211_hdrlen(hdr->frame_control);
-
-			if (rx->skb->len < hdrlen + 8)
-				return RX_DROP_MONITOR;
-
-			skb_copy_bits(rx->skb, hdrlen + 6, &ethertype, 2);
-			if (ethertype == rx->sdata->control_port_protocol)
+			payload = rx->skb->data +
+				ieee80211_hdrlen(hdr->frame_control);
+			ethertype = (payload[6] << 8) | payload[7];
+			if (cpu_to_be16(ethertype) ==
+			    rx->sdata->control_port_protocol)
 				return RX_CONTINUE;
 		}
 
@@ -1478,14 +1465,11 @@ ieee80211_rx_h_defragment(struct ieee80211_rx_data *rx)
 
 	hdr = (struct ieee80211_hdr *)rx->skb->data;
 	fc = hdr->frame_control;
-
-	if (ieee80211_is_ctl(fc))
-		return RX_CONTINUE;
-
 	sc = le16_to_cpu(hdr->seq_ctrl);
 	frag = sc & IEEE80211_SCTL_FRAG;
 
 	if (likely((!ieee80211_has_morefrags(fc) && frag == 0) ||
+		   (rx->skb)->len < 24 ||
 		   is_multicast_ether_addr(hdr->addr1))) {
 		/* not fragmented */
 		goto out;
@@ -1908,20 +1892,6 @@ ieee80211_rx_h_mesh_fwding(struct ieee80211_rx_data *rx)
 
 	hdr = (struct ieee80211_hdr *) skb->data;
 	hdrlen = ieee80211_hdrlen(hdr->frame_control);
-
-	/* make sure fixed part of mesh header is there, also checks skb len */
-	if (!pskb_may_pull(rx->skb, hdrlen + 6))
-		return RX_DROP_MONITOR;
-
-	mesh_hdr = (struct ieee80211s_hdr *) (skb->data + hdrlen);
-
-	/* make sure full mesh header is there, also checks skb len */
-	if (!pskb_may_pull(rx->skb,
-			   hdrlen + ieee80211_get_mesh_hdrlen(mesh_hdr)))
-		return RX_DROP_MONITOR;
-
-	/* reload pointers */
-	hdr = (struct ieee80211_hdr *) skb->data;
 	mesh_hdr = (struct ieee80211s_hdr *) (skb->data + hdrlen);
 
 	/* frame is in RMC, don't forward */
@@ -1930,8 +1900,7 @@ ieee80211_rx_h_mesh_fwding(struct ieee80211_rx_data *rx)
 	    mesh_rmc_check(hdr->addr3, mesh_hdr, rx->sdata))
 		return RX_DROP_MONITOR;
 
-	if (!ieee80211_is_data(hdr->frame_control) ||
-	    !(status->rx_flags & IEEE80211_RX_RA_MATCH))
+	if (!ieee80211_is_data(hdr->frame_control))
 		return RX_CONTINUE;
 
 	if (!mesh_hdr->ttl)
@@ -1945,12 +1914,9 @@ ieee80211_rx_h_mesh_fwding(struct ieee80211_rx_data *rx)
 		if (is_multicast_ether_addr(hdr->addr1)) {
 			mpp_addr = hdr->addr3;
 			proxied_addr = mesh_hdr->eaddr1;
-		} else if (mesh_hdr->flags & MESH_FLAGS_AE_A5_A6) {
-			/* has_a4 already checked in ieee80211_rx_mesh_check */
+		} else {
 			mpp_addr = hdr->addr4;
 			proxied_addr = mesh_hdr->eaddr2;
-		} else {
-			return RX_DROP_MONITOR;
 		}
 
 		rcu_read_lock();
@@ -1977,6 +1943,9 @@ ieee80211_rx_h_mesh_fwding(struct ieee80211_rx_data *rx)
 		return RX_DROP_MONITOR;
 	}
 	skb_set_queue_mapping(skb, q);
+
+	if (!(status->rx_flags & IEEE80211_RX_RA_MATCH))
+		goto out;
 
 	if (!--mesh_hdr->ttl) {
 		IEEE80211_IFSTA_MESH_CTR_INC(ifmsh, dropped_frames_ttl);
@@ -2392,10 +2361,6 @@ ieee80211_rx_h_action(struct ieee80211_rx_data *rx)
 		}
 		break;
 	case WLAN_CATEGORY_SELF_PROTECTED:
-		if (len < (IEEE80211_MIN_ACTION_SIZE +
-			   sizeof(mgmt->u.action.u.self_prot.action_code)))
-			break;
-
 		switch (mgmt->u.action.u.self_prot.action_code) {
 		case WLAN_SP_MESH_PEERING_OPEN:
 		case WLAN_SP_MESH_PEERING_CLOSE:
@@ -2414,10 +2379,6 @@ ieee80211_rx_h_action(struct ieee80211_rx_data *rx)
 		}
 		break;
 	case WLAN_CATEGORY_MESH_ACTION:
-		if (len < (IEEE80211_MIN_ACTION_SIZE +
-			   sizeof(mgmt->u.action.u.mesh_action.action_code)))
-			break;
-
 		if (!ieee80211_vif_is_mesh(&sdata->vif))
 			break;
 		if (mesh_action_is_path_sel(mgmt) &&
@@ -2498,7 +2459,7 @@ ieee80211_rx_h_action_return(struct ieee80211_rx_data *rx)
 	 * frames that we didn't handle, including returning unknown
 	 * ones. For all other modes we will return them to the sender,
 	 * setting the 0x80 bit in the action category, as required by
-	 * 802.11-2012 9.24.4.
+	 * 802.11-2007 7.3.1.11.
 	 * Newer versions of hostapd shall also use the management frame
 	 * registration mechanisms, but older ones still use cooked
 	 * monitor interfaces so push all frames there.
@@ -2506,9 +2467,6 @@ ieee80211_rx_h_action_return(struct ieee80211_rx_data *rx)
 	if (!(status->rx_flags & IEEE80211_RX_MALFORMED_ACTION_FRM) &&
 	    (sdata->vif.type == NL80211_IFTYPE_AP ||
 	     sdata->vif.type == NL80211_IFTYPE_AP_VLAN))
-		return RX_DROP_MONITOR;
-
-	if (is_multicast_ether_addr(mgmt->da))
 		return RX_DROP_MONITOR;
 
 	/* do not return rejected action frames */
@@ -2966,15 +2924,10 @@ static void __ieee80211_rx_handle_packet(struct ieee80211_hw *hw,
 		     test_bit(SCAN_SW_SCANNING, &local->scanning)))
 		status->rx_flags |= IEEE80211_RX_IN_SCAN;
 
-	if (ieee80211_is_mgmt(fc)) {
-		/* drop frame if too short for header */
-		if (skb->len < ieee80211_hdrlen(fc))
-			err = -ENOBUFS;
-		else
-			err = skb_linearize(skb);
-	} else {
+	if (ieee80211_is_mgmt(fc))
+		err = skb_linearize(skb);
+	else
 		err = !pskb_may_pull(skb, ieee80211_hdrlen(fc));
-	}
 
 	if (err) {
 		dev_kfree_skb(skb);

@@ -1,0 +1,87 @@
+config FB_MSM_MDSS_WRITEBACK
+	bool "MDSS Writeback Panel"
+	---help---
+	The MDSS Writeback Panel provides support for routing the output of
+	MDSS frame buffer driver and MDP processing to memory.
+
+config FB_MSM_MDSS_HDMI_PANEL
+	depends on FB_MSM_MDSS
+	bool "MDSS HDMI Tx Panel"
+	default n
+	---help---
+	The MDSS HDMI Panel provides support for transmitting TMDS signals of
+	MDSS frame buffer data to connected hdmi compliant TVs, monitors etc.
+
+config HTC_MHL_DETECTION
+        depends on FB_MSM_MDSS_HDMI_PANEL
+        bool 'Using HTC MHL detection '
+        default n
+        ---help---
+          Using HTC MHL detection instead of silicon image advised.
+
+config FB_MSM_MDSS_HDMI_MHL_SII8334
+	depends on FB_MSM_MDSS_HDMI_PANEL
+	bool 'MHL SII8334 support '
+	default n
+	---help---
+	  Support the HDMI to MHL conversion.
+	  MHL (Mobile High-Definition Link) technology
+	  uses USB connector to output HDMI content
+
+config FB_MSM_MDSS_DSI_CTRL_STATUS
+	tristate "DSI controller status check feature"
+	---help---
+	  Check DSI controller status periodically (default period is 5
+	  seconds) by sending Bus-Turn-Around (BTA) command. If DSI controller
+	  fails to acknowledge the BTA command, it sends PANEL_ALIVE=0 status
+	  to HAL layer to reset the controller.
+
+config FB_MSM_MDSS_MDP3
+	depends on FB_MSM_MDSS
+	bool "MDP3 display controller"
+	---help---
+	The MDP3 provides support for an older version display controller
+	included in latest display sub-system, known as MDSS.
+
+config FB_MSM_MDSS_HDMI_MHL_SII9234
+        depends on FB_MSM_MDSS_HDMI_PANEL
+        bool 'MHL SII9244 support '
+        select HTC_MHL_DETECTION
+        default n
+        ---help---
+          Support the HDMI to MHL conversion.
+          MHL (Mobile High-Definition Link) technology
+          uses USB connector to output HDMI content
+          Only support detect MHL dongle by USB driver in SII9234.
+
+config FB_MSM_MDSS_HDMI_MHL_SII8240_SII8558
+        depends on FB_MSM_MDSS_HDMI_PANEL
+        bool 'MHL SII8240/SII8558 support '
+        default n
+        ---help---
+          Support the HDMI to MHL conversion.
+          MHL (Mobile High-Definition Link) technology
+          uses USB connector to output HDMI content
+
+config INTERNAL_CHARGING_SUPPORT
+        depends on FB_MSM_MDSS_HDMI_PANEL
+        boolean "INTERNAL CHARGING SUPPORT"
+        default n:
+
+config MHL_DONGLE_WORKAROUND
+    depends on FB_MSM_MDSS_HDMI_PANEL
+	boolean 'Dongle MHL function workaround'
+	default n
+	---help---
+	Support the MHL function in some dongle.
+	Some dongle will abort cbus command when it's reading devcap.
+	Workaound for this kind of issue.
+
+config MHL_MONITOR_WORKAROUND
+	depends on INTERNAL_CHARGING_SUPPORT
+	boolean 'Monitor MHL function workaround'
+	default n
+	---help---
+	Support the MHL function in some monitor.
+	Some monitor can't full support HDMI spec.
+	Workaound for this kind of issue

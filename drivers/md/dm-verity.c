@@ -718,8 +718,8 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	v->hash_dev_block_bits = ffs(num) - 1;
 
 	if (sscanf(argv[5], "%llu%c", &num_ll, &dummy) != 1 ||
-	    (sector_t)(num_ll << (v->data_dev_block_bits - SECTOR_SHIFT))
-	    >> (v->data_dev_block_bits - SECTOR_SHIFT) != num_ll) {
+	    num_ll << (v->data_dev_block_bits - SECTOR_SHIFT) !=
+	    (sector_t)num_ll << (v->data_dev_block_bits - SECTOR_SHIFT)) {
 		ti->error = "Invalid data blocks";
 		r = -EINVAL;
 		goto bad;
@@ -733,8 +733,8 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	}
 
 	if (sscanf(argv[6], "%llu%c", &num_ll, &dummy) != 1 ||
-	    (sector_t)(num_ll << (v->hash_dev_block_bits - SECTOR_SHIFT))
-	    >> (v->hash_dev_block_bits - SECTOR_SHIFT) != num_ll) {
+	    num_ll << (v->hash_dev_block_bits - SECTOR_SHIFT) !=
+	    (sector_t)num_ll << (v->hash_dev_block_bits - SECTOR_SHIFT)) {
 		ti->error = "Invalid hash start";
 		r = -EINVAL;
 		goto bad;
@@ -813,8 +813,9 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	for (i = v->levels - 1; i >= 0; i--) {
 		sector_t s;
 		v->hash_level_block[i] = hash_position;
-		s = (v->data_blocks + ((sector_t)1 << ((i + 1) * v->hash_per_block_bits)) - 1)
-					>> ((i + 1) * v->hash_per_block_bits);
+		s = verity_position_at_level(v, v->data_blocks, i);
+		s = (s >> v->hash_per_block_bits) +
+		    !!(s & ((1 << v->hash_per_block_bits) - 1));
 		if (hash_position + s < hash_position) {
 			ti->error = "Hash device offset overflow";
 			r = -E2BIG;

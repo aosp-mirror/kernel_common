@@ -318,6 +318,9 @@ ENTRY(arm920_dma_unmap_area)
 	mov	pc, lr
 ENDPROC(arm920_dma_unmap_area)
 
+	.globl	arm920_flush_kern_cache_louis
+	.equ	arm920_flush_kern_cache_louis, arm920_flush_kern_cache_all
+
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
 	define_cache_functions arm920
 #endif
@@ -383,7 +386,7 @@ ENTRY(cpu_arm920_set_pte_ext)
 /* Suspend/resume support: taken from arch/arm/plat-s3c24xx/sleep.S */
 .globl	cpu_arm920_suspend_size
 .equ	cpu_arm920_suspend_size, 4 * 3
-#ifdef CONFIG_ARM_CPU_SUSPEND
+#ifdef CONFIG_PM_SLEEP
 ENTRY(cpu_arm920_do_suspend)
 	stmfd	sp!, {r4 - r6, lr}
 	mrc	p15, 0, r4, c13, c0, 0	@ PID

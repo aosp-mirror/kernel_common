@@ -56,7 +56,7 @@ static char __init *find_link(int major, int minor, int ino,
 	q->minor = minor;
 	q->ino = ino;
 	q->mode = mode;
-	strcpy(q->name, name);
+	strncpy(q->name, name, sizeof(q->name) - 1);
 	q->next = NULL;
 	*p = q;
 	return NULL;

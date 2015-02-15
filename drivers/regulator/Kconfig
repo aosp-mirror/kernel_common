@@ -102,6 +102,17 @@ config REGULATOR_DA9052
 	  This driver supports the voltage regulators of DA9052-BC and
 	  DA9053-AA/Bx PMIC.
 
+config REGULATOR_FAN53555
+	tristate "Fairchild FAN53555 Regulator"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  This driver supports Fairchild FAN53555 Digitally Programmable
+	  TinyBuck Regulator. The FAN53555 is a step-down switching voltage
+	  regulator that delivers a digitally programmable output from an
+	  input voltage supply of 2.5V to 5.5V. The output voltage is
+	  programmed through an I2C interface.
+
 config REGULATOR_ANATOP
 	tristate "Freescale i.MX on-chip ANATOP LDO regulators"
 	depends on MFD_ANATOP
@@ -128,6 +139,15 @@ config REGULATOR_MC13892
 	help
 	  Say y here to support the regulators found on the Freescale MC13892
 	  PMIC.
+
+config REGULATOR_MEM_ACC
+	tristate "QTI Memory accelerator regulator driver"
+	help
+	 Say y here to enable the memory accelerator driver for Qualcomm
+	 Technologies (QTI) chips. The accelerator controls delays applied
+	 for memory accesses.
+	 This driver configures the power-mode (corner) for the memory
+	 accelerator.
 
 config REGULATOR_ISL6271A
 	tristate "Intersil ISL6271A Power regulator"
@@ -194,6 +214,15 @@ config REGULATOR_MAX8998
 	  This driver controls a Maxim 8998 voltage output regulator
 	  via I2C bus. The provided regulator is suitable for S3C6410
 	  and S5PC1XX chips to control VCC_CORE and VCC_USIM voltages.
+
+config REGULATOR_ONSEMI_NCP6335D
+	tristate "OnSemi NCP6335D regulator support"
+	depends on I2C
+	help
+	 This driver supports the OnSemi NCP6335D switching voltage regulator
+	 (buck convertor). The regulator is controlled using an I2C interface
+	 and supports a programmable voltage range from 0.6V to 1.4V in steps
+	 of 6.25mV.
 
 config REGULATOR_PCAP
 	tristate "Motorola PCAP2 regulator driver"
@@ -365,6 +394,80 @@ config REGULATOR_WM8994
 	help
 	  This driver provides support for the voltage regulators on the
 	  WM8994 CODEC.
+
+config REGULATOR_PMIC8058
+        tristate "PMIC8058 regulator driver"
+        depends on PMIC8058 && (ARCH_MSM8X60 || ARCH_FSM9XXX)
+        default y if PMIC8058 && (ARCH_MSM8X60 || ARCH_FSM9XXX)
+        help
+         Say Y here to support the voltage regulators on PMIC8058
+
+config REGULATOR_PMIC8901
+        tristate "PMIC8901 regulator driver"
+        depends on PMIC8901 && ARCH_MSM8X60
+        default y if PMIC8901 && ARCH_MSM8X60
+        help
+         Say Y here to support the voltage regulators on PMIC8901
+
+config REGULATOR_PM8XXX
+	tristate "Qualcomm PM8XXX PMIC Voltage regulators"
+	depends on MFD_PM8XXX
+	help
+	  This driver supports voltage regulators in Qualcomm PM8XXX PMIC chips.
+	  PM8XXX chips provide several different varieties of LDO and switching
+	  regulators.  They also provide negative charge pumps and voltage
+	  switches.
+
+config REGULATOR_MSM_GPIO
+	tristate "MSM GPIO regulator"
+	depends on GPIOLIB
+	help
+	  This driver provides a regulator wrapper around a GPIO pin that is set
+	  to output.  It is intended to be used for GPIO pins that provide the
+	  enable signal to a physical regulator.  The GPIO enable signal can
+	  be configured to be active high (default) or active low.
+
+config REGULATOR_PM8058_XO
+	tristate "PM8058 XO Buffer driver"
+	depends on PMIC8058
+	default n
+	help
+	  This driver supports xo buffer control in the Qualcomm PM8058 PMIC
+	  chip. It is only supposed to be used when Linux on application
+	  processor is the master in control of XO buffers.
+
+config REGULATOR_STUB
+	tristate "Stub Regulator"
+	help
+	  This driver adds stub regulator support. The driver is absent of any
+	  real hardware based implementation. It allows for clients to register
+	  their regulator device constraints and use all of the standard
+	  regulator interfaces. This is useful for bringing up new platforms
+	  when the real hardware based implementation may not be yet available.
+	  Clients can use the real regulator device names with proper
+	  constraint checking while the real driver is being developed.
+
+config REGULATOR_QPNP
+	depends on SPMI
+	depends on OF_SPMI
+	tristate "Qualcomm QPNP regulator support"
+	help
+	  This driver supports voltage regulators in Qualcomm PMIC chips which
+	  comply with QPNP.  QPNP is a SPMI based PMIC implementation.  These
+	  chips provide several different varieties of LDO and switching
+	  regulators.  They also provide voltage switches and boost regulators.
+
+config REGULATOR_NCP6924
+	tristate "ON NCP6924 PMIC"
+	depends on I2C
+	help
+	  This driver supports voltage regulator of ON Semiconductor NCP6924 chips.
+
+config REGULATOR_NCP6924_OFFMODE_CHARGE
+	tristate "OFF NCP6924 PMIC"
+	depends on I2C
+	help
+	  This driver supports voltage regulator of OFF Semiconductor NCP6924 chips.
 
 endif
 

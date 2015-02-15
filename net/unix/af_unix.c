@@ -114,7 +114,6 @@
 #include <linux/mount.h>
 #include <net/checksum.h>
 #include <linux/security.h>
-#include <linux/freezer.h>
 
 struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
 EXPORT_SYMBOL_GPL(unix_socket_table);
@@ -358,7 +357,7 @@ static void unix_sock_destructor(struct sock *sk)
 	WARN_ON(!sk_unhashed(sk));
 	WARN_ON(sk->sk_socket);
 	if (!sock_flag(sk, SOCK_DEAD)) {
-		printk(KERN_INFO "Attempt to release alive unix socket: %p\n", sk);
+		WARN(1, "Attempt to release alive unix socket: %p\n", sk);
 		return;
 	}
 
@@ -1106,6 +1105,8 @@ restart:
 
 	/* Apparently VFS overslept socket death. Retry. */
 	if (sock_flag(other, SOCK_DEAD)) {
+		pr_err("%s other->sk_flags=%ld on %s(%d)\n", __func__, other->sk_flags,
+				current->comm, current->pid);
 		unix_state_unlock(other);
 		sock_put(other);
 		goto restart;
@@ -1122,9 +1123,14 @@ restart:
 		if (!timeo)
 			goto out_unlock;
 
+		pr_err("%s skb_queue_len=%d  sk_max_ack_backlog=%d on %s(%d)\n", __func__,
+				skb_queue_len(&other->sk_receive_queue), other->sk_max_ack_backlog,
+				current->comm, current->pid);
 		timeo = unix_wait_for_peer(other, timeo);
 
 		err = sock_intr_errno(timeo);
+		pr_err("%s timeo=0x%lx, err=%d on %s(%d)\n", __func__, timeo, err,
+				current->comm, current->pid);
 		if (signal_pending(current))
 			goto out;
 		sock_put(other);
@@ -1160,6 +1166,8 @@ restart:
 	unix_state_lock_nested(sk);
 
 	if (sk->sk_state != st) {
+		pr_err("%s sk->sk_state=%d, st=%d on %s(%d)\n", __func__, sk->sk_state,
+				st, current->comm, current->pid);
 		unix_state_unlock(sk);
 		unix_state_unlock(other);
 		sock_put(other);
@@ -1874,7 +1882,7 @@ static long unix_stream_data_wait(struct sock *sk, long timeo)
 
 		set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
 		unix_state_unlock(sk);
-		timeo = freezable_schedule_timeout(timeo);
+		timeo = schedule_timeout(timeo);
 		unix_state_lock(sk);
 		clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
 	}
@@ -1987,7 +1995,7 @@ again:
 			if ((UNIXCB(skb).pid  != siocb->scm->pid) ||
 			    (UNIXCB(skb).cred != siocb->scm->cred))
 				break;
-		} else if (test_bit(SOCK_PASSCRED, &sock->flags)) {
+		} else {
 			/* Copy credentials */
 			scm_set_cred(siocb->scm, UNIXCB(skb).pid, UNIXCB(skb).cred);
 			check_creds = 1;

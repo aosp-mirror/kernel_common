@@ -136,16 +136,8 @@ static long comedi_unlocked_ioctl(struct file *file, unsigned int cmd,
 	/* Device config is special, because it must work on
 	 * an unconfigured device. */
 	if (cmd == COMEDI_DEVCONFIG) {
-		if (minor >= COMEDI_NUM_BOARD_MINORS) {
-			/* Device config not appropriate on non-board minors. */
-			rc = -ENOTTY;
-			goto done;
-		}
 		rc = do_devconfig_ioctl(dev,
 					(struct comedi_devconfig __user *)arg);
-		if (rc == 0)
-			/* Evade comedi_auto_unconfig(). */
-			dev_file_info->hardware_device = NULL;
 		goto done;
 	}
 
@@ -288,7 +280,7 @@ static int do_devconfig_ioctl(struct comedi_device *dev,
 	if (ret == 0) {
 		if (!try_module_get(dev->driver->module)) {
 			comedi_device_detach(dev);
-			ret = -ENOSYS;
+			return -ENOSYS;
 		}
 	}
 
@@ -851,7 +843,7 @@ static int parse_insn(struct comedi_device *dev, struct comedi_insn *insn,
 				ret = -EAGAIN;
 				break;
 			}
-			ret = s->async->inttrig(dev, s, data[0]);
+			ret = s->async->inttrig(dev, s, insn->data[0]);
 			if (ret >= 0)
 				ret = 1;
 			break;
@@ -1096,6 +1088,7 @@ static int do_cmd_ioctl(struct comedi_device *dev,
 		goto cleanup;
 	}
 
+	kfree(async->cmd.chanlist);
 	async->cmd = user_cmd;
 	async->cmd.data = NULL;
 	/* load channel/gain list */
@@ -1370,7 +1363,6 @@ static int do_cancel_ioctl(struct comedi_device *dev, unsigned int arg,
 			   void *file)
 {
 	struct comedi_subdevice *s;
-	int ret;
 
 	if (arg >= dev->n_subdevices)
 		return -EINVAL;
@@ -1387,11 +1379,7 @@ static int do_cancel_ioctl(struct comedi_device *dev, unsigned int arg,
 	if (s->busy != file)
 		return -EBUSY;
 
-	ret = do_cancel(dev, s);
-	if (comedi_get_subdevice_runflags(s) & SRF_USER)
-		wake_up_interruptible(&s->async->wait_head);
-
-	return ret;
+	return do_cancel(dev, s);
 }
 
 /*
@@ -1582,7 +1570,7 @@ static unsigned int comedi_poll(struct file *file, poll_table * wait)
 
 	mask = 0;
 	read_subdev = comedi_get_read_subdevice(dev_file_info);
-	if (read_subdev && read_subdev->async) {
+	if (read_subdev) {
 		poll_wait(file, &read_subdev->async->wait_head, wait);
 		if (!read_subdev->busy
 		    || comedi_buf_read_n_available(read_subdev->async) > 0
@@ -1592,7 +1580,7 @@ static unsigned int comedi_poll(struct file *file, poll_table * wait)
 		}
 	}
 	write_subdev = comedi_get_write_subdevice(dev_file_info);
-	if (write_subdev && write_subdev->async) {
+	if (write_subdev) {
 		poll_wait(file, &write_subdev->async->wait_head, wait);
 		comedi_buf_write_alloc(write_subdev->async,
 				       write_subdev->async->prealloc_bufsz);
@@ -1634,7 +1622,7 @@ static ssize_t comedi_write(struct file *file, const char __user *buf,
 	}
 
 	s = comedi_get_write_subdevice(dev_file_info);
-	if (s == NULL || s->async == NULL) {
+	if (s == NULL) {
 		retval = -EIO;
 		goto done;
 	}
@@ -1745,7 +1733,7 @@ static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
 	}
 
 	s = comedi_get_read_subdevice(dev_file_info);
-	if (s == NULL || s->async == NULL) {
+	if (s == NULL) {
 		retval = -EIO;
 		goto done;
 	}
@@ -1845,8 +1833,6 @@ void do_become_nonbusy(struct comedi_device *dev, struct comedi_subdevice *s)
 	if (async) {
 		comedi_reset_async_buf(async);
 		async->inttrig = NULL;
-		kfree(async->cmd.chanlist);
-		async->cmd.chanlist = NULL;
 	} else {
 		printk(KERN_ERR
 		       "BUG: (?) do_become_nonbusy called with async=0\n");
@@ -2220,7 +2206,6 @@ int comedi_alloc_board_minor(struct device *hardware_device)
 		kfree(info);
 		return -ENOMEM;
 	}
-	info->hardware_device = hardware_device;
 	comedi_device_init(info->device);
 	spin_lock_irqsave(&comedi_file_info_table_lock, flags);
 	for (i = 0; i < COMEDI_NUM_BOARD_MINORS; ++i) {
@@ -2307,23 +2292,6 @@ void comedi_free_board_minor(unsigned minor)
 		}
 		kfree(info);
 	}
-}
-
-int comedi_find_board_minor(struct device *hardware_device)
-{
-	int minor;
-	struct comedi_device_file_info *info;
-
-	for (minor = 0; minor < COMEDI_NUM_BOARD_MINORS; minor++) {
-		spin_lock(&comedi_file_info_table_lock);
-		info = comedi_file_info_table[minor];
-		if (info && info->hardware_device == hardware_device) {
-			spin_unlock(&comedi_file_info_table_lock);
-			return minor;
-		}
-		spin_unlock(&comedi_file_info_table_lock);
-	}
-	return -ENODEV;
 }
 
 int comedi_alloc_subdevice_minor(struct comedi_device *dev,

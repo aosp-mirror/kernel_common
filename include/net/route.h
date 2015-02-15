@@ -45,7 +45,7 @@ struct fib_info;
 struct rtable {
 	struct dst_entry	dst;
 
-	/* Lookup key. */
+	
 	__be32			rt_key_dst;
 	__be32			rt_key_src;
 
@@ -54,22 +54,22 @@ struct rtable {
 	__u16			rt_type;
 	__u8			rt_key_tos;
 
-	__be32			rt_dst;	/* Path destination	*/
-	__be32			rt_src;	/* Path source		*/
+	__be32			rt_dst;	
+	__be32			rt_src;	
 	int			rt_route_iif;
 	int			rt_iif;
 	int			rt_oif;
 	__u32			rt_mark;
 	uid_t			rt_uid;
 
-	/* Info on neighbour */
+	
 	__be32			rt_gateway;
 
-	/* Miscellaneous cached information */
-	__be32			rt_spec_dst; /* RFC1122 specific destination */
+	
+	__be32			rt_spec_dst; 
 	u32			rt_peer_genid;
-	struct inet_peer	*peer; /* long-living peer info */
-	struct fib_info		*fi; /* for client ref to shared metrics */
+	struct inet_peer	*peer; 
+	struct fib_info		*fi; 
 };
 
 static inline bool rt_is_input_route(const struct rtable *rt)
@@ -212,29 +212,6 @@ static inline char rt_tos2priority(u8 tos)
 	return ip_tos2prio[IPTOS_TOS(tos)>>1];
 }
 
-/* ip_route_connect() and ip_route_newports() work in tandem whilst
- * binding a socket for a new outgoing connection.
- *
- * In order to use IPSEC properly, we must, in the end, have a
- * route that was looked up using all available keys including source
- * and destination ports.
- *
- * However, if a source port needs to be allocated (the user specified
- * a wildcard source port) we need to obtain addressing information
- * in order to perform that allocation.
- *
- * So ip_route_connect() looks up a route using wildcarded source and
- * destination ports in the key, simply so that we can get a pair of
- * addresses to use for port allocation.
- *
- * Later, once the ports are allocated, ip_route_newports() will make
- * another route lookup if needed to make sure we catch any IPSEC
- * rules keyed on the port information.
- *
- * The callers allocate the flow key on their stack, and must pass in
- * the same flowi4 object to both the ip_route_connect() and the
- * ip_route_newports() calls.
- */
 
 static inline void ip_route_connect_init(struct flowi4 *fl4, __be32 dst, __be32 src,
 					 u32 tos, int oif, u8 protocol,
@@ -323,4 +300,4 @@ static inline int ip4_dst_hoplimit(const struct dst_entry *dst)
 	return hoplimit;
 }
 
-#endif	/* _ROUTE_H */
+#endif	

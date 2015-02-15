@@ -138,9 +138,6 @@ EXPORT_SYMBOL_GPL(dm_tm_create_non_blocking_clone);
 
 void dm_tm_destroy(struct dm_transaction_manager *tm)
 {
-	if (!tm->is_clone)
-		wipe_shadow_table(tm);
-
 	kfree(tm);
 }
 EXPORT_SYMBOL_GPL(dm_tm_destroy);
@@ -345,10 +342,8 @@ static int dm_tm_create_internal(struct dm_block_manager *bm,
 		}
 
 		*sm = dm_sm_checker_create(inner);
-		if (IS_ERR(*sm)) {
-			r = PTR_ERR(*sm);
+		if (!*sm)
 			goto bad2;
-		}
 
 	} else {
 		r = dm_bm_write_lock(dm_tm_get_bm(*tm), sb_location,
@@ -367,10 +362,8 @@ static int dm_tm_create_internal(struct dm_block_manager *bm,
 		}
 
 		*sm = dm_sm_checker_create(inner);
-		if (IS_ERR(*sm)) {
-			r = PTR_ERR(*sm);
+		if (!*sm)
 			goto bad2;
-		}
 	}
 
 	return 0;

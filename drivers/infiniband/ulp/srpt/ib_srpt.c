@@ -1610,7 +1610,7 @@ static int srpt_build_tskmgmt_rsp(struct srpt_rdma_ch *ch,
 	int resp_data_len;
 	int resp_len;
 
-	resp_data_len = 4;
+	resp_data_len = (rsp_code == SRP_TSK_MGMT_SUCCESS) ? 0 : 4;
 	resp_len = sizeof(*srp_rsp) + resp_data_len;
 
 	srp_rsp = ioctx->ioctx.buf;
@@ -1622,9 +1622,11 @@ static int srpt_build_tskmgmt_rsp(struct srpt_rdma_ch *ch,
 				    + atomic_xchg(&ch->req_lim_delta, 0));
 	srp_rsp->tag = tag;
 
-	srp_rsp->flags |= SRP_RSP_FLAG_RSPVALID;
-	srp_rsp->resp_data_len = cpu_to_be32(resp_data_len);
-	srp_rsp->data[3] = rsp_code;
+	if (rsp_code != SRP_TSK_MGMT_SUCCESS) {
+		srp_rsp->flags |= SRP_RSP_FLAG_RSPVALID;
+		srp_rsp->resp_data_len = cpu_to_be32(resp_data_len);
+		srp_rsp->data[3] = rsp_code;
+	}
 
 	return resp_len;
 }
@@ -1767,7 +1769,7 @@ static int srpt_handle_cmd(struct srpt_rdma_ch *ch,
 		kref_put(&send_ioctx->kref, srpt_put_send_ioctx_kref);
 		goto send_sense;
 	}
-	ret = transport_generic_allocate_tasks(cmd, srp_cmd->cdb);
+	ret = target_setup_cmd_from_cdb(cmd, srp_cmd->cdb);
 	if (ret < 0) {
 		kref_put(&send_ioctx->kref, srpt_put_send_ioctx_kref);
 		if (cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT) {
@@ -2371,8 +2373,6 @@ static void srpt_release_channel_work(struct work_struct *w)
 	transport_deregister_session(ch->sess);
 	ch->sess = NULL;
 
-	ib_destroy_cm_id(ch->cm_id);
-
 	srpt_destroy_ch_ib(ch);
 
 	srpt_free_ioctx_ring((struct srpt_ioctx **)ch->ioctx_ring,
@@ -2382,6 +2382,8 @@ static void srpt_release_channel_work(struct work_struct *w)
 	spin_lock_irq(&sdev->spinlock);
 	list_del(&ch->list);
 	spin_unlock_irq(&sdev->spinlock);
+
+	ib_destroy_cm_id(ch->cm_id);
 
 	if (ch->release_done)
 		complete(ch->release_done);

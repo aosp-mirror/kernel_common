@@ -18,6 +18,10 @@
 
 #include <linux/input.h>
 
+#define KEY_LOGD(fmt, args...) printk(KERN_DEBUG "[KEY] "fmt, ##args)
+#define KEY_LOGI(fmt, args...) printk(KERN_INFO "[KEY] "fmt, ##args)
+#define KEY_LOGE(fmt, args...) printk(KERN_ERR "[KEY] "fmt, ##args)
+
 struct gpio_event_input_devs {
 	int count;
 	struct input_dev *dev[];
@@ -37,6 +41,7 @@ struct gpio_event_info {
 		     void **data, unsigned int dev, unsigned int type,
 		     unsigned int code, int value); /* out events */
 	bool no_suspend;
+	uint8_t rrm1_mode;
 };
 
 struct gpio_event_platform_data {
@@ -44,6 +49,7 @@ struct gpio_event_platform_data {
 	struct gpio_event_info **info;
 	size_t info_count;
 	int (*power)(const struct gpio_event_platform_data *pdata, bool on);
+	uint8_t cmcc_disable_reset;
 	const char *names[]; /* If name is NULL, names contain a NULL */
 			     /* terminated list of input devices to create */
 };
@@ -105,6 +111,8 @@ struct gpio_event_direct_entry {
 	uint32_t gpio:16;
 	uint32_t code:10;
 	uint32_t dev:6;
+	uint32_t pull:10;
+	bool     not_wakeup_src;
 };
 
 /* inputs */
@@ -119,6 +127,14 @@ struct gpio_event_input_info {
 	uint16_t type;
 	const struct gpio_event_direct_entry *keymap;
 	size_t keymap_size;
+	void (*set_qty_irq)(uint8_t);
+#ifdef CONFIG_OF
+	void (*dt_setup_input_gpio)(const struct gpio_event_direct_entry *cfg, size_t size);
+	uint32_t clr_gpio:16;
+	void (*dt_clear_hw_reset)(uint32_t clear_gpio);
+#endif
+	void (*setup_input_gpio)(void);
+	void (*clear_hw_reset)(void);
 };
 
 /* outputs */
@@ -167,4 +183,19 @@ uint16_t gpio_axis_4bit_gray_map(
 uint16_t gpio_axis_5bit_singletrack_map(
 			struct gpio_event_axis_info *info, uint16_t in);
 
+/* switchs */
+extern int gpio_event_switch_func(struct gpio_event_input_devs *input_devs,
+			struct gpio_event_info *info, void **data, int func);
+struct gpio_event_switch_info {
+	/* initialize to gpio_event_switch_func */
+	struct gpio_event_info info;
+	ktime_t debounce_time;
+	ktime_t poll_time;
+	uint16_t flags;
+	uint16_t type;
+	const struct gpio_event_direct_entry *keymap;
+	size_t keymap_size;
+	void (*setup_switch_gpio)(void);
+	void (*set_qty_irq)(uint8_t);
+};
 #endif

@@ -1042,6 +1042,7 @@ static int pscsi_map_sg(struct se_task *task, struct scatterlist *task_sg,
 				bio = NULL;
 			}
 
+			page++;
 			len -= bytes;
 			data_len -= bytes;
 			off = 0;

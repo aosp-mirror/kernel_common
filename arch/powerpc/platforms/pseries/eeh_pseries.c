@@ -83,11 +83,7 @@ static int pseries_eeh_init(void)
 	ibm_configure_pe		= rtas_token("ibm,configure-pe");
 	ibm_configure_bridge		= rtas_token ("ibm,configure-bridge");
 
-	/*
-	 * Necessary sanity check. We needn't check "get-config-addr-info"
-	 * and its variant since the old firmware probably support address
-	 * of domain/bus/slot/function for EEH RTAS operations.
-	 */
+	/* necessary sanity check */
 	if (ibm_set_eeh_option == RTAS_UNKNOWN_SERVICE) {
 		pr_warning("%s: RTAS service <ibm,set-eeh-option> invalid\n",
 			__func__);
@@ -104,6 +100,12 @@ static int pseries_eeh_init(void)
 		return -EINVAL;
 	} else if (ibm_slot_error_detail == RTAS_UNKNOWN_SERVICE) {
 		pr_warning("%s: RTAS service <ibm,slot-error-detail> invalid\n",
+			__func__);
+		return -EINVAL;
+	} else if (ibm_get_config_addr_info2 == RTAS_UNKNOWN_SERVICE &&
+		   ibm_get_config_addr_info == RTAS_UNKNOWN_SERVICE) {
+		pr_warning("%s: RTAS service <ibm,get-config-addr-info2> and "
+			"<ibm,get-config-addr-info> invalid\n",
 			__func__);
 		return -EINVAL;
 	} else if (ibm_configure_pe == RTAS_UNKNOWN_SERVICE &&

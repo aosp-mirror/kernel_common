@@ -167,6 +167,7 @@ struct input_keymap_entry {
 #define INPUT_PROP_DIRECT		0x01	/* direct input devices */
 #define INPUT_PROP_BUTTONPAD		0x02	/* has button(s) under pad */
 #define INPUT_PROP_SEMI_MT		0x03	/* touch rectangle only */
+#define INPUT_PROP_NO_DUMMY_RELEASE	0x04	/* no dummy event */
 
 #define INPUT_PROP_MAX			0x1f
 #define INPUT_PROP_CNT			(INPUT_PROP_MAX + 1)
@@ -198,8 +199,6 @@ struct input_keymap_entry {
 #define SYN_CONFIG		1
 #define SYN_MT_REPORT		2
 #define SYN_DROPPED		3
-#define SYN_TIME_SEC		4
-#define SYN_TIME_NSEC		5
 
 /*
  * Keys and buttons
@@ -464,17 +463,17 @@ struct input_keymap_entry {
 #define KEY_VIDEO_NEXT		241	/* drive next video source */
 #define KEY_VIDEO_PREV		242	/* drive previous video source */
 #define KEY_BRIGHTNESS_CYCLE	243	/* brightness up, after max is min */
-#define KEY_BRIGHTNESS_AUTO	244	/* Set Auto Brightness: manual
-					  brightness control is off,
-					  rely on ambient */
-#define KEY_BRIGHTNESS_ZERO	KEY_BRIGHTNESS_AUTO
+#define KEY_BRIGHTNESS_ZERO	244	/* brightness off, use ambient */
 #define KEY_DISPLAY_OFF		245	/* display device to off state */
 
-#define KEY_WWAN		246	/* Wireless WAN (LTE, UMTS, GSM, etc.) */
-#define KEY_WIMAX		KEY_WWAN
+#define KEY_WIMAX		246
 #define KEY_RFKILL		247	/* Key that controls all radios */
 
 #define KEY_MICMUTE		248	/* Mute / unmute the microphone */
+#define KEY_APP_SWITCH		249	/* key for list app*/
+#define KEY_WEIBO		250	/* key for weibo, customize*/
+#define HALL_N_POLE		251	/* HALL Sensor N pole*/
+#define HALL_S_POLE		252	/* HALL Sensor S pole*/
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
@@ -516,15 +515,11 @@ struct input_keymap_entry {
 #define BTN_DEAD		0x12f
 
 #define BTN_GAMEPAD		0x130
-#define BTN_SOUTH		0x130
-#define BTN_A			BTN_SOUTH
-#define BTN_EAST		0x131
-#define BTN_B			BTN_EAST
+#define BTN_A			0x130
+#define BTN_B			0x131
 #define BTN_C			0x132
-#define BTN_NORTH		0x133
-#define BTN_X			BTN_NORTH
-#define BTN_WEST		0x134
-#define BTN_Y			BTN_WEST
+#define BTN_X			0x133
+#define BTN_Y			0x134
 #define BTN_Z			0x135
 #define BTN_TL			0x136
 #define BTN_TR			0x137
@@ -637,7 +632,6 @@ struct input_keymap_entry {
 #define KEY_ADDRESSBOOK		0x1ad	/* AL Contacts/Address Book */
 #define KEY_MESSENGER		0x1ae	/* AL Instant Messaging */
 #define KEY_DISPLAYTOGGLE	0x1af	/* Turn display (LCD) on and off */
-#define KEY_BRIGHTNESS_TOGGLE	KEY_DISPLAYTOGGLE
 #define KEY_SPELLCHECK		0x1b0   /* AL Spell Check */
 #define KEY_LOGOFF		0x1b1   /* AL Logoff */
 
@@ -702,7 +696,7 @@ struct input_keymap_entry {
 #define KEY_NUMERIC_9		0x209
 #define KEY_NUMERIC_STAR	0x20a
 #define KEY_NUMERIC_POUND	0x20b
-
+#define KEY_CAMERA_SNAPSHOT	0x2fe
 #define KEY_CAMERA_FOCUS	0x210
 #define KEY_WPS_BUTTON		0x211	/* WiFi Protected Setup key */
 
@@ -716,24 +710,6 @@ struct input_keymap_entry {
 #define KEY_CAMERA_DOWN		0x218
 #define KEY_CAMERA_LEFT		0x219
 #define KEY_CAMERA_RIGHT	0x21a
-
-#define BTN_DPAD_UP		0x220
-#define BTN_DPAD_DOWN		0x221
-#define BTN_DPAD_LEFT		0x222
-#define BTN_DPAD_RIGHT		0x223
-
-#define KEY_ALS_TOGGLE		0x230	/* Ambient light sensor */
-
-#define KEY_BUTTONCONFIG		0x240	/* AL Button Configuration */
-#define KEY_TASKMANAGER		0x241	/* AL Task/Project Manager */
-#define KEY_JOURNAL		0x242	/* AL Log/Journal/Timecard */
-#define KEY_CONTROLPANEL		0x243	/* AL Control Panel */
-#define KEY_APPSELECT		0x244	/* AL Select Task/Application */
-#define KEY_SCREENSAVER		0x245	/* AL Screen Saver */
-#define KEY_VOICECOMMAND		0x246	/* Listening Voice Command */
-
-#define KEY_BRIGHTNESS_MIN		0x250	/* Set Brightness to Minimum */
-#define KEY_BRIGHTNESS_MAX		0x251	/* Set Brightness to Maximum */
 
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
@@ -832,6 +808,8 @@ struct input_keymap_entry {
 
 #define ABS_MISC		0x28
 
+#define ABS_MT_POSITION		0x2a    /* Group a set of X and Y */
+#define ABS_MT_AMPLITUDE	0x2b    /* Group a set of Z and W */
 #define ABS_MT_SLOT		0x2f	/* MT slot being modified */
 #define ABS_MT_TOUCH_MAJOR	0x30	/* Major axis of touching ellipse */
 #define ABS_MT_TOUCH_MINOR	0x31	/* Minor axis (omit if circular) */
@@ -875,8 +853,11 @@ struct input_keymap_entry {
 #define SW_FRONT_PROXIMITY	0x0b  /* set = front proximity sensor active */
 #define SW_ROTATE_LOCK		0x0c  /* set = rotate locked/disabled */
 #define SW_LINEIN_INSERT	0x0d  /* set = inserted */
-#define SW_MUTE_DEVICE		0x0e  /* set = device disabled */
-#define SW_MAX			0x0f
+#define SW_HPHL_OVERCURRENT    0x0e  /* set = over current on left hph */
+#define SW_HPHR_OVERCURRENT    0x0f  /* set = over current on right hph */
+#define SW_UNSUPPORT_INSERT	0x10  /* set = unsupported device inserted */
+#define SW_MICROPHONE2_INSERT   0x11  /* set = inserted */
+#define SW_MAX			0x20
 #define SW_CNT			(SW_MAX+1)
 
 /*

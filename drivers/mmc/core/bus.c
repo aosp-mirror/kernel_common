@@ -26,6 +26,7 @@
 #include "bus.h"
 
 #define to_mmc_driver(d)	container_of(d, struct mmc_driver, drv)
+#define RUNTIME_SUSPEND_DELAY_MS 10000
 
 static ssize_t mmc_type_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -122,6 +123,26 @@ static int mmc_bus_remove(struct device *dev)
 	return 0;
 }
 
+static void mmc_bus_shutdown(struct device *dev)
+{
+	struct mmc_driver *drv = to_mmc_driver(dev->driver);
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	if (!drv) {
+		pr_debug("%s: %s: drv is NULL\n", dev_name(dev), __func__);
+		return;
+	}
+
+	if (!card) {
+		pr_debug("%s: %s: card is NULL\n", dev_name(dev), __func__);
+		return;
+	}
+
+	if (drv->shutdown)
+		drv->shutdown(card);
+}
+
+#ifdef CONFIG_PM_SLEEP
 static int mmc_bus_suspend(struct device *dev)
 {
 	struct mmc_driver *drv = to_mmc_driver(dev->driver);
@@ -143,6 +164,7 @@ static int mmc_bus_resume(struct device *dev)
 		ret = drv->resume(card);
 	return ret;
 }
+#endif
 
 #ifdef CONFIG_PM_RUNTIME
 
@@ -150,19 +172,48 @@ static int mmc_runtime_suspend(struct device *dev)
 {
 	struct mmc_card *card = mmc_dev_to_card(dev);
 
-	return mmc_power_save_host(card->host);
+	if (mmc_use_core_runtime_pm(card->host)) {
+		/*
+		 * If idle time bkops is running on the card, let's not get
+		 * into suspend.
+		 */
+		if (mmc_card_doing_bkops(card) && mmc_card_is_prog_state(card))
+			return -EBUSY;
+		else
+			return 0;
+	} else {
+		return mmc_power_save_host(card->host);
+	}
 }
 
 static int mmc_runtime_resume(struct device *dev)
 {
 	struct mmc_card *card = mmc_dev_to_card(dev);
 
-	return mmc_power_restore_host(card->host);
+	if (mmc_use_core_runtime_pm(card->host))
+		return 0;
+	else
+		return mmc_power_restore_host(card->host);
 }
 
 static int mmc_runtime_idle(struct device *dev)
 {
-	return pm_runtime_suspend(dev);
+	struct mmc_card *card = mmc_dev_to_card(dev);
+	struct mmc_host *host = card->host;
+	int ret = 0;
+
+	if (mmc_use_core_runtime_pm(card->host)) {
+		ret = pm_schedule_suspend(dev, card->idle_timeout);
+		if ((ret < 0) && (dev->power.runtime_error ||
+				  dev->power.disable_depth > 0)) {
+			pr_err("%s: %s: %s: pm_schedule_suspend failed: err: %d\n",
+			       mmc_hostname(host), __func__, dev_name(dev),
+			       ret);
+			return ret;
+		}
+	}
+
+	return ret;
 }
 
 #endif /* !CONFIG_PM_RUNTIME */
@@ -173,6 +224,42 @@ static const struct dev_pm_ops mmc_bus_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(mmc_bus_suspend, mmc_bus_resume)
 };
 
+static ssize_t show_rpm_delay(struct device *dev, struct device_attribute *attr,
+			      char *buf)
+{
+	struct mmc_card *card = mmc_dev_to_card(dev);
+
+	if (!card) {
+		pr_err("%s: %s: card is NULL\n", dev_name(dev), __func__);
+		return -EINVAL;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%u\n", card->idle_timeout);
+}
+
+static ssize_t store_rpm_delay(struct device *dev, struct device_attribute
+			       *attr, const char *buf, size_t count)
+{
+	struct mmc_card *card = mmc_dev_to_card(dev);
+	unsigned int delay;
+
+	if (!card) {
+		pr_err("%s: %s: card is NULL\n", dev_name(dev), __func__);
+		return -EINVAL;
+	}
+
+	if (!kstrtou32(buf, 0, &delay)) {
+		if (delay < 2000) {
+			pr_err("%s: %s: less than 2 sec delay is unsupported\n",
+			       mmc_hostname(card->host), __func__);
+			return -EINVAL;
+		}
+		card->idle_timeout = delay;
+	}
+
+	return count;
+}
+
 static struct bus_type mmc_bus_type = {
 	.name		= "mmc",
 	.dev_attrs	= mmc_dev_attrs,
@@ -180,6 +267,7 @@ static struct bus_type mmc_bus_type = {
 	.uevent		= mmc_bus_uevent,
 	.probe		= mmc_bus_probe,
 	.remove		= mmc_bus_remove,
+	.shutdown        = mmc_bus_shutdown,
 	.pm		= &mmc_bus_pm_ops,
 };
 
@@ -249,6 +337,9 @@ struct mmc_card *mmc_alloc_card(struct mmc_host *host, struct device_type *type)
 	card->dev.release = mmc_release_card;
 	card->dev.type = type;
 
+	spin_lock_init(&card->bkops_info.bkops_stats.lock);
+	spin_lock_init(&card->wr_pack_stats.lock);
+
 	return card;
 }
 
@@ -270,10 +361,16 @@ int mmc_add_card(struct mmc_card *card)
 
 
 	dev_set_name(&card->dev, "%s:%04x", mmc_hostname(card->host), card->rca);
-
+	card->state &= ~MMC_CARD_REMOVED;
+	card->do_remove = 0;
 	switch (card->type) {
 	case MMC_TYPE_MMC:
 		type = "MMC";
+		if (stats_workqueue && !card->host->perf_enable) {
+			card->host->perf_enable = true;
+			queue_delayed_work(stats_workqueue, &card->host->stats_work,
+					msecs_to_jiffies(MMC_STATS_INTERVAL));
+		}
 		break;
 	case MMC_TYPE_SD:
 		type = "SD";
@@ -282,6 +379,11 @@ int mmc_add_card(struct mmc_card *card)
 				type = "SDXC";
 			else
 				type = "SDHC";
+		}
+		if (stats_workqueue && !card->host->perf_enable) {
+			card->host->perf_enable = true;
+			queue_delayed_work(stats_workqueue, &card->host->stats_work,
+					msecs_to_jiffies(MMC_STATS_INTERVAL));
 		}
 		break;
 	case MMC_TYPE_SDIO:
@@ -308,24 +410,55 @@ int mmc_add_card(struct mmc_card *card)
 			mmc_card_ddr_mode(card) ? "DDR " : "",
 			type);
 	} else {
-		pr_info("%s: new %s%s%s%s%s card at address %04x\n",
+		pr_info("%s: new %s%s%s%s%s%s card at address %04x\n",
 			mmc_hostname(card->host),
 			mmc_card_uhs(card) ? "ultra high speed " :
 			(mmc_card_highspeed(card) ? "high speed " : ""),
+			(mmc_card_hs400(card) ? "HS400 " : ""),
 			(mmc_card_hs200(card) ? "HS200 " : ""),
 			mmc_card_ddr_mode(card) ? "DDR " : "",
 			uhs_bus_speed_mode, type, card->rca);
 	}
 
+	mmc_card_set_present(card);
+
 #ifdef CONFIG_DEBUG_FS
 	mmc_add_card_debugfs(card);
 #endif
+	mmc_init_context_info(card->host);
 
+	ret = pm_runtime_set_active(&card->dev);
+	if (ret)
+		pr_err("%s: %s: failed setting runtime active: ret: %d\n",
+		       mmc_hostname(card->host), __func__, ret);
+	else if (!mmc_card_sdio(card) && mmc_use_core_runtime_pm(card->host))
+		pm_runtime_enable(&card->dev);
+
+	if (mmc_card_sdio(card)) {
+		ret = device_init_wakeup(&card->dev, true);
+		if (ret)
+			pr_err("%s: %s: failed to init wakeup: %d\n",
+			       mmc_hostname(card->host), __func__, ret);
+	}
 	ret = device_add(&card->dev);
 	if (ret)
 		return ret;
 
-	mmc_card_set_present(card);
+	device_enable_async_suspend(&card->dev);
+	if (mmc_use_core_runtime_pm(card->host) && !mmc_card_sdio(card)) {
+		card->rpm_attrib.show = show_rpm_delay;
+		card->rpm_attrib.store = store_rpm_delay;
+		sysfs_attr_init(&card->rpm_attrib.attr);
+		card->rpm_attrib.attr.name = "runtime_pm_timeout";
+		card->rpm_attrib.attr.mode = S_IRUGO | S_IWUSR;
+
+		ret = device_create_file(&card->dev, &card->rpm_attrib);
+		if (ret)
+			pr_err("%s: %s: creating runtime pm sysfs entry: failed: %d\n",
+			       mmc_hostname(card->host), __func__, ret);
+		/* Default timeout is 10 seconds */
+		card->idle_timeout = RUNTIME_SUSPEND_DELAY_MS;
+	}
 
 	return 0;
 }
@@ -339,7 +472,8 @@ void mmc_remove_card(struct mmc_card *card)
 #ifdef CONFIG_DEBUG_FS
 	mmc_remove_card_debugfs(card);
 #endif
-
+	if (mmc_card_sd(card))
+		mmc_card_set_removed(card);
 	if (mmc_card_present(card)) {
 		if (mmc_host_is_spi(card->host)) {
 			pr_info("%s: SPI card removed\n",
@@ -350,6 +484,9 @@ void mmc_remove_card(struct mmc_card *card)
 		}
 		device_del(&card->dev);
 	}
+
+	kfree(card->wr_pack_stats.packing_events);
+	kfree(card->cached_ext_csd);
 
 	put_device(&card->dev);
 }

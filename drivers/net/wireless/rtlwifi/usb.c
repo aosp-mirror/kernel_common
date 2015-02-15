@@ -42,12 +42,8 @@
 
 static void usbctrl_async_callback(struct urb *urb)
 {
-	if (urb) {
-		/* free dr */
-		kfree(urb->setup_packet);
-		/* free databuf */
-		kfree(urb->transfer_buffer);
-	}
+	if (urb)
+		kfree(urb->context);
 }
 
 static int _usbctrl_vendorreq_async_write(struct usb_device *udev, u8 request,
@@ -59,31 +55,25 @@ static int _usbctrl_vendorreq_async_write(struct usb_device *udev, u8 request,
 	u8 reqtype;
 	struct usb_ctrlrequest *dr;
 	struct urb *urb;
-	const u16 databuf_maxlen = REALTEK_USB_VENQT_MAX_BUF_SIZE;
-	u8 *databuf;
-
-	if (WARN_ON_ONCE(len > databuf_maxlen))
-		len = databuf_maxlen;
+	struct rtl819x_async_write_data {
+		u8 data[REALTEK_USB_VENQT_MAX_BUF_SIZE];
+		struct usb_ctrlrequest dr;
+	} *buf;
 
 	pipe = usb_sndctrlpipe(udev, 0); /* write_out */
 	reqtype =  REALTEK_USB_VENQT_WRITE;
 
-	dr = kmalloc(sizeof(*dr), GFP_ATOMIC);
-	if (!dr)
+	buf = kmalloc(sizeof(*buf), GFP_ATOMIC);
+	if (!buf)
 		return -ENOMEM;
-
-	databuf = kmalloc(databuf_maxlen, GFP_ATOMIC);
-	if (!databuf) {
-		kfree(dr);
-		return -ENOMEM;
-	}
 
 	urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!urb) {
-		kfree(databuf);
-		kfree(dr);
+		kfree(buf);
 		return -ENOMEM;
 	}
+
+	dr = &buf->dr;
 
 	dr->bRequestType = reqtype;
 	dr->bRequest = request;
@@ -91,15 +81,13 @@ static int _usbctrl_vendorreq_async_write(struct usb_device *udev, u8 request,
 	dr->wIndex = cpu_to_le16(index);
 	dr->wLength = cpu_to_le16(len);
 	/* data are already in little-endian order */
-	memcpy(databuf, pdata, len);
+	memcpy(buf, pdata, len);
 	usb_fill_control_urb(urb, udev, pipe,
-			     (unsigned char *)dr, databuf, len,
-			     usbctrl_async_callback, NULL);
+			     (unsigned char *)dr, buf, len,
+			     usbctrl_async_callback, buf);
 	rc = usb_submit_urb(urb, GFP_ATOMIC);
-	if (rc < 0) {
-		kfree(databuf);
-		kfree(dr);
-	}
+	if (rc < 0)
+		kfree(buf);
 	usb_free_urb(urb);
 	return rc;
 }
@@ -143,19 +131,15 @@ static u32 _usb_read_sync(struct rtl_priv *rtlpriv, u32 addr, u16 len)
 	u8 request;
 	u16 wvalue;
 	u16 index;
-	__le32 *data;
-	unsigned long flags;
+	__le32 *data = &rtlpriv->usb_data[rtlpriv->usb_data_index];
 
-	spin_lock_irqsave(&rtlpriv->locks.usb_lock, flags);
-	if (++rtlpriv->usb_data_index >= RTL_USB_MAX_RX_COUNT)
-		rtlpriv->usb_data_index = 0;
-	data = &rtlpriv->usb_data[rtlpriv->usb_data_index];
-	spin_unlock_irqrestore(&rtlpriv->locks.usb_lock, flags);
 	request = REALTEK_USB_VENQT_CMD_REQ;
 	index = REALTEK_USB_VENQT_CMD_IDX; /* n/a */
 
 	wvalue = (u16)addr;
 	_usbctrl_vendorreq_sync_read(udev, request, wvalue, index, data, len);
+	if (++rtlpriv->usb_data_index >= RTL_USB_MAX_RX_COUNT)
+		rtlpriv->usb_data_index = 0;
 	return le32_to_cpu(*data);
 }
 
@@ -222,16 +206,17 @@ static void _usb_writeN_sync(struct rtl_priv *rtlpriv, u32 addr, void *data,
 	u16 index = REALTEK_USB_VENQT_CMD_IDX;
 	int pipe = usb_sndctrlpipe(udev, 0); /* write_out */
 	u8 *buffer;
+	dma_addr_t dma_addr;
 
-	wvalue = (u16)(addr & 0x0000ffff);
-	buffer = kmalloc(len, GFP_ATOMIC);
+	wvalue = (u16)(addr&0x0000ffff);
+	buffer = usb_alloc_coherent(udev, (size_t)len, GFP_ATOMIC, &dma_addr);
 	if (!buffer)
 		return;
 	memcpy(buffer, data, len);
 	usb_control_msg(udev, pipe, request, reqtype, wvalue,
 			index, buffer, len, 50);
 
-	kfree(buffer);
+	usb_free_coherent(udev, (size_t)len, buffer, dma_addr);
 }
 
 static void _rtl_usb_io_handler_init(struct device *dev,
@@ -554,8 +539,8 @@ static void _rtl_rx_pre_process(struct ieee80211_hw *hw, struct sk_buff *skb)
 	WARN_ON(skb_queue_empty(&rx_queue));
 	while (!skb_queue_empty(&rx_queue)) {
 		_skb = skb_dequeue(&rx_queue);
-		_rtl_usb_rx_process_agg(hw, _skb);
-		ieee80211_rx_irqsafe(hw, _skb);
+		_rtl_usb_rx_process_agg(hw, skb);
+		ieee80211_rx_irqsafe(hw, skb);
 	}
 }
 
@@ -853,7 +838,6 @@ static void _rtl_usb_transmit(struct ieee80211_hw *hw, struct sk_buff *skb,
 	if (unlikely(!_urb)) {
 		RT_TRACE(rtlpriv, COMP_ERR, DBG_EMERG,
 			 "Can't allocate urb. Drop skb!\n");
-		kfree_skb(skb);
 		return;
 	}
 	urb_list = &rtlusb->tx_pending[ep_num];
@@ -967,10 +951,6 @@ int __devinit rtl_usb_probe(struct usb_interface *intf,
 				    GFP_KERNEL);
 	if (!rtlpriv->usb_data)
 		return -ENOMEM;
-
-	/* this spin lock must be initialized early */
-	spin_lock_init(&rtlpriv->locks.usb_lock);
-
 	rtlpriv->usb_data_index = 0;
 	init_completion(&rtlpriv->firmware_loading_complete);
 	SET_IEEE80211_DEV(hw, &intf->dev);

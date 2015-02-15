@@ -3514,7 +3514,7 @@ xlog_do_recovery_pass(
 				 *   - order is important.
 				 */
 				error = xlog_bread_offset(log, 0,
-						bblks - split_bblks, dbp,
+						bblks - split_bblks, hbp,
 						offset + BBTOB(split_bblks));
 				if (error)
 					goto bread_err2;

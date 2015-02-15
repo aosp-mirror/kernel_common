@@ -654,7 +654,7 @@ static void cpuidle_coupled_allow_idle(struct cpuidle_coupled *coupled)
 
 	/*
 	 * Write barrier ensures readers see the new online_count when they
-	 * see prevent == false.
+	 * see prevent == 0.
 	 */
 	smp_wmb();
 	coupled->prevent--;

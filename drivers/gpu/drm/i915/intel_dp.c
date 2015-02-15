@@ -368,7 +368,7 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 	int recv_bytes;
 	uint32_t status;
 	uint32_t aux_clock_divider;
-	int try, precharge;
+	int try, precharge = 5;
 
 	intel_dp_check_edp(intel_dp);
 	/* The clock divider is based off the hrawclk,
@@ -387,11 +387,6 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 		aux_clock_divider = 63; /* IRL input clock fixed at 125Mhz */
 	else
 		aux_clock_divider = intel_hrawclk(dev) / 2;
-
-	if (IS_GEN6(dev))
-		precharge = 3;
-	else
-		precharge = 5;
 
 	/* Try to wait for any previous AUX channel activity */
 	for (try = 0; try < 3; try++) {
@@ -625,18 +620,7 @@ intel_dp_i2c_aux_ch(struct i2c_adapter *adapter, int mode,
 			DRM_DEBUG_KMS("aux_ch native nack\n");
 			return -EREMOTEIO;
 		case AUX_NATIVE_REPLY_DEFER:
-			/*
-			 * For now, just give more slack to branch devices. We
-			 * could check the DPCD for I2C bit rate capabilities,
-			 * and if available, adjust the interval. We could also
-			 * be more careful with DP-to-Legacy adapters where a
-			 * long legacy cable may force very low I2C bit rates.
-			 */
-			if (intel_dp->dpcd[DP_DOWNSTREAMPORT_PRESENT] &
-			    DP_DWN_STRM_PORT_PRESENT)
-				usleep_range(500, 600);
-			else
-				usleep_range(300, 400);
+			udelay(100);
 			continue;
 		default:
 			DRM_ERROR("aux_ch invalid native reply 0x%02x\n",
@@ -723,8 +707,8 @@ intel_dp_mode_fixup(struct drm_encoder *encoder, struct drm_display_mode *mode,
 
 	bpp = adjusted_mode->private_flags & INTEL_MODE_DP_FORCE_6BPC ? 18 : 24;
 
-	for (clock = 0; clock <= max_clock; clock++) {
-		for (lane_count = 1; lane_count <= max_lane_count; lane_count <<= 1) {
+	for (lane_count = 1; lane_count <= max_lane_count; lane_count <<= 1) {
+		for (clock = 0; clock <= max_clock; clock++) {
 			int link_avail = intel_dp_max_data_rate(intel_dp_link_clock(bws[clock]), lane_count);
 
 			if (intel_dp_link_required(mode->clock, bpp)
@@ -1164,16 +1148,12 @@ static void ironlake_edp_panel_off(struct intel_dp *intel_dp)
 
 	DRM_DEBUG_KMS("Turn eDP power off\n");
 
-	WARN(!intel_dp->want_panel_vdd, "Need VDD to turn off panel\n");
+	WARN(intel_dp->want_panel_vdd, "Cannot turn power off while VDD is on\n");
 
 	pp = ironlake_get_pp_control(dev_priv);
-	/* We need to switch off panel power _and_ force vdd, for otherwise some
-	 * panels get very unhappy and cease to work. */
 	pp &= ~(POWER_TARGET_ON | EDP_FORCE_VDD | PANEL_POWER_RESET | EDP_BLC_ENABLE);
 	I915_WRITE(PCH_PP_CONTROL, pp);
 	POSTING_READ(PCH_PP_CONTROL);
-
-	intel_dp->want_panel_vdd = false;
 
 	ironlake_wait_panel_off(intel_dp);
 }
@@ -1279,14 +1259,18 @@ static void intel_dp_prepare(struct drm_encoder *encoder)
 {
 	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
 
-
-	/* Make sure the panel is off before trying to change the mode. But also
-	 * ensure that we have vdd while we switch off the panel. */
-	ironlake_edp_panel_vdd_on(intel_dp);
 	ironlake_edp_backlight_off(intel_dp);
-	intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
 	ironlake_edp_panel_off(intel_dp);
+
+	/* Wake up the sink first */
+	ironlake_edp_panel_vdd_on(intel_dp);
+	intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
 	intel_dp_link_down(intel_dp);
+	ironlake_edp_panel_vdd_off(intel_dp, false);
+
+	/* Make sure the panel is off before trying to
+	 * change the mode
+	 */
 }
 
 static void intel_dp_commit(struct drm_encoder *encoder)
@@ -1318,12 +1302,13 @@ intel_dp_dpms(struct drm_encoder *encoder, int mode)
 	uint32_t dp_reg = I915_READ(intel_dp->output_reg);
 
 	if (mode != DRM_MODE_DPMS_ON) {
-		/* Switching the panel off requires vdd. */
-		ironlake_edp_panel_vdd_on(intel_dp);
 		ironlake_edp_backlight_off(intel_dp);
-		intel_dp_sink_dpms(intel_dp, mode);
 		ironlake_edp_panel_off(intel_dp);
+
+		ironlake_edp_panel_vdd_on(intel_dp);
+		intel_dp_sink_dpms(intel_dp, mode);
 		intel_dp_link_down(intel_dp);
+		ironlake_edp_panel_vdd_off(intel_dp, false);
 
 		if (is_cpu_edp(intel_dp))
 			ironlake_edp_pll_off(encoder);

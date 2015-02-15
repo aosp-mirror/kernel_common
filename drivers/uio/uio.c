@@ -46,12 +46,8 @@ static struct cdev *uio_cdev;
 static DEFINE_IDR(uio_idr);
 static const struct file_operations uio_fops;
 
-/* Protect idr accesses */
 static DEFINE_MUTEX(minor_lock);
 
-/*
- * attributes
- */
 
 struct uio_map {
 	struct kobject kobj;
@@ -102,7 +98,7 @@ static struct attribute *attrs[] = {
 	&addr_attribute.attr,
 	&size_attribute.attr,
 	&offset_attribute.attr,
-	NULL,	/* need to NULL terminate the list of attributes */
+	NULL,	
 };
 
 static void map_release(struct kobject *kobj)
@@ -252,18 +248,14 @@ static struct device_attribute uio_class_attributes[] = {
 	{}
 };
 
-/* UIO class infrastructure */
 static struct class uio_class = {
 	.name = "uio",
 	.dev_attrs = uio_class_attributes,
 };
 
-/*
- * device functions
- */
 static int uio_dev_add_attributes(struct uio_device *idev)
 {
-	int ret;
+	int ret = 0;
 	int mi, pi;
 	int map_found = 0;
 	int portio_found = 0;
@@ -400,10 +392,6 @@ static void uio_free_minor(struct uio_device *idev)
 	mutex_unlock(&minor_lock);
 }
 
-/**
- * uio_event_notify - trigger an interrupt event
- * @info: UIO device capabilities
- */
 void uio_event_notify(struct uio_info *info)
 {
 	struct uio_device *idev = info->uio_dev;
@@ -414,11 +402,6 @@ void uio_event_notify(struct uio_info *info)
 }
 EXPORT_SYMBOL_GPL(uio_event_notify);
 
-/**
- * uio_interrupt - hardware interrupt handler
- * @irq: IRQ number, can be UIO_IRQ_CYCLIC for cyclic timer
- * @dev_id: Pointer to the devices uio_device structure
- */
 static irqreturn_t uio_interrupt(int irq, void *dev_id)
 {
 	struct uio_device *idev = (struct uio_device *)dev_id;
@@ -625,10 +608,6 @@ static int uio_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	if (mi < 0)
 		return VM_FAULT_SIGBUS;
 
-	/*
-	 * We need to subtract mi because userspace uses offset = N*PAGE_SIZE
-	 * to use mem[N].
-	 */
 	offset = (vmf->pgoff - mi) << PAGE_SHIFT;
 
 	if (idev->info->mem[mi].memtype == UIO_MEM_LOGICAL)
@@ -640,36 +619,47 @@ static int uio_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return 0;
 }
 
-static const struct vm_operations_struct uio_vm_ops = {
+static const struct vm_operations_struct uio_logical_vm_ops = {
 	.open = uio_vma_open,
 	.close = uio_vma_close,
 	.fault = uio_vma_fault,
+};
+
+static int uio_mmap_logical(struct vm_area_struct *vma)
+{
+	vma->vm_flags |= VM_DONTEXPAND | VM_NODUMP;
+	vma->vm_ops = &uio_logical_vm_ops;
+	uio_vma_open(vma);
+	return 0;
+}
+
+static const struct vm_operations_struct uio_physical_vm_ops = {
+#ifdef CONFIG_HAVE_IOREMAP_PROT
+	.access = generic_access_phys,
+#endif
 };
 
 static int uio_mmap_physical(struct vm_area_struct *vma)
 {
 	struct uio_device *idev = vma->vm_private_data;
 	int mi = uio_find_mem_index(vma);
+	struct uio_mem *mem;
 	if (mi < 0)
 		return -EINVAL;
+	mem = idev->info->mem + mi;
 
-	vma->vm_flags |= VM_IO | VM_RESERVED;
+	if (vma->vm_end - vma->vm_start > mem->size)
+		return -EINVAL;
 
+	vma->vm_ops = &uio_physical_vm_ops;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
 
 	return remap_pfn_range(vma,
 			       vma->vm_start,
-			       idev->info->mem[mi].addr >> PAGE_SHIFT,
+			       mem->addr >> PAGE_SHIFT,
 			       vma->vm_end - vma->vm_start,
 			       vma->vm_page_prot);
-}
-
-static int uio_mmap_logical(struct vm_area_struct *vma)
-{
-	vma->vm_flags |= VM_RESERVED;
-	vma->vm_ops = &uio_vm_ops;
-	uio_vma_open(vma);
-	return 0;
 }
 
 static int uio_mmap(struct file *filep, struct vm_area_struct *vma)
@@ -768,7 +758,7 @@ static int init_uio_class(void)
 {
 	int ret;
 
-	/* This is the first time in here, set everything up properly */
+	
 	ret = uio_major_init();
 	if (ret)
 		goto exit;
@@ -792,14 +782,6 @@ static void release_uio_class(void)
 	uio_major_cleanup();
 }
 
-/**
- * uio_register_device - register a new userspace IO device
- * @owner:	module that creates the new device
- * @parent:	parent device
- * @info:	UIO device capabilities
- *
- * returns zero on success or a negative error code.
- */
 int __uio_register_device(struct module *owner,
 			  struct device *parent,
 			  struct uio_info *info)
@@ -864,11 +846,6 @@ err_kzalloc:
 }
 EXPORT_SYMBOL_GPL(__uio_register_device);
 
-/**
- * uio_unregister_device - unregister a industrial IO device
- * @info:	UIO device capabilities
- *
- */
 void uio_unregister_device(struct uio_info *info)
 {
 	struct uio_device *idev;

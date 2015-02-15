@@ -64,7 +64,7 @@
 		status = "disable";
 	};
 
-	sdhci@78000600 {
+	sdhci@78000400 {
 		support-8bit;
 	};
 };

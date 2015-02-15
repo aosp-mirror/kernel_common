@@ -104,8 +104,6 @@ static void __init soc_detect(u32 dbgu_base)
 	switch (socid) {
 	case ARCH_ID_AT91RM9200:
 		at91_soc_initdata.type = AT91_SOC_RM9200;
-		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_NONE)
-			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
 		at91_boot_soc = at91rm9200_soc;
 		break;
 
@@ -148,7 +146,7 @@ static void __init soc_detect(u32 dbgu_base)
 	}
 
 	/* at91sam9g10 */
-	if ((socid & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
+	if ((cidr & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
 		at91_soc_initdata.type = AT91_SOC_SAM9G10;
 		at91_boot_soc = at91sam9261_soc;
 	}
@@ -326,7 +324,7 @@ static void at91_dt_rstc(void)
 
 	of_id = of_match_node(rstc_ids, np);
 	if (!of_id)
-		panic("AT91: rtsc no restart function available\n");
+		panic("AT91: rtsc no restart function availlable\n");
 
 	arm_pm_restart = of_id->data;
 

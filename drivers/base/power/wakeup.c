@@ -127,8 +127,6 @@ EXPORT_SYMBOL_GPL(wakeup_source_destroy);
  */
 void wakeup_source_add(struct wakeup_source *ws)
 {
-	unsigned long flags;
-
 	if (WARN_ON(!ws))
 		return;
 
@@ -137,9 +135,9 @@ void wakeup_source_add(struct wakeup_source *ws)
 	ws->active = false;
 	ws->last_time = ktime_get();
 
-	spin_lock_irqsave(&events_lock, flags);
+	spin_lock_irq(&events_lock);
 	list_add_rcu(&ws->entry, &wakeup_sources);
-	spin_unlock_irqrestore(&events_lock, flags);
+	spin_unlock_irq(&events_lock);
 }
 EXPORT_SYMBOL_GPL(wakeup_source_add);
 
@@ -149,14 +147,12 @@ EXPORT_SYMBOL_GPL(wakeup_source_add);
  */
 void wakeup_source_remove(struct wakeup_source *ws)
 {
-	unsigned long flags;
-
 	if (WARN_ON(!ws))
 		return;
 
-	spin_lock_irqsave(&events_lock, flags);
+	spin_lock_irq(&events_lock);
 	list_del_rcu(&ws->entry);
-	spin_unlock_irqrestore(&events_lock, flags);
+	spin_unlock_irq(&events_lock);
 	synchronize_rcu();
 }
 EXPORT_SYMBOL_GPL(wakeup_source_remove);
@@ -653,31 +649,6 @@ void pm_wakeup_event(struct device *dev, unsigned int msec)
 }
 EXPORT_SYMBOL_GPL(pm_wakeup_event);
 
-static void print_active_wakeup_sources(void)
-{
-	struct wakeup_source *ws;
-	int active = 0;
-	struct wakeup_source *last_activity_ws = NULL;
-
-	rcu_read_lock();
-	list_for_each_entry_rcu(ws, &wakeup_sources, entry) {
-		if (ws->active) {
-			pr_info("active wakeup source: %s\n", ws->name);
-			active = 1;
-		} else if (!active &&
-			   (!last_activity_ws ||
-			    ktime_to_ns(ws->last_time) >
-			    ktime_to_ns(last_activity_ws->last_time))) {
-			last_activity_ws = ws;
-		}
-	}
-
-	if (!active && last_activity_ws)
-		pr_info("last active wakeup source: %s\n",
-			last_activity_ws->name);
-	rcu_read_unlock();
-}
-
 /**
  * pm_wakeup_pending - Check if power transition in progress should be aborted.
  *
@@ -700,10 +671,6 @@ bool pm_wakeup_pending(void)
 		events_check_enabled = !ret;
 	}
 	spin_unlock_irqrestore(&events_lock, flags);
-
-	if (ret)
-		print_active_wakeup_sources();
-
 	return ret;
 }
 
@@ -756,16 +723,15 @@ bool pm_get_wakeup_count(unsigned int *count, bool block)
 bool pm_save_wakeup_count(unsigned int count)
 {
 	unsigned int cnt, inpr;
-	unsigned long flags;
 
 	events_check_enabled = false;
-	spin_lock_irqsave(&events_lock, flags);
+	spin_lock_irq(&events_lock);
 	split_counters(&cnt, &inpr);
 	if (cnt == count && inpr == 0) {
 		saved_count = count;
 		events_check_enabled = true;
 	}
-	spin_unlock_irqrestore(&events_lock, flags);
+	spin_unlock_irq(&events_lock);
 	return events_check_enabled;
 }
 
@@ -848,6 +814,33 @@ static int print_wakeup_source_stats(struct seq_file *m,
 
 	return ret;
 }
+
+#ifdef CONFIG_HTC_POWER_DEBUG
+void htc_print_wakeup_source(struct wakeup_source *ws)
+{
+        if (ws->active) {
+                if (ws->timer_expires) {
+                        long timeout = ws->timer_expires - jiffies;
+                        if (timeout > 0)
+                                printk(" '%s', time left %ld ticks; ", ws->name, timeout);
+                } else
+                        printk(" '%s' ", ws->name);
+        }
+}
+
+void htc_print_active_wakeup_sources(void)
+{
+        struct wakeup_source *ws;
+        unsigned long flags;
+
+        printk("wakeup sources: ");
+        spin_lock_irqsave(&events_lock, flags);
+        list_for_each_entry_rcu(ws, &wakeup_sources, entry)
+                htc_print_wakeup_source(ws);
+        spin_unlock_irqrestore(&events_lock, flags);
+        printk("\n");
+}
+#endif
 
 /**
  * wakeup_sources_stats_show - Print wakeup sources statistics information.

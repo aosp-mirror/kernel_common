@@ -24,6 +24,7 @@
 #include <linux/hw_breakpoint.h>
 #include <linux/regset.h>
 #include <linux/audit.h>
+#include <linux/unistd.h>
 
 #include <asm/pgtable.h>
 #include <asm/traps.h>
@@ -844,7 +845,7 @@ long arch_ptrace(struct task_struct *child, long request,
 #endif
 
 		case PTRACE_GET_THREAD_AREA:
-			ret = put_user(task_thread_info(child)->tp_value,
+			ret = put_user(task_thread_info(child)->tp_value[0],
 				       datap);
 			break;
 
@@ -909,28 +910,21 @@ long arch_ptrace(struct task_struct *child, long request,
 asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
 {
 	unsigned long ip;
-	current_thread_info()->syscall = scno;
 
 	if (why)
 		audit_syscall_exit(regs);
-	else {
-		if (secure_computing(scno) == -1)
-			return -1;
+	else
 		audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
 				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
-	}
 
+	if (why == 0 && test_and_clear_thread_flag(TIF_SYSCALL_RESTARTSYS))
+		scno = __NR_restart_syscall - __NR_SYSCALL_BASE;
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		return scno;
 	if (!(current->ptrace & PT_PTRACED))
 		return scno;
 
-	/*
-	 * IP is used to denote syscall entry/exit:
-	 * IP = 0 -> entry, =1 -> exit
-	 */
-	ip = regs->ARM_ip;
-	regs->ARM_ip = why;
+	current_thread_info()->syscall = scno;
 
 	/*
 	 * IP is used to denote syscall entry/exit:

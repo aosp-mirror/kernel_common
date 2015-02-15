@@ -340,7 +340,7 @@ static struct resource orion_ge10_shared_resources[] = {
 
 static struct platform_device orion_ge10_shared = {
 	.name		= MV643XX_ETH_SHARED_NAME,
-	.id		= 2,
+	.id		= 1,
 	.dev		= {
 		.platform_data	= &orion_ge10_shared_data,
 	},
@@ -355,8 +355,8 @@ static struct resource orion_ge10_resources[] = {
 
 static struct platform_device orion_ge10 = {
 	.name		= MV643XX_ETH_NAME,
-	.id		= 2,
-	.num_resources	= 1,
+	.id		= 1,
+	.num_resources	= 2,
 	.resource	= orion_ge10_resources,
 	.dev		= {
 		.coherent_dma_mask	= DMA_BIT_MASK(32),
@@ -393,7 +393,7 @@ static struct resource orion_ge11_shared_resources[] = {
 
 static struct platform_device orion_ge11_shared = {
 	.name		= MV643XX_ETH_SHARED_NAME,
-	.id		= 3,
+	.id		= 1,
 	.dev		= {
 		.platform_data	= &orion_ge11_shared_data,
 	},
@@ -408,8 +408,8 @@ static struct resource orion_ge11_resources[] = {
 
 static struct platform_device orion_ge11 = {
 	.name		= MV643XX_ETH_NAME,
-	.id		= 3,
-	.num_resources	= 1,
+	.id		= 1,
+	.num_resources	= 2,
 	.resource	= orion_ge11_resources,
 	.dev		= {
 		.coherent_dma_mask	= DMA_BIT_MASK(32),
@@ -570,7 +570,7 @@ void __init orion_spi_1_init(unsigned long mapbase,
 static struct orion_wdt_platform_data orion_wdt_data;
 
 static struct resource orion_wdt_resource =
-		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x28);
+		DEFINE_RES_MEM(TIMER_VIRT_BASE, 0x28);
 
 static struct platform_device orion_wdt_device = {
 	.name		= "orion_wdt",

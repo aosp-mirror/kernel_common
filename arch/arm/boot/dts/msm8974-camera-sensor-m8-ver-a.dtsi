@@ -1,0 +1,342 @@
+/*
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&soc {
+	spi@f9967000 {
+		cell-index = <11>;
+		compatible = "qcom,spi-qup-v2";
+		reg = <0xf9967000 0x1000>;
+		spi-max-frequency = <25000000>;	// 960000, 4800000, 9600000, 15000000, 19200000, 25000000, 50000000
+		#address-cells = <1>;
+		#size-cells = <0>;
+		interrupts = <0 105 0>;
+		qcom,gpio-mosi = <&msmgpio 81 0>;
+		qcom,gpio-miso = <&msmgpio 82 0>;
+		qcom,gpio-clk  = <&msmgpio 84 0>;
+		qcom,gpio-cs0  = <&msmgpio 83 0>;
+
+		qcom,master-id = <84>;
+
+		spi_rawchip@0 {
+			compatible = "spi_rawchip";
+			reg = <0>;
+			spi-max-frequency = <25000000>;
+		};
+
+	};
+
+	yushanII {
+		compatible = "yushanII";
+		reg = <0x00>;
+		rawchip-reset = <&pm8941_gpios 14 0>;
+		raw_mclk = <&msmgpio 15 0>;
+
+		interrupt-parent = <&msmgpio>;
+		interrupts = <80 0x4>,
+			     <79 0x4>;
+		interrupt-names = "rawchip_intr0", "rawchip_intr1";
+
+		raw-vreg-type = <1 2>;                //VREG type for below two item, 1 => REG_VS,  2=>REG_GPIO
+		raw_1v8-supply = <&pm8941_lvs1>;      //1V8 enable by REG_VS, define raw_1v8-gpio if type = REG_GPIO
+		raw_1v2-gpio = <&pm8941_gpios 8 0>;   //1V2 enable by REG_GPIO, define raw_1v2-supply if type = REG_VS
+	};
+};
+
+&cci {
+
+
+	actuator0: qcom,actuator@1c {
+		cell-index = <0>;
+		reg = <0x1c>;
+		compatible = "qcom,actuator";
+		qcom,cci-master = <0>;
+	};
+
+	qcom,camera@20 {
+		compatible = "htc,vd6869";
+		reg = <0x20 0x0>;
+		qcom,slave-id = <0x20 0x0 0x0365>;
+		qcom,csiphy-sd-index = <0>;
+		qcom,csid-sd-index = <0>;
+		qcom,actuator-src = <&actuator0>;
+		qcom,led-flash-src = <&led_flash0>;
+		qcom,mount-angle = <90>;
+		qcom,sensor-name = "vd6869";
+		qcom,htc-image = <1>;
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
+		cam_vdig-supply = <&pm8941_gpios 23 0>;
+		cam_vana-supply = <&pm8941_l17>;
+		cam_vio-supply = <&pm8941_lvs3>;
+		cam_vaf-supply = <&pm8941_gpios 22 0>;
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana",
+				     "cam_vaf";
+		qcom,cam-vreg-type = <2 1 0 2>;
+		qcom,cam-vreg-min-voltage = <0 0 2850000 0>;
+		qcom,cam-vreg-max-voltage = <0 0 2850000 0>;
+		qcom,cam-vreg-op-mode = <0 100000 80000 0>;
+		qcom,cam-vreg-gpios-index = <1 99 99 2>;
+
+		qcom,gpio-no-mux = <0>;
+		gpios = <&msmgpio 15 0>,
+			<&pm8941_gpios 12 0>,
+			<&pm8941_gpios 23 0>,
+			<&pm8941_gpios 22 0>,
+			<&pm8941_gpios 11 0>;
+
+		qcom,gpio-reset = <1>;
+		qcom,gpio-vcm-pwd = <4>;
+		qcom,gpio-req-tbl-num = <1 2 3 4>;
+		qcom,gpio-req-tbl-flags = <0 0 0 0>;
+		qcom,gpio-req-tbl-label = /*"CAMIF_MCLK",*/
+					  "CAM_PWDN",
+					  "V_CAM_D1V2_EN",
+					  "CAM_VCM2V85_EN",
+					  "VCM_PWD";
+
+		qcom,csi-lane-assign = <0x4320>;
+		qcom,csi-lane-mask = <0x1F>;
+		qcom,sensor-position = <0>;
+		qcom,sensor-mode = <1>;
+		qcom,cci-master = <0>;
+		status = "ok";
+	};
+
+	qcom,camera@00 {
+		compatible = "htc,ov4688";
+		reg = <0x00 0x0>;
+		qcom,slave-id = <0x20 0x300A 0x4688>;
+		qcom,csiphy-sd-index = <0>;
+		qcom,csid-sd-index = <0>;
+		qcom,actuator-src = <&actuator0>;
+		qcom,led-flash-src = <&led_flash0>;
+		qcom,mount-angle = <90>;
+		qcom,sensor-name = "ov4688";
+		qcom,htc-image = <1>;
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
+		cam_vdig-supply = <&pm8941_gpios 23 0>;
+		cam_vana-supply = <&pm8941_l17>;
+		cam_vio-supply = <&pm8941_lvs3>;
+		cam_vaf-supply = <&pm8941_gpios 22 0>;
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana",
+				     "cam_vaf";
+		qcom,cam-vreg-type = <2 1 0 2>;
+		qcom,cam-vreg-min-voltage = <0 0 2850000 0>;
+		qcom,cam-vreg-max-voltage = <0 0 2850000 0>;
+		qcom,cam-vreg-op-mode = <0 100000 80000 0>;
+		qcom,cam-vreg-gpios-index = <1 99 99 2>;
+
+		qcom,gpio-no-mux = <0>;
+		gpios = <&msmgpio 15 0>,
+			<&pm8941_gpios 12 0>,
+			<&pm8941_gpios 23 0>,
+			<&pm8941_gpios 22 0>,
+			<&pm8941_gpios 11 0>;
+
+		qcom,gpio-reset = <1>;
+		qcom,gpio-vcm-pwd = <4>;
+		qcom,gpio-req-tbl-num = <1 2 3 4>;
+		qcom,gpio-req-tbl-flags = <0 0 0 0>;
+		qcom,gpio-req-tbl-label = /*"CAMIF_MCLK",*/
+					  "CAM_PWDN",
+					  "V_CAM_D1V2_EN",
+					  "CAM_VCM2V85_EN",
+					  "VCM_PWD";
+
+		qcom,csi-lane-assign = <0x4320>;
+		qcom,csi-lane-mask = <0x1F>;
+		qcom,sensor-position = <0>;
+		qcom,sensor-mode = <1>;
+		qcom,cci-master = <0>;
+		status = "ok";
+	};
+
+	qcom,camera@01 {
+		compatible = "subcam,ov2722";
+		reg = <0x01 0x0>;
+		qcom,slave-id = <0x6c 0x300A 0x2722>;
+		qcom,csiphy-sd-index = <1>;
+		qcom,csid-sd-index = <1>;
+		qcom,mount-angle = <270>;
+		qcom,sensor-name = "ov2722_subcam";
+		qcom,htc-image = <0>;
+		cam_vdig-supply = <&pm8941_gpios 23 0>;  //not used. dummy item for qct code limitation
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
+		cam_vio-supply = <&pm8941_lvs3>;
+		cam_vana-supply = <&pm8941_l17>;
+
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana";
+		qcom,cam-vreg-type = <1 1 0>;
+		qcom,cam-vreg-min-voltage = <0 0 2850000>;
+		qcom,cam-vreg-max-voltage = <0 0 2850000>;
+		qcom,cam-vreg-op-mode = <0 0 80000>;
+		qcom,cam-vreg-gpios-index = <99 99 99>;
+
+		qcom,gpio-no-mux = <0>;
+		gpios = <&msmgpio 16 0>,
+			<&pm8941_gpios 13 0>;
+		qcom,gpio-reset = <1>;
+		qcom,gpio-req-tbl-num = <0 1>;
+		qcom,gpio-req-tbl-flags = <1 0>;
+		qcom,gpio-req-tbl-label = "CAM2_MCLK_CPU",
+					  "CAM2_RST";
+
+		qcom,gpio-set-tbl-num = <1 1>;
+		qcom,gpio-set-tbl-flags = <0 2>;
+		qcom,gpio-set-tbl-delay = <1000 4000>;
+		qcom,csi-lane-assign = <0x4320>;
+		qcom,csi-lane-mask = <0x3>;
+		qcom,sensor-position = <2>;
+		qcom,sensor-mode = <1>;
+		qcom,cci-master = <1>;
+		status = "ok";
+	};
+
+	qcom,camera@6c {
+		compatible = "htc,ov2722";
+		reg = <0x6c 0x0>;
+		qcom,slave-id = <0x6c 0x300A 0x2722>;
+		qcom,csiphy-sd-index = <2>;
+		qcom,csid-sd-index = <2>;
+		qcom,mount-angle = <270>;
+		qcom,sensor-name = "ov2722";
+		qcom,htc-image = <0>;
+		cam_vdig-supply = <&pm8941_gpios 23 0>;  //not used. dummy item for qct code limitation
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
+		cam_vio-supply = <&pm8941_lvs3>;
+		cam_vana-supply = <&pm8941_l17>;
+
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana";
+		qcom,cam-vreg-type = <1 1 0>;
+		qcom,cam-vreg-min-voltage = <0 0 2850000>;
+		qcom,cam-vreg-max-voltage = <0 0 2850000>;
+		qcom,cam-vreg-op-mode = <0 0 80000>;
+		qcom,cam-vreg-gpios-index = <99 99 99>;
+
+		qcom,gpio-no-mux = <0>;
+		gpios = <&msmgpio 17 0>,
+			<&msmgpio 31 0>;
+		qcom,gpio-reset = <1>;
+		qcom,gpio-req-tbl-num = <0 1>;
+		qcom,gpio-req-tbl-flags = <1 0>;
+		qcom,gpio-req-tbl-label = "CAM2_MCLK_CPU",
+					  "CAM2_RST";
+
+		qcom,gpio-set-tbl-num = <1 1>;
+		qcom,gpio-set-tbl-flags = <0 2>;
+		qcom,gpio-set-tbl-delay = <1000 4000>;
+		qcom,csi-lane-assign = <0x4320>;
+		qcom,csi-lane-mask = <0x3>;
+		qcom,sensor-position = <1>;
+		qcom,sensor-mode = <1>;
+		qcom,cci-master = <0>;
+		status = "ok";
+	};
+
+	qcom,camera@02 {
+		compatible = "htc,ar1820";
+		reg = <0x02 0x0>;
+		qcom,slave-id = <0x6e 0x0 0x50>;
+		qcom,csiphy-sd-index = <0>;
+		qcom,csid-sd-index = <0>;
+		qcom,actuator-src = <&actuator0>;
+		qcom,led-flash-src = <&led_flash0>;
+		qcom,mount-angle = <90>;
+		qcom,sensor-name = "ar1820";
+		qcom,htc-image = <0>;
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
+		cam_vdig-supply = <&pm8941_gpios 23 0>;
+		cam_vana-supply = <&pm8941_l17>;
+		cam_vio-supply = <&pm8941_lvs3>;
+		cam_vaf-supply = <&pm8941_gpios 22 0>;
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana",
+				     "cam_vaf";
+		qcom,cam-vreg-type = <2 1 0 2>;
+		qcom,cam-vreg-min-voltage = <0 0 2850000 0>;
+		qcom,cam-vreg-max-voltage = <0 0 2850000 0>;
+		qcom,cam-vreg-op-mode = <0 100000 80000 0>;
+		qcom,cam-vreg-gpios-index = <2 99 99 3>;
+
+		qcom,gpio-no-mux = <0>;
+		gpios = <&msmgpio 15 0>,
+			<&pm8941_gpios 12 0>,
+			<&pm8941_gpios 23 0>,
+			<&pm8941_gpios 22 0>,
+			<&pm8941_gpios 11 0>;
+
+		qcom,gpio-reset = <1>;
+		qcom,gpio-vcm-pwd = <4>;
+		qcom,gpio-req-tbl-num = <0 1 2 3 4>;
+		qcom,gpio-req-tbl-flags = <0 0 0 0 0>;
+		qcom,gpio-req-tbl-label = "CAMIF_MCLK",
+					  "CAM_PWDN",
+					  "V_CAM_D1V2_EN",
+					  "CAM_VCM2V85_EN",
+					  "VCM_PWD";
+
+		qcom,csi-lane-assign = <0x4320>;
+		qcom,csi-lane-mask = <0x1F>;
+		qcom,sensor-position = <0>;
+		qcom,sensor-mode = <1>;
+		qcom,cci-master = <0>;
+		status = "ok";
+	};
+   qcom,camera@4 {
+		compatible = "htc,s5k5e";
+		reg = <0x04 0x0>;
+		qcom,slave-id = <0x20 0x0000 0x5E20>;
+		qcom,csiphy-sd-index = <2>;
+		qcom,csid-sd-index = <2>;
+		qcom,mount-angle = <270>;
+		qcom,sensor-name = "s5k5e";
+		qcom,htc-image = <0>;
+		qcom,vdd-cx-supply = <&pm8841_s2>;
+		qcom,vdd-cx-name = "qcom,vdd-cx";
+		cam_vdig-supply = <&pm8941_gpios 23 0>;
+		cam_vio-supply = <&pm8941_lvs3>;
+		cam_vana-supply = <&pm8941_l17>;
+
+		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana";
+		qcom,cam-vreg-type = <2 1 0>;
+		qcom,cam-vreg-min-voltage = <0 0 2850000>;
+		qcom,cam-vreg-max-voltage = <0 0 2850000>;
+		qcom,cam-vreg-op-mode = <0 0 80000>;
+		qcom,cam-vreg-gpios-index = <2 99 99>;
+
+		qcom,gpio-no-mux = <0>;
+		gpios = <&msmgpio 17 0>,
+			    <&msmgpio 31 0>,
+			    <&pm8941_gpios 23 0>;
+
+		qcom,gpio-reset = <1>;
+		qcom,gpio-req-tbl-num = <0 1 2>;
+		qcom,gpio-req-tbl-flags = <1 0 0>;
+		qcom,gpio-req-tbl-label = "CAM2_MCLK_CPU",
+					              "CAM2_RST",
+					              "V_CAM_D1V2_EN";
+
+		//qcom,gpio-set-tbl-num = <1 1>;
+		//qcom,gpio-set-tbl-flags = <0 2>;
+		//qcom,gpio-set-tbl-delay = <1000 4000>;
+		qcom,csi-lane-assign = <0x4320>;
+		qcom,csi-lane-mask = <0x7>;
+		qcom,sensor-position = <1>;
+		qcom,sensor-mode = <1>;
+		qcom,cci-master = <1>;
+		status = "ok";
+	};
+};

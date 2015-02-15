@@ -36,9 +36,6 @@
 #include <asm/fb.h>
 
 
-    /*
-     *  Frame buffer device initialization and setup routines
-     */
 
 #define FBPIXMAPSIZE	(1024 * 8)
 
@@ -81,9 +78,6 @@ int lock_fb_info(struct fb_info *info)
 }
 EXPORT_SYMBOL(lock_fb_info);
 
-/*
- * Helpers
- */
 
 int fb_get_color_depth(struct fb_var_screeninfo *var,
 		       struct fb_fix_screeninfo *fix)
@@ -108,9 +102,6 @@ int fb_get_color_depth(struct fb_var_screeninfo *var,
 }
 EXPORT_SYMBOL(fb_get_color_depth);
 
-/*
- * Data padding functions.
- */
 void fb_pad_aligned_buffer(u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch, u32 height)
 {
 	__fb_pad_aligned_buffer(dst, d_pitch, src, s_pitch, height);
@@ -147,32 +138,21 @@ void fb_pad_unaligned_buffer(u8 *dst, u32 d_pitch, u8 *src, u32 idx, u32 height,
 }
 EXPORT_SYMBOL(fb_pad_unaligned_buffer);
 
-/*
- * we need to lock this section since fb_cursor
- * may use fb_imageblit()
- */
 char* fb_get_buffer_offset(struct fb_info *info, struct fb_pixmap *buf, u32 size)
 {
 	u32 align = buf->buf_align - 1, offset;
 	char *addr = buf->addr;
 
-	/* If IO mapped, we need to sync before access, no sharing of
-	 * the pixmap is done
-	 */
 	if (buf->flags & FB_PIXMAP_IO) {
 		if (info->fbops->fb_sync && (buf->flags & FB_PIXMAP_SYNC))
 			info->fbops->fb_sync(info);
 		return addr;
 	}
 
-	/* See if we fit in the remaining pixmap space */
+	
 	offset = buf->offset + align;
 	offset &= ~align;
 	if (offset + size > buf->size) {
-		/* We do not fit. In order to be able to re-use the buffer,
-		 * we must ensure no asynchronous DMA'ing or whatever operation
-		 * is in progress, we sync for that.
-		 */
 		if (info->fbops->fb_sync && (buf->flags & FB_PIXMAP_SYNC))
 			info->fbops->fb_sync(info);
 		offset = 0;
@@ -209,7 +189,7 @@ static void fb_set_logocmap(struct fb_info *info,
 
 	for (i = 0; i < logo->clutsize; i += n) {
 		n = logo->clutsize - i;
-		/* palette_cmap provides space for only 16 colors at once */
+		
 		if (n > 16)
 			n = 16;
 		palette_cmap.start = 32 + i;
@@ -234,11 +214,7 @@ static void  fb_set_logo_truepalette(struct fb_info *info,
 	int i;
 	const unsigned char *clut = logo->clut;
 
-	/*
-	 * We have to create a temporary palette since console palette is only
-	 * 16 colors long.
-	 */
-	/* Bug: Doesn't obey msb_right ... (who needs that?) */
+	
 	redmask   = mask[info->var.red.length   < 8 ? info->var.red.length   : 8];
 	greenmask = mask[info->var.green.length < 8 ? info->var.green.length : 8];
 	bluemask  = mask[info->var.blue.length  < 8 ? info->var.blue.length  : 8];
@@ -320,32 +296,6 @@ static void fb_set_logo(struct fb_info *info,
 	}
 }
 
-/*
- * Three (3) kinds of logo maps exist.  linux_logo_clut224 (>16 colors),
- * linux_logo_vga16 (16 colors) and linux_logo_mono (2 colors).  Depending on
- * the visual format and color depth of the framebuffer, the DAC, the
- * pseudo_palette, and the logo data will be adjusted accordingly.
- *
- * Case 1 - linux_logo_clut224:
- * Color exceeds the number of console colors (16), thus we set the hardware DAC
- * using fb_set_cmap() appropriately.  The "needs_cmapreset"  flag will be set.
- *
- * For visuals that require color info from the pseudo_palette, we also construct
- * one for temporary use. The "needs_directpalette" or "needs_truepalette" flags
- * will be set.
- *
- * Case 2 - linux_logo_vga16:
- * The number of colors just matches the console colors, thus there is no need
- * to set the DAC or the pseudo_palette.  However, the bitmap is packed, ie,
- * each byte contains color information for two pixels (upper and lower nibble).
- * To be consistent with fb_imageblit() usage, we therefore separate the two
- * nibbles into separate bytes. The "depth" flag will be set to 4.
- *
- * Case 3 - linux_logo_mono:
- * This is similar with Case 2.  Each byte contains information for 8 pixels.
- * We isolate each bit and expand each into a byte. The "depth" flag will
- * be set to 1.
- */
 static struct logo_data {
 	int depth;
 	int needs_directpalette;
@@ -455,7 +405,7 @@ static int fb_show_logo_line(struct fb_info *info, int rotate,
 	unsigned char *logo_new = NULL, *logo_rotate = NULL;
 	struct fb_image image;
 
-	/* Return if the frame buffer is not mapped or suspended */
+	
 	if (logo == NULL || info->state != FBINFO_STATE_RUNNING ||
 	    info->flags & FBINFO_MODULE)
 		return 0;
@@ -540,7 +490,7 @@ static int fb_prepare_extra_logos(struct fb_info *info, unsigned int height,
 {
 	unsigned int i;
 
-	/* FIXME: logo_ex supports only truecolor fb. */
+	
 	if (info->fix.visual != FB_VISUAL_TRUECOLOR)
 		fb_logo_ex_num = 0;
 
@@ -570,7 +520,7 @@ static int fb_show_extra_logos(struct fb_info *info, int y, int rotate)
 	return y;
 }
 
-#else /* !CONFIG_FB_LOGO_EXTRA */
+#else 
 
 static inline int fb_prepare_extra_logos(struct fb_info *info,
 					 unsigned int height,
@@ -584,7 +534,7 @@ static inline int fb_show_extra_logos(struct fb_info *info, int y, int rotate)
 	return y;
 }
 
-#endif /* CONFIG_FB_LOGO_EXTRA */
+#endif 
 
 
 int fb_prepare_logo(struct fb_info *info, int rotate)
@@ -607,11 +557,11 @@ int fb_prepare_logo(struct fb_info *info, int rotate)
 	}
 
 	if (info->fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR && depth > 4) {
-		/* assume console colormap */
+		
 		depth = 4;
 	}
 
-	/* Return if no suitable logo was found */
+	
 	fb_logo.logo = fb_find_logo(depth);
 
 	if (!fb_logo.logo) {
@@ -628,7 +578,7 @@ int fb_prepare_logo(struct fb_info *info, int rotate)
 		return 0;
 	}
 
-	/* What depth we asked for might be different from what we get */
+	
 	if (fb_logo.logo->type == LINUX_LOGO_CLUT224)
 		fb_logo.depth = 8;
 	else if (fb_logo.logo->type == LINUX_LOGO_VGA16)
@@ -668,7 +618,7 @@ int fb_show_logo(struct fb_info *info, int rotate)
 #else
 int fb_prepare_logo(struct fb_info *info, int rotate) { return 0; }
 int fb_show_logo(struct fb_info *info, int rotate) { return 0; }
-#endif /* CONFIG_LOGO */
+#endif 
 
 static void *fb_seq_start(struct seq_file *m, loff_t *pos)
 {
@@ -717,19 +667,15 @@ static const struct file_operations fb_proc_fops = {
 	.release	= seq_release,
 };
 
-/*
- * We hold a reference to the fb_info in file->private_data,
- * but if the current registered fb has changed, we don't
- * actually want to use it.
- *
- * So look up the fb_info using the inode minor number,
- * and just verify it against the reference we have.
- */
 static struct fb_info *file_fb_info(struct file *file)
 {
 	struct inode *inode = file->f_path.dentry->d_inode;
 	int fbidx = iminor(inode);
-	struct fb_info *info = registered_fb[fbidx];
+	struct fb_info *info = NULL;
+
+	if (fbidx >= FB_MAX)
+		return NULL;
+	info = registered_fb[fbidx];
 
 	if (info != file->private_data)
 		info = NULL;
@@ -944,7 +890,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 		fb_var_to_videomode(&mode1, var);
 		fb_var_to_videomode(&mode2, &info->var);
-		/* make sure we don't delete the videomode of current var */
+		
 		ret = fb_mode_is_equal(&mode1, &mode2);
 
 		if (!ret) {
@@ -967,9 +913,6 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 	    memcmp(&info->var, var, sizeof(struct fb_var_screeninfo))) {
 		u32 activate = var->activate;
 
-		/* When using FOURCC mode, make sure the red, green, blue and
-		 * transp fields are set to 0.
-		 */
 		if ((info->fix.capabilities & FB_CAP_FOURCC) &&
 		    var->grayscale > 1) {
 			if (var->red.offset     || var->green.offset    ||
@@ -1113,6 +1056,10 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		if (copy_from_user(&cmap, argp, sizeof(cmap)))
 			return -EFAULT;
 		ret = fb_set_user_cmap(&cmap, info);
+		if (ret) {
+			if (info)
+				fb_dealloc_cmap(&info->cmap);
+		}
 		break;
 	case FBIOGETCMAP:
 		if (copy_from_user(&cmap, argp, sizeof(cmap)))
@@ -1168,10 +1115,8 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		event.data = &con2fb;
 		if (!lock_fb_info(info))
 			return -ENODEV;
-		console_lock();
 		event.info = info;
 		ret = fb_notifier_call_chain(FB_EVENT_SET_CONSOLE_MAP, &event);
-		console_unlock();
 		unlock_fb_info(info);
 		break;
 	case FBIOBLANK:
@@ -1185,14 +1130,11 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		unlock_fb_info(info);
 		break;
 	default:
-		if (!lock_fb_info(info))
-			return -ENODEV;
 		fb = info->fbops;
 		if (fb->fb_ioctl)
 			ret = fb->fb_ioctl(info, cmd, arg);
 		else
 			ret = -ENOTTY;
-		unlock_fb_info(info);
 	}
 	return ret;
 }
@@ -1364,12 +1306,15 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 {
 	struct fb_info *info = file_fb_info(file);
 	struct fb_ops *fb;
-	unsigned long mmio_pgoff;
+	unsigned long off;
 	unsigned long start;
 	u32 len;
 
 	if (!info)
 		return -ENODEV;
+	if (vma->vm_pgoff > (~0UL >> PAGE_SHIFT))
+		return -EINVAL;
+	off = vma->vm_pgoff << PAGE_SHIFT;
 	fb = info->fbops;
 	if (!fb)
 		return -ENODEV;
@@ -1381,24 +1326,33 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 		return res;
 	}
 
-	/*
-	 * Ugh. This can be either the frame buffer mapping, or
-	 * if pgoff points past it, the mmio mapping.
-	 */
+	
 	start = info->fix.smem_start;
-	len = info->fix.smem_len;
-	mmio_pgoff = PAGE_ALIGN((start & ~PAGE_MASK) + len) >> PAGE_SHIFT;
-	if (vma->vm_pgoff >= mmio_pgoff) {
-		vma->vm_pgoff -= mmio_pgoff;
+	len = PAGE_ALIGN((start & ~PAGE_MASK) + info->fix.smem_len);
+	if (off >= len) {
+		
+		off -= len;
+		if (info->var.accel_flags) {
+			mutex_unlock(&info->mm_lock);
+			return -EINVAL;
+		}
 		start = info->fix.mmio_start;
-		len = info->fix.mmio_len;
+		len = PAGE_ALIGN((start & ~PAGE_MASK) + info->fix.mmio_len);
 	}
 	mutex_unlock(&info->mm_lock);
-
+	start &= PAGE_MASK;
+	if ((vma->vm_end - vma->vm_start + off) > len)
+		return -EINVAL;
+	off += start;
+	vma->vm_pgoff = off >> PAGE_SHIFT;
+	
+	vma->vm_flags |= VM_IO | VM_RESERVED;
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
-	fb_pgprotect(file, vma, start);
-
-	return vm_iomap_memory(vma, start, len);
+	fb_pgprotect(file, vma, off);
+	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
+			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
+		return -EAGAIN;
+	return 0;
 }
 
 static int
@@ -1491,7 +1445,7 @@ static int fb_check_foreignness(struct fb_info *fi)
 	fi->flags |= foreign_endian ? 0 : FBINFO_BE_MATH;
 #else
 	fi->flags |= foreign_endian ? FBINFO_BE_MATH : 0;
-#endif /* __BIG_ENDIAN */
+#endif 
 
 	if (fi->flags & FBINFO_BE_MATH && !fb_be_math(fi)) {
 		pr_err("%s: enable CONFIG_FB_BIG_ENDIAN to "
@@ -1508,10 +1462,10 @@ static int fb_check_foreignness(struct fb_info *fi)
 
 static bool apertures_overlap(struct aperture *gen, struct aperture *hw)
 {
-	/* is the generic aperture base the same as the HW one */
+	
 	if (gen->base == hw->base)
 		return true;
-	/* is the generic aperture base inside the hw base->hw base+size */
+	
 	if (gen->base > hw->base && gen->base < hw->base + hw->size)
 		return true;
 	return false;
@@ -1549,7 +1503,7 @@ static void do_remove_conflicting_framebuffers(struct apertures_struct *a,
 {
 	int i;
 
-	/* check all firmware fbs and kick off if the base addr overlaps */
+	
 	for (i = 0 ; i < FB_MAX; i++) {
 		struct apertures_struct *gen_aper;
 		if (!registered_fb[i])
@@ -1598,7 +1552,7 @@ static int do_register_framebuffer(struct fb_info *fb_info)
 	fb_info->dev = device_create(fb_class, fb_info->device,
 				     MKDEV(FB_MAJOR, i), NULL, "fb%d", i);
 	if (IS_ERR(fb_info->dev)) {
-		/* Not fatal */
+		
 		printk(KERN_WARNING "Unable to create device for framebuffer %d; errno = %ld\n", i, PTR_ERR(fb_info->dev));
 		fb_info->dev = NULL;
 	} else
@@ -1632,9 +1586,7 @@ static int do_register_framebuffer(struct fb_info *fb_info)
 	event.info = fb_info;
 	if (!lock_fb_info(fb_info))
 		return -ENODEV;
-	console_lock();
 	fb_notifier_call_chain(FB_EVENT_FB_REGISTERED, &event);
-	console_unlock();
 	unlock_fb_info(fb_info);
 	return 0;
 }
@@ -1650,10 +1602,8 @@ static int do_unregister_framebuffer(struct fb_info *fb_info)
 
 	if (!lock_fb_info(fb_info))
 		return -ENODEV;
-	console_lock();
 	event.info = fb_info;
 	ret = fb_notifier_call_chain(FB_EVENT_FB_UNBIND, &event);
-	console_unlock();
 	unlock_fb_info(fb_info);
 
 	if (ret)
@@ -1668,11 +1618,9 @@ static int do_unregister_framebuffer(struct fb_info *fb_info)
 	num_registered_fb--;
 	fb_cleanup_device(fb_info);
 	event.info = fb_info;
-	console_lock();
 	fb_notifier_call_chain(FB_EVENT_FB_UNREGISTERED, &event);
-	console_unlock();
 
-	/* this may free fb info */
+	
 	put_fb_info(fb_info);
 	return 0;
 }
@@ -1702,15 +1650,6 @@ void remove_conflicting_framebuffers(struct apertures_struct *a,
 }
 EXPORT_SYMBOL(remove_conflicting_framebuffers);
 
-/**
- *	register_framebuffer - registers a frame buffer device
- *	@fb_info: frame buffer info structure
- *
- *	Registers a frame buffer device @fb_info.
- *
- *	Returns negative errno on error, or zero for success.
- *
- */
 int
 register_framebuffer(struct fb_info *fb_info)
 {
@@ -1723,22 +1662,6 @@ register_framebuffer(struct fb_info *fb_info)
 	return ret;
 }
 
-/**
- *	unregister_framebuffer - releases a frame buffer device
- *	@fb_info: frame buffer info structure
- *
- *	Unregisters a frame buffer device @fb_info.
- *
- *	Returns negative errno on error, or zero for success.
- *
- *      This function will also notify the framebuffer console
- *      to release the driver.
- *
- *      This is meant to be called within a driver's module_exit()
- *      function. If this is called outside module_exit(), ensure
- *      that the driver implements fb_open() and fb_release() to
- *      check that no processes are using the device.
- */
 int
 unregister_framebuffer(struct fb_info *fb_info)
 {
@@ -1751,15 +1674,6 @@ unregister_framebuffer(struct fb_info *fb_info)
 	return ret;
 }
 
-/**
- *	fb_set_suspend - low level driver signals suspend
- *	@info: framebuffer affected
- *	@state: 0 = resuming, !=0 = suspending
- *
- *	This is meant to be used by low level drivers to
- * 	signal suspend/resume to the core & clients.
- *	It must be called with the console semaphore held
- */
 void fb_set_suspend(struct fb_info *info, int state)
 {
 	struct fb_event event;
@@ -1774,14 +1688,6 @@ void fb_set_suspend(struct fb_info *info, int state)
 	}
 }
 
-/**
- *	fbmem_init - init frame buffer subsystem
- *
- *	Initialize the frame buffer subsystem.
- *
- *	NOTE: This function is _only_ to be called by drivers/char/mem.c.
- *
- */
 
 static int __init
 fbmem_init(void)
@@ -1841,8 +1747,11 @@ int fb_new_modelist(struct fb_info *info)
 	err = 1;
 
 	if (!list_empty(&info->modelist)) {
+		if (!lock_fb_info(info))
+			return -ENODEV;
 		event.info = info;
 		err = fb_notifier_call_chain(FB_EVENT_NEW_MODELIST, &event);
+		unlock_fb_info(info);
 	}
 
 	return err;
@@ -1851,15 +1760,6 @@ int fb_new_modelist(struct fb_info *info)
 static char *video_options[FB_MAX] __read_mostly;
 static int ofonly __read_mostly;
 
-/**
- * fb_get_options - get kernel boot parameters
- * @name:   framebuffer name as it would appear in
- *          the boot parameter line
- *          (video=<name>:<options>)
- * @option: the option will be stored here
- *
- * NOTE: Needed to maintain backwards compatibility
- */
 int fb_get_options(char *name, char **option)
 {
 	char *opt, *options = NULL;
@@ -1891,19 +1791,6 @@ int fb_get_options(char *name, char **option)
 }
 
 #ifndef MODULE
-/**
- *	video_setup - process command line options
- *	@options: string of options
- *
- *	Process command line options for frame buffer subsystem.
- *
- *	NOTE: This function is a __setup and __init function.
- *            It only stores the options.  Drivers have to call
- *            fb_get_options() as necessary.
- *
- *	Returns zero.
- *
- */
 static int __init video_setup(char *options)
 {
 	int i, global = 0;
@@ -1936,9 +1823,6 @@ static int __init video_setup(char *options)
 __setup("video=", video_setup);
 #endif
 
-    /*
-     *  Visible symbols for modules
-     */
 
 EXPORT_SYMBOL(register_framebuffer);
 EXPORT_SYMBOL(unregister_framebuffer);

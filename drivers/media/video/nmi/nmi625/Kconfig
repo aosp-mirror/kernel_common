@@ -1,0 +1,14 @@
+#
+# Configuration for nmi_hw (ISDB-T)
+#
+
+config ISDBT_NMI
+	bool "ISDB-T NMI Driver" 
+	default y
+	---help---
+	  This is a ISDB-T for NMI Driver.
+
+config ISDBT_NMI_DEBUG
+	bool "print ISDB-T NMI debug message"
+	depends on ISDBT_NMI
+	default n

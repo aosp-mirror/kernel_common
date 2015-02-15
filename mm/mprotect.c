@@ -52,10 +52,6 @@ static void change_pte_range(struct mm_struct *mm, pmd_t *pmd,
 			ptent = ptep_modify_prot_start(mm, addr, pte);
 			ptent = pte_modify(ptent, newprot);
 
-			/*
-			 * Avoid taking write faults for pages we know to be
-			 * dirty.
-			 */
 			if (dirty_accountable && pte_dirty(ptent))
 				ptent = pte_mkwrite(ptent);
 
@@ -64,10 +60,6 @@ static void change_pte_range(struct mm_struct *mm, pmd_t *pmd,
 			swp_entry_t entry = pte_to_swp_entry(oldpte);
 
 			if (is_write_migration_entry(entry)) {
-				/*
-				 * A protection check is difficult so
-				 * just be safe and disable write
-				 */
 				make_migration_entry_read(&entry);
 				set_pte_at(mm, addr, pte,
 					swp_entry_to_pte(entry));
@@ -93,7 +85,7 @@ static inline void change_pmd_range(struct vm_area_struct *vma, pud_t *pud,
 				split_huge_page_pmd(vma->vm_mm, pmd);
 			else if (change_huge_pmd(vma, pmd, addr, newprot))
 				continue;
-			/* fall through */
+			
 		}
 		if (pmd_none_or_clear_bad(pmd))
 			continue;
@@ -158,12 +150,6 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 		return 0;
 	}
 
-	/*
-	 * If we make a private mapping writable we increase our commit;
-	 * but (without finer accounting) cannot reduce our commit if we
-	 * make it unwritable again. hugetlb mapping were accounted for
-	 * even if read-only so there is no need to account for them here
-	 */
 	if (newflags & VM_WRITE) {
 		if (!(oldflags & (VM_ACCOUNT|VM_WRITE|VM_HUGETLB|
 						VM_SHARED|VM_NORESERVE))) {
@@ -174,9 +160,6 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 		}
 	}
 
-	/*
-	 * First try to merge with previous and/or next vma.
-	 */
 	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
 	*pprev = vma_merge(mm, *pprev, start, end, newflags,
 			vma->anon_vma, vma->vm_file, pgoff, vma_policy(vma),
@@ -201,10 +184,6 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 	}
 
 success:
-	/*
-	 * vm_flags and vm_page_prot are protected by the mmap_sem
-	 * held in write mode.
-	 */
 	vma->vm_flags = newflags;
 	vma->vm_page_prot = pgprot_modify(vma->vm_page_prot,
 					  vm_get_page_prot(newflags));
@@ -238,7 +217,7 @@ SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
 	int error = -EINVAL;
 	const int grows = prot & (PROT_GROWSDOWN|PROT_GROWSUP);
 	prot &= ~(PROT_GROWSDOWN|PROT_GROWSUP);
-	if (grows == (PROT_GROWSDOWN|PROT_GROWSUP)) /* can't be both */
+	if (grows == (PROT_GROWSDOWN|PROT_GROWSUP)) 
 		return -EINVAL;
 
 	if (start & ~PAGE_MASK)
@@ -253,9 +232,6 @@ SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
 		return -EINVAL;
 
 	reqprot = prot;
-	/*
-	 * Does the application expect PROT_READ to imply PROT_EXEC:
-	 */
 	if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
 		prot |= PROT_EXEC;
 
@@ -292,11 +268,11 @@ SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
 	for (nstart = start ; ; ) {
 		unsigned long newflags;
 
-		/* Here we know that  vma->vm_start <= nstart < vma->vm_end. */
+		
 
 		newflags = vm_flags | (vma->vm_flags & ~(VM_READ | VM_WRITE | VM_EXEC));
 
-		/* newflags >> 4 shift VM_MAY% in place of VM_% */
+		
 		if ((newflags & ~(newflags >> 4)) & (VM_READ | VM_WRITE | VM_EXEC)) {
 			error = -EACCES;
 			goto out;

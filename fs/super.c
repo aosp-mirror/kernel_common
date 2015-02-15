@@ -298,19 +298,19 @@ EXPORT_SYMBOL(deactivate_super);
  *	and want to turn it into a full-blown active reference.  grab_super()
  *	is called with sb_lock held and drops it.  Returns 1 in case of
  *	success, 0 if we had failed (superblock contents was already dead or
- *	dying when grab_super() had been called).  Note that this is only
- *	called for superblocks not in rundown mode (== ones still on ->fs_supers
- *	of their type), so increment of ->s_count is OK here.
+ *	dying when grab_super() had been called).
  */
 static int grab_super(struct super_block *s) __releases(sb_lock)
 {
-	s->s_count++;
-	spin_unlock(&sb_lock);
-	down_write(&s->s_umount);
-	if ((s->s_flags & MS_BORN) && atomic_inc_not_zero(&s->s_active)) {
-		put_super(s);
+	if (atomic_inc_not_zero(&s->s_active)) {
+		spin_unlock(&sb_lock);
 		return 1;
 	}
+	/* it's going away */
+	s->s_count++;
+	spin_unlock(&sb_lock);
+	/* wait for it to die */
+	down_write(&s->s_umount);
 	up_write(&s->s_umount);
 	put_super(s);
 	return 0;
@@ -439,6 +439,11 @@ retry:
 				up_write(&s->s_umount);
 				destroy_super(s);
 				s = NULL;
+			}
+			down_write(&old->s_umount);
+			if (unlikely(!(old->s_flags & MS_BORN))) {
+				deactivate_locked_super(old);
+				goto retry;
 			}
 			return old;
 		}
@@ -672,10 +677,10 @@ restart:
 		if (hlist_unhashed(&sb->s_instances))
 			continue;
 		if (sb->s_bdev == bdev) {
-			if (!grab_super(sb))
+			if (grab_super(sb)) /* drops sb_lock */
+				return sb;
+			else
 				goto restart;
-			up_write(&sb->s_umount);
-			return sb;
 		}
 	}
 	spin_unlock(&sb_lock);
@@ -782,10 +787,15 @@ cancel_readonly:
 	return retval;
 }
 
+extern int get_partition_num_by_name(char *name);
 static void do_emergency_remount(struct work_struct *work)
 {
 	struct super_block *sb, *p = NULL;
+	char ptn_name[64];
 
+	/* umount devlog before emergency remount */
+	umount2("/devlog", MNT_DETACH);
+	umount2("/fataldevlog", MNT_DETACH);
 	spin_lock(&sb_lock);
 	list_for_each_entry(sb, &super_blocks, s_list) {
 		if (hlist_unhashed(&sb->s_instances))
@@ -798,7 +808,10 @@ static void do_emergency_remount(struct work_struct *work)
 			/*
 			 * What lock protects sb->s_flags??
 			 */
-			do_remount_sb(sb, MS_RDONLY, NULL, 1);
+			/* ext4 KP workaround: don't remount devlog partition */
+			sprintf(ptn_name, "mmcblk0p%d", get_partition_num_by_name("devlog"));
+			if (strcmp(sb->s_id, ptn_name))
+				do_remount_sb(sb, MS_RDONLY, NULL, 1);
 		}
 		up_write(&sb->s_umount);
 		spin_lock(&sb_lock);

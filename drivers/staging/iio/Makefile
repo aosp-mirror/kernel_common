@@ -19,6 +19,9 @@ obj-$(CONFIG_IIO_DUMMY_EVGEN) += iio_dummy_evgen.o
 
 obj-$(CONFIG_IIO_ST_HWMON) += iio_hwmon.o
 
+obj-$(CONFIG_IIO_SENSORS_YAS53X) += yas_mag_kernel.o
+obj-$(CONFIG_IIO_SENSORS_YAS53X) += yas_mag_drv-yas532.o
+
 obj-y += accel/
 obj-y += adc/
 obj-y += addac/

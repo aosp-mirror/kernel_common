@@ -137,6 +137,7 @@ print_task(struct seq_file *m, struct rq *rq, struct task_struct *p)
 #endif
 
 	SEQ_printf(m, "\n");
+	if (!m) show_stack(p, NULL);
 }
 
 static void print_rq(struct seq_file *m, struct rq *rq, int rq_cpu)
@@ -374,10 +375,12 @@ static int sched_debug_show(struct seq_file *m, void *v)
 	return 0;
 }
 
+#ifdef CONFIG_SYSRQ_SCHED_DEBUG
 void sysrq_sched_debug_show(void)
 {
 	sched_debug_show(NULL, NULL);
 }
+#endif
 
 static int sched_debug_open(struct inode *inode, struct file *filp)
 {

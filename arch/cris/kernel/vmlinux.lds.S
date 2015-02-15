@@ -52,7 +52,6 @@ SECTIONS
 
 	EXCEPTION_TABLE(4)
 
-	_sdata = .;
 	RODATA
 
 	. = ALIGN (4);

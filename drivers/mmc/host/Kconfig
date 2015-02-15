@@ -297,6 +297,16 @@ config MMC_ATMELMCI
 
 endchoice
 
+config MMC_ATMELMCI_DMA
+	bool "Atmel MCI DMA support"
+	depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
+	help
+	  Say Y here to have the Atmel MCI driver use a DMA engine to
+	  do data transfers and thus increase the throughput and
+	  reduce the CPU utilization.
+
+	  If unsure, say N.
+
 config MMC_IMX
 	tristate "Motorola i.MX Multimedia Card Interface support"
 	depends on ARCH_MX1
@@ -447,6 +457,114 @@ config MMC_SDRICOH_CS
 
 config MMC_TMIO_CORE
 	tristate
+
+config MMC_SDHCI_MSM
+	tristate "Qualcomm SDHCI Controller Support"
+	depends on ARCH_MSM
+	depends on MMC_SDHCI_PLTFM
+	help
+	  This selects the Secure Digital Host Controller Interface (SDHCI)
+	  support present in MSM SOCs from Qualcomm. The controller
+	  supports SD/MMC/SDIO devices.
+
+	  If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+
+config MMC_MSM
+	tristate "Qualcomm SDCC Controller Support"
+	depends on MMC && ARCH_MSM
+	help
+	  This provides support for the SD/MMC cell found in the
+          MSM and QSD SOCs from Qualcomm.
+
+config MMC_MSM_SDC1_SUPPORT
+	boolean "Qualcomm SDC1 support"
+	depends on MMC_MSM
+	default y
+	help
+	  Select Y to enable Slot 1.
+
+config MMC_MSM_SDC1_8_BIT_SUPPORT
+	boolean "Qualcomm SDC1 8bit support"
+	depends on MMC_MSM_SDC1_SUPPORT
+	default n
+	help
+	  Select Y to enable 8bit support for Slot 1.
+
+config MMC_MSM_SDC2_SUPPORT
+	boolean "Qualcomm SDC2 support"
+	depends on MMC_MSM
+	default y
+	help
+	  Select Y to enable Slot 2.
+
+config MMC_MSM_SDC2_8_BIT_SUPPORT
+	boolean "Qualcomm SDC2 8bit support"
+	depends on MMC_MSM_SDC2_SUPPORT
+	default n
+	help
+	  Select Y to enable 8bit support for Slot 2.
+
+config MMC_MSM_SDC3_SUPPORT
+	boolean "Qualcomm SDC3 support"
+	depends on MMC_MSM
+	default n
+	help
+	  Select Y to enable Slot 3.
+
+config MMC_MSM_SDC3_POLLING
+	boolean "Qualcomm SDC3 support"
+	depends on MMC_MSM
+
+config MMC_MSM_SDC3_8_BIT_SUPPORT
+	boolean "Qualcomm SDC3 8bit support"
+	depends on MMC_MSM_SDC3_SUPPORT
+	default n
+	help
+	  Select Y to enable 8bit support for Slot 3.
+
+config MMC_MSM_SDC3_WP_SUPPORT
+	boolean "Qualcomm SDC3 write protection support"
+	depends on MMC_MSM_SDC3_SUPPORT
+	default n
+	help
+	  Select Y to enable write protection support for Slot 3.
+
+config MMC_MSM_SDC4_SUPPORT
+	boolean "Qualcomm SDC4 support"
+	depends on MMC_MSM
+	default n
+	help
+	  Select Y to enable Slot 4.
+
+config MMC_MSM_SDC4_8_BIT_SUPPORT
+	boolean "Qualcomm SDC4 8bit support"
+	depends on MMC_MSM_SDC4_SUPPORT
+	default n
+	help
+	  Select Y to enable 8bit support for Slot 4.
+
+config MMC_MSM_SDC5_SUPPORT
+	boolean "Qualcomm SDC5 support"
+	depends on MMC_MSM
+	default n
+	help
+	  Select Y to enable Slot 5.
+
+config MMC_MSM_SDC5_8_BIT_SUPPORT
+	boolean "Qualcomm SDC5 8bit support"
+	depends on MMC_MSM_SDC5_SUPPORT
+	default n
+	help
+	  Select Y to enable 8bit support for Slot 5.
+
+config MMC_MSM_SPS_SUPPORT
+	bool "Use SPS BAM as data mover"
+	depends on MMC_MSM && SPS
+	default n
+	help
+	  Select Y to use SPS BAM as data mover
 
 config MMC_TMIO
 	tristate "Toshiba Mobile IO Controller (TMIO) MMC/SD function support"

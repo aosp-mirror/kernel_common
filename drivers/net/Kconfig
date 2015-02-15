@@ -344,4 +344,11 @@ config VMXNET3
 
 source "drivers/net/hyperv/Kconfig"
 
+config KINETO_GAN
+    tristate "Kineto GAN virtual network interface"
+    depends on ARM
+    default n
+    help
+      Virtual ethernet interface for Kineto GAN transport.
+
 endif # NETDEVICES

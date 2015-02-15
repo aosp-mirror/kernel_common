@@ -1,0 +1,2358 @@
+&mdss_mdp {
+	qcom,mdss_dsi_m8_lg_1080p_video {
+		compatible = "qcom,mdss-dsi-panel";
+		status = "disable";
+		qcom,cont-splash-enabled;
+		qcom,mdss-dsi-panel-name = "LG Renesas 1080p video mode dsi panel";
+		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
+		qcom,mdss-dsi-panel-type = "dsi_video_mode";
+		qcom,mdss-dsi-panel-destination = "display_1";
+		qcom,mdss-dsi-panel-framerate = <60>;
+		qcom,mdss-dsi-virtual-channel-id = <0>;
+		qcom,mdss-dsi-stream = <0>;
+		qcom,mdss-dsi-panel-width = <1080>;
+		qcom,mdss-dsi-panel-height = <1920>;
+		qcom,mdss-dsi-h-front-porch = <100>;
+		qcom,mdss-dsi-h-back-porch = <50>;
+		qcom,mdss-dsi-h-pulse-width = <10>;
+		qcom,mdss-dsi-h-sync-skew = <0>;
+		qcom,mdss-dsi-v-back-porch = <4>;
+		qcom,mdss-dsi-v-front-porch = <4>;
+		qcom,mdss-dsi-v-pulse-width = <2>;
+		qcom,mdss-dsi-h-left-border = <0>;
+		qcom,mdss-dsi-h-right-border = <0>;
+		qcom,mdss-dsi-v-top-border = <0>;
+		qcom,mdss-dsi-v-bottom-border = <0>;
+		qcom,mdss-dsi-bpp = <24>;
+		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
+		qcom,mdss-dsi-underflow-color = <0xff>;
+		qcom,mdss-dsi-border-color = <0>;
+		qcom,mdss-dsi-on-command = [
+			29 01 00 00 01 00 02 b0 04 /* interface_setting_0 */
+			15 01 00 00 01 00 02 00 00 /* nop */
+			15 01 00 00 01 00 02 00 00 /* nop */
+			29 01 00 00 01 00 02 B3 14/* Config to Video Mode */
+			29 01 00 00 01 00 03 B6 3A D3 /* DSI control */
+			29 01 00 00 01 00 23 C1 84 60 50 EB FF
+			6F CE FF FF 17 12 58 73 AE 31
+			20 C6 FF FF 1F F3 FF 5F 10 10
+			10 10 00 00 01 22 02 02 00
+			29 01 00 00 01 00 08 C2 31 F7 80 0A 08
+			00 00
+			29 01 00 00 01 00 04 C3 05 00 09 /* VSYNC and HSYNC Setting */
+			29 01 00 00 01 00 17 C4 70 00 00 00 07
+			05 05 09 09 0C 06 00 00 00 00
+			07 05 05 09 09 0C 06
+			29 01 00 00 01 00 29 C6 00 69 00 69 00
+			69 00 00 00 00 00 69 00 69 00
+			69 10 19 07 00 01 00 69 00 69
+			00 69 00 00 00 00 00 69 00 69
+			00 69 10 19 07
+			29 01 00 00 01 00 19 C7 00 05 0C 20 2C /* Gamma Setting A */
+			40 30 44 50 54 58 70 00 05 0C
+			20 2C 40 30 44 50 54 58 70
+			29 01 00 00 01 00 19 C8 00 05 0C 20 2C /* Gamma Setting B */
+			40 30 44 50 54 58 70 00 05 0C
+			20 2C 40 30 44 50 54 58 70
+			29 01 00 00 01 00 19 C9 00 05 0C 20 2C /* Gamma Setting C */
+			40 30 44 50 54 58 70 00 05 0C
+			20 2C 40 30 44 50 54 58 70
+			29 01 00 00 01 00 02 CC 0A	/* Panel Interface Control */
+			29 01 00 00 01 00 0F D0 00 00 19 18 99 /* Power Setting */
+			99 19 01 89 00 55 1B 9B 01
+			29 01 00 00 01 00 1B D3 1B 33 BB CC C4
+			33 33 33 00 01 00 A0 E8 A0 0D
+			56 33 44 22 70 02 56 03 3D BF
+			AA
+			29 01 00 00 01 00 08 D5 06 00 00 01 4A 01 4A
+			15 01 00 00 01 00 02 53 04 /* write_control_display */
+			15 01 00 00 01 00 02 55 01 /* CABC */
+			15 01 00 00 01 00 02 35 00 /* TE_OUT */
+			39 01 00 00 01 00 02 29 00];
+
+		qcom,mdss-dsi-off-command = [
+			39 01 00 00 00 00 08 D5 06 00 00 01 4A 01 4A
+			39 01 00 00 10 00 08 D5 06 00 00 01 4A 01 4A
+			39 01 00 00 16 00 02 28 00 /* display_off */
+			39 01 00 00 4A 00 02 10 00];
+		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
+		qcom,mdss-dsi-h-sync-pulse = <0>;
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
+		qcom,mdss-dsi-bllp-eof-power-mode;
+		qcom,mdss-dsi-lane-map = "lane_map_0123";
+		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-dsi-lane-0-state;
+		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-lane-2-state;
+		qcom,mdss-dsi-lane-3-state;
+		qcom,mdss-dsi-panel-timings = [c8 40 33 00 57 51 35 42 55 03 04 00];
+		qcom,mdss-dsi-t-clk-post = <0x02>;
+		qcom,mdss-dsi-t-clk-pre = <0x2a>;
+		qcom,mdss-dsi-bl-min-level = <1>;
+		qcom,mdss-dsi-bl-max-level = <255>;
+		qcom,mdss-dsi-dma-trigger = "trigger_sw";
+		qcom,mdss-dsi-mdp-trigger = "none";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+		qcom,display-on-cmds = [
+			39 01 00 00 78 00 02 11 00 /* Sleep Out */
+			39 01 00 00 00 00 08 D5 06 00 00 01 4A 01 4A
+			39 01 00 00 10 00 08 D5 06 00 00 01 4A 01 4A];
+		qcom,display-on-wait = <120>;
+		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
+		qcom,mdss-pan-physical-width-dimension = <61>;
+		qcom,mdss-pan-physical-height-dimension = <109>;
+		qcom,mdss-shrink-pwm = <6 79 255>;
+		qcom,mdss-dsi-lp11-init;
+		htc,mdss-camera-blk = <177>;
+		htc,mdss-camera-dua-blk = <177>;
+		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
+		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 02];
+		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 03];
+		htc,dimming-on-cmds = [39 01 00 00 00 00 02 53 2C];
+		htc,panel-id=<2>;
+	};
+
+	qcom,mdss_dsi_sharp_1080p_video {
+		compatible = "qcom,mdss-dsi-panel";
+		status = "disable";
+		qcom,cont-splash-enabled;
+		qcom,mdss-dsi-panel-name = "sharp 1080p video mode dsi panel";
+		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
+		qcom,mdss-dsi-panel-type = "dsi_video_mode";
+		qcom,mdss-dsi-panel-destination = "display_1";
+		qcom,mdss-dsi-panel-framerate = <60>;
+		qcom,mdss-dsi-virtual-channel-id = <0>;
+		qcom,mdss-dsi-stream = <0>;
+		qcom,mdss-dsi-panel-width = <1080>;
+		qcom,mdss-dsi-panel-height = <1920>;
+		qcom,mdss-dsi-h-front-porch = <100>;
+		qcom,mdss-dsi-h-back-porch = <50>;
+		qcom,mdss-dsi-h-pulse-width = <10>;
+		qcom,mdss-dsi-h-sync-skew = <0>;
+		qcom,mdss-dsi-v-back-porch = <4>;
+		qcom,mdss-dsi-v-front-porch = <4>;
+		qcom,mdss-dsi-v-pulse-width = <2>;
+		qcom,mdss-dsi-h-left-border = <0>;
+		qcom,mdss-dsi-h-right-border = <0>;
+		qcom,mdss-dsi-v-top-border = <0>;
+		qcom,mdss-dsi-v-bottom-border = <0>;
+		qcom,mdss-dsi-bpp = <24>;
+		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
+		qcom,mdss-dsi-underflow-color = <0xff>;
+		qcom,mdss-dsi-border-color = <0>;
+		qcom,mdss-dsi-on-command = [
+			29 01 00 00 00 00 02 b0 04 /* interface_setting_0 */
+			15 01 00 00 00 00 02 00 00 /* nop */
+			15 01 00 00 00 00 02 00 00 /* nop */
+			29 01 00 00 00 00 02 d6 01 /* Manufacture_Command_setting */
+			29 01 00 00 00 00 02 b3 14 /* Config to Video Mode */
+			29 01 00 00 00 00 21 /* Color_enhancement */
+			ca 01 02 a4 a4 b8
+			b4 b0 a4 3f 28 05
+			b9 90 70 01 ff 05
+			f8 0c 0c 0c 0c 13
+			13 f0 20 10 10 10
+			10 10 10
+			29 01 00 00 00 00 08 /* BackLight_Control_6 */
+			ce 00 07 00 c1 24 b2 02
+			29 01 00 00 00 00 04
+			c3 05 00 09
+			15 01 00 00 00 00 02 53 24 /* write_control_display */
+			15 01 00 00 00 00 02 55 01 /* CABC */
+			15 01 00 00 00 00 02 35 00 /* TE_OUT */
+			05 01 00 00 78 00 02 11 00 ];
+
+		qcom,mdss-dsi-off-command = [
+			39 01 00 00 16 00 02 28 00 /* display_off */
+			39 01 00 00 4A 00 02 10 00];
+		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
+		qcom,mdss-dsi-h-sync-pulse = <0>;
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
+		qcom,mdss-dsi-bllp-eof-power-mode;
+		qcom,mdss-dsi-lane-map = "lane_map_0123";
+		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-dsi-lane-0-state;
+		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-lane-2-state;
+		qcom,mdss-dsi-lane-3-state;
+		qcom,mdss-dsi-panel-timings = [c8 40 33 00 57 51 35 42 55 03 04 00];
+		qcom,mdss-dsi-t-clk-post = <0x02>;
+		qcom,mdss-dsi-t-clk-pre = <0x2a>;
+		qcom,mdss-dsi-bl-min-level = <1>;
+		qcom,mdss-dsi-bl-max-level = <255>;
+		qcom,mdss-dsi-dma-trigger = "trigger_sw";
+		qcom,mdss-dsi-mdp-trigger = "none";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+		qcom,display-on-cmds = [39 01 00 00 00 00 02 29 00];
+		qcom,display-on-wait = <120>;
+		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
+		qcom,mdss-pan-physical-width-dimension = <61>;
+		qcom,mdss-pan-physical-height-dimension = <109>;
+		qcom,mdss-shrink-pwm = <6 79 255>;
+		qcom,mdss-pwm-ctl-type = <1>;
+		qcom,mdss-dsi-lp11-init;
+		htc,mdss-camera-blk = <177>;
+		htc,mdss-camera-dua-blk = <177>;
+		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
+		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 02];
+		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 03];
+		htc,dimming-on-cmds = [39 01 00 00 00 00 02 53 2C];
+		htc,panel-id=<0>;
+	};
+	qcom,mdss_dsi_glu_sharp_1080p_cmd {
+		compatible = "qcom,mdss-dsi-panel";
+		status = "disable";
+		qcom,mdss-dsi-panel-name = "glu 1080p sharp/R63417 cmd mode dsi panel";
+		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
+
+		qcom,mdss-dsi-panel-type = "dsi_cmd_mode";
+		qcom,mdss-dsi-te-pin-select = <1>;
+		qcom,mdss-dsi-te-v-sync-rd-ptr-irq-line = <0x2c>;
+		qcom,mdss-dsi-te-dcs-command = <1>;
+		qcom,mdss-dsi-te-check-enable;
+		qcom,mdss-dsi-te-using-te-pin;
+
+		qcom,mdss-dsi-panel-destination = "display_1";
+		qcom,mdss-dsi-panel-framerate = <60>;
+		qcom,mdss-dsi-virtual-channel-id = <0>;
+		qcom,mdss-dsi-stream = <0>;
+		qcom,mdss-dsi-panel-width = <1080>;
+		qcom,mdss-dsi-panel-height = <1920>;
+		qcom,mdss-dsi-h-front-porch = <100>;
+		qcom,mdss-dsi-h-back-porch = <50>;
+		qcom,mdss-dsi-h-pulse-width = <10>;
+		qcom,mdss-dsi-h-sync-skew = <0>;
+		qcom,mdss-dsi-v-back-porch = <4>;
+		qcom,mdss-dsi-v-front-porch = <4>;
+		qcom,mdss-dsi-v-pulse-width = <2>;
+		qcom,mdss-dsi-h-left-border = <0>;
+		qcom,mdss-dsi-h-right-border = <0>;
+		qcom,mdss-dsi-v-top-border = <0>;
+		qcom,mdss-dsi-v-bottom-border = <0>;
+		qcom,mdss-dsi-bpp = <24>;
+		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
+		qcom,mdss-dsi-underflow-color = <0xff>;
+		qcom,mdss-dsi-border-color = <0>;
+		qcom,mdss-dsi-on-command = [
+			29 01 00 00 00 00 02 b0 04 /* unlock_command */
+			29 01 00 00 00 00 02 d6 01 /* Manufacture_Command */
+			29 01 00 00 00 00 18 CE 69 40 43 49 55 62 71 /* Common setting */
+			82 94 A8 B9 CB DB E9 F5
+			FC FF 04 0B 06 06 54 20
+			29 01 00 00 00 00 07 B9 07 90 1E 10 1E 66 /* still mode */
+			29 01 00 00 00 00 07 BA 07 96 41 10 6E CC /* move mode */
+			29 01 00 00 00 00 21 CA 01 02 9A A4 B8 B4 /* color enhancement */
+			B0 A4 08 28 05 87 B0 50
+			01 FF 05 F8 0C 0C 50 40
+			13 13 F0 08 10 10 3F 3F
+			3F 3F
+			39 01 00 00 00 00 02 53 04 /* pwm_enable */
+			39 01 00 00 00 00 02 55 02 /* cabc mode */
+			39 01 00 00 00 00 02 5E 0B /* cabc min */
+			15 01 00 00 00 00 02 35 00 /* TE */
+			/* 39 01 00 00 00 00 02 29 00  display_on */
+			39 01 00 00 78 00 02 11 00 /* exit_sleep */];
+		qcom,mdss-dsi-off-command = [
+			39 01 00 00 16 00 02 28 00
+			39 01 00 00 4A 00 02 10 00];
+		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
+		qcom,mdss-dsi-h-sync-pulse = <1>;
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
+		qcom,mdss-dsi-bllp-eof-power-mode;
+		qcom,mdss-dsi-lane-map = "lane_map_0123";
+		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-dsi-lane-0-state;
+		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-lane-2-state;
+		qcom,mdss-dsi-lane-3-state;
+		qcom,mdss-dsi-panel-timings =  [c3 40 33 00 57 51 35 42 52 03 04 00];
+		qcom,mdss-dsi-t-clk-post = <0x02>;
+		qcom,mdss-dsi-t-clk-pre = <0x2a>;
+		qcom,mdss-dsi-bl-min-level = <1>;
+		qcom,mdss-dsi-bl-max-level = <4095>;
+		qcom,mdss-dsi-dma-trigger = "trigger_sw";
+		qcom,mdss-dsi-mdp-trigger = "none";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+
+		qcom,display-on-cmds = [39 01 00 00 00 00 02 29 00];
+		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
+		qcom,mdss-pan-physical-width-dimension = <64>;
+		qcom,mdss-pan-physical-height-dimension = <114>;
+		qcom,mdss-shrink-pwm = <6 79 255>;
+		htc,mdss-camera-blk = <177>;
+		htc,mdss-camera-dua-blk = <177>;
+		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
+		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 02];
+		htc,dimming-on-cmds = [39 01 00 00 00 00 02 53 0C];
+		htc,panel-id=<4>;
+	};
+
+	qcom,mdss_dsi_m8_sharp_novatek_35695_1080p_cmd {
+		compatible = "qcom,mdss-dsi-panel";
+		status = "disable";
+		qcom,cont-splash-enabled;
+		qcom,mdss-dsi-panel-name = "m8 1080p sharp/NT35695 cmd mode dsi panel";
+		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
+
+		qcom,mdss-dsi-panel-type = "dsi_cmd_mode";
+		qcom,mdss-dsi-te-pin-select = <1>;
+		qcom,mdss-dsi-te-v-sync-rd-ptr-irq-line = <0x2c>;
+		qcom,mdss-dsi-te-dcs-command = <1>;
+		qcom,mdss-dsi-te-check-enable;
+		qcom,mdss-dsi-te-using-te-pin;
+
+		qcom,mdss-dsi-panel-destination = "display_1";
+		qcom,mdss-dsi-panel-framerate = <60>;
+		qcom,mdss-dsi-virtual-channel-id = <0>;
+		qcom,mdss-dsi-stream = <0>;
+		qcom,mdss-dsi-panel-width = <1080>;
+		qcom,mdss-dsi-panel-height = <1920>;
+		qcom,mdss-dsi-h-front-porch = <100>;
+		qcom,mdss-dsi-h-back-porch = <50>;
+		qcom,mdss-dsi-h-pulse-width = <10>;
+		qcom,mdss-dsi-h-sync-skew = <0>;
+		qcom,mdss-dsi-v-back-porch = <4>;
+		qcom,mdss-dsi-v-front-porch = <4>;
+		qcom,mdss-dsi-v-pulse-width = <2>;
+		qcom,mdss-dsi-h-left-border = <0>;
+		qcom,mdss-dsi-h-right-border = <0>;
+		qcom,mdss-dsi-v-top-border = <0>;
+		qcom,mdss-dsi-v-bottom-border = <0>;
+		qcom,mdss-dsi-bpp = <24>;
+		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
+		qcom,mdss-dsi-underflow-color = <0xff>;
+		qcom,mdss-dsi-border-color = <0>;
+		qcom,mdss-dsi-on-command = [
+			39 01 00 00 00 00 02 BB 10 /* MIPI CMD mode */
+			39 01 00 00 01 00 02 FF 23 /* Enter CMD2 page3 */
+			39 01 00 00 00 00 02 00 02 /* DMCT = 1, Select the enable / disable mechanism for CABC and Manual dimming functions. */
+			39 01 00 00 00 00 02 01 84 /* Enable CABC dimmin and Gamma Dimming */
+			39 01 00 00 00 00 02 05 24 /* Moving mode dimming 32step, still mode 32step */
+			39 01 00 00 00 00 02 08 02 /* PWMDIV[7:0] for PWM frequency */
+			39 01 00 00 00 00 02 46 30 /* PWM duty count for 42.96kHZ */
+			39 01 00 00 00 00 02 17 FF /* CABC still mode PWM - gray 240-255 */
+			39 01 00 00 00 00 02 18 FA /* CABC still mode PWM - gray 224-239 */
+			39 01 00 00 00 00 02 19 F8 /* CABC still mode PWM - gray 208-223 */
+			39 01 00 00 00 00 02 1A F5 /* CABC still mode PWM - gray 192-207 */
+			39 01 00 00 00 00 02 1B EE /* CABC still mode PWM - gray 160-191 */
+			39 01 00 00 00 00 02 1C E1 /* CABC still mode PWM - gray 128-159 */
+			39 01 00 00 00 00 02 1D D5 /* CABC still mode PWM - gray 112-127 */
+			39 01 00 00 00 00 02 1E CD /* CABC still mode PWM - gray 64-111 */
+			39 01 00 00 00 00 02 1F B9 /* CABC still mode PWM - gray 16-63 */
+			39 01 00 00 00 00 02 20 B4 /* CABC still mode PWM - gray 0-15 */
+			39 01 00 00 00 00 02 21 FF /* CABC movie mode PWM - gray 240-255 */
+			39 01 00 00 00 00 02 22 FA /* CABC movie mode PWM - gray 224-239 */
+			39 01 00 00 00 00 02 23 F5 /* CABC movie mode PWM - gray 208-223 */
+			39 01 00 00 00 00 02 24 EB /* CABC movie mode PWM -gray 192-207 */
+			39 01 00 00 00 00 02 25 E1 /* CABC movie mode PWM - gray 160-191 */
+			39 01 00 00 00 00 02 26 C8 /* CABC movie mode PWM - gray 128-159 */
+			39 01 00 00 00 00 02 27 AA /* CABC movie mode PWM - gray 112-127 */
+			39 01 00 00 00 00 02 28 96 /* CABC movie mode PWM- gray 64-111 */
+			39 01 00 00 00 00 02 29 73 /* CABC movie mode PWM - gray 16-63 */
+			39 01 00 00 00 00 02 2A 66 /* CABC movie mode PWM - gray 0-15 */
+			39 01 00 00 00 00 02 09 02 /* CABC still mode Gamma curve compensation - gray 240-255 */
+			39 01 00 00 00 00 02 0A 06 /* CABC still mode Gamma curve compensation - gray 224-239 */
+			39 01 00 00 00 00 02 0B 07 /* CABC still mode Gamma curve compensation - gray 208-223 */
+			39 01 00 00 00 00 02 0C 08 /* CABC still mode Gamma curve compensation - gray 192-207 */
+			39 01 00 00 00 00 02 0D 09 /* CABC still mode Gamma curve compensation - gray 160-191 */
+			39 01 00 00 00 00 02 0E 0B /* CABC still mode Gamma curve compensation - gray 128-159 */
+			39 01 00 00 00 00 02 0F 0D /* CABC still mode Gamma curve compensation - gray 112-127 */
+			39 01 00 00 00 00 02 10 0D /* CABC still mode Gamma curve compensation - gray 64-111 */
+			39 01 00 00 00 00 02 11 12 /* CABC still mode Gamma curve compensation - gray 16-63 */
+			39 01 00 00 00 00 02 12 20 /* CABC still mode Gamma curve compensation - gray 0-15 */
+			39 01 00 00 00 00 02 33 0C /* CABC Movie mode Gamma curve compensation */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P3 */
+			39 01 00 00 01 00 02 FF 22 /* Enter CMD2 page2 */
+			39 01 00 00 00 00 02 00 00 /* parameter to adjust saturation > 0.98 */
+			39 01 00 00 00 00 02 01 04 /* parameter to adjustsaturation 0.95~0.98 */
+			39 01 00 00 00 00 02 02 08 /* parameter to adjustsaturation 0.91~0.95 */
+			39 01 00 00 00 00 02 03 0C /* parameter to adjustsaturation 0.88~0.91 */
+			39 01 00 00 00 00 02 04 10 /* parameter to adjustsaturation 0.85~0.88 */
+			39 01 00 00 00 00 02 05 14 /* parameter to adjustsaturation 0.82~0.85 */
+			39 01 00 00 00 00 02 06 18 /* parameter to adjustsaturation 0.79~0.82 */
+			39 01 00 00 00 00 02 07 20 /* parameter to adjustsaturation 0.76~0.79 */
+			39 01 00 00 00 00 02 08 24 /* parameter to adjustsaturation 0.73~0.76 */
+			39 01 00 00 00 00 02 09 28 /* parameter to adjustsaturation 0.7~0.73 */
+			39 01 00 00 00 00 02 0A 30 /* parameter to adjustsaturation 0.66~0.7 */
+			39 01 00 00 00 00 02 0B 38 /* parameter to adjustsaturation 0.6~0.66 */
+			39 01 00 00 00 00 02 0C 38 /* parameter to adjustsaturation 0.54~0.6 */
+			39 01 00 00 00 00 02 0D 30 /* parameter to adjustsaturation 0.48~0.54 */
+			39 01 00 00 00 00 02 0E 28 /* parameter to adjustsaturation 0.41~0.48 */
+			39 01 00 00 00 00 02 0F 20 /* parameter to adjustsaturation 0.35~0.41 */
+			39 01 00 00 00 00 02 10 10 /* parameter to adjustsaturation 0.26~0.35 */
+			39 01 00 00 00 00 02 11 00 /* parameter to adjustsaturation 0.16~0.26 */
+			39 01 00 00 00 00 02 12 00 /* parameter to adjustsaturation 0.07~0.16 */
+			39 01 00 00 00 00 02 13 00 /* parameter to adjustsaturation < 0.07 */
+			39 01 00 00 00 00 02 32 10 /* HUE 0~15 degree */
+			39 01 00 00 00 00 02 33 10 /* HUE 15~30 degree */
+			39 01 00 00 00 00 02 34 10 /* HUE 30~45 degree */
+			39 01 00 00 00 00 02 35 10 /* HUE 45~60 degree */
+			39 01 00 00 00 00 02 36 10 /* HUE 60~75 degree */
+			39 01 00 00 00 00 02 37 10 /* HUE 75~90 degree */
+			39 01 00 00 00 00 02 38 10 /* HUE 90~105 degree */
+			39 01 00 00 00 00 02 39 10 /* HUE 105~120 degree */
+			39 01 00 00 00 00 02 3A 10 /* HUE 120~135 degree */
+			39 01 00 00 00 00 02 3B 10 /* HUE 135~150 degree */
+			39 01 00 00 00 00 02 3F 10 /* HUE 150~165 degree */
+			39 01 00 00 00 00 02 40 10 /* HUE 165~180 degree */
+			39 01 00 00 00 00 02 41 10 /* HUE 180~195 degree */
+			39 01 00 00 00 00 02 42 10 /* HUE 195~210 degree */
+			39 01 00 00 00 00 02 43 10 /* HUE 210~225 degree */
+			39 01 00 00 00 00 02 44 10 /* HUE 225~240 degree */
+			39 01 00 00 00 00 02 45 10 /* HUE 240~255 degree */
+			39 01 00 00 00 00 02 46 10 /* HUE 255~270 degree */
+			39 01 00 00 00 00 02 47 10 /* HUE 270~285 degree */
+			39 01 00 00 00 00 02 48 10 /* HUE 285~300 degree */
+			39 01 00 00 00 00 02 49 10 /* HUE 300~315 degree */
+			39 01 00 00 00 00 02 4A 10 /* HUE 315~330 degree */
+			39 01 00 00 00 00 02 4B 10 /* HUE 330~345 degree */
+			39 01 00 00 00 00 02 4C 10 /* HUE 345~360 degree */
+			39 01 00 00 00 00 02 1A 00 /* Disable Vivid Color */
+			39 01 00 00 00 00 02 53 01 /* Enable Smart Color */
+			39 01 00 00 00 00 02 54 00 /* Disable SKIN_KEEP */
+			39 01 00 00 00 00 02 55 00 /* Disable Over-Saturation protection */
+			39 01 00 00 00 00 02 56 01 /* Enable Smart Contrast */
+			39 01 00 00 00 00 02 68 01 /* Enable Edge Enhancement */
+			39 01 00 00 00 00 02 4D 0E /* Smart Color global ratio */
+			39 01 00 00 00 00 02 58 0E /* Smart Contrast Dark part parameter 14 */
+			39 01 00 00 00 00 02 59 14 /* Smart Contrast Light part parameter 20 */
+			39 01 00 00 00 00 02 64 20 /* Turn off Smart Contrast local reference */
+			39 01 00 00 00 00 02 65 02 /* Edge level 2 */
+			39 01 00 00 00 00 02 69 02 /* Edge THD level 0 */
+			39 01 00 00 00 00 02 97 FF /* Edge THD maxima */
+			39 01 00 00 00 00 02 98 00 /* Disable Jaggy suppression function */
+			39 01 00 00 00 00 02 A2 20 /* Enable Dither function */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P2 */
+			39 01 00 00 01 00 02 FF E0 /* Page switching to engineering mode */
+			39 01 00 00 00 00 02 B8 AD /* Pre-charge voltage level */
+			39 01 00 00 00 00 02 FB 01 /* Non-reload */
+			39 01 00 00 01 00 02 FF 20 /* Enter CMD2 page0 */
+			39 01 00 00 00 00 02 10 06 /* VDD boost + 200mV */
+			39 01 00 00 00 00 02 FB 01 /* Non-reload */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 00 00 02 55 82 /* Enable IE slight level and CABC still mode */
+			39 01 00 00 00 00 02 5E 22 /* Enable CMB function limit 13% */
+			39 01 00 00 78 00 02 11 00 /* LCD Sleep out command */
+			39 01 00 00 01 00 02 FF 24 /* Enter CMD24 */
+			39 01 00 00 00 00 02 C6 09 /* Output Hsync to HSOUT */
+			39 01 00 00 00 00 02 FB 01 /* No MTP reload at CMD2 P4 */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 00 00 02 44 03 /* Set TE line */
+			39 01 00 00 00 00 02 35 00 /* Turn on TE (TEE/ TE H/W pin) function */
+			39 01 00 00 00 00 02 29 00 /* LCD Display on */];
+		qcom,mdss-dsi-off-command = [
+			39 01 00 00 16 00 02 28 00
+			39 01 00 00 4A 00 02 10 00];
+		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
+		qcom,mdss-dsi-h-sync-pulse = <1>;
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
+		qcom,mdss-dsi-bllp-eof-power-mode;
+		qcom,mdss-dsi-lane-map = "lane_map_0123";
+		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-dsi-lane-0-state;
+		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-lane-2-state;
+		qcom,mdss-dsi-lane-3-state;
+		qcom,mdss-dsi-panel-timings =  [c3 40 33 00 57 51 35 42 52 03 04 00];
+		qcom,mdss-dsi-t-clk-post = <0x21>;
+		qcom,mdss-dsi-t-clk-pre = <0x2a>;
+		qcom,mdss-dsi-bl-min-level = <1>;
+		qcom,mdss-dsi-bl-max-level = <255>;
+		qcom,mdss-dsi-dma-trigger = "trigger_sw";
+		qcom,mdss-dsi-mdp-trigger = "none";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+		qcom,display-on-cmds = [39 01 00 00 00 00 02 53 24 /* Turn on BL */];
+		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
+		qcom,mdss-pan-physical-width-dimension = <61>;
+		qcom,mdss-pan-physical-height-dimension = <109>;
+		qcom,mdss-shrink-pwm = <6 79 255>;
+		qcom,mdss-dsi-lp11-init;
+		htc,mdss-camera-blk = <177>;
+		htc,mdss-camera-dua-blk = <177>;
+		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
+		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 82];
+		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 83];
+		htc,dimming-on-cmds = [39 01 00 00 00 00 02 53 2C];
+		htc,mdss-pp-hue = <0xfef>;
+		qcom,mdss-shrink-pwm-power-hack = <6 56 255>;
+		htc,mdss-camera-blk-power-hack = <130>;
+		htc,cabc-ui-cmds-power-hack = [
+					39 01 00 00 00 00 02 55 82
+					39 01 00 00 01 00 02 FF 24 /* Enter Page2 CMD4 */
+					39 01 00 00 01 00 02 90 94  /* fps 60 */
+					39 01 00 00 01 00 02 91 40  /* fps 60 */
+					39 01 00 00 01 00 02 92 95  /* fps 60 */
+					39 01 00 00 01 00 02 FF 01 /* Enter CMD1 */];
+		htc,cabc-video-cmds-power-hack = [
+					39 01 00 00 00 00 02 55 83
+					39 01 00 00 01 00 02 FF 24 /* Enter Page2 CMD4 */
+					39 01 00 00 01 00 02 90 2A /* fps 30 */
+					39 01 00 00 01 00 02 91 61  /* fps 30 */
+					39 01 00 00 01 00 02 92 2A /* fps 30 */
+					39 01 00 00 01 00 02 FF 01 /* Enter CMD1 */];
+		htc,panel-id=<3>;
+	};
+
+	qcom,mdss_dsi_m8_sharp_novatek_35595_1080p_cmd {
+		compatible = "qcom,mdss-dsi-panel";
+		status = "disable";
+		qcom,cont-splash-enabled;
+		qcom,mdss-dsi-panel-name = "m8 1080p sharp/NT35595 cmd mode dsi panel";
+		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
+
+		qcom,mdss-dsi-panel-type = "dsi_cmd_mode";
+		qcom,mdss-dsi-te-pin-select = <1>;
+		qcom,mdss-dsi-te-v-sync-rd-ptr-irq-line = <0x2c>;
+		qcom,mdss-dsi-te-dcs-command = <1>;
+		qcom,mdss-dsi-te-check-enable;
+		qcom,mdss-dsi-te-using-te-pin;
+
+		qcom,mdss-dsi-panel-destination = "display_1";
+		qcom,mdss-dsi-panel-framerate = <60>;
+		qcom,mdss-dsi-virtual-channel-id = <0>;
+		qcom,mdss-dsi-stream = <0>;
+		qcom,mdss-dsi-panel-width = <1080>;
+		qcom,mdss-dsi-panel-height = <1920>;
+		qcom,mdss-dsi-h-front-porch = <100>;
+		qcom,mdss-dsi-h-back-porch = <50>;
+		qcom,mdss-dsi-h-pulse-width = <10>;
+		qcom,mdss-dsi-h-sync-skew = <0>;
+		qcom,mdss-dsi-v-back-porch = <4>;
+		qcom,mdss-dsi-v-front-porch = <4>;
+		qcom,mdss-dsi-v-pulse-width = <2>;
+		qcom,mdss-dsi-h-left-border = <0>;
+		qcom,mdss-dsi-h-right-border = <0>;
+		qcom,mdss-dsi-v-top-border = <0>;
+		qcom,mdss-dsi-v-bottom-border = <0>;
+		qcom,mdss-dsi-bpp = <24>;
+		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
+		qcom,mdss-dsi-underflow-color = <0xff>;
+		qcom,mdss-dsi-border-color = <0>;
+		qcom,mdss-dsi-on-command = [
+			39 01 00 00 00 00 02 BB 10 /* MIPI CMD mode */
+			39 01 00 00 01 00 02 FF 23 /* Enter CMD2 page3 */
+			39 01 00 00 00 00 02 00 02 /* DMCT = 1, Select the enable / disable mechanism for CABC and Manual dimming functions. */
+			39 01 00 00 00 00 02 01 84 /* Enable CABC dimmin and Gamma Dimming */
+			39 01 00 00 00 00 02 05 24 /* Moving mode dimming 32step, still mode 32step */
+			39 01 00 00 00 00 02 08 04 /* PWMDIV[7:0] for PWM frequency */
+			39 01 00 00 00 00 02 46 00 /* PWM duty count for 42.96kHZ */
+			39 01 00 00 00 00 02 17 FF /* CABC still mode PWM - gray 240-255 */
+			39 01 00 00 00 00 02 18 FA /* CABC still mode PWM - gray 224-239 */
+			39 01 00 00 00 00 02 19 F8 /* CABC still mode PWM - gray 208-223 */
+			39 01 00 00 00 00 02 1A F5 /* CABC still mode PWM - gray 192-207 */
+			39 01 00 00 00 00 02 1B EE /* CABC still mode PWM - gray 160-191 */
+			39 01 00 00 00 00 02 1C E1 /* CABC still mode PWM - gray 128-159 */
+			39 01 00 00 00 00 02 1D D5 /* CABC still mode PWM - gray 112-127 */
+			39 01 00 00 00 00 02 1E CD /* CABC still mode PWM - gray 64-111 */
+			39 01 00 00 00 00 02 1F B9 /* CABC still mode PWM - gray 16-63 */
+			39 01 00 00 00 00 02 20 B4 /* CABC still mode PWM - gray 0-15 */
+			39 01 00 00 00 00 02 21 FF /* CABC movie mode PWM - gray 240-255 */
+			39 01 00 00 00 00 02 22 FA /* CABC movie mode PWM - gray 224-239 */
+			39 01 00 00 00 00 02 23 F5 /* CABC movie mode PWM - gray 208-223 */
+			39 01 00 00 00 00 02 24 EB /* CABC movie mode PWM -gray 192-207 */
+			39 01 00 00 00 00 02 25 E1 /* CABC movie mode PWM - gray 160-191 */
+			39 01 00 00 00 00 02 26 C8 /* CABC movie mode PWM - gray 128-159 */
+			39 01 00 00 00 00 02 27 AA /* CABC movie mode PWM - gray 112-127 */
+			39 01 00 00 00 00 02 28 96 /* CABC movie mode PWM- gray 64-111 */
+			39 01 00 00 00 00 02 29 73 /* CABC movie mode PWM - gray 16-63 */
+			39 01 00 00 00 00 02 2A 66 /* CABC movie mode PWM - gray 0-15 */
+			39 01 00 00 00 00 02 09 02 /* CABC still mode Gamma curve compensation - gray 240-255 */
+			39 01 00 00 00 00 02 0A 06 /* CABC still mode Gamma curve compensation - gray 224-239 */
+			39 01 00 00 00 00 02 0B 07 /* CABC still mode Gamma curve compensation - gray 208-223 */
+			39 01 00 00 00 00 02 0C 08 /* CABC still mode Gamma curve compensation - gray 192-207 */
+			39 01 00 00 00 00 02 0D 09 /* CABC still mode Gamma curve compensation - gray 160-191 */
+			39 01 00 00 00 00 02 0E 0B /* CABC still mode Gamma curve compensation - gray 128-159 */
+			39 01 00 00 00 00 02 0F 0D /* CABC still mode Gamma curve compensation - gray 112-127 */
+			39 01 00 00 00 00 02 10 0D /* CABC still mode Gamma curve compensation - gray 64-111 */
+			39 01 00 00 00 00 02 11 12 /* CABC still mode Gamma curve compensation - gray 16-63 */
+			39 01 00 00 00 00 02 12 20 /* CABC still mode Gamma curve compensation - gray 0-15 */
+			39 01 00 00 00 00 02 33 0C /* CABC Movie mode Gamma curve compensation */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P3 */
+			39 01 00 00 01 00 02 FF 22 /* Enter CMD2 page2 */
+			39 01 00 00 00 00 02 00 00 /* parameter to adjust saturation > 0.98 */
+			39 01 00 00 00 00 02 01 04 /* parameter to adjustsaturation 0.95~0.98 */
+			39 01 00 00 00 00 02 02 08 /* parameter to adjustsaturation 0.91~0.95 */
+			39 01 00 00 00 00 02 03 0C /* parameter to adjustsaturation 0.88~0.91 */
+			39 01 00 00 00 00 02 04 10 /* parameter to adjustsaturation 0.85~0.88 */
+			39 01 00 00 00 00 02 05 14 /* parameter to adjustsaturation 0.82~0.85 */
+			39 01 00 00 00 00 02 06 18 /* parameter to adjustsaturation 0.79~0.82 */
+			39 01 00 00 00 00 02 07 20 /* parameter to adjustsaturation 0.76~0.79 */
+			39 01 00 00 00 00 02 08 24 /* parameter to adjustsaturation 0.73~0.76 */
+			39 01 00 00 00 00 02 09 28 /* parameter to adjustsaturation 0.7~0.73 */
+			39 01 00 00 00 00 02 0A 30 /* parameter to adjustsaturation 0.66~0.7 */
+			39 01 00 00 00 00 02 0B 38 /* parameter to adjustsaturation 0.6~0.66 */
+			39 01 00 00 00 00 02 0C 38 /* parameter to adjustsaturation 0.54~0.6 */
+			39 01 00 00 00 00 02 0D 30 /* parameter to adjustsaturation 0.48~0.54 */
+			39 01 00 00 00 00 02 0E 28 /* parameter to adjustsaturation 0.41~0.48 */
+			39 01 00 00 00 00 02 0F 20 /* parameter to adjustsaturation 0.35~0.41 */
+			39 01 00 00 00 00 02 10 10 /* parameter to adjustsaturation 0.26~0.35 */
+			39 01 00 00 00 00 02 11 00 /* parameter to adjustsaturation 0.16~0.26 */
+			39 01 00 00 00 00 02 12 00 /* parameter to adjustsaturation 0.07~0.16 */
+			39 01 00 00 00 00 02 13 00 /* parameter to adjustsaturation < 0.07 */
+			39 01 00 00 00 00 02 32 10 /* HUE 0~15 degree */
+			39 01 00 00 00 00 02 33 10 /* HUE 15~30 degree */
+			39 01 00 00 00 00 02 34 10 /* HUE 30~45 degree */
+			39 01 00 00 00 00 02 35 10 /* HUE 45~60 degree */
+			39 01 00 00 00 00 02 36 10 /* HUE 60~75 degree */
+			39 01 00 00 00 00 02 37 10 /* HUE 75~90 degree */
+			39 01 00 00 00 00 02 38 10 /* HUE 90~105 degree */
+			39 01 00 00 00 00 02 39 10 /* HUE 105~120 degree */
+			39 01 00 00 00 00 02 3A 10 /* HUE 120~135 degree */
+			39 01 00 00 00 00 02 3B 10 /* HUE 135~150 degree */
+			39 01 00 00 00 00 02 3F 10 /* HUE 150~165 degree */
+			39 01 00 00 00 00 02 40 10 /* HUE 165~180 degree */
+			39 01 00 00 00 00 02 41 10 /* HUE 180~195 degree */
+			39 01 00 00 00 00 02 42 10 /* HUE 195~210 degree */
+			39 01 00 00 00 00 02 43 10 /* HUE 210~225 degree */
+			39 01 00 00 00 00 02 44 10 /* HUE 225~240 degree */
+			39 01 00 00 00 00 02 45 10 /* HUE 240~255 degree */
+			39 01 00 00 00 00 02 46 10 /* HUE 255~270 degree */
+			39 01 00 00 00 00 02 47 10 /* HUE 270~285 degree */
+			39 01 00 00 00 00 02 48 10 /* HUE 285~300 degree */
+			39 01 00 00 00 00 02 49 10 /* HUE 300~315 degree */
+			39 01 00 00 00 00 02 4A 10 /* HUE 315~330 degree */
+			39 01 00 00 00 00 02 4B 10 /* HUE 330~345 degree */
+			39 01 00 00 00 00 02 4C 10 /* HUE 345~360 degree */
+			39 01 00 00 00 00 02 1A 00 /* Disable Vivid Color */
+			39 01 00 00 00 00 02 53 01 /* Enable Smart Color */
+			39 01 00 00 00 00 02 54 00 /* Disable SKIN_KEEP */
+			39 01 00 00 00 00 02 55 00 /* Disable Over-Saturation protection */
+			39 01 00 00 00 00 02 56 01 /* Enable Smart Contrast */
+			39 01 00 00 00 00 02 68 01 /* Enable Edge Enhancement */
+			39 01 00 00 00 00 02 4D 0E /* Smart Color global ratio */
+			39 01 00 00 00 00 02 58 0E /* Smart Contrast Dark part parameter 14 */
+			39 01 00 00 00 00 02 59 14 /* Smart Contrast Light part parameter 20 */
+			39 01 00 00 00 00 02 64 20 /* Turn off Smart Contrast local reference */
+			39 01 00 00 00 00 02 65 02 /* Edge level 2 */
+			39 01 00 00 00 00 02 69 02 /* Edge THD level 0 */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P2 */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 00 00 02 55 82 /* Enable IE slight level and CABC still mode */
+			39 01 00 00 00 00 02 5E 22 /* Enable CMB function limit 13% */
+			39 01 00 00 78 00 02 11 00 /* LCD Sleep out command */
+			39 01 00 00 01 00 02 FF 24 /* Enter CMD24 */
+			39 01 00 00 00 00 02 C6 09 /* Output Hsync to HSOUT */
+			39 01 00 00 00 00 02 FB 01 /* No MTP reload at CMD2 P4 */
+			39 01 00 00 00 00 02 FF F0
+			39 01 00 00 00 00 02 B3 FF
+			39 01 00 00 00 00 02 B4 FF
+			39 01 00 00 00 00 02 B5 FF
+			39 01 00 00 00 00 02 B6 FF
+			39 01 00 00 00 00 02 B7 FF
+			39 01 00 00 00 00 02 B8 FF
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 00 00 02 35 00 /* Turn on TE (TEE/ TE H/W pin) function */
+			39 01 00 00 00 00 02 29 00 /* LCD Display on */];
+		qcom,mdss-dsi-off-command = [
+			39 01 00 00 16 00 02 28 00
+			39 01 00 00 4A 00 02 10 00];
+		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
+		qcom,mdss-dsi-h-sync-pulse = <1>;
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
+		qcom,mdss-dsi-bllp-eof-power-mode;
+		qcom,mdss-dsi-lane-map = "lane_map_0123";
+		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-dsi-lane-0-state;
+		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-lane-2-state;
+		qcom,mdss-dsi-lane-3-state;
+		qcom,mdss-dsi-panel-timings =  [c3 40 33 00 57 51 35 42 52 03 04 00];
+		qcom,mdss-dsi-t-clk-post = <0x0a>;
+		qcom,mdss-dsi-t-clk-pre = <0x2a>;
+		qcom,mdss-dsi-bl-min-level = <1>;
+		qcom,mdss-dsi-bl-max-level = <255>;
+		qcom,mdss-dsi-dma-trigger = "trigger_sw";
+		qcom,mdss-dsi-mdp-trigger = "none";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+		qcom,display-on-cmds = [39 01 00 00 00 00 02 53 24 /* Turn on BL */];
+		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
+		qcom,mdss-pan-physical-width-dimension = <61>;
+		qcom,mdss-pan-physical-height-dimension = <109>;
+		qcom,mdss-shrink-pwm = <6 79 255>;
+		qcom,mdss-dsi-lp11-init;
+		qcom,partial-update-enabled;
+		qcom,mdss-even-coordinate-update;
+		htc,mdss-camera-blk = <177>;
+		htc,mdss-camera-dua-blk = <177>;
+		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
+		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 82];
+		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 83];
+		htc,dimming-on-cmds = [39 01 00 00 00 00 02 53 2C];
+		htc,mdss-pp-hue = <0xfef>;
+		qcom,mdss-shrink-pwm-power-hack = <6 56 255>;
+		htc,mdss-camera-blk-power-hack = <130>;
+		htc,cabc-ui-cmds-power-hack = [
+					39 01 00 00 00 00 02 55 82
+					39 01 00 00 01 00 02 FF 24 /* Enter Page2 CMD4 */
+					39 01 00 00 01 00 02 90 78 /* fps 60 */
+					39 01 00 00 01 00 02 92 78 /* fps 60 */
+					39 01 00 00 01 00 02 FF 01 /* Enter CMD1 */];
+		htc,cabc-video-cmds-power-hack = [
+					39 01 00 00 00 00 02 55 83
+					39 01 00 00 01 00 02 FF 24 /* Enter Page2 CMD4 */
+					39 01 00 00 01 00 02 90 E1 /* fps 30 */
+					39 01 00 00 01 00 02 92 E1 /* fps 30 */
+					39 01 00 00 01 00 02 FF 01 /* Enter CMD1 */];
+		htc,frame-suffix-cmds = [
+					15 00 00 00 00 00 02 FF F0 /* Enter CMD3 – Engineer Mode B */
+					15 00 00 00 00 00 02 BD 02 /* Set BIST CLK: 1T =200nS */
+					15 00 00 00 00 00 02 B9 A0 /* BIST Enable Mode set */
+					15 00 00 00 00 00 02 BD 0A /* Set BIST Revise Scan */
+					15 00 00 00 00 00 02 B9 A2 /* BIST ON */
+					05 00 00 00 00 00 02 D2 00 /* Dummy write for delay */
+					15 00 00 00 00 00 02 BD 02 /* Set BIST Forward Scan */
+					05 00 00 00 00 00 02 D2 00 /* Dummy write for delay */
+					05 00 00 00 00 00 02 D2 00 /* Dummy write for delay */
+					05 00 00 00 00 00 02 D2 00 /* Dummy write for delay */
+					15 00 00 00 00 00 02 B9 80 /* BIST OFF */
+					15 01 00 00 00 00 02 FF 10 /* Enter CMD1 */];
+		htc,panel-id=<1>;
+	};
+
+	qcom,mdss_dsi_m8_sharp_novatek_35695_1080p_video {
+		compatible = "qcom,mdss-dsi-panel";
+		status = "disable";
+		qcom,cont-splash-enabled;
+		qcom,mdss-dsi-panel-name = "m8 1080p sharp/NT35695 video mode dsi panel";
+		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
+		qcom,mdss-dsi-panel-type = "dsi_video_mode";
+		qcom,mdss-dsi-panel-destination = "display_1";
+		qcom,mdss-dsi-panel-framerate = <60>;
+		qcom,mdss-dsi-virtual-channel-id = <0>;
+		qcom,mdss-dsi-stream = <0>;
+		qcom,mdss-dsi-panel-width = <1080>;
+		qcom,mdss-dsi-panel-height = <1920>;
+		qcom,mdss-dsi-h-front-porch = <100>;
+		qcom,mdss-dsi-h-back-porch = <50>;
+		qcom,mdss-dsi-h-pulse-width = <10>;
+		qcom,mdss-dsi-h-sync-skew = <0>;
+		qcom,mdss-dsi-v-back-porch = <4>;
+		qcom,mdss-dsi-v-front-porch = <4>;
+		qcom,mdss-dsi-v-pulse-width = <2>;
+		qcom,mdss-dsi-h-left-border = <0>;
+		qcom,mdss-dsi-h-right-border = <0>;
+		qcom,mdss-dsi-v-top-border = <0>;
+		qcom,mdss-dsi-v-bottom-border = <0>;
+		qcom,mdss-dsi-bpp = <24>;
+		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
+		qcom,mdss-dsi-underflow-color = <0xff>;
+		qcom,mdss-dsi-border-color = <0>;
+		qcom,mdss-dsi-on-command = [
+			39 01 00 00 00 00 02 BB 03 /* MIPI Video mode bypass ram */
+			39 01 00 00 00 00 04 3B 03 06 04 /* Set V-Porch for MIPI Video mode */
+			39 01 00 00 01 00 02 FF 10
+			39 01 00 00 01 00 02 FF 23
+			39 01 00 00 00 00 02 00 02 /* DMCT = 1, Select the enable / disable mechanism for CABC and Manual dimming functions. */
+			39 01 00 00 00 00 02 05 12
+			39 01 00 00 00 00 02 01 80 /* still mode, movie mode dimming */
+			39 01 00 00 00 00 02 46 00 /* PWM duty count for 42.96kHZ */
+			39 01 00 00 00 00 02 08 02 /* PWMDIV[7:0] for PWM frequency */
+			39 01 00 00 00 00 02 17 FF /* CABC still mode PWM */
+			39 01 00 00 00 00 02 18 FA /* CABC still mode PWM */
+			39 01 00 00 00 00 02 19 F8 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1A F5 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1B EE /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1C E1 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1D D5 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1E CD /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1F B9 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 20 B4 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 21 FF /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 22 FA /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 23 F5 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 24 EB /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 25 E1 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 26 C8 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 27 AA /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 28 96 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 29 73 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 2A 66 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 09 0A /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0A 0B /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0B 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0C 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0D 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0E 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0F 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 10 17 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 11 18 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 12 20 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 33 20 /* CABC Movie mode Gamma curve compensation */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P3 */
+			39 01 00 00 01 00 02 FF 10
+			39 01 00 00 01 00 02 FF 22 /* Enter CMD2 page2 */
+			39 01 00 00 00 00 02 00 00 /* IE setting */
+			39 01 00 00 00 00 02 01 04
+			39 01 00 00 00 00 02 02 08
+			39 01 00 00 00 00 02 03 0C
+			39 01 00 00 00 00 02 04 10
+			39 01 00 00 00 00 02 05 14
+			39 01 00 00 00 00 02 06 18
+			39 01 00 00 00 00 02 07 20
+			39 01 00 00 00 00 02 08 24
+			39 01 00 00 00 00 02 09 28
+			39 01 00 00 00 00 02 0A 30
+			39 01 00 00 00 00 02 0B 38
+			39 01 00 00 00 00 02 0C 38
+			39 01 00 00 00 00 02 0D 30
+			39 01 00 00 00 00 02 0E 28
+			39 01 00 00 00 00 02 0F 20
+			39 01 00 00 00 00 02 10 10
+			39 01 00 00 00 00 02 11 00
+			39 01 00 00 00 00 02 12 00
+			39 01 00 00 00 00 02 13 00
+			39 01 00 00 00 00 02 1B 00
+			39 01 00 00 00 00 02 1C 04
+			39 01 00 00 00 00 02 1D 08
+			39 01 00 00 00 00 02 1E 0C
+			39 01 00 00 00 00 02 1F 10
+			39 01 00 00 00 00 02 20 14
+			39 01 00 00 00 00 02 21 18
+			39 01 00 00 00 00 02 22 20
+			39 01 00 00 00 00 02 23 18
+			39 01 00 00 00 00 02 24 10
+			39 01 00 00 00 00 02 25 08
+			39 01 00 00 00 00 02 26 00
+			39 01 00 00 00 00 02 27 00
+			39 01 00 00 00 00 02 28 00
+			39 01 00 00 00 00 02 29 00
+			39 01 00 00 00 00 02 2A 00
+			39 01 00 00 00 00 02 2B 00
+			39 01 00 00 00 00 02 2F 00
+			39 01 00 00 00 00 02 30 00
+			39 01 00 00 00 00 02 31 00
+			39 01 00 00 00 00 02 32 9C
+			39 01 00 00 00 00 02 33 9C
+			39 01 00 00 00 00 02 34 9C
+			39 01 00 00 00 00 02 35 00
+			39 01 00 00 00 00 02 36 02
+			39 01 00 00 00 00 02 37 04
+			39 01 00 00 00 00 02 38 06
+			39 01 00 00 00 00 02 39 08
+			39 01 00 00 00 00 02 3A 0A
+			39 01 00 00 00 00 02 3B 0C
+			39 01 00 00 00 00 02 3F 0E
+			39 01 00 00 00 00 02 40 12
+			39 01 00 00 00 00 02 41 16
+			39 01 00 00 00 00 02 42 16
+			39 01 00 00 00 00 02 43 12
+			39 01 00 00 00 00 02 44 0E
+			39 01 00 00 00 00 02 45 0C
+			39 01 00 00 00 00 02 46 0A
+			39 01 00 00 00 00 02 47 08
+			39 01 00 00 00 00 02 48 06
+			39 01 00 00 00 00 02 49 04
+			39 01 00 00 00 00 02 4A 02
+			39 01 00 00 00 00 02 4B 00
+			39 01 00 00 00 00 02 4C 9C
+			39 01 00 00 00 00 02 1A 01
+			39 01 00 00 00 00 02 53 00
+			39 01 00 00 00 00 02 54 00
+			39 01 00 00 00 00 02 55 00
+			39 01 00 00 00 00 02 56 00
+			39 01 00 00 00 00 02 68 01
+			39 01 00 00 00 00 02 14 10
+			39 01 00 00 00 00 02 4D 00
+			39 01 00 00 00 00 02 58 12
+			39 01 00 00 00 00 02 59 0E
+			39 01 00 00 00 00 02 64 2F
+			39 01 00 00 00 00 02 65 02
+			39 01 00 00 00 00 02 69 02
+			39 01 00 00 00 00 02 FB 01
+			39 01 00 00 01 00 02 FF 10
+			39 01 00 00 00 00 02 55 82 /* Enable IE slight level and CABC still mode */
+			39 01 00 00 78 00 02 11 00 /* LCD Sleep out command */
+			39 01 00 00 01 00 02 FF 24 /* Enter CMD24 */
+			39 01 00 00 00 00 02 C6 09 /* Output Hsync to HSOUT */
+			39 01 00 00 00 00 02 E3 04 /* Enable Auto detect VBP VFP function*/
+			39 01 00 00 00 00 02 FB 01 /* No MTP reload at CMD 24 */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 00 00 02 35 00 /* Turn on TE (TEE/ TE H/W pin) function */
+			39 01 00 00 00 00 02 53 24 /* Enable CABC, Turn on BL */];
+		qcom,mdss-dsi-off-command = [
+			39 01 00 00 16 00 02 28 00 /* display_off */
+			39 01 00 00 4A 00 02 10 00];
+		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
+		qcom,mdss-dsi-h-sync-pulse = <0>;
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
+		qcom,mdss-dsi-bllp-eof-power-mode;
+		qcom,mdss-dsi-lane-map = "lane_map_0123";
+		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-dsi-lane-0-state;
+		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-lane-2-state;
+		qcom,mdss-dsi-lane-3-state;
+		qcom,mdss-dsi-panel-timings =  [c3 40 33 00 57 51 35 42 52 03 04 00];
+		qcom,mdss-dsi-t-clk-post = <0x02>;
+		qcom,mdss-dsi-t-clk-pre = <0x2a>;
+		qcom,mdss-dsi-bl-min-level = <1>;
+		qcom,mdss-dsi-bl-max-level = <255>;
+		qcom,mdss-dsi-dma-trigger = "trigger_sw";
+		qcom,mdss-dsi-mdp-trigger = "none";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+		qcom,display-on-cmds = [39 01 00 00 00 00 02 29 00 /* LCD Display on */];
+		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
+		qcom,mdss-pan-physical-width-dimension = <61>;
+		qcom,mdss-pan-physical-height-dimension = <109>;
+		qcom,mdss-shrink-pwm = <6 79 255>;
+		qcom,mdss-dsi-lp11-init;
+		htc,mdss-camera-blk = <177>;
+		htc,mdss-camera-dua-blk = <177>;
+		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
+		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 82];
+		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 83];
+		htc,dimming-on-cmds = [39 01 00 00 00 00 02 53 2C];
+		htc,panel-id=<3>;
+	};
+
+	qcom,mdss_dsi_m8_lg_novatek_35695_1080p_video {
+		compatible = "qcom,mdss-dsi-panel";
+		status = "disable";
+		qcom,cont-splash-enabled;
+		qcom,mdss-dsi-panel-name = "m8 1080p LG/NT35695 video mode dsi panel";
+		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
+		qcom,mdss-dsi-panel-type = "dsi_video_mode";
+		qcom,mdss-dsi-panel-destination = "display_1";
+		qcom,mdss-dsi-panel-framerate = <60>;
+		qcom,mdss-dsi-virtual-channel-id = <0>;
+		qcom,mdss-dsi-stream = <0>;
+		qcom,mdss-dsi-panel-width = <1080>;
+		qcom,mdss-dsi-panel-height = <1920>;
+		qcom,mdss-dsi-h-front-porch = <100>;
+		qcom,mdss-dsi-h-back-porch = <50>;
+		qcom,mdss-dsi-h-pulse-width = <10>;
+		qcom,mdss-dsi-h-sync-skew = <0>;
+		qcom,mdss-dsi-v-back-porch = <4>;
+		qcom,mdss-dsi-v-front-porch = <4>;
+		qcom,mdss-dsi-v-pulse-width = <2>;
+		qcom,mdss-dsi-h-left-border = <0>;
+		qcom,mdss-dsi-h-right-border = <0>;
+		qcom,mdss-dsi-v-top-border = <0>;
+		qcom,mdss-dsi-v-bottom-border = <0>;
+		qcom,mdss-dsi-bpp = <24>;
+		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
+		qcom,mdss-dsi-underflow-color = <0xff>;
+		qcom,mdss-dsi-border-color = <0>;
+		qcom,mdss-dsi-on-command = [
+			39 01 00 00 00 00 02 BB 03 /* MIPI VIDEO mode */
+			39 01 00 00 00 00 04 3B 03 06 04 /* Set V-Porch for MIPI Video mode */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 01 00 02 FF 23 /* Enter CMD2 page3 */
+			39 01 00 00 00 00 02 00 02 /* DMCT = 1, Select the enable / disable mechanism for CABC and Manual dimming functions. */
+			39 01 00 00 00 00 02 05 12
+			39 01 00 00 00 00 02 01 80 /* still mode, movie mode dimming */
+			39 01 00 00 00 00 02 46 00 /* PWM duty count for 42.96kHZ */
+			39 01 00 00 00 00 02 08 02 /* PWMDIV[7:0] for PWM frequency */
+			39 01 00 00 00 00 02 17 FF /* CABC still mode PWM */
+			39 01 00 00 00 00 02 18 FA /* CABC still mode PWM */
+			39 01 00 00 00 00 02 19 F8 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1A F5 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1B EE /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1C E1 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1D D5 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1E CD /* CABC still mode PWM */
+			39 01 00 00 00 00 02 1F B9 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 20 B4 /* CABC still mode PWM */
+			39 01 00 00 00 00 02 21 FF /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 22 FA /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 23 F5 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 24 EB /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 25 E1 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 26 C8 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 27 AA /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 28 96 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 29 73 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 2A 66 /* CABC movie mode PWM */
+			39 01 00 00 00 00 02 09 0A /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0A 0B /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0B 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0C 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0D 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0E 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 0F 10 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 10 17 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 11 18 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 12 20 /* CABC still mode Gamma curve compensation */
+			39 01 00 00 00 00 02 33 20 /* CABC Movie mode Gamma curve compensation */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P3 */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 01 00 02 FF 22 /* Enter CMD2 page2 */
+			39 01 00 00 00 00 02 00 00
+			39 01 00 00 00 00 02 01 04
+			39 01 00 00 00 00 02 02 08
+			39 01 00 00 00 00 02 03 0C
+			39 01 00 00 00 00 02 04 10
+			39 01 00 00 00 00 02 05 14
+			39 01 00 00 00 00 02 06 18
+			39 01 00 00 00 00 02 07 20
+			39 01 00 00 00 00 02 08 24
+			39 01 00 00 00 00 02 09 28
+			39 01 00 00 00 00 02 0A 30
+			39 01 00 00 00 00 02 0B 38
+			39 01 00 00 00 00 02 0C 38
+			39 01 00 00 00 00 02 0D 30
+			39 01 00 00 00 00 02 0E 28
+			39 01 00 00 00 00 02 0F 20
+			39 01 00 00 00 00 02 10 10
+			39 01 00 00 00 00 02 11 00
+			39 01 00 00 00 00 02 12 00
+			39 01 00 00 00 00 02 13 00
+			39 01 00 00 00 00 02 1B 00
+			39 01 00 00 00 00 02 1C 04
+			39 01 00 00 00 00 02 1D 08
+			39 01 00 00 00 00 02 1E 0C
+			39 01 00 00 00 00 02 1F 10
+			39 01 00 00 00 00 02 20 14
+			39 01 00 00 00 00 02 21 18
+			39 01 00 00 00 00 02 22 20
+			39 01 00 00 00 00 02 23 18
+			39 01 00 00 00 00 02 24 10
+			39 01 00 00 00 00 02 25 08
+			39 01 00 00 00 00 02 26 00
+			39 01 00 00 00 00 02 27 00
+			39 01 00 00 00 00 02 28 00
+			39 01 00 00 00 00 02 29 00
+			39 01 00 00 00 00 02 2A 00
+			39 01 00 00 00 00 02 2B 00
+			39 01 00 00 00 00 02 2F 00
+			39 01 00 00 00 00 02 30 00
+			39 01 00 00 00 00 02 31 00
+			39 01 00 00 00 00 02 32 9C
+			39 01 00 00 00 00 02 33 9C
+			39 01 00 00 00 00 02 34 9C
+			39 01 00 00 00 00 02 35 00
+			39 01 00 00 00 00 02 36 02
+			39 01 00 00 00 00 02 37 04
+			39 01 00 00 00 00 02 38 06
+			39 01 00 00 00 00 02 39 08
+			39 01 00 00 00 00 02 3A 0A
+			39 01 00 00 00 00 02 3B 0C
+			39 01 00 00 00 00 02 3F 0E
+			39 01 00 00 00 00 02 40 12
+			39 01 00 00 00 00 02 41 16
+			39 01 00 00 00 00 02 42 16
+			39 01 00 00 00 00 02 43 12
+			39 01 00 00 00 00 02 44 0E
+			39 01 00 00 00 00 02 45 0C
+			39 01 00 00 00 00 02 46 0A
+			39 01 00 00 00 00 02 47 08
+			39 01 00 00 00 00 02 48 06
+			39 01 00 00 00 00 02 49 04
+			39 01 00 00 00 00 02 4A 02
+			39 01 00 00 00 00 02 4B 00
+			39 01 00 00 00 00 02 4C 9C
+			39 01 00 00 00 00 02 1A 01
+			39 01 00 00 00 00 02 53 00
+			39 01 00 00 00 00 02 54 00
+			39 01 00 00 00 00 02 55 00
+			39 01 00 00 00 00 02 56 00
+			39 01 00 00 00 00 02 68 01
+			39 01 00 00 00 00 02 14 10
+			39 01 00 00 00 00 02 4D 00
+			39 01 00 00 00 00 02 58 12
+			39 01 00 00 00 00 02 59 0E
+			39 01 00 00 00 00 02 64 2F
+			39 01 00 00 00 00 02 65 02
+			39 01 00 00 00 00 02 69 02
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P2 */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 01 00 02 FF 20 /* Enter CMD2 page0 */
+			39 01 00 00 00 00 02 00 01
+			39 01 00 00 00 00 02 01 55
+			39 01 00 00 00 00 02 02 45
+			39 01 00 00 00 00 02 03 55
+			39 01 00 00 00 00 02 05 50
+			39 01 00 00 00 00 02 06 9E
+			39 01 00 00 00 00 02 07 A8
+			39 01 00 00 00 00 02 08 0C
+			39 01 00 00 00 00 02 0D 00
+			39 01 00 00 00 00 02 0B F0 /* GVDDP=5.2V */
+			39 01 00 00 00 00 02 0C F0 /* GVDDN=-5.2V */
+			39 01 00 00 00 00 02 0E 00
+			39 01 00 00 00 00 02 0F 00
+			39 01 00 00 00 00 02 11 29
+			39 01 00 00 00 00 02 12 29
+			39 01 00 00 00 00 02 13 03
+			39 01 00 00 00 00 02 14 0A
+			39 01 00 00 00 00 02 15 9C
+			39 01 00 00 00 00 02 16 9C
+			39 01 00 00 00 00 02 58 00
+			39 01 00 00 00 00 02 59 00
+			39 01 00 00 00 00 02 5A 00
+			39 01 00 00 00 00 02 5B 00
+			39 01 00 00 00 00 02 5C 00
+			39 01 00 00 00 00 02 5D 00
+			39 01 00 00 00 00 02 5E 00
+			39 01 00 00 00 00 02 5F 00
+			39 01 00 00 00 00 02 68 03
+			39 01 00 00 00 00 02 69 A0
+			39 01 00 00 00 00 02 6A 33
+			39 01 00 00 00 00 02 6B 40
+			39 01 00 00 00 00 02 6C 33
+			39 01 00 00 00 00 02 6D 44
+			39 01 00 00 00 00 02 75 00
+			39 01 00 00 00 00 02 76 00
+			39 01 00 00 00 00 02 77 00
+			39 01 00 00 00 00 02 78 4E
+			39 01 00 00 00 00 02 79 00
+			39 01 00 00 00 00 02 7A 74
+			39 01 00 00 00 00 02 7B 00
+			39 01 00 00 00 00 02 7C 92
+			39 01 00 00 00 00 02 7D 00
+			39 01 00 00 00 00 02 7E A6
+			39 01 00 00 00 00 02 7F 00
+			39 01 00 00 00 00 02 80 BA
+			39 01 00 00 00 00 02 81 00
+			39 01 00 00 00 00 02 82 CC
+			39 01 00 00 00 00 02 83 00
+			39 01 00 00 00 00 02 84 DF
+			39 01 00 00 00 00 02 85 00
+			39 01 00 00 00 00 02 86 F4
+			39 01 00 00 00 00 02 87 01
+			39 01 00 00 00 00 02 88 15
+			39 01 00 00 00 00 02 89 01
+			39 01 00 00 00 00 02 8A 48
+			39 01 00 00 00 00 02 8B 01
+			39 01 00 00 00 00 02 8C 7A
+			39 01 00 00 00 00 02 8D 01
+			39 01 00 00 00 00 02 8E A6
+			39 01 00 00 00 00 02 8F 01
+			39 01 00 00 00 00 02 90 DF
+			39 01 00 00 00 00 02 91 02
+			39 01 00 00 00 00 02 92 12
+			39 01 00 00 00 00 02 93 02
+			39 01 00 00 00 00 02 94 15
+			39 01 00 00 00 00 02 95 02
+			39 01 00 00 00 00 02 96 3C
+			39 01 00 00 00 00 02 97 02
+			39 01 00 00 00 00 02 98 71
+			39 01 00 00 00 00 02 99 02
+			39 01 00 00 00 00 02 9A 92
+			39 01 00 00 00 00 02 9B 02
+			39 01 00 00 00 00 02 9C C7
+			39 01 00 00 00 00 02 9D 02
+			39 01 00 00 00 00 02 9E F4
+			39 01 00 00 00 00 02 9F 03
+			39 01 00 00 00 00 02 A0 1B
+			39 01 00 00 00 00 02 A2 03
+			39 01 00 00 00 00 02 A3 41
+			39 01 00 00 00 00 02 A4 03
+			39 01 00 00 00 00 02 A5 53
+			39 01 00 00 00 00 02 A6 03
+			39 01 00 00 00 00 02 A7 68
+			39 01 00 00 00 00 02 A9 03
+			39 01 00 00 00 00 02 AA 8A
+			39 01 00 00 00 00 02 AB 03
+			39 01 00 00 00 00 02 AC B4
+			39 01 00 00 00 00 02 AD 03
+			39 01 00 00 00 00 02 AE C0
+			39 01 00 00 00 00 02 AF 03
+			39 01 00 00 00 00 02 B0 E1
+			39 01 00 00 00 00 02 B1 03
+			39 01 00 00 00 00 02 B2 FF
+			39 01 00 00 00 00 02 B3 00
+			39 01 00 00 00 00 02 B4 00
+			39 01 00 00 00 00 02 B5 00
+			39 01 00 00 00 00 02 B6 4E
+			39 01 00 00 00 00 02 B7 00
+			39 01 00 00 00 00 02 B8 74
+			39 01 00 00 00 00 02 B9 00
+			39 01 00 00 00 00 02 BA 92
+			39 01 00 00 00 00 02 BB 00
+			39 01 00 00 00 00 02 BC A6
+			39 01 00 00 00 00 02 BD 00
+			39 01 00 00 00 00 02 BE BA
+			39 01 00 00 00 00 02 BF 00
+			39 01 00 00 00 00 02 C0 CC
+			39 01 00 00 00 00 02 C1 00
+			39 01 00 00 00 00 02 C2 DF
+			39 01 00 00 00 00 02 C3 00
+			39 01 00 00 00 00 02 C4 F4
+			39 01 00 00 00 00 02 C5 01
+			39 01 00 00 00 00 02 C6 15
+			39 01 00 00 00 00 02 C7 01
+			39 01 00 00 00 00 02 C8 48
+			39 01 00 00 00 00 02 C9 01
+			39 01 00 00 00 00 02 CA 7A
+			39 01 00 00 00 00 02 CB 01
+			39 01 00 00 00 00 02 CC A6
+			39 01 00 00 00 00 02 CD 01
+			39 01 00 00 00 00 02 CE DF
+			39 01 00 00 00 00 02 CF 02
+			39 01 00 00 00 00 02 D0 12
+			39 01 00 00 00 00 02 D1 02
+			39 01 00 00 00 00 02 D2 15
+			39 01 00 00 00 00 02 D3 02
+			39 01 00 00 00 00 02 D4 3C
+			39 01 00 00 00 00 02 D5 02
+			39 01 00 00 00 00 02 D6 71
+			39 01 00 00 00 00 02 D7 02
+			39 01 00 00 00 00 02 D8 92
+			39 01 00 00 00 00 02 D9 02
+			39 01 00 00 00 00 02 DA C7
+			39 01 00 00 00 00 02 DB 02
+			39 01 00 00 00 00 02 DC F4
+			39 01 00 00 00 00 02 DD 03
+			39 01 00 00 00 00 02 DE 1B
+			39 01 00 00 00 00 02 DF 03
+			39 01 00 00 00 00 02 E0 41
+			39 01 00 00 00 00 02 E1 03
+			39 01 00 00 00 00 02 E2 53
+			39 01 00 00 00 00 02 E3 03
+			39 01 00 00 00 00 02 E4 68
+			39 01 00 00 00 00 02 E5 03
+			39 01 00 00 00 00 02 E6 8A
+			39 01 00 00 00 00 02 E7 03
+			39 01 00 00 00 00 02 E8 B4
+			39 01 00 00 00 00 02 E9 03
+			39 01 00 00 00 00 02 EA C0
+			39 01 00 00 00 00 02 EB 03
+			39 01 00 00 00 00 02 EC E1
+			39 01 00 00 00 00 02 ED 03
+			39 01 00 00 00 00 02 EE FF
+			39 01 00 00 00 00 02 EF 00
+			39 01 00 00 00 00 02 F0 00
+			39 01 00 00 00 00 02 F1 00
+			39 01 00 00 00 00 02 F2 4E
+			39 01 00 00 00 00 02 F3 00
+			39 01 00 00 00 00 02 F4 74
+			39 01 00 00 00 00 02 F5 00
+			39 01 00 00 00 00 02 F6 92
+			39 01 00 00 00 00 02 F7 00
+			39 01 00 00 00 00 02 F8 A6
+			39 01 00 00 00 00 02 F9 00
+			39 01 00 00 00 00 02 FA BA
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P0 */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 01 00 02 FF 21 /* Enter CMD2 page1 */
+			39 01 00 00 00 00 02 00 00
+			39 01 00 00 00 00 02 01 CC
+			39 01 00 00 00 00 02 02 00
+			39 01 00 00 00 00 02 03 DF
+			39 01 00 00 00 00 02 04 00
+			39 01 00 00 00 00 02 05 F4
+			39 01 00 00 00 00 02 06 01
+			39 01 00 00 00 00 02 07 15
+			39 01 00 00 00 00 02 08 01
+			39 01 00 00 00 00 02 09 48
+			39 01 00 00 00 00 02 0A 01
+			39 01 00 00 00 00 02 0B 7A
+			39 01 00 00 00 00 02 0C 01
+			39 01 00 00 00 00 02 0D A6
+			39 01 00 00 00 00 02 0E 01
+			39 01 00 00 00 00 02 0F DF
+			39 01 00 00 00 00 02 10 02
+			39 01 00 00 00 00 02 11 12
+			39 01 00 00 00 00 02 12 02
+			39 01 00 00 00 00 02 13 15
+			39 01 00 00 00 00 02 14 02
+			39 01 00 00 00 00 02 15 3C
+			39 01 00 00 00 00 02 16 02
+			39 01 00 00 00 00 02 17 71
+			39 01 00 00 00 00 02 18 02
+			39 01 00 00 00 00 02 19 92
+			39 01 00 00 00 00 02 1A 02
+			39 01 00 00 00 00 02 1B C7
+			39 01 00 00 00 00 02 1C 02
+			39 01 00 00 00 00 02 1D F4
+			39 01 00 00 00 00 02 1E 03
+			39 01 00 00 00 00 02 1F 1B
+			39 01 00 00 00 00 02 20 03
+			39 01 00 00 00 00 02 21 41
+			39 01 00 00 00 00 02 22 03
+			39 01 00 00 00 00 02 23 53
+			39 01 00 00 00 00 02 24 03
+			39 01 00 00 00 00 02 25 68
+			39 01 00 00 00 00 02 26 03
+			39 01 00 00 00 00 02 27 8A
+			39 01 00 00 00 00 02 28 03
+			39 01 00 00 00 00 02 29 B4
+			39 01 00 00 00 00 02 2A 03
+			39 01 00 00 00 00 02 2B C0
+			39 01 00 00 00 00 02 2D 03
+			39 01 00 00 00 00 02 2F E1
+			39 01 00 00 00 00 02 30 03
+			39 01 00 00 00 00 02 31 FF
+			39 01 00 00 00 00 02 32 00
+			39 01 00 00 00 00 02 33 00
+			39 01 00 00 00 00 02 34 00
+			39 01 00 00 00 00 02 35 4E
+			39 01 00 00 00 00 02 36 00
+			39 01 00 00 00 00 02 37 74
+			39 01 00 00 00 00 02 38 00
+			39 01 00 00 00 00 02 39 92
+			39 01 00 00 00 00 02 3A 00
+			39 01 00 00 00 00 02 3B A6
+			39 01 00 00 00 00 02 3D 00
+			39 01 00 00 00 00 02 3F BA
+			39 01 00 00 00 00 02 40 00
+			39 01 00 00 00 00 02 41 CC
+			39 01 00 00 00 00 02 42 00
+			39 01 00 00 00 00 02 43 DF
+			39 01 00 00 00 00 02 44 00
+			39 01 00 00 00 00 02 45 F4
+			39 01 00 00 00 00 02 46 01
+			39 01 00 00 00 00 02 47 15
+			39 01 00 00 00 00 02 48 01
+			39 01 00 00 00 00 02 49 48
+			39 01 00 00 00 00 02 4A 01
+			39 01 00 00 00 00 02 4B 7A
+			39 01 00 00 00 00 02 4C 01
+			39 01 00 00 00 00 02 4D A6
+			39 01 00 00 00 00 02 4E 01
+			39 01 00 00 00 00 02 4F DF
+			39 01 00 00 00 00 02 50 02
+			39 01 00 00 00 00 02 51 12
+			39 01 00 00 00 00 02 52 02
+			39 01 00 00 00 00 02 53 15
+			39 01 00 00 00 00 02 54 02
+			39 01 00 00 00 00 02 55 3C
+			39 01 00 00 00 00 02 56 02
+			39 01 00 00 00 00 02 58 71
+			39 01 00 00 00 00 02 59 02
+			39 01 00 00 00 00 02 5A 92
+			39 01 00 00 00 00 02 5B 02
+			39 01 00 00 00 00 02 5C C7
+			39 01 00 00 00 00 02 5D 02
+			39 01 00 00 00 00 02 5E F4
+			39 01 00 00 00 00 02 5F 03
+			39 01 00 00 00 00 02 60 1B
+			39 01 00 00 00 00 02 61 03
+			39 01 00 00 00 00 02 62 41
+			39 01 00 00 00 00 02 63 03
+			39 01 00 00 00 00 02 64 53
+			39 01 00 00 00 00 02 65 03
+			39 01 00 00 00 00 02 66 68
+			39 01 00 00 00 00 02 67 03
+			39 01 00 00 00 00 02 68 8A
+			39 01 00 00 00 00 02 69 03
+			39 01 00 00 00 00 02 6A B4
+			39 01 00 00 00 00 02 6B 03
+			39 01 00 00 00 00 02 6C C0
+			39 01 00 00 00 00 02 6D 03
+			39 01 00 00 00 00 02 6E E1
+			39 01 00 00 00 00 02 6F 03
+			39 01 00 00 00 00 02 70 FF
+			39 01 00 00 00 00 02 71 00
+			39 01 00 00 00 00 02 72 00
+			39 01 00 00 00 00 02 73 00
+			39 01 00 00 00 00 02 74 4E
+			39 01 00 00 00 00 02 75 00
+			39 01 00 00 00 00 02 76 74
+			39 01 00 00 00 00 02 77 00
+			39 01 00 00 00 00 02 78 92
+			39 01 00 00 00 00 02 79 00
+			39 01 00 00 00 00 02 7A A6
+			39 01 00 00 00 00 02 7B 00
+			39 01 00 00 00 00 02 7C BA
+			39 01 00 00 00 00 02 7D 00
+			39 01 00 00 00 00 02 7E CC
+			39 01 00 00 00 00 02 7F 00
+			39 01 00 00 00 00 02 80 DF
+			39 01 00 00 00 00 02 81 00
+			39 01 00 00 00 00 02 82 F4
+			39 01 00 00 00 00 02 83 01
+			39 01 00 00 00 00 02 84 15
+			39 01 00 00 00 00 02 85 01
+			39 01 00 00 00 00 02 86 48
+			39 01 00 00 00 00 02 87 01
+			39 01 00 00 00 00 02 88 7A
+			39 01 00 00 00 00 02 89 01
+			39 01 00 00 00 00 02 8A A6
+			39 01 00 00 00 00 02 8B 01
+			39 01 00 00 00 00 02 8C DF
+			39 01 00 00 00 00 02 8D 02
+			39 01 00 00 00 00 02 8E 12
+			39 01 00 00 00 00 02 8F 02
+			39 01 00 00 00 00 02 90 15
+			39 01 00 00 00 00 02 91 02
+			39 01 00 00 00 00 02 92 3C
+			39 01 00 00 00 00 02 93 02
+			39 01 00 00 00 00 02 94 71
+			39 01 00 00 00 00 02 95 02
+			39 01 00 00 00 00 02 96 92
+			39 01 00 00 00 00 02 97 02
+			39 01 00 00 00 00 02 98 C7
+			39 01 00 00 00 00 02 99 02
+			39 01 00 00 00 00 02 9A F4
+			39 01 00 00 00 00 02 9B 03
+			39 01 00 00 00 00 02 9C 1B
+			39 01 00 00 00 00 02 9D 03
+			39 01 00 00 00 00 02 9E 41
+			39 01 00 00 00 00 02 9F 03
+			39 01 00 00 00 00 02 A0 53
+			39 01 00 00 00 00 02 A2 03
+			39 01 00 00 00 00 02 A3 68
+			39 01 00 00 00 00 02 A4 03
+			39 01 00 00 00 00 02 A5 8A
+			39 01 00 00 00 00 02 A6 03
+			39 01 00 00 00 00 02 A7 B4
+			39 01 00 00 00 00 02 A9 03
+			39 01 00 00 00 00 02 AA C0
+			39 01 00 00 00 00 02 AB 03
+			39 01 00 00 00 00 02 AC E1
+			39 01 00 00 00 00 02 AD 03
+			39 01 00 00 00 00 02 AE FF
+			39 01 00 00 00 00 02 AF 00
+			39 01 00 00 00 00 02 B0 00
+			39 01 00 00 00 00 02 B1 00
+			39 01 00 00 00 00 02 B2 4E
+			39 01 00 00 00 00 02 B3 00
+			39 01 00 00 00 00 02 B4 74
+			39 01 00 00 00 00 02 B5 00
+			39 01 00 00 00 00 02 B6 92
+			39 01 00 00 00 00 02 B7 00
+			39 01 00 00 00 00 02 B8 A6
+			39 01 00 00 00 00 02 B9 00
+			39 01 00 00 00 00 02 BA BA
+			39 01 00 00 00 00 02 BB 00
+			39 01 00 00 00 00 02 BC CC
+			39 01 00 00 00 00 02 BD 00
+			39 01 00 00 00 00 02 BE DF
+			39 01 00 00 00 00 02 BF 00
+			39 01 00 00 00 00 02 C0 F4
+			39 01 00 00 00 00 02 C1 01
+			39 01 00 00 00 00 02 C2 15
+			39 01 00 00 00 00 02 C3 01
+			39 01 00 00 00 00 02 C4 48
+			39 01 00 00 00 00 02 C5 01
+			39 01 00 00 00 00 02 C6 7A
+			39 01 00 00 00 00 02 C7 01
+			39 01 00 00 00 00 02 C8 A6
+			39 01 00 00 00 00 02 C9 01
+			39 01 00 00 00 00 02 CA DF
+			39 01 00 00 00 00 02 CB 02
+			39 01 00 00 00 00 02 CC 12
+			39 01 00 00 00 00 02 CD 02
+			39 01 00 00 00 00 02 CE 15
+			39 01 00 00 00 00 02 CF 02
+			39 01 00 00 00 00 02 D0 3C
+			39 01 00 00 00 00 02 D1 02
+			39 01 00 00 00 00 02 D2 71
+			39 01 00 00 00 00 02 D3 02
+			39 01 00 00 00 00 02 D4 92
+			39 01 00 00 00 00 02 D5 02
+			39 01 00 00 00 00 02 D6 C7
+			39 01 00 00 00 00 02 D7 02
+			39 01 00 00 00 00 02 D8 F4
+			39 01 00 00 00 00 02 D9 03
+			39 01 00 00 00 00 02 DA 1B
+			39 01 00 00 00 00 02 DB 03
+			39 01 00 00 00 00 02 DC 41
+			39 01 00 00 00 00 02 DD 03
+			39 01 00 00 00 00 02 DE 53
+			39 01 00 00 00 00 02 DF 03
+			39 01 00 00 00 00 02 E0 68
+			39 01 00 00 00 00 02 E1 03
+			39 01 00 00 00 00 02 E2 8A
+			39 01 00 00 00 00 02 E3 03
+			39 01 00 00 00 00 02 E4 B4
+			39 01 00 00 00 00 02 E5 03
+			39 01 00 00 00 00 02 E6 C0
+			39 01 00 00 00 00 02 E7 03
+			39 01 00 00 00 00 02 E8 E1
+			39 01 00 00 00 00 02 E9 03
+			39 01 00 00 00 00 02 EA FF
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P0 */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 01 00 02 FF 24 /* Enter CMD2 page4 */
+			39 01 00 00 00 00 02 00 0F
+			39 01 00 00 00 00 02 01 00
+			39 01 00 00 00 00 02 02 00
+			39 01 00 00 00 00 02 03 00
+			39 01 00 00 00 00 02 04 0B
+			39 01 00 00 00 00 02 05 0C
+			39 01 00 00 00 00 02 06 00
+			39 01 00 00 00 00 02 07 00
+			39 01 00 00 00 00 02 08 00
+			39 01 00 00 00 00 02 09 00
+			39 01 00 00 00 00 02 0A 03
+			39 01 00 00 00 00 02 0B 04
+			39 01 00 00 00 00 02 0C 01
+			39 01 00 00 00 00 02 0D 13
+			39 01 00 00 00 00 02 0E 15
+			39 01 00 00 00 00 02 0F 17
+			39 01 00 00 00 00 02 10 0F
+			39 01 00 00 00 00 02 11 00
+			39 01 00 00 00 00 02 12 00
+			39 01 00 00 00 00 02 13 00
+			39 01 00 00 00 00 02 14 0B
+			39 01 00 00 00 00 02 15 0C
+			39 01 00 00 00 00 02 16 00
+			39 01 00 00 00 00 02 17 00
+			39 01 00 00 00 00 02 18 00
+			39 01 00 00 00 00 02 19 00
+			39 01 00 00 00 00 02 1A 03
+			39 01 00 00 00 00 02 1B 04
+			39 01 00 00 00 00 02 1C 01
+			39 01 00 00 00 00 02 1D 13
+			39 01 00 00 00 00 02 1E 15
+			39 01 00 00 00 00 02 1F 17
+			39 01 00 00 00 00 02 20 09
+			39 01 00 00 00 00 02 21 01
+			39 01 00 00 00 00 02 22 00
+			39 01 00 00 00 00 02 23 00
+			39 01 00 00 00 00 02 24 00
+			39 01 00 00 00 00 02 25 6D
+			39 01 00 00 00 00 02 26 00
+			39 01 00 00 00 00 02 27 00
+			39 01 00 00 00 00 02 29 58
+			39 01 00 00 00 00 02 2A 16
+			39 01 00 00 00 00 02 2F 02
+			39 01 00 00 00 00 02 30 04
+			39 01 00 00 00 00 02 31 49
+			39 01 00 00 00 00 02 32 23
+			39 01 00 00 00 00 02 33 01
+			39 01 00 00 00 00 02 34 00
+			39 01 00 00 00 00 02 35 69
+			39 01 00 00 00 00 02 36 00
+			39 01 00 00 00 00 02 37 2D
+			39 01 00 00 00 00 02 38 08
+			39 01 00 00 00 00 02 39 00
+			39 01 00 00 00 00 02 3A 69
+			39 01 00 00 00 00 02 5B 00
+			39 01 00 00 00 00 02 5F 75
+			39 01 00 00 00 00 02 63 00
+			39 01 00 00 00 00 02 67 04
+			39 01 00 00 00 00 02 5C 05
+			39 01 00 00 00 00 02 60 75
+			39 01 00 00 00 00 02 64 01
+			39 01 00 00 00 00 02 68 04
+			39 01 00 00 00 00 02 6E 10
+			39 01 00 00 00 00 02 72 00
+			39 01 00 00 00 00 02 73 00
+			39 01 00 00 00 00 02 74 10
+			39 01 00 00 00 00 02 75 19
+			39 01 00 00 00 00 02 76 06
+			39 01 00 00 00 00 02 77 03
+			39 01 00 00 00 00 02 78 00
+			39 01 00 00 00 00 02 79 00
+			39 01 00 00 00 00 02 7A 00
+			39 01 00 00 00 00 02 7B 80
+			39 01 00 00 00 00 02 7C D8
+			39 01 00 00 00 00 02 7D 60
+			39 01 00 00 00 00 02 7E 10
+			39 01 00 00 00 00 02 7F 19
+			39 01 00 00 00 00 02 80 00
+			39 01 00 00 00 00 02 81 06
+			39 01 00 00 00 00 02 82 03
+			39 01 00 00 00 00 02 83 00
+			39 01 00 00 00 00 02 84 03
+			39 01 00 00 00 00 02 85 07
+			39 01 00 00 00 00 02 86 1B
+			39 01 00 00 00 00 02 87 39
+			39 01 00 00 00 00 02 88 1B
+			39 01 00 00 00 00 02 89 39
+			39 01 00 00 00 00 02 8A 33
+			39 01 00 00 00 00 02 8B F4
+			39 01 00 00 00 00 02 8C 01
+			39 01 00 00 00 00 02 9B 0F
+			39 01 00 00 00 00 02 90 78
+			39 01 00 00 00 00 02 91 4C
+			39 01 00 00 00 00 02 92 78
+			39 01 00 00 00 00 02 93 02
+			39 01 00 00 00 00 02 94 0A
+			39 01 00 00 00 00 02 95 E4
+			39 01 00 00 00 00 02 98 00
+			39 01 00 00 00 00 02 99 33
+			39 01 00 00 00 00 02 9D B0
+			39 01 00 00 00 00 02 DE FF
+			39 01 00 00 00 00 02 B3 28
+			39 01 00 00 00 00 02 B4 05
+			39 01 00 00 00 00 02 B5 10
+			39 01 00 00 00 00 02 C6 09 /* Hsync Enable */
+			39 01 00 00 00 00 02 E3 04 /* Enable Auto detect VBP VFP function */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P4 */
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 01 00 02 FF E0 /* Enter CMD3 pageA */
+			39 01 00 00 00 00 02 2F 00 /* VDD1,2=1.4V */
+			39 01 00 00 00 00 02 30 00 /* VDD3,4=1.4V */
+			39 01 00 00 00 00 02 B0 01 /* Reduce OSC 70% */
+			//39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD3 PA */ //skip this command for NT35595 IC
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 00 00 02 55 82 /* Enable IE slight level and CABC still mode */
+			39 01 00 00 78 00 02 11 00 /* LCD Sleep out command */
+			39 01 00 00 00 00 02 35 00 /* Turn on TE (TEE/ TE H/W pin) function */
+			39 01 00 00 00 00 02 53 24 /* Enable CABC, Turn on BL */];
+		qcom,mdss-dsi-off-command = [
+			39 01 00 00 16 00 02 28 00 /* display_off */
+			39 01 00 00 4A 00 02 10 00];
+		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
+		qcom,mdss-dsi-h-sync-pulse = <0>;
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
+		qcom,mdss-dsi-bllp-eof-power-mode;
+		qcom,mdss-dsi-lane-map = "lane_map_0123";
+		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-dsi-lane-0-state;
+		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-lane-2-state;
+		qcom,mdss-dsi-lane-3-state;
+		qcom,mdss-dsi-panel-timings =  [c3 40 33 00 57 51 35 42 52 03 04 00];
+		qcom,mdss-dsi-t-clk-post = <0x02>;
+		qcom,mdss-dsi-t-clk-pre = <0x2a>;
+		qcom,mdss-dsi-bl-min-level = <1>;
+		qcom,mdss-dsi-bl-max-level = <255>;
+		qcom,mdss-dsi-dma-trigger = "trigger_sw";
+		qcom,mdss-dsi-mdp-trigger = "none";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+		qcom,display-on-cmds = [39 01 00 00 00 00 02 29 00 /* LCD Display on */];
+		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
+		qcom,mdss-pan-physical-width-dimension = <61>;
+		qcom,mdss-pan-physical-height-dimension = <109>;
+		qcom,mdss-shrink-pwm = <6 79 255>;
+		qcom,mdss-dsi-lp11-init;
+		htc,mdss-camera-blk = <177>;
+		htc,mdss-camera-dua-blk = <177>;
+		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
+		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 82];
+		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 83];
+		htc,dimming-on-cmds = [39 01 00 00 00 00 02 53 2C];
+		htc,panel-id=<5>;
+	};
+
+	qcom,mdss_dsi_m8_lg_novatek_35595_1080p_cmd {
+		compatible = "qcom,mdss-dsi-panel";
+		status = "disable";
+		qcom,cont-splash-enabled;
+		qcom,mdss-dsi-panel-name = "m8 1080p LG/NT35595 cmd mode dsi panel";
+		qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
+
+		qcom,mdss-dsi-panel-type = "dsi_cmd_mode";
+		qcom,mdss-dsi-te-pin-select = <1>;
+		qcom,mdss-dsi-te-v-sync-rd-ptr-irq-line = <0x2c>;
+		qcom,mdss-dsi-te-dcs-command = <1>;
+		qcom,mdss-dsi-te-check-enable;
+		qcom,mdss-dsi-te-using-te-pin;
+
+		qcom,mdss-dsi-panel-destination = "display_1";
+		qcom,mdss-dsi-panel-framerate = <60>;
+		qcom,mdss-dsi-virtual-channel-id = <0>;
+		qcom,mdss-dsi-stream = <0>;
+		qcom,mdss-dsi-panel-width = <1080>;
+		qcom,mdss-dsi-panel-height = <1920>;
+		qcom,mdss-dsi-h-front-porch = <100>;
+		qcom,mdss-dsi-h-back-porch = <50>;
+		qcom,mdss-dsi-h-pulse-width = <10>;
+		qcom,mdss-dsi-h-sync-skew = <0>;
+		qcom,mdss-dsi-v-back-porch = <4>;
+		qcom,mdss-dsi-v-front-porch = <4>;
+		qcom,mdss-dsi-v-pulse-width = <2>;
+		qcom,mdss-dsi-h-left-border = <0>;
+		qcom,mdss-dsi-h-right-border = <0>;
+		qcom,mdss-dsi-v-top-border = <0>;
+		qcom,mdss-dsi-v-bottom-border = <0>;
+		qcom,mdss-dsi-bpp = <24>;
+		qcom,mdss-dsi-color-order = "rgb_swap_rgb";
+		qcom,mdss-dsi-underflow-color = <0xff>;
+		qcom,mdss-dsi-border-color = <0>;
+		qcom,mdss-dsi-on-command = [
+			39 01 00 00 00 00 02 BB 10 /* MIPI CMD mode */
+			39 01 00 00 01 00 02 FF 23 /* Enter CMD2 page3 */
+			39 01 00 00 00 00 02 00 02 /* DMCT = 1, Select the enable / disable mechanism for CABC and Manual dimming functions. */
+			39 01 00 00 00 00 02 01 84 /* Enable CABC dimmin and Gamma Dimming */
+			39 01 00 00 00 00 02 05 24 /* Moving mode dimming 32step, still mode 32step */
+			39 01 00 00 00 00 02 08 04 /* PWMDIV[7:0] for PWM frequency */
+			39 01 00 00 00 00 02 46 00 /* PWM duty count for 42.96kHZ */
+			39 01 00 00 00 00 02 17 FF /* CABC still mode PWM - gray 240-255 */
+			39 01 00 00 00 00 02 18 FA /* CABC still mode PWM - gray 224-239 */
+			39 01 00 00 00 00 02 19 F8 /* CABC still mode PWM - gray 208-223 */
+			39 01 00 00 00 00 02 1A F5 /* CABC still mode PWM - gray 192-207 */
+			39 01 00 00 00 00 02 1B EE /* CABC still mode PWM - gray 160-191 */
+			39 01 00 00 00 00 02 1C E1 /* CABC still mode PWM - gray 128-159 */
+			39 01 00 00 00 00 02 1D D5 /* CABC still mode PWM - gray 112-127 */
+			39 01 00 00 00 00 02 1E CD /* CABC still mode PWM - gray 64-111 */
+			39 01 00 00 00 00 02 1F B9 /* CABC still mode PWM - gray 16-63 */
+			39 01 00 00 00 00 02 20 B4 /* CABC still mode PWM - gray 0-15 */
+			39 01 00 00 00 00 02 21 FF /* CABC movie mode PWM - gray 240-255 */
+			39 01 00 00 00 00 02 22 FA /* CABC movie mode PWM - gray 224-239 */
+			39 01 00 00 00 00 02 23 F5 /* CABC movie mode PWM - gray 208-223 */
+			39 01 00 00 00 00 02 24 EB /* CABC movie mode PWM -gray 192-207 */
+			39 01 00 00 00 00 02 25 E1 /* CABC movie mode PWM - gray 160-191 */
+			39 01 00 00 00 00 02 26 C8 /* CABC movie mode PWM - gray 128-159 */
+			39 01 00 00 00 00 02 27 AA /* CABC movie mode PWM - gray 112-127 */
+			39 01 00 00 00 00 02 28 96 /* CABC movie mode PWM- gray 64-111 */
+			39 01 00 00 00 00 02 29 73 /* CABC movie mode PWM - gray 16-63 */
+			39 01 00 00 00 00 02 2A 66 /* CABC movie mode PWM - gray 0-15 */
+			39 01 00 00 00 00 02 09 01 /* CABC still mode Gamma curve compensation - gray 240-255 */
+			39 01 00 00 00 00 02 0A 07 /* CABC still mode Gamma curve compensation - gray 224-239 */
+			39 01 00 00 00 00 02 0B 07 /* CABC still mode Gamma curve compensation - gray 208-223 */
+			39 01 00 00 00 00 02 0C 07 /* CABC still mode Gamma curve compensation - gray 192-207 */
+			39 01 00 00 00 00 02 0D 07 /* CABC still mode Gamma curve compensation - gray 160-191 */
+			39 01 00 00 00 00 02 0E 08 /* CABC still mode Gamma curve compensation - gray 128-159 */
+			39 01 00 00 00 00 02 0F 09 /* CABC still mode Gamma curve compensation - gray 112-127 */
+			39 01 00 00 00 00 02 10 0B /* CABC still mode Gamma curve compensation - gray 64-111 */
+			39 01 00 00 00 00 02 11 11 /* CABC still mode Gamma curve compensation - gray 16-63 */
+			39 01 00 00 00 00 02 12 20 /* CABC still mode Gamma curve compensation - gray 0-15 */
+			39 01 00 00 00 00 02 33 0C /* CABC Movie mode Gamma curve compensation */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P3 */
+			39 01 00 00 01 00 02 FF 22 /* Enter CMD2 page2 */
+			39 01 00 00 00 00 02 00 00 /* parameter to adjust saturation > 0.98 */
+			39 01 00 00 00 00 02 01 04 /* parameter to adjustsaturation 0.95~0.98 */
+			39 01 00 00 00 00 02 02 08 /* parameter to adjustsaturation 0.91~0.95 */
+			39 01 00 00 00 00 02 03 0C /* parameter to adjustsaturation 0.88~0.91 */
+			39 01 00 00 00 00 02 04 10 /* parameter to adjustsaturation 0.85~0.88 */
+			39 01 00 00 00 00 02 05 14 /* parameter to adjustsaturation 0.82~0.85 */
+			39 01 00 00 00 00 02 06 18 /* parameter to adjustsaturation 0.79~0.82 */
+			39 01 00 00 00 00 02 07 20 /* parameter to adjustsaturation 0.76~0.79 */
+			39 01 00 00 00 00 02 08 24 /* parameter to adjustsaturation 0.73~0.76 */
+			39 01 00 00 00 00 02 09 28 /* parameter to adjustsaturation 0.7~0.73 */
+			39 01 00 00 00 00 02 0A 30 /* parameter to adjustsaturation 0.66~0.7 */
+			39 01 00 00 00 00 02 0B 38 /* parameter to adjustsaturation 0.6~0.66 */
+			39 01 00 00 00 00 02 0C 38 /* parameter to adjustsaturation 0.54~0.6 */
+			39 01 00 00 00 00 02 0D 30 /* parameter to adjustsaturation 0.48~0.54 */
+			39 01 00 00 00 00 02 0E 28 /* parameter to adjustsaturation 0.41~0.48 */
+			39 01 00 00 00 00 02 0F 20 /* parameter to adjustsaturation 0.35~0.41 */
+			39 01 00 00 00 00 02 10 10 /* parameter to adjustsaturation 0.26~0.35 */
+			39 01 00 00 00 00 02 11 00 /* parameter to adjustsaturation 0.16~0.26 */
+			39 01 00 00 00 00 02 12 00 /* parameter to adjustsaturation 0.07~0.16 */
+			39 01 00 00 00 00 02 13 00 /* parameter to adjustsaturation < 0.07 */
+			39 01 00 00 00 00 02 32 10 /* HUE 0~15 degree */
+			39 01 00 00 00 00 02 33 10 /* HUE 15~30 degree */
+			39 01 00 00 00 00 02 34 10 /* HUE 30~45 degree */
+			39 01 00 00 00 00 02 35 10 /* HUE 45~60 degree */
+			39 01 00 00 00 00 02 36 10 /* HUE 60~75 degree */
+			39 01 00 00 00 00 02 37 10 /* HUE 75~90 degree */
+			39 01 00 00 00 00 02 38 10 /* HUE 90~105 degree */
+			39 01 00 00 00 00 02 39 10 /* HUE 105~120 degree */
+			39 01 00 00 00 00 02 3A 10 /* HUE 120~135 degree */
+			39 01 00 00 00 00 02 3B 10 /* HUE 135~150 degree */
+			39 01 00 00 00 00 02 3F 10 /* HUE 150~165 degree */
+			39 01 00 00 00 00 02 40 10 /* HUE 165~180 degree */
+			39 01 00 00 00 00 02 41 10 /* HUE 180~195 degree */
+			39 01 00 00 00 00 02 42 10 /* HUE 195~210 degree */
+			39 01 00 00 00 00 02 43 10 /* HUE 210~225 degree */
+			39 01 00 00 00 00 02 44 10 /* HUE 225~240 degree */
+			39 01 00 00 00 00 02 45 10 /* HUE 240~255 degree */
+			39 01 00 00 00 00 02 46 10 /* HUE 255~270 degree */
+			39 01 00 00 00 00 02 47 10 /* HUE 270~285 degree */
+			39 01 00 00 00 00 02 48 10 /* HUE 285~300 degree */
+			39 01 00 00 00 00 02 49 10 /* HUE 300~315 degree */
+			39 01 00 00 00 00 02 4A 10 /* HUE 315~330 degree */
+			39 01 00 00 00 00 02 4B 10 /* HUE 330~345 degree */
+			39 01 00 00 00 00 02 4C 10 /* HUE 345~360 degree */
+			39 01 00 00 00 00 02 1A 00 /* Disable Vivid Color */
+			39 01 00 00 00 00 02 53 01 /* Enable Smart Color */
+			39 01 00 00 00 00 02 54 00 /* Disable SKIN_KEEP */
+			39 01 00 00 00 00 02 55 00 /* Disable Over-Saturation protection */
+			39 01 00 00 00 00 02 56 01 /* Enable Smart Contrast */
+			39 01 00 00 00 00 02 68 01 /* Enable Edge Enhancement */
+			39 01 00 00 00 00 02 4D 0E /* Smart Color global ratio */
+			39 01 00 00 00 00 02 58 0E /* Smart Contrast Dark part parameter 14 */
+			39 01 00 00 00 00 02 59 14 /* Smart Contrast Light part parameter 20 */
+			39 01 00 00 00 00 02 64 20 /* Turn off Smart Contrast local reference */
+			39 01 00 00 00 00 02 65 02 /* Edge level 2 */
+			39 01 00 00 00 00 02 69 02 /* Edge THD level 0 */
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P2 */
+			39 01 00 00 01 00 02 FF 20 /* Enter CMD2 page0 */
+			39 01 00 00 00 00 02 30 67 /* For ESD */
+			39 01 00 00 00 00 02 00 01
+			39 01 00 00 00 00 02 01 55
+			39 01 00 00 00 00 02 02 45
+			39 01 00 00 00 00 02 03 55
+			39 01 00 00 00 00 02 05 50
+			39 01 00 00 00 00 02 06 9E
+			39 01 00 00 00 00 02 07 A8
+			39 01 00 00 00 00 02 08 0C
+			39 01 00 00 00 00 02 0B F0 /* GVDDP Voltage (TBD) */
+			39 01 00 00 00 00 02 0C F0 /* GVDDN Voltage (TBD) */
+			39 01 00 00 00 00 02 0E 00
+			39 01 00 00 00 00 02 0F 00
+			39 01 00 00 00 00 02 14 0A
+			39 01 00 00 00 00 02 15 9C
+			39 01 00 00 00 00 02 16 9C
+			39 01 00 00 00 00 02 18 00
+			39 01 00 00 00 00 02 58 80
+			39 01 00 00 00 00 02 59 00
+			39 01 00 00 00 00 02 5A 00
+			39 01 00 00 00 00 02 5B 00
+			39 01 00 00 00 00 02 5C 82
+			39 01 00 00 00 00 02 5D 82
+			39 01 00 00 00 00 02 5E 02
+			39 01 00 00 00 00 02 5F 02
+			39 01 00 00 00 00 02 68 03
+			39 01 00 00 00 00 02 69 A0
+			39 01 00 00 00 00 02 6A 33
+			39 01 00 00 00 00 02 6B 40
+			39 01 00 00 00 00 02 6C 33
+			39 01 00 00 00 00 02 6D 44
+			39 01 00 00 00 00 02 75 00
+			39 01 00 00 00 00 02 76 00
+			39 01 00 00 00 00 02 77 00
+			39 01 00 00 00 00 02 78 70
+			39 01 00 00 00 00 02 79 00
+			39 01 00 00 00 00 02 7A 9F
+			39 01 00 00 00 00 02 7B 00
+			39 01 00 00 00 00 02 7C BF
+			39 01 00 00 00 00 02 7D 00
+			39 01 00 00 00 00 02 7E D7
+			39 01 00 00 00 00 02 7F 00
+			39 01 00 00 00 00 02 80 EB
+			39 01 00 00 00 00 02 81 00
+			39 01 00 00 00 00 02 82 FC
+			39 01 00 00 00 00 02 83 01
+			39 01 00 00 00 00 02 84 0B
+			39 01 00 00 00 00 02 85 01
+			39 01 00 00 00 00 02 86 18
+			39 01 00 00 00 00 02 87 01
+			39 01 00 00 00 00 02 88 42
+			39 01 00 00 00 00 02 89 01
+			39 01 00 00 00 00 02 8A 61
+			39 01 00 00 00 00 02 8B 01
+			39 01 00 00 00 00 02 8C 8F
+			39 01 00 00 00 00 02 8D 01
+			39 01 00 00 00 00 02 8E B1
+			39 01 00 00 00 00 02 8F 01
+			39 01 00 00 00 00 02 90 E8
+			39 01 00 00 00 00 02 91 02
+			39 01 00 00 00 00 02 92 12
+			39 01 00 00 00 00 02 93 02
+			39 01 00 00 00 00 02 94 14
+			39 01 00 00 00 00 02 95 02
+			39 01 00 00 00 00 02 96 3D
+			39 01 00 00 00 00 02 97 02
+			39 01 00 00 00 00 02 98 6D
+			39 01 00 00 00 00 02 99 02
+			39 01 00 00 00 00 02 9A 8E
+			39 01 00 00 00 00 02 9B 02
+			39 01 00 00 00 00 02 9C C0
+			39 01 00 00 00 00 02 9D 02
+			39 01 00 00 00 00 02 9E E1
+			39 01 00 00 00 00 02 9F 03
+			39 01 00 00 00 00 02 A0 12
+			39 01 00 00 00 00 02 A2 03
+			39 01 00 00 00 00 02 A3 21
+			39 01 00 00 00 00 02 A4 03
+			39 01 00 00 00 00 02 A5 31
+			39 01 00 00 00 00 02 A6 03
+			39 01 00 00 00 00 02 A7 45
+			39 01 00 00 00 00 02 A9 03
+			39 01 00 00 00 00 02 AA 56
+			39 01 00 00 00 00 02 AB 03
+			39 01 00 00 00 00 02 AC 7B
+			39 01 00 00 00 00 02 AD 03
+			39 01 00 00 00 00 02 AE 97
+			39 01 00 00 00 00 02 AF 03
+			39 01 00 00 00 00 02 B0 C0
+			39 01 00 00 00 00 02 B1 03
+			39 01 00 00 00 00 02 B2 FF
+			39 01 00 00 00 00 02 B3 00
+			39 01 00 00 00 00 02 B4 00
+			39 01 00 00 00 00 02 B5 00
+			39 01 00 00 00 00 02 B6 70
+			39 01 00 00 00 00 02 B7 00
+			39 01 00 00 00 00 02 B8 9F
+			39 01 00 00 00 00 02 B9 00
+			39 01 00 00 00 00 02 BA BF
+			39 01 00 00 00 00 02 BB 00
+			39 01 00 00 00 00 02 BC D7
+			39 01 00 00 00 00 02 BD 00
+			39 01 00 00 00 00 02 BE EB
+			39 01 00 00 00 00 02 BF 00
+			39 01 00 00 00 00 02 C0 FC
+			39 01 00 00 00 00 02 C1 01
+			39 01 00 00 00 00 02 C2 0B
+			39 01 00 00 00 00 02 C3 01
+			39 01 00 00 00 00 02 C4 18
+			39 01 00 00 00 00 02 C5 01
+			39 01 00 00 00 00 02 C6 42
+			39 01 00 00 00 00 02 C7 01
+			39 01 00 00 00 00 02 C8 61
+			39 01 00 00 00 00 02 C9 01
+			39 01 00 00 00 00 02 CA 8F
+			39 01 00 00 00 00 02 CB 01
+			39 01 00 00 00 00 02 CC B1
+			39 01 00 00 00 00 02 CD 01
+			39 01 00 00 00 00 02 CE E8
+			39 01 00 00 00 00 02 CF 02
+			39 01 00 00 00 00 02 D0 12
+			39 01 00 00 00 00 02 D1 02
+			39 01 00 00 00 00 02 D2 14
+			39 01 00 00 00 00 02 D3 02
+			39 01 00 00 00 00 02 D4 3D
+			39 01 00 00 00 00 02 D5 02
+			39 01 00 00 00 00 02 D6 6D
+			39 01 00 00 00 00 02 D7 02
+			39 01 00 00 00 00 02 D8 8E
+			39 01 00 00 00 00 02 D9 02
+			39 01 00 00 00 00 02 DA C0
+			39 01 00 00 00 00 02 DB 02
+			39 01 00 00 00 00 02 DC E1
+			39 01 00 00 00 00 02 DD 03
+			39 01 00 00 00 00 02 DE 12
+			39 01 00 00 00 00 02 DF 03
+			39 01 00 00 00 00 02 E0 21
+			39 01 00 00 00 00 02 E1 03
+			39 01 00 00 00 00 02 E2 31
+			39 01 00 00 00 00 02 E3 03
+			39 01 00 00 00 00 02 E4 45
+			39 01 00 00 00 00 02 E5 03
+			39 01 00 00 00 00 02 E6 56
+			39 01 00 00 00 00 02 E7 03
+			39 01 00 00 00 00 02 E8 7B
+			39 01 00 00 00 00 02 E9 03
+			39 01 00 00 00 00 02 EA 97
+			39 01 00 00 00 00 02 EB 03
+			39 01 00 00 00 00 02 EC C0
+			39 01 00 00 00 00 02 ED 03
+			39 01 00 00 00 00 02 EE FF
+			39 01 00 00 00 00 02 EF 00
+			39 01 00 00 00 00 02 F0 00
+			39 01 00 00 00 00 02 F1 00
+			39 01 00 00 00 00 02 F2 70
+			39 01 00 00 00 00 02 F3 00
+			39 01 00 00 00 00 02 F4 9F
+			39 01 00 00 00 00 02 F5 00
+			39 01 00 00 00 00 02 F6 BF
+			39 01 00 00 00 00 02 F7 00
+			39 01 00 00 00 00 02 F8 D7
+			39 01 00 00 00 00 02 F9 00
+			39 01 00 00 00 00 02 FA EB
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P0 */
+			39 01 00 00 01 00 02 FF 21 /* Enter CMD2 page1 */
+			39 01 00 00 00 00 02 00 00
+			39 01 00 00 00 00 02 01 FC
+			39 01 00 00 00 00 02 02 01
+			39 01 00 00 00 00 02 03 0B
+			39 01 00 00 00 00 02 04 01
+			39 01 00 00 00 00 02 05 18
+			39 01 00 00 00 00 02 06 01
+			39 01 00 00 00 00 02 07 42
+			39 01 00 00 00 00 02 08 01
+			39 01 00 00 00 00 02 09 61
+			39 01 00 00 00 00 02 0A 01
+			39 01 00 00 00 00 02 0B 8F
+			39 01 00 00 00 00 02 0C 01
+			39 01 00 00 00 00 02 0D B1
+			39 01 00 00 00 00 02 0E 01
+			39 01 00 00 00 00 02 0F E8
+			39 01 00 00 00 00 02 10 02
+			39 01 00 00 00 00 02 11 12
+			39 01 00 00 00 00 02 12 02
+			39 01 00 00 00 00 02 13 14
+			39 01 00 00 00 00 02 14 02
+			39 01 00 00 00 00 02 15 3D
+			39 01 00 00 00 00 02 16 02
+			39 01 00 00 00 00 02 17 6D
+			39 01 00 00 00 00 02 18 02
+			39 01 00 00 00 00 02 19 8E
+			39 01 00 00 00 00 02 1A 02
+			39 01 00 00 00 00 02 1B C0
+			39 01 00 00 00 00 02 1C 02
+			39 01 00 00 00 00 02 1D E1
+			39 01 00 00 00 00 02 1E 03
+			39 01 00 00 00 00 02 1F 12
+			39 01 00 00 00 00 02 20 03
+			39 01 00 00 00 00 02 21 21
+			39 01 00 00 00 00 02 22 03
+			39 01 00 00 00 00 02 23 31
+			39 01 00 00 00 00 02 24 03
+			39 01 00 00 00 00 02 25 45
+			39 01 00 00 00 00 02 26 03
+			39 01 00 00 00 00 02 27 56
+			39 01 00 00 00 00 02 28 03
+			39 01 00 00 00 00 02 29 7B
+			39 01 00 00 00 00 02 2A 03
+			39 01 00 00 00 00 02 2B 97
+			39 01 00 00 00 00 02 2D 03
+			39 01 00 00 00 00 02 2F C0
+			39 01 00 00 00 00 02 30 03
+			39 01 00 00 00 00 02 31 FF
+			39 01 00 00 00 00 02 32 00
+			39 01 00 00 00 00 02 33 00
+			39 01 00 00 00 00 02 34 00
+			39 01 00 00 00 00 02 35 70
+			39 01 00 00 00 00 02 36 00
+			39 01 00 00 00 00 02 37 9F
+			39 01 00 00 00 00 02 38 00
+			39 01 00 00 00 00 02 39 BF
+			39 01 00 00 00 00 02 3A 00
+			39 01 00 00 00 00 02 3B D7
+			39 01 00 00 00 00 02 3D 00
+			39 01 00 00 00 00 02 3F EB
+			39 01 00 00 00 00 02 40 00
+			39 01 00 00 00 00 02 41 FC
+			39 01 00 00 00 00 02 42 01
+			39 01 00 00 00 00 02 43 0B
+			39 01 00 00 00 00 02 44 01
+			39 01 00 00 00 00 02 45 18
+			39 01 00 00 00 00 02 46 01
+			39 01 00 00 00 00 02 47 42
+			39 01 00 00 00 00 02 48 01
+			39 01 00 00 00 00 02 49 61
+			39 01 00 00 00 00 02 4A 01
+			39 01 00 00 00 00 02 4B 8F
+			39 01 00 00 00 00 02 4C 01
+			39 01 00 00 00 00 02 4D B1
+			39 01 00 00 00 00 02 4E 01
+			39 01 00 00 00 00 02 4F E8
+			39 01 00 00 00 00 02 50 02
+			39 01 00 00 00 00 02 51 12
+			39 01 00 00 00 00 02 52 02
+			39 01 00 00 00 00 02 53 14
+			39 01 00 00 00 00 02 54 02
+			39 01 00 00 00 00 02 55 3D
+			39 01 00 00 00 00 02 56 02
+			39 01 00 00 00 00 02 58 6D
+			39 01 00 00 00 00 02 59 02
+			39 01 00 00 00 00 02 5A 8E
+			39 01 00 00 00 00 02 5B 02
+			39 01 00 00 00 00 02 5C C0
+			39 01 00 00 00 00 02 5D 02
+			39 01 00 00 00 00 02 5E E1
+			39 01 00 00 00 00 02 5F 03
+			39 01 00 00 00 00 02 60 12
+			39 01 00 00 00 00 02 61 03
+			39 01 00 00 00 00 02 62 21
+			39 01 00 00 00 00 02 63 03
+			39 01 00 00 00 00 02 64 31
+			39 01 00 00 00 00 02 65 03
+			39 01 00 00 00 00 02 66 45
+			39 01 00 00 00 00 02 67 03
+			39 01 00 00 00 00 02 68 56
+			39 01 00 00 00 00 02 69 03
+			39 01 00 00 00 00 02 6A 7B
+			39 01 00 00 00 00 02 6B 03
+			39 01 00 00 00 00 02 6C 97
+			39 01 00 00 00 00 02 6D 03
+			39 01 00 00 00 00 02 6E C0
+			39 01 00 00 00 00 02 6F 03
+			39 01 00 00 00 00 02 70 FF
+			39 01 00 00 00 00 02 71 00
+			39 01 00 00 00 00 02 72 00
+			39 01 00 00 00 00 02 73 00
+			39 01 00 00 00 00 02 74 70
+			39 01 00 00 00 00 02 75 00
+			39 01 00 00 00 00 02 76 9F
+			39 01 00 00 00 00 02 77 00
+			39 01 00 00 00 00 02 78 BF
+			39 01 00 00 00 00 02 79 00
+			39 01 00 00 00 00 02 7A D7
+			39 01 00 00 00 00 02 7B 00
+			39 01 00 00 00 00 02 7C EB
+			39 01 00 00 00 00 02 7D 00
+			39 01 00 00 00 00 02 7E FC
+			39 01 00 00 00 00 02 7F 01
+			39 01 00 00 00 00 02 80 0B
+			39 01 00 00 00 00 02 81 01
+			39 01 00 00 00 00 02 82 18
+			39 01 00 00 00 00 02 83 01
+			39 01 00 00 00 00 02 84 42
+			39 01 00 00 00 00 02 85 01
+			39 01 00 00 00 00 02 86 61
+			39 01 00 00 00 00 02 87 01
+			39 01 00 00 00 00 02 88 8F
+			39 01 00 00 00 00 02 89 01
+			39 01 00 00 00 00 02 8A B1
+			39 01 00 00 00 00 02 8B 01
+			39 01 00 00 00 00 02 8C E8
+			39 01 00 00 00 00 02 8D 02
+			39 01 00 00 00 00 02 8E 12
+			39 01 00 00 00 00 02 8F 02
+			39 01 00 00 00 00 02 90 14
+			39 01 00 00 00 00 02 91 02
+			39 01 00 00 00 00 02 92 3D
+			39 01 00 00 00 00 02 93 02
+			39 01 00 00 00 00 02 94 6D
+			39 01 00 00 00 00 02 95 02
+			39 01 00 00 00 00 02 96 8E
+			39 01 00 00 00 00 02 97 02
+			39 01 00 00 00 00 02 98 C0
+			39 01 00 00 00 00 02 99 02
+			39 01 00 00 00 00 02 9A E1
+			39 01 00 00 00 00 02 9B 03
+			39 01 00 00 00 00 02 9C 12
+			39 01 00 00 00 00 02 9D 03
+			39 01 00 00 00 00 02 9E 21
+			39 01 00 00 00 00 02 9F 03
+			39 01 00 00 00 00 02 A0 31
+			39 01 00 00 00 00 02 A2 03
+			39 01 00 00 00 00 02 A3 45
+			39 01 00 00 00 00 02 A4 03
+			39 01 00 00 00 00 02 A5 56
+			39 01 00 00 00 00 02 A6 03
+			39 01 00 00 00 00 02 A7 7B
+			39 01 00 00 00 00 02 A9 03
+			39 01 00 00 00 00 02 AA 97
+			39 01 00 00 00 00 02 AB 03
+			39 01 00 00 00 00 02 AC C0
+			39 01 00 00 00 00 02 AD 03
+			39 01 00 00 00 00 02 AE FF
+			39 01 00 00 00 00 02 AF 00
+			39 01 00 00 00 00 02 B0 00
+			39 01 00 00 00 00 02 B1 00
+			39 01 00 00 00 00 02 B2 70
+			39 01 00 00 00 00 02 B3 00
+			39 01 00 00 00 00 02 B4 9F
+			39 01 00 00 00 00 02 B5 00
+			39 01 00 00 00 00 02 B6 BF
+			39 01 00 00 00 00 02 B7 00
+			39 01 00 00 00 00 02 B8 D7
+			39 01 00 00 00 00 02 B9 00
+			39 01 00 00 00 00 02 BA EB
+			39 01 00 00 00 00 02 BB 00
+			39 01 00 00 00 00 02 BC FC
+			39 01 00 00 00 00 02 BD 01
+			39 01 00 00 00 00 02 BE 0B
+			39 01 00 00 00 00 02 BF 01
+			39 01 00 00 00 00 02 C0 18
+			39 01 00 00 00 00 02 C1 01
+			39 01 00 00 00 00 02 C2 42
+			39 01 00 00 00 00 02 C3 01
+			39 01 00 00 00 00 02 C4 61
+			39 01 00 00 00 00 02 C5 01
+			39 01 00 00 00 00 02 C6 8F
+			39 01 00 00 00 00 02 C7 01
+			39 01 00 00 00 00 02 C8 B1
+			39 01 00 00 00 00 02 C9 01
+			39 01 00 00 00 00 02 CA E8
+			39 01 00 00 00 00 02 CB 02
+			39 01 00 00 00 00 02 CC 12
+			39 01 00 00 00 00 02 CD 02
+			39 01 00 00 00 00 02 CE 14
+			39 01 00 00 00 00 02 CF 02
+			39 01 00 00 00 00 02 D0 3D
+			39 01 00 00 00 00 02 D1 02
+			39 01 00 00 00 00 02 D2 6D
+			39 01 00 00 00 00 02 D3 02
+			39 01 00 00 00 00 02 D4 8E
+			39 01 00 00 00 00 02 D5 02
+			39 01 00 00 00 00 02 D6 C0
+			39 01 00 00 00 00 02 D7 02
+			39 01 00 00 00 00 02 D8 E1
+			39 01 00 00 00 00 02 D9 03
+			39 01 00 00 00 00 02 DA 12
+			39 01 00 00 00 00 02 DB 03
+			39 01 00 00 00 00 02 DC 21
+			39 01 00 00 00 00 02 DD 03
+			39 01 00 00 00 00 02 DE 31
+			39 01 00 00 00 00 02 DF 03
+			39 01 00 00 00 00 02 E0 45
+			39 01 00 00 00 00 02 E1 03
+			39 01 00 00 00 00 02 E2 56
+			39 01 00 00 00 00 02 E3 03
+			39 01 00 00 00 00 02 E4 7B
+			39 01 00 00 00 00 02 E5 03
+			39 01 00 00 00 00 02 E6 97
+			39 01 00 00 00 00 02 E7 03
+			39 01 00 00 00 00 02 E8 C0
+			39 01 00 00 00 00 02 E9 03
+			39 01 00 00 00 00 02 EA FF
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P1 */
+			39 01 00 00 01 00 02 FF 24 /* Enter CMD2 page4 */
+			39 01 00 00 00 00 02 00 0F
+			39 01 00 00 00 00 02 01 00
+			39 01 00 00 00 00 02 02 00
+			39 01 00 00 00 00 02 03 00
+			39 01 00 00 00 00 02 04 0B
+			39 01 00 00 00 00 02 05 0C
+			39 01 00 00 00 00 02 06 00
+			39 01 00 00 00 00 02 07 00
+			39 01 00 00 00 00 02 08 00
+			39 01 00 00 00 00 02 09 00
+			39 01 00 00 00 00 02 0A 03
+			39 01 00 00 00 00 02 0B 04
+			39 01 00 00 00 00 02 0C 01
+			39 01 00 00 00 00 02 0D 13
+			39 01 00 00 00 00 02 0E 15
+			39 01 00 00 00 00 02 0F 17
+			39 01 00 00 00 00 02 10 0F
+			39 01 00 00 00 00 02 11 00
+			39 01 00 00 00 00 02 12 00
+			39 01 00 00 00 00 02 13 00
+			39 01 00 00 00 00 02 14 0B
+			39 01 00 00 00 00 02 15 0C
+			39 01 00 00 00 00 02 16 00
+			39 01 00 00 00 00 02 17 00
+			39 01 00 00 00 00 02 18 00
+			39 01 00 00 00 00 02 19 00
+			39 01 00 00 00 00 02 1A 03
+			39 01 00 00 00 00 02 1B 04
+			39 01 00 00 00 00 02 1C 01
+			39 01 00 00 00 00 02 1D 13
+			39 01 00 00 00 00 02 1E 15
+			39 01 00 00 00 00 02 1F 17
+			39 01 00 00 00 00 02 20 09
+			39 01 00 00 00 00 02 21 01
+			39 01 00 00 00 00 02 22 00
+			39 01 00 00 00 00 02 23 00
+			39 01 00 00 00 00 02 24 00
+			39 01 00 00 00 00 02 25 6D
+			39 01 00 00 00 00 02 26 00
+			39 01 00 00 00 00 02 27 00
+			39 01 00 00 00 00 02 29 58
+			39 01 00 00 00 00 02 2A 16
+			39 01 00 00 00 00 02 2F 02
+			39 01 00 00 00 00 02 30 04
+			39 01 00 00 00 00 02 31 49
+			39 01 00 00 00 00 02 32 23
+			39 01 00 00 00 00 02 33 01
+			39 01 00 00 00 00 02 34 00
+			39 01 00 00 00 00 02 35 69
+			39 01 00 00 00 00 02 36 00
+			39 01 00 00 00 00 02 37 2D
+			39 01 00 00 00 00 02 38 08
+			39 01 00 00 00 00 02 39 00
+			39 01 00 00 00 00 02 3A 69
+			39 01 00 00 00 00 02 5B 00
+			39 01 00 00 00 00 02 5F 75
+			39 01 00 00 00 00 02 63 00
+			39 01 00 00 00 00 02 67 04
+			39 01 00 00 00 00 02 5C 05
+			39 01 00 00 00 00 02 60 75
+			39 01 00 00 00 00 02 64 01
+			39 01 00 00 00 00 02 68 04
+			39 01 00 00 00 00 02 6E 10
+			39 01 00 00 00 00 02 72 00
+			39 01 00 00 00 00 02 74 10
+			39 01 00 00 00 00 02 75 19
+			39 01 00 00 00 00 02 76 06
+			39 01 00 00 00 00 02 77 03
+			39 01 00 00 00 00 02 78 00
+			39 01 00 00 00 00 02 79 00
+			39 01 00 00 00 00 02 7A 00
+			39 01 00 00 00 00 02 7B 80
+			39 01 00 00 00 00 02 7C D8
+			39 01 00 00 00 00 02 7D 60
+			39 01 00 00 00 00 02 7E 10
+			39 01 00 00 00 00 02 7F 19
+			39 01 00 00 00 00 02 80 00
+			39 01 00 00 00 00 02 81 06
+			39 01 00 00 00 00 02 82 03
+			39 01 00 00 00 00 02 83 00
+			39 01 00 00 00 00 02 84 03
+			39 01 00 00 00 00 02 85 07
+			39 01 00 00 00 00 02 86 1B
+			39 01 00 00 00 00 02 87 39
+			39 01 00 00 00 00 02 88 1B
+			39 01 00 00 00 00 02 89 39
+			39 01 00 00 00 00 02 8A 33
+			39 01 00 00 00 00 02 8B F4
+			39 01 00 00 00 00 02 8C 01
+			39 01 00 00 00 00 02 9B 0F
+			39 01 00 00 00 00 02 90 78
+			39 01 00 00 00 00 02 91 4C
+			39 01 00 00 00 00 02 92 78
+			39 01 00 00 00 00 02 93 02
+			39 01 00 00 00 00 02 94 0A
+			39 01 00 00 00 00 02 95 E4
+			39 01 00 00 00 00 02 98 00
+			39 01 00 00 00 00 02 99 33
+			39 01 00 00 00 00 02 9D B0
+			39 01 00 00 00 00 02 DE FF
+			39 01 00 00 00 00 02 B3 28
+			39 01 00 00 00 00 02 B4 05
+			39 01 00 00 00 00 02 B5 10
+			39 01 00 00 00 00 02 C6 09
+			39 01 00 00 00 00 02 FB 01 /* MTP do not reload CMD2 P4 */
+			39 01 00 00 00 00 02 FF F0
+			39 01 00 00 00 00 02 B3 FF
+			39 01 00 00 00 00 02 B4 FF
+			39 01 00 00 00 00 02 B5 FF
+			39 01 00 00 00 00 02 B6 FF
+			39 01 00 00 00 00 02 B7 FF
+			39 01 00 00 00 00 02 B8 FF
+			39 01 00 00 01 00 02 FF 10 /* Enter CMD1 */
+			39 01 00 00 00 00 02 55 82 /* Enable IE slight level and CABC still mode */
+			39 01 00 00 00 00 02 5E 22 /* Enable CMB function limit 13%*/
+			39 01 00 00 78 00 02 11 00 /* LCD Sleep out command */
+			39 01 00 00 00 00 02 35 00 /* Turn on TE (TEE/ TE H/W pin) function */
+			39 01 00 00 00 00 02 29 00 /* LCD Display on */];
+		qcom,mdss-dsi-off-command = [
+			39 01 00 00 16 00 02 28 00 /* display_off */
+			39 01 00 00 4A 00 02 10 00];
+		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
+		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
+		qcom,mdss-dsi-h-sync-pulse = <1>;
+		qcom,mdss-dsi-traffic-mode = "non_burst_sync_event";
+		qcom,mdss-dsi-bllp-eof-power-mode;
+		qcom,mdss-dsi-lane-map = "lane_map_0123";
+		qcom,mdss-dsi-bllp-power-mode;
+		qcom,mdss-dsi-lane-0-state;
+		qcom,mdss-dsi-lane-1-state;
+		qcom,mdss-dsi-lane-2-state;
+		qcom,mdss-dsi-lane-3-state;
+		qcom,mdss-dsi-panel-timings =  [c3 40 33 00 57 51 35 42 52 03 04 00];
+		qcom,mdss-dsi-t-clk-post = <0x0a>;
+		qcom,mdss-dsi-t-clk-pre = <0x2a>;
+		qcom,mdss-dsi-bl-min-level = <1>;
+		qcom,mdss-dsi-bl-max-level = <255>;
+		qcom,mdss-dsi-dma-trigger = "trigger_sw";
+		qcom,mdss-dsi-mdp-trigger = "none";
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+		qcom,display-on-cmds = [39 01 00 00 00 00 02 53 24 /* Turn on BL */];
+		qcom,mdss-dsi-default-command-state = "dsi_hs_mode";
+		qcom,mdss-pan-physical-width-dimension = <61>;
+		qcom,mdss-pan-physical-height-dimension = <109>;
+		qcom,mdss-shrink-pwm = <6 79 255>;
+		qcom,mdss-dsi-lp11-init;
+		qcom,partial-update-enabled;
+		qcom,mdss-even-coordinate-update;
+		htc,mdss-camera-blk = <177>;
+		htc,mdss-camera-dua-blk = <177>;
+		htc,cabc-off-cmds = [39 01 00 00 00 00 02 55 00];
+		htc,cabc-ui-cmds = [39 01 00 00 00 00 02 55 82];
+		htc,cabc-video-cmds = [39 01 00 00 00 00 02 55 83];
+		htc,dimming-on-cmds = [39 01 00 00 00 00 02 53 2C];
+		htc,mdss-pp-hue = <0xfef>;
+		qcom,mdss-shrink-pwm-power-hack = <6 56 255>;
+		htc,mdss-camera-blk-power-hack = <130>;
+		htc,cabc-ui-cmds-power-hack = [
+					39 01 00 00 00 00 02 55 82
+					39 01 00 00 01 00 02 FF 24 /* Enter Page2 CMD4 */
+					39 01 00 00 01 00 02 90 78 /* fps 60 */
+					39 01 00 00 01 00 02 92 78 /* fps 60 */
+					39 01 00 00 01 00 02 FF 01 /* Enter CMD1 */];
+		htc,cabc-video-cmds-power-hack = [
+					39 01 00 00 00 00 02 55 83
+					39 01 00 00 01 00 02 FF 24 /* Enter Page2 CMD4 */
+					39 01 00 00 01 00 02 90 E1 /* fps 30 */
+					39 01 00 00 01 00 02 92 E1 /* fps 30 */
+					39 01 00 00 01 00 02 FF 01 /* Enter CMD1 */];
+		htc,frame-suffix-cmds = [
+					15 00 00 00 00 00 02 FF F0 /* Enter CMD3 – Engineer Mode B */
+					15 00 00 00 00 00 02 BD 02 /* Set BIST CLK: 1T =200nS */
+					15 00 00 00 00 00 02 B9 A0 /* BIST Enable Mode set */
+					15 00 00 00 00 00 02 BD 0A /* Set BIST Revise Scan */
+					15 00 00 00 00 00 02 B9 A2 /* BIST ON */
+					05 00 00 00 00 00 02 D2 00 /* Dummy write for delay */
+					15 00 00 00 00 00 02 BD 02 /* Set BIST Forward Scan */
+					05 00 00 00 00 00 02 D2 00 /* Dummy write for delay */
+					05 00 00 00 00 00 02 D2 00 /* Dummy write for delay */
+					05 00 00 00 00 00 02 D2 00 /* Dummy write for delay */
+					15 00 00 00 00 00 02 B9 80 /* BIST OFF */
+					15 01 00 00 00 00 02 FF 10 /* Enter CMD1 */];
+		htc,panel-id=<6>;
+	};
+};
+&mdss_dsi0 {
+	vlcmio-supply = <&pm8941_lvs2>;      /* lcm 1v8 */
+	qcom,platform-reset-gpio = <&msmgpio 13 0>;
+	qcom,platform-te-gpio = <&msmgpio 12 0>;
+	htc,lcm_bl_en-gpio = <&pm8941_gpios 4 0>;
+	htc,lcm_p5v-gpio = <&pm8941_gpios 6 0>;
+	htc,lcm_n5v-gpio = <&pm8941_gpios 5 0>;
+};
+
+&mdss_dsi1 {
+	vlcmio-supply = <&pm8941_lvs2>;      /* lcm 1v8 */
+	qcom,platform-reset-gpio = <&msmgpio 13 0>;
+	qcom,platform-te-gpio = <&msmgpio 12 0>;
+	htc,lcm_bl_en-gpio = <&pm8941_gpios 4 0>;
+	htc,lcm_p5v-gpio = <&pm8941_gpios 6 0>;
+	htc,lcm_n5v-gpio = <&pm8941_gpios 5 0>;
+};
+
+&mdss_fb0 {
+	cell-index = <0>;
+	compatible = "qcom,mdss-fb";
+	/* qcom,memory-reservation-type = "EBI1";
+	qcom,memory-reservation-size = <0x1800000>; */ /* FB size for dynamic allocation */
+	qcom,memory-reservation-addr = <0x05d00000>;
+};

@@ -18,7 +18,7 @@
 #include "nl80211.h"
 #include "wext-compat.h"
 
-#define IEEE80211_SCAN_RESULT_EXPIRE	(7 * HZ)
+#define IEEE80211_SCAN_RESULT_EXPIRE	(3 * HZ)
 
 void ___cfg80211_scan_done(struct cfg80211_registered_device *rdev, bool leak)
 {
@@ -783,8 +783,8 @@ cfg80211_inform_bss(struct wiphy *wiphy,
 	if (!res)
 		return NULL;
 
-	if (res->pub.capability & WLAN_CAPABILITY_ESS)
-		regulatory_hint_found_beacon(wiphy, channel, gfp);
+	//if (res->pub.capability & WLAN_CAPABILITY_ESS)
+		//regulatory_hint_found_beacon(wiphy, channel, gfp);
 
 	/* cfg80211_bss_update gives us a referenced result */
 	return &res->pub;
@@ -852,8 +852,8 @@ cfg80211_inform_bss_frame(struct wiphy *wiphy,
 	if (!res)
 		return NULL;
 
-	if (res->pub.capability & WLAN_CAPABILITY_ESS)
-		regulatory_hint_found_beacon(wiphy, channel, gfp);
+	//if (res->pub.capability & WLAN_CAPABILITY_ESS)
+		//regulatory_hint_found_beacon(wiphy, channel, gfp);
 
 	/* cfg80211_bss_update gives us a referenced result */
 	return &res->pub;

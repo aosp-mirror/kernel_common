@@ -470,17 +470,18 @@ static int __devinit isci_pci_probe(struct pci_dev *pdev, const struct pci_devic
 		return -ENOMEM;
 	pci_set_drvdata(pdev, pci_info);
 
-	if (efi_enabled(EFI_RUNTIME_SERVICES))
+	if (efi_enabled)
 		orom = isci_get_efi_var(pdev);
 
 	if (!orom)
 		orom = isci_request_oprom(pdev);
 
-	for (i = 0; orom && i < num_controllers(pdev); i++) {
+	for (i = 0; orom && i < ARRAY_SIZE(orom->ctrl); i++) {
 		if (sci_oem_parameters_validate(&orom->ctrl[i],
 						orom->hdr.version)) {
 			dev_warn(&pdev->dev,
 				 "[%d]: invalid oem parameters detected, falling back to firmware\n", i);
+			devm_kfree(&pdev->dev, orom);
 			orom = NULL;
 			break;
 		}

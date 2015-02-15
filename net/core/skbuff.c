@@ -191,7 +191,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	size = SKB_DATA_ALIGN(size);
 	size += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
 	data = kmalloc_node_track_caller(size, gfp_mask, node);
-	if (!data)
+	if (unlikely(ZERO_OR_NULL_PTR(data)))
 		goto nodata;
 	/* kmalloc(size) might give us more room than requested.
 	 * Put skb_shared_info exactly at the end of allocated zone,
@@ -311,6 +311,12 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev,
 	struct sk_buff *skb;
 
 	skb = __alloc_skb(length + NET_SKB_PAD, gfp_mask, 0, NUMA_NO_NODE);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(skb) || (!skb))
+		printk(KERN_ERR "[CORE] skb is NULL in %s!\n", __func__);
+#endif
+
 	if (likely(skb)) {
 		skb_reserve(skb, NET_SKB_PAD);
 		skb->dev = dev;
@@ -1271,6 +1277,12 @@ drop_pages:
 			struct sk_buff *nfrag;
 
 			nfrag = skb_clone(frag, GFP_ATOMIC);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+		if (IS_ERR(nfrag) || (!nfrag))
+			printk(KERN_ERR "[CORE] nfrag is NULL in %s!\n", __func__);
+#endif
+
 			if (unlikely(!nfrag))
 				return -ENOMEM;
 
@@ -1402,7 +1414,12 @@ unsigned char *__pskb_pull_tail(struct sk_buff *skb, int delta)
 					insp = list;
 				}
 				if (!pskb_pull(list, eat)) {
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+					if (!IS_ERR(clone) && (clone))
+						kfree_skb(clone);
+#else
 					kfree_skb(clone);
+#endif
 					return NULL;
 				}
 				break;
@@ -1712,7 +1729,6 @@ int skb_splice_bits(struct sk_buff *skb, unsigned int offset,
 	struct splice_pipe_desc spd = {
 		.pages = pages,
 		.partial = partial,
-		.nr_pages_max = MAX_SKB_FRAGS,
 		.flags = flags,
 		.ops = &sock_pipe_buf_ops,
 		.spd_release = sock_spd_release,
@@ -1759,7 +1775,7 @@ done:
 		lock_sock(sk);
 	}
 
-	splice_shrink_spd(&spd);
+	splice_shrink_spd(pipe, &spd);
 	return ret;
 }
 
@@ -2733,6 +2749,11 @@ struct sk_buff *skb_segment(struct sk_buff *skb, netdev_features_t features)
 			nskb = alloc_skb(hsize + doffset + headroom,
 					 GFP_ATOMIC);
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+		if (IS_ERR(nskb) || (!nskb))
+			printk(KERN_ERR "[CORE] nskb is NULL in %s!\n", __func__);
+#endif
+
 			if (unlikely(!nskb))
 				goto err;
 
@@ -2884,6 +2905,12 @@ int skb_gro_receive(struct sk_buff **head, struct sk_buff *skb)
 
 	headroom = skb_headroom(p);
 	nskb = alloc_skb(headroom + skb_gro_offset(p), GFP_ATOMIC);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(nskb) || (!nskb))
+		printk(KERN_ERR "[CORE] nskb is NULL in %s!\n", __func__);
+#endif
+
 	if (unlikely(!nskb))
 		return -ENOMEM;
 
@@ -3129,6 +3156,12 @@ int skb_cow_data(struct sk_buff *skb, int tailbits, struct sk_buff **trailer)
 						       skb_headroom(skb1),
 						       ntail,
 						       GFP_ATOMIC);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+			if (IS_ERR(skb2) || (!skb2))
+				printk(KERN_ERR "[CORE] skb2 is NULL in %s!\n", __func__);
+#endif
+
 			if (unlikely(skb2 == NULL))
 				return -ENOMEM;
 

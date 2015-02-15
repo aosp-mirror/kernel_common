@@ -102,22 +102,18 @@ static void zfcp_qdio_int_resp(struct ccw_device *cdev, unsigned int qdio_err,
 {
 	struct zfcp_qdio *qdio = (struct zfcp_qdio *) parm;
 	struct zfcp_adapter *adapter = qdio->adapter;
+	struct qdio_buffer_element *sbale;
 	int sbal_no, sbal_idx;
+	void *pl[ZFCP_QDIO_MAX_SBALS_PER_REQ + 1];
+	u64 req_id;
+	u8 scount;
 
 	if (unlikely(qdio_err)) {
+		memset(pl, 0, ZFCP_QDIO_MAX_SBALS_PER_REQ * sizeof(void *));
 		if (zfcp_adapter_multi_buffer_active(adapter)) {
-			void *pl[ZFCP_QDIO_MAX_SBALS_PER_REQ + 1];
-			struct qdio_buffer_element *sbale;
-			u64 req_id;
-			u8 scount;
-
-			memset(pl, 0,
-			       ZFCP_QDIO_MAX_SBALS_PER_REQ * sizeof(void *));
 			sbale = qdio->res_q[idx]->element;
 			req_id = (u64) sbale->addr;
-			scount = min(sbale->scount + 1,
-				     ZFCP_QDIO_MAX_SBALS_PER_REQ + 1);
-				     /* incl. signaling SBAL */
+			scount = sbale->scount + 1; /* incl. signaling SBAL */
 
 			for (sbal_no = 0; sbal_no < scount; sbal_no++) {
 				sbal_idx = (idx + sbal_no) %
@@ -224,9 +220,11 @@ int zfcp_qdio_sbals_from_sg(struct zfcp_qdio *qdio, struct zfcp_qdio_req *q_req,
 
 static int zfcp_qdio_sbal_check(struct zfcp_qdio *qdio)
 {
+	spin_lock_irq(&qdio->req_q_lock);
 	if (atomic_read(&qdio->req_q_free) ||
 	    !(atomic_read(&qdio->adapter->status) & ZFCP_STATUS_ADAPTER_QDIOUP))
 		return 1;
+	spin_unlock_irq(&qdio->req_q_lock);
 	return 0;
 }
 
@@ -244,8 +242,9 @@ int zfcp_qdio_sbal_get(struct zfcp_qdio *qdio)
 {
 	long ret;
 
-	ret = wait_event_interruptible_lock_irq_timeout(qdio->req_q_wq,
-		       zfcp_qdio_sbal_check(qdio), qdio->req_q_lock, 5 * HZ);
+	spin_unlock_irq(&qdio->req_q_lock);
+	ret = wait_event_interruptible_timeout(qdio->req_q_wq,
+			       zfcp_qdio_sbal_check(qdio), 5 * HZ);
 
 	if (!(atomic_read(&qdio->adapter->status) & ZFCP_STATUS_ADAPTER_QDIOUP))
 		return -EIO;
@@ -259,6 +258,7 @@ int zfcp_qdio_sbal_get(struct zfcp_qdio *qdio)
 		zfcp_erp_adapter_reopen(qdio->adapter, 0, "qdsbg_1");
 	}
 
+	spin_lock_irq(&qdio->req_q_lock);
 	return -EIO;
 }
 

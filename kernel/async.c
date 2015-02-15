@@ -86,13 +86,6 @@ static async_cookie_t  __lowest_in_progress(struct list_head *running)
 {
 	struct async_entry *entry;
 
-	if (!running) { /* just check the entry count */
-		if (atomic_read(&entry_count))
-			return 0; /* smaller than any cookie */
-		else
-			return next_cookie;
-	}
-
 	if (!list_empty(running)) {
 		entry = list_first_entry(running,
 			struct async_entry, list);
@@ -126,6 +119,7 @@ static void async_run_entry_fn(struct work_struct *work)
 		container_of(work, struct async_entry, work);
 	unsigned long flags;
 	ktime_t uninitialized_var(calltime), delta, rettime;
+	unsigned long long duration;
 
 	/* 1) move self to the running queue */
 	spin_lock_irqsave(&async_lock, flags);
@@ -143,10 +137,18 @@ static void async_run_entry_fn(struct work_struct *work)
 	if (initcall_debug && system_state == SYSTEM_BOOTING) {
 		rettime = ktime_get();
 		delta = ktime_sub(rettime, calltime);
-		printk(KERN_DEBUG "initcall %lli_%pF returned 0 after %lld usecs\n",
-			(long long)entry->cookie,
-			entry->func,
-			(long long)ktime_to_ns(delta) >> 10);
+		duration = (unsigned long long) ktime_to_ns(delta) >> 10;
+
+		if(duration >= initcall_debug)
+			printk(KERN_WARNING "initcall %lli_%pF returned 0 after %lld usecs\n",
+				(long long)entry->cookie,
+				entry->func,
+				duration);
+		else
+			printk(KERN_DEBUG "initcall %lli_%pF returned 0 after %lld usecs\n",
+				(long long)entry->cookie,
+				entry->func,
+				duration);
 	}
 
 	/* 3) remove self from the running queue */
@@ -243,7 +245,9 @@ EXPORT_SYMBOL_GPL(async_schedule_domain);
  */
 void async_synchronize_full(void)
 {
-	async_synchronize_cookie_domain(next_cookie, NULL);
+	do {
+		async_synchronize_cookie(next_cookie);
+	} while (!list_empty(&async_running) || !list_empty(&async_pending));
 }
 EXPORT_SYMBOL_GPL(async_synchronize_full);
 
@@ -263,7 +267,7 @@ EXPORT_SYMBOL_GPL(async_synchronize_full_domain);
 /**
  * async_synchronize_cookie_domain - synchronize asynchronous function calls within a certain domain with cookie checkpointing
  * @cookie: async_cookie_t to use as checkpoint
- * @running: running list to synchronize on, NULL indicates all lists
+ * @running: running list to synchronize on
  *
  * This function waits until all asynchronous function calls for the
  * synchronization domain specified by the running list @list submitted

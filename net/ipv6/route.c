@@ -11,18 +11,6 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-/*	Changes:
- *
- *	YOSHIFUJI Hideaki @USAGI
- *		reworked default router selection.
- *		- respect outgoing interface
- *		- select from (probably) reachable routers (i.e.
- *		routers in REACHABLE, STALE, DELAY or PROBE states).
- *		- always select the same router if it is (probably)
- *		reachable.  otherwise, round-robin the list.
- *	Ville Nuorvala
- *		Fixed routing subtrees.
- */
 
 #include <linux/capability.h>
 #include <linux/errno.h>
@@ -203,7 +191,7 @@ static struct dst_ops ip6_dst_blackhole_ops = {
 };
 
 static const u32 ip6_template_metrics[RTAX_MAX] = {
-	[RTAX_HOPLIMIT - 1] = 0,
+	[RTAX_HOPLIMIT - 1] = 255,
 };
 
 static struct rt6_info ip6_null_entry_template = {
@@ -258,7 +246,6 @@ static struct rt6_info ip6_blk_hole_entry_template = {
 
 #endif
 
-/* allocate dst with ip6_dst_ops */
 static inline struct rt6_info *ip6_dst_alloc(struct dst_ops *ops,
 					     struct net_device *dev,
 					     int flags)
@@ -352,9 +339,6 @@ static inline int rt6_need_strict(const struct in6_addr *daddr)
 		(IPV6_ADDR_MULTICAST | IPV6_ADDR_LINKLOCAL | IPV6_ADDR_LOOPBACK);
 }
 
-/*
- *	Route lookup. Any table->tb6_lock is implied.
- */
 
 static inline struct rt6_info *rt6_device_match(struct net *net,
 						    struct rt6_info *rt,
@@ -407,14 +391,6 @@ out:
 static void rt6_probe(struct rt6_info *rt)
 {
 	struct neighbour *neigh;
-	/*
-	 * Okay, this does not seem to be appropriate
-	 * for now, however, we need to check if it
-	 * is really so; aka Router Reachability Probing.
-	 *
-	 * Router Reachability Probe MUST be rate-limited
-	 * to no more than one per minute.
-	 */
 	rcu_read_lock();
 	neigh = rt ? dst_get_neighbour_noref(&rt->dst) : NULL;
 	if (!neigh || (neigh->nud_state & NUD_VALID))
@@ -443,9 +419,6 @@ static inline void rt6_probe(struct rt6_info *rt)
 }
 #endif
 
-/*
- * Default Router Selection (RFC 2461 6.3.6)
- */
 static inline int rt6_check_dev(struct rt6_info *rt, int oif)
 {
 	struct net_device *dev = rt->dst.dev;
@@ -559,7 +532,7 @@ static struct rt6_info *rt6_select(struct fib6_node *fn, int oif, int strict)
 	    (strict & RT6_LOOKUP_F_REACHABLE)) {
 		struct rt6_info *next = rt0->dst.rt6_next;
 
-		/* no entries matched; do round-robin */
+		
 		if (!next || next->rt6i_metric != rt0->rt6i_metric)
 			next = fn->leaf;
 
@@ -585,7 +558,7 @@ int rt6_route_rcv(struct net_device *dev, u8 *opt, int len,
 		return -EINVAL;
 	}
 
-	/* Sanity check for prefix_len and length */
+	
 	if (rinfo->length > 3) {
 		return -EINVAL;
 	} else if (rinfo->prefix_len > 128) {
@@ -609,7 +582,7 @@ int rt6_route_rcv(struct net_device *dev, u8 *opt, int len,
 	if (rinfo->length == 3)
 		prefix = (struct in6_addr *)rinfo->prefix;
 	else {
-		/* this function is safe */
+		
 		ipv6_addr_prefix(&prefix_buf,
 				 (struct in6_addr *)rinfo->prefix,
 				 rinfo->prefix_len);
@@ -712,11 +685,6 @@ struct rt6_info *rt6_lookup(struct net *net, const struct in6_addr *daddr,
 
 EXPORT_SYMBOL(rt6_lookup);
 
-/* ip6_ins_rt is called with FREE table->tb6_lock.
-   It takes new route entry, the addition fails by any reason the
-   route is freed. In any case, if caller does not hold it, it may
-   be destroyed.
- */
 
 static int __ip6_ins_rt(struct rt6_info *rt, struct nl_info *info)
 {
@@ -745,9 +713,6 @@ static struct rt6_info *rt6_alloc_cow(struct rt6_info *ort,
 {
 	struct rt6_info *rt;
 
-	/*
-	 *	Clone the route.
-	 */
 
 	rt = ip6_rt_copy(ort, daddr);
 
@@ -843,8 +808,7 @@ restart:
 	dst_hold(&rt->dst);
 	read_unlock_bh(&table->tb6_lock);
 
-	if (!dst_get_neighbour_noref_raw(&rt->dst) &&
-	    !(rt->rt6i_flags & (RTF_NONEXTHOP | RTF_LOCAL)))
+	if (!dst_get_neighbour_noref_raw(&rt->dst) && !(rt->rt6i_flags & RTF_NONEXTHOP))
 		nrt = rt6_alloc_cow(rt, &fl6->daddr, &fl6->saddr);
 	else if (!(rt->dst.flags & DST_HOST))
 		nrt = rt6_alloc_clone(rt, &fl6->daddr);
@@ -864,10 +828,6 @@ restart:
 	if (--attempts <= 0)
 		goto out2;
 
-	/*
-	 * Race condition! In the gap, when table->tb6_lock was
-	 * released someone could insert this route.  Relookup.
-	 */
 	dst_release(&rt->dst);
 	goto relookup;
 
@@ -982,9 +942,6 @@ struct dst_entry *ip6_blackhole_route(struct net *net, struct dst_entry *dst_ori
 	return new ? new : ERR_PTR(-ENOMEM);
 }
 
-/*
- *	Destination cache support functions
- */
 
 static struct dst_entry *ip6_dst_check(struct dst_entry *dst, u32 cookie)
 {
@@ -1029,13 +986,10 @@ static void ip6_link_failure(struct sk_buff *skb)
 
 	rt = (struct rt6_info *) skb_dst(skb);
 	if (rt) {
-		if (rt->rt6i_flags & RTF_CACHE) {
-			dst_hold(&rt->dst);
-			if (ip6_del_rt(rt))
-				dst_free(&rt->dst);
-		} else if (rt->rt6i_node && (rt->rt6i_flags & RTF_DEFAULT)) {
+		if (rt->rt6i_flags & RTF_CACHE)
+			rt6_update_expires(rt, 0);
+		else if (rt->rt6i_node && (rt->rt6i_flags & RTF_DEFAULT))
 			rt->rt6i_node->fn_sernum = -1;
-		}
 	}
 }
 
@@ -1066,12 +1020,6 @@ static unsigned int ip6_default_advmss(const struct dst_entry *dst)
 	if (mtu < net->ipv6.sysctl.ip6_rt_min_advmss)
 		mtu = net->ipv6.sysctl.ip6_rt_min_advmss;
 
-	/*
-	 * Maximal non-jumbo IPv6 payload is IPV6_MAXPLEN and
-	 * corresponding MSS is IPV6_MAXPLEN - tcp_header_size.
-	 * IPV6_MAXPLEN is also valid and means: "any MSS,
-	 * rely only on pmtu discovery"
-	 */
 	if (mtu > IPV6_MAXPLEN - sizeof(struct tcphdr))
 		mtu = IPV6_MAXPLEN;
 	return mtu;
@@ -1136,7 +1084,7 @@ struct dst_entry *icmp6_dst_alloc(struct net_device *dev,
 	rt->rt6i_dst.addr = fl6->daddr;
 	rt->rt6i_dst.plen = 128;
 	rt->rt6i_idev     = idev;
-	dst_metric_set(&rt->dst, RTAX_HOPLIMIT, 0);
+	dst_metric_set(&rt->dst, RTAX_HOPLIMIT, 255);
 
 	spin_lock_bh(&icmp6_dst_lock);
 	rt->dst.next = icmp6_dst_gc_list;
@@ -1220,11 +1168,6 @@ out:
 	return entries > rt_max_size;
 }
 
-/* Clean host part of a prefix. Not necessary in radix tree,
-   but results in cleaner routing tables.
-
-   Remove it only when all the things will work!
- */
 
 int ip6_dst_hoplimit(struct dst_entry *dst)
 {
@@ -1245,9 +1188,6 @@ int ip6_dst_hoplimit(struct dst_entry *dst)
 }
 EXPORT_SYMBOL(ip6_dst_hoplimit);
 
-/*
- *
- */
 
 int ip6_route_add(struct fib6_config *cfg)
 {
@@ -1343,14 +1283,11 @@ int ip6_route_add(struct fib6_config *cfg)
 
 	rt->rt6i_metric = cfg->fc_metric;
 
-	/* We cannot add true routes via loopback here,
-	   they would result in kernel looping; promote them to reject routes
-	 */
 	if ((cfg->fc_flags & RTF_REJECT) ||
 	    (dev && (dev->flags & IFF_LOOPBACK) &&
 	     !(addr_type & IPV6_ADDR_LOOPBACK) &&
 	     !(cfg->fc_flags & RTF_LOCAL))) {
-		/* hold loopback dev/idev if we haven't done so. */
+		
 		if (dev != net->loopback_dev) {
 			if (dev) {
 				dev_put(dev);
@@ -1382,13 +1319,6 @@ int ip6_route_add(struct fib6_config *cfg)
 		if (gwa_type != (IPV6_ADDR_LINKLOCAL|IPV6_ADDR_UNICAST)) {
 			struct rt6_info *grt;
 
-			/* IPv6 strictly inhibits using not link-local
-			   addresses as nexthop address.
-			   Otherwise, router will not able to send redirects.
-			   It is very good, but in some (rare!) circumstances
-			   (SIT, PtP, NBMA NOARP links) it is handy to allow
-			   some exceptions. --ANK
-			 */
 			err = -EINVAL;
 			if (!(gwa_type & IPV6_ADDR_UNICAST))
 				goto out;
@@ -1486,18 +1416,17 @@ static int __ip6_del_rt(struct rt6_info *rt, struct nl_info *info)
 	struct fib6_table *table;
 	struct net *net = dev_net(rt->dst.dev);
 
-	if (rt == net->ipv6.ip6_null_entry) {
-		err = -ENOENT;
-		goto out;
-	}
+	if (rt == net->ipv6.ip6_null_entry)
+		return -ENOENT;
 
 	table = rt->rt6i_table;
 	write_lock_bh(&table->tb6_lock);
+
 	err = fib6_del(rt, info);
+	dst_release(&rt->dst);
+
 	write_unlock_bh(&table->tb6_lock);
 
-out:
-	dst_release(&rt->dst);
 	return err;
 }
 
@@ -1548,9 +1477,6 @@ static int ip6_route_del(struct fib6_config *cfg)
 	return err;
 }
 
-/*
- *	Handle redirects
- */
 struct ip6rd_flowi {
 	struct flowi6 fl6;
 	struct in6_addr gateway;
@@ -1565,29 +1491,11 @@ static struct rt6_info *__ip6_route_redirect(struct net *net,
 	struct rt6_info *rt;
 	struct fib6_node *fn;
 
-	/*
-	 * Get the "current" route for this destination and
-	 * check if the redirect has come from approriate router.
-	 *
-	 * RFC 2461 specifies that redirects should only be
-	 * accepted if they come from the nexthop to the target.
-	 * Due to the way the routes are chosen, this notion
-	 * is a bit fuzzy and one might need to check all possible
-	 * routes.
-	 */
 
 	read_lock_bh(&table->tb6_lock);
 	fn = fib6_lookup(&table->tb6_root, &fl6->daddr, &fl6->saddr);
 restart:
 	for (rt = fn->leaf; rt; rt = rt->dst.rt6_next) {
-		/*
-		 * Current route is on-link; redirect is always invalid.
-		 *
-		 * Seems, previous statement is not true. It could
-		 * be node, which looks for us as on-link (f.e. proxy ndisc)
-		 * But then router serving it might decide, that we should
-		 * know truth 8)8) --ANK (980726).
-		 */
 		if (rt6_check_expired(rt))
 			continue;
 		if (!(rt->rt6i_flags & RTF_GATEWAY))
@@ -1651,9 +1559,6 @@ void rt6_redirect(const struct in6_addr *dest, const struct in6_addr *src,
 		goto out;
 	}
 
-	/*
-	 *	We have finally decided to accept it.
-	 */
 
 	neigh_update(neigh, lladdr, NUD_STALE,
 		     NEIGH_UPDATE_F_WEAK_OVERRIDE|
@@ -1662,14 +1567,9 @@ void rt6_redirect(const struct in6_addr *dest, const struct in6_addr *src,
 				     NEIGH_UPDATE_F_ISROUTER))
 		     );
 
-	/*
-	 * Redirect received -> path was valid.
-	 * Look, redirects are sent only in response to data packets,
-	 * so that this nexthop apparently is reachable. --ANK
-	 */
 	dst_confirm(&rt->dst);
 
-	/* Duplicate redirect: silently ignore. */
+	
 	if (neigh == dst_get_neighbour_noref_raw(&rt->dst))
 		goto out;
 
@@ -1700,10 +1600,6 @@ out:
 	dst_release(&rt->dst);
 }
 
-/*
- *	Handle ICMP "packet too big" messages
- *	i.e. Path MTU discovery
- */
 
 static void rt6_do_pmtu_disc(const struct in6_addr *daddr, const struct in6_addr *saddr,
 			     struct net *net, u32 pmtu, int ifindex)
@@ -1724,27 +1620,12 @@ again:
 		goto out;
 
 	if (pmtu < IPV6_MIN_MTU) {
-		/*
-		 * According to RFC2460, PMTU is set to the IPv6 Minimum Link
-		 * MTU (1280) and a fragment header should always be included
-		 * after a node receiving Too Big message reporting PMTU is
-		 * less than the IPv6 Minimum Link MTU.
-		 */
 		pmtu = IPV6_MIN_MTU;
 		allfrag = 1;
 	}
 
-	/* New mtu received -> path was valid.
-	   They are sent only in response to data packets,
-	   so that this nexthop apparently is reachable. --ANK
-	 */
 	dst_confirm(&rt->dst);
 
-	/* Host route. If it is static, it would be better
-	   not to override it, but add new one, so that
-	   when cache entry will expire old pmtu
-	   would return automatically.
-	 */
 	if (rt->rt6i_flags & RTF_CACHE) {
 		dst_metric_set(&rt->dst, RTAX_MTU, pmtu);
 		if (allfrag) {
@@ -1757,11 +1638,6 @@ again:
 		goto out;
 	}
 
-	/* Network route.
-	   Two cases are possible:
-	   1. It is connected route. Action: COW
-	   2. It is gatewayed route or NONEXTHOP route. Action: clone it.
-	 */
 	if (!dst_get_neighbour_noref_raw(&rt->dst) && !(rt->rt6i_flags & RTF_NONEXTHOP))
 		nrt = rt6_alloc_cow(rt, daddr, saddr);
 	else
@@ -1775,12 +1651,6 @@ again:
 			dst_metric_set(&nrt->dst, RTAX_FEATURES, features);
 		}
 
-		/* According to RFC 1981, detecting PMTU increase shouldn't be
-		 * happened within 5 mins, the recommended timer is 10 mins.
-		 * Here this route expiration time is set to ip6_rt_mtu_expires
-		 * which is 10 mins. After 10 mins the decreased pmtu is expired
-		 * and detecting PMTU increase will be automatically happened.
-		 */
 		rt6_update_expires(nrt, net->ipv6.sysctl.ip6_rt_mtu_expires);
 		nrt->rt6i_flags |= RTF_DYNAMIC;
 		ip6_ins_rt(nrt);
@@ -1794,25 +1664,10 @@ void rt6_pmtu_discovery(const struct in6_addr *daddr, const struct in6_addr *sad
 {
 	struct net *net = dev_net(dev);
 
-	/*
-	 * RFC 1981 states that a node "MUST reduce the size of the packets it
-	 * is sending along the path" that caused the Packet Too Big message.
-	 * Since it's not possible in the general case to determine which
-	 * interface was used to send the original packet, we update the MTU
-	 * on the interface that will be used to send future packets. We also
-	 * update the MTU on the interface that received the Packet Too Big in
-	 * case the original packet was forced out that interface with
-	 * SO_BINDTODEVICE or similar. This is the next best thing to the
-	 * correct behaviour, which would be to update the MTU on all
-	 * interfaces.
-	 */
 	rt6_do_pmtu_disc(daddr, saddr, net, pmtu, 0);
 	rt6_do_pmtu_disc(daddr, saddr, net, pmtu, dev->ifindex);
 }
 
-/*
- *	Misc support functions
- */
 
 static struct rt6_info *ip6_rt_copy(struct rt6_info *ort,
 				    const struct in6_addr *dest)
@@ -1907,7 +1762,7 @@ static struct rt6_info *rt6_add_route_info(struct net_device *dev,
 	cfg.fc_dst = *prefix;
 	cfg.fc_gateway = *gwaddr;
 
-	/* We should treat it as a default route if prefix length is 0. */
+	
 	if (!prefixlen)
 		cfg.fc_flags |= RTF_DEFAULT;
 
@@ -2003,8 +1858,8 @@ int ipv6_route_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 	int err;
 
 	switch(cmd) {
-	case SIOCADDRT:		/* Add a route */
-	case SIOCDELRT:		/* Delete a route */
+	case SIOCADDRT:		
+	case SIOCDELRT:		
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 		err = copy_from_user(&rtmsg, arg,
@@ -2033,9 +1888,6 @@ int ipv6_route_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 	return -EINVAL;
 }
 
-/*
- *	Drop the packet on the floor
- */
 
 static int ip6_pkt_drop(struct sk_buff *skb, u8 code, int ipstats_mib_noroutes)
 {
@@ -2049,7 +1901,7 @@ static int ip6_pkt_drop(struct sk_buff *skb, u8 code, int ipstats_mib_noroutes)
 				      IPSTATS_MIB_INADDRERRORS);
 			break;
 		}
-		/* FALLTHROUGH */
+		
 	case IPSTATS_MIB_OUTNOROUTES:
 		IP6_INC_STATS(dev_net(dst->dev), ip6_dst_idev(dst),
 			      ipstats_mib_noroutes);
@@ -2086,9 +1938,6 @@ static int ip6_pkt_prohibit_out(struct sk_buff *skb)
 
 #endif
 
-/*
- *	Allocate a dst for local (unicast / anycast) address.
- */
 
 struct rt6_info *addrconf_dst_alloc(struct inet6_dev *idev,
 				    const struct in6_addr *addr,
@@ -2150,7 +1999,6 @@ int ip6_route_get_saddr(struct net *net,
 	return err;
 }
 
-/* remove deleted ip from prefsrc entries */
 struct arg_dev_net_ip {
 	struct net_device *dev;
 	struct net *net;
@@ -2166,7 +2014,7 @@ static int fib6_remove_prefsrc(struct rt6_info *rt, void *arg)
 	if (((void *)rt->dst.dev == dev || !dev) &&
 	    rt != net->ipv6.ip6_null_entry &&
 	    ipv6_addr_equal(addr, &rt->rt6i_prefsrc.addr)) {
-		/* remove prefsrc entry */
+		
 		rt->rt6i_prefsrc.plen = 0;
 	}
 	return 0;
@@ -2222,30 +2070,11 @@ static int rt6_mtu_change_route(struct rt6_info *rt, void *p_arg)
 	struct rt6_mtu_change_arg *arg = (struct rt6_mtu_change_arg *) p_arg;
 	struct inet6_dev *idev;
 
-	/* In IPv6 pmtu discovery is not optional,
-	   so that RTAX_MTU lock cannot disable it.
-	   We still use this lock to block changes
-	   caused by addrconf/ndisc.
-	*/
 
 	idev = __in6_dev_get(arg->dev);
 	if (!idev)
 		return 0;
 
-	/* For administrative MTU increase, there is no way to discover
-	   IPv6 PMTU increase, so PMTU increase should be updated here.
-	   Since RFC 1981 doesn't include administrative MTU increase
-	   update PMTU increase is a MUST. (i.e. jumbo frame)
-	 */
-	/*
-	   If new MTU is less than route PMTU, this new MTU will be the
-	   lowest MTU in the path, update the route PMTU to reflect PMTU
-	   decreases; if new MTU is greater than route PMTU, and the
-	   old MTU is the lowest MTU in the path, update the route PMTU
-	   to reflect the increase. In this case if the other nodes' MTU
-	   also have the lowest MTU, TOO BIG MESSAGE will be lead to
-	   PMTU discouvery.
-	 */
 	if (rt->dst.dev == arg->dev &&
 	    !dst_metric_locked(&rt->dst, RTAX_MTU) &&
 	    (dst_mtu(&rt->dst) >= arg->mtu ||
@@ -2378,15 +2207,15 @@ static int inet6_rtm_newroute(struct sk_buff *skb, struct nlmsghdr* nlh, void *a
 static inline size_t rt6_nlmsg_size(void)
 {
 	return NLMSG_ALIGN(sizeof(struct rtmsg))
-	       + nla_total_size(16) /* RTA_SRC */
-	       + nla_total_size(16) /* RTA_DST */
-	       + nla_total_size(16) /* RTA_GATEWAY */
-	       + nla_total_size(16) /* RTA_PREFSRC */
-	       + nla_total_size(4) /* RTA_TABLE */
-	       + nla_total_size(4) /* RTA_IIF */
-	       + nla_total_size(4) /* RTA_OIF */
-	       + nla_total_size(4) /* RTA_PRIORITY */
-	       + RTAX_MAX * nla_total_size(4) /* RTA_METRICS */
+	       + nla_total_size(16) 
+	       + nla_total_size(16) 
+	       + nla_total_size(16) 
+	       + nla_total_size(16) 
+	       + nla_total_size(4) 
+	       + nla_total_size(4) 
+	       + nla_total_size(4) 
+	       + nla_total_size(4) 
+	       + RTAX_MAX * nla_total_size(4) 
 	       + nla_total_size(sizeof(struct rta_cacheinfo));
 }
 
@@ -2404,9 +2233,9 @@ static int rt6_fill_node(struct net *net,
 	struct neighbour *n;
 	u32 ts, tsage;
 
-	if (prefix) {	/* user wants prefix routes only */
+	if (prefix) {	
 		if (!(rt->rt6i_flags & RTF_PREFIX_RT)) {
-			/* success since this is not a prefix route */
+			
 			return 1;
 		}
 	}
@@ -2619,9 +2448,6 @@ static int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void
 		goto errout;
 	}
 
-	/* Reserve room for dummy headers, this skb can pass
-	   through good chunk of routing engine.
-	 */
 	skb_reset_mac_header(skb);
 	skb_reserve(skb, MAX_HEADER + sizeof(struct ipv6hdr));
 
@@ -2657,7 +2483,7 @@ void inet6_rt_notify(int event, struct rt6_info *rt, struct nl_info *info)
 	err = rt6_fill_node(net, skb, rt, NULL, NULL, 0,
 				event, info->pid, seq, 0, 0, 0);
 	if (err < 0) {
-		/* -EMSGSIZE implies BUG in rt6_nlmsg_size() */
+		
 		WARN_ON(err == -EMSGSIZE);
 		kfree_skb(skb);
 		goto errout;
@@ -2690,9 +2516,6 @@ static int ip6_route_dev_notify(struct notifier_block *this,
 	return NOTIFY_OK;
 }
 
-/*
- *	/proc
- */
 
 #ifdef CONFIG_PROC_FS
 
@@ -2779,7 +2602,7 @@ static const struct file_operations rt6_stats_seq_fops = {
 	.llseek	 = seq_lseek,
 	.release = single_release_net,
 };
-#endif	/* CONFIG_PROC_FS */
+#endif	
 
 #ifdef CONFIG_SYSCTL
 
@@ -2953,6 +2776,10 @@ static int __net_init ip6_route_net_init(struct net *net)
 	net->ipv6.sysctl.ip6_rt_mtu_expires = 10*60*HZ;
 	net->ipv6.sysctl.ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
 
+#ifdef CONFIG_PROC_FS
+	proc_net_fops_create(net, "ipv6_route", 0, &ipv6_route_proc_fops);
+	proc_net_fops_create(net, "rt6_stats", S_IRUGO, &rt6_stats_seq_fops);
+#endif
 	net->ipv6.ip6_rt_gc_expire = 30*HZ;
 
 	ret = 0;
@@ -2973,6 +2800,10 @@ out_ip6_dst_ops:
 
 static void __net_exit ip6_route_net_exit(struct net *net)
 {
+#ifdef CONFIG_PROC_FS
+	proc_net_remove(net, "ipv6_route");
+	proc_net_remove(net, "rt6_stats");
+#endif
 	kfree(net->ipv6.ip6_null_entry);
 #ifdef CONFIG_IPV6_MULTIPLE_TABLES
 	kfree(net->ipv6.ip6_prohibit_entry);
@@ -2981,31 +2812,9 @@ static void __net_exit ip6_route_net_exit(struct net *net)
 	dst_entries_destroy(&net->ipv6.ip6_dst_ops);
 }
 
-static int __net_init ip6_route_net_init_late(struct net *net)
-{
-#ifdef CONFIG_PROC_FS
-	proc_net_fops_create(net, "ipv6_route", 0, &ipv6_route_proc_fops);
-	proc_net_fops_create(net, "rt6_stats", S_IRUGO, &rt6_stats_seq_fops);
-#endif
-	return 0;
-}
-
-static void __net_exit ip6_route_net_exit_late(struct net *net)
-{
-#ifdef CONFIG_PROC_FS
-	proc_net_remove(net, "ipv6_route");
-	proc_net_remove(net, "rt6_stats");
-#endif
-}
-
 static struct pernet_operations ip6_route_net_ops = {
 	.init = ip6_route_net_init,
 	.exit = ip6_route_net_exit,
-};
-
-static struct pernet_operations ip6_route_net_late_ops = {
-	.init = ip6_route_net_init_late,
-	.exit = ip6_route_net_exit_late,
 };
 
 static struct notifier_block ip6_route_dev_notifier = {
@@ -3034,9 +2843,6 @@ int __init ip6_route_init(void)
 
 	ip6_dst_blackhole_ops.kmem_cachep = ip6_dst_ops_template.kmem_cachep;
 
-	/* Registering of the loopback is done before this portion of code,
-	 * the loopback reference in rt6_info will not be taken, do it
-	 * manually for init_net */
 	init_net.ipv6.ip6_null_entry->dst.dev = init_net.loopback_dev;
 	init_net.ipv6.ip6_null_entry->rt6i_idev = in6_dev_get(init_net.loopback_dev);
   #ifdef CONFIG_IPV6_MULTIPLE_TABLES
@@ -3057,25 +2863,19 @@ int __init ip6_route_init(void)
 	if (ret)
 		goto xfrm6_init;
 
-	ret = register_pernet_subsys(&ip6_route_net_late_ops);
-	if (ret)
-		goto fib6_rules_init;
-
 	ret = -ENOBUFS;
 	if (__rtnl_register(PF_INET6, RTM_NEWROUTE, inet6_rtm_newroute, NULL, NULL) ||
 	    __rtnl_register(PF_INET6, RTM_DELROUTE, inet6_rtm_delroute, NULL, NULL) ||
 	    __rtnl_register(PF_INET6, RTM_GETROUTE, inet6_rtm_getroute, NULL, NULL))
-		goto out_register_late_subsys;
+		goto fib6_rules_init;
 
 	ret = register_netdevice_notifier(&ip6_route_dev_notifier);
 	if (ret)
-		goto out_register_late_subsys;
+		goto fib6_rules_init;
 
 out:
 	return ret;
 
-out_register_late_subsys:
-	unregister_pernet_subsys(&ip6_route_net_late_ops);
 fib6_rules_init:
 	fib6_rules_cleanup();
 xfrm6_init:
@@ -3094,7 +2894,6 @@ out_kmem_cache:
 void ip6_route_cleanup(void)
 {
 	unregister_netdevice_notifier(&ip6_route_dev_notifier);
-	unregister_pernet_subsys(&ip6_route_net_late_ops);
 	fib6_rules_cleanup();
 	xfrm6_fini();
 	fib6_gc_cleanup();

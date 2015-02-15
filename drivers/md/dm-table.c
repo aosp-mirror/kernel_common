@@ -330,11 +330,14 @@ static int open_dev(struct dm_dev_internal *d, dev_t dev,
 	BUG_ON(d->dm_dev.bdev);
 
 	bdev = blkdev_get_by_dev(dev, d->dm_dev.mode | FMODE_EXCL, _claim_ptr);
-	if (IS_ERR(bdev))
+	if (IS_ERR(bdev)) {
+		pr_info("%s blkdev_get_by_dev error\n", __func__);
 		return PTR_ERR(bdev);
+	}
 
 	r = bd_link_disk_holder(bdev, dm_disk(md));
 	if (r) {
+		pr_info("%s bd_link_disk_holder error\n", __func__);
 		blkdev_put(bdev, d->dm_dev.mode | FMODE_EXCL);
 		return r;
 	}
@@ -468,6 +471,7 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 	BUG_ON(!t);
 
 	if (sscanf(path, "%u:%u%c", &major, &minor, &dummy) == 2) {
+		pr_info("%s get existing dm-device\n", __func__);
 		/* Extract the major/minor numbers */
 		dev = MKDEV(major, minor);
 		if (MAJOR(dev) != major || MINOR(dev) != minor)
@@ -475,9 +479,12 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 	} else {
 		/* convert the path to a device */
 		struct block_device *bdev = lookup_bdev(path);
+		pr_info("%s create new dm-device\n", __func__);
 
-		if (IS_ERR(bdev))
+		if (IS_ERR(bdev)) {
+			pr_info("%s create new dm-device error\n", __func__);
 			return PTR_ERR(bdev);
+		}
 		dev = bdev->bd_dev;
 		bdput(bdev);
 	}
@@ -493,6 +500,7 @@ int dm_get_device(struct dm_target *ti, const char *path, fmode_t mode,
 
 		if ((r = open_dev(dd, dev, t->md))) {
 			kfree(dd);
+			pr_info("%s open_dev fail, rc = %d\n", __func__, r);
 			return r;
 		}
 
@@ -1351,25 +1359,17 @@ static int device_is_nonrot(struct dm_target *ti, struct dm_dev *dev,
 	return q && blk_queue_nonrot(q);
 }
 
-static int device_is_not_random(struct dm_target *ti, struct dm_dev *dev,
-			     sector_t start, sector_t len, void *data)
-{
-	struct request_queue *q = bdev_get_queue(dev->bdev);
-
-	return q && !blk_queue_add_random(q);
-}
-
-static bool dm_table_all_devices_attribute(struct dm_table *t,
-					   iterate_devices_callout_fn func)
+static bool dm_table_is_nonrot(struct dm_table *t)
 {
 	struct dm_target *ti;
 	unsigned i = 0;
 
+	/* Ensure that all underlying device are non-rotational. */
 	while (i < dm_table_get_num_targets(t)) {
 		ti = dm_table_get_target(t, i++);
 
 		if (!ti->type->iterate_devices ||
-		    !ti->type->iterate_devices(ti, func, NULL))
+		    !ti->type->iterate_devices(ti, device_is_nonrot, NULL))
 			return 0;
 	}
 
@@ -1401,22 +1401,12 @@ void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q,
 	if (!dm_table_discard_zeroes_data(t))
 		q->limits.discard_zeroes_data = 0;
 
-	/* Ensure that all underlying devices are non-rotational. */
-	if (dm_table_all_devices_attribute(t, device_is_nonrot))
+	if (dm_table_is_nonrot(t))
 		queue_flag_set_unlocked(QUEUE_FLAG_NONROT, q);
 	else
 		queue_flag_clear_unlocked(QUEUE_FLAG_NONROT, q);
 
 	dm_table_set_integrity(t);
-
-	/*
-	 * Determine whether or not this queue's I/O timings contribute
-	 * to the entropy pool, Only request-based targets use this.
-	 * Clear QUEUE_FLAG_ADD_RANDOM if any underlying device does not
-	 * have it set.
-	 */
-	if (blk_queue_add_random(q) && dm_table_all_devices_attribute(t, device_is_not_random))
-		queue_flag_clear_unlocked(QUEUE_FLAG_ADD_RANDOM, q);
 
 	/*
 	 * QUEUE_FLAG_STACKABLE must be set after all queue settings are

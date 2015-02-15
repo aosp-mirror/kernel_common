@@ -1,0 +1,231 @@
+&soc {
+	htc,pm8226-vreg {
+		compatible = "htc,vreg-dump";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		range_ctl_offset = <0x40>;
+		step_ctl_offset = <0x41>;
+		mode_ctl_offset = <0x45>;
+		en_ctl_offset = <0x46>;
+		pd_ctl_offset = <0x48>;
+		en_bit = <7>;
+		pd_bit = <7>;
+
+		vreg@0 {
+			reg = <0x0>;
+			vreg_name = "8226_s1";
+			base_addr = <0x11400>;
+			type = "ft-smps";
+		};
+
+		vreg@1 {
+			reg = <0x1>;
+			vreg_name = "8226_s2";
+			base_addr = <0x11700>;
+			type = "ft-smps";
+		};
+
+		vreg@2 {
+			reg = <0x2>;
+			vreg_name = "8226_s3";
+			base_addr = <0x11a00>;
+			type = "hf-smps";
+		};
+
+		vreg@3 {
+			reg = <0x3>;
+			vreg_name = "8226_s4";
+			base_addr = <0x11d00>;
+			type = "hf-smps";
+		};
+
+		vreg@4 {
+			reg = <0x4>;
+			vreg_name = "8226_l1";
+			base_addr = <0x14000>;
+			type = "nldo";
+		};
+
+		vreg@5 {
+			reg = <0x5>;
+			vreg_name = "8226_l2";
+			base_addr = <0x14100>;
+			type = "nldo";
+		};
+
+		vreg@6 {
+			reg = <0x6>;
+			vreg_name = "8226_l3";
+			base_addr = <0x14200>;
+			type = "nldo";
+		};
+
+		vreg@7 {
+			reg = <0x7>;
+			vreg_name = "8226_l4";
+			base_addr = <0x14300>;
+			type = "nldo";
+		};
+
+		vreg@8 {
+			reg = <0x8>;
+			vreg_name = "8226_l5";
+			base_addr = <0x14400>;
+			type = "nldo";
+		};
+
+		vreg@9 {
+			reg = <0x9>;
+			vreg_name = "8226_l6";
+			base_addr = <0x14500>;
+			type = "pldo";
+		};
+
+		vreg@a {
+			reg = <0xa>;
+			vreg_name = "8226_l7";
+			base_addr = <0x14600>;
+			type = "pldo";
+		};
+
+		vreg@b {
+			reg = <0xb>;
+			vreg_name = "8226_l8";
+			base_addr = <0x14700>;
+			type = "pldo";
+		};
+
+		vreg@c {
+			reg = <0xc>;
+			vreg_name = "8226_l9";
+			base_addr = <0x14800>;
+			type = "pldo";
+		};
+
+		vreg@d {
+			reg = <0xd>;
+			vreg_name = "8226_l10";
+			base_addr = <0x14900>;
+			type = "pldo";
+		};
+
+		vreg@e {
+			reg = <0xe>;
+			vreg_name = "8226_l12";
+			base_addr = <0x14b00>;
+			type = "pldo";
+		};
+
+		vreg@f {
+			reg = <0xf>;
+			vreg_name = "8226_l14";
+			base_addr = <0x14d00>;
+			type = "pldo";
+		};
+		vreg@10 {
+			reg = <0x10>;
+			vreg_name = "8226_l15";
+			base_addr = <0x14e00>;
+			type = "pldo";
+		};
+
+		vreg@11 {
+			reg = <0x11>;
+			vreg_name = "8226_l16";
+			base_addr = <0x14f00>;
+			type = "pldo";
+		};
+
+		vreg@12 {
+			reg = <0x12>;
+			vreg_name = "8226_l17";
+			base_addr = <0x15000>;
+			type = "pldo";
+		};
+
+		vreg@13 {
+			reg = <0x13>;
+			vreg_name = "8226_l18";
+			base_addr = <0x15100>;
+			type = "pldo";
+		};
+
+		vreg@14 {
+			reg = <0x14>;
+			vreg_name = "8226_l19";
+			base_addr = <0x15200>;
+			type = "pldo";
+		};
+
+		vreg@15 {
+			reg = <0x15>;
+			vreg_name = "8226_l20";
+			base_addr = <0x15300>;
+			type = "pldo";
+		};
+
+
+		vreg@16 {
+			reg = <0x16>;
+			vreg_name = "8226_l21";
+			base_addr = <0x15400>;
+			type = "pldo";
+		};
+
+		vreg@17 {
+			reg = <0x17>;
+			vreg_name = "8226_l22";
+			base_addr = <0x15500>;
+			type = "pldo";
+		};
+
+		vreg@18 {
+			reg = <0x18>;
+			vreg_name = "8226_l23";
+			base_addr = <0x15600>;
+			type = "pldo";
+		};
+
+		vreg@19 {
+			reg = <0x19>;
+			vreg_name = "8226_l24";
+			base_addr = <0x15700>;
+			type = "nldo";
+		};
+
+		vreg@1a {
+			reg = <0x1a>;
+			vreg_name = "8226_l25";
+			base_addr = <0x15800>;
+			type = "pldo";
+		};
+
+		vreg@1b {
+			reg = <0x1b>;
+			vreg_name = "8226_l26";
+			base_addr = <0x15900>;
+			type = "nldo";
+		};
+
+		vreg@1c {
+			reg = <0x1c>;
+			vreg_name = "8226_l27";
+			base_addr = <0x15a00>;
+			type = "pldo";
+		};
+
+		vreg@1d {
+			reg = <0x1d>;
+			vreg_name = "8226_l28";
+			base_addr = <0x15b00>;
+			type = "pldo";
+		};
+
+		vreg@1e {
+			reg = <0x1e>;
+			vreg_name = "8226_lvs1";
+			base_addr = <0x18000>;
+			type = "lvs";
+		};
+	};
+};

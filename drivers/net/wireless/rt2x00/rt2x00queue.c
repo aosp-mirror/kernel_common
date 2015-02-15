@@ -207,7 +207,6 @@ static void rt2x00queue_create_tx_descriptor_seq(struct rt2x00_dev *rt2x00dev,
 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct rt2x00_intf *intf = vif_to_intf(tx_info->control.vif);
-	u16 seqno;
 
 	if (!(tx_info->flags & IEEE80211_TX_CTL_ASSIGN_SEQ))
 		return;
@@ -228,13 +227,15 @@ static void rt2x00queue_create_tx_descriptor_seq(struct rt2x00_dev *rt2x00dev,
 	 * sequence counting per-frame, since those will override the
 	 * sequence counter given by mac80211.
 	 */
-	if (test_bit(ENTRY_TXD_FIRST_FRAGMENT, &txdesc->flags))
-		seqno = atomic_add_return(0x10, &intf->seqno);
-	else
-		seqno = atomic_read(&intf->seqno);
+	spin_lock(&intf->seqlock);
 
+	if (test_bit(ENTRY_TXD_FIRST_FRAGMENT, &txdesc->flags))
+		intf->seqno += 0x10;
 	hdr->seq_ctrl &= cpu_to_le16(IEEE80211_SCTL_FRAG);
-	hdr->seq_ctrl |= cpu_to_le16(seqno);
+	hdr->seq_ctrl |= cpu_to_le16(intf->seqno);
+
+	spin_unlock(&intf->seqlock);
+
 }
 
 static void rt2x00queue_create_tx_descriptor_plcp(struct rt2x00_dev *rt2x00dev,
@@ -856,8 +857,13 @@ void rt2x00queue_index_inc(struct queue_entry *entry, enum queue_index index)
 	spin_unlock_irqrestore(&queue->index_lock, irqflags);
 }
 
-void rt2x00queue_pause_queue_nocheck(struct data_queue *queue)
+void rt2x00queue_pause_queue(struct data_queue *queue)
 {
+	if (!test_bit(DEVICE_STATE_PRESENT, &queue->rt2x00dev->flags) ||
+	    !test_bit(QUEUE_STARTED, &queue->flags) ||
+	    test_and_set_bit(QUEUE_PAUSED, &queue->flags))
+		return;
+
 	switch (queue->qid) {
 	case QID_AC_VO:
 	case QID_AC_VI:
@@ -872,15 +878,6 @@ void rt2x00queue_pause_queue_nocheck(struct data_queue *queue)
 	default:
 		break;
 	}
-}
-void rt2x00queue_pause_queue(struct data_queue *queue)
-{
-	if (!test_bit(DEVICE_STATE_PRESENT, &queue->rt2x00dev->flags) ||
-	    !test_bit(QUEUE_STARTED, &queue->flags) ||
-	    test_and_set_bit(QUEUE_PAUSED, &queue->flags))
-		return;
-
-	rt2x00queue_pause_queue_nocheck(queue);
 }
 EXPORT_SYMBOL_GPL(rt2x00queue_pause_queue);
 
@@ -943,7 +940,7 @@ void rt2x00queue_stop_queue(struct data_queue *queue)
 		return;
 	}
 
-	rt2x00queue_pause_queue_nocheck(queue);
+	rt2x00queue_pause_queue(queue);
 
 	queue->rt2x00dev->ops->lib->stop_queue(queue);
 

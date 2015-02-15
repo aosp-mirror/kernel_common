@@ -19,6 +19,8 @@
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
+#include <mach/devices_cmdline.h>
+#include <htc_debug/stability/dirty_file_detector.h>
 
 const struct file_operations generic_ro_fops = {
 	.llseek		= generic_file_llseek,
@@ -50,21 +52,6 @@ static loff_t lseek_execute(struct file *file, struct inode *inode,
 	return offset;
 }
 
-/**
- * generic_file_llseek_size - generic llseek implementation for regular files
- * @file:	file structure to seek on
- * @offset:	file offset to seek to
- * @origin:	type of seek
- * @size:	max size of file system
- *
- * This is a variant of generic_file_llseek that allows passing in a custom
- * file size.
- *
- * Synchronization:
- * SEEK_SET and SEEK_END are unsynchronized (but atomic on 64bit platforms)
- * SEEK_CUR is synchronized against other SEEK_CURs, but not read/writes.
- * read/writes behave like SEEK_SET against seeks.
- */
 loff_t
 generic_file_llseek_size(struct file *file, loff_t offset, int origin,
 		loff_t maxsize)
@@ -76,37 +63,18 @@ generic_file_llseek_size(struct file *file, loff_t offset, int origin,
 		offset += i_size_read(inode);
 		break;
 	case SEEK_CUR:
-		/*
-		 * Here we special-case the lseek(fd, 0, SEEK_CUR)
-		 * position-querying operation.  Avoid rewriting the "same"
-		 * f_pos value back to the file because a concurrent read(),
-		 * write() or lseek() might have altered it
-		 */
 		if (offset == 0)
 			return file->f_pos;
-		/*
-		 * f_lock protects against read/modify/write race with other
-		 * SEEK_CURs. Note that parallel writes and reads behave
-		 * like SEEK_SET.
-		 */
 		spin_lock(&file->f_lock);
 		offset = lseek_execute(file, inode, file->f_pos + offset,
 				       maxsize);
 		spin_unlock(&file->f_lock);
 		return offset;
 	case SEEK_DATA:
-		/*
-		 * In the generic case the entire file is data, so as long as
-		 * offset isn't at the end of the file then the offset is data.
-		 */
 		if (offset >= i_size_read(inode))
 			return -ENXIO;
 		break;
 	case SEEK_HOLE:
-		/*
-		 * There is a virtual hole at the end of the file, so as long as
-		 * offset isn't i_size or larger, return i_size.
-		 */
 		if (offset >= i_size_read(inode))
 			return -ENXIO;
 		offset = i_size_read(inode);
@@ -117,16 +85,6 @@ generic_file_llseek_size(struct file *file, loff_t offset, int origin,
 }
 EXPORT_SYMBOL(generic_file_llseek_size);
 
-/**
- * generic_file_llseek - generic llseek implementation for regular files
- * @file:	file structure to seek on
- * @offset:	file offset to seek to
- * @origin:	type of seek
- *
- * This is a generic implemenation of ->llseek useable for all normal local
- * filesystems.  It just updates the file offset to the value specified by
- * @offset and @origin under i_mutex.
- */
 loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
 {
 	struct inode *inode = file->f_mapping->host;
@@ -136,17 +94,6 @@ loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
 }
 EXPORT_SYMBOL(generic_file_llseek);
 
-/**
- * noop_llseek - No Operation Performed llseek implementation
- * @file:	file structure to seek on
- * @offset:	file offset to seek to
- * @origin:	type of seek
- *
- * This is an implementation of ->llseek useable for the rare special case when
- * userspace expects the seek to succeed but the (device) file is actually not
- * able to perform the seek. In this case you use noop_llseek() instead of
- * falling back to the default implementation of ->llseek.
- */
 loff_t noop_llseek(struct file *file, loff_t offset, int origin)
 {
 	return file->f_pos;
@@ -177,22 +124,12 @@ loff_t default_llseek(struct file *file, loff_t offset, int origin)
 			offset += file->f_pos;
 			break;
 		case SEEK_DATA:
-			/*
-			 * In the generic case the entire file is data, so as
-			 * long as offset isn't at the end of the file then the
-			 * offset is data.
-			 */
 			if (offset >= inode->i_size) {
 				retval = -ENXIO;
 				goto out;
 			}
 			break;
 		case SEEK_HOLE:
-			/*
-			 * There is a virtual hole at the end of the file, so
-			 * as long as offset isn't i_size or larger, return
-			 * i_size.
-			 */
 			if (offset >= inode->i_size) {
 				retval = -ENXIO;
 				goto out;
@@ -243,7 +180,7 @@ SYSCALL_DEFINE3(lseek, unsigned int, fd, off_t, offset, unsigned int, origin)
 		loff_t res = vfs_llseek(file, offset, origin);
 		retval = res;
 		if (res != (loff_t)retval)
-			retval = -EOVERFLOW;	/* LFS: should only happen on 32 bit platforms */
+			retval = -EOVERFLOW;	
 	}
 	fput_light(file, fput_needed);
 bad:
@@ -286,11 +223,6 @@ bad:
 #endif
 
 
-/*
- * rw_verify_area doesn't like huge counts. We limit
- * them to something that fits in "int" so that others
- * won't have to do range checks all the time.
- */
 int rw_verify_area(int read_write, struct file *file, loff_t *ppos, size_t count)
 {
 	struct inode *inode;
@@ -304,7 +236,7 @@ int rw_verify_area(int read_write, struct file *file, loff_t *ppos, size_t count
 	if (unlikely(pos < 0)) {
 		if (!unsigned_offsets(file))
 			return retval;
-		if (count >= -pos) /* both values are in 0..LLONG_MAX */
+		if (count >= -pos) 
 			return -EOVERFLOW;
 	} else if (unlikely((loff_t) (pos + count) < 0)) {
 		if (!unsigned_offsets(file))
@@ -333,6 +265,65 @@ static void wait_on_retry_sync_kiocb(struct kiocb *iocb)
 	else
 		kiocbClearKicked(iocb);
 	__set_current_state(TASK_RUNNING);
+}
+
+static struct fs_dbg_threshold dbg_threshold[] = {
+	{ 10485760, "read"}, 
+	{ 10485760, "write"}, 
+	{ 10485760, "erase"}, 
+};
+static void check_dbg_threshold(struct task_io_accounting *acc,
+	struct fs_dbg_threshold *thresh, int type)
+{
+	if (acc->acc_bytes[type] > thresh->threshold) {
+		pr_info("FS Statistics: %s(pid %d, parent %s(%d)) %s %llu MB in %u ms\n",
+				current->comm, current->pid,
+				current->parent->comm, current->parent->pid,
+				thresh->type,
+				acc->acc_bytes[type] / 1048576,
+				jiffies_to_msecs(jiffies - acc->last_jiffies[type]));
+		acc->acc_bytes[type] = 0;
+		acc->last_jiffies[type] = 0;
+	}
+}
+
+extern unsigned int get_tamper_sf(void);
+void fs_debug_dump(unsigned int type, size_t bytes)
+{
+	unsigned long last_jiffies;
+
+	if (get_tamper_sf() == 1)
+		return;
+	if (type > FS_DBG_TYPE_ERASE)
+		return;
+	if (!strcmp(current->comm, "sdcard"))
+		return;
+
+	last_jiffies = current->ioac.last_jiffies[type];
+	
+	if ((last_jiffies == 0) || time_after(jiffies, last_jiffies + 5 * HZ)) {
+		current->ioac.acc_bytes[type] = bytes;
+		current->ioac.last_jiffies[type] = jiffies;
+		if (type == FS_DBG_TYPE_ERASE)
+			check_dbg_threshold(&current->ioac, &dbg_threshold[type], type);
+		return;
+	}
+	current->ioac.acc_bytes[type] += bytes;
+
+	
+	if (type == FS_DBG_TYPE_ERASE) {
+		check_dbg_threshold(&current->ioac, &dbg_threshold[type], type);
+		return;
+	}
+
+	
+	if (time_before(jiffies, last_jiffies + HZ))
+		return;
+
+	
+	check_dbg_threshold(&current->ioac, &dbg_threshold[type], type);
+
+	return;
 }
 
 ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
@@ -364,6 +355,7 @@ EXPORT_SYMBOL(do_sync_read);
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	ssize_t ret;
+	struct super_block *sb = file->f_path.dentry->d_sb;
 
 	if (!(file->f_mode & FMODE_READ))
 		return -EBADF;
@@ -385,6 +377,10 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 		}
 		inc_syscr(current);
 	}
+	if (sb && (!strcmp(sb->s_type->name, "ext4")
+		|| !strcmp(sb->s_type->name, "fuse")
+		|| !strcmp(sb->s_type->name, "vfat")))
+		fs_debug_dump(FS_DBG_TYPE_READ, count);
 
 	return ret;
 }
@@ -420,6 +416,7 @@ EXPORT_SYMBOL(do_sync_write);
 ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
 {
 	ssize_t ret;
+	struct super_block *sb = file->f_path.dentry->d_sb;
 
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
@@ -441,6 +438,11 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 		}
 		inc_syscw(current);
 	}
+
+	if (sb && (!strcmp(sb->s_type->name, "ext4")
+		|| !strcmp(sb->s_type->name, "fuse")
+		|| !strcmp(sb->s_type->name, "vfat")))
+		fs_debug_dump(FS_DBG_TYPE_WRITE, count);
 
 	return ret;
 }
@@ -474,17 +476,103 @@ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
 	return ret;
 }
 
+#define WRITE_TIMEOUT_VALUE 5
+#if defined(CONFIG_HTC_DEBUG_BINDER_WRITE)
+static int current_task_is_system_server_binder(void)
+{
+	struct task_struct* leader = current->group_leader;
+
+	if (!strncmp(current->comm, "Binder", strlen("Binder")))
+		if (leader && !strncmp(leader->comm,
+				"system_server", strlen("system_server")))
+			return 1;
+	return 0;
+}
+
+static void vfs_write_timeout(unsigned long data)
+{
+	struct task_struct* tsk = (struct task_struct*) data;
+	pr_warn("%s: vfs_write timed out after %d seconds! dump call stack:\n",
+		__func__, WRITE_TIMEOUT_VALUE);
+	show_stack(tsk, NULL);
+	pr_warn("### Show Blocked State ###\n");
+	show_state_filter(TASK_UNINTERRUPTIBLE);
+	pr_warn("### Show System Server State ###\n");
+	show_thread_group_state_filter("system_server", 0);
+	pr_info("### Show bugreport State ###\n");
+	show_thread_group_state_filter("bugreport", 0);
+	pr_info("### Show adbd State ###\n");
+	show_thread_group_state_filter("adbd", 0);
+}
+#endif
+
 SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf,
 		size_t, count)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
 	int fput_needed;
+#ifdef CONFIG_DIRTY_SYSTEM_DETECTOR
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+	struct mount *mnt;
+#else
+	struct vfsmount *mnt;
+#endif
+#endif
 
 	file = fget_light(fd, &fput_needed);
+
+#ifdef CONFIG_DIRTY_SYSTEM_DETECTOR
+	
+	
+	if (!get_tamper_sf() && file != NULL) {
+		
+		if (board_mfg_mode() != 2
+				&& strcmp("htcunzip", current->comm)) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+			mnt = real_mount(file->f_path.mnt);
+#else
+			mnt = file->f_path.mnt;
+#endif
+			if (!strcmp("system",  mnt->mnt_mountpoint->d_name.name)) {
+				printk("%s to /system partition: file(%s)\n", __func__, file->f_path.dentry->d_name.name);
+				mark_system_dirty(file->f_path.dentry->d_name.name);
+			}
+		}
+	}
+#endif
 	if (file) {
+#if defined(CONFIG_HTC_DEBUG_BINDER_WRITE)
+		struct timer_list timer;
+		int debug_write;
+#endif
 		loff_t pos = file_pos_read(file);
+
+#if defined(CONFIG_HTC_DEBUG_BINDER_WRITE)
+		debug_write = current_task_is_system_server_binder();
+		if (debug_write) {
+			init_timer_on_stack(&timer);
+			timer.function = vfs_write_timeout;
+			timer.expires = jiffies + HZ * WRITE_TIMEOUT_VALUE;
+			timer.data = (unsigned long) current;
+			add_timer(&timer);
+		}
+#endif
+
 		ret = vfs_write(file, buf, count, &pos);
+
+#if defined(CONFIG_HTC_DEBUG_BINDER_WRITE)
+		if (debug_write) {
+			del_timer_sync(&timer);
+			destroy_timer_on_stack(&timer);
+			if (ret < 0 && file && file->f_op) {
+				pr_info("%s: %s (%d:%d) ret: %d, write: %pf, aio_write: %pf\n",
+						__func__, current->comm, current->tgid, current->pid, ret,
+						file->f_op->write, file->f_op->aio_write);
+			}
+		}
+#endif
+
 		file_pos_write(file, pos);
 		fput_light(file, fput_needed);
 	}
@@ -550,9 +638,6 @@ asmlinkage long SyS_pwrite64(long fd, long buf, long count, loff_t pos)
 SYSCALL_ALIAS(sys_pwrite64, SyS_pwrite64);
 #endif
 
-/*
- * Reduce an iovec's length in-place.  Return the resulting number of segments
- */
 unsigned long iov_shorten(struct iovec *iov, unsigned long nr_segs, size_t to)
 {
 	unsigned long seg = 0;
@@ -595,7 +680,6 @@ ssize_t do_sync_readv_writev(struct file *filp, const struct iovec *iov,
 	return ret;
 }
 
-/* Do it by hand, with file-ops */
 ssize_t do_loop_readv_writev(struct file *filp, struct iovec *iov,
 		unsigned long nr_segs, loff_t *ppos, io_fn_t fn)
 {
@@ -627,7 +711,6 @@ ssize_t do_loop_readv_writev(struct file *filp, struct iovec *iov,
 	return ret;
 }
 
-/* A write operation does a read from user space and vice versa */
 #define vrfy_dir(type) ((type) == READ ? VERIFY_WRITE : VERIFY_READ)
 
 ssize_t rw_copy_check_uvector(int type, const struct iovec __user * uvector,
@@ -640,20 +723,11 @@ ssize_t rw_copy_check_uvector(int type, const struct iovec __user * uvector,
 	ssize_t ret;
 	struct iovec *iov = fast_pointer;
 
-	/*
-	 * SuS says "The readv() function *may* fail if the iovcnt argument
-	 * was less than or equal to 0, or greater than {IOV_MAX}.  Linux has
-	 * traditionally returned zero for zero segments, so...
-	 */
 	if (nr_segs == 0) {
 		ret = 0;
 		goto out;
 	}
 
-	/*
-	 * First get the "struct iovec" from user memory and
-	 * verify all the pointers
-	 */
 	if (nr_segs > UIO_MAXIOV) {
 		ret = -EINVAL;
 		goto out;
@@ -670,22 +744,11 @@ ssize_t rw_copy_check_uvector(int type, const struct iovec __user * uvector,
 		goto out;
 	}
 
-	/*
-	 * According to the Single Unix Specification we should return EINVAL
-	 * if an element length is < 0 when cast to ssize_t or if the
-	 * total length would overflow the ssize_t return value of the
-	 * system call.
-	 *
-	 * Linux caps all read/write calls to MAX_RW_COUNT, and avoids the
-	 * overflow case.
-	 */
 	ret = 0;
 	for (seg = 0; seg < nr_segs; seg++) {
 		void __user *buf = iov[seg].iov_base;
 		ssize_t len = (ssize_t)iov[seg].iov_len;
 
-		/* see if we we're about to use an invalid len or if
-		 * it's about to overflow ssize_t */
 		if (len < 0) {
 			ret = -EINVAL;
 			goto out;
@@ -892,9 +955,6 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	ssize_t retval;
 	int fput_needed_in, fput_needed_out, fl;
 
-	/*
-	 * Get input file, and verify that it is ok..
-	 */
 	retval = -EBADF;
 	in_file = fget_light(in_fd, &fput_needed_in);
 	if (!in_file)
@@ -912,9 +972,6 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 		goto fput_in;
 	count = retval;
 
-	/*
-	 * Get output file, and verify that it is ok..
-	 */
 	retval = -EBADF;
 	out_file = fget_light(out_fd, &fput_needed_out);
 	if (!out_file)
@@ -942,12 +999,6 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 
 	fl = 0;
 #if 0
-	/*
-	 * We need to debate whether we can enable this or not. The
-	 * man page documents EAGAIN return for the output at least,
-	 * and the application is arguably buggy if it doesn't expect
-	 * EAGAIN on a non-blocking file descriptor.
-	 */
 	if (in_file->f_flags & O_NONBLOCK)
 		fl = SPLICE_F_NONBLOCK;
 #endif

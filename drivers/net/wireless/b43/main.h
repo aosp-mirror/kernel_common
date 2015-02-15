@@ -137,8 +137,9 @@ void b43_mac_phy_clock_set(struct b43_wldev *dev, bool on);
 
 
 struct b43_request_fw_context;
-int b43_do_request_fw(struct b43_request_fw_context *ctx, const char *name,
-		      struct b43_firmware_file *fw, bool async);
+int b43_do_request_fw(struct b43_request_fw_context *ctx,
+		      const char *name,
+		      struct b43_firmware_file *fw);
 void b43_do_release_fw(struct b43_firmware_file *fw);
 
 #endif /* B43_MAIN_H_ */

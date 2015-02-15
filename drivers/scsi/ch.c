@@ -634,19 +634,19 @@ static long ch_ioctl(struct file *file,
 		memset(&vparams,0,sizeof(vparams));
 		if (ch->counts[CHET_V1]) {
 			vparams.cvp_n1  = ch->counts[CHET_V1];
-			strncpy(vparams.cvp_label1,vendor_labels[0],16);
+			strncpy(vparams.cvp_label1,vendor_labels[0],sizeof(vparams.cvp_label1) - 1);
 		}
 		if (ch->counts[CHET_V2]) {
 			vparams.cvp_n2  = ch->counts[CHET_V2];
-			strncpy(vparams.cvp_label2,vendor_labels[1],16);
+			strncpy(vparams.cvp_label2,vendor_labels[1],sizeof(vparams.cvp_label2) - 1);
 		}
 		if (ch->counts[CHET_V3]) {
 			vparams.cvp_n3  = ch->counts[CHET_V3];
-			strncpy(vparams.cvp_label3,vendor_labels[2],16);
+			strncpy(vparams.cvp_label3,vendor_labels[2],sizeof(vparams.cvp_label3) - 1);
 		}
 		if (ch->counts[CHET_V4]) {
 			vparams.cvp_n4  = ch->counts[CHET_V4];
-			strncpy(vparams.cvp_label4,vendor_labels[3],16);
+			strncpy(vparams.cvp_label4,vendor_labels[3],sizeof(vparams.cvp_label4) - 1);
 		}
 		if (copy_to_user(argp, &vparams, sizeof(vparams)))
 			return -EFAULT;
@@ -921,7 +921,7 @@ static int ch_probe(struct device *dev)
 	}
 
 	ch->minor = minor;
-	sprintf(ch->name,"ch%d",ch->minor);
+	snprintf(ch->name, sizeof(ch->name) - 1, "ch%d",ch->minor);
 
 	class_dev = device_create(ch_sysfs_class, dev,
 				  MKDEV(SCSI_CHANGER_MAJOR, ch->minor), ch,

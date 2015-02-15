@@ -1,0 +1,22 @@
+&spmi_bus {
+	qcom,pm8226@1 {
+                qcom,leds@d300 {
+			htc_flash: htc,flash_mode {
+				qcom,max-current = <1000>;
+				qcom,default-state = "off";
+				qcom,headroom = <3>;
+				qcom,duration = <600>;
+				qcom,clamp-curr = <200>;
+				qcom,startup-dly = <3>;
+				qcom,safety-timer;
+				label = "flash";
+				linux,default-trigger =
+					"htc_flash_mode";
+				qcom,id = <1>;
+				linux,name = "flashlight";
+				qcom,current = <750>;
+				qcom,turn-off-delay-ms = <600>;
+			};
+		};
+	};
+};

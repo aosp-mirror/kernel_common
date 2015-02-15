@@ -114,6 +114,12 @@ int nf_ct_gre_keymap_add(struct nf_conn *ct, enum ip_conntrack_dir dir,
 	struct nf_ct_gre_keymap **kmp, *km;
 
 	kmp = &help->help.ct_pptp_info.keymap[dir];
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(kmp) || (!kmp))
+		printk(KERN_ERR "[NET] kmp is NULL in %s!\n", __func__);
+#endif
+
 	if (*kmp) {
 		/* check whether it's a retransmission */
 		read_lock_bh(&net_gre->keymap_lock);
@@ -155,6 +161,11 @@ void nf_ct_gre_keymap_destroy(struct nf_conn *ct)
 	enum ip_conntrack_dir dir;
 
 	pr_debug("entering for ct %p\n", ct);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
 
 	write_lock_bh(&net_gre->keymap_lock);
 	for (dir = IP_CT_DIR_ORIGINAL; dir < IP_CT_DIR_MAX; dir++) {

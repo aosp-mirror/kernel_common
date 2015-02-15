@@ -99,7 +99,6 @@
 #define PASID_MASK		0x000fffff
 
 /* MMIO status bits */
-#define MMIO_STATUS_EVT_INT_MASK	(1 << 1)
 #define MMIO_STATUS_COM_WAIT_INT_MASK	(1 << 2)
 #define MMIO_STATUS_PPR_INT_MASK	(1 << 6)
 
@@ -481,9 +480,6 @@ struct amd_iommu {
 
 	/* Pointer to PCI device of this IOMMU */
 	struct pci_dev *dev;
-
-	/* Cache pdev to root device for resume quirks */
-	struct pci_dev *root_pdev;
 
 	/* physical address of MMIO space */
 	u64 mmio_phys;

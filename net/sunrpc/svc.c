@@ -407,14 +407,6 @@ static int svc_uses_rpcbind(struct svc_serv *serv)
 	return 0;
 }
 
-int svc_bind(struct svc_serv *serv, struct net *net)
-{
-	if (!svc_uses_rpcbind(serv))
-		return 0;
-	return svc_rpcb_setup(serv, net);
-}
-EXPORT_SYMBOL_GPL(svc_bind);
-
 /*
  * Create an RPC service
  */
@@ -479,8 +471,15 @@ __svc_create(struct svc_program *prog, unsigned int bufsize, int npools,
 		spin_lock_init(&pool->sp_lock);
 	}
 
-	if (svc_uses_rpcbind(serv) && (!serv->sv_shutdown))
-		serv->sv_shutdown = svc_rpcb_cleanup;
+	if (svc_uses_rpcbind(serv)) {
+		if (svc_rpcb_setup(serv, current->nsproxy->net_ns) < 0) {
+			kfree(serv->sv_pools);
+			kfree(serv);
+			return NULL;
+		}
+		if (!serv->sv_shutdown)
+			serv->sv_shutdown = svc_rpcb_cleanup;
+	}
 
 	return serv;
 }
@@ -537,6 +536,8 @@ EXPORT_SYMBOL_GPL(svc_shutdown_net);
 void
 svc_destroy(struct svc_serv *serv)
 {
+	struct net *net = current->nsproxy->net_ns;
+
 	dprintk("svc: svc_destroy(%s, %d)\n",
 				serv->sv_program->pg_name,
 				serv->sv_nrthreads);
@@ -550,6 +551,8 @@ svc_destroy(struct svc_serv *serv)
 		printk("svc_destroy: no threads for serv=%p!\n", serv);
 
 	del_timer_sync(&serv->sv_temptimer);
+
+	svc_shutdown_net(serv, net);
 
 	/*
 	 * The last user is gone and thus all sockets have to be destroyed to
@@ -1376,8 +1379,7 @@ bc_svc_process(struct svc_serv *serv, struct rpc_rqst *req,
 						sizeof(req->rq_snd_buf));
 		return bc_send(req);
 	} else {
-		/* drop request */
-		xprt_free_bc_request(req);
+		/* Nothing to do to drop request */
 		return 0;
 	}
 }

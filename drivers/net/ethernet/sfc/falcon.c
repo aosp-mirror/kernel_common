@@ -25,11 +25,8 @@
 #include "io.h"
 #include "phy.h"
 #include "workarounds.h"
-#include "selftest.h"
 
 /* Hardware control for SFC4000 (aka Falcon). */
-
-static int falcon_reset_hw(struct efx_nic *efx, enum reset_type method);
 
 static const unsigned int
 /* "Large" EEPROM device: Atmel AT25640 or similar
@@ -1037,34 +1034,10 @@ static const struct efx_nic_register_test falcon_b0_register_tests[] = {
 	  EFX_OWORD32(0x0003FF0F, 0x00000000, 0x00000000, 0x00000000) },
 };
 
-static int
-falcon_b0_test_chip(struct efx_nic *efx, struct efx_self_tests *tests)
+static int falcon_b0_test_registers(struct efx_nic *efx)
 {
-	enum reset_type reset_method = RESET_TYPE_INVISIBLE;
-	int rc, rc2;
-
-	mutex_lock(&efx->mac_lock);
-	if (efx->loopback_modes) {
-		/* We need the 312 clock from the PHY to test the XMAC
-		 * registers, so move into XGMII loopback if available */
-		if (efx->loopback_modes & (1 << LOOPBACK_XGMII))
-			efx->loopback_mode = LOOPBACK_XGMII;
-		else
-			efx->loopback_mode = __ffs(efx->loopback_modes);
-	}
-	__efx_reconfigure_port(efx);
-	mutex_unlock(&efx->mac_lock);
-
-	efx_reset_down(efx, reset_method);
-
-	tests->registers =
-		efx_nic_test_registers(efx, falcon_b0_register_tests,
-				       ARRAY_SIZE(falcon_b0_register_tests))
-		? -1 : 1;
-
-	rc = falcon_reset_hw(efx, reset_method);
-	rc2 = efx_reset_up(efx, reset_method, rc == 0);
-	return rc ? rc : rc2;
+	return efx_nic_test_registers(efx, falcon_b0_register_tests,
+				      ARRAY_SIZE(falcon_b0_register_tests));
 }
 
 /**************************************************************************
@@ -1792,7 +1765,6 @@ const struct efx_nic_type falcon_a1_nic_type = {
 	.remove_port = falcon_remove_port,
 	.handle_global_event = falcon_handle_global_event,
 	.prepare_flush = falcon_prepare_flush,
-	.finish_flush = efx_port_dummy_op_void,
 	.update_stats = falcon_update_nic_stats,
 	.start_stats = falcon_start_nic_stats,
 	.stop_stats = falcon_stop_nic_stats,
@@ -1835,7 +1807,6 @@ const struct efx_nic_type falcon_b0_nic_type = {
 	.remove_port = falcon_remove_port,
 	.handle_global_event = falcon_handle_global_event,
 	.prepare_flush = falcon_prepare_flush,
-	.finish_flush = efx_port_dummy_op_void,
 	.update_stats = falcon_update_nic_stats,
 	.start_stats = falcon_start_nic_stats,
 	.stop_stats = falcon_stop_nic_stats,
@@ -1847,7 +1818,7 @@ const struct efx_nic_type falcon_b0_nic_type = {
 	.get_wol = falcon_get_wol,
 	.set_wol = falcon_set_wol,
 	.resume_wol = efx_port_dummy_op_void,
-	.test_chip = falcon_b0_test_chip,
+	.test_registers = falcon_b0_test_registers,
 	.test_nvram = falcon_test_nvram,
 
 	.revision = EFX_REV_FALCON_B0,

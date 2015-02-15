@@ -33,11 +33,7 @@ int inet6_csk_bind_conflict(const struct sock *sk,
 	const struct sock *sk2;
 	const struct hlist_node *node;
 
-	/* We must walk the whole port owner list in this case. -DaveM */
-	/*
-	 * See comment in inet_csk_bind_conflict about sock lookup
-	 * vs net namespaces issues.
-	 */
+	
 	sk_for_each_bound(sk2, node, &tb->owners) {
 		if (sk != sk2 &&
 		    (!sk->sk_bound_dev_if ||
@@ -82,9 +78,6 @@ struct dst_entry *inet6_csk_route_req(struct sock *sk,
 	return dst;
 }
 
-/*
- * request_sock (formerly open request) hash tables.
- */
 static u32 inet6_synq_hash(const struct in6_addr *raddr, const __be16 rport,
 			   const u32 rnd, const u32 synq_hsize)
 {
@@ -160,7 +153,7 @@ void inet6_csk_addr2sockaddr(struct sock *sk, struct sockaddr * uaddr)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_addr = np->daddr;
 	sin6->sin6_port	= inet_sk(sk)->inet_dport;
-	/* We do not store received flowlabel for TCP */
+	
 	sin6->sin6_flowinfo = 0;
 	sin6->sin6_scope_id = 0;
 	if (sk->sk_bound_dev_if &&
@@ -247,7 +240,7 @@ int inet6_csk_xmit(struct sk_buff *skb, struct flowi *fl_unused)
 	rcu_read_lock();
 	skb_dst_set_noref(skb, dst);
 
-	/* Restore final destination back after routing done */
+	
 	fl6.daddr = np->daddr;
 
 	res = ip6_xmit(sk, skb, &fl6, np->opt, np->tclass);

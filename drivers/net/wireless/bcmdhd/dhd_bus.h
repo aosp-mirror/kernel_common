@@ -4,7 +4,7 @@
  * Provides type definitions and function prototypes used to link the
  * DHD OS, bus, and protocol modules.
  *
- * Copyright (C) 1999-2013, Broadcom Corporation
+ * Copyright (C) 1999-2012, Broadcom Corporation
  * 
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_bus.h 335569 2012-05-29 12:04:43Z $
+ * $Id: dhd_bus.h 313456 2012-02-07 22:03:40Z $
  */
 
 #ifndef _dhd_bus_h_
@@ -105,7 +105,5 @@ extern uint dhd_bus_hdrlen(struct dhd_bus *bus);
 /* Register a dummy SDIO client driver in order to be notified of new SDIO device */
 extern int dhd_bus_reg_sdio_notify(void* semaphore);
 extern void dhd_bus_unreg_sdio_notify(void);
-
-extern void dhd_txglom_enable(dhd_pub_t *dhdp, bool enable);
 
 #endif /* _dhd_bus_h_ */

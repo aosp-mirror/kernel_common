@@ -791,6 +791,11 @@ static int refresh_signalling_expectation(struct nf_conn *ct,
 	struct hlist_node *n, *next;
 	int found = 0;
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
+
 	spin_lock_bh(&nf_conntrack_lock);
 	hlist_for_each_entry_safe(exp, n, next, &help->expectations, lnode) {
 		if (exp->class != SIP_EXPECT_SIGNALLING ||
@@ -815,6 +820,11 @@ static void flush_expectations(struct nf_conn *ct, bool media)
 	struct nf_conn_help *help = nfct_help(ct);
 	struct nf_conntrack_expect *exp;
 	struct hlist_node *n, *next;
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
 
 	spin_lock_bh(&nf_conntrack_lock);
 	hlist_for_each_entry_safe(exp, n, next, &help->expectations, lnode) {
@@ -1077,6 +1087,11 @@ static int process_invite_response(struct sk_buff *skb, unsigned int dataoff,
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
 	struct nf_conn_help *help = nfct_help(ct);
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
+
 	if ((code >= 100 && code <= 199) ||
 	    (code >= 200 && code <= 299))
 		return process_sdp(skb, dataoff, dptr, datalen, cseq);
@@ -1092,6 +1107,11 @@ static int process_update_response(struct sk_buff *skb, unsigned int dataoff,
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
 	struct nf_conn_help *help = nfct_help(ct);
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
 
 	if ((code >= 100 && code <= 199) ||
 	    (code >= 200 && code <= 299))
@@ -1109,6 +1129,11 @@ static int process_prack_response(struct sk_buff *skb, unsigned int dataoff,
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
 	struct nf_conn_help *help = nfct_help(ct);
 
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
+
 	if ((code >= 100 && code <= 199) ||
 	    (code >= 200 && code <= 299))
 		return process_sdp(skb, dataoff, dptr, datalen, cseq);
@@ -1125,6 +1150,11 @@ static int process_invite_request(struct sk_buff *skb, unsigned int dataoff,
 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
 	struct nf_conn_help *help = nfct_help(ct);
 	unsigned int ret;
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
 
 	flush_expectations(ct, true);
 	ret = process_sdp(skb, dataoff, dptr, datalen, cseq);
@@ -1168,6 +1198,11 @@ static int process_register_request(struct sk_buff *skb, unsigned int dataoff,
 	/* Expected connections can not register again. */
 	if (ct->status & IPS_EXPECTED)
 		return NF_ACCEPT;
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
 
 	/* We must check the expiration time: a value of zero signals the
 	 * registrar to release the binding. We'll remove our expectation
@@ -1253,6 +1288,11 @@ static int process_register_response(struct sk_buff *skb, unsigned int dataoff,
 	unsigned int matchoff, matchlen, coff = 0;
 	unsigned int expires = 0;
 	int in_contact = 0, ret;
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(help) || (!help))
+		printk(KERN_ERR "[NET] help is NULL in %s!\n", __func__);
+#endif
 
 	/* According to RFC 3261, "UAs MUST NOT send a new registration until
 	 * they have received a final response from the registrar for the

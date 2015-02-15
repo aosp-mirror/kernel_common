@@ -117,9 +117,6 @@
 
 #include <linux/netfilter_arp.h>
 
-/*
- *	Interface to generic neighbour cache.
- */
 static u32 arp_hash(const void *pkey, const struct net_device *dev, __u32 *hash_rnd);
 static int arp_constructor(struct neighbour *neigh);
 static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb);
@@ -245,33 +242,8 @@ static int arp_constructor(struct neighbour *neigh)
 		neigh->ops = &arp_direct_ops;
 		neigh->output = neigh_direct_output;
 	} else {
-		/* Good devices (checked by reading texts, but only Ethernet is
-		   tested)
-
-		   ARPHRD_ETHER: (ethernet, apfddi)
-		   ARPHRD_FDDI: (fddi)
-		   ARPHRD_IEEE802: (tr)
-		   ARPHRD_METRICOM: (strip)
-		   ARPHRD_ARCNET:
-		   etc. etc. etc.
-
-		   ARPHRD_IPDDP will also work, if author repairs it.
-		   I did not it, because this driver does not work even
-		   in old paradigm.
-		 */
 
 #if 1
-		/* So... these "amateur" devices are hopeless.
-		   The only thing, that I can say now:
-		   It is very sad that we need to keep ugly obsolete
-		   code to make them happy.
-
-		   They should be moved to more reasonable state, now
-		   they use rebuild_header INSTEAD OF hard_start_xmit!!!
-		   Besides that, they are sort of out of date
-		   (a lot of redundant clones/copies, useless in 2.1),
-		   I wonder why people believe that they work.
-		 */
 		switch (dev->type) {
 		default:
 			break;
@@ -329,6 +301,13 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	int probes = atomic_read(&neigh->probes);
 	struct in_device *in_dev;
 
+    
+    #ifdef CONFIG_HTC_NETWORK_CNE
+    __be32 dev_addr = 0;
+    dev_addr = inet_select_addr(dev, target, RT_SCOPE_LINK);
+    #endif
+    
+
 	rcu_read_lock();
 	in_dev = __in_dev_get_rcu(dev);
 	if (!in_dev) {
@@ -337,23 +316,23 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	}
 	switch (IN_DEV_ARP_ANNOUNCE(in_dev)) {
 	default:
-	case 0:		/* By default announce any local IP */
+	case 0:		
 		if (skb && inet_addr_type(dev_net(dev),
 					  ip_hdr(skb)->saddr) == RTN_LOCAL)
 			saddr = ip_hdr(skb)->saddr;
 		break;
-	case 1:		/* Restrict announcements of saddr in same subnet */
+	case 1:		
 		if (!skb)
 			break;
 		saddr = ip_hdr(skb)->saddr;
 		if (inet_addr_type(dev_net(dev), saddr) == RTN_LOCAL) {
-			/* saddr should be known to target */
+			
 			if (inet_addr_onlink(in_dev, target, saddr))
 				break;
 		}
 		saddr = 0;
 		break;
-	case 2:		/* Avoid secondary IPs, get a primary/preferred one */
+	case 2:		
 		break;
 	}
 	rcu_read_unlock();
@@ -378,6 +357,16 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 		}
 	}
 
+    
+    #ifdef CONFIG_HTC_NETWORK_CNE
+    if (dev_addr != saddr)
+    {
+        printk(KERN_DEBUG "CnE detects wrong sender IP in ARP\n");
+        saddr = dev_addr;
+    }
+    #endif
+    
+
 	arp_send(ARPOP_REQUEST, ETH_P_ARP, target, dev, saddr,
 		 dst_ha, dev->dev_addr, NULL);
 	if (dst_ha)
@@ -389,28 +378,25 @@ static int arp_ignore(struct in_device *in_dev, __be32 sip, __be32 tip)
 	int scope;
 
 	switch (IN_DEV_ARP_IGNORE(in_dev)) {
-	case 0:	/* Reply, the tip is already validated */
+	case 0:	
 		return 0;
-	case 1:	/* Reply only if tip is configured on the incoming interface */
+	case 1:	
 		sip = 0;
 		scope = RT_SCOPE_HOST;
 		break;
-	case 2:	/*
-		 * Reply only if tip is configured on the incoming interface
-		 * and is in same subnet as sip
-		 */
+	case 2:	
 		scope = RT_SCOPE_HOST;
 		break;
-	case 3:	/* Do not reply for scope host addresses */
+	case 3:	
 		sip = 0;
 		scope = RT_SCOPE_LINK;
 		break;
-	case 4:	/* Reserved */
+	case 4:	
 	case 5:
 	case 6:
 	case 7:
 		return 0;
-	case 8:	/* Do not reply */
+	case 8:	
 		return 1;
 	default:
 		return 0;
@@ -422,7 +408,7 @@ static int arp_filter(__be32 sip, __be32 tip, struct net_device *dev)
 {
 	struct rtable *rt;
 	int flag = 0;
-	/*unsigned long now; */
+	
 	struct net *net = dev_net(dev);
 
 	rt = ip_route_output(net, sip, tip, 0, 0);
@@ -436,16 +422,7 @@ static int arp_filter(__be32 sip, __be32 tip, struct net_device *dev)
 	return flag;
 }
 
-/* OBSOLETE FUNCTIONS */
 
-/*
- *	Find an arp mapping in the cache. If not found, post a request.
- *
- *	It is very UGLY routine: it DOES NOT use skb->dst->neighbour,
- *	even if it exists. It is supposed that skb->dev was mangled
- *	by a virtual device (eql, shaper). Nobody but broken devices
- *	is allowed to use this function, it is scheduled to be removed. --ANK
- */
 
 static int arp_set_predefined(int addr_hint, unsigned char *haddr,
 			      __be32 paddr, struct net_device *dev)
@@ -500,11 +477,7 @@ int arp_find(unsigned char *haddr, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(arp_find);
 
-/* END OF OBSOLETE FUNCTIONS */
 
-/*
- * Check if we can use proxy ARP for this path
- */
 static inline int arp_fwd_proxy(struct in_device *in_dev,
 				struct net_device *dev,	struct rtable *rt)
 {
@@ -522,7 +495,7 @@ static inline int arp_fwd_proxy(struct in_device *in_dev,
 	if (imi == -1)
 		return 0;
 
-	/* place to check for proxy_arp for routes */
+	
 
 	out_dev = __in_dev_get_rcu(rt->dst.dev);
 	if (out_dev)
@@ -531,34 +504,15 @@ static inline int arp_fwd_proxy(struct in_device *in_dev,
 	return omi != imi && omi != -1;
 }
 
-/*
- * Check for RFC3069 proxy arp private VLAN (allow to send back to same dev)
- *
- * RFC3069 supports proxy arp replies back to the same interface.  This
- * is done to support (ethernet) switch features, like RFC 3069, where
- * the individual ports are not allowed to communicate with each
- * other, BUT they are allowed to talk to the upstream router.  As
- * described in RFC 3069, it is possible to allow these hosts to
- * communicate through the upstream router, by proxy_arp'ing.
- *
- * RFC 3069: "VLAN Aggregation for Efficient IP Address Allocation"
- *
- *  This technology is known by different names:
- *    In RFC 3069 it is called VLAN Aggregation.
- *    Cisco and Allied Telesyn call it Private VLAN.
- *    Hewlett-Packard call it Source-Port filtering or port-isolation.
- *    Ericsson call it MAC-Forced Forwarding (RFC Draft).
- *
- */
 static inline int arp_fwd_pvlan(struct in_device *in_dev,
 				struct net_device *dev,	struct rtable *rt,
 				__be32 sip, __be32 tip)
 {
-	/* Private VLAN is only concerned about the same ethernet segment */
+	
 	if (rt->dst.dev != dev)
 		return 0;
 
-	/* Don't reply on self probes (often done by windowz boxes)*/
+	
 	if (sip == tip)
 		return 0;
 
@@ -568,14 +522,7 @@ static inline int arp_fwd_pvlan(struct in_device *in_dev,
 		return 0;
 }
 
-/*
- *	Interface to link layer: send routine and receive handler.
- */
 
-/*
- *	Create an arp packet. If (dest_hw == NULL), we create a broadcast
- *	message.
- */
 struct sk_buff *arp_create(int type, int ptype, __be32 dest_ip,
 			   struct net_device *dev, __be32 src_ip,
 			   const unsigned char *dest_hw,
@@ -588,9 +535,6 @@ struct sk_buff *arp_create(int type, int ptype, __be32 dest_ip,
 	int hlen = LL_RESERVED_SPACE(dev);
 	int tlen = dev->needed_tailroom;
 
-	/*
-	 *	Allocate a buffer
-	 */
 
 	skb = alloc_skb(arp_hdr_len(dev) + hlen + tlen, GFP_ATOMIC);
 	if (skb == NULL)
@@ -606,22 +550,9 @@ struct sk_buff *arp_create(int type, int ptype, __be32 dest_ip,
 	if (dest_hw == NULL)
 		dest_hw = dev->broadcast;
 
-	/*
-	 *	Fill the device header for the ARP frame
-	 */
 	if (dev_hard_header(skb, dev, ptype, dest_hw, src_hw, skb->len) < 0)
 		goto out;
 
-	/*
-	 * Fill out the arp protocol part.
-	 *
-	 * The arp hardware type should match the device type, except for FDDI,
-	 * which (according to RFC 1390) should always equal 1 (Ethernet).
-	 */
-	/*
-	 *	Exceptions everywhere. AX.25 uses the AX.25 PID value not the
-	 *	DIX code for the protocol. Make these device structure fields.
-	 */
 	switch (dev->type) {
 	default:
 		arp->ar_hrd = htons(dev->type);
@@ -681,19 +612,13 @@ out:
 }
 EXPORT_SYMBOL(arp_create);
 
-/*
- *	Send an arp packet.
- */
 void arp_xmit(struct sk_buff *skb)
 {
-	/* Send it off, maybe filter it using firewalling first.  */
+	
 	NF_HOOK(NFPROTO_ARP, NF_ARP_OUT, skb, NULL, skb->dev, dev_queue_xmit);
 }
 EXPORT_SYMBOL(arp_xmit);
 
-/*
- *	Create and send an arp packet.
- */
 void arp_send(int type, int ptype, __be32 dest_ip,
 	      struct net_device *dev, __be32 src_ip,
 	      const unsigned char *dest_hw, const unsigned char *src_hw,
@@ -701,9 +626,6 @@ void arp_send(int type, int ptype, __be32 dest_ip,
 {
 	struct sk_buff *skb;
 
-	/*
-	 *	No arp on this interface.
-	 */
 
 	if (dev->flags&IFF_NOARP)
 		return;
@@ -717,9 +639,6 @@ void arp_send(int type, int ptype, __be32 dest_ip,
 }
 EXPORT_SYMBOL(arp_send);
 
-/*
- *	Process an arp request.
- */
 
 static int arp_process(struct sk_buff *skb)
 {
@@ -735,9 +654,6 @@ static int arp_process(struct sk_buff *skb)
 	struct neighbour *n;
 	struct net *net = dev_net(dev);
 
-	/* arp_rcv below verifies the ARP header and verifies the device
-	 * is ARP'able.
-	 */
 
 	if (in_dev == NULL)
 		goto out;
@@ -754,15 +670,6 @@ static int arp_process(struct sk_buff *skb)
 	case ARPHRD_IEEE802_TR:
 	case ARPHRD_FDDI:
 	case ARPHRD_IEEE802:
-		/*
-		 * ETHERNET, Token Ring and Fibre Channel (which are IEEE 802
-		 * devices, according to RFC 2625) devices will accept ARP
-		 * hardware types of either 1 (Ethernet) or 6 (IEEE 802.2).
-		 * This is the case also of FDDI, where the RFC 1390 says that
-		 * FDDI devices should accept ARP hardware of (1) Ethernet,
-		 * however, to be more robust, we'll accept both 1 (Ethernet)
-		 * or 6 (IEEE 802.2)
-		 */
 		if ((arp->ar_hrd != htons(ARPHRD_ETHER) &&
 		     arp->ar_hrd != htons(ARPHRD_IEEE802)) ||
 		    arp->ar_pro != htons(ETH_P_IP))
@@ -780,15 +687,12 @@ static int arp_process(struct sk_buff *skb)
 		break;
 	}
 
-	/* Understand only these message types */
+	
 
 	if (arp->ar_op != htons(ARPOP_REPLY) &&
 	    arp->ar_op != htons(ARPOP_REQUEST))
 		goto out;
 
-/*
- *	Extract fields
- */
 	arp_ptr = (unsigned char *)(arp + 1);
 	sha	= arp_ptr;
 	arp_ptr += dev->addr_len;
@@ -796,37 +700,14 @@ static int arp_process(struct sk_buff *skb)
 	arp_ptr += 4;
 	arp_ptr += dev->addr_len;
 	memcpy(&tip, arp_ptr, 4);
-/*
- *	Check for bad requests for 127.x.x.x and requests for multicast
- *	addresses.  If this is one such, delete it.
- */
 	if (ipv4_is_loopback(tip) || ipv4_is_multicast(tip))
 		goto out;
 
-/*
- *     Special case: We must set Frame Relay source Q.922 address
- */
 	if (dev_type == ARPHRD_DLCI)
 		sha = dev->broadcast;
 
-/*
- *  Process entry.  The idea here is we want to send a reply if it is a
- *  request for us or if it is a request for someone else that we hold
- *  a proxy for.  We want to add an entry to our cache if it is a reply
- *  to us or if it is a request for our address.
- *  (The assumption for this last is that if someone is requesting our
- *  address, they are probably intending to talk to us, so it saves time
- *  if we cache their address.  Their address is also probably not in
- *  our cache, since ours is not in their cache.)
- *
- *  Putting this another way, we only care about replies if they are to
- *  us, in which case we add them to the cache.  For requests, we care
- *  about those for us and those for our proxies.  We reply to both,
- *  and in the case of requests for us we add the requester to the arp
- *  cache.
- */
 
-	/* Special case: IPv4 duplicate address detection packet (RFC2131) */
+	
 	if (sip == 0) {
 		if (arp->ar_op == htons(ARPOP_REQUEST) &&
 		    inet_addr_type(net, tip) == RTN_LOCAL &&
@@ -884,15 +765,11 @@ static int arp_process(struct sk_buff *skb)
 		}
 	}
 
-	/* Update our ARP tables */
+	
 
 	n = __neigh_lookup(&arp_tbl, &sip, dev, 0);
 
 	if (IN_DEV_ARP_ACCEPT(in_dev)) {
-		/* Unsolicited ARP is not accepted by default.
-		   It is possible, that this option should be enabled for some
-		   devices (strip is candidate)
-		 */
 		if (n == NULL &&
 		    (arp->ar_op == htons(ARPOP_REPLY) ||
 		     (arp->ar_op == htons(ARPOP_REQUEST) && tip == sip)) &&
@@ -904,16 +781,8 @@ static int arp_process(struct sk_buff *skb)
 		int state = NUD_REACHABLE;
 		int override;
 
-		/* If several different ARP replies follows back-to-back,
-		   use the FIRST one. It is possible, if several proxy
-		   agents are active. Taking the first reply prevents
-		   arp trashing and chooses the fastest router.
-		 */
 		override = time_after(jiffies, n->updated + n->parms->locktime);
 
-		/* Broadcast replies and request packets
-		   do not assert neighbour reachability.
-		 */
 		if (arp->ar_op != htons(ARPOP_REPLY) ||
 		    skb->pkt_type != PACKET_HOST)
 			state = NUD_STALE;
@@ -933,16 +802,13 @@ static void parp_redo(struct sk_buff *skb)
 }
 
 
-/*
- *	Receive an arp request from the device layer.
- */
 
 static int arp_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt, struct net_device *orig_dev)
 {
 	struct arphdr *arp;
 
-	/* ARP header, plus 2 device addresses, plus 2 IP addresses.  */
+	
 	if (!pskb_may_pull(skb, arp_hdr_len(dev)))
 		goto freeskb;
 
@@ -968,13 +834,7 @@ out_of_mem:
 	return 0;
 }
 
-/*
- *	User level interface (ioctl)
- */
 
-/*
- *	Set (create) an ARP cache entry.
- */
 
 static int arp_req_set_proxy(struct net *net, struct net_device *dev, int on)
 {
@@ -1038,12 +898,6 @@ static int arp_req_set(struct net *net, struct arpreq *r,
 	switch (dev->type) {
 #if IS_ENABLED(CONFIG_FDDI)
 	case ARPHRD_FDDI:
-		/*
-		 * According to RFC 1390, FDDI devices should accept ARP
-		 * hardware types of 1 (Ethernet).  However, to be more
-		 * robust, we'll accept hardware types of either 1 (Ethernet)
-		 * or 6 (IEEE 802.2).
-		 */
 		if (r->arp_ha.sa_family != ARPHRD_FDDI &&
 		    r->arp_ha.sa_family != ARPHRD_ETHER &&
 		    r->arp_ha.sa_family != ARPHRD_IEEE802)
@@ -1081,9 +935,6 @@ static unsigned arp_state_to_flags(struct neighbour *neigh)
 		return 0;
 }
 
-/*
- *	Get an ARP cache entry.
- */
 
 static int arp_req_get(struct arpreq *r, struct net_device *dev)
 {
@@ -1158,9 +1009,6 @@ static int arp_req_delete(struct net *net, struct arpreq *r,
 	return arp_invalidate(dev, ip);
 }
 
-/*
- *	Handle an ARP layer I/O control request.
- */
 
 int arp_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 {
@@ -1198,7 +1046,7 @@ int arp_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 		if (dev == NULL)
 			goto out;
 
-		/* Mmmm... It is wrong... ARPHRD_NETROM==0 */
+		
 		if (!r.arp_ha.sa_family)
 			r.arp_ha.sa_family = dev->type;
 		err = -EINVAL;
@@ -1248,19 +1096,12 @@ static struct notifier_block arp_netdev_notifier = {
 	.notifier_call = arp_netdev_event,
 };
 
-/* Note, that it is not on notifier chain.
-   It is necessary, that this routine was called after route cache will be
-   flushed.
- */
 void arp_ifdown(struct net_device *dev)
 {
 	neigh_ifdown(&arp_tbl, dev);
 }
 
 
-/*
- *	Called once on startup.
- */
 
 static struct packet_type arp_packet_type __read_mostly = {
 	.type =	cpu_to_be16(ETH_P_ARP),
@@ -1284,10 +1125,6 @@ void __init arp_init(void)
 #ifdef CONFIG_PROC_FS
 #if IS_ENABLED(CONFIG_AX25)
 
-/* ------------------------------------------------------------------------ */
-/*
- *	ax25 -> ASCII conversion
- */
 static char *ax2asc2(ax25_address *a, char *buf)
 {
 	char c, *s;
@@ -1315,7 +1152,7 @@ static char *ax2asc2(ax25_address *a, char *buf)
 
 	return buf;
 }
-#endif /* CONFIG_AX25 */
+#endif 
 
 #define HBUFFERLEN 30
 
@@ -1329,7 +1166,7 @@ static void arp_format_neigh_entry(struct seq_file *seq,
 	int hatype = dev->type;
 
 	read_lock(&n->lock);
-	/* Convert hardware address to XX:XX:XX:XX ... form. */
+	
 #if IS_ENABLED(CONFIG_AX25)
 	if (hatype == ARPHRD_AX25 || hatype == ARPHRD_NETROM)
 		ax2asc2((ax25_address *)n->ha, hbuffer);
@@ -1384,13 +1221,9 @@ static int arp_seq_show(struct seq_file *seq, void *v)
 
 static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	/* Don't want to confuse "arp -a" w/ magic entries,
-	 * so we tell the generic iterator to skip NUD_NOARP.
-	 */
 	return neigh_seq_start(seq, pos, &arp_tbl, NEIGH_SEQ_SKIP_NOARP);
 }
 
-/* ------------------------------------------------------------------------ */
 
 static const struct seq_operations arp_seq_ops = {
 	.start	= arp_seq_start,
@@ -1436,11 +1269,11 @@ static int __init arp_proc_init(void)
 	return register_pernet_subsys(&arp_net_ops);
 }
 
-#else /* CONFIG_PROC_FS */
+#else 
 
 static int __init arp_proc_init(void)
 {
 	return 0;
 }
 
-#endif /* CONFIG_PROC_FS */
+#endif 

@@ -3,7 +3,7 @@
  *
  * Implementation of FSF commands.
  *
- * Copyright IBM Corp. 2002, 2013
+ * Copyright IBM Corporation 2002, 2010
  */
 
 #define KMSG_COMPONENT "zfcp"
@@ -219,7 +219,7 @@ static void zfcp_fsf_status_read_handler(struct zfcp_fsf_req *req)
 		return;
 	}
 
-	zfcp_dbf_hba_fsf_uss("fssrh_4", req);
+	zfcp_dbf_hba_fsf_uss("fssrh_2", req);
 
 	switch (sr_buf->status_type) {
 	case FSF_STATUS_READ_PORT_CLOSED:
@@ -437,34 +437,6 @@ void zfcp_fsf_req_dismiss_all(struct zfcp_adapter *adapter)
 	}
 }
 
-#define ZFCP_FSF_PORTSPEED_1GBIT	(1 <<  0)
-#define ZFCP_FSF_PORTSPEED_2GBIT	(1 <<  1)
-#define ZFCP_FSF_PORTSPEED_4GBIT	(1 <<  2)
-#define ZFCP_FSF_PORTSPEED_10GBIT	(1 <<  3)
-#define ZFCP_FSF_PORTSPEED_8GBIT	(1 <<  4)
-#define ZFCP_FSF_PORTSPEED_16GBIT	(1 <<  5)
-#define ZFCP_FSF_PORTSPEED_NOT_NEGOTIATED (1 << 15)
-
-static u32 zfcp_fsf_convert_portspeed(u32 fsf_speed)
-{
-	u32 fdmi_speed = 0;
-	if (fsf_speed & ZFCP_FSF_PORTSPEED_1GBIT)
-		fdmi_speed |= FC_PORTSPEED_1GBIT;
-	if (fsf_speed & ZFCP_FSF_PORTSPEED_2GBIT)
-		fdmi_speed |= FC_PORTSPEED_2GBIT;
-	if (fsf_speed & ZFCP_FSF_PORTSPEED_4GBIT)
-		fdmi_speed |= FC_PORTSPEED_4GBIT;
-	if (fsf_speed & ZFCP_FSF_PORTSPEED_10GBIT)
-		fdmi_speed |= FC_PORTSPEED_10GBIT;
-	if (fsf_speed & ZFCP_FSF_PORTSPEED_8GBIT)
-		fdmi_speed |= FC_PORTSPEED_8GBIT;
-	if (fsf_speed & ZFCP_FSF_PORTSPEED_16GBIT)
-		fdmi_speed |= FC_PORTSPEED_16GBIT;
-	if (fsf_speed & ZFCP_FSF_PORTSPEED_NOT_NEGOTIATED)
-		fdmi_speed |= FC_PORTSPEED_NOT_NEGOTIATED;
-	return fdmi_speed;
-}
-
 static int zfcp_fsf_exchange_config_evaluate(struct zfcp_fsf_req *req)
 {
 	struct fsf_qtcb_bottom_config *bottom = &req->qtcb->bottom.config;
@@ -483,27 +455,17 @@ static int zfcp_fsf_exchange_config_evaluate(struct zfcp_fsf_req *req)
 
 	fc_host_port_name(shost) = nsp->fl_wwpn;
 	fc_host_node_name(shost) = nsp->fl_wwnn;
+	fc_host_port_id(shost) = ntoh24(bottom->s_id);
+	fc_host_speed(shost) = bottom->fc_link_speed;
 	fc_host_supported_classes(shost) = FC_COS_CLASS2 | FC_COS_CLASS3;
 
+	adapter->hydra_version = bottom->adapter_type;
 	adapter->timer_ticks = bottom->timer_interval & ZFCP_FSF_TIMER_INT_MASK;
 	adapter->stat_read_buf_num = max(bottom->status_read_buf_num,
 					 (u16)FSF_STATUS_READS_RECOM);
 
 	if (fc_host_permanent_port_name(shost) == -1)
 		fc_host_permanent_port_name(shost) = fc_host_port_name(shost);
-
-	zfcp_scsi_set_prot(adapter);
-
-	/* no error return above here, otherwise must fix call chains */
-	/* do not evaluate invalid fields */
-	if (req->qtcb->header.fsf_status == FSF_EXCHANGE_CONFIG_DATA_INCOMPLETE)
-		return 0;
-
-	fc_host_port_id(shost) = ntoh24(bottom->s_id);
-	fc_host_speed(shost) =
-		zfcp_fsf_convert_portspeed(bottom->fc_link_speed);
-
-	adapter->hydra_version = bottom->adapter_type;
 
 	switch (bottom->fc_topology) {
 	case FSF_TOPO_P2P:
@@ -525,6 +487,8 @@ static int zfcp_fsf_exchange_config_evaluate(struct zfcp_fsf_req *req)
 		zfcp_erp_adapter_shutdown(adapter, 0, "fsece_1");
 		return -EIO;
 	}
+
+	zfcp_scsi_set_prot(adapter);
 
 	return 0;
 }
@@ -570,14 +534,8 @@ static void zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *req)
 		fc_host_port_type(shost) = FC_PORTTYPE_UNKNOWN;
 		adapter->hydra_version = 0;
 
-		/* avoids adapter shutdown to be able to recognize
-		 * events such as LINK UP */
-		atomic_set_mask(ZFCP_STATUS_ADAPTER_XCONFIG_OK,
-				&adapter->status);
 		zfcp_fsf_link_down_info_eval(req,
 			&qtcb->header.fsf_status_qual.link_down_info);
-		if (zfcp_fsf_exchange_config_evaluate(req))
-			return;
 		break;
 	default:
 		zfcp_erp_adapter_shutdown(adapter, 0, "fsecdh3");
@@ -622,8 +580,7 @@ static void zfcp_fsf_exchange_port_evaluate(struct zfcp_fsf_req *req)
 	} else
 		fc_host_permanent_port_name(shost) = fc_host_port_name(shost);
 	fc_host_maxframe_size(shost) = bottom->maximum_frame_size;
-	fc_host_supported_speeds(shost) =
-		zfcp_fsf_convert_portspeed(bottom->supported_speed);
+	fc_host_supported_speeds(shost) = bottom->supported_speed;
 	memcpy(fc_host_supported_fc4s(shost), bottom->supported_fc4_types,
 	       FC_FC4_LIST_SIZE);
 	memcpy(fc_host_active_fc4s(shost), bottom->active_fc4_types,
@@ -814,13 +771,11 @@ out:
 static void zfcp_fsf_abort_fcp_command_handler(struct zfcp_fsf_req *req)
 {
 	struct scsi_device *sdev = req->data;
-	struct zfcp_scsi_dev *zfcp_sdev;
+	struct zfcp_scsi_dev *zfcp_sdev = sdev_to_zfcp(sdev);
 	union fsf_status_qual *fsq = &req->qtcb->header.fsf_status_qual;
 
 	if (req->status & ZFCP_STATUS_FSFREQ_ERROR)
 		return;
-
-	zfcp_sdev = sdev_to_zfcp(sdev);
 
 	switch (req->qtcb->header.fsf_status) {
 	case FSF_PORT_HANDLE_NOT_VALID:
@@ -930,7 +885,7 @@ static void zfcp_fsf_send_ct_handler(struct zfcp_fsf_req *req)
 
 	switch (header->fsf_status) {
         case FSF_GOOD:
-		zfcp_dbf_san_res("fsscth2", req);
+		zfcp_dbf_san_res("fsscth1", req);
 		ct->status = 0;
 		break;
         case FSF_SERVICE_CLASS_NOT_SUPPORTED:
@@ -1784,14 +1739,12 @@ static void zfcp_fsf_open_lun_handler(struct zfcp_fsf_req *req)
 {
 	struct zfcp_adapter *adapter = req->adapter;
 	struct scsi_device *sdev = req->data;
-	struct zfcp_scsi_dev *zfcp_sdev;
+	struct zfcp_scsi_dev *zfcp_sdev = sdev_to_zfcp(sdev);
 	struct fsf_qtcb_header *header = &req->qtcb->header;
 	struct fsf_qtcb_bottom_support *bottom = &req->qtcb->bottom.support;
 
 	if (req->status & ZFCP_STATUS_FSFREQ_ERROR)
 		return;
-
-	zfcp_sdev = sdev_to_zfcp(sdev);
 
 	atomic_clear_mask(ZFCP_STATUS_COMMON_ACCESS_DENIED |
 			  ZFCP_STATUS_COMMON_ACCESS_BOXED |
@@ -1903,12 +1856,10 @@ out:
 static void zfcp_fsf_close_lun_handler(struct zfcp_fsf_req *req)
 {
 	struct scsi_device *sdev = req->data;
-	struct zfcp_scsi_dev *zfcp_sdev;
+	struct zfcp_scsi_dev *zfcp_sdev = sdev_to_zfcp(sdev);
 
 	if (req->status & ZFCP_STATUS_FSFREQ_ERROR)
 		return;
-
-	zfcp_sdev = sdev_to_zfcp(sdev);
 
 	switch (req->qtcb->header.fsf_status) {
 	case FSF_PORT_HANDLE_NOT_VALID:
@@ -1999,7 +1950,7 @@ static void zfcp_fsf_req_trace(struct zfcp_fsf_req *req, struct scsi_cmnd *scsi)
 {
 	struct fsf_qual_latency_info *lat_in;
 	struct latency_cont *lat = NULL;
-	struct zfcp_scsi_dev *zfcp_sdev;
+	struct zfcp_scsi_dev *zfcp_sdev = sdev_to_zfcp(scsi->device);
 	struct zfcp_blk_drv_data blktrc;
 	int ticks = req->adapter->timer_ticks;
 
@@ -2014,7 +1965,6 @@ static void zfcp_fsf_req_trace(struct zfcp_fsf_req *req, struct scsi_cmnd *scsi)
 
 	if (req->adapter->adapter_features & FSF_FEATURE_MEASUREMENT_DATA &&
 	    !(req->status & ZFCP_STATUS_FSFREQ_ERROR)) {
-		zfcp_sdev = sdev_to_zfcp(scsi->device);
 		blktrc.flags |= ZFCP_BLK_LAT_VALID;
 		blktrc.channel_lat = lat_in->channel_lat * ticks;
 		blktrc.fabric_lat = lat_in->fabric_lat * ticks;
@@ -2052,13 +2002,11 @@ static void zfcp_fsf_fcp_handler_common(struct zfcp_fsf_req *req)
 {
 	struct scsi_cmnd *scmnd = req->data;
 	struct scsi_device *sdev = scmnd->device;
-	struct zfcp_scsi_dev *zfcp_sdev;
+	struct zfcp_scsi_dev *zfcp_sdev = sdev_to_zfcp(sdev);
 	struct fsf_qtcb_header *header = &req->qtcb->header;
 
 	if (unlikely(req->status & ZFCP_STATUS_FSFREQ_ERROR))
 		return;
-
-	zfcp_sdev = sdev_to_zfcp(sdev);
 
 	switch (header->fsf_status) {
 	case FSF_HANDLE_MISMATCH:

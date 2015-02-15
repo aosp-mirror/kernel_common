@@ -454,6 +454,12 @@ void __init of_irq_init(const struct of_device_id *matches)
 
 			list_del(&desc->list);
 			match = of_match_node(matches, desc->dev);
+			if (unlikely(!match)) {
+				pr_debug("of_irq_init: match is null\n");
+				kfree(desc);
+				continue;
+			}
+			
 			if (WARN(!match->data,
 			    "of_irq_init: no init function for %s\n",
 			    match->compatible)) {

@@ -398,7 +398,7 @@ config INET_DIAG
 	  Support for INET (TCP, DCCP, etc) socket monitoring interface used by
 	  native Linux tools such as ss. ss is included in iproute2, currently
 	  downloadable at:
-	  
+
 	    http://www.linuxfoundation.org/collaborate/workgroups/networking/iproute2
 
 	  If unsure, say Y.
@@ -630,3 +630,38 @@ config TCP_MD5SIG
 	  on the Internet.
 
 	  If unsure, say N.
+
+config HTC_LARGE_TCP_INITIAL_BUFFER
+	bool "TCP: initial TCP buffer size 5K:64K"
+	default n
+	help
+	yes means TCP buffer size 5K
+
+config HTC_TCP_SYN_FAIL
+	tristate "Belong to HTC TCP SYN FAIL calculation feature"
+	---help---
+	HTC_TCP_SYN_FAIL
+
+config HTC_LARGE_TCP_MEM
+	tristate "Grant socket memory limit for socket close issue"
+	---help---
+	HTC_LARGE_TCP_MEM
+
+config HTC_FIB_RULE_DEBUG
+    tristate "HTC_FIB_RULE_DEBUG , HTC add iptables debug log"
+	---help---
+	HTC_FIB_RULE_DEBUG
+
+config HTC_MONITOR
+	tristate "HTC_MONITOR"
+	default n
+	---help---
+	  Come up with a way to add information of data usage in attribute file
+	  for identifying the process that requested for data transmission.
+
+config HTC_NETWORK_CNE
+    tristate "HTC_NETWORK_CNE"
+    default n
+    ---help---
+    HTC_NETWORK_CNE
+

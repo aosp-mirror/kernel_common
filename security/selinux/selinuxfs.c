@@ -709,6 +709,7 @@ static ssize_t sel_write_access(struct file *file, char *buf, size_t size)
 	u16 tclass;
 	struct av_decision avd;
 	ssize_t length;
+	char format[32];
 
 	length = task_has_security(current, SECURITY__COMPUTE_AV);
 	if (length)
@@ -725,7 +726,8 @@ static ssize_t sel_write_access(struct file *file, char *buf, size_t size)
 		goto out;
 
 	length = -EINVAL;
-	if (sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3)
+	snprintf(format, sizeof(format), "%%%ds %%%ds %%hu", size, size);
+	if (sscanf(buf, format, scon, tcon, &tclass) != 3)
 		goto out;
 
 	length = security_context_to_sid(scon, strlen(scon) + 1, &ssid);
@@ -759,6 +761,7 @@ static ssize_t sel_write_create(struct file *file, char *buf, size_t size)
 	char *newcon = NULL;
 	u32 len;
 	int nargs;
+	char format[32];
 
 	length = task_has_security(current, SECURITY__COMPUTE_CREATE);
 	if (length)
@@ -780,7 +783,8 @@ static ssize_t sel_write_create(struct file *file, char *buf, size_t size)
 		goto out;
 
 	length = -EINVAL;
-	nargs = sscanf(buf, "%s %s %hu %s", scon, tcon, &tclass, namebuf);
+	snprintf(format, sizeof(format), "%%%ds %%%ds %%hu %%%ds", size, size, size);
+	nargs = sscanf(buf, format, scon, tcon, &tclass, namebuf);
 	if (nargs < 3 || nargs > 4)
 		goto out;
 	if (nargs == 4) {
@@ -856,6 +860,7 @@ static ssize_t sel_write_relabel(struct file *file, char *buf, size_t size)
 	ssize_t length;
 	char *newcon = NULL;
 	u32 len;
+	char format[32];
 
 	length = task_has_security(current, SECURITY__COMPUTE_RELABEL);
 	if (length)
@@ -872,7 +877,8 @@ static ssize_t sel_write_relabel(struct file *file, char *buf, size_t size)
 		goto out;
 
 	length = -EINVAL;
-	if (sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3)
+	snprintf(format, sizeof(format), "%%%ds %%%ds %%hu", size, size);
+	if (sscanf(buf, format, scon, tcon, &tclass) != 3)
 		goto out;
 
 	length = security_context_to_sid(scon, strlen(scon) + 1, &ssid);
@@ -912,6 +918,7 @@ static ssize_t sel_write_user(struct file *file, char *buf, size_t size)
 	char *newcon;
 	int i, rc;
 	u32 len, nsids;
+	char format[32];
 
 	length = task_has_security(current, SECURITY__COMPUTE_USER);
 	if (length)
@@ -928,7 +935,8 @@ static ssize_t sel_write_user(struct file *file, char *buf, size_t size)
 		goto out;
 
 	length = -EINVAL;
-	if (sscanf(buf, "%s %s", con, user) != 2)
+	snprintf(format, sizeof(format), "%%%ds %%%ds", size, size);
+	if (sscanf(buf, format, con, user) != 2)
 		goto out;
 
 	length = security_context_to_sid(con, strlen(con) + 1, &sid);
@@ -939,7 +947,7 @@ static ssize_t sel_write_user(struct file *file, char *buf, size_t size)
 	if (length)
 		goto out;
 
-	length = sprintf(buf, "%u", nsids) + 1;
+	length = snprintf(buf, PAGE_SIZE, "%u", nsids) + 1;
 	ptr = buf + length;
 	for (i = 0; i < nsids; i++) {
 		rc = security_sid_to_context(sids[i], &newcon, &len);
@@ -972,6 +980,7 @@ static ssize_t sel_write_member(struct file *file, char *buf, size_t size)
 	ssize_t length;
 	char *newcon = NULL;
 	u32 len;
+	char format[32];
 
 	length = task_has_security(current, SECURITY__COMPUTE_MEMBER);
 	if (length)
@@ -988,7 +997,8 @@ static ssize_t sel_write_member(struct file *file, char *buf, size_t size)
 		goto out;
 
 	length = -EINVAL;
-	if (sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3)
+	snprintf(format, sizeof(format), "%%%ds %%%ds %%hu", size, size);
+	if (sscanf(buf, format, scon, tcon, &tclass) != 3)
 		goto out;
 
 	length = security_context_to_sid(scon, strlen(scon) + 1, &ssid);
@@ -1232,7 +1242,6 @@ static int sel_make_bools(void)
 		kfree(bool_pending_names[i]);
 	kfree(bool_pending_names);
 	kfree(bool_pending_values);
-	bool_num = 0;
 	bool_pending_names = NULL;
 	bool_pending_values = NULL;
 
@@ -1533,11 +1542,6 @@ static int sel_make_initcon_files(struct dentry *dir)
 	return 0;
 }
 
-static inline unsigned int sel_div(unsigned long a, unsigned long b)
-{
-	return a / b - (a % b < 0);
-}
-
 static inline unsigned long sel_class_to_ino(u16 class)
 {
 	return (class * (SEL_VEC_MAX + 1)) | SEL_CLASS_INO_OFFSET;
@@ -1545,7 +1549,7 @@ static inline unsigned long sel_class_to_ino(u16 class)
 
 static inline u16 sel_ino_to_class(unsigned long ino)
 {
-	return sel_div(ino & SEL_INO_MASK, SEL_VEC_MAX + 1);
+	return (ino & SEL_INO_MASK) / (SEL_VEC_MAX + 1);
 }
 
 static inline unsigned long sel_perm_to_ino(u16 class, u32 perm)

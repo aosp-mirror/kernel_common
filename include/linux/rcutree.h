@@ -32,7 +32,7 @@
 
 extern void rcu_init(void);
 extern void rcu_note_context_switch(int cpu);
-extern int rcu_needs_cpu(int cpu);
+extern int rcu_needs_cpu(int cpu, unsigned long *delta_jiffies);
 extern void rcu_cpu_stall_reset(void);
 
 /*
@@ -44,18 +44,6 @@ static inline void rcu_virt_note_context_switch(int cpu)
 {
 	rcu_note_context_switch(cpu);
 }
-
-#ifdef CONFIG_TREE_PREEMPT_RCU
-
-extern void exit_rcu(void);
-
-#else /* #ifdef CONFIG_TREE_PREEMPT_RCU */
-
-static inline void exit_rcu(void)
-{
-}
-
-#endif /* #else #ifdef CONFIG_TREE_PREEMPT_RCU */
 
 extern void synchronize_rcu_bh(void);
 extern void synchronize_sched_expedited(void);

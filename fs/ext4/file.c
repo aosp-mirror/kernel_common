@@ -28,19 +28,15 @@
 #include "ext4_jbd2.h"
 #include "xattr.h"
 #include "acl.h"
+#include <trace/events/mmcio.h>
 
-/*
- * Called when an inode is released. Note that this is different
- * from ext4_file_open: open gets called at every open, but release
- * gets called only when /all/ the files are closed.
- */
 static int ext4_release_file(struct inode *inode, struct file *filp)
 {
 	if (ext4_test_inode_state(inode, EXT4_STATE_DA_ALLOC_CLOSE)) {
 		ext4_alloc_da_blocks(inode);
 		ext4_clear_inode_state(inode, EXT4_STATE_DA_ALLOC_CLOSE);
 	}
-	/* if we are the last writer on the inode, drop the block reservation */
+	
 	if ((filp->f_mode & FMODE_WRITE) &&
 			(atomic_read(&inode->i_writecount) == 1) &&
 		        !EXT4_I(inode)->i_reserved_data_blocks)
@@ -97,10 +93,7 @@ ext4_file_write(struct kiocb *iocb, const struct iovec *iov,
 	int unaligned_aio = 0;
 	int ret;
 
-	/*
-	 * If we have encountered a bitmap-format file, the size limit
-	 * is smaller than s_maxbytes, which is for extent-mapped files.
-	 */
+	trace_ext4_file_write(iocb->ki_filp->f_path.dentry, iocb->ki_left);
 
 	if (!(ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))) {
 		struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
@@ -119,11 +112,11 @@ ext4_file_write(struct kiocb *iocb, const struct iovec *iov,
 		unaligned_aio = ext4_unaligned_aio(inode, iov, nr_segs, pos);
 	}
 
-	/* Unaligned direct AIO must be serialized; see comment above */
+	
 	if (unaligned_aio) {
 		static unsigned long unaligned_warn_time;
 
-		/* Warn about this once per day */
+		
 		if (printk_timed_ratelimit(&unaligned_warn_time, 60*60*24*HZ))
 			ext4_msg(inode->i_sb, KERN_WARNING,
 				 "Unaligned AIO/DIO on inode %ld by %s; "
@@ -170,12 +163,6 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 	if (unlikely(!(sbi->s_mount_flags & EXT4_MF_MNTDIR_SAMPLED) &&
 		     !(sb->s_flags & MS_RDONLY))) {
 		sbi->s_mount_flags |= EXT4_MF_MNTDIR_SAMPLED;
-		/*
-		 * Sample where the filesystem has been mounted and
-		 * store it in the superblock for sysadmin convenience
-		 * when trying to sort through large numbers of block
-		 * devices or filesystem images.
-		 */
 		memset(buf, 0, sizeof(buf));
 		path.mnt = mnt;
 		path.dentry = mnt->mnt_root;
@@ -186,10 +173,6 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 			ext4_mark_super_dirty(sb);
 		}
 	}
-	/*
-	 * Set up the jbd2_inode if we are opening the inode for
-	 * writing and the journal is present
-	 */
 	if (sbi->s_journal && !ei->jinode && (filp->f_mode & FMODE_WRITE)) {
 		struct jbd2_inode *jinode = jbd2_alloc_inode(GFP_KERNEL);
 
@@ -210,11 +193,6 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 	return dquot_file_open(inode, filp);
 }
 
-/*
- * ext4_llseek() copied from generic_file_llseek() to handle both
- * block-mapped and extent-mapped maxbytes values. This should
- * otherwise be identical with generic_file_llseek().
- */
 loff_t ext4_llseek(struct file *file, loff_t offset, int origin)
 {
 	struct inode *inode = file->f_mapping->host;

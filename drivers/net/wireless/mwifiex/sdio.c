@@ -158,6 +158,7 @@ static int mwifiex_sdio_suspend(struct device *dev)
 	struct sdio_mmc_card *card;
 	struct mwifiex_adapter *adapter;
 	mmc_pm_flag_t pm_flag = 0;
+	int hs_actived = 0;
 	int i;
 	int ret = 0;
 
@@ -184,13 +185,11 @@ static int mwifiex_sdio_suspend(struct device *dev)
 	adapter = card->adapter;
 
 	/* Enable the Host Sleep */
-	if (!mwifiex_enable_hs(adapter)) {
-		dev_err(adapter->dev, "cmd: failed to suspend\n");
-		return -EFAULT;
+	hs_actived = mwifiex_enable_hs(adapter);
+	if (hs_actived) {
+		pr_debug("cmd: suspend with MMC_PM_KEEP_POWER\n");
+		ret = sdio_set_host_pm_flags(func, MMC_PM_KEEP_POWER);
 	}
-
-	dev_dbg(adapter->dev, "cmd: suspend with MMC_PM_KEEP_POWER\n");
-	ret = sdio_set_host_pm_flags(func, MMC_PM_KEEP_POWER);
 
 	/* Indicate device suspended */
 	adapter->is_suspended = true;
@@ -1449,8 +1448,8 @@ static int mwifiex_sdio_host_to_card(struct mwifiex_adapter *adapter,
 	/* Allocate buffer and copy payload */
 	blk_size = MWIFIEX_SDIO_BLOCK_SIZE;
 	buf_block_len = (pkt_len + blk_size - 1) / blk_size;
-	*(__le16 *)&payload[0] = cpu_to_le16((u16)pkt_len);
-	*(__le16 *)&payload[2] = cpu_to_le16(type);
+	*(u16 *) &payload[0] = (u16) pkt_len;
+	*(u16 *) &payload[2] = type;
 
 	/*
 	 * This is SDIO specific header

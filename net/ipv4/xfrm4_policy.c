@@ -1,12 +1,3 @@
-/*
- * xfrm4_policy.c
- *
- * Changes:
- *	Kazunori MIYAZAWA @USAGI
- * 	YOSHIFUJI Hideaki @USAGI
- *		Split up af-specific portion
- *
- */
 
 #include <linux/err.h>
 #include <linux/kernel.h>
@@ -64,7 +55,7 @@ static int xfrm4_get_saddr(struct net *net,
 
 static int xfrm4_get_tos(const struct flowi *fl)
 {
-	return IPTOS_RT_MASK & fl->u.ip4.flowi4_tos; /* Strip ECN bits */
+	return IPTOS_RT_MASK & fl->u.ip4.flowi4_tos; 
 }
 
 static int xfrm4_init_path(struct xfrm_dst *path, struct dst_entry *dst,
@@ -95,8 +86,6 @@ static int xfrm4_fill_dst(struct xfrm_dst *xdst, struct net_device *dev,
 	if (rt->peer)
 		atomic_inc(&rt->peer->refcnt);
 
-	/* Sheit... I remember I did this right. Apparently,
-	 * it was magically lost, so this code needs audit */
 	xdst->u.rt.rt_flags = rt->rt_flags & (RTCF_BROADCAST | RTCF_MULTICAST |
 					      RTCF_LOCAL);
 	xdst->u.rt.rt_type = rt->rt_type;
@@ -283,16 +272,6 @@ static void __exit xfrm4_policy_fini(void)
 
 void __init xfrm4_init(int rt_max_size)
 {
-	/*
-	 * Select a default value for the gc_thresh based on the main route
-	 * table hash size.  It seems to me the worst case scenario is when
-	 * we have ipsec operating in transport mode, in which we create a
-	 * dst_entry per socket.  The xfrm gc algorithm starts trying to remove
-	 * entries at gc_thresh, and prevents new allocations as 2*gc_thresh
-	 * so lets set an initial xfrm gc_thresh value at the rt_max_size/2.
-	 * That will let us store an ipsec connection per route table entry,
-	 * and start cleaning when were 1/2 full
-	 */
 	xfrm4_dst_ops.gc_thresh = rt_max_size/2;
 	dst_entries_init(&xfrm4_dst_ops);
 

@@ -13,7 +13,7 @@
 
 #define format_dev_t(buffer, dev)					\
 	({								\
-		sprintf(buffer, "%u:%u", MAJOR(dev), MINOR(dev));	\
+		snprintf(buffer, sizeof(buffer) - 1, "%u:%u", MAJOR(dev), MINOR(dev));	\
 		buffer;							\
 	})
 

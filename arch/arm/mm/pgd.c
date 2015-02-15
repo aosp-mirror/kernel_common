@@ -17,14 +17,31 @@
 #include <asm/page.h>
 #include <asm/tlbflush.h>
 
+#include <htc_debug/stability/htc_report_meminfo.h>
+
 #include "mm.h"
 
 #ifdef CONFIG_ARM_LPAE
 #define __pgd_alloc()	kmalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL)
 #define __pgd_free(pgd)	kfree(pgd)
 #else
-#define __pgd_alloc()	(pgd_t *)__get_free_pages(GFP_KERNEL, 2)
-#define __pgd_free(pgd)	free_pages((unsigned long)pgd, 2)
+static inline pgd_t *__pgd_alloc(void)
+{
+	unsigned long addr = __get_free_pages(GFP_KERNEL, 2);
+
+	pgd_alloc_count(addr);
+
+	return (pgd_t *) addr;
+}
+
+static inline void __pgd_free(pgd_t * pgd)
+{
+	unsigned long addr = (unsigned long)pgd;
+
+	pgd_free_count(addr);
+
+	free_pages(addr, 2);
+}
 #endif
 
 /*

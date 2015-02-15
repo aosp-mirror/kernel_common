@@ -173,7 +173,11 @@ MODULE_DEVICE_TABLE(pnp_card, snd_opti9xx_pnpids);
 
 #endif	/* CONFIG_PNP */
 
-#define DEV_NAME KBUILD_MODNAME
+#ifdef OPTi93X
+#define DEV_NAME "opti93x"
+#else
+#define DEV_NAME "opti92x"
+#endif
 
 static char * snd_opti9xx_names[] = {
 	"unknown",
@@ -1122,7 +1126,7 @@ static void __devexit snd_opti9xx_pnp_remove(struct pnp_card_link * pcard)
 
 static struct pnp_card_driver opti9xx_pnpc_driver = {
 	.flags		= PNP_DRIVER_RES_DISABLE,
-	.name		= DEV_NAME,
+	.name		= "opti9xx",
 	.id_table	= snd_opti9xx_pnpids,
 	.probe		= snd_opti9xx_pnp_probe,
 	.remove		= __devexit_p(snd_opti9xx_pnp_remove),

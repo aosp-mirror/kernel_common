@@ -664,7 +664,7 @@ static void __cpuinit get_core_online(unsigned int cpu)
 	 * sensors. We check this bit only, all the early CPUs
 	 * without thermal sensors will be filtered out.
 	 */
-	if (!cpu_has(c, X86_FEATURE_DTHERM))
+	if (!cpu_has(c, X86_FEATURE_DTS))
 		return;
 
 	if (!pdev) {
@@ -765,7 +765,7 @@ static struct notifier_block coretemp_cpu_notifier __refdata = {
 };
 
 static const struct x86_cpu_id coretemp_ids[] = {
-	{ X86_VENDOR_INTEL, X86_FAMILY_ANY, X86_MODEL_ANY, X86_FEATURE_DTHERM },
+	{ X86_VENDOR_INTEL, X86_FAMILY_ANY, X86_MODEL_ANY, X86_FEATURE_DTS },
 	{}
 };
 MODULE_DEVICE_TABLE(x86cpu, coretemp_ids);

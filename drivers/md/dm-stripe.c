@@ -350,7 +350,7 @@ static int stripe_end_io(struct dm_target *ti, struct bio *bio,
 		return error;
 
 	memset(major_minor, 0, sizeof(major_minor));
-	sprintf(major_minor, "%d:%d",
+	snprintf(major_minor, sizeof(major_minor) - 1, "%d:%d",
 		MAJOR(disk_devt(bio->bi_bdev->bd_disk)),
 		MINOR(disk_devt(bio->bi_bdev->bd_disk)));
 

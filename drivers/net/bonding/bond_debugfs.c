@@ -6,7 +6,7 @@
 #include "bonding.h"
 #include "bond_alb.h"
 
-#if defined(CONFIG_DEBUG_FS) && !defined(CONFIG_NET_NS)
+#ifdef CONFIG_DEBUG_FS
 
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
