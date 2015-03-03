@@ -218,6 +218,14 @@ ssize_t trusty_version_show(struct device *dev, struct device_attribute *attr,
 
 DEVICE_ATTR(trusty_version, S_IRUSR, trusty_version_show, NULL);
 
+const char *trusty_version_str_get(struct device *dev)
+{
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	return s->version_str;
+}
+EXPORT_SYMBOL(trusty_version_str_get);
+
 static void trusty_init_version(struct trusty_state *s, struct device *dev)
 {
 	int ret;
