@@ -851,7 +851,8 @@ int ping_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			return ip_recv_error(sk, msg, len, addr_len);
 #if IS_ENABLED(CONFIG_IPV6)
 		} else if (family == AF_INET6) {
-			return pingv6_ops.ipv6_recv_error(sk, msg, len);
+			return pingv6_ops.ipv6_recv_error(sk, msg, len,
+							  addr_len);
 #endif
 		}
 	}
