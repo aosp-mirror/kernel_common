@@ -229,12 +229,14 @@ static inline unsigned int __inet_ehashfn(const __be32 laddr,
 			    initval);
 }
 
-static inline struct request_sock *inet_reqsk_alloc(struct request_sock_ops *ops)
+static inline struct request_sock *
+inet_reqsk_alloc(const struct request_sock_ops *ops, struct sock *sk_listener)
 {
 	struct request_sock *req = reqsk_alloc(ops);
-	struct inet_request_sock *ireq = inet_rsk(req);
 
-	if (req != NULL) {
+	if (req) {
+		struct inet_request_sock *ireq = inet_rsk(req);
+
 		kmemcheck_annotate_bitfield(ireq, flags);
 		ireq->opt = NULL;
 	}
