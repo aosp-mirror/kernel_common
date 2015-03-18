@@ -52,6 +52,7 @@ struct request_sock {
 #define rsk_refcnt			__req_common.skc_refcnt
 
 	struct request_sock		*dl_next;
+	struct sock			*rsk_listener;
 	u16				mss;
 	u8				num_retrans; /* number of retransmits */
 	u8				cookie_ts:1; /* syncookie: encode tcpopts in timestamp */
@@ -67,13 +68,16 @@ struct request_sock {
 	u32				peer_secid;
 };
 
-static inline struct request_sock *reqsk_alloc(const struct request_sock_ops *ops)
+static inline struct request_sock *
+reqsk_alloc(const struct request_sock_ops *ops, struct sock *sk_listener)
 {
 	struct request_sock *req = kmem_cache_alloc(ops->slab, GFP_ATOMIC);
 
-	if (req != NULL)
+	if (req) {
 		req->rsk_ops = ops;
-
+		sock_hold(sk_listener);
+		req->rsk_listener = sk_listener;
+	}
 	return req;
 }
 
@@ -91,6 +95,8 @@ static inline void reqsk_free(struct request_sock *req)
 {
 	req->rsk_ops->destructor(req);
 	__reqsk_free(req);
+	if (req->rsk_listener)
+		sock_put(req->rsk_listener);
 }
 
 static inline void reqsk_put(struct request_sock *req)
