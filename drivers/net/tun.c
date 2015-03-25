@@ -1166,7 +1166,7 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 			}
 			skb_shinfo(skb)->gso_type = SKB_GSO_UDP;
 			if (skb->protocol == htons(ETH_P_IPV6))
-				ipv6_proxy_select_ident(skb);
+				ipv6_proxy_select_ident(dev_net(skb->dev), skb);
 			break;
 		}
 		default:
