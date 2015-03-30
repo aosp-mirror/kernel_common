@@ -44,6 +44,18 @@ config TRUSTY_LOG
 
 	  If you build this as a module, it will be called trusty-log.
 
+config TRUSTY_VIRTIO
+	tristate "Trusty virtio support"
+	select VIRTIO
+	default y
+	help
+	  Enable the Trusty virtio driver, which is responsible for management
+	  and interaction with virtio devices exposed by Trusty.  This driver
+	  requests the virtio device descriptors from Trusty, then parses them
+	  and adds the corresponding virtio devices.
+
+	  If you build this as a module, it will be called trusty-virtio.
+
 endif # TRUSTY
 
 endmenu
