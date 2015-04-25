@@ -552,13 +552,6 @@ static int trusty_virtio_add_devices(struct trusty_ctx *tctx)
 		goto err_parse_descr;
 	}
 
-	/* start virtio */
-	ret = trusty_virtio_start(tctx, descr_va, descr_sz);
-	if (ret) {
-		dev_err(tctx->dev, "failed (%d) to start virtio\n", ret);
-		goto err_start_virtio;
-	}
-
 	/* register call notifier */
 	ret = trusty_call_notifier_register(tctx->dev->parent,
 					    &tctx->call_notifier);
@@ -566,6 +559,13 @@ static int trusty_virtio_add_devices(struct trusty_ctx *tctx)
 		dev_err(tctx->dev, "%s: failed (%d) to register notifier\n",
 			__func__, ret);
 		goto err_register_notifier;
+	}
+
+	/* start virtio */
+	ret = trusty_virtio_start(tctx, descr_va, descr_sz);
+	if (ret) {
+		dev_err(tctx->dev, "failed (%d) to start virtio\n", ret);
+		goto err_start_virtio;
 	}
 
 	/* attach shared area */
@@ -576,8 +576,11 @@ static int trusty_virtio_add_devices(struct trusty_ctx *tctx)
 
 	return 0;
 
-err_register_notifier:
 err_start_virtio:
+	trusty_call_notifier_unregister(tctx->dev->parent,
+					&tctx->call_notifier);
+	cancel_work_sync(&tctx->check_vqs);
+err_register_notifier:
 err_parse_descr:
 	_remove_devices_locked(tctx);
 	mutex_unlock(&tctx->mlock);
