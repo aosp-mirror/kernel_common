@@ -149,11 +149,19 @@ static void trusty_virtio_notify(struct virtqueue *vq)
 static int trusty_load_device_descr(struct trusty_ctx *tctx,
 				    void *va, size_t sz)
 {
+	int ret;
+
 	dev_dbg(tctx->dev, "%s: %zu bytes @ %p\n", __func__, sz, va);
 
-	return trusty_call32_mem_buf(tctx->dev->parent,
-				     SMC_SC_VIRTIO_GET_DESCR,
-				     virt_to_page(va), sz, PAGE_KERNEL);
+	ret = trusty_call32_mem_buf(tctx->dev->parent,
+				    SMC_SC_VIRTIO_GET_DESCR,
+				    virt_to_page(va), sz, PAGE_KERNEL);
+	if (ret < 0) {
+		dev_err(tctx->dev, "%s: virtio get descr returned (%d)\n",
+			__func__, ret);
+		return -ENODEV;
+	}
+	return ret;
 }
 
 static void trusty_virtio_stop(struct trusty_ctx *tctx, void *va, size_t sz)
