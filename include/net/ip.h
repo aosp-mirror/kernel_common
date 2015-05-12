@@ -31,7 +31,7 @@
 #include <net/route.h>
 #include <net/snmp.h>
 #include <net/flow.h>
-#include <net/flow_keys.h>
+#include <net/flow_dissector.h>
 
 #define IPV4_MIN_MTU		68			/* RFC 791 */
 
