@@ -157,8 +157,8 @@ static u32 goldfish_cmd_status(struct goldfish_pipe *pipe, u32 cmd)
 	struct goldfish_pipe_dev *dev = pipe->dev;
 
 	spin_lock_irqsave(&dev->lock, flags);
-	gf_write64((u64)(unsigned long)pipe, dev->base + PIPE_REG_CHANNEL,
-				dev->base + PIPE_REG_CHANNEL_HIGH);
+	gf_write_ptr(pipe, dev->base + PIPE_REG_CHANNEL,
+		     dev->base + PIPE_REG_CHANNEL_HIGH);
 	writel(cmd, dev->base + PIPE_REG_COMMAND);
 	status = readl(dev->base + PIPE_REG_STATUS);
 	spin_unlock_irqrestore(&dev->lock, flags);
@@ -171,8 +171,8 @@ static void goldfish_cmd(struct goldfish_pipe *pipe, u32 cmd)
 	struct goldfish_pipe_dev *dev = pipe->dev;
 
 	spin_lock_irqsave(&dev->lock, flags);
-	gf_write64((u64)(unsigned long)pipe, dev->base + PIPE_REG_CHANNEL,
-				dev->base + PIPE_REG_CHANNEL_HIGH);
+	gf_write_ptr(pipe, dev->base + PIPE_REG_CHANNEL,
+		     dev->base + PIPE_REG_CHANNEL_HIGH);
 	writel(cmd, dev->base + PIPE_REG_COMMAND);
 	spin_unlock_irqrestore(&dev->lock, flags);
 }
@@ -330,12 +330,12 @@ static ssize_t goldfish_pipe_read_write(struct file *filp, char __user *buffer,
 		if (access_with_param(dev,
 				      is_write ? CMD_WRITE_BUFFER : CMD_READ_BUFFER,
 				      xaddr, avail, pipe, &status)) {
-			gf_write64((u64)(unsigned long)pipe,
-				   dev->base + PIPE_REG_CHANNEL,
-				   dev->base + PIPE_REG_CHANNEL_HIGH);
+			gf_write_ptr(pipe, dev->base + PIPE_REG_CHANNEL,
+				     dev->base + PIPE_REG_CHANNEL_HIGH);
 			writel(avail, dev->base + PIPE_REG_SIZE);
-			gf_write64(xaddr, dev->base + PIPE_REG_ADDRESS,
-				dev->base + PIPE_REG_ADDRESS_HIGH);
+			gf_write_ptr((void *)xaddr,
+				     dev->base + PIPE_REG_ADDRESS,
+				     dev->base + PIPE_REG_ADDRESS_HIGH);
 			writel(is_write ? CMD_WRITE_BUFFER : CMD_READ_BUFFER,
 			       dev->base + PIPE_REG_COMMAND);
 			status = readl(dev->base + PIPE_REG_STATUS);
