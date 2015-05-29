@@ -122,7 +122,6 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
 }
 
 struct mpidr_hash mpidr_hash;
-#ifdef CONFIG_SMP
 /**
  * smp_build_mpidr_hash - Pre-compute shifts required at each affinity
  *			  level in order to build a linear index from an
@@ -188,7 +187,6 @@ static void __init smp_build_mpidr_hash(void)
 		pr_warn("Large number of MPIDR hash buckets detected\n");
 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
 }
-#endif
 
 static void __init setup_machine_fdt(phys_addr_t dt_phys)
 {
@@ -284,9 +282,7 @@ void __init setup_arch(char **cmdline_p)
 		acpi_init_cpus();
 	}
 
-#ifdef CONFIG_SMP
 	smp_build_mpidr_hash();
-#endif
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
