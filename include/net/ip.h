@@ -365,6 +365,8 @@ static inline void inet_set_txhash(struct sock *sk)
 	struct inet_sock *inet = inet_sk(sk);
 	struct flow_keys keys;
 
+	memset(&keys, 0, sizeof(keys));
+
 	keys.addrs.src = inet->inet_saddr;
 	keys.addrs.dst = inet->inet_daddr;
 	keys.ports.port16[0] = inet->inet_sport;
