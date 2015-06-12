@@ -179,6 +179,8 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 	dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) returned 0x%x\n",
 		__func__, smcnr, a0, a1, a2, ret);
 
+	WARN_ONCE(ret == SM_ERR_PANIC, "trusty crashed");
+
 	mutex_unlock(&s->smc_lock);
 
 	return ret;

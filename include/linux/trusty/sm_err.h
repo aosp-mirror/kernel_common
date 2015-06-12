@@ -34,5 +34,6 @@
 #define SM_ERR_NOT_SUPPORTED		-8
 #define SM_ERR_NOT_ALLOWED		-9	/* SMC call not allowed */
 #define SM_ERR_END_OF_INPUT		-10
+#define SM_ERR_PANIC			-11	/* Secure OS crashed */
 
 #endif
