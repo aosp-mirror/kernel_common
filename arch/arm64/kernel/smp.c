@@ -636,7 +636,7 @@ static void custom_ipi_enable(struct irq_data *data)
 	 * Always trigger a new ipi on enable. This only works for clients
 	 * that then clear the ipi before unmasking interrupts.
 	 */
-	smp_cross_call(cpumask_of(smp_processor_id()), data->irq);
+	smp_cross_call(cpumask_of(smp_processor_id()), data->hwirq);
 }
 
 static void custom_ipi_disable(struct irq_data *data)
@@ -663,9 +663,47 @@ static void handle_custom_ipi_irq(unsigned int irq, struct irq_desc *desc)
 	handle_percpu_devid_irq(irq, desc);
 }
 
+static int custom_ipi_domain_map(struct irq_domain *d, unsigned int irq,
+				 irq_hw_number_t hw)
+{
+	if (hw < IPI_CUSTOM_FIRST || hw > IPI_CUSTOM_LAST) {
+		pr_err("hwirq-%u is not in supported range for CustomIPI IRQ domain\n",
+		       (uint)hw);
+		return -EINVAL;
+	}
+
+	irq_set_percpu_devid(irq);
+	irq_set_chip_and_handler(irq, &custom_ipi_chip, handle_custom_ipi_irq);
+	set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
+	return 0;
+}
+
+static const struct irq_domain_ops custom_ipi_domain_ops = {
+	.map = custom_ipi_domain_map,
+};
+
 static int __init smp_custom_ipi_init(void)
 {
 	int ipinr;
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, "android,CustomIPI");
+	if (np) {
+		/*
+		 * Register linear irq doman to cover the whole IPI range
+		 * even though we are only using part of it. Proper IRQ
+		 * range check will be done by an implementation of mapping
+		 * routine.
+		 */
+		pr_info("Initilizing CustomIPI irq domain\n");
+		ipi_custom_irq_domain =
+			irq_domain_add_linear(np,
+					      IPI_CUSTOM_LAST + 1,
+					      &custom_ipi_domain_ops,
+					      NULL);
+		WARN_ON(!ipi_custom_irq_domain);
+		return 0;
+	}
 
 	for (ipinr = IPI_CUSTOM_FIRST; ipinr <= IPI_CUSTOM_LAST; ipinr++) {
 		irq_set_percpu_devid(ipinr);
@@ -678,6 +716,7 @@ static int __init smp_custom_ipi_init(void)
 					IPI_CUSTOM_FIRST, IPI_CUSTOM_FIRST,
 					&irq_domain_simple_ops,
 					&custom_ipi_chip);
+	WARN_ON(!ipi_custom_irq_domain);
 
 	return 0;
 }
