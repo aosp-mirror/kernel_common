@@ -2182,12 +2182,13 @@ static void batadv_tt_req_node_put(struct batadv_tt_req_node *tt_req_node)
 
 static void batadv_tt_req_list_free(struct batadv_priv *bat_priv)
 {
-	struct batadv_tt_req_node *node, *safe;
+	struct batadv_tt_req_node *node;
+	struct hlist_node *safe;
 
 	spin_lock_bh(&bat_priv->tt.req_list_lock);
 
-	list_for_each_entry_safe(node, safe, &bat_priv->tt.req_list, list) {
-		list_del_init(&node->list);
+	hlist_for_each_entry_safe(node, safe, &bat_priv->tt.req_list, list) {
+		hlist_del_init(&node->list);
 		batadv_tt_req_node_put(node);
 	}
 
@@ -2217,13 +2218,14 @@ static void batadv_tt_save_orig_buffer(struct batadv_priv *bat_priv,
 
 static void batadv_tt_req_purge(struct batadv_priv *bat_priv)
 {
-	struct batadv_tt_req_node *node, *safe;
+	struct batadv_tt_req_node *node;
+	struct hlist_node *safe;
 
 	spin_lock_bh(&bat_priv->tt.req_list_lock);
-	list_for_each_entry_safe(node, safe, &bat_priv->tt.req_list, list) {
+	hlist_for_each_entry_safe(node, safe, &bat_priv->tt.req_list, list) {
 		if (batadv_has_timed_out(node->issued_at,
 					 BATADV_TT_REQUEST_TIMEOUT)) {
-			list_del_init(&node->list);
+			hlist_del_init(&node->list);
 			batadv_tt_req_node_put(node);
 		}
 	}
@@ -2240,7 +2242,7 @@ batadv_new_tt_req_node(struct batadv_priv *bat_priv,
 	struct batadv_tt_req_node *tt_req_node_tmp, *tt_req_node = NULL;
 
 	spin_lock_bh(&bat_priv->tt.req_list_lock);
-	list_for_each_entry(tt_req_node_tmp, &bat_priv->tt.req_list, list) {
+	hlist_for_each_entry(tt_req_node_tmp, &bat_priv->tt.req_list, list) {
 		if (batadv_compare_eth(tt_req_node_tmp, orig_node) &&
 		    !batadv_has_timed_out(tt_req_node_tmp->issued_at,
 					  BATADV_TT_REQUEST_TIMEOUT))
@@ -2256,7 +2258,7 @@ batadv_new_tt_req_node(struct batadv_priv *bat_priv,
 	tt_req_node->issued_at = jiffies;
 
 	kref_get(&tt_req_node->refcount);
-	list_add(&tt_req_node->list, &bat_priv->tt.req_list);
+	hlist_add_head(&tt_req_node->list, &bat_priv->tt.req_list);
 unlock:
 	spin_unlock_bh(&bat_priv->tt.req_list_lock);
 	return tt_req_node;
@@ -2509,8 +2511,8 @@ out:
 	if (ret && tt_req_node) {
 		spin_lock_bh(&bat_priv->tt.req_list_lock);
 		if (!hlist_unhashed(&tt_req_node->list)) {
-			/* list_del_init() verifies tt_req_node still is in the list */
-			list_del_init(&tt_req_node->list);
+			/* hlist_del_init() verifies tt_req_node still is in the list */
+			hlist_del_init(&tt_req_node->list);
 			batadv_tt_req_node_put(tt_req_node);
 		}
 		spin_unlock_bh(&bat_priv->tt.req_list_lock);
@@ -2912,7 +2914,8 @@ static void batadv_handle_tt_response(struct batadv_priv *bat_priv,
 				      struct batadv_tvlv_tt_data *tt_data,
 				      uint8_t *resp_src, uint16_t num_entries)
 {
-	struct batadv_tt_req_node *node, *safe;
+	struct batadv_tt_req_node *node;
+	struct hlist_node *safe;
 	struct batadv_orig_node *orig_node = NULL;
 	struct batadv_tvlv_tt_change *tt_change;
 	uint8_t *tvlv_ptr = (uint8_t *)tt_data;
@@ -2950,10 +2953,10 @@ static void batadv_handle_tt_response(struct batadv_priv *bat_priv,
 
 	/* Delete the tt_req_node from pending tt_requests list */
 	spin_lock_bh(&bat_priv->tt.req_list_lock);
-	list_for_each_entry_safe(node, safe, &bat_priv->tt.req_list, list) {
+	hlist_for_each_entry_safe(node, safe, &bat_priv->tt.req_list, list) {
 		if (!batadv_compare_eth(node->addr, resp_src))
 			continue;
-		list_del_init(&node->list);
+		hlist_del_init(&node->list);
 		batadv_tt_req_node_put(node);
 	}
 
