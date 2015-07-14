@@ -3606,7 +3606,6 @@ static int binder_transactions_show(struct seq_file *m, void *unused)
 static int binder_proc_show(struct seq_file *m, void *unused)
 {
 	struct binder_proc *itr;
-	struct hlist_node *pos;
 	struct binder_proc *proc = m->private;
 	struct hlist_node *pos;
 	int do_lock = !binder_debug_no_lock;
