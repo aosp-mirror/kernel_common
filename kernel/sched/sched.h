@@ -819,6 +819,8 @@ struct rq {
 
 	unsigned char		idle_balance;
 
+	unsigned int		misfit_task_load;
+
 	/* For active balancing */
 	int			active_balance;
 	int			push_cpu;
