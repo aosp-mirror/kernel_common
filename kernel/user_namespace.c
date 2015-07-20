@@ -11,6 +11,7 @@
 #include <linux/user_namespace.h>
 #include <linux/highuid.h>
 #include <linux/cred.h>
+#include <linux/proc_fs.h>
 
 static struct kmem_cache *user_ns_cachep __read_mostly;
 
