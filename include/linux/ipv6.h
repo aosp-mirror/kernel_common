@@ -58,6 +58,7 @@ struct ipv6_devconf {
 		bool initialized;
 		struct in6_addr secret;
 	} stable_secret;
+	__s32		use_oif_addrs_only;
 	void		*sysctl;
 };
 
