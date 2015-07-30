@@ -155,6 +155,8 @@ struct tipc_chan {
 static struct class *tipc_class;
 static unsigned int tipc_major;
 
+struct virtio_device *default_vdev;
+
 static DEFINE_IDR(tipc_devices);
 static DEFINE_MUTEX(tipc_devices_lock);
 
@@ -473,9 +475,27 @@ struct tipc_chan *tipc_create_channel(struct device *dev,
 				      const struct tipc_chan_ops *ops,
 				      void *ops_arg)
 {
-	struct virtio_device *vd =
-			container_of(dev, struct virtio_device, dev);
-	return vds_create_channel(vd->priv, ops, ops_arg);
+	struct virtio_device *vd;
+	struct tipc_chan *chan;
+	struct tipc_virtio_dev *vds;
+
+	mutex_lock(&tipc_devices_lock);
+	if (dev) {
+		vd = container_of(dev, struct virtio_device, dev);
+	} else {
+		vd = default_vdev;
+		if (!vd) {
+			mutex_unlock(&tipc_devices_lock);
+			return ERR_PTR(-ENOENT);
+		}
+	}
+	vds = vd->priv;
+	kref_get(&vds->refcount);
+	mutex_unlock(&tipc_devices_lock);
+
+	chan = vds_create_channel(vds, ops, ops_arg);
+	kref_put(&vds->refcount, _free_vds);
+	return chan;
 }
 EXPORT_SYMBOL(tipc_create_channel);
 
@@ -1191,6 +1211,12 @@ static void create_cdev_node(struct tipc_virtio_dev *vds,
 	int err;
 
 	mutex_lock(&tipc_devices_lock);
+
+	if (!default_vdev) {
+		kref_get(&vds->refcount);
+		default_vdev = vds->vdev;
+	}
+
 	if (vds->cdev_name[0] && !cdn->dev) {
 		kref_get(&vds->refcount);
 		err = _create_cdev_node(&vds->vdev->dev, cdn, vds->cdev_name);
@@ -1214,6 +1240,12 @@ static void destroy_cdev_node(struct tipc_virtio_dev *vds,
 		cdn->dev = NULL;
 		kref_put(&vds->refcount, _free_vds);
 	}
+
+	if (default_vdev == vds->vdev) {
+		default_vdev = NULL;
+		kref_put(&vds->refcount, _free_vds);
+	}
+
 	mutex_unlock(&tipc_devices_lock);
 }
 
