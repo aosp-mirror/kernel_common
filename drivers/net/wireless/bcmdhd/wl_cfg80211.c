@@ -119,8 +119,6 @@ u32 wl_dbg_level = WL_DBG_ERR;
 #define WL_IS_P2P_DEV_EVENT(e) ((e->emsg.ifidx == 0) && \
 		(e->emsg.bsscfgidx == P2PAPI_BSSCFG_DEVICE))
 
-#define COEX_DHCP
-
 #define WLAN_EID_SSID	0
 #define CH_MIN_5G_CHANNEL 34
 #define CH_MIN_2G_CHANNEL 1
@@ -10917,11 +10915,9 @@ s32 wl_cfg80211_attach(struct net_device *ndev, void *context)
 		goto cfg80211_attach_out;
 	}
 
-#if defined(COEX_DHCP)
 	cfg->btcoex_info = wl_cfg80211_btcoex_init(cfg->wdev->netdev);
 	if (!cfg->btcoex_info)
 		goto cfg80211_attach_out;
-#endif
 
 #if defined(WL_ENABLE_P2P_IF)
 	err = wl_cfg80211_attach_p2p(cfg);
@@ -10946,10 +10942,8 @@ void wl_cfg80211_detach(struct bcm_cfg80211 *cfg)
 
 	wl_add_remove_pm_enable_work(cfg, FALSE, WL_HANDLER_DEL);
 
-#if defined(COEX_DHCP)
 	wl_cfg80211_btcoex_deinit();
 	cfg->btcoex_info = NULL;
-#endif
 
 	wl_setup_rfkill(cfg, FALSE);
 #ifdef DEBUGFS_CFG80211
