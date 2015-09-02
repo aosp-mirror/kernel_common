@@ -55,8 +55,6 @@ struct btcoex_info {
 	struct net_device *dev;
 };
 
-static struct btcoex_info *btcoex_info_loc = NULL;
-
 /* TODO: clean up the BT-Coex code, it still have some legacy ioctl/iovar functions */
 
 /* use New SCO/eSCO smart YG suppression */
@@ -395,29 +393,30 @@ void* wl_cfg80211_btcoex_init(struct net_device *ndev)
 
 	INIT_WORK(&btco_inf->work, wl_cfg80211_bt_handler);
 
-	btcoex_info_loc = btco_inf;
 	return btco_inf;
 }
 
-void wl_cfg80211_btcoex_deinit()
+void wl_cfg80211_btcoex_deinit(void *inf)
 {
-	if (!btcoex_info_loc)
+	struct btcoex_info *btco_inf = inf;
+
+	if (!btco_inf)
 		return;
 
-	if (btcoex_info_loc->timer_on) {
-		btcoex_info_loc->timer_on = 0;
-		del_timer_sync(&btcoex_info_loc->timer);
+	if (btco_inf->timer_on) {
+		btco_inf->timer_on = 0;
+		del_timer_sync(&btco_inf->timer);
 	}
 
-	cancel_work_sync(&btcoex_info_loc->work);
+	cancel_work_sync(&btco_inf->work);
 
-	kfree(btcoex_info_loc);
+	kfree(btco_inf);
 }
 
 int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *command)
 {
-
-	struct btcoex_info *btco_inf = btcoex_info_loc;
+	struct bcm_cfg80211 *cfg = wl_get_cfg(dev);
+	struct btcoex_info *btco_inf = cfg->btcoex_info;
 	char powermode_val = 0;
 	char buf_reg66va_dhcp_on[8] = { 66, 00, 00, 00, 0x10, 0x27, 0x00, 0x00 };
 	char buf_reg41va_dhcp_on[8] = { 41, 00, 00, 00, 0x33, 0x00, 0x00, 0x00 };

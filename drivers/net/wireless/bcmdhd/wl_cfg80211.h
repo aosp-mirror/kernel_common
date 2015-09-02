@@ -776,6 +776,9 @@ wl_get_netinfo_by_netdev(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 	}
 	return NULL;
 }
+
+struct bcm_cfg80211 *wl_get_cfg(struct net_device *ndev);
+
 #define bcmcfg_to_wiphy(cfg) (cfg->wdev->wiphy)
 #define bcmcfg_to_prmry_ndev(cfg) (cfg->wdev->netdev)
 #define bcmcfg_to_prmry_wdev(cfg) (cfg->wdev)
@@ -895,7 +898,7 @@ extern struct bcm_cfg80211 *wl_get_cfg(struct net_device *ndev);
 
 /* btcoex functions */
 void* wl_cfg80211_btcoex_init(struct net_device *ndev);
-void wl_cfg80211_btcoex_deinit(void);
+void wl_cfg80211_btcoex_deinit(void *);
 
 #ifdef WL_SUPPORT_AUTO_CHANNEL
 #define CHANSPEC_BUF_SIZE	1024
