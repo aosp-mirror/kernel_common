@@ -17,14 +17,14 @@
 #include <net/flow_dissector.h>
 #include <scsi/fc/fc_fcoe.h>
 
-static bool skb_flow_dissector_uses_key(struct flow_dissector *flow_dissector,
-					enum flow_dissector_key_id key_id)
+static bool dissector_uses_key(const struct flow_dissector *flow_dissector,
+			       enum flow_dissector_key_id key_id)
 {
 	return flow_dissector->used_keys & (1 << key_id);
 }
 
-static void skb_flow_dissector_set_key(struct flow_dissector *flow_dissector,
-				       enum flow_dissector_key_id key_id)
+static void dissector_set_key(struct flow_dissector *flow_dissector,
+			      enum flow_dissector_key_id key_id)
 {
 	flow_dissector->used_keys |= (1 << key_id);
 }
@@ -49,20 +49,20 @@ void skb_flow_dissector_init(struct flow_dissector *flow_dissector,
 		 * boundaries of unsigned short.
 		 */
 		BUG_ON(key->offset > USHRT_MAX);
-		BUG_ON(skb_flow_dissector_uses_key(flow_dissector,
-						   key->key_id));
+		BUG_ON(dissector_uses_key(flow_dissector,
+					  key->key_id));
 
-		skb_flow_dissector_set_key(flow_dissector, key->key_id);
+		dissector_set_key(flow_dissector, key->key_id);
 		flow_dissector->offset[key->key_id] = key->offset;
 	}
 
 	/* Ensure that the dissector always includes control and basic key.
 	 * That way we are able to avoid handling lack of these in fast path.
 	 */
-	BUG_ON(!skb_flow_dissector_uses_key(flow_dissector,
-					    FLOW_DISSECTOR_KEY_CONTROL));
-	BUG_ON(!skb_flow_dissector_uses_key(flow_dissector,
-					    FLOW_DISSECTOR_KEY_BASIC));
+	BUG_ON(!dissector_uses_key(flow_dissector,
+				   FLOW_DISSECTOR_KEY_CONTROL));
+	BUG_ON(!dissector_uses_key(flow_dissector,
+				   FLOW_DISSECTOR_KEY_BASIC));
 }
 EXPORT_SYMBOL(skb_flow_dissector_init);
 
@@ -163,8 +163,8 @@ ip:
 		if (ip_is_fragment(iph))
 			ip_proto = 0;
 
-		if (!skb_flow_dissector_uses_key(flow_dissector,
-						 FLOW_DISSECTOR_KEY_IPV4_ADDRS))
+		if (!dissector_uses_key(flow_dissector,
+					FLOW_DISSECTOR_KEY_IPV4_ADDRS))
 			break;
 		key_addrs = skb_flow_dissector_target(flow_dissector,
 						      FLOW_DISSECTOR_KEY_IPV4_ADDRS,
@@ -185,8 +185,8 @@ ipv6:
 		ip_proto = iph->nexthdr;
 		nhoff += sizeof(struct ipv6hdr);
 
-		if (!skb_flow_dissector_uses_key(flow_dissector,
-						 FLOW_DISSECTOR_KEY_IPV6_HASH_ADDRS))
+		if (!dissector_uses_key(flow_dissector,
+					FLOW_DISSECTOR_KEY_IPV6_HASH_ADDRS))
 			break;
 		key_addrs = skb_flow_dissector_target(flow_dissector,
 						      FLOW_DISSECTOR_KEY_IPV6_HASH_ADDRS,
@@ -206,8 +206,8 @@ ipv6:
 			key_basic->ip_proto = ip_proto;
 			key_control->thoff = (u16)nhoff;
 
-			if (!skb_flow_dissector_uses_key(flow_dissector,
-							 FLOW_DISSECTOR_KEY_PORTS))
+			if (!dissector_uses_key(flow_dissector,
+						FLOW_DISSECTOR_KEY_PORTS))
 				break;
 			key_ports = skb_flow_dissector_target(flow_dissector,
 							      FLOW_DISSECTOR_KEY_PORTS,
@@ -317,8 +317,8 @@ ipv6:
 	key_basic->ip_proto = ip_proto;
 	key_control->thoff = (u16)nhoff;
 
-	if (skb_flow_dissector_uses_key(flow_dissector,
-					FLOW_DISSECTOR_KEY_PORTS)) {
+	if (dissector_uses_key(flow_dissector,
+			       FLOW_DISSECTOR_KEY_PORTS)) {
 		key_ports = skb_flow_dissector_target(flow_dissector,
 						      FLOW_DISSECTOR_KEY_PORTS,
 						      target_container);
@@ -336,18 +336,21 @@ static __always_inline void __flow_hash_secret_init(void)
 	net_get_random_once(&hashrnd, sizeof(hashrnd));
 }
 
-static __always_inline u32 __flow_hash_words(u32 *words, u32 length, u32 keyval)
+static __always_inline u32 __flow_hash_words(const u32 *words, u32 length,
+					     u32 keyval)
 {
 	return jhash2(words, length, keyval);
 }
 
-static inline void *flow_keys_hash_start(struct flow_keys *flow)
+static inline const u32 *flow_keys_hash_start(const struct flow_keys *flow)
 {
+	const void *p = flow;
+
 	BUILD_BUG_ON(FLOW_KEYS_HASH_OFFSET % sizeof(u32));
-	return (void *)flow + FLOW_KEYS_HASH_OFFSET;
+	return (const u32 *)(p + FLOW_KEYS_HASH_OFFSET);
 }
 
-static inline size_t flow_keys_hash_length(struct flow_keys *flow)
+static inline size_t flow_keys_hash_length(const struct flow_keys *flow)
 {
 	BUILD_BUG_ON((sizeof(*flow) - FLOW_KEYS_HASH_OFFSET) % sizeof(u32));
 	return (sizeof(*flow) - FLOW_KEYS_HASH_OFFSET) / sizeof(u32);
@@ -365,7 +368,7 @@ static inline u32 __flow_hash_from_keys(struct flow_keys *keys, u32 keyval)
 		swap(keys->ports.port16[0], keys->ports.port16[1]);
 	}
 
-	hash = __flow_hash_words((u32 *)flow_keys_hash_start(keys),
+	hash = __flow_hash_words(flow_keys_hash_start(keys),
 				 flow_keys_hash_length(keys), keyval);
 	if (!hash)
 		hash = 1;
