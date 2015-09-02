@@ -42,16 +42,13 @@ extern void dhd_pktfilter_offload_enable(dhd_pub_t * dhd, char *arg, int enable,
 #endif
 
 struct btcoex_info {
-	struct timer_list timer;
-	u32 timer_ms;
-	u32 timer_on;
 	u32 ts_dhcp_start;	/* ms ts ecord time stats */
 	u32 ts_dhcp_ok;		/* ms ts ecord time stats */
 	bool dhcp_done;	/* flag, indicates that host done with
 					 * dhcp before t1/t2 expiration
 					 */
 	s32 bt_state;
-	struct work_struct work;
+	struct delayed_work work;
 	struct net_device *dev;
 };
 
@@ -62,7 +59,7 @@ struct btcoex_info {
 /* this flag boost wifi pkt priority to max, caution: -not fair to sco */
 #define BT_DHCP_USE_FLAGS
 /* T1 start SCO/ESCo priority suppression */
-#define BT_DHCP_OPPR_WIN_TIME	2500
+#define BT_DHCP_OPPR_WIN_TIME		2500
 /* T2 turn off SCO/SCO supperesion is (timeout) */
 #define BT_DHCP_FLAG_FORCE_TIME 5500
 
@@ -293,24 +290,10 @@ wl_cfg80211_bt_setflag(struct net_device *dev, bool set)
 #endif
 }
 
-static void wl_cfg80211_bt_timerfunc(ulong data)
-{
-	struct btcoex_info *bt_local = (struct btcoex_info *)data;
-	WL_TRACE(("Enter\n"));
-	bt_local->timer_on = 0;
-	schedule_work(&bt_local->work);
-}
-
 static void wl_cfg80211_bt_handler(struct work_struct *work)
 {
-	struct btcoex_info *btcx_inf;
-
-	btcx_inf = container_of(work, struct btcoex_info, work);
-
-	if (btcx_inf->timer_on) {
-		btcx_inf->timer_on = 0;
-		del_timer_sync(&btcx_inf->timer);
-	}
+	struct btcoex_info *btcx_inf = container_of(work, struct btcoex_info,
+						    work.work);
 
 	switch (btcx_inf->bt_state) {
 		case BT_DHCP_START:
@@ -320,9 +303,8 @@ static void wl_cfg80211_bt_handler(struct work_struct *work)
 			WL_TRACE(("bt_dhcp stm: started \n"));
 
 			btcx_inf->bt_state = BT_DHCP_OPPR_WIN;
-			mod_timer(&btcx_inf->timer,
-				jiffies + msecs_to_jiffies(BT_DHCP_OPPR_WIN_TIME));
-			btcx_inf->timer_on = 1;
+			schedule_delayed_work(&btcx_inf->work,
+				msecs_to_jiffies(BT_DHCP_OPPR_WIN_TIME));
 			break;
 
 		case BT_DHCP_OPPR_WIN:
@@ -338,9 +320,8 @@ static void wl_cfg80211_bt_handler(struct work_struct *work)
 			if (btcx_inf->dev)
 				wl_cfg80211_bt_setflag(btcx_inf->dev, TRUE);
 			btcx_inf->bt_state = BT_DHCP_FLAG_FORCE_TIMEOUT;
-			mod_timer(&btcx_inf->timer,
-				jiffies + msecs_to_jiffies(BT_DHCP_FLAG_FORCE_TIME));
-			btcx_inf->timer_on = 1;
+			schedule_delayed_work(&btcx_inf->work,
+				msecs_to_jiffies(BT_DHCP_FLAG_FORCE_TIME));
 			break;
 
 		case BT_DHCP_FLAG_FORCE_TIMEOUT:
@@ -357,7 +338,6 @@ static void wl_cfg80211_bt_handler(struct work_struct *work)
 				wl_cfg80211_bt_setflag(btcx_inf->dev, FALSE);
 btc_coex_idle:
 			btcx_inf->bt_state = BT_DHCP_IDLE;
-			btcx_inf->timer_on = 0;
 			break;
 
 		default:
@@ -365,7 +345,6 @@ btc_coex_idle:
 			if (btcx_inf->dev)
 				wl_cfg80211_bt_setflag(btcx_inf->dev, FALSE);
 			btcx_inf->bt_state = BT_DHCP_IDLE;
-			btcx_inf->timer_on = 0;
 			break;
 	}
 
@@ -383,15 +362,10 @@ void* wl_cfg80211_btcoex_init(struct net_device *ndev)
 	btco_inf->bt_state = BT_DHCP_IDLE;
 	btco_inf->ts_dhcp_start = 0;
 	btco_inf->ts_dhcp_ok = 0;
-	/* Set up timer for BT  */
-	btco_inf->timer_ms = 10;
-	init_timer(&btco_inf->timer);
-	btco_inf->timer.data = (ulong)btco_inf;
-	btco_inf->timer.function = wl_cfg80211_bt_timerfunc;
 
 	btco_inf->dev = ndev;
 
-	INIT_WORK(&btco_inf->work, wl_cfg80211_bt_handler);
+	INIT_DELAYED_WORK(&btco_inf->work, wl_cfg80211_bt_handler);
 
 	return btco_inf;
 }
@@ -400,17 +374,10 @@ void wl_cfg80211_btcoex_deinit(void *inf)
 {
 	struct btcoex_info *btco_inf = inf;
 
-	if (!btco_inf)
-		return;
-
-	if (btco_inf->timer_on) {
-		btco_inf->timer_on = 0;
-		del_timer_sync(&btco_inf->timer);
+	if (btco_inf) {
+		cancel_delayed_work_sync(&btco_inf->work);
+		kfree(btco_inf);
 	}
-
-	cancel_work_sync(&btco_inf->work);
-
-	kfree(btco_inf);
 }
 
 int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *command)
@@ -474,10 +441,9 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 						sizeof(buf_reg68va_dhcp_on));
 					saved_status = TRUE;
 
+					WL_TRACE(("enable BT DHCP Work\n"));
 					btco_inf->bt_state = BT_DHCP_START;
-					btco_inf->timer_on = 1;
-					mod_timer(&btco_inf->timer, btco_inf->timer.expires);
-					WL_TRACE(("enable BT DHCP Timer\n"));
+					mod_delayed_work(system_wq, &btco_inf->work, 0);
 				}
 		}
 		else if (saved_status == TRUE) {
@@ -501,18 +467,11 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 
 		/* Restoring PM mode */
 
-		/* Stop any bt timer because DHCP session is done */
-		WL_TRACE(("disable BT DHCP Timer\n"));
-		if (btco_inf->timer_on) {
-			btco_inf->timer_on = 0;
-			del_timer_sync(&btco_inf->timer);
-
-			if (btco_inf->bt_state != BT_DHCP_IDLE) {
+		if (btco_inf->bt_state != BT_DHCP_IDLE) {
 			/* need to restore original btc flags & extra btc params */
-				WL_TRACE(("bt->bt_state:%d\n", btco_inf->bt_state));
-				/* wake up btcoex thread to restore btlags+params  */
-				schedule_work(&btco_inf->work);
-			}
+			WL_TRACE(("bt->bt_state:%d\n", btco_inf->bt_state));
+			/* wake up btcoex thread to restore btlags+params  */
+			mod_delayed_work(system_wq, &btco_inf->work, 0);
 		}
 
 		/* Restoring btc_flag paramter anyway */
