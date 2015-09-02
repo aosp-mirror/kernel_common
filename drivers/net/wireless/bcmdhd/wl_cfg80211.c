@@ -119,7 +119,6 @@ u32 wl_dbg_level = WL_DBG_ERR;
 #define WL_IS_P2P_DEV_EVENT(e) ((e->emsg.ifidx == 0) && \
 		(e->emsg.bsscfgidx == P2PAPI_BSSCFG_DEVICE))
 
-#define DNGL_FUNC(func, parameters) func parameters
 #define COEX_DHCP
 
 #define WLAN_EID_SSID	0
@@ -1524,7 +1523,7 @@ wl_cfg80211_add_virtual_iface(struct wiphy *wiphy,
 				dhd_mode = DHD_FLAG_P2P_GC_MODE;
 			else if (type == NL80211_IFTYPE_P2P_GO)
 				dhd_mode = DHD_FLAG_P2P_GO_MODE;
-			DNGL_FUNC(dhd_cfg80211_set_p2p_info, (cfg, dhd_mode));
+			dhd_cfg80211_set_p2p_info(cfg, dhd_mode);
 			/* reinitialize completion to clear previous count */
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 13, 0))
 			INIT_COMPLETION(cfg->iface_disable);
@@ -1619,7 +1618,7 @@ wl_cfg80211_del_virtual_iface(struct wiphy *wiphy, bcm_struct_cfgdev *cfgdev)
 
 			memset(&cfg->if_event_info, 0, sizeof(cfg->if_event_info));
 			wl_set_p2p_status(cfg, IF_DELETING);
-			DNGL_FUNC(dhd_cfg80211_clean_p2p_info, (cfg));
+			dhd_cfg80211_clean_p2p_info(cfg);
 
 			/* for GO */
 			if (wl_get_mode_by_netdev(cfg, dev) == WL_MODE_AP) {
@@ -10725,14 +10724,14 @@ static s32 wl_init_priv(struct bcm_cfg80211 *cfg)
 	wl_init_conf(cfg->conf);
 	wl_init_prof(cfg, ndev);
 	wl_link_down(cfg);
-	DNGL_FUNC(dhd_cfg80211_init, (cfg));
+	dhd_cfg80211_init(cfg);
 
 	return err;
 }
 
 static void wl_deinit_priv(struct bcm_cfg80211 *cfg)
 {
-	DNGL_FUNC(dhd_cfg80211_deinit, (cfg));
+	dhd_cfg80211_deinit(cfg);
 	wl_destroy_event_handler(cfg);
 	wl_flush_eq(cfg);
 	wl_link_down(cfg);
@@ -11704,7 +11703,7 @@ static s32 __wl_cfg80211_down(struct bcm_cfg80211 *cfg)
 		wl_cfg80211_del_iface(cfg->wdev->wiphy, cfg->bss_cfgdev);
 #endif /* defined (DUAL_STA) || defined (DUAL_STA_STATIC_IF) */
 
-	DNGL_FUNC(dhd_cfg80211_down, (cfg));
+	dhd_cfg80211_down(cfg);
 
 	return err;
 }
