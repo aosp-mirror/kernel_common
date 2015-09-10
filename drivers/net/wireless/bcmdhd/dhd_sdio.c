@@ -6586,6 +6586,7 @@ extern bool
 dhd_bus_watchdog(dhd_pub_t *dhdp)
 {
 	dhd_bus_t *bus;
+	bool ret = FALSE;
 
 	DHD_TIMER(("%s: Enter\n", __FUNCTION__));
 
@@ -6599,14 +6600,19 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 		return FALSE;
 	}
 
+	dhd_os_sdlock(bus->dhd);
+
 	/* Ignore the timer if simulating bus down */
 	if (!SLPAUTO_ENAB(bus) && bus->sleeping)
-		return FALSE;
+		goto wd_end;
 
 	if (dhdp->busstate == DHD_BUS_DOWN)
-		return FALSE;
+		goto wd_end;
 
-	dhd_os_sdlock(bus->dhd);
+	if (!dhdp->up)
+		goto wd_end;
+
+	ret = TRUE;
 
 	/* Poll period: check device if appropriate. */
 	if (!SLPAUTO_ENAB(bus) && (bus->poll && (++bus->polltick >= bus->pollrate))) {
@@ -6708,9 +6714,10 @@ dhd_bus_watchdog(dhd_pub_t *dhdp)
 	}
 #endif /* DHD_USE_IDLECOUNT */
 
+wd_end:
 	dhd_os_sdunlock(bus->dhd);
 
-	return bus->ipend;
+	return (ret ? bus->ipend : FALSE);
 }
 
 #ifdef DHD_DEBUG
