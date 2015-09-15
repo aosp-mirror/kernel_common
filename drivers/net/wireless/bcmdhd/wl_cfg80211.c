@@ -10739,7 +10739,7 @@ static void wl_deinit_priv(struct bcm_cfg80211 *cfg)
 }
 
 #if defined(WL_ENABLE_P2P_IF)
-static s32 wl_cfg80211_attach_p2p(struct bcm_cfg80211 *cfg)
+static int wl_cfg80211_attach_p2p(struct bcm_cfg80211 *cfg)
 {
 	WL_TRACE(("Enter \n"));
 
@@ -10751,30 +10751,11 @@ static s32 wl_cfg80211_attach_p2p(struct bcm_cfg80211 *cfg)
 	return 0;
 }
 
-static s32  wl_cfg80211_detach_p2p(struct bcm_cfg80211 *cfg)
+static void wl_cfg80211_detach_p2p(struct bcm_cfg80211 *cfg)
 {
-	struct wireless_dev *wdev;
-
-	WL_DBG(("Enter \n"));
-	if (!cfg) {
-		WL_ERR(("Invalid Ptr\n"));
-		return -EINVAL;
-	} else
-		wdev = cfg->p2p_wdev;
-
-	if (!wdev) {
-		WL_ERR(("Invalid Ptr\n"));
-		return -EINVAL;
-	}
+	WL_TRACE(("Enter \n"));
 
 	wl_cfgp2p_unregister_ndev(cfg);
-
-	cfg->p2p_wdev = NULL;
-	cfg->p2p_net = NULL;
-	WL_DBG(("Freeing 0x%08x \n", (unsigned int)wdev));
-	kfree(wdev);
-
-	return 0;
 }
 #endif
 
