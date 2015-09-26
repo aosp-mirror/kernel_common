@@ -689,6 +689,12 @@ struct freq_domain {
 	struct rcu_head rcu;
 };
 
+struct max_cpu_capacity {
+	raw_spinlock_t lock;
+	unsigned long val;
+	int cpu;
+};
+
 /*
  * We add the notion of a root-domain which will be used to define per-domain
  * variables. Each exclusive cpuset essentially defines an island domain by
@@ -743,7 +749,8 @@ struct root_domain {
 	cpumask_var_t		rto_mask;
 	struct cpupri		cpupri;
 
-	unsigned long		max_cpu_capacity;
+	/* Maximum cpu capacity in the system. */
+	struct max_cpu_capacity max_cpu_capacity;
 
 #ifdef CONFIG_ENERGY_MODEL
 	/*
@@ -758,6 +765,7 @@ extern struct root_domain def_root_domain;
 extern struct mutex sched_domains_mutex;
 
 extern void init_defrootdomain(void);
+extern void init_max_cpu_capacity(struct max_cpu_capacity *mcc);
 extern int sched_init_domains(const struct cpumask *cpu_map);
 extern void rq_attach_root(struct rq *rq, struct root_domain *rd);
 extern void sched_get_rd(struct root_domain *rd);
