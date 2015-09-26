@@ -696,6 +696,12 @@ static inline bool sched_asym_prefer(int a, int b)
 	return arch_asym_cpu_priority(a) > arch_asym_cpu_priority(b);
 }
 
+struct max_cpu_capacity {
+	raw_spinlock_t lock;
+	unsigned long val;
+	int cpu;
+};
+
 /*
  * We add the notion of a root-domain which will be used to define per-domain
  * variables. Each exclusive cpuset essentially defines an island domain by
@@ -750,7 +756,8 @@ struct root_domain {
 	cpumask_var_t		rto_mask;
 	struct cpupri		cpupri;
 
-	unsigned long		max_cpu_capacity;
+	/* Maximum cpu capacity in the system. */
+	struct max_cpu_capacity max_cpu_capacity;
 };
 
 extern struct root_domain def_root_domain;
@@ -1680,6 +1687,10 @@ static inline void sched_update_tick_dependency(struct rq *rq)
 #else
 static inline int sched_tick_offload_init(void) { return 0; }
 static inline void sched_update_tick_dependency(struct rq *rq) { }
+#endif
+
+#ifdef CONFIG_SMP
+extern void init_max_cpu_capacity(struct max_cpu_capacity *mcc);
 #endif
 
 static inline void add_nr_running(struct rq *rq, unsigned count)
