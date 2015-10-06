@@ -3323,17 +3323,18 @@ dhdsdio_doiovar(dhd_bus_t *bus, const bcm_iovar_t *vi, uint32 actionid, const ch
 	DHD_TRACE(("%s: Enter, action %d name %s params %p plen %d arg %p len %d val_size %d\n",
 	           __FUNCTION__, actionid, name, params, plen, arg, len, val_size));
 
-	if ((bcmerror = bcm_iovar_lencheck(vi, arg, len, IOV_ISSET(actionid))) != 0)
+	/* Some ioctls use the bus */
+	dhd_os_sdlock(bus->dhd);
+
+	if ((bcmerror = bcm_iovar_lencheck(vi, arg, len, IOV_ISSET(actionid))) != 0) {
+		DHD_ERROR(("%s: error %d on len %d\n", __FUNCTION__, bcmerror, len));
 		goto exit;
+	}
 
 	if (plen >= (int)sizeof(int_val))
 		bcopy(params, &int_val, sizeof(int_val));
 
 	bool_val = (int_val != 0) ? TRUE : FALSE;
-
-
-	/* Some ioctls use the bus */
-	dhd_os_sdlock(bus->dhd);
 
 	/* Check if dongle is in reset. If so, only allow DEVRESET iovars */
 	if (bus->dhd->dongle_reset && !(actionid == IOV_SVAL(IOV_DEVRESET) ||
