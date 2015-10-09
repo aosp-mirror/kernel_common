@@ -44,6 +44,7 @@
 #include <linux/etherdevice.h>
 #include <linux/random.h>
 #include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <linux/ethtool.h>
 #include <linux/fcntl.h>
 #include <linux/fs.h>
@@ -393,7 +394,7 @@ typedef struct dhd_info {
 	spinlock_t	txqlock;
 	spinlock_t	dhd_lock;
 
-	struct semaphore sdsem;
+	struct mutex	sdmutex;
 	tsk_ctl_t	thr_dpc_ctl;
 	tsk_ctl_t	thr_wdt_ctl;
 
@@ -4808,7 +4809,7 @@ dhd_attach(osl_t *osh, struct dhd_bus *bus, uint bus_hdrlen)
 	dhd->thr_wdt_ctl.thr_pid = DHD_PID_KT_INVALID;
 
 	/* Initialize thread based operation and lock */
-	sema_init(&dhd->sdsem, 1);
+	mutex_init(&dhd->sdmutex);
 
 	/* Some DHD modules (e.g. cfg80211) configures operation mode based on firmware name.
 	 * This is indeed a hack but we have to make it work properly before we have a better
@@ -7325,7 +7326,7 @@ dhd_os_sdlock(dhd_pub_t *pub)
 	dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd_dpc_prio >= 0)
-		down(&dhd->sdsem);
+		mutex_lock(&dhd->sdmutex);
 	else
 		spin_lock_bh(&dhd->sdlock);
 }
@@ -7338,7 +7339,7 @@ dhd_os_sdunlock(dhd_pub_t *pub)
 	dhd = (dhd_info_t *)(pub->info);
 
 	if (dhd_dpc_prio >= 0)
-		up(&dhd->sdsem);
+		mutex_unlock(&dhd->sdmutex);
 	else
 		spin_unlock_bh(&dhd->sdlock);
 }
