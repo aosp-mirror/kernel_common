@@ -136,7 +136,7 @@ static void kick_vqs(struct work_struct *work)
 	mutex_unlock(&tctx->mlock);
 }
 
-static void trusty_virtio_notify(struct virtqueue *vq)
+static bool trusty_virtio_notify(struct virtqueue *vq)
 {
 	struct trusty_vring *tvr = vq->priv;
 	struct trusty_vdev *tvdev = tvr->tvdev;
@@ -144,6 +144,8 @@ static void trusty_virtio_notify(struct virtqueue *vq)
 
 	atomic_set(&tvr->needs_kick, 1);
 	schedule_work(&tctx->kick_vqs);
+
+	return true;
 }
 
 static int trusty_load_device_descr(struct trusty_ctx *tctx,
