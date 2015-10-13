@@ -724,6 +724,7 @@ struct tipc_msg_buf *dn_handle_msg(void *data, struct tipc_msg_buf *rxbuf)
 			 * incoming message
 			 */
 			pr_err("%s: discard incoming message\n", __func__);
+			newbuf = rxbuf;
 		}
 	}
 	mutex_unlock(&dn->lock);
