@@ -1301,7 +1301,8 @@ static void _handle_disc_req(struct tipc_virtio_dev *vds,
 	chan = vds_lookup_channel(vds, req->target);
 	if (chan) {
 		mutex_lock(&chan->lock);
-		if (chan->state == TIPC_CONNECTED) {
+		if (chan->state == TIPC_CONNECTED ||
+			chan->state == TIPC_CONNECTING) {
 			chan->state = TIPC_DISCONNECTED;
 			chan->remote = 0;
 			chan_trigger_event(chan, TIPC_CHANNEL_DISCONNECTED);
