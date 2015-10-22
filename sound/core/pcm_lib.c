@@ -1849,9 +1849,6 @@ void snd_pcm_period_elapsed(struct snd_pcm_substream *substream)
 	if (snd_BUG_ON(!substream))
 		return;
 
-	if (runtime->transfer_ack_begin)
-		runtime->transfer_ack_begin(substream);
-
 	snd_pcm_stream_lock_irqsave(substream, flags);
 	if (PCM_RUNTIME_CHECK(substream))
 		goto _unlock;
@@ -1867,8 +1864,6 @@ void snd_pcm_period_elapsed(struct snd_pcm_substream *substream)
 	kill_fasync(&runtime->fasync, SIGIO, POLL_IN);
  _unlock:
 	snd_pcm_stream_unlock_irqrestore(substream, flags);
-	if (runtime->transfer_ack_end)
-		runtime->transfer_ack_end(substream);
 }
 
 EXPORT_SYMBOL(snd_pcm_period_elapsed);
