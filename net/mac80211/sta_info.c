@@ -439,6 +439,7 @@ free:
 
 static int sta_info_insert_check(struct sta_info *sta)
 {
+	struct ieee80211_local *local = sta->local;
 	struct ieee80211_sub_if_data *sdata = sta->sdata;
 
 	/*
@@ -452,6 +453,19 @@ static int sta_info_insert_check(struct sta_info *sta)
 	if (WARN_ON(ether_addr_equal(sta->sta.addr, sdata->vif.addr) ||
 		    is_multicast_ether_addr(sta->sta.addr)))
 		return -EINVAL;
+
+	/* Strictly speaking this isn't necessary as we hold the mutex, but
+	 * the rhashtable code can't really deal with that distinction. We
+	 * do require the mutex for correctness though.
+	 */
+	rcu_read_lock();
+	lockdep_assert_held(&sdata->local->sta_mtx);
+	if (local->hw.flags & IEEE80211_HW_NEEDS_UNIQUE_STA_ADDR &&
+	    ieee80211_find_sta_by_ifaddr(&sdata->local->hw, sta->sta.addr, NULL)) {
+		rcu_read_unlock();
+		return -ENOTUNIQ;
+	}
+	rcu_read_unlock();
 
 	return 0;
 }
@@ -572,13 +586,14 @@ int sta_info_insert_rcu(struct sta_info *sta) __acquires(RCU)
 
 	might_sleep();
 
+	mutex_lock(&local->sta_mtx);
+
 	err = sta_info_insert_check(sta);
 	if (err) {
+		mutex_unlock(&local->sta_mtx);
 		rcu_read_lock();
 		goto out_free;
 	}
-
-	mutex_lock(&local->sta_mtx);
 
 	err = sta_info_insert_finish(sta);
 	if (err)

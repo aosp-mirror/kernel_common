@@ -1610,6 +1610,12 @@ struct ieee80211_tx_control {
  *
  * @IEEE80211_SINGLE_HW_SCAN_ON_ALL_BANDS: The HW supports scanning on all bands
  *	in one command, mac80211 doesn't have to run separate scans per band.
+ *
+ * @IEEE80211_HW_NEEDS_UNIQUE_STA_ADDR: Hardware (or driver) requires that each
+ *	station has a unique address, i.e. each station entry can be identified
+ *	by just its MAC address; this prevents, for example, the same station
+ *	from connecting to two virtual AP interfaces at the same time.
+ *
  */
 enum ieee80211_hw_flags {
 	IEEE80211_HW_HAS_RATE_CONTROL			= 1<<0,
@@ -1643,6 +1649,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_CHANCTX_STA_CSA			= 1<<28,
 	IEEE80211_HW_SUPPORTS_CLONED_SKBS		= 1<<29,
 	IEEE80211_SINGLE_HW_SCAN_ON_ALL_BANDS		= 1<<30,
+	IEEE80211_HW_NEEDS_UNIQUE_STA_ADDR		= 1<<31,
 };
 
 /**
