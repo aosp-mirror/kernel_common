@@ -2626,9 +2626,13 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 			I915_WRITE(SDEIIR, pch_iir);
 			ret = IRQ_HANDLED;
 			cpt_irq_handler(dev, pch_iir);
-		} else
-			DRM_ERROR("The master control interrupt lied (SDE)!\n");
-
+		} else {
+			/*
+			 * Like on previous PCH there seems to be something
+			 * fishy going on with forwarding PCH interrupts.
+			 */
+			DRM_DEBUG_DRIVER("The master control interrupt lied (SDE)!\n");
+		}
 	}
 
 	I915_WRITE(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
