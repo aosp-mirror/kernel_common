@@ -75,7 +75,7 @@ uint sd_divisor = 2;			/* Default 48MHz/2 = 24MHz */
 uint sd_power = 1;		/* Default to SD Slot powered ON */
 uint sd_clock = 1;		/* Default to SD Clock turned ON */
 uint sd_hiok = FALSE;	/* Don't use hi-speed mode by default */
-uint sd_msglevel = 0x01;
+uint sd_msglevel = SDH_ERROR_VAL;
 uint sd_use_dma = TRUE;
 
 #ifndef CUSTOM_RXCHAIN
