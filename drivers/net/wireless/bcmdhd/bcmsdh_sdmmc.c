@@ -922,6 +922,7 @@ sdioh_request_word(sdioh_info_t *sd, uint cmd_type, uint rw, uint func, uint add
 
 		sd_err(("bcmsdh_sdmmc: Failed to %s word, Err: %d\n",
 			rw ? "Write" : "Read", err_ret));
+		WARN_ON_ONCE(1);
 #if defined(MMC_SDIO_ABORT)
 		/* Any error on CMD53 transaction should abort that function using function 0. */
 		while (sdio_abort_retry--) {
