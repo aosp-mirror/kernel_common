@@ -918,6 +918,10 @@ sdioh_request_word(sdioh_info_t *sd, uint cmd_type, uint rw, uint func, uint add
 	sdio_release_host(sd->func[func]);
 
 	if (err_ret) {
+		int abort_err;
+
+		sd_err(("bcmsdh_sdmmc: Failed to %s word, Err: %d\n",
+			rw ? "Write" : "Read", err_ret));
 #if defined(MMC_SDIO_ABORT)
 		/* Any error on CMD53 transaction should abort that function using function 0. */
 		while (sdio_abort_retry--) {
@@ -929,18 +933,15 @@ sdioh_request_word(sdioh_info_t *sd, uint cmd_type, uint rw, uint func, uint add
 				 * As of this time, this is temporaray one
 				 */
 				sdio_writeb(sd->func[0],
-					func, SDIOD_CCCR_IOABORT, &err_ret);
+					func, SDIOD_CCCR_IOABORT, &abort_err);
 				sdio_release_host(sd->func[0]);
 			}
-			if (!err_ret)
+			if (!abort_err)
 				break;
 		}
-		if (err_ret)
+		if (abort_err)
+			sd_err(("bcmsdh_sdmmc: Failed to send abort: %d\n", abort_err));
 #endif /* MMC_SDIO_ABORT */
-		{
-			sd_err(("bcmsdh_sdmmc: Failed to %s word, Err: 0x%08x",
-				rw ? "Write" : "Read", err_ret));
-		}
 	}
 
 	return ((err_ret == 0) ? SDIOH_API_RC_SUCCESS : SDIOH_API_RC_FAIL);

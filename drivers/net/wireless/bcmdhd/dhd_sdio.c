@@ -486,7 +486,7 @@ do { \
 	if (retryvar) { \
 		bus->regfails += (retryvar-1); \
 		if (retryvar > retry_limit) { \
-			DHD_ERROR(("%s: FAILED" #regvar "READ, LINE %d\n", \
+			DHD_ERROR(("%s: FAILED " #regvar " READ, LINE %d\n", \
 			           __FUNCTION__, __LINE__)); \
 			regvar = 0; \
 		} \
