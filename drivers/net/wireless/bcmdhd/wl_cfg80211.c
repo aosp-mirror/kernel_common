@@ -9985,11 +9985,12 @@ static void wl_send_event(struct net_device *dev, uint32 event_type,
 static s32
 wl_cfg80211_netdev_notifier_call(struct notifier_block * nb,
 	unsigned long state,
-	void *ndev)
+	void *info)
 {
 	struct bcm_cfg80211 *cfg =
 		container_of(nb, struct bcm_cfg80211, netdev_notifier);
-	struct net_device *dev = ndev;
+	struct netdev_notifier_info *data = (struct netdev_notifier_info *)info;
+	struct net_device *dev = data->dev;
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 
 	/* We need to be careful when using passed in net_device since
@@ -10041,9 +10042,14 @@ wl_cfg80211_netdev_notifier_call(struct notifier_block * nb,
 		}
 
 		case NETDEV_UNREGISTER:
+		{
+			u32 orig_cnt = cfg->iface_cnt;
 			/* after calling list_del_rcu(&wdev->list) */
-			wl_dealloc_netinfo(cfg, ndev);
+			wl_dealloc_netinfo(cfg, dev);
+			if (orig_cnt == cfg->iface_cnt)
+				WL_ERR(("Failed to dealloc netinfo - count:%d!\n", orig_cnt));
 			break;
+		}
 		case NETDEV_GOING_DOWN:
 			/* At NETDEV_DOWN state, wdev_cleanup_work work will be called.
 			*  In front of door, the function checks
