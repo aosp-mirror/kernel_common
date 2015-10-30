@@ -250,8 +250,6 @@ typedef struct dhd_bus {
 
 	void		*glomd;			/* Packet containing glomming descriptor */
 	void		*glom;			/* Packet chain for glommed superframe */
-	uint		glomerr;		/* Glom packet read errors */
-
 	uint8		*rxbuf;			/* Buffer for receiving control packets */
 	uint		rxblen;			/* Allocated length of rxbuf */
 	uint8		*rxctl;			/* Aligned pointer into rxbuf */
@@ -4851,23 +4849,17 @@ dhdsdio_rxglom(dhd_bus_t *bus, uint8 rxseq, int pkt_wake)
 		bus->f2rxdata++;
 		ASSERT(errcode != BCME_PENDING);
 
-		/* On failure, kill the superframe, allow a couple retries */
+		/* On failure, kill the superframe */
 		if (errcode < 0) {
 			DHD_ERROR(("%s: glom read of %d bytes failed: %d\n",
 			           __FUNCTION__, dlen, errcode));
 			bus->dhd->rx_errors++;
-
-			if (bus->glomerr++ < 3) {
-				dhdsdio_rxfail(bus, TRUE, TRUE);
-			} else {
-				bus->glomerr = 0;
-				dhdsdio_rxfail(bus, TRUE, FALSE);
-				dhd_os_sdlock_rxq(bus->dhd);
-				PKTFREE(osh, bus->glom, FALSE);
-				dhd_os_sdunlock_rxq(bus->dhd);
-				bus->rxglomfail++;
-				bus->glom = NULL;
-			}
+			dhdsdio_rxfail(bus, TRUE, FALSE);
+			dhd_os_sdlock_rxq(bus->dhd);
+			PKTFREE(osh, bus->glom, FALSE);
+			dhd_os_sdunlock_rxq(bus->dhd);
+			bus->rxglomfail++;
+			bus->glom = NULL;
 			return 0;
 		}
 
@@ -4977,20 +4969,13 @@ dhdsdio_rxglom(dhd_bus_t *bus, uint8 rxseq, int pkt_wake)
 		}
 
 		if (errcode) {
-			/* Terminate frame on error, request a couple retries */
-			if (bus->glomerr++ < 3) {
-				/* Restore superframe header space */
-				PKTPUSH(osh, pfirst, sfdoff);
-				dhdsdio_rxfail(bus, TRUE, TRUE);
-			} else {
-				bus->glomerr = 0;
-				dhdsdio_rxfail(bus, TRUE, FALSE);
-				dhd_os_sdlock_rxq(bus->dhd);
-				PKTFREE(osh, bus->glom, FALSE);
-				dhd_os_sdunlock_rxq(bus->dhd);
-				bus->rxglomfail++;
-				bus->glom = NULL;
-			}
+			/* Terminate frame on error */
+			dhdsdio_rxfail(bus, TRUE, FALSE);
+			dhd_os_sdlock_rxq(bus->dhd);
+			PKTFREE(osh, bus->glom, FALSE);
+			dhd_os_sdunlock_rxq(bus->dhd);
+			bus->rxglomfail++;
+			bus->glom = NULL;
 			bus->nextlen = 0;
 			return 0;
 		}
