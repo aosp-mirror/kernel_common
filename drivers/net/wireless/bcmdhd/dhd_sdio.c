@@ -1003,6 +1003,10 @@ dhdsdio_clk_devsleep_iovar(dhd_bus_t *bus, bool on)
 		DHD_TRACE(("%s: clk before sleep: 0x%x\n", __FUNCTION__,
 			bcmsdh_cfg_read(bus->sdh, SDIO_FUNC_1,
 			SBSDIO_FUNC1_CHIPCLKCSR, &err)));
+
+		/* Dongle would not reponse to CMD19 in sleep so block retune */
+		bcmsdh_retune_hold(bus->sdh, TRUE);
+
 #ifdef USE_CMD14
 		err = bcmsdh_sleep(bus->sdh, TRUE);
 #else
@@ -1102,6 +1106,9 @@ dhdsdio_clk_devsleep_iovar(dhd_bus_t *bus, bool on)
 				err = BCME_NODEVICE;
 			}
 		}
+
+		/* Unblock retune */
+		bcmsdh_retune_hold(bus->sdh, FALSE);
 	}
 
 	/* Update if successful */

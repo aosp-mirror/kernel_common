@@ -259,4 +259,6 @@ extern bool bcmsdh_gpioin(void *sd, uint32 gpio);
 extern int bcmsdh_gpioouten(void *sd, uint32 gpio);
 extern int bcmsdh_gpioout(void *sd, uint32 gpio, bool enab);
 
+extern void bcmsdh_retune_hold(void *sdh, bool hold);
+
 #endif	/* _bcmsdh_h_ */

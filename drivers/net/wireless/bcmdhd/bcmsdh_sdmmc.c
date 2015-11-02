@@ -1457,3 +1457,14 @@ sdioh_gpio_init(sdioh_info_t *sd)
 {
 	return SDIOH_API_RC_FAIL;
 }
+
+void
+sdioh_retune_hold(sdioh_info_t *sd, bool hold)
+{
+	sdio_claim_host(sd->func[0]);
+	if (hold)
+		sdio_retune_hold_now(sd->func[0]);
+	else
+		sdio_retune_release(sd->func[0]);
+	sdio_release_host(sd->func[0]);
+}
