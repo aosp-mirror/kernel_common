@@ -5528,7 +5528,8 @@ dhdsdio_readframes(dhd_bus_t *bus, uint maxframes, bool *finished)
 		if (sdret < 0) {
 			DHD_ERROR(("%s: RXHEADER FAILED: %d\n", __FUNCTION__, sdret));
 			bus->rx_hdrfail++;
-			dhdsdio_rxfail(bus, TRUE, TRUE);
+			dhdsdio_rxfail(bus, TRUE, FALSE);
+			memset(bus->rxhdr, 0, SDPCM_HDRLEN);
 			continue;
 		}
 
