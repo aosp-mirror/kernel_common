@@ -699,7 +699,8 @@ int wl_android_wifi_on(struct net_device *dev)
 #if defined(BCMSDIO) || defined(BCMPCIE)
 		ret = dhd_net_bus_devreset(dev, FALSE);
 #ifdef BCMSDIO
-		dhd_net_bus_resume(dev, 1);
+		if (!ret)
+			dhd_net_bus_resume(dev, 1);
 #endif
 #endif /* BCMSDIO || BCMPCIE */
 #ifndef BCMPCIE
