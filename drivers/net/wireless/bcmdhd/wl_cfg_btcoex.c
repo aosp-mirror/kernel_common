@@ -35,23 +35,6 @@
 #include <dhdioctl.h>
 #include <wlioctl.h>
 
-#ifdef PKT_FILTER_SUPPORT
-extern uint dhd_pkt_filter_enable;
-extern uint dhd_master_mode;
-extern void dhd_pktfilter_offload_enable(dhd_pub_t * dhd, char *arg, int enable, int master_mode);
-#endif
-
-struct btcoex_info {
-	u32 ts_dhcp_start;	/* ms ts ecord time stats */
-	u32 ts_dhcp_ok;		/* ms ts ecord time stats */
-	bool dhcp_done;	/* flag, indicates that host done with
-					 * dhcp before t1/t2 expiration
-					 */
-	s32 bt_state;
-	struct delayed_work work;
-	struct net_device *dev;
-};
-
 /* TODO: clean up the BT-Coex code, it still have some legacy ioctl/iovar functions */
 
 /* use New SCO/eSCO smart YG suppression */
@@ -68,6 +51,26 @@ enum wl_cfg80211_btcoex_status {
 	BT_DHCP_START,
 	BT_DHCP_OPPR_WIN,
 	BT_DHCP_FLAG_FORCE_TIMEOUT
+};
+
+struct btcoex_info {
+	enum wl_cfg80211_btcoex_status bt_state;
+	struct delayed_work work;
+	struct net_device *dev;
+
+	u32 saved_reg66;
+	u32 saved_reg41;
+	u32 saved_reg68;
+	bool dhcp_saved_status;
+
+#ifdef BT_DHCP_eSCO_FIX
+	u32 saved_reg50;
+	u32 saved_reg51;
+	u32 saved_reg64;
+	u32 saved_reg65;
+	u32 saved_reg71;
+	bool esco_saved_status;
+#endif
 };
 
 /*
@@ -159,9 +162,9 @@ static bool btcoex_is_sco_active(struct net_device *dev)
 
 #if defined(BT_DHCP_eSCO_FIX)
 /* Enhanced BT COEX settings for eSCO compatibility during DHCP window */
-static int set_btc_esco_params(struct net_device *dev, bool trump_sco)
+static int set_btc_esco_params(struct btcoex_info *btco_inf, bool trump_sco)
 {
-	static bool saved_status = FALSE;
+	struct net_device *dev = btco_inf->dev;
 
 	char buf_reg50va_dhcp_on[8] =
 		{ 50, 00, 00, 00, 0x22, 0x80, 0x00, 0x00 };
@@ -174,34 +177,29 @@ static int set_btc_esco_params(struct net_device *dev, bool trump_sco)
 	char buf_reg71va_dhcp_on[8] =
 		{ 71, 00, 00, 00, 0x00, 0x00, 0x00, 0x00 };
 	uint32 regaddr;
-	static uint32 saved_reg50;
-	static uint32 saved_reg51;
-	static uint32 saved_reg64;
-	static uint32 saved_reg65;
-	static uint32 saved_reg71;
 
 	if (trump_sco) {
-		/* this should reduce eSCO agressive retransmit
+		/* this should reduce eSCO aggressive retransmit
 		 * w/o breaking it
 		 */
 
 		/* 1st save current */
-		WL_TRACE(("Do new SCO/eSCO coex algo {save &"
-			  "override}\n"));
-		if ((!dev_wlc_intvar_get_reg(dev, "btc_params", 50, &saved_reg50)) &&
-			(!dev_wlc_intvar_get_reg(dev, "btc_params", 51, &saved_reg51)) &&
-			(!dev_wlc_intvar_get_reg(dev, "btc_params", 64, &saved_reg64)) &&
-			(!dev_wlc_intvar_get_reg(dev, "btc_params", 65, &saved_reg65)) &&
-			(!dev_wlc_intvar_get_reg(dev, "btc_params", 71, &saved_reg71))) {
-			saved_status = TRUE;
+		WL_TRACE(("Do new SCO/eSCO coex algo {save & override}\n"));
+		if (!dev_wlc_intvar_get_reg(dev, "btc_params", 50, &btco_inf->saved_reg50) &&
+		    !dev_wlc_intvar_get_reg(dev, "btc_params", 51, &btco_inf->saved_reg51) &&
+		    !dev_wlc_intvar_get_reg(dev, "btc_params", 64, &btco_inf->saved_reg64) &&
+		    !dev_wlc_intvar_get_reg(dev, "btc_params", 65, &btco_inf->saved_reg65) &&
+		    !dev_wlc_intvar_get_reg(dev, "btc_params", 71, &btco_inf->saved_reg71)) {
+			btco_inf->esco_saved_status = TRUE;
 			WL_TRACE(("saved bt_params[50,51,64,65,71]:"
 				  "0x%x 0x%x 0x%x 0x%x 0x%x\n",
-				  saved_reg50, saved_reg51,
-				  saved_reg64, saved_reg65, saved_reg71));
+				  btco_inf->saved_reg50, btco_inf->saved_reg51,
+				  btco_inf->saved_reg64, btco_inf->saved_reg65,
+				  btco_inf->saved_reg71));
 		} else {
 			WL_ERR((":%s: save btc_params failed\n",
 				__FUNCTION__));
-			saved_status = FALSE;
+			btco_inf->esco_saved_status = FALSE;
 			return -1;
 		}
 
@@ -214,44 +212,47 @@ static int set_btc_esco_params(struct net_device *dev, bool trump_sco)
 			  *(u32 *)(buf_reg71va_dhcp_on+4)));
 
 		dev_wlc_bufvar_set(dev, "btc_params",
-			(char *)&buf_reg50va_dhcp_on[0], 8);
+				   buf_reg50va_dhcp_on,
+				   sizeof(buf_reg50va_dhcp_on));
 		dev_wlc_bufvar_set(dev, "btc_params",
-			(char *)&buf_reg51va_dhcp_on[0], 8);
+				   buf_reg51va_dhcp_on,
+				   sizeof(buf_reg51va_dhcp_on));
 		dev_wlc_bufvar_set(dev, "btc_params",
-			(char *)&buf_reg64va_dhcp_on[0], 8);
+				   buf_reg64va_dhcp_on,
+				   sizeof(buf_reg64va_dhcp_on));
 		dev_wlc_bufvar_set(dev, "btc_params",
-			(char *)&buf_reg65va_dhcp_on[0], 8);
+				   buf_reg65va_dhcp_on,
+				   sizeof(buf_reg65va_dhcp_on));
 		dev_wlc_bufvar_set(dev, "btc_params",
-			(char *)&buf_reg71va_dhcp_on[0], 8);
-
-		saved_status = TRUE;
-	} else if (saved_status) {
+				   buf_reg71va_dhcp_on,
+				   sizeof(buf_reg71va_dhcp_on));
+	} else if (btco_inf->esco_saved_status) {
 		/* restore previously saved bt params */
-		WL_TRACE(("Do new SCO/eSCO coex algo {save &"
-			  "override}\n"));
+		WL_TRACE(("Do new SCO/eSCO coex algo {save & override}\n"));
 
 		regaddr = 50;
 		dev_wlc_intvar_set_reg(dev, "btc_params",
-			(char *)&regaddr, (char *)&saved_reg50);
+			(char *)&regaddr, (char *)&btco_inf->saved_reg50);
 		regaddr = 51;
 		dev_wlc_intvar_set_reg(dev, "btc_params",
-			(char *)&regaddr, (char *)&saved_reg51);
+			(char *)&regaddr, (char *)&btco_inf->saved_reg51);
 		regaddr = 64;
 		dev_wlc_intvar_set_reg(dev, "btc_params",
-			(char *)&regaddr, (char *)&saved_reg64);
+			(char *)&regaddr, (char *)&btco_inf->saved_reg64);
 		regaddr = 65;
 		dev_wlc_intvar_set_reg(dev, "btc_params",
-			(char *)&regaddr, (char *)&saved_reg65);
+			(char *)&regaddr, (char *)&btco_inf->saved_reg65);
 		regaddr = 71;
 		dev_wlc_intvar_set_reg(dev, "btc_params",
-			(char *)&regaddr, (char *)&saved_reg71);
+			(char *)&regaddr, (char *)&btco_inf->saved_reg71);
 
 		WL_TRACE(("restore bt_params[50,51,64,65,71]:"
 			"0x%x 0x%x 0x%x 0x%x 0x%x\n",
-			saved_reg50, saved_reg51, saved_reg64,
-			saved_reg65, saved_reg71));
+			btco_inf->saved_reg50, btco_inf->saved_reg51,
+			btco_inf->saved_reg64, btco_inf->saved_reg65,
+			btco_inf->saved_reg71));
 
-		saved_status = FALSE;
+		btco_inf->esco_saved_status = FALSE;
 	} else {
 		WL_ERR((":%s att to restore not saved BTCOEX params\n",
 			__FUNCTION__));
@@ -262,17 +263,17 @@ static int set_btc_esco_params(struct net_device *dev, bool trump_sco)
 #endif /* BT_DHCP_eSCO_FIX */
 
 static void
-wl_cfg80211_bt_setflag(struct net_device *dev, bool set)
+wl_cfg80211_bt_setflag(struct btcoex_info *btco_inf, bool set)
 {
+	struct net_device *dev = btco_inf->dev;
 #if defined(BT_DHCP_USE_FLAGS)
 	char buf_flag7_dhcp_on[8] = { 7, 00, 00, 00, 0x1, 0x0, 0x00, 0x00 };
 	char buf_flag7_default[8]   = { 7, 00, 00, 00, 0x0, 0x00, 0x00, 0x00};
 #endif
 
-
 #if defined(BT_DHCP_eSCO_FIX)
 	/* set = 1, save & turn on  0 - off & restore prev settings */
-	set_btc_esco_params(dev, set);
+	set_btc_esco_params(btco_inf, set);
 #endif
 
 #if defined(BT_DHCP_USE_FLAGS)
@@ -308,42 +309,29 @@ static void wl_cfg80211_bt_handler(struct work_struct *work)
 			break;
 
 		case BT_DHCP_OPPR_WIN:
-			if (btcx_inf->dhcp_done) {
-				WL_TRACE(("DHCP Done before T1 expiration\n"));
-				goto btc_coex_idle;
-			}
-
 			/* DHCP is not over yet, start lowering BT priority
 			 * enforce btc_params + flags if necessary
 			 */
 			WL_TRACE(("DHCP T1:%d expired\n", BT_DHCP_OPPR_WIN_TIME));
-			if (btcx_inf->dev)
-				wl_cfg80211_bt_setflag(btcx_inf->dev, TRUE);
+			wl_cfg80211_bt_setflag(btcx_inf, TRUE);
 			btcx_inf->bt_state = BT_DHCP_FLAG_FORCE_TIMEOUT;
 			schedule_delayed_work(&btcx_inf->work,
 				msecs_to_jiffies(BT_DHCP_FLAG_FORCE_TIME));
 			break;
 
 		case BT_DHCP_FLAG_FORCE_TIMEOUT:
-			if (btcx_inf->dhcp_done) {
-				WL_TRACE(("DHCP Done before T2 expiration\n"));
-			} else {
-				/* Noo dhcp during T1+T2, restore BT priority */
-				WL_TRACE(("DHCP wait interval T2:%d msec expired\n",
-					BT_DHCP_FLAG_FORCE_TIME));
-			}
+			/* No dhcp during T1+T2, restore BT priority */
+			WL_TRACE(("DHCP wait interval T2:%d msec expired\n",
+				BT_DHCP_FLAG_FORCE_TIME));
 
 			/* Restoring default bt priority */
-			if (btcx_inf->dev)
-				wl_cfg80211_bt_setflag(btcx_inf->dev, FALSE);
-btc_coex_idle:
+			wl_cfg80211_bt_setflag(btcx_inf, FALSE);
 			btcx_inf->bt_state = BT_DHCP_IDLE;
 			break;
 
 		default:
 			WL_ERR(("error g_status=%d !!!\n",	btcx_inf->bt_state));
-			if (btcx_inf->dev)
-				wl_cfg80211_bt_setflag(btcx_inf->dev, FALSE);
+			wl_cfg80211_bt_setflag(btcx_inf, FALSE);
 			btcx_inf->bt_state = BT_DHCP_IDLE;
 			break;
 	}
@@ -351,18 +339,15 @@ btc_coex_idle:
 	net_os_wake_unlock(btcx_inf->dev);
 }
 
-void* wl_cfg80211_btcoex_init(struct net_device *ndev)
+void *wl_cfg80211_btcoex_init(struct net_device *ndev)
 {
-	struct btcoex_info *btco_inf = NULL;
+	struct btcoex_info *btco_inf;
 
-	btco_inf = kmalloc(sizeof(struct btcoex_info), GFP_KERNEL);
+	btco_inf = kzalloc(sizeof(struct btcoex_info), GFP_KERNEL);
 	if (!btco_inf)
 		return NULL;
 
 	btco_inf->bt_state = BT_DHCP_IDLE;
-	btco_inf->ts_dhcp_start = 0;
-	btco_inf->ts_dhcp_ok = 0;
-
 	btco_inf->dev = ndev;
 
 	INIT_DELAYED_WORK(&btco_inf->work, wl_cfg80211_bt_handler);
@@ -390,11 +375,6 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 	char buf_reg68va_dhcp_on[8] = { 68, 00, 00, 00, 0x90, 0x01, 0x00, 0x00 };
 
 	uint32 regaddr;
-	static uint32 saved_reg66;
-	static uint32 saved_reg41;
-	static uint32 saved_reg68;
-	static bool saved_status = FALSE;
-
 	char buf_flag7_default[8] =   { 7, 00, 00, 00, 0x0, 0x00, 0x00, 0x00};
 
 	/* Figure out powermode 1 or o command */
@@ -413,47 +393,44 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 		}
 #endif
 
-		/* Retrieve and saved orig regs value */
-		if ((saved_status == FALSE) &&
-			(!dev_wlc_intvar_get_reg(dev, "btc_params", 66,  &saved_reg66)) &&
-			(!dev_wlc_intvar_get_reg(dev, "btc_params", 41,  &saved_reg41)) &&
-			(!dev_wlc_intvar_get_reg(dev, "btc_params", 68,  &saved_reg68)))   {
-				saved_status = TRUE;
+		if (!btco_inf->dhcp_saved_status) {
+			/* Retrieve and saved orig regs value */
+			if (!dev_wlc_intvar_get_reg(dev, "btc_params", 66,
+						    &btco_inf->saved_reg66) &&
+			    !dev_wlc_intvar_get_reg(dev, "btc_params", 41,
+						    &btco_inf->saved_reg41) &&
+			    !dev_wlc_intvar_get_reg(dev, "btc_params", 68,
+						    &btco_inf->saved_reg68)) {
+				btco_inf->dhcp_saved_status = TRUE;
 				WL_TRACE(("Saved 0x%x 0x%x 0x%x\n",
-					saved_reg66, saved_reg41, saved_reg68));
+					btco_inf->saved_reg66, btco_inf->saved_reg41,
+					btco_inf->saved_reg68));
 
 				/* Disable PM mode during dhpc session */
-
-				/* Disable PM mode during dhpc session */
-				/* Start  BT timer only for SCO connection */
+				/* Start BT timer only for SCO connection */
 				if (btcoex_is_sco_active(dev)) {
 					/* btc_params 66 */
 					dev_wlc_bufvar_set(dev, "btc_params",
-						(char *)&buf_reg66va_dhcp_on[0],
+						buf_reg66va_dhcp_on,
 						sizeof(buf_reg66va_dhcp_on));
 					/* btc_params 41 0x33 */
 					dev_wlc_bufvar_set(dev, "btc_params",
-						(char *)&buf_reg41va_dhcp_on[0],
+						buf_reg41va_dhcp_on,
 						sizeof(buf_reg41va_dhcp_on));
 					/* btc_params 68 0x190 */
 					dev_wlc_bufvar_set(dev, "btc_params",
-						(char *)&buf_reg68va_dhcp_on[0],
+						buf_reg68va_dhcp_on,
 						sizeof(buf_reg68va_dhcp_on));
-					saved_status = TRUE;
 
 					WL_TRACE(("enable BT DHCP Work\n"));
 					btco_inf->bt_state = BT_DHCP_START;
 					mod_delayed_work(system_wq, &btco_inf->work, 0);
 				}
-		}
-		else if (saved_status == TRUE) {
+			}
+		} else {
 			WL_ERR(("was called w/o DHCP OFF. Continue\n"));
 		}
-	}
-	else if (strnicmp((char *)&powermode_val, "2", strlen("2")) == 0) {
-
-
-
+	} else if (strnicmp((char *)&powermode_val, "2", strlen("2")) == 0) {
 #ifdef PKT_FILTER_SUPPORT
 		dhd->dhcp_in_progress = 0;
 		WL_TRACE_HW4(("DHCP is complete \n"));
@@ -470,35 +447,37 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 		WL_TRACE(("bt->bt_state:%d\n", btco_inf->bt_state));
 		if (btco_inf->bt_state == BT_DHCP_FLAG_FORCE_TIMEOUT) {
 			/* need to restore original btc flags & extra btc params */
-			if (btco_inf->dev)
-				wl_cfg80211_bt_setflag(btco_inf->dev, FALSE);
+			wl_cfg80211_bt_setflag(btco_inf, FALSE);
 		}
 		btco_inf->bt_state = BT_DHCP_IDLE;
 
-		/* Restoring btc_flag paramter anyway */
-		if (saved_status == TRUE)
+		if (btco_inf->dhcp_saved_status) {
+			/* Restoring default btc_flag */
 			dev_wlc_bufvar_set(dev, "btc_flags",
-				(char *)&buf_flag7_default[0], sizeof(buf_flag7_default));
+					   buf_flag7_default,
+					   sizeof(buf_flag7_default));
 
-		/* Restore original values */
-		if (saved_status == TRUE) {
+			/* Restore original values */
 			regaddr = 66;
 			dev_wlc_intvar_set_reg(dev, "btc_params",
-				(char *)&regaddr, (char *)&saved_reg66);
+				(char *)&regaddr,
+				(char *)&btco_inf->saved_reg66);
 			regaddr = 41;
 			dev_wlc_intvar_set_reg(dev, "btc_params",
-				(char *)&regaddr, (char *)&saved_reg41);
+				(char *)&regaddr,
+				(char *)&btco_inf->saved_reg41);
 			regaddr = 68;
 			dev_wlc_intvar_set_reg(dev, "btc_params",
-				(char *)&regaddr, (char *)&saved_reg68);
+				(char *)&regaddr,
+				(char *)&btco_inf->saved_reg68);
 
 			WL_TRACE(("restore regs {66,41,68} <- 0x%x 0x%x 0x%x\n",
-				saved_reg66, saved_reg41, saved_reg68));
-		}
-		saved_status = FALSE;
+				btco_inf->saved_reg66, btco_inf->saved_reg41,
+				btco_inf->saved_reg68));
 
-	}
-	else {
+			btco_inf->dhcp_saved_status = FALSE;
+		}
+	} else {
 		WL_ERR(("Unkwown yet power setting, ignored\n"));
 	}
 
