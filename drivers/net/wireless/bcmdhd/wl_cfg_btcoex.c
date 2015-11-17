@@ -365,11 +365,11 @@ void wl_cfg80211_btcoex_deinit(void *inf)
 	}
 }
 
-int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *command)
+int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, int mode)
 {
+	dhd_pub_t *dhd = wl_cfg80211_get_dhdp(dev);
 	struct bcm_cfg80211 *cfg = wl_get_cfg(dev);
 	struct btcoex_info *btco_inf = cfg->btcoex_info;
-	char powermode_val = 0;
 	char buf_reg66va_dhcp_on[8] = { 66, 00, 00, 00, 0x10, 0x27, 0x00, 0x00 };
 	char buf_reg41va_dhcp_on[8] = { 41, 00, 00, 00, 0x33, 0x00, 0x00, 0x00 };
 	char buf_reg68va_dhcp_on[8] = { 68, 00, 00, 00, 0x90, 0x01, 0x00, 0x00 };
@@ -377,12 +377,9 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 	uint32 regaddr;
 	char buf_flag7_default[8] =   { 7, 00, 00, 00, 0x0, 0x00, 0x00, 0x00};
 
-	/* Figure out powermode 1 or o command */
-	strncpy((char *)&powermode_val, command + strlen("BTCOEXMODE") +1, 1);
-
-	if (strnicmp((char *)&powermode_val, "1", strlen("1")) == 0) {
+	switch (mode) {
+	case 1:
 		WL_TRACE_HW4(("DHCP session starts\n"));
-
 
 #ifdef PKT_FILTER_SUPPORT
 		dhd->dhcp_in_progress = 1;
@@ -430,7 +427,9 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 		} else {
 			WL_ERR(("was called w/o DHCP OFF. Continue\n"));
 		}
-	} else if (strnicmp((char *)&powermode_val, "2", strlen("2")) == 0) {
+		break;
+
+	case 2:
 #ifdef PKT_FILTER_SUPPORT
 		dhd->dhcp_in_progress = 0;
 		WL_TRACE_HW4(("DHCP is complete \n"));
@@ -477,11 +476,12 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 
 			btco_inf->dhcp_saved_status = FALSE;
 		}
-	} else {
+		break;
+
+	default:
 		WL_ERR(("Unkwown yet power setting, ignored\n"));
+		return -EINVAL;
 	}
 
-	snprintf(command, 3, "OK");
-
-	return (strlen("OK"));
+	return 0;
 }

@@ -67,7 +67,7 @@
 #define CMD_RXFILTER_REMOVE	"RXFILTER-REMOVE"
 #define CMD_BTCOEXSCAN_START	"BTCOEXSCAN-START"
 #define CMD_BTCOEXSCAN_STOP	"BTCOEXSCAN-STOP"
-#define CMD_BTCOEXMODE		"BTCOEXMODE"
+#define CMD_BTCOEXMODE		"BTCOEXMODE " /* "BTCOEXMODE %d" */
 #define CMD_SETSUSPENDOPT	"SETSUSPENDOPT"
 #define CMD_SETSUSPENDMODE      "SETSUSPENDMODE"
 #define CMD_P2P_DEV_ADDR	"P2P_DEV_ADDR"
@@ -176,7 +176,7 @@ int dhd_net_bus_devreset(struct net_device *dev, uint8 flag);
 int dhd_dev_init_ioctl(struct net_device *dev);
 #ifdef WL_CFG80211
 int wl_cfg80211_get_p2p_dev_addr(struct net_device *net, struct ether_addr *p2pdev_addr);
-int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *command);
+int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, int mode);
 #else
 int wl_cfg80211_get_p2p_dev_addr(struct net_device *net, struct ether_addr *p2pdev_addr)
 { return 0; }
@@ -1380,20 +1380,21 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_BTCOEXSCAN_STOP, strlen(CMD_BTCOEXSCAN_STOP)) == 0) {
 		/* TBD: BTCOEXSCAN-STOP */
 	}
-	else if (strnicmp(command, CMD_BTCOEXMODE, strlen(CMD_BTCOEXMODE)) == 0) {
+	else if (priv_cmd.total_len > strlen(CMD_BTCOEXMODE) &&
+		 strnicmp(command, CMD_BTCOEXMODE, strlen(CMD_BTCOEXMODE)) == 0) {
+		int mode = command[strlen(CMD_BTCOEXMODE)] - '0';
 #ifdef WL_CFG80211
-		void *dhdp = wl_cfg80211_get_dhdp(net);
-		bytes_written = wl_cfg80211_set_btcoex_dhcp(net, dhdp, command);
+		wl_cfg80211_set_btcoex_dhcp(net, mode);
 #else
 #ifdef PKT_FILTER_SUPPORT
-		uint mode = *(command + strlen(CMD_BTCOEXMODE) + 1) - '0';
-
 		if (mode == 1)
 			net_os_enable_packet_filter(net, 0); /* DHCP starts */
 		else
 			net_os_enable_packet_filter(net, 1); /* DHCP ends */
 #endif /* PKT_FILTER_SUPPORT */
 #endif /* WL_CFG80211 */
+		/* We are always successful */
+		bytes_written = sprintf(command, "OK");
 	}
 	else if (strnicmp(command, CMD_SETSUSPENDOPT, strlen(CMD_SETSUSPENDOPT)) == 0) {
 		bytes_written = wl_android_set_suspendopt(net, command, priv_cmd.total_len);
