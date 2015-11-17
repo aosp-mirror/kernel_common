@@ -466,13 +466,14 @@ int wl_cfg80211_set_btcoex_dhcp(struct net_device *dev, dhd_pub_t *dhd, char *co
 #endif /* PKT_FILTER_SUPPORT */
 
 		/* Restoring PM mode */
-
-		if (btco_inf->bt_state != BT_DHCP_IDLE) {
+		cancel_delayed_work_sync(&btco_inf->work);
+		WL_TRACE(("bt->bt_state:%d\n", btco_inf->bt_state));
+		if (btco_inf->bt_state == BT_DHCP_FLAG_FORCE_TIMEOUT) {
 			/* need to restore original btc flags & extra btc params */
-			WL_TRACE(("bt->bt_state:%d\n", btco_inf->bt_state));
-			/* wake up btcoex thread to restore btlags+params  */
-			mod_delayed_work(system_wq, &btco_inf->work, 0);
+			if (btco_inf->dev)
+				wl_cfg80211_bt_setflag(btco_inf->dev, FALSE);
 		}
+		btco_inf->bt_state = BT_DHCP_IDLE;
 
 		/* Restoring btc_flag paramter anyway */
 		if (saved_status == TRUE)
