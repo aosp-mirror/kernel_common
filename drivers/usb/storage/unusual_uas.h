@@ -139,7 +139,7 @@ UNUSUAL_DEV(0x152d, 0x0567, 0x0000, 0x9999,
 		"JMicron",
 		"JMS567",
 		USB_SC_DEVICE, USB_PR_DEVICE, NULL,
-		US_FL_NO_REPORT_OPCODES),
+		US_FL_BROKEN_FUA | US_FL_NO_REPORT_OPCODES),
 
 /* Most ASM1051 based devices have issues with uas, blacklist them all */
 /* Reported-by: Hans de Goede <hdegoede@redhat.com> */
