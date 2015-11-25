@@ -344,6 +344,8 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
 {
 	struct sdhci_host *host;
 	struct device_node *np;
+	struct sdhci_pltfm_host *pltfm_host;
+	struct sdhci_esdhc *esdhc;
 	int ret;
 
 	host = sdhci_pltfm_init(pdev, &sdhci_esdhc_pdata, 0);
@@ -353,6 +355,15 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
 	sdhci_get_of_property(pdev);
 
 	np = pdev->dev.of_node;
+
+	pltfm_host = sdhci_priv(host);
+	esdhc = pltfm_host->priv;
+	if (esdhc->vendor_ver == VENDOR_V_22)
+		host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+
+	if (esdhc->vendor_ver > VENDOR_V_22)
+		host->quirks &= ~SDHCI_QUIRK_NO_BUSY_IRQ;
+
 	if (of_device_is_compatible(np, "fsl,p2020-esdhc")) {
 		/*
 		 * Freescale messed up with P2020 as it has a non-standard
