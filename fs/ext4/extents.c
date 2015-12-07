@@ -4861,6 +4861,9 @@ static long ext4_zero_range(struct file *file, loff_t offset,
 	if (max_blocks > 0) {
 		flags |= (EXT4_GET_BLOCKS_CONVERT_UNWRITTEN |
 			  EXT4_EX_NOCACHE);
+		ret = ext4_update_disksize_before_punch(inode, offset, len);
+		if (ret)
+			goto out_dio;
 
 		/* Now release the pages and zero block aligned part of pages*/
 		truncate_pagecache_range(inode, start, end - 1);
