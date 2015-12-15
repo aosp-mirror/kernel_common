@@ -671,7 +671,8 @@ void hv_kvp_onchannelcallback(void *context)
 			 * user-mode not responding.
 			 */
 			schedule_work(&kvp_sendkey_work);
-			schedule_delayed_work(&kvp_work, 5*HZ);
+			schedule_delayed_work(&kvp_work,
+					      HV_UTIL_TIMEOUT * HZ);
 
 			return;
 
