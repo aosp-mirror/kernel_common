@@ -1582,8 +1582,23 @@ int btrfs_init_fs_root(struct btrfs_root *root)
 	ret = get_anon_bdev(&root->anon_dev);
 	if (ret)
 		goto free_writers;
+
+	mutex_lock(&root->objectid_mutex);
+	ret = btrfs_find_highest_objectid(root,
+					&root->highest_objectid);
+	if (ret) {
+		mutex_unlock(&root->objectid_mutex);
+		goto free_root_dev;
+	}
+
+	ASSERT(root->highest_objectid <= BTRFS_LAST_FREE_OBJECTID);
+
+	mutex_unlock(&root->objectid_mutex);
+
 	return 0;
 
+free_root_dev:
+	free_anon_bdev(root->anon_dev);
 free_writers:
 	btrfs_free_subvolume_writers(root->subv_writers);
 fail:
@@ -2712,6 +2727,7 @@ retry_root_backup:
 	tree_root->commit_root = btrfs_root_node(tree_root);
 	btrfs_set_root_refs(&tree_root->root_item, 1);
 
+
 	location.objectid = BTRFS_EXTENT_TREE_OBJECTID;
 	location.type = BTRFS_ROOT_ITEM_KEY;
 	location.offset = 0;
@@ -2723,6 +2739,18 @@ retry_root_backup:
 	}
 	set_bit(BTRFS_ROOT_TRACK_DIRTY, &extent_root->state);
 	fs_info->extent_root = extent_root;
+
+	mutex_lock(&tree_root->objectid_mutex);
+	ret = btrfs_find_highest_objectid(tree_root,
+					&tree_root->highest_objectid);
+	if (ret) {
+		mutex_unlock(&tree_root->objectid_mutex);
+		goto recovery_tree_root;
+	}
+
+	ASSERT(tree_root->highest_objectid <= BTRFS_LAST_FREE_OBJECTID);
+
+	mutex_unlock(&tree_root->objectid_mutex);
 
 	location.objectid = BTRFS_DEV_TREE_OBJECTID;
 	dev_root = btrfs_read_tree_root(tree_root, &location);
