@@ -324,6 +324,9 @@ static int recv_pkt(struct sk_buff *skb, struct net_device *dev,
 
 	/* check that it's our buffer */
 	if (skb->data[0] == LOWPAN_DISPATCH_IPV6) {
+		/* Pull off the 1-byte of 6lowpan header. */
+		skb_pull(skb, 1);
+
 		/* Copy the packet so that the IPv6 header is
 		 * properly aligned.
 		 */
