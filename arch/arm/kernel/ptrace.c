@@ -24,6 +24,7 @@
 #include <linux/hw_breakpoint.h>
 #include <linux/regset.h>
 #include <linux/audit.h>
+#include <linux/tracehook.h>
 #include <linux/unistd.h>
 
 #include <asm/pgtable.h>
