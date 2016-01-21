@@ -4319,11 +4319,13 @@ static void css_free_work_fn(struct work_struct *work)
 
 	if (css->ss) {
 		/* css free path */
-		if (css->parent)
-			css_put(css->parent);
+		struct cgroup_subsys_state *parent = css->parent;
 
 		css->ss->css_free(css);
 		cgroup_put(cgrp);
+
+		if (parent)
+			css_put(parent);
 	} else {
 		/* cgroup free path */
 		atomic_dec(&cgrp->root->nr_cgrps);
