@@ -24,6 +24,7 @@
 #include <crypto/hash.h>
 #include <linux/writeback.h>
 #include <linux/overflow.h>
+#include <linux/fs.h>
 
 #define __FS_HAS_ENCRYPTION IS_ENABLED(CONFIG_F2FS_FS_ENCRYPTION)
 #include <linux/fscrypt.h>
@@ -185,21 +186,6 @@ static inline int wbc_to_write_flags(struct writeback_control *wbc)
 	if (wbc->sync_mode == WB_SYNC_ALL)
 		return REQ_SYNC;
 	return 0;
-}
-
-static inline void inode_lock(struct inode *inode)
-{
-	mutex_lock(&inode->i_mutex);
-}
-
-static inline int inode_trylock(struct inode *inode)
-{
-	return mutex_trylock(&inode->i_mutex);
-}
-
-static inline void inode_unlock(struct inode *inode)
-{
-	mutex_unlock(&inode->i_mutex);
 }
 
 #define rb_entry_safe(ptr, type, member) \
