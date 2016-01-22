@@ -642,8 +642,6 @@ struct ll_file_data {
 
 struct lov_stripe_md;
 
-extern spinlock_t inode_lock;
-
 extern struct proc_dir_entry *proc_lustre_fs_root;
 
 static inline struct inode *ll_info2i(struct ll_inode_info *lli)
