@@ -435,26 +435,6 @@ static const struct drm_crtc_helper_funcs crtc_helper_funcs = {
 	.disable = rcar_du_crtc_disable,
 };
 
-void rcar_du_crtc_cancel_page_flip(struct rcar_du_crtc *rcrtc,
-				   struct drm_file *file)
-{
-	struct drm_pending_vblank_event *event;
-	struct drm_device *dev = rcrtc->crtc.dev;
-	unsigned long flags;
-
-	/* Destroy the pending vertical blanking event associated with the
-	 * pending page flip, if any, and disable vertical blanking interrupts.
-	 */
-	spin_lock_irqsave(&dev->event_lock, flags);
-	event = rcrtc->event;
-	if (event && event->base.file_priv == file) {
-		rcrtc->event = NULL;
-		event->base.destroy(&event->base);
-		drm_vblank_put(dev, rcrtc->index);
-	}
-	spin_unlock_irqrestore(&dev->event_lock, flags);
-}
-
 static void rcar_du_crtc_finish_page_flip(struct rcar_du_crtc *rcrtc)
 {
 	struct drm_pending_vblank_event *event;
