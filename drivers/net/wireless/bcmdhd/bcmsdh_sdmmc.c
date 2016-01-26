@@ -1461,10 +1461,12 @@ sdioh_gpio_init(sdioh_info_t *sd)
 void
 sdioh_retune_hold(sdioh_info_t *sd, bool hold)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0))
 	sdio_claim_host(sd->func[0]);
 	if (hold)
 		sdio_retune_hold_now(sd->func[0]);
 	else
 		sdio_retune_release(sd->func[0]);
 	sdio_release_host(sd->func[0]);
+#endif
 }
