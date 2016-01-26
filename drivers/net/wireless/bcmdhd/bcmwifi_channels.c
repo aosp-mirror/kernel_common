@@ -31,6 +31,7 @@
 
 #ifdef BCMDRIVER
 #include <osl.h>
+#include <linux/ctype.h>
 #else
 #include <stdio.h>
 #include <stdlib.h>
