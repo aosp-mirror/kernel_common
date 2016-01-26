@@ -27,7 +27,7 @@
 	(defined(CONFIG_DVB_##fe##_MODULE) && defined(MODULE)))
 
 /* lnb control */
-#if FE_SUPPORTED(MT312) || FE_SUPPORTED(STV0299)
+#if (FE_SUPPORTED(MT312) || FE_SUPPORTED(STV0299)) && FE_SUPPORTED(PLL)
 static int flexcop_set_voltage(struct dvb_frontend *fe, fe_sec_voltage_t voltage)
 {
 	struct flexcop_device *fc = fe->dvb->priv;
@@ -56,7 +56,7 @@ static int flexcop_set_voltage(struct dvb_frontend *fe, fe_sec_voltage_t voltage
 #endif
 
 #if FE_SUPPORTED(S5H1420) || FE_SUPPORTED(STV0299) || FE_SUPPORTED(MT312)
-static int flexcop_sleep(struct dvb_frontend* fe)
+static int __maybe_unused flexcop_sleep(struct dvb_frontend* fe)
 {
 	struct flexcop_device *fc = fe->dvb->priv;
 	if (fc->fe_sleep)
