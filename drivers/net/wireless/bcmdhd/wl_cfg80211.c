@@ -9996,8 +9996,12 @@ wl_cfg80211_netdev_notifier_call(struct notifier_block * nb,
 {
 	struct bcm_cfg80211 *cfg =
 		container_of(nb, struct bcm_cfg80211, netdev_notifier);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 11, 0))
+	struct net_device *dev = info;
+#else
 	struct netdev_notifier_info *data = (struct netdev_notifier_info *)info;
 	struct net_device *dev = data->dev;
+#endif
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 
 	/* We need to be careful when using passed in net_device since
