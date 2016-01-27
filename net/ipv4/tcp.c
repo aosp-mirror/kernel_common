@@ -279,6 +279,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
+#include <asm/unaligned.h>
 #include <net/busy_poll.h>
 
 int sysctl_tcp_fin_timeout __read_mostly = TCP_FIN_TIMEOUT;
@@ -2682,6 +2683,7 @@ void tcp_get_info(const struct sock *sk, struct tcp_info *info)
 	const struct tcp_sock *tp = tcp_sk(sk);
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	u32 now = tcp_time_stamp;
+	u64 rate64;
 	u32 rate;
 
 	memset(info, 0, sizeof(*info));
@@ -2744,10 +2746,12 @@ void tcp_get_info(const struct sock *sk, struct tcp_info *info)
 	info->tcpi_total_retrans = tp->total_retrans;
 
 	rate = READ_ONCE(sk->sk_pacing_rate);
-	info->tcpi_pacing_rate = rate != ~0U ? rate : ~0ULL;
+	rate64 = rate != ~0U ? rate : ~0ULL;
+	put_unaligned(rate64, &info->tcpi_pacing_rate);
 
 	rate = READ_ONCE(sk->sk_max_pacing_rate);
-	info->tcpi_max_pacing_rate = rate != ~0U ? rate : ~0ULL;
+	rate64 = rate != ~0U ? rate : ~0ULL;
+	put_unaligned(rate64, &info->tcpi_max_pacing_rate);
 }
 EXPORT_SYMBOL_GPL(tcp_get_info);
 
