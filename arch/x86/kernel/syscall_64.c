@@ -6,11 +6,11 @@
 #include <asm/asm-offsets.h>
 #include <asm/syscall.h>
 
-#define __SYSCALL_64(nr, sym, compat) extern asmlinkage void sym(void) ;
+#define __SYSCALL_64(nr, sym) extern asmlinkage void sym(void) ;
 #include <asm/syscalls_64.h>
 #undef __SYSCALL_64
 
-#define __SYSCALL_64(nr, sym, compat) [nr] = sym,
+#define __SYSCALL_64(nr, sym) [nr] = sym,
 
 extern void sys_ni_syscall(void);
 
