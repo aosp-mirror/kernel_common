@@ -909,6 +909,7 @@ static int ip6_dst_lookup_tail(struct sock *sk,
 	struct rt6_info *rt;
 #endif
 	int err;
+	int flags = 0;
 
 	if (*dst == NULL)
 		*dst = ip6_route_output(net, sk, fl6);
@@ -923,6 +924,9 @@ static int ip6_dst_lookup_tail(struct sock *sk,
 					  &fl6->saddr);
 		if (err)
 			goto out_err_release;
+
+		if (fl6->flowi6_oif)
+			flags |= RT6_LOOKUP_F_IFACE;
 	}
 
 #ifdef CONFIG_IPV6_OPTIMISTIC_DAD
