@@ -16,7 +16,7 @@
 
 #include <linux/debugfs.h>
 #include <linux/err.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/seq_file.h>
 #include <linux/syscore_ops.h>
