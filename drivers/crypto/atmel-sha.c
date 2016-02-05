@@ -781,7 +781,7 @@ static void atmel_sha_finish_req(struct ahash_request *req, int err)
 	dd->flags &= ~(SHA_FLAGS_BUSY | SHA_FLAGS_FINAL | SHA_FLAGS_CPU |
 			SHA_FLAGS_DMA_READY | SHA_FLAGS_OUTPUT_READY);
 
-	clk_disable_unprepare(dd->iclk);
+	clk_disable(dd->iclk);
 
 	if (req->base.complete)
 		req->base.complete(&req->base, err);
@@ -792,7 +792,7 @@ static void atmel_sha_finish_req(struct ahash_request *req, int err)
 
 static int atmel_sha_hw_init(struct atmel_sha_dev *dd)
 {
-	clk_prepare_enable(dd->iclk);
+	clk_enable(dd->iclk);
 
 	if (!(SHA_FLAGS_INIT & dd->flags)) {
 		atmel_sha_write(dd, SHA_CR, SHA_CR_SWRST);
@@ -817,7 +817,7 @@ static void atmel_sha_hw_version_init(struct atmel_sha_dev *dd)
 	dev_info(dd->dev,
 			"version: 0x%x\n", dd->hw_version);
 
-	clk_disable_unprepare(dd->iclk);
+	clk_disable(dd->iclk);
 }
 
 static int atmel_sha_handle_queue(struct atmel_sha_dev *dd,
@@ -1437,6 +1437,10 @@ static int atmel_sha_probe(struct platform_device *pdev)
 		goto sha_io_err;
 	}
 
+	err = clk_prepare(sha_dd->iclk);
+	if (err)
+		goto res_err;
+
 	atmel_sha_hw_version_init(sha_dd);
 
 	atmel_sha_get_cap(sha_dd);
@@ -1448,12 +1452,12 @@ static int atmel_sha_probe(struct platform_device *pdev)
 			if (IS_ERR(pdata)) {
 				dev_err(&pdev->dev, "platform data not available\n");
 				err = PTR_ERR(pdata);
-				goto err_pdata;
+				goto iclk_unprepare;
 			}
 		}
 		if (!pdata->dma_slave) {
 			err = -ENXIO;
-			goto err_pdata;
+			goto iclk_unprepare;
 		}
 		err = atmel_sha_dma_init(sha_dd, pdata);
 		if (err)
@@ -1484,7 +1488,8 @@ err_algs:
 	if (sha_dd->caps.has_dma)
 		atmel_sha_dma_cleanup(sha_dd);
 err_sha_dma:
-err_pdata:
+iclk_unprepare:
+	clk_unprepare(sha_dd->iclk);
 	iounmap(sha_dd->io_base);
 sha_io_err:
 	clk_put(sha_dd->iclk);
@@ -1515,6 +1520,8 @@ static int atmel_sha_remove(struct platform_device *pdev)
 
 	if (sha_dd->caps.has_dma)
 		atmel_sha_dma_cleanup(sha_dd);
+
+	clk_unprepare(sha_dd->iclk);
 
 	return 0;
 }
