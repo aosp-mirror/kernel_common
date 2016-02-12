@@ -385,6 +385,10 @@ source "net/ceph/Kconfig"
 source "net/nfc/Kconfig"
 
 
+config DST_CACHE
+	bool "dst cache"
+	default n
+
 endif   # if NET
 
 # Used by archs to tell that they support BPF_JIT
