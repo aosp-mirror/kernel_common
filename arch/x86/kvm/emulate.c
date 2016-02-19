@@ -658,6 +658,7 @@ static int __linearize(struct x86_emulate_ctxt *ctxt,
 	*max_size = 0;
 	switch (ctxt->mode) {
 	case X86EMUL_MODE_PROT64:
+		*linear = la;
 		if (is_noncanonical_address(la))
 			return emulate_gp(ctxt, 0);
 
@@ -666,6 +667,7 @@ static int __linearize(struct x86_emulate_ctxt *ctxt,
 			goto bad;
 		break;
 	default:
+		*linear = la = (u32)la;
 		usable = ctxt->ops->get_segment(ctxt, &sel, &desc, NULL,
 						addr.seg);
 		if (!usable)
