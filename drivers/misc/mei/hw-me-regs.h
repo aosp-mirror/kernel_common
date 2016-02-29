@@ -119,7 +119,16 @@
 
 /* Host Firmware Status Registers in PCI Config Space */
 #define PCI_CFG_HFS_1         0x40
+#  define PCI_CFG_HFS_1_D0I3_MSK     0x80000000
 #define PCI_CFG_HFS_2         0x48
+#define PCI_CFG_HFS_2         0x48
+#define PCI_CFG_HFS_3         0x60
+#define PCI_CFG_HFS_4         0x64
+#define PCI_CFG_HFS_5         0x68
+#define PCI_CFG_HFS_6         0x6C
+
+#define MEI_DEV_ID_BXT_M      0x1A9A  /* Broxton M */
+#define MEI_DEV_ID_APL_I      0x5A9A  /* Apollo Lake I */
 
 /*
  * MEI HW Section
