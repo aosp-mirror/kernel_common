@@ -1380,9 +1380,9 @@ static int atmel_aes_probe(struct platform_device *pdev)
 	}
 
 	aes_dd->io_base = ioremap(aes_dd->phys_base, aes_phys_size);
-	if (!aes_dd->io_base) {
+	if (IS_ERR(aes_dd->io_base)) {
 		dev_err(dev, "can't ioremap\n");
-		err = -ENOMEM;
+		err = PTR_ERR(aes_dd->io_base);
 		goto aes_io_err;
 	}
 
