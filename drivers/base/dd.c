@@ -789,6 +789,7 @@ bool __init driver_probe_done(void)
 	pr_debug("%s: probe_count = %d\n", __func__, local_probe_count);
 	return !local_probe_count;
 }
+EXPORT_SYMBOL(driver_probe_done);
 
 /**
  * wait_for_device_probe
