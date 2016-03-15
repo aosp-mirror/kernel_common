@@ -1788,7 +1788,7 @@ static int cleaner_kthread(void *arg)
 		 */
 		btrfs_run_defrag_inodes(root->fs_info);
 sleep:
-		if (!try_to_freeze() && !again) {
+		if (!again) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			if (!kthread_should_stop())
 				schedule();
