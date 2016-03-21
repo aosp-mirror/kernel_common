@@ -36,7 +36,7 @@ struct ovl_dir_cache {
 
 struct ovl_readdir_data {
 	struct dir_context ctx;
-	bool is_merge;
+	bool is_lowest;
 	struct rb_root root;
 	struct list_head *list;
 	struct list_head middle;
@@ -133,9 +133,9 @@ static int ovl_cache_entry_add_rb(struct ovl_readdir_data *rdd,
 	return 0;
 }
 
-static int ovl_fill_lower(struct ovl_readdir_data *rdd,
-			  const char *name, int namelen,
-			  loff_t offset, u64 ino, unsigned int d_type)
+static int ovl_fill_lowest(struct ovl_readdir_data *rdd,
+			   const char *name, int namelen,
+			   loff_t offset, u64 ino, unsigned int d_type)
 {
 	struct ovl_cache_entry *p;
 
@@ -186,10 +186,10 @@ static int ovl_fill_merge(void *buf, const char *name, int namelen,
 	struct ovl_readdir_data *rdd = buf;
 
 	rdd->count++;
-	if (!rdd->is_merge)
+	if (!rdd->is_lowest)
 		return ovl_cache_entry_add_rb(rdd, name, namelen, ino, d_type);
 	else
-		return ovl_fill_lower(rdd, name, namelen, offset, ino, d_type);
+		return ovl_fill_lowest(rdd, name, namelen, offset, ino, d_type);
 }
 
 static inline int ovl_dir_read(struct path *realpath,
@@ -283,7 +283,7 @@ static int ovl_dir_read_merged(struct dentry *dentry, struct list_head *list)
 		.ctx.actor = ovl_fill_merge,
 		.list = list,
 		.root = RB_ROOT,
-		.is_merge = false,
+		.is_lowest = false,
 	};
 
 	ovl_path_lower(dentry, &lowerpath);
@@ -306,7 +306,7 @@ static int ovl_dir_read_merged(struct dentry *dentry, struct list_head *list)
 		 * offsets to be reasonably constant
 		 */
 		list_add(&rdd.middle, rdd.list);
-		rdd.is_merge = true;
+		rdd.is_lowest = true;
 		err = ovl_dir_read(&lowerpath, &rdd);
 		list_del(&rdd.middle);
 	}
