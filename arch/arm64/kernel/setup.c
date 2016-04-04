@@ -432,6 +432,15 @@ static const char *compat_hwcap_str[] = {
 	"lpae",
 	"evtstrm"
 };
+
+static const char *compat_hwcap2_str[] = {
+	"aes",
+	"pmull",
+	"sha1",
+	"sha2",
+	"crc32",
+	NULL
+};
 #endif /* CONFIG_COMPAT */
 
 static int c_show(struct seq_file *m, void *v)
@@ -466,6 +475,10 @@ static int c_show(struct seq_file *m, void *v)
 			for (j = 0; compat_hwcap_str[j]; j++)
 				if (COMPAT_ELF_HWCAP & (1 << j))
 					seq_printf(m, " %s", compat_hwcap_str[j]);
+
+			for (j = 0; compat_hwcap2_str[j]; j++)
+				if (compat_elf_hwcap2 & (1 << j))
+					seq_printf(m, " %s", compat_hwcap2_str[j]);
 #endif /* CONFIG_COMPAT */
 		} else {
 			for (j = 0; hwcap_str[j]; j++)
