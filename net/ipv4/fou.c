@@ -121,6 +121,9 @@ static struct sk_buff **fou_gro_receive(struct sk_buff **head,
 	 */
 	NAPI_GRO_CB(skb)->encap_mark = 0;
 
+	/* Flag this frame as already having an outer encap header */
+	NAPI_GRO_CB(skb)->is_fou = 1;
+
 	rcu_read_lock();
 	offloads = NAPI_GRO_CB(skb)->is_ipv6 ? inet6_offloads : inet_offloads;
 	ops = rcu_dereference(offloads[proto]);
@@ -235,6 +238,9 @@ static struct sk_buff **gue_gro_receive(struct sk_buff **head,
 
 	/* Adjusted NAPI_GRO_CB(skb)->csum after skb_gro_pull()*/
 	skb_gro_postpull_rcsum(skb, guehdr, guehlen);
+
+	/* Flag this frame as already having an outer encap header */
+	NAPI_GRO_CB(skb)->is_fou = 1;
 
 	pp = ops->callbacks.gro_receive(head, skb);
 
