@@ -153,7 +153,7 @@ xfs_xattr_put_listent(
 	arraytop = context->count + prefix_len + namelen + 1;
 	if (arraytop > context->firstu) {
 		context->count = -1;	/* insufficient space */
-		return 1;
+		return 0;
 	}
 	offset = (char *)context->alist + context->count;
 	strncpy(offset, xfs_xattr_prefix(flags), prefix_len);
@@ -195,12 +195,15 @@ list_one_attr(const char *name, const size_t len, void *data,
 }
 
 ssize_t
-xfs_vn_listxattr(struct dentry *dentry, char *data, size_t size)
+xfs_vn_listxattr(
+	struct dentry	*dentry,
+	char		*data,
+	size_t		size)
 {
 	struct xfs_attr_list_context context;
 	struct attrlist_cursor_kern cursor = { 0 };
-	struct inode		*inode = dentry->d_inode;
-	int			error;
+	struct inode	*inode = d_inode(dentry);
+	int		error;
 
 	/*
 	 * First read the regular on-disk attributes.
@@ -218,7 +221,9 @@ xfs_vn_listxattr(struct dentry *dentry, char *data, size_t size)
 	else
 		context.put_listent = xfs_xattr_put_listent_sizes;
 
-	xfs_attr_list_int(&context);
+	error = xfs_attr_list_int(&context);
+	if (error)
+		return error;
 	if (context.count < 0)
 		return -ERANGE;
 
