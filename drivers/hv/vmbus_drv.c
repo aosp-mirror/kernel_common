@@ -35,6 +35,7 @@
 #include <asm/hyperv.h>
 #include <asm/hypervisor.h>
 #include <asm/mshyperv.h>
+#include <linux/random.h>
 #include "hyperv_vmbus.h"
 
 static struct acpi_device  *hv_acpi_dev;
@@ -689,6 +690,8 @@ static void vmbus_isr(void)
 	/* Check if there are actual msgs to be processed */
 	if (msg->header.message_type != HVMSG_NONE)
 		tasklet_schedule(&msg_dpc);
+
+	add_interrupt_randomness(HYPERVISOR_CALLBACK_VECTOR, 0);
 }
 
 /*
