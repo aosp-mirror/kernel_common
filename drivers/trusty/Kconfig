@@ -20,4 +20,9 @@ config TRUSTY_SMC_ARM64
 	depends on ARM64
 	default y
 
+config TRUSTY_LOG
+	tristate
+	depends on TRUSTY
+	default y
+
 endmenu
