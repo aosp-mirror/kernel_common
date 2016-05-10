@@ -1404,6 +1404,7 @@ void qlcnic_83xx_get_minidump_template(struct qlcnic_adapter *adapter)
 	struct qlcnic_hardware_context *ahw = adapter->ahw;
 	struct qlcnic_fw_dump *fw_dump = &ahw->fw_dump;
 	struct pci_dev *pdev = adapter->pdev;
+	int ret;
 
 	prev_version = adapter->fw_version;
 	current_version = qlcnic_83xx_get_fw_version(adapter);
@@ -1411,7 +1412,10 @@ void qlcnic_83xx_get_minidump_template(struct qlcnic_adapter *adapter)
 	if (fw_dump->tmpl_hdr == NULL || current_version > prev_version) {
 		if (fw_dump->tmpl_hdr)
 			vfree(fw_dump->tmpl_hdr);
-		if (!qlcnic_fw_cmd_get_minidump_temp(adapter))
-			dev_info(&pdev->dev, "Supports FW dump capability\n");
+		ret = qlcnic_fw_cmd_get_minidump_temp(adapter);
+		if (ret)
+			return;
+
+		dev_info(&pdev->dev, "Supports FW dump capability\n");
 	}
 }
