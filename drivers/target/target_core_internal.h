@@ -106,6 +106,7 @@ int	transport_clear_lun_ref(struct se_lun *);
 void	transport_send_task_abort(struct se_cmd *);
 sense_reason_t	target_cmd_size_check(struct se_cmd *cmd, unsigned int size);
 void	target_qf_do_work(struct work_struct *work);
+void	__target_execute_cmd(struct se_cmd *, bool);
 
 /* target_core_stat.c */
 void	target_stat_setup_dev_default_groups(struct se_device *);
