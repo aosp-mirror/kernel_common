@@ -331,6 +331,7 @@ static void alc_fill_eapd_coef(struct hda_codec *codec)
 	case 0x10ec0283:
 	case 0x10ec0286:
 	case 0x10ec0288:
+	case 0x10ec0295:
 	case 0x10ec0298:
 		alc_update_coef_idx(codec, 0x10, 1<<9, 0);
 		break;
@@ -896,6 +897,7 @@ static struct alc_codec_rename_pci_table rename_pci_tbl[] = {
 	{ 0x10ec0298, 0x1028, 0, "ALC3266" },
 	{ 0x10ec0256, 0x1028, 0, "ALC3246" },
 	{ 0x10ec0225, 0x1028, 0, "ALC3253" },
+	{ 0x10ec0295, 0x1028, 0, "ALC3254" },
 	{ 0x10ec0670, 0x1025, 0, "ALC669X" },
 	{ 0x10ec0676, 0x1025, 0, "ALC679X" },
 	{ 0x10ec0282, 0x1043, 0, "ALC3229" },
@@ -3725,6 +3727,7 @@ static void alc_headset_mode_unplugged(struct hda_codec *codec)
 		alc_process_coef_fw(codec, coef0668);
 		break;
 	case 0x10ec0225:
+	case 0x10ec0295:
 		alc_process_coef_fw(codec, coef0225);
 		break;
 	}
@@ -3825,6 +3828,7 @@ static void alc_headset_mode_mic_in(struct hda_codec *codec, hda_nid_t hp_pin,
 		snd_hda_set_pin_ctl_cache(codec, mic_pin, PIN_VREF50);
 		break;
 	case 0x10ec0225:
+	case 0x10ec0295:
 		alc_update_coef_idx(codec, 0x45, 0x3f<<10, 0x31<<10);
 		snd_hda_set_pin_ctl_cache(codec, hp_pin, 0);
 		alc_process_coef_fw(codec, coef0225);
@@ -3882,6 +3886,7 @@ static void alc_headset_mode_default(struct hda_codec *codec)
 
 	switch (codec->vendor_id) {
 	case 0x10ec0225:
+	case 0x10ec0295:
 		alc_process_coef_fw(codec, coef0225);
 		break;
 	case 0x10ec0255:
@@ -3985,6 +3990,7 @@ static void alc_headset_mode_ctia(struct hda_codec *codec)
 		alc_process_coef_fw(codec, coef0688);
 		break;
 	case 0x10ec0225:
+	case 0x10ec0295:
 		alc_process_coef_fw(codec, coef0225);
 		break;
 	}
@@ -4066,6 +4072,7 @@ static void alc_headset_mode_omtp(struct hda_codec *codec)
 		alc_process_coef_fw(codec, coef0688);
 		break;
 	case 0x10ec0225:
+	case 0x10ec0295:
 		alc_process_coef_fw(codec, coef0225);
 		break;
 	}
@@ -4149,6 +4156,7 @@ static void alc_determine_headset_type(struct hda_codec *codec)
 		is_ctia = (val & 0x1c02) == 0x1c02;
 		break;
 	case 0x10ec0225:
+	case 0x10ec0295:
 		alc_process_coef_fw(codec, coef0225);
 		msleep(800);
 		val = alc_read_coef_idx(codec, 0x46);
@@ -6160,6 +6168,7 @@ static int patch_alc269(struct hda_codec *codec)
 		alc_update_coef_idx(codec, 0x36, 1 << 13, 1 << 5); /* Switch pcbeep path to Line in path*/
 		break;
 	case 0x10ec0225:
+	case 0x10ec0295:
 		spec->codec_variant = ALC269_TYPE_ALC225;
 		break;
 	case 0x10ec0234:
@@ -7170,6 +7179,7 @@ static const struct hda_codec_preset snd_hda_preset_realtek[] = {
 	{ .id = 0x10ec0292, .name = "ALC292", .patch = patch_alc269 },
 	{ .id = 0x10ec0293, .name = "ALC293", .patch = patch_alc269 },
 	{ .id = 0x10ec0294, .name = "ALC294", .patch = patch_alc269 },
+	{ .id = 0x10ec0295, .name = "ALC295", .patch = patch_alc269 },
 	{ .id = 0x10ec0298, .name = "ALC298", .patch = patch_alc269 },
 	{ .id = 0x10ec0861, .rev = 0x100340, .name = "ALC660",
 	  .patch = patch_alc861 },
