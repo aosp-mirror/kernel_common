@@ -100,7 +100,7 @@ struct sur40_data {
 #define TOUCH_ENDPOINT 0x86
 
 /* polling interval (ms) */
-#define POLL_INTERVAL 10
+#define POLL_INTERVAL 1
 
 /* maximum number of contacts FIXME: this is a guess? */
 #define MAX_CONTACTS 64
