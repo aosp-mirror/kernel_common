@@ -321,6 +321,10 @@ DEVICE_CHANNEL(ch4_dimm_label, S_IRUGO | S_IWUSR,
 	channel_dimm_label_show, channel_dimm_label_store, 4);
 DEVICE_CHANNEL(ch5_dimm_label, S_IRUGO | S_IWUSR,
 	channel_dimm_label_show, channel_dimm_label_store, 5);
+DEVICE_CHANNEL(ch6_dimm_label, S_IRUGO | S_IWUSR,
+	channel_dimm_label_show, channel_dimm_label_store, 6);
+DEVICE_CHANNEL(ch7_dimm_label, S_IRUGO | S_IWUSR,
+	channel_dimm_label_show, channel_dimm_label_store, 7);
 
 /* Total possible dynamic DIMM Label attribute file table */
 static struct device_attribute *dynamic_csrow_dimm_attr[] = {
@@ -329,7 +333,9 @@ static struct device_attribute *dynamic_csrow_dimm_attr[] = {
 	&dev_attr_legacy_ch2_dimm_label.attr,
 	&dev_attr_legacy_ch3_dimm_label.attr,
 	&dev_attr_legacy_ch4_dimm_label.attr,
-	&dev_attr_legacy_ch5_dimm_label.attr
+	&dev_attr_legacy_ch5_dimm_label.attr,
+	&dev_attr_legacy_ch6_dimm_label.attr,
+	&dev_attr_legacy_ch7_dimm_label.attr,
 };
 
 /* possible dynamic channel ce_count attribute files */
@@ -345,6 +351,10 @@ DEVICE_CHANNEL(ch4_ce_count, S_IRUGO,
 		   channel_ce_count_show, NULL, 4);
 DEVICE_CHANNEL(ch5_ce_count, S_IRUGO,
 		   channel_ce_count_show, NULL, 5);
+DEVICE_CHANNEL(ch6_ce_count, S_IRUGO,
+		   channel_ce_count_show, NULL, 6);
+DEVICE_CHANNEL(ch7_ce_count, S_IRUGO,
+		   channel_ce_count_show, NULL, 7);
 
 /* Total possible dynamic ce_count attribute file table */
 static struct device_attribute *dynamic_csrow_ce_count_attr[] = {
@@ -353,7 +363,9 @@ static struct device_attribute *dynamic_csrow_ce_count_attr[] = {
 	&dev_attr_legacy_ch2_ce_count.attr,
 	&dev_attr_legacy_ch3_ce_count.attr,
 	&dev_attr_legacy_ch4_ce_count.attr,
-	&dev_attr_legacy_ch5_ce_count.attr
+	&dev_attr_legacy_ch5_ce_count.attr,
+	&dev_attr_legacy_ch6_ce_count.attr,
+	&dev_attr_legacy_ch7_ce_count.attr,
 };
 
 static inline int nr_pages_per_csrow(struct csrow_info *csrow)
