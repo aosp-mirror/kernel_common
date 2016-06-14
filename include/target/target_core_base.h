@@ -171,6 +171,7 @@ enum se_cmd_flags_table {
 	SCF_COMPARE_AND_WRITE		= 0x00080000,
 	SCF_COMPARE_AND_WRITE_POST	= 0x00100000,
 	SCF_CMD_XCOPY_PASSTHROUGH	= 0x00200000,
+	SCF_TASK_ATTR_SET		= 0x01000000,
 };
 
 /* struct se_dev_entry->lun_flags and struct se_lun->lun_access */
