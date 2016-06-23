@@ -1203,6 +1203,8 @@ static int bgmac_open(struct net_device *net_dev)
 
 	netif_carrier_on(net_dev);
 
+	netif_start_queue(net_dev);
+
 err_out:
 	return err;
 }
