@@ -431,6 +431,7 @@ enum {
 	ATA_HORKAGE_WD_BROKEN_LPM = (1 << 21),	/* some WDs have broken LPM */
 	ATA_HORKAGE_ZERO_AFTER_TRIM = (1 << 22),/* guarantees zero after trim */
 	ATA_HORKAGE_NOTRIM	= (1 << 24),	/* don't use TRIM */
+	ATA_HORKAGE_MAX_SEC_1024 = (1 << 25),   /* Limit max sects to 1024 */
 
 
 	 /* DMA mask for user DMA control: User visible values; DO NOT
