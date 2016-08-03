@@ -17,11 +17,11 @@
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/hashtable.h>
-#include <linux/init.h>
 #include <linux/kconfig.h>
 #include <linux/kernel.h>
 #include <linux/kobject.h>
 #include <linux/memory-state-time.h>
+#include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of_platform.h>
 #include <linux/slab.h>
@@ -46,6 +46,7 @@ static DEFINE_MUTEX(mem_lock);
 #define BW_NODE "/soc/memory-state-time"
 #define FREQ_TBL "freq-tbl"
 #define BW_TBL "bw-buckets"
+#define NUM_SOURCES "num-sources"
 
 #define LOWEST_FREQ 2
 
@@ -59,10 +60,8 @@ static int registered_bw_sources;
 static u64 last_update;
 static bool init_success;
 static struct workqueue_struct *memory_wq;
-
-#define MAX_NUM_SOURCES 10
-
-static int bandwidths[MAX_NUM_SOURCES];
+static u32 num_sources = 10;
+static int *bandwidths;
 
 struct freq_entry {
 	int freq;
@@ -117,7 +116,7 @@ static ssize_t show_stat_show(struct kobject *kobj,
 			if (freq_entry->freq == freq_buckets[i]) {
 				len += scnprintf(buf + len, PAGE_SIZE - len,
 						"%d ", freq_buckets[i]);
-				if (len < PAGE_SIZE)
+				if (len >= PAGE_SIZE)
 					break;
 				for (j = 0; j < num_buckets; j++) {
 					len += scnprintf(buf + len,
@@ -274,7 +273,7 @@ struct memory_state_update_block *memory_state_register_bandwidth_source(void)
 		if (!block)
 			return NULL;
 		block->update_call = memory_state_bw_update;
-		if (registered_bw_sources + 1 <= MAX_NUM_SOURCES) {
+		if (registered_bw_sources < num_sources) {
 			block->id = registered_bw_sources++;
 		} else {
 			pr_err("Unable to allocate source; max number reached\n");
@@ -296,15 +295,24 @@ static int get_bw_buckets(struct device *dev)
 	int ret, lenb;
 	struct device_node *node = dev->of_node;
 
+	of_property_read_u32(node, NUM_SOURCES, &num_sources);
 	if (of_find_property(node, BW_TBL, &lenb)) {
-		lenb /= sizeof(*bw_buckets);
-		bw_buckets = devm_kzalloc(dev, lenb * sizeof(*bandwidths),
-				GFP_KERNEL);
-		if (!bw_buckets)
+		bandwidths = devm_kzalloc(dev,
+				sizeof(*bandwidths) * num_sources, GFP_KERNEL);
+		if (!bandwidths)
 			return -ENOMEM;
+		lenb /= sizeof(*bw_buckets);
+		bw_buckets = devm_kzalloc(dev, lenb * sizeof(*bw_buckets),
+				GFP_KERNEL);
+		if (!bw_buckets) {
+			devm_kfree(dev, bandwidths);
+			return -ENOMEM;
+		}
 		ret = of_property_read_u32_array(node, BW_TBL, bw_buckets,
 				lenb);
 		if (ret < 0) {
+			devm_kfree(dev, bandwidths);
+			devm_kfree(dev, bw_buckets);
 			pr_err("Unable to read bandwidth table from device tree.\n");
 			return ret;
 		}
@@ -334,6 +342,7 @@ static int freq_buckets_init(struct device *dev)
 		ret = of_property_read_u32_array(node, FREQ_TBL, freq_buckets,
 				lenf);
 		if (ret < 0) {
+			devm_kfree(dev, freq_buckets);
 			pr_err("Unable to read frequency table from device tree.\n");
 			return ret;
 		}
@@ -349,8 +358,10 @@ static int freq_buckets_init(struct device *dev)
 			return -ENOMEM;
 		freq_entry->buckets = devm_kzalloc(dev, sizeof(u64)*num_buckets,
 				GFP_KERNEL);
-		if (!freq_entry->buckets)
+		if (!freq_entry->buckets) {
+			devm_kfree(dev, freq_entry);
 			return -ENOMEM;
+		}
 		pr_debug("memory_state_time Adding freq to ht %d\n",
 				freq_buckets[i]);
 		freq_entry->freq = freq_buckets[i];
@@ -375,7 +386,6 @@ static int memory_state_time_probe(struct platform_device *pdev)
 {
 	int error;
 
-	mutex_lock(&mem_lock);
 	error = get_bw_buckets(&pdev->dev);
 	if (error)
 		return error;
@@ -384,7 +394,6 @@ static int memory_state_time_probe(struct platform_device *pdev)
 		return error;
 	last_update = ktime_get_boot_ns();
 	init_success = true;
-	mutex_unlock(&mem_lock);
 
 	pr_debug("memory_state_time initialized with num_freqs %d\n",
 			num_freqs);
@@ -421,21 +430,25 @@ static int __init memory_state_time_init(void)
 	memory_kobj = kobject_create_and_add(TAG, kernel_kobj);
 	if (!memory_kobj) {
 		pr_err("Unable to allocate memory_kobj for sysfs directory.\n");
-		return -ENOMEM;
+		error = -ENOMEM;
+		goto wq;
 	}
 	error = sysfs_create_group(memory_kobj, &memory_attr_group);
 	if (error) {
 		pr_err("Unable to create sysfs folder.\n");
-		kobject_put(memory_kobj);
-		return error;
+		goto kobj;
 	}
 
 	error = platform_driver_register(&memory_state_time_driver);
 	if (error) {
 		pr_err("Unable to register memory_state_time platform driver.\n");
-		return error;
+		goto group;
 	}
 	return 0;
-}
 
-late_initcall(memory_state_time_init);
+group:	sysfs_remove_group(memory_kobj, &memory_attr_group);
+kobj:	kobject_put(memory_kobj);
+wq:	destroy_workqueue(memory_wq);
+	return error;
+}
+module_init(memory_state_time_init);
