@@ -414,6 +414,9 @@ static int aead_set_sh_desc(struct crypto_aead *aead)
 	if (!ctx->authsize)
 		return 0;
 
+	if (!ctx->authsize)
+		return 0;
+
 	/* NULL encryption / decryption */
 	if (!ctx->enckeylen)
 		return aead_null_set_sh_desc(aead);
