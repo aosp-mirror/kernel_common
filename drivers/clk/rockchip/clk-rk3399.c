@@ -160,9 +160,9 @@ PNAME(mux_pll_src_novpll_cpll_gpll_24m_p)	= { "prevent:vpll", "cpll",
 						    "gpll", "xin24m" };
 
 PNAME(mux_dclk_vop0_p)			= { "dclk_vop0_div",
-					    "dclk_vop0_frac" };
+					    "prevent:dclk_vop0_frac" };
 PNAME(mux_dclk_vop1_p)			= { "dclk_vop1_div",
-					    "dclk_vop1_frac" };
+					    "prevent:dclk_vop1_frac" };
 
 PNAME(mux_clk_cif_p)			= { "clk_cifout_src", "xin24m" };
 
