@@ -2146,6 +2146,12 @@ void audit_log_d_path(struct audit_buffer *ab, const char *prefix,
 	if (prefix)
 		audit_log_format(ab, "%s", prefix);
 
+	/* The process may be exiting. */
+	if (!current->fs) {
+		audit_log_format(ab, "<unknown>");
+		return;
+	}
+
 	/* We will allow 11 spaces for ' (deleted)' to be appended */
 	pathname = kmalloc(PATH_MAX+11, ab->gfp_mask);
 	if (!pathname) {
