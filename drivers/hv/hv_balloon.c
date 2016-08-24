@@ -439,6 +439,16 @@ struct hv_hotadd_state {
 	unsigned long covered_end_pfn;
 	unsigned long ha_end_pfn;
 	unsigned long end_pfn;
+	/*
+	 * A list of gaps.
+	 */
+	struct list_head gap_list;
+};
+
+struct hv_hotadd_gap {
+	struct list_head list;
+	unsigned long start_pfn;
+	unsigned long end_pfn;
 };
 
 struct balloon_state {
@@ -551,17 +561,46 @@ static struct hv_dynmem_device dm_device;
 static void post_status(struct hv_dynmem_device *dm);
 #ifdef CONFIG_MEMORY_HOTPLUG
 
-static void hv_bring_pgs_online(unsigned long start_pfn, unsigned long size)
+/* Check if the particular page is backed and can be onlined and online it. */
+static void hv_page_online_one(struct hv_hotadd_state *has, struct page *pg)
+{
+	unsigned long cur_start_pgp;
+	unsigned long cur_end_pgp;
+	struct hv_hotadd_gap *gap;
+
+	cur_start_pgp = (unsigned long)pfn_to_page(has->covered_start_pfn);
+	cur_end_pgp = (unsigned long)pfn_to_page(has->covered_end_pfn);
+
+	/* The page is not backed. */
+	if (((unsigned long)pg < cur_start_pgp) ||
+	    ((unsigned long)pg >= cur_end_pgp))
+		return;
+
+	/* Check for gaps. */
+	list_for_each_entry(gap, &has->gap_list, list) {
+		cur_start_pgp = (unsigned long)
+			pfn_to_page(gap->start_pfn);
+		cur_end_pgp = (unsigned long)
+			pfn_to_page(gap->end_pfn);
+		if (((unsigned long)pg >= cur_start_pgp) &&
+		    ((unsigned long)pg < cur_end_pgp)) {
+			return;
+		}
+	}
+
+	/* This frame is currently backed; online the page. */
+	__online_page_set_limits(pg);
+	__online_page_increment_counters(pg);
+	__online_page_free(pg);
+}
+
+static void hv_bring_pgs_online(struct hv_hotadd_state *has,
+				unsigned long start_pfn, unsigned long size)
 {
 	int i;
 
-	for (i = 0; i < size; i++) {
-		struct page *pg;
-		pg = pfn_to_page(start_pfn + i);
-		__online_page_set_limits(pg);
-		__online_page_increment_counters(pg);
-		__online_page_free(pg);
-	}
+	for (i = 0; i < size; i++)
+		hv_page_online_one(has, pfn_to_page(start_pfn + i));
 }
 
 static void hv_mem_hot_add(unsigned long start, unsigned long size,
@@ -640,27 +679,24 @@ static void hv_online_page(struct page *pg)
 	list_for_each(cur, &dm_device.ha_region_list) {
 		has = list_entry(cur, struct hv_hotadd_state, list);
 		cur_start_pgp = (unsigned long)
-				pfn_to_page(has->covered_start_pfn);
-		cur_end_pgp = (unsigned long)pfn_to_page(has->covered_end_pfn);
+			pfn_to_page(has->start_pfn);
+		cur_end_pgp = (unsigned long)pfn_to_page(has->end_pfn);
 
-		if (((unsigned long)pg >= cur_start_pgp) &&
-			((unsigned long)pg < cur_end_pgp)) {
-			/*
-			 * This frame is currently backed; online the
-			 * page.
-			 */
-			__online_page_set_limits(pg);
-			__online_page_increment_counters(pg);
-			__online_page_free(pg);
-			has->covered_start_pfn++;
-		}
+		/* The page belongs to a different HAS. */
+		if (((unsigned long)pg < cur_start_pgp) ||
+		    ((unsigned long)pg >= cur_end_pgp))
+			continue;
+
+		hv_page_online_one(has, pg);
+		break;
 	}
 }
 
-static bool pfn_covered(unsigned long start_pfn, unsigned long pfn_cnt)
+static int pfn_covered(unsigned long start_pfn, unsigned long pfn_cnt)
 {
 	struct list_head *cur;
 	struct hv_hotadd_state *has;
+	struct hv_hotadd_gap *gap;
 	unsigned long residual, new_inc;
 
 	if (list_empty(&dm_device.ha_region_list))
@@ -675,6 +711,24 @@ static bool pfn_covered(unsigned long start_pfn, unsigned long pfn_cnt)
 		 */
 		if (start_pfn < has->start_pfn || start_pfn >= has->end_pfn)
 			continue;
+
+		/*
+		 * If the current start pfn is not where the covered_end
+		 * is, create a gap and update covered_end_pfn.
+		 */
+		if (has->covered_end_pfn != start_pfn) {
+			gap = kzalloc(sizeof(struct hv_hotadd_gap), GFP_ATOMIC);
+			if (!gap)
+				return -ENOMEM;
+
+			INIT_LIST_HEAD(&gap->list);
+			gap->start_pfn = has->covered_end_pfn;
+			gap->end_pfn = start_pfn;
+			list_add_tail(&gap->list, &has->gap_list);
+
+			has->covered_end_pfn = start_pfn;
+		}
+
 		/*
 		 * If the current hot add-request extends beyond
 		 * our current limit; extend it.
@@ -691,20 +745,10 @@ static bool pfn_covered(unsigned long start_pfn, unsigned long pfn_cnt)
 			has->end_pfn += new_inc;
 		}
 
-		/*
-		 * If the current start pfn is not where the covered_end
-		 * is, update it.
-		 */
-
-		if (has->covered_end_pfn != start_pfn) {
-			has->covered_end_pfn = start_pfn;
-			has->covered_start_pfn = start_pfn;
-		}
-		return true;
-
+		return 1;
 	}
 
-	return false;
+	return 0;
 }
 
 static unsigned long handle_pg_range(unsigned long pg_start,
@@ -742,10 +786,12 @@ static unsigned long handle_pg_range(unsigned long pg_start,
 			pgs_ol = has->ha_end_pfn - start_pfn;
 			if (pgs_ol > pfn_cnt)
 				pgs_ol = pfn_cnt;
-			hv_bring_pgs_online(start_pfn, pgs_ol);
+
 			has->covered_end_pfn +=  pgs_ol;
 			has->covered_start_pfn +=  pgs_ol;
 			pfn_cnt -= pgs_ol;
+
+			hv_bring_pgs_online(has, start_pfn, pgs_ol);
 		}
 
 		if ((has->ha_end_pfn < has->end_pfn) && (pfn_cnt > 0)) {
@@ -783,13 +829,19 @@ static unsigned long process_hot_add(unsigned long pg_start,
 					unsigned long rg_size)
 {
 	struct hv_hotadd_state *ha_region = NULL;
+	int covered;
 
 	if (pfn_cnt == 0)
 		return 0;
 
-	if (!dm_device.host_specified_ha_region)
-		if (pfn_covered(pg_start, pfn_cnt))
+	if (!dm_device.host_specified_ha_region) {
+		covered = pfn_covered(pg_start, pfn_cnt);
+		if (covered < 0)
+			return 0;
+
+		if (covered)
 			goto do_pg_range;
+	}
 
 	/*
 	 * If the host has specified a hot-add range; deal with it first.
@@ -801,6 +853,7 @@ static unsigned long process_hot_add(unsigned long pg_start,
 			return 0;
 
 		INIT_LIST_HEAD(&ha_region->list);
+		INIT_LIST_HEAD(&ha_region->gap_list);
 
 		list_add_tail(&ha_region->list, &dm_device.ha_region_list);
 		ha_region->start_pfn = rg_start;
@@ -1503,6 +1556,7 @@ static int balloon_remove(struct hv_device *dev)
 	struct hv_dynmem_device *dm = hv_get_drvdata(dev);
 	struct list_head *cur, *tmp;
 	struct hv_hotadd_state *has;
+	struct hv_hotadd_gap *gap, *tmp_gap;
 
 	if (dm->num_pages_ballooned != 0)
 		pr_warn("Ballooned pages: %d\n", dm->num_pages_ballooned);
@@ -1518,6 +1572,10 @@ static int balloon_remove(struct hv_device *dev)
 #endif
 	list_for_each_safe(cur, tmp, &dm->ha_region_list) {
 		has = list_entry(cur, struct hv_hotadd_state, list);
+		list_for_each_entry_safe(gap, tmp_gap, &has->gap_list, list) {
+			list_del(&gap->list);
+			kfree(gap);
+		}
 		list_del(&has->list);
 		kfree(has);
 	}
