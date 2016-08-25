@@ -3713,6 +3713,12 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 	return decayed;
 }
 
+unsigned long sched_get_rt_rq_util(int cpu)
+{
+	struct rt_rq *rt_rq = &(cpu_rq(cpu)->rt);
+	return rt_rq->avg.util_avg;
+}
+
 /**
  * attach_entity_load_avg - attach this entity to its cfs_rq load avg
  * @cfs_rq: cfs_rq to attach to
