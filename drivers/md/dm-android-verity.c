@@ -576,15 +576,15 @@ static int add_as_linear_device(struct dm_target *ti, char *dev)
 					DM_LINEAR_TARGET_OFFSET};
 	int err = 0;
 
-	android_verity_target.dtr = linear_target.dtr,
-	android_verity_target.map = linear_target.map,
-	android_verity_target.status = linear_target.status,
-	android_verity_target.ioctl = linear_target.ioctl,
-	android_verity_target.merge = linear_target.merge,
-	android_verity_target.iterate_devices = linear_target.iterate_devices,
+	android_verity_target.dtr = dm_linear_dtr,
+	android_verity_target.map = dm_linear_map,
+	android_verity_target.status = dm_linear_status,
+	android_verity_target.ioctl = dm_linear_ioctl,
+	android_verity_target.merge = dm_linear_merge,
+	android_verity_target.iterate_devices = dm_linear_iterate_devices,
 	android_verity_target.io_hints = NULL;
 
-	err = linear_target.ctr(ti, DM_LINEAR_ARGS, linear_table_args);
+	err = dm_linear_ctr(ti, DM_LINEAR_ARGS, linear_table_args);
 
 	if (!err) {
 		DMINFO("Added android-verity as a linear target");
@@ -613,9 +613,8 @@ static int android_verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	/* One for specifying number of opt args and one for mode */
 	sector_t data_sectors;
 	u32 data_block_size;
-	unsigned int major, minor,
-	no_of_args = VERITY_TABLE_ARGS + 2 + VERITY_TABLE_OPT_FEC_ARGS;
-	struct fec_header fec;
+	unsigned int no_of_args = VERITY_TABLE_ARGS + 2 + VERITY_TABLE_OPT_FEC_ARGS;
+	struct fec_header uninitialized_var(fec);
 	struct fec_ecc_metadata uninitialized_var(ecc);
 	char buf[FEC_ARG_LENGTH], *buf_ptr;
 	unsigned long long tmpll;
@@ -630,13 +629,11 @@ static int android_verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	key_id = argv[0];
 	strreplace(argv[0], '#', ' ');
 
-	if (sscanf(argv[1], "%u:%u%c", &major, &minor, &dummy) == 2) {
-		dev = MKDEV(major, minor);
-		if (MAJOR(dev) != major || MINOR(dev) != minor) {
-			DMERR("Incorrect bdev major minor number");
-			handle_error();
-			return -EOVERFLOW;
-		}
+	dev = name_to_dev_t(argv[1]);
+	if (!dev) {
+		DMERR("no dev found for %s", argv[1]);
+		handle_error();
+		return -EINVAL;
 	}
 
 	DMINFO("key:%s dev:%s", argv[0], argv[1]);
