@@ -5698,26 +5698,26 @@ tracing_buffers_splice_read(struct file *file, loff_t *ppos,
 #ifdef CONFIG_TRACER_MAX_TRACE
 	if (iter->snapshot && iter->tr->current_trace->use_max_tr) {
 		ret = -EBUSY;
-		goto out;
+		goto unlock;
 	}
 #endif
 
-	if (splice_grow_spd(pipe, &spd)) {
-		ret = -ENOMEM;
-		goto out;
-	}
-
 	if (*ppos & (PAGE_SIZE - 1)) {
 		ret = -EINVAL;
-		goto out;
+		goto unlock;
 	}
 
 	if (len & (PAGE_SIZE - 1)) {
 		if (len < PAGE_SIZE) {
 			ret = -EINVAL;
-			goto out;
+			goto unlock;
 		}
 		len &= PAGE_MASK;
+	}
+
+	if (splice_grow_spd(pipe, &spd)) {
+		ret = -ENOMEM;
+		goto unlock;
 	}
 
  again:
@@ -5785,8 +5785,9 @@ tracing_buffers_splice_read(struct file *file, loff_t *ppos,
 	}
 
 	ret = splice_to_pipe(pipe, &spd);
-	splice_shrink_spd(&spd);
 out:
+	splice_shrink_spd(&spd);
+unlock:
 	mutex_unlock(&trace_types_lock);
 
 	return ret;
