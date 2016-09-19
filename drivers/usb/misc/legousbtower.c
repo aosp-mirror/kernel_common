@@ -893,23 +893,6 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 	dev->interrupt_in_interval = interrupt_in_interval ? interrupt_in_interval : dev->interrupt_in_endpoint->bInterval;
 	dev->interrupt_out_interval = interrupt_out_interval ? interrupt_out_interval : dev->interrupt_out_endpoint->bInterval;
 
-	/* we can register the device now, as it is ready */
-	usb_set_intfdata (interface, dev);
-
-	retval = usb_register_dev (interface, &tower_class);
-
-	if (retval) {
-		/* something prevented us from registering this driver */
-		dev_err(idev, "Not able to get a minor for this device.\n");
-		goto error;
-	}
-	dev->minor = interface->minor;
-
-	/* let the user know what node this device is now attached to */
-	dev_info(&interface->dev, "LEGO USB Tower #%d now attached to major "
-		 "%d minor %d\n", (dev->minor - LEGO_USB_TOWER_MINOR_BASE),
-		 USB_MAJOR, dev->minor);
-
 	get_version_reply = kmalloc(sizeof(*get_version_reply), GFP_KERNEL);
 
 	if (!get_version_reply) {
@@ -940,6 +923,22 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 		 get_version_reply->minor,
 		 le16_to_cpu(get_version_reply->build_no));
 
+	/* we can register the device now, as it is ready */
+	usb_set_intfdata (interface, dev);
+
+	retval = usb_register_dev (interface, &tower_class);
+
+	if (retval) {
+		/* something prevented us from registering this driver */
+		dev_err(idev, "Not able to get a minor for this device.\n");
+		goto error;
+	}
+	dev->minor = interface->minor;
+
+	/* let the user know what node this device is now attached to */
+	dev_info(&interface->dev, "LEGO USB Tower #%d now attached to major "
+		 "%d minor %d\n", (dev->minor - LEGO_USB_TOWER_MINOR_BASE),
+		 USB_MAJOR, dev->minor);
 
 exit:
 	kfree(get_version_reply);
