@@ -36,7 +36,7 @@ extern int nand_scan_ident(struct mtd_info *mtd, int max_chips,
 			   struct nand_flash_dev *table);
 extern int nand_scan_tail(struct mtd_info *mtd);
 
-/* Free resources held by the NAND device */
+/* Unregister the MTD device and free resources held by the NAND device */
 extern void nand_release(struct mtd_info *mtd);
 
 /* Internal helper for board drivers which need to override command function */
@@ -1012,4 +1012,8 @@ struct nand_sdr_timings {
 
 /* get timing characteristics from ONFI timing mode. */
 const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode);
+
+/* Free resources held by the NAND device */
+void nand_cleanup(struct nand_chip *chip);
+
 #endif /* __LINUX_MTD_NAND_H */
