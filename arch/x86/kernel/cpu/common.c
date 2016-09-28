@@ -727,22 +727,21 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 		identify_cpu_without_cpuid(c);
 
 	/* cyrix could have cpuid enabled via c_identify()*/
-	if (!have_cpuid_p())
-		return;
+	if (have_cpuid_p()) {
+		cpu_detect(c);
+		get_cpu_vendor(c);
+		get_cpu_cap(c);
+		fpu_detect(c);
 
-	cpu_detect(c);
-	get_cpu_vendor(c);
-	get_cpu_cap(c);
-	fpu_detect(c);
+		if (this_cpu->c_early_init)
+			this_cpu->c_early_init(c);
 
-	if (this_cpu->c_early_init)
-		this_cpu->c_early_init(c);
+		c->cpu_index = 0;
+		filter_cpuid_features(c, false);
 
-	c->cpu_index = 0;
-	filter_cpuid_features(c, false);
-
-	if (this_cpu->c_bsp_init)
-		this_cpu->c_bsp_init(c);
+		if (this_cpu->c_bsp_init)
+			this_cpu->c_bsp_init(c);
+	}
 
 	setup_force_cpu_cap(X86_FEATURE_ALWAYS);
 }
