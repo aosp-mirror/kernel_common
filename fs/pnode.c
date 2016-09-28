@@ -257,7 +257,7 @@ static int propagate_one(struct mount *m)
 	last_dest = m;
 	last_source = child;
 	hlist_add_head(&child->mnt_hash, list);
-	return 0;
+	return count_mounts(m->mnt_ns, child);
 }
 
 /*
