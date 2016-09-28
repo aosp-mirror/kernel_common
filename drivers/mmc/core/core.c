@@ -30,7 +30,13 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 
+#define CREATE_TRACE_POINTS
 #include <trace/events/mmc.h>
+
+EXPORT_TRACEPOINT_SYMBOL(mmc_blk_rw_end);
+EXPORT_TRACEPOINT_SYMBOL(mmc_blk_rw_start);
+EXPORT_TRACEPOINT_SYMBOL(mmc_blk_erase_start);
+EXPORT_TRACEPOINT_SYMBOL(mmc_blk_erase_end);
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
