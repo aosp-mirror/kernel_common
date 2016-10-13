@@ -5460,11 +5460,21 @@ compute_after:
 
 	/* Account for "after" metrics */
 	if (after) {
+		if (sg->group_weight == 1 &&
+		    cpumask_test_cpu(eenv->dst_cpu, sched_group_cpus(sg))) {
+			eenv->after.utilization = group_util;
+			eenv->after.capacity = cap;
+		}
 		eenv->after.energy += total_energy;
 		return;
 	}
 
 	/* Account for "before" metrics */
+	if (sg->group_weight == 1 &&
+	    cpumask_test_cpu(eenv->src_cpu, sched_group_cpus(sg))) {
+		eenv->after.utilization = group_util;
+		eenv->before.capacity = cap;
+	}
 	eenv->before.energy += total_energy;
 
 	/* Setup eenv for the "after" case */
@@ -5553,6 +5563,55 @@ static inline bool cpu_in_sg(struct sched_group *sg, int cpu)
 	return cpu != -1 && cpumask_test_cpu(cpu, sched_group_cpus(sg));
 }
 
+#ifdef CONFIG_SCHED_TUNE
+static inline int normalize_energy(int energy_diff);
+
+#define eenv_before(__X) eenv->before.__X
+#define eenv_after(__X)  eenv->after.__X
+#define eenv_delta(__X)  eenv->after.__X - eenv->before.__X
+
+static inline void
+__update_perf_energy_deltas(struct energy_env *eenv)
+{
+	unsigned long task_util = eenv->util_delta;
+
+	/*
+	 * SpeedUp Index
+	 *
+	 *   SPI := cpu_capacity - task_util
+	 *
+	 * which estimate how sooner a task will complete when running
+	 * on an higher OPP wrt the minimum required.
+	 */
+	eenv_before(speedup_idx) = eenv_before(capacity) - task_util;
+	eenv_after(speedup_idx)  = eenv_after(capacity) - task_util;
+
+	/*
+	 * Delay Index
+	 *
+	 *   DLI := 1024 * (cpu_util - task_util) / cpu_util
+	 *
+	 * which represents the "fraction" of CPU bandwidth consumed by other
+	 * tasks in the worst case, i.e. assuming all other tasks runs before.
+	 *
+	 * NOTE: in the above formula we assume that "cpu_util" includes
+	 *       already the task utilization.
+	 */
+	eenv_before(delay_idx)  =  SCHED_CAPACITY_SCALE;
+	eenv_before(delay_idx) *= (eenv_before(utilization) - task_util);
+	eenv_before(delay_idx) /=  eenv_before(utilization);
+	eenv_after(delay_idx)   =  SCHED_CAPACITY_SCALE;
+	eenv_after(delay_idx)  *= (eenv_after(utilization) - task_util);
+	eenv_after(delay_idx)  /=  eenv_after(utilization);
+
+	/* Performance Variation */
+	eenv->prf_delta = eenv_delta(speedup_idx) - eenv_delta(delay_idx);
+
+	/* Energy Variation */
+	eenv->nrg_delta = normalize_energy(eenv_delta(energy));
+
+}
+#endif
 /*
  * energy_diff(): Estimate the energy impact of changing the utilization
  * distribution. eenv specifies the change: utilisation amount, source, and
@@ -5587,6 +5646,9 @@ static inline int __energy_diff(struct energy_env *eenv)
 
 	} while (sg = sg->next, sg != sd->groups);
 
+	/*
+	 * Use absolute E variations for dead-zone filtering
+	 */
 	eenv->nrg_delta = eenv->before.energy - eenv->after.energy;
 
 	/*
@@ -5596,6 +5658,12 @@ static inline int __energy_diff(struct energy_env *eenv)
 	if (abs(eenv->nrg_delta) < margin)
 		eenv->nrg_delta = 0;
 
+#ifdef CONFIG_SCHED_TUNE
+	/*
+	 * Normalize E and P variations
+	 */
+	__update_perf_energy_deltas(eenv);
+#endif
 	return eenv->nrg_delta;
 }
 
