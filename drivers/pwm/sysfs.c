@@ -343,6 +343,8 @@ void pwmchip_sysfs_unexport(struct pwm_chip *chip)
 		if (test_bit(PWMF_EXPORTED, &pwm->flags))
 			pwm_unexport_child(parent, pwm);
 	}
+
+	put_device(parent);
 }
 
 static int __init pwm_sysfs_init(void)
