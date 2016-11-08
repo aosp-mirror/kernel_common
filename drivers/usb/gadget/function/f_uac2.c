@@ -1046,14 +1046,14 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	agdev->out_ep = usb_ep_autoconfig(gadget, &fs_epout_desc);
 	if (!agdev->out_ep) {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
-		goto err;
+		return ret;
 	}
 	agdev->out_ep->driver_data = agdev;
 
 	agdev->in_ep = usb_ep_autoconfig(gadget, &fs_epin_desc);
 	if (!agdev->in_ep) {
 		dev_err(dev, "%s:%d Error!\n", __func__, __LINE__);
-		goto err;
+		return ret;
 	}
 	agdev->in_ep->driver_data = agdev;
 
@@ -1067,7 +1067,7 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 
 	ret = usb_assign_descriptors(fn, fs_audio_desc, hs_audio_desc, NULL);
 	if (ret)
-		goto err;
+		return ret;
 
 	prm = &agdev->uac2.c_prm;
 	prm->max_psize = hs_epout_desc.wMaxPacketSize;
@@ -1082,16 +1082,14 @@ afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 	prm->rbuf = kzalloc(prm->max_psize * USB_XFERS, GFP_KERNEL);
 	if (!prm->rbuf) {
 		prm->max_psize = 0;
-		goto err_free_descs;
+		goto err;
 	}
 
 	ret = alsa_uac2_init(agdev);
 	if (ret)
-		goto err_free_descs;
+		goto err;
 	return 0;
 
-err_free_descs:
-	usb_free_all_descriptors(fn);
 err:
 	kfree(agdev->uac2.p_prm.rbuf);
 	kfree(agdev->uac2.c_prm.rbuf);
@@ -1099,6 +1097,8 @@ err:
 		agdev->in_ep->driver_data = NULL;
 	if (agdev->out_ep)
 		agdev->out_ep->driver_data = NULL;
+err_free_descs:
+	usb_free_all_descriptors(fn);
 	return -EINVAL;
 }
 
