@@ -261,7 +261,7 @@ struct fuse_io_priv {
 
 #define FUSE_IO_PRIV_SYNC(f) \
 {					\
-	.refcnt = { ATOMIC_INIT(1) },	\
+	.refcnt = KREF_INIT(1),		\
 	.async = 0,			\
 	.file = f,			\
 }
