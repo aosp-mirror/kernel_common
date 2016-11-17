@@ -271,6 +271,7 @@ static inline struct audio_dev *func_to_audio(struct usb_function *f)
 static struct usb_request *audio_request_new(struct usb_ep *ep, int buffer_size)
 {
 	struct usb_request *req = usb_ep_alloc_request(ep, GFP_KERNEL);
+
 	if (!req)
 		return NULL;
 
