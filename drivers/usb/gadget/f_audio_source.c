@@ -521,7 +521,7 @@ audio_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	return value;
 }
 
-static int audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
+static int audio_set_alt(struct usb_function *f, unsigned int intf, unsigned int alt)
 {
 	struct audio_dev *audio = func_to_audio(f);
 	struct usb_composite_dev *cdev = f->config->cdev;

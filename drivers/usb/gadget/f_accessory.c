@@ -549,7 +549,7 @@ static ssize_t acc_read(struct file *fp, char __user *buf,
 	struct acc_dev *dev = fp->private_data;
 	struct usb_request *req;
 	ssize_t r = count;
-	unsigned xfer;
+	unsigned int xfer;
 	int ret = 0;
 
 	pr_debug("acc_read(%zu)\n", count);
@@ -628,7 +628,7 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 	struct acc_dev *dev = fp->private_data;
 	struct usb_request *req = 0;
 	ssize_t r = count;
-	unsigned xfer;
+	unsigned int xfer;
 	int ret;
 
 	pr_debug("acc_write(%zu)\n", count);
@@ -693,7 +693,7 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 	return r;
 }
 
-static long acc_ioctl(struct file *fp, unsigned code, unsigned long value)
+static long acc_ioctl(struct file *fp, unsigned int code, unsigned long value)
 {
 	struct acc_dev *dev = fp->private_data;
 	char *src = NULL;
@@ -1082,7 +1082,7 @@ static void acc_hid_work(struct work_struct *data)
 }
 
 static int acc_function_set_alt(struct usb_function *f,
-		unsigned intf, unsigned alt)
+		unsigned int intf, unsigned int alt)
 {
 	struct acc_dev	*dev = func_to_dev(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
