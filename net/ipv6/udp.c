@@ -570,7 +570,7 @@ out:
 	sock_put(sk);
 }
 
-static int __udpv6_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
+int __udpv6_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	int rc;
 
