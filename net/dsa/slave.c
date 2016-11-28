@@ -466,7 +466,7 @@ static void dsa_slave_phy_setup(struct dsa_slave_priv *p,
 	p->phy_interface = of_get_phy_mode(port_dn);
 
 	phy_dn = of_parse_phandle(port_dn, "phy-handle", 0);
-	if (of_phy_is_fixed_link(port_dn)) {
+	if (!phy_dn && of_phy_is_fixed_link(port_dn)) {
 		/* In the case of a fixed PHY, the DT node associated
 		 * to the fixed PHY is the Port DT node
 		 */
@@ -476,16 +476,18 @@ static void dsa_slave_phy_setup(struct dsa_slave_priv *p,
 			return;
 		}
 		phy_is_fixed = true;
-		phy_dn = port_dn;
+		phy_dn = of_node_get(port_dn);
 	}
 
 	if (ds->drv->get_phy_flags)
 		phy_flags = ds->drv->get_phy_flags(ds, p->port);
 
-	if (phy_dn)
+	if (phy_dn) {
 		p->phy = of_phy_connect(slave_dev, phy_dn,
 					dsa_slave_adjust_link, phy_flags,
 					p->phy_interface);
+		of_node_put(phy_dn);
+	}
 
 	if (p->phy && phy_is_fixed)
 		fixed_phy_set_link_update(p->phy, dsa_slave_fixed_link_update);
