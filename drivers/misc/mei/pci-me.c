@@ -82,6 +82,7 @@ static const struct pci_device_id mei_me_pci_tbl[] = {
 	{MEI_PCI_DEVICE(MEI_DEV_ID_LPT_HR, mei_me_lpt_cfg)},
 	{MEI_PCI_DEVICE(MEI_DEV_ID_WPT_LP, mei_me_pch_cfg)},
 	{MEI_PCI_DEVICE(MEI_DEV_ID_WPT_LP_2, mei_me_pch_cfg)},
+	{MEI_PCI_DEVICE(MEI_DEV_ID_LBG, mei_me_pch8_cfg)},
 
 	{MEI_PCI_DEVICE(MEI_DEV_ID_BXT_M, mei_me_pch8_cfg)},
 	{MEI_PCI_DEVICE(MEI_DEV_ID_APL_I, mei_me_pch8_cfg)},
