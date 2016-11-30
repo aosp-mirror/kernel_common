@@ -822,6 +822,8 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
 		if (ghes_read_estatus(ghes, 1)) {
 			ghes_clear_estatus(ghes);
 			continue;
+		} else {
+			ret = NMI_HANDLED;
 		}
 		sev = ghes_severity(ghes->estatus->error_severity);
 		if (sev > sev_global) {
@@ -873,7 +875,8 @@ next:
 		ghes_clear_estatus(ghes);
 	}
 #ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
-	irq_work_queue(&ghes_proc_irq_work);
+	if (ret == NMI_HANDLED)
+		irq_work_queue(&ghes_proc_irq_work);
 #endif
 
 out:
