@@ -274,6 +274,8 @@ EXPORT_SYMBOL(blk_limits_max_hw_sectors);
 void blk_queue_max_hw_sectors(struct request_queue *q, unsigned int max_hw_sectors)
 {
 	blk_limits_max_hw_sectors(&q->limits, max_hw_sectors);
+	q->backing_dev_info.io_pages =
+			q->limits.max_sectors >> (PAGE_SHIFT - 9);
 }
 EXPORT_SYMBOL(blk_queue_max_hw_sectors);
 
