@@ -228,17 +228,19 @@ static inline void mb_reset(struct tipc_msg_buf *mb)
 	mb->rpos = 0;
 }
 
-static void _free_chan(struct kref *kref)
-{
-	struct tipc_chan *ch = container_of(kref, struct tipc_chan, refcount);
-	kfree(ch);
-}
-
 static void _free_vds(struct kref *kref)
 {
 	struct tipc_virtio_dev *vds =
 		container_of(kref, struct tipc_virtio_dev, refcount);
 	kfree(vds);
+}
+
+static void _free_chan(struct kref *kref)
+{
+	struct tipc_chan *ch = container_of(kref, struct tipc_chan, refcount);
+
+	kref_put(&ch->vds->refcount, _free_vds);
+	kfree(ch);
 }
 
 static struct tipc_msg_buf *vds_alloc_msg_buf(struct tipc_virtio_dev *vds)
@@ -299,9 +301,6 @@ static struct tipc_msg_buf *_vds_get_txbuf(struct tipc_virtio_dev *vds)
 
 static void vds_put_txbuf(struct tipc_virtio_dev *vds, struct tipc_msg_buf *mb)
 {
-	if (!vds)
-		return;
-
 	mutex_lock(&vds->lock);
 	_put_txbuf_locked(vds, mb);
 	wake_up_interruptible(&vds->sendq);
@@ -312,9 +311,6 @@ static struct tipc_msg_buf *vds_get_txbuf(struct tipc_virtio_dev *vds,
 					  long timeout)
 {
 	struct tipc_msg_buf *mb;
-
-	if (!vds)
-		return ERR_PTR(-EINVAL);
 
 	mb = _vds_get_txbuf(vds);
 
@@ -361,9 +357,6 @@ static int vds_queue_txbuf(struct tipc_virtio_dev *vds,
 	int err;
 	struct scatterlist sg;
 	bool need_notify = false;
-
-	if (!vds)
-		return -EINVAL;
 
 	mutex_lock(&vds->lock);
 	if (vds->state == VDS_ONLINE) {
@@ -687,13 +680,7 @@ EXPORT_SYMBOL(tipc_chan_shutdown);
 
 void tipc_chan_destroy(struct tipc_chan *chan)
 {
-	mutex_lock(&chan->lock);
-	if (chan->vds) {
-		vds_del_channel(chan->vds, chan);
-		kref_put(&chan->vds->refcount, _free_vds);
-		chan->vds = NULL;
-	}
-	mutex_unlock(&chan->lock);
+	vds_del_channel(chan->vds, chan);
 	kref_put(&chan->refcount, _free_chan);
 }
 EXPORT_SYMBOL(tipc_chan_destroy);
