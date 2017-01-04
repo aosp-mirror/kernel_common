@@ -357,6 +357,9 @@ static void snd_complete_urb(struct urb *urb)
 		     ep->chip->shutdown))		/* device disconnected */
 		goto exit_clear;
 
+	if (unlikely(!test_bit(EP_FLAG_RUNNING, &ep->flags)))
+		goto exit_clear;
+
 	if (usb_pipeout(ep->pipe)) {
 		retire_outbound_urb(ep, ctx);
 		/* can be stopped during retire callback */
