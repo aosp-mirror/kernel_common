@@ -37,6 +37,16 @@ config SECURITY_SELINUX_DEVELOP
 	  permissive mode (if permitted by the policy) via
 	  /sys/fs/selinux/enforce.
 
+config SECURITY_SELINUX_PERMISSIVE_DONTAUDIT
+	bool "NSA SELinux don't audit permissive"
+	depends on SECURITY_SELINUX
+	default n
+	help
+	  This prevents logging when permissive=1.  If unsure, say N.  With
+	  this option enabled, any avc logs that would occur on a permissive
+	  domain won't be logged.  This can prevent a significant amount of
+	  logspam.
+
 config SECURITY_SELINUX_AVC_STATS
 	bool "SELinux AVC Statistics"
 	depends on SECURITY_SELINUX

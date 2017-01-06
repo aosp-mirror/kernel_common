@@ -771,6 +771,15 @@ noinline int slow_avc_audit(u32 ssid, u32 tsid, u16 tclass,
 	if (WARN_ON(!tclass || tclass >= ARRAY_SIZE(secclass_map)))
 		return -EINVAL;
 
+	/*
+	 * Avoid logging permissive=1 messages for
+	 * SECURITY_SELINUX_PERMISSIVE_DONTAUDIT.
+	 */
+	if (IS_ENABLED(CONFIG_SECURITY_SELINUX_PERMISSIVE_DONTAUDIT) && denied
+	    && !result) {
+		return 0;
+	}
+
 	if (!a) {
 		a = &stack_data;
 		a->type = LSM_AUDIT_DATA_NONE;
