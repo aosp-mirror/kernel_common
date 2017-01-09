@@ -5364,7 +5364,8 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 	ext4_lblk_t ex_start, ex_end;
 
 	/* Let path point to the last extent */
-	path = ext4_find_extent(inode, EXT_MAX_BLOCKS - 1, NULL, 0);
+	path = ext4_find_extent(inode, EXT_MAX_BLOCKS - 1, NULL,
+				EXT4_EX_NOCACHE);
 	if (IS_ERR(path))
 		return PTR_ERR(path);
 
@@ -5384,7 +5385,8 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 	 * Don't start shifting extents until we make sure the hole is big
 	 * enough to accomodate the shift.
 	 */
-	path = ext4_find_extent(inode, start - 1, &path, 0);
+	path = ext4_find_extent(inode, start - 1, &path,
+				EXT4_EX_NOCACHE);
 	if (IS_ERR(path))
 		return PTR_ERR(path);
 	depth = path->p_depth;
@@ -5404,7 +5406,8 @@ ext4_ext_shift_extents(struct inode *inode, handle_t *handle,
 
 	/* Its safe to start updating extents */
 	while (start < stop_block) {
-		path = ext4_find_extent(inode, start, &path, 0);
+		path = ext4_find_extent(inode, start, &path,
+					EXT4_EX_NOCACHE);
 		if (IS_ERR(path))
 			return PTR_ERR(path);
 		depth = path->p_depth;
