@@ -260,7 +260,7 @@ void fixup_perms_recursive(struct dentry *dentry, struct limit_search *limit) {
 	struct sdcardfs_inode_info *info;
 	if (!dget(dentry))
 		return;
-	if (!dentry)) {
+	if (!d_inode(dentry)) {
 		dput(dentry);
 		return;
 	}
