@@ -70,7 +70,7 @@ ENDPROC(__get_user_4)
 _ASM_NOKPROBE(__get_user_4)
 
 ENTRY(__get_user_8)
-	check_uaccess r0, 8, r1, r2, __get_user_bad
+	check_uaccess r0, 8, r1, r2, __get_user_bad8
 #ifdef CONFIG_THUMB2_KERNEL
 5: TUSER(ldr)	r2, [r0]
 6: TUSER(ldr)	r3, [r0, #4]
