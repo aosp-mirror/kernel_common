@@ -653,7 +653,7 @@ void sta_info_recalc_tim(struct sta_info *sta)
 	}
 
 	/* No need to do anything if the driver does all */
-	if (local->hw.flags & IEEE80211_HW_AP_LINK_PS)
+	if (local->hw.flags & IEEE80211_HW_AP_LINK_PS && !local->ops->set_tim)
 		return;
 
 	if (sta->dead)
