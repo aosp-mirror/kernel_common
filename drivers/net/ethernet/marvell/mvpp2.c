@@ -4410,14 +4410,13 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *port,
 							txq_pcpu->txq_get_index;
 		struct sk_buff *skb = txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
 
-		mvpp2_txq_inc_get(txq_pcpu);
-
-		if (!skb)
-			continue;
 
 		dma_unmap_single(port->dev->dev.parent, tx_desc->buf_phys_addr,
 				 tx_desc->data_size, DMA_TO_DEVICE);
-		dev_kfree_skb_any(skb);
+		if (skb)
+			dev_kfree_skb_any(skb);
+
+		mvpp2_txq_inc_get(txq_pcpu);
 	}
 }
 
