@@ -830,7 +830,9 @@ static ssize_t message_show(struct kobject *kobj,
 	struct msg_group_t *group = spk_find_msg_group(attr->attr.name);
 	unsigned long flags;
 
-	BUG_ON(!group);
+	if (WARN_ON(!group))
+		return -EINVAL;
+
 	spin_lock_irqsave(&speakup_info.spinlock, flags);
 	retval = message_show_helper(buf, group->start, group->end);
 	spin_unlock_irqrestore(&speakup_info.spinlock, flags);
@@ -843,7 +845,9 @@ static ssize_t message_store(struct kobject *kobj, struct kobj_attribute *attr,
 	ssize_t retval = 0;
 	struct msg_group_t *group = spk_find_msg_group(attr->attr.name);
 
-	BUG_ON(!group);
+	if (WARN_ON(!group))
+		return -EINVAL;
+
 	retval = message_store_helper(buf, count, group);
 	return retval;
 }
