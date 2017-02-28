@@ -143,9 +143,6 @@ static int omap_gem_dmabuf_mmap(struct dma_buf *buffer,
 	struct drm_device *dev = obj->dev;
 	int ret = 0;
 
-	if (WARN_ON(!obj->filp))
-		return -EINVAL;
-
 	mutex_lock(&dev->struct_mutex);
 	ret = drm_gem_mmap_obj(obj, omap_gem_mmap_size(obj), vma);
 	mutex_unlock(&dev->struct_mutex);
