@@ -107,6 +107,7 @@ struct bnx2x_vf_mac_vlan_filter {
 #define BNX2X_VF_FILTER_VLAN	2
 
 	bool add;
+	bool applied;
 	u8 *mac;
 	u16 vid;
 };
