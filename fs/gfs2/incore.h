@@ -204,7 +204,7 @@ enum {
 struct lm_lockname {
 	u64 ln_number;
 	unsigned int ln_type;
-};
+} __packed __aligned(sizeof(int));
 
 #define lm_name_equal(name1, name2) \
         (((name1)->ln_number == (name2)->ln_number) && \
