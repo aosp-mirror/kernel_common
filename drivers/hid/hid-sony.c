@@ -622,6 +622,10 @@ struct ds4_calibration_data {
 	int sens_denom;
 };
 
+enum sony_worker {
+	SONY_WORKER_STATE
+};
+
 struct sony_sc {
 	spinlock_t lock;
 	struct list_head list_node;
@@ -643,7 +647,7 @@ struct sony_sc {
 #endif
 
 	u8 mac_address[6];
-	u8 worker_initialized;
+	u8 state_worker_initialized;
 	u8 defer_initialization;
 	u8 cable_state;
 	u8 battery_charging;
@@ -664,10 +668,14 @@ struct sony_sc {
 
 static void sony_set_leds(struct sony_sc *sc);
 
-static inline void sony_schedule_work(struct sony_sc *sc)
+static inline void sony_schedule_work(struct sony_sc *sc,
+				      enum sony_worker which)
 {
-	if (!sc->defer_initialization)
-		schedule_work(&sc->state_worker);
+	switch (which) {
+	case SONY_WORKER_STATE:
+		if (!sc->defer_initialization)
+			schedule_work(&sc->state_worker);
+	}
 }
 
 static u8 *sixaxis_fixup(struct hid_device *hdev, u8 *rdesc,
@@ -1098,7 +1106,7 @@ static int sony_raw_event(struct hid_device *hdev, struct hid_report *report,
 
 	if (sc->defer_initialization) {
 		sc->defer_initialization = 0;
-		sony_schedule_work(sc);
+		sony_schedule_work(sc, SONY_WORKER_STATE);
 	}
 
 	return 0;
@@ -1579,7 +1587,7 @@ static void buzz_set_leds(struct sony_sc *sc)
 static void sony_set_leds(struct sony_sc *sc)
 {
 	if (!(sc->quirks & BUZZ_CONTROLLER))
-		sony_schedule_work(sc);
+		sony_schedule_work(sc, SONY_WORKER_STATE);
 	else
 		buzz_set_leds(sc);
 }
@@ -1690,7 +1698,7 @@ static int sony_led_blink_set(struct led_classdev *led, unsigned long *delay_on,
 		new_off != drv_data->led_delay_off[n]) {
 		drv_data->led_delay_on[n] = new_on;
 		drv_data->led_delay_off[n] = new_off;
-		sony_schedule_work(drv_data);
+		sony_schedule_work(drv_data, SONY_WORKER_STATE);
 	}
 
 	return 0;
@@ -2020,7 +2028,7 @@ static int sony_play_effect(struct input_dev *dev, void *data,
 	sc->left = effect->u.rumble.strong_magnitude / 256;
 	sc->right = effect->u.rumble.weak_magnitude / 256;
 
-	sony_schedule_work(sc);
+	sony_schedule_work(sc, SONY_WORKER_STATE);
 	return 0;
 }
 
@@ -2347,15 +2355,15 @@ static inline void sony_init_output_report(struct sony_sc *sc,
 {
 	sc->send_output_report = send_output_report;
 
-	if (!sc->worker_initialized)
+	if (!sc->state_worker_initialized)
 		INIT_WORK(&sc->state_worker, sony_state_worker);
 
-	sc->worker_initialized = 1;
+	sc->state_worker_initialized = 1;
 }
 
 static inline void sony_cancel_work_sync(struct sony_sc *sc)
 {
-	if (sc->worker_initialized)
+	if (sc->state_worker_initialized)
 		cancel_work_sync(&sc->state_worker);
 }
 
