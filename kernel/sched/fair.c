@@ -3316,6 +3316,9 @@ __update_load_avg_cfs_rq(u64 now, int cpu, struct cfs_rq *cfs_rq)
 				cfs_rq->curr != NULL)) {
 
 		___update_load_avg(&cfs_rq->avg, 1, 1);
+
+		trace_sched_load_cfs_rq(cfs_rq);
+
 		return 1;
 	}
 
@@ -3593,6 +3596,8 @@ static inline int propagate_entity_load_avg(struct sched_entity *se)
 	update_tg_cfs_util(cfs_rq, se, gcfs_rq);
 	update_tg_cfs_runnable(cfs_rq, se, gcfs_rq);
 
+	trace_sched_load_cfs_rq(cfs_rq);
+
 	return 1;
 }
 
@@ -3744,6 +3749,8 @@ static void attach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 	add_tg_cfs_propagate(cfs_rq, se->avg.load_sum);
 
 	cfs_rq_util_change(cfs_rq);
+
+	trace_sched_load_cfs_rq(cfs_rq);
 }
 
 /**
@@ -3763,6 +3770,8 @@ static void detach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 	add_tg_cfs_propagate(cfs_rq, -se->avg.load_sum);
 
 	cfs_rq_util_change(cfs_rq);
+
+	trace_sched_load_cfs_rq(cfs_rq);
 }
 
 /*
