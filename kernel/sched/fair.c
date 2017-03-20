@@ -3281,6 +3281,9 @@ __update_load_avg_blocked_se(u64 now, int cpu, struct sched_entity *se)
 
 	if (___update_load_sum(now, cpu, &se->avg, 0, 0, 0)) {
 		___update_load_avg(&se->avg, se_weight(se), se_runnable(se));
+
+		trace_sched_load_se(se);
+
 		return 1;
 	}
 
@@ -3297,6 +3300,9 @@ __update_load_avg_se(u64 now, int cpu, struct cfs_rq *cfs_rq, struct sched_entit
 				cfs_rq->curr == se)) {
 
 		___update_load_avg(&se->avg, se_weight(se), se_runnable(se));
+
+		trace_sched_load_se(se);
+
 		return 1;
 	}
 
@@ -3593,6 +3599,7 @@ static inline int propagate_entity_load_avg(struct sched_entity *se)
 	update_tg_cfs_runnable(cfs_rq, se, gcfs_rq);
 
 	trace_sched_load_cfs_rq(cfs_rq);
+	trace_sched_load_se(se);
 
 	return 1;
 }
