@@ -485,28 +485,6 @@ void pci_iov_release(struct pci_dev *dev)
 }
 
 /**
- * pci_iov_resource_bar - get position of the SR-IOV BAR
- * @dev: the PCI device
- * @resno: the resource number
- * @type: the BAR type to be filled in
- *
- * Returns position of the BAR encapsulated in the SR-IOV capability.
- */
-int pci_iov_resource_bar(struct pci_dev *dev, int resno,
-			 enum pci_bar_type *type)
-{
-	if (resno < PCI_IOV_RESOURCES || resno > PCI_IOV_RESOURCE_END)
-		return 0;
-
-	BUG_ON(!dev->is_physfn);
-
-	*type = pci_bar_unknown;
-
-	return dev->sriov->pos + PCI_SRIOV_BAR +
-		4 * (resno - PCI_IOV_RESOURCES);
-}
-
-/**
  * pci_sriov_resource_alignment - get resource alignment for VF BAR
  * @dev: the PCI device
  * @resno: the resource number
