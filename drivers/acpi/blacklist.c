@@ -371,6 +371,17 @@ static struct dmi_system_id acpi_osi_dmi_table[] __initdata = {
 		     DMI_MATCH(DMI_PRODUCT_NAME, "1015PX"),
 		},
 	},
+	/*
+	 * Resolves a quirk with the Dell Latitude 3350 that
+	 * causes the ethernet adapter to not function.
+	 */
+	{
+	 .ident = "DELL Latitude 3350",
+	 .matches = {
+		      DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+		      DMI_MATCH(DMI_PRODUCT_NAME, "Latitude 3350"),
+		},
+	},
 	{}
 };
 
