@@ -5762,6 +5762,7 @@ energy_diff(struct energy_env *eenv)
 
 out:
 	trace_sched_energy_diff(eenv);
+	trace_sched_energy_perf_deltas(eenv);
 
 	return ret;
 }

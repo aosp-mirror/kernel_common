@@ -945,6 +945,72 @@ TRACE_EVENT(sched_energy_diff,
 
 );
 
+TRACE_EVENT(sched_energy_perf_deltas,
+
+
+	TP_PROTO(struct energy_env *eenv),
+
+	TP_ARGS(eenv),
+
+	TP_STRUCT__entry(
+		__array( char,	comm,	TASK_COMM_LEN	)
+		__field( pid_t,		pid	)
+		__field( int,		s_cpu	)
+		__field( int,		d_cpu	)
+		__field( int,		utl_d	)
+
+		__field( unsigned,	cap_b	)
+		__field( unsigned,	cpu_b	)
+		__field( unsigned,	spi_b	)
+		__field( unsigned,	dli_b	)
+
+		__field( unsigned,	cap_a	)
+		__field( unsigned,	cpu_a	)
+		__field( unsigned,	spi_a	)
+		__field( unsigned,	dli_a	)
+
+		__field( int,		nrg_d	)
+		__field( int,		prf_d	)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->comm,	eenv->task->comm, TASK_COMM_LEN);
+		__entry->pid	= eenv->task->pid;
+		__entry->s_cpu 	= eenv->src_cpu;
+		__entry->d_cpu 	= eenv->dst_cpu;
+		__entry->utl_d 	= eenv->util_delta;
+
+		__entry->cap_b  = eenv->before.capacity;
+		__entry->cpu_b 	= eenv->before.utilization;
+		__entry->spi_b 	= eenv->before.speedup_idx;
+		__entry->dli_b 	= eenv->before.delay_idx;
+
+		__entry->cap_a  = eenv->after.capacity;
+		__entry->cpu_a 	= eenv->after.utilization;
+		__entry->spi_a 	= eenv->after.speedup_idx;
+		__entry->dli_a 	= eenv->after.delay_idx;
+
+		__entry->prf_d	= eenv->prf_delta;
+		__entry->nrg_d	= eenv->nrg_delta;
+	),
+
+	TP_printk("pid=%d comm=%s s_cpu=%d d_cpu=%d utl_d=%d "
+			"cap_b=%u cap_a=%u "
+			"cpu_b=%u cpu_a=%u "
+			"spi_b=%u spi_a=%u "
+			"dli_b=%u dli_a=%u "
+			"prf_d=%d nrg_d=%d",
+		__entry->pid,   __entry->comm,
+		__entry->s_cpu, __entry->d_cpu,
+		__entry->utl_d,
+		__entry->cap_b, __entry->cap_a,
+		__entry->cpu_b, __entry->cpu_a,
+		__entry->spi_b, __entry->spi_a,
+		__entry->dli_b, __entry->dli_a,
+		__entry->prf_d, __entry->nrg_d)
+
+);
+
 /*
  * Tracepoint for schedtune_tasks_update
  */
