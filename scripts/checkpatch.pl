@@ -2243,7 +2243,8 @@ sub process {
 		}
 
 # Check for git id commit length and improperly formed commit descriptions
-		if ($in_commit_log && $line =~ /\b(c)ommit\s+([0-9a-f]{5,})/i) {
+		if ($in_commit_log && $line =~ /\b(c)ommit\s+([0-9a-f]{5,})/i &&
+		    $line !~ /^This reverts commit [0-9a-f]{7,40}/) {
 			my $init_char = $1;
 			my $orig_commit = lc($2);
 			my $short = 1;
