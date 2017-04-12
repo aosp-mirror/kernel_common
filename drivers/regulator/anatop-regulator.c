@@ -291,6 +291,11 @@ static int anatop_regulator_probe(struct platform_device *pdev)
 		 */
 		if (!sreg->sel && !strcmp(sreg->name, "vddpu"))
 			sreg->sel = 22;
+
+		/* set the default voltage of the pcie phy to be 1.100v */
+		if (!sreg->sel && rdesc->name &&
+		    !strcmp(rdesc->name, "vddpcie"))
+			sreg->sel = 0x10;
 	} else {
 		rdesc->ops = &anatop_rops;
 	}
