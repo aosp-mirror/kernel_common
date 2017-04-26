@@ -261,3 +261,25 @@ int ecryptfs_read_lower_page_segment(struct page *page_for_ecryptfs,
 	flush_dcache_page(page_for_ecryptfs);
 	return rc;
 }
+
+/**
+ * ecryptfs_fsync_lower
+ * @ecryptfs_inode: The eCryptfs inode
+ * @datasync: Only perform a fdatasync operation
+ *
+ * Write back data and metadata for the lower file to disk.  If @datasync is
+ * set only metadata needed to access modified file data is written.
+ *
+ * Returns 0 on success; less than zero on error
+ */
+int ecryptfs_fsync_lower(struct inode *ecryptfs_inode, int datasync)
+{
+	struct file *lower_file;
+
+	lower_file = ecryptfs_inode_to_private(ecryptfs_inode)->lower_file;
+	if (!lower_file)
+		return -EIO;
+	if (!lower_file->f_op->fsync)
+		return 0;
+	return vfs_fsync(lower_file, datasync);
+}

@@ -800,6 +800,12 @@ static int truncate_upper(struct dentry *dentry, struct iattr *ia,
 			       "rc = [%d]\n", rc);
 			goto out;
 		}
+		rc = ecryptfs_fsync_lower(inode, 1);
+		if (rc) {
+			printk(KERN_WARNING "Problem with ecryptfs_fsync_lower,"
+			       "continue without syncing; "
+			       "rc = [%d]\n", rc);
+		}
 		/* We are reducing the size of the ecryptfs file, and need to
 		 * know if we need to reduce the size of the lower file. */
 		lower_size_before_truncate =
