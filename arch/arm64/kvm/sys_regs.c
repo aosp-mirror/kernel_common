@@ -791,12 +791,12 @@ static int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
 {
 	struct sys_reg_params params;
 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
-	int Rt2 = (hsr >> 10) & 0xf;
+	int Rt2 = (hsr >> 10) & 0x1f;
 
 	params.is_aarch32 = true;
 	params.is_32bit = false;
 	params.CRm = (hsr >> 1) & 0xf;
-	params.Rt = (hsr >> 5) & 0xf;
+	params.Rt = (hsr >> 5) & 0x1f;
 	params.is_write = ((hsr & 1) == 0);
 
 	params.Op0 = 0;
@@ -851,7 +851,7 @@ static int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
 	params.is_aarch32 = true;
 	params.is_32bit = true;
 	params.CRm = (hsr >> 1) & 0xf;
-	params.Rt  = (hsr >> 5) & 0xf;
+	params.Rt  = (hsr >> 5) & 0x1f;
 	params.is_write = ((hsr & 1) == 0);
 	params.CRn = (hsr >> 10) & 0xf;
 	params.Op0 = 0;
