@@ -1989,8 +1989,7 @@ abort_transaction_no_dev_fatal:
 	netif_set_real_num_tx_queues(info->netdev, 0);
 	rtnl_unlock();
  out:
-	unregister_netdev(info->netdev);
-	xennet_free_netdev(info->netdev);
+	device_unregister(&dev->dev);
 	return err;
 }
 
