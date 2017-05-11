@@ -46,3 +46,7 @@
     __has_builtin(__builtin_sub_overflow)
 #define COMPILER_HAS_GENERIC_BUILTIN_OVERFLOW 1
 #endif
+
+#ifdef CONFIG_CFI_CLANG
+#define __nocfi		__attribute__((no_sanitize("cfi")))
+#endif
