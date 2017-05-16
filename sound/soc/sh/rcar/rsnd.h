@@ -177,6 +177,7 @@ void  rsnd_dma_quit(struct rsnd_priv *priv,
  */
 enum rsnd_mod_type {
 	RSND_MOD_SRC = 0,
+	RSND_MOD_SSIP, /* SSI parent */
 	RSND_MOD_SSI,
 	RSND_MOD_DVC,
 	RSND_MOD_MAX,
@@ -240,6 +241,7 @@ struct rsnd_dai_stream {
 	int next_period_byte;
 };
 #define rsnd_io_to_mod_ssi(io)	((io)->mod[RSND_MOD_SSI])
+#define rsnd_io_to_mod_ssip(io) ((io)->mod[RSND_MOD_SSIP])
 #define rsnd_io_to_mod_src(io)	((io)->mod[RSND_MOD_SRC])
 #define rsnd_io_to_mod_dvc(io)	((io)->mod[RSND_MOD_DVC])
 
