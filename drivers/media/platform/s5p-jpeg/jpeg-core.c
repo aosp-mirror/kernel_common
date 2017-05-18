@@ -894,7 +894,7 @@ static bool s5p_jpeg_parse_hdr(struct s5p_jpeg_q_data *result,
 			       struct s5p_jpeg_ctx *ctx)
 {
 	int c, components = 0, notfound;
-	unsigned int height, width, word, subsampling = 0;
+	unsigned int height = 0, width = 0, word, subsampling = 0;
 	long length;
 	struct s5p_jpeg_buffer jpeg_buffer;
 
