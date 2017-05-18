@@ -281,8 +281,10 @@ static void xen_blkif_free(struct xen_blkif *blkif)
 	struct pending_req *req, *n;
 	int i = 0, j;
 
-	xen_blkif_disconnect(blkif);
+	WARN_ON(xen_blkif_disconnect(blkif));
 	xen_vbd_free(&blkif->vbd);
+	kfree(blkif->be->mode);
+	kfree(blkif->be);
 
 	/* Make sure everything is drained before shutting down */
 	BUG_ON(blkif->persistent_gnt_c != 0);
@@ -475,8 +477,6 @@ static int xen_blkbk_remove(struct xenbus_device *dev)
 		xen_blkif_put(be->blkif);
 	}
 
-	kfree(be->mode);
-	kfree(be);
 	return 0;
 }
 
