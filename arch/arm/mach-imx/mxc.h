@@ -38,6 +38,7 @@
 #define MXC_CPU_IMX6DL		0x61
 #define MXC_CPU_IMX6SX		0x62
 #define MXC_CPU_IMX6Q		0x63
+#define MXC_CPU_IMX6ULL		0x65
 
 #define IMX_CHIP_REVISION_1_0		0x10
 #define IMX_CHIP_REVISION_1_1		0x11
@@ -176,6 +177,11 @@ static inline bool cpu_is_imx6dl(void)
 static inline bool cpu_is_imx6sx(void)
 {
 	return __mxc_cpu_type == MXC_CPU_IMX6SX;
+}
+
+static inline bool cpu_is_imx6ull(void)
+{
+	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
 }
 
 static inline bool cpu_is_imx6q(void)
