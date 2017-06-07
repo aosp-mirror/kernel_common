@@ -216,10 +216,13 @@ struct binder_error {
  *                        and by @lock)
  * @has_async_transaction: async transaction to node in progress
  *                        (protected by @lock)
+ * @sched_policy:         minimum scheduling policy for node
+ *                        (invariant after initialized)
  * @accept_fds:           file descriptor operations supported for node
  *                        (invariant after initialized)
  * @min_priority:         minimum scheduling priority
  *                        (invariant after initialized)
+ * @inherit_rt:           inherit RT scheduling policy from caller
  * @txn_security_ctx:     require sender's security context
  *                        (invariant after initialized)
  * @async_todo:           list of async work items
@@ -257,6 +260,8 @@ struct binder_node {
 		/*
 		 * invariant after initialization
 		 */
+		u8 sched_policy:2;
+		u8 inherit_rt:1;
 		u8 accept_fds:1;
 		u8 txn_security_ctx:1;
 		u8 min_priority;
@@ -323,6 +328,22 @@ struct binder_ref {
 	struct binder_proc *proc;
 	struct binder_node *node;
 	struct binder_ref_death *death;
+};
+
+/**
+ * struct binder_priority - scheduler policy and priority
+ * @sched_policy            scheduler policy
+ * @prio                    [100..139] for SCHED_NORMAL, [0..99] for FIFO/RT
+ *
+ * The binder driver supports inheriting the following scheduler policies:
+ * SCHED_NORMAL
+ * SCHED_BATCH
+ * SCHED_FIFO
+ * SCHED_RR
+ */
+struct binder_priority {
+	unsigned int sched_policy;
+	int prio;
 };
 
 /**
@@ -425,7 +446,7 @@ struct binder_proc {
 	int requested_threads;
 	int requested_threads_started;
 	int tmp_ref;
-	long default_priority;
+	struct binder_priority default_priority;
 	struct dentry *debugfs_entry;
 	struct binder_alloc alloc;
 	struct binder_context *context;
@@ -470,6 +491,7 @@ struct binder_proc {
  * @is_dead:              thread is dead and awaiting free
  *                        when outstanding transactions are cleaned up
  *                        (protected by @proc->inner_lock)
+ * @task:                 struct task_struct for this thread
  *
  * Bookkeeping structure for binder threads.
  */
@@ -490,6 +512,7 @@ struct binder_thread {
 	struct binder_stats stats;
 	atomic_t tmp_ref;
 	bool is_dead;
+	struct task_struct *task;
 };
 
 /**
@@ -527,8 +550,9 @@ struct binder_transaction {
 	struct binder_buffer *buffer;
 	unsigned int    code;
 	unsigned int    flags;
-	long    priority;
-	long    saved_priority;
+	struct binder_priority priority;
+	struct binder_priority saved_priority;
+	bool set_priority_called;
 	kuid_t  sender_euid;
 	ktime_t start_time;
 	struct list_head fd_fixups;
