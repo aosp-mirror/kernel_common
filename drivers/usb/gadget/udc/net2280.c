@@ -2428,11 +2428,8 @@ static void stop_activity(struct net2280 *dev, struct usb_gadget_driver *driver)
 		nuke(&dev->ep[i]);
 
 	/* report disconnect; the driver is already quiesced */
-	if (driver) {
-		spin_unlock(&dev->lock);
+	if (driver)
 		driver->disconnect(&dev->gadget);
-		spin_lock(&dev->lock);
-	}
 
 	usb_reinit(dev);
 }
