@@ -43,6 +43,7 @@
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/smap.h>
 
 #include <xen/interface/xen.h>
 #include <xen/interface/sched.h>
@@ -216,10 +217,12 @@ privcmd_call(unsigned call,
 	if (call >= PAGE_SIZE / sizeof(hypercall_page[0]))
 		return -EINVAL;
 
+	stac();
 	asm volatile("call *%[call]"
 		     : __HYPERCALL_5PARAM
 		     : [call] "a" (&hypercall_page[call])
 		     : __HYPERCALL_CLOBBER5);
+	clac();
 
 	return (long)__res;
 }
