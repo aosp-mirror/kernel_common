@@ -715,8 +715,8 @@ int tpm1_auto_startup(struct tpm_chip *chip)
 		chip->flags |= TPM_CHIP_FLAG_FIRMWARE_UPGRADE;
 		return 0;
 	} else if (rc) {
-		dev_err(&chip->dev, "TPM self test failed\n");
-		goto out;
+		dev_err(&chip->dev, "TPM self test failed - ignoring\n");
+		return 0;
 	}
 
 	return rc;
