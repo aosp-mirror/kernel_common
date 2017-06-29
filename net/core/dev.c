@@ -4172,6 +4172,11 @@ struct packet_offload *gro_find_complete_by_type(__be16 type)
 }
 EXPORT_SYMBOL(gro_find_complete_by_type);
 
+static void napi_skb_free_stolen_head(struct sk_buff *skb)
+{
+	kmem_cache_free(skbuff_head_cache, skb);
+}
+
 static gro_result_t napi_skb_finish(gro_result_t ret, struct sk_buff *skb)
 {
 	switch (ret) {
@@ -4186,7 +4191,7 @@ static gro_result_t napi_skb_finish(gro_result_t ret, struct sk_buff *skb)
 
 	case GRO_MERGED_FREE:
 		if (NAPI_GRO_CB(skb)->free == NAPI_GRO_FREE_STOLEN_HEAD)
-			kmem_cache_free(skbuff_head_cache, skb);
+			napi_skb_free_stolen_head(skb);
 		else
 			__kfree_skb(skb);
 		break;
@@ -4258,8 +4263,14 @@ static gro_result_t napi_frags_finish(struct napi_struct *napi,
 		break;
 
 	case GRO_DROP:
-	case GRO_MERGED_FREE:
 		napi_reuse_skb(napi, skb);
+		break;
+
+	case GRO_MERGED_FREE:
+		if (NAPI_GRO_CB(skb)->free == NAPI_GRO_FREE_STOLEN_HEAD)
+			napi_skb_free_stolen_head(skb);
+		else
+			napi_reuse_skb(napi, skb);
 		break;
 
 	case GRO_MERGED:
