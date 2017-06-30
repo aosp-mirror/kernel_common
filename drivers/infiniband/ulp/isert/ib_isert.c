@@ -1564,7 +1564,7 @@ static void
 isert_rx_completion(struct iser_rx_desc *desc, struct isert_conn *isert_conn,
 		    unsigned long xfer_len)
 {
-	struct ib_device *ib_dev = isert_conn->conn_cm_id->device;
+	struct ib_device *ib_dev = isert_conn->conn_device->ib_device;
 	struct iscsi_hdr *hdr;
 	u64 rx_dma;
 	int rx_buflen, outstanding;
