@@ -43,6 +43,8 @@
 #include "binder.h"
 #include "binder_trace.h"
 
+#define BINDER_MIN_ALLOC (1 * PAGE_SIZE)
+
 static HLIST_HEAD(binder_devices);
 
 static struct dentry *binder_debugfs_dir_entry_root;
@@ -580,9 +582,9 @@ static struct binder_buffer *binder_buffer_lookup(struct binder_proc *proc,
 	return NULL;
 }
 
-static int binder_update_page_range(struct binder_proc *proc, int allocate,
-				    void *start, void *end,
-				    struct vm_area_struct *vma)
+static int __binder_update_page_range(struct binder_proc *proc, int allocate,
+				      void *start, void *end,
+				      struct vm_area_struct *vma)
 {
 	void *page_addr;
 	unsigned long user_page_addr;
@@ -680,6 +682,20 @@ err_no_vma:
 		mmput(mm);
 	}
 	return -ENOMEM;
+}
+
+static int binder_update_page_range(struct binder_proc *proc, int allocate,
+				    void *start, void *end,
+				    struct vm_area_struct *vma)
+{
+	/*
+	 * For regular updates, move up start if needed since MIN_ALLOC pages
+	 * are always mapped
+	 */
+	if (start - proc->buffer < BINDER_MIN_ALLOC)
+		start = proc->buffer + BINDER_MIN_ALLOC;
+
+	return __binder_update_page_range(proc, allocate, start, end, vma);
 }
 
 static struct binder_buffer *binder_alloc_buf(struct binder_proc *proc,
@@ -3422,7 +3438,8 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 	vma->vm_ops = &binder_vm_ops;
 	vma->vm_private_data = proc;
 
-	if (binder_update_page_range(proc, 1, proc->buffer, proc->buffer + PAGE_SIZE, vma)) {
+	if (__binder_update_page_range(proc, 1, proc->buffer,
+				       proc->buffer + BINDER_MIN_ALLOC, vma)) {
 		ret = -ENOMEM;
 		failure_string = "alloc small buf";
 		goto err_alloc_small_buf_failed;
