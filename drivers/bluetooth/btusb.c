@@ -49,6 +49,7 @@ static struct usb_driver btusb_driver;
 #define BTUSB_INTEL_BOOT	0x200
 #define BTUSB_BCM_PATCHRAM	0x400
 #define BTUSB_MARVELL		0x800
+#define BTUSB_REALTEK           0x20000
 
 static const struct usb_device_id btusb_table[] = {
 	/* Generic Bluetooth USB device */
@@ -282,6 +283,9 @@ static const struct usb_device_id blacklist_table[] = {
 	/* Marvell device */
 	{ USB_DEVICE(0x1286, 0x2044), .driver_info = BTUSB_MARVELL },
 	{ USB_DEVICE(0x1286, 0x2046), .driver_info = BTUSB_MARVELL },
+
+	/* Additional Realtek 8723BE Bluetooth devices */
+	{ USB_DEVICE(0x13d3, 0x3494), .driver_info = BTUSB_REALTEK },
 
 	{ }	/* Terminating entry */
 };
