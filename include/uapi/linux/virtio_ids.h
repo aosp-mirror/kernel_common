@@ -81,4 +81,8 @@
 #define VIRTIO_TRANS_ID_RNG		0x1005 /* transitional virtio rng */
 #define VIRTIO_TRANS_ID_9P		0x1009 /* transitional virtio 9p console */
 
+/* Chrome OS-specific devices */
+#define VIRTIO_ID_WL           63 /* virtio wayland */
+#define VIRTIO_ID_TPM          62 /* virtio tpm */
+
 #endif /* _LINUX_VIRTIO_IDS_H */
