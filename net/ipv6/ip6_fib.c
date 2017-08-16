@@ -841,6 +841,8 @@ add:
 			fn->fn_flags |= RTN_RTINFO;
 		}
 		fib6_purge_rt(iter, fn, info->nl_net);
+		if (fn->rr_ptr == iter)
+			fn->rr_ptr = NULL;
 		rt6_release(iter);
 	}
 
