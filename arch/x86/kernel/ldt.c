@@ -15,9 +15,9 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/uaccess.h>
+#include <linux/kaiser.h>
 
 #include <asm/ldt.h>
-#include <asm/kaiser.h>
 #include <asm/desc.h>
 #include <asm/mmu_context.h>
 #include <asm/syscalls.h>
@@ -48,7 +48,7 @@ static struct ldt_struct *alloc_ldt_struct(int size)
 {
 	struct ldt_struct *new_ldt;
 	int alloc_size;
-	int ret = 0;
+	int ret;
 
 	if (size > LDT_ENTRIES)
 		return NULL;
@@ -76,10 +76,8 @@ static struct ldt_struct *alloc_ldt_struct(int size)
 		return NULL;
 	}
 
-	// FIXME: make kaiser_add_mapping() return an error code
-	// when it fails
-	kaiser_add_mapping((unsigned long)new_ldt->entries, alloc_size,
-			   __PAGE_KERNEL);
+	ret = kaiser_add_mapping((unsigned long)new_ldt->entries, alloc_size,
+				 __PAGE_KERNEL);
 	if (ret) {
 		__free_ldt_struct(new_ldt);
 		return NULL;
