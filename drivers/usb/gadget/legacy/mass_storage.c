@@ -121,15 +121,6 @@ static unsigned int fsg_num_buffers = CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS;
 
 FSG_MODULE_PARAMETERS(/* no prefix */, mod_data);
 
-static unsigned long msg_registered;
-static void msg_cleanup(void);
-
-static int msg_thread_exits(struct fsg_common *common)
-{
-	msg_cleanup();
-	return 0;
-}
-
 static int __init msg_do_config(struct usb_configuration *c)
 {
 	struct fsg_opts *opts;
@@ -168,9 +159,6 @@ static struct usb_configuration msg_config_driver = {
 
 static int __init msg_bind(struct usb_composite_dev *cdev)
 {
-	static const struct fsg_operations ops = {
-		.thread_exits = msg_thread_exits,
-	};
 	struct fsg_opts *opts;
 	struct fsg_config config;
 	int status;
@@ -190,8 +178,6 @@ static int __init msg_bind(struct usb_composite_dev *cdev)
 	status = fsg_common_set_nluns(opts->common, config.nluns);
 	if (status)
 		goto fail_set_nluns;
-
-	fsg_common_set_ops(opts->common, &ops);
 
 	status = fsg_common_set_cdev(opts->common, cdev, config.can_stall);
 	if (status)
@@ -259,18 +245,12 @@ MODULE_LICENSE("GPL");
 
 static int __init msg_init(void)
 {
-	int ret;
-
-	ret = usb_composite_probe(&msg_driver);
-	set_bit(0, &msg_registered);
-
-	return ret;
+	return usb_composite_probe(&msg_driver);
 }
 module_init(msg_init);
 
-static void msg_cleanup(void)
+static void __exit msg_cleanup(void)
 {
-	if (test_and_clear_bit(0, &msg_registered))
-		usb_composite_unregister(&msg_driver);
+	usb_composite_unregister(&msg_driver);
 }
 module_exit(msg_cleanup);
