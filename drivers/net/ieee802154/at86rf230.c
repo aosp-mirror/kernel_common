@@ -1016,7 +1016,7 @@ static int
 at86rf230_ed(struct ieee802154_dev *dev, u8 *level)
 {
 	might_sleep();
-	BUG_ON(!level);
+	WARN_ON(!level);
 	*level = 0xbe;
 	return 0;
 }
