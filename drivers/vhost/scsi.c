@@ -833,6 +833,7 @@ vhost_scsi_map_iov_to_sgl(struct tcm_vhost_cmd *cmd,
 			  bool write)
 {
 	struct scatterlist *sg = cmd->tvc_sgl;
+	struct scatterlist *p = sg;
 	unsigned int sgl_count = 0;
 	int ret, i;
 
@@ -856,9 +857,11 @@ vhost_scsi_map_iov_to_sgl(struct tcm_vhost_cmd *cmd,
 		ret = vhost_scsi_map_to_sgl(cmd, sg, sgl_count, &iov[i],
 					    cmd->tvc_upages, write);
 		if (ret < 0) {
-			for (i = 0; i < cmd->tvc_sgl_count; i++)
-				put_page(sg_page(&cmd->tvc_sgl[i]));
-
+			while (p < sg) {
+				struct page *page = sg_page(p++);
+				if (page)
+					put_page(page);
+			}
 			cmd->tvc_sgl_count = 0;
 			return ret;
 		}
