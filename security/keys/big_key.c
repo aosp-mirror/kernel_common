@@ -127,7 +127,7 @@ void big_key_revoke(struct key *key)
 
 	/* clear the quota */
 	key_payload_reserve(key, 0);
-	if (key_is_instantiated(key) && key->type_data.x[1] > BIG_KEY_FILE_THRESHOLD)
+	if (key_is_positive(key) && key->type_data.x[1] > BIG_KEY_FILE_THRESHOLD)
 		vfs_truncate(path, 0);
 }
 
@@ -156,7 +156,7 @@ void big_key_describe(const struct key *key, struct seq_file *m)
 
 	seq_puts(m, key->description);
 
-	if (key_is_instantiated(key))
+	if (key_is_positive(key))
 		seq_printf(m, ": %lu [%s]",
 			   datalen,
 			   datalen > BIG_KEY_FILE_THRESHOLD ? "file" : "buff");
