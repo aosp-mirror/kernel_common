@@ -371,12 +371,14 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
 			}
 
 			sg_init_aead(&sg[0], xbuf,
-				    *b_size + (enc ? authsize : 0));
+				    *b_size + (enc ? 0 : authsize));
 
 			sg_init_aead(&sgout[0], xoutbuf,
 				    *b_size + (enc ? authsize : 0));
 
-			aead_request_set_crypt(req, sg, sgout, *b_size, iv);
+			aead_request_set_crypt(req, sg, sgout,
+					       *b_size + (enc ? 0 : authsize),
+					       iv);
 			aead_request_set_assoc(req, asg, aad_size);
 
 			if (secs)
