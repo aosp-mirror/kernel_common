@@ -2083,7 +2083,7 @@ static void switched_to_rt(struct rq *rq, struct task_struct *p)
 		    push_rt_task(rq) && rq != task_rq(p))
 			check_resched = 0;
 #endif /* CONFIG_SMP */
-		if (check_resched && p->prio < rq->curr->prio)
+		if (check_resched && p->prio < rq->curr->prio && cpu_online(cpu_of(rq)))
 			resched_curr(rq);
 	}
 }
