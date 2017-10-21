@@ -41,6 +41,11 @@ unsigned int sysctl_sched_latency			= 6000000ULL;
 unsigned int normalized_sysctl_sched_latency		= 6000000ULL;
 
 /*
+ * Enable/disable honoring sync flag in energy-aware wakeups.
+ */
+unsigned int sysctl_sched_sync_hint_enable = 1;
+
+/*
  * The initial- and re-scaling of tunables is configurable
  *
  * Options are:
@@ -6776,12 +6781,18 @@ static void select_max_spare_cap_cpus(struct sched_domain *sd, cpumask_t *cpus,
 
 static DEFINE_PER_CPU(cpumask_t, energy_cpus);
 
-static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
+static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sync)
 {
 	unsigned long cur_energy, prev_energy, best_energy;
 	int cpu, best_energy_cpu = prev_cpu, weight;
 	struct sched_domain *sd;
 	cpumask_t *candidates;
+
+	if (sysctl_sched_sync_hint_enable && sync) {
+		cpu = smp_processor_id();
+		if (cpumask_test_cpu(cpu, &p->cpus_allowed))
+			return cpu;
+	}
 
 	sync_entity_load_avg(&p->se);
 
@@ -6862,7 +6873,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 
 	rcu_read_lock();
 	if (want_energy) {
-		new_cpu = find_energy_efficient_cpu(p, prev_cpu);
+		new_cpu = find_energy_efficient_cpu(p, prev_cpu, sync);
 		goto unlock;
 	}
 
