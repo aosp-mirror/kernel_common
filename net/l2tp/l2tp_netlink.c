@@ -215,7 +215,7 @@ static int l2tp_nl_cmd_tunnel_delete(struct sk_buff *skb, struct genl_info *info
 		goto out;
 	}
 
-	(void) l2tp_tunnel_delete(tunnel);
+	l2tp_tunnel_delete(tunnel);
 
 	l2tp_tunnel_dec_refcount(tunnel);
 
