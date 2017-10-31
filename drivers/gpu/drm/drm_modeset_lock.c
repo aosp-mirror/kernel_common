@@ -75,7 +75,7 @@ int __drm_modeset_lock_all(struct drm_device *dev,
 	int ret;
 
 	ctx = kzalloc(sizeof(*ctx),
-		      trylock ? GFP_ATOMIC : GFP_KERNEL);
+		      trylock ? GFP_ATOMIC : GFP_KERNEL | __GFP_NOFAIL);
 	if (!ctx)
 		return -ENOMEM;
 
