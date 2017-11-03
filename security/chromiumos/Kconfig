@@ -35,3 +35,11 @@ config ALT_SYSCALL_CHROMIUMOS
 	  Register restricted, alternate syscall tables used by Chromium OS
 	  using the alt-syscall infrastructure.  Alternate syscall tables
 	  can be selected with prctl(PR_ALT_SYSCALL).
+
+config SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
+	bool "Force /proc/<pid>/mem paths to be read-only"
+	default y
+	help
+	  When enabled, attempts to open /proc/self/mem for write access
+	  will always fail.  Write access to this file allows bypassing
+	  of memory map permissions (such as modifying read-only code).
