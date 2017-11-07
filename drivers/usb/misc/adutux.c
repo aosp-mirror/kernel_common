@@ -800,13 +800,11 @@ error:
 static void adu_disconnect(struct usb_interface *interface)
 {
 	struct adu_device *dev;
-	int minor;
 
 	dev = usb_get_intfdata(interface);
 
 	mutex_lock(&dev->mtx);	/* not interruptible */
 	dev->udev = NULL;	/* poison */
-	minor = dev->minor;
 	usb_deregister_dev(interface, &adu_class);
 	mutex_unlock(&dev->mtx);
 
@@ -820,9 +818,6 @@ static void adu_disconnect(struct usb_interface *interface)
 		adu_delete(dev);
 
 	mutex_unlock(&adutux_mutex);
-
-	dev_info(&interface->dev, "ADU device adutux%d now disconnected\n",
-		 (minor - ADU_MINOR_BASE));
 }
 
 /* usb specific object needed to register this driver with the usb subsystem */
