@@ -366,6 +366,7 @@ static int cros_ec_spi_probe(struct spi_device *spi)
 	ec_dev->parent = &ec_spi->spi->dev;
 	ec_dev->din_size = EC_MSG_BYTES + EC_MSG_PREAMBLE_COUNT;
 	ec_dev->dout_size = EC_MSG_BYTES;
+	ec_spi->last_transfer_ns = ktime_get_ns();
 
 	err = cros_ec_register(ec_dev);
 	if (err) {
