@@ -140,3 +140,7 @@ static void denali_exit_pci(void)
 	pci_unregister_driver(&denali_pci_driver);
 }
 module_exit(denali_exit_pci);
+
+MODULE_DESCRIPTION("PCI driver for Denali NAND controller");
+MODULE_AUTHOR("Intel Corporation and its suppliers");
+MODULE_LICENSE("GPL v2");
