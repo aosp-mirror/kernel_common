@@ -18,7 +18,10 @@ FW="$FWPATH/test-firmware.bin"
 test_finish()
 {
 	echo "$OLD_TIMEOUT" >/sys/class/firmware/timeout
-	echo -n "$OLD_PATH" >/sys/module/firmware_class/parameters/path
+	if [ "$OLD_FWPATH" = "" ]; then
+		OLD_FWPATH=" "
+	fi
+	echo -n "$OLD_FWPATH" >/sys/module/firmware_class/parameters/path
 	rm -f "$FW"
 	rmdir "$FWPATH"
 }
