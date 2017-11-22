@@ -136,6 +136,10 @@ ENTRY(_cpu_resume)
 	bl	kasan_unpoison_task_stack_below
 #endif
 
+#ifdef CONFIG_TRUSTY_FIQ
+	bl	trusty_fiq_cpu_resume
+#endif
+
 	ldp	x19, x20, [x29, #16]
 	ldp	x21, x22, [x29, #32]
 	ldp	x23, x24, [x29, #48]

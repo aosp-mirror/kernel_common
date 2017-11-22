@@ -52,3 +52,8 @@ ENTRY(trusty_fiq_glue_arm64)
 	ldr	x0, =SMC_FC_FIQ_EXIT
 	smc	#0
 	b	.	/* should not get here */
+
+ENTRY(trusty_fiq_cpu_resume)
+	ldr	x0, =SMC_FC_FIQ_RESUME
+	smc	#0
+	ret
