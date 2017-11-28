@@ -227,7 +227,10 @@ quiet_cmd_ld = LD      $@
 # ---------------------------------------------------------------------------
 
 quiet_cmd_ar = AR      $@
-      cmd_ar = rm -f $@; $(AR) rcsTP$(KBUILD_ARFLAGS) $@ $(real-prereqs)
+      cmd_ar = $(update_lto_symversions)                       \
+               rm -f $@;                                       \
+               $(AR) rcsTP$(KBUILD_ARFLAGS) $@ $(real-prereqs) \
+               $(update_lto_symtable)
 
 # Objcopy
 # ---------------------------------------------------------------------------
