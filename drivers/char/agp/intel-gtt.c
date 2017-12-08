@@ -865,6 +865,8 @@ void intel_gtt_insert_sg_entries(struct sg_table *st,
 		}
 	}
 	readl(intel_private.gtt+j-1);
+	if (intel_private.driver->chipset_flush)
+		intel_private.driver->chipset_flush();
 }
 EXPORT_SYMBOL(intel_gtt_insert_sg_entries);
 
