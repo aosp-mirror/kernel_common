@@ -101,3 +101,8 @@ SCHED_FEAT(UTIL_EST, true)
  * RT class.
  */
 SCHED_FEAT(SCHEDTUNE_BOOST_HOLD_ALL, false)
+
+/*
+ * Fast pre-selection of CPU candidates for EAS.
+ */
+SCHED_FEAT(FIND_BEST_TARGET, true)
