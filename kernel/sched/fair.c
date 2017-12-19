@@ -6862,13 +6862,17 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 	int new_cpu = prev_cpu;
 	int want_affine = 0, want_energy = 0;
 	int sync = (wake_flags & WF_SYNC) && !(current->flags & PF_EXITING);
+	bool prefer_idle = schedtune_prefer_idle(p);
 
-	if (sd_flag & SD_BALANCE_WAKE) {
+	if ((sd_flag & SD_BALANCE_WAKE)) {
 		record_wakee(p);
-		want_energy = sched_energy_enabled() &&
-			      !READ_ONCE(cpu_rq(cpu)->rd->overutilized);
-		want_affine = !wake_wide(p) && !wake_cap(p, cpu, prev_cpu)
-			      && cpumask_test_cpu(cpu, &p->cpus_allowed);
+		if (sync || !prefer_idle || sched_feat(EAS_PREFER_IDLE)) {
+			want_energy = sched_energy_enabled() &&
+				!READ_ONCE(cpu_rq(cpu)->rd->overutilized);
+			want_affine = !wake_wide(p) &&
+				!wake_cap(p, cpu, prev_cpu) &&
+				cpumask_test_cpu(cpu, &p->cpus_allowed);
+		}
 	}
 
 	rcu_read_lock();
