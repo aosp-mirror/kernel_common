@@ -2057,6 +2057,9 @@ static inline void nohz_balance_exit_idle(unsigned int cpu) { }
 
 
 #ifdef CONFIG_SMP
+
+extern void init_energy_aware_data(int cpu);
+
 static inline
 void __dl_update(struct dl_bw *dl_b, s64 bw)
 {
