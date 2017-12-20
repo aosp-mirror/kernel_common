@@ -1114,14 +1114,19 @@ fail:
 
 static void ip_fib_net_exit(struct net *net)
 {
-	unsigned int i;
+	int i;
 
 #ifdef CONFIG_IP_MULTIPLE_TABLES
 	fib4_rules_exit(net);
 #endif
 
 	rtnl_lock();
-	for (i = 0; i < FIB_TABLE_HASHSZ; i++) {
+	/* Destroy the tables in reverse order to guarantee that the
+	 * local table, ID 255, is destroyed before the main table, ID
+	 * 254. This is necessary as the local table may contain
+	 * references to data contained in the main table.
+	 */
+	for (i = FIB_TABLE_HASHSZ - 1; i >= 0; i--) {
 		struct fib_table *tb;
 		struct hlist_head *head;
 		struct hlist_node *tmp;
