@@ -490,7 +490,7 @@ static int flexcan_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		u32 data = be32_to_cpup((__be32 *)&cf->data[0]);
 		flexcan_write(data, &regs->cantxfg[FLEXCAN_TX_BUF_ID].data[0]);
 	}
-	if (cf->can_dlc > 3) {
+	if (cf->can_dlc > 4) {
 		u32 data = be32_to_cpup((__be32 *)&cf->data[4]);
 		flexcan_write(data, &regs->cantxfg[FLEXCAN_TX_BUF_ID].data[1]);
 	}
