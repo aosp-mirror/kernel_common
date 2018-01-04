@@ -712,4 +712,4 @@ DEFINE_PER_CPU_SHARED_ALIGNED(struct tlb_state, cpu_tlbstate) = {
 #endif
 	.cr4 = ~0UL,	/* fail hard if we screw up cr4 shadow initialization */
 };
-EXPORT_SYMBOL_GPL(cpu_tlbstate);
+EXPORT_PER_CPU_SYMBOL(cpu_tlbstate);
