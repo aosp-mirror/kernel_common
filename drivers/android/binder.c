@@ -3197,6 +3197,12 @@ static unsigned int binder_poll(struct file *filp,
 
 	thread->looper |= BINDER_LOOPER_STATE_POLL;
 
+	if (!thread) {
+		binder_unlock(__func__);
+		return POLLERR;
+	}
+	thread->looper |= BINDER_LOOPER_STATE_POLL;
+
 	wait_for_proc_work = thread->transaction_stack == NULL &&
 		list_empty(&thread->todo) && thread->return_error == BR_OK;
 
