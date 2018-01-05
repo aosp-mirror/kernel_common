@@ -249,7 +249,7 @@
 #define X86_BUG_11AP		X86_BUG(5) /* Bad local APIC aka 11AP */
 #define X86_BUG_FXSAVE_LEAK	X86_BUG(6) /* FXSAVE leaks FOP/FIP/FOP */
 #define X86_BUG_CLFLUSH_MONITOR	X86_BUG(7) /* AAI65, CLFLUSH required before MONITOR */
-#define X86_BUG_CPU_INSECURE	X86_BUG(14) /* CPU is insecure and needs kernel page table isolation */
+#define X86_BUG_CPU_MELTDOWN	X86_BUG(14) /* CPU is affected by meltdown attack and needs kernel page table isolation */
 
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
 
