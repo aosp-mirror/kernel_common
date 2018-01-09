@@ -560,6 +560,7 @@ struct rt_rq {
 	unsigned long rt_nr_total;
 	int overloaded;
 	struct plist_head pushable_tasks;
+	struct sched_avg avg;
 #endif /* CONFIG_SMP */
 	int rt_queued;
 

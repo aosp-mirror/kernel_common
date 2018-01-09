@@ -314,3 +314,26 @@ int __update_load_avg_cfs_rq(u64 now, int cpu, struct cfs_rq *cfs_rq)
 
 	return 0;
 }
+
+/*
+ * rt_rq:
+ *
+ *   util_sum = \Sum se->avg.util_sum but se->avg.util_sum is not tracked
+ *   util_sum = cpu_scale * load_sum
+ *   runnable_load_sum = load_sum
+ *
+ */
+
+int update_rt_rq_load_avg(u64 now, int cpu, struct rt_rq *rt_rq, int running)
+{
+	if (___update_load_sum(now, cpu, &rt_rq->avg,
+				running,
+				running,
+				running)) {
+
+		___update_load_avg(&rt_rq->avg, 1, 1);
+		return 1;
+	}
+
+	return 0;
+}
