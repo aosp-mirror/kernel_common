@@ -2082,10 +2082,6 @@ static int fixup_pi_state_owner(u32 __user *uaddr, struct futex_q *q,
 	u32 uval, uninitialized_var(curval), newval;
 	int ret;
 
-	/* Owner died? */
-	if (!pi_state->owner)
-		newtid |= FUTEX_OWNER_DIED;
-
 	/*
 	 * We are here either because we stole the rtmutex from the
 	 * previous highest priority waiter or we are the highest priority
@@ -2104,6 +2100,11 @@ static int fixup_pi_state_owner(u32 __user *uaddr, struct futex_q *q,
 	 * in lookup_pi_state.
 	 */
 retry:
+
+	/* Owner died? */
+	if (!pi_state->owner)
+		newtid |= FUTEX_OWNER_DIED;
+
 	if (get_futex_value_locked(&uval, uaddr))
 		goto handle_fault;
 
