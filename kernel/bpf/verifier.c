@@ -643,6 +643,13 @@ static int check_ctx_access(struct verifier_env *env, int off, int size,
 	return -EACCES;
 }
 
+static bool is_ctx_reg(struct verifier_env *env, int regno)
+{
+	const struct reg_state *reg = &env->cur_state.regs[regno];
+
+	return reg->type == PTR_TO_CTX;
+}
+
 /* check whether memory at (regno + off) is accessible for t = (read | write)
  * if t==write, value_regno is a register which value is stored into memory
  * if t==read, value_regno is a register which will receive the value from memory
@@ -712,6 +719,12 @@ static int check_xadd(struct verifier_env *env, struct bpf_insn *insn)
 	err = check_reg_arg(regs, insn->dst_reg, SRC_OP);
 	if (err)
 		return err;
+
+	if (is_ctx_reg(env, insn->dst_reg)) {
+		verbose("BPF_XADD stores into R%d context is not allowed\n",
+			insn->dst_reg);
+		return -EACCES;
+	}
 
 	/* check whether atomic_add can read the memory */
 	err = check_mem_access(env, insn->dst_reg, insn->off,
@@ -1612,6 +1625,12 @@ static int do_check(struct verifier_env *env)
 			err = check_reg_arg(regs, insn->dst_reg, SRC_OP);
 			if (err)
 				return err;
+
+			if (is_ctx_reg(env, insn->dst_reg)) {
+				verbose("BPF_ST stores into R%d context is not allowed\n",
+					insn->dst_reg);
+				return -EACCES;
+			}
 
 			/* check that memory (dst_reg + off) is writeable */
 			err = check_mem_access(env, insn->dst_reg, insn->off,
