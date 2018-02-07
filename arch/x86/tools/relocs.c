@@ -763,9 +763,15 @@ static int do_reloc64(struct section *sec, Elf_Rel *rel, ElfW(Sym) *sym,
 	switch (r_type) {
 	case R_X86_64_NONE:
 	case R_X86_64_PC32:
+	case R_X86_64_PLT32:
 		/*
 		 * NONE can be ignored and PC relative relocations don't
 		 * need to be adjusted.
+		 *
+		 * PC relative relocations don't need to be adjusted unless
+		 * referencing a percpu symbol.
+		 *
+		 * NB: R_X86_64_PLT32 can be treated as R_X86_64_PC32.
 		 */
 		break;
 
