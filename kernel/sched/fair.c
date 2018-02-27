@@ -8276,7 +8276,7 @@ static bool update_nohz_stats(struct rq *rq, bool force)
 static inline void update_sg_lb_stats(struct lb_env *env,
 			struct sched_group *group, int load_idx,
 			int local_group, struct sg_lb_stats *sgs,
-			bool *overload, int *overutilized)
+			int *overload, int *overutilized)
 {
 	unsigned long load;
 	int i, nr_running;
@@ -8301,7 +8301,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 
 		nr_running = rq->nr_running;
 		if (nr_running > 1)
-			*overload = true;
+			*overload = 1;
 
 		if (cpu_overutilized(i))
 			*overutilized = 1;
@@ -8453,9 +8453,7 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 	struct sched_group *sg = env->sd->groups;
 	struct sg_lb_stats *local = &sds->local_stat;
 	struct sg_lb_stats tmp_sgs;
-	int load_idx, prefer_sibling = 0;
-	bool overload = false;
-	int overutilized = 0;
+	int load_idx, prefer_sibling, overload = 0, overutilized = 0;
 
 	if (child && child->flags & SD_PREFER_SIBLING)
 		prefer_sibling = 1;
