@@ -1,0 +1,3 @@
+android-4.9-llvm is an obsolete development branch.  LLVM support has been
+merged into android-4.9, and any future LLVM-related changes will land there
+instead.
