@@ -546,6 +546,7 @@ static int tpm_add_hwrng(struct tpm_chip *chip)
 		 "tpm-rng-%d", chip->dev_num);
 	chip->hwrng.name = chip->hwrng_name;
 	chip->hwrng.read = tpm_hwrng_read;
+	chip->hwrng.quality = 1000;
 	return hwrng_register(&chip->hwrng);
 }
 
