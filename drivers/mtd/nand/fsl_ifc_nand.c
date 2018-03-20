@@ -725,6 +725,7 @@ static int fsl_ifc_wait(struct mtd_info *mtd, struct nand_chip *chip)
 	struct fsl_ifc_ctrl *ctrl = priv->ctrl;
 	struct fsl_ifc_regs __iomem *ifc = ctrl->regs;
 	u32 nand_fsr;
+	int status;
 
 	/* Use READ_STATUS command, but wait for the device to be ready */
 	iowrite32be((IFC_FIR_OP_CW0 << IFC_NAND_FIR0_OP0_SHIFT) |
@@ -740,11 +741,12 @@ static int fsl_ifc_wait(struct mtd_info *mtd, struct nand_chip *chip)
 
 	nand_fsr = ioread32be(&ifc->ifc_nand.nand_fsr);
 
+	status = nand_fsr >> 24;
 	/*
 	 * The chip always seems to report that it is
 	 * write-protected, even when it is not.
 	 */
-	return nand_fsr | NAND_STATUS_WP;
+	return status | NAND_STATUS_WP;
 }
 
 static int fsl_ifc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
