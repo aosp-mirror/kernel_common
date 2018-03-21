@@ -239,6 +239,9 @@ static void _free_chan(struct kref *kref)
 {
 	struct tipc_chan *ch = container_of(kref, struct tipc_chan, refcount);
 
+	if (ch->ops && ch->ops->handle_release)
+		ch->ops->handle_release(ch->ops_arg);
+
 	kref_put(&ch->vds->refcount, _free_vds);
 	kfree(ch);
 }
@@ -818,9 +821,15 @@ static void dn_handle_event(void *data, int event)
 	}
 }
 
+static void dn_handle_release(void *data)
+{
+	kfree(data);
+}
+
 static struct tipc_chan_ops _dn_ops = {
 	.handle_msg = dn_handle_msg,
 	.handle_event = dn_handle_event,
+	.handle_release = dn_handle_release,
 };
 
 #define cdev_to_cdn(c) container_of((c), struct tipc_cdev_node, cdev)
@@ -1100,8 +1109,6 @@ static int tipc_release(struct inode *inode, struct file *filp)
 
 	/* and destroy it */
 	tipc_chan_destroy(dn->chan);
-
-	kfree(dn);
 
 	return 0;
 }
