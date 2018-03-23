@@ -51,7 +51,9 @@ struct usb_request;
 struct usb_request *alloc_ep_req(struct usb_ep *ep, int len, int default_len);
 static inline void free_ep_req(struct usb_ep *ep, struct usb_request *req)
 {
+	WARN_ON(req->buf == NULL);
 	kfree(req->buf);
+	req->buf = NULL;
 	usb_ep_free_request(ep, req);
 }
 
