@@ -226,6 +226,7 @@
 # define DP_PSR_MAIN_LINK_ACTIVE	    (1 << 1)
 # define DP_PSR_CRC_VERIFICATION	    (1 << 2)
 # define DP_PSR_FRAME_CAPTURE		    (1 << 3)
+# define DP_PSR_ENABLE_PSR2		    (1 << 6) /* eDP 1.4a */
 
 #define DP_ADAPTER_CTRL			    0x1a0
 # define DP_ADAPTER_CTRL_FORCE_LOAD_SENSE   (1 << 0)
