@@ -647,6 +647,7 @@ int dccp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 	ireq = inet_rsk(req);
 	ireq->ir_loc_addr = ip_hdr(skb)->daddr;
 	ireq->ir_rmt_addr = ip_hdr(skb)->saddr;
+	ireq->ir_mark = inet_request_mark(sk, skb);
 
 	/*
 	 * Step 3: Process LISTEN state
