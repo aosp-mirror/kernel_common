@@ -61,6 +61,7 @@ config USB_SERIAL_SIMPLE
 		- Medtronic CareLink USB device
 		- Fundamental Software dongle.
 		- HP4x calculators
+		- Libtransistor USB console
 		- a number of Motorola phones
 		- Motorola Tetra devices
 		- Novatel Wireless GPS receivers
