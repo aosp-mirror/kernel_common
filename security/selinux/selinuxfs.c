@@ -2127,6 +2127,7 @@ __initcall(init_sel_fs);
 void exit_sel_fs(void)
 {
 	sysfs_remove_mount_point(fs_kobj, "selinux");
+	dput(selinux_null.dentry);
 	kern_unmount(selinuxfs_mount);
 	unregister_filesystem(&sel_fs_type);
 }
