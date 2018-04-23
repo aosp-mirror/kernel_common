@@ -1293,18 +1293,18 @@ static int ib_rate_to_mlx5(struct mlx5_ib_dev *dev, u8 rate)
 	struct mlx5_general_caps *gen;
 
 	gen = &dev->mdev->caps.gen;
-	if (rate == IB_RATE_PORT_CURRENT) {
+	if (rate == IB_RATE_PORT_CURRENT)
 		return 0;
-	} else if (rate < IB_RATE_2_5_GBPS || rate > IB_RATE_300_GBPS) {
-		return -EINVAL;
-	} else {
-		while (rate != IB_RATE_2_5_GBPS &&
-		       !(1 << (rate + MLX5_STAT_RATE_OFFSET) &
-			 gen->stat_rate_support))
-			--rate;
-	}
 
-	return rate + MLX5_STAT_RATE_OFFSET;
+	if (rate < IB_RATE_2_5_GBPS || rate > IB_RATE_300_GBPS)
+		return -EINVAL;
+
+	while (rate != IB_RATE_2_5_GBPS &&
+	       !(1 << (rate + MLX5_STAT_RATE_OFFSET) &
+		 gen->stat_rate_support))
+		--rate;
+
+	return rate ? rate + MLX5_STAT_RATE_OFFSET : rate;
 }
 
 static int mlx5_set_path(struct mlx5_ib_dev *dev, const struct ib_ah_attr *ah,
