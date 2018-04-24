@@ -3330,6 +3330,7 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 	if (info->attrs[HWSIM_ATTR_PERM_ADDR]) {
 		if (!is_valid_ether_addr(
 				nla_data(info->attrs[HWSIM_ATTR_PERM_ADDR]))) {
+			kfree(hwname);
 			return -EINVAL;
 		}
 
