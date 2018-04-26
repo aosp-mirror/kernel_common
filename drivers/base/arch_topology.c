@@ -10,7 +10,9 @@
 #include <linux/arch_topology.h>
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
+#include <linux/cpuset.h>
 #include <linux/device.h>
+#include <linux/energy_model.h>
 #include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -287,6 +289,9 @@ static cpumask_var_t cpus_to_visit;
 static void parsing_done_workfn(struct work_struct *work);
 static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
 
+static void start_eas_workfn(struct work_struct *work);
+static DECLARE_WORK(start_eas_work, start_eas_workfn);
+
 static int
 init_cpu_capacity_callback(struct notifier_block *nb,
 			   unsigned long val,
@@ -320,6 +325,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
 		free_raw_capacity();
 		pr_debug("cpu_capacity: parsing done\n");
 		schedule_work(&parsing_done_work);
+		schedule_work(&start_eas_work);
 	}
 
 	return 0;
@@ -363,6 +369,15 @@ static void parsing_done_workfn(struct work_struct *work)
 	cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
 					 CPUFREQ_POLICY_NOTIFIER);
 	free_cpumask_var(cpus_to_visit);
+}
+
+static void start_eas_workfn(struct work_struct *work)
+{
+	/* Make sure the EM knows about the updated CPU capacities. */
+	em_rescale_cpu_capacity();
+
+	/* Inform the scheduler about the EM availability. */
+	rebuild_sched_domains();
 }
 
 #else
