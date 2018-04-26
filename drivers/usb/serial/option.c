@@ -236,6 +236,8 @@ static void option_instat_callback(struct urb *urb);
 /* These Quectel products use Qualcomm's vendor ID */
 #define QUECTEL_PRODUCT_UC20			0x9003
 #define QUECTEL_PRODUCT_UC15			0x9090
+/* These u-blox products use Qualcomm's vendor ID */
+#define UBLOX_PRODUCT_R410M			0x90b2
 /* These Yuga products use Qualcomm's vendor ID */
 #define YUGA_PRODUCT_CLM920_NC5			0x9625
 
@@ -722,6 +724,10 @@ static const struct option_blacklist_info cellient_mpl200_blacklist = {
 
 static const struct option_blacklist_info yuga_clm920_nc5_blacklist = {
 	.reserved = BIT(1) | BIT(4),
+};
+
+static const struct option_blacklist_info ublox_r410m_blacklist = {
+	.reserved = BIT(1) | BIT(3),
 };
 
 static const struct option_blacklist_info fibocom_nl668_iot_blacklist = {
@@ -1248,6 +1254,9 @@ static const struct usb_device_id option_ids[] = {
 	/* Yuga products use Qualcomm vendor ID */
 	{ USB_DEVICE(QUALCOMM_VENDOR_ID, YUGA_PRODUCT_CLM920_NC5),
 	  .driver_info = (kernel_ulong_t)&yuga_clm920_nc5_blacklist },
+	/* u-blox products using Qualcomm vendor ID */
+	{ USB_DEVICE(QUALCOMM_VENDOR_ID, UBLOX_PRODUCT_R410M),
+	  .driver_info = (kernel_ulong_t)&ublox_r410m_blacklist },
 	/* Quectel products using Quectel vendor ID */
 	{ USB_DEVICE(QUECTEL_VENDOR_ID, QUECTEL_PRODUCT_EC21),
 	  .driver_info = (kernel_ulong_t)&net_intf4_blacklist },
