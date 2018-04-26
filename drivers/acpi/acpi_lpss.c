@@ -154,6 +154,7 @@ static struct lpss_device_desc lpt_sdio_dev_desc = {
 
 static struct lpss_device_desc byt_pwm_dev_desc = {
 	.flags = LPSS_SAVE_CTX,
+	.prv_offset = 0x800,
 };
 
 static struct lpss_device_desc byt_uart_dev_desc = {
