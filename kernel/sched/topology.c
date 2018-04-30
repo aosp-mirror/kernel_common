@@ -201,6 +201,19 @@ sd_parent_degenerate(struct sched_domain *sd, struct sched_domain *parent)
 	return 1;
 }
 
+#ifdef CONFIG_ENERGY_MODEL
+static void free_fd(struct freq_domain *fd)
+{
+	struct freq_domain *tmp;
+
+	while (fd) {
+		tmp = fd->next;
+		kfree(fd);
+		fd = tmp;
+	}
+}
+#endif
+
 static void free_rootdomain(struct rcu_head *rcu)
 {
 	struct root_domain *rd = container_of(rcu, struct root_domain, rcu);
@@ -211,6 +224,9 @@ static void free_rootdomain(struct rcu_head *rcu)
 	free_cpumask_var(rd->rto_mask);
 	free_cpumask_var(rd->online);
 	free_cpumask_var(rd->span);
+#ifdef CONFIG_ENERGY_MODEL
+	free_fd(rd->fd);
+#endif
 	kfree(rd);
 }
 
@@ -1635,6 +1651,104 @@ static struct sched_domain *build_sched_domain(struct sched_domain_topology_leve
 	return sd;
 }
 
+#ifdef CONFIG_ENERGY_MODEL
+static struct freq_domain *find_fd(struct freq_domain *fd, int cpu)
+{
+	while (fd) {
+		if (cpumask_test_cpu(cpu, freq_domain_span(fd)))
+			return fd;
+		fd = fd->next;
+	}
+
+	return NULL;
+}
+
+static struct freq_domain *fd_init(int cpu)
+{
+	struct em_freq_domain *obj = em_cpu_get(cpu);
+	struct freq_domain *fd;
+
+	if (!obj) {
+		if (sched_debug())
+			pr_info("%s: no EM found for CPU%d\n", __func__, cpu);
+		return NULL;
+	}
+
+	fd = kzalloc(sizeof(*fd), GFP_KERNEL);
+	if (!fd)
+		return NULL;
+	fd->obj = obj;
+
+	return fd;
+}
+
+static void sched_energy_fd_debug(const struct cpumask * cpu_map,
+						struct freq_domain *fd)
+{
+	if (!sched_debug() || !fd)
+		return;
+
+	printk(KERN_DEBUG "root_domain %*pbl: fd:", cpumask_pr_args(cpu_map));
+
+	while (fd) {
+		printk(KERN_CONT " { fd%d cpus=%*pbl nr_cstate=%d }",
+				cpumask_first(freq_domain_span(fd)),
+				cpumask_pr_args(freq_domain_span(fd)),
+				em_fd_nr_cap_states(fd->obj));
+		fd = fd->next;
+	}
+
+	printk(KERN_CONT "\n");
+}
+
+static void destroy_freq_domain_rcu(struct rcu_head *rp)
+{
+	struct freq_domain *fd;
+
+	fd = container_of(rp, struct freq_domain, rcu);
+	free_fd(fd);
+}
+
+static void build_freq_domains(const struct cpumask *cpu_map)
+{
+	struct freq_domain *fd = NULL, *tmp;
+	int cpu = cpumask_first(cpu_map);
+	struct root_domain *rd = cpu_rq(cpu)->rd;
+	int i;
+
+	for_each_cpu(i, cpu_map) {
+		/* Skip already covered CPUs. */
+		if (find_fd(fd, i))
+			continue;
+
+		/* Create the new fd and add it to the local list. */
+		tmp = fd_init(i);
+		if (!tmp)
+			goto free;
+		tmp->next = fd;
+		fd = tmp;
+	}
+
+	sched_energy_fd_debug(cpu_map, fd);
+
+	/* Attach the new list of frequency domains to the root domain. */
+	tmp = rd->fd;
+	rcu_assign_pointer(rd->fd, fd);
+	if (tmp)
+		call_rcu(&tmp->rcu, destroy_freq_domain_rcu);
+
+	return;
+
+free:
+	free_fd(fd);
+	tmp = rd->fd;
+	rcu_assign_pointer(rd->fd, NULL);
+	if (tmp)
+		call_rcu(&tmp->rcu, destroy_freq_domain_rcu);
+}
+#endif
+
+
 /*
  * Build sched domains for a given set of CPUs and attach the sched domains
  * to the individual CPUs
@@ -1912,6 +2026,21 @@ match1:
 match2:
 		;
 	}
+
+#ifdef CONFIG_ENERGY_MODEL
+	/* Build freq domains: */
+	for (i = 0; i < ndoms_new; i++) {
+		for (j = 0; j < n; j++) {
+			if (cpumask_equal(doms_new[i], doms_cur[j])
+			    && cpu_rq(cpumask_first(doms_cur[j]))->rd->fd)
+			       goto match3;
+		}
+		/* No match - add freq domains for a new rd */
+		build_freq_domains(doms_new[i]);
+match3:
+		;
+	}
+#endif
 
 	/* Remember the new sched domains: */
 	if (doms_cur != &fallback_doms)
