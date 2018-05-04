@@ -874,13 +874,6 @@ static int vsoc_probe_device(struct pci_dev *pdev,
 	for (i = 0; i < vsoc_dev.layout->region_count; ++i)
 		vsoc_dev.msix_entries[i].entry = i;
 
-	result = pci_enable_msix_exact(vsoc_dev.dev, vsoc_dev.msix_entries,
-				       vsoc_dev.layout->region_count);
-	if (result) {
-		dev_info(&pdev->dev, "pci_enable_msix failed: %d\n", result);
-		vsoc_remove_device(pdev);
-		return -ENOSPC;
-	}
 	/* Check that all regions are well formed */
 	for (i = 0; i < vsoc_dev.layout->region_count; ++i) {
 		const struct vsoc_device_region *region = vsoc_dev.regions + i;
@@ -911,7 +904,6 @@ static int vsoc_probe_device(struct pci_dev *pdev,
 			return -EFAULT;
 		}
 	}
-	vsoc_dev.msix_enabled = true;
 	for (i = 0; i < vsoc_dev.layout->region_count; ++i) {
 		const struct vsoc_device_region *region = vsoc_dev.regions + i;
 		size_t name_sz = sizeof(vsoc_dev.regions_data[i].name) - 1;
@@ -934,6 +926,25 @@ static int vsoc_probe_device(struct pci_dev *pdev,
 		vsoc_dev.regions_data[i].outgoing_signalled =
 			shm_off_to_virtual_addr(region->region_begin_offset) +
 			g_to_h_signal_table->interrupt_signalled_offset;
+
+		if (!device_create(vsoc_dev.class, NULL,
+				   MKDEV(vsoc_dev.major, i),
+				   NULL, vsoc_dev.regions_data[i].name)) {
+			dev_err(&vsoc_dev.dev->dev, "device_create failed\n");
+			vsoc_remove_device(pdev);
+			return -EBUSY;
+		}
+		vsoc_dev.regions_data[i].device_created = true;
+	}
+	result = pci_enable_msix_exact(vsoc_dev.dev, vsoc_dev.msix_entries,
+				       vsoc_dev.layout->region_count);
+	if (result) {
+		dev_info(&pdev->dev, "pci_enable_msix failed: %d\n", result);
+		vsoc_remove_device(pdev);
+		return -ENOSPC;
+	}
+	vsoc_dev.msix_enabled = true;
+	for (i = 0; i < vsoc_dev.layout->region_count; ++i) {
 		result = request_irq(
 				vsoc_dev.msix_entries[i].vector,
 				vsoc_interrupt, 0,
@@ -947,14 +958,6 @@ static int vsoc_probe_device(struct pci_dev *pdev,
 			return -ENOSPC;
 		}
 		vsoc_dev.regions_data[i].irq_requested = true;
-		if (!device_create(vsoc_dev.class, NULL,
-				   MKDEV(vsoc_dev.major, i),
-				   NULL, vsoc_dev.regions_data[i].name)) {
-			dev_err(&vsoc_dev.dev->dev, "device_create failed\n");
-			vsoc_remove_device(pdev);
-			return -EBUSY;
-		}
-		vsoc_dev.regions_data[i].device_created = true;
 	}
 	return 0;
 }
@@ -981,6 +984,10 @@ static void vsoc_remove_device(struct pci_dev *pdev)
 	if (!pdev || !vsoc_dev.dev)
 		return;
 	dev_info(&pdev->dev, "remove_device\n");
+	if (vsoc_dev.msix_enabled) {
+		pci_disable_msix(pdev);
+		vsoc_dev.msix_enabled = false;
+	}
 	if (vsoc_dev.regions_data) {
 		for (i = 0; i < vsoc_dev.layout->region_count; ++i) {
 			if (vsoc_dev.regions_data[i].device_created) {
@@ -994,10 +1001,6 @@ static void vsoc_remove_device(struct pci_dev *pdev)
 		}
 		kfree(vsoc_dev.regions_data);
 		vsoc_dev.regions_data = NULL;
-	}
-	if (vsoc_dev.msix_enabled) {
-		pci_disable_msix(pdev);
-		vsoc_dev.msix_enabled = false;
 	}
 	kfree(vsoc_dev.msix_entries);
 	vsoc_dev.msix_entries = NULL;
