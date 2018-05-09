@@ -13,6 +13,7 @@
 #include <linux/of.h>
 #include <linux/idr.h>
 #include <linux/device.h>
+#include <linux/notifier.h>
 #include <linux/sysfs.h>
 #include <linux/workqueue.h>
 #include <linux/android_kabi.h>
@@ -445,5 +446,8 @@ static inline int thermal_zone_device_enable(struct thermal_zone_device *tz)
 static inline int thermal_zone_device_disable(struct thermal_zone_device *tz)
 { return -ENODEV; }
 #endif /* CONFIG_THERMAL */
+
+extern int register_thermal_notifier(struct notifier_block *);
+extern int unregister_thermal_notifier(struct notifier_block *);
 
 #endif /* __THERMAL_H__ */
