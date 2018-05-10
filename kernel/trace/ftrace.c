@@ -125,8 +125,9 @@ static void ftrace_ops_list_func(unsigned long ip, unsigned long parent_ip,
 				 struct ftrace_ops *op, struct pt_regs *regs);
 #else
 /* See comment below, where ftrace_ops_list_func is defined */
-static void ftrace_ops_no_ops(unsigned long ip, unsigned long parent_ip);
-#define ftrace_ops_list_func ((ftrace_func_t)ftrace_ops_no_ops)
+static void ftrace_ops_no_ops(unsigned long ip, unsigned long parent_ip,
+			      struct ftrace_ops *op, struct pt_regs *regs);
+#define ftrace_ops_list_func ftrace_ops_no_ops
 #endif
 
 static inline void ftrace_ops_init(struct ftrace_ops *ops)
@@ -6310,7 +6311,8 @@ static void ftrace_ops_list_func(unsigned long ip, unsigned long parent_ip,
 }
 NOKPROBE_SYMBOL(ftrace_ops_list_func);
 #else
-static void ftrace_ops_no_ops(unsigned long ip, unsigned long parent_ip)
+static void ftrace_ops_no_ops(unsigned long ip, unsigned long parent_ip,
+			      struct ftrace_ops *op, struct pt_regs *regs)
 {
 	__ftrace_ops_list_func(ip, parent_ip, NULL, NULL);
 }
