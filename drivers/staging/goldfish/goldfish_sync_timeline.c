@@ -760,7 +760,7 @@ static long goldfish_sync_ioctl(struct file *file,
 						sizeof(ioctl_data))) {
 			DPRINT("Error, could not copy to user!!!");
 
-			sys_close(fd_out);
+			ksys_close(fd_out);
 			/* We won't be doing an increment, kref_put immediately. */
 			kref_put(&timeline->kref, delete_timeline_obj);
 			mutex_unlock(&global_sync_state->mutex_lock);
