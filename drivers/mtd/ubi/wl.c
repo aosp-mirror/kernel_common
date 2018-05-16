@@ -1875,6 +1875,7 @@ int ubi_thread(void *u)
 	}
 
 	dbg_wl("background thread \"%s\" is killed", ubi->bgt_name);
+	ubi->thread_enabled = 0;
 	return 0;
 }
 
