@@ -23,6 +23,7 @@ struct em_cs_table {
 
 struct em_freq_domain {
 	struct em_cs_table *cs_table; /* Capacity state table, RCU-protected */
+	struct kobject kobj;
 	unsigned long cpus[0]; /* CPUs of the frequency domain. */
 };
 
