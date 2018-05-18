@@ -374,7 +374,7 @@ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_exact);
 
-static noinline struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
+struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
 						   unsigned long *freq)
 {
 	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);

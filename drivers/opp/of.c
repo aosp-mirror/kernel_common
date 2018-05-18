@@ -55,14 +55,17 @@ void _of_init_opp_table(struct opp_table *opp_table, struct device *dev)
 {
 	struct device_node *np;
 
-	/*
-	 * Only required for backward compatibility with v1 bindings, but isn't
-	 * harmful for other cases. And so we do it unconditionally.
-	 */
 	np = of_node_get(dev->of_node);
 	if (np) {
 		u32 val;
 
+		if (!of_property_read_u32(np, "dynamic-power-coefficient", &val))
+			opp_table->capacitance = val;
+
+		/*
+		 * Required for backward compatibility with v1 bindings, but
+		 * isn't harmful for other cases so we do it unconditionally.
+		 */
 		if (!of_property_read_u32(np, "clock-latency", &val))
 			opp_table->clock_latency_ns_max = val;
 		of_property_read_u32(np, "voltage-tolerance",
@@ -633,3 +636,55 @@ put_cpu_node:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_of_get_sharing_cpus);
+
+/*
+ * dev_pm_opp_of_estimate_power() - Estimates the dynamic power consumption.
+ * @power:	Pointer to return the power of the OPP
+ * @freq:	Start frequency
+ * @cpu:	CPU for which we do this operation.
+ *
+ * Search for the matching ceil *available* OPP from a starting freq for a
+ * CPU and estimate its dynamic power consumption when fully utilized.
+ *
+ * Returns 0 in case of a success.
+ */
+
+int dev_pm_opp_of_estimate_power(unsigned long *power, unsigned long *freq,
+				  int cpu)
+{
+	struct opp_table *opp_table;
+	unsigned long mV, KHz, cap;
+	struct dev_pm_opp *opp;
+	struct device *cpu_dev;
+	int ret = 0;
+
+	cpu_dev = get_cpu_device(cpu);
+        if (!cpu_dev)
+                return -ENODEV;
+
+	opp_table = _find_opp_table(cpu_dev);
+	if (IS_ERR(opp_table))
+		return -EINVAL;
+
+	opp = _find_freq_ceil(opp_table, freq);
+	if (IS_ERR(opp)) {
+		ret = -EINVAL;
+		goto put_table;
+        }
+
+	mV = opp->supplies[0].u_volt / 1000;
+	KHz = opp->rate / 1000;
+	cap = opp_table->capacitance;
+	dev_pm_opp_put(opp);
+
+	/*
+	 * Estimate the power as P = C * V^2 * f with the CPU capacitance and
+	 * V and f the voltage and frequency of the OPP.
+	 */
+	*power = cap * mV * mV * KHz / 1000000000;
+
+put_table:
+	dev_pm_opp_put_opp_table(opp_table);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dev_pm_opp_of_estimate_power);
