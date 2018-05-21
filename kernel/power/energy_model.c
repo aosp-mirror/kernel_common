@@ -29,6 +29,86 @@ static DEFINE_RWLOCK(em_data_lock);
  */
 static DEFINE_MUTEX(em_fd_mutex);
 
+static struct kobject *em_kobject;
+
+/* Getters for the attributes of em_freq_domain objects */
+struct em_fd_attr {
+	struct attribute attr;
+	ssize_t (*show)(struct em_freq_domain *fd, char *buf);
+	ssize_t (*store)(struct em_freq_domain *fd, const char *buf, size_t s);
+};
+
+#define EM_ATTR_LEN 13
+#define show_table_attr(_attr) \
+static ssize_t show_##_attr(struct em_freq_domain *fd, char *buf) \
+{ \
+	ssize_t cnt = 0; \
+	int i; \
+	struct em_cs_table *table; \
+	rcu_read_lock(); \
+	table = rcu_dereference(fd->cs_table);\
+	for (i = 0; i < table->nr_cap_states; i++) { \
+		if (cnt >= (ssize_t) (PAGE_SIZE / sizeof(char) \
+				      - (EM_ATTR_LEN + 2))) \
+			goto out; \
+		cnt += scnprintf(&buf[cnt], EM_ATTR_LEN + 1, "%lu ", \
+				 table->state[i]._attr); \
+	} \
+out: \
+	rcu_read_unlock(); \
+	cnt += sprintf(&buf[cnt], "\n"); \
+	return cnt; \
+}
+
+show_table_attr(power);
+show_table_attr(frequency);
+show_table_attr(capacity);
+
+static ssize_t show_cpus(struct em_freq_domain *fd, char *buf)
+{
+	return sprintf(buf, "%*pbl\n", cpumask_pr_args(&fd->cpus));
+}
+
+#define fd_attr(_name) em_fd_##_name##_attr
+#define define_fd_attr(_name) static struct em_fd_attr fd_attr(_name) = \
+		__ATTR(_name, 0444, show_##_name, NULL)
+
+define_fd_attr(power);
+define_fd_attr(frequency);
+define_fd_attr(capacity);
+define_fd_attr(cpus);
+
+static struct attribute *em_fd_default_attrs[] = {
+	&fd_attr(power).attr,
+	&fd_attr(frequency).attr,
+	&fd_attr(capacity).attr,
+	&fd_attr(cpus).attr,
+	NULL
+};
+
+#define to_fd(k) container_of(k, struct em_freq_domain, kobj)
+#define to_fd_attr(a) container_of(a, struct em_fd_attr, attr)
+
+static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
+{
+	struct em_freq_domain *fd = to_fd(kobj);
+	struct em_fd_attr *fd_attr = to_fd_attr(attr);
+	ssize_t ret;
+
+	ret = fd_attr->show(fd, buf);
+
+	return ret;
+}
+
+static const struct sysfs_ops em_fd_sysfs_ops = {
+	.show	= show,
+};
+
+static struct kobj_type ktype_em_fd = {
+	.sysfs_ops	= &em_fd_sysfs_ops,
+	.default_attrs	= em_fd_default_attrs,
+};
+
 static struct em_cs_table *alloc_cs_table(int nr_states)
 {
 	struct em_cs_table *cs_table;
@@ -113,6 +193,11 @@ static struct em_freq_domain *em_create_fd(cpumask_t *span, int nr_states,
 		prev_opp_eff = opp_eff;
 	}
 	fd_update_cs_table(fd->cs_table, cpu);
+
+	ret = kobject_init_and_add(&fd->kobj, &ktype_em_fd, em_kobject, "fd%u",
+									cpu);
+	if (ret)
+		pr_warn("%*pbl: failed kobject init\n", cpumask_pr_args(span));
 
 	return fd;
 
@@ -220,6 +305,15 @@ int em_register_freq_domain(cpumask_t *span, unsigned int nr_states,
 		return -EINVAL;
 
 	mutex_lock(&em_fd_mutex);
+
+	if (!em_kobject) {
+		em_kobject = kobject_create_and_add("energy_model",
+						&cpu_subsys.dev_root->kobj);
+		if (!em_kobject) {
+			ret = -ENODEV;
+			goto unlock;
+		}
+	}
 
 	/* Make sure we don't register again an existing domain. */
 	for_each_cpu(cpu, span) {

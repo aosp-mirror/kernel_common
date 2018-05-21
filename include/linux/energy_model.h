@@ -24,6 +24,7 @@ struct em_cs_table {
 struct em_freq_domain {
 	struct em_cs_table *cs_table;
 	cpumask_t cpus;
+	struct kobject kobj;
 };
 
 struct em_data_callback {
