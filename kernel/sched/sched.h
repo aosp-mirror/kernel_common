@@ -2279,6 +2279,19 @@ static inline unsigned long cpu_util_rt(struct rq *rq)
 	return rq->avg_rt.util_avg;
 }
 
+#if defined(CONFIG_IRQ_TIME_ACCOUNTING) || defined(CONFIG_PARAVIRT_TIME_ACCOUNTING)
+static inline unsigned long cpu_util_irq(struct rq *rq)
+{
+	return rq->avg_irq.util_avg;
+}
+#else
+static inline unsigned long cpu_util_irq(struct rq *rq)
+{
+	return 0;
+}
+
+#endif
+
 #ifdef CONFIG_ENERGY_MODEL
 extern struct static_key_false sched_energy_present;
 /**

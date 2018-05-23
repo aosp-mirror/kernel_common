@@ -59,6 +59,7 @@ struct sugov_cpu {
 	unsigned long		util_dl;
 	unsigned long		bw_dl;
 	unsigned long		util_rt;
+	unsigned long		util_irq;
 	unsigned long		max;
 
 	/* The field below is for single-CPU policies only: */
@@ -191,21 +192,30 @@ static void sugov_get_util(struct sugov_cpu *sg_cpu)
 	sg_cpu->util_dl  = cpu_util_dl(rq);
 	sg_cpu->bw_dl    = cpu_bw_dl(rq);
 	sg_cpu->util_rt  = cpu_util_rt(rq);
+	sg_cpu->util_irq = cpu_util_irq(rq);
 }
 
 static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
 {
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
-	unsigned long util;
+	unsigned long util, max = sg_cpu->max;
 
 	if (rt_rq_is_runnable(&rq->rt))
 		return sg_cpu->max;
 
+	if (unlikely(sg_cpu->util_irq >= max))
+		return max;
+
+	/* Sum rq utilization */
 	util = sg_cpu->util_cfs;
 	util += sg_cpu->util_rt;
 
-	if ((util + sg_cpu->util_dl) >= sg_cpu->max)
-		return sg_cpu->max;
+	/*
+	 * Interrupt time is not seen by rqs utilization nso we can compare
+	 * them with the CPU capacity
+	 */
+	if ((util + sg_cpu->util_dl) >= max)
+		return max;
 
 	/*
 	 * As there is still idle time on the CPU, we need to compute the
@@ -221,10 +231,17 @@ static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
 	 * ready for such an interface. So, we only do the latter for now.
 	 */
 
+	/* Weight rqs utilization to normal context window */
+	util *= (max - sg_cpu->util_irq);
+	util /= max;
+
+	/* Add interrupt utilization */
+	util += sg_cpu->util_irq;
+
 	/* Add DL bandwidth requirement */
 	util += sg_cpu->bw_dl;
 
-	return min(sg_cpu->max, util);
+	return min(max, util);
 }
 
 /**
