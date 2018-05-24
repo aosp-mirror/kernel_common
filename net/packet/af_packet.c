@@ -2546,7 +2546,7 @@ static int packet_snd(struct socket *sock, struct msghdr *msg, size_t len)
 	    (offset = dev_hard_header(skb, dev, ntohs(proto), addr, NULL, len)) < 0)
 		goto out_free;
 	else if (reserve)
-		skb_push(skb, reserve);
+		skb_reserve(skb, -reserve);
 
 	/* Returns -EFAULT on error */
 	err = skb_copy_datagram_from_iovec(skb, offset, msg->msg_iov, 0, len);
