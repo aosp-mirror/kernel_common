@@ -426,13 +426,13 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 	if (events & POLLIN)
 		schedule_work(&irqfd->inject);
 
+	srcu_read_unlock(&kvm->irq_srcu, idx);
+
 	/*
 	 * do not drop the file until the irqfd is fully initialized, otherwise
 	 * we might race against the POLLHUP
 	 */
 	fdput(f);
-
-	srcu_read_unlock(&kvm->irq_srcu, idx);
 	return 0;
 
 fail:
