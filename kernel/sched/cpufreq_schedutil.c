@@ -185,16 +185,11 @@ static void sugov_get_util(struct sugov_cpu *sg_cpu)
 
 static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
 {
-	struct rq *rq = cpu_rq(sg_cpu->cpu);
 	unsigned long util;
 
-	if (rq->rt.rt_nr_running) {
-		util = sg_cpu->max;
-	} else {
-		util = sg_cpu->util_dl;
-		util += sg_cpu->util_cfs;
-		util += sg_cpu->util_rt;
-	}
+	util = sg_cpu->util_dl;
+	util += sg_cpu->util_cfs;
+	util += sg_cpu->util_rt;
 
 	/*
 	 * Utilization required by DEADLINE must always be granted while, for
