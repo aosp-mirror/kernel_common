@@ -60,7 +60,7 @@ struct dm_bio_prison *dm_bio_prison_create(unsigned nr_cells)
 	uint32_t nr_buckets = calc_nr_buckets(nr_cells);
 	size_t len = sizeof(struct dm_bio_prison) +
 		(sizeof(struct bucket) * nr_buckets);
-	struct dm_bio_prison *prison = kmalloc(len, GFP_KERNEL);
+	struct dm_bio_prison *prison = kzalloc(len, GFP_KERNEL);
 
 	if (!prison)
 		return NULL;
