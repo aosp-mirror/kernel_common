@@ -245,7 +245,7 @@ cmd_record_mcount = 						\
 	if [ "$(findstring -pg,$(_c_flags))" = "-pg" ]; then	\
 		$(sub_cmd_record_mcount)			\
 	fi;
-endif
+endif # -record-mcount
 endif
 
 define rule_cc_o_c
