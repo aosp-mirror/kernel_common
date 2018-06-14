@@ -278,6 +278,8 @@ static void i2c_acpi_register_device(struct i2c_adapter *adapter,
 				     struct acpi_device *adev,
 				     struct i2c_board_info *info)
 {
+	struct i2c_client *client;
+
 	/*
 	 * Skip registration on boards where the ACPI tables are
 	 * known to contain bogus I2C devices.
@@ -288,7 +290,15 @@ static void i2c_acpi_register_device(struct i2c_adapter *adapter,
 	adev->power.flags.ignore_parent = true;
 	acpi_device_set_enumerated(adev);
 
-	if (IS_ERR(i2c_new_client_device(adapter, info)))
+	if (!acpi_dev_get_property(adev, "linux,probed", ACPI_TYPE_ANY, NULL)) {
+		unsigned short addrs[] = { info->addr, I2C_CLIENT_END };
+
+		client = i2c_new_scanned_device(adapter, info, addrs, NULL);
+	} else {
+		client = i2c_new_client_device(adapter, info);
+	}
+
+	if (IS_ERR(client))
 		adev->power.flags.ignore_parent = false;
 }
 
