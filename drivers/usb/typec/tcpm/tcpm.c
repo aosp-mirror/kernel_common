@@ -3713,7 +3713,9 @@ static void run_state_machine(struct tcpm_port *port)
 		} else {
 			tcpm_pd_send_control(port, PD_CTRL_ACCEPT);
 			port->usb_comm_capable = port->sink_request &
-				RDO_USB_COMM;
+						 RDO_USB_COMM;
+			/* Notify TCPC of usb_comm_capable. */
+			tcpm_set_attached_state(port, true);
 			tcpm_set_state(port, SRC_TRANSITION_SUPPLY,
 				       PD_T_SRC_TRANSITION);
 		}
@@ -3948,7 +3950,9 @@ static void run_state_machine(struct tcpm_port *port)
 	case SNK_NEGOTIATE_CAPABILITIES:
 		tcpm_set_pd_capable(port, true);
 		port->usb_comm_capable = port->source_caps[0] &
-			PDO_FIXED_USB_COMM;
+					 PDO_FIXED_USB_COMM;
+		/* Notify TCPC of usb_comm_capable. */
+		tcpm_set_attached_state(port, true);
 		port->hard_reset_count = 0;
 		ret = tcpm_pd_send_request(port);
 		if (ret < 0) {
