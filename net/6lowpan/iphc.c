@@ -497,6 +497,8 @@ int lowpan_process_data(struct sk_buff *skb, struct net_device *dev,
 		hdr.version, ntohs(hdr.payload_len), hdr.nexthdr,
 		hdr.hop_limit, &hdr.daddr);
 
+	skb_reset_mac_header(skb);
+
 	raw_dump_table(__func__, "raw header dump", (u8 *)&hdr, sizeof(hdr));
 
 	return skb_deliver(skb, &hdr, dev, deliver_skb);
