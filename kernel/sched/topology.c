@@ -1713,12 +1713,31 @@ static void destroy_freq_domain_rcu(struct rcu_head *rp)
 	free_fd(fd);
 }
 
+/*
+ * The complexity of the Energy Model is defined as: nr_fd * (nr_cpus + nr_cs)
+ * with: 'nr_fd' the number of frequency domains; 'nr_cpus' the number of CPUs;
+ * and 'nr_cs' the sum of the capacity states numbers of all frequency domains.
+ *
+ * It is generally not a good idea to use such a model in the wake-up path on
+ * very complex platforms because of the associated scheduling overheads. The
+ * arbitrary constraint below prevents that. It makes EAS usable up to 16 CPUs
+ * with per-CPU DVFS and less than 8 capacity states each, for example.
+ */
+#define EM_MAX_COMPLEXITY 2048
+
 static void build_freq_domains(const struct cpumask *cpu_map)
 {
+	int i, nr_fd = 0, nr_cs = 0, nr_cpus = cpumask_weight(cpu_map);
 	struct freq_domain *fd = NULL, *tmp;
 	int cpu = cpumask_first(cpu_map);
 	struct root_domain *rd = cpu_rq(cpu)->rd;
-	int i;
+
+	/* EAS is enabled for asymmetric CPU capacity topologies. */
+	if (!per_cpu(sd_ea, cpu)) {
+		if (sched_debug())
+			pr_info("rd %*pbl: !sd_ea\n", cpumask_pr_args(cpu_map));
+		goto free;
+	}
 
 	for_each_cpu(i, cpu_map) {
 		/* Skip already covered CPUs. */
@@ -1731,6 +1750,18 @@ static void build_freq_domains(const struct cpumask *cpu_map)
 			goto free;
 		tmp->next = fd;
 		fd = tmp;
+
+		/* Count freq. doms and perf states for the complexity check. */
+		nr_fd++;
+		nr_cs += em_fd_nr_cap_states(fd->obj);
+	}
+
+	/* Bail out if the Energy Model complexity is too high. */
+	if (nr_fd * (nr_cs + nr_cpus) > EM_MAX_COMPLEXITY) {
+		if (sched_debug())
+			pr_info("rd %*pbl: EM complexity is too high\n ",
+						cpumask_pr_args(cpu_map));
+		goto free;
 	}
 
 	sched_energy_fd_debug(cpu_map, fd);
@@ -1749,6 +1780,44 @@ free:
 	rcu_assign_pointer(rd->fd, NULL);
 	if (tmp)
 		call_rcu(&tmp->rcu, destroy_freq_domain_rcu);
+}
+
+/*
+ * This static_key is set if at least one root domain meets all the following
+ * conditions:
+ *    1. all CPUs of the root domain are covered by the EM;
+ *    2. the EM complexity is low enough to keep scheduling overheads low;
+ *    3. the SD_ASYM_CPUCAPACITY flag is set in the sched_domain hierarchy.
+ */
+DEFINE_STATIC_KEY_FALSE(sched_energy_present);
+
+static void sched_energy_start(int ndoms_new, cpumask_var_t doms_new[])
+{
+	/*
+	 * The conditions for EAS to start are checked during the creation of
+	 * root domains. If one of them meets all conditions, it will have a
+	 * non-null list of frequency domains.
+	 */
+	while (ndoms_new) {
+		if (cpu_rq(cpumask_first(doms_new[ndoms_new - 1]))->rd->fd)
+			goto enable;
+		ndoms_new--;
+	}
+
+	if (static_branch_unlikely(&sched_energy_present)) {
+		if (sched_debug())
+			pr_info("%s: stopping EAS\n", __func__);
+		static_branch_disable_cpuslocked(&sched_energy_present);
+	}
+
+	return;
+
+enable:
+	if (!static_branch_unlikely(&sched_energy_present)) {
+		if (sched_debug())
+			pr_info("%s: starting EAS\n", __func__);
+		static_branch_enable_cpuslocked(&sched_energy_present);
+	}
 }
 #endif
 
@@ -2044,6 +2113,7 @@ match2:
 match3:
 		;
 	}
+	sched_energy_start(ndoms_new, doms_new);
 #endif
 
 	/* Remember the new sched domains: */

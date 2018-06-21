@@ -2193,8 +2193,25 @@ static inline unsigned long cpu_util_cfs(struct rq *rq)
 }
 
 #ifdef CONFIG_ENERGY_MODEL
+extern struct static_key_false sched_energy_present;
+/**
+ * rd_freq_domain - Get the frequency domains of a root domain.
+ *
+ * Must be called from a RCU read-side critical section.
+ */
+static inline struct freq_domain *rd_freq_domain(struct root_domain *rd)
+{
+	if (!static_branch_unlikely(&sched_energy_present))
+		return NULL;
+
+	return rcu_dereference(rd->fd);
+}
 #define freq_domain_span(fd) (to_cpumask(((fd)->obj->cpus)))
 #else
+static inline struct freq_domain *rd_freq_domain(struct root_domain *rd)
+{
+	return NULL;
+}
 #define freq_domain_span(fd) NULL
 #endif
 
