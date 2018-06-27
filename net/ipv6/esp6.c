@@ -384,8 +384,10 @@ static int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 
 	sg_init_table(sg, nfrags);
 	ret = skb_to_sgvec(skb, sg, sizeof(*esph) + crypto_aead_ivsize(aead), elen);
-	if (unlikely(ret < 0))
+	if (unlikely(ret < 0)) {
+		kfree(tmp);
 		goto out;
+	}
 
 	if ((x->props.flags & XFRM_STATE_ESN)) {
 		sg_init_table(asg, 3);
