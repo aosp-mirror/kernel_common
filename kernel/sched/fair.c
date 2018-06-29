@@ -6842,6 +6842,43 @@ static long compute_energy(struct task_struct *p, int dst_cpu,
 	return energy;
 }
 
+static void select_max_spare_cap_cpus(struct sched_domain *sd, cpumask_t *cpus,
+				struct freq_domain *fd, struct task_struct *p)
+{
+	unsigned long spare_cap, max_spare_cap, util, cpu_cap;
+	int cpu, max_spare_cap_cpu;
+
+	while (fd) {
+		max_spare_cap = 0;
+		max_spare_cap_cpu = -1;
+
+		for_each_cpu_and(cpu, freq_domain_span(fd), sched_domain_span(sd)) {
+			if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
+				continue;
+
+			/* Skip CPUs that will be overutilized. */
+			util = cpu_util_next(cpu, p, cpu);
+			cpu_cap = capacity_of(cpu);
+			if (cpu_cap * 1024 < util * capacity_margin)
+				continue;
+
+			/* Find the CPU with the max spare cap the fd. */
+			spare_cap = cpu_cap - util;
+			if (spare_cap > max_spare_cap) {
+				max_spare_cap = spare_cap;
+				max_spare_cap_cpu = cpu;
+			}
+		}
+
+		if (max_spare_cap_cpu >= 0)
+			cpumask_set_cpu(max_spare_cap_cpu, cpus);
+
+		fd = fd->next;
+	}
+}
+
+static DEFINE_PER_CPU(cpumask_t, energy_cpus);
+
 /*
  * find_energy_efficient_cpu(): Find most energy-efficient target CPU for the
  * waking task. find_energy_efficient_cpu() looks for the CPU with maximum
@@ -6875,10 +6912,10 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu,
 							struct freq_domain *fd)
 {
 	unsigned long prev_energy = ULONG_MAX, best_energy = ULONG_MAX;
-	int cpu, best_energy_cpu = prev_cpu;
-	struct freq_domain *head = fd;
-	unsigned long cpu_cap, util;
+	int cur_energy, cpu, best_energy_cpu = prev_cpu;
 	struct sched_domain *sd;
+	cpumask_t *candidates;
+	int weight;
 
 	sync_entity_load_avg(&p->se);
 
@@ -6895,45 +6932,30 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu,
 	if (!sd)
 		return prev_cpu;
 
-	while (fd) {
-		unsigned long cur_energy, spare_cap, max_spare_cap = 0;
-		int max_spare_cap_cpu = -1;
+       /* Pre-select a set of candidate CPUs. */
+	candidates = this_cpu_ptr(&energy_cpus);
+	cpumask_clear(candidates);
+	select_max_spare_cap_cpus(sd, candidates, fd, p);
 
-		for_each_cpu_and(cpu, freq_domain_span(fd), sched_domain_span(sd)) {
-			if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
-				continue;
+	/* Bail out if there is no candidate, or if the only one is prev_cpu */
+	weight = cpumask_weight(candidates);
+	if (!weight || (weight == 1 && cpumask_first(candidates) == prev_cpu))
+		return prev_cpu;
 
-			/* Skip CPUs that will be overutilized. */
-			util = cpu_util_next(cpu, p, cpu);
-			cpu_cap = capacity_of(cpu);
-			if (cpu_cap * 1024 < util * capacity_margin)
-				continue;
+	if (cpumask_test_cpu(prev_cpu, &p->cpus_allowed))
+		prev_energy = best_energy = compute_energy(p, prev_cpu, fd);
+	else
+		prev_energy = best_energy = ULONG_MAX;
 
-			/* Always use prev_cpu as a candidate. */
-			if (cpu == prev_cpu) {
-				prev_energy = compute_energy(p, prev_cpu, head);
-				if (prev_energy < best_energy)
-					best_energy = prev_energy;
-				continue;
-			}
-
-			/* Find the CPU with the max spare cap the fd. */
-			spare_cap = cpu_cap - util;
-			if (spare_cap > max_spare_cap) {
-				max_spare_cap = spare_cap;
-				max_spare_cap_cpu = cpu;
-			}
+	/* Select the best candidate energy-wise. */
+	for_each_cpu(cpu, candidates) {
+		if (cpu == prev_cpu)
+			continue;
+		cur_energy = compute_energy(p, cpu, fd);
+		if (cur_energy < best_energy) {
+			best_energy = cur_energy;
+			best_energy_cpu = cpu;
 		}
-
-		/* Evaluate the energy impact of using this CPU. */
-		if (max_spare_cap_cpu >= 0) {
-			cur_energy = compute_energy(p, max_spare_cap_cpu, head);
-			if (cur_energy < best_energy) {
-				best_energy = cur_energy;
-				best_energy_cpu = max_spare_cap_cpu;
-			}
-		}
-		fd = fd->next;
 	}
 
 	/*
