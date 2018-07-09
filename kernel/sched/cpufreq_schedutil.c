@@ -187,6 +187,9 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
  * Where the cfs,rt and dl util numbers are tracked with the same metric and
  * synchronized windows and are thus directly comparable.
  *
+ * The @util parameter passed to this function is assumed to be the aggregation
+ * of RT and CFS util numbers. The cases of DL and IRQ are managed here.
+ *
  * The cfs,rt,dl utilization are the running times measured with rq->clock_task
  * which excludes things like IRQ and steal-time. These latter are then accrued
  * in the irq utilization.
@@ -195,10 +198,10 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
  * based on the task model parameters and gives the minimal utilization
  * required to meet deadlines.
  */
-unsigned long schedutil_freq_util(int cpu, unsigned long util_cfs,
+unsigned long schedutil_freq_util(int cpu, unsigned long util,
 				  unsigned long max, enum schedutil_type type)
 {
-	unsigned long dl_util, util, irq;
+	unsigned long dl_util, irq;
 	struct rq *rq = cpu_rq(cpu);
 
 	if (type == FREQUENCY_UTIL && rt_rq_is_runnable(&rq->rt))
@@ -214,14 +217,11 @@ unsigned long schedutil_freq_util(int cpu, unsigned long util_cfs,
 		return max;
 
 	/*
-	 * Because the time spend on RT/DL tasks is visible as 'lost' time to
-	 * CFS tasks and we use the same metric to track the effective
-	 * utilization (PELT windows are synchronized) we can directly add them
-	 * to obtain the CPU's actual utilization.
+	 * The function is called with @util defined as the aggregation (the
+	 * sum) of RT and CFS signals, hence leaving the special case of DL
+	 * to be delt with. The exact way of doing things depend on the calling
+	 * context.
 	 */
-	util = util_cfs;
-	util += cpu_util_rt(rq);
-
 	dl_util = cpu_util_dl(rq);
 
 	/*
@@ -274,7 +274,7 @@ unsigned long schedutil_freq_util(int cpu, unsigned long util_cfs,
 static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 {
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
-	unsigned long util = boosted_cpu_util(sg_cpu->cpu);
+	unsigned long util = boosted_cpu_util(sg_cpu->cpu, cpu_util_rt(rq));
 	unsigned long max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
 
 	sg_cpu->max = max;
