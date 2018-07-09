@@ -5876,9 +5876,9 @@ schedtune_task_margin(struct task_struct *task)
 }
 
 unsigned long
-boosted_cpu_util(int cpu)
+boosted_cpu_util(int cpu, unsigned long other_util)
 {
-	unsigned long util = cpu_util_cfs(cpu_rq(cpu));
+	unsigned long util = cpu_util_cfs(cpu_rq(cpu)) + other_util;
 	long margin = schedtune_cpu_margin(util, cpu);
 
 	return util + margin;
@@ -5899,8 +5899,6 @@ schedtune_task_margin(struct task_struct *task)
 }
 
 #endif /* CONFIG_SCHED_TUNE */
-
-
 
 static inline unsigned long
 boosted_task_util(struct task_struct *task)
@@ -6634,6 +6632,7 @@ compute_energy(struct task_struct *p, int dst_cpu, struct perf_domain *pd)
 		 */
 		for_each_cpu_and(cpu, perf_domain_span(pd), cpu_online_mask) {
 			util = cpu_util_next(cpu, p, dst_cpu);
+			util += cpu_util_rt(cpu_rq(cpu));
 			util = schedutil_energy_util(cpu, util);
 			max_util = max(util, max_util);
 			sum_util += util;
