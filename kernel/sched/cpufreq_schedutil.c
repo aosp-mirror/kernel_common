@@ -224,8 +224,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 		return max;
 
 	/* Sum rq utilization */
-	util = boosted_cpu_util(sg_cpu->cpu);
-	util += cpu_util_rt(rq);
+	util = boosted_cpu_util(sg_cpu->cpu, cpu_util_rt(rq));
 
 	/*
 	 * Interrupt time is not seen by rqs utilization nso we can compare
