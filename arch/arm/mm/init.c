@@ -734,18 +734,28 @@ static inline void fix_kernmem_perms(void)
 }
 
 #ifdef CONFIG_DEBUG_RODATA
+
+static int kernel_set_to_readonly __read_mostly;
+
 void mark_rodata_ro(void)
 {
+	kernel_set_to_readonly = 1;
 	set_section_perms(ro_perms, prot);
 }
 
 void set_kernel_text_rw(void)
 {
+	if (!kernel_set_to_readonly)
+		return;
+
 	set_section_perms(ro_perms, clear);
 }
 
 void set_kernel_text_ro(void)
 {
+	if (!kernel_set_to_readonly)
+		return;
+
 	set_section_perms(ro_perms, prot);
 }
 #endif /* CONFIG_DEBUG_RODATA */
