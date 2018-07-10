@@ -186,7 +186,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 	sg_cpu->max = max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
 	sg_cpu->bw_dl = cpu_bw_dl(rq);
 
-	if (rt_rq_is_runnable(&rq->rt))
+	if (sched_feat(SUGOV_RT_MAX_FREQ) && rt_rq_is_runnable(&rq->rt))
 		return max;
 
 	irq = cpu_util_irq(rq);
