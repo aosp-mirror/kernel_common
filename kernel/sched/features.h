@@ -101,3 +101,8 @@ SCHED_FEAT(UTIL_EST, true)
  * RT class.
  */
 SCHED_FEAT(SCHEDTUNE_BOOST_HOLD_ALL, false)
+
+/*
+ * Request max frequency from schedutil whenever a RT task is running.
+ */
+SCHED_FEAT(SUGOV_RT_MAX_FREQ, false)
