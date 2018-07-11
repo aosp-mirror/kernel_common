@@ -843,11 +843,6 @@ static int scrub_handle_errored_block(struct scrub_block *sblock_to_check)
 	csum = sblock_to_check->pagev[0]->csum;
 	dev = sblock_to_check->pagev[0]->dev;
 
-	if (sctx->is_dev_replace && !is_metadata && !have_csum) {
-		sblocks_for_recheck = NULL;
-		goto nodatasum_case;
-	}
-
 	/*
 	 * read all mirrors one after the other. This includes to
 	 * re-read the extent or metadata block that failed (that was
@@ -962,10 +957,17 @@ static int scrub_handle_errored_block(struct scrub_block *sblock_to_check)
 		goto out;
 	}
 
-	if (!is_metadata && !have_csum) {
+	/*
+	 * NOTE: Even for nodatasum case, it's still possible that it's a
+	 * compressed data extent, thus scrub_fixup_nodatasum(), which write
+	 * inode page cache onto disk, could cause serious data corruption.
+	 *
+	 * So here we could only read from disk, and hope our recovery could
+	 * reach disk before the newer write.
+	 */
+	if (0 && !is_metadata && !have_csum) {
 		struct scrub_fixup_nodatasum *fixup_nodatasum;
 
-nodatasum_case:
 		WARN_ON(sctx->is_dev_replace);
 
 		/*
