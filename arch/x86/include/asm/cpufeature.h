@@ -12,7 +12,7 @@
 #include <asm/disabled-features.h>
 #endif
 
-#define NCAPINTS	11	/* N 32-bit words worth of info */
+#define NCAPINTS	16	/* N 32-bit words worth of info */
 #define NBUGINTS	1	/* N 32-bit bug flags */
 
 /*
@@ -178,17 +178,16 @@
 
 /*
  * Auxiliary flags: Linux defined - For features scattered in various
- * CPUID levels like 0x6, 0xA etc, word 7
+ * CPUID levels like 0x6, 0xA etc, word 7.
+ *
+ * Reuse free bits when adding new feature flags!
  */
-#define X86_FEATURE_IDA		( 7*32+ 0) /* Intel Dynamic Acceleration */
-#define X86_FEATURE_ARAT	( 7*32+ 1) /* Always Running APIC Timer */
+
 #define X86_FEATURE_CPB		( 7*32+ 2) /* AMD Core Performance Boost */
 #define X86_FEATURE_EPB		( 7*32+ 3) /* IA32_ENERGY_PERF_BIAS support */
-#define X86_FEATURE_PLN		( 7*32+ 5) /* Intel Power Limit Notification */
-#define X86_FEATURE_PTS		( 7*32+ 6) /* Intel Package Thermal Status */
-#define X86_FEATURE_DTHERM	( 7*32+ 7) /* Digital Thermal Sensor */
 #define X86_FEATURE_HW_PSTATE	( 7*32+ 8) /* AMD HW-PState */
 #define X86_FEATURE_PROC_FEEDBACK ( 7*32+ 9) /* AMD ProcFeedbackInterface */
+
 #define X86_FEATURE_RSB_CTXSW	( 7*32+19) /* Fill RSB on context switches */
 
 #define X86_FEATURE_RETPOLINE	( 7*32+29) /* Generic Retpoline mitigation for Spectre variant 2 */
@@ -200,16 +199,7 @@
 #define X86_FEATURE_FLEXPRIORITY ( 8*32+ 2) /* Intel FlexPriority */
 #define X86_FEATURE_EPT         ( 8*32+ 3) /* Intel Extended Page Table */
 #define X86_FEATURE_VPID        ( 8*32+ 4) /* Intel Virtual Processor ID */
-#define X86_FEATURE_NPT		( 8*32+ 5) /* AMD Nested Page Table support */
-#define X86_FEATURE_LBRV	( 8*32+ 6) /* AMD LBR Virtualization support */
-#define X86_FEATURE_SVML	( 8*32+ 7) /* "svm_lock" AMD SVM locking MSR */
-#define X86_FEATURE_NRIPS	( 8*32+ 8) /* "nrip_save" AMD SVM next_rip save */
-#define X86_FEATURE_TSCRATEMSR  ( 8*32+ 9) /* "tsc_scale" AMD TSC scaling support */
-#define X86_FEATURE_VMCBCLEAN   ( 8*32+10) /* "vmcb_clean" AMD VMCB clean bits support */
-#define X86_FEATURE_FLUSHBYASID ( 8*32+11) /* AMD flush-by-ASID support */
-#define X86_FEATURE_DECODEASSISTS ( 8*32+12) /* AMD Decode Assists support */
-#define X86_FEATURE_PAUSEFILTER ( 8*32+13) /* AMD filtered pause intercept */
-#define X86_FEATURE_PFTHRESHOLD ( 8*32+14) /* AMD pause filter threshold */
+
 #define X86_FEATURE_VMMCALL     ( 8*32+15) /* Prefer vmmcall to vmcall */
 
 
@@ -239,6 +229,30 @@
 #define X86_FEATURE_XSAVEC	(10*32+ 1) /* XSAVEC */
 #define X86_FEATURE_XGETBV1	(10*32+ 2) /* XGETBV with ECX = 1 */
 #define X86_FEATURE_XSAVES	(10*32+ 3) /* XSAVES/XRSTORS */
+
+/* Thermal and Power Management Leaf, CPUID level 0x00000006 (eax), word 14 */
+#define X86_FEATURE_DTHERM	(14*32+ 0) /* Digital Thermal Sensor */
+#define X86_FEATURE_IDA		(14*32+ 1) /* Intel Dynamic Acceleration */
+#define X86_FEATURE_ARAT	(14*32+ 2) /* Always Running APIC Timer */
+#define X86_FEATURE_PLN		(14*32+ 4) /* Intel Power Limit Notification */
+#define X86_FEATURE_PTS		(14*32+ 6) /* Intel Package Thermal Status */
+#define X86_FEATURE_HWP		(14*32+ 7) /* Intel Hardware P-states */
+#define X86_FEATURE_HWP_NOTIFY	(14*32+ 8) /* HWP Notification */
+#define X86_FEATURE_HWP_ACT_WINDOW (14*32+ 9) /* HWP Activity Window */
+#define X86_FEATURE_HWP_EPP	(14*32+10) /* HWP Energy Perf. Preference */
+#define X86_FEATURE_HWP_PKG_REQ (14*32+11) /* HWP Package Level Request */
+
+/* AMD SVM Feature Identification, CPUID level 0x8000000a (edx), word 15 */
+#define X86_FEATURE_NPT		(15*32+ 0) /* Nested Page Table support */
+#define X86_FEATURE_LBRV	(15*32+ 1) /* LBR Virtualization support */
+#define X86_FEATURE_SVML	(15*32+ 2) /* "svm_lock" SVM locking MSR */
+#define X86_FEATURE_NRIPS	(15*32+ 3) /* "nrip_save" SVM next_rip save */
+#define X86_FEATURE_TSCRATEMSR  (15*32+ 4) /* "tsc_scale" TSC scaling support */
+#define X86_FEATURE_VMCBCLEAN   (15*32+ 5) /* "vmcb_clean" VMCB clean bits support */
+#define X86_FEATURE_FLUSHBYASID (15*32+ 6) /* flush-by-ASID support */
+#define X86_FEATURE_DECODEASSISTS (15*32+ 7) /* Decode Assists support */
+#define X86_FEATURE_PAUSEFILTER (15*32+10) /* filtered pause intercept */
+#define X86_FEATURE_PFTHRESHOLD (15*32+12) /* pause filter threshold */
 
 /*
  * BUG word(s)
