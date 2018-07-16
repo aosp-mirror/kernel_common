@@ -224,7 +224,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 		return max;
 
 	/* Sum rq utilization */
-	util = cpu_util_cfs(rq);
+	util = boosted_cpu_util(sg_cpu->cpu);
 	util += cpu_util_rt(rq);
 
 	/*
