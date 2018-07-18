@@ -868,21 +868,21 @@ qca_spi_probe(struct spi_device *spi_device)
 
 	if ((qcaspi_clkspeed < QCASPI_CLK_SPEED_MIN) ||
 	    (qcaspi_clkspeed > QCASPI_CLK_SPEED_MAX)) {
-		dev_info(&spi_device->dev, "Invalid clkspeed: %d\n",
+		dev_err(&spi_device->dev, "Invalid clkspeed: %d\n",
 			 qcaspi_clkspeed);
 		return -EINVAL;
 	}
 
 	if ((qcaspi_burst_len < QCASPI_BURST_LEN_MIN) ||
 	    (qcaspi_burst_len > QCASPI_BURST_LEN_MAX)) {
-		dev_info(&spi_device->dev, "Invalid burst len: %d\n",
+		dev_err(&spi_device->dev, "Invalid burst len: %d\n",
 			 qcaspi_burst_len);
 		return -EINVAL;
 	}
 
 	if ((qcaspi_pluggable < QCASPI_PLUGGABLE_MIN) ||
 	    (qcaspi_pluggable > QCASPI_PLUGGABLE_MAX)) {
-		dev_info(&spi_device->dev, "Invalid pluggable: %d\n",
+		dev_err(&spi_device->dev, "Invalid pluggable: %d\n",
 			 qcaspi_pluggable);
 		return -EINVAL;
 	}
@@ -942,7 +942,7 @@ qca_spi_probe(struct spi_device *spi_device)
 	}
 
 	if (register_netdev(qcaspi_devs)) {
-		dev_info(&spi_device->dev, "Unable to register net device %s\n",
+		dev_err(&spi_device->dev, "Unable to register net device %s\n",
 			 qcaspi_devs->name);
 		free_netdev(qcaspi_devs);
 		return -EFAULT;
