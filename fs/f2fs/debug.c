@@ -274,7 +274,8 @@ static int stat_show(struct seq_file *s, void *v)
 		seq_printf(s, "\n=====[ partition info(%s). #%d, %s, CP: %s]=====\n",
 			bdevname(si->sbi->sb->s_bdev, devname), i++,
 			f2fs_readonly(si->sbi->sb) ? "RO": "RW",
-			f2fs_cp_error(si->sbi) ? "Error": "Good");
+			is_set_ckpt_flags(si->sbi, CP_DISABLED_FLAG) ?
+			"Disabled": (f2fs_cp_error(si->sbi) ? "Error": "Good"));
 		seq_printf(s, "[SB: 1] [CP: 2] [SIT: %d] [NAT: %d] ",
 			   si->sit_area_segs, si->nat_area_segs);
 		seq_printf(s, "[SSA: %d] [MAIN: %d",
