@@ -215,9 +215,11 @@ static const struct acpi_device_id acpi_lpss_device_ids[] = {
 	{ "INT33FC", },
 
 	/* Braswell LPSS devices */
+	{ "80862286", LPSS_ADDR(lpss_dma_desc) },
 	{ "80862288", LPSS_ADDR(byt_pwm_dev_desc) },
 	{ "8086228A", LPSS_ADDR(byt_uart_dev_desc) },
 	{ "8086228E", LPSS_ADDR(bsw_spi_dev_desc) },
+	{ "808622C0", LPSS_ADDR(lpss_dma_desc) },
 	{ "808622C1", LPSS_ADDR(byt_i2c_dev_desc) },
 
 	{ "INT3430", LPSS_ADDR(lpt_dev_desc) },
