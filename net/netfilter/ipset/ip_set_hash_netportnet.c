@@ -207,14 +207,14 @@ hash_netportnet4_uadt(struct ip_set *set, struct nlattr *tb[],
 
 	if (tb[IPSET_ATTR_CIDR]) {
 		cidr = nla_get_u8(tb[IPSET_ATTR_CIDR]);
-		if (!cidr || cidr > HOST_MASK)
+		if (cidr > HOST_MASK)
 			return -IPSET_ERR_INVALID_CIDR;
 		e.cidr[0] = cidr;
 	}
 
 	if (tb[IPSET_ATTR_CIDR2]) {
 		cidr = nla_get_u8(tb[IPSET_ATTR_CIDR2]);
-		if (!cidr || cidr > HOST_MASK)
+		if (cidr > HOST_MASK)
 			return -IPSET_ERR_INVALID_CIDR;
 		e.cidr[1] = cidr;
 	}
@@ -487,8 +487,7 @@ hash_netportnet6_uadt(struct ip_set *set, struct nlattr *tb[],
 	if (tb[IPSET_ATTR_CIDR2])
 		e.cidr[1] = nla_get_u8(tb[IPSET_ATTR_CIDR2]);
 
-	if (unlikely(!e.cidr[0] || e.cidr[0] > HOST_MASK || !e.cidr[1] ||
-		     e.cidr[1] > HOST_MASK))
+	if (unlikely(e.cidr[0] > HOST_MASK || e.cidr[1] > HOST_MASK))
 		return -IPSET_ERR_INVALID_CIDR;
 
 	ip6_netmask(&e.ip[0], e.cidr[0]);
