@@ -40,17 +40,22 @@ static struct ieee80211_channel channel = {
 	.max_reg_power = 9999,
 };
 
-static struct ieee80211_rate bitrate = {
-	.flags = IEEE80211_RATE_SHORT_PREAMBLE, /* ieee80211_rate_flags */
-	.bitrate = 1000,
+static struct ieee80211_rate bitrates[] = {
+	{
+		.bitrate = 60,
+	}, {
+		.bitrate = 120,
+	}, {
+		.bitrate = 240,
+	},
 };
 
 static struct ieee80211_supported_band band_5ghz = {
 	.channels = &channel,
-	.bitrates = &bitrate,
+	.bitrates = bitrates,
 	.band = IEEE80211_BAND_5GHZ,
 	.n_channels = 1,
-	.n_bitrates = 1,
+	.n_bitrates = 3,
 };
 
 static struct cfg80211_inform_bss mock_inform_bss = {
