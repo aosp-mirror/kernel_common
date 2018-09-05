@@ -188,12 +188,16 @@ static int virtio_gpu_resource_create_ioctl(struct drm_device *dev, void *data,
 	return 0;
 }
 
-static int virtio_gpu_resource_info_ioctl(struct drm_device *dev, void *data,
-					  struct drm_file *file)
+static int virtio_gpu_resource_info_cros_ioctl(struct drm_device *dev,
+					       void *data,
+					       struct drm_file *file)
 {
-	struct drm_virtgpu_resource_info *ri = data;
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+	struct drm_virtgpu_resource_info_cros *ri = data;
+	const u32 type = ri->type;
 	struct drm_gem_object *gobj = NULL;
 	struct virtio_gpu_object *qobj = NULL;
+	int ret = 0;
 
 	gobj = drm_gem_object_lookup(file, ri->bo_handle);
 	if (gobj == NULL)
@@ -203,11 +207,40 @@ static int virtio_gpu_resource_info_ioctl(struct drm_device *dev, void *data,
 
 	ri->size = qobj->base.base.size;
 	ri->res_handle = qobj->hw_res_handle;
-	if (qobj->host3d_blob || qobj->guest_blob)
-		ri->blob_mem = qobj->blob_mem;
 
+	if (type == VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT) {
+		ri->blob_mem = qobj->blob_mem;
+		goto out;
+	} else {
+		if (qobj->blob_mem) {
+			ret = -EINVAL;
+			goto out;
+		}
+		ri->stride = 0;
+	}
+
+	if (!qobj->create_callback_done) {
+		ret = wait_event_interruptible(vgdev->resp_wq,
+					       qobj->create_callback_done);
+		if (ret)
+			goto out;
+	}
+
+	if (qobj->num_planes) {
+		int i;
+
+		ri->num_planes = qobj->num_planes;
+		for (i = 0; i < qobj->num_planes; i++) {
+			ri->strides[i] = qobj->strides[i];
+			ri->offsets[i] = qobj->offsets[i];
+		}
+	}
+
+	ri->format_modifier = qobj->format_modifier;
+
+out:
 	drm_gem_object_put(gobj);
-	return 0;
+	return ret;
 }
 
 static int virtio_gpu_transfer_from_host_ioctl(struct drm_device *dev,
@@ -682,7 +715,8 @@ struct drm_ioctl_desc virtio_gpu_ioctls[DRM_VIRTIO_NUM_IOCTLS] = {
 			  virtio_gpu_resource_create_ioctl,
 			  DRM_RENDER_ALLOW),
 
-	DRM_IOCTL_DEF_DRV(VIRTGPU_RESOURCE_INFO, virtio_gpu_resource_info_ioctl,
+	DRM_IOCTL_DEF_DRV(VIRTGPU_RESOURCE_INFO_CROS,
+			  virtio_gpu_resource_info_cros_ioctl,
 			  DRM_RENDER_ALLOW),
 
 	/* make transfer async to the main ring? - no sure, can we
