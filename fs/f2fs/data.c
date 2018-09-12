@@ -123,8 +123,8 @@ static bool f2fs_bio_post_read_required(struct bio *bio, int err)
 
 static void f2fs_read_end_io(struct bio *bio, int err)
 {
-	if (time_to_inject(F2FS_P_SB(bio->bi_io_vec->bv_page), FAULT_IO)) {
-		f2fs_show_injection_info(FAULT_IO);
+	if (time_to_inject(F2FS_P_SB(bio->bi_io_vec->bv_page), FAULT_READ_IO)) {
+		f2fs_show_injection_info(FAULT_READ_IO);
 		err = -EIO;
 	}
 
@@ -144,6 +144,11 @@ static void f2fs_write_end_io(struct bio *bio, int err)
 	struct f2fs_sb_info *sbi = bio->bi_private;
 	struct bio_vec *bvec;
 	int i;
+
+	if (time_to_inject(sbi, FAULT_WRITE_IO)) {
+		f2fs_show_injection_info(FAULT_WRITE_IO);
+		err = -EIO;
+	}
 
 	bio_for_each_segment_all(bvec, bio, i) {
 		struct page *page = bvec->bv_page;
