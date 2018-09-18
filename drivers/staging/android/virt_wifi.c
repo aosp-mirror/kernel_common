@@ -148,128 +148,19 @@ static void virtio_wifi_scan_complete(struct work_struct *work)
 	priv->scan_request = NULL;
 }
 
-static struct ieee80211_mgmt auth_mgmt_frame = {
-	.frame_control = cpu_to_le16(IEEE80211_FTYPE_MGMT
-				     | IEEE80211_STYPE_AUTH),
-	.duration = 1, /* ??? */
-	.u = {
-		.auth = {
-			.auth_alg = WLAN_AUTH_OPEN,
-			/* auth request has 1, auth response has 2 */
-			.auth_transaction = 2,
-		},
-	},
-};
-
-static int virt_wifi_auth(
-		struct wiphy *wiphy,
-		struct net_device *dev,
-		struct cfg80211_auth_request *req)
-{
-	wiphy_debug(wiphy, "auth\n");
-	memcpy(auth_mgmt_frame.da, dev->dev_addr, dev->addr_len);
-	memcpy(auth_mgmt_frame.sa, fake_router_bssid,
-	       sizeof(fake_router_bssid));
-	memcpy(auth_mgmt_frame.bssid, fake_router_bssid,
-	       sizeof(fake_router_bssid));
-	/* Must call cfg80211_rx_mlme_mgmt to notify about the response to this.
-	 * This must hold the mutex for the wedev while calling the function.
-	 * Luckily the nl80211 code invoking this already holds that mutex.
-	 */
-	cfg80211_rx_mlme_mgmt(dev, (const u8 *)&auth_mgmt_frame,
-			      sizeof(auth_mgmt_frame));
+static int virt_wifi_connect(struct wiphy *wiphy,
+			     struct net_device *dev,
+			     struct cfg80211_connect_params *sme) {
+	wiphy_debug(wiphy, "connect\n");
+	cfg80211_connect_result(dev, fake_router_bssid, NULL, 0, NULL, 0, 0,
+				GFP_KERNEL);
 	return 0;
 }
 
-static struct ieee80211_mgmt assoc_mgmt_frame = {
-	.frame_control = cpu_to_le16(IEEE80211_FTYPE_MGMT
-				     | IEEE80211_STYPE_ASSOC_RESP),
-	.duration = 1, /* ??? */
-	.u = {
-		.assoc_resp = {
-			.capab_info = 1,
-			.status_code = 0,
-			.aid = 2, /* "association id" */
-		},
-	},
-};
-
-static int virt_wifi_assoc(
-		struct wiphy *wiphy,
-		struct net_device *dev,
-		struct cfg80211_assoc_request *req)
-{
-	wiphy_debug(wiphy, "assoc\n");
-	memcpy(assoc_mgmt_frame.da, dev->dev_addr, dev->addr_len);
-	memcpy(assoc_mgmt_frame.sa, fake_router_bssid,
-	       sizeof(fake_router_bssid));
-	memcpy(assoc_mgmt_frame.bssid, fake_router_bssid,
-	       sizeof(fake_router_bssid));
-	/* Must call cfg80211_rx_assoc_resp to notify about the response to
-	 * this. This must hold the mutex for the wedev while calling the
-	 * function. Luckily the nl80211 code invoking this already holds that
-	 * mutex.
-	 */
-	cfg80211_rx_assoc_resp(
-			/* struct net_device *dev */ dev,
-			/* struct cfg80211_bss *bss */ req->bss,
-			/* const u8 *buf */ (const u8 *)&assoc_mgmt_frame,
-			/* size_t len */ sizeof(assoc_mgmt_frame),
-			/* int uapsd_queues */ -1);
-	return 0;
-}
-
-static struct ieee80211_mgmt deauth_mgmt_frame = {
-	.frame_control = cpu_to_le16(IEEE80211_FTYPE_MGMT
-				     | IEEE80211_STYPE_DEAUTH),
-	.duration = 1, /* ??? */
-};
-
-static int virt_wifi_deauth(
-		struct wiphy *wiphy,
-		struct net_device *dev,
-		struct cfg80211_deauth_request *req)
-{
-	wiphy_debug(wiphy, "deauth\n");
-	memcpy(deauth_mgmt_frame.da, dev->dev_addr, dev->addr_len);
-	memcpy(deauth_mgmt_frame.sa, fake_router_bssid,
-	       sizeof(fake_router_bssid));
-	memcpy(deauth_mgmt_frame.bssid, fake_router_bssid,
-	       sizeof(fake_router_bssid));
-	deauth_mgmt_frame.u.deauth.reason_code = req->reason_code;
-	/* Must call cfg80211_rx_mlme_mgmt to notify about the response to this.
-	 * This must hold the mutex for the wedev while calling the function.
-	 * Luckily the nl80211 code invoking this already holds that mutex.
-	 */
-	cfg80211_rx_mlme_mgmt(dev, (const u8 *)&deauth_mgmt_frame,
-			      sizeof(auth_mgmt_frame));
-	return 0;
-}
-
-static struct ieee80211_mgmt disassoc_mgmt_frame = {
-	.frame_control = cpu_to_le16(IEEE80211_FTYPE_MGMT
-				     | IEEE80211_STYPE_DISASSOC),
-	.duration = 1, /* ??? */
-};
-
-static int virt_wifi_disassoc(
-		struct wiphy *wiphy,
-		struct net_device *dev,
-		struct cfg80211_disassoc_request *req)
-{
-	wiphy_debug(wiphy, "disassoc\n");
-	memcpy(disassoc_mgmt_frame.da, dev->dev_addr, dev->addr_len);
-	memcpy(disassoc_mgmt_frame.sa, fake_router_bssid,
-	       sizeof(fake_router_bssid));
-	memcpy(disassoc_mgmt_frame.bssid, fake_router_bssid,
-	       sizeof(fake_router_bssid));
-	disassoc_mgmt_frame.u.disassoc.reason_code = req->reason_code;
-	/* Must call cfg80211_rx_mlme_mgmt to notify about the response to this.
-	 * This must hold the mutex for the wedev while calling the function.
-	 * Luckily the nl80211 code invoking this already holds that mutex.
-	 */
-	cfg80211_rx_mlme_mgmt(dev, (const u8 *)&disassoc_mgmt_frame,
-			      sizeof(auth_mgmt_frame));
+static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *dev,
+				u16 reason_code) {
+	wiphy_debug(wiphy, "disconnect\n");
+	cfg80211_disconnected(dev, reason_code, NULL, 0, true, GFP_KERNEL);
 	return 0;
 }
 
@@ -296,10 +187,8 @@ static int virt_wifi_get_station(
 static const struct cfg80211_ops virt_wifi_cfg80211_ops = {
 	.scan = virt_wifi_scan,
 
-	.auth = virt_wifi_auth,
-	.assoc = virt_wifi_assoc,
-	.deauth = virt_wifi_deauth,
-	.disassoc = virt_wifi_disassoc,
+	.connect = virt_wifi_connect,
+	.disconnect = virt_wifi_disconnect,
 
 	.get_station = virt_wifi_get_station,
 };
