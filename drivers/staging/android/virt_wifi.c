@@ -29,7 +29,44 @@ struct virt_wifi_priv {
 	struct delayed_work scan_complete;
 };
 
-static struct ieee80211_channel channel = {
+static struct ieee80211_channel channel_2ghz = {
+	.band = IEEE80211_BAND_2GHZ,
+	.center_freq = 5500,
+	.hw_value = 5500,
+
+	.flags = 0, /* ieee80211_channel_flags */
+	.max_antenna_gain = 20,
+	.max_power = 5500,
+	.max_reg_power = 9999,
+};
+
+static struct ieee80211_rate bitrates_2ghz[] = {
+	{
+		.bitrate = 10,
+	}, {
+		.bitrate = 20,
+	}, {
+		.bitrate = 55,
+	}, {
+		.bitrate = 60,
+	}, {
+		.bitrate = 110,
+	}, {
+		.bitrate = 120,
+	}, {
+		.bitrate = 240,
+	},
+};
+
+static struct ieee80211_supported_band band_2ghz = {
+	.channels = &channel_2ghz,
+	.bitrates = bitrates_2ghz,
+	.band = IEEE80211_BAND_2GHZ,
+	.n_channels = 1,
+	.n_bitrates = 7,
+};
+
+static struct ieee80211_channel channel_5ghz = {
 	.band = IEEE80211_BAND_5GHZ,
 	.center_freq = 5500,
 	.hw_value = 5500,
@@ -40,7 +77,7 @@ static struct ieee80211_channel channel = {
 	.max_reg_power = 9999,
 };
 
-static struct ieee80211_rate bitrates[] = {
+static struct ieee80211_rate bitrates_5ghz[] = {
 	{
 		.bitrate = 60,
 	}, {
@@ -51,17 +88,17 @@ static struct ieee80211_rate bitrates[] = {
 };
 
 static struct ieee80211_supported_band band_5ghz = {
-	.channels = &channel,
-	.bitrates = bitrates,
+	.channels = &channel_5ghz,
+	.bitrates = bitrates_5ghz,
 	.band = IEEE80211_BAND_5GHZ,
 	.n_channels = 1,
 	.n_bitrates = 3,
 };
 
 static struct cfg80211_inform_bss mock_inform_bss = {
-	/* ieee80211_channel* */ .chan = &channel,
+	/* ieee80211_channel* */ .chan = &channel_5ghz,
 	/* nl80211_bss_scan_width */ .scan_width = NL80211_BSS_CHAN_WIDTH_20,
-	/* s32 */ .signal = 99,
+	/* s32 */ .signal = -60,
 };
 
 static u8 fake_router_bssid[] = {4, 4, 4, 4, 4, 4};
@@ -94,7 +131,7 @@ static int virt_wifi_scan(
 	}
 
 	priv->scan_request = request;
-	schedule_delayed_work(&priv->scan_result, HZ / 100);
+	schedule_delayed_work(&priv->scan_result, HZ * 2);
 
 	return 0;
 }
@@ -143,7 +180,7 @@ static void virtio_wifi_scan_result(struct work_struct *work)
 			/* gfp_t gfp */ GFP_KERNEL);
 	cfg80211_put_bss(wiphy, informed_bss);
 
-	schedule_delayed_work(&priv->scan_complete, HZ / 100);
+	schedule_delayed_work(&priv->scan_complete, HZ * 2);
 }
 
 static void virtio_wifi_scan_complete(struct work_struct *work)
@@ -179,15 +216,14 @@ static int virt_wifi_get_station(
 		struct station_info *sinfo)
 {
 	wiphy_debug(wiphy, "get_station\n");
-	/* Only the values used by netlink_utils.cpp. */
 	sinfo->filled = BIT(NL80211_STA_INFO_TX_PACKETS) |
 		BIT(NL80211_STA_INFO_TX_FAILED) | BIT(NL80211_STA_INFO_SIGNAL) |
 		BIT(NL80211_STA_INFO_TX_BITRATE);
 	sinfo->tx_packets = 1;
 	sinfo->tx_failed = 0;
-	sinfo->signal = -1; /* -1 is the maximum signal strength, somehow. */
+	sinfo->signal = -60;
 	sinfo->txrate = (struct rate_info) {
-		.legacy = 10000, /* units are 100kbit/s */
+		.legacy = 10, /* units are 100kbit/s */
 	};
 	return 0;
 }
@@ -222,34 +258,17 @@ static struct wireless_dev *virtio_wireless_dev(struct device *device)
 
 	wdev->wiphy = wiphy;
 
-	/* 100 SSIDs should be enough for anyone! */
-	wiphy->max_scan_ssids = 101;
+	wiphy->max_scan_ssids = 4;
 	wiphy->max_scan_ie_len = 1000;
 	wiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
 
-	wiphy->bands[IEEE80211_BAND_2GHZ] = NULL;
+	wiphy->bands[IEEE80211_BAND_2GHZ] = &band_2ghz;
 	wiphy->bands[IEEE80211_BAND_5GHZ] = &band_5ghz;
 	wiphy->bands[IEEE80211_BAND_60GHZ] = NULL;
 
 	/* Don't worry about frequency regulations. */
 	wiphy->regulatory_flags = REGULATORY_WIPHY_SELF_MANAGED;
-	wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) |
-				     BIT(NL80211_IFTYPE_AP) |
-				     BIT(NL80211_IFTYPE_P2P_CLIENT) |
-				     BIT(NL80211_IFTYPE_P2P_GO) |
-				     BIT(NL80211_IFTYPE_ADHOC) |
-				     BIT(NL80211_IFTYPE_MESH_POINT) |
-				     BIT(NL80211_IFTYPE_MONITOR);
-	wiphy->flags |= WIPHY_FLAG_SUPPORTS_TDLS |
-			    WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL |
-			    WIPHY_FLAG_AP_UAPSD |
-			    WIPHY_FLAG_HAS_CHANNEL_SWITCH;
-	wiphy->features |= NL80211_FEATURE_ACTIVE_MONITOR |
-			       NL80211_FEATURE_AP_MODE_CHAN_WIDTH_CHANGE |
-			       NL80211_FEATURE_STATIC_SMPS |
-			       NL80211_FEATURE_DYNAMIC_SMPS |
-			       NL80211_FEATURE_AP_SCAN |
-			       NL80211_FEATURE_SCAN_RANDOM_MAC_ADDR;
+	wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION);
 	set_wiphy_dev(wiphy, device);
 
 	priv = wiphy_priv(wiphy);
@@ -275,7 +294,7 @@ static netdev_tx_t virt_wifi_start_xmit(struct sk_buff *skb,
 	return dev_queue_xmit(skb);
 }
 
-static const struct net_device_ops wifi_vlan_ops = {
+static const struct net_device_ops virt_wifi_ops = {
 	.ndo_start_xmit = virt_wifi_start_xmit,
 };
 
@@ -302,7 +321,7 @@ static void free_netdev_and_wiphy(struct net_device *dev)
 static void virt_wifi_setup(struct net_device *dev)
 {
 	ether_setup(dev);
-	dev->netdev_ops = &wifi_vlan_ops;
+	dev->netdev_ops = &virt_wifi_ops;
 	dev->destructor = free_netdev_and_wiphy;
 }
 
