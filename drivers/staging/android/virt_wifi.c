@@ -24,9 +24,13 @@
 
 struct virt_wifi_priv {
 	bool being_deleted;
+	struct net_device *netdev;
 	struct cfg80211_scan_request *scan_request;
 	struct delayed_work scan_result;
 	struct delayed_work scan_complete;
+	struct delayed_work connect;
+	struct delayed_work disconnect;
+	u16 disconnect_reason;
 };
 
 static struct ieee80211_channel channel_2ghz = {
@@ -194,19 +198,52 @@ static void virtio_wifi_scan_complete(struct work_struct *work)
 }
 
 static int virt_wifi_connect(struct wiphy *wiphy,
-			     struct net_device *dev,
+			     struct net_device *netdev,
 			     struct cfg80211_connect_params *sme) {
+	struct virt_wifi_priv *priv = wiphy_priv(wiphy);
+	bool could_schedule;
+
+	if (priv->being_deleted)
+		return -EBUSY;
+
 	wiphy_debug(wiphy, "connect\n");
-	cfg80211_connect_result(dev, fake_router_bssid, NULL, 0, NULL, 0, 0,
-				GFP_KERNEL);
+	could_schedule = schedule_delayed_work(&priv->connect, HZ * 2);
+	return could_schedule ? 0 : -EBUSY;
+}
+
+static void virt_wifi_connect_complete(struct work_struct *work)
+{
+	struct virt_wifi_priv *priv =
+		container_of(work, struct virt_wifi_priv, connect.work);
+
+	cfg80211_connect_result(priv->netdev, fake_router_bssid, NULL, 0, NULL,
+				0, 0, GFP_KERNEL);
+}
+
+static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
+				u16 reason_code)
+{
+	struct virt_wifi_priv *priv = wiphy_priv(wiphy);
+	bool could_schedule;
+
+	if (priv->being_deleted)
+		return -EBUSY;
+
+	wiphy_debug(wiphy, "disconnect\n");
+	could_schedule = schedule_delayed_work(&priv->disconnect, HZ * 2);
+	if (!could_schedule)
+		return -EBUSY;
+	priv->disconnect_reason = reason_code;
 	return 0;
 }
 
-static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *dev,
-				u16 reason_code) {
-	wiphy_debug(wiphy, "disconnect\n");
-	cfg80211_disconnected(dev, reason_code, NULL, 0, true, GFP_KERNEL);
-	return 0;
+static void virt_wifi_disconnect_complete(struct work_struct *work)
+{
+	struct virt_wifi_priv *priv =
+		container_of(work, struct virt_wifi_priv, disconnect.work);
+
+	cfg80211_disconnected(priv->netdev, priv->disconnect_reason, NULL, 0,
+			      true, GFP_KERNEL);
 }
 
 static int virt_wifi_get_station(
@@ -237,7 +274,8 @@ static const struct cfg80211_ops virt_wifi_cfg80211_ops = {
 	.get_station = virt_wifi_get_station,
 };
 
-static struct wireless_dev *virtio_wireless_dev(struct device *device)
+static struct wireless_dev *virtio_wireless_dev(struct device *device,
+						struct net_device *netdev)
 {
 	struct wireless_dev *wdev;
 	struct wiphy *wiphy;
@@ -274,8 +312,11 @@ static struct wireless_dev *virtio_wireless_dev(struct device *device)
 	priv = wiphy_priv(wiphy);
 	priv->being_deleted = false;
 	priv->scan_request = NULL;
+	priv->netdev = netdev;
 	INIT_DELAYED_WORK(&priv->scan_result, virtio_wifi_scan_result);
 	INIT_DELAYED_WORK(&priv->scan_complete, virtio_wifi_scan_complete);
+	INIT_DELAYED_WORK(&priv->connect, virt_wifi_connect_complete);
+	INIT_DELAYED_WORK(&priv->disconnect, virt_wifi_disconnect_complete);
 	return wdev;
 }
 
@@ -309,6 +350,8 @@ static void free_netdev_and_wiphy(struct net_device *dev)
 		w_priv->being_deleted = true;
 		flush_delayed_work(&w_priv->scan_result);
 		flush_delayed_work(&w_priv->scan_complete);
+		flush_delayed_work(&w_priv->connect);
+		flush_delayed_work(&w_priv->disconnect);
 
 		if (dev->ieee80211_ptr->wiphy->registered)
 			wiphy_unregister(dev->ieee80211_ptr->wiphy);
@@ -406,7 +449,7 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 	netif_stacked_transfer_operstate(priv->lowerdev, dev);
 
 	SET_NETDEV_DEV(dev, &priv->lowerdev->dev);
-	dev->ieee80211_ptr = virtio_wireless_dev(&priv->lowerdev->dev);
+	dev->ieee80211_ptr = virtio_wireless_dev(&priv->lowerdev->dev, dev);
 
 	if (IS_ERR(dev->ieee80211_ptr)) {
 		dev_err(&priv->lowerdev->dev, "%s: can't init wireless: %ld\n",
