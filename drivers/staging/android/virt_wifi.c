@@ -316,7 +316,7 @@ static struct wireless_dev *virtio_wireless_dev(struct device *device)
 		return ERR_PTR(-ENOMEM);
 
 	wdev->iftype = NL80211_IFTYPE_STATION;
-	wiphy = wiphy_new(&virt_wifi_cfg80211_ops, 0);
+	wiphy = wiphy_new(&virt_wifi_cfg80211_ops, sizeof(*priv));
 
 	if (!wiphy) {
 		kfree(wdev);
