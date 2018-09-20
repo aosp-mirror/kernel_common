@@ -70,10 +70,6 @@ static struct inode *f2fs_new_inode(struct inode *dir, umode_t mode)
 							F2FS_DEF_PROJID);
 	dquot_initialize(inode);
 
-	err = dquot_alloc_inode(inode);
-	if (err)
-		goto fail_drop;
-
 	set_inode_flag(inode, FI_NEW_INODE);
 
 	/* If the directory encrypted, then we should encrypt the inode. */
@@ -130,16 +126,6 @@ fail:
 	make_bad_inode(inode);
 	if (nid_free)
 		set_inode_flag(inode, FI_FREE_NID);
-	iput(inode);
-	return ERR_PTR(err);
-fail_drop:
-	trace_f2fs_new_inode(inode, err);
-	dquot_drop(inode);
-	inode->i_flags |= S_NOQUOTA;
-	if (nid_free)
-		set_inode_flag(inode, FI_FREE_NID);
-	clear_nlink(inode);
-	unlock_new_inode(inode);
 	iput(inode);
 	return ERR_PTR(err);
 }

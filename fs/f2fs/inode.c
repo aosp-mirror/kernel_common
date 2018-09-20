@@ -686,9 +686,10 @@ retry:
 		goto retry;
 	}
 
-	if (err)
+	if (err) {
 		f2fs_update_inode_page(inode);
-	dquot_free_inode(inode);
+		set_sbi_flag(sbi, SBI_QUOTA_NEED_REPAIR);
+	}
 	sb_end_intwrite(inode->i_sb);
 no_delete:
 	dquot_drop(inode);
