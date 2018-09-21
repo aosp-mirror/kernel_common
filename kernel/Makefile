@@ -52,6 +52,8 @@ obj-y += dma/
 obj-y += entry/
 obj-$(CONFIG_MODULES) += module/
 
+obj-$(CONFIG_ALT_SYSCALL) += alt-syscall.o
+
 obj-$(CONFIG_KCMP) += kcmp.o
 obj-$(CONFIG_FREEZER) += freezer.o
 obj-$(CONFIG_PROFILING) += profile.o

@@ -255,5 +255,13 @@ config LSM
 
 source "security/Kconfig.hardening"
 
-endmenu
+config ARCH_HAS_ALT_SYSCALL
+	def_bool n
 
+config ALT_SYSCALL
+	bool "Alternate syscall table support"
+	depends on ARCH_HAS_ALT_SYSCALL
+	help
+	  Allow syscall table to be swapped on a running process.
+
+endmenu

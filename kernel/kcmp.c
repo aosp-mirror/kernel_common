@@ -132,8 +132,8 @@ static int kcmp_epoll_target(struct task_struct *task1,
 }
 #endif
 
-SYSCALL_DEFINE5(kcmp, pid_t, pid1, pid_t, pid2, int, type,
-		unsigned long, idx1, unsigned long, idx2)
+int ksys_kcmp(pid_t pid1, pid_t pid2, int type,
+		unsigned long idx1, unsigned long idx2)
 {
 	struct task_struct *task1, *task2;
 	int ret;
@@ -223,6 +223,12 @@ err:
 err_no_task:
 	rcu_read_unlock();
 	return -ESRCH;
+}
+
+SYSCALL_DEFINE5(kcmp, pid_t, pid1, pid_t, pid2, int, type,
+		unsigned long, idx1, unsigned long, idx2)
+{
+	return ksys_kcmp(pid1, pid2, type, idx1, idx2);
 }
 
 static __init int kcmp_cookies_init(void)

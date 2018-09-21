@@ -27,3 +27,11 @@ config SECURITY_CHROMIUMOS_NO_UNPRIVILEGED_UNSAFE_MOUNTS
 	  is attempted that would cause the filesystem to have the exec, suid,
 	  or dev flags if the caller does not have the CAP_SYS_ADMIN capability
 	  in the init namespace.
+
+config ALT_SYSCALL_CHROMIUMOS
+	bool "Chromium OS Alt-Syscall Tables"
+	depends on ALT_SYSCALL
+	help
+	  Register restricted, alternate syscall tables used by Chromium OS
+	  using the alt-syscall infrastructure.  Alternate syscall tables
+	  can be selected with prctl(PR_ALT_SYSCALL).
