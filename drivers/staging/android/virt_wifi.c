@@ -16,6 +16,7 @@
 
 struct virt_wifi_priv {
 	bool being_deleted;
+	bool is_connected;
 	struct net_device *netdev;
 	struct cfg80211_scan_request *scan_request;
 	struct delayed_work scan_result;
@@ -210,6 +211,7 @@ static void virt_wifi_connect_complete(struct work_struct *work)
 
 	cfg80211_connect_result(priv->netdev, fake_router_bssid, NULL, 0, NULL,
 				0, 0, GFP_KERNEL);
+	priv->is_connected = true;
 }
 
 static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
@@ -236,6 +238,7 @@ static void virt_wifi_disconnect_complete(struct work_struct *work)
 
 	cfg80211_disconnected(priv->netdev, priv->disconnect_reason, NULL, 0,
 			      true, GFP_KERNEL);
+	priv->is_connected = false;
 }
 
 static int virt_wifi_get_station(
@@ -303,6 +306,7 @@ static struct wireless_dev *virt_wireless_dev(struct device *device,
 
 	priv = wiphy_priv(wiphy);
 	priv->being_deleted = false;
+	priv->is_connected = false;
 	priv->scan_request = NULL;
 	priv->netdev = netdev;
 	INIT_DELAYED_WORK(&priv->scan_result, virt_wifi_scan_result);
@@ -322,6 +326,10 @@ static netdev_tx_t virt_wifi_start_xmit(struct sk_buff *skb,
 					struct net_device *dev)
 {
 	struct virt_wifi_netdev_priv *priv = netdev_priv(dev);
+	struct virt_wifi_priv *w_priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
+
+	if (!w_priv->is_connected)
+		return NETDEV_TX_BUSY;
 
 	skb->dev = priv->lowerdev;
 	return dev_queue_xmit(skb);
@@ -366,6 +374,11 @@ static rx_handler_result_t virt_wifi_rx_handler(struct sk_buff **pskb)
 	struct sk_buff *skb = *pskb;
 	struct virt_wifi_netdev_priv *priv =
 		rcu_dereference(skb->dev->rx_handler_data);
+	struct virt_wifi_priv *w_priv =
+		wiphy_priv(priv->upperdev->ieee80211_ptr->wiphy);
+
+	if (!w_priv->is_connected)
+		return RX_HANDLER_PASS;
 
 	/* GFP_ATOMIC because this is a packet interrupt handler. */
 	skb = skb_share_check(skb, GFP_ATOMIC);
