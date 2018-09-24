@@ -260,6 +260,22 @@ static int virt_wifi_get_station(
 	return 0;
 }
 
+static int virt_wifi_dump_station(
+		struct wiphy *wiphy,
+		struct net_device *dev,
+		int idx,
+		u8 *mac,
+		struct station_info *sinfo)
+{
+	wiphy_debug(wiphy, "dump_station\n");
+
+	if (idx != 0)
+		return -ENOENT;
+
+	ether_addr_copy(mac, fake_router_bssid);
+	return virt_wifi_get_station(wiphy, dev, fake_router_bssid, sinfo);
+}
+
 static const struct cfg80211_ops virt_wifi_cfg80211_ops = {
 	.scan = virt_wifi_scan,
 
@@ -267,6 +283,7 @@ static const struct cfg80211_ops virt_wifi_cfg80211_ops = {
 	.disconnect = virt_wifi_disconnect,
 
 	.get_station = virt_wifi_get_station,
+	.dump_station = virt_wifi_dump_station,
 };
 
 static struct wireless_dev *virt_wireless_dev(struct device *device,
