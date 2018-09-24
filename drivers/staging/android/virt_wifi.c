@@ -60,6 +60,12 @@ static struct ieee80211_supported_band band_2ghz = {
 	.band = NL80211_BAND_2GHZ,
 	.n_channels = 1,
 	.n_bitrates = 7,
+	.ht_cap = {
+		.ht_supported = true,
+	},
+	.vht_cap = {
+		.vht_supported = true,
+	},
 };
 
 static struct ieee80211_channel channel_5ghz = {
@@ -89,15 +95,16 @@ static struct ieee80211_supported_band band_5ghz = {
 	.band = NL80211_BAND_5GHZ,
 	.n_channels = 1,
 	.n_bitrates = 3,
+	.ht_cap = {
+		.ht_supported = true,
+	},
+	.vht_cap = {
+		.vht_supported = true,
+	},
 };
 
-static struct cfg80211_inform_bss mock_inform_bss = {
-	/* ieee80211_channel* */ .chan = &channel_5ghz,
-	/* nl80211_bss_scan_width */ .scan_width = NL80211_BSS_CHAN_WIDTH_20,
-	/* s32 */ .signal = -60,
-};
-
-static u8 fake_router_bssid[] = {4, 4, 4, 4, 4, 4};
+/** Assigned at module init. Guaranteed locally-administered and unicast. */
+static u8 fake_router_bssid[ETH_ALEN] = {};
 
 static int virt_wifi_scan(
 		struct wiphy *wiphy,
@@ -124,8 +131,12 @@ static void virt_wifi_scan_result(struct work_struct *work)
 		container_of(work, struct virt_wifi_priv,
 			     scan_result.work);
 	struct wiphy *wiphy = priv_to_wiphy(priv);
-
-	mock_inform_bss.boottime_ns = ktime_get_boot_ns();
+	struct cfg80211_inform_bss mock_inform_bss = {
+		.chan = &channel_5ghz,
+		.scan_width = NL80211_BSS_CHAN_WIDTH_20,
+		.signal = -60,
+		.boottime_ns = ktime_get_boot_ns(),
+	};
 
 	ssid[0] = WLAN_EID_SSID;
 	/* size of the array minus null terminator, length byte, tag byte */
@@ -183,6 +194,9 @@ static int virt_wifi_connect(struct wiphy *wiphy,
 
 	if (priv->being_deleted)
 		return -EBUSY;
+
+	if (sme->bssid && !ether_addr_equal(sme->bssid, fake_router_bssid))
+		return -EINVAL;
 
 	wiphy_debug(wiphy, "connect\n");
 	could_schedule = schedule_delayed_work(&priv->connect, HZ * 2);
@@ -488,6 +502,8 @@ static struct rtnl_link_ops virt_wifi_link_ops = {
 
 static int __init virt_wifi_init_module(void)
 {
+	/* Guaranteed to be locallly-administered and not multicast. */
+	eth_random_addr(fake_router_bssid);
 	return rtnl_link_register(&virt_wifi_link_ops);
 }
 
