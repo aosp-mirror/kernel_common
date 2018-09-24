@@ -118,29 +118,13 @@ static int virt_wifi_scan(
 	if (priv->scan_request || priv->being_deleted)
 		return -EBUSY;
 
-	if (request->ie_len > 0)
-		wiphy_debug(wiphy, "scan: first ie: %d\n", (int)request->ie[0]);
-
-	if (request->n_ssids > 0) {
-		int i;
-		u8 request_ssid_copy[IEEE80211_MAX_SSID_LEN + 1];
-
-		for (i = 0; i < request->n_ssids; i++) {
-			strncpy(request_ssid_copy, request->ssids[i].ssid,
-				request->ssids[i].ssid_len);
-			request_ssid_copy[request->ssids[i].ssid_len] = 0;
-			wiphy_debug(wiphy, "scan: ssid: %s\n",
-				    request_ssid_copy);
-		}
-	}
-
 	priv->scan_request = request;
 	schedule_delayed_work(&priv->scan_result, HZ * 2);
 
 	return 0;
 }
 
-static void virtio_wifi_scan_result(struct work_struct *work)
+static void virt_wifi_scan_result(struct work_struct *work)
 {
 	char ssid[] = "__AndroidWifi";
 	struct cfg80211_bss *informed_bss;
@@ -187,7 +171,7 @@ static void virtio_wifi_scan_result(struct work_struct *work)
 	schedule_delayed_work(&priv->scan_complete, HZ * 2);
 }
 
-static void virtio_wifi_scan_complete(struct work_struct *work)
+static void virt_wifi_scan_complete(struct work_struct *work)
 {
 	struct virt_wifi_priv *priv =
 		container_of(work, struct virt_wifi_priv,
@@ -274,8 +258,8 @@ static const struct cfg80211_ops virt_wifi_cfg80211_ops = {
 	.get_station = virt_wifi_get_station,
 };
 
-static struct wireless_dev *virtio_wireless_dev(struct device *device,
-						struct net_device *netdev)
+static struct wireless_dev *virt_wireless_dev(struct device *device,
+					      struct net_device *netdev)
 {
 	struct wireless_dev *wdev;
 	struct wiphy *wiphy;
@@ -313,8 +297,8 @@ static struct wireless_dev *virtio_wireless_dev(struct device *device,
 	priv->being_deleted = false;
 	priv->scan_request = NULL;
 	priv->netdev = netdev;
-	INIT_DELAYED_WORK(&priv->scan_result, virtio_wifi_scan_result);
-	INIT_DELAYED_WORK(&priv->scan_complete, virtio_wifi_scan_complete);
+	INIT_DELAYED_WORK(&priv->scan_result, virt_wifi_scan_result);
+	INIT_DELAYED_WORK(&priv->scan_complete, virt_wifi_scan_complete);
 	INIT_DELAYED_WORK(&priv->connect, virt_wifi_connect_complete);
 	INIT_DELAYED_WORK(&priv->disconnect, virt_wifi_disconnect_complete);
 	return wdev;
@@ -375,11 +359,10 @@ static rx_handler_result_t virt_wifi_rx_handler(struct sk_buff **pskb)
 	struct virt_wifi_netdev_priv *priv =
 		rcu_dereference(skb->dev->rx_handler_data);
 
-	/* macvlan uses GFP_ATOMIC here. */
+	/* GFP_ATOMIC because this is a packet interrupt handler. */
 	skb = skb_share_check(skb, GFP_ATOMIC);
 	if (!skb) {
-		dev_err(&priv->upperdev->dev, "%s: can't skb_share_check\n",
-			__func__);
+		dev_err(&priv->upperdev->dev, "can't skb_share_check\n");
 		return RX_HANDLER_CONSUMED;
 	}
 
@@ -399,8 +382,8 @@ static void virt_wifi_register_wiphy(struct work_struct *work)
 
 	err = wiphy_register(wdev->wiphy);
 	if (err < 0) {
-		dev_err(&priv->upperdev->dev, "%s: can't wiphy_register (%d)\n",
-			__func__, err);
+		dev_err(&priv->upperdev->dev, "can't wiphy_register (%d)\n",
+			err);
 
 		/* Roll back the net_device, it's not going to do wifi. */
 		rtnl_lock();
@@ -440,8 +423,8 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 					 priv);
 	if (err != 0) {
 		dev_err(&priv->lowerdev->dev,
-			"%s: can't netdev_rx_handler_register: %ld\n",
-			__func__, PTR_ERR(dev->ieee80211_ptr));
+			"can't netdev_rx_handler_register: %ld\n",
+			PTR_ERR(dev->ieee80211_ptr));
 		return err;
 	}
 
@@ -449,25 +432,25 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 	netif_stacked_transfer_operstate(priv->lowerdev, dev);
 
 	SET_NETDEV_DEV(dev, &priv->lowerdev->dev);
-	dev->ieee80211_ptr = virtio_wireless_dev(&priv->lowerdev->dev, dev);
+	dev->ieee80211_ptr = virt_wireless_dev(&priv->lowerdev->dev, dev);
 
 	if (IS_ERR(dev->ieee80211_ptr)) {
-		dev_err(&priv->lowerdev->dev, "%s: can't init wireless: %ld\n",
-			__func__, PTR_ERR(dev->ieee80211_ptr));
+		dev_err(&priv->lowerdev->dev, "can't init wireless: %ld\n",
+			PTR_ERR(dev->ieee80211_ptr));
 		return PTR_ERR(dev->ieee80211_ptr);
 	}
 
 	err = register_netdevice(dev);
 	if (err) {
-		dev_err(&priv->lowerdev->dev, "%s: can't register_netdevice: %d\n",
-			__func__, err);
+		dev_err(&priv->lowerdev->dev, "can't register_netdevice: %d\n",
+			err);
 		goto remove_handler;
 	}
 
 	err = netdev_upper_dev_link(priv->lowerdev, dev);
 	if (err) {
-		dev_err(&priv->lowerdev->dev, "%s: can't netdev_upper_dev_link: %d\n",
-			__func__, err);
+		dev_err(&priv->lowerdev->dev, "can't netdev_upper_dev_link: %d\n",
+			err);
 		goto unregister_netdev;
 	}
 
@@ -521,7 +504,7 @@ static void __exit virt_wifi_cleanup_module(void)
 module_init(virt_wifi_init_module);
 module_exit(virt_wifi_cleanup_module);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Cody Schuffelen <schuffelen@google.com>");
 MODULE_DESCRIPTION("Driver for a wireless wrapper of ethernet devices");
 MODULE_ALIAS_RTNL_LINK("virt_wifi");
