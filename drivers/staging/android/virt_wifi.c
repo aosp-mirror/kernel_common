@@ -184,8 +184,9 @@ static void virtio_wifi_scan_complete(struct work_struct *work)
 	struct virt_wifi_priv *priv =
 		container_of(work, struct virt_wifi_priv,
 			     scan_complete.work);
+	struct cfg80211_scan_info scan_info = {};
 
-	cfg80211_scan_done(priv->scan_request, false);
+	cfg80211_scan_done(priv->scan_request, &scan_info);
 	priv->scan_request = NULL;
 }
 
