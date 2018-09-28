@@ -1437,7 +1437,6 @@ retry_lookup:
 			dn = splice_dentry(dn, in, NULL);
 			if (IS_ERR(dn)) {
 				err = PTR_ERR(dn);
-				dn = NULL;
 				goto next_item;
 			}
 		}
