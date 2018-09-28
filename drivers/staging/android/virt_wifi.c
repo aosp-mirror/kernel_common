@@ -145,9 +145,8 @@ static struct ieee80211_supported_band band_5ghz = {
 /** Assigned at module init. Guaranteed locally-administered and unicast. */
 static u8 fake_router_bssid[ETH_ALEN] __ro_after_init = {};
 
-static int virt_wifi_scan(
-		struct wiphy *wiphy,
-		struct cfg80211_scan_request *request)
+static int virt_wifi_scan(struct wiphy *wiphy,
+			  struct cfg80211_scan_request *request)
 {
 	struct virt_wifi_priv *priv = wiphy_priv(wiphy);
 
@@ -367,7 +366,7 @@ static netdev_tx_t virt_wifi_start_xmit(struct sk_buff *skb,
 	struct virt_wifi_priv *w_priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
 
 	if (!w_priv->is_connected)
-		return NETDEV_TX_BUSY;
+		return NET_XMIT_DROP;
 
 	skb->dev = priv->lowerdev;
 	return dev_queue_xmit(skb);
@@ -466,6 +465,7 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 	if (!tb[IFLA_LINK])
 		return -EINVAL;
 
+	INIT_WORK(&priv->register_wiphy_work, virt_wifi_register_wiphy);
 	priv->upperdev = dev;
 	priv->lowerdev = __dev_get_by_index(src_net,
 					    nla_get_u32(tb[IFLA_LINK]));
@@ -479,10 +479,9 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 
 	err = netdev_rx_handler_register(priv->lowerdev, virt_wifi_rx_handler,
 					 priv);
-	if (err != 0) {
+	if (err) {
 		dev_err(&priv->lowerdev->dev,
-			"can't netdev_rx_handler_register: %ld\n",
-			PTR_ERR(dev->ieee80211_ptr));
+			"can't netdev_rx_handler_register: %d\n", err);
 		return err;
 	}
 
@@ -495,14 +494,15 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 	if (IS_ERR(dev->ieee80211_ptr)) {
 		dev_err(&priv->lowerdev->dev, "can't init wireless: %ld\n",
 			PTR_ERR(dev->ieee80211_ptr));
-		return PTR_ERR(dev->ieee80211_ptr);
+		err = PTR_ERR(dev->ieee80211_ptr);
+		goto remove_handler;
 	}
 
 	err = register_netdevice(dev);
 	if (err) {
 		dev_err(&priv->lowerdev->dev, "can't register_netdevice: %d\n",
 			err);
-		goto remove_handler;
+		goto free_wiphy;
 	}
 
 	err = netdev_upper_dev_link(priv->lowerdev, dev);
@@ -515,19 +515,22 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 	/* The newlink callback is invoked while holding the rtnl lock, but
 	 * register_wiphy wants to claim the rtnl lock itself.
 	 */
-	INIT_WORK(&priv->register_wiphy_work, virt_wifi_register_wiphy);
 	schedule_work(&priv->register_wiphy_work);
 
 	return 0;
-remove_handler:
-	netdev_rx_handler_unregister(priv->lowerdev);
 unregister_netdev:
 	unregister_netdevice(dev);
+free_wiphy: /* Safe whether or not netdev destructor runs. */
+	wiphy_free(dev->ieee80211_ptr->wiphy);
+	kfree(dev->ieee80211_ptr);
+	dev->ieee80211_ptr = NULL;
+remove_handler:
+	netdev_rx_handler_unregister(priv->lowerdev);
 
 	return err;
 }
 
-/** Called with rtnl lock held. */
+/* Called with rtnl lock held. */
 static void virt_wifi_dellink(struct net_device *dev,
 			      struct list_head *head)
 {
