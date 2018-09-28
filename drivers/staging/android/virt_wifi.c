@@ -27,8 +27,8 @@ struct virt_wifi_priv {
 	bool is_connected;
 	struct net_device *netdev;
 	struct cfg80211_scan_request *scan_request;
+	u8 connect_requested_bss[ETH_ALEN];
 	struct delayed_work scan_result;
-	struct delayed_work scan_complete;
 	struct delayed_work connect;
 	struct delayed_work disconnect;
 	u16 disconnect_reason;
@@ -164,7 +164,16 @@ static int virt_wifi_scan(
 
 static void virt_wifi_scan_result(struct work_struct *work)
 {
-	char ssid[] = "__AndroidWifi";
+	const union {
+		struct {
+			u8 tag;
+			u8 len;
+			u8 ssid[11];
+		} __packed parts;
+		u8 data[13];
+	} ssid = { .parts = {
+		.tag = WLAN_EID_SSID, .len = 11, .ssid = "AndroidWifi" }
+	};
 	struct cfg80211_bss *informed_bss;
 	struct virt_wifi_priv *priv =
 		container_of(work, struct virt_wifi_priv,
@@ -177,47 +186,14 @@ static void virt_wifi_scan_result(struct work_struct *work)
 		.boottime_ns = ktime_get_boot_ns(),
 	};
 
-	ssid[0] = WLAN_EID_SSID;
-	/* size of the array minus null terminator, length byte, tag byte */
-	ssid[1] = sizeof(ssid) - 3;
-
 	informed_bss =
-		cfg80211_inform_bss_data(
-			/* struct wiphy *wiphy */ wiphy,
-			/* struct cfg80211_inform_bss* */ &mock_inform_bss,
-			/* cfg80211_bss_frame_type */ CFG80211_BSS_FTYPE_PRESP,
-			/* const u8 *bssid */ fake_router_bssid,
-			/* u64 tsf */ mock_inform_bss.boottime_ns,
-			/* u16 capability */ WLAN_CAPABILITY_ESS, /* ??? */
-			/* u16 beacon_interval */ 0,
-			/* const u8 *ie */ ssid,
-			/* Truncate before the null terminator. */
-			/* size_t ielen */ sizeof(ssid) - 1,
-			/* gfp_t gfp */ GFP_KERNEL);
+		cfg80211_inform_bss_data(wiphy, &mock_inform_bss,
+					 CFG80211_BSS_FTYPE_PRESP,
+					 fake_router_bssid,
+					 mock_inform_bss.boottime_ns,
+					 WLAN_CAPABILITY_ESS, 0, ssid.data,
+					 sizeof(ssid), GFP_KERNEL);
 	cfg80211_put_bss(wiphy, informed_bss);
-
-	informed_bss =
-		cfg80211_inform_bss_data(
-			/* struct wiphy *wiphy */ wiphy,
-			/* struct cfg80211_inform_bss* */ &mock_inform_bss,
-			/* cfg80211_bss_frame_type */ CFG80211_BSS_FTYPE_BEACON,
-			/* const u8 *bssid */ fake_router_bssid,
-			/* u64 tsf */ mock_inform_bss.boottime_ns,
-			/* u16 capability */ WLAN_CAPABILITY_ESS, /* ??? */
-			/* u16 beacon_interval */ 0,
-			/* const u8 *ie */ ssid,
-			/* size_t ielen */ sizeof(ssid) - 1,
-			/* gfp_t gfp */ GFP_KERNEL);
-	cfg80211_put_bss(wiphy, informed_bss);
-
-	schedule_delayed_work(&priv->scan_complete, HZ * 2);
-}
-
-static void virt_wifi_scan_complete(struct work_struct *work)
-{
-	struct virt_wifi_priv *priv =
-		container_of(work, struct virt_wifi_priv,
-			     scan_complete.work);
 
 	cfg80211_scan_done(priv->scan_request, false);
 	priv->scan_request = NULL;
@@ -232,8 +208,10 @@ static int virt_wifi_connect(struct wiphy *wiphy,
 	if (priv->being_deleted)
 		return -EBUSY;
 
-	if (sme->bssid && !ether_addr_equal(sme->bssid, fake_router_bssid))
-		return -EINVAL;
+	if (sme->bssid)
+		ether_addr_copy(priv->connect_requested_bss, sme->bssid);
+	else
+		eth_zero_addr(priv->connect_requested_bss);
 
 	wiphy_debug(wiphy, "connect\n");
 	could_schedule = schedule_delayed_work(&priv->connect, HZ * 2);
@@ -244,6 +222,10 @@ static void virt_wifi_connect_complete(struct work_struct *work)
 {
 	struct virt_wifi_priv *priv =
 		container_of(work, struct virt_wifi_priv, connect.work);
+
+	if (!is_zero_ether_addr(priv->connect_requested_bss) &&
+	    !ether_addr_equal(priv->connect_requested_bss, fake_router_bssid))
+		return;
 
 	cfg80211_connect_result(priv->netdev, fake_router_bssid, NULL, 0, NULL,
 				0, 0, GFP_KERNEL);
@@ -284,6 +266,10 @@ static int virt_wifi_get_station(
 		struct station_info *sinfo)
 {
 	wiphy_debug(wiphy, "get_station\n");
+
+	if (!ether_addr_equal(mac, fake_router_bssid))
+		return -ENOENT;
+
 	sinfo->filled = BIT(NL80211_STA_INFO_TX_PACKETS) |
 		BIT(NL80211_STA_INFO_TX_FAILED) | BIT(NL80211_STA_INFO_SIGNAL) |
 		BIT(NL80211_STA_INFO_TX_BITRATE);
@@ -363,7 +349,6 @@ static struct wireless_dev *virt_wireless_dev(struct device *device,
 	priv->scan_request = NULL;
 	priv->netdev = netdev;
 	INIT_DELAYED_WORK(&priv->scan_result, virt_wifi_scan_result);
-	INIT_DELAYED_WORK(&priv->scan_complete, virt_wifi_scan_complete);
 	INIT_DELAYED_WORK(&priv->connect, virt_wifi_connect_complete);
 	INIT_DELAYED_WORK(&priv->disconnect, virt_wifi_disconnect_complete);
 	return wdev;
@@ -402,7 +387,6 @@ static void free_netdev_and_wiphy(struct net_device *dev)
 		w_priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
 		w_priv->being_deleted = true;
 		flush_delayed_work(&w_priv->scan_result);
-		flush_delayed_work(&w_priv->scan_complete);
 		flush_delayed_work(&w_priv->connect);
 		flush_delayed_work(&w_priv->disconnect);
 
