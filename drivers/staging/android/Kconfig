@@ -24,7 +24,7 @@ config ANDROID_VSOC
 	  a QEmu ivshmem device. If built as a module, it will be called vsoc.
 
 config ANDROID_VIRT_WIFI
-	tristate "Wifi wrapper for ethernet drivers"
+	bool "Wifi wrapper for ethernet drivers"
 	default n
 	---help---
 	  This option adds support for ethernet connections to appear as if they

@@ -28,31 +28,19 @@ struct virt_wifi_priv {
 
 static struct ieee80211_channel channel_2ghz = {
 	.band = NL80211_BAND_2GHZ,
-	.center_freq = 5500,
-	.hw_value = 5500,
-
-	.flags = 0, /* ieee80211_channel_flags */
-	.max_antenna_gain = 20,
-	.max_power = 5500,
-	.max_reg_power = 9999,
+	.center_freq = 2432,
+	.hw_value = 2432,
+	.max_power = 20,
 };
 
 static struct ieee80211_rate bitrates_2ghz[] = {
-	{
-		.bitrate = 10,
-	}, {
-		.bitrate = 20,
-	}, {
-		.bitrate = 55,
-	}, {
-		.bitrate = 60,
-	}, {
-		.bitrate = 110,
-	}, {
-		.bitrate = 120,
-	}, {
-		.bitrate = 240,
-	},
+	{ .bitrate = 10 },
+	{ .bitrate = 20 },
+	{ .bitrate = 55 },
+	{ .bitrate = 60 },
+	{ .bitrate = 110 },
+	{ .bitrate = 120 },
+	{ .bitrate = 240 },
 };
 
 static struct ieee80211_supported_band band_2ghz = {
@@ -60,34 +48,34 @@ static struct ieee80211_supported_band band_2ghz = {
 	.bitrates = bitrates_2ghz,
 	.band = NL80211_BAND_2GHZ,
 	.n_channels = 1,
-	.n_bitrates = 7,
+	.n_bitrates = ARRAY_SIZE(bitrates_2ghz),
 	.ht_cap = {
 		.ht_supported = true,
-	},
-	.vht_cap = {
-		.vht_supported = true,
+		.cap = IEEE80211_HT_CAP_SUP_WIDTH_20_40 |
+		       IEEE80211_HT_CAP_GRN_FLD |
+		       IEEE80211_HT_CAP_SGI_20 |
+		       IEEE80211_HT_CAP_SGI_40 |
+		       IEEE80211_HT_CAP_DSSSCCK40,
+		.ampdu_factor = 0x3,
+		.ampdu_density = 0x6,
+		.mcs = {
+			.rx_mask = {0xff, 0xff},
+			.tx_params = IEEE80211_HT_MCS_TX_DEFINED,
+		},
 	},
 };
 
 static struct ieee80211_channel channel_5ghz = {
 	.band = NL80211_BAND_5GHZ,
-	.center_freq = 5500,
-	.hw_value = 5500,
-
-	.flags = 0, /* ieee80211_channel_flags */
-	.max_antenna_gain = 20,
-	.max_power = 5500,
-	.max_reg_power = 9999,
+	.center_freq = 5240,
+	.hw_value = 5240,
+	.max_power = 20,
 };
 
 static struct ieee80211_rate bitrates_5ghz[] = {
-	{
-		.bitrate = 60,
-	}, {
-		.bitrate = 120,
-	}, {
-		.bitrate = 240,
-	},
+	{ .bitrate = 60 },
+	{ .bitrate = 120 },
+	{ .bitrate = 240 },
 };
 
 static struct ieee80211_supported_band band_5ghz = {
@@ -95,17 +83,59 @@ static struct ieee80211_supported_band band_5ghz = {
 	.bitrates = bitrates_5ghz,
 	.band = NL80211_BAND_5GHZ,
 	.n_channels = 1,
-	.n_bitrates = 3,
+	.n_bitrates = ARRAY_SIZE(bitrates_5ghz),
 	.ht_cap = {
 		.ht_supported = true,
+		.cap = IEEE80211_HT_CAP_SUP_WIDTH_20_40 |
+		       IEEE80211_HT_CAP_GRN_FLD |
+		       IEEE80211_HT_CAP_SGI_20 |
+		       IEEE80211_HT_CAP_SGI_40 |
+		       IEEE80211_HT_CAP_DSSSCCK40,
+		.ampdu_factor = 0x3,
+		.ampdu_density = 0x6,
+		.mcs = {
+			.rx_mask = {0xff, 0xff},
+			.tx_params = IEEE80211_HT_MCS_TX_DEFINED,
+		},
 	},
 	.vht_cap = {
 		.vht_supported = true,
+		.cap = IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_11454 |
+		       IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160_80PLUS80MHZ |
+		       IEEE80211_VHT_CAP_RXLDPC |
+		       IEEE80211_VHT_CAP_SHORT_GI_80 |
+		       IEEE80211_VHT_CAP_SHORT_GI_160 |
+		       IEEE80211_VHT_CAP_TXSTBC |
+		       IEEE80211_VHT_CAP_RXSTBC_1 |
+		       IEEE80211_VHT_CAP_RXSTBC_2 |
+		       IEEE80211_VHT_CAP_RXSTBC_3 |
+		       IEEE80211_VHT_CAP_RXSTBC_4 |
+		       IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK,
+		.vht_mcs = {
+			.rx_mcs_map = cpu_to_le16(
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 0 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 2 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 4 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 6 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 8 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 10 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 12 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 14),
+			.tx_mcs_map = cpu_to_le16(
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 0 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 2 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 4 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 6 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 8 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 10 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 12 |
+				IEEE80211_VHT_MCS_SUPPORT_0_9 << 14),
+		}
 	},
 };
 
 /** Assigned at module init. Guaranteed locally-administered and unicast. */
-static u8 fake_router_bssid[ETH_ALEN] = {};
+static u8 fake_router_bssid[ETH_ALEN] __ro_after_init = {};
 
 static int virt_wifi_scan(
 		struct wiphy *wiphy,
