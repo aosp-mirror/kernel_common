@@ -187,8 +187,12 @@ static void virt_wifi_scan_result(struct work_struct *work)
 					 sizeof(ssid), GFP_KERNEL);
 	cfg80211_put_bss(wiphy, informed_bss);
 
-	cfg80211_scan_done(priv->scan_request, &scan_info);
-	priv->scan_request = NULL;
+	rtnl_lock();
+	if (priv->scan_request) {
+		cfg80211_scan_done(priv->scan_request, &scan_info);
+		priv->scan_request = NULL;
+	}
+	rtnl_unlock();
 }
 
 static int virt_wifi_connect(struct wiphy *wiphy,
@@ -366,8 +370,27 @@ static netdev_tx_t virt_wifi_start_xmit(struct sk_buff *skb,
 	return dev_queue_xmit(skb);
 }
 
+/* Called with rtnl lock held. */
+static int virt_wifi_net_device_stop(struct net_device *dev)
+{
+	struct virt_wifi_priv *w_priv;
+	struct cfg80211_scan_info scan_info = { .aborted = true };
+
+	if (!dev->ieee80211_ptr)
+		return 0;
+	w_priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
+
+	if (w_priv->scan_request) {
+		cfg80211_scan_done(w_priv->scan_request, &scan_info);
+		w_priv->scan_request = NULL;
+	}
+
+	return 0;
+}
+
 static const struct net_device_ops virt_wifi_ops = {
 	.ndo_start_xmit = virt_wifi_start_xmit,
+	.ndo_stop = virt_wifi_net_device_stop,
 };
 
 static void free_netdev_and_wiphy(struct net_device *dev)
