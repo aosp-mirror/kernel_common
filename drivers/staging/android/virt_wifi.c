@@ -212,14 +212,18 @@ static int virt_wifi_connect(struct wiphy *wiphy,
 	if (priv->being_deleted)
 		return -EBUSY;
 
+	could_schedule = schedule_delayed_work(&priv->connect, HZ * 2);
+	if (!could_schedule)
+		return -EBUSY;
+
 	if (sme->bssid)
 		ether_addr_copy(priv->connect_requested_bss, sme->bssid);
 	else
 		eth_zero_addr(priv->connect_requested_bss);
 
 	wiphy_debug(wiphy, "connect\n");
-	could_schedule = schedule_delayed_work(&priv->connect, HZ * 2);
-	return could_schedule ? 0 : -EBUSY;
+
+	return 0;
 }
 
 static void virt_wifi_connect_complete(struct work_struct *work)
