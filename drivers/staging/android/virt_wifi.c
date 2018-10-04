@@ -25,6 +25,7 @@
 struct virt_wifi_priv {
 	bool being_deleted;
 	bool is_connected;
+	bool netdev_is_up;
 	struct net_device *netdev;
 	struct cfg80211_scan_request *scan_request;
 	u8 connect_requested_bss[ETH_ALEN];
@@ -225,14 +226,20 @@ static void virt_wifi_connect_complete(struct work_struct *work)
 {
 	struct virt_wifi_priv *priv =
 		container_of(work, struct virt_wifi_priv, connect.work);
+	u8 *requested_bss = priv->connect_requested_bss;
+	bool has_addr = !is_zero_ether_addr(requested_bss);
+	bool right_addr = ether_addr_equal(requested_bss, fake_router_bssid);
+	u16 status = WLAN_STATUS_SUCCESS;
 
-	if (!is_zero_ether_addr(priv->connect_requested_bss) &&
-	    !ether_addr_equal(priv->connect_requested_bss, fake_router_bssid))
-		return;
+	rtnl_lock();
+	if (!priv->netdev_is_up || (has_addr && !right_addr))
+		status = WLAN_STATUS_UNSPECIFIED_FAILURE;
+	else
+		priv->is_connected = true;
 
-	cfg80211_connect_result(priv->netdev, fake_router_bssid, NULL, 0, NULL,
-				0, 0, GFP_KERNEL);
-	priv->is_connected = true;
+	cfg80211_connect_result(priv->netdev, requested_bss, NULL, 0, NULL, 0,
+				status, GFP_KERNEL);
+	rtnl_unlock();
 }
 
 static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
@@ -347,6 +354,7 @@ static struct wireless_dev *virt_wireless_dev(struct device *device,
 	set_wiphy_dev(wiphy, device);
 
 	priv = wiphy_priv(wiphy);
+	priv->netdev_is_up = false;
 	priv->being_deleted = false;
 	priv->is_connected = false;
 	priv->scan_request = NULL;
@@ -377,6 +385,19 @@ static netdev_tx_t virt_wifi_start_xmit(struct sk_buff *skb,
 }
 
 /* Called with rtnl lock held. */
+static int virt_wifi_net_device_open(struct net_device *dev)
+{
+	struct virt_wifi_priv *w_priv;
+
+	if (!dev->ieee80211_ptr)
+		return 0;
+	w_priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
+
+	w_priv->netdev_is_up = true;
+	return 0;
+}
+
+/* Called with rtnl lock held. */
 static int virt_wifi_net_device_stop(struct net_device *dev)
 {
 	struct virt_wifi_priv *w_priv;
@@ -384,6 +405,7 @@ static int virt_wifi_net_device_stop(struct net_device *dev)
 	if (!dev->ieee80211_ptr)
 		return 0;
 	w_priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
+	w_priv->netdev_is_up = false;
 
 	if (w_priv->scan_request) {
 		cfg80211_scan_done(w_priv->scan_request, true);
@@ -395,6 +417,7 @@ static int virt_wifi_net_device_stop(struct net_device *dev)
 
 static const struct net_device_ops virt_wifi_ops = {
 	.ndo_start_xmit = virt_wifi_start_xmit,
+	.ndo_open = virt_wifi_net_device_open,
 	.ndo_stop = virt_wifi_net_device_stop,
 };
 
