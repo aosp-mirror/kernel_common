@@ -78,7 +78,7 @@
 
 #define CCK_GROUP						\
 	[MINSTREL_MAX_STREAMS * MINSTREL_STREAM_GROUPS] = {	\
-		.streams = 0,					\
+		.streams = 1,					\
 		.duration = {					\
 			CCK_DURATION_LIST(false),		\
 			CCK_DURATION_LIST(true)			\
