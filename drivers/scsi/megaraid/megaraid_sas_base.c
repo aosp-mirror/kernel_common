@@ -6322,6 +6322,9 @@ static int megasas_mgmt_compat_ioctl_fw(struct file *file, unsigned long arg)
 	    copy_in_user(&ioc->sge_count, &cioc->sge_count, sizeof(u32)))
 		return -EFAULT;
 
+	if (local_sense_off != user_sense_off)
+		return -EINVAL;
+
 	/*
 	 * The sense_ptr is used in megasas_mgmt_fw_ioctl only when
 	 * sense_len is not null, so prepare the 64bit value under
