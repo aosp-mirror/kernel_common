@@ -284,9 +284,10 @@ static int virt_wifi_get_station(
 	if (!ether_addr_equal(mac, fake_router_bssid))
 		return -ENOENT;
 
-	sinfo->filled = BIT(NL80211_STA_INFO_TX_PACKETS) |
-		BIT(NL80211_STA_INFO_TX_FAILED) | BIT(NL80211_STA_INFO_SIGNAL) |
-		BIT(NL80211_STA_INFO_TX_BITRATE);
+	sinfo->filled = BIT_ULL(NL80211_STA_INFO_TX_PACKETS) |
+		BIT_ULL(NL80211_STA_INFO_TX_FAILED) |
+		BIT_ULL(NL80211_STA_INFO_SIGNAL) |
+		BIT_ULL(NL80211_STA_INFO_TX_BITRATE);
 	sinfo->tx_packets = priv->tx_packets;
 	sinfo->tx_failed = priv->tx_failed;
 	sinfo->signal = -60;
