@@ -25,6 +25,8 @@ struct virt_wifi_priv {
 	struct delayed_work connect;
 	struct delayed_work disconnect;
 	u16 disconnect_reason;
+	u32 tx_packets;
+	u32 tx_failed;
 };
 
 static struct ieee80211_channel channel_2ghz = {
@@ -268,6 +270,8 @@ static int virt_wifi_get_station(
 		const u8 *mac,
 		struct station_info *sinfo)
 {
+	struct virt_wifi_priv *priv = wiphy_priv(wiphy);
+
 	wiphy_debug(wiphy, "get_station\n");
 
 	if (!ether_addr_equal(mac, fake_router_bssid))
@@ -276,8 +280,8 @@ static int virt_wifi_get_station(
 	sinfo->filled = BIT(NL80211_STA_INFO_TX_PACKETS) |
 		BIT(NL80211_STA_INFO_TX_FAILED) | BIT(NL80211_STA_INFO_SIGNAL) |
 		BIT(NL80211_STA_INFO_TX_BITRATE);
-	sinfo->tx_packets = 1;
-	sinfo->tx_failed = 0;
+	sinfo->tx_packets = priv->tx_packets;
+	sinfo->tx_failed = priv->tx_failed;
 	sinfo->signal = -60;
 	sinfo->txrate = (struct rate_info) {
 		.legacy = 10, /* units are 100kbit/s */
@@ -292,9 +296,11 @@ static int virt_wifi_dump_station(
 		u8 *mac,
 		struct station_info *sinfo)
 {
+	struct virt_wifi_priv *priv = wiphy_priv(wiphy);
+
 	wiphy_debug(wiphy, "dump_station\n");
 
-	if (idx != 0)
+	if (idx != 0 || !priv->is_connected)
 		return -ENOENT;
 
 	ether_addr_copy(mac, fake_router_bssid);
@@ -370,8 +376,11 @@ static netdev_tx_t virt_wifi_start_xmit(struct sk_buff *skb,
 	struct virt_wifi_netdev_priv *priv = netdev_priv(dev);
 	struct virt_wifi_priv *w_priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
 
-	if (!w_priv->is_connected)
+	w_priv->tx_packets++;
+	if (!w_priv->is_connected) {
+		w_priv->tx_failed++;
 		return NET_XMIT_DROP;
+	}
 
 	skb->dev = priv->lowerdev;
 	return dev_queue_xmit(skb);
