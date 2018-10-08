@@ -231,6 +231,7 @@ static void virt_wifi_connect_complete(struct work_struct *work)
 	cfg80211_connect_result(priv->netdev, requested_bss, NULL, 0, NULL, 0,
 				status, GFP_KERNEL);
 	rtnl_unlock();
+	netif_carrier_on(priv->netdev);
 }
 
 static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
@@ -258,6 +259,7 @@ static void virt_wifi_disconnect_complete(struct work_struct *work)
 	cfg80211_disconnected(priv->netdev, priv->disconnect_reason, NULL, 0,
 			      true, GFP_KERNEL);
 	priv->is_connected = false;
+	netif_carrier_off(priv->netdev);
 }
 
 static int virt_wifi_get_station(
@@ -502,6 +504,8 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 
 	if (!tb[IFLA_LINK])
 		return -EINVAL;
+
+	netif_carrier_off(dev);
 
 	INIT_WORK(&priv->register_wiphy_work, virt_wifi_register_wiphy);
 	priv->upperdev = dev;
