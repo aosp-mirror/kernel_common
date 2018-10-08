@@ -171,21 +171,14 @@ static void virt_wifi_scan_result(struct work_struct *work)
 		container_of(work, struct virt_wifi_priv,
 			     scan_result.work);
 	struct wiphy *wiphy = priv_to_wiphy(priv);
-	struct cfg80211_inform_bss mock_inform_bss = {
-		.chan = &channel_5ghz,
-		.scan_width = NL80211_BSS_CHAN_WIDTH_20,
-		.signal = -60,
-		.boottime_ns = ktime_get_boot_ns(),
-	};
-	struct cfg80211_scan_info scan_info = {};
 
-	informed_bss =
-		cfg80211_inform_bss_data(wiphy, &mock_inform_bss,
-					 CFG80211_BSS_FTYPE_PRESP,
-					 fake_router_bssid,
-					 mock_inform_bss.boottime_ns,
-					 WLAN_CAPABILITY_ESS, 0, ssid.data,
-					 sizeof(ssid), GFP_KERNEL);
+	informed_bss = cfg80211_inform_bss(wiphy, &channel_5ghz,
+					   CFG80211_BSS_FTYPE_PRESP,
+					   fake_router_bssid,
+					   ktime_get_boot_ns(),
+					   WLAN_CAPABILITY_ESS, 0, ssid.data,
+					   sizeof(ssid), DBM_TO_MBM(60),
+					   GFP_KERNEL);
 	cfg80211_put_bss(wiphy, informed_bss);
 
 	rtnl_lock();
