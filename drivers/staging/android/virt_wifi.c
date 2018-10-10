@@ -158,15 +158,12 @@ static int virt_wifi_scan(struct wiphy *wiphy,
 
 static void virt_wifi_scan_result(struct work_struct *work)
 {
-	const union {
-		struct {
-			u8 tag;
-			u8 len;
-			u8 ssid[11];
-		} __packed parts;
-		u8 data[13];
-	} ssid = { .parts = {
-		.tag = WLAN_EID_SSID, .len = 11, .ssid = "AndroidWifi" }
+	struct {
+		u8 tag;
+		u8 len;
+		u8 ssid[11];
+	} __packed ssid = {
+		.tag = WLAN_EID_SSID, .len = 11, .ssid = "AndroidWifi",
 	};
 	struct cfg80211_bss *informed_bss;
 	struct virt_wifi_priv *priv =
@@ -179,9 +176,9 @@ static void virt_wifi_scan_result(struct work_struct *work)
 					   CFG80211_BSS_FTYPE_PRESP,
 					   fake_router_bssid,
 					   ktime_get_boot_ns(),
-					   WLAN_CAPABILITY_ESS, 0, ssid.data,
-					   sizeof(ssid), DBM_TO_MBM(60),
-					   GFP_KERNEL);
+					   WLAN_CAPABILITY_ESS, 0,
+					   (void *)&ssid, sizeof(ssid),
+					   DBM_TO_MBM(60), GFP_KERNEL);
 	cfg80211_put_bss(wiphy, informed_bss);
 
 	rtnl_lock();
