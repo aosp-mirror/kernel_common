@@ -81,6 +81,24 @@ static struct ieee80211_rate bitrates_5ghz[] = {
 	{ .bitrate = 240 },
 };
 
+#define RX_MCS_MAP (IEEE80211_VHT_MCS_SUPPORT_0_9 << 0 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 2 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 4 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 6 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 8 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 10 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 12 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 14)
+
+#define TX_MCS_MAP (IEEE80211_VHT_MCS_SUPPORT_0_9 << 0 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 2 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 4 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 6 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 8 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 10 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 12 | \
+		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 14)
+
 static struct ieee80211_supported_band band_5ghz = {
 	.channels = &channel_5ghz,
 	.bitrates = bitrates_5ghz,
@@ -115,24 +133,8 @@ static struct ieee80211_supported_band band_5ghz = {
 		       IEEE80211_VHT_CAP_RXSTBC_4 |
 		       IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK,
 		.vht_mcs = {
-			.rx_mcs_map = cpu_to_le16(
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 0 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 2 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 4 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 6 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 8 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 10 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 12 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 14),
-			.tx_mcs_map = cpu_to_le16(
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 0 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 2 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 4 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 6 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 8 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 10 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 12 |
-				IEEE80211_VHT_MCS_SUPPORT_0_9 << 14),
+			.rx_mcs_map = cpu_to_le16(RX_MCS_MAP),
+			.tx_mcs_map = cpu_to_le16(TX_MCS_MAP),
 		}
 	},
 };
@@ -262,11 +264,8 @@ static void virt_wifi_disconnect_complete(struct work_struct *work)
 	netif_carrier_off(priv->netdev);
 }
 
-static int virt_wifi_get_station(
-		struct wiphy *wiphy,
-		struct net_device *dev,
-		const u8 *mac,
-		struct station_info *sinfo)
+static int virt_wifi_get_station(struct wiphy *wiphy, struct net_device *dev,
+				 const u8 *mac, struct station_info *sinfo)
 {
 	struct virt_wifi_priv *priv = wiphy_priv(wiphy);
 
@@ -288,12 +287,8 @@ static int virt_wifi_get_station(
 	return 0;
 }
 
-static int virt_wifi_dump_station(
-		struct wiphy *wiphy,
-		struct net_device *dev,
-		int idx,
-		u8 *mac,
-		struct station_info *sinfo)
+static int virt_wifi_dump_station(struct wiphy *wiphy, struct net_device *dev,
+				  int idx, u8 *mac, struct station_info *sinfo)
 {
 	struct virt_wifi_priv *priv = wiphy_priv(wiphy);
 
