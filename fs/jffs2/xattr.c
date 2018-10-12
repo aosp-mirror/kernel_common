@@ -1003,12 +1003,14 @@ ssize_t jffs2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 		if (buffer) {
 			rc = xhandle->list(dentry, buffer+len, size-len,
 					   xd->xname, xd->name_len, xd->flags);
+			if (rc > size - len) {
+				rc = -ERANGE;
+				goto out;
+			}
 		} else {
 			rc = xhandle->list(dentry, NULL, 0, xd->xname,
 					   xd->name_len, xd->flags);
 		}
-		if (rc < 0)
-			goto out;
 		len += rc;
 	}
 	rc = len;
