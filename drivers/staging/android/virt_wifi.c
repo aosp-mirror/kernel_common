@@ -31,8 +31,6 @@ struct virt_wifi_priv {
 	u8 connect_requested_bss[ETH_ALEN];
 	struct delayed_work scan_result;
 	struct delayed_work connect;
-	struct delayed_work disconnect;
-	u16 disconnect_reason;
 	u32 tx_packets;
 	u32 tx_failed;
 };
@@ -247,28 +245,18 @@ static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
 				u16 reason_code)
 {
 	struct virt_wifi_priv *priv = wiphy_priv(wiphy);
-	bool could_schedule;
 
 	if (priv->being_deleted)
 		return -EBUSY;
 
 	wiphy_debug(wiphy, "disconnect\n");
-	could_schedule = schedule_delayed_work(&priv->disconnect, HZ * 2);
-	if (!could_schedule)
-		return -EBUSY;
-	priv->disconnect_reason = reason_code;
-	return 0;
-}
+	cancel_delayed_work_sync(&priv->connect);
 
-static void virt_wifi_disconnect_complete(struct work_struct *work)
-{
-	struct virt_wifi_priv *priv =
-		container_of(work, struct virt_wifi_priv, disconnect.work);
-
-	cfg80211_disconnected(priv->netdev, priv->disconnect_reason, NULL, 0,
-			      true, GFP_KERNEL);
+	cfg80211_disconnected(netdev, reason_code, NULL, 0, true, GFP_KERNEL);
 	priv->is_connected = false;
 	netif_carrier_off(priv->netdev);
+
+	return 0;
 }
 
 static int virt_wifi_get_station(struct wiphy *wiphy, struct net_device *dev,
@@ -361,7 +349,6 @@ static struct wireless_dev *virt_wireless_dev(struct device *device,
 	priv->netdev = netdev;
 	INIT_DELAYED_WORK(&priv->scan_result, virt_wifi_scan_result);
 	INIT_DELAYED_WORK(&priv->connect, virt_wifi_connect_complete);
-	INIT_DELAYED_WORK(&priv->disconnect, virt_wifi_disconnect_complete);
 	return wdev;
 }
 
@@ -435,7 +422,6 @@ static void free_netdev_and_wiphy(struct net_device *dev)
 		w_priv->being_deleted = true;
 		flush_delayed_work(&w_priv->scan_result);
 		flush_delayed_work(&w_priv->connect);
-		flush_delayed_work(&w_priv->disconnect);
 
 		if (dev->ieee80211_ptr->wiphy->registered)
 			wiphy_unregister(dev->ieee80211_ptr->wiphy);
