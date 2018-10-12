@@ -2474,9 +2474,8 @@ static int imx319_probe(struct i2c_client *client)
 	}
 
 	if (i == imx319->hwcfg->nr_of_link_freqs) {
-		dev_err(&client->dev, "no link frequency supported");
-		ret = -EINVAL;
-		goto error_probe;
+		dev_warn(&client->dev, "no link frequency supported "
+			 "defaulting to %lld\n", imx319->link_def_freq);
 	}
 
 	/* Set default mode to max resolution */
