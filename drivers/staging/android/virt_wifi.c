@@ -173,6 +173,7 @@ static void virt_wifi_scan_result(struct work_struct *work)
 		container_of(work, struct virt_wifi_priv,
 			     scan_result.work);
 	struct wiphy *wiphy = priv_to_wiphy(priv);
+	struct cfg80211_scan_info scan_info;
 
 	informed_bss = cfg80211_inform_bss(wiphy, &channel_5ghz,
 					   CFG80211_BSS_FTYPE_PRESP,
