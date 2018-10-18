@@ -144,7 +144,7 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 		u64 mode = (*(u64 *)valp) & COMPAT_PSR_MODE_MASK;
 		switch (mode) {
 		case COMPAT_PSR_MODE_USR:
-			if ((read_cpuid(ID_AA64PFR0_EL1) & 0xf) != 2)
+			if ((read_cpuid(SYS_ID_AA64PFR0_EL1) & 0xf) != 2)
 				return -EINVAL;
 			break;
 		case COMPAT_PSR_MODE_FIQ:
