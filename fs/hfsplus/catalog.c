@@ -250,6 +250,14 @@ int hfsplus_create_cat(u32 cnid, struct inode *dir,
 	if (err)
 		return err;
 
+	/*
+	 * Fail early and avoid ENOSPC during the btree operations. We may
+	 * have to split the root node at most once.
+	 */
+	err = hfs_bmap_reserve(fd.tree, 2 * fd.tree->depth);
+	if (err)
+		goto err2;
+
 	hfsplus_cat_build_key(sb, fd.search_key, cnid, NULL);
 	entry_size = hfsplus_fill_cat_thread(sb, &entry,
 		S_ISDIR(inode->i_mode) ?
@@ -309,6 +317,14 @@ int hfsplus_delete_cat(u32 cnid, struct inode *dir, struct qstr *str)
 	err = hfs_find_init(HFSPLUS_SB(sb)->cat_tree, &fd);
 	if (err)
 		return err;
+
+	/*
+	 * Fail early and avoid ENOSPC during the btree operations. We may
+	 * have to split the root node at most once.
+	 */
+	err = hfs_bmap_reserve(fd.tree, 2 * (int)fd.tree->depth - 2);
+	if (err)
+		goto out;
 
 	if (!str) {
 		int len;
@@ -403,6 +419,14 @@ int hfsplus_rename_cat(u32 cnid,
 	if (err)
 		return err;
 	dst_fd = src_fd;
+
+	/*
+	 * Fail early and avoid ENOSPC during the btree operations. We may
+	 * have to split the root node at most twice.
+	 */
+	err = hfs_bmap_reserve(src_fd.tree, 4 * (int)src_fd.tree->depth - 1);
+	if (err)
+		goto out;
 
 	/* find the old dir entry and read the data */
 	hfsplus_cat_build_key(sb, src_fd.search_key, src_dir->i_ino, src_name);
