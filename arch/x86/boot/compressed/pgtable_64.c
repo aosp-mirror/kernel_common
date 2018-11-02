@@ -92,9 +92,6 @@ struct paging_config paging_prepare(void *rmode)
 {
 	struct paging_config paging_config = {};
 
-	/* Initialize boot_params. Required for cmdline_find_option_bool(). */
-	boot_params = rmode;
-
 	/*
 	 * Check if LA57 is desired and supported.
 	 *
@@ -107,11 +104,15 @@ struct paging_config paging_prepare(void *rmode)
 	 *
 	 * That's substitute for boot_cpu_has() in early boot code.
 	 */
-	if (IS_ENABLED(CONFIG_X86_5LEVEL) &&
-			!cmdline_find_option_bool("no5lvl") &&
-			native_cpuid_eax(0) >= 7 &&
-			(native_cpuid_ecx(7) & (1 << (X86_FEATURE_LA57 & 31)))) {
-		paging_config.l5_required = 1;
+	if (IS_ENABLED(CONFIG_X86_5LEVEL)) {
+		/* Initialize boot_params. Required for cmdline_find_option_bool(). */
+		boot_params = rmode;
+
+		if (!cmdline_find_option_bool("no5lvl") &&
+				native_cpuid_eax(0) >= 7 &&
+				(native_cpuid_ecx(7) & (1 << (X86_FEATURE_LA57 & 31)))) {
+			paging_config.l5_required = 1;
+		}
 	}
 
 	paging_config.trampoline_start = find_trampoline_placement();
