@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 #include "misc.h"
 
-#if CONFIG_EARLY_PRINTK || CONFIG_RANDOMIZE_BASE || CONFIG_X86_5LEVEL
+#if CONFIG_EARLY_PRINTK || CONFIG_RANDOMIZE_BASE
 
 static unsigned long fs;
 static inline void set_fs(unsigned long seg)

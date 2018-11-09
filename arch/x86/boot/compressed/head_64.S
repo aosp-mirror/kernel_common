@@ -365,7 +365,6 @@ ENTRY(startup_64)
 	 * this function call.
 	 */
 	pushq	%rsi
-	movq	%rsi, %rdi		/* real mode address */
 	call	paging_prepare
 	popq	%rsi
 
