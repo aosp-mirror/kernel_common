@@ -1840,7 +1840,7 @@ static int domain_context_mapping_one(struct dmar_domain *domain,
 		 * Unnecessary for PT mode.
 		 */
 		if (translation != CONTEXT_TT_PASS_THROUGH) {
-			for (agaw = domain->agaw; agaw != iommu->agaw; agaw--) {
+			for (agaw = domain->agaw; agaw > iommu->agaw; agaw--) {
 				pgd = phys_to_virt(dma_pte_addr(pgd));
 				if (!dma_pte_present(pgd)) {
 					spin_unlock_irqrestore(&iommu->lock, flags);
@@ -1865,7 +1865,7 @@ static int domain_context_mapping_one(struct dmar_domain *domain,
 		context_set_address_width(context, iommu->msagaw);
 	else {
 		context_set_address_root(context, virt_to_phys(pgd));
-		context_set_address_width(context, iommu->agaw);
+		context_set_address_width(context, agaw);
 	}
 
 	context_set_translation_type(context, translation);
