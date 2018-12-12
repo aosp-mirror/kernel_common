@@ -755,6 +755,11 @@ static const struct option_blacklist_info fibocom_nl668_iot_blacklist = {
 
 };
 
+static const struct option_blacklist_info fibocom_nl668_blacklist = {
+	.reserved = BIT(4) | BIT(5) | BIT(6),
+
+};
+
 static const struct option_blacklist_info quectel_ep06_blacklist = {
 	.reserved = BIT(4) | BIT(5),
 };
@@ -2181,6 +2186,8 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE_INTERFACE_CLASS(0x305a, 0x1404, 0xff) },			/* GosunCn GM500 RNDIS */
 	{ USB_DEVICE_INTERFACE_CLASS(0x305a, 0x1405, 0xff) },			/* GosunCn GM500 MBIM */
 	{ USB_DEVICE_INTERFACE_CLASS(0x305a, 0x1406, 0xff) },			/* GosunCn GM500 ECM/NCM */
+	{ USB_DEVICE(0x1508, 0x1001),						/* Fibocom NL668 */
+	  .driver_info = (kernel_ulong_t)&fibocom_nl668_blacklist },
 	{ } /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, option_ids);
