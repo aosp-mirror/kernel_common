@@ -689,6 +689,15 @@ static const struct option_blacklist_info telit_me910_dual_modem_blacklist = {
 	.reserved = BIT(3),
 };
 
+static const struct option_blacklist_info telit_me940_qmi_blacklist = {
+	.sendsetup = BIT(0),
+	.reserved = BIT(1),
+};
+
+static const struct option_blacklist_info telit_me940_mbim_blacklist = {
+	.sendsetup = BIT(0),
+};
+
 static const struct option_blacklist_info telit_ft980_ks_blacklist = {
 	.sendsetup = BIT(2),
 	.reserved = BIT(3),
@@ -1380,6 +1389,10 @@ static const struct usb_device_id option_ids[] = {
 		.driver_info = (kernel_ulong_t)&telit_le910_blacklist },
 	{ USB_DEVICE_INTERFACE_CLASS(TELIT_VENDOR_ID, 0x1231, 0xff),	/* Telit LE910Cx (RNDIS) */
 		.driver_info = (kernel_ulong_t)&telit_le910c_blacklist },
+	{ USB_DEVICE(TELIT_VENDOR_ID, 0x1900),				/* Telit LN940 (QMI) */
+	  .driver_info = (kernel_ulong_t)&telit_me940_qmi_blacklist },
+	{ USB_DEVICE_INTERFACE_CLASS(TELIT_VENDOR_ID, 0x1901, 0xff),	/* Telit LN940 (MBIM) */
+	  .driver_info = (kernel_ulong_t)&telit_me940_mbim_blacklist },
 	{ USB_DEVICE_AND_INTERFACE_INFO(ZTE_VENDOR_ID, ZTE_PRODUCT_MF622, 0xff, 0xff, 0xff) }, /* ZTE WCDMA products */
 	{ USB_DEVICE_AND_INTERFACE_INFO(ZTE_VENDOR_ID, 0x0002, 0xff, 0xff, 0xff),
 		.driver_info = (kernel_ulong_t)&net_intf1_blacklist },
