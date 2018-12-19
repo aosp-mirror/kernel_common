@@ -105,6 +105,7 @@ static inline void gro_cells_destroy(struct gro_cells *gcells)
 	if (!cell)
 		return;
 	for (i = 0; i <= gcells->gro_cells_mask; i++,cell++) {
+		napi_disable(&cell->napi);
 		netif_napi_del(&cell->napi);
 		skb_queue_purge(&cell->napi_skbs);
 	}
