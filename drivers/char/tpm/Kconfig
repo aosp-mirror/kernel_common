@@ -210,5 +210,14 @@ config TCG_FTPM_TEE
 	help
 	  This driver proxies for firmware TPM running in TEE.
 
+config TCG_VIRTIO_VTPM
+	tristate "Virtio vTPM"
+	depends on TCG_TPM && VIRTIO
+	help
+	  This driver provides the guest kernel side of TPM over Virtio. If
+	  you are building Linux to run inside of a hypervisor that supports
+	  TPM over Virtio, say Yes and the virtualized TPM will be
+	  accessible from the guest.
+
 source "drivers/char/tpm/st33zp24/Kconfig"
 endif # TCG_TPM
