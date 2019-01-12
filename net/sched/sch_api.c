@@ -1815,10 +1815,11 @@ done:
 int tc_classify_compat(struct sk_buff *skb, const struct tcf_proto *tp,
 		       struct tcf_result *res)
 {
-	__be16 protocol = skb->protocol;
 	int err;
 
 	for (; tp; tp = rcu_dereference_bh(tp->next)) {
+		__be16 protocol = skb->protocol;
+
 		if (tp->protocol != protocol &&
 		    tp->protocol != htons(ETH_P_ALL))
 			continue;
