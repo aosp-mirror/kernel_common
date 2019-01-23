@@ -721,6 +721,7 @@ static const struct of_device_id trusty_of_match[] = {
 	{
 		.compatible = "android,trusty-virtio-v1",
 	},
+	{},
 };
 
 MODULE_DEVICE_TABLE(of, trusty_of_match);
