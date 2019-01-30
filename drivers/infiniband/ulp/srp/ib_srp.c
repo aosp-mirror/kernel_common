@@ -2408,7 +2408,6 @@ static int srp_abort(struct scsi_cmnd *scmnd)
 static int srp_reset_device(struct scsi_cmnd *scmnd)
 {
 	struct srp_target_port *target = host_to_target(scmnd->device->host);
-	int i;
 
 	shost_printk(KERN_ERR, target->scsi_host, "SRP reset_device called\n");
 
@@ -2417,11 +2416,6 @@ static int srp_reset_device(struct scsi_cmnd *scmnd)
 		return FAILED;
 	if (target->tsk_mgmt_status)
 		return FAILED;
-
-	for (i = 0; i < target->req_ring_size; ++i) {
-		struct srp_request *req = &target->req_ring[i];
-		srp_finish_req(target, req, scmnd->device, DID_RESET << 16);
-	}
 
 	return SUCCESS;
 }
