@@ -1138,6 +1138,7 @@ static void init_aead_job(u32 *sh_desc, dma_addr_t ptr,
 	} else {
 		if (!edesc->dst_nents) {
 			dst_dma = sg_dma_address(req->dst);
+			out_options = 0;
 		} else {
 			dst_dma = edesc->sec4_sg_dma +
 				  sec4_sg_index *
