@@ -4672,24 +4672,39 @@ int tcpm_update_sink_capabilities(struct tcpm_port *port, const u32 *pdo, unsign
 }
 EXPORT_SYMBOL_GPL(tcpm_update_sink_capabilities);
 
+/*
+ * Don't call this function in interrupt context. Caller needs to free the
+ * memory by calling tcpm_put_partner_src_caps.
+ */
 int tcpm_get_partner_src_caps(struct tcpm_port *port, u32 **src_pdo)
 {
 	unsigned int nr_pdo;
 
-	if (port->nr_source_caps == 0)
+	mutex_lock(&port->lock);
+	if (port->nr_source_caps == 0) {
+		mutex_unlock(&port->lock);
 		return -ENODATA;
+	}
 
 	*src_pdo = kcalloc(port->nr_source_caps, sizeof(u32), GFP_KERNEL);
-	if (!src_pdo)
+	if (!src_pdo) {
+		mutex_unlock(&port->lock);
 		return -ENOMEM;
+	}
 
-	mutex_lock(&port->lock);
 	nr_pdo = tcpm_copy_pdos(*src_pdo, port->source_caps,
 				port->nr_source_caps);
 	mutex_unlock(&port->lock);
 	return nr_pdo;
 }
 EXPORT_SYMBOL_GPL(tcpm_get_partner_src_caps);
+
+void tcpm_put_partner_src_caps(u32 **src_pdo)
+{
+	kfree(*src_pdo);
+	*src_pdo = NULL;
+}
+EXPORT_SYMBOL_GPL(tcpm_put_partner_src_caps);
 
 /* Power Supply access to expose source power information */
 enum tcpm_psy_online_states {
