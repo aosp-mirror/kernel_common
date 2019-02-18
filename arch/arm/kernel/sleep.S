@@ -125,12 +125,22 @@ ENDPROC(cpu_resume_after_mmu)
  */
 	.data
 	.align
+
+#ifdef CONFIG_MCPM
+	.arm
+THUMB(	.thumb			)
+ENTRY(cpu_resume_no_hyp)
+ARM_BE8(setend be)			@ ensure we are in BE mode
+	b	no_hyp
+#endif
+
 ENTRY(cpu_resume)
 ARM_BE8(setend be)			@ ensure we are in BE mode
 #ifdef CONFIG_ARM_VIRT_EXT
 	bl	__hyp_stub_install_secondary
 #endif
 	safe_svcmode_maskall r1
+no_hyp:
 	mov	r1, #0
 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
 	ALT_UP_B(1f)
@@ -154,6 +164,10 @@ THUMB(	ldmia	r0!, {r1, r2, r3}	)
 THUMB(	mov	sp, r2			)
 THUMB(	bx	r3			)
 ENDPROC(cpu_resume)
+
+#ifdef CONFIG_MCPM
+ENDPROC(cpu_resume_no_hyp)
+#endif
 
 	.align 2
 mpidr_hash_ptr:
