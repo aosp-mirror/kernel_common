@@ -20,6 +20,8 @@ obj-$(CONFIG_CPU_FREQ_GOV_ATTR_SET)	+= cpufreq_governor_attr_set.o
 obj-$(CONFIG_CPUFREQ_DT)		+= cpufreq-dt.o
 obj-$(CONFIG_CPUFREQ_DT_PLATDEV)	+= cpufreq-dt-platdev.o
 
+obj-$(CONFIG_CPUFREQ_DUMMY)		+= dummy-cpufreq.o
+
 # Traces
 CFLAGS_amd-pstate-trace.o               := -I$(src)
 amd_pstate-y				:= amd-pstate.o amd-pstate-trace.o
