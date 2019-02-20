@@ -689,6 +689,10 @@ static const struct option_blacklist_info telit_me910_dual_modem_blacklist = {
 	.reserved = BIT(3),
 };
 
+static const struct option_blacklist_info telit_me910_ecm_blacklist = {
+	.sendsetup = BIT(0),
+};
+
 static const struct option_blacklist_info telit_me940_qmi_blacklist = {
 	.sendsetup = BIT(0),
 	.reserved = BIT(1),
@@ -1377,6 +1381,8 @@ static const struct usb_device_id option_ids[] = {
 		.driver_info = (kernel_ulong_t)&telit_me910_blacklist },
 	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_ME910_DUAL_MODEM),
 		.driver_info = (kernel_ulong_t)&telit_me910_dual_modem_blacklist },
+	{ USB_DEVICE_INTERFACE_CLASS(TELIT_VENDOR_ID, 0x1102, 0xff),	/* Telit ME910 (ECM) */
+	  .driver_info = (kernel_ulong_t)&telit_me910_ecm_blacklist },
 	{ USB_DEVICE(TELIT_VENDOR_ID, TELIT_PRODUCT_LE910),
 		.driver_info = (kernel_ulong_t)&telit_le910_blacklist },
 	{ USB_DEVICE_INTERFACE_CLASS(TELIT_VENDOR_ID, 0x1203, 0xff),	/* Telit LE910Cx (RNDIS) */
