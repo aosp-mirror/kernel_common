@@ -610,6 +610,7 @@ static void __sock_release(struct socket *sock, struct inode *inode)
 		if (inode)
 			mutex_lock(&inode->i_mutex);
 		sock->ops->release(sock);
+		sock->sk = NULL;
 		if (inode)
 			mutex_unlock(&inode->i_mutex);
 		sock->ops = NULL;
