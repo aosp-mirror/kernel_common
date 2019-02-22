@@ -42,6 +42,8 @@ struct trusty_vdev;
 struct trusty_ctx {
 	struct device		*dev;
 	void			*shared_va;
+	struct scatterlist	shared_sg;
+	trusty_shared_mem_id_t	shared_id;
 	size_t			shared_sz;
 	struct work_struct	check_vqs;
 	struct work_struct	kick_vqs;
@@ -54,7 +56,8 @@ struct trusty_ctx {
 
 struct trusty_vring {
 	void			*vaddr;
-	phys_addr_t		paddr;
+	struct scatterlist	sg;
+	trusty_shared_mem_id_t	shared_mem_id;
 	size_t			size;
 	uint			align;
 	uint			elem_num;
@@ -159,15 +162,14 @@ static bool trusty_virtio_notify(struct virtqueue *vq)
 }
 
 static int trusty_load_device_descr(struct trusty_ctx *tctx,
-				    void *va, size_t sz)
+				    trusty_shared_mem_id_t id, size_t sz)
 {
 	int ret;
 
-	dev_dbg(tctx->dev, "%s: %zu bytes @ %p\n", __func__, sz, va);
+	dev_dbg(tctx->dev, "%s: %zu bytes @ id %d\n", __func__, sz, id);
 
-	ret = trusty_call32_mem_buf(tctx->dev->parent,
-				    SMC_SC_VIRTIO_GET_DESCR,
-				    virt_to_page(va), sz, PAGE_KERNEL);
+	ret = trusty_std_call32(tctx->dev->parent, SMC_SC_VIRTIO_GET_DESCR,
+				(u32)id, id >> 32, sz);
 	if (ret < 0) {
 		dev_err(tctx->dev, "%s: virtio get descr returned (%d)\n",
 			__func__, ret);
@@ -176,14 +178,15 @@ static int trusty_load_device_descr(struct trusty_ctx *tctx,
 	return ret;
 }
 
-static void trusty_virtio_stop(struct trusty_ctx *tctx, void *va, size_t sz)
+static void trusty_virtio_stop(struct trusty_ctx *tctx,
+			       trusty_shared_mem_id_t id, size_t sz)
 {
 	int ret;
 
-	dev_dbg(tctx->dev, "%s: %zu bytes @ %p\n", __func__, sz, va);
+	dev_dbg(tctx->dev, "%s: %zu bytes @ id %d\n", __func__, sz, id);
 
-	ret = trusty_call32_mem_buf(tctx->dev->parent, SMC_SC_VIRTIO_STOP,
-				    virt_to_page(va), sz, PAGE_KERNEL);
+	ret = trusty_std_call32(tctx->dev->parent, SMC_SC_VIRTIO_STOP,
+				(u32)id, id >> 32, sz);
 	if (ret) {
 		dev_err(tctx->dev, "%s: virtio done returned (%d)\n",
 			__func__, ret);
@@ -192,14 +195,14 @@ static void trusty_virtio_stop(struct trusty_ctx *tctx, void *va, size_t sz)
 }
 
 static int trusty_virtio_start(struct trusty_ctx *tctx,
-			       void *va, size_t sz)
+			       trusty_shared_mem_id_t id, size_t sz)
 {
 	int ret;
 
-	dev_dbg(tctx->dev, "%s: %zu bytes @ %p\n", __func__, sz, va);
+	dev_dbg(tctx->dev, "%s: %zu bytes @ id %d\n", __func__, sz, id);
 
-	ret = trusty_call32_mem_buf(tctx->dev->parent, SMC_SC_VIRTIO_START,
-				    virt_to_page(va), sz, PAGE_KERNEL);
+	ret = trusty_std_call32(tctx->dev->parent, SMC_SC_VIRTIO_START,
+				(u32)id, id >> 32, sz);
 	if (ret) {
 		dev_err(tctx->dev, "%s: virtio start returned (%d)\n",
 			__func__, ret);
@@ -279,6 +282,7 @@ static void trusty_virtio_set_status(struct virtio_device *vdev, u8 status)
 static void _del_vqs(struct virtio_device *vdev)
 {
 	uint i;
+	int ret;
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
 	struct trusty_vring *tvr = &tvdev->vrings[0];
 
@@ -293,7 +297,21 @@ static void _del_vqs(struct virtio_device *vdev)
 		}
 		/* delete vring */
 		if (tvr->vaddr) {
-			free_pages_exact(tvr->vaddr, tvr->size);
+			ret = trusty_reclaim_memory(tvdev->tctx->dev->parent,
+						    tvr->shared_mem_id,
+						    &tvr->sg, 1);
+			if (WARN_ON(ret)) {
+				dev_err(&vdev->dev,
+					"trusty_revoke_memory failed: %d 0x%llx\n",
+					ret, tvr->shared_mem_id);
+				/*
+				 * It is not safe to free this memory if
+				 * trusty_revoke_memory fails. Leak it in that
+				 * case.
+				 */
+			} else {
+				free_pages_exact(tvr->vaddr, tvr->size);
+			}
 			tvr->vaddr = NULL;
 		}
 	}
@@ -315,6 +333,7 @@ static struct virtqueue *_find_vq(struct virtio_device *vdev,
 	struct trusty_vring *tvr;
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
 	phys_addr_t pa;
+	int ret;
 
 	if (!name)
 		return ERR_PTR(-EINVAL);
@@ -334,16 +353,28 @@ static struct virtqueue *_find_vq(struct virtio_device *vdev,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	pa = virt_to_phys(tvr->vaddr);
-	/* save vring address to shared structure */
-	tvr->vr_descr->da = (u32)pa;
-	/* da field is only 32 bit wide. Use previously unused 'reserved' field
-	 * to store top 32 bits of 64-bit address
-	 */
-	tvr->vr_descr->pa = (u32)(pa >> 32);
+	sg_init_one(&tvr->sg, tvr->vaddr, tvr->size);
+	ret = trusty_share_memory_compat(tvdev->tctx->dev->parent,
+					 &tvr->shared_mem_id, &tvr->sg, 1,
+					 PAGE_KERNEL);
+	if (ret) {
+		pa = virt_to_phys(tvr->vaddr);
+		dev_err(&vdev->dev, "trusty_share_memory failed: %d %pa\n",
+			ret, &pa);
+		goto err_share_memory;
+	}
 
-	dev_info(&vdev->dev, "vring%d: va(pa)  %p(%llx) qsz %d notifyid %d\n",
-		 id, tvr->vaddr, (u64)tvr->paddr, tvr->elem_num, tvr->notifyid);
+	/* save vring address to shared structure */
+	tvr->vr_descr->da = (u32)tvr->shared_mem_id;
+
+	/* da field is only 32 bit wide. Use previously unused 'reserved' field
+	 * to store top 32 bits of 64-bit shared_mem_id
+	 */
+	tvr->vr_descr->pa = (u32)(tvr->shared_mem_id >> 32);
+
+	dev_info(&vdev->dev, "vring%d: va(id)  %p(%llx) qsz %d notifyid %d\n",
+		 id, tvr->vaddr, (u64)tvr->shared_mem_id, tvr->elem_num,
+		 tvr->notifyid);
 
 	tvr->vq = vring_new_virtqueue(id, tvr->elem_num, tvr->align,
 				      vdev, true, ctx, tvr->vaddr,
@@ -359,7 +390,19 @@ static struct virtqueue *_find_vq(struct virtio_device *vdev,
 	return tvr->vq;
 
 err_new_virtqueue:
-	free_pages_exact(tvr->vaddr, tvr->size);
+	ret = trusty_reclaim_memory(tvdev->tctx->dev->parent,
+				    tvr->shared_mem_id, &tvr->sg, 1);
+	if (WARN_ON(ret)) {
+		dev_err(&vdev->dev, "trusty_revoke_memory failed: %d 0x%llx\n",
+			ret, tvr->shared_mem_id);
+		/*
+		 * It is not safe to free this memory if trusty_revoke_memory
+		 * fails. Leak it in that case.
+		 */
+	} else {
+err_share_memory:
+		free_pages_exact(tvr->vaddr, tvr->size);
+	}
 	tvr->vaddr = NULL;
 	return ERR_PTR(-ENOMEM);
 }
@@ -573,7 +616,9 @@ static void trusty_virtio_remove_devices(struct trusty_ctx *tctx)
 static int trusty_virtio_add_devices(struct trusty_ctx *tctx)
 {
 	int ret;
+	int ret_tmp;
 	void *descr_va;
+	trusty_shared_mem_id_t descr_id;
 	size_t descr_sz;
 	size_t descr_buf_sz;
 
@@ -585,8 +630,16 @@ static int trusty_virtio_add_devices(struct trusty_ctx *tctx)
 		return -ENOMEM;
 	}
 
+	sg_init_one(&tctx->shared_sg, descr_va, descr_buf_sz);
+	ret = trusty_share_memory(tctx->dev->parent, &descr_id,
+				  &tctx->shared_sg, 1, PAGE_KERNEL);
+	if (ret) {
+		dev_err(tctx->dev, "trusty_share_memory failed: %d\n", ret);
+		goto err_share_memory;
+	}
+
 	/* load device descriptors */
-	ret = trusty_load_device_descr(tctx, descr_va, descr_buf_sz);
+	ret = trusty_load_device_descr(tctx, descr_id, descr_buf_sz);
 	if (ret < 0) {
 		dev_err(tctx->dev, "failed (%d) to load device descr\n", ret);
 		goto err_load_descr;
@@ -613,7 +666,7 @@ static int trusty_virtio_add_devices(struct trusty_ctx *tctx)
 	}
 
 	/* start virtio */
-	ret = trusty_virtio_start(tctx, descr_va, descr_sz);
+	ret = trusty_virtio_start(tctx, descr_id, descr_sz);
 	if (ret) {
 		dev_err(tctx->dev, "failed (%d) to start virtio\n", ret);
 		goto err_start_virtio;
@@ -621,6 +674,7 @@ static int trusty_virtio_add_devices(struct trusty_ctx *tctx)
 
 	/* attach shared area */
 	tctx->shared_va = descr_va;
+	tctx->shared_id = descr_id;
 	tctx->shared_sz = descr_buf_sz;
 
 	mutex_unlock(&tctx->mlock);
@@ -636,9 +690,21 @@ err_parse_descr:
 	_remove_devices_locked(tctx);
 	mutex_unlock(&tctx->mlock);
 	cancel_work_sync(&tctx->kick_vqs);
-	trusty_virtio_stop(tctx, descr_va, descr_sz);
+	trusty_virtio_stop(tctx, descr_id, descr_sz);
 err_load_descr:
-	free_pages_exact(descr_va, descr_buf_sz);
+	ret_tmp = trusty_reclaim_memory(tctx->dev->parent, descr_id,
+					&tctx->shared_sg, 1);
+	if (WARN_ON(ret_tmp)) {
+		dev_err(tctx->dev, "trusty_revoke_memory failed: %d 0x%llx\n",
+			ret_tmp, tctx->shared_id);
+		/*
+		 * It is not safe to free this memory if trusty_revoke_memory
+		 * fails. Leak it in that case.
+		 */
+	} else {
+err_share_memory:
+		free_pages_exact(descr_va, descr_buf_sz);
+	}
 	return ret;
 }
 
@@ -649,7 +715,7 @@ dma_addr_t trusty_virtio_dma_map_page(struct device *dev, struct page *page,
 {
 	struct tipc_msg_buf *buf = page_to_virt(page) + offset;
 
-	return buf->buf_pa;
+	return buf->buf_id;
 }
 
 static const struct dma_map_ops trusty_virtio_dma_map_ops = {
@@ -715,6 +781,7 @@ err_create_check_wq:
 static int trusty_virtio_remove(struct platform_device *pdev)
 {
 	struct trusty_ctx *tctx = platform_get_drvdata(pdev);
+	int ret;
 
 	dev_err(&pdev->dev, "removing\n");
 
@@ -732,10 +799,21 @@ static int trusty_virtio_remove(struct platform_device *pdev)
 	destroy_workqueue(tctx->check_wq);
 
 	/* notify remote that shared area goes away */
-	trusty_virtio_stop(tctx, tctx->shared_va, tctx->shared_sz);
+	trusty_virtio_stop(tctx, tctx->shared_id, tctx->shared_sz);
 
 	/* free shared area */
-	free_pages_exact(tctx->shared_va, tctx->shared_sz);
+	ret = trusty_reclaim_memory(tctx->dev->parent, tctx->shared_id,
+				    &tctx->shared_sg, 1);
+	if (WARN_ON(ret)) {
+		dev_err(tctx->dev, "trusty_revoke_memory failed: %d 0x%llx\n",
+			ret, tctx->shared_id);
+		/*
+		 * It is not safe to free this memory if trusty_revoke_memory
+		 * fails. Leak it in that case.
+		 */
+	} else {
+		free_pages_exact(tctx->shared_va, tctx->shared_sz);
+	}
 
 	/* free context */
 	kfree(tctx);
