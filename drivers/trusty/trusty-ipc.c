@@ -30,6 +30,7 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
 
+#include <linux/trusty/trusty.h>
 #include <linux/trusty/trusty_ipc.h>
 
 #define MAX_DEVICES			4
@@ -184,8 +185,10 @@ static void _free_shareable_mem(size_t sz, void *va)
 static struct tipc_msg_buf *vds_alloc_msg_buf(struct tipc_virtio_dev *vds,
 					      bool share_write)
 {
+	int ret;
 	struct tipc_msg_buf *mb;
 	size_t sz = vds->msg_buf_max_sz;
+	pgprot_t pgprot = share_write ? PAGE_KERNEL : PAGE_KERNEL_RO;
 
 	/* allocate tracking structure */
 	mb = kzalloc(sizeof(struct tipc_msg_buf), GFP_KERNEL);
@@ -197,11 +200,21 @@ static struct tipc_msg_buf *vds_alloc_msg_buf(struct tipc_virtio_dev *vds,
 	if (!mb->buf_va)
 		goto err_alloc;
 
-	mb->buf_pa = virt_to_phys(mb->buf_va);
+	sg_init_one(&mb->sg, mb->buf_va, sz);
+	ret = trusty_share_memory_compat(vds->vdev->dev.parent->parent,
+					 &mb->buf_id, &mb->sg, 1, pgprot);
+	if (ret) {
+		dev_err(&vds->vdev->dev, "trusty_share_memory failed: %d\n",
+			ret);
+		goto err_share;
+	}
+
 	mb->buf_sz = sz;
 
 	return mb;
 
+err_share:
+	_free_shareable_mem(sz, mb->buf_va);
 err_alloc:
 	kfree(mb);
 	return NULL;
@@ -210,7 +223,22 @@ err_alloc:
 static void vds_free_msg_buf(struct tipc_virtio_dev *vds,
 			     struct tipc_msg_buf *mb)
 {
-	_free_shareable_mem(mb->buf_sz, mb->buf_va);
+	int ret;
+
+	ret = trusty_reclaim_memory(vds->vdev->dev.parent->parent, mb->buf_id,
+				    &mb->sg, 1);
+	if (WARN_ON(ret)) {
+		dev_err(&vds->vdev->dev,
+			"trusty_revoke_memory failed: %d txbuf %lld\n",
+			ret, mb->buf_id);
+
+		/*
+		 * It is not safe to free this memory if trusty_revoke_memory
+		 * fails. Leak it in that case.
+		 */
+	} else {
+		_free_shareable_mem(mb->buf_sz, mb->buf_va);
+	}
 	kfree(mb);
 }
 

@@ -14,11 +14,17 @@
 #ifndef __LINUX_TRUSTY_TRUSTY_IPC_H
 #define __LINUX_TRUSTY_TRUSTY_IPC_H
 
+#include <linux/list.h>
+#include <linux/scatterlist.h>
+#include <linux/trusty/trusty.h>
+#include <linux/types.h>
+
 struct tipc_chan;
 
 struct tipc_msg_buf {
 	void *buf_va;
-	phys_addr_t buf_pa;
+	struct scatterlist sg;
+	trusty_shared_mem_id_t buf_id;
 	size_t buf_sz;
 	size_t wpos;
 	size_t rpos;

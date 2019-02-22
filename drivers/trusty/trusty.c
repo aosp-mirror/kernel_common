@@ -24,9 +24,13 @@
 #include <linux/trusty/sm_err.h>
 #include <linux/trusty/trusty.h>
 
+#include <linux/scatterlist.h>
+#include <linux/dma-mapping.h>
+
 #include "trusty-smc.h"
 
 struct trusty_state;
+static struct platform_driver trusty_driver;
 
 struct trusty_work {
 	struct trusty_state *ts;
@@ -45,6 +49,7 @@ struct trusty_state {
 	struct trusty_work __percpu *nop_works;
 	struct list_head nop_queue;
 	spinlock_t nop_lock; /* protects nop_queue */
+	struct device_dma_parameters dma_parms;
 };
 
 static inline ulong smc(ulong r0, ulong r1, ulong r2, ulong r3)
@@ -204,6 +209,104 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 	return ret;
 }
 EXPORT_SYMBOL(trusty_std_call32);
+
+int trusty_share_memory(struct device *dev, uint64_t *id,
+			struct scatterlist *sglist, unsigned int nents,
+			pgprot_t pgprot)
+{
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+	int ret;
+	struct ns_mem_page_info pg_inf;
+	struct scatterlist *sg;
+	size_t count;
+
+	dev_dbg(s->dev, "%s\n", __func__);
+
+	if (WARN_ON(dev->driver != &trusty_driver.driver))
+		return -EINVAL;
+
+	if (WARN_ON(nents < 1))
+		return -EINVAL;
+
+	if (nents != 1) {
+		dev_err(s->dev, "%s: not supported\n", __func__);
+		return -ENOTSUPP;
+	}
+
+	count = dma_map_sg(dev, sglist, nents, DMA_BIDIRECTIONAL);
+	if (count != nents) {
+		dev_err(s->dev, "failed to dma map sg_table\n");
+		return -EINVAL;
+	}
+
+	sg = sglist;
+	ret = trusty_encode_page_info(&pg_inf, phys_to_page(sg_dma_address(sg)),
+				      pgprot);
+	if (ret) {
+		dev_err(s->dev, "%s: trusty_encode_page_info failed\n",
+			__func__);
+		goto err_encode_page_info;
+	}
+
+	dev_dbg(s->dev, "%s: not supported, fall back to ns_mem_page_info 0x%llx for paddr 0x%llx\n",
+		__func__, pg_inf.attr, sg_dma_address(sg));
+
+	*id = pg_inf.attr;
+
+	return 0;
+
+err_encode_page_info:
+	dma_unmap_sg(dev, sglist, nents, DMA_BIDIRECTIONAL);
+	return ret;
+}
+EXPORT_SYMBOL(trusty_share_memory);
+
+/*
+ * trusty_share_memory_compat - trusty_share_memory wrapper for old apis
+ *
+ * Call trusty_share_memory and filter out memory attributes if trusty version
+ * is old. Used by clients that used to pass just a physical address to trusty
+ * instead of a physical address plus memory attributes value.
+ */
+int trusty_share_memory_compat(struct device *dev, uint64_t *id,
+			       struct scatterlist *sglist, unsigned int nents,
+			       pgprot_t pgprot)
+{
+	int ret;
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	ret = trusty_share_memory(dev, id, sglist, nents, pgprot);
+	if (!ret && s->api_version < TRUSTY_API_VERSION_PHYS_MEM_OBJ)
+		*id &= 0x0000FFFFFFFFF000ull;
+
+	return ret;
+}
+EXPORT_SYMBOL(trusty_share_memory_compat);
+
+int trusty_reclaim_memory(struct device *dev, uint64_t id,
+			  struct scatterlist *sglist, unsigned int nents)
+{
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+
+	dev_dbg(s->dev, "%s\n", __func__);
+
+	if (WARN_ON(dev->driver != &trusty_driver.driver))
+		return -EINVAL;
+
+	if (WARN_ON(nents < 1))
+		return -EINVAL;
+
+	if (nents != 1) {
+		dev_err(s->dev, "%s: not supported\n", __func__);
+		return -ENOTSUPP;
+	}
+
+	dma_unmap_sg(dev, sglist, nents, DMA_BIDIRECTIONAL);
+
+	dev_dbg(s->dev, "%s: done\n", __func__);
+	return 0;
+}
+EXPORT_SYMBOL(trusty_reclaim_memory);
 
 int trusty_call_notifier_register(struct device *dev, struct notifier_block *n)
 {
@@ -450,6 +553,15 @@ static int trusty_probe(struct platform_device *pdev)
 	mutex_init(&s->smc_lock);
 	ATOMIC_INIT_NOTIFIER_HEAD(&s->notifier);
 	init_completion(&s->cpu_idle_completion);
+
+	s->dev->dma_parms = &s->dma_parms;
+	dma_set_max_seg_size(s->dev, 0xfffff000); /* dma_parms limit */
+	/*
+	 * Set dma mask to 48 bits. This is the current limit of
+	 * trusty_encode_page_info.
+	 */
+	dma_coerce_mask_and_coherent(s->dev, DMA_BIT_MASK(48));
+
 	platform_set_drvdata(pdev, s);
 
 	trusty_init_version(s, &pdev->dev);
@@ -503,6 +615,7 @@ err_alloc_works:
 	destroy_workqueue(s->nop_wq);
 err_create_nop_wq:
 err_api_version:
+	s->dev->dma_parms = NULL;
 	if (s->version_str) {
 		device_remove_file(&pdev->dev, &dev_attr_trusty_version);
 		kfree(s->version_str);
@@ -530,6 +643,7 @@ static int trusty_remove(struct platform_device *pdev)
 	destroy_workqueue(s->nop_wq);
 
 	mutex_destroy(&s->smc_lock);
+	s->dev->dma_parms = NULL;
 	if (s->version_str) {
 		device_remove_file(&pdev->dev, &dev_attr_trusty_version);
 		kfree(s->version_str);

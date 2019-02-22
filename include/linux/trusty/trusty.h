@@ -16,6 +16,7 @@
 
 #include <linux/kernel.h>
 #include <linux/trusty/sm_err.h>
+#include <linux/types.h>
 #include <linux/device.h>
 #include <linux/pagemap.h>
 
@@ -65,9 +66,16 @@ struct ns_mem_page_info {
 int trusty_encode_page_info(struct ns_mem_page_info *inf,
 			    struct page *page, pgprot_t pgprot);
 
-int trusty_call32_mem_buf(struct device *dev, u32 smcnr,
-			  struct page *page,  u32 size,
-			  pgprot_t pgprot);
+struct scatterlist;
+typedef u64 trusty_shared_mem_id_t;
+int trusty_share_memory(struct device *dev, trusty_shared_mem_id_t *id,
+			struct scatterlist *sglist, unsigned int nents,
+			pgprot_t pgprot);
+int trusty_share_memory_compat(struct device *dev, trusty_shared_mem_id_t *id,
+			       struct scatterlist *sglist, unsigned int nents,
+			       pgprot_t pgprot);
+int trusty_reclaim_memory(struct device *dev, trusty_shared_mem_id_t id,
+			  struct scatterlist *sglist, unsigned int nents);
 
 struct trusty_nop {
 	struct list_head node;

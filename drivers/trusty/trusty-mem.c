@@ -106,29 +106,3 @@ int trusty_encode_page_info(struct ns_mem_page_info *inf,
 	inf->attr = (pte & 0x0000FFFFFFFFFFFFull) | ((uint64_t)mem_attr << 48);
 	return 0;
 }
-
-int trusty_call32_mem_buf(struct device *dev, u32 smcnr,
-			  struct page *page,  u32 size,
-			  pgprot_t pgprot)
-{
-	int ret;
-	struct ns_mem_page_info pg_inf;
-
-	if (!dev || !page)
-		return -EINVAL;
-
-	ret = trusty_encode_page_info(&pg_inf, page, pgprot);
-	if (ret)
-		return ret;
-
-	if (SMC_IS_FASTCALL(smcnr)) {
-		return trusty_fast_call32(dev, smcnr,
-					  (u32)pg_inf.attr,
-					  (u32)(pg_inf.attr >> 32), size);
-	} else {
-		return trusty_std_call32(dev, smcnr,
-					 (u32)pg_inf.attr,
-					 (u32)(pg_inf.attr >> 32), size);
-	}
-}
-
