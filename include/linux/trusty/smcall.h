@@ -32,10 +32,10 @@
 #define SMC_ENTITY(smc_nr)	(((smc_nr) & 0x3F000000) >> 24)
 #define SMC_FUNCTION(smc_nr)	((smc_nr) & 0x0000FFFF)
 
-#define SMC_NR(entity, fn, fastcall, smc64) ((((fastcall) & 0x1) << 31) | \
-					     (((smc64) & 0x1) << 30) | \
-					     (((entity) & 0x3F) << 24) | \
-					     ((fn) & 0xFFFF) \
+#define SMC_NR(entity, fn, fastcall, smc64) ((((fastcall) & 0x1U) << 31) | \
+					     (((smc64) & 0x1U) << 30) | \
+					     (((entity) & 0x3FU) << 24) | \
+					     ((fn) & 0xFFFFU) \
 					    )
 
 #define SMC_FASTCALL_NR(entity, fn)	SMC_NR((entity), (fn), 1, 0)
@@ -123,7 +123,8 @@
 #define TRUSTY_API_VERSION_SMP		(2)
 #define TRUSTY_API_VERSION_SMP_NOP	(3)
 #define TRUSTY_API_VERSION_PHYS_MEM_OBJ	(4)
-#define TRUSTY_API_VERSION_CURRENT	(4)
+#define TRUSTY_API_VERSION_MEM_OBJ	(5)
+#define TRUSTY_API_VERSION_CURRENT	(5)
 #define SMC_FC_API_VERSION	SMC_FASTCALL_NR (SMC_ENTITY_SECURE_MONITOR, 11)
 
 /* TRUSTED_OS entity calls */
