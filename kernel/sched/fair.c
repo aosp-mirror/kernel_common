@@ -6687,10 +6687,15 @@ compute_energy(struct task_struct *p, int dst_cpu, struct perf_domain *pd)
 static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 {
 	unsigned long prev_energy = ULONG_MAX, best_energy = ULONG_MAX;
+	int highest_spare_cap_cpu = prev_cpu, best_idle_cpu = -1;
 	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
+	unsigned long highest_spare_cap = 0, target_cap;
+	unsigned int min_exit_lat = UINT_MAX;
 	int cpu, best_energy_cpu = prev_cpu;
 	struct perf_domain *head, *pd;
 	unsigned long cpu_cap, util;
+	struct cpuidle_state *idle;
+	bool prefer_idle, boosted;
 	struct sched_domain *sd;
 
 	rcu_read_lock();
@@ -6713,6 +6718,10 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 	if (!task_util_est(p))
 		goto unlock;
 
+	prefer_idle = schedtune_prefer_idle(p);
+	boosted = schedtune_task_boost(p) > 0;
+	target_cap = boosted ? 0 : ULONG_MAX;
+
 	for (; pd; pd = pd->next) {
 		unsigned long cur_energy, spare_cap, max_spare_cap = 0;
 		int max_spare_cap_cpu = -1;
@@ -6728,7 +6737,7 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 				continue;
 
 			/* Always use prev_cpu as a candidate. */
-			if (cpu == prev_cpu) {
+			if (!prefer_idle && cpu == prev_cpu) {
 				prev_energy = compute_energy(p, prev_cpu, head);
 				best_energy = min(best_energy, prev_energy);
 				continue;
@@ -6743,10 +6752,33 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 				max_spare_cap = spare_cap;
 				max_spare_cap_cpu = cpu;
 			}
+
+			if (!prefer_idle)
+				continue;
+
+			if (idle_cpu(cpu)) {
+				cpu_cap = capacity_orig_of(cpu);
+				if (boosted && cpu_cap < target_cap)
+					continue;
+				if (!boosted && cpu_cap > target_cap)
+					continue;
+				idle = idle_get_state(cpu_rq(cpu));
+				if (idle && idle->exit_latency > min_exit_lat &&
+						cpu_cap == target_cap)
+					continue;
+
+				if (idle)
+					min_exit_lat = idle->exit_latency;
+				target_cap = cpu_cap;
+				best_idle_cpu = cpu;
+			} else if (spare_cap > highest_spare_cap) {
+				highest_spare_cap = spare_cap;
+				highest_spare_cap_cpu = cpu;
+			}
 		}
 
 		/* Evaluate the energy impact of using this CPU. */
-		if (max_spare_cap_cpu >= 0) {
+		if (!prefer_idle && max_spare_cap_cpu >= 0) {
 			cur_energy = compute_energy(p, max_spare_cap_cpu, head);
 			if (cur_energy < best_energy) {
 				best_energy = cur_energy;
@@ -6756,6 +6788,9 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 	}
 unlock:
 	rcu_read_unlock();
+
+	if (prefer_idle)
+		return best_idle_cpu >= 0 ? best_idle_cpu : highest_spare_cap_cpu;
 
 	/*
 	 * Pick the best CPU if prev_cpu cannot be used, or if it saves at
