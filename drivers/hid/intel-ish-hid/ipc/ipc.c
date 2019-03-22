@@ -847,22 +847,32 @@ static int _ish_ipc_reset(struct ishtp_device *dev)
  */
 int ish_hw_start(struct ishtp_device *dev)
 {
-	ish_set_host_rdy(dev);
+	int retry = 3;
 
-	set_host_ready(dev);
+	/* crosbug 128339821: Retry if we fail to start ISH on first attempt */
+	do {
+		ish_set_host_rdy(dev);
 
-	/* After that we can enable ISH DMA operation and wakeup ISHFW */
-	ish_wakeup(dev);
+		set_host_ready(dev);
 
-	/* wait for FW-initiated reset flow */
-	if (!dev->recvd_hw_ready)
-		wait_event_interruptible_timeout(dev->wait_hw_ready,
-						 dev->recvd_hw_ready,
-						 10 * HZ);
+		/* Next we can enable ISH DMA operation and wakeup ISH FW */
+		ish_wakeup(dev);
+
+		/* wait for FW-initiated reset flow */
+		if (!dev->recvd_hw_ready)
+			wait_event_interruptible_timeout(dev->wait_hw_ready,
+							 dev->recvd_hw_ready,
+							 2 * HZ);
+		if (!dev->recvd_hw_ready)
+			dev_warn(dev->devc,
+				 "[ishtp-ish]: Timed out for FW-initiated reset. Try again\n");
+		else
+			break;
+	} while (--retry);
 
 	if (!dev->recvd_hw_ready) {
 		dev_err(dev->devc,
-			"[ishtp-ish]: Timed out waiting for FW-initiated reset\n");
+			"[ishtp-ish]: ISH FW reset failed\n");
 		return	-ENODEV;
 	}
 
