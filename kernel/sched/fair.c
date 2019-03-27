@@ -7888,6 +7888,12 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sy
 		return cpu;
 	}
 
+	cpu = smp_processor_id();
+	if (sync && cpumask_test_cpu(cpu, p->cpus_ptr)) {
+		rcu_read_unlock();
+		return cpu;
+	}
+
 	/*
 	 * Energy-aware wake-up happens on the lowest sched_domain starting
 	 * from sd_asym_cpucapacity spanning over this_cpu and prev_cpu.
