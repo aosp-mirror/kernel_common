@@ -163,9 +163,9 @@ static void virt_wifi_scan_result(struct work_struct *work)
 	struct {
 		u8 tag;
 		u8 len;
-		u8 ssid[8];
+		u8 ssid[11];
 	} __packed ssid = {
-		.tag = WLAN_EID_SSID, .len = 8, .ssid = "VirtWifi",
+		.tag = WLAN_EID_SSID, .len = 11, .ssid = "AndroidWifi",
 	};
 	struct cfg80211_bss *informed_bss;
 	struct virt_wifi_wiphy_priv *priv =
