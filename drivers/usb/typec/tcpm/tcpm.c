@@ -1171,11 +1171,10 @@ static int tcpm_ams_start(struct tcpm_port *port, enum tcpm_ams ams)
 			tcpm_set_state(port, HARD_RESET_START, 0);
 			return ret;
 		} else if (ams == SOFT_RESET_AMS) {
-			if (!port->explicit_contract) {
-				port->upcoming_state = INVALID_STATE;
+			if (!port->explicit_contract)
 				tcpm_set_cc(port, tcpm_rp_cc(port));
-				return ret;
-			}
+			tcpm_set_state(port, SOFT_RESET_SEND, 0);
+			return ret;
 		} else if (tcpm_vdm_ams(port)) {
 			/* tSinkTx is enforced in vdm_run_state_machine */
 			tcpm_set_cc(port, SINK_TX_NG);
@@ -2085,6 +2084,10 @@ static void tcpm_pd_ctrl_request(struct tcpm_port *port,
 		case SNK_NEGOTIATE_CAPABILITIES:
 			tcpm_set_state(port, SNK_SOFT_RESET, 0);
 			break;
+		case SRC_SEND_CAPABILITIES:
+			tcpm_set_state(port, SRC_SOFT_RESET_WAIT_SNK_TX,
+				       0);
+			break;
 		default:
 			tcpm_queue_message(port, PD_MSG_CTRL_REJECT);
 			break;
@@ -2175,8 +2178,6 @@ static void tcpm_pd_ctrl_request(struct tcpm_port *port,
 			tcpm_set_state(port, SNK_TRANSITION_SINK, 0);
 			break;
 		case SOFT_RESET_SEND:
-			port->message_id = 0;
-			port->rx_msgid = -1;
 			if (port->ams == SOFT_RESET_AMS)
 				tcpm_ams_finish(port);
 			if (port->pwr_role == TYPEC_SOURCE) {
