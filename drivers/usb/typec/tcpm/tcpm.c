@@ -1152,7 +1152,8 @@ static int tcpm_ams_start(struct tcpm_port *port, enum tcpm_ams ams)
 
 	tcpm_log(port, "AMS %s start", tcpm_ams_str[ams]);
 
-	if (!tcpm_ams_interruptible(port) && ams != HARD_RESET) {
+	if (!tcpm_ams_interruptible(port) &&
+	    !(ams == HARD_RESET || ams == SOFT_RESET_AMS)) {
 		port->upcoming_state = INVALID_STATE;
 		tcpm_log(port, "AMS %s not interruptible, aborting",
 			 tcpm_ams_str[port->ams]);
@@ -2080,6 +2081,9 @@ static void tcpm_pd_ctrl_request(struct tcpm_port *port,
 		case SRC_READY:
 		case SNK_READY:
 			tcpm_queue_message(port, PD_MSG_DATA_SINK_CAP);
+			break;
+		case SNK_NEGOTIATE_CAPABILITIES:
+			tcpm_set_state(port, SNK_SOFT_RESET, 0);
 			break;
 		default:
 			tcpm_queue_message(port, PD_MSG_CTRL_REJECT);
