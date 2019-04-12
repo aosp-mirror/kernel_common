@@ -79,7 +79,7 @@ static void crypto_scomp_free_scratches(void)
 	int i;
 
 	for_each_possible_cpu(i) {
-		scratch = raw_cpu_ptr(&scomp_scratch);
+		scratch = per_cpu_ptr(&scomp_scratch, i);
 
 		vfree(scratch->src);
 		vfree(scratch->dst);
@@ -96,7 +96,7 @@ static int crypto_scomp_alloc_scratches(void)
 	for_each_possible_cpu(i) {
 		void *mem;
 
-		scratch = raw_cpu_ptr(&scomp_scratch);
+		scratch = per_cpu_ptr(&scomp_scratch, i);
 
 		mem = vmalloc_node(SCOMP_SCRATCH_SIZE, cpu_to_node(i));
 		if (!mem)
