@@ -1387,6 +1387,9 @@ static int tcpm_pd_svdm(struct tcpm_port *port, struct typec_altmode *adev,
 	case CMDT_INIT:
 		switch (cmd) {
 		case CMD_DISCOVER_IDENT:
+			if (PD_VDO_VID(p[0]) != USB_SID_PD)
+				break;
+
 			/* 6.4.4.3.1: Only respond as UFP (device) */
 			if (port->data_role == TYPEC_DEVICE &&
 			    port->nr_snk_vdo) {
@@ -1396,6 +1399,8 @@ static int tcpm_pd_svdm(struct tcpm_port *port, struct typec_altmode *adev,
 			}
 			break;
 		case CMD_DISCOVER_SVID:
+			if (PD_VDO_VID(p[0]) != USB_SID_PD)
+				break;
 			break;
 		case CMD_DISCOVER_MODES:
 			break;
@@ -1471,22 +1476,34 @@ static int tcpm_pd_svdm(struct tcpm_port *port, struct typec_altmode *adev,
 			}
 			break;
 		default:
+			/* Unrecognized SVDM */
+			response[0] = p[0] | VDO_CMDT(CMDT_RSP_NAK);
+			rlen = 1;
 			break;
 		}
 		tcpm_ams_finish(port);
 		break;
 	case CMDT_RSP_NAK:
 		switch (cmd) {
+		case CMD_DISCOVER_IDENT:
+		case CMD_DISCOVER_SVID:
+		case CMD_DISCOVER_MODES:
+			break;
 		case CMD_ENTER_MODE:
 			/* Back to USB Operation */
 			*adev_action = ADEV_NOTIFY_USB_AND_QUEUE_VDM;
 			return 0;
 		default:
+			/* Unrecognized SVDM */
+			response[0] = p[0] | VDO_CMDT(CMDT_RSP_NAK);
+			rlen = 1;
 			break;
 		}
 		tcpm_ams_finish(port);
 		break;
 	default:
+		response[0] = p[0] | VDO_CMDT(CMDT_RSP_NAK);
+		rlen = 1;
 		break;
 	}
 
