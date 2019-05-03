@@ -90,6 +90,9 @@ static int cros_ec_sensorhub_register(struct device *dev,
 		case MOTIONSENSE_TYPE_LIGHT:
 			name = "cros-ec-light";
 			break;
+		case MOTIONSENSE_TYPE_LIGHT_RGB:
+			/* Processed with cros-ec-light. */
+			continue;
 		case MOTIONSENSE_TYPE_ACTIVITY:
 			name = "cros-ec-activity";
 			break;
