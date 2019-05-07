@@ -32,7 +32,7 @@ struct rockchip_dp_phy {
 static int rockchip_set_phy_state(struct phy *phy, bool enable)
 {
 	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
-	int ret;
+	int ret = 0;
 
 	if (enable) {
 		ret = regmap_write(dp->grf, GRF_SOC_CON12,
@@ -47,9 +47,12 @@ static int rockchip_set_phy_state(struct phy *phy, bool enable)
 	} else {
 		clk_disable_unprepare(dp->phy_24m);
 
-		ret = regmap_write(dp->grf, GRF_SOC_CON12,
-				   GRF_EDP_PHY_SIDDQ_HIWORD_MASK |
-				   GRF_EDP_PHY_SIDDQ_OFF);
+		/*
+		 * Intentionally don't turn SIDDQ off when disabling
+		 * the PHY.  There is a power leak on rk3288 and
+		 * suspend power _increases_ by 5 mA if you turn this
+		 * off.
+		 */
 	}
 
 	return ret;
