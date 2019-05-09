@@ -1540,8 +1540,12 @@ static void tcpm_handle_vdm_request(struct tcpm_port *port,
 		port->vdm_state = VDM_STATE_DONE;
 	}
 
-	if (PD_VDO_SVDM(p[0]))
+	if (PD_VDO_SVDM(p[0])) {
 		rlen = tcpm_pd_svdm(port, adev, p, cnt, response, &adev_action);
+	} else {
+		if (port->negotiated_rev >= PD_REV30)
+			tcpm_queue_message(port, PD_MSG_CTRL_NOT_SUPP);
+	}
 
 	/*
 	 * We are done with any state stored in the port struct now, except
