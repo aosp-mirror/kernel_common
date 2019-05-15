@@ -58,6 +58,22 @@ asmlinkage void pmull_ghash_update_p8(int blocks, u64 dg[], const char *src,
 				      struct ghash_key const *k,
 				      const char *head);
 
+#ifdef CONFIG_CFI_CLANG
+static inline void __cfi_pmull_ghash_update_p64(int blocks, u64 dg[],
+                const char *src, struct ghash_key const *k, const char *head)
+{
+        return pmull_ghash_update_p64(blocks, dg, src, k, head);
+}
+#define pmull_ghash_update_p64 __cfi_pmull_ghash_update_p64
+
+static inline void __cfi_pmull_ghash_update_p8(int blocks, u64 dg[],
+                const char *src, struct ghash_key const *k, const char *head)
+{
+        return pmull_ghash_update_p8(blocks, dg, src, k, head);
+}
+#define pmull_ghash_update_p8 __cfi_pmull_ghash_update_p8
+#endif
+
 asmlinkage void pmull_gcm_encrypt(int blocks, u64 dg[], u8 dst[],
 				  const u8 src[], struct ghash_key const *k,
 				  u8 ctr[], u32 const rk[], int rounds,
