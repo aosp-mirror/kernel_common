@@ -1053,9 +1053,6 @@ static void ieee80211_chswitch_work(struct work_struct *work)
 		goto out;
 	}
 
-	/* XXX: shouldn't really modify cfg80211-owned data! */
-	ifmgd->associated->channel = sdata->csa_chandef.chan;
-
 	sdata->vif.csa_active = false;
 
 	/* XXX: wait for a beacon first? */
