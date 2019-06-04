@@ -5174,8 +5174,10 @@ static inline bool cpu_overutilized(int cpu)
 
 static inline void update_overutilized_status(struct rq *rq)
 {
-	if (!READ_ONCE(rq->rd->overutilized) && cpu_overutilized(rq->cpu))
+	if (!READ_ONCE(rq->rd->overutilized) && cpu_overutilized(rq->cpu)) {
 		WRITE_ONCE(rq->rd->overutilized, SG_OVERUTILIZED);
+		trace_sched_overutilized_tp(rq->rd, SG_OVERUTILIZED);
+	}
 }
 #else
 static inline void update_overutilized_status(struct rq *rq) { }
@@ -8207,8 +8209,12 @@ next_group:
 
 		/* Update over-utilization (tipping point, U >= 0) indicator */
 		WRITE_ONCE(rd->overutilized, sg_status & SG_OVERUTILIZED);
+		trace_sched_overutilized_tp(rd, sg_status & SG_OVERUTILIZED);
 	} else if (sg_status & SG_OVERUTILIZED) {
-		WRITE_ONCE(env->dst_rq->rd->overutilized, SG_OVERUTILIZED);
+		struct root_domain *rd = env->dst_rq->rd;
+
+		WRITE_ONCE(rd->overutilized, SG_OVERUTILIZED);
+		trace_sched_overutilized_tp(rd, SG_OVERUTILIZED);
 	}
 }
 
