@@ -39,6 +39,24 @@ info()
 	fi
 }
 
+# Thin archive build here makes a final archive with symbol table and indexes
+# from vmlinux objects INIT and MAIN, which can be used as input to linker.
+# KBUILD_VMLINUX_LIBS archives should already have symbol table and indexes
+# added.
+#
+# Traditional incremental style of link does not require this step
+#
+# built-in.a output file
+#
+archive_builtin()
+{
+	info AR built-in.a
+	rm -f built-in.a;
+	${AR} rcsTP${KBUILD_ARFLAGS} built-in.a			\
+				${KBUILD_VMLINUX_INIT}		\
+				${KBUILD_VMLINUX_MAIN}
+}
+
 # Link of vmlinux.o used for section mismatch analysis
 # ${1} output file
 modpost_link()
@@ -46,7 +64,7 @@ modpost_link()
 	local objects
 
 	objects="--whole-archive				\
-		${KBUILD_VMLINUX_OBJS}				\
+		built-in.a					\
 		--no-whole-archive				\
 		--start-group					\
 		${KBUILD_VMLINUX_LIBS}				\
@@ -65,7 +83,7 @@ vmlinux_link()
 
 	if [ "${SRCARCH}" != "um" ]; then
 		objects="--whole-archive			\
-			${KBUILD_VMLINUX_OBJS}			\
+			built-in.a				\
 			--no-whole-archive			\
 			--start-group				\
 			${KBUILD_VMLINUX_LIBS}			\
@@ -76,7 +94,7 @@ vmlinux_link()
 			-T ${lds} ${objects}
 	else
 		objects="-Wl,--whole-archive			\
-			${KBUILD_VMLINUX_OBJS}			\
+			built-in.a				\
 			-Wl,--no-whole-archive			\
 			-Wl,--start-group			\
 			${KBUILD_VMLINUX_LIBS}			\
@@ -156,6 +174,7 @@ cleanup()
 	rm -f .tmp_System.map
 	rm -f .tmp_kallsyms*
 	rm -f .tmp_vmlinux*
+	rm -f built-in.a
 	rm -f System.map
 	rm -f vmlinux
 	rm -f vmlinux.o
@@ -204,6 +223,8 @@ fi;
 
 # final build of init/
 ${MAKE} -f "${srctree}/scripts/Makefile.build" obj=init
+
+archive_builtin
 
 #link vmlinux.o
 info LD vmlinux.o
