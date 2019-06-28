@@ -603,7 +603,7 @@ static void __init clean_rootfs(void)
 #endif
 
 #ifdef CONFIG_BLK_DEV_RAM
-static void populate_initrd_image(char *err)
+static void __init populate_initrd_image(char *err)
 {
 	ssize_t written;
 	struct file *file;
