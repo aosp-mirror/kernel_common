@@ -845,9 +845,9 @@ static int port_info_get(struct vchiq_mmal_instance *instance,
 		goto release_msg;
 
 	if (rmsg->u.port_info_get_reply.port.is_enabled == 0)
-		port->enabled = false;
+		port->enabled = 0;
 	else
-		port->enabled = true;
+		port->enabled = 1;
 
 	/* copy the values out of the message */
 	port->handle = rmsg->u.port_info_get_reply.port_handle;
@@ -1283,7 +1283,7 @@ static int port_disable(struct vchiq_mmal_instance *instance,
 	if (!port->enabled)
 		return 0;
 
-	port->enabled = false;
+	port->enabled = 0;
 
 	ret = port_action_port(instance, port,
 			       MMAL_MSG_PORT_ACTION_TYPE_DISABLE);
@@ -1335,7 +1335,7 @@ static int port_enable(struct vchiq_mmal_instance *instance,
 	if (ret)
 		goto done;
 
-	port->enabled = true;
+	port->enabled = 1;
 
 	if (port->buffer_cb) {
 		/* send buffer headers to videocore */
@@ -1502,7 +1502,7 @@ int vchiq_mmal_port_connect_tunnel(struct vchiq_mmal_instance *instance,
 			pr_err("failed disconnecting src port\n");
 			goto release_unlock;
 		}
-		src->connected->enabled = false;
+		src->connected->enabled = 0;
 		src->connected = NULL;
 	}
 
@@ -1746,7 +1746,7 @@ int vchiq_mmal_component_disable(struct vchiq_mmal_instance *instance,
 
 	ret = disable_component(instance, component);
 	if (ret == 0)
-		component->enabled = false;
+		component->enabled = 0;
 
 	mutex_unlock(&instance->vchiq_mutex);
 
