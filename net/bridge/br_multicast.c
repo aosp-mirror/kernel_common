@@ -1309,7 +1309,6 @@ static int br_ip6_multicast_query(struct net_bridge *br,
 				  struct sk_buff *skb,
 				  u16 vid)
 {
-	const struct ipv6hdr *ip6h = ipv6_hdr(skb);
 	struct mld_msg *mld;
 	struct net_bridge_mdb_entry *mp;
 	struct mld2_query *mld2q;
@@ -1328,7 +1327,7 @@ static int br_ip6_multicast_query(struct net_bridge *br,
 		goto out;
 
 	/* RFC2710+RFC3810 (MLDv1+MLDv2) require link-local source addresses */
-	if (!(ipv6_addr_type(&ip6h->saddr) & IPV6_ADDR_LINKLOCAL)) {
+	if (!(ipv6_addr_type(&ipv6_hdr(skb)->saddr) & IPV6_ADDR_LINKLOCAL)) {
 		err = -EINVAL;
 		goto out;
 	}
@@ -1359,14 +1358,14 @@ static int br_ip6_multicast_query(struct net_bridge *br,
 	/* RFC2710+RFC3810 (MLDv1+MLDv2) require the multicast link layer
 	 * all-nodes destination address (ff02::1) for general queries
 	 */
-	if (is_general_query && !ipv6_addr_is_ll_all_nodes(&ip6h->daddr)) {
+	if (is_general_query && !ipv6_addr_is_ll_all_nodes(&ipv6_hdr(skb)->daddr)) {
 		err = -EINVAL;
 		goto out;
 	}
 
 	if (is_general_query) {
 		saddr.proto = htons(ETH_P_IPV6);
-		saddr.u.ip6 = ip6h->saddr;
+		saddr.u.ip6 = ipv6_hdr(skb)->saddr;
 
 		br_multicast_query_received(br, port, &br->ip6_other_query,
 					    &saddr, max_delay);
