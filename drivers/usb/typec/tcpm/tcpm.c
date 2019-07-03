@@ -693,14 +693,21 @@ static void tcpm_set_cc(struct tcpm_port *port, enum typec_cc_status cc)
 	port->tcpc->set_cc(port->tcpc, cc);
 }
 
+static enum typec_cc_status tcpm_rp_cc(struct tcpm_port *port);
 static int tcpm_ams_finish(struct tcpm_port *port)
 {
 	int ret = 0;
 
 	tcpm_log(port, "AMS %s finished", tcpm_ams_str[port->ams]);
 
-	if (port->negotiated_rev >= PD_REV30 && port->pwr_role == TYPEC_SOURCE)
-		tcpm_set_cc(port, SINK_TX_OK);
+	if (port->pd_capable && port->pwr_role == TYPEC_SOURCE) {
+		if (port->negotiated_rev >= PD_REV30)
+			tcpm_set_cc(port, SINK_TX_OK);
+		else
+			tcpm_set_cc(port, SINK_TX_NG);
+	} else if (port->pwr_role == TYPEC_SOURCE) {
+		tcpm_set_cc(port, tcpm_rp_cc(port));
+	}
 
 	port->in_ams = false;
 	port->ams = NONE_AMS;
