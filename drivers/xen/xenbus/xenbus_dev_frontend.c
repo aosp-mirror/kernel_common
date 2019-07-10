@@ -62,6 +62,8 @@
 
 #include "xenbus.h"
 
+unsigned int xb_dev_generation_id;
+
 /*
  * An element of a list of outstanding transactions, for which we're
  * still waiting a reply.
@@ -69,6 +71,7 @@
 struct xenbus_transaction_holder {
 	struct list_head list;
 	struct xenbus_transaction handle;
+	unsigned int generation_id;
 };
 
 /*
@@ -441,6 +444,7 @@ static int xenbus_write_transaction(unsigned msg_type,
 			rc = -ENOMEM;
 			goto out;
 		}
+		trans->generation_id = xb_dev_generation_id;
 		list_add(&trans->list, &u->transactions);
 	} else if (msg->hdr.tx_id != 0 &&
 		   !xenbus_get_transaction(u, msg->hdr.tx_id))
@@ -449,6 +453,20 @@ static int xenbus_write_transaction(unsigned msg_type,
 		 !(msg->hdr.len == 2 &&
 		   (!strcmp(msg->body, "T") || !strcmp(msg->body, "F"))))
 		return xenbus_command_reply(u, XS_ERROR, "EINVAL");
+	else if (msg_type == XS_TRANSACTION_END) {
+		trans = xenbus_get_transaction(u, msg->hdr.tx_id);
+		if (trans && trans->generation_id != xb_dev_generation_id) {
+			list_del(&trans->list);
+			kfree(trans);
+			if (!strcmp(msg->body, "T"))
+				return xenbus_command_reply(u, XS_ERROR,
+							    "EAGAIN");
+			else
+				return xenbus_command_reply(u,
+							    XS_TRANSACTION_END,
+							    "OK");
+		}
+	}
 
 	rc = xenbus_dev_request_and_reply(&msg->hdr, u);
 	if (rc && trans) {
@@ -622,9 +640,7 @@ static int xenbus_file_open(struct inode *inode, struct file *filp)
 	if (xen_store_evtchn == 0)
 		return -ENOENT;
 
-	nonseekable_open(inode, filp);
-
-	filp->f_mode &= ~FMODE_ATOMIC_POS; /* cdev-style semantics */
+	stream_open(inode, filp);
 
 	u = kzalloc(sizeof(*u), GFP_KERNEL);
 	if (u == NULL)
