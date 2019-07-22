@@ -1530,7 +1530,7 @@ static struct ctl_table vm_table[] = {
 		.maxlen         = sizeof(extra_free_kbytes),
 		.mode           = 0644,
 		.proc_handler   = min_free_kbytes_sysctl_handler,
-		.extra1         = &zero,
+		.extra1		= SYSCTL_ZERO,
 	},
 	{
 		.procname	= "percpu_pagelist_fraction",
