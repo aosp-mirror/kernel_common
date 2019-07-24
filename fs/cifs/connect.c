@@ -876,6 +876,7 @@ cifs_demultiplex_thread(void *p)
 				GFP_KERNEL);
 
 	set_freezable();
+	allow_signal(SIGKILL);
 	while (server->tcpStatus != CifsExiting) {
 		if (try_to_freeze())
 			continue;
