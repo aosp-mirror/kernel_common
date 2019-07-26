@@ -39,6 +39,7 @@ struct trusty_state {
 	struct completion cpu_idle_completion;
 	char *version_str;
 	u32 api_version;
+	bool trusty_panicked;
 	struct device *dev;
 	struct workqueue_struct *nop_wq;
 	struct trusty_work __percpu *nop_works;
@@ -158,6 +159,14 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 	BUG_ON(SMC_IS_FASTCALL(smcnr));
 	BUG_ON(SMC_IS_SMC64(smcnr));
 
+	if (s->trusty_panicked) {
+		/*
+		 * Avoid calling the notifiers if trusty has panicked as they
+		 * can trigger more calls.
+		 */
+		return SM_ERR_PANIC;
+	}
+
 	if (smcnr != SMC_SC_NOP) {
 		mutex_lock(&s->smc_lock);
 		reinit_completion(&s->cpu_idle_completion);
@@ -177,7 +186,8 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 	dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) returned 0x%x\n",
 		__func__, smcnr, a0, a1, a2, ret);
 
-	WARN_ONCE(ret == SM_ERR_PANIC, "trusty crashed");
+	if (WARN_ONCE(ret == SM_ERR_PANIC, "trusty crashed"))
+		s->trusty_panicked = true;
 
 	if (smcnr == SMC_SC_NOP)
 		complete(&s->cpu_idle_completion);
