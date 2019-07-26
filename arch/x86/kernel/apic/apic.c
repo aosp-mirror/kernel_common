@@ -201,7 +201,7 @@ int first_system_vector = 0xfe;
 /*
  * Debug level, exported for io_apic.c
  */
-unsigned int apic_verbosity;
+int apic_verbosity;
 
 int pic_mode;
 
