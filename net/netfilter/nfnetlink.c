@@ -486,7 +486,7 @@ static int nfnetlink_bind(int group)
 	ss = nfnetlink_get_subsys(type);
 	rcu_read_unlock();
 	if (!ss)
-		request_module("nfnetlink-subsys-%d", type);
+		request_module_nowait("nfnetlink-subsys-%d", type);
 	return 0;
 }
 #endif
