@@ -1140,13 +1140,17 @@ static u8 simd_prefix_to_bytes(const struct x86_emulate_ctxt *ctxt,
 
 	switch (ctxt->b) {
 	case 0x11:
+		/* movss xmm, m32 */
 		/* movsd xmm, m64 */
 		/* movups xmm, m128 */
-		if (simd_prefix == 0xf2) {
+		if (simd_prefix == 0xf3) {
+			bytes = 4;
+			break;
+		} else if (simd_prefix == 0xf2) {
 			bytes = 8;
 			break;
 		}
-		/* fallthrough */
+		fallthrough;
 	default:
 		bytes = 16;
 		break;
@@ -4203,7 +4207,7 @@ static const struct gprefix pfx_0f_2b = {
 };
 
 static const struct gprefix pfx_0f_10_0f_11 = {
-	I(Unaligned, em_mov), I(Unaligned, em_mov), I(Unaligned, em_mov), N,
+	I(Unaligned, em_mov), I(Unaligned, em_mov), I(Unaligned, em_mov), I(Unaligned, em_mov),
 };
 
 static const struct gprefix pfx_0f_28_0f_29 = {
