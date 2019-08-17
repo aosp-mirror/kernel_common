@@ -132,7 +132,7 @@ int sk_stream_wait_memory(struct sock *sk, long *timeo_p)
 		if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
 			goto do_error;
 		if (!*timeo_p)
-			goto do_nonblock;
+			goto do_eagain;
 		if (signal_pending(current))
 			goto do_interrupted;
 		clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
@@ -164,7 +164,13 @@ out:
 do_error:
 	err = -EPIPE;
 	goto out;
-do_nonblock:
+do_eagain:
+	/* Make sure that whenever EAGAIN is returned, EPOLLOUT event can
+	 * be generated later.
+	 * When TCP receives ACK packets that make room, tcp_check_space()
+	 * only calls tcp_new_space() if SOCK_NOSPACE is set.
+	 */
+	set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
 	err = -EAGAIN;
 	goto out;
 do_interrupted:
