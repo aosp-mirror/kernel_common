@@ -1158,7 +1158,7 @@ static int _create_cdev_node(struct device *parent,
 	}
 
 	/* allocate minor */
-	ret = idr_alloc(&tipc_devices, cdn, 0, MAX_DEVICES-1, GFP_KERNEL);
+	ret = idr_alloc(&tipc_devices, cdn, 0, MAX_DEVICES, GFP_KERNEL);
 	if (ret < 0) {
 		dev_dbg(parent, "%s: failed (%d) to get id\n",
 			__func__, ret);
