@@ -219,6 +219,17 @@ static int vb2_fill_vb2_v4l2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b
 					b->m.planes[plane].m.fd;
 				planes[plane].length =
 					b->m.planes[plane].length;
+				/*
+				 * HACK(crbug/901264): This allows users to use
+				 * data_offset to pass an offset when importing
+				 * a DMA-buf that contains all color planes of
+				 * a multiplanar format.
+				 *
+				 * TODO(b/149113276): Remove this hack once
+				 * v4l2_buffer_ext API is supported.
+				 */
+				planes[plane].data_offset =
+					b->m.planes[plane].data_offset;
 			}
 			break;
 		default:
