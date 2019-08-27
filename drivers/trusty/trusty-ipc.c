@@ -171,19 +171,20 @@ static int _match_data(int id, void *p, void *data)
 	return (p == data);
 }
 
-static void *_alloc_shareable_mem(size_t sz, phys_addr_t *ppa, gfp_t gfp)
+static void *_alloc_shareable_mem(size_t sz, gfp_t gfp)
 {
 	return alloc_pages_exact(sz, gfp);
 }
 
-static void _free_shareable_mem(size_t sz, void *va, phys_addr_t pa)
+static void _free_shareable_mem(size_t sz, void *va)
 {
 	free_pages_exact(va, sz);
 }
 
-static struct tipc_msg_buf *_alloc_msg_buf(size_t sz)
+static struct tipc_msg_buf *vds_alloc_msg_buf(struct tipc_virtio_dev *vds)
 {
 	struct tipc_msg_buf *mb;
+	size_t sz = vds->msg_buf_max_sz;
 
 	/* allocate tracking structure */
 	mb = kzalloc(sizeof(struct tipc_msg_buf), GFP_KERNEL);
@@ -191,10 +192,11 @@ static struct tipc_msg_buf *_alloc_msg_buf(size_t sz)
 		return NULL;
 
 	/* allocate buffer that can be shared with secure world */
-	mb->buf_va = _alloc_shareable_mem(sz, &mb->buf_pa, GFP_KERNEL);
+	mb->buf_va = _alloc_shareable_mem(sz, GFP_KERNEL);
 	if (!mb->buf_va)
 		goto err_alloc;
 
+	mb->buf_pa = virt_to_phys(mb->buf_va);
 	mb->buf_sz = sz;
 
 	return mb;
@@ -204,20 +206,22 @@ err_alloc:
 	return NULL;
 }
 
-static void _free_msg_buf(struct tipc_msg_buf *mb)
+static void vds_free_msg_buf(struct tipc_virtio_dev *vds,
+			     struct tipc_msg_buf *mb)
 {
-	_free_shareable_mem(mb->buf_sz, mb->buf_va, mb->buf_pa);
+	_free_shareable_mem(mb->buf_sz, mb->buf_va);
 	kfree(mb);
 }
 
-static void _free_msg_buf_list(struct list_head *list)
+static void vds_free_msg_buf_list(struct tipc_virtio_dev *vds,
+				  struct list_head *list)
 {
 	struct tipc_msg_buf *mb = NULL;
 
 	mb = list_first_entry_or_null(list, struct tipc_msg_buf, node);
 	while (mb) {
 		list_del(&mb->node);
-		_free_msg_buf(mb);
+		vds_free_msg_buf(vds, mb);
 		mb = list_first_entry_or_null(list, struct tipc_msg_buf, node);
 	}
 }
@@ -246,17 +250,6 @@ static void _free_chan(struct kref *kref)
 	kfree(ch);
 }
 
-static struct tipc_msg_buf *vds_alloc_msg_buf(struct tipc_virtio_dev *vds)
-{
-	return _alloc_msg_buf(vds->msg_buf_max_sz);
-}
-
-static void vds_free_msg_buf(struct tipc_virtio_dev *vds,
-			     struct tipc_msg_buf *mb)
-{
-	_free_msg_buf(mb);
-}
-
 static bool _put_txbuf_locked(struct tipc_virtio_dev *vds,
 			      struct tipc_msg_buf *mb)
 {
@@ -282,7 +275,7 @@ static struct tipc_msg_buf *_get_txbuf_locked(struct tipc_virtio_dev *vds)
 			return ERR_PTR(-EAGAIN);
 
 		/* try to allocate it */
-		mb = _alloc_msg_buf(vds->msg_buf_max_sz);
+		mb = vds_alloc_msg_buf(vds);
 		if (!mb)
 			return ERR_PTR(-ENOMEM);
 
@@ -1102,7 +1095,7 @@ static int tipc_release(struct inode *inode, struct file *filp)
 	dn_shutdown(dn);
 
 	/* free all pending buffers */
-	_free_msg_buf_list(&dn->rx_msg_queue);
+	vds_free_msg_buf_list(dn->chan->vds, &dn->rx_msg_queue);
 
 	/* shutdown channel  */
 	tipc_chan_shutdown(dn->chan);
@@ -1136,12 +1129,12 @@ static void chan_trigger_event(struct tipc_chan *chan, int event)
 	chan->ops->handle_event(chan->ops_arg, event);
 }
 
-static void _cleanup_vq(struct virtqueue *vq)
+static void _cleanup_vq(struct tipc_virtio_dev *vds, struct virtqueue *vq)
 {
 	struct tipc_msg_buf *mb;
 
 	while ((mb = virtqueue_detach_unused_buf(vq)) != NULL)
-		_free_msg_buf(mb);
+		vds_free_msg_buf(vds, mb);
 }
 
 static int _create_cdev_node(struct device *parent,
@@ -1549,7 +1542,7 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 		struct scatterlist sg;
 		struct tipc_msg_buf *rxbuf;
 
-		rxbuf = _alloc_msg_buf(vds->msg_buf_max_sz);
+		rxbuf = vds_alloc_msg_buf(vds);
 		if (!rxbuf) {
 			dev_err(&vdev->dev, "failed to allocate rx buffer\n");
 			err = -ENOMEM;
@@ -1568,7 +1561,7 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 	return 0;
 
 err_free_rx_buffers:
-	_cleanup_vq(vds->rxvq);
+	_cleanup_vq(vds, vds->rxvq);
 err_find_vqs:
 	kref_put(&vds->refcount, _free_vds);
 	return err;
@@ -1589,9 +1582,9 @@ static void tipc_virtio_remove(struct virtio_device *vdev)
 
 	idr_destroy(&vds->addr_idr);
 
-	_cleanup_vq(vds->rxvq);
-	_cleanup_vq(vds->txvq);
-	_free_msg_buf_list(&vds->free_buf_list);
+	_cleanup_vq(vds, vds->rxvq);
+	_cleanup_vq(vds, vds->txvq);
+	vds_free_msg_buf_list(vds, &vds->free_buf_list);
 
 	vdev->config->del_vqs(vds->vdev);
 
