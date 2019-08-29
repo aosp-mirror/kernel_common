@@ -1,0 +1,7 @@
+BRANCH=android-4.4-o
+KERNEL_DIR=common
+
+CLANG_PREBUILT_BIN=prebuilts/clang/host/linux-x86/clang-4630689/bin
+CC=clang
+
+EXTRA_CMDS=''
