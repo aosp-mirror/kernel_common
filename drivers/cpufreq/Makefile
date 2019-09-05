@@ -5,6 +5,9 @@ obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o freq_table.o
 # CPUfreq stats
 obj-$(CONFIG_CPU_FREQ_STAT)             += cpufreq_stats.o
 
+# CPUfreq stats goldfish (fake value)
+obj-$(CONFIG_CPU_FREQ_STAT_GOLDFISH)    += goldfish_cpufreq_stats.o
+
 # CPUfreq times
 obj-$(CONFIG_CPU_FREQ_TIMES)		+= cpufreq_times.o
 
