@@ -1660,7 +1660,7 @@
 			mediatek,gce-client-reg = <&gce SUBSYS_1400XXXX 0 0x1000>;
 		};
 
-		dma-controller0@14001000 {
+		mdp3_rdma0: dma-controller0@14001000 {
 			compatible = "mediatek,mt8183-mdp3-rdma";
 			reg = <0 0x14001000 0 0x1000>;
 			mediatek,gce-client-reg = <&gce SUBSYS_1400XXXX 0x1000 0x1000>;
@@ -1877,6 +1877,21 @@
 			compatible = "mediatek,mt8183-imgsys", "syscon";
 			reg = <0 0x15020000 0 0x1000>;
 			#clock-cells = <1>;
+		};
+
+		dip: dip@15022000 {
+			compatible = "mediatek,mt8183-dip";
+			mediatek,larb = <&larb5>;
+			mediatek,mdp3 = <&mdp3_rdma0>;
+			mediatek,scp = <&scp>;
+			iommus = <&iommu M4U_PORT_CAM_IMGI>;
+			reg = <0 0x15022000 0 0x6000>;
+			interrupts = <GIC_SPI 268 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&imgsys CLK_IMG_LARB5>,
+				 <&imgsys CLK_IMG_DIP>;
+			clock-names = "larb5",
+				      "dip";
+			power-domains = <&spm MT8183_POWER_DOMAIN_ISP>;
 		};
 
 		larb5: larb@15021000 {
