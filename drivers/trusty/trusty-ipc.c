@@ -181,7 +181,8 @@ static void _free_shareable_mem(size_t sz, void *va)
 	free_pages_exact(va, sz);
 }
 
-static struct tipc_msg_buf *vds_alloc_msg_buf(struct tipc_virtio_dev *vds)
+static struct tipc_msg_buf *vds_alloc_msg_buf(struct tipc_virtio_dev *vds,
+					      bool share_write)
 {
 	struct tipc_msg_buf *mb;
 	size_t sz = vds->msg_buf_max_sz;
@@ -275,7 +276,7 @@ static struct tipc_msg_buf *_get_txbuf_locked(struct tipc_virtio_dev *vds)
 			return ERR_PTR(-EAGAIN);
 
 		/* try to allocate it */
-		mb = vds_alloc_msg_buf(vds);
+		mb = vds_alloc_msg_buf(vds, false);
 		if (!mb)
 			return ERR_PTR(-ENOMEM);
 
@@ -505,7 +506,7 @@ EXPORT_SYMBOL(tipc_create_channel);
 
 struct tipc_msg_buf *tipc_chan_get_rxbuf(struct tipc_chan *chan)
 {
-	return vds_alloc_msg_buf(chan->vds);
+	return vds_alloc_msg_buf(chan->vds, true);
 }
 EXPORT_SYMBOL(tipc_chan_get_rxbuf);
 
@@ -1542,7 +1543,7 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 		struct scatterlist sg;
 		struct tipc_msg_buf *rxbuf;
 
-		rxbuf = vds_alloc_msg_buf(vds);
+		rxbuf = vds_alloc_msg_buf(vds, true);
 		if (!rxbuf) {
 			dev_err(&vdev->dev, "failed to allocate rx buffer\n");
 			err = -ENOMEM;
