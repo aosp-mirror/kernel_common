@@ -16,6 +16,7 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 
+#include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
@@ -25,6 +26,7 @@
 #include <linux/platform_device.h>
 #include <linux/trusty/smcall.h>
 #include <linux/trusty/trusty.h>
+#include <linux/trusty/trusty_ipc.h>
 
 #include <linux/virtio.h>
 #include <linux/virtio_config.h>
@@ -219,15 +221,22 @@ static void trusty_virtio_reset(struct virtio_device *vdev)
 static u64 trusty_virtio_get_features(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
-	return tvdev->vdev_descr->dfeatures;
+	return tvdev->vdev_descr->dfeatures | (1ULL << VIRTIO_F_IOMMU_PLATFORM);
 }
 
 static int trusty_virtio_finalize_features(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
-	
+	u64 features = vdev->features;
+
+	/*
+	 * We set VIRTIO_F_IOMMU_PLATFORM to enable the dma mapping hooks. The
+	 * other side does not need to know.
+	 */
+	features &= ~(1ULL << VIRTIO_F_IOMMU_PLATFORM);
+
 	/* Make sure we don't have any features > 32 bits! */
-	BUG_ON((u32)vdev->features != vdev->features);
+	BUG_ON((u32)vdev->features != features);
 
 	tvdev->vdev_descr->gfeatures = vdev->features;
 	return 0;
@@ -633,6 +642,20 @@ err_load_descr:
 	return ret;
 }
 
+dma_addr_t trusty_virtio_dma_map_page(struct device *dev, struct page *page,
+				      unsigned long offset, size_t size,
+				      enum dma_data_direction dir,
+				      unsigned long attrs)
+{
+	struct tipc_msg_buf *buf = page_to_virt(page) + offset;
+
+	return buf->buf_pa;
+}
+
+static const struct dma_map_ops trusty_virtio_dma_map_ops = {
+	.map_page = trusty_virtio_dma_map_page,
+};
+
 static int trusty_virtio_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -653,6 +676,8 @@ static int trusty_virtio_probe(struct platform_device *pdev)
 	INIT_WORK(&tctx->check_vqs, check_all_vqs);
 	INIT_WORK(&tctx->kick_vqs, kick_vqs);
 	platform_set_drvdata(pdev, tctx);
+
+	set_dma_ops(&pdev->dev, &trusty_virtio_dma_map_ops);
 
 	tctx->check_wq = alloc_workqueue("trusty-check-wq", WQ_UNBOUND, 0);
 	if (!tctx->check_wq) {

@@ -356,7 +356,7 @@ static int vds_queue_txbuf(struct tipc_virtio_dev *vds,
 
 	mutex_lock(&vds->lock);
 	if (vds->state == VDS_ONLINE) {
-		sg_init_one(&sg, mb->buf_va, mb->wpos);
+		sg_init_one(&sg, mb, mb->wpos);
 		err = virtqueue_add_outbuf(vds->txvq, &sg, 1, mb, GFP_KERNEL);
 		need_notify = virtqueue_kick_prepare(vds->txvq);
 	} else {
@@ -1440,7 +1440,7 @@ static int _handle_rxbuf(struct tipc_virtio_dev *vds,
 
 drop_it:
 	/* add the buffer back to the virtqueue */
-	sg_init_one(&sg, rxbuf->buf_va, rxbuf->buf_sz);
+	sg_init_one(&sg, rxbuf, rxbuf->buf_sz);
 	err = virtqueue_add_inbuf(vds->rxvq, &sg, 1, rxbuf, GFP_KERNEL);
 	if (err < 0) {
 		dev_err(dev, "failed to add a virtqueue buffer: %d\n", err);
@@ -1549,7 +1549,7 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 			goto err_free_rx_buffers;
 		}
 
-		sg_init_one(&sg, rxbuf->buf_va, rxbuf->buf_sz);
+		sg_init_one(&sg, rxbuf, rxbuf->buf_sz);
 		err = virtqueue_add_inbuf(vds->rxvq, &sg, 1, rxbuf, GFP_KERNEL);
 		WARN_ON(err); /* sanity check; this can't really happen */
 	}
