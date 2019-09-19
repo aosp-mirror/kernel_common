@@ -2076,6 +2076,12 @@
 					<&larb6>;
 			power-domains = <&spm MT8183_POWER_DOMAIN_CAM>;
 			mediatek,scp = <&scp>;
+
+			port {
+				camisp_endpoint: endpoint {
+					remote-endpoint = <&seninf_camisp_endpoint>;
+				};
+			};
 		};
 
 		seninf: seninf@1a040000 {
@@ -2089,6 +2095,20 @@
 				 <&topckgen CLK_TOP_MUX_SENINF>;
 			clock-names = "CLK_CAM_SENINF", "CLK_TOP_MUX_SENINF";
 			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@4 {
+					reg = <4>;
+
+					seninf_camisp_endpoint: endpoint {
+						remote-endpoint = <&camisp_endpoint>;
+					};
+				};
+			};
+
 		};
 
 		larb6: larb@1a001000 {
