@@ -1126,10 +1126,10 @@ static int azx_free(struct azx *chip)
 	}
 
 	if (chip->initialized) {
+		azx_stop_chip(chip);
 		azx_clear_irq_pending(chip);
 		for (i = 0; i < chip->num_streams; i++)
 			azx_stream_stop(chip, &chip->azx_dev[i]);
-		azx_stop_chip(chip);
 	}
 
 	if (chip->irq >= 0)
