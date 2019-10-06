@@ -3354,3 +3354,7 @@ static inline bool f2fs_force_buffered_io(struct inode *inode, int rw)
 }
 
 #endif
+
+#define EFSBADCRC	EBADMSG		/* Bad CRC detected */
+#define EFSCORRUPTED	EUCLEAN		/* Filesystem is corrupted */
+
