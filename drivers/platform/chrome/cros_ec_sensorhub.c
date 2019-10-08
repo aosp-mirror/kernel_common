@@ -96,6 +96,9 @@ static int cros_ec_sensorhub_register(struct device *dev,
 		case MOTIONSENSE_TYPE_ACTIVITY:
 			name = "cros-ec-activity";
 			break;
+		case MOTIONSENSE_TYPE_SYNC:
+			name = "cros-ec-sync";
+			break;
 		default:
 			dev_warn(dev, "unknown type %d\n",
 				 sensorhub->resp->info.type);
