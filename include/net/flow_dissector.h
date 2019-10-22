@@ -1,6 +1,8 @@
 #ifndef _NET_FLOW_DISSECTOR_H
 #define _NET_FLOW_DISSECTOR_H
 
+#include <linux/siphash.h>
+
 /**
  * struct flow_dissector_key_control:
  * @thoff: Transport header offset
@@ -89,7 +91,7 @@ static inline bool skb_flow_dissect(const struct sk_buff *skb,
 struct flow_keys {
 	struct flow_dissector_key_control control;
 #define FLOW_KEYS_HASH_START_FIELD basic
-	struct flow_dissector_key_basic basic;
+	struct flow_dissector_key_basic basic __aligned(SIPHASH_ALIGNMENT);
 	struct flow_dissector_key_ports ports;
 	struct flow_dissector_key_addrs addrs;
 };
