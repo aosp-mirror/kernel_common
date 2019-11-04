@@ -137,7 +137,8 @@ static bool erofs_xattr_trusted_list(struct dentry *dentry)
 
 static int erofs_xattr_generic_get(const struct xattr_handler *handler,
 				   struct dentry *unused, struct inode *inode,
-				   const char *name, void *buffer, size_t size)
+				   const char *name, void *buffer, size_t size,
+				   int flags)
 {
 	if (handler->flags == EROFS_XATTR_INDEX_USER &&
 	    !test_opt(&EROFS_I_SB(inode)->opt, XATTR_USER))
