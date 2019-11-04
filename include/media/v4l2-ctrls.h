@@ -52,6 +52,7 @@ struct poll_table_struct;
  * @p_vp8_frame_header:		Pointer to a VP8 frame header structure.
  * @p_area:			Pointer to an area.
  * @p:				Pointer to a compound value.
+ * @p_const:			Pointer to a constant compound value.
  */
 union v4l2_ctrl_ptr {
 	s32 *p_s32;
@@ -71,6 +72,7 @@ union v4l2_ctrl_ptr {
 	struct v4l2_ctrl_vp8_frame_header *p_vp8_frame_header;
 	struct v4l2_area *p_area;
 	void *p;
+	const void *p_const;
 };
 
 /**
