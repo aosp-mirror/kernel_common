@@ -1532,7 +1532,8 @@ static bool std_equal(const struct v4l2_ctrl *ctrl, u32 idx,
 		if (ctrl->is_int)
 			return ptr1.p_s32[idx] == ptr2.p_s32[idx];
 		idx *= ctrl->elem_size;
-		return !memcmp(ptr1.p + idx, ptr2.p + idx, ctrl->elem_size);
+		return !memcmp(ptr1.p_const + idx, ptr2.p_const + idx,
+			       ctrl->elem_size);
 	}
 }
 
@@ -1542,8 +1543,8 @@ static void std_init_compound(const struct v4l2_ctrl *ctrl, u32 idx,
 	struct v4l2_ctrl_mpeg2_slice_params *p_mpeg2_slice_params;
 	void *p = ptr.p + idx * ctrl->elem_size;
 
-	if (ctrl->p_def.p)
-		memcpy(p, ctrl->p_def.p, ctrl->elem_size);
+	if (ctrl->p_def.p_const)
+		memcpy(p, ctrl->p_def.p_const, ctrl->elem_size);
 	else
 		memset(p, 0, ctrl->elem_size);
 
@@ -1861,7 +1862,7 @@ static int ptr_to_user(struct v4l2_ext_control *c,
 	u32 len;
 
 	if (ctrl->is_ptr && !ctrl->is_string)
-		return copy_to_user(c->ptr, ptr.p, c->size) ?
+		return copy_to_user(c->ptr, ptr.p_const, c->size) ?
 		       -EFAULT : 0;
 
 	switch (ctrl->type) {
@@ -1976,7 +1977,7 @@ static void ptr_to_ptr(struct v4l2_ctrl *ctrl,
 {
 	if (ctrl == NULL)
 		return;
-	memcpy(to.p, from.p, ctrl->elems * ctrl->elem_size);
+	memcpy(to.p, from.p_const, ctrl->elems * ctrl->elem_size);
 }
 
 /* Copy the new value to the current value. */
@@ -2485,7 +2486,7 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 		 is_array)
 		sz_extra += 2 * tot_ctrl_size;
 
-	if (type >= V4L2_CTRL_COMPOUND_TYPES && p_def.p)
+	if (type >= V4L2_CTRL_COMPOUND_TYPES && p_def.p_const)
 		sz_extra += elem_size;
 
 	ctrl = kvzalloc(sizeof(*ctrl) + sz_extra, GFP_KERNEL);
@@ -2532,9 +2533,9 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 		ctrl->p_cur.p = &ctrl->cur.val;
 	}
 
-	if (type >= V4L2_CTRL_COMPOUND_TYPES && p_def.p) {
+	if (type >= V4L2_CTRL_COMPOUND_TYPES && p_def.p_const) {
 		ctrl->p_def.p = ctrl->p_cur.p + tot_ctrl_size;
-		memcpy(ctrl->p_def.p, p_def.p, elem_size);
+		memcpy(ctrl->p_def.p, p_def.p_const, elem_size);
 	}
 
 	for (idx = 0; idx < elems; idx++) {
