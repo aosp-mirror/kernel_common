@@ -4415,7 +4415,7 @@ static void hp_callback(struct hda_codec *codec, struct hda_jack_callback *cb)
 	/* Delay enabling the HP amp, to let the mic-detection
 	 * state machine run.
 	 */
-	cancel_delayed_work_sync(&spec->unsol_hp_work);
+	cancel_delayed_work(&spec->unsol_hp_work);
 	queue_delayed_work(codec->bus->workq, &spec->unsol_hp_work,
 			   msecs_to_jiffies(500));
 	cb->tbl->block_report = 1;
