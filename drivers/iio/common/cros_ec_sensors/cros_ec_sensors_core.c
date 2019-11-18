@@ -111,6 +111,33 @@ static int cros_ec_sensor_set_ec_rate(struct cros_ec_sensors_core_state *st,
 	return ret;
 }
 
+static ssize_t cros_ec_sensors_flush(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t len)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct cros_ec_sensors_core_state *st = iio_priv(indio_dev);
+	int ret = 0;
+	bool flush;
+
+	ret = strtobool(buf, &flush);
+	if (ret < 0)
+		return ret;
+	if (!flush)
+		return -EINVAL;
+
+	mutex_lock(&st->cmd_lock);
+	st->param.cmd = MOTIONSENSE_CMD_FIFO_FLUSH;
+	ret = cros_ec_motion_send_host_cmd(st, 0);
+	if (ret != 0)
+		dev_warn(&indio_dev->dev, "Unable to flush sensor\n");
+	mutex_unlock(&st->cmd_lock);
+	return ret ? ret : len;
+}
+
+static IIO_DEVICE_ATTR(hwfifo_flush, 0644, NULL,
+		       cros_ec_sensors_flush, 0);
+
 static ssize_t cros_ec_sensor_set_report_latency(struct device *dev,
 						 struct device_attribute *attr,
 						 const char *buf, size_t len)
@@ -173,6 +200,7 @@ static ssize_t hwfifo_watermark_max_show(struct device *dev,
 static IIO_DEVICE_ATTR_RO(hwfifo_watermark_max, 0);
 
 static const struct iio_dev_attr *cros_ec_sensor_fifo_attributes[] = {
+	&iio_dev_attr_hwfifo_flush,	
 	&iio_dev_attr_hwfifo_timeout,
 	&iio_dev_attr_hwfifo_watermark_max,
 	NULL,
