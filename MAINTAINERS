@@ -10772,6 +10772,13 @@ L:	linux-fbdev@vger.kernel.org
 S:	Orphan
 F:	drivers/video/fbdev/imsttfb.c
 
+INCREMENTAL FILE SYSTEM
+M:	Paul Lawrence <paullawrence@google.com>
+L:	linux-unionfs@vger.kernel.org
+S:	Supported
+F:	fs/incfs/
+F:	tools/testing/selftests/filesystems/incfs/
+
 INDEX OF FURTHER KERNEL DOCUMENTATION
 M:	Carlos Bilbao <carlos.bilbao.osdev@gmail.com>
 S:	Maintained
