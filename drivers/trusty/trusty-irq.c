@@ -32,6 +32,7 @@ struct trusty_irq {
 	unsigned int irq;
 	bool percpu;
 	bool enable;
+	bool doorbell;
 	struct trusty_irq __percpu *percpu_ptr;
 };
 
@@ -161,20 +162,22 @@ irqreturn_t trusty_irq_handler(int irq, void *data)
 		__func__, irq, trusty_irq->irq, smp_processor_id(),
 		trusty_irq->enable);
 
-	if (trusty_irq->percpu) {
-		disable_percpu_irq(irq);
-		irqset = this_cpu_ptr(is->percpu_irqs);
-	} else {
-		disable_irq_nosync(irq);
-		irqset = &is->normal_irqs;
-	}
+	if (!trusty_irq->doorbell) {
+		if (trusty_irq->percpu) {
+			disable_percpu_irq(irq);
+			irqset = this_cpu_ptr(is->percpu_irqs);
+		} else {
+			disable_irq_nosync(irq);
+			irqset = &is->normal_irqs;
+		}
 
-	spin_lock(&is->normal_irqs_lock);
-	if (trusty_irq->enable) {
-		hlist_del(&trusty_irq->node);
-		hlist_add_head(&trusty_irq->node, &irqset->pending);
+		spin_lock(&is->normal_irqs_lock);
+		if (trusty_irq->enable) {
+			hlist_del(&trusty_irq->node);
+			hlist_add_head(&trusty_irq->node, &irqset->pending);
+		}
+		spin_unlock(&is->normal_irqs_lock);
 	}
-	spin_unlock(&is->normal_irqs_lock);
 
 	trusty_enqueue_nop(is->trusty_dev, NULL);
 
@@ -339,7 +342,8 @@ err_request_irq:
 	return ret;
 }
 
-static int trusty_irq_init_per_cpu_irq(struct trusty_irq_state *is, int tirq)
+static int trusty_irq_init_per_cpu_irq(struct trusty_irq_state *is, int tirq,
+				       unsigned int type)
 {
 	int ret;
 	int irq;
@@ -370,6 +374,7 @@ static int trusty_irq_init_per_cpu_irq(struct trusty_irq_state *is, int tirq)
 		hlist_add_head(&trusty_irq->node, &irqset->inactive);
 		trusty_irq->irq = irq;
 		trusty_irq->percpu = true;
+		trusty_irq->doorbell = type == TRUSTY_IRQ_TYPE_DOORBELL;
 		trusty_irq->percpu_ptr = trusty_irq_handler_data;
 	}
 
@@ -395,23 +400,23 @@ err_request_percpu_irq:
 }
 
 static int trusty_smc_get_next_irq(struct trusty_irq_state *is,
-				   unsigned long min_irq, bool per_cpu)
+				   unsigned long min_irq, unsigned int type)
 {
 	return trusty_fast_call32(is->trusty_dev, SMC_FC_GET_NEXT_IRQ,
-				  min_irq, per_cpu, 0);
+				  min_irq, type, 0);
 }
 
 static int trusty_irq_init_one(struct trusty_irq_state *is,
-			       int irq, bool per_cpu)
+			       int irq, unsigned int type)
 {
 	int ret;
 
-	irq = trusty_smc_get_next_irq(is, irq, per_cpu);
+	irq = trusty_smc_get_next_irq(is, irq, type);
 	if (irq < 0)
 		return irq;
 
-	if (per_cpu)
-		ret = trusty_irq_init_per_cpu_irq(is, irq);
+	if (type != TRUSTY_IRQ_TYPE_NORMAL)
+		ret = trusty_irq_init_per_cpu_irq(is, irq, type);
 	else
 		ret = trusty_irq_init_normal_irq(is, irq);
 
@@ -490,9 +495,11 @@ static int trusty_irq_probe(struct platform_device *pdev)
 	}
 
 	for (irq = 0; irq >= 0;)
-		irq = trusty_irq_init_one(is, irq, true);
+		irq = trusty_irq_init_one(is, irq, TRUSTY_IRQ_TYPE_PER_CPU);
 	for (irq = 0; irq >= 0;)
-		irq = trusty_irq_init_one(is, irq, false);
+		irq = trusty_irq_init_one(is, irq, TRUSTY_IRQ_TYPE_NORMAL);
+	for (irq = 0; irq >= 0;)
+		irq = trusty_irq_init_one(is, irq, TRUSTY_IRQ_TYPE_DOORBELL);
 
 	ret = cpuhp_state_add_instance(trusty_irq_cpuhp_slot, &is->cpuhp_node);
 	if (ret < 0) {
