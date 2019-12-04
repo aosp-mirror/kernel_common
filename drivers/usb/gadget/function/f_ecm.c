@@ -628,8 +628,12 @@ static void ecm_disable(struct usb_function *f)
 
 	DBG(cdev, "ecm deactivated\n");
 
-	if (ecm->port.in_ep->driver_data)
+	if (ecm->port.in_ep->driver_data) {
 		gether_disconnect(&ecm->port);
+	} else {
+		ecm->port.in_ep->desc = NULL;
+		ecm->port.out_ep->desc = NULL;
+	}
 
 	if (ecm->notify->driver_data) {
 		usb_ep_disable(ecm->notify);
