@@ -114,6 +114,13 @@ static ulong trusty_std_call_helper(struct device *dev, ulong smcnr,
 		ret = trusty_std_call_inner(dev, smcnr, a0, a1, a2);
 		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_RETURNED,
 					   NULL);
+		if (ret == SM_ERR_INTERRUPTED) {
+			/*
+			 * Make sure this cpu will eventually re-enter trusty
+			 * even if the std_call resumes on another cpu.
+			 */
+			trusty_enqueue_nop(dev, NULL);
+		}
 		local_irq_enable();
 
 		if ((int)ret != SM_ERR_BUSY)
