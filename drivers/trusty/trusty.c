@@ -354,6 +354,7 @@ static void nop_work_func(struct work_struct *work)
 	int ret;
 	bool next;
 	u32 args[3];
+	u32 last_arg0;
 	struct trusty_work *tw = container_of(work, struct trusty_work, work);
 	struct trusty_state *s = tw->ts;
 
@@ -364,16 +365,25 @@ static void nop_work_func(struct work_struct *work)
 		dev_dbg(s->dev, "%s: %x %x %x\n",
 			__func__, args[0], args[1], args[2]);
 
+		last_arg0 = args[0];
 		ret = trusty_std_call32(s->dev, SMC_SC_NOP,
 					args[0], args[1], args[2]);
 
 		next = dequeue_nop(s, args);
 
-		if (ret == SM_ERR_NOP_INTERRUPTED)
+		if (ret == SM_ERR_NOP_INTERRUPTED) {
 			next = true;
-		else if (ret != SM_ERR_NOP_DONE)
-			dev_err(s->dev, "%s: SMC_SC_NOP failed %d",
-				__func__, ret);
+		} else if (ret != SM_ERR_NOP_DONE) {
+			dev_err(s->dev, "%s: SMC_SC_NOP %x failed %d",
+				__func__, last_arg0, ret);
+			if (last_arg0) {
+				/*
+				 * Don't break out of the loop if a non-default
+				 * nop-handler returns an error.
+				 */
+				next = true;
+			}
+		}
 	} while (next);
 
 	dev_dbg(s->dev, "%s: done\n", __func__);
