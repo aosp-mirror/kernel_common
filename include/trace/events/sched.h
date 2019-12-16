@@ -636,7 +636,7 @@ TRACE_EVENT(sched_load_avg_task,
 		__field( unsigned long,	load_avg		)
 		__field( unsigned long,	util_avg		)
 		__field( unsigned long,	util_avg_pelt		)
-		__field( unsigned long,	util_avg_walt		)
+		__field( u64,		util_avg_walt		)
 		__field( u64,		load_sum		)
 		__field( u32,		util_sum		)
 		__field( u32,		period_contrib		)
@@ -661,7 +661,7 @@ TRACE_EVENT(sched_load_avg_task,
 #endif
 	),
 	TP_printk("comm=%s pid=%d cpu=%d load_avg=%lu util_avg=%lu "
-			"util_avg_pelt=%lu util_avg_walt=%lu load_sum=%llu"
+			"util_avg_pelt=%lu util_avg_walt=%llu load_sum=%llu"
 		  " util_sum=%u period_contrib=%u",
 		  __entry->comm,
 		  __entry->pid,
@@ -689,7 +689,7 @@ TRACE_EVENT(sched_load_avg_cpu,
 		__field( unsigned long,	load_avg		)
 		__field( unsigned long,	util_avg		)
 		__field( unsigned long,	util_avg_pelt		)
-		__field( unsigned long,	util_avg_walt		)
+		__field( u64,		util_avg_walt		)
 	),
 
 	TP_fast_assign(
@@ -708,7 +708,7 @@ TRACE_EVENT(sched_load_avg_cpu,
 	),
 
 	TP_printk("cpu=%d load_avg=%lu util_avg=%lu "
-			  "util_avg_pelt=%lu util_avg_walt=%lu",
+			  "util_avg_pelt=%lu util_avg_walt=%llu",
 		  __entry->cpu, __entry->load_avg, __entry->util_avg,
 		  __entry->util_avg_pelt, __entry->util_avg_walt)
 );
@@ -1033,7 +1033,7 @@ TRACE_EVENT(walt_update_task_ravg,
 		__field(	 int,	cpu			)
 		__field(	u64,	cs			)
 		__field(	u64,	ps			)
-		__field(unsigned long,	util			)
+		__field(	u64,	util			)
 		__field(	u32,	curr_window		)
 		__field(	u32,	prev_window		)
 		__field(	u64,	nt_cs			)
@@ -1068,7 +1068,7 @@ TRACE_EVENT(walt_update_task_ravg,
 	),
 
 	TP_printk("wc %llu ws %llu delta %llu event %d cpu %d cur_freq %u cur_pid %d task %d (%s) ms %llu delta %llu demand %u sum %u irqtime %llu"
-		" cs %llu ps %llu util %lu cur_window %u prev_window %u active_wins %u"
+		" cs %llu ps %llu util %llu cur_window %u prev_window %u active_wins %u"
 		, __entry->wallclock, __entry->win_start, __entry->delta,
 		__entry->evt, __entry->cpu,
 		__entry->cur_freq, __entry->cur_pid,
