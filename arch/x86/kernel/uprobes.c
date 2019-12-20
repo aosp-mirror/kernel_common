@@ -455,12 +455,9 @@ struct uprobe_xol_ops {
 	void	(*abort)(struct arch_uprobe *, struct pt_regs *);
 };
 
-static inline int sizeof_long(struct pt_regs *regs)
+static inline int sizeof_long(void)
 {
-	/*
-	 * Check registers for mode as in_xxx_syscall() does not apply here.
-	 */
-	return user_64bit_mode(regs) ? 8 : 4;
+	return is_ia32_task() ? 4 : 8;
 }
 
 static int default_pre_xol_op(struct arch_uprobe *auprobe, struct pt_regs *regs)
@@ -471,9 +468,9 @@ static int default_pre_xol_op(struct arch_uprobe *auprobe, struct pt_regs *regs)
 
 static int push_ret_address(struct pt_regs *regs, unsigned long ip)
 {
-	unsigned long new_sp = regs->sp - sizeof_long(regs);
+	unsigned long new_sp = regs->sp - sizeof_long();
 
-	if (copy_to_user((void __user *)new_sp, &ip, sizeof_long(regs)))
+	if (copy_to_user((void __user *)new_sp, &ip, sizeof_long()))
 		return -EFAULT;
 
 	regs->sp = new_sp;
@@ -506,7 +503,7 @@ static int default_post_xol_op(struct arch_uprobe *auprobe, struct pt_regs *regs
 		long correction = utask->vaddr - utask->xol_vaddr;
 		regs->ip += correction;
 	} else if (auprobe->defparam.fixups & UPROBE_FIX_CALL) {
-		regs->sp += sizeof_long(regs); /* Pop incorrect return address */
+		regs->sp += sizeof_long(); /* Pop incorrect return address */
 		if (push_ret_address(regs, utask->vaddr + auprobe->defparam.ilen))
 			return -ERESTART;
 	}
@@ -615,7 +612,7 @@ static int branch_post_xol_op(struct arch_uprobe *auprobe, struct pt_regs *regs)
 	 * "call" insn was executed out-of-line. Just restore ->sp and restart.
 	 * We could also restore ->ip and try to call branch_emulate_op() again.
 	 */
-	regs->sp += sizeof_long(regs);
+	regs->sp += sizeof_long();
 	return -ERESTART;
 }
 
@@ -906,7 +903,7 @@ bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
 unsigned long
 arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs)
 {
-	int rasize = sizeof_long(regs), nleft;
+	int rasize = sizeof_long(), nleft;
 	unsigned long orig_ret_vaddr = 0; /* clear high bits for 32-bit apps */
 
 	if (copy_from_user(&orig_ret_vaddr, (void __user *)regs->sp, rasize))
