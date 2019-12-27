@@ -556,6 +556,7 @@ struct mlx5_cmd_work_ent {
 	mlx5_cmd_cbk_t		callback;
 	void		       *context;
 	int			idx;
+	struct completion	handling;
 	struct completion	done;
 	struct mlx5_cmd        *cmd;
 	struct work_struct	work;
