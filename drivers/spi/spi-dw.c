@@ -415,6 +415,9 @@ static void pump_transfers(unsigned long data)
 
 	cr0 = chip->cr0;
 
+	/* Ensure dw->rx and dw->rx_end are visible */
+	smp_mb();
+
 	/* Handle per transfer options for bpw and speed */
 	if (transfer->speed_hz) {
 		speed = chip->speed_hz;
