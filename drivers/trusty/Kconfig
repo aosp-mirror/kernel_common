@@ -25,6 +25,16 @@ config TRUSTY_LOG
 	depends on TRUSTY
 	default y
 
+config TRUSTY_TEST
+	tristate "Trusty stdcall test"
+	depends on TRUSTY
+	default y
+	help
+	  Allow running tests of trusty stdcall interface.
+
+	  Need test service on trusty side.
+	  Say N if you don't have the matching trusty side test service.
+
 config TRUSTY_VIRTIO
 	tristate "Trusty virtio support"
 	depends on TRUSTY
