@@ -44,6 +44,17 @@ config TRUSTY_LOG
 
 	  If you build this as a module, it will be called trusty-log.
 
+config TRUSTY_TEST
+	tristate "Trusty stdcall test"
+	default y
+	help
+	  Allow running tests of the Trusty stdcall interface.  Running these
+	  tests is initiated by userspace writing to a sysfs file.
+
+	  This depends on having a test sevice running on the Trusty side.
+
+	  If you build this as a module, it will be called trusty-test.
+
 config TRUSTY_VIRTIO
 	tristate "Trusty virtio support"
 	select VIRTIO
