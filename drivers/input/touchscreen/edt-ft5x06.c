@@ -958,6 +958,7 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
 	const struct edt_ft5x06_platform_data *pdata =
 						dev_get_platdata(&client->dev);
 	struct edt_ft5x06_ts_data *tsdata;
+	u8 buf[2] = { 0xfc, 0x00 };
 	struct input_dev *input;
 	int error;
 	char fw_version[EDT_NAME_LEN];
@@ -1014,6 +1015,12 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
 		dev_err(&client->dev, "touchscreen probe failed\n");
 		return error;
 	}
+
+	/*
+	 * Dummy read access. EP0700MLP1 returns bogus data on the first
+	 * register read access and ignores writes.
+	 */
+	edt_ft5x06_ts_readwrite(tsdata->client, 2, buf, 2, buf);
 
 	edt_ft5x06_ts_set_regs(tsdata);
 
