@@ -79,6 +79,8 @@ static const char * const sym_regex_kernel[S_NSYMTYPES] = {
 	"__end_rodata_hpage_align|"
 #endif
 	"__vvar_page|"
+	"_etext|"
+	"__end_of_kernel_reserve|"
 	"_end)$"
 };
 
