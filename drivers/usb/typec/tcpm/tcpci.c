@@ -289,6 +289,18 @@ static int tcpci_get_vbus(struct tcpc_dev *tcpc)
 	return !!(reg & TCPC_POWER_STATUS_VBUS_PRES);
 }
 
+static int tcpci_set_current_limit(struct tcpc_dev *tcpc, u32 max_ma, u32 mv)
+{
+	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
+	int ret = 0;
+
+	if (tcpci->data->set_current_limit)
+		ret = tcpci->data->set_current_limit(tcpci, tcpci->data, max_ma,
+						     mv);
+
+	return ret;
+}
+
 static int tcpci_set_vbus(struct tcpc_dev *tcpc, bool source, bool sink)
 {
 	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
@@ -553,6 +565,7 @@ struct tcpci *tcpci_register_port(struct device *dev, struct tcpci_data *data)
 	tcpci->tcpc.set_roles = tcpci_set_roles;
 	tcpci->tcpc.pd_transmit = tcpci_pd_transmit;
 	tcpci->tcpc.set_bist_data = tcpci_set_bist_data;
+	tcpci->tcpc.set_current_limit =  tcpci_set_current_limit;
 
 	err = tcpci_parse_config(tcpci);
 	if (err < 0)
