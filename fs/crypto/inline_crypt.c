@@ -15,6 +15,7 @@
 #include <linux/blk-crypto.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
+#include <linux/keyslot-manager.h>
 #include <linux/sched/mm.h>
 #include <linux/uio.h>
 
@@ -64,7 +65,8 @@ static unsigned int fscrypt_get_dun_bytes(const struct fscrypt_info *ci)
 }
 
 /* Enable inline encryption for this file if supported. */
-int fscrypt_select_encryption_impl(struct fscrypt_info *ci)
+int fscrypt_select_encryption_impl(struct fscrypt_info *ci,
+				   bool is_hw_wrapped_key)
 {
 	const struct inode *inode = ci->ci_inode;
 	struct super_block *sb = inode->i_sb;
@@ -105,7 +107,7 @@ int fscrypt_select_encryption_impl(struct fscrypt_info *ci)
 	crypto_cfg.crypto_mode = ci->ci_mode->blk_crypto_mode;
 	crypto_cfg.data_unit_size = sb->s_blocksize;
 	crypto_cfg.dun_bytes = fscrypt_get_dun_bytes(ci);
-	crypto_cfg.is_hw_wrapped = false;
+	crypto_cfg.is_hw_wrapped = is_hw_wrapped_key;
 	num_devs = fscrypt_get_num_devices(sb);
 	devs = kmalloc_array(num_devs, sizeof(*devs), GFP_NOFS);
 	if (!devs)
@@ -126,6 +128,8 @@ out_free_devs:
 
 int fscrypt_prepare_inline_crypt_key(struct fscrypt_prepared_key *prep_key,
 				     const u8 *raw_key,
+				     unsigned int raw_key_size,
+				     bool is_hw_wrapped,
 				     const struct fscrypt_info *ci)
 {
 	const struct inode *inode = ci->ci_inode;
@@ -145,9 +149,12 @@ int fscrypt_prepare_inline_crypt_key(struct fscrypt_prepared_key *prep_key,
 	blk_key->num_devs = num_devs;
 	fscrypt_get_devices(sb, num_devs, blk_key->devs);
 
-	err = blk_crypto_init_key(&blk_key->base, raw_key, ci->ci_mode->keysize,
-				  false, crypto_mode, fscrypt_get_dun_bytes(ci),
-				  sb->s_blocksize);
+	BUILD_BUG_ON(FSCRYPT_MAX_HW_WRAPPED_KEY_SIZE >
+		     BLK_CRYPTO_MAX_WRAPPED_KEY_SIZE);
+
+	err = blk_crypto_init_key(&blk_key->base, raw_key, raw_key_size,
+				  is_hw_wrapped, crypto_mode,
+				  fscrypt_get_dun_bytes(ci), sb->s_blocksize);
 	if (err) {
 		fscrypt_err(inode, "error %d initializing blk-crypto key", err);
 		goto fail;
@@ -206,6 +213,21 @@ void fscrypt_destroy_inline_crypt_key(struct fscrypt_prepared_key *prep_key)
 		}
 		kzfree(blk_key);
 	}
+}
+
+int fscrypt_derive_raw_secret(struct super_block *sb,
+			      const u8 *wrapped_key,
+			      unsigned int wrapped_key_size,
+			      u8 *raw_secret, unsigned int raw_secret_size)
+{
+	struct request_queue *q;
+
+	q = bdev_get_queue(sb->s_bdev);
+	if (!q->ksm)
+		return -EOPNOTSUPP;
+
+	return blk_ksm_derive_raw_secret(q->ksm, wrapped_key, wrapped_key_size,
+					 raw_secret, raw_secret_size);
 }
 
 bool __fscrypt_inode_uses_inline_crypto(const struct inode *inode)
