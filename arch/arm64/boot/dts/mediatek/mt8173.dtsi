@@ -310,6 +310,11 @@
 							  THERMAL_NO_LIMIT>;
 					contribution = <1024>;
 				};
+				map@2 {
+					trip = <&target>;
+					cooling-device = <&gpu 0 0>;
+					contribution = <2048>;
+				};
 			};
 		};
 	};
@@ -984,7 +989,49 @@
 			};
 		};
 
-		mmsys: syscon@14000000 {
+		gpu: mfgsys-gpu@13000000 {
+			compatible = "mediatek,mt8173-gpu";
+			reg = <0 0x13000000 0 0xffff>, <0 0x13fff000 0 0x1000>;
+			power-domains =	<&scpsys MT8173_POWER_DOMAIN_MFG>;
+			operating-points = <
+				253500 1000000
+				299000 1000000
+				396500 1000000
+				455000 1000000
+				494000 1130000
+				598000 1130000
+			>;
+			clocks = <&apmixedsys CLK_APMIXED_MMPLL>,
+				 <&topckgen CLK_TOP_MEM_MFG_IN_SEL>,
+				 <&topckgen CLK_TOP_AXI_MFG_IN_SEL>,
+				 <&topckgen CLK_TOP_AXI_SEL>,
+				 <&topckgen CLK_TOP_MEM_SEL>,
+				 <&topckgen CLK_TOP_MFG_SEL>,
+				 <&topckgen CLK_TOP_MMPLL>,
+				 <&clk26m>;
+			clock-names = "mmpll_clk",
+				      "mfg_mem_in_sel",
+				      "mfg_axi_in_sel",
+				      "top_axi",
+				      "top_mem",
+				      "top_mfg",
+				      "top_mmpll",
+				      "clk26m";
+			interrupts = <0 217 IRQ_TYPE_LEVEL_LOW>;
+			interrupt-names = "RGX";
+			status = "disabled";
+			#cooling-cells = <2>;
+			#cooling-min-level = <0>;
+			#cooling-max-level = <3>;
+		};
+
+		mfgsys: mfgsys@13fff000 {
+			compatible = "mediatek,mt8173-mfgsys", "syscon";
+			reg = <0 0x13fff000 0 0x1000>;
+			#clock-cells = <1>;
+		};
+
+		mmsys: clock-controller@14000000 {
 			compatible = "mediatek,mt8173-mmsys", "syscon";
 			reg = <0 0x14000000 0 0x1000>;
 			power-domains = <&spm MT8173_POWER_DOMAIN_MM>;
