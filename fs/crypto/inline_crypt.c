@@ -298,12 +298,17 @@ static void fscrypt_generate_dun(const struct fscrypt_inode_info *ci,
  * otherwise fscrypt_mergeable_bio() won't work as intended.
  *
  * The encryption context will be freed automatically when the bio is freed.
+ *
+ * This function also handles setting bi_skip_dm_default_key when needed.
  */
 void fscrypt_set_bio_crypt_ctx(struct bio *bio, const struct inode *inode,
 			       u64 first_lblk, gfp_t gfp_mask)
 {
 	const struct fscrypt_inode_info *ci;
 	u64 dun[BLK_CRYPTO_DUN_ARRAY_SIZE];
+
+	if (fscrypt_inode_should_skip_dm_default_key(inode))
+		bio_set_skip_dm_default_key(bio);
 
 	if (!fscrypt_inode_uses_inline_crypto(inode))
 		return;
@@ -379,6 +384,9 @@ EXPORT_SYMBOL_GPL(fscrypt_set_bio_crypt_ctx_bh);
  * another way, such as I/O targeting only a single file (and thus a single key)
  * combined with fscrypt_limit_io_blocks() to ensure DUN contiguity.
  *
+ * This function also returns false if the next part of the I/O would need to
+ * have a different value for the bi_skip_dm_default_key flag.
+ *
  * Return: true iff the I/O is mergeable
  */
 bool fscrypt_mergeable_bio(struct bio *bio, const struct inode *inode,
@@ -388,6 +396,9 @@ bool fscrypt_mergeable_bio(struct bio *bio, const struct inode *inode,
 	u64 next_dun[BLK_CRYPTO_DUN_ARRAY_SIZE];
 
 	if (!!bc != fscrypt_inode_uses_inline_crypto(inode))
+		return false;
+	if (bio_should_skip_dm_default_key(bio) !=
+	    fscrypt_inode_should_skip_dm_default_key(inode))
 		return false;
 	if (!bc)
 		return true;
@@ -422,7 +433,8 @@ bool fscrypt_mergeable_bio_bh(struct bio *bio,
 	u64 next_lblk;
 
 	if (!bh_get_inode_and_lblk_num(next_bh, &inode, &next_lblk))
-		return !bio->bi_crypt_context;
+		return !bio->bi_crypt_context &&
+		       !bio_should_skip_dm_default_key(bio);
 
 	return fscrypt_mergeable_bio(bio, inode, next_lblk);
 }
