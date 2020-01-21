@@ -9,6 +9,8 @@
 #include <linux/bio.h>
 #include <linux/blk-crypto.h>
 
+#ifdef CONFIG_BLK_INLINE_ENCRYPTION
+
 struct blk_keyslot_manager;
 
 /**
@@ -103,6 +105,11 @@ void blk_ksm_reprogram_all_keys(struct blk_keyslot_manager *ksm);
 
 void blk_ksm_destroy(struct blk_keyslot_manager *ksm);
 
+void blk_ksm_intersect_modes(struct blk_keyslot_manager *parent,
+			     const struct blk_keyslot_manager *child);
+
 void blk_ksm_init_passthrough(struct blk_keyslot_manager *ksm);
+
+#endif /* CONFIG_BLK_INLINE_ENCRYPTION */
 
 #endif /* __LINUX_KEYSLOT_MANAGER_H */
