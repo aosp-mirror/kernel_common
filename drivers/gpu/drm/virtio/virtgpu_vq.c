@@ -1118,12 +1118,14 @@ void virtio_gpu_cmd_map(struct virtio_gpu_device *vgdev,
 	struct virtio_gpu_vbuffer *vbuf;
 	struct virtio_gpu_resp_map_info *resp_buf;
 
+	/* gets freed when the ring has consumed it */
 	resp_buf = kzalloc(sizeof(*resp_buf), GFP_KERNEL);
 	if (!resp_buf) {
 		DRM_ERROR("allocation failure\n");
 		return;
 	}
 
+	/* gets freed when the ring has consumed it */
 	cmd_p = virtio_gpu_alloc_cmd_resp(vgdev,
 		virtio_gpu_cmd_resource_map_cb, &vbuf, sizeof(*cmd_p),
 		sizeof(struct virtio_gpu_resp_map_info), resp_buf);
@@ -1142,6 +1144,7 @@ void virtio_gpu_cmd_unmap(struct virtio_gpu_device *vgdev,
 	struct virtio_gpu_resource_unmap *cmd_p;
 	struct virtio_gpu_vbuffer *vbuf;
 
+	/* gets freed when the ring has consumed it */
 	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
 	memset(cmd_p, 0, sizeof(*cmd_p));
 
@@ -1162,6 +1165,7 @@ virtio_gpu_cmd_resource_create_blob(struct virtio_gpu_device *vgdev,
 	struct virtio_gpu_resource_create_blob *cmd_p;
 	struct virtio_gpu_vbuffer *vbuf;
 
+	/* gets freed when the ring has consumed it */
 	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
 	memset(cmd_p, 0, sizeof(*cmd_p));
 
