@@ -314,8 +314,6 @@ static void audit_update_watch(struct audit_parent *parent,
 					     &nentry->rule.list);
 			}
 
-			audit_watch_log_rule_change(r, owatch, "updated_rules");
-
 			call_rcu(&oentry->rcu, audit_free_rule_rcu);
 		}
 
