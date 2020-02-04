@@ -441,6 +441,12 @@
 			no delay (0).
 			Format: integer
 
+	bootconfig	[KNL]
+			Extended command line options can be added to an initrd
+			and this will cause the kernel to look for it.
+
+			See Documentation/admin-guide/bootconfig.rst
+
 	bootmem_debug	[KNL] Enable bootmem allocator debug messages.
 
 	bert_disable	[ACPI]
