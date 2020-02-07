@@ -501,6 +501,7 @@ int blk_crypto_derive_sw_secret(struct block_device *bdev,
 	blk_crypto_hw_exit(profile);
 	return err;
 }
+EXPORT_SYMBOL_GPL(blk_crypto_derive_sw_secret);
 
 /**
  * blk_crypto_intersect_capabilities() - restrict supported crypto capabilities
