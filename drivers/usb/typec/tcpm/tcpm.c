@@ -875,6 +875,14 @@ static int tcpm_set_current_limit(struct tcpm_port *port, u32 max_ma, u32 mv)
 	return ret;
 }
 
+static void tcpm_set_pd_capable(struct tcpm_port *port, bool capable)
+{
+	tcpm_log(port, "Setting pd capable %s", capable ? "true" : "false");
+
+	if (port->tcpc->set_pd_capable)
+		port->tcpc->set_pd_capable(port->tcpc, capable);
+}
+
 /*
  * Determine RP value to set based on maximum current supported
  * by a port if configured as source.
@@ -3296,7 +3304,7 @@ static int tcpm_src_attach(struct tcpm_port *port)
 	if (ret < 0)
 		goto out_disable_vconn;
 
-	port->pd_capable = false;
+	tcpm_set_pd_capable(port, false);
 
 	port->partner = NULL;
 
@@ -3346,7 +3354,7 @@ static void tcpm_reset_port(struct tcpm_port *port)
 	tcpm_unregister_altmodes(port);
 	tcpm_typec_disconnect(port);
 	port->attached = false;
-	port->pd_capable = false;
+	tcpm_set_pd_capable(port, false);
 	port->pps_data.supported = false;
 
 	/*
@@ -3408,7 +3416,7 @@ static int tcpm_snk_attach(struct tcpm_port *port)
 	if (ret < 0)
 		return ret;
 
-	port->pd_capable = false;
+	tcpm_set_pd_capable(port, false);
 
 	port->partner = NULL;
 
@@ -3655,7 +3663,8 @@ static void run_state_machine(struct tcpm_port *port)
 			 */
 			/* port->hard_reset_count = 0; */
 			port->caps_count = 0;
-			port->pd_capable = true;
+
+			tcpm_set_pd_capable(port, true);
 			tcpm_set_state_cond(port, SRC_SEND_CAPABILITIES_TIMEOUT,
 					    PD_T_SEND_SOURCE_CAP);
 		}
@@ -3929,7 +3938,7 @@ static void run_state_machine(struct tcpm_port *port)
 		}
 		break;
 	case SNK_NEGOTIATE_CAPABILITIES:
-		port->pd_capable = true;
+		tcpm_set_pd_capable(port, true);
 		port->hard_reset_count = 0;
 		ret = tcpm_pd_send_request(port);
 		if (ret < 0) {
