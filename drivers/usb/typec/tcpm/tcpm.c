@@ -881,6 +881,8 @@ static void tcpm_set_pd_capable(struct tcpm_port *port, bool capable)
 
 	if (port->tcpc->set_pd_capable)
 		port->tcpc->set_pd_capable(port->tcpc, capable);
+
+	port->pd_capable = capable;
 }
 
 /*
