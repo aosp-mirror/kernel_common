@@ -212,6 +212,7 @@ comment "Drivers filtered as selected at 'Filter media drivers'"
 source "drivers/media/usb/Kconfig"
 source "drivers/media/pci/Kconfig"
 source "drivers/media/radio/Kconfig"
+source "drivers/media/virtio/Kconfig"
 
 # Common driver options
 source "drivers/media/common/Kconfig"

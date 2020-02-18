@@ -81,6 +81,9 @@
 #define VIRTIO_TRANS_ID_RNG		0x1005 /* transitional virtio rng */
 #define VIRTIO_TRANS_ID_9P		0x1009 /* transitional virtio 9p console */
 
+#define VIRTIO_ID_VIDEO_ENC    30 /* virtio video encoder */
+#define VIRTIO_ID_VIDEO_DEC    31 /* virtio video decoder */
+
 /* Chrome OS-specific devices */
 #define VIRTIO_ID_WL           63 /* virtio wayland */
 #define VIRTIO_ID_TPM          62 /* virtio tpm */
