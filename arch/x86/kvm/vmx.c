@@ -7077,7 +7077,7 @@ static bool nested_vmx_exit_handled(struct kvm_vcpu *vcpu)
 		return 1;
 	}
 
-	switch (exit_reason) {
+	switch ((u16)exit_reason) {
 	case EXIT_REASON_EXCEPTION_NMI:
 		if (!is_exception(intr_info))
 			return 0;
