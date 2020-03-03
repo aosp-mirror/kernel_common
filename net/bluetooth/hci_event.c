@@ -4685,6 +4685,11 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 
 	hci_dev_lock(hdev);
 
+	if (!event) {
+		BT_INFO("Received unexpected HCI Event 00000000");
+		goto done;
+	}
+
 	/* Received events are (currently) only needed when a request is
 	 * ongoing so avoid unnecessary memory allocation.
 	 */
@@ -4878,6 +4883,7 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 		break;
 	}
 
+done:
 	kfree_skb(skb);
 	hdev->stat.evt_rx++;
 }
