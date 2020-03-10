@@ -17,6 +17,16 @@
 #include <linux/trusty/trusty.h>
 #include <linux/trusty/smcall.h>
 
+#define MEM_ATTR_STRONGLY_ORDERED (0x00U)
+#define MEM_ATTR_DEVICE (0x04U)
+#define MEM_ATTR_NORMAL_NON_CACHEABLE (0x44U)
+#define MEM_ATTR_NORMAL_WRITE_THROUGH (0xAAU)
+#define MEM_ATTR_NORMAL_WRITE_BACK_READ_ALLOCATE (0xEEU)
+#define MEM_ATTR_NORMAL_WRITE_BACK_WRITE_ALLOCATE (0xFFU)
+
+#define ATTR_RDONLY (1U << 7)
+#define ATTR_INNER_SHAREABLE (3U << 8)
+
 static int get_mem_attr(struct page *page, pgprot_t pgprot)
 {
 #if defined(CONFIG_ARM64)
@@ -42,29 +52,23 @@ static int get_mem_attr(struct page *page, pgprot_t pgprot)
 	/* check memory type */
 	switch (pgprot_val(pgprot) & L_PTE_MT_MASK) {
 	case L_PTE_MT_WRITEALLOC:
-		/* Normal: write back write allocate */
-		return 0xFF;
+		return MEM_ATTR_NORMAL_WRITE_BACK_WRITE_ALLOCATE;
 
 	case L_PTE_MT_BUFFERABLE:
-		/* Normal: non-cacheble */
-		return 0x44;
+		return MEM_ATTR_NORMAL_NON_CACHEABLE;
 
 	case L_PTE_MT_WRITEBACK:
-		/* Normal: writeback, read allocate */
-		return 0xEE;
+		return MEM_ATTR_NORMAL_WRITE_BACK_READ_ALLOCATE;
 
 	case L_PTE_MT_WRITETHROUGH:
-		/* Normal: write through */
-		return 0xAA;
+		return MEM_ATTR_NORMAL_WRITE_THROUGH;
 
 	case L_PTE_MT_UNCACHED:
-		/* strongly ordered */
-		return 0x00;
+		return MEM_ATTR_STRONGLY_ORDERED;
 
 	case L_PTE_MT_DEV_SHARED:
 	case L_PTE_MT_DEV_NONSHARED:
-		/* device */
-		return 0x04;
+		return MEM_ATTR_DEVICE;
 
 	default:
 		return -EINVAL;
@@ -95,12 +99,10 @@ int trusty_encode_page_info(struct ns_mem_page_info *inf,
 #if defined(CONFIG_ARM64) || defined(CONFIG_ARM_LPAE)
 	pte |= pgprot_val(pgprot);
 #elif defined(CONFIG_ARM)
-	if (pgprot_val(pgprot) & L_PTE_USER)
-		pte |= (1 << 6);
 	if (pgprot_val(pgprot) & L_PTE_RDONLY)
-		pte |= (1 << 7);
+		pte |= ATTR_RDONLY;
 	if (pgprot_val(pgprot) & L_PTE_SHARED)
-		pte |= (3 << 8); /* inner sharable */
+		pte |= ATTR_INNER_SHAREABLE; /* inner sharable */
 #endif
 
 	inf->attr = (pte & 0x0000FFFFFFFFFFFFull) | ((uint64_t)mem_attr << 48);
