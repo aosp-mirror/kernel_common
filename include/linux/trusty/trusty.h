@@ -66,10 +66,6 @@ struct ns_mem_page_info {
 int trusty_encode_page_info(struct ns_mem_page_info *inf,
 			    struct page *page, pgprot_t pgprot);
 
-int trusty_call32_mem_buf(struct device *dev, u32 smcnr,
-			  struct page *page,  u32 size,
-			  pgprot_t pgprot);
-
 struct scatterlist;
 typedef u64 trusty_shared_mem_id_t;
 int trusty_share_memory(struct device *dev, trusty_shared_mem_id_t *id,
