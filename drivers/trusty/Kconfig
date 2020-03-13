@@ -13,12 +13,12 @@ config TRUSTY_FIQ
 	depends on TRUSTY
 
 config TRUSTY_FIQ_ARM
-	tristate
+	tristate "Trusty FIQ support for ARM"
 	depends on TRUSTY
 	depends on ARM
 	select FIQ_GLUE
 	select TRUSTY_FIQ
-	default y
+	default n
 
 config TRUSTY_FIQ_ARM64
 	tristate
