@@ -425,7 +425,7 @@ int virtio_video_try_fmt(struct virtio_video_stream *stream,
 				  frame->width.max))
 			continue;
 
-		if (!within_range(frame->height.min, pix_mp->width,
+		if (!within_range(frame->height.min, pix_mp->height,
 				  frame->height.max))
 			continue;
 		idx = i;
