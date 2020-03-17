@@ -537,6 +537,30 @@ int virtio_video_cmd_resource_create_object(
 	return virtio_video_queue_cmd_buffer(vv, vbuf);
 }
 
+static void
+virtio_video_cmd_resource_destroy_all_cb(struct virtio_video *vv,
+					 struct virtio_video_vbuffer *vbuf)
+{
+	struct virtio_video_stream *stream = vbuf->priv;
+	struct virtio_video_resource_destroy_all *req_p =
+		(struct virtio_video_resource_destroy_all *)vbuf->buf;
+
+	switch (le32_to_cpu(req_p->queue_type)) {
+	case VIRTIO_VIDEO_QUEUE_TYPE_INPUT:
+		stream->src_destroyed = true;
+		break;
+	case VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT:
+		stream->dst_destroyed = true;
+		break;
+	default:
+		v4l2_err(&vv->v4l2_dev, "invalid queue type: %u\n",
+			 req_p->queue_type);
+		return;
+	}
+
+	wake_up(&vv->wq);
+}
+
 int virtio_video_cmd_resource_destroy_all(struct virtio_video *vv,
 					  struct virtio_video_stream *stream,
 					  enum virtio_video_queue_type qtype)
@@ -544,13 +568,18 @@ int virtio_video_cmd_resource_destroy_all(struct virtio_video *vv,
 	struct virtio_video_resource_destroy_all *req_p;
 	struct virtio_video_vbuffer *vbuf;
 
-	req_p = virtio_video_alloc_req(vv, &vbuf, sizeof(*req_p));
+	req_p = virtio_video_alloc_req_resp
+		(vv, &virtio_video_cmd_resource_destroy_all_cb,
+		 &vbuf, sizeof(*req_p),
+		 sizeof(struct virtio_video_cmd_hdr), NULL);
 	if (IS_ERR(req_p))
 		return PTR_ERR(req_p);
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_RESOURCE_DESTROY_ALL);
 	req_p->hdr.stream_id = cpu_to_le32(stream->stream_id);
 	req_p->queue_type = cpu_to_le32(qtype);
+
+	vbuf->priv = stream;
 
 	return virtio_video_queue_cmd_buffer(vv, vbuf);
 }
