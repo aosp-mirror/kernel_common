@@ -31,6 +31,7 @@
 
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
+#include <linux/mutex.h>
 
 /**
  * batadv_hardif_release - release hard interface from lists and queue for
@@ -590,6 +591,7 @@ batadv_hardif_add_interface(struct net_device *net_dev)
 		goto free_sysfs;
 
 	INIT_LIST_HEAD(&hard_iface->list);
+	mutex_init(&hard_iface->bat_iv.ogm_buff_mutex);
 	INIT_WORK(&hard_iface->cleanup_work,
 		  batadv_hardif_remove_interface_finish);
 
