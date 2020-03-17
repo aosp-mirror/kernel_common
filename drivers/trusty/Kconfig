@@ -8,6 +8,18 @@ config TRUSTY
 	tristate "Trusty"
 	default n
 
+config TRUSTY_SMC_ARM
+	tristate
+	depends on TRUSTY
+	depends on ARM
+	default y
+
+config TRUSTY_SMC_ARM64
+	tristate
+	depends on TRUSTY
+	depends on ARM64
+	default y
+
 config TRUSTY_FIQ
 	tristate
 	depends on TRUSTY
