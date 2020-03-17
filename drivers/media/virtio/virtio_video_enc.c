@@ -174,7 +174,9 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 				V4L2_CID_MIN_BUFFERS_FOR_OUTPUT,
 				MIN_BUFS_MIN, MIN_BUFS_MAX, MIN_BUFS_STEP,
 				MIN_BUFS_DEF);
-	ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
+
+	if (ctrl)
+		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
 
 	list_for_each_entry(c_fmt, &vvd->controls_fmt_list,
 			    controls_list_entry) {
