@@ -418,6 +418,12 @@ int virtio_video_try_fmt(struct virtio_video_stream *stream,
 		return 0;
 	}
 
+	/* For coded formats whose metadata are in steram */
+	if (pix_mp->width == 0 && pix_mp->height == 0)  {
+		stream->current_frame = &fmt->frames[0];
+		return 0;
+	}
+
 	for (i = 0; i < fmt->desc.num_frames && !found; i++) {
 		frm = &fmt->frames[i];
 		frame = &frm->frame;
