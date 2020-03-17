@@ -2696,11 +2696,13 @@ redo:
 	preempt_enable();
 
 	if (likely(page == c->page)) {
-		set_freepointer(s, object, c->freelist);
+		void **freelist = READ_ONCE(c->freelist);
+
+		set_freepointer(s, object, freelist);
 
 		if (unlikely(!this_cpu_cmpxchg_double(
 				s->cpu_slab->freelist, s->cpu_slab->tid,
-				c->freelist, tid,
+				freelist, tid,
 				object, next_tid(tid)))) {
 
 			note_cmpxchg_failure("slab_free", s, tid);
