@@ -73,11 +73,15 @@ static int virtio_video_send_resource_create_object(struct vb2_buffer *vb,
 	struct virtio_video_object_entry *ent;
 	int queue_type;
 	int ret;
+	bool *destroyed;
 
-	if (V4L2_TYPE_IS_OUTPUT(vb->vb2_queue->type))
+	if (V4L2_TYPE_IS_OUTPUT(vb->vb2_queue->type)) {
 		queue_type = VIRTIO_VIDEO_QUEUE_TYPE_INPUT;
-	else
+		destroyed = &stream->src_destroyed;
+	} else {
 		queue_type = VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT;
+		destroyed = &stream->dst_destroyed;
+	}
 
 	ent = kcalloc(1, sizeof(*ent), GFP_KERNEL);
 	uuid_copy((uuid_t *) &ent->uuid, &uuid);
@@ -107,6 +111,7 @@ static int virtio_video_send_resource_create_object(struct vb2_buffer *vb,
 
 	virtio_vb->resource_id = resource_id;
 	virtio_vb->uuid = uuid;
+	*destroyed = false;
 
 	return 0;
 }
@@ -611,12 +616,23 @@ static int virtio_video_queue_free(struct virtio_video *vv,
 {
 	int ret;
 	uint32_t queue_type = to_virtio_queue_type(type);
+	const bool *destroyed = V4L2_TYPE_IS_OUTPUT(type) ?
+		&stream->src_destroyed : &stream->dst_destroyed;
 
 	ret = virtio_video_cmd_resource_destroy_all(vv, stream,
 						    queue_type);
-	if (ret)
+	if (ret) {
 		v4l2_warn(&vv->v4l2_dev,
 			  "failed to destroy resources\n");
+		return ret;
+	}
+
+	ret = wait_event_timeout(vv->wq, *destroyed, 5 * HZ);
+	if (ret == 0) {
+		v4l2_err(&vv->v4l2_dev, "timed out waiting for resource destruction for %s\n",
+			 V4L2_TYPE_IS_OUTPUT(type) ? "OUTPUT" : "CAPTURE");
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -881,6 +897,8 @@ static int virtio_video_device_open(struct file *file)
 	stream->video_dev = video_dev;
 	stream->stream_id = stream_id;
 	stream->state = STREAM_STATE_IDLE;
+	stream->src_destroyed = true;
+	stream->dst_destroyed = true;
 
 	ret = virtio_video_cmd_get_params(vv, stream,
 					  VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
