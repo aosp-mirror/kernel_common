@@ -823,8 +823,7 @@ ext2_xattr_cache_insert(struct mb2_cache *cache, struct buffer_head *bh)
 	error = mb2_cache_entry_create(cache, GFP_NOFS, hash, bh->b_blocknr);
 	if (error) {
 		if (error == -EBUSY) {
-			ea_bdebug(bh, "already in cache (%d cache entries)",
-				atomic_read(&ext2_xattr_cache->c_entry_count));
+			ea_bdebug(bh, "already in cache");
 			error = 0;
 		}
 	} else
