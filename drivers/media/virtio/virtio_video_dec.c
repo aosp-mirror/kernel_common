@@ -165,7 +165,9 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 				V4L2_CID_MIN_BUFFERS_FOR_CAPTURE,
 				MIN_BUFS_MIN, MIN_BUFS_MAX, MIN_BUFS_STEP,
 				MIN_BUFS_DEF);
-	ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
+
+	if (ctrl)
+		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
 
 	if (stream->ctrl_handler.error)
 		return stream->ctrl_handler.error;
