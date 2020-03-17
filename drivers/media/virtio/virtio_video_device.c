@@ -577,6 +577,25 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 		virtio_video_queue_eos_event(stream);
 	}
 
+	/*
+	 * If the host notifies an error or EOS with a buffer flag,
+	 * the driver must set |bytesused| to 0.
+	 *
+	 * TODO(b/151810591): Though crosvm virtio-video device returns an
+	 * empty buffer with EOS flag, the currecnt virtio-video protocol
+	 * (v3 RFC) doesn't provides a way of knowing whether an EOS buffer
+	 * is empty or not.
+	 * So, we are assuming that EOS buffer is always empty. Once the
+	 * protocol is updated, we should update this implementation based
+	 * on the wrong assumption.
+	 */
+	if ((flags & VIRTIO_VIDEO_BUFFER_FLAG_ERR) ||
+	    (flags & VIRTIO_VIDEO_BUFFER_FLAG_EOS)) {
+		vb->planes[0].bytesused = 0;
+		v4l2_m2m_buf_done(v4l2_vb, done_state);
+		return;
+	}
+
 	if (!V4L2_TYPE_IS_OUTPUT(vb2_queue->type)) {
 		switch (vvd->type) {
 		case VIRTIO_VIDEO_DEVICE_ENCODER:
