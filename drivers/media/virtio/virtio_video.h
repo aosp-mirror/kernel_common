@@ -25,6 +25,7 @@
 #include <linux/virtio_config.h>
 #include <linux/virtio_video.h>
 #include <linux/list.h>
+#include <media/videobuf2-core.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-mem2mem.h>
 #include <media/v4l2-ctrls.h>
@@ -123,9 +124,16 @@ struct virtio_video_queue {
 	struct work_struct dequeue_work;
 };
 
+enum virtio_video_resource_type {
+	RESOURCE_TYPE_GUEST_PAGES = 0,
+	RESOURCE_TYPE_VIRTIO_OBJECT,
+};
+
 struct virtio_video {
 	struct v4l2_device v4l2_dev;
 	int instance;
+
+	enum virtio_video_resource_type res_type;
 
 	struct virtio_device *vdev;
 	struct virtio_video_queue commandq;
@@ -207,6 +215,9 @@ struct virtio_video_buffer {
 	struct v4l2_m2m_buffer v4l2_m2m_vb;
 	uint32_t resource_id;
 	bool queued;
+
+	/* Only for virtio object buffer */
+	uuid_t uuid;
 };
 
 static inline gfp_t
@@ -300,12 +311,14 @@ int virtio_video_cmd_stream_create(struct virtio_video *vv, uint32_t stream_id,
 int virtio_video_cmd_stream_destroy(struct virtio_video *vv,
 				    uint32_t stream_id);
 int virtio_video_cmd_stream_drain(struct virtio_video *vv, uint32_t stream_id);
-int virtio_video_cmd_resource_create(struct virtio_video *vv,
-				     uint32_t stream_id, uint32_t resource_id,
-				     uint32_t queue_type,
-				     struct virtio_video_mem_entry *ents,
-				    unsigned int num_planes,
-				     unsigned int *num_entry);
+int virtio_video_cmd_resource_create_page(
+	struct virtio_video *vv, uint32_t stream_id, uint32_t resource_id,
+	uint32_t queue_type, unsigned int num_planes, unsigned int *num_entries,
+	struct virtio_video_mem_entry *ents);
+int virtio_video_cmd_resource_create_object(
+	struct virtio_video *vv, uint32_t stream_id, uint32_t resource_id,
+	uint32_t queue_type, unsigned int num_planes, struct vb2_plane *planes,
+	struct virtio_video_object_entry *ents);
 int virtio_video_cmd_resource_destroy_all(struct virtio_video *vv,
 					  struct virtio_video_stream *stream,
 					  uint32_t queue_type);
@@ -354,6 +367,7 @@ void virtio_video_mark_drain_complete(struct virtio_video_stream *stream,
 int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 			     unsigned int *num_planes, unsigned int sizes[],
 			     struct device *alloc_devs[]);
+int virtio_video_buf_prepare(struct vb2_buffer *vb);
 int virtio_video_buf_init(struct vb2_buffer *vb);
 void virtio_video_buf_cleanup(struct vb2_buffer *vb);
 int virtio_video_querycap(struct file *file, void *fh,

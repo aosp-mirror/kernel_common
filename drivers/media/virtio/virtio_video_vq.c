@@ -411,6 +411,18 @@ int virtio_video_cmd_stream_create(struct virtio_video *vv, uint32_t stream_id,
 {
 	struct virtio_video_stream_create *req_p;
 	struct virtio_video_vbuffer *vbuf;
+	int resource_type;
+
+	switch (vv->res_type) {
+	case RESOURCE_TYPE_GUEST_PAGES:
+		resource_type = VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES;
+		break;
+	case RESOURCE_TYPE_VIRTIO_OBJECT:
+		resource_type = VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT;
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	req_p = virtio_video_alloc_req(vv, &vbuf, sizeof(*req_p));
 	if (IS_ERR(req_p))
@@ -418,9 +430,10 @@ int virtio_video_cmd_stream_create(struct virtio_video *vv, uint32_t stream_id,
 
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_STREAM_CREATE);
 	req_p->hdr.stream_id = cpu_to_le32(stream_id);
-	req_p->in_mem_type = cpu_to_le32(VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES);
-	req_p->out_mem_type = cpu_to_le32(VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES);
 	req_p->coded_format = cpu_to_le32(format);
+	req_p->in_mem_type = cpu_to_le32(resource_type);
+	req_p->out_mem_type = cpu_to_le32(resource_type);
+
 	strncpy(req_p->tag, tag, sizeof(req_p->tag) - 1);
 	req_p->tag[sizeof(req_p->tag) - 1] = 0;
 
@@ -457,34 +470,69 @@ int virtio_video_cmd_stream_drain(struct virtio_video *vv, uint32_t stream_id)
 	return virtio_video_queue_cmd_buffer(vv, vbuf);
 }
 
-int virtio_video_cmd_resource_create(struct virtio_video *vv,
-				     uint32_t stream_id, uint32_t resource_id,
-				     uint32_t queue_type,
-				     struct virtio_video_mem_entry *ents,
-				     unsigned int num_planes,
-				     unsigned int *num_entry)
+static void virtio_video_cmd_resource_create_core(
+	struct virtio_video *vv, struct virtio_video_resource_create *req_p,
+	uint32_t stream_id, uint32_t resource_id, uint32_t queue_type,
+	unsigned int num_planes)
 {
-	unsigned int i = 0, nents = 0;
+	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_RESOURCE_CREATE);
+	req_p->hdr.stream_id = cpu_to_le32(stream_id);
+	req_p->resource_id = cpu_to_le32(resource_id);
+	req_p->queue_type = cpu_to_le32(queue_type);
+	req_p->num_planes = cpu_to_le32(num_planes);
+}
+
+int virtio_video_cmd_resource_create_page(
+	struct virtio_video *vv, uint32_t stream_id, uint32_t resource_id,
+	uint32_t queue_type, unsigned int num_planes, unsigned int *num_entries,
+	struct virtio_video_mem_entry *ents)
+{
 	struct virtio_video_resource_create *req_p;
 	struct virtio_video_vbuffer *vbuf;
+	unsigned int nents = 0;
+	int i;
 
 	req_p = virtio_video_alloc_req(vv, &vbuf, sizeof(*req_p));
 	if (IS_ERR(req_p))
 		return PTR_ERR(req_p);
 
-	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_RESOURCE_CREATE);
-	req_p->hdr.stream_id = cpu_to_le32(stream_id);
-	req_p->resource_id = cpu_to_le32(resource_id);
-	req_p->queue_type = cpu_to_le32(queue_type);
-	 req_p->num_planes = cpu_to_le32(num_planes);
+	virtio_video_cmd_resource_create_core(vv, req_p, stream_id, resource_id,
+					      queue_type, num_planes);
 
 	for (i = 0; i < num_planes; i++) {
-		nents += num_entry[i];
-		req_p->num_entries[i] = cpu_to_le32(num_entry[i]);
+		nents += num_entries[i];
+		req_p->num_entries[i] = cpu_to_le32(num_entries[i]);
 	}
 
 	vbuf->data_buf = ents;
 	vbuf->data_size = sizeof(*ents) * nents;
+
+	return virtio_video_queue_cmd_buffer(vv, vbuf);
+}
+
+int virtio_video_cmd_resource_create_object(
+	struct virtio_video *vv, uint32_t stream_id, uint32_t resource_id,
+	uint32_t queue_type, unsigned int num_planes, struct vb2_plane *planes,
+	struct virtio_video_object_entry *ents)
+{
+	struct virtio_video_resource_create *req_p;
+	struct virtio_video_vbuffer *vbuf;
+	int i;
+
+	req_p = virtio_video_alloc_req(vv, &vbuf, sizeof(*req_p));
+	if (IS_ERR(req_p))
+		return PTR_ERR(req_p);
+
+	virtio_video_cmd_resource_create_core(vv, req_p, stream_id, resource_id,
+					      queue_type, num_planes);
+
+	req_p->planes_layout =
+		cpu_to_le32(VIRTIO_VIDEO_PLANES_LAYOUT_SINGLE_BUFFER);
+	for (i = 0; i < num_planes; i++)
+		req_p->plane_offsets[i] = planes[i].data_offset;
+
+	vbuf->data_buf = ents;
+	vbuf->data_size = sizeof(*ents);
 
 	return virtio_video_queue_cmd_buffer(vv, vbuf);
 }
@@ -1009,4 +1057,3 @@ int virtio_video_cmd_set_control(struct virtio_video *vv, uint32_t stream_id,
 
 	return virtio_video_queue_cmd_buffer(vv, vbuf);
 }
-

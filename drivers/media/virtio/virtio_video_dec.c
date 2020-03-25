@@ -123,6 +123,7 @@ static void virtio_video_dec_stop_streaming(struct vb2_queue *vq)
 static const struct vb2_ops virtio_video_dec_qops = {
 	.queue_setup	 = virtio_video_queue_setup,
 	.buf_init	 = virtio_video_buf_init,
+	.buf_prepare	 = virtio_video_buf_prepare,
 	.buf_cleanup	 = virtio_video_buf_cleanup,
 	.buf_queue	 = virtio_video_dec_buf_queue,
 	.start_streaming = virtio_video_dec_start_streaming,
