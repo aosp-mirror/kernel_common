@@ -8,6 +8,7 @@ config VIRTIO_VIDEO
 	select VIDEOBUF2_DMA_SG
 	select VIDEOBUF2_DMA_CONTIG
 	select V4L2_MEM2MEM_DEV
+	select VIRTIO_DMA_SHARED_BUFFER
 	help
           This is the virtual video driver for virtio.
           Say Y or M.

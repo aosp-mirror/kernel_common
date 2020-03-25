@@ -49,6 +49,8 @@
  * scatter-gather lists.
  */
 #define VIRTIO_VIDEO_F_RESOURCE_NON_CONTIG 1
+/* Objects exported by another virtio device can be used for video buffers */
+#define VIRTIO_VIDEO_F_RESOURCE_VIRTIO_OBJECT 2
 
 /*
  * Image formats
@@ -240,6 +242,7 @@ struct virtio_video_query_capability_resp {
 /* VIRTIO_VIDEO_CMD_STREAM_CREATE */
 enum virtio_video_mem_type {
 	VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES,
+	VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT,
 };
 
 struct virtio_video_stream_create {
@@ -268,6 +271,10 @@ struct virtio_video_mem_entry {
 	__u8 padding[4];
 };
 
+struct virtio_video_object_entry {
+	__u8 uuid[16];
+};
+
 #define VIRTIO_VIDEO_MAX_PLANES 8
 
 struct virtio_video_resource_create {
@@ -278,7 +285,13 @@ struct virtio_video_resource_create {
 	__le32 num_planes;
 	__le32 plane_offsets[VIRTIO_VIDEO_MAX_PLANES];
 	__le32 num_entries[VIRTIO_VIDEO_MAX_PLANES];
-	/* Followed by struct virtio_video_mem_entry entries[] */
+	/**
+	 * Followed by either
+	 * - struct virtio_video_mem_entry entries[]
+	 *   for VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES
+	 * - struct virtio_video_object_entry entries[]
+	 *   for VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT
+	 */
 };
 
 /* VIRTIO_VIDEO_CMD_RESOURCE_QUEUE */
