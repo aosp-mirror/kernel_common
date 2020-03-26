@@ -68,6 +68,8 @@ static int virtio_video_send_resource_create_object(struct vb2_buffer *vb,
 {
 	struct virtio_video_stream *stream = vb2_get_drv_priv(vb->vb2_queue);
 	struct virtio_video *vv = to_virtio_vd(stream->video_dev)->vv;
+	struct virtio_video_buffer *virtio_vb = to_virtio_vb(vb);
+	struct vb2_buffer *cur_vb;
 	struct virtio_video_object_entry *ent;
 	int queue_type;
 	int ret;
@@ -85,10 +87,28 @@ static int virtio_video_send_resource_create_object(struct vb2_buffer *vb,
 						      queue_type,
 						      vb->num_planes,
 						      vb->planes, ent);
-	if (ret)
+	if (ret) {
 		kfree(ent);
+		return ret;
+	}
 
-	return ret;
+	/**
+	 * If the given uuid was previously used in another entry, invalidate
+	 * it because the uuid must be tied with only one resource_id.
+	 */
+	list_for_each_entry(cur_vb, &vb->vb2_queue->queued_list,
+			    queued_entry) {
+		struct virtio_video_buffer *cur_vvb =
+			to_virtio_vb(cur_vb);
+
+		if (uuid_equal(&uuid, &cur_vvb->uuid))
+			cur_vvb->uuid = uuid_null;
+	}
+
+	virtio_vb->resource_id = resource_id;
+	virtio_vb->uuid = uuid;
+
+	return 0;
 }
 
 static int virtio_video_buf_init_guest_pages(struct vb2_buffer *vb)
@@ -192,8 +212,6 @@ static int virtio_video_buf_init_virtio_object(struct vb2_buffer *vb)
 	}
 
 	virtio_vb->queued = false;
-	virtio_vb->resource_id = resource_id;
-	virtio_vb->uuid = uuid;
 
 	return 0;
 }
@@ -241,7 +259,6 @@ int virtio_video_buf_prepare(struct vb2_buffer *vb)
 			vb, virtio_vb->resource_id, uuid);
 		if (ret)
 			return ret;
-		virtio_vb->uuid = uuid;
 	}
 
 	return ret;
