@@ -1478,8 +1478,6 @@ good_area:
 	 */
 	if (unlikely((fault & VM_FAULT_RETRY) &&
 		     (flags & FAULT_FLAG_ALLOW_RETRY))) {
-		/* Retry at most once */
-		flags &= ~FAULT_FLAG_ALLOW_RETRY;
 		flags |= FAULT_FLAG_TRIED;
 		goto retry;
 	}
