@@ -17,8 +17,11 @@
   atomic_notifier_call_chain
   atomic_notifier_chain_register
   atomic_notifier_chain_unregister
+  blk_finish_plug
+  blk_start_plug
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
+  __breadahead
   bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
@@ -52,6 +55,7 @@
   clk_set_parent
   clk_set_rate
   clk_unprepare
+  compat_alloc_user_space
   complete
   complete_all
   config_ep_by_speed
@@ -159,6 +163,7 @@
   event_triggers_call
   extcon_get_edev_by_phandle
   extcon_get_state
+  __find_get_block
   find_next_bit
   finish_wait
   flush_work
@@ -352,6 +357,8 @@
   of_property_read_u64
   of_property_read_variable_u32_array
   of_prop_next_string
+  overflowgid
+  overflowuid
   panic
   param_ops_charp
   param_ops_uint
@@ -527,6 +534,7 @@
   strstr
   __sw_hweight32
   __sw_hweight64
+  sync_filesystem
   syscon_regmap_lookup_by_phandle
   syscon_regmap_lookup_by_phandle_args
   sysfs_create_file_ns
@@ -543,6 +551,7 @@
   system_freezing_cnt
   system_unbound_wq
   system_wq
+  sys_tz
   tasklet_init
   tasklet_kill
   __tasklet_schedule
@@ -723,6 +732,75 @@
   usb_gadget_set_state
   usb_gadget_unmap_request_by_dev
   usb_get_maximum_speed
+
+# required by exfat.ko
+  __blockdev_direct_IO
+  block_write_full_page
+  __bread_gfp
+  __brelse
+  cont_write_begin
+  current_time
+  d_find_alias
+  d_instantiate
+  d_move
+  drop_nlink
+  filemap_fdatawait_range
+  filemap_fdatawrite_range
+  full_name_hash
+  generic_block_bmap
+  generic_cont_expand_simple
+  generic_fh_to_dentry
+  generic_fh_to_parent
+  generic_file_fsync
+  generic_file_mmap
+  generic_file_read_iter
+  generic_file_splice_read
+  generic_file_write_iter
+  generic_fillattr
+  generic_write_end
+  __getblk_gfp
+  ilookup
+  inc_nlink
+  in_group_p
+  __insert_inode_hash
+  invalidate_inode_buffers
+  iunique
+  kill_block_super
+  kvfree
+  kvmalloc_node
+  load_nls
+  __lock_buffer
+  mark_buffer_dirty
+  __mark_inode_dirty
+  match_int
+  match_octal
+  match_strdup
+  match_token
+  mktime64
+  mount_bdev
+  mpage_readpage
+  mpage_readpages
+  mpage_writepages
+  new_inode
+  __remove_inode_hash
+  sb_min_blocksize
+  sb_set_blocksize
+  setattr_copy
+  strscpy
+  sync_blockdev
+  sync_dirty_buffer
+  sync_mapping_buffers
+  time64_to_tm
+  touch_buffer
+  truncate_pagecache
+  unload_nls
+  unlock_buffer
+  utf16s_to_utf8s
+  utf8s_to_utf16s
+  write_inode_now
+
+# required by fan53555.ko
+  regulator_set_voltage_time_sel
 
 # required by focaltech_ats.ko
   devm_input_allocate_device
@@ -1241,9 +1319,22 @@
   unregister_netdevice_notifier
 
 # required by shubcore.ko
+  iio_alloc_pollfunc
+  iio_dealloc_pollfunc
   iio_device_alloc
+  iio_device_attach_buffer
   iio_device_free
   iio_device_unregister
+  iio_pollfunc_store_time
+  iio_push_to_buffers
+  iio_trigger_alloc
+  iio_triggered_buffer_postenable
+  iio_triggered_buffer_predisable
+  iio_trigger_free
+  iio_trigger_notify_done
+  iio_trigger_poll
+  __iio_trigger_register
+  iio_trigger_unregister
   ktime_get_with_offset
   param_array_ops
   unregister_pm_notifier
@@ -1452,6 +1543,7 @@
   drm_crtc_send_vblank_event
   drm_crtc_vblank_off
   drm_crtc_vblank_on
+  drm_detect_monitor_audio
   drm_display_mode_from_videomode
   drm_display_mode_to_videomode
   drm_dp_aux_register
@@ -1489,6 +1581,8 @@
   drm_hdcp_update_content_protection
   drm_helper_hpd_irq_event
   drm_helper_probe_single_connector_modes
+  drm_kms_helper_poll_disable
+  drm_kms_helper_poll_enable
   drm_kms_helper_poll_fini
   drm_kms_helper_poll_init
   drm_match_cea_mode
@@ -1577,6 +1671,17 @@
   __i2c_transfer
   rt_mutex_trylock
 
+# required by sprd_dedicate_thm.ko
+  devm_thermal_zone_of_sensor_register
+  system_power_efficient_wq
+
+# required by sprd_dvfs.ko
+  devfreq_add_governor
+  devfreq_remove_governor
+  devfreq_update_status
+  device_rename
+  update_devfreq
+
 # required by sprd_hwspinlock.ko
   hwspin_lock_register
   hwspin_lock_unregister
@@ -1652,13 +1757,18 @@
 
 # required by sprdwl_ng.ko
   bcmp
+  build_skb
   __cfg80211_alloc_event_skb
   __cfg80211_alloc_reply_skb
+  cfg80211_chandef_create
+  cfg80211_ch_switch_notify
   cfg80211_connect_done
   cfg80211_cqm_rssi_notify
   cfg80211_del_sta_sinfo
   cfg80211_disconnected
+  cfg80211_find_elem_match
   cfg80211_get_bss
+  cfg80211_ibss_joined
   cfg80211_inform_bss_data
   cfg80211_mgmt_tx_status
   cfg80211_michael_mic_failure
@@ -1676,6 +1786,7 @@
   cfg80211_unlink_bss
   cfg80211_unregister_wdev
   cfg80211_vendor_cmd_reply
+  console_printk
   consume_skb
   _ctype
   dev_get_by_index
@@ -1685,14 +1796,19 @@
   ieee80211_channel_to_frequency
   ieee80211_frequency_to_channel
   ieee80211_get_channel
+  jiffies_to_usecs
+  kfree_skb_list
+  netdev_alloc_frag
   netdev_err
   netdev_info
   netdev_warn
   netlink_unicast
   nla_memcpy
   __nla_parse
-  nla_put_64bit
   nla_put
+  nla_put_64bit
+  nla_put_nohdr
+  printk_timed_ratelimit
   register_inet6addr_notifier
   register_inetaddr_notifier
   register_netdevice
@@ -1700,6 +1816,8 @@
   rtnl_lock
   rtnl_unlock
   simple_open
+  skb_queue_purge
+  skb_unlink
   synchronize_rcu
   unregister_inet6addr_notifier
   unregister_inetaddr_notifier
