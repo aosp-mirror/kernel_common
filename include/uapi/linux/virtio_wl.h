@@ -18,6 +18,8 @@
 
 /* Enables the transition to new flag semantics */
 #define VIRTIO_WL_F_TRANS_FLAGS 1
+/* Enables send fence support with virtio_wl_ctrl_vfd_send_vfd_v2 */
+#define VIRTIO_WL_F_SEND_FENCES 2
 
 struct virtio_wl_config {
 };
@@ -103,11 +105,23 @@ enum virtio_wl_ctrl_vfd_send_kind {
 	VIRTIO_WL_CTRL_VFD_SEND_KIND_LOCAL,
 	/* The id after this one is a virtio-gpu resource id. */
 	VIRTIO_WL_CTRL_VFD_SEND_KIND_VIRTGPU,
+	VIRTIO_WL_CTRL_VFD_SEND_KIND_VIRTGPU_FENCE,
+	VIRTIO_WL_CTRL_VFD_SEND_KIND_VIRTGPU_SIGNALED_FENCE,
 };
 
 struct virtio_wl_ctrl_vfd_send_vfd {
 	__le32 kind; /* virtio_wl_ctrl_vfd_send_kind */
 	__le32 id;
+};
+
+struct virtio_wl_ctrl_vfd_send_vfd_v2 {
+	__le32 kind; /* virtio_wl_ctrl_vfd_send_kind */
+	union {
+		/* For KIND_LOCAL and KIND_VIRTGPU */
+		__le32 id;
+		/* For KIND_VIRTGPU_FENCE */
+		__le64 seqno;
+	};
 };
 
 struct virtio_wl_ctrl_vfd_send {
