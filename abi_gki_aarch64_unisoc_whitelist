@@ -11,6 +11,7 @@
   __alloc_skb
   alloc_workqueue
   __arch_copy_from_user
+  __arch_copy_in_user
   __arch_copy_to_user
   arm64_const_caps_ready
   arp_tbl
@@ -21,11 +22,11 @@
   blk_start_plug
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
-  __breadahead
   bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
+  __breadahead
   bus_register
   bus_unregister
   call_rcu
@@ -59,6 +60,8 @@
   complete
   complete_all
   config_ep_by_speed
+  console_lock
+  console_unlock
   __const_udelay
   cpu_hwcap_keys
   cpu_hwcaps
@@ -152,17 +155,22 @@
   drm_mode_config_cleanup
   drm_mode_config_init
   drm_open
+  drm_plane_create_color_properties
   drm_poll
   drm_read
   drm_release
   dst_release
   dump_stack
+  __dynamic_dev_dbg
+  __dynamic_pr_debug
   enable_irq
   ether_setup
   eth_type_trans
   event_triggers_call
   extcon_get_edev_by_phandle
   extcon_get_state
+  fb_mode_option
+  fb_notifier_call_chain
   __find_get_block
   find_next_bit
   finish_wait
@@ -204,11 +212,20 @@
   handle_bad_irq
   handle_edge_irq
   handle_level_irq
+  hid_compare_device_paths
+  hid_debug
+  hid_field_extract
+  hid_hw_close
+  hid_hw_open
+  hid_hw_stop
+  hid_input_report
+  hid_report_raw_event
+  __hid_request
   i2c_del_driver
   i2c_register_driver
-  i2c_transfer_buffer_flags
   i2c_smbus_read_byte_data
   i2c_smbus_write_byte_data
+  i2c_transfer_buffer_flags
   ida_alloc_range
   ida_destroy
   ida_free
@@ -217,17 +234,19 @@
   idr_find
   idr_for_each
   idr_remove
+  ignore_console_lock_warning
   init_net
   __init_rwsem
   init_timer_key
   init_wait_entry
   __init_waitqueue_head
+  input_alloc_absinfo
   input_allocate_device
   input_event
   input_free_device
+  input_mt_get_slot_by_key
+  input_mt_sync_frame
   input_register_device
-  __ioremap
-  iounmap
   iommu_alloc_resv_region
   iommu_attach_device
   iommu_detach_device
@@ -255,6 +274,8 @@
   iommu_put_dma_cookie
   iommu_set_fault_handler
   iommu_unmap
+  __ioremap
+  iounmap
   ip_route_output_flow
   irq_find_mapping
   irq_get_irq_data
@@ -262,6 +283,7 @@
   irq_of_parse_and_map
   irq_set_irq_type
   irq_set_irq_wake
+  is_console_locked
   jiffies
   jiffies_to_msecs
   kernel_kobj
@@ -301,6 +323,7 @@
   __list_add_valid
   __list_del_entry_valid
   memcpy
+  __memcpy_fromio
   memset
   misc_deregister
   misc_register
@@ -344,6 +367,7 @@
   of_get_property
   of_get_regulator_init_data
   of_graph_get_remote_node
+  of_irq_get
   of_match_node
   of_nvmem_cell_get
   of_parse_phandle
@@ -357,6 +381,7 @@
   of_property_read_u64
   of_property_read_variable_u32_array
   of_prop_next_string
+  oops_in_progress
   overflowgid
   overflowuid
   panic
@@ -393,9 +418,9 @@
   pm_runtime_allow
   __pm_runtime_disable
   pm_runtime_enable
+  pm_runtime_forbid
   pm_runtime_force_resume
   pm_runtime_force_suspend
-  pm_runtime_forbid
   __pm_runtime_idle
   __pm_runtime_resume
   pm_runtime_set_autosuspend_delay
@@ -409,6 +434,7 @@
   power_supply_get_by_name
   power_supply_get_drvdata
   power_supply_get_property
+  power_supply_powers
   power_supply_put
   preempt_schedule
   preempt_schedule_notrace
@@ -416,6 +442,7 @@
   printk
   proc_create
   proc_create_data
+  proc_create_seq_private
   proc_mkdir
   __pskb_copy_fclone
   put_device
@@ -437,6 +464,7 @@
   refcount_dec_and_test_checked
   refcount_inc_checked
   __refrigerator
+  __register_chrdev
   register_pernet_subsys
   register_pm_notifier
   regmap_read
@@ -455,6 +483,7 @@
   remap_pfn_range
   remove_proc_entry
   remove_wait_queue
+  __request_module
   request_threaded_irq
   reset_control_assert
   reset_control_deassert
@@ -487,12 +516,14 @@
   simple_attr_release
   simple_attr_write
   simple_read_from_buffer
+  simple_strtol
   single_open
   single_release
   skb_clone
   skb_push
   skb_put
   skb_realloc_headroom
+  skb_trim
   snd_info_create_card_entry
   snd_info_free_entry
   snd_info_get_line
@@ -556,6 +587,7 @@
   tasklet_kill
   __tasklet_schedule
   thermal_zone_get_zone_by_name
+  timer_of_init
   trace_define_field
   trace_event_buffer_commit
   trace_event_buffer_reserve
@@ -589,6 +621,7 @@
   tty_unregister_driver
   tty_vhangup
   __udelay
+  __unregister_chrdev
   unregister_chrdev_region
   unregister_pernet_subsys
   up
@@ -618,6 +651,7 @@
   usb_get_dr_mode
   usb_get_intf
   usb_hcd_is_primary_hcd
+  usb_hid_driver
   usb_interface_id
   usb_kill_urb
   usb_phy_get_charger_current
@@ -631,6 +665,7 @@
   vfree
   vmalloc
   vmemmap
+  vm_iomap_memory
   vm_map_ram
   vm_unmap_ram
   vsnprintf
@@ -690,6 +725,11 @@
   divider_recalc_rate
   divider_round_rate_parent
   of_clk_hw_onecell_get
+
+# required by cpufreq_userspace.ko
+  __cpufreq_driver_target
+  cpufreq_register_governor
+  cpufreq_unregister_governor
 
 # required by dwc3-haps.ko
   pcim_enable_device
@@ -833,6 +873,46 @@
   hid_open_report
   __hid_register_driver
   hid_unregister_driver
+
+# required by hid-logitech-dj.ko
+  hid_add_device
+  hid_allocate_device
+  hid_destroy_device
+  hid_parse_report
+  strlcat
+
+# required by hid-logitech-hidpp.ko
+  hid_snto32
+  input_ff_create
+  strnstr
+
+# required by hid-picolcd.ko
+  hid_set_field
+
+# required by hid-prodikeys.ko
+  snd_card_disconnect
+  snd_card_free_when_closed
+  snd_card_new
+  snd_card_register
+  snd_device_new
+  snd_rawmidi_new
+  snd_rawmidi_receive
+  snd_rawmidi_set_ops
+
+# required by hid-roccat.ko
+  noop_llseek
+
+# required by hid-roccat-lua.ko
+  sysfs_create_bin_file
+  sysfs_remove_bin_file
+
+# required by hid-uclogic.ko
+  usb_string
+
+# required by hid-wiimote.ko
+  kasprintf
+  led_classdev_register_ext
+  led_classdev_unregister
 
 # required by i2c-sprd.ko
   i2c_add_numbered_adapter
@@ -1019,6 +1099,7 @@
   dev_pm_opp_get_opp_count
   dev_pm_opp_get_voltage
   dev_pm_opp_of_add_table
+  dev_pm_opp_of_register_em
   dev_pm_opp_of_remove_table
   dev_pm_opp_put
   dma_buf_attach
@@ -1344,6 +1425,7 @@
 # required by sipa_core.ko
   free_pages
   memremap
+  memunmap
   pm_wakeup_dev_event
   skb_dequeue
   skb_queue_tail
@@ -1686,6 +1768,26 @@
   hwspin_lock_register
   hwspin_lock_unregister
 
+# required by sprd_ipa.ko
+  debug_dma_mapping_error
+  skb_to_sgvec
+  irq_set_affinity_hint
+  napi_gro_receivenetif_tx_napi_add
+  skb_reserve
+  dma_unmap_sg
+  __dev_alloc_skb
+  dev_kfree_skb_any
+  napi_gro_receive
+  list_for_each_entry
+  list_splice_tail_init
+  list_first_entry_or_null
+  list_move_tail
+  napi_schedule
+  kcalloc
+  skb_reset_mac_header
+  dma_alloc_coherent
+  skb_set_network_header
+
 # required by sprd-saudio.ko
   snd_card_free
 
@@ -1706,6 +1808,9 @@
   cpu_down
   cpufreq_get_policy
   cpu_up
+
+# required by sprd-mailbox.ko
+  devm_mbox_controller_register
 
 # required by sprd_mcd.ko
   gpiod_set_value_cansleep
@@ -1957,6 +2062,27 @@
   scatterwalk_map_and_copy
   sg_init_one
   sg_nents_for_len
+
+# required by wacom.ko
+  devm_led_trigger_register
+  devres_close_group
+  devres_open_group
+  devres_release_group
+  hid_alloc_report_buf
+  hidinput_calc_abs_res
+  int_sqrt
+  __kfifo_in_r
+  __kfifo_max_r
+  __kfifo_out_r
+  __kfifo_skip_r
+  led_trigger_event
+  memmove
+  sysfs_create_files
+
+# required by wcn_bsp.ko
+  memdup_user
+  register_chrdev_region
+  request_firmware_direct
 
 # required by xhci-hcd.ko
   dma_pool_alloc
