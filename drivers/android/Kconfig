@@ -54,6 +54,13 @@ config ANDROID_BINDER_IPC_SELFTEST
 	  exhaustively with combinations of various buffer sizes and
 	  alignments.
 
+config ANDROID_VENDOR_HOOKS
+	bool "Android Vendor Hooks"
+	depends on TRACEPOINTS
+	default n
+	---help---
+	  Enable vendor hooks implemented as tracepoints
+
 endif # if ANDROID
 
 endmenu
