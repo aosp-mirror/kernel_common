@@ -1126,7 +1126,6 @@
   thermal_zone_device_update
 
 # required by 8250_dw.ko
-  dw8250_setup_port
   of_device_is_big_endian
   serial8250_clear_and_reinit_fifos
   serial8250_do_pm
