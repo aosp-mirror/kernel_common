@@ -158,7 +158,6 @@
   cfg80211_tdls_oper_request
   cfg80211_unlink_bss
   cfg80211_vendor_cmd_reply
-  __cfi_slowpath_diag
   check_disk_change
   __check_object_size
   __class_create
@@ -255,7 +254,6 @@
   __cpuhp_state_remove_instance
   cpu_hwcap_keys
   cpu_hwcaps
-  __cpu_isolated_mask
   cpumask_next
   cpumask_next_wrap
   cpu_number
@@ -300,7 +298,6 @@
   current_time
   datagram_poll
   d_drop
-  debug_smp_processor_id
   default_llseek
   default_wake_function
   delayed_work_timer_fn
@@ -351,7 +348,6 @@
   device_link_del
   device_match_fwnode
   device_match_name
-  device_online
   device_property_present
   device_property_read_string
   device_property_read_u32_array
@@ -467,7 +463,6 @@
   dev_queue_xmit
   dev_remove_pack
   devres_add
-  __devres_alloc_node
   devres_destroy
   devres_free
   devres_release
@@ -646,7 +641,6 @@
   drm_cvt_mode
   drm_dbg
   drm_debug
-  drm_debugfs_create_files
   drm_detect_hdmi_monitor
   drm_detect_monitor_audio
   drm_dev_alloc
@@ -844,7 +838,6 @@
   finish_wait
   firmware_request_nowarn
   flow_keys_basic_dissector
-  flush_cache_all
   flush_dcache_page
   flush_delayed_work
   flush_work
@@ -1257,7 +1250,6 @@
   __msecs_to_jiffies
   msleep
   msleep_interruptible
-  msm_gpio_mpm_wake_set
   msm_pinctrl_probe
   msm_pinctrl_remove
   __mutex_init
@@ -1401,9 +1393,7 @@
   of_match_node
   of_modalias_node
   of_n_addr_cells
-  of_node_get
   of_node_name_eq
-  of_node_put
   of_n_size_cells
   of_parse_phandle
   of_parse_phandle_with_args
@@ -1591,8 +1581,6 @@
   power_supply_set_property
   power_supply_unreg_notifier
   prandom_u32
-  preempt_count_add
-  preempt_count_sub
   preempt_schedule
   preempt_schedule_notrace
   prepare_binprm
@@ -1622,44 +1610,11 @@
   pwm_apply_state
   pwmchip_add
   pwmchip_remove
-  qcom_scm_assign_mem_regions
-  qcom_scm_camera_protect_phy_lanes
-  qcom_scm_deassert_ps_hold
-  qcom_scm_disable_sdi
-  qcom_scm_get_sec_dump_state
-  qcom_scm_halt_spmi_pmic_arbiter
-  qcom_scm_io_readl
-  qcom_scm_io_writel
-  qcom_scm_kgsl_set_smmu_aperture
-  qcom_scm_kgsl_set_smmu_aperture_available
-  qcom_scm_mem_protect_region_id
-  qcom_scm_mem_protect_sd_ctrl
-  qcom_scm_mem_protect_video
-  qcom_scm_pas_auth_and_reset
-  qcom_scm_pas_init_image
-  qcom_scm_pas_mem_setup
-  qcom_scm_pas_shutdown
-  qcom_scm_qseecom_call
-  qcom_scm_qseecom_call_noretry
-  qcom_scm_qsmmu500_wait_safe_toggle
-  qcom_scm_sec_wdog_deactivate
-  qcom_scm_sec_wdog_trigger
-  qcom_scm_set_download_mode
-  qcom_scm_set_remote_state
-  qcom_scm_smmu_notify_secure_lut
-  qcom_scm_spin_cpu
   qcom_smem_state_get
   qcom_smem_state_register
   qcom_smem_state_unregister
   qcom_smem_state_update_bits
   qdisc_reset
-  qtee_shmbridge_allocate_shm
-  qtee_shmbridge_deregister
-  qtee_shmbridge_flush_shm_buf
-  qtee_shmbridge_free_shm
-  qtee_shmbridge_is_enabled
-  qtee_shmbridge_query
-  qtee_shmbridge_register
   queue_delayed_work_on
   queue_work_on
   radix_tree_delete
@@ -1806,7 +1761,6 @@
   round_jiffies
   rpmh_flush
   rpmh_invalidate
-  rpmh_mode_solver_set
   rpmh_write
   rpmh_write_async
   rpmh_write_batch
@@ -1973,20 +1927,6 @@
   skb_tstamp_tx
   sk_free
   skip_spaces
-  slim_add_device
-  slim_change_val_element
-  slim_connect_sink
-  slim_connect_src
-  slim_control_ch
-  slim_define_ch
-  slim_disconnect_ports
-  slim_driver_register
-  slim_driver_unregister
-  slim_get_logical_addr
-  slim_get_slaveport
-  slim_query_ch
-  slim_remove_device
-  slim_request_val_element
   smp_call_function
   smp_call_function_single
   snd_ctl_add
@@ -2194,13 +2134,9 @@
   thermal_zone_get_zone_by_name
   thermal_zone_of_sensor_register
   thermal_zone_of_sensor_unregister
-  __this_cpu_preempt_check
-  time64_to_tm
   timer_unstable_counter_workaround
   timespec64_to_jiffies
   _totalram_pages
-  touch_event_register_notifier
-  touch_event_unregister_notifier
   __trace_bprintk
   trace_define_field
   trace_event_buffer_commit
@@ -2237,7 +2173,6 @@
   uart_unregister_driver
   uart_update_timeout
   uart_write_wakeup
-  __ubsan_handle_cfi_check_fail
   __udelay
   ufshcd_crypto_cap_find
   ufshcd_crypto_disable_spec
