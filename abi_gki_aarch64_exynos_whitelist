@@ -166,9 +166,7 @@
   _ctype
   dapm_pinctrl_event
   dapm_regulator_event
-  dbg_snapshot_cpuidle
   d_drop
-  debug_smp_processor_id
   default_llseek
   delayed_work_timer_fn
   del_timer
@@ -270,7 +268,6 @@
   dev_pm_opp_set_regulators
   dev_printk
   devres_add
-  __devres_alloc_node
   devres_alloc_node
   devres_free
   dev_set_mac_address
@@ -549,21 +546,14 @@
   __iowrite32_copy
   iput
   __irq_alloc_descs
-  __irq_alloc_domain_generic_chips
   irq_create_mapping
   __irq_domain_add
   irq_domain_remove
   irq_domain_xlate_twocell
   irq_find_mapping
-  irq_gc_ack_set_bit
-  irq_gc_mask_clr_bit
-  irq_gc_mask_set_bit
-  irq_generic_chip_ops
-  irq_get_domain_generic_chip
   irq_get_irq_data
   irq_modify_status
   irq_of_parse_and_map
-  irq_remove_generic_chip
   irq_set_affinity_hint
   irq_set_chained_handler_and_data
   irq_set_chip_and_handler_name
@@ -578,7 +568,6 @@
   jiffies_64_to_clock_t
   jiffies_to_msecs
   jiffies_to_usecs
-  kallsyms_lookup_name
   kasprintf
   kernel_kobj
   kernel_write
@@ -879,8 +868,6 @@
   power_supply_put
   power_supply_register
   power_supply_unregister
-  preempt_count_add
-  preempt_count_sub
   preempt_schedule
   preempt_schedule_notrace
   prepare_creds
