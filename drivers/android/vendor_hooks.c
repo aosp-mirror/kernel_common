@@ -15,4 +15,5 @@
  * associated with them) to allow external modules to probe them.
  */
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_sched_exit);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_sched_exit);
 
