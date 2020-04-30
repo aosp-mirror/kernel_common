@@ -417,7 +417,7 @@
 #define __NR_pwritev2		393
 
 #ifdef __KERNEL__
-#define __NR_syscalls		394
+#define __NR_syscalls 441
 #endif
 
 #endif /* __ASM_SH_UNISTD_64_H */
