@@ -8,6 +8,7 @@
  */
 #include "virtio_pmem.h"
 #include "nd.h"
+#include <trace/hooks/sched.h>
 
 static struct virtio_device_id id_table[] = {
 	{ VIRTIO_ID_PMEM, VIRTIO_DEV_ANY_ID },
@@ -29,6 +30,12 @@ static int init_vq(struct virtio_pmem *vpmem)
 	return 0;
 };
 
+
+static void test_vendor_hook(void *data, struct task_struct *p, int *countp)
+{
+	(*countp)++;
+}
+
 static int virtio_pmem_probe(struct virtio_device *vdev)
 {
 	struct nd_region_desc ndr_desc = {};
@@ -37,6 +44,7 @@ static int virtio_pmem_probe(struct virtio_device *vdev)
 	struct virtio_pmem *vpmem;
 	struct resource res;
 	int err = 0;
+	int rc;
 
 	if (!vdev->config->get) {
 		dev_err(&vdev->dev, "%s failure: config access disabled\n",
@@ -49,6 +57,21 @@ static int virtio_pmem_probe(struct virtio_device *vdev)
 		err = -ENOMEM;
 		goto out_err;
 	}
+
+	/*
+	 * These attaches will succeed. This handler is safe
+	 * to use for regular or restricted hooks.
+	 */
+	rc = register_trace_android_vh_sched_exit(test_vendor_hook, NULL);
+	pr_info("vhook: register hook returned %d\n", rc);
+	rc = register_trace_android_rvh_sched_exit(test_vendor_hook, NULL);
+	pr_info("vhook: register rhook returned %d\n", rc);
+	/*
+	 * This attempt to register will fail with -EBUSY since
+	 * restricted hooks only allow 1 attachment
+	 */
+	rc = register_trace_android_rvh_sched_exit(test_vendor_hook, NULL);
+	pr_info("vhook: 2nd register rhook returned %d\n", rc);
 
 	vpmem->vdev = vdev;
 	vdev->priv = vpmem;
