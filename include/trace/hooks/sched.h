@@ -20,12 +20,8 @@ DECLARE_HOOK(android_vh_sched_exit,
 	TP_PROTO(struct task_struct *p, int *countp),
 	TP_ARGS(p, countp));
 
-DECLARE_RESTRICTED_HOOK(android_rvh_sched_exit,
-	TP_PROTO(struct task_struct *p, int *countp),
-	TP_ARGS(p, countp), 1);
 #else
 #define trace_android_vh_sched_exit(p, countp)
-#define trace_android_rvh_sched_exit(p, countp)
 #endif
 
 #endif /* _TRACE_HOOK_SCHED_H */

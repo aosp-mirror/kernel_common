@@ -710,7 +710,6 @@ static inline void check_stack_usage(void) {}
 #endif
 
 int vendor_hook_calls = 0;
-int restricted_vendor_hook_calls = 0;
 
 void __noreturn do_exit(long code)
 {
@@ -722,7 +721,6 @@ void __noreturn do_exit(long code)
 
 	WARN_ON(blk_needs_flush_plug(tsk));
 	trace_android_vh_sched_exit(tsk, &vendor_hook_calls);
-	trace_android_rvh_sched_exit(tsk, &restricted_vendor_hook_calls);
 
 	if (unlikely(in_interrupt()))
 		panic("Aiee, killing interrupt handler!");
