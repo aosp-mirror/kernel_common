@@ -55,7 +55,6 @@
 #include <linux/init_task.h>
 #include <linux/perf_event.h>
 #include <trace/events/sched.h>
-#include <trace/hooks/sched.h>
 #include <linux/hw_breakpoint.h>
 #include <linux/oom.h>
 #include <linux/writeback.h>
@@ -709,8 +708,6 @@ static void check_stack_usage(void)
 static inline void check_stack_usage(void) {}
 #endif
 
-int vendor_hook_calls = 0;
-
 void __noreturn do_exit(long code)
 {
 	struct task_struct *tsk = current;
@@ -720,7 +717,6 @@ void __noreturn do_exit(long code)
 	kcov_task_exit(tsk);
 
 	WARN_ON(blk_needs_flush_plug(tsk));
-	trace_android_vh_sched_exit(tsk, &vendor_hook_calls);
 
 	if (unlikely(in_interrupt()))
 		panic("Aiee, killing interrupt handler!");
