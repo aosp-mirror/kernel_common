@@ -324,6 +324,7 @@ struct tcpm_port {
 	unsigned int hard_reset_count;
 	bool pd_capable;
 	bool explicit_contract;
+	bool usb_comm_capable;
 	unsigned int rx_msgid;
 
 	/* Partner capabilities/requests */
@@ -921,7 +922,8 @@ static enum typec_cc_status tcpm_rp_cc(struct tcpm_port *port)
 static int tcpm_set_attached_state(struct tcpm_port *port, bool attached)
 {
 	return port->tcpc->set_roles(port->tcpc, attached, port->pwr_role,
-				     port->data_role);
+				     port->data_role,
+				     port->usb_comm_capable);
 }
 
 static int tcpm_set_roles(struct tcpm_port *port, bool attached,
@@ -965,7 +967,8 @@ static int tcpm_set_roles(struct tcpm_port *port, bool attached,
 	if (ret < 0)
 		return ret;
 
-	ret = port->tcpc->set_roles(port->tcpc, attached, role, data);
+	ret = port->tcpc->set_roles(port->tcpc, attached, role, data,
+				    port->usb_comm_capable);
 	if (ret < 0)
 		return ret;
 
@@ -982,7 +985,8 @@ static int tcpm_set_pwr_role(struct tcpm_port *port, enum typec_role role)
 	int ret;
 
 	ret = port->tcpc->set_roles(port->tcpc, true, role,
-				    port->data_role);
+				    port->data_role,
+				    port->usb_comm_capable);
 	if (ret < 0)
 		return ret;
 
@@ -3358,6 +3362,7 @@ static void tcpm_reset_port(struct tcpm_port *port)
 	port->attached = false;
 	tcpm_set_pd_capable(port, false);
 	port->pps_data.supported = false;
+	port->usb_comm_capable = false;
 
 	/*
 	 * First Rx ID should be 0; set this to a sentinel of -1 so that
@@ -3707,6 +3712,8 @@ static void run_state_machine(struct tcpm_port *port)
 			}
 		} else {
 			tcpm_pd_send_control(port, PD_CTRL_ACCEPT);
+			port->usb_comm_capable = port->sink_request &
+				RDO_USB_COMM;
 			tcpm_set_state(port, SRC_TRANSITION_SUPPLY,
 				       PD_T_SRC_TRANSITION);
 		}
@@ -3941,6 +3948,8 @@ static void run_state_machine(struct tcpm_port *port)
 		break;
 	case SNK_NEGOTIATE_CAPABILITIES:
 		tcpm_set_pd_capable(port, true);
+		port->usb_comm_capable = port->source_caps[0] &
+			PDO_FIXED_USB_COMM;
 		port->hard_reset_count = 0;
 		ret = tcpm_pd_send_request(port);
 		if (ret < 0) {
@@ -4041,6 +4050,7 @@ static void run_state_machine(struct tcpm_port *port)
 		port->tcpc->set_pd_rx(port->tcpc, false);
 		tcpm_unregister_altmodes(port);
 		port->send_discover = true;
+		port->usb_comm_capable = false;
 		if (port->pwr_role == TYPEC_SOURCE)
 			tcpm_set_state(port, SRC_HARD_RESET_VBUS_OFF,
 				       PD_T_PS_HARD_RESET);

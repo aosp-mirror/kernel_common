@@ -112,7 +112,8 @@ struct tcpc_dev {
 	int (*set_current_limit)(struct tcpc_dev *dev, u32 max_ma, u32 mv);
 	int (*set_pd_rx)(struct tcpc_dev *dev, bool on);
 	int (*set_roles)(struct tcpc_dev *dev, bool attached,
-			 enum typec_role role, enum typec_data_role data);
+			 enum typec_role role, enum typec_data_role data,
+			 bool usb_comm_capable);
 	int (*start_toggling)(struct tcpc_dev *dev,
 			      enum typec_port_type port_type,
 			      enum typec_cc_status cc);
