@@ -55,7 +55,6 @@
 
 #include <linux/buffer_head.h>
 #include <linux/init.h>
-#include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/mbcache2.h>
 #include <linux/quotaops.h>
@@ -86,8 +85,8 @@
 		printk("\n"); \
 	} while (0)
 #else
-# define ea_idebug(inode, f...)	no_printk(f)
-# define ea_bdebug(bh, f...)	no_printk(f)
+# define ea_idebug(f...)
+# define ea_bdebug(f...)
 #endif
 
 static int ext2_xattr_set2(struct inode *, struct buffer_head *,
