@@ -28,6 +28,7 @@ struct tcpci {
 	struct regmap *regmap;
 
 	bool controls_vbus;
+	enum typec_port_type port_type;
 
 	struct tcpc_dev tcpc;
 	struct tcpci_data *data;
@@ -114,6 +115,8 @@ static int tcpci_start_toggling(struct tcpc_dev *tcpc,
 	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
 	unsigned int reg = TCPC_ROLE_CTRL_DRP;
 
+	tcpci->port_type = port_type;
+
 	if (port_type != TYPEC_PORT_DRP)
 		return -EOPNOTSUPP;
 
@@ -181,12 +184,18 @@ static int tcpci_get_cc(struct tcpc_dev *tcpc,
 	if (ret < 0)
 		return ret;
 
+	dev_info(tcpci->dev,
+		 "TCPM_DEBUG TCPC_CC_STATUS port_type:%#x status:%#x\n",
+		 tcpci->port_type, reg);
+
 	*cc1 = tcpci_to_typec_cc((reg >> TCPC_CC_STATUS_CC1_SHIFT) &
 				 TCPC_CC_STATUS_CC1_MASK,
-				 reg & TCPC_CC_STATUS_TERM);
+				 reg & TCPC_CC_STATUS_TERM ||
+				 tcpci->port_type == TYPEC_PORT_SNK);
 	*cc2 = tcpci_to_typec_cc((reg >> TCPC_CC_STATUS_CC2_SHIFT) &
 				 TCPC_CC_STATUS_CC2_MASK,
-				 reg & TCPC_CC_STATUS_TERM);
+				 reg & TCPC_CC_STATUS_TERM ||
+				 tcpci->port_type == TYPEC_PORT_SNK);
 
 	return 0;
 }
