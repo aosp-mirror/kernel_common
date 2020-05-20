@@ -744,6 +744,14 @@ static ssize_t show_##file_name				\
 	return sprintf(buf, "%u\n", policy->object);	\
 }
 
+static ssize_t show_cpuinfo_max_freq(struct cpufreq_policy *policy, char *buf)
+{
+	unsigned int max_freq = policy->cpuinfo.max_freq;
+
+	trace_android_vh_show_max_freq(policy, &max_freq);
+	return sprintf(buf, "%u\n", max_freq);
+}
+
 show_one(cpuinfo_min_freq, cpuinfo.min_freq);
 show_one(cpuinfo_max_freq, cpuinfo.max_freq);
 show_one(cpuinfo_transition_latency, cpuinfo.transition_latency);

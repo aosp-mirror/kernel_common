@@ -4,6 +4,7 @@
  */
 
 #include <linux/bsearch.h>
+#include <trace/hooks/sched.h>
 
 DEFINE_MUTEX(sched_domains_mutex);
 
@@ -2529,6 +2530,7 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
 
 	if (rq && sched_debug_verbose)
 		pr_info("root domain span: %*pbl\n", cpumask_pr_args(cpu_map));
+	trace_android_vh_build_sched_domains(has_asym);
 
 	ret = 0;
 error:

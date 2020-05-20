@@ -116,6 +116,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/task.h>
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/sched.h>
 /*
  * Minimum number of threads to boot the kernel
  */
@@ -589,6 +591,7 @@ void free_task(struct task_struct *tsk)
 	release_user_cpus_ptr(tsk);
 	scs_release(tsk);
 
+	trace_android_vh_free_task(tsk);
 #ifndef CONFIG_THREAD_INFO_IN_TASK
 	/*
 	 * The task is finally done with both the stack and thread_info,
@@ -1196,6 +1199,9 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	tsk->mm_cid_active = 0;
 	tsk->migrate_from_cpu = -1;
 #endif
+	android_init_vendor_data(tsk, 1);
+	android_init_oem_data(tsk, 1);
+
 	return tsk;
 
 free_stack:
