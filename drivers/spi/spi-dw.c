@@ -688,7 +688,7 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 
 	tasklet_init(&dws->pump_transfers, pump_transfers, (unsigned long)dws);
 
-	ret = devm_spi_register_master(dev, master);
+	ret = spi_register_master(master);
 	if (ret) {
 		dev_err(&master->dev, "problem registering spi master\n");
 		goto err_dma_exit;
@@ -712,6 +712,8 @@ void dw_spi_remove_host(struct dw_spi *dws)
 	if (!dws)
 		return;
 	dw_spi_debugfs_remove(dws);
+
+	spi_unregister_master(dws->master);
 
 	if (dws->dma_ops && dws->dma_ops->dma_exit)
 		dws->dma_ops->dma_exit(dws);
