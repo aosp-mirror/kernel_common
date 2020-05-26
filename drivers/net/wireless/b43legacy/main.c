@@ -3838,7 +3838,9 @@ static int b43legacy_wireless_init(struct ssb_device *dev)
 
 	/* fill hw info */
 	hw->flags = IEEE80211_HW_RX_INCLUDES_FCS |
-		    IEEE80211_HW_SIGNAL_DBM;
+		    IEEE80211_HW_SIGNAL_DBM |
+		    IEEE80211_HW_MFP_CAPABLE; /* Allow WPA3 in software */
+
 	hw->wiphy->interface_modes =
 		BIT(NL80211_IFTYPE_AP) |
 		BIT(NL80211_IFTYPE_STATION) |
