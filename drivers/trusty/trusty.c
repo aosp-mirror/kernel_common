@@ -591,6 +591,11 @@ static int trusty_probe(struct platform_device *pdev)
 
 	s->dev->dma_parms = &s->dma_parms;
 	dma_set_max_seg_size(s->dev, 0xfffff000); /* dma_parms limit */
+	/*
+	 * Set dma mask to 48 bits. This is the current limit of
+	 * trusty_encode_page_info.
+	 */
+	dma_coerce_mask_and_coherent(s->dev, DMA_BIT_MASK(48));
 
 	platform_set_drvdata(pdev, s);
 
