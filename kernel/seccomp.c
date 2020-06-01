@@ -102,13 +102,11 @@ struct seccomp_knotif {
  *           filter->notify_lock.
  * @next_id: The id of the next request.
  * @notifications: A list of struct seccomp_knotif elements.
- * @wqh: A wait queue for poll.
  */
 struct notification {
 	struct semaphore request;
 	u64 next_id;
 	struct list_head notifications;
-	wait_queue_head_t wqh;
 };
 
 /**
@@ -124,6 +122,7 @@ struct notification {
  * @prog: the BPF program to evaluate
  * @notif: the struct that holds all notification related information
  * @notify_lock: A lock for all notification-related accesses.
+ * @wqh: A wait queue for poll if a notifier is in use.
  *
  * seccomp_filter objects are organized in a tree linked via the @prev
  * pointer.  For any task, it appears to be a singly-linked list starting
@@ -142,6 +141,7 @@ struct seccomp_filter {
 	struct bpf_prog *prog;
 	struct notification *notif;
 	struct mutex notify_lock;
+	wait_queue_head_t wqh;
 };
 
 /* Limit any path through the tree to 256KB worth of instructions. */
@@ -510,6 +510,7 @@ static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
 	}
 
 	refcount_set(&sfilter->refs, 1);
+	init_waitqueue_head(&sfilter->wqh);
 
 	return sfilter;
 }
@@ -777,7 +778,7 @@ static void seccomp_do_user_notification(int this_syscall,
 	list_add(&n.list, &match->notif->notifications);
 
 	up(&match->notif->request);
-	wake_up_poll(&match->notif->wqh, EPOLLIN | EPOLLRDNORM);
+	wake_up_poll(&match->wqh, EPOLLIN | EPOLLRDNORM);
 	mutex_unlock(&match->notify_lock);
 
 	/*
@@ -1092,7 +1093,7 @@ static long seccomp_notify_recv(struct seccomp_filter *filter,
 	unotif.data = *(knotif->data);
 
 	knotif->state = SECCOMP_NOTIFY_SENT;
-	wake_up_poll(&filter->notif->wqh, EPOLLOUT | EPOLLWRNORM);
+	wake_up_poll(&filter->wqh, EPOLLOUT | EPOLLWRNORM);
 	ret = 0;
 out:
 	mutex_unlock(&filter->notify_lock);
@@ -1207,7 +1208,7 @@ static __poll_t seccomp_notify_poll(struct file *file,
 	__poll_t ret = 0;
 	struct seccomp_knotif *cur;
 
-	poll_wait(file, &filter->notif->wqh, poll_tab);
+	poll_wait(file, &filter->wqh, poll_tab);
 
 	if (mutex_lock_interruptible(&filter->notify_lock) < 0)
 		return EPOLLERR;
@@ -1245,7 +1246,6 @@ static struct file *init_listener(struct seccomp_filter *filter)
 	sema_init(&filter->notif->request, 0);
 	filter->notif->next_id = get_random_u64();
 	INIT_LIST_HEAD(&filter->notif->notifications);
-	init_waitqueue_head(&filter->notif->wqh);
 
 	ret = anon_inode_getfile("seccomp notify", &seccomp_notify_ops,
 				 filter, O_RDWR);
