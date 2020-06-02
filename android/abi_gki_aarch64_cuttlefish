@@ -295,23 +295,6 @@
   cpufreq_register_driver
   cpufreq_unregister_driver
 
-# required by dummy_hcd.ko
-  device_create_file
-  device_remove_file
-  ktime_get_ts64
-  platform_device_add_data
-  sg_miter_next
-  sg_miter_start
-  sg_miter_stop
-  usb_add_gadget_udc
-  usb_create_hcd
-  usb_del_gadget_udc
-  usb_ep_set_maxpacket_limit
-  usb_gadget_giveback_request
-  usb_gadget_udc_reset
-  usb_get_dev
-  usb_put_dev
-
 # required by failover.ko
   netdev_master_upper_dev_link
   rtnl_is_locked
