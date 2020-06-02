@@ -2414,6 +2414,7 @@
   vb2_streamon
   vfree
   vfs_fsync
+  vfs_read
   vfs_statx
   video_devdata
   video_device_alloc

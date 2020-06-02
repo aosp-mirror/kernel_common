@@ -1648,6 +1648,7 @@
   regmap_get_reg_stride
   regmap_get_val_bytes
   try_wait_for_completion
+  vfs_write
 
 # required by spi-sprd.ko
   dma_request_chan
@@ -1833,6 +1834,7 @@
   unregister_inet6addr_notifier
   unregister_inetaddr_notifier
   unregister_netdevice_queue
+  vfs_read
   wiphy_free
   wiphy_new_nm
   wiphy_register
