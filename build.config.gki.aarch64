@@ -13,6 +13,7 @@ abi_gki_aarch64_qcom_whitelist
 abi_gki_aarch64_unisoc_whitelist
 abi_gki_aarch64_exynos_whitelist
 abi_gki_aarch64_sunxi_whitelist
+abi_gki_aarch64_android_internal_whitelist
 "
 TRIM_NONLISTED_KMI=1
 KMI_WHITELIST_STRICT_MODE=1
