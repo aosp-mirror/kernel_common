@@ -3752,7 +3752,6 @@ static void run_state_machine(struct tcpm_port *port)
 			tcpm_set_state(port, upcoming_state, 0);
 			break;
 		}
-
 		tcpm_check_send_discover(port);
 		/*
 		 * 6.3.5
@@ -4013,7 +4012,6 @@ static void run_state_machine(struct tcpm_port *port)
 			tcpm_set_state(port, upcoming_state, 0);
 			break;
 		}
-
 		tcpm_check_send_discover(port);
 		power_supply_changed(port->psy);
 
@@ -4463,9 +4461,13 @@ static void _tcpm_cc_change(struct tcpm_port *port, enum typec_cc_status cc1,
 		       "CC1: %u -> %u, CC2: %u -> %u [state %s, polarity %d, %s]",
 		       old_cc1, cc1, old_cc2, cc2, tcpm_states[port->state],
 		       port->polarity,
-		       tcpm_port_is_disconnected(port) ? "disconnected"
-						       : "connected");
-
+		       tcpm_port_is_disconnected(port) ? "disconnected" :
+		       "connected");
+	dev_info(port->dev,
+		 "TCPM_DEBUG CC1: %u -> %u, CC2: %u -> %u [state %s, polarity %d, %s]",
+		 old_cc1, cc1, old_cc2, cc2, tcpm_states[port->state],
+		 port->polarity, tcpm_port_is_disconnected(port) ?
+		 "disconnected" : "connected");
 	switch (port->state) {
 	case TOGGLING:
 		if (tcpm_port_is_debug(port) || tcpm_port_is_audio(port) ||
