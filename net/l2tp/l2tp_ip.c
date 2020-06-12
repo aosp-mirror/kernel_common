@@ -192,11 +192,6 @@ pass_up:
 	sock_hold(sk);
 	read_unlock_bh(&l2tp_ip_lock);
 
-	if (sk == NULL)
-		goto discard;
-
-	sock_hold(sk);
-
 	if (!xfrm4_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_put;
 
