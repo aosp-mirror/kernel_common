@@ -19,6 +19,7 @@ struct tipc_msg_buf {
 	size_t buf_sz;
 	size_t wpos;
 	size_t rpos;
+	size_t shm_cnt;
 	struct list_head node;
 };
 
