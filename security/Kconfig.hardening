@@ -25,7 +25,7 @@ choice
 		  classes of uninitialized stack variable exploits
 		  and information exposures.
 
-	config INIT_STACK_ALL
+	config INIT_STACK_ALL_PATTERN
 		bool "0xAA-init everything on the stack (strongest)"
 		help
 		  Initializes everything on the stack with a 0xAA
@@ -33,6 +33,23 @@ choice
 		  of uninitialized stack variable exploits and information
 		  exposures, even variables that were warned to have been
 		  left uninitialized.
+
+		  Pattern initialization is known to provoke many existing bugs
+		  related to uninitialized locals, e.g. pointers receive
+		  non-NULL values, buffer sizes and indices are very big.
+
+	config INIT_STACK_ALL_ZERO
+		bool "zero-init everything on the stack (strongest and safest)"
+		help
+		  Initializes everything on the stack with a zero
+		  value. This is intended to eliminate all classes
+		  of uninitialized stack variable exploits and information
+		  exposures, even variables that were warned to have been
+		  left uninitialized.
+
+		  Zero initialization provides safe defaults for strings,
+		  pointers, indices and sizes, and is therefore
+		  more suitable as a security mitigation measure.
 
 endchoice
 
