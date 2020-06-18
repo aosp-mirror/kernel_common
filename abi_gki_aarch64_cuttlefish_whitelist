@@ -9,6 +9,9 @@
   __arch_copy_to_user
   arm64_const_caps_ready
   bcmp
+  bio_alloc_bioset
+  bpf_trace_run2
+  call_rcu
   cancel_delayed_work_sync
   capable
   cfg80211_inform_bss_data
@@ -32,9 +35,11 @@
   dev_queue_xmit
   dev_set_name
   _dev_warn
+  d_make_root
   dma_set_coherent_mask
   dma_set_mask
   down_write
+  d_splice_alias
   ethtool_op_get_link
   eth_validate_addr
   event_triggers_call
@@ -45,6 +50,9 @@
   free_irq
   free_netdev
   __free_pages
+  fs_bio_set
+  generic_file_llseek
+  generic_read_dir
   get_device
   get_random_bytes
   get_unused_fd_flags
@@ -52,9 +60,13 @@
   hwrng_unregister
   ida_alloc_range
   ida_free
+  iget5_locked
+  init_special_inode
   init_timer_key
   init_wait_entry
   __init_waitqueue_head
+  inode_init_once
+  iput
   jiffies
   kfree
   kfree_skb
@@ -69,11 +81,14 @@
   kstrdup
   kstrtoull
   ktime_get
+  kvfree
+  kvmalloc_node
   __list_add_valid
   __list_del_entry_valid
   __local_bh_enable_ip
   lock_sock_nested
   memcpy
+  memmove
   memset
   misc_deregister
   misc_register
@@ -85,6 +100,7 @@
   __mutex_init
   mutex_lock
   mutex_lock_interruptible
+  mutex_trylock
   mutex_unlock
   netdev_err
   netdev_info
@@ -126,6 +142,7 @@
   printk
   __put_cred
   put_device
+  __put_page
   __put_task_struct
   put_unused_fd
   queue_delayed_work_on
@@ -142,6 +159,7 @@
   __rcu_read_unlock
   refcount_dec_and_test_checked
   refcount_inc_checked
+  register_filesystem
   register_netdev
   register_netdevice_notifier
   register_virtio_device
@@ -156,6 +174,8 @@
   schedule_timeout_uninterruptible
   scnprintf
   seq_printf
+  seq_puts
+  set_nlink
   sg_init_one
   sg_init_table
   skb_clone
@@ -174,6 +194,7 @@
   strncpy
   strsep
   strstr
+  submit_bio
   synchronize_irq
   synchronize_net
   synchronize_rcu
@@ -185,8 +206,11 @@
   trace_event_raw_init
   trace_event_reg
   trace_handle_return
+  trace_print_symbols_seq
   trace_raw_output_prep
   trace_seq_printf
+  unlock_new_inode
+  unregister_filesystem
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
@@ -259,6 +283,64 @@
   usb_put_hcd
   usb_remove_hcd
 
+# required by erofs.ko
+  add_to_page_cache_lru
+  bio_add_page
+  bio_associate_blkg
+  bio_put
+  bit_wait
+  bpf_trace_run1
+  bpf_trace_run3
+  bpf_trace_run4
+  __cpu_possible_mask
+  flush_dcache_page
+  fs_ftype_to_dtype
+  generic_block_bmap
+  generic_fillattr
+  generic_ro_fops
+  iget_failed
+  init_user_ns
+  inode_nohighmem
+  kill_block_super
+  kimage_vaddr
+  __lock_page
+  LZ4_decompress_safe_partial
+  match_strdup
+  match_token
+  mount_bdev
+  new_inode
+  out_of_line_wait_on_bit_lock
+  pagecache_get_page
+  page_get_link
+  posix_acl_access_xattr_handler
+  posix_acl_default_xattr_handler
+  posix_acl_from_xattr
+  preempt_schedule
+  print_hex_dump
+  put_pages_list
+  radix_tree_delete
+  radix_tree_gang_lookup
+  radix_tree_insert
+  radix_tree_lookup
+  radix_tree_preload
+  rcu_barrier
+  read_cache_page
+  read_cache_page_gfp
+  register_shrinker
+  sb_set_blocksize
+  simple_get_link
+  strnlen
+  strscpy
+  __sw_hweight64
+  trace_print_flags_seq
+  unlock_page
+  unregister_shrinker
+  vm_map_ram
+  vm_unmap_aliases
+  vm_unmap_ram
+  wake_up_bit
+  __wake_up_locked
+
 # required by failover.ko
   netdev_master_upper_dev_link
   rtnl_is_locked
@@ -289,11 +371,8 @@
   serdev_device_write_wakeup
 
 # required by nd_virtio.ko
-  bio_alloc_bioset
   bio_chain
   bio_clone_blkg_association
-  fs_bio_set
-  submit_bio
 
 # required by net_failover.ko
   call_netdevice_notifiers
@@ -325,7 +404,6 @@
 
 # required by sdcardfs.ko
   __break_lease
-  call_rcu
   clear_inode
   clear_nlink
   configfs_register_subsystem
@@ -339,12 +417,10 @@
   dentry_open
   dget_parent
   d_invalidate
-  d_make_root
   d_path
   dput
   d_rehash
   d_set_d_op
-  d_splice_alias
   filemap_write_and_wait
   filp_close
   filp_open
@@ -355,15 +431,9 @@
   fsstack_copy_inode_size
   generic_delete_inode
   __generic_file_fsync
-  generic_file_llseek
   generic_permission
-  generic_read_dir
-  iget5_locked
   igrab
-  init_special_inode
-  inode_init_once
   inode_newsize_ok
-  iput
   iterate_dir
   kern_path
   kill_anon_super
@@ -379,12 +449,9 @@
   path_put
   prepare_creds
   ___ratelimit
-  register_filesystem
   revert_creds
-  seq_puts
   setattr_prepare
   set_fs_pwd
-  set_nlink
   shrink_dcache_sb
   strcasecmp
   strncasecmp
@@ -392,9 +459,7 @@
   touch_atime
   truncate_inode_pages
   truncate_setsize
-  unlock_new_inode
   unlock_rename
-  unregister_filesystem
   vfs_create2
   vfs_fsync_range
   vfs_getattr
@@ -532,7 +597,6 @@
   request_firmware
 
 # required by virtio-gpu.ko
-  bpf_trace_run2
   dma_buf_get_uuid
   dma_direct_map_sg
   dma_direct_sync_sg_for_device
@@ -582,6 +646,7 @@
   drm_crtc_send_vblank_event
   drm_cvt_mode
   drm_dbg
+  drm_debugfs_create_files
   drm_dev_alloc
   drm_dev_put
   drm_dev_register
@@ -623,10 +688,7 @@
   drm_universal_plane_init
   __get_task_comm
   kmalloc_order_trace
-  kvfree
-  kvmalloc_node
   memdup_user
-  mutex_trylock
   __sg_alloc_table_from_pages
   sg_free_table
   sg_next
@@ -701,7 +763,6 @@
   device_add_disk
   _dev_notice
   kobject_uevent_env
-  memmove
   put_disk
   register_blkdev
   revalidate_disk
@@ -774,7 +835,6 @@
   net_ratelimit
   nf_conntrack_destroy
   __num_online_cpus
-  __put_page
   _raw_spin_trylock
   sched_clock
   skb_add_rx_frag
@@ -828,7 +888,6 @@
   cancel_delayed_work
   _copy_from_iter_full
   _copy_to_iter
-  trace_print_symbols_seq
 
 # required by vsock.ko
   autoremove_wake_function
