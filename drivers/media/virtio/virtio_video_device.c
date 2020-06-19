@@ -491,11 +491,20 @@ int virtio_video_g_selection(struct file *file, void *fh,
 	}
 
 	switch (sel->target) {
-	case V4L2_SEL_TGT_COMPOSE:
-	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
-	case V4L2_SEL_TGT_COMPOSE_PADDED:
+	case V4L2_SEL_TGT_CROP_BOUNDS:
 		sel->r.width = info->frame_width;
 		sel->r.height = info->frame_height;
+		break;
+	case V4L2_SEL_TGT_CROP_DEFAULT:
+	case V4L2_SEL_TGT_CROP:
+	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
+	case V4L2_SEL_TGT_COMPOSE_DEFAULT:
+	case V4L2_SEL_TGT_COMPOSE:
+	case V4L2_SEL_TGT_COMPOSE_PADDED:
+		sel->r.left = info->crop.left;
+		sel->r.top = info->crop.top;
+		sel->r.width = info->crop.width;
+		sel->r.height = info->crop.height;
 		break;
 	default:
 		v4l2_dbg(1, vvd->vv->debug, &vvd->vv->v4l2_dev,
