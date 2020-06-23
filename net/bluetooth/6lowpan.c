@@ -64,6 +64,7 @@ static u16 psm_6lowpan;
 /* We are listening incoming connections via this channel
  */
 static struct l2cap_chan *listen_chan;
+static DEFINE_MUTEX(set_lock);
 
 struct lowpan_peer {
 	struct list_head list;
@@ -1205,12 +1206,14 @@ static int lowpan_psm_set(void *data, u64 val)
 
 	psm_6lowpan = psm;
 
+	mutex_lock(&set_lock);
 	if (listen_chan) {
 		l2cap_chan_close(listen_chan, 0);
 		l2cap_chan_put(listen_chan);
 	}
 
 	listen_chan = bt_6lowpan_listen();
+	mutex_unlock(&set_lock);
 
 	return 0;
 }
@@ -1246,11 +1249,13 @@ static ssize_t lowpan_control_write(struct file *fp,
 		if (ret == -EINVAL)
 			return ret;
 
+		mutex_lock(&set_lock);
 		if (listen_chan) {
 			l2cap_chan_close(listen_chan, 0);
 			l2cap_chan_put(listen_chan);
 			listen_chan = NULL;
 		}
+		mutex_unlock(&set_lock);
 
 		if (conn) {
 			struct lowpan_peer *peer;
