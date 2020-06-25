@@ -2311,6 +2311,8 @@ static void dm_init_inline_encryption(struct mapped_device *md)
 	 * the device restrictions.
 	 */
 	md->ksm.max_dun_bytes_supported = UINT_MAX;
+	md->ksm.features = BLK_CRYPTO_FEATURE_STANDARD_KEYS |
+			   BLK_CRYPTO_FEATURE_WRAPPED_KEYS;
 	memset(md->ksm.crypto_modes_supported, 0xFF,
 	       sizeof(md->ksm.crypto_modes_supported));
 
