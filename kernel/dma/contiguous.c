@@ -293,6 +293,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
 	dma_contiguous_early_fixup(cma_get_base(*res_cma),
 				cma_get_size(*res_cma));
 
+	memblock_memsize_record("dma_cma", cma_get_base(*res_cma),
+				cma_get_size(*res_cma), false, true);
 	return 0;
 }
 

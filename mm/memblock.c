@@ -19,6 +19,7 @@
 
 #include <asm/sections.h>
 #include <linux/io.h>
+#include <linux/sort.h>
 
 #include "internal.h"
 
@@ -1974,6 +1975,65 @@ static int __init early_memblock(char *p)
 }
 early_param("memblock", early_memblock);
 
+#ifdef CONFIG_MEMBLOCK_MEMSIZE
+
+#define NAME_SIZE	100
+struct memsize_rgn_struct {
+	phys_addr_t	base;
+	long		size;
+	bool		nomap;			/*  1/32 byte */
+	bool		reusable;		/*  1/32 byte */
+	char		name[NAME_SIZE];	/* 30/32 byte */
+};
+
+static struct memsize_rgn_struct memsize_rgn[CONFIG_MAX_MEMBLOCK_MEMSIZE] __initdata_memblock;
+static int memsize_rgn_count __initdata_memblock;
+
+static void __init_memblock memsize_get_valid_name(char *valid_name, const char *name)
+{
+	char *head, *tail, *found;
+	int valid_size;
+
+	head = (char *)name;
+	tail = head + strlen(name);
+
+	/* get tail position after valid char */
+	found = strchr(name, '@');
+	if (found)
+		tail = found;
+
+	valid_size = tail - head + 1;
+	if (valid_size > NAME_SIZE)
+		valid_size = NAME_SIZE;
+	strscpy(valid_name, head, valid_size);
+}
+
+void __init_memblock memblock_memsize_record(const char *name, phys_addr_t base,
+			     phys_addr_t size, bool nomap, bool reusable)
+{
+	struct memsize_rgn_struct *rgn;
+	phys_addr_t end;
+
+	if (memsize_rgn_count == CONFIG_MAX_MEMBLOCK_MEMSIZE) {
+		pr_err("not enough space on memsize_rgn\n");
+		return;
+	}
+	rgn = &memsize_rgn[memsize_rgn_count++];
+	rgn->base = base;
+	rgn->size = size;
+	rgn->nomap = nomap;
+	rgn->reusable = reusable;
+
+	if (!name)
+		strscpy(rgn->name, "unknown", sizeof(rgn->name));
+	else
+		memsize_get_valid_name(rgn->name, name);
+	end = base + size - 1;
+	memblock_dbg("%s %pa..%pa nomap:%d reusable:%d\n",
+		     __func__, &base, &end, nomap, reusable);
+}
+#endif /* MEMBLOCK_MEMSIZE */
+
 static void __init free_memmap(unsigned long start_pfn, unsigned long end_pfn)
 {
 	struct page *start_pg, *end_pg;
@@ -2231,6 +2291,61 @@ static int memblock_debug_show(struct seq_file *m, void *private)
 }
 DEFINE_SHOW_ATTRIBUTE(memblock_debug);
 
+#ifdef CONFIG_MEMBLOCK_MEMSIZE
+
+static int memsize_rgn_cmp(const void *a, const void *b)
+{
+	const struct memsize_rgn_struct *ra = a, *rb = b;
+
+	if (ra->base > rb->base)
+		return -1;
+
+	if (ra->base < rb->base)
+		return 1;
+
+	return 0;
+}
+
+static int memblock_memsize_show(struct seq_file *m, void *private)
+{
+	int i;
+	struct memsize_rgn_struct *rgn;
+	unsigned long reserved = 0, reusable = 0;
+
+	sort(memsize_rgn, memsize_rgn_count,
+	     sizeof(memsize_rgn[0]), memsize_rgn_cmp, NULL);
+	for (i = 0; i < memsize_rgn_count; i++) {
+		phys_addr_t base, end;
+		long size;
+
+		rgn = &memsize_rgn[i];
+		base = rgn->base;
+		size = rgn->size;
+		end = base + size;
+
+		seq_printf(m, "0x%pK-0x%pK 0x%08lx ( %7lu KB ) %s %s %s\n",
+			   (void *)base, (void *)end,
+			   size, DIV_ROUND_UP(size, SZ_1K),
+			   rgn->nomap ? "nomap" : "  map",
+			   rgn->reusable ? "reusable" : "unusable",
+			   rgn->name);
+		if (rgn->reusable)
+			reusable += (unsigned long)rgn->size;
+		else
+			reserved += (unsigned long)rgn->size;
+	}
+
+	seq_puts(m, "\n");
+	seq_printf(m, " .unusable  : %7lu KB\n",
+		   DIV_ROUND_UP(reserved, SZ_1K));
+	seq_printf(m, " .reusable  : %7lu KB\n",
+		   DIV_ROUND_UP(reusable, SZ_1K));
+	return 0;
+}
+
+DEFINE_SHOW_ATTRIBUTE(memblock_memsize);
+#endif
+
 static int __init memblock_init_debugfs(void)
 {
 	struct dentry *root = debugfs_create_dir("memblock", NULL);
@@ -2242,6 +2357,10 @@ static int __init memblock_init_debugfs(void)
 #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
 	debugfs_create_file("physmem", 0444, root, &physmem,
 			    &memblock_debug_fops);
+#endif
+#ifdef CONFIG_MEMBLOCK_MEMSIZE
+	debugfs_create_file("memsize", 0444, root,
+			    NULL, &memblock_memsize_fops);
 #endif
 
 	return 0;
