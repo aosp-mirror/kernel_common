@@ -307,8 +307,8 @@ static int trusty_test_run(struct trusty_test_state *s, size_t page_count,
 		if (tmpret) {
 			ret = tmpret;
 			dev_err(s->dev,
-				"trusty_reclaim_memory failed: %d, id=0x%llx, i=%zd/%zd\n",
-				ret, obj->mem_id, i, repeat_share);
+				"trusty_reclaim_memory failed: %d, i=%zd/%zd\n",
+				ret, i, repeat_share);
 		}
 	}
 
