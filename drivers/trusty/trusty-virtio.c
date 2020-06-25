@@ -166,7 +166,7 @@ static int trusty_load_device_descr(struct trusty_ctx *tctx,
 {
 	int ret;
 
-	dev_dbg(tctx->dev, "%s: %zu bytes @ id %d\n", __func__, sz, id);
+	dev_dbg(tctx->dev, "%s: %zu bytes @ id %llu\n", __func__, sz, id);
 
 	ret = trusty_std_call32(tctx->dev->parent, SMC_SC_VIRTIO_GET_DESCR,
 				(u32)id, id >> 32, sz);
@@ -183,7 +183,7 @@ static void trusty_virtio_stop(struct trusty_ctx *tctx,
 {
 	int ret;
 
-	dev_dbg(tctx->dev, "%s: %zu bytes @ id %d\n", __func__, sz, id);
+	dev_dbg(tctx->dev, "%s: %zu bytes @ id %llu\n", __func__, sz, id);
 
 	ret = trusty_std_call32(tctx->dev->parent, SMC_SC_VIRTIO_STOP,
 				(u32)id, id >> 32, sz);
@@ -199,7 +199,7 @@ static int trusty_virtio_start(struct trusty_ctx *tctx,
 {
 	int ret;
 
-	dev_dbg(tctx->dev, "%s: %zu bytes @ id %d\n", __func__, sz, id);
+	dev_dbg(tctx->dev, "%s: %zu bytes @ id %llu\n", __func__, sz, id);
 
 	ret = trusty_std_call32(tctx->dev->parent, SMC_SC_VIRTIO_START,
 				(u32)id, id >> 32, sz);
