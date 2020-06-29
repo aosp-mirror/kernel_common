@@ -11,19 +11,24 @@
   bcmp
   bio_alloc_bioset
   bpf_trace_run2
+  __break_lease
+  call_rcu
   cancel_delayed_work_sync
   capable
   cfg80211_inform_bss_data
   cfg80211_put_bss
   __cfi_slowpath
   __check_object_size
+  clear_inode
   __const_udelay
   consume_skb
   cpu_hwcap_keys
   cpu_hwcaps
   cpu_number
   __cpu_online_mask
+  d_drop
   delayed_work_timer_fn
+  dentry_open
   destroy_workqueue
   _dev_err
   device_register
@@ -34,10 +39,13 @@
   dev_queue_xmit
   dev_set_name
   _dev_warn
+  dget_parent
   d_make_root
   dma_set_coherent_mask
   dma_set_mask
   down_write
+  dput
+  d_splice_alias
   ethtool_op_get_link
   eth_validate_addr
   event_triggers_call
@@ -60,12 +68,15 @@
   ida_alloc_range
   ida_free
   iget5_locked
+  init_special_inode
   init_timer_key
   init_wait_entry
   __init_waitqueue_head
   inode_init_once
   iput
+  iterate_dir
   jiffies
+  kern_path
   kfree
   kfree_skb
   __kmalloc
@@ -77,12 +88,15 @@
   kmem_cache_free
   kmemdup
   kstrdup
+  kstrtoull
   ktime_get
   kvfree
   kvmalloc_node
   __list_add_valid
   __list_del_entry_valid
   __local_bh_enable_ip
+  lockref_get
+  lock_rename
   lock_sock_nested
   match_token
   memcpy
@@ -119,6 +133,8 @@
   param_ops_int
   param_ops_uint
   passthru_features_check
+  path_get
+  path_put
   pci_disable_device
   pci_enable_device
   pci_iomap
@@ -172,8 +188,10 @@
   schedule
   schedule_timeout
   schedule_timeout_uninterruptible
+  scnprintf
   seq_printf
   seq_puts
+  set_nlink
   sg_init_one
   sg_init_table
   skb_clone
@@ -195,6 +213,7 @@
   submit_bio
   synchronize_irq
   synchronize_net
+  synchronize_rcu
   system_wq
   trace_define_field
   trace_event_buffer_commit
@@ -206,8 +225,10 @@
   trace_print_symbols_seq
   trace_raw_output_prep
   trace_seq_printf
+  truncate_inode_pages
   unlock_new_inode
   unlock_page
+  unlock_rename
   unregister_filesystem
   unregister_netdev
   unregister_netdevice_notifier
@@ -216,6 +237,7 @@
   unregister_virtio_driver
   up_write
   usleep_range
+  vfs_getattr
   virtio_check_driver_offered_feature
   virtio_config_changed
   virtio_max_dma_size
@@ -257,7 +279,6 @@
   device_remove_file
   ktime_get_ts64
   platform_device_add_data
-  scnprintf
   sg_miter_next
   sg_miter_start
   sg_miter_stop
@@ -291,15 +312,12 @@
   bpf_trace_run1
   bpf_trace_run3
   bpf_trace_run4
-  call_rcu
   __cpu_possible_mask
-  d_splice_alias
   fs_ftype_to_dtype
   generic_block_bmap
   generic_fillattr
   generic_ro_fops
   iget_failed
-  init_special_inode
   init_user_ns
   inode_nohighmem
   kill_block_super
@@ -326,7 +344,6 @@
   read_cache_page_gfp
   register_shrinker
   sb_set_blocksize
-  set_nlink
   simple_get_link
   strnlen
   strscpy
@@ -370,20 +387,14 @@
 
 # required by incrementalfs.ko
   bin2hex
-  __break_lease
-  clear_inode
   __close_fd
   crc32_le
   crypto_alloc_shash
   crypto_destroy_tfm
   crypto_shash_digest
   d_add
-  d_drop
   deactivate_locked_super
-  dentry_open
-  dget_parent
   d_instantiate
-  dput
   fget
   flush_delayed_work
   free_pages
@@ -397,22 +408,16 @@
   get_zeroed_page
   ihold
   inode_init_owner
-  iterate_dir
   kernel_read
   kernel_write
-  kern_path
   kobject_create_and_add
   kobject_put
-  lockref_get
-  lock_rename
   lookup_one_len
   LZ4_decompress_safe
   match_int
   __msecs_to_jiffies
   mutex_is_locked
   notify_change
-  path_get
-  path_put
   set_anon_super
   sget
   simple_getattr
@@ -422,12 +427,9 @@
   sync_filesystem
   sysfs_create_group
   sysfs_remove_group
-  truncate_inode_pages
-  unlock_rename
   user_path_at_empty
   vfs_create
   vfs_fallocate
-  vfs_getattr
   vfs_getxattr
   vfs_link
   vfs_listxattr
@@ -468,6 +470,62 @@
   rtc_time64_to_tm
   rtc_tm_to_time64
   rtc_update_irq
+
+# required by sdcardfs.ko
+  clear_nlink
+  configfs_register_subsystem
+  configfs_unregister_subsystem
+  config_group_init
+  config_group_init_type_name
+  config_item_init_type_name
+  copy_fs_struct
+  _ctype
+  d_invalidate
+  d_path
+  d_rehash
+  d_set_d_op
+  filemap_write_and_wait
+  filp_close
+  filp_open
+  free_fs_struct
+  fscrypt_register_key_removal_notifier
+  fscrypt_unregister_key_removal_notifier
+  fs_parse
+  fsstack_copy_inode_size
+  generic_delete_inode
+  __generic_file_fsync
+  generic_permission
+  igrab
+  inode_newsize_ok
+  kill_anon_super
+  kstrtouint
+  lookup_one_len_unlocked
+  mntget
+  names_cachep
+  notify_change2
+  override_creds
+  prepare_creds
+  ___ratelimit
+  revert_creds
+  setattr_prepare
+  set_fs_pwd
+  shrink_dcache_sb
+  strcasecmp
+  strncasecmp
+  strrchr
+  touch_atime
+  truncate_setsize
+  vfs_create2
+  vfs_fsync_range
+  vfs_get_super
+  vfs_mkdir2
+  vfs_path_lookup
+  vfs_read
+  vfs_rename2
+  vfs_rmdir2
+  vfs_statfs
+  vfs_unlink2
+  vfs_write
 
 # required by snd-ac97-codec.ko
   pci_read_config_word
@@ -589,7 +647,6 @@
 
 # required by virt_wifi_sim.ko
   ieee80211_get_channel
-  kstrtoull
   release_firmware
   request_firmware
 
@@ -878,9 +935,6 @@
   nvdimm_bus_register
   nvdimm_bus_unregister
   nvdimm_pmem_region_create
-
-# required by vmw_vsock_virtio_transport.ko
-  synchronize_rcu
 
 # required by vmw_vsock_virtio_transport_common.ko
   bpf_trace_run10
