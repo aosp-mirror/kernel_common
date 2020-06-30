@@ -2018,6 +2018,11 @@ struct memsize_rgn_struct {
 
 static struct memsize_rgn_struct memsize_rgn[CONFIG_MAX_MEMBLOCK_MEMSIZE] __initdata_memblock;
 static int memsize_rgn_count __initdata_memblock;
+static long memsize_memmap;
+static unsigned long memsize_code __initdata_memblock;
+static unsigned long memsize_data __initdata_memblock;
+static unsigned long memsize_ro __initdata_memblock;
+static unsigned long memsize_bss __initdata_memblock;
 
 void __init memblock_memsize_enable_tracking(void)
 {
@@ -2029,9 +2034,23 @@ void __init memblock_memsize_disable_tracking(void)
 	memblock_memsize_tracking = false;
 }
 
+void __init memblock_memsize_mod_memmap_size(long size)
+{
+	memsize_memmap += size;
+}
+
 void memblock_memsize_mod_kernel_size(long size)
 {
 	memsize_kinit += size;
+}
+
+void __init memblock_memsize_kernel_code_data(unsigned long code, unsigned long data,
+		unsigned long ro, unsigned long bss)
+{
+	memsize_code = code;
+	memsize_data = data;
+	memsize_ro = ro;
+	memsize_bss = bss;
 }
 
 static void __init_memblock memsize_get_valid_name(char *valid_name, const char *name)
@@ -2592,6 +2611,11 @@ static int memblock_memsize_show(struct seq_file *m, void *private)
 	struct memsize_rgn_struct *rgn;
 	unsigned long reserved = 0, reusable = 0, total;
 	unsigned long system = totalram_pages() << PAGE_SHIFT;
+	unsigned long etc;
+
+	etc = memsize_kinit;
+	etc -= memsize_code + memsize_data + memsize_ro + memsize_bss +
+		memsize_memmap;
 
 	sort(memsize_rgn, memsize_rgn_count,
 	     sizeof(memsize_rgn[0]), memsize_rgn_cmp, NULL);
@@ -2624,6 +2648,18 @@ static int memblock_memsize_show(struct seq_file *m, void *private)
 		   DIV_ROUND_UP(memsize_kinit + reserved, SZ_1K));
 	seq_printf(m, " .kernel    : %7lu KB\n",
 		   DIV_ROUND_UP(memsize_kinit, SZ_1K));
+	seq_printf(m, "  .text     : %7lu KB\n"
+		      "  .rwdata   : %7lu KB\n"
+		      "  .rodata   : %7lu KB\n"
+		      "  .bss      : %7lu KB\n"
+		      "  .memmap   : %7lu KB\n"
+		      "  .etc      : %7lu KB\n",
+			DIV_ROUND_UP(memsize_code, SZ_1K),
+			DIV_ROUND_UP(memsize_data, SZ_1K),
+			DIV_ROUND_UP(memsize_ro, SZ_1K),
+			DIV_ROUND_UP(memsize_bss, SZ_1K),
+			DIV_ROUND_UP(memsize_memmap, SZ_1K),
+			DIV_ROUND_UP(etc, SZ_1K));
 	seq_printf(m, " .unusable  : %7lu KB\n",
 		   DIV_ROUND_UP(reserved, SZ_1K));
 	seq_printf(m, "System      : %7lu KB\n",

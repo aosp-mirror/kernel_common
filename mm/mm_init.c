@@ -1723,8 +1723,10 @@ void __init *memmap_alloc(phys_addr_t size, phys_addr_t align,
 						 MEMBLOCK_ALLOC_ACCESSIBLE,
 						 nid);
 
-	if (ptr && size > 0)
+	if (ptr && size > 0) {
 		page_init_poison(ptr, size);
+		memblock_memsize_mod_memmap_size((long)size);
+	}
 
 	return ptr;
 }
@@ -2817,6 +2819,8 @@ static void __init mem_init_print_info(void)
 	bss_size = __bss_stop - __bss_start;
 	init_data_size = __init_end - __init_begin;
 	init_code_size = _einittext - _sinittext;
+
+	memblock_memsize_kernel_code_data(codesize, datasize, rosize, bss_size);
 
 	/*
 	 * Detect special cases and adjust section sizes accordingly:
