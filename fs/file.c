@@ -670,7 +670,7 @@ int __close_fd(struct files_struct *files, unsigned fd)
 
 	return filp_close(file, files);
 }
-EXPORT_SYMBOL(__close_fd); /* for ksys_close() */
+EXPORT_SYMBOL_NS(__close_fd, ANDROID_GKI_VFS_EXPORT_ONLY); /* for ksys_close() */
 
 /**
  * last_fd - return last valid index into fd table
