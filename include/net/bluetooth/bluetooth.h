@@ -252,21 +252,32 @@ void bt_dbg_set(bool enable);
 bool bt_dbg_get(void);
 __printf(1, 2)
 void bt_dbg(const char *fmt, ...);
+#define BT_DBG_INT	bt_dbg
+#else
+#define BT_DBG_INT	pr_debug
 #endif
 __printf(1, 2)
 void bt_warn_ratelimited(const char *fmt, ...);
 __printf(1, 2)
 void bt_err_ratelimited(const char *fmt, ...);
 
-#define BT_INFO(fmt, ...)	bt_info(fmt "\n", ##__VA_ARGS__)
-#define BT_WARN(fmt, ...)	bt_warn(fmt "\n", ##__VA_ARGS__)
-#define BT_ERR(fmt, ...)	bt_err(fmt "\n", ##__VA_ARGS__)
-
-#if IS_ENABLED(CONFIG_BT_FEATURE_DEBUG)
-#define BT_DBG(fmt, ...)	bt_dbg(fmt "\n", ##__VA_ARGS__)
+#if IS_ENABLED(CONFIG_BT_FEATURE_DEBUG_FUNC_NAMES)
+#define BT_PREFIX "%s() "
+#define BT_PREFIX_PARAM ,__func__
+#define BT_DBG(fmt, ...)	\
+	BT_DBG_INT(BT_PREFIX fmt "\n", __func__, ##__VA_ARGS__)
 #else
-#define BT_DBG(fmt, ...)	pr_debug(fmt "\n", ##__VA_ARGS__)
+#define BT_PREFIX
+#define BT_PREFIX_PARAM
+#define BT_DBG(fmt, ...)	BT_DBG_INT(fmt "\n", ##__VA_ARGS__)
 #endif
+
+#define BT_INFO(fmt, ...)	\
+	bt_info(BT_PREFIX fmt "\n" BT_PREFIX_PARAM, ##__VA_ARGS__)
+#define BT_WARN(fmt, ...)	\
+	bt_warn(BT_PREFIX fmt "\n" BT_PREFIX_PARAM, ##__VA_ARGS__)
+#define BT_ERR(fmt, ...)	\
+	bt_err(BT_PREFIX fmt "\n" BT_PREFIX_PARAM, ##__VA_ARGS__)
 
 #define bt_dev_name(hdev) ((hdev) ? (hdev)->name : "null")
 
@@ -280,7 +291,9 @@ void bt_err_ratelimited(const char *fmt, ...);
 	BT_DBG("%s: " fmt, bt_dev_name(hdev), ##__VA_ARGS__)
 
 #define bt_dev_warn_ratelimited(hdev, fmt, ...)			\
-	bt_warn_ratelimited("%s: " fmt, bt_dev_name(hdev), ##__VA_ARGS__)
+	bt_warn_ratelimited("%s: " BT_PREFIX fmt, bt_dev_name(hdev)	\
+			    BT_PREFIX_PARAM, ##__VA_ARGS__)
+
 #define bt_dev_err_ratelimited(hdev, fmt, ...)			\
 	bt_err_ratelimited("%s: " fmt, bt_dev_name(hdev), ##__VA_ARGS__)
 
