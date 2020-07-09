@@ -8,6 +8,7 @@
 #include <asm/vfpmacros.h>
 
 	.text
+	.fpu vfpv2
 	.pushsection	.hyp.text, "ax"
 
 /* void __vfp_save_state(struct vfp_hard_struct *vfp); */

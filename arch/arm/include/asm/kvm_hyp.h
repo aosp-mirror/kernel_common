@@ -14,9 +14,6 @@
 
 #define __hyp_text __section(.hyp.text) notrace
 
-#define __ACCESS_VFP(CRn)			\
-	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
-
 #define write_special(v, r)					\
 	asm volatile("msr " __stringify(r) ", %0" : : "r" (v))
 #define read_special(r) ({					\
@@ -78,8 +75,6 @@
 #define CNTP_CTL	__ACCESS_CP15(c14, 0, c2, 1)
 #define CNTV_CTL	__ACCESS_CP15(c14, 0, c3, 1)
 #define CNTHCTL		__ACCESS_CP15(c14, 4, c1, 0)
-
-#define VFP_FPEXC	__ACCESS_VFP(FPEXC)
 
 /* AArch64 compatibility macros, only for the timer so far */
 #define read_sysreg_el0(r)		read_sysreg(r##_EL0)
