@@ -8,6 +8,7 @@
 #include <linux/cache.h>
 #include <linux/dma-map-ops.h>
 #include <xen/xen.h>
+#include <trace/hooks/iommu.h>
 
 #include <asm/cacheflush.h>
 #include <asm/xen/xen-ops.h>
