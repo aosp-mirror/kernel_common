@@ -58,6 +58,15 @@ extern int  __qcom_scm_pas_auth_and_reset(struct device *dev, u32 peripheral);
 extern int  __qcom_scm_pas_shutdown(struct device *dev, u32 peripheral);
 extern int  __qcom_scm_pas_mss_reset(struct device *dev, bool reset);
 
+#define QCOM_SCM_SVC_ES			0x10	/* Enterprise Security */
+#define QCOM_SCM_ES_INVALIDATE_ICE_KEY	0x03
+#define QCOM_SCM_ES_CONFIG_SET_ICE_KEY	0x04
+extern int __qcom_scm_ice_invalidate_key(struct device *dev, u32 index);
+extern int __qcom_scm_ice_set_key(struct device *dev, u32 index,
+				  dma_addr_t key_phys,
+				  u32 key_size, enum qcom_scm_ice_cipher cipher,
+				  u32 data_unit_size);
+
 /* common error codes */
 #define QCOM_SCM_V2_EBUSY	-12
 #define QCOM_SCM_ENOMEM		-5
