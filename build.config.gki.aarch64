@@ -13,7 +13,6 @@ android/abi_gki_aarch64_qcom
 android/abi_gki_aarch64_unisoc
 android/abi_gki_aarch64_exynos
 android/abi_gki_aarch64_sunxi
-android/abi_gki_aarch64_android_internal
 "
 TRIM_NONLISTED_KMI=1
 KMI_SYMBOL_LIST_STRICT_MODE=1
