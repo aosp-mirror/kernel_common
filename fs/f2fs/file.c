@@ -3707,11 +3707,11 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return -ENOSPC;
 
 	switch (cmd) {
-	case F2FS_IOC_GETFLAGS:
+	case FS_IOC_GETFLAGS:
 		return f2fs_ioc_getflags(filp, arg);
-	case F2FS_IOC_SETFLAGS:
+	case FS_IOC_SETFLAGS:
 		return f2fs_ioc_setflags(filp, arg);
-	case F2FS_IOC_GETVERSION:
+	case FS_IOC_GETVERSION:
 		return f2fs_ioc_getversion(filp, arg);
 	case F2FS_IOC_START_ATOMIC_WRITE:
 		return f2fs_ioc_start_atomic_write(filp);
@@ -3727,11 +3727,11 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return f2fs_ioc_shutdown(filp, arg);
 	case FITRIM:
 		return f2fs_ioc_fitrim(filp, arg);
-	case F2FS_IOC_SET_ENCRYPTION_POLICY:
+	case FS_IOC_SET_ENCRYPTION_POLICY:
 		return f2fs_ioc_set_encryption_policy(filp, arg);
-	case F2FS_IOC_GET_ENCRYPTION_POLICY:
+	case FS_IOC_GET_ENCRYPTION_POLICY:
 		return f2fs_ioc_get_encryption_policy(filp, arg);
-	case F2FS_IOC_GET_ENCRYPTION_PWSALT:
+	case FS_IOC_GET_ENCRYPTION_PWSALT:
 		return f2fs_ioc_get_encryption_pwsalt(filp, arg);
 	case FS_IOC_GET_ENCRYPTION_POLICY_EX:
 		return f2fs_ioc_get_encryption_policy_ex(filp, arg);
@@ -3759,9 +3759,9 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return f2fs_ioc_flush_device(filp, arg);
 	case F2FS_IOC_GET_FEATURES:
 		return f2fs_ioc_get_features(filp, arg);
-	case F2FS_IOC_FSGETXATTR:
+	case FS_IOC_FSGETXATTR:
 		return f2fs_ioc_fsgetxattr(filp, arg);
-	case F2FS_IOC_FSSETXATTR:
+	case FS_IOC_FSSETXATTR:
 		return f2fs_ioc_fssetxattr(filp, arg);
 	case F2FS_IOC_GET_PIN_FILE:
 		return f2fs_ioc_get_pin_file(filp, arg);
@@ -3905,14 +3905,14 @@ out:
 long f2fs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
-	case F2FS_IOC32_GETFLAGS:
-		cmd = F2FS_IOC_GETFLAGS;
+	case FS_IOC32_GETFLAGS:
+		cmd = FS_IOC_GETFLAGS;
 		break;
-	case F2FS_IOC32_SETFLAGS:
-		cmd = F2FS_IOC_SETFLAGS;
+	case FS_IOC32_SETFLAGS:
+		cmd = FS_IOC_SETFLAGS;
 		break;
-	case F2FS_IOC32_GETVERSION:
-		cmd = F2FS_IOC_GETVERSION;
+	case FS_IOC32_GETVERSION:
+		cmd = FS_IOC_GETVERSION;
 		break;
 	case F2FS_IOC_START_ATOMIC_WRITE:
 	case F2FS_IOC_COMMIT_ATOMIC_WRITE:
@@ -3920,9 +3920,9 @@ long f2fs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case F2FS_IOC_RELEASE_VOLATILE_WRITE:
 	case F2FS_IOC_ABORT_VOLATILE_WRITE:
 	case F2FS_IOC_SHUTDOWN:
-	case F2FS_IOC_SET_ENCRYPTION_POLICY:
-	case F2FS_IOC_GET_ENCRYPTION_PWSALT:
-	case F2FS_IOC_GET_ENCRYPTION_POLICY:
+	case FS_IOC_SET_ENCRYPTION_POLICY:
+	case FS_IOC_GET_ENCRYPTION_PWSALT:
+	case FS_IOC_GET_ENCRYPTION_POLICY:
 	case FS_IOC_GET_ENCRYPTION_POLICY_EX:
 	case FS_IOC_ADD_ENCRYPTION_KEY:
 	case FS_IOC_REMOVE_ENCRYPTION_KEY:
@@ -3936,8 +3936,8 @@ long f2fs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case F2FS_IOC_MOVE_RANGE:
 	case F2FS_IOC_FLUSH_DEVICE:
 	case F2FS_IOC_GET_FEATURES:
-	case F2FS_IOC_FSGETXATTR:
-	case F2FS_IOC_FSSETXATTR:
+	case FS_IOC_FSGETXATTR:
+	case FS_IOC_FSSETXATTR:
 	case F2FS_IOC_GET_PIN_FILE:
 	case F2FS_IOC_SET_PIN_FILE:
 	case F2FS_IOC_PRECACHE_EXTENTS:
