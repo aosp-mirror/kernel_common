@@ -83,7 +83,6 @@ nfs_file_release(struct inode *inode, struct file *filp)
 	dprintk("NFS: release(%pD2)\n", filp);
 
 	nfs_inc_stats(inode, NFSIOS_VFSRELEASE);
-	inode_dio_wait(inode);
 	return nfs_release(inode, filp);
 }
 EXPORT_SYMBOL_GPL(nfs_file_release);
