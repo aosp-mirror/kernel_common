@@ -179,7 +179,6 @@
   __free_pages
   free_pages_exact
   free_percpu
-  free_reserved_area
   freezing_slow_path
   fwnode_property_present
   fwnode_property_read_string
