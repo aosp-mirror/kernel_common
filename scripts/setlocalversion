@@ -39,8 +39,7 @@ if test $# -gt 0; then
 
 	if test $# -gt 0; then
 		kmi_generation=$1
-		re='^[^0-9]+$'
-		[[ $kmi_generation =~ $re ]] && usage
+		[ $(expr $kmi_generation : '^[0-9]\+$') -eq 0 ] && usage
 		shift
 	else
 		usage
