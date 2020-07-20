@@ -345,11 +345,14 @@ do {									\
 
 #define __get_user_size(x, ptr, size, retval, errret)			\
 do {									\
+	unsigned char x_u8__;						\
+									\
 	retval = 0;							\
 	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	case 1:								\
-		__get_user_asm(x, ptr, retval, "b", "b", "=q", errret);	\
+		__get_user_asm(x_u8__, ptr, retval, "b", "b", "=q", errret);	\
+		(x) = x_u8__;						\
 		break;							\
 	case 2:								\
 		__get_user_asm(x, ptr, retval, "w", "w", "=r", errret);	\
