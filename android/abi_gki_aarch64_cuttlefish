@@ -1,6 +1,7 @@
 [abi_whitelist]
 # commonly used symbols
   add_wait_queue
+  __alloc_disk_node
   alloc_etherdev_mqs
   __alloc_pages_nodemask
   __alloc_skb
@@ -10,6 +11,14 @@
   arm64_const_caps_ready
   bcmp
   bio_alloc_bioset
+  blk_cleanup_queue
+  blk_queue_flag_set
+  blk_queue_io_min
+  blk_queue_io_opt
+  blk_queue_logical_block_size
+  blk_queue_max_discard_sectors
+  blk_queue_max_write_zeroes_sectors
+  blk_queue_physical_block_size
   bpf_trace_run2
   __break_lease
   call_rcu
@@ -25,15 +34,28 @@
   complete
   __const_udelay
   consume_skb
+  __cpuhp_remove_state
+  __cpuhp_setup_state
+  __cpuhp_state_add_instance
+  __cpuhp_state_remove_instance
   cpu_hwcap_keys
   cpu_hwcaps
+  cpumask_next
   cpu_number
   __cpu_online_mask
+  __cpu_possible_mask
+  crypto_destroy_tfm
+  crypto_register_alg
+  crypto_register_scomp
+  crypto_unregister_alg
+  crypto_unregister_scomp
   d_drop
   delayed_work_timer_fn
+  del_gendisk
   dentry_open
   destroy_workqueue
   _dev_err
+  device_add_disk
   device_register
   device_unregister
   _dev_info
@@ -46,6 +68,7 @@
   d_make_root
   dma_set_coherent_mask
   dma_set_mask
+  down_read
   down_write
   dput
   d_splice_alias
@@ -60,17 +83,23 @@
   free_irq
   free_netdev
   __free_pages
+  free_pages
   fs_bio_set
   generic_file_llseek
   generic_read_dir
   get_device
+  __get_free_pages
   get_random_bytes
   get_unused_fd_flags
   hwrng_register
   hwrng_unregister
   ida_alloc_range
   ida_free
+  idr_alloc
+  idr_destroy
+  idr_remove
   iget5_locked
+  __init_rwsem
   init_special_inode
   init_timer_key
   init_wait_entry
@@ -105,6 +134,7 @@
   match_token
   memcpy
   memmove
+  memparse
   memset
   misc_deregister
   misc_register
@@ -114,6 +144,7 @@
   module_put
   msleep
   __mutex_init
+  mutex_is_locked
   mutex_lock
   mutex_lock_interruptible
   mutex_trylock
@@ -132,6 +163,7 @@
   nonseekable_open
   noop_llseek
   nr_cpu_ids
+  __num_online_cpus
   pagecache_get_page
   param_ops_bool
   param_ops_charp
@@ -163,6 +195,7 @@
   printk
   __put_cred
   put_device
+  put_disk
   __put_page
   __put_task_struct
   put_unused_fd
@@ -180,6 +213,7 @@
   __rcu_read_unlock
   refcount_dec_and_test_checked
   refcount_inc_checked
+  register_blkdev
   register_filesystem
   register_netdev
   register_netdevice_notifier
@@ -188,6 +222,7 @@
   release_sock
   remove_wait_queue
   request_threaded_irq
+  revalidate_disk
   rtnl_lock
   rtnl_unlock
   schedule
@@ -222,6 +257,7 @@
   synchronize_net
   synchronize_rcu
   sysfs_create_group
+  __sysfs_match_string
   sysfs_remove_group
   system_wq
   trace_define_field
@@ -238,14 +274,17 @@
   unlock_new_inode
   unlock_page
   unlock_rename
+  unregister_blkdev
   unregister_filesystem
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
   unregister_virtio_device
   unregister_virtio_driver
+  up_read
   up_write
   usleep_range
+  vfree
   vfs_getattr
   virtio_check_driver_offered_feature
   virtio_config_changed
@@ -322,7 +361,6 @@
   bpf_trace_run1
   bpf_trace_run3
   bpf_trace_run4
-  __cpu_possible_mask
   fs_ftype_to_dtype
   generic_block_bmap
   generic_fillattr
@@ -400,21 +438,18 @@
   __close_fd
   crc32_le
   crypto_alloc_shash
-  crypto_destroy_tfm
   crypto_shash_digest
   d_add
   deactivate_locked_super
   d_instantiate
   fget
   flush_delayed_work
-  free_pages
   fs_kobj
   fsstack_copy_attr_all
   generic_file_mmap
   generic_file_read_iter
   generic_file_splice_read
   generic_shutdown_super
-  __get_free_pages
   get_zeroed_page
   ihold
   inode_init_owner
@@ -426,7 +461,6 @@
   LZ4_decompress_safe
   match_int
   __msecs_to_jiffies
-  mutex_is_locked
   notify_change
   set_anon_super
   sget
@@ -583,7 +617,6 @@
 # required by test_meminit.ko
   kmem_cache_alloc_bulk
   kmem_cache_free_bulk
-  vfree
   vmalloc
 
 # required by tpm.ko
@@ -595,16 +628,11 @@
   del_timer_sync
   device_initialize
   devm_add_action
-  down_read
   efi
   efi_tpm_final_log_size
   hash_digest_size
-  idr_alloc
-  idr_destroy
   idr_get_next
-  idr_remove
   idr_replace
-  __init_rwsem
   jiffies_to_msecs
   jiffies_to_usecs
   krealloc
@@ -624,7 +652,6 @@
   seq_write
   sysfs_remove_link
   unregister_chrdev_region
-  up_read
   __usecs_to_jiffies
 
 # required by tpm_vtpm_proxy.ko
@@ -782,8 +809,6 @@
   wait_for_completion_killable
 
 # required by virtio_blk.ko
-  __alloc_disk_node
-  blk_cleanup_queue
   blk_execute_rq
   blk_get_request
   blk_mq_alloc_tag_set
@@ -799,32 +824,18 @@
   blk_mq_virtio_map_queues
   blk_put_request
   blk_queue_alignment_offset
-  blk_queue_flag_set
-  blk_queue_io_min
-  blk_queue_io_opt
-  blk_queue_logical_block_size
-  blk_queue_max_discard_sectors
   blk_queue_max_discard_segments
   blk_queue_max_hw_sectors
   blk_queue_max_segments
   blk_queue_max_segment_size
-  blk_queue_max_write_zeroes_sectors
-  blk_queue_physical_block_size
   blk_queue_write_cache
   blk_rq_map_kern
   blk_rq_map_sg
   blk_status_to_errno
-  del_gendisk
-  device_add_disk
   _dev_notice
   kobject_uevent_env
-  put_disk
-  register_blkdev
-  revalidate_disk
   set_disk_ro
   string_get_size
-  __sysfs_match_string
-  unregister_blkdev
 
 # required by virtio_console.ko
   cancel_work_sync
@@ -875,7 +886,6 @@
   devm_kfree
   __devm_request_region
   iomem_resource
-  memparse
   platform_device_register_full
   platform_get_irq
   platform_get_resource
@@ -889,11 +899,6 @@
   bpf_stats_enabled_key
   bpf_warn_invalid_xdp_action
   build_skb
-  __cpuhp_remove_state
-  __cpuhp_setup_state
-  __cpuhp_state_add_instance
-  __cpuhp_state_remove_instance
-  cpumask_next
   cpumask_next_wrap
   cpus_read_lock
   cpus_read_unlock
@@ -922,7 +927,6 @@
   __netif_set_xps_queue
   net_ratelimit
   nf_conntrack_destroy
-  __num_online_cpus
   _raw_spin_trylock
   sched_clock
   skb_add_rx_frag
@@ -1008,3 +1012,39 @@
   sock_diag_save_cookie
   sock_diag_unregister
   sock_i_ino
+
+# required by zram.ko
+  __alloc_percpu
+  bdget_disk
+  bdput
+  bio_endio
+  blk_alloc_queue
+  blk_queue_flag_clear
+  blk_queue_make_request
+  __class_register
+  class_unregister
+  crypto_alloc_base
+  crypto_has_alg
+  free_percpu
+  fsync_bdev
+  generic_end_io_acct
+  generic_start_io_acct
+  idr_find
+  idr_for_each
+  kstrtoint
+  kstrtou16
+  memset64
+  page_endio
+  __per_cpu_offset
+  sysfs_streq
+  vzalloc
+  zs_compact
+  zs_create_pool
+  zs_destroy_pool
+  zs_free
+  zs_get_total_pages
+  zs_huge_class_size
+  zs_malloc
+  zs_map_object
+  zs_pool_stats
+  zs_unmap_object
