@@ -183,7 +183,7 @@ int ion_buffer_zero(struct ion_buffer *buffer)
 	else
 		pgprot = pgprot_writecombine(PAGE_KERNEL);
 
-	return ion_sglist_zero(table->sgl, table->nents, pgprot);
+	return ion_sglist_zero(table->sgl, table->orig_nents, pgprot);
 }
 EXPORT_SYMBOL_GPL(ion_buffer_zero);
 
