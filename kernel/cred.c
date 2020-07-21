@@ -20,6 +20,8 @@
 #include <linux/cn_proc.h>
 #include <linux/uidgid.h>
 
+#include <trace/hooks/creds.h>
+
 #if 0
 #define kdebug(FMT, ...)						\
 	printk("[%-5.5s%5u] " FMT "\n",					\
@@ -138,6 +140,7 @@ void exit_creds(struct task_struct *tsk)
 	key_put(tsk->cached_requested_key);
 	tsk->cached_requested_key = NULL;
 #endif
+	trace_android_rvh_exit_creds(tsk, cred);
 }
 
 /**
@@ -437,6 +440,7 @@ int commit_creds(struct cred *new)
 		inc_rlimit_ucounts(new->ucounts, UCOUNT_RLIMIT_NPROC, 1);
 	rcu_assign_pointer(task->real_cred, new);
 	rcu_assign_pointer(task->cred, new);
+	trace_android_rvh_commit_creds(task, new);
 	if (new->user != old->user || new->user_ns != old->user_ns)
 		dec_rlimit_ucounts(old->ucounts, UCOUNT_RLIMIT_NPROC, 1);
 
@@ -500,6 +504,7 @@ const struct cred *override_creds(const struct cred *new)
 	 */
 	get_new_cred((struct cred *)new);
 	rcu_assign_pointer(current->cred, new);
+	trace_android_rvh_override_creds(current, new);
 
 	kdebug("override_creds() = %p{%ld}", old,
 	       atomic_long_read(&old->usage));
@@ -522,6 +527,7 @@ void revert_creds(const struct cred *old)
 	       atomic_long_read(&old->usage));
 
 	rcu_assign_pointer(current->cred, old);
+	trace_android_rvh_revert_creds(current, old);
 	put_cred(override);
 }
 EXPORT_SYMBOL(revert_creds);

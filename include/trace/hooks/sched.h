@@ -87,6 +87,10 @@ DECLARE_HOOK(android_vh_dump_throttled_rt_tasks,
 			s64 rt_period_timer_expires),
 	TP_ARGS(cpu, clock, rt_period, rt_runtime, rt_period_timer_expires));
 
+DECLARE_HOOK(android_vh_jiffies_update,
+	TP_PROTO(void *unused),
+	TP_ARGS(unused));
+
 struct rq_flags;
 DECLARE_RESTRICTED_HOOK(android_rvh_sched_newidle_balance,
 	TP_PROTO(struct rq *this_rq, struct rq_flags *rf,
