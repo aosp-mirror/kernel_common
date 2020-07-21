@@ -225,6 +225,7 @@ static int virtio_gpu_execbuffer_ioctl(struct drm_device *dev, void *data,
 			      vfpriv->ctx_id, out_fence);
 
 	ttm_eu_fence_buffer_objects(&ticket, &validate_list, &out_fence->f);
+	dma_fence_put(&out_fence->f);
 
 	/* fence the command bo */
 	virtio_gpu_unref_list(&validate_list);
