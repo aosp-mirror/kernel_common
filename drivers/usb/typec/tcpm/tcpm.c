@@ -3914,7 +3914,7 @@ static void run_state_machine(struct tcpm_port *port)
 			/* SRC -> SNK POWER/FAST_ROLE_SWAP finished */
 			tcpm_ams_finish(port);
 
-		tcpm_set_state(port, SNK_DISCOVERY, 0);
+		tcpm_set_state(port, SNK_DISCOVERY, 500);
 		break;
 	case SNK_DISCOVERY:
 		if (port->vbus_present) {
