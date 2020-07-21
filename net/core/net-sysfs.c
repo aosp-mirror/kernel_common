@@ -912,7 +912,7 @@ static ssize_t show_trans_timeout(struct netdev_queue *queue,
 	trans_timeout = queue->trans_timeout;
 	spin_unlock_irq(&queue->_xmit_lock);
 
-	return sprintf(buf, "%lu", trans_timeout);
+	return sprintf(buf, fmt_ulong, trans_timeout);
 }
 
 static struct netdev_queue_attribute queue_trans_timeout =
