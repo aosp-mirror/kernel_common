@@ -221,6 +221,7 @@ static int virtio_gpu_execbuffer_ioctl(struct drm_device *dev, void *data,
 
 	virtio_gpu_cmd_submit(vgdev, buf, exbuf->size,
 			      vfpriv->ctx_id, out_fence);
+	dma_fence_put(&out_fence->f);
 
 	ttm_eu_fence_buffer_objects(&ticket, &validate_list, &out_fence->f);
 
