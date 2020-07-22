@@ -50,6 +50,7 @@
   crypto_unregister_alg
   crypto_unregister_scomp
   d_drop
+  deactivate_locked_super
   delayed_work_timer_fn
   del_gendisk
   dentry_open
@@ -78,6 +79,7 @@
   fd_install
   finish_wait
   flush_dcache_page
+  flush_delayed_work
   flush_work
   fput
   free_irq
@@ -102,6 +104,7 @@
   __init_rwsem
   init_special_inode
   init_timer_key
+  init_user_ns
   init_wait_entry
   __init_waitqueue_head
   inode_init_once
@@ -372,7 +375,6 @@
   generic_fillattr
   generic_ro_fops
   iget_failed
-  init_user_ns
   inode_nohighmem
   kill_block_super
   kimage_vaddr
@@ -443,10 +445,8 @@
   crypto_alloc_shash
   crypto_shash_digest
   d_add
-  deactivate_locked_super
   d_instantiate
   fget
-  flush_delayed_work
   fs_kobj
   fsstack_copy_attr_all
   generic_file_mmap
@@ -974,6 +974,25 @@
   nvdimm_bus_register
   nvdimm_bus_unregister
   nvdimm_pmem_region_create
+
+# required by virtiofs.ko
+  fuse_conn_get
+  fuse_conn_init
+  fuse_conn_put
+  fuse_dequeue_forget
+  fuse_dev_alloc
+  fuse_dev_free
+  fuse_dev_install
+  fuse_fill_super_common
+  fuse_free_conn
+  fuse_get_unique
+  fuse_kill_sb_anon
+  fuse_len_args
+  fuse_request_end
+  fuse_send_init
+  get_anon_bdev
+  memchr
+  sget_fc
 
 # required by vmw_vsock_virtio_transport_common.ko
   bpf_trace_run10
