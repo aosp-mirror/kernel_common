@@ -111,6 +111,7 @@
   kern_path
   kfree
   kfree_skb
+  kill_anon_super
   __kmalloc
   kmalloc_caches
   kmalloc_order_trace
@@ -128,6 +129,7 @@
   __list_add_valid
   __list_del_entry_valid
   __local_bh_enable_ip
+  __lock_page
   lockref_get
   lock_rename
   lock_sock_nested
@@ -180,6 +182,7 @@
   pci_request_region
   pci_set_master
   pci_unregister_driver
+  __per_cpu_offset
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   platform_device_add
@@ -217,6 +220,7 @@
   register_filesystem
   register_netdev
   register_netdevice_notifier
+  register_shrinker
   register_virtio_device
   register_virtio_driver
   release_sock
@@ -279,6 +283,7 @@
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
+  unregister_shrinker
   unregister_virtio_device
   unregister_virtio_driver
   up_read
@@ -304,6 +309,7 @@
   virtqueue_kick
   virtqueue_kick_prepare
   virtqueue_notify
+  vmemmap
   vring_create_virtqueue
   vring_del_virtqueue
   vring_interrupt
@@ -370,7 +376,6 @@
   inode_nohighmem
   kill_block_super
   kimage_vaddr
-  __lock_page
   LZ4_decompress_safe_partial
   match_strdup
   mount_bdev
@@ -390,14 +395,12 @@
   rcu_barrier
   read_cache_page
   read_cache_page_gfp
-  register_shrinker
   sb_set_blocksize
   simple_get_link
   strnlen
   strscpy
   __sw_hweight64
   trace_print_flags_seq
-  unregister_shrinker
   vm_map_ram
   vm_unmap_aliases
   vm_unmap_ram
@@ -539,7 +542,6 @@
   generic_permission
   igrab
   inode_newsize_ok
-  kill_anon_super
   kstrtouint
   lookup_one_len_unlocked
   mntget
@@ -801,7 +803,6 @@
   ttm_eu_fence_buffer_objects
   ttm_eu_reserve_buffers
   ttm_tt_init
-  vmemmap
   ww_mutex_lock_interruptible
   ww_mutex_unlock
 
@@ -1035,16 +1036,21 @@
   kstrtou16
   memset64
   page_endio
-  __per_cpu_offset
   sysfs_streq
   vzalloc
-  zs_compact
-  zs_create_pool
-  zs_destroy_pool
-  zs_free
-  zs_get_total_pages
-  zs_huge_class_size
-  zs_malloc
-  zs_map_object
-  zs_pool_stats
-  zs_unmap_object
+
+# required by zsmalloc.ko
+  alloc_anon_inode
+  __ClearPageMovable
+  contig_page_data
+  dec_zone_page_state
+  inc_zone_page_state
+  init_pseudo
+  kern_mount
+  kern_unmount
+  page_mapping
+  _raw_read_lock
+  _raw_read_unlock
+  _raw_write_lock
+  _raw_write_unlock
+  __SetPageMovable
