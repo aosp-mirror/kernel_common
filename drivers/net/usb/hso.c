@@ -2266,6 +2266,8 @@ static int hso_serial_common_create(struct hso_serial *serial, int num_urbs,
 	/* register our minor number */
 	serial->parent->dev = tty_port_register_device(&serial->port, tty_drv,
 			minor, &serial->parent->interface->dev);
+	if (IS_ERR(serial->parent->dev))
+		goto exit;
 	dev = serial->parent->dev;
 	dev_set_drvdata(dev, serial->parent);
 	i = device_create_file(dev, &dev_attr_hsotype);
