@@ -9,7 +9,12 @@ EXT_MODULES="
 hikey-modules/midgard
 "
 
-FILES="
+MAKE_GOALS="${MAKE_GOALS}
+hisilicon/hi3660-hikey960.dtb
+Image.gz
+"
+
+FILES="${FILES}
 arch/arm64/boot/Image.gz
 arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dtb
 vmlinux
