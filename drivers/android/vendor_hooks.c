@@ -35,6 +35,7 @@
 #include <trace/hooks/remoteproc.h>
 #include <trace/hooks/timer.h>
 #include <trace/hooks/fpsimd.h>
+#include <trace/hooks/dtask.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -95,3 +96,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rproc_recovery);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rproc_recovery_set);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_timer_calc_index);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_is_fpsimd_save);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_sched_show_task);
