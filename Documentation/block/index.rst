@@ -14,7 +14,6 @@ Block
    cmdline-partition
    data-integrity
    deadline-iosched
-   inline-encryption
    ioprio
    kyber-iosched
    null_blk

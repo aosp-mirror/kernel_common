@@ -45,9 +45,9 @@ static void free_master_key(struct fscrypt_master_key *mk)
 	wipe_master_key_secret(&mk->mk_secret);
 
 	for (i = 0; i <= __FSCRYPT_MODE_MAX; i++) {
-		fscrypt_destroy_prepared_key(&mk->mk_direct_keys[i]);
-		fscrypt_destroy_prepared_key(&mk->mk_iv_ino_lblk_64_keys[i]);
-		fscrypt_destroy_prepared_key(&mk->mk_iv_ino_lblk_32_keys[i]);
+		crypto_free_skcipher(mk->mk_direct_keys[i]);
+		crypto_free_skcipher(mk->mk_iv_ino_lblk_64_keys[i]);
+		crypto_free_skcipher(mk->mk_iv_ino_lblk_32_keys[i]);
 	}
 
 	key_put(mk->mk_users);
@@ -467,9 +467,6 @@ out_unlock:
 	return err;
 }
 
-/* Size of software "secret" derived from hardware-wrapped key */
-#define RAW_SECRET_SIZE 32
-
 static int add_master_key(struct super_block *sb,
 			  struct fscrypt_master_key_secret *secret,
 			  struct fscrypt_key_specifier *key_spec)
@@ -477,27 +474,16 @@ static int add_master_key(struct super_block *sb,
 	int err;
 
 	if (key_spec->type == FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER) {
-		u8 _kdf_key[RAW_SECRET_SIZE];
-		u8 *kdf_key = secret->raw;
-		unsigned int kdf_key_size = secret->size;
-
-		if (secret->is_hw_wrapped) {
-			kdf_key = _kdf_key;
-			kdf_key_size = RAW_SECRET_SIZE;
-			err = fscrypt_derive_raw_secret(sb, secret->raw,
-							secret->size,
-							kdf_key, kdf_key_size);
-			if (err)
-				return err;
-		}
-		err = fscrypt_init_hkdf(&secret->hkdf, kdf_key, kdf_key_size);
-		/*
-		 * Now that the HKDF context is initialized, the raw HKDF key is
-		 * no longer needed.
-		 */
-		memzero_explicit(kdf_key, kdf_key_size);
+		err = fscrypt_init_hkdf(&secret->hkdf, secret->raw,
+					secret->size);
 		if (err)
 			return err;
+
+		/*
+		 * Now that the HKDF context is initialized, the raw key is no
+		 * longer needed.
+		 */
+		memzero_explicit(secret->raw, secret->size);
 
 		/* Calculate the key identifier */
 		err = fscrypt_hkdf_expand(&secret->hkdf,
@@ -514,10 +500,8 @@ static int fscrypt_provisioning_key_preparse(struct key_preparsed_payload *prep)
 {
 	const struct fscrypt_provisioning_key_payload *payload = prep->data;
 
-	BUILD_BUG_ON(FSCRYPT_MAX_HW_WRAPPED_KEY_SIZE < FSCRYPT_MAX_KEY_SIZE);
-
 	if (prep->datalen < sizeof(*payload) + FSCRYPT_MIN_KEY_SIZE ||
-	    prep->datalen > sizeof(*payload) + FSCRYPT_MAX_HW_WRAPPED_KEY_SIZE)
+	    prep->datalen > sizeof(*payload) + FSCRYPT_MAX_KEY_SIZE)
 		return -EINVAL;
 
 	if (payload->type != FSCRYPT_KEY_SPEC_TYPE_DESCRIPTOR &&
@@ -666,29 +650,15 @@ int fscrypt_ioctl_add_key(struct file *filp, void __user *_uarg)
 		return -EACCES;
 
 	memset(&secret, 0, sizeof(secret));
-
-	if (arg.__flags) {
-		if (arg.__flags & ~__FSCRYPT_ADD_KEY_FLAG_HW_WRAPPED)
-			return -EINVAL;
-		if (arg.key_spec.type != FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER)
-			return -EINVAL;
-		secret.is_hw_wrapped = true;
-	}
-
 	if (arg.key_id) {
 		if (arg.raw_size != 0)
 			return -EINVAL;
 		err = get_keyring_key(arg.key_id, arg.key_spec.type, &secret);
 		if (err)
 			goto out_wipe_secret;
-		err = -EINVAL;
-		if (secret.size > FSCRYPT_MAX_KEY_SIZE && !secret.is_hw_wrapped)
-			goto out_wipe_secret;
 	} else {
 		if (arg.raw_size < FSCRYPT_MIN_KEY_SIZE ||
-		    arg.raw_size > (secret.is_hw_wrapped ?
-				    FSCRYPT_MAX_HW_WRAPPED_KEY_SIZE :
-				    FSCRYPT_MAX_KEY_SIZE))
+		    arg.raw_size > FSCRYPT_MAX_KEY_SIZE)
 			return -EINVAL;
 		secret.size = arg.raw_size;
 		err = -EFAULT;

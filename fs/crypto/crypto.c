@@ -69,14 +69,6 @@ void fscrypt_free_bounce_page(struct page *bounce_page)
 }
 EXPORT_SYMBOL(fscrypt_free_bounce_page);
 
-/*
- * Generate the IV for the given logical block number within the given file.
- * For filenames encryption, lblk_num == 0.
- *
- * Keep this in sync with fscrypt_limit_dio_pages().  fscrypt_limit_dio_pages()
- * needs to know about any IV generation methods where the low bits of IV don't
- * simply contain the lblk_num (e.g., IV_INO_LBLK_32).
- */
 void fscrypt_generate_iv(union fscrypt_iv *iv, u64 lblk_num,
 			 const struct fscrypt_info *ci)
 {
@@ -108,7 +100,7 @@ int fscrypt_crypt_block(const struct inode *inode, fscrypt_direction_t rw,
 	DECLARE_CRYPTO_WAIT(wait);
 	struct scatterlist dst, src;
 	struct fscrypt_info *ci = inode->i_crypt_info;
-	struct crypto_skcipher *tfm = ci->ci_key.tfm;
+	struct crypto_skcipher *tfm = ci->ci_ctfm;
 	int res = 0;
 
 	if (WARN_ON_ONCE(len <= 0))
