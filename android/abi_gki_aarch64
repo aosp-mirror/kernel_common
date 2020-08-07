@@ -3,10 +3,6 @@
   module_layout
   __put_task_struct
 
-# Below are symbols for Android GKI "internal" modules that will not be exported
-# for "external" modules in the future, but for now we need to keep track of
-# them until that framework is in place.
-
 # required by erofs.ko
   add_to_page_cache_lru
   __alloc_pages_nodemask
