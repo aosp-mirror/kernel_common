@@ -84,6 +84,7 @@ irqreturn_t dw_handle_msi_irq(struct dw_pcie_rp *pp)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(dw_handle_msi_irq);
 
 /* Chained MSI interrupt service routine */
 static void dw_chained_msi_isr(struct irq_desc *desc)
