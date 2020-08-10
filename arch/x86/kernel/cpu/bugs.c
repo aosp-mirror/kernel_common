@@ -1889,7 +1889,7 @@ static void update_stibp_strict(void)
 /* Update the static key controlling the evaluation of TIF_SPEC_IB */
 static void update_indir_branch_cond(void)
 {
-	if (sched_smt_active())
+	if (!IS_ENABLED(CONFIG_SCHED_CORE) && sched_smt_active())
 		static_branch_enable(&switch_to_cond_stibp);
 	else
 		static_branch_disable(&switch_to_cond_stibp);
