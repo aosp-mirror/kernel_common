@@ -31,7 +31,6 @@
   _bcd2bin
   bcmp
   _bin2bcd
-  bio_crypt_should_process
   __bitmap_clear
   __bitmap_parse
   bitmap_parselist
@@ -572,8 +571,6 @@
   kernel_kobj
   kernel_write
   kern_path
-  keyslot_manager_create_passthrough
-  keyslot_manager_private
   __kfifo_alloc
   __kfifo_free
   __kfifo_in
