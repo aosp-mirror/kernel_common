@@ -267,6 +267,21 @@
 	};
 };
 
+&dpi0 {
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&dpi_pins>;
+	pinctrl-1 = <&dpi_pins_sleep>;
+	status = "okay";
+
+	ports {
+		port {
+			dpi_out: endpoint {
+				remote-endpoint = <&anx7625_dp_in>;
+			};
+		};
+	};
+};
+
 &dsi0 {
 	status = "okay";
 };
@@ -389,6 +404,81 @@
 	clock-frequency = <400000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c7_pins>;
+
+	anx_bridge_dp: bridge@58 {
+		compatible = "analogix,anx7625";
+		reg = <0x58>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&anx7625_dp_pins>;
+		enable-gpios = <&pio 8 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&pio 9 GPIO_ACTIVE_HIGH>;
+		interrupt-parent = <&pio>;
+		interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
+		vdd10-supply = <&pp1000_dpbrdg>;
+		vdd18-supply = <&pp1800_dpbrdg>;
+		vdd33-supply = <&pp3300_dpbrdg>;
+		analogix,audio-enable;
+		#address-cells = <0>;
+		#size-cells = <0>;
+		#sound-dai-cells = <0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+
+				anx7625_dp_in: endpoint {
+					bus-type = <7>;
+					remote-endpoint = <&dpi_out>;
+				};
+			};
+		};
+
+		switches {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			switch@0 {
+				compatible = "typec-switch";
+				reg = <0>;
+				mode-switch;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+
+						anx_typec0: endpoint {
+							remote-endpoint = <&typec_port0>;
+						};
+					};
+				};
+			};
+
+			switch@1 {
+				compatible = "typec-switch";
+				reg = <1>;
+				mode-switch;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+
+						anx_typec1: endpoint {
+							remote-endpoint = <&typec_port1>;
+						};
+					};
+				};
+			};
+		};
+	};
 };
 
 &mfg0 {
@@ -755,6 +845,19 @@
 		};
 	};
 
+	anx7625_dp_pins: anx7625-dp-pins {
+		pins1 {
+			pinmux = <PINMUX_GPIO8__FUNC_GPIO8>,
+				 <PINMUX_GPIO9__FUNC_GPIO9>;
+			output-low;
+		};
+		pins2 {
+			pinmux = <PINMUX_GPIO7__FUNC_GPIO7>;
+			input-enable;
+			bias-pull-up;
+		};
+	};
+
 	aud_clk_mosi_off_pins: aud-clk-mosi-off-pins {
 		pins-mosi-off {
 			pinmux = <PINMUX_GPIO214__FUNC_GPIO214>,
@@ -926,6 +1029,51 @@
 			pinmux = <PINMUX_GPIO5__FUNC_GPIO5>;
 			input-enable;
 			bias-pull-up;
+		};
+	};
+
+	dpi_pins: dpi-pins {
+		pins {
+			pinmux = <PINMUX_GPIO96__FUNC_DPI_D0>,
+				 <PINMUX_GPIO97__FUNC_DPI_D1>,
+				 <PINMUX_GPIO98__FUNC_DPI_D2>,
+				 <PINMUX_GPIO99__FUNC_DPI_D3>,
+				 <PINMUX_GPIO100__FUNC_DPI_D4>,
+				 <PINMUX_GPIO101__FUNC_DPI_D5>,
+				 <PINMUX_GPIO102__FUNC_DPI_D6>,
+				 <PINMUX_GPIO103__FUNC_DPI_D7>,
+				 <PINMUX_GPIO104__FUNC_DPI_D8>,
+				 <PINMUX_GPIO105__FUNC_DPI_D9>,
+				 <PINMUX_GPIO106__FUNC_DPI_D10>,
+				 <PINMUX_GPIO110__FUNC_DPI_D11>,
+				 <PINMUX_GPIO113__FUNC_DPI_HSYNC>,
+				 <PINMUX_GPIO111__FUNC_DPI_VSYNC>,
+				 <PINMUX_GPIO109__FUNC_DPI_DE>,
+				 <PINMUX_GPIO112__FUNC_DPI_CK>;
+			drive-strength = <MTK_DRIVE_6mA>;
+		};
+	};
+
+	dpi_pins_sleep: dpi-sleep-pins {
+		pins {
+			pinmux = <PINMUX_GPIO96__FUNC_GPIO96>,
+				 <PINMUX_GPIO97__FUNC_GPIO97>,
+				 <PINMUX_GPIO98__FUNC_GPIO98>,
+				 <PINMUX_GPIO99__FUNC_GPIO99>,
+				 <PINMUX_GPIO100__FUNC_GPIO100>,
+				 <PINMUX_GPIO101__FUNC_GPIO101>,
+				 <PINMUX_GPIO102__FUNC_GPIO102>,
+				 <PINMUX_GPIO103__FUNC_GPIO103>,
+				 <PINMUX_GPIO104__FUNC_GPIO104>,
+				 <PINMUX_GPIO105__FUNC_GPIO105>,
+				 <PINMUX_GPIO106__FUNC_GPIO106>,
+				 <PINMUX_GPIO110__FUNC_GPIO110>,
+				 <PINMUX_GPIO113__FUNC_GPIO113>,
+				 <PINMUX_GPIO111__FUNC_GPIO111>,
+				 <PINMUX_GPIO109__FUNC_GPIO109>,
+				 <PINMUX_GPIO112__FUNC_GPIO112>;
+			drive-strength = <MTK_DRIVE_6mA>;
+			output-low;
 		};
 	};
 
@@ -1350,6 +1498,19 @@
 				power-role = "dual";
 				data-role = "host";
 				try-power-role = "source";
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@1 {
+						reg = <1>;
+
+						typec_port0: endpoint {
+							remote-endpoint = <&anx_typec0>;
+						};
+					};
+				};
 			};
 
 			usb_c1: connector@1 {
@@ -1359,6 +1520,19 @@
 				power-role = "dual";
 				data-role = "host";
 				try-power-role = "source";
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@1 {
+						reg = <1>;
+
+						typec_port1: endpoint {
+							remote-endpoint = <&anx_typec1>;
+						};
+					};
+				};
 			};
 		};
 	};
