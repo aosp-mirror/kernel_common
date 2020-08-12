@@ -9,3 +9,4 @@ cpufreq changes
 mm (memory management) changes
 security changes
 dma-buf changes
+driver framework and misc driver changes
