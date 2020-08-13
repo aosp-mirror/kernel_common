@@ -2262,7 +2262,6 @@ static int snd_echo_resume(struct device *dev)
 	if (err < 0) {
 		kfree(commpage_bak);
 		DE_INIT(("resume init_hw err=%d\n", err));
-		snd_echo_free(chip);
 		return err;
 	}
 	DE_INIT(("resume init OK\n"));
@@ -2291,7 +2290,6 @@ static int snd_echo_resume(struct device *dev)
 	if (request_irq(pci->irq, snd_echo_interrupt, IRQF_SHARED,
 			KBUILD_MODNAME, chip)) {
 		dev_err(chip->card->dev, "cannot grab irq\n");
-		snd_echo_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;
