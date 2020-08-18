@@ -283,6 +283,7 @@
   strlcpy
   strlen
   strncpy
+  strscpy
   strsep
   strstr
   submit_bio
@@ -356,6 +357,7 @@
   vring_interrupt
   vring_transport_features
   wait_for_completion
+  wait_for_completion_timeout
   wait_woken
   __wake_up
   __warn_printk
@@ -421,7 +423,6 @@
   sb_set_blocksize
   simple_get_link
   strnlen
-  strscpy
   __sw_hweight64
   trace_print_flags_seq
   vm_map_ram
@@ -525,6 +526,21 @@
   netdev_lower_state_changed
   netdev_pick_tx
   pci_bus_type
+
+# required by pulse8-cec.ko
+  cec_allocate_adapter
+  cec_delete_adapter
+  cec_received_msg_ts
+  cec_register_adapter
+  cec_s_log_addrs
+  cec_s_phys_addr
+  cec_transmit_attempt_done_ts
+  cec_unregister_adapter
+  serio_close
+  serio_open
+  __serio_register_driver
+  serio_unregister_driver
+  time64_to_tm
 
 # required by rtc-test.ko
   device_init_wakeup
@@ -1069,7 +1085,6 @@
   usb_root_hub_lost_power
   usb_wakeup_notification
   vsnprintf
-  wait_for_completion_timeout
 
 # required by xhci-pci.ko
   pci_d3cold_disable
