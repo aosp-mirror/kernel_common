@@ -829,8 +829,10 @@ static int gfar_of_init(struct platform_device *ofdev, struct net_device **pdev)
 	if (priv->mode == MQ_MG_MODE) {
 		for_each_child_of_node(np, child) {
 			err = gfar_parse_group(child, priv, model);
-			if (err)
+			if (err) {
+				of_node_put(child);
 				goto err_grp_init;
+			}
 		}
 	} else { /* SQ_SG_MODE */
 		err = gfar_parse_group(np, priv, model);
