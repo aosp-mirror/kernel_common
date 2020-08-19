@@ -200,6 +200,7 @@
   idr_find
   idr_get_next
   idr_remove
+  ieee80211_get_channel_khz
   iget5_locked
   init_timer_key
   init_wait_entry
@@ -411,6 +412,7 @@
   reset_control_assert
   reset_control_deassert
   reset_control_reset
+  rpmh_write
   rpmh_write_async
   rpmsg_register_device
   rpmsg_send
@@ -627,6 +629,7 @@
   ieee80211_beacon_get_tim
   ieee80211_beacon_loss
   ieee80211_bss_get_elem
+  ieee80211_channel_to_freq_khz
   ieee80211_connection_loss
   ieee80211_csa_finish
   ieee80211_csa_is_complete
@@ -1266,7 +1269,6 @@
   of_get_regulator_init_data
   of_node_name_eq
   regulator_list_voltage_linear_range
-  rpmh_write
 
 # required by qcom-scm-64.ko
   __arm_smccc_smc
