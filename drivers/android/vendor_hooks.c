@@ -10,6 +10,7 @@
 #include <trace/hooks/vendor_hooks.h>
 #include <linux/tracepoint.h>
 
+#include <trace/hooks/cpuidle.h>
 #include <trace/hooks/mpam.h>
 #include <trace/hooks/wqlockup.h>
 #include <trace/hooks/debug.h>
@@ -20,6 +21,8 @@
 #include <trace/hooks/sys.h>
 #include <trace/hooks/iommu.h>
 #include <trace/hooks/net.h>
+#include <trace/hooks/pm_domain.h>
+#include <trace/hooks/cpuidle_psci.h>
 #include <trace/hooks/vmscan.h>
 #include <trace/hooks/creds.h>
 #include <trace/hooks/syscall_check.h>
@@ -29,6 +32,8 @@
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
  * associated with them) to allow external modules to probe them.
  */
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cpu_idle_enter);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cpu_idle_exit);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mpam_set);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_wq_lockup_pool);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ipi_stop);
@@ -47,6 +52,9 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_syscall_prctl_finished);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cgroup_attach);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_iommu_setup_dma_ops);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ptype_head);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_allow_domain_state);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cpuidle_psci_enter);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cpuidle_psci_exit);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_set_balance_anon_file_reclaim);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_commit_creds);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_exit_creds);
