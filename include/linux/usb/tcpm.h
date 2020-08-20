@@ -95,6 +95,14 @@ enum tcpm_transmit_type {
  *		restart toggling after checking the connector for contaminant.
  *		This forces the TCPM state machine to tranistion to TOGGLING state
  *		without calling start_toggling callback.
+ * @enable_frs:
+ *		Optional; Called to enable/disable PD 3.0 fast role swap.
+ *		Enabling frs is accessory dependent as not all PD3.0
+ *		accessories support fast role swap.
+ * @frs_sourcing_vbus:
+ *		Optional; Called to notify the low level chip drivers that
+ *		sink frs operation is complete. The low level drivers can
+ *		perform clean up operation if any.
  */
 struct tcpc_dev {
 	struct fwnode_handle *fwnode;
@@ -123,6 +131,8 @@ struct tcpc_dev {
 	int (*set_bist_data)(struct tcpc_dev *dev, bool on);
 	int (*check_contaminant)(struct tcpc_dev *dev);
 	void (*set_pd_capable)(struct tcpc_dev *dev, bool capable);
+	int (*enable_frs)(struct tcpc_dev *dev, bool enable);
+	int (*frs_sourcing_vbus)(struct tcpc_dev *dev);
 };
 
 struct tcpm_port;
@@ -136,6 +146,8 @@ int tcpm_update_sink_capabilities(struct tcpm_port *port, const u32 *pdo,
 
 void tcpm_vbus_change(struct tcpm_port *port);
 void tcpm_cc_change(struct tcpm_port *port);
+void tcpm_sink_frs(struct tcpm_port *port);
+void tcpm_sourcing_vbus(struct tcpm_port *port);
 void tcpm_pd_receive(struct tcpm_port *port,
 		     const struct pd_message *msg);
 void tcpm_pd_transmit_complete(struct tcpm_port *port,
