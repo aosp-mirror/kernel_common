@@ -711,6 +711,13 @@ struct ufs_hba {
 	 */
 	#define UFSHCD_QUIRK_NO_KEYSLOTS			0x2000
 
+	/*
+	 * This quirk needs to be enabled if the host controller requires that
+	 * the PRDT be cleared after each encrypted request because encryption
+	 * keys were stored in it.
+	 */
+	#define UFSHCD_QUIRK_KEYS_IN_PRDT			0x4000
+
 	unsigned int quirks;	/* Deviations from standard UFSHCI spec. */
 
 	/* Device deviations from standard UFS device spec. */
