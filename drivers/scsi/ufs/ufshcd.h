@@ -702,6 +702,15 @@ struct ufs_hba {
 	 */
 	#define UFSHCD_QUIRK_BROKEN_OCS_FATAL_ERROR		0x1000
 
+	/*
+	 * This quirk needs to be enabled if the host controller supports inline
+	 * encryption, but it uses a nonstandard mechanism where the standard
+	 * crypto registers aren't used and there is no concept of keyslots.
+	 * ufs_hba_variant_ops::init() is expected to initialize ufs_hba::ksm as
+	 * a passthrough keyslot manager.
+	 */
+	#define UFSHCD_QUIRK_NO_KEYSLOTS			0x2000
+
 	unsigned int quirks;	/* Deviations from standard UFSHCI spec. */
 
 	/* Device deviations from standard UFS device spec. */
