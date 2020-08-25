@@ -40,8 +40,6 @@
   bpf_trace_run2
   bpf_trace_run3
   __break_lease
-  bus_register
-  bus_unregister
   cancel_delayed_work
   cancel_delayed_work_sync
   cancel_work_sync
@@ -210,6 +208,7 @@
   ida_alloc_range
   ida_destroy
   ida_free
+  ieee80211_channel_to_freq_khz
   ieee80211_connection_loss
   ieee80211_find_sta
   ieee80211_get_hdrlen_from_skb
@@ -246,9 +245,6 @@
   kstrtouint
   kstrtoul_from_user
   kstrtoull
-  kthread_create_on_node
-  kthread_should_stop
-  kthread_stop
   ktime_get
   ktime_get_mono_fast_ns
   ktime_get_with_offset
@@ -451,7 +447,6 @@
   strncmp
   strncpy
   strnlen
-  strsep
   __sw_hweight32
   __sw_hweight64
   synchronize_irq
@@ -526,10 +521,18 @@
   wait_for_completion
   wait_for_completion_timeout
   __wake_up
-  wake_up_process
   __warn_printk
 
 # required by adv7511.ko
+  cec_allocate_adapter
+  cec_delete_adapter
+  cec_received_msg_ts
+  cec_register_adapter
+  cec_s_phys_addr
+  cec_s_phys_addr_from_edid
+  cec_transmit_attempt_done_ts
+  cec_transmit_done_ts
+  cec_unregister_adapter
   devm_regulator_bulk_get
   drm_add_edid_modes
   drm_bridge_add
@@ -565,14 +568,6 @@
 
 # required by armmmci.ko
   clk_round_rate
-
-# required by cec.ko
-  debugfs_create_devm_seqfile
-  kobject_set_name
-  memdup_user_nul
-  skip_spaces
-  strscpy
-  wait_for_completion_killable
 
 # required by clk-hi655x.ko
   devm_clk_hw_register
@@ -837,6 +832,7 @@
   simple_getattr
   simple_setattr
   strndup_user
+  strsep
   sync_filesystem
   unlock_page
   user_path_at_empty
@@ -1004,6 +1000,9 @@
   iomem_resource
   kimage_voffset
   kstrtobool_from_user
+  kthread_create_on_node
+  kthread_should_stop
+  kthread_stop
   ktime_add_safe
   ktime_get_raw_ts64
   misc_deregister
@@ -1048,6 +1047,7 @@
   vm_mmap
   vunmap
   vzalloc
+  wake_up_process
 
 # required by mmc_block.ko
   blk_get_request
@@ -1059,6 +1059,8 @@
   blk_queue_max_segment_size
   blk_queue_rq_timeout
   blk_update_request
+  bus_register
+  bus_unregister
   check_disk_change
   dma_get_merge_boundary
   mmc_app_cmd
@@ -1414,6 +1416,7 @@
   ieee80211_csa_finish
   ieee80211_free_hw
   ieee80211_free_txskb
+  ieee80211_freq_khz_to_channel
   ieee80211_hdrlen
   ieee80211_iterate_active_interfaces_atomic
   ieee80211_iterate_interfaces
