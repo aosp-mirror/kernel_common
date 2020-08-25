@@ -1078,11 +1078,14 @@ static void drm_core_exit(void)
 	drm_sysfs_destroy();
 	idr_destroy(&drm_minors_idr);
 	drm_connector_ida_destroy();
+	drm_trace_cleanup();
 }
 
 static int __init drm_core_init(void)
 {
 	int ret;
+
+	drm_trace_init();
 
 	drm_connector_ida_init();
 	idr_init(&drm_minors_idr);

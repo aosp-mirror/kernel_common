@@ -30,6 +30,7 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/dynamic_debug.h>
+#include <linux/trace.h>
 
 #include <drm/drm.h>
 #include <drm/drm_drv.h>
@@ -42,15 +43,25 @@
 unsigned long __drm_debug_syslog;
 EXPORT_SYMBOL(__drm_debug_syslog);
 
-MODULE_PARM_DESC(debug, "Enable debug output, where each bit enables a debug category.\n"
-"\t\tBit 0 (0x01)  will enable CORE messages (drm core code)\n"
-"\t\tBit 1 (0x02)  will enable DRIVER messages (drm controller code)\n"
-"\t\tBit 2 (0x04)  will enable KMS messages (modesetting code)\n"
-"\t\tBit 3 (0x08)  will enable PRIME messages (prime code)\n"
-"\t\tBit 4 (0x10)  will enable ATOMIC messages (atomic code)\n"
-"\t\tBit 5 (0x20)  will enable VBL messages (vblank code)\n"
-"\t\tBit 7 (0x80)  will enable LEASE messages (leasing code)\n"
-"\t\tBit 8 (0x100) will enable DP messages (displayport code)");
+/*
+ * __drm_debug_trace: Enable debug output in drm tracing instance.
+ * Bitmask of DRM_UT_x. See include/drm/drm_print.h for details.
+ */
+unsigned int __drm_debug_trace;
+EXPORT_SYMBOL(__drm_debug_trace);
+
+#define DEBUG_PARM_DESC(dst) \
+"Enable debug output to " dst ", where each bit enables a debug category.\n" \
+"\t\tBit 0 (0x01)  will enable CORE messages (drm core code)\n" \
+"\t\tBit 1 (0x02)  will enable DRIVER messages (drm controller code)\n" \
+"\t\tBit 2 (0x04)  will enable KMS messages (modesetting code)\n" \
+"\t\tBit 3 (0x08)  will enable PRIME messages (prime code)\n" \
+"\t\tBit 4 (0x10)  will enable ATOMIC messages (atomic code)\n" \
+"\t\tBit 5 (0x20)  will enable VBL messages (vblank code)\n" \
+"\t\tBit 7 (0x80)  will enable LEASE messages (leasing code)\n" \
+"\t\tBit 8 (0x100) will enable DP messages (displayport code)"
+
+MODULE_PARM_DESC(debug, DEBUG_PARM_DESC("syslog"));
 
 #if !defined(CONFIG_DRM_USE_DYNAMIC_DEBUG)
 module_param_named(debug, __drm_debug_syslog, ulong, 0600);
@@ -74,6 +85,13 @@ static struct ddebug_class_param drm_debug_bitmap = {
 	.map = &drm_debug_classes,
 };
 module_param_cb(debug, &param_ops_dyndbg_classes, &drm_debug_bitmap, 0600);
+#endif
+
+MODULE_PARM_DESC(trace, DEBUG_PARM_DESC("tracefs"));
+module_param_named(trace, __drm_debug_trace, int, 0600);
+
+#ifdef CONFIG_TRACING
+struct trace_array *trace_arr;
 #endif
 
 void __drm_puts_coredump(struct drm_printer *p, const char *str)
@@ -189,6 +207,20 @@ void __drm_printfn_debug_syslog(struct drm_printer *p, struct va_format *vaf)
 }
 EXPORT_SYMBOL(__drm_printfn_debug_syslog);
 
+void __drm_printfn_trace(struct drm_printer *p, struct va_format *vaf)
+{
+	drm_trace_printf("%s %pV", p->prefix, vaf);
+}
+EXPORT_SYMBOL(__drm_printfn_trace);
+
+void __drm_printfn_debug_syslog_and_trace(struct drm_printer *p,
+					   struct va_format *vaf)
+{
+	pr_debug("%s %pV", p->prefix, vaf);
+	drm_trace_printf("%s %pV", p->prefix, vaf);
+}
+EXPORT_SYMBOL(__drm_printfn_debug_syslog_and_trace);
+
 void __drm_printfn_err(struct drm_printer *p, struct va_format *vaf)
 {
 	pr_err("*ERROR* %s %pV", p->prefix, vaf);
@@ -273,6 +305,10 @@ void drm_dev_printk(const struct device *dev, const char *level,
 	vaf.fmt = format;
 	vaf.va = &args;
 
+	drm_trace_printf("%s%s[" DRM_NAME ":%ps] %pV",
+			 dev ? dev_name(dev) : "",dev ? " " : "",
+			 __builtin_return_address(0), &vaf);
+
 	if (dev)
 		dev_printk(level, dev, "[" DRM_NAME ":%ps] %pV",
 			   __builtin_return_address(0), &vaf);
@@ -290,22 +326,30 @@ void __drm_dev_dbg(struct _ddebug *desc, const struct device *dev,
 	struct va_format vaf;
 	va_list args;
 
-	if (!__drm_debug_enabled(category))
-		return;
+	if (drm_debug_syslog_enabled(category)) {
+		va_start(args, format);
+		vaf.fmt = format;
+		vaf.va = &args;
 
-	/* we know we are printing for either syslog, tracefs, or both */
-	va_start(args, format);
-	vaf.fmt = format;
-	vaf.va = &args;
+		if (dev)
+			dev_printk(KERN_DEBUG, dev, "[" DRM_NAME ":%ps] %pV",
+				__builtin_return_address(0), &vaf);
+		else
+			printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
+			__builtin_return_address(0), &vaf);
 
-	if (dev)
-		dev_printk(KERN_DEBUG, dev, "[" DRM_NAME ":%ps] %pV",
-			   __builtin_return_address(0), &vaf);
-	else
-		printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
-		       __builtin_return_address(0), &vaf);
+		va_end(args);
+	}
 
-	va_end(args);
+	if (drm_debug_trace_enabled(category)) {
+		va_start(args, format);
+		vaf.fmt = format;
+		vaf.va = &args;
+		drm_trace_printf("%s%s[" DRM_NAME ":%ps] %pV",
+				 dev ? dev_name(dev) : "", dev ? " " : "",
+				 __builtin_return_address(0), &vaf);
+		va_end(args);
+	}
 }
 EXPORT_SYMBOL(__drm_dev_dbg);
 
@@ -314,17 +358,25 @@ void ___drm_dbg(struct _ddebug *desc, enum drm_debug_category category, const ch
 	struct va_format vaf;
 	va_list args;
 
-	if (!__drm_debug_enabled(category))
-		return;
+	if (drm_debug_syslog_enabled(category)) {
+		va_start(args, format);
+		vaf.fmt = format;
+		vaf.va = &args;
 
-	va_start(args, format);
-	vaf.fmt = format;
-	vaf.va = &args;
+		printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
+		__builtin_return_address(0), &vaf);
 
-	printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
-	       __builtin_return_address(0), &vaf);
+		va_end(args);
+	}
 
-	va_end(args);
+	if (drm_debug_trace_enabled(category)) {
+		va_start(args, format);
+		vaf.fmt = format;
+		vaf.va = &args;
+		drm_trace_printf("[" DRM_NAME ":%ps] %pV",
+				 __builtin_return_address(0), &vaf);
+		va_end(args);
+	}
 }
 EXPORT_SYMBOL(___drm_dbg);
 
@@ -340,6 +392,13 @@ void __drm_err(const char *format, ...)
 	printk(KERN_ERR "[" DRM_NAME ":%ps] *ERROR* %pV",
 	       __builtin_return_address(0), &vaf);
 
+	va_end(args);
+
+	va_start(args, format);
+	vaf.fmt = format;
+	vaf.va = &args;
+	drm_trace_printf("[" DRM_NAME ":%ps] *ERROR* %pV",
+				__builtin_return_address(0), &vaf);
 	va_end(args);
 }
 EXPORT_SYMBOL(__drm_err);
@@ -371,3 +430,104 @@ void drm_print_regset32(struct drm_printer *p, struct debugfs_regset32 *regset)
 	}
 }
 EXPORT_SYMBOL(drm_print_regset32);
+
+
+/**
+ * DOC: DRM Tracing
+ *
+ * *tl;dr* DRM tracing is a lightweight alternative to traditional DRM debug
+ * logging.
+ *
+ * While DRM logging is quite convenient when reproducing a specific issue, it
+ * doesn't help when something goes wrong unexpectedly. There are a couple
+ * reasons why one does not want to enable DRM logging at all times:
+ *
+ * 1. We don't want to overwhelm syslog with drm spam, others have to use it too
+ * 2. Console logging is slow
+ *
+ * DRM tracing aims to solve both these problems.
+ *
+ * To use DRM tracing, set the drm.trace module parameter (via cmdline or sysfs)
+ * to a DRM debug category mask (this is a bitmask of &drm_debug_category
+ * values):
+ * ::
+ *
+ *    eg: echo 0x106 > /sys/module/drm/parameters/trace
+ *
+ * Once active, all log messages in the specified categories will be written to
+ * the DRM trace. Once at capacity, the trace will overwrite old messages with
+ * new ones. At any point, one can read the trace file to extract the previous N
+ * DRM messages:
+ * ::
+ *
+ *    eg: cat /sys/kernel/tracing/instances/drm/trace
+ *
+ * Considerations
+ * **************
+ * The trace is subsystem wide, so if you have multiple devices active, they
+ * will be adding logs to the same trace.
+ *
+ * The contents of the DRM Trace are **not** considered UABI. **DO NOT depend on
+ * the values of these traces in your userspace.** These traces are intended for
+ * entertainment purposes only. The contents of these logs carry no warranty,
+ * expressed or implied.
+ */
+
+
+#ifdef CONFIG_TRACING
+
+/**
+ * drm_trace_init - initializes the drm trace array
+ *
+ * This function fetches (or creates) the drm trace array. This should be called
+ * once on drm subsystem creation and matched with drm_trace_cleanup().
+ */
+void drm_trace_init(void)
+{
+	int ret;
+
+	trace_arr = trace_array_get_by_name("drm");
+	if (!trace_arr)
+		return;
+
+	ret = trace_array_init_printk(trace_arr);
+	if (ret)
+		drm_trace_cleanup();
+}
+EXPORT_SYMBOL(drm_trace_init);
+
+/**
+ * drm_trace_printf - adds an entry to the drm tracefs instance
+ * @format: printf format of the message to add to the trace
+ *
+ * This function adds a new entry in the drm tracefs instance
+ */
+void drm_trace_printf(const char *format, ...)
+{
+	struct va_format vaf;
+	va_list args;
+
+	va_start(args, format);
+	vaf.fmt = format;
+	vaf.va = &args;
+	trace_array_printk(trace_arr, _THIS_IP_, "%pV", &vaf);
+	va_end(args);
+}
+
+/**
+ * drm_trace_cleanup - destroys the drm trace array
+ *
+ * This function destroys the drm trace array created with drm_trace_init. This
+ * should be called once on drm subsystem close and matched with
+ * drm_trace_init().
+ */
+void drm_trace_cleanup(void)
+{
+	if (trace_arr) {
+		trace_array_put(trace_arr);
+		trace_array_destroy(trace_arr);
+		trace_arr = NULL;
+	}
+}
+EXPORT_SYMBOL(drm_trace_cleanup);
+#endif

@@ -37,12 +37,13 @@
 
 /* Do *not* use outside of drm_print.[ch]! */
 extern unsigned long __drm_debug_syslog;
+extern unsigned int __drm_debug_trace;
 
 /**
  * DOC: print
  *
  * A simple wrapper for dev_printk(), seq_printf(), etc.  Allows same
- * debug code to be used for both debugfs and printk logging.
+ * debug code to be used for debugfs, printk and tracefs logging.
  *
  * For example::
  *
@@ -87,6 +88,9 @@ void __drm_printfn_seq_file(struct drm_printer *p, struct va_format *vaf);
 void __drm_puts_seq_file(struct drm_printer *p, const char *str);
 void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf);
 void __drm_printfn_debug_syslog(struct drm_printer *p, struct va_format *vaf);
+void __drm_printfn_trace(struct drm_printer *p, struct va_format *vaf);
+void __drm_printfn_debug_syslog_and_trace(struct drm_printer *p,
+					   struct va_format *vaf);
 void __drm_printfn_err(struct drm_printer *p, struct va_format *vaf);
 void __drm_printfn_noop(struct drm_printer *p, struct va_format *vaf);
 
@@ -220,7 +224,8 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 }
 
 /**
- * drm_debug_printer - construct a &drm_printer that outputs to pr_debug()
+ * drm_debug_printer - construct a &drm_printer that outputs to pr_debug() and
+ * drm tracefs
  * @prefix: debug output prefix
  *
  * RETURNS:
@@ -229,7 +234,7 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
-		.printfn = __drm_printfn_debug_syslog,
+		.printfn = __drm_printfn_debug_syslog_and_trace,
 		.prefix = prefix
 	};
 	return p;
@@ -255,14 +260,14 @@ static inline struct drm_printer drm_err_printer(const char *prefix)
  * enum drm_debug_category - The DRM debug categories
  *
  * Each of the DRM debug logging macros use a specific category, and the logging
- * is filtered by the drm.debug module parameter. This enum specifies the values
- * for the interface.
+ * is filtered by the drm.debug and drm.trace module parameters. This enum
+ * specifies the values for the interface.
  *
  * Each DRM_DEBUG_<CATEGORY> macro logs to DRM_UT_<CATEGORY> category, except
  * DRM_DEBUG() logs to DRM_UT_CORE.
  *
- * Enabling verbose debug messages is done through the drm.debug parameter, each
- * category being enabled by a bit:
+ * Enabling verbose debug messages is done through the drm.debug and drm.trace
+ * parameters, each category being enabled by a bit:
  *
  *  - drm.debug=0x1 will enable CORE messages
  *  - drm.debug=0x2 will enable DRIVER messages
@@ -271,9 +276,13 @@ static inline struct drm_printer drm_err_printer(const char *prefix)
  *  - drm.debug=0x1ff will enable all messages
  *
  * An interesting feature is that it's possible to enable verbose logging at
- * run-time by echoing the debug value in its sysfs node::
+ * run-time by echoing the debug category value in its sysfs node::
  *
+ *   # For syslog logging:
  *   # echo 0xf > /sys/module/drm/parameters/debug
+ *
+ *   # For tracefs logging:
+ *   # echo 0xf > /sys/module/drm/parameters/trace
  *
  */
 enum drm_debug_category {
@@ -327,9 +336,21 @@ static inline bool drm_debug_syslog_enabled(enum drm_debug_category category)
 	return unlikely(__drm_debug_syslog & category);
 }
 
+static inline bool drm_debug_trace_enabled(enum drm_debug_category category)
+{
+	return unlikely(__drm_debug_trace & category);
+}
+
+static inline bool drm_debug_enabled(enum drm_debug_category category)
+{
+	return drm_debug_syslog_enabled(category) ||
+	       drm_debug_trace_enabled(category);
+}
+
 static inline bool drm_debug_enabled_raw(enum drm_debug_category category)
 {
-	return drm_debug_syslog_enabled(category);
+	return drm_debug_syslog_enabled(category) ||
+	       drm_debug_trace_enabled(category);
 }
 
 #define drm_debug_enabled_instrumented(category)			\
@@ -353,7 +374,7 @@ static inline bool drm_debug_enabled_raw(enum drm_debug_category category)
 
 /**
  * drm_debug_category_printer - construct a &drm_printer that outputs to
- * pr_debug() if enabled for the given category.
+ * pr_debug() and/or the drm tracefs instance if enabled for the given category.
  * @category: the DRM_UT_* message category this message belongs to
  * @prefix: trace output prefix
  *
@@ -368,8 +389,13 @@ drm_debug_category_printer(enum drm_debug_category category,
 		.prefix = prefix
 	};
 
-	if (drm_debug_syslog_enabled(category)) {
+	if (drm_debug_syslog_enabled(category) &&
+	    drm_debug_trace_enabled(category)) {
+		p.printfn = __drm_printfn_debug_syslog_and_trace;
+	} else if (drm_debug_syslog_enabled(category)) {
 		p.printfn = __drm_printfn_debug_syslog;
+	} else if (drm_debug_trace_enabled(category)) {
+		p.printfn = __drm_printfn_trace;
 	} else {
 		WARN(1, "Debug category %d is inactive.", category);
 		p.printfn = __drm_printfn_noop;
@@ -377,6 +403,27 @@ drm_debug_category_printer(enum drm_debug_category category,
 
 	return p;
 }
+
+
+#ifdef CONFIG_TRACING
+void drm_trace_init(void);
+__printf(1, 2)
+void drm_trace_printf(const char *format, ...);
+void drm_trace_cleanup(void);
+#else
+static inline void drm_trace_init(void)
+{
+}
+
+__printf(1, 2)
+static inline void drm_trace_printf(const char *format, ...)
+{
+}
+
+static inline void drm_trace_cleanup(void)
+{
+}
+#endif
 
 /*
  * struct device based logging
