@@ -101,6 +101,7 @@
   __devm_of_phy_provider_register
   devm_of_platform_populate
   devm_phy_create
+  devm_phy_get
   devm_pinctrl_register
   __devm_regmap_init_mmio_clk
   devm_regulator_bulk_get
@@ -331,6 +332,11 @@
   pci_write_config_dword
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
+  phy_exit
+  phy_init
+  phy_power_off
+  phy_power_on
+  phy_set_mode_ext
   pinconf_generic_dt_node_to_map
   pinctrl_dev_get_drvdata
   pinctrl_pm_select_default_state
@@ -408,6 +414,7 @@
   regulator_set_voltage
   release_firmware
   request_firmware
+  request_firmware_into_buf
   request_threaded_irq
   reset_control_assert
   reset_control_deassert
@@ -750,18 +757,12 @@
   dev_fwnode
   device_property_read_string
   device_property_read_u8_array
-  devm_phy_get
   devm_usb_get_phy
   extcon_find_edev_by_node
   extcon_get_extcon_dev
   of_usb_get_phy_mode
-  phy_exit
-  phy_init
   phy_pm_runtime_get_sync
   phy_pm_runtime_put_sync
-  phy_power_off
-  phy_power_on
-  phy_set_mode_ext
   platform_get_irq_byname_optional
   system_freezable_wq
   usb_add_gadget_udc
@@ -878,9 +879,6 @@
   mipi_dsi_device_unregister
   of_find_mipi_dsi_host_by_node
   regmap_multi_reg_write
-
-# required by mdt_loader.ko
-  request_firmware_into_buf
 
 # required by msm.ko
   __bitmap_andnot
@@ -1550,6 +1548,23 @@
   spmi_controller_add
   spmi_controller_alloc
   spmi_controller_remove
+
+# required by ufs-qcom.ko
+  ufshcd_dme_get_attr
+  ufshcd_dme_set_attr
+  ufshcd_dump_regs
+  ufshcd_get_local_unipro_ver
+  ufshcd_get_pwr_dev_param
+  ufshcd_pltfrm_init
+  ufshcd_pltfrm_resume
+  ufshcd_pltfrm_runtime_idle
+  ufshcd_pltfrm_runtime_resume
+  ufshcd_pltfrm_runtime_suspend
+  ufshcd_pltfrm_shutdown
+  ufshcd_pltfrm_suspend
+  ufshcd_remove
+  ufshcd_uic_hibern8_enter
+  ufshcd_uic_hibern8_exit
 
 # required by ulpi.ko
   of_device_modalias
