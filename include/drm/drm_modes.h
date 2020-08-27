@@ -350,12 +350,19 @@ struct drm_display_mode {
 	u8 type;
 
 	/**
-	 * @private_flags:
+	 * @private:
 	 *
-	 * Driver private flags. private_flags can only be used for mode
+	 * Pointer for driver private data. This can only be used for mode
 	 * objects passed to drivers in modeset operations. It shouldn't be used
 	 * by atomic drivers since they can store any additional data by
 	 * subclassing state structures.
+	 */
+	int *private;
+
+	/**
+	 * @private_flags:
+	 *
+	 * Similar to @private, but just an integer.
 	 */
 	int private_flags;
 
