@@ -306,6 +306,8 @@ static const struct of_device_id trusty_test_of_match[] = {
 	{},
 };
 
+MODULE_DEVICE_TABLE(trusty, trusty_test_of_match);
+
 static struct platform_driver trusty_log_driver = {
 	.probe = trusty_log_probe,
 	.remove = trusty_log_remove,
@@ -317,3 +319,6 @@ static struct platform_driver trusty_log_driver = {
 };
 
 module_platform_driver(trusty_log_driver);
+
+MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("Trusty logging driver");
