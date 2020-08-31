@@ -557,6 +557,8 @@ static const struct of_device_id trusty_test_of_match[] = {
 	{},
 };
 
+MODULE_DEVICE_TABLE(trusty, trusty_test_of_match);
+
 static struct platform_driver trusty_irq_driver = {
 	.probe = trusty_irq_probe,
 	.remove = trusty_irq_remove,
@@ -604,3 +606,6 @@ static void __exit trusty_irq_driver_exit(void)
 
 module_init(trusty_irq_driver_init);
 module_exit(trusty_irq_driver_exit);
+
+MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("Trusty IRQ driver");
