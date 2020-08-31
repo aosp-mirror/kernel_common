@@ -931,6 +931,8 @@ static const struct of_device_id trusty_of_match[] = {
 	{},
 };
 
+MODULE_DEVICE_TABLE(trusty, trusty_of_match);
+
 static struct platform_driver trusty_driver = {
 	.probe = trusty_probe,
 	.remove = trusty_remove,
@@ -953,3 +955,6 @@ static void __exit trusty_driver_exit(void)
 
 subsys_initcall(trusty_driver_init);
 module_exit(trusty_driver_exit);
+
+MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("Trusty core driver");
