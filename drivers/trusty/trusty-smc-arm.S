@@ -38,3 +38,4 @@ ENTRY(trusty_smc8)
 
     /* Return */
     bx      lr
+ENDPROC(trusty_smc8)

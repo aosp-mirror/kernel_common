@@ -32,3 +32,4 @@ ENTRY(trusty_smc8)
     stp     x6, x7, [x8], #16
 
     ret
+ENDPROC(trusty_smc8)
