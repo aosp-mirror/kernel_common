@@ -342,7 +342,7 @@ int trusty_share_memory(struct device *dev, uint64_t *id,
 			}
 		} else if (smc_ret.r0 == SMC_FC_FFA_SUCCESS) {
 			ffa_handle = smc_ret.r2 | smc_ret.r3 << 32;
-			dev_dbg(s->dev, "%s: fragment_len %zd/%zd, got handle 0x%lx\n",
+			dev_dbg(s->dev, "%s: fragment_len %zu/%zu, got handle 0x%llx\n",
 				__func__, fragment_len, total_len,
 				ffa_handle);
 			if (count) {
@@ -351,14 +351,14 @@ int trusty_share_memory(struct device *dev, uint64_t *id,
 				 * Expected SMC_FC_FFA_MEM_FRAG_RX not
 				 * SMC_FC_FFA_SUCCESS.
 				 */
-				dev_err(s->dev, "%s: fragment_len %zd/%zd, unexpected SMC_FC_FFA_SUCCESS, count %d != 0\n",
+				dev_err(s->dev, "%s: fragment_len %zu/%zu, unexpected SMC_FC_FFA_SUCCESS, count %zu != 0\n",
 					__func__, fragment_len, total_len,
 					count);
 				ret = -EIO;
 				break;
 			}
 		} else {
-			dev_err(s->dev, "%s: fragment_len %zd/%zd, SMC_FC_FFA_MEM_SHARE failed 0x%x 0x%x 0x%x",
+			dev_err(s->dev, "%s: fragment_len %zu/%zu, SMC_FC_FFA_MEM_SHARE failed 0x%lx 0x%lx 0x%lx",
 				__func__, fragment_len, total_len,
 				smc_ret.r0, smc_ret.r1, smc_ret.r2);
 			ret = -EIO;
@@ -439,7 +439,7 @@ int trusty_reclaim_memory(struct device *dev, uint64_t id,
 	smc_ret = trusty_smc8(SMC_FC_FFA_MEM_RECLAIM, (u32)id, id >> 32, 0, 0,
 			      0, 0, 0);
 	if (smc_ret.r0 != SMC_FC_FFA_SUCCESS) {
-		dev_err(s->dev, "%s: SMC_FC_FFA_MEM_RECLAIM failed 0x%x 0x%x 0x%x",
+		dev_err(s->dev, "%s: SMC_FC_FFA_MEM_RECLAIM failed 0x%lx 0x%lx 0x%lx",
 			__func__, smc_ret.r0, smc_ret.r1, smc_ret.r2);
 		if (smc_ret.r0 == SMC_FC_FFA_ERROR &&
 		    smc_ret.r2 == FFA_ERROR_DENIED)
@@ -516,7 +516,7 @@ static int trusty_init_msg_buf(struct trusty_state *s, struct device *dev)
 			      0, 0, 0, 0);
 	if (FFA_VERSION_TO_MAJOR(smc_ret.r0) != FFA_CURRENT_VERSION_MAJOR) {
 		dev_err(s->dev,
-			"%s: Unsupported FF-A version 0x%x, expected 0x%x\n",
+			"%s: Unsupported FF-A version 0x%lx, expected 0x%x\n",
 			__func__, smc_ret.r0, FFA_CURRENT_VERSION);
 		ret = -EIO;
 		goto err_version;
@@ -527,7 +527,7 @@ static int trusty_init_msg_buf(struct trusty_state *s, struct device *dev)
 			      0, 0, 0, 0);
 	if (smc_ret.r0 != SMC_FC_FFA_SUCCESS) {
 		dev_err(s->dev,
-			"%s: SMC_FC_FFA_FEATURES(SMC_FC_FFA_MEM_SHARE) failed 0x%x 0x%x 0x%x\n",
+			"%s: SMC_FC_FFA_FEATURES(SMC_FC_FFA_MEM_SHARE) failed 0x%lx 0x%lx 0x%lx\n",
 			__func__, smc_ret.r0, smc_ret.r1, smc_ret.r2);
 		ret = -EIO;
 		goto err_features;
@@ -542,7 +542,7 @@ static int trusty_init_msg_buf(struct trusty_state *s, struct device *dev)
 	smc_ret = trusty_smc8(SMC_FC_FFA_ID_GET, 0, 0, 0, 0, 0, 0, 0);
 	if (smc_ret.r0 != SMC_FC_FFA_SUCCESS) {
 		dev_err(s->dev,
-			"%s: SMC_FC_FFA_ID_GET failed 0x%x 0x%x 0x%x\n",
+			"%s: SMC_FC_FFA_ID_GET failed 0x%lx 0x%lx 0x%lx\n",
 			__func__, smc_ret.r0, smc_ret.r1, smc_ret.r2);
 		ret = -EIO;
 		goto err_id_get;
@@ -576,7 +576,7 @@ static int trusty_init_msg_buf(struct trusty_state *s, struct device *dev)
 	smc_ret = trusty_smc8(SMC_FCZ_FFA_RXTX_MAP, tx_paddr, rx_paddr, 1, 0,
 			      0, 0, 0);
 	if (smc_ret.r0 != SMC_FC_FFA_SUCCESS) {
-		dev_err(s->dev, "%s: SMC_FCZ_FFA_RXTX_MAP failed 0x%x 0x%x 0x%x\n",
+		dev_err(s->dev, "%s: SMC_FCZ_FFA_RXTX_MAP failed 0x%lx 0x%lx 0x%lx\n",
 			__func__, smc_ret.r0, smc_ret.r1, smc_ret.r2);
 		ret = -EIO;
 		goto err_rxtx_map;
@@ -605,7 +605,7 @@ static void trusty_free_msg_buf(struct trusty_state *s, struct device *dev)
 
 	smc_ret = trusty_smc8(SMC_FC_FFA_RXTX_UNMAP, 0, 0, 0, 0, 0, 0, 0);
 	if (smc_ret.r0 != SMC_FC_FFA_SUCCESS) {
-		dev_err(s->dev, "%s: SMC_FC_FFA_RXTX_UNMAP failed 0x%x 0x%x 0x%x\n",
+		dev_err(s->dev, "%s: SMC_FC_FFA_RXTX_UNMAP failed 0x%lx 0x%lx 0x%lx\n",
 			__func__, smc_ret.r0, smc_ret.r1, smc_ret.r2);
 	} else {
 		kfree(s->ffa_rx);
