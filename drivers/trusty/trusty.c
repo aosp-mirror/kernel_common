@@ -303,8 +303,9 @@ int trusty_share_memory(struct device *dev, uint64_t *id,
 	total_len = cons_mrd_offset + nents * sizeof(*cons_mrd);
 	sg = sglist;
 	while (count) {
-		size_t lcount = min(count, (PAGE_SIZE - cons_mrd_offset) /
-				    sizeof(*cons_mrd));
+		size_t lcount =
+			min_t(size_t, count, (PAGE_SIZE - cons_mrd_offset) /
+			      sizeof(*cons_mrd));
 		size_t fragment_len = lcount * sizeof(*cons_mrd) +
 				      cons_mrd_offset;
 
@@ -341,7 +342,7 @@ int trusty_share_memory(struct device *dev, uint64_t *id,
 				break;
 			}
 		} else if (smc_ret.r0 == SMC_FC_FFA_SUCCESS) {
-			ffa_handle = smc_ret.r2 | smc_ret.r3 << 32;
+			ffa_handle = smc_ret.r2 | (u64)smc_ret.r3 << 32;
 			dev_dbg(s->dev, "%s: fragment_len %zu/%zu, got handle 0x%llx\n",
 				__func__, fragment_len, total_len,
 				ffa_handle);
