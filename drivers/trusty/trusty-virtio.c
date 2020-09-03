@@ -831,3 +831,10 @@ module_platform_driver(trusty_virtio_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Trusty virtio driver");
+/*
+ * TODO(b/168322325): trusty-virtio and trusty-ipc should be independent.
+ * However, trusty-virtio is not completely generic and is aware of trusty-ipc.
+ * See header includes. Particularly, trusty-virtio.ko can't be loaded before
+ * trusty-ipc.ko.
+ */
+MODULE_SOFTDEP("pre: trusty-ipc");
