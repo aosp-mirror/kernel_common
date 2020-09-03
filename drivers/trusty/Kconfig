@@ -9,13 +9,13 @@ config TRUSTY
 	default n
 
 config TRUSTY_SMC_ARM
-	tristate
+	bool
 	depends on TRUSTY
 	depends on ARM
 	default y
 
 config TRUSTY_SMC_ARM64
-	tristate
+	bool
 	depends on TRUSTY
 	depends on ARM64
 	default y
