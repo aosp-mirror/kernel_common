@@ -1363,6 +1363,7 @@
 # required by qrtr.ko
   __alloc_skb
   datagram_poll
+  idr_alloc_u32
   lock_sock_nested
   netlink_capable
   __nla_parse
@@ -1549,7 +1550,7 @@
   spmi_controller_alloc
   spmi_controller_remove
 
-# required by ufs-qcom.ko
+# required by ufs_qcom.ko
   ufshcd_dme_get_attr
   ufshcd_dme_set_attr
   ufshcd_dump_regs
