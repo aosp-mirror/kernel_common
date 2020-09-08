@@ -491,4 +491,5 @@ static inline unsigned int rdo_max_power(u32 rdo)
 #define PD_N_HARD_RESET_COUNT	2
 
 #define PD_T_BIST_CONT_MODE	50 /* 30 - 60 ms */
+#define PD_P_SNK_STDBY_5V	500	/* 2500 mw - 500mA @ 5V */
 #endif /* __LINUX_USB_PD_H */
