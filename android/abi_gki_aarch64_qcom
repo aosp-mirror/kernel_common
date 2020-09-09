@@ -1188,6 +1188,8 @@
   kvfree
   kvmalloc_node
   kzfree
+  led_classdev_flash_register_ext
+  led_classdev_flash_unregister
   led_classdev_register_ext
   led_classdev_unregister
   led_trigger_event
