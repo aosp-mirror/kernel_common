@@ -301,6 +301,12 @@ static int tcpci_enable_frs(struct tcpc_dev *dev, bool enable)
 	struct tcpci *tcpci = tcpc_to_tcpci(dev);
 	int ret;
 
+	if (tcpci->data->enable_frs) {
+		ret = tcpci->data->enable_frs(tcpci, tcpci->data, enable);
+		if (ret < 0)
+			return ret;
+	}
+
 	/* To prevent disconnect during FRS, set disconnect threshold to 3.5V */
 	ret = tcpci_write16(tcpci, TCPC_VBUS_SINK_DISCONNECT_THRESH, enable ? 0 : 0x8c);
 	if (ret < 0)

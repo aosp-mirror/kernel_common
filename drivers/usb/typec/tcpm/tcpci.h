@@ -168,6 +168,7 @@ struct tcpci_data {
 	void (*set_cc_polarity)(struct tcpci *tcpci, struct tcpci_data *data,
 				enum typec_cc_polarity polarity);
 	int (*frs_sourcing_vbus)(struct tcpci *tcpci, struct tcpci_data *data);
+	int (*enable_frs)(struct tcpci *tcpci, struct tcpci_data *data, bool enable);
 };
 
 struct tcpci *tcpci_register_port(struct device *dev, struct tcpci_data *data);
