@@ -12,16 +12,24 @@
   bio_add_page
   bio_alloc_bioset
   bio_associate_blkg
+  bio_endio
   bio_put
+  blk_alloc_queue
   blk_cleanup_queue
+  blk_queue_flag_clear
   blk_queue_flag_set
+  blk_queue_io_min
+  blk_queue_io_opt
+  blk_queue_logical_block_size
+  blk_queue_make_request
+  blk_queue_max_discard_sectors
+  blk_queue_max_write_zeroes_sectors
+  blk_queue_physical_block_size
   blk_queue_write_cache
   bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
-  __break_lease
-  call_rcu
   cancel_delayed_work_sync
   cancel_work_sync
   capable
@@ -29,25 +37,31 @@
   __check_object_size
   __class_create
   class_destroy
-  clear_inode
   __close_fd
   complete
   __const_udelay
   consume_skb
+  __cpuhp_remove_state
+  __cpuhp_setup_state
+  __cpuhp_state_add_instance
+  __cpuhp_state_remove_instance
   cpu_hwcap_keys
   cpu_hwcaps
   cpumask_next
   cpu_number
   __cpu_online_mask
   __cpu_possible_mask
+  crypto_destroy_tfm
+  crypto_register_alg
+  crypto_register_scomp
+  crypto_unregister_alg
+  crypto_unregister_scomp
   _ctype
-  d_drop
   debugfs_create_dir
   debugfs_create_file
   debugfs_remove_recursive
   delayed_work_timer_fn
   del_gendisk
-  dentry_open
   destroy_workqueue
   _dev_err
   device_add_disk
@@ -60,7 +74,6 @@
   devm_kmalloc
   devm_request_threaded_irq
   _dev_warn
-  dget_parent
   dma_alloc_attrs
   dma_fence_context_alloc
   dma_fence_init
@@ -71,8 +84,6 @@
   dma_set_coherent_mask
   dma_set_mask
   down_write
-  dput
-  d_splice_alias
   ethtool_op_get_link
   eth_validate_addr
   event_triggers_call
@@ -96,7 +107,6 @@
   ida_alloc_range
   ida_free
   iget5_locked
-  init_special_inode
   init_timer_key
   init_wait_entry
   __init_waitqueue_head
@@ -108,10 +118,8 @@
   input_unregister_device
   iounmap
   iput
-  iterate_dir
   jiffies
   jiffies_to_msecs
-  kern_path
   kfree
   kimage_vaddr
   kimage_voffset
@@ -130,7 +138,7 @@
   kobject_put
   kobject_uevent
   kstrdup
-  kstrtouint
+  kstrtoint
   kstrtoull
   ktime_get_mono_fast_ns
   ktime_get_raw_ts64
@@ -143,11 +151,11 @@
   __list_add_valid
   __list_del_entry_valid
   __local_bh_enable_ip
-  lockref_get
-  lock_rename
+  __lock_page
   match_token
   memcpy
   memmove
+  memparse
   memset
   misc_deregister
   misc_register
@@ -157,6 +165,7 @@
   __msecs_to_jiffies
   msleep
   __mutex_init
+  mutex_is_locked
   mutex_lock
   mutex_lock_interruptible
   mutex_trylock
@@ -171,13 +180,12 @@
   nf_conntrack_destroy
   noop_llseek
   nr_cpu_ids
+  __num_online_cpus
   pagecache_get_page
   param_ops_bool
   param_ops_int
   param_ops_uint
   passthru_features_check
-  path_get
-  path_put
   pci_disable_device
   pci_enable_device
   pci_read_config_byte
@@ -187,6 +195,7 @@
   pci_request_region
   pci_set_master
   pci_unregister_driver
+  __per_cpu_offset
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   physvirt_offset
@@ -199,14 +208,12 @@
   platform_driver_unregister
   platform_get_irq
   platform_get_resource
-  pm_runtime_allow
   __pm_runtime_suspend
   __pm_runtime_use_autosuspend
   preempt_schedule
   preempt_schedule_notrace
   prepare_to_wait_event
   printk
-  __put_cred
   put_device
   put_disk
   __put_page
@@ -230,6 +237,7 @@
   register_blkdev
   register_filesystem
   register_netdev
+  register_shrinker
   register_virtio_device
   register_virtio_driver
   remap_pfn_range
@@ -246,7 +254,6 @@
   seq_puts
   seq_read
   set_disk_ro
-  set_nlink
   sg_init_one
   sg_init_table
   skb_add_rx_frag
@@ -274,8 +281,8 @@
   __sw_hweight64
   sync_file_create
   synchronize_irq
-  synchronize_rcu
   sysfs_create_group
+  __sysfs_match_string
   sysfs_remove_group
   system_wq
   trace_define_field
@@ -287,20 +294,19 @@
   trace_handle_return
   trace_raw_output_prep
   trace_seq_printf
-  truncate_inode_pages
   try_module_get
   unlock_new_inode
   unlock_page
-  unlock_rename
   unregister_blkdev
   unregister_filesystem
   unregister_netdev
+  unregister_shrinker
   unregister_virtio_device
   unregister_virtio_driver
   up_write
   usleep_range
   vabits_actual
-  vfs_getattr
+  vfree
   virtio_check_driver_offered_feature
   virtio_config_changed
   virtio_max_dma_size
@@ -365,15 +371,17 @@
 # required by erofs.ko
   add_to_page_cache_lru
   bit_wait
+  call_rcu
+  d_splice_alias
   fs_ftype_to_dtype
   generic_block_bmap
   generic_fillattr
   generic_ro_fops
   iget_failed
+  init_special_inode
   init_user_ns
   inode_nohighmem
   kill_block_super
-  __lock_page
   LZ4_decompress_safe_partial
   match_strdup
   mount_bdev
@@ -393,14 +401,13 @@
   rcu_barrier
   read_cache_page
   read_cache_page_gfp
-  register_shrinker
   sb_set_blocksize
+  set_nlink
   simple_get_link
   strnlen
   strscpy
   trace_print_flags_seq
   trace_print_symbols_seq
-  unregister_shrinker
   vm_map_ram
   vm_unmap_aliases
   vm_unmap_ram
@@ -441,13 +448,18 @@
 
 # required by incrementalfs.ko
   bin2hex
+  __break_lease
+  clear_inode
   crc32_le
   crypto_alloc_shash
-  crypto_destroy_tfm
   crypto_shash_digest
   d_add
+  d_drop
   deactivate_locked_super
+  dentry_open
+  dget_parent
   d_instantiate
+  dput
   flush_delayed_work
   fs_kobj
   fsstack_copy_attr_all
@@ -458,14 +470,20 @@
   get_zeroed_page
   ihold
   inode_init_owner
+  iterate_dir
   kernel_read
   kernel_write
+  kern_path
   ktime_get
+  lockref_get
+  lock_rename
   lookup_one_len
   LZ4_decompress_safe
   match_int
-  mutex_is_locked
   notify_change
+  path_get
+  path_put
+  __put_cred
   set_anon_super
   sget
   simple_getattr
@@ -473,9 +491,12 @@
   simple_statfs
   strndup_user
   sync_filesystem
+  truncate_inode_pages
+  unlock_rename
   user_path_at_empty
   vfs_create
   vfs_fallocate
+  vfs_getattr
   vfs_getxattr
   vfs_link
   vfs_listxattr
@@ -581,15 +602,11 @@
   bdev_read_only
   bd_link_disk_holder
   bd_unlink_disk_holder
-  bio_endio
   bioset_exit
   bioset_init
-  blk_alloc_queue
   blkdev_get_by_dev
   blkdev_put
   blk_finish_plug
-  blk_queue_flag_clear
-  blk_queue_make_request
   blk_queue_split
   blk_register_region
   blk_set_stacking_limits
@@ -614,6 +631,7 @@
   kobject_get
   kstrtobool
   kstrtoll
+  kstrtouint
   kthread_create_on_node
   kthread_parkme
   kthread_should_park
@@ -623,7 +641,6 @@
   mempool_destroy
   mempool_kfree
   mempool_kmalloc
-  __per_cpu_offset
   percpu_ref_exit
   percpu_ref_init
   percpu_ref_switch_to_atomic_sync
@@ -643,6 +660,7 @@
   submit_bh
   submit_bio_wait
   sync_blockdev
+  synchronize_rcu
   sysfs_create_link
   sysfs_notify
   sysfs_remove_link
@@ -684,59 +702,6 @@
   rtc_tm_to_time64
   rtc_update_irq
 
-# required by sdcardfs.ko
-  clear_nlink
-  configfs_register_subsystem
-  configfs_unregister_subsystem
-  config_group_init
-  config_group_init_type_name
-  config_item_init_type_name
-  copy_fs_struct
-  d_invalidate
-  d_path
-  d_rehash
-  d_set_d_op
-  filemap_write_and_wait
-  filp_close
-  filp_open
-  free_fs_struct
-  fscrypt_register_key_removal_notifier
-  fscrypt_unregister_key_removal_notifier
-  fs_parse
-  fsstack_copy_inode_size
-  generic_delete_inode
-  __generic_file_fsync
-  generic_permission
-  igrab
-  inode_newsize_ok
-  kill_anon_super
-  lookup_one_len_unlocked
-  mntget
-  names_cachep
-  notify_change2
-  override_creds
-  prepare_creds
-  revert_creds
-  setattr_prepare
-  set_fs_pwd
-  shrink_dcache_sb
-  strcasecmp
-  strncasecmp
-  strrchr
-  touch_atime
-  truncate_setsize
-  vfs_create2
-  vfs_fsync_range
-  vfs_get_super
-  vfs_mkdir2
-  vfs_path_lookup
-  vfs_read
-  vfs_rename2
-  vfs_rmdir2
-  vfs_statfs
-  vfs_unlink2
-  vfs_write
-
 # required by snd-hda-codec-generic.ko
   snd_ctl_boolean_stereo_info
   strchr
@@ -751,6 +716,7 @@
   get_device_system_crosststamp
   kvasprintf
   ns_to_timespec
+  pm_runtime_allow
   __pm_runtime_disable
   pm_runtime_enable
   pm_runtime_forbid
@@ -802,7 +768,6 @@
   dev_set_name
   kasprintf
   krealloc
-  kstrtoint
   pm_runtime_get_if_in_use
   __pm_runtime_resume
   __pm_runtime_set_status
@@ -846,7 +811,6 @@
 # required by test_meminit.ko
   kmem_cache_alloc_bulk
   kmem_cache_free_bulk
-  vfree
   vmalloc
 
 # required by virtio-gpu.ko
@@ -984,23 +948,16 @@
   blk_mq_virtio_map_queues
   blk_put_request
   blk_queue_alignment_offset
-  blk_queue_io_min
-  blk_queue_io_opt
-  blk_queue_logical_block_size
-  blk_queue_max_discard_sectors
   blk_queue_max_discard_segments
   blk_queue_max_hw_sectors
   blk_queue_max_segments
   blk_queue_max_segment_size
-  blk_queue_max_write_zeroes_sectors
-  blk_queue_physical_block_size
   blk_rq_map_kern
   blk_rq_map_sg
   blk_status_to_errno
   _dev_notice
   kobject_uevent_env
   string_get_size
-  __sysfs_match_string
 
 # required by virtio_console.ko
   cdev_add
@@ -1039,7 +996,6 @@
   device_register
   __devm_request_region
   iomem_resource
-  memparse
   platform_device_register_full
   sscanf
 
@@ -1051,10 +1007,6 @@
   bpf_stats_enabled_key
   bpf_warn_invalid_xdp_action
   build_skb
-  __cpuhp_remove_state
-  __cpuhp_setup_state
-  __cpuhp_state_add_instance
-  __cpuhp_state_remove_instance
   cpumask_next_wrap
   cpus_read_lock
   cpus_read_unlock
@@ -1082,7 +1034,6 @@
   netif_set_real_num_tx_queues
   __netif_set_xps_queue
   net_ratelimit
-  __num_online_cpus
   _raw_spin_trylock
   sched_clock
   skb_coalesce_rx_frag
@@ -1128,3 +1079,46 @@
   nvdimm_bus_register
   nvdimm_bus_unregister
   nvdimm_pmem_region_create
+
+# required by zram.ko
+  __alloc_percpu
+  bdget_disk
+  bdput
+  __class_register
+  class_unregister
+  crypto_alloc_base
+  crypto_has_alg
+  down_read
+  free_percpu
+  fsync_bdev
+  generic_end_io_acct
+  generic_start_io_acct
+  idr_alloc
+  idr_destroy
+  idr_find
+  idr_for_each
+  idr_remove
+  __init_rwsem
+  kstrtou16
+  memset64
+  page_endio
+  sysfs_streq
+  up_read
+  vzalloc
+
+# required by zsmalloc.ko
+  alloc_anon_inode
+  __ClearPageMovable
+  contig_page_data
+  dec_zone_page_state
+  inc_zone_page_state
+  init_pseudo
+  kern_mount
+  kern_unmount
+  kill_anon_super
+  page_mapping
+  _raw_read_lock
+  _raw_read_unlock
+  _raw_write_lock
+  _raw_write_unlock
+  __SetPageMovable

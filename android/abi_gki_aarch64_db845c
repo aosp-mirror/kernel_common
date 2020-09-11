@@ -1438,69 +1438,6 @@
   rtc_update_irq
   rtc_valid_tm
 
-# required by sdcardfs.ko
-  call_rcu
-  clear_nlink
-  configfs_register_subsystem
-  configfs_unregister_subsystem
-  config_group_init
-  config_group_init_type_name
-  config_item_init_type_name
-  copy_fs_struct
-  d_invalidate
-  d_path
-  d_rehash
-  d_set_d_op
-  d_splice_alias
-  filemap_write_and_wait
-  filp_close
-  filp_open
-  free_fs_struct
-  fscrypt_register_key_removal_notifier
-  fscrypt_unregister_key_removal_notifier
-  fs_parse
-  fsstack_copy_inode_size
-  generic_delete_inode
-  __generic_file_fsync
-  generic_permission
-  igrab
-  init_special_inode
-  inode_newsize_ok
-  kill_anon_super
-  kmem_cache_alloc
-  kmem_cache_create
-  kmem_cache_destroy
-  kmem_cache_free
-  kstrtoull
-  lookup_one_len_unlocked
-  mntget
-  names_cachep
-  notify_change2
-  override_creds
-  prepare_creds
-  revert_creds
-  setattr_prepare
-  set_fs_pwd
-  set_nlink
-  shrink_dcache_sb
-  strcasecmp
-  strncasecmp
-  strrchr
-  synchronize_rcu
-  touch_atime
-  truncate_setsize
-  vfs_create2
-  vfs_fsync_range
-  vfs_get_super
-  vfs_mkdir2
-  vfs_path_lookup
-  vfs_read
-  vfs_rename2
-  vfs_rmdir2
-  vfs_statfs
-  vfs_unlink2
-  vfs_write
-
 # required by sdhci-msm.ko
   mmc_of_parse
   mmc_send_tuning
