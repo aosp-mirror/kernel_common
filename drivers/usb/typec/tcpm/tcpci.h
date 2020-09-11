@@ -157,6 +157,16 @@ struct tcpci;
 /*
  * @auto_discharge_disconnect:
  *		Optional; Enables TCPC to autonously discharge vbus on disconnect.
+ * @get_vbus:
+ *		Optional; From the tcpci spec, "The TCPC shall report VBUS present
+ *		when TCPC detects VBUS rises above 4V. The TCPC shall report VBUS is
+ *		not present when TCPC detects VBUS falls below 3.5V. The TCPC may report
+ *		VBUS is not present if VBUS is between 3.5V and 4V." Between one
+ *		implementation of TCPC and another, 3.5V < VBUS < 4V might or
+ *		might not be reported as PRESENT. When VBUS < 4V is reported as
+ *		absent, the link might be disconnected to early before
+ *		vSinkDisconnect max(3.67V) is reached. Hence provide a chip
+ *		specific callback for the tcpc chip driver override if needed.
  */
 struct tcpci_data {
 	struct regmap *regmap;
@@ -170,6 +180,7 @@ struct tcpci_data {
 	int (*start_drp_toggling)(struct tcpci *tcpci, struct tcpci_data *data,
 				  enum typec_cc_status cc);
 	int (*set_vbus)(struct tcpci *tcpci, struct tcpci_data *data, bool source, bool sink);
+	int (*get_vbus)(struct tcpci *tcpci, struct tcpci_data *data);
 	int (*set_roles)(struct tcpci *tcpci, struct tcpci_data *data, bool attached,
 			 enum typec_role role, enum typec_data_role data_role,
 			 bool usb_comm_capable);

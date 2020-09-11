@@ -439,6 +439,9 @@ static int tcpci_get_vbus(struct tcpc_dev *tcpc)
 	unsigned int reg;
 	int ret;
 
+	if (tcpci->data->get_vbus)
+		return tcpci->data->get_vbus(tcpci, tcpci->data);
+
 	ret = regmap_read(tcpci->regmap, TCPC_POWER_STATUS, &reg);
 	if (ret < 0)
 		return ret;
