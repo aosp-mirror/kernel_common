@@ -535,6 +535,7 @@ struct vm_operations_struct {
 	ANDROID_KABI_RESERVE(2);
 	ANDROID_KABI_RESERVE(3);
 	ANDROID_KABI_RESERVE(4);
+	ANDROID_VENDOR_DATA(1);
 };
 
 static inline void vma_init(struct vm_area_struct *vma, struct mm_struct *mm)
