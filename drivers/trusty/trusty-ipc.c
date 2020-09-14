@@ -61,7 +61,7 @@ struct tipc_msg_hdr {
 	u32 reserved;
 	u16 len;
 	u16 flags;
-	u8 data[0];
+	u8 data[];
 } __packed;
 
 enum tipc_ctrl_msg_types {
@@ -75,7 +75,7 @@ enum tipc_ctrl_msg_types {
 struct tipc_ctrl_msg {
 	u32 type;
 	u32 body_len;
-	u8  body[0];
+	u8  body[];
 } __packed;
 
 struct tipc_conn_req_body {

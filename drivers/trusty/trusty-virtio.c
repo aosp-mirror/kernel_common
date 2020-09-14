@@ -70,7 +70,7 @@ struct trusty_vdev {
 	void			*config;
 	struct fw_rsc_vdev	*vdev_descr;
 	uint			vring_num;
-	struct trusty_vring	vrings[0];
+	struct trusty_vring	vrings[];
 };
 
 #define vdev_to_tvdev(vd)  container_of((vd), struct trusty_vdev, vdev)

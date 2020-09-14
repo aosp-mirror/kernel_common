@@ -10,7 +10,7 @@ struct log_rb {
 	volatile uint32_t alloc;
 	volatile uint32_t put;
 	uint32_t sz;
-	volatile char data[0];
+	volatile char data[];
 } __packed;
 
 #define SMC_SC_SHARED_LOG_VERSION	SMC_STDCALL_NR(SMC_ENTITY_LOGGING, 0)
