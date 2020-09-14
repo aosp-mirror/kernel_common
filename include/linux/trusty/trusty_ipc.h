@@ -69,6 +69,7 @@ static inline size_t mb_avail_data(struct tipc_msg_buf *mb)
 static inline void *mb_put_data(struct tipc_msg_buf *mb, size_t len)
 {
 	void *pos = (u8 *)mb->buf_va + mb->wpos;
+
 	BUG_ON(mb->wpos + len > mb->buf_sz);
 	mb->wpos += len;
 	return pos;
@@ -77,6 +78,7 @@ static inline void *mb_put_data(struct tipc_msg_buf *mb, size_t len)
 static inline void *mb_get_data(struct tipc_msg_buf *mb, size_t len)
 {
 	void *pos = (u8 *)mb->buf_va + mb->rpos;
+
 	BUG_ON(mb->rpos + len > mb->wpos);
 	mb->rpos += len;
 	return pos;

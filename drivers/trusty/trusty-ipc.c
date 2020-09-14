@@ -1311,8 +1311,7 @@ static void _handle_conn_rsp(struct tipc_virtio_dev *vds,
 	}
 
 	dev_dbg(&vds->vdev->dev,
-		"%s: connection response: for addr 0x%x: "
-		"status %d remote addr 0x%x\n",
+		"%s: connection response: for addr 0x%x: status %d remote addr 0x%x\n",
 		__func__, rsp->target, rsp->status, rsp->remote);
 
 	/* Lookup channel */
@@ -1516,7 +1515,7 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 	struct tipc_dev_config config;
 	struct virtqueue *vqs[2];
 	vq_callback_t *vq_cbs[] = {_rxvq_cb, _txvq_cb};
-	const char *vq_names[] = { "rx", "tx" };
+	static const char * const vq_names[] = { "rx", "tx" };
 
 	dev_dbg(&vdev->dev, "%s:\n", __func__);
 

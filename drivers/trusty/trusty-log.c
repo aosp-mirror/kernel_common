@@ -157,13 +157,12 @@ static bool trusty_supports_logging(struct device *device)
 		return false;
 	}
 
-	if (result == TRUSTY_LOG_API_VERSION) {
-		return true;
-	} else {
+	if (result != TRUSTY_LOG_API_VERSION) {
 		pr_info("trusty-log unsupported api version: %d, supported: %d\n",
 			result, TRUSTY_LOG_API_VERSION);
 		return false;
 	}
+	return true;
 }
 
 static int trusty_log_probe(struct platform_device *pdev)
@@ -173,9 +172,8 @@ static int trusty_log_probe(struct platform_device *pdev)
 	trusty_shared_mem_id_t mem_id;
 
 	dev_dbg(&pdev->dev, "%s\n", __func__);
-	if (!trusty_supports_logging(pdev->dev.parent)) {
+	if (!trusty_supports_logging(pdev->dev.parent))
 		return -ENXIO;
-	}
 
 	s = kzalloc(sizeof(*s), GFP_KERNEL);
 	if (!s) {

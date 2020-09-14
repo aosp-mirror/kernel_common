@@ -241,7 +241,7 @@ int trusty_share_memory(struct device *dev, uint64_t *id,
 	if (nents != 1 && s->api_version < TRUSTY_API_VERSION_MEM_OBJ) {
 		dev_err(s->dev, "%s: old trusty version does not support non-contiguous memory objects\n",
 			__func__);
-		return -ENOTSUPP;
+		return -EOPNOTSUPP;
 	}
 
 	count = dma_map_sg(dev, sglist, nents, DMA_BIDIRECTIONAL);
@@ -417,7 +417,7 @@ int trusty_reclaim_memory(struct device *dev, uint64_t id,
 	if (s->api_version < TRUSTY_API_VERSION_MEM_OBJ) {
 		if (nents != 1) {
 			dev_err(s->dev, "%s: not supported\n", __func__);
-			return -ENOTSUPP;
+			return -EOPNOTSUPP;
 		}
 
 		dma_unmap_sg(dev, sglist, nents, DMA_BIDIRECTIONAL);
@@ -483,7 +483,7 @@ ssize_t trusty_version_show(struct device *dev, struct device_attribute *attr,
 	return scnprintf(buf, PAGE_SIZE, "%s\n", s->version_str);
 }
 
-DEVICE_ATTR(trusty_version, S_IRUSR, trusty_version_show, NULL);
+DEVICE_ATTR(trusty_version, 0400, trusty_version_show, NULL);
 
 const char *trusty_version_str_get(struct device *dev)
 {
@@ -652,6 +652,7 @@ EXPORT_SYMBOL(trusty_get_api_version);
 static int trusty_init_api_version(struct trusty_state *s, struct device *dev)
 {
 	u32 api_version;
+
 	api_version = trusty_fast_call32(dev, SMC_FC_API_VERSION,
 					 TRUSTY_API_VERSION_CURRENT, 0, 0);
 	if (api_version == SM_ERR_UNDEFINED_SMC)

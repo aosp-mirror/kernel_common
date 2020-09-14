@@ -129,6 +129,7 @@ static void kick_vqs(struct work_struct *work)
 	list_for_each_entry(tvdev, &tctx->vdev_list, node) {
 		for (i = 0; i < tvdev->vring_num; i++) {
 			struct trusty_vring *tvr = &tvdev->vrings[i];
+
 			if (atomic_xchg(&tvr->needs_kick, 0))
 				kick_vq(tctx, tvdev, tvr);
 		}
@@ -216,6 +217,7 @@ static void trusty_virtio_reset(struct virtio_device *vdev)
 static u64 trusty_virtio_get_features(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
+
 	return tvdev->vdev_descr->dfeatures | (1ULL << VIRTIO_F_IOMMU_PLATFORM);
 }
 
@@ -238,8 +240,8 @@ static int trusty_virtio_finalize_features(struct virtio_device *vdev)
 }
 
 static void trusty_virtio_get_config(struct virtio_device *vdev,
-				     unsigned offset, void *buf,
-				     unsigned len)
+				     unsigned int offset, void *buf,
+				     unsigned int len)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
 
@@ -253,8 +255,8 @@ static void trusty_virtio_get_config(struct virtio_device *vdev,
 }
 
 static void trusty_virtio_set_config(struct virtio_device *vdev,
-				     unsigned offset, const void *buf,
-				     unsigned len)
+				     unsigned int offset, const void *buf,
+				     unsigned int len)
 {
 	dev_dbg(&vdev->dev, "%s\n", __func__);
 }
@@ -262,12 +264,14 @@ static void trusty_virtio_set_config(struct virtio_device *vdev,
 static u8 trusty_virtio_get_status(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
+
 	return tvdev->vdev_descr->status;
 }
 
 static void trusty_virtio_set_status(struct virtio_device *vdev, u8 status)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
+
 	tvdev->vdev_descr->status = status;
 }
 
@@ -317,7 +321,7 @@ static void trusty_virtio_del_vqs(struct virtio_device *vdev)
 
 
 static struct virtqueue *_find_vq(struct virtio_device *vdev,
-				  unsigned id,
+				  unsigned int id,
 				  void (*callback)(struct virtqueue *vq),
 				  const char *name,
 				  bool ctx)
@@ -399,7 +403,7 @@ err_share_memory:
 	return ERR_PTR(-ENOMEM);
 }
 
-static int trusty_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
+static int trusty_virtio_find_vqs(struct virtio_device *vdev, unsigned int nvqs,
 				  struct virtqueue *vqs[],
 				  vq_callback_t *callbacks[],
 				  const char * const names[],
@@ -412,9 +416,8 @@ static int trusty_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 
 	for (i = 0; i < nvqs; i++) {
 		ctx = false;
-		if (ctxs) {
+		if (ctxs)
 			ctx = ctxs[i];
-		}
 		vqs[i] = _find_vq(vdev, i, callbacks[i], names[i], ctx);
 		if (IS_ERR(vqs[i])) {
 			ret = PTR_ERR(vqs[i]);
@@ -455,10 +458,8 @@ static int trusty_virtio_add_device(struct trusty_ctx *tctx,
 	tvdev = kzalloc(sizeof(struct trusty_vdev) +
 			vdev_descr->num_of_vrings * sizeof(struct trusty_vring),
 			GFP_KERNEL);
-	if (!tvdev) {
-		dev_err(tctx->dev, "Failed to allocate VDEV\n");
+	if (!tvdev)
 		return -ENOMEM;
-	}
 
 	/* setup vdev */
 	tvdev->tctx = tctx;
@@ -477,6 +478,7 @@ static int trusty_virtio_add_device(struct trusty_ctx *tctx,
 
 	for (i = 0; i < tvdev->vring_num; i++, vr_descr++) {
 		struct trusty_vring *tvr = &tvdev->vrings[i];
+
 		tvr->tvdev    = tvdev;
 		tvr->vr_descr = vr_descr;
 		tvr->align    = vr_descr->align;
@@ -722,10 +724,8 @@ static int trusty_virtio_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "initializing\n");
 
 	tctx = kzalloc(sizeof(*tctx), GFP_KERNEL);
-	if (!tctx) {
-		dev_err(&pdev->dev, "Failed to allocate context\n");
+	if (!tctx)
 		return -ENOMEM;
-	}
 
 	tctx->dev = &pdev->dev;
 	tctx->call_notifier.notifier_call = trusty_call_notify;
