@@ -168,6 +168,7 @@ struct tcpci;
  *		absent, the link might be disconnected to early before
  *		vSinkDisconnect max(3.67V) is reached. Hence provide a chip
  *		specific callback for the tcpc chip driver override if needed.
+ *		Return 0 from callback for TCPM to restart toggling.
  */
 struct tcpci_data {
 	struct regmap *regmap;
@@ -192,12 +193,14 @@ struct tcpci_data {
 				enum typec_cc_polarity polarity);
 	int (*frs_sourcing_vbus)(struct tcpci *tcpci, struct tcpci_data *data);
 	int (*enable_frs)(struct tcpci *tcpci, struct tcpci_data *data, bool enable);
+	int (*check_contaminant)(struct tcpci *tcpci, struct tcpci_data *data);
 };
 
 struct tcpci *tcpci_register_port(struct device *dev, struct tcpci_data *data);
 void tcpci_unregister_port(struct tcpci *tcpci);
 irqreturn_t tcpci_irq(struct tcpci *tcpci);
 void tcpci_auto_discharge_update(struct tcpci *tcpci);
+bool tcpci_is_debouncing(struct tcpci *tcpci);
 
 struct tcpm_port;
 struct tcpm_port *tcpci_get_tcpm_port(struct tcpci *tcpci);
