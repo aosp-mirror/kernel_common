@@ -3379,7 +3379,7 @@ static int f2fs_ioc_getfslabel(struct file *filp, unsigned long arg)
 				min(FSLABEL_MAX, count)))
 		err = -EFAULT;
 
-	kvfree(vbuf);
+	kfree(vbuf);
 	return err;
 }
 
