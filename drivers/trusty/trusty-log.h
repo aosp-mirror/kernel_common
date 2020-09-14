@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 #ifndef _TRUSTY_LOG_H_
 #define _TRUSTY_LOG_H_
 
