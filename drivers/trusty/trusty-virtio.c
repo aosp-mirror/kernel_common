@@ -455,8 +455,7 @@ static int trusty_virtio_add_device(struct trusty_ctx *tctx,
 	int i, ret;
 	struct trusty_vdev *tvdev;
 
-	tvdev = kzalloc(sizeof(struct trusty_vdev) +
-			vdev_descr->num_of_vrings * sizeof(struct trusty_vring),
+	tvdev = kzalloc(struct_size(tvdev, vrings, vdev_descr->num_of_vrings),
 			GFP_KERNEL);
 	if (!tvdev)
 		return -ENOMEM;
