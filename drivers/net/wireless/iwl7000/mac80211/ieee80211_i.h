@@ -441,6 +441,7 @@ struct ieee80211_mgd_assoc_data {
 	bool synced;
 	bool timeout_started;
 	bool s1g;
+	bool spp_amsdu;
 
 	unsigned int assoc_link_id;
 
