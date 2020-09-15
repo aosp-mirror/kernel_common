@@ -13,7 +13,6 @@
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
-  __break_lease
   bus_register
   bus_unregister
   cancel_delayed_work
@@ -22,7 +21,6 @@
   capable
   __cfi_slowpath
   __check_object_size
-  clear_inode
   clk_bulk_disable
   clk_bulk_enable
   clk_bulk_prepare
@@ -31,6 +29,7 @@
   clk_enable
   clk_fixed_factor_ops
   clk_fixed_rate_ops
+  clk_get
   clk_get_rate
   clk_hw_get_parent
   clk_hw_get_rate
@@ -54,8 +53,6 @@
   cpu_number
   __cpu_online_mask
   crc32_le
-  _ctype
-  d_drop
   debugfs_create_dir
   debugfs_create_file
   debugfs_create_regset32
@@ -66,7 +63,6 @@
   delayed_work_timer_fn
   del_timer
   del_timer_sync
-  dentry_open
   destroy_workqueue
   dev_driver_string
   _dev_err
@@ -117,9 +113,10 @@
   dev_pm_domain_attach_by_name
   dev_pm_domain_detach
   dev_pm_genpd_set_performance_state
+  dev_pm_opp_add
+  dev_pm_opp_get_opp_count
   dev_set_name
   _dev_warn
-  dget_parent
   disable_irq
   disable_irq_nosync
   divider_get_val
@@ -132,7 +129,6 @@
   dma_direct_unmap_page
   dma_direct_unmap_sg
   dma_free_attrs
-  d_make_root
   dmam_alloc_attrs
   dma_pool_alloc
   dma_pool_create
@@ -143,8 +139,6 @@
   dma_set_coherent_mask
   dma_set_mask
   do_SAK
-  down_write
-  dput
   driver_register
   driver_unregister
   drm_add_edid_modes
@@ -178,7 +172,6 @@
   generic_file_llseek
   generic_handle_irq
   generic_mii_ioctl
-  generic_read_dir
   get_device
   get_random_bytes
   get_unused_fd_flags
@@ -202,17 +195,14 @@
   idr_get_next
   idr_remove
   ieee80211_get_channel_khz
-  iget5_locked
   init_timer_key
   init_wait_entry
   __init_waitqueue_head
-  inode_init_once
   iommu_present
   __ioread32_copy
   __ioremap
   iounmap
   __iowrite32_copy
-  iput
   irq_chip_mask_parent
   irq_chip_set_type_parent
   irq_chip_unmask_parent
@@ -229,9 +219,7 @@
   irq_set_chip_data
   irq_set_irq_wake
   irq_to_desc
-  iterate_dir
   jiffies
-  kern_path
   kfree
   kfree_skb
   kimage_vaddr
@@ -241,13 +229,10 @@
   kmem_cache_alloc_trace
   kmemdup
   kstrdup
-  kstrtouint
   ktime_get
   ktime_get_mono_fast_ns
   __list_add_valid
   __list_del_entry_valid
-  lockref_get
-  lock_rename
   mbox_client_txdone
   mbox_free_channel
   mbox_request_channel
@@ -321,8 +306,6 @@
   param_ops_bool
   param_ops_int
   param_ops_uint
-  path_get
-  path_put
   pci_bus_type
   pci_dev_put
   pci_read_config_byte
@@ -374,7 +357,6 @@
   prepare_to_wait_event
   printk
   pskb_expand_head
-  __put_cred
   put_device
   __put_task_struct
   qcom_smem_state_register
@@ -398,7 +380,6 @@
   rdev_get_drvdata
   refcount_dec_and_test_checked
   refcount_inc_checked
-  register_filesystem
   register_reboot_notifier
   __register_rpmsg_driver
   regmap_bulk_read
@@ -481,7 +462,6 @@
   trace_handle_return
   trace_raw_output_prep
   trace_seq_printf
-  truncate_inode_pages
   tty_flip_buffer_push
   __tty_insert_flip_char
   uart_add_one_port
@@ -494,12 +474,8 @@
   uart_update_timeout
   uart_write_wakeup
   __udelay
-  unlock_new_inode
-  unlock_rename
-  unregister_filesystem
   unregister_reboot_notifier
   unregister_rpmsg_driver
-  up_write
   usb_add_hcd
   usb_amd_dev_put
   usb_amd_quirk_pll_check
@@ -548,7 +524,6 @@
   usb_remove_hcd
   usb_root_hub_lost_power
   usleep_range
-  vfs_getattr
   vsnprintf
   wait_for_completion_timeout
   __wake_up
@@ -760,6 +735,7 @@
   devm_usb_get_phy
   extcon_find_edev_by_node
   extcon_get_extcon_dev
+  kstrtouint
   of_usb_get_phy_mode
   phy_pm_runtime_get_sync
   phy_pm_runtime_put_sync
@@ -811,13 +787,21 @@
 
 # required by incrementalfs.ko
   bin2hex
+  __break_lease
+  clear_inode
   __close_fd
   crypto_alloc_shash
   crypto_destroy_tfm
   crypto_shash_digest
   d_add
+  d_drop
   deactivate_locked_super
+  dentry_open
+  dget_parent
   d_instantiate
+  d_make_root
+  down_write
+  dput
   fget
   flush_dcache_page
   flush_delayed_work
@@ -826,14 +810,22 @@
   generic_file_mmap
   generic_file_read_iter
   generic_file_splice_read
+  generic_read_dir
   generic_shutdown_super
   __get_free_pages
+  iget5_locked
   ihold
+  inode_init_once
   inode_init_owner
+  iput
+  iterate_dir
   kernel_read
   kernel_write
+  kern_path
   kobject_create_and_add
   kobject_put
+  lockref_get
+  lock_rename
   lookup_one_len
   LZ4_decompress_safe
   match_int
@@ -841,7 +833,11 @@
   noop_llseek
   notify_change
   pagecache_get_page
+  path_get
+  path_put
+  __put_cred
   __put_page
+  register_filesystem
   set_anon_super
   sget
   simple_getattr
@@ -852,10 +848,16 @@
   sync_filesystem
   sysfs_create_group
   sysfs_remove_group
+  truncate_inode_pages
+  unlock_new_inode
   unlock_page
+  unlock_rename
+  unregister_filesystem
+  up_write
   user_path_at_empty
   vfs_create
   vfs_fallocate
+  vfs_getattr
   vfs_getxattr
   vfs_link
   vfs_listxattr
@@ -886,7 +888,6 @@
   bpf_trace_run5
   bpf_trace_run6
   bpf_trace_run8
-  clk_get
   clk_get_parent
   clk_hw_register_divider
   clk_hw_register_fixed_factor
@@ -902,6 +903,7 @@
   component_master_add_with_match
   component_master_del
   component_unbind_all
+  _ctype
   debugfs_create_bool
   debugfs_create_u64
   devfreq_recommended_opp
@@ -912,12 +914,10 @@
   devm_devfreq_add_device
   devm_ioremap_nocache
   devm_regulator_get_exclusive
-  dev_pm_opp_add
   dev_pm_opp_find_freq_ceil
   dev_pm_opp_find_freq_exact
   dev_pm_opp_find_freq_floor
   dev_pm_opp_get_level
-  dev_pm_opp_get_opp_count
   dev_pm_opp_get_voltage
   dev_pm_opp_of_add_table
   dev_pm_opp_put
@@ -1248,6 +1248,24 @@
 
 # required by qcom-apcs-ipc-mailbox.ko
   devm_mbox_controller_register
+
+# required by qcom-cpufreq-hw.ko
+  arch_set_freq_scale
+  cpufreq_cpu_get_raw
+  cpufreq_freq_attr_scaling_available_freqs
+  cpufreq_freq_attr_scaling_boost_freqs
+  cpufreq_generic_frequency_table_verify
+  cpufreq_register_driver
+  cpufreq_unregister_driver
+  cpumask_next
+  __cpu_possible_mask
+  dev_pm_opp_of_register_em
+  dev_pm_opp_remove_all_dynamic
+  dev_pm_opp_set_sharing_cpus
+  get_cpu_device
+  nr_cpu_ids
+  of_get_cpu_node
+  of_parse_phandle_with_args
 
 # required by qcom-pdc.ko
   irq_chip_disable_parent
