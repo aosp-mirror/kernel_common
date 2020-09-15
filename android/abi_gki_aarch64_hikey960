@@ -1,4 +1,4 @@
-[abi_whitelist]
+[abi_symbol_list]
 # commonly used symbols
   alloc_chrdev_region
   __alloc_disk_node
