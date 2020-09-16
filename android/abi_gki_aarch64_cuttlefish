@@ -1,4 +1,4 @@
-[abi_whitelist]
+[abi_symbol_list]
 # commonly used symbols
   add_timer
   __alloc_disk_node
@@ -9,7 +9,6 @@
   __arch_copy_to_user
   arm64_const_caps_ready
   bcmp
-  bio_alloc_bioset
   blk_cleanup_queue
   blk_queue_flag_set
   blk_queue_io_min
@@ -18,11 +17,8 @@
   blk_queue_max_discard_sectors
   blk_queue_max_write_zeroes_sectors
   blk_queue_physical_block_size
-  bpf_trace_run1
   bpf_trace_run2
-  bpf_trace_run3
   cancel_delayed_work_sync
-  capable
   cfg80211_inform_bss_data
   cfg80211_put_bss
   __cfi_slowpath
@@ -41,7 +37,6 @@
   cpumask_next
   cpu_number
   __cpu_online_mask
-  __cpu_possible_mask
   crypto_destroy_tfm
   crypto_register_alg
   crypto_register_scomp
@@ -69,7 +64,6 @@
   _dev_warn
   dma_alloc_attrs
   dma_free_attrs
-  d_make_root
   dma_set_coherent_mask
   dma_set_mask
   down_read
@@ -88,9 +82,6 @@
   free_netdev
   __free_pages
   free_pages
-  fs_bio_set
-  generic_file_llseek
-  generic_read_dir
   get_device
   __get_free_pages
   get_random_bytes
@@ -102,13 +93,10 @@
   idr_alloc
   idr_destroy
   idr_remove
-  iget5_locked
   __init_rwsem
   init_timer_key
-  init_user_ns
   init_wait_entry
   __init_waitqueue_head
-  inode_init_once
   iput
   jiffies
   kfree
@@ -129,11 +117,9 @@
   __list_add_valid
   __list_del_entry_valid
   __local_bh_enable_ip
-  __lock_page
   lockref_get
-  match_token
+  lzo1x_decompress_safe
   memcpy
-  memmove
   memparse
   memset
   mod_timer
@@ -143,7 +129,6 @@
   mutex_is_locked
   mutex_lock
   mutex_lock_interruptible
-  mutex_trylock
   mutex_unlock
   netdev_err
   netdev_info
@@ -159,7 +144,6 @@
   noop_llseek
   nr_cpu_ids
   __num_online_cpus
-  pagecache_get_page
   param_ops_bool
   param_ops_charp
   param_ops_int
@@ -200,9 +184,6 @@
   put_unused_fd
   queue_delayed_work_on
   queue_work_on
-  radix_tree_delete
-  radix_tree_insert
-  radix_tree_lookup
   _raw_spin_lock
   _raw_spin_lock_bh
   _raw_spin_lock_irq
@@ -219,7 +200,6 @@
   register_filesystem
   register_netdev
   register_netdevice_notifier
-  register_shrinker
   register_virtio_device
   register_virtio_driver
   request_threaded_irq
@@ -232,7 +212,6 @@
   scnprintf
   seq_lseek
   seq_printf
-  seq_puts
   seq_read
   sg_init_one
   sg_init_table
@@ -250,10 +229,8 @@
   strlcpy
   strlen
   strncpy
-  strscpy
   strsep
   strstr
-  submit_bio
   synchronize_irq
   sysfs_create_group
   __sysfs_match_string
@@ -266,17 +243,14 @@
   trace_event_raw_init
   trace_event_reg
   trace_handle_return
-  trace_print_symbols_seq
   trace_raw_output_prep
   trace_seq_printf
-  unlock_new_inode
   unlock_page
   unregister_blkdev
   unregister_filesystem
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
-  unregister_shrinker
   unregister_virtio_device
   unregister_virtio_driver
   up_read
@@ -349,52 +323,6 @@
   usb_get_dev
   usb_put_dev
 
-# required by erofs.ko
-  add_to_page_cache_lru
-  bio_add_page
-  bio_associate_blkg
-  bio_put
-  bit_wait
-  bpf_trace_run4
-  call_rcu
-  d_splice_alias
-  fs_ftype_to_dtype
-  generic_block_bmap
-  generic_fillattr
-  generic_ro_fops
-  iget_failed
-  init_special_inode
-  inode_nohighmem
-  kill_block_super
-  kimage_vaddr
-  LZ4_decompress_safe_partial
-  match_strdup
-  mount_bdev
-  new_inode
-  out_of_line_wait_on_bit_lock
-  page_get_link
-  posix_acl_access_xattr_handler
-  posix_acl_default_xattr_handler
-  posix_acl_from_xattr
-  print_hex_dump
-  put_pages_list
-  radix_tree_gang_lookup
-  radix_tree_preload
-  rcu_barrier
-  read_cache_page
-  read_cache_page_gfp
-  sb_set_blocksize
-  set_nlink
-  simple_get_link
-  strnlen
-  __sw_hweight64
-  trace_print_flags_seq
-  vm_map_ram
-  vm_unmap_aliases
-  vm_unmap_ram
-  wake_up_bit
-  __wake_up_locked
-
 # required by failover.ko
   netdev_master_upper_dev_link
   rtnl_is_locked
@@ -437,16 +365,21 @@
   dentry_open
   dget_parent
   d_instantiate
+  d_make_root
   dput
   fget
   fs_kobj
   fsstack_copy_attr_all
+  generic_file_llseek
   generic_file_mmap
   generic_file_read_iter
   generic_file_splice_read
+  generic_read_dir
   generic_shutdown_super
   get_zeroed_page
+  iget5_locked
   ihold
+  inode_init_once
   inode_init_owner
   iterate_dir
   kernel_read
@@ -458,11 +391,14 @@
   lookup_one_len
   LZ4_decompress_safe
   match_int
+  match_token
   __msecs_to_jiffies
   notify_change
+  pagecache_get_page
   path_get
   path_put
   __put_cred
+  seq_puts
   set_anon_super
   sget
   simple_getattr
@@ -471,6 +407,7 @@
   strndup_user
   sync_filesystem
   truncate_inode_pages
+  unlock_new_inode
   unlock_rename
   user_path_at_empty
   vfs_create
@@ -485,9 +422,18 @@
   vfs_setxattr
   vfs_unlink
 
+# required by lzo-rle.ko
+  lzorle1x_1_compress
+
+# required by lzo.ko
+  lzo1x_1_compress
+
 # required by nd_virtio.ko
+  bio_alloc_bioset
   bio_chain
   bio_clone_blkg_association
+  fs_bio_set
+  submit_bio
 
 # required by net_failover.ko
   call_netdevice_notifiers
@@ -519,6 +465,7 @@
   serio_open
   __serio_register_driver
   serio_unregister_driver
+  strscpy
   time64_to_tm
 
 # required by rtc-test.ko
@@ -615,6 +562,7 @@
 
 # required by tpm_vtpm_proxy.ko
   anon_inode_getfile
+  capable
   misc_deregister
   misc_register
 
@@ -738,6 +686,7 @@
   drm_universal_plane_init
   __get_task_comm
   memdup_user
+  mutex_trylock
   __sg_alloc_table_from_pages
   sg_free_table
   sync_file_create
@@ -797,6 +746,7 @@
   blk_status_to_errno
   _dev_notice
   kobject_uevent_env
+  memmove
   set_disk_ro
   string_get_size
 
@@ -945,6 +895,7 @@
   fuse_request_end
   fuse_send_init
   get_anon_bdev
+  init_user_ns
   memchr
   sget_fc
 
@@ -987,6 +938,8 @@
   vsock_for_each_connected_socket
 
 # required by xhci-hcd.ko
+  bpf_trace_run1
+  bpf_trace_run3
   cancel_delayed_work
   complete_all
   debugfs_create_regset32
@@ -1001,11 +954,15 @@
   param_ops_ullong
   platform_device_add_properties
   platform_device_add_resources
+  radix_tree_delete
+  radix_tree_insert
+  radix_tree_lookup
   radix_tree_maybe_preload
   ___ratelimit
   sg_pcopy_from_buffer
   sg_pcopy_to_buffer
   __sw_hweight32
+  trace_print_symbols_seq
   usb_amd_dev_put
   usb_amd_pt_check_port
   usb_amd_quirk_pll_disable
@@ -1044,6 +1001,7 @@
   blk_queue_make_request
   __class_register
   class_unregister
+  __cpu_possible_mask
   crypto_alloc_base
   crypto_has_alg
   free_percpu
@@ -1069,9 +1027,12 @@
   kern_mount
   kern_unmount
   kill_anon_super
+  __lock_page
   page_mapping
   _raw_read_lock
   _raw_read_unlock
   _raw_write_lock
   _raw_write_unlock
+  register_shrinker
   __SetPageMovable
+  unregister_shrinker
