@@ -210,6 +210,39 @@ static int trusty_irq_cpu_down(unsigned int cpu, struct hlist_node *node)
 	return 0;
 }
 
+static int trusty_irq_map_ipi(struct trusty_irq_state *is, int irq)
+{
+	int ret;
+	u32 ipi_range[3];
+	struct device_node *gic;
+	struct of_phandle_args oirq = {};
+	u32 beg, end, ipi_base;
+
+	ret = of_property_read_u32_array(is->dev->of_node, "ipi-range",
+					 ipi_range, ARRAY_SIZE(ipi_range));
+	if (ret != 0)
+		return -ENODATA;
+	beg = ipi_range[0];
+	end = ipi_range[1];
+	ipi_base = ipi_range[2];
+
+	if (irq < beg || irq > end)
+		return -ENODATA;
+
+	gic = of_irq_find_parent(is->dev->of_node);
+	if (!gic)
+		return -ENXIO;
+
+	oirq.np = gic;
+	oirq.args_count = 1;
+	oirq.args[0] = ipi_base + (irq - beg);
+
+	ret = irq_create_of_mapping(&oirq);
+
+	of_node_put(gic);
+	return (!ret) ? -EINVAL : ret;
+}
+
 static int trusty_irq_create_irq_mapping(struct trusty_irq_state *is, int irq)
 {
 	int ret;
@@ -219,6 +252,11 @@ static int trusty_irq_create_irq_mapping(struct trusty_irq_state *is, int irq)
 	u32 range_base;
 	u32 range_end;
 	struct of_phandle_args oirq;
+
+	/* check if this is an IPI (inter-processor interrupt) */
+	ret = trusty_irq_map_ipi(is, irq);
+	if (ret != -ENODATA)
+		return ret;
 
 	/* check if "interrupt-ranges" property is present */
 	if (!of_find_property(is->dev->of_node, "interrupt-ranges", NULL)) {
