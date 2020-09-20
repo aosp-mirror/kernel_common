@@ -2430,6 +2430,13 @@ static int sanity_check_raw_super(struct f2fs_sb_info *sbi,
 	size_t crc_offset = 0;
 	__u32 crc = 0;
 
+	if (le32_to_cpu(raw_super->magic) != F2FS_SUPER_MAGIC) {
+		f2fs_msg(sb, KERN_INFO,
+			"Magic Mismatch, valid(0x%x) - read(0x%x)",
+			F2FS_SUPER_MAGIC, le32_to_cpu(raw_super->magic));
+		return -EINVAL;
+	}
+
 	/* Check checksum_offset and crc in superblock */
 	if (__F2FS_HAS_FEATURE(raw_super, F2FS_FEATURE_SB_CHKSUM)) {
 		crc_offset = le32_to_cpu(raw_super->checksum_offset);
@@ -2438,21 +2445,14 @@ static int sanity_check_raw_super(struct f2fs_sb_info *sbi,
 			f2fs_msg(sb, KERN_INFO,
 				"Invalid SB checksum offset: %zu",
 				crc_offset);
-			return 1;
+			return -EFSCORRUPTED;
 		}
 		crc = le32_to_cpu(raw_super->crc);
 		if (!f2fs_crc_valid(sbi, crc, raw_super, crc_offset)) {
 			f2fs_msg(sb, KERN_INFO,
 				"Invalid SB checksum value: %u", crc);
-			return 1;
+			return -EFSCORRUPTED;
 		}
-	}
-
-	if (le32_to_cpu(raw_super->magic) != F2FS_SUPER_MAGIC) {
-		f2fs_msg(sb, KERN_INFO,
-			"Magic Mismatch, valid(0x%x) - read(0x%x)",
-			F2FS_SUPER_MAGIC, le32_to_cpu(raw_super->magic));
-		return -EINVAL;
 	}
 
 	/* Currently, support only 4KB page cache size */
