@@ -8,18 +8,6 @@ config TRUSTY
 	tristate "Trusty"
 	depends on ARM || ARM64
 
-config TRUSTY_SMC_ARM
-	bool
-	depends on TRUSTY
-	depends on ARM
-	default y
-
-config TRUSTY_SMC_ARM64
-	bool
-	depends on TRUSTY
-	depends on ARM64
-	default y
-
 config TRUSTY_IRQ
 	tristate
 	depends on TRUSTY
