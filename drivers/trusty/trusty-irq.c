@@ -143,7 +143,7 @@ static int trusty_irq_call_notify(struct notifier_block *nb,
 	return NOTIFY_OK;
 }
 
-irqreturn_t trusty_irq_handler(int irq, void *data)
+static irqreturn_t trusty_irq_handler(int irq, void *data)
 {
 	struct trusty_irq *trusty_irq = data;
 	struct trusty_irq_state *is = trusty_irq->is;

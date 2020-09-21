@@ -475,15 +475,15 @@ static int trusty_remove_child(struct device *dev, void *data)
 	return 0;
 }
 
-ssize_t trusty_version_show(struct device *dev, struct device_attribute *attr,
-			    char *buf)
+static ssize_t trusty_version_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
 	return scnprintf(buf, PAGE_SIZE, "%s\n", s->version_str);
 }
 
-DEVICE_ATTR(trusty_version, 0400, trusty_version_show, NULL);
+static DEVICE_ATTR(trusty_version, 0400, trusty_version_show, NULL);
 
 const char *trusty_version_str_get(struct device *dev)
 {

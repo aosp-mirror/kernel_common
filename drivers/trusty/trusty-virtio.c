@@ -701,10 +701,11 @@ err_share_memory:
 	return ret;
 }
 
-dma_addr_t trusty_virtio_dma_map_page(struct device *dev, struct page *page,
-				      unsigned long offset, size_t size,
-				      enum dma_data_direction dir,
-				      unsigned long attrs)
+static dma_addr_t trusty_virtio_dma_map_page(struct device *dev,
+					     struct page *page,
+					     unsigned long offset, size_t size,
+					     enum dma_data_direction dir,
+					     unsigned long attrs)
 {
 	struct tipc_msg_buf *buf = page_to_virt(page) + offset;
 

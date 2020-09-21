@@ -379,7 +379,7 @@ static ssize_t trusty_test_run_store(struct device *dev,
 	}
 }
 
-DEVICE_ATTR_WO(trusty_test_run);
+static DEVICE_ATTR_WO(trusty_test_run);
 
 static int trusty_test_probe(struct platform_device *pdev)
 {
