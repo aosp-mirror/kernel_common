@@ -1838,21 +1838,21 @@ static void _handle_ctrl_msg(struct tipc_virtio_dev *vds,
 	switch (msg->type) {
 	case TIPC_CTRL_MSGTYPE_GO_ONLINE:
 		_go_online(vds);
-	break;
+		break;
 
 	case TIPC_CTRL_MSGTYPE_GO_OFFLINE:
 		_go_offline(vds);
-	break;
+		break;
 
 	case TIPC_CTRL_MSGTYPE_CONN_RSP:
 		_handle_conn_rsp(vds, (struct tipc_conn_rsp_body *)msg->body,
 				 msg->body_len);
-	break;
+		break;
 
 	case TIPC_CTRL_MSGTYPE_DISC_REQ:
 		_handle_disc_req(vds, (struct tipc_disc_req_body *)msg->body,
 				 msg->body_len);
-	break;
+		break;
 
 	case TIPC_CTRL_MSGTYPE_RELEASE:
 		_handle_release(vds, (struct tipc_release_body *)msg->body,
