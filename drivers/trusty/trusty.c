@@ -481,10 +481,16 @@ static ssize_t trusty_version_show(struct device *dev,
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
-	return scnprintf(buf, PAGE_SIZE, "%s\n", s->version_str);
+	return scnprintf(buf, PAGE_SIZE, "%s\n", s->version_str ?: "unknown");
 }
 
 static DEVICE_ATTR(trusty_version, 0400, trusty_version_show, NULL);
+
+static struct attribute *trusty_attrs[] = {
+	&dev_attr_trusty_version.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(trusty);
 
 const char *trusty_version_str_get(struct device *dev)
 {
@@ -628,13 +634,8 @@ static void trusty_init_version(struct trusty_state *s, struct device *dev)
 	s->version_str[i] = '\0';
 
 	dev_info(dev, "trusty version: %s\n", s->version_str);
-
-	ret = device_create_file(dev, &dev_attr_trusty_version);
-	if (ret)
-		goto err_create_file;
 	return;
 
-err_create_file:
 err_get_char:
 	kfree(s->version_str);
 	s->version_str = NULL;
@@ -881,10 +882,7 @@ err_create_nop_wq:
 err_init_msg_buf:
 err_api_version:
 	s->dev->dma_parms = NULL;
-	if (s->version_str) {
-		device_remove_file(&pdev->dev, &dev_attr_trusty_version);
-		kfree(s->version_str);
-	}
+	kfree(s->version_str);
 	device_for_each_child(&pdev->dev, NULL, trusty_remove_child);
 	mutex_destroy(&s->share_memory_msg_lock);
 	mutex_destroy(&s->smc_lock);
@@ -912,10 +910,7 @@ static int trusty_remove(struct platform_device *pdev)
 	mutex_destroy(&s->smc_lock);
 	trusty_free_msg_buf(s, &pdev->dev);
 	s->dev->dma_parms = NULL;
-	if (s->version_str) {
-		device_remove_file(&pdev->dev, &dev_attr_trusty_version);
-		kfree(s->version_str);
-	}
+	kfree(s->version_str);
 	kfree(s);
 	return 0;
 }
@@ -933,6 +928,7 @@ static struct platform_driver trusty_driver = {
 	.driver	= {
 		.name = "trusty",
 		.of_match_table = trusty_of_match,
+		.dev_groups = trusty_groups,
 	},
 };
 
