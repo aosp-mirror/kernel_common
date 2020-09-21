@@ -302,7 +302,6 @@ static struct platform_driver trusty_log_driver = {
 	.remove = trusty_log_remove,
 	.driver = {
 		.name = "trusty-log",
-		.owner = THIS_MODULE,
 		.of_match_table = trusty_test_of_match,
 	},
 };

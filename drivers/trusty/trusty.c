@@ -931,7 +931,6 @@ static struct platform_driver trusty_driver = {
 	.remove = trusty_remove,
 	.driver	= {
 		.name = "trusty",
-		.owner = THIS_MODULE,
 		.of_match_table = trusty_of_match,
 	},
 };

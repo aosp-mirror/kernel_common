@@ -826,7 +826,6 @@ static struct platform_driver trusty_virtio_driver = {
 	.remove = trusty_virtio_remove,
 	.driver = {
 		.name = "trusty-virtio",
-		.owner = THIS_MODULE,
 		.of_match_table = trusty_of_match,
 	},
 };

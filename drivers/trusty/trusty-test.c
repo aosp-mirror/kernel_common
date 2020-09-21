@@ -443,7 +443,6 @@ static struct platform_driver trusty_test_driver = {
 	.remove = trusty_test_remove,
 	.driver = {
 		.name = "trusty-test",
-		.owner = THIS_MODULE,
 		.of_match_table = trusty_test_of_match,
 	},
 };

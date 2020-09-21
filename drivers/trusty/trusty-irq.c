@@ -555,7 +555,6 @@ static struct platform_driver trusty_irq_driver = {
 	.remove = trusty_irq_remove,
 	.driver	= {
 		.name = "trusty-irq",
-		.owner = THIS_MODULE,
 		.of_match_table = trusty_test_of_match,
 	},
 };
