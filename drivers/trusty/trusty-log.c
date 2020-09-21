@@ -54,8 +54,8 @@ static int log_read_line(struct trusty_log_state *s, int put, int get)
 	struct log_rb *log = s->log;
 	int i;
 	char c = '\0';
-	size_t max_to_read = min((size_t)(put - get),
-				 sizeof(s->line_buffer) - 1);
+	size_t max_to_read =
+		min_t(size_t, put - get, sizeof(s->line_buffer) - 1);
 	size_t mask = log->sz - 1;
 
 	for (i = 0; i < max_to_read && c != '\n';)
