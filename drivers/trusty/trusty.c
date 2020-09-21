@@ -58,9 +58,12 @@ s32 trusty_fast_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
-	BUG_ON(!s);
-	BUG_ON(!SMC_IS_FASTCALL(smcnr));
-	BUG_ON(SMC_IS_SMC64(smcnr));
+	if (WARN_ON(!s))
+		return SM_ERR_INVALID_PARAMETERS;
+	if (WARN_ON(!SMC_IS_FASTCALL(smcnr)))
+		return SM_ERR_INVALID_PARAMETERS;
+	if (WARN_ON(SMC_IS_SMC64(smcnr)))
+		return SM_ERR_INVALID_PARAMETERS;
 
 	return smc(smcnr, a0, a1, a2);
 }
@@ -71,9 +74,12 @@ s64 trusty_fast_call64(struct device *dev, u64 smcnr, u64 a0, u64 a1, u64 a2)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
-	BUG_ON(!s);
-	BUG_ON(!SMC_IS_FASTCALL(smcnr));
-	BUG_ON(!SMC_IS_SMC64(smcnr));
+	if (WARN_ON(!s))
+		return SM_ERR_INVALID_PARAMETERS;
+	if (WARN_ON(!SMC_IS_FASTCALL(smcnr)))
+		return SM_ERR_INVALID_PARAMETERS;
+	if (WARN_ON(!SMC_IS_SMC64(smcnr)))
+		return SM_ERR_INVALID_PARAMETERS;
 
 	return smc(smcnr, a0, a1, a2);
 }
@@ -167,8 +173,11 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 	int ret;
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 
-	BUG_ON(SMC_IS_FASTCALL(smcnr));
-	BUG_ON(SMC_IS_SMC64(smcnr));
+	if (WARN_ON(SMC_IS_FASTCALL(smcnr)))
+		return SM_ERR_INVALID_PARAMETERS;
+
+	if (WARN_ON(SMC_IS_SMC64(smcnr)))
+		return SM_ERR_INVALID_PARAMETERS;
 
 	if (s->trusty_panicked) {
 		/*

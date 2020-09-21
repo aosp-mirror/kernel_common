@@ -128,7 +128,8 @@ static int trusty_irq_call_notify(struct notifier_block *nb,
 {
 	struct trusty_irq_state *is;
 
-	BUG_ON(!irqs_disabled());
+	if (WARN_ON(!irqs_disabled()))
+		return NOTIFY_DONE;
 
 	if (action != TRUSTY_CALL_PREPARE)
 		return NOTIFY_DONE;

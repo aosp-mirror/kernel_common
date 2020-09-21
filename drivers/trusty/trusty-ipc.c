@@ -390,7 +390,8 @@ static struct tipc_msg_buf *vds_get_txbuf(struct tipc_virtio_dev *vds,
 	if (IS_ERR(mb))
 		return mb;
 
-	BUG_ON(!mb);
+	if (WARN_ON(!mb))
+		return ERR_PTR(-EINVAL);
 
 	/* reset and reserve space for message header */
 	mb_reset(mb);
@@ -1964,8 +1965,9 @@ static int _handle_rxbuf(struct tipc_virtio_dev *vds,
 		if (chan) {
 			/* handle it */
 			rxbuf = chan->ops->handle_msg(chan->ops_arg, rxbuf);
-			BUG_ON(!rxbuf);
 			kref_put(&chan->refcount, _free_chan);
+			if (WARN_ON(!rxbuf))
+				return -EINVAL;
 		}
 	}
 

@@ -234,7 +234,8 @@ static int trusty_virtio_finalize_features(struct virtio_device *vdev)
 	features &= ~(1ULL << VIRTIO_F_IOMMU_PLATFORM);
 
 	/* Make sure we don't have any features > 32 bits! */
-	BUG_ON((u32)vdev->features != features);
+	if (WARN_ON((u32)vdev->features != features))
+		return -EINVAL;
 
 	tvdev->vdev_descr->gfeatures = vdev->features;
 	return 0;

@@ -71,7 +71,8 @@ static void trusty_dump_logs(struct trusty_log_state *s)
 	uint32_t get, put, alloc;
 	int read_chars;
 
-	BUG_ON(!is_power_of_2(log->sz));
+	if (WARN_ON(!is_power_of_2(log->sz)))
+		return;
 
 	/*
 	 * For this ring buffer, at any given point, alloc >= put >= get.
