@@ -77,6 +77,7 @@ s64 trusty_fast_call64(struct device *dev, u64 smcnr, u64 a0, u64 a1, u64 a2)
 
 	return smc(smcnr, a0, a1, a2);
 }
+EXPORT_SYMBOL(trusty_fast_call64);
 #endif
 
 static ulong trusty_std_call_inner(struct device *dev, ulong smcnr,
