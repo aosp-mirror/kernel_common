@@ -1875,6 +1875,9 @@ struct xfrm_translator {
 	struct nlmsghdr *(*rcv_msg_compat)(const struct nlmsghdr *nlh,
 			int maxtype, const struct nla_policy *policy);
 
+	/* Translate 32-bit user_policy from sockptr */
+	int (*xlate_user_policy_sockptr)(u8 **pdata32, int optlen);
+
 	struct module *owner;
 };
 
