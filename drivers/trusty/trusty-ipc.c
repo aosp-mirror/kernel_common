@@ -994,7 +994,7 @@ static void dn_handle_release(void *data)
 	kfree(data);
 }
 
-static struct tipc_chan_ops _dn_ops = {
+static const struct tipc_chan_ops _dn_ops = {
 	.handle_msg = dn_handle_msg,
 	.handle_event = dn_handle_event,
 	.handle_release = dn_handle_release,
@@ -2120,12 +2120,12 @@ static void tipc_virtio_remove(struct virtio_device *vdev)
 	kref_put(&vds->refcount, _free_vds);
 }
 
-static struct virtio_device_id tipc_virtio_id_table[] = {
+static const struct virtio_device_id tipc_virtio_id_table[] = {
 	{ VIRTIO_ID_TRUSTY_IPC, VIRTIO_DEV_ANY_ID },
 	{ 0 },
 };
 
-static unsigned int features[] = {
+static const unsigned int features[] = {
 	0,
 };
 
