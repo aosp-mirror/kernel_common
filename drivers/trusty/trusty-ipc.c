@@ -124,10 +124,10 @@ struct tipc_virtio_dev {
 	struct virtio_device *vdev;
 	struct virtqueue *rxvq;
 	struct virtqueue *txvq;
-	uint msg_buf_cnt;
-	uint msg_buf_max_cnt;
+	unsigned int msg_buf_cnt;
+	unsigned int msg_buf_max_cnt;
 	size_t msg_buf_max_sz;
-	uint free_msg_buf_cnt;
+	unsigned int free_msg_buf_cnt;
 	struct list_head free_buf_list;
 	wait_queue_head_t sendq;
 	struct idr addr_idr;
@@ -1947,8 +1947,8 @@ static int _handle_rxbuf(struct tipc_virtio_dev *vds,
 	/* get message header */
 	msg = mb_get_data(rxbuf, sizeof(*msg));
 	if (mb_avail_data(rxbuf) != msg->len) {
-		dev_warn(dev, "inbound msg length mismatch: (%d vs. %d)\n",
-			 (uint) mb_avail_data(rxbuf), (uint)msg->len);
+		dev_warn(dev, "inbound msg length mismatch: (%zu vs. %d)\n",
+			 mb_avail_data(rxbuf), msg->len);
 		goto drop_it;
 	}
 

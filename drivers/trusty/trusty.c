@@ -49,7 +49,8 @@ struct trusty_state {
 	struct mutex share_memory_msg_lock; /* protects share_memory_msg */
 };
 
-static inline ulong smc(ulong r0, ulong r1, ulong r2, ulong r3)
+static inline unsigned long smc(unsigned long r0, unsigned long r1,
+				unsigned long r2, unsigned long r3)
 {
 	return trusty_smc8(r0, r1, r2, r3, 0, 0, 0, 0).r0;
 }
@@ -86,10 +87,12 @@ s64 trusty_fast_call64(struct device *dev, u64 smcnr, u64 a0, u64 a1, u64 a2)
 EXPORT_SYMBOL(trusty_fast_call64);
 #endif
 
-static ulong trusty_std_call_inner(struct device *dev, ulong smcnr,
-				   ulong a0, ulong a1, ulong a2)
+static unsigned long trusty_std_call_inner(struct device *dev,
+					   unsigned long smcnr,
+					   unsigned long a0, unsigned long a1,
+					   unsigned long a2)
 {
-	ulong ret;
+	unsigned long ret;
 	int retry = 5;
 
 	dev_dbg(dev, "%s(0x%lx 0x%lx 0x%lx 0x%lx)\n",
@@ -109,10 +112,12 @@ static ulong trusty_std_call_inner(struct device *dev, ulong smcnr,
 	return ret;
 }
 
-static ulong trusty_std_call_helper(struct device *dev, ulong smcnr,
-				    ulong a0, ulong a1, ulong a2)
+static unsigned long trusty_std_call_helper(struct device *dev,
+					    unsigned long smcnr,
+					    unsigned long a0, unsigned long a1,
+					    unsigned long a2)
 {
-	ulong ret;
+	unsigned long ret;
 	int sleep_time = 1;
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 

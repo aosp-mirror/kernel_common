@@ -51,8 +51,8 @@ struct trusty_vring {
 	struct scatterlist	sg;
 	trusty_shared_mem_id_t	shared_mem_id;
 	size_t			size;
-	uint			align;
-	uint			elem_num;
+	unsigned int		align;
+	unsigned int		elem_num;
 	u32			notifyid;
 	atomic_t		needs_kick;
 	struct fw_rsc_vdev_vring *vr_descr;
@@ -66,10 +66,10 @@ struct trusty_vdev {
 	struct virtio_device	vdev;
 	struct trusty_ctx	*tctx;
 	u32			notifyid;
-	uint			config_len;
+	unsigned int		config_len;
 	void			*config;
 	struct fw_rsc_vdev	*vdev_descr;
-	uint			vring_num;
+	unsigned int		vring_num;
 	struct trusty_vring	vrings[];
 };
 
@@ -77,7 +77,7 @@ struct trusty_vdev {
 
 static void check_all_vqs(struct work_struct *work)
 {
-	uint i;
+	unsigned int i;
 	struct trusty_ctx *tctx = container_of(work, struct trusty_ctx,
 					       check_vqs);
 	struct trusty_vdev *tvdev;
@@ -122,7 +122,7 @@ static void kick_vq(struct trusty_ctx *tctx,
 
 static void kick_vqs(struct work_struct *work)
 {
-	uint i;
+	unsigned int i;
 	struct trusty_vdev *tvdev;
 	struct trusty_ctx *tctx = container_of(work, struct trusty_ctx,
 					       kick_vqs);
@@ -278,7 +278,7 @@ static void trusty_virtio_set_status(struct virtio_device *vdev, u8 status)
 
 static void _del_vqs(struct virtio_device *vdev)
 {
-	uint i;
+	unsigned int i;
 	int ret;
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
 	struct trusty_vring *tvr = &tvdev->vrings[0];
@@ -410,7 +410,7 @@ static int trusty_virtio_find_vqs(struct virtio_device *vdev, unsigned int nvqs,
 				  const bool *ctxs,
 				  struct irq_affinity *desc)
 {
-	uint i;
+	unsigned int i;
 	int ret;
 	bool ctx = false;
 
@@ -541,14 +541,14 @@ static int trusty_parse_device_descr(struct trusty_ctx *tctx,
 
 		if (offset >= descr_sz) {
 			dev_err(tctx->dev, "offset is out of bounds (%u)\n",
-				(uint)offset);
+				offset);
 			return -ENODEV;
 		}
 
 		/* check space for rsc header */
 		if ((descr_sz - offset) < sizeof(struct fw_rsc_hdr)) {
 			dev_err(tctx->dev, "no space for rsc header (%u)\n",
-				(uint)offset);
+				offset);
 			return -ENODEV;
 		}
 		hdr = (struct fw_rsc_hdr *)((u8 *)descr + offset);
@@ -557,14 +557,14 @@ static int trusty_parse_device_descr(struct trusty_ctx *tctx,
 		/* check type */
 		if (hdr->type != RSC_VDEV) {
 			dev_err(tctx->dev, "unsupported rsc type (%u)\n",
-				(uint)hdr->type);
+				hdr->type);
 			continue;
 		}
 
 		/* got vdev: check space for vdev */
 		if ((descr_sz - offset) < sizeof(struct fw_rsc_vdev)) {
 			dev_err(tctx->dev, "no space for vdev descr (%u)\n",
-				(uint)offset);
+				offset);
 			return -ENODEV;
 		}
 		vd = (struct fw_rsc_vdev *)((u8 *)descr + offset);
@@ -575,8 +575,7 @@ static int trusty_parse_device_descr(struct trusty_ctx *tctx,
 			vd->config_len;
 
 		if ((descr_sz - offset) < vd_sz) {
-			dev_err(tctx->dev, "no space for vdev (%u)\n",
-				(uint)offset);
+			dev_err(tctx->dev, "no space for vdev (%u)\n", offset);
 			return -ENODEV;
 		}
 		vr = (struct fw_rsc_vdev_vring *)vd->vring;

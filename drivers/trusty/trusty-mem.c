@@ -23,14 +23,14 @@ static int get_mem_attr(struct page *page, pgprot_t pgprot)
 {
 #if defined(CONFIG_ARM64)
 	u64 mair;
-	uint attr_index = (pgprot_val(pgprot) & PTE_ATTRINDX_MASK) >> 2;
+	unsigned int attr_index = (pgprot_val(pgprot) & PTE_ATTRINDX_MASK) >> 2;
 
 	asm ("mrs %0, mair_el1\n" : "=&r" (mair));
 	return (mair >> (attr_index * 8)) & 0xff;
 
 #elif defined(CONFIG_ARM_LPAE)
 	u32 mair;
-	uint attr_index = ((pgprot_val(pgprot) & L_PTE_MT_MASK) >> 2);
+	unsigned int attr_index = ((pgprot_val(pgprot) & L_PTE_MT_MASK) >> 2);
 
 	if (attr_index >= 4) {
 		attr_index -= 4;
