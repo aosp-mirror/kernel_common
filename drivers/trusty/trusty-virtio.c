@@ -721,8 +721,6 @@ static int trusty_virtio_probe(struct platform_device *pdev)
 	int ret;
 	struct trusty_ctx *tctx;
 
-	dev_info(&pdev->dev, "initializing\n");
-
 	tctx = kzalloc(sizeof(*tctx), GFP_KERNEL);
 	if (!tctx)
 		return -ENOMEM;
@@ -774,8 +772,6 @@ static int trusty_virtio_remove(struct platform_device *pdev)
 {
 	struct trusty_ctx *tctx = platform_get_drvdata(pdev);
 	int ret;
-
-	dev_err(&pdev->dev, "removing\n");
 
 	/* unregister call notifier and wait until workqueue is done */
 	trusty_call_notifier_unregister(tctx->dev->parent,
