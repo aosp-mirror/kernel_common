@@ -1511,9 +1511,9 @@ err_out:
 	return ret;
 }
 
-static unsigned int tipc_poll(struct file *filp, poll_table *wait)
+static __poll_t tipc_poll(struct file *filp, poll_table *wait)
 {
-	unsigned int mask = 0;
+	__poll_t mask = 0;
 	struct tipc_dn_chan *dn = filp->private_data;
 
 	mutex_lock(&dn->lock);
@@ -1521,13 +1521,13 @@ static unsigned int tipc_poll(struct file *filp, poll_table *wait)
 	poll_wait(filp, &dn->readq, wait);
 
 	/* Writes always succeed for now */
-	mask |= POLLOUT | POLLWRNORM;
+	mask |= EPOLLOUT | EPOLLWRNORM;
 
 	if (!list_empty(&dn->rx_msg_queue))
-		mask |= POLLIN | POLLRDNORM;
+		mask |= EPOLLIN | EPOLLRDNORM;
 
 	if (dn->state != TIPC_CONNECTED)
-		mask |= POLLERR;
+		mask |= EPOLLERR;
 
 	mutex_unlock(&dn->lock);
 	return mask;
