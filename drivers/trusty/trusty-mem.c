@@ -22,14 +22,14 @@
 static int get_mem_attr(struct page *page, pgprot_t pgprot)
 {
 #if defined(CONFIG_ARM64)
-	uint64_t mair;
+	u64 mair;
 	uint attr_index = (pgprot_val(pgprot) & PTE_ATTRINDX_MASK) >> 2;
 
 	asm ("mrs %0, mair_el1\n" : "=&r" (mair));
 	return (mair >> (attr_index * 8)) & 0xff;
 
 #elif defined(CONFIG_ARM_LPAE)
-	uint32_t mair;
+	u32 mair;
 	uint attr_index = ((pgprot_val(pgprot) & L_PTE_MT_MASK) >> 2);
 
 	if (attr_index >= 4) {
@@ -74,15 +74,15 @@ int trusty_encode_page_info(struct ns_mem_page_info *inf,
 			    struct page *page, pgprot_t pgprot)
 {
 	int mem_attr;
-	uint64_t pte;
-	uint8_t ffa_mem_attr;
-	uint8_t ffa_mem_perm = 0;
+	u64 pte;
+	u8 ffa_mem_attr;
+	u8 ffa_mem_perm = 0;
 
 	if (!inf || !page)
 		return -EINVAL;
 
 	/* get physical address */
-	pte = (uint64_t) page_to_phys(page);
+	pte = (u64)page_to_phys(page);
 
 	/* get memory attributes */
 	mem_attr = get_mem_attr(page, pgprot);
@@ -134,6 +134,6 @@ int trusty_encode_page_info(struct ns_mem_page_info *inf,
 	inf->ffa_mem_attr = ffa_mem_attr;
 	inf->ffa_mem_perm = ffa_mem_perm;
 	inf->compat_attr = (pte & 0x0000FFFFFFFFFFFFull) |
-			   ((uint64_t)mem_attr << 48);
+			   ((u64)mem_attr << 48);
 	return 0;
 }

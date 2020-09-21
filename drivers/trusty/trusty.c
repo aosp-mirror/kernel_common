@@ -218,7 +218,7 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 }
 EXPORT_SYMBOL(trusty_std_call32);
 
-int trusty_share_memory(struct device *dev, uint64_t *id,
+int trusty_share_memory(struct device *dev, u64 *id,
 			struct scatterlist *sglist, unsigned int nents,
 			pgprot_t pgprot)
 {
@@ -238,8 +238,8 @@ int trusty_share_memory(struct device *dev, uint64_t *id,
 	struct ffa_cons_mrd *cons_mrd = comp_mrd->address_range_array;
 	size_t cons_mrd_offset = (void *)cons_mrd - s->ffa_tx;
 	struct smc_ret8 smc_ret;
-	uint32_t cookie_low;
-	uint32_t cookie_high;
+	u32 cookie_low;
+	u32 cookie_high;
 
 	if (WARN_ON(dev->driver != &trusty_driver.driver))
 		return -EINVAL;
@@ -393,7 +393,7 @@ EXPORT_SYMBOL(trusty_share_memory);
  * is old. Used by clients that used to pass just a physical address to trusty
  * instead of a physical address plus memory attributes value.
  */
-int trusty_share_memory_compat(struct device *dev, uint64_t *id,
+int trusty_share_memory_compat(struct device *dev, u64 *id,
 			       struct scatterlist *sglist, unsigned int nents,
 			       pgprot_t pgprot)
 {
@@ -408,7 +408,7 @@ int trusty_share_memory_compat(struct device *dev, uint64_t *id,
 }
 EXPORT_SYMBOL(trusty_share_memory_compat);
 
-int trusty_reclaim_memory(struct device *dev, uint64_t id,
+int trusty_reclaim_memory(struct device *dev, u64 id,
 			  struct scatterlist *sglist, unsigned int nents)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));

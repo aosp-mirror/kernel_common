@@ -51,10 +51,10 @@ const char *trusty_version_str_get(struct device *dev);
 u32 trusty_get_api_version(struct device *dev);
 
 struct ns_mem_page_info {
-	uint64_t paddr;
-	uint8_t ffa_mem_attr;
-	uint8_t ffa_mem_perm;
-	uint64_t compat_attr;
+	u64 paddr;
+	u8 ffa_mem_attr;
+	u8 ffa_mem_perm;
+	u64 compat_attr;
 };
 
 int trusty_encode_page_info(struct ns_mem_page_info *inf,

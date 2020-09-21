@@ -38,7 +38,7 @@ struct trusty_log_state {
 	 */
 	spinlock_t lock;
 	struct log_rb *log;
-	uint32_t get;
+	u32 get;
 
 	struct page *log_pages;
 	struct scatterlist sg;
@@ -68,7 +68,7 @@ static int log_read_line(struct trusty_log_state *s, int put, int get)
 static void trusty_dump_logs(struct trusty_log_state *s)
 {
 	struct log_rb *log = s->log;
-	uint32_t get, put, alloc;
+	u32 get, put, alloc;
 	int read_chars;
 
 	if (WARN_ON(!is_power_of_2(log->sz)))
