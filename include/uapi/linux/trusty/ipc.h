@@ -57,9 +57,4 @@ struct tipc_send_msg_req {
 #define TIPC_IOC_SEND_MSG		_IOW(TIPC_IOC_MAGIC, 0x81, \
 					     struct tipc_send_msg_req)
 
-#if defined(CONFIG_COMPAT)
-#define TIPC_IOC_CONNECT_COMPAT		_IOW(TIPC_IOC_MAGIC, 0x80, \
-					     compat_uptr_t)
-#endif
-
 #endif
