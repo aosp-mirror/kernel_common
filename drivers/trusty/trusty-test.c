@@ -381,6 +381,12 @@ static ssize_t trusty_test_run_store(struct device *dev,
 
 static DEVICE_ATTR_WO(trusty_test_run);
 
+static struct attribute *trusty_test_attrs[] = {
+	&dev_attr_trusty_test_run.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(trusty_test);
+
 static int trusty_test_probe(struct platform_device *pdev)
 {
 	struct trusty_test_state *s;
@@ -390,33 +396,19 @@ static int trusty_test_probe(struct platform_device *pdev)
 
 	ret = trusty_std_call32(pdev->dev.parent, SMC_SC_TEST_VERSION,
 				TRUSTY_STDCALLTEST_API_VERSION, 0, 0);
-	if (ret != TRUSTY_STDCALLTEST_API_VERSION) {
-		ret = -ENOENT;
-		goto err_unsupported;
-	}
+	if (ret != TRUSTY_STDCALLTEST_API_VERSION)
+		return -ENOENT;
 
 	s = kzalloc(sizeof(*s), GFP_KERNEL);
-	if (!s) {
-		ret = -ENOMEM;
-		goto err_alloc_state;
-	}
+	if (!s)
+		return -ENOMEM;
 
 	s->dev = &pdev->dev;
 	s->trusty_dev = s->dev->parent;
 
 	platform_set_drvdata(pdev, s);
 
-	ret = device_create_file(&pdev->dev, &dev_attr_trusty_test_run);
-	if (ret)
-		goto err_create_file;
-
 	return 0;
-
-err_create_file:
-	kfree(s);
-err_alloc_state:
-err_unsupported:
-	return ret;
 }
 
 static int trusty_test_remove(struct platform_device *pdev)
@@ -425,9 +417,7 @@ static int trusty_test_remove(struct platform_device *pdev)
 
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 
-	device_remove_file(&pdev->dev, &dev_attr_trusty_test_run);
 	kfree(s);
-
 	return 0;
 }
 
@@ -444,6 +434,7 @@ static struct platform_driver trusty_test_driver = {
 	.driver = {
 		.name = "trusty-test",
 		.of_match_table = trusty_test_of_match,
+		.dev_groups = trusty_test_groups,
 	},
 };
 
