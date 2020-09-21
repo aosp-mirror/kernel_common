@@ -97,13 +97,13 @@ static void trusty_dump_logs(struct trusty_log_state *s)
 		 * have been corrupted by the producer.
 		 */
 		if (alloc - get > log->sz) {
-			pr_err("trusty: log overflow.");
+			dev_err(s->dev, "log overflow.");
 			get = alloc - log->sz;
 			continue;
 		}
 
 		if (__ratelimit(&trusty_log_rate_limit))
-			pr_info("trusty: %s", s->line_buffer);
+			dev_info(s->dev, "%s", s->line_buffer);
 
 		get += read_chars;
 	}
@@ -136,8 +136,8 @@ static int trusty_log_panic_notify(struct notifier_block *nb,
 	 * though this is racy.
 	 */
 	s = container_of(nb, struct trusty_log_state, panic_notifier);
-	pr_info("trusty-log panic notifier - trusty version %s",
-		trusty_version_str_get(s->trusty_dev));
+	dev_info(s->dev, "panic notifier - trusty version %s",
+		 trusty_version_str_get(s->trusty_dev));
 	trusty_dump_logs(s);
 	return NOTIFY_OK;
 }
@@ -149,17 +149,18 @@ static bool trusty_supports_logging(struct device *device)
 	result = trusty_std_call32(device, SMC_SC_SHARED_LOG_VERSION,
 				   TRUSTY_LOG_API_VERSION, 0, 0);
 	if (result == SM_ERR_UNDEFINED_SMC) {
-		pr_info("trusty-log not supported on secure side.\n");
+		dev_info(device, "trusty-log not supported on secure side.\n");
 		return false;
 	} else if (result < 0) {
-		pr_err("trusty std call (SMC_SC_SHARED_LOG_VERSION) failed: %d\n",
-		       result);
+		dev_err(device,
+			"trusty std call (SMC_SC_SHARED_LOG_VERSION) failed: %d\n",
+			result);
 		return false;
 	}
 
 	if (result != TRUSTY_LOG_API_VERSION) {
-		pr_info("trusty-log unsupported api version: %d, supported: %d\n",
-			result, TRUSTY_LOG_API_VERSION);
+		dev_info(device, "unsupported api version: %d, supported: %d\n",
+			 result, TRUSTY_LOG_API_VERSION);
 		return false;
 	}
 	return true;
@@ -196,7 +197,7 @@ static int trusty_log_probe(struct platform_device *pdev)
 	result = trusty_share_memory_compat(s->trusty_dev, &mem_id, &s->sg, 1,
 					    PAGE_KERNEL);
 	if (result) {
-		pr_err("trusty_share_memory failed: %d\n", result);
+		dev_err(s->dev, "trusty_share_memory failed: %d\n", result);
 		goto err_share_memory;
 	}
 	s->log_pages_shared_mem_id = mem_id;
@@ -206,8 +207,9 @@ static int trusty_log_probe(struct platform_device *pdev)
 				   (u32)(mem_id), (u32)(mem_id >> 32),
 				   TRUSTY_LOG_SIZE);
 	if (result < 0) {
-		pr_err("trusty std call (SMC_SC_SHARED_LOG_ADD) failed: %d 0x%llx\n",
-		       result, mem_id);
+		dev_err(s->dev,
+			"trusty std call (SMC_SC_SHARED_LOG_ADD) failed: %d 0x%llx\n",
+			result, mem_id);
 		goto error_std_call;
 	}
 
@@ -268,8 +270,9 @@ static int trusty_log_remove(struct platform_device *pdev)
 	result = trusty_std_call32(s->trusty_dev, SMC_SC_SHARED_LOG_RM,
 				   (u32)mem_id, (u32)(mem_id >> 32), 0);
 	if (result) {
-		pr_err("trusty std call (SMC_SC_SHARED_LOG_RM) failed: %d\n",
-		       result);
+		dev_err(&pdev->dev,
+			"trusty std call (SMC_SC_SHARED_LOG_RM) failed: %d\n",
+			result);
 	}
 	result = trusty_reclaim_memory(s->trusty_dev, mem_id, &s->sg, 1);
 	if (WARN_ON(result)) {
