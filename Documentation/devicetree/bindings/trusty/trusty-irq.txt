@@ -31,6 +31,13 @@ Optional properties:
                    that must be used as a template for all interrupts
                    in this range
 
+- ipi-range: optional mapping of a linear range of trusty IRQs to a linear range
+  of IPIs (inter-processor interrupts).  This has the following format:
+    <beg end ipi_base>
+      beg - first trusty IRQ number that is an IPI
+      end - last trusty IRQ number that is an IPI
+      ipi_base - IPI number of 'beg'
+
 Example:
 {
 	gic: interrupt-controller@50041000 {
@@ -38,12 +45,6 @@ Example:
 		#interrupt-cells = <3>;
 		interrupt-controller;
 		...
-	};
-	...
-	IPI: interrupt-controller {
-		compatible = "android,CustomIPI";
-		#interrupt-cells = <1>;
-		interrupt-controller;
 	};
 	...
 	trusty {
@@ -54,12 +55,11 @@ Example:
 
 		irq {
 			compatible = "android,trusty-irq-v1";
-			interrupt-templates = <&IPI 0>,
-					      <&gic 1 GIC_PPI 0>,
+			interrupt-templates = <&gic 1 GIC_PPI 0>,
 					      <&gic 1 GIC_SPI 0>;
-			interrupt-ranges = < 0  15 0>,
-					   <16  31 1>,
-					   <32 223 2>;
+			interrupt-ranges = <16  31 0>,
+					   <32 223 1>;
+			ipi-range = <8 15 8>;
 		};
 	}
 }
