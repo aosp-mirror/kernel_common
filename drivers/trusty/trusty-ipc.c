@@ -1073,19 +1073,20 @@ err_vds_lookup:
 
 static int dn_connect_ioctl(struct tipc_dn_chan *dn, char __user *usr_name)
 {
-	int err;
+	int ret;
 	char name[MAX_SRV_NAME_LEN];
 
 	/* copy in service name from user space */
-	err = strncpy_from_user(name, usr_name, sizeof(name));
-	if (err < 0)
-		return err;
-	name[sizeof(name)-1] = '\0';
+	ret = strncpy_from_user(name, usr_name, sizeof(name));
+	if (ret < 0)
+		return ret;
+	if (ret == sizeof(name))
+		return -ENAMETOOLONG;
 
 	/* send connect request */
-	err = tipc_chan_connect(dn->chan, name);
-	if (err)
-		return err;
+	ret = tipc_chan_connect(dn->chan, name);
+	if (ret)
+		return ret;
 
 	/* and wait for reply */
 	return dn_wait_for_reply(dn, REPLY_TIMEOUT);
