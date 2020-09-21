@@ -2,8 +2,8 @@
 /*
  * Copyright (C) 2020 Google, Inc.
  */
-
-#pragma once
+#ifndef __LINUX_TRUSTY_ARM_FFA_H
+#define __LINUX_TRUSTY_ARM_FFA_H
 
 /*
  * Subset of Arm PSA Firmware Framework for Arm v8-A 1.0 EAC 1_0
@@ -585,3 +585,5 @@ enum ffa_error {
  * * w1/x1-w5/x5:    See opcode in w0.
  */
 #define SMC_FC_FFA_MEM_FRAG_TX SMC_FASTCALL_NR_SHARED_MEMORY(0x7B)
+
+#endif /* __LINUX_TRUSTY_ARM_FFA_H */
