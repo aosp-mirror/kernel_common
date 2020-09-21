@@ -171,7 +171,6 @@ static int trusty_log_probe(struct platform_device *pdev)
 	int result;
 	trusty_shared_mem_id_t mem_id;
 
-	dev_dbg(&pdev->dev, "%s\n", __func__);
 	if (!trusty_supports_logging(pdev->dev.parent))
 		return -ENXIO;
 
@@ -261,8 +260,6 @@ static int trusty_log_remove(struct platform_device *pdev)
 	int result;
 	struct trusty_log_state *s = platform_get_drvdata(pdev);
 	trusty_shared_mem_id_t mem_id = s->log_pages_shared_mem_id;
-
-	dev_dbg(&pdev->dev, "%s\n", __func__);
 
 	atomic_notifier_chain_unregister(&panic_notifier_list,
 					 &s->panic_notifier);

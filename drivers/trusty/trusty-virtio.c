@@ -259,7 +259,6 @@ static void trusty_virtio_set_config(struct virtio_device *vdev,
 				     unsigned int offset, const void *buf,
 				     unsigned int len)
 {
-	dev_dbg(&vdev->dev, "%s\n", __func__);
 }
 
 static u8 trusty_virtio_get_status(struct virtio_device *vdev)
@@ -316,7 +315,6 @@ static void _del_vqs(struct virtio_device *vdev)
 
 static void trusty_virtio_del_vqs(struct virtio_device *vdev)
 {
-	dev_dbg(&vdev->dev, "%s\n", __func__);
 	_del_vqs(vdev);
 }
 

@@ -231,8 +231,6 @@ int trusty_share_memory(struct device *dev, uint64_t *id,
 	uint32_t cookie_low;
 	uint32_t cookie_high;
 
-	dev_dbg(s->dev, "%s\n", __func__);
-
 	if (WARN_ON(dev->driver != &trusty_driver.driver))
 		return -EINVAL;
 
@@ -406,8 +404,6 @@ int trusty_reclaim_memory(struct device *dev, uint64_t id,
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 	int ret = 0;
 	struct smc_ret8 smc_ret;
-
-	dev_dbg(s->dev, "%s\n", __func__);
 
 	if (WARN_ON(dev->driver != &trusty_driver.driver))
 		return -EINVAL;
@@ -701,8 +697,6 @@ static void locked_nop_work_func(struct work_struct *work)
 	struct trusty_work *tw = container_of(work, struct trusty_work, work);
 	struct trusty_state *s = tw->ts;
 
-	dev_dbg(s->dev, "%s\n", __func__);
-
 	ret = trusty_std_call32(s->dev, SMC_SC_LOCKED_NOP, 0, 0, 0);
 	if (ret != 0)
 		dev_err(s->dev, "%s: SMC_SC_LOCKED_NOP failed %d",
@@ -719,8 +713,6 @@ static void nop_work_func(struct work_struct *work)
 	u32 last_arg0;
 	struct trusty_work *tw = container_of(work, struct trusty_work, work);
 	struct trusty_state *s = tw->ts;
-
-	dev_dbg(s->dev, "%s:\n", __func__);
 
 	dequeue_nop(s, args);
 	do {

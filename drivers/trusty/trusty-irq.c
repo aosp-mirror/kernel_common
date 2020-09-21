@@ -457,8 +457,6 @@ static int trusty_irq_probe(struct platform_device *pdev)
 	unsigned long irq_flags;
 	struct trusty_irq_state *is;
 
-	dev_dbg(&pdev->dev, "%s\n", __func__);
-
 	is = kzalloc(sizeof(*is), GFP_KERNEL);
 	if (!is) {
 		ret = -ENOMEM;
@@ -521,8 +519,6 @@ static int trusty_irq_remove(struct platform_device *pdev)
 	int ret;
 	unsigned long irq_flags;
 	struct trusty_irq_state *is = platform_get_drvdata(pdev);
-
-	dev_dbg(&pdev->dev, "%s\n", __func__);
 
 	ret = cpuhp_state_remove_instance(trusty_irq_cpuhp_slot,
 					  &is->cpuhp_node);

@@ -392,8 +392,6 @@ static int trusty_test_probe(struct platform_device *pdev)
 	struct trusty_test_state *s;
 	int ret;
 
-	dev_dbg(&pdev->dev, "%s\n", __func__);
-
 	ret = trusty_std_call32(pdev->dev.parent, SMC_SC_TEST_VERSION,
 				TRUSTY_STDCALLTEST_API_VERSION, 0, 0);
 	if (ret != TRUSTY_STDCALLTEST_API_VERSION)
@@ -414,8 +412,6 @@ static int trusty_test_probe(struct platform_device *pdev)
 static int trusty_test_remove(struct platform_device *pdev)
 {
 	struct trusty_log_state *s = platform_get_drvdata(pdev);
-
-	dev_dbg(&pdev->dev, "%s\n", __func__);
 
 	kfree(s);
 	return 0;
