@@ -2840,6 +2840,46 @@ static int __maybe_unused it6505_audio_setup_hw_params(struct it6505 *it6505,
 	return 0;
 }
 
+static int it6505_audio_hw_params(struct device *dev, void *data,
+				  struct hdmi_codec_daifmt *daifmt,
+				  struct hdmi_codec_params *params)
+{
+	struct it6505 *it6505 = dev_get_drvdata(dev);
+
+	return it6505_audio_setup_hw_params(it6505, params);
+}
+
+static int it6505_audio_setup_trigger(struct it6505 *it6505,
+						     int event)
+{
+	struct device *dev = it6505->dev;
+
+	DRM_DEV_DEBUG_DRIVER(dev, "event: %d", event);
+
+	switch (event) {
+	case HDMI_CODEC_TRIGGER_EVENT_START:
+	case HDMI_CODEC_TRIGGER_EVENT_RESUME:
+		queue_delayed_work(system_wq, &it6505->delayed_audio,
+				   msecs_to_jiffies(180));
+		break;
+	case HDMI_CODEC_TRIGGER_EVENT_STOP:
+	case HDMI_CODEC_TRIGGER_EVENT_SUSPEND:
+		cancel_delayed_work(&it6505->delayed_audio);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int it6505_audio_trigger(struct device *dev, int event)
+{
+	struct it6505 *it6505 = dev_get_drvdata(dev);
+
+	return it6505_audio_setup_trigger(it6505, event);
+}
+
 static void __maybe_unused it6505_audio_shutdown(struct device *dev, void *data)
 {
 	struct it6505 *it6505 = dev_get_drvdata(dev);
@@ -2858,6 +2898,36 @@ static int __maybe_unused it6505_audio_hook_plugged_cb(struct device *dev,
 	it6505->plugged_cb = fn;
 	it6505->codec_dev = codec_dev;
 	it6505_plugged_status_to_codec(it6505);
+
+	return 0;
+}
+
+static const struct hdmi_codec_ops it6505_audio_codec_ops = {
+	.hw_params = it6505_audio_hw_params,
+	.trigger = it6505_audio_trigger,
+	.audio_shutdown = it6505_audio_shutdown,
+	.hook_plugged_cb = it6505_audio_hook_plugged_cb,
+};
+
+static int it6505_register_audio_driver(struct device *dev)
+{
+	struct it6505 *it6505 = dev_get_drvdata(dev);
+	struct hdmi_codec_pdata codec_data = {
+		.ops = &it6505_audio_codec_ops,
+		.max_i2s_channels = 8,
+		.i2s = 1,
+		.data = it6505,
+	};
+	struct platform_device *pdev;
+
+	pdev = platform_device_register_data(dev, HDMI_CODEC_DRV_NAME,
+					     PLATFORM_DEVID_AUTO, &codec_data,
+					     sizeof(codec_data));
+	if (IS_ERR(pdev))
+		return PTR_ERR(pdev);
+
+	INIT_DELAYED_WORK(&it6505->delayed_audio, it6505_delayed_audio);
+	DRM_DEV_DEBUG_DRIVER(dev, "bound to %s", HDMI_CODEC_DRV_NAME);
 
 	return 0;
 }
@@ -3420,6 +3490,12 @@ static int it6505_i2c_probe(struct i2c_client *client)
 					"it6505-intp", it6505);
 	if (err) {
 		dev_err(dev, "Failed to request INTP threaded IRQ: %d", err);
+		return err;
+	}
+
+	err = it6505_register_audio_driver(dev);
+	if (err < 0) {
+		DRM_DEV_ERROR(dev, "Failed to register audio driver: %d", err);
 		return err;
 	}
 
