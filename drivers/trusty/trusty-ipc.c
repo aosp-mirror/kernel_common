@@ -1144,7 +1144,7 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 		shmem_err = shmem_getpage(file->f_inode, pg_idx, &page,
 					  SGP_CACHE);
 		if (shmem_err < 0) {
-			dev_dbg(dev, "shmem_getpage(%d) failed: %d\n", pg_idx,
+			dev_dbg(dev, "shmem_getpage(%lu) failed: %d\n", pg_idx,
 				shmem_err);
 			ret = shmem_err;
 			goto cleanup_pages;
