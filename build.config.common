@@ -1,5 +1,4 @@
 BRANCH=android-4.14
-KERNEL_DIR=common
 
 CC=clang
 LD=ld.lld

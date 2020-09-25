@@ -1,5 +1,5 @@
-. ${ROOT_DIR}/common/build.config.common
-. ${ROOT_DIR}/common/build.config.x86_64
+. ${ROOT_DIR}/${KERNEL_DIR}/build.config.common
+. ${ROOT_DIR}/${KERNEL_DIR}/build.config.x86_64
 
 LZ4_RAMDISK=1
 DEFCONFIG=x86_64_cuttlefish_defconfig
