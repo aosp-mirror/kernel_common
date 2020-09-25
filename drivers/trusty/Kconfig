@@ -12,11 +12,11 @@ config TRUSTY
 if TRUSTY
 
 config TRUSTY_IRQ
-	tristate
+	tristate "Trusty IRQ support"
 	default y
 
 config TRUSTY_LOG
-	tristate
+	tristate "Trusty log support"
 	default y
 
 config TRUSTY_TEST
