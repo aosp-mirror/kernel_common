@@ -709,19 +709,25 @@ struct ufs_hba {
 
 	/*
 	 * This quirk needs to be enabled if the host controller supports inline
-	 * encryption, but it uses a nonstandard mechanism where the standard
-	 * crypto registers aren't used and there is no concept of keyslots.
-	 * ufs_hba_variant_ops::init() is expected to initialize ufs_hba::ksm as
-	 * a passthrough keyslot manager.
+	 * encryption, but it doesn't use the standard crypto capability
+	 * registers.  If enabled, the standard code won't initialize the
+	 * keyslot manager; ufs_hba_variant_ops::init() must do it instead.
 	 */
-	#define UFSHCD_QUIRK_NO_KEYSLOTS			0x2000
+	#define UFSHCD_QUIRK_BROKEN_CRYPTO_CAPS			0x100000
+
+	/*
+	 * This quirk needs to be enabled if the host controller supports inline
+	 * encryption, but the CRYPTO_GENERAL_ENABLE bit is not implemented and
+	 * breaks the HCE sequence if used.
+	 */
+	#define UFSHCD_QUIRK_BROKEN_CRYPTO_ENABLE		0x200000
 
 	/*
 	 * This quirk needs to be enabled if the host controller requires that
 	 * the PRDT be cleared after each encrypted request because encryption
 	 * keys were stored in it.
 	 */
-	#define UFSHCD_QUIRK_KEYS_IN_PRDT			0x4000
+	#define UFSHCD_QUIRK_KEYS_IN_PRDT			0x400000
 
 	unsigned int quirks;	/* Deviations from standard UFSHCI spec. */
 
