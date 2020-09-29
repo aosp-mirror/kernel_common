@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 /*
  * Copyright (c) 2013-2014 Google Inc. All rights reserved
+ *
+ * Trusty and TF-A also have a copy of this header.
+ * Please keep the copies in sync.
  */
 #ifndef __LINUX_TRUSTY_SMCALL_H
 #define __LINUX_TRUSTY_SMCALL_H

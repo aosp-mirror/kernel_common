@@ -1,6 +1,9 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+/* SPDX-License-Identifier: MIT */
 /*
  * Copyright (C) 2020 Google, Inc.
+ *
+ * Trusty and TF-A also have a copy of this header.
+ * Please keep the copies in sync.
  */
 #ifndef __LINUX_TRUSTY_ARM_FFA_H
 #define __LINUX_TRUSTY_ARM_FFA_H
@@ -9,8 +12,6 @@
  * Subset of Arm PSA Firmware Framework for Arm v8-A 1.0 EAC 1_0
  * (https://developer.arm.com/docs/den0077/a) needed for shared memory.
  */
-
-#include <linux/bits.h>
 
 #include "smcall.h"
 

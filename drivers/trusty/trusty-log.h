@@ -1,4 +1,9 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+/* SPDX-License-Identifier: MIT */
+/*
+ * Copyright (c) 2015 Google, Inc.
+ *
+ * Trusty also has a copy of this header.  Please keep the copies in sync.
+ */
 #ifndef _TRUSTY_LOG_H_
 #define _TRUSTY_LOG_H_
 
