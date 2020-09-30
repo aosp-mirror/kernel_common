@@ -654,6 +654,20 @@ config DM_AUDIT
 	  Enables audit logging of several security relevant events in the
 	  particular device-mapper targets, especially the integrity target.
 
+config DM_USER
+	tristate "Block device in userspace"
+	depends on BLK_DEV_DM
+	default y
+	help
+	  This device-mapper target allows a userspace daemon to provide the
+	  contents of a block device.  See
+	  <file:Documentation/block/dm-user.rst> for more information.
+
+	  To compile this code as a module, choose M here: the module will be
+	  called dm-user.
+
+	  If unsure, say N.
+
 source "drivers/md/dm-vdo/Kconfig"
 
 endif # MD
