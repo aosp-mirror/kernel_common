@@ -149,6 +149,8 @@ struct tcpci_data {
 	int (*get_current_limit)(struct tcpci *tcpci, struct tcpci_data *data);
 	int (*set_current_limit)(struct tcpci *tcpci, struct tcpci_data *data, u32 max_ma, u32 mv);
 	void (*set_pd_capable)(struct tcpci *tcpci, struct tcpci_data *data, bool capable);
+	void (*set_cc_polarity)(struct tcpci *tcpci, struct tcpci_data *data,
+				enum typec_cc_polarity polarity);
 };
 
 struct tcpci *tcpci_register_port(struct device *dev, struct tcpci_data *data);
