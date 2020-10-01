@@ -132,6 +132,8 @@ struct tcpci_data {
 	int (*start_drp_toggling)(struct tcpci *tcpci, struct tcpci_data *data,
 				  enum typec_cc_status cc);
 	int (*set_vbus)(struct tcpci *tcpci, struct tcpci_data *data, bool source, bool sink);
+	int (*set_roles)(struct tcpci *tcpci, struct tcpci_data *data, bool attached,
+			 enum typec_role role, enum typec_data_role data_role);
 };
 
 struct tcpci *tcpci_register_port(struct device *dev, struct tcpci_data *data);
