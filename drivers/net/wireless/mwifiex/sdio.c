@@ -1750,6 +1750,8 @@ error:
 	if (ret) {
 		kfree(card->mpa_tx.buf);
 		kfree(card->mpa_rx.buf);
+		card->mpa_tx.buf = NULL;
+		card->mpa_rx.buf = NULL;
 	}
 
 	return ret;
