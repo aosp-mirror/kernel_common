@@ -2886,6 +2886,11 @@ static void con_fault(struct ceph_connection *con)
 		con->in_msg = NULL;
 		con->ops->put(con);
 	}
+	if (con->out_msg) {
+		BUG_ON(con->out_msg->con != con);
+		ceph_msg_put(con->out_msg);
+		con->out_msg = NULL;
+	}
 
 	/* Requeue anything that hasn't been acked */
 	list_splice_init(&con->out_sent, &con->out_queue);
