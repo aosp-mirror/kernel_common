@@ -170,8 +170,12 @@ int virtio_video_dec_init_ctrls(struct virtio_video_stream *stream)
 	if (ctrl)
 		ctrl->flags |= V4L2_CTRL_FLAG_VOLATILE;
 
-	if (stream->ctrl_handler.error)
-		return stream->ctrl_handler.error;
+	if (stream->ctrl_handler.error) {
+		int err = stream->ctrl_handler.error;
+
+		v4l2_ctrl_handler_free(&stream->ctrl_handler);
+		return err;
+	}
 
 	v4l2_ctrl_handler_setup(&stream->ctrl_handler);
 
