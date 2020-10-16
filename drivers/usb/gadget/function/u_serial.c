@@ -452,6 +452,9 @@ static void gs_read_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct gs_port	*port = ep->driver_data;
 
+	if (!port)
+		return;
+
 	/* Queue all received data until the tty layer is ready for it. */
 	spin_lock(&port->port_lock);
 	list_add_tail(&req->list, &port->read_queue);
@@ -462,6 +465,9 @@ static void gs_read_complete(struct usb_ep *ep, struct usb_request *req)
 static void gs_write_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct gs_port	*port = ep->driver_data;
+
+	if (!port)
+		return;
 
 	spin_lock(&port->port_lock);
 	list_add(&req->list, &port->write_pool);
