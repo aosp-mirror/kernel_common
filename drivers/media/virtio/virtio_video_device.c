@@ -57,9 +57,11 @@ static int virtio_video_get_dma_buf_id(struct virtio_video_device *vvd,
 	/**
 	 * For multiplanar formats, we assume all planes are on one DMA buffer.
 	 */
-	struct dma_buf *dma_buf = dma_buf_get(vb->planes[0].m.fd);
-
-	return virtio_dma_buf_get_uuid(dma_buf, uuid);
+	if (vb->planes[0].dbuf) {
+		return virtio_dma_buf_get_uuid(vb->planes[0].dbuf, uuid);
+	} else {
+		return -EINVAL;
+	}
 }
 
 static int virtio_video_send_resource_create_object(struct vb2_buffer *vb,
