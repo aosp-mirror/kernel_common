@@ -16,3 +16,7 @@ arch/arm64/boot/Image.lz4
 KERNEL_BINARY=Image.lz4
 SKIP_VENDOR_BOOT=1
 GKI_RAMDISK_PREBUILT_BINARY=${ROOT_DIR}/prebuilts/boot-artifacts/ramdisks/ramdisk-git_master.img
+
+if [ -n "${GKI_DEFCONFIG_FRAGMENT}" ]; then
+source ${GKI_DEFCONFIG_FRAGMENT}
+fi
