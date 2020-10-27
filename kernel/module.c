@@ -3357,6 +3357,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	return do_init_module(mod);
 
  bug_cleanup:
+	mod->state = MODULE_STATE_GOING;
 	/* module_bug_cleanup needs module_mutex protection */
 	mutex_lock(&module_mutex);
 	module_bug_cleanup(mod);
