@@ -15,7 +15,6 @@ generic-y += mmiowb.h
 generic-y += msi.h
 generic-y += parport.h
 generic-y += preempt.h
-generic-y += seccomp.h
 generic-y += serial.h
 generic-y += trace_clock.h
 
