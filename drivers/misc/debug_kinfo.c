@@ -2,6 +2,7 @@
 /*
  * debug_kinfo.c - backup kernel information for bootloader usage
  *
+ * Copyright 2002 Rusty Russell <rusty@rustcorp.com.au> IBM Corporation
  * Copyright 2020 Google LLC
  */
 
