@@ -37,7 +37,7 @@ extern const u16 kallsyms_token_index[] __weak;
 
 extern const unsigned int kallsyms_markers[] __weak;
 
-static phys_addr_t all_info_addr;
+static void *all_info_addr;
 static u32 all_info_size;
 
 static void update_kernel_all_info(struct kernel_all_info *all_info)
@@ -128,7 +128,7 @@ static int debug_kinfo_probe(struct platform_device *pdev)
 	all_info_addr = rmem->priv;
 	all_info_size = rmem->size;
 
-	memset((void *)all_info_addr, 0, all_info_size);
+	memset(all_info_addr, 0, all_info_size);
 	all_info = (struct kernel_all_info *)all_info_addr;
 	info = &(all_info->info);
 	info->enabled_all = IS_ENABLED(CONFIG_KALLSYMS_ALL);
