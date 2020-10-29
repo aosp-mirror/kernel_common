@@ -25,6 +25,7 @@
 #include <linux/uaccess.h>
 
 #include "internal.h"
+#include <trace/hooks/pstore.h>
 
 #define	PSTORE_NAMELEN	64
 
@@ -133,6 +134,15 @@ static ssize_t pstore_file_read(struct file *file, char __user *userbuf,
 
 	if (ps->record->type == PSTORE_TYPE_FTRACE)
 		return seq_read(file, userbuf, count, ppos);
+
+	if (ps->record->type == PSTORE_TYPE_CONSOLE) {
+		ssize_t len = 0;
+		trace_android_vh_pstore_console_read(userbuf, count, ppos,
+						     ps->record->buf, ps->total_size,  &len);
+		if (len > 0)
+			return len;
+	}
+
 	return simple_read_from_buffer(userbuf, count, ppos,
 				       ps->record->buf, ps->total_size);
 }
@@ -387,6 +397,9 @@ int pstore_mkfile(struct dentry *root, struct pstore_record *record)
 	private->record = record;
 	inode->i_size = private->total_size = size;
 	inode->i_private = private;
+
+	if (record->type == PSTORE_TYPE_CONSOLE)
+		trace_android_vh_pstore_console_mkfile(&inode->i_size);
 
 	if (record->time.tv_sec)
 		inode->i_mtime = inode->i_ctime = record->time;
