@@ -42,7 +42,7 @@
 
 #define __DECLARE_HOOK(name, proto, args, cond, data_proto, data_args)	\
 	extern struct tracepoint __tracepoint_##name;			\
-	static inline void trace_##name(proto)				\
+	static inline void __nocfi trace_##name(proto)			\
 	{								\
 		if (static_key_false(&__tracepoint_##name.key))		\
 			DO_HOOK(&__tracepoint_##name,			\
