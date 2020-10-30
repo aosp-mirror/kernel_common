@@ -103,7 +103,13 @@ static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 static bool sugov_update_next_freq(struct sugov_policy *sg_policy, u64 time,
 				   unsigned int next_freq)
 {
+	bool should_update = true;
+
 	if (sg_policy->next_freq == next_freq)
+		return false;
+
+	trace_android_rvh_set_sugov_update(sg_policy, next_freq, &should_update);
+	if (!should_update)
 		return false;
 
 	sg_policy->next_freq = next_freq;
