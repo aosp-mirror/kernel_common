@@ -855,6 +855,28 @@ static int fuse_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
 	return create_new_entry(fm, &args, dir, entry, S_IFDIR);
 }
 
+static int fuse_chromeos_tmpfile(struct user_namespace *mnt_userns,
+                                 struct inode *dir, struct dentry *entry,
+				 umode_t mode)
+{
+	struct fuse_chromeos_tmpfile_in inarg;
+	struct fuse_mount *fm = get_fuse_mount(dir);
+	FUSE_ARGS(args);
+
+	if (!fm->fc->dont_mask)
+		mode &= ~current_umask();
+
+	memset(&inarg, 0, sizeof(inarg));
+	inarg.mode = mode;
+	inarg.umask = current_umask();
+	args.opcode = FUSE_CHROMEOS_TMPFILE;
+	args.in_numargs = 1;
+	args.in_args[0].size = sizeof(inarg);
+	args.in_args[0].value = &inarg;
+
+	return create_new_entry(fm, &args, dir, entry, S_IFREG);
+}
+
 static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
 			struct dentry *entry, const char *link)
 {
@@ -1965,6 +1987,7 @@ static const struct inode_operations fuse_dir_inode_operations = {
 	.set_acl	= fuse_set_acl,
 	.fileattr_get	= fuse_fileattr_get,
 	.fileattr_set	= fuse_fileattr_set,
+	.tmpfile	= fuse_chromeos_tmpfile,
 };
 
 static const struct file_operations fuse_dir_operations = {
