@@ -534,6 +534,9 @@ enum fuse_opcode {
 	/* Reserved opcodes: helpful to detect structure endian-ness */
 	CUSE_INIT_BSWAP_RESERVED	= 1048576,	/* CUSE_INIT << 8 */
 	FUSE_INIT_BSWAP_RESERVED	= 436207616,	/* FUSE_INIT << 24 */
+
+	/* Chrome OS extensions */
+	FUSE_CHROMEOS_TMPFILE	= 0xffffffff,	/* u32::MAX */
 };
 
 enum fuse_notify_code {
@@ -648,6 +651,11 @@ struct fuse_create_in {
 	uint32_t	mode;
 	uint32_t	umask;
 	uint32_t	open_flags;	/* FUSE_OPEN_... */
+};
+
+struct fuse_chromeos_tmpfile_in {
+	uint32_t mode;
+	uint32_t umask;
 };
 
 struct fuse_open_out {
