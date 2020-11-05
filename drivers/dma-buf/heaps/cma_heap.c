@@ -40,10 +40,10 @@ static void cma_heap_free(struct heap_helper_buffer *buffer)
 }
 
 /* dmabuf heap CMA operations functions */
-struct dma_buf *cma_heap_allocate(struct dma_heap *heap,
-				  unsigned long len,
-				  unsigned long fd_flags,
-				  unsigned long heap_flags)
+static struct dma_buf *cma_heap_allocate(struct dma_heap *heap,
+					 unsigned long len,
+					 unsigned long fd_flags,
+					 unsigned long heap_flags)
 {
 	struct cma_heap *cma_heap = dma_heap_get_drvdata(heap);
 	struct heap_helper_buffer *helper_buffer;
