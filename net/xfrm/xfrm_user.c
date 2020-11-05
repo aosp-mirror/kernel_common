@@ -3256,16 +3256,17 @@ static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 		if (in_compat_syscall()) {
 			struct xfrm_translator *xtr = xfrm_get_translator();
 
-		if (!xtr)
-			return -EOPNOTSUPP;
+			if (!xtr)
+				return -EOPNOTSUPP;
 
-		nlh64 = xtr->rcv_msg_compat(nlh, link->nla_max,
-					    link->nla_pol, extack);
-		xfrm_put_translator(xtr);
-		if (IS_ERR(nlh64))
-			return PTR_ERR(nlh64);
-		if (nlh64)
-			nlh = nlh64;
+			nlh64 = xtr->rcv_msg_compat(nlh, link->nla_max,
+						    link->nla_pol, extack);
+			xfrm_put_translator(xtr);
+			if (IS_ERR(nlh64))
+				return PTR_ERR(nlh64);
+			if (nlh64)
+				nlh = nlh64;
+		}
 	}
 
 	if ((type == (XFRM_MSG_GETSA - XFRM_MSG_BASE) ||
