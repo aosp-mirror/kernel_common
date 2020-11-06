@@ -211,7 +211,8 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 		v4l2_ctrl_new_std(&stream->ctrl_handler,
 				  &virtio_video_enc_ctrl_ops,
 				  V4L2_CID_MPEG_VIDEO_BITRATE,
-				  1, stream->control.bitrate,
+				  // Set max to 1GBs to cover most use cases.
+				  1, 1000000000,
 				  1, stream->control.bitrate);
 	}
 
