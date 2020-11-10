@@ -141,7 +141,7 @@ static int debug_kinfo_probe(struct platform_device *pdev)
 	info->module_name_len = MODULE_NAME_LEN;
 	info->symbol_len = KSYM_SYMBOL_LEN;
 	info->_addresses_pa = (u64)virt_to_phys(kallsyms_addresses);
-	info->_relative_pa = (u64)virt_to_phys(kallsyms_relative_base);
+	info->_relative_pa = (u64)virt_to_phys((void *)kallsyms_relative_base);
 	info->_stext_pa = (u64)virt_to_phys(_stext);
 	info->_etext_pa = (u64)virt_to_phys(_etext);
 	info->_sinittext_pa = (u64)virt_to_phys(_sinittext);
