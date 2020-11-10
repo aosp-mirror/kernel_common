@@ -2588,7 +2588,13 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	lrbp->lun = ufshcd_scsi_to_upiu_lun(cmd->device->lun);
 	lrbp->intr_cmd = !ufshcd_is_intr_aggr_allowed(hba) ? true : false;
 
-	ufshcd_vops_prepare_command(hba, cmd->request, lrbp);
+	err = ufshcd_vops_prepare_command(hba, cmd->request, lrbp);
+	if (err) {
+		ufshcd_release(hba);
+		lrbp->cmd = NULL;
+		clear_bit_unlock(tag, &hba->lrb_in_use);
+		goto out;
+	}
 
 	ufshcd_prepare_lrbp_crypto(cmd->request, lrbp);
 
