@@ -256,6 +256,7 @@ static int virtio_video_decoder_cmd(struct file *file, void *fh,
 	struct virtio_video_stream *stream = file2stream(file);
 	struct virtio_video_device *vvd = video_drvdata(file);
 	struct virtio_video *vv = vvd->vv;
+	int current_state;
 
 	ret = virtio_video_try_decoder_cmd(file, fh, cmd);
 	if (ret < 0)
@@ -290,13 +291,14 @@ static int virtio_video_decoder_cmd(struct file *file, void *fh,
 			return 0;
 		}
 
+		current_state = stream->state;
+		stream->state = STREAM_STATE_DRAIN;
 		ret = virtio_video_cmd_stream_drain(vv, stream->stream_id);
 		if (ret) {
+			stream->state = current_state;
 			v4l2_err(&vv->v4l2_dev, "failed to drain stream\n");
 			return ret;
 		}
-
-		stream->state = STREAM_STATE_DRAIN;
 		break;
 	default:
 		return -EINVAL;
