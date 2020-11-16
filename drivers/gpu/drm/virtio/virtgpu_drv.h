@@ -54,6 +54,8 @@
 #define STATE_OK 1
 #define STATE_ERR 2
 
+#define MAX_CAPSET_ID 31
+
 struct virtio_gpu_object_params {
 	unsigned long size;
 	bool dumb;
@@ -252,6 +254,7 @@ struct virtio_gpu_device {
 
 	struct virtio_gpu_drv_capset *capsets;
 	uint32_t num_capsets;
+	uint32_t capset_id_mask;
 	struct list_head cap_cache;
 
 	/* protects uuid state when exporting */
