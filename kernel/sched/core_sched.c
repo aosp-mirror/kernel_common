@@ -145,6 +145,9 @@ int sched_core_share_pid(unsigned int cmd, pid_t pid, enum pid_type type,
 	    (cmd != PR_SCHED_CORE_GET && uaddr))
 		return -EINVAL;
 
+	if (!static_branch_likely(&sched_coresched_supported))
+		return 0;
+
 	rcu_read_lock();
 	if (pid == 0) {
 		task = current;
