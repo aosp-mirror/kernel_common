@@ -1891,7 +1891,6 @@ static int f2fs_remount(struct super_block *sb, int *flags, char *data)
 
 	if (*flags & MS_RDONLY ||
 		F2FS_OPTION(sbi).whint_mode != org_mount_opt.whint_mode) {
-		writeback_inodes_sb(sb, WB_REASON_SYNC);
 		sync_inodes_sb(sb);
 
 		set_sbi_flag(sbi, SBI_IS_DIRTY);
