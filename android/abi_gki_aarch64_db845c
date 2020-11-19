@@ -476,7 +476,6 @@
   __udelay
   unregister_reboot_notifier
   unregister_rpmsg_driver
-  usb_add_hcd
   usb_amd_dev_put
   usb_amd_quirk_pll_check
   usb_amd_quirk_pll_disable
@@ -519,9 +518,7 @@
   usbnet_write_cmd
   usbnet_write_cmd_async
   usbnet_write_cmd_nopm
-  usb_put_hcd
   usb_register_driver
-  usb_remove_hcd
   usb_root_hub_lost_power
   usleep_range
   vsnprintf
@@ -1527,29 +1524,6 @@
   of_device_request_module
   __request_module
 
-# required by xhci-hcd.ko
-  add_timer
-  mod_delayed_work_on
-  __num_online_cpus
-  param_ops_ullong
-  pci_alloc_irq_vectors_affinity
-  pci_free_irq_vectors
-  pci_irq_vector
-  radix_tree_maybe_preload
-  sg_pcopy_from_buffer
-  sg_pcopy_to_buffer
-  trace_print_symbols_seq
-  usb_amd_pt_check_port
-  usb_asmedia_modifyflowcontrol
-  usb_disable_xhci_ports
-  usb_hcd_end_port_resume
-  usb_hcd_irq
-  usb_hcd_map_urb_for_dma
-  usb_hcd_start_port_resume
-  usb_hub_clear_tt_buffer
-  usb_wakeup_notification
-  wait_for_completion
-
 # required by xhci-pci-renesas.ko
   debugfs_attr_read
   debugfs_attr_write
@@ -1558,14 +1532,3 @@
   pci_read_config_word
   pci_write_config_byte
   request_firmware_nowait
-
-# required by xhci-pci.ko
-  pci_d3cold_disable
-  pci_set_mwi
-  pci_set_power_state
-  usb_create_shared_hcd
-  usb_enable_intel_xhci_ports
-
-# required by xhci-plat-hcd.ko
-  of_usb_host_tpl_support
-  __usb_create_hcd
