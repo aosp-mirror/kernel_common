@@ -640,8 +640,9 @@ static int verify_blob(struct virtio_gpu_device *vgdev,
 	return 0;
 }
 
-static int virtio_gpu_resource_create_blob(struct drm_device *dev,
-					   void *data, struct drm_file *file)
+static int virtio_gpu_resource_create_blob_ioctl(struct drm_device *dev,
+						 void *data,
+						 struct drm_file *file)
 {
 	int ret = 0;
 	uint32_t handle = 0;
@@ -811,7 +812,7 @@ struct drm_ioctl_desc virtio_gpu_ioctls[DRM_VIRTIO_NUM_IOCTLS] = {
 			  DRM_RENDER_ALLOW),
 
 	DRM_IOCTL_DEF_DRV(VIRTGPU_RESOURCE_CREATE_BLOB,
-			  virtio_gpu_resource_create_blob,
+			  virtio_gpu_resource_create_blob_ioctl,
 			  DRM_RENDER_ALLOW),
 
 	DRM_IOCTL_DEF_DRV(VIRTGPU_CONTEXT_INIT, virtio_gpu_context_init_ioctl,
