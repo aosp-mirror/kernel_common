@@ -31,6 +31,7 @@
 #include <linux/tick.h>
 #include <linux/units.h>
 #include <trace/events/power.h>
+#include <trace/hooks/cpufreq.h>
 
 static LIST_HEAD(cpufreq_policy_list);
 
@@ -748,12 +749,11 @@ static ssize_t show_cpuinfo_max_freq(struct cpufreq_policy *policy, char *buf)
 {
 	unsigned int max_freq = policy->cpuinfo.max_freq;
 
-	trace_android_vh_show_max_freq(policy, &max_freq);
+	trace_android_rvh_show_max_freq(policy, &max_freq);
 	return sprintf(buf, "%u\n", max_freq);
 }
 
 show_one(cpuinfo_min_freq, cpuinfo.min_freq);
-show_one(cpuinfo_max_freq, cpuinfo.max_freq);
 show_one(cpuinfo_transition_latency, cpuinfo.transition_latency);
 show_one(scaling_min_freq, min);
 show_one(scaling_max_freq, max);
@@ -1503,6 +1503,8 @@ static int cpufreq_online(unsigned int cpu)
 			policy->max_freq_req = NULL;
 			goto out_destroy_policy;
 		}
+
+		trace_android_vh_cpufreq_online(policy);
 
 		blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 				CPUFREQ_CREATE_POLICY, policy);
