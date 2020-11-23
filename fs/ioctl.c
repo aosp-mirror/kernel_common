@@ -173,6 +173,34 @@ static int fiemap_check_ranges(struct super_block *sb,
 	return 0;
 }
 
+int fiemap_prep(struct inode *inode, struct fiemap_extent_info *fieinfo,
+		u64 start, u64 *len, u32 supported_flags)
+{
+	u64 maxbytes = inode->i_sb->s_maxbytes;
+	u32 incompat_flags;
+
+	if (*len == 0)
+		return -EINVAL;
+
+	if (start > maxbytes)
+		return -EFBIG;
+
+	/*
+	 * Shrink request scope to what the fs can actually handle.
+	 */
+	if (*len > maxbytes || (maxbytes - *len) < start)
+		*len = maxbytes - start;
+
+	supported_flags &= FIEMAP_FLAGS_COMPAT;
+	incompat_flags = fieinfo->fi_flags & ~supported_flags;
+	if (incompat_flags) {
+		fieinfo->fi_flags = incompat_flags;
+		return -EBADR;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(fiemap_prep);
+
 static int ioctl_fiemap(struct file *filp, unsigned long arg)
 {
 	struct fiemap fiemap;
