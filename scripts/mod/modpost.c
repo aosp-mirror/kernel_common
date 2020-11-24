@@ -390,9 +390,9 @@ static struct symbol *sym_add_exported(const char *name, struct module *mod,
 		s = new_symbol(name, mod, export);
 	} else {
 		if (!s->preloaded) {
-			warn("%s: '%s' exported twice. Previous export was in %s%s\n",
-			     mod->name, name, s->module->name,
-			     is_vmlinux(s->module->name) ? "" : ".ko");
+			fatal("%s: '%s' exported twice. Previous export was in %s%s\n",
+			      mod->name, name, s->module->name,
+			      is_vmlinux(s->module->name) ? "" : ".ko");
 		} else {
 			/* In case Module.symvers was out of date */
 			s->module = mod;
