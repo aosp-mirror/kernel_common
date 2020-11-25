@@ -4827,10 +4827,10 @@ static void _tcpm_cc_change(struct tcpm_port *port, enum typec_cc_status cc1,
 			tcpm_set_state(port, SNK_TRYWAIT_DEBOUNCE, 0);
 		break;
 	case SNK_TRY_WAIT_DEBOUNCE_CHECK_VBUS:
-		if (!tcpm_port_is_sink(port)) {
-			port->max_wait = 0;
-			tcpm_set_state(port, SRC_TRYWAIT, 0);
-		}
+		if (!tcpm_port_is_sink(port))
+			tcpm_set_state(port, SRC_TRYWAIT, PD_T_TRY_CC_DEBOUNCE);
+		else
+			tcpm_set_state(port, SNK_TRY_WAIT_DEBOUNCE_CHECK_VBUS, 0);
 		break;
 	case SNK_TRYWAIT:
 		/* Do nothing, waiting for tCCDebounce */
