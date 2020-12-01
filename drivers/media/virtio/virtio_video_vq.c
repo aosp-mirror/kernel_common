@@ -355,15 +355,21 @@ static void virtio_video_event_cb(struct virtio_video *vv,
 	struct virtio_video_stream *stream;
 	struct virtio_video_event *event =
 		(struct virtio_video_event *)vbuf->resp_buf;
+	struct vb2_queue *src_vq;
+	struct vb2_queue *dst_vq;
+	uint32_t stream_id, event_type;
 
-	stream = idr_find(&vv->stream_idr, event->stream_id);
+	stream_id = le32_to_cpu(event->stream_id);
+	event_type = le32_to_cpu(event->event_type);
+
+	stream = idr_find(&vv->stream_idr, stream_id);
 	if (!stream) {
 		v4l2_warn(&vv->v4l2_dev, "no stream %u found for event\n",
-			  event->stream_id);
+			  stream_id);
 		return;
 	}
 
-	switch (le32_to_cpu(event->event_type)) {
+	switch (event_type) {
 	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
 		virtio_video_cmd_get_params(vv, stream,
 					   VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
@@ -373,8 +379,18 @@ static void virtio_video_event_cb(struct virtio_video *vv,
 			wake_up(&vv->wq);
 		}
 		break;
+	case VIRTIO_VIDEO_EVENT_ERROR:
+		v4l2_err(&vv->v4l2_dev, "error on stream %d\n", stream_id);
+		src_vq = v4l2_m2m_get_vq(stream->fh.m2m_ctx,
+					 V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
+		dst_vq = v4l2_m2m_get_vq(stream->fh.m2m_ctx,
+					 V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE);
+		vb2_queue_error(src_vq);
+		vb2_queue_error(dst_vq);
+		break;
 	default:
-		v4l2_warn(&vv->v4l2_dev, "failed to queue event buffer\n");
+		v4l2_warn(&vv->v4l2_dev, "unknown event %d on %d\n",
+			  event_type, stream_id);
 		break;
 	}
 
