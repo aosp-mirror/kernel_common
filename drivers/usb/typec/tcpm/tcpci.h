@@ -50,6 +50,7 @@
 #define TCPC_TCPC_CTRL_BIST_TM		BIT(1)
 
 #define TCPC_EXTENDED_STATUS		0x20
+#define TCPC_EXTENDED_STATUS_VSAFE0V	BIT(0)
 
 #define TCPC_ROLE_CTRL			0x1a
 #define TCPC_ROLE_CTRL_DRP		BIT(6)
@@ -169,12 +170,15 @@ struct tcpci;
  *		vSinkDisconnect max(3.67V) is reached. Hence provide a chip
  *		specific callback for the tcpc chip driver override if needed.
  *		Return 0 from callback for TCPM to restart toggling.
+ * @vbus_vsafe0v:
+ *		optional; Set when TCPC can detect whether vbus is at VSAFE0V.
  */
 struct tcpci_data {
 	struct regmap *regmap;
 	unsigned char TX_BUF_BYTE_x_hidden:1;
 	bool override_toggling;
 	unsigned char auto_discharge_disconnect:1;
+	unsigned char vbus_vsafe0v:1;
 
 	int (*init)(struct tcpci *tcpci, struct tcpci_data *data);
 	int (*set_vconn)(struct tcpci *tcpci, struct tcpci_data *data,

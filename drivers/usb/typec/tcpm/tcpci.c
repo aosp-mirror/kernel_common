@@ -480,6 +480,19 @@ static int tcpci_check_contaminant(struct tcpc_dev *tcpc)
 	return 0;
 }
 
+static bool tcpci_is_vbus_vsafe0v(struct tcpc_dev *tcpc)
+{
+	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
+	unsigned int reg;
+	int ret;
+
+	ret = regmap_read(tcpci->regmap, TCPC_EXTENDED_STATUS, &reg);
+	if (ret < 0)
+		return false;
+
+	return !!(reg & TCPC_EXTENDED_STATUS_VSAFE0V);
+}
+
 static int tcpci_set_vbus(struct tcpc_dev *tcpc, bool source, bool sink)
 {
 	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
@@ -633,12 +646,22 @@ static int tcpci_init(struct tcpc_dev *tcpc)
 		TCPC_ALERT_RX_HARD_RST | TCPC_ALERT_CC_STATUS;
 	if (tcpci->controls_vbus)
 		reg |= TCPC_ALERT_POWER_STATUS;
+	/* Enable VSAFE0V status interrupt when detecting VSAFE0V is supported */
+	if (tcpci->data->vbus_vsafe0v) {
+		reg |= TCPC_ALERT_EXTENDED_STATUS;
+		ret = regmap_write(tcpci->regmap, TCPC_EXTENDED_STATUS_MASK,
+				   TCPC_EXTENDED_STATUS_VSAFE0V);
+		if (ret < 0)
+			return ret;
+	}
 	return tcpci_write16(tcpci, TCPC_ALERT_MASK, reg);
 }
 
 irqreturn_t tcpci_irq(struct tcpci *tcpci)
 {
 	u16 status;
+	int ret;
+	unsigned int raw;
 
 	tcpci_read16(tcpci, TCPC_ALERT, &status);
 
@@ -654,15 +677,12 @@ irqreturn_t tcpci_irq(struct tcpci *tcpci)
 		tcpm_cc_change(tcpci->port);
 
 	if (status & TCPC_ALERT_POWER_STATUS) {
-		unsigned int reg;
-
-		regmap_read(tcpci->regmap, TCPC_POWER_STATUS_MASK, &reg);
-
+		regmap_read(tcpci->regmap, TCPC_POWER_STATUS_MASK, &raw);
 		/*
 		 * If power status mask has been reset, then the TCPC
 		 * has reset.
 		 */
-		if (reg == 0xff)
+		if (raw == 0xff)
 			tcpm_tcpc_reset(tcpci->port);
 		else
 			tcpm_vbus_change(tcpci->port);
@@ -699,6 +719,12 @@ irqreturn_t tcpci_irq(struct tcpci *tcpci)
 		tcpci_write16(tcpci, TCPC_ALERT, TCPC_ALERT_RX_STATUS);
 
 		tcpm_pd_receive(tcpci->port, &msg);
+	}
+
+	if (status & TCPC_ALERT_EXTENDED_STATUS) {
+		ret = regmap_read(tcpci->regmap, TCPC_EXTENDED_STATUS, &raw);
+		if (!ret && (raw & TCPC_EXTENDED_STATUS_VSAFE0V))
+			tcpm_vbus_change(tcpci->port);
 	}
 
 	if (status & TCPC_ALERT_RX_HARD_RST)
@@ -789,6 +815,9 @@ struct tcpci *tcpci_register_port(struct device *dev, struct tcpci_data *data)
 	tcpci->tcpc.enable_frs = tcpci_enable_frs;
 	tcpci->tcpc.frs_sourcing_vbus = tcpci_frs_sourcing_vbus;
 	tcpci->tcpc.check_contaminant = tcpci_check_contaminant;
+
+	if (tcpci->data->vbus_vsafe0v)
+		tcpci->tcpc.is_vbus_vsafe0v = tcpci_is_vbus_vsafe0v;
 
 	err = tcpci_parse_config(tcpci);
 	if (err < 0)
