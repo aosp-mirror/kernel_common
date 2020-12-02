@@ -294,15 +294,15 @@ placeholder:
 		goto err;
 	}
 
+	INIT_LIST_HEAD(&slot->list);
+	list_add(&slot->list, &parent->slots);
+
 	err = kobject_init_and_add(&slot->kobj, &pci_slot_ktype, NULL,
 				   "%s", slot_name);
 	if (err) {
 		kobject_put(&slot->kobj);
 		goto err;
 	}
-
-	INIT_LIST_HEAD(&slot->list);
-	list_add(&slot->list, &parent->slots);
 
 	list_for_each_entry(dev, &parent->devices, bus_list)
 		if (PCI_SLOT(dev->devfn) == slot_nr)
