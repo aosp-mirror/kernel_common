@@ -2,6 +2,7 @@
 # commonly used symbols
   module_layout
   __put_task_struct
+  __ubsan_handle_cfi_check_fail_abort
 
 # required by erofs.ko
   add_to_page_cache_lru
