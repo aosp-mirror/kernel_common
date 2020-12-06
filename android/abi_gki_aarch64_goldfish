@@ -442,8 +442,6 @@
   ihold
   inode_init_owner
   iterate_dir
-  kernel_read
-  kernel_write
   kern_path
   ktime_get
   lockref_get
@@ -465,17 +463,6 @@
   truncate_inode_pages
   unlock_rename
   user_path_at_empty
-  vfs_create
-  vfs_fallocate
-  vfs_getattr
-  vfs_getxattr
-  vfs_link
-  vfs_listxattr
-  vfs_mkdir
-  vfs_rename
-  vfs_rmdir
-  vfs_setxattr
-  vfs_unlink
 
 # required by mac80211_hwsim.ko
   alloc_netdev_mqs

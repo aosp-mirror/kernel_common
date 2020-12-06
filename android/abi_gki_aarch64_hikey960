@@ -494,8 +494,6 @@
   __usecs_to_jiffies
   usleep_range
   vfree
-  vfs_fallocate
-  vfs_getattr
   vmalloc
   vmemmap
   wait_for_completion
@@ -796,8 +794,6 @@
   generic_shutdown_super
   ihold
   inode_init_owner
-  kernel_read
-  kernel_write
   kobject_create_and_add
   kobject_put
   lookup_one_len
@@ -816,15 +812,6 @@
   sync_filesystem
   unlock_page
   user_path_at_empty
-  vfs_create
-  vfs_getxattr
-  vfs_link
-  vfs_listxattr
-  vfs_mkdir
-  vfs_rename
-  vfs_rmdir
-  vfs_setxattr
-  vfs_unlink
 
 # required by ion_cma_heap.ko
   cma_alloc

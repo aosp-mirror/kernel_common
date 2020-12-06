@@ -528,7 +528,6 @@
   jiffies_to_usecs
   kasprintf
   kernel_kobj
-  kernel_write
   kern_path
   __kfifo_alloc
   __kfifo_free

@@ -703,8 +703,6 @@
   inode_init_owner
   iput
   iterate_dir
-  kernel_read
-  kernel_write
   kern_path
   kobject_create_and_add
   kobject_put
@@ -740,17 +738,6 @@
   unregister_filesystem
   up_write
   user_path_at_empty
-  vfs_create
-  vfs_fallocate
-  vfs_getattr
-  vfs_getxattr
-  vfs_link
-  vfs_listxattr
-  vfs_mkdir
-  vfs_rename
-  vfs_rmdir
-  vfs_setxattr
-  vfs_unlink
 
 # required by lt9611.ko
   __devm_regmap_init_i2c

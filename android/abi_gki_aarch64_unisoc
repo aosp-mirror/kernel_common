@@ -1280,8 +1280,6 @@
   ktime_get_with_offset
   param_array_ops
   unregister_pm_notifier
-  vfs_getattr
-  vfs_statx
 
 # required by sipa_core.ko
   free_pages
