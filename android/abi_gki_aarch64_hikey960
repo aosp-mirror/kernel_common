@@ -179,7 +179,6 @@
   extcon_get_edev_by_phandle
   extcon_get_state
   fd_install
-  filp_open
   find_next_bit
   find_next_zero_bit
   finish_wait
