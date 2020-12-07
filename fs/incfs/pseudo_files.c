@@ -1162,7 +1162,7 @@ static const struct file_operations incfs_blocks_written_file_ops = {
  ******************************************************************************/
 static bool get_pseudo_inode(int ino, struct inode *inode)
 {
-	inode->i_ctime = (struct timespec64){};
+	inode->i_ctime = (struct timespec){};
 	inode->i_mtime = inode->i_ctime;
 	inode->i_atime = inode->i_ctime;
 	inode->i_size = 0;
