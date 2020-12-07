@@ -344,7 +344,6 @@ enum {
 };
 #define UFS_DEV_HPB_SUPPORT_VERSION		0x310
 
-#define POWER_DESC_MAX_SIZE			0x62
 #define POWER_DESC_MAX_ACTV_ICC_LVLS		16
 
 /* Attribute  bActiveICCLevel parameter bit masks definitions */
