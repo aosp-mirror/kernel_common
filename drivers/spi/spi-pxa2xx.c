@@ -1126,7 +1126,7 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
 	}
 
 	/* Allocate master with space for drv_data and null dma buffer */
-	master = spi_alloc_master(dev, sizeof(struct driver_data) + 16);
+	master = devm_spi_alloc_master(dev, sizeof(*drv_data) + 16);
 	if (!master) {
 		dev_err(&pdev->dev, "cannot alloc spi_master\n");
 		pxa_ssp_free(ssp);
@@ -1233,7 +1233,6 @@ out_error_clock_enabled:
 	free_irq(ssp->irq, drv_data);
 
 out_error_master_alloc:
-	spi_master_put(master);
 	pxa_ssp_free(ssp);
 	return status;
 }
