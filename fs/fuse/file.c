@@ -2715,6 +2715,20 @@ static int fuse_copy_ioctl_iovec(struct fuse_conn *fc, struct iovec *dst,
 	return 0;
 }
 
+static int fuse_get_ioctl_len(unsigned int cmd, unsigned long arg, size_t *len)
+{
+	switch (cmd) {
+	case FS_IOC_GETFLAGS:
+	case FS_IOC_SETFLAGS:
+		*len = sizeof(int);
+		break;
+	default:
+		*len = _IOC_SIZE(cmd);
+		break;
+	}
+
+	return 0;
+}
 
 /*
  * For ioctls, there is no generic way to determine how much memory
@@ -2814,16 +2828,9 @@ long fuse_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg,
 		struct iovec *iov = iov_page;
 
 		iov->iov_base = (void __user *)arg;
-
-		switch (cmd) {
-		case FS_IOC_GETFLAGS:
-		case FS_IOC_SETFLAGS:
-			iov->iov_len = sizeof(int);
-			break;
-		default:
-			iov->iov_len = _IOC_SIZE(cmd);
-			break;
-		}
+		err = fuse_get_ioctl_len(cmd, arg, &iov->iov_len);
+		if (err)
+			goto out;
 
 		if (_IOC_DIR(cmd) & _IOC_WRITE) {
 			in_iov = iov;
