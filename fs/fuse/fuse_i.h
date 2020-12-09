@@ -519,6 +519,7 @@ struct fuse_fs_context {
 	bool no_force_umount:1;
 	bool legacy_opts_show:1;
 	bool dax:1;
+	bool init_security:1;
 	unsigned int max_read;
 	unsigned int blksize;
 	const char *subtype;
@@ -764,6 +765,9 @@ struct fuse_conn {
 
 	/** Passthrough mode for read/write IO */
 	unsigned int passthrough:1;
+
+	/** Initialize security xattrs when creating a new inode */
+	unsigned int init_security:1;
 
 	/** The number of requests waiting for completion */
 	atomic_t num_waiting;
