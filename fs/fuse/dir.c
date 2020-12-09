@@ -22,6 +22,7 @@
 #include <linux/security.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/limits.h>
 
 #include "../internal.h"
 
@@ -705,6 +706,47 @@ out_err:
 	return err;
 }
 
+static int fuse_initxattrs(struct inode *inode, const struct xattr *xattrs,
+			   void *fs_info)
+{
+	const struct xattr *xattr;
+	int err = 0;
+	int len;
+	char name[XATTR_NAME_MAX + 1];
+
+	for (xattr = xattrs; xattr->name != NULL; ++xattr) {
+		len = scnprintf(name, sizeof(name), XATTR_SECURITY_PREFIX "%s",
+				xattr->name);
+		if (len == sizeof(name)) {
+			err = -EOVERFLOW;
+			break;
+		}
+		err = fuse_setxattr(inode, name, xattr->value, xattr->value_len,
+				    0, 0);
+		if (err < 0)
+			break;
+	}
+
+	return err;
+}
+
+/*
+ * Initialize security xattrs on newly created inodes if supported by the
+ * filesystem.
+ */
+static int fuse_init_security(struct fuse_conn *fc, struct inode *inode,
+			      struct inode *dir, const struct qstr *qstr)
+{
+	int err = 0;
+
+	if (fc->init_security) {
+		err = security_inode_init_security(inode, dir, qstr,
+						   fuse_initxattrs, NULL);
+	}
+
+	return err;
+}
+
 /*
  * Atomic create+open operation
  *
@@ -819,6 +861,14 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 		err = -ENOMEM;
 		goto out_err;
 	}
+
+	err = fuse_init_security(fc, inode, dir, &entry->d_name);
+	if (err) {
+		flags &= ~(O_CREAT | O_EXCL | O_TRUNC);
+		fuse_sync_release(NULL, ff, flags);
+		fuse_queue_forget(fc, forget, outentry.nodeid, 1);
+		goto out_err;
+	}
 	kfree(forget);
 	d_instantiate(entry, inode);
 	fuse_change_entry_timeout(entry, &outentry);
@@ -898,7 +948,7 @@ no_open:
  */
 static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
 			    struct inode *dir, struct dentry *entry,
-			    umode_t mode)
+			    umode_t mode, bool init_security)
 {
 	struct fuse_entry_out outarg;
 	struct inode *inode;
@@ -952,6 +1002,13 @@ static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
 		fuse_queue_forget(fm->fc, forget, outarg.nodeid, 1);
 		return -ENOMEM;
 	}
+	if (init_security) {
+		err = fuse_init_security(fm->fc, inode, dir, &entry->d_name);
+		if (err) {
+			fuse_queue_forget(fm->fc, forget, outarg.nodeid, 1);
+			return err;
+		}
+	}
 	kfree(forget);
 
 	d_drop(entry);
@@ -1004,7 +1061,7 @@ static int fuse_mknod(struct user_namespace *mnt_userns, struct inode *dir,
 	args.in_args[0].value = &inarg;
 	args.in_args[1].size = entry->d_name.len + 1;
 	args.in_args[1].value = entry->d_name.name;
-	return create_new_entry(fm, &args, dir, entry, mode);
+	return create_new_entry(fm, &args, dir, entry, mode, true);
 }
 
 static int fuse_create(struct user_namespace *mnt_userns, struct inode *dir,
@@ -1043,7 +1100,7 @@ static int fuse_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
 	args.in_args[0].value = &inarg;
 	args.in_args[1].size = entry->d_name.len + 1;
 	args.in_args[1].value = entry->d_name.name;
-	return create_new_entry(fm, &args, dir, entry, S_IFDIR);
+	return create_new_entry(fm, &args, dir, entry, S_IFDIR, true);
 }
 
 static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
@@ -1070,7 +1127,7 @@ static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
 	args.in_args[0].value = entry->d_name.name;
 	args.in_args[1].size = len;
 	args.in_args[1].value = link;
-	return create_new_entry(fm, &args, dir, entry, S_IFLNK);
+	return create_new_entry(fm, &args, dir, entry, S_IFLNK, true);
 }
 
 void fuse_flush_time_update(struct inode *inode)
@@ -1319,7 +1376,7 @@ static int fuse_link(struct dentry *entry, struct inode *newdir,
 	args.in_args[0].value = &inarg;
 	args.in_args[1].size = newent->d_name.len + 1;
 	args.in_args[1].value = newent->d_name.name;
-	err = create_new_entry(fm, &args, newdir, newent, inode->i_mode);
+	err = create_new_entry(fm, &args, newdir, newent, inode->i_mode, false);
 	/* Contrary to "normal" filesystems it can happen that link
 	   makes two "logical" inodes point to the same "physical"
 	   inode.  We invalidate the attributes of the old one, so it
