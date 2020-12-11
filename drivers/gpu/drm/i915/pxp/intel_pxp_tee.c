@@ -75,14 +75,15 @@ int intel_pxp_tee_io_message(struct intel_pxp *pxp,
 
 	if (pxp->mei_pxp_last_msg_interrupted) {
 		/* read and drop data from the previous iteration */
-		ret = pxp_component->ops->recv(pxp_component->tee_dev, &tmp_drop_buf, 64);
+		ret = pxp_component->ops->recv(pxp_component->tee_dev, &tmp_drop_buf, 64, 1);
 		if (ret == -EINTR)
 			goto unlock;
 
 		pxp->mei_pxp_last_msg_interrupted = false;
 	}
 
-	ret = pxp_component->ops->send(pxp_component->tee_dev, msg_in, msg_in_size);
+	ret = pxp_component->ops->send(pxp_component->tee_dev, msg_in, msg_in_size, 1);
+
 	if (ret) {
 		/* flag on next msg to drop interrupted msg */
 		if (ret == -EINTR)
@@ -91,7 +92,7 @@ int intel_pxp_tee_io_message(struct intel_pxp *pxp,
 		goto unlock;
 	}
 
-	ret = pxp_component->ops->recv(pxp_component->tee_dev, msg_out, msg_out_max_size);
+	ret = pxp_component->ops->recv(pxp_component->tee_dev, msg_out, msg_out_max_size, 1);
 	if (ret < 0) {
 		/* flag on next msg to drop interrupted msg */
 		if (ret == -EINTR)
