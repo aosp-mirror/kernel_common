@@ -247,6 +247,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
 err_lup:
 	devm_clk_unregister(&pdev->dev, s2mps11_clk->clk);
 err_reg:
+	of_node_put(s2mps11_clks[0].clk_np);
 	while (s2mps11_clk > s2mps11_clks) {
 		if (s2mps11_clk->lookup) {
 			clkdev_drop(s2mps11_clk->lookup);
