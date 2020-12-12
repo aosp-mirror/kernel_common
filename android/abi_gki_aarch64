@@ -2,7 +2,6 @@
 # commonly used symbols
   module_layout
   __put_task_struct
-  __ubsan_handle_cfi_check_fail_abort
 
 # required by erofs.ko
   add_to_page_cache_lru
@@ -133,6 +132,7 @@
   trace_print_symbols_seq
   trace_raw_output_prep
   trace_seq_printf
+  __ubsan_handle_cfi_check_fail_abort
   unlock_new_inode
   unlock_page
   unregister_filesystem

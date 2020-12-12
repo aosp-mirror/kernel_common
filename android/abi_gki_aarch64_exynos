@@ -505,7 +505,6 @@
   iounmap
   __iowrite32_copy
   __irq_alloc_descs
-  irq_create_mapping
   __irq_domain_add
   irq_domain_remove
   irq_domain_xlate_twocell
