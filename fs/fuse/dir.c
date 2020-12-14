@@ -783,10 +783,27 @@ static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
 		fuse_queue_forget(fm->fc, forget, outarg.nodeid, 1);
 		return -ENOMEM;
 	}
+	if (args->opcode == FUSE_CHROMEOS_TMPFILE && inode->i_nlink != 0) {
+		fuse_queue_forget(fm->fc, forget, outarg.nodeid, 1);
+		return -EIO;
+	}
 	kfree(forget);
 
 	d_drop(entry);
-	d = d_splice_alias(inode, entry);
+	if (args->opcode == FUSE_CHROMEOS_TMPFILE) {
+		/*
+		 * d_tmpfile will decrement the link count and print a warning
+		 * if the link count is 0, and we checked that the server sent
+		 * us an inode with an nlink count of 0 above.  Set the nlink
+		 * count to 1 to suppress the warning. btrfs does the same
+		 * thing.
+		 */
+		set_nlink(inode, 1);
+		d_tmpfile(entry, inode);
+		d = NULL;
+	} else {
+		d = d_splice_alias(inode, entry);
+	}
 	if (IS_ERR(d))
 		return PTR_ERR(d);
 
