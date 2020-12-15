@@ -1248,6 +1248,9 @@ static int acc_setup(void)
 	struct acc_dev *dev;
 	int ret;
 
+	if (kref_read(&ref->kref))
+		return -EBUSY;
+
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
@@ -1264,16 +1267,21 @@ static int acc_setup(void)
 	INIT_WORK(&dev->hid_work, acc_hid_work);
 
 	dev->ref = ref;
-	kref_init(&ref->kref);
-	ref->acc_dev = dev;
+	if (cmpxchg_relaxed(&ref->acc_dev, NULL, dev)) {
+		ret = -EBUSY;
+		goto err_free_dev;
+	}
 
 	ret = misc_register(&acc_device);
 	if (ret)
-		goto err;
+		goto err_zap_ptr;
 
+	kref_init(&ref->kref);
 	return 0;
 
-err:
+err_zap_ptr:
+	ref->acc_dev = NULL;
+err_free_dev:
 	kfree(dev);
 	pr_err("USB accessory gadget driver failed to initialize\n");
 	return ret;
