@@ -122,9 +122,6 @@ static u8 __mtrr_type_lookup(u64 start, u64 end, u64 *partial_end, int *repeat)
 	if (!mtrr_state.enabled)
 		return 0xFF;
 
-	/* Make end inclusive end, instead of exclusive */
-	end--;
-
 	/* Look in fixed ranges. Just return the type as per start */
 	if (mtrr_state.have_fixed && (start < 0x100000)) {
 		int idx;
@@ -229,6 +226,9 @@ u8 mtrr_type_lookup(u64 start, u64 end)
 	u8 type, prev_type;
 	int repeat;
 	u64 partial_end;
+
+	/* Make end inclusive instead of exclusive */
+	end--;
 
 	type = __mtrr_type_lookup(start, end, &partial_end, &repeat);
 
