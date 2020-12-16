@@ -21,6 +21,7 @@
 #include <linux/scatterlist.h>
 #include <linux/sched/signal.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 
 
 struct cma_heap {
