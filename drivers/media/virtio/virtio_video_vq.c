@@ -1070,6 +1070,9 @@ int virtio_video_cmd_set_control(struct virtio_video *vv, uint32_t stream_id,
 	case VIRTIO_VIDEO_CONTROL_BITRATE:
 		size = sizeof(struct virtio_video_control_val_bitrate);
 		break;
+	case VIRTIO_VIDEO_CONTROL_FORCE_KEYFRAME:
+		size = 0;
+		break;
 	default:
 		return -1;
 	}
@@ -1097,6 +1100,9 @@ int virtio_video_cmd_set_control(struct virtio_video *vv, uint32_t stream_id,
 		ctrl_b = (void *)((char *)req_p +
 				 sizeof(struct virtio_video_set_control));
 		ctrl_b->bitrate = cpu_to_le32(value);
+		break;
+	case VIRTIO_VIDEO_CONTROL_FORCE_KEYFRAME:
+		// Button controls have no value.
 		break;
 	}
 

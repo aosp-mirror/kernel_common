@@ -384,6 +384,7 @@ enum virtio_video_control_type {
 	VIRTIO_VIDEO_CONTROL_BITRATE = 1,
 	VIRTIO_VIDEO_CONTROL_PROFILE,
 	VIRTIO_VIDEO_CONTROL_LEVEL,
+	VIRTIO_VIDEO_CONTROL_FORCE_KEYFRAME,
 };
 
 struct virtio_video_query_control_profile {
