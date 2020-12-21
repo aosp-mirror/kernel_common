@@ -532,6 +532,9 @@ static int find_secsym_ndx(unsigned const txtndx,
 			/* avoid file symbols */
 			if (ELF_ST_TYPE(symp->st_info) == STT_FILE)
 				continue;
+			/* avoid SHN_ABS */
+			if (symp->st_shndx == SHN_ABS)
+				continue;
 			/* function symbols on ARM have quirks, avoid them */
 			if (w2(ehdr->e_machine) == EM_ARM
 			    && ELF_ST_TYPE(symp->st_info) == STT_FUNC)
