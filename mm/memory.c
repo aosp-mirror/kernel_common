@@ -181,6 +181,7 @@ void mm_trace_rss_stat(struct mm_struct *mm, int member)
 {
 	trace_rss_stat(mm, member);
 }
+EXPORT_SYMBOL_GPL(mm_trace_rss_stat);
 
 /*
  * Note: this doesn't free the actual pages themselves. That
