@@ -4472,16 +4472,15 @@ int mwifiex_register_cfg80211(struct mwifiex_adapter *adapter)
 				mwifiex_dbg(adapter, WARN,
 					    "Ignore world regulatory domain\n");
 			} else {
-				wiphy->regulatory_flags |=
-					REGULATORY_DISABLE_BEACON_HINTS |
-					REGULATORY_COUNTRY_IE_IGNORE;
 				country_code =
 					mwifiex_11d_code_2_region(
 						adapter->region_code);
-				if (country_code &&
-				    regulatory_hint(wiphy, country_code))
-					mwifiex_dbg(priv->adapter, ERROR,
-						    "regulatory_hint() failed\n");
+				if (country_code) {
+					mwifiex_dbg(priv->adapter, MSG,
+						    "ignoring EEPROM country code: %c%c\n",
+						    country_code[0],
+						    country_code[1]);
+				}
 			}
 		}
 	}
