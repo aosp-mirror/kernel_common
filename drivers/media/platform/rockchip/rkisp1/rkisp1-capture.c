@@ -35,7 +35,7 @@
 #define RKISP1_SP_DEV_NAME	RKISP1_DRIVER_NAME "_selfpath"
 #define RKISP1_MP_DEV_NAME	RKISP1_DRIVER_NAME "_mainpath"
 
-#define RKISP1_MIN_BUFFERS_NEEDED 3
+#define RKISP1_MIN_BUFFERS_NEEDED 0
 
 enum rkisp1_plane {
 	RKISP1_PLANE_Y	= 0,
