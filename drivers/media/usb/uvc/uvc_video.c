@@ -2216,6 +2216,29 @@ int uvc_video_init(struct uvc_streaming *stream)
 	return 0;
 }
 
+static void uvc_gpio_privacy_quirks(struct uvc_streaming *stream, bool enable)
+{
+	struct uvc_device *dev = stream->dev;
+	struct uvc_video_chain *first_chain;
+
+	if (!(dev->quirks & UVC_QUIRK_PRIVACY_DURING_STREAM))
+		return;
+
+	if (!dev->gpio_unit)
+		return;
+
+	first_chain = list_first_entry(&dev->chains,
+				       struct uvc_video_chain, list);
+	/* GPIO entities are always on the first chain. */
+	if (stream->chain != first_chain)
+		return;
+
+	dev->gpio_unit->gpio.is_gpio_ready = enable;
+
+	if (enable)
+		uvc_gpio_event(stream->dev);
+}
+
 int uvc_video_start_streaming(struct uvc_streaming *stream)
 {
 	int ret;
@@ -2233,6 +2256,8 @@ int uvc_video_start_streaming(struct uvc_streaming *stream)
 	if (ret < 0)
 		goto error_video;
 
+	uvc_gpio_privacy_quirks(stream, true);
+
 	return 0;
 
 error_video:
@@ -2245,6 +2270,8 @@ error_commit:
 
 void uvc_video_stop_streaming(struct uvc_streaming *stream)
 {
+	uvc_gpio_privacy_quirks(stream, false);
+
 	uvc_video_stop_transfer(stream, 1);
 
 	if (stream->intf->num_altsetting > 1) {

@@ -8,6 +8,7 @@
 
 #include <linux/atomic.h>
 #include <linux/bits.h>
+#include <linux/dmi.h>
 #include <linux/gpio/consumer.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -1218,7 +1219,7 @@ next_descriptor:
  * Privacy GPIO
  */
 
-static void uvc_gpio_event(struct uvc_device *dev)
+void uvc_gpio_event(struct uvc_device *dev)
 {
 	struct uvc_entity *unit = dev->gpio_unit;
 	struct uvc_video_chain *chain;
@@ -1227,18 +1228,28 @@ static void uvc_gpio_event(struct uvc_device *dev)
 	if (!unit)
 		return;
 
-	new_val = gpiod_get_value_cansleep(unit->gpio.gpio_privacy);
+	mutex_lock(&unit->gpio.event_mutex);
 
-	/* GPIO entities are always on the first chain. */
-	chain = list_first_entry(&dev->chains, struct uvc_video_chain, list);
-	uvc_ctrl_status_event(chain, unit->controls, &new_val);
+	new_val = gpiod_get_value_cansleep(unit->gpio.gpio_privacy);
+	if (unit->gpio.last_event_val != new_val) {
+		/* GPIO entities are always on the first chain. */
+		chain = list_first_entry(&dev->chains,
+					 struct uvc_video_chain, list);
+		uvc_ctrl_status_event(chain, unit->controls, &new_val);
+	}
+	unit->gpio.last_event_val = new_val;
+
+	mutex_unlock(&unit->gpio.event_mutex);
 }
 
 static int uvc_gpio_get_cur(struct uvc_device *dev, struct uvc_entity *entity,
 			    u8 cs, void *data, u16 size)
 {
-	if (cs != UVC_CT_PRIVACY_CONTROL || size < 1)
+	if (cs != UVC_CT_PRIVACY_CONTROL || size < 1 || !dev->gpio_unit)
 		return -EINVAL;
+
+	if (!dev->gpio_unit->gpio.is_gpio_ready)
+		return -EBUSY;
 
 	*(u8 *)data = gpiod_get_value_cansleep(entity->gpio.gpio_privacy);
 
@@ -1259,9 +1270,30 @@ static irqreturn_t uvc_gpio_irq(int irq, void *data)
 {
 	struct uvc_device *dev = data;
 
+	if (!dev->gpio_unit->gpio.is_gpio_ready)
+		return IRQ_HANDLED;
+
 	uvc_gpio_event(dev);
 	return IRQ_HANDLED;
 }
+
+static const struct dmi_system_id privacy_valid_during_streamon[] = {
+	{
+		.ident = "HP Elite c1030 Chromebook",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "HP"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Jinlon"),
+		},
+	},
+	{
+		.ident = "HP Pro c640 Chromebook",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "HP"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Dratini"),
+		},
+	},
+	{ } /* terminate list */
+};
 
 static int uvc_gpio_parse(struct uvc_device *dev)
 {
@@ -1284,6 +1316,7 @@ static int uvc_gpio_parse(struct uvc_device *dev)
 		return -ENOMEM;
 
 	unit->gpio.gpio_privacy = gpio_privacy;
+	unit->gpio.last_event_val = -1;
 	unit->gpio.irq = irq;
 	unit->gpio.bControlSize = 1;
 	unit->gpio.bmControls = (u8 *)unit + sizeof(*unit);
@@ -1291,6 +1324,18 @@ static int uvc_gpio_parse(struct uvc_device *dev)
 	unit->get_cur = uvc_gpio_get_cur;
 	unit->get_info = uvc_gpio_get_info;
 	strscpy(unit->name, "GPIO", sizeof(unit->name));
+	mutex_init(&unit->gpio.event_mutex);
+
+	/*
+	 * Note: This quirk will not match external UVC cameras,
+	 * as they will not have the corresponding ACPI GPIO entity.
+	 */
+	if (dmi_check_system(privacy_valid_during_streamon)) {
+		dev->quirks |= UVC_QUIRK_PRIVACY_DURING_STREAM;
+		unit->gpio.is_gpio_ready = false;
+	} else {
+		unit->gpio.is_gpio_ready = true;
+	}
 
 	list_add_tail(&unit->list, &dev->entities);
 
