@@ -216,7 +216,7 @@ __be32 fib_compute_spec_dst(struct sk_buff *skb)
 		struct flowi4 fl4 = {
 			.flowi4_iif = LOOPBACK_IFINDEX,
 			.daddr = ip_hdr(skb)->saddr,
-			.flowi4_tos = RT_TOS(ip_hdr(skb)->tos),
+			.flowi4_tos = ip_hdr(skb)->tos & IPTOS_RT_MASK,
 			.flowi4_scope = scope,
 			.flowi4_mark = IN_DEV_SRC_VMARK(in_dev) ? skb->mark : 0,
 		};
