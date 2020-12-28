@@ -48,6 +48,7 @@
 #include <linux/fsnotify.h>
 #include <linux/irq_work.h>
 #include <linux/workqueue.h>
+#include <trace/hooks/ftrace_dump.h>
 
 #include <asm/setup.h> /* COMMAND_LINE_SIZE */
 
@@ -10246,6 +10247,7 @@ static void ftrace_dump_one(struct trace_array *tr, enum ftrace_dump_mode dump_m
 	unsigned int old_userobj;
 	unsigned long flags;
 	int cnt = 0, cpu;
+	bool ftrace_check = true;
 
 	/*
 	 * Always turn off tracing when we dump.
@@ -10288,6 +10290,14 @@ static void ftrace_dump_one(struct trace_array *tr, enum ftrace_dump_mode dump_m
 	}
 
 	/*
+	 * Ftrace timestmap support two types:
+	 * - ftrace_check = 1, latency format, start with 0 from a specific time.
+	 * - ftrace_check = 0, absolute time format, consistent with kernel time.
+	 * With this vendor hook, we can choose the format from different requirement.
+	 */
+	trace_android_vh_ftrace_format_check(&ftrace_check);
+
+	/*
 	 * We need to stop all tracing on all CPUS to read
 	 * the next buffer. This is a bit expensive, but is
 	 * not done often. We fill all what we can read,
@@ -10295,14 +10305,14 @@ static void ftrace_dump_one(struct trace_array *tr, enum ftrace_dump_mode dump_m
 	 */
 
 	while (!trace_empty(&iter)) {
-
 		if (!cnt)
 			printk(KERN_TRACE "---------------------------------\n");
 
 		cnt++;
 
 		trace_iterator_reset(&iter);
-		iter.iter_flags |= TRACE_FILE_LAT_FMT;
+		if (ftrace_check)
+			iter.iter_flags |= TRACE_FILE_LAT_FMT;
 
 		if (trace_find_next_entry_inc(&iter) != NULL) {
 			int ret;
