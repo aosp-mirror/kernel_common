@@ -34,7 +34,6 @@
   flush_dcache_page
   fs_bio_set
   fs_ftype_to_dtype
-  generic_block_bmap
   generic_file_llseek
   generic_fillattr
   generic_read_dir
