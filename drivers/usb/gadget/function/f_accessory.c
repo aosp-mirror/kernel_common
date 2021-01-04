@@ -229,8 +229,6 @@ static void __put_acc_dev(struct kref *kref)
 
 	/* Cancel any async work */
 	cancel_delayed_work_sync(&dev->start_work);
-	cancel_work_sync(&dev->getprotocol_work);
-	cancel_work_sync(&dev->sendstring_work);
 	cancel_work_sync(&dev->hid_work);
 
 	ref->acc_dev = NULL;
