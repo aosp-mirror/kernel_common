@@ -12,12 +12,12 @@
 #include <linux/poll.h>
 #include <linux/idr.h>
 #include <linux/completion.h>
+#include <linux/dma-buf.h>
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
 #include <linux/compat.h>
 #include <linux/uio.h>
 #include <linux/file.h>
-#include <linux/shmem_fs.h>
 
 #include <linux/virtio.h>
 #include <linux/virtio_ids.h>
@@ -164,7 +164,9 @@ struct tipc_shared_handle {
 	struct rb_node node;
 	struct tipc_shm tipc;
 	struct tipc_virtio_dev *vds;
-	struct sg_table sgt;
+	struct sg_table *sgt;
+	struct dma_buf_attachment *attach;
+	struct dma_buf *dma_buf;
 	bool shared;
 };
 
@@ -527,13 +529,15 @@ static void fill_msg_hdr(struct tipc_msg_buf *mb, u32 src, u32 dst)
 	hdr->reserved = 0;
 }
 
-static int tipc_shared_handle_new(struct tipc_shared_handle **shared_handle)
+static int tipc_shared_handle_new(struct tipc_shared_handle **shared_handle,
+				  struct tipc_virtio_dev *vds)
 {
 	struct tipc_shared_handle *out = kzalloc(sizeof(*out), GFP_KERNEL);
 
 	if (!out)
 		return -ENOMEM;
 
+	out->vds = vds;
 	*shared_handle = out;
 
 	return 0;
@@ -606,7 +610,6 @@ static struct tipc_shared_handle *tipc_shared_handle_take(struct tipc_virtio_dev
 static int tipc_shared_handle_drop(struct tipc_shared_handle *shared_handle)
 {
 	int ret;
-	struct sg_page_iter piter;
 	struct tipc_virtio_dev *vds = shared_handle->vds;
 	struct device *dev = tipc_shared_handle_dev(shared_handle);
 
@@ -624,8 +627,8 @@ static int tipc_shared_handle_drop(struct tipc_shared_handle *shared_handle)
 	if (shared_handle->shared) {
 		ret = trusty_reclaim_memory(dev,
 					    shared_handle->tipc.obj_id,
-					    shared_handle->sgt.sgl,
-					    shared_handle->sgt.orig_nents);
+					    shared_handle->sgt->sgl,
+					    shared_handle->sgt->orig_nents);
 		if (ret) {
 			/*
 			 * We can't safely release this, it may still be in
@@ -636,12 +639,13 @@ static int tipc_shared_handle_drop(struct tipc_shared_handle *shared_handle)
 		}
 	}
 
-	for_each_sg_page(shared_handle->sgt.sgl, &piter,
-			 shared_handle->sgt.orig_nents, 0) {
-		page_ref_dec(sg_page_iter_page(&piter));
-	}
-
-	sg_free_table(&shared_handle->sgt);
+	if (shared_handle->sgt)
+		dma_buf_unmap_attachment(shared_handle->attach,
+					 shared_handle->sgt, DMA_BIDIRECTIONAL);
+	if (shared_handle->attach)
+		dma_buf_detach(shared_handle->dma_buf, shared_handle->attach);
+	if (shared_handle->dma_buf)
+		dma_buf_put(shared_handle->dma_buf);
 
 	kfree(shared_handle);
 
@@ -1095,17 +1099,12 @@ static int dn_connect_ioctl(struct tipc_dn_chan *dn, char __user *usr_name)
 static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 		       struct tipc_shared_handle **out)
 {
-	int ret;
-	int shmem_err;
-	struct file *file;
-	pgprot_t prot;
-	size_t shm_size;
-	size_t max_pages;
-	pgoff_t pg_idx = 0;
-	struct tipc_shared_handle *shared_handle;
-	struct page **pages = NULL;
+	int ret = 0;
+	struct tipc_shared_handle *shared_handle = NULL;
+	struct file *file = NULL;
 	struct device *dev = &dn->chan->vds->vdev->dev;
-	bool writable;
+	bool writable = false;
+	pgprot_t prot;
 
 	if (dn->state != TIPC_CONNECTED) {
 		dev_dbg(dev, "Tried to share fd while not connected\n");
@@ -1118,71 +1117,50 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 		return -EBADF;
 	}
 
-	if (!shmem_file(file)) {
-		dev_dbg(dev, "Tried to send non-shmem fd\n");
-		ret = -EINVAL;
-		goto cleanup_file;
-	}
-
 	if (!(file->f_mode & FMODE_READ)) {
 		dev_dbg(dev, "Cannot create write-only mapping\n");
-		/* This error matches mmap() behavior for write-only fds */
-		ret = -EACCES;
-		goto cleanup_file;
+		fput(file);
+		return -EACCES;
 	}
 
 	writable = file->f_mode & FMODE_WRITE;
 	prot = writable ? PAGE_KERNEL : PAGE_KERNEL_RO;
+	fput(file);
+	file = NULL;
 
-	shm_size = i_size_read(file->f_inode);
-
-	max_pages = DIV_ROUND_UP(shm_size, PAGE_SIZE);
-
-	pages = kmalloc_array(max_pages, sizeof(struct page *), GFP_KERNEL);
-	if (!pages) {
-		ret = -ENOMEM;
-		goto cleanup_file;
-	}
-
-	ret = tipc_shared_handle_new(&shared_handle);
+	ret = tipc_shared_handle_new(&shared_handle, dn->chan->vds);
 	if (ret)
-		goto cleanup_file;
+		return ret;
 
-	for (pg_idx = 0; pg_idx < max_pages; pg_idx++) {
-		struct page *page;
-
-		shmem_err = shmem_getpage(file->f_inode, pg_idx, &page,
-					  SGP_CACHE);
-		if (shmem_err < 0) {
-			dev_dbg(dev, "shmem_getpage(%lu) failed: %d\n", pg_idx,
-				shmem_err);
-			ret = shmem_err;
-			goto cleanup_pages;
-		}
-
-		if (writable)
-			set_page_dirty(page);
-
-		page_ref_inc(page);
-		unlock_page(page);
-
-		pages[pg_idx] = page;
+	shared_handle->dma_buf = dma_buf_get(fd);
+	if (IS_ERR(shared_handle->dma_buf)) {
+		ret = PTR_ERR(shared_handle->dma_buf);
+		shared_handle->dma_buf = NULL;
+		dev_dbg(dev, "Unable to get dma buf from fd (%d)\n", ret);
+		goto cleanup_handle;
 	}
 
-	ret = sg_alloc_table_from_pages(&shared_handle->sgt,
-					pages, max_pages, 0,
-					shm_size, GFP_KERNEL);
-	if (ret < 0) {
-		dev_dbg(dev, "sg_alloc_table_from_pages failed: %d\n", ret);
-		goto cleanup_pages;
+	shared_handle->attach = dma_buf_attach(shared_handle->dma_buf, dev);
+	if (IS_ERR(shared_handle->attach)) {
+		ret = PTR_ERR(shared_handle->attach);
+		shared_handle->attach = NULL;
+		dev_dbg(dev, "Unable to attach to dma_buf (%d)\n", ret);
+		goto cleanup_handle;
 	}
 
-	shared_handle->vds = dn->chan->vds;
+	shared_handle->sgt = dma_buf_map_attachment(shared_handle->attach,
+						    DMA_BIDIRECTIONAL);
+	if (IS_ERR(shared_handle->sgt)) {
+		ret = PTR_ERR(shared_handle->sgt);
+		shared_handle->sgt = NULL;
+		dev_dbg(dev, "Failed to match attachment (%d)\n", ret);
+		goto cleanup_handle;
+	}
 
 	ret = trusty_share_memory(tipc_shared_handle_dev(shared_handle),
 				  &shared_handle->tipc.obj_id,
-				  shared_handle->sgt.sgl,
-				  shared_handle->sgt.orig_nents, prot);
+				  shared_handle->sgt->sgl,
+				  shared_handle->sgt->orig_nents, prot);
 	if (ret < 0) {
 		dev_dbg(dev, "trusty_share_memory failed: %d\n", ret);
 		/*
@@ -1192,22 +1170,12 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 		goto cleanup_handle;
 	}
 	shared_handle->shared = true;
-
-	shared_handle->tipc.size = shm_size;
+	shared_handle->tipc.size = shared_handle->dma_buf->size;
 	*out = shared_handle;
-	ret = 0;
-	goto cleanup_file;
+	return 0;
 
-cleanup_pages:
-	while (pg_idx > 0) {
-		pg_idx--;
-		page_ref_dec(pages[pg_idx]);
-	}
 cleanup_handle:
 	tipc_shared_handle_drop(shared_handle);
-cleanup_file:
-	kfree(pages);
-	fput(file);
 	return ret;
 }
 
@@ -2046,6 +2014,8 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 	INIT_LIST_HEAD(&vds->free_buf_list);
 	idr_init(&vds->addr_idr);
 	vds->shared_handles = RB_ROOT;
+	dma_coerce_mask_and_coherent(&vds->vdev->dev,
+				     *vds->vdev->dev.parent->parent->dma_mask);
 
 	/* set default max message size and alignment */
 	memset(&config, 0, sizeof(config));
