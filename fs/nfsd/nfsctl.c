@@ -1522,7 +1522,9 @@ static int __init init_nfsd(void)
 	retval = nfsd4_init_pnfs();
 	if (retval)
 		goto out_free_slabs;
-	nfsd_stat_init();	/* Statistics */
+	retval = nfsd_stat_init();	/* Statistics */
+	if (retval)
+		goto out_free_pnfs;
 	retval = nfsd_drc_slab_create();
 	if (retval)
 		goto out_free_stat;
@@ -1552,6 +1554,7 @@ out_free_lockd:
 	nfsd_drc_slab_free();
 out_free_stat:
 	nfsd_stat_shutdown();
+out_free_pnfs:
 	nfsd4_exit_pnfs();
 out_free_slabs:
 	nfsd4_free_slabs();
