@@ -326,7 +326,13 @@ static int virtio_gpu_resource_info_cros_ioctl(struct drm_device *dev,
 	struct virtio_gpu_object *qobj = NULL;
 	int ret = 0;
 
+	/* validate only as the extended info is returned in either case */
+	if (type != VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT &&
+	    type != VIRTGPU_RESOURCE_INFO_TYPE_EXTENDED)
+		return -EINVAL;
+
 	gobj = drm_gem_object_lookup(file, ri->bo_handle);
+
 	if (gobj == NULL)
 		return -ENOENT;
 
