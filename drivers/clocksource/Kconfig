@@ -484,8 +484,6 @@ config MTK_TIMER
 config SPRD_TIMER
 	tristate "Spreadtrum timer driver" if EXPERT
 	depends on HAS_IOMEM
-	depends on (ARCH_SPRD || COMPILE_TEST)
-	default ARCH_SPRD
 	select TIMER_OF
 	help
 	  Enables support for the Spreadtrum timer driver.
