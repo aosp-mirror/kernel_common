@@ -452,9 +452,7 @@
   __usecs_to_jiffies
   usleep_range
   vfree
-  vfs_fallocate
   vfs_fsync
-  vfs_getattr
   vmalloc
   vmap
   vmemmap
@@ -711,82 +709,6 @@
   i2c_transfer_buffer_flags
   i2c_verify_client
   register_chrdev_region
-
-# required by incrementalfs.ko
-  __break_lease
-  call_rcu
-  clear_inode
-  crypto_alloc_shash
-  crypto_destroy_tfm
-  crypto_shash_digest
-  d_drop
-  deactivate_locked_super
-  dentry_open
-  dget_parent
-  d_instantiate
-  down_read_killable
-  down_write_killable
-  fget
-  flush_dcache_page
-  flush_delayed_work
-  fs_kobj
-  fsstack_copy_attr_all
-  generic_file_mmap
-  generic_file_read_iter
-  generic_file_splice_read
-  generic_read_dir
-  generic_shutdown_super
-  iget5_locked
-  ihold
-  inode_init_once
-  inode_init_owner
-  iput
-  iterate_dir
-  kernel_read
-  kernel_write
-  kern_path
-  kobject_create_and_add
-  kobject_put
-  kvfree
-  kvmalloc_node
-  lockref_get
-  lock_rename
-  lookup_one_len
-  LZ4_decompress_safe
-  match_int
-  match_token
-  mutex_is_locked
-  notify_change
-  override_creds
-  pagecache_get_page
-  path_get
-  path_put
-  __put_cred
-  revert_creds
-  set_anon_super
-  sget
-  simple_getattr
-  simple_setattr
-  strndup_user
-  strsep
-  sync_filesystem
-  truncate_inode_pages
-  unlock_new_inode
-  unlock_page
-  unlock_rename
-  user_path_at_empty
-  vfs_create
-  vfs_getxattr
-  vfs_link
-  vfs_listxattr
-  vfs_mkdir
-  vfs_rename
-  vfs_rmdir
-  vfs_setxattr
-  vfs_unlink
-  ZSTD_decompressStream
-  ZSTD_DStreamWorkspaceBound
-  ZSTD_initDStream
 
 # required by ion_cma_heap.ko
   cma_for_each_area
@@ -1145,7 +1067,6 @@
   config_group_init_type_name
   cpumask_next
   _ctype
-  filp_open
   fs_bio_set
   hex_to_bin
   iov_iter_bvec
