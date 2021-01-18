@@ -2213,9 +2213,9 @@ static int sh_eth_close(struct net_device *ndev)
 	/* free DMA buffer */
 	sh_eth_free_dma_buffer(mdp);
 
-	pm_runtime_put_sync(&mdp->pdev->dev);
-
 	mdp->is_opened = 0;
+
+	pm_runtime_put(&mdp->pdev->dev);
 
 	return 0;
 }
