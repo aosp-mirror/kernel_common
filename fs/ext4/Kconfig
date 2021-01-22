@@ -110,8 +110,7 @@ config EXT4_DEBUG
 
 config EXT4_KUNIT_TESTS
 	tristate "KUnit tests for ext4"
-	select EXT4_FS
-	depends on KUNIT
+	depends on EXT4_FS && KUNIT
 	help
 	  This builds the ext4 KUnit tests.
 
