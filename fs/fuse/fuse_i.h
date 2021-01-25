@@ -165,14 +165,6 @@ enum {
 struct fuse_conn;
 struct fuse_release_args;
 
-/**
- * Reference to lower filesystem file for read/write operations handled in
- * passthrough mode
- */
-struct fuse_passthrough {
-	struct file *filp;
-};
-
 /** FUSE specific file data */
 struct fuse_file {
 	/** Fuse connection for this file */
@@ -217,9 +209,6 @@ struct fuse_file {
 		u64 version;
 
 	} readdir;
-
-	/** Container for data related to the passthrough functionality */
-	struct fuse_passthrough passthrough;
 
 	/** RB node to be linked on fuse_conn->polled_files */
 	struct rb_node polled_node;
@@ -734,9 +723,6 @@ struct fuse_conn {
 	/* Do not show mount options */
 	unsigned int no_mount_options:1;
 
-	/** Passthrough mode for read/write IO */
-	unsigned int passthrough:1;
-
 	/** The number of requests waiting for completion */
 	atomic_t num_waiting;
 
@@ -772,12 +758,6 @@ struct fuse_conn {
 
 	/** List of device instances belonging to this connection */
 	struct list_head devices;
-
-	/** IDR for passthrough requests */
-	struct idr passthrough_req;
-
-	/** Protects passthrough_req */
-	spinlock_t passthrough_req_lock;
 };
 
 static inline struct fuse_conn *get_fuse_conn_super(struct super_block *sb)
@@ -1125,11 +1105,5 @@ unsigned int fuse_len_args(unsigned int numargs, struct fuse_arg *args);
  */
 u64 fuse_get_unique(struct fuse_iqueue *fiq);
 void fuse_free_conn(struct fuse_conn *fc);
-
-int fuse_passthrough_open(struct fuse_dev *fud,
-			  struct fuse_passthrough_out *pto);
-int fuse_passthrough_setup(struct fuse_conn *fc, struct fuse_file *ff,
-			   struct fuse_open_out *openarg);
-void fuse_passthrough_release(struct fuse_passthrough *passthrough);
 
 #endif /* _FS_FUSE_I_H */
