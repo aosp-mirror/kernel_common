@@ -10,6 +10,7 @@
 #include <linux/adreno-smmu-priv.h>
 #include <linux/clk.h>
 #include <linux/devfreq.h>
+#include <linux/input.h>
 #include <linux/interconnect.h>
 #include <linux/pm_opp.h>
 #include <linux/regulator/consumer.h>
@@ -255,6 +256,10 @@ struct msm_gpu {
 #define DRM_MSM_HANGCHECK_DEFAULT_PERIOD 500 /* in ms */
 #define DRM_MSM_HANGCHECK_PROGRESS_RETRIES 3
 	struct timer_list hangcheck_timer;
+
+	/* work for waking GPU on input: */
+	struct kthread_work boost_work;
+	struct input_handler boost_handler;
 
 	/* Fault info for most recent iova fault: */
 	struct msm_gpu_fault_info fault_info;

@@ -177,6 +177,23 @@ TRACE_EVENT(msm_gpu_resume,
 		TP_printk("%u", __entry->dummy)
 );
 
+
+TRACE_EVENT(msm_gpu_boost,
+		TP_PROTO(unsigned int type, unsigned int code, int value),
+		TP_ARGS(type, code, value),
+		TP_STRUCT__entry(
+			__field(u32, type)
+			__field(u32, code)
+			__field(int, value)
+			),
+		TP_fast_assign(
+			__entry->type = type;
+			__entry->code = code;
+			__entry->value = value;
+			),
+		TP_printk("type=%u, code=%u, value=%d", __entry->type, __entry->code, __entry->value)
+);
+
 #endif
 
 #undef TRACE_INCLUDE_PATH
