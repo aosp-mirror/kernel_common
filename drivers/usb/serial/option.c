@@ -421,6 +421,8 @@ static void option_instat_callback(struct urb *urb);
 #define CINTERION_PRODUCT_PH8_AUDIO		0x0083
 #define CINTERION_PRODUCT_AHXX_2RMNET		0x0084
 #define CINTERION_PRODUCT_AHXX_AUDIO		0x0085
+#define CINTERION_PRODUCT_MV31_MBIM		0x00b3
+#define CINTERION_PRODUCT_MV31_RMNET		0x00b7
 
 /* Olivetti products */
 #define OLIVETTI_VENDOR_ID			0x0b3c
@@ -644,6 +646,14 @@ static const struct option_blacklist_info net_intf5_blacklist = {
 
 static const struct option_blacklist_info net_intf6_blacklist = {
 	.reserved = BIT(6),
+};
+
+static const struct option_blacklist_info cinterion_mv31_mbim_blacklist = {
+	.reserved = BIT(3),
+};
+
+static const struct option_blacklist_info cinterion_mv31_rmnet_blacklist = {
+	.reserved = BIT(0),
 };
 
 static const struct option_blacklist_info zte_mf626_blacklist = {
@@ -2020,6 +2030,10 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(SIEMENS_VENDOR_ID, CINTERION_PRODUCT_HC25_MDMNET) },
 	{ USB_DEVICE(SIEMENS_VENDOR_ID, CINTERION_PRODUCT_HC28_MDM) }, /* HC28 enumerates with Siemens or Cinterion VID depending on FW revision */
 	{ USB_DEVICE(SIEMENS_VENDOR_ID, CINTERION_PRODUCT_HC28_MDMNET) },
+	{ USB_DEVICE_INTERFACE_CLASS(CINTERION_VENDOR_ID, CINTERION_PRODUCT_MV31_MBIM, 0xff),
+	  .driver_info = (kernel_ulong_t)&cinterion_mv31_mbim_blacklist },
+	{ USB_DEVICE_INTERFACE_CLASS(CINTERION_VENDOR_ID, CINTERION_PRODUCT_MV31_RMNET, 0xff),
+	  .driver_info = (kernel_ulong_t)&cinterion_mv31_rmnet_blacklist },
 	{ USB_DEVICE(OLIVETTI_VENDOR_ID, OLIVETTI_PRODUCT_OLICARD100),
 		.driver_info = (kernel_ulong_t)&net_intf4_blacklist },
 	{ USB_DEVICE(OLIVETTI_VENDOR_ID, OLIVETTI_PRODUCT_OLICARD120),
