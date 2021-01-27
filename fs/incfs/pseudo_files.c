@@ -524,7 +524,6 @@ static long ioctl_create_file(struct mount_info *mi,
 	char *file_id_str = NULL;
 	struct dentry *index_file_dentry = NULL;
 	struct dentry *named_file_dentry = NULL;
-	struct dentry *incomplete_file_dentry = NULL;
 	struct path parent_dir_path = {};
 	struct inode *index_dir_inode = NULL;
 	__le64 size_attr_value = 0;
@@ -532,11 +531,8 @@ static long ioctl_create_file(struct mount_info *mi,
 	char *attr_value = NULL;
 	int error = 0;
 	bool locked = false;
-	bool index_linked = false;
-	bool name_linked = false;
-	bool incomplete_linked = false;
 
-	if (!mi || !mi->mi_index_dir || !mi->mi_incomplete_dir) {
+	if (!mi || !mi->mi_index_dir) {
 		error = -EFAULT;
 		goto out;
 	}
@@ -581,12 +577,6 @@ static long ioctl_create_file(struct mount_info *mi,
 		goto out;
 	}
 
-	if (parent_dir_path.dentry == mi->mi_incomplete_dir) {
-		/* Can't create a file directly inside .incomplete */
-		error = -EBUSY;
-		goto out;
-	}
-
 	/* Look up a dentry in the parent dir. It should be negative. */
 	named_file_dentry = incfs_lookup_dentry(parent_dir_path.dentry,
 					file_name);
@@ -604,25 +594,6 @@ static long ioctl_create_file(struct mount_info *mi,
 		error = -EEXIST;
 		goto out;
 	}
-
-	/* Look up a dentry in the incomplete dir. It should be negative. */
-	incomplete_file_dentry = incfs_lookup_dentry(mi->mi_incomplete_dir,
-					file_id_str);
-	if (!incomplete_file_dentry) {
-		error = -EFAULT;
-		goto out;
-	}
-	if (IS_ERR(incomplete_file_dentry)) {
-		error = PTR_ERR(incomplete_file_dentry);
-		incomplete_file_dentry = NULL;
-		goto out;
-	}
-	if (d_really_is_positive(incomplete_file_dentry)) {
-		/* File with this path already exists. */
-		error = -EEXIST;
-		goto out;
-	}
-
 	/* Look up a dentry in the .index dir. It should be negative. */
 	index_file_dentry = incfs_lookup_dentry(mi->mi_index_dir, file_id_str);
 	if (!index_file_dentry) {
@@ -657,7 +628,7 @@ static long ioctl_create_file(struct mount_info *mi,
 	error = chmod(index_file_dentry, args.mode | 0222);
 	if (error) {
 		pr_debug("incfs: chmod err: %d\n", error);
-		goto out;
+		goto delete_index_file;
 	}
 
 	/* Save the file's ID as an xattr for easy fetching in future. */
@@ -665,7 +636,7 @@ static long ioctl_create_file(struct mount_info *mi,
 		file_id_str, strlen(file_id_str), XATTR_CREATE);
 	if (error) {
 		pr_debug("incfs: vfs_setxattr err:%d\n", error);
-		goto out;
+		goto delete_index_file;
 	}
 
 	/* Save the file's size as an xattr for easy fetching in future. */
@@ -675,27 +646,27 @@ static long ioctl_create_file(struct mount_info *mi,
 		XATTR_CREATE);
 	if (error) {
 		pr_debug("incfs: vfs_setxattr err:%d\n", error);
-		goto out;
+		goto delete_index_file;
 	}
 
 	/* Save the file's attribute as an xattr */
 	if (args.file_attr_len && args.file_attr) {
 		if (args.file_attr_len > INCFS_MAX_FILE_ATTR_SIZE) {
 			error = -E2BIG;
-			goto out;
+			goto delete_index_file;
 		}
 
 		attr_value = kmalloc(args.file_attr_len, GFP_NOFS);
 		if (!attr_value) {
 			error = -ENOMEM;
-			goto out;
+			goto delete_index_file;
 		}
 
 		if (copy_from_user(attr_value,
 				u64_to_user_ptr(args.file_attr),
 				args.file_attr_len) > 0) {
 			error = -EFAULT;
-			goto out;
+			goto delete_index_file;
 		}
 
 		error = vfs_setxattr(index_file_dentry,
@@ -704,7 +675,7 @@ static long ioctl_create_file(struct mount_info *mi,
 				XATTR_CREATE);
 
 		if (error)
-			goto out;
+			goto delete_index_file;
 	}
 
 	/* Initializing a newly created file. */
@@ -713,40 +684,26 @@ static long ioctl_create_file(struct mount_info *mi,
 			      (u8 __user *)args.signature_info,
 			      args.signature_size);
 	if (error)
-		goto out;
-	index_linked = true;
+		goto delete_index_file;
 
 	/* Linking a file with its real name from the requested dir. */
 	error = incfs_link(index_file_dentry, named_file_dentry);
-	if (error)
-		goto out;
-	name_linked = true;
 
-	if (args.size) {
-		/* Linking a file with its incomplete entry */
-		error = incfs_link(index_file_dentry, incomplete_file_dentry);
-		if (error)
-			goto out;
-		incomplete_linked = true;
-	}
+	if (!error)
+		goto out;
+
+delete_index_file:
+	incfs_unlink(index_file_dentry);
 
 out:
-	if (error) {
+	if (error)
 		pr_debug("incfs: %s err:%d\n", __func__, error);
-		if (index_linked)
-			incfs_unlink(index_file_dentry);
-		if (name_linked)
-			incfs_unlink(named_file_dentry);
-		if (incomplete_linked)
-			incfs_unlink(incomplete_file_dentry);
-	}
 
 	kfree(file_id_str);
 	kfree(file_name);
 	kfree(attr_value);
 	dput(named_file_dentry);
 	dput(index_file_dentry);
-	dput(incomplete_file_dentry);
 	path_put(&parent_dir_path);
 	if (locked)
 		mutex_unlock(&mi->mi_dir_struct_mutex);
