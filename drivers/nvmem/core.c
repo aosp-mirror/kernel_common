@@ -278,6 +278,7 @@ static int nvmem_add_cells_from_of(struct nvmem_device *nvmem)
 			dev_err(dev, "cell %s unaligned to nvmem stride %d\n",
 				cell->name, nvmem->stride);
 			/* Cells already added will be freed later. */
+			of_node_put(cell->np);
 			kfree(cell);
 			return -EINVAL;
 		}
