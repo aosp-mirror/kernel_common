@@ -1008,7 +1008,6 @@
   unregister_shrinker
   unregister_vmap_purge_notifier
   vmap
-  vmemmap
   vmf_insert_mixed
   vm_get_page_prot
   vscnprintf

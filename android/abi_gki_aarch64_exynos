@@ -748,7 +748,6 @@
   phy_power_on
   phy_reset
   phy_set_mode_ext
-  physvirt_offset
   pinctrl_add_gpio_range
   pinctrl_dev_get_drvdata
   pinctrl_force_sleep
@@ -1284,7 +1283,6 @@
   vmalloc_to_page
   vmalloc_user
   vmap
-  vmemmap
   vmf_insert_pfn_prot
   vm_get_page_prot
   vm_iomap_memory

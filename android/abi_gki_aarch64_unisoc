@@ -383,7 +383,6 @@
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   pfn_valid
-  physvirt_offset
   pinctrl_lookup_state
   pinctrl_select_state
   platform_bus_type
@@ -649,7 +648,6 @@
   vabits_actual
   vfree
   vmalloc
-  vmemmap
   vm_iomap_memory
   vm_map_ram
   vm_unmap_ram

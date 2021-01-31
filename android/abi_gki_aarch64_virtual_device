@@ -222,7 +222,6 @@
   __per_cpu_offset
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
-  physvirt_offset
   platform_device_unregister
   __platform_driver_register
   platform_driver_unregister
@@ -383,7 +382,6 @@
   virtqueue_kick
   virtqueue_kick_prepare
   virtqueue_notify
-  vmemmap
   vring_create_virtqueue
   vring_del_virtqueue
   vring_interrupt

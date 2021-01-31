@@ -1501,7 +1501,6 @@
   phy_power_off
   phy_power_on
   phy_set_mode_ext
-  physvirt_offset
   pinconf_generic_dt_node_to_map
   pinctrl_dev_get_drvdata
   pinctrl_lookup_state
@@ -2388,7 +2387,6 @@
   vmalloc_to_page
   vmalloc_user
   vmap
-  vmemmap
   vmf_insert_mixed
   vmf_insert_pfn
   vm_get_page_prot

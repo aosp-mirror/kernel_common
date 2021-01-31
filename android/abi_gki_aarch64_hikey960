@@ -455,7 +455,6 @@
   vfs_fsync
   vmalloc
   vmap
-  vmemmap
   vunmap
   vzalloc
   wait_for_completion
@@ -875,7 +874,6 @@
   of_find_device_by_node
   of_get_next_available_child
   of_property_read_u64
-  physvirt_offset
   rb_erase
   rb_first
   rb_insert_color
