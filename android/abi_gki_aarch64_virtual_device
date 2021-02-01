@@ -83,6 +83,9 @@
   dev_set_name
   _dev_warn
   dma_alloc_attrs
+  dma_direct_map_sg
+  dma_direct_sync_sg_for_device
+  dma_direct_unmap_sg
   dma_fence_context_alloc
   dma_fence_init
   dma_fence_release
@@ -171,6 +174,7 @@
   memparse
   memremap
   memset
+  memstart_addr
   memunmap
   misc_deregister
   misc_register
@@ -281,8 +285,10 @@
   seq_read
   seq_release
   set_disk_ro
+  sg_free_table
   sg_init_one
   sg_init_table
+  sg_next
   simple_strtoul
   skb_add_rx_frag
   skb_put
@@ -382,6 +388,7 @@
   virtqueue_kick
   virtqueue_kick_prepare
   virtqueue_notify
+  vmalloc
   vring_create_virtqueue
   vring_del_virtqueue
   vring_interrupt
@@ -786,10 +793,20 @@
   snd_pcm_hw_constraint_list
   snd_pcm_hw_constraint_msbits
 
+# required by system_heap.ko
+  dma_buf_export
+  dma_direct_sync_sg_for_cpu
+  dma_heap_add
+  dma_heap_get_dev
+  sg_alloc_table
+  __sg_page_iter_next
+  __sg_page_iter_start
+  vmap
+  vunmap
+
 # required by test_meminit.ko
   kmem_cache_alloc_bulk
   kmem_cache_free_bulk
-  vmalloc
 
 # required by tpm.ko
   alloc_chrdev_region
@@ -844,9 +861,6 @@
 
 # required by virtio-gpu.ko
   dma_buf_get_uuid
-  dma_direct_map_sg
-  dma_direct_sync_sg_for_device
-  dma_direct_unmap_sg
   dma_fence_match_context
   dma_fence_wait_timeout
   dma_resv_add_excl_fence
@@ -932,10 +946,9 @@
   kmalloc_order_trace
   memdup_user
   __sg_alloc_table_from_pages
-  sg_free_table
-  sg_next
   sync_file_get_fence
   __tracepoint_dma_fence_emit
+  __tracepoint_gpu_mem_total
   ttm_bo_add_to_lru
   ttm_bo_del_sub_from_lru
   ttm_bo_device_init
