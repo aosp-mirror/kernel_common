@@ -45,6 +45,10 @@ DECLARE_HOOK(android_vh_disable_thermal_cooling_stats,
 	TP_PROTO(struct thermal_cooling_device *cdev, int *disable_stats),
 	TP_ARGS(cdev, disable_stats));
 
+DECLARE_HOOK(android_vh_enable_thermal_genl_check,
+	TP_PROTO(int event, int tz_id, int *enable_thermal_genl),
+	TP_ARGS(event, tz_id, enable_thermal_genl));
+
 #endif /* _TRACE_HOOK_THERMAL_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>
