@@ -1020,6 +1020,7 @@ static int alloc_iommu(struct dmar_drhd_unit *drhd)
 	raw_spin_lock_init(&iommu->register_lock);
 
 	drhd->iommu = iommu;
+	iommu->drhd = drhd;
 
 	if (intel_iommu_enabled && !drhd->ignored)
 		iommu->iommu_dev = iommu_device_create(NULL, iommu,
@@ -1035,7 +1036,7 @@ error:
 
 static void free_iommu(struct intel_iommu *iommu)
 {
-	if (intel_iommu_enabled && iommu->iommu_dev)
+	if (intel_iommu_enabled && !iommu->drhd->ignored)
 		iommu_device_destroy(iommu->iommu_dev);
 
 	if (iommu->irq) {
