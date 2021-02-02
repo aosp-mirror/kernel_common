@@ -5,10 +5,11 @@
   __arch_copy_from_user
   __arch_copy_to_user
   arm64_const_caps_ready
-  bcmp
   blocking_notifier_call_chain
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
+  bpf_trace_run4
+  bpf_trace_run5
   bus_register
   bus_unregister
   cancel_delayed_work_sync
@@ -36,8 +37,6 @@
   clk_set_rate
   clk_sync_state
   clk_unprepare
-  cmd_db_read_addr
-  cmd_db_read_aux_data
   complete
   complete_all
   completion_done
@@ -46,6 +45,8 @@
   _copy_from_iter_full
   cpu_hwcap_keys
   cpu_hwcaps
+  cpu_number
+  __cpu_online_mask
   crc32_le
   debugfs_create_dir
   debugfs_create_file
@@ -87,6 +88,7 @@
   devm_of_platform_populate
   devm_phy_create
   devm_pinctrl_register
+  devm_platform_ioremap_resource
   __devm_regmap_init_mmio_clk
   devm_regulator_bulk_get
   devm_regulator_get
@@ -100,6 +102,7 @@
   dev_pm_domain_detach
   dev_pm_genpd_set_performance_state
   dev_pm_opp_add
+  dev_pm_opp_get_level
   dev_pm_opp_get_opp_count
   dev_set_name
   _dev_warn
@@ -108,6 +111,7 @@
   divider_recalc_rate
   divider_round_rate_parent
   dma_alloc_attrs
+  dma_buf_export
   dma_direct_map_page
   dma_direct_map_sg
   dma_direct_sync_single_for_device
@@ -137,21 +141,16 @@
   drm_mode_vrefresh
   enable_irq
   eth_validate_addr
-  fd_install
+  event_triggers_call
   find_next_bit
   find_next_zero_bit
   finish_wait
   flush_workqueue
-  fput
   free_irq
-  free_pages
-  generic_file_llseek
   generic_handle_irq
   generic_mii_ioctl
   get_device
   get_random_bytes
-  get_unused_fd_flags
-  get_zeroed_page
   gpiochip_add_data_with_key
   gpiochip_add_pin_range
   gpiochip_generic_free
@@ -216,7 +215,9 @@
   memcpy
   __memcpy_fromio
   memmove
+  memremap
   memset
+  memstart_addr
   mii_ethtool_gset
   mii_nway_restart
   misc_deregister
@@ -228,9 +229,7 @@
   msm_pinctrl_probe
   msm_pinctrl_remove
   __mutex_init
-  mutex_is_locked
   mutex_lock
-  mutex_lock_interruptible
   mutex_unlock
   napi_complete_done
   napi_disable
@@ -259,6 +258,7 @@
   of_get_child_by_name
   of_get_next_available_child
   of_get_next_child
+  of_get_property
   of_graph_get_remote_node
   of_iomap
   of_irq_find_parent
@@ -280,6 +280,8 @@
   param_ops_uint
   __pci_register_driver
   pci_unregister_driver
+  perf_trace_buf_alloc
+  perf_trace_run_bpf_submit
   pinconf_generic_dt_node_to_map
   pinctrl_dev_get_drvdata
   pinctrl_pm_select_default_state
@@ -294,6 +296,7 @@
   platform_get_irq_byname
   platform_get_resource
   platform_get_resource_byname
+  pm_genpd_add_subdomain
   pm_genpd_init
   __pm_runtime_disable
   pm_runtime_enable
@@ -306,6 +309,7 @@
   __pm_runtime_set_status
   __pm_runtime_suspend
   __pm_runtime_use_autosuspend
+  preempt_schedule_notrace
   prepare_to_wait_event
   printk
   pskb_expand_head
@@ -341,6 +345,7 @@
   regulator_set_load
   regulator_set_voltage
   release_firmware
+  remap_pfn_range
   request_firmware
   request_firmware_into_buf
   request_threaded_irq
@@ -394,6 +399,15 @@
   syscon_regmap_lookup_by_phandle
   system_wq
   thermal_cooling_device_unregister
+  trace_define_field
+  trace_event_buffer_commit
+  trace_event_buffer_reserve
+  trace_event_ignore_this_pid
+  trace_event_raw_init
+  trace_event_reg
+  trace_handle_return
+  trace_raw_output_prep
+  trace_seq_printf
   tty_flip_buffer_push
   __tty_insert_flip_char
   uart_add_one_port
@@ -405,6 +419,7 @@
   uart_unregister_driver
   uart_update_timeout
   uart_write_wakeup
+  __ubsan_handle_cfi_check_fail_abort
   __udelay
   unregister_reboot_notifier
   unregister_rpmsg_driver
@@ -433,6 +448,8 @@
   usbnet_write_cmd_nopm
   usb_register_driver
   usleep_range
+  vmap
+  vunmap
   wait_for_completion_timeout
   __wake_up
   __warn_printk
@@ -506,6 +523,7 @@
   wiphy_apply_custom_regulatory
 
 # required by ath10k_core.ko
+  bcmp
   cancel_delayed_work
   cfg80211_calculate_bitrate
   cfg80211_find_elem_match
@@ -566,7 +584,6 @@
   __kfifo_alloc
   __kfifo_free
   __local_bh_enable_ip
-  of_get_property
   param_ops_ulong
   regulatory_hint
   skb_copy
@@ -621,7 +638,6 @@
   divider_ro_round_rate_parent
   of_find_node_opts_by_path
   of_prop_next_u32
-  pm_genpd_add_subdomain
   pm_genpd_remove_subdomain
 
 # required by clk-rpmh.ko
@@ -648,7 +664,6 @@
 # required by fastrpc.ko
   dma_buf_attach
   dma_buf_detach
-  dma_buf_export
   dma_buf_fd
   dma_buf_get
   dma_buf_map_attachment
@@ -688,8 +703,6 @@
   bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
-  bpf_trace_run4
-  bpf_trace_run5
   bpf_trace_run6
   bpf_trace_run8
   clk_get_parent
@@ -707,8 +720,6 @@
   component_master_add_with_match
   component_master_del
   component_unbind_all
-  cpu_number
-  __cpu_online_mask
   _ctype
   debugfs_create_bool
   debugfs_create_u64
@@ -724,7 +735,6 @@
   dev_pm_opp_find_freq_ceil
   dev_pm_opp_find_freq_exact
   dev_pm_opp_find_freq_floor
-  dev_pm_opp_get_level
   dev_pm_opp_get_voltage
   dev_pm_opp_of_add_table
   dev_pm_opp_put
@@ -903,8 +913,11 @@
   drm_state_dump
   drm_universal_plane_init
   drm_vblank_init
-  event_triggers_call
+  fd_install
+  fput
+  generic_file_llseek
   get_pid_task
+  get_unused_fd_flags
   gpiod_direction_input
   gpiod_direction_output
   gpiod_get_value
@@ -939,12 +952,13 @@
   kvmalloc_node
   llist_add_batch
   memparse
-  memremap
   memunmap
   mipi_dsi_create_packet
   mipi_dsi_host_register
   mipi_dsi_host_unregister
   mipi_dsi_packet_format_is_long
+  mutex_is_locked
+  mutex_lock_interruptible
   mutex_trylock_recursive
   no_llseek
   nsecs_to_jiffies
@@ -964,11 +978,8 @@
   of_graph_parse_endpoint
   of_icc_get
   param_ops_charp
-  perf_trace_buf_alloc
-  perf_trace_run_bpf_submit
   pid_task
   pm_runtime_get_if_in_use
-  preempt_schedule_notrace
   put_pid
   put_unused_fd
   _raw_read_lock
@@ -995,24 +1006,13 @@
   sync_file_create
   sync_file_get_fence
   timespec64_to_jiffies
-  trace_define_field
-  trace_event_buffer_commit
-  trace_event_buffer_reserve
-  trace_event_ignore_this_pid
-  trace_event_raw_init
-  trace_event_reg
-  trace_handle_return
-  trace_raw_output_prep
-  trace_seq_printf
   unmap_mapping_range
   unregister_shrinker
   unregister_vmap_purge_notifier
-  vmap
   vmf_insert_mixed
   vm_get_page_prot
   vscnprintf
   vsnprintf
-  vunmap
   wake_up_process
   ww_mutex_lock_interruptible
   ww_mutex_unlock
@@ -1034,9 +1034,11 @@
   dma_pool_destroy
   dma_pool_free
   flush_work
+  free_pages
   gen_pool_dma_alloc_align
   gen_pool_dma_zalloc_align
   gen_pool_free_owner
+  get_zeroed_page
   _raw_spin_lock_irq
   _raw_spin_unlock_irq
   sb800_prefetch
@@ -1168,7 +1170,6 @@
 # required by qcom_geni_serial.ko
   console_stop
   device_create_file
-  devm_platform_ioremap_resource
   handle_sysrq
   kstrtoint
   oops_in_progress
@@ -1199,6 +1200,10 @@
 
 # required by qcom_q6v5_wcss.ko
   rproc_elf_get_boot_addr
+
+# required by qcom_rpmh.ko
+  bitmap_find_next_zero_area_off
+  __bitmap_set
 
 # required by qcom_smd.ko
   __memcpy_toio
@@ -1310,7 +1315,6 @@
   __class_register
   class_unregister
   device_initialize
-  remap_pfn_range
   unregister_chrdev_region
 
 # required by rtc-pm8xxx.ko
@@ -1369,6 +1373,19 @@
   spmi_controller_add
   spmi_controller_alloc
   spmi_controller_remove
+
+# required by system_heap.ko
+  __alloc_pages_nodemask
+  dma_direct_sync_sg_for_cpu
+  dma_direct_sync_sg_for_device
+  dma_heap_add
+  dma_heap_get_dev
+  __free_pages
+  sg_alloc_table
+  __sg_page_iter_next
+  __sg_page_iter_start
+  vfree
+  vmalloc
 
 # required by ufs_qcom.ko
   devm_phy_get
