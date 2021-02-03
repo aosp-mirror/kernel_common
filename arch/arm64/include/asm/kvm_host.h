@@ -102,6 +102,11 @@ struct kvm_s2_mmu {
 struct kvm_arch_memory_slot {
 };
 
+struct kvm_protected_vm {
+	bool enabled;
+	int shadow_handle;
+};
+
 struct kvm_arch {
 	struct kvm_s2_mmu mmu;
 
@@ -137,6 +142,22 @@ struct kvm_arch {
 
 	/* Memory Tagging Extension enabled for the guest */
 	bool mte_enabled;
+
+	struct kvm_protected_vm pkvm;
+};
+
+struct kvm_protected_vcpu {
+	/* A unique id to the shadow structs in the hyp shadow area. */
+	int shadow_handle;
+
+	/* A pointer to the host's vcpu. */
+	struct kvm_vcpu *host_vcpu;
+
+	/* A pointer to the shadow vm. */
+	struct kvm_shadow_vm *shadow_vm;
+
+	/* Tracks exit code for the protected guest. */
+	int exit_code;
 };
 
 struct kvm_vcpu_fault_info {
@@ -390,6 +411,8 @@ struct kvm_vcpu_arch {
 		u64 last_steal;
 		gpa_t base;
 	} steal;
+
+	struct kvm_protected_vcpu pkvm;
 };
 
 /* Pointer to the vcpu's SVE FFR for sve_{save,load}_state() */
