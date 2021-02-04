@@ -9,6 +9,7 @@
 #include <linux/scatterlist.h>
 #include <linux/trusty/trusty.h>
 #include <linux/types.h>
+#include <uapi/linux/trusty/ipc.h>
 
 struct tipc_chan;
 

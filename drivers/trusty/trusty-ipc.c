@@ -28,6 +28,8 @@
 
 #include <uapi/linux/trusty/ipc.h>
 
+#include "trusty-ipc-trace.h"
+
 #define MAX_DEVICES			4
 
 #define REPLY_TIMEOUT			5000
@@ -795,6 +797,8 @@ int tipc_chan_connect(struct tipc_chan *chan, const char *name)
 	struct tipc_conn_req_body *body;
 	struct tipc_msg_buf *txbuf;
 
+	trace_trusty_ipc_connect(chan, name);
+
 	txbuf = vds_get_txbuf(chan->vds, TXBUF_TIMEOUT);
 	if (IS_ERR(txbuf))
 		return PTR_ERR(txbuf);
@@ -961,6 +965,8 @@ static struct tipc_msg_buf *dn_handle_msg(void *data,
 
 	mutex_lock(&dn->lock);
 	if (dn->state == TIPC_CONNECTED) {
+		/* buffer received from trusty */
+		trace_trusty_ipc_rx(dn->chan, rxbuf);
 		/* get new buffer */
 		newbuf = tipc_chan_get_rxbuf(dn->chan);
 		if (newbuf) {
@@ -1026,6 +1032,7 @@ static void dn_shutdown(struct tipc_dn_chan *dn)
 static void dn_handle_event(void *data, int event)
 {
 	struct tipc_dn_chan *dn = data;
+	trace_trusty_ipc_handle_event(dn->chan, event);
 
 	switch (event) {
 	case TIPC_CHANNEL_SHUTDOWN:
@@ -1136,10 +1143,14 @@ static int dn_connect_ioctl(struct tipc_dn_chan *dn, char __user *usr_name)
 	/* send connect request */
 	ret = tipc_chan_connect(dn->chan, name);
 	if (ret)
-		return ret;
+		goto err_handle;
 
 	/* and wait for reply */
-	return dn_wait_for_reply(dn, REPLY_TIMEOUT);
+	ret = dn_wait_for_reply(dn, REPLY_TIMEOUT);
+
+err_handle:
+	trace_trusty_ipc_connect_end(dn->chan, ret);
+	return ret;
 }
 
 static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
@@ -1407,6 +1418,8 @@ static long filp_send_ioctl(struct file *filp,
 	for (shm_idx = 0; shm_idx < req.shm_cnt; shm_idx++)
 		tipc_shared_handle_register(shm_handles[shm_idx]);
 
+	trace_trusty_ipc_write(dn->chan, ret, NULL, NULL);
+
 	ret = tipc_chan_queue_msg(dn->chan, txbuf);
 
 	if (ret)
@@ -1421,6 +1434,9 @@ load_shm_args_failed:
 	kfree(shm_handles);
 shm_handles_alloc_failed:
 	kfree(shm);
+
+	if (ret)
+		trace_trusty_ipc_write(dn->chan, ret, txbuf, shm);
 	return ret;
 
 queue_failed:
@@ -1433,6 +1449,7 @@ get_txbuf_failed:
 shm_share_failed:
 	for (shm_idx--; shm_idx >= 0; shm_idx--)
 		tipc_shared_handle_drop(shm_handles[shm_idx]);
+
 	goto common_cleanup;
 }
 
@@ -1488,11 +1505,13 @@ static ssize_t tipc_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	ssize_t ret;
 	size_t len;
-	struct tipc_msg_buf *mb;
+	struct tipc_msg_buf *mb = NULL;
 	struct file *filp = iocb->ki_filp;
 	struct tipc_dn_chan *dn = filp->private_data;
 
 	mutex_lock(&dn->lock);
+
+	trace_trusty_ipc_read(dn->chan);
 
 	while (list_empty(&dn->rx_msg_queue)) {
 		if (dn->state != TIPC_CONNECTED) {
@@ -1536,6 +1555,7 @@ static ssize_t tipc_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	tipc_chan_put_rxbuf(dn->chan, mb);
 
 out:
+	trace_trusty_ipc_read_end(dn->chan, ret, mb);
 	mutex_unlock(&dn->lock);
 	return ret;
 }
@@ -1554,22 +1574,30 @@ static ssize_t tipc_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 	txbuf = tipc_chan_get_txbuf_timeout(dn->chan, timeout);
 
-	if (IS_ERR(txbuf))
-		return PTR_ERR(txbuf);
+	if (IS_ERR(txbuf)) {
+		ret = PTR_ERR(txbuf);
+		goto exit_out;
+	}
 
 	len = txbuf_write_iter(txbuf, iter);
-	if (len < 0)
+	if (len < 0) {
+		ret = len;
 		goto err_out;
+	}
 
 	/* queue message */
 	ret = tipc_chan_queue_msg(dn->chan, txbuf);
 	if (ret)
 		goto err_out;
 
+	trace_trusty_ipc_write(dn->chan, len, txbuf, NULL);
+
 	return len;
 
 err_out:
 	tipc_chan_put_txbuf(dn->chan, txbuf);
+exit_out:
+	trace_trusty_ipc_write(dn->chan, ret, NULL, NULL);
 	return ret;
 }
 
@@ -1592,6 +1620,8 @@ static __poll_t tipc_poll(struct file *filp, poll_table *wait)
 		mask |= EPOLLERR;
 
 	mutex_unlock(&dn->lock);
+
+	trace_trusty_ipc_poll(dn->chan, mask);
 	return mask;
 }
 
@@ -2253,6 +2283,9 @@ static void __exit tipc_exit(void)
 /* We need to init this early */
 subsys_initcall(tipc_init);
 module_exit(tipc_exit);
+
+#define CREATE_TRACE_POINTS
+#include "trusty-ipc-trace.h"
 
 MODULE_DEVICE_TABLE(tipc, tipc_virtio_id_table);
 MODULE_DESCRIPTION("Trusty IPC driver");
