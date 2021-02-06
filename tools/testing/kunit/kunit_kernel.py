@@ -140,7 +140,9 @@ class LinuxSourceTree(object):
 			return False
 		return True
 
-	def run_kernel(self, args=[], timeout=None, build_dir=None):
+	def run_kernel(self, args=None, timeout=None, build_dir=None):
+		if not args:
+			args = []
 		args.extend(['mem=256M'])
 		process = self._ops.linux_bin(args, timeout, build_dir)
 		with open('test.log', 'w') as f:
