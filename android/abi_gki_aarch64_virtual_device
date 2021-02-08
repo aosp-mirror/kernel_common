@@ -262,7 +262,6 @@
   refcount_dec_and_test_checked
   refcount_inc_checked
   register_blkdev
-  register_filesystem
   register_netdev
   register_netdevice
   register_netdevice_notifier
@@ -358,7 +357,6 @@
   __ubsan_handle_cfi_check_fail_abort
   unlock_page
   unregister_blkdev
-  unregister_filesystem
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
