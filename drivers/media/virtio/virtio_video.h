@@ -146,7 +146,7 @@ struct virtio_video {
 	struct idr resource_idr;
 	spinlock_t resource_idr_lock;
 	struct idr stream_idr;
-	spinlock_t stream_idr_lock;
+	struct mutex stream_idr_lock;
 
 	uint32_t max_caps_len;
 	uint32_t max_resp_len;
@@ -209,6 +209,7 @@ struct virtio_video_stream {
 	bool dst_destroyed;
 	struct work_struct work;
 	struct video_format_frame *current_frame;
+	struct mutex event_mutex;
 };
 
 struct virtio_video_buffer {
@@ -301,7 +302,7 @@ void virtio_video_device_deinit(struct virtio_video *vv);
 void virtio_video_stream_id_get(struct virtio_video *vv,
 				struct virtio_video_stream *stream,
 				uint32_t *id);
-void virtio_video_stream_id_put(struct virtio_video *vv, uint32_t id);
+void virtio_video_stream_id_put(struct virtio_video *vv, struct virtio_video_stream *stream);
 void virtio_video_resource_id_get(struct virtio_video *vv, uint32_t *id);
 void virtio_video_resource_id_put(struct virtio_video *vv, uint32_t id);
 
