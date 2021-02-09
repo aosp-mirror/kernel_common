@@ -53,19 +53,19 @@ void virtio_video_stream_id_get(struct virtio_video *vv,
 {
 	int handle;
 
-	idr_preload(GFP_KERNEL);
-	spin_lock(&vv->stream_idr_lock);
-	handle = idr_alloc(&vv->stream_idr, stream, 1, 0, 0);
-	spin_unlock(&vv->stream_idr_lock);
-	idr_preload_end();
+	mutex_lock(&vv->stream_idr_lock);
+	handle = idr_alloc(&vv->stream_idr, stream, 1, 0, GFP_KERNEL);
+	mutex_unlock(&vv->stream_idr_lock);
 	*id = handle;
 }
 
-void virtio_video_stream_id_put(struct virtio_video *vv, uint32_t id)
+void virtio_video_stream_id_put(struct virtio_video *vv, struct virtio_video_stream *stream)
 {
-	spin_lock(&vv->stream_idr_lock);
-	idr_remove(&vv->stream_idr, id);
-	spin_unlock(&vv->stream_idr_lock);
+	mutex_lock(&vv->stream_idr_lock);
+	mutex_lock(&stream->event_mutex);
+	idr_remove(&vv->stream_idr, stream->stream_id);
+	mutex_unlock(&stream->event_mutex);
+	mutex_unlock(&vv->stream_idr_lock);
 }
 
 void virtio_video_cmd_ack(struct virtqueue *vq)
@@ -362,12 +362,16 @@ static void virtio_video_event_cb(struct virtio_video *vv,
 	stream_id = le32_to_cpu(event->stream_id);
 	event_type = le32_to_cpu(event->event_type);
 
+	mutex_lock(&vv->stream_idr_lock);
 	stream = idr_find(&vv->stream_idr, stream_id);
 	if (!stream) {
+		mutex_unlock(&vv->stream_idr_lock);
 		v4l2_warn(&vv->v4l2_dev, "no stream %u found for event\n",
 			  stream_id);
 		return;
 	}
+	mutex_lock(&stream->event_mutex);
+	mutex_unlock(&vv->stream_idr_lock);
 
 	switch (event_type) {
 	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
@@ -393,6 +397,7 @@ static void virtio_video_event_cb(struct virtio_video *vv,
 			  event_type, stream_id);
 		break;
 	}
+	mutex_unlock(&stream->event_mutex);
 
 	memset(vbuf->resp_buf, 0, vbuf->resp_size);
 	ret = virtio_video_queue_event_buffer(vv, vbuf);
