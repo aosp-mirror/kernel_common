@@ -813,7 +813,6 @@
   preempt_schedule
   preempt_schedule_notrace
   prepare_to_wait_event
-  print_hex_dump
   printk
   proc_create_seq_private
   __put_cred
@@ -1287,8 +1286,6 @@
   vm_get_page_prot
   vm_iomap_memory
   vm_map_pages
-  vm_map_ram
-  vm_unmap_ram
   vsnprintf
   vunmap
   vzalloc

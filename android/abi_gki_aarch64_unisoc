@@ -32,7 +32,6 @@
   bus_register
   bus_set_iommu
   bus_unregister
-  call_rcu
   cancel_delayed_work
   cancel_delayed_work_sync
   cancel_work_sync
@@ -741,8 +740,6 @@
   vfree
   vmalloc
   vm_iomap_memory
-  vm_map_ram
-  vm_unmap_ram
   vsnprintf
   vunmap
   wait_for_completion
@@ -865,7 +862,6 @@
   generic_file_read_iter
   generic_file_splice_read
   generic_file_write_iter
-  generic_fillattr
   generic_write_end
   __getblk_gfp
   ilookup
@@ -874,7 +870,6 @@
   __insert_inode_hash
   invalidate_inode_buffers
   iunique
-  kill_block_super
   kvfree
   kvmalloc_node
   load_nls
@@ -883,17 +878,11 @@
   __mark_inode_dirty
   match_int
   match_octal
-  match_strdup
-  match_token
   mktime64
-  mount_bdev
   mpage_readpage
   mpage_readpages
   mpage_writepages
-  new_inode
   __remove_inode_hash
-  sb_min_blocksize
-  sb_set_blocksize
   setattr_copy
   strscpy
   sync_blockdev
@@ -968,7 +957,6 @@
   prandom_u32
   proc_create_net_data
   __pskb_pull_tail
-  rcu_barrier
   skb_checksum_help
   strim
   xfrm_lookup
@@ -1204,7 +1192,6 @@
   sync_file_create
   sync_file_get_fence
   __task_pid_nr_ns
-  trace_print_symbols_seq
   trace_set_clr_event
   unmap_mapping_range
   unregister_shrinker
@@ -1318,7 +1305,6 @@
   mmc_detect_change
   mmc_set_data_timeout
   mmc_wait_for_req
-  print_hex_dump
   __put_page
   sdio_claim_host
   sdio_enable_func
@@ -2377,7 +2363,6 @@
   trace_output_call
   __tracepoint_gpu_mem_total
   trace_print_array_seq
-  trace_print_flags_seq
   vmf_insert_pfn_prot
 
 # required by sprd_ion.ko

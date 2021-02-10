@@ -130,7 +130,6 @@
   dma_direct_unmap_sg
   dma_free_attrs
   dma_heap_add
-  d_make_root
   dmam_alloc_attrs
   dma_pool_alloc
   dma_pool_create
@@ -335,7 +334,6 @@
   refcount_dec_and_test_checked
   refcount_inc_checked
   refcount_inc_not_zero_checked
-  register_filesystem
   regmap_raw_read
   regmap_raw_write
   regmap_read
@@ -414,7 +412,6 @@
   trace_event_raw_init
   trace_event_reg
   trace_handle_return
-  trace_print_symbols_seq
   trace_raw_output_prep
   trace_seq_printf
   trace_seq_putc
@@ -422,7 +419,6 @@
   __ubsan_handle_cfi_check_fail_abort
   __udelay
   unregister_chrdev_region
-  unregister_filesystem
   up_read
   up_write
   usb_add_hcd
@@ -602,7 +598,6 @@
   kill_litter_super
   kiocb_set_cancel_fn
   mutex_trylock
-  new_inode
   simple_dir_inode_operations
   simple_dir_operations
   unuse_mm
@@ -1080,7 +1075,6 @@
   percpu_ref_exit
   percpu_ref_init
   percpu_ref_kill_and_confirm
-  radix_tree_delete
   radix_tree_next_chunk
   __request_module
   sgl_alloc
@@ -1286,7 +1280,6 @@
   platform_device_add_resources
   platform_device_alloc
   platform_device_put
-  print_hex_dump
   sdio_claim_host
   sdio_disable_func
   sdio_enable_func

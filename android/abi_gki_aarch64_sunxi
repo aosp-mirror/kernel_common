@@ -165,8 +165,6 @@
   load_nls_default
   __lock_page
   make_bad_inode
-  pagecache_get_page
-  read_cache_page
   truncate_inode_pages_final
   __vmalloc
   io_schedule
@@ -174,14 +172,10 @@
   end_buffer_read_sync
 
 # required by squashfs.ko
-  generic_ro_fops
   get_tree_bdev
-  iget_failed
   iget_locked
-  inode_nohighmem
   ll_rw_block
   logfc
-  page_get_link
   zlib_inflate
   zlib_inflateEnd
   zlib_inflateInit2

@@ -1253,9 +1253,6 @@
   __nla_parse
   proto_register
   proto_unregister
-  radix_tree_delete
-  radix_tree_insert
-  radix_tree_lookup
   _raw_write_lock_bh
   _raw_write_unlock_bh
   refcount_dec_and_mutex_lock
