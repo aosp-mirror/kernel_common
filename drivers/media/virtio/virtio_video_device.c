@@ -916,35 +916,35 @@ static int virtio_video_device_open(struct file *file)
 					  VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
 	if (ret) {
 		v4l2_err(&vv->v4l2_dev, "failed to get stream in params\n");
-		goto err_init_ctrls;
+		goto err_stream_get_params;
 	}
 
 	ret = virtio_video_cmd_get_params(vv, stream,
 					  VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
 	if (ret) {
 		v4l2_err(&vv->v4l2_dev, "failed to get stream out params\n");
-		goto err_init_ctrls;
+		goto err_stream_get_params;
 	}
 
 	ret = virtio_video_cmd_get_control(vv, stream,
 					   VIRTIO_VIDEO_CONTROL_PROFILE);
 	if (ret) {
 		v4l2_err(&vv->v4l2_dev, "failed to get stream profile\n");
-		goto err_init_ctrls;
+		goto err_stream_get_params;
 	}
 
 	ret = virtio_video_cmd_get_control(vv, stream,
 					   VIRTIO_VIDEO_CONTROL_LEVEL);
 	if (ret) {
 		v4l2_err(&vv->v4l2_dev, "failed to get stream level\n");
-		goto err_init_ctrls;
+		goto err_stream_get_params;
 	}
 
 	ret = virtio_video_cmd_get_control(vv, stream,
 					   VIRTIO_VIDEO_CONTROL_BITRATE);
 	if (ret) {
 		v4l2_err(&vv->v4l2_dev, "failed to get stream bitrate\n");
-		goto err_init_ctrls;
+		goto err_stream_get_params;
 	}
 
 	mutex_init(&stream->vq_mutex);
@@ -965,7 +965,8 @@ static int virtio_video_device_open(struct file *file)
 		break;
 	default:
 		v4l2_err(&vv->v4l2_dev, "unsupported device type\n");
-		goto err_stream_create;
+		ret = -EINVAL;
+		goto err_init_m2m_ctx;
 	}
 
 	v4l2_m2m_set_src_buffered(stream->fh.m2m_ctx, true);
@@ -981,7 +982,8 @@ static int virtio_video_device_open(struct file *file)
 		ret = virtio_video_dec_init_ctrls(stream);
 		break;
 	default:
-		ret = 0;
+		// We should have failed in the previous switch.
+		BUG_ON(true);
 		break;
 	}
 
@@ -992,11 +994,14 @@ static int virtio_video_device_open(struct file *file)
 	return 0;
 
 err_init_ctrls:
-	v4l2_fh_del(&stream->fh);
-	v4l2_fh_exit(&stream->fh);
 	mutex_lock(video_dev->lock);
 	v4l2_m2m_ctx_release(stream->fh.m2m_ctx);
 	mutex_unlock(video_dev->lock);
+err_init_m2m_ctx:
+	v4l2_fh_del(&stream->fh);
+	v4l2_fh_exit(&stream->fh);
+err_stream_get_params:
+	virtio_video_cmd_stream_destroy(vv, stream->stream_id);
 err_stream_create:
 	virtio_video_stream_id_put(vv, stream);
 	kfree(stream);
