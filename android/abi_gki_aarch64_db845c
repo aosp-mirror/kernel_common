@@ -147,6 +147,7 @@
   finish_wait
   flush_workqueue
   free_irq
+  __free_pages
   generic_handle_irq
   generic_mii_ioctl
   get_device
@@ -204,6 +205,7 @@
   kmem_cache_alloc_trace
   kmemdup
   kstrdup
+  kthread_create_on_node
   ktime_get
   ktime_get_mono_fast_ns
   __list_add_valid
@@ -333,6 +335,7 @@
   refcount_inc_checked
   register_reboot_notifier
   __register_rpmsg_driver
+  register_shrinker
   regmap_bulk_read
   regmap_bulk_write
   regmap_read
@@ -361,6 +364,7 @@
   rproc_del
   rproc_free
   rproc_remove_subdev
+  sched_setscheduler
   schedule
   schedule_timeout
   scnprintf
@@ -452,6 +456,7 @@
   vunmap
   wait_for_completion_timeout
   __wake_up
+  wake_up_process
   __warn_printk
   watchdog_init_timeout
 
@@ -651,6 +656,11 @@
 # required by cqhci.ko
   dmam_free_coherent
   mmc_cqe_request_done
+
+# required by deferred-free-helper.ko
+  freezing_slow_path
+  __refrigerator
+  system_freezing_cnt
 
 # required by extcon-usb-gpio.ko
   devm_extcon_dev_allocate
@@ -942,7 +952,6 @@
   kasprintf
   kstrdup_quotable_cmdline
   kstrtouint_from_user
-  kthread_create_on_node
   kthread_destroy_worker
   __kthread_init_worker
   kthread_queue_work
@@ -986,14 +995,12 @@
   _raw_read_unlock
   _raw_write_lock
   _raw_write_unlock
-  register_shrinker
   register_vmap_purge_notifier
   regulator_get
   regulator_put
   request_firmware_direct
   reservation_ww_class
   round_jiffies_up
-  sched_setscheduler
   schedule_timeout_interruptible
   shmem_truncate_range
   simple_attr_open
@@ -1013,7 +1020,6 @@
   vm_get_page_prot
   vscnprintf
   vsnprintf
-  wake_up_process
   ww_mutex_lock_interruptible
   ww_mutex_unlock
 
@@ -1078,6 +1084,11 @@
   usb_hcd_platform_shutdown
   usb_put_hcd
   usb_remove_hcd
+
+# required by page_pool.ko
+  __alloc_pages_nodemask
+  contig_page_data
+  mod_node_page_state
 
 # required by phy-qcom-qmp.ko
   of_clk_get_by_name
@@ -1253,6 +1264,9 @@
   __nla_parse
   proto_register
   proto_unregister
+  radix_tree_delete
+  radix_tree_insert
+  radix_tree_lookup
   _raw_write_lock_bh
   _raw_write_unlock_bh
   refcount_dec_and_mutex_lock
@@ -1372,12 +1386,12 @@
   spmi_controller_remove
 
 # required by system_heap.ko
-  __alloc_pages_nodemask
   dma_direct_sync_sg_for_cpu
   dma_direct_sync_sg_for_device
   dma_heap_add
   dma_heap_get_dev
-  __free_pages
+  dma_heap_get_name
+  preempt_schedule
   sg_alloc_table
   __sg_page_iter_next
   __sg_page_iter_start
