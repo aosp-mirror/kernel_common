@@ -50,9 +50,6 @@ struct mapped_device {
 
 	int numa_node_id;
 	struct request_queue *queue;
-#ifdef CONFIG_BLK_INLINE_ENCRYPTION
-	struct blk_keyslot_manager ksm;
-#endif
 
 	atomic_t holders;
 	atomic_t open_count;
