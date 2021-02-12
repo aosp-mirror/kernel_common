@@ -2315,11 +2315,12 @@ static int ieee80211_set_bitrate_mask(struct wiphy *wiphy,
 		if (!sband)
 			continue;
 
-		for (j = 0; j < IEEE80211_HT_MCS_MASK_LEN; j++)
-			if (~sdata->rc_rateidx_mcs_mask[i][j]) {
+		for (j = 0; j < IEEE80211_HT_MCS_MASK_LEN; j++) {
+			if (sdata->rc_rateidx_mcs_mask[i][j] != 0xff) {
 				sdata->rc_has_mcs_mask[i] = true;
 				break;
 			}
+		}
 	}
 
 	return 0;
