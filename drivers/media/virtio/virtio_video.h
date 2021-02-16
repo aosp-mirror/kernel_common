@@ -219,6 +219,8 @@ struct virtio_video_buffer {
 
 	/* Only for virtio object buffer */
 	uuid_t uuid;
+	uint32_t num_planes;
+	uint32_t plane_offsets[VIRTIO_VIDEO_MAX_PLANES];
 };
 
 static inline gfp_t
@@ -318,7 +320,7 @@ int virtio_video_cmd_resource_create_page(
 	struct virtio_video_mem_entry *ents);
 int virtio_video_cmd_resource_create_object(
 	struct virtio_video *vv, uint32_t stream_id, uint32_t resource_id,
-	uint32_t queue_type, unsigned int num_planes, struct vb2_plane *planes,
+	uint32_t queue_type, unsigned int num_planes, uint32_t *plane_offsets,
 	struct virtio_video_object_entry *ents);
 int virtio_video_cmd_resource_destroy_all(struct virtio_video *vv,
 					  struct virtio_video_stream *stream,
