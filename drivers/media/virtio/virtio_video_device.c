@@ -76,6 +76,8 @@ static int virtio_video_send_resource_create_object(struct vb2_buffer *vb,
 	int queue_type;
 	int ret;
 	bool *destroyed;
+	uint32_t plane_offsets[VIRTIO_VIDEO_MAX_PLANES];
+	int i;
 
 	if (V4L2_TYPE_IS_OUTPUT(vb->vb2_queue->type)) {
 		queue_type = VIRTIO_VIDEO_QUEUE_TYPE_INPUT;
@@ -87,12 +89,14 @@ static int virtio_video_send_resource_create_object(struct vb2_buffer *vb,
 
 	ent = kcalloc(1, sizeof(*ent), GFP_KERNEL);
 	uuid_copy((uuid_t *) &ent->uuid, &uuid);
+	for (i = 0; i < vb->num_planes; i++)
+		plane_offsets[i] = vb->planes[i].data_offset;
 
 	ret = virtio_video_cmd_resource_create_object(vv, stream->stream_id,
 						      resource_id,
 						      queue_type,
 						      vb->num_planes,
-						      vb->planes, ent);
+						      plane_offsets, ent);
 	if (ret) {
 		kfree(ent);
 		return ret;
@@ -113,6 +117,8 @@ static int virtio_video_send_resource_create_object(struct vb2_buffer *vb,
 
 	virtio_vb->resource_id = resource_id;
 	virtio_vb->uuid = uuid;
+	virtio_vb->num_planes = vb->num_planes;
+	memcpy(virtio_vb->plane_offsets, plane_offsets, sizeof(plane_offsets));
 	*destroyed = false;
 
 	return 0;
@@ -239,6 +245,25 @@ int virtio_video_buf_init(struct vb2_buffer *vb)
 	}
 }
 
+static bool virtio_video_buf_object_stale(struct vb2_buffer *vb, uuid_t *uuid)
+{
+	struct virtio_video_buffer *virtio_vb = to_virtio_vb(vb);
+	int i;
+
+	if (!uuid_equal(uuid, &virtio_vb->uuid))
+		return true;
+
+	if (vb->num_planes != virtio_vb->num_planes)
+		return true;
+
+	for (i = 0; i < vb->num_planes; i++) {
+		if (vb->planes[i].data_offset != virtio_vb->plane_offsets[i])
+			return true;
+	}
+
+	return false;
+}
+
 int virtio_video_buf_prepare(struct vb2_buffer *vb)
 {
 	struct virtio_video_stream *stream = vb2_get_drv_priv(vb->vb2_queue);
@@ -261,7 +286,7 @@ int virtio_video_buf_prepare(struct vb2_buffer *vb)
 	 * If a user gave a different object as a buffer from the previous
 	 * one, send RESOURCE_CREATE again to register the object.
 	 */
-	if (!uuid_equal(&uuid, &virtio_vb->uuid)) {
+	if (virtio_video_buf_object_stale(vb, &uuid)) {
 		ret = virtio_video_send_resource_create_object(
 			vb, virtio_vb->resource_id, uuid);
 		if (ret)

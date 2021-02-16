@@ -533,7 +533,7 @@ int virtio_video_cmd_resource_create_page(
 
 int virtio_video_cmd_resource_create_object(
 	struct virtio_video *vv, uint32_t stream_id, uint32_t resource_id,
-	uint32_t queue_type, unsigned int num_planes, struct vb2_plane *planes,
+	uint32_t queue_type, unsigned int num_planes, uint32_t *plane_offsets,
 	struct virtio_video_object_entry *ents)
 {
 	struct virtio_video_resource_create *req_p;
@@ -550,7 +550,7 @@ int virtio_video_cmd_resource_create_object(
 	req_p->planes_layout =
 		cpu_to_le32(VIRTIO_VIDEO_PLANES_LAYOUT_SINGLE_BUFFER);
 	for (i = 0; i < num_planes; i++)
-		req_p->plane_offsets[i] = planes[i].data_offset;
+		req_p->plane_offsets[i] = plane_offsets[i];
 
 	vbuf->data_buf = ents;
 	vbuf->data_size = sizeof(*ents);
