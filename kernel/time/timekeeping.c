@@ -1613,7 +1613,7 @@ static bool persistent_clock_exists;
  */
 void __init timekeeping_init(void)
 {
-	struct timespec64 wall_time, boot_offset, wall_to_mono;
+	struct timespec64 wall_time, boot_offset, wall_to_mono, boot_delta;
 	struct timekeeper *tk = &tk_core.timekeeper;
 	struct clocksource *clock;
 	unsigned long flags;
@@ -1649,6 +1649,14 @@ void __init timekeeping_init(void)
 	tk->raw_sec = 0;
 
 	tk_set_wall_to_mono(tk, wall_to_mono);
+
+	// TODO(b/162547792): Remove following CLOCK_BOOTTIME adjustment
+	// once the underlying issue is resolved.
+	// The gap added here is larger enough than
+	// MIN_DELTA_BETWEEN_CLOCKS_MS which is expected by CTS Verifier.
+	boot_delta.tv_sec = 5;
+	boot_delta.tv_nsec = 0;
+	tk_update_sleep_time(tk, timespec64_to_ktime(boot_delta));
 
 	timekeeping_update(tk, TK_MIRROR | TK_CLOCK_WAS_SET);
 
