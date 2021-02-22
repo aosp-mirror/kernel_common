@@ -93,6 +93,9 @@
   __crypto_xor
   csum_ipv6_magic
   csum_partial
+  debugfs_create_dir
+  debugfs_create_file
+  debugfs_remove_recursive
   default_llseek
   delayed_work_timer_fn
   del_timer
@@ -123,6 +126,7 @@
   __dev_kfree_skb_any
   devm_add_action
   devm_backlight_device_register
+  devm_clk_bulk_get
   devm_clk_bulk_get_all
   devm_clk_get
   devm_free_irq
@@ -198,6 +202,7 @@
   ether_setup
   eth_type_trans
   event_triggers_call
+  extcon_find_edev_by_node
   extcon_get_edev_by_phandle
   extcon_get_state
   fb_mode_option
@@ -216,6 +221,7 @@
   freezing_slow_path
   fwnode_property_present
   fwnode_property_read_string
+  gen_pool_avail
   generic_file_llseek
   generic_handle_irq
   genl_register_family
@@ -320,6 +326,12 @@
   ip_route_output_flow
   ipv4_redirect
   ipv4_update_pmtu
+  ir_lirc_scancode_event
+  ir_raw_gen_manchester
+  ir_raw_gen_pd
+  ir_raw_handler_register
+  ir_raw_handler_unregister
+  ir_raw_gen_pl
   irq_find_mapping
   irq_get_irq_data
   irq_modify_status
@@ -454,6 +466,8 @@
   pfn_valid
   pinctrl_lookup_state
   pinctrl_select_state
+  pinctrl_pm_select_default_state
+  pinctrl_pm_select_sleep_state
   platform_bus_type
   platform_device_add
   platform_device_add_properties
@@ -522,6 +536,10 @@
   _raw_spin_unlock_irqrestore
   __rcu_read_lock
   __rcu_read_unlock
+  rc_map_unregister
+  rc_repeat
+  rc_keydown
+  rc_map_register
   rdev_get_drvdata
   refcount_dec_and_test_checked
   refcount_inc_checked
@@ -1510,6 +1528,7 @@
   dev_pm_opp_init_cpufreq_table
 
 # required by sprd-drm.ko
+  adjust_managed_page_count
   component_add
   component_bind_all
   component_del
@@ -1543,6 +1562,8 @@
   drm_atomic_helper_page_flip
   __drm_atomic_helper_plane_destroy_state
   __drm_atomic_helper_plane_duplicate_state
+  __dynamic_dev_dbg
+  __dynamic_pr_debug
   drm_atomic_helper_prepare_planes
   drm_atomic_helper_resume
   drm_atomic_helper_set_config
