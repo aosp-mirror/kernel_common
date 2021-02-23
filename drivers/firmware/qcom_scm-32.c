@@ -417,7 +417,7 @@ void __qcom_scm_cpu_power_down(u32 flags)
 			flags & QCOM_SCM_FLUSH_FLAG_MASK);
 }
 
-int __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
+bool __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
 {
 	int ret;
 	__le32 svc_cmd = cpu_to_le32((svc_id << 10) | cmd_id);
@@ -426,10 +426,7 @@ int __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
 	ret = qcom_scm_call(dev, QCOM_SCM_SVC_INFO, QCOM_IS_CALL_AVAIL_CMD,
 			    &svc_cmd, sizeof(svc_cmd), &ret_val,
 			    sizeof(ret_val));
-	if (ret)
-		return ret;
-
-	return le32_to_cpu(ret_val);
+	return ret ? false : !!ret_val;
 }
 
 int __qcom_scm_hdcp_req(struct device *dev, struct qcom_scm_hdcp_req *req,

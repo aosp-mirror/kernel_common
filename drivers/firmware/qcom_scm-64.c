@@ -246,7 +246,7 @@ void __qcom_scm_cpu_power_down(u32 flags)
 {
 }
 
-int __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
+bool __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
 {
 	int ret;
 	struct qcom_scm_desc desc = {0};
@@ -259,7 +259,7 @@ int __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
 	ret = qcom_scm_call(dev, QCOM_SCM_SVC_INFO, QCOM_IS_CALL_AVAIL_CMD,
 			    &desc, &res);
 
-	return ret ? : res.a1;
+	return ret ? false : !!res.a1;
 }
 
 int __qcom_scm_hdcp_req(struct device *dev, struct qcom_scm_hdcp_req *req,

@@ -32,7 +32,7 @@ extern int __qcom_scm_io_writel(struct device *dev, phys_addr_t addr, unsigned i
 
 #define QCOM_SCM_SVC_INFO		0x6
 #define QCOM_IS_CALL_AVAIL_CMD		0x1
-extern int __qcom_scm_is_call_available(struct device *dev, u32 svc_id,
+extern bool __qcom_scm_is_call_available(struct device *dev, u32 svc_id,
 		u32 cmd_id);
 
 #define QCOM_SCM_SVC_HDCP		0x11

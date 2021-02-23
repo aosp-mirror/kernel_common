@@ -135,17 +135,18 @@ EXPORT_SYMBOL(qcom_scm_cpu_power_down);
  */
 bool qcom_scm_hdcp_available(void)
 {
+	bool avail;
 	int ret = qcom_scm_clk_enable();
 
 	if (ret)
 		return ret;
 
-	ret = __qcom_scm_is_call_available(__scm->dev, QCOM_SCM_SVC_HDCP,
+	avail = __qcom_scm_is_call_available(__scm->dev, QCOM_SCM_SVC_HDCP,
 						QCOM_SCM_CMD_HDCP);
 
 	qcom_scm_clk_disable();
 
-	return ret > 0 ? true : false;
+	return avail;
 }
 EXPORT_SYMBOL(qcom_scm_hdcp_available);
 
@@ -181,9 +182,8 @@ bool qcom_scm_pas_supported(u32 peripheral)
 {
 	int ret;
 
-	ret = __qcom_scm_is_call_available(__scm->dev, QCOM_SCM_SVC_PIL,
-					   QCOM_SCM_PAS_IS_SUPPORTED_CMD);
-	if (ret <= 0)
+	if (!__qcom_scm_is_call_available(__scm->dev, QCOM_SCM_SVC_PIL,
+					  QCOM_SCM_PAS_IS_SUPPORTED_CMD))
 		return false;
 
 	return __qcom_scm_pas_supported(__scm->dev, peripheral);
