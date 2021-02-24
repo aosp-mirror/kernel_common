@@ -331,8 +331,6 @@ struct ufs_pwr_mode_info {
  * @program_key: program or evict an inline encryption key
  * @fill_prdt: called after initializing the standard PRDT fields so that any
  *	       variant-specific PRDT fields can be initialized too
- * @prepare_command: called when receiving a request in the first place
- * @update_sysfs: adds vendor-specific sysfs entries
  */
 struct ufs_hba_variant_ops {
 	const char *name;
@@ -370,9 +368,6 @@ struct ufs_hba_variant_ops {
 			       const union ufs_crypto_cfg_entry *cfg, int slot);
 	int	(*fill_prdt)(struct ufs_hba *hba, struct ufshcd_lrb *lrbp,
 			     unsigned int segments);
-	int	(*prepare_command)(struct ufs_hba *hba,
-				struct request *rq, struct ufshcd_lrb *lrbp);
-	int     (*update_sysfs)(struct ufs_hba *hba);
 
 	ANDROID_KABI_RESERVE(1);
 	ANDROID_KABI_RESERVE(2);
@@ -1271,21 +1266,6 @@ static inline int ufshcd_vops_fill_prdt(struct ufs_hba *hba,
 	if (hba->vops && hba->vops->fill_prdt)
 		return hba->vops->fill_prdt(hba, lrbp, segments);
 
-	return 0;
-}
-
-static inline int ufshcd_vops_prepare_command(struct ufs_hba *hba,
-		struct request *rq, struct ufshcd_lrb *lrbp)
-{
-	if (hba->vops && hba->vops->prepare_command)
-		return hba->vops->prepare_command(hba, rq, lrbp);
-	return 0;
-}
-
-static inline int ufshcd_vops_update_sysfs(struct ufs_hba *hba)
-{
-	if (hba->vops && hba->vops->update_sysfs)
-		return hba->vops->update_sysfs(hba);
 	return 0;
 }
 
