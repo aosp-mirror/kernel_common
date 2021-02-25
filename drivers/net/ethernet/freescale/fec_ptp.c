@@ -412,9 +412,16 @@ static int fec_ptp_gettime(struct ptp_clock_info *ptp, struct timespec *ts)
 	u32 remainder;
 	unsigned long flags;
 
+	mutex_lock(&adapter->ptp_clk_mutex);
+	/* Check the ptp clock */
+	if (!adapter->ptp_clk_on) {
+		mutex_unlock(&adapter->ptp_clk_mutex);
+		return -EINVAL;
+	}
 	spin_lock_irqsave(&adapter->tmreg_lock, flags);
 	ns = timecounter_read(&adapter->tc);
 	spin_unlock_irqrestore(&adapter->tmreg_lock, flags);
+	mutex_unlock(&adapter->ptp_clk_mutex);
 
 	ts->tv_sec = div_u64_rem(ns, 1000000000ULL, &remainder);
 	ts->tv_nsec = remainder;
