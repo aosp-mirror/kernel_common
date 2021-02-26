@@ -654,6 +654,7 @@
   scmi_driver_unregister
 
 # required by cqhci.ko
+  devm_blk_ksm_init
   dmam_free_coherent
   mmc_cqe_request_done
 
