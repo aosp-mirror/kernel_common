@@ -41,7 +41,7 @@ PHONY := __modpost
 __modpost:
 
 include include/config/auto.conf
-include scripts/Kbuild.include
+include $(srctree)/scripts/Kbuild.include
 
 # for mod-prelink-ext
 include scripts/Makefile.lib
