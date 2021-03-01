@@ -3803,20 +3803,15 @@ static const struct dma_map_ops intel_dma_ops = {
 	.get_required_mask = intel_get_required_mask,
 };
 
-static void
-bounce_sync_single(struct device *dev, dma_addr_t addr, size_t size,
-		   enum dma_data_direction dir, enum dma_sync_target target)
+static phys_addr_t bounce_sync_single(struct device *dev, dma_addr_t addr)
 {
 	struct dmar_domain *domain;
-	phys_addr_t tlb_addr;
 
 	domain = find_domain(dev);
 	if (WARN_ON(!domain))
-		return;
+		return 0;
 
-	tlb_addr = intel_iommu_iova_to_phys(&domain->domain, addr);
-	if (is_swiotlb_buffer(tlb_addr))
-		swiotlb_tbl_sync_single(dev, tlb_addr, size, dir, target);
+	return intel_iommu_iova_to_phys(&domain->domain, addr);
 }
 
 static dma_addr_t
@@ -4002,14 +3997,20 @@ static void
 bounce_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
 			   size_t size, enum dma_data_direction dir)
 {
-	bounce_sync_single(dev, addr, size, dir, SYNC_FOR_CPU);
+	phys_addr_t tlb_addr = bounce_sync_single(dev, addr);
+
+	if (is_swiotlb_buffer(tlb_addr))
+		swiotlb_sync_single_for_cpu(dev, tlb_addr, size, dir);
 }
 
 static void
 bounce_sync_single_for_device(struct device *dev, dma_addr_t addr,
 			      size_t size, enum dma_data_direction dir)
 {
-	bounce_sync_single(dev, addr, size, dir, SYNC_FOR_DEVICE);
+	phys_addr_t tlb_addr = bounce_sync_single(dev, addr);
+
+	if (is_swiotlb_buffer(tlb_addr))
+		swiotlb_sync_single_for_device(dev, tlb_addr, size, dir);
 }
 
 static void
@@ -4020,8 +4021,8 @@ bounce_sync_sg_for_cpu(struct device *dev, struct scatterlist *sglist,
 	int i;
 
 	for_each_sg(sglist, sg, nelems, i)
-		bounce_sync_single(dev, sg_dma_address(sg),
-				   sg_dma_len(sg), dir, SYNC_FOR_CPU);
+		bounce_sync_single_for_cpu(dev, sg_dma_address(sg),
+					   sg_dma_len(sg), dir);
 }
 
 static void
@@ -4032,8 +4033,8 @@ bounce_sync_sg_for_device(struct device *dev, struct scatterlist *sglist,
 	int i;
 
 	for_each_sg(sglist, sg, nelems, i)
-		bounce_sync_single(dev, sg_dma_address(sg),
-				   sg_dma_len(sg), dir, SYNC_FOR_DEVICE);
+		bounce_sync_single_for_device(dev, sg_dma_address(sg),
+					      sg_dma_len(sg), dir);
 }
 
 static const struct dma_map_ops bounce_dma_ops = {
