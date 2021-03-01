@@ -3899,8 +3899,7 @@ bounce_map_single(struct device *dev, phys_addr_t paddr, size_t size,
 
 mapping_error:
 	if (is_swiotlb_buffer(tlb_addr))
-		swiotlb_tbl_unmap_single(dev, tlb_addr, size,
-					 aligned_size, dir, attrs);
+		swiotlb_tbl_unmap_single(dev, tlb_addr, size, dir, attrs);
 swiotlb_error:
 	free_iova_fast(&domain->iovad, iova_pfn, dma_to_mm_pfn(nrpages));
 	dev_err(dev, "Device bounce map: %zx@%llx dir %d --- failed\n",
@@ -3913,7 +3912,6 @@ static void
 bounce_unmap_single(struct device *dev, dma_addr_t dev_addr, size_t size,
 		    enum dma_data_direction dir, unsigned long attrs)
 {
-	size_t aligned_size = ALIGN(size, VTD_PAGE_SIZE);
 	struct dmar_domain *domain;
 	phys_addr_t tlb_addr;
 
@@ -3927,8 +3925,7 @@ bounce_unmap_single(struct device *dev, dma_addr_t dev_addr, size_t size,
 
 	intel_unmap(dev, dev_addr, size);
 	if (is_swiotlb_buffer(tlb_addr))
-		swiotlb_tbl_unmap_single(dev, tlb_addr, size,
-					 aligned_size, dir, attrs);
+		swiotlb_tbl_unmap_single(dev, tlb_addr, size, dir, attrs);
 
 	trace_bounce_unmap_single(dev, dev_addr, size);
 }
