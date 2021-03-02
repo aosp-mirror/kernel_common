@@ -69,3 +69,6 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_prepare_command);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_update_sysfs);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_send_command);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_compl_command);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_send_uic_command);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_send_tm_command);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_check_int_errors);
