@@ -114,7 +114,7 @@ int inotify_handle_inode_event(struct fsnotify_mark *inode_mark, u32 mask,
 		mask &= ~IN_ISDIR;
 
 	fsn_event = &event->fse;
-	fsnotify_init_event(fsn_event, 0);
+	fsnotify_init_event(fsn_event);
 	event->mask = mask;
 	event->wd = wd;
 	event->sync_cookie = cookie;
