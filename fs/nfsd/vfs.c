@@ -1979,8 +1979,9 @@ static int nfsd_buffered_filldir(struct dir_context *ctx, const char *name,
 	return 0;
 }
 
-static __be32 nfsd_buffered_readdir(struct file *file, nfsd_filldir_t func,
-				    struct readdir_cd *cdp, loff_t *offsetp)
+static __be32 nfsd_buffered_readdir(struct file *file, struct svc_fh *fhp,
+				    nfsd_filldir_t func, struct readdir_cd *cdp,
+				    loff_t *offsetp)
 {
 	struct buffered_dirent *de;
 	int host_err;
@@ -2025,6 +2026,8 @@ static __be32 nfsd_buffered_readdir(struct file *file, nfsd_filldir_t func,
 
 			if (cdp->err != nfs_ok)
 				break;
+
+			trace_nfsd_dirent(fhp, de->ino, de->name, de->namlen);
 
 			reclen = ALIGN(sizeof(*de) + de->namlen,
 				       sizeof(u64));
@@ -2073,7 +2076,7 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t *offsetp,
 		goto out_close;
 	}
 
-	err = nfsd_buffered_readdir(file, func, cdp, offsetp);
+	err = nfsd_buffered_readdir(file, fhp, func, cdp, offsetp);
 
 	if (err == nfserr_eof || err == nfserr_toosmall)
 		err = nfs_ok; /* can still be found in ->err */
