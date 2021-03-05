@@ -2183,9 +2183,6 @@
 # required by ghash-ce.ko
   gf128mul_lle
 
-# required by ip6t_NPT.ko
-  icmpv6_send
-
 # required by pppoe.ko
   _copy_from_iter_full
   datagram_poll
