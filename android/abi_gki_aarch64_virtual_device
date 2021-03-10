@@ -9,11 +9,8 @@
   __arch_copy_to_user
   arm64_const_caps_ready
   bcmp
-  bio_add_page
   bio_alloc_bioset
-  bio_associate_blkg
   bio_endio
-  bio_put
   blk_alloc_queue
   blk_cleanup_queue
   blk_queue_flag_clear
@@ -26,10 +23,8 @@
   blk_queue_max_write_zeroes_sectors
   blk_queue_physical_block_size
   blk_queue_write_cache
-  bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
-  bpf_trace_run4
   bus_register
   bus_unregister
   cancel_delayed_work_sync
@@ -44,6 +39,7 @@
   complete
   __const_udelay
   consume_skb
+  contig_page_data
   __cpuhp_remove_state
   __cpuhp_setup_state
   __cpuhp_state_add_instance
@@ -101,15 +97,14 @@
   event_triggers_call
   fd_install
   finish_wait
-  flush_dcache_page
   flush_work
   fput
   free_irq
   free_netdev
   __free_pages
   free_pages
+  freezing_slow_path
   fs_bio_set
-  generic_file_llseek
   get_device
   __get_free_pages
   get_random_bytes
@@ -123,7 +118,6 @@
   idr_remove
   __init_rwsem
   init_timer_key
-  init_user_ns
   init_wait_entry
   __init_waitqueue_head
   input_allocate_device
@@ -132,7 +126,6 @@
   input_register_device
   input_unregister_device
   iounmap
-  iput
   jiffies
   jiffies_to_msecs
   kfree
@@ -155,6 +148,7 @@
   kstrdup
   kstrtoint
   kstrtoull
+  kthread_create_on_node
   ktime_get
   ktime_get_mono_fast_ns
   ktime_get_raw_ts64
@@ -167,7 +161,6 @@
   __list_add_valid
   __list_del_entry_valid
   __local_bh_enable_ip
-  __lock_page
   lzo1x_decompress_safe
   memcpy
   memmove
@@ -200,6 +193,7 @@
   netif_tx_wake_queue
   nf_conntrack_destroy
   no_llseek
+  nonseekable_open
   noop_llseek
   nr_cpu_ids
   __num_online_cpus
@@ -261,6 +255,7 @@
   __rcu_read_unlock
   refcount_dec_and_test_checked
   refcount_inc_checked
+  __refrigerator
   register_blkdev
   register_netdev
   register_netdevice
@@ -290,7 +285,10 @@
   sg_next
   simple_strtoul
   skb_add_rx_frag
+  skb_dequeue
+  skb_push
   skb_put
+  skb_queue_tail
   snd_card_disconnect
   snd_card_free
   snd_card_new
@@ -332,10 +330,8 @@
   strlen
   strncmp
   strncpy
-  strscpy
   strsep
   submit_bio
-  __sw_hweight64
   sync_file_create
   synchronize_irq
   synchronize_rcu
@@ -343,6 +339,7 @@
   __sysfs_match_string
   sysfs_remove_group
   sysfs_remove_link
+  system_freezing_cnt
   system_wq
   trace_define_field
   trace_event_buffer_commit
@@ -360,7 +357,6 @@
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
-  unregister_shrinker
   unregister_virtio_device
   unregister_virtio_driver
   up_read
@@ -393,7 +389,11 @@
   vring_transport_features
   wait_for_completion
   __wake_up
+  wake_up_process
   __warn_printk
+
+# required by deferred-free-helper.ko
+  sched_setscheduler
 
 # required by dummy-cpufreq.ko
   cpufreq_generic_attr
@@ -448,6 +448,18 @@
   dma_fence_default_wait
   dma_fence_free
 
+# required by hci_vhci.ko
+  bt_err
+  _copy_from_iter_full
+  hci_alloc_dev
+  hci_free_dev
+  hci_recv_frame
+  hci_register_dev
+  hci_unregister_dev
+  skb_pull
+  skb_queue_head
+  skb_queue_purge
+
 # required by lzo-rle.ko
   lzorle1x_1_compress
 
@@ -464,6 +476,7 @@
   device_bind_driver
   dst_release
   eth_mac_addr
+  generic_file_llseek
   genlmsg_put
   genl_notify
   genl_register_family
@@ -521,10 +534,7 @@
   simple_attr_write
   skb_copy
   skb_copy_expand
-  skb_dequeue
   __skb_ext_put
-  skb_push
-  skb_queue_tail
   skb_trim
   skb_unlink
   unregister_pernet_device
@@ -546,6 +556,9 @@
   bdev_read_only
   bd_link_disk_holder
   bd_unlink_disk_holder
+  bio_add_page
+  bio_associate_blkg
+  bio_put
   bioset_exit
   bioset_init
   blkdev_get_by_dev
@@ -576,7 +589,6 @@
   kstrtobool
   kstrtoll
   kstrtouint
-  kthread_create_on_node
   kthread_parkme
   kthread_should_park
   kthread_should_stop
@@ -606,7 +618,6 @@
   unregister_reboot_notifier
   unregister_sysctl_table
   vfs_fsync
-  wake_up_process
 
 # required by nd_virtio.ko
   bio_chain
@@ -629,6 +640,9 @@
   netdev_pick_tx
   pci_bus_type
 
+# required by page_pool.ko
+  mod_node_page_state
+
 # required by pulse8-cec.ko
   cec_allocate_adapter
   cec_delete_adapter
@@ -642,6 +656,7 @@
   serio_open
   __serio_register_driver
   serio_unregister_driver
+  strscpy
   time64_to_tm
   wait_for_completion_timeout
 
@@ -674,6 +689,7 @@
   __sw_hweight32
 
 # required by snd-hda-codec.ko
+  bpf_trace_run4
   current_work
   device_attach
   driver_register
@@ -718,9 +734,11 @@
   regmap_update_bits_base
   regmap_write
   snd_pcm_format_width
+  __sw_hweight64
   timecounter_init
 
 # required by snd-hda-intel.ko
+  bpf_trace_run1
   complete_all
   param_array_ops
   param_get_int
@@ -745,6 +763,7 @@
   dma_direct_sync_sg_for_cpu
   dma_heap_add
   dma_heap_get_dev
+  dma_heap_get_name
   sg_alloc_table
   __sg_page_iter_next
   __sg_page_iter_start
@@ -958,7 +977,6 @@
   debugfs_remove
   device_destroy
   fasync_helper
-  freezing_slow_path
   hvc_alloc
   hvc_instantiate
   hvc_kick
@@ -966,15 +984,12 @@
   hvc_remove
   __hvc_resize
   kill_fasync
-  nonseekable_open
   pipe_lock
   pipe_unlock
-  __refrigerator
   __register_chrdev
   single_open
   single_release
   __splice_from_pipe
-  system_freezing_cnt
   __unregister_chrdev
 
 # required by virtio_input.ko
@@ -1069,28 +1084,6 @@
   nvdimm_bus_unregister
   nvdimm_pmem_region_create
 
-# required by virtiofs.ko
-  deactivate_locked_super
-  flush_delayed_work
-  fuse_conn_get
-  fuse_conn_init
-  fuse_conn_put
-  fuse_dequeue_forget
-  fuse_dev_alloc
-  fuse_dev_free
-  fuse_dev_install
-  fuse_fill_super_common
-  fuse_free_conn
-  fuse_get_unique
-  fuse_kill_sb_anon
-  fuse_len_args
-  fuse_request_end
-  fuse_send_init
-  get_anon_bdev
-  lockref_get
-  memchr
-  sget_fc
-
 # required by vmw_vsock_virtio_transport.ko
   lock_sock_nested
   release_sock
@@ -1137,6 +1130,7 @@
   crypto_alloc_base
   crypto_destroy_tfm
   crypto_has_alg
+  flush_dcache_page
   free_percpu
   fsync_bdev
   generic_end_io_acct
@@ -1153,16 +1147,18 @@
 # required by zsmalloc.ko
   alloc_anon_inode
   __ClearPageMovable
-  contig_page_data
   dec_zone_page_state
   inc_zone_page_state
   init_pseudo
+  iput
   kern_mount
   kern_unmount
   kill_anon_super
+  __lock_page
   page_mapping
   _raw_read_lock
   _raw_read_unlock
   _raw_write_lock
   _raw_write_unlock
   __SetPageMovable
+  unregister_shrinker
