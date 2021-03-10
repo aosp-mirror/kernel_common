@@ -110,11 +110,36 @@ static const struct address_space_operations incfs_address_space_ops = {
 	/* .readpages = readpages */
 };
 
+static vm_fault_t incfs_fault(struct vm_fault *vmf)
+{
+	vmf->flags &= ~FAULT_FLAG_ALLOW_RETRY;
+	return filemap_fault(vmf);
+}
+
+static const struct vm_operations_struct incfs_file_vm_ops = {
+	.fault		= incfs_fault,
+	.map_pages	= filemap_map_pages,
+	.page_mkwrite	= filemap_page_mkwrite,
+};
+
+/* This is used for a general mmap of a disk file */
+
+static int incfs_file_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct address_space *mapping = file->f_mapping;
+
+	if (!mapping->a_ops->readpage)
+		return -ENOEXEC;
+	file_accessed(file);
+	vma->vm_ops = &incfs_file_vm_ops;
+	return 0;
+}
+
 const struct file_operations incfs_file_ops = {
 	.open = file_open,
 	.release = file_release,
 	.read_iter = generic_file_read_iter,
-	.mmap = generic_file_mmap,
+	.mmap = incfs_file_mmap,
 	.splice_read = generic_file_splice_read,
 	.llseek = generic_file_llseek,
 	.unlocked_ioctl = dispatch_ioctl,
