@@ -169,9 +169,11 @@ static void mxs_set_mode(enum clock_event_mode mode,
 		timrot_irq_acknowledge();
 	}
 
-	pr_debug("%s: changing mode from %s to %s\n", __func__,
+#ifdef DEBUG
+	pr_info("%s: changing mode from %s to %s\n", __func__,
 		clock_event_mode_label[mxs_clockevent_mode],
 		clock_event_mode_label[mode]);
+#endif /* DEBUG */
 
 	/* Remember timer mode */
 	mxs_clockevent_mode = mode;
