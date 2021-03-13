@@ -32,8 +32,11 @@ int adis16400_update_scan_mode(struct iio_dev *indio_dev,
 
 	adis->buffer = kzalloc(indio_dev->scan_bytes + sizeof(u16),
 		GFP_KERNEL);
-	if (!adis->buffer)
+	if (!adis->buffer) {
+		kfree(adis->xfer);
+		adis->xfer = NULL;
 		return -ENOMEM;
+	}
 
 	tx = adis->buffer + indio_dev->scan_bytes;
 
