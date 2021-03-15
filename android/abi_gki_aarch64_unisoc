@@ -3,8 +3,10 @@
   add_timer
   add_uevent_var
   add_wait_queue
+  add_to_page_cache_lru
   aes_encrypt
   aes_expandkey
+  alloc_anon_inode
   alloc_chrdev_region
   alloc_netdev_mqs
   alloc_pages_exact
@@ -20,8 +22,25 @@
   atomic_notifier_call_chain
   atomic_notifier_chain_register
   atomic_notifier_chain_unregister
+  bdget_disk
+  bdput
+  bio_add_page
+  bio_alloc_bioset
+  bio_associate_blkg
+  bio_endio
+  bio_put
+  bit_wait
+  blk_alloc_queue
   blk_finish_plug
   blk_start_plug
+  blk_queue_flag_clear
+  blk_queue_flag_set
+  blk_queue_io_min
+  blk_queue_io_opt
+  blk_queue_make_request
+  blk_queue_max_discard_sectors
+  blk_queue_max_write_zeroes_sectors
+  blk_queue_physical_block_size
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
   bpf_trace_run1
@@ -32,6 +51,8 @@
   bus_register
   bus_set_iommu
   bus_unregister
+  __ClearPageMovable
+  call_rcu
   cancel_delayed_work
   cancel_delayed_work_sync
   cancel_work_sync
@@ -66,6 +87,7 @@
   complete_all
   config_ep_by_speed
   config_group_init_type_name
+  contig_page_data
   console_lock
   console_unlock
   __const_udelay
@@ -78,10 +100,12 @@
   cpu_number
   __cpu_online_mask
   __cpu_possible_mask
+  crypto_alloc_base
   crypto_ahash_digest
   crypto_ahash_setkey
   crypto_alloc_ahash
   crypto_destroy_tfm
+  crypto_has_alg
   crypto_inc
   __crypto_memneq
   crypto_register_aead
@@ -93,9 +117,16 @@
   __crypto_xor
   csum_ipv6_magic
   csum_partial
+  d_make_root
+  d_splice_alias
   debugfs_create_dir
   debugfs_create_file
+  debugfs_create_u32
+  debugfs_initialized
+  debugfs_remove
   debugfs_remove_recursive
+  debugfs_create_symlink
+  dec_zone_page_state
   default_llseek
   delayed_work_timer_fn
   del_timer
@@ -219,11 +250,18 @@
   free_pages_exact
   free_percpu
   freezing_slow_path
+  fs_bio_set
+  fs_ftype_to_dtype
+  fsync_bdev
   fwnode_property_present
   fwnode_property_read_string
   gen_pool_avail
+  generic_end_io_acct
   generic_file_llseek
   generic_handle_irq
+  generic_read_dir
+  generic_ro_fops
+  generic_start_io_acct
   genl_register_family
   genl_unregister_family
   gen_pool_add_owner
@@ -271,13 +309,21 @@
   ieee80211_channel_to_freq_khz
   ieee80211_freq_khz_to_channel
   ieee80211_get_channel_khz
+  iget_failed
+  iget5_locked
   ignore_console_lock_warning
   inet_proto_csum_replace4
   init_net
   __init_rwsem
   init_timer_key
+  init_user_ns
   init_wait_entry
+  init_pseudo
+  init_special_inode
   __init_waitqueue_head
+  inc_zone_page_state
+  inode_init_once
+  inode_nohighmem
   input_alloc_absinfo
   input_allocate_device
   input_event
@@ -319,6 +365,7 @@
   iommu_unmap
   __ioremap
   iounmap
+  iput
   ip6t_alloc_initial_table
   ip6t_do_table
   ip6t_register_table
@@ -342,6 +389,8 @@
   is_console_locked
   jiffies
   jiffies_to_msecs
+  kern_mount
+  kern_unmount
   kernel_kobj
   kasprintf
   kernel_neon_begin
@@ -352,6 +401,7 @@
   __kfifo_out
   kfree
   kfree_skb
+  kill_anon_super
   kimage_vaddr
   kimage_voffset
   __kmalloc
@@ -366,6 +416,7 @@
   kobject_create_and_add
   kobject_uevent_env
   kstrndup
+  kstrtou16
   kstrtobool
   kstrtoint
   kstrtoll
@@ -379,12 +430,18 @@
   ktime_get_real_seconds
   ktime_get_real_ts64
   kzfree
+  LZ4_decompress_safe_partial
+  lzo1x_decompress_safe
+  lzorle1x_1_compress
+  lzo1x_1_compress
   __list_add_valid
   __list_del_entry_valid
   memcpy
   __memcpy_fromio
   memmove
+  memparse
   memset
+  memset64
   misc_deregister
   misc_register
   mod_timer
@@ -399,6 +456,7 @@
   nd_tbl
   neigh_destroy
   __netdev_alloc_skb
+  __num_online_cpus
   netif_carrier_off
   netif_carrier_on
   netif_rx_ni
@@ -450,9 +508,14 @@
   of_property_read_variable_u32_array
   of_prop_next_string
   oops_in_progress
+  out_of_line_wait_on_bit_lock
   overflowgid
   overflowuid
   panic
+  page_endio
+  page_get_link
+  page_mapping
+  pagecache_get_page
   param_ops_charp
   param_ops_uint
   param_ops_ushort
@@ -499,6 +562,9 @@
   __pm_runtime_use_autosuspend
   __pm_stay_awake
   pm_wakeup_ws_event
+  posix_acl_access_xattr_handler
+  posix_acl_default_xattr_handler
+  posix_acl_from_xattr
   power_supply_changed
   power_supply_get_battery_info
   power_supply_get_by_name
@@ -520,6 +586,7 @@
   __pskb_copy_fclone
   pskb_expand_head
   put_device
+  put_pages_list
   put_tty_driver
   queue_delayed_work_on
   queue_work_on
@@ -534,8 +601,15 @@
   _raw_spin_unlock_bh
   _raw_spin_unlock_irq
   _raw_spin_unlock_irqrestore
+  _raw_write_lock
+  _raw_write_unlock
   __rcu_read_lock
   __rcu_read_unlock
+  radix_tree_preload
+  radix_tree_delete
+  radix_tree_gang_lookup
+  radix_tree_insert
+  radix_tree_lookup
   rc_map_unregister
   rc_repeat
   rc_keydown
@@ -545,6 +619,9 @@
   refcount_inc_checked
   __refrigerator
   __register_chrdev
+  read_cache_page
+  read_cache_page_gfp
+  register_filesystem
   register_pernet_subsys
   register_pm_notifier
   regmap_read
@@ -567,11 +644,13 @@
   request_threaded_irq
   reset_control_assert
   reset_control_deassert
+  revalidate_disk
   rfkill_alloc
   rfkill_destroy
   rfkill_init_sw_state
   rfkill_register
   rfkill_unregister
+  __SetPageMovable
   sched_clock
   sched_setscheduler
   schedule
@@ -583,6 +662,7 @@
   seq_putc
   seq_puts
   seq_read
+  set_nlink
   set_normalized_timespec64
   set_user_nice
   sg_init_table
@@ -595,6 +675,7 @@
   simple_attr_read
   simple_attr_release
   simple_attr_write
+  simple_get_link
   simple_read_from_buffer
   simple_strtol
   single_open
@@ -656,6 +737,7 @@
   strstr
   __sw_hweight32
   __sw_hweight64
+  submit_bio
   sync_filesystem
   syscon_regmap_lookup_by_phandle
   syscon_regmap_lookup_by_phandle_args
@@ -714,8 +796,12 @@
   tty_unregister_device
   tty_unregister_driver
   tty_vhangup
+  __ubsan_handle_cfi_check_fail_abort
   __udelay
   __unregister_chrdev
+  unlock_new_inode
+  unlock_page
+  unregister_filesystem
   unregister_chrdev_region
   unregister_pernet_subsys
   up
@@ -757,6 +843,9 @@
   vabits_actual
   vfree
   vmalloc
+  vm_map_ram
+  vm_unmap_aliases
+  vm_unmap_ram
   vm_iomap_memory
   vsnprintf
   vunmap
@@ -765,6 +854,8 @@
   wait_for_completion_interruptible_timeout
   wait_for_completion_timeout
   __wake_up
+  __wake_up_locked
+  wake_up_bit
   wake_up_process
   wakeup_source_add
   wakeup_source_create
@@ -857,6 +948,12 @@
   devm_extcon_register_notifier
   devm_reset_control_array_get
 
+# required by dwc3.ko
+  extcon_register_notifier
+  extcon_unregister_notifier
+  usb_gadget_map_request_by_dev
+  usb_gadget_set_state
+
 # required by exfat.ko
   __blockdev_direct_IO
   block_write_full_page
@@ -880,6 +977,7 @@
   generic_file_read_iter
   generic_file_splice_read
   generic_file_write_iter
+  generic_fillattr
   generic_write_end
   __getblk_gfp
   ilookup
@@ -888,20 +986,27 @@
   __insert_inode_hash
   invalidate_inode_buffers
   iunique
+  kill_block_super
   kvfree
   kvmalloc_node
   load_nls
   __lock_buffer
+  __lock_page
+  new_inode
   mark_buffer_dirty
   __mark_inode_dirty
   match_int
   match_octal
+  match_strdup
+  match_token
   mktime64
+  mount_bdev
   mpage_readpage
   mpage_readpages
   mpage_writepages
   __remove_inode_hash
   setattr_copy
+  sb_set_blocksize
   strscpy
   sync_blockdev
   sync_dirty_buffer
@@ -976,6 +1081,7 @@
   proc_create_net_data
   __pskb_pull_tail
   skb_checksum_help
+  rcu_barrier
   strim
   xfrm_lookup
   completion_done
@@ -1038,6 +1144,7 @@
   set_page_dirty_lock
   strcspn
   system_highpri_wq
+  trace_print_flags_seq
   vmalloc_user
   ww_mutex_lock
   ww_mutex_unlock
@@ -1053,6 +1160,7 @@
   device_wakeup_enable
   dev_printk
   flush_delayed_work
+  flush_dcache_page
   param_ops_bool
   usb_add_hcd
   usb_create_hcd
@@ -1324,6 +1432,7 @@
   mmc_set_data_timeout
   mmc_wait_for_req
   __put_page
+  print_hex_dump
   sdio_claim_host
   sdio_enable_func
   sdio_memcpy_fromio
@@ -2018,8 +2127,10 @@
   crypto_engine_start
   crypto_finalize_ablkcipher_request
   crypto_register_alg
+  crypto_register_scomp
   crypto_transfer_ablkcipher_request_to_engine
   crypto_unregister_alg
+  crypto_unregister_scomp
   scatterwalk_map_and_copy
   sg_init_one
   sg_nents_for_len
@@ -2399,6 +2510,9 @@
   snd_pcm_rate_bit_to_rate
   snd_soc_bytes_info_ext
   snd_soc_new_compress
+
+# required by ssd20xx_ts.ko
+  input_mt_report_pointer_emulation
 
 # cpufreq_interactive.ko
   add_timer_on
