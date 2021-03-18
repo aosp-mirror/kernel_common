@@ -301,3 +301,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_early_resume_begin);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_si_meminfo);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_exit_signal);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_tcpci_override_toggling);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_typec_tcpci_get_vbus);
