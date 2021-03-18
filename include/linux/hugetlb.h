@@ -10,6 +10,7 @@
 #include <linux/list.h>
 #include <linux/kref.h>
 #include <asm/pgtable.h>
+#include <linux/userfaultfd_k.h>
 
 struct ctl_table;
 struct user_struct;
@@ -94,6 +95,7 @@ int hugetlb_mcopy_atomic_pte(struct mm_struct *dst_mm, pte_t *dst_pte,
 				struct vm_area_struct *dst_vma,
 				unsigned long dst_addr,
 				unsigned long src_addr,
+				enum mcopy_atomic_mode mode,
 				struct page **pagep);
 #endif /* CONFIG_USERFAULTFD */
 int hugetlb_reserve_pages(struct inode *inode, long from, long to,
@@ -189,7 +191,7 @@ static inline void hugetlb_show_meminfo(void)
 #define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) ({BUG(); 0; })
 #ifdef CONFIG_USERFAULTFD
 #define hugetlb_mcopy_atomic_pte(dst_mm, dst_pte, dst_vma, dst_addr, \
-				src_addr, pagep)	({ BUG(); 0; })
+				src_addr, mode, pagep)	({ BUG(); 0; })
 #endif /* CONFIG_USERFAULTFD */
 #define huge_pte_offset(mm, address, sz)	0
 
