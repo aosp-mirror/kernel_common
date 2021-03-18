@@ -128,6 +128,7 @@ int virtio_gpu_vram_create(struct virtio_gpu_device *vgdev,
 	struct drm_gem_object *obj;
 	struct virtio_gpu_object_vram *vram;
 	int ret;
+	struct virtio_gpu_object_array *objs;
 
 	vram = kzalloc(sizeof(*vram), GFP_KERNEL);
 	if (!vram)
@@ -152,8 +153,16 @@ int virtio_gpu_vram_create(struct virtio_gpu_device *vgdev,
 		return ret;
 	}
 
+	objs = virtio_gpu_array_alloc(1);
+	if (!objs) {
+		virtio_gpu_resource_id_put(vgdev, vram->base.hw_res_handle);
+		kfree(vram);
+		return -ENOMEM;
+	}
+	virtio_gpu_array_add_obj(objs, &vram->base.base.base);
+
 	virtio_gpu_cmd_resource_create_blob(vgdev, &vram->base, params, NULL,
-					    0);
+					    0, objs);
 	if (params->blob_flags & VIRTGPU_BLOB_FLAG_USE_MAPPABLE) {
 		ret = virtio_gpu_vram_map(&vram->base);
 		if (ret) {
