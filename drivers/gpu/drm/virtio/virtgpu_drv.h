@@ -411,7 +411,8 @@ virtio_gpu_cmd_resource_create_blob(struct virtio_gpu_device *vgdev,
 				    struct virtio_gpu_object *bo,
 				    struct virtio_gpu_object_params *params,
 				    struct virtio_gpu_mem_entry *ents,
-				    uint32_t nents);
+				    uint32_t nents,
+				    struct virtio_gpu_object_array *objs);
 void
 virtio_gpu_cmd_set_scanout_blob(struct virtio_gpu_device *vgdev,
 				uint32_t scanout_id,
@@ -452,6 +453,7 @@ bool virtio_gpu_is_shmem(struct virtio_gpu_object *bo);
 
 int virtio_gpu_resource_id_get(struct virtio_gpu_device *vgdev,
 			       uint32_t *resid);
+void virtio_gpu_resource_id_put(struct virtio_gpu_device *vgdev, uint32_t id);
 /* virtgpu_prime.c */
 int virtio_gpu_resource_assign_uuid(struct virtio_gpu_device *vgdev,
 				    struct virtio_gpu_object *bo);

@@ -350,8 +350,6 @@ static int virtio_gpu_resource_info_cros_ioctl(struct drm_device *dev,
 	}
 
 	ri->stride = 0;
-	if (qobj->blob_mem)
-		goto out;
 
 	if (!qobj->create_callback_done) {
 		ret = wait_event_interruptible(vgdev->resp_wq,
