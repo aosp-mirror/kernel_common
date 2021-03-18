@@ -4899,9 +4899,6 @@ static bool vma_shareable(struct vm_area_struct *vma, unsigned long addr)
 
 bool want_pmd_share(struct vm_area_struct *vma, unsigned long addr)
 {
-#ifndef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
-	return false;
-#endif
 #ifdef CONFIG_USERFAULTFD
 	if (uffd_disable_huge_pmd_share(vma))
 		return false;
@@ -5035,6 +5032,11 @@ int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
 void adjust_range_if_pmd_sharing_possible(struct vm_area_struct *vma,
 				unsigned long *start, unsigned long *end)
 {
+}
+
+bool want_pmd_share(struct vm_area_struct *vma, unsigned long addr)
+{
+	return false;
 }
 #endif /* CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
 
