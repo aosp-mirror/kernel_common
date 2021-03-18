@@ -273,7 +273,7 @@ retry:
 		mutex_lock(&hugetlb_fault_mutex_table[hash]);
 
 		err = -ENOMEM;
-		dst_pte = huge_pte_alloc(dst_mm, dst_addr, huge_page_size(h));
+		dst_pte = huge_pte_alloc(dst_mm, dst_vma, dst_addr, huge_page_size(h));
 		if (!dst_pte) {
 			mutex_unlock(&hugetlb_fault_mutex_table[hash]);
 			goto out_unlock;
