@@ -23,9 +23,9 @@ DECLARE_HOOK(android_vh_typec_tcpci_override_toggling,
  * function.
  * Handler can set vbus or clear vbus to indicate vbus present or absent
  */
-DECLARE_HOOK(android_vh_typec_tcpci_get_vbus,
+DECLARE_RESTRICTED_HOOK(android_rvh_typec_tcpci_get_vbus,
 	TP_PROTO(struct tcpci *tcpci, struct tcpci_data *data, int *vbus, int *bypass),
-	TP_ARGS(tcpci, data, vbus, bypass));
+	TP_ARGS(tcpci, data, vbus, bypass), 1);
 
 #endif /* _TRACE_HOOK_UFSHCD_H */
 /* This part must be outside protection */
