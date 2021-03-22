@@ -4100,6 +4100,7 @@ retry:
 		/* Check for page in userfault range. */
 		if (userfaultfd_minor(vma)) {
 			unlock_page(page);
+			put_page(page);
 			ret = hugetlb_handle_userfault(vma, mapping, h,
 						       idx, flags, haddr,
 						       VM_UFFD_MINOR);
