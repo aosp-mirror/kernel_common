@@ -390,8 +390,7 @@ static void fotg210_ep0_queue(struct fotg210_ep *ep,
 			pr_err("%s : req->req.length = 0x%x\n",
 			       __func__, req->req.length);
 		}
-		if ((req->req.length == req->req.actual) ||
-		    (req->req.actual < ep->ep.maxpacket))
+		if (req->req.length == req->req.actual)
 			fotg210_done(ep, req, 0);
 	} else { /* OUT */
 		if (!req->req.length) {
