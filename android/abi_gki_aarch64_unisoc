@@ -117,6 +117,7 @@
   __crypto_xor
   csum_ipv6_magic
   csum_partial
+  __dynamic_netdev_dbg
   d_make_root
   d_splice_alias
   debugfs_create_dir
@@ -200,6 +201,9 @@
   dma_fence_release
   dma_fence_wait_timeout
   dma_free_attrs
+  dma_heap_add
+  dma_heap_get_dev
+  dma_heap_get_name
   dma_max_mapping_size
   dma_set_mask
   down
@@ -444,6 +448,7 @@
   memset64
   misc_deregister
   misc_register
+  mod_node_page_state
   mod_timer
   module_put
   __msecs_to_jiffies
@@ -1013,6 +1018,7 @@
   sync_mapping_buffers
   time64_to_tm
   touch_buffer
+  trace_print_symbols_seq
   truncate_pagecache
   unload_nls
   unlock_buffer
@@ -1419,6 +1425,7 @@
   sdhci_enable_v4_mode
   sdhci_pltfm_free
   sdhci_pltfm_init
+  sdhci_remove_host
   sdhci_request
   sdhci_request_atomic
   sdhci_reset
