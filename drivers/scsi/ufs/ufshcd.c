@@ -341,11 +341,15 @@ static void ufshcd_add_tm_upiu_trace(struct ufs_hba *hba, unsigned int tag,
 
 	trace_android_vh_ufs_send_tm_command(hba, tag, str_t_to_str[str_t]);
 	if (str_t == UFS_TM_SEND)
-		trace_ufshcd_upiu(dev_name(hba->dev), str_t, &descp->req_header,
-				  &descp->input_param1, UFS_TSF_TM_INPUT);
+		trace_ufshcd_upiu(dev_name(hba->dev), str_t,
+				  &descp->upiu_req.req_header,
+				  &descp->upiu_req.input_param1,
+				  UFS_TSF_TM_INPUT);
 	else
-		trace_ufshcd_upiu(dev_name(hba->dev), str_t, &descp->rsp_header,
-				  &descp->output_param1, UFS_TSF_TM_OUTPUT);
+		trace_ufshcd_upiu(dev_name(hba->dev), str_t,
+				  &descp->upiu_rsp.rsp_header,
+				  &descp->upiu_rsp.output_param1,
+				  UFS_TSF_TM_OUTPUT);
 }
 
 static void ufshcd_add_uic_command_trace(struct ufs_hba *hba,
@@ -6535,7 +6539,7 @@ static int __ufshcd_issue_tm_cmd(struct ufs_hba *hba,
 
 	task_tag = req->tag;
 	hba->tmf_rqs[req->tag] = req;
-	treq->req_header.dword_0 |= cpu_to_be32(task_tag);
+	treq->upiu_req.req_header.dword_0 |= cpu_to_be32(task_tag);
 
 	memcpy(hba->utmrdl_base_addr + task_tag, treq, sizeof(*treq));
 	ufshcd_vops_setup_task_mgmt(hba, task_tag, tm_function);
@@ -6609,16 +6613,16 @@ static int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
 	treq.header.dword_2 = cpu_to_le32(OCS_INVALID_COMMAND_STATUS);
 
 	/* Configure task request UPIU */
-	treq.req_header.dword_0 = cpu_to_be32(lun_id << 8) |
+	treq.upiu_req.req_header.dword_0 = cpu_to_be32(lun_id << 8) |
 				  cpu_to_be32(UPIU_TRANSACTION_TASK_REQ << 24);
-	treq.req_header.dword_1 = cpu_to_be32(tm_function << 16);
+	treq.upiu_req.req_header.dword_1 = cpu_to_be32(tm_function << 16);
 
 	/*
 	 * The host shall provide the same value for LUN field in the basic
 	 * header and for Input Parameter.
 	 */
-	treq.input_param1 = cpu_to_be32(lun_id);
-	treq.input_param2 = cpu_to_be32(task_id);
+	treq.upiu_req.input_param1 = cpu_to_be32(lun_id);
+	treq.upiu_req.input_param2 = cpu_to_be32(task_id);
 
 	err = __ufshcd_issue_tm_cmd(hba, &treq, tm_function);
 	if (err == -ETIMEDOUT)
@@ -6629,7 +6633,7 @@ static int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
 		dev_err(hba->dev, "%s: failed, ocs = 0x%x\n",
 				__func__, ocs_value);
 	else if (tm_response)
-		*tm_response = be32_to_cpu(treq.output_param1) &
+		*tm_response = be32_to_cpu(treq.upiu_rsp.output_param1) &
 				MASK_TM_SERVICE_RESP;
 	return err;
 }
@@ -6795,7 +6799,7 @@ int ufshcd_exec_raw_upiu_cmd(struct ufs_hba *hba,
 		treq.header.dword_0 = cpu_to_le32(UTP_REQ_DESC_INT_CMD);
 		treq.header.dword_2 = cpu_to_le32(OCS_INVALID_COMMAND_STATUS);
 
-		memcpy(&treq.req_header, req_upiu, sizeof(*req_upiu));
+		memcpy(&treq.upiu_req, req_upiu, sizeof(*req_upiu));
 
 		err = __ufshcd_issue_tm_cmd(hba, &treq, tm_f);
 		if (err == -ETIMEDOUT)
@@ -6808,7 +6812,7 @@ int ufshcd_exec_raw_upiu_cmd(struct ufs_hba *hba,
 			break;
 		}
 
-		memcpy(rsp_upiu, &treq.rsp_header, sizeof(*rsp_upiu));
+		memcpy(rsp_upiu, &treq.upiu_rsp, sizeof(*rsp_upiu));
 
 		break;
 	default:
