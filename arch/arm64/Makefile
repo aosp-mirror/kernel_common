@@ -175,7 +175,10 @@ else
 KBUILD_IMAGE	:= $(boot)/vmlinuz.efi
 endif
 
+# Don't compile Image in mixed build with "all" target
+ifndef KBUILD_MIXED_TREE
 all:	$(notdir $(KBUILD_IMAGE))
+endif
 
 image.fit: dtbs
 

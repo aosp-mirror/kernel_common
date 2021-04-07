@@ -33,7 +33,7 @@ quiet_cmd_install_modorder = INSTALL $@
 # Install modules.builtin(.modinfo) even when CONFIG_MODULES is disabled.
 install-y += $(addprefix $(MODLIB)/, modules.builtin modules.builtin.modinfo)
 
-$(addprefix $(MODLIB)/, modules.builtin modules.builtin.modinfo): $(MODLIB)/%: % FORCE
+$(addprefix $(MODLIB)/, modules.builtin modules.builtin.modinfo): $(MODLIB)/%: $(mixed-build-prefix)% FORCE
 	$(call cmd,install)
 
 endif
@@ -140,7 +140,7 @@ depmod: $(install-y)
 	$(call cmd,depmod)
 
 quiet_cmd_depmod = DEPMOD  $(MODLIB)
-      cmd_depmod = $(srctree)/scripts/depmod.sh $(KERNELRELEASE)
+      cmd_depmod = $(srctree)/scripts/depmod.sh $(KERNELRELEASE) $(mixed-build-prefix)
 endif
 
 else
