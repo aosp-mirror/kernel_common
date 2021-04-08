@@ -279,6 +279,7 @@
   seq_read
   seq_release
   set_disk_ro
+  sg_alloc_table
   sg_free_table
   sg_init_one
   sg_init_table
@@ -764,7 +765,6 @@
   dma_heap_add
   dma_heap_get_dev
   dma_heap_get_name
-  sg_alloc_table
   __sg_page_iter_next
   __sg_page_iter_start
   vmap
@@ -910,7 +910,6 @@
   drm_universal_plane_init
   __get_task_comm
   kmalloc_order_trace
-  memdup_user
   __sg_alloc_table_from_pages
   sync_file_get_fence
   __tracepoint_dma_fence_emit
@@ -937,6 +936,8 @@
   ttm_eu_fence_buffer_objects
   ttm_eu_reserve_buffers
   ttm_tt_init
+  vmalloc_to_page
+  vmemdup_user
   ww_mutex_lock_interruptible
   ww_mutex_unlock
 
