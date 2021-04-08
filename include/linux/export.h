@@ -151,7 +151,12 @@ struct kernel_symbol {
 #define ___cond_export_sym(sym, sec, enabled)			\
 	__cond_export_sym_##enabled(sym, sec)
 #define __cond_export_sym_1(sym, sec) ___EXPORT_SYMBOL(sym, sec)
+
+#ifdef __GENKSYMS__
+#define __cond_export_sym_0(sym, sec) __GENKSYMS_EXPORT_SYMBOL(sym)
+#else
 #define __cond_export_sym_0(sym, sec) /* nothing */
+#endif
 
 #define __EXPORT_SYMBOL_NS(sym, sec, ns)				\
 	__ksym_marker(sym);						\
@@ -161,7 +166,12 @@ struct kernel_symbol {
 #define ___cond_export_ns_sym(sym, sec, ns, enabled)			\
 	__cond_export_ns_sym_##enabled(sym, sec, ns)
 #define __cond_export_ns_sym_1(sym, sec, ns) ___EXPORT_SYMBOL_NS(sym, sec, ns)
+
+#ifdef __GENKSYMS__
+#define __cond_export_ns_sym_0(sym, sec, ns) __GENKSYMS_EXPORT_SYMBOL(sym)
+#else
 #define __cond_export_ns_sym_0(sym, sec, ns) /* nothing */
+#endif
 
 #else
 
