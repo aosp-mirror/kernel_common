@@ -1,5 +1,6 @@
 [abi_symbol_list]
 # commonly used symbols
+  alloc_anon_inode
   __alloc_disk_node
   alloc_etherdev_mqs
   __alloc_pages_nodemask
@@ -36,6 +37,7 @@
   __check_object_size
   __class_create
   class_destroy
+  __ClearPageMovable
   complete
   __const_udelay
   consume_skb
@@ -116,6 +118,7 @@
   idr_alloc
   idr_destroy
   idr_remove
+  init_pseudo
   __init_rwsem
   init_timer_key
   init_wait_entry
@@ -126,10 +129,14 @@
   input_register_device
   input_unregister_device
   iounmap
+  iput
   jiffies
   jiffies_to_msecs
+  kern_mount
+  kern_unmount
   kfree
   kfree_skb
+  kill_anon_super
   kimage_vaddr
   kimage_voffset
   __kmalloc
@@ -279,7 +286,7 @@
   seq_read
   seq_release
   set_disk_ro
-  sg_alloc_table
+  __SetPageMovable
   sg_free_table
   sg_init_one
   sg_init_table
@@ -358,6 +365,7 @@
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
+  unregister_shrinker
   unregister_virtio_device
   unregister_virtio_driver
   up_read
@@ -765,6 +773,7 @@
   dma_heap_add
   dma_heap_get_dev
   dma_heap_get_name
+  sg_alloc_table
   __sg_page_iter_next
   __sg_page_iter_start
   vmap
@@ -910,6 +919,7 @@
   drm_universal_plane_init
   __get_task_comm
   kmalloc_order_trace
+  memdup_user
   __sg_alloc_table_from_pages
   sync_file_get_fence
   __tracepoint_dma_fence_emit
@@ -936,13 +946,24 @@
   ttm_eu_fence_buffer_objects
   ttm_eu_reserve_buffers
   ttm_tt_init
-  vmalloc_to_page
-  vmemdup_user
   ww_mutex_lock_interruptible
   ww_mutex_unlock
 
 # required by virtio-rng.ko
   wait_for_completion_killable
+
+# required by virtio_balloon.ko
+  adjust_managed_page_count
+  all_vm_events
+  balloon_aops
+  balloon_page_alloc
+  balloon_page_dequeue
+  balloon_page_enqueue
+  si_mem_available
+  si_meminfo
+  system_freezable_wq
+  vm_event_states
+  vm_node_stat
 
 # required by virtio_blk.ko
   blk_execute_rq
@@ -1146,20 +1167,11 @@
   vzalloc
 
 # required by zsmalloc.ko
-  alloc_anon_inode
-  __ClearPageMovable
   dec_zone_page_state
   inc_zone_page_state
-  init_pseudo
-  iput
-  kern_mount
-  kern_unmount
-  kill_anon_super
   __lock_page
   page_mapping
   _raw_read_lock
   _raw_read_unlock
   _raw_write_lock
   _raw_write_unlock
-  __SetPageMovable
-  unregister_shrinker
