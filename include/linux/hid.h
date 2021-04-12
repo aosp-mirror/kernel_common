@@ -426,6 +426,7 @@ struct hid_item {
 
 struct hid_global {
 	unsigned usage_page;
+	/* HID Global fields are constrained by spec to 32-bits */
 	__s32    logical_minimum;
 	__s32    logical_maximum;
 	__s32    physical_minimum;
@@ -492,7 +493,7 @@ struct hid_field {
 	unsigned  maxusage;		/* maximum usage index */
 	unsigned  flags;		/* main-item flags (i.e. volatile,array,constant) */
 	unsigned  report_offset;	/* bit offset in the report */
-	unsigned  report_size;		/* size of this field in the report */
+	unsigned  report_size;		/* size of this field in the report, in bits */
 	unsigned  report_count;		/* number of this field in the report */
 	unsigned  report_type;		/* (input,output,feature) */
 	__s32    *value;		/* last known value(s) */

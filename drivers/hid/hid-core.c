@@ -339,7 +339,8 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 }
 
 /*
- * Read data value from item.
+ * Read data value from global items, which are
+ * a maximum of 32 bits in size.
  */
 
 static u32 item_udata(struct hid_item *item)
@@ -720,7 +721,7 @@ static void hid_device_release(struct device *dev)
 
 /*
  * Fetch a report description item from the data stream. We support long
- * items, though they are not used yet.
+ * items, though there are not yet any defined uses for them.
  */
 
 static u8 *fetch_item(__u8 *start, __u8 *end, struct hid_item *item)
@@ -756,6 +757,7 @@ static u8 *fetch_item(__u8 *start, __u8 *end, struct hid_item *item)
 	item->format = HID_ITEM_FORMAT_SHORT;
 	item->size = b & 3;
 
+	/* Map size values 0,1,2,3 to actual sizes 0,1,2,4 */
 	switch (item->size) {
 	case 0:
 		return start;
@@ -774,7 +776,7 @@ static u8 *fetch_item(__u8 *start, __u8 *end, struct hid_item *item)
 		return start;
 
 	case 3:
-		item->size++;
+		item->size = 4;
 		if ((end - start) < 4)
 			return NULL;
 		item->data.u32 = get_unaligned_le32(start);
@@ -1316,9 +1318,7 @@ alloc_err:
 EXPORT_SYMBOL_GPL(hid_open_report);
 
 /*
- * Convert a signed n-bit integer to signed 32-bit integer. Common
- * cases are done through the compiler, the screwed things has to be
- * done by hand.
+ * Convert a signed n-bit integer to signed 32-bit integer.
  */
 
 static s32 snto32(__u32 value, unsigned n)
@@ -1329,12 +1329,7 @@ static s32 snto32(__u32 value, unsigned n)
 	if (n > 32)
 		n = 32;
 
-	switch (n) {
-	case 8:  return ((__s8)value);
-	case 16: return ((__s16)value);
-	case 32: return ((__s32)value);
-	}
-	return value & (1 << (n - 1)) ? value | (~0U << n) : value;
+	return sign_extend32(value, n - 1);
 }
 
 s32 hid_snto32(__u32 value, unsigned n)
