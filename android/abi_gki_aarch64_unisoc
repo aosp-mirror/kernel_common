@@ -51,6 +51,7 @@
   bus_register
   bus_set_iommu
   bus_unregister
+  __close_fd
   __ClearPageMovable
   call_rcu
   cancel_delayed_work
@@ -66,6 +67,8 @@
   __class_create
   class_destroy
   class_find_device
+  clear_nlink
+  clear_inode
   clk_bulk_disable
   clk_bulk_enable
   clk_bulk_prepare
@@ -120,6 +123,7 @@
   __dynamic_netdev_dbg
   d_make_root
   d_splice_alias
+  debugfs_create_bool
   debugfs_create_dir
   debugfs_create_file
   debugfs_create_u32
@@ -149,6 +153,7 @@
   device_match_fwnode
   device_match_name
   device_property_present
+  device_property_read_string
   device_property_read_u32_array
   device_register
   device_remove_file
@@ -161,6 +166,7 @@
   devm_clk_bulk_get
   devm_clk_bulk_get_all
   devm_clk_get
+  devm_clk_get_optional
   devm_free_irq
   devm_gpiochip_add_data
   devm_gpiod_get
@@ -207,6 +213,7 @@
   dma_max_mapping_size
   dma_set_mask
   down
+  dput
   driver_register
   driver_unregister
   drm_atomic_helper_plane_destroy_state
@@ -316,6 +323,7 @@
   iget_failed
   iget5_locked
   ignore_console_lock_warning
+  igrab
   inet_proto_csum_replace4
   init_net
   __init_rwsem
@@ -744,6 +752,7 @@
   __sw_hweight64
   submit_bio
   sync_filesystem
+  synchronize_irq
   syscon_regmap_lookup_by_phandle
   syscon_regmap_lookup_by_phandle_args
   sysfs_create_bin_file
@@ -1011,6 +1020,8 @@
   mpage_writepages
   __remove_inode_hash
   setattr_copy
+  setattr_prepare
+  sb_min_blocksize
   sb_set_blocksize
   strscpy
   sync_blockdev
@@ -1019,7 +1030,9 @@
   time64_to_tm
   touch_buffer
   trace_print_symbols_seq
+  truncate_inode_pages
   truncate_pagecache
+  truncate_setsize
   unload_nls
   unlock_buffer
   utf16s_to_utf8s
@@ -2517,6 +2530,12 @@
   snd_pcm_rate_bit_to_rate
   snd_soc_bytes_info_ext
   snd_soc_new_compress
+  snd_card_new
+  snd_card_register
+  snd_ctl_add
+  snd_ctl_new1
+  snd_pcm_new
+  snd_pcm_set_ops
 
 # required by ssd20xx_ts.ko
   input_mt_report_pointer_emulation
