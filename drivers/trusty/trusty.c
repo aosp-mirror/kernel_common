@@ -226,13 +226,14 @@ int trusty_share_memory(struct device *dev, u64 *id,
 			struct scatterlist *sglist, unsigned int nents,
 			pgprot_t pgprot)
 {
-	return trusty_transfer_memory(dev, id, sglist, nents, pgprot, 0);
+	return trusty_transfer_memory(dev, id, sglist, nents, pgprot, 0,
+				      false);
 }
 EXPORT_SYMBOL(trusty_share_memory);
 
 int trusty_transfer_memory(struct device *dev, u64 *id,
 			   struct scatterlist *sglist, unsigned int nents,
-			   pgprot_t pgprot, u64 tag)
+			   pgprot_t pgprot, u64 tag, bool lend)
 {
 	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
 	int ret;
@@ -329,8 +330,10 @@ int trusty_transfer_memory(struct device *dev, u64 *id,
 		}
 		count -= lcount;
 		if (cons_mrd_offset) {
+			u32 smc = lend ? SMC_FC_FFA_MEM_LEND :
+					 SMC_FC_FFA_MEM_SHARE;
 			/* First fragment */
-			smc_ret = trusty_smc8(SMC_FC_FFA_MEM_SHARE, total_len,
+			smc_ret = trusty_smc8(smc, total_len,
 					      fragment_len, 0, 0, 0, 0, 0);
 		} else {
 			smc_ret = trusty_smc8(SMC_FC_FFA_MEM_FRAG_TX,

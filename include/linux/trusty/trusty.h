@@ -71,7 +71,7 @@ int trusty_share_memory_compat(struct device *dev, trusty_shared_mem_id_t *id,
 			       pgprot_t pgprot);
 int trusty_transfer_memory(struct device *dev, u64 *id,
 			   struct scatterlist *sglist, unsigned int nents,
-			   pgprot_t pgprot, u64 tag);
+			   pgprot_t pgprot, u64 tag, bool lend);
 int trusty_reclaim_memory(struct device *dev, trusty_shared_mem_id_t id,
 			  struct scatterlist *sglist, unsigned int nents);
 

@@ -1098,6 +1098,7 @@ static int dn_connect_ioctl(struct tipc_dn_chan *dn, char __user *usr_name)
 }
 
 static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
+		       bool lend,
 		       struct tipc_shared_handle **out)
 {
 	int ret = 0;
@@ -1165,7 +1166,7 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 				     &shared_handle->tipc.obj_id,
 				     shared_handle->sgt->sgl,
 				     shared_handle->sgt->orig_nents, prot,
-				     tag);
+				     tag, lend);
 
 	if (ret < 0) {
 		dev_dbg(dev, "Transferring memory failed: %d\n", ret);
@@ -1248,6 +1249,7 @@ static long filp_send_ioctl(struct file *filp,
 	long ret = 0;
 	ssize_t data_len = 0;
 	ssize_t shm_len = 0;
+	bool lend = false;
 
 	if (copy_from_user(&req, arg, sizeof(req)))
 		return -EFAULT;
@@ -1282,17 +1284,22 @@ static long filp_send_ioctl(struct file *filp,
 	for (shm_idx = 0; shm_idx < req.shm_cnt; shm_idx++) {
 		switch (shm[shm_idx].transfer) {
 		case TRUSTY_SHARE:
-			ret = dn_share_fd(dn, shm[shm_idx].fd,
-					  &shm_handles[shm_idx]);
-			if (ret) {
-				dev_dbg(dev, "Forwarding shared memory failed\n"
-					);
-				goto shm_share_failed;
-			}
+			lend = false;
+			break;
+		case TRUSTY_LEND:
+			lend = true;
 			break;
 		default:
 			dev_err(dev, "Unknown transfer type: 0x%x\n",
 				shm[shm_idx].transfer);
+			goto shm_share_failed;
+		}
+		ret = dn_share_fd(dn, shm[shm_idx].fd,
+				  lend,
+				  &shm_handles[shm_idx]);
+		if (ret) {
+			dev_dbg(dev, "Forwarding memory failed\n"
+				);
 			goto shm_share_failed;
 		}
 	}
