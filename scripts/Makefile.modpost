@@ -96,7 +96,7 @@ cmd_cc_lto_link_modules =						\
 			echo -T $(@:$(modpost-ext).o=.o.symversions))	\
 		--whole-archive $(filter-out FORCE,$^)
 
-$(modules:.ko=$(modpost-ext).o): %$(modpost-ext).o: %.o FORCE
+$(modules:.ko=$(modpost-ext).o): %$(modpost-ext).o: %.o
 	$(call if_changed,cc_lto_link_modules)
 
 PHONY += FORCE
