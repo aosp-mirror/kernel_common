@@ -76,6 +76,18 @@ config TRUSTY_VIRTIO_IPC
 
 	  If you build this as a module, it will be called trusty-ipc.
 
+config TRUSTY_DMA_BUF_FFA_TAG
+	bool "Availability of trusty_dma_buf_get_ffa_tag"
+	default n
+	help
+	  Whether trusty_dma_buf_get_ffa_tag is provided on this platform.
+	  Providing this function will allow the platform to select what tag
+	  should be passed to the SPM when attempting to transfer the buffer
+	  to secure world. The value passed here is implementation defined and
+	  may depend on your SPM.
+
+	  If set to N, a default implementation which returns 0 will be used.
+
 endif # TRUSTY
 
 endmenu
