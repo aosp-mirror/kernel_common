@@ -2555,3 +2555,17 @@
 # required by sprd_wdf.ko
   kstrtoull_from_user
   smpboot_register_percpu_thread
+
+# required by zram.ko
+	bdgrab
+	bio_chain
+	bio_init
+	blkdev_put
+	blk_status_to_errno
+	blkdev_get
+	filp_close
+	filp_open
+	file_path
+	I_BDEV
+	set_blocksize
+	submit_bio_wait
