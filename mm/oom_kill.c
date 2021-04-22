@@ -53,6 +53,9 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/oom.h>
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/mm.h>
+
 static int sysctl_panic_on_oom;
 static int sysctl_oom_kill_allocating_task;
 static int sysctl_oom_dump_tasks = 1;
@@ -1160,6 +1163,12 @@ bool out_of_memory(struct oom_control *oc)
 	select_bad_process(oc);
 	/* Found nothing?!?! */
 	if (!oc->chosen) {
+		int ret = false;
+
+		trace_android_vh_oom_check_panic(oc, &ret);
+		if (ret)
+			return true;
+
 		dump_header(oc);
 		pr_warn("Out of memory and no killable processes...\n");
 		/*
