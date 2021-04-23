@@ -3523,7 +3523,7 @@ static int ext4_rename(struct inode *old_dir, struct dentry *old_dentry,
 	    !ext4_is_child_context_consistent_with_parent(new.dir,
 							  old.inode)) {
 		retval = -EPERM;
-		goto end_rename;
+		goto release_bh;
 	}
 
 	new.bh = ext4_find_entry(new.dir, &new.dentry->d_name,
