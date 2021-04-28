@@ -387,6 +387,14 @@ static inline struct intel_gt *to_gt(struct drm_i915_private *i915)
 	return &i915->gt0;
 }
 
+#define PRELIM_DRM_IOCTL_DEF_DRV(ioctl, _func, _flags)			\
+	[DRM_IOCTL_NR(PRELIM_DRM_IOCTL_##ioctl) - DRM_COMMAND_BASE] = {	\
+		.cmd = PRELIM_DRM_IOCTL_##ioctl,			\
+		.func = _func,						\
+		.flags = _flags,					\
+		.name = #ioctl						\
+	}
+
 /* Simple iterator over all initialised engines */
 #define for_each_engine(engine__, gt__, id__) \
 	for ((id__) = 0; \
