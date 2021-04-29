@@ -255,7 +255,7 @@ static int omap1_spi100k_setup_transfer(struct spi_device *spi,
 	if (!word_len)
 		word_len = 8;
 
-	if (spi->bits_per_word > 32)
+	if (word_len > 32)
 		return -EINVAL;
 	cs->word_len = word_len;
 
