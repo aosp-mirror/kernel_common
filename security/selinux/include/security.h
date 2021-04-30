@@ -82,6 +82,7 @@ enum {
 extern char *selinux_policycap_names[__POLICYDB_CAPABILITY_MAX];
 
 extern int selinux_android_netlink_route;
+extern int selinux_android_netlink_getneigh;
 extern int selinux_policycap_netpeer;
 extern int selinux_policycap_openperm;
 extern int selinux_policycap_extsockclass;
