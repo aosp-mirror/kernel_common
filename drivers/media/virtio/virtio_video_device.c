@@ -745,8 +745,13 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 		v4l2_vb->flags |= V4L2_BUF_FLAG_PFRAME;
 
 	if (flags & VIRTIO_VIDEO_BUFFER_FLAG_EOS) {
+		// Lock stream mutex as 'virtio_video_buf_done' can be called in
+		// response to a V4L2_ENC_CMD_STOP command before handling of the
+		// command has completed (see b/186588566).
+		mutex_lock(&stream->event_mutex);
 		v4l2_vb->flags |= V4L2_BUF_FLAG_LAST;
 		stream->state = STREAM_STATE_STOPPED;
+		mutex_unlock(&stream->event_mutex);
 		virtio_video_queue_eos_event(stream);
 	}
 
