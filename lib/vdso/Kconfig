@@ -3,14 +3,15 @@
 config HAVE_GENERIC_VDSO
 	bool
 
-if HAVE_GENERIC_VDSO
-
 config GENERIC_GETTIMEOFDAY
 	bool
+	depends on HAVE_GENERIC_VDSO || ARM
 	help
 	  This is a generic implementation of gettimeofday vdso.
 	  Each architecture that enables this feature has to
 	  provide the fallback implementation.
+
+if HAVE_GENERIC_VDSO
 
 config GENERIC_VDSO_32
 	bool
