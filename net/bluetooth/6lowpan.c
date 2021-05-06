@@ -35,7 +35,6 @@ static struct dentry *lowpan_psm_debugfs;
 static struct dentry *lowpan_control_debugfs;
 
 #define IFACE_NAME_TEMPLATE "bt%d"
-#define EUI64_ADDR_LEN 8
 
 struct skb_cb {
 	struct in6_addr addr;
