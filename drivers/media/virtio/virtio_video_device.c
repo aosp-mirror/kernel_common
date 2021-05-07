@@ -718,20 +718,6 @@ void virtio_video_queue_res_chg_event(struct virtio_video_stream *stream)
 	v4l2_event_queue_fh(&stream->fh, &ev_src_ch);
 }
 
-void virtio_video_mark_drain_complete(struct virtio_video_stream *stream,
-				      struct vb2_v4l2_buffer *v4l2_vb)
-{
-	struct vb2_buffer *vb2_buf;
-
-	v4l2_vb->flags |= V4L2_BUF_FLAG_LAST;
-
-	vb2_buf = &v4l2_vb->vb2_buf;
-	vb2_buf->planes[0].bytesused = 0;
-
-	v4l2_m2m_buf_done(v4l2_vb, VB2_BUF_STATE_DONE);
-	stream->state = STREAM_STATE_STOPPED;
-}
-
 void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 			   uint32_t flags, uint64_t timestamp, uint32_t size)
 {
