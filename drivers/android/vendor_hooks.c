@@ -83,6 +83,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_sk_alloc);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_sk_free);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_nf_conn_alloc);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_nf_conn_free);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_refrigerator);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_arch_set_freq_scale);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_is_fpsimd_save);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_binder_transaction_init);
