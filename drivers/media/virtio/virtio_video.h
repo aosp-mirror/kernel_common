@@ -364,8 +364,6 @@ int virtio_video_buf_plane_init(uint32_t idx, uint32_t resource_id,
 				struct virtio_video_device *vvd,
 				struct virtio_video_stream *stream,
 				struct vb2_buffer *vb);
-void virtio_video_mark_drain_complete(struct virtio_video_stream *stream,
-				      struct vb2_v4l2_buffer *v4l2_vb);
 
 int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 			     unsigned int *num_planes, unsigned int sizes[],
