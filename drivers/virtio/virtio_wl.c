@@ -83,6 +83,10 @@ struct virtwl_vfd {
 	struct mutex lock;
 
 	struct virtwl_info *vi;
+	/*
+	 * @id, @flags, @pfn and @size never change after vfd is initialized,
+	 * so we don't have to take the @lock when read-access those members.
+	 */
 	uint32_t id;
 	uint32_t flags;
 	uint64_t pfn;
@@ -228,6 +232,11 @@ static bool vq_handle_new(struct virtwl_info *vi,
 	if (!vfd)
 		return true; /* return the inbuf to vq */
 
+	vfd->id = id;
+	vfd->size = new->size;
+	vfd->pfn = new->pfn;
+	vfd->flags = new->flags;
+
 	mutex_lock(&vi->vfds_lock);
 	ret = idr_alloc(&vi->vfds, vfd, id, id + 1, GFP_KERNEL);
 	mutex_unlock(&vi->vfds_lock);
@@ -237,11 +246,6 @@ static bool vq_handle_new(struct virtwl_info *vi,
 		pr_warn("virtwl: failed to place received vfd: %d\n", ret);
 		return true; /* return the inbuf to vq */
 	}
-
-	vfd->id = id;
-	vfd->size = new->size;
-	vfd->pfn = new->pfn;
-	vfd->flags = new->flags;
 
 	return true; /* return the inbuf to vq */
 }
@@ -1017,27 +1021,19 @@ static int virtwl_vfd_mmap(struct file *filp, struct vm_area_struct *vma)
 	unsigned long vm_size = vma->vm_end - vma->vm_start;
 	int ret = 0;
 
-	mutex_lock(&vfd->lock);
+	if (!vfd->pfn)
+		return -EACCES;
 
-	if (!vfd->pfn) {
-		ret = -EACCES;
-		goto out_unlock;
-	}
-
-	if (vm_size + (vma->vm_pgoff << PAGE_SHIFT) > PAGE_ALIGN(vfd->size)) {
-		ret = -EINVAL;
-		goto out_unlock;
-	}
+	if (vm_size + (vma->vm_pgoff << PAGE_SHIFT) > PAGE_ALIGN(vfd->size))
+		return -EINVAL;
 
 	ret = io_remap_pfn_range(vma, vma->vm_start, vfd->pfn, vm_size,
 				 vma->vm_page_prot);
 	if (ret)
-		goto out_unlock;
+		return ret;
 
 	vma->vm_flags |= VM_PFNMAP | VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
 
-out_unlock:
-	mutex_unlock(&vfd->lock);
 	return ret;
 }
 
@@ -1121,16 +1117,15 @@ static struct virtwl_vfd *do_new(struct virtwl_info *vi,
 		goto free_ctrl_new;
 	}
 
-	mutex_lock(&vi->vfds_lock);
 	/*
-	 * Take the lock before adding it to the vfds list where others might
-	 * reference it.
+	 * We keep ->vfds_lock until we fully setup new vfd. By doing so we
+	 * prevent this vfd from being looked up and being used in some other
+	 * context concurrently (e.g. virtwl_vfd_mmap()).
 	 */
-	mutex_lock(&vfd->lock);
+	mutex_lock(&vi->vfds_lock);
 	ret = idr_alloc(&vi->vfds, vfd, 1, VIRTWL_MAX_ALLOC, GFP_KERNEL);
-	mutex_unlock(&vi->vfds_lock);
 	if (ret <= 0)
-		goto remove_vfd;
+		goto unlock_free_vfd;
 
 	vfd->id = ret;
 	ret = 0;
@@ -1170,7 +1165,7 @@ static struct virtwl_vfd *do_new(struct virtwl_info *vi,
 		/* fall-through */
 	default:
 		ret = -EINVAL;
-		goto remove_vfd;
+		goto unlock_free_vfd;
 	}
 
 	init_completion(&finish_completion);
@@ -1179,19 +1174,17 @@ static struct virtwl_vfd *do_new(struct virtwl_info *vi,
 
 	ret = vq_queue_out(vi, &out_sg, &in_sg, &finish_completion, nonblock);
 	if (ret)
-		goto remove_vfd;
+		goto unlock_free_vfd;
 
 	wait_for_completion(&finish_completion);
 
 	ret = virtwl_resp_err(ctrl_new->hdr.type);
 	if (ret)
-		goto remove_vfd;
+		goto unlock_free_vfd;
 
 	vfd->size = ctrl_new->size;
 	vfd->pfn = ctrl_new->pfn;
 	vfd->flags = ctrl_new->flags;
-
-	mutex_unlock(&vfd->lock);
 
 	if (ioctl_new->type == VIRTWL_IOCTL_NEW_DMABUF) {
 		/* FIXME: convert to host byte order. */
@@ -1199,15 +1192,13 @@ static struct virtwl_vfd *do_new(struct virtwl_info *vi,
 		       sizeof(ctrl_new->dmabuf));
 	}
 
+	mutex_unlock(&vi->vfds_lock);
 	kfree(ctrl_new);
+
 	return vfd;
 
-remove_vfd:
-	/*
-	 * unlock the vfd to avoid deadlock when unlinking it
-	 * or freeing a held lock
-	 */
-	mutex_unlock(&vfd->lock);
+unlock_free_vfd:
+	mutex_unlock(&vi->vfds_lock);
 	/* this is safe since the id cannot change after the vfd is created */
 	if (vfd->id)
 		virtwl_vfd_lock_unlink(vfd);
