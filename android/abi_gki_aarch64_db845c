@@ -89,6 +89,7 @@
   devm_phy_create
   devm_pinctrl_register
   devm_platform_ioremap_resource
+  devm_regmap_field_alloc
   __devm_regmap_init_mmio_clk
   devm_regulator_bulk_get
   devm_regulator_get
@@ -196,6 +197,7 @@
   irq_set_irq_wake
   irq_to_desc
   jiffies
+  jiffies_to_usecs
   kfree
   kfree_skb
   kimage_vaddr
@@ -242,6 +244,8 @@
   netdev_warn
   netif_napi_add
   netif_napi_del
+  nvmem_cell_get
+  nvmem_cell_put
   nvmem_cell_read
   of_address_to_resource
   of_alias_get_id
@@ -253,6 +257,7 @@
   of_device_get_match_data
   of_device_is_compatible
   of_device_uevent_modalias
+  of_find_device_by_node
   of_find_property
   of_fwnode_ops
   of_genpd_add_provider_onecell
@@ -338,6 +343,7 @@
   register_shrinker
   regmap_bulk_read
   regmap_bulk_write
+  regmap_field_read
   regmap_read
   regmap_update_bits_base
   regmap_write
@@ -973,13 +979,10 @@
   no_llseek
   nsecs_to_jiffies
   ns_to_timespec
-  nvmem_cell_get
-  nvmem_cell_put
   of_device_is_available
   of_dma_configure
   of_drm_find_bridge
   of_drm_find_panel
-  of_find_device_by_node
   of_find_matching_node_and_match
   of_get_compatible_child
   of_graph_get_endpoint_by_regs
@@ -1196,10 +1199,8 @@
   of_irq_get
 
 # required by qcom_hwspinlock.ko
-  devm_regmap_field_alloc
   hwspin_lock_register
   hwspin_lock_unregister
-  regmap_field_read
   regmap_field_update_bits_base
 
 # required by qcom_q6v5.ko
@@ -1221,7 +1222,6 @@
   __memcpy_toio
 
 # required by qcom_spmi-regulator.ko
-  jiffies_to_usecs
   regulator_disable_regmap
   regulator_enable_regmap
   regulator_is_enabled_regmap
@@ -1231,6 +1231,10 @@
   of_irq_get_byname
   rproc_get_by_child
   try_wait_for_completion
+
+# required by qcom_tsens.ko
+  devm_thermal_zone_of_sensor_register
+  thermal_zone_get_slope
 
 # required by qmi_helpers.ko
   init_net
