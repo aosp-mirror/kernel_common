@@ -637,36 +637,6 @@ static int afunc_validate_opts(struct g_audio *agdev, struct device *dev)
 	return 0;
 }
 
-static int afunc_validate_opts(struct g_audio *agdev, struct device *dev)
-{
-	struct f_uac2_opts *opts = g_audio_to_uac2_opts(agdev);
-
-	if (!opts->p_chmask && !opts->c_chmask) {
-		dev_err(dev, "Error: no playback and capture channels\n");
-		return -EINVAL;
-	} else if (opts->p_chmask & ~UAC2_CHANNEL_MASK) {
-		dev_err(dev, "Error: unsupported playback channels mask\n");
-		return -EINVAL;
-	} else if (opts->c_chmask & ~UAC2_CHANNEL_MASK) {
-		dev_err(dev, "Error: unsupported capture channels mask\n");
-		return -EINVAL;
-	} else if ((opts->p_ssize < 1) || (opts->p_ssize > 4)) {
-		dev_err(dev, "Error: incorrect playback sample size\n");
-		return -EINVAL;
-	} else if ((opts->c_ssize < 1) || (opts->c_ssize > 4)) {
-		dev_err(dev, "Error: incorrect capture sample size\n");
-		return -EINVAL;
-	} else if (!opts->p_srate) {
-		dev_err(dev, "Error: incorrect playback sampling rate\n");
-		return -EINVAL;
-	} else if (!opts->c_srate) {
-		dev_err(dev, "Error: incorrect capture sampling rate\n");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int
 afunc_bind(struct usb_configuration *cfg, struct usb_function *fn)
 {
