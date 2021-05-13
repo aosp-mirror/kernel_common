@@ -4117,6 +4117,7 @@ enum skb_ext_id {
 #if IS_ENABLED(CONFIG_NET_TC_SKB_EXT)
 	TC_SKB_EXT,
 #endif
+	SKB_EXT_ANDROID_VENDOR1, /* reserved for android vendor only */
 	SKB_EXT_NUM, /* must be last */
 };
 
