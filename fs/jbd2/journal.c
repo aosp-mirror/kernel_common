@@ -794,23 +794,18 @@ int jbd2_journal_bmap(journal_t *journal, unsigned long blocknr,
 {
 	int err = 0;
 	unsigned long long ret;
-	sector_t block = 0;
 
 	if (journal->j_inode) {
-		block = blocknr;
-		ret = bmap(journal->j_inode, &block);
-
-		if (ret || !block) {
+		ret = bmap(journal->j_inode, blocknr);
+		if (ret)
+			*retp = ret;
+		else {
 			printk(KERN_ALERT "%s: journal block not found "
 					"at offset %lu on %s\n",
 			       __func__, blocknr, journal->j_devname);
 			err = -EIO;
 			jbd2_journal_abort(journal, err);
-
-		} else {
-			*retp = block;
 		}
-
 	} else {
 		*retp = blocknr; /* +journal->j_blk_offset */
 	}
@@ -1237,14 +1232,11 @@ journal_t *jbd2_journal_init_dev(struct block_device *bdev,
 journal_t *jbd2_journal_init_inode(struct inode *inode)
 {
 	journal_t *journal;
-	sector_t blocknr;
 	char *p;
-	int err = 0;
+	unsigned long long blocknr;
 
-	blocknr = 0;
-	err = bmap(inode, &blocknr);
-
-	if (err || !blocknr) {
+	blocknr = bmap(inode, 0);
+	if (!blocknr) {
 		pr_err("%s: Cannot locate journal superblock\n",
 			__func__);
 		return NULL;

@@ -364,7 +364,7 @@ static int read_page(struct file *file, unsigned long index,
 	int ret = 0;
 	struct inode *inode = file_inode(file);
 	struct buffer_head *bh;
-	sector_t block, blk_cur;
+	sector_t block;
 
 	pr_debug("read bitmap file (%dB @ %llu)\n", (int)PAGE_SIZE,
 		 (unsigned long long)index << PAGE_SHIFT);
@@ -375,21 +375,17 @@ static int read_page(struct file *file, unsigned long index,
 		goto out;
 	}
 	attach_page_buffers(page, bh);
-	blk_cur = index << (PAGE_SHIFT - inode->i_blkbits);
+	block = index << (PAGE_SHIFT - inode->i_blkbits);
 	while (bh) {
-		block = blk_cur;
-
 		if (count == 0)
 			bh->b_blocknr = 0;
 		else {
-			ret = bmap(inode, &block);
-			if (ret || !block) {
+			bh->b_blocknr = bmap(inode, block);
+			if (bh->b_blocknr == 0) {
+				/* Cannot use this file! */
 				ret = -EINVAL;
-				bh->b_blocknr = 0;
 				goto out;
 			}
-
-			bh->b_blocknr = block;
 			bh->b_bdev = inode->i_sb->s_bdev;
 			if (count < (1<<inode->i_blkbits))
 				count = 0;
@@ -403,7 +399,7 @@ static int read_page(struct file *file, unsigned long index,
 			set_buffer_mapped(bh);
 			submit_bh(REQ_OP_READ, 0, bh);
 		}
-		blk_cur++;
+		block++;
 		bh = bh->b_this_page;
 	}
 	page->index = index;
