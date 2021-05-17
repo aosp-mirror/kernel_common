@@ -2570,3 +2570,15 @@
   I_BDEV
   set_blocksize
   submit_bio_wait
+
+# required by sprd_usb_f_rndis.ko
+  alloc_etherdev_mqs
+  dev_get_stats
+  dev_set_mac_address
+  eth_mac_addr
+  eth_validate_addr
+  ethtool_op_get_link
+  hex_to_bin
+  usb_assign_descriptors
+  usb_free_all_descriptors
+  usb_gstrings_attach
