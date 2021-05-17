@@ -9,6 +9,7 @@
 
 /dts-v1/;
 #include "mt8183-kukui-kodama.dtsi"
+#include "mt8183-kukui-kodama-camera-ov5695.dtsi"
 
 / {
 	model = "MediaTek kodama sku16 board";
