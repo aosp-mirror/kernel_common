@@ -227,6 +227,7 @@
   drm_dev_register
   drm_err
   drm_ioctl
+  drm_ioctl_kernel
   drm_mm_init
   drm_mm_insert_node_in_range
   drm_mm_remove_node
@@ -1909,6 +1910,7 @@
   gpiod_set_value_cansleep
   kernel_power_off
   register_restart_handler
+  register_reboot_notifier
   unregister_reboot_notifier
 
 # required by sprd_pcie_ep_device.ko
