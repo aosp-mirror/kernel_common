@@ -15,7 +15,7 @@ void memcpy_flushcache(void *dst, const void *src, size_t cnt)
 	 * barrier to order the cache maintenance against the memcpy.
 	 */
 	memcpy(dst, src, cnt);
-	__clean_dcache_area_pop(dst, cnt);
+	__clean_dcache_area_pop((unsigned long)dst, (unsigned long)dst + cnt);
 }
 EXPORT_SYMBOL_GPL(memcpy_flushcache);
 
@@ -35,6 +35,6 @@ unsigned long __copy_user_flushcache(void *to, const void __user *from,
 	uaccess_disable_not_uao();
 
 	/* See above */
-	__clean_dcache_area_pop(to, n - rc);
+	__clean_dcache_area_pop((unsigned long)to, (unsigned long)to + n - rc);
 	return rc;
 }
