@@ -126,6 +126,8 @@ static unsigned long trusty_std_call_helper(struct device *dev,
 		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_PREPARE,
 					   NULL);
 		ret = trusty_std_call_inner(dev, smcnr, a0, a1, a2);
+		if (WARN_ONCE(ret == SM_ERR_PANIC, "trusty crashed"))
+			s->trusty_panicked = true;
 		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_RETURNED,
 					   NULL);
 		if (ret == SM_ERR_INTERRUPTED) {
@@ -210,9 +212,6 @@ s32 trusty_std_call32(struct device *dev, u32 smcnr, u32 a0, u32 a1, u32 a2)
 	}
 	dev_dbg(dev, "%s(0x%x 0x%x 0x%x 0x%x) returned 0x%x\n",
 		__func__, smcnr, a0, a1, a2, ret);
-
-	if (WARN_ONCE(ret == SM_ERR_PANIC, "trusty crashed"))
-		s->trusty_panicked = true;
 
 	if (smcnr == SMC_SC_NOP)
 		complete(&s->cpu_idle_completion);
@@ -669,6 +668,15 @@ u32 trusty_get_api_version(struct device *dev)
 	return s->api_version;
 }
 EXPORT_SYMBOL(trusty_get_api_version);
+
+bool trusty_get_panic_status(struct device *dev)
+{
+	struct trusty_state *s = platform_get_drvdata(to_platform_device(dev));
+	if (WARN_ON(dev->driver != &trusty_driver.driver))
+		return false;
+	return s->trusty_panicked;
+}
+EXPORT_SYMBOL(trusty_get_panic_status);
 
 static int trusty_init_api_version(struct trusty_state *s, struct device *dev)
 {

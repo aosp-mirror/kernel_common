@@ -49,6 +49,7 @@ int trusty_call_notifier_unregister(struct device *dev,
 				    struct notifier_block *n);
 const char *trusty_version_str_get(struct device *dev);
 u32 trusty_get_api_version(struct device *dev);
+bool trusty_get_panic_status(struct device *dev);
 
 struct ns_mem_page_info {
 	u64 paddr;
