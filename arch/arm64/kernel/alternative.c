@@ -182,7 +182,7 @@ static void __nocfi __apply_alternatives(void *alt_region,  bool is_module,
 	 */
 	if (!is_module) {
 		dsb(ish);
-		__flush_icache_all();
+		icache_inval_all_pou();
 		isb();
 
 		/* Ignore ARM64_CB bit from feature mask */
