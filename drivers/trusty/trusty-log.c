@@ -15,7 +15,16 @@
 #include <asm/page.h>
 #include "trusty-log.h"
 
-#define TRUSTY_LOG_SIZE (PAGE_SIZE * 2)
+/*
+ * Rationale for the chosen log buffer size:
+ *  - the log buffer shall contain unthrottled trusty crash dump.
+ *    Testing identifies that the logbuffer size shall be
+ *    (~96Bytes * 100) i.e. ~2^13
+ *  - specifying twice as much as the crash dump minimum allows to have
+ *    ~100 lines of context prior to the crash.
+ *  - conclusion: logbuffer = 2^14 is comfortable, half is minimal.
+ */
+#define TRUSTY_LOG_SIZE (PAGE_SIZE * 5)
 #define TRUSTY_LINE_BUFFER_SIZE 256
 
 /*
