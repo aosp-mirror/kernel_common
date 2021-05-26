@@ -21,6 +21,7 @@
 #include <linux/fs.h>
 #include <linux/jiffies.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/mei.h>
 
@@ -264,6 +265,9 @@ static int mei_cl_irq_read(struct mei_cl *cl, struct mei_cl_cb *cb,
 		list_move_tail(&cb->list, &cmpl_list->list);
 		return ret;
 	}
+
+	pm_runtime_mark_last_busy(dev->dev);
+	pm_request_autosuspend(dev->dev);
 
 	list_move_tail(&cb->list, &dev->read_list.list);
 
