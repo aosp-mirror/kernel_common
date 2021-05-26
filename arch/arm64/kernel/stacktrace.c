@@ -50,7 +50,7 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	if (!tsk)
 		tsk = current;
 
-	if (!on_accessible_stack(tsk, fp, &info))
+	if (!on_accessible_stack(tsk, fp, 16, &info))
 		return -EINVAL;
 
 	if (test_bit(info.type, frame->stacks_done))
