@@ -48,6 +48,9 @@ DECLARE_HOOK(android_vh_typec_store_partner_src_caps,
 		 u32 (*source_caps)[PDO_MAX_OBJECTS]),
 	TP_ARGS(port, nr_source_caps, source_caps));
 
+DECLARE_HOOK(android_vh_typec_tcpm_log,
+	TP_PROTO(const char *log, bool *bypass),
+	TP_ARGS(log, bypass));
 #endif /* _TRACE_HOOK_UFSHCD_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>
