@@ -2208,6 +2208,8 @@ static inline int task_on_rq_migrating(struct task_struct *p)
 #define WF_MIGRATED     0x20 /* Internal use, task got migrated */
 #define WF_CURRENT_CPU  0x40 /* Prefer to move the wakee to the current CPU. */
 
+#define WF_ANDROID_VENDOR	0x1000 /* Vendor specific for Android */
+
 #ifdef CONFIG_SMP
 static_assert(WF_EXEC == SD_BALANCE_EXEC);
 static_assert(WF_FORK == SD_BALANCE_FORK);
