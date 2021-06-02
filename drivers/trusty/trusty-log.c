@@ -60,17 +60,50 @@ struct trusty_log_state {
 	char line_buffer[TRUSTY_LINE_BUFFER_SIZE];
 };
 
-static int log_read_line(struct trusty_log_state *s, int put, int get)
+static inline u32 u32_add_overflow(u32 a, u32 b)
+{
+	u32 d;
+
+	if (check_add_overflow(a, b, &d)) {
+		/*
+		 * silence the overflow,
+		 * what matters in the log buffer context
+		 * is the casted addition
+		 */
+	}
+	return d;
+}
+
+static inline u32 u32_sub_overflow(u32 a, u32 b)
+{
+	u32 d;
+
+	if (check_sub_overflow(a, b, &d)) {
+		/*
+		 * silence the overflow,
+		 * what matters in the log buffer context
+		 * is the casted substraction
+		 */
+	}
+	return d;
+}
+
+static int log_read_line(struct trusty_log_state *s, u32 put, u32 get)
 {
 	struct log_rb *log = s->log;
 	int i;
 	char c = '\0';
 	size_t max_to_read =
-		min_t(size_t, put - get, sizeof(s->line_buffer) - 1);
+		min_t(size_t,
+		      u32_sub_overflow(put, get),
+		      sizeof(s->line_buffer) - 1);
 	size_t mask = log->sz - 1;
 
-	for (i = 0; i < max_to_read && c != '\n';)
-		s->line_buffer[i++] = c = log->data[get++ & mask];
+	for (i = 0; i < max_to_read && c != '\n';) {
+		c = log->data[get & mask];
+		s->line_buffer[i++] = c;
+		get = u32_add_overflow(get, 1);
+	}
 	s->line_buffer[i] = '\0';
 
 	return i;
@@ -109,13 +142,13 @@ static void trusty_dump_logs(struct trusty_log_state *s)
 		 * Discard the line that was just read if the data could
 		 * have been corrupted by the producer.
 		 */
-		if (alloc - get > log->sz) {
+		if (u32_sub_overflow(alloc, get) > log->sz) {
 			dev_err(s->dev, "log overflow.");
-			get = alloc - log->sz;
+			get = u32_sub_overflow(alloc, log->sz);
 			continue;
 		}
 		/* compute next line index */
-		get += read_chars;
+		get = u32_add_overflow(get, read_chars);
 		if (trusty_panicked || __ratelimit(&trusty_log_rate_limit)) {
 			dev_info(s->dev, "%s", s->line_buffer);
 			/* next line after last successful get */
