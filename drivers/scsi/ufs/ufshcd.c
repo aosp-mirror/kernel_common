@@ -9116,7 +9116,6 @@ static void ufshcd_wl_shutdown(struct device *dev)
  *
  * This function will put disable irqs, turn off clocks
  * and set vreg and hba-vreg in lpm mode.
- * Also check the description of __ufshcd_wl_suspend().
  */
 static int ufshcd_suspend(struct ufs_hba *hba)
 {
@@ -9152,7 +9151,6 @@ static int ufshcd_suspend(struct ufs_hba *hba)
  *
  * This function basically turns on the regulators, clocks and
  * irqs of the hba.
- * Also check the description of __ufshcd_wl_resume().
  *
  * Returns 0 for success and non-zero for failure
  */
@@ -9190,7 +9188,6 @@ out:
  * @hba: per adapter instance
  *
  * Check the description of ufshcd_suspend() function for more details.
- * Also check the description of __ufshcd_wl_suspend().
  *
  * Returns 0 for success and non-zero for failure
  */
@@ -9242,7 +9239,6 @@ EXPORT_SYMBOL(ufshcd_system_resume);
  * @hba: per adapter instance
  *
  * Check the description of ufshcd_suspend() function for more details.
- * Also check the description of __ufshcd_wl_suspend().
  *
  * Returns 0 for success and non-zero for failure
  */
