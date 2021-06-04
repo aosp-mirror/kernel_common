@@ -238,7 +238,7 @@ int radeon_uvd_resume(struct radeon_device *rdev)
 	if (rdev->uvd.vcpu_bo == NULL)
 		return -EINVAL;
 
-	memcpy(rdev->uvd.cpu_addr, rdev->uvd_fw->data, rdev->uvd_fw->size);
+	memcpy_toio((void __iomem *)rdev->uvd.cpu_addr, rdev->uvd_fw->data, rdev->uvd_fw->size);
 
 	size = radeon_bo_size(rdev->uvd.vcpu_bo);
 	size -= rdev->uvd_fw->size;
@@ -251,7 +251,7 @@ int radeon_uvd_resume(struct radeon_device *rdev)
 		kfree(rdev->uvd.saved_bo);
 		rdev->uvd.saved_bo = NULL;
 	} else
-		memset(ptr, 0, size);
+		memset_io((void __iomem *)ptr, 0, size);
 
 	return 0;
 }
