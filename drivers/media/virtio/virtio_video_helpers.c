@@ -154,8 +154,38 @@ uint32_t virtio_video_v4l2_format_to_virtio(uint32_t v4l2_format)
 	return 0;
 }
 
+static struct virtio_video_convert_table bitrate_mode_table[] = {
+	{ VIRTIO_VIDEO_BITRATE_MODE_VBR, V4L2_MPEG_VIDEO_BITRATE_MODE_VBR },
+	{ VIRTIO_VIDEO_BITRATE_MODE_CBR, V4L2_MPEG_VIDEO_BITRATE_MODE_CBR },
+};
+
+uint32_t virtio_video_bitrate_mode_to_v4l2(uint32_t bitrate_mode)
+{
+	size_t idx;
+
+	for (idx = 0; idx < ARRAY_SIZE(bitrate_mode_table); idx++) {
+		if (bitrate_mode_table[idx].virtio_value == bitrate_mode)
+			return bitrate_mode_table[idx].v4l2_value;
+	}
+
+	return 0;
+}
+
+uint32_t virtio_video_v4l2_bitrate_mode_to_virtio(uint32_t v4l2_bitrate_mode)
+{
+	size_t idx;
+
+	for (idx = 0; idx < ARRAY_SIZE(bitrate_mode_table); idx++) {
+		if (bitrate_mode_table[idx].v4l2_value == v4l2_bitrate_mode)
+			return bitrate_mode_table[idx].virtio_value;
+	}
+
+	return 0;
+}
+
 static struct virtio_video_convert_table control_table[] = {
 	{ VIRTIO_VIDEO_CONTROL_BITRATE, V4L2_CID_MPEG_VIDEO_BITRATE },
+	{ VIRTIO_VIDEO_CONTROL_BITRATE_MODE, V4L2_CID_MPEG_VIDEO_BITRATE_MODE },
 	{ VIRTIO_VIDEO_CONTROL_PROFILE, V4L2_CID_MPEG_VIDEO_H264_PROFILE },
 	{ VIRTIO_VIDEO_CONTROL_LEVEL, V4L2_CID_MPEG_VIDEO_H264_LEVEL },
 	{ VIRTIO_VIDEO_CONTROL_FORCE_KEYFRAME,
