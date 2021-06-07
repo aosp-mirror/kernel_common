@@ -92,6 +92,7 @@ struct video_control_info {
 	uint32_t profile;
 	uint32_t level;
 	uint32_t bitrate;
+	uint32_t bitrate_mode;
 	bool is_updated;
 };
 
@@ -397,10 +398,12 @@ uint32_t virtio_video_format_to_v4l2(uint32_t format);
 uint32_t virtio_video_control_to_v4l2(uint32_t control);
 uint32_t virtio_video_profile_to_v4l2(uint32_t profile);
 uint32_t virtio_video_level_to_v4l2(uint32_t level);
+uint32_t virtio_video_bitrate_mode_to_v4l2(uint32_t bitrate_mode);
 uint32_t virtio_video_v4l2_format_to_virtio(uint32_t v4l2_format);
 uint32_t virtio_video_v4l2_control_to_virtio(uint32_t v4l2_control);
 uint32_t virtio_video_v4l2_profile_to_virtio(uint32_t v4l2_profile);
 uint32_t virtio_video_v4l2_level_to_virtio(uint32_t v4l2_level);
+uint32_t virtio_video_v4l2_bitrate_mode_to_virtio(uint32_t v4l2_bitrate_mode);
 
 struct video_format *find_video_format(struct list_head *fmts_list,
 				       uint32_t fourcc);

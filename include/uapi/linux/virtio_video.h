@@ -140,6 +140,11 @@ enum virtio_video_level {
 	VIRTIO_VIDEO_LEVEL_H264_MAX = VIRTIO_VIDEO_LEVEL_H264_5_1,
 };
 
+enum virtio_video_bitrate_mode {
+	VIRTIO_VIDEO_BITRATE_MODE_VBR = 0,
+	VIRTIO_VIDEO_BITRATE_MODE_CBR = 1,
+};
+
 /*
  * Config
  */
@@ -385,6 +390,7 @@ enum virtio_video_control_type {
 	VIRTIO_VIDEO_CONTROL_PROFILE,
 	VIRTIO_VIDEO_CONTROL_LEVEL,
 	VIRTIO_VIDEO_CONTROL_FORCE_KEYFRAME,
+	VIRTIO_VIDEO_CONTROL_BITRATE_MODE,
 };
 
 struct virtio_video_query_control_profile {
@@ -433,6 +439,11 @@ struct virtio_video_get_control {
 
 struct virtio_video_control_val_bitrate {
 	__le32 bitrate;
+	__u8 padding[4];
+};
+
+struct virtio_video_control_val_bitrate_mode {
+	__le32 bitrate_mode;
 	__u8 padding[4];
 };
 
