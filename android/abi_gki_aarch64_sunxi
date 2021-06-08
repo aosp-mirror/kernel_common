@@ -180,3 +180,89 @@
   zlib_inflateEnd
   zlib_inflateInit2
   zlib_inflate_workspacesize
+
+# required by cpufreq_ondemand.ko
+  cpufreq_dbs_governor_init
+  cpufreq_dbs_governor_exit
+  cpufreq_dbs_governor_start
+  cpufreq_dbs_governor_stop
+  cpufreq_dbs_governor_limits
+  store_sampling_rate
+  gov_update_cpu_data
+  dbs_update
+  get_cpu_idle_time_us
+
+# required by disp.ko
+  memblock_free
+
+#required by ehci-sunxi.ko
+  ehci_init_driver
+  ehci_resume
+  ehci_suspend
+
+# required by irq-sun8i-nmi.ko
+  __irq_alloc_domain_generic_chips
+  irq_gc_ack_set_bit
+  irq_gc_mask_clr_bit
+  irq_gc_mask_set_bit
+  irq_generic_chip_ops
+  irq_get_domain_generic_chip
+  irq_setup_alt_chip
+
+# required by lan78xx.ko
+  __bitmap_or
+  fixed_phy_register
+  fixed_phy_unregister
+  __genphy_config_aneg
+  genphy_read_status
+  irq_create_mapping_affinity
+  irq_domain_add_simple
+  mdiobus_read
+  mdiobus_write
+  of_mdiobus_register
+  phy_connect_direct
+  phy_ethtool_get_eee
+  phy_ethtool_ksettings_get
+  phy_ethtool_ksettings_set
+  phy_ethtool_set_eee
+  phy_ethtool_set_wol
+  phy_find_first
+  phy_read_mmd
+  phy_register_fixup_for_uid
+  phy_remove_link_mode
+  phy_unregister_fixup_for_uid
+  phy_write_mmd
+  usb_scuttle_anchored_urbs
+
+# required by pinctrl-sunxi.ko
+  gpiochip_generic_config
+  irq_create_mapping_affinity
+  pinctrl_gpio_direction_input
+  pinctrl_gpio_direction_output
+
+# required by rtc-sunxi-ccu.ko
+  clk_unregister_fixed_factor
+  clk_unregister_fixed_rate
+  clk_unregister_gate
+
+# required by smsc75xx.ko and smsc95xx.ko
+  crc16
+  of_get_mac_address
+  usbnet_defer_kevent
+
+# required by snd-soc-sunxi.ko
+  snd_dmaengine_pcm_open
+  snd_dmaengine_pcm_pointer_no_residue
+
+# required by sun50i-cpufreq-nvmem.ko
+  dev_pm_opp_of_get_opp_desc_node
+  dev_pm_opp_put_prop_name
+  dev_pm_opp_put_supported_hw
+  dev_pm_opp_set_prop_name
+
+# required by sun6i-dma.ko
+  dma_get_any_slave_channel
+
+# required by sunxi-keyboard.ko
+  iio_map_array_register
+  iio_map_array_unregister
