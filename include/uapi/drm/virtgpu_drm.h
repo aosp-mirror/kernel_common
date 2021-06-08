@@ -135,11 +135,16 @@ struct drm_virtgpu_resource_info_cros {
 	__u32 res_handle;
 	__u32 size;
 
-/* Return res_handle and size.  Return extended info (strides, num_planes,
- * etc.) until chromeos-5.4 and return blob_mem since chromeos-5.10.
+/* Always returns res_handle, size, and blob_mem.
+ * !! RETURN SEMANTICS ARE CHANGED BY THIS COMMIT.
+ * !! User space changes are likely required for anything relying on
+ * !! getting extended info from VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT.
  */
 #define VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT 0
-/* Return res_handle, size, and extended info */
+/* Always returns res_handle, size, and "extended info".
+ * !! Produces an error (EINVAL) for blob resources created with blob_mem ==
+ * !! VIRTGPU_BLOB_MEM_GUEST, which doesn't use host storage.
+ */
 #define VIRTGPU_RESOURCE_INFO_TYPE_EXTENDED 1
 	union {
 		__u32 type; /* in, VIRTGPU_RESOURCE_INFO_TYPE_* */
