@@ -92,6 +92,7 @@ struct video_control_info {
 	uint32_t profile;
 	uint32_t level;
 	uint32_t bitrate;
+	uint32_t bitrate_peak;
 	uint32_t bitrate_mode;
 	bool is_updated;
 };
