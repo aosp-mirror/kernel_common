@@ -811,6 +811,9 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 	struct completion finish_completion;
 	struct scatterlist out_sg;
 	struct scatterlist in_sg;
+	struct sg_table sgt;
+	struct vm_struct *area;
+	bool vmalloced;
 	int ret;
 	int i;
 
@@ -885,7 +888,13 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 	}
 #endif
 	ctrl_send_size = sizeof(*ctrl_send) + vfd_ids_size + len;
-	ctrl_send = kzalloc(ctrl_send_size, GFP_KERNEL);
+	vmalloced = false;
+	if (ctrl_send_size < PAGE_SIZE)
+		ctrl_send = kzalloc(ctrl_send_size, GFP_KERNEL);
+	else {
+		vmalloced = true;
+		ctrl_send = vzalloc(ctrl_send_size);
+	}
 	if (!ctrl_send) {
 		ret = -ENOMEM;
 		goto put_files;
@@ -926,20 +935,38 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 	}
 
 	init_completion(&finish_completion);
-	sg_init_one(&out_sg, ctrl_send, ctrl_send_size);
-	sg_init_one(&in_sg, ctrl_send, sizeof(struct virtio_wl_ctrl_hdr));
+	if (!vmalloced) {
+		sg_init_one(&out_sg, ctrl_send, ctrl_send_size);
+		sg_init_one(&in_sg, ctrl_send,
+		    sizeof(struct virtio_wl_ctrl_hdr));
+		ret = vq_queue_out(vi, &out_sg, &in_sg, &finish_completion,
+		    filp->f_flags & O_NONBLOCK);
+	} else {
+		area = find_vm_area(ctrl_send);
+		ret = sg_alloc_table_from_pages(&sgt, area->pages,
+		    area->nr_pages, 0, ctrl_send_size, GFP_KERNEL);
+		if (ret)
+			goto free_ctrl_send;
 
-	ret = vq_queue_out(vi, &out_sg, &in_sg, &finish_completion,
-				       filp->f_flags & O_NONBLOCK);
+		sg_init_table(&in_sg, 1);
+		sg_set_page(&in_sg, area->pages[0],
+		    sizeof(struct virtio_wl_ctrl_hdr), 0);
+
+		ret = vq_queue_out(vi, sgt.sgl, &in_sg, &finish_completion,
+		    filp->f_flags & O_NONBLOCK);
+	}
 	if (ret)
-		goto free_ctrl_send;
+		goto free_sgt;
 
 	wait_for_completion(&finish_completion);
 
 	ret = virtwl_resp_err(ctrl_send->hdr.type);
 
+free_sgt:
+	if (vmalloced)
+		sg_free_table(&sgt);
 free_ctrl_send:
-	kfree(ctrl_send);
+	kvfree(ctrl_send);
 put_files:
 	for (i = 0; i < VIRTWL_SEND_MAX_ALLOCS; i++) {
 		if (vfd_files[i].file)
