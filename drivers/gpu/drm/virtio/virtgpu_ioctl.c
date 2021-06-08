@@ -344,13 +344,14 @@ static int virtio_gpu_resource_info_cros_ioctl(struct drm_device *dev,
 	if (type == VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT) {
 		ri->blob_mem = qobj->blob_mem;
 		goto out;
-	} else {
-		if (qobj->blob_mem) {
-			ret = -EINVAL;
-			goto out;
-		}
-		ri->stride = 0;
+	} else if (qobj->blob_mem == VIRTGPU_BLOB_MEM_GUEST) {
+		ret = -EINVAL;
+		goto out;
 	}
+
+	ri->stride = 0;
+	if (qobj->blob_mem)
+		goto out;
 
 	if (!qobj->create_callback_done) {
 		ret = wait_event_interruptible(vgdev->resp_wq,
