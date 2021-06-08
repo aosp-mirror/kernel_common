@@ -965,11 +965,13 @@ static int virtio_video_device_open(struct file *file)
 		goto err_stream_get_params;
 	}
 
-	ret = virtio_video_cmd_get_control(vv, stream,
-					   VIRTIO_VIDEO_CONTROL_BITRATE);
-	if (ret) {
-		v4l2_err(&vv->v4l2_dev, "failed to get stream bitrate\n");
-		goto err_stream_get_params;
+	if (vvd->type == VIRTIO_VIDEO_DEVICE_ENCODER) {
+		ret = virtio_video_cmd_get_control(vv, stream,
+						   VIRTIO_VIDEO_CONTROL_BITRATE);
+		if (ret) {
+			v4l2_err(&vv->v4l2_dev, "failed to get stream bitrate\n");
+			goto err_stream_get_params;
+		}
 	}
 
 	mutex_init(&stream->vq_mutex);
