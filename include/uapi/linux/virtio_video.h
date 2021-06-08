@@ -391,6 +391,7 @@ enum virtio_video_control_type {
 	VIRTIO_VIDEO_CONTROL_LEVEL,
 	VIRTIO_VIDEO_CONTROL_FORCE_KEYFRAME,
 	VIRTIO_VIDEO_CONTROL_BITRATE_MODE,
+	VIRTIO_VIDEO_CONTROL_BITRATE_PEAK,
 };
 
 struct virtio_video_query_control_profile {
@@ -439,6 +440,11 @@ struct virtio_video_get_control {
 
 struct virtio_video_control_val_bitrate {
 	__le32 bitrate;
+	__u8 padding[4];
+};
+
+struct virtio_video_control_val_bitrate_peak {
+	__le32 bitrate_peak;
 	__u8 padding[4];
 };
 

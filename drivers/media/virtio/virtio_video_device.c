@@ -965,6 +965,13 @@ static int virtio_video_device_open(struct file *file)
 		}
 
 		ret = virtio_video_cmd_get_control(vv, stream,
+						   VIRTIO_VIDEO_CONTROL_BITRATE_PEAK);
+		if (ret) {
+			v4l2_err(&vv->v4l2_dev, "failed to get stream peak bitrate\n");
+			goto err_stream_get_params;
+		}
+
+		ret = virtio_video_cmd_get_control(vv, stream,
 						   VIRTIO_VIDEO_CONTROL_BITRATE_MODE);
 		if (ret) {
 			v4l2_err(&vv->v4l2_dev, "failed to get stream bitrate mode\n");

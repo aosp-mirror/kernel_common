@@ -995,6 +995,27 @@ virtio_video_cmd_get_ctrl_bitrate_cb(struct virtio_video *vv,
 }
 
 static void
+virtio_video_cmd_get_ctrl_bitrate_peak_cb(struct virtio_video *vv,
+					  struct virtio_video_vbuffer *vbuf)
+{
+	struct virtio_video_get_control_resp *resp =
+		(struct virtio_video_get_control_resp *)vbuf->resp_buf;
+	struct virtio_video_control_val_bitrate_peak *resp_bp = NULL;
+	struct virtio_video_stream *stream = vbuf->priv;
+	struct video_control_info *control = &stream->control;
+
+	if (!control)
+		return;
+
+	resp_bp = (void *)((char *) resp +
+			   sizeof(struct virtio_video_get_control_resp));
+
+	control->bitrate_peak = le32_to_cpu(resp_bp->bitrate_peak);
+	control->is_updated = true;
+	wake_up(&vv->wq);
+}
+
+static void
 virtio_video_cmd_get_ctrl_bitrate_mode_cb(struct virtio_video *vv,
 					  struct virtio_video_vbuffer *vbuf)
 {
@@ -1042,6 +1063,10 @@ int virtio_video_cmd_get_control(struct virtio_video *vv,
 		resp_size += sizeof(struct virtio_video_control_val_bitrate);
 		cb = &virtio_video_cmd_get_ctrl_bitrate_cb;
 		break;
+	case VIRTIO_VIDEO_CONTROL_BITRATE_PEAK:
+		resp_size += sizeof(struct virtio_video_control_val_bitrate_peak);
+		cb = &virtio_video_cmd_get_ctrl_bitrate_peak_cb;
+		break;
 	case VIRTIO_VIDEO_CONTROL_BITRATE_MODE:
 		resp_size += sizeof(struct virtio_video_control_val_bitrate_mode);
 		cb = &virtio_video_cmd_get_ctrl_bitrate_mode_cb;
@@ -1085,6 +1110,7 @@ int virtio_video_cmd_set_control(struct virtio_video *vv, uint32_t stream_id,
 	struct virtio_video_control_val_level *ctrl_l = NULL;
 	struct virtio_video_control_val_profile *ctrl_p = NULL;
 	struct virtio_video_control_val_bitrate *ctrl_b = NULL;
+	struct virtio_video_control_val_bitrate_peak *ctrl_bp = NULL;
 	struct virtio_video_control_val_bitrate_mode *ctrl_bm = NULL;
 	size_t size;
 
@@ -1100,6 +1126,9 @@ int virtio_video_cmd_set_control(struct virtio_video *vv, uint32_t stream_id,
 		break;
 	case VIRTIO_VIDEO_CONTROL_BITRATE:
 		size = sizeof(struct virtio_video_control_val_bitrate);
+		break;
+	case VIRTIO_VIDEO_CONTROL_BITRATE_PEAK:
+		size = sizeof(struct virtio_video_control_val_bitrate_peak);
 		break;
 	case VIRTIO_VIDEO_CONTROL_BITRATE_MODE:
 		size = sizeof(struct virtio_video_control_val_bitrate_mode);
@@ -1134,6 +1163,11 @@ int virtio_video_cmd_set_control(struct virtio_video *vv, uint32_t stream_id,
 		ctrl_b = (void *)((char *)req_p +
 				 sizeof(struct virtio_video_set_control));
 		ctrl_b->bitrate = cpu_to_le32(value);
+		break;
+	case VIRTIO_VIDEO_CONTROL_BITRATE_PEAK:
+		ctrl_bp = (void *)((char *)req_p +
+				  sizeof(struct virtio_video_set_control));
+		ctrl_bp->bitrate_peak = cpu_to_le32(value);
 		break;
 	case VIRTIO_VIDEO_CONTROL_BITRATE_MODE:
 		ctrl_bm = (void *)((char *)req_p +

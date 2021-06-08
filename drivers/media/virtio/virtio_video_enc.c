@@ -118,6 +118,10 @@ static int virtio_video_enc_s_ctrl(struct v4l2_ctrl *ctrl)
 		ret = virtio_video_cmd_set_control(vv, stream->stream_id,
 						   control, ctrl->val);
 		break;
+	case V4L2_CID_MPEG_VIDEO_BITRATE_PEAK:
+		ret = virtio_video_cmd_set_control(vv, stream->stream_id,
+						   control, ctrl->val);
+		break;
 	case V4L2_CID_MPEG_VIDEO_BITRATE_MODE:
 		value = virtio_video_v4l2_bitrate_mode_to_virtio(ctrl->val);
 		ret = virtio_video_cmd_set_control(vv, stream->stream_id,
@@ -224,6 +228,13 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 				  1, 1000000000,
 				  1, stream->control.bitrate);
 	}
+
+	v4l2_ctrl_new_std(&stream->ctrl_handler,
+			  &virtio_video_enc_ctrl_ops,
+			  V4L2_CID_MPEG_VIDEO_BITRATE_PEAK,
+			  // Set max to 1GBs to cover most use cases.
+			  1, 1000000000,
+			  1, stream->control.bitrate_peak);
 
 	v4l2_ctrl_new_std_menu(&stream->ctrl_handler,
 			       &virtio_video_enc_ctrl_ops,
