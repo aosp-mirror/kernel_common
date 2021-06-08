@@ -480,7 +480,7 @@ int rds_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 
 		if (rds_cmsg_recv(inc, msg)) {
 			ret = -EFAULT;
-			goto out;
+			break;
 		}
 
 		rds_stats_inc(s_recv_delivered);
