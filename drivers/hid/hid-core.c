@@ -261,6 +261,7 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 	unsigned int offset;
 	unsigned int i;
 	unsigned int application;
+	bool dg_tsn_large_fixup = false;
 
 	application = hid_lookup_collection(parser, HID_COLLECTION_APPLICATION);
 
@@ -302,6 +303,18 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 	usages = max_t(unsigned, parser->local.usage_index,
 				 parser->global.report_count);
 
+	/* Recognize a Usage(Digitizers.Transducer Serial Number) of 64 bits,
+	 * for special processing later; we need to reserve two usages now.
+	 */
+	if (usages == 1 &&
+	    parser->global.report_size == 64 &&
+	    parser->local.usage[0] == (HID_UP_DIGITIZER | 0x005b) &&
+	    parser->global.report_count == 1 &&
+	    parser->local.usage_index == 1) {
+		dg_tsn_large_fixup = true;
+		usages = 2;
+	}
+
 	field = hid_register_field(report, usages);
 	if (!field)
 		return 0;
@@ -334,6 +347,15 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 	field->physical_maximum = parser->global.physical_maximum;
 	field->unit_exponent = parser->global.unit_exponent;
 	field->unit = parser->global.unit;
+
+	/* Fix up that particular report, split it into two distinct 32-bit fields.
+	 */
+	if (dg_tsn_large_fixup) {
+		/* Convert second half into Usage(Digitizers.Transducer Serial Number Second 32 Bits) */
+		field->usage[1].hid = (HID_UP_DIGITIZER | 0x006e);
+		field->report_size = 32;
+		field->report_count = 2;
+	}
 
 	return 0;
 }
