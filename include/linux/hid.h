@@ -645,9 +645,15 @@ struct hid_device {							/* device report descriptor */
 	__s32 battery_max;
 	__s32 battery_report_type;
 	__s32 battery_report_id;
+	__u64 battery_serial_number;
+	__u64 battery_new_serial_number;				/* gather entire updated 64-bit SN here for end of report */
+	char battery_serial_number_str[17];				/* Space for max 16 hex digits */
 	__s32 battery_charge_status;
 	enum hid_battery_status battery_status;
 	bool battery_avoid_query;
+	bool battery_state_changed;					/* a battery field has been changed within the current report */
+	bool battery_reported;
+	bool battery_sn_64bit;						/* whether battery S/N is 32 or 64 bits long */
 	ktime_t battery_ratelimit_time;
 #endif
 
