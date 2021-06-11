@@ -1308,6 +1308,12 @@ static long filp_send_ioctl(struct file *filp,
 		timeout = 0;
 
 	txbuf = tipc_chan_get_txbuf_timeout(dn->chan, timeout);
+	if (IS_ERR(txbuf)) {
+		dev_dbg(dev, "Failed to get txbuffer\n");
+		ret = PTR_ERR(txbuf);
+		goto get_txbuf_failed;
+	}
+
 	data_len = txbuf_write_iter(txbuf, &iter);
 	if (data_len < 0) {
 		ret = data_len;
@@ -1351,6 +1357,7 @@ queue_failed:
 					shm_handles[release_idx]->tipc.obj_id);
 txbuf_write_failed:
 	tipc_chan_put_txbuf(dn->chan, txbuf);
+get_txbuf_failed:
 shm_share_failed:
 	for (shm_idx--; shm_idx >= 0; shm_idx--)
 		tipc_shared_handle_drop(shm_handles[shm_idx]);
