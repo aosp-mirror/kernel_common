@@ -147,12 +147,6 @@ int load_xbc_file(const char *path, char **buf)
 	return ret;
 }
 
-static int pr_errno(const char *msg, int err)
-{
-	pr_err("%s: %d\n", msg, err);
-	return err;
-}
-
 int load_xbc_from_initrd(int fd, char **buf)
 {
 	struct stat stat;
@@ -168,24 +162,26 @@ int load_xbc_from_initrd(int fd, char **buf)
 	if (stat.st_size < 8 + BOOTCONFIG_MAGIC_LEN)
 		return 0;
 
-	if (lseek(fd, -BOOTCONFIG_MAGIC_LEN, SEEK_END) < 0)
-		return pr_errno("Failed to lseek for magic", -errno);
-
+	if (lseek(fd, -BOOTCONFIG_MAGIC_LEN, SEEK_END) < 0) {
+		pr_err("Failed to lseek: %d\n", -errno);
+		return -errno;
+	}
 	if (read(fd, magic, BOOTCONFIG_MAGIC_LEN) < 0)
-		return pr_errno("Failed to read", -errno);
-
+		return -errno;
 	/* Check the bootconfig magic bytes */
 	if (memcmp(magic, BOOTCONFIG_MAGIC, BOOTCONFIG_MAGIC_LEN) != 0)
 		return 0;
 
-	if (lseek(fd, -(8 + BOOTCONFIG_MAGIC_LEN), SEEK_END) < 0)
-		return pr_errno("Failed to lseek for size", -errno);
+	if (lseek(fd, -(8 + BOOTCONFIG_MAGIC_LEN), SEEK_END) < 0) {
+		pr_err("Failed to lseek: %d\n", -errno);
+		return -errno;
+	}
 
 	if (read(fd, &size, sizeof(u32)) < 0)
-		return pr_errno("Failed to read size", -errno);
+		return -errno;
 
 	if (read(fd, &csum, sizeof(u32)) < 0)
-		return pr_errno("Failed to read checksum", -errno);
+		return -errno;
 
 	/* Wrong size error  */
 	if (stat.st_size < size + 8 + BOOTCONFIG_MAGIC_LEN) {
@@ -194,8 +190,10 @@ int load_xbc_from_initrd(int fd, char **buf)
 	}
 
 	if (lseek(fd, stat.st_size - (size + 8 + BOOTCONFIG_MAGIC_LEN),
-		  SEEK_SET) < 0)
-		return pr_errno("Failed to lseek", -errno);
+		  SEEK_SET) < 0) {
+		pr_err("Failed to lseek: %d\n", -errno);
+		return -errno;
+	}
 
 	ret = load_xbc_fd(fd, buf, size);
 	if (ret < 0)
@@ -270,9 +268,8 @@ int show_xbc(const char *path, bool list)
 
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {
-		ret = -errno;
-		pr_err("Failed to open initrd %s: %d\n", path, ret);
-		return ret;
+		pr_err("Failed to open initrd %s: %d\n", path, fd);
+		return -errno;
 	}
 
 	ret = load_xbc_from_initrd(fd, &buf);
@@ -310,9 +307,8 @@ int delete_xbc(const char *path)
 
 	fd = open(path, O_RDWR);
 	if (fd < 0) {
-		ret = -errno;
-		pr_err("Failed to open initrd %s: %d\n", path, ret);
-		return ret;
+		pr_err("Failed to open initrd %s: %d\n", path, fd);
+		return -errno;
 	}
 
 	size = load_xbc_from_initrd(fd, &buf);
@@ -388,10 +384,9 @@ int apply_xbc(const char *path, const char *xbc_path)
 	/* Apply new one */
 	fd = open(path, O_RDWR | O_APPEND);
 	if (fd < 0) {
-		ret = -errno;
-		pr_err("Failed to open %s: %d\n", path, ret);
+		pr_err("Failed to open %s: %d\n", path, fd);
 		free(data);
-		return ret;
+		return fd;
 	}
 	/* TODO: Ensure the @path is initramfs/initrd image */
 	if (fstat(fd, &stat) < 0) {
