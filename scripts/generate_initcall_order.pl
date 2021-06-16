@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use IO::Handle;
 
-my $nm = $ENV{'LLVM_NM'} || "llvm-nm";
+my $nm = $ENV{'NM'} || "llvm-nm";
 my $ar = $ENV{'AR'}	 || "llvm-ar";
 my $objtree = $ENV{'objtree'} || ".";
 
