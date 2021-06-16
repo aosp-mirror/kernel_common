@@ -4973,6 +4973,7 @@ stats_clean:
 ctrl_clean:
 	be_ctrl_cleanup(adapter);
 free_netdev:
+	pci_disable_pcie_error_reporting(pdev);
 	free_netdev(netdev);
 rel_reg:
 	pci_release_regions(pdev);
