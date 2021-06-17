@@ -46,6 +46,7 @@ struct kmem_cache {
 #include <linux/kmemleak.h>
 #include <linux/random.h>
 #include <linux/sched/mm.h>
+#include <linux/android_vendor.h>
 
 /*
  * State of the slab allocator.
@@ -104,6 +105,9 @@ struct track {
 	int cpu;		/* Was running on cpu */
 	int pid;		/* Pid context */
 	unsigned long when;	/* When did the operation occur */
+#ifdef CONFIG_STACKTRACE
+	ANDROID_OEM_DATA(1);
+#endif
 };
 
 enum track_item { TRACK_ALLOC, TRACK_FREE };
@@ -676,5 +680,11 @@ static inline bool slab_want_init_on_free(struct kmem_cache *c)
 			 (c->flags & (SLAB_TYPESAFE_BY_RCU | SLAB_POISON)));
 	return false;
 }
+
+#if defined(CONFIG_DEBUG_FS) && defined(CONFIG_SLUB_DEBUG)
+void debugfs_slab_release(struct kmem_cache *);
+#else
+static inline void debugfs_slab_release(struct kmem_cache *s) { }
+#endif
 
 #endif /* MM_SLAB_H */
