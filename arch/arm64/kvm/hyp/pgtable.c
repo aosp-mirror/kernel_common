@@ -864,10 +864,11 @@ int kvm_pgtable_stage2_unmap(struct kvm_pgtable *pgt, u64 addr, u64 size)
 }
 
 struct stage2_attr_data {
-	kvm_pte_t	attr_set;
-	kvm_pte_t	attr_clr;
-	kvm_pte_t	pte;
-	u32		level;
+	kvm_pte_t			attr_set;
+	kvm_pte_t			attr_clr;
+	kvm_pte_t			pte;
+	u32				level;
+	struct kvm_pgtable_mm_ops	*mm_ops;
 };
 
 static int stage2_attr_walker(u64 addr, u64 end, u32 level, kvm_pte_t *ptep,
@@ -906,6 +907,7 @@ static int stage2_update_leaf_attrs(struct kvm_pgtable *pgt, u64 addr,
 	struct stage2_attr_data data = {
 		.attr_set	= attr_set & attr_mask,
 		.attr_clr	= attr_clr & attr_mask,
+		.mm_ops		= pgt->mm_ops,
 	};
 	struct kvm_pgtable_walker walker = {
 		.cb		= stage2_attr_walker,
