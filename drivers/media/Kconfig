@@ -50,7 +50,7 @@ config MEDIA_ANALOG_TV_SUPPORT
 		will disable support for them.
 
 config MEDIA_DIGITAL_TV_SUPPORT
-	bool "Digital TV support"
+	tristate "Digital TV support"
 	help
 	  Enable digital TV support.
 
