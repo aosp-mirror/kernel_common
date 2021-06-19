@@ -1328,7 +1328,7 @@ nouveau_ttm_tt_populate(struct ttm_bo_device *bdev,
 #endif
 
 #if IS_ENABLED(CONFIG_SWIOTLB) && IS_ENABLED(CONFIG_X86)
-	if (is_swiotlb_active()) {
+	if (is_swiotlb_active(dev)) {
 		return ttm_dma_populate((void *)ttm, dev, ctx);
 	}
 #endif
@@ -1358,7 +1358,7 @@ nouveau_ttm_tt_unpopulate(struct ttm_bo_device *bdev,
 #endif
 
 #if IS_ENABLED(CONFIG_SWIOTLB) && IS_ENABLED(CONFIG_X86)
-	if (is_swiotlb_active()) {
+	if (is_swiotlb_active(dev)) {
 		ttm_dma_unpopulate((void *)ttm, dev);
 		return;
 	}
