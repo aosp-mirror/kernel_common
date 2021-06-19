@@ -3893,7 +3893,7 @@ bounce_map_single(struct device *dev, phys_addr_t paddr, size_t size,
 	return (phys_addr_t)iova_pfn << PAGE_SHIFT;
 
 mapping_error:
-	if (is_swiotlb_buffer(tlb_addr))
+	if (is_swiotlb_buffer(dev, tlb_addr))
 		swiotlb_tbl_unmap_single(dev, tlb_addr, size, dir, attrs);
 swiotlb_error:
 	free_iova_fast(&domain->iovad, iova_pfn, dma_to_mm_pfn(nrpages));
@@ -3919,7 +3919,7 @@ bounce_unmap_single(struct device *dev, dma_addr_t dev_addr, size_t size,
 		return;
 
 	intel_unmap(dev, dev_addr, size);
-	if (is_swiotlb_buffer(tlb_addr))
+	if (is_swiotlb_buffer(dev, tlb_addr))
 		swiotlb_tbl_unmap_single(dev, tlb_addr, size, dir, attrs);
 
 	trace_bounce_unmap_single(dev, dev_addr, size);
@@ -3999,7 +3999,7 @@ bounce_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
 {
 	phys_addr_t tlb_addr = bounce_sync_single(dev, addr);
 
-	if (is_swiotlb_buffer(tlb_addr))
+	if (is_swiotlb_buffer(dev, tlb_addr))
 		swiotlb_sync_single_for_cpu(dev, tlb_addr, size, dir);
 }
 
@@ -4009,7 +4009,7 @@ bounce_sync_single_for_device(struct device *dev, dma_addr_t addr,
 {
 	phys_addr_t tlb_addr = bounce_sync_single(dev, addr);
 
-	if (is_swiotlb_buffer(tlb_addr))
+	if (is_swiotlb_buffer(dev, tlb_addr))
 		swiotlb_sync_single_for_device(dev, tlb_addr, size, dir);
 }
 
