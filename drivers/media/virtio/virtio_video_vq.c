@@ -525,6 +525,9 @@ int virtio_video_cmd_resource_create_page(
 		req_p->num_entries[i] = cpu_to_le32(num_entries[i]);
 	}
 
+	req_p->planes_layout =
+		cpu_to_le32(VIRTIO_VIDEO_PLANES_LAYOUT_SINGLE_BUFFER);
+
 	vbuf->data_buf = ents;
 	vbuf->data_size = sizeof(*ents) * nents;
 
