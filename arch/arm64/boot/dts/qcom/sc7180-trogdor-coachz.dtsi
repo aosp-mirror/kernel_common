@@ -331,3 +331,5 @@ ap_ts_pen_1v8: &i2c4 {
 		bias-pull-up;
 	};
 };
+
+#include "sc7180-trogdor-mipi-camera.dtsi"
