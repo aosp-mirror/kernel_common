@@ -76,6 +76,8 @@ struct uvc_request {
 	struct usb_request *req;
 	u8 *req_buffer;
 	struct uvc_video *video;
+	struct sg_table sgt;
+	u8 header[2];
 };
 
 struct uvc_video {
