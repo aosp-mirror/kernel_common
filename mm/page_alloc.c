@@ -9111,7 +9111,7 @@ static unsigned long pfn_max_align_down(unsigned long pfn)
 			     pageblock_nr_pages) - 1);
 }
 
-static unsigned long pfn_max_align_up(unsigned long pfn)
+unsigned long pfn_max_align_up(unsigned long pfn)
 {
 	return ALIGN(pfn, max_t(unsigned long, MAX_ORDER_NR_PAGES,
 				pageblock_nr_pages));
@@ -9213,6 +9213,12 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
 				page_pinner_failure_detect(page);
 			}
 		}
+
+		if (!list_empty(&cc->migratepages)) {
+			page = list_first_entry(&cc->migratepages, struct page , lru);
+			info->failed_pfn = page_to_pfn(page);
+		}
+
 		putback_movable_pages(&cc->migratepages);
 		info->err |= ACR_ERR_MIGRATE;
 		return ret;
@@ -9287,7 +9293,8 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 	 */
 
 	ret = start_isolate_page_range(pfn_max_align_down(start),
-				       pfn_max_align_up(end), migratetype, 0);
+				       pfn_max_align_up(end), migratetype, 0,
+				       &info->failed_pfn);
 	if (ret) {
 		info->err |= ACR_ERR_ISOLATE;
 		return ret;
@@ -9354,7 +9361,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 	}
 
 	/* Make sure the range is really isolated. */
-	if (test_pages_isolated(outer_start, end, 0)) {
+	if (test_pages_isolated(outer_start, end, 0, &info->failed_pfn)) {
 		ret = -EBUSY;
 		info->err |= ACR_ERR_TEST;
 		goto done;
