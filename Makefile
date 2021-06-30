@@ -668,16 +668,6 @@ RETPOLINE_VDSO_CFLAGS := $(call cc-option,$(RETPOLINE_VDSO_CFLAGS_GCC),$(call cc
 export RETPOLINE_CFLAGS
 export RETPOLINE_VDSO_CFLAGS
 
-# Make toolchain changes before including arch/$(SRCARCH)/Makefile to ensure
-# ar/cc/ld-* macros return correct values.
-ifdef CONFIG_LTO_CLANG
-# LTO produces LLVM IR instead of object files. Use llvm-ar and llvm-nm, so we
-# can process these.
-AR		:= llvm-ar
-LLVM_NM		:= llvm-nm
-export LLVM_NM
-endif
-
 include arch/$(SRCARCH)/Makefile
 
 ifdef need-config

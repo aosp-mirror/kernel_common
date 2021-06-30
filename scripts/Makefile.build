@@ -152,7 +152,7 @@ ifdef CONFIG_LTO_CLANG
 # Generate .o.symversions files for each .o with exported symbols, and link these
 # to the kernel and/or modules at the end.
 cmd_modversions_c =								\
-	if $(LLVM_NM) $@ | grep -q __ksymtab; then				\
+	if $(NM) $@ | grep -q __ksymtab; then				\
 		$(call cmd_gensymtypes_c,$(KBUILD_SYMTYPES),$(@:.o=.symtypes))	\
 		    > $@.symversions;						\
 	fi;
@@ -450,7 +450,7 @@ ksyms-lds = $(dot-target).lds
 
 ifdef CONFIG_LTO_CLANG
 # Objdump doesn't understand LLVM IR. Use llvm-nm to dump symbols.
-dump_export_list = $(LLVM_NM)
+dump_export_list = $(NM)
 else
 dump_export_list = $(OBJDUMP) -h
 endif
