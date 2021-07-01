@@ -525,6 +525,7 @@ static void svc_xprt_release(struct svc_rqst *rqstp)
 	kfree(rqstp->rq_deferred);
 	rqstp->rq_deferred = NULL;
 
+	pagevec_release(&rqstp->rq_pvec);
 	svc_free_res_pages(rqstp);
 	rqstp->rq_res.page_len = 0;
 	rqstp->rq_res.page_base = 0;
@@ -650,6 +651,8 @@ static int svc_alloc_arg(struct svc_rqst *rqstp)
 	struct xdr_buf *arg;
 	int pages;
 	int i;
+
+	pagevec_init(&rqstp->rq_pvec);
 
 	/* now allocate needed pages.  If we get a failure, sleep briefly */
 	pages = (serv->sv_max_mesg + 2 * PAGE_SIZE) >> PAGE_SHIFT;
