@@ -6,6 +6,7 @@
  */
 #include <linux/device.h>
 #include <linux/types.h>
+#include <linux/android_kabi.h>
 
 #define SCMI_MAX_STR_SIZE	16
 #define SCMI_MAX_NUM_RATES	16
@@ -74,6 +75,8 @@ struct scmi_clk_ops {
 			u64 rate);
 	int (*enable)(const struct scmi_handle *handle, u32 clk_id);
 	int (*disable)(const struct scmi_handle *handle, u32 clk_id);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -114,6 +117,8 @@ struct scmi_perf_ops {
 			unsigned long *rate, bool poll);
 	int (*est_power_get)(const struct scmi_handle *handle, u32 domain,
 			     unsigned long *rate, unsigned long *power);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -139,6 +144,8 @@ struct scmi_power_ops {
 			 u32 state);
 	int (*state_get)(const struct scmi_handle *handle, u32 domain,
 			 u32 *state);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct scmi_sensor_info {
@@ -148,6 +155,8 @@ struct scmi_sensor_info {
 	u8 num_trip_points;
 	bool async;
 	char name[SCMI_MAX_STR_SIZE];
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /*
@@ -185,6 +194,8 @@ struct scmi_sensor_ops {
 				 u32 sensor_id, u8 trip_id, u64 trip_value);
 	int (*reading_get)(const struct scmi_handle *handle, u32 sensor_id,
 			   u64 *value);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -205,6 +216,8 @@ struct scmi_reset_ops {
 	int (*reset)(const struct scmi_handle *handle, u32 domain);
 	int (*assert)(const struct scmi_handle *handle, u32 domain);
 	int (*deassert)(const struct scmi_handle *handle, u32 domain);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -242,6 +255,8 @@ struct scmi_handle {
 	void *power_priv;
 	void *sensor_priv;
 	void *reset_priv;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 enum scmi_std_protocol {
@@ -259,6 +274,8 @@ struct scmi_device {
 	u8 protocol_id;
 	struct device dev;
 	struct scmi_handle *handle;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 #define to_scmi_dev(d) container_of(d, struct scmi_device, dev)

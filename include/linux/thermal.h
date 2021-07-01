@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/sysfs.h>
 #include <linux/workqueue.h>
+#include <linux/android_kabi.h>
 #include <uapi/linux/thermal.h>
 
 #define THERMAL_TRIPS_NONE	-1
@@ -113,6 +114,7 @@ struct thermal_zone_device_ops {
 			  enum thermal_trend *);
 	int (*notify) (struct thermal_zone_device *, int,
 		       enum thermal_trip_type);
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct thermal_cooling_device_ops {
@@ -125,6 +127,8 @@ struct thermal_cooling_device_ops {
 			   struct thermal_zone_device *, unsigned long, u32 *);
 	int (*power2state)(struct thermal_cooling_device *,
 			   struct thermal_zone_device *, u32, unsigned long *);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct thermal_cooling_device {
@@ -139,6 +143,8 @@ struct thermal_cooling_device {
 	struct mutex lock; /* protect thermal_instances list */
 	struct list_head thermal_instances;
 	struct list_head node;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct thermal_attr {
@@ -219,6 +225,8 @@ struct thermal_zone_device {
 	struct list_head node;
 	struct delayed_work poll_queue;
 	enum thermal_notify_event notify_event;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -239,6 +247,8 @@ struct thermal_governor {
 	void (*unbind_from_tz)(struct thermal_zone_device *tz);
 	int (*throttle)(struct thermal_zone_device *tz, int trip);
 	struct list_head	governor_list;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /* Structure that holds binding parameters for a zone */
@@ -274,6 +284,8 @@ struct thermal_bind_params {
 	unsigned long *binding_limits;
 	int (*match) (struct thermal_zone_device *tz,
 			struct thermal_cooling_device *cdev);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /* Structure to define Thermal Zone parameters */
@@ -327,6 +339,8 @@ struct thermal_zone_params {
 	 * 		Used by thermal zone drivers (default 0).
 	 */
 	int offset;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct thermal_genl_event {
@@ -356,6 +370,8 @@ struct thermal_zone_of_device_ops {
 	int (*set_trips)(void *, int, int);
 	int (*set_emul_temp)(void *, int);
 	int (*set_trip_temp)(void *, int, int);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -371,6 +387,8 @@ struct thermal_trip {
 	int temperature;
 	int hysteresis;
 	enum thermal_trip_type type;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /* Function declarations */
