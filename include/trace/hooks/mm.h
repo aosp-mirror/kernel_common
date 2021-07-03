@@ -21,6 +21,14 @@ DECLARE_RESTRICTED_HOOK(android_rvh_set_readahead_gfp_mask,
 			TP_ARGS(flags), 1);
 
 */
+struct mem_cgroup;
+DECLARE_HOOK(android_vh_mem_cgroup_alloc,
+	TP_PROTO(struct mem_cgroup *memcg),
+	TP_ARGS(memcg));
+DECLARE_HOOK(android_vh_mem_cgroup_free,
+	TP_PROTO(struct mem_cgroup *memcg),
+	TP_ARGS(memcg));
+
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
