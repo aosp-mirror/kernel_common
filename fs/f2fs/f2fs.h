@@ -1330,7 +1330,8 @@ enum {
 #define PAGE_PRIVATE_GET_FUNC(name, flagname) \
 static inline bool page_private_##name(struct page *page) \
 { \
-	return test_bit(PAGE_PRIVATE_NOT_POINTER, &page_private(page)) && \
+	return PagePrivate(page) && \
+		test_bit(PAGE_PRIVATE_NOT_POINTER, &page_private(page)) && \
 		test_bit(PAGE_PRIVATE_##flagname, &page_private(page)); \
 }
 
@@ -1340,6 +1341,7 @@ static inline void set_page_private_##name(struct page *page) \
 	if (!PagePrivate(page)) { \
 		get_page(page); \
 		SetPagePrivate(page); \
+		set_page_private(page, 0); \
 	} \
 	set_bit(PAGE_PRIVATE_NOT_POINTER, &page_private(page)); \
 	set_bit(PAGE_PRIVATE_##flagname, &page_private(page)); \
@@ -1398,6 +1400,7 @@ static inline void set_page_private_data(struct page *page, unsigned long data)
 	if (!PagePrivate(page)) {
 		get_page(page);
 		SetPagePrivate(page);
+		set_page_private(page, 0);
 	}
 	set_bit(PAGE_PRIVATE_NOT_POINTER, &page_private(page));
 	page_private(page) |= data << PAGE_PRIVATE_MAX;
