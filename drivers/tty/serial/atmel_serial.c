@@ -174,9 +174,6 @@ struct atmel_uart_port {
 	bool			ms_irq_enabled;
 	bool			is_usart;	/* usart or uart */
 	struct timer_list	uart_timer;	/* uart timer */
-
-	bool			hd_start_rx;	/* can start RX during half-duplex operation */
-
 	int (*prepare_rx)(struct uart_port *port);
 	int (*prepare_tx)(struct uart_port *port);
 	void (*schedule_rx)(struct uart_port *port);
@@ -737,13 +734,8 @@ static void atmel_complete_tx_dma(void *arg)
 		tasklet_schedule(&atmel_port->tasklet);
 	else if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
 		 !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX)) {
-		/*
-		 * DMA done, re-enable TXEMPTY and signal that we can stop
-		 * TX and start RX for RS485
-		 */
-		atmel_port->hd_start_rx = true;
-		atmel_uart_writel(port, ATMEL_US_IER,
-				  atmel_port->tx_done_mask);
+		/* DMA done, stop TX, start RX for RS485 */
+		atmel_start_rx(port);
 	}
 
 	spin_unlock_irqrestore(&port->lock, flags);
@@ -1136,19 +1128,8 @@ atmel_handle_transmit(struct uart_port *port, unsigned int pending)
 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
 
 	if (pending & atmel_port->tx_done_mask) {
+		/* Either PDC or interrupt transmission */
 		UART_PUT_IDR(port, atmel_port->tx_done_mask);
-
-		/* Start RX if flag was set and FIFO is empty */
-		if (atmel_port->hd_start_rx) {
-			if (!(atmel_uart_readl(port, ATMEL_US_CSR)
-					& ATMEL_US_TXEMPTY))
-				dev_warn(port->dev, "Should start RX, but TX fifo is not empty\n");
-
-			atmel_port->hd_start_rx = false;
-			atmel_start_rx(port);
-			return;
-		}
-
 		tasklet_schedule(&atmel_port->tasklet);
 	}
 }
