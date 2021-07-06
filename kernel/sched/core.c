@@ -3802,6 +3802,7 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 
 	return ns;
 }
+EXPORT_SYMBOL_GPL(task_sched_runtime);
 
 /*
  * This function gets called by the timer code, with HZ frequency.
