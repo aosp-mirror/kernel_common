@@ -88,6 +88,16 @@ config TRUSTY_DMA_BUF_FFA_TAG
 
 	  If set to N, a default implementation which returns 0 will be used.
 
+config TRUSTY_CRASH_IS_PANIC
+	bool "When trusty panics, then panic the kernel"
+	help
+	 This option will treat Trusty panics as fatal.  This is useful if
+	 your system cannot recover from Trusty panic/halt and you require
+	 the system to reboot to recover.
+
+	 If N, it will contine to run the kernel, but trusty operations will
+	 return errors.
+
 endif # TRUSTY
 
 endmenu

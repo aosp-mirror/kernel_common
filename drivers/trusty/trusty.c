@@ -126,8 +126,14 @@ static unsigned long trusty_std_call_helper(struct device *dev,
 		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_PREPARE,
 					   NULL);
 		ret = trusty_std_call_inner(dev, smcnr, a0, a1, a2);
-		if (WARN_ONCE(ret == SM_ERR_PANIC, "trusty crashed"))
+		if (ret == SM_ERR_PANIC) {
 			s->trusty_panicked = true;
+			if (IS_ENABLED(CONFIG_TRUSTY_CRASH_IS_PANIC))
+				panic("trusty crashed");
+			else
+				WARN_ONCE(1, "trusty crashed");
+		}
+
 		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_RETURNED,
 					   NULL);
 		if (ret == SM_ERR_INTERRUPTED) {
