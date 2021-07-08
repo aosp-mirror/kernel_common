@@ -59,6 +59,7 @@
 #include <linux/virtio.h>
 #include <linux/virtio_dma_buf.h>
 #include <linux/virtio_wl.h>
+#include <linux/vmalloc.h>
 
 #include <uapi/linux/dma-buf.h>
 
