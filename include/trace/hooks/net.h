@@ -12,11 +12,16 @@
 struct packet_type;
 struct list_head;
 struct sk_buff;
+struct nf_conn;
 DECLARE_HOOK(android_vh_ptype_head,
 	TP_PROTO(const struct packet_type *pt, struct list_head *vendor_pt),
 	TP_ARGS(pt, vendor_pt));
 DECLARE_HOOK(android_vh_kfree_skb,
 	TP_PROTO(struct sk_buff *skb), TP_ARGS(skb));
+DECLARE_RESTRICTED_HOOK(android_rvh_nf_conn_alloc,
+	TP_PROTO(struct nf_conn *nf_conn), TP_ARGS(nf_conn), 1);
+DECLARE_RESTRICTED_HOOK(android_rvh_nf_conn_free,
+	TP_PROTO(struct nf_conn *nf_conn), TP_ARGS(nf_conn), 1);
 
 /* macro versions of hooks are no longer required */
 
