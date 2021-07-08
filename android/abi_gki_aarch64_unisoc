@@ -131,6 +131,7 @@
   debugfs_create_bool
   debugfs_create_dir
   debugfs_create_file
+  debugfs_create_regset32
   debugfs_create_u32
   debugfs_create_x32
   debugfs_initialized
@@ -1272,11 +1273,14 @@
   devm_ioremap
   dw_pcie_host_init
   dw_pcie_msi_init
+  dw_pcie_read_dbi
   dw_pcie_setup_rc
   dw_pcie_wait_for_link
+  dw_pcie_write_dbi
   fwnode_handle_put
   gpiod_get_value
   of_fwnode_ops
+  msi_desc_to_pci_sysdata
   pci_assign_unassigned_bus_resources
   pci_bus_add_devices
   pci_check_and_mask_intx
