@@ -169,11 +169,14 @@ enum virtio_video_cmd_type {
 	VIRTIO_VIDEO_CMD_RESOURCE_QUEUE,
 	VIRTIO_VIDEO_CMD_RESOURCE_DESTROY_ALL,
 	VIRTIO_VIDEO_CMD_QUEUE_CLEAR,
-	VIRTIO_VIDEO_CMD_GET_PARAMS,
-	VIRTIO_VIDEO_CMD_SET_PARAMS,
+	/* GET/SET_PARAMS are being replaced with GET/SET_PARAMS_EXT */
+	VIRTIO_VIDEO_CMD_GET_PARAMS__UNUSED,
+	VIRTIO_VIDEO_CMD_SET_PARAMS__UNUSED,
 	VIRTIO_VIDEO_CMD_QUERY_CONTROL,
 	VIRTIO_VIDEO_CMD_GET_CONTROL,
 	VIRTIO_VIDEO_CMD_SET_CONTROL,
+	VIRTIO_VIDEO_CMD_GET_PARAMS_EXT,
+	VIRTIO_VIDEO_CMD_SET_PARAMS_EXT,
 
 	/* Response */
 	VIRTIO_VIDEO_RESP_OK_NODATA = 0x0200,
@@ -365,6 +368,8 @@ struct virtio_video_params {
 	__le32 frame_rate;
 	__le32 num_planes;
 	struct virtio_video_plane_format plane_formats[VIRTIO_VIDEO_MAX_PLANES];
+	__le32 resource_type; /* One of VIRTIO_VIDEO_MEM_TYPE_* types */
+	__u8 padding[4];
 };
 
 struct virtio_video_get_params {

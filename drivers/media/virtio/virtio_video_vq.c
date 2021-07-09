@@ -431,6 +431,11 @@ int virtio_video_cmd_stream_create(struct virtio_video *vv, uint32_t stream_id,
 {
 	struct virtio_video_stream_create *req_p;
 	struct virtio_video_vbuffer *vbuf;
+	/*
+	 * Use virtio objects by default ; future versions of the virtio-video
+	 * spec will very likely drop this parameter.
+	 */
+	int resource_type = VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT;
 
 	req_p = virtio_video_alloc_req(vv, &vbuf, sizeof(*req_p));
 	if (IS_ERR(req_p))
@@ -439,8 +444,8 @@ int virtio_video_cmd_stream_create(struct virtio_video *vv, uint32_t stream_id,
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_STREAM_CREATE);
 	req_p->hdr.stream_id = cpu_to_le32(stream_id);
 	req_p->coded_format = cpu_to_le32(format);
-	req_p->in_mem_type = cpu_to_le32(vv->res_type);
-	req_p->out_mem_type = cpu_to_le32(vv->res_type);
+	req_p->in_mem_type = cpu_to_le32(resource_type);
+	req_p->out_mem_type = cpu_to_le32(resource_type);
 
 	strncpy(req_p->tag, tag, sizeof(req_p->tag) - 1);
 	req_p->tag[sizeof(req_p->tag) - 1] = 0;
@@ -805,6 +810,7 @@ virtio_video_cmd_get_params_cb(struct virtio_video *vv,
 	if (!format_info)
 		return;
 
+	format_info->resource_type = le32_to_cpu(params->resource_type);
 	format_info->frame_rate = le32_to_cpu(params->frame_rate);
 	format_info->frame_width = le32_to_cpu(params->frame_width);
 	format_info->frame_height = le32_to_cpu(params->frame_height);
@@ -856,7 +862,7 @@ int virtio_video_cmd_get_params(struct virtio_video *vv,
 	if (IS_ERR(req_p))
 		return PTR_ERR(req_p);
 
-	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_GET_PARAMS);
+	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_GET_PARAMS_EXT);
 	req_p->hdr.stream_id = cpu_to_le32(stream->stream_id);
 	req_p->queue_type = cpu_to_le32(queue_type);
 
@@ -898,9 +904,10 @@ virtio_video_cmd_set_params(struct virtio_video *vv,
 	if (IS_ERR(req_p))
 		return PTR_ERR(req_p);
 
-	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_SET_PARAMS);
+	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_SET_PARAMS_EXT);
 	req_p->hdr.stream_id = cpu_to_le32(stream->stream_id);
 	req_p->params.queue_type = cpu_to_le32(queue_type);
+	req_p->params.resource_type = cpu_to_le32(format_info->resource_type);
 	req_p->params.frame_rate = cpu_to_le32(format_info->frame_rate);
 	req_p->params.frame_width = cpu_to_le32(format_info->frame_width);
 	req_p->params.frame_height = cpu_to_le32(format_info->frame_height);

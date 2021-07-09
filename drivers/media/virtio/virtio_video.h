@@ -76,6 +76,7 @@ struct video_plane_format {
 };
 
 struct video_format_info {
+	uint32_t resource_type;
 	uint32_t fourcc_format;
 	uint32_t frame_rate;
 	uint32_t frame_width;
@@ -130,8 +131,6 @@ struct virtio_video_queue {
 struct virtio_video {
 	struct v4l2_device v4l2_dev;
 	int instance;
-
-	u32 res_type;
 
 	struct virtio_device *vdev;
 	struct virtio_video_queue commandq;
@@ -276,6 +275,20 @@ static inline uint32_t to_virtio_queue_type(enum v4l2_buf_type type)
 		return VIRTIO_VIDEO_QUEUE_TYPE_INPUT;
 	else
 		return VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT;
+}
+
+static inline uint32_t to_virtio_mem_type(enum vb2_memory v4l2_mem)
+{
+	switch (v4l2_mem) {
+	case VB2_MEMORY_UNKNOWN:
+	case VB2_MEMORY_MMAP:
+	case VB2_MEMORY_USERPTR:
+		return VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES;
+	case VB2_MEMORY_DMABUF:
+		return VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT;
+	default:
+		return -1;
+	}
 }
 
 static inline bool within_range(uint32_t min, uint32_t val, uint32_t max)

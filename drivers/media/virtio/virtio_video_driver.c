@@ -122,23 +122,6 @@ static int virtio_video_probe(struct virtio_device *vdev)
 	if (!vv)
 		return -ENOMEM;
 
-	/**
-	 * RESOURCE_VIRTIO_OBJECT is prioritized when both resource type is
-	 * supported.
-	 * TODO: Can we provide users with a way of specifying a
-	 *  resource type when both are supported?
-	 */
-	if (virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_VIRTIO_OBJECT)) {
-		vv->res_type = VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT;
-	} else if (virtio_has_feature(vdev,
-				      VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
-		vv->res_type = VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES;
-	} else {
-		dev_err(dev, "device must support guest allocated buffers or virtio objects\n");
-		ret = -ENODEV;
-		goto err_res_type;
-	}
-
 	vv->vdev = vdev;
 	vv->debug = debug;
 	vv->use_dma_mem = use_dma_mem;
@@ -224,7 +207,6 @@ err_vbufs:
 err_vqs:
 	v4l2_device_unregister(&vv->v4l2_dev);
 err_v4l2_reg:
-err_res_type:
 	devm_kfree(&vdev->dev, vv);
 
 	return ret;
