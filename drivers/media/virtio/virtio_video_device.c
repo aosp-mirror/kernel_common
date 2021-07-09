@@ -248,11 +248,10 @@ static int virtio_video_buf_init_virtio_object(struct vb2_buffer *vb)
 
 int virtio_video_buf_init(struct vb2_buffer *vb)
 {
-	struct virtio_video_stream *stream = vb2_get_drv_priv(vb->vb2_queue);
-	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
-	struct virtio_video *vv = vvd->vv;
+	struct vb2_queue *queue = vb->vb2_queue;
+	int mem_type = to_virtio_mem_type(queue->memory);
 
-	switch (vv->res_type) {
+	switch (mem_type) {
 	case VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES:
 		return virtio_video_buf_init_guest_pages(vb);
 	case VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT:
@@ -283,14 +282,16 @@ static bool virtio_video_buf_object_stale(struct vb2_buffer *vb, uuid_t *uuid)
 
 int virtio_video_buf_prepare(struct vb2_buffer *vb)
 {
-	struct virtio_video_stream *stream = vb2_get_drv_priv(vb->vb2_queue);
+	struct vb2_queue *queue = vb->vb2_queue;
+	struct virtio_video_stream *stream = vb2_get_drv_priv(queue);
 	struct virtio_video_buffer *virtio_vb = to_virtio_vb(vb);
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
+	int mem_type = to_virtio_mem_type(queue->memory);
 	struct virtio_video *vv = vvd->vv;
 	uuid_t uuid;
 	int ret;
 
-	if (vv->res_type != VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT)
+	if (mem_type != VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT)
 		return 0;
 
 	ret = virtio_video_get_dma_buf_id(vvd, vb, &uuid);
@@ -690,9 +691,38 @@ int virtio_video_reqbufs(struct file *file, void *priv,
 	struct v4l2_m2m_ctx *m2m_ctx = stream->fh.m2m_ctx;
 	struct vb2_queue *vq = v4l2_m2m_get_vq(m2m_ctx, rb->type);
 	struct virtio_video_device *vvd = video_drvdata(file);
+	struct virtio_video *vv = vvd->vv;
+	struct video_format_info *params;
+	uint32_t queue_type = to_virtio_queue_type(vq->type);
+	uint32_t mem_type = to_virtio_mem_type(rb->memory);
+	int ret;
+
+	/* Check that the host supports the requested memory type */
+	if ((mem_type == VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES &&
+	     !virtio_has_feature(vv->vdev,
+				 VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) ||
+	    (mem_type == VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT &&
+	     !virtio_has_feature(vv->vdev,
+				 VIRTIO_VIDEO_F_RESOURCE_VIRTIO_OBJECT)))
+		return -EINVAL;
 
 	if (rb->count == 0)
 		virtio_video_queue_free(vvd->vv, stream, vq->type);
+
+	/*
+	 * The memory type of the queue has been set, inform the host.
+	 * This needs to be done before calling v4l2_m2m_reqbufs() as it may
+	 * start creating host resources immediately, and we need the memory
+	 * type to be the correct one when that happens.
+	 */
+	if (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT)
+		params = &stream->in_info;
+	else
+		params = &stream->out_info;
+	params->resource_type = mem_type;
+	ret = virtio_video_cmd_set_params(vv, stream, params, queue_type);
+	if (ret)
+		return ret;
 
 	return v4l2_m2m_reqbufs(file, m2m_ctx, rb);
 }
