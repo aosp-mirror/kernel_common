@@ -222,6 +222,7 @@ mipi_dsi_device_register_full(struct mipi_dsi_host *host,
 	}
 
 	dsi->dev.of_node = info->node;
+	dsi->dev.fwnode = of_fwnode_handle(info->node);
 	dsi->channel = info->channel;
 	strlcpy(dsi->name, info->type, sizeof(dsi->name));
 
