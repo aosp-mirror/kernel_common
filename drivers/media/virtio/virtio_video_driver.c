@@ -211,6 +211,7 @@ static int virtio_video_probe(struct virtio_device *vdev)
 	vv->use_dma_api = !virtio_has_dma_quirk(vdev);
 	if (!vv->use_dma_api)
 		set_dma_ops(dev, &dma_phys_ops);
+	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
 
 	dev_set_name(dev, "%s.%i", DRIVER_NAME, vdev->index);
 	ret = v4l2_device_register(dev, &vv->v4l2_dev);
