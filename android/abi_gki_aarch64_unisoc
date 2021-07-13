@@ -86,6 +86,10 @@
   clocks_calc_mult_shift
   clockevents_config_and_register
   __clocksource_register_scale
+  cma_alloc
+  cma_for_each_area
+  cma_get_name
+  cma_release
   compat_alloc_user_space
   complete
   complete_all
@@ -127,7 +131,9 @@
   debugfs_create_bool
   debugfs_create_dir
   debugfs_create_file
+  debugfs_create_regset32
   debugfs_create_u32
+  debugfs_create_x32
   debugfs_initialized
   debugfs_remove
   debugfs_remove_recursive
@@ -312,6 +318,7 @@
   i2c_del_driver
   i2c_register_driver
   i2c_smbus_read_byte_data
+  i2c_smbus_read_word_data
   i2c_smbus_write_byte_data
   i2c_transfer_buffer_flags
   ida_alloc_range
@@ -380,6 +387,8 @@
   iommu_put_dma_cookie
   iommu_set_fault_handler
   iommu_unmap
+  ion_buffer_prep_noncached
+  ion_device_remove_heap
   __ioremap
   iounmap
   iput
@@ -440,6 +449,7 @@
   kstrtouint
   kstrtoull
   kthread_create_on_node
+  kthread_flush_worker
   kthread_should_stop
   kthread_stop
   ktime_get
@@ -609,6 +619,8 @@
   power_supply_get_property
   power_supply_powers
   power_supply_put
+  power_supply_reg_notifier
+  power_supply_unreg_notifier
   ppp_input
   ppp_register_compressor
   ppp_unregister_compressor
@@ -661,6 +673,7 @@
   register_filesystem
   register_pernet_subsys
   register_pm_notifier
+  regmap_exit
   regmap_read
   regmap_update_bits_base
   regmap_write
@@ -754,6 +767,7 @@
   snd_soc_unregister_component
   snprintf
   __spi_alloc_controller
+  spi_setup
   sprintf
   sscanf
   __stack_chk_fail
@@ -1259,11 +1273,14 @@
   devm_ioremap
   dw_pcie_host_init
   dw_pcie_msi_init
+  dw_pcie_read_dbi
   dw_pcie_setup_rc
   dw_pcie_wait_for_link
+  dw_pcie_write_dbi
   fwnode_handle_put
   gpiod_get_value
   of_fwnode_ops
+  msi_desc_to_pci_sysdata
   pci_assign_unassigned_bus_resources
   pci_bus_add_devices
   pci_check_and_mask_intx
@@ -1886,6 +1903,7 @@
 
 # required by spi-sprd.ko
   dma_request_chan
+  spi_controller_resume
   spi_controller_suspend
   spi_finalize_current_transfer
 
@@ -2083,6 +2101,13 @@
 # required by tcpm.ko
   fwnode_property_read_u32_array
   mod_delayed_work_on
+  tcpm_cc_change
+  tcpm_pd_hard_reset
+  tcpm_pd_receive
+  tcpm_pd_transmit_complete
+  tcpm_register_port
+  tcpm_unregister_port
+  tcpm_vbus_change
   usb_debug_root
 
 # required by trusty.ko
@@ -2636,3 +2661,30 @@
   usb_assign_descriptors
   usb_free_all_descriptors
   usb_gstrings_attach
+
+# required by sprd_apdu_r3p0.ko
+  __netlink_kernel_create
+  __nlmsg_put
+  netlink_kernel_release
+  of_get_address
+  of_get_compatible_child
+
+# required by sprd_tcpm.ko
+  typec_altmode_attention
+  typec_altmode_notify
+  typec_altmode_update_active
+  typec_altmode_vdm
+  typec_find_port_data_role
+  typec_find_port_power_role
+  typec_find_power_role
+  typec_get_drvdata
+  typec_match_altmode
+  typec_partner_set_identity
+  typec_partner_register_altmode
+  typec_port_register_altmode
+  typec_set_mode
+  typec_set_orientation
+  typec_unregister_altmode
+  usb_role_switch_get
+  usb_role_switch_put
+  usb_role_switch_set_role
