@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/cred.h>
 #include <linux/mm.h>
+#include <linux/pagemap.h>
 
 #include <asm/uaccess.h>
 #include <asm/page.h>
@@ -35,6 +36,9 @@ static void seq_set_overflow(struct seq_file *m)
 static void *seq_buf_alloc(unsigned long size)
 {
 	void *buf;
+
+	if (unlikely(size > MAX_RW_COUNT))
+		return NULL;
 
 	buf = kmalloc(size, GFP_KERNEL | __GFP_NOWARN);
 	if (!buf && size > PAGE_SIZE)
