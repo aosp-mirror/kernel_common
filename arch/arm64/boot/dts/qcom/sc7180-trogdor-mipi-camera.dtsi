@@ -235,6 +235,7 @@
 		regulator-name = "cam_0";
 		gpio = <&tlmm 7 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-enable-ramp-delay = <1000>;
 	};
 
 	vcam1: fixedregulator-cam1 {
@@ -243,6 +244,7 @@
 		regulator-name = "cam_1";
 		gpio = <&tlmm 6 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-enable-ramp-delay = <1000>;
 	};
 
 	cam_af0: fixedregulator-af0 {
