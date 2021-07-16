@@ -189,11 +189,13 @@ int kernfs_iop_getattr(const struct path *path, struct kstat *stat,
 	struct inode *inode = d_inode(path->dentry);
 	struct kernfs_node *kn = inode->i_private;
 
-	down_write(&kernfs_rwsem);
+	down_read(&kernfs_rwsem);
+	spin_lock(&inode->i_lock);
 	kernfs_refresh_inode(kn, inode);
-	up_write(&kernfs_rwsem);
-
 	generic_fillattr(inode, stat);
+	spin_unlock(&inode->i_lock);
+	up_read(&kernfs_rwsem);
+
 	return 0;
 }
 
@@ -275,17 +277,21 @@ void kernfs_evict_inode(struct inode *inode)
 int kernfs_iop_permission(struct inode *inode, int mask)
 {
 	struct kernfs_node *kn;
+	int ret;
 
 	if (mask & MAY_NOT_BLOCK)
 		return -ECHILD;
 
 	kn = inode->i_private;
 
-	down_write(&kernfs_rwsem);
+	down_read(&kernfs_rwsem);
+	spin_lock(&inode->i_lock);
 	kernfs_refresh_inode(kn, inode);
-	up_write(&kernfs_rwsem);
+	ret = generic_permission(inode, mask);
+	spin_unlock(&inode->i_lock);
+	up_read(&kernfs_rwsem);
 
-	return generic_permission(inode, mask);
+	return ret;
 }
 
 int kernfs_xattr_get(struct kernfs_node *kn, const char *name,
