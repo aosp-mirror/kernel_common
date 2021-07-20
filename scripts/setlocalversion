@@ -214,4 +214,9 @@ else
 	fi
 fi
 
+# finally, add the abXXX number if BUILD_NUMBER is set
+if test -n "${BUILD_NUMBER}"; then
+	res="$res-ab${BUILD_NUMBER}"
+fi
+
 echo "$res"
