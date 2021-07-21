@@ -6,10 +6,5 @@ set noparent
 #
 # See the GKI release documentation (go/gki-dr-no) for further details.
 
-adelva@google.com
-maennich@google.com
-malchev@google.com
-saravanak@google.com
-smuckle@google.com
-sspatil@google.com
-tkjos@google.com
+include kernel/common:android12-5.10:/OWNERS
+
