@@ -539,6 +539,8 @@ struct mm_struct {
 		atomic_long_t hugetlb_usage;
 #endif
 		struct work_struct async_put_work;
+
+		ANDROID_KABI_RESERVE(1);
 		ANDROID_VENDOR_DATA(1);
 	} __randomize_layout;
 

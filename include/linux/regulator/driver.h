@@ -16,6 +16,7 @@
 #include <linux/notifier.h>
 #include <linux/regulator/consumer.h>
 #include <linux/ww_mutex.h>
+#include <linux/android_kabi.h>
 
 struct gpio_desc;
 struct regmap;
@@ -219,6 +220,8 @@ struct regulator_ops {
 	int (*resume)(struct regulator_dev *rdev);
 
 	int (*set_pull_down) (struct regulator_dev *);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /*
@@ -390,6 +393,8 @@ struct regulator_desc {
 	unsigned int off_on_delay;
 
 	unsigned int (*of_map_mode)(unsigned int mode);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -482,6 +487,8 @@ struct regulator_dev {
 
 	/* time when this regulator was disabled last time */
 	unsigned long last_off_jiffy;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct regulator_dev *

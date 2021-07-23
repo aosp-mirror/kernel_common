@@ -149,6 +149,7 @@
   dev_fwnode
   dev_get_by_name
   dev_get_regmap
+  dev_open
   device_add
   device_connection_find_match
   device_create
@@ -986,6 +987,7 @@
 # required by charger-manager.ko
   alarm_cancel
   alarm_expires_remaining
+  alarm_forward
   alarm_init
   alarm_start
   alarmtimer_get_rtcdev
@@ -1142,6 +1144,7 @@
   dma_direct_unmap_sg
   idr_get_next
   sg_alloc_table
+  sg_alloc_table_from_pages
   sg_free_table
   vsprintf
 

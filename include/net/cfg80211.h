@@ -20,6 +20,7 @@
 #include <linux/if_ether.h>
 #include <linux/ieee80211.h>
 #include <linux/net.h>
+#include <linux/android_kabi.h>
 #include <net/regulatory.h>
 
 /**
@@ -892,6 +893,8 @@ struct cfg80211_crypto_settings {
 	const u8 *psk;
 	const u8 *sae_pwd;
 	u8 sae_pwd_len;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -938,6 +941,8 @@ struct cfg80211_beacon_data {
 	size_t probe_resp_len;
 	size_t lci_len;
 	size_t civicloc_len;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct mac_address {
@@ -1044,6 +1049,8 @@ struct cfg80211_ap_settings {
 	bool twt_responder;
 	u32 flags;
 	struct ieee80211_he_obss_pd he_obss_pd;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -1073,6 +1080,8 @@ struct cfg80211_csa_settings {
 	bool radar_required;
 	bool block_tx;
 	u8 count;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 #define CFG80211_MAX_NUM_DIFFERENT_CHANNELS 10
@@ -1212,6 +1221,8 @@ struct station_parameters {
 	u16 airtime_weight;
 	struct sta_txpwr txpwr;
 	const struct ieee80211_he_6ghz_capa *he_6ghz_capa;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -1555,6 +1566,8 @@ struct station_info {
 	u32 fcs_err_count;
 
 	u32 airtime_link_metric;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 #if IS_ENABLED(CONFIG_CFG80211)
@@ -1801,6 +1814,8 @@ struct mesh_config {
 	enum nl80211_mesh_power_mode power_mode;
 	u16 dot11MeshAwakeWindowDuration;
 	u32 plink_timeout;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -1850,6 +1865,8 @@ struct mesh_setup {
 	struct cfg80211_bitrate_mask beacon_rate;
 	bool userspace_handles_dfs;
 	bool control_port_over_nl80211;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -1982,6 +1999,8 @@ struct cfg80211_scan_request {
 	struct cfg80211_scan_info info;
 	bool notified;
 	bool no_cck;
+
+	ANDROID_KABI_RESERVE(1);
 
 	/* keep last */
 	struct ieee80211_channel *channels[0];
@@ -2129,6 +2148,8 @@ struct cfg80211_sched_scan_request {
 	bool nl_owner_dead;
 	struct list_head list;
 
+	ANDROID_KABI_RESERVE(1);
+
 	/* keep last */
 	struct ieee80211_channel *channels[0];
 };
@@ -2251,6 +2272,8 @@ struct cfg80211_bss {
 
 	u8 bssid_index;
 	u8 max_bssid_indicator;
+
+	ANDROID_KABI_RESERVE(1);
 
 	u8 priv[0] __aligned(sizeof(void *));
 };
@@ -2375,6 +2398,8 @@ struct cfg80211_assoc_request {
 	const u8 *fils_kek;
 	size_t fils_kek_len;
 	const u8 *fils_nonces;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -2473,6 +2498,8 @@ struct cfg80211_ibss_params {
 	struct ieee80211_ht_cap ht_capa_mask;
 	struct key_params *wep_keys;
 	int wep_tx_key;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -2587,6 +2614,8 @@ struct cfg80211_connect_params {
 	size_t fils_erp_rrk_len;
 	bool want_1x;
 	struct ieee80211_edmg edmg;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -3019,6 +3048,8 @@ struct cfg80211_nan_func {
 	u8 num_rx_filters;
 	u8 instance_id;
 	u64 cookie;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -3179,6 +3210,8 @@ struct cfg80211_pmsr_ftm_result {
 	    dist_avg_valid:1,
 	    dist_variance_valid:1,
 	    dist_spread_valid:1;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -3978,6 +4011,11 @@ struct cfg80211_ops {
 				   struct cfg80211_update_owe_info *owe_info);
 	int	(*probe_mesh_link)(struct wiphy *wiphy, struct net_device *dev,
 				   const u8 *buf, size_t len);
+
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
+	ANDROID_KABI_RESERVE(3);
+	ANDROID_KABI_RESERVE(4);
 };
 
 /*
@@ -4338,6 +4376,8 @@ struct wiphy_vendor_command {
 		      unsigned long *storage);
 	const struct nla_policy *policy;
 	unsigned int maxattr;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -4711,6 +4751,8 @@ struct wiphy {
 
 	const struct cfg80211_pmsr_capabilities *pmsr_capa;
 
+	ANDROID_KABI_RESERVE(1);
+
 	char priv[0] __aligned(NETDEV_ALIGN);
 };
 
@@ -5003,6 +5045,9 @@ struct wireless_dev {
 	struct list_head pmsr_list;
 	spinlock_t pmsr_lock;
 	struct work_struct pmsr_free_wk;
+
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
 };
 
 static inline u8 *wdev_address(struct wireless_dev *wdev)

@@ -11,6 +11,7 @@
 #include <linux/mutex.h>
 #include <linux/property.h>
 #include <linux/slab.h>
+#include <linux/android_kabi.h>
 
 #include "bus.h"
 
@@ -18,6 +19,7 @@ struct typec_plug {
 	struct device			dev;
 	enum typec_plug_index		index;
 	struct ida			mode_ids;
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct typec_cable {
@@ -25,6 +27,7 @@ struct typec_cable {
 	enum typec_plug_type		type;
 	struct usb_pd_identity		*identity;
 	unsigned int			active:1;
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct typec_partner {
@@ -33,6 +36,7 @@ struct typec_partner {
 	struct usb_pd_identity		*identity;
 	enum typec_accessory		accessory;
 	struct ida			mode_ids;
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct typec_port {
@@ -54,6 +58,7 @@ struct typec_port {
 
 	const struct typec_capability	*cap;
 	const struct typec_operations   *ops;
+	ANDROID_KABI_RESERVE(1);
 };
 
 #define to_typec_port(_dev_) container_of(_dev_, struct typec_port, dev)
