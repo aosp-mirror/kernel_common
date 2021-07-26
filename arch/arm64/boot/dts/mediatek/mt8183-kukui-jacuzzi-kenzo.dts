@@ -11,3 +11,7 @@
 	model = "Google kenzo sku17 board";
 	compatible = "google,juniper-sku17", "google,juniper", "mediatek,mt8183";
 };
+
+&i2c2 {
+	mediatek,default-timing-adjust;
+};
