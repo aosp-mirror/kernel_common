@@ -74,6 +74,7 @@
 #include <trace/hooks/sound.h>
 #include <trace/hooks/snd_compr.h>
 #include <trace/hooks/gup.h>
+#include <trace/hooks/pci.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -395,3 +396,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_load_avg);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_remove_entity_load_avg);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_blocked_fair);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_rt_rq_load_avg);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_pci_d3_sleep);
