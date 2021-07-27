@@ -116,6 +116,9 @@ struct tls_rec {
 	char aad_space[TLS_AAD_SPACE_SIZE];
 	u8 iv_data[MAX_IV_SIZE];
 	struct aead_request aead_req;
+
+	ANDROID_KABI_RESERVE(1);
+
 	u8 aead_req_ctx[];
 };
 
@@ -144,6 +147,8 @@ struct tls_sw_context_tx {
 #define BIT_TX_SCHEDULED	0
 #define BIT_TX_CLOSING		1
 	unsigned long tx_bitmask;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct tls_sw_context_rx {
@@ -161,6 +166,8 @@ struct tls_sw_context_rx {
 	/* protect crypto_wait with decrypt_pending*/
 	spinlock_t decrypt_compl_lock;
 	bool async_notify;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 struct tls_record_info {
@@ -194,7 +201,11 @@ struct tls_offload_context_tx {
 	(sizeof(struct tls_offload_context_tx) + TLS_DRIVER_STATE_SIZE_TX)
 
 enum tls_context_flags {
-	TLS_RX_SYNC_RUNNING = 0,
+	/* tls_device_down was called after the netdev went down, device state
+	 * was released, and kTLS works in software, even though rx_conf is
+	 * still TLS_HW (needed for transition).
+	 */
+	TLS_RX_DEV_DEGRADED = 0,
 	/* Unlike RX where resync is driven entirely by the core in TX only
 	 * the driver knows when things went out of sync, so we need the flag
 	 * to be atomic.
@@ -266,6 +277,7 @@ struct tls_context {
 
 	/* cache cold stuff */
 	struct proto *sk_proto;
+	struct sock *sk;
 
 	void (*sk_destruct)(struct sock *sk);
 
@@ -454,6 +466,9 @@ static inline u16 tls_user_config(struct tls_context *ctx, bool tx)
 struct sk_buff *
 tls_validate_xmit_skb(struct sock *sk, struct net_device *dev,
 		      struct sk_buff *skb);
+struct sk_buff *
+tls_validate_xmit_skb_sw(struct sock *sk, struct net_device *dev,
+			 struct sk_buff *skb);
 
 static inline bool tls_is_sk_tx_device_offloaded(struct sock *sk)
 {

@@ -10,6 +10,7 @@
 #include <linux/types.h>
 
 #include <linux/mm.h>
+#include <linux/oom.h>
 #include <linux/tracepoint.h>
 #include <trace/hooks/vendor_hooks.h>
 
@@ -41,12 +42,29 @@ DECLARE_HOOK(android_vh_pagecache_get_page,
 	TP_PROTO(struct address_space *mapping, pgoff_t index,
 		int fgp_flags, gfp_t gfp_mask, struct page *page),
 	TP_ARGS(mapping, index, fgp_flags, gfp_mask, page));
+DECLARE_HOOK(android_vh_filemap_fault_get_page,
+	TP_PROTO(struct vm_fault *vmf, struct page **page, bool *retry),
+	TP_ARGS(vmf, page, retry));
+DECLARE_HOOK(android_vh_filemap_fault_cache_page,
+	TP_PROTO(struct vm_fault *vmf, struct page *page),
+	TP_ARGS(vmf, page));
 DECLARE_HOOK(android_vh_meminfo_proc_show,
 	TP_PROTO(struct seq_file *m),
 	TP_ARGS(m));
 DECLARE_HOOK(android_vh_exit_mm,
 	TP_PROTO(struct mm_struct *mm),
 	TP_ARGS(mm));
+DECLARE_HOOK(android_vh_get_from_fragment_pool,
+	TP_PROTO(struct mm_struct *mm, struct vm_unmapped_area_info *info,
+		unsigned long *addr),
+	TP_ARGS(mm, info, addr));
+DECLARE_HOOK(android_vh_exclude_reserved_zone,
+	TP_PROTO(struct mm_struct *mm, struct vm_unmapped_area_info *info),
+	TP_ARGS(mm, info));
+DECLARE_HOOK(android_vh_include_reserved_zone,
+	TP_PROTO(struct mm_struct *mm, struct vm_unmapped_area_info *info,
+		unsigned long *addr),
+	TP_ARGS(mm, info, addr));
 DECLARE_HOOK(android_vh_show_mem,
 	TP_PROTO(unsigned int filter, nodemask_t *nodemask),
 	TP_ARGS(filter, nodemask));
@@ -60,6 +78,45 @@ struct slabinfo;
 DECLARE_HOOK(android_vh_cache_show,
 	TP_PROTO(struct seq_file *m, struct slabinfo *sinfo, struct kmem_cache *s),
 	TP_ARGS(m, sinfo, s));
+struct dirty_throttle_control;
+DECLARE_HOOK(android_vh_mm_dirty_limits,
+	TP_PROTO(struct dirty_throttle_control *const gdtc, bool strictlimit,
+		unsigned long dirty, unsigned long bg_thresh,
+		unsigned long nr_reclaimable, unsigned long pages_dirtied),
+	TP_ARGS(gdtc, strictlimit, dirty, bg_thresh,
+		nr_reclaimable, pages_dirtied));
+DECLARE_HOOK(android_vh_oom_check_panic,
+	TP_PROTO(struct oom_control *oc, int *ret),
+	TP_ARGS(oc, ret));
+DECLARE_HOOK(android_vh_save_vmalloc_stack,
+	TP_PROTO(unsigned long flags, struct vm_struct *vm),
+	TP_ARGS(flags, vm));
+DECLARE_HOOK(android_vh_show_stack_hash,
+	TP_PROTO(struct seq_file *m, struct vm_struct *v),
+	TP_ARGS(m, v));
+DECLARE_HOOK(android_vh_save_track_hash,
+	TP_PROTO(bool alloc, unsigned long p),
+	TP_ARGS(alloc, p));
+struct mem_cgroup;
+DECLARE_HOOK(android_vh_vmpressure,
+	TP_PROTO(struct mem_cgroup *memcg, bool *bypass),
+	TP_ARGS(memcg, bypass));
+DECLARE_HOOK(android_vh_mem_cgroup_alloc,
+	TP_PROTO(struct mem_cgroup *memcg),
+	TP_ARGS(memcg));
+DECLARE_HOOK(android_vh_mem_cgroup_free,
+	TP_PROTO(struct mem_cgroup *memcg),
+	TP_ARGS(memcg));
+DECLARE_HOOK(android_vh_mem_cgroup_id_remove,
+	TP_PROTO(struct mem_cgroup *memcg),
+	TP_ARGS(memcg));
+struct cgroup_subsys_state;
+DECLARE_HOOK(android_vh_mem_cgroup_css_online,
+	TP_PROTO(struct cgroup_subsys_state *css, struct mem_cgroup *memcg),
+	TP_ARGS(css, memcg));
+DECLARE_HOOK(android_vh_mem_cgroup_css_offline,
+	TP_PROTO(struct cgroup_subsys_state *css, struct mem_cgroup *memcg),
+	TP_ARGS(css, memcg));
 /* macro versions of hooks are no longer required */
 
 #endif /* _TRACE_HOOK_MM_H */
