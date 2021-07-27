@@ -69,6 +69,7 @@
 #include <linux/net_tstamp.h>
 #include <net/l3mdev.h>
 #include <linux/android_kabi.h>
+#include <linux/android_vendor.h>
 
 /*
  * This structure really needs to be cleaned up.
@@ -530,6 +531,8 @@ struct sock {
 	ANDROID_KABI_RESERVE(6);
 	ANDROID_KABI_RESERVE(7);
 	ANDROID_KABI_RESERVE(8);
+
+	ANDROID_OEM_DATA(1);
 };
 
 enum sk_pacing {
@@ -2207,13 +2210,15 @@ static inline void skb_set_owner_r(struct sk_buff *skb, struct sock *sk)
 	sk_mem_charge(sk, skb->truesize);
 }
 
-static inline void skb_set_owner_sk_safe(struct sk_buff *skb, struct sock *sk)
+static inline __must_check bool skb_set_owner_sk_safe(struct sk_buff *skb, struct sock *sk)
 {
 	if (sk && refcount_inc_not_zero(&sk->sk_refcnt)) {
 		skb_orphan(skb);
 		skb->destructor = sock_efree;
 		skb->sk = sk;
+		return true;
 	}
+	return false;
 }
 
 void sk_reset_timer(struct sock *sk, struct timer_list *timer,

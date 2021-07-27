@@ -92,7 +92,6 @@
  * 3) module_addr_min/module_addr_max.
  * (delete and add uses RCU list operations). */
 DEFINE_MUTEX(module_mutex);
-EXPORT_SYMBOL_GPL(module_mutex);
 static LIST_HEAD(modules);
 
 /* Work queue for freeing init sections in success case */
@@ -645,7 +644,6 @@ struct module *find_module(const char *name)
 	module_assert_mutex();
 	return find_module_all(name, strlen(name), false);
 }
-EXPORT_SYMBOL_GPL(find_module);
 
 #ifdef CONFIG_SMP
 
@@ -4789,6 +4787,23 @@ void print_modules(void)
 		pr_cont(" [last unloaded: %s]", last_unloaded_module);
 	pr_cont("\n");
 }
+
+#ifdef CONFIG_ANDROID_DEBUG_SYMBOLS
+void android_debug_for_each_module(int (*fn)(const char *mod_name, void *mod_addr, void *data),
+	void *data)
+{
+	struct module *module;
+
+	preempt_disable();
+	list_for_each_entry_rcu(module, &modules, list) {
+		if (fn(module->name, module->core_layout.base, data))
+			goto out;
+	}
+out:
+	preempt_enable();
+}
+EXPORT_SYMBOL_GPL(android_debug_for_each_module);
+#endif
 
 #ifdef CONFIG_MODVERSIONS
 /* Generate the signature for all relevant module structures here.

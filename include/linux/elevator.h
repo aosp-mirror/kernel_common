@@ -4,6 +4,7 @@
 
 #include <linux/percpu.h>
 #include <linux/hashtable.h>
+#include <linux/android_kabi.h>
 
 #ifdef CONFIG_BLOCK
 
@@ -34,7 +35,7 @@ struct elevator_mq_ops {
 	void (*depth_updated)(struct blk_mq_hw_ctx *);
 
 	bool (*allow_merge)(struct request_queue *, struct request *, struct bio *);
-	bool (*bio_merge)(struct blk_mq_hw_ctx *, struct bio *, unsigned int);
+	bool (*bio_merge)(struct request_queue *, struct bio *, unsigned int);
 	int (*request_merge)(struct request_queue *q, struct request **, struct bio *);
 	void (*request_merged)(struct request_queue *, struct request *, enum elv_merge);
 	void (*requests_merged)(struct request_queue *, struct request *, struct request *);
@@ -50,6 +51,11 @@ struct elevator_mq_ops {
 	struct request *(*next_request)(struct request_queue *, struct request *);
 	void (*init_icq)(struct io_cq *);
 	void (*exit_icq)(struct io_cq *);
+
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
+	ANDROID_KABI_RESERVE(3);
+	ANDROID_KABI_RESERVE(4);
 };
 
 #define ELV_NAME_MAX	(16)
@@ -86,6 +92,9 @@ struct elevator_type
 	/* managed by elevator core */
 	char icq_cache_name[ELV_NAME_MAX + 6];	/* elvname + "_io_cq" */
 	struct list_head list;
+
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
 };
 
 #define ELV_HASH_BITS 6
@@ -172,6 +181,8 @@ extern struct request *elv_rb_find(struct rb_root *, sector_t);
 
 /* Supports zoned block devices sequential write constraint */
 #define ELEVATOR_F_ZBD_SEQ_WRITE	(1U << 0)
+/* Supports scheduling on multiple hardware queues */
+#define ELEVATOR_F_MQ_AWARE		(1U << 1)
 
 #endif /* CONFIG_BLOCK */
 #endif

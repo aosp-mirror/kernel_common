@@ -11,6 +11,7 @@
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/videodev2.h>
+#include <linux/android_kabi.h>
 #include <media/media-request.h>
 
 /*
@@ -56,6 +57,8 @@ struct video_device;
  * @p_hevc_sps:			Pointer to an HEVC sequence parameter set structure.
  * @p_hevc_pps:			Pointer to an HEVC picture parameter set structure.
  * @p_hevc_slice_params:	Pointer to an HEVC slice parameters structure.
+ * @p_hdr10_cll:		Pointer to an HDR10 Content Light Level structure.
+ * @p_hdr10_mastering:		Pointer to an HDR10 Mastering Display structure.
  * @p_area:			Pointer to an area.
  * @p:				Pointer to a compound value.
  * @p_const:			Pointer to a constant compound value.
@@ -80,9 +83,14 @@ union v4l2_ctrl_ptr {
 	struct v4l2_ctrl_hevc_sps *p_hevc_sps;
 	struct v4l2_ctrl_hevc_pps *p_hevc_pps;
 	struct v4l2_ctrl_hevc_slice_params *p_hevc_slice_params;
+	struct v4l2_ctrl_hdr10_cll_info *p_hdr10_cll;
+	struct v4l2_ctrl_hdr10_mastering_display *p_hdr10_mastering;
 	struct v4l2_area *p_area;
 	void *p;
 	const void *p_const;
+
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
 };
 
 /**
@@ -115,6 +123,8 @@ struct v4l2_ctrl_ops {
 	int (*g_volatile_ctrl)(struct v4l2_ctrl *ctrl);
 	int (*try_ctrl)(struct v4l2_ctrl *ctrl);
 	int (*s_ctrl)(struct v4l2_ctrl *ctrl);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -136,6 +146,8 @@ struct v4l2_ctrl_type_ops {
 	void (*log)(const struct v4l2_ctrl *ctrl);
 	int (*validate)(const struct v4l2_ctrl *ctrl, u32 idx,
 			union v4l2_ctrl_ptr ptr);
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -286,6 +298,8 @@ struct v4l2_ctrl {
 	union v4l2_ctrl_ptr p_def;
 	union v4l2_ctrl_ptr p_new;
 	union v4l2_ctrl_ptr p_cur;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -303,12 +317,14 @@ struct v4l2_ctrl {
  *		the control has been applied. This prevents applying controls
  *		from a cluster with multiple controls twice (when the first
  *		control of a cluster is applied, they all are).
- * @req:	If set, this refers to another request that sets this control.
+ * @valid_p_req: If set, then p_req contains the control value for the request.
  * @p_req:	If the control handler containing this control reference
  *		is bound to a media request, then this points to the
- *		value of the control that should be applied when the request
+ *		value of the control that must be applied when the request
  *		is executed, or to the value of the control at the time
- *		that the request was completed.
+ *		that the request was completed. If @valid_p_req is false,
+ *		then this control was never set for this request and the
+ *		control will not be updated when this request is applied.
  *
  * Each control handler has a list of these refs. The list_head is used to
  * keep a sorted-by-control-ID list of all controls, while the next pointer
@@ -321,8 +337,10 @@ struct v4l2_ctrl_ref {
 	struct v4l2_ctrl_helper *helper;
 	bool from_other_dev;
 	bool req_done;
-	struct v4l2_ctrl_ref *req;
+	bool valid_p_req;
 	union v4l2_ctrl_ptr p_req;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -348,7 +366,7 @@ struct v4l2_ctrl_ref {
  * @error:	The error code of the first failed control addition.
  * @request_is_queued: True if the request was queued.
  * @requests:	List to keep track of open control handler request objects.
- *		For the parent control handler (@req_obj.req == NULL) this
+ *		For the parent control handler (@req_obj.ops == NULL) this
  *		is the list header. When the parent control handler is
  *		removed, it has to unbind and put all these requests since
  *		they refer to the parent.
@@ -373,6 +391,8 @@ struct v4l2_ctrl_handler {
 	struct list_head requests;
 	struct list_head requests_queued;
 	struct media_request_object req_obj;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**
@@ -424,6 +444,8 @@ struct v4l2_ctrl_config {
 	const char * const *qmenu;
 	const s64 *qmenu_int;
 	unsigned int is_private:1;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 /**

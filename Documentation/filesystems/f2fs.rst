@@ -110,6 +110,12 @@ background_gc=%s	 Turn on/off cleaning operations, namely garbage
 			 on synchronous garbage collection running in background.
 			 Default value for this option is on. So garbage
 			 collection is on by default.
+gc_merge		 When background_gc is on, this option can be enabled to
+			 let background GC thread to handle foreground GC requests,
+			 it can eliminate the sluggish issue caused by slow foreground
+			 GC operation when GC is triggered from a process with limited
+			 I/O and CPU resources.
+nogc_merge		 Disable GC merge feature.
 disable_roll_forward	 Disable the roll-forward recovery routine
 norecovery		 Disable the roll-forward recovery routine, mounted read-
 			 only (i.e., -o ro,disable_roll_forward)
@@ -283,6 +289,9 @@ compress_mode=%s	 Control file compression mode. This supports "fs" and "user"
 			 choosing the target file and the timing. The user can do manual
 			 compression/decompression on the compression enabled files using
 			 ioctls.
+compress_cache		 Support to use address space of a filesystem managed inode to
+			 cache compressed block, in order to improve cache hit ratio of
+			 random read.
 inlinecrypt		 When possible, encrypt/decrypt the contents of encrypted
 			 files using the blk-crypto framework rather than
 			 filesystem-layer encryption. This allows the use of
@@ -711,10 +720,10 @@ users.
 ===================== ======================== ===================
 User                  F2FS                     Block
 ===================== ======================== ===================
-                      META                     WRITE_LIFE_NOT_SET
-                      HOT_NODE                 "
-                      WARM_NODE                "
-                      COLD_NODE                "
+N/A                   META                     WRITE_LIFE_NOT_SET
+N/A                   HOT_NODE                 "
+N/A                   WARM_NODE                "
+N/A                   COLD_NODE                "
 ioctl(COLD)           COLD_DATA                WRITE_LIFE_EXTREME
 extension list        "                        "
 
@@ -740,10 +749,10 @@ WRITE_LIFE_LONG       "                        WRITE_LIFE_LONG
 ===================== ======================== ===================
 User                  F2FS                     Block
 ===================== ======================== ===================
-                      META                     WRITE_LIFE_MEDIUM;
-                      HOT_NODE                 WRITE_LIFE_NOT_SET
-                      WARM_NODE                "
-                      COLD_NODE                WRITE_LIFE_NONE
+N/A                   META                     WRITE_LIFE_MEDIUM;
+N/A                   HOT_NODE                 WRITE_LIFE_NOT_SET
+N/A                   WARM_NODE                "
+N/A                   COLD_NODE                WRITE_LIFE_NONE
 ioctl(COLD)           COLD_DATA                WRITE_LIFE_EXTREME
 extension list        "                        "
 
@@ -813,6 +822,14 @@ Compression implementation
   * chattr +c file
   * chattr +c dir; touch dir/file
   * mount w/ -o compress_extension=ext; touch file.ext
+  * mount w/ -o compress_extension=*; touch any_file
+
+- At this point, compression feature doesn't expose compressed space to user
+  directly in order to guarantee potential data updates later to the space.
+  Instead, the main goal is to reduce data writes to flash disk as much as
+  possible, resulting in extending disk life time as well as relaxing IO
+  congestion. Alternatively, we've added ioctl interface to reclaim compressed
+  space and show it to user after putting the immutable bit.
 
 Compress metadata layout::
 

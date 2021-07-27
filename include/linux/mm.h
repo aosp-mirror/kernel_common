@@ -573,6 +573,7 @@ struct vm_fault {
 	 */
 	unsigned long vma_flags;
 	pgprot_t vma_page_prot;
+	ANDROID_OEM_DATA_ARRAY(1, 2);
 };
 
 /* page entry size for vm->huge_fault() */
@@ -755,8 +756,13 @@ struct inode;
  */
 static inline int put_page_testzero(struct page *page)
 {
+	int ret;
+
 	VM_BUG_ON_PAGE(page_ref_count(page) == 0, page);
-	return page_ref_dec_and_test(page);
+	ret = page_ref_dec_and_test(page);
+	page_pinner_put_page(page);
+
+	return ret;
 }
 
 /*
@@ -1231,8 +1237,6 @@ static inline __must_check bool try_get_page(struct page *page)
 static inline void put_page(struct page *page)
 {
 	page = compound_head(page);
-
-	page_pinner_migration_failed(page);
 
 	/*
 	 * For devmap managed pages we need to catch refcount transition from
@@ -3354,6 +3358,40 @@ unsigned long wp_shared_mapping_range(struct address_space *mapping,
 
 extern int sysctl_nr_trim_pages;
 extern bool pte_map_lock_addr(struct vm_fault *vmf, unsigned long addr);
+extern int reclaim_shmem_address_space(struct address_space *mapping);
+extern int reclaim_pages_from_list(struct list_head *page_list);
+
+/**
+ * seal_check_future_write - Check for F_SEAL_FUTURE_WRITE flag and handle it
+ * @seals: the seals to check
+ * @vma: the vma to operate on
+ *
+ * Check whether F_SEAL_FUTURE_WRITE is set; if so, do proper check/handling on
+ * the vma flags.  Return 0 if check pass, or <0 for errors.
+ */
+static inline int seal_check_future_write(int seals, struct vm_area_struct *vma)
+{
+	if (seals & F_SEAL_FUTURE_WRITE) {
+		/*
+		 * New PROT_WRITE and MAP_SHARED mmaps are not allowed when
+		 * "future write" seal active.
+		 */
+		if ((vma->vm_flags & VM_SHARED) && (vma->vm_flags & VM_WRITE))
+			return -EPERM;
+
+		/*
+		 * Since an F_SEAL_FUTURE_WRITE sealed memfd can be mapped as
+		 * MAP_SHARED and read-only, take care to not allow mprotect to
+		 * revert protections on such mappings. Do this only for shared
+		 * mappings. For private mappings, don't need to mask
+		 * VM_MAYWRITE as we still want them to be COW-writable.
+		 */
+		if (vma->vm_flags & VM_SHARED)
+			vma->vm_flags &= ~(VM_MAYWRITE);
+	}
+
+	return 0;
+}
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

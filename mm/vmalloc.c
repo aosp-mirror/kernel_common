@@ -34,6 +34,7 @@
 #include <linux/bitops.h>
 #include <linux/rbtree_augmented.h>
 #include <linux/overflow.h>
+#include <trace/hooks/mm.h>
 
 #include <linux/uaccess.h>
 #include <asm/tlbflush.h>
@@ -326,6 +327,7 @@ int map_kernel_range(unsigned long start, unsigned long size, pgprot_t prot,
 	flush_cache_vmap(start, start + size);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(map_kernel_range);
 
 int is_vmalloc_or_module_addr(const void *x)
 {
@@ -2033,6 +2035,7 @@ static inline void setup_vmalloc_vm_locked(struct vm_struct *vm,
 	vm->size = va->va_end - va->va_start;
 	vm->caller = caller;
 	va->vm = vm;
+	trace_android_vh_save_vmalloc_stack(flags, vm);
 }
 
 static void setup_vmalloc_vm(struct vm_struct *vm, struct vmap_area *va,
@@ -2098,6 +2101,7 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
 	return __get_vm_area_node(size, 1, flags, start, end, NUMA_NO_NODE,
 				  GFP_KERNEL, caller);
 }
+EXPORT_SYMBOL_GPL(__get_vm_area_caller);
 
 /**
  * get_vm_area - reserve a contiguous kernel virtual area
@@ -3550,6 +3554,7 @@ static int s_show(struct seq_file *m, void *p)
 		seq_puts(m, " vpages");
 
 	show_numa_info(m, v);
+	trace_android_vh_show_stack_hash(m, v);
 	seq_putc(m, '\n');
 
 	/*
