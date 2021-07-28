@@ -864,6 +864,17 @@ config PARAVIRT_TIME_ACCOUNTING
 config PARAVIRT_CLOCK
 	bool
 
+config KVM_PREEMPT_COUNT_REPORTING
+	bool "KVM preempt_count reporting to the host"
+	depends on KVM_GUEST && PREEMPT_COUNT
+	default n
+	help
+	 Select this option to enable KVM preempt_count reporting to the host,
+	 which can be useful in cases where some VCPUs are RT and the rest
+	 aren't.
+
+	 If in doubt, say N here.
+
 config JAILHOUSE_GUEST
 	bool "Jailhouse non-root cell support"
 	depends on X86_64 && PCI
