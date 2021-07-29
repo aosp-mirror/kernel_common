@@ -392,6 +392,7 @@ enum virtio_video_control_type {
 	VIRTIO_VIDEO_CONTROL_FORCE_KEYFRAME,
 	VIRTIO_VIDEO_CONTROL_BITRATE_MODE,
 	VIRTIO_VIDEO_CONTROL_BITRATE_PEAK,
+	VIRTIO_VIDEO_CONTROL_PREPEND_SPSPPS_TO_IDR,
 };
 
 struct virtio_video_query_control_profile {
@@ -460,6 +461,11 @@ struct virtio_video_control_val_profile {
 
 struct virtio_video_control_val_level {
 	__le32 level;
+	__u8 padding[4];
+};
+
+struct virtio_video_control_val_prepend_spspps_to_idr {
+	__le32 prepend_spspps_to_idr;
 	__u8 padding[4];
 };
 
