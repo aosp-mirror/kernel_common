@@ -141,6 +141,10 @@ static int virtio_video_enc_s_ctrl(struct v4l2_ctrl *ctrl)
 		ret = virtio_video_cmd_set_control(vv, stream->stream_id,
 						   control, 1 /*ignored*/);
 		break;
+	case V4L2_CID_MPEG_VIDEO_PREPEND_SPSPPS_TO_IDR:
+		ret = virtio_video_cmd_set_control(vv, stream->stream_id,
+						   control, ctrl->val);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -247,6 +251,12 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 			  &virtio_video_enc_ctrl_ops,
 			  V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME,
 			  0, 0, 0, 0);
+
+	v4l2_ctrl_new_std(&stream->ctrl_handler,
+			  &virtio_video_enc_ctrl_ops,
+			  V4L2_CID_MPEG_VIDEO_PREPEND_SPSPPS_TO_IDR,
+			  0, 1,
+			  1, 0);
 
 	if (stream->ctrl_handler.error)
 		return stream->ctrl_handler.error;

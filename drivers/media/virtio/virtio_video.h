@@ -94,6 +94,7 @@ struct video_control_info {
 	uint32_t bitrate;
 	uint32_t bitrate_peak;
 	uint32_t bitrate_mode;
+	uint32_t prepend_spspps_to_idr;
 	bool is_updated;
 };
 
