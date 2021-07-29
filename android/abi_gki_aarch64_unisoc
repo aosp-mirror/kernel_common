@@ -688,6 +688,7 @@
   regulator_map_voltage_linear
   regulator_set_voltage_sel_regmap
   release_firmware
+  __regmap_init_i2c
   remap_pfn_range
   remove_proc_entry
   remove_wait_queue
