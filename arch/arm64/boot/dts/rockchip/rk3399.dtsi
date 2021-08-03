@@ -2125,6 +2125,14 @@
 		#cooling-cells = <2>;
 		power-domains = <&power RK3399_PD_GPU>;
 		status = "disabled";
+
+		gpu_power_model: power_model {
+			compatible = "arm,mali-simple-power-model";
+			static-coefficient = <411522>;
+			dynamic-coefficient = <977>;
+			ts = <32000 4700 (-80) 2>;
+			thermal-zone = "gpu";
+		};
 	};
 
 	pinctrl: pinctrl {
