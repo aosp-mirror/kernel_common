@@ -797,7 +797,8 @@ static int ip_set_mcast_msfilter(struct sock *sk, sockptr_t optval, int optlen)
 		goto out_free_gsf;
 
 	err = set_mcast_msfilter(sk, gsf->gf_interface, gsf->gf_numsrc,
-				 gsf->gf_fmode, &gsf->gf_group, gsf->gf_slist);
+				 gsf->gf_fmode, &gsf->gf_group,
+				 gsf->gf_slist_flex);
 out_free_gsf:
 	kfree(gsf);
 	return err;
@@ -806,7 +807,7 @@ out_free_gsf:
 static int compat_ip_set_mcast_msfilter(struct sock *sk, sockptr_t optval,
 		int optlen)
 {
-	const int size0 = offsetof(struct compat_group_filter, gf_slist);
+	const int size0 = offsetof(struct compat_group_filter, gf_slist_flex);
 	struct compat_group_filter *gf32;
 	unsigned int n;
 	void *p;
@@ -820,7 +821,7 @@ static int compat_ip_set_mcast_msfilter(struct sock *sk, sockptr_t optval,
 	p = kmalloc(optlen + 4, GFP_KERNEL);
 	if (!p)
 		return -ENOMEM;
-	gf32 = p + 4; /* we want ->gf_group and ->gf_slist aligned */
+	gf32 = p + 4; /* we want ->gf_group and ->gf_slist_flex aligned */
 
 	err = -EFAULT;
 	if (copy_from_sockptr(gf32, optval, optlen))
@@ -833,7 +834,7 @@ static int compat_ip_set_mcast_msfilter(struct sock *sk, sockptr_t optval,
 		goto out_free_gsf;
 
 	err = -EINVAL;
-	if (offsetof(struct compat_group_filter, gf_slist[n]) > optlen)
+	if (offsetof(struct compat_group_filter, gf_slist_flex[n]) > optlen)
 		goto out_free_gsf;
 
 	/* numsrc >= (4G-140)/128 overflow in 32 bits */
@@ -841,7 +842,7 @@ static int compat_ip_set_mcast_msfilter(struct sock *sk, sockptr_t optval,
 	if (n > READ_ONCE(sock_net(sk)->ipv4.sysctl_igmp_max_msf))
 		goto out_free_gsf;
 	err = set_mcast_msfilter(sk, gf32->gf_interface, n, gf32->gf_fmode,
-				 &gf32->gf_group, gf32->gf_slist);
+				 &gf32->gf_group, gf32->gf_slist_flex);
 out_free_gsf:
 	kfree(p);
 	return err;
@@ -1462,7 +1463,7 @@ static bool getsockopt_needs_rtnl(int optname)
 static int ip_get_mcast_msfilter(struct sock *sk, void __user *optval,
 		int __user *optlen, int len)
 {
-	const int size0 = offsetof(struct group_filter, gf_slist);
+	const int size0 = offsetof(struct group_filter, gf_slist_flex);
 	struct group_filter __user *p = optval;
 	struct group_filter gsf;
 	int num;
@@ -1474,7 +1475,7 @@ static int ip_get_mcast_msfilter(struct sock *sk, void __user *optval,
 		return -EFAULT;
 
 	num = gsf.gf_numsrc;
-	err = ip_mc_gsfget(sk, &gsf, p->gf_slist);
+	err = ip_mc_gsfget(sk, &gsf, p->gf_slist_flex);
 	if (err)
 		return err;
 	if (gsf.gf_numsrc < num)
@@ -1488,7 +1489,7 @@ static int ip_get_mcast_msfilter(struct sock *sk, void __user *optval,
 static int compat_ip_get_mcast_msfilter(struct sock *sk, void __user *optval,
 		int __user *optlen, int len)
 {
-	const int size0 = offsetof(struct compat_group_filter, gf_slist);
+	const int size0 = offsetof(struct compat_group_filter, gf_slist_flex);
 	struct compat_group_filter __user *p = optval;
 	struct compat_group_filter gf32;
 	struct group_filter gf;
@@ -1505,7 +1506,7 @@ static int compat_ip_get_mcast_msfilter(struct sock *sk, void __user *optval,
 	num = gf.gf_numsrc = gf32.gf_numsrc;
 	gf.gf_group = gf32.gf_group;
 
-	err = ip_mc_gsfget(sk, &gf, p->gf_slist);
+	err = ip_mc_gsfget(sk, &gf, p->gf_slist_flex);
 	if (err)
 		return err;
 	if (gf.gf_numsrc < num)
