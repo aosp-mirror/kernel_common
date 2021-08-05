@@ -38,10 +38,12 @@
   crypto_grab_ahash
   crypto_grab_shash
   crypto_grab_skcipher
+  crypto_grab_spawn
   crypto_inst_setname
   crypto_put_default_null_skcipher
   crypto_register_aead
   crypto_register_alg
+  crypto_register_rng
   crypto_register_rngs
   crypto_register_shash
   crypto_register_shashes
@@ -62,9 +64,11 @@
   crypto_skcipher_decrypt
   crypto_skcipher_encrypt
   crypto_skcipher_setkey
+  crypto_spawn_tfm
   crypto_spawn_tfm2
   crypto_unregister_aead
   crypto_unregister_alg
+  crypto_unregister_rng
   crypto_unregister_rngs
   crypto_unregister_shash
   crypto_unregister_shashes
