@@ -23,6 +23,7 @@
 #include <linux/compiler.h>
 #include <linux/audit.h>
 #include <trace/hooks/timekeeping.h>
+#include <linux/kvm_host.h>
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
