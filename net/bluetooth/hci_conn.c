@@ -1565,6 +1565,7 @@ struct hci_conn *hci_connect_le_scan(struct hci_dev *hdev, bdaddr_t *dst,
 				     enum conn_reasons conn_reason)
 {
 	struct hci_conn *conn;
+	struct smp_irk *irk;
 
 	/* Let's make sure that le is enabled.*/
 	if (!hci_dev_test_flag(hdev, HCI_LE_ENABLED)) {
@@ -1588,6 +1589,20 @@ struct hci_conn *hci_connect_le_scan(struct hci_dev *hdev, bdaddr_t *dst,
 		if (conn->pending_sec_level < sec_level)
 			conn->pending_sec_level = sec_level;
 		goto done;
+	}
+
+	/* If we don't have an Irk or that we have a recent rpa, skip the extra
+	 * scan and try to connect immediately.
+	 */
+	irk = hci_find_irk_by_addr(hdev, dst, dst_type);
+	if (!irk ||
+	    time_before(jiffies, irk->rpa_timestamp + msecs_to_jiffies(2000))) {
+		bt_dev_info(hdev, "Skipping le scan before connect");
+
+		return hci_connect_le(hdev, dst, dst_type,
+				sec_level, false,
+				HCI_LE_CONN_TIMEOUT,
+				HCI_ROLE_MASTER);
 	}
 
 	BT_DBG("requesting refresh of dst_addr");

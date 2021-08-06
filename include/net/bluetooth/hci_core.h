@@ -213,6 +213,7 @@ struct smp_irk {
 	struct list_head list;
 	struct rcu_head rcu;
 	bdaddr_t rpa;
+	__u32 rpa_timestamp;
 	bdaddr_t bdaddr;
 	u8 addr_type;
 	u8 link_type;
