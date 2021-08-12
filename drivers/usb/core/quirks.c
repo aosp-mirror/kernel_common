@@ -12,6 +12,8 @@
 #include <linux/usb/hcd.h>
 #include "usb.h"
 
+#include <trace/hooks/usb.h>
+
 struct quirk_entry {
 	u16 vid;
 	u16 pid;
@@ -674,6 +676,8 @@ void usb_detect_quirks(struct usb_device *udev)
 	if (udev->descriptor.bDeviceClass == USB_CLASS_HUB)
 		udev->persist_enabled = 1;
 #endif	/* CONFIG_USB_DEFAULT_PERSIST */
+
+	trace_android_vh_usb_persist_overwrite(udev);
 }
 
 void usb_detect_interface_quirks(struct usb_device *udev)
