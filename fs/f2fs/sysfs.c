@@ -1260,13 +1260,13 @@ int f2fs_register_sysfs(struct f2fs_sb_info *sbi)
 		sbi->s_proc = proc_mkdir(sb->s_id, f2fs_proc_root);
 
 	if (sbi->s_proc) {
-		proc_create_data("segment_info", S_IRUGO, sbi->s_proc,
-				 &f2fs_seq_segment_info_fops, sb);
-		proc_create_data("segment_bits", S_IRUGO, sbi->s_proc,
-				 &f2fs_seq_segment_bits_fops, sb);
-		proc_create_data("iostat_info", S_IRUGO, sbi->s_proc,
+		proc_create_data("segment_info", 0444, sbi->s_proc,
+				&f2fs_seq_segment_info_fops, sb);
+		proc_create_data("segment_bits", 0444, sbi->s_proc,
+				&f2fs_seq_segment_bits_fops, sb);
+		proc_create_data("iostat_info", 0444, sbi->s_proc,
 				&f2fs_seq_iostat_info_fops, sb);
-		proc_create_data("victim_bits", S_IRUGO, sbi->s_proc,
+		proc_create_data("victim_bits", 0444, sbi->s_proc,
 				&f2fs_seq_victim_bits_fops, sb);
 	}
 	return 0;
