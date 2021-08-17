@@ -14,6 +14,9 @@
 #include <linux/pagemap.h>
 #include <linux/memremap.h>
 
+extern bool isolate_lru_page(struct page *page);
+extern void putback_lru_page(struct page *page);
+
 /*
  * The anon_vma heads a list of private "related" vmas, to scan if
  * an anonymous page pointing to this anon_vma needs to be unmapped:

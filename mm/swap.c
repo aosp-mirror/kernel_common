@@ -607,6 +607,7 @@ static void lru_deactivate_fn(struct lruvec *lruvec, struct folio *folio)
 		lruvec_del_folio(lruvec, folio);
 		folio_clear_active(folio);
 		folio_clear_referenced(folio);
+		folio_test_clear_young(folio);
 		lruvec_add_folio(lruvec, folio);
 
 		__count_vm_events(PGDEACTIVATE, nr_pages);
