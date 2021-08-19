@@ -1408,7 +1408,12 @@ restart:
 		 */
 		hpet = is_hpet_enabled();
 		tsc_start = tsc_read_refs(&ref_start, hpet);
-		schedule_delayed_work(&tsc_irqwork, HZ);
+		/* temporary workaround for AMD Cezanne. BUG=b:191845735 */
+		if ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) && (boot_cpu_data.x86 == 25)
+			&& (boot_cpu_data.x86_model == 80))
+			schedule_delayed_work(&tsc_irqwork, HZ/2);
+		else
+			schedule_delayed_work(&tsc_irqwork, HZ);
 		return;
 	}
 
