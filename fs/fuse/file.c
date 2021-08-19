@@ -20,6 +20,7 @@
 #include <linux/uio.h>
 #include <linux/fs.h>
 #include <linux/fscrypt.h>
+#include <linux/fsverity.h>
 
 static struct page **fuse_pages_alloc(unsigned int npages, gfp_t flags,
 				      struct fuse_page_desc **desc)
@@ -2762,6 +2763,21 @@ static int fuse_get_ioctl_len(unsigned int cmd, unsigned long arg, size_t *len)
 			return -EINVAL;
 
 		*len = sizeof(policy_size) + policy_size;
+		break;
+	}
+	case FS_IOC_MEASURE_VERITY: {
+		__u16 digest_size;
+		struct fsverity_digest __user *uarg =
+			(struct fsverity_digest __user *)arg;
+
+		if (copy_from_user(&digest_size, &uarg->digest_size,
+				   sizeof(digest_size)))
+			return -EFAULT;
+
+		if (digest_size > SIZE_MAX - sizeof(struct fsverity_digest))
+			return -EINVAL;
+
+		*len = sizeof(struct fsverity_digest) + digest_size;
 		break;
 	}
 	default:
