@@ -1258,30 +1258,36 @@ static int uvc_ioctl_g_roi_target(struct file *file, void *fh,
 		return -EINVAL;
 	}
 
-	/* hcd requires transfer buffer to be DMA capable */
-	roi = kzalloc(sizeof(struct uvc_roi), GFP_KERNEL);
-	if (!roi)
-		return -ENOMEM;
-
 	/*
 	 * Synchronize with uvc_ioctl_query_ext_ctrl() that can set
 	 * ROI auto_controls concurrently.
 	 */
 	mutex_lock(&chain->ctrl_mutex);
 
+	roi = uvc_ctrl_roi(chain, query);
+	if (!roi) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/*
+	 * This reads actual configuration from the firmware and at the
+	 * same updates cached UVC control data.
+	 */
 	ret = uvc_query_ctrl(stream->dev, query, 1, stream->dev->intfnum,
 			     UVC_CT_REGION_OF_INTEREST_CONTROL, roi,
 			     sizeof(struct uvc_roi));
-	if (!ret) {
-		/* ROI left, top, right, bottom are global coordinates. */
-		sel->r.top	= roi->wROI_Top;
-		sel->r.left	= roi->wROI_Left;
-		sel->r.height	= roi->wROI_Bottom - roi->wROI_Top + 1;
-		sel->r.width	= roi->wROI_Right - roi->wROI_Left + 1;
-	}
+	if (ret)
+		goto out;
 
+	/* ROI left, top, right, bottom are global coordinates. */
+	sel->r.top	= roi->wROI_Top;
+	sel->r.left	= roi->wROI_Left;
+	sel->r.height	= roi->wROI_Bottom - roi->wROI_Top + 1;
+	sel->r.width	= roi->wROI_Right - roi->wROI_Left + 1;
+
+out:
 	mutex_unlock(&chain->ctrl_mutex);
-	kfree(roi);
 	return ret;
 }
 
@@ -1369,13 +1375,9 @@ static int uvc_ioctl_s_roi(struct file *file, void *fh,
 	struct uvc_fh *handle = fh;
 	struct uvc_streaming *stream = handle->stream;
 	struct uvc_video_chain *chain = handle->chain;
+	struct uvc_roi roi_backup;
 	struct uvc_roi *roi;
 	int ret;
-
-	/* hcd requires transfer buffer to be DMA capable */
-	roi = kzalloc(sizeof(struct uvc_roi), GFP_KERNEL);
-	if (!roi)
-		return -ENOMEM;
 
 	/*
 	 * Synchronize with uvc_ioctl_query_ext_ctrl() that can set
@@ -1383,12 +1385,22 @@ static int uvc_ioctl_s_roi(struct file *file, void *fh,
 	 */
 	mutex_lock(&chain->ctrl_mutex);
 
+	roi = uvc_ctrl_roi(chain, UVC_GET_CUR);
+	if (!roi) {
+		mutex_unlock(&chain->ctrl_mutex);
+		return -EINVAL;
+	}
+
+	mutex_lock(&stream->mutex);
+
 	/*
-	 * Get current ROI configuration. We are especially interested in
-	 * ->auto_controls, because we will use GET_CUR ->auto_controls
-	 * value for SET_CUR. Some firmwares require sizeof(uvc_roi)
-	 * to be 5 * sizeof(__u16) so we need to set correct rectangle
-	 * dimensions and correct auto_controls value.
+	 * Get current ROI configuration from the firmware. First, we need
+	 * ->auto_controls, which is handled by UVC control code.
+	 *
+	 * Second, the rectangle value, which is passed via v4l2 selection
+	 * API, must also be stored in UVC control data, so that when use
+	 * changes auto_controls, it will use most recent ROI rectangle
+	 * value and new auto_controls value.
 	 */
 	ret = uvc_query_ctrl(stream->dev, UVC_GET_CUR, 1, stream->dev->intfnum,
 			     UVC_CT_REGION_OF_INTEREST_CONTROL, roi,
@@ -1396,9 +1408,9 @@ static int uvc_ioctl_s_roi(struct file *file, void *fh,
 	if (ret)
 		goto out;
 
-	mutex_lock(&stream->mutex);
-
 	validate_roi_bounds(stream, sel);
+
+	roi_backup = *roi;
 
 	/*
 	 * ROI left, top, right, bottom are global coordinates.
@@ -1412,12 +1424,14 @@ static int uvc_ioctl_s_roi(struct file *file, void *fh,
 	ret = uvc_query_ctrl(stream->dev, UVC_SET_CUR, 1, stream->dev->intfnum,
 			     UVC_CT_REGION_OF_INTEREST_CONTROL, roi,
 			     sizeof(struct uvc_roi));
-
-	mutex_unlock(&stream->mutex);
+	if (ret) {
+		*roi = roi_backup;
+		goto out;
+	}
 
 out:
+	mutex_unlock(&stream->mutex);
 	mutex_unlock(&chain->ctrl_mutex);
-	kfree(roi);
 	return ret;
 }
 

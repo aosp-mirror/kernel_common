@@ -2638,6 +2638,37 @@ out:
 	return ret;
 }
 
+struct uvc_roi *uvc_ctrl_roi(struct uvc_video_chain *chain, u8 query)
+{
+	struct uvc_control_mapping *mapping;
+	struct uvc_control *ctrl;
+	int id;
+
+	switch (query) {
+	case UVC_GET_CUR:
+		id = UVC_CTRL_DATA_CURRENT;
+		break;
+	case UVC_GET_DEF:
+		id = UVC_CTRL_DATA_DEF;
+		break;
+	case UVC_GET_MIN:
+		id = UVC_CTRL_DATA_MIN;
+		break;
+	case UVC_GET_MAX:
+		id = UVC_CTRL_DATA_MAX;
+		break;
+	default:
+		return NULL;
+	}
+
+	ctrl = uvc_find_control(chain, V4L2_CID_REGION_OF_INTEREST_AUTO,
+				&mapping);
+	if (!ctrl)
+		return NULL;
+
+	return (struct uvc_roi *)uvc_ctrl_data(ctrl, id);
+}
+
 /*
  * Add control information and hardcoded stock control mappings to the given
  * device.

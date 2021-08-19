@@ -824,4 +824,6 @@ void uvc_debugfs_cleanup_stream(struct uvc_streaming *stream);
 size_t uvc_video_stats_dump(struct uvc_streaming *stream, char *buf,
 			    size_t size);
 
+struct uvc_roi *uvc_ctrl_roi(struct uvc_video_chain *chain, u8 query);
+
 #endif
