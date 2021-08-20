@@ -119,7 +119,6 @@
   skcipher_walk_virt
   snprintf
   __stack_chk_fail
-  __stack_chk_guard
   strcmp
   strlcat
   strlcpy
