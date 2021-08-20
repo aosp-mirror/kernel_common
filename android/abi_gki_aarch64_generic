@@ -473,6 +473,8 @@
   dma_map_resource
   dma_map_sg_attrs
   dma_mmap_attrs
+  dma_pool_alloc
+  dma_pool_free
   dma_release_channel
   dma_request_chan
   dma_set_coherent_mask
@@ -2096,8 +2098,14 @@
   xhci_bus_resume
   xhci_bus_suspend
   xhci_gen_setup
+  xhci_get_ep_ctx
+  xhci_get_slot_ctx
+  xhci_handle_event
   xhci_init_driver
   xhci_resume
+  xhci_ring_alloc
+  xhci_ring_free
   xhci_run
   xhci_suspend
+  xhci_update_erst_dequeue
   xhci_vendor_get_ops
