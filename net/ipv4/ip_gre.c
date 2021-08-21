@@ -502,6 +502,10 @@ static void __gre_xmit(struct sk_buff *skb, struct net_device *dev,
 static struct sk_buff *gre_handle_offloads(struct sk_buff *skb,
 					   bool csum)
 {
+	unsigned char *skb_checksum_start = skb->head + skb->csum_start;
+
+	if (csum && skb_checksum_start < skb->data)
+		return ERR_PTR(-EINVAL);
 	return iptunnel_handle_offloads(skb, csum,
 					csum ? SKB_GSO_GRE_CSUM : SKB_GSO_GRE);
 }
