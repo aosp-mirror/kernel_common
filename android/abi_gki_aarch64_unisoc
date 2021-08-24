@@ -544,6 +544,7 @@
   of_property_read_string
   of_property_read_u32_index
   of_property_read_u64
+  of_property_read_u64_index
   of_property_read_variable_u32_array
   of_prop_next_string
   oops_in_progress
@@ -716,6 +717,7 @@
   seq_read
   set_nlink
   set_normalized_timespec64
+  set_page_dirty
   set_user_nice
   sg_init_table
   sg_miter_next
@@ -925,6 +927,7 @@
   vabits_actual
   vfree
   vmalloc
+  vmalloc_to_page
   vm_map_ram
   vm_unmap_aliases
   vm_unmap_ram
@@ -1051,6 +1054,7 @@
   filemap_fdatawait_range
   filemap_fdatawrite_range
   full_name_hash
+  gen_pool_virt_to_phys
   generic_block_bmap
   generic_cont_expand_simple
   generic_fh_to_dentry
@@ -1418,6 +1422,7 @@
   up_write
   __usecs_to_jiffies
   vmf_insert_mixed
+  vmf_insert_pfn
   vm_get_page_prot
   vm_insert_page
   vsscanf
