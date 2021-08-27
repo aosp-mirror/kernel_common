@@ -1271,6 +1271,11 @@ void btrtl_set_quirks(struct hci_dev *hdev, struct btrtl_device_info *btrtl_dev)
 	/* Enable WBS supported for the specific Realtek devices. */
 	switch (btrtl_dev->project_id) {
 	case CHIP_ID_8822C:
+		/* Disallow RTL8822 to remote wakeup, in order to enter
+		 * global suspend and save power.
+		 */
+		set_bit(HCI_QUIRK_DISABLE_REMOTE_WAKE, &hdev->quirks);
+		fallthrough;
 	case CHIP_ID_8852A:
 	case CHIP_ID_8852B:
 	case CHIP_ID_8852C:
