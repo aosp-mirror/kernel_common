@@ -247,6 +247,7 @@
   cpus_read_lock
   cpus_read_unlock
   cpu_subsys
+  crc32_le
   crc8
   crc8_populate_msb
   crypto_aead_decrypt
