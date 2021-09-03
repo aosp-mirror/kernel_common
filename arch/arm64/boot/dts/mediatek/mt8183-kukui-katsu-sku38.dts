@@ -16,6 +16,7 @@
 &i2c0 {
 	status = "okay";
 
+	/delete-node/touchscreen@10;
 	touchscreen1: touchscreen@5D {
 		compatible = "hid-over-i2c";
 		reg = <0x5D>;
