@@ -152,6 +152,36 @@ static int fuse_get_ioctl_iovs(unsigned int cmd, unsigned long arg,
 		iov->iov_len = sizeof(struct fsverity_digest) + digest_size;
 		break;
 	}
+	case FS_IOC_ENABLE_VERITY: {
+		struct fsverity_enable_arg enable;
+		struct fsverity_enable_arg __user *uarg =
+			(struct fsverity_enable_arg __user *)arg;
+		const __u32 max_buffer_len = FUSE_MAX_MAX_PAGES * PAGE_SIZE;
+
+		if (copy_from_user(&enable, uarg, sizeof(enable)))
+			return -EFAULT;
+
+		if (enable.salt_size > max_buffer_len ||
+		    enable.sig_size > max_buffer_len)
+			return -ENOMEM;
+
+		if (enable.salt_size > 0) {
+			iov++;
+			(*num_in_iov)++;
+
+			iov->iov_base = u64_to_user_ptr(enable.salt_ptr);
+			iov->iov_len = enable.salt_size;
+		}
+
+		if (enable.sig_size > 0) {
+			iov++;
+			(*num_in_iov)++;
+
+			iov->iov_base = u64_to_user_ptr(enable.sig_ptr);
+			iov->iov_len = enable.sig_size;
+		}
+		break;
+	}
 	default:
 		break;
 	}
