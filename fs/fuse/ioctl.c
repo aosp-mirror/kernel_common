@@ -98,12 +98,29 @@ static int fuse_copy_ioctl_iovec(struct fuse_conn *fc, struct iovec *dst,
 
 	return 0;
 }
-static int fuse_get_ioctl_len(unsigned int cmd, unsigned long arg, size_t *len)
+
+static int fuse_get_ioctl_iovs(unsigned int cmd, unsigned long arg,
+                              struct iovec *iov, struct iovec **in_iov,
+                              unsigned int *num_in_iov, struct iovec **out_iov,
+                              unsigned int *num_out_iov)
 {
+       iov->iov_base = (void __user *)arg;
+       iov->iov_len = _IOC_SIZE(cmd);
+
+       if (_IOC_DIR(cmd) & _IOC_WRITE) {
+               *in_iov = iov;
+               *num_in_iov = 1;
+       }
+
+       if (_IOC_DIR(cmd) & _IOC_READ) {
+               *out_iov = iov;
+               *num_out_iov = 1;
+       }
+
 	switch (cmd) {
 	case FS_IOC_GETFLAGS:
 	case FS_IOC_SETFLAGS:
-		*len = sizeof(int);
+		iov->iov_len = sizeof(int);
 		break;
 	case FS_IOC_GET_ENCRYPTION_POLICY_EX: {
 		__u64 policy_size;
@@ -117,7 +134,7 @@ static int fuse_get_ioctl_len(unsigned int cmd, unsigned long arg, size_t *len)
 		if (policy_size > SIZE_MAX - sizeof(policy_size))
 			return -EINVAL;
 
-		*len = sizeof(policy_size) + policy_size;
+		iov->iov_len = sizeof(policy_size) + policy_size;
 		break;
 	}
 	case FS_IOC_MEASURE_VERITY: {
@@ -132,11 +149,10 @@ static int fuse_get_ioctl_len(unsigned int cmd, unsigned long arg, size_t *len)
 		if (digest_size > SIZE_MAX - sizeof(struct fsverity_digest))
 			return -EINVAL;
 
-		*len = sizeof(struct fsverity_digest) + digest_size;
+		iov->iov_len = sizeof(struct fsverity_digest) + digest_size;
 		break;
 	}
 	default:
-		*len = _IOC_SIZE(cmd);
 		break;
 	}
 
@@ -238,22 +254,11 @@ long fuse_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg,
 	 * RETRY from server is not allowed.
 	 */
 	if (!(flags & FUSE_IOCTL_UNRESTRICTED)) {
-		struct iovec *iov = iov_page;
+		err = fuse_get_ioctl_iovs(cmd, arg, iov_page, &in_iov, &in_iovs,
+					  &out_iov, &out_iovs);
 
-		iov->iov_base = (void __user *)arg;
-		err = fuse_get_ioctl_len(cmd, arg, &iov->iov_len);
 		if (err)
 			goto out;
-
-		if (_IOC_DIR(cmd) & _IOC_WRITE) {
-			in_iov = iov;
-			in_iovs = 1;
-		}
-
-		if (_IOC_DIR(cmd) & _IOC_READ) {
-			out_iov = iov;
-			out_iovs = 1;
-		}
 	}
 
  retry:
