@@ -664,6 +664,7 @@
   drm_property_create_bool
   drm_property_create_enum
   drm_property_create_range
+  drm_property_create_signed_range
   drm_property_lookup_blob
   drm_property_replace_blob
   __drm_puts_seq_file
