@@ -1,9 +1,5 @@
-#ifndef _LINUX_VIRTIO_IDS_H
-#define _LINUX_VIRTIO_IDS_H
-/*
- * Virtio IDs
- *
- * This header is BSD licensed so anyone can use the definitions to implement
+/* SPDX-License-Identifier: (GPL-2.0 WITH Linux-syscall-note) OR BSD-3-Clause */
+/* This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,26 +23,52 @@
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE. */
+ * SUCH DAMAGE.
+ */
 
-#define VIRTIO_ID_NET		1 /* virtio net */
-#define VIRTIO_ID_BLOCK		2 /* virtio block */
-#define VIRTIO_ID_CONSOLE	3 /* virtio console */
-#define VIRTIO_ID_RNG		4 /* virtio rng */
-#define VIRTIO_ID_BALLOON	5 /* virtio balloon */
-#define VIRTIO_ID_RPMSG		7 /* virtio remote processor messaging */
-#define VIRTIO_ID_SCSI		8 /* virtio scsi */
-#define VIRTIO_ID_9P		9 /* 9p virtio console */
-#define VIRTIO_ID_RPROC_SERIAL 11 /* virtio remoteproc serial link */
-#define VIRTIO_ID_CAIF	       12 /* Virtio caif */
-#define VIRTIO_ID_GPU          16 /* virtio GPU */
-#define VIRTIO_ID_INPUT        18 /* virtio input */
-#define VIRTIO_ID_VSOCK        19 /* virtio vsock transport */
-#define VIRTIO_ID_CRYPTO       20 /* virtio crypto */
-#define VIRTIO_ID_IOMMU        23 /* virtio IOMMU */
-#define VIRTIO_ID_FS           26 /* virtio filesystem */
-#define VIRTIO_ID_PMEM         27 /* virtio pmem */
-#define VIRTIO_ID_MAC80211_HWSIM 29 /* virtio mac80211-hwsim */
-#define VIRTIO_ID_PVCLOCK        61 /* virtio pvclock (experimental id) */
+#ifndef _LINUX_VIRTIO_PVCLOCK_H
+#define _LINUX_VIRTIO_PVCLOCK_H
 
-#endif /* _LINUX_VIRTIO_IDS_H */
+#include <linux/types.h>
+#include <linux/virtio_types.h>
+#include <linux/virtio_ids.h>
+#include <linux/virtio_config.h>
+
+/* The feature bitmap for virtio pvclock */
+/* TSC is stable */
+#define VIRTIO_PVCLOCK_F_TSC_STABLE 0
+/* Inject sleep for suspend */
+#define VIRTIO_PVCLOCK_F_INJECT_SLEEP 1
+/* Use device clocksource rating */
+#define VIRTIO_PVCLOCK_F_CLOCKSOURCE_RATING 2
+
+struct virtio_pvclock_config {
+	/* Number of ns the VM has been suspended without guest suspension. */
+	__u64 suspend_time_ns;
+	/* Device-suggested rating of the pvclock clocksource. */
+	__u32 clocksource_rating;
+	__u32 padding;
+};
+
+/* Status values for a virtio_pvclock request. */
+#define VIRTIO_PVCLOCK_S_OK 0
+#define VIRTIO_PVCLOCK_S_IOERR 1
+#define VIRTIO_PVCLOCK_S_UNSUPP 2
+
+/*
+ * Virtio pvclock set pvclock page request. Sets up the shared memory
+ * pvclock_vsyscall_time_info struct.
+ */
+struct virtio_pvclock_set_pvclock_page_req {
+	/* Physical address of pvclock_vsyscall_time_info. */
+	__u64 pvclock_page_pa;
+	/* Current system time. */
+	__u64 system_time;
+	/* Current tsc value. */
+	__u64 tsc_timestamp;
+	/* Status of this request, one of VIRTIO_PVCLOCK_S_*. */
+	__u8 status;
+	__u8 padding[7];
+};
+
+#endif /* _LINUX_VIRTIO_PVCLOCK_H */

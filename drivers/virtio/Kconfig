@@ -95,4 +95,14 @@ config VIRTIO_MMIO_CMDLINE_DEVICES
 
 	 If unsure, say 'N'.
 
+config VIRTIO_PVCLOCK
+	tristate "Virtio pvclock driver"
+	depends on VIRTIO
+	depends on X86 && HYPERVISOR_GUEST
+	select PARAVIRT_CLOCK
+	help
+	 This driver supports virtio pvclock devices.
+
+	 If unsure, say M.
+
 endif # VIRTIO_MENU
