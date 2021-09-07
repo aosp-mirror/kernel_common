@@ -164,7 +164,7 @@ config COMPILE_TEST
 
 config WERROR
 	bool "Compile the kernel with warnings as errors"
-	default COMPILE_TEST
+	default y
 	help
 	  A kernel build should not cause any compiler warnings, and this
 	  enables the '-Werror' (for C) and '-Dwarnings' (for Rust) flags
