@@ -1778,6 +1778,7 @@ void timekeeping_inject_sleeptime64(const struct timespec64 *delta)
 	/* Signal hrtimers about time change */
 	clock_was_set(CLOCK_SET_WALL | CLOCK_SET_BOOT);
 }
+EXPORT_SYMBOL_GPL(timekeeping_inject_sleeptime64);
 #endif
 
 /**
