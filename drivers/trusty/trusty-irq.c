@@ -191,6 +191,15 @@ static int trusty_irq_cpu_up(unsigned int cpu, struct hlist_node *node)
 	trusty_irq_enable_irqset(is, this_cpu_ptr(is->percpu_irqs));
 	local_irq_restore(irq_flags);
 
+	/*
+	 * Temporary workaround blindly enqueuing work to force trusty scheduler
+	 * to run after a cpu suspend.
+	 * Root causing the workqueue being inappropriately empty
+	 * (e.g. loss of an IPI) may make this workaround unnecessary
+	 * in the future.
+	 */
+	trusty_enqueue_nop(is->trusty_dev, NULL);
+
 	return 0;
 }
 
