@@ -933,4 +933,6 @@ config LRU_GEN_STATS
 	  This option has a per-memcg and per-node memory overhead.
 # }
 
+source "mm/damon/Kconfig"
+
 endmenu
