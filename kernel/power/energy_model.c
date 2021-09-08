@@ -81,8 +81,7 @@ static void em_debug_create_pd(struct em_perf_domain *pd, int cpu) {}
 static struct em_perf_domain *em_create_pd(cpumask_t *span, int nr_states,
 						struct em_data_callback *cb)
 {
-	unsigned long opp_eff, prev_opp_eff = ULONG_MAX;
-	unsigned long power, freq, prev_freq = 0;
+	unsigned long power, freq, prev_freq = 0, prev_cost = ULONG_MAX;
 	int i, ret, cpu = cpumask_first(span);
 	struct em_cap_state *table;
 	struct em_perf_domain *pd;
@@ -132,27 +131,21 @@ static struct em_perf_domain *em_create_pd(cpumask_t *span, int nr_states,
 
 		table[i].power = power;
 		table[i].frequency = prev_freq = freq;
-
-		/*
-		 * The hertz/watts efficiency ratio should decrease as the
-		 * frequency grows on sane platforms. But this isn't always
-		 * true in practice so warn the user if a higher OPP is more
-		 * power efficient than a lower one.
-		 */
-		opp_eff = freq / power;
-		if (opp_eff >= prev_opp_eff)
-			pr_warn("pd%d: hertz/watts ratio non-monotonically decreasing: em_cap_state %d >= em_cap_state%d\n",
-					cpu, i, i - 1);
-		prev_opp_eff = opp_eff;
 	}
 
 	/* Compute the cost of each capacity_state. */
 	fmax = (u64) table[nr_states - 1].frequency;
-	for (i = 0; i < nr_states; i++) {
+	for (i = nr_states - 1; i >= 0; i--) {
 		unsigned long power_res = em_scale_power(table[i].power);
 
 		table[i].cost = div64_u64(fmax * power_res,
 					  table[i].frequency);
+		if (table[i].cost >= prev_cost) {
+			pr_warn("pd%d: EM: OPP:%lu is inefficient\n",
+				cpu, table[i].frequency);
+		} else {
+			prev_cost = table[i].cost;
+		}
 	}
 
 	pd->table = table;
