@@ -277,6 +277,7 @@ struct imx208 {
 	struct v4l2_ctrl *pixel_rate;
 	struct v4l2_ctrl *vblank;
 	struct v4l2_ctrl *hblank;
+	struct v4l2_ctrl *exposure;
 	struct v4l2_ctrl *vflip;
 	struct v4l2_ctrl *hflip;
 
@@ -435,7 +436,16 @@ static int imx208_set_ctrl(struct v4l2_ctrl *ctrl)
 	struct imx208 *imx208 =
 		container_of(ctrl->handler, struct imx208, ctrl_handler);
 	struct i2c_client *client = v4l2_get_subdevdata(&imx208->sd);
+	s64 max;
 	int ret;
+
+	if (ctrl->id == V4L2_CID_VBLANK) {
+		/* Update max exposure while meeting expected vblanking */
+		max = imx208->cur_mode->height + ctrl->val - 8;
+		__v4l2_ctrl_modify_range(imx208->exposure,
+					 imx208->exposure->minimum,
+					 max, imx208->exposure->step, max);
+	}
 
 	/*
 	 * Applying V4L2 control value only happens
@@ -931,9 +941,11 @@ static int imx208_init_controls(struct imx208 *imx208)
 		imx208->hblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
 	exposure_max = imx208->cur_mode->vts_def - 8;
-	v4l2_ctrl_new_std(ctrl_hdlr, &imx208_ctrl_ops, V4L2_CID_EXPOSURE,
-			  IMX208_EXPOSURE_MIN, exposure_max,
-			  IMX208_EXPOSURE_STEP, IMX208_EXPOSURE_DEFAULT);
+	imx208->exposure = v4l2_ctrl_new_std(ctrl_hdlr, &imx208_ctrl_ops,
+					     V4L2_CID_EXPOSURE,
+					     IMX208_EXPOSURE_MIN, exposure_max,
+					     IMX208_EXPOSURE_STEP,
+					     IMX208_EXPOSURE_DEFAULT);
 
 	imx208->hflip = v4l2_ctrl_new_std(ctrl_hdlr, &imx208_ctrl_ops,
 					  V4L2_CID_HFLIP, 0, 1, 1, 0);
