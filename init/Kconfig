@@ -164,6 +164,7 @@ config COMPILE_TEST
 
 config WERROR
 	bool "Compile the kernel with warnings as errors"
+	depends on !COMPILE_TEST || ARM64 || X86 || ARM
 	default y
 	help
 	  A kernel build should not cause any compiler warnings, and this
