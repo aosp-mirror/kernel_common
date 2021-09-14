@@ -694,6 +694,7 @@
   dw_pcie_write
   __dynamic_dev_dbg
   __dynamic_pr_debug
+  emergency_restart
   enable_irq
   enable_percpu_irq
   eth_type_trans
@@ -955,6 +956,7 @@
   kasprintf
   kernel_cpustat
   kernel_kobj
+  kernel_restart
   kern_mount
   kern_unmount
   __kfifo_alloc
