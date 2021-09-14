@@ -1271,6 +1271,7 @@
   phy_init
   phy_power_off
   phy_power_on
+  pid_task
   pinconf_generic_dt_free_map
   pinconf_generic_dt_node_to_map
   pinctrl_add_gpio_range
@@ -1355,6 +1356,7 @@
   put_device
   put_disk
   __put_page
+  put_pid
   put_sg_io_hdr
   __put_task_struct
   put_unused_fd
@@ -1412,6 +1414,7 @@
   register_netdev
   register_netdevice
   register_netdevice_notifier
+  register_oom_notifier
   register_pm_notifier
   register_reboot_notifier
   register_restart_handler
@@ -1955,6 +1958,7 @@
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
+  unregister_oom_notifier
   unregister_pm_notifier
   unregister_reboot_notifier
   unregister_shrinker
