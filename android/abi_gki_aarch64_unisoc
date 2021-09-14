@@ -4,6 +4,7 @@
   add_uevent_var
   add_wait_queue
   add_to_page_cache_lru
+  addrconf_prefix_rcv_add_addr
   aes_encrypt
   aes_expandkey
   alloc_anon_inode
@@ -400,6 +401,7 @@
   ip_route_output_flow
   ipv4_redirect
   ipv4_update_pmtu
+  ipv6_skip_exthdr
   ir_lirc_scancode_event
   ir_raw_gen_manchester
   ir_raw_gen_pd
@@ -732,6 +734,7 @@
   simple_get_link
   simple_read_from_buffer
   simple_strtol
+  simple_write_to_buffer
   single_open
   single_release
   skb_clone
@@ -1508,6 +1511,7 @@
   clk_round_rate
   mmc_free_host
   mmc_of_parse
+  mmc_regulator_set_ocr
   mmc_regulator_set_vqmmc
   mmc_remove_host
   mmc_request_done
