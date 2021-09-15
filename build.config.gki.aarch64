@@ -12,6 +12,7 @@ ADDITIONAL_KMI_SYMBOL_LISTS="
 android/abi_gki_aarch64_core
 android/abi_gki_aarch64_fips140
 android/abi_gki_aarch64_generic
+android/abi_gki_aarch64_virtual_device
 "
 
 FILES="${FILES}
