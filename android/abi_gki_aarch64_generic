@@ -1288,6 +1288,7 @@
   pin_get_name
   pin_user_pages
   pin_user_pages_fast
+  pin_user_pages_remote
   platform_bus_type
   platform_device_add
   platform_device_add_data
