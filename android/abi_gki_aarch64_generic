@@ -651,6 +651,7 @@
   drm_plane_create_alpha_property
   drm_plane_create_blend_mode_property
   drm_plane_create_rotation_property
+  drm_plane_create_zpos_immutable_property
   drm_plane_create_zpos_property
   drm_poll
   drm_prime_gem_destroy
