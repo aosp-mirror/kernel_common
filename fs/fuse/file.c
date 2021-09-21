@@ -1283,16 +1283,21 @@ static ssize_t fuse_cache_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	ssize_t written = 0;
 	ssize_t written_buffered = 0;
 	struct inode *inode = mapping->host;
+	struct fuse_conn *fc = get_fuse_conn(inode);
 	ssize_t err;
 	loff_t endbyte = 0;
 
-	if (get_fuse_conn(inode)->writeback_cache) {
+	if (fc->writeback_cache) {
 		/* Update size (EOF optimization) and mode (SUID clearing) */
 		err = fuse_update_attributes(mapping->host, file);
 		if (err)
 			return err;
 
-		return generic_file_write_iter(iocb, from);
+		if (!fc->handle_killpriv ||
+		    !should_remove_suid(file->f_path.dentry))
+			return generic_file_write_iter(iocb, from);
+
+		/* Fall back to unbuffered write to remove suid/sgid bits */
 	}
 
 	inode_lock(inode);

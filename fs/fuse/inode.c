@@ -8,6 +8,7 @@
 
 #include "fuse_i.h"
 
+#include <linux/fs.h>
 #include <linux/pagemap.h>
 #include <linux/slab.h>
 #include <linux/file.h>
@@ -204,6 +205,13 @@ void fuse_change_attributes_common(struct inode *inode, struct fuse_attr *attr,
 		inode->i_mode &= ~S_ISVTX;
 
 	fi->orig_ino = attr->ino;
+
+	/*
+	 * Reset S_NOSEC since the file server observed that the suid/sgid bit
+	 * is set.
+	 */
+	if (IS_NOSEC(inode) && is_sxid(inode->i_mode))
+		inode->i_flags &= ~S_NOSEC;
 }
 
 void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,

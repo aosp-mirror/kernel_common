@@ -1348,6 +1348,22 @@ static int virtio_fs_fill_super(struct super_block *sb, struct fs_context *fsc)
 	/* Previous unmount will stop all queues. Start these again */
 	virtio_fs_start_all_queues(fs);
 	fuse_send_init(fm);
+
+	/*
+	 * We set the SB_NOSEC flag for virtiofs to improve small write
+	 * performance. This requires that the server kills the suid/sgid bits
+	 * as well as the security.capability xattr on chown() as well as on
+	 * truncate() and write() if the caller does not have CAP_FSETID.
+	 * We know this is true for our virtiofs implementation but we cannot
+	 * make this assumption for general fuse servers. The proper fix is
+	 * being worked on upstream so this is just a temporary hack until the
+	 * upstream solution can be merged.
+	 *
+	 * TODO(b/163383485): Revert this once the proper fix has landed
+	 * upstream and can be backported.
+	 */
+	sb->s_flags |= SB_NOSEC;
+
 	mutex_unlock(&virtio_fs_mutex);
 	return 0;
 
