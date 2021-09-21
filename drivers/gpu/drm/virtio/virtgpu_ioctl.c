@@ -738,6 +738,7 @@ static int virtio_gpu_context_init_ioctl(struct drm_device *dev,
 {
 	int ret = 0;
 	uint32_t num_params, i, param, value;
+	uint64_t valid_ring_mask;
 	size_t len;
 	struct drm_virtgpu_context_set_param *ctx_set_params;
 	struct virtio_gpu_device *vgdev = dev->dev_private;
@@ -751,7 +752,7 @@ static int virtio_gpu_context_init_ioctl(struct drm_device *dev,
 		return -EINVAL;
 
 	/* Number of unique parameters supported at this time. */
-	if (num_params > 2)
+	if (num_params > 3)
 		return -EINVAL;
 
 	ctx_set_params = memdup_user(u64_to_user_ptr(args->ctx_set_params),
@@ -799,8 +800,27 @@ static int virtio_gpu_context_init_ioctl(struct drm_device *dev,
 			vfpriv->base_fence_ctx = dma_fence_context_alloc(value);
 			vfpriv->num_rings = value;
 			break;
+		case VIRTGPU_CONTEXT_PARAM_POLL_RINGS_MASK:
+			if (vfpriv->ring_idx_mask) {
+				ret = -EINVAL;
+				goto out_unlock;
+			}
+
+			vfpriv->ring_idx_mask = value;
+			break;
 		default:
 			return -EINVAL;
+		}
+	}
+
+	if (vfpriv->ring_idx_mask) {
+		valid_ring_mask = 0;
+		for (i = 0; i < vfpriv->num_rings; i++)
+			valid_ring_mask |= 1 << i;
+
+		if (~valid_ring_mask & vfpriv->ring_idx_mask) {
+			ret = -EINVAL;
+			goto out_unlock;
 		}
 	}
 
