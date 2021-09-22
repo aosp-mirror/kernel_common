@@ -422,6 +422,7 @@
   dev_queue_xmit
   devres_add
   devres_alloc_node
+  devres_free
   dev_set_name
   _dev_warn
   disable_irq
