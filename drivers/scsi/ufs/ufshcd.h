@@ -881,8 +881,6 @@ struct ufs_hba {
 	struct ufs_vreg_info vreg_info;
 	struct list_head clk_list_head;
 
-	bool wlun_dev_clr_ua;
-
 	/* Number of requests aborts */
 	int req_abort_count;
 
