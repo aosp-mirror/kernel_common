@@ -900,7 +900,7 @@ static int snd_intel8x0_hw_params(struct snd_pcm_substream *substream,
 	struct ichdev *ichdev = get_ichdev(substream);
 	int dbl = params_rate(hw_params) > 48000;
 	int err;
-
+	synchronize_irq(chip->irq);
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 	if (err < 0)
 		return err;
@@ -925,6 +925,7 @@ static int snd_intel8x0_hw_free(struct snd_pcm_substream *substream)
 {
 	struct ichdev *ichdev = get_ichdev(substream);
 
+	synchronize_irq(chip->irq);
 	if (ichdev->pcm_open_flag) {
 		snd_ac97_pcm_close(ichdev->pcm);
 		ichdev->pcm_open_flag = 0;
@@ -993,6 +994,7 @@ static int snd_intel8x0_pcm_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct ichdev *ichdev = get_ichdev(substream);
 
+	synchronize_irq(chip->irq);
 	ichdev->physbuf = runtime->dma_addr;
 	ichdev->size = snd_pcm_lib_buffer_bytes(substream);
 	ichdev->fragsize = snd_pcm_lib_period_bytes(substream);
