@@ -428,9 +428,7 @@ struct irq_desc *irq_to_desc(unsigned int irq)
 {
 	return mtree_load(&sparse_irqs, irq);
 }
-#ifdef CONFIG_KVM_BOOK3S_64_HV_MODULE
 EXPORT_SYMBOL_GPL(irq_to_desc);
-#endif
 
 void irq_lock_sparse(void)
 {
@@ -967,6 +965,7 @@ unsigned int kstat_irqs_cpu(unsigned int irq, int cpu)
 
 	return desc && desc->kstat_irqs ? per_cpu(desc->kstat_irqs->cnt, cpu) : 0;
 }
+EXPORT_SYMBOL_GPL(kstat_irqs_cpu);
 
 unsigned int kstat_irqs_desc(struct irq_desc *desc, const struct cpumask *cpumask)
 {
@@ -1050,3 +1049,4 @@ void __irq_set_lockdep_class(unsigned int irq, struct lock_class_key *lock_class
 }
 EXPORT_SYMBOL_GPL(__irq_set_lockdep_class);
 #endif
+EXPORT_SYMBOL_GPL(kstat_irqs_usr);
