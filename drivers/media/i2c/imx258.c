@@ -30,6 +30,7 @@
 #define IMX258_VTS_MAX			0xffff
 
 /*Frame Length Line*/
+#define IMX258_REG_FLL			0x0340
 #define IMX258_FLL_MIN			0x08a6
 #define IMX258_FLL_MAX			0xffff
 #define IMX258_FLL_STEP			1
@@ -242,7 +243,7 @@ static const struct imx258_reg mode_4208x3118_regs[] = {
 	{ 0x034D, 0x70 },
 	{ 0x034E, 0x0C },
 	{ 0x034F, 0x30 },
-	{ 0x0350, 0x01 },
+	{ 0x0350, 0x00 }, /* no frame length automatic tracking control */
 	{ 0x0202, 0x0C },
 	{ 0x0203, 0x46 },
 	{ 0x0204, 0x00 },
@@ -361,7 +362,7 @@ static const struct imx258_reg mode_2104_1560_regs[] = {
 	{ 0x034D, 0x38 },
 	{ 0x034E, 0x06 },
 	{ 0x034F, 0x18 },
-	{ 0x0350, 0x01 },
+	{ 0x0350, 0x00 }, /* no frame length automatic tracking control */
 	{ 0x0202, 0x06 },
 	{ 0x0203, 0x2E },
 	{ 0x0204, 0x00 },
@@ -480,7 +481,7 @@ static const struct imx258_reg mode_1048_780_regs[] = {
 	{ 0x034D, 0x18 },
 	{ 0x034E, 0x03 },
 	{ 0x034F, 0x0C },
-	{ 0x0350, 0x01 },
+	{ 0x0350, 0x00 }, /* no frame length automatic tracking control */
 	{ 0x0202, 0x03 },
 	{ 0x0203, 0x42 },
 	{ 0x0204, 0x00 },
@@ -754,7 +755,16 @@ static int imx258_set_ctrl(struct v4l2_ctrl *ctrl)
 	struct imx258 *imx258 =
 		container_of(ctrl->handler, struct imx258, ctrl_handler);
 	struct i2c_client *client = v4l2_get_subdevdata(&imx258->sd);
+	s64 max;
 	int ret = 0;
+
+	if (ctrl->id == V4L2_CID_VBLANK) {
+		/* Update max exposure to meet expected vblanking */
+		max = imx258->cur_mode->height + ctrl->val - 10;
+		__v4l2_ctrl_modify_range(imx258->exposure,
+					 imx258->exposure->minimum,
+					 max, imx258->exposure->step, max);
+	}
 
 	/*
 	 * Applying V4L2 control value only happens
@@ -773,6 +783,10 @@ static int imx258_set_ctrl(struct v4l2_ctrl *ctrl)
 		ret = imx258_write_reg(imx258, IMX258_REG_EXPOSURE,
 				IMX258_REG_VALUE_16BIT,
 				ctrl->val);
+		break;
+	case V4L2_CID_VBLANK:
+		ret = imx258_write_reg(imx258, IMX258_REG_FLL, 2,
+				       imx258->cur_mode->height + ctrl->val);
 		break;
 	case V4L2_CID_DIGITAL_GAIN:
 		ret = imx258_update_digital_gain(imx258, IMX258_REG_VALUE_16BIT,
@@ -1202,9 +1216,6 @@ static int imx258_init_controls(struct imx258 *imx258)
 				vblank_min,
 				IMX258_VTS_MAX - imx258->cur_mode->height, 1,
 				vblank_def);
-
-	if (imx258->vblank)
-		imx258->vblank->flags |= V4L2_CTRL_FLAG_READ_ONLY;
 
 	imx258->hblank = v4l2_ctrl_new_std(
 				ctrl_hdlr, &imx258_ctrl_ops, V4L2_CID_HBLANK,
