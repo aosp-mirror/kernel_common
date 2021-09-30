@@ -59,6 +59,7 @@ static int intel_pxp_tee_io_message(struct intel_pxp *pxp,
 {
 	struct drm_i915_private *i915 = pxp->ctrl_gt->i915;
 	struct i915_pxp_component *pxp_component = pxp->pxp_component;
+	u8 tmp_drop_buf[64];
 	int ret = 0;
 
 	mutex_lock(&pxp->tee_mutex);
@@ -72,14 +73,29 @@ static int intel_pxp_tee_io_message(struct intel_pxp *pxp,
 		goto unlock;
 	}
 
+	if (pxp->mei_pxp_last_msg_interrupted) {
+		/* read and drop data from the previous iteration */
+		ret = pxp_component->ops->recv(pxp_component->tee_dev, &tmp_drop_buf, 64);
+		if (ret == -EINTR)
+			goto unlock;
+
+		pxp->mei_pxp_last_msg_interrupted = false;
+	}
+
 	ret = pxp_component->ops->send(pxp_component->tee_dev, msg_in, msg_in_size);
 	if (ret) {
+		/* flag on next msg to drop interrupted msg */
+		if (ret == -EINTR)
+			pxp->mei_pxp_last_msg_interrupted = true;
 		drm_err(&i915->drm, "Failed to send PXP TEE message\n");
 		goto unlock;
 	}
 
 	ret = pxp_component->ops->recv(pxp_component->tee_dev, msg_out, msg_out_max_size);
 	if (ret < 0) {
+		/* flag on next msg to drop interrupted msg */
+		if (ret == -EINTR)
+			pxp->mei_pxp_last_msg_interrupted = true;
 		drm_err(&i915->drm, "Failed to receive PXP TEE message\n");
 		goto unlock;
 	}
