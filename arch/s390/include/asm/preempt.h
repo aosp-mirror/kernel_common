@@ -32,7 +32,7 @@ static inline void preempt_count_set(int pc)
 #define init_task_preempt_count(p)	do { } while (0)
 
 #define init_idle_preempt_count(p, cpu)	do { \
-	S390_lowcore.preempt_count = PREEMPT_DISABLED; \
+	S390_lowcore.preempt_count = PREEMPT_ENABLED; \
 } while (0)
 
 static inline void set_preempt_need_resched(void)
@@ -91,7 +91,7 @@ static inline void preempt_count_set(int pc)
 #define init_task_preempt_count(p)	do { } while (0)
 
 #define init_idle_preempt_count(p, cpu)	do { \
-	S390_lowcore.preempt_count = PREEMPT_DISABLED; \
+	S390_lowcore.preempt_count = PREEMPT_ENABLED; \
 } while (0)
 
 static inline void set_preempt_need_resched(void)
