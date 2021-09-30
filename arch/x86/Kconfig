@@ -352,6 +352,9 @@ config ARCH_SUSPEND_POSSIBLE
 config ARCH_WANT_GENERAL_HUGETLB
 	def_bool y
 
+config ZONE_DMA32
+	def_bool n
+
 config AUDIT_ARCH
 	def_bool y if X86_64
 
