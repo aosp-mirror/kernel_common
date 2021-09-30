@@ -811,7 +811,7 @@ static int virtio_gpu_context_init_ioctl(struct drm_device *dev,
 			if (value > MAX_CAPSET_ID)
 				return -EINVAL;
 
-			if ((vgdev->capset_id_mask & (1 << value)) == 0)
+			if ((vgdev->capset_id_mask & (1ULL << value)) == 0)
 				return -EINVAL;
 
 			/* Context capset ID already set */
