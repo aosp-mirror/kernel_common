@@ -929,6 +929,7 @@
   __ioremap
   io_schedule_timeout
   iounmap
+  iov_iter_bvec
   iput
   __irq_alloc_descs
   irq_create_mapping_affinity
