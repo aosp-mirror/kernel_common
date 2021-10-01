@@ -61,6 +61,7 @@ struct virtio_wl_ctrl_hdr {
 enum virtio_wl_vfd_flags {
 	VIRTIO_WL_VFD_WRITE = 0x1, /* intended to be written by guest */
 	VIRTIO_WL_VFD_READ = 0x2, /* intended to be read by guest */
+	VIRTIO_WL_VFD_FENCE = 0x8,
 };
 
 struct virtio_wl_ctrl_vfd {
