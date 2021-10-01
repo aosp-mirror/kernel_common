@@ -94,8 +94,13 @@ struct virtwl_vfd {
 	uint32_t size;
 	bool hungup;
 
-	struct list_head in_queue; /* list of virtwl_vfd_qentry */
+	union {
+		struct list_head in_queue; /* list of virtwl_vfd_qentry */
+		struct list_head fence_release_entry;
+	};
 	wait_queue_head_t in_waitq;
+
+	struct dma_fence *fence;
 };
 
 struct virtwl_info {
@@ -115,10 +120,20 @@ struct virtwl_info {
 	struct idr vfds;
 
 	bool use_send_vfd_v2;
+
+	spinlock_t fence_lock;
+	struct list_head fence_release_list;
+	struct work_struct fence_release_work;
+};
+
+struct virtwl_fence {
+	struct dma_fence base;
+	struct virtwl_vfd *vfd;
 };
 
 static struct virtwl_vfd *virtwl_vfd_alloc(struct virtwl_info *vi);
 static void virtwl_vfd_free(struct virtwl_vfd *vfd);
+static int do_vfd_close(struct virtwl_vfd *vfd);
 
 static const struct file_operations virtwl_vfd_fops;
 
@@ -214,6 +229,63 @@ clear_queue:
 	return ret;
 }
 
+#define to_virtwl_fence(dma_fence) \
+	container_of(dma_fence, struct virtwl_fence, base)
+
+static void virtwl_fence_release_handler(struct work_struct *work)
+{
+	struct virtwl_info *vi = container_of(work, struct virtwl_info,
+					      fence_release_work);
+	struct virtwl_vfd *vfd, *next;
+	LIST_HEAD(to_release);
+	unsigned long flags;
+
+	spin_lock_irqsave(&vi->fence_lock, flags);
+	list_splice_init(&vi->fence_release_list, &to_release);
+	spin_unlock_irqrestore(&vi->fence_lock, flags);
+
+	list_for_each_entry_safe(vfd, next, &to_release, fence_release_entry) {
+		uint32_t vfd_id = vfd->id;
+		int ret;
+
+		list_del_init(&vfd->fence_release_entry);
+		ret = do_vfd_close(vfd);
+		if (ret)
+			pr_warn("virtwl: failed to release vfd id %u: %d\n",
+				vfd_id, ret);
+	}
+}
+
+static const char *virtwl_fence_driver_name(struct dma_fence *fence)
+{
+	return "virtio_wl";
+}
+
+static void virtwl_fence_release(struct dma_fence *f)
+{
+	struct virtwl_fence *fence = to_virtwl_fence(f);
+	struct virtwl_info *vi = fence->vfd->vi;
+	unsigned long flags;
+
+	spin_lock_irqsave(&vi->fence_lock, flags);
+	list_add_tail(&fence->vfd->fence_release_entry,
+		      &vi->fence_release_list);
+	spin_unlock_irqrestore(&vi->fence_lock, flags);
+
+	// Release may be called from an IRQ context. Since closing the fence's
+	// vfd involves waiting for a reply completion, it needs to be done on
+	// a worker thread.
+	schedule_work(&vi->fence_release_work);
+
+	dma_fence_free(&fence->base);
+}
+
+static const struct dma_fence_ops virtwl_fence_ops = {
+	.get_driver_name = virtwl_fence_driver_name,
+	.get_timeline_name = virtwl_fence_driver_name,
+	.release = virtwl_fence_release,
+};
+
 static bool vq_handle_new(struct virtwl_info *vi,
 			  struct virtio_wl_ctrl_vfd_new *new, unsigned int len)
 {
@@ -269,6 +341,11 @@ static bool vq_handle_recv(struct virtwl_info *vi,
 		return true; /* return the inbuf to vq */
 	}
 
+	if (vfd->flags & VIRTIO_WL_VFD_FENCE) {
+		pr_warn("virtwl: recv for fence vfd_id %u\n", recv->vfd_id);
+		return true; /* return the inbuf to vq */
+	}
+
 	qentry = kzalloc(sizeof(*qentry), GFP_KERNEL);
 	if (!qentry) {
 		mutex_unlock(&vfd->lock);
@@ -307,7 +384,18 @@ static bool vq_handle_hup(struct virtwl_info *vi,
 		pr_warn("virtwl: hup for hungup vfd_id %u\n", vfd_hup->vfd_id);
 
 	vfd->hungup = true;
-	wake_up_interruptible_all(&vfd->in_waitq);
+
+	if (vfd->flags & VIRTIO_WL_VFD_FENCE) {
+		spin_lock(&vi->fence_lock);
+		if (vfd->fence) {
+			dma_fence_signal_locked(vfd->fence);
+			dma_fence_put(vfd->fence);
+		}
+		spin_unlock(&vi->fence_lock);
+	} else {
+		wake_up_interruptible_all(&vfd->in_waitq);
+	}
+
 	mutex_unlock(&vfd->lock);
 
 	return true;
@@ -725,8 +813,8 @@ static int get_dma_buf_id(struct dma_buf *dma_buf, u32 *id)
 	return ret;
 }
 
-static int encode_fence(struct dma_fence *fence,
-			struct virtio_wl_ctrl_vfd_send_vfd_v2 *vfd_id)
+static int encode_external_fence(struct dma_fence *fence,
+				 struct virtio_wl_ctrl_vfd_send_vfd_v2 *vfd_id)
 {
 	const char *name = fence->ops->get_driver_name(fence);
 
@@ -744,6 +832,11 @@ static int encode_fence(struct dma_fence *fence,
 		vfd_id->seqno = cpu_to_le32(fence->seqno);
 	}
 	return 0;
+}
+
+static bool is_local_fence(struct dma_fence *fence)
+{
+	return fence && fence->ops == &virtwl_fence_ops;
 }
 
 static int encode_vfd_ids_foreign(struct virtwl_vfd **vfds,
@@ -770,8 +863,8 @@ static int encode_vfd_ids_foreign(struct virtwl_vfd **vfds,
 				return ret;
 			kind = VIRTIO_WL_CTRL_VFD_SEND_KIND_VIRTGPU;
 		} else if (virtgpu_dma_fence[i]) {
-			ret = encode_fence(virtgpu_dma_fence[i],
-					   ids_v2 + i);
+			ret = encode_external_fence(virtgpu_dma_fence[i],
+						    ids_v2 + i);
 			if (ret)
 				return ret;
 		} else {
@@ -822,6 +915,9 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 		for (i = 0; i < VIRTWL_SEND_MAX_ALLOCS; i++) {
 			struct fd vfd_file;
 			int fd = vfd_fds[i];
+			struct dma_fence *fence;
+			struct dma_buf *dma_buf = ERR_PTR(-EINVAL);
+			bool handled = false;
 
 			if (fd < 0)
 				break;
@@ -834,8 +930,20 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 
 			if (vfd_file.file->f_op == &virtwl_vfd_fops) {
 				vfd_files[i] = vfd_file;
-
 				vfds[i] = vfd_file.file->private_data;
+				handled = true;
+			}
+
+			if (!handled) {
+				fence = sync_file_get_fence(vfd_fds[i]);
+				if (fence && is_local_fence(fence)) {
+					vfd_files[i] = vfd_file;
+					vfds[i] = to_virtwl_fence(fence)->vfd;
+					handled = true;
+				}
+			}
+
+			if (handled) {
 				if (vfds[i] && vfds[i]->id) {
 					vfd_count++;
 					continue;
@@ -843,35 +951,32 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 
 				ret = -EINVAL;
 				goto put_files;
-			} else {
-				struct dma_buf *dma_buf = ERR_PTR(-EINVAL);
-				struct dma_fence *dma_fence = ERR_PTR(-EINVAL);
-				bool handled = false;
+			}
 
 #ifdef SEND_VIRTGPU_RESOURCES
+			if (!fence)
 				dma_buf = dma_buf_get(vfd_fds[i]);
-				dma_fence = vi->use_send_vfd_v2
-					? sync_file_get_fence(vfd_fds[i])
-					: ERR_PTR(-EINVAL);
-				handled = !IS_ERR(dma_buf) ||
-					  !IS_ERR(dma_fence);
 
-				if (!IS_ERR(dma_buf)) {
-					virtgpu_dma_bufs[i] = dma_buf;
-				} else {
-					virtgpu_dma_fence[i] = dma_fence;
-				}
+			handled = true;
+			if (!IS_ERR(dma_buf))
+				virtgpu_dma_bufs[i] = dma_buf;
+			else if (fence && vi->use_send_vfd_v2)
+				virtgpu_dma_fence[i] = fence;
+			else
+				handled = false;
 
-				foreign_id = true;
-				vfd_count++;
+			foreign_id = true;
+			vfd_count++;
 #endif
-				fdput(vfd_file);
-				if (!handled) {
-					ret = IS_ERR(dma_buf) ?
-						PTR_ERR(dma_buf) :
-						PTR_ERR(dma_fence);
-					goto put_files;
-				}
+			fdput(vfd_file);
+			if (!handled) {
+				if (fence)
+					dma_fence_put(fence);
+
+				ret = IS_ERR(dma_buf) ?
+					PTR_ERR(dma_buf) :
+					-EINVAL;
+				goto put_files;
 			}
 		}
 	}
@@ -1290,9 +1395,53 @@ static long virtwl_ioctl_recv(struct file *filp, void __user *ptr)
 	}
 
 	for (i = 0; i < vfd_count; i++) {
-		ret = anon_inode_getfd("[virtwl_vfd]", &virtwl_vfd_fops,
-				       vfds[i], virtwl_vfd_file_flags(vfds[i])
-				       | O_CLOEXEC);
+		if (vfds[i]->flags & VIRTIO_WL_VFD_FENCE) {
+			struct virtwl_vfd *vfd = filp->private_data;
+			struct virtwl_info *vi = vfd->vi;
+			struct virtwl_fence *fence;
+			struct sync_file *sync;
+
+			fence = kzalloc(sizeof(*fence), GFP_KERNEL);
+			if (!fence) {
+				ret = -ENOMEM;
+				goto free_vfds;
+			}
+			fence->vfd = vfds[i];
+			dma_fence_init(&fence->base, &virtwl_fence_ops,
+				       &vi->fence_lock, fence->vfd->id, 1);
+
+			// If something fails, cleanup of the dma_fence will
+			// clean up this vfd.
+			vfds[i] = NULL;
+
+			sync = sync_file_create(&fence->base);
+			dma_fence_put(&fence->base);
+			if (!sync) {
+				// Maybe not -ENOMEM, but sync_file_create
+				// doesn't expose what actually went wrong.
+				ret = -ENOMEM;
+				goto free_vfds;
+			}
+
+			spin_lock(&vi->fence_lock);
+			if (!fence->vfd->hungup)
+				fence->vfd->fence = dma_fence_get(&fence->base);
+			else
+				dma_fence_signal_locked(&fence->base);
+			spin_unlock(&vi->fence_lock);
+
+			ret = get_unused_fd_flags(O_CLOEXEC);
+			if (ret < 0) {
+				fput(sync->file);
+				goto free_vfds;
+			}
+			fd_install(ret, sync->file);
+		} else {
+			ret = anon_inode_getfd("[virtwl_vfd]", &virtwl_vfd_fops,
+					       vfds[i], virtwl_vfd_file_flags(vfds[i])
+					       | O_CLOEXEC);
+		}
+
 		if (ret < 0)
 			goto free_vfds;
 
@@ -1496,12 +1645,16 @@ static int probe_common(struct virtio_device *vdev)
 		goto del_cdev;
 	}
 
+	INIT_LIST_HEAD(&vi->fence_release_list);
+
 	INIT_WORK(&vi->in_vq_work, vq_in_work_handler);
 	INIT_WORK(&vi->out_vq_work, vq_out_work_handler);
+	INIT_WORK(&vi->fence_release_work, virtwl_fence_release_handler);
 	init_waitqueue_head(&vi->out_waitq);
 
 	mutex_init(&vi->vfds_lock);
 	idr_init(&vi->vfds);
+	spin_lock_init(&vi->fence_lock);
 
 	vi->use_send_vfd_v2 = virtio_has_feature(vdev, VIRTIO_WL_F_SEND_FENCES);
 
