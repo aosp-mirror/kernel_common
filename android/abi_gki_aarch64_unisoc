@@ -278,6 +278,7 @@
   fwnode_property_present
   fwnode_property_read_string
   gen_pool_avail
+  gen_pool_fixed_alloc
   generic_end_io_acct
   generic_file_llseek
   generic_handle_irq
