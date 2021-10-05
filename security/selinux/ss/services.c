@@ -68,6 +68,8 @@
 #include "policycap_names.h"
 #include "ima.h"
 
+#include <trace/hooks/selinux.h>
+
 struct selinux_policy_convert_data {
 	struct convert_context_args args;
 	struct sidtab_convert_params sidtab_params;
@@ -2228,6 +2230,7 @@ void selinux_policy_commit(struct selinux_load_state *load_state)
 		 */
 		selinux_mark_initialized();
 		selinux_complete_init();
+		trace_android_rvh_selinux_is_initialized(state);
 	}
 
 	/* Free the old policy */
