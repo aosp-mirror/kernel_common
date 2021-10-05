@@ -316,7 +316,9 @@
   device_destroy
   device_find_child
   device_for_each_child
+  device_get_child_node_count
   device_get_dma_attr
+  device_get_next_child_node
   device_initialize
   device_init_wakeup
   device_link_add
@@ -750,6 +752,7 @@
   full_name_hash
   fwnode_get_name
   fwnode_gpiod_get_index
+  fwnode_property_read_u32_array
   gcd
   generic_file_llseek
   generic_handle_irq
