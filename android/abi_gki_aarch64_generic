@@ -1224,6 +1224,7 @@
   panic
   panic_notifier_list
   param_array_ops
+  param_get_int
   param_ops_bool
   param_ops_byte
   param_ops_charp
@@ -1232,6 +1233,7 @@
   param_ops_string
   param_ops_uint
   param_ops_ulong
+  param_set_int
   pause_cpus
   pci_alloc_irq_vectors_affinity
   pci_assign_resource
