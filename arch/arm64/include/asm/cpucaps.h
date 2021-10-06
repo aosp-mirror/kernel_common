@@ -70,6 +70,7 @@
 #define ARM64_HAS_LDAPR				59
 #define ARM64_KVM_PROTECTED_MODE		60
 #define ARM64_WORKAROUND_TSB_FLUSH_FAILURE	61
+#define ARM64_MTE_ASYMM				62
 
 /* kabi: reserve 62 - 76 for future cpu capabilities */
 #define ARM64_NCAPS				76
