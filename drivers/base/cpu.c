@@ -360,6 +360,9 @@ int register_cpu(struct cpu *cpu, int num)
 {
 	int error;
 
+	if (!cpumask_test_cpu(num, housekeeping_cpumask(HK_FLAG_DOMAIN)))
+		return 0;
+
 	cpu->node_id = cpu_to_node(num);
 	memset(&cpu->dev, 0x00, sizeof(struct device));
 	cpu->dev.id = num;
