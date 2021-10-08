@@ -1860,11 +1860,18 @@
   trace_event_raw_init
   trace_event_reg
   trace_handle_return
+  __traceiter_android_rvh_arm64_serror_panic
+  __traceiter_android_rvh_bad_mode
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpu_cgroup_online
   __traceiter_android_rvh_cpu_overutilized
   __traceiter_android_rvh_dequeue_task
+  __traceiter_android_rvh_die_kernel_fault
+  __traceiter_android_rvh_do_mem_abort
+  __traceiter_android_rvh_do_sea
+  __traceiter_android_rvh_do_sp_pc_abort
+  __traceiter_android_rvh_do_undefinstr
   __traceiter_android_rvh_find_energy_efficient_cpu
   __traceiter_android_rvh_irqs_disable
   __traceiter_android_rvh_irqs_enable
@@ -1932,11 +1939,18 @@
   __traceiter_sched_util_est_se_tp
   __traceiter_suspend_resume
   trace_output_call
+  __tracepoint_android_rvh_arm64_serror_panic
+  __tracepoint_android_rvh_bad_mode
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpu_cgroup_online
   __tracepoint_android_rvh_cpu_overutilized
   __tracepoint_android_rvh_dequeue_task
+  __tracepoint_android_rvh_die_kernel_fault
+  __tracepoint_android_rvh_do_mem_abort
+  __tracepoint_android_rvh_do_sea
+  __tracepoint_android_rvh_do_sp_pc_abort
+  __tracepoint_android_rvh_do_undefinstr
   __tracepoint_android_rvh_find_energy_efficient_cpu
   __tracepoint_android_rvh_irqs_disable
   __tracepoint_android_rvh_irqs_enable
