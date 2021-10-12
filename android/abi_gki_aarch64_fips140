@@ -6,10 +6,13 @@
 # required by fips140.ko
   add_random_ready_callback
   aead_register_instance
+  ahash_register_instance
   arch_timer_read_counter
   bcmp
   cancel_work_sync
   __cfi_slowpath
+  complete_all
+  completion_done
   cpu_have_feature
   crypto_aead_decrypt
   crypto_aead_encrypt
@@ -40,11 +43,16 @@
   crypto_inst_setname
   crypto_put_default_null_skcipher
   crypto_register_aead
+  crypto_register_aeads
+  crypto_register_ahash
+  crypto_register_ahashes
   crypto_register_alg
+  crypto_register_algs
   crypto_register_rng
   crypto_register_rngs
   crypto_register_shash
   crypto_register_shashes
+  crypto_register_skcipher
   crypto_register_skciphers
   crypto_register_template
   crypto_register_templates
@@ -137,3 +145,5 @@
   tracepoint_probe_register
   up_write
   wait_for_completion
+  xa_load
+  xa_store
