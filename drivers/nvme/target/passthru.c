@@ -26,7 +26,7 @@ static u16 nvmet_passthru_override_id_ctrl(struct nvmet_req *req)
 	struct nvme_ctrl *pctrl = ctrl->subsys->passthru_ctrl;
 	u16 status = NVME_SC_SUCCESS;
 	struct nvme_id_ctrl *id;
-	int max_hw_sectors;
+	unsigned int max_hw_sectors;
 	int page_shift;
 
 	id = kzalloc(sizeof(*id), GFP_KERNEL);
@@ -200,7 +200,7 @@ static int nvmet_passthru_map_sg(struct nvmet_req *req, struct request *rq)
 	else if (nvme_is_write(req->cmd))
 		op_flags = REQ_SYNC | REQ_IDLE;
 
-	bio = bio_alloc(GFP_KERNEL, req->sg_cnt);
+	bio = bio_alloc(GFP_KERNEL, bio_max_segs(req->sg_cnt));
 	bio->bi_end_io = bio_put;
 	bio->bi_opf = req_op(rq) | op_flags;
 
