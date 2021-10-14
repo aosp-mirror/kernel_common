@@ -94,6 +94,7 @@
   compat_alloc_user_space
   complete
   complete_all
+  complete_and_exit
   config_ep_by_speed
   config_group_init_type_name
   contig_page_data
@@ -1072,6 +1073,7 @@
   generic_write_end
   __getblk_gfp
   ilookup
+  in6_dev_finish_destroy
   inc_nlink
   in_group_p
   __insert_inode_hash
@@ -1279,6 +1281,9 @@
   usb_ep_disable
   usb_speed_string
 
+# required by nu1619_wireless_charger.ko
+  regmap_bulk_read
+
 # required by pcie-sprd.ko
   device_get_next_child_node
   devm_gpiod_get_index
@@ -1479,6 +1484,7 @@
   devm_iio_channel_get
   gpiod_get_value_cansleep
   iio_read_channel_processed
+  rtc_read_time
   power_supply_find_ocv2cap_table
   power_supply_ocv2cap_simple
   power_supply_put_battery_info
