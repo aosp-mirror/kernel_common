@@ -83,10 +83,6 @@ struct kvm_clock_pairing {
 	__u32 pad[9];
 };
 
-struct kvm_suspend_time {
-	__u64   suspend_time_ns;
-};
-
 #define KVM_STEAL_ALIGNMENT_BITS 5
 #define KVM_STEAL_VALID_BITS ((-1ULL << (KVM_STEAL_ALIGNMENT_BITS + 1)))
 #define KVM_STEAL_RESERVED_MASK (((1 << KVM_STEAL_ALIGNMENT_BITS) - 1 ) << 1)
