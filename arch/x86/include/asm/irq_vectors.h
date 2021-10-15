@@ -104,12 +104,7 @@
 #define HYPERV_STIMER0_VECTOR		0xed
 #endif
 
-#if defined(CONFIG_KVM_VIRT_SUSPEND_TIMING) || \
-	defined(CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST)
-#define VIRT_SUSPEND_TIMING_VECTOR	0xec
-#endif
-
-#define LOCAL_TIMER_VECTOR		0xeb
+#define LOCAL_TIMER_VECTOR		0xec
 
 #define NR_VECTORS			 256
 

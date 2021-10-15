@@ -22,7 +22,6 @@
 #include <linux/pvclock_gtod.h>
 #include <linux/compiler.h>
 #include <linux/audit.h>
-#include <linux/kvm_host.h>
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
