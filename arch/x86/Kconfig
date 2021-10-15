@@ -826,19 +826,6 @@ config KVM_GUEST
 	  underlying device model, the host provides the guest with
 	  timing infrastructure such as time of day, and system time
 
-config KVM_VIRT_SUSPEND_TIMING_GUEST
-	bool "Virtual suspend time injection (guest side)"
-	depends on KVM_GUEST
-	default n
-	help
-	 This option makes the host's suspension reflected on the guest's clocks.
-	 In other words, guest's CLOCK_MONOTONIC will stop and
-	 CLOCK_BOOTTIME keeps running during the host's suspension.
-	 This feature will only be effective when both guest and host enable
-	 this option.
-
-	 If unsure, say N.
-
 config ARCH_CPUIDLE_HALTPOLL
 	def_bool n
 	prompt "Disable host haltpoll when loading haltpoll driver"

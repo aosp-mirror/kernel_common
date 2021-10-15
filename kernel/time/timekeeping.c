@@ -2123,39 +2123,6 @@ static u64 logarithmic_accumulation(struct timekeeper *tk, u64 offset,
 	return offset;
 }
 
-#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
-/*
- * timekeeping_inject_virtual_suspend_time - Inject virtual suspend time
- * when requested by the kvm host.
- * This function should be called under irq context.
- */
-void timekeeping_inject_virtual_suspend_time(void)
-{
-	/*
-	 * Only updates shadow_timekeeper so the change will be reflected
-	 * on the next call of timekeeping_advance().
-	 */
-	struct timekeeper *tk = &shadow_timekeeper;
-	unsigned long flags;
-	struct timespec64 delta;
-	u64 suspend_time;
-
-	raw_spin_lock_irqsave(&timekeeper_lock, flags);
-	suspend_time = kvm_get_suspend_time();
-	if (suspend_time > tk->suspend_time_injected) {
-		/*
-		 * Do injection only if the time is not injected yet.
-		 * suspend_time and tk->suspend_time_injected values are
-		 * cummrative, so take a diff and inject the duration.
-		 */
-		delta = ns_to_timespec64(suspend_time - tk->suspend_time_injected);
-		__timekeeping_inject_sleeptime(tk, &delta);
-		tk->suspend_time_injected = suspend_time;
-	}
-	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
-}
-#endif
-
 /*
  * timekeeping_advance - Updates the timekeeper to the current time and
  * current NTP tick length

@@ -124,10 +124,6 @@ struct timekeeper {
 	u32			ntp_err_mult;
 	/* Flag used to avoid updating NTP twice with same second */
 	u32			skip_second_overflow;
-#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
-	/* suspend_time_injected keeps the duration injected through kvm */
-	u64			suspend_time_injected;
-#endif
 #ifdef CONFIG_DEBUG_TIMEKEEPING
 	long			last_warning;
 	/*
