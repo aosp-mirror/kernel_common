@@ -610,9 +610,9 @@ enum ufshcd_quirks {
 
 	/*
 	 * This quirk needs to be enabled if the host controller cannot
-	 * support interface configuration.
+	 * support physical host configuration.
 	 */
-	UFSHCD_QUIRK_SKIP_INTERFACE_CONFIGURATION	= 1 << 16,
+	UFSHCD_QUIRK_SKIP_PH_CONFIGURATION		= 1 << 16,
 
 	/*
 	 * This quirk needs to be enabled if the host controller supports inline
