@@ -5790,13 +5790,18 @@ static int slab_debug_trace_open(struct inode *inode, struct file *filep)
 						sizeof(struct loc_track));
 	struct kmem_cache *s = file_inode(filep)->i_private;
 
+	if (!t)
+		return -ENOMEM;
+
 	if (strcmp(filep->f_path.dentry->d_name.name, "alloc_traces") == 0)
 		alloc = TRACK_ALLOC;
 	else
 		alloc = TRACK_FREE;
 
-	if (!alloc_loc_track(t, PAGE_SIZE / sizeof(struct location), GFP_KERNEL))
+	if (!alloc_loc_track(t, PAGE_SIZE / sizeof(struct location), GFP_KERNEL)) {
+		seq_release_private(inode, filep);
 		return -ENOMEM;
+	}
 
 	/* Push back cpu slabs */
 	flush_all(s);
