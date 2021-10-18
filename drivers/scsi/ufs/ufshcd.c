@@ -5014,7 +5014,7 @@ static int ufshcd_slave_configure(struct scsi_device *sdev)
 	 */
 	sdev->silence_suspend = 1;
 
-	ufshcd_crypto_setup_rq_keyslot_manager(hba, q);
+	ufshcd_crypto_register(hba, q);
 
 	trace_android_vh_ufs_update_sdev(sdev);
 
