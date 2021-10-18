@@ -37,7 +37,7 @@ struct pr_ops;
 struct rq_qos;
 struct blk_queue_stats;
 struct blk_stat_callback;
-struct blk_keyslot_manager;
+struct blk_crypto_profile;
 
 #define BLKDEV_MIN_RQ	4
 #define BLKDEV_MAX_RQ	128	/* Default maximum */
@@ -211,7 +211,7 @@ struct request {
 
 #ifdef CONFIG_BLK_INLINE_ENCRYPTION
 	struct bio_crypt_ctx *crypt_ctx;
-	struct blk_ksm_keyslot *crypt_keyslot;
+	struct blk_crypto_keyslot *crypt_keyslot;
 #endif
 
 	unsigned short write_hint;
@@ -444,8 +444,7 @@ struct request_queue {
 	unsigned int		dma_alignment;
 
 #ifdef CONFIG_BLK_INLINE_ENCRYPTION
-	/* Inline crypto capabilities */
-	struct blk_keyslot_manager *ksm;
+	struct blk_crypto_profile *crypto_profile;
 #endif
 
 	unsigned int		rq_timeout;
@@ -1813,19 +1812,20 @@ static inline struct bio_vec *rq_integrity_vec(struct request *rq)
 
 #ifdef CONFIG_BLK_INLINE_ENCRYPTION
 
-bool blk_ksm_register(struct blk_keyslot_manager *ksm, struct request_queue *q);
+bool blk_crypto_register(struct blk_crypto_profile *profile,
+			 struct request_queue *q);
 
-void blk_ksm_unregister(struct request_queue *q);
+void blk_crypto_unregister(struct request_queue *q);
 
 #else /* CONFIG_BLK_INLINE_ENCRYPTION */
 
-static inline bool blk_ksm_register(struct blk_keyslot_manager *ksm,
-				    struct request_queue *q)
+static inline bool blk_crypto_register(struct blk_crypto_profile *profile,
+				       struct request_queue *q)
 {
 	return true;
 }
 
-static inline void blk_ksm_unregister(struct request_queue *q) { }
+static inline void blk_crypto_unregister(struct request_queue *q) { }
 
 #endif /* CONFIG_BLK_INLINE_ENCRYPTION */
 
