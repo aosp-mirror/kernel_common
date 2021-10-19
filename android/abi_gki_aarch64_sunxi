@@ -266,3 +266,17 @@
 # required by sunxi-keyboard.ko
   iio_map_array_register
   iio_map_array_unregister
+
+# required by sunxi_rfkill.ko
+  rfkill_set_states
+
+# required by aic8800_bsp.ko
+  skb_dequeue_tail
+  wait_for_completion_killable_timeout
+
+# required by aic8800_fbrv.ko
+  cfg80211_cac_event
+  cfg80211_chandef_valid
+  cfg80211_external_auth_request
+  cfg80211_radar_event
+  cfg80211_stop_iface
