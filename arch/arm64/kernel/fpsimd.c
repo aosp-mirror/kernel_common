@@ -293,7 +293,7 @@ static void task_fpsimd_load(void)
 
 	if (IS_ENABLED(CONFIG_ARM64_SVE) && test_thread_flag(TIF_SVE))
 		sve_load_state(sve_pffr(&current->thread),
-			       &current->thread.uw.fpsimd_state.fpsr,
+			       &current->thread.uw.fpsimd_state.fpsr, true,
 			       sve_vq_from_vl(current->thread.sve_vl) - 1);
 	else
 		fpsimd_load_state(&current->thread.uw.fpsimd_state);
@@ -335,7 +335,7 @@ static void fpsimd_save(void)
 
 		sve_save_state((char *)last->sve_state +
 					sve_ffr_offset(last->sve_vl),
-			       &last->st->fpsr);
+			       &last->st->fpsr, true);
 	} else {
 		fpsimd_save_state(last->st);
 	}
@@ -972,7 +972,7 @@ void do_sve_acc(unsigned int esr, struct pt_regs *regs)
 		unsigned long vq_minus_one =
 			sve_vq_from_vl(current->thread.sve_vl) - 1;
 		sve_set_vq(vq_minus_one);
-		sve_flush_live(vq_minus_one);
+		sve_flush_live(true, vq_minus_one);
 		fpsimd_bind_task_to_cpu();
 	} else {
 		fpsimd_to_sve(current);
@@ -1366,7 +1366,8 @@ void __efi_fpsimd_begin(void)
 			__this_cpu_write(efi_sve_state_used, true);
 
 			sve_save_state(sve_state + sve_ffr_offset(sve_max_vl),
-				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr);
+				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr,
+				       true);
 		} else {
 			fpsimd_save_state(this_cpu_ptr(&efi_fpsimd_state));
 		}
@@ -1392,6 +1393,7 @@ void __efi_fpsimd_end(void)
 
 			sve_load_state(sve_state + sve_ffr_offset(sve_max_vl),
 				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr,
+				       true,
 				       sve_vq_from_vl(sve_get_vl()) - 1);
 
 			__this_cpu_write(efi_sve_state_used, false);
