@@ -180,6 +180,8 @@ extern u64 ktime_get_boot_fast_ns(void);
 extern u64 ktime_get_tai_fast_ns(void);
 extern u64 ktime_get_real_fast_ns(void);
 
+extern u64 ktime_get_offs_boot_ns(void);
+
 /*
  * timespec64/time64_t interfaces utilizing the ktime based ones
  * for API completeness, these could be implemented more efficiently
