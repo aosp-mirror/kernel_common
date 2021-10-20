@@ -16,11 +16,15 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/set_memory.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
 
 #include <asm/hypervisor.h>
 #include <asm/mem_encrypt.h>
 #include <asm/x86_init.h>
 #include <asm/kvmclock.h>
+#include <asm/desc.h>
+#include <asm/idtentry.h>
 
 static int kvmclock __initdata = 1;
 static int kvmclock_vsyscall __initdata = 1;
@@ -49,6 +53,9 @@ early_param("no-kvmclock-vsyscall", parse_no_kvmclock_vsyscall);
 
 static struct pvclock_vsyscall_time_info
 			hv_clock_boot[HVC_BOOT_ARRAY_SIZE] __bss_decrypted __aligned(PAGE_SIZE);
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
+static struct kvm_suspend_time suspend_time __bss_decrypted;
+#endif
 static struct pvclock_wall_clock wall_clock __bss_decrypted;
 static DEFINE_PER_CPU(struct pvclock_vsyscall_time_info *, hv_clock_per_cpu);
 static struct pvclock_vsyscall_time_info *hvclock_mem;
@@ -291,6 +298,17 @@ static int kvmclock_setup_percpu(unsigned int cpu)
 	return p ? 0 : -ENOMEM;
 }
 
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
+/**
+ * kvm_get_suspend_time - duration of host suspend.
+ * Return: Cumulative duration of host suspend in nanoseconds.
+ */
+u64 kvm_get_suspend_time(void)
+{
+	return suspend_time.suspend_time_ns;
+}
+#endif
+
 void __init kvmclock_init(void)
 {
 	u8 flags;
@@ -304,6 +322,14 @@ void __init kvmclock_init(void)
 	} else if (!kvm_para_has_feature(KVM_FEATURE_CLOCKSOURCE)) {
 		return;
 	}
+
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
+	if (kvm_para_has_feature(KVM_FEATURE_HOST_SUSPEND_TIME)) {
+		/* Register the suspend time structure */
+		wrmsrl(MSR_KVM_HOST_SUSPEND_TIME,
+		       slow_virt_to_phys(&suspend_time) | KVM_MSR_ENABLED);
+	}
+#endif
 
 	if (cpuhp_setup_state(CPUHP_BP_PREPARE_DYN, "kvmclock:setup_percpu",
 			      kvmclock_setup_percpu, NULL) < 0) {

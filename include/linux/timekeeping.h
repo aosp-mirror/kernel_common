@@ -305,4 +305,8 @@ void read_persistent_wall_and_boot_offset(struct timespec64 *wall_clock,
 					  struct timespec64 *boot_offset);
 extern int update_persistent_clock64(struct timespec64 now);
 
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
+void timekeeping_inject_virtual_suspend_time(u64 total_duration_ns);
+#endif
+
 #endif

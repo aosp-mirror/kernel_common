@@ -40,6 +40,7 @@
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
 #include <asm/svm.h>
+#include <asm/kvmclock.h>
 
 DEFINE_STATIC_KEY_FALSE(kvm_async_pf_enabled);
 
@@ -270,7 +271,7 @@ noinstr bool __kvm_handle_async_pf(struct pt_regs *regs, u32 token)
 	return true;
 }
 
-DEFINE_IDTENTRY_SYSVEC(sysvec_kvm_asyncpf_interrupt)
+DEFINE_IDTENTRY_SYSVEC(sysvec_kvm_hv_callback)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 	u32 token;
@@ -285,6 +286,8 @@ DEFINE_IDTENTRY_SYSVEC(sysvec_kvm_asyncpf_interrupt)
 		__this_cpu_write(apf_reason.token, 0);
 		wrmsrl(MSR_KVM_ASYNC_PF_ACK, 1);
 	}
+
+	timekeeping_inject_virtual_suspend_time(kvm_get_suspend_time());
 
 	set_irq_regs(old_regs);
 }
@@ -714,10 +717,13 @@ static void __init kvm_guest_init(void)
 	if (kvm_para_has_feature(KVM_FEATURE_PV_EOI))
 		apic_set_eoi_write(kvm_guest_apic_eoi_write);
 
-	if (kvm_para_has_feature(KVM_FEATURE_ASYNC_PF_INT) && kvmapf) {
+	if (kvm_para_has_feature(KVM_FEATURE_ASYNC_PF_INT) && kvmapf)
 		static_branch_enable(&kvm_async_pf_enabled);
-		alloc_intr_gate(HYPERVISOR_CALLBACK_VECTOR, asm_sysvec_kvm_asyncpf_interrupt);
-	}
+
+	if ((kvm_para_has_feature(KVM_FEATURE_ASYNC_PF_INT) && kvmapf) ||
+	    kvm_para_has_feature(KVM_FEATURE_HOST_SUSPEND_TIME))
+		alloc_intr_gate(HYPERVISOR_CALLBACK_VECTOR,
+				asm_sysvec_kvm_hv_callback);
 
 #ifdef CONFIG_SMP
 	smp_ops.smp_prepare_boot_cpu = kvm_smp_prepare_boot_cpu;

@@ -68,6 +68,8 @@ struct tk_read_base {
  *			shifted nano seconds.
  * @ntp_error_shift:	Shift conversion between clock shifted nano seconds and
  *			ntp shifted nano seconds.
+ * @kvm_suspend_time:	The cumulative duration of suspend injected through KVM
+ *			in nano seconds.
  * @last_warning:	Warning ratelimiter (DEBUG_TIMEKEEPING)
  * @underflow_seen:	Underflow warning flag (DEBUG_TIMEKEEPING)
  * @overflow_seen:	Overflow warning flag (DEBUG_TIMEKEEPING)
@@ -124,6 +126,9 @@ struct timekeeper {
 	u32			ntp_err_mult;
 	/* Flag used to avoid updating NTP twice with same second */
 	u32			skip_second_overflow;
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
+	u64			kvm_suspend_time;
+#endif
 #ifdef CONFIG_DEBUG_TIMEKEEPING
 	long			last_warning;
 	/*

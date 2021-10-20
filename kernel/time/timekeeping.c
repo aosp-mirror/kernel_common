@@ -2122,6 +2122,52 @@ static u64 logarithmic_accumulation(struct timekeeper *tk, u64 offset,
 	return offset;
 }
 
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
+/**
+ * timekeeping_inject_virtual_suspend_time - Inject virtual suspend time
+ * when requested by the kvm host.
+ * @total_duration_ns:	Total suspend time to be injected in nanoseconds.
+ */
+void timekeeping_inject_virtual_suspend_time(u64 total_duration_ns)
+{
+	struct timekeeper *tk = &tk_core.timekeeper;
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&timekeeper_lock, flags);
+	if (total_duration_ns > tk->kvm_suspend_time) {
+		/*
+		 * Do injection only if the time is not injected yet.
+		 * total_duration_ns and tk->kvm_suspend_time values are
+		 * cumulative, so the delta between them will be an amount
+		 * of adjustments. For example, if the host suspends 2 times
+		 * during the guest is running and each suspend is 5 seconds,
+		 * total_duration_ns will be 5 seconds at the first injection
+		 * and tk->kvm_suspend_time was initialized to zero so the
+		 * adjustment injected here will be 5 - 0 = 5 seconds and
+		 * tk->kvm_suspend_time will be updated to 5 seconds.
+		 * On the second injection after the second resume,
+		 * total_duration_ns will be 10 seconds and
+		 * tk->kvm_suspend_time will be 5 seconds so 10 - 5 = 5 seconds
+		 * of the suspend time will be injected again.
+		 */
+		struct timespec64 delta =
+			ns_to_timespec64(total_duration_ns -
+					 tk->kvm_suspend_time);
+		tk->kvm_suspend_time = total_duration_ns;
+
+		write_seqcount_begin(&tk_core.seq);
+		timekeeping_forward_now(tk);
+		__timekeeping_inject_sleeptime(tk, &delta);
+		timekeeping_update(tk, TK_CLEAR_NTP | TK_MIRROR | TK_CLOCK_WAS_SET);
+		write_seqcount_end(&tk_core.seq);
+
+		/* signal hrtimers about time change */
+		clock_was_set_delayed();
+	}
+	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+}
+#endif
+
 /*
  * timekeeping_advance - Updates the timekeeper to the current time and
  * current NTP tick length
