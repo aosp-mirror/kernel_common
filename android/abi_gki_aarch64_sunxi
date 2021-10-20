@@ -283,3 +283,8 @@
   cfg80211_external_auth_request
   cfg80211_radar_event
   cfg80211_stop_iface
+
+# required by sunxi_drm_heap.ko
+  xa_erase
+  __xa_alloc
+  xa_load
