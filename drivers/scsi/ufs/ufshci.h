@@ -430,7 +430,7 @@ struct ufshcd_sg_entry {
 };
 
 /**
- * struct utp_transfer_cmd_desc - UFS Command Descriptor structure
+ * struct utp_transfer_cmd_desc - UTP Command Descriptor (UCD)
  * @command_upiu: Command UPIU Frame address
  * @response_upiu: Response UPIU Frame address
  * @prd_table: Physical Region Descriptor: an array of SG_ALL struct
@@ -460,7 +460,7 @@ struct request_desc_header {
 };
 
 /**
- * struct utp_transfer_req_desc - UTRD structure
+ * struct utp_transfer_req_desc - UTP Transfer Request Descriptor (UTRD)
  * @header: UTRD header DW-0 to DW-3
  * @command_desc_base_addr_lo: UCD base address low DW-4
  * @command_desc_base_addr_hi: UCD base address high DW-5
