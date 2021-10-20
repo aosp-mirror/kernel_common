@@ -2441,9 +2441,9 @@ static int ufshcd_map_sg(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 				cpu_to_le16(sg_segments * hba->sg_entry_size);
 		else
 			lrbp->utr_descriptor_ptr->prd_table_length =
-				cpu_to_le16((u16) (sg_segments));
+				cpu_to_le16(sg_segments);
 
-		prd = (struct ufshcd_sg_entry *)lrbp->ucd_prdt_ptr;
+		prd = lrbp->ucd_prdt_ptr;
 
 		scsi_for_each_sg(cmd, sg, sg_segments, i) {
 			prd->size =
