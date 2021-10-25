@@ -1606,6 +1606,29 @@ void xhci_cleanup_command_queue(struct xhci_hcd *xhci)
 		xhci_complete_del_and_free_cmd(cur_cmd, COMP_COMMAND_ABORTED);
 }
 
+static bool xhci_pending_command_completion(struct xhci_hcd *xhci)
+{
+	struct xhci_interrupter *ir = xhci->interrupters[0];
+	struct xhci_segment	*seg = ir->event_ring->deq_seg;
+	union xhci_trb		*deq = ir->event_ring->dequeue;
+	u32			deq_flags = le32_to_cpu(deq->event_cmd.flags);
+	u32			cycle = ir->event_ring->cycle_state;
+	int			i = 0;
+
+	/* Check if event ring contains an unhandled command completion */
+	while ((deq_flags & TRB_CYCLE) == cycle) {
+		if ((deq_flags & TRB_TYPE_BITMASK) == TRB_TYPE(TRB_COMPLETION))
+			return true;
+		if (last_trb_on_ring(ir->event_ring, seg, deq))
+			cycle ^= 1;
+		next_trb(xhci, ir->event_ring,  &seg, &deq);
+		deq_flags = le32_to_cpu(deq->event_cmd.flags);
+		if (i++ > TRBS_PER_SEGMENT)
+			break;
+	}
+	return false;
+}
+
 void xhci_handle_command_timeout(struct work_struct *work)
 {
 	struct xhci_hcd	*xhci;
@@ -1626,6 +1649,14 @@ void xhci_handle_command_timeout(struct work_struct *work)
 	if (!xhci->current_cmd || delayed_work_pending(&xhci->cmd_timer)) {
 		spin_unlock_irqrestore(&xhci->lock, flags);
 		return;
+	}
+
+	/* Did hw complete the command but event handler was blocked? */
+	if (xhci_pending_interrupt(xhci) > 0 &&
+	    xhci_pending_command_completion(xhci)) {
+		xhci_dbg(xhci, "Command timeout with unhandled command completion\n");
+		xhci_mod_cmd_timer(xhci);
+		goto time_out_completed;
 	}
 
 	cmd_field3 = le32_to_cpu(xhci->current_cmd->command_trb->generic.field[3]);
