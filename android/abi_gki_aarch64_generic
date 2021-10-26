@@ -87,6 +87,7 @@
   blocking_notifier_chain_unregister
   bpf_trace_run1
   bpf_trace_run10
+  bpf_trace_run11
   bpf_trace_run12
   bpf_trace_run2
   bpf_trace_run3
@@ -1579,6 +1580,7 @@
   rtc_valid_tm
   __rt_mutex_init
   rt_mutex_lock
+  rt_mutex_trylock
   rt_mutex_unlock
   rtnl_is_locked
   rtnl_lock
@@ -1928,6 +1930,7 @@
   __traceiter_android_vh_rmqueue
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_snd_compr_use_pause_in_drain
+  __traceiter_android_vh_sound_usb_support_cpu_suspend
   __traceiter_android_vh_sysrq_crash
   __traceiter_android_vh_thermal_pm_notify_suspend
   __traceiter_android_vh_timerfd_create
@@ -1943,6 +1946,8 @@
   __traceiter_android_vh_ufs_send_tm_command
   __traceiter_android_vh_ufs_send_uic_command
   __traceiter_android_vh_ufs_update_sysfs
+  __traceiter_android_vh_usb_dev_resume
+  __traceiter_android_vh_usb_dev_suspend
   __traceiter_clock_set_rate
   __traceiter_cpu_frequency
   __traceiter_device_pm_callback_end
@@ -2007,6 +2012,7 @@
   __tracepoint_android_vh_rmqueue
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_snd_compr_use_pause_in_drain
+  __tracepoint_android_vh_sound_usb_support_cpu_suspend
   __tracepoint_android_vh_sysrq_crash
   __tracepoint_android_vh_thermal_pm_notify_suspend
   __tracepoint_android_vh_timerfd_create
@@ -2022,6 +2028,8 @@
   __tracepoint_android_vh_ufs_send_tm_command
   __tracepoint_android_vh_ufs_send_uic_command
   __tracepoint_android_vh_ufs_update_sysfs
+  __tracepoint_android_vh_usb_dev_resume
+  __tracepoint_android_vh_usb_dev_suspend
   __tracepoint_clock_set_rate
   __tracepoint_cpu_frequency
   __tracepoint_device_pm_callback_end
