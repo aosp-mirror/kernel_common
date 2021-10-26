@@ -138,6 +138,7 @@
   cfg80211_rx_mgmt_khz
   cfg80211_scan_done
   cfg80211_sched_scan_results
+  cfg80211_sched_scan_stopped
   cfg80211_sched_scan_stopped_rtnl
   __cfg80211_send_event_skb
   cfg80211_unlink_bss
@@ -359,12 +360,15 @@
   devm_clk_hw_register
   devm_clk_hw_register_clkdev
   devm_clk_put
+  devm_device_add_group
   devm_device_add_groups
+  devm_device_remove_group
   __devm_drm_dev_alloc
   devm_drm_panel_bridge_add_typed
   devm_extcon_dev_allocate
   devm_extcon_dev_register
   devm_free_irq
+  devm_fwnode_pwm_get
   devm_gen_pool_create
   devm_gpiochip_add_data_with_key
   devm_gpiod_get
@@ -388,6 +392,7 @@
   devm_kmemdup
   devm_kstrdup
   devm_kstrdup_const
+  devm_led_classdev_register_ext
   devm_mfd_add_devices
   devm_nvmem_register
   devm_of_clk_add_hw_provider
@@ -403,6 +408,7 @@
   devm_platform_ioremap_resource
   devm_platform_ioremap_resource_byname
   devm_power_supply_register
+  devm_pwm_get
   devm_regmap_add_irq_chip
   __devm_regmap_init
   __devm_regmap_init_i2c
@@ -440,6 +446,7 @@
   dev_pm_opp_set_regulators
   dev_pm_qos_read_value
   dev_pm_qos_update_request
+  dev_printk
   dev_printk_emit
   dev_queue_xmit
   devres_add
@@ -775,6 +782,9 @@
   full_name_hash
   fwnode_get_name
   fwnode_gpiod_get_index
+  fwnode_handle_put
+  fwnode_property_present
+  fwnode_property_read_string
   fwnode_property_read_u32_array
   gcd
   generic_file_llseek
@@ -801,6 +811,7 @@
   get_governor_parent_kobj
   get_pid_task
   get_random_bytes
+  get_random_bytes_arch
   get_random_u32
   get_sg_io_hdr
   __get_task_comm
@@ -852,6 +863,12 @@
   hex2bin
   hex_dump_to_buffer
   hex_to_bin
+  hid_add_device
+  hid_allocate_device
+  hid_debug
+  hid_destroy_device
+  hid_input_report
+  hid_parse_report
   hrtimer_active
   hrtimer_cancel
   hrtimer_forward
@@ -875,6 +892,7 @@
   i2c_new_dummy_device
   i2c_put_adapter
   i2c_register_driver
+  i2c_smbus_read_byte
   i2c_smbus_read_byte_data
   i2c_smbus_write_byte_data
   i2c_smbus_xfer
@@ -1167,11 +1185,13 @@
   netlink_kernel_release
   netlink_unicast
   net_ratelimit
+  nla_append
   nla_memcpy
   __nla_parse
   nla_put
   nla_put_64bit
   nla_put_nohdr
+  nla_reserve
   nla_strlcpy
   __nlmsg_put
   no_llseek
@@ -1253,6 +1273,7 @@
   of_property_read_variable_u8_array
   of_prop_next_string
   of_prop_next_u32
+  of_pwm_xlate_with_flags
   of_reserved_mem_device_init_by_idx
   of_reserved_mem_device_release
   of_reserved_mem_lookup
@@ -1394,6 +1415,7 @@
   power_supply_set_property
   power_supply_unregister
   power_supply_unreg_notifier
+  prandom_bytes
   prandom_u32
   preempt_schedule
   preempt_schedule_notrace
@@ -1421,6 +1443,11 @@
   __put_task_struct
   put_unused_fd
   put_vaddr_frames
+  pwm_apply_state
+  pwmchip_add
+  pwmchip_remove
+  pwm_get_chip_data
+  pwm_set_chip_data
   queue_delayed_work_on
   queue_work_on
   ___ratelimit
@@ -1520,6 +1547,7 @@
   regulator_set_voltage_sel_regmap
   regulator_unregister
   regulatory_hint
+  regulatory_set_wiphy_regd_sync_rtnl
   release_firmware
   __release_region
   remap_pfn_range
@@ -2227,6 +2255,7 @@
   wakeup_source_create
   wakeup_source_destroy
   wakeup_source_register
+  wakeup_source_remove
   wakeup_source_unregister
   __wake_up_sync
   __warn_printk
