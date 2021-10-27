@@ -21,7 +21,6 @@
   crypto_ahash_finup
   crypto_ahash_setkey
   crypto_alg_list
-  crypto_alg_mod_lookup
   crypto_alg_sem
   crypto_alloc_aead
   crypto_alloc_base
@@ -132,7 +131,6 @@
   strlcpy
   strlen
   strncmp
-  synchronize_rcu_tasks
   system_wq
   __traceiter_android_vh_aes_decrypt
   __traceiter_android_vh_aes_encrypt
