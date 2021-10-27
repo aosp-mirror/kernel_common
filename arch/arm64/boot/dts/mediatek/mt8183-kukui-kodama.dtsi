@@ -71,7 +71,7 @@
 		vcc-supply = <&mt6358_vcamio_reg>;
 	};
 
-	camera_main_af: camera_main_af {
+	camera_main_af: camera_main_af@c {
 		compatible = "dongwoon,dw9768";
 		reg = <0x0c>;
 
@@ -94,7 +94,7 @@
 		vcc-supply = <&mt6358_vcn18_reg>;
 	};
 
-	sensor_sub: sensor_sub {
+	sensor_sub: sensor_sub@3d {
 		status = "okay";
 		compatible = "ovti,ov02a10";
 		reg = <0x3d>;
