@@ -16,9 +16,9 @@
 	status = "okay";
 
 	/delete-node/touchscreen@10;
-	touchscreen1: touchscreen@5D {
+	touchscreen1: touchscreen@5d {
 		compatible = "goodix,gt7375p";
-		reg = <0x5D>;
+		reg = <0x5d>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&open_touch>;
 
