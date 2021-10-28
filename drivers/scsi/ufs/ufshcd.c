@@ -7042,7 +7042,7 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 	int tag = scsi_cmd_to_rq(cmd)->tag;
 	struct ufshcd_lrb *lrbp = &hba->lrb[tag];
 	unsigned long flags;
-	int err = FAILED, res;
+	int err = FAILED;
 	u32 reg;
 
 	WARN_ONCE(tag < 0, "Invalid tag %d\n", tag);
@@ -7112,10 +7112,11 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 		goto release;
 	}
 
-	res = ufshcd_try_to_abort_task(hba, tag);
-	if (res) {
-		dev_err(hba->dev, "%s: failed with err %d\n", __func__, res);
+	err = ufshcd_try_to_abort_task(hba, tag);
+	if (err) {
+		dev_err(hba->dev, "%s: failed with err %d\n", __func__, err);
 		ufshcd_set_req_abort_skip(hba, hba->outstanding_reqs);
+		err = FAILED;
 		goto release;
 	}
 
