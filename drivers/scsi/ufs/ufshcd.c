@@ -9694,10 +9694,6 @@ void ufshcd_resume_complete(struct device *dev)
 		ufshcd_rpm_put(hba);
 		hba->complete_put = false;
 	}
-	if (hba->rpmb_complete_put) {
-		ufshcd_rpmb_rpm_put(hba);
-		hba->rpmb_complete_put = false;
-	}
 }
 EXPORT_SYMBOL_GPL(ufshcd_resume_complete);
 
@@ -9719,10 +9715,6 @@ int ufshcd_suspend_prepare(struct device *dev)
 			return ret;
 		}
 		hba->complete_put = true;
-	}
-	if (hba->sdev_rpmb) {
-		ufshcd_rpmb_rpm_get_sync(hba);
-		hba->rpmb_complete_put = true;
 	}
 	return 0;
 }
@@ -9792,42 +9784,6 @@ static struct scsi_driver ufs_dev_wlun_template = {
 	},
 };
 
-static int ufshcd_rpmb_probe(struct device *dev)
-{
-	return is_rpmb_wlun(to_scsi_device(dev)) ? 0 : -ENODEV;
-}
-
-static inline int ufshcd_clear_rpmb_uac(struct ufs_hba *hba)
-{
-	return 0;
-}
-
-#ifdef CONFIG_PM
-static int ufshcd_rpmb_resume(struct device *dev)
-{
-	struct ufs_hba *hba = wlun_dev_to_hba(dev);
-
-	if (hba->sdev_rpmb)
-		ufshcd_clear_rpmb_uac(hba);
-	return 0;
-}
-#endif
-
-static const struct dev_pm_ops ufs_rpmb_pm_ops = {
-	SET_RUNTIME_PM_OPS(NULL, ufshcd_rpmb_resume, NULL)
-	SET_SYSTEM_SLEEP_PM_OPS(NULL, ufshcd_rpmb_resume)
-};
-
-/* ufs_rpmb_wlun_template - Describes UFS RPMB WLUN. Used only to send UAC. */
-static struct scsi_driver ufs_rpmb_wlun_template = {
-	.gendrv = {
-		.name = "ufs_rpmb_wlun",
-		.owner = THIS_MODULE,
-		.probe = ufshcd_rpmb_probe,
-		.pm = &ufs_rpmb_pm_ops,
-	},
-};
-
 static int __init ufshcd_core_init(void)
 {
 	int ret;
@@ -9836,24 +9792,13 @@ static int __init ufshcd_core_init(void)
 
 	ret = scsi_register_driver(&ufs_dev_wlun_template.gendrv);
 	if (ret)
-		goto debugfs_exit;
-
-	ret = scsi_register_driver(&ufs_rpmb_wlun_template.gendrv);
-	if (ret)
-		goto unregister;
-
-	return ret;
-unregister:
-	scsi_unregister_driver(&ufs_dev_wlun_template.gendrv);
-debugfs_exit:
-	ufs_debugfs_exit();
+		ufs_debugfs_exit();
 	return ret;
 }
 
 static void __exit ufshcd_core_exit(void)
 {
 	ufs_debugfs_exit();
-	scsi_unregister_driver(&ufs_rpmb_wlun_template.gendrv);
 	scsi_unregister_driver(&ufs_dev_wlun_template.gendrv);
 }
 

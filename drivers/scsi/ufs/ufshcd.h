@@ -976,7 +976,6 @@ struct ufs_hba {
 #endif
 	u32 luns_avail;
 	bool complete_put;
-	bool rpmb_complete_put;
 
 	ANDROID_KABI_RESERVE(1);
 	ANDROID_KABI_RESERVE(2);
@@ -1466,16 +1465,6 @@ static inline int ufshcd_rpm_put_sync(struct ufs_hba *hba)
 static inline int ufshcd_rpm_put(struct ufs_hba *hba)
 {
 	return pm_runtime_put(&hba->sdev_ufs_device->sdev_gendev);
-}
-
-static inline int ufshcd_rpmb_rpm_get_sync(struct ufs_hba *hba)
-{
-	return pm_runtime_get_sync(&hba->sdev_rpmb->sdev_gendev);
-}
-
-static inline int ufshcd_rpmb_rpm_put(struct ufs_hba *hba)
-{
-	return pm_runtime_put(&hba->sdev_rpmb->sdev_gendev);
 }
 
 #endif /* End of Header */
