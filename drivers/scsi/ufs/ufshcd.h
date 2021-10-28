@@ -974,7 +974,6 @@ struct ufs_hba {
 	struct delayed_work debugfs_ee_work;
 	u32 debugfs_ee_rate_limit_ms;
 #endif
-
 	u32 luns_avail;
 	bool complete_put;
 	bool rpmb_complete_put;
