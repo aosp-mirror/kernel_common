@@ -38,9 +38,6 @@ notrace void start_backtrace(struct stackframe *frame, unsigned long fp,
 {
 	frame->fp = fp;
 	frame->pc = pc;
-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-	frame->graph = 0;
-#endif
 
 	/*
 	 * Prime the first unwind.
@@ -115,24 +112,25 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	frame->prev_fp = fp;
 	frame->prev_type = info.type;
 
+	frame->pc = ptrauth_strip_insn_pac(frame->pc);
+
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	if (tsk->ret_stack &&
-		(ptrauth_strip_insn_pac(frame->pc) == (unsigned long)return_to_handler)) {
-		struct ftrace_ret_stack *ret_stack;
+		(frame->pc == (unsigned long)return_to_handler)) {
+		unsigned long orig_pc;
 		/*
 		 * This is a case where function graph tracer has
 		 * modified a return address (LR) in a stack frame
 		 * to hook a function return.
 		 * So replace it to an original value.
 		 */
-		ret_stack = ftrace_graph_get_ret_stack(tsk, frame->graph++);
-		if (WARN_ON_ONCE(!ret_stack))
+		orig_pc = ftrace_graph_ret_addr(tsk, NULL, frame->pc,
+						(void *)frame->fp);
+		if (WARN_ON_ONCE(frame->pc == orig_pc))
 			return -EINVAL;
-		frame->pc = ret_stack->ret;
+		frame->pc = orig_pc;
 	}
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
-
-	frame->pc = ptrauth_strip_insn_pac(frame->pc);
 
 	return 0;
 }
