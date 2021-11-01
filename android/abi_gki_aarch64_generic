@@ -22,6 +22,7 @@
   alloc_workqueue
   amba_driver_register
   amba_driver_unregister
+  android_debug_symbol
   android_rvh_probe_register
   anon_inode_getfd
   __arch_clear_user
