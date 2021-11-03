@@ -353,9 +353,16 @@ struct scsi_host_template {
 	/*
 	 * This determines if we will use a non-interrupt driven
 	 * or an interrupt driven scheme.  It is set to the maximum number
-	 * of simultaneous commands a single hw queue in HBA will accept.
+	 * of simultaneous commands a single hw queue in HBA will accept. Does
+	 * not include @reserved_tags.
 	 */
 	int can_queue;
+
+	/*
+	 * Number of tags to reserve. A reserved tag can be allocated by passing
+	 * the BLK_MQ_REQ_RESERVED flag to blk_mq_alloc_request().
+	 */
+	unsigned reserved_tags;
 
 	/*
 	 * In many instances, especially where disconnect / reconnect are
