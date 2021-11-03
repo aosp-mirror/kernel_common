@@ -59,7 +59,6 @@
 enum kvm_mode {
 	KVM_MODE_DEFAULT,
 	KVM_MODE_PROTECTED,
-	KVM_MODE_NONE,
 };
 enum kvm_mode kvm_get_mode(void);
 

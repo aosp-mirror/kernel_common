@@ -2302,9 +2302,6 @@
 	kvm-arm.mode=
 			[KVM,ARM] Select one of KVM/arm64's modes of operation.
 
-			none: Forcefully disable KVM and run in nVHE mode,
-			      preventing KVM from ever initialising.
-
 			nvhe: Standard nVHE-based mode, without support for
 			      protected guests.
 

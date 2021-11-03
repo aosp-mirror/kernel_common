@@ -2046,11 +2046,6 @@ int kvm_arch_init(void *opaque)
 		return -ENODEV;
 	}
 
-	if (kvm_get_mode() == KVM_MODE_NONE) {
-		kvm_info("KVM disabled from command line\n");
-		return -ENODEV;
-	}
-
 	in_hyp_mode = is_kernel_in_hyp_mode();
 
 	if (cpus_have_final_cap(ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE) ||
@@ -2124,15 +2119,8 @@ static int __init early_kvm_mode_cfg(char *arg)
 		return 0;
 	}
 
-	if (strcmp(arg, "nvhe") == 0 && !WARN_ON(is_kernel_in_hyp_mode())) {
-		kvm_mode = KVM_MODE_DEFAULT;
+	if (strcmp(arg, "nvhe") == 0 && !WARN_ON(is_kernel_in_hyp_mode()))
 		return 0;
-	}
-
-	if (strcmp(arg, "none") == 0 && !WARN_ON(is_kernel_in_hyp_mode())) {
-		kvm_mode = KVM_MODE_NONE;
-		return 0;
-	}
 
 	return -EINVAL;
 }
