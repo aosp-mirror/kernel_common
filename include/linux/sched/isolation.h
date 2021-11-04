@@ -19,7 +19,6 @@ enum hk_flags {
 
 #ifdef CONFIG_CPU_ISOLATION
 DECLARE_STATIC_KEY_FALSE(housekeeping_overridden);
-extern cpumask_var_t housekeeping_mask;
 extern int housekeeping_any_cpu(enum hk_flags flags);
 extern const struct cpumask *housekeeping_cpumask(enum hk_flags flags);
 extern bool housekeeping_enabled(enum hk_flags flags);
