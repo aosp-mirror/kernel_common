@@ -22,6 +22,7 @@
 #include <trace/hooks/sys.h>
 #include <trace/hooks/ufshcd.h>
 #include <trace/hooks/usb.h>
+#include <trace/hooks/psci.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -79,3 +80,5 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_send_uic_command);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_send_tm_command);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_check_int_errors);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_usb_persist_overwrite);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_psci_tos_resident_on);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_psci_cpu_suspend);
