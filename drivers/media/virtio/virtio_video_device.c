@@ -34,7 +34,6 @@ int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 	int i;
 	struct virtio_video_stream *stream = vb2_get_drv_priv(vq);
 	struct video_format_info *p_info;
-	u32 plane_size = 0;
 
 	if (*num_planes)
 		return 0;
@@ -44,15 +43,10 @@ int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 	else
 		p_info = &stream->out_info;
 
-	/*
-	 * The driver only supports single-planar (in the V4L2 sense, i.e. one
-	 * buffer for all color planes) formats at the moment, so aggregate all
-	 * the color planes into a single buffer.
-	 */
-	*num_planes = 1;
+	*num_planes = p_info->num_planes;
+
 	for (i = 0; i < p_info->num_planes; i++)
-		plane_size += p_info->plane_format[i].plane_size;
-	sizes[0] = plane_size;
+		sizes[i] = p_info->plane_format[i].plane_size;
 
 	return 0;
 }
@@ -735,7 +729,6 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 	struct virtio_video_stream *stream = vb2_get_drv_priv(vb2_queue);
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	struct video_format_info *p_info;
-	u32 bytesused = 0;
 
 	virtio_vb->queued = false;
 
@@ -788,16 +781,9 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 			break;
 		case VIRTIO_VIDEO_DEVICE_DECODER:
 			p_info = &stream->out_info;
-			/*
-			 * The driver only supports single-planar (in the V4L2
-			 * sense, i.e. one buffer for all color planes) formats
-			 * at the moment. All color planes have been written
-			 * one after the other in a single buffer.
-			 */
 			for (i = 0; i < p_info->num_planes; i++)
-				bytesused +=
+				vb->planes[i].bytesused =
 					p_info->plane_format[i].plane_size;
-			vb->planes[0].bytesused = bytesused;
 			break;
 		}
 
