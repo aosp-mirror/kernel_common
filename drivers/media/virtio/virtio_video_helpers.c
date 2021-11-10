@@ -237,7 +237,6 @@ void virtio_video_format_from_info(struct video_format_info *info,
 				   struct v4l2_pix_format_mplane *pix_mp)
 {
 	int i;
-	int plane_size;
 
 	pix_mp->width = info->frame_width;
 	pix_mp->height = info->frame_height;
@@ -250,19 +249,15 @@ void virtio_video_format_from_info(struct video_format_info *info,
 	memset(pix_mp->plane_fmt[0].reserved, 0,
 	       sizeof(pix_mp->plane_fmt[0].reserved));
 
+	pix_mp->num_planes = info->num_planes;
 	pix_mp->pixelformat = info->fourcc_format;
 
-	/*
-	 * The driver only supports single-planar (in the V4L2 sense, i.e. one
-	 * buffer for all color planes) formats at the moment, so aggregate all
-	 * the color planes into a single buffer.
-	 */
-	pix_mp->num_planes = 1;
-	plane_size = 0;
-	for (i = 0; i < info->num_planes; i++)
-		plane_size += info->plane_format[i].plane_size;
-	pix_mp->plane_fmt[0].bytesperline = info->plane_format[0].stride;
-	pix_mp->plane_fmt[0].sizeimage = plane_size;
+	for (i = 0; i < info->num_planes; i++) {
+		pix_mp->plane_fmt[i].bytesperline =
+					 info->plane_format[i].stride;
+		pix_mp->plane_fmt[i].sizeimage =
+					 info->plane_format[i].plane_size;
+	}
 }
 
 void virtio_video_format_fill_default_info(struct video_format_info *dst_info,
