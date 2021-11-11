@@ -13,11 +13,7 @@
   arm64_const_caps_ready
   arm64_use_ng_mappings
   bcmp
-  bio_alloc_bioset
-  bio_endio
-  blk_alloc_queue
   blk_cleanup_queue
-  blk_queue_flag_clear
   blk_queue_flag_set
   blk_queue_io_min
   blk_queue_io_opt
@@ -25,8 +21,6 @@
   blk_queue_max_discard_sectors
   blk_queue_max_write_zeroes_sectors
   blk_queue_physical_block_size
-  blk_queue_write_cache
-  blk_status_to_errno
   bpf_trace_run2
   bpf_trace_run3
   cancel_delayed_work_sync
@@ -55,12 +49,10 @@
   cpumask_next
   cpu_number
   __cpu_online_mask
-  __cpu_possible_mask
   crypto_register_alg
   crypto_register_scomp
   crypto_unregister_alg
   crypto_unregister_scomp
-  _ctype
   debugfs_create_dir
   debugfs_create_file
   debugfs_remove
@@ -104,13 +96,10 @@
   fd_install
   finish_wait
   flush_work
-  flush_workqueue
-  fput
   free_irq
   free_netdev
   __free_pages
   free_pages
-  fs_bio_set
   get_device
   __get_free_pages
   get_random_bytes
@@ -150,21 +139,16 @@
   kmem_cache_destroy
   kmem_cache_free
   kmemdup
-  kobject_add
-  kobject_init
-  kobject_put
   kobject_uevent
   krealloc
   kstrdup
   kstrndup
-  kstrtobool
   kstrtoint
   kstrtouint
   kstrtoull
   ktime_get
   ktime_get_mono_fast_ns
   ktime_get_raw_ts64
-  ktime_get_real_seconds
   ktime_get_real_ts64
   ktime_get_ts64
   ktime_get_with_offset
@@ -249,7 +233,6 @@
   __pm_runtime_use_autosuspend
   preempt_schedule
   preempt_schedule_notrace
-  prepare_to_wait
   prepare_to_wait_event
   printk
   put_device
@@ -282,7 +265,6 @@
   regmap_read
   regmap_write
   remap_pfn_range
-  __request_module
   request_threaded_irq
   revalidate_disk_size
   rtnl_link_register
@@ -293,10 +275,8 @@
   schedule_timeout
   scnprintf
   seq_lseek
-  seq_open
   seq_printf
   seq_read
-  seq_release
   serio_close
   serio_interrupt
   serio_open
@@ -304,7 +284,6 @@
   __serio_register_driver
   __serio_register_port
   serio_unregister_driver
-  set_disk_ro
   sg_alloc_table
   sg_free_table
   sg_init_one
@@ -342,12 +321,10 @@
   strncmp
   strncpy
   strsep
-  submit_bio
   synchronize_rcu
   sysfs_create_group
   __sysfs_match_string
   sysfs_remove_group
-  sysfs_remove_link
   system_wq
   trace_event_buffer_commit
   trace_event_buffer_reserve
@@ -363,7 +340,6 @@
   __tracepoint_rwmmio_write
   trace_raw_output_prep
   trace_seq_printf
-  try_module_get
   __udelay
   unlock_page
   unregister_blkdev
@@ -610,93 +586,12 @@
   unregister_pernet_device
   wiphy_apply_custom_regulatory
 
-# required by md-mod.ko
-  ack_all_badblocks
-  alloc_page_buffers
-  _atomic_dec_and_lock
-  autoremove_wake_function
-  badblocks_clear
-  badblocks_exit
-  badblocks_init
-  badblocks_set
-  badblocks_show
-  badblocks_store
-  bdev_check_media_change
-  bdevname
-  bdev_read_only
-  bd_link_disk_holder
-  bd_unlink_disk_holder
-  bio_add_page
-  bio_associate_blkg
-  bio_put
-  bioset_exit
-  bioset_init
-  blkdev_get_by_dev
-  blkdev_put
-  blk_finish_plug
-  blk_queue_split
-  blk_register_region
-  blk_set_stacking_limits
-  blk_start_plug
-  blk_sync_queue
-  blk_unregister_region
-  bmap
-  fget
-  file_path
-  flush_signals
-  free_buffer_head
-  int_pow
-  invalidate_bdev
-  invalidate_mapping_pages
-  kernel_sigaction
-  kernfs_find_and_get_ns
-  kernfs_notify
-  kernfs_put
-  kobject_del
-  kobject_get
-  kstrtoll
-  kthread_create_on_node
-  kthread_parkme
-  kthread_should_park
-  kthread_should_stop
-  kthread_stop
-  mempool_alloc
-  mempool_create
-  mempool_destroy
-  mempool_exit
-  mempool_free
-  mempool_init
-  mempool_kfree
-  mempool_kmalloc
-  mutex_trylock
-  part_end_io_acct
-  part_start_io_acct
-  percpu_ref_exit
-  percpu_ref_init
-  percpu_ref_is_zero
-  percpu_ref_switch_to_atomic_sync
-  percpu_ref_switch_to_percpu
-  proc_create
-  proc_dointvec
-  register_reboot_notifier
-  register_sysctl_table
-  remove_proc_entry
-  seq_file_path
-  simple_strtoul
-  skip_spaces
-  strreplace
-  submit_bh
-  submit_bio_wait
-  sync_blockdev
-  sysfs_create_link
-  unregister_reboot_notifier
-  unregister_sysctl_table
-  vfs_fsync
-  wake_up_process
-
 # required by nd_virtio.ko
+  bio_alloc_bioset
   bio_chain
   bio_clone_blkg_association
+  fs_bio_set
+  submit_bio
 
 # required by net_failover.ko
   call_netdevice_notifiers
@@ -721,6 +616,7 @@
   device_create_file
   device_remove_file
   device_remove_groups
+  flush_workqueue
   i2c_adapter_type
   i2c_bus_type
   i2c_client_type
@@ -735,6 +631,7 @@
   input_mt_report_slot_state
   input_mt_sync_frame
   input_set_capability
+  kstrtobool
   kstrtou8
   pm_wakeup_dev_event
   ps2_begin_command
@@ -767,6 +664,7 @@
   add_timer
   device_init_wakeup
   devm_rtc_allocate_device
+  ktime_get_real_seconds
   platform_device_add
   platform_device_alloc
   platform_device_del
@@ -786,6 +684,7 @@
   tty_unregister_ldisc
 
 # required by snd-hda-codec-generic.ko
+  _ctype
   devm_led_classdev_register_ext
   snd_ctl_boolean_stereo_info
   strchr
@@ -804,6 +703,7 @@
   pm_runtime_forbid
   __printk_ratelimit
   regcache_mark_dirty
+  __request_module
   snd_card_rw_proc_new
   snd_component_add
   _snd_ctl_add_follower
@@ -826,6 +726,7 @@
   snd_pcm_std_chmaps
   strncat
   timecounter_read
+  try_module_get
 
 # required by snd-hda-core.ko
   add_uevent_var
@@ -834,9 +735,13 @@
   device_add
   device_del
   kasprintf
+  kobject_add
   kobject_create_and_add
+  kobject_init
+  kobject_put
   pm_runtime_get_if_active
   __pm_runtime_set_status
+  prepare_to_wait
   regcache_cache_only
   regcache_sync
   regmap_update_bits_base
@@ -906,13 +811,17 @@
   securityfs_create_dir
   securityfs_create_file
   securityfs_remove
+  seq_open
   seq_putc
+  seq_release
   seq_write
+  sysfs_remove_link
   unregister_chrdev_region
 
 # required by tpm_vtpm_proxy.ko
   anon_inode_getfile
   compat_ptr_ioctl
+  fput
 
 # required by vcan.ko
   sock_efree
@@ -1110,9 +1019,12 @@
   blk_queue_max_hw_sectors
   blk_queue_max_segments
   blk_queue_max_segment_size
+  blk_queue_write_cache
   blk_rq_map_kern
   __blk_rq_map_sg
+  blk_status_to_errno
   set_capacity_revalidate_and_notify
+  set_disk_ro
   string_get_size
   virtio_max_dma_size
 
@@ -1288,8 +1200,12 @@
   __alloc_percpu
   bdget_disk
   bdput
+  bio_endio
+  blk_alloc_queue
+  blk_queue_flag_clear
   __class_register
   class_unregister
+  __cpu_possible_mask
   crypto_alloc_base
   crypto_comp_compress
   crypto_comp_decompress
