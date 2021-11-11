@@ -149,6 +149,9 @@
   v4l2_spi_new_subdev
   v4l_bound_align_image
   vb2_plane_cookie
+  vb2_dma_contig_set_max_seg_size
+  vb2_dma_contig_clear_max_seg_size
+  vb2_dma_contig_memops
 
 # required by init-input.ko
   of_find_i2c_device_by_node
@@ -280,3 +283,8 @@
   cfg80211_external_auth_request
   cfg80211_radar_event
   cfg80211_stop_iface
+
+# required by sunxi_drm_heap.ko
+  xa_erase
+  __xa_alloc
+  xa_load
