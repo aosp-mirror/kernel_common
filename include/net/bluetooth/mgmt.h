@@ -1214,3 +1214,10 @@ struct mgmt_ev_mesh_device_found {
 struct mgmt_ev_mesh_pkt_cmplt {
 	__u8	handle;
 } __packed;
+
+#define MGMT_EV_QUALITY_REPORT			0x0033
+struct mgmt_ev_quality_report {
+	__u8 quality_spec;
+	__u8 data_len;
+	__u8 data[0];
+} __packed;

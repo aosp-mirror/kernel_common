@@ -2334,6 +2334,8 @@ void mgmt_adv_monitor_removed(struct hci_dev *hdev, u16 handle);
 int mgmt_phy_configuration_changed(struct hci_dev *hdev, struct sock *skip);
 void mgmt_adv_monitor_device_lost(struct hci_dev *hdev, u16 handle,
 				  bdaddr_t *bdaddr, u8 addr_type);
+int mgmt_quality_report(struct hci_dev *hdev, struct sk_buff *skb,
+			u8 quality_spec);
 
 int hci_abort_conn(struct hci_conn *conn, u8 reason);
 u8 hci_le_conn_update(struct hci_conn *conn, u16 min, u16 max, u16 latency,

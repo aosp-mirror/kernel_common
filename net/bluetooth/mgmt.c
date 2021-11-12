@@ -4982,6 +4982,28 @@ static u32 get_params_flags(struct hci_dev *hdev,
 	return flags;
 }
 
+int mgmt_quality_report(struct hci_dev *hdev, struct sk_buff *skb,
+			u8 quality_spec)
+{
+	struct mgmt_ev_quality_report *ev;
+	size_t ev_len;
+	int err;
+
+	/* The ev comes with a variable-length data field. */
+	ev_len = sizeof(*ev) + skb->len;
+	ev = kmalloc(ev_len, GFP_KERNEL);
+	if (!ev)
+		return -ENOMEM;
+
+	ev->quality_spec = quality_spec;
+	ev->data_len = skb->len;
+	memcpy(ev->data, skb->data, skb->len);
+	err = mgmt_event(MGMT_EV_QUALITY_REPORT, hdev, ev, ev_len, NULL);
+	kfree(ev);
+
+	return err;
+}
+
 static int get_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
 			    u16 data_len)
 {
