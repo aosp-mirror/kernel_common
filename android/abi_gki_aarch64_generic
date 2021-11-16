@@ -65,6 +65,7 @@
   blk_alloc_queue
   blk_cleanup_queue
   blkdev_get_by_dev
+  blkdev_get_by_path
   blkdev_put
   blk_execute_rq_nowait
   blk_get_request
