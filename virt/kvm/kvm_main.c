@@ -257,8 +257,9 @@ bool kvm_make_vcpus_request_mask(struct kvm *kvm, unsigned int req,
 				 struct kvm_vcpu *except,
 				 unsigned long *vcpu_bitmap, cpumask_var_t tmp)
 {
-	int i, cpu, me;
+	int cpu, me;
 	struct kvm_vcpu *vcpu;
+	unsigned long i;
 	bool called;
 
 	me = get_cpu();
@@ -447,7 +448,7 @@ static void kvm_vcpu_destroy(struct kvm_vcpu *vcpu)
 
 void kvm_destroy_vcpus(struct kvm *kvm)
 {
-	unsigned int i;
+	unsigned long i;
 	struct kvm_vcpu *vcpu;
 
 	kvm_for_each_vcpu(i, vcpu, kvm) {
@@ -3478,10 +3479,10 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 	struct kvm *kvm = me->kvm;
 	struct kvm_vcpu *vcpu;
 	int last_boosted_vcpu = me->kvm->last_boosted_vcpu;
+	unsigned long i;
 	int yielded = 0;
 	int try = 3;
 	int pass;
-	int i;
 
 	kvm_vcpu_set_in_spin_loop(me, true);
 	/*
@@ -4293,7 +4294,7 @@ static int kvm_vm_ioctl_enable_dirty_log_ring(struct kvm *kvm, u32 size)
 
 static int kvm_vm_ioctl_reset_dirty_pages(struct kvm *kvm)
 {
-	int i;
+	unsigned long i;
 	struct kvm_vcpu *vcpu;
 	int cleared = 0;
 
@@ -5212,7 +5213,7 @@ static int kvm_clear_stat_per_vm(struct kvm *kvm, size_t offset)
 
 static int kvm_get_stat_per_vcpu(struct kvm *kvm, size_t offset, u64 *val)
 {
-	int i;
+	unsigned long i;
 	struct kvm_vcpu *vcpu;
 
 	*val = 0;
@@ -5225,7 +5226,7 @@ static int kvm_get_stat_per_vcpu(struct kvm *kvm, size_t offset, u64 *val)
 
 static int kvm_clear_stat_per_vcpu(struct kvm *kvm, size_t offset)
 {
-	int i;
+	unsigned long i;
 	struct kvm_vcpu *vcpu;
 
 	kvm_for_each_vcpu(i, vcpu, kvm)

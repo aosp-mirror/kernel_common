@@ -645,7 +645,7 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
 
 void kvm_arm_halt_guest(struct kvm *kvm)
 {
-	int i;
+	unsigned long i;
 	struct kvm_vcpu *vcpu;
 
 	kvm_for_each_vcpu(i, vcpu, kvm)
@@ -655,7 +655,7 @@ void kvm_arm_halt_guest(struct kvm *kvm)
 
 void kvm_arm_resume_guest(struct kvm *kvm)
 {
-	int i;
+	unsigned long i;
 	struct kvm_vcpu *vcpu;
 
 	kvm_for_each_vcpu(i, vcpu, kvm) {
@@ -2076,7 +2076,7 @@ static int finalize_hyp_mode(void)
 struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
 {
 	struct kvm_vcpu *vcpu;
-	int i;
+	unsigned long i;
 
 	mpidr &= MPIDR_HWID_BITMASK;
 	kvm_for_each_vcpu(i, vcpu, kvm) {

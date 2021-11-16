@@ -629,7 +629,8 @@ static int __sev_launch_update_vmsa(struct kvm *kvm, struct kvm_vcpu *vcpu,
 static int sev_launch_update_vmsa(struct kvm *kvm, struct kvm_sev_cmd *argp)
 {
 	struct kvm_vcpu *vcpu;
-	int i, ret;
+	unsigned long i;
+	int ret;
 
 	if (!sev_es_guest(kvm))
 		return -ENOTTY;
