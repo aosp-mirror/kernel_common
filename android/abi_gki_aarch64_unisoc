@@ -106,6 +106,7 @@
   cpu_hwcaps
   cpumask_next
   cpufreq_add_update_util_hook
+  cpufreq_quick_get_max
   cpufreq_remove_update_util_hook
   cpu_number
   __cpu_online_mask
@@ -475,6 +476,7 @@
   memcpy
   __memcpy_fromio
   memmove
+  memory_read_from_buffer
   memparse
   memset
   memset64
@@ -511,6 +513,7 @@
   nf_ct_l4proto_find
   nf_register_net_hooks
   nf_unregister_net_hooks
+  noop_llseek
   nr_cpu_ids
   nvmem_cell_get
   nvmem_cell_put
@@ -599,6 +602,7 @@
   platform_get_irq_byname
   platform_get_resource
   platform_get_resource_byname
+  pm_get_active_wakeup_sources
   pm_power_off
   __pm_relax
   pm_runtime_allow
