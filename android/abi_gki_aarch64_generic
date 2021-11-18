@@ -49,6 +49,7 @@
   bio_alloc_bioset
   bio_associate_blkg
   bio_chain
+  bio_crypt_set_ctx
   bio_endio
   bio_init
   bio_put
