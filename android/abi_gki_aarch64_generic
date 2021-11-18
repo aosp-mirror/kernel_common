@@ -627,6 +627,7 @@
   drm_dev_register
   drm_dev_unregister
   drm_display_mode_to_videomode
+  drm_dsc_pps_payload_pack
   drm_encoder_cleanup
   drm_encoder_init
   __drm_err
