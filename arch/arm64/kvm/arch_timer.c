@@ -101,7 +101,7 @@ u64 timer_get_cval(struct arch_timer_context *ctxt)
 	}
 }
 
-static u64 timer_get_offset(struct arch_timer_context *ctxt)
+u64 timer_get_offset(struct arch_timer_context *ctxt)
 {
 	u64 offset = 0;
 
