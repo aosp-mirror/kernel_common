@@ -4903,7 +4903,11 @@ static int ufshcd_slave_alloc(struct scsi_device *sdev)
  */
 static int ufshcd_change_queue_depth(struct scsi_device *sdev, int depth)
 {
-	return scsi_change_queue_depth(sdev, min(depth, sdev->host->can_queue));
+	struct ufs_hba *hba = shost_priv(sdev->host);
+
+	if (depth > hba->nutrs)
+		depth = hba->nutrs;
+	return scsi_change_queue_depth(sdev, depth);
 }
 
 static void ufshcd_hpb_destroy(struct ufs_hba *hba, struct scsi_device *sdev)
