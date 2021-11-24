@@ -1832,8 +1832,6 @@ static inline struct bio_vec *rq_integrity_vec(struct request *rq)
 bool blk_crypto_register(struct blk_crypto_profile *profile,
 			 struct request_queue *q);
 
-void blk_crypto_unregister(struct request_queue *q);
-
 #else /* CONFIG_BLK_INLINE_ENCRYPTION */
 
 static inline bool blk_crypto_register(struct blk_crypto_profile *profile,
@@ -1841,8 +1839,6 @@ static inline bool blk_crypto_register(struct blk_crypto_profile *profile,
 {
 	return true;
 }
-
-static inline void blk_crypto_unregister(struct request_queue *q) { }
 
 #endif /* CONFIG_BLK_INLINE_ENCRYPTION */
 
