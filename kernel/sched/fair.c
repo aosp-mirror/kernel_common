@@ -3927,9 +3927,16 @@ static inline unsigned long task_util_est(struct task_struct *p)
 #ifdef CONFIG_UCLAMP_TASK
 static inline unsigned long uclamp_task_util(struct task_struct *p)
 {
-	return clamp(task_util_est(p),
-		     uclamp_eff_value(p, UCLAMP_MIN),
-		     uclamp_eff_value(p, UCLAMP_MAX));
+	unsigned long min_util = uclamp_eff_value(p, UCLAMP_MIN);
+	unsigned long max_util = uclamp_eff_value(p, UCLAMP_MAX);
+	unsigned long task_util = task_util_est(p);
+	unsigned long ret = 0;
+
+	trace_android_rvh_uclamp_task_util(task_util, min_util, max_util, &ret);
+	if (ret)
+		return ret;
+
+	return clamp(task_util, min_util, max_util);
 }
 #else
 static inline unsigned long uclamp_task_util(struct task_struct *p)

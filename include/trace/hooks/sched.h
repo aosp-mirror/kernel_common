@@ -279,6 +279,16 @@ DECLARE_RESTRICTED_HOOK(android_rvh_uclamp_eff_get,
 		 struct uclamp_se *uclamp_max, struct uclamp_se *uclamp_eff, int *ret),
 	TP_ARGS(p, clamp_id, uclamp_max, uclamp_eff, ret), 1);
 
+DECLARE_RESTRICTED_HOOK(android_rvh_uclamp_task_util,
+	TP_PROTO(unsigned long task_util, unsigned long min_util,
+		 unsigned long max_util, unsigned long *ret),
+	TP_ARGS(task_util, min_util, max_util, ret), 1);
+
+DECLARE_RESTRICTED_HOOK(android_rvh_uclamp_rq_util_with,
+	TP_PROTO(unsigned long util, unsigned long min_util,
+		 unsigned long max_util, unsigned long *ret),
+	TP_ARGS(util, min_util, max_util, ret), 1);
+
 DECLARE_HOOK(android_vh_build_sched_domains,
 	TP_PROTO(bool has_asym),
 	TP_ARGS(has_asym));
