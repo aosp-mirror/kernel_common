@@ -205,6 +205,8 @@ struct kvm_arch {
 	bool mte_enabled;
 
 	struct kvm_protected_vm pkvm;
+
+	u64 hypercall_exit_enabled;
 };
 
 struct kvm_protected_vcpu {
