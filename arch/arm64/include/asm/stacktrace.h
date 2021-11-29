@@ -55,9 +55,6 @@ struct stackframe {
 	enum stack_type prev_type;
 };
 
-extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
-extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
-			    bool (*fn)(void *, unsigned long), void *data);
 extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk,
 			   const char *loglvl);
 
@@ -141,8 +138,5 @@ static inline bool on_accessible_stack(const struct task_struct *tsk,
 
 	return false;
 }
-
-void start_backtrace(struct stackframe *frame, unsigned long fp,
-		     unsigned long pc);
 
 #endif	/* __ASM_STACKTRACE_H */
