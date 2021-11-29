@@ -2028,6 +2028,7 @@
   __traceiter_android_rvh_do_sea
   __traceiter_android_rvh_do_sp_pc_abort
   __traceiter_android_rvh_do_undefinstr
+  __traceiter_android_rvh_enqueue_task
   __traceiter_android_rvh_find_energy_efficient_cpu
   __traceiter_android_rvh_irqs_disable
   __traceiter_android_rvh_irqs_enable
@@ -2035,6 +2036,7 @@
   __traceiter_android_rvh_preempt_disable
   __traceiter_android_rvh_preempt_enable
   __traceiter_android_rvh_sched_fork
+  __traceiter_android_rvh_select_task_rq_fair
   __traceiter_android_rvh_select_task_rq_rt
   __traceiter_android_rvh_set_iowait
   __traceiter_android_rvh_typec_tcpci_chk_contaminant
@@ -2111,6 +2113,7 @@
   __tracepoint_android_rvh_do_sea
   __tracepoint_android_rvh_do_sp_pc_abort
   __tracepoint_android_rvh_do_undefinstr
+  __tracepoint_android_rvh_enqueue_task
   __tracepoint_android_rvh_find_energy_efficient_cpu
   __tracepoint_android_rvh_irqs_disable
   __tracepoint_android_rvh_irqs_enable
@@ -2118,6 +2121,7 @@
   __tracepoint_android_rvh_preempt_disable
   __tracepoint_android_rvh_preempt_enable
   __tracepoint_android_rvh_sched_fork
+  __tracepoint_android_rvh_select_task_rq_fair
   __tracepoint_android_rvh_select_task_rq_rt
   __tracepoint_android_rvh_set_iowait
   __tracepoint_android_rvh_typec_tcpci_chk_contaminant
