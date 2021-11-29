@@ -19,6 +19,14 @@ DECLARE_HOOK(android_vh_thermal_pm_notify_suspend,
 	     TP_PROTO(struct thermal_zone_device *tz, int *irq_wakeable),
 	     TP_ARGS(tz, irq_wakeable));
 
+DECLARE_HOOK(android_vh_modify_thermal_request_freq,
+	TP_PROTO(struct cpufreq_policy *policy, unsigned long *request_freq),
+	TP_ARGS(policy, request_freq));
+
+DECLARE_HOOK(android_vh_modify_thermal_target_freq,
+	TP_PROTO(struct cpufreq_policy *policy, unsigned int *target_freq),
+	TP_ARGS(policy, target_freq));
+
 #endif /* _TRACE_HOOK_THERMAL_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>
