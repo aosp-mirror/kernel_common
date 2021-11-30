@@ -1732,6 +1732,7 @@
   scsi_register_interface
   scsi_unblock_requests
   sdev_prefix_printk
+  send_sig_info
   seq_hex_dump
   seq_lseek
   seq_open
