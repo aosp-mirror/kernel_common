@@ -2411,6 +2411,10 @@ int f2fs_mpage_readpages(struct address_space *mapping,
 	int ret = 0;
 	bool drop_ra = false;
 
+	/* this is real from f2fs_merkle_tree_readahead() in old kernel only. */
+	if (!nr_pages)
+		return 0;
+
 	map.m_pblk = 0;
 	map.m_lblk = 0;
 	map.m_len = 0;
