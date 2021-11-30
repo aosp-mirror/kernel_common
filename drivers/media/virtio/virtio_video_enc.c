@@ -495,8 +495,8 @@ static int virtio_video_enc_try_framerate(struct virtio_video_stream *stream,
 static void virtio_video_timeperframe_from_info(struct video_format_info *info,
 						struct v4l2_fract *timeperframe)
 {
-	timeperframe->numerator = info->frame_rate;
-	timeperframe->denominator = 1;
+	timeperframe->numerator = 1;
+	timeperframe->denominator = info->frame_rate;
 }
 
 static int virtio_video_enc_g_parm(struct file *file, void *priv,
@@ -531,15 +531,28 @@ static int virtio_video_enc_s_parm(struct file *file, void *priv,
 	struct virtio_video *vv = vvd->vv;
 	struct v4l2_outputparm *out = &a->parm.output;
 	struct v4l2_fract *timeperframe = &out->timeperframe;
+	struct v4l2_fract stps;
+
+	/* To comply with V4l2 docs, reset frame interval if zero was supplied */
+	virtio_video_timeperframe_from_info(&stream->in_info, &stps);
+	if (!timeperframe->numerator)
+		timeperframe->numerator = stps.numerator;
+	if (!timeperframe->denominator)
+		timeperframe->denominator = stps.denominator;
 
 	if (V4L2_TYPE_IS_OUTPUT(a->type)) {
-		frame_interval = timeperframe->numerator * (u64)USEC_PER_SEC;
-		do_div(frame_interval, timeperframe->denominator);
-		if (!frame_interval)
-			return -EINVAL;
-
-		frame_rate = (u64)USEC_PER_SEC;
-		do_div(frame_rate, frame_interval);
+		if (!timeperframe->denominator) {
+			frame_rate = 0;
+		} else {
+			frame_interval = timeperframe->numerator * (u64)USEC_PER_SEC;
+			do_div(frame_interval, timeperframe->denominator);
+			if (!frame_interval) {
+				frame_rate = stream->in_info.frame_rate;
+			} else {
+				frame_rate = (u64)USEC_PER_SEC;
+				do_div(frame_rate, frame_interval);
+			}
+		}
 	} else {
 		v4l2_err(&vv->v4l2_dev,
 			 "setting FPS is only possible for the output queue\n");
