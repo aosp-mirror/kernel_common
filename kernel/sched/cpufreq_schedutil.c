@@ -104,6 +104,9 @@ static bool sugov_update_next_freq(struct sugov_policy *sg_policy, u64 time,
 				   unsigned int next_freq)
 {
 	if (!sg_policy->need_freq_update) {
+		s64 delta_ns = time - sg_policy->last_freq_update_time;
+		trace_android_vh_update_next_freq(sg_policy->policy, sg_policy->next_freq,
+				&next_freq, delta_ns);
 		if (sg_policy->next_freq == next_freq)
 			return false;
 	} else {
