@@ -1983,6 +1983,7 @@
   sysctl_sched_latency
   sysfs_add_file_to_group
   sysfs_add_link_to_group
+  sysfs_create_bin_file
   sysfs_create_file_ns
   sysfs_create_files
   sysfs_create_group
@@ -1991,6 +1992,7 @@
   sysfs_emit
   sysfs_emit_at
   sysfs_notify
+  sysfs_remove_bin_file
   sysfs_remove_file_from_group
   sysfs_remove_file_ns
   sysfs_remove_group
