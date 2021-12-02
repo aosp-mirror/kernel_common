@@ -121,7 +121,7 @@ static bool fuse_emit(struct file *file, struct dir_context *ctx,
 			dirent->type);
 }
 
-static int parse_dirfile(char *buf, size_t nbytes, struct file *file,
+int fuse_parse_dirfile(char *buf, size_t nbytes, struct file *file,
 			 struct dir_context *ctx)
 {
 	while (nbytes >= FUSE_NAME_OFFSET) {
@@ -360,7 +360,7 @@ static int fuse_readdir_uncached(struct file *file, struct dir_context *ctx)
 			res = parse_dirplusfile(page_address(page), res,
 						file, ctx, attr_version);
 		} else {
-			res = parse_dirfile(page_address(page), res, file,
+			res = fuse_parse_dirfile(page_address(page), res, file,
 					    ctx);
 		}
 	}
