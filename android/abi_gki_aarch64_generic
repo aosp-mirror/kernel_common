@@ -70,6 +70,7 @@
   __bitmap_weight
   blk_alloc_queue
   blk_cleanup_queue
+  blk_crypto_init_key
   blkdev_get_by_dev
   blkdev_get_by_path
   blkdev_put
