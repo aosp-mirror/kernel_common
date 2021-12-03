@@ -1242,7 +1242,7 @@ next_pdu:
 	}
 
 	memalloc_noreclaim_restore(noreclaim_flag);
-	module_put_and_exit(0);
+	module_put_and_kthread_exit(0);
 }
 
 /* extract the host portion of the UNC string */
