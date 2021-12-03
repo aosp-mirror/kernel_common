@@ -868,6 +868,10 @@
   compat_ptr_ioctl
   fput
 
+# required by usbip-core.ko
+  iov_iter_kvec
+  sock_recvmsg
+
 # required by vcan.ko
   sock_efree
 
@@ -886,6 +890,14 @@
   bgpio_init
   devm_gpiochip_add_data_with_key
   devm_mfd_add_devices
+
+# required by vhci-hcd.ko
+  kernel_sock_shutdown
+  platform_bus
+  sockfd_lookup
+  usb_create_shared_hcd
+  usb_get_dev
+  usb_put_dev
 
 # required by virt_wifi.ko
   cfg80211_connect_done
