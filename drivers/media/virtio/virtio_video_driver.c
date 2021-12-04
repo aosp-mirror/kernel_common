@@ -129,10 +129,10 @@ static int virtio_video_probe(struct virtio_device *vdev)
 	 *  resource type when both are supported?
 	 */
 	if (virtio_has_feature(vdev, VIRTIO_VIDEO_F_RESOURCE_VIRTIO_OBJECT)) {
-		vv->res_type = RESOURCE_TYPE_VIRTIO_OBJECT;
+		vv->res_type = VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT;
 	} else if (virtio_has_feature(vdev,
 				      VIRTIO_VIDEO_F_RESOURCE_GUEST_PAGES)) {
-		vv->res_type = RESOURCE_TYPE_GUEST_PAGES;
+		vv->res_type = VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES;
 	} else {
 		dev_err(dev, "device must support guest allocated buffers or virtio objects\n");
 		ret = -ENODEV;
