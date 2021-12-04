@@ -432,18 +432,6 @@ int virtio_video_cmd_stream_create(struct virtio_video *vv, uint32_t stream_id,
 {
 	struct virtio_video_stream_create *req_p;
 	struct virtio_video_vbuffer *vbuf;
-	int resource_type;
-
-	switch (vv->res_type) {
-	case RESOURCE_TYPE_GUEST_PAGES:
-		resource_type = VIRTIO_VIDEO_MEM_TYPE_GUEST_PAGES;
-		break;
-	case RESOURCE_TYPE_VIRTIO_OBJECT:
-		resource_type = VIRTIO_VIDEO_MEM_TYPE_VIRTIO_OBJECT;
-		break;
-	default:
-		return -EINVAL;
-	}
 
 	req_p = virtio_video_alloc_req(vv, &vbuf, sizeof(*req_p));
 	if (IS_ERR(req_p))
@@ -452,8 +440,8 @@ int virtio_video_cmd_stream_create(struct virtio_video *vv, uint32_t stream_id,
 	req_p->hdr.type = cpu_to_le32(VIRTIO_VIDEO_CMD_STREAM_CREATE);
 	req_p->hdr.stream_id = cpu_to_le32(stream_id);
 	req_p->coded_format = cpu_to_le32(format);
-	req_p->in_mem_type = cpu_to_le32(resource_type);
-	req_p->out_mem_type = cpu_to_le32(resource_type);
+	req_p->in_mem_type = cpu_to_le32(vv->res_type);
+	req_p->out_mem_type = cpu_to_le32(vv->res_type);
 
 	strncpy(req_p->tag, tag, sizeof(req_p->tag) - 1);
 	req_p->tag[sizeof(req_p->tag) - 1] = 0;

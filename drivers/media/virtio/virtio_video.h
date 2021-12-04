@@ -127,16 +127,11 @@ struct virtio_video_queue {
 	struct work_struct dequeue_work;
 };
 
-enum virtio_video_resource_type {
-	RESOURCE_TYPE_GUEST_PAGES = 0,
-	RESOURCE_TYPE_VIRTIO_OBJECT,
-};
-
 struct virtio_video {
 	struct v4l2_device v4l2_dev;
 	int instance;
 
-	enum virtio_video_resource_type res_type;
+	u32 res_type;
 
 	struct virtio_device *vdev;
 	struct virtio_video_queue commandq;
