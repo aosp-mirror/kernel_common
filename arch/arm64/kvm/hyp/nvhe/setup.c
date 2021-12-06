@@ -256,6 +256,15 @@ void __noreturn __pkvm_init_finalise(void)
 	if (ret)
 		goto out;
 
+	pkvm_pgtable_mm_ops = (struct kvm_pgtable_mm_ops) {
+		.zalloc_page = hyp_zalloc_hyp_page,
+		.phys_to_virt = hyp_phys_to_virt,
+		.virt_to_phys = hyp_virt_to_phys,
+		.get_page = hpool_get_page,
+		.put_page = hpool_put_page,
+	};
+	pkvm_pgtable.mm_ops = &pkvm_pgtable_mm_ops;
+
 	if (kvm_iommu_ops.init) {
 		ret = kvm_iommu_ops.init();
 		if (ret)
@@ -265,15 +274,6 @@ void __noreturn __pkvm_init_finalise(void)
 	ret = finalize_host_mappings();
 	if (ret)
 		goto out;
-
-	pkvm_pgtable_mm_ops = (struct kvm_pgtable_mm_ops) {
-		.zalloc_page = hyp_zalloc_hyp_page,
-		.phys_to_virt = hyp_phys_to_virt,
-		.virt_to_phys = hyp_virt_to_phys,
-		.get_page = hpool_get_page,
-		.put_page = hpool_put_page,
-	};
-	pkvm_pgtable.mm_ops = &pkvm_pgtable_mm_ops;
 
 out:
 	/*
