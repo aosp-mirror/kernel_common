@@ -43,6 +43,11 @@
   blk_queue_max_discard_sectors
   blk_queue_max_write_zeroes_sectors
   blk_queue_physical_block_size
+  blk_mq_complete_request
+  __blk_mq_end_request
+  blk_mq_requeue_request
+  blk_mq_run_hw_queues
+  blk_update_request
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
   bpf_trace_run1
@@ -326,6 +331,7 @@
   i2c_smbus_read_word_data
   i2c_smbus_write_byte_data
   i2c_transfer_buffer_flags
+  icmp6_send
   ida_alloc_range
   ida_destroy
   ida_free
@@ -397,10 +403,12 @@
   __ioremap
   iounmap
   iput
+  ip6_find_1stfragopt
   ip6t_alloc_initial_table
   ip6t_do_table
   ip6t_register_table
   ip6t_unregister_table
+  ipv6_select_ident
   ip_route_output_flow
   ipv4_redirect
   ipv4_update_pmtu
@@ -743,6 +751,7 @@
   simple_write_to_buffer
   single_open
   single_release
+  __skb_ext_put
   skb_clone
   skb_copy
   skb_copy_expand
@@ -758,6 +767,7 @@
   skcipher_walk_done
   skcipher_walk_virt
   sk_free
+  softnet_data
   snd_info_create_card_entry
   snd_info_free_entry
   snd_info_get_line
@@ -967,6 +977,7 @@
   xfrm_output_resume
   xfrm_register_type
   __xfrm_state_destroy
+  xfrm_state_afinfo_get_rcu
   xfrm_state_lookup
   xfrm_unregister_type
   xt_register_match
@@ -1247,6 +1258,9 @@
   set_page_dirty_lock
   strcspn
   system_highpri_wq
+  tracepoint_probe_register
+  __tracepoint_android_vh_psci_tos_resident_on
+  __tracepoint_android_vh_psci_cpu_suspend
   __tracepoint_clock_set_rate
   trace_print_flags_seq
   vmalloc_user
@@ -2457,6 +2471,7 @@
   sock_no_socketpair
   sock_queue_rcv_skb
   sock_wmalloc
+  sock_wfree
   unregister_pernet_device
   unregister_pppox_proto
 
