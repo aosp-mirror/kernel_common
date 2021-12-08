@@ -40,60 +40,6 @@ static void virtio_video_init_vq(struct virtio_video_queue *vvq,
 	INIT_WORK(&vvq->dequeue_work, work_func);
 }
 
-static void *dma_phys_alloc(struct device *dev, size_t size,
-			    dma_addr_t *dma_handle, gfp_t gfp,
-			    unsigned long attrs)
-{
-	void *ret;
-
-	ret = (void *)__get_free_pages(gfp, get_order(size));
-	if (ret)
-		*dma_handle = translate_phys_to_dma(dev, virt_to_phys(ret));
-
-	return ret;
-}
-
-static void dma_phys_free(struct device *dev, size_t size,
-			  void *cpu_addr, dma_addr_t dma_addr,
-			  unsigned long attrs)
-{
-	free_pages((unsigned long)cpu_addr, get_order(size));
-}
-
-static dma_addr_t dma_phys_map_page(struct device *dev, struct page *page,
-				    unsigned long offset, size_t size,
-				    enum dma_data_direction dir,
-				    unsigned long attrs)
-{
-	return translate_phys_to_dma(dev, page_to_phys(page) + offset);
-}
-
-static int dma_phys_map_sg(struct device *dev, struct scatterlist *sgl,
-			   int nents, enum dma_data_direction dir,
-			   unsigned long attrs)
-{
-	int i;
-	struct scatterlist *sg;
-
-	for_each_sg(sgl, sg, nents, i) {
-		void *va;
-
-		BUG_ON(!sg_page(sg));
-		va = sg_virt(sg);
-		sg_dma_address(sg) = translate_phys_to_dma(dev, (dma_addr_t)virt_to_phys(va));
-		sg_dma_len(sg) = sg->length;
-	}
-
-	return nents;
-}
-
-const struct dma_map_ops dma_phys_ops = {
-	.alloc			= dma_phys_alloc,
-	.free			= dma_phys_free,
-	.map_page		= dma_phys_map_page,
-	.map_sg			= dma_phys_map_sg,
-};
-
 static int virtio_video_query_cap_resp_buf(struct virtio_video *vv, void
 					   **resp_buf, int queue_type)
 {
@@ -209,8 +155,6 @@ static int virtio_video_probe(struct virtio_device *vdev)
 		vv->supp_non_contig = true;
 
 	vv->use_dma_api = !virtio_has_dma_quirk(vdev);
-	if (!vv->use_dma_api)
-		set_dma_ops(dev, &dma_phys_ops);
 	dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
 
 	dev_set_name(dev, "%s.%i", DRIVER_NAME, vdev->index);
