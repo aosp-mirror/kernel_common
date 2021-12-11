@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/log2.h>
 #include <linux/miscdevice.h>
+#include <linux/poll.h>
 #include <linux/seq_file.h>
 #include <asm/page.h>
 #include "trusty-log.h"
@@ -43,13 +44,11 @@ static struct ratelimit_state trusty_log_rate_limit =
  * struct trusty_log_sfile - trusty log misc device state
  *
  * @misc:          misc device created for the trusty log virtual file
- * @sfile:         seq_file created when opening the misc device
  * @device_name:   misc device name following the convention
  *                 "trusty-<name><id>"
  */
 struct trusty_log_sfile {
 	struct miscdevice misc;
-	struct seq_file sfile;
 	char device_name[64];
 };
 
@@ -103,6 +102,10 @@ struct trusty_log_state {
 	struct notifier_block call_notifier;
 	struct notifier_block panic_notifier;
 	char line_buffer[TRUSTY_LINE_BUFFER_SIZE];
+	wait_queue_head_t poll_waiters;
+	/* this lock protects access to wake_put */
+	spinlock_t wake_up_lock;
+	u32 last_wake_put;
 };
 
 static inline u32 u32_add_overflow(u32 a, u32 b)
@@ -431,11 +434,19 @@ static int trusty_log_call_notify(struct notifier_block *nb,
 {
 	struct trusty_log_state *s;
 	unsigned long flags;
+	u32 cur_put;
 
 	if (action != TRUSTY_CALL_RETURNED)
 		return NOTIFY_DONE;
 
 	s = container_of(nb, struct trusty_log_state, call_notifier);
+	spin_lock_irqsave(&s->wake_up_lock, flags);
+	cur_put = s->log->put;
+	if (cur_put != s->last_wake_put) {
+		s->last_wake_put = cur_put;
+		wake_up_all(&s->poll_waiters);
+	}
+	spin_unlock_irqrestore(&s->wake_up_lock, flags);
 	spin_lock_irqsave(&s->lock, flags);
 	trusty_dump_logs(s);
 	spin_unlock_irqrestore(&s->lock, flags);
@@ -471,11 +482,19 @@ static int trusty_log_sfile_dev_open(struct inode *inode, struct file *file)
 	struct seq_file *sfile;
 	int rc;
 
+	/*
+	 * file->private_data contains a pointer to the misc_device struct
+	 * passed to misc_register()
+	 */
 	if (WARN_ON(!file->private_data))
 		return -EINVAL;
 
 	ls = container_of(file->private_data, struct trusty_log_sfile, misc);
 
+	/*
+	 * seq_open uses file->private_data to store the seq_file associated
+	 * with the struct file, but it must be NULL when seq_open is called
+	 */
 	file->private_data = NULL;
 	rc = seq_open(file, &trusty_log_seq_ops);
 	if (rc < 0)
@@ -489,9 +508,36 @@ static int trusty_log_sfile_dev_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static unsigned int trusty_log_sfile_dev_poll(struct file *filp,
+					      struct poll_table_struct *wait)
+{
+	struct seq_file *sfile;
+	struct trusty_log_sfile *lb;
+	struct trusty_log_state *s;
+	struct log_rb *log;
+
+	/*
+	 * trusty_log_sfile_dev_open() pointed filp->private_data to a
+	 * seq_file, and that seq_file->private to the trusty_log_sfile
+	 * field of a trusty_log_state
+	 */
+	sfile = filp->private_data;
+	lb = sfile->private;
+	s = container_of(lb, struct trusty_log_state, log_sfile);
+	poll_wait(filp, &s->poll_waiters, wait);
+	log = s->log;
+	if (log->put != (u32)filp->f_pos) {
+		/* data ready to read */
+		return EPOLLIN | EPOLLRDNORM;
+	}
+	/* no data available, go to sleep */
+	return 0;
+}
+
 static const struct file_operations log_sfile_dev_operations = {
 	.owner = THIS_MODULE,
 	.open = trusty_log_sfile_dev_open,
+	.poll = trusty_log_sfile_dev_poll,
 	.read = seq_read,
 	.release = seq_release,
 };
@@ -602,6 +648,9 @@ static int trusty_log_probe(struct platform_device *pdev)
 			result, mem_id);
 		goto error_std_call;
 	}
+
+	init_waitqueue_head(&s->poll_waiters);
+	spin_lock_init(&s->wake_up_lock);
 
 	s->call_notifier.notifier_call = trusty_log_call_notify;
 	result = trusty_call_notifier_register(s->trusty_dev,
