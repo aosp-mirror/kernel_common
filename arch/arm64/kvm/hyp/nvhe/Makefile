@@ -18,3 +18,4 @@ $(obj)/hyp.lds: $(src)/hyp.lds.S FORCE
 
 include $(srctree)/arch/arm64/kvm/hyp/nvhe/Makefile.nvhe
 obj-y := kvm_nvhe.o
+KCSAN_SANITIZE := n
