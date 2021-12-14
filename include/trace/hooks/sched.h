@@ -241,6 +241,10 @@ DECLARE_HOOK(android_vh_update_next_freq,
 		unsigned int *new_next_freq, s64 delta_ns),
 	TP_ARGS(policy, old_next_freq, new_next_freq, delta_ns));
 
+DECLARE_HOOK(android_vh_sugov_get_util,
+	TP_PROTO(unsigned int cpu, unsigned long *ret),
+	TP_ARGS(cpu, ret));
+
 struct em_perf_domain;
 DECLARE_HOOK(android_vh_em_cpu_energy,
 	TP_PROTO(struct em_perf_domain *pd,
