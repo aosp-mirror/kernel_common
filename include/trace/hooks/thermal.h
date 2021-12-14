@@ -9,6 +9,7 @@
 
 #include <linux/tracepoint.h>
 #include <trace/hooks/vendor_hooks.h>
+#include <linux/cpufreq.h>
 
 DECLARE_HOOK(android_vh_enable_thermal_genl_check,
 	TP_PROTO(int event, int tz_id, int *enable_thermal_genl),
