@@ -195,7 +195,7 @@ out:
 static int bpf_test_real(const char *mount_dir)
 {
 	const char *test_name = "real";
-	const char *test_data =	"Weebles wobble but they don't fall down";
+	const char *test_data = "Weebles wobble but they don't fall down";
 	int result = TEST_FAILURE;
 	int bpf_fd = -1;
 	int src_fd = -1;
@@ -434,7 +434,7 @@ out:
 
 static int bpf_test_redact_readdir(const char *mount_dir)
 {
-	char *names[] = {"f1", "f2", "f3", "f4", "f5", "f6", ".", ".."};
+	const char *names[] = {"f1", "f2", "f3", "f4", "f5", "f6", ".", ".."};
 	int num_shown = (ARRAY_SIZE(names) - 2) / 2 + 2;
 	int result = TEST_FAILURE;
 	int bpf_fd = -1;
@@ -965,7 +965,7 @@ static int bpf_test_symlink(const char *mount_dir)
 {
 	const char *test_name = "real";
 	const char *symlink_name = "partial";
-	const char *test_data =	"Weebles wobble but they don't fall down";
+	const char *test_data = "Weebles wobble but they don't fall down";
 	int result = TEST_FAILURE;
 	int bpf_fd = -1;
 	int src_fd = -1;
