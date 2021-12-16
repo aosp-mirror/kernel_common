@@ -1496,6 +1496,8 @@ int fuse_file_write_iter_backing(struct fuse_args *fa,
 void *fuse_file_write_iter_finalize(struct fuse_args *fa,
 		struct kiocb *iocb, struct iov_iter *from);
 
+ssize_t fuse_backing_mmap(struct file *file, struct vm_area_struct *vma);
+
 int fuse_file_fallocate_initialize(struct fuse_args *fa,
 		struct fuse_fallocate_in *ffi,
 		struct file *file, int mode, loff_t offset, loff_t length);
