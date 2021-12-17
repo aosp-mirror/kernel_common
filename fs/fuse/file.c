@@ -1947,6 +1947,16 @@ int fuse_write_inode(struct inode *inode, struct writeback_control *wbc)
 	 */
 	if (!S_ISREG(inode->i_mode))
 		return 0;
+	/*
+	 * Inode is always written before the last reference is dropped and
+	 * hence this should not be reached from reclaim.
+	 *
+	 * Writing back the inode from reclaim can deadlock if the request
+	 * processing itself needs an allocation.  Allocations triggering
+	 * reclaim while serving a request can't be prevented, because it can
+	 * involve any number of unrelated userspace processes.
+	 */
+	WARN_ON(wbc->for_reclaim);
 
 	ff = __fuse_write_file_get(fc, fi);
 	err = fuse_flush_times(inode, ff);
@@ -3458,6 +3468,8 @@ out:
 	if (lock_inode)
 		inode_unlock(inode);
 
+	fuse_flush_time_update(inode);
+
 	return err;
 }
 
@@ -3566,6 +3578,8 @@ out:
 
 	inode_unlock(inode_out);
 	file_accessed(file_in);
+
+	fuse_flush_time_update(inode_out);
 
 	return err;
 }
