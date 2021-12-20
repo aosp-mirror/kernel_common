@@ -959,6 +959,7 @@ struct dentry *fuse_lookup_finalize(struct fuse_args *fa, struct inode *dir,
 
 		fc = get_fuse_mount(dir)->fc;
 		backing_file = fuse_fget(fc, febo->backing_fd);
+		__close_fd(fc->task->files, febo->backing_fd);
 		if (!backing_file)
 			return ERR_PTR(-EIO);
 

@@ -1154,7 +1154,6 @@ static int bpf_test_remove_backing(const char *mount_dir)
 	int pid = -1;
 	int status;
 	char data[256] = {0};
-	int backing_fd = -1;
 
 	/*
 	 * Create folder1/file
@@ -1200,6 +1199,7 @@ static int bpf_test_remove_backing(const char *mount_dir)
 			struct fuse_entry_out feo;
 			struct fuse_entry_bpf_out febo;
 		} __attribute__((packed)) in;
+		int backing_fd = -1;
 
 		TESTFUSEINIT();
 		TESTFUSEIN(FUSE_LOOKUP | FUSE_POSTFILTER, &in);
@@ -1213,20 +1213,16 @@ static int bpf_test_remove_backing(const char *mount_dir)
 			.backing_fd = backing_fd,
 			}));
 
-		while (read(fuse_dev, bytes_in, sizeof(bytes_in)) != -1) {
-			struct fuse_in_header *in_header =
-				(struct fuse_in_header *)bytes_in;
-
-			TESTCOND(in_header->opcode == FUSE_FORGET ||
-				 in_header->opcode == FUSE_BATCH_FORGET);
-		}
+		while (read(fuse_dev, bytes_in, sizeof(bytes_in)) != -1)
+			;
+		TESTEQUAL(close(backing_fd), -1);
+		TESTEQUAL(errno, EBADF);
 	FUSE_DONE
 
 	result = TEST_SUCCESS;
 out:
 	close(fuse_dev);
 	close(fd);
-	close(backing_fd);
 	close(src_fd);
 	close(bpf_fd);
 	umount(mount_dir);
