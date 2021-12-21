@@ -1107,6 +1107,7 @@
   kobject_add
   kobject_create_and_add
   kobject_del
+  kobject_get
   kobject_init
   kobject_init_and_add
   kobject_put
@@ -1153,6 +1154,7 @@
   ktime_get_raw_ts64
   ktime_get_real_seconds
   ktime_get_real_ts64
+  ktime_get_snapshot
   ktime_get_ts64
   ktime_get_with_offset
   kvfree
