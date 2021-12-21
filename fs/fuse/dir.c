@@ -237,6 +237,15 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 				 &entry->d_name, &outarg, &bpf_outarg);
 		ret = fuse_simple_request(fm, &args);
 		dput(parent);
+
+		/*
+		 * TODO This doesn't seem sufficient, though we don't plan to
+		 * change the backing file ever, so not sure what is correct
+		 * here yet, especially as we can't return an error to user
+		 */
+		if (bpf_outarg.backing_action == FUSE_ACTION_REPLACE)
+			__close_fd(fm->fc->task->files, bpf_outarg.backing_fd);
+
 		/* Zero nodeid is same as -ENOENT */
 		if (!ret && !outarg.nodeid)
 			ret = -ENOENT;
