@@ -733,6 +733,8 @@ int virtio_video_subscribe_event(struct v4l2_fh *fh,
 	struct virtio_video_device *vvd = to_virtio_vd(fh->vdev);
 
 	switch (sub->type) {
+	case V4L2_EVENT_CTRL:
+		return v4l2_ctrl_subscribe_event(fh, sub);
 	case V4L2_EVENT_EOS:
 		return v4l2_event_subscribe(fh, sub, 0, NULL);
 	case V4L2_EVENT_SOURCE_CHANGE:
@@ -764,12 +766,43 @@ void virtio_video_queue_res_chg_event(struct virtio_video_stream *stream)
 	v4l2_event_queue_fh(&stream->fh, &ev_src_ch);
 }
 
+static void
+virtio_video_queue_ctrl_event(struct virtio_video_stream *stream, int cid,
+			     int value,
+			     int changes)
+{
+	struct v4l2_event ev_ctrl;
+	struct v4l2_ctrl *ctrl;
+
+	ctrl = v4l2_ctrl_find(&stream->ctrl_handler, cid);
+	if (!ctrl)
+		return;
+
+	ev_ctrl.type = V4L2_EVENT_CTRL;
+	ev_ctrl.id = cid;
+	ev_ctrl.u.ctrl.changes = changes;
+	ev_ctrl.u.ctrl.type = ctrl->type;
+	ev_ctrl.u.ctrl.flags = ctrl->flags;
+	ev_ctrl.u.ctrl.value = value;
+	ev_ctrl.u.ctrl.minimum  = ctrl->minimum;
+	ev_ctrl.u.ctrl.maximum  = ctrl->maximum;
+	ev_ctrl.u.ctrl.step = ctrl->step;
+	ev_ctrl.u.ctrl.default_value = ctrl->default_value;
+
+	v4l2_event_queue_fh(&stream->fh, &ev_ctrl);
+}
+
 int virtio_video_update_params(struct virtio_video *vv,
 			       struct virtio_video_stream *stream,
 			       struct video_format_info *in_info,
 			       struct video_format_info *out_info)
 {
-	int ret;
+	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
+	int ret, in_prev_min_buffs, out_prev_min_buffs;
+	bool is_encoder;
+
+	in_prev_min_buffs = stream->in_info.min_buffers;
+	out_prev_min_buffs = stream->out_info.min_buffers;
 
 	if (in_info) {
 		ret = virtio_video_cmd_set_params(vv, stream, in_info,
@@ -790,8 +823,22 @@ int virtio_video_update_params(struct virtio_video *vv,
 		return ret;
 	ret = virtio_video_cmd_get_params(vv, stream,
 					  VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+	if (ret)
+		return ret;
 
-	return ret;
+	is_encoder = vvd->type == VIRTIO_VIDEO_DEVICE_ENCODER;
+	if (is_encoder && in_prev_min_buffs != stream->in_info.min_buffers)
+		virtio_video_queue_ctrl_event(stream,
+					      V4L2_CID_MIN_BUFFERS_FOR_OUTPUT,
+					      stream->in_info.min_buffers,
+					      V4L2_EVENT_CTRL_CH_VALUE);
+	if (!is_encoder && in_prev_min_buffs != stream->out_info.min_buffers)
+		virtio_video_queue_ctrl_event(stream,
+					      V4L2_CID_MIN_BUFFERS_FOR_CAPTURE,
+					      stream->out_info.min_buffers,
+					      V4L2_EVENT_CTRL_CH_VALUE);
+
+	return 0;
 }
 
 void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
