@@ -61,11 +61,13 @@
   __bitmap_andnot
   __bitmap_clear
   __bitmap_equal
+  bitmap_find_next_zero_area_off
   bitmap_from_arr32
   __bitmap_or
   bitmap_parse
   bitmap_parselist
   bitmap_print_to_pagebuf
+  __bitmap_set
   bitmap_to_arr32
   __bitmap_weight
   blk_alloc_queue
@@ -1257,6 +1259,7 @@
   netif_receive_skb_list
   netif_rx
   netif_rx_ni
+  netif_schedule_queue
   netif_tx_stop_all_queues
   netif_tx_wake_queue
   netlink_broadcast
@@ -1796,6 +1799,7 @@
   skb_dequeue
   skb_dequeue_tail
   skb_free_datagram
+  __skb_get_hash
   __skb_pad
   skb_pull
   skb_push
