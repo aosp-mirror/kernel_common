@@ -34,6 +34,7 @@ int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 	int i;
 	struct virtio_video_stream *stream = vb2_get_drv_priv(vq);
 	struct video_format_info *p_info;
+	const struct v4l2_format_info *v4l2_info;
 
 	if (*num_planes)
 		return 0;
@@ -43,10 +44,26 @@ int virtio_video_queue_setup(struct vb2_queue *vq, unsigned int *num_buffers,
 	else
 		p_info = &stream->out_info;
 
-	*num_planes = p_info->num_planes;
+	/*
+	 * The virtio-video device reports component planes, but V4L2 queues
+	 * work with memory planes. If the currently set V4L2 format is
+	 * single-planar then all the component planes will be laid one after
+	 * another into a single memory buffer which size will be the sum of
+	 * all the component planes' sizes.
+	 */
+	v4l2_info = v4l2_format_info(p_info->fourcc_format);
+	if (v4l2_info && v4l2_info->mem_planes == 1) {
+		*num_planes = 1;
 
-	for (i = 0; i < p_info->num_planes; i++)
-		sizes[i] = p_info->plane_format[i].plane_size;
+		sizes[0] = 0;
+		for (i = 0; i < p_info->num_planes; i++)
+			sizes[0] += p_info->plane_format[i].plane_size;
+	} else {
+		*num_planes = p_info->num_planes;
+
+		for (i = 0; i < p_info->num_planes; i++)
+			sizes[i] = p_info->plane_format[i].plane_size;
+	}
 
 	return 0;
 }
@@ -787,9 +804,23 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 			break;
 		case VIRTIO_VIDEO_DEVICE_DECODER:
 			p_info = &stream->out_info;
-			for (i = 0; i < p_info->num_planes; i++)
-				vb->planes[i].bytesused =
-					p_info->plane_format[i].plane_size;
+			/*
+			 * If the currently set V4L2 format is single-planar,
+			 * then all the component planes are laid one after
+			 * another in a single buffer which size is the sum of
+			 * all component planes.
+			 */
+			if (vb->num_planes == 1) {
+				vb->planes[0].bytesused = 0;
+				for (i = 0; i < p_info->num_planes; i++)
+					vb->planes[0].bytesused +=
+						p_info->plane_format[i].plane_size;
+
+			} else {
+				for (i = 0; i < p_info->num_planes; i++)
+					vb->planes[i].bytesused =
+						p_info->plane_format[i].plane_size;
+			}
 			break;
 		}
 
