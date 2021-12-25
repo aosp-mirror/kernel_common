@@ -236,6 +236,7 @@ struct video_format *find_video_format(struct list_head *fmts_list,
 void virtio_video_format_from_info(struct video_format_info *info,
 				   struct v4l2_pix_format_mplane *pix_mp)
 {
+	const struct v4l2_format_info *v4l2_info;
 	int i;
 
 	pix_mp->width = info->frame_width;
@@ -249,14 +250,30 @@ void virtio_video_format_from_info(struct video_format_info *info,
 	memset(pix_mp->plane_fmt[0].reserved, 0,
 	       sizeof(pix_mp->plane_fmt[0].reserved));
 
-	pix_mp->num_planes = info->num_planes;
 	pix_mp->pixelformat = info->fourcc_format;
-
-	for (i = 0; i < info->num_planes; i++) {
-		pix_mp->plane_fmt[i].bytesperline =
-					 info->plane_format[i].stride;
-		pix_mp->plane_fmt[i].sizeimage =
-					 info->plane_format[i].plane_size;
+	/*
+	 * The virtio-video device reports component planes, but V4L2 queues
+	 * work with memory planes. If the currently set V4L2 format is
+	 * single-planar then all the component planes will be laid one after
+	 * another into a single memory buffer which size will be the sum of
+	 * all the component planes' sizes.
+	 */
+	v4l2_info = v4l2_format_info(info->fourcc_format);
+	if (v4l2_info && v4l2_info->mem_planes == 1) {
+		pix_mp->num_planes = 1;
+		pix_mp->plane_fmt[0].bytesperline = info->plane_format[0].stride;
+		pix_mp->plane_fmt[0].sizeimage = 0;
+		for (i = 0; i < info->num_planes; i++)
+			pix_mp->plane_fmt[0].sizeimage +=
+						info->plane_format[i].plane_size;
+	} else {
+		pix_mp->num_planes = info->num_planes;
+		for (i = 0; i < info->num_planes; i++) {
+			pix_mp->plane_fmt[i].bytesperline =
+						info->plane_format[i].stride;
+			pix_mp->plane_fmt[i].sizeimage =
+						info->plane_format[i].plane_size;
+		}
 	}
 }
 
