@@ -2672,16 +2672,15 @@ extern struct vm_area_struct *__vma_merge(struct mm_struct *mm,
 	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
 	unsigned long vm_flags, struct anon_vma *anon, struct file *file,
 	pgoff_t pgoff, struct mempolicy *mpol, struct vm_userfaultfd_ctx uff,
-	const char __user *user, bool keep_locked);
+	bool keep_locked);
 
 static inline struct vm_area_struct *vma_merge(struct mm_struct *mm,
 	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
 	unsigned long vm_flags, struct anon_vma *anon, struct file *file,
-	pgoff_t off, struct mempolicy *pol, struct vm_userfaultfd_ctx uff,
-	const char __user *user)
+	pgoff_t off, struct mempolicy *pol, struct vm_userfaultfd_ctx uff)
 {
 	return __vma_merge(mm, prev, addr, end, vm_flags, anon, file, off,
-			   pol, uff, user, false);
+			   pol, uff, false);
 }
 
 extern struct anon_vma *find_mergeable_anon_vma(struct vm_area_struct *);
