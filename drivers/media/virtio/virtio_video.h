@@ -383,6 +383,10 @@ int virtio_video_reqbufs(struct file *file, void *priv,
 			 struct v4l2_requestbuffers *rb);
 int virtio_video_subscribe_event(struct v4l2_fh *fh,
 				 const struct v4l2_event_subscription *sub);
+int virtio_video_update_params(struct virtio_video *vv,
+			       struct virtio_video_stream *stream,
+			       struct video_format_info *in_info,
+			       struct video_format_info *out_info);
 
 void virtio_video_free_caps_list(struct list_head *caps_list);
 int virtio_video_parse_virtio_capability(struct virtio_video_device *vvd,
