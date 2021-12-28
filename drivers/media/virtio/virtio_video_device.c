@@ -471,19 +471,15 @@ int virtio_video_s_fmt(struct file *file, void *fh, struct v4l2_format *f)
 	struct virtio_video *vv = vvd->vv;
 	struct video_format_info info;
 	struct video_format_info *p_info;
-	uint32_t queue;
 
 	ret = virtio_video_try_fmt(stream, f);
 	if (ret)
 		return ret;
 
-	if (V4L2_TYPE_IS_OUTPUT(f->type)) {
+	if (V4L2_TYPE_IS_OUTPUT(f->type))
 		virtio_video_format_fill_default_info(&info, &stream->in_info);
-		queue = VIRTIO_VIDEO_QUEUE_TYPE_INPUT;
-	} else {
+	else
 		virtio_video_format_fill_default_info(&info, &stream->out_info);
-		queue = VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT;
-	}
 
 	info.frame_width = pix_mp->width;
 	info.frame_height = pix_mp->height;
@@ -497,14 +493,13 @@ int virtio_video_s_fmt(struct file *file, void *fh, struct v4l2_format *f)
 					 pix_mp->plane_fmt[i].sizeimage;
 	}
 
-	virtio_video_cmd_set_params(vv, stream, &info, queue);
-	virtio_video_cmd_get_params(vv, stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
-	virtio_video_cmd_get_params(vv, stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
-
-	if (V4L2_TYPE_IS_OUTPUT(f->type))
+	if (V4L2_TYPE_IS_OUTPUT(f->type)) {
+		virtio_video_update_params(vv, stream, &info, NULL);
 		p_info = &stream->in_info;
-	else
+	} else {
+		virtio_video_update_params(vv, stream, NULL, &info);
 		p_info = &stream->out_info;
+	}
 
 	virtio_video_format_from_info(p_info, pix_mp);
 
@@ -573,14 +568,12 @@ int virtio_video_s_selection(struct file *file, void *fh,
 	stream->out_info.crop.width = sel->r.width;
 	stream->out_info.crop.height = sel->r.height;
 
-	ret = virtio_video_cmd_set_params(vv, stream,  &stream->out_info,
-					   VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
-	if (ret < 0)
+	/* Set selection and get actual that was set */
+	ret = virtio_video_update_params(vv, stream, NULL, &stream->out_info);
+	if (ret)
 		return -EINVAL;
 
-	/* Get actual selection that was set */
-	return virtio_video_cmd_get_params(vv, stream,
-					   VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+	return 0;
 }
 
 int virtio_video_try_fmt(struct virtio_video_stream *stream,
@@ -739,6 +732,36 @@ void virtio_video_queue_res_chg_event(struct virtio_video_stream *stream)
 	};
 
 	v4l2_event_queue_fh(&stream->fh, &ev_src_ch);
+}
+
+int virtio_video_update_params(struct virtio_video *vv,
+			       struct virtio_video_stream *stream,
+			       struct video_format_info *in_info,
+			       struct video_format_info *out_info)
+{
+	int ret;
+
+	if (in_info) {
+		ret = virtio_video_cmd_set_params(vv, stream, in_info,
+						  VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
+		if (ret)
+			return ret;
+	}
+	if (out_info) {
+		ret = virtio_video_cmd_set_params(vv, stream, out_info,
+						  VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+		if (ret)
+			return ret;
+	}
+
+	ret = virtio_video_cmd_get_params(vv, stream,
+					  VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
+	if (ret)
+		return ret;
+	ret = virtio_video_cmd_get_params(vv, stream,
+					  VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+
+	return ret;
 }
 
 void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,

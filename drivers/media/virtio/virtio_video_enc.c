@@ -566,10 +566,7 @@ static int virtio_video_enc_s_parm(struct file *file, void *priv,
 	virtio_video_format_fill_default_info(&info, &stream->in_info);
 	info.frame_rate = frame_rate;
 
-	virtio_video_cmd_set_params(vv, stream, &info,
-				    VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
-	virtio_video_cmd_get_params(vv, stream, VIRTIO_VIDEO_QUEUE_TYPE_INPUT);
-	virtio_video_cmd_get_params(vv, stream, VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+	virtio_video_update_params(vv, stream, &info, NULL);
 
 	out->capability = V4L2_CAP_TIMEPERFRAME;
 	virtio_video_timeperframe_from_info(&stream->in_info, timeperframe);

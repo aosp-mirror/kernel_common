@@ -375,8 +375,7 @@ static void virtio_video_event_cb(struct virtio_video *vv,
 
 	switch (event_type) {
 	case VIRTIO_VIDEO_EVENT_DECODER_RESOLUTION_CHANGED:
-		virtio_video_cmd_get_params(vv, stream,
-					   VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT);
+		virtio_video_update_params(vv, stream, NULL, NULL);
 		virtio_video_queue_res_chg_event(stream);
 		if (stream->state == STREAM_STATE_INIT) {
 			stream->state = STREAM_STATE_METADATA;
