@@ -100,11 +100,6 @@ struct kernfs_elem_dir {
 	 * better directly in kernfs_node but is here to save space.
 	 */
 	struct kernfs_root	*root;
-	/*
-	 * Monotonic revision counter, used to identify if a directory
-	 * node has changed during negative dentry revalidation.
-	 */
-	unsigned long		rev;
 };
 
 struct kernfs_elem_symlink {
@@ -167,6 +162,15 @@ struct kernfs_node {
 	ANDROID_KABI_RESERVE(1);
 };
 
+struct kernfs_node_ext {
+	struct kernfs_node	node;
+	/*
+	 * Monotonic revision counter, used to identify if a directory
+	 * node has changed during negative dentry revalidation.
+	 */
+	unsigned long		rev;
+};
+
 /*
  * kernfs_syscall_ops may be specified on kernfs_create_root() to support
  * syscalls.  These optional callbacks are invoked on the matching syscalls
@@ -206,9 +210,13 @@ struct kernfs_root {
 	struct list_head	supers;
 
 	wait_queue_head_t	deactivate_waitq;
-	struct rw_semaphore	kernfs_rwsem;
 
 	ANDROID_KABI_RESERVE(1);
+};
+
+struct kernfs_root_ext {
+	struct kernfs_root	root;
+	struct rw_semaphore	kernfs_rwsem;
 };
 
 struct kernfs_open_file {

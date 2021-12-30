@@ -107,9 +107,9 @@ int kernfs_setattr(struct kernfs_node *kn, const struct iattr *iattr)
 	int ret;
 	struct kernfs_root *root = kernfs_root(kn);
 
-	down_write(&root->kernfs_rwsem);
+	down_write(kernfs_rwsem(root));
 	ret = __kernfs_setattr(kn, iattr);
-	up_write(&root->kernfs_rwsem);
+	up_write(kernfs_rwsem(root));
 	return ret;
 }
 
@@ -124,7 +124,7 @@ int kernfs_iop_setattr(struct dentry *dentry, struct iattr *iattr)
 		return -EINVAL;
 
 	root = kernfs_root(kn);
-	down_write(&root->kernfs_rwsem);
+	down_write(kernfs_rwsem(root));
 	error = setattr_prepare(dentry, iattr);
 	if (error)
 		goto out;
@@ -137,7 +137,7 @@ int kernfs_iop_setattr(struct dentry *dentry, struct iattr *iattr)
 	setattr_copy(inode, iattr);
 
 out:
-	up_write(&root->kernfs_rwsem);
+	up_write(kernfs_rwsem(root));
 	return error;
 }
 
@@ -193,12 +193,12 @@ int kernfs_iop_getattr(const struct path *path, struct kstat *stat,
 	struct kernfs_node *kn = inode->i_private;
 	struct kernfs_root *root = kernfs_root(kn);
 
-	down_read(&root->kernfs_rwsem);
+	down_read(kernfs_rwsem(root));
 	spin_lock(&inode->i_lock);
 	kernfs_refresh_inode(kn, inode);
 	generic_fillattr(inode, stat);
 	spin_unlock(&inode->i_lock);
-	up_read(&root->kernfs_rwsem);
+	up_read(kernfs_rwsem(root));
 
 	return 0;
 }
@@ -290,12 +290,12 @@ int kernfs_iop_permission(struct inode *inode, int mask)
 	kn = inode->i_private;
 	root = kernfs_root(kn);
 
-	down_read(&root->kernfs_rwsem);
+	down_read(kernfs_rwsem(root));
 	spin_lock(&inode->i_lock);
 	kernfs_refresh_inode(kn, inode);
 	ret = generic_permission(inode, mask);
 	spin_unlock(&inode->i_lock);
-	up_read(&root->kernfs_rwsem);
+	up_read(kernfs_rwsem(root));
 
 	return ret;
 }
