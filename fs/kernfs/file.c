@@ -862,7 +862,7 @@ repeat:
 
 	root = kernfs_root(kn);
 	/* kick fsnotify */
-	down_write(&root->kernfs_rwsem);
+	down_write(kernfs_rwsem(root));
 
 	list_for_each_entry(info, &kernfs_root(kn)->supers, node) {
 		struct kernfs_node *parent;
@@ -900,7 +900,7 @@ repeat:
 		iput(inode);
 	}
 
-	up_write(&root->kernfs_rwsem);
+	up_write(kernfs_rwsem(root));
 	kernfs_put(kn);
 	goto repeat;
 }
