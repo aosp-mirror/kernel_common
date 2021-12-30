@@ -206,9 +206,13 @@ struct kernfs_root {
 	struct list_head	supers;
 
 	wait_queue_head_t	deactivate_waitq;
-	struct rw_semaphore	kernfs_rwsem;
 
 	ANDROID_KABI_RESERVE(1);
+};
+
+struct kernfs_root_ext {
+	struct kernfs_root	root;
+	struct rw_semaphore	kernfs_rwsem;
 };
 
 struct kernfs_open_file {

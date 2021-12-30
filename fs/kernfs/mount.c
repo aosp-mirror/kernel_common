@@ -256,9 +256,9 @@ static int kernfs_fill_super(struct super_block *sb, struct kernfs_fs_context *k
 	sb->s_shrink.seeks = 0;
 
 	/* get root inode, initialize and unlock it */
-	down_read(&kf_root->kernfs_rwsem);
+	down_read(kernfs_rwsem(kf_root));
 	inode = kernfs_get_inode(sb, info->root->kn);
-	up_read(&kf_root->kernfs_rwsem);
+	up_read(kernfs_rwsem(kf_root));
 	if (!inode) {
 		pr_debug("kernfs: could not get root inode\n");
 		return -ENOMEM;
@@ -346,9 +346,9 @@ int kernfs_get_tree(struct fs_context *fc)
 		}
 		sb->s_flags |= SB_ACTIVE;
 
-		down_write(&root->kernfs_rwsem);
+		down_write(kernfs_rwsem(root));
 		list_add(&info->node, &info->root->supers);
-		up_write(&root->kernfs_rwsem);
+		up_write(kernfs_rwsem(root));
 	}
 
 	fc->root = dget(sb->s_root);
@@ -375,9 +375,9 @@ void kernfs_kill_sb(struct super_block *sb)
 	struct kernfs_super_info *info = kernfs_info(sb);
 	struct kernfs_root *root = info->root;
 
-	down_write(&root->kernfs_rwsem);
+	down_write(kernfs_rwsem(root));
 	list_del(&info->node);
-	up_write(&root->kernfs_rwsem);
+	up_write(kernfs_rwsem(root));
 
 	/*
 	 * Remove the superblock from fs_supers/s_instances
