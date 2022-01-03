@@ -1223,6 +1223,8 @@ virtio_video_device_create(struct virtio_video *vv)
 	v4l2_disable_ioctl(vd, VIDIOC_CROPCAP);
 	v4l2_disable_ioctl(vd, VIDIOC_G_CROP);
 	v4l2_disable_ioctl(vd, VIDIOC_S_CROP);
+	if (vv->vdev->id.device == VIRTIO_ID_VIDEO_DEC)
+		v4l2_disable_ioctl(vd, VIDIOC_ENUM_FRAMEINTERVALS);
 
 	video_set_drvdata(vd, vvd);
 
