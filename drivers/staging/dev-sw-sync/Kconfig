@@ -4,7 +4,7 @@ menu "DEV_SW_SYNC options"
 config DEV_SW_SYNC
 	bool "Sync File Validation Framework implemented through a Linux device"
 	default n
-	depends on SYNC_FILE
+	depends on SYNC_FILE && !SW_SYNC
 	help
 	  A sync object driver that uses a 32bit counter to coordinate
 	  synchronization.  Useful when there is no hardware primitive backing
@@ -12,8 +12,5 @@ config DEV_SW_SYNC
 
 	  WARNING: improper use of this can result in deadlocking kernel
 	  drivers from userspace. Intended for test and debug only.
-
-	  WARNING: do not set to y at the same time as SW_SYNC or the build will
-	  fail.
 
 endmenu
