@@ -98,6 +98,11 @@ int trace_test(struct fuse_args *fa)
 		return 0;
 	}
 
+	case FUSE_ACCESS | FUSE_PREFILTER: {
+		bpf_printk("Access: %d", fa->nodeid);
+		return FUSE_BPF_BACKING;
+	}
+
 	case FUSE_CREATE | FUSE_PREFILTER:
 		bpf_printk("Create: %d", fa->nodeid);
 		return FUSE_BPF_BACKING;
@@ -344,6 +349,11 @@ int trace_hidden(struct fuse_args *fa)
 		if (!strcmp(name, "hide"))
 			return -ENOENT;
 
+		return FUSE_BPF_BACKING;
+	}
+
+	case FUSE_ACCESS | FUSE_PREFILTER: {
+		bpf_printk("Access: %d", fa->nodeid);
 		return FUSE_BPF_BACKING;
 	}
 

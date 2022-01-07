@@ -140,6 +140,8 @@ int fuse_open_backing(struct fuse_args *fa,
 	struct fuse_mount *fm = get_fuse_mount(inode);
 	const struct fuse_open_in *foi = fa->in_args[0].value;
 	struct fuse_file *ff;
+	int retval;
+	int mask;
 	struct fuse_dentry *fd = get_fuse_dentry(file->f_path.dentry);
 	struct file *backing_file;
 
@@ -148,9 +150,31 @@ int fuse_open_backing(struct fuse_args *fa,
 		return -ENOMEM;
 	file->private_data = ff;
 
+	switch (foi->flags & O_ACCMODE) {
+	case O_RDONLY:
+		mask = MAY_READ;
+		break;
+
+	case O_WRONLY:
+		mask = MAY_WRITE;
+		break;
+
+	case O_RDWR:
+		mask = MAY_READ | MAY_WRITE;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	retval = inode_permission(get_fuse_inode(inode)->backing_inode, mask);
+	if (retval)
+		return retval;
+
 	backing_file = dentry_open(&fd->backing_path,
 				   foi->flags,
 				   current_cred());
+
 	if (IS_ERR(backing_file)) {
 		fuse_file_free(ff);
 		file->private_data = NULL;

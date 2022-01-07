@@ -14,8 +14,10 @@
 
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 
+#include <linux/capability.h>
 #include <linux/random.h>
 
 #include <include/uapi/linux/fuse.h>
@@ -1324,6 +1326,47 @@ out:
 	return result;
 }
 
+static int readdir_perms_test(const char *mount_dir)
+{
+	int result = TEST_FAILURE;
+	struct __user_cap_header_struct uchs = { _LINUX_CAPABILITY_VERSION_3 };
+	struct __user_cap_data_struct ucds[2];
+	int src_fd = -1;
+	int fuse_dev = -1;
+	DIR *dir = NULL;
+
+	/* Must remove capabilities for this test. */
+	TESTSYSCALL(syscall(SYS_capget, &uchs, ucds));
+	ucds[0].effective &= ~(1 << CAP_DAC_OVERRIDE | 1 << CAP_DAC_READ_SEARCH);
+	TESTSYSCALL(syscall(SYS_capset, &uchs, ucds));
+
+	/* This is what we are testing in fuseland. First test without fuse, */
+	TESTSYSCALL(mkdir("test", 0111));
+	TEST(dir = opendir("test"), dir == NULL);
+	closedir(dir);
+	dir = NULL;
+
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TESTEQUAL(mount_fuse(mount_dir, -1, src_fd, &fuse_dev), 0);
+
+	TESTSYSCALL(s_mkdir(s_path(s(mount_dir), s("test")), 0111));
+	TEST(dir = s_opendir(s_path(s(mount_dir), s("test"))), dir == NULL);
+
+	result = TEST_SUCCESS;
+out:
+	ucds[0].effective |= 1 << CAP_DAC_OVERRIDE | 1 << CAP_DAC_READ_SEARCH;
+	syscall(SYS_capset, &uchs, ucds);
+
+	closedir(dir);
+	s_rmdir(s_path(s(mount_dir), s("test")));
+	umount(mount_dir);
+	close(fuse_dev);
+	close(src_fd);
+	rmdir("test");
+	return result;
+}
+
 static int parse_options(int argc, char *const *argv)
 {
 	signed char c;
@@ -1424,6 +1467,7 @@ int main(int argc, char *argv[])
 		MAKE_TEST(bpf_test_alter_errcode_bpf),
 		MAKE_TEST(bpf_test_alter_errcode_userspace),
 		MAKE_TEST(mmap_test),
+		MAKE_TEST(readdir_perms_test),
 	};
 #undef MAKE_TEST
 
