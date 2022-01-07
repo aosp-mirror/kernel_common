@@ -1110,6 +1110,7 @@ int fuse_mkdir_backing(
 	struct inode *backing_inode = get_fuse_inode(dir)->backing_inode;
 	struct path backing_path = {};
 	struct inode *inode = NULL;
+	struct dentry *d;
 
 	//TODO Actually deal with changing the backing entry in mkdir
 	get_fuse_backing_path(entry, &backing_path);
@@ -1118,17 +1119,18 @@ int fuse_mkdir_backing(
 
 	inode_lock_nested(backing_inode, I_MUTEX_PARENT);
 	err = vfs_mkdir(backing_inode, backing_path.dentry, fmi->mode & ~fmi->umask);
-	inode_unlock(backing_inode);
 	if (err)
 		goto out;
 	if (d_really_is_negative(backing_path.dentry) ||
 		unlikely(d_unhashed(backing_path.dentry))) {
-		err = -EINVAL;
-		/**
-		 * TODO: overlayfs responds to this situation with a
-		 * lookupOneLen. Should we do that too?
-		 */
-		goto out;
+		d = lookup_one_len(entry->d_name.name, backing_path.dentry->d_parent,
+				entry->d_name.len);
+		if (IS_ERR(d)) {
+			err = PTR_ERR(d);
+			goto out;
+		}
+		dput(backing_path.dentry);
+		backing_path.dentry = d;
 	}
 	inode = fuse_iget_backing(dir->i_sb, backing_inode);
 	if (IS_ERR(inode)) {
@@ -1137,6 +1139,7 @@ int fuse_mkdir_backing(
 	}
 	d_instantiate(entry, inode);
 out:
+	inode_unlock(backing_inode);
 	path_put(&backing_path);
 	return err;
 }
