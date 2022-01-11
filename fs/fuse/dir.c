@@ -1576,8 +1576,10 @@ static int fuse_permission(struct inode *inode, int mask)
 			if (!err && !(inode->i_mode & S_IXUGO))
 				return -EACCES;
 		}
+#ifdef CONFIG_FUSE_BPF
 	} else if (!(mask & MAY_NOT_BLOCK) && fi->backing_inode) {
 		err = fuse_access(inode, mask);
+#endif
 	}
 	return err;
 }
