@@ -65,6 +65,17 @@ char *concat_file_name(const char *dir, const char *file);
 char *setup_mount_dir(const char *name);
 int delete_dir_tree(const char *dir_path, bool remove_root);
 
+#define TESTFUSEINNULL(_opcode)						\
+	do {								\
+		struct fuse_in_header *in_header =			\
+				(struct fuse_in_header *)bytes_in;	\
+		ssize_t res = read(fuse_dev, &bytes_in,			\
+			sizeof(bytes_in));				\
+									\
+		TESTEQUAL(in_header->opcode, _opcode);			\
+		TESTEQUAL(res, sizeof(*in_header));			\
+	} while (false)
+
 #define TESTFUSEIN(_opcode, in_struct)					\
 	do {								\
 		struct fuse_in_header *in_header =			\

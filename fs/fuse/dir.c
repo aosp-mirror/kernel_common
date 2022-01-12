@@ -421,6 +421,18 @@ static void fuse_dentry_canonical_path(const struct path *path,
 	char *path_name;
 	int err;
 
+#ifdef CONFIG_FUSE_BPF
+	struct fuse_err_ret fer;
+
+	fer = fuse_bpf_backing(inode, struct fuse_dummy_io,
+			       fuse_canonical_path_initialize,
+			       fuse_canonical_path_backing,
+			       fuse_canonical_path_finalize, path,
+			       canonical_path);
+	if (fer.ret)
+		return;
+#endif
+
 	path_name = (char *)get_zeroed_page(GFP_KERNEL);
 	if (!path_name)
 		goto default_path;

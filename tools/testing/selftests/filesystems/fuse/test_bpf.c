@@ -329,6 +329,11 @@ int trace_test(struct fuse_args *fa)
 		return FUSE_BPF_BACKING;
 	}
 
+	case FUSE_CANONICAL_PATH | FUSE_PREFILTER: {
+		bpf_printk("canonical_path");
+		return FUSE_BPF_BACKING;
+	}
+
 	default:
 		bpf_printk("Unknown opcode %d", fa->opcode);
 		return 0;
@@ -384,6 +389,9 @@ int trace_hidden(struct fuse_args *fa)
 	//	bpf_printk("fallocate %d", fa->nodeid);
 		return FUSE_BPF_BACKING;
 
+	case FUSE_CANONICAL_PATH | FUSE_PREFILTER: {
+		return FUSE_BPF_BACKING;
+	}
 	default:
 		bpf_printk("Unknown opcode: %d", fa->opcode);
 		return 0;

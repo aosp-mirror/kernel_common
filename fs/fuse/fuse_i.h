@@ -1523,6 +1523,16 @@ int fuse_revalidate_backing(struct fuse_args *fa, struct inode *dir,
 void *fuse_revalidate_finalize(struct fuse_args *fa, struct inode *dir,
 			   struct dentry *entry, unsigned int flags);
 
+int fuse_canonical_path_initialize(struct fuse_args *fa,
+				   struct fuse_dummy_io *fdi,
+				   const struct path *path,
+				   struct path *canonical_path);
+int fuse_canonical_path_backing(struct fuse_args *fa, const struct path *path,
+				struct path *canonical_path);
+void *fuse_canonical_path_finalize(struct fuse_args *fa,
+				   const struct path *path,
+				   struct path *canonical_path);
+
 struct fuse_getattr_io {
 	struct fuse_getattr_in fgi;
 	struct fuse_attr_out fao;
