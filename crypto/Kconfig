@@ -1966,5 +1966,3 @@ source crypto/asymmetric_keys/Kconfig
 source certs/Kconfig
 
 endif	# if CRYPTO
-
-source "lib/crypto/Kconfig"
