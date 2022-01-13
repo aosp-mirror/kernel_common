@@ -90,7 +90,7 @@ static inline int fsnotify_file(struct file *file, __u32 mask)
 	/*
 	 * Open calls notify early on, so lower file system must be notified
 	 */
-	if (mask == FS_OPEN) {
+	if (mask & FS_OPEN) {
 		if (path->dentry->d_op &&
 		    path->dentry->d_op->d_canonical_path) {
 			struct path lower_path;
