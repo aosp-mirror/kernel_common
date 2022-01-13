@@ -10,6 +10,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/dma-noncoherent.h>
+#include <trace/hooks/ion.h>
 
 #define CREATE_TRACE_POINTS
 #include "ion_trace.h"
@@ -213,6 +214,7 @@ void ion_buffer_release(struct ion_buffer *buffer)
 		ion_heap_unmap_kernel(buffer->heap, buffer);
 	}
 	buffer->heap->ops->free(buffer);
+	trace_android_vh_ion_buffer_release(buffer);
 	spin_lock(&buffer->heap->stat_lock);
 	buffer->heap->num_of_buffers--;
 	buffer->heap->num_of_alloc_bytes -= buffer->size;
