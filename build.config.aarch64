@@ -1,6 +1,4 @@
 ARCH=arm64
-LLVM_IAS=1
-CROSS_COMPILE=aarch64-linux-gnu-
 MAKE_GOALS="
 Image
 modules

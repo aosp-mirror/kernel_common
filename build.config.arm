@@ -1,6 +1,4 @@
 ARCH=arm
-LLVM_IAS=1
-CROSS_COMPILE=arm-linux-gnueabi-
 MAKE_GOALS="
 zImage
 modules
