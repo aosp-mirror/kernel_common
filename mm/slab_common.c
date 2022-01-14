@@ -488,7 +488,7 @@ void kmem_cache_destroy(struct kmem_cache *s)
 {
 	int err;
 
-	if (unlikely(!s))
+	if (unlikely(!s) || !kasan_check_byte(s))
 		return;
 
 	get_online_cpus();
