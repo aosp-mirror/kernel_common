@@ -6,6 +6,7 @@
  */
 
 #include <linux/input/mt.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 
 #include "hid-haptic.h"
@@ -343,6 +344,46 @@ static int hid_haptic_playback(struct input_dev *dev, int effect_id, int value)
 	return 0;
 }
 
+static int hid_haptic_change_control(struct input_dev *dev, int effect_id,
+				     struct file *file, int take)
+{
+	struct hid_haptic_device *haptic = dev->ff->private;
+	struct hid_haptic_effect_node *effect_node;
+	struct hid_haptic_effect *effect;
+	bool found = false;
+	int ret = 0;
+
+	effect = &haptic->effect[effect_id];
+	mutex_lock(&effect->control_mutex);
+	list_for_each_entry(effect_node, &effect->control, node) {
+		if (effect_node->file == file) {
+			found = true;
+			break;
+		}
+	}
+	if (take) {
+		if (!found) {
+			effect_node = kvzalloc(sizeof(struct hid_haptic_effect),
+					       GFP_KERNEL);
+			if (!effect_node) {
+				ret = -ENOMEM;
+				goto exit;
+			}
+			effect_node->file = file;
+		}
+		list_add(&effect_node->node, &effect->control);
+	} else {
+		if (found) {
+			list_del(&effect_node->node);
+			kvfree(effect_node);
+		}
+	}
+exit:
+	mutex_unlock(&effect->control_mutex);
+
+	return ret;
+}
+
 static void effect_set_default(struct ff_effect *effect)
 {
 	effect->type = FF_HID;
@@ -527,6 +568,8 @@ int hid_haptic_init(struct hid_device *hdev,
 		}
 		haptic->effect[r].input_dev = dev;
 		INIT_WORK(&haptic->effect[r].work, haptic_work_handler);
+		INIT_LIST_HEAD(&haptic->effect[r].control);
+		mutex_init(&haptic->effect[r].control_mutex);
 	}
 	haptic->stop_effect.report_buf =
 		hid_alloc_report_buf(haptic->manual_trigger_report,
@@ -563,6 +606,7 @@ int hid_haptic_init(struct hid_device *hdev,
 	ff->private = haptic;
 	ff->upload = hid_haptic_upload_effect;
 	ff->playback = hid_haptic_playback;
+	ff->change_control = hid_haptic_change_control;
 	ff->erase = hid_haptic_erase;
 	ff->destroy = hid_haptic_destroy;
 	if (!try_module_get(THIS_MODULE)) {
@@ -652,13 +696,15 @@ void hid_haptic_handle_press_release(struct hid_haptic_device *haptic)
 	else if (haptic->pressure_sum < haptic->release_threshold)
 		haptic->pressed_state = 0;
 	if (!prev_pressed_state && haptic->pressed_state &&
-	    haptic->mode == HID_HAPTIC_MODE_KERNEL) {
+	    haptic->mode == HID_HAPTIC_MODE_KERNEL &&
+	    list_empty(&haptic->effect[HID_HAPTIC_PRESS_EFFECT_ID].control)) {
 		spin_lock_irqsave(&input->event_lock, flags);
 		input->ff->playback(input, HID_HAPTIC_PRESS_EFFECT_ID, 1);
 		spin_unlock_irqrestore(&input->event_lock, flags);
 	}
 	if (prev_pressed_state && !haptic->pressed_state &&
-	    haptic->mode == HID_HAPTIC_MODE_KERNEL) {
+	    haptic->mode == HID_HAPTIC_MODE_KERNEL &&
+	    list_empty(&haptic->effect[HID_HAPTIC_RELEASE_EFFECT_ID].control)) {
 		spin_lock_irqsave(&input->event_lock, flags);
 		input->ff->playback(input, HID_HAPTIC_RELEASE_EFFECT_ID, 1);
 		spin_unlock_irqrestore(&input->event_lock, flags);
