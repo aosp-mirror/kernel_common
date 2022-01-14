@@ -92,6 +92,9 @@ config HID_GENERIC
 
 	If unsure, say Y.
 
+config HID_HAPTIC
+	bool
+
 menu "Special HID drivers"
 
 config HID_A4TECH
