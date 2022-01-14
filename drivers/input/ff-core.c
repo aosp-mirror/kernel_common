@@ -252,6 +252,91 @@ int input_ff_erase(struct input_dev *dev, int effect_id, struct file *file)
 EXPORT_SYMBOL_GPL(input_ff_erase);
 
 /*
+ * Take control over the effect if the requester is also the effect owner.
+ * The mutex should already be locked before calling this function.
+ */
+static int control_effect(struct input_dev *dev, int effect_id,
+			  struct file *file, int take)
+{
+	struct ff_device *ff = dev->ff;
+	int error;
+
+	error = check_effect_access(ff, effect_id, file);
+	if (error) {
+		error = check_effect_shared(ff, effect_id);
+		if (error)
+			return error;
+	}
+
+	if (ff->change_control) {
+		error = ff->change_control(dev, effect_id, file, take);
+		if (error)
+			return error;
+	}
+
+	return 0;
+}
+/**
+ * input_ff_take_control - take control over a force-feedback effect from kernel
+ * @dev: input device to take control over effect from
+ * @effect_id: id of the effect to take control over
+ * @file: purported owner of the request
+ *
+ * This function switches user-controlled mode on for the given force-feedback
+ * effect. The user-mode will persist unitl the last caller releases control.
+ * The effect will only be taken control of if it was uploaded through the same
+ * file handle that is requesting taking control or for simple haptic effects
+ * 0 and 1.
+ * Valid only for simple haptic effects (ff_hid_effect).
+ */
+int input_ff_take_control(struct input_dev *dev, int effect_id,
+			  struct file *file)
+{
+	struct ff_device *ff = dev->ff;
+	int ret;
+
+	if (!test_bit(EV_FF, dev->evbit))
+		return -EINVAL;
+
+	mutex_lock(&ff->mutex);
+	ret = control_effect(dev, effect_id, file, 1);
+	mutex_unlock(&ff->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(input_ff_take_control);
+
+/**
+ * input_ff_release_control - release control over a force-feedback effect
+ * @dev: input device to release control over effect to
+ * @effect_id: id of the effect to release control
+ * @file: purported owner of the request
+ *
+ * This function switches user-controlled mode off for the given force-feedback
+ * effect. The user-mode will persist unitl the last caller releases control.
+ * The control will be released of if it was uploaded through the same
+ * file handle that is requesting taking control or for simple haptic effects
+ * 0 and 1.
+ * Valid only for simple haptic effects (ff_hid_effect).
+ */
+int input_ff_release_control(struct input_dev *dev, int effect_id,
+			     struct file *file)
+{
+	struct ff_device *ff = dev->ff;
+	int ret;
+
+	if (!test_bit(EV_FF, dev->evbit))
+		return -EINVAL;
+
+	mutex_lock(&ff->mutex);
+	ret = control_effect(dev, effect_id, file, 0);
+	mutex_unlock(&ff->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(input_ff_release_control);
+
+/*
  * input_ff_flush - erase all effects owned by a file handle
  * @dev: input device to erase effect from
  * @file: purported owner of the effects
@@ -269,8 +354,10 @@ int input_ff_flush(struct input_dev *dev, struct file *file)
 
 	mutex_lock(&ff->mutex);
 
-	for (i = 0; i < ff->max_effects; i++)
+	for (i = 0; i < ff->max_effects; i++) {
+		control_effect(dev, i, file, 0);
 		erase_effect(dev, i, file);
+	}
 
 	mutex_unlock(&ff->mutex);
 

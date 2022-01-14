@@ -181,6 +181,10 @@ struct input_mask {
 
 #define EVIOCSFF		_IOW('E', 0x80, struct ff_effect)	/* send a force effect to a force feedback device */
 #define EVIOCRMFF		_IOW('E', 0x81, int)			/* Erase a force effect */
+/* Take control over a force effect */
+#define EVIOCFFTAKECONTROL	_IOW('E', 0x82, int)
+/* Release control over a force effect */
+#define EVIOCFFRELEASECONTROL	_IOW('E', 0x83, int)
 #define EVIOCGEFFECTS		_IOR('E', 0x84, int)			/* Report number of effects playable at the same time */
 
 #define EVIOCGRAB		_IOW('E', 0x90, int)			/* Grab/Release device */

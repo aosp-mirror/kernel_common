@@ -531,6 +531,7 @@ extern struct class input_class;
  * @upload: Called to upload an new effect into device
  * @erase: Called to erase an effect from device
  * @playback: Called to request device to start playing specified effect
+ * @change_control: Called to change control over specified effect
  * @set_gain: Called to set specified gain
  * @set_autocenter: Called to auto-center device
  * @destroy: called by input core when parent input device is being
@@ -559,6 +560,8 @@ struct ff_device {
 	int (*erase)(struct input_dev *dev, int effect_id);
 
 	int (*playback)(struct input_dev *dev, int effect_id, int value);
+	int (*change_control)(struct input_dev *dev, int effect_id,
+			      struct file *file, int take);
 	void (*set_gain)(struct input_dev *dev, u16 gain);
 	void (*set_autocenter)(struct input_dev *dev, u16 magnitude);
 
@@ -585,6 +588,8 @@ int input_ff_event(struct input_dev *dev, unsigned int type, unsigned int code, 
 
 int input_ff_upload(struct input_dev *dev, struct ff_effect *effect, struct file *file);
 int input_ff_erase(struct input_dev *dev, int effect_id, struct file *file);
+int input_ff_take_control(struct input_dev *dev, int effect_id, struct file *file);
+int input_ff_release_control(struct input_dev *dev, int effect_id, struct file *file);
 int input_ff_flush(struct input_dev *dev, struct file *file);
 
 int input_ff_create_memless(struct input_dev *dev, void *data,
