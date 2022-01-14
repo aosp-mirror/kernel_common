@@ -34,6 +34,23 @@ static int check_effect_access(struct ff_device *ff, int effect_id,
 }
 
 /*
+ * Check that the effect_id is a valid effect and whether the effect
+ * is shared
+ */
+static int check_effect_shared(struct ff_device *ff, int effect_id)
+{
+	if (effect_id < 0 || effect_id >= ff->max_effects ||
+	    !ff->effect_owners[effect_id])
+		return -EINVAL;
+
+	/* Shared effect */
+	if (ff->effect_owners[effect_id] == (struct file *)UINTPTR_MAX)
+		return 0;
+
+	return -EACCES;
+}
+
+/*
  * Checks whether 2 effects can be combined together
  */
 static inline int check_effects_compatible(struct ff_effect *e1,
@@ -138,8 +155,11 @@ int input_ff_upload(struct input_dev *dev, struct ff_effect *effect,
 		id = effect->id;
 
 		ret = check_effect_access(ff, id, file);
-		if (ret)
-			goto out;
+		if (ret) {
+			ret = check_effect_shared(ff, id);
+			if (ret)
+				goto out;
+		}
 
 		old = &ff->effects[id];
 
@@ -173,21 +193,29 @@ static int erase_effect(struct input_dev *dev, int effect_id,
 {
 	struct ff_device *ff = dev->ff;
 	int error;
+	bool shared = false;
 
 	error = check_effect_access(ff, effect_id, file);
-	if (error)
-		return error;
+	if (error) {
+		error = check_effect_shared(ff, effect_id);
+		if (!error)
+			shared = true;
+		else
+			return error;
+	}
 
 	spin_lock_irq(&dev->event_lock);
 	ff->playback(dev, effect_id, 0);
-	ff->effect_owners[effect_id] = NULL;
+	if (!shared)
+		ff->effect_owners[effect_id] = NULL;
 	spin_unlock_irq(&dev->event_lock);
 
 	if (ff->erase) {
 		error = ff->erase(dev, effect_id);
 		if (error) {
 			spin_lock_irq(&dev->event_lock);
-			ff->effect_owners[effect_id] = file;
+			if (!shared)
+				ff->effect_owners[effect_id] = file;
 			spin_unlock_irq(&dev->event_lock);
 
 			return error;
