@@ -50,8 +50,13 @@ EXPORT_SYMBOL_GPL(hid_haptic_feature_mapping);
 bool hid_haptic_check_pressure_unit(struct hid_haptic_device *haptic,
 				    struct hid_input *hi, struct hid_field *field)
 {
-	if (field->unit == HID_UNIT_GRAM || field->unit == HID_UNIT_NEWTON)
+	if (field->unit == HID_UNIT_GRAM || field->unit == HID_UNIT_NEWTON) {
+		haptic->force_logical_minimum = field->logical_minimum;
+		haptic->force_physical_minimum = field->physical_minimum;
+		haptic->force_resolution = input_abs_get_res(hi->input,
+							     ABS_MT_PRESSURE);
 		return true;
+	}
 	return false;
 }
 EXPORT_SYMBOL_GPL(hid_haptic_check_pressure_unit);
@@ -350,6 +355,12 @@ static void hid_haptic_destroy(struct ff_device *ff)
 	module_put(THIS_MODULE);
 }
 
+static u32 convert_force_to_logical(struct hid_haptic_device *haptic, u32 value)
+{
+	return (value - haptic->force_physical_minimum) *
+		haptic->force_resolution + haptic->force_logical_minimum;
+}
+
 int hid_haptic_init(struct hid_device *hdev,
 		    struct hid_haptic_device **haptic_ptr)
 {
@@ -457,6 +468,13 @@ int hid_haptic_init(struct hid_device *hdev,
 	fill_effect_buf(haptic, &stop_effect, &haptic->stop_effect,
 			HID_HAPTIC_ORDINAL_WAVEFORMSTOP);
 
+	haptic->mode = HID_HAPTIC_MODE_DEVICE;
+	haptic->press_threshold = convert_force_to_logical(haptic,
+							   HID_HAPTIC_PRESS_THRESH);
+	haptic->release_threshold = convert_force_to_logical(haptic,
+							     HID_HAPTIC_RELEASE_THRESH);
+
+
 	input_set_capability(dev, EV_FF, FF_HID);
 
 	flush = dev->flush;
@@ -548,3 +566,54 @@ exit:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(hid_haptic_init);
+
+void hid_haptic_handle_press_release(struct hid_haptic_device *haptic)
+{
+	int prev_pressed_state = haptic->pressed_state;
+	struct input_dev *input = haptic->input_dev;
+	unsigned long flags;
+
+	if (haptic->pressure_sum > haptic->press_threshold)
+		haptic->pressed_state = 1;
+	else if (haptic->pressure_sum < haptic->release_threshold)
+		haptic->pressed_state = 0;
+	if (!prev_pressed_state && haptic->pressed_state &&
+	    haptic->mode == HID_HAPTIC_MODE_KERNEL) {
+		spin_lock_irqsave(&input->event_lock, flags);
+		input->ff->playback(input, PRESS_HID_EFFECT_ID, 1);
+		spin_unlock_irqrestore(&input->event_lock, flags);
+	}
+	if (prev_pressed_state && !haptic->pressed_state &&
+	    haptic->mode == HID_HAPTIC_MODE_KERNEL) {
+		spin_lock_irqsave(&input->event_lock, flags);
+		input->ff->playback(input, RELEASE_HID_EFFECT_ID, 1);
+		spin_unlock_irqrestore(&input->event_lock, flags);
+	}
+}
+EXPORT_SYMBOL_GPL(hid_haptic_handle_press_release);
+
+bool hid_haptic_handle_input(struct hid_haptic_device *haptic)
+{
+	if (haptic->mode == HID_HAPTIC_MODE_KERNEL) {
+		input_event(haptic->input_dev, EV_KEY, BTN_LEFT,
+			    haptic->pressed_state);
+		input_event(haptic->input_dev, EV_ABS, ABS_PRESSURE,
+			    haptic->pressure_sum);
+		return true;
+	}
+	return false;
+}
+EXPORT_SYMBOL_GPL(hid_haptic_handle_input);
+
+void hid_haptic_pressure_reset(struct hid_haptic_device *haptic)
+{
+	haptic->pressure_sum = 0;
+}
+EXPORT_SYMBOL_GPL(hid_haptic_pressure_reset);
+
+void hid_haptic_pressure_increase(struct hid_haptic_device *haptic,
+				 __s32 pressure)
+{
+	haptic->pressure_sum += pressure;
+}
+EXPORT_SYMBOL_GPL(hid_haptic_pressure_increase);
