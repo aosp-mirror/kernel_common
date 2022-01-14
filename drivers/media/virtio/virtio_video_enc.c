@@ -310,26 +310,11 @@ static int virtio_video_try_encoder_cmd(struct file *file, void *fh,
 					struct v4l2_encoder_cmd *cmd)
 {
 	struct virtio_video_stream *stream = file2stream(file);
-	struct virtio_video_device *vvd = video_drvdata(file);
-	struct virtio_video *vv = vvd->vv;
 
 	if (stream->state == STREAM_STATE_DRAIN)
 		return -EBUSY;
 
-	switch (cmd->cmd) {
-	case V4L2_ENC_CMD_STOP:
-	case V4L2_ENC_CMD_START:
-		if (cmd->flags != 0) {
-			v4l2_err(&vv->v4l2_dev, "flags=%u are not supported",
-				 cmd->flags);
-			return -EINVAL;
-		}
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	return 0;
+	return v4l2_m2m_ioctl_try_encoder_cmd(file, fh, cmd);
 }
 
 static int virtio_video_encoder_cmd(struct file *file, void *fh,
