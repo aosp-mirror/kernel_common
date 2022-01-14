@@ -365,6 +365,7 @@ int hid_haptic_init(struct hid_device *hdev,
 	char *name;
 	int (*flush)(struct input_dev *dev, struct file *file);
 	int (*event)(struct input_dev *dev, unsigned int type, unsigned int code, int value);
+	struct ff_effect release_effect, press_effect;
 
 	haptic->hdev = hdev;
 	haptic->max_waveform_id = max(2u, haptic->max_waveform_id);
@@ -481,8 +482,41 @@ int hid_haptic_init(struct hid_device *hdev,
 		module_put(THIS_MODULE);
 		goto input_free;
 	}
+
+	effect_set_default(&release_effect);
+	if (haptic->release_ordinal_orig)
+		release_effect.u.hid.hid_usage = HID_HP_WAVEFORMRELEASE &
+			HID_USAGE;
+	ret = input_ff_upload(dev, &release_effect, (struct file *)UINTPTR_MAX);
+	if (ret || release_effect.id != HID_HAPTIC_RELEASE_EFFECT_ID) {
+		if (!ret) {
+			ret = -EBUSY;
+			input_ff_erase(dev, release_effect.id,
+				       (struct file *)UINTPTR_MAX);
+		}
+		dev_err(&hdev->dev,
+			"Failed to allocate id 0 for release effect.\n");
+		goto input_free;
+	}
+	effect_set_default(&press_effect);
+	if (haptic->press_ordinal_orig)
+		press_effect.u.hid.hid_usage = HID_HP_WAVEFORMPRESS & HID_USAGE;
+	ret = input_ff_upload(dev, &press_effect, (struct file *)UINTPTR_MAX);
+	if (ret || press_effect.id != HID_HAPTIC_PRESS_EFFECT_ID) {
+		if (!ret) {
+			ret = -EBUSY;
+			input_ff_erase(dev, press_effect.id,
+				       (struct file *)UINTPTR_MAX);
+		}
+		dev_err(&hdev->dev,
+			"Failed to allocate id 1 for press effect.\n");
+		goto release_free;
+	}
+
 	return 0;
 
+release_free:
+	input_ff_erase(dev, release_effect.id, (struct file *)UINTPTR_MAX);
 input_free:
 	input_ff_destroy(dev);
 	/* Do not let double free happen, input_ff_destroy will call
