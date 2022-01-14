@@ -82,6 +82,10 @@ int hid_haptic_input_mapping(struct hid_device *hdev,
 int hid_haptic_input_configured(struct hid_device *hdev,
 				struct hid_haptic_device *haptic,
 				struct hid_input *hi);
+#ifdef CONFIG_PM
+void hid_haptic_resume(struct hid_device *hdev, struct hid_haptic_device *haptic);
+void hid_haptic_suspend(struct hid_device *hdev, struct hid_haptic_device *haptic);
+#endif
 int hid_haptic_init(struct hid_device *hdev, struct hid_haptic_device **haptic_ptr);
 void hid_haptic_handle_press_release(struct hid_haptic_device *haptic);
 bool hid_haptic_handle_input(struct hid_haptic_device *haptic);
@@ -117,6 +121,12 @@ int hid_haptic_input_configured(struct hid_device *hdev,
 {
 	return 0;
 }
+#ifdef CONFIG_PM
+static inline
+void hid_haptic_resume(struct hid_device *hdev, struct hid_haptic_device *haptic) {}
+static inline
+void hid_haptic_suspend(struct hid_device *hdev, struct hid_haptic_device *haptic) {}
+#endif
 static inline
 int hid_haptic_init(struct hid_device *hdev, struct hid_haptic_device **haptic_ptr)
 {

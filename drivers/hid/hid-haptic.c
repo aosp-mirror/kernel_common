@@ -5,6 +5,7 @@
  *  Copyright (c) 2021 Angela Czubak <acz@semihalf.com>
  */
 
+#include <linux/input/mt.h>
 #include <linux/module.h>
 
 #include "hid-haptic.h"
@@ -199,9 +200,58 @@ static void fill_effect_buf(struct hid_haptic_device *haptic,
 	mutex_unlock(&haptic->manual_trigger_mutex);
 }
 
+static void switch_mode(struct hid_device *hdev, struct hid_haptic_device *haptic,
+			int mode)
+{
+	struct hid_report *rep = haptic->auto_trigger_report;
+	struct hid_field *field;
+	s32 value;
+	int i, j;
+
+	if (mode == HID_HAPTIC_MODE_KERNEL)
+		value = HID_HAPTIC_ORDINAL_WAVEFORMSTOP;
+	else
+		value = haptic->default_auto_trigger;
+
+	mutex_lock(&haptic->auto_trigger_mutex);
+	for (i = 0; i < rep->maxfield; i++) {
+		field = rep->field[i];
+		/* Ignore if report count is out of bounds. */
+		if (field->report_count < 1)
+			continue;
+
+		for (j = 0; j < field->maxusage; j++) {
+			if (field->usage[j].hid == HID_HP_AUTOTRIGGER)
+				field->value[j] = value;
+		}
+	}
+
+	/* send the report */
+	hid_hw_request(hdev, rep, HID_REQ_SET_REPORT);
+	mutex_unlock(&haptic->auto_trigger_mutex);
+	haptic->mode = mode;
+}
+
+#ifdef CONFIG_PM
+void hid_haptic_resume(struct hid_device *hdev, struct hid_haptic_device *haptic)
+{
+	if (haptic->press_ordinal_cur && haptic->release_ordinal_cur)
+		switch_mode(hdev, haptic, HID_HAPTIC_MODE_KERNEL);
+}
+EXPORT_SYMBOL_GPL(hid_haptic_resume);
+
+void hid_haptic_suspend(struct hid_device *hdev, struct hid_haptic_device *haptic)
+{
+	if (haptic->press_ordinal_cur && haptic->release_ordinal_cur)
+		switch_mode(hdev, haptic, HID_HAPTIC_MODE_DEVICE);
+}
+EXPORT_SYMBOL_GPL(hid_haptic_suspend);
+#endif
+
 static int hid_haptic_upload_effect(struct input_dev *dev, struct ff_effect *effect,
 				    struct ff_effect *old)
 {
+	struct hid_device *hdev = input_get_drvdata(dev);
 	struct ff_device *ff = dev->ff;
 	struct hid_haptic_device *haptic = ff->private;
 	int i, ordinal = 0;
@@ -226,6 +276,20 @@ static int hid_haptic_upload_effect(struct input_dev *dev, struct ff_effect *eff
 	/* Fill the buffer for the efect id */
 	fill_effect_buf(haptic, &effect->u.hid, &haptic->effect[effect->id],
 			ordinal);
+
+	if (effect->id == HID_HAPTIC_RELEASE_EFFECT_ID) {
+		if (haptic->press_ordinal_cur &&
+		    haptic->mode == HID_HAPTIC_MODE_DEVICE) {
+			switch_mode(hdev, haptic, HID_HAPTIC_MODE_KERNEL);
+		}
+		haptic->release_ordinal_cur = ordinal;
+	} else if (effect->id == HID_HAPTIC_PRESS_EFFECT_ID) {
+		if (haptic->release_ordinal_cur &&
+		    haptic->mode == HID_HAPTIC_MODE_DEVICE) {
+			switch_mode(hdev, haptic, HID_HAPTIC_MODE_KERNEL);
+		}
+		haptic->press_ordinal_cur = ordinal;
+	}
 
 	return 0;
 }
@@ -292,6 +356,7 @@ static void effect_set_default(struct ff_effect *effect)
 static int hid_haptic_erase(struct input_dev *dev, int effect_id)
 {
 	struct hid_haptic_device *haptic = dev->ff->private;
+	struct hid_device *hdev = input_get_drvdata(dev);
 	struct ff_effect effect;
 	int ordinal;
 
@@ -299,21 +364,29 @@ static int hid_haptic_erase(struct input_dev *dev, int effect_id)
 	switch (effect_id) {
 	case HID_HAPTIC_RELEASE_EFFECT_ID:
 		ordinal = haptic->release_ordinal_orig;
-		if (!ordinal)
+		haptic->release_ordinal_cur = ordinal;
+		if (!ordinal) {
 			ordinal = HID_HAPTIC_ORDINAL_WAVEFORMNONE;
-		else
+			if (haptic->mode == HID_HAPTIC_MODE_KERNEL)
+				switch_mode(hdev, haptic, HID_HAPTIC_MODE_DEVICE);
+		} else {
 			effect.u.hid.hid_usage = HID_HP_WAVEFORMRELEASE &
 				HID_USAGE;
+		}
 		fill_effect_buf(haptic, &effect.u.hid, &haptic->effect[effect_id],
 				ordinal);
 		break;
 	case HID_HAPTIC_PRESS_EFFECT_ID:
 		ordinal = haptic->press_ordinal_orig;
-		if (!ordinal)
+		haptic->press_ordinal_cur = ordinal;
+		if (!ordinal) {
 			ordinal = HID_HAPTIC_ORDINAL_WAVEFORMNONE;
-		else
+			if (haptic->mode == HID_HAPTIC_MODE_KERNEL)
+				switch_mode(hdev, haptic, HID_HAPTIC_MODE_DEVICE);
+		} else {
 			effect.u.hid.hid_usage = HID_HP_WAVEFORMPRESS &
 				HID_USAGE;
+		}
 		fill_effect_buf(haptic, &effect.u.hid, &haptic->effect[effect_id],
 				ordinal);
 		break;
@@ -405,6 +478,7 @@ int hid_haptic_init(struct hid_device *hdev,
 	haptic->hid_usage_map[HID_HAPTIC_ORDINAL_WAVEFORMSTOP] =
 		HID_HP_WAVEFORMSTOP & HID_USAGE;
 
+	mutex_init(&haptic->auto_trigger_mutex);
 	for (r = 0; r < haptic->auto_trigger_report->maxfield; r++)
 		parse_auto_trigger_field(haptic, haptic->auto_trigger_report->field[r]);
 
@@ -580,13 +654,13 @@ void hid_haptic_handle_press_release(struct hid_haptic_device *haptic)
 	if (!prev_pressed_state && haptic->pressed_state &&
 	    haptic->mode == HID_HAPTIC_MODE_KERNEL) {
 		spin_lock_irqsave(&input->event_lock, flags);
-		input->ff->playback(input, PRESS_HID_EFFECT_ID, 1);
+		input->ff->playback(input, HID_HAPTIC_PRESS_EFFECT_ID, 1);
 		spin_unlock_irqrestore(&input->event_lock, flags);
 	}
 	if (prev_pressed_state && !haptic->pressed_state &&
 	    haptic->mode == HID_HAPTIC_MODE_KERNEL) {
 		spin_lock_irqsave(&input->event_lock, flags);
-		input->ff->playback(input, RELEASE_HID_EFFECT_ID, 1);
+		input->ff->playback(input, HID_HAPTIC_RELEASE_EFFECT_ID, 1);
 		spin_unlock_irqrestore(&input->event_lock, flags);
 	}
 }
@@ -597,8 +671,6 @@ bool hid_haptic_handle_input(struct hid_haptic_device *haptic)
 	if (haptic->mode == HID_HAPTIC_MODE_KERNEL) {
 		input_event(haptic->input_dev, EV_KEY, BTN_LEFT,
 			    haptic->pressed_state);
-		input_event(haptic->input_dev, EV_ABS, ABS_PRESSURE,
-			    haptic->pressure_sum);
 		return true;
 	}
 	return false;
