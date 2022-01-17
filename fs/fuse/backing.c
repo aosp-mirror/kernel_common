@@ -1272,7 +1272,13 @@ static int fuse_rename_backing_common(
 		return -EBADF;
 	get_fuse_backing_path(newent, &new_backing_path);
 	if (!new_backing_path.dentry) {
-		err = -EBADF;
+		/*
+		 * TODO A file being moved from a backing path to another
+		 * backing path which is not yet instrumented with FUSE-BPF.
+		 * This may be slow and should be substituted with something
+		 * more clever.
+		 */
+		err = -EXDEV;
 		goto put_old_path;
 	}
 	if (new_backing_path.mnt != old_backing_path.mnt) {
