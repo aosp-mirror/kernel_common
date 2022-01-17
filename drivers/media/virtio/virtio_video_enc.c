@@ -128,11 +128,15 @@ static int virtio_video_enc_s_ctrl(struct v4l2_ctrl *ctrl)
 						   control, value);
 		break;
 	case V4L2_CID_MPEG_VIDEO_H264_LEVEL:
+		if (stream->out_info.fourcc_format != V4L2_PIX_FMT_H264)
+			return -EINVAL;
 		value = virtio_video_v4l2_level_to_virtio(ctrl->val);
 		ret = virtio_video_cmd_set_control(vv, stream->stream_id,
 						   control, value);
 		break;
 	case V4L2_CID_MPEG_VIDEO_H264_PROFILE:
+		if (stream->out_info.fourcc_format != V4L2_PIX_FMT_H264)
+			return -EINVAL;
 		value = virtio_video_v4l2_profile_to_virtio(ctrl->val);
 		ret = virtio_video_cmd_set_control(vv, stream->stream_id,
 						   control, value);
