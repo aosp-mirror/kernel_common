@@ -27,6 +27,8 @@
 #include <asm/smp_plat.h>
 #include <asm/suspend.h>
 
+#include <trace/hooks/psci.h>
+
 /*
  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
  * calls it is necessary to use SMC64 to pass or return 64-bit values.
@@ -49,6 +51,12 @@ static int resident_cpu = -1;
 
 bool psci_tos_resident_on(int cpu)
 {
+	bool resident = false;
+
+	trace_android_vh_psci_tos_resident_on(cpu, &resident);
+	if (resident)
+		return resident;
+
 	return cpu == resident_cpu;
 }
 
@@ -158,6 +166,11 @@ static int psci_cpu_suspend(u32 state, unsigned long entry_point)
 {
 	int err;
 	u32 fn;
+	bool deny = false;
+
+	trace_android_vh_psci_cpu_suspend(state, &deny);
+	if (deny)
+		return -EPERM;
 
 	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
 	err = invoke_psci_fn(fn, state, entry_point, 0);
