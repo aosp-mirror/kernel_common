@@ -461,7 +461,11 @@ static const struct ath11k_hw_params ath11k_hw_params[] = {
 		.name = "wcn6855 hw2.1",
 		.hw_rev = ATH11K_HW_WCN6855_HW21,
 		.fw = {
-			.dir = "WCN6855/hw2.1",
+			/* WCN6855 hw2.1 and hw2.0 share the same FW.
+			 * To maintain backward compatibility, use hw2.0
+			 * directory.for 2.1 as well.
+			 */
+			.dir = "WCN6855/hw2.0",
 			.board_size = 256 * 1024,
 			.cal_offset = 128 * 1024,
 		},
