@@ -560,6 +560,22 @@ static struct device *tipc_shared_handle_dev(struct tipc_shared_handle
 	return shared_handle->vds->vdev->dev.parent->parent;
 }
 
+static bool is_same_memory_region(struct tipc_shared_handle *h1,
+				  struct tipc_shared_handle *h2)
+{
+	return h1->tipc.obj_id == h2->tipc.obj_id &&
+			h1->tipc.size == h2->tipc.size &&
+			h1->tipc.tag == h2->tipc.tag &&
+			h1->dma_buf == h2->dma_buf &&
+			h1->shared == h2->shared;
+}
+
+static bool dma_buf_owns_shared_mem_id(struct tipc_shared_handle *h)
+{
+	/* h->shared is true only if dma_buf did not own an shared memory ID */
+	return !h->shared;
+}
+
 static void tipc_shared_handle_register(struct tipc_shared_handle
 					*new_handle)
 {
@@ -574,9 +590,21 @@ static void tipc_shared_handle_register(struct tipc_shared_handle
 		struct tipc_shared_handle *handle =
 			rb_entry(*new, struct tipc_shared_handle, node);
 		parent = *new;
-		/* The handle is already registered? */
-		if (WARN_ON(handle->tipc.obj_id == new_handle->tipc.obj_id))
-			goto already_registered;
+		/*
+		 * An obj_id can be registered multiple times if it's owned by a
+		 * dma_buf, because in this case we use the same obj_id across
+		 * multiple memory transfer operations.
+		 */
+		if (handle->tipc.obj_id == new_handle->tipc.obj_id) {
+			if (dma_buf_owns_shared_mem_id(new_handle)) {
+				WARN_ON(!is_same_memory_region(handle,
+							       new_handle));
+			} else {
+				WARN(1, "This handle is already registered");
+				goto already_registered;
+			}
+		}
+
 		if (handle->tipc.obj_id > new_handle->tipc.obj_id)
 			new = &((*new)->rb_left);
 		else
@@ -626,18 +654,23 @@ static int tipc_shared_handle_drop(struct tipc_shared_handle *shared_handle)
 	struct tipc_virtio_dev *vds = shared_handle->vds;
 	struct device *dev = tipc_shared_handle_dev(shared_handle);
 
-	/*
-	 * If this warning fires, it means this shared handle was still in
-	 * the set of active handles. This shouldn't happen (calling code
-	 * should ensure it is out if the tree) but this serves as an extra
-	 * check before it is released.
-	 *
-	 * However, the take itself should clean this incorrect state up by
-	 * removing the handle from the tree.
-	 */
-	WARN_ON(tipc_shared_handle_take(vds, shared_handle->tipc.obj_id));
-
 	if (shared_handle->shared) {
+		/*
+		 * If this warning fires, it means this shared handle was still
+		 * in the set of active handles. This shouldn't happen (calling
+		 * code should ensure it is out if the tree) but this serves as
+		 * an extra check before it is released.
+		 *
+		 * However, the take itself should clean this incorrect state up
+		 * by removing the handle from the tree.
+		 *
+		 * This warning is only applicable when registering a handle
+		 * multiple times is not allowed, i.e. when dma_buf doesn't own
+		 * the handle.
+		 */
+		WARN_ON(tipc_shared_handle_take(vds,
+						shared_handle->tipc.obj_id));
+
 		ret = trusty_reclaim_memory(dev,
 					    shared_handle->tipc.obj_id,
 					    shared_handle->sgt->sgl,
