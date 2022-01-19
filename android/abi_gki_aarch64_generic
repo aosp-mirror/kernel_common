@@ -1542,6 +1542,7 @@
   proc_mkdir
   proc_mkdir_data
   proc_remove
+  proc_set_size
   proto_register
   proto_unregister
   pskb_expand_head
