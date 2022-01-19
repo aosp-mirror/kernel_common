@@ -173,7 +173,7 @@
 			<0 0xac42000 0 0x5000>;
 		reg-cam-base = <0x40000 0x42000>;
 		interrupt-names = "cam-cpas";
-		interrupts = <GIC_SPI 459 IRQ_TYPE_LEVEL_HIGH>;
+		interrupts = <GIC_SPI 459 IRQ_TYPE_EDGE_RISING>;
 		qcom,cpas-hw-ver = <0x150110>; /* Titan v150 v1.1.0 */
 		camnoc-axi-min-ib-bw = <3000000000>;
 		power-domains = <&camcc TITAN_TOP_GDSC>;
@@ -290,7 +290,7 @@
 			reg = <0 0xac48000 0 0x1000>;
 			reg-names = "cpas-cdm";
 			reg-cam-base = <0x48000>;
-			interrupts = <GIC_SPI 469 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 469 IRQ_TYPE_EDGE_RISING>;
 			interrupt-names = "cpas-cdm0";
 			clock-names = "gcc_camera_ahb",
 				"gcc_camera_axi",
@@ -323,7 +323,7 @@
 			reg = <0 0x0ac65000 0 0x1000>;
 			reg-names = "csiphy";
 			reg-cam-base = <0x65000>;
-			interrupts = <GIC_SPI 477 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 477 IRQ_TYPE_EDGE_RISING>;
 			interrupt-names = "cam-csiphy0";
 			clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
 				<&camcc CAM_CC_SOC_AHB_CLK>,
@@ -356,7 +356,7 @@
 			reg = <0 0xac66000 0 0x1000>;
 			reg-names = "csiphy";
 			reg-cam-base = <0x66000>;
-			interrupts = <GIC_SPI 478 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 478 IRQ_TYPE_EDGE_RISING>;
 			interrupt-names = "cam-csiphy1";
 			clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
 				<&camcc CAM_CC_SOC_AHB_CLK>,
@@ -389,7 +389,7 @@
 			reg = <0 0xac67000 0 0x1000>;
 			reg-names = "csiphy";
 			reg-cam-base = <0x67000>;
-			interrupts = <GIC_SPI 479 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 479 IRQ_TYPE_EDGE_RISING>;
 			interrupt-names = "cam-csiphy2";
 			clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
 				<&camcc CAM_CC_SOC_AHB_CLK>,
@@ -422,7 +422,7 @@
 			reg = <0 0xac68000 0 0x1000>;
 			reg-names = "csiphy";
 			reg-cam-base = <0x68000>;
-			interrupts = <GIC_SPI 461 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 461 IRQ_TYPE_EDGE_RISING>;
 			interrupt-names = "cam-csiphy3";
 			clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
 				<&camcc CAM_CC_SOC_AHB_CLK>,
@@ -455,7 +455,7 @@
 			reg = <0 0xace0000 0 0x200>;
 			reg-cam-base = <0xe0000>;
 			interrupt-names = "ppi";
-			interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 170 IRQ_TYPE_EDGE_RISING>;
 			clocks = <&camcc CAM_CC_CSIPHY0_CLK>;
 			clock-names = "csiphy0_clk";
 			clock-cntl-level = "svs";
@@ -469,7 +469,7 @@
 			reg = <0 0xace0200 0 0x200>;
 			reg-cam-base = <0xe0200>;
 			interrupt-names = "ppi";
-			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 171 IRQ_TYPE_EDGE_RISING>;
 			clocks = <&camcc CAM_CC_CSIPHY1_CLK>;
 			clock-names = "csiphy1_clk";
 			clock-cntl-level = "svs";
@@ -483,7 +483,7 @@
 			reg = <0 0xace0400 0 0x200>;
 			reg-cam-base = <0xe0400>;
 			interrupt-names = "ppi";
-			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 172 IRQ_TYPE_EDGE_RISING>;
 			clocks = <&camcc CAM_CC_CSIPHY2_CLK>;
 			clock-names = "csiphy2_clk";
 			clock-cntl-level = "svs";
@@ -497,7 +497,7 @@
 			reg = <0 0xace0600 0 0x200>;
 			reg-cam-base = <0xe00600>;
 			interrupt-names = "ppi";
-			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 173 IRQ_TYPE_EDGE_RISING>;
 			clocks = <&camcc CAM_CC_CSIPHY3_CLK>;
 			clock-names = "csiphy3_clk";
 			clock-cntl-level = "svs";
@@ -511,7 +511,7 @@
 			reg = <0 0xacb3000 0 0x1000>;
 			reg-cam-base = <0xb3000>;
 			interrupt-names = "cam-csid0";
-			interrupts = <GIC_SPI 464 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 464 IRQ_TYPE_EDGE_RISING>;
 			power-domains = <&camcc IFE_0_GDSC>;
 			clock-names = "camera_ahb",
 				"camera_axi",
@@ -555,7 +555,7 @@
 			reg = <0 0xacba000 0 0x1000>;
 			reg-cam-base = <0xba000>;
 			interrupt-names = "cam-csid1";
-			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 466 IRQ_TYPE_EDGE_RISING>;
 			power-domains = <&camcc IFE_1_GDSC>;
 			clock-names = "camera_ahb",
 				"camera_axi",
@@ -599,7 +599,7 @@
 			reg = <0 0xacc8000 0 0x1000>;
 			reg-cam-base = <0xc8000>;
 			interrupt-names = "cam-csid-lite";
-			interrupts = <GIC_SPI 473 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 473 IRQ_TYPE_EDGE_RISING>;
 			clock-names = "camera_ahb",
 				"camera_axi",
 				"soc_ahb_clk",
@@ -641,7 +641,7 @@
 				<0 0xac42000 0 0x5000>;
 			reg-cam-base = <0xaf000 0 0x42000>;
 			interrupt-names = "cam-vfe0";
-			interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 465 IRQ_TYPE_EDGE_RISING>;
 			power-domains = <&camcc IFE_0_GDSC>;
 			clock-names = "camera_ahb",
 				"camera_axi",
@@ -680,7 +680,7 @@
 				<0 0xac42000 0 0x5000>;
 			reg-cam-base = <0xb6000 0x42000>;
 			interrupt-names = "cam-vfe1";
-			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 467 IRQ_TYPE_EDGE_RISING>;
 			power-domains = <&camcc IFE_1_GDSC>;
 			clock-names = "camera_ahb",
 				"camera_axi",
@@ -718,7 +718,7 @@
 			reg = <0 0xacc4000 0 0x4000>;
 			reg-cam-base = <0xc4000>;
 			interrupt-names = "cam-vfe-lite";
-			interrupts = <GIC_SPI 472 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 472 IRQ_TYPE_EDGE_RISING>;
 			clock-names = "camera_ahb",
 				"camera_axi",
 				"soc_ahb_clk",
@@ -765,7 +765,7 @@
 			<0 0xac18000 0 0x3000>;
 		reg-names = "a5_qgic", "a5_sierra", "a5_csr";
 		reg-cam-base = <0x00000 0x10000 0x18000>;
-		interrupts = <GIC_SPI 463 IRQ_TYPE_LEVEL_HIGH>;
+		interrupts = <GIC_SPI 463 IRQ_TYPE_EDGE_RISING>;
 		interrupt-names = "a5";
 		clock-names = "gcc_cam_ahb_clk",
 			"gcc_cam_axi_clk",
@@ -867,7 +867,7 @@
 			reg = <0 0xac4e000 0 0x4000>;
 			reg-cam-base = <0x4e000>;
 			interrupt-names = "cam-jpeg-enc";
-			interrupts = <GIC_SPI 474 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 474 IRQ_TYPE_EDGE_RISING>;
 			clock-names = "camera_ahb",
 				"camera_axi",
 				"soc_ahb_clk",
@@ -895,7 +895,7 @@
 			reg = <0 0xac52000 0 0x4000>;
 			reg-cam-base = <0x52000>;
 			interrupt-names = "cam-jpeg-dma";
-			interrupts = <GIC_SPI 475 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 475 IRQ_TYPE_EDGE_RISING>;
 			clock-names = "camera_ahb",
 				"camera_axi",
 				"soc_ahb_clk",
@@ -932,7 +932,7 @@
 			reg = <0 0xac6b000 0 0x1000>;
 			reg-cam-base = <0x6b000>;
 			interrupt-names = "lrme";
-			interrupts = <GIC_SPI 476 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 476 IRQ_TYPE_EDGE_RISING>;
 			clock-names = "camera_ahb",
 				"camera_axi",
 				"soc_ahb_clk",
@@ -971,7 +971,7 @@
 		reg-names = "cci";
 		reg-cam-base = <0 0x4a000>;
 		interrupt-names = "cam-cci0";
-		interrupts = <GIC_SPI 468 IRQ_TYPE_LEVEL_HIGH>;
+		interrupts = <GIC_SPI 468 IRQ_TYPE_EDGE_RISING>;
 		clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
 			<&camcc CAM_CC_SOC_AHB_CLK>,
 			<&camcc CAM_CC_SLOW_AHB_CLK_SRC>,
@@ -1056,7 +1056,7 @@
 		reg-names = "cci";
 		reg-cam-base = <0 0x4b000>;
 		interrupt-names = "cam-cci1";
-		interrupts = <GIC_SPI 462 IRQ_TYPE_LEVEL_HIGH>;
+		interrupts = <GIC_SPI 462 IRQ_TYPE_EDGE_RISING>;
 		clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
 			<&camcc CAM_CC_SOC_AHB_CLK>,
 			<&camcc CAM_CC_SLOW_AHB_CLK_SRC>,
