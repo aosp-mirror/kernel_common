@@ -165,10 +165,14 @@ struct tipc_shared_handle {
 	struct rb_node node;
 	struct tipc_shm tipc;
 	struct tipc_virtio_dev *vds;
-	struct sg_table *sgt;
-	struct dma_buf_attachment *attach;
 	struct dma_buf *dma_buf;
 	bool shared;
+	/*
+	 * Following fields are only used if dma_buf does not own a
+	 * trusty_shared_mem_id_t.
+	 */
+	struct dma_buf_attachment *attach;
+	struct sg_table *sgt;
 };
 
 static struct class *tipc_class;
@@ -1106,7 +1110,7 @@ static int dn_connect_ioctl(struct tipc_dn_chan *dn, char __user *usr_name)
 }
 
 static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
-		       bool lend,
+		       enum transfer_kind transfer_kind,
 		       struct tipc_shared_handle **out)
 {
 	int ret = 0;
@@ -1116,6 +1120,8 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 	bool writable = false;
 	pgprot_t prot;
 	u64 tag = 0;
+	trusty_shared_mem_id_t mem_id;
+	bool lend;
 
 	if (dn->state != TIPC_CONNECTED) {
 		dev_dbg(dev, "Tried to share fd while not connected\n");
@@ -1151,6 +1157,32 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 		goto cleanup_handle;
 	}
 
+	tag = trusty_dma_buf_get_ffa_tag(shared_handle->dma_buf);
+	ret = trusty_dma_buf_get_shared_mem_id(shared_handle->dma_buf, &mem_id);
+	/*
+	 * Buffers with a preallocated mem_id should only be sent to Trusty
+	 * using TRUSTY_SEND_SECURE. And conversely, TRUSTY_SEND_SECURE should
+	 * only be used to send buffers with preallcoated mem_id.
+	 */
+	if (!ret) {
+		/* Use shared memory ID owned by dma_buf */
+		/* TODO: Enforce transfer_kind == TRUSTY_SEND_SECURE */
+		WARN_ONCE(transfer_kind != TRUSTY_SEND_SECURE,
+			  "Use TRUSTY_SEND_SECURE instead");
+		goto mem_id_allocated;
+	}
+
+	if (ret != -ENODATA) {
+		dev_err(dev, "dma_buf can't be transferred (%d)\n", ret);
+		goto cleanup_handle;
+	}
+
+	if (transfer_kind == TRUSTY_SEND_SECURE) {
+		dev_err(dev, "No mem ID for TRUSTY_SEND_SECURE\n");
+		goto cleanup_handle;
+	}
+	lend = (transfer_kind == TRUSTY_LEND);
+
 	shared_handle->attach = dma_buf_attach(shared_handle->dma_buf, dev);
 	if (IS_ERR(shared_handle->attach)) {
 		ret = PTR_ERR(shared_handle->attach);
@@ -1168,13 +1200,10 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 		goto cleanup_handle;
 	}
 
-	tag = trusty_dma_buf_get_ffa_tag(shared_handle->dma_buf);
-
 	ret = trusty_transfer_memory(tipc_shared_handle_dev(shared_handle),
-				     &shared_handle->tipc.obj_id,
-				     shared_handle->sgt->sgl,
-				     shared_handle->sgt->orig_nents, prot,
-				     tag, lend);
+				     &mem_id, shared_handle->sgt->sgl,
+				     shared_handle->sgt->orig_nents, prot, tag,
+				     lend);
 
 	if (ret < 0) {
 		dev_dbg(dev, "Transferring memory failed: %d\n", ret);
@@ -1185,6 +1214,9 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 		goto cleanup_handle;
 	}
 	shared_handle->shared = true;
+
+mem_id_allocated:
+	shared_handle->tipc.obj_id = mem_id;
 	shared_handle->tipc.size = shared_handle->dma_buf->size;
 	shared_handle->tipc.tag = tag;
 	*out = shared_handle;
@@ -1257,7 +1289,6 @@ static long filp_send_ioctl(struct file *filp,
 	long ret = 0;
 	ssize_t data_len = 0;
 	ssize_t shm_len = 0;
-	bool lend = false;
 
 	if (copy_from_user(&req, arg, sizeof(req)))
 		return -EFAULT;
@@ -1292,18 +1323,15 @@ static long filp_send_ioctl(struct file *filp,
 	for (shm_idx = 0; shm_idx < req.shm_cnt; shm_idx++) {
 		switch (shm[shm_idx].transfer) {
 		case TRUSTY_SHARE:
-			lend = false;
-			break;
 		case TRUSTY_LEND:
-			lend = true;
+		case TRUSTY_SEND_SECURE:
 			break;
 		default:
 			dev_err(dev, "Unknown transfer type: 0x%x\n",
 				shm[shm_idx].transfer);
 			goto shm_share_failed;
 		}
-		ret = dn_share_fd(dn, shm[shm_idx].fd,
-				  lend,
+		ret = dn_share_fd(dn, shm[shm_idx].fd, shm[shm_idx].transfer,
 				  &shm_handles[shm_idx]);
 		if (ret) {
 			dev_dbg(dev, "Forwarding memory failed\n"

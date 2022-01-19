@@ -88,6 +88,19 @@ config TRUSTY_DMA_BUF_FFA_TAG
 
 	  If set to N, a default implementation which returns 0 will be used.
 
+config TRUSTY_DMA_BUF_SHARED_MEM_ID
+	bool "Availability of trusty_dma_buf_get_shared_mem_id"
+	default n
+	help
+	  Whether trusty_dma_buf_get_shared_mem_id is provided on this platform.
+	  Providing this function allows the platform to manage memory
+	  transaction life cycle of DMA bufs independently of Trusty IPC driver.
+	  The latter can query trusty_shared_mem_id_t value allocated for a
+	  given DMA buf using trusty_dma_buf_get_shared_mem_id interface.
+
+	  If set to N, a default implementation which does not allocate any IDs
+	  will be used.
+
 config TRUSTY_CRASH_IS_PANIC
 	bool "When trusty panics, then panic the kernel"
 	help
