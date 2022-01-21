@@ -11,6 +11,7 @@
 #include <linux/mm.h>
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/log2.h>
 #include <linux/miscdevice.h>
 #include <linux/poll.h>
@@ -19,17 +20,47 @@
 #include "trusty-log.h"
 
 /*
- * Rationale for the chosen log buffer size:
- *  - the log buffer shall contain unthrottled trusty crash dump.
- *    Testing identifies that the logbuffer size shall be
- *    (~96Bytes * 100) i.e. ~2^13
- *  - specifying twice as much as the crash dump minimum allows to have
- *    ~100 lines of context prior to the crash.
- *  - conclusion: logbuffer = 2^14 is comfortable, half is minimal.
+ * Rationale for the chosen default log buffer size:
+ *  - the log buffer shall contain unthrottled Trusty crash dump.
+ *  - the register list portion of a crash dump is about 1KB
+ *  - the memory-around-registers portion of a crash dump can be up to 12 KB
+ *  - an average size backtrace is about 1 KB
+ *  - average length of non-crash trusty logs during boot is about 85 characters
+ *  - a crash dump with 50 lines of context therefore requires up to 18 KB
+ *  - buffer size needs to be power-of-two number of bytes
+ *  - rounding up to power of two from 18 KB gives 32 KB
+ *  The log size can be adjusted by setting the "trusty_log.log_size" parameter
+ *  on the kernel command line. The specified value will be adjusted as needed.
  */
-#define TRUSTY_LOG_SIZE (PAGE_SIZE * 5)
-#define TRUSTY_LINE_BUFFER_SIZE 256
 
+#define TRUSTY_LOG_DEFAULT_SIZE (32768)
+#define TRUSTY_LOG_MIN_SIZE (PAGE_SIZE / 2)
+#define TRUSTY_LOG_MAX_SIZE (1 * 1024 * 1024 * 1024)
+#define TRUSTY_LINE_BUFFER_SIZE (256)
+
+static size_t log_size_param = TRUSTY_LOG_DEFAULT_SIZE;
+
+static int trusty_log_size_set(const char *val, const struct kernel_param *kp)
+{
+	unsigned long long requested = memparse(val, NULL);
+
+	if (requested < TRUSTY_LOG_MIN_SIZE)
+		requested = TRUSTY_LOG_MIN_SIZE;
+	if (requested > TRUSTY_LOG_MAX_SIZE)
+		requested = TRUSTY_LOG_MAX_SIZE;
+	requested = rounddown_pow_of_two(requested);
+	log_size_param = requested;
+	return 0;
+}
+
+static int trusty_log_size_get(char *buffer, const struct kernel_param *kp)
+{
+	sprintf(buffer, "%zu", log_size_param);
+	return strlen(buffer);
+}
+
+module_param_call(log_size, trusty_log_size_set, trusty_log_size_get, NULL,
+		  0644);
 /*
  * If we log too much and a UART or other slow source is connected, we can stall
  * out another thread which is doing printk.
@@ -95,8 +126,8 @@ struct trusty_log_state {
 	struct log_rb *log;
 	struct trusty_log_sink_state klog_sink;
 
-	struct page *log_pages;
-	struct scatterlist sg;
+	u32 log_num_pages;
+	struct scatterlist *sg;
 	trusty_shared_mem_id_t log_pages_shared_mem_id;
 
 	struct notifier_block call_notifier;
@@ -603,14 +634,15 @@ static bool trusty_supports_logging(struct device *device)
 	return true;
 }
 
-static int trusty_log_probe(struct platform_device *pdev)
+static int trusty_log_init(struct platform_device *pdev)
 {
 	struct trusty_log_state *s;
+	struct scatterlist *sg;
+	unsigned char *mem;
+	int i;
 	int result;
 	trusty_shared_mem_id_t mem_id;
-
-	if (!trusty_supports_logging(pdev->dev.parent))
-		return -ENXIO;
+	int log_size;
 
 	s = kzalloc(sizeof(*s), GFP_KERNEL);
 	if (!s) {
@@ -621,17 +653,44 @@ static int trusty_log_probe(struct platform_device *pdev)
 	spin_lock_init(&s->lock);
 	s->dev = &pdev->dev;
 	s->trusty_dev = s->dev->parent;
-	s->log_pages = alloc_pages(GFP_KERNEL | __GFP_ZERO,
-				   get_order(TRUSTY_LOG_SIZE));
-	if (!s->log_pages) {
+
+	s->log_num_pages = DIV_ROUND_UP(log_size_param + sizeof(struct log_rb),
+					PAGE_SIZE);
+	s->sg = kcalloc(s->log_num_pages, sizeof(*s->sg), GFP_KERNEL);
+	if (!s->sg) {
+		result = -ENOMEM;
+		goto error_alloc_sg;
+	}
+
+	log_size = s->log_num_pages * PAGE_SIZE;
+	mem = vzalloc(log_size);
+	if (!mem) {
 		result = -ENOMEM;
 		goto error_alloc_log;
 	}
-	s->log = page_address(s->log_pages);
 
-	sg_init_one(&s->sg, s->log, TRUSTY_LOG_SIZE);
-	result = trusty_share_memory_compat(s->trusty_dev, &mem_id, &s->sg, 1,
-					    PAGE_KERNEL);
+	s->log = (struct log_rb *)mem;
+
+	sg_init_table(s->sg, s->log_num_pages);
+	for_each_sg(s->sg, sg, s->log_num_pages, i) {
+		struct page *pg = vmalloc_to_page(mem + (i * PAGE_SIZE));
+
+		if (!pg) {
+			result = -ENOMEM;
+			goto err_share_memory;
+		}
+		sg_set_page(sg, pg, PAGE_SIZE, 0);
+	}
+	/*
+	 * This will fail for Trusty api version < TRUSTY_API_VERSION_MEM_OBJ
+	 * if s->log_num_pages > 1
+	 * Use trusty_share_memory_compat instead of trusty_share_memory in case
+	 * s->log_num_pages == 1 and api version < TRUSTY_API_VERSION_MEM_OBJ,
+	 * In that case SMC_SC_SHARED_LOG_ADD expects a different value than
+	 * what trusty_share_memory returns
+	 */
+	result = trusty_share_memory_compat(s->trusty_dev, &mem_id, s->sg,
+					    s->log_num_pages, PAGE_KERNEL);
 	if (result) {
 		dev_err(s->dev, "trusty_share_memory failed: %d\n", result);
 		goto err_share_memory;
@@ -641,7 +700,7 @@ static int trusty_log_probe(struct platform_device *pdev)
 	result = trusty_std_call32(s->trusty_dev,
 				   SMC_SC_SHARED_LOG_ADD,
 				   (u32)(mem_id), (u32)(mem_id >> 32),
-				   TRUSTY_LOG_SIZE);
+				   log_size);
 	if (result < 0) {
 		dev_err(s->dev,
 			"trusty std call (SMC_SC_SHARED_LOG_ADD) failed: %d 0x%llx\n",
@@ -689,7 +748,8 @@ error_call_notifier:
 	trusty_std_call32(s->trusty_dev, SMC_SC_SHARED_LOG_RM,
 			  (u32)mem_id, (u32)(mem_id >> 32), 0);
 error_std_call:
-	if (WARN_ON(trusty_reclaim_memory(s->trusty_dev, mem_id, &s->sg, 1))) {
+	if (WARN_ON(trusty_reclaim_memory(s->trusty_dev, mem_id, s->sg,
+					  s->log_num_pages))) {
 		dev_err(&pdev->dev, "trusty_revoke_memory failed: %d 0x%llx\n",
 			result, mem_id);
 		/*
@@ -698,12 +758,30 @@ error_std_call:
 		 */
 	} else {
 err_share_memory:
-		__free_pages(s->log_pages, get_order(TRUSTY_LOG_SIZE));
+		vfree(s->log);
 	}
 error_alloc_log:
+	kfree(s->sg);
+error_alloc_sg:
 	kfree(s);
 error_alloc_state:
 	return result;
+}
+
+static int trusty_log_probe(struct platform_device *pdev)
+{
+	int rc;
+
+	if (!trusty_supports_logging(pdev->dev.parent))
+		return -ENXIO;
+
+	rc = trusty_log_init(pdev);
+	if (rc && log_size_param > TRUSTY_LOG_MIN_SIZE) {
+		dev_warn(&pdev->dev, "init failed, retrying with 1-page log\n");
+		log_size_param = TRUSTY_LOG_MIN_SIZE;
+		rc = trusty_log_init(pdev);
+	}
+	return rc;
 }
 
 static int trusty_log_remove(struct platform_device *pdev)
@@ -724,7 +802,8 @@ static int trusty_log_remove(struct platform_device *pdev)
 			"trusty std call (SMC_SC_SHARED_LOG_RM) failed: %d\n",
 			result);
 	}
-	result = trusty_reclaim_memory(s->trusty_dev, mem_id, &s->sg, 1);
+	result = trusty_reclaim_memory(s->trusty_dev, mem_id, s->sg,
+				       s->log_num_pages);
 	if (WARN_ON(result)) {
 		dev_err(&pdev->dev,
 			"trusty failed to remove shared memory: %d\n", result);
@@ -733,8 +812,9 @@ static int trusty_log_remove(struct platform_device *pdev)
 		 * It is not safe to free this memory if trusty_revoke_memory
 		 * fails. Leak it in that case.
 		 */
-		__free_pages(s->log_pages, get_order(TRUSTY_LOG_SIZE));
+		vfree(s->log);
 	}
+	kfree(s->sg);
 	kfree(s);
 
 	return 0;
