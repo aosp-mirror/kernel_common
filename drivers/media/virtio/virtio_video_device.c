@@ -453,10 +453,16 @@ int virtio_video_g_fmt(struct file *file, void *fh, struct v4l2_format *f)
 	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
 	struct virtio_video_stream *stream = file2stream(file);
 
-	if (!V4L2_TYPE_IS_OUTPUT(f->type))
+	switch (f->type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
 		info = &stream->out_info;
-	else
+		break;
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
 		info = &stream->in_info;
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	virtio_video_format_from_info(info, pix_mp);
 
@@ -477,10 +483,16 @@ int virtio_video_s_fmt(struct file *file, void *fh, struct v4l2_format *f)
 	if (ret)
 		return ret;
 
-	if (V4L2_TYPE_IS_OUTPUT(f->type))
-		virtio_video_format_fill_default_info(&info, &stream->in_info);
-	else
+	switch (f->type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
 		virtio_video_format_fill_default_info(&info, &stream->out_info);
+		break;
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+		virtio_video_format_fill_default_info(&info, &stream->in_info);
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	info.frame_width = pix_mp->width;
 	info.frame_height = pix_mp->height;
@@ -494,12 +506,17 @@ int virtio_video_s_fmt(struct file *file, void *fh, struct v4l2_format *f)
 					 pix_mp->plane_fmt[i].sizeimage;
 	}
 
-	if (V4L2_TYPE_IS_OUTPUT(f->type)) {
-		virtio_video_update_params(vv, stream, &info, NULL);
-		p_info = &stream->in_info;
-	} else {
+	switch (f->type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
 		virtio_video_update_params(vv, stream, NULL, &info);
 		p_info = &stream->out_info;
+		break;
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+		virtio_video_update_params(vv, stream, &info, NULL);
+		p_info = &stream->in_info;
+		break;
+	default:
+		return -EINVAL;
 	}
 
 	virtio_video_format_from_info(p_info, pix_mp);
