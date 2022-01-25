@@ -843,6 +843,7 @@
   finish_wait
   firmware_request_nowarn
   flush_dcache_page
+  flush_delayed_work
   flush_work
   flush_workqueue
   fput
