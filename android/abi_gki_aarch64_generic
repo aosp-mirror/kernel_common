@@ -650,6 +650,7 @@
   drm_connector_list_iter_end
   drm_connector_list_iter_next
   drm_connector_register
+  drm_connector_set_panel_orientation
   drm_connector_unregister
   drm_crtc_arm_vblank_event
   drm_crtc_cleanup
