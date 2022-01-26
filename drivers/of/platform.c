@@ -511,7 +511,6 @@ static const struct of_device_id reserved_mem_matches[] = {
 	{ .compatible = "qcom,rmtfs-mem" },
 	{ .compatible = "qcom,cmd-db" },
 	{ .compatible = "ramoops" },
-	{ .compatible = "google,open-dice" },
 	{}
 };
 
