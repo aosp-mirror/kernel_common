@@ -12,9 +12,9 @@
 
 #if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS)
 
-DECLARE_HOOK(android_vh_iommu_setup_dma_ops,
+DECLARE_RESTRICTED_HOOK(android_rvh_iommu_setup_dma_ops,
 	TP_PROTO(struct device *dev, u64 dma_base, u64 dma_limit),
-	TP_ARGS(dev, dma_base, dma_limit));
+	TP_ARGS(dev, dma_base, dma_limit), 1);
 
 #else
 
