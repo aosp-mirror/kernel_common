@@ -90,12 +90,20 @@ static u64 virtio_pvclock_clocksource_read(struct clocksource *cs)
 	return ret;
 }
 
+static int virtio_pvclock_cs_enable(struct clocksource *cs)
+{
+	if (cs->vdso_clock_mode == VDSO_CLOCKMODE_PVCLOCK)
+		vclocks_set_used(VDSO_CLOCKMODE_PVCLOCK);
+	return 0;
+}
+
 static struct clocksource virtio_pvclock_clocksource = {
 	.name = "virtio-pvclock",
 	.rating = 200, /* default rating, updated by virtpvclock_validate */
 	.read = virtio_pvclock_clocksource_read,
 	.mask = CLOCKSOURCE_MASK(64),
 	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+	.enable = virtio_pvclock_cs_enable,
 };
 
 static void set_pvclock_page_callback(struct virtqueue *vq)
@@ -122,8 +130,6 @@ static void create_clocksource(struct work_struct *work)
 
 	vp = container_of(work, struct virtio_pvclock, create_clocksource_work);
 
-	clocksource_register_hz(&virtio_pvclock_clocksource, NSEC_PER_SEC);
-
 	/*
 	 * VDSO pvclock can only be used if the TSCs are stable. The device also
 	 * must set PVCLOCK_TSC_STABLE_BIT in the pvclock flags field.
@@ -133,6 +139,8 @@ static void create_clocksource(struct work_struct *work)
 		virtio_pvclock_clocksource.vdso_clock_mode =
 			VDSO_CLOCKMODE_PVCLOCK;
 	}
+
+	clocksource_register_hz(&virtio_pvclock_clocksource, NSEC_PER_SEC);
 
 	dev_info(&vp->vdev->dev, "registered clocksource\n");
 }
