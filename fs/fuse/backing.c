@@ -1738,6 +1738,9 @@ int fuse_setattr_backing(struct fuse_args *fa,
 	inode_lock(d_inode(backing_path->dentry));
 	res = notify_change(backing_path->dentry, &new_attr, NULL);
 	inode_unlock(d_inode(backing_path->dentry));
+
+	if (res == 0 && (new_attr.ia_valid & ATTR_SIZE))
+		i_size_write(dentry->d_inode, new_attr.ia_size);
 	return res;
 }
 
