@@ -1144,10 +1144,12 @@ u64 bpf_jit_alloc_exec_limit(void)
 
 void *bpf_jit_alloc_exec(unsigned long size)
 {
-	return __vmalloc_node_range(size, PAGE_SIZE, BPF_JIT_REGION_START,
-				    BPF_JIT_REGION_END, GFP_KERNEL,
-				    PAGE_KERNEL, 0, NUMA_NO_NODE,
-				    __builtin_return_address(0));
+	void *p = __vmalloc_node_range(size, PAGE_SIZE, BPF_JIT_REGION_START,
+				       BPF_JIT_REGION_END, GFP_KERNEL,
+				       PAGE_KERNEL, 0, NUMA_NO_NODE,
+				       __builtin_return_address(0));
+	/* Memory is intended to be executable, reset the pointer tag. */
+	return kasan_reset_tag(p);
 }
 
 void bpf_jit_free_exec(void *addr)
