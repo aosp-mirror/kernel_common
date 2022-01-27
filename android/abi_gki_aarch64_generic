@@ -1151,6 +1151,7 @@
   kthread_flush_worker
   __kthread_init_worker
   kthread_mod_delayed_work
+  kthread_queue_delayed_work
   kthread_queue_work
   kthread_should_stop
   kthread_stop
