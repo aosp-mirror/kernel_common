@@ -1504,8 +1504,9 @@ static void f2fs_destroy_inode(struct inode *inode)
 
 static void destroy_percpu_info(struct f2fs_sb_info *sbi)
 {
-	percpu_counter_destroy(&sbi->alloc_valid_block_count);
 	percpu_counter_destroy(&sbi->total_valid_inode_count);
+	percpu_counter_destroy(&sbi->rf_node_block_count);
+	percpu_counter_destroy(&sbi->alloc_valid_block_count);
 }
 
 static void destroy_device_list(struct f2fs_sb_info *sbi)
@@ -3595,11 +3596,20 @@ static int init_percpu_info(struct f2fs_sb_info *sbi)
 	if (err)
 		return err;
 
+	err = percpu_counter_init(&sbi->rf_node_block_count, 0, GFP_KERNEL);
+	if (err)
+		goto err_valid_block;
+
 	err = percpu_counter_init(&sbi->total_valid_inode_count, 0,
 								GFP_KERNEL);
 	if (err)
-		percpu_counter_destroy(&sbi->alloc_valid_block_count);
+		goto err_node_block;
+	return 0;
 
+err_node_block:
+	percpu_counter_destroy(&sbi->rf_node_block_count);
+err_valid_block:
+	percpu_counter_destroy(&sbi->alloc_valid_block_count);
 	return err;
 }
 
