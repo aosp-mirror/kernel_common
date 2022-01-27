@@ -503,6 +503,7 @@
   disk_end_io_acct
   disk_start_io_acct
   dma_alloc_attrs
+  dma_alloc_noncoherent
   dma_async_device_register
   dma_async_device_unregister
   dma_async_tx_descriptor_init
@@ -538,6 +539,7 @@
   dma_fence_signal
   dma_fence_signal_locked
   dma_free_attrs
+  dma_free_noncoherent
   dma_get_sgtable_attrs
   dma_get_slave_caps
   dma_get_slave_channel
