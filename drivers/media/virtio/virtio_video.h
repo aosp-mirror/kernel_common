@@ -205,7 +205,6 @@ struct virtio_video_stream {
 	bool src_destroyed;
 	bool dst_destroyed;
 	struct work_struct work;
-	struct video_format_frame *current_frame;
 	struct mutex event_mutex;
 };
 
@@ -419,6 +418,10 @@ uint32_t virtio_video_v4l2_profile_to_virtio(uint32_t v4l2_profile);
 uint32_t virtio_video_v4l2_level_to_virtio(uint32_t v4l2_level);
 uint32_t virtio_video_v4l2_bitrate_mode_to_virtio(uint32_t v4l2_bitrate_mode);
 
+struct video_format_frame *
+virtio_video_find_format(struct virtio_video_stream *stream,
+			 uint32_t type, uint32_t pixelformat,
+			 uint32_t frame_width, uint32_t frame_height);
 struct video_format *find_video_format(struct list_head *fmts_list,
 				       uint32_t fourcc);
 void virtio_video_format_from_info(struct video_format_info *info,
