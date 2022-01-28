@@ -544,6 +544,7 @@ struct fuse_fs_context {
 	bool no_force_umount:1;
 	bool legacy_opts_show:1;
 	bool dax:1;
+	bool no_daemon:1;
 	unsigned int max_read;
 	unsigned int blksize;
 	const char *subtype;
@@ -791,6 +792,9 @@ struct fuse_conn {
 
 	/** Passthrough mode for read/write IO */
 	unsigned int passthrough:1;
+
+	/** BPF Only, no Daemon running */
+	unsigned int no_daemon:1;
 
 	/** The number of requests waiting for completion */
 	atomic_t num_waiting;
