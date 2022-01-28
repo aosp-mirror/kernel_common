@@ -779,6 +779,7 @@
   dw_pcie_write
   __dynamic_dev_dbg
   __dynamic_pr_debug
+  em_cpu_get
   emergency_restart
   enable_irq
   enable_percpu_irq
