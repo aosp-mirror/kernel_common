@@ -594,50 +594,45 @@ int virtio_video_s_selection(struct file *file, void *fh,
 	return 0;
 }
 
-int virtio_video_try_fmt(struct virtio_video_stream *stream,
-			 struct v4l2_format *f)
+struct video_format_frame *
+virtio_video_find_format(struct virtio_video_stream *stream,
+			 uint32_t type, uint32_t pixelformat,
+			 uint32_t frame_width, uint32_t frame_height)
 {
 	int i, idx = 0;
-	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	struct video_format *fmt = NULL;
-	bool found = false;
 	struct video_format_frame *frm = NULL;
 	struct virtio_video_format_frame *frame = NULL;
 
-	if (V4L2_TYPE_IS_OUTPUT(f->type))
-		fmt = find_video_format(&vvd->input_fmt_list,
-					pix_mp->pixelformat);
-	else
+	switch (type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
 		fmt = find_video_format(&vvd->output_fmt_list,
-					pix_mp->pixelformat);
-
-	if (!fmt) {
-		if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
-			virtio_video_format_from_info(&stream->out_info,
-						      pix_mp);
-		else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
-			virtio_video_format_from_info(&stream->in_info,
-						      pix_mp);
-		else
-			return -EINVAL;
-		return 0;
+					pixelformat);
+		break;
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+		fmt = find_video_format(&vvd->input_fmt_list,
+					pixelformat);
+		break;
+	default:
+		return ERR_PTR(EINVAL);
 	}
 
+	if (!fmt)
+		return NULL;
 	/* For coded formats whose metadata are in steram */
-	if (pix_mp->width == 0 && pix_mp->height == 0)  {
-		stream->current_frame = &fmt->frames[0];
-		return 0;
+	if (frame_width == 0 && frame_height == 0)  {
+		return &fmt->frames[0];
 	}
 
-	for (i = 0; i < fmt->desc.num_frames && !found; i++) {
+	for (i = 0; i < fmt->desc.num_frames; i++) {
 		frm = &fmt->frames[i];
 		frame = &frm->frame;
-		if (!within_range(frame->width.min, pix_mp->width,
+		if (!within_range(frame->width.min, frame_width,
 				  frame->width.max))
 			continue;
 
-		if (!within_range(frame->height.min, pix_mp->height,
+		if (!within_range(frame->height.min, frame_height,
 				  frame->height.max))
 			continue;
 		idx = i;
@@ -645,32 +640,54 @@ int virtio_video_try_fmt(struct virtio_video_stream *stream,
 		 * Try to find a more suitable frame size. Go with the current
 		 * one otherwise.
 		 */
-		if (needs_alignment(pix_mp->width, frame->width.step))
+		if (needs_alignment(frame_width, frame->width.step))
 			continue;
 
-		if (needs_alignment(pix_mp->height, frame->height.step))
+		if (needs_alignment(frame_height, frame->height.step))
 			continue;
 
-		stream->current_frame = frm;
-		found = true;
+		return frm;
 	}
 
-	if (!found) {
-		frm = &fmt->frames[idx];
-		frame = &frm->frame;
-		pix_mp->width = clamp(pix_mp->width, frame->width.min,
-				      frame->width.max);
-		if (frame->width.step != 0)
-			pix_mp->width = ALIGN(pix_mp->width, frame->width.step);
+	frm = &fmt->frames[idx];
+	frame = &frm->frame;
+	frame_width = clamp(frame_width, frame->width.min,
+			      frame->width.max);
+	if (frame->width.step != 0)
+		frame_width = ALIGN(frame_width, frame->width.step);
 
-		pix_mp->height = clamp(pix_mp->height, frame->height.min,
-				       frame->height.max);
-		if (frame->height.step != 0)
-			pix_mp->height = ALIGN(pix_mp->height,
-					       frame->height.step);
-		stream->current_frame = frm;
+	frame_height = clamp(frame_height, frame->height.min,
+			     frame->height.max);
+	if (frame->height.step != 0)
+		frame_height = ALIGN(frame_height,
+				     frame->height.step);
+	return frm;
+}
+
+int virtio_video_try_fmt(struct virtio_video_stream *stream,
+			 struct v4l2_format *f)
+{
+	struct video_format_frame *frame;
+	struct video_format_info *info;
+
+	switch (f->type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
+		info = &stream->out_info;
+		break;
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+		info = &stream->in_info;
+		break;
+	default:
+		return -EINVAL;
 	}
 
+	frame = virtio_video_find_format(stream, f->type, info->fourcc_format,
+					 info->frame_width, info->frame_height);
+	if (frame != NULL)
+		return PTR_ERR_OR_ZERO(frame);
+
+	/* Given format is not supported, returning current */
+	virtio_video_format_from_info(info, &f->fmt.pix_mp);
 	return 0;
 }
 
