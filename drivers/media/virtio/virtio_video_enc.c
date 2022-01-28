@@ -464,12 +464,17 @@ static int virtio_video_enc_try_framerate(struct virtio_video_stream *stream,
 					  unsigned int fps)
 {
 	int rate_idx;
+	struct video_format_info *info = &stream->out_info;
 	struct video_format_frame *frame = NULL;
 
-	if (stream->current_frame == NULL)
+	frame = virtio_video_find_format(stream,
+					 V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE,
+					 info->fourcc_format,
+					 info->frame_width,
+					 info->frame_height);
+	if (IS_ERR_OR_NULL(frame))
 		return -EINVAL;
 
-	frame = stream->current_frame;
 	for (rate_idx = 0; rate_idx < frame->frame.num_rates; rate_idx++) {
 		struct virtio_video_format_range *frame_rate =
 			&frame->frame_rates[rate_idx];
