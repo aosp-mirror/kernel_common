@@ -568,6 +568,14 @@ static int virtio_video_enc_s_parm(struct file *file, void *priv,
 	return 0;
 }
 
+static int virtio_video_enc_try_fmt(struct file *file, void *fh,
+				  struct v4l2_format *f)
+{
+	struct virtio_video_stream *stream = file2stream(file);
+
+	return virtio_video_try_fmt(stream, f);
+}
+
 static const struct v4l2_ioctl_ops virtio_video_enc_ioctl_ops = {
 	.vidioc_querycap	= virtio_video_querycap,
 
@@ -578,12 +586,18 @@ static const struct v4l2_ioctl_ops virtio_video_enc_ioctl_ops = {
 	.vidioc_g_fmt_vid_cap_mplane	= virtio_video_g_fmt,
 	.vidioc_s_fmt_vid_cap_mplane	= virtio_video_enc_s_fmt,
 
+	.vidioc_try_fmt_vid_cap		= virtio_video_enc_try_fmt,
+	.vidioc_try_fmt_vid_cap_mplane	= virtio_video_enc_try_fmt,
+
 	.vidioc_enum_fmt_vid_out = virtio_video_enc_enum_fmt_vid_out,
 	.vidioc_g_fmt_vid_out	= virtio_video_g_fmt,
 	.vidioc_s_fmt_vid_out	= virtio_video_enc_s_fmt,
 
 	.vidioc_g_fmt_vid_out_mplane	= virtio_video_g_fmt,
 	.vidioc_s_fmt_vid_out_mplane	= virtio_video_enc_s_fmt,
+
+	.vidioc_try_fmt_vid_out		= virtio_video_enc_try_fmt,
+	.vidioc_try_fmt_vid_out_mplane	= virtio_video_enc_try_fmt,
 
 	.vidioc_try_encoder_cmd	= virtio_video_try_encoder_cmd,
 	.vidioc_encoder_cmd	= virtio_video_encoder_cmd,
