@@ -502,14 +502,23 @@ static int virtio_video_enc_g_parm(struct file *file, void *priv,
 	struct v4l2_outputparm *out = &a->parm.output;
 	struct v4l2_fract *timeperframe = &out->timeperframe;
 
-	if (!V4L2_TYPE_IS_OUTPUT(a->type)) {
+	switch (a->type) {
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+		virtio_video_timeperframe_from_info(&stream->in_info,
+						    timeperframe);
+		break;
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
+		virtio_video_timeperframe_from_info(&stream->out_info,
+						    timeperframe);
+		break;
+	default:
 		v4l2_err(&vv->v4l2_dev,
-			 "getting FPS is only possible for the output queue\n");
+			 "getting FPS is only possible for the output or capture queue\n");
 		return -EINVAL;
+
 	}
 
 	out->capability = V4L2_CAP_TIMEPERFRAME;
-	virtio_video_timeperframe_from_info(&stream->in_info, timeperframe);
 
 	return 0;
 }
@@ -534,7 +543,7 @@ static int virtio_video_enc_s_parm(struct file *file, void *priv,
 	if (!timeperframe->denominator)
 		timeperframe->denominator = stps.denominator;
 
-	if (V4L2_TYPE_IS_OUTPUT(a->type)) {
+	if (a->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
 		if (!timeperframe->denominator) {
 			frame_rate = 0;
 		} else {
