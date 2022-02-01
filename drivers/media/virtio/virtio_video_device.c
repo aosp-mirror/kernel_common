@@ -434,8 +434,13 @@ int virtio_video_enum_framemintervals(struct file *file, void *fh,
 	} else {
 		f->stepwise.min.numerator = 1;
 		f->stepwise.min.denominator = frate->max;
-		f->stepwise.max.numerator = 1;
-		f->stepwise.max.denominator = frate->min;
+		if (frate->min != 0) {
+			f->stepwise.max.numerator = 1;
+			f->stepwise.max.denominator = frate->min;
+		} else {
+			f->stepwise.max.numerator = U32_MAX;
+			f->stepwise.max.denominator = 1;
+		}
 		f->stepwise.step.numerator = 1;
 		f->stepwise.step.denominator = frate->step;
 		if (frate->step == 1)
