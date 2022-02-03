@@ -284,6 +284,11 @@ int trace_daemon(struct fuse_args *fa)
 		return FUSE_BPF_BACKING;
 	}
 
+	case FUSE_STATFS | FUSE_PREFILTER: {
+		bpf_printk("statfs %d", fa->nodeid);
+		return FUSE_BPF_BACKING;
+	}
+
 	default:
 		if (fa->opcode & FUSE_PREFILTER)
 			bpf_printk("prefilter *** UNKNOWN *** opcode: %d",

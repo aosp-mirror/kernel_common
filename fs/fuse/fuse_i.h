@@ -33,6 +33,9 @@
 #include <linux/pid_namespace.h>
 #include <linux/refcount.h>
 #include <linux/user_namespace.h>
+#include <linux/statfs.h>
+
+#define FUSE_SUPER_MAGIC 0x65735546
 
 /** Default max number of pages that can be used in a single read request */
 #define FUSE_DEFAULT_MAX_PAGES_PER_REQ 32
@@ -1567,6 +1570,13 @@ int fuse_setattr_backing(struct fuse_args *fa,
 void *fuse_setattr_finalize(struct fuse_args *fa,
 		struct dentry *dentry, struct iattr *attr, struct file *file);
 
+int fuse_statfs_initialize(struct fuse_args *fa, struct fuse_statfs_out *fso,
+		struct dentry *dentry, struct kstatfs *buf);
+int fuse_statfs_backing(struct fuse_args *fa,
+		struct dentry *dentry, struct kstatfs *buf);
+void *fuse_statfs_finalize(struct fuse_args *fa,
+		struct dentry *dentry, struct kstatfs *buf);
+
 int fuse_get_link_initialize(struct fuse_args *fa, struct fuse_dummy_io *dummy,
 		struct inode *inode, struct dentry *dentry,
 		struct delayed_call *callback, const char **out);
@@ -1706,6 +1716,33 @@ static inline int finalize_attr(struct inode *inode, struct fuse_attr_out *outar
 			fuse_fillattr(inode, &outarg->attr, stat);
 	}
 	return err;
+}
+
+static inline void convert_statfs_to_fuse(struct fuse_kstatfs *attr, struct kstatfs *stbuf)
+{
+	attr->bsize   = stbuf->f_bsize;
+	attr->frsize  = stbuf->f_frsize;
+	attr->blocks  = stbuf->f_blocks;
+	attr->bfree   = stbuf->f_bfree;
+	attr->bavail  = stbuf->f_bavail;
+	attr->files   = stbuf->f_files;
+	attr->ffree   = stbuf->f_ffree;
+	attr->namelen = stbuf->f_namelen;
+	/* fsid is left zero */
+}
+
+static inline void convert_fuse_statfs(struct kstatfs *stbuf, struct fuse_kstatfs *attr)
+{
+	stbuf->f_type    = FUSE_SUPER_MAGIC;
+	stbuf->f_bsize   = attr->bsize;
+	stbuf->f_frsize  = attr->frsize;
+	stbuf->f_blocks  = attr->blocks;
+	stbuf->f_bfree   = attr->bfree;
+	stbuf->f_bavail  = attr->bavail;
+	stbuf->f_files   = attr->files;
+	stbuf->f_ffree   = attr->ffree;
+	stbuf->f_namelen = attr->namelen;
+	/* fsid is left zero */
 }
 
 #ifdef CONFIG_FUSE_BPF

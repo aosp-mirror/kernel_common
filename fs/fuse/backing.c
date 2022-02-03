@@ -1786,6 +1786,56 @@ void *fuse_setattr_finalize(struct fuse_args *fa,
 	return NULL;
 }
 
+int fuse_statfs_initialize(
+		struct fuse_args *fa, struct fuse_statfs_out *fso,
+		struct dentry *dentry, struct kstatfs *buf)
+{
+	*fso = (struct fuse_statfs_out) {0};
+	*fa = (struct fuse_args) {
+		.nodeid = get_node_id(d_inode(dentry)),
+		.opcode = FUSE_STATFS,
+		.out_numargs = 1,
+		.out_numargs = 1,
+		.out_args[0].size = sizeof(fso),
+		.out_args[0].value = fso,
+	};
+
+	return 0;
+}
+
+int fuse_statfs_backing(
+		struct fuse_args *fa,
+		struct dentry *dentry, struct kstatfs *buf)
+{
+	int err = 0;
+	struct path backing_path;
+	struct fuse_statfs_out *fso = fa->out_args[0].value;
+
+	get_fuse_backing_path(dentry, &backing_path);
+	if (!backing_path.dentry)
+		return -EBADF;
+	err = vfs_statfs(&backing_path, buf);
+	path_put(&backing_path);
+	buf->f_type = FUSE_SUPER_MAGIC;
+
+	//TODO Provide postfilter opportunity to modify
+	if (!err)
+		convert_statfs_to_fuse(&fso->st, buf);
+
+	return err;
+}
+
+void *fuse_statfs_finalize(
+		struct fuse_args *fa,
+		struct dentry *dentry, struct kstatfs *buf)
+{
+	struct fuse_statfs_out *fso = fa->out_args[0].value;
+
+	if (!fa->error_in)
+		convert_fuse_statfs(buf, &fso->st);
+	return NULL;
+}
+
 int fuse_get_link_initialize(struct fuse_args *fa, struct fuse_dummy_io *unused,
 		struct inode *inode, struct dentry *dentry,
 		struct delayed_call *callback, const char **out)

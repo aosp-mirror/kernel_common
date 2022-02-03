@@ -16,6 +16,7 @@
 
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/statfs.h>
 #include <sys/xattr.h>
 
 #include <linux/unistd.h>
@@ -298,6 +299,20 @@ int s_stat(struct s pathname, struct stat *st)
 	}
 
 	res = stat(pathname.s, st);
+	free(pathname.s);
+	return res;
+}
+
+int s_statfs(struct s pathname, struct statfs *st)
+{
+	int res;
+
+	if (!pathname.s) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	res = statfs(pathname.s, st);
 	free(pathname.s);
 	return res;
 }

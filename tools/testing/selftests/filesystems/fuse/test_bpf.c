@@ -341,6 +341,11 @@ int trace_test(struct fuse_args *fa)
 		return FUSE_BPF_BACKING;
 	}
 
+	case FUSE_STATFS | FUSE_PREFILTER: {
+		bpf_printk("statfs");
+		return FUSE_BPF_BACKING;
+	}
+
 	default:
 		bpf_printk("Unknown opcode %d", fa->opcode);
 		return 0;

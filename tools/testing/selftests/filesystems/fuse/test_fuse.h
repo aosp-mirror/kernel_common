@@ -12,6 +12,7 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/statfs.h>
 #include <sys/types.h>
 
 #define PAGE_SIZE 4096
@@ -50,6 +51,7 @@ int s_openat(int dirfd, struct s pathname, int flags, ...);
 int s_creat(struct s pathname, mode_t mode);
 int s_mkfifo(struct s pathname, mode_t mode);
 int s_stat(struct s pathname, struct stat *st);
+int s_statfs(struct s pathname, struct statfs *st);
 DIR *s_opendir(struct s pathname);
 int s_getxattr(struct s pathname, const char name[], void *value, size_t size,
 	       ssize_t *ret_size);
