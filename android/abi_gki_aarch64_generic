@@ -48,6 +48,12 @@
   autoremove_wake_function
   available_idle_cpu
   backlight_device_set_brightness
+  badblocks_check
+  badblocks_clear
+  badblocks_exit
+  badblocks_init
+  badblocks_set
+  badblocks_show
   bcmp
   bdget_disk
   bdput
@@ -72,6 +78,7 @@
   __bitmap_set
   bitmap_to_arr32
   __bitmap_weight
+  blk_abort_request
   blk_alloc_queue
   blk_check_plugged
   blk_cleanup_queue
@@ -82,6 +89,16 @@
   blk_execute_rq_nowait
   blk_get_request
   blk_ksm_init_passthrough
+  blk_mq_alloc_tag_set
+  blk_mq_complete_request
+  blk_mq_end_request
+  blk_mq_free_tag_set
+  blk_mq_init_queue_data
+  blk_mq_start_request
+  blk_mq_start_stopped_hw_queues
+  blk_mq_stop_hw_queues
+  blk_mq_unique_tag
+  blk_mq_update_nr_hw_queues
   blk_put_request
   blk_queue_flag_clear
   blk_queue_flag_set
@@ -91,6 +108,7 @@
   blk_queue_max_discard_sectors
   blk_queue_max_write_zeroes_sectors
   blk_queue_physical_block_size
+  blk_queue_write_cache
   blk_rq_map_user
   blk_rq_map_user_iov
   blk_rq_unmap_user
@@ -214,7 +232,12 @@
   component_match_add_release
   component_unbind_all
   config_ep_by_speed
+  configfs_register_subsystem
+  configfs_unregister_subsystem
+  config_group_init
   config_group_init_type_name
+  config_item_init_type_name
+  config_item_put
   console_suspend_enabled
   console_trylock
   console_unlock
@@ -299,7 +322,9 @@
   crypto_destroy_tfm
   __crypto_memneq
   crypto_register_alg
+  crypto_register_notifier
   crypto_register_scomp
+  crypto_register_shash
   crypto_shash_digest
   crypto_shash_final
   crypto_shash_finup
@@ -309,7 +334,9 @@
   crypto_skcipher_encrypt
   crypto_skcipher_setkey
   crypto_unregister_alg
+  crypto_unregister_notifier
   crypto_unregister_scomp
+  crypto_unregister_shash
   csum_ipv6_magic
   csum_partial
   csum_tcpudp_nofold
@@ -783,6 +810,7 @@
   emergency_restart
   enable_irq
   enable_percpu_irq
+  errno_to_blk_status
   ether_setup
   eth_type_trans
   eventfd_ctx_fdget
@@ -1007,6 +1035,7 @@
   input_unregister_handle
   input_unregister_handler
   int_sqrt
+  int_to_scsilun
   iomem_resource
   iommu_alloc_resv_region
   iommu_attach_group
@@ -1043,9 +1072,11 @@
   iommu_unmap
   iommu_unregister_device_fault_handler
   __ioremap
+  io_schedule
   io_schedule_timeout
   iounmap
   iov_iter_bvec
+  ip_compute_csum
   ip_send_check
   iput
   __ipv6_addr_type
@@ -1566,10 +1597,13 @@
   pwm_set_chip_data
   queue_delayed_work_on
   queue_work_on
+  radix_tree_delete_item
+  radix_tree_gang_lookup
   radix_tree_insert
   radix_tree_iter_delete
   radix_tree_lookup
   radix_tree_next_chunk
+  radix_tree_preload
   ___ratelimit
   raw_notifier_call_chain
   raw_notifier_chain_register
@@ -1698,6 +1732,8 @@
   rfkill_init_sw_state
   rfkill_register
   rfkill_unregister
+  __root_device_register
+  root_device_unregister
   root_task_group
   rps_needed
   rtc_class_close
@@ -1735,19 +1771,28 @@
   schedule_timeout
   schedule_timeout_interruptible
   scnprintf
+  scsi_add_host_with_dma
   scsi_autopm_get_device
   scsi_autopm_put_device
   scsi_block_requests
   scsi_block_when_processing_errors
+  scsi_build_sense_buffer
+  scsi_change_queue_depth
   scsi_command_size_tbl
   scsi_compat_ioctl
   scsi_device_get
   scsi_device_put
+  scsi_host_alloc
+  scsi_host_put
   scsi_ioctl
   scsi_ioctl_block_when_processing_errors
+  __scsi_iterate_devices
   scsi_normalize_sense
   __scsi_print_sense
   scsi_register_interface
+  scsi_remove_host
+  scsi_scan_host
+  scsi_set_sense_information
   scsi_unblock_requests
   sdev_prefix_printk
   send_sig_info
@@ -1773,12 +1818,19 @@
   set_user_nice
   sg_alloc_table
   sg_alloc_table_from_pages
+  sg_copy_buffer
+  sg_copy_from_buffer
+  sg_copy_to_buffer
   sg_free_table
   sg_init_one
   sg_init_table
+  sg_miter_next
+  sg_miter_start
+  sg_miter_stop
   sg_next
   __sg_page_iter_next
   __sg_page_iter_start
+  sg_pcopy_from_buffer
   sg_scsi_ioctl
   shmem_file_setup
   simple_attr_open
@@ -1996,6 +2048,7 @@
   sysfs_create_link
   sysfs_emit
   sysfs_emit_at
+  __sysfs_match_string
   sysfs_notify
   sysfs_remove_file_from_group
   sysfs_remove_file_ns
@@ -2339,6 +2392,7 @@
   usb_unregister_notify
   __usecs_to_jiffies
   usleep_range
+  uuid_gen
   v4l2_ctrl_handler_free
   v4l2_ctrl_handler_init_class
   v4l2_ctrl_log_status
@@ -2466,10 +2520,15 @@
   wireless_send_event
   woken_wake_function
   work_busy
+  __xa_alloc
+  xa_clear_mark
+  xa_destroy
   xa_erase
   xa_find
   xa_find_after
+  xa_get_mark
   xa_load
+  xa_set_mark
   xa_store
   __xfrm_state_destroy
   xfrm_state_lookup_byspi
