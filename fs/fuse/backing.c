@@ -339,8 +339,10 @@ void *fuse_create_open_finalize(
 	struct fuse_entry_out *feo = fa->out_args[0].value;
 	struct fuse_open_out *foo = fa->out_args[1].value;
 
-	fi->nodeid = feo->nodeid;
-	ff->fh = foo->fh;
+	if (fi)
+		fi->nodeid = feo->nodeid;
+	if (ff)
+		ff->fh = foo->fh;
 	return 0;
 }
 
