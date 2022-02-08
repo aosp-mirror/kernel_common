@@ -217,10 +217,17 @@ static int fuse_xattr_set(const struct xattr_handler *handler,
 #ifdef CONFIG_FUSE_BPF
 	struct fuse_err_ret fer;
 
-	fer = fuse_bpf_backing(inode, struct fuse_setxattr_in,
+	if (value)
+		fer = fuse_bpf_backing(inode, struct fuse_setxattr_in,
 			       fuse_setxattr_initialize, fuse_setxattr_backing,
 			       fuse_setxattr_finalize, dentry, name, value,
 			       size, flags);
+	else
+		fer = fuse_bpf_backing(inode, struct fuse_dummy_io,
+				       fuse_removexattr_initialize,
+				       fuse_removexattr_backing,
+				       fuse_removexattr_finalize,
+				       dentry, name);
 	if (fer.ret)
 		return PTR_ERR(fer.result);
 #endif

@@ -1476,6 +1476,14 @@ void *fuse_setxattr_finalize(struct fuse_args *fa, struct dentry *dentry,
 			     const char *name, const void *value, size_t size,
 			     int flags);
 
+int fuse_removexattr_initialize(struct fuse_args *fa,
+				struct fuse_dummy_io *unused,
+				struct dentry *dentry, const char *name);
+int fuse_removexattr_backing(struct fuse_args *fa,
+			     struct dentry *dentry, const char *name);
+void *fuse_removexattr_finalize(struct fuse_args *fa,
+				struct dentry *dentry, const char *name);
+
 int fuse_file_read_iter_initialize(
 		struct fuse_args *fa, struct fuse_read_in *fri,
 		struct kiocb *iocb, struct iov_iter *to);

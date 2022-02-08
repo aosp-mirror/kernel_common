@@ -56,6 +56,7 @@ int s_getxattr(struct s pathname, const char name[], void *value, size_t size,
 int s_listxattr(struct s pathname, void *list, size_t size, ssize_t *ret_size);
 int s_setxattr(struct s pathname, const char name[], const void *value,
 	       size_t size, int flags);
+int s_removexattr(struct s pathname, const char name[]);
 int s_rename(struct s oldpathname, struct s newpathname);
 
 struct s tracing_folder(void);

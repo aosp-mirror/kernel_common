@@ -329,6 +329,13 @@ int trace_test(struct fuse_args *fa)
 		return FUSE_BPF_BACKING;
 	}
 
+	case FUSE_REMOVEXATTR | FUSE_PREFILTER: {
+		const char *name = fa->in_args[0].value;
+
+		bpf_printk("removexattr %s", name);
+		return FUSE_BPF_BACKING;
+	}
+
 	case FUSE_CANONICAL_PATH | FUSE_PREFILTER: {
 		bpf_printk("canonical_path");
 		return FUSE_BPF_BACKING;

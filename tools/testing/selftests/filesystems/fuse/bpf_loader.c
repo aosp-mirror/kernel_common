@@ -350,6 +350,20 @@ int s_setxattr(struct s pathname, const char name[], const void *value, size_t s
 	return res;
 }
 
+int s_removexattr(struct s pathname, const char name[])
+{
+	int res;
+
+	if (!pathname.s) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	res = removexattr(pathname.s, name);
+	free(pathname.s);
+	return res;
+}
+
 int s_rename(struct s oldpathname, struct s newpathname)
 {
 	int res;

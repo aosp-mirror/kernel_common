@@ -661,6 +661,39 @@ void *fuse_setxattr_finalize(struct fuse_args *fa, struct dentry *dentry,
 	return NULL;
 }
 
+int fuse_removexattr_initialize(struct fuse_args *fa,
+				struct fuse_dummy_io *unused,
+				struct dentry *dentry, const char *name)
+{
+	*fa = (struct fuse_args) {
+		.nodeid = get_fuse_inode(dentry->d_inode)->nodeid,
+		.opcode = FUSE_REMOVEXATTR,
+		.in_numargs = 1,
+		.in_args[0] = (struct fuse_in_arg) {
+			.size = strlen(name) + 1,
+			.value = name,
+		},
+	};
+
+	return 0;
+}
+
+int fuse_removexattr_backing(struct fuse_args *fa,
+			     struct dentry *dentry, const char *name)
+{
+	struct path *backing_path =
+		&get_fuse_dentry(dentry)->backing_path;
+
+	/* TODO account for changes of the name by prefilter */
+	return vfs_removexattr(backing_path->dentry, name);
+}
+
+void *fuse_removexattr_finalize(struct fuse_args *fa,
+				struct dentry *dentry, const char *name)
+{
+	return NULL;
+}
+
 int fuse_file_read_iter_initialize(
 		struct fuse_args *fa, struct fuse_read_in *fri,
 		struct kiocb *iocb, struct iov_iter *to)

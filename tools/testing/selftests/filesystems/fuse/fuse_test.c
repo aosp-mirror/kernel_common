@@ -1076,6 +1076,14 @@ static int bpf_test_xattr(const char *mount_dir)
 	TESTEQUAL(xattr_size, xattr_size_ret);
 	TESTEQUAL(strcmp(xattr_value, xattr_value_ret), 0);
 
+	TESTSYSCALL(s_removexattr(s_path(s(mount_dir), s(file_name)), xattr_name));
+	TESTEQUAL(bpf_test_trace("removexattr"), 0);
+
+	TESTEQUAL(s_getxattr(s_path(s(mount_dir), s(file_name)), xattr_name,
+			       xattr_value_ret, sizeof(xattr_value_ret),
+			       &xattr_size_ret), -1);
+	TESTEQUAL(errno, ENODATA);
+
 	TESTSYSCALL(s_unlink(s_path(s(mount_dir), s(file_name))));
 	TESTEQUAL(bpf_test_trace("unlink"), 0);
 	TESTEQUAL(s_stat(s_path(s(ft_src), s(file_name)), &st), -1);
