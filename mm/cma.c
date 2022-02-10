@@ -54,6 +54,7 @@ unsigned long cma_get_size(const struct cma *cma)
 {
 	return cma->count << PAGE_SHIFT;
 }
+EXPORT_SYMBOL_GPL(cma_get_size);
 
 const char *cma_get_name(const struct cma *cma)
 {
