@@ -1954,6 +1954,7 @@
   snd_soc_runtime_set_dai_fmt
   snd_soc_unregister_card
   snd_soc_unregister_component
+  snd_vendor_set_ops
   snprintf
   soc_device_register
   sock_alloc_send_skb
