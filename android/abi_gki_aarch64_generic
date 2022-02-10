@@ -900,6 +900,7 @@
   get_random_u32
   get_sg_io_hdr
   __get_task_comm
+  get_task_cred
   get_thermal_instance
   get_unused_fd_flags
   get_user_pages
@@ -1320,6 +1321,7 @@
   noop_llseek
   nr_cpu_ids
   nr_irqs
+  ns_capable
   nsec_to_clock_t
   ns_to_timespec64
   __num_online_cpus
@@ -1583,6 +1585,7 @@
   proto_unregister
   pskb_expand_head
   __pskb_pull_tail
+  __put_cred
   put_device
   put_disk
   __put_page
