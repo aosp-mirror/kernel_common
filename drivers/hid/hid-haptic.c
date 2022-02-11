@@ -265,7 +265,7 @@ static int hid_haptic_upload_effect(struct input_dev *dev, struct ff_effect *eff
 		return -EINVAL;
 
 	/* Check hid_usage */
-	for (i = 1; i < haptic->max_waveform_id; i++) {
+	for (i = 1; i <= haptic->max_waveform_id; i++) {
 		if (haptic->hid_usage_map[i] == effect->u.hid.hid_usage) {
 			ordinal = i;
 			break;
