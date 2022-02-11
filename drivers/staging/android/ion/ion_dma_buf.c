@@ -23,14 +23,14 @@ static struct sg_table *dup_sg_table(struct sg_table *table)
 	if (!new_table)
 		return ERR_PTR(-ENOMEM);
 
-	ret = sg_alloc_table(new_table, table->nents, GFP_KERNEL);
+	ret = sg_alloc_table(new_table, table->orig_nents, GFP_KERNEL);
 	if (ret) {
 		kfree(new_table);
 		return ERR_PTR(-ENOMEM);
 	}
 
 	new_sg = new_table->sgl;
-	for_each_sg(table->sgl, sg, table->nents, i) {
+	for_each_sg(table->sgl, sg, table->orig_nents, i) {
 		memcpy(new_sg, sg, sizeof(*sg));
 		new_sg->dma_address = 0;
 		new_sg = sg_next(new_sg);
@@ -116,8 +116,9 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 	if (!(buffer->flags & ION_FLAG_CACHED))
 		attrs |= DMA_ATTR_SKIP_CPU_SYNC;
 
-	if (!dma_map_sg_attrs(attachment->dev, table->sgl, table->nents,
-			      direction, attrs))
+	table->nents = dma_map_sg_attrs(attachment->dev, table->sgl,
+					table->orig_nents, direction, attrs);
+	if (!table->nents)
 		return ERR_PTR(-ENOMEM);
 
 	a->mapped = true;
@@ -143,7 +144,7 @@ static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
 	if (!(buffer->flags & ION_FLAG_CACHED))
 		attrs |= DMA_ATTR_SKIP_CPU_SYNC;
 
-	dma_unmap_sg_attrs(attachment->dev, table->sgl, table->nents,
+	dma_unmap_sg_attrs(attachment->dev, table->sgl, table->orig_nents,
 			   direction, attrs);
 }
 
@@ -175,7 +176,7 @@ static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 	list_for_each_entry(a, &buffer->attachments, list) {
 		if (!a->mapped)
 			continue;
-		dma_sync_sg_for_cpu(a->dev, a->table->sgl, a->table->nents,
+		dma_sync_sg_for_cpu(a->dev, a->table->sgl, a->table->orig_nents,
 				    direction);
 	}
 
@@ -220,8 +221,8 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 	list_for_each_entry(a, &buffer->attachments, list) {
 		if (!a->mapped)
 			continue;
-		dma_sync_sg_for_device(a->dev, a->table->sgl, a->table->nents,
-				       direction);
+		dma_sync_sg_for_device(a->dev, a->table->sgl,
+				       a->table->orig_nents, direction);
 	}
 unlock:
 	mutex_unlock(&buffer->lock);
