@@ -2109,6 +2109,7 @@
   time64_to_tm
   topology_set_thermal_pressure
   _totalram_pages
+  touch_softlockup_watchdog
   __trace_bprintk
   trace_event_buffer_commit
   trace_event_buffer_reserve
