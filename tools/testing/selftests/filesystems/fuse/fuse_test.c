@@ -524,12 +524,14 @@ static int bpf_test_redact_readdir(const char *mount_dir)
 				bool is_dot;
 
 				fuse_dirent_in = (struct fuse_dirent *) dirs_in;
-				is_dot = !strcmp(fuse_dirent_in->name, ".") ||
-					 !strcmp(fuse_dirent_in->name, "..");
+				is_dot = (fuse_dirent_in->namelen == 1 &&
+						!strncmp(fuse_dirent_in->name, ".", 1)) ||
+					 (fuse_dirent_in->namelen == 2 &&
+						!strncmp(fuse_dirent_in->name, "..", 2));
 
 				dir_ent_len = FUSE_DIRENT_ALIGN(
 					sizeof(*fuse_dirent_in) +
-					fuse_dirent_in->namelen + 1);
+					fuse_dirent_in->namelen);
 
 				if (dirs_in + dir_ent_len < bytes_in + res)
 					next = (struct fuse_dirent *)
@@ -538,7 +540,7 @@ static int bpf_test_redact_readdir(const char *mount_dir)
 				if (!skip || is_dot) {
 					memcpy(dirs_out, fuse_dirent_in,
 					       sizeof(struct fuse_dirent) +
-					       fuse_dirent_in->namelen + 1);
+					       fuse_dirent_in->namelen);
 					length_out += dir_ent_len;
 				}
 				again = ((skip && !is_dot) && next);

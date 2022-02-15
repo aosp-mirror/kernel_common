@@ -191,7 +191,8 @@ void *fuse_open_finalize(struct fuse_args *fa,
 	struct fuse_file *ff = file->private_data;
 	struct fuse_open_out *foo = fa->out_args[0].value;
 
-	ff->fh = foo->fh;
+	if (ff)
+		ff->fh = foo->fh;
 	return 0;
 }
 
@@ -1987,7 +1988,7 @@ static int filldir(struct dir_context *ctx, const char *name, int namelen,
 		.type = d_type,
 	};
 
-	strcpy(fd->name, name);
+	memcpy(fd->name, name, namelen);
 	ec->offset += FUSE_DIRENT_SIZE(fd);
 
 	return 0;
