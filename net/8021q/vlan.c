@@ -116,9 +116,6 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 	}
 
 	vlan_vid_del(real_dev, vlan->vlan_proto, vlan_id);
-
-	/* Get rid of the vlan's reference to real_dev */
-	dev_put(real_dev);
 }
 
 int vlan_check_real_dev(struct net_device *real_dev,
@@ -280,7 +277,8 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	return 0;
 
 out_free_newdev:
-	if (new_dev->reg_state == NETREG_UNINITIALIZED)
+	if (new_dev->reg_state == NETREG_UNINITIALIZED ||
+	    new_dev->reg_state == NETREG_UNREGISTERED)
 		free_netdev(new_dev);
 	return err;
 }

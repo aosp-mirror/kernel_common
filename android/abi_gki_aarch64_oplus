@@ -51,6 +51,7 @@
   regulator_set_voltage
   remove_proc_entry
   schedule_timeout
+  sdio_writeb_readb
   seq_printf
   seq_read
   simple_open
@@ -198,6 +199,7 @@
   remove_proc_subtree
   request_firmware
   rtc_time64_to_tm
+  spi_set_cs_timing
   spi_sync
   strcat
   system_wq

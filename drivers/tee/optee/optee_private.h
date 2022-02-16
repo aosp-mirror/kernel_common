@@ -152,6 +152,7 @@ int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session);
 
 void optee_enable_shm_cache(struct optee *optee);
 void optee_disable_shm_cache(struct optee *optee);
+void optee_disable_unmapped_shm_cache(struct optee *optee);
 
 int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 		       struct page **pages, size_t num_pages,
@@ -174,6 +175,7 @@ void optee_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
 			   size_t page_offset);
 
 int optee_enumerate_devices(void);
+void optee_unregister_devices(void);
 
 /*
  * Small helpers

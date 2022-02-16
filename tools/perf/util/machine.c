@@ -2020,6 +2020,7 @@ static int add_callchain_ip(struct thread *thread,
 
 	al.filtered = 0;
 	al.sym = NULL;
+	al.srcline = NULL;
 	if (!cpumode) {
 		thread__find_cpumode_addr_location(thread, ip, &al);
 	} else {
@@ -2587,7 +2588,7 @@ int machines__for_each_thread(struct machines *machines,
 
 pid_t machine__get_current_tid(struct machine *machine, int cpu)
 {
-	int nr_cpus = min(machine->env->nr_cpus_online, MAX_NR_CPUS);
+	int nr_cpus = min(machine->env->nr_cpus_avail, MAX_NR_CPUS);
 
 	if (cpu < 0 || cpu >= nr_cpus || !machine->current_tid)
 		return -1;
@@ -2599,7 +2600,7 @@ int machine__set_current_tid(struct machine *machine, int cpu, pid_t pid,
 			     pid_t tid)
 {
 	struct thread *thread;
-	int nr_cpus = min(machine->env->nr_cpus_online, MAX_NR_CPUS);
+	int nr_cpus = min(machine->env->nr_cpus_avail, MAX_NR_CPUS);
 
 	if (cpu < 0)
 		return -EINVAL;

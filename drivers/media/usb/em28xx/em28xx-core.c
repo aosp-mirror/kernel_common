@@ -956,14 +956,10 @@ int em28xx_alloc_urbs(struct em28xx *dev, enum em28xx_mode mode, int xfer_bulk,
 
 		usb_bufs->buf[i] = kzalloc(sb_size, GFP_KERNEL);
 		if (!usb_bufs->buf[i]) {
-			em28xx_uninit_usb_xfer(dev, mode);
-
 			for (i--; i >= 0; i--)
 				kfree(usb_bufs->buf[i]);
 
-			kfree(usb_bufs->buf);
-			usb_bufs->buf = NULL;
-
+			em28xx_uninit_usb_xfer(dev, mode);
 			return -ENOMEM;
 		}
 
@@ -1156,8 +1152,9 @@ int em28xx_suspend_extension(struct em28xx *dev)
 	dev_info(&dev->intf->dev, "Suspending extensions\n");
 	mutex_lock(&em28xx_devlist_mutex);
 	list_for_each_entry(ops, &em28xx_extension_devlist, next) {
-		if (ops->suspend)
-			ops->suspend(dev);
+		if (!ops->suspend)
+			continue;
+		ops->suspend(dev);
 		if (dev->dev_next)
 			ops->suspend(dev->dev_next);
 	}

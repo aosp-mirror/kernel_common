@@ -1103,9 +1103,11 @@
   gpiochip_generic_free
   gpiochip_generic_request
   gpiochip_get_data
+  gpiochip_irqchip_add_key
   gpiochip_line_is_valid
   gpiochip_lock_as_irq
   gpiochip_remove
+  gpiochip_set_nested_irqchip
   gpiochip_unlock_as_irq
   gpiod_direction_input
   gpiod_direction_output
@@ -1632,6 +1634,7 @@
   of_find_node_opts_by_path
   of_find_node_with_property
   of_find_property
+  of_find_spi_device_by_node
   of_fwnode_ops
   of_genpd_add_provider_onecell
   of_genpd_add_provider_simple
@@ -1972,6 +1975,7 @@
   regulator_unlock
   regulator_unregister_notifier
   regulatory_hint
+  regulatory_set_wiphy_regd_sync_rtnl
   release_firmware
   release_sock
   regmap_mmio_detach_clk
@@ -2168,6 +2172,7 @@
   smpboot_unregister_percpu_thread
   snd_card_free
   snd_card_new
+  snd_card_ref
   snd_card_register
   snd_compr_stop_error
   snd_ctl_add
@@ -2212,7 +2217,9 @@
   snd_soc_card_get_kcontrol
   snd_soc_component_async_complete
   snd_soc_component_disable_pin
+  snd_soc_component_enable_pin
   snd_soc_component_force_enable_pin
+  snd_soc_component_get_pin_status
   snd_soc_component_init_regmap
   snd_soc_component_read
   snd_soc_component_read32
