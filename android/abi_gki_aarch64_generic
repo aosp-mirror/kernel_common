@@ -128,6 +128,7 @@
   bpf_trace_run6
   bpf_trace_run7
   bpf_trace_run8
+  bpf_trace_run9
   build_skb
   bus_find_device
   bus_for_each_dev
@@ -1170,6 +1171,7 @@
   kstrtos8
   kstrtou16
   kstrtou8
+  kstrtou8_from_user
   kstrtouint
   kstrtouint_from_user
   kstrtoull
@@ -1760,6 +1762,7 @@
   sched_clock
   sched_feat_keys
   sched_setattr_nocheck
+  sched_set_fifo
   sched_setscheduler
   sched_setscheduler_nocheck
   sched_show_task
@@ -1987,6 +1990,7 @@
   spi_finalize_current_message
   spi_register_controller
   __spi_register_driver
+  spi_set_cs_timing
   spi_setup
   spi_sync
   spi_sync_locked
