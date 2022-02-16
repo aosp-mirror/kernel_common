@@ -218,6 +218,7 @@
   cma_alloc
   cma_for_each_area
   cma_get_name
+  cma_get_size
   cma_release
   compat_alloc_user_space
   complete
