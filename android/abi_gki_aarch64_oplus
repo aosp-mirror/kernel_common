@@ -2595,6 +2595,8 @@
   __traceiter_android_vh_binder_priority_skip
   __traceiter_android_vh_binder_proc_transaction
   __traceiter_android_vh_binder_proc_transaction_end
+  __traceiter_android_vh_binder_proc_transaction_entry
+  __traceiter_android_vh_binder_select_worklist_ilocked
   __traceiter_android_vh_binder_proc_transaction_finish
   __traceiter_android_vh_binder_read_done
   __traceiter_android_vh_binder_reply
@@ -2798,6 +2800,8 @@
   __tracepoint_android_vh_binder_priority_skip
   __tracepoint_android_vh_binder_proc_transaction
   __tracepoint_android_vh_binder_proc_transaction_end
+  __tracepoint_android_vh_binder_proc_transaction_entry
+  __tracepoint_android_vh_binder_select_worklist_ilocked
   __tracepoint_android_vh_binder_proc_transaction_finish
   __tracepoint_android_vh_binder_read_done
   __tracepoint_android_vh_binder_reply
