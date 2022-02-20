@@ -46,6 +46,15 @@ DECLARE_HOOK(android_vh_binder_proc_transaction_finish,
 	TP_PROTO(struct binder_proc *proc, struct binder_transaction *t,
 		struct task_struct *binder_th_task, bool pending_async, bool sync),
 	TP_ARGS(proc, t, binder_th_task, pending_async, sync));
+DECLARE_HOOK(android_vh_binder_proc_transaction_entry,
+	TP_PROTO(struct binder_proc *proc, struct binder_transaction *t,
+	struct binder_thread **thread, int node_debug_id, bool pending_async,
+	bool sync, bool *skip),
+	TP_ARGS(proc, t, thread, node_debug_id, pending_async, sync, skip));
+DECLARE_HOOK(android_vh_binder_select_worklist_ilocked,
+	TP_PROTO(struct list_head **list, struct binder_thread *thread, struct binder_proc *proc,
+	int wait_for_proc_work),
+	TP_ARGS(list, thread, proc, wait_for_proc_work));
 DECLARE_HOOK(android_vh_binder_print_transaction_info,
 	TP_PROTO(struct seq_file *m, struct binder_proc *proc,
 		 const char *prefix, struct binder_transaction *t),
