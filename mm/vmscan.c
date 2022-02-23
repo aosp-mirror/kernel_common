@@ -2085,6 +2085,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	unsigned nr_rotated = 0;
 	int file = is_file_lru(lru);
 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
+	bool bypass = false;
 
 	lru_add_drain();
 
@@ -2119,6 +2120,10 @@ static void shrink_active_list(unsigned long nr_to_scan,
 			}
 		}
 
+		trace_android_vh_page_referenced_check_bypass(page, nr_to_scan, lru, &bypass);
+		if (bypass)
+			goto skip_page_referenced;
+
 		if (page_referenced(page, 0, sc->target_mem_cgroup,
 				    &vm_flags)) {
 			/*
@@ -2136,7 +2141,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 				continue;
 			}
 		}
-
+skip_page_referenced:
 		ClearPageActive(page);	/* we are de-activating */
 		SetPageWorkingset(page);
 		list_add(&page->lru, &l_inactive);
