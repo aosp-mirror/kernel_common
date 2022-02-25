@@ -797,6 +797,10 @@ int fuse_file_write_iter_backing(struct fuse_args *fa,
 	/* TODO This just plain ignores any change to fuse_write_in */
 	fwo->size = vfs_iter_write(ff->backing_file, from, &iocb->ki_pos, 0);
 
+	/* Must reflect change in size of backing file to upper file */
+	if (fwo->size > 0)
+		fuse_copyattr(file, ff->backing_file);
+
 	if (fwo->size < 0)
 		return fwo->size;
 	return 0;
