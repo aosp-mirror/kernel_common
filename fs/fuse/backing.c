@@ -1055,6 +1055,13 @@ int fuse_revalidate_backing(struct fuse_args *fa, struct inode *dir,
 	struct fuse_dentry *fuse_dentry = get_fuse_dentry(entry);
 	struct dentry *backing_entry = fuse_dentry->backing_path.dentry;
 
+	spin_lock(&backing_entry->d_lock);
+	if (d_unhashed(backing_entry)) {
+		spin_unlock(&backing_entry->d_lock);
+			return 0;
+	}
+	spin_unlock(&backing_entry->d_lock);
+
 	if (unlikely(backing_entry->d_flags & DCACHE_OP_REVALIDATE))
 		return backing_entry->d_op->d_revalidate(backing_entry, flags);
 	return 1;
