@@ -1145,6 +1145,7 @@ static int bpf_test_set_backing(const char *mount_dir)
 			}));
 		read(fuse_dev, bytes_in, sizeof(bytes_in));
 		TESTSYSCALL(close(bpf_fd));
+		TESTSYSCALL(close(backing_fd));
 	FUSE_DONE
 
 	result = TEST_SUCCESS;
@@ -1234,8 +1235,7 @@ static int bpf_test_remove_backing(const char *mount_dir)
 
 		while (read(fuse_dev, bytes_in, sizeof(bytes_in)) != -1)
 			;
-		TESTEQUAL(close(backing_fd), -1);
-		TESTEQUAL(errno, EBADF);
+		TESTSYSCALL(close(backing_fd));
 	FUSE_DONE
 
 	result = TEST_SUCCESS;

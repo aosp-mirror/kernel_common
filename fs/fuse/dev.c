@@ -1943,6 +1943,18 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 			kern_path(path, 0, req->args->canonical_path);
 	}
 
+	if (!err && (req->in.h.opcode == FUSE_LOOKUP ||
+		     req->in.h.opcode == (FUSE_LOOKUP | FUSE_POSTFILTER)) &&
+		req->args->out_args[1].size == sizeof(struct fuse_entry_bpf_out)) {
+		struct fuse_entry_bpf_out *febo = (struct fuse_entry_bpf_out *)
+				req->args->out_args[1].value;
+
+		if (febo->backing_action == FUSE_ACTION_REPLACE)
+			febo->backing_fd = (uint64_t) fget(febo->backing_fd);
+		if (febo->bpf_action == FUSE_ACTION_REPLACE)
+			febo->bpf_fd = (uint64_t) fget(febo->bpf_fd);
+	}
+
 	spin_lock(&fpq->lock);
 	clear_bit(FR_LOCKED, &req->flags);
 	if (!fpq->connected)

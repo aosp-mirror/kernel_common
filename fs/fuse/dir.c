@@ -243,8 +243,19 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 		 * change the backing file ever, so not sure what is correct
 		 * here yet, especially as we can't return an error to user
 		 */
-		if (bpf_outarg.backing_action == FUSE_ACTION_REPLACE)
-			__close_fd(fm->fc->task->files, bpf_outarg.backing_fd);
+		if (bpf_outarg.backing_action == FUSE_ACTION_REPLACE) {
+			struct file *file = (struct file *) bpf_outarg.backing_fd;
+
+			if (file && !IS_ERR(file))
+				fput(file);
+		}
+
+		if (bpf_outarg.bpf_action == FUSE_ACTION_REPLACE) {
+			struct file *file = (struct file *) bpf_outarg.bpf_fd;
+
+			if (file && !IS_ERR(file))
+				fput(file);
+		}
 
 		/* Zero nodeid is same as -ENOENT */
 		if (!ret && !outarg.nodeid)
@@ -529,17 +540,9 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, const struct qstr *name
 		if (bpf_outarg->backing_action != FUSE_ACTION_REPLACE)
 			goto out_queue_forget;
 
-		backing_file = fuse_fget(fm->fc, bpf_outarg->backing_fd);
-		if (!backing_file)
+		backing_file = (struct file *) bpf_outarg->backing_fd;
+		if (!backing_file || IS_ERR(backing_file))
 			goto out_queue_forget;
-
-		/* TODO userspace doesn't really know when the right time to
-		 * close the passed fd is. This because after replying to the
-		 * driver request, so assume that after a lookup with bpf_args,
-		 * the daemon passes the fd ownership to the kernel, which also
-		 * takes care of closing it at the right time.
-		 */
-		__close_fd(fm->fc->task->files, bpf_outarg->backing_fd);
 
 		backing_inode = backing_file->f_inode;
 		*inode = fuse_iget_backing(sb, backing_inode);
@@ -547,8 +550,11 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, const struct qstr *name
 			goto bpf_outarg_out;
 
 		if (bpf_outarg->bpf_action == FUSE_ACTION_REPLACE) {
-			struct bpf_prog *bpf_prog = fuse_get_bpf_prog(fm->fc,
-							bpf_outarg->bpf_fd);
+			struct file *bpf_file = (struct file*) bpf_outarg->bpf_fd;
+			struct bpf_prog *bpf_prog = ERR_PTR(-EINVAL);
+
+			if (bpf_file && !IS_ERR(bpf_file))
+				bpf_prog = fuse_get_bpf_prog(bpf_file);;
 
 			if (IS_ERR(bpf_prog)) {
 				iput(*inode);
