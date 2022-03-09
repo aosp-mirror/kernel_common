@@ -72,6 +72,7 @@
 #include <trace/hooks/ipv6.h>
 #include <trace/hooks/sound.h>
 #include <trace/hooks/snd_compr.h>
+#include <trace/hooks/gup.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -382,3 +383,8 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_enable_thermal_power_throttle);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_thermal_power_cap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_get_thermal_zone_device);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_tcpm_modify_src_caps);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_try_grab_compound_head);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh___get_user_pages_remote);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_get_user_pages);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_internal_get_user_pages_fast);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pin_user_pages);
