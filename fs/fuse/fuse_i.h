@@ -950,7 +950,6 @@ struct inode *fuse_iget(struct super_block *sb, u64 nodeid,
 
 int fuse_lookup_name(struct super_block *sb, u64 nodeid, const struct qstr *name,
 		     struct fuse_entry_out *outarg,
-		     struct fuse_entry_bpf_out *bpf_outarg,
 		     struct dentry *entry, struct inode **inode);
 
 /**
@@ -1521,7 +1520,7 @@ void *fuse_file_fallocate_finalize(struct fuse_args *fa,
 
 struct fuse_lookup_io {
 	struct fuse_entry_out feo;
-	struct fuse_entry_bpf_out febo;
+	struct fuse_entry_bpf feb;
 };
 
 int fuse_lookup_initialize(struct fuse_args *fa, struct fuse_lookup_io *feo,

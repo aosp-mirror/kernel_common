@@ -874,8 +874,8 @@ int fuse_lookup_initialize(struct fuse_args *fa, struct fuse_lookup_io *fli,
 			.value = &fli->feo,
 		},
 		.out_args[1] = (struct fuse_arg) {
-			.size = sizeof(fli->febo),
-			.value = &fli->febo,
+			.size = sizeof(fli->feb.out),
+			.value = &fli->feb.out,
 		},
 	};
 
@@ -917,6 +917,7 @@ struct dentry *fuse_lookup_finalize(struct fuse_args *fa, struct inode *dir,
 	struct inode *inode, *backing_inode;
 	struct fuse_entry_out *feo = fa->out_args[0].value;
 	struct fuse_entry_bpf_out *febo = fa->out_args[1].value;
+	struct fuse_entry_bpf *feb = container_of(febo, struct fuse_entry_bpf, out);
 
 	fd = get_fuse_dentry(entry);
 	if (!fd)
@@ -952,7 +953,7 @@ struct dentry *fuse_lookup_finalize(struct fuse_args *fa, struct inode *dir,
 		break;
 
 	case FUSE_ACTION_REPLACE: {
-		struct file *bpf_file = (struct file*) febo->bpf_fd;
+		struct file *bpf_file = feb->bpf_file;
 		struct bpf_prog *bpf_prog = ERR_PTR(-EINVAL);
 
 		if (bpf_file && !IS_ERR(bpf_file))
@@ -985,7 +986,7 @@ struct dentry *fuse_lookup_finalize(struct fuse_args *fa, struct inode *dir,
 		struct file *backing_file;
 
 		fc = get_fuse_mount(dir)->fc;
-		backing_file = (struct file *) febo->backing_fd;
+		backing_file = feb->backing_file;
 		if (!backing_file || IS_ERR(backing_file))
 			return ERR_PTR(-EIO);
 

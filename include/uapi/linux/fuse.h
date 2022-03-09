@@ -527,6 +527,12 @@ struct fuse_entry_bpf_out {
 	uint64_t	bpf_fd;
 };
 
+struct fuse_entry_bpf {
+	struct fuse_entry_bpf_out out;
+	struct file *backing_file;
+	struct file *bpf_file;
+};
+
 struct fuse_forget_in {
 	uint64_t	nlookup;
 };

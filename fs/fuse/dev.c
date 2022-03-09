@@ -1948,11 +1948,12 @@ static ssize_t fuse_dev_do_write(struct fuse_dev *fud,
 		req->args->out_args[1].size == sizeof(struct fuse_entry_bpf_out)) {
 		struct fuse_entry_bpf_out *febo = (struct fuse_entry_bpf_out *)
 				req->args->out_args[1].value;
+		struct fuse_entry_bpf *feb = container_of(febo, struct fuse_entry_bpf, out);
 
 		if (febo->backing_action == FUSE_ACTION_REPLACE)
-			febo->backing_fd = (uint64_t) fget(febo->backing_fd);
+			feb->backing_file = fget(febo->backing_fd);
 		if (febo->bpf_action == FUSE_ACTION_REPLACE)
-			febo->bpf_fd = (uint64_t) fget(febo->bpf_fd);
+			feb->bpf_file = fget(febo->bpf_fd);
 	}
 
 	spin_lock(&fpq->lock);
