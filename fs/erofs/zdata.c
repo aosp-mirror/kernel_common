@@ -1205,10 +1205,10 @@ static void z_erofs_decompressqueue_work(struct work_struct *work)
 static struct page *pickup_page_for_submission(struct z_erofs_pcluster *pcl,
 					       unsigned int nr,
 					       struct page **pagepool,
-					       struct address_space *mc,
-					       gfp_t gfp)
+					       struct address_space *mc)
 {
 	const pgoff_t index = pcl->obj.index;
+	gfp_t gfp = mapping_gfp_mask(mc);
 	bool tocache = false;
 
 	struct address_space *mapping;
@@ -1438,8 +1438,7 @@ static void z_erofs_submit_queue(struct super_block *sb,
 			struct page *page;
 
 			page = pickup_page_for_submission(pcl, i++, pagepool,
-							  MNGD_MAPPING(sbi),
-							  GFP_NOFS);
+							  MNGD_MAPPING(sbi));
 			if (!page)
 				continue;
 
