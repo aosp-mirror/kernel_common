@@ -1837,6 +1837,7 @@ struct dentry *incfs_mount_fs(struct file_system_type *type, int flags,
 	sb->s_flags |= SB_ACTIVE;
 
 	pr_debug("incfs: mount\n");
+	free_options(&options);
 	return dget(sb->s_root);
 err:
 	sb->s_fs_info = NULL;
