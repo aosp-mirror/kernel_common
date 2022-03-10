@@ -557,12 +557,15 @@ int fuse_listxattr_backing(struct fuse_args *fa, struct dentry *dentry,
 		vfs_listxattr(get_fuse_dentry(dentry)->backing_path.dentry,
 			      list, size);
 
+	if (ret < 0)
+		return ret;
+
 	if (fa->out_argvar)
 		fa->out_args[0].size = ret;
 	else
 		((struct fuse_getxattr_out *)fa->out_args[0].value)->size = ret;
 
-	return 0;
+	return ret;
 }
 
 void *fuse_listxattr_finalize(struct fuse_args *fa, struct dentry *dentry,
@@ -570,11 +573,13 @@ void *fuse_listxattr_finalize(struct fuse_args *fa, struct dentry *dentry,
 {
 	struct fuse_getxattr_out *fgo;
 
+	if (fa->error_in)
+		return NULL;
+
 	if (fa->out_argvar)
 		return ERR_PTR(fa->out_args[0].size);
 
 	fgo = fa->out_args[0].value;
-
 	return ERR_PTR(fgo->size);
 }
 

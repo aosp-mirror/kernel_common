@@ -1845,12 +1845,12 @@ struct fuse_err_ret {
 			ERR_PTR(backing(&fa, args)),			\
 			true,						\
 		};							\
+		if (IS_ERR(fer.result))					\
+			fa.error_in = PTR_ERR(fer.result);		\
 		if (!(ext_flags & FUSE_BPF_POST_FILTER))		\
 			break;						\
 									\
 		fa.opcode |= FUSE_POSTFILTER;				\
-		if (IS_ERR(fer.result))					\
-			fa.error_in = PTR_ERR(fer.result);		\
 		for (i = 0; i < fa.out_numargs; ++i)			\
 			fa.in_args[fa.in_numargs++] =			\
 				(struct fuse_in_arg) {			\
