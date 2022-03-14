@@ -1105,8 +1105,7 @@ out_dir:
 out_old:
 	f2fs_put_page(old_page, 0);
 out:
-	if (whiteout)
-		iput(whiteout);
+	iput(whiteout);
 	return err;
 }
 
