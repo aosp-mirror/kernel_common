@@ -346,6 +346,13 @@ int trace_test(struct fuse_args *fa)
 		return FUSE_BPF_BACKING;
 	}
 
+	case FUSE_LSEEK | FUSE_PREFILTER: {
+		const struct fuse_lseek_in *fli = fa->in_args[0].value;
+
+		bpf_printk("lseek type:%d, offset:%lld", fli->whence, fli->offset);
+		return FUSE_BPF_BACKING;
+	}
+
 	default:
 		bpf_printk("Unknown opcode %d", fa->opcode);
 		return 0;

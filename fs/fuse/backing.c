@@ -403,6 +403,65 @@ void *fuse_flush_finalize(struct fuse_args *fa, struct file *file, fl_owner_t id
 	return NULL;
 }
 
+int fuse_lseek_initialize(struct fuse_args *fa, struct fuse_lseek_io *flio,
+			  struct file *file, loff_t offset, int whence)
+{
+	struct fuse_file *fuse_file = file->private_data;
+
+	flio->fli = (struct fuse_lseek_in) {
+		.fh = fuse_file->fh,
+		.offset = offset,
+		.whence = whence,
+	};
+
+	*fa = (struct fuse_args) {
+		.nodeid = get_node_id(file->f_inode),
+		.opcode = FUSE_LSEEK,
+		.in_numargs = 1,
+		.in_args[0].size = sizeof(flio->fli),
+		.in_args[0].value = &flio->fli,
+		.out_numargs = 1,
+		.out_args[0].size = sizeof(flio->flo),
+		.out_args[0].value = &flio->flo,
+	};
+
+	return 0;
+}
+
+int fuse_lseek_backing(struct fuse_args *fa, struct file *file, loff_t offset, int whence)
+{
+	const struct fuse_lseek_in *fli = fa->in_args[0].value;
+	struct fuse_lseek_out *flo = fa->out_args[0].value;
+	struct fuse_file *fuse_file = file->private_data;
+	struct file *backing_file = fuse_file->backing_file;
+	loff_t ret;
+
+	/* TODO: Handle changing of the file handle */
+	if (offset == 0) {
+		if (whence == SEEK_CUR)
+			return file->f_pos;
+
+		if (whence == SEEK_SET)
+			return vfs_setpos(file, 0, 0);
+	}
+
+	inode_lock(file->f_inode);
+	backing_file->f_pos = file->f_pos;
+	ret = vfs_llseek(backing_file, fli->offset, fli->whence);
+	flo->offset = ret;
+	inode_unlock(file->f_inode);
+	return ret;
+}
+
+void *fuse_lseek_finalize(struct fuse_args *fa, struct file *file, loff_t offset, int whence)
+{
+	struct fuse_lseek_out *flo = fa->out_args[0].value;
+
+	if (!fa->error_in)
+		file->f_pos = flo->offset;
+	return ERR_PTR(flo->offset);
+}
+
 int fuse_copy_file_range_initialize(struct fuse_args *fa, struct fuse_copy_file_range_io *fcf,
 				   struct file *file_in, loff_t pos_in, struct file *file_out,
 				   loff_t pos_out, size_t len, unsigned int flags)

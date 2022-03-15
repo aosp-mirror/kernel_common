@@ -1450,6 +1450,48 @@ out:
 	return result;
 }
 
+static int bpf_test_lseek(const char *mount_dir)
+{
+	const char *file = "real";
+	const char *test_data = "data";
+	int result = TEST_FAILURE;
+	int src_fd = -1;
+	int bpf_fd = -1;
+	int fuse_dev = -1;
+	int fd = -1;
+
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TEST(fd = openat(src_fd, file, O_CREAT | O_RDWR | O_CLOEXEC, 0777),
+	     fd != -1);
+	TESTEQUAL(write(fd, test_data, strlen(test_data)), strlen(test_data));
+	TESTSYSCALL(close(fd));
+	fd = -1;
+	TESTEQUAL(install_elf_bpf("test_bpf.bpf", "test_trace",
+				  &bpf_fd, NULL, NULL), 0);
+	TESTEQUAL(mount_fuse(mount_dir, bpf_fd, src_fd, &fuse_dev), 0);
+
+	TEST(fd = s_open(s_path(s(mount_dir), s(file)), O_RDONLY | O_CLOEXEC),
+	     fd != -1);
+	TESTEQUAL(lseek(fd, 3, SEEK_SET), 3);
+	TESTEQUAL(bpf_test_trace("lseek"), 0);
+	TESTEQUAL(lseek(fd, 5, SEEK_END), 9);
+	TESTEQUAL(bpf_test_trace("lseek"), 0);
+	TESTEQUAL(lseek(fd, 1, SEEK_CUR), 10);
+	TESTEQUAL(bpf_test_trace("lseek"), 0);
+	TESTEQUAL(lseek(fd, 1, SEEK_DATA), 1);
+	TESTEQUAL(bpf_test_trace("lseek"), 0);
+	result = TEST_SUCCESS;
+out:
+	close(fd);
+	umount(mount_dir);
+	close(fuse_dev);
+	close(bpf_fd);
+	close(src_fd);
+	return result;
+}
+
+
 static int parse_options(int argc, char *const *argv)
 {
 	signed char c;
@@ -1553,6 +1595,7 @@ int main(int argc, char *argv[])
 		MAKE_TEST(readdir_perms_test),
 		MAKE_TEST(inotify_test),
 		MAKE_TEST(bpf_test_statfs),
+		MAKE_TEST(bpf_test_lseek),
 	};
 #undef MAKE_TEST
 

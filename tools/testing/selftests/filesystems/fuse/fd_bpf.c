@@ -289,6 +289,13 @@ int trace_daemon(struct fuse_args *fa)
 		return FUSE_BPF_BACKING;
 	}
 
+	case FUSE_LSEEK | FUSE_PREFILTER: {
+		const struct fuse_lseek_in *fli = fa->in_args[0].value;
+
+		bpf_printk("lseek type:%d, offset:%lld", fli->whence, fli->offset);
+		return FUSE_BPF_BACKING;
+	}
+
 	default:
 		if (fa->opcode & FUSE_PREFILTER)
 			bpf_printk("prefilter *** UNKNOWN *** opcode: %d",
