@@ -1195,13 +1195,16 @@ static int dn_share_fd(struct tipc_dn_chan *dn, int fd,
 	/*
 	 * Buffers with a preallocated mem_id should only be sent to Trusty
 	 * using TRUSTY_SEND_SECURE. And conversely, TRUSTY_SEND_SECURE should
-	 * only be used to send buffers with preallcoated mem_id.
+	 * only be used to send buffers with preallocated mem_id.
 	 */
 	if (!ret) {
 		/* Use shared memory ID owned by dma_buf */
-		/* TODO: Enforce transfer_kind == TRUSTY_SEND_SECURE */
-		WARN_ONCE(transfer_kind != TRUSTY_SEND_SECURE,
-			  "Use TRUSTY_SEND_SECURE instead");
+		if (transfer_kind != TRUSTY_SEND_SECURE) {
+			dev_err(dev, "transfer_kind: %d, must be TRUSTY_SEND_SECURE\n",
+				transfer_kind);
+			ret = -EINVAL;
+			goto cleanup_handle;
+		}
 		goto mem_id_allocated;
 	}
 
