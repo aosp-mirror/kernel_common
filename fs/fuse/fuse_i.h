@@ -1524,9 +1524,13 @@ int fuse_file_read_iter_backing(struct fuse_args *fa,
 void *fuse_file_read_iter_finalize(struct fuse_args *fa,
 		struct kiocb *iocb, struct iov_iter *to);
 
+struct fuse_write_iter_out {
+	uint64_t ret;
+};
 struct fuse_file_write_iter_io {
 	struct fuse_write_in fwi;
 	struct fuse_write_out fwo;
+	struct fuse_write_iter_out fwio;
 };
 
 int fuse_file_write_iter_initialize(

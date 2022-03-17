@@ -13,6 +13,33 @@
 
 #include "../internal.h"
 
+#define FUSE_BPF_IOCB_MASK (IOCB_APPEND | IOCB_DSYNC | IOCB_HIPRI | IOCB_NOWAIT | IOCB_SYNC)
+
+struct fuse_bpf_aio_req {
+	struct kiocb iocb;
+	struct kiocb *iocb_fuse;
+};
+
+static void fuse_file_accessed(struct file *dst_file, struct file *src_file)
+{
+	struct inode *dst_inode;
+	struct inode *src_inode;
+
+	if (dst_file->f_flags & O_NOATIME)
+		return;
+
+	dst_inode = file_inode(dst_file);
+	src_inode = file_inode(src_file);
+
+	if ((!timespec64_equal(&dst_inode->i_mtime, &src_inode->i_mtime) ||
+	     !timespec64_equal(&dst_inode->i_ctime, &src_inode->i_ctime))) {
+		dst_inode->i_mtime = src_inode->i_mtime;
+		dst_inode->i_ctime = src_inode->i_ctime;
+	}
+
+	touch_atime(&dst_file->f_path);
+}
+
 struct bpf_prog *fuse_get_bpf_prog(struct file *file)
 {
 	struct bpf_prog *bpf_prog = ERR_PTR(-EINVAL);
@@ -779,6 +806,33 @@ void *fuse_removexattr_finalize(struct fuse_args *fa,
 	return NULL;
 }
 
+static void fuse_bpf_aio_cleanup_handler(struct fuse_bpf_aio_req *aio_req)
+{
+	struct kiocb *iocb = &aio_req->iocb;
+	struct kiocb *iocb_fuse = aio_req->iocb_fuse;
+
+	if (iocb->ki_flags & IOCB_WRITE) {
+		__sb_writers_acquired(file_inode(iocb->ki_filp)->i_sb,
+				      SB_FREEZE_WRITE);
+		file_end_write(iocb->ki_filp);
+		fuse_copyattr(iocb_fuse->ki_filp, iocb->ki_filp);
+	}
+
+	iocb_fuse->ki_pos = iocb->ki_pos;
+	kfree(aio_req);
+}
+
+static void fuse_bpf_aio_rw_complete(struct kiocb *iocb, long res, long res2)
+{
+	struct fuse_bpf_aio_req *aio_req =
+		container_of(iocb, struct fuse_bpf_aio_req, iocb);
+	struct kiocb *iocb_fuse = aio_req->iocb_fuse;
+
+	fuse_bpf_aio_cleanup_handler(aio_req);
+	iocb_fuse->ki_complete(iocb_fuse, res, res2);
+}
+
+
 int fuse_file_read_iter_initialize(
 		struct fuse_args *fa, struct fuse_read_in *fri,
 		struct kiocb *iocb, struct iov_iter *to)
@@ -820,17 +874,44 @@ int fuse_file_read_iter_backing(struct fuse_args *fa,
 {
 	struct file *file = iocb->ki_filp;
 	struct fuse_file *ff = file->private_data;
-	ssize_t result;
+	ssize_t ret;
+
+	if (!iov_iter_count(to))
+		return 0;
+
+	if ((iocb->ki_flags & IOCB_DIRECT) &&
+	    (!ff->backing_file->f_mapping->a_ops ||
+	     !ff->backing_file->f_mapping->a_ops->direct_IO))
+		return -EINVAL;
 
 	/* TODO This just plain ignores any change to fuse_read_in */
-	result = vfs_iter_read(ff->backing_file, to, &iocb->ki_pos, 0);
+	if (is_sync_kiocb(iocb)) {
+		ret = vfs_iter_read(ff->backing_file, to, &iocb->ki_pos,
+				iocb_to_rw_flags(iocb->ki_flags, FUSE_BPF_IOCB_MASK));
+	} else {
+		struct fuse_bpf_aio_req *aio_req;
 
-	if (result < 0)
-		return result;
+		ret = -ENOMEM;
+		aio_req = kzalloc(sizeof(struct fuse_bpf_aio_req), GFP_KERNEL);
+		if (!aio_req)
+			goto out;
+		aio_req->iocb_fuse = iocb;
+		kiocb_clone(&aio_req->iocb, iocb, ff->backing_file);
+		aio_req->iocb.ki_complete = fuse_bpf_aio_rw_complete;
+		ret = vfs_iocb_iter_read(ff->backing_file, &aio_req->iocb, to);
+		if (ret != -EIOCBQUEUED)
+			fuse_bpf_aio_cleanup_handler(aio_req);
+	}
+
+	if (ret >= 0)
+		fa->out_args[0].size = ret;
 
 	/* TODO Need to point value at the buffer for post-modification */
-	fa->out_args[0].size = result;
-	return result;
+
+out:
+	fuse_file_accessed(file, ff->backing_file);
+
+	return ret;
 }
 
 void *fuse_file_read_iter_finalize(struct fuse_args *fa,
@@ -862,8 +943,8 @@ int fuse_file_write_iter_initialize(
 		.in_args[1].size = fwio->fwi.size,
 		.in_args[1].value = from->kvec->iov_base,
 		.out_numargs = 1,
-		.out_args[0].size = sizeof(fwio->fwo),
-		.out_args[0].value = &fwio->fwo,
+		.out_args[0].size = sizeof(fwio->fwio),
+		.out_args[0].value = &fwio->fwio,
 	};
 
 	return 0;
@@ -874,26 +955,60 @@ int fuse_file_write_iter_backing(struct fuse_args *fa,
 {
 	struct file *file = iocb->ki_filp;
 	struct fuse_file *ff = file->private_data;
-	struct fuse_write_out *fwo = fa->out_args[0].value;
+	struct fuse_write_iter_out *fwio = fa->out_args[0].value;
+	ssize_t ret;
+
+	if (!iov_iter_count(from))
+		return 0;
 
 	/* TODO This just plain ignores any change to fuse_write_in */
-	fwo->size = vfs_iter_write(ff->backing_file, from, &iocb->ki_pos, 0);
+	/* TODO uint32_t seems smaller than ssize_t.... right? */
+	inode_lock(file_inode(file));
 
-	/* Must reflect change in size of backing file to upper file */
-	if (fwo->size > 0)
-		fuse_copyattr(file, ff->backing_file);
+	fuse_copyattr(file, ff->backing_file);
 
-	if (fwo->size < 0)
-		return fwo->size;
+	if (is_sync_kiocb(iocb)) {
+		file_start_write(ff->backing_file);
+		ret = vfs_iter_write(ff->backing_file, from, &iocb->ki_pos,
+					   iocb_to_rw_flags(iocb->ki_flags, FUSE_BPF_IOCB_MASK));
+		file_end_write(ff->backing_file);
+
+		/* Must reflect change in size of backing file to upper file */
+		if (ret > 0)
+			fuse_copyattr(file, ff->backing_file);
+	} else {
+		struct fuse_bpf_aio_req *aio_req;
+
+		ret = -ENOMEM;
+		/* TODO get this from a cache? */
+		aio_req = kzalloc(sizeof(struct fuse_bpf_aio_req), GFP_KERNEL);
+		if (!aio_req)
+			goto out;
+
+		file_start_write(ff->backing_file);
+		__sb_writers_release(file_inode(ff->backing_file)->i_sb, SB_FREEZE_WRITE);
+		aio_req->iocb_fuse = iocb;
+		kiocb_clone(&aio_req->iocb, iocb, ff->backing_file);
+		aio_req->iocb.ki_complete = fuse_bpf_aio_rw_complete;
+		ret = vfs_iocb_iter_write(ff->backing_file, &aio_req->iocb, from);
+		if (ret != -EIOCBQUEUED)
+			fuse_bpf_aio_cleanup_handler(aio_req);
+	}
+
+out:
+	inode_unlock(file_inode(file));
+	fwio->ret = ret;
+	if (ret < 0)
+		return ret;
 	return 0;
 }
 
 void *fuse_file_write_iter_finalize(struct fuse_args *fa,
 		struct kiocb *iocb, struct iov_iter *from)
 {
-	struct fuse_write_out *fwo = fa->out_args[0].value;
+	struct fuse_write_iter_out *fwio = fa->out_args[0].value;
 
-	return ERR_PTR(fwo->size);
+	return ERR_PTR(fwio->ret);
 }
 
 ssize_t fuse_backing_mmap(struct file *file, struct vm_area_struct *vma)
