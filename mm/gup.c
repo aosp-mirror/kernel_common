@@ -185,7 +185,7 @@ static void put_compound_head(struct page *page, int refs, unsigned int flags)
 	}
 
 	if (flags & FOLL_GET)
-		reset_page_pinner(page, compound_order(page));
+		unset_page_pinner(page, compound_order(page));
 	put_page_refs(page, refs);
 }
 
@@ -277,7 +277,7 @@ void put_user_page(struct page *page)
 {
 	struct page *head = compound_head(page);
 
-	reset_page_pinner(head, compound_order(head));
+	unset_page_pinner(head, compound_order(head));
 	put_page(page);
 }
 EXPORT_SYMBOL(put_user_page);

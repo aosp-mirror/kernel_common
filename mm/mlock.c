@@ -479,7 +479,7 @@ void munlock_vma_pages_range(struct vm_area_struct *vma,
 			 * sites correctly so just unattribute them to avoid
 			 * false positive at this moment.
 			 */
-			reset_page_pinner(page, compound_order(page));
+			unset_page_pinner(page, compound_order(page));
 			if (PageTransTail(page)) {
 				VM_BUG_ON_PAGE(PageMlocked(page), page);
 				put_page(page); /* follow_page_mask() */

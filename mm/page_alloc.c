@@ -8715,7 +8715,12 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
 	if (ret < 0) {
 		if (ret == -EBUSY) {
 			alloc_contig_dump_pages(&cc->migratepages);
-			page_pinner_mark_migration_failed_pages(&cc->migratepages);
+			list_for_each_entry(page, &cc->migratepages, lru) {
+				/* The page will be freed by putback_movable_pages soon */
+				if (page_count(page) == 1)
+					continue;
+				page_pinner_failure_detect(page);
+			}
 		}
 
 		if (!list_empty(&cc->migratepages)) {
