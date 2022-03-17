@@ -23,6 +23,12 @@ struct page_pinner {
 	atomic_t count;
 };
 
+enum pp_state {
+	PP_PUT,
+	PP_FREE,
+	PP_FAIL_DETECTED,
+};
+
 struct captured_pinner {
 	depot_stack_handle_t handle;
 	union {
@@ -36,6 +42,7 @@ struct captured_pinner {
 	int mapcount;
 	struct address_space *mapping;
 	unsigned long flags;
+	enum pp_state state;
 };
 
 struct page_pinner_buffer {
@@ -158,6 +165,7 @@ static void check_longterm_pin(struct page_pinner *page_pinner,
 
 	record.handle = page_pinner->handle;
 	record.elapsed = delta;
+	record.state = PP_PUT;
 	capture_page_state(page, &record);
 
 	add_record(&lt_buffer, &record);
@@ -180,6 +188,7 @@ void __unset_page_pinner(struct page *page, unsigned int order)
 		page_pinner = get_page_pinner(page_ext);
 		check_longterm_pin(page_pinner, page);
 		clear_bit(PAGE_EXT_GET, &page_ext->flags);
+		page_pinner->ts_usec = 0;
 		page_ext = page_ext_next(page_ext);
 	}
 }
@@ -209,6 +218,7 @@ void __free_page_pinner(struct page *page, unsigned int order)
 
 		record.handle = save_stack(GFP_NOWAIT|__GFP_NOWARN);
 		record.ts_usec = ktime_to_us(ktime_get_boottime());
+		record.state = PP_FREE;
 		capture_page_state(page, &record);
 
 		add_record(&acf_buffer, &record);
@@ -245,7 +255,7 @@ noinline void __set_page_pinner(struct page *page, unsigned int order)
 }
 
 static ssize_t
-print_page_pinner(bool longterm, char __user *buf, size_t count, struct captured_pinner *record)
+print_page_pinner(char __user *buf, size_t count, struct captured_pinner *record)
 {
 	int ret;
 	unsigned long *entries;
@@ -257,15 +267,17 @@ print_page_pinner(bool longterm, char __user *buf, size_t count, struct captured
 	if (!kbuf)
 		return -ENOMEM;
 
-	if (longterm) {
-		ret = snprintf(kbuf, count, "Page pinned for %lld us\n",
+	if (record->state == PP_PUT) {
+		ret = snprintf(kbuf, count, "At least, pinned for %lld us\n",
 			       record->elapsed);
 	} else {
 		s64 ts_usec = record->ts_usec;
 		unsigned long rem_usec = do_div(ts_usec, 1000000);
 
 		ret = snprintf(kbuf, count,
-			       "Page pinned ts [%5lu.%06lu]\n",
+			       "%s [%5lu.%06lu]\n",
+			       record->state == PP_FREE ? "Freed at" :
+							  "Failure detected at",
 			       (unsigned long)ts_usec, rem_usec);
 	}
 
@@ -356,7 +368,9 @@ void __dump_page_pinner(struct page *page)
 void __page_pinner_failure_detect(struct page *page)
 {
 	struct page_ext *page_ext = lookup_page_ext(page);
+	struct page_pinner *page_pinner;
 	struct captured_pinner record;
+	s64 now;
 
 	if (unlikely(!page_ext))
 		return;
@@ -364,9 +378,14 @@ void __page_pinner_failure_detect(struct page *page)
 	if (test_bit(PAGE_EXT_PINNER_MIGRATION_FAILED, &page_ext->flags))
 		return;
 
+	now = ktime_to_us(ktime_get_boottime());
+	page_pinner = get_page_pinner(page_ext);
+	if (!page_pinner->ts_usec)
+		page_pinner->ts_usec = now;
 	set_bit(PAGE_EXT_PINNER_MIGRATION_FAILED, &page_ext->flags);
 	record.handle = save_stack(GFP_NOWAIT|__GFP_NOWARN);
-	record.ts_usec = ktime_to_us(ktime_get_boottime());
+	record.ts_usec = now;
+	record.state = PP_FAIL_DETECTED;
 	capture_page_state(page, &record);
 
 	add_record(&acf_buffer, &record);
@@ -376,6 +395,7 @@ EXPORT_SYMBOL_GPL(__page_pinner_failure_detect);
 void __page_pinner_put_page(struct page *page)
 {
 	struct page_ext *page_ext = lookup_page_ext(page);
+	struct page_pinner *page_pinner;
 	struct captured_pinner record;
 
 	if (unlikely(!page_ext))
@@ -384,8 +404,10 @@ void __page_pinner_put_page(struct page *page)
 	if (!test_bit(PAGE_EXT_PINNER_MIGRATION_FAILED, &page_ext->flags))
 		return;
 
+	page_pinner = get_page_pinner(page_ext);
 	record.handle = save_stack(GFP_NOWAIT|__GFP_NOWARN);
-	record.ts_usec = ktime_to_us(ktime_get_boottime());
+	record.elapsed = ktime_to_us(ktime_get_boottime()) - page_pinner->ts_usec;
+	record.state = PP_PUT;
 	capture_page_state(page, &record);
 
 	add_record(&acf_buffer, &record);
@@ -421,7 +443,7 @@ read_longterm_page_pinner(struct file *file, char __user *buf, size_t count,
 	if (!record.handle)
 		return 0;
 
-	return print_page_pinner(true, buf, count, &record);
+	return print_page_pinner(buf, count, &record);
 }
 
 static const struct file_operations proc_longterm_pinner_operations = {
@@ -457,7 +479,7 @@ static ssize_t read_alloc_contig_failed(struct file *file, char __user *buf,
 	if (!record.handle)
 		return 0;
 
-	return print_page_pinner(false, buf, count, &record);
+	return print_page_pinner(buf, count, &record);
 }
 
 static const struct file_operations proc_alloc_contig_failed_operations = {
