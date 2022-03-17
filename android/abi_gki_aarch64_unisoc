@@ -107,6 +107,8 @@
   console_unlock
   __const_udelay
   cpu_have_feature
+  cpu_hotplug_enable
+  cpu_hotplug_disable
   cpu_hwcap_keys
   cpu_hwcaps
   cpumask_next
