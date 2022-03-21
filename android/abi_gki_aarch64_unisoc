@@ -464,6 +464,7 @@
   kstrtoll
   kstrtouint
   kstrtoull
+  ksys_sync_helper
   kthread_create_on_node
   kthread_flush_worker
   kthread_should_stop
