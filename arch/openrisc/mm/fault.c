@@ -31,7 +31,7 @@ unsigned long pte_errors;	/* updated by do_page_fault() */
  */
 volatile pgd_t *current_pgd[NR_CPUS];
 
-extern void die(char *, struct pt_regs *, long);
+extern void __noreturn die(char *, struct pt_regs *, long);
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -248,8 +248,6 @@ no_context:
 	printk(" at virtual address 0x%08lx\n", address);
 
 	die("Oops", regs, write_acc);
-
-	do_exit(SIGKILL);
 
 	/*
 	 * We ran out of memory, or some other thing happened to us that made

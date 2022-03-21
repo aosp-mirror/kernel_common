@@ -107,6 +107,8 @@
   console_unlock
   __const_udelay
   cpu_have_feature
+  cpu_hotplug_enable
+  cpu_hotplug_disable
   cpu_hwcap_keys
   cpu_hwcaps
   cpumask_next
@@ -462,6 +464,7 @@
   kstrtoll
   kstrtouint
   kstrtoull
+  ksys_sync_helper
   kthread_create_on_node
   kthread_flush_worker
   kthread_should_stop
@@ -1263,6 +1266,7 @@
   strcspn
   system_highpri_wq
   tracepoint_probe_register
+  __tracepoint_android_vh_ion_buffer_release
   __tracepoint_android_vh_psci_tos_resident_on
   __tracepoint_android_vh_psci_cpu_suspend
   __tracepoint_clock_set_rate
