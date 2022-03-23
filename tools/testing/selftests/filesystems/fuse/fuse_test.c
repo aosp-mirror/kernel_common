@@ -485,7 +485,7 @@ static int bpf_test_redact_readdir(const char *mount_dir)
 		TESTSYSCALL(closedir(dir));
 		dir = NULL;
 	FUSE_DAEMON
-	bool skip = true;
+		bool skip = true;
 		for (int i = 0; i < ARRAY_SIZE(names) + 1; i++) {
 			uint8_t bytes_in[FUSE_MIN_READ_BUFFER];
 			uint8_t bytes_out[FUSE_MIN_READ_BUFFER];

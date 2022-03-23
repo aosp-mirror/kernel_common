@@ -987,10 +987,6 @@ struct fuse_io_args {
 void fuse_read_args_fill(struct fuse_io_args *ia, struct file *file, loff_t pos,
 			 size_t count, int opcode);
 
-
-int fuse_parse_dirfile(char *buf, size_t nbytes, struct file *file,
-			 struct dir_context *ctx);
-
 /**
  * Send OPEN or OPENDIR request
  */
@@ -1637,13 +1633,13 @@ struct fuse_read_io {
 
 int fuse_readdir_initialize(struct fuse_args *fa, struct fuse_read_io *frio,
 			    struct file *file, struct dir_context *ctx,
-			    bool *force_again, bool *allow_force);
+			    bool *force_again, bool *allow_force, bool is_continued);
 int fuse_readdir_backing(struct fuse_args *fa,
 			 struct file *file, struct dir_context *ctx,
-			 bool *force_again, bool *allow_force);
+			 bool *force_again, bool *allow_force, bool is_continued);
 void *fuse_readdir_finalize(struct fuse_args *fa,
 			    struct file *file, struct dir_context *ctx,
-			    bool *force_again, bool *allow_force);
+			    bool *force_again, bool *allow_force, bool is_continued);
 
 int fuse_access_initialize(struct fuse_args *fa, struct fuse_access_in *fai,
 			   struct inode *inode, int mask);

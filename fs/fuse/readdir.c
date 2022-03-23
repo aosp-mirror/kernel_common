@@ -121,7 +121,7 @@ static bool fuse_emit(struct file *file, struct dir_context *ctx,
 			dirent->type);
 }
 
-int fuse_parse_dirfile(char *buf, size_t nbytes, struct file *file,
+static int parse_dirfile(char *buf, size_t nbytes, struct file *file,
 			 struct dir_context *ctx)
 {
 	while (nbytes >= FUSE_NAME_OFFSET) {
@@ -360,7 +360,7 @@ static int fuse_readdir_uncached(struct file *file, struct dir_context *ctx)
 			res = parse_dirplusfile(page_address(page), res,
 						file, ctx, attr_version);
 		} else {
-			res = fuse_parse_dirfile(page_address(page), res, file,
+			res = parse_dirfile(page_address(page), res, file,
 					    ctx);
 		}
 	}
@@ -574,13 +574,17 @@ int fuse_readdir(struct file *file, struct dir_context *ctx)
 #ifdef CONFIG_FUSE_BPF
 	struct fuse_err_ret fer;
 	bool force_again, allow_force;
+	bool is_continued = false;
+
 again:
 	fer = fuse_bpf_backing(inode, struct fuse_read_io,
 			       fuse_readdir_initialize, fuse_readdir_backing,
 			       fuse_readdir_finalize,
-			       file, ctx, &force_again, &allow_force);
-	if (force_again && !IS_ERR(fer.result))
+			       file, ctx, &force_again, &allow_force, is_continued);
+	if (force_again && !IS_ERR(fer.result)) {
+		is_continued = true;
 		goto again;
+	}
 
 	if (fer.ret)
 		return PTR_ERR(fer.result);

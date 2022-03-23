@@ -2189,7 +2189,7 @@ void *fuse_symlink_finalize(
 
 int fuse_readdir_initialize(struct fuse_args *fa, struct fuse_read_io *frio,
 			    struct file *file, struct dir_context *ctx,
-			    bool *force_again, bool *allow_force)
+			    bool *force_again, bool *allow_force, bool is_continued)
 {
 	struct fuse_file *ff = file->private_data;
 	u8 *page = (u8 *)__get_free_page(GFP_KERNEL);
@@ -2259,9 +2259,35 @@ static int filldir(struct dir_context *ctx, const char *name, int namelen,
 	return 0;
 }
 
+static int parse_dirfile(char *buf, size_t nbytes, struct dir_context *ctx)
+{
+	while (nbytes >= FUSE_NAME_OFFSET) {
+		struct fuse_dirent *dirent = (struct fuse_dirent *) buf;
+		size_t reclen = FUSE_DIRENT_SIZE(dirent);
+
+		if (!dirent->namelen || dirent->namelen > FUSE_NAME_MAX)
+			return -EIO;
+		if (reclen > nbytes)
+			break;
+		if (memchr(dirent->name, '/', dirent->namelen) != NULL)
+			return -EIO;
+
+		ctx->pos = dirent->off;
+		if (!dir_emit(ctx, dirent->name, dirent->namelen, dirent->ino,
+				dirent->type))
+			break;
+
+		buf += reclen;
+		nbytes -= reclen;
+	}
+
+	return 0;
+}
+
+
 int fuse_readdir_backing(struct fuse_args *fa,
 			 struct file *file, struct dir_context *ctx,
-			 bool *force_again, bool *allow_force)
+			 bool *force_again, bool *allow_force, bool is_continued)
 {
 	struct fuse_file *ff = file->private_data;
 	struct file *backing_dir = ff->backing_file;
@@ -2278,6 +2304,9 @@ int fuse_readdir_backing(struct fuse_args *fa,
 	if (!ec.addr)
 		return -ENOMEM;
 
+	if (!is_continued)
+		backing_dir->f_pos = file->f_pos;
+
 	err = iterate_dir(backing_dir, &ec.ctx);
 	if (ec.offset == 0)
 		*allow_force = false;
@@ -2290,18 +2319,19 @@ int fuse_readdir_backing(struct fuse_args *fa,
 
 void *fuse_readdir_finalize(struct fuse_args *fa,
 			    struct file *file, struct dir_context *ctx,
-			    bool *force_again, bool *allow_force)
+			    bool *force_again, bool *allow_force, bool is_continued)
 {
-	int err = 0;
+	struct fuse_read_out *fro = fa->out_args[0].value;
 	struct fuse_file *ff = file->private_data;
 	struct file *backing_dir = ff->backing_file;
-	struct fuse_read_out *fro = fa->out_args[0].value;
+	int err = 0;
 
-	err = fuse_parse_dirfile(fa->out_args[1].value,
-				 fa->out_args[1].size, file, ctx);
+	err = parse_dirfile(fa->out_args[1].value, fa->out_args[1].size, ctx);
 	*force_again = !!fro->again;
 	if (*force_again && !*allow_force)
 		err = -EINVAL;
+
+	ctx->pos = fro->offset;
 	backing_dir->f_pos = fro->offset;
 
 	free_page((unsigned long) fa->out_args[1].value);
