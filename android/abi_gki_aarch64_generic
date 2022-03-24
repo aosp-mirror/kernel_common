@@ -1655,6 +1655,7 @@
   __rcu_read_unlock
   rdev_get_drvdata
   rdev_get_id
+  reboot_mode
   refcount_dec_not_one
   refcount_warn_saturate
   __refrigerator
