@@ -35,3 +35,5 @@ MODULES_ORDER=android/gki_aarch64_modules
 if [ -n "${GKI_DEFCONFIG_FRAGMENT}" ]; then
 source ${GKI_DEFCONFIG_FRAGMENT}
 fi
+
+BUILD_GKI_CERTIFICATION_TOOLS=1
