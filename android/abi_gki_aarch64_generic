@@ -388,6 +388,7 @@
   devfreq_update_interval
   dev_fwnode
   dev_get_by_name
+  dev_get_stats
   device_add
   device_add_disk
   device_add_groups
@@ -897,6 +898,21 @@
   get_device
   __get_free_pages
   get_governor_parent_kobj
+  gether_cleanup
+  gether_connect
+  gether_disconnect
+  gether_get_dev_addr
+  gether_get_host_addr
+  gether_get_host_addr_u8
+  gether_get_ifname
+  gether_get_qmult
+  gether_register_netdev
+  gether_set_dev_addr
+  gether_set_gadget
+  gether_set_host_addr
+  gether_set_ifname
+  gether_set_qmult
+  gether_setup_name_default
   get_pfnblock_flags_mask
   get_pid_task
   get_random_bytes
@@ -2399,20 +2415,27 @@
   up_write
   usb_add_function
   usb_add_hcd
+  usb_assign_descriptors
   usb_copy_descriptors
   __usb_create_hcd
   usb_disabled
   usb_enable_autosuspend
+  usb_ep_alloc_request
   usb_ep_autoconfig
   usb_ep_disable
   usb_ep_enable
+  usb_ep_free_request
+  usb_ep_queue
+  usb_free_all_descriptors
   usb_function_register
   usb_function_unregister
   usb_gadget_set_state
+  usb_gstrings_attach
   usb_hcd_is_primary_hcd
   usb_hcd_platform_shutdown
   usb_hub_find_child
   usb_interface_id
+  usb_os_desc_prepare_interf_dir
   usb_otg_state_string
   usb_put_function_instance
   usb_put_hcd
