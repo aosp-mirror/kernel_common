@@ -1493,6 +1493,7 @@
   pci_write_config_dword
   pci_write_config_word
   PDE_DATA
+  pelt_load_avg_max
   __per_cpu_offset
   perf_aux_output_begin
   perf_aux_output_end
@@ -2148,6 +2149,7 @@
   trace_event_reg
   trace_handle_return
   __traceiter_android_rvh_arm64_serror_panic
+  __traceiter_android_rvh_attach_entity_load_avg
   __traceiter_android_rvh_bad_mode
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
@@ -2155,6 +2157,7 @@
   __traceiter_android_rvh_cpu_overutilized
   __traceiter_android_rvh_dequeue_task
   __traceiter_android_rvh_dequeue_task_fair
+  __traceiter_android_rvh_detach_entity_load_avg
   __traceiter_android_rvh_die_kernel_fault
   __traceiter_android_rvh_do_mem_abort
   __traceiter_android_rvh_do_sea
@@ -2168,6 +2171,7 @@
   __traceiter_android_rvh_post_init_entity_util_avg
   __traceiter_android_rvh_preempt_disable
   __traceiter_android_rvh_preempt_enable
+  __traceiter_android_rvh_remove_entity_load_avg
   __traceiter_android_rvh_sched_fork
   __traceiter_android_rvh_select_task_rq_fair
   __traceiter_android_rvh_select_task_rq_rt
@@ -2178,6 +2182,8 @@
   __traceiter_android_rvh_uclamp_rq_util_with
   __traceiter_android_rvh_ufs_complete_init
   __traceiter_android_rvh_ufs_reprogram_all_keys
+  __traceiter_android_rvh_update_blocked_fair
+  __traceiter_android_rvh_update_load_avg
   __traceiter_android_rvh_util_est_update
   __traceiter_android_vh_arch_set_freq_scale
   __traceiter_android_vh_cma_alloc_finish
@@ -2244,6 +2250,7 @@
   __traceiter_suspend_resume
   trace_output_call
   __tracepoint_android_rvh_arm64_serror_panic
+  __tracepoint_android_rvh_attach_entity_load_avg
   __tracepoint_android_rvh_bad_mode
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
@@ -2251,6 +2258,7 @@
   __tracepoint_android_rvh_cpu_overutilized
   __tracepoint_android_rvh_dequeue_task
   __tracepoint_android_rvh_dequeue_task_fair
+  __tracepoint_android_rvh_detach_entity_load_avg
   __tracepoint_android_rvh_die_kernel_fault
   __tracepoint_android_rvh_do_mem_abort
   __tracepoint_android_rvh_do_sea
@@ -2264,6 +2272,7 @@
   __tracepoint_android_rvh_post_init_entity_util_avg
   __tracepoint_android_rvh_preempt_disable
   __tracepoint_android_rvh_preempt_enable
+  __tracepoint_android_rvh_remove_entity_load_avg
   __tracepoint_android_rvh_sched_fork
   __tracepoint_android_rvh_select_task_rq_fair
   __tracepoint_android_rvh_select_task_rq_rt
@@ -2274,6 +2283,8 @@
   __tracepoint_android_rvh_uclamp_rq_util_with
   __tracepoint_android_rvh_ufs_complete_init
   __tracepoint_android_rvh_ufs_reprogram_all_keys
+  __tracepoint_android_rvh_update_blocked_fair
+  __tracepoint_android_rvh_update_load_avg
   __tracepoint_android_rvh_util_est_update
   __tracepoint_android_vh_arch_set_freq_scale
   __tracepoint_android_vh_cma_alloc_finish
@@ -2409,7 +2420,9 @@
   unregister_virtio_driver
   up
   update_devfreq
+  ___update_load_avg
   __update_load_avg_blocked_se
+  ___update_load_sum
   update_rq_clock
   up_read
   up_write
