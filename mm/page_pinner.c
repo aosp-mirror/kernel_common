@@ -48,13 +48,11 @@ struct captured_pinner {
 struct page_pinner_buffer {
 	spinlock_t lock;
 	unsigned int index;
-	struct captured_pinner buffer[PP_BUF_SIZE];
+	struct captured_pinner *buffer;
 };
 
 /* alloc_contig failed pinner */
-static struct page_pinner_buffer acf_buffer = {
-	.lock = __SPIN_LOCK_UNLOCKED(acf_buffer.lock),
-};
+static struct page_pinner_buffer pp_buffer;
 
 static bool page_pinner_enabled;
 DEFINE_STATIC_KEY_FALSE(page_pinner_inited);
@@ -148,6 +146,10 @@ void __free_page_pinner(struct page *page, unsigned int order)
 	struct page_ext *page_ext;
 	int i;
 
+	/* free_page could be called before buffer is initialized */
+	if (!pp_buffer.buffer)
+		return;
+
 	page_ext = lookup_page_ext(page);
 	if (unlikely(!page_ext))
 		return;
@@ -169,7 +171,7 @@ void __free_page_pinner(struct page *page, unsigned int order)
 		record.state = PP_FREE;
 		capture_page_state(page, &record);
 
-		add_record(&acf_buffer, &record);
+		add_record(&pp_buffer, &record);
 
 		atomic_set(&page_pinner->count, 0);
 		page_pinner->ts_usec = 0;
@@ -312,7 +314,7 @@ void __page_pinner_failure_detect(struct page *page)
 	record.state = PP_FAIL_DETECTED;
 	capture_page_state(page, &record);
 
-	add_record(&acf_buffer, &record);
+	add_record(&pp_buffer, &record);
 }
 EXPORT_SYMBOL_GPL(__page_pinner_failure_detect);
 
@@ -334,7 +336,7 @@ void __page_pinner_put_page(struct page *page)
 	record.state = PP_PUT;
 	capture_page_state(page, &record);
 
-	add_record(&acf_buffer, &record);
+	add_record(&pp_buffer, &record);
 }
 EXPORT_SYMBOL_GPL(__page_pinner_put_page);
 
@@ -358,12 +360,12 @@ static ssize_t read_buffer(struct file *file, char __user *buf,
 	 * reading the records in the reverse order with newest one
 	 * being read first followed by older ones
 	 */
-	idx = (acf_buffer.index - 1 - i + PP_BUF_SIZE) %
+	idx = (pp_buffer.index - 1 - i + PP_BUF_SIZE) %
 	       PP_BUF_SIZE;
 
-	spin_lock_irqsave(&acf_buffer.lock, flags);
-	record = acf_buffer.buffer[idx];
-	spin_unlock_irqrestore(&acf_buffer.lock, flags);
+	spin_lock_irqsave(&pp_buffer.lock, flags);
+	record = pp_buffer.buffer[idx];
+	spin_unlock_irqrestore(&pp_buffer.lock, flags);
 	if (!record.handle)
 		return 0;
 
@@ -401,6 +403,16 @@ static int __init page_pinner_init(void)
 
 	if (!static_branch_unlikely(&page_pinner_inited))
 		return 0;
+
+	pp_buffer.buffer = kvmalloc_array(PP_BUF_SIZE, sizeof(*pp_buffer.buffer),
+				GFP_KERNEL);
+	if (!pp_buffer.buffer) {
+		pr_info("page_pinner disabled due to \n");
+		return 1;
+	}
+
+	spin_lock_init(&pp_buffer.lock);
+	pp_buffer.index = 0;
 
 	pr_info("page_pinner enabled\n");
 
