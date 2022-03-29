@@ -133,6 +133,8 @@ static const u16 mgmt_commands[] = {
 	MGMT_OP_MESH_READ_FEATURES,
 	MGMT_OP_MESH_SEND,
 	MGMT_OP_MESH_SEND_CANCEL,
+	MGMT_OP_GET_SCO_CODEC_CAPABILITIES,
+	MGMT_OP_NOTIFY_SCO_CONNECTION_CHANGE,
 };
 
 static const u16 mgmt_events[] = {
@@ -9173,6 +9175,145 @@ static int get_adv_size_info(struct sock *sk, struct hci_dev *hdev,
 				 MGMT_STATUS_SUCCESS, &rp, sizeof(rp));
 }
 
+static int get_sco_codec_capabilities(struct sock *sk, struct hci_dev *hdev,
+				      void *data, u16 data_len)
+{
+	struct mgmt_cp_get_codec_capabilities *cp = data;
+	struct mgmt_rp_get_codec_capabilities *rp;
+	int i, num_rp_codecs;
+	int err;
+	size_t total_size = sizeof(struct mgmt_rp_get_codec_capabilities);
+	bool wbs_supported = false;
+	struct hci_dev *d;
+	u8 *ptr;
+
+	// First find the corresponding hci device.
+	read_lock(&hci_dev_list_lock);
+
+	list_for_each_entry(d, &hci_dev_list, list) {
+		if (d->id == cp->hci_id) {
+			hdev = d;
+			break;
+		}
+	}
+	read_unlock(&hci_dev_list_lock);
+
+	// Make sure we have a valid hdev.
+	if (!hdev || hdev->id != cp->hci_id)
+		return -EINVAL;
+
+	wbs_supported = test_bit(HCI_QUIRK_WIDEBAND_SPEECH_SUPPORTED, &hdev->quirks);
+
+	if (MGMT_GET_SCO_CODEC_CAPABILITIES_SIZE + cp->num_codecs != data_len)
+		return -EINVAL;
+
+	// Determine total alloc size for supported codecs.
+	for (i = 0; i < cp->num_codecs; ++i) {
+		switch (cp->codecs[i]) {
+		case MGMT_SCO_CODEC_CVSD:
+			total_size += sizeof(struct mgmt_bt_codec);
+			break;
+		case MGMT_SCO_CODEC_MSBC_TRANSPARENT:
+			if (wbs_supported)
+				total_size += sizeof(struct mgmt_bt_codec);
+			break;
+		default:
+			bt_dev_dbg(hdev, "Unknown codec %d", cp->codecs[i]);
+			break;
+		}
+	}
+
+	rp = kzalloc(total_size, GFP_KERNEL);
+	if (!rp)
+		return -ENOMEM;
+
+	rp->hci_id = hdev->id;
+	rp->offload_capable = false;
+
+	// Copy codec information to return.
+	ptr = (u8 *)rp->codecs;
+	for (i = 0, num_rp_codecs = 0; i < cp->num_codecs; ++i) {
+		struct mgmt_bt_codec *rc = (struct mgmt_bt_codec *)ptr;
+
+		switch (cp->codecs[i]) {
+		case MGMT_SCO_CODEC_CVSD:
+			rc->codec = cp->codecs[i];
+			ptr += sizeof(*rc);
+			num_rp_codecs++;
+			break;
+		case MGMT_SCO_CODEC_MSBC_TRANSPARENT:
+			if (wbs_supported) {
+				rc->codec = cp->codecs[i];
+				rc->packet_size = hdev->wbs_pkt_len;
+				ptr += sizeof(*rc);
+				num_rp_codecs++;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	// Only return the number of codecs actually written
+	rp->num_codecs = num_rp_codecs;
+
+	err = mgmt_cmd_complete(sk, MGMT_INDEX_NONE,
+				MGMT_OP_GET_SCO_CODEC_CAPABILITIES,
+				MGMT_STATUS_SUCCESS, rp, total_size);
+	kfree(rp);
+
+	return err;
+}
+
+static int notify_sco_connection_change(struct sock *sk, struct hci_dev *hdev,
+					void *data, u16 data_len)
+{
+	struct mgmt_cp_notify_sco_connection_change *cp = data;
+
+	struct hci_conn *conn;
+	int notify;
+	struct hci_dev *d;
+
+	// First find the corresponding hci device.
+	read_lock(&hci_dev_list_lock);
+
+	list_for_each_entry(d, &hci_dev_list, list) {
+		if (d->id == cp->hci_id) {
+			hdev = d;
+			break;
+		}
+	}
+	read_unlock(&hci_dev_list_lock);
+
+	// Make sure we have a valid hdev.
+	if (!hdev || hdev->id != cp->hci_id)
+		return -EINVAL;
+
+	/* We only need to notify the driver if it listens for it. */
+	if (!hdev->notify)
+		return 0;
+
+	/* We only notify for the first connected or disconnected change for a
+	 * given device.
+	 */
+	conn = hci_conn_hash_lookup_ba(hdev, SCO_LINK, &cp->addr.bdaddr);
+	if (cp->connected && !conn) {
+		conn = hci_conn_add_unset(hdev, SCO_LINK, &cp->addr.bdaddr, 0);
+		if (!conn)
+			return -ENOMEM;
+
+		notify = (cp->codec == MGMT_SCO_CODEC_MSBC_TRANSPARENT) ?
+					HCI_NOTIFY_ENABLE_SCO_TRANSP :
+					HCI_NOTIFY_ENABLE_SCO_CVSD;
+		hdev->notify(hdev, notify);
+	} else if (!cp->connected && conn) {
+		hci_conn_del(conn);
+		hdev->notify(hdev, HCI_NOTIFY_DISABLE_SCO);
+	}
+
+	return 0;
+}
+
 static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ NULL }, /* 0x0000 (no command) */
 	{ read_version,            MGMT_READ_VERSION_SIZE,
@@ -9305,6 +9446,13 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ mesh_send,               MGMT_MESH_SEND_SIZE,
 						HCI_MGMT_VAR_LEN },
 	{ mesh_send_cancel,        MGMT_MESH_SEND_CANCEL_SIZE },
+	{ get_sco_codec_capabilities, MGMT_GET_SCO_CODEC_CAPABILITIES_SIZE,
+						HCI_MGMT_NO_HDEV |
+						HCI_MGMT_UNTRUSTED |
+						HCI_MGMT_VAR_LEN },
+	{ notify_sco_connection_change, MGMT_NOTIFY_SCO_CONNECTION_CHANGE_SIZE,
+						HCI_MGMT_NO_HDEV |
+						HCI_MGMT_UNTRUSTED }
 };
 
 void mgmt_index_added(struct hci_dev *hdev)

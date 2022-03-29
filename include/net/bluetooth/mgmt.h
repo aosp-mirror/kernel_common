@@ -879,6 +879,42 @@ struct mgmt_cp_mesh_send_cancel {
 } __packed;
 #define MGMT_MESH_SEND_CANCEL_SIZE	1
 
+#define MGMT_OP_GET_SCO_CODEC_CAPABILITIES	0x0057
+#define MGMT_SCO_CODEC_CVSD			0x1
+#define MGMT_SCO_CODEC_MSBC_TRANSPARENT		0x2
+#define MGMT_SCO_CODEC_MSBC			0x3
+
+struct mgmt_bt_codec {
+	__u8	codec;
+	__u8	packet_size;
+	__u8	data_path;
+	__u32	data_length;
+	__u8	data[];
+} __packed;
+
+struct mgmt_cp_get_codec_capabilities {
+	__u16	hci_id;
+	__u32	num_codecs;
+	__u8	codecs[];
+} __packed;
+#define MGMT_GET_SCO_CODEC_CAPABILITIES_SIZE	0x6
+
+struct mgmt_rp_get_codec_capabilities {
+	__u16			hci_id;
+	__u8			offload_capable;
+	__u32			num_codecs;
+	struct mgmt_bt_codec	codecs[];
+} __packed;
+
+#define MGMT_OP_NOTIFY_SCO_CONNECTION_CHANGE	0x0058
+struct mgmt_cp_notify_sco_connection_change {
+	__u16 hci_id;
+	struct mgmt_addr_info	addr;
+	__u8			connected;
+	__u8			codec;
+} __packed;
+#define MGMT_NOTIFY_SCO_CONNECTION_CHANGE_SIZE	0xB
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;
