@@ -965,42 +965,44 @@ struct fuse_removemapping_one {
 #define FUSE_REMOVEMAPPING_MAX_ENTRY   \
 		(PAGE_SIZE / sizeof(struct fuse_removemapping_one))
 
-struct fuse_mount;
+/*
+ * Fuse BPF Args
+ *
+ * Used to communicate with bpf programs to allow checking or altering certain values.
+ * The end_offset allows the bpf verifier to check boundaries statically. This reflects
+ * the ends of the buffer. size shows the length that was actually used.
+ *
+ */
 
 /** One input argument of a request */
-struct fuse_in_arg {
-	unsigned size;
+struct fuse_bpf_in_arg {
+	uint32_t size;
 	const void *value;
+	const void *end_offset;
 };
 
 /** One output argument of a request */
-struct fuse_arg {
-	unsigned size;
+struct fuse_bpf_arg {
+	uint32_t size;
 	void *value;
+	void *end_offset;
 };
 
-struct fuse_args {
+#define FUSE_MAX_IN_ARGS 5
+#define FUSE_MAX_OUT_ARGS 3
+
+#define FUSE_BPF_FORCE (1 << 0)
+#define FUSE_BPF_OUT_ARGVAR (1 << 6)
+
+struct fuse_bpf_args {
 	uint64_t nodeid;
 	uint32_t opcode;
 	uint32_t error_in;
-	unsigned short in_numargs;
-	unsigned short out_numargs;
-	int force:1;
-	int noreply:1;
-	int nocreds:1;
-	int in_pages:1;
-	int out_pages:1;
-	int user_pages:1;
-	int out_argvar:1;
-	int page_zeroing:1;
-	int page_replace:1;
-	int may_block:1;
-	struct fuse_in_arg in_args[5];
-	struct fuse_arg out_args[3];
-	void (*end)(struct fuse_mount *fm, struct fuse_args *args, int error);
-
-	/* Path used for completing d_canonical_path */
-	struct path *canonical_path;
+	uint32_t in_numargs;
+	uint32_t out_numargs;
+	uint32_t flags;
+	struct fuse_bpf_in_arg in_args[FUSE_MAX_IN_ARGS];
+	struct fuse_bpf_arg out_args[FUSE_MAX_OUT_ARGS];
 };
 
 #define FUSE_BPF_USER_FILTER	1
