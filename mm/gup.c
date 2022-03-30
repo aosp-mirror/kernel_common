@@ -1740,7 +1740,7 @@ static long __get_user_pages_remote(struct mm_struct *mm,
 				    unsigned int gup_flags, struct page **pages,
 				    struct vm_area_struct **vmas, int *locked)
 {
-	trace_android_vh___get_user_pages_remote(locked, &gup_flags);
+	trace_android_vh___get_user_pages_remote(locked, &gup_flags, pages);
 
 	/*
 	 * Parts of FOLL_LONGTERM behavior are incompatible with
@@ -1880,7 +1880,7 @@ long get_user_pages(unsigned long start, unsigned long nr_pages,
 	if (!is_valid_gup_flags(gup_flags))
 		return -EINVAL;
 
-	trace_android_vh_get_user_pages(&gup_flags);
+	trace_android_vh_get_user_pages(&gup_flags, pages);
 
 	return __gup_longterm_locked(current->mm, start, nr_pages,
 				     pages, vmas, gup_flags | FOLL_TOUCH);
@@ -2691,7 +2691,7 @@ static int internal_get_user_pages_fast(unsigned long start,
 	/* Slow path: try to get the remaining pages with get_user_pages */
 	start += nr_pinned << PAGE_SHIFT;
 	pages += nr_pinned;
-	trace_android_vh_internal_get_user_pages_fast(&gup_flags);
+	trace_android_vh_internal_get_user_pages_fast(&gup_flags, pages);
 	ret = __gup_longterm_unlocked(start, nr_pages - nr_pinned, gup_flags,
 				      pages);
 	if (ret < 0) {
@@ -2917,7 +2917,7 @@ long pin_user_pages(unsigned long start, unsigned long nr_pages,
 		return -EINVAL;
 
 	gup_flags |= FOLL_PIN;
-	trace_android_vh_pin_user_pages(&gup_flags);
+	trace_android_vh_pin_user_pages(&gup_flags, pages);
 	return __gup_longterm_locked(current->mm, start, nr_pages,
 				     pages, vmas, gup_flags);
 }
