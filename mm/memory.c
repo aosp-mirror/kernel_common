@@ -5535,7 +5535,7 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 						    buf, maddr + offset, bytes);
 			}
 			kunmap(page);
-			put_user_page(page);
+			put_page(page);
 		}
 		len -= bytes;
 		buf += bytes;
