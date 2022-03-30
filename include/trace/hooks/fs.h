@@ -8,7 +8,6 @@
 #if !defined(_TRACE_HOOK_FS_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_FS_H
 
-#include <linux/tracepoint.h>
 #include <trace/hooks/vendor_hooks.h>
 DECLARE_HOOK(android_vh_ep_create_wakeup_source,
 	TP_PROTO(char *name, int len),

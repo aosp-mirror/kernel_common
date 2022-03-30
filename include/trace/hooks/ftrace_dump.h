@@ -10,7 +10,6 @@
 #include <linux/trace_seq.h>
 #include <linux/trace_events.h>
 
-#include <linux/tracepoint.h>
 #include <trace/hooks/vendor_hooks.h>
 
 DECLARE_HOOK(android_vh_ftrace_oops_enter,

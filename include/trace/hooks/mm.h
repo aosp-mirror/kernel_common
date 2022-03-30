@@ -11,7 +11,6 @@
 
 #include <linux/mm.h>
 #include <linux/oom.h>
-#include <linux/tracepoint.h>
 #include <trace/hooks/vendor_hooks.h>
 
 struct cma;

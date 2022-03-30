@@ -4,7 +4,6 @@
 #define TRACE_INCLUDE_PATH trace/hooks
 #if !defined(_TRACE_HOOK_TYPEC_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_TYPEC_H
-#include <linux/tracepoint.h>
 #include <linux/usb/pd.h>
 #include <trace/hooks/vendor_hooks.h>
 /*
