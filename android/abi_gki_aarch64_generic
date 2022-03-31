@@ -1106,7 +1106,9 @@
   irq_create_mapping_affinity
   irq_create_of_mapping
   __irq_domain_add
+  irq_domain_get_irq_data
   irq_domain_remove
+  irq_domain_set_info
   irq_domain_xlate_twocell
   irq_find_mapping
   irq_get_irq_data
@@ -1554,6 +1556,7 @@
   platform_find_device_by_driver
   platform_get_irq
   platform_get_irq_byname
+  platform_get_irq_optional
   platform_get_resource
   platform_get_resource_byname
   platform_irq_count
