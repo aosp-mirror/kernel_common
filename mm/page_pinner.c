@@ -19,7 +19,7 @@ static unsigned long pp_buf_size = 4096;
 
 struct page_pinner {
 	depot_stack_handle_t handle;
-	s64 ts_usec;
+	u64 ts_usec;
 	atomic_t count;
 };
 
@@ -32,8 +32,8 @@ enum pp_state {
 struct captured_pinner {
 	depot_stack_handle_t handle;
 	union {
-		s64 ts_usec;
-		s64 elapsed;
+		u64 ts_usec;
+		u64 elapsed;
 	};
 
 	/* struct page fields */
@@ -167,7 +167,7 @@ void __free_page_pinner(struct page *page, unsigned int order)
 			continue;
 
 		record.handle = save_stack(GFP_NOWAIT|__GFP_NOWARN);
-		record.ts_usec = ktime_to_us(ktime_get_boottime());
+		record.ts_usec = (u64)ktime_to_us(ktime_get_boottime());
 		record.state = PP_FREE;
 		capture_page_state(page, &record);
 
@@ -197,7 +197,7 @@ print_page_pinner(char __user *buf, size_t count, struct captured_pinner *record
 		ret = snprintf(kbuf, count, "At least, pinned for %lld us\n",
 			       record->elapsed);
 	} else {
-		s64 ts_usec = record->ts_usec;
+		u64 ts_usec = record->ts_usec;
 		unsigned long rem_usec = do_div(ts_usec, 1000000);
 
 		ret = snprintf(kbuf, count,
@@ -254,7 +254,7 @@ void __dump_page_pinner(struct page *page)
 	unsigned long pfn;
 	int count;
 	unsigned long rem_usec;
-	s64 ts_usec;
+	u64 ts_usec;
 
 	if (unlikely(!page_ext)) {
 		pr_alert("There is not page extension available.\n");
@@ -273,7 +273,7 @@ void __dump_page_pinner(struct page *page)
 	ts_usec = page_pinner->ts_usec;
 	rem_usec = do_div(ts_usec, 1000000);
 	pr_alert("page last pinned %5lu.%06lu] count %d\n",
-		 (unsigned long)ts_usec, rem_usec, count);
+		 ts_usec, rem_usec, count);
 
 	pageblock_mt = get_pageblock_migratetype(page);
 	pr_alert("PFN %lu Block %lu type %s Flags %#lx(%pGp)\n",
@@ -296,7 +296,7 @@ void __page_pinner_failure_detect(struct page *page)
 	struct page_ext *page_ext = lookup_page_ext(page);
 	struct page_pinner *page_pinner;
 	struct captured_pinner record;
-	s64 now;
+	u64 now;
 
 	if (unlikely(!page_ext))
 		return;
@@ -304,7 +304,7 @@ void __page_pinner_failure_detect(struct page *page)
 	if (test_bit(PAGE_EXT_PINNER_MIGRATION_FAILED, &page_ext->flags))
 		return;
 
-	now = ktime_to_us(ktime_get_boottime());
+	now = (u64)ktime_to_us(ktime_get_boottime());
 	page_pinner = get_page_pinner(page_ext);
 	if (!page_pinner->ts_usec)
 		page_pinner->ts_usec = now;
@@ -332,7 +332,8 @@ void __page_pinner_put_page(struct page *page)
 
 	page_pinner = get_page_pinner(page_ext);
 	record.handle = save_stack(GFP_NOWAIT|__GFP_NOWARN);
-	record.elapsed = ktime_to_us(ktime_get_boottime()) - page_pinner->ts_usec;
+	record.elapsed = min_t(u64, 0, (u64)ktime_to_us(ktime_get_boottime()) -
+				page_pinner->ts_usec);
 	record.state = PP_PUT;
 	capture_page_state(page, &record);
 
