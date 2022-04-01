@@ -63,12 +63,13 @@ static void vp_iowrite64_twopart(u64 val,
 	vp_iowrite32(val >> 32, hi);
 }
 
-static void __iomem *map_capability(struct pci_dev *dev, int off,
+static void __iomem *map_capability(struct virtio_pci_device *vp_dev, int off,
 				    size_t minlen,
 				    u32 align,
 				    u32 start, u32 size,
 				    size_t *len)
 {
+	struct pci_dev *dev = vp_dev->pci_dev;
 	u8 bar;
 	u32 offset, length;
 	void __iomem *p;
@@ -80,6 +81,13 @@ static void __iomem *map_capability(struct pci_dev *dev, int off,
 			     &offset);
 	pci_read_config_dword(dev, off + offsetof(struct virtio_pci_cap, length),
 			      &length);
+
+	/* Check if the BAR may have changed since we requested the region. */
+	if (bar >= PCI_STD_NUM_BARS || !(vp_dev->modern_bars & (1 << bar))) {
+		dev_err(&dev->dev,
+			"virtio_pci: bar unexpectedly changed to %u\n", bar);
+		return NULL;
+	}
 
 	if (length <= start) {
 		dev_err(&dev->dev,
@@ -370,7 +378,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
 		vq->priv = (void __force *)vp_dev->notify_base +
 			off * vp_dev->notify_offset_multiplier;
 	} else {
-		vq->priv = (void __force *)map_capability(vp_dev->pci_dev,
+		vq->priv = (void __force *)map_capability(vp_dev,
 					  vp_dev->notify_map_cap, 2, 2,
 					  off * vp_dev->notify_offset_multiplier, 2,
 					  NULL);
@@ -451,7 +459,7 @@ static int virtio_pci_find_shm_cap(struct pci_dev *dev, u8 required_id,
 
 	for (pos = pci_find_capability(dev, PCI_CAP_ID_VNDR); pos > 0;
 	     pos = pci_find_next_capability(dev, pos, PCI_CAP_ID_VNDR)) {
-		u8 type, cap_len, id;
+		u8 type, cap_len, id, res_bar;
 		u32 tmp32;
 		u64 res_offset, res_length;
 
@@ -473,9 +481,14 @@ static int virtio_pci_find_shm_cap(struct pci_dev *dev, u8 required_id,
 		if (id != required_id)
 			continue;
 
-		/* Type, and ID match, looks good */
 		pci_read_config_byte(dev, pos + offsetof(struct virtio_pci_cap,
-							 bar), bar);
+							 bar), &res_bar);
+		if (res_bar >= PCI_STD_NUM_BARS)
+			continue;
+
+		/* Type and ID match, and the BAR value isn't reserved.
+		 * Looks good.
+		 */
 
 		/* Read the lower 32bit of length and offset */
 		pci_read_config_dword(dev, pos + offsetof(struct virtio_pci_cap,
@@ -495,6 +508,7 @@ static int virtio_pci_find_shm_cap(struct pci_dev *dev, u8 required_id,
 						     length_hi), &tmp32);
 		res_length |= ((u64)tmp32) << 32;
 
+		*bar = res_bar;
 		*offset = res_offset;
 		*len = res_length;
 
@@ -597,7 +611,7 @@ static inline int virtio_pci_find_capability(struct pci_dev *dev, u8 cfg_type,
 				     &bar);
 
 		/* Ignore structures with reserved BAR values */
-		if (bar > 0x5)
+		if (bar >= PCI_STD_NUM_BARS)
 			continue;
 
 		if (type == cfg_type) {
@@ -743,13 +757,13 @@ int virtio_pci_modern_probe(struct virtio_pci_device *vp_dev)
 		return err;
 
 	err = -EINVAL;
-	vp_dev->common = map_capability(pci_dev, common,
+	vp_dev->common = map_capability(vp_dev, common,
 					sizeof(struct virtio_pci_common_cfg), 4,
 					0, sizeof(struct virtio_pci_common_cfg),
 					NULL);
 	if (!vp_dev->common)
 		goto err_map_common;
-	vp_dev->isr = map_capability(pci_dev, isr, sizeof(u8), 1,
+	vp_dev->isr = map_capability(vp_dev, isr, sizeof(u8), 1,
 				     0, 1,
 				     NULL);
 	if (!vp_dev->isr)
@@ -776,7 +790,7 @@ int virtio_pci_modern_probe(struct virtio_pci_device *vp_dev)
 	 * Otherwise, map each VQ individually later.
 	 */
 	if ((u64)notify_length + (notify_offset % PAGE_SIZE) <= PAGE_SIZE) {
-		vp_dev->notify_base = map_capability(pci_dev, notify, 2, 2,
+		vp_dev->notify_base = map_capability(vp_dev, notify, 2, 2,
 						     0, notify_length,
 						     &vp_dev->notify_len);
 		if (!vp_dev->notify_base)
@@ -789,7 +803,7 @@ int virtio_pci_modern_probe(struct virtio_pci_device *vp_dev)
 	 * is more than enough for all existing devices.
 	 */
 	if (device) {
-		vp_dev->device = map_capability(pci_dev, device, 0, 4,
+		vp_dev->device = map_capability(vp_dev, device, 0, 4,
 						0, PAGE_SIZE,
 						&vp_dev->device_len);
 		if (!vp_dev->device)
