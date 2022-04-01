@@ -818,7 +818,6 @@ struct kvm {
 	u64 suspend_time_ns;
 	spinlock_t suspend_time_ns_lock;
 	u64 base_offs_boot_ns;
-	struct gfn_to_hva_cache suspend_time_ghc;
 #endif
 };
 

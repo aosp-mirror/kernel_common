@@ -1044,15 +1044,13 @@ void kvm_write_suspend_time(struct kvm *kvm)
 	struct kvm_suspend_time st;
 
 	st.suspend_time_ns = kvm->suspend_time_ns;
-	kvm_write_guest_cached(kvm, &kvm->suspend_time_ghc, &st, sizeof(st));
+	kvm_write_guest(kvm, kvm->arch.msr_suspend_time & ~1ULL,
+			&st, sizeof(st));
 }
 
 int kvm_init_suspend_time_ghc(struct kvm *kvm, gpa_t gpa)
 {
-	if (kvm_gfn_to_hva_cache_init(kvm, &kvm->suspend_time_ghc, gpa,
-				      sizeof(struct kvm_suspend_time)))
-		return 1;
-
+	kvm->arch.msr_suspend_time = gpa;
 	kvm_write_suspend_time(kvm);
 	return 0;
 }

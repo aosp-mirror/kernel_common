@@ -3895,11 +3895,7 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	case MSR_KVM_HOST_SUSPEND_TIME:
 		if (!(data & KVM_MSR_ENABLED))
 			break;
-
-		if (kvm_init_suspend_time_ghc(vcpu->kvm, data & ~1ULL))
-			return 1;
-
-		vcpu->kvm->arch.msr_suspend_time = data;
+		kvm_init_suspend_time_ghc(vcpu->kvm, data);
 		break;
 	case MSR_IA32_MCG_CTL:
 	case MSR_IA32_MCG_STATUS:
