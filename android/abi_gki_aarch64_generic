@@ -568,6 +568,7 @@
   dma_fence_remove_callback
   dma_fence_signal
   dma_fence_signal_locked
+  dma_fence_wait_timeout
   dma_free_attrs
   dma_free_noncoherent
   dma_get_sgtable_attrs
@@ -1046,6 +1047,7 @@
   input_mt_destroy_slots
   input_mt_init_slots
   input_mt_report_slot_state
+  input_mt_sync_frame
   input_open_device
   input_register_device
   input_register_handle
@@ -1477,6 +1479,8 @@
   pci_irq_vector
   pci_load_and_free_saved_state
   pci_load_saved_state
+  pci_msi_mask_irq
+  pci_msi_unmask_irq
   pci_read_config_dword
   pci_read_config_word
   __pci_register_driver
