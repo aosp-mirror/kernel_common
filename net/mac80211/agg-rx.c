@@ -260,7 +260,7 @@ static void ieee80211_send_addba_resp(struct sta_info *sta, u8 *da, u16 tid,
 	mgmt->u.action.u.addba_resp.timeout = cpu_to_le16(timeout);
 	mgmt->u.action.u.addba_resp.status = cpu_to_le16(status);
 
-	if (sta->sta.he_cap.has_he && addbaext)
+	if (sta->sta.deflink.he_cap.has_he && addbaext)
 		ieee80211_add_addbaext(sdata, skb, addbaext);
 
 	ieee80211_tx_skb(sdata, skb);
@@ -293,7 +293,7 @@ void ___ieee80211_start_rx_ba_session(struct sta_info *sta,
 		goto end;
 	}
 
-	if (!sta->sta.ht_cap.ht_supported &&
+	if (!sta->sta.deflink.ht_cap.ht_supported &&
 	    sta->sdata->vif.bss_conf.chandef.chan->band != NL80211_BAND_6GHZ) {
 		ht_dbg(sta->sdata,
 		       "STA %pM erroneously requests BA session on tid %d w/o QoS\n",
@@ -309,7 +309,7 @@ void ___ieee80211_start_rx_ba_session(struct sta_info *sta,
 		goto end;
 	}
 
-	if (sta->sta.he_cap.has_he)
+	if (sta->sta.deflink.eht_cap.has_eht)
 		max_buf_size = IEEE80211_MAX_AMPDU_BUF_HE;
 	else
 		max_buf_size = IEEE80211_MAX_AMPDU_BUF_HT;
@@ -319,7 +319,7 @@ void ___ieee80211_start_rx_ba_session(struct sta_info *sta,
 	 * and if buffer size does not exceeds max value */
 	/* XXX: check own ht delayed BA capability?? */
 	if (((ba_policy != 1) &&
-	     (!(sta->sta.ht_cap.cap & IEEE80211_HT_CAP_DELAY_BA))) ||
+	     (!(sta->sta.deflink.ht_cap.cap & IEEE80211_HT_CAP_DELAY_BA))) ||
 	    (buf_size > max_buf_size)) {
 		status = WLAN_STATUS_INVALID_QOS_PARAM;
 		ht_dbg_ratelimited(sta->sdata,

@@ -538,10 +538,10 @@ mt7921_mcu_tx_done_event(struct mt7921_dev *dev, struct sk_buff *skb)
 		/* peer config based on IEEE SPEC */
 		memset(&peer, 0x0, sizeof(peer));
 		peer.bw = event->bw;
-		peer.g2 = !!(sta->ht_cap.cap & IEEE80211_HT_CAP_SGI_20);
-		peer.g4 = !!(sta->ht_cap.cap & IEEE80211_HT_CAP_SGI_40);
-		peer.g8 = !!(sta->vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_80);
-		peer.g16 = !!(sta->vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_160);
+		peer.g2 = !!(sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_20);
+		peer.g4 = !!(sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_40);
+		peer.g8 = !!(sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_80);
+		peer.g16 = !!(sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_160);
 		mt7921_mcu_tx_rate_parse(mphy->mt76, &peer,
 					 &msta->stats.tx_rate,
 					 le16_to_cpu(event->tx_rate));

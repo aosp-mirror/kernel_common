@@ -967,7 +967,7 @@ mt7921_tx_check_aggr(struct ieee80211_sta *sta, __le32 *txwi)
 	u16 fc, tid;
 	u32 val;
 
-	if (!sta || !sta->ht_cap.ht_supported)
+	if (!sta || !sta->deflink.ht_cap.ht_supported)
 		return;
 
 	tid = FIELD_GET(MT_TXD1_TID, le32_to_cpu(txwi[1]));
