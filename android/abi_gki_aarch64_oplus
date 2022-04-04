@@ -2248,6 +2248,7 @@
   __sg_page_iter_start
   sg_scsi_ioctl
   show_regs
+  shrink_slab
   sigprocmask
   si_mem_available
   si_meminfo
@@ -2432,6 +2433,7 @@
   __sw_hweight32
   __sw_hweight64
   __sw_hweight8
+  swp_swap_info
   sync_file_create
   sync_file_get_fence
   synchronize_irq
@@ -2686,6 +2688,7 @@
   __traceiter_android_vh_show_resume_epoch_val
   __traceiter_android_vh_show_stack_hash
   __traceiter_android_vh_show_suspend_epoch_val
+  __traceiter_android_vh_shrink_node_memcgs
   __traceiter_android_vh_sync_txn_recvd
   __traceiter_android_vh_syscall_prctl_finished
   __traceiter_android_vh_timer_calc_index
@@ -2694,6 +2697,8 @@
   __traceiter_android_vh_tune_swappiness
   __traceiter_android_vh_page_referenced_check_bypass
   __traceiter_android_vh_drain_all_pages_bypass
+  __traceiter_android_vh_cma_drain_all_pages_bypass
+  __traceiter_android_vh_pcplist_add_cma_pages_bypass
   __traceiter_android_vh_ufs_compl_command
   __traceiter_android_vh_ufs_send_command
   __traceiter_android_vh_ufs_send_tm_command
@@ -2890,6 +2895,7 @@
   __tracepoint_android_vh_show_resume_epoch_val
   __tracepoint_android_vh_show_stack_hash
   __tracepoint_android_vh_show_suspend_epoch_val
+  __tracepoint_android_vh_shrink_node_memcgs
   __tracepoint_android_vh_sync_txn_recvd
   __tracepoint_android_vh_syscall_prctl_finished
   __tracepoint_android_vh_timer_calc_index
@@ -2898,6 +2904,8 @@
   __tracepoint_android_vh_tune_swappiness
   __tracepoint_android_vh_page_referenced_check_bypass
   __tracepoint_android_vh_drain_all_pages_bypass
+  __tracepoint_android_vh_cma_drain_all_pages_bypass
+  __tracepoint_android_vh_pcplist_add_cma_pages_bypass
   __tracepoint_android_vh_ufs_compl_command
   __tracepoint_android_vh_ufs_send_command
   __tracepoint_android_vh_ufs_send_tm_command
@@ -3339,6 +3347,7 @@
   wakeup_source_register
   wakeup_source_remove
   wakeup_source_unregister
+  walk_page_range
   __warn_printk
   watchdog_init_timeout
   watchdog_set_restart_priority
