@@ -1565,7 +1565,7 @@ static int fuse_rename_backing_common(
 	if (target_inode)
 		fsstack_copy_attr_all(target_inode,
 				get_fuse_inode(target_inode)->backing_inode);
-	fsstack_copy_attr_all(newdir, d_inode(new_backing_dir_dentry));
+	fsstack_copy_attr_all(d_inode(oldent), d_inode(old_backing_dentry));
 unlock:
 	unlock_rename(old_backing_dir_dentry, new_backing_dir_dentry);
 put_parents:
