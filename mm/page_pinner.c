@@ -194,7 +194,7 @@ print_page_pinner(char __user *buf, size_t count, struct captured_pinner *record
 		return -ENOMEM;
 
 	if (record->state == PP_PUT) {
-		ret = snprintf(kbuf, count, "At least, pinned for %lld us\n",
+		ret = snprintf(kbuf, count, "At least, pinned for %llu us\n",
 			       record->elapsed);
 	} else {
 		u64 ts_usec = record->ts_usec;
@@ -241,54 +241,6 @@ print_page_pinner(char __user *buf, size_t count, struct captured_pinner *record
 err:
 	kfree(kbuf);
 	return -ENOMEM;
-}
-
-void __dump_page_pinner(struct page *page)
-{
-	struct page_ext *page_ext = lookup_page_ext(page);
-	struct page_pinner *page_pinner;
-	depot_stack_handle_t handle;
-	unsigned long *entries;
-	unsigned int nr_entries;
-	int pageblock_mt;
-	unsigned long pfn;
-	int count;
-	unsigned long rem_usec;
-	u64 ts_usec;
-
-	if (unlikely(!page_ext)) {
-		pr_alert("There is not page extension available.\n");
-		return;
-	}
-
-	page_pinner = get_page_pinner(page_ext);
-
-	count = atomic_read(&page_pinner->count);
-	if (!count) {
-		pr_alert("page_pinner info is not present (never set?)\n");
-		return;
-	}
-
-	pfn = page_to_pfn(page);
-	ts_usec = page_pinner->ts_usec;
-	rem_usec = do_div(ts_usec, 1000000);
-	pr_alert("page last pinned %5lu.%06lu] count %d\n",
-		 ts_usec, rem_usec, count);
-
-	pageblock_mt = get_pageblock_migratetype(page);
-	pr_alert("PFN %lu Block %lu type %s Flags %#lx(%pGp)\n",
-			pfn,
-			pfn >> pageblock_order,
-			migratetype_names[pageblock_mt],
-			page->flags, &page->flags);
-
-	handle = READ_ONCE(page_pinner->handle);
-	if (!handle) {
-		pr_alert("page_pinner allocation stack trace missing\n");
-	} else {
-		nr_entries = stack_depot_fetch(handle, &entries);
-		stack_trace_print(entries, nr_entries, 0);
-	}
 }
 
 void __page_pinner_failure_detect(struct page *page)

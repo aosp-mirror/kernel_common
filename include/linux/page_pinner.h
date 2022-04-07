@@ -10,7 +10,6 @@ extern struct static_key_true failure_tracking;
 extern struct page_ext_operations page_pinner_ops;
 
 extern void __free_page_pinner(struct page *page, unsigned int order);
-extern void __dump_page_pinner(struct page *page);
 void __page_pinner_failure_detect(struct page *page);
 void __page_pinner_put_page(struct page *page);
 
@@ -18,12 +17,6 @@ static inline void free_page_pinner(struct page *page, unsigned int order)
 {
 	if (static_branch_unlikely(&page_pinner_inited))
 		__free_page_pinner(page, order);
-}
-
-static inline void dump_page_pinner(struct page *page)
-{
-	if (static_branch_unlikely(&page_pinner_inited))
-		__dump_page_pinner(page);
 }
 
 static inline void page_pinner_put_page(struct page *page)
@@ -43,9 +36,6 @@ static inline void page_pinner_failure_detect(struct page *page)
 }
 #else
 static inline void free_page_pinner(struct page *page, unsigned int order)
-{
-}
-static inline void dump_page_pinner(struct page *page)
 {
 }
 static inline void page_pinner_put_page(struct page *page)
