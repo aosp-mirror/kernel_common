@@ -71,6 +71,10 @@ module_param_call(log_size, trusty_log_size_set, trusty_log_size_get, NULL,
 static struct ratelimit_state trusty_log_rate_limit =
 	RATELIMIT_STATE_INIT("trusty_log", 1 * HZ, 100);
 
+module_param_named(log_ratelimit_burst, trusty_log_rate_limit.burst, int, 0644);
+module_param_named(log_ratelimit_interval, trusty_log_rate_limit.interval, int,
+		   0644);
+
 /**
  * struct trusty_log_sfile - trusty log misc device state
  *
