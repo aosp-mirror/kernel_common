@@ -3518,7 +3518,7 @@ void free_unref_page(struct page *page, unsigned int order)
 	 * excessively into the page allocator
 	 */
 	migratetype = get_pcppage_migratetype(page);
-	if (unlikely(migratetype >= MIGRATE_PCPTYPES)) {
+	if (unlikely(migratetype > MIGRATE_RECLAIMABLE)) {
 		trace_android_vh_pcplist_add_cma_pages_bypass(migratetype,
 			&pcp_skip_cma_pages);
 		if (unlikely(is_migrate_isolate(migratetype)) ||
@@ -3527,6 +3527,8 @@ void free_unref_page(struct page *page, unsigned int order)
 			return;
 		}
 		migratetype = MIGRATE_MOVABLE;
+		if (migratetype == MIGRATE_HIGHATOMIC)
+			migratetype = MIGRATE_MOVABLE;
 	}
 
 	local_lock_irqsave(&pagesets.lock, flags);
