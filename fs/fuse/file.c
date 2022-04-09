@@ -1643,7 +1643,7 @@ static ssize_t fuse_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 	{
 		struct fuse_err_ret fer;
 
-		fer = fuse_bpf_backing(inode, struct fuse_read_in,
+		fer = fuse_bpf_backing(inode, struct fuse_file_read_iter_io,
 				       fuse_file_read_iter_initialize,
 				       fuse_file_read_iter_backing,
 				       fuse_file_read_iter_finalize,

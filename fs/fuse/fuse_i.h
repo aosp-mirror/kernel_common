@@ -1512,8 +1512,16 @@ int fuse_removexattr_backing(struct fuse_args *fa,
 void *fuse_removexattr_finalize(struct fuse_args *fa,
 				struct dentry *dentry, const char *name);
 
+struct fuse_read_iter_out {
+	uint64_t ret;
+};
+struct fuse_file_read_iter_io {
+	struct fuse_read_in fri;
+	struct fuse_read_iter_out frio;
+};
+
 int fuse_file_read_iter_initialize(
-		struct fuse_args *fa, struct fuse_read_in *fri,
+		struct fuse_args *fa, struct fuse_file_read_iter_io *fri,
 		struct kiocb *iocb, struct iov_iter *to);
 int fuse_file_read_iter_backing(struct fuse_args *fa,
 		struct kiocb *iocb, struct iov_iter *to);

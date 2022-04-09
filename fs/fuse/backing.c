@@ -846,16 +846,20 @@ static void fuse_bpf_aio_rw_complete(struct kiocb *iocb, long res, long res2)
 
 
 int fuse_file_read_iter_initialize(
-		struct fuse_args *fa, struct fuse_read_in *fri,
+		struct fuse_args *fa, struct fuse_file_read_iter_io *fri,
 		struct kiocb *iocb, struct iov_iter *to)
 {
 	struct file *file = iocb->ki_filp;
 	struct fuse_file *ff = file->private_data;
 
-	*fri = (struct fuse_read_in) {
+	fri->fri = (struct fuse_read_in) {
 		.fh = ff->fh,
 		.offset = iocb->ki_pos,
 		.size = to->count,
+	};
+
+	fri->frio = (struct fuse_read_iter_out) {
+		.ret = fri->fri.size,
 	};
 
 	/* TODO we can't assume 'to' is a kvec */
@@ -864,11 +868,11 @@ int fuse_file_read_iter_initialize(
 		.opcode = FUSE_READ,
 		.nodeid = ff->nodeid,
 		.in_numargs = 1,
-		.in_args[0].size = sizeof(*fri),
-		.in_args[0].value = fri,
+		.in_args[0].size = sizeof(fri->fri),
+		.in_args[0].value = &fri->fri,
 		.out_numargs = 1,
-		.out_args[0].size = fri->size,
-		.out_args[0].value = to->kvec->iov_base,
+		.out_args[0].size = sizeof(fri->frio),
+		.out_args[0].value = &fri->frio,
 		/*
 		 * TODO Design this properly.
 		 * Possible approach: do not pass buf to bpf
@@ -884,6 +888,7 @@ int fuse_file_read_iter_initialize(
 int fuse_file_read_iter_backing(struct fuse_args *fa,
 		struct kiocb *iocb, struct iov_iter *to)
 {
+	struct fuse_read_iter_out *frio = fa->out_args[0].value;
 	struct file *file = iocb->ki_filp;
 	struct fuse_file *ff = file->private_data;
 	ssize_t ret;
@@ -918,8 +923,7 @@ int fuse_file_read_iter_backing(struct fuse_args *fa,
 			fuse_bpf_aio_cleanup_handler(aio_req);
 	}
 
-	if (ret >= 0)
-		fa->out_args[0].size = ret;
+	frio->ret = ret;
 
 	/* TODO Need to point value at the buffer for post-modification */
 
@@ -932,7 +936,9 @@ out:
 void *fuse_file_read_iter_finalize(struct fuse_args *fa,
 		struct kiocb *iocb, struct iov_iter *to)
 {
-	return ERR_PTR(fa->out_args[0].size);
+	struct fuse_read_iter_out *frio = fa->out_args[0].value;
+
+	return ERR_PTR(frio->ret);
 }
 
 int fuse_file_write_iter_initialize(
