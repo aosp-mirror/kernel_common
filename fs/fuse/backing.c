@@ -17,8 +17,11 @@
 
 struct fuse_bpf_aio_req {
 	struct kiocb iocb;
+	refcount_t ref;
 	struct kiocb *iocb_orig;
 };
+
+static struct kmem_cache *fuse_bpf_aio_request_cachep;
 
 static void fuse_file_accessed(struct file *dst_file, struct file *src_file)
 {
@@ -810,6 +813,12 @@ void *fuse_removexattr_finalize(struct fuse_args *fa,
 	return NULL;
 }
 
+static inline void fuse_bpf_aio_put(struct fuse_bpf_aio_req *aio_req)
+{
+	if (refcount_dec_and_test(&aio_req->ref))
+		kmem_cache_free(fuse_bpf_aio_request_cachep, aio_req);
+}
+
 static void fuse_bpf_aio_cleanup_handler(struct fuse_bpf_aio_req *aio_req)
 {
 	struct kiocb *iocb = &aio_req->iocb;
@@ -821,9 +830,8 @@ static void fuse_bpf_aio_cleanup_handler(struct fuse_bpf_aio_req *aio_req)
 		file_end_write(iocb->ki_filp);
 		fuse_copyattr(iocb_orig->ki_filp, iocb->ki_filp);
 	}
-
 	iocb_orig->ki_pos = iocb->ki_pos;
-	kfree(aio_req);
+	fuse_bpf_aio_put(aio_req);
 }
 
 static void fuse_bpf_aio_rw_complete(struct kiocb *iocb, long res, long res2)
@@ -896,13 +904,16 @@ int fuse_file_read_iter_backing(struct fuse_args *fa,
 		struct fuse_bpf_aio_req *aio_req;
 
 		ret = -ENOMEM;
-		aio_req = kzalloc(sizeof(struct fuse_bpf_aio_req), GFP_KERNEL);
+		aio_req = kmem_cache_zalloc(fuse_bpf_aio_request_cachep, GFP_KERNEL);
 		if (!aio_req)
 			goto out;
+
 		aio_req->iocb_orig = iocb;
 		kiocb_clone(&aio_req->iocb, iocb, ff->backing_file);
 		aio_req->iocb.ki_complete = fuse_bpf_aio_rw_complete;
+		refcount_set(&aio_req->ref, 2);
 		ret = vfs_iocb_iter_read(ff->backing_file, &aio_req->iocb, to);
+		fuse_bpf_aio_put(aio_req);
 		if (ret != -EIOCBQUEUED)
 			fuse_bpf_aio_cleanup_handler(aio_req);
 	}
@@ -984,8 +995,7 @@ int fuse_file_write_iter_backing(struct fuse_args *fa,
 		struct fuse_bpf_aio_req *aio_req;
 
 		ret = -ENOMEM;
-		/* TODO get this from a cache? */
-		aio_req = kzalloc(sizeof(struct fuse_bpf_aio_req), GFP_KERNEL);
+		aio_req = kmem_cache_zalloc(fuse_bpf_aio_request_cachep, GFP_KERNEL);
 		if (!aio_req)
 			goto out;
 
@@ -994,7 +1004,9 @@ int fuse_file_write_iter_backing(struct fuse_args *fa,
 		aio_req->iocb_orig = iocb;
 		kiocb_clone(&aio_req->iocb, iocb, ff->backing_file);
 		aio_req->iocb.ki_complete = fuse_bpf_aio_rw_complete;
+		refcount_set(&aio_req->ref, 2);
 		ret = vfs_iocb_iter_write(ff->backing_file, &aio_req->iocb, from);
+		fuse_bpf_aio_put(aio_req);
 		if (ret != -EIOCBQUEUED)
 			fuse_bpf_aio_cleanup_handler(aio_req);
 	}
@@ -2368,4 +2380,20 @@ int fuse_access_backing(struct fuse_args *fa, struct inode *inode, int mask)
 void *fuse_access_finalize(struct fuse_args *fa, struct inode *inode, int mask)
 {
 	return NULL;
+}
+
+int __init fuse_bpf_init(void)
+{
+	fuse_bpf_aio_request_cachep = kmem_cache_create("fuse_bpf_aio_req",
+						   sizeof(struct fuse_bpf_aio_req),
+						   0, SLAB_HWCACHE_ALIGN, NULL);
+	if (!fuse_bpf_aio_request_cachep)
+		return -ENOMEM;
+
+	return 0;
+}
+
+void __exit fuse_bpf_cleanup(void)
+{
+	kmem_cache_destroy(fuse_bpf_aio_request_cachep);
 }
