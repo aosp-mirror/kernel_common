@@ -771,6 +771,7 @@
   drm_poll
   drm_prime_gem_destroy
   drm_printf
+  __drm_printfn_debug
   __drm_printfn_info
   __drm_printfn_seq_file
   drm_property_blob_get
