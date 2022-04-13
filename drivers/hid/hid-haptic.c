@@ -233,6 +233,13 @@ static void switch_mode(struct hid_device *hdev, struct hid_haptic_device *hapti
 	haptic->mode = mode;
 }
 
+void hid_haptic_reset(struct hid_device *hdev, struct hid_haptic_device *haptic)
+{
+	if (haptic->press_ordinal_cur && haptic->release_ordinal_cur)
+		switch_mode(hdev, haptic, HID_HAPTIC_MODE_KERNEL);
+}
+EXPORT_SYMBOL_GPL(hid_haptic_reset);
+
 #ifdef CONFIG_PM
 void hid_haptic_resume(struct hid_device *hdev, struct hid_haptic_device *haptic)
 {

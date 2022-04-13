@@ -2104,6 +2104,20 @@ static int mt_resume(struct hid_device *hdev)
 }
 #endif
 
+static int mt_reset(struct hid_device *hdev)
+{
+	struct mt_device *td = hid_get_drvdata(hdev);
+	struct hid_haptic_device *haptic = td->haptic;
+
+	mt_release_contacts(hdev);
+	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
+
+	if (td->is_haptic_touchpad)
+		hid_haptic_reset(hdev, haptic);
+
+	return 0;
+}
+
 static void mt_remove(struct hid_device *hdev)
 {
 	struct mt_device *td = hid_get_drvdata(hdev);
@@ -2545,6 +2559,7 @@ static struct hid_driver mt_driver = {
 #ifdef CONFIG_PM
 	.suspend = mt_suspend,
 	.reset_resume = mt_reset_resume,
+	.reset = mt_reset,
 	.resume = mt_resume,
 #endif
 };
