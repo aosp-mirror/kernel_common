@@ -1089,11 +1089,44 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__pkvm_iommu_finalize),
 };
 
+static inline u64 kernel__text_addr(void)
+{
+	u64 val;
+
+	asm volatile(ALTERNATIVE_CB("movz	%0, #0\n"
+				    "movk	%0, #0, lsl #16\n"
+				    "movk	%0, #0, lsl #32\n"
+				    "movk	%0, #0, lsl #48\n",
+				    kvm_get__text)
+		     : "=r" (val));
+
+	return val;
+}
+
+static inline u64 kernel__etext_addr(void)
+{
+	u64 val;
+
+	asm volatile(ALTERNATIVE_CB("movz	%0, #0\n"
+				    "movk	%0, #0, lsl #16\n"
+				    "movk	%0, #0, lsl #32\n"
+				    "movk	%0, #0, lsl #48\n",
+				    kvm_get__etext)
+		     : "=r" (val));
+
+	return val;
+}
+
 static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
 {
 	DECLARE_REG(unsigned long, id, host_ctxt, 0);
+	u64 elr = read_sysreg_el2(SYS_ELR) - 4;
 	unsigned long hcall_min = 0;
 	hcall_t hfn;
+
+	/* Check for the provenance of the HC */
+	if (unlikely(elr < kernel__text_addr() || elr >= kernel__etext_addr()))
+		goto inval;
 
 	/*
 	 * If pKVM has been initialised then reject any calls to the
