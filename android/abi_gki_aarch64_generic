@@ -1059,6 +1059,10 @@
   input_unregister_device
   input_unregister_handle
   input_unregister_handler
+  interval_tree_insert
+  interval_tree_iter_first
+  interval_tree_iter_next
+  interval_tree_remove
   int_sqrt
   int_to_scsilun
   iomem_resource
@@ -1446,6 +1450,7 @@
   __page_frag_cache_drain
   page_frag_free
   page_mapping
+  __page_pinner_put_page
   panic
   panic_notifier_list
   param_array_ops
@@ -2074,6 +2079,7 @@
   submit_bio
   submit_bio_wait
   subsys_system_register
+  suspend_set_ops
   __sw_hweight32
   __sw_hweight64
   sync_file_create
