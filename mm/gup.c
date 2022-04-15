@@ -1740,6 +1740,8 @@ static long __get_user_pages_remote(struct mm_struct *mm,
 				    unsigned int gup_flags, struct page **pages,
 				    struct vm_area_struct **vmas, int *locked)
 {
+	unsigned int orig_gup_flags = gup_flags;
+
 	trace_android_vh___get_user_pages_remote(locked, &gup_flags, pages);
 
 	/*
@@ -1749,16 +1751,23 @@ static long __get_user_pages_remote(struct mm_struct *mm,
 	 * callers that do request FOLL_LONGTERM, but do not set locked. So,
 	 * allow what we can.
 	 */
+retry:
 	if (gup_flags & FOLL_LONGTERM) {
+		long ret;
+
 		if (WARN_ON_ONCE(locked))
 			return -EINVAL;
 		/*
 		 * This will check the vmas (even if our vmas arg is NULL)
 		 * and return -ENOTSUPP if DAX isn't allowed in this case:
 		 */
-		return __gup_longterm_locked(mm, start, nr_pages, pages,
+		ret = __gup_longterm_locked(mm, start, nr_pages, pages,
 					     vmas, gup_flags | FOLL_TOUCH |
 					     FOLL_REMOTE);
+		if (ret < 0 && orig_gup_flags != gup_flags) {
+			gup_flags = orig_gup_flags;
+			goto retry;
+		}
 	}
 
 	return __get_user_pages_locked(mm, start, nr_pages, pages, vmas,
@@ -1877,13 +1886,23 @@ long get_user_pages(unsigned long start, unsigned long nr_pages,
 		unsigned int gup_flags, struct page **pages,
 		struct vm_area_struct **vmas)
 {
+	long ret;
+	unsigned int orig_gup_flags;
+
 	if (!is_valid_gup_flags(gup_flags))
 		return -EINVAL;
 
+	orig_gup_flags = gup_flags;
 	trace_android_vh_get_user_pages(&gup_flags, pages);
-
-	return __gup_longterm_locked(current->mm, start, nr_pages,
+retry:
+	ret = __gup_longterm_locked(current->mm, start, nr_pages,
 				     pages, vmas, gup_flags | FOLL_TOUCH);
+	if (ret < 0 && orig_gup_flags != gup_flags) {
+		gup_flags = orig_gup_flags;
+		goto retry;
+	}
+
+	return ret;
 }
 EXPORT_SYMBOL(get_user_pages);
 
