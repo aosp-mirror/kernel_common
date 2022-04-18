@@ -275,6 +275,7 @@ void __page_pinner_put_page(struct page *page)
 	struct page_ext *page_ext = lookup_page_ext(page);
 	struct page_pinner *page_pinner;
 	struct captured_pinner record;
+	u64 now, ts_usec;
 
 	if (unlikely(!page_ext))
 		return;
@@ -284,8 +285,13 @@ void __page_pinner_put_page(struct page *page)
 
 	page_pinner = get_page_pinner(page_ext);
 	record.handle = save_stack(GFP_NOWAIT|__GFP_NOWARN);
-	record.elapsed = min_t(u64, 0, (u64)ktime_to_us(ktime_get_boottime()) -
-				page_pinner->ts_usec);
+	now = (u64)ktime_to_us(ktime_get_boottime());
+	ts_usec = page_pinner->ts_usec;
+
+	if (now > ts_usec)
+		record.elapsed = now - ts_usec;
+	else
+		record.elapsed = 0;
 	record.state = PP_PUT;
 	capture_page_state(page, &record);
 
