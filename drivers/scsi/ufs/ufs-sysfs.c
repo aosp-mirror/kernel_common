@@ -8,7 +8,7 @@
 
 #include "ufs.h"
 #include "ufs-sysfs.h"
-#include "ufshcd.h"
+#include "ufshcd-priv.h"
 
 #include <trace/hooks/ufshcd.h>
 
