@@ -183,7 +183,6 @@ struct ufs_pm_lvl_states {
  * @ucd_req_dma_addr: UPIU request dma address for debug
  * @cmd: pointer to SCSI command
  * @sense_buffer: pointer to sense buffer address of the SCSI command
- * @sense_bufflen: Length of the sense buffer
  * @scsi_status: SCSI status of the command
  * @command_type: SCSI, UFS, Query.
  * @task_tag: Task tag of the command
@@ -208,7 +207,6 @@ struct ufshcd_lrb {
 
 	struct scsi_cmnd *cmd;
 	u8 *sense_buffer;
-	unsigned int sense_bufflen;
 	int scsi_status;
 
 	int command_type;
