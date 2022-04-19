@@ -1010,6 +1010,7 @@
   i2c_unregister_device
   i2c_verify_client
   ida_alloc_range
+  ida_destroy
   ida_free
   idr_alloc
   idr_alloc_cyclic
@@ -2183,6 +2184,7 @@
   __traceiter_android_rvh_find_energy_efficient_cpu
   __traceiter_android_rvh_irqs_disable
   __traceiter_android_rvh_irqs_enable
+  __traceiter_android_rvh_pci_d3_sleep
   __traceiter_android_rvh_post_init_entity_util_avg
   __traceiter_android_rvh_preempt_disable
   __traceiter_android_rvh_preempt_enable
@@ -2284,6 +2286,7 @@
   __tracepoint_android_rvh_find_energy_efficient_cpu
   __tracepoint_android_rvh_irqs_disable
   __tracepoint_android_rvh_irqs_enable
+  __tracepoint_android_rvh_pci_d3_sleep
   __tracepoint_android_rvh_post_init_entity_util_avg
   __tracepoint_android_rvh_preempt_disable
   __tracepoint_android_rvh_preempt_enable
