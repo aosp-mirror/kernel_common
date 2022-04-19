@@ -240,6 +240,7 @@
   config_group_init_type_name
   config_item_init_type_name
   config_item_put
+  console_set_on_cmdline
   console_suspend_enabled
   console_trylock
   console_unlock
