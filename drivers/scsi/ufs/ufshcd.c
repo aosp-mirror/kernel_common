@@ -951,10 +951,7 @@ static bool ufshcd_is_unipro_pa_params_tuning_req(struct ufs_hba *hba)
 	 * logic simple, we will only do manual tuning if local unipro version
 	 * doesn't support ver1.6 or later.
 	 */
-	if (ufshcd_get_local_unipro_ver(hba) < UFS_UNIPRO_VER_1_6)
-		return true;
-	else
-		return false;
+	return ufshcd_get_local_unipro_ver(hba) < UFS_UNIPRO_VER_1_6;
 }
 
 /**
@@ -2267,10 +2264,7 @@ static inline int ufshcd_hba_capabilities(struct ufs_hba *hba)
  */
 static inline bool ufshcd_ready_for_uic_cmd(struct ufs_hba *hba)
 {
-	if (ufshcd_readl(hba, REG_CONTROLLER_STATUS) & UIC_COMMAND_READY)
-		return true;
-	else
-		return false;
+	return ufshcd_readl(hba, REG_CONTROLLER_STATUS) & UIC_COMMAND_READY;
 }
 
 /**
@@ -5856,10 +5850,7 @@ static bool ufshcd_wb_presrv_usrspc_keep_vcc_on(struct ufs_hba *hba,
 		return false;
 	}
 	/* Let it continue to flush when available buffer exceeds threshold */
-	if (avail_buf < hba->vps->wb_flush_threshold)
-		return true;
-
-	return false;
+	return avail_buf < hba->vps->wb_flush_threshold;
 }
 
 static void ufshcd_wb_force_disable(struct ufs_hba *hba)
@@ -5938,11 +5929,8 @@ static bool ufshcd_wb_need_flush(struct ufs_hba *hba)
 		return false;
 	}
 
-	if (!hba->dev_info.b_presrv_uspc_en) {
-		if (avail_buf <= UFS_WB_BUF_REMAIN_PERCENT(10))
-			return true;
-		return false;
-	}
+	if (!hba->dev_info.b_presrv_uspc_en)
+		return avail_buf <= UFS_WB_BUF_REMAIN_PERCENT(10);
 
 	return ufshcd_wb_presrv_usrspc_keep_vcc_on(hba, avail_buf);
 }
