@@ -1232,6 +1232,8 @@ int ufshcd_read_string_desc(struct ufs_hba *hba, u8 desc_index,
 int ufshcd_hold(struct ufs_hba *hba, bool async);
 void ufshcd_release(struct ufs_hba *hba);
 
+void ufshcd_clkgate_delay_set(struct device *dev, unsigned long value);
+
 int ufshcd_freeze_scsi_devs(struct ufs_hba *hba, u64 timeout_us);
 void ufshcd_unfreeze_scsi_devs(struct ufs_hba *hba);
 
