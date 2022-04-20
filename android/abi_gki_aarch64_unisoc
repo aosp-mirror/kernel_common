@@ -331,6 +331,7 @@
   handle_edge_irq
   handle_level_irq
   have_governor_per_policy
+  hdmi_drm_infoframe_pack_only
   i2c_del_driver
   i2c_register_driver
   i2c_smbus_read_byte_data
@@ -1417,6 +1418,7 @@
   down_read
   down_write
   drm_dev_unregister
+  drm_hdmi_infoframe_set_hdr_metadata
   fd_install
   fget
   find_vma
