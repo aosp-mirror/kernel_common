@@ -267,6 +267,10 @@
   extcon_find_edev_by_node
   extcon_get_edev_by_phandle
   extcon_get_state
+  extcon_set_state
+  extcon_set_property
+  extcon_set_property_capability
+  extcon_sync
   fb_mode_option
   __find_get_block
   find_next_bit
@@ -327,6 +331,7 @@
   handle_edge_irq
   handle_level_irq
   have_governor_per_policy
+  hdmi_drm_infoframe_pack_only
   i2c_del_driver
   i2c_register_driver
   i2c_smbus_read_byte_data
@@ -1413,6 +1418,7 @@
   down_read
   down_write
   drm_dev_unregister
+  drm_hdmi_infoframe_set_hdr_metadata
   fd_install
   fget
   find_vma
@@ -1525,6 +1531,11 @@
   devm_extcon_dev_allocate
   devm_extcon_dev_register
   extcon_set_state_sync
+  typec_altmode_enter
+  typec_altmode_exit
+  __typec_altmode_register_driver
+  typec_altmode_get_partner
+  typec_altmode_unregister_driver
   typec_register_partner
   typec_register_port
   typec_set_data_role
