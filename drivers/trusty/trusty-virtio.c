@@ -31,6 +31,8 @@
 #define  RSC_DESCR_VER  1
 
 struct trusty_vdev;
+static bool use_high_wq;
+module_param(use_high_wq, bool, 0660);
 
 struct trusty_ctx {
 	struct device		*dev;
@@ -45,6 +47,7 @@ struct trusty_ctx {
 	struct mutex		mlock; /* protects vdev_list */
 	struct workqueue_struct	*kick_wq;
 	struct workqueue_struct	*check_wq;
+	struct workqueue_struct	*check_wq_high;
 };
 
 struct trusty_vring {
@@ -99,7 +102,10 @@ static int trusty_call_notify(struct notifier_block *nb,
 		return NOTIFY_DONE;
 
 	tctx = container_of(nb, struct trusty_ctx, call_notifier);
-	queue_work(tctx->check_wq, &tctx->check_vqs);
+	if (use_high_wq)
+		queue_work(tctx->check_wq_high, &tctx->check_vqs);
+	else
+		queue_work(tctx->check_wq, &tctx->check_vqs);
 
 	return NOTIFY_OK;
 }
@@ -751,6 +757,14 @@ static int trusty_virtio_probe(struct platform_device *pdev)
 		goto err_create_kick_wq;
 	}
 
+	tctx->check_wq_high = alloc_workqueue("trusty-check-wq-high",
+					      WQ_UNBOUND | WQ_HIGHPRI, 0);
+	if (!tctx->check_wq_high) {
+		ret = -ENODEV;
+		dev_err(&pdev->dev, "Failed create trusty-check-wq-high\n");
+		goto err_create_check_wq_high;
+	}
+
 	ret = trusty_virtio_add_devices(tctx);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to add virtio devices\n");
@@ -761,6 +775,8 @@ static int trusty_virtio_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_devices:
+	destroy_workqueue(tctx->check_wq_high);
+err_create_check_wq_high:
 	destroy_workqueue(tctx->kick_wq);
 err_create_kick_wq:
 	destroy_workqueue(tctx->check_wq);
@@ -786,6 +802,7 @@ static int trusty_virtio_remove(struct platform_device *pdev)
 	/* destroy workqueues */
 	destroy_workqueue(tctx->kick_wq);
 	destroy_workqueue(tctx->check_wq);
+	destroy_workqueue(tctx->check_wq_high);
 
 	/* notify remote that shared area goes away */
 	trusty_virtio_stop(tctx, tctx->shared_id, tctx->shared_sz);
