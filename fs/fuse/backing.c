@@ -2439,7 +2439,7 @@ ssize_t fuse_bpf_simple_request(struct fuse_mount *fm, struct fuse_bpf_args *bpf
 	};
 	if (args.force)
 		bpf_args->flags |= FUSE_BPF_FORCE;
-	if (args.out_args)
+	if (args.out_argvar)
 		bpf_args->flags |= FUSE_BPF_OUT_ARGVAR;
 	for (i = 0; i < args.in_numargs; ++i)
 		bpf_args->in_args[i] = (struct fuse_bpf_in_arg) {
