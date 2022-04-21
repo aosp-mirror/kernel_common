@@ -1570,6 +1570,12 @@ uvcg_uncompressed_##cname##_store(struct config_item *item,		\
 	if (ret)							\
 		goto end;						\
 									\
+	/* index values in uvc are never 0 */				\
+	if (!num) {							\
+		ret = -EINVAL;						\
+		goto end;						\
+	}								\
+									\
 	u->desc.aname = num;						\
 	ret = len;							\
 end:									\
@@ -1762,6 +1768,12 @@ uvcg_mjpeg_##cname##_store(struct config_item *item,			\
 	ret = kstrtou8(page, 0, &num);					\
 	if (ret)							\
 		goto end;						\
+									\
+	/* index values in uvc are never 0 */				\
+	if (!num) {							\
+		ret = -EINVAL;						\
+		goto end;						\
+	}								\
 									\
 	u->desc.aname = num;						\
 	ret = len;							\
