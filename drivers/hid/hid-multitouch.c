@@ -718,7 +718,7 @@ static void mt_configure_lid_handler(struct mt_device *td)
 {
 	struct hid_device *hdev = td->hdev;
 
-	if (!hid_is_using_ll_driver(hdev, &i2c_hid_ll_driver))
+	if (hdev->bus != BUS_I2C)
 		return;
 
 	td->lid_switch = true;
