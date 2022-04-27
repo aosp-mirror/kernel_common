@@ -1358,6 +1358,7 @@
   nsec_to_clock_t
   ns_to_timespec64
   __num_online_cpus
+  nvhe_hyp_panic_handler
   nvmem_device_put
   nvmem_device_read
   nvmem_device_write
