@@ -124,6 +124,8 @@
 
 #define SO_BUF_LOCK              0x0051
 
+#define SO_RCVMARK               0x0054
+
 #if !defined(__KERNEL__)
 
 
