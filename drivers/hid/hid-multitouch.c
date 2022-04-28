@@ -666,6 +666,11 @@ static void lid_work_handler(struct work_struct *work)
 
 	mutex_lock(&td->mode_mutex);
 	mt_set_modes(hdev, HID_LATENCY_NORMAL, false, false);
+	/* Elan's touchpad VID 323B needs this delay to handle both switch
+	 * surface off and switch surface on and trigger recalibration
+	 * properly.
+	 */
+	msleep(50);
 	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
 	mutex_unlock(&td->mode_mutex);
 }
@@ -693,7 +698,7 @@ static int mt_create_lid_handler(void)
 	if (!dmi_check_system(mt_lid_handler_dmi_table))
 		return 0;
 
-	mt_mode_wq = create_singlethread_workqueue("hid-mt-lid");
+	mt_mode_wq = alloc_ordered_workqueue("hid-mt-lid", WQ_FREEZABLE);
 	if (mt_mode_wq == NULL)
 		return -ENOMEM;
 
