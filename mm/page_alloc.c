@@ -3342,8 +3342,7 @@ static bool free_unref_page_prepare(struct page *page, unsigned long pfn)
 	return true;
 }
 
-static void free_unref_page_commit(struct page *page, unsigned long pfn,
-				   int migratetype)
+static void free_unref_page_commit(struct page *page, int migratetype)
 {
 	struct zone *zone = page_zone(page);
 	struct per_cpu_pages *pcp;
@@ -3388,7 +3387,7 @@ void free_unref_page(struct page *page)
 	}
 
 	local_irq_save(flags);
-	free_unref_page_commit(page, pfn, migratetype);
+	free_unref_page_commit(page, migratetype);
 	local_irq_restore(flags);
 }
 
@@ -3398,13 +3397,13 @@ void free_unref_page(struct page *page)
 void free_unref_page_list(struct list_head *list)
 {
 	struct page *page, *next;
-	unsigned long flags, pfn;
+	unsigned long flags;
 	int batch_count = 0;
 	int migratetype;
 
 	/* Prepare pages for freeing */
 	list_for_each_entry_safe(page, next, list, lru) {
-		pfn = page_to_pfn(page);
+		unsigned long pfn = page_to_pfn(page);
 		if (!free_unref_page_prepare(page, pfn))
 			list_del(&page->lru);
 
@@ -3428,17 +3427,13 @@ void free_unref_page_list(struct list_head *list)
 			if (migratetype == MIGRATE_HIGHATOMIC)
 				set_pcppage_migratetype(page, MIGRATE_MOVABLE);
 		}
-
-		set_page_private(page, pfn);
 	}
 
 	local_irq_save(flags);
 	list_for_each_entry_safe(page, next, list, lru) {
-		pfn = page_private(page);
-		set_page_private(page, 0);
 		migratetype = get_pcppage_migratetype(page);
 		trace_mm_page_free_batched(page);
-		free_unref_page_commit(page, pfn, migratetype);
+		free_unref_page_commit(page, migratetype);
 
 		/*
 		 * Guard against excessive IRQ disabled times when we get
