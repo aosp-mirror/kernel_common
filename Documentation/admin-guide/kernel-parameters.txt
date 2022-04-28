@@ -3437,6 +3437,9 @@
 			just as if they had also been called out in the
 			rcu_nocbs= boot parameter.
 
+			Note that this argument takes precedence over
+			the CONFIG_RCU_NOCB_CPU_DEFAULT_ALL option.
+
 	noiotrap	[SH] Disables trapped I/O port accesses.
 
 	noirqdebug	[X86-32] Disables the code which attempts to detect and
@@ -4201,6 +4204,9 @@
 			which can be useful for HPC and real-time
 			workloads.  It can also improve energy efficiency
 			for asymmetric multiprocessors.
+
+			Note that this argument takes precedence over
+			the CONFIG_RCU_NOCB_CPU_DEFAULT_ALL option.
 
 	rcu_nocb_poll	[KNL]
 			Rather than requiring that offloaded CPUs
