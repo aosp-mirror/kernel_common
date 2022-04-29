@@ -220,6 +220,7 @@ struct qca_serdev {
 	struct hci_uart	 serdev_hu;
 	struct gpio_desc *bt_en;
 	struct gpio_desc *sw_ctrl;
+	struct gpio_desc *wlan_en;
 	struct clk	 *susclk;
 	enum qca_btsoc_type btsoc_type;
 	struct qca_power *bt_power;
@@ -1726,12 +1727,25 @@ static int qca_regulator_init(struct hci_uart *hu)
 	if (qcadev->bt_en) {
 		gpiod_set_value_cansleep(qcadev->bt_en, 0);
 		msleep(50);
+	}
+
+	if (!qcadev->wlan_en || (qcadev->wlan_en && gpiod_get_value_cansleep(qcadev->wlan_en)))
 		gpiod_set_value_cansleep(qcadev->bt_en, 1);
-		msleep(50);
-		if (qcadev->sw_ctrl) {
-			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
-			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
-		}
+
+	if (qcadev->wlan_en && !gpiod_get_value_cansleep(qcadev->wlan_en)) {
+		gpiod_set_value_cansleep(qcadev->bt_en, 0);
+		msleep(100);
+		gpiod_set_value_cansleep(qcadev->bt_en, 1);
+	}
+
+	if (!gpiod_get_value_cansleep(qcadev->bt_en))
+		gpiod_set_value_cansleep(qcadev->bt_en, 1);
+
+	msleep(50);
+
+	if (qcadev->sw_ctrl) {
+		sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
+		bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
 	}
 
 	qca_set_speed(hu, QCA_INIT_SPEED);
@@ -2127,8 +2141,8 @@ static void qca_power_shutdown(struct hci_uart *hu)
 	case QCA_WCN6750:
 	case QCA_WCN6855:
 		gpiod_set_value_cansleep(qcadev->bt_en, 0);
-		msleep(100);
 		qca_regulator_disable(qcadev);
+		msleep(100);
 		if (qcadev->sw_ctrl) {
 			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
 			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
@@ -2291,6 +2305,10 @@ static int qca_serdev_probe(struct serdev_device *serdev)
 		}
 
 		qcadev->bt_power->vregs_on = false;
+
+		qcadev->wlan_en = devm_gpiod_get_optional(&serdev->dev, "wlan", GPIOD_ASIS);
+		if (!qcadev->wlan_en && data->soc_type == QCA_WCN6750)
+			dev_err(&serdev->dev, "failed to acquire WL_EN gpio");
 
 		qcadev->bt_en = devm_gpiod_get_optional(&serdev->dev, "enable",
 					       GPIOD_OUT_LOW);
