@@ -2616,7 +2616,7 @@
 			CONFIG_KUNIT to be set to be fully enabled. The
 			default value can be overridden via
 			KUNIT_DEFAULT_ENABLED.
-			Default is 1 (enabled)
+			Default is 0 (disabled)
 
 	kvm.ignore_msrs=[KVM] Ignore guest accesses to unhandled MSRs.
 			Default is 0 (don't ignore, but inject #GP)
