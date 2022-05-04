@@ -513,6 +513,7 @@
   ieee80211_scan_completed
   ieee80211_start_tx_ba_cb_irqsafe
   ieee80211_stop_tx_ba_cb_irqsafe
+  ieee80211_tx_prepare_skb
   ieee80211_tx_status_irqsafe
   ieee80211_unregister_hw
   init_net
@@ -1091,6 +1092,7 @@
 # required by virtio_pci.ko
   irq_set_affinity_hint
   pci_alloc_irq_vectors_affinity
+  pci_device_is_present
   pci_disable_sriov
   pci_enable_sriov
   pci_find_capability
@@ -1103,6 +1105,7 @@
   pci_release_selected_regions
   pci_request_selected_regions
   pci_vfs_assigned
+  virtio_break_device
   virtio_device_freeze
   virtio_device_restore
 
