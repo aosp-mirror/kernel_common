@@ -1667,7 +1667,8 @@ static int expand_inode_data(struct inode *inode, loff_t offset,
 	struct f2fs_gc_control gc_control = { .victim_segno = NULL_SEGNO,
 			.init_gc_type = FG_GC,
 			.should_migrate_blocks = false,
-			.err_gc_skipped = true };
+			.err_gc_skipped = true,
+			.nr_free_secs = 0 };
 	pgoff_t pg_start, pg_end;
 	loff_t new_size = i_size_read(inode);
 	loff_t off_end;
@@ -2427,7 +2428,8 @@ static int f2fs_ioc_gc(struct file *filp, unsigned long arg)
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct f2fs_gc_control gc_control = { .victim_segno = NULL_SEGNO,
 			.no_bg_gc = false,
-			.should_migrate_blocks = false };
+			.should_migrate_blocks = false,
+			.nr_free_secs = 0 };
 	__u32 sync;
 	int ret;
 
@@ -2468,7 +2470,8 @@ static int __f2fs_ioc_gc_range(struct file *filp, struct f2fs_gc_range *range)
 			.init_gc_type = range->sync ? FG_GC : BG_GC,
 			.no_bg_gc = false,
 			.should_migrate_blocks = false,
-			.err_gc_skipped = range->sync };
+			.err_gc_skipped = range->sync,
+			.nr_free_secs = 0 };
 	u64 end;
 	int ret;
 
@@ -2914,7 +2917,8 @@ static int f2fs_ioc_flush_device(struct file *filp, unsigned long arg)
 	struct f2fs_gc_control gc_control = {
 			.init_gc_type = FG_GC,
 			.should_migrate_blocks = true,
-			.err_gc_skipped = true };
+			.err_gc_skipped = true,
+			.nr_free_secs = 0 };
 	int ret;
 
 	if (!capable(CAP_SYS_ADMIN))
