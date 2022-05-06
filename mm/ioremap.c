@@ -225,6 +225,7 @@ int ioremap_page_range(unsigned long addr,
 	pgd_t *pgd;
 	unsigned long start;
 	unsigned long next;
+	phys_addr_t phys_start = phys_addr;
 	int err;
 	pgtbl_mod_mask mask = 0;
 
@@ -245,6 +246,9 @@ int ioremap_page_range(unsigned long addr,
 
 	if (mask & ARCH_PAGE_TABLE_SYNC_MASK)
 		arch_sync_kernel_mappings(start, end);
+
+	if (IS_ENABLED(CONFIG_ARCH_HAS_IOREMAP_PHYS_HOOKS) && !err)
+		ioremap_phys_range_hook(phys_start, end - start, prot);
 
 	return err;
 }

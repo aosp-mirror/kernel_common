@@ -25,6 +25,9 @@
 
 #include "internal.h"
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/gup.h>
+
 struct follow_page_context {
 	struct dev_pagemap *pgmap;
 	unsigned int page_mask;
@@ -116,11 +119,14 @@ static __maybe_unused struct page *try_grab_compound_head(struct page *page,
 							  int refs,
 							  unsigned int flags)
 {
+	bool vendor_ret = false;
+
+	trace_android_vh_try_grab_compound_head(page, refs, flags, &vendor_ret);
+	if (vendor_ret)
+		return NULL;
+
 	if (flags & FOLL_GET) {
-		struct page *head = try_get_compound_head(page, refs);
-		if (head)
-			set_page_pinner(head, compound_order(head));
-		return head;
+		return try_get_compound_head(page, refs);
 	} else if (flags & FOLL_PIN) {
 		int orig_refs = refs;
 
@@ -175,8 +181,6 @@ static void put_compound_head(struct page *page, int refs, unsigned int flags)
 			refs *= GUP_PIN_COUNTING_BIAS;
 	}
 
-	if (flags & FOLL_GET)
-		reset_page_pinner(page, compound_order(page));
 	put_page_refs(page, refs);
 }
 
@@ -206,13 +210,7 @@ bool __must_check try_grab_page(struct page *page, unsigned int flags)
 	WARN_ON_ONCE((flags & (FOLL_GET | FOLL_PIN)) == (FOLL_GET | FOLL_PIN));
 
 	if (flags & FOLL_GET) {
-		bool ret = try_get_page(page);
-
-		if (ret) {
-			page = compound_head(page);
-			set_page_pinner(page, compound_order(page));
-		}
-		return ret;
+		return try_get_page(page);
 	} else if (flags & FOLL_PIN) {
 		int refs = 1;
 
@@ -254,24 +252,6 @@ void unpin_user_page(struct page *page)
 	put_compound_head(compound_head(page), 1, FOLL_PIN);
 }
 EXPORT_SYMBOL(unpin_user_page);
-
-/*
- * put_user_page() - release a page obtained using get_user_pages() or
- *                   follow_page(FOLL_GET)
- * @page:            pointer to page to be released
- *
- * Pages that were obtained via get_user_pages()/follow_page(FOLL_GET) must be
- * released via put_user_page.
- * note: If it's not a page from GUP or follow_page(FOLL_GET), it's harmless.
- */
-void put_user_page(struct page *page)
-{
-	struct page *head = compound_head(page);
-
-	reset_page_pinner(head, compound_order(head));
-	put_page(page);
-}
-EXPORT_SYMBOL(put_user_page);
 
 /**
  * unpin_user_pages_dirty_lock() - release and optionally dirty gup-pinned pages
@@ -948,6 +928,9 @@ static int check_vma_flags(struct vm_area_struct *vma, unsigned long gup_flags)
 	if (gup_flags & FOLL_ANON && !vma_is_anonymous(vma))
 		return -EFAULT;
 
+	if ((gup_flags & FOLL_LONGTERM) && vma_is_fsdax(vma))
+		return -EOPNOTSUPP;
+
 	if (write) {
 		if (!(vm_flags & VM_WRITE)) {
 			if (!(gup_flags & FOLL_FORCE))
@@ -1085,10 +1068,14 @@ static long __get_user_pages(struct mm_struct *mm,
 				goto next_page;
 			}
 
-			if (!vma || check_vma_flags(vma, gup_flags)) {
+			if (!vma) {
 				ret = -EFAULT;
 				goto out;
 			}
+			ret = check_vma_flags(vma, gup_flags);
+			if (ret)
+				goto out;
+
 			if (is_vm_hugetlb_page(vma)) {
 				i = follow_hugetlb_page(mm, vma, pages, vmas,
 						&start, &nr_pages, i,
@@ -1592,26 +1579,6 @@ struct page *get_dump_page(unsigned long addr)
 }
 #endif /* CONFIG_ELF_CORE */
 
-#if defined(CONFIG_FS_DAX) || defined (CONFIG_CMA)
-static bool check_dax_vmas(struct vm_area_struct **vmas, long nr_pages)
-{
-	long i;
-	struct vm_area_struct *vma_prev = NULL;
-
-	for (i = 0; i < nr_pages; i++) {
-		struct vm_area_struct *vma = vmas[i];
-
-		if (vma == vma_prev)
-			continue;
-
-		vma_prev = vma;
-
-		if (vma_is_fsdax(vma))
-			return true;
-	}
-	return false;
-}
-
 #ifdef CONFIG_CMA
 static long check_and_migrate_cma_pages(struct mm_struct *mm,
 					unsigned long start,
@@ -1730,63 +1697,23 @@ static long __gup_longterm_locked(struct mm_struct *mm,
 				  struct vm_area_struct **vmas,
 				  unsigned int gup_flags)
 {
-	struct vm_area_struct **vmas_tmp = vmas;
 	unsigned long flags = 0;
-	long rc, i;
+	long rc;
 
-	if (gup_flags & FOLL_LONGTERM) {
-		if (!pages)
-			return -EINVAL;
-
-		if (!vmas_tmp) {
-			vmas_tmp = kcalloc(nr_pages,
-					   sizeof(struct vm_area_struct *),
-					   GFP_KERNEL);
-			if (!vmas_tmp)
-				return -ENOMEM;
-		}
+	if (gup_flags & FOLL_LONGTERM)
 		flags = memalloc_nocma_save();
-	}
 
-	rc = __get_user_pages_locked(mm, start, nr_pages, pages,
-				     vmas_tmp, NULL, gup_flags);
+	rc = __get_user_pages_locked(mm, start, nr_pages, pages, vmas, NULL,
+				     gup_flags);
 
 	if (gup_flags & FOLL_LONGTERM) {
-		if (rc < 0)
-			goto out;
-
-		if (check_dax_vmas(vmas_tmp, rc)) {
-			if (gup_flags & FOLL_PIN)
-				unpin_user_pages(pages, rc);
-			else
-				for (i = 0; i < rc; i++)
-					put_page(pages[i]);
-			rc = -EOPNOTSUPP;
-			goto out;
-		}
-
-		rc = check_and_migrate_cma_pages(mm, start, rc, pages,
-						 vmas_tmp, gup_flags);
-out:
+		if (rc > 0)
+			rc = check_and_migrate_cma_pages(mm, start, rc, pages,
+							 vmas, gup_flags);
 		memalloc_nocma_restore(flags);
 	}
-
-	if (vmas_tmp != vmas)
-		kfree(vmas_tmp);
 	return rc;
 }
-#else /* !CONFIG_FS_DAX && !CONFIG_CMA */
-static __always_inline long __gup_longterm_locked(struct mm_struct *mm,
-						  unsigned long start,
-						  unsigned long nr_pages,
-						  struct page **pages,
-						  struct vm_area_struct **vmas,
-						  unsigned int flags)
-{
-	return __get_user_pages_locked(mm, start, nr_pages, pages, vmas,
-				       NULL, flags);
-}
-#endif /* CONFIG_FS_DAX || CONFIG_CMA */
 
 static bool is_valid_gup_flags(unsigned int gup_flags)
 {
@@ -1813,6 +1740,10 @@ static long __get_user_pages_remote(struct mm_struct *mm,
 				    unsigned int gup_flags, struct page **pages,
 				    struct vm_area_struct **vmas, int *locked)
 {
+	unsigned int orig_gup_flags = gup_flags;
+
+	trace_android_vh___get_user_pages_remote(locked, &gup_flags, pages);
+
 	/*
 	 * Parts of FOLL_LONGTERM behavior are incompatible with
 	 * FAULT_FLAG_ALLOW_RETRY because of the FS DAX check requirement on
@@ -1820,16 +1751,23 @@ static long __get_user_pages_remote(struct mm_struct *mm,
 	 * callers that do request FOLL_LONGTERM, but do not set locked. So,
 	 * allow what we can.
 	 */
+retry:
 	if (gup_flags & FOLL_LONGTERM) {
+		long ret;
+
 		if (WARN_ON_ONCE(locked))
 			return -EINVAL;
 		/*
 		 * This will check the vmas (even if our vmas arg is NULL)
 		 * and return -ENOTSUPP if DAX isn't allowed in this case:
 		 */
-		return __gup_longterm_locked(mm, start, nr_pages, pages,
+		ret = __gup_longterm_locked(mm, start, nr_pages, pages,
 					     vmas, gup_flags | FOLL_TOUCH |
 					     FOLL_REMOTE);
+		if (ret < 0 && orig_gup_flags != gup_flags) {
+			gup_flags = orig_gup_flags;
+			goto retry;
+		}
 	}
 
 	return __get_user_pages_locked(mm, start, nr_pages, pages, vmas,
@@ -1948,11 +1886,23 @@ long get_user_pages(unsigned long start, unsigned long nr_pages,
 		unsigned int gup_flags, struct page **pages,
 		struct vm_area_struct **vmas)
 {
+	long ret;
+	unsigned int orig_gup_flags;
+
 	if (!is_valid_gup_flags(gup_flags))
 		return -EINVAL;
 
-	return __gup_longterm_locked(current->mm, start, nr_pages,
+	orig_gup_flags = gup_flags;
+	trace_android_vh_get_user_pages(&gup_flags, pages);
+retry:
+	ret = __gup_longterm_locked(current->mm, start, nr_pages,
 				     pages, vmas, gup_flags | FOLL_TOUCH);
+	if (ret < 0 && orig_gup_flags != gup_flags) {
+		gup_flags = orig_gup_flags;
+		goto retry;
+	}
+
+	return ret;
 }
 EXPORT_SYMBOL(get_user_pages);
 
@@ -2760,6 +2710,7 @@ static int internal_get_user_pages_fast(unsigned long start,
 	/* Slow path: try to get the remaining pages with get_user_pages */
 	start += nr_pinned << PAGE_SHIFT;
 	pages += nr_pinned;
+	trace_android_vh_internal_get_user_pages_fast(&gup_flags, pages);
 	ret = __gup_longterm_unlocked(start, nr_pages - nr_pinned, gup_flags,
 				      pages);
 	if (ret < 0) {
@@ -2985,6 +2936,7 @@ long pin_user_pages(unsigned long start, unsigned long nr_pages,
 		return -EINVAL;
 
 	gup_flags |= FOLL_PIN;
+	trace_android_vh_pin_user_pages(&gup_flags, pages);
 	return __gup_longterm_locked(current->mm, start, nr_pages,
 				     pages, vmas, gup_flags);
 }

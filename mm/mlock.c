@@ -119,7 +119,7 @@ static bool __munlock_isolate_lru_page(struct page *page, bool getpage)
 		if (getpage)
 			get_page(page);
 		ClearPageLRU(page);
-		del_page_from_lru_list(page, lruvec, page_lru(page));
+		del_page_from_lru_list(page, lruvec);
 		return true;
 	}
 
@@ -472,14 +472,6 @@ void munlock_vma_pages_range(struct vm_area_struct *vma,
 		 */
 		page = follow_page(vma, start, FOLL_GET | FOLL_DUMP);
 		if (page && !IS_ERR(page)) {
-			/*
-			 * munlock_vma_pages_range uses follow_page(FOLL_GET)
-			 * so it need to use put_user_page but the munlock
-			 * path is quite complicated to deal with each put
-			 * sites correctly so just unattribute them to avoid
-			 * false positive at this moment.
-			 */
-			reset_page_pinner(page, compound_order(page));
 			if (PageTransTail(page)) {
 				VM_BUG_ON_PAGE(PageMlocked(page), page);
 				put_page(page); /* follow_page_mask() */
@@ -550,7 +542,7 @@ static int mlock_fixup(struct vm_area_struct *vma, struct vm_area_struct **prev,
 	pgoff = vma->vm_pgoff + ((start - vma->vm_start) >> PAGE_SHIFT);
 	*prev = vma_merge(mm, *prev, start, end, newflags, vma->anon_vma,
 			  vma->vm_file, pgoff, vma_policy(vma),
-			  vma->vm_userfaultfd_ctx, vma_get_anon_name(vma));
+			  vma->vm_userfaultfd_ctx, anon_vma_name(vma));
 	if (*prev) {
 		vma = *prev;
 		goto success;

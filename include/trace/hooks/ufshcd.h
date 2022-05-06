@@ -4,7 +4,6 @@
 #define TRACE_INCLUDE_PATH trace/hooks
 #if !defined(_TRACE_HOOK_UFSHCD_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_UFSHCD_H
-#include <linux/tracepoint.h>
 #include <trace/hooks/vendor_hooks.h>
 /*
  * Following tracepoints are not exported in tracefs and provide a
@@ -18,6 +17,10 @@ DECLARE_HOOK(android_vh_ufs_fill_prdt,
 	TP_PROTO(struct ufs_hba *hba, struct ufshcd_lrb *lrbp,
 		 unsigned int segments, int *err),
 	TP_ARGS(hba, lrbp, segments, err));
+
+DECLARE_RESTRICTED_HOOK(android_rvh_ufs_complete_init,
+			TP_PROTO(struct ufs_hba *hba),
+			TP_ARGS(hba), 1);
 
 DECLARE_RESTRICTED_HOOK(android_rvh_ufs_reprogram_all_keys,
 			TP_PROTO(struct ufs_hba *hba, int *err),

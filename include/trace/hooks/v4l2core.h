@@ -7,7 +7,6 @@
 #if !defined(_TRACE_HOOK_V4L2CORE_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_V4L2_CORE_H
 
-#include <linux/tracepoint.h>
 #include <trace/hooks/vendor_hooks.h>
 
 struct v4l2_format;

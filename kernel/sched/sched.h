@@ -79,6 +79,7 @@
 #include "cpudeadline.h"
 
 #include <trace/events/sched.h>
+#include <trace/hooks/sched.h>
 
 #ifdef CONFIG_SCHED_DEBUG
 # define SCHED_WARN_ON(x)	WARN_ONCE(x, #x)
@@ -2465,6 +2466,7 @@ unsigned long uclamp_rq_util_with(struct rq *rq, unsigned long util,
 {
 	unsigned long min_util = 0;
 	unsigned long max_util = 0;
+	unsigned long ret = 0;
 
 	if (!static_branch_likely(&sched_uclamp_used))
 		return util;
@@ -2491,6 +2493,10 @@ out:
 	 */
 	if (unlikely(min_util >= max_util))
 		return min_util;
+
+	trace_android_rvh_uclamp_rq_util_with(util, min_util, max_util, &ret);
+	if (ret)
+		return ret;
 
 	return clamp(util, min_util, max_util);
 }

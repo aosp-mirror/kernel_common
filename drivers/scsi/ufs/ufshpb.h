@@ -31,7 +31,6 @@
 
 /* hpb support chunk size */
 #define HPB_LEGACY_CHUNK_HIGH			1
-#define HPB_MULTI_CHUNK_LOW			7
 #define HPB_MULTI_CHUNK_HIGH			256
 
 /* hpb vender defined opcode */
@@ -239,8 +238,6 @@ struct ufshpb_lu {
 	int throttle_pre_req;
 	int num_inflight_map_req;
 	struct list_head lh_pre_req_free;
-	int cur_read_id;
-	int pre_req_min_tr_len;
 	int pre_req_max_tr_len;
 
 	/* cached L2P map management worker */

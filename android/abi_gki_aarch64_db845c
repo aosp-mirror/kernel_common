@@ -851,7 +851,9 @@
   dma_buf_put
   dma_buf_unmap_attachment
   dma_get_sgtable_attrs
+  down_read
   find_vma
+  up_read
   wait_for_completion_interruptible
 
 # required by gpio-regulator.ko
@@ -1672,19 +1674,22 @@
 
 # required by ufs_qcom.ko
   phy_set_mode_ext
+  ufshcd_dme_configure_adapt
   ufshcd_dme_get_attr
   ufshcd_dme_set_attr
   ufshcd_dump_regs
   ufshcd_get_local_unipro_ver
   ufshcd_get_pwr_dev_param
+  ufshcd_init_pwr_dev_param
   ufshcd_pltfrm_init
-  ufshcd_pltfrm_resume
-  ufshcd_pltfrm_runtime_idle
-  ufshcd_pltfrm_runtime_resume
-  ufshcd_pltfrm_runtime_suspend
   ufshcd_pltfrm_shutdown
-  ufshcd_pltfrm_suspend
   ufshcd_remove
+  ufshcd_resume_complete
+  ufshcd_runtime_resume
+  ufshcd_runtime_suspend
+  ufshcd_suspend_prepare
+  ufshcd_system_resume
+  ufshcd_system_suspend
   ufshcd_uic_hibern8_enter
   ufshcd_uic_hibern8_exit
 

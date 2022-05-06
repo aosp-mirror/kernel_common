@@ -24,6 +24,7 @@
 
 #define MTE_CTRL_TCF_SYNC		(1UL << 16)
 #define MTE_CTRL_TCF_ASYNC		(1UL << 17)
+#define MTE_CTRL_TCF_ASYMM		(1UL << 18)
 
 #ifndef __ASSEMBLY__
 
@@ -338,13 +339,13 @@ long get_tagged_addr_ctrl(struct task_struct *task);
  * of header definitions for the use of task_stack_page.
  */
 
-#define current_top_of_stack()							\
-({										\
-	struct stack_info _info;						\
-	BUG_ON(!on_accessible_stack(current, current_stack_pointer, &_info));	\
-	_info.high;								\
+#define current_top_of_stack()								\
+({											\
+	struct stack_info _info;							\
+	BUG_ON(!on_accessible_stack(current, current_stack_pointer, 1, &_info));	\
+	_info.high;									\
 })
-#define on_thread_stack()	(on_task_stack(current, current_stack_pointer, NULL))
+#define on_thread_stack()	(on_task_stack(current, current_stack_pointer, 1, NULL))
 
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_PROCESSOR_H */
