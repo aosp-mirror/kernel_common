@@ -1,0 +1,2 @@
+# include OWNERS from the top level trusty repo
+include trusty:refs/meta/config:/OWNERS
