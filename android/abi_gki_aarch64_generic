@@ -286,6 +286,8 @@
   cpuhp_tasks_frozen
   cpu_hwcap_keys
   cpu_hwcaps
+  cpuidle_driver_state_disabled
+  cpuidle_get_driver
   cpuidle_governor_latency_req
   cpuidle_pause_and_lock
   cpuidle_resume_and_unlock
