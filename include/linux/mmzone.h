@@ -547,6 +547,11 @@ struct per_cpu_pageset {
 #endif
 };
 
+struct per_cpu_pageset_ext {
+	spinlock_t lock;	/* Protects pageset.pcp.lists field */
+	struct per_cpu_pageset pageset;
+};
+
 struct per_cpu_nodestat {
 	s8 stat_threshold;
 	s8 vm_node_stat_diff[NR_VM_NODE_STAT_ITEMS];

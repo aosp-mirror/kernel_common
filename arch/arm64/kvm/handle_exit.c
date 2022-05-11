@@ -349,3 +349,4 @@ void __noreturn __cold nvhe_hyp_panic_handler(u64 esr, u64 spsr,
 	panic("HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%016lx\n",
 	      spsr, elr_virt, esr, far, hpfar, par, vcpu);
 }
+EXPORT_SYMBOL_GPL(nvhe_hyp_panic_handler);
