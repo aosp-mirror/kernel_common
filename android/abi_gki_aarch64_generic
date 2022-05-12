@@ -2467,6 +2467,8 @@
   usb_free_all_descriptors
   usb_function_register
   usb_function_unregister
+  usb_gadget_activate
+  usb_gadget_deactivate
   usb_gadget_set_state
   usb_gstrings_attach
   usb_hcd_is_primary_hcd
