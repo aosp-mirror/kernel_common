@@ -503,11 +503,8 @@ process_slot:
 			 */
 			ASSERT(key.offset == 0);
 			ASSERT(datal <= fs_info->sectorsize);
-			if (WARN_ON(key.offset != 0) ||
-			    WARN_ON(datal > fs_info->sectorsize)) {
-				ret = -EUCLEAN;
-				goto out;
-			}
+			if (key.offset != 0 || datal > fs_info->sectorsize)
+				return -EUCLEAN;
 
 			ret = clone_copy_inline_extent(inode, path, &new_key,
 						       drop_start, datal, size,

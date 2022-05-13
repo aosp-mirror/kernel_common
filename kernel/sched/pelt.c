@@ -30,6 +30,7 @@
 
 int pelt_load_avg_period = PELT32_LOAD_AVG_PERIOD;
 int pelt_load_avg_max = PELT32_LOAD_AVG_MAX;
+EXPORT_SYMBOL_GPL(pelt_load_avg_max);
 const u32 *pelt_runnable_avg_yN_inv = pelt32_runnable_avg_yN_inv;
 
 static int __init set_pelt(char *str)
@@ -216,9 +217,8 @@ accumulate_sum(u64 delta, struct sched_avg *sa,
  *   load_avg = u_0` + y*(u_0 + u_1*y + u_2*y^2 + ... )
  *            = u_0 + u_1*y + u_2*y^2 + ... [re-labeling u_i --> u_{i+1}]
  */
-static __always_inline int
-___update_load_sum(u64 now, struct sched_avg *sa,
-		  unsigned long load, unsigned long runnable, int running)
+int ___update_load_sum(u64 now, struct sched_avg *sa,
+		       unsigned long load, unsigned long runnable, int running)
 {
 	u64 delta;
 
@@ -268,6 +268,7 @@ ___update_load_sum(u64 now, struct sched_avg *sa,
 
 	return 1;
 }
+EXPORT_SYMBOL_GPL(___update_load_sum);
 
 /*
  * When syncing *_avg with *_sum, we must take into account the current
@@ -293,8 +294,7 @@ ___update_load_sum(u64 now, struct sched_avg *sa,
  * the period_contrib of cfs_rq when updating the sched_avg of a sched_entity
  * if it's more convenient.
  */
-static __always_inline void
-___update_load_avg(struct sched_avg *sa, unsigned long load)
+void ___update_load_avg(struct sched_avg *sa, unsigned long load)
 {
 	u32 divider = get_pelt_divider(sa);
 
@@ -305,6 +305,7 @@ ___update_load_avg(struct sched_avg *sa, unsigned long load)
 	sa->runnable_avg = div_u64(sa->runnable_sum, divider);
 	WRITE_ONCE(sa->util_avg, sa->util_sum / divider);
 }
+EXPORT_SYMBOL_GPL(___update_load_avg);
 
 /*
  * sched_entity:

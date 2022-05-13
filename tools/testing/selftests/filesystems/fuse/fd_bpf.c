@@ -74,7 +74,7 @@ SEC("maps") struct fuse_bpf_map test_map2 = {
 
 SEC("test_daemon")
 
-int trace_daemon(struct fuse_args *fa)
+int trace_daemon(struct fuse_bpf_args *fa)
 {
 	uint64_t uid_gid = bpf_get_current_uid_gid();
 	uint32_t uid = uid_gid & 0xffffffff;

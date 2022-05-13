@@ -50,9 +50,6 @@ static void batadv_tvlv_handler_release(struct kref *ref)
  */
 static void batadv_tvlv_handler_put(struct batadv_tvlv_handler *tvlv_handler)
 {
-	if (!tvlv_handler)
-		return;
-
 	kref_put(&tvlv_handler->refcount, batadv_tvlv_handler_release);
 }
 
@@ -109,9 +106,6 @@ static void batadv_tvlv_container_release(struct kref *ref)
  */
 static void batadv_tvlv_container_put(struct batadv_tvlv_container *tvlv)
 {
-	if (!tvlv)
-		return;
-
 	kref_put(&tvlv->refcount, batadv_tvlv_container_release);
 }
 

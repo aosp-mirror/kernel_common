@@ -2883,6 +2883,7 @@ static void commit_charge(struct page *page, struct mem_cgroup *memcg)
 	 * - LRU isolation
 	 * - lock_page_memcg()
 	 * - exclusive reference
+	 * - mem_cgroup_trylock_pages()
 	 */
 	page->mem_cgroup = memcg;
 }
@@ -5254,6 +5255,7 @@ static void __mem_cgroup_free(struct mem_cgroup *memcg)
 
 static void mem_cgroup_free(struct mem_cgroup *memcg)
 {
+	lru_gen_exit_memcg(memcg);
 	memcg_wb_domain_exit(memcg);
 	/*
 	 * Flush percpu vmstats and vmevents to guarantee the value correctness
@@ -5329,6 +5331,7 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 #endif
 	idr_replace(&mem_cgroup_idr, memcg, memcg->id.id);
 	trace_android_vh_mem_cgroup_alloc(memcg);
+	lru_gen_init_memcg(memcg);
 	return memcg;
 fail:
 	mem_cgroup_id_remove(memcg);
@@ -6223,6 +6226,29 @@ static void mem_cgroup_move_task(void)
 }
 #endif
 
+#ifdef CONFIG_LRU_GEN
+static void mem_cgroup_attach(struct cgroup_taskset *tset)
+{
+	struct cgroup_subsys_state *css;
+	struct task_struct *task = NULL;
+
+	cgroup_taskset_for_each_leader(task, css, tset)
+		break;
+
+	if (!task)
+		return;
+
+	task_lock(task);
+	if (task->mm && task->mm->owner == task)
+		lru_gen_migrate_mm(task->mm);
+	task_unlock(task);
+}
+#else
+static void mem_cgroup_attach(struct cgroup_taskset *tset)
+{
+}
+#endif /* CONFIG_LRU_GEN */
+
 /*
  * Cgroup retains root cgroups across [un]mount cycles making it necessary
  * to verify whether we're attached to the default hierarchy on each mount
@@ -6575,6 +6601,7 @@ struct cgroup_subsys memory_cgrp_subsys = {
 	.css_free = mem_cgroup_css_free,
 	.css_reset = mem_cgroup_css_reset,
 	.can_attach = mem_cgroup_can_attach,
+	.attach = mem_cgroup_attach,
 	.cancel_attach = mem_cgroup_cancel_attach,
 	.post_attach = mem_cgroup_move_task,
 	.bind = mem_cgroup_bind,
@@ -7123,7 +7150,7 @@ static int __init cgroup_memory(char *s)
 		if (!strcmp(token, "nokmem"))
 			cgroup_memory_nokmem = true;
 	}
-	return 1;
+	return 0;
 }
 __setup("cgroup.memory=", cgroup_memory);
 

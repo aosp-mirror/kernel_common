@@ -27,6 +27,7 @@
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
 MODULE_DESCRIPTION("Filesystem in Userspace");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(ANDROID_GKI_VFS_EXPORT_ONLY);
 
 static struct kmem_cache *fuse_inode_cachep;
 struct list_head fuse_conn_list;
@@ -1902,11 +1903,21 @@ static int __init fuse_init(void)
 	if (res)
 		goto err_sysfs_cleanup;
 
+#ifdef CONFIG_FUSE_BPF
+	res = fuse_bpf_init();
+	if (res)
+		goto err_ctl_cleanup;
+#endif
+
 	sanitize_global_limit(&max_user_bgreq);
 	sanitize_global_limit(&max_user_congthresh);
 
 	return 0;
 
+#ifdef CONFIG_FUSE_BPF
+ err_ctl_cleanup:
+	fuse_ctl_cleanup();
+#endif
  err_sysfs_cleanup:
 	fuse_sysfs_cleanup();
  err_dev_cleanup:
@@ -1924,6 +1935,9 @@ static void __exit fuse_exit(void)
 	fuse_ctl_cleanup();
 	fuse_sysfs_cleanup();
 	fuse_fs_cleanup();
+#ifdef CONFIG_FUSE_BPF
+	fuse_bpf_cleanup();
+#endif
 	fuse_dev_cleanup();
 }
 

@@ -65,6 +65,8 @@ __efistub__ctype		= _ctype;
 KVM_NVHE_ALIAS(kvm_patch_vector_branch);
 KVM_NVHE_ALIAS(kvm_update_va_mask);
 KVM_NVHE_ALIAS(kvm_get_kimage_voffset);
+KVM_NVHE_ALIAS(kvm_get__text);
+KVM_NVHE_ALIAS(kvm_get__etext);
 KVM_NVHE_ALIAS(kvm_compute_final_ctr_el0);
 KVM_NVHE_ALIAS(spectre_bhb_patch_loop_iter);
 KVM_NVHE_ALIAS(spectre_bhb_patch_loop_mitigation_enable);
@@ -99,9 +101,6 @@ KVM_NVHE_ALIAS(gic_nonsecure_priorities);
 KVM_NVHE_ALIAS(__start___kvm_ex_table);
 KVM_NVHE_ALIAS(__stop___kvm_ex_table);
 
-/* Array containing bases of nVHE per-CPU memory regions. */
-KVM_NVHE_ALIAS(kvm_arm_hyp_percpu_base);
-
 /* PMU available static key */
 KVM_NVHE_ALIAS(kvm_arm_pmu_available);
 
@@ -115,12 +114,6 @@ KVM_NVHE_ALIAS_HYP(memset, __pi_memset);
 KVM_NVHE_ALIAS_HYP(__memcpy, __pi_memcpy);
 KVM_NVHE_ALIAS_HYP(__memset, __pi_memset);
 #endif
-
-/* Kernel memory sections */
-KVM_NVHE_ALIAS(__start_rodata);
-KVM_NVHE_ALIAS(__end_rodata);
-KVM_NVHE_ALIAS(__bss_start);
-KVM_NVHE_ALIAS(__bss_stop);
 
 /* Hyp memory sections */
 KVM_NVHE_ALIAS(__hyp_idmap_text_start);

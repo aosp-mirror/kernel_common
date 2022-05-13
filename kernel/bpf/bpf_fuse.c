@@ -36,12 +36,12 @@ static bool fuse_prog_is_valid_access(int off, int size,
 {
 	int i;
 
-	if (off < 0 || off > offsetofend(struct fuse_args, out_args))
+	if (off < 0 || off > offsetofend(struct fuse_bpf_args, out_args))
 		return false;
 
 	/* TODO This is garbage. Do it properly */
 	for (i = 0; i < 5; i++) {
-		if (off == offsetof(struct fuse_args, in_args[i].value)) {
+		if (off == offsetof(struct fuse_bpf_args, in_args[i].value)) {
 			info->reg_type = PTR_TO_RDONLY_BUF;
 			info->ctx_field_size = 256;
 			if (type != BPF_READ)
@@ -50,7 +50,7 @@ static bool fuse_prog_is_valid_access(int off, int size,
 		}
 	}
 	for (i = 0; i < 3; i++) {
-		if (off == offsetof(struct fuse_args, out_args[i].value)) {
+		if (off == offsetof(struct fuse_bpf_args, out_args[i].value)) {
 			info->reg_type = PTR_TO_RDWR_BUF;
 			info->ctx_field_size = 256;
 			return true;

@@ -8,6 +8,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/hooks/vendor_hooks.h>
+#include <linux/tracepoint.h>
 #include <trace/hooks/sched.h>
 #include <trace/hooks/cpu.h>
 #include <trace/hooks/fpsimd.h>
@@ -72,6 +73,8 @@
 #include <trace/hooks/ipv6.h>
 #include <trace/hooks/sound.h>
 #include <trace/hooks/snd_compr.h>
+#include <trace/hooks/gup.h>
+#include <trace/hooks/pci.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -382,3 +385,15 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_enable_thermal_power_throttle);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_thermal_power_cap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_get_thermal_zone_device);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_tcpm_modify_src_caps);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_try_grab_compound_head);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh___get_user_pages_remote);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_get_user_pages);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_internal_get_user_pages_fast);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pin_user_pages);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_attach_entity_load_avg);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_detach_entity_load_avg);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_load_avg);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_remove_entity_load_avg);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_blocked_fair);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_rt_rq_load_avg);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_pci_d3_sleep);

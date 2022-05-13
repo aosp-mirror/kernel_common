@@ -149,10 +149,8 @@ static int __control_devkmsg(char *str)
 
 static int __init control_devkmsg(char *str)
 {
-	if (__control_devkmsg(str) < 0) {
-		pr_warn("printk.devkmsg: bad option string '%s'\n", str);
+	if (__control_devkmsg(str) < 0)
 		return 1;
-	}
 
 	/*
 	 * Set sysctl string accordingly:
@@ -171,7 +169,7 @@ static int __init control_devkmsg(char *str)
 	 */
 	devkmsg_log |= DEVKMSG_LOG_MASK_LOCK;
 
-	return 1;
+	return 0;
 }
 __setup("printk.devkmsg=", control_devkmsg);
 

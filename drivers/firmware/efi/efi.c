@@ -209,7 +209,7 @@ static int __init efivar_ssdt_setup(char *str)
 		memcpy(efivar_ssdt, str, strlen(str));
 	else
 		pr_warn("efivar_ssdt: name too long: %s\n", str);
-	return 1;
+	return 0;
 }
 __setup("efivar_ssdt=", efivar_ssdt_setup);
 

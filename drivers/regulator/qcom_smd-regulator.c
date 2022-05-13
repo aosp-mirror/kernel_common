@@ -1185,10 +1185,8 @@ static int rpm_reg_probe(struct platform_device *pdev)
 
 	for_each_available_child_of_node(dev->of_node, node) {
 		vreg = devm_kzalloc(&pdev->dev, sizeof(*vreg), GFP_KERNEL);
-		if (!vreg) {
-			of_node_put(node);
+		if (!vreg)
 			return -ENOMEM;
-		}
 
 		ret = rpm_regulator_init_vreg(vreg, dev, node, rpm, vreg_data);
 

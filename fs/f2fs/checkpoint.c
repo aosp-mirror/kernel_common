@@ -98,6 +98,13 @@ repeat:
 	}
 
 	if (unlikely(!PageUptodate(page))) {
+		if (page->index == sbi->metapage_eio_ofs &&
+			sbi->metapage_eio_cnt++ == MAX_RETRY_META_PAGE_EIO) {
+			set_ckpt_flags(sbi, CP_ERROR_FLAG);
+		} else {
+			sbi->metapage_eio_ofs = page->index;
+			sbi->metapage_eio_cnt = 0;
+		}
 		f2fs_put_page(page, 1);
 		return ERR_PTR(-EIO);
 	}
@@ -282,10 +289,14 @@ out:
 	return blkno - start;
 }
 
-void f2fs_ra_meta_pages_cond(struct f2fs_sb_info *sbi, pgoff_t index)
+void f2fs_ra_meta_pages_cond(struct f2fs_sb_info *sbi, pgoff_t index,
+							unsigned int ra_blocks)
 {
 	struct page *page;
 	bool readahead = false;
+
+	if (ra_blocks == RECOVERY_MIN_RA_BLOCKS)
+		return;
 
 	page = find_get_page(META_MAPPING(sbi), index);
 	if (!page || !PageUptodate(page))
@@ -293,7 +304,7 @@ void f2fs_ra_meta_pages_cond(struct f2fs_sb_info *sbi, pgoff_t index)
 	f2fs_put_page(page, 0);
 
 	if (readahead)
-		f2fs_ra_meta_pages(sbi, index, BIO_MAX_PAGES, META_POR, true);
+		f2fs_ra_meta_pages(sbi, index, ra_blocks, META_POR, true);
 }
 
 static int __f2fs_write_meta_page(struct page *page,
@@ -1545,6 +1556,7 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	/* update user_block_counts */
 	sbi->last_valid_block_count = sbi->total_valid_block_count;
 	percpu_counter_set(&sbi->alloc_valid_block_count, 0);
+	percpu_counter_set(&sbi->rf_node_block_count, 0);
 
 	/* Here, we have one bio having CP pack except cp pack 2 page */
 	f2fs_sync_meta_pages(sbi, META, LONG_MAX, FS_CP_META_IO);

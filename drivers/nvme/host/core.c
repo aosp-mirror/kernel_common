@@ -3681,15 +3681,16 @@ static struct nvme_ns_head *nvme_find_ns_head(struct nvme_subsystem *subsys,
 	return NULL;
 }
 
-static int nvme_subsys_check_duplicate_ids(struct nvme_subsystem *subsys,
-		struct nvme_ns_ids *ids)
+static int __nvme_check_ids(struct nvme_subsystem *subsys,
+		struct nvme_ns_head *new)
 {
 	struct nvme_ns_head *h;
 
 	lockdep_assert_held(&subsys->lock);
 
 	list_for_each_entry(h, &subsys->nsheads, entry) {
-		if (nvme_ns_ids_valid(ids) && nvme_ns_ids_equal(ids, &h->ids))
+		if (nvme_ns_ids_valid(&new->ids) &&
+		    nvme_ns_ids_equal(&new->ids, &h->ids))
 			return -EINVAL;
 	}
 
@@ -3723,7 +3724,7 @@ static struct nvme_ns_head *nvme_alloc_ns_head(struct nvme_ctrl *ctrl,
 	head->ids = *ids;
 	kref_init(&head->ref);
 
-	ret = nvme_subsys_check_duplicate_ids(ctrl->subsys, &head->ids);
+	ret = __nvme_check_ids(ctrl->subsys, head);
 	if (ret) {
 		dev_err(ctrl->device,
 			"duplicate IDs for nsid %d\n", nsid);

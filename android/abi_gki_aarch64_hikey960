@@ -791,7 +791,6 @@
   of_get_next_available_child
   of_parse_phandle
   of_property_read_u64
-  __page_pinner_migration_failed
   __put_page
   put_unused_fd
   rb_erase

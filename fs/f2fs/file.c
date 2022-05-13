@@ -818,7 +818,7 @@ int f2fs_getattr(const struct path *path, struct kstat *stat,
 {
 	struct inode *inode = d_inode(path->dentry);
 	struct f2fs_inode_info *fi = F2FS_I(inode);
-	struct f2fs_inode *ri;
+	struct f2fs_inode *ri = NULL;
 	unsigned int flags;
 
 	if (f2fs_has_extra_attr(inode) &&
@@ -2621,16 +2621,19 @@ static int f2fs_defragment_range(struct f2fs_sb_info *sbi,
 	bool fragmented = false;
 	int err;
 
-	/* if in-place-update policy is enabled, don't waste time here */
-	if (f2fs_should_update_inplace(inode, NULL))
-		return -EINVAL;
-
 	pg_start = range->start >> PAGE_SHIFT;
 	pg_end = (range->start + range->len) >> PAGE_SHIFT;
 
 	f2fs_balance_fs(sbi, true);
 
 	inode_lock(inode);
+
+	/* if in-place-update policy is enabled, don't waste time here */
+	set_inode_flag(inode, FI_OPU_WRITE);
+	if (f2fs_should_update_inplace(inode, NULL)) {
+		err = -EINVAL;
+		goto out;
+	}
 
 	/* writeback all dirty pages in the range */
 	err = filemap_write_and_wait_range(inode->i_mapping, range->start,
@@ -2713,7 +2716,7 @@ do_map:
 			goto check;
 		}
 
-		set_inode_flag(inode, FI_DO_DEFRAG);
+		set_inode_flag(inode, FI_SKIP_WRITES);
 
 		idx = map.m_lblk;
 		while (idx < map.m_lblk + map.m_len && cnt < blk_per_seg) {
@@ -2738,15 +2741,16 @@ check:
 		if (map.m_lblk < pg_end && cnt < blk_per_seg)
 			goto do_map;
 
-		clear_inode_flag(inode, FI_DO_DEFRAG);
+		clear_inode_flag(inode, FI_SKIP_WRITES);
 
 		err = filemap_fdatawrite(inode->i_mapping);
 		if (err)
 			goto out;
 	}
 clear_out:
-	clear_inode_flag(inode, FI_DO_DEFRAG);
+	clear_inode_flag(inode, FI_SKIP_WRITES);
 out:
+	clear_inode_flag(inode, FI_OPU_WRITE);
 	inode_unlock(inode);
 	if (!err)
 		range->len = (u64)total << PAGE_SHIFT;
@@ -3053,7 +3057,7 @@ static int f2fs_ioc_setproject(struct file *filp, __u32 projid)
 	struct inode *inode = file_inode(filp);
 	struct f2fs_inode_info *fi = F2FS_I(inode);
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
-	struct page *ipage;
+	struct f2fs_inode *ri = NULL;
 	kprojid_t kprojid;
 	int err;
 
@@ -3077,17 +3081,8 @@ static int f2fs_ioc_setproject(struct file *filp, __u32 projid)
 	if (IS_NOQUOTA(inode))
 		return err;
 
-	ipage = f2fs_get_node_page(sbi, inode->i_ino);
-	if (IS_ERR(ipage))
-		return PTR_ERR(ipage);
-
-	if (!F2FS_FITS_IN_INODE(F2FS_INODE(ipage), fi->i_extra_isize,
-								i_projid)) {
-		err = -EOVERFLOW;
-		f2fs_put_page(ipage, 1);
-		return err;
-	}
-	f2fs_put_page(ipage, 1);
+	if (!F2FS_FITS_IN_INODE(ri, fi->i_extra_isize, i_projid))
+		return -EOVERFLOW;
 
 	err = f2fs_dquot_initialize(inode);
 	if (err)

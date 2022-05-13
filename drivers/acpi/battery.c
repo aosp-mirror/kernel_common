@@ -66,10 +66,6 @@ MODULE_PARM_DESC(cache_time, "cache time in milliseconds");
 
 static const struct acpi_device_id battery_device_ids[] = {
 	{"PNP0C0A", 0},
-
-	/* Microsoft Surface Go 3 */
-	{"MSHW0146", 0},
-
 	{"", 0},
 };
 
@@ -1173,14 +1169,6 @@ static const struct dmi_system_id bat_dmi_table[] __initconst = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
 			DMI_MATCH(DMI_PRODUCT_VERSION, "ThinkPad"),
-		},
-	},
-	{
-		/* Microsoft Surface Go 3 */
-		.callback = battery_notification_delay_quirk,
-		.matches = {
-			DMI_MATCH(DMI_SYS_VENDOR, "Microsoft Corporation"),
-			DMI_MATCH(DMI_PRODUCT_NAME, "Surface Go 3"),
 		},
 	},
 	{},

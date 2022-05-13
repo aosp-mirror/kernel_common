@@ -61,7 +61,7 @@ static void patch_text(unsigned long addr, const void *data, size_t sz)
 			.data = data,
 		};
 		stop_machine_cpuslocked(patch_text_stop_machine,
-					&patch, cpu_online_mask);
+					&patch, NULL);
 	} else {
 		unsigned long flags;
 

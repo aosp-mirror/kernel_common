@@ -1107,6 +1107,8 @@ vm_fault_t finish_mkwrite_fault(struct vm_fault *vmf);
 #define ZONES_PGOFF		(NODES_PGOFF - ZONES_WIDTH)
 #define LAST_CPUPID_PGOFF	(ZONES_PGOFF - LAST_CPUPID_WIDTH)
 #define KASAN_TAG_PGOFF		(LAST_CPUPID_PGOFF - KASAN_TAG_WIDTH)
+#define LRU_GEN_PGOFF		(KASAN_TAG_PGOFF - LRU_GEN_WIDTH)
+#define LRU_REFS_PGOFF		(LRU_GEN_PGOFF - LRU_REFS_WIDTH)
 
 /*
  * Define the bit shifts to access each section.  For non-existent
@@ -1286,7 +1288,6 @@ static inline void put_page(struct page *page)
  */
 #define GUP_PIN_COUNTING_BIAS (1U << 10)
 
-void put_user_page(struct page *page);
 void unpin_user_page(struct page *page);
 void unpin_user_pages_dirty_lock(struct page **pages, unsigned long npages,
 				 bool make_dirty);
@@ -2672,13 +2673,13 @@ extern struct vm_area_struct *__vma_merge(struct mm_struct *mm,
 	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
 	unsigned long vm_flags, struct anon_vma *anon, struct file *file,
 	pgoff_t pgoff, struct mempolicy *mpol, struct vm_userfaultfd_ctx uff,
-	const char *, bool keep_locked);
+	struct anon_vma_name *, bool keep_locked);
 
 static inline struct vm_area_struct *vma_merge(struct mm_struct *mm,
 	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
 	unsigned long vm_flags, struct anon_vma *anon, struct file *file,
 	pgoff_t off, struct mempolicy *pol, struct vm_userfaultfd_ctx uff,
-	const char *anon_name)
+	struct anon_vma_name *anon_name)
 {
 	return __vma_merge(mm, prev, addr, end, vm_flags, anon, file, off,
 			   pol, uff, anon_name, false);
@@ -3397,11 +3398,12 @@ static inline int seal_check_future_write(int seals, struct vm_area_struct *vma)
 
 #ifdef CONFIG_ANON_VMA_NAME
 int madvise_set_anon_name(struct mm_struct *mm, unsigned long start,
-			  unsigned long len_in, const char *name);
+			  unsigned long len_in,
+			  struct anon_vma_name *anon_name);
 #else
 static inline int
 madvise_set_anon_name(struct mm_struct *mm, unsigned long start,
-		      unsigned long len_in, const char *name) {
+		      unsigned long len_in, struct anon_vma_name *anon_name) {
 	return 0;
 }
 #endif

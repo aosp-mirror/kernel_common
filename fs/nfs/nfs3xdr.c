@@ -1964,6 +1964,7 @@ int nfs3_decode_dirent(struct xdr_stream *xdr, struct nfs_entry *entry,
 		       bool plus)
 {
 	struct user_namespace *userns = rpc_userns(entry->server->client);
+	struct nfs_entry old = *entry;
 	__be32 *p;
 	int error;
 	u64 new_cookie;
@@ -1983,15 +1984,15 @@ int nfs3_decode_dirent(struct xdr_stream *xdr, struct nfs_entry *entry,
 
 	error = decode_fileid3(xdr, &entry->ino);
 	if (unlikely(error))
-		return -EAGAIN;
+		return error;
 
 	error = decode_inline_filename3(xdr, &entry->name, &entry->len);
 	if (unlikely(error))
-		return -EAGAIN;
+		return error;
 
 	error = decode_cookie3(xdr, &new_cookie);
 	if (unlikely(error))
-		return -EAGAIN;
+		return error;
 
 	entry->d_type = DT_UNKNOWN;
 
@@ -1999,7 +2000,7 @@ int nfs3_decode_dirent(struct xdr_stream *xdr, struct nfs_entry *entry,
 		entry->fattr->valid = 0;
 		error = decode_post_op_attr(xdr, entry->fattr, userns);
 		if (unlikely(error))
-			return -EAGAIN;
+			return error;
 		if (entry->fattr->valid & NFS_ATTR_FATTR_V3)
 			entry->d_type = nfs_umode_to_dtype(entry->fattr->mode);
 
@@ -2014,8 +2015,11 @@ int nfs3_decode_dirent(struct xdr_stream *xdr, struct nfs_entry *entry,
 			return -EAGAIN;
 		if (*p != xdr_zero) {
 			error = decode_nfs_fh3(xdr, entry->fh);
-			if (unlikely(error))
-				return -EAGAIN;
+			if (unlikely(error)) {
+				if (error == -E2BIG)
+					goto out_truncated;
+				return error;
+			}
 		} else
 			zero_nfs_fh3(entry->fh);
 	}
@@ -2024,6 +2028,11 @@ int nfs3_decode_dirent(struct xdr_stream *xdr, struct nfs_entry *entry,
 	entry->cookie = new_cookie;
 
 	return 0;
+
+out_truncated:
+	dprintk("NFS: directory entry contains invalid file handle\n");
+	*entry = old;
+	return -EAGAIN;
 }
 
 /*

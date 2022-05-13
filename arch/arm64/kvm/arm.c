@@ -50,7 +50,6 @@ DEFINE_STATIC_KEY_FALSE(kvm_protected_mode_initialized);
 DECLARE_KVM_HYP_PER_CPU(unsigned long, kvm_hyp_vector);
 
 static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
-unsigned long kvm_arm_hyp_percpu_base[NR_CPUS];
 DECLARE_KVM_NVHE_PER_CPU(struct kvm_nvhe_init_params, kvm_init_params);
 
 /* The VMID used in the VTTBR */
@@ -62,10 +61,6 @@ static bool vgic_present;
 
 static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
 DEFINE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
-
-/* KVM "vendor" hypercalls which may be forwarded to userspace on request. */
-#define KVM_EXIT_HYPERCALL_VALID_MASK	(BIT(ARM_SMCCC_KVM_FUNC_MEM_SHARE) |	\
-					 BIT(ARM_SMCCC_KVM_FUNC_MEM_UNSHARE))
 
 int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
 {
@@ -116,16 +111,6 @@ int kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 			set_bit(KVM_ARCH_FLAG_MTE_ENABLED, &kvm->arch.flags);
 		}
 		mutex_unlock(&kvm->lock);
-		break;
-	case KVM_CAP_EXIT_HYPERCALL:
-		if (cap->args[0] & ~KVM_EXIT_HYPERCALL_VALID_MASK)
-			return -EINVAL;
-
-		if (cap->args[1] || cap->args[2] || cap->args[3])
-			return -EINVAL;
-
-		WRITE_ONCE(kvm->arch.hypercall_exit_enabled, cap->args[0]);
-		r = 0;
 		break;
 	default:
 		r = -EINVAL;
@@ -314,9 +299,6 @@ static int kvm_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_ARM_PTRAUTH_GENERIC:
 		r = system_has_full_ptr_auth();
 		break;
-	case KVM_CAP_EXIT_HYPERCALL:
-		r = KVM_EXIT_HYPERCALL_VALID_MASK;
-		break;
 	default:
 		r = 0;
 	}
@@ -341,7 +323,6 @@ static int pkvm_check_extension(struct kvm *kvm, long ext, int kvm_cap)
 	case KVM_CAP_MAX_VCPU_ID:
 	case KVM_CAP_MSI_DEVID:
 	case KVM_CAP_ARM_VM_IPA_SIZE:
-	case KVM_CAP_EXIT_HYPERCALL:
 		r = kvm_cap;
 		break;
 	case KVM_CAP_GUEST_DEBUG_HW_BPS:
@@ -892,12 +873,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 		ret = kvm_handle_mmio_return(vcpu);
 		if (ret)
 			return ret;
-	} else if (run->exit_reason == KVM_EXIT_HYPERCALL) {
-		smccc_set_retval(vcpu,
-				 vcpu->run->hypercall.ret,
-				 vcpu->run->hypercall.args[0],
-				 vcpu->run->hypercall.args[1],
-				 vcpu->run->hypercall.args[2]);
 	}
 
 	vcpu_load(vcpu);
@@ -1923,13 +1898,13 @@ static void teardown_hyp_mode(void)
 	free_hyp_pgds();
 	for_each_possible_cpu(cpu) {
 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
-		free_pages(kvm_arm_hyp_percpu_base[cpu], nvhe_percpu_order());
+		free_pages(kvm_nvhe_sym(kvm_arm_hyp_percpu_base)[cpu], nvhe_percpu_order());
 	}
 }
 
 static int do_pkvm_init(u32 hyp_va_bits)
 {
-	void *per_cpu_base = kvm_ksym_ref(kvm_arm_hyp_percpu_base);
+	void *per_cpu_base = kvm_ksym_ref(kvm_nvhe_sym(kvm_arm_hyp_percpu_base));
 	int ret;
 
 	preempt_disable();
@@ -2030,7 +2005,7 @@ static int init_hyp_mode(void)
 
 		page_addr = page_address(page);
 		memcpy(page_addr, CHOOSE_NVHE_SYM(__per_cpu_start), nvhe_percpu_size());
-		kvm_arm_hyp_percpu_base[cpu] = (unsigned long)page_addr;
+		kvm_nvhe_sym(kvm_arm_hyp_percpu_base)[cpu] = (unsigned long)page_addr;
 	}
 
 	/*
@@ -2098,7 +2073,7 @@ static int init_hyp_mode(void)
 	}
 
 	for_each_possible_cpu(cpu) {
-		char *percpu_begin = (char *)kvm_arm_hyp_percpu_base[cpu];
+		char *percpu_begin = (char *)kvm_nvhe_sym(kvm_arm_hyp_percpu_base)[cpu];
 		char *percpu_end = percpu_begin + nvhe_percpu_size();
 
 		/* Map Hyp percpu pages */

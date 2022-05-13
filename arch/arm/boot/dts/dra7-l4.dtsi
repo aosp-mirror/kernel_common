@@ -3448,7 +3448,8 @@
 				ti,timer-pwm;
 			};
 		};
-		timer15_target: target-module@2c000 {	/* 0x4882c000, ap 17 02.0 */
+
+		target-module@2c000 {			/* 0x4882c000, ap 17 02.0 */
 			compatible = "ti,sysc-omap4-timer", "ti,sysc";
 			reg = <0x2c000 0x4>,
 			      <0x2c010 0x4>;
@@ -3476,7 +3477,7 @@
 			};
 		};
 
-		timer16_target: target-module@2e000 {	/* 0x4882e000, ap 19 14.0 */
+		target-module@2e000 {			/* 0x4882e000, ap 19 14.0 */
 			compatible = "ti,sysc-omap4-timer", "ti,sysc";
 			reg = <0x2e000 0x4>,
 			      <0x2e010 0x4>;

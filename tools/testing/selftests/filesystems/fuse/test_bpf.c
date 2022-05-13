@@ -35,7 +35,7 @@ inline int strcmp(const char *a, const char *b)
 }
 SEC("test_readdir_redact")
 /* return FUSE_BPF_BACKING to use backing fs, 0 to pass to usermode */
-int readdir_test(struct fuse_args *fa)
+int readdir_test(struct fuse_bpf_args *fa)
 {
 	switch (fa->opcode) {
 	case FUSE_READDIR | FUSE_PREFILTER: {
@@ -60,7 +60,7 @@ int readdir_test(struct fuse_args *fa)
 SEC("test_trace")
 
 /* return FUSE_BPF_BACKING to use backing fs, 0 to pass to usermode */
-int trace_test(struct fuse_args *fa)
+int trace_test(struct fuse_bpf_args *fa)
 {
 	switch (fa->opcode) {
 	case FUSE_LOOKUP | FUSE_PREFILTER: {
@@ -361,7 +361,7 @@ int trace_test(struct fuse_args *fa)
 
 SEC("test_hidden")
 
-int trace_hidden(struct fuse_args *fa)
+int trace_hidden(struct fuse_bpf_args *fa)
 {
 	switch (fa->opcode) {
 	case FUSE_LOOKUP | FUSE_PREFILTER: {
@@ -418,7 +418,7 @@ int trace_hidden(struct fuse_args *fa)
 }
 
 SEC("test_simple")
-int trace_simple(struct fuse_args *fa)
+int trace_simple(struct fuse_bpf_args *fa)
 {
 	if (fa->opcode & FUSE_PREFILTER)
 		bpf_printk("prefilter opcode: %d",
@@ -432,7 +432,7 @@ int trace_simple(struct fuse_args *fa)
 }
 
 SEC("test_passthrough")
-int trace_daemon(struct fuse_args *fa)
+int trace_daemon(struct fuse_bpf_args *fa)
 {
 	switch (fa->opcode) {
 	case FUSE_LOOKUP | FUSE_PREFILTER: {
@@ -468,7 +468,7 @@ int trace_daemon(struct fuse_args *fa)
 SEC("test_error")
 
 /* return FUSE_BPF_BACKING to use backing fs, 0 to pass to usermode */
-int error_test(struct fuse_args *fa)
+int error_test(struct fuse_bpf_args *fa)
 {
 	switch (fa->opcode) {
 	case FUSE_MKDIR | FUSE_PREFILTER: {

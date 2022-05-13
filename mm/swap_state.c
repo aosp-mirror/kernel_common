@@ -513,7 +513,7 @@ struct page *__read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 		 * __read_swap_cache_async(), which has set SWAP_HAS_CACHE
 		 * in swap_map, but not yet added its page to swap cache.
 		 */
-		schedule_timeout_uninterruptible(1);
+		cond_resched();
 	}
 
 	/*
@@ -538,7 +538,6 @@ struct page *__read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 		workingset_refault(page, shadow);
 
 	/* Caller will initiate read into locked page */
-	SetPageWorkingset(page);
 	lru_cache_add(page);
 	*new_page_allocated = true;
 	return page;

@@ -512,7 +512,7 @@ out:
  *  after rcu grace period
  * @ref: kref pointer of the vlan object
  */
-void batadv_softif_vlan_release(struct kref *ref)
+static void batadv_softif_vlan_release(struct kref *ref)
 {
 	struct batadv_softif_vlan *vlan;
 
@@ -523,6 +523,19 @@ void batadv_softif_vlan_release(struct kref *ref)
 	spin_unlock_bh(&vlan->bat_priv->softif_vlan_list_lock);
 
 	kfree_rcu(vlan, rcu);
+}
+
+/**
+ * batadv_softif_vlan_put() - decrease the vlan object refcounter and
+ *  possibly release it
+ * @vlan: the vlan object to release
+ */
+void batadv_softif_vlan_put(struct batadv_softif_vlan *vlan)
+{
+	if (!vlan)
+		return;
+
+	kref_put(&vlan->refcount, batadv_softif_vlan_release);
 }
 
 /**

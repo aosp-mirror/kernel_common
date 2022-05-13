@@ -274,7 +274,7 @@ long watch_queue_set_size(struct pipe_inode_info *pipe, unsigned int nr_notes)
 	return 0;
 
 error_p:
-	while (--i >= 0)
+	for (i = 0; i < nr_pages; i++)
 		__free_page(pages[i]);
 	kfree(pages);
 error:
@@ -373,7 +373,6 @@ static void __put_watch_queue(struct kref *kref)
 
 	for (i = 0; i < wqueue->nr_pages; i++)
 		__free_page(wqueue->notes[i]);
-	kfree(wqueue->notes);
 	bitmap_free(wqueue->notes_bitmap);
 
 	wfilter = rcu_access_pointer(wqueue->filter);
@@ -399,7 +398,6 @@ static void free_watch(struct rcu_head *rcu)
 	put_watch_queue(rcu_access_pointer(watch->queue));
 	atomic_dec(&watch->cred->user->nr_watches);
 	put_cred(watch->cred);
-	kfree(watch);
 }
 
 static void __put_watch(struct kref *kref)

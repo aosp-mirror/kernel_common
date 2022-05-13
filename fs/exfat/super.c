@@ -690,7 +690,7 @@ static int exfat_fill_super(struct super_block *sb, struct fs_context *fc)
 	if (!sb->s_root) {
 		exfat_err(sb, "failed to get the root dentry");
 		err = -ENOMEM;
-		goto free_table;
+		goto put_inode;
 	}
 
 	return 0;
@@ -836,5 +836,6 @@ module_exit(exit_exfat_fs);
 
 MODULE_ALIAS_FS("exfat");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(ANDROID_GKI_VFS_EXPORT_ONLY);
 MODULE_DESCRIPTION("exFAT filesystem support");
 MODULE_AUTHOR("Samsung Electronics Co., Ltd.");

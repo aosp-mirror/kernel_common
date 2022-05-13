@@ -27,7 +27,6 @@ int sk_msg_alloc(struct sock *sk, struct sk_msg *msg, int len,
 		 int elem_first_coalesce)
 {
 	struct page_frag *pfrag = sk_page_frag(sk);
-	u32 osize = msg->sg.size;
 	int ret = 0;
 
 	len -= msg->sg.size;
@@ -36,17 +35,13 @@ int sk_msg_alloc(struct sock *sk, struct sk_msg *msg, int len,
 		u32 orig_offset;
 		int use, i;
 
-		if (!sk_page_frag_refill(sk, pfrag)) {
-			ret = -ENOMEM;
-			goto msg_trim;
-		}
+		if (!sk_page_frag_refill(sk, pfrag))
+			return -ENOMEM;
 
 		orig_offset = pfrag->offset;
 		use = min_t(int, len, pfrag->size - orig_offset);
-		if (!sk_wmem_schedule(sk, use)) {
-			ret = -ENOMEM;
-			goto msg_trim;
-		}
+		if (!sk_wmem_schedule(sk, use))
+			return -ENOMEM;
 
 		i = msg->sg.end;
 		sk_msg_iter_var_prev(i);
@@ -75,10 +70,6 @@ int sk_msg_alloc(struct sock *sk, struct sk_msg *msg, int len,
 		len -= use;
 	}
 
-	return ret;
-
-msg_trim:
-	sk_msg_trim(sk, msg, osize);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(sk_msg_alloc);

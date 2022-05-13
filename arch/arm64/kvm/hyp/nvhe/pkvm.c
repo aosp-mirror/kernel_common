@@ -226,6 +226,11 @@ static int index_to_shadow_handle(int index)
 extern unsigned long hyp_nr_cpus;
 
 /*
+ * Track the vcpu most recently loaded on each physical CPU.
+ */
+static DEFINE_PER_CPU(struct kvm_vcpu *, last_loaded_vcpu);
+
+/*
  * Spinlock for protecting the shadow table related state.
  * Protects writes to shadow_table, num_shadow_entries, and next_shadow_alloc,
  * as well as reads and writes to last_shadow_vcpu_lookup.
@@ -267,6 +272,7 @@ struct kvm_vcpu *get_shadow_vcpu(int shadow_handle, unsigned int vcpu_idx)
 {
 	struct kvm_vcpu *vcpu = NULL;
 	struct kvm_shadow_vm *vm;
+	bool flush_context = false;
 
 	hyp_spin_lock(&shadow_lock);
 	vm = find_shadow_by_handle(shadow_handle);
@@ -279,11 +285,27 @@ struct kvm_vcpu *get_shadow_vcpu(int shadow_handle, unsigned int vcpu_idx)
 		vcpu = NULL;
 		goto unlock;
 	}
+
+	/*
+	 * Guarantee that both TLBs and I-cache are private to each vcpu.
+	 * The check below is conservative and could lead to over-invalidation,
+	 * because there is no need to nuke the contexts if the vcpu belongs to
+	 * a different vm.
+	 */
+	if (vcpu != __this_cpu_read(last_loaded_vcpu)) {
+		flush_context = true;
+		__this_cpu_write(last_loaded_vcpu, vcpu);
+	}
+
 	vcpu->arch.pkvm.loaded_on_cpu = true;
 
 	hyp_page_ref_inc(hyp_virt_to_page(vm));
 unlock:
 	hyp_spin_unlock(&shadow_lock);
+
+	/* No need for the lock while flushing the context. */
+	if (flush_context)
+		__kvm_flush_cpu_context(vcpu->arch.hw_mmu);
 
 	return vcpu;
 }
@@ -354,8 +376,19 @@ static void unpin_host_vcpus(struct shadow_vcpu_state *shadow_vcpus, int nr_vcpu
 
 	for (i = 0; i < nr_vcpus; i++) {
 		struct kvm_vcpu *host_vcpu = shadow_vcpus[i].vcpu.arch.pkvm.host_vcpu;
+		struct kvm_vcpu *shadow_vcpu = &shadow_vcpus[i].vcpu;
+		size_t sve_state_size;
+		void *sve_state;
 
 		hyp_unpin_shared_mem(host_vcpu, host_vcpu + 1);
+
+		if (!test_bit(KVM_ARM_VCPU_SVE, shadow_vcpu->arch.features))
+			continue;
+
+		sve_state = shadow_vcpu->arch.sve_state;
+		sve_state = kern_hyp_va(sve_state);
+		sve_state_size = vcpu_sve_state_size(shadow_vcpu);
+		hyp_unpin_shared_mem(sve_state, sve_state + sve_state_size);
 	}
 }
 
@@ -404,6 +437,27 @@ static int init_shadow_structs(struct kvm *kvm, struct kvm_shadow_vm *vm,
 		ret = copy_features(shadow_vcpu, host_vcpu);
 		if (ret)
 			return ret;
+
+		if (test_bit(KVM_ARM_VCPU_SVE, shadow_vcpu->arch.features)) {
+			size_t sve_state_size;
+			void *sve_state;
+
+			shadow_vcpu->arch.sve_state = READ_ONCE(host_vcpu->arch.sve_state);
+			shadow_vcpu->arch.sve_max_vl = READ_ONCE(host_vcpu->arch.sve_max_vl);
+
+			sve_state = kern_hyp_va(shadow_vcpu->arch.sve_state);
+			sve_state_size = vcpu_sve_state_size(shadow_vcpu);
+
+			if (!shadow_vcpu->arch.sve_state || !sve_state_size ||
+			    hyp_pin_shared_mem(sve_state,
+					       sve_state + sve_state_size)) {
+				clear_bit(KVM_ARM_VCPU_SVE,
+					  shadow_vcpu->arch.features);
+				shadow_vcpu->arch.sve_state = NULL;
+				shadow_vcpu->arch.sve_max_vl = 0;
+				return -EINVAL;
+			}
+		}
 
 		if (vm->arch.pkvm.enabled)
 			pkvm_vcpu_init_traps(shadow_vcpu);
@@ -664,6 +718,7 @@ int __pkvm_teardown_shadow(int shadow_handle)
 	u64 pfn;
 	u64 nr_pages;
 	void *addr;
+	int i;
 
 	/* Lookup then remove entry from the shadow table. */
 	hyp_spin_lock(&shadow_lock);
@@ -678,6 +733,21 @@ int __pkvm_teardown_shadow(int shadow_handle)
 		goto err_unlock;
 	}
 
+	/*
+	 * Clear the tracking for last_loaded_vcpu for all cpus for this vm in
+	 * case the same addresses for those vcpus are reused for future vms.
+	 */
+	for (i = 0; i < hyp_nr_cpus; i++) {
+		struct kvm_vcpu **last_loaded_vcpu_ptr =
+			per_cpu_ptr(&last_loaded_vcpu, i);
+		struct kvm_vcpu *vcpu = *last_loaded_vcpu_ptr;
+
+		if (vcpu && vcpu->arch.pkvm.shadow_handle == shadow_handle)
+			*last_loaded_vcpu_ptr = NULL;
+	}
+
+	/* Ensure the VMID is clean before it can be reallocated */
+	__kvm_tlb_flush_vmid(&vm->arch.mmu);
 	remove_shadow_table(shadow_handle);
 	hyp_spin_unlock(&shadow_lock);
 
@@ -799,6 +869,10 @@ void pkvm_reset_vcpu(struct kvm_vcpu *vcpu)
 		*vcpu_pc(vcpu) = entry;
 
 		vm->pvmfw_entry_vcpu = NULL;
+
+		/* Auto enroll MMIO guard */
+		set_bit(KVM_ARCH_FLAG_MMIO_GUARD,
+			&vcpu->arch.pkvm.shadow_vm->arch.flags);
 	} else {
 		*vcpu_pc(vcpu) = reset_state->pc;
 		vcpu_set_reg(vcpu, 0, reset_state->r0);

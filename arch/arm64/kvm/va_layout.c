@@ -295,3 +295,15 @@ void kvm_compute_final_ctr_el0(struct alt_instr *alt,
 	generate_mov_q(read_sanitised_ftr_reg(SYS_CTR_EL0),
 		       origptr, updptr, nr_inst);
 }
+
+void kvm_get__text(struct alt_instr *alt,
+		   __le32 *origptr, __le32 *updptr, int nr_inst)
+{
+	generate_mov_q((u64)_text, origptr, updptr, nr_inst);
+}
+
+void kvm_get__etext(struct alt_instr *alt,
+		   __le32 *origptr, __le32 *updptr, int nr_inst)
+{
+	generate_mov_q((u64)_etext, origptr, updptr, nr_inst);
+}
