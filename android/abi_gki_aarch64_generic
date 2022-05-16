@@ -286,6 +286,8 @@
   cpuhp_tasks_frozen
   cpu_hwcap_keys
   cpu_hwcaps
+  cpuidle_driver_state_disabled
+  cpuidle_get_driver
   cpuidle_governor_latency_req
   cpuidle_pause_and_lock
   cpuidle_resume_and_unlock
@@ -611,6 +613,7 @@
   down_timeout
   down_trylock
   down_write
+  d_path
   drain_workqueue
   driver_create_file
   driver_register
@@ -924,6 +927,7 @@
   get_sg_io_hdr
   __get_task_comm
   get_task_cred
+  get_task_mm
   get_thermal_instance
   get_unused_fd_flags
   get_user_pages
@@ -1300,6 +1304,7 @@
   misc_deregister
   misc_register
   __mmdrop
+  mmput
   mod_delayed_work_on
   mod_timer
   __module_get
@@ -1358,6 +1363,7 @@
   nsec_to_clock_t
   ns_to_timespec64
   __num_online_cpus
+  nvhe_hyp_panic_handler
   nvmem_device_put
   nvmem_device_read
   nvmem_device_write
@@ -1614,6 +1620,7 @@
   print_hex_dump
   printk
   printk_deferred
+  __printk_ratelimit
   proc_create
   proc_create_data
   proc_create_single_data
@@ -2223,6 +2230,7 @@
   __traceiter_android_vh_pagecache_get_page
   __traceiter_android_vh_pin_user_pages
   __traceiter_android_vh_rmqueue
+  __traceiter_android_vh_sched_setaffinity_early
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_snd_compr_use_pause_in_drain
@@ -2327,6 +2335,7 @@
   __tracepoint_android_vh_pagecache_get_page
   __tracepoint_android_vh_pin_user_pages
   __tracepoint_android_vh_rmqueue
+  __tracepoint_android_vh_sched_setaffinity_early
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_snd_compr_use_pause_in_drain
@@ -2466,6 +2475,8 @@
   usb_free_all_descriptors
   usb_function_register
   usb_function_unregister
+  usb_gadget_activate
+  usb_gadget_deactivate
   usb_gadget_set_state
   usb_gstrings_attach
   usb_hcd_is_primary_hcd
