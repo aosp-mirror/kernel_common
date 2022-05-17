@@ -631,15 +631,15 @@ static unsigned int trusty_log_sfile_dev_poll(struct file *filp,
 	log = s->log;
 
 	/*
-	 * Userspace has read up to filp->f_pos so far. Update klog_sink
+	 * Userspace has read up to sfile->index so far. Update klog_sink
 	 * to indicate that, so that we don't end up dumping the entire
 	 * Trusty log in case of panic. Only do this when not logging to
 	 * klog_sink, since logging to klog_sink already updates this.
 	 */
 	if (log_to_dmesg_param != ALWAYS)
-		s->klog_sink.last_successful_next = (u32)filp->f_pos;
+		s->klog_sink.last_successful_next = (u32)sfile->index;
 
-	if (log->put != (u32)filp->f_pos) {
+	if (log->put != (u32)sfile->index) {
 		/* data ready to read */
 		return EPOLLIN | EPOLLRDNORM;
 	}
