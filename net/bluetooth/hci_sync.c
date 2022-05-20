@@ -1074,12 +1074,16 @@ int hci_setup_ext_adv_instance_sync(struct hci_dev *hdev, u8 instance)
 
 	/* Updating parameters of an active instance will return a
 	 * Command Disallowed error, so we must first disable the
-	 * instance if it is active.
+	 * instance if it is active. This call may fail if the instance
+	 * has been removed from the controller.
 	 */
 	if (adv && !adv->pending) {
 		err = hci_disable_ext_adv_instance_sync(hdev, instance);
 		if (err)
-			return err;
+			bt_dev_dbg(hdev, "Error code %d while disabling \
+				   instance %d. Continue \
+				   re-registering the instance",
+				   err, instance);
 	}
 
 	flags = hci_adv_instance_flags(hdev, instance);
@@ -5556,10 +5560,6 @@ static int hci_power_off_sync(struct hci_dev *hdev)
 		if (err)
 			return err;
 	}
-
-	err = hci_clear_adv_sync(hdev, NULL, false);
-	if (err)
-		return err;
 
 	err = hci_stop_discovery_sync(hdev);
 	if (err)
