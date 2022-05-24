@@ -41,6 +41,9 @@ DECLARE_HOOK(android_vh_show_mem,
 DECLARE_HOOK(android_vh_alloc_pages_slowpath,
 	TP_PROTO(gfp_t gfp_mask, unsigned int order, unsigned long delta),
 	TP_ARGS(gfp_mask, order, delta));
+DECLARE_HOOK(android_vh_cma_alloc_adjust,
+	TP_PROTO(struct zone *zone, bool *is_cma_alloc),
+	TP_ARGS(zone, is_cma_alloc));
 DECLARE_HOOK(android_vh_print_slabinfo_header,
 	TP_PROTO(struct seq_file *m),
 	TP_ARGS(m));
