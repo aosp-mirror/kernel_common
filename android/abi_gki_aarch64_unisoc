@@ -147,6 +147,7 @@
   debugfs_create_u64
   debugfs_create_x32
   debugfs_initialized
+  debugfs_lookup
   debugfs_remove
   debugfs_remove_recursive
   debugfs_create_symlink
