@@ -334,7 +334,7 @@ static void print_address_description(void *addr, u8 tag)
 			       va->addr, va->addr + va->size, va->caller);
 			pr_err("\n");
 
-			page = vmalloc_to_page(page);
+			page = vmalloc_to_page(addr);
 		}
 	}
 
