@@ -675,6 +675,8 @@
   phy_print_status
   phy_start
   phy_stop
+  phy_pm_runtime_get_sync
+  phy_pm_runtime_put_sync
   pinctrl_lookup_state
   pinctrl_select_state
   pinctrl_pm_select_default_state
@@ -1009,6 +1011,7 @@
   unregister_pernet_subsys
   up
   update_rq_clock
+  usb_add_gadget
   usb_add_gadget_udc
   usb_alloc_coherent
   usb_alloc_urb
@@ -1016,6 +1019,7 @@
   usb_autopm_get_interface_no_resume
   usb_autopm_put_interface
   usb_control_msg
+  usb_del_gadget
   usb_del_gadget_udc
   usb_deregister
   usb_ep_alloc_request
@@ -1034,7 +1038,9 @@
   usb_gadget_udc_reset
   usb_get_dr_mode
   usb_get_intf
+  usb_get_maximum_ssp_rate
   usb_hcd_is_primary_hcd
+  usb_initialize_gadget
   usb_interface_id
   usb_kill_urb
   usb_phy_get_charger_current
