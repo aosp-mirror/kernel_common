@@ -1,0 +1,15 @@
+SRCARCH=${ARCH}
+if [ "${ARCH}" = x86_64 ]; then
+    SRCARCH=x86
+fi
+
+DEFCONFIG=microdroid_defconfig
+
+# MERGED_CONFIG is created by merging GKI_DEFCONFIG and FRAGMENT_CONFIG using MERGE_SCRIPT
+MERGE_SCRIPT=${ROOT_DIR}/${KERNEL_DIR}/scripts/kconfig/merge_config.sh
+GKI_DEFCONFIG=${ROOT_DIR}/${KERNEL_DIR}/arch/${SRCARCH}/configs/gki_defconfig
+FRAGMENT_CONFIG=${ROOT_DIR}/${KERNEL_DIR}/arch/${SRCARCH}/configs/microdroid.fragment
+MERGED_CONFIG=${ROOT_DIR}/${KERNEL_DIR}/arch/${SRCARCH}/configs/${DEFCONFIG}
+
+PRE_DEFCONFIG_CMDS="KCONFIG_CONFIG=${MERGED_CONFIG} ${MERGE_SCRIPT} -m ${GKI_DEFCONFIG} ${FRAGMENT_CONFIG}"
+POST_DEFCONFIG_CMDS="rm ${MERGED_CONFIG}"
