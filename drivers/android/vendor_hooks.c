@@ -331,3 +331,5 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_tcp_recvmsg);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_udp_sendmsg);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_udp_recvmsg);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_tcp_recvmsg_stat);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_partial_init);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_mmc_cache_card_properties);
