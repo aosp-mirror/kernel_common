@@ -703,6 +703,7 @@
   refcount_inc_checked
   __refrigerator
   __register_chrdev
+  __reset_control_get
   read_cache_page
   read_cache_page_gfp
   register_filesystem
@@ -908,6 +909,7 @@
   usb_autopm_get_interface_no_resume
   usb_autopm_put_interface
   usb_control_msg
+  usb_create_shared_hcd
   usb_del_gadget_udc
   usb_deregister
   usb_ep_alloc_request
@@ -927,6 +929,7 @@
   usb_get_dr_mode
   usb_get_intf
   usb_hcd_is_primary_hcd
+  usb_hcd_irq
   usb_interface_id
   usb_kill_urb
   usb_phy_get_charger_current
