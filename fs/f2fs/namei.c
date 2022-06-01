@@ -322,6 +322,7 @@ static void set_compress_inode(struct f2fs_sb_info *sbi, struct inode *inode,
 			continue;
 
 		/* Do not use inline_data with compression */
+		stat_dec_inline_inode(inode);
 		clear_inode_flag(inode, FI_INLINE_DATA);
 		set_compress_context(inode);
 		return;
