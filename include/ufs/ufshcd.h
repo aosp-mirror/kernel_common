@@ -18,11 +18,11 @@
 #include <linux/devfreq.h>
 #include <linux/pm_runtime.h>
 #include <scsi/scsi_device.h>
-#include "unipro.h"
 #include <linux/android_kabi.h>
-#include "ufs.h"
-#include "ufs_quirks.h"
-#include "ufshci.h"
+#include <ufs/unipro.h>
+#include <ufs/ufs.h>
+#include <ufs/ufs_quirks.h>
+#include <ufs/ufshci.h>
 
 #define UFSHCD "ufshcd"
 
