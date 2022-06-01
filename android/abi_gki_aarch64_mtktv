@@ -238,6 +238,8 @@
   d_add
   d_add_ci
   dbs_update
+  debugfs_attr_read
+  debugfs_attr_write
   debugfs_create_bool
   debugfs_create_devm_seqfile
   debugfs_create_dir
@@ -831,6 +833,7 @@
   kstrtou16
   kstrtou8
   kstrtouint
+  kstrtouint_from_user
   kstrtoull
   kthread_bind
   kthread_create_on_node
@@ -974,6 +977,7 @@
   of_device_is_available
   of_device_is_compatible
   of_dma_configure_id
+  of_dma_is_coherent
   of_drm_find_panel
   of_find_compatible_node
   of_find_device_by_node
@@ -984,6 +988,7 @@
   of_find_node_with_property
   of_find_property
   of_fwnode_ops
+  of_get_child_by_name
   of_get_mac_address
   of_get_named_gpio_flags
   of_get_next_available_child
@@ -1099,7 +1104,9 @@
   pinmux_generic_get_function_groups
   pinmux_generic_get_function_name
   pinmux_generic_remove_function
+  pin_user_pages
   pin_user_pages_fast
+  pin_user_pages_remote
   platform_bus_type
   platform_device_add
   platform_device_alloc
@@ -1542,6 +1549,7 @@
   unlock_new_inode
   unlock_page
   unmap_mapping_range
+  unpin_user_page
   unpin_user_pages
   unregister_blkdev
   __unregister_chrdev
