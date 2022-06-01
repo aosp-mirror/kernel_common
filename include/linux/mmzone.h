@@ -74,7 +74,11 @@ extern const char * const migratetype_names[MIGRATE_TYPES];
 
 #ifdef CONFIG_CMA
 #  define is_migrate_cma(migratetype) unlikely((migratetype) == MIGRATE_CMA)
-#  define is_migrate_cma_page(_page) (get_pageblock_migratetype(_page) == MIGRATE_CMA)
+#  define is_migrate_cma_page(_page) ({						\
+	int mt = get_pageblock_migratetype(_page);				\
+	bool ret = (mt == MIGRATE_ISOLATE || mt == MIGRATE_CMA) ? true : false;	\
+	ret;									\
+})
 #  define get_cma_migrate_type() MIGRATE_CMA
 #else
 #  define is_migrate_cma(migratetype) false
