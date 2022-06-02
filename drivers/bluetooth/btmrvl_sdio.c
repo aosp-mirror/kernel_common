@@ -1643,7 +1643,6 @@ static int btmrvl_sdio_suspend(struct device *dev)
 	priv->adapter->is_suspending = true;
 	hcidev = priv->btmrvl_dev.hcidev;
 	BT_DBG("%s: SDIO suspend", hcidev->name);
-	hci_suspend_dev(hcidev);
 
 	if (priv->adapter->hs_state != HS_ACTIVATED) {
 		if (btmrvl_enable_hs(priv)) {
@@ -1708,7 +1707,6 @@ static int btmrvl_sdio_resume(struct device *dev)
 	BT_DBG("%s: HS DEACTIVATED in resume!", hcidev->name);
 	priv->adapter->is_suspended = false;
 	BT_DBG("%s: SDIO resume", hcidev->name);
-	hci_resume_dev(hcidev);
 
 	/* Disable platform specific wakeup interrupt */
 	if (card->plt_wake_cfg && card->plt_wake_cfg->irq_bt >= 0 &&
