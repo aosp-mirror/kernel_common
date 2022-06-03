@@ -646,34 +646,6 @@ static void release_victim_entry(struct f2fs_sb_info *sbi)
 	f2fs_bug_on(sbi, !list_empty(&am->victim_list));
 }
 
-static void pin_section(struct f2fs_sb_info *sbi, unsigned int segno)
-{
-	struct dirty_seglist_info *dirty_i = DIRTY_I(sbi);
-
-	set_bit(GET_SEC_FROM_SEG(sbi, segno), dirty_i->pinned_secmap);
-	dirty_i->pinned_secmap_cnt++;
-}
-
-static bool pinned_section_exists(struct dirty_seglist_info *dirty_i)
-{
-	return dirty_i->pinned_secmap_cnt;
-}
-
-static bool section_is_pinned(struct dirty_seglist_info *dirty_i,
-						unsigned int secno)
-{
-	return pinned_section_exists(dirty_i) &&
-			test_bit(secno, dirty_i->pinned_secmap);
-}
-
-static void unpin_all_sections(struct f2fs_sb_info *sbi)
-{
-	unsigned int bitmap_size = f2fs_bitmap_size(MAIN_SECS(sbi));
-
-	memset(DIRTY_I(sbi)->pinned_secmap, 0, bitmap_size);
-	DIRTY_I(sbi)->pinned_secmap_cnt = 0;
-}
-
 /*
  * This function is called from two paths.
  * One is garbage collection and the other is SSR segment selection.
@@ -813,9 +785,6 @@ retry:
 		}
 
 		if (gc_type == BG_GC && test_bit(secno, dirty_i->victim_secmap))
-			goto next;
-
-		if (gc_type == FG_GC && section_is_pinned(dirty_i, secno))
 			goto next;
 
 		if (is_atgc) {
@@ -1233,10 +1202,8 @@ static int move_data_block(struct inode *inode, block_t bidx,
 	}
 
 	if (f2fs_is_pinned_file(inode)) {
-		if (gc_type == FG_GC) {
+		if (gc_type == FG_GC)
 			f2fs_pin_file_control(inode, true);
-			pin_section(F2FS_I_SB(inode), segno);
-		}
 		err = -EAGAIN;
 		goto out;
 	}
@@ -1385,10 +1352,8 @@ static int move_data_page(struct inode *inode, block_t bidx, int gc_type,
 		goto out;
 	}
 	if (f2fs_is_pinned_file(inode)) {
-		if (gc_type == FG_GC) {
+		if (gc_type == FG_GC)
 			f2fs_pin_file_control(inode, true);
-			pin_section(F2FS_I_SB(inode), segno);
-		}
 		err = -EAGAIN;
 		goto out;
 	}
@@ -1521,7 +1486,6 @@ next_step:
 							gc_type == FG_GC) {
 				f2fs_pin_file_control(inode, true);
 				iput(inode);
-				pin_section(sbi, segno);
 				return submitted;
 			}
 
@@ -1803,17 +1767,9 @@ gc_more:
 		ret = -EINVAL;
 		goto stop;
 	}
-retry:
 	ret = __get_victim(sbi, &segno, gc_type);
-	if (ret) {
-		/* allow to search victim from sections has pinned data */
-		if (ret == -ENODATA && gc_type == FG_GC &&
-				pinned_section_exists(DIRTY_I(sbi))) {
-			unpin_all_sections(sbi);
-			goto retry;
-		}
+	if (ret)
 		goto stop;
-	}
 
 	seg_freed = do_garbage_collect(sbi, segno, &gc_list, gc_type, force);
 	if (gc_type == FG_GC &&
@@ -1855,9 +1811,6 @@ retry:
 stop:
 	SIT_I(sbi)->last_victim[ALLOC_NEXT] = 0;
 	SIT_I(sbi)->last_victim[FLUSH_DEVICE] = init_segno;
-
-	if (gc_type == FG_GC && pinned_section_exists(DIRTY_I(sbi)))
-		unpin_all_sections(sbi);
 
 	trace_f2fs_gc_end(sbi->sb, ret, total_freed, sec_freed,
 				get_pages(sbi, F2FS_DIRTY_NODES),
