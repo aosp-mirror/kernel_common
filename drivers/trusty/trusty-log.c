@@ -179,6 +179,7 @@ struct trusty_log_state {
 	struct device *dev;
 	struct device *trusty_dev;
 	struct trusty_log_sfile log_sfile;
+	struct kref refcount;
 
 	/*
 	 * This lock is here to ensure only one consumer will read
@@ -200,6 +201,7 @@ struct trusty_log_state {
 	spinlock_t wake_up_lock;
 	u32 last_wake_put;
 	bool have_first_reader;
+	bool registered;
 };
 
 static inline u32 u32_add_overflow(u32 a, u32 b)
@@ -608,6 +610,7 @@ static int trusty_log_sfile_dev_open(struct inode *inode, struct file *file)
 	sfile->private = ls;
 	s = container_of(ls, struct trusty_log_state, log_sfile);
 	s->have_first_reader = true;
+	kref_get(&s->refcount);
 	return 0;
 }
 
@@ -627,6 +630,12 @@ static unsigned int trusty_log_sfile_dev_poll(struct file *filp,
 	sfile = filp->private_data;
 	lb = sfile->private;
 	s = container_of(lb, struct trusty_log_state, log_sfile);
+
+	if (!s->registered) {
+		dev_err(s->dev, "invalid poll fd\n");
+		return -EINVAL;
+	}
+
 	poll_wait(filp, &s->poll_waiters, wait);
 	log = s->log;
 
@@ -647,12 +656,50 @@ static unsigned int trusty_log_sfile_dev_poll(struct file *filp,
 	return 0;
 }
 
+static void trusty_log_cleanup(struct kref *ref);
+
+static int trusty_log_sfile_dev_release(struct inode *inode,
+					struct file *filp)
+{
+	struct seq_file *sfile;
+	struct trusty_log_sfile *lb;
+	struct trusty_log_state *s;
+
+	sfile = filp->private_data;
+	lb = sfile->private;
+	s = container_of(lb, struct trusty_log_state, log_sfile);
+
+	kref_put(&s->refcount, trusty_log_cleanup);
+
+	seq_release(inode, filp);
+	return 0;
+}
+
+ssize_t trusty_log_sfile_dev_read(struct file *filp, char __user *buf,
+				  size_t size, loff_t *ppos)
+{
+	struct seq_file *sfile;
+	struct trusty_log_sfile *lb;
+	struct trusty_log_state *s;
+
+	sfile = filp->private_data;
+	lb = sfile->private;
+	s = container_of(lb, struct trusty_log_state, log_sfile);
+
+	if (!s->registered) {
+		dev_err(s->dev, "invalid read fd\n");
+		return -EINVAL;
+	}
+
+	return seq_read(filp, buf, size, ppos);
+}
+
 static const struct file_operations log_sfile_dev_operations = {
 	.owner = THIS_MODULE,
 	.open = trusty_log_sfile_dev_open,
 	.poll = trusty_log_sfile_dev_poll,
-	.read = seq_read,
-	.release = seq_release,
+	.read = trusty_log_sfile_dev_read,
+	.release = trusty_log_sfile_dev_release,
 };
 
 static int trusty_log_sfile_register(struct trusty_log_state *s)
@@ -676,6 +723,7 @@ static int trusty_log_sfile_register(struct trusty_log_state *s)
 			ret);
 		return ret;
 	}
+	s->registered = true;
 	dev_info(s->dev, "/dev/%s registered\n",
 		 ls->device_name);
 	return 0;
@@ -689,6 +737,7 @@ static void trusty_log_sfile_unregister(struct trusty_log_state *s)
 	if (s->dev) {
 		dev_info(s->dev, "/dev/%s unregistered\n",
 			 ls->misc.name);
+		s->registered = false;
 	}
 }
 
@@ -817,6 +866,7 @@ static int trusty_log_init(struct platform_device *pdev)
 		goto error_log_sfile;
 	}
 
+	kref_init(&s->refcount);
 	platform_set_drvdata(pdev, s);
 
 	return 0;
@@ -868,11 +918,23 @@ static int trusty_log_probe(struct platform_device *pdev)
 
 static int trusty_log_remove(struct platform_device *pdev)
 {
-	int result;
 	struct trusty_log_state *s = platform_get_drvdata(pdev);
-	trusty_shared_mem_id_t mem_id = s->log_pages_shared_mem_id;
 
 	trusty_log_sfile_unregister(s);
+	kref_put(&s->refcount, trusty_log_cleanup);
+	return 0;
+}
+
+static void trusty_log_cleanup(struct kref *ref)
+{
+	int result;
+	struct trusty_log_state *s;
+	trusty_shared_mem_id_t mem_id;
+
+	s = container_of(ref, struct trusty_log_state, refcount);
+	dev_info(s->dev, "log_cleanup\n");
+	mem_id = s->log_pages_shared_mem_id;
+
 	atomic_notifier_chain_unregister(&panic_notifier_list,
 					 &s->panic_notifier);
 	trusty_call_notifier_unregister(s->trusty_dev, &s->call_notifier);
@@ -880,14 +942,14 @@ static int trusty_log_remove(struct platform_device *pdev)
 	result = trusty_std_call32(s->trusty_dev, SMC_SC_SHARED_LOG_RM,
 				   (u32)mem_id, (u32)(mem_id >> 32), 0);
 	if (result) {
-		dev_err(&pdev->dev,
+		dev_err(s->dev,
 			"trusty std call (SMC_SC_SHARED_LOG_RM) failed: %d\n",
 			result);
 	}
 	result = trusty_reclaim_memory(s->trusty_dev, mem_id, s->sg,
 				       s->log_num_pages);
 	if (WARN_ON(result)) {
-		dev_err(&pdev->dev,
+		dev_err(s->dev,
 			"trusty failed to remove shared memory: %d\n", result);
 	} else {
 		/*
@@ -898,8 +960,6 @@ static int trusty_log_remove(struct platform_device *pdev)
 	}
 	kfree(s->sg);
 	kfree(s);
-
-	return 0;
 }
 
 static const struct of_device_id trusty_test_of_match[] = {
