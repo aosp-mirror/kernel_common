@@ -591,6 +591,11 @@ enum ufshcd_quirks {
 	UFSHCD_QUIRK_SKIP_PH_CONFIGURATION		= 1 << 16,
 
 	/*
+	 * This quirk needs to be enabled if the host controller has
+	 * 64-bit addressing supported capability but it doesn't work.
+	 */
+	UFSHCD_QUIRK_BROKEN_64BIT_ADDRESS		= 1 << 17,
+	/*
 	 * This quirk needs to be enabled if the host controller supports inline
 	 * encryption, but it needs to initialize the crypto capabilities in a
 	 * nonstandard way and/or it needs to override blk_crypto_ll_ops.  If
