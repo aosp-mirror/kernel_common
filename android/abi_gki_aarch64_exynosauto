@@ -37,7 +37,6 @@
   blk_cleanup_disk
   blk_execute_rq
   blk_get_request
-  blk_ksm_init_passthrough
   __blk_mq_alloc_disk
   blk_mq_alloc_tag_set
   blk_mq_complete_request
@@ -226,6 +225,7 @@
   _dev_info
   __dev_kfree_skb_any
   devm_add_action
+  devm_blk_crypto_profile_init
   devm_clk_get
   devm_clk_get_optional
   devm_clk_put

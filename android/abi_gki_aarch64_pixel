@@ -312,7 +312,7 @@
   devm_add_action
   devm_backlight_device_register
   devm_backlight_device_unregister
-  devm_blk_ksm_init
+  devm_blk_crypto_profile_init
   devm_clk_get
   devm_clk_get_optional
   devm_clk_put

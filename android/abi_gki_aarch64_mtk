@@ -315,7 +315,7 @@
   __dev_kfree_skb_any
   devm_add_action
   __devm_alloc_percpu
-  devm_blk_ksm_init
+  devm_blk_crypto_profile_init
   devm_clk_bulk_get
   devm_clk_bulk_get_optional
   devm_clk_get

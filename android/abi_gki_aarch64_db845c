@@ -908,7 +908,7 @@
   seq_putc
 
 # required by cqhci.ko
-  devm_blk_ksm_init
+  devm_blk_crypto_profile_init
   dmam_free_coherent
   mmc_cqe_request_done
 

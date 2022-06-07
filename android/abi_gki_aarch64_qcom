@@ -334,7 +334,7 @@
   _dev_info
   devm_add_action
   devm_alloc_etherdev_mqs
-  devm_blk_ksm_init
+  devm_blk_crypto_profile_init
   devm_clk_bulk_get_all
   devm_clk_get
   devm_clk_get_optional
