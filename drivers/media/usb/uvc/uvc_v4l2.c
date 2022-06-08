@@ -1393,21 +1393,6 @@ static int uvc_ioctl_s_roi(struct file *file, void *fh,
 
 	mutex_lock(&stream->mutex);
 
-	/*
-	 * Get current ROI configuration from the firmware. First, we need
-	 * ->auto_controls, which is handled by UVC control code.
-	 *
-	 * Second, the rectangle value, which is passed via v4l2 selection
-	 * API, must also be stored in UVC control data, so that when use
-	 * changes auto_controls, it will use most recent ROI rectangle
-	 * value and new auto_controls value.
-	 */
-	ret = uvc_query_ctrl(stream->dev, UVC_GET_CUR, 1, stream->dev->intfnum,
-			     UVC_CT_REGION_OF_INTEREST_CONTROL, roi,
-			     sizeof(struct uvc_roi));
-	if (ret)
-		goto out;
-
 	validate_roi_bounds(stream, sel);
 
 	roi_backup = *roi;
