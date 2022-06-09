@@ -406,7 +406,43 @@
 		CALL(sys_pkey_mprotect)
 /* 395 */	CALL(sys_pkey_alloc)
 		CALL(sys_pkey_free)
+		CALL(sys_ni_syscall)	/* for sys_statx */
+		CALL(sys_ni_syscall)	/* for sys_rseq */
+		CALL(sys_ni_syscall)	/* for sys_io_pgetevents_time32 */
+/* 400 */	CALL(sys_ni_syscall)	/* for sys_migrate_pages */
+		CALL(sys_ni_syscall)	/* for sys_kexec_file_load */
+		CALL(sys_ni_syscall)	/* unused */
+		CALL(sys_ni_syscall)	/* for sys_clock_gettime */
+		CALL(sys_ni_syscall)	/* for sys_clock_settime */
+/* 405 */	CALL(sys_ni_syscall)	/* for sys_clock_adjtime */
+		CALL(sys_ni_syscall)	/* for sys_clock_getres */
+		CALL(sys_ni_syscall)	/* for sys_clock_nanosleep */
+		CALL(sys_ni_syscall)	/* for sys_timer_gettime */
+		CALL(sys_ni_syscall)	/* for sys_timer_settime */
+/* 410 */	CALL(sys_ni_syscall)	/* for sys_timerfd_gettime */
+		CALL(sys_ni_syscall)	/* for sys_timerfd_settime */
+		CALL(sys_ni_syscall)	/* for sys_utimensat */
+		CALL(sys_ni_syscall)	/* for sys_pselect6 */
+		CALL(sys_ni_syscall)	/* for sys_ppoll */
+/* 415*/	CALL(sys_ni_syscall)	/* unused */
+		CALL(sys_ni_syscall)	/* for sys_io_pgetevents */
+		CALL(sys_ni_syscall)	/* for sys_recvmmsg */
+		CALL(sys_ni_syscall)	/* for sys_mq_timedsend */
+		CALL(sys_ni_syscall)	/* for sys_mq_timedreceive */
+/* 420 */	CALL(sys_ni_syscall)	/* for sys_semtimedop */
+		CALL(sys_ni_syscall)	/* for sys_rt_sigtimedwait */
+		CALL(sys_ni_syscall)	/* for sys_futex */
+		CALL(sys_ni_syscall)	/* for sys_sched_rr_get_interval */
 		CALL(sys_pidfd_send_signal)
+/* 425 */	CALL(sys_ni_syscall)	/* for sys_io_uring_setup */
+		CALL(sys_ni_syscall)	/* for sys_io_uring_enter */
+		CALL(sys_ni_syscall)	/* for sys_io_uring_register */
+		CALL(sys_ni_syscall)	/* for sys_open_tree */
+		CALL(sys_ni_syscall)	/* for sys_move_mount */
+/* 430 */	CALL(sys_ni_syscall)	/* for sys_fsopen */
+		CALL(sys_ni_syscall)	/* for sys_fsconfig */
+		CALL(sys_ni_syscall)	/* for sys_fsmount */
+		CALL(sys_ni_syscall)	/* for sys_fspick */
 		CALL(sys_pidfd_open)
 #ifndef syscalls_counted
 .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
