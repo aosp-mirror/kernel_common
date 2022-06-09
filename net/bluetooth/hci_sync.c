@@ -5082,7 +5082,8 @@ int hci_dev_close_sync(struct hci_dev *hdev)
 	 * is called. Otherwise, some chips may panic.
 	 */
 	if (!hci_dev_test_flag(hdev, HCI_USER_CHANNEL)) {
-		set_quality_report(hdev, false);
+		if (!hci_dev_test_flag(hdev, HCI_UNREGISTER))
+			set_quality_report(hdev, false);
 
 		aosp_do_close(hdev);
 	}
