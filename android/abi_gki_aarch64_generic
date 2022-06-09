@@ -1256,6 +1256,8 @@
   log_threaded_irq_wakeup_reason
   __log_write_mmio
   loops_per_jiffy
+  lru_cache_disable
+  lru_cache_enable
   lzo1x_1_compress
   lzo1x_decompress_safe
   lzorle1x_1_compress
