@@ -2248,6 +2248,7 @@
   __sg_page_iter_start
   sg_scsi_ioctl
   show_regs
+  shrink_slab
   sigprocmask
   si_mem_available
   si_meminfo
@@ -2584,6 +2585,11 @@
   __traceiter_android_vh_alter_futex_plist_add
   __traceiter_android_vh_alter_mutex_list_add
   __traceiter_android_vh_alter_rwsem_list_add
+  __traceiter_android_vh_rwsem_set_owner
+  __traceiter_android_vh_rwsem_set_reader_owned
+  __traceiter_android_vh_rwsem_mark_wake_readers
+  __traceiter_android_vh_rwsem_up_read_end
+  __traceiter_android_vh_rwsem_up_write_end
   __traceiter_android_vh_arch_set_freq_scale
   __traceiter_android_vh_binder_alloc_new_buf_locked
   __traceiter_android_vh_binder_del_ref
@@ -2658,6 +2664,7 @@
   __traceiter_android_vh_mutex_unlock_slowpath
   __traceiter_android_vh_mutex_wait_finish
   __traceiter_android_vh_mutex_wait_start
+  __traceiter_android_vh_mutex_unlock_slowpath_end
   __traceiter_android_vh_override_creds
   __traceiter_android_vh_prepare_update_load_avg_se
   __traceiter_android_vh_printk_hotplug
@@ -2697,6 +2704,9 @@
   __traceiter_android_vh_tune_scan_type
   __traceiter_android_vh_tune_swappiness
   __traceiter_android_vh_page_referenced_check_bypass
+  __traceiter_android_vh_drain_all_pages_bypass
+  __traceiter_android_vh_cma_drain_all_pages_bypass
+  __traceiter_android_vh_pcplist_add_cma_pages_bypass
   __traceiter_android_vh_ufs_compl_command
   __traceiter_android_vh_ufs_send_command
   __traceiter_android_vh_ufs_send_tm_command
@@ -2791,6 +2801,11 @@
   __tracepoint_android_vh_alter_futex_plist_add
   __tracepoint_android_vh_alter_mutex_list_add
   __tracepoint_android_vh_alter_rwsem_list_add
+  __tracepoint_android_vh_rwsem_set_owner
+  __tracepoint_android_vh_rwsem_set_reader_owned
+  __tracepoint_android_vh_rwsem_mark_wake_readers
+  __tracepoint_android_vh_rwsem_up_read_end
+  __tracepoint_android_vh_rwsem_up_write_end
   __tracepoint_android_vh_arch_set_freq_scale
   __tracepoint_android_vh_binder_alloc_new_buf_locked
   __tracepoint_android_vh_binder_del_ref
@@ -2865,6 +2880,7 @@
   __tracepoint_android_vh_mutex_unlock_slowpath
   __tracepoint_android_vh_mutex_wait_finish
   __tracepoint_android_vh_mutex_wait_start
+  __tracepoint_android_vh_mutex_unlock_slowpath_end
   __tracepoint_android_vh_override_creds
   __tracepoint_android_vh_prepare_update_load_avg_se
   __tracepoint_android_vh_printk_hotplug
@@ -2904,6 +2920,9 @@
   __tracepoint_android_vh_tune_scan_type
   __tracepoint_android_vh_tune_swappiness
   __tracepoint_android_vh_page_referenced_check_bypass
+  __tracepoint_android_vh_drain_all_pages_bypass
+  __tracepoint_android_vh_cma_drain_all_pages_bypass
+  __tracepoint_android_vh_pcplist_add_cma_pages_bypass
   __tracepoint_android_vh_ufs_compl_command
   __tracepoint_android_vh_ufs_send_command
   __tracepoint_android_vh_ufs_send_tm_command
