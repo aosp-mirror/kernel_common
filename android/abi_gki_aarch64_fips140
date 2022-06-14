@@ -109,6 +109,7 @@
   _raw_spin_lock
   _raw_spin_unlock
   refcount_warn_saturate
+  register_random_ready_notifier
   scatterwalk_ffwd
   scatterwalk_map_and_copy
   sg_init_one
@@ -140,6 +141,7 @@
   __tracepoint_android_vh_sha256
   tracepoint_probe_register
   __ubsan_handle_cfi_check_fail_abort
+  unregister_random_ready_notifier
   up_write
   wait_for_completion
   xa_load
