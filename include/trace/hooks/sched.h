@@ -337,6 +337,11 @@ DECLARE_HOOK(android_vh_sched_setaffinity_early,
 	TP_PROTO(struct task_struct *p, const struct cpumask *new_mask, int *retval),
 	TP_ARGS(p, new_mask, retval));
 
+DECLARE_RESTRICTED_HOOK(android_rvh_cpumask_any_and_distribute,
+	TP_PROTO(struct task_struct *p, const struct cpumask *cpu_valid_mask ,
+		const struct cpumask *new_mask, int *dest_cpu),
+	TP_ARGS(p, cpu_valid_mask, new_mask, dest_cpu), 1);
+
 DECLARE_HOOK(android_vh_free_task,
 	TP_PROTO(struct task_struct *p),
 	TP_ARGS(p));

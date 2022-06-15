@@ -184,6 +184,7 @@
   cfg80211_unlink_bss
   cfg80211_unregister_wdev
   cfg80211_update_owe_info_event
+  cfg80211_vendor_cmd_get_sender
   cfg80211_vendor_cmd_reply
   __cfi_slowpath
   __check_object_size
@@ -294,6 +295,7 @@
   cpu_latency_qos_add_request
   cpu_latency_qos_remove_request
   cpu_latency_qos_update_request
+  cpumask_any_and_distribute
   cpumask_any_but
   cpumask_next
   cpumask_next_and
@@ -1254,6 +1256,8 @@
   log_threaded_irq_wakeup_reason
   __log_write_mmio
   loops_per_jiffy
+  lru_cache_disable
+  lru_cache_enable
   lzo1x_1_compress
   lzo1x_decompress_safe
   lzorle1x_1_compress
@@ -2181,6 +2185,7 @@
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpu_cgroup_online
+  __traceiter_android_rvh_cpumask_any_and_distribute
   __traceiter_android_rvh_cpu_overutilized
   __traceiter_android_rvh_dequeue_task
   __traceiter_android_rvh_dequeue_task_fair
@@ -2293,6 +2298,7 @@
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpu_cgroup_online
+  __tracepoint_android_rvh_cpumask_any_and_distribute
   __tracepoint_android_rvh_cpu_overutilized
   __tracepoint_android_rvh_dequeue_task
   __tracepoint_android_rvh_dequeue_task_fair
