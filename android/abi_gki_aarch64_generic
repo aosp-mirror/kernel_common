@@ -184,6 +184,7 @@
   cfg80211_unlink_bss
   cfg80211_unregister_wdev
   cfg80211_update_owe_info_event
+  cfg80211_vendor_cmd_get_sender
   cfg80211_vendor_cmd_reply
   __cfi_slowpath
   __check_object_size
@@ -294,6 +295,7 @@
   cpu_latency_qos_add_request
   cpu_latency_qos_remove_request
   cpu_latency_qos_update_request
+  cpumask_any_and_distribute
   cpumask_any_but
   cpumask_next
   cpumask_next_and
@@ -850,6 +852,7 @@
   find_pid_ns
   find_task_by_vpid
   find_vma
+  find_vpid
   finish_wait
   firmware_request_nowarn
   flush_dcache_page
@@ -871,6 +874,7 @@
   freq_qos_add_request
   freq_qos_remove_request
   freq_qos_update_request
+  freq_scale
   fs_bio_set
   fsync_bdev
   full_name_hash
@@ -1252,6 +1256,8 @@
   log_threaded_irq_wakeup_reason
   __log_write_mmio
   loops_per_jiffy
+  lru_cache_disable
+  lru_cache_enable
   lzo1x_1_compress
   lzo1x_decompress_safe
   lzorle1x_1_compress
@@ -2179,6 +2185,7 @@
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpu_cgroup_online
+  __traceiter_android_rvh_cpumask_any_and_distribute
   __traceiter_android_rvh_cpu_overutilized
   __traceiter_android_rvh_dequeue_task
   __traceiter_android_rvh_dequeue_task_fair
@@ -2211,13 +2218,16 @@
   __traceiter_android_rvh_ufs_reprogram_all_keys
   __traceiter_android_rvh_update_blocked_fair
   __traceiter_android_rvh_update_load_avg
+  __traceiter_android_rvh_update_rq_clock_pelt
   __traceiter_android_rvh_update_rt_rq_load_avg
   __traceiter_android_rvh_util_est_update
   __traceiter_android_vh_arch_set_freq_scale
+  __traceiter_android_vh_cma_alloc_adjust
   __traceiter_android_vh_cma_alloc_finish
   __traceiter_android_vh_cma_alloc_start
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
+  __traceiter_android_vh_dump_throttled_rt_tasks
   __traceiter_android_vh_dup_task_struct
   __traceiter_android_vh_enable_thermal_genl_check
   __traceiter_android_vh_ep_create_wakeup_source
@@ -2226,6 +2236,8 @@
   __traceiter_android_vh_internal_get_user_pages_fast
   __traceiter_android_vh_ipi_stop
   __traceiter_android_vh_meminfo_proc_show
+  __traceiter_android_vh_mm_compaction_begin
+  __traceiter_android_vh_mm_compaction_end
   __traceiter_android_vh_of_i2c_get_board_info
   __traceiter_android_vh_pagecache_get_page
   __traceiter_android_vh_pin_user_pages
@@ -2233,6 +2245,7 @@
   __traceiter_android_vh_sched_setaffinity_early
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
+  __traceiter_android_vh_show_max_freq
   __traceiter_android_vh_snd_compr_use_pause_in_drain
   __traceiter_android_vh_sound_usb_support_cpu_suspend
   __traceiter_android_vh_sysrq_crash
@@ -2251,6 +2264,7 @@
   __traceiter_android_vh_ufs_send_command
   __traceiter_android_vh_ufs_send_tm_command
   __traceiter_android_vh_ufs_send_uic_command
+  __traceiter_android_vh_ufs_update_sdev
   __traceiter_android_vh_ufs_update_sysfs
   __traceiter_android_vh_usb_dev_resume
   __traceiter_android_vh_usb_dev_suspend
@@ -2284,6 +2298,7 @@
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpu_cgroup_online
+  __tracepoint_android_rvh_cpumask_any_and_distribute
   __tracepoint_android_rvh_cpu_overutilized
   __tracepoint_android_rvh_dequeue_task
   __tracepoint_android_rvh_dequeue_task_fair
@@ -2316,13 +2331,16 @@
   __tracepoint_android_rvh_ufs_reprogram_all_keys
   __tracepoint_android_rvh_update_blocked_fair
   __tracepoint_android_rvh_update_load_avg
+  __tracepoint_android_rvh_update_rq_clock_pelt
   __tracepoint_android_rvh_update_rt_rq_load_avg
   __tracepoint_android_rvh_util_est_update
   __tracepoint_android_vh_arch_set_freq_scale
+  __tracepoint_android_vh_cma_alloc_adjust
   __tracepoint_android_vh_cma_alloc_finish
   __tracepoint_android_vh_cma_alloc_start
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
+  __tracepoint_android_vh_dump_throttled_rt_tasks
   __tracepoint_android_vh_dup_task_struct
   __tracepoint_android_vh_enable_thermal_genl_check
   __tracepoint_android_vh_ep_create_wakeup_source
@@ -2331,6 +2349,8 @@
   __tracepoint_android_vh_internal_get_user_pages_fast
   __tracepoint_android_vh_ipi_stop
   __tracepoint_android_vh_meminfo_proc_show
+  __tracepoint_android_vh_mm_compaction_begin
+  __tracepoint_android_vh_mm_compaction_end
   __tracepoint_android_vh_of_i2c_get_board_info
   __tracepoint_android_vh_pagecache_get_page
   __tracepoint_android_vh_pin_user_pages
@@ -2338,6 +2358,7 @@
   __tracepoint_android_vh_sched_setaffinity_early
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
+  __tracepoint_android_vh_show_max_freq
   __tracepoint_android_vh_snd_compr_use_pause_in_drain
   __tracepoint_android_vh_sound_usb_support_cpu_suspend
   __tracepoint_android_vh_sysrq_crash
@@ -2356,6 +2377,7 @@
   __tracepoint_android_vh_ufs_send_command
   __tracepoint_android_vh_ufs_send_tm_command
   __tracepoint_android_vh_ufs_send_uic_command
+  __tracepoint_android_vh_ufs_update_sdev
   __tracepoint_android_vh_ufs_update_sysfs
   __tracepoint_android_vh_usb_dev_resume
   __tracepoint_android_vh_usb_dev_suspend
@@ -2588,6 +2610,7 @@
   vm_map_ram
   vm_unmap_ram
   vprintk
+  vprintk_emit
   vring_del_virtqueue
   vring_interrupt
   vring_new_virtqueue

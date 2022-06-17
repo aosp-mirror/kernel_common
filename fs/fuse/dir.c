@@ -212,7 +212,7 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 		{
 			struct fuse_err_ret fer;
 
-			fer = fuse_bpf_backing(entry->d_parent->d_inode,
+			fer = fuse_bpf_backing(inode,
 					struct fuse_lookup_io,
 					fuse_lookup_initialize,
 					fuse_revalidate_backing,
