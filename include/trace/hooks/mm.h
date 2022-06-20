@@ -12,6 +12,7 @@
 struct oom_control;
 struct slabinfo;
 struct cma;
+struct acr_info;
 struct compact_control;
 
 DECLARE_RESTRICTED_HOOK(android_rvh_set_skip_swapcache_flags,
@@ -40,6 +41,9 @@ DECLARE_HOOK(android_vh_cma_alloc_finish,
 	TP_PROTO(struct cma *cma, struct page *page, unsigned long count,
 		 unsigned int align, gfp_t gfp_mask, s64 ts),
 	TP_ARGS(cma, page, count, align, gfp_mask, ts));
+DECLARE_HOOK(android_vh_cma_alloc_busy_info,
+	TP_PROTO(struct acr_info *info),
+	TP_ARGS(info));
 DECLARE_HOOK(android_vh_meminfo_proc_show,
 	TP_PROTO(struct seq_file *m),
 	TP_ARGS(m));
