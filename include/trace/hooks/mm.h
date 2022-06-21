@@ -36,6 +36,10 @@ DECLARE_HOOK(android_vh_cma_alloc_finish,
 DECLARE_HOOK(android_vh_cma_alloc_busy_info,
 	TP_PROTO(struct acr_info *info),
 	TP_ARGS(info));
+DECLARE_HOOK(android_vh_calc_alloc_flags,
+	TP_PROTO(unsigned int pflags, gfp_t gfp_mask, unsigned int *alloc_flags,
+		bool *bypass),
+	TP_ARGS(pflags, gfp_mask, alloc_flags, bypass));
 DECLARE_HOOK(android_vh_mm_compaction_begin,
 	TP_PROTO(struct compact_control *cc, long *vendor_ret),
 	TP_ARGS(cc, vendor_ret));

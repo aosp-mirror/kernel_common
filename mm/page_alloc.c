@@ -4112,6 +4112,11 @@ static inline unsigned int current_alloc_flags(gfp_t gfp_mask,
 {
 #ifdef CONFIG_CMA
 	unsigned int pflags = current->flags;
+	bool bypass = false;
+
+	trace_android_vh_calc_alloc_flags(pflags, gfp_mask, &alloc_flags, &bypass);
+	if (bypass)
+		return alloc_flags;
 
 	if (!(pflags & PF_MEMALLOC_NOCMA) &&
 			gfp_migratetype(gfp_mask) == MIGRATE_MOVABLE &&
