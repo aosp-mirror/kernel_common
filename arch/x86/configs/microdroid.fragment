@@ -12,3 +12,6 @@ CONFIG_VIRTIO_VSOCKETS=y
 # CONFIG_SERIAL_SAMSUNG is not set
 # CONFIG_SERIAL_SAMSUNG_CONSOLE is not set
 # CONFIG_SERIAL_DEV_BUS is not set
+
+# Remove config options that are for unknown vendor modules
+# CONFIG_GKI_HACKS_TO_FIX is not set
