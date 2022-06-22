@@ -3871,7 +3871,8 @@ static int hci_set_event_mask_sync(struct hci_dev *hdev)
 
 		/* Don't set Disconnect Complete and mode change when
 		 * suspended as that would wakeup the host when disconnecting
-		 * due to suspend.
+		 * due to suspend. Also unset Mode Change while suspending for
+		 * the same reason.
 		 */
 		if (hdev->suspended) {
 			events[0] &= 0xef;
@@ -3891,10 +3892,13 @@ static int hci_set_event_mask_sync(struct hci_dev *hdev)
 		if (hdev->commands[0] & 0x20) {
 			/* Don't set Disconnect Complete when suspended as that
 			 * would wakeup the host when disconnecting due to
-			 * suspend.
+			 * suspend. Also unset Mode Change while suspending for
+			 * the same reason.
 			 */
-			if (!hdev->suspended)
+			if (!hdev->suspended) {
 				events[0] |= 0x10; /* Disconnection Complete */
+				events[2] |= 0x08; /* Mode Change */
+			}
 			events[2] |= 0x04; /* Number of Completed Packets */
 			events[3] |= 0x02; /* Data Buffer Overflow */
 		}
