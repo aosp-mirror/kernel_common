@@ -278,6 +278,7 @@
   extcon_sync
   fb_mode_option
   __find_get_block
+  find_get_pid
   find_next_bit
   finish_wait
   flush_work
