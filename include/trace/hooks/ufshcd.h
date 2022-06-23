@@ -39,7 +39,8 @@ DECLARE_HOOK(android_vh_ufs_compl_command,
 	TP_ARGS(hba, lrbp));
 
 DECLARE_HOOK(android_vh_ufs_send_uic_command,
-	TP_PROTO(struct ufs_hba *hba, struct uic_command *ucmd, int str_t),
+	TP_PROTO(struct ufs_hba *hba, const struct uic_command *ucmd,
+		 int str_t),
 	TP_ARGS(hba, ucmd, str_t));
 
 DECLARE_HOOK(android_vh_ufs_send_tm_command,
