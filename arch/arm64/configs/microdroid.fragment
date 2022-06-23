@@ -18,7 +18,7 @@ CONFIG_VIRTIO_VSOCKETS=y
 # CONFIG_QCOM_GENI_CONSOLE is not set
 # CONFIG_SERIAL_SPRD is not set
 # CONFIG_SERIAL_SPRD_CONSOLE is not set
-# CONFIG_HVC_DCC=y is not set
+# CONFIG_HVC_DCC is not set
 # CONFIG_SERIAL_DEV_BUS is not set
 
 # Remove config options that are for unknown vendor modules
