@@ -2212,6 +2212,8 @@ blk_qc_t blk_mq_submit_bio(struct bio *bio)
 	if (!bio_integrity_prep(bio))
 		goto queue_exit;
 
+	bio_set_ioprio(bio);
+
 	if (!is_flush_fua && !blk_queue_nomerges(q) &&
 	    blk_attempt_plug_merge(q, bio, nr_segs, &same_queue_rq))
 		goto queue_exit;
@@ -2233,8 +2235,6 @@ blk_qc_t blk_mq_submit_bio(struct bio *bio)
 	}
 
 	trace_block_getrq(bio);
-
-	bio_set_ioprio(bio);
 
 	rq_qos_track(q, rq, bio);
 
