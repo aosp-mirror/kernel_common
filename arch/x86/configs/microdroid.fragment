@@ -15,3 +15,13 @@ CONFIG_VIRTIO_VSOCKETS=y
 
 # Remove config options that are for unknown vendor modules
 # CONFIG_GKI_HACKS_TO_FIX is not set
+
+# Remove unnecessary filesystems
+# CONFIG_F2FS_FS is not set
+# CONFIG_VIRTIO_FS is not set
+# CONFIG_OVERLAY_FS is not set
+# CONFIG_INCREMENTAL_FS is not set
+# CONFIG_MSDOS_FS is not set
+# CONFIG_VFAT_FS is not set
+# CONFIG_VFAT_FS is not set
+# CONFIG_EXFAT_FS is not set
