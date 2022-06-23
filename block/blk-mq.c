@@ -2167,6 +2167,9 @@ static inline unsigned short blk_plug_max_rq_count(struct blk_plug *plug)
 
 static void bio_set_ioprio(struct bio *bio)
 {
+	/* Nobody set ioprio so far? Initialize it based on task's nice value */
+	if (IOPRIO_PRIO_CLASS(bio->bi_ioprio) == IOPRIO_CLASS_NONE)
+		bio->bi_ioprio = get_current_ioprio();
 	blkcg_set_ioprio(bio);
 }
 
