@@ -40,6 +40,7 @@
 #include "blk-stat.h"
 #include "blk-mq-sched.h"
 #include "blk-rq-qos.h"
+#include "blk-ioprio.h"
 
 #include <trace/hooks/block.h>
 
@@ -2164,6 +2165,11 @@ static inline unsigned short blk_plug_max_rq_count(struct blk_plug *plug)
 	return BLK_MAX_REQUEST_COUNT;
 }
 
+static void bio_set_ioprio(struct bio *bio)
+{
+	blkcg_set_ioprio(bio);
+}
+
 /**
  * blk_mq_submit_bio - Create and send a request to block device.
  * @bio: Bio pointer.
@@ -2224,6 +2230,8 @@ blk_qc_t blk_mq_submit_bio(struct bio *bio)
 	}
 
 	trace_block_getrq(bio);
+
+	bio_set_ioprio(bio);
 
 	rq_qos_track(q, rq, bio);
 
