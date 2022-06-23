@@ -4391,8 +4391,7 @@ static const struct wiphy_vendor_command mwifiex_vendor_commands[] = {
 			.vendor_id = MWIFIEX_VENDOR_ID,
 			.subcmd = MWIFIEX_VENDOR_CMD_SET_TX_POWER_LIMIT,
 		},
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
-			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV,
 		.doit = mwifiex_vendor_set_tx_power_limt,
 		.policy = mwifiex_vendor_attr_policy,
 		.maxattr = MAX_MWIFIEX_VENDOR_CMD_ATTR,
