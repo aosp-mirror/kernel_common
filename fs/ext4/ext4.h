@@ -2389,9 +2389,9 @@ extern unsigned ext4_free_clusters_after_init(struct super_block *sb,
 ext4_fsblk_t ext4_inode_to_goal_block(struct inode *);
 
 #ifdef CONFIG_UNICODE
-extern int ext4_fname_setup_ci_filename(struct inode *dir,
+extern void ext4_fname_setup_ci_filename(struct inode *dir,
 					 const struct qstr *iname,
-					 struct ext4_filename *fname);
+					 struct fscrypt_str *fname);
 #endif
 
 #ifdef CONFIG_FS_ENCRYPTION
@@ -2422,9 +2422,9 @@ static inline int ext4_fname_setup_filename(struct inode *dir,
 	ext4_fname_from_fscrypt_name(fname, &name);
 
 #ifdef CONFIG_UNICODE
-	err = ext4_fname_setup_ci_filename(dir, iname, fname);
+	ext4_fname_setup_ci_filename(dir, iname, &fname->cf_name);
 #endif
-	return err;
+	return 0;
 }
 
 static inline int ext4_fname_prepare_lookup(struct inode *dir,
@@ -2441,9 +2441,9 @@ static inline int ext4_fname_prepare_lookup(struct inode *dir,
 	ext4_fname_from_fscrypt_name(fname, &name);
 
 #ifdef CONFIG_UNICODE
-	err = ext4_fname_setup_ci_filename(dir, &dentry->d_name, fname);
+	ext4_fname_setup_ci_filename(dir, &dentry->d_name, &fname->cf_name);
 #endif
-	return err;
+	return 0;
 }
 
 static inline void ext4_fname_free_filename(struct ext4_filename *fname)
@@ -2468,16 +2468,15 @@ static inline int ext4_fname_setup_filename(struct inode *dir,
 					    int lookup,
 					    struct ext4_filename *fname)
 {
-	int err = 0;
 	fname->usr_fname = iname;
 	fname->disk_name.name = (unsigned char *) iname->name;
 	fname->disk_name.len = iname->len;
 
 #ifdef CONFIG_UNICODE
-	err = ext4_fname_setup_ci_filename(dir, iname, fname);
+	ext4_fname_setup_ci_filename(dir, iname, &fname->cf_name);
 #endif
 
-	return err;
+	return 0;
 }
 
 static inline int ext4_fname_prepare_lookup(struct inode *dir,
