@@ -573,7 +573,8 @@ int fuse_readdir(struct file *file, struct dir_context *ctx)
 
 #ifdef CONFIG_FUSE_BPF
 	struct fuse_err_ret fer;
-	bool force_again, allow_force;
+	bool allow_force;
+	bool force_again = false;
 	bool is_continued = false;
 
 again:
