@@ -60,9 +60,6 @@
 #include <asm/irq_regs.h>
 #include <asm/io.h>
 
-//#define CREATE_TRACE_POINTS
-//#include <trace/events/random.h>
-
 /*********************************************************************
  *
  * Initialization and readiness waiting.
@@ -221,7 +218,7 @@ enum {
 };
 
 static struct {
-	u8 key[CHACHA_KEY_SIZE] __aligned(__alignof__(long));
+	u8 key[CHACHA20_KEY_SIZE] __aligned(__alignof__(long));
 	unsigned long birth;
 	unsigned long generation;
 	spinlock_t lock;
@@ -230,7 +227,7 @@ static struct {
 };
 
 struct crng {
-	u8 key[CHACHA_KEY_SIZE];
+	u8 key[CHACHA20_KEY_SIZE];
 	unsigned long generation;
 };
 
@@ -246,7 +243,7 @@ static void crng_reseed(void)
 {
 	unsigned long flags;
 	unsigned long next_gen;
-	u8 key[CHACHA_KEY_SIZE];
+	u8 key[CHACHA20_KEY_SIZE];
 
 	extract_entropy(key, sizeof(key));
 
@@ -283,21 +280,21 @@ static void crng_reseed(void)
  * safer to set the random_data parameter to &chacha_state[4] so
  * that this function overwrites it before returning.
  */
-static void crng_fast_key_erasure(u8 key[CHACHA_KEY_SIZE],
-				  u32 chacha_state[CHACHA_BLOCK_SIZE / sizeof(u32)],
+static void crng_fast_key_erasure(u8 key[CHACHA20_KEY_SIZE],
+				  u32 chacha_state[CHACHA20_BLOCK_SIZE / sizeof(u32)],
 				  u8 *random_data, size_t random_data_len)
 {
-	u8 first_block[CHACHA_BLOCK_SIZE];
+	u8 first_block[CHACHA20_BLOCK_SIZE];
 
 	BUG_ON(random_data_len > 32);
 
 	chacha_init_consts(chacha_state);
-	memcpy(&chacha_state[4], key, CHACHA_KEY_SIZE);
+	memcpy(&chacha_state[4], key, CHACHA20_KEY_SIZE);
 	memset(&chacha_state[12], 0, sizeof(u32) * 4);
 	chacha20_block(chacha_state, first_block);
 
-	memcpy(key, first_block, CHACHA_KEY_SIZE);
-	memcpy(random_data, first_block + CHACHA_KEY_SIZE, random_data_len);
+	memcpy(key, first_block, CHACHA20_KEY_SIZE);
+	memcpy(random_data, first_block + CHACHA20_KEY_SIZE, random_data_len);
 	memzero_explicit(first_block, sizeof(first_block));
 }
 
@@ -328,7 +325,7 @@ static bool crng_has_old_seed(void)
  * random data. It also returns up to 32 bytes on its own of random data
  * that may be used; random_data_len may not be greater than 32.
  */
-static void crng_make_state(u32 chacha_state[CHACHA_BLOCK_SIZE / sizeof(u32)],
+static void crng_make_state(u32 chacha_state[CHACHA20_BLOCK_SIZE / sizeof(u32)],
 			    u8 *random_data, size_t random_data_len)
 {
 	unsigned long flags;
@@ -395,8 +392,8 @@ static void crng_make_state(u32 chacha_state[CHACHA_BLOCK_SIZE / sizeof(u32)],
 
 static void _get_random_bytes(void *buf, size_t len)
 {
-	u32 chacha_state[CHACHA_BLOCK_SIZE / sizeof(u32)];
-	u8 tmp[CHACHA_BLOCK_SIZE];
+	u32 chacha_state[CHACHA20_BLOCK_SIZE / sizeof(u32)];
+	u8 tmp[CHACHA20_BLOCK_SIZE];
 	size_t first_block_len;
 
 	if (!len)
@@ -408,7 +405,7 @@ static void _get_random_bytes(void *buf, size_t len)
 	buf += first_block_len;
 
 	while (len) {
-		if (len < CHACHA_BLOCK_SIZE) {
+		if (len < CHACHA20_BLOCK_SIZE) {
 			chacha20_block(chacha_state, tmp);
 			memcpy(buf, tmp, len);
 			memzero_explicit(tmp, sizeof(tmp));
@@ -418,8 +415,8 @@ static void _get_random_bytes(void *buf, size_t len)
 		chacha20_block(chacha_state, buf);
 		if (unlikely(chacha_state[12] == 0))
 			++chacha_state[13];
-		len -= CHACHA_BLOCK_SIZE;
-		buf += CHACHA_BLOCK_SIZE;
+		len -= CHACHA20_BLOCK_SIZE;
+		buf += CHACHA20_BLOCK_SIZE;
 	}
 
 	memzero_explicit(chacha_state, sizeof(chacha_state));
@@ -444,8 +441,8 @@ EXPORT_SYMBOL(get_random_bytes);
 
 static ssize_t get_random_bytes_user(struct iov_iter *iter)
 {
-	u32 chacha_state[CHACHA_BLOCK_SIZE / sizeof(u32)];
-	u8 block[CHACHA_BLOCK_SIZE];
+	u32 chacha_state[CHACHA20_BLOCK_SIZE / sizeof(u32)];
+	u8 block[CHACHA20_BLOCK_SIZE];
 	size_t ret = 0, copied;
 
 	if (unlikely(!iov_iter_count(iter)))
@@ -456,14 +453,14 @@ static ssize_t get_random_bytes_user(struct iov_iter *iter)
 	 * bytes, in case userspace causes copy_to_user() below to sleep
 	 * forever, so that we still retain forward secrecy in that case.
 	 */
-	crng_make_state(chacha_state, (u8 *)&chacha_state[4], CHACHA_KEY_SIZE);
+	crng_make_state(chacha_state, (u8 *)&chacha_state[4], CHACHA20_KEY_SIZE);
 	/*
 	 * However, if we're doing a read of len <= 32, we don't need to
 	 * use chacha_state after, so we can simply return those bytes to
 	 * the user directly.
 	 */
-	if (iov_iter_count(iter) <= CHACHA_KEY_SIZE) {
-		ret = copy_to_iter(&chacha_state[4], CHACHA_KEY_SIZE, iter);
+	if (iov_iter_count(iter) <= CHACHA20_KEY_SIZE) {
+		ret = copy_to_iter(&chacha_state[4], CHACHA20_KEY_SIZE, iter);
 		goto out_zero_chacha;
 	}
 
@@ -505,9 +502,9 @@ struct batch_ ##type {								\
 	 * remaining 32 bytes from fast key erasure, plus one full		\
 	 * block from the detached ChaCha state. We can increase		\
 	 * the size of this later if needed so long as we keep the		\
-	 * formula of (integer_blocks + 0.5) * CHACHA_BLOCK_SIZE.		\
+	 * formula of (integer_blocks + 0.5) * CHACHA20_BLOCK_SIZE.		\
 	 */									\
-	type entropy[CHACHA_BLOCK_SIZE * 3 / (2 * sizeof(type))];		\
+	type entropy[CHACHA20_BLOCK_SIZE * 3 / (2 * sizeof(type))];		\
 	unsigned long generation;						\
 	unsigned int position;							\
 };										\
