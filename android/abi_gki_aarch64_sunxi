@@ -288,3 +288,11 @@
   xa_erase
   __xa_alloc
   xa_load
+
+# required by sunxi_nsipmu.ko
+  devm_devfreq_event_add_edev
+
+# required by sunxi_dmc.ko
+  devfreq_event_get_edev_by_phandle
+  devfreq_event_enable_edev
+  devfreq_event_disable_edev
