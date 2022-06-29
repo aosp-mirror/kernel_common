@@ -545,7 +545,7 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, const struct qstr *name
 			goto out_queue_forget;
 
 		backing_inode = backing_file->f_inode;
-		*inode = fuse_iget_backing(sb, backing_inode);
+		*inode = fuse_iget_backing(sb, outarg->nodeid, backing_inode);
 		if (!*inode)
 			goto bpf_arg_out;
 
