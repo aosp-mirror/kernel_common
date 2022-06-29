@@ -10,3 +10,8 @@
   ufshcd_query_descriptor_retry
   ufshcd_query_flag
   sdev_prefix_printk
+
+# required by tran_turbo.ko
+  task_sched_runtime
+  uclamp_eff_value
+  cpu_scale
