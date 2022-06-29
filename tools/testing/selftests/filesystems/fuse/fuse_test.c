@@ -1491,6 +1491,192 @@ out:
 	return result;
 }
 
+/*
+ * State:
+ * Original: dst/folder1/content.txt
+ *                  ^
+ *                  |
+ *                  |
+ * Backing:  src/folder1/content.txt
+ *
+ * Step 1:  open(folder1) - set backing to src/folder1
+ * Check 1: cat(content.txt) - check not receiving call on the fuse daemon
+ *                             and content is the same
+ * Step 2:  readdirplus(dst)
+ * Check 2: cat(content.txt) - check not receiving call on the fuse daemon
+ *                             and content is the same
+ */
+static int bpf_test_readdirplus_not_overriding_backing(const char *mount_dir)
+{
+	const char *folder1 = "folder1";
+	const char *content_file = "content.txt";
+	const char *content = "hello world";
+
+	int result = TEST_FAILURE;
+	int fuse_dev = -1;
+	int src_fd = -1;
+	int content_fd = -1;
+	int pid = -1;
+	int status;
+
+	TESTSYSCALL(s_mkdir(s_path(s(ft_src), s(folder1)), 0777));
+	TEST(content_fd = s_creat(s_pathn(3, s(ft_src), s(folder1), s(content_file)), 0777),
+		content_fd != -1);
+	TESTEQUAL(write(content_fd, content, strlen(content)), strlen(content));
+	TESTEQUAL(mount_fuse_no_init(mount_dir, -1, -1, &fuse_dev), 0);
+
+	FUSE_ACTION
+		DIR *open_mount_dir = NULL;
+		struct dirent *mount_dirent;
+		int dst_folder1_fd = -1;
+		int dst_content_fd = -1;
+		int dst_content_read_size = -1;
+		char content_buffer[12];
+
+		// Step 1: Lookup folder1
+		TESTERR(dst_folder1_fd = s_open(s_path(s(mount_dir), s(folder1)),
+			O_RDONLY | O_CLOEXEC), dst_folder1_fd != -1);
+
+		// Check 1: Read content file (backed)
+		TESTERR(dst_content_fd =
+			s_open(s_pathn(3, s(mount_dir), s(folder1), s(content_file)),
+			O_RDONLY | O_CLOEXEC), dst_content_fd != -1);
+
+		TEST(dst_content_read_size =
+			read(dst_content_fd, content_buffer, strlen(content)),
+			dst_content_read_size == strlen(content) &&
+			strcmp(content, content_buffer) == 0);
+
+		TESTSYSCALL(close(dst_content_fd));
+		dst_content_fd = -1;
+		TESTSYSCALL(close(dst_folder1_fd));
+		dst_folder1_fd = -1;
+		memset(content_buffer, 0, strlen(content));
+
+		// Step 2: readdir folder 1
+		TEST(open_mount_dir = s_opendir(s(mount_dir)),
+			open_mount_dir != NULL);
+		TEST(mount_dirent = readdir(open_mount_dir), mount_dirent != NULL);
+		TESTSYSCALL(closedir(open_mount_dir));
+		open_mount_dir = NULL;
+
+		// Check 2: Read content file again (must be backed)
+		TESTERR(dst_content_fd =
+			s_open(s_pathn(3, s(mount_dir), s(folder1), s(content_file)),
+			O_RDONLY | O_CLOEXEC), dst_content_fd != -1);
+
+		TEST(dst_content_read_size =
+			read(dst_content_fd, content_buffer, strlen(content)),
+			dst_content_read_size == strlen(content) &&
+			strcmp(content, content_buffer) == 0);
+
+		TESTSYSCALL(close(dst_content_fd));
+		dst_content_fd = -1;
+	FUSE_DAEMON
+		size_t read_size = 0;
+		struct fuse_in_header *in_header = (struct fuse_in_header *)bytes_in;
+		struct fuse_read_out *read_out = NULL;
+		struct fuse_attr attr = {};
+		int backing_fd = -1;
+		DECL_FUSE_IN(open);
+		DECL_FUSE_IN(getattr);
+
+		TESTFUSEINITFLAGS(FUSE_DO_READDIRPLUS | FUSE_READDIRPLUS_AUTO);
+
+		// Step 1: Lookup folder 1 with backing
+		TESTFUSELOOKUP(folder1, 0);
+		TESTSYSCALL(s_fuse_attr(s_path(s(ft_src), s(folder1)), &attr));
+		TEST(backing_fd = s_open(s_path(s(ft_src), s(folder1)),
+					 O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+		     backing_fd != -1);
+		TESTFUSEOUT2(fuse_entry_out, ((struct fuse_entry_out) {
+				.nodeid = attr.ino,
+				.generation = 0,
+				.entry_valid = UINT64_MAX,
+				.attr_valid = UINT64_MAX,
+				.entry_valid_nsec = UINT32_MAX,
+				.attr_valid_nsec = UINT32_MAX,
+				.attr = attr,
+			     }), fuse_entry_bpf_out, ((struct fuse_entry_bpf_out) {
+				.backing_action = FUSE_ACTION_REPLACE,
+				.backing_fd = backing_fd,
+			     }));
+		TESTSYSCALL(close(backing_fd));
+
+		// Step 2: Open root dir
+		TESTFUSEIN(FUSE_OPENDIR, open_in);
+		TESTFUSEOUT1(fuse_open_out, ((struct fuse_open_out) {
+			.fh = 100,
+			.open_flags = open_in->flags
+		}));
+
+		// Step 2: Handle getattr
+		TESTFUSEIN(FUSE_GETATTR, getattr_in);
+		TESTSYSCALL(s_fuse_attr(s(ft_src), &attr));
+		TESTFUSEOUT1(fuse_attr_out, ((struct fuse_attr_out) {
+			.attr_valid = UINT64_MAX,
+			.attr_valid_nsec = UINT32_MAX,
+			.attr = attr
+		}));
+
+		// Step 2: Handle readdirplus
+		read_size = read(fuse_dev, bytes_in, sizeof(bytes_in));
+		TESTEQUAL(in_header->opcode, FUSE_READDIRPLUS);
+
+		struct fuse_direntplus *dirent_plus =
+			(struct fuse_direntplus *) (bytes_in + read_size);
+		struct fuse_dirent dirent;
+		struct fuse_entry_out entry_out;
+
+		read_out = (struct fuse_read_out *) (bytes_in +
+					sizeof(*in_header) +
+					sizeof(struct fuse_read_in));
+
+		TESTSYSCALL(s_fuse_attr(s_path(s(ft_src), s(folder1)), &attr));
+
+		dirent = (struct fuse_dirent) {
+			.ino = attr.ino,
+			.off = 1,
+			.namelen = strlen(folder1),
+			.type = DT_REG
+		};
+		entry_out = (struct fuse_entry_out) {
+			.nodeid = attr.ino,
+			.generation = 0,
+			.entry_valid = UINT64_MAX,
+			.attr_valid = UINT64_MAX,
+			.entry_valid_nsec = UINT32_MAX,
+			.attr_valid_nsec = UINT32_MAX,
+			.attr = attr
+		};
+		*dirent_plus = (struct fuse_direntplus) {
+			.dirent = dirent,
+			.entry_out = entry_out
+		};
+
+		strcpy((char *)(bytes_in + read_size + sizeof(*dirent_plus)), folder1);
+		read_size += FUSE_DIRENT_ALIGN(sizeof(*dirent_plus) + strlen(folder1) +
+					1);
+		TESTFUSEDIROUTREAD(read_out,
+				bytes_in +
+				sizeof(struct fuse_in_header) +
+				sizeof(struct fuse_read_in) +
+				sizeof(struct fuse_read_out),
+				read_size - sizeof(struct fuse_in_header) -
+					sizeof(struct fuse_read_in) -
+					sizeof(struct fuse_read_out));
+	FUSE_DONE
+
+	result = TEST_SUCCESS;
+
+out:
+	close(fuse_dev);
+	close(content_fd);
+	close(src_fd);
+	umount(mount_dir);
+	return result;
+}
+
 
 static int parse_options(int argc, char *const *argv)
 {
@@ -1596,6 +1782,7 @@ int main(int argc, char *argv[])
 		MAKE_TEST(inotify_test),
 		MAKE_TEST(bpf_test_statfs),
 		MAKE_TEST(bpf_test_lseek),
+		MAKE_TEST(bpf_test_readdirplus_not_overriding_backing)
 	};
 #undef MAKE_TEST
 
