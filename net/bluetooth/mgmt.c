@@ -9228,7 +9228,9 @@ static int floss_get_sco_codec_capabilities(struct sock *sk,
 {
 	struct mgmt_cp_get_codec_capabilities *cp = data;
 	struct mgmt_rp_get_codec_capabilities *rp;
-	int i, num_rp_codecs;
+	struct codec_list *c;
+	struct hci_codec_caps *caps;
+	int i, j, num_rp_codecs;
 	int err;
 	size_t total_size = sizeof(struct mgmt_rp_get_codec_capabilities);
 	bool wbs_supported = false;
@@ -9257,6 +9259,26 @@ static int floss_get_sco_codec_capabilities(struct sock *sk,
 		case MGMT_SCO_CODEC_MSBC_TRANSPARENT:
 			if (wbs_supported)
 				total_size += sizeof(struct mgmt_bt_codec);
+			break;
+		case MGMT_SCO_CODEC_MSBC:
+			num_rp_codecs = 0;
+			hci_dev_lock(hdev);
+			list_for_each_entry(c, &hdev->local_codecs, list) {
+				/* 0x01 - HCI Transport (Codec supported over BR/EDR SCO and eSCO)
+				 * 0x05 - mSBC Codec ID
+				 */
+				if (c->transport != 0x01 || c->id != 0x05)
+					continue;
+
+				num_rp_codecs++;
+				for (j = 0, caps = c->caps; j < c->num_caps; j++) {
+					total_size += 1 + caps->len;
+					caps = (void *)&caps->data[caps->len];
+				}
+				total_size += sizeof(struct mgmt_bt_codec);
+				break;
+			}
+			hci_dev_unlock(hdev);
 			break;
 		default:
 			bt_dev_dbg(hdev, "Unknown codec %d", cp->codecs[i]);
@@ -9289,6 +9311,31 @@ static int floss_get_sco_codec_capabilities(struct sock *sk,
 				ptr += sizeof(*rc);
 				num_rp_codecs++;
 			}
+			break;
+		case MGMT_SCO_CODEC_MSBC:
+			/* Need to read the support from the controller and then assign to TRUE
+			 * for now by default enable it as TRUE
+			 */
+			rp->offload_capable = true;
+
+			hci_dev_lock(hdev);
+			list_for_each_entry(c, &hdev->local_codecs, list) {
+				if (c->transport != 0x01 || c->id != 0x05)
+					continue;
+
+				rc->codec = c->id;
+				rc->packet_size = c->len;
+				rc->data_length = c->caps->len;
+				memcpy(rc->data, c->caps, c->caps->len);
+				break;
+			}
+			hci_dev_unlock(hdev);
+
+			ptr += sizeof(*rc);
+			num_rp_codecs++;
+
+			if (hdev->get_data_path_id)
+				hdev->get_data_path_id(hdev, &rc->data_path);
 			break;
 		default:
 			break;
