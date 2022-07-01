@@ -33,6 +33,7 @@ struct mem_cgroup;
 #include <linux/memcontrol.h>
 #endif /* __GENKSYMS__ */
 struct cma;
+struct acr_info;
 
 DECLARE_RESTRICTED_HOOK(android_rvh_set_skip_swapcache_flags,
 			TP_PROTO(gfp_t *flags),
