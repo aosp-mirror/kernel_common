@@ -14,6 +14,7 @@
   __alloc_pages_nodemask
   __alloc_percpu
   __alloc_skb
+  alloc_vm_area
   alloc_workqueue
   __arch_copy_from_user
   __arch_copy_in_user
@@ -143,8 +144,10 @@
   debugfs_create_file
   debugfs_create_regset32
   debugfs_create_u32
+  debugfs_create_u64
   debugfs_create_x32
   debugfs_initialized
+  debugfs_lookup
   debugfs_remove
   debugfs_remove_recursive
   debugfs_create_symlink
@@ -155,6 +158,7 @@
   del_timer_sync
   destroy_workqueue
   dev_driver_string
+  _dev_crit
   _dev_err
   dev_fwnode
   dev_get_by_name
@@ -222,6 +226,7 @@
   dma_direct_sync_single_for_cpu
   dma_direct_sync_single_for_device
   dma_direct_unmap_page
+  dma_fence_array_create
   dma_fence_release
   dma_fence_wait_timeout
   dma_free_attrs
@@ -259,6 +264,7 @@
   drm_release
   dst_release
   dump_stack
+  emergency_restart
   enable_irq
   ether_setup
   eth_type_trans
@@ -273,6 +279,7 @@
   extcon_sync
   fb_mode_option
   __find_get_block
+  find_get_pid
   find_next_bit
   finish_wait
   flush_work
@@ -698,6 +705,7 @@
   refcount_inc_checked
   __refrigerator
   __register_chrdev
+  __reset_control_get
   read_cache_page
   read_cache_page_gfp
   register_filesystem
@@ -738,6 +746,9 @@
   schedule_timeout
   schedule_timeout_interruptible
   scnprintf
+  sdev_prefix_printk
+  seq_list_next
+  seq_list_start
   seq_lseek
   seq_printf
   seq_putc
@@ -892,6 +903,7 @@
   unregister_filesystem
   unregister_chrdev_region
   unregister_pernet_subsys
+  unmap_kernel_range
   up
   usb_add_gadget_udc
   usb_alloc_coherent
@@ -900,6 +912,7 @@
   usb_autopm_get_interface_no_resume
   usb_autopm_put_interface
   usb_control_msg
+  usb_create_shared_hcd
   usb_del_gadget_udc
   usb_deregister
   usb_ep_alloc_request
@@ -919,6 +932,7 @@
   usb_get_dr_mode
   usb_get_intf
   usb_hcd_is_primary_hcd
+  usb_hcd_irq
   usb_interface_id
   usb_kill_urb
   usb_phy_get_charger_current
@@ -957,6 +971,7 @@
   usleep_range
   vabits_actual
   vfree
+  verify_pkcs7_signature
   vmalloc
   vmalloc_to_page
   vm_map_ram
@@ -1000,6 +1015,7 @@
   xt_unregister_matches
   xt_unregister_target
   xt_unregister_targets
+  yield
 
 # required by blk-mq-virtio.ko
   blk_mq_map_queues
@@ -1444,6 +1460,7 @@
   _raw_read_lock_bh
   _raw_read_unlock_bh
   _raw_write_lock_bh
+  _raw_read_trylock
   _raw_write_unlock_bh
   register_shrinker
   request_firmware
@@ -2633,10 +2650,16 @@
   unregister_syscore_ops
 
 # required by ufs-sprd.ko
+  __tracepoint_android_vh_ufs_prepare_command
+  ufshcd_auto_hibern8_update
   ufshcd_config_pwr_mode
+  ufshcd_delay_us
   ufshcd_dme_get_attr
   ufshcd_dme_set_attr
+  ufshcd_dump_regs
+  ufshcd_fixup_dev_quirks
   ufshcd_get_local_unipro_ver
+  ufshcd_hold
   ufshcd_pltfrm_init
   ufshcd_pltfrm_resume
   ufshcd_pltfrm_runtime_idle
@@ -2644,6 +2667,10 @@
   ufshcd_pltfrm_runtime_suspend
   ufshcd_pltfrm_shutdown
   ufshcd_pltfrm_suspend
+  ufshcd_query_attr
+  ufshcd_query_descriptor_retry
+  ufshcd_query_flag
+  ufshcd_release
   ufshcd_remove
   ufshcd_read_desc_param
 

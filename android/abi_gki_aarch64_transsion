@@ -1,0 +1,17 @@
+[abi_symbol_list]
+# commonly used symbols
+
+# required by ufs-sprd_qogirl6.ko
+  emergency_restart
+  scsi_device_lookup
+  scsi_device_quiesce
+  scsi_device_resume
+  ufshcd_query_attr
+  ufshcd_query_descriptor_retry
+  ufshcd_query_flag
+  sdev_prefix_printk
+
+# required by tran_turbo.ko
+  task_sched_runtime
+  uclamp_eff_value
+  cpu_scale
