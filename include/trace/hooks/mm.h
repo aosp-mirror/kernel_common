@@ -13,6 +13,25 @@
 #include <linux/oom.h>
 #include <trace/hooks/vendor_hooks.h>
 
+#ifdef __GENKSYMS__
+struct cma;
+struct acr_info;
+struct compact_control;
+struct slabinfo;
+struct cgroup_subsys_state;
+struct mem_cgroup;
+#else
+/* struct compact_control */
+#include <../mm/internal.h>
+/* struct slabinfo */
+#include <../mm/slab.h>
+/* struct cgroup_subsys_state */
+#include <linux/cgroup-defs.h>
+/* struct acr_info */
+#include <linux/gfp.h>
+/* struct mem_cgroup */
+#include <linux/memcontrol.h>
+#endif /* __GENKSYMS__ */
 struct cma;
 
 DECLARE_RESTRICTED_HOOK(android_rvh_set_skip_swapcache_flags,
@@ -31,6 +50,19 @@ DECLARE_HOOK(android_vh_cma_alloc_finish,
 	TP_PROTO(struct cma *cma, struct page *page, unsigned long count,
 		 unsigned int align, gfp_t gfp_mask, s64 ts),
 	TP_ARGS(cma, page, count, align, gfp_mask, ts));
+DECLARE_HOOK(android_vh_cma_alloc_busy_info,
+	TP_PROTO(struct acr_info *info),
+	TP_ARGS(info));
+DECLARE_HOOK(android_vh_calc_alloc_flags,
+	TP_PROTO(unsigned int pflags, gfp_t gfp_mask, unsigned int *alloc_flags,
+		bool *bypass),
+	TP_ARGS(pflags, gfp_mask, alloc_flags, bypass));
+DECLARE_HOOK(android_vh_mm_compaction_begin,
+	TP_PROTO(struct compact_control *cc, long *vendor_ret),
+	TP_ARGS(cc, vendor_ret));
+DECLARE_HOOK(android_vh_mm_compaction_end,
+	TP_PROTO(struct compact_control *cc, long vendor_ret),
+	TP_ARGS(cc, vendor_ret));
 DECLARE_HOOK(android_vh_rmqueue,
 	TP_PROTO(struct zone *preferred_zone, struct zone *zone,
 		unsigned int order, gfp_t gfp_flags,
@@ -70,10 +102,12 @@ DECLARE_HOOK(android_vh_show_mem,
 DECLARE_HOOK(android_vh_alloc_pages_slowpath,
 	TP_PROTO(gfp_t gfp_mask, unsigned int order, unsigned long delta),
 	TP_ARGS(gfp_mask, order, delta));
+DECLARE_HOOK(android_vh_cma_alloc_adjust,
+	TP_PROTO(struct zone *zone, bool *is_cma_alloc),
+	TP_ARGS(zone, is_cma_alloc));
 DECLARE_HOOK(android_vh_print_slabinfo_header,
 	TP_PROTO(struct seq_file *m),
 	TP_ARGS(m));
-struct slabinfo;
 DECLARE_HOOK(android_vh_cache_show,
 	TP_PROTO(struct seq_file *m, struct slabinfo *sinfo, struct kmem_cache *s),
 	TP_ARGS(m, sinfo, s));
@@ -96,7 +130,6 @@ DECLARE_HOOK(android_vh_show_stack_hash,
 DECLARE_HOOK(android_vh_save_track_hash,
 	TP_PROTO(bool alloc, unsigned long p),
 	TP_ARGS(alloc, p));
-struct mem_cgroup;
 DECLARE_HOOK(android_vh_vmpressure,
 	TP_PROTO(struct mem_cgroup *memcg, bool *bypass),
 	TP_ARGS(memcg, bypass));
@@ -109,7 +142,6 @@ DECLARE_HOOK(android_vh_mem_cgroup_free,
 DECLARE_HOOK(android_vh_mem_cgroup_id_remove,
 	TP_PROTO(struct mem_cgroup *memcg),
 	TP_ARGS(memcg));
-struct cgroup_subsys_state;
 DECLARE_HOOK(android_vh_mem_cgroup_css_online,
 	TP_PROTO(struct cgroup_subsys_state *css, struct mem_cgroup *memcg),
 	TP_ARGS(css, memcg));
