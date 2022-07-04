@@ -1169,8 +1169,8 @@
 #define CTR_EL0_IDC_SHIFT		28
 #define CTR_EL0_DIC_SHIFT		29
 
-#define DCZID_DZP_SHIFT			4
-#define DCZID_BS_SHIFT			0
+#define DCZID_EL0_DZP_SHIFT		4
+#define DCZID_EL0_BS_SHIFT		0
 
 #define ZCR_ELx_LEN_SHIFT	0
 #define ZCR_ELx_LEN_WIDTH	4
