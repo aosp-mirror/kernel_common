@@ -4,6 +4,9 @@ CONFIG_VIRTIO_CONSOLE=y
 CONFIG_VIRTIO_PCI=y
 CONFIG_VIRTIO_VSOCKETS=y
 
+# To use kdump
+CONFIG_KEXEC_FILE=y
+
 # Remove unnecessary serial devices
 # CONFIG_SERIAL_8250_16550A_VARIANT is not set
 # CONFIG_SERIAL_8250_DMA is not set
