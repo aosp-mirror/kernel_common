@@ -171,6 +171,9 @@
   skb_get_hash_perturb
   __sw_hweight16
 
+# required by xradio_btlpm.ko
+  bt_info
+
 # required by arc4.ko
   arc4_crypt
   arc4_setkey
