@@ -262,6 +262,8 @@ int fuse_create_open_backing(
 	struct dentry *newent;
 	int err = 0;
 	const struct fuse_create_in *fci = fa->in_args[0].value;
+	struct fuse_inode *fuse_inode = get_fuse_inode(entry->d_inode);
+	u64 target_nodeid = 0;
 
 	if (!dir_fuse_inode || !dir_fuse_dentry)
 		return -EIO;
@@ -293,7 +295,10 @@ int fuse_create_open_backing(
 	};
 	path_get(&get_fuse_dentry(entry)->backing_path);
 
-	inode = fuse_iget_backing(dir->i_sb,
+	if (fuse_inode)
+		target_nodeid = fuse_inode->nodeid;
+
+	inode = fuse_iget_backing(dir->i_sb, target_nodeid,
 			get_fuse_dentry(entry)->backing_path.dentry->d_inode);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
@@ -1173,9 +1178,11 @@ struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
 	struct fuse_dentry *fd;
 	struct dentry *bd;
 	struct inode *inode, *backing_inode;
+	struct fuse_inode *fuse_inode = get_fuse_inode(entry->d_inode);
 	struct fuse_entry_out *feo = fa->out_args[0].value;
 	struct fuse_entry_bpf_out *febo = fa->out_args[1].value;
 	struct fuse_entry_bpf *feb = container_of(febo, struct fuse_entry_bpf, out);
+	u64 target_nodeid = 0;
 
 	fd = get_fuse_dentry(entry);
 	if (!fd)
@@ -1187,7 +1194,10 @@ struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
 	if (!backing_inode)
 		return 0;
 
-	inode = fuse_iget_backing(dir->i_sb, backing_inode);
+	if (fuse_inode)
+		target_nodeid = fuse_inode->nodeid;
+
+	inode = fuse_iget_backing(dir->i_sb, target_nodeid, backing_inode);
 
 	if (IS_ERR(inode))
 		return ERR_PTR(PTR_ERR(inode));
@@ -1349,7 +1359,8 @@ int fuse_mknod_backing(
 {
 	int err = 0;
 	const struct fuse_mknod_in *fmi = fa->in_args[0].value;
-	struct inode *backing_inode = get_fuse_inode(dir)->backing_inode;
+	struct fuse_inode *fuse_inode = get_fuse_inode(dir);
+	struct inode *backing_inode = fuse_inode->backing_inode;
 	struct path backing_path = {};
 	struct inode *inode = NULL;
 
@@ -1376,7 +1387,7 @@ int fuse_mknod_backing(
 		 */
 		goto out;
 	}
-	inode = fuse_iget_backing(dir->i_sb, backing_inode);
+	inode = fuse_iget_backing(dir->i_sb, fuse_inode->nodeid, backing_inode);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
 		goto out;
@@ -1425,7 +1436,8 @@ int fuse_mkdir_backing(
 {
 	int err = 0;
 	const struct fuse_mkdir_in *fmi = fa->in_args[0].value;
-	struct inode *backing_inode = get_fuse_inode(dir)->backing_inode;
+	struct fuse_inode *fuse_inode = get_fuse_inode(dir);
+	struct inode *backing_inode = fuse_inode->backing_inode;
 	struct path backing_path = {};
 	struct inode *inode = NULL;
 	struct dentry *d;
@@ -1453,7 +1465,7 @@ int fuse_mkdir_backing(
 		dput(backing_path.dentry);
 		backing_path.dentry = d;
 	}
-	inode = fuse_iget_backing(dir->i_sb, backing_inode);
+	inode = fuse_iget_backing(dir->i_sb, fuse_inode->nodeid, backing_inode);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
 		goto out;
@@ -1768,7 +1780,8 @@ int fuse_link_backing(struct fuse_bpf_args *fa, struct dentry *entry,
 	struct path backing_new_path = {};
 	struct dentry *backing_dir_dentry;
 	struct inode *fuse_new_inode = NULL;
-	struct inode *backing_dir_inode = get_fuse_inode(dir)->backing_inode;
+	struct fuse_inode *fuse_dir_inode = get_fuse_inode(dir);
+	struct inode *backing_dir_inode = fuse_dir_inode->backing_inode;
 
 	get_fuse_backing_path(entry, &backing_old_path);
 	if (!backing_old_path.dentry)
@@ -1799,7 +1812,7 @@ int fuse_link_backing(struct fuse_bpf_args *fa, struct dentry *entry,
 		goto out;
 	}
 
-	fuse_new_inode = fuse_iget_backing(dir->i_sb, backing_dir_inode);
+	fuse_new_inode = fuse_iget_backing(dir->i_sb, fuse_dir_inode->nodeid, backing_dir_inode);
 	if (IS_ERR(fuse_new_inode)) {
 		err = PTR_ERR(fuse_new_inode);
 		goto out;
@@ -2163,7 +2176,8 @@ int fuse_symlink_backing(
 		struct inode *dir, struct dentry *entry, const char *link, int len)
 {
 	int err = 0;
-	struct inode *backing_inode = get_fuse_inode(dir)->backing_inode;
+	struct fuse_inode *fuse_inode = get_fuse_inode(dir);
+	struct inode *backing_inode = fuse_inode->backing_inode;
 	struct path backing_path = {};
 	struct inode *inode = NULL;
 
@@ -2186,7 +2200,7 @@ int fuse_symlink_backing(
 		 */
 		goto out;
 	}
-	inode = fuse_iget_backing(dir->i_sb, backing_inode);
+	inode = fuse_iget_backing(dir->i_sb, fuse_inode->nodeid, backing_inode);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
 		goto out;
