@@ -53,7 +53,8 @@ extern struct host_kvm host_kvm;
 
 typedef u32 pkvm_id;
 static const pkvm_id pkvm_host_id	= 0;
-static const pkvm_id pkvm_hyp_id	= (1 << 16);
+static const pkvm_id pkvm_hyp_id	= 1;
+static const pkvm_id pkvm_guest_id	= 2;
 
 extern unsigned long hyp_nr_cpus;
 
