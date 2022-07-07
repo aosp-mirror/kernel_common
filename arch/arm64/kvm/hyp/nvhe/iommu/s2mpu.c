@@ -465,9 +465,9 @@ static int s2mpu_init(void *data, size_t size)
 	return ret;
 }
 
-static int s2mpu_validate(struct pkvm_iommu *dev)
+static int s2mpu_validate(phys_addr_t pa, size_t size)
 {
-	if (dev->size != S2MPU_MMIO_SIZE)
+	if (size != S2MPU_MMIO_SIZE)
 		return -EINVAL;
 
 	return 0;
