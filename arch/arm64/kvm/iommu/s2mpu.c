@@ -6,7 +6,6 @@
 
 #include <linux/io-64-nonatomic-hi-lo.h>
 #include <linux/kvm_host.h>
-#include <linux/list.h>
 #include <linux/of_platform.h>
 
 #include <asm/kvm_mmu.h>
@@ -22,14 +21,6 @@ struct s2mpu_irq_info {
 	struct device *dev;
 	void __iomem *va;
 };
-
-struct s2mpu_list_entry {
-	struct list_head list;
-	struct device *dev;
-	struct s2mpu info;
-};
-
-static LIST_HEAD(s2mpu_list);
 
 static irqreturn_t s2mpu_irq_handler(int irq, void *data)
 {
@@ -118,16 +109,15 @@ static u32 gen_ctx_cfg_valid_vid(struct platform_device *pdev,
 	     | CTX_CFG_ENTRY(7, ctx, ctx_vid[7]);
 }
 
-static int s2mpu_probe_v9(struct platform_device *pdev, void __iomem *kaddr,
-			  struct s2mpu *info)
+static int s2mpu_probe_v9(struct platform_device *pdev, void __iomem *kaddr)
 {
 	unsigned int num_ctx;
-	u32 ssmt_valid_vid_bmap;
+	u32 ssmt_valid_vid_bmap, ctx_cfg_valid_vid;
 
 	ssmt_valid_vid_bmap = ALL_VIDS_BITMAP;
 	num_ctx = readl_relaxed(kaddr + REG_NS_NUM_CONTEXT) & NUM_CONTEXT_MASK;
-	info->context_cfg_valid_vid = gen_ctx_cfg_valid_vid(pdev, num_ctx, ssmt_valid_vid_bmap);
-	if (!info->context_cfg_valid_vid) {
+	ctx_cfg_valid_vid = gen_ctx_cfg_valid_vid(pdev, num_ctx, ssmt_valid_vid_bmap);
+	if (!ctx_cfg_valid_vid) {
 		dev_err(&pdev->dev, "failed to allocate context IDs");
 		return -EINVAL;
 	}
@@ -178,15 +168,9 @@ static int s2mpu_probe(struct platform_device *pdev)
 	struct resource *res;
 	void __iomem *kaddr;
 	size_t res_size;
-	struct s2mpu_list_entry *entry;
-	struct s2mpu *info;
+	enum s2mpu_power_state power_state = S2MPU_POWER_ALWAYS_ON;
+	u32 version, power_domain_id = 0;
 	int ret;
-
-	entry = devm_kzalloc(&pdev->dev, sizeof(*entry), GFP_KERNEL);
-	if (!entry)
-		return -ENOMEM;
-	entry->dev = &pdev->dev;
-	info = &entry->info;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -207,7 +191,6 @@ static int s2mpu_probe(struct platform_device *pdev)
 			res->start);
 		return -EINVAL;
 	}
-	info->pa = res->start;
 
 	res_size = resource_size(res);
 	if (res_size != S2MPU_MMIO_SIZE) {
@@ -218,9 +201,9 @@ static int s2mpu_probe(struct platform_device *pdev)
 	}
 
 	ret = of_property_read_u32(pdev->dev.of_node, "power-domain-id",
-				   &info->power_domain_id);
+				   &power_domain_id);
 	if (!ret) {
-		info->power_state = S2MPU_POWER_ON;
+		power_state = S2MPU_POWER_ON;
 	} else if (ret != -EINVAL) {
 		dev_err(&pdev->dev, "failed to parse power-domain-id: %d", ret);
 		return ret;
@@ -233,23 +216,20 @@ static int s2mpu_probe(struct platform_device *pdev)
 	 */
 	s2mpu_probe_irq(pdev, kaddr);
 
-	info->version = readl_relaxed(kaddr + REG_NS_VERSION);
-	switch (info->version & VERSION_CHECK_MASK) {
+	version = readl_relaxed(kaddr + REG_NS_VERSION);
+	switch (version & VERSION_CHECK_MASK) {
 	case S2MPU_VERSION_8:
 		break;
 	case S2MPU_VERSION_9:
-		ret = s2mpu_probe_v9(pdev, kaddr, info);
+		ret = s2mpu_probe_v9(pdev, kaddr);
 		if (ret)
 			return ret;
 		break;
 	default:
-		dev_err(&pdev->dev, "unexpected version 0x%08x", info->version);
+		dev_err(&pdev->dev, "unexpected version 0x%08x", version);
 		return -EINVAL;
 	}
 
-	/* Insert successfully parsed devices to a list later copied to hyp. */
-	list_add_tail(&entry->list, &s2mpu_list);
-	kvm_hyp_nr_s2mpus++;
 	return 0;
 }
 
@@ -265,61 +245,16 @@ static struct platform_driver of_driver = {
 	},
 };
 
-static struct s2mpu *alloc_s2mpu_array(void)
-{
-	unsigned int order;
-
-	order = get_order(kvm_hyp_nr_s2mpus * sizeof(struct s2mpu));
-	return (struct s2mpu *)__get_free_pages(GFP_KERNEL, order);
-}
-
-static void free_s2mpu_array(struct s2mpu *array)
-{
-	unsigned int order;
-
-	order = get_order(kvm_hyp_nr_s2mpus * sizeof(struct s2mpu));
-	free_pages((unsigned long)array, order);
-}
-
-static int create_s2mpu_array(struct s2mpu **array)
-{
-	struct s2mpu_list_entry *entry, *tmp;
-	size_t i;
-
-	*array = alloc_s2mpu_array();
-	if (!*array)
-		return -ENOMEM;
-
-	/* Copy list to hyp array and destroy the list in the process. */
-	i = 0;
-	list_for_each_entry_safe(entry, tmp, &s2mpu_list, list) {
-		(*array)[i++] = entry->info;
-		list_del(&entry->list);
-		devm_kfree(entry->dev, entry);
-	}
-	WARN_ON(i != kvm_hyp_nr_s2mpus);
-
-	kvm_hyp_s2mpus = kern_hyp_va(*array);
-	return 0;
-}
-
 int kvm_s2mpu_init(void)
 {
-	struct s2mpu *s2mpus = NULL;
 	int ret;
 
 	ret = platform_driver_probe(&of_driver, s2mpu_probe);
 	if (ret)
 		goto out;
 
-	ret = create_s2mpu_array(&s2mpus);
-	if (ret)
-		goto out;
-
 	kvm_info("S2MPU driver initialized\n");
 
 out:
-	if (ret)
-		free_s2mpu_array(s2mpus);
 	return ret;
 }
