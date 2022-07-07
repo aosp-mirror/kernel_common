@@ -94,8 +94,6 @@ static int kvm_vcpu_finalize_sve(struct kvm_vcpu *vcpu)
 {
 	void *buf;
 	unsigned int vl;
-	size_t reg_sz;
-	int ret;
 
 	vl = vcpu->arch.sve_max_vl;
 
@@ -108,17 +106,10 @@ static int kvm_vcpu_finalize_sve(struct kvm_vcpu *vcpu)
 		    vl > SVE_VL_ARCH_MAX))
 		return -EIO;
 
-	reg_sz = vcpu_sve_state_size(vcpu);
-	buf = kzalloc(reg_sz, GFP_KERNEL_ACCOUNT);
+	buf = kzalloc(SVE_SIG_REGS_SIZE(sve_vq_from_vl(vl)), GFP_KERNEL_ACCOUNT);
 	if (!buf)
 		return -ENOMEM;
 
-	ret = create_hyp_mappings(buf, buf + reg_sz, PAGE_HYP);
-	if (ret) {
-		kfree(buf);
-		return ret;
-	}
-	
 	vcpu->arch.sve_state = buf;
 	vcpu->arch.flags |= KVM_ARM64_VCPU_SVE_FINALIZED;
 	return 0;
