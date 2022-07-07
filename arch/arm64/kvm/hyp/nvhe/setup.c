@@ -31,11 +31,12 @@ static struct hyp_pool hpool;
 
 static int divide_memory_pool(void *virt, unsigned long size)
 {
-	unsigned long nr_pages;
+	unsigned long vstart, vend, nr_pages;
 
 	hyp_early_alloc_init(virt, size);
 
-	nr_pages = hyp_vmemmap_pages(sizeof(struct hyp_page));
+	hyp_vmemmap_range(__hyp_pa(virt), size, &vstart, &vend);
+	nr_pages = (vend - vstart) >> PAGE_SHIFT;
 	vmemmap_base = hyp_early_alloc_contig(nr_pages);
 	if (!vmemmap_base)
 		return -ENOMEM;
@@ -77,7 +78,7 @@ static int recreate_hyp_mappings(phys_addr_t phys, unsigned long size,
 	if (ret)
 		return ret;
 
-	ret = hyp_back_vmemmap(hyp_virt_to_phys(vmemmap_base));
+	ret = hyp_back_vmemmap(phys, size, hyp_virt_to_phys(vmemmap_base));
 	if (ret)
 		return ret;
 
