@@ -99,6 +99,5 @@ static inline bool ipa_in_pvmfw_region(struct kvm_shadow_vm *vm, u64 ipa)
 
 int pkvm_load_pvmfw_pages(struct kvm_shadow_vm *vm, u64 ipa, phys_addr_t phys,
 			  u64 size);
-void pkvm_clear_pvmfw_pages(void);
 
 #endif /* __ARM64_KVM_NVHE_PKVM_H__ */
