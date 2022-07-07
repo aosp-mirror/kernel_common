@@ -467,8 +467,7 @@ bool pkvm_iommu_host_dabt_handler(struct kvm_cpu_context *host_ctxt, u32 esr,
 		if (pa < dev->pa || pa >= dev->pa + dev->size)
 			continue;
 
-		/* No 'powered' check - the host assumes it is powered. */
-		if (!dev->ops->host_dabt_handler ||
+		if (!dev->powered || !dev->ops->host_dabt_handler ||
 		    !dev->ops->host_dabt_handler(dev, host_ctxt, esr, pa - dev->pa))
 			return false;
 
