@@ -230,25 +230,19 @@ extern unsigned long hyp_nr_cpus;
  * Protects writes to shadow_table, num_shadow_entries, and next_shadow_alloc,
  * as well as reads and writes to last_shadow_vcpu_lookup.
  */
-static DEFINE_HYP_SPINLOCK(shadow_lock);
+DEFINE_HYP_SPINLOCK(shadow_lock);
 
 /*
  * The table of shadow entries for protected VMs in hyp.
  * Allocated at hyp initialization and setup.
  */
-static struct kvm_shadow_vm **shadow_table;
+struct kvm_shadow_vm **shadow_table;
 
 /* Current number of vms in the shadow table. */
-static int num_shadow_entries;
+int num_shadow_entries;
 
 /* The next entry index to try to allocate from. */
-static int next_shadow_alloc;
-
-void hyp_shadow_table_init(void *tbl)
-{
-	WARN_ON(shadow_table);
-	shadow_table = tbl;
-}
+int next_shadow_alloc;
 
 /*
  * Return the shadow vm corresponding to the handle.

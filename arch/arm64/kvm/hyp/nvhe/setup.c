@@ -29,7 +29,6 @@ phys_addr_t pvmfw_size;
 			 (unsigned long)__per_cpu_start)
 
 static void *vmemmap_base;
-static void *shadow_table_base;
 static void *hyp_pgt_base;
 static void *host_s2_pgt_base;
 static void *ffa_proxy_pages;
@@ -48,8 +47,8 @@ static int divide_memory_pool(void *virt, unsigned long size)
 		return -ENOMEM;
 
 	nr_pages = hyp_shadow_table_pages(sizeof(struct kvm_shadow_vm));
-	shadow_table_base = hyp_early_alloc_contig(nr_pages);
-	if (!shadow_table_base)
+	shadow_table = hyp_early_alloc_contig(nr_pages);
+	if (!shadow_table)
 		return -ENOMEM;
 
 	nr_pages = hyp_s1_pgtable_pages();
@@ -342,8 +341,6 @@ void __noreturn __pkvm_init_finalise(void)
 	ret = hyp_ffa_init(ffa_proxy_pages);
 	if (ret)
 		goto out;
-
-	hyp_shadow_table_init(shadow_table_base);
 out:
 	/*
 	 * We tail-called to here from handle___pkvm_init() and will not return,
