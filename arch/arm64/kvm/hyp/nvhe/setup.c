@@ -31,7 +31,6 @@ phys_addr_t pvmfw_size;
 static void *vmemmap_base;
 static void *hyp_pgt_base;
 static void *host_s2_pgt_base;
-static void *ffa_proxy_pages;
 static struct kvm_pgtable_mm_ops pkvm_pgtable_mm_ops;
 static struct hyp_pool hpool;
 
@@ -59,11 +58,6 @@ static int divide_memory_pool(void *virt, unsigned long size)
 	nr_pages = host_s2_pgtable_pages();
 	host_s2_pgt_base = hyp_early_alloc_contig(nr_pages);
 	if (!host_s2_pgt_base)
-		return -ENOMEM;
-
-	nr_pages = hyp_ffa_proxy_pages();
-	ffa_proxy_pages = hyp_early_alloc_contig(nr_pages);
-	if (!ffa_proxy_pages)
 		return -ENOMEM;
 
 	return 0;
@@ -338,7 +332,7 @@ void __noreturn __pkvm_init_finalise(void)
 	if (ret)
 		goto out;
 
-	ret = hyp_ffa_init(ffa_proxy_pages);
+	ret = hyp_ffa_init();
 	if (ret)
 		goto out;
 out:
