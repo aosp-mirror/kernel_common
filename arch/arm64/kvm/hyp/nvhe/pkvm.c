@@ -637,16 +637,20 @@ err:
 	return ret;
 }
 
-int __pkvm_teardown_shadow(int shadow_handle)
+int __pkvm_teardown_shadow(struct kvm *kvm)
 {
 	struct kvm_hyp_memcache *mc;
 	struct kvm_shadow_vm *vm;
 	struct kvm *host_kvm;
 	size_t shadow_size;
-	int err;
+	int err, shadow_handle;
 	u64 pfn;
 	u64 nr_pages;
 	void *addr;
+
+	kvm = kern_hyp_va(kvm);
+
+	shadow_handle = kvm->arch.pkvm.shadow_handle;
 
 	/* Lookup then remove entry from the shadow table. */
 	hyp_spin_lock(&shadow_lock);
