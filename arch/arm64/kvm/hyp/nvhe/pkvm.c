@@ -379,8 +379,7 @@ static int init_shadow_structs(struct kvm *kvm, struct kvm_shadow_vm *vm,
 		if (ret)
 			return ret;
 
-		if (vm->arch.pkvm.enabled)
-			pkvm_vcpu_init_traps(shadow_vcpu);
+		pkvm_vcpu_init_traps(shadow_vcpu);
 		kvm_reset_pvm_sys_regs(shadow_vcpu);
 
 		vm->vcpus[i] = shadow_vcpu;
