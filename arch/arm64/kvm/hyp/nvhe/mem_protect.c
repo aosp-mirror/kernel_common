@@ -292,17 +292,7 @@ static int reclaim_walker(u64 addr, u64 end, u32 level, kvm_pte_t *ptep,
 		return 0;
 
 	page = hyp_phys_to_page(kvm_pte_to_phys(pte));
-	switch (pkvm_getstate(kvm_pgtable_stage2_pte_prot(pte))) {
-	case PKVM_PAGE_OWNED:
-		page->flags |= HOST_PAGE_NEED_POISONING;
-		fallthrough;
-	case PKVM_PAGE_SHARED_BORROWED:
-	case PKVM_PAGE_SHARED_OWNED:
-		page->flags |= HOST_PAGE_PENDING_RECLAIM;
-		break;
-	default:
-		return -EPERM;
-	}
+	page->flags |= HOST_PAGE_NEED_POISONING;
 
 	return 0;
 }
@@ -1879,22 +1869,15 @@ int __pkvm_host_reclaim_page(u64 pfn)
 		goto unlock;
 
 	page = hyp_phys_to_page(addr);
-	if (!(page->flags & HOST_PAGE_PENDING_RECLAIM)) {
-		ret = -EPERM;
-		goto unlock;
-	}
-
 	if (page->flags & HOST_PAGE_NEED_POISONING) {
 		ret = hyp_zero_page(addr);
 		if (ret)
 			goto unlock;
 		page->flags &= ~HOST_PAGE_NEED_POISONING;
+		ret = host_stage2_set_owner_locked(addr, PAGE_SIZE, pkvm_host_id);
+	} else {
+		ret = -EPERM;
 	}
-
-	ret = host_stage2_set_owner_locked(addr, PAGE_SIZE, pkvm_host_id);
-	if (ret)
-		goto unlock;
-	page->flags &= ~HOST_PAGE_PENDING_RECLAIM;
 
 unlock:
 	host_unlock_component();
