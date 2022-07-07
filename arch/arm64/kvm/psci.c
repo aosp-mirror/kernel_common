@@ -277,19 +277,16 @@ out:
 	return ret;
 }
 
-static int kvm_psci_1_x_call(struct kvm_vcpu *vcpu, u32 minor)
+static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
 {
 	u32 psci_fn = smccc_get_function(vcpu);
 	u32 feature;
 	unsigned long val;
 	int ret = 1;
 
-	if (minor > 1)
-		return -EINVAL;
-
 	switch(psci_fn) {
 	case PSCI_0_2_FN_PSCI_VERSION:
-		val = minor == 0 ? KVM_ARM_PSCI_1_0 : KVM_ARM_PSCI_1_1;
+		val = KVM_ARM_PSCI_1_0;
 		break;
 	case PSCI_1_0_FN_PSCI_FEATURES:
 		feature = smccc_get_arg1(vcpu);
@@ -368,10 +365,8 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
 int kvm_psci_call(struct kvm_vcpu *vcpu)
 {
 	switch (kvm_psci_version(vcpu, vcpu->kvm)) {
-	case KVM_ARM_PSCI_1_1:
-		return kvm_psci_1_x_call(vcpu, 1);
 	case KVM_ARM_PSCI_1_0:
-		return kvm_psci_1_x_call(vcpu, 0);
+		return kvm_psci_1_0_call(vcpu);
 	case KVM_ARM_PSCI_0_2:
 		return kvm_psci_0_2_call(vcpu);
 	case KVM_ARM_PSCI_0_1:
@@ -503,7 +498,6 @@ int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 			return 0;
 		case KVM_ARM_PSCI_0_2:
 		case KVM_ARM_PSCI_1_0:
-		case KVM_ARM_PSCI_1_1:
 			if (!wants_02)
 				return -EINVAL;
 			vcpu->kvm->arch.psci_version = val;
