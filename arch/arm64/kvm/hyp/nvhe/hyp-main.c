@@ -616,10 +616,9 @@ static void fpsimd_host_restore(void)
 
 static void handle___pkvm_vcpu_load(struct kvm_cpu_context *host_ctxt)
 {
-	DECLARE_REG(int, shadow_handle, host_ctxt, 1);
-	DECLARE_REG(int, vcpu_idx, host_ctxt, 2);
-	DECLARE_REG(u64, hcr_el2, host_ctxt, 3);
+	DECLARE_REG(struct kvm_vcpu *, vcpu, host_ctxt, 1);
 	struct pkvm_loaded_state *state;
+	int handle;
 
 	/* Why did you bother? */
 	if (!is_protected_kvm_enabled())
@@ -631,7 +630,10 @@ static void handle___pkvm_vcpu_load(struct kvm_cpu_context *host_ctxt)
 	if (state->vcpu)
 		return;
 
-	state->vcpu = get_shadow_vcpu(shadow_handle, vcpu_idx);
+	vcpu = kern_hyp_va(vcpu);
+
+	handle = READ_ONCE(vcpu->arch.pkvm.shadow_handle);
+	state->vcpu = get_shadow_vcpu(handle, vcpu->vcpu_idx);
 
 	if (!state->vcpu)
 		return;
@@ -645,7 +647,8 @@ static void handle___pkvm_vcpu_load(struct kvm_cpu_context *host_ctxt)
 		/* Propagate WFx trapping flags, trap ptrauth */
 		state->vcpu->arch.hcr_el2 &= ~(HCR_TWE | HCR_TWI |
 					       HCR_API | HCR_APK);
-		state->vcpu->arch.hcr_el2 |= hcr_el2 & (HCR_TWE | HCR_TWI);
+		state->vcpu->arch.hcr_el2 |= vcpu->arch.hcr_el2 & (HCR_TWE |
+								   HCR_TWI);
 	}
 }
 
