@@ -727,21 +727,20 @@ static void handle___pkvm_host_donate_guest(struct kvm_cpu_context *host_ctxt)
 {
 	DECLARE_REG(u64, pfn, host_ctxt, 1);
 	DECLARE_REG(u64, gfn, host_ctxt, 2);
-	struct kvm_vcpu *host_vcpu;
+	DECLARE_REG(struct kvm_vcpu *, vcpu, host_ctxt, 3);
 	struct pkvm_loaded_state *state;
 	int ret = -EINVAL;
 
 	if (!is_protected_kvm_enabled())
 		goto out;
 
+	vcpu = kern_hyp_va(vcpu);
 	state = this_cpu_ptr(&loaded_state);
 	if (!state->vcpu)
 		goto out;
 
-	host_vcpu = state->vcpu->arch.pkvm.host_vcpu;
-
 	/* Topup shadow memcache with the host's */
-	ret = pkvm_refill_memcache(state->vcpu, host_vcpu);
+	ret = pkvm_refill_memcache(state->vcpu, vcpu);
 	if (!ret) {
 		if (state->is_protected)
 			ret = __pkvm_host_donate_guest(pfn, gfn, state->vcpu);
