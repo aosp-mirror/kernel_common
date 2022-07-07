@@ -360,12 +360,10 @@ int __pkvm_iommu_pm_notify(unsigned long dev_id, enum pkvm_iommu_pm_event event)
 	if (dev) {
 		if (event == PKVM_IOMMU_PM_SUSPEND) {
 			ret = dev->ops->suspend ? dev->ops->suspend(dev) : 0;
-			if (!ret)
-				dev->powered = false;
+			dev->powered = !!ret;
 		} else if (event == PKVM_IOMMU_PM_RESUME) {
 			ret = dev->ops->resume ? dev->ops->resume(dev) : 0;
-			if (!ret)
-				dev->powered = true;
+			dev->powered = !ret;
 		} else {
 			ret = -EINVAL;
 		}
