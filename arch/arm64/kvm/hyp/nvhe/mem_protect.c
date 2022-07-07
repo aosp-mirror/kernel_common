@@ -16,7 +16,6 @@
 #include <hyp/fault.h>
 
 #include <nvhe/gfp.h>
-#include <nvhe/iommu.h>
 #include <nvhe/memory.h>
 #include <nvhe/mem_protect.h>
 #include <nvhe/mm.h>
@@ -28,6 +27,9 @@ extern unsigned long hyp_nr_cpus;
 struct host_kvm host_kvm;
 
 static struct hyp_pool host_s2_pool;
+
+const u8 pkvm_host_id = 0;
+const u8 pkvm_hyp_id = 1;
 
 static DEFINE_PER_CPU(struct kvm_shadow_vm *, __current_vm);
 #define current_vm (*this_cpu_ptr(&__current_vm))
@@ -511,14 +513,14 @@ int host_stage2_idmap_locked(phys_addr_t addr, u64 size,
 	return host_stage2_try(__host_stage2_idmap, addr, addr + size, prot);
 }
 
-#define KVM_INVALID_PTE_OWNER_MASK	GENMASK(32, 1)
-static kvm_pte_t kvm_init_invalid_leaf_owner(pkvm_id owner_id)
+#define KVM_INVALID_PTE_OWNER_MASK	GENMASK(9, 2)
+static kvm_pte_t kvm_init_invalid_leaf_owner(u8 owner_id)
 {
 	return FIELD_PREP(KVM_INVALID_PTE_OWNER_MASK, owner_id);
 }
 
 int host_stage2_set_owner_locked(phys_addr_t addr, u64 size,
-				 pkvm_id owner_id)
+				 u8 owner_id)
 {
 	kvm_pte_t annotation = kvm_init_invalid_leaf_owner(owner_id);
 	int ret;
@@ -680,7 +682,7 @@ struct pkvm_mem_donation {
 	const struct pkvm_mem_transition	tx;
 };
 
-static pkvm_id completer_owner_id(const struct pkvm_mem_transition *tx)
+static u8 completer_owner_id(const struct pkvm_mem_transition *tx)
 {
 	switch (tx->completer.id) {
 	case PKVM_ID_HOST:
@@ -795,7 +797,7 @@ static int host_initiate_unshare(u64 *completer_addr,
 static int host_initiate_donation(u64 *completer_addr,
 				  const struct pkvm_mem_transition *tx)
 {
-	pkvm_id owner_id = completer_owner_id(tx);
+	u8 owner_id = completer_owner_id(tx);
 	u64 size = tx->nr_pages * PAGE_SIZE;
 
 	*completer_addr = tx->initiator.host.completer_addr;
@@ -821,7 +823,7 @@ static int host_ack_donation(u64 addr, const struct pkvm_mem_transition *tx)
 static int host_complete_donation(u64 addr, const struct pkvm_mem_transition *tx)
 {
 	u64 size = tx->nr_pages * PAGE_SIZE;
-	pkvm_id host_id = completer_owner_id(tx);
+	u8 host_id = completer_owner_id(tx);
 
 	return host_stage2_set_owner_locked(addr, size, host_id);
 }
