@@ -763,12 +763,10 @@ static int vgic_register_all_redist_iodevs(struct kvm *kvm)
 	}
 
 	if (ret) {
-		/* The current c failed, so iterate over the previous ones. */
-		int i;
-
+		/* The current c failed, so we start with the previous one. */
 		mutex_lock(&kvm->slots_lock);
-		for (i = 0; i < c; i++) {
-			vcpu = kvm_get_vcpu(kvm, i);
+		for (c--; c >= 0; c--) {
+			vcpu = kvm_get_vcpu(kvm, c);
 			vgic_unregister_redist_iodev(vcpu);
 		}
 		mutex_unlock(&kvm->slots_lock);
