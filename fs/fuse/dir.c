@@ -238,25 +238,23 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 		ret = fuse_simple_request(fm, &args);
 		dput(parent);
 
-		/*
-		 * TODO This doesn't seem sufficient, though we don't plan to
-		 * change the backing file ever, so not sure what is correct
-		 * here yet, especially as we can't return an error to user
-		 */
-		if (bpf_arg.out.backing_action == FUSE_ACTION_REPLACE) {
-			struct file *file = bpf_arg.backing_file;
+#ifdef CONFIG_FUSE_BPF
+		if (ret == sizeof(bpf_arg.out)) {
+			ret = -ENOENT;
+			if (!entry)
+				goto out;
 
-			if (file && !IS_ERR(file))
-				fput(file);
+			ret = handle_inode_backing_fd(inode, entry,
+				&bpf_arg.out, &bpf_arg);
+			if (ret)
+				goto out;
+
+			ret = handle_inode_bpf(inode, entry->d_parent->d_inode,
+				&bpf_arg.out, &bpf_arg);
+			if (ret)
+				goto out;
 		}
-
-		if (bpf_arg.out.bpf_action == FUSE_ACTION_REPLACE) {
-			struct file *file = bpf_arg.bpf_file;
-
-			if (file && !IS_ERR(file))
-				fput(file);
-		}
-
+#endif
 		/* Zero nodeid is same as -ENOENT */
 		if (!ret && !outarg.nodeid)
 			ret = -ENOENT;
@@ -528,7 +526,6 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, const struct qstr *name
 #ifdef CONFIG_FUSE_BPF
 	if (err == sizeof(bpf_arg.out)) {
 		/* TODO Make sure this handles invalid handles */
-		/* TODO Do we need the same code in revalidate */
 		struct file *backing_file;
 		struct inode *backing_inode;
 
@@ -537,37 +534,29 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, const struct qstr *name
 			goto out_queue_forget;
 
 		err = -EINVAL;
-		if (bpf_arg.out.backing_action != FUSE_ACTION_REPLACE)
+		backing_file = bpf_arg.backing_file;
+		if (!backing_file)
 			goto out_queue_forget;
 
-		backing_file = bpf_arg.backing_file;
-		if (!backing_file || IS_ERR(backing_file))
+		if (IS_ERR(backing_file)) {
+			err = PTR_ERR(backing_file);
 			goto out_queue_forget;
+		}
 
 		backing_inode = backing_file->f_inode;
 		*inode = fuse_iget_backing(sb, outarg->nodeid, backing_inode);
 		if (!*inode)
 			goto bpf_arg_out;
 
-		if (bpf_arg.out.bpf_action == FUSE_ACTION_REPLACE) {
-			struct file *bpf_file = bpf_arg.bpf_file;
-			struct bpf_prog *bpf_prog = ERR_PTR(-EINVAL);
+		err = handle_inode_backing_fd(*inode, entry,
+			&bpf_arg.out, &bpf_arg);
+		if (err)
+			goto out;
 
-			if (bpf_file && !IS_ERR(bpf_file))
-				bpf_prog = fuse_get_bpf_prog(bpf_file);;
-
-			if (IS_ERR(bpf_prog)) {
-				iput(*inode);
-				*inode = NULL;
-				err = PTR_ERR(bpf_prog);
-				goto bpf_arg_out;
-			}
-			get_fuse_inode(*inode)->bpf = bpf_prog;
-		}
-
-		get_fuse_dentry(entry)->backing_path = backing_file->f_path;
-		path_get(&get_fuse_dentry(entry)->backing_path);
-
+		err = handle_inode_bpf(*inode, NULL,
+			&bpf_arg.out, &bpf_arg);
+		if (err)
+			goto out;
 bpf_arg_out:
 		fput(backing_file);
 	} else
