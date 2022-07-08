@@ -26,12 +26,18 @@ load("//build/kernel/kleaf:common_kernels.bzl", "define_common_kernels", "define
 # or TRIM_NONLISTED_KMI changes, override kmi_configs here.
 define_common_kernels(target_configs = {
     "kernel_aarch64": {
+        # TODO(b/188620248): re-enable trimming
+        "trim_nonlisted_kmi": False,
+        "kmi_symbol_list_strict_mode": False,
         "module_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
         ],
     },
     "kernel_aarch64_debug": {
+        # TODO(b/188620248): re-enable trimming
+        "trim_nonlisted_kmi": False,
+        "kmi_symbol_list_strict_mode": False,
         "module_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
