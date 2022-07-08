@@ -1410,3 +1410,4 @@
   _raw_read_unlock
   _raw_write_lock
   _raw_write_unlock
+  wait_on_page_bit
