@@ -1306,8 +1306,7 @@ struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
 	return d_splice_alias(inode, entry);
 }
 
-int fuse_revalidate_backing(struct fuse_bpf_args *fa, struct inode *dir,
-			   struct dentry *entry, unsigned int flags)
+int fuse_revalidate_backing(struct dentry *entry, unsigned int flags)
 {
 	struct fuse_dentry *fuse_dentry = get_fuse_dentry(entry);
 	struct dentry *backing_entry = fuse_dentry->backing_path.dentry;
@@ -1322,12 +1321,6 @@ int fuse_revalidate_backing(struct fuse_bpf_args *fa, struct inode *dir,
 	if (unlikely(backing_entry->d_flags & DCACHE_OP_REVALIDATE))
 		return backing_entry->d_op->d_revalidate(backing_entry, flags);
 	return 1;
-}
-
-void *fuse_revalidate_finalize(struct fuse_bpf_args *fa, struct inode *dir,
-			   struct dentry *entry, unsigned int flags)
-{
-	return 0;
 }
 
 int fuse_canonical_path_initialize(struct fuse_bpf_args *fa,

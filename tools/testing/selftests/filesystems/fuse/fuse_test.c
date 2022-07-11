@@ -1862,6 +1862,27 @@ static int bpf_test_revalidate_handle_backing_fd(const char *mount_dir)
 			     }));
 		TESTSYSCALL(close(backing_fd));
 		// Step 1: Lookup folder1 as a reaction to revalidate call
+		// This attempts to change the backing node, which is not allowed on revalidate
+		TESTFUSELOOKUP(folder1, 0);
+		TESTSYSCALL(s_fuse_attr(s_path(s(ft_src), s(folder1)), &attr));
+		TEST(backing_fd = s_open(s_path(s(ft_src), s(folder1)),
+					 O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+		     backing_fd != -1);
+		TESTFUSEOUT2(fuse_entry_out, ((struct fuse_entry_out) {
+				.nodeid = attr.ino,
+				.generation = 0,
+				.entry_valid = UINT64_MAX,
+				.attr_valid = UINT64_MAX,
+				.entry_valid_nsec = UINT32_MAX,
+				.attr_valid_nsec = UINT32_MAX,
+				.attr = attr,
+			     }), fuse_entry_bpf_out, ((struct fuse_entry_bpf_out) {
+				.backing_action = FUSE_ACTION_REPLACE,
+				.backing_fd = backing_fd,
+			     }));
+		TESTSYSCALL(close(backing_fd));
+
+		// Lookup folder1 as a reaction to failed revalidate
 		TESTFUSELOOKUP(folder1, 0);
 		TESTSYSCALL(s_fuse_attr(s_path(s(ft_src), s(folder1)), &attr));
 		TEST(backing_fd = s_open(s_path(s(ft_src), s(folder1)),

@@ -1608,10 +1608,7 @@ int fuse_lookup_backing(struct fuse_bpf_args *fa, struct inode *dir,
 			  struct dentry *entry, unsigned int flags);
 struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
 			   struct dentry *entry, unsigned int flags);
-int fuse_revalidate_backing(struct fuse_bpf_args *fa, struct inode *dir,
-			   struct dentry *entry, unsigned int flags);
-void *fuse_revalidate_finalize(struct fuse_bpf_args *fa, struct inode *dir,
-			   struct dentry *entry, unsigned int flags);
+int fuse_revalidate_backing(struct dentry *entry, unsigned int flags);
 
 int fuse_canonical_path_initialize(struct fuse_bpf_args *fa,
 				   struct fuse_dummy_io *fdi,
