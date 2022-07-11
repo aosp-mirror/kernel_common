@@ -431,6 +431,17 @@ static const struct iio_info cros_ec_light_prox_info = {
 	.read_avail = &cros_ec_sensors_core_read_avail,
 };
 
+static void cros_ec_light_clean_callback(void *arg)
+{
+	struct platform_device *pdev = (struct platform_device *)arg;
+	struct cros_ec_sensorhub *sensor_hub =
+		dev_get_drvdata(pdev->dev.parent);
+	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+	struct cros_ec_sensors_core_state *st = iio_priv(indio_dev);
+	u8 sensor_num = st->param.info.sensor_num;
+
+	cros_ec_sensorhub_unregister_push_data(sensor_hub, sensor_num + 1);
+}
 
 static int cros_ec_light_prox_probe(struct platform_device *pdev)
 {
@@ -497,8 +508,6 @@ static int cros_ec_light_prox_probe(struct platform_device *pdev)
 	channel++;
 
 	if (num_channels > CROS_EC_LIGHT_PROX_MIN_CHANNELS) {
-		u8 sensor_num = state->core.param.info.sensor_num;
-
 		for (i = CROS_EC_SENSOR_X; i < CROS_EC_SENSOR_MAX_AXIS;
 				i++, channel++) {
 			cros_ec_light_channel_common(channel);
@@ -507,15 +516,6 @@ static int cros_ec_light_prox_probe(struct platform_device *pdev)
 			channel->channel2 = IIO_MOD_LIGHT_RED + i;
 			channel->type = IIO_LIGHT;
 		}
-		cros_ec_sensorhub_unregister_push_data(sensor_hub, sensor_num);
-		cros_ec_sensorhub_register_push_data(
-				sensor_hub, sensor_num,
-				indio_dev,
-				cros_ec_light_push_data);
-		cros_ec_sensorhub_register_push_data(
-				sensor_hub, sensor_num + 1,
-				indio_dev,
-				cros_ec_light_push_data_rgb);
 	}
 
 	/* Timestamp */
@@ -528,8 +528,27 @@ static int cros_ec_light_prox_probe(struct platform_device *pdev)
 
 	state->core.read_ec_sensors_data = cros_ec_sensors_read_cmd;
 
-	return cros_ec_sensors_core_register(dev, indio_dev,
-					     cros_ec_sensors_push_data);
+	if (num_channels > CROS_EC_LIGHT_PROX_MIN_CHANNELS) {
+		u8 sensor_num = state->core.param.info.sensor_num;
+
+		ret = cros_ec_sensors_core_register(dev, indio_dev,
+				cros_ec_light_push_data);
+		if (ret)
+			return ret;
+
+		ret = cros_ec_sensorhub_register_push_data(
+				sensor_hub, sensor_num + 1,
+				indio_dev,
+				cros_ec_light_push_data_rgb);
+		if (ret)
+			return ret;
+
+		return devm_add_action_or_reset(dev, cros_ec_light_clean_callback,
+				pdev);
+	} else {
+		return cros_ec_sensors_core_register(dev, indio_dev,
+				cros_ec_sensors_push_data);
+	}
 }
 
 static const struct platform_device_id cros_ec_light_prox_ids[] = {
