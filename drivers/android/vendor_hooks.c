@@ -409,3 +409,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_cpumask_any_and_distribute);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_resume_begin);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_resume_end);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tune_memcg_scan_type);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pidfd_open);
