@@ -207,6 +207,7 @@ static blk_status_t virtblk_setup_cmd(struct virtio_device *vdev,
 {
 	bool unmap = false;
 	u32 type;
+	struct virtio_blk *vblk = container_of(&vdev, struct virtio_blk, vdev);
 
 	vbr->out_hdr.sector = 0;
 
@@ -238,6 +239,10 @@ static blk_status_t virtblk_setup_cmd(struct virtio_device *vdev,
 		WARN_ON_ONCE(1);
 		return BLK_STS_IOERR;
 	}
+
+	BUG_ON(type != VIRTIO_BLK_T_DISCARD &&
+	       type != VIRTIO_BLK_T_WRITE_ZEROES &&
+	       (req->nr_phys_segments + 2 > vblk->sg_elems));
 
 	vbr->out_hdr.type = cpu_to_virtio32(vdev, type);
 	vbr->out_hdr.ioprio = cpu_to_virtio32(vdev, req_get_ioprio(req));
@@ -314,8 +319,6 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 	bool notify = false;
 	blk_status_t status;
 	int err;
-
-	BUG_ON(req->nr_phys_segments + 2 > vblk->sg_elems);
 
 	status = virtblk_setup_cmd(vblk->vdev, req, vbr);
 	if (unlikely(status))
