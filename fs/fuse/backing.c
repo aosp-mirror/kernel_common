@@ -262,7 +262,7 @@ int fuse_create_open_backing(
 	struct dentry *newent;
 	int err = 0;
 	const struct fuse_create_in *fci = fa->in_args[0].value;
-	struct fuse_inode *fuse_inode = get_fuse_inode(entry->d_inode);
+	struct inode *d_inode = entry->d_inode;
 	u64 target_nodeid = 0;
 
 	if (!dir_fuse_inode || !dir_fuse_dentry)
@@ -295,8 +295,8 @@ int fuse_create_open_backing(
 	};
 	path_get(&get_fuse_dentry(entry)->backing_path);
 
-	if (fuse_inode)
-		target_nodeid = fuse_inode->nodeid;
+	if (d_inode)
+		target_nodeid = get_fuse_inode(d_inode)->nodeid;
 
 	inode = fuse_iget_backing(dir->i_sb, target_nodeid,
 			get_fuse_dentry(entry)->backing_path.dentry->d_inode);
@@ -1178,7 +1178,7 @@ struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
 	struct fuse_dentry *fd;
 	struct dentry *bd;
 	struct inode *inode, *backing_inode;
-	struct fuse_inode *fuse_inode = get_fuse_inode(entry->d_inode);
+	struct inode *d_inode = entry->d_inode;
 	struct fuse_entry_out *feo = fa->out_args[0].value;
 	struct fuse_entry_bpf_out *febo = fa->out_args[1].value;
 	struct fuse_entry_bpf *feb = container_of(febo, struct fuse_entry_bpf, out);
@@ -1194,8 +1194,8 @@ struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
 	if (!backing_inode)
 		return 0;
 
-	if (fuse_inode)
-		target_nodeid = fuse_inode->nodeid;
+	if (d_inode)
+		target_nodeid = get_fuse_inode(d_inode)->nodeid;
 
 	inode = fuse_iget_backing(dir->i_sb, target_nodeid, backing_inode);
 
