@@ -75,6 +75,7 @@
 #include <trace/hooks/snd_compr.h>
 #include <trace/hooks/gup.h>
 #include <trace/hooks/pci.h>
+#include <trace/hooks/suspend.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -404,3 +405,5 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_rt_rq_load_avg);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_pci_d3_sleep);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_rq_clock_pelt);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_cpumask_any_and_distribute);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_resume_begin);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_resume_end);
