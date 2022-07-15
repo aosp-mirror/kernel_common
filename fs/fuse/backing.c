@@ -1172,23 +1172,17 @@ int fuse_lookup_backing(struct fuse_bpf_args *fa, struct inode *dir,
 	return 0;
 }
 
-int handle_inode_backing_fd(struct inode *inode, struct dentry *entry,
-			    struct fuse_entry_bpf_out *febo,
-			    struct fuse_entry_bpf *feb)
-{
-	struct fuse_inode *fi = get_fuse_inode(inode);
-	struct fuse_dentry *fd = get_fuse_dentry(entry);
-	int ret = 0;
-
-	switch (febo->backing_action) {
+int fuse_handle_backing(struct fuse_entry_bpf *feb, struct inode **backing_inode,
+			struct path *backing_path) {
+	switch (feb->out.backing_action) {
 	case FUSE_ACTION_KEEP:
 		/* backing inode/path are added in fuse_lookup_backing */
 		break;
 
 	case FUSE_ACTION_REMOVE:
-		iput(fi->backing_inode);
-		fi->backing_inode = NULL;
-		path_put_init(&fd->backing_path);
+		iput(*backing_inode);
+		*backing_inode = NULL;
+		path_put_init(backing_path);
 		break;
 
 	case FUSE_ACTION_REPLACE: {
@@ -1199,14 +1193,14 @@ int handle_inode_backing_fd(struct inode *inode, struct dentry *entry,
 		if (IS_ERR(backing_file))
 			return PTR_ERR(backing_file);
 
-		if (fi->backing_inode)
-			iput(fi->backing_inode);
-		fi->backing_inode = backing_file->f_inode;
-		ihold(fi->backing_inode);
+		if (backing_inode)
+			iput(*backing_inode);
+		*backing_inode = backing_file->f_inode;
+		ihold(*backing_inode);
 
-		path_put(&fd->backing_path);
-		fd->backing_path = backing_file->f_path;
-		path_get(&fd->backing_path);
+		path_put(backing_path);
+		*backing_path = backing_file->f_path;
+		path_get(backing_path);
 
 		fput(backing_file);
 		break;
@@ -1216,34 +1210,31 @@ int handle_inode_backing_fd(struct inode *inode, struct dentry *entry,
 		return -EINVAL;
 	}
 
-	return ret;
+	return 0;
 }
 
-int handle_inode_bpf(struct inode *inode, struct inode *parent,
-		     struct fuse_entry_bpf_out *febo,
-		     struct fuse_entry_bpf *feb)
+int fuse_handle_bpf_prog(struct fuse_entry_bpf *feb, struct inode *parent,
+			 struct bpf_prog **bpf)
 {
-	struct fuse_inode *fi = get_fuse_inode(inode);
 	struct fuse_inode *pi;
-	int ret = 0;
 
 	// Parent isn't presented, but we want to keep
 	// Don't touch bpf program at all in this case
-	if (febo->bpf_action == FUSE_ACTION_KEEP && !parent) {
+	if (feb->out.bpf_action == FUSE_ACTION_KEEP && !parent) {
 		goto out;
 	}
 
-	if (fi->bpf) {
-		bpf_prog_put(fi->bpf);
-		fi->bpf = NULL;
+	if (*bpf) {
+		bpf_prog_put(*bpf);
+		*bpf = NULL;
 	}
 
-	switch (febo->bpf_action) {
+	switch (feb->out.bpf_action) {
 	case FUSE_ACTION_KEEP:
 		pi = get_fuse_inode(parent);
-		fi->bpf = pi->bpf;
-		if (fi->bpf)
-			bpf_prog_inc(fi->bpf);
+		*bpf = pi->bpf;
+		if (*bpf)
+			bpf_prog_inc(*bpf);
 		break;
 
 	case FUSE_ACTION_REMOVE:
@@ -1259,7 +1250,7 @@ int handle_inode_bpf(struct inode *inode, struct inode *parent,
 		if (IS_ERR(bpf_prog))
 			return PTR_ERR(bpf_prog);
 
-		fi->bpf = bpf_prog;
+		*bpf = bpf_prog;
 		break;
 	}
 
@@ -1268,7 +1259,7 @@ int handle_inode_bpf(struct inode *inode, struct inode *parent,
 	}
 
 out:
-	return ret;
+	return 0;
 }
 
 struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
@@ -1302,11 +1293,11 @@ struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
 	if (IS_ERR(inode))
 		return ERR_PTR(PTR_ERR(inode));
 
-	error = handle_inode_bpf(inode, dir, febo, feb);
+	error = fuse_handle_bpf_prog(feb, dir, &get_fuse_inode(inode)->bpf);
 	if (error)
 		return ERR_PTR(error);
 
-	error = handle_inode_backing_fd(inode, entry, febo, feb);
+	error = fuse_handle_backing(feb, &get_fuse_inode(inode)->backing_inode, &fd->backing_path);
 	if (error)
 		return ERR_PTR(error);
 

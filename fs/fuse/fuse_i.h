@@ -1597,12 +1597,10 @@ struct fuse_lookup_io {
 	struct fuse_entry_bpf feb;
 };
 
-int handle_inode_backing_fd(struct inode *inode, struct dentry *entry,
-			    struct fuse_entry_bpf_out *febo,
-			    struct fuse_entry_bpf *feb);
-int handle_inode_bpf(struct inode *inode, struct inode *parent,
-		     struct fuse_entry_bpf_out *febo,
-		     struct fuse_entry_bpf *feb);
+int fuse_handle_backing(struct fuse_entry_bpf *feb, struct inode **backing_inode,
+			struct path *backing_path);
+int fuse_handle_bpf_prog(struct fuse_entry_bpf *feb, struct inode *parent,
+			 struct bpf_prog **bpf);
 
 int fuse_lookup_initialize(struct fuse_bpf_args *fa, struct fuse_lookup_io *feo,
 	       struct inode *dir, struct dentry *entry, unsigned int flags);
