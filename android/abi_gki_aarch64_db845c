@@ -339,6 +339,8 @@
   kstrtoint
   kstrtouint
   kthread_create_on_node
+  kthread_should_stop
+  kthread_stop
   ktime_get
   ktime_get_mono_fast_ns
   ktime_get_real_ts64
@@ -549,6 +551,7 @@
   request_threaded_irq
   reset_control_assert
   reset_control_deassert
+  reset_control_put
   reset_control_reset
   rpmsg_register_device
   rpmsg_send
@@ -858,8 +861,6 @@
   kthread_park
   kthread_parkme
   kthread_should_park
-  kthread_should_stop
-  kthread_stop
   kthread_unpark
   rcu_barrier
   wait_for_completion
@@ -1082,9 +1083,11 @@
   drm_atomic_private_obj_init
   __drm_atomic_state_free
   drm_bridge_attach
+  drm_bridge_connector_enable_hpd
+  drm_bridge_connector_init
+  drm_bridge_detect
   drm_compat_ioctl
   drm_connector_has_possible_encoder
-  drm_connector_init_with_ddc
   drm_connector_list_iter_begin
   drm_connector_list_iter_end
   drm_connector_list_iter_next
@@ -1385,7 +1388,7 @@
   usb_remove_hcd
 
 # required by phy-qcom-qmp.ko
-  of_clk_get_by_name
+  devm_get_clk_from_child
   __of_reset_control_get
 
 # required by phy-qcom-qusb2.ko
@@ -1641,7 +1644,6 @@
   mmc_send_tuning
   regulator_is_supported_voltage
   __reset_control_get
-  reset_control_put
   __sdhci_add_host
   sdhci_add_host
   sdhci_cleanup_host
