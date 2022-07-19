@@ -14,6 +14,10 @@
 	chassis-type = "convertible";
 };
 
+&target {
+	temperature = <75000>;
+};
+
 &keyboard_controller {
 	function-row-physmap = <
 		MATRIX_KEY(0x00, 0x02, 0)	/* T1 */

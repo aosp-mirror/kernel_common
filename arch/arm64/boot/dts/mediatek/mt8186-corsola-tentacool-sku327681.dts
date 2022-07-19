@@ -12,6 +12,10 @@
 	chassis-type = "laptop";
 };
 
+&target {
+	temperature = <75000>;
+};
+
 /* Tentacool omits the pen. */
 &gpio_keys {
 	status = "disabled";
