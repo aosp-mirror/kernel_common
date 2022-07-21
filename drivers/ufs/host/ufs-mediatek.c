@@ -765,7 +765,7 @@ out:
 }
 
 static bool ufs_mtk_pmc_via_fastauto(struct ufs_hba *hba,
-	struct ufs_pa_layer_attr *dev_req_params)
+				     struct ufs_pa_layer_attr *dev_req_params)
 {
 	if (!ufs_mtk_is_pmc_via_fastauto(hba))
 		return false;
@@ -773,12 +773,12 @@ static bool ufs_mtk_pmc_via_fastauto(struct ufs_hba *hba,
 	if (dev_req_params->hs_rate == hba->pwr_info.hs_rate)
 		return false;
 
-	if ((dev_req_params->pwr_tx != FAST_MODE) &&
-		(dev_req_params->gear_tx < UFS_HS_G4))
+	if (dev_req_params->pwr_tx != FAST_MODE &&
+	    dev_req_params->gear_tx < UFS_HS_G4)
 		return false;
 
-	if ((dev_req_params->pwr_rx != FAST_MODE) &&
-		(dev_req_params->gear_rx < UFS_HS_G4))
+	if (dev_req_params->pwr_rx != FAST_MODE &&
+	    dev_req_params->gear_rx < UFS_HS_G4)
 		return false;
 
 	return true;
@@ -812,17 +812,17 @@ static int ufs_mtk_pre_pwr_change(struct ufs_hba *hba,
 		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_RXGEAR), UFS_HS_G1);
 
 		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_ACTIVETXDATALANES),
-			dev_req_params->lane_tx);
+			       dev_req_params->lane_tx);
 		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_ACTIVERXDATALANES),
-			dev_req_params->lane_rx);
+			       dev_req_params->lane_rx);
 		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_HSSERIES),
-			dev_req_params->hs_rate);
+			       dev_req_params->hs_rate);
 
 		ufshcd_dme_set(hba, UIC_ARG_MIB(PA_TXHSADAPTTYPE),
-			PA_NO_ADAPT);
+			       PA_NO_ADAPT);
 
 		ret = ufshcd_uic_change_pwr_mode(hba,
-			FASTAUTO_MODE << 4 | FASTAUTO_MODE);
+					FASTAUTO_MODE << 4 | FASTAUTO_MODE);
 
 		if (ret) {
 			dev_err(hba->dev, "%s: HSG1B FASTAUTO failed ret=%d\n",
