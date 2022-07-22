@@ -4629,6 +4629,12 @@ static int set_rpa_resolution_func(struct sock *sk, struct hci_dev *hdev,
 				       MGMT_OP_SET_EXP_FEATURE,
 				       MGMT_STATUS_INVALID_INDEX);
 
+	/* Controller does not support LL privacy */
+	if (!ll_privacy_capable(hdev))
+		return mgmt_cmd_status(sk, hdev->id,
+				       MGMT_OP_SET_EXP_FEATURE,
+				       MGMT_STATUS_NOT_SUPPORTED);
+
 	/* Changes can only be made when controller is powered down */
 	if (hdev_is_powered(hdev))
 		return mgmt_cmd_status(sk, hdev->id,
