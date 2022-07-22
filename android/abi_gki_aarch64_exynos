@@ -1028,7 +1028,6 @@
   __memcpy_fromio
   __memcpy_toio
   memdup_user
-  mem_encrypt_active
   memmove
   memory_read_from_buffer
   memparse
