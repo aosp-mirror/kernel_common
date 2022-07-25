@@ -243,14 +243,6 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 			goto out;
 		}
 	}
-	/* TODO: Respect timeouts for lookups with backing inodes */
-	parent = dget_parent(entry);
-	if (get_fuse_inode(d_inode_rcu(parent))->backing_inode) {
-		dput(parent);
-		ret = 1;
-		goto out;
-	}
-	dput(parent);
 #endif
 	if (time_before64(fuse_dentry_time(entry), get_jiffies_64()) ||
 		 (flags & LOOKUP_REVAL)) {
@@ -269,22 +261,25 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 			goto out;
 		fm = get_fuse_mount(inode);
 
-		forget = fuse_alloc_forget();
-		ret = -ENOMEM;
-		if (!forget)
-			goto out;
-
-		attr_version = fuse_get_attr_version(fm->fc);
-
 		parent = dget_parent(entry);
 
 		/* TODO: Once we're handling timeouts for backing inodes, do a
 		 * bpf based lookup_revalidate here.
 		 */
 		if (get_fuse_inode(parent->d_inode)->backing_inode) {
+			dput(parent);
 			ret = 1;
 			goto out;
 		}
+
+		forget = fuse_alloc_forget();
+		ret = -ENOMEM;
+		if (!forget) {
+			dput(parent);
+			goto out;
+		}
+
+		attr_version = fuse_get_attr_version(fm->fc);
 
 		fuse_lookup_init(fm->fc, &args, get_node_id(d_inode(parent)),
 				 &entry->d_name, &outarg, &bpf_arg.out);
