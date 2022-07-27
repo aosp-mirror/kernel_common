@@ -1677,6 +1677,239 @@ out:
 	return result;
 }
 
+static int bpf_test_no_readdirplus_without_nodeid(const char *mount_dir)
+{
+	const char *folder1 = "folder1";
+	const char *folder2 = "folder2";
+	int result = TEST_FAILURE;
+	int fuse_dev = -1;
+	int src_fd = -1;
+	int content_fd = -1;
+	int bpf_fd = -1;
+	int pid = -1;
+	int status;
+
+	TESTEQUAL(install_elf_bpf("test_bpf.bpf", "test_readdirplus",
+					  &bpf_fd, NULL, NULL), 0);
+	TESTSYSCALL(s_mkdir(s_path(s(ft_src), s(folder1)), 0777));
+	TESTSYSCALL(s_mkdir(s_path(s(ft_src), s(folder2)), 0777));
+	TESTEQUAL(mount_fuse_no_init(mount_dir, -1, -1, &fuse_dev), 0);
+	FUSE_ACTION
+		DIR *open_dir = NULL;
+		struct dirent *dirent;
+
+		// Folder 1: Readdir with no nodeid
+		TEST(open_dir = s_opendir(s_path(s(ft_dst), s(folder1))),
+				open_dir != NULL);
+		TEST(dirent = readdir(open_dir), dirent == NULL);
+		TESTCOND(errno == EINVAL);
+		TESTSYSCALL(closedir(open_dir));
+		open_dir = NULL;
+
+		// Folder 2: Readdir with a nodeid
+		TEST(open_dir = s_opendir(s_path(s(ft_dst), s(folder2))),
+				open_dir != NULL);
+		TEST(dirent = readdir(open_dir), dirent == NULL);
+		TESTCOND(errno == EINVAL);
+		TESTSYSCALL(closedir(open_dir));
+		open_dir = NULL;
+	FUSE_DAEMON
+		size_t read_size;
+		struct fuse_in_header *in_header = (struct fuse_in_header *)bytes_in;
+		struct fuse_attr attr = {};
+		int backing_fd = -1;
+
+		TESTFUSEINITFLAGS(FUSE_DO_READDIRPLUS | FUSE_READDIRPLUS_AUTO);
+
+		// folder 1: Set 0 as nodeid, Expect READDIR
+		TESTFUSELOOKUP(folder1, 0);
+		TEST(backing_fd = s_open(s_path(s(ft_src), s(folder1)),
+					 O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+		     backing_fd != -1);
+		TESTFUSEOUT2(fuse_entry_out, ((struct fuse_entry_out) {
+				.nodeid = 0,
+				.generation = 0,
+				.entry_valid = UINT64_MAX,
+				.attr_valid = UINT64_MAX,
+				.entry_valid_nsec = UINT32_MAX,
+				.attr_valid_nsec = UINT32_MAX,
+				.attr = attr,
+			     }), fuse_entry_bpf_out, ((struct fuse_entry_bpf_out) {
+				.backing_action = FUSE_ACTION_REPLACE,
+				.backing_fd = backing_fd,
+				.bpf_action = FUSE_ACTION_REPLACE,
+				.bpf_fd = bpf_fd,
+			     }));
+		TESTSYSCALL(close(backing_fd));
+		TEST(read_size = read(fuse_dev, bytes_in, sizeof(bytes_in)), read_size > 0);
+		TESTEQUAL(in_header->opcode, FUSE_READDIR);
+		TESTFUSEOUTERROR(-EINVAL);
+
+		// folder 2: Set 10 as nodeid, Expect READDIRPLUS
+		TESTFUSELOOKUP(folder2, 0);
+		TEST(backing_fd = s_open(s_path(s(ft_src), s(folder2)),
+					 O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+		     backing_fd != -1);
+		TESTFUSEOUT2(fuse_entry_out, ((struct fuse_entry_out) {
+				.nodeid = 10,
+				.generation = 0,
+				.entry_valid = UINT64_MAX,
+				.attr_valid = UINT64_MAX,
+				.entry_valid_nsec = UINT32_MAX,
+				.attr_valid_nsec = UINT32_MAX,
+				.attr = attr,
+			     }), fuse_entry_bpf_out, ((struct fuse_entry_bpf_out) {
+				.backing_action = FUSE_ACTION_REPLACE,
+				.backing_fd = backing_fd,
+				.bpf_action = FUSE_ACTION_REPLACE,
+				.bpf_fd = bpf_fd,
+			     }));
+		TESTSYSCALL(close(backing_fd));
+		TEST(read_size = read(fuse_dev, bytes_in, sizeof(bytes_in)), read_size > 0);
+		TESTEQUAL(in_header->opcode, FUSE_READDIRPLUS);
+		TESTFUSEOUTERROR(-EINVAL);
+	FUSE_DONE
+	result = TEST_SUCCESS;
+out:
+	close(fuse_dev);
+	close(content_fd);
+	close(src_fd);
+	close(bpf_fd);
+	umount(mount_dir);
+	return result;
+}
+
+/*
+ * State:
+ * Original: dst/folder1/content.txt
+ *                  ^
+ *                  |
+ *                  |
+ * Backing:  src/folder1/content.txt
+ *
+ * Step 1:  open(folder1) - lookup folder1 with entry_timeout set to 0
+ * Step 2:  open(folder1) - lookup folder1 again to trigger revalidate wich will
+ *                          set backing fd
+ *
+ * Check 1: cat(content.txt) - check not receiving call on the fuse daemon
+ *                             and content is the same
+ */
+static int bpf_test_revalidate_handle_backing_fd(const char *mount_dir)
+{
+	const char *folder1 = "folder1";
+	const char *content_file = "content.txt";
+	const char *content = "hello world";
+	int result = TEST_FAILURE;
+	int fuse_dev = -1;
+	int src_fd = -1;
+	int content_fd = -1;
+	int pid = -1;
+	int status;
+	TESTSYSCALL(s_mkdir(s_path(s(ft_src), s(folder1)), 0777));
+	TEST(content_fd = s_creat(s_pathn(3, s(ft_src), s(folder1), s(content_file)), 0777),
+		content_fd != -1);
+	TESTEQUAL(write(content_fd, content, strlen(content)), strlen(content));
+	TESTSYSCALL(close(content_fd));
+	content_fd = -1;
+	TESTEQUAL(mount_fuse_no_init(mount_dir, -1, -1, &fuse_dev), 0);
+	FUSE_ACTION
+		int dst_folder1_fd = -1;
+		int dst_content_fd = -1;
+		int dst_content_read_size = -1;
+		char content_buffer[9] = {0};
+		// Step 1: Lookup folder1
+		TESTERR(dst_folder1_fd = s_open(s_path(s(mount_dir), s(folder1)),
+			O_RDONLY | O_CLOEXEC), dst_folder1_fd != -1);
+		TESTSYSCALL(close(dst_folder1_fd));
+		dst_folder1_fd = -1;
+		// Step 2: Lookup folder1 again
+		TESTERR(dst_folder1_fd = s_open(s_path(s(mount_dir), s(folder1)),
+			O_RDONLY | O_CLOEXEC), dst_folder1_fd != -1);
+		TESTSYSCALL(close(dst_folder1_fd));
+		dst_folder1_fd = -1;
+		// Check 1: Read content file (must be backed)
+		TESTERR(dst_content_fd =
+			s_open(s_pathn(3, s(mount_dir), s(folder1), s(content_file)),
+			O_RDONLY | O_CLOEXEC), dst_content_fd != -1);
+		TEST(dst_content_read_size =
+			read(dst_content_fd, content_buffer, strlen(content)),
+			dst_content_read_size == strlen(content) &&
+			strcmp(content, content_buffer) == 0);
+		TESTSYSCALL(close(dst_content_fd));
+		dst_content_fd = -1;
+	FUSE_DAEMON
+		struct fuse_attr attr = {};
+		int backing_fd = -1;
+		TESTFUSEINITFLAGS(FUSE_DO_READDIRPLUS | FUSE_READDIRPLUS_AUTO);
+		// Step 1: Lookup folder1 set entry_timeout to 0 to trigger
+		// revalidate later
+		TESTFUSELOOKUP(folder1, 0);
+		TESTSYSCALL(s_fuse_attr(s_path(s(ft_src), s(folder1)), &attr));
+		TEST(backing_fd = s_open(s_path(s(ft_src), s(folder1)),
+					 O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+		     backing_fd != -1);
+		TESTFUSEOUT2(fuse_entry_out, ((struct fuse_entry_out) {
+				.nodeid = attr.ino,
+				.generation = 0,
+				.entry_valid = 0,
+				.attr_valid = UINT64_MAX,
+				.entry_valid_nsec = 0,
+				.attr_valid_nsec = UINT32_MAX,
+				.attr = attr,
+			     }), fuse_entry_bpf_out, ((struct fuse_entry_bpf_out) {
+				.backing_action = FUSE_ACTION_REPLACE,
+				.backing_fd = backing_fd,
+			     }));
+		TESTSYSCALL(close(backing_fd));
+		// Step 1: Lookup folder1 as a reaction to revalidate call
+		// This attempts to change the backing node, which is not allowed on revalidate
+		TESTFUSELOOKUP(folder1, 0);
+		TESTSYSCALL(s_fuse_attr(s_path(s(ft_src), s(folder1)), &attr));
+		TEST(backing_fd = s_open(s_path(s(ft_src), s(folder1)),
+					 O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+		     backing_fd != -1);
+		TESTFUSEOUT2(fuse_entry_out, ((struct fuse_entry_out) {
+				.nodeid = attr.ino,
+				.generation = 0,
+				.entry_valid = UINT64_MAX,
+				.attr_valid = UINT64_MAX,
+				.entry_valid_nsec = UINT32_MAX,
+				.attr_valid_nsec = UINT32_MAX,
+				.attr = attr,
+			     }), fuse_entry_bpf_out, ((struct fuse_entry_bpf_out) {
+				.backing_action = FUSE_ACTION_REPLACE,
+				.backing_fd = backing_fd,
+			     }));
+		TESTSYSCALL(close(backing_fd));
+
+		// Lookup folder1 as a reaction to failed revalidate
+		TESTFUSELOOKUP(folder1, 0);
+		TESTSYSCALL(s_fuse_attr(s_path(s(ft_src), s(folder1)), &attr));
+		TEST(backing_fd = s_open(s_path(s(ft_src), s(folder1)),
+					 O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+		     backing_fd != -1);
+		TESTFUSEOUT2(fuse_entry_out, ((struct fuse_entry_out) {
+				.nodeid = attr.ino,
+				.generation = 0,
+				.entry_valid = UINT64_MAX,
+				.attr_valid = UINT64_MAX,
+				.entry_valid_nsec = UINT32_MAX,
+				.attr_valid_nsec = UINT32_MAX,
+				.attr = attr,
+			     }), fuse_entry_bpf_out, ((struct fuse_entry_bpf_out) {
+				.backing_action = FUSE_ACTION_REPLACE,
+				.backing_fd = backing_fd,
+			     }));
+		TESTSYSCALL(close(backing_fd));
+	FUSE_DONE
+	result = TEST_SUCCESS;
+out:
+	close(fuse_dev);
+	close(content_fd);
+	close(src_fd);
+	umount(mount_dir);
+	return result;
+}
 
 static int parse_options(int argc, char *const *argv)
 {
@@ -1782,7 +2015,9 @@ int main(int argc, char *argv[])
 		MAKE_TEST(inotify_test),
 		MAKE_TEST(bpf_test_statfs),
 		MAKE_TEST(bpf_test_lseek),
-		MAKE_TEST(bpf_test_readdirplus_not_overriding_backing)
+		MAKE_TEST(bpf_test_readdirplus_not_overriding_backing),
+		MAKE_TEST(bpf_test_no_readdirplus_without_nodeid),
+		MAKE_TEST(bpf_test_revalidate_handle_backing_fd)
 	};
 #undef MAKE_TEST
 
