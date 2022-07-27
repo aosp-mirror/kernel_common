@@ -1,0 +1,60 @@
+[abi_symbol_list]
+# required by nonvolatile.ko
+  __lock_page
+  sync_blockdev
+  read_cache_page
+  blkdev_put
+  blkdev_get_by_path
+
+# required by fj_watchdog.ko
+  del_timer
+  panic
+  param_get_uint
+  param_set_int
+  platform_device_register
+
+# required by sleep_time_log.ko
+  register_pm_notifier
+  rtc_time64_to_tm
+  unregister_pm_notifier
+
+# required by aw_haptic.ko
+  devm_gpio_free
+
+# required by fs18xx_dlkm.ko
+  snd_pcm_format_physical_width
+  snd_pcm_hw_constraint_mask64
+
+# required by camera.ko
+  i2c_unregister_device
+  i2c_smbus_write_byte_data
+  i2c_smbus_read_byte_data
+
+# required by semi_touch_driver.ko
+  filp_close
+  filp_open
+  vfs_llseek
+
+# required by cdfingerfp.ko
+  wakeup_source_remove
+  wakeup_source_add
+
+# required by drv2624-ram.ko
+  devm_led_classdev_unregister
+
+# required by chipone-ts.ko
+  input_mt_sync_frame
+
+# required by hqhardwareinfo
+  simple_strtoull
+
+# required by spidev
+  stream_open
+  kmalloc_order
+
+# required by sdhci-msm
+  mmc_gpio_set_cd_wake
+
+# required by aw882xx_smartpa.ko
+  class_create_file_ns
+  class_remove_file_ns

@@ -96,30 +96,89 @@
   snd_soc_register_card
 
 # required by xr829.ko
+  __alloc_percpu_gfp
   bridge_tunnel_header
+  cfg80211_abandon_assoc
   cfg80211_assoc_timeout
   cfg80211_auth_timeout
+  cfg80211_chandef_compatible
+  cfg80211_chandef_dfs_required
+  cfg80211_chandef_usable
+  cfg80211_check_combinations
+  cfg80211_check_station_change
+  cfg80211_ch_switch_started_notify
   cfg80211_classify8021d
+  cfg80211_cqm_beacon_loss_notify
   cfg80211_cqm_pktloss_notify
+  cfg80211_free_nan_func
+  cfg80211_get_drvinfo
+  cfg80211_get_p2p_attr
+  cfg80211_iftype_allowed
+  cfg80211_is_element_inherited
+  cfg80211_iter_combinations
+  cfg80211_merge_profile
+  cfg80211_nan_func_terminated
+  cfg80211_nan_match
+  cfg80211_probe_status
+  cfg80211_ref_bss
+  cfg80211_reg_can_beacon
+  cfg80211_reg_can_beacon_relax
+  cfg80211_report_obss_beacon
+  cfg80211_report_wowlan_wakeup
   cfg80211_rx_assoc_resp
+  cfg80211_rx_control_port
   cfg80211_rx_mlme_mgmt
+  cfg80211_rx_spurious_frame
+  cfg80211_rx_unexpected_4addr_frame
   cfg80211_sched_scan_stopped
+  cfg80211_sched_scan_stopped_rtnl
+  cfg80211_send_layer2_update
+  cfg80211_shutdown_all_interfaces
+  cfg80211_sinfo_alloc_tid_stats
+  cfg80211_sta_opmode_change_notify
+  cfg80211_tx_mgmt_expired
   cfg80211_tx_mlme_mgmt
   crc32_be
+  crypto_aead_decrypt
+  crypto_shash_finup
+  debugfs_create_x8
+  device_move
   __dev_kfree_skb_irq
   __hw_addr_init
   __hw_addr_sync
   __hw_addr_unsync
   ieee80211_amsdu_to_8023s
   ieee80211_bss_get_elem
+  ieee80211_chandef_to_operating_class
   ieee80211_data_to_8023_exthdr
+  ieee80211_ie_split_ric
+  ieee80211_mandatory_rates
+  ieee80211_operating_class_to_band
   ieee80211_radiotap_iterator_init
   ieee80211_radiotap_iterator_next
   kernel_param_lock
   kernel_param_unlock
+  ktime_get_seconds
+  netdev_set_default_ethtool_ops
+  prandom_bytes
+  regulatory_pre_cac_allowed
+  rhashtable_free_and_destroy
+  rhltable_init
   round_jiffies_relative
   sdio_align_size
+  skb_clone_sk
+  skb_complete_wifi_ack
+  skb_get_hash_perturb
   __sw_hweight16
+
+# required by xradio_btlpm.ko
+  bt_info
+
+# required by snd_aloop.ko
+  _snd_pcm_lib_alloc_vmalloc_buffer
+  snd_pcm_format_set_silence
+  snd_pcm_lib_free_vmalloc_buffer
+  snd_pcm_lib_get_vmalloc_page
 
 # required by arc4.ko
   arc4_crypt
