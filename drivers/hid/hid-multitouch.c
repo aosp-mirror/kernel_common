@@ -688,6 +688,12 @@ static const struct dmi_system_id mt_lid_handler_dmi_table[] = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "Redrix4ES"),
 		},
 	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Google"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Vell"),
+		},
+	},
 	{}
 };
 
