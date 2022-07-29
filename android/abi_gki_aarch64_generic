@@ -374,6 +374,7 @@
   desc_to_gpio
   destroy_workqueue
   dev_alloc_name
+  dev_base_lock
   dev_close
   _dev_crit
   dev_driver_string
@@ -1351,6 +1352,8 @@
   netlink_kernel_release
   netlink_unicast
   net_ratelimit
+  nf_register_net_hooks
+  nf_unregister_net_hooks
   nla_append
   nla_memcpy
   __nla_parse
