@@ -22,6 +22,7 @@ __u64 msft_get_features(struct hci_dev *hdev);
 int msft_add_monitor_pattern(struct hci_dev *hdev, struct adv_monitor *monitor);
 int msft_remove_monitor(struct hci_dev *hdev, struct adv_monitor *monitor);
 void msft_req_add_set_filter_enable(struct hci_request *req, bool enable);
+void msft_set_active_scan(struct hci_dev *hdev, bool enable);
 int msft_set_filter_enable(struct hci_dev *hdev, bool enable);
 int msft_suspend_sync(struct hci_dev *hdev);
 int msft_resume_sync(struct hci_dev *hdev);
@@ -55,6 +56,7 @@ static inline int msft_remove_monitor(struct hci_dev *hdev,
 
 static inline void msft_req_add_set_filter_enable(struct hci_request *req,
 						  bool enable) {}
+static inline void msft_set_active_scan(struct hci_dev *hdev, bool enable) {}
 static inline int msft_set_filter_enable(struct hci_dev *hdev, bool enable)
 {
 	return -EOPNOTSUPP;
