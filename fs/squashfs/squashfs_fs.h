@@ -202,7 +202,7 @@ static inline int squashfs_block_size(__le32 raw)
 #define SQUASHFS_XATTR_OFFSET(A)	((unsigned int) ((A) & 0xffff))
 
 /* cached data constants for filesystem */
-#define SQUASHFS_CACHED_BLKS		8
+unsigned int squashfs_cached_blks(void);
 
 /* meta index cache */
 #define SQUASHFS_META_INDEXES	(SQUASHFS_METADATA_SIZE / sizeof(unsigned int))
