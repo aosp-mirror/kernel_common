@@ -1283,5 +1283,6 @@
   _raw_write_unlock
   register_shrinker
   __SetPageMovable
+  wait_on_page_bit
   unregister_shrinker
 
