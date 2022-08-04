@@ -80,8 +80,6 @@ struct rwsem_waiter {
 	enum rwsem_waiter_type type;
 	unsigned long timeout;
 	unsigned long last_rowner;
-
-	/* Writer only, not initialized in reader */
 	bool handoff_set;
 };
 
