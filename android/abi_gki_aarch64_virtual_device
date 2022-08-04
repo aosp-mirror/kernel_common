@@ -34,6 +34,8 @@
   cancel_delayed_work
   cancel_delayed_work_sync
   cancel_work_sync
+  cdev_add
+  cdev_del
   __cfi_slowpath_diag
   __check_object_size
   __class_create
@@ -103,6 +105,7 @@
   dma_alloc_attrs
   dma_buf_export
   dma_fence_context_alloc
+  dma_fence_free
   dma_fence_init
   dma_fence_release
   dma_fence_signal_locked
@@ -479,6 +482,7 @@
   __sw_hweight32
   __sw_hweight8
   sync_file_create
+  sync_file_get_fence
   synchronize_irq
   synchronize_net
   synchronize_rcu
@@ -580,7 +584,6 @@
 
 # required by goldfish_sync.ko
   dma_fence_default_wait
-  dma_fence_free
 
 # required by virtio-gpu.ko
   __devm_request_region
@@ -664,13 +667,25 @@
   iomem_resource
   is_virtio_device
   memdup_user
-  sync_file_get_fence
   __traceiter_dma_fence_emit
   __tracepoint_dma_fence_emit
   vmemdup_user
   vm_get_page_prot
   ww_mutex_lock_interruptible
   ww_mutex_unlock
+
+# required by virtio_wl.ko
+  alloc_chrdev_region
+  anon_inode_getfd
+  cdev_init
+  close_fd
+  dma_buf_get
+  dma_buf_put
+  dma_fence_signal
+  __fdget
+  find_vm_area
+  sg_alloc_table_from_pages_segment
+  unregister_chrdev_region
 
 # required by virtio_blk.ko
   blk_execute_rq
@@ -790,9 +805,7 @@
   wait_for_completion_killable
 
 # required by virtio_console.ko
-  cdev_add
   cdev_alloc
-  cdev_del
   device_destroy
   fasync_helper
   freezing_slow_path
