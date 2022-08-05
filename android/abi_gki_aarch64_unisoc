@@ -85,6 +85,7 @@
   clk_enable
   clk_fixed_factor_ops
   clk_get_rate
+  __clk_is_enabled
   clk_prepare
   clk_put
   clk_set_parent
@@ -177,6 +178,7 @@
   device_property_present
   device_property_read_string
   device_property_read_u32_array
+  device_property_read_u8_array
   device_register
   device_remove_file
   device_set_wakeup_capable
@@ -310,12 +312,16 @@
   genl_unregister_family
   gen_pool_add_owner
   gen_pool_alloc_algo_owner
+  gen_pool_best_fit
   gen_pool_create
   gen_pool_free_owner
+  gen_pool_set_algo
   genphy_resume
+  getboottime64
   get_cpu_device
   __get_free_pages
   get_governor_parent_kobj
+  get_pid_task
   get_random_bytes
   gov_attr_set_get
   gov_attr_set_init
@@ -562,6 +568,7 @@
   of_get_regulator_init_data
   of_graph_get_remote_node
   of_irq_get
+  of_irq_get_byname
   of_match_node
   of_nvmem_cell_get
   of_parse_phandle
@@ -577,6 +584,7 @@
   of_property_read_u64_index
   of_property_read_variable_u32_array
   of_prop_next_string
+  of_usb_get_phy_mode
   oops_in_progress
   out_of_line_wait_on_bit_lock
   overflowgid
@@ -597,6 +605,13 @@
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   pfn_valid
+  phy_exit
+  phy_init
+  phy_pm_runtime_get_sync
+  phy_pm_runtime_put_sync
+  phy_power_off
+  phy_power_on
+  phy_set_mode_ext
   phy_connect
   phy_disconnect
   phy_ethtool_get_link_ksettings
@@ -624,6 +639,7 @@
   platform_get_irq
   platform_get_irq_byname
   platform_get_resource
+  platform_get_irq_byname_optional
   platform_get_resource_byname
   pm_get_active_wakeup_sources
   pm_power_off
@@ -673,6 +689,7 @@
   pskb_expand_head
   put_device
   put_pages_list
+  put_pid
   put_tty_driver
   queue_delayed_work_on
   queue_work_on
@@ -731,6 +748,7 @@
   remove_wait_queue
   __request_module
   request_threaded_irq
+  __devm_reset_control_get
   reset_control_assert
   reset_control_deassert
   revalidate_disk
@@ -1017,6 +1035,9 @@
   xt_unregister_targets
   yield
 
+# required by apsys-dvfs.ko
+  of_find_matching_node_and_match
+
 # required by blk-mq-virtio.ko
   blk_mq_map_queues
 
@@ -1085,8 +1106,14 @@
 # required by dwc3.ko
   extcon_register_notifier
   extcon_unregister_notifier
+  extcon_get_extcon_dev
   usb_gadget_map_request_by_dev
   usb_gadget_set_state
+  usb_decode_ctrl
+  usb_gadget_unmap_request_by_dev
+  usb_get_maximum_speed
+  usb_role_switch_register
+  usb_role_switch_unregister
 
 # required by exfat.ko
   __blockdev_direct_IO
@@ -1167,6 +1194,7 @@
 # required by focaltech_ats.ko
   devm_input_allocate_device
   devm_regulator_put
+  devm_phy_get
   i2c_new_probed_device
   i2c_transfer
   input_mt_init_slots
@@ -1175,6 +1203,7 @@
   input_set_capability
   kobject_put
   of_find_i2c_adapter_by_node
+  of_find_node_by_phandle
   of_property_read_variable_u8_array
   request_firmware_nowait
 
@@ -1302,6 +1331,12 @@
 # required by mmc_hsq.ko
   mmc_cqe_request_done
   mmc_send_tuning
+  mmc_cmdq_enable
+  mmc_cqe_post_req
+  mmc_hw_reset
+  mmc_put_card
+  mmc_switch
+  mmc_wait_for_cmd
 
 # required by musb_hdrc.ko
   device_wakeup_enable
@@ -1368,6 +1403,8 @@
   sdio_release_irq
   sdio_set_host_pm_flags
   sdio_writew
+  sg_copy_from_buffer
+  sg_copy_to_buffer
 
 # required by phy-sprd-sharkl3.ko
   usb_add_phy_dev
@@ -1567,6 +1604,7 @@
 
 # required by sc9863a-clk.ko
   device_get_match_data
+  devm_reset_controller_register
 
 # required by sdhci-sprd.ko
   clk_round_rate
@@ -1590,6 +1628,33 @@
   sdhci_runtime_suspend_host
   sdhci_set_bus_width
   sdhci_setup_host
+
+# required by mmc_swcq.ko
+  mmc_cmdq_disable
+  mmc_cmdq_enable
+  mmc_cqe_post_req
+  mmc_hw_reset
+  mmc_put_card
+  mmc_switch
+  mmc_wait_for_cmd
+  sg_copy_from_buffer
+  sg_copy_to_buffer
+  cpufreq_cpu_get
+  cpufreq_cpu_put
+  __drm_atomic_helper_crtc_destroy_state
+  __drm_atomic_helper_crtc_duplicate_state
+  drm_dev_printk
+  drm_dp_get_adjust_request_pre_emphasis
+  drm_dp_get_adjust_request_voltage
+  drm_dp_link_train_channel_eq_delay
+  extcon_get_property
+  send_sig_info
+  gen_pool_best_fit
+  gen_pool_set_algo
+  vm_node_stat
+  raw_notifier_call_chain
+  raw_notifier_chain_register
+  smp_call_function_single
 
 # required by sdiohal.ko
   mmc_detect_change
@@ -1829,7 +1894,9 @@
   drm_atomic_helper_connector_duplicate_state
   drm_atomic_helper_connector_reset
   drm_atomic_helper_crtc_destroy_state
+  __drm_atomic_helper_crtc_destroy_state
   drm_atomic_helper_crtc_duplicate_state
+  __drm_atomic_helper_crtc_duplicate_state
   drm_atomic_helper_crtc_reset
   drm_atomic_helper_disable_plane
   drm_atomic_helper_page_flip
