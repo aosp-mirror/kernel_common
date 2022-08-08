@@ -2528,6 +2528,16 @@ static void hci_check_pending_name(struct hci_dev *hdev, struct hci_conn *conn,
 	if (conn && (conn->state == BT_CONFIG || conn->state == BT_CONNECTED))
 		mgmt_device_connected(hdev, conn, name, name_len);
 
+	e = hci_inquiry_cache_lookup_resolve(hdev, bdaddr, NAME_PENDING);
+
+	if (e) {
+		list_del(&e->list);
+
+		e->name_state = name ? NAME_KNOWN : NAME_NOT_KNOWN;
+		mgmt_remote_name(hdev, bdaddr, ACL_LINK, 0x00, e->data.rssi,
+				 name, name_len);
+	}
+
 	if (discov->state == DISCOVERY_STOPPED)
 		return;
 
@@ -2537,19 +2547,12 @@ static void hci_check_pending_name(struct hci_dev *hdev, struct hci_conn *conn,
 	if (discov->state != DISCOVERY_RESOLVING)
 		return;
 
-	e = hci_inquiry_cache_lookup_resolve(hdev, bdaddr, NAME_PENDING);
 	/* If the device was not found in a list of found devices names of which
 	 * are pending. there is no need to continue resolving a next name as it
 	 * will be done upon receiving another Remote Name Request Complete
 	 * Event */
 	if (!e)
 		return;
-
-	list_del(&e->list);
-
-	e->name_state = name ? NAME_KNOWN : NAME_NOT_KNOWN;
-	mgmt_remote_name(hdev, bdaddr, ACL_LINK, 0x00, e->data.rssi,
-			 name, name_len);
 
 	if (hci_resolve_next_name(hdev))
 		return;
