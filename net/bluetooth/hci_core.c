@@ -1493,18 +1493,25 @@ static void hci_cmd_timeout(struct work_struct *work)
 	struct hci_dev *hdev = container_of(work, struct hci_dev,
 					    cmd_timer.work);
 
-	if (hdev->req_skb) {
-		u16 opcode = hci_skb_opcode(hdev->req_skb);
+	/* Don't trigger the timeout behavior if it happens while we're in
+	 * userchannel mode. Userspace is responsible for handling any command
+	 * timeouts.
+	 */
+	if (!(hci_dev_test_flag(hdev, HCI_USER_CHANNEL) &&
+	      test_bit(HCI_UP, &hdev->flags))) {
+		if (hdev->req_skb) {
+			u16 opcode = hci_skb_opcode(hdev->req_skb);
 
-		bt_dev_err(hdev, "command 0x%4.4x tx timeout", opcode);
+			bt_dev_err(hdev, "command 0x%4.4x tx timeout", opcode);
 
-		hci_cmd_sync_cancel_sync(hdev, ETIMEDOUT);
-	} else {
-		bt_dev_err(hdev, "command tx timeout");
+			hci_cmd_sync_cancel_sync(hdev, ETIMEDOUT);
+		} else {
+			bt_dev_err(hdev, "command tx timeout");
+		}
+
+		if (hdev->cmd_timeout)
+			hdev->cmd_timeout(hdev);
 	}
-
-	if (hdev->cmd_timeout)
-		hdev->cmd_timeout(hdev);
 
 	atomic_set(&hdev->cmd_cnt, 1);
 	queue_work(hdev->workqueue, &hdev->cmd_work);
