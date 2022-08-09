@@ -699,107 +699,14 @@ out:
 	return ret;
 }
 
-static int f2fs_prepare_decomp_mem(struct decompress_io_ctx *dic, bool end_io)
-{
-	const struct f2fs_compress_ops *cops =
-		f2fs_cops[F2FS_I(dic->inode)->i_compress_algorithm];
-	int i;
-
-	if (end_io ^ f2fs_low_mem_mode(F2FS_I_SB(dic->inode)))
-		return 0;
-
-	dic->tpages = page_array_alloc(dic->inode, dic->cluster_size);
-	if (!dic->tpages)
-		return 1;
-
-	for (i = 0; i < dic->cluster_size; i++) {
-		if (dic->rpages[i]) {
-			dic->tpages[i] = dic->rpages[i];
-			continue;
-		}
-
-		dic->tpages[i] = f2fs_compress_alloc_page();
-		if (!dic->tpages[i])
-			return 1;
-	}
-
-	dic->rbuf = f2fs_vmap(dic->tpages, dic->cluster_size);
-	if (!dic->rbuf)
-		return 1;
-
-	dic->cbuf = f2fs_vmap(dic->cpages, dic->nr_cpages);
-	if (!dic->cbuf)
-		return 1;
-
-	cops = f2fs_cops[F2FS_I(dic->inode)->i_compress_algorithm];
-	if (cops->init_decompress_ctx) {
-		int ret = cops->init_decompress_ctx(dic);
-
-		if (ret)
-			return 1;
-	}
-
-	return 0;
-}
-
-static void f2fs_release_decomp_mem(struct decompress_io_ctx *dic,
-		bool bypass_destroy_callback, bool end_io)
-{
-	const struct f2fs_compress_ops *cops =
-		f2fs_cops[F2FS_I(dic->inode)->i_compress_algorithm];
-
-	if (end_io ^ f2fs_low_mem_mode(F2FS_I_SB(dic->inode)))
-		return;
-
-	if (!bypass_destroy_callback && cops->destroy_decompress_ctx)
-		cops->destroy_decompress_ctx(dic);
-
-	if (dic->cbuf)
-		vm_unmap_ram(dic->cbuf, dic->nr_cpages);
-
-	if (dic->rbuf)
-		vm_unmap_ram(dic->rbuf, dic->cluster_size);
-}
-
-static void f2fs_free_dic(struct decompress_io_ctx *dic,
-		bool bypass_destroy_callback)
-{
-	int i;
-
-	f2fs_release_decomp_mem(dic, bypass_destroy_callback, false);
-
-	if (dic->tpages) {
-		for (i = 0; i < dic->cluster_size; i++) {
-			if (dic->rpages[i])
-				continue;
-			if (!dic->tpages[i])
-				continue;
-			f2fs_compress_free_page(dic->tpages[i]);
-		}
-		page_array_free(dic->inode, dic->tpages, dic->cluster_size);
-	}
-
-	if (dic->cpages) {
-		for (i = 0; i < dic->nr_cpages; i++) {
-			if (!dic->cpages[i])
-				continue;
-			f2fs_compress_free_page(dic->cpages[i]);
-		}
-		page_array_free(dic->inode, dic->cpages, dic->nr_cpages);
-	}
-
-	page_array_free(dic->inode, dic->rpages, dic->nr_rpages);
-	kmem_cache_free(dic_entry_slab, dic);
-}
-
-void f2fs_decompress_cluster(struct decompress_io_ctx *dic, bool in_task)
+void f2fs_decompress_cluster(struct decompress_io_ctx *dic)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(dic->inode);
 	struct f2fs_inode_info *fi = F2FS_I(dic->inode);
 	const struct f2fs_compress_ops *cops =
 			f2fs_cops[fi->i_compress_algorithm];
-	bool bypass_callback = false;
 	int ret;
+	int i;
 
 	trace_f2fs_decompress_pages_start(dic->inode, dic->cluster_idx,
 				dic->cluster_size, fi->i_compress_algorithm);
@@ -809,10 +716,41 @@ void f2fs_decompress_cluster(struct decompress_io_ctx *dic, bool in_task)
 		goto out_end_io;
 	}
 
-	if (f2fs_prepare_decomp_mem(dic, true)) {
-		bypass_callback = true;
+	dic->tpages = page_array_alloc(dic->inode, dic->cluster_size);
+	if (!dic->tpages) {
 		ret = -ENOMEM;
-		goto out_release;
+		goto out_end_io;
+	}
+
+	for (i = 0; i < dic->cluster_size; i++) {
+		if (dic->rpages[i]) {
+			dic->tpages[i] = dic->rpages[i];
+			continue;
+		}
+
+		dic->tpages[i] = f2fs_compress_alloc_page();
+		if (!dic->tpages[i]) {
+			ret = -ENOMEM;
+			goto out_end_io;
+		}
+	}
+
+	if (cops->init_decompress_ctx) {
+		ret = cops->init_decompress_ctx(dic);
+		if (ret)
+			goto out_end_io;
+	}
+
+	dic->rbuf = f2fs_vmap(dic->tpages, dic->cluster_size);
+	if (!dic->rbuf) {
+		ret = -ENOMEM;
+		goto out_destroy_decompress_ctx;
+	}
+
+	dic->cbuf = f2fs_vmap(dic->cpages, dic->nr_cpages);
+	if (!dic->cbuf) {
+		ret = -ENOMEM;
+		goto out_vunmap_rbuf;
 	}
 
 	dic->clen = le32_to_cpu(dic->cbuf->clen);
@@ -820,7 +758,7 @@ void f2fs_decompress_cluster(struct decompress_io_ctx *dic, bool in_task)
 
 	if (dic->clen > PAGE_SIZE * dic->nr_cpages - COMPRESS_HEADER_SIZE) {
 		ret = -EFSCORRUPTED;
-		goto out_release;
+		goto out_vunmap_cbuf;
 	}
 
 	ret = cops->decompress_pages(dic);
@@ -841,13 +779,17 @@ void f2fs_decompress_cluster(struct decompress_io_ctx *dic, bool in_task)
 		}
 	}
 
-out_release:
-	f2fs_release_decomp_mem(dic, bypass_callback, true);
-
+out_vunmap_cbuf:
+	vm_unmap_ram(dic->cbuf, dic->nr_cpages);
+out_vunmap_rbuf:
+	vm_unmap_ram(dic->rbuf, dic->cluster_size);
+out_destroy_decompress_ctx:
+	if (cops->destroy_decompress_ctx)
+		cops->destroy_decompress_ctx(dic);
 out_end_io:
 	trace_f2fs_decompress_pages_end(dic->inode, dic->cluster_idx,
 							dic->clen, ret);
-	f2fs_decompress_end_io(dic, ret, in_task);
+	f2fs_decompress_end_io(dic, ret);
 }
 
 /*
@@ -857,7 +799,7 @@ out_end_io:
  * (or in the case of a failure, cleans up without actually decompressing).
  */
 void f2fs_end_read_compressed_page(struct page *page, bool failed,
-		block_t blkaddr, bool in_task)
+						block_t blkaddr)
 {
 	struct decompress_io_ctx *dic =
 			(struct decompress_io_ctx *)page_private(page);
@@ -867,12 +809,12 @@ void f2fs_end_read_compressed_page(struct page *page, bool failed,
 
 	if (failed)
 		WRITE_ONCE(dic->failed, true);
-	else if (blkaddr && in_task)
+	else if (blkaddr)
 		f2fs_cache_compressed_page(sbi, page,
 					dic->inode->i_ino, blkaddr);
 
 	if (atomic_dec_and_test(&dic->remaining_pages))
-		f2fs_decompress_cluster(dic, in_task);
+		f2fs_decompress_cluster(dic);
 }
 
 static bool is_page_in_cluster(struct compress_ctx *cc, pgoff_t index)
@@ -1580,14 +1522,16 @@ destroy_out:
 	return err;
 }
 
+static void f2fs_free_dic(struct decompress_io_ctx *dic);
+
 struct decompress_io_ctx *f2fs_alloc_dic(struct compress_ctx *cc)
 {
 	struct decompress_io_ctx *dic;
 	pgoff_t start_idx = start_idx_of_cluster(cc);
-	struct f2fs_sb_info *sbi = F2FS_I_SB(cc->inode);
 	int i;
 
-	dic = f2fs_kmem_cache_alloc(dic_entry_slab, GFP_F2FS_ZERO, false, sbi);
+	dic = f2fs_kmem_cache_alloc(dic_entry_slab, GFP_F2FS_ZERO,
+					false, F2FS_I_SB(cc->inode));
 	if (!dic)
 		return ERR_PTR(-ENOMEM);
 
@@ -1628,43 +1572,52 @@ struct decompress_io_ctx *f2fs_alloc_dic(struct compress_ctx *cc)
 		dic->cpages[i] = page;
 	}
 
-	if (f2fs_prepare_decomp_mem(dic, false))
-		goto out_free;
-
 	return dic;
 
 out_free:
-	f2fs_free_dic(dic, true);
+	f2fs_free_dic(dic);
 	return ERR_PTR(-ENOMEM);
 }
 
-static void f2fs_late_free_dic(struct work_struct *work)
+static void f2fs_free_dic(struct decompress_io_ctx *dic)
 {
-	struct decompress_io_ctx *dic =
-		container_of(work, struct decompress_io_ctx, free_work);
+	int i;
 
-	f2fs_free_dic(dic, false);
+	if (dic->tpages) {
+		for (i = 0; i < dic->cluster_size; i++) {
+			if (dic->rpages[i])
+				continue;
+			if (!dic->tpages[i])
+				continue;
+			f2fs_compress_free_page(dic->tpages[i]);
+		}
+		page_array_free(dic->inode, dic->tpages, dic->cluster_size);
+	}
+
+	if (dic->cpages) {
+		for (i = 0; i < dic->nr_cpages; i++) {
+			if (!dic->cpages[i])
+				continue;
+			f2fs_compress_free_page(dic->cpages[i]);
+		}
+		page_array_free(dic->inode, dic->cpages, dic->nr_cpages);
+	}
+
+	page_array_free(dic->inode, dic->rpages, dic->nr_rpages);
+	kmem_cache_free(dic_entry_slab, dic);
 }
 
-static void f2fs_put_dic(struct decompress_io_ctx *dic, bool in_task)
+static void f2fs_put_dic(struct decompress_io_ctx *dic)
 {
-	if (refcount_dec_and_test(&dic->refcnt)) {
-		if (in_task) {
-			f2fs_free_dic(dic, false);
-		} else {
-			INIT_WORK(&dic->free_work, f2fs_late_free_dic);
-			queue_work(F2FS_I_SB(dic->inode)->post_read_wq,
-					&dic->free_work);
-		}
-	}
+	if (refcount_dec_and_test(&dic->refcnt))
+		f2fs_free_dic(dic);
 }
 
 /*
  * Update and unlock the cluster's pagecache pages, and release the reference to
  * the decompress_io_ctx that was being held for I/O completion.
  */
-static void __f2fs_decompress_end_io(struct decompress_io_ctx *dic, bool failed,
-				bool in_task)
+static void __f2fs_decompress_end_io(struct decompress_io_ctx *dic, bool failed)
 {
 	int i;
 
@@ -1685,7 +1638,7 @@ static void __f2fs_decompress_end_io(struct decompress_io_ctx *dic, bool failed,
 		unlock_page(rpage);
 	}
 
-	f2fs_put_dic(dic, in_task);
+	f2fs_put_dic(dic);
 }
 
 static void f2fs_verify_cluster(struct work_struct *work)
@@ -1702,15 +1655,14 @@ static void f2fs_verify_cluster(struct work_struct *work)
 			SetPageError(rpage);
 	}
 
-	__f2fs_decompress_end_io(dic, false, true);
+	__f2fs_decompress_end_io(dic, false);
 }
 
 /*
  * This is called when a compressed cluster has been decompressed
  * (or failed to be read and/or decompressed).
  */
-void f2fs_decompress_end_io(struct decompress_io_ctx *dic, bool failed,
-				bool in_task)
+void f2fs_decompress_end_io(struct decompress_io_ctx *dic, bool failed)
 {
 	if (!failed && dic->need_verity) {
 		/*
@@ -1722,7 +1674,7 @@ void f2fs_decompress_end_io(struct decompress_io_ctx *dic, bool failed,
 		INIT_WORK(&dic->verity_work, f2fs_verify_cluster);
 		fsverity_enqueue_verify_work(&dic->verity_work);
 	} else {
-		__f2fs_decompress_end_io(dic, failed, in_task);
+		__f2fs_decompress_end_io(dic, failed);
 	}
 }
 
@@ -1731,12 +1683,12 @@ void f2fs_decompress_end_io(struct decompress_io_ctx *dic, bool failed,
  *
  * This is called when the page is no longer needed and can be freed.
  */
-void f2fs_put_page_dic(struct page *page, bool in_task)
+void f2fs_put_page_dic(struct page *page)
 {
 	struct decompress_io_ctx *dic =
 			(struct decompress_io_ctx *)page_private(page);
 
-	f2fs_put_dic(dic, in_task);
+	f2fs_put_dic(dic);
 }
 
 /*
