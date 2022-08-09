@@ -2292,8 +2292,17 @@ static int hci_le_add_accept_list_sync(struct hci_dev *hdev,
 	if (*num_entries >= hdev->le_accept_list_size)
 		return -ENOSPC;
 
-	/* Accept list can not be used with RPAs */
-	if (!use_ll_privacy(hdev) &&
+	/* Accept list can not be used with RPAs if ll privacy is not enabled.
+	 *
+	 * There are devices which do not use RPAs and still have IRKs. As a
+	 * result, during suspend all devices can be added to accept list to
+	 * be permissive and allow filter policy to use accept list.
+	 *
+	 * For all other cases, accept list will not be used if a device has
+	 * IRK and ll privacy is not enabled, because devices with RPAs are
+	 * filtered by the accept list.
+	 */
+	if (!hdev->suspended && !use_ll_privacy(hdev) &&
 	    hci_find_irk_by_addr(hdev, &params->addr, params->addr_type))
 		return -EINVAL;
 
