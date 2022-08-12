@@ -2255,6 +2255,7 @@
   __traceiter_android_vh_thermal_pm_notify_suspend
   __traceiter_android_vh_timerfd_create
   __traceiter_android_vh_try_grab_compound_head
+  __traceiter_android_vh_try_to_freeze_todo_logging
   __traceiter_android_vh_typec_store_partner_src_caps
   __traceiter_android_vh_typec_tcpci_override_toggling
   __traceiter_android_vh_typec_tcpm_get_timer
@@ -2368,6 +2369,7 @@
   __tracepoint_android_vh_thermal_pm_notify_suspend
   __tracepoint_android_vh_timerfd_create
   __tracepoint_android_vh_try_grab_compound_head
+  __tracepoint_android_vh_try_to_freeze_todo_logging
   __tracepoint_android_vh_typec_store_partner_src_caps
   __tracepoint_android_vh_typec_tcpci_override_toggling
   __tracepoint_android_vh_typec_tcpm_get_timer
