@@ -553,23 +553,10 @@ static inline bool range_included(struct kvm_mem_range *child,
 	return parent->start <= child->start && child->end <= parent->end;
 }
 
-static int host_stage2_adjust_range(u64 addr, struct kvm_mem_range *range)
+static int host_stage2_adjust_range(u64 addr, struct kvm_mem_range *range,
+				    u32 level)
 {
 	struct kvm_mem_range cur;
-	kvm_pte_t pte;
-	u32 level;
-	int ret;
-
-	hyp_assert_lock_held(&host_mmu.lock);
-	ret = kvm_pgtable_get_leaf(&host_mmu.pgt, addr, &pte, &level);
-	if (ret)
-		return ret;
-
-	if (kvm_pte_valid(pte))
-		return -EAGAIN;
-
-	if (pte)
-		return -EPERM;
 
 	do {
 		u64 granule = kvm_granule_size(level);
@@ -640,16 +627,74 @@ static bool host_stage2_force_pte_cb(u64 addr, u64 end, enum kvm_pgtable_prot pr
 		return prot != PKVM_HOST_MMIO_PROT;
 }
 
-static int host_stage2_idmap(u64 addr)
+#define DEFERRED_MEMATTR_NOTE	(1ULL << 24)
+static int resolve_stage2_prot_from_stage1(struct kvm_vcpu_fault_info *fault,
+					   u64 addr, enum kvm_pgtable_prot *prot,
+					   struct kvm_mem_range *range)
+{
+	u64 par, oldpar;
+
+	/* If the S1 MMU is disabled, treat the access as cacheable */
+	if (unlikely(!(read_sysreg(sctlr_el1) & SCTLR_ELx_M)))
+		return 0;
+
+	/* If we took a fault on a PTW, then treat it as cacheable */
+	if (fault->esr_el2 & ESR_ELx_S1PTW)
+		return 0;
+
+	oldpar = read_sysreg_par();
+
+	if (!__kvm_at("s1e1r", fault->far_el2))
+		par = read_sysreg_par();
+	else
+		par = SYS_PAR_EL1_F;
+
+	write_sysreg(oldpar, par_el1);
+
+	if (unlikely(par & SYS_PAR_EL1_F))
+		return -EAGAIN;
+
+	if ((par >> 56) == MAIR_ATTR_NORMAL_NC) {
+		range->start	= ALIGN_DOWN(addr, PAGE_SIZE);
+		range->end	= range->start + PAGE_SIZE;
+		*prot		|= KVM_PGTABLE_PROT_NC;
+	}
+
+	return 0;
+}
+
+static int host_stage2_idmap(struct kvm_vcpu_fault_info *fault, u64 addr)
 {
 	struct kvm_mem_range range;
 	bool is_memory = !!find_mem_range(addr, &range);
 	enum kvm_pgtable_prot prot;
+	kvm_pte_t pte;
+	u32 level;
 	int ret;
 
 	hyp_assert_lock_held(&host_mmu.lock);
 
 	prot = is_memory ? PKVM_HOST_MEM_PROT : PKVM_HOST_MMIO_PROT;
+
+	ret = kvm_pgtable_get_leaf(&host_mmu.pgt, addr, &pte, &level);
+	if (ret)
+		return ret;
+
+	if (kvm_pte_valid(pte))
+		return -EAGAIN;
+
+	if (pte) {
+		if (!is_memory)
+			return -EPERM;
+
+		if (pte != DEFERRED_MEMATTR_NOTE)
+			return -EPERM;
+
+		ret = resolve_stage2_prot_from_stage1(fault, addr, &prot, &range);
+		if (ret)
+			return ret;
+	}
+
 	/*
 	 * Adjust against IOMMU devices first. host_stage2_adjust_range() should
 	 * be called last for proper alignment.
@@ -661,11 +706,15 @@ static int host_stage2_idmap(u64 addr)
 			return ret;
 	}
 
-	ret = host_stage2_adjust_range(addr, &range);
+	ret = host_stage2_adjust_range(addr, &range, level);
 	if (ret)
 		return ret;
 
-	return host_stage2_idmap_locked(range.start, range.end - range.start, prot, false);
+	ret = host_stage2_idmap_locked(range.start, range.end - range.start, prot, false);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static void host_inject_abort(struct kvm_cpu_context *host_ctxt)
@@ -740,6 +789,7 @@ void handle_host_mem_abort(struct kvm_cpu_context *host_ctxt)
 
 	esr = read_sysreg_el2(SYS_ESR);
 	BUG_ON(!__get_fault_info(esr, &fault));
+	fault.esr_el2 = esr;
 
 	addr = (fault.hpfar_el2 & HPFAR_MASK) << 8;
 	addr |= fault.far_el2 & FAR_MASK;
@@ -753,7 +803,7 @@ void handle_host_mem_abort(struct kvm_cpu_context *host_ctxt)
 
 	/* If not handled, attempt to map the page. */
 	if (ret == -EPERM)
-		ret = host_stage2_idmap(addr);
+		ret = host_stage2_idmap(&fault, addr);
 
 	host_unlock_component();
 
@@ -2170,5 +2220,56 @@ bool __pkvm_check_ioguard_page(struct pkvm_hyp_vcpu *hyp_vcpu)
 		ret &= __check_ioguard_page(hyp_vcpu, end);
 	guest_unlock_component(vm);
 
+	return ret;
+}
+
+int __pkvm_host_set_stage2_memattr(phys_addr_t phys, bool force_nc)
+{
+	kvm_pte_t pte;
+	int ret = 0;
+
+	phys = ALIGN_DOWN(phys, PAGE_SIZE);
+	host_lock_component();
+
+	ret = kvm_pgtable_get_leaf(&host_mmu.pgt, phys, &pte, NULL);
+	if (ret)
+		goto unlock;
+
+	if (!addr_is_memory(phys)) {
+		ret = -EIO;
+		goto unlock;
+	}
+
+	if (!kvm_pte_valid(pte) && pte) {
+		switch (pte) {
+		case DEFERRED_MEMATTR_NOTE:
+			break;
+		default:
+			ret = -EPERM;
+		}
+	} else if (host_get_page_state(pte) != PKVM_PAGE_OWNED) {
+		ret = -EPERM;
+	}
+
+	if (ret)
+		goto unlock;
+
+	if (force_nc) {
+		ret = host_stage2_idmap_locked(phys, PAGE_SIZE,
+					       PKVM_HOST_MEM_PROT |
+					       KVM_PGTABLE_PROT_NC,
+					       false);
+		if (ret)
+			goto unlock;
+
+		kvm_flush_dcache_to_poc(hyp_fixmap_map_nc(phys), PAGE_SIZE);
+		hyp_fixmap_unmap();
+	} else {
+		ret = kvm_pgtable_stage2_annotate(&host_mmu.pgt, phys,
+						  PAGE_SIZE, &host_s2_pool,
+						  DEFERRED_MEMATTR_NOTE);
+	}
+unlock:
+	host_unlock_component();
 	return ret;
 }

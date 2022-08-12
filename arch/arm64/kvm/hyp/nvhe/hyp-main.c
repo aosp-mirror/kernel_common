@@ -1199,6 +1199,14 @@ handle___pkvm_close_module_registration(struct kvm_cpu_context *host_ctxt)
 	cpu_reg(host_ctxt, 1) = __pkvm_close_module_registration();
 }
 
+static void handle___pkvm_host_set_stage2_memattr(struct kvm_cpu_context *host_ctxt)
+{
+	DECLARE_REG(phys_addr_t, phys, host_ctxt, 1);
+	DECLARE_REG(bool, force_nc, host_ctxt, 2);
+
+	cpu_reg(host_ctxt, 1) = __pkvm_host_set_stage2_memattr(phys, force_nc);
+}
+
 typedef void (*hcall_t)(struct kvm_cpu_context *);
 
 #define HANDLE_FUNC(x)	[__KVM_HOST_SMCCC_FUNC_##x] = (hcall_t)handle_##x
@@ -1243,6 +1251,7 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__pkvm_init_module),
 	HANDLE_FUNC(__pkvm_register_hcall),
 	HANDLE_FUNC(__pkvm_close_module_registration),
+	HANDLE_FUNC(__pkvm_host_set_stage2_memattr),
 };
 
 static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)

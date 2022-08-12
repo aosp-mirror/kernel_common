@@ -2264,6 +2264,8 @@ static int pkvm_drop_host_privileges(void)
 
 static int finalize_hyp_mode(void)
 {
+	int ret;
+
 	if (!is_protected_kvm_enabled())
 		return 0;
 
@@ -2273,7 +2275,12 @@ static int finalize_hyp_mode(void)
 	 */
 	kmemleak_free_part(__hyp_bss_start, __hyp_bss_end - __hyp_bss_start);
 	kmemleak_free_part_phys(hyp_mem_base, hyp_mem_size);
-	return pkvm_drop_host_privileges();
+
+	ret = pkvm_drop_host_privileges();
+	if (ret)
+		return ret;
+
+	return pkvm_host_register_early_nc_mappings();
 }
 
 struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)

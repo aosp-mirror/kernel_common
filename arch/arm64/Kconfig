@@ -1017,6 +1017,11 @@ config SOCIONEXT_SYNQUACER_PREITS
 
 	  If unsure, say Y.
 
+config ARM64_WORKAROUND_DMA_BEYOND_POC
+	bool "Remove cacheable aliases of non-cacheable DMA buffers"
+	default y
+	depends on KVM
+
 endmenu
 
 
