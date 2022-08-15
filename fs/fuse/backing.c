@@ -23,6 +23,9 @@ struct fuse_bpf_aio_req {
 
 static struct kmem_cache *fuse_bpf_aio_request_cachep;
 
+static void fuse_stat_to_attr(struct fuse_conn *fc, struct inode *inode,
+		struct kstat *stat, struct fuse_attr *attr);
+
 static void fuse_file_accessed(struct file *dst_file, struct file *src_file)
 {
 	struct inode *dst_inode;
@@ -181,8 +184,10 @@ void *fuse_open_finalize(struct fuse_bpf_args *fa,
 	struct fuse_file *ff = file->private_data;
 	struct fuse_open_out *foo = fa->out_args[0].value;
 
-	if (ff)
+	if (ff) {
 		ff->fh = foo->fh;
+		ff->nodeid = get_fuse_inode(inode)->nodeid;
+	}
 	return 0;
 }
 
@@ -1153,6 +1158,9 @@ int fuse_lookup_backing(struct fuse_bpf_args *fa, struct inode *dir,
 	struct dentry *dir_backing_entry = dir_fuse_entry->backing_path.dentry;
 	struct inode *dir_backing_inode = dir_backing_entry->d_inode;
 	struct dentry *backing_entry;
+	struct fuse_entry_out *feo = (void *)fa->out_args[0].value;
+	struct kstat stat;
+	int err;
 
 	/* TODO this will not handle lookups over mount points */
 	inode_lock_nested(dir_backing_inode, I_MUTEX_PARENT);
@@ -1165,10 +1173,21 @@ int fuse_lookup_backing(struct fuse_bpf_args *fa, struct inode *dir,
 
 	fuse_entry->backing_path = (struct path) {
 		.dentry = backing_entry,
-		.mnt = dir_fuse_entry->backing_path.mnt,
+		.mnt = mntget(dir_fuse_entry->backing_path.mnt),
 	};
 
-	mntget(fuse_entry->backing_path.mnt);
+	if (d_is_negative(backing_entry))
+		return 0;
+
+	err = vfs_getattr(&fuse_entry->backing_path, &stat,
+				  STATX_BASIC_STATS, 0);
+	if (err) {
+		path_put_init(&fuse_entry->backing_path);
+		return err;
+	}
+
+	fuse_stat_to_attr(get_fuse_conn(dir),
+			  backing_entry->d_inode, &stat, &feo->attr);
 	return 0;
 }
 
