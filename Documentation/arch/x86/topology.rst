@@ -52,10 +52,6 @@ Package-related topology information in the kernel:
     The maximum possible number of cores in a package. This information is
     retrieved via CPUID.
 
-  - cpuinfo_x86.x86_max_dies:
-
-    The number of dies in a package. This information is retrieved via CPUID.
-
   - cpuinfo_x86.cpu_die_id:
 
     The physical ID of the die. This information is retrieved via CPUID.
