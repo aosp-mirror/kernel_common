@@ -451,6 +451,13 @@ DECLARE_RESTRICTED_HOOK(android_rvh_update_rq_clock_pelt,
 	TP_PROTO(struct rq *rq, s64 delta, bool *ret),
 	TP_ARGS(rq, delta, ret), 1);
 
+DECLARE_HOOK(android_vh_pidfd_open,
+	TP_PROTO(struct pid *p),
+	TP_ARGS(p));
+
+DECLARE_HOOK(android_vh_mmput,
+	TP_PROTO(void *unused),
+	TP_ARGS(unused));
 /* macro versions of hooks are no longer required */
 
 #endif /* _TRACE_HOOK_SCHED_H */
