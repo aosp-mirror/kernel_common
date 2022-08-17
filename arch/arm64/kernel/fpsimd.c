@@ -705,10 +705,12 @@ size_t sve_state_size(struct task_struct const *task)
  * do_sve_acc() case, there is no ABI requirement to hide stale data
  * written previously be task.
  */
-void sve_alloc(struct task_struct *task)
+void sve_alloc(struct task_struct *task, bool flush)
 {
 	if (task->thread.sve_state) {
-		memset(task->thread.sve_state, 0, sve_state_size(task));
+		if (flush)
+			memset(task->thread.sve_state, 0,
+			       sve_state_size(task));
 		return;
 	}
 
@@ -1378,7 +1380,7 @@ void do_sve_acc(unsigned int esr, struct pt_regs *regs)
 		return;
 	}
 
-	sve_alloc(current);
+	sve_alloc(current, true);
 	if (!current->thread.sve_state) {
 		force_sig(SIGKILL);
 		return;
@@ -1429,7 +1431,7 @@ void do_sme_acc(unsigned int esr, struct pt_regs *regs)
 		return;
 	}
 
-	sve_alloc(current);
+	sve_alloc(current, false);
 	sme_alloc(current);
 	if (!current->thread.sve_state || !current->thread.za_state) {
 		force_sig(SIGKILL);
