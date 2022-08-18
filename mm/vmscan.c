@@ -4564,6 +4564,15 @@ static int __meminit __maybe_unused mem_notifier(struct notifier_block *self,
  *                          sysfs interface
  ******************************************************************************/
 
+static int run_aging(struct lruvec *lruvec, unsigned long seq, int swappiness);
+
+static int run_eviction(struct lruvec *lruvec, unsigned long seq, int swappiness,
+			unsigned long nr_to_reclaim);
+
+static int run_cmd(char cmd, int memcg_id, int nid, unsigned long seq,
+			int swappiness, unsigned long nr_to_reclaim);
+
+
 static ssize_t show_min_ttl(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%u\n", jiffies_to_msecs(READ_ONCE(lru_gen_min_ttl)));
@@ -4608,9 +4617,149 @@ static struct kobj_attribute lru_gen_enabled_attr = __ATTR(
 	enabled, 0644, show_enable, store_enable
 );
 
+void print_lru_gen_admin(struct lruvec *lruvec, struct mem_cgroup *memcg,
+				char *buf, int nid, void *memory)
+{
+	unsigned long seq;
+	struct lrugen *lrugen = &lruvec->evictable;
+
+	nid = lruvec_pgdat(lruvec)->node_id;
+	memcg = lruvec_memcg(lruvec);
+	DEFINE_MAX_SEQ(lruvec);
+	DEFINE_MIN_SEQ(lruvec);
+
+	if (nid == first_memory_node) {
+		const char *path = memcg ? memory : "";
+
+#ifdef CONFIG_MEMCG
+		if (memcg)
+			cgroup_path(memcg->css.cgroup, memory, PATH_MAX);
+#endif
+		snprintf(buf + strlen(buf), PAGE_SIZE,
+			"memcg %5hu %s\n", mem_cgroup_id(memcg), path);
+	}
+
+	snprintf(buf + strlen(buf), PAGE_SIZE, " node %5d\n", nid);
+
+	seq = min(min_seq[0], min_seq[1]);
+
+	for (; seq <= max_seq; seq++) {
+		int gen, type, zone;
+		unsigned int msecs;
+
+		gen = lru_gen_from_seq(seq);
+		msecs = jiffies_to_msecs(jiffies - READ_ONCE(lrugen->timestamps[gen]));
+
+		snprintf(buf + strlen(buf), PAGE_SIZE, " %10lu %10u", seq, msecs);
+
+		for (type = 0; type < ANON_AND_FILE; type++) {
+			long size = 0;
+
+			if (seq < min_seq[type]) {
+				snprintf(buf + strlen(buf), PAGE_SIZE, "         -0 ");
+				continue;
+			}
+
+			for (zone = 0; zone < MAX_NR_ZONES; zone++)
+				size += READ_ONCE(lrugen->sizes[gen][type][zone]);
+
+			snprintf(buf + strlen(buf), PAGE_SIZE, " %10lu ", max(size, 0L));
+		}
+
+		snprintf(buf + strlen(buf), PAGE_SIZE, "\n");
+
+	}
+}
+
+static ssize_t show_lru_gen_admin(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	struct lruvec *lruvec;
+	struct mem_cgroup *memcg;
+
+	void *memory = kvmalloc(PATH_MAX, GFP_KERNEL);
+
+	if (!memory)
+		return -EINVAL;
+
+	memcg = mem_cgroup_iter(NULL, NULL, NULL);
+	do {
+		int nid;
+
+		for_each_node_state(nid, N_MEMORY) {
+			lruvec = mem_cgroup_lruvec(memcg, NODE_DATA(nid));
+			while (lruvec != NULL) {
+				print_lru_gen_admin(lruvec, memcg, buf, nid, memory);
+
+				int next_nid = next_memory_node(nid);
+				struct mem_cgroup *next_memcg = memcg;
+
+				if (next_nid == MAX_NUMNODES) {
+					next_memcg = mem_cgroup_iter(NULL, next_memcg, NULL);
+					if (!next_memcg)
+						lruvec = NULL;
+					next_nid = first_memory_node;
+				}
+
+				if (next_memcg)
+					lruvec = mem_cgroup_lruvec(next_memcg, NODE_DATA(next_nid));
+			}
+		}
+	} while ((memcg = mem_cgroup_iter(NULL, memcg, NULL)));
+
+	if (!IS_ERR_OR_NULL(lruvec))
+		mem_cgroup_iter_break(NULL, lruvec_memcg(lruvec));
+
+	kvfree(memory);
+	memory = NULL;
+
+	return strlen(buf);
+}
+
+static ssize_t store_lru_gen_admin(struct kobject *kobj, struct kobj_attribute *attr,
+			    const char *buf, size_t len)
+{
+	int err = 0;
+	char *cur, *next;
+
+	strcpy(next, buf);
+
+	while ((cur = strsep(&next, ",;\n"))) {
+		int n;
+		int end;
+		char cmd;
+		unsigned int memcg_id;
+		unsigned int nid;
+		unsigned long seq;
+		unsigned int swappiness = -1;
+		unsigned long nr_to_reclaim = -1;
+
+		cur = skip_spaces(cur);
+		if (!*cur)
+			continue;
+
+		n = sscanf(cur, "%c %u %u %lu %n %u %n %lu %n", &cmd, &memcg_id, &nid,
+			   &seq, &end, &swappiness, &end, &nr_to_reclaim, &end);
+		if (n < 4 || cur[end]) {
+			err = -EINVAL;
+			break;
+		}
+
+		err = run_cmd(cmd, memcg_id, nid, seq, swappiness, nr_to_reclaim);
+		if (err)
+			break;
+	}
+
+	return err ? : len;
+}
+
+static struct kobj_attribute lru_gen_admin_attr = __ATTR(
+	admin, 0644, show_lru_gen_admin, store_lru_gen_admin
+);
+
 static struct attribute *lru_gen_attrs[] = {
 	&lru_gen_min_ttl_attr.attr,
 	&lru_gen_enabled_attr.attr,
+	&lru_gen_admin_attr.attr,
 	NULL
 };
 
