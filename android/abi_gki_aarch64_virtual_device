@@ -374,6 +374,7 @@
   usleep_range
   vabits_actual
   vfree
+  virtio_break_device
   virtio_check_driver_offered_feature
   virtio_config_changed
   virtio_max_dma_size
@@ -1105,7 +1106,6 @@
   pci_release_selected_regions
   pci_request_selected_regions
   pci_vfs_assigned
-  virtio_break_device
   virtio_device_freeze
   virtio_device_restore
 
@@ -1183,3 +1183,4 @@
   _raw_read_unlock
   _raw_write_lock
   _raw_write_unlock
+  wait_on_page_bit
