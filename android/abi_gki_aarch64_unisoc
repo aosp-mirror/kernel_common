@@ -158,6 +158,7 @@
   del_timer
   del_timer_sync
   destroy_workqueue
+  dev_close
   dev_driver_string
   _dev_crit
   _dev_err
@@ -1168,6 +1169,7 @@
   mpage_readpages
   mpage_writepages
   __remove_inode_hash
+  sched_setattr
   setattr_copy
   setattr_prepare
   sb_min_blocksize
