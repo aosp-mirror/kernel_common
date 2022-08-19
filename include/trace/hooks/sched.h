@@ -239,18 +239,6 @@ DECLARE_RESTRICTED_HOOK(android_rvh_update_misfit_status,
 	TP_PROTO(struct task_struct *p, struct rq *rq, bool *need_update),
 	TP_ARGS(p, rq, need_update), 1);
 
-DECLARE_RESTRICTED_HOOK(android_rvh_cpu_cgroup_attach,
-	TP_PROTO(struct cgroup_taskset *tset),
-	TP_ARGS(tset), 1);
-
-DECLARE_RESTRICTED_HOOK(android_rvh_cpu_cgroup_can_attach,
-	TP_PROTO(struct cgroup_taskset *tset, int *retval),
-	TP_ARGS(tset, retval), 1);
-
-DECLARE_RESTRICTED_HOOK(android_rvh_cpu_cgroup_online,
-	TP_PROTO(struct cgroup_subsys_state *css),
-	TP_ARGS(css), 1);
-
 DECLARE_RESTRICTED_HOOK(android_rvh_sched_fork_init,
 	TP_PROTO(struct task_struct *p),
 	TP_ARGS(p), 1);
