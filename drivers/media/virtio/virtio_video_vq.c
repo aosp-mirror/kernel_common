@@ -642,8 +642,14 @@ int virtio_video_cmd_resource_queue(struct virtio_video *vv, uint32_t stream_id,
 	req_p->queue_type = cpu_to_le32(queue_type);
 	req_p->resource_id = cpu_to_le32(virtio_vb->resource_id);
 	req_p->num_data_sizes = num_data_size;
-	req_p->timestamp =
-		cpu_to_le64(virtio_vb->v4l2_m2m_vb.vb.vb2_buf.timestamp);
+	/*
+	 * The virtio-video spec states:
+	 *   timestamp: ... For VIRTIO_VIDEO_QUEUE_TYPE_OUTPUT, the driver MUST
+	 *     set it to 0.
+	 */
+	if (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT)
+		req_p->timestamp = cpu_to_le64(
+			virtio_vb->v4l2_m2m_vb.vb.vb2_buf.timestamp);
 
 	for (i = 0; i < num_data_size; ++i)
 		req_p->data_sizes[i] = cpu_to_le32(data_size[i]);
