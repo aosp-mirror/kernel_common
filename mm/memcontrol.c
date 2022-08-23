@@ -1403,6 +1403,7 @@ static const struct memory_stat memory_stats[] = {
 	{ "file",			NR_FILE_PAGES			},
 	{ "kernel_stack",		NR_KERNEL_STACK_KB		},
 	{ "pagetables",			NR_PAGETABLE			},
+	{ "sec_pagetables",		NR_SECONDARY_PAGETABLE		},
 	{ "percpu",			MEMCG_PERCPU_B			},
 	{ "sock",			MEMCG_SOCK			},
 	{ "shmem",			NR_SHMEM			},
