@@ -440,7 +440,7 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 	BUG_ON(!irqs_disabled());
 
 	system_state = SYSTEM_SUSPEND;
-
+	trace_android_vh_early_resume_begin(NULL);
 	error = syscore_suspend();
 	if (!error) {
 		*wakeup = pm_wakeup_pending();

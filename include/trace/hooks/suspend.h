@@ -15,6 +15,9 @@ DECLARE_HOOK(android_vh_resume_begin,
 DECLARE_HOOK(android_vh_resume_end,
 	TP_PROTO(void *unused),
 	TP_ARGS(unused))
+DECLARE_HOOK(android_vh_early_resume_begin,
+	TP_PROTO(void *unused),
+	TP_ARGS(unused))
 
 /* macro versions of hooks are no longer required */
 
