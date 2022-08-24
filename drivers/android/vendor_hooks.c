@@ -408,4 +408,5 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tune_memcg_scan_type);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pidfd_open);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mmput);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_early_resume_begin);
-
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_alloc_pages_reclaim_bypass);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_alloc_pages_failure_bypass);
