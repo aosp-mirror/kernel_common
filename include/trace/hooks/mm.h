@@ -131,9 +131,6 @@ DECLARE_HOOK(android_vh_show_stack_hash,
 DECLARE_HOOK(android_vh_save_track_hash,
 	TP_PROTO(bool alloc, unsigned long p),
 	TP_ARGS(alloc, p));
-DECLARE_HOOK(android_vh_vmpressure,
-	TP_PROTO(struct mem_cgroup *memcg, bool *bypass),
-	TP_ARGS(memcg, bypass));
 DECLARE_HOOK(android_vh_mem_cgroup_alloc,
 	TP_PROTO(struct mem_cgroup *memcg),
 	TP_ARGS(memcg));
