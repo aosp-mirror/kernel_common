@@ -241,6 +241,8 @@
   dput
   driver_register
   driver_unregister
+  __drm_atomic_helper_crtc_destroy_state
+  __drm_atomic_helper_crtc_duplicate_state
   drm_atomic_helper_plane_destroy_state
   drm_atomic_helper_plane_duplicate_state
   drm_atomic_helper_plane_reset
@@ -519,10 +521,13 @@
   mii_nway_restart
   misc_deregister
   misc_register
+  mmc_cmdq_disable
   mmc_cmdq_enable
   mmc_cqe_post_req
+  mmc_cqe_request_done
   mmc_hw_reset
   mmc_put_card
+  mmc_send_tuning
   mmc_switch
   mmc_wait_for_cmd
   mod_node_page_state
@@ -605,6 +610,7 @@
   param_ops_charp
   param_ops_uint
   param_ops_ushort
+  pci_alloc_irq_vectors_affinity
   __pci_register_driver
   pci_set_master
   pci_unregister_driver
@@ -783,6 +789,8 @@
   set_page_dirty
   __SetPageMovable
   set_user_nice
+  sg_copy_from_buffer
+  sg_copy_to_buffer
   sg_init_table
   sg_miter_next
   sg_miter_start
@@ -1463,10 +1471,6 @@
 # required by microarray_fp.ko
   cdev_alloc
 
-# required by mmc_hsq.ko
-  mmc_cqe_request_done
-  mmc_send_tuning
-
 # required by mmc_swcq.ko
   cpufreq_cpu_get
   cpufreq_cpu_put
@@ -1475,7 +1479,6 @@
   drm_dp_get_adjust_request_voltage
   drm_dp_link_train_channel_eq_delay
   extcon_get_property
-  mmc_cmdq_disable
   raw_notifier_call_chain
   raw_notifier_chain_register
   send_sig_info
@@ -1506,6 +1509,9 @@
 # required by musb_sprd.ko
   usb_ep_disable
   usb_speed_string
+
+# required by npu_img_vha.ko
+  do_exit
 
 # required by nu1619_wireless_charger.ko
   regmap_bulk_read
@@ -1547,8 +1553,6 @@
   sdio_release_irq
   sdio_set_host_pm_flags
   sdio_writew
-  sg_copy_from_buffer
-  sg_copy_to_buffer
 
 # required by phy-sprd-sharkl3.ko
   usb_add_phy_dev
@@ -2178,9 +2182,7 @@
   drm_atomic_helper_connector_destroy_state
   drm_atomic_helper_connector_duplicate_state
   drm_atomic_helper_connector_reset
-  __drm_atomic_helper_crtc_destroy_state
   drm_atomic_helper_crtc_destroy_state
-  __drm_atomic_helper_crtc_duplicate_state
   drm_atomic_helper_crtc_duplicate_state
   drm_atomic_helper_crtc_reset
   drm_atomic_helper_disable_plane
