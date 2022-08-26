@@ -18,6 +18,7 @@ android/abi_gki_aarch64_exynos
 android/abi_gki_aarch64_sunxi
 android/abi_gki_aarch64_virtual_device
 android/abi_gki_aarch64_transsion
+android/abi_gki_aarch64_telechips
 "
 
 FILES="${FILES}
