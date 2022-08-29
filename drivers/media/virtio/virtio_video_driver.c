@@ -25,6 +25,9 @@
 
 #include "virtio_video.h"
 
+#define CREATE_TRACE_POINTS
+#include "trace.h"
+
 static unsigned int debug;
 module_param(debug, uint, 0644);
 

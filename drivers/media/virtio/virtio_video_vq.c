@@ -22,6 +22,8 @@
 
 #include "virtio_video.h"
 
+#include "trace.h"
+
 #define MAX_INLINE_CMD_SIZE   298
 #define MAX_INLINE_RESP_SIZE  298
 #define VBUFFER_SIZE          (sizeof(struct virtio_video_vbuffer) \
@@ -242,6 +244,9 @@ void virtio_video_dequeue_cmd_func(struct work_struct *work)
 		    cpu_to_le32(VIRTIO_VIDEO_RESP_ERR_INVALID_OPERATION))
 			v4l2_dbg(1, vv->debug, &vv->v4l2_dev,
 				 "response 0x%x\n", le32_to_cpu(resp->type));
+
+		trace_virtio_video_cmd_done((struct virtio_video_cmd_hdr *) entry->buf);
+
 		if (entry->resp_cb)
 			entry->resp_cb(vv, entry);
 
@@ -321,6 +326,8 @@ static int virtio_video_queue_cmd_buffer(struct virtio_video *vv,
 					  struct virtio_video_vbuffer *vbuf)
 {
 	int ret;
+
+	trace_virtio_video_cmd((struct virtio_video_cmd_hdr *) vbuf->buf);
 
 	spin_lock(&vv->commandq.qlock);
 	ret = virtio_video_queue_cmd_buffer_locked(vv, vbuf);
@@ -606,15 +613,24 @@ static void
 virtio_video_cmd_resource_queue_cb(struct virtio_video *vv,
 				   struct virtio_video_vbuffer *vbuf)
 {
-	uint32_t flags, bytesused;
+	uint32_t stream_id, flags, bytesused, queue_type;
 	uint64_t timestamp;
 	struct virtio_video_buffer *virtio_vb = vbuf->priv;
+	struct virtio_video_resource_queue *req =
+		(struct virtio_video_resource_queue *)vbuf->buf;
 	struct virtio_video_resource_queue_resp *resp =
 		(struct virtio_video_resource_queue_resp *)vbuf->resp_buf;
 
+	queue_type = le32_to_cpu(req->queue_type);
+
+	stream_id = le32_to_cpu(resp->hdr.stream_id);
 	flags = le32_to_cpu(resp->flags);
 	bytesused = le32_to_cpu(resp->size);
 	timestamp = le64_to_cpu(resp->timestamp);
+
+	trace_virtio_video_resource_queue_done(stream_id,
+		virtio_vb->resource_id, &bytesused, 1, queue_type,
+		timestamp);
 
 	virtio_video_buf_done(virtio_vb, flags, timestamp, bytesused);
 }
@@ -658,6 +674,10 @@ int virtio_video_cmd_resource_queue(struct virtio_video *vv, uint32_t stream_id,
 	memset(resp_p, 0, sizeof(*resp_p));
 
 	vbuf->priv = virtio_vb;
+
+	trace_virtio_video_resource_queue(stream_id,
+		virtio_vb->resource_id, data_size, num_data_size, queue_type,
+		virtio_vb->v4l2_m2m_vb.vb.vb2_buf.timestamp);
 
 	return virtio_video_queue_cmd_buffer(vv, vbuf);
 }
