@@ -11,7 +11,6 @@
 #include <linux/tracepoint.h>
 #include <trace/hooks/sched.h>
 #include <trace/hooks/cpu.h>
-#include <trace/hooks/fpsimd.h>
 #include <trace/hooks/binder.h>
 #include <trace/hooks/rwsem.h>
 #include <trace/hooks/futex.h>
@@ -100,7 +99,6 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_sk_free);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_nf_conn_alloc);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_nf_conn_free);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_arch_set_freq_scale);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_is_fpsimd_save);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_binder_transaction_init);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_binder_priority_skip);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_binder_set_priority);
