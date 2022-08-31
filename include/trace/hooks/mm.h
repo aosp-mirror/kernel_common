@@ -8,30 +8,20 @@
 #define _TRACE_HOOK_MM_H
 
 #include <linux/types.h>
-
-#include <linux/mm.h>
-#include <linux/oom.h>
 #include <trace/hooks/vendor_hooks.h>
 
 #ifdef __GENKSYMS__
+#include <linux/mm.h>
+#include <linux/oom.h>
+#endif
+
+struct oom_control;
 struct cma;
 struct acr_info;
 struct compact_control;
 struct slabinfo;
 struct cgroup_subsys_state;
 struct mem_cgroup;
-#else
-/* struct compact_control */
-#include <../mm/internal.h>
-/* struct slabinfo */
-#include <../mm/slab.h>
-/* struct cgroup_subsys_state */
-#include <linux/cgroup-defs.h>
-/* struct acr_info */
-#include <linux/gfp.h>
-/* struct mem_cgroup */
-#include <linux/memcontrol.h>
-#endif /* __GENKSYMS__ */
 struct cma;
 struct acr_info;
 

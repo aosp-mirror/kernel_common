@@ -8,7 +8,12 @@
 #define _TRACE_HOOK_GPIOLIB_H
 
 #include <trace/hooks/vendor_hooks.h>
+
+#ifdef __GENKSYMS__
 #include "../drivers/gpio/gpiolib.h"
+#endif
+
+struct gpio_device;
 
 DECLARE_HOOK(android_vh_gpio_block_read,
 	TP_PROTO(struct gpio_device *gdev, bool *block_gpio_read),

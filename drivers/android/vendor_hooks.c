@@ -5,6 +5,28 @@
  *
  * Copyright 2020 Google LLC
  */
+#ifndef __GENKSYMS__
+#include <uapi/linux/hdreg.h>
+#include <net/addrconf.h>
+#include <linux/fsverity.h>
+#include <linux/ipc_namespace.h>
+#include <linux/key-type.h>
+#include <linux/mtd/mtd.h>
+#include <linux/pr.h>
+#include <linux/time_namespace.h>
+#include <net/macsec.h>
+#include <net/netfilter/nf_log.h>
+#include <net/raw.h>
+#include <net/smc.h>
+#include <../drivers/net/wireless/intel/ipw2x00/libipw.h>
+#include <../fs/mount.h>
+#include <../fs/kernfs/kernfs-internal.h>
+#include <../kernel/audit.h>
+#include <../net/can/af_can.h>
+#include <../net/tipc/bearer.h>
+#include <../net/xdp/xsk_queue.h>
+#include <../security/keys/internal.h>
+#endif
 
 #define CREATE_TRACE_POINTS
 #include <trace/hooks/vendor_hooks.h>

@@ -9,7 +9,6 @@
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
  */
-#ifdef __GENKSYMS__
 struct cgroup_taskset;
 struct cgroup_subsys_state;
 struct cpufreq_policy;
@@ -18,20 +17,7 @@ enum uclamp_id;
 struct sched_entity;
 struct task_struct;
 struct uclamp_se;
-#else
-/* Including ../kernel/cgroup/cgroup-internal.h breaks builds. */
-struct cgroup_taskset;
-/* struct cgroup_subsys_state */
-#include <linux/cgroup-defs.h>
-/* struct cpufreq_policy */
-#include <linux/cpufreq.h>
-/* struct em_perf_domain */
-#include <linux/energy_model.h>
-/* enum uclamp_id, struct sched_entity, struct task_struct, struct uclamp_se */
-#include <linux/sched.h>
-/* Only defined with CONFIG_UCLAMP_TASK, so declare unconditionally. */
-struct uclamp_se;
-#endif /* __GENKSYMS__ */
+
 DECLARE_RESTRICTED_HOOK(android_rvh_select_task_rq_fair,
 	TP_PROTO(struct task_struct *p, int prev_cpu, int sd_flag, int wake_flags, int *new_cpu),
 	TP_ARGS(p, prev_cpu, sd_flag, wake_flags, new_cpu), 1);

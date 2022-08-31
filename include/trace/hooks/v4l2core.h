@@ -9,7 +9,6 @@
 
 #include <trace/hooks/vendor_hooks.h>
 
-#ifdef __GENKSYMS__
 struct v4l2_subdev;
 struct v4l2_subdev_pad_config;
 struct v4l2_subdev_format;
@@ -17,14 +16,7 @@ struct v4l2_subdev_frame_interval;
 struct v4l2_subdev_selection;
 struct v4l2_fmtdesc;
 struct v4l2_format;
-#else
-/* struct v4l2_subdev, struct v4l2_subdev_pad_config */
-#include <media/v4l2-subdev.h>
-/* struct v4l2_subdev_format, struct v4l2_subdev_frame_interval, struct v4l2_subdev_selection */
-#include <uapi/linux/v4l2-subdev.h>
-/* struct v4l2_fmtdesc, struct v4l2_format */
-#include <uapi/linux/videodev2.h>
-#endif /* __GENKSYMS__ */
+
 DECLARE_HOOK(android_vh_clear_reserved_fmt_fields,
 	TP_PROTO(struct v4l2_format *fmt, int *ret),
 	TP_ARGS(fmt, ret));

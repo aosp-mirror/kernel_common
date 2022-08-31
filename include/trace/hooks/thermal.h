@@ -10,12 +10,8 @@
 #include <trace/hooks/vendor_hooks.h>
 #include <linux/cpufreq.h>
 
-#ifdef __GENKSYMS__
 struct thermal_zone_device;
-#else
-/* struct thermal_zone_device */
-#include <linux/thermal.h>
-#endif /* __GENKSYMS__ */
+
 DECLARE_HOOK(android_vh_enable_thermal_genl_check,
 	TP_PROTO(int event, int tz_id, int *enable_thermal_genl),
 	TP_ARGS(event, tz_id, enable_thermal_genl));

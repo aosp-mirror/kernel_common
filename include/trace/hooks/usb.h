@@ -5,8 +5,14 @@
 #define TRACE_INCLUDE_PATH trace/hooks
 #if !defined(_TRACE_HOOK_USB_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_USB_H
-#include <linux/usb.h>
 #include <trace/hooks/vendor_hooks.h>
+
+#ifdef __GENKSYMS__
+#include <linux/usb.h>
+#endif
+
+struct usb_device;
+
 /*
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
