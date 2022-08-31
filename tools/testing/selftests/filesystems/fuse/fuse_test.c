@@ -1911,6 +1911,63 @@ out:
 	return result;
 }
 
+static int bpf_test_lookup_postfilter(const char *mount_dir)
+{
+	const char *file1_name = "file1";
+	const char *file2_name = "file2";
+	int result = TEST_FAILURE;
+	int bpf_fd = -1;
+	int src_fd = -1;
+	int fuse_dev = -1;
+	int file_fd = -1;
+	int pid = -1;
+	int status;
+
+	TEST(file_fd = s_creat(s_path(s(ft_src), s(file1_name)), 0777),
+	     file_fd != -1);
+	TESTSYSCALL(close(file_fd));
+	TEST(file_fd = s_creat(s_path(s(ft_src), s(file2_name)), 0777),
+	     file_fd != -1);
+	TESTSYSCALL(close(file_fd));
+	file_fd = -1;
+	TESTEQUAL(install_elf_bpf("test_bpf.bpf", "test_lookup_postfilter",
+					  &bpf_fd, NULL, NULL), 0);
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TESTEQUAL(mount_fuse(mount_dir, bpf_fd, src_fd, &fuse_dev), 0);
+	FUSE_ACTION
+		int fd = -1;
+
+		TESTEQUAL(s_open(s_path(s(mount_dir), s(file1_name)), O_RDONLY),
+			  -1);
+		TESTEQUAL(errno, ENOENT);
+		TEST(fd = s_open(s_path(s(mount_dir), s(file2_name)), O_RDONLY),
+		     fd != -1);
+		TESTSYSCALL(close(fd));
+	FUSE_DAEMON
+		struct fuse_entry_out *feo;
+		struct fuse_entry_bpf_out *febo;
+
+		TESTFUSELOOKUP(file1_name, FUSE_POSTFILTER);
+		TESTFUSEOUTERROR(-ENOENT);
+		TESTFUSELOOKUP(file2_name, FUSE_POSTFILTER);
+		feo = (struct fuse_entry_out *) (bytes_in +
+			sizeof(struct fuse_in_header) +	strlen(file2_name) + 1);
+		febo = (struct fuse_entry_bpf_out *) ((char *)feo +
+			sizeof(*feo));
+		TESTFUSEOUT2(fuse_entry_out, *feo, fuse_entry_bpf_out, *febo);
+	FUSE_DONE
+
+	result = TEST_SUCCESS;
+out:
+	close(file_fd);
+	close(fuse_dev);
+	umount(mount_dir);
+	close(src_fd);
+	close(bpf_fd);
+	return result;
+}
+
 static int parse_options(int argc, char *const *argv)
 {
 	signed char c;
@@ -2017,7 +2074,8 @@ int main(int argc, char *argv[])
 		MAKE_TEST(bpf_test_lseek),
 		MAKE_TEST(bpf_test_readdirplus_not_overriding_backing),
 		MAKE_TEST(bpf_test_no_readdirplus_without_nodeid),
-		MAKE_TEST(bpf_test_revalidate_handle_backing_fd)
+		MAKE_TEST(bpf_test_revalidate_handle_backing_fd),
+		MAKE_TEST(bpf_test_lookup_postfilter),
 	};
 #undef MAKE_TEST
 
