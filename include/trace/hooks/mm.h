@@ -131,9 +131,6 @@ DECLARE_HOOK(android_vh_show_stack_hash,
 DECLARE_HOOK(android_vh_save_track_hash,
 	TP_PROTO(bool alloc, unsigned long p),
 	TP_ARGS(alloc, p));
-DECLARE_HOOK(android_vh_vmpressure,
-	TP_PROTO(struct mem_cgroup *memcg, bool *bypass),
-	TP_ARGS(memcg, bypass));
 DECLARE_HOOK(android_vh_mem_cgroup_alloc,
 	TP_PROTO(struct mem_cgroup *memcg),
 	TP_ARGS(memcg));
@@ -149,6 +146,14 @@ DECLARE_HOOK(android_vh_mem_cgroup_css_online,
 DECLARE_HOOK(android_vh_mem_cgroup_css_offline,
 	TP_PROTO(struct cgroup_subsys_state *css, struct mem_cgroup *memcg),
 	TP_ARGS(css, memcg));
+DECLARE_HOOK(android_vh_alloc_pages_reclaim_bypass,
+	TP_PROTO(gfp_t gfp_mask, int order, int alloc_flags,
+	int migratetype, struct page **page),
+	TP_ARGS(gfp_mask, order, alloc_flags, migratetype, page));
+DECLARE_HOOK(android_vh_alloc_pages_failure_bypass,
+	TP_PROTO(gfp_t gfp_mask, int order, int alloc_flags,
+	int migratetype, struct page **page),
+	TP_ARGS(gfp_mask, order, alloc_flags, migratetype, page));
 /* macro versions of hooks are no longer required */
 
 #endif /* _TRACE_HOOK_MM_H */

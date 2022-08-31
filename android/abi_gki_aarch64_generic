@@ -1195,6 +1195,7 @@
   kobject_init
   kobject_init_and_add
   kobject_put
+  kobject_rename
   kobject_uevent
   kobject_uevent_env
   kobj_sysfs_ops
