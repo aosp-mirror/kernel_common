@@ -107,8 +107,21 @@ static ssize_t identity_show(struct device *dev,
 }
 DEVICE_ATTR_RO(identity);
 
+static ssize_t reset_store(struct device *dev, struct device_attribute *attr,
+			   const char *buf, size_t count)
+{
+	struct hci_dev *hdev = to_hci_dev(dev);
+
+	if (hdev->cmd_timeout)
+		hdev->cmd_timeout(hdev);
+
+	return count;
+}
+DEVICE_ATTR_WO(reset);
+
 static struct attribute *bt_host_attrs[] = {
 	&dev_attr_identity.attr,
+	&dev_attr_reset.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(bt_host);
