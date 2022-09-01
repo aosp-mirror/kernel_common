@@ -29,7 +29,7 @@ define_common_kernels(target_configs = {
         # TODO(b/188620248): re-enable trimming
         "trim_nonlisted_kmi": False,
         "kmi_symbol_list_strict_mode": False,
-        "module_outs": [
+        "module_implicit_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
         ],
@@ -38,7 +38,7 @@ define_common_kernels(target_configs = {
         # TODO(b/188620248): re-enable trimming
         "trim_nonlisted_kmi": False,
         "kmi_symbol_list_strict_mode": False,
-        "module_outs": [
+        "module_implicit_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
         ],
