@@ -9,6 +9,8 @@
 
 #include <trace/hooks/vendor_hooks.h>
 
+struct task_struct;
+
 DECLARE_HOOK(android_vh_check_uninterruptible_tasks,
 	TP_PROTO(struct task_struct *t, unsigned long timeout,
 		bool *need_check),

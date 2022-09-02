@@ -10,8 +10,9 @@
  * mechanism for vendor modules to hook and extend functionality
  */
 
-/* struct rw_semaphore, struct rwsem_waiter */
-#include <linux/rwsem.h>
+struct rw_semaphore;
+struct rwsem_waiter;
+
 DECLARE_HOOK(android_vh_rwsem_init,
 	TP_PROTO(struct rw_semaphore *sem),
 	TP_ARGS(sem));

@@ -6,7 +6,6 @@
 
 #if !defined(_TRACE_HOOK_IPV4_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_IPV4_H
-#include <linux/tracepoint.h>
 #include <trace/hooks/vendor_hooks.h>
 
 DECLARE_RESTRICTED_HOOK(android_rvh_tcp_sendmsg_locked,

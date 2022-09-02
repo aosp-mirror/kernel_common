@@ -10,10 +10,9 @@
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
  */
-/* struct cred */
-#include <linux/cred.h>
-/* struct task_struct */
-#include <linux/sched.h>
+struct cred;
+struct task_struct;
+
 DECLARE_RESTRICTED_HOOK(android_rvh_commit_creds,
 	TP_PROTO(const struct task_struct *task, const struct cred *new),
 	TP_ARGS(task, new), 1);

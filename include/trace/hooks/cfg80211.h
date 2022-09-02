@@ -8,7 +8,9 @@
 #define _TRACE_HOOK_CFG80211_H
 
 #include <trace/hooks/vendor_hooks.h>
-#include <net/cfg80211.h>
+
+struct wiphy;
+struct wireless_dev;
 
 DECLARE_HOOK(android_vh_cfg80211_set_context,
 	TP_PROTO(struct wiphy *wiphy, struct wireless_dev *wdev, int context_id,

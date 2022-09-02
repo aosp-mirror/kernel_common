@@ -9,8 +9,7 @@
 
 #include <trace/hooks/vendor_hooks.h>
 
-/* struct pt_regs */
-#include <asm/ptrace.h>
+struct pt_regs;
 
 DECLARE_HOOK(android_vh_ipi_stop,
 	TP_PROTO(struct pt_regs *regs),

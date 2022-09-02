@@ -8,8 +8,8 @@
 #define _TRACE_HOOK_GIC_H
 
 #include <trace/hooks/vendor_hooks.h>
-/* struct irq_data */
-#include <linux/irq.h>
+
+struct irq_data;
 struct gic_chip_data;
 
 DECLARE_HOOK(android_vh_gic_resume,

@@ -10,8 +10,8 @@
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
  */
-/* struct task_struct */
-#include <linux/sched.h>
+struct task_struct;
+
 DECLARE_HOOK(android_vh_mpam_set,
 	TP_PROTO(struct task_struct *prev, struct task_struct *next),
 	TP_ARGS(prev, next));

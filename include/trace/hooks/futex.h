@@ -6,7 +6,9 @@
 #if !defined(_TRACE_HOOK_FUTEX_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_FUTEX_H
 #include <trace/hooks/vendor_hooks.h>
-#include <linux/plist.h>
+
+struct plist_node;
+struct plist_head;
 /*
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
