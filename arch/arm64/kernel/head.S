@@ -295,7 +295,7 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 
 #ifdef CONFIG_ARM64_VA_BITS_52
 	mrs_s	x6, SYS_ID_AA64MMFR2_EL1
-	and	x6, x6, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+	and	x6, x6, #(0xf << ID_AA64MMFR2_EL1_LVA_SHIFT)
 	mov	x5, #52
 	cbnz	x6, 1f
 #endif
@@ -726,7 +726,7 @@ SYM_FUNC_START(__cpu_secondary_check52bitva)
 	b.ne	2f
 
 	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
-	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+	and	x0, x0, #(0xf << ID_AA64MMFR2_EL1_LVA_SHIFT)
 	cbnz	x0, 2f
 
 	update_early_cpu_boot_status \
