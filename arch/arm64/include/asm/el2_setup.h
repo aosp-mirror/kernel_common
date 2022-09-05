@@ -97,7 +97,7 @@
 /* GICv3 system register access */
 .macro __init_el2_gicv3
 	mrs	x0, id_aa64pfr0_el1
-	ubfx	x0, x0, #ID_AA64PFR0_GIC_SHIFT, #4
+	ubfx	x0, x0, #ID_AA64PFR0_EL1_GIC_SHIFT, #4
 	cbz	x0, .Lskip_gicv3_\@
 
 	mrs_s	x0, SYS_ICC_SRE_EL2
@@ -132,7 +132,7 @@
 /* SVE register access */
 .macro __init_el2_nvhe_sve
 	mrs	x1, id_aa64pfr0_el1
-	ubfx	x1, x1, #ID_AA64PFR0_SVE_SHIFT, #4
+	ubfx	x1, x1, #ID_AA64PFR0_EL1_SVE_SHIFT, #4
 	cbz	x1, .Lskip_sve_\@
 
 	bic	x0, x0, #CPTR_EL2_TZ		// Also disable SVE traps
@@ -220,7 +220,7 @@
 	msr_s	SYS_HFGITR_EL2, xzr
 
 	mrs	x1, id_aa64pfr0_el1		// AMU traps UNDEF without AMU
-	ubfx	x1, x1, #ID_AA64PFR0_AMU_SHIFT, #4
+	ubfx	x1, x1, #ID_AA64PFR0_EL1_AMU_SHIFT, #4
 	cbz	x1, .Lskip_fgt_\@
 
 	msr_s	SYS_HAFGRTR_EL2, xzr
@@ -236,7 +236,7 @@
 #ifdef CONFIG_ARM64_MPAM
 	/* Memory Partioning And Monitoring: disable EL2 traps */
 	mrs	x1, id_aa64pfr0_el1
-	ubfx	x0, x1, #ID_AA64PFR0_MPAM_SHIFT, #4
+	ubfx	x0, x1, #ID_AA64PFR0_EL1_MPAM_SHIFT, #4
 	cbz	x0, .Lskip_mpam_\@		// skip if no MPAM
 	msr_s	SYS_MPAM0_EL1, xzr		// use the default partition..
 	msr_s	SYS_MPAM2_EL2, xzr		// ..and disable lower traps
