@@ -53,8 +53,8 @@ static const struct ftr_set_desc pfr1 __initconst = {
 	.name		= "id_aa64pfr1",
 	.override	= &id_aa64pfr1_override,
 	.fields		= {
-		{ "bt", ID_AA64PFR1_BT_SHIFT },
-		{ "mte", ID_AA64PFR1_MTE_SHIFT},
+		{ "bt", ID_AA64PFR1_EL1_BT_SHIFT },
+		{ "mte", ID_AA64PFR1_EL1_MTE_SHIFT },
 		{}
 	},
 };
