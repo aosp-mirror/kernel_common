@@ -2666,6 +2666,7 @@
   xa_find
   xa_find_after
   xa_get_mark
+  __xa_insert
   xa_load
   xa_set_mark
   xa_store
