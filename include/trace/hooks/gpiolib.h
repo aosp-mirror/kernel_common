@@ -10,13 +10,9 @@
 #include <trace/hooks/vendor_hooks.h>
 #include "../drivers/gpio/gpiolib.h"
 
-#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS)
 DECLARE_HOOK(android_vh_gpio_block_read,
 	TP_PROTO(struct gpio_device *gdev, bool *block_gpio_read),
 	TP_ARGS(gdev, block_gpio_read));
-#else
-#define trace_android_vh_gpio_block_read(gdev, block_gpio_read)
-#endif
 
 #endif /* _TRACE_HOOK_GPIOLIB_H */
 /* This part must be outside protection */
