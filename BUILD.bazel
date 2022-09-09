@@ -17,7 +17,9 @@ package(
     ],
 )
 
+load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:common_kernels.bzl", "define_common_kernels", "define_db845c")
+load("//build/kernel/kleaf:kernel.bzl", "kernel_build")
 
 # This uses android/abi_gki_aarch64* in kmi_configs. If the list of
 # glob(["android/abi_gki_aarch64*"]) differs from
@@ -217,4 +219,21 @@ define_db845c(
         "sound/soc/qcom/snd-soc-sdm845.ko",
         "sound/soc/qcom/snd-soc-sm8250.ko",
     ],
+)
+
+kernel_build(
+    name = "fips140",
+    outs = [],
+    base_kernel = ":kernel_aarch64",
+    build_config = "build.config.gki.aarch64.fips140",
+    module_outs = ["crypto/fips140.ko"],
+)
+
+copy_to_dist_dir(
+    name = "fips140_dist",
+    data = [
+        ":fips140",
+    ],
+    dist_dir = "out/fips140/dist",
+    flat = True,
 )
