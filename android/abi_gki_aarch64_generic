@@ -78,6 +78,7 @@
   __bitmap_set
   bitmap_to_arr32
   __bitmap_weight
+  __bitmap_xor
   blk_abort_request
   blk_alloc_queue
   blk_check_plugged
