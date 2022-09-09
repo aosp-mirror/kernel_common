@@ -486,8 +486,10 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 				spin_unlock_irq(&cma->lock);
 
 				if (fatal_signal_pending(current) ||
-				    (gfp_mask & __GFP_NORETRY))
+				    (gfp_mask & __GFP_NORETRY)) {
+					ret = -EINTR;
 					break;
+				}
 
 				/*
 				 * Page may be momentarily pinned by some other
