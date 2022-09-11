@@ -60,6 +60,10 @@ struct kernel_info {
 	__u32 mod_kallsyms_offset;
 	__u64 module_start_va;
 	__u64 module_end_va;
+
+	/* For module scmversion */
+	__u32 enabled_module_scmversion;
+	__u32 mod_scmversion_offset;
 } __packed;
 
 struct kernel_all_info {
