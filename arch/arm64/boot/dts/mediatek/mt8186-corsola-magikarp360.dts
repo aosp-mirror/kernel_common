@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2022 Google LLC
+ */
+
+/dts-v1/;
+#include "mt8186-corsola-magikarp.dtsi"
+
+/ {
+	model = "Google Magikarp360 board";
+	compatible = "google,magikarp-sku524288", "google,magikarp", "google,corsola",
+		     "mediatek,mt8186";
+};
+
+&gpio_keys {
+	status = "okay";
+};
+
+&touchscreen {
+	status = "okay";
+};
