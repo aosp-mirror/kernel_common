@@ -55,6 +55,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(neigh_event_send_dead);
 EXPORT_TRACEPOINT_SYMBOL_GPL(neigh_cleanup_and_release);
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(kfree_skb);
+EXPORT_TRACEPOINT_SYMBOL_GPL(consume_skb);
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(napi_poll);
 
