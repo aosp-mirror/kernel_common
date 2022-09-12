@@ -1237,7 +1237,7 @@ svc_generic_init_request(struct svc_rqst *rqstp,
 	rqstp->rq_procinfo = procp = &versp->vs_proc[rqstp->rq_proc];
 
 	/* Initialize storage for argp and resp */
-	memset(rqstp->rq_argp, 0, procp->pc_argsize);
+	memset(rqstp->rq_argp, 0, procp->pc_argzero);
 	memset(rqstp->rq_resp, 0, procp->pc_ressize);
 
 	/* Bump per-procedure stats counter */
