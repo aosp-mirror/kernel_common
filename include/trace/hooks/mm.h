@@ -42,6 +42,18 @@ struct oom_control;
 DECLARE_HOOK(android_vh_oom_check_panic,
 	TP_PROTO(struct oom_control *oc, int *ret),
 	TP_ARGS(oc, ret));
+
+struct page_vma_mapped_walk;
+DECLARE_HOOK(android_vh_test_clear_look_around_ref,
+	TP_PROTO(struct page *page),
+	TP_ARGS(page));
+DECLARE_HOOK(android_vh_look_around_migrate_folio,
+	TP_PROTO(struct folio *old_folio, struct folio *new_folio),
+	TP_ARGS(old_folio, new_folio));
+DECLARE_HOOK(android_vh_look_around,
+	TP_PROTO(struct page_vma_mapped_walk *pvmw, struct folio *folio,
+		struct vm_area_struct *vma, int *referenced),
+	TP_ARGS(pvmw, folio, vma, referenced));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
