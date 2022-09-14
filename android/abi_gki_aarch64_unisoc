@@ -2833,3 +2833,5 @@
   set_blocksize
   submit_bio_wait
 
+# required by zsmalloc.ko
+  wait_on_page_bit
