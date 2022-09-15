@@ -24,6 +24,7 @@ struct cgroup_subsys_state;
 struct mem_cgroup;
 struct cma;
 struct acr_info;
+struct vm_unmapped_area_info;
 
 DECLARE_RESTRICTED_HOOK(android_rvh_set_skip_swapcache_flags,
 			TP_PROTO(gfp_t *flags),
