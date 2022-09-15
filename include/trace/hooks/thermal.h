@@ -11,6 +11,7 @@
 
 struct thermal_cooling_device;
 struct thermal_zone_device;
+struct cpufreq_policy;
 
 DECLARE_HOOK(android_vh_modify_thermal_request_freq,
 	TP_PROTO(struct cpufreq_policy *policy, unsigned long *request_freq),
