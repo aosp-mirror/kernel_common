@@ -68,6 +68,8 @@
 		vdd33-supply = <&pp3300_edp_dx>;
 		#address-cells = <1>;
 		#size-cells = <0>;
+		analogix,lane0-swing = /bits/ 8 <0x70 0x30>;
+		analogix,lane1-swing = /bits/ 8 <0x70 0x30>;
 
 		port@0 {
 			reg = <0>;
