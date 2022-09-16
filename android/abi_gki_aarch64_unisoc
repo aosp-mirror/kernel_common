@@ -487,7 +487,10 @@
   kstrtouint
   kstrtoull
   ksys_sync_helper
+  kthread_cancel_work_sync
   kthread_create_on_node
+  kthread_create_worker
+  kthread_destroy_worker
   kthread_flush_worker
   kthread_should_stop
   kthread_stop
