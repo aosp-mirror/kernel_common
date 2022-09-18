@@ -5164,6 +5164,7 @@ static ssize_t show_min_ttl(struct kobject *kobj, struct kobj_attribute *attr, c
 	return sprintf(buf, "%u\n", jiffies_to_msecs(READ_ONCE(lru_gen_min_ttl)));
 }
 
+/* see Documentation/admin-guide/mm/multigen_lru.rst for details */
 static ssize_t store_min_ttl(struct kobject *kobj, struct kobj_attribute *attr,
 			     const char *buf, size_t len)
 {
@@ -5197,6 +5198,7 @@ static ssize_t show_enabled(struct kobject *kobj, struct kobj_attribute *attr, c
 	return snprintf(buf, PAGE_SIZE, "0x%04x\n", caps);
 }
 
+/* see Documentation/admin-guide/mm/multigen_lru.rst for details */
 static ssize_t store_enabled(struct kobject *kobj, struct kobj_attribute *attr,
 			     const char *buf, size_t len)
 {
@@ -5344,6 +5346,7 @@ static void lru_gen_seq_show_full(struct seq_file *m, struct lruvec *lruvec,
 	seq_putc(m, '\n');
 }
 
+/* see Documentation/admin-guide/mm/multigen_lru.rst for details */
 static int lru_gen_seq_show(struct seq_file *m, void *v)
 {
 	unsigned long seq;
@@ -5502,6 +5505,7 @@ done:
 	return err;
 }
 
+/* see Documentation/admin-guide/mm/multigen_lru.rst for details */
 static ssize_t lru_gen_seq_write(struct file *file, const char __user *src,
 				 size_t len, loff_t *pos)
 {
