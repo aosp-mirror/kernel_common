@@ -135,26 +135,40 @@
 			};
 		};
 
-		anx-mux@0 {
-			compatible = "typec-mode-switch";
-			reg = <0>;
-			accessory;
+		switches {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			switch@0 {
+				compatible = "typec-switch";
+				reg = <0>;
+				mode-switch;
 
-			port {
-				anx_typec0: endpoint {
-					remote-endpoint = <&typec_port0>;
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						anx_typec0: endpoint {
+							remote-endpoint = <&typec_port0>;
+						};
+					};
 				};
 			};
-		};
 
-		anx-mux@1 {
-			compatible = "typec-mode-switch";
-			reg = <1>;
-			accessory;
+			switch@1 {
+				compatible = "typec-switch";
+				reg = <1>;
+				mode-switch;
 
-			port {
-				anx_typec1: endpoint {
-					remote-endpoint = <&typec_port1>;
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						anx_typec1: endpoint {
+							remote-endpoint = <&typec_port1>;
+						};
+					};
 				};
 			};
 		};
