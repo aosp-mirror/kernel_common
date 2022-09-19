@@ -17,6 +17,7 @@
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/types.h>
+#include <linux/usb/typec_mux.h>
 #include <linux/wait.h>
 
 #include <crypto/hash.h>
@@ -401,6 +402,11 @@ struct debugfs_entries {
 	const struct file_operations *fops;
 };
 
+struct it6505_port_data {
+	struct typec_mux_dev *typec_mux;
+	struct it6505 *it6505;
+};
+
 struct it6505 {
 	struct drm_dp_aux aux;
 	struct drm_bridge bridge;
@@ -455,6 +461,7 @@ struct it6505 {
 	struct it6505_audio_data audio;
 	struct dentry *debugfs;
 	int num_typec_switches;
+	struct it6505_port_data *typec_ports;
 
 	/* it6505 driver hold option */
 	bool enable_drv_hold;
@@ -3431,9 +3438,59 @@ static void it6505_shutdown(struct i2c_client *client)
 		it6505_lane_off(it6505);
 }
 
+static int it6505_typec_mux_set(struct typec_mux_dev *mux,
+				struct typec_mux_state *state)
+{
+	return 0;
+}
+
+static int it6505_register_mode_switch(struct device *dev, struct device_node *node,
+					struct it6505 *it6505)
+{
+	struct it6505_port_data *port_data;
+	struct typec_mux_desc mux_desc = {};
+	char name[32];
+	u32 port_num;
+	int ret;
+
+	ret = of_property_read_u32(node, "reg", &port_num);
+	if (ret)
+		return ret;
+
+	if (port_num >= it6505->num_typec_switches) {
+		dev_err(dev, "Invalid port number specified: %d\n", port_num);
+		return -EINVAL;
+	}
+
+	port_data = &it6505->typec_ports[port_num];
+	port_data->it6505 = it6505;
+	mux_desc.fwnode = &node->fwnode;
+	mux_desc.drvdata = port_data;
+	snprintf(name, sizeof(name), "%s-%u", node->name, port_num);
+	mux_desc.name = name;
+	mux_desc.set = it6505_typec_mux_set;
+
+	port_data->typec_mux = typec_mux_register(dev, &mux_desc);
+	if (IS_ERR(port_data->typec_mux)) {
+		ret = PTR_ERR(port_data->typec_mux);
+		dev_err(dev, "Mode switch register for port %d failed: %d", port_num, ret);
+	}
+
+	return ret;
+}
+
+static void it6505_unregister_typec_switches(struct it6505 *it6505)
+{
+	int i;
+
+	for (i = 0; i < it6505->num_typec_switches; i++)
+		typec_mux_unregister(it6505->typec_ports[i].typec_mux);
+}
+
 static int it6505_register_typec_switches(struct device *device, struct it6505 *it6505)
 {
-	struct device_node *of;
+	struct device_node *of, *sw;
+	int ret = 0;
 
 	of = of_get_child_by_name(device->of_node, "switches");
 	if (!of)
@@ -3442,8 +3499,29 @@ static int it6505_register_typec_switches(struct device *device, struct it6505 *
 	it6505->num_typec_switches = of_get_child_count(of);
 	if (it6505->num_typec_switches <= 0)
 		return -ENODEV;
+	it6505->typec_ports = devm_kzalloc(device,
+					   it6505->num_typec_switches *
+					   sizeof(struct it6505_port_data),
+					   GFP_KERNEL);
+	if (!it6505->typec_ports)
+		return -ENOMEM;
 
-	return 0;
+	/* Register switches for each connector. */
+	for_each_available_child_of_node(of, sw) {
+		if (!of_property_read_bool(sw, "mode-switch"))
+			continue;
+		ret = it6505_register_mode_switch(device, sw, it6505);
+		if (ret) {
+			dev_err(device, "Failed to register mode switch: %d\n", ret);
+			of_node_put(sw);
+			break;
+		}
+	}
+
+	if (ret)
+		it6505_unregister_typec_switches(it6505);
+
+	return ret;
 }
 
 static int it6505_i2c_probe(struct i2c_client *client)
@@ -3480,7 +3558,8 @@ static int it6505_i2c_probe(struct i2c_client *client)
 
 	ret = it6505_register_typec_switches(dev, it6505);
 	if (ret) {
-		dev_dbg(dev, "Didn't register Type C switches, err: %d", ret);
+		if (ret != -ENODEV)
+			dev_warn(dev, "Didn't register Type C switches, err: %d", ret);
 		if (!it6505->extcon) {
 			dev_err(dev, "Both extcon and typec-switch are not registered.");
 			return -EINVAL;
@@ -3562,7 +3641,7 @@ static void it6505_i2c_remove(struct i2c_client *client)
 	drm_dp_aux_unregister(&it6505->aux);
 	it6505_debugfs_remove(it6505);
 	it6505_poweroff(it6505);
-	it6505_remove_edid(it6505);
+	it6505_unregister_typec_switches(it6505);
 }
 
 static const struct i2c_device_id it6505_id[] = {
