@@ -17,6 +17,7 @@
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/types.h>
+#include <linux/usb/typec_dp.h>
 #include <linux/usb/typec_mux.h>
 #include <linux/wait.h>
 
@@ -403,6 +404,7 @@ struct debugfs_entries {
 };
 
 struct it6505_port_data {
+	bool dp_connected;
 	struct typec_mux_dev *typec_mux;
 	struct it6505 *it6505;
 };
@@ -3438,9 +3440,74 @@ static void it6505_shutdown(struct i2c_client *client)
 		it6505_lane_off(it6505);
 }
 
+static void it6505_typec_ports_update(struct it6505 *it6505)
+{
+	usleep_range(3000, 4000);
+
+	if (it6505->typec_ports[0].dp_connected && it6505->typec_ports[1].dp_connected)
+		/* Both ports available, do nothing to retain the current one. */
+		return;
+	else if (it6505->typec_ports[0].dp_connected)
+		it6505->lane_swap = false;
+	else if (it6505->typec_ports[1].dp_connected)
+		it6505->lane_swap = true;
+
+	usleep_range(3000, 4000);
+}
+
 static int it6505_typec_mux_set(struct typec_mux_dev *mux,
 				struct typec_mux_state *state)
 {
+	struct it6505_port_data *data = typec_mux_get_drvdata(mux);
+	struct it6505 *it6505 = data->it6505;
+	struct device *dev = it6505->dev;
+	bool old_dp_connected, new_dp_connected;
+
+	if (it6505->num_typec_switches == 1)
+		return 0;
+
+	mutex_lock(&it6505->extcon_lock);
+
+	old_dp_connected = it6505->typec_ports[0].dp_connected ||
+			   it6505->typec_ports[1].dp_connected;
+
+	data->dp_connected = (state->alt && state->alt->svid == USB_TYPEC_DP_SID &&
+			      state->alt->mode == USB_TYPEC_DP_MODE);
+
+	dev_dbg(dev, "mux_set dp_connected: c0=%d, c1=%d\n",
+		it6505->typec_ports[0].dp_connected, it6505->typec_ports[1].dp_connected);
+
+	new_dp_connected = it6505->typec_ports[0].dp_connected ||
+			   it6505->typec_ports[1].dp_connected;
+
+	if (it6505->enable_drv_hold) {
+		dev_dbg(dev, "enable driver hold");
+		goto unlock;
+	}
+
+	it6505_typec_ports_update(it6505);
+
+	if (!old_dp_connected && new_dp_connected) {
+		int ret = pm_runtime_get_sync(dev);
+
+		/*
+		 * On system resume, mux_set can be triggered before
+		 * pm_runtime_force_resume re-enables runtime power management.
+		 * Handling the error here to make sure the bridge is powered on.
+		 */
+		if (ret < 0)
+			it6505_poweron(it6505);
+	}
+
+	if (old_dp_connected && !new_dp_connected) {
+		pm_runtime_put_sync(dev);
+		if (it6505->bridge.dev)
+			drm_helper_hpd_irq_event(it6505->bridge.dev);
+		memset(it6505->dpcd, 0, sizeof(it6505->dpcd));
+	}
+
+unlock:
+	mutex_unlock(&it6505->extcon_lock);
 	return 0;
 }
 
