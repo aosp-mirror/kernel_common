@@ -10,7 +10,6 @@
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
  */
-#ifdef __GENKSYMS__
 struct binder_alloc;
 struct binder_proc;
 struct binder_thread;
@@ -18,18 +17,7 @@ struct binder_transaction;
 struct task_struct;
 struct seq_file;
 struct binder_transaction_data;
-#else
-/* struct binder_alloc */
-#include <../drivers/android/binder_alloc.h>
-/* struct binder_proc, struct binder_thread, struct binder_transaction */
-#include <../drivers/android/binder_internal.h>
-/* struct task_struct */
-#include <linux/sched.h>
-/* struct seq_file */
-#include <linux/seq_file.h>
-/* struct binder_transaction_data */
-#include <uapi/linux/android/binder.h>
-#endif /* __GENKSYMS__ */
+
 DECLARE_HOOK(android_vh_binder_transaction_init,
 	TP_PROTO(struct binder_transaction *t),
 	TP_ARGS(t));

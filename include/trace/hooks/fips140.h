@@ -7,12 +7,7 @@
 #define _TRACE_HOOK_FIPS140_H
 #include <trace/hooks/vendor_hooks.h>
 
-#ifdef __GENKSYMS__
 struct crypto_aes_ctx;
-#else
-/* struct crypto_aes_ctx */
-#include <crypto/aes.h>
-#endif /* __GENKSYMS__ */
 
 /*
  * These hooks exist only for the benefit of the FIPS140 crypto module, which

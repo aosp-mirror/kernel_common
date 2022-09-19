@@ -8,24 +8,12 @@
 #define _TRACE_HOOK_NET_VH_H
 #include <trace/hooks/vendor_hooks.h>
 
-#ifdef __GENKSYMS__
 struct packet_type;
 struct sk_buff;
 struct list_head;
 struct nf_conn;
 struct sock;
-#else
-/* struct packet_type */
-#include <linux/netdevice.h>
-/* struct sk_buff */
-#include <linux/skbuff.h>
-/* struct list_head */
-#include <linux/types.h>
-/* struct nf_conn */
-#include <net/netfilter/nf_conntrack.h>
-/* struct sock */
-#include <net/sock.h>
-#endif /* __GENKSYMS__ */
+
 DECLARE_HOOK(android_vh_ptype_head,
 	TP_PROTO(const struct packet_type *pt, struct list_head *vendor_pt),
 	TP_ARGS(pt, vendor_pt));

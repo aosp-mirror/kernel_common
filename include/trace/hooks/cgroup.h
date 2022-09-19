@@ -7,18 +7,10 @@
 #define _TRACE_HOOK_CGROUP_H
 #include <trace/hooks/vendor_hooks.h>
 
-#ifdef __GENKSYMS__
 struct cgroup_taskset;
 struct cgroup_subsys;
 struct task_struct;
-#else
-/* Including ../kernel/cgroup/cgroup-internal.h breaks builds. */
-struct cgroup_taskset;
-/* struct cgroup_subsys */
-#include <linux/cgroup-defs.h>
-/* struct task_struct */
-#include <linux/sched.h>
-#endif /* __GENKSYMS__ */
+
 DECLARE_HOOK(android_vh_cgroup_set_task,
 	TP_PROTO(int ret, struct task_struct *task),
 	TP_ARGS(ret, task));
