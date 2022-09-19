@@ -340,6 +340,19 @@
 		/* Toggle WLAN_MODULE_RST_L to reset the chip */
 		reset-gpios = <&pio 54 1>;
 	};
+
+	wifi_wakeup: wifi-wakeup {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&wifi_pins_wakeup>;
+
+		wowlan {
+			label = "Wake on WiFi";
+			gpios = <&pio 7 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_WAKEUP>;
+			wakeup-source;
+		};
+	};
 };
 
 &adsp {
@@ -1445,6 +1458,13 @@
 	wifi_pins_pwrseq: wifipwrseq {
 		pins-wifi-enable {
 			pinmux = <PINMUX_GPIO54__FUNC_GPIO54>;
+		};
+	};
+
+	wifi_pins_wakeup: wifi-pins-wakeup {
+		pins-wifi-wakeup {
+			pinmux = <PINMUX_GPIO7__FUNC_GPIO7>;
+			input-enable;
 		};
 	};
 };
