@@ -125,8 +125,8 @@
 		reset-gpios = <&pio 177 0>;
 		hpd-gpios = <&pio 10 0>;
 		no-laneswap;
-		max-lane-count = <2>;
-		max-dpi-pixel-clock = <150000>;
+		data-lanes = <2>;
+		max-pixel-clock-khz = <150000>;
 
 		port {
 			it6505_in: endpoint {
