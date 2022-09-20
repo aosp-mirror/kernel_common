@@ -121,13 +121,13 @@
 
 &i2c2 {
 	pinctrl-0 = <&i2c2_pins &trackpad_pins>;
+	pinctrl-names = "default";
 
 	touchpad@15 {
 		compatible = "elan,ekth3000";
 		reg = <0x15>;
 		interrupt-parent = <&pio>;
 		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
-		pinctrl-names = "default";
 		vcc-supply = <&pp3300_s3>;
 		wakeup-source;
 	};
@@ -137,7 +137,6 @@
 		reg = <0x2c>;
 		hid-descr-addr = <0x20>;
 		interrupts-extended = <&pio 11 IRQ_TYPE_LEVEL_LOW>;
-		pinctrl-names = "default";
 		vcc-supply = <&pp3300_s3>;
 		wakeup-source;
 	};

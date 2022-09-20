@@ -8,8 +8,8 @@
 
 / {
 	model = "Google Steelix sku131072 board";
-	compatible = "google,steelix-rev2-sku131072", "google,steelix-rev2", "google,steelix",
-		     "mediatek,mt8186";
+	compatible = "google,steelix-rev2-sku131072", "google,steelix-rev2-sku131074",
+		     "google,steelix-rev2", "google,steelix", "mediatek,mt8186";
 };
 
 &mt6366codec {

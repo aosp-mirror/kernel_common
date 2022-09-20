@@ -9,6 +9,7 @@
 / {
 	model = "Google Rusty sku196608/196609 board";
 	compatible = "google,steelix-rev2-sku196608", "google,steelix-rev2-sku196609",
+		     "google,steelix-rev2-sku196610", "google,steelix-rev2-sku196611",
 		     "google,steelix-rev2", "google,steelix", "mediatek,mt8186";
 };
 
