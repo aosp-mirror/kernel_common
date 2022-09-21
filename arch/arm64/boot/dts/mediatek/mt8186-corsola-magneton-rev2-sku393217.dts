@@ -8,8 +8,8 @@
 
 / {
 	model = "Google Magneton sku393217 board";
-	compatible = "google,steelix-rev2-sku393217", "google,steelix-rev2", "google,steelix",
-		     "mediatek,mt8186";
+	compatible = "google,steelix-rev2-sku393217", "google,steelix-rev2-sku393220",
+		     "google,steelix-rev2", "google,steelix", "mediatek,mt8186";
 };
 
 &gpio_keys {
