@@ -2,3 +2,4 @@
 
 # for type visibility
   GKI_struct_blk_mq_alloc_data
+  GKI_struct_cgroup_taskset
