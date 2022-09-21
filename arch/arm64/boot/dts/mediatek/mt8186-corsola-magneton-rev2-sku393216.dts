@@ -37,3 +37,6 @@
 	status = "disabled";
 };
 
+&usb_c1 {
+	status = "disabled";
+};

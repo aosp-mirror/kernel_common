@@ -36,3 +36,7 @@
 		hid-descr-addr = <0x0001>;
 	};
 };
+
+&usb_c1 {
+	status = "disabled";
+};
