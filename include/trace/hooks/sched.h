@@ -392,6 +392,10 @@ DECLARE_HOOK(android_vh_pidfd_open,
 DECLARE_HOOK(android_vh_mmput,
 	TP_PROTO(void *unused),
 	TP_ARGS(unused));
+
+DECLARE_HOOK(android_vh_rebuild_root_domains_bypass,
+	TP_PROTO(bool cpuhp_tasks_frozen, bool *bypass),
+	TP_ARGS(cpuhp_tasks_frozen, bypass));
 /* macro versions of hooks are no longer required */
 
 #endif /* _TRACE_HOOK_SCHED_H */
