@@ -962,7 +962,6 @@
   __kfifo_out_peek
   kfree
   kfree_sensitive
-  kfree_skb
   kfree_skb_list
   kill_anon_super
   kill_fasync

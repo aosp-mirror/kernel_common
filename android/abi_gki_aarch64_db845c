@@ -328,7 +328,6 @@
   kernel_sendmsg
   kfree
   kfree_const
-  kfree_skb
   __kmalloc
   kmalloc_caches
   kmalloc_order_trace
