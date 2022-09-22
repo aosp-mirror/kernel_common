@@ -687,14 +687,20 @@ unsigned long native_calibrate_tsc(void)
 	 * This is temporary workaround for bugs:
 	 * b/148108096, b/154283905, b/146787525, b/153400677, b/148178929
 	 * chromium/1031054
+	 *
+	 * Temporarily adding workaround for hatch devices - Kohaku, dratini
+	 * and jinlon. (b/244456300)
 	 */
 	if (crystal_khz == 0) {
 		switch (boot_cpu_data.x86_model) {
-			case INTEL_FAM6_SKYLAKE_L:
+		case INTEL_FAM6_KABYLAKE_L:
 			crystal_khz = 24000;	/* 24.0 MHz */
 			break;
 		case INTEL_FAM6_ATOM_GOLDMONT_D:
 			crystal_khz = 25000;	/* 25.0 MHz */
+			break;
+		case INTEL_FAM6_SKYLAKE_L:
+			crystal_khz = 24000;	/* 24.0 MHz */
 			break;
 		}
 	}
