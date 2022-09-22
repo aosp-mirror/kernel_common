@@ -879,7 +879,11 @@ struct mgmt_cp_mesh_send_cancel {
 } __packed;
 #define MGMT_MESH_SEND_CANCEL_SIZE	1
 
-#define MGMT_OP_GET_SCO_CODEC_CAPABILITIES	0x0057
+
+/*
+ * Floss MGMT Opcodes start here.
+ */
+#define MGMT_OP_GET_SCO_CODEC_CAPABILITIES	0x0100
 #define MGMT_SCO_CODEC_CVSD			0x1
 #define MGMT_SCO_CODEC_MSBC_TRANSPARENT		0x2
 #define MGMT_SCO_CODEC_MSBC			0x3
@@ -906,7 +910,7 @@ struct mgmt_rp_get_codec_capabilities {
 	struct mgmt_bt_codec	codecs[];
 } __packed;
 
-#define MGMT_OP_NOTIFY_SCO_CONNECTION_CHANGE	0x0058
+#define MGMT_OP_NOTIFY_SCO_CONNECTION_CHANGE	0x0101
 struct mgmt_cp_notify_sco_connection_change {
 	__u16 hci_id;
 	struct mgmt_addr_info	addr;
@@ -914,6 +918,20 @@ struct mgmt_cp_notify_sco_connection_change {
 	__u8			codec;
 } __packed;
 #define MGMT_NOTIFY_SCO_CONNECTION_CHANGE_SIZE	0xB
+
+#define MGMT_OP_GET_VS_OPCODE			0x0102
+#define MGMT_VS_OPCODE_MSFT			0x0001
+
+struct mgmt_cp_get_vs_opcode {
+	__u16	hci_id;
+	__u16	vendor_specification;
+} __packed;
+#define MGMT_GET_VS_OPCODE_SIZE			0x4
+
+struct mgmt_rp_get_vs_opcode {
+	__u16	hci_id;
+	__u16	opcode;
+} __packed;
 
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
