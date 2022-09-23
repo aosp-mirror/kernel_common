@@ -921,9 +921,6 @@ static void clone_endio(struct bio *bio)
 			disable_write_zeroes(md);
 	}
 
-	if (blk_queue_is_zoned(q))
-		dm_zone_endio(io, bio);
-
 	if (endio) {
 		int r = endio(tio->ti, bio, &error);
 		switch (r) {
@@ -948,6 +945,9 @@ static void clone_endio(struct bio *bio)
 			BUG();
 		}
 	}
+
+	if (blk_queue_is_zoned(q))
+		dm_zone_endio(io, bio);
 
 	if (unlikely(swap_bios_limit(tio->ti, bio))) {
 		struct mapped_device *md = io->md;
