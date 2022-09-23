@@ -53,7 +53,6 @@ notrace void start_backtrace(struct stackframe *frame, unsigned long fp,
 	frame->prev_type = STACK_TYPE_UNKNOWN;
 }
 NOKPROBE_SYMBOL(start_backtrace);
-EXPORT_SYMBOL_GPL(start_backtrace);
 
 /*
  * Unwind from one frame record (A) to the next frame record (B).
