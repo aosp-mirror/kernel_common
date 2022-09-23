@@ -1968,7 +1968,50 @@ out:
 	return result;
 }
 
-static int parse_options(int argc, char *const *argv)
+static void parse_range(const char *ranges, bool *run_test, size_t tests)
+{
+	size_t i;
+	char *range;
+
+	for (i = 0; i < tests; ++i)
+		run_test[i] = false;
+
+	range = strtok(optarg, ",");
+	while (range) {
+		char *dash = strchr(range, '-');
+
+		if (dash) {
+			size_t start = 1, end = tests;
+			char *end_ptr;
+
+			if (dash > range) {
+				start = strtol(range, &end_ptr, 10);
+				if (*end_ptr != '-' || start <= 0 || start > tests)
+					ksft_exit_fail_msg("Bad range\n");
+			}
+
+			if (dash[1]) {
+				end = strtol(dash + 1, &end_ptr, 10);
+				if (*end_ptr || end <= start || end > tests)
+					ksft_exit_fail_msg("Bad range\n");
+			}
+
+			for (i = start; i <= end; ++i)
+				run_test[i - 1] = true;
+		} else {
+			char *end;
+			long value = strtol(range, &end, 10);
+
+			if (*end || value <= 0 || value > tests)
+				ksft_exit_fail_msg("Bad range\n");
+			run_test[value - 1] = true;
+		}
+		range = strtok(NULL, ",");
+	}
+}
+
+static int parse_options(int argc, char *const *argv, bool *run_test,
+			 size_t tests)
 {
 	signed char c;
 
@@ -1979,7 +2022,7 @@ static int parse_options(int argc, char *const *argv)
 			break;
 
 		case 't':
-			test_options.test = strtol(optarg, NULL, 10);
+			parse_range(optarg, run_test, tests);
 			break;
 
 		case 'v':
@@ -1998,7 +2041,8 @@ struct test_case {
 	const char *name;
 };
 
-static void run_one_test(const char *mount_dir, struct test_case *test_case)
+static void run_one_test(const char *mount_dir,
+			 const struct test_case *test_case)
 {
 	ksft_print_msg("Running %s\n", test_case->name);
 	if (test_case->pfunc(mount_dir) == TEST_SUCCESS)
@@ -2014,37 +2058,11 @@ int main(int argc, char *argv[])
 	int i;
 	int fd, count;
 
-	if (parse_options(argc, argv))
-		ksft_exit_fail_msg("Bad options\n");
-
-	// Seed randomness pool for testing on QEMU
-	// NOTE - this abuses the concept of randomness - do *not* ever do this
-	// on a machine for production use - the device will think it has good
-	// randomness when it does not.
-	fd = open("/dev/urandom", O_WRONLY | O_CLOEXEC);
-	count = 4096;
-	for (int i = 0; i < 128; ++i)
-		ioctl(fd, RNDADDTOENTCNT, &count);
-	close(fd);
-
-	ksft_print_header();
-
-	if (geteuid() != 0)
-		ksft_print_msg("Not a root, might fail to mount.\n");
-
-	if (tracing_on() != TEST_SUCCESS)
-		ksft_exit_fail_msg("Can't turn on tracing\n");
-
-	src_dir = setup_mount_dir(ft_src);
-	mount_dir = setup_mount_dir(ft_dst);
-	if (src_dir == NULL || mount_dir == NULL)
-		ksft_exit_fail_msg("Can't create a mount dir\n");
-
 #define MAKE_TEST(test)                                                        \
 	{                                                                      \
 		test, #test                                                    \
 	}
-	struct test_case cases[] = {
+	const struct test_case cases[] = {
 		MAKE_TEST(basic_test),
 		MAKE_TEST(bpf_test_real),
 		MAKE_TEST(bpf_test_partial),
@@ -2079,23 +2097,46 @@ int main(int argc, char *argv[])
 	};
 #undef MAKE_TEST
 
-	if (test_options.test) {
-		if (test_options.test <= 0 ||
-		    test_options.test > ARRAY_SIZE(cases))
-			ksft_exit_fail_msg("Invalid test\n");
+	bool run_test[ARRAY_SIZE(cases)];
 
-		ksft_set_plan(1);
-		delete_dir_tree(mount_dir, false);
-		delete_dir_tree(src_dir, false);
-		run_one_test(mount_dir, &cases[test_options.test - 1]);
-	} else {
-		ksft_set_plan(ARRAY_SIZE(cases));
-		for (i = 0; i < ARRAY_SIZE(cases); ++i) {
+	for (int i = 0; i < ARRAY_SIZE(cases); ++i)
+		run_test[i] = true;
+
+	if (parse_options(argc, argv, run_test, ARRAY_SIZE(cases)))
+		ksft_exit_fail_msg("Bad options\n");
+
+	// Seed randomness pool for testing on QEMU
+	// NOTE - this abuses the concept of randomness - do *not* ever do this
+	// on a machine for production use - the device will think it has good
+	// randomness when it does not.
+	fd = open("/dev/urandom", O_WRONLY | O_CLOEXEC);
+	count = 4096;
+	for (int i = 0; i < 128; ++i)
+		ioctl(fd, RNDADDTOENTCNT, &count);
+	close(fd);
+
+	ksft_print_header();
+
+	if (geteuid() != 0)
+		ksft_print_msg("Not a root, might fail to mount.\n");
+
+	if (tracing_on() != TEST_SUCCESS)
+		ksft_exit_fail_msg("Can't turn on tracing\n");
+
+	src_dir = setup_mount_dir(ft_src);
+	mount_dir = setup_mount_dir(ft_dst);
+	if (src_dir == NULL || mount_dir == NULL)
+		ksft_exit_fail_msg("Can't create a mount dir\n");
+
+	ksft_set_plan(ARRAY_SIZE(run_test));
+
+	for (i = 0; i < ARRAY_SIZE(run_test); ++i)
+		if (run_test[i]) {
 			delete_dir_tree(mount_dir, false);
 			delete_dir_tree(src_dir, false);
 			run_one_test(mount_dir, &cases[i]);
-		}
-	}
+		} else
+			ksft_cnt.ksft_xskip++;
 
 	umount2(mount_dir, MNT_FORCE);
 	delete_dir_tree(mount_dir, true);
