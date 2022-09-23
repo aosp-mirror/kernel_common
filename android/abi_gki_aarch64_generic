@@ -1052,6 +1052,7 @@
   __init_swait_queue_head
   init_task
   init_timer_key
+  init_user_ns
   init_wait_entry
   __init_waitqueue_head
   input_alloc_absinfo
@@ -1375,6 +1376,7 @@
   nr_cpu_ids
   nr_irqs
   ns_capable
+  ns_capable_noaudit
   nsec_to_clock_t
   ns_to_timespec64
   __num_online_cpus
