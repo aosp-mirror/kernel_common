@@ -1,11 +1,18 @@
 [abi_symbol_list]
 # commonly used symbols
+  add_timer
   alloc_workqueue
   arm64_const_caps_ready
   atomic_notifier_chain_register
   atomic_notifier_chain_unregister
+  _bcd2bin
+  _bin2bcd
+  blocking_notifier_call_chain
+  blocking_notifier_chain_register
+  blocking_notifier_chain_unregister
   cancel_delayed_work_sync
   __cfi_slowpath
+  class_for_each_device
   clk_bulk_disable
   clk_bulk_enable
   clk_bulk_prepare
@@ -38,6 +45,7 @@
   cpus_read_lock
   cpus_read_unlock
   delayed_work_timer_fn
+  destroy_workqueue
   _dev_err
   devfreq_recommended_opp
   dev_fwnode
@@ -51,13 +59,22 @@
   devm_clk_get
   devm_clk_hw_register
   devm_clk_register
+  devm_gpiochip_add_data_with_key
+  devm_gpiod_get
+  devm_gpiod_get_index_optional
   devm_gpiod_get_optional
+  devm_gpio_request
   devm_ioremap_resource
   devm_kfree
   devm_kmalloc
+  devm_mfd_add_devices
   devm_nvmem_register
+  devm_of_clk_add_hw_provider
+  devm_pinctrl_get
+  devm_pinctrl_register
   devm_platform_ioremap_resource
   devm_power_supply_register
+  devm_pwm_get
   devm_regmap_field_alloc
   __devm_regmap_init_i2c
   devm_regulator_get
@@ -80,27 +97,52 @@
   devres_alloc_node
   devres_free
   _dev_warn
+  disable_irq
   down_read
   down_write
+  enable_irq
+  extcon_get_edev_by_phandle
+  extcon_get_state
+  extcon_register_notifier
+  extcon_unregister_notifier
+  flush_workqueue
   freq_qos_add_request
   freq_qos_remove_request
   freq_qos_update_request
   get_cpu_device
+  gpiochip_add_pin_range
+  gpiochip_generic_free
+  gpiochip_generic_request
+  gpiochip_get_data
+  gpiod_direction_input
   gpiod_direction_output
+  gpiod_get_raw_value
   gpiod_get_value
+  gpiod_set_raw_value
+  gpiod_set_value
+  gpiod_set_value_cansleep
+  gpiod_to_irq
+  gpio_to_desc
   i2c_del_driver
   i2c_register_driver
+  i2c_smbus_read_byte_data
   i2c_smbus_read_i2c_block_data
   i2c_smbus_write_i2c_block_data
   init_timer_key
   iounmap
+  irq_set_irq_type
   irq_set_irq_wake
   irq_to_desc
+  jiffies
+  jiffies_to_msecs
+  kasprintf
   kfree
   __kmalloc
   kmalloc_caches
   kmem_cache_alloc_trace
+  kobject_create_and_add
   ktime_get
+  ktime_get_with_offset
   __list_add_valid
   __list_del_entry_valid
   __log_post_read_mmio
@@ -108,6 +150,7 @@
   __log_write_mmio
   memcpy
   memset
+  mod_timer
   module_layout
   __msecs_to_jiffies
   msleep
@@ -115,6 +158,7 @@
   mutex_lock
   mutex_unlock
   nr_cpu_ids
+  ns_to_timespec64
   nvmem_cell_put
   nvmem_cell_read
   of_clk_add_provider
@@ -131,8 +175,12 @@
   of_find_node_by_name
   of_find_property
   of_get_child_by_name
+  of_get_named_gpio_flags
   of_get_next_available_child
   of_get_next_child
+  of_get_parent
+  of_get_property
+  of_get_regulator_init_data
   of_iomap
   of_machine_is_compatible
   of_match_device
@@ -144,9 +192,17 @@
   of_property_read_string_helper
   of_property_read_u32_index
   of_property_read_variable_u32_array
+  of_regulator_match
   panic_notifier_list
   param_ops_int
   __per_cpu_offset
+  pinconf_generic_dt_node_to_map
+  pinctrl_dev_get_drvdata
+  pinctrl_gpio_direction_input
+  pinctrl_gpio_direction_output
+  pinctrl_lookup_state
+  pinctrl_select_state
+  pinctrl_utils_free_map
   __platform_driver_probe
   __platform_driver_register
   platform_driver_unregister
@@ -154,8 +210,12 @@
   platform_get_resource
   pm_clk_create
   pm_clk_destroy
+  pm_power_off
+  __pm_relax
+  pm_wakeup_ws_event
   power_supply_am_i_supplied
   power_supply_changed
+  power_supply_class
   power_supply_get_battery_info
   power_supply_get_by_phandle
   power_supply_get_drvdata
@@ -167,25 +227,48 @@
   print_hex_dump
   printk
   __put_task_struct
+  pwm_apply_state
   queue_delayed_work_on
   queue_work_on
+  _raw_spin_lock_irqsave
+  _raw_spin_unlock_irqrestore
   rdev_get_drvdata
+  rdev_get_id
   register_pm_notifier
+  register_reboot_notifier
   regmap_bulk_read
   regmap_field_read
   regmap_field_update_bits_base
+  regmap_irq_get_domain
+  regmap_irq_get_virq
   regmap_raw_read
   regmap_raw_write
   regmap_read
   regmap_update_bits_base
   regmap_write
   regulator_disable
+  regulator_disable_regmap
   regulator_enable
+  regulator_enable_regmap
   regulator_get_voltage
+  regulator_get_voltage_sel_regmap
+  regulator_is_enabled
+  regulator_is_enabled_regmap
+  regulator_list_voltage_linear
+  regulator_list_voltage_linear_range
+  regulator_map_voltage_linear
+  regulator_map_voltage_linear_range
   regulator_put
   regulator_set_voltage
+  regulator_set_voltage_sel_regmap
+  regulator_set_voltage_time_sel
+  regulator_unregister
   reset_control_assert
   reset_control_deassert
+  rtc_class_open
+  rtc_read_time
+  rtc_tm_to_time64
+  rtc_valid_tm
   snprintf
   sprintf
   sscanf
@@ -195,6 +278,7 @@
   syscon_regmap_lookup_by_phandle
   sysfs_create_file_ns
   system_freezable_wq
+  system_state
   system_wq
   thermal_zone_get_zone_by_name
   __traceiter_rwmmio_post_read
@@ -208,19 +292,18 @@
   up_read
   up_write
   usleep_range
+  wakeup_source_add
+  __warn_printk
+
+# required by act8865-regulator.ko
+  regulator_set_pull_down_regmap
 
 # required by bq25700_charger.ko
-  extcon_get_edev_by_phandle
-  extcon_get_state
-  extcon_register_notifier
-  irq_set_irq_type
   of_find_compatible_node
   power_supply_get_by_name
 
 # required by bq25890_charger.ko
-  devm_gpiod_get
   devm_usb_get_phy
-  gpiod_to_irq
   system_power_efficient_wq
 
 # required by clk-link.ko
@@ -231,10 +314,8 @@
   pm_runtime_enable
 
 # required by clk-pwm.ko
-  devm_pwm_get
   of_clk_add_hw_provider
   of_clk_hw_simple_get
-  pwm_apply_state
 
 # required by clk-rockchip.ko
   clk_divider_ops
@@ -263,15 +344,11 @@
   match_string
   of_clk_src_onecell_get
   rational_best_approximation
-  _raw_spin_lock_irqsave
-  _raw_spin_unlock_irqrestore
   register_restart_handler
   reset_controller_register
-  __warn_printk
 
 # required by clk-scmi.ko
   clk_hw_set_rate_range
-  devm_of_clk_add_hw_provider
   of_clk_hw_onecell_get
   scmi_driver_register
   scmi_driver_unregister
@@ -317,7 +394,36 @@
 
 # required by cw221x_battery.ko
   cancel_delayed_work
-  destroy_workqueue
+
+# required by gpio-regulator.ko
+  devm_gpiod_get_index
+  devm_kmemdup
+  devm_kstrdup
+  gpiod_count
+  gpiod_get_optional
+  gpiod_set_consumer_name
+  strncmp
+
+# required by gpio-rockchip.ko
+  generic_handle_irq
+  gpiochip_add_data_with_key
+  gpiochip_remove
+  handle_edge_irq
+  handle_level_irq
+  __irq_alloc_domain_generic_chips
+  irq_create_mapping_affinity
+  __irq_domain_add
+  irq_domain_remove
+  irq_find_mapping
+  irq_gc_ack_set_bit
+  irq_gc_mask_clr_bit
+  irq_gc_mask_set_bit
+  irq_gc_set_wake
+  irq_generic_chip_ops
+  irq_get_domain_generic_chip
+  irq_set_chained_handler_and_data
+  of_alias_get_id
+  of_pinctrl_get
 
 # required by industrialio-triggered-buffer.ko
   iio_alloc_pollfunc
@@ -342,6 +448,16 @@
   devm_clk_bulk_get
   param_ops_uint
 
+# required by pinctrl-rockchip.ko
+  __devm_regmap_init_mmio_clk
+  of_find_node_by_phandle
+  of_platform_depopulate
+  of_platform_populate
+  pinconf_generic_parse_dt_config
+  pinctrl_force_default
+  pinctrl_force_sleep
+  pin_get_name
+
 # required by pm_domains.ko
   clk_bulk_put
   of_genpd_add_provider_onecell
@@ -352,6 +468,46 @@
   pm_genpd_init
   pm_genpd_remove
   strrchr
+
+# required by pwm-regulator.ko
+  gpiod_get_value_cansleep
+  pwm_adjust_config
+  regulator_map_voltage_iterate
+
+# required by rk806-core.ko
+  devm_regmap_add_irq_chip
+  kobject_put
+  sysfs_remove_file_ns
+
+# required by rk806-spi.ko
+  __devm_regmap_init
+  driver_unregister
+  __spi_register_driver
+  spi_sync
+  spi_write_then_read
+
+# required by rk808-regulator.ko
+  gpiod_is_active_low
+
+# required by rk808.ko
+  mfd_remove_devices
+  platform_device_add
+  platform_device_alloc
+  platform_device_put
+  pm_power_off_prepare
+  register_syscore_ops
+  regmap_add_irq_chip
+  regmap_del_irq_chip
+  unregister_syscore_ops
+
+# required by rk817_charger.ko
+  dev_driver_string
+
+# required by rk818_battery.ko
+  del_timer
+
+# required by rk860x-regulator.ko
+  regulator_suspend_enable
 
 # required by rockchip-cpufreq.ko
   cpufreq_unregister_notifier
@@ -404,8 +560,6 @@
   devm_devfreq_register_opp_notifier
   _dev_notice
   dev_pm_opp_unregister_set_opp_helper
-  disable_irq
-  enable_irq
   finish_wait
   init_wait_entry
   __init_waitqueue_head
@@ -434,9 +588,6 @@
   regulator_get_linear_step
   regulator_get_optional
 
-# required by rockchip_pm_config.ko
-  of_get_named_gpio_flags
-
 # required by rockchip_pvtm.ko
   debugfs_create_dir
   debugfs_create_file
@@ -454,15 +605,8 @@
   input_register_device
   input_set_capability
   irq_set_affinity_hint
-  jiffies
-  jiffies_to_msecs
-  mod_timer
-  of_get_property
-  __pm_relax
-  pm_wakeup_ws_event
   __tasklet_hi_schedule
   tasklet_init
-  wakeup_source_add
   wakeup_source_remove
 
 # required by rockchip_saradc.ko
@@ -497,11 +641,9 @@
   dev_pm_qos_add_request
   dev_pm_qos_remove_request
   dev_pm_qos_update_request
-  kobject_create_and_add
   kstrdup
   kstrtoull
   mod_delayed_work_on
-  register_reboot_notifier
   regulator_get
   remove_cpu
   strchr
@@ -510,27 +652,30 @@
   thermal_zone_get_temp
 
 # required by rockchip_thermal.ko
-  devm_pinctrl_get
   devm_thermal_zone_of_sensor_register
-  pinctrl_lookup_state
-  pinctrl_select_state
   thermal_zone_device_disable
   thermal_zone_device_enable
   thermal_zone_device_update
 
 # required by rtc-hym8563.ko
-  _bcd2bin
-  _bin2bcd
   devm_rtc_device_register
-  i2c_smbus_read_byte_data
   i2c_smbus_write_byte_data
-  rtc_valid_tm
+
+# required by rtc-rk808.ko
+  devm_rtc_allocate_device
+  regmap_bulk_write
+  __rtc_register_device
+  rtc_time64_to_tm
+  rtc_update_irq
 
 # required by sgm41542_charger.ko
-  regulator_unregister
   strncpy
 
 # required by timer-rockchip.ko
   clockevents_config_and_register
   irq_of_parse_and_map
   request_threaded_irq
+
+# required by tps65132-regulator.ko
+  devm_fwnode_gpiod_get_index
+  regulator_set_active_discharge_regmap
