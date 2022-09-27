@@ -623,7 +623,7 @@ virtio_video_cmd_resource_queue_cb(struct virtio_video *vv,
 
 	queue_type = le32_to_cpu(req->queue_type);
 
-	stream_id = le32_to_cpu(resp->hdr.stream_id);
+	stream_id = le32_to_cpu(req->hdr.stream_id);
 	flags = le32_to_cpu(resp->flags);
 	bytesused = le32_to_cpu(resp->size);
 	timestamp = le64_to_cpu(resp->timestamp);
