@@ -1,5 +1,6 @@
 [abi_symbol_list]
 # commonly used symbols
+  arm64_const_caps_ready
   atomic_notifier_chain_register
   cancel_delayed_work_sync
   __cfi_slowpath
@@ -20,9 +21,20 @@
   clk_set_rate
   clk_unprepare
   __const_udelay
+  __cpufreq_driver_target
+  cpufreq_generic_suspend
+  cpufreq_register_governor
+  cpufreq_register_notifier
+  cpufreq_unregister_governor
+  cpu_hwcap_keys
+  cpu_latency_qos_add_request
+  cpu_latency_qos_update_request
   cpumask_next
+  cpu_number
   __cpu_online_mask
   __cpu_possible_mask
+  cpus_read_lock
+  cpus_read_unlock
   delayed_work_timer_fn
   _dev_err
   devfreq_recommended_opp
@@ -45,14 +57,23 @@
   dev_pm_opp_get_opp_count
   dev_pm_opp_get_opp_table
   dev_pm_opp_get_voltage
+  dev_pm_opp_of_get_sharing_cpus
   dev_pm_opp_put
   dev_pm_opp_put_opp_table
+  dev_pm_opp_put_regulators
+  dev_pm_opp_register_set_opp_helper
+  dev_pm_opp_set_rate
+  dev_pm_opp_set_regulators
   devres_add
   devres_alloc_node
   devres_free
   _dev_warn
   down_read
   down_write
+  freq_qos_add_request
+  freq_qos_remove_request
+  freq_qos_update_request
+  get_cpu_device
   init_timer_key
   iounmap
   irq_set_irq_wake
@@ -63,6 +84,7 @@
   kmem_cache_alloc_trace
   ktime_get
   __list_add_valid
+  __list_del_entry_valid
   __log_post_read_mmio
   __log_read_mmio
   __log_write_mmio
@@ -90,6 +112,7 @@
   of_get_next_available_child
   of_get_next_child
   of_iomap
+  of_machine_is_compatible
   of_match_device
   of_match_node
   of_nvmem_cell_get
@@ -100,6 +123,7 @@
   of_property_read_u32_index
   of_property_read_variable_u32_array
   panic_notifier_list
+  __per_cpu_offset
   __platform_driver_probe
   __platform_driver_register
   platform_driver_unregister
@@ -196,6 +220,40 @@
   scmi_driver_register
   scmi_driver_unregister
 
+# required by cpufreq-dt.ko
+  cpufreq_enable_boost_support
+  cpufreq_freq_attr_scaling_available_freqs
+  cpufreq_freq_attr_scaling_boost_freqs
+  cpufreq_generic_frequency_table_verify
+  cpufreq_generic_get
+  cpufreq_register_driver
+  cpufreq_unregister_driver
+  dev_pm_opp_free_cpufreq_table
+  dev_pm_opp_get_max_transition_latency
+  dev_pm_opp_get_sharing_cpus
+  dev_pm_opp_get_suspend_opp_freq
+  dev_pm_opp_init_cpufreq_table
+  dev_pm_opp_of_cpumask_add_table
+  dev_pm_opp_of_cpumask_remove_table
+  dev_pm_opp_of_register_em
+  dev_pm_opp_set_sharing_cpus
+  policy_has_boost_freq
+
+# required by cpufreq_ondemand.ko
+  cpufreq_cpu_get_raw
+  cpufreq_dbs_governor_exit
+  cpufreq_dbs_governor_init
+  cpufreq_dbs_governor_limits
+  cpufreq_dbs_governor_start
+  cpufreq_dbs_governor_stop
+  cpufreq_table_index_unsorted
+  dbs_update
+  get_cpu_idle_time_us
+  gov_update_cpu_data
+  preempt_schedule
+  sscanf
+  store_sampling_rate
+
 # required by industrialio-triggered-buffer.ko
   iio_alloc_pollfunc
   iio_dealloc_pollfunc
@@ -230,6 +288,13 @@
   pm_genpd_remove
   strrchr
 
+# required by rockchip-cpufreq.ko
+  cpufreq_unregister_notifier
+  dev_pm_opp_put_prop_name
+  dev_pm_opp_set_supported_hw
+  of_property_match_string
+  platform_device_register_full
+
 # required by rockchip-cpuinfo.ko
   nvmem_cell_get
 
@@ -248,24 +313,16 @@
   phy_drivers_unregister
 
 # required by rockchip_bus.ko
-  cpufreq_register_notifier
   cpu_topology
 
 # required by rockchip_debug.ko
   atomic_notifier_chain_unregister
   nr_irqs
-  __per_cpu_offset
 
 # required by rockchip_dmc.ko
   cpufreq_cpu_get
   cpufreq_cpu_put
-  __cpufreq_driver_target
   cpufreq_quick_get
-  cpu_latency_qos_add_request
-  cpu_latency_qos_update_request
-  cpu_number
-  cpus_read_lock
-  cpus_read_unlock
   devfreq_add_governor
   devfreq_event_disable_edev
   devfreq_event_enable_edev
@@ -282,10 +339,6 @@
   devm_devfreq_add_device
   devm_devfreq_register_opp_notifier
   _dev_notice
-  dev_pm_opp_put_regulators
-  dev_pm_opp_register_set_opp_helper
-  dev_pm_opp_set_rate
-  dev_pm_opp_set_regulators
   dev_pm_opp_unregister_set_opp_helper
   disable_irq
   enable_irq
@@ -316,7 +369,6 @@
   dev_pm_opp_of_add_table
   dev_pm_opp_set_prop_name
   of_find_node_opts_by_path
-  of_machine_is_compatible
   regulator_get_linear_step
   regulator_get_optional
 
@@ -336,8 +388,6 @@
   single_release
 
 # required by rockchip_pwm_remotectl.ko
-  arm64_const_caps_ready
-  cpu_hwcap_keys
   devm_input_allocate_device
   input_event
   input_register_device
@@ -387,13 +437,9 @@
   dev_pm_qos_add_request
   dev_pm_qos_remove_request
   dev_pm_qos_update_request
-  freq_qos_add_request
-  freq_qos_remove_request
-  freq_qos_update_request
   kobject_create_and_add
   kstrdup
   kstrtoull
-  __list_del_entry_valid
   memset
   mod_delayed_work_on
   register_pm_notifier
