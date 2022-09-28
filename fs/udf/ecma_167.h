@@ -304,14 +304,14 @@ struct logicalVolDesc {
 	struct regid		impIdent;
 	uint8_t			impUse[128];
 	struct extent_ad	integritySeqExt;
-	uint8_t			partitionMaps[0];
+	uint8_t			partitionMaps[];
 } __packed;
 
 /* Generic Partition Map (ECMA 167r3 3/10.7.1) */
 struct genericPartitionMap {
 	uint8_t		partitionMapType;
 	uint8_t		partitionMapLength;
-	uint8_t		partitionMapping[0];
+	uint8_t		partitionMapping[];
 } __packed;
 
 /* Partition Map Type (ECMA 167r3 3/10.7.1.1) */
@@ -339,7 +339,7 @@ struct unallocSpaceDesc {
 	struct tag		descTag;
 	__le32			volDescSeqNum;
 	__le32			numAllocDescs;
-	struct extent_ad	allocDescs[0];
+	struct extent_ad	allocDescs[];
 } __packed;
 
 /* Terminating Descriptor (ECMA 167r3 3/10.9) */
@@ -357,9 +357,9 @@ struct logicalVolIntegrityDesc {
 	uint8_t			logicalVolContentsUse[32];
 	__le32			numOfPartitions;
 	__le32			lengthOfImpUse;
-	__le32			freeSpaceTable[0];
-	__le32			sizeTable[0];
-	uint8_t			impUse[0];
+	__le32			freeSpaceTable[];
+	/* __le32		sizeTable[]; */
+	/* uint8_t		impUse[]; */
 } __packed;
 
 /* Integrity Type (ECMA 167r3 3/10.10.3) */
@@ -468,9 +468,9 @@ struct fileIdentDesc {
 	uint8_t		lengthFileIdent;
 	struct long_ad	icb;
 	__le16		lengthOfImpUse;
-	uint8_t		impUse[0];
-	uint8_t		fileIdent[0];
-	uint8_t		padding[0];
+	uint8_t		impUse[];
+	/* uint8_t	fileIdent[]; */
+	/* uint8_t	padding[]; */
 } __packed;
 
 /* File Characteristics (ECMA 167r3 4/14.4.3) */
@@ -575,8 +575,8 @@ struct fileEntry {
 	__le64			uniqueID;
 	__le32			lengthExtendedAttr;
 	__le32			lengthAllocDescs;
-	uint8_t			extendedAttr[0];
-	uint8_t			allocDescs[0];
+	uint8_t			extendedAttr[];
+	/* uint8_t		allocDescs[]; */
 } __packed;
 
 /* Permissions (ECMA 167r3 4/14.9.5) */
@@ -629,7 +629,7 @@ struct genericFormat {
 	uint8_t		attrSubtype;
 	uint8_t		reserved[3];
 	__le32		attrLength;
-	uint8_t		attrData[0];
+	uint8_t		attrData[];
 } __packed;
 
 /* Character Set Information (ECMA 167r3 4/14.10.3) */
@@ -640,7 +640,7 @@ struct charSetInfo {
 	__le32		attrLength;
 	__le32		escapeSeqLength;
 	uint8_t		charSetType;
-	uint8_t		escapeSeq[0];
+	uint8_t		escapeSeq[];
 } __packed;
 
 /* Alternate Permissions (ECMA 167r3 4/14.10.4) */
@@ -679,7 +679,7 @@ struct infoTimesExtAttr {
 	__le32		attrLength;
 	__le32		dataLength;
 	__le32		infoTimeExistence;
-	uint8_t		infoTimes[0];
+	uint8_t		infoTimes[];
 } __packed;
 
 /* Device Specification (ECMA 167r3 4/14.10.7) */
@@ -691,7 +691,7 @@ struct deviceSpec {
 	__le32		impUseLength;
 	__le32		majorDeviceIdent;
 	__le32		minorDeviceIdent;
-	uint8_t		impUse[0];
+	uint8_t		impUse[];
 } __packed;
 
 /* Implementation Use Extended Attr (ECMA 167r3 4/14.10.8) */
@@ -702,7 +702,7 @@ struct impUseExtAttr {
 	__le32		attrLength;
 	__le32		impUseLength;
 	struct regid	impIdent;
-	uint8_t		impUse[0];
+	uint8_t		impUse[];
 } __packed;
 
 /* Application Use Extended Attribute (ECMA 167r3 4/14.10.9) */
@@ -713,7 +713,7 @@ struct appUseExtAttr {
 	__le32		attrLength;
 	__le32		appUseLength;
 	struct regid	appIdent;
-	uint8_t		appUse[0];
+	uint8_t		appUse[];
 } __packed;
 
 #define EXTATTR_CHAR_SET		1
@@ -729,7 +729,7 @@ struct unallocSpaceEntry {
 	struct tag	descTag;
 	struct icbtag	icbTag;
 	__le32		lengthAllocDescs;
-	uint8_t		allocDescs[0];
+	uint8_t		allocDescs[];
 } __packed;
 
 /* Space Bitmap Descriptor (ECMA 167r3 4/14.12) */
@@ -737,7 +737,7 @@ struct spaceBitmapDesc {
 	struct tag	descTag;
 	__le32		numOfBits;
 	__le32		numOfBytes;
-	uint8_t		bitmap[0];
+	uint8_t		bitmap[];
 } __packed;
 
 /* Partition Integrity Entry (ECMA 167r3 4/14.13) */
@@ -774,7 +774,7 @@ struct pathComponent {
 	uint8_t		componentType;
 	uint8_t		lengthComponentIdent;
 	__le16		componentFileVersionNum;
-	dstring		componentIdent[0];
+	dstring		componentIdent[];
 } __packed;
 
 /* File Entry (ECMA 167r3 4/14.17) */
@@ -803,8 +803,8 @@ struct extendedFileEntry {
 	__le64			uniqueID;
 	__le32			lengthExtendedAttr;
 	__le32			lengthAllocDescs;
-	uint8_t			extendedAttr[0];
-	uint8_t			allocDescs[0];
+	uint8_t			extendedAttr[];
+	/* uint8_t		allocDescs[]; */
 } __packed;
 
 #endif /* _ECMA_167_H */
