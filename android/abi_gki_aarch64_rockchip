@@ -1,7 +1,9 @@
 [abi_symbol_list]
 # commonly used symbols
+  alloc_workqueue
   arm64_const_caps_ready
   atomic_notifier_chain_register
+  atomic_notifier_chain_unregister
   cancel_delayed_work_sync
   __cfi_slowpath
   clk_bulk_disable
@@ -38,19 +40,29 @@
   delayed_work_timer_fn
   _dev_err
   devfreq_recommended_opp
+  dev_fwnode
+  device_create_file
   device_init_wakeup
+  device_property_present
+  device_property_read_u32_array
+  device_property_read_u8_array
   _dev_info
   devm_clk_bulk_get_all
   devm_clk_get
   devm_clk_hw_register
   devm_clk_register
+  devm_gpiod_get_optional
   devm_ioremap_resource
   devm_kfree
   devm_kmalloc
   devm_nvmem_register
   devm_platform_ioremap_resource
+  devm_power_supply_register
+  devm_regmap_field_alloc
+  __devm_regmap_init_i2c
   devm_regulator_get
   devm_regulator_get_optional
+  devm_regulator_register
   devm_request_threaded_irq
   devm_reset_control_array_get
   dev_pm_opp_find_freq_ceil
@@ -74,6 +86,12 @@
   freq_qos_remove_request
   freq_qos_update_request
   get_cpu_device
+  gpiod_direction_output
+  gpiod_get_value
+  i2c_del_driver
+  i2c_register_driver
+  i2c_smbus_read_i2c_block_data
+  i2c_smbus_write_i2c_block_data
   init_timer_key
   iounmap
   irq_set_irq_wake
@@ -89,6 +107,7 @@
   __log_read_mmio
   __log_write_mmio
   memcpy
+  memset
   module_layout
   __msecs_to_jiffies
   msleep
@@ -107,8 +126,11 @@
   of_count_phandle_with_args
   of_device_get_match_data
   of_device_is_available
+  of_device_is_compatible
   of_find_matching_node_and_match
+  of_find_node_by_name
   of_find_property
+  of_get_child_by_name
   of_get_next_available_child
   of_get_next_child
   of_iomap
@@ -123,6 +145,7 @@
   of_property_read_u32_index
   of_property_read_variable_u32_array
   panic_notifier_list
+  param_ops_int
   __per_cpu_offset
   __platform_driver_probe
   __platform_driver_register
@@ -131,10 +154,28 @@
   platform_get_resource
   pm_clk_create
   pm_clk_destroy
+  power_supply_am_i_supplied
+  power_supply_changed
+  power_supply_get_battery_info
+  power_supply_get_by_phandle
+  power_supply_get_drvdata
+  power_supply_get_property
+  power_supply_put_battery_info
+  power_supply_register
+  power_supply_reg_notifier
+  power_supply_unregister
   print_hex_dump
   printk
   __put_task_struct
   queue_delayed_work_on
+  queue_work_on
+  rdev_get_drvdata
+  register_pm_notifier
+  regmap_bulk_read
+  regmap_field_read
+  regmap_field_update_bits_base
+  regmap_raw_read
+  regmap_raw_write
   regmap_read
   regmap_update_bits_base
   regmap_write
@@ -147,6 +188,7 @@
   reset_control_deassert
   snprintf
   sprintf
+  sscanf
   __stack_chk_fail
   strcmp
   syscon_node_to_regmap
@@ -166,6 +208,20 @@
   up_read
   up_write
   usleep_range
+
+# required by bq25700_charger.ko
+  extcon_get_edev_by_phandle
+  extcon_get_state
+  extcon_register_notifier
+  irq_set_irq_type
+  of_find_compatible_node
+  power_supply_get_by_name
+
+# required by bq25890_charger.ko
+  devm_gpiod_get
+  devm_usb_get_phy
+  gpiod_to_irq
+  system_power_efficient_wq
 
 # required by clk-link.ko
   pm_clk_add
@@ -251,8 +307,17 @@
   get_cpu_idle_time_us
   gov_update_cpu_data
   preempt_schedule
-  sscanf
   store_sampling_rate
+
+# required by cw2015_battery.ko
+  dev_err_probe
+
+# required by cw2017_battery.ko
+  bcmp
+
+# required by cw221x_battery.ko
+  cancel_delayed_work
+  destroy_workqueue
 
 # required by industrialio-triggered-buffer.ko
   iio_alloc_pollfunc
@@ -316,7 +381,6 @@
   cpu_topology
 
 # required by rockchip_debug.ko
-  atomic_notifier_chain_unregister
   nr_irqs
 
 # required by rockchip_dmc.ko
@@ -353,10 +417,8 @@
   kstrtouint
   __memset_io
   of_devfreq_cooling_register_power
-  of_get_child_by_name
   platform_get_irq_byname
   prepare_to_wait_event
-  queue_work_on
   ___ratelimit
   schedule_timeout
   __wake_up
@@ -373,7 +435,6 @@
   regulator_get_optional
 
 # required by rockchip_pm_config.ko
-  of_find_node_by_name
   of_get_named_gpio_flags
 
 # required by rockchip_pvtm.ko
@@ -397,7 +458,6 @@
   jiffies_to_msecs
   mod_timer
   of_get_property
-  param_ops_int
   __pm_relax
   pm_wakeup_ws_event
   __tasklet_hi_schedule
@@ -440,9 +500,7 @@
   kobject_create_and_add
   kstrdup
   kstrtoull
-  memset
   mod_delayed_work_on
-  register_pm_notifier
   register_reboot_notifier
   regulator_get
   remove_cpu
@@ -463,18 +521,16 @@
 # required by rtc-hym8563.ko
   _bcd2bin
   _bin2bcd
-  device_property_present
   devm_rtc_device_register
-  i2c_del_driver
-  i2c_register_driver
   i2c_smbus_read_byte_data
-  i2c_smbus_read_i2c_block_data
   i2c_smbus_write_byte_data
-  i2c_smbus_write_i2c_block_data
   rtc_valid_tm
+
+# required by sgm41542_charger.ko
+  regulator_unregister
+  strncpy
 
 # required by timer-rockchip.ko
   clockevents_config_and_register
   irq_of_parse_and_map
-  of_device_is_compatible
   request_threaded_irq
