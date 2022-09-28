@@ -755,6 +755,7 @@
   drm_mode_object_find
   drm_mode_object_get
   drm_mode_object_put
+  drm_mode_parse_command_line_for_connector
   drm_mode_probed_add
   drm_modeset_acquire_fini
   drm_modeset_acquire_init
