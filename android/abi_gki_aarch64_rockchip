@@ -33,6 +33,7 @@
   clk_prepare
   clk_put
   clk_register
+  clk_set_phase
   clk_set_rate
   clk_unprepare
   complete
@@ -52,10 +53,13 @@
   cpus_read_lock
   cpus_read_unlock
   debugfs_create_dir
+  debugfs_create_file
   debugfs_remove
   delayed_work_timer_fn
+  del_timer
   destroy_workqueue
   _dev_err
+  dev_err_probe
   devfreq_recommended_opp
   dev_fwnode
   device_create_file
@@ -110,6 +114,13 @@
   devres_free
   _dev_warn
   disable_irq
+  dmam_alloc_attrs
+  dma_map_sg_attrs
+  dma_set_coherent_mask
+  dma_set_mask
+  dma_sync_sg_for_cpu
+  dma_sync_sg_for_device
+  dma_unmap_sg_attrs
   down_read
   down_write
   drm_connector_update_edid_property
@@ -125,6 +136,7 @@
   extcon_register_notifier
   extcon_unregister_notifier
   find_next_bit
+  finish_wait
   flush_workqueue
   freq_qos_add_request
   freq_qos_remove_request
@@ -151,6 +163,8 @@
   i2c_smbus_write_i2c_block_data
   __init_swait_queue_head
   init_timer_key
+  init_wait_entry
+  __init_waitqueue_head
   iounmap
   irq_set_irq_type
   irq_set_irq_wake
@@ -174,6 +188,7 @@
   memcpy
   memset
   memstart_addr
+  mmc_of_parse
   mod_timer
   module_layout
   __msecs_to_jiffies
@@ -185,6 +200,7 @@
   ns_to_timespec64
   nvmem_cell_put
   nvmem_cell_read
+  of_alias_get_id
   of_clk_add_provider
   of_clk_del_provider
   of_clk_get
@@ -234,12 +250,20 @@
   platform_driver_unregister
   platform_get_irq
   platform_get_resource
+  platform_get_resource_byname
   pm_clk_create
   pm_clk_destroy
   pm_power_off
   __pm_relax
   __pm_runtime_disable
   pm_runtime_enable
+  pm_runtime_force_resume
+  pm_runtime_force_suspend
+  __pm_runtime_resume
+  pm_runtime_set_autosuspend_delay
+  __pm_runtime_set_status
+  __pm_runtime_suspend
+  __pm_runtime_use_autosuspend
   pm_wakeup_ws_event
   power_supply_am_i_supplied
   power_supply_changed
@@ -252,6 +276,7 @@
   power_supply_register
   power_supply_reg_notifier
   power_supply_unregister
+  prepare_to_wait_event
   print_hex_dump
   printk
   put_device
@@ -260,7 +285,9 @@
   queue_delayed_work_on
   queue_work_on
   ___ratelimit
+  _raw_spin_lock
   _raw_spin_lock_irqsave
+  _raw_spin_unlock
   _raw_spin_unlock_irqrestore
   rdev_get_drvdata
   rdev_get_id
@@ -299,7 +326,23 @@
   rtc_read_time
   rtc_tm_to_time64
   rtc_valid_tm
+  schedule_timeout
+  sdhci_add_host
+  sdhci_get_property
+  sdhci_pltfm_clk_get_max_clock
+  sdhci_pltfm_free
+  sdhci_pltfm_init
+  sdhci_reset
+  sdhci_resume_host
+  sdhci_set_bus_width
+  sdhci_set_clock
+  sdhci_suspend_host
+  seq_lseek
   seq_printf
+  seq_read
+  sg_next
+  single_open
+  single_release
   snprintf
   sprintf
   sscanf
@@ -311,6 +354,7 @@
   system_freezable_wq
   system_state
   system_wq
+  tasklet_init
   thermal_zone_get_zone_by_name
   __traceiter_rwmmio_post_read
   __traceiter_rwmmio_read
@@ -325,6 +369,7 @@
   usleep_range
   vmap
   wait_for_completion_timeout
+  __wake_up
   wakeup_source_add
   __warn_printk
 
@@ -412,8 +457,12 @@
   preempt_schedule
   store_sampling_rate
 
-# required by cw2015_battery.ko
-  dev_err_probe
+# required by cqhci.ko
+  devm_blk_ksm_init
+  devm_ioremap
+  dmam_free_coherent
+  mmc_cqe_request_done
+  schedule
 
 # required by cw2017_battery.ko
   bcmp
@@ -429,6 +478,37 @@
   drm_probe_ddc
   i2c_put_adapter
   of_get_i2c_adapter_by_node
+
+# required by dw_mmc-rockchip.ko
+  clk_get_phase
+  mmc_send_tuning
+
+# required by dw_mmc.ko
+  debugfs_create_u32
+  debugfs_create_x64
+  del_timer_sync
+  device_property_read_string_array
+  dma_release_channel
+  dma_request_chan
+  mmc_add_host
+  mmc_alloc_host
+  mmc_can_gpio_cd
+  mmc_detect_change
+  mmc_free_host
+  mmc_gpio_get_cd
+  mmc_gpio_get_ro
+  mmc_regulator_get_supply
+  mmc_regulator_set_ocr
+  mmc_regulator_set_vqmmc
+  mmc_remove_host
+  mmc_request_done
+  _raw_spin_lock_bh
+  _raw_spin_unlock_bh
+  sdio_signal_irq
+  sg_miter_next
+  sg_miter_start
+  sg_miter_stop
+  __tasklet_schedule
 
 # required by gpio-regulator.ko
   devm_gpiod_get_index
@@ -455,7 +535,6 @@
   irq_generic_chip_ops
   irq_get_domain_generic_chip
   irq_set_chained_handler_and_data
-  of_alias_get_id
   of_pinctrl_get
 
 # required by industrialio-triggered-buffer.ko
@@ -563,9 +642,6 @@
 # required by rk817_charger.ko
   dev_driver_string
 
-# required by rk818_battery.ko
-  del_timer
-
 # required by rk860x-regulator.ko
   regulator_suspend_enable
 
@@ -619,9 +695,6 @@
   devm_devfreq_register_opp_notifier
   _dev_notice
   dev_pm_opp_unregister_set_opp_helper
-  finish_wait
-  init_wait_entry
-  __init_waitqueue_head
   input_close_device
   input_open_device
   input_register_handle
@@ -631,9 +704,6 @@
   __memset_io
   of_devfreq_cooling_register_power
   platform_get_irq_byname
-  prepare_to_wait_event
-  schedule_timeout
-  __wake_up
 
 # required by rockchip_dmc_common.ko
   down_write_trylock
@@ -647,12 +717,7 @@
   regulator_get_optional
 
 # required by rockchip_pvtm.ko
-  debugfs_create_file
-  seq_lseek
   seq_puts
-  seq_read
-  single_open
-  single_release
 
 # required by rockchip_pwm_remotectl.ko
   devm_input_allocate_device
@@ -661,7 +726,6 @@
   input_set_capability
   irq_set_affinity_hint
   __tasklet_hi_schedule
-  tasklet_init
   wakeup_source_remove
 
 # required by rockchip_saradc.ko
@@ -723,15 +787,9 @@
   dma_buf_unmap_attachment
   dma_free_attrs
   dma_get_sgtable_attrs
-  dma_map_sg_attrs
   dma_mmap_attrs
-  dma_set_coherent_mask
-  dma_set_mask
-  dma_sync_sg_for_cpu
-  dma_sync_sg_for_device
   dma_sync_single_for_cpu
   dma_sync_single_for_device
-  dma_unmap_sg_attrs
   drm_add_modes_noedid
   drm_atomic_commit
   drm_atomic_get_connector_state
@@ -919,19 +977,14 @@
   of_reserved_mem_device_init_by_idx
   platform_bus_type
   platform_find_device_by_driver
-  platform_get_resource_byname
   __platform_register_drivers
   platform_unregister_drivers
   pm_runtime_get_if_active
   __pm_runtime_idle
-  __pm_runtime_resume
-  _raw_spin_lock
   _raw_spin_lock_irq
-  _raw_spin_unlock
   _raw_spin_unlock_irq
   refcount_warn_saturate
   sg_free_table
-  sg_next
   sort
   strlen
   __sw_hweight32
@@ -953,6 +1006,33 @@
   __rtc_register_device
   rtc_time64_to_tm
   rtc_update_irq
+
+# required by sdhci-of-arasan.ko
+  devm_phy_get
+  phy_exit
+  phy_init
+  phy_power_off
+  phy_power_on
+  __sdhci_add_host
+  sdhci_cleanup_host
+  sdhci_cqe_disable
+  sdhci_cqe_enable
+  sdhci_cqe_irq
+  sdhci_dumpregs
+  sdhci_enable_clk
+  sdhci_execute_tuning
+  sdhci_pltfm_unregister
+  sdhci_set_power_and_bus_voltage
+  sdhci_set_uhs_signaling
+  sdhci_setup_host
+
+# required by sdhci-of-dwcmshc.ko
+  device_get_match_data
+  devm_clk_bulk_get_optional
+  dma_get_required_mask
+  sdhci_adma_write_desc
+  sdhci_remove_host
+  sdhci_request
 
 # required by sgm41542_charger.ko
   strncpy
