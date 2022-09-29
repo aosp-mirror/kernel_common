@@ -578,6 +578,13 @@
 	vmmc-supply = <&mmc1_fixed_power>;
 	vqmmc-supply = <&mmc1_fixed_io>;
 	mmc-pwrseq = <&wifi_pwrseq>;
+
+	bt_reset: bt-reset {
+		compatible = "mediatek,mt7921s-bluetooth";
+		pinctrl-names = "default";
+		pinctrl-0 = <&bt_pins_reset>;
+		reset-gpios = <&pio 155 GPIO_ACTIVE_LOW>;
+	};
 };
 
 &nor_flash {
@@ -1465,6 +1472,13 @@
 		pins-wifi-wakeup {
 			pinmux = <PINMUX_GPIO7__FUNC_GPIO7>;
 			input-enable;
+		};
+	};
+
+	bt_pins_reset: bt-pins-reset {
+		pins_bt_reset {
+			pinmux = <PINMUX_GPIO155__FUNC_GPIO155>;
+			output-high;
 		};
 	};
 };
