@@ -745,23 +745,24 @@ int virtio_video_reqbufs(struct file *file, void *priv,
 				 VIRTIO_VIDEO_F_RESOURCE_VIRTIO_OBJECT)))
 		return -EINVAL;
 
-	if (rb->count == 0)
+	if (rb->count == 0) {
 		virtio_video_queue_free(vvd->vv, stream, vq->type);
-
-	/*
-	 * The memory type of the queue has been set, inform the host.
-	 * This needs to be done before calling v4l2_m2m_reqbufs() as it may
-	 * start creating host resources immediately, and we need the memory
-	 * type to be the correct one when that happens.
-	 */
-	if (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT)
-		params = &stream->in_info;
-	else
-		params = &stream->out_info;
-	params->resource_type = mem_type;
-	ret = virtio_video_cmd_set_params(vv, stream, params, queue_type);
-	if (ret)
-		return ret;
+	} else {
+		/*
+		 * The memory type of the queue has been set, inform the host.
+		 * This needs to be done before calling v4l2_m2m_reqbufs() as it may
+		 * start creating host resources immediately, and we need the memory
+		 * type to be the correct one when that happens.
+		 */
+		if (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT)
+			params = &stream->in_info;
+		else
+			params = &stream->out_info;
+		params->resource_type = mem_type;
+		ret = virtio_video_cmd_set_params(vv, stream, params, queue_type);
+		if (ret)
+			return ret;
+	}
 
 	return v4l2_m2m_reqbufs(file, m2m_ctx, rb);
 }
