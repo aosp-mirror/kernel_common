@@ -213,7 +213,7 @@ int virtio_video_parse_virtio_capability(struct virtio_video_device *vvd,
 			return -1;
 		}
 		offset += fmt_size;
-		list_add(&fmt->formats_list_entry, &vvd->input_fmt_list);
+		list_add_tail(&fmt->formats_list_entry, &vvd->input_fmt_list);
 	}
 
 	vvd->num_output_fmts = le32_to_cpu(output_resp->num_descs);
@@ -237,7 +237,7 @@ int virtio_video_parse_virtio_capability(struct virtio_video_device *vvd,
 			return -1;
 		}
 		offset += fmt_size;
-		list_add(&fmt->formats_list_entry, &vvd->output_fmt_list);
+		list_add_tail(&fmt->formats_list_entry, &vvd->output_fmt_list);
 	}
 	return 0;
 }
