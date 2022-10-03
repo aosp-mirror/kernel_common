@@ -1915,6 +1915,7 @@ static int bpf_test_lookup_postfilter(const char *mount_dir)
 {
 	const char *file1_name = "file1";
 	const char *file2_name = "file2";
+	const char *file3_name = "file3";
 	int result = TEST_FAILURE;
 	int bpf_fd = -1;
 	int src_fd = -1;
@@ -1944,18 +1945,27 @@ static int bpf_test_lookup_postfilter(const char *mount_dir)
 		TEST(fd = s_open(s_path(s(mount_dir), s(file2_name)), O_RDONLY),
 		     fd != -1);
 		TESTSYSCALL(close(fd));
+		TESTEQUAL(s_open(s_path(s(mount_dir), s(file3_name)), O_RDONLY),
+			  -1);
 	FUSE_DAEMON
+		struct fuse_in_header *in_header =
+				(struct fuse_in_header *)bytes_in;
 		struct fuse_entry_out *feo;
 		struct fuse_entry_bpf_out *febo;
 
 		TESTFUSELOOKUP(file1_name, FUSE_POSTFILTER);
 		TESTFUSEOUTERROR(-ENOENT);
+
 		TESTFUSELOOKUP(file2_name, FUSE_POSTFILTER);
 		feo = (struct fuse_entry_out *) (bytes_in +
 			sizeof(struct fuse_in_header) +	strlen(file2_name) + 1);
 		febo = (struct fuse_entry_bpf_out *) ((char *)feo +
 			sizeof(*feo));
 		TESTFUSEOUT2(fuse_entry_out, *feo, fuse_entry_bpf_out, *febo);
+
+		TESTFUSELOOKUP(file3_name, FUSE_POSTFILTER);
+		TESTEQUAL(in_header->error_in, -ENOENT);
+		TESTFUSEOUTERROR(-ENOENT);
 	FUSE_DONE
 
 	result = TEST_SUCCESS;
