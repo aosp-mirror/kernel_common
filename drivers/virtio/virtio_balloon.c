@@ -6,6 +6,7 @@
  *  Copyright 2008 Rusty Russell IBM Corporation
  */
 
+#include "linux/dev_printk.h"
 #include <linux/virtio.h>
 #include <linux/virtio_balloon.h>
 #include <linux/swap.h>
@@ -472,17 +473,14 @@ static void update_balloon_stats_func(struct work_struct *work)
 	stats_handle_request(vb);
 }
 
-static void update_balloon_size_func(struct work_struct *work)
+static s64 update_balloon_size_internal(struct virtio_balloon *vb)
 {
-	struct virtio_balloon *vb;
 	s64 diff;
 
-	vb = container_of(work, struct virtio_balloon,
-			  update_balloon_size_work);
 	diff = towards_target(vb);
 
 	if (!diff)
-		return;
+		return diff;
 
 	if (diff > 0)
 		diff -= fill_balloon(vb, diff);
@@ -490,7 +488,17 @@ static void update_balloon_size_func(struct work_struct *work)
 		diff += leak_balloon(vb, -diff);
 	update_balloon_size(vb);
 
-	if (diff)
+	return diff;
+}
+
+static void update_balloon_size_func(struct work_struct *work)
+{
+	struct virtio_balloon *vb;
+
+	vb = container_of(work, struct virtio_balloon,
+			  update_balloon_size_work);
+
+	if (update_balloon_size_internal(vb))
 		queue_work(system_freezable_wq, work);
 }
 
@@ -1000,8 +1008,22 @@ static int virtballoon_probe(struct virtio_device *vdev)
 
 	virtio_device_ready(vdev);
 
-	if (towards_target(vb))
-		virtballoon_changed(vdev);
+	if (towards_target(vb)) {
+		s64 diff = -1;
+		do {
+			s64 new_diff = update_balloon_size_internal(vb);
+			/* The BUG below will be triggered if the balloon couldn't make any
+			 * progress with the initial inflation.
+			 * Explicit crash because there shouldn't be any failure at this stage.
+			 * The reasons this BUG could trigger if:
+			 *  * the initial target is too aggressive
+			 *  * virtio-balloon is not being loaded at the 1st stage init
+			 * Both are considered programming bugs and should be fixed.
+			 */
+			BUG_ON(new_diff == diff);
+			diff = new_diff;
+		} while (diff != 0);
+	}
 	return 0;
 
 out_unregister_oom:
