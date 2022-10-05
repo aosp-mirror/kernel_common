@@ -39,6 +39,7 @@
 #define VIRTIO_BALLOON_F_REPORTING	5 /* Page reporting virtqueue */
 
 /* Size of a PFN in the balloon interface. */
+/* This is not useful with the change that allocates using hugepages */
 #define VIRTIO_BALLOON_PFN_SHIFT 12
 
 #define VIRTIO_BALLOON_CMD_ID_STOP	0
@@ -59,6 +60,8 @@ struct virtio_balloon_config {
 	};
 	/* Stores PAGE_POISON if page poisoning is in use */
 	__le32 poison_val;
+	/* allocation size for balloon page, order to use, e.g. 0=>4k, 9=>2MB. etc.*/
+	__le32 hugepage_order;
 };
 
 #define VIRTIO_BALLOON_S_SWAP_IN  0   /* Amount of memory swapped in */

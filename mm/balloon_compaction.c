@@ -6,6 +6,8 @@
  *
  * Copyright (C) 2012, Red Hat, Inc.  Rafael Aquini <aquini@redhat.com>
  */
+#include "linux/gfp.h"
+#include "linux/types.h"
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/export.h>
@@ -119,13 +121,19 @@ EXPORT_SYMBOL_GPL(balloon_page_list_dequeue);
  * Driver must call balloon_page_enqueue before definitively removing the page
  * from the guest system.
  *
+ * @order: order to use when allocating a page. 0 => 4k, otherwise __GFP_COMP
+ *         is used to allocate a hugepage.
  * Return: struct page for the allocated page or NULL on allocation failure.
  */
-struct page *balloon_page_alloc(void)
+struct page *balloon_page_alloc(int order)
 {
-	struct page *page = alloc_page(balloon_mapping_gfp_mask() |
-				       __GFP_NOMEMALLOC | __GFP_NORETRY |
-				       __GFP_NOWARN);
+	struct page *page;
+	gfp_t gfp_mask = balloon_mapping_gfp_mask() | __GFP_NOMEMALLOC |
+			 __GFP_NORETRY | __GFP_NOWARN;
+	if (order != 0) {
+		gfp_mask |= __GFP_COMP;
+	}
+	page = alloc_pages(gfp_mask, order);
 	return page;
 }
 EXPORT_SYMBOL_GPL(balloon_page_alloc);

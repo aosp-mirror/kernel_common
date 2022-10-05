@@ -27,8 +27,14 @@
  * Balloon device works in 4K page units.  So each page is pointed to by
  * multiple balloon pages.  All memory counters in this driver are in balloon
  * page units.
+ *
+ * With hugepage allocation, we need to treat 1 page == 1 balloon page at least
+ * for x86 which is the current prototype target.
  */
+#define VIRTIO_BALLOON_PAGES_PER_PAGE 1
+/*
 #define VIRTIO_BALLOON_PAGES_PER_PAGE (unsigned)(PAGE_SIZE >> VIRTIO_BALLOON_PFN_SHIFT)
+*/
 #define VIRTIO_BALLOON_ARRAY_PFNS_MAX 256
 /* Maximum number of (4k) pages to deflate on OOM notifications. */
 #define VIRTIO_BALLOON_OOM_NR_PAGES 256
@@ -127,6 +133,9 @@ struct virtio_balloon {
 	/* Free page reporting device */
 	struct virtqueue *reporting_vq;
 	struct page_reporting_dev_info pr_dev_info;
+
+	/* order to use for hugepage allocation, 0 => 4k, 1 => 8k, 2 => 16k, etc. */
+	unsigned int hugepage_order;
 };
 
 static const struct virtio_device_id id_table[] = {
@@ -205,8 +214,9 @@ static void set_page_pfns(struct virtio_balloon *vb,
 	 * Note that the first pfn points at start of the page.
 	 */
 	for (i = 0; i < VIRTIO_BALLOON_PAGES_PER_PAGE; i++)
-		pfns[i] = cpu_to_virtio32(vb->vdev,
-					  page_to_balloon_pfn(page) + i);
+		pfns[i] = cpu_to_virtio32(
+			vb->vdev,
+			(page_to_balloon_pfn(page) >> vb->hugepage_order) + i);
 }
 
 static unsigned fill_balloon(struct virtio_balloon *vb, size_t num)
@@ -221,7 +231,7 @@ static unsigned fill_balloon(struct virtio_balloon *vb, size_t num)
 
 	for (num_pfns = 0; num_pfns < num;
 	     num_pfns += VIRTIO_BALLOON_PAGES_PER_PAGE) {
-		struct page *page = balloon_page_alloc();
+		struct page *page = balloon_page_alloc(vb->hugepage_order);
 
 		if (!page) {
 			dev_info_ratelimited(&vb->vdev->dev,
@@ -246,7 +256,7 @@ static unsigned fill_balloon(struct virtio_balloon *vb, size_t num)
 		vb->num_pages += VIRTIO_BALLOON_PAGES_PER_PAGE;
 		if (!virtio_has_feature(vb->vdev,
 					VIRTIO_BALLOON_F_DEFLATE_ON_OOM))
-			adjust_managed_page_count(page, -1);
+			adjust_managed_page_count(page, -(1 << vb->hugepage_order));
 		vb->num_pfns += VIRTIO_BALLOON_PAGES_PER_PAGE;
 	}
 
@@ -267,7 +277,7 @@ static void release_pages_balloon(struct virtio_balloon *vb,
 	list_for_each_entry_safe(page, next, pages, lru) {
 		if (!virtio_has_feature(vb->vdev,
 					VIRTIO_BALLOON_F_DEFLATE_ON_OOM))
-			adjust_managed_page_count(page, 1);
+			adjust_managed_page_count(page, (1 << vb->hugepage_order));
 		list_del(&page->lru);
 		put_page(page); /* balloon reference */
 	}
@@ -909,6 +919,10 @@ static int virtballoon_probe(struct virtio_device *vdev)
 	mutex_init(&vb->balloon_lock);
 	init_waitqueue_head(&vb->acked);
 	vb->vdev = vdev;
+	/* Set the hugepage_order provided by the hypervisor */
+	virtio_cread_le(vb->vdev, struct virtio_balloon_config, hugepage_order,
+			&vb->hugepage_order);
+	dev_info_ratelimited(&vdev->dev, "allocation using order=%d", vb->hugepage_order);
 
 	balloon_devinfo_init(&vb->vb_dev_info);
 
