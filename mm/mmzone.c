@@ -72,7 +72,6 @@ struct zoneref *__next_zones_zonelist(struct zoneref *z,
 
 	return z;
 }
-EXPORT_SYMBOL_GPL(__next_zones_zonelist);
 
 void lruvec_init(struct lruvec *lruvec)
 {
@@ -119,4 +118,3 @@ enum zone_type gfp_zone(gfp_t flags)
 	VM_BUG_ON((GFP_ZONE_BAD >> bit) & 1);
 	return z;
 }
-EXPORT_SYMBOL_GPL(gfp_zone);

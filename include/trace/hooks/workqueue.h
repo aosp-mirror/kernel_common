@@ -10,12 +10,8 @@
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
  */
-#ifdef __GENKSYMS__
 struct worker;
-#else
-/* struct worker */
-#include <../kernel/workqueue_internal.h>
-#endif /* __GENKSYMS__ */
+
 DECLARE_HOOK(android_vh_create_worker,
 	TP_PROTO(struct worker *worker, struct workqueue_attrs *attrs),
 	TP_ARGS(worker, attrs));

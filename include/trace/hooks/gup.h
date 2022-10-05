@@ -7,12 +7,7 @@
 #define _TRACE_HOOK_GUP_H
 #include <trace/hooks/vendor_hooks.h>
 
-#ifdef __GENKSYMS__
 struct page;
-#else
-/* struct page */
-#include <linux/mm_types.h>
-#endif /* __GENKSYMS__ */
 
 DECLARE_HOOK(android_vh_try_grab_compound_head,
        TP_PROTO(struct page *page, int refs, unsigned int flags, bool *ret),

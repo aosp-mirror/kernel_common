@@ -9,18 +9,9 @@
 
 #include <trace/hooks/vendor_hooks.h>
 
-#ifdef __GENKSYMS__
 struct sdhci_host;
 struct mmc_card;
 struct mmc_host;
-#else
-/* struct sdhci_host */
-#include <../drivers/mmc/host/sdhci.h>
-/* struct mmc_card */
-#include <linux/mmc/card.h>
-/* struct mmc_host */
-#include <linux/mmc/host.h>
-#endif /* __GENKSYMS__ */
 
 DECLARE_HOOK(android_vh_mmc_blk_reset,
 	     TP_PROTO(struct mmc_host *host, int err, bool *allow),

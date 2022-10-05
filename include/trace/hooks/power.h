@@ -10,20 +10,21 @@
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
  */
-#ifdef __GENKSYMS__
-enum freq_qos_req_type;
+
+/* needed for enum freq_qos_req_types */
+#include <linux/pm_qos.h>
+
 struct freq_constraints;
 struct freq_qos_request;
 struct task_struct;
-#else
-/* enum freq_qos_req_type, struct freq_constraints, struct freq_qos_request */
-#include <linux/pm_qos.h>
-/* struct task_struct */
-#include <linux/sched.h>
-#endif /* __GENKSYMS__ */
+
 DECLARE_HOOK(android_vh_try_to_freeze_todo,
 	TP_PROTO(unsigned int todo, unsigned int elapsed_msecs, bool wq_busy),
 	TP_ARGS(todo, elapsed_msecs, wq_busy));
+
+DECLARE_HOOK(android_vh_try_to_freeze_todo_logging,
+	TP_PROTO(bool *logging_on),
+	TP_ARGS(logging_on));
 
 DECLARE_HOOK(android_vh_try_to_freeze_todo_unfrozen,
 	TP_PROTO(struct task_struct *p),

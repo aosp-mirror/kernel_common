@@ -78,6 +78,7 @@
   __bitmap_set
   bitmap_to_arr32
   __bitmap_weight
+  __bitmap_xor
   blk_abort_request
   blk_alloc_queue
   blk_check_plugged
@@ -332,6 +333,7 @@
   crypto_register_notifier
   crypto_register_scomp
   crypto_register_shash
+  crypto_req_done
   crypto_shash_digest
   crypto_shash_final
   crypto_shash_finup
@@ -374,6 +376,7 @@
   desc_to_gpio
   destroy_workqueue
   dev_alloc_name
+  dev_base_lock
   dev_close
   _dev_crit
   dev_driver_string
@@ -442,11 +445,13 @@
   devm_extcon_dev_allocate
   devm_extcon_dev_register
   devm_free_irq
+  devm_fwnode_gpiod_get_index
   devm_fwnode_pwm_get
   devm_gen_pool_create
   devm_gpiochip_add_data_with_key
   devm_gpiod_get
   devm_gpiod_get_array
+  devm_gpiod_get_array_optional
   devm_gpiod_get_optional
   devm_gpiod_put_array
   devm_gpio_free
@@ -624,6 +629,7 @@
   drm_add_modes_noedid
   drm_atomic_add_affected_connectors
   drm_atomic_add_affected_planes
+  drm_atomic_bridge_chain_disable
   drm_atomic_commit
   drm_atomic_get_connector_state
   drm_atomic_get_crtc_state
@@ -749,6 +755,7 @@
   drm_mode_object_find
   drm_mode_object_get
   drm_mode_object_put
+  drm_mode_parse_command_line_for_connector
   drm_mode_probed_add
   drm_modeset_acquire_fini
   drm_modeset_acquire_init
@@ -959,6 +966,7 @@
   gpiod_get_raw_value_cansleep
   gpiod_get_value
   gpiod_get_value_cansleep
+  gpiod_set_debounce
   gpiod_set_raw_value
   gpiod_set_raw_value_cansleep
   gpiod_set_value
@@ -1047,6 +1055,7 @@
   __init_swait_queue_head
   init_task
   init_timer_key
+  init_user_ns
   init_wait_entry
   __init_waitqueue_head
   input_alloc_absinfo
@@ -1088,6 +1097,7 @@
   iommu_device_sysfs_remove
   iommu_device_unlink
   iommu_device_unregister
+  iommu_dma_enable_best_fit_algo
   iommu_domain_alloc
   iommu_domain_free
   iommu_fwspec_add_ids
@@ -1191,6 +1201,7 @@
   kobject_init
   kobject_init_and_add
   kobject_put
+  kobject_rename
   kobject_uevent
   kobject_uevent_env
   kobj_sysfs_ops
@@ -1351,6 +1362,8 @@
   netlink_kernel_release
   netlink_unicast
   net_ratelimit
+  nf_register_net_hooks
+  nf_unregister_net_hooks
   nla_append
   nla_memcpy
   __nla_parse
@@ -1366,6 +1379,7 @@
   nr_cpu_ids
   nr_irqs
   ns_capable
+  ns_capable_noaudit
   nsec_to_clock_t
   ns_to_timespec64
   __num_online_cpus
@@ -1765,6 +1779,7 @@
   regulator_notifier_call_chain
   regulator_put
   regulator_register
+  regulator_set_active_discharge_regmap
   regulator_set_load
   regulator_set_voltage
   regulator_set_voltage_sel_regmap
@@ -2229,6 +2244,7 @@
   __traceiter_android_vh_cpu_idle_exit
   __traceiter_android_vh_dump_throttled_rt_tasks
   __traceiter_android_vh_dup_task_struct
+  __traceiter_android_vh_early_resume_begin
   __traceiter_android_vh_enable_thermal_genl_check
   __traceiter_android_vh_ep_create_wakeup_source
   __traceiter_android_vh_get_user_pages
@@ -2241,6 +2257,7 @@
   __traceiter_android_vh_of_i2c_get_board_info
   __traceiter_android_vh_pagecache_get_page
   __traceiter_android_vh_pin_user_pages
+  __traceiter_android_vh_resume_end
   __traceiter_android_vh_rmqueue
   __traceiter_android_vh_sched_setaffinity_early
   __traceiter_android_vh_scheduler_tick
@@ -2252,6 +2269,7 @@
   __traceiter_android_vh_thermal_pm_notify_suspend
   __traceiter_android_vh_timerfd_create
   __traceiter_android_vh_try_grab_compound_head
+  __traceiter_android_vh_try_to_freeze_todo_logging
   __traceiter_android_vh_typec_store_partner_src_caps
   __traceiter_android_vh_typec_tcpci_override_toggling
   __traceiter_android_vh_typec_tcpm_get_timer
@@ -2342,6 +2360,7 @@
   __tracepoint_android_vh_cpu_idle_exit
   __tracepoint_android_vh_dump_throttled_rt_tasks
   __tracepoint_android_vh_dup_task_struct
+  __tracepoint_android_vh_early_resume_begin
   __tracepoint_android_vh_enable_thermal_genl_check
   __tracepoint_android_vh_ep_create_wakeup_source
   __tracepoint_android_vh_get_user_pages
@@ -2354,6 +2373,7 @@
   __tracepoint_android_vh_of_i2c_get_board_info
   __tracepoint_android_vh_pagecache_get_page
   __tracepoint_android_vh_pin_user_pages
+  __tracepoint_android_vh_resume_end
   __tracepoint_android_vh_rmqueue
   __tracepoint_android_vh_sched_setaffinity_early
   __tracepoint_android_vh_scheduler_tick
@@ -2365,6 +2385,7 @@
   __tracepoint_android_vh_thermal_pm_notify_suspend
   __tracepoint_android_vh_timerfd_create
   __tracepoint_android_vh_try_grab_compound_head
+  __tracepoint_android_vh_try_to_freeze_todo_logging
   __tracepoint_android_vh_typec_store_partner_src_caps
   __tracepoint_android_vh_typec_tcpci_override_toggling
   __tracepoint_android_vh_typec_tcpm_get_timer
@@ -2656,6 +2677,7 @@
   xa_find
   xa_find_after
   xa_get_mark
+  __xa_insert
   xa_load
   xa_set_mark
   xa_store
