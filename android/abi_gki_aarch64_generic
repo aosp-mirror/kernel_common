@@ -2257,6 +2257,7 @@
   __traceiter_android_vh_of_i2c_get_board_info
   __traceiter_android_vh_pagecache_get_page
   __traceiter_android_vh_pin_user_pages
+  __traceiter_android_vh_rebuild_root_domains_bypass
   __traceiter_android_vh_resume_end
   __traceiter_android_vh_rmqueue
   __traceiter_android_vh_sched_setaffinity_early
@@ -2373,6 +2374,7 @@
   __tracepoint_android_vh_of_i2c_get_board_info
   __tracepoint_android_vh_pagecache_get_page
   __tracepoint_android_vh_pin_user_pages
+  __tracepoint_android_vh_rebuild_root_domains_bypass
   __tracepoint_android_vh_resume_end
   __tracepoint_android_vh_rmqueue
   __tracepoint_android_vh_sched_setaffinity_early
