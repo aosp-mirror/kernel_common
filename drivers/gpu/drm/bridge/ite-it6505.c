@@ -3497,9 +3497,12 @@ static int it6505_typec_mux_set(struct typec_mux_dev *mux,
 		 */
 		if (ret < 0)
 			it6505_poweron(it6505);
+
+		complete_all(&it6505->extcon_completion);
 	}
 
 	if (old_dp_connected && !new_dp_connected) {
+		reinit_completion(&it6505->extcon_completion);
 		pm_runtime_put_sync(dev);
 		if (it6505->bridge.dev)
 			drm_helper_hpd_irq_event(it6505->bridge.dev);
