@@ -588,6 +588,14 @@ int __pkvm_register_el2_call(dyn_hcall_t hfn, unsigned long token,
 }
 EXPORT_SYMBOL_GPL(__pkvm_register_el2_call);
 
+DEFINE_STATIC_KEY_FALSE(pkvm_force_nc);
+static int __init early_pkvm_force_nc_cfg(char *arg)
+{
+	static_branch_enable(&pkvm_force_nc);
+	return 0;
+}
+early_param("kvm-arm.force_nc", early_pkvm_force_nc_cfg);
+
 /*
  * Update the stage-2 memory attributes (cacheability) for a page, usually
  * in response to mapping or unmapping a normal non-cacheable region at stage-1.

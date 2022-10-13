@@ -316,9 +316,13 @@ static inline void __check_racy_pte_update(struct mm_struct *mm, pte_t *ptep,
 extern int pkvm_host_register_early_nc_mappings(void);
 extern void pkvm_host_set_stage2_memattr(phys_addr_t addr, bool force_nc);
 
+DECLARE_STATIC_KEY_FALSE(pkvm_force_nc);
 static inline bool prot_needs_stage2_update(pgprot_t prot)
 {
 	pteval_t val = pgprot_val(prot);
+
+	if (!static_branch_unlikely(&pkvm_force_nc))
+		return 0;
 
 	return (val & PTE_ATTRINDX_MASK) == PTE_ATTRINDX(MT_NORMAL_NC);
 }
@@ -327,6 +331,9 @@ static inline void arm64_update_cacheable_aliases(pte_t *ptep, pte_t pte)
 {
 	pte_t old_pte = READ_ONCE(*ptep);
 	bool force_nc;
+
+	if (!static_branch_unlikely(&pkvm_force_nc))
+		return;
 
 	if (pte_valid(old_pte) == pte_valid(pte))
 		return;
