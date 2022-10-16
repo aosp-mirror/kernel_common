@@ -3847,12 +3847,22 @@ static void rcu_barrier_func(void *cpu_in)
 {
 	uintptr_t cpu = (uintptr_t)cpu_in;
 	struct rcu_data *rdp = per_cpu_ptr(&rcu_data, cpu);
+	bool wake_nocb = false;
+	bool was_alldone = false;
+	unsigned long flags;
 
 	rcu_barrier_trace(TPS("IRQ"), -1, rcu_state.barrier_sequence);
 	rdp->barrier_head.func = rcu_barrier_callback;
 	debug_rcu_head_queue(&rdp->barrier_head);
-	rcu_nocb_lock(rdp);
+	rcu_nocb_lock_irqsave(rdp, flags);
+	/*
+	 * Flush bypass and wakeup rcuog if we add callbacks to an empty regular
+	 * queue. This way we don't wait for bypass timer that can reach seconds
+	 * if it's fully lazy.
+	 */
+	was_alldone = rcu_segcblist_is_offloaded(&rdp->cblist) && !rcu_segcblist_pend_cbs(&rdp->cblist);
 	WARN_ON_ONCE(!rcu_nocb_flush_bypass(rdp, NULL, jiffies));
+	wake_nocb = was_alldone && rcu_segcblist_pend_cbs(&rdp->cblist);
 	if (rcu_segcblist_entrain(&rdp->cblist, &rdp->barrier_head)) {
 		atomic_inc(&rcu_state.barrier_cpu_count);
 	} else {
@@ -3860,7 +3870,10 @@ static void rcu_barrier_func(void *cpu_in)
 		rcu_barrier_trace(TPS("IRQNQ"), -1,
 				  rcu_state.barrier_sequence);
 	}
-	rcu_nocb_unlock(rdp);
+	if (wake_nocb)
+		wake_nocb_gp(rdp, false, flags);
+	else
+		rcu_nocb_unlock_irqrestore(rdp, flags);
 }
 
 /**

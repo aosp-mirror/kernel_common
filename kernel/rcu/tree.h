@@ -444,6 +444,7 @@ static void rcu_nocb_unlock_irqrestore(struct rcu_data *rdp,
 static void rcu_lockdep_assert_cblist_protected(struct rcu_data *rdp);
 #ifdef CONFIG_RCU_NOCB_CPU
 static void __init rcu_organize_nocb_kthreads(void);
+static void wake_nocb_gp(struct rcu_data *rdp, bool force, unsigned long flags);
 #define rcu_nocb_lock_irqsave(rdp, flags)				\
 do {									\
 	if (!rcu_segcblist_is_offloaded(&(rdp)->cblist))		\
@@ -453,6 +454,7 @@ do {									\
 } while (0)
 #else /* #ifdef CONFIG_RCU_NOCB_CPU */
 #define rcu_nocb_lock_irqsave(rdp, flags) local_irq_save(flags)
+static void wake_nocb_gp(struct rcu_data *rdp, bool force, unsigned long flags) {  }
 #endif /* #else #ifdef CONFIG_RCU_NOCB_CPU */
 
 static void rcu_bind_gp_kthread(void);
