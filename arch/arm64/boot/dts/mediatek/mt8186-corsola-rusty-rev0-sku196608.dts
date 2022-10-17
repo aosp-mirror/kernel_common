@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2022 Google LLC
+ */
+
+/dts-v1/;
+#include "mt8186-corsola-steelix.dtsi"
+#include "mt8186-corsola-ps8640.dtsi"
+
+/ {
+	model = "Google Rusty rev0/rev1 sku196608/196609 board";
+	compatible = "google,steelix-rev0-sku196608", "google,steelix-rev0-sku196609",
+		     "google,steelix-rev1-sku196608", "google,steelix-rev1-sku196609",
+		     "google,steelix-rev0", "google,steelix-rev1",
+		     "google,steelix", "mediatek,mt8186";
+};
+
+&gpio_keys {
+	status = "disabled";
+};
+
+&touchscreen {
+	status = "disabled";
+};
