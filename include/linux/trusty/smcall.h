@@ -68,6 +68,36 @@
  */
 #define SMC_SC_NOP		SMC_STDCALL_NR(SMC_ENTITY_SECURE_MONITOR, 3)
 
+/**
+ * SMC API for supporting shared-memory based trusty-linux info exchange
+ *
+ * SMC_SC_SCHED_SHARE_REGISTER - enter trusty to establish a shared-memory region
+ * Arguments:
+ * param[0]: shared-memory client-id
+ * param[1]: shared-memory buffer-id
+ * param[2]: shared-memory block size
+ *
+ * returns:
+ * SM_ERR_INTERNAL_FAILURE on failure.
+ * 0 on success.
+ */
+#define SMC_SC_SCHED_SHARE_REGISTER   SMC_STDCALL_NR(SMC_ENTITY_SECURE_MONITOR, 4)
+
+/**
+ * SMC API for supporting shared-memory based trusty-linux info exchange
+ *
+ * SMC_SC_SCHED_SHARE_UNREGISTER - enter trusty to release the shared-memory region
+ * Arguments:
+ * param[0]: shared-memory client-id
+ * param[1]: shared-memory buffer-id
+ *
+ * returns:
+ * SM_ERR_INTERNAL_FAILURE on failure.
+ * 0 on success.
+ */
+#define SMC_SC_SCHED_SHARE_UNREGISTER \
+	SMC_STDCALL_NR(SMC_ENTITY_SECURE_MONITOR, 5)
+
 /*
  * Return from secure os to non-secure os with return value in r1
  */

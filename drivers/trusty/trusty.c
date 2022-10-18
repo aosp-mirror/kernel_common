@@ -21,6 +21,7 @@
 
 #include "trusty-smc.h"
 #include "trusty-trace.h"
+#include "trusty-sched-share-api.h"
 
 struct trusty_state;
 static struct platform_driver trusty_driver;
@@ -46,6 +47,7 @@ struct trusty_state {
 	struct list_head nop_queue;
 	spinlock_t nop_lock; /* protects nop_queue */
 	struct device_dma_parameters dma_parms;
+	struct trusty_sched_share_state *trusty_sched_share_state;
 	void *ffa_tx;
 	void *ffa_rx;
 	u16 ffa_local_id;
@@ -935,6 +937,8 @@ static int trusty_probe(struct platform_device *pdev)
 		INIT_WORK(&tw->work, work_func);
 	}
 
+	s->trusty_sched_share_state = trusty_register_sched_share(&pdev->dev);
+
 	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to add children: %d\n", ret);
@@ -970,6 +974,8 @@ static int trusty_remove(struct platform_device *pdev)
 {
 	unsigned int cpu;
 	struct trusty_state *s = platform_get_drvdata(pdev);
+
+	trusty_unregister_sched_share(s->trusty_sched_share_state);
 
 	device_for_each_child(&pdev->dev, NULL, trusty_remove_child);
 
