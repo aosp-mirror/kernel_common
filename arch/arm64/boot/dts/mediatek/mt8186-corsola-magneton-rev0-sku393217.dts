@@ -5,11 +5,13 @@
 
 /dts-v1/;
 #include "mt8186-corsola-steelix.dtsi"
+#include "mt8186-corsola-ps8640.dtsi"
 
 / {
-	model = "Google Magneton sku393217 board";
-	compatible = "google,steelix-rev2-sku393217", "google,steelix-rev2-sku393220",
-		     "google,steelix-rev2", "google,steelix", "mediatek,mt8186";
+	model = "Google Magneton rev0/rev1 sku393217 board";
+	compatible = "google,steelix-rev0-sku393217", "google,steelix-rev0",
+		     "google,steelix-rev1-sku393217", "google,steelix-rev1",
+		     "google,steelix", "mediatek,mt8186";
 };
 
 &gpio_keys {
