@@ -790,6 +790,7 @@ static bool page_referenced_one(struct page *page, struct vm_area_struct *vma,
 		}
 
 		if (pvmw.pte) {
+			trace_android_vh_look_around(&pvmw, page, vma, &referenced);
 			/* the multigenerational lru exploits the spatial locality */
 			if (lru_gen_enabled() && pte_young(*pvmw.pte) &&
 			    !(vma->vm_flags & VM_SEQ_READ)) {
