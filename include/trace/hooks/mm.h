@@ -61,6 +61,9 @@ DECLARE_HOOK(android_vh_rmqueue,
 		unsigned int alloc_flags, int migratetype),
 	TP_ARGS(preferred_zone, zone, order,
 		gfp_flags, alloc_flags, migratetype));
+DECLARE_HOOK(android_vh_pagevec_drain,
+	TP_PROTO(struct page *page, bool *ret),
+	TP_ARGS(page, ret));
 DECLARE_HOOK(android_vh_pagecache_get_page,
 	TP_PROTO(struct address_space *mapping, pgoff_t index,
 		int fgp_flags, gfp_t gfp_mask, struct page *page),

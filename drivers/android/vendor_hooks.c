@@ -225,6 +225,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_calc_alloc_flags);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mm_compaction_begin);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mm_compaction_end);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rmqueue);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pagevec_drain);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pagecache_get_page);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_filemap_fault_get_page);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_filemap_fault_cache_page);
