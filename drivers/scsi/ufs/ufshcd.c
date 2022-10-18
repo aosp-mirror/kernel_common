@@ -147,6 +147,8 @@ static const char *const ufshcd_state_name[] = {
 	[UFSHCD_STATE_EH_SCHEDULED_NON_FATAL]	= "eh_non_fatal",
 };
 
+static bool system_suspending;
+
 /* UFSHCD error handling flags */
 enum {
 	UFSHCD_EH_IN_PROGRESS = (1 << 0),
@@ -9332,6 +9334,7 @@ static int ufshcd_wl_suspend(struct device *dev)
 
 	hba = shost_priv(sdev->host);
 	down(&hba->host_sem);
+	system_suspending = true;
 
 	if (pm_runtime_suspended(dev))
 		goto out;
@@ -9373,6 +9376,7 @@ out:
 		hba->curr_dev_pwr_mode, hba->uic_link_state);
 	if (!ret)
 		hba->is_sys_suspended = false;
+	system_suspending = false;
 	up(&hba->host_sem);
 	return ret;
 }
