@@ -100,6 +100,15 @@ DECLARE_HOOK(android_vh_alloc_pages_slowpath,
 DECLARE_HOOK(android_vh_cma_alloc_adjust,
 	TP_PROTO(struct zone *zone, bool *is_cma_alloc),
 	TP_ARGS(zone, is_cma_alloc));
+DECLARE_HOOK(android_vh_zap_pte_range_tlb_start,
+	TP_PROTO(void *unused),
+	TP_ARGS(unused));
+DECLARE_HOOK(android_vh_zap_pte_range_tlb_force_flush,
+	TP_PROTO(struct page *page, bool *flush),
+	TP_ARGS(page, flush));
+DECLARE_HOOK(android_vh_zap_pte_range_tlb_end,
+	TP_PROTO(void *unused),
+	TP_ARGS(unused));
 DECLARE_HOOK(android_vh_print_slabinfo_header,
 	TP_PROTO(struct seq_file *m),
 	TP_ARGS(m));
