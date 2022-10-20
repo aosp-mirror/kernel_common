@@ -89,6 +89,9 @@ DECLARE_HOOK(android_vh_zap_pte_range_tlb_force_flush,
 DECLARE_HOOK(android_vh_zap_pte_range_tlb_end,
 	TP_PROTO(void *ret),
 	TP_ARGS(ret));
+DECLARE_HOOK(android_vh_skip_lru_disable,
+	TP_PROTO(bool *skip),
+	TP_ARGS(skip));
 struct mem_cgroup;
 DECLARE_HOOK(android_vh_mem_cgroup_alloc,
 	TP_PROTO(struct mem_cgroup *memcg),
