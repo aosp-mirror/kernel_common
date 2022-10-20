@@ -61,6 +61,7 @@
 #include <trace/hooks/iommu.h>
 #include <trace/hooks/thermal.h>
 #include <trace/hooks/ufshcd.h>
+#include <trace/hooks/buffer.h>
 #ifdef __GENKSYMS__
 #include <trace/hooks/cgroup.h>
 #endif
@@ -285,6 +286,8 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_alloc_pages_slowpath);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_zap_pte_range_tlb_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_zap_pte_range_tlb_force_flush);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_zap_pte_range_tlb_end);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_bh_lru_install);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_skip_lru_disable);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cma_alloc_adjust);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_show_mem);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_print_slabinfo_header);

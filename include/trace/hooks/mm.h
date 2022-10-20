@@ -109,6 +109,9 @@ DECLARE_HOOK(android_vh_zap_pte_range_tlb_force_flush,
 DECLARE_HOOK(android_vh_zap_pte_range_tlb_end,
 	TP_PROTO(void *unused),
 	TP_ARGS(unused));
+DECLARE_HOOK(android_vh_skip_lru_disable,
+	TP_PROTO(bool *skip),
+	TP_ARGS(skip));
 DECLARE_HOOK(android_vh_print_slabinfo_header,
 	TP_PROTO(struct seq_file *m),
 	TP_ARGS(m));
