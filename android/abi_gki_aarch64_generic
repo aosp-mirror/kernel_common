@@ -2241,6 +2241,7 @@
   __traceiter_android_rvh_update_rt_rq_load_avg
   __traceiter_android_rvh_util_est_update
   __traceiter_android_vh_arch_set_freq_scale
+  __traceiter_android_vh_bh_lru_install
   __traceiter_android_vh_cma_alloc_adjust
   __traceiter_android_vh_cma_alloc_finish
   __traceiter_android_vh_cma_alloc_start
@@ -2269,6 +2270,7 @@
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_show_max_freq
+  __traceiter_android_vh_skip_lru_disable
   __traceiter_android_vh_snd_compr_use_pause_in_drain
   __traceiter_android_vh_sound_usb_support_cpu_suspend
   __traceiter_android_vh_sysrq_crash
@@ -2362,6 +2364,7 @@
   __tracepoint_android_rvh_update_rt_rq_load_avg
   __tracepoint_android_rvh_util_est_update
   __tracepoint_android_vh_arch_set_freq_scale
+  __tracepoint_android_vh_bh_lru_install
   __tracepoint_android_vh_cma_alloc_adjust
   __tracepoint_android_vh_cma_alloc_finish
   __tracepoint_android_vh_cma_alloc_start
@@ -2390,6 +2393,7 @@
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_show_max_freq
+  __tracepoint_android_vh_skip_lru_disable
   __tracepoint_android_vh_snd_compr_use_pause_in_drain
   __tracepoint_android_vh_sound_usb_support_cpu_suspend
   __tracepoint_android_vh_sysrq_crash
