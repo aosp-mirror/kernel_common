@@ -3087,7 +3087,7 @@ DECLARE_STATIC_KEY_FALSE(init_on_alloc);
 static inline bool want_init_on_alloc(gfp_t flags)
 {
 	if (static_branch_unlikely(&init_on_alloc))
-		return true;
+		return !(flags & __GFP_NO_INIT_ON_ALLOC);
 	return flags & __GFP_ZERO;
 }
 

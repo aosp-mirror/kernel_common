@@ -55,6 +55,7 @@ struct vm_area_struct;
 #else
 #define ___GFP_NOLOCKDEP	0
 #endif
+#define ___GFP_NO_INIT_ON_ALLOC	 0x8000000u
 
 /* If the above are modified, __GFP_BITS_SHIFT may need updating */
 
@@ -235,12 +236,17 @@ struct vm_area_struct;
  * %__GFP_SKIP_KASAN_POISON returns a page which does not need to be poisoned
  * on deallocation. Typically used for userspace pages. Currently only has an
  * effect in HW tags mode.
+ *
+ * %__GFP_NO_INIT_ON_ALLOC skips zeroing a page if `init_on_alloc` is set.
+ * Typically used to reduce performance hit for really large allocations that
+ * will not be accessed. e.g. for virtio-balloon allocations when inflating.
  */
 #define __GFP_NOWARN	((__force gfp_t)___GFP_NOWARN)
 #define __GFP_COMP	((__force gfp_t)___GFP_COMP)
 #define __GFP_ZERO	((__force gfp_t)___GFP_ZERO)
 #define __GFP_ZEROTAGS	((__force gfp_t)___GFP_ZEROTAGS)
 #define __GFP_SKIP_KASAN_POISON	((__force gfp_t)___GFP_SKIP_KASAN_POISON)
+#define __GFP_NO_INIT_ON_ALLOC	((__force gfp_t)___GFP_NO_INIT_ON_ALLOC)
 
 /* Disable lockdep for GFP context tracking */
 #define __GFP_NOLOCKDEP ((__force gfp_t)___GFP_NOLOCKDEP)
