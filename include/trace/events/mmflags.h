@@ -12,7 +12,6 @@
  *
  * Thus most bits set go first.
  */
-
 #define gfpflag_string(flag) {(__force unsigned long)flag, #flag}
 
 #define __def_gfpflag_names			\
@@ -52,7 +51,8 @@
 	gfpflag_string(__GFP_DIRECT_RECLAIM),	\
 	gfpflag_string(__GFP_KSWAPD_RECLAIM),	\
 	gfpflag_string(__GFP_ZEROTAGS),		\
-	gfpflag_string(__GFP_CMA)
+	gfpflag_string(__GFP_CMA),              \
+        gfpflag_string(__GFP_NO_INIT_ON_ALLOC)
 
 #ifdef CONFIG_KASAN_HW_TAGS
 #define __def_gfpflag_names_kasan ,			\

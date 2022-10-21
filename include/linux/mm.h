@@ -3448,7 +3448,7 @@ static inline bool want_init_on_alloc(gfp_t flags)
 {
 	if (static_branch_maybe(CONFIG_INIT_ON_ALLOC_DEFAULT_ON,
 				&init_on_alloc))
-		return true;
+		return !(flags & __GFP_NO_INIT_ON_ALLOC);
 	return flags & __GFP_ZERO;
 }
 
