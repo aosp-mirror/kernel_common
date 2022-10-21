@@ -295,7 +295,7 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 
 #ifdef CONFIG_ARM64_VA_BITS_52
 	mrs_s	x6, SYS_ID_AA64MMFR2_EL1
-	and	x6, x6, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+	and	x6, x6, #(0xf << ID_AA64MMFR2_EL1_VARange_SHIFT)
 	mov	x5, #52
 	cbnz	x6, 1f
 #endif
@@ -700,10 +700,10 @@ SYM_FUNC_END(__secondary_too_slow)
  */
 SYM_FUNC_START(__enable_mmu)
 	mrs	x2, ID_AA64MMFR0_EL1
-	ubfx	x2, x2, #ID_AA64MMFR0_TGRAN_SHIFT, 4
-	cmp     x2, #ID_AA64MMFR0_TGRAN_SUPPORTED_MIN
+	ubfx	x2, x2, #ID_AA64MMFR0_EL1_TGRAN_SHIFT, 4
+	cmp     x2, #ID_AA64MMFR0_EL1_TGRAN_SUPPORTED_MIN
 	b.lt    __no_granule_support
-	cmp     x2, #ID_AA64MMFR0_TGRAN_SUPPORTED_MAX
+	cmp     x2, #ID_AA64MMFR0_EL1_TGRAN_SUPPORTED_MAX
 	b.gt    __no_granule_support
 	update_early_cpu_boot_status 0, x2, x3
 	adrp	x2, idmap_pg_dir
@@ -726,7 +726,7 @@ SYM_FUNC_START(__cpu_secondary_check52bitva)
 	b.ne	2f
 
 	mrs_s	x0, SYS_ID_AA64MMFR2_EL1
-	and	x0, x0, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+	and	x0, x0, #(0xf << ID_AA64MMFR2_EL1_VARange_SHIFT)
 	cbnz	x0, 2f
 
 	update_early_cpu_boot_status \

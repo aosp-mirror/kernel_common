@@ -21,6 +21,10 @@ DECLARE_HOOK(android_vh_ufs_fill_prdt,
 		 unsigned int segments, int *err),
 	TP_ARGS(hba, lrbp, segments, err));
 
+DECLARE_RESTRICTED_HOOK(android_rvh_ufs_complete_init,
+			TP_PROTO(struct ufs_hba *hba),
+			TP_ARGS(hba), 1);
+
 DECLARE_HOOK(android_vh_ufs_prepare_command,
 	TP_PROTO(struct ufs_hba *hba, struct request *rq,
 		 struct ufshcd_lrb *lrbp, int *err),

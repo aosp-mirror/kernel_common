@@ -55,12 +55,12 @@ extern void fpsimd_save_and_flush_cpu_state(void);
 
 static inline bool thread_sm_enabled(struct thread_struct *thread)
 {
-	return system_supports_sme() && (thread->svcr & SYS_SVCR_EL0_SM_MASK);
+	return system_supports_sme() && (thread->svcr & SVCR_SM_MASK);
 }
 
 static inline bool thread_za_enabled(struct thread_struct *thread)
 {
-	return system_supports_sme() && (thread->svcr & SYS_SVCR_EL0_ZA_MASK);
+	return system_supports_sme() && (thread->svcr & SVCR_ZA_MASK);
 }
 
 /* Maximum VL that SVE/SME VL-agnostic software can transparently support */
@@ -248,6 +248,11 @@ static inline void sve_alloc(struct task_struct *task) { }
 static inline void fpsimd_release_task(struct task_struct *task) { }
 static inline void sve_sync_to_fpsimd(struct task_struct *task) { }
 static inline void sve_sync_from_fpsimd_zeropad(struct task_struct *task) { }
+
+static inline int sve_max_virtualisable_vl(void)
+{
+	return 0;
+}
 
 static inline int sve_set_current_vl(unsigned long arg)
 {

@@ -38,9 +38,7 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
 	*vcpu_pc(vcpu) = read_sysreg_el2(SYS_ELR);
 	*vcpu_cpsr(vcpu) = read_sysreg_el2(SYS_SPSR);
 
-	vcpu->arch.flags |= (KVM_ARM64_EXCEPT_AA64_EL1 |
-			     KVM_ARM64_EXCEPT_AA64_ELx_SYNC |
-			     KVM_ARM64_PENDING_EXCEPTION);
+	kvm_pend_exception(vcpu, EXCEPT_AA64_EL1_SYNC);
 
 	__kvm_adjust_pc(vcpu);
 
@@ -94,9 +92,9 @@ static u64 get_pvm_id_aa64pfr0(const struct kvm_vcpu *vcpu)
 		PVM_ID_AA64PFR0_RESTRICT_UNSIGNED);
 
 	/* Spectre and Meltdown mitigation in KVM */
-	set_mask |= FIELD_PREP(ARM64_FEATURE_MASK(ID_AA64PFR0_CSV2),
+	set_mask |= FIELD_PREP(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_CSV2),
 			       (u64)kvm->arch.pfr0_csv2);
-	set_mask |= FIELD_PREP(ARM64_FEATURE_MASK(ID_AA64PFR0_CSV3),
+	set_mask |= FIELD_PREP(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_CSV3),
 			       (u64)kvm->arch.pfr0_csv3);
 
 	return (id_aa64pfr0_el1_sys_val & allow_mask) | set_mask;
@@ -108,7 +106,7 @@ static u64 get_pvm_id_aa64pfr1(const struct kvm_vcpu *vcpu)
 	u64 allow_mask = PVM_ID_AA64PFR1_ALLOW;
 
 	if (!kvm_has_mte(kvm))
-		allow_mask &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_MTE);
+		allow_mask &= ~ARM64_FEATURE_MASK(ID_AA64PFR1_EL1_MTE);
 
 	return id_aa64pfr1_el1_sys_val & allow_mask;
 }
@@ -173,10 +171,10 @@ static u64 get_pvm_id_aa64isar1(const struct kvm_vcpu *vcpu)
 	u64 allow_mask = PVM_ID_AA64ISAR1_ALLOW;
 
 	if (!vcpu_has_ptrauth(vcpu))
-		allow_mask &= ~(ARM64_FEATURE_MASK(ID_AA64ISAR1_APA) |
-				ARM64_FEATURE_MASK(ID_AA64ISAR1_API) |
-				ARM64_FEATURE_MASK(ID_AA64ISAR1_GPA) |
-				ARM64_FEATURE_MASK(ID_AA64ISAR1_GPI));
+		allow_mask &= ~(ARM64_FEATURE_MASK(ID_AA64ISAR1_EL1_APA) |
+				ARM64_FEATURE_MASK(ID_AA64ISAR1_EL1_API) |
+				ARM64_FEATURE_MASK(ID_AA64ISAR1_EL1_GPA) |
+				ARM64_FEATURE_MASK(ID_AA64ISAR1_EL1_GPI));
 
 	return id_aa64isar1_el1_sys_val & allow_mask;
 }
@@ -186,8 +184,8 @@ static u64 get_pvm_id_aa64isar2(const struct kvm_vcpu *vcpu)
 	u64 allow_mask = PVM_ID_AA64ISAR2_ALLOW;
 
 	if (!vcpu_has_ptrauth(vcpu))
-		allow_mask &= ~(ARM64_FEATURE_MASK(ID_AA64ISAR2_APA3) |
-				ARM64_FEATURE_MASK(ID_AA64ISAR2_GPA3));
+		allow_mask &= ~(ARM64_FEATURE_MASK(ID_AA64ISAR2_EL1_APA3) |
+				ARM64_FEATURE_MASK(ID_AA64ISAR2_EL1_GPA3));
 
 	return id_aa64isar2_el1_sys_val & allow_mask;
 }
@@ -283,8 +281,8 @@ static bool pvm_access_id_aarch32(struct kvm_vcpu *vcpu,
 	 * No support for AArch32 guests, therefore, pKVM has no sanitized copy
 	 * of AArch32 feature id registers.
 	 */
-	BUILD_BUG_ON(FIELD_GET(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1),
-		     PVM_ID_AA64PFR0_RESTRICT_UNSIGNED) > ID_AA64PFR0_ELx_64BIT_ONLY);
+	BUILD_BUG_ON(FIELD_GET(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_EL1),
+		     PVM_ID_AA64PFR0_RESTRICT_UNSIGNED) > ID_AA64PFR0_EL1_ELx_64BIT_ONLY);
 
 	return pvm_access_raz_wi(vcpu, p, r);
 }
