@@ -7,6 +7,7 @@
  * Copyright (C) 2012, Red Hat, Inc.  Rafael Aquini <aquini@redhat.com>
  */
 #include "linux/gfp.h"
+#include "linux/jump_label.h"
 #include "linux/types.h"
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -129,7 +130,7 @@ struct page *balloon_page_alloc(int order)
 {
 	struct page *page;
 	gfp_t gfp_mask = balloon_mapping_gfp_mask() | __GFP_NOMEMALLOC |
-			 __GFP_NORETRY | __GFP_NOWARN;
+			 __GFP_NORETRY | __GFP_NOWARN | __GFP_NO_INIT_ON_ALLOC;
 	if (order != 0) {
 		gfp_mask |= __GFP_COMP;
 	}

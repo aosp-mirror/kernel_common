@@ -1038,6 +1038,7 @@ static int virtballoon_probe(struct virtio_device *vdev)
 			diff = new_diff;
 		} while (diff != 0);
 	}
+	dev_info_ratelimited(&vdev->dev, "initial allocation done");
 	return 0;
 
 out_unregister_oom:
