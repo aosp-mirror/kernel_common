@@ -268,10 +268,15 @@ ddk_headers(
 # directories that are safe to use in DDK modules.
 ddk_headers(
     name = "all_headers_allowlist",
-    hdrs = [],
+    hdrs = [":all_headers_allowlist_globs"],
     # The list of include directories where source files can #include headers
     # from. In other words, these are the `-I` option to the C compiler.
-    includes = [],
+    includes = [
+        "arch/arm64/include",
+        "arch/arm64/include/uapi",
+        "include",
+        "include/uapi",
+    ],
     visibility = ["//visibility:private"],
 )
 
@@ -280,7 +285,10 @@ ddk_headers(
 # are safe to use.
 filegroup(
     name = "all_headers_allowlist_globs",
-    srcs = [],
+    srcs = glob([
+        "arch/arm64/include/**/*.h",
+        "include/**/*.h",
+    ]),
     visibility = ["//visibility:private"],
 )
 
@@ -292,9 +300,46 @@ filegroup(
 # - be moved into all_headers
 ddk_headers(
     name = "all_headers_unsafe",
-    hdrs = [],
+    hdrs = [
+        "drivers/devfreq/governor.h",
+        "drivers/dma-buf/heaps/deferred-free-helper.h",
+        "drivers/dma-buf/heaps/page_pool.h",
+        "drivers/dma/dmaengine.h",
+        "drivers/pci/controller/dwc/pcie-designware.h",
+        "drivers/pinctrl/core.h",
+        "drivers/pinctrl/samsung/pinctrl-samsung.h",
+        "drivers/staging/android/debug_kinfo.h",
+        "drivers/thermal/thermal_core.h",
+        "drivers/thermal/thermal_netlink.h",
+        "drivers/usb/core/phy.h",
+        "drivers/usb/dwc3/core.h",
+        "drivers/usb/dwc3/debug.h",
+        "drivers/usb/dwc3/gadget.h",
+        "drivers/usb/dwc3/io.h",
+        "drivers/usb/dwc3/trace.h",
+        "drivers/usb/gadget/configfs.h",
+        "drivers/usb/gadget/function/u_serial.h",
+        "drivers/usb/host/pci-quirks.h",
+        "drivers/usb/host/xhci.h",
+        "drivers/usb/host/xhci-ext-caps.h",
+        "drivers/usb/host/xhci-mvebu.h",
+        "drivers/usb/host/xhci-plat.h",
+        "drivers/usb/host/xhci-rcar.h",
+        "drivers/usb/typec/tcpm/tcpci.h",
+    ],
     # The list of include directories where source files can #include headers
     # from. In other words, these are the `-I` option to the C compiler.
-    includes = [],
+    includes = [
+        "drivers/devfreq",
+        "drivers/dma",
+        "drivers/dma-buf",
+        "drivers/pci/controller/dwc",
+        "drivers/pinctrl",
+        "drivers/scsi/ufs",
+        "drivers/thermal",
+        "drivers/usb",
+        "drivers/usb/gadget/function",
+        "drivers/usb/typec",
+    ],
     visibility = ["//visibility:private"],
 )
