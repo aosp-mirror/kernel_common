@@ -274,6 +274,8 @@ ddk_headers(
     includes = [
         "arch/arm64/include",
         "arch/arm64/include/uapi",
+        "arch/x86/include",
+        "arch/x86/include/uapi",
         "include",
         "include/uapi",
     ],
@@ -287,6 +289,7 @@ filegroup(
     name = "all_headers_allowlist_globs",
     srcs = glob([
         "arch/arm64/include/**/*.h",
+        "arch/x86/include/**/*.h",
         "include/**/*.h",
     ]),
     visibility = ["//visibility:private"],
@@ -305,6 +308,7 @@ ddk_headers(
         "drivers/dma-buf/heaps/deferred-free-helper.h",
         "drivers/dma-buf/heaps/page_pool.h",
         "drivers/dma/dmaengine.h",
+        "drivers/gpu/drm/virtio/virtgpu_trace.h",
         "drivers/pci/controller/dwc/pcie-designware.h",
         "drivers/pinctrl/core.h",
         "drivers/pinctrl/samsung/pinctrl-samsung.h",
