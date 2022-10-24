@@ -109,6 +109,7 @@ enum {
 	Opt_noinline_dentry,
 	Opt_flush_merge,
 	Opt_noflush_merge,
+	Opt_barrier,
 	Opt_nobarrier,
 	Opt_fastboot,
 	Opt_extent_cache,
@@ -184,6 +185,7 @@ static match_table_t f2fs_tokens = {
 	{Opt_noinline_dentry, "noinline_dentry"},
 	{Opt_flush_merge, "flush_merge"},
 	{Opt_noflush_merge, "noflush_merge"},
+	{Opt_barrier, "barrier"},
 	{Opt_nobarrier, "nobarrier"},
 	{Opt_fastboot, "fastboot"},
 	{Opt_extent_cache, "extent_cache"},
@@ -797,6 +799,9 @@ static int parse_options(struct super_block *sb, char *options, bool is_remount)
 			break;
 		case Opt_nobarrier:
 			set_opt(sbi, NOBARRIER);
+			break;
+		case Opt_barrier:
+			clear_opt(sbi, NOBARRIER);
 			break;
 		case Opt_fastboot:
 			set_opt(sbi, FASTBOOT);
@@ -1924,6 +1929,8 @@ static int f2fs_show_options(struct seq_file *seq, struct dentry *root)
 		seq_puts(seq, ",flush_merge");
 	if (test_opt(sbi, NOBARRIER))
 		seq_puts(seq, ",nobarrier");
+	else
+		seq_puts(seq, ",barrier");
 	if (test_opt(sbi, FASTBOOT))
 		seq_puts(seq, ",fastboot");
 	if (test_opt(sbi, EXTENT_CACHE))
