@@ -9,10 +9,9 @@
 
 #include <trace/hooks/vendor_hooks.h>
 
-#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS)
-
-struct psi_trigger;
 struct psi_group;
+struct psi_trigger;
+
 DECLARE_HOOK(android_vh_psi_event,
 	TP_PROTO(struct psi_trigger *t),
 	TP_ARGS(t));
@@ -20,11 +19,6 @@ DECLARE_HOOK(android_vh_psi_event,
 DECLARE_HOOK(android_vh_psi_group,
 	TP_PROTO(struct psi_group *group),
 	TP_ARGS(group));
-
-#else
-#define trace_android_vh_psi_event(t)
-#define trace_android_vh_psi_group(group)
-#endif
 
 #endif /* _TRACE_HOOK_PSI_H */
 

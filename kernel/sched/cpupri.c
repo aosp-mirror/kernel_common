@@ -150,7 +150,7 @@ int cpupri_find_fitness(struct cpupri *cp, struct task_struct *p,
 {
 	int task_pri = convert_prio(p->prio);
 	int idx, cpu;
-	bool drop_nopreempts = task_pri <= MAX_RT_PRIO;
+	bool drop_nopreempts = task_pri <= MAX_RT_PRIO + 1;
 
 	BUG_ON(task_pri >= CPUPRI_NR_PRIORITIES);
 
@@ -343,6 +343,7 @@ bool cpupri_check_rt(void)
 {
 	int cpu = raw_smp_processor_id();
 
-	return cpu_rq(cpu)->rd->cpupri.cpu_to_pri[cpu] > CPUPRI_NORMAL;
+	return (cpu_rq(cpu)->rd->cpupri.cpu_to_pri[cpu] > CPUPRI_NORMAL) &&
+	       (cpu_rq(cpu)->rt.rt_throttled == 0);
 }
 #endif

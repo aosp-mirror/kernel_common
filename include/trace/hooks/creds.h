@@ -12,6 +12,7 @@
  */
 struct cred;
 struct task_struct;
+
 DECLARE_HOOK(android_vh_commit_creds,
 	TP_PROTO(const struct task_struct *task, const struct cred *new),
 	TP_ARGS(task, new));

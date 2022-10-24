@@ -8,6 +8,7 @@
 #include <trace/hooks/vendor_hooks.h>
 
 struct task_struct;
+
 DECLARE_HOOK(android_vh_do_send_sig_info,
 	TP_PROTO(int sig, struct task_struct *killer, struct task_struct *dst),
 	TP_ARGS(sig, killer, dst));

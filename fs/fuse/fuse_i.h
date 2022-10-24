@@ -976,9 +976,10 @@ extern const struct dentry_operations fuse_dentry_operations;
 extern const struct dentry_operations fuse_root_dentry_operations;
 
 /**
- * Get a filled in inode
+ * Get a filled-in inode
  */
 struct inode *fuse_iget_backing(struct super_block *sb,
+				u64 nodeid,
 				struct inode *backing_inode);
 struct inode *fuse_iget(struct super_block *sb, u64 nodeid,
 			int generation, struct fuse_attr *attr,
@@ -1596,16 +1597,18 @@ struct fuse_lookup_io {
 	struct fuse_entry_bpf feb;
 };
 
+int fuse_handle_backing(struct fuse_entry_bpf *feb, struct inode **backing_inode,
+			struct path *backing_path);
+int fuse_handle_bpf_prog(struct fuse_entry_bpf *feb, struct inode *parent,
+			 struct bpf_prog **bpf);
+
 int fuse_lookup_initialize(struct fuse_bpf_args *fa, struct fuse_lookup_io *feo,
 	       struct inode *dir, struct dentry *entry, unsigned int flags);
 int fuse_lookup_backing(struct fuse_bpf_args *fa, struct inode *dir,
 			  struct dentry *entry, unsigned int flags);
 struct dentry *fuse_lookup_finalize(struct fuse_bpf_args *fa, struct inode *dir,
 			   struct dentry *entry, unsigned int flags);
-int fuse_revalidate_backing(struct fuse_bpf_args *fa, struct inode *dir,
-			   struct dentry *entry, unsigned int flags);
-void *fuse_revalidate_finalize(struct fuse_bpf_args *fa, struct inode *dir,
-			   struct dentry *entry, unsigned int flags);
+int fuse_revalidate_backing(struct dentry *entry, unsigned int flags);
 
 int fuse_canonical_path_initialize(struct fuse_bpf_args *fa,
 				   struct fuse_dummy_io *fdi,

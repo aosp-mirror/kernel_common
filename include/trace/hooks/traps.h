@@ -11,6 +11,7 @@
  * mechanism for vendor modules to hook and extend functionality
  */
 struct pt_regs;
+
 DECLARE_RESTRICTED_HOOK(android_rvh_do_undefinstr,
 	TP_PROTO(struct pt_regs *regs, bool user),
 	TP_ARGS(regs, user),

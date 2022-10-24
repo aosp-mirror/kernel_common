@@ -330,6 +330,15 @@ static int fuse_inode_eq(struct inode *inode, void *_nodeidp)
 		(struct fuse_inode_identifier *) _nodeidp;
 	struct fuse_inode *fi = get_fuse_inode(inode);
 
+	return fii->nodeid == fi->nodeid;
+}
+
+static int fuse_inode_backing_eq(struct inode *inode, void *_nodeidp)
+{
+	struct fuse_inode_identifier *fii =
+		(struct fuse_inode_identifier *) _nodeidp;
+	struct fuse_inode *fi = get_fuse_inode(inode);
+
 	return fii->nodeid == fi->nodeid
 #ifdef CONFIG_FUSE_BPF
 		&& fii->backing_inode == fi->backing_inode
@@ -338,6 +347,17 @@ static int fuse_inode_eq(struct inode *inode, void *_nodeidp)
 }
 
 static int fuse_inode_set(struct inode *inode, void *_nodeidp)
+{
+	struct fuse_inode_identifier *fii =
+		(struct fuse_inode_identifier *) _nodeidp;
+	struct fuse_inode *fi = get_fuse_inode(inode);
+
+	fi->nodeid = fii->nodeid;
+
+	return 0;
+}
+
+static int fuse_inode_backing_set(struct inode *inode, void *_nodeidp)
 {
 	struct fuse_inode_identifier *fii =
 		(struct fuse_inode_identifier *) _nodeidp;
@@ -353,20 +373,25 @@ static int fuse_inode_set(struct inode *inode, void *_nodeidp)
 	return 0;
 }
 
-struct inode *fuse_iget_backing(struct super_block *sb,
+struct inode *fuse_iget_backing(struct super_block *sb, u64 nodeid,
 				struct inode *backing_inode)
 {
 	struct inode *inode;
 	struct fuse_inode *fi;
 	struct fuse_conn *fc = get_fuse_conn_super(sb);
 	struct fuse_inode_identifier fii = {
+		.nodeid = nodeid,
 		.backing_inode = backing_inode,
 	};
 	struct fuse_attr attr;
+	unsigned long hash = (unsigned long) backing_inode;
+
+	if (nodeid)
+		hash = nodeid;
 
 	fuse_fill_attr_from_inode(&attr, backing_inode);
-	inode = iget5_locked(sb, (unsigned long) backing_inode, fuse_inode_eq,
-			     fuse_inode_set, &fii);
+	inode = iget5_locked(sb, hash, fuse_inode_backing_eq,
+			     fuse_inode_backing_set, &fii);
 	if (!inode)
 		return NULL;
 

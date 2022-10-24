@@ -8,6 +8,7 @@
 #include <trace/hooks/vendor_hooks.h>
 
 struct page;
+
 DECLARE_HOOK(android_vh_shmem_alloc_page,
 	TP_PROTO(struct page **page),
 	TP_ARGS(page));

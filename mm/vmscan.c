@@ -1046,6 +1046,10 @@ static enum page_references page_check_references(struct page *page,
 	if (vm_flags & VM_LOCKED)
 		return PAGEREF_RECLAIM;
 
+	/* rmap lock contention: rotate */
+	if (referenced_ptes == -1)
+		return PAGEREF_KEEP;
+
 	if (referenced_ptes) {
 		/*
 		 * All mapped pages start out with page table
@@ -2131,8 +2135,9 @@ static void shrink_active_list(unsigned long nr_to_scan,
 			}
 		}
 
+		/* Referenced or rmap lock contention: rotate */
 		if (page_referenced(page, 0, sc->target_mem_cgroup,
-				    &vm_flags)) {
+				     &vm_flags) != 0) {
 			/*
 			 * Identify referenced, file-backed active pages and
 			 * give them one more trip around the active list. So
@@ -2504,6 +2509,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	denominator = ap + fp;
 out:
 	trace_android_vh_tune_scan_type((char *)(&scan_balance));
+	trace_android_vh_tune_memcg_scan_type(memcg, (char *)(&scan_balance));
 	for_each_evictable_lru(lru) {
 		int file = is_file_lru(lru);
 		unsigned long lruvec_size;

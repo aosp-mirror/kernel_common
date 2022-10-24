@@ -2139,11 +2139,11 @@ static int finalize_hyp_mode(void)
 		return 0;
 
 	/*
-	 * Exclude HYP BSS from kmemleak so that it doesn't get peeked
-	 * at, which would end badly once the section is inaccessible.
-	 * None of other sections should ever be introspected.
+	 * Exclude HYP BSS and DATA from kmemleak so that they don't get peeked
+	 * at, which would end badly once the sections are inaccessible.
 	 */
 	kmemleak_free_part(__hyp_bss_start, __hyp_bss_end - __hyp_bss_start);
+	kmemleak_free_part(__hyp_data_start, __hyp_data_end - __hyp_data_start);
 	return pkvm_drop_host_privileges();
 }
 
@@ -2286,6 +2286,16 @@ static int __init early_kvm_mode_cfg(char *arg)
 	if (!arg)
 		return -EINVAL;
 
+	if (strcmp(arg, "none") == 0) {
+		kvm_mode = KVM_MODE_NONE;
+		return 0;
+	}
+
+	if (!is_hyp_mode_available()) {
+		pr_warn_once("KVM is not available. Ignoring kvm-arm.mode\n");
+		return 0;
+	}
+
 	if (strcmp(arg, "protected") == 0) {
 		if (!is_kernel_in_hyp_mode())
 			kvm_mode = KVM_MODE_PROTECTED;
@@ -2297,11 +2307,6 @@ static int __init early_kvm_mode_cfg(char *arg)
 
 	if (strcmp(arg, "nvhe") == 0 && !WARN_ON(is_kernel_in_hyp_mode())) {
 		kvm_mode = KVM_MODE_DEFAULT;
-		return 0;
-	}
-
-	if (strcmp(arg, "none") == 0) {
-		kvm_mode = KVM_MODE_NONE;
 		return 0;
 	}
 

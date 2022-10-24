@@ -266,6 +266,7 @@ static void update_rq_clock_task(struct rq *rq, s64 delta)
  * to sched_rt_avg_update. But I don't trust it...
  */
 	s64 __maybe_unused steal = 0, irq_delta = 0;
+	bool ret = false;
 
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
 	irq_delta = irq_time_read(cpu_of(rq)) - rq->prev_irq_time;
@@ -310,7 +311,9 @@ static void update_rq_clock_task(struct rq *rq, s64 delta)
 	if ((irq_delta + steal) && sched_feat(NONTASK_CAPACITY))
 		update_irq_load_avg(rq, irq_delta + steal);
 #endif
-	update_rq_clock_pelt(rq, delta);
+	trace_android_rvh_update_rq_clock_pelt(rq, delta, &ret);
+	if (!ret)
+		update_rq_clock_pelt(rq, delta);
 }
 
 void update_rq_clock(struct rq *rq)
@@ -1981,7 +1984,7 @@ static int __set_cpus_allowed_ptr_locked(struct task_struct *p,
 {
 	const struct cpumask *cpu_valid_mask = cpu_active_mask;
 	const struct cpumask *cpu_allowed_mask = task_cpu_possible_mask(p);
-	unsigned int dest_cpu;
+	unsigned int dest_cpu = nr_cpu_ids;
 	int ret = 0;
 
 	update_rq_clock(rq);
@@ -2013,10 +2016,14 @@ static int __set_cpus_allowed_ptr_locked(struct task_struct *p,
 	 * for groups of tasks (ie. cpuset), so that load balancing is not
 	 * immediately required to distribute the tasks within their new mask.
 	 */
-	dest_cpu = cpumask_any_and_distribute(cpu_valid_mask, new_mask);
+	trace_android_rvh_cpumask_any_and_distribute(p, cpu_valid_mask, new_mask, &dest_cpu);
+
 	if (dest_cpu >= nr_cpu_ids) {
-		ret = -EINVAL;
-		goto out;
+		dest_cpu = cpumask_any_and_distribute(cpu_valid_mask, new_mask);
+		if (dest_cpu >= nr_cpu_ids) {
+			ret = -EINVAL;
+			goto out;
+		}
 	}
 
 	do_set_cpus_allowed(p, new_mask);
@@ -3187,8 +3194,6 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	 */
 	smp_cond_load_acquire(&p->on_cpu, !VAL);
 
-	trace_android_rvh_try_to_wake_up(p);
-
 	cpu = select_task_rq(p, p->wake_cpu, SD_BALANCE_WAKE, wake_flags);
 	if (task_cpu(p) != cpu) {
 		if (p->in_iowait) {
@@ -3208,10 +3213,8 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 unlock:
 	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 out:
-	if (success) {
-		trace_android_rvh_try_to_wake_up_success(p);
+	if (success)
 		ttwu_stat(p, task_cpu(p), wake_flags);
-	}
 	preempt_enable();
 
 	return success;
@@ -3572,8 +3575,6 @@ void wake_up_new_task(struct task_struct *p)
 	struct rq_flags rf;
 	struct rq *rq;
 
-	trace_android_rvh_wake_up_new_task(p);
-
 	raw_spin_lock_irqsave(&p->pi_lock, rf.flags);
 	p->state = TASK_RUNNING;
 #ifdef CONFIG_SMP
@@ -3592,7 +3593,6 @@ void wake_up_new_task(struct task_struct *p)
 	rq = __task_rq_lock(p, &rf);
 	update_rq_clock(rq);
 	post_init_entity_util_avg(p);
-	trace_android_rvh_new_task_stats(p);
 
 	activate_task(rq, p, ENQUEUE_NOCLOCK);
 	trace_sched_wakeup_new(p);
@@ -3884,7 +3884,6 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 		 * task and put them back on the free list.
 		 */
 		kprobe_flush_task(prev);
-		trace_android_rvh_flush_task(prev);
 
 		/* Task is done with its stack. */
 		put_task_stack(prev);
@@ -4240,7 +4239,6 @@ void scheduler_tick(void)
 
 	rq_lock(rq, &rf);
 
-	trace_android_rvh_tick_entry(rq);
 	update_rq_clock(rq);
 	thermal_pressure = arch_scale_thermal_pressure(cpu_of(rq));
 	update_thermal_load_avg(rq_clock_thermal(rq), rq, thermal_pressure);
@@ -4765,7 +4763,6 @@ static void __sched notrace __schedule(bool preempt)
 	clear_tsk_need_resched(prev);
 	clear_preempt_need_resched();
 
-	trace_android_rvh_schedule(prev, next, rq);
 	if (likely(prev != next)) {
 		rq->nr_switches++;
 		/*
@@ -7349,7 +7346,6 @@ int sched_cpu_starting(unsigned int cpu)
 {
 	sched_rq_cpu_starting(cpu);
 	sched_tick_start(cpu);
-	trace_android_rvh_sched_cpu_starting(cpu);
 	return 0;
 }
 
@@ -7370,8 +7366,6 @@ int sched_cpu_dying(unsigned int cpu)
 	migrate_tasks(rq, &rf, true);
 	BUG_ON(rq->nr_running != 1);
 	rq_unlock_irqrestore(rq, &rf);
-
-	trace_android_rvh_sched_cpu_dying(cpu);
 
 	calc_load_migrate(rq);
 	nohz_balance_exit_idle(rq);

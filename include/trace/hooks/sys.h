@@ -8,6 +8,7 @@
 #include <trace/hooks/vendor_hooks.h>
 
 struct task_struct;
+
 DECLARE_HOOK(android_vh_syscall_prctl_finished,
 	TP_PROTO(int option, struct task_struct *task),
 	TP_ARGS(option, task));

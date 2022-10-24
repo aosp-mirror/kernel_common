@@ -11,6 +11,7 @@
 
 struct media_link;
 struct media_link_desc;
+
 DECLARE_HOOK(android_vh_media_device_setup_link,
 	TP_PROTO(struct media_link *link, struct media_link_desc *linkd, int *ret),
 	TP_ARGS(link, linkd, ret));

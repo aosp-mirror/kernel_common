@@ -984,6 +984,11 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 #ifdef CONFIG_MEMCG
 	tsk->active_memcg = NULL;
 #endif
+
+#ifdef CONFIG_ANDROID_VENDOR_OEM_DATA
+	memset(&tsk->android_vendor_data1, 0, sizeof(tsk->android_vendor_data1));
+	memset(&tsk->android_oem_data1, 0, sizeof(tsk->android_oem_data1));
+#endif
 	trace_android_vh_dup_task_struct(tsk, orig);
 	return tsk;
 
@@ -1154,8 +1159,10 @@ void mmput(struct mm_struct *mm)
 {
 	might_sleep();
 
-	if (atomic_dec_and_test(&mm->mm_users))
+	if (atomic_dec_and_test(&mm->mm_users)) {
+		trace_android_vh_mmput(NULL);
 		__mmput(mm);
+	}
 }
 EXPORT_SYMBOL_GPL(mmput);
 

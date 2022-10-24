@@ -10,8 +10,9 @@
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
  */
-struct tcpci;
+/* Including ../drivers/usb/typec/tcpm/tcpci.h breaks builds. */
 struct tcpci_data;
+struct tcpci;
 struct tcpm_port;
 
 #ifndef TYPEC_TIMER
