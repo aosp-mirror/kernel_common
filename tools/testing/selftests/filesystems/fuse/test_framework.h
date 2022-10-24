@@ -40,7 +40,6 @@ static int test_case_fail;
 
 struct _test_options {
 	int file;
-	int test;
 	bool verbose;
 };
 

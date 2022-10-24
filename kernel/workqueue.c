@@ -54,7 +54,6 @@
 
 #include "workqueue_internal.h"
 
-#include <trace/hooks/wqlockup.h>
 #include <trace/hooks/workqueue.h>
 /* events/workqueue.h uses default TRACE_INCLUDE_PATH */
 #undef TRACE_INCLUDE_PATH
@@ -5845,7 +5844,6 @@ static void wq_watchdog_timer_fn(struct timer_list *unused)
 			pr_cont_pool_info(pool);
 			pr_cont(" stuck for %us!\n",
 				jiffies_to_msecs(now - pool_ts) / 1000);
-			trace_android_vh_wq_lockup_pool(pool->cpu, pool_ts);
 		}
 	}
 
