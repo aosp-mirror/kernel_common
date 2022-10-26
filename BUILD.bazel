@@ -60,6 +60,22 @@ define_common_kernels(target_configs = {
         "kmi_symbol_list": "android/abi_gki_aarch64",
         "additional_kmi_symbol_lists": _aarch64_additional_kmi_symbol_lists,
     },
+    # Sync with build.config.gki.x86_64
+    "kernel_x86_64": {
+        "kmi_symbol_list_strict_mode": False,
+        "module_implicit_outs": [
+            "drivers/block/zram/zram.ko",
+            "mm/zsmalloc.ko",
+        ],
+    },
+    # Sync with build.config.gki-debug.x86_64
+    "kernel_x86_64_debug": {
+        "kmi_symbol_list_strict_mode": False,
+        "module_implicit_outs": [
+            "drivers/block/zram/zram.ko",
+            "mm/zsmalloc.ko",
+        ],
+    },
 })
 
 # Sync with build.config.db845c
