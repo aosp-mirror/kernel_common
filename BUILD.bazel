@@ -37,8 +37,8 @@ define_common_kernels(target_configs = {
         "module_implicit_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
-            "net/wireless/cfg80211.ko",
             "net/mac80211/mac80211.ko",
+            "net/wireless/cfg80211.ko",
         ],
         "kmi_symbol_list": "android/abi_gki_aarch64",
         "additional_kmi_symbol_lists": _aarch64_additional_kmi_symbol_lists,
@@ -48,8 +48,8 @@ define_common_kernels(target_configs = {
         "module_implicit_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
-            "net/wireless/cfg80211.ko",
             "net/mac80211/mac80211.ko",
+            "net/wireless/cfg80211.ko",
         ],
     },
     # Sync with build.config.gki-debug.aarch64
@@ -60,8 +60,8 @@ define_common_kernels(target_configs = {
         "module_implicit_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
-            "net/wireless/cfg80211.ko",
             "net/mac80211/mac80211.ko",
+            "net/wireless/cfg80211.ko",
         ],
         "kmi_symbol_list": "android/abi_gki_aarch64",
         "additional_kmi_symbol_lists": _aarch64_additional_kmi_symbol_lists,
@@ -72,8 +72,8 @@ define_common_kernels(target_configs = {
         "module_implicit_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
-            "net/wireless/cfg80211.ko",
             "net/mac80211/mac80211.ko",
+            "net/wireless/cfg80211.ko",
         ],
     },
     # Sync with build.config.gki-debug.x86_64
@@ -82,8 +82,8 @@ define_common_kernels(target_configs = {
         "module_implicit_outs": [
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
-            "net/wireless/cfg80211.ko",
             "net/mac80211/mac80211.ko",
+            "net/wireless/cfg80211.ko",
         ],
     },
 })
