@@ -34,6 +34,7 @@ define_common_kernels(target_configs = {
         "trim_nonlisted_kmi": False,
         "kmi_symbol_list_strict_mode": False,
         "module_implicit_outs": [
+            # keep sorted
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
             "net/mac80211/mac80211.ko",
@@ -44,6 +45,7 @@ define_common_kernels(target_configs = {
     },
     "kernel_aarch64_16k": {
         "module_implicit_outs": [
+            # keep sorted
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
             "net/mac80211/mac80211.ko",
@@ -55,6 +57,7 @@ define_common_kernels(target_configs = {
         "trim_nonlisted_kmi": False,
         "kmi_symbol_list_strict_mode": False,
         "module_implicit_outs": [
+            # keep sorted
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
             "net/mac80211/mac80211.ko",
@@ -66,6 +69,7 @@ define_common_kernels(target_configs = {
     "kernel_x86_64": {
         "kmi_symbol_list_strict_mode": False,
         "module_implicit_outs": [
+            # keep sorted
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
             "net/mac80211/mac80211.ko",
@@ -75,6 +79,7 @@ define_common_kernels(target_configs = {
     "kernel_x86_64_debug": {
         "kmi_symbol_list_strict_mode": False,
         "module_implicit_outs": [
+            # keep sorted
             "drivers/block/zram/zram.ko",
             "mm/zsmalloc.ko",
             "net/mac80211/mac80211.ko",
