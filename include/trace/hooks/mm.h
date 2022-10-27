@@ -92,6 +92,15 @@ DECLARE_HOOK(android_vh_zap_pte_range_tlb_end,
 DECLARE_HOOK(android_vh_skip_lru_disable,
 	TP_PROTO(bool *skip),
 	TP_ARGS(skip));
+DECLARE_HOOK(android_vh_do_madvise_blk_plug,
+	TP_PROTO(int behavior, bool *do_plug),
+	TP_ARGS(behavior, do_plug));
+DECLARE_HOOK(android_vh_shrink_inactive_list_blk_plug,
+	TP_PROTO(bool *do_plug),
+	TP_ARGS(do_plug));
+DECLARE_HOOK(android_vh_reclaim_pages_plug,
+	TP_PROTO(bool *do_plug),
+	TP_ARGS(do_plug));
 struct mem_cgroup;
 DECLARE_HOOK(android_vh_mem_cgroup_alloc,
 	TP_PROTO(struct mem_cgroup *memcg),

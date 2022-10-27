@@ -69,6 +69,9 @@
 #undef CREATE_TRACE_POINTS
 #include <trace/hooks/vmscan.h>
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/mm.h>
+
 EXPORT_TRACEPOINT_SYMBOL_GPL(mm_vmscan_direct_reclaim_begin);
 EXPORT_TRACEPOINT_SYMBOL_GPL(mm_vmscan_direct_reclaim_end);
 
@@ -2215,6 +2218,8 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	enum vm_event_item item;
 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
 	bool stalled = false;
+	struct blk_plug plug;
+	bool do_plug = false;
 
 	while (unlikely(too_many_isolated(pgdat, file, sc))) {
 		if (stalled)
@@ -2248,6 +2253,9 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	if (nr_taken == 0)
 		return 0;
 
+	trace_android_vh_shrink_inactive_list_blk_plug(&do_plug);
+	if (do_plug)
+		blk_start_plug(&plug);
 	nr_reclaimed = shrink_page_list(&page_list, pgdat, sc, &stat, false);
 
 	spin_lock_irq(&lruvec->lru_lock);
@@ -2260,6 +2268,9 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	__count_memcg_events(lruvec_memcg(lruvec), item, nr_reclaimed);
 	__count_vm_events(PGSTEAL_ANON + file, nr_reclaimed);
 	spin_unlock_irq(&lruvec->lru_lock);
+
+	if (do_plug)
+		blk_finish_plug(&plug);
 
 	lru_note_cost(lruvec, file, stat.nr_pageout);
 	mem_cgroup_uncharge_list(&page_list);
@@ -2418,6 +2429,8 @@ unsigned long reclaim_pages(struct list_head *page_list)
 	LIST_HEAD(node_page_list);
 	struct reclaim_stat dummy_stat;
 	struct page *page;
+	struct blk_plug plug;
+	bool do_plug = false;
 	unsigned int noreclaim_flag;
 	struct scan_control sc = {
 		.gfp_mask = GFP_KERNEL,
@@ -2428,6 +2441,10 @@ unsigned long reclaim_pages(struct list_head *page_list)
 	};
 
 	noreclaim_flag = memalloc_noreclaim_save();
+
+	trace_android_vh_reclaim_pages_plug(&do_plug);
+	if (do_plug)
+		blk_start_plug(&plug);
 
 	while (!list_empty(page_list)) {
 		page = lru_to_page(page_list);
@@ -2466,6 +2483,9 @@ unsigned long reclaim_pages(struct list_head *page_list)
 	}
 
 	memalloc_noreclaim_restore(noreclaim_flag);
+
+	if (do_plug)
+		blk_finish_plug(&plug);
 
 	return nr_reclaimed;
 }
