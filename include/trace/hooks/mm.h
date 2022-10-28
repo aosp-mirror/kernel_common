@@ -100,6 +100,15 @@ DECLARE_HOOK(android_vh_alloc_pages_slowpath,
 DECLARE_HOOK(android_vh_cma_alloc_adjust,
 	TP_PROTO(struct zone *zone, bool *is_cma_alloc),
 	TP_ARGS(zone, is_cma_alloc));
+DECLARE_HOOK(android_vh_do_madvise_blk_plug,
+	TP_PROTO(int behavior, bool *do_plug),
+	TP_ARGS(behavior, do_plug));
+DECLARE_HOOK(android_vh_shrink_inactive_list_blk_plug,
+	TP_PROTO(bool *do_plug),
+	TP_ARGS(do_plug));
+DECLARE_HOOK(android_vh_reclaim_pages_plug,
+	TP_PROTO(bool *do_plug),
+	TP_ARGS(do_plug));
 DECLARE_HOOK(android_vh_zap_pte_range_tlb_start,
 	TP_PROTO(void *unused),
 	TP_ARGS(unused));
