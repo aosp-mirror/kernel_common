@@ -2247,6 +2247,8 @@
   __traceiter_android_rvh_util_est_update
   __traceiter_android_vh_arch_set_freq_scale
   __traceiter_android_vh_bh_lru_install
+  __traceiter_android_vh_binder_restore_priority
+  __traceiter_android_vh_binder_set_priority
   __traceiter_android_vh_cma_alloc_adjust
   __traceiter_android_vh_cma_alloc_finish
   __traceiter_android_vh_cma_alloc_start
@@ -2376,6 +2378,8 @@
   __tracepoint_android_rvh_util_est_update
   __tracepoint_android_vh_arch_set_freq_scale
   __tracepoint_android_vh_bh_lru_install
+  __tracepoint_android_vh_binder_restore_priority
+  __tracepoint_android_vh_binder_set_priority
   __tracepoint_android_vh_cma_alloc_adjust
   __tracepoint_android_vh_cma_alloc_finish
   __tracepoint_android_vh_cma_alloc_start
