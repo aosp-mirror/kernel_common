@@ -39,3 +39,7 @@
 		CROS_STD_MAIN_KEYMAP
 	>;
 };
+
+&target {
+	temperature = <75000>;
+};
