@@ -31,7 +31,13 @@ _aarch64_additional_kmi_symbol_lists = [
 _common_gki_modules_list = [
     # keep sorted
     "drivers/block/zram/zram.ko",
+    "drivers/net/can/dev/can-dev.ko",
+    "drivers/net/can/slcan.ko",
+    "drivers/net/can/vcan.ko",
     "mm/zsmalloc.ko",
+    "net/can/can-bcm.ko",
+    "net/can/can-gw.ko",
+    "net/can/can-raw.ko",
     "net/mac80211/mac80211.ko",
     "net/wireless/cfg80211.ko",
 ]
