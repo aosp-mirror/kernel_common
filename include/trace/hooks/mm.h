@@ -98,6 +98,9 @@ DECLARE_HOOK(android_vh_do_madvise_blk_plug,
 DECLARE_HOOK(android_vh_shrink_inactive_list_blk_plug,
 	TP_PROTO(bool *do_plug),
 	TP_ARGS(do_plug));
+DECLARE_HOOK(android_vh_shrink_lruvec_blk_plug,
+	TP_PROTO(bool *do_plug),
+	TP_ARGS(do_plug));
 DECLARE_HOOK(android_vh_reclaim_pages_plug,
 	TP_PROTO(bool *do_plug),
 	TP_ARGS(do_plug));

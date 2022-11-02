@@ -287,4 +287,5 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_bh_lru_install);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_skip_lru_disable);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_madvise_blk_plug);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_inactive_list_blk_plug);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_lruvec_blk_plug);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_reclaim_pages_plug);
