@@ -1641,3 +1641,194 @@
 # required by snd-soc-s3c-dma.ko
   devm_snd_dmaengine_pcm_register
   snd_dmaengine_pcm_prepare_slave_config
+
+# required by snd-soc-samsung-abox.ko
+  dapm_pinctrl_event
+  debugfs_create_symlink
+  dev_get_regmap
+  device_show_bool
+  device_show_int
+  device_store_bool
+  device_store_int
+  devm_krealloc
+  __devm_regmap_init_mmio_clk
+  devm_snd_soc_register_component
+  dma_buf_fd
+  dma_mmap_attrs
+  firmware_request_nowarn
+  iommu_iova_to_phys
+  iommu_map
+  kfree_const
+  kstrtoull_from_user
+  kvasprintf
+  nsecs_to_jiffies
+  pinctrl_get
+  pinctrl_put
+  platform_device_register_full
+  __platform_register_drivers
+  pm_runtime_barrier
+  pm_runtime_get_if_active
+  pm_runtime_no_callbacks
+  pm_wakeup_dev_event
+  proc_remove
+  proc_set_size
+  proc_symlink
+  regcache_mark_dirty
+  regcache_sync
+  regmap_multi_reg_write
+  request_firmware_direct
+  request_firmware_nowait
+  snd_device_free
+  snd_dma_alloc_pages
+  snd_dma_free_pages
+  snd_hwdep_new
+  snd_pcm_format_physical_width
+  snd_pcm_lib_free_pages
+  snd_pcm_lib_malloc_pages
+  snd_pcm_lib_preallocate_free_for_all
+  snd_pcm_lib_preallocate_pages
+  snd_pcm_period_elapsed
+  snd_pcm_rate_range_to_bits
+  snd_soc_add_component_controls
+  snd_soc_bytes_info_ext
+  snd_soc_bytes_tlv_callback
+  snd_soc_component_async_complete
+  snd_soc_component_init_regmap
+  snd_soc_component_read
+  snd_soc_component_update_bits
+  snd_soc_component_update_bits_async
+  snd_soc_component_write
+  snd_soc_dapm_add_routes
+  snd_soc_dapm_disable_pin
+  snd_soc_dapm_enable_pin
+  snd_soc_dapm_get_pin_status
+  snd_soc_dapm_new_controls
+  snd_soc_dapm_weak_routes
+  snd_soc_find_dai
+  snd_soc_get_xr_sx
+  snd_soc_info_volsw_sx
+  snd_soc_info_xr_sx
+  snd_soc_lookup_component
+  snd_soc_new_compress
+  snd_soc_put_xr_sx
+  snd_soc_register_card
+  snd_soc_set_runtime_hwparams
+  snd_soc_tplg_component_load
+  snd_soc_tplg_component_remove
+  snd_soc_tplg_widget_bind_event
+  snd_soc_unregister_card
+  strim
+  system_unbound_wq
+
+# required by spi-s3c64xx.ko
+  __spi_alloc_controller
+  spi_controller_resume
+  spi_controller_suspend
+  spi_finalize_current_message
+  spi_register_controller
+  spi_unregister_controller
+
+# required by synaptics_rmi.ko
+  input_mt_init_slots
+  input_mt_report_slot_state
+  input_set_abs_params
+  strncat
+  sysfs_remove_bin_file
+
+# required by usb_f_dm.ko
+  usb_ep_alloc_request
+  usb_ep_free_request
+  usb_ep_queue
+
+# required by usb_notifier.ko
+  power_supply_put
+
+# required by usb_notify_layer.ko
+  complete_and_exit
+  usb_speed_string
+
+# required by xhci-exynos.ko
+  device_set_wakeup_enable
+  device_wakeup_enable
+  devm_clk_get_optional
+  devm_usb_get_phy_by_phandle
+  of_fwnode_ops
+  of_usb_host_tpl_support
+  pci_bus_type
+  usb_add_hcd
+  __usb_create_hcd
+  usb_disabled
+  usb_enable_autosuspend
+  usb_hcd_is_primary_hcd
+  usb_put_hcd
+  usb_remove_hcd
+  xhci_bus_resume
+  xhci_bus_suspend
+  xhci_gen_setup
+  xhci_init_driver
+  xhci_resume
+  xhci_run
+  xhci_suspend
+  xhci_vendor_get_ops
+
+# required by xperf.ko
+  cpufreq_quick_get_max
+  kthread_bind_mask
+
+# required by zram.ko
+  __alloc_disk_node
+  bdget_disk
+  bdput
+  bio_endio
+  blk_alloc_queue
+  blk_cleanup_queue
+  blk_queue_flag_clear
+  blk_queue_flag_set
+  blk_queue_io_min
+  blk_queue_io_opt
+  blk_queue_logical_block_size
+  blk_queue_max_discard_sectors
+  blk_queue_max_write_zeroes_sectors
+  blk_queue_physical_block_size
+  __class_register
+  __cpuhp_state_add_instance
+  __cpuhp_state_remove_instance
+  crypto_alloc_base
+  crypto_comp_compress
+  crypto_comp_decompress
+  crypto_has_alg
+  del_gendisk
+  device_add_disk
+  disk_end_io_acct
+  disk_start_io_acct
+  fsync_bdev
+  idr_destroy
+  idr_find
+  idr_for_each
+  kstrtou16
+  memparse
+  memset64
+  page_endio
+  put_disk
+  register_blkdev
+  revalidate_disk_size
+  __sysfs_match_string
+  unregister_blkdev
+
+# required by zsmalloc.ko
+  alloc_anon_inode
+  __ClearPageMovable
+  contig_page_data
+  dec_zone_page_state
+  inc_zone_page_state
+  init_pseudo
+  iput
+  kern_mount
+  kern_unmount
+  kill_anon_super
+  __lock_page
+  page_mapping
+  _raw_write_lock
+  _raw_write_unlock
+  __SetPageMovable
+  unlock_page
