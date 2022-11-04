@@ -1266,3 +1266,213 @@
 
 # required by leds-s2mu106.ko
   devm_led_classdev_register_ext
+
+# required by lzo-rle.ko
+  lzorle1x_1_compress
+
+# required by lzo.ko
+  lzo1x_1_compress
+
+# required by mali_kbase.ko
+  anon_inode_getfd
+  __arch_clear_user
+  __bitmap_weight
+  cache_line_size
+  clear_page
+  debugfs_attr_read
+  debugfs_attr_write
+  dev_pm_opp_of_add_table
+  dev_pm_opp_of_remove_table
+  dev_pm_opp_put_regulators
+  dev_pm_opp_set_regulators
+  downgrade_write
+  down_trylock
+  find_get_pid
+  find_vma
+  __get_task_comm
+  get_user_pages
+  get_user_pages_fast
+  ktime_get_raw
+  __mmdrop
+  of_clk_get
+  of_dma_is_coherent
+  of_property_read_variable_u8_array
+  param_ops_byte
+  pid_task
+  pin_user_pages_remote
+  put_pid
+  rb_erase
+  rb_first
+  rb_next
+  rb_prev
+  rb_replace_node
+  register_oom_notifier
+  remap_vmalloc_range
+  seq_open
+  seq_putc
+  seq_write
+  set_page_dirty_lock
+  strcspn
+  synchronize_irq
+  __traceiter_gpu_mem_total
+  trace_output_call
+  __tracepoint_gpu_mem_total
+  trace_print_flags_seq
+  trace_print_symbols_seq
+  unmap_mapping_range
+  unregister_oom_notifier
+  vmalloc_user
+  vmf_insert_pfn_prot
+
+# required by mcDrvModule.ko
+  crypto_alloc_shash
+  crypto_shash_final
+  crypto_shash_update
+  d_path
+  freezing_slow_path
+  get_task_exe_file
+  get_task_mm
+  get_zeroed_page
+  kstrtol_from_user
+  mmput
+  __refrigerator
+  release_pages
+  system_freezing_cnt
+  vmalloc_to_page
+  wait_for_completion_killable
+
+# required by mx_client_test.ko
+  cdev_alloc
+
+# required by nanohub.ko
+  arch_timer_read_counter
+  autoremove_wake_function
+  clocks_calc_mult_shift
+  do_wait_intr
+  iio_device_alloc
+  iio_device_free
+  rtc_set_time
+  rtc_tm_to_time64
+  sched_setscheduler
+  sysfs_remove_link
+  __wake_up_locked_key
+  __wake_up_sync
+
+# required by pinctrl-samsung-core.ko
+  bitmap_to_arr32
+  devm_gpiochip_add_data_with_key
+  devm_pinctrl_register
+  generic_handle_irq
+  gpiochip_generic_free
+  gpiochip_generic_request
+  gpiochip_get_data
+  gpiochip_lock_as_irq
+  gpiochip_unlock_as_irq
+  handle_edge_irq
+  irq_create_mapping_affinity
+  __irq_domain_add
+  irq_domain_remove
+  irq_domain_xlate_twocell
+  irq_find_mapping
+  irq_set_chained_handler_and_data
+  of_node_name_eq
+  pinctrl_add_gpio_range
+  pinctrl_dev_get_drvdata
+  pinctrl_force_sleep
+  pinctrl_remove_gpio_range
+  pin_get_name
+
+# required by pl330.ko
+  amba_driver_register
+  amba_driver_unregister
+  cpu_all_bits
+  dev_err_probe
+  dma_async_device_register
+  dma_async_device_unregister
+  dma_async_tx_descriptor_init
+  dmaengine_unmap_put
+  dma_get_slave_channel
+  dma_map_resource
+  dma_unmap_resource
+  of_dma_controller_free
+  of_dma_controller_register
+  pm_runtime_irq_safe
+
+# required by pwm-samsung.ko
+  of_pwm_xlate_with_flags
+  pwmchip_add
+  pwmchip_remove
+  pwm_get_chip_data
+  pwm_set_chip_data
+
+# required by rtc-s2mpu12.ko
+  devm_rtc_device_register
+  rtc_update_irq
+  rtc_valid_tm
+
+# required by s2m_chg_manager.ko
+  alarm_cancel
+  alarm_init
+  alarm_start_relative
+
+# required by s2m_muic_module.ko
+  printk_timed_ratelimit
+
+# required by s2m_pdic_module.ko
+  typec_get_drvdata
+  typec_register_partner
+  typec_register_port
+  typec_set_data_role
+  typec_set_pwr_opmode
+  typec_set_pwr_role
+  typec_unregister_partner
+  typec_unregister_port
+
+# required by s2mpu12-regulator.ko
+  of_get_regulator_init_data
+  rdev_get_drvdata
+  rdev_get_id
+  regulator_list_voltage_linear
+  regulator_map_voltage_linear
+  regulator_register
+  regulator_unregister
+
+# required by s2mu106_mfd.ko
+  i2c_smbus_read_word_data
+  i2c_smbus_write_word_data
+
+# required by s3c2410_wdt.ko
+  system_state
+  watchdog_init_timeout
+  watchdog_register_device
+  watchdog_set_restart_priority
+  watchdog_unregister_device
+
+# required by samsung-iommu-group.ko
+  iommu_group_alloc
+  iommu_group_set_name
+
+# required by samsung-secure-iova.ko
+  gen_pool_avail
+  gen_pool_create
+  gen_pool_destroy
+  gen_pool_first_fit_align
+  gen_pool_size
+
+# required by samsung_dma_heap.ko
+  anon_inode_getfile
+  deferred_free
+  devm_gen_pool_create
+  dma_buf_get_flags
+  dmabuf_page_pool_alloc
+  dmabuf_page_pool_create
+  dmabuf_page_pool_destroy
+  dmabuf_page_pool_free
+  dma_heap_add
+  dma_heap_get_dev
+  dma_heap_get_drvdata
+  dma_heap_get_name
+  is_dma_buf_file
+  iterate_fd
+  __traceiter_android_vh_show_mem
+  __tracepoint_android_vh_show_mem
