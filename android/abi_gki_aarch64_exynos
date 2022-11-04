@@ -903,3 +903,182 @@
   __tracepoint_dwc3_writel
   usb_gadget_set_state
   usb_otg_state_string
+
+# required by ems.ko
+  activate_task
+  android_rvh_probe_register
+  available_idle_cpu
+  bpf_trace_run10
+  bpf_trace_run11
+  bpf_trace_run8
+  bpf_trace_run9
+  cgroup_taskset_first
+  cgroup_taskset_next
+  check_preempt_curr
+  cpufreq_add_update_util_hook
+  cpufreq_disable_fast_switch
+  cpufreq_driver_fast_switch
+  __cpufreq_driver_target
+  cpufreq_enable_fast_switch
+  cpufreq_frequency_table_get_index
+  cpufreq_register_governor
+  cpufreq_remove_update_util_hook
+  cpufreq_this_cpu_can_update
+  cpu_topology
+  deactivate_task
+  dev_pm_qos_add_notifier
+  dev_pm_qos_add_request
+  dev_pm_qos_remove_request
+  dev_pm_qos_update_request
+  get_pid_task
+  housekeeping_cpumask
+  irq_work_queue
+  irq_work_sync
+  kthread_cancel_work_sync
+  match_string
+  memory_read_from_buffer
+  raw_notifier_chain_unregister
+  _raw_write_trylock
+  reciprocal_value
+  resched_curr
+  runqueues
+  sched_feat_keys
+  sched_feat_names
+  sched_uclamp_used
+  set_next_entity
+  set_task_cpu
+  static_key_disable
+  stop_one_cpu_nowait
+  sysctl_sched_features
+  system_32bit_el0_cpumask
+  task_rq_lock
+  __traceiter_android_rvh_can_migrate_task
+  __traceiter_android_rvh_check_preempt_wakeup
+  __traceiter_android_rvh_cpu_cgroup_can_attach
+  __traceiter_android_rvh_dequeue_task
+  __traceiter_android_rvh_enqueue_task
+  __traceiter_android_rvh_find_busiest_queue
+  __traceiter_android_rvh_find_lowest_rq
+  __traceiter_android_rvh_find_new_ilb
+  __traceiter_android_rvh_post_init_entity_util_avg
+  __traceiter_android_rvh_replace_next_task_fair
+  __traceiter_android_rvh_sched_fork_init
+  __traceiter_android_rvh_sched_newidle_balance
+  __traceiter_android_rvh_sched_nohz_balancer_kick
+  __traceiter_android_rvh_sched_rebalance_domains
+  __traceiter_android_rvh_select_fallback_rq
+  __traceiter_android_rvh_select_task_rq_fair
+  __traceiter_android_rvh_select_task_rq_rt
+  __traceiter_android_rvh_set_task_cpu
+  __traceiter_android_rvh_uclamp_rq_util_with
+  __traceiter_android_vh_arch_set_freq_scale
+  __traceiter_android_vh_binder_restore_priority
+  __traceiter_android_vh_binder_set_priority
+  __traceiter_android_vh_binder_wakeup_ilocked
+  __traceiter_android_vh_scheduler_tick
+  __traceiter_binder_transaction_received
+  __traceiter_pelt_dl_tp
+  __traceiter_pelt_irq_tp
+  __traceiter_pelt_rt_tp
+  __traceiter_pelt_se_tp
+  __traceiter_sched_overutilized_tp
+  __tracepoint_android_rvh_can_migrate_task
+  __tracepoint_android_rvh_check_preempt_wakeup
+  __tracepoint_android_rvh_cpu_cgroup_can_attach
+  __tracepoint_android_rvh_dequeue_task
+  __tracepoint_android_rvh_enqueue_task
+  __tracepoint_android_rvh_find_busiest_queue
+  __tracepoint_android_rvh_find_lowest_rq
+  __tracepoint_android_rvh_find_new_ilb
+  __tracepoint_android_rvh_post_init_entity_util_avg
+  __tracepoint_android_rvh_replace_next_task_fair
+  __tracepoint_android_rvh_sched_fork_init
+  __tracepoint_android_rvh_sched_newidle_balance
+  __tracepoint_android_rvh_sched_nohz_balancer_kick
+  __tracepoint_android_rvh_sched_rebalance_domains
+  __tracepoint_android_rvh_select_fallback_rq
+  __tracepoint_android_rvh_select_task_rq_fair
+  __tracepoint_android_rvh_select_task_rq_rt
+  __tracepoint_android_rvh_set_task_cpu
+  __tracepoint_android_rvh_uclamp_rq_util_with
+  __tracepoint_android_vh_arch_set_freq_scale
+  __tracepoint_android_vh_binder_restore_priority
+  __tracepoint_android_vh_binder_set_priority
+  __tracepoint_android_vh_binder_wakeup_ilocked
+  __tracepoint_android_vh_scheduler_tick
+  __tracepoint_binder_transaction_received
+  __tracepoint_pelt_dl_tp
+  __tracepoint_pelt_irq_tp
+  __tracepoint_pelt_rt_tp
+  __tracepoint_pelt_se_tp
+  __tracepoint_sched_overutilized_tp
+  uclamp_eff_value
+  update_rq_clock
+  wake_up_if_idle
+
+# required by exynos-acme.ko
+  cpufreq_freq_transition_begin
+  cpufreq_freq_transition_end
+  cpufreq_generic_attr
+  cpufreq_register_driver
+  cpuhp_tasks_frozen
+  dev_pm_opp_of_register_em
+  refresh_frequency_limits
+  topology_set_thermal_pressure
+
+# required by exynos-bcm_dbg.ko
+  caches_clean_inval_pou
+  hrtimer_try_to_cancel
+  kick_all_cpus_sync
+  __platform_driver_probe
+
+# required by exynos-bts.ko
+  devm_kstrdup
+
+# required by exynos-chipid_v2.ko
+  soc_device_register
+  subsys_system_register
+
+# required by exynos-coresight.ko
+  __cpuhp_setup_state_cpuslocked
+  cpu_pm_register_notifier
+
+# required by exynos-cpuhp.ko
+  add_cpu
+
+# required by exynos-cpupm.ko
+  cpuidle_get_cpu_driver
+  of_find_node_by_type
+  smp_call_function_many
+  __traceiter_ipi_entry
+  __traceiter_ipi_exit
+  __traceiter_ipi_raise
+  __tracepoint_ipi_entry
+  __tracepoint_ipi_exit
+  __tracepoint_ipi_raise
+
+# required by exynos-debug-test.ko
+  _dev_crit
+
+# required by exynos-ecc-handler.ko
+  cpu_hotplug_disable
+  cpu_hotplug_enable
+
+# required by exynos-itmon.ko
+  int_pow
+
+# required by exynos-pd.ko
+  of_genpd_add_provider_simple
+  pm_genpd_add_subdomain
+  pm_genpd_init
+
+# required by exynos-reboot.ko
+  pm_power_off
+
+# required by exynos-ssld.ko
+  bus_register
+  bus_unregister
+  device_register
+  device_unregister
+  driver_register
+  tracepoint_probe_unregister
