@@ -1082,3 +1082,187 @@
   device_unregister
   driver_register
   tracepoint_probe_unregister
+
+# required by exynos3830_sound.ko
+  dapm_regulator_event
+  devm_snd_soc_register_card
+  snd_soc_component_set_pll
+  snd_soc_component_set_sysclk
+  snd_soc_dai_set_sysclk
+  snd_soc_dai_set_tdm_slot
+  snd_soc_dapm_get_pin_switch
+  snd_soc_dapm_new_control
+  snd_soc_dapm_put_pin_switch
+  snd_soc_get_pcm_runtime
+  snd_soc_of_get_dai_link_codecs
+  snd_soc_of_get_dai_name
+  snd_soc_of_parse_audio_routing
+  snd_soc_of_parse_daifmt
+  snd_soc_of_put_dai_link_codecs
+  snd_soc_params_to_bclk
+  snd_soc_pm_ops
+
+# required by exynos_adc.ko
+  devm_iio_device_alloc
+
+# required by exynos_devfreq.ko
+  devfreq_add_device
+  devfreq_add_governor
+  devfreq_recommended_opp
+  devfreq_register_opp_notifier
+  devfreq_remove_device
+  devfreq_unregister_opp_notifier
+  dev_pm_opp_disable
+  dev_pm_opp_get_freq
+  strpbrk
+  unregister_reboot_notifier
+  update_devfreq
+
+# required by exynos_mct.ko
+  clockevents_config_and_register
+  disable_percpu_irq
+  enable_percpu_irq
+  free_percpu_irq
+  of_clk_get_by_name
+  of_irq_parse_one
+  __request_percpu_irq
+
+# required by exynos_mfc.ko
+  dma_buf_begin_cpu_access_partial
+  dma_buf_end_cpu_access_partial
+
+# required by exynos_pm_qos.ko
+  _raw_read_lock_irqsave
+  _raw_read_unlock_irqrestore
+
+# required by exynos_thermal.ko
+  dev_pm_opp_find_freq_exact
+  dev_pm_opp_get_opp_count
+  get_cpu_idle_time
+  ida_alloc_range
+  ida_free
+  kthread_cancel_delayed_work_sync
+  kthread_flush_work
+  kthread_mod_delayed_work
+  of_thermal_get_ntrips
+  of_thermal_is_trip_valid
+  thermal_zone_device_disable
+  thermal_zone_device_enable
+  thermal_zone_device_is_enabled
+  thermal_zone_device_update
+  thermal_zone_of_sensor_register
+  thermal_zone_of_sensor_unregister
+
+# required by exynos_tty.ko
+  console_stop
+  dma_get_slave_caps
+  do_SAK
+  handle_sysrq
+  sysrq_mask
+  tty_flip_buffer_push
+  tty_insert_flip_string_fixed_flag
+  tty_kref_put
+  tty_port_tty_get
+  uart_add_one_port
+  uart_console_write
+  uart_get_baud_rate
+  uart_parse_options
+  uart_register_driver
+  uart_remove_one_port
+  uart_resume_port
+  uart_set_options
+  uart_suspend_port
+  uart_try_toggle_sysrq
+  uart_unregister_driver
+  uart_update_timeout
+  uart_write_wakeup
+
+# required by exyswd-rng.ko
+  devm_hwrng_register
+  platform_device_register
+
+# required by fb.ko
+  __arch_copy_in_user
+  console_lock
+  fb_mode_option
+  ignore_console_lock_warning
+  oops_in_progress
+  proc_create_seq_private
+  __request_module
+  simple_strtol
+  simple_strtoul
+  vm_get_page_prot
+  vm_iomap_memory
+
+# required by fimc-is.ko
+  cpuidle_pause_and_lock
+  cpuidle_resume_and_unlock
+  device_get_dma_attr
+  devm_phy_put
+  get_random_u32
+  __get_vm_area_caller
+  llist_add_batch
+  map_kernel_range
+  names_cachep
+  param_set_uint
+  phy_configure
+  regulator_force_disable
+  regulator_get_voltage
+  regulator_set_mode
+  spi_bus_type
+  __spi_register_driver
+  spi_setup
+  spi_sync
+  vb2_prepare_buf
+  vsprintf
+
+# required by fm_s610.ko
+  of_find_i2c_device_by_node
+  of_property_read_variable_u16_array
+  v4l2_ctrl_poll
+  v4l2_ctrl_subscribe_event
+  v4l2_event_unsubscribe
+  v4l2_fh_is_singular
+  v4l2_fh_open
+  v4l2_fh_release
+  video_device_release_empty
+
+# required by freq-qos-tracer.ko
+  freq_qos_add_request
+  freq_qos_remove_request
+
+# required by gdc.ko
+  v4l2_m2m_querybuf
+
+# required by gnssif.ko
+  skb_clone
+
+# required by gpu_cooling.ko
+  thermal_cooling_device_unregister
+
+# required by hardlockup-watchdog.ko
+  cpus_read_lock
+  cpus_read_unlock
+  smp_call_on_cpu
+
+# required by i2c-dev.ko
+  bus_register_notifier
+  bus_unregister_notifier
+  cdev_device_add
+  cdev_device_del
+  i2c_adapter_type
+  i2c_bus_type
+  i2c_for_each_dev
+  i2c_get_adapter
+  i2c_put_adapter
+  i2c_smbus_xfer
+  i2c_verify_client
+
+# required by i2c-s3c2410.ko
+  __ndelay
+
+# required by is-actuator-dw9839.ko
+  kfree_sensitive
+
+# required by leds-s2mu106.ko
+  devm_led_classdev_register_ext
