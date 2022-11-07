@@ -4668,12 +4668,12 @@ static ssize_t show_lru_gen_admin(struct kobject *kobj, struct kobj_attribute *a
 	struct lruvec *lruvec;
 	struct mem_cgroup *memcg;
 
-	void *path = kvmalloc(PATH_MAX, GFP_KERNEL);
+	char *path = kvmalloc(PATH_MAX, GFP_KERNEL);
 	int buf_len = 0;
 
 	if (!path)
 		return -EINVAL;
-
+	path[0] = 0;
 	buf[0] = 0;
 	memcg = mem_cgroup_iter(NULL, NULL, NULL);
 	do {
@@ -4686,6 +4686,8 @@ static ssize_t show_lru_gen_admin(struct kobject *kobj, struct kobj_attribute *a
 #ifdef CONFIG_MEMCG
 					if (memcg)
 						cgroup_path(memcg->css.cgroup, path, PATH_MAX);
+					else
+						path[0] = 0;
 #endif
 					buf_len += snprintf(buf + buf_len, PAGE_SIZE - buf_len,
 						"memcg %5hu %s\n", mem_cgroup_id(memcg), path);
@@ -4703,7 +4705,6 @@ static ssize_t show_lru_gen_admin(struct kobject *kobj, struct kobj_attribute *a
 	buf[buf_len] = 0;
 
 	kvfree(path);
-	path = NULL;
 
 	return buf_len;
 }
