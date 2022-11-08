@@ -70,7 +70,7 @@ struct victim_entry {
 		struct victim_info vi;	/* victim info */
 	};
 	struct list_head list;
-};
+} __packed;
 
 /*
  * inline functions
