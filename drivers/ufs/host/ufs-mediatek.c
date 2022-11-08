@@ -1230,9 +1230,6 @@ static int ufs_mtk_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 	ufs_mtk_host_pwr_ctrl(HOST_PWR_HCI, true, res);
 
-	if (hba->ufshcd_state != UFSHCD_STATE_OPERATIONAL)
-		ufs_mtk_dev_vreg_set_lpm(hba, false);
-
 	err = ufs_mtk_mphy_power_on(hba, true);
 	if (err)
 		goto fail;
