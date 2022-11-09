@@ -233,6 +233,9 @@ static int kvm_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_PTP_KVM:
 		r = 1;
 		break;
+	case KVM_CAP_UCLAMP_SYNC:
+		r = 1;
+		break;
 	case KVM_CAP_ARM_NISV_TO_USER:
 		r = !kvm || !kvm_vm_is_protected(kvm);
 		break;

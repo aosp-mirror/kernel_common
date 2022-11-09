@@ -3,6 +3,8 @@
 
 #include <linux/arm-smccc.h>
 #include <linux/kvm_host.h>
+#include <linux/sched.h>
+#include <uapi/linux/sched/types.h>
 
 #include <asm/kvm_emulate.h>
 
@@ -56,6 +58,24 @@ static void kvm_ptp_get_time(struct kvm_vcpu *vcpu, u64 *val)
 	val[1] = lower_32_bits(systime_snapshot.real);
 	val[2] = upper_32_bits(cycles);
 	val[3] = lower_32_bits(cycles);
+}
+
+static void kvm_sched_set_uclamp(struct kvm_vcpu *vcpu, u64 *val)
+{
+	struct sched_attr attr = {
+		.sched_flags = SCHED_FLAG_UTIL_CLAMP,
+	};
+	int ret;
+
+	attr.sched_util_min = smccc_get_arg1(vcpu);
+	attr.sched_util_max = smccc_get_arg2(vcpu);
+
+	ret = sched_setattr(current, &attr);
+
+	val[0] = (u64)ret;
+	val[1] = 0;
+	val[2] = 0;
+	val[3] = 0;
 }
 
 int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
@@ -141,6 +161,7 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 	case ARM_SMCCC_VENDOR_HYP_KVM_FEATURES_FUNC_ID:
 		val[0] = BIT(ARM_SMCCC_KVM_FUNC_FEATURES);
 		val[0] |= BIT(ARM_SMCCC_KVM_FUNC_PTP);
+		val[ARM_SMCCC_KVM_FUNC_UCLAMP / 32] |= BIT(ARM_SMCCC_KVM_FUNC_UCLAMP % 32);
 		break;
 	case ARM_SMCCC_VENDOR_HYP_KVM_PTP_FUNC_ID:
 		kvm_ptp_get_time(vcpu, val);
@@ -148,6 +169,9 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 	case ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_MAP_FUNC_ID:
 		if (kvm_vm_is_protected(vcpu->kvm) && !topup_hyp_memcache(vcpu))
 			val[0] = SMCCC_RET_SUCCESS;
+		break;
+	case ARM_SMCCC_VENDOR_HYP_KVM_UCLAMP_FUNC_ID:
+		kvm_sched_set_uclamp(vcpu, val);
 		break;
 	case ARM_SMCCC_TRNG_VERSION:
 	case ARM_SMCCC_TRNG_FEATURES:

@@ -12,3 +12,4 @@ ARM
    pvtime
    ptp_kvm
    mmio-guard
+   uclamp
