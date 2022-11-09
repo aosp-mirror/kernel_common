@@ -3,6 +3,7 @@ drivers/block/zram/zram.ko
 drivers/net/can/dev/can-dev.ko
 drivers/net/can/vcan.ko
 drivers/net/can/slcan.ko
+drivers/usb/class/cdc-acm.ko
 net/can/can-raw.ko
 net/can/can-bcm.ko
 net/can/can-gw.ko
