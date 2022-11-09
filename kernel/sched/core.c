@@ -16,6 +16,7 @@
 
 #include <linux/kcov.h>
 #include <linux/scs.h>
+#include <linux/uclamp_kvm.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
@@ -1168,6 +1169,22 @@ unsigned long uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id)
 }
 EXPORT_SYMBOL_GPL(uclamp_eff_value);
 
+static inline void kvm_set_host_uclamp(struct task_struct *next)
+{
+	if (!kvm_arch_uclamp_supported())
+		return;
+
+	/*
+	 * Soon after scheduling the idle task, the vCPU can yield to other host
+	 * process and it can re-schedule same uclamp modified tasks. Skip it.
+	 */
+	if (is_idle_task(next))
+		return;
+
+	kvm_arch_set_vcpu_uclamp(uclamp_eff_value(next, UCLAMP_MIN),
+				 uclamp_eff_value(next, UCLAMP_MAX));
+}
+
 /*
  * When a task is enqueued on a rq, the clamp bucket currently defined by the
  * task's uclamp::bucket_id is refcounted on that rq. This also immediately
@@ -1645,6 +1662,7 @@ static inline int uclamp_validate(struct task_struct *p,
 }
 static void __setscheduler_uclamp(struct task_struct *p,
 				  const struct sched_attr *attr) { }
+static inline void kvm_set_host_uclamp(struct task_struct *next) { }
 static inline void uclamp_fork(struct task_struct *p) { }
 static inline void uclamp_post_fork(struct task_struct *p) { }
 static inline void init_uclamp(void) { }
@@ -4790,6 +4808,9 @@ static void __sched notrace __schedule(bool preempt)
 		++*switch_count;
 
 		psi_sched_switch(prev, next, !task_on_rq_queued(prev));
+
+		if (IS_ENABLED(CONFIG_UCLAMP_TASK))
+			kvm_set_host_uclamp(next);
 
 		trace_sched_switch(preempt, prev, next);
 
