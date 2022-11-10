@@ -1,0 +1,434 @@
+[abi_symbol_list]
+# commonly used symbols
+  atomic_notifier_chain_register
+  cancel_delayed_work_sync
+  __cfi_slowpath
+  clk_bulk_disable
+  clk_bulk_enable
+  clk_bulk_prepare
+  clk_bulk_unprepare
+  clk_disable
+  clk_enable
+  clk_gate_ops
+  clk_get
+  __clk_get_name
+  clk_get_rate
+  clk_notifier_register
+  clk_prepare
+  clk_put
+  clk_register
+  clk_set_rate
+  clk_unprepare
+  __const_udelay
+  cpumask_next
+  __cpu_online_mask
+  __cpu_possible_mask
+  delayed_work_timer_fn
+  _dev_err
+  devfreq_recommended_opp
+  device_init_wakeup
+  _dev_info
+  devm_clk_bulk_get_all
+  devm_clk_get
+  devm_clk_hw_register
+  devm_clk_register
+  devm_ioremap_resource
+  devm_kfree
+  devm_kmalloc
+  devm_nvmem_register
+  devm_platform_ioremap_resource
+  devm_regulator_get
+  devm_regulator_get_optional
+  devm_request_threaded_irq
+  devm_reset_control_array_get
+  dev_pm_opp_find_freq_ceil
+  dev_pm_opp_get_opp_count
+  dev_pm_opp_get_opp_table
+  dev_pm_opp_get_voltage
+  dev_pm_opp_put
+  dev_pm_opp_put_opp_table
+  devres_add
+  devres_alloc_node
+  devres_free
+  _dev_warn
+  down_read
+  down_write
+  init_timer_key
+  iounmap
+  irq_set_irq_wake
+  irq_to_desc
+  kfree
+  __kmalloc
+  kmalloc_caches
+  kmem_cache_alloc_trace
+  ktime_get
+  __list_add_valid
+  __log_post_read_mmio
+  __log_read_mmio
+  __log_write_mmio
+  memcpy
+  module_layout
+  __msecs_to_jiffies
+  msleep
+  __mutex_init
+  mutex_lock
+  mutex_unlock
+  nr_cpu_ids
+  nvmem_cell_put
+  nvmem_cell_read
+  of_clk_add_provider
+  of_clk_del_provider
+  of_clk_get
+  of_clk_get_by_name
+  of_clk_get_parent_count
+  of_clk_src_simple_get
+  of_count_phandle_with_args
+  of_device_get_match_data
+  of_device_is_available
+  of_find_matching_node_and_match
+  of_find_property
+  of_get_next_available_child
+  of_get_next_child
+  of_iomap
+  of_match_device
+  of_match_node
+  of_nvmem_cell_get
+  of_parse_phandle
+  of_property_count_elems_of_size
+  of_property_read_string
+  of_property_read_string_helper
+  of_property_read_u32_index
+  of_property_read_variable_u32_array
+  panic_notifier_list
+  __platform_driver_probe
+  __platform_driver_register
+  platform_driver_unregister
+  platform_get_irq
+  platform_get_resource
+  pm_clk_create
+  pm_clk_destroy
+  print_hex_dump
+  printk
+  __put_task_struct
+  queue_delayed_work_on
+  regmap_read
+  regmap_update_bits_base
+  regmap_write
+  regulator_disable
+  regulator_enable
+  regulator_get_voltage
+  regulator_put
+  regulator_set_voltage
+  reset_control_assert
+  reset_control_deassert
+  snprintf
+  sprintf
+  __stack_chk_fail
+  strcmp
+  syscon_node_to_regmap
+  syscon_regmap_lookup_by_phandle
+  sysfs_create_file_ns
+  system_freezable_wq
+  system_wq
+  thermal_zone_get_zone_by_name
+  __traceiter_rwmmio_post_read
+  __traceiter_rwmmio_read
+  __traceiter_rwmmio_write
+  __tracepoint_rwmmio_post_read
+  __tracepoint_rwmmio_read
+  __tracepoint_rwmmio_write
+  __udelay
+  update_devfreq
+  up_read
+  up_write
+  usleep_range
+
+# required by clk-link.ko
+  pm_clk_add
+  pm_clk_resume
+  pm_clk_suspend
+  __pm_runtime_disable
+  pm_runtime_enable
+
+# required by clk-pwm.ko
+  devm_pwm_get
+  of_clk_add_hw_provider
+  of_clk_hw_simple_get
+  pwm_apply_state
+
+# required by clk-rockchip.ko
+  clk_divider_ops
+  clk_divider_ro_ops
+  clk_fixed_factor_ops
+  clk_fractional_divider_ops
+  __clk_get_hw
+  clk_get_parent
+  clk_hw_get_flags
+  clk_hw_get_name
+  clk_hw_get_parent
+  clk_hw_get_rate
+  clk_hw_register_composite
+  clk_hw_round_rate
+  __clk_mux_determine_rate
+  clk_mux_ops
+  clk_mux_ro_ops
+  clk_notifier_unregister
+  clk_register_divider_table
+  clk_register_fixed_factor
+  clk_register_gate
+  clk_register_mux_table
+  clk_unregister
+  gcd
+  kmemdup
+  match_string
+  of_clk_src_onecell_get
+  rational_best_approximation
+  _raw_spin_lock_irqsave
+  _raw_spin_unlock_irqrestore
+  register_restart_handler
+  reset_controller_register
+  __warn_printk
+
+# required by clk-scmi.ko
+  clk_hw_set_rate_range
+  devm_of_clk_add_hw_provider
+  of_clk_hw_onecell_get
+  scmi_driver_register
+  scmi_driver_unregister
+
+# required by industrialio-triggered-buffer.ko
+  iio_alloc_pollfunc
+  iio_dealloc_pollfunc
+  iio_device_attach_buffer
+
+# required by io-domain.ko
+  _dev_crit
+  regulator_register_notifier
+  regulator_unregister_notifier
+
+# required by kfifo_buf.ko
+  iio_buffer_init
+  iio_buffer_put
+  __kfifo_alloc
+  __kfifo_free
+  __kfifo_in
+  __kfifo_to_user
+  mutex_lock_interruptible
+
+# required by nvmem-rockchip-otp.ko
+  devm_clk_bulk_get
+  param_ops_uint
+
+# required by pm_domains.ko
+  clk_bulk_put
+  of_genpd_add_provider_onecell
+  panic
+  param_ops_bool
+  pm_clk_add_clk
+  pm_genpd_add_subdomain
+  pm_genpd_init
+  pm_genpd_remove
+  strrchr
+
+# required by rockchip-cpuinfo.ko
+  nvmem_cell_get
+
+# required by rockchip-dfi.ko
+  devm_devfreq_event_add_edev
+  gic_nonsecure_priorities
+
+# required by rockchip.ko
+  __genphy_config_aneg
+  genphy_resume
+  genphy_soft_reset
+  genphy_suspend
+  mdiobus_read
+  mdiobus_write
+  phy_drivers_register
+  phy_drivers_unregister
+
+# required by rockchip_bus.ko
+  cpufreq_register_notifier
+  cpu_topology
+
+# required by rockchip_debug.ko
+  atomic_notifier_chain_unregister
+  nr_irqs
+  __per_cpu_offset
+
+# required by rockchip_dmc.ko
+  cpufreq_cpu_get
+  cpufreq_cpu_put
+  __cpufreq_driver_target
+  cpufreq_quick_get
+  cpu_latency_qos_add_request
+  cpu_latency_qos_update_request
+  cpu_number
+  cpus_read_lock
+  cpus_read_unlock
+  devfreq_add_governor
+  devfreq_event_disable_edev
+  devfreq_event_enable_edev
+  devfreq_event_get_edev_by_phandle
+  devfreq_event_get_edev_count
+  devfreq_event_get_event
+  devfreq_monitor_resume
+  devfreq_monitor_start
+  devfreq_monitor_stop
+  devfreq_monitor_suspend
+  devfreq_resume_device
+  devfreq_suspend_device
+  devfreq_update_interval
+  devm_devfreq_add_device
+  devm_devfreq_register_opp_notifier
+  _dev_notice
+  dev_pm_opp_put_regulators
+  dev_pm_opp_register_set_opp_helper
+  dev_pm_opp_set_rate
+  dev_pm_opp_set_regulators
+  dev_pm_opp_unregister_set_opp_helper
+  disable_irq
+  enable_irq
+  finish_wait
+  init_wait_entry
+  __init_waitqueue_head
+  input_close_device
+  input_open_device
+  input_register_handle
+  input_register_handler
+  input_unregister_handle
+  kstrtouint
+  __memset_io
+  of_devfreq_cooling_register_power
+  of_get_child_by_name
+  platform_get_irq_byname
+  prepare_to_wait_event
+  queue_work_on
+  ___ratelimit
+  schedule_timeout
+  __wake_up
+
+# required by rockchip_dmc_common.ko
+  down_write_trylock
+
+# required by rockchip_opp_select.ko
+  dev_pm_opp_disable
+  dev_pm_opp_of_add_table
+  dev_pm_opp_set_prop_name
+  of_find_node_opts_by_path
+  of_machine_is_compatible
+  regulator_get_linear_step
+  regulator_get_optional
+
+# required by rockchip_pm_config.ko
+  of_find_node_by_name
+  of_get_named_gpio_flags
+
+# required by rockchip_pvtm.ko
+  debugfs_create_dir
+  debugfs_create_file
+  debugfs_remove
+  seq_lseek
+  seq_printf
+  seq_puts
+  seq_read
+  single_open
+  single_release
+
+# required by rockchip_pwm_remotectl.ko
+  arm64_const_caps_ready
+  cpu_hwcap_keys
+  devm_input_allocate_device
+  input_event
+  input_register_device
+  input_set_capability
+  irq_set_affinity_hint
+  jiffies
+  jiffies_to_msecs
+  mod_timer
+  of_get_property
+  param_ops_int
+  __pm_relax
+  pm_wakeup_ws_event
+  __tasklet_hi_schedule
+  tasklet_init
+  wakeup_source_add
+  wakeup_source_remove
+
+# required by rockchip_saradc.ko
+  complete
+  devm_add_action
+  devm_iio_device_alloc
+  __devm_iio_device_register
+  __devm_reset_control_get
+  find_next_bit
+  iio_get_time_ns
+  iio_push_to_buffers
+  iio_trigger_notify_done
+  __init_swait_queue_head
+  wait_for_completion_timeout
+
+# required by rockchip_sip.ko
+  arm64_use_ng_mappings
+  __arm_smccc_smc
+  __ioremap
+  memstart_addr
+  pfn_valid
+  sched_clock
+  vmap
+
+# required by rockchip_system_monitor.ko
+  add_cpu
+  bitmap_parselist
+  blocking_notifier_call_chain
+  blocking_notifier_chain_register
+  blocking_notifier_chain_unregister
+  dev_pm_opp_find_freq_floor
+  dev_pm_qos_add_request
+  dev_pm_qos_remove_request
+  dev_pm_qos_update_request
+  freq_qos_add_request
+  freq_qos_remove_request
+  freq_qos_update_request
+  kobject_create_and_add
+  kstrdup
+  kstrtoull
+  __list_del_entry_valid
+  memset
+  mod_delayed_work_on
+  register_pm_notifier
+  register_reboot_notifier
+  regulator_get
+  remove_cpu
+  strchr
+  strsep
+  strstr
+  thermal_zone_get_temp
+
+# required by rockchip_thermal.ko
+  devm_pinctrl_get
+  devm_thermal_zone_of_sensor_register
+  pinctrl_lookup_state
+  pinctrl_select_state
+  thermal_zone_device_disable
+  thermal_zone_device_enable
+  thermal_zone_device_update
+
+# required by rtc-hym8563.ko
+  _bcd2bin
+  _bin2bcd
+  device_property_present
+  devm_rtc_device_register
+  i2c_del_driver
+  i2c_register_driver
+  i2c_smbus_read_byte_data
+  i2c_smbus_read_i2c_block_data
+  i2c_smbus_write_byte_data
+  i2c_smbus_write_i2c_block_data
+  rtc_valid_tm
+
+# required by timer-rockchip.ko
+  clockevents_config_and_register
+  irq_of_parse_and_map
+  of_device_is_compatible
+  request_threaded_irq

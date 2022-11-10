@@ -5275,6 +5275,7 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 	unsigned long nr_reclaimed = 0;
 	unsigned long nr_to_reclaim = sc->nr_to_reclaim;
 	struct blk_plug plug;
+	bool do_plug = true;
 	bool scan_adjusted;
 
 	if (lru_gen_enabled()) {
@@ -5301,7 +5302,9 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 	scan_adjusted = (!cgroup_reclaim(sc) && !current_is_kswapd() &&
 			 sc->priority == DEF_PRIORITY);
 
-	blk_start_plug(&plug);
+	trace_android_vh_shrink_lruvec_blk_plug(&do_plug);
+	if (do_plug)
+		blk_start_plug(&plug);
 	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
 					nr[LRU_INACTIVE_FILE]) {
 		unsigned long nr_anon, nr_file, percentage;
@@ -5373,7 +5376,8 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 
 		scan_adjusted = true;
 	}
-	blk_finish_plug(&plug);
+	if (do_plug)
+		blk_finish_plug(&plug);
 	sc->nr_reclaimed += nr_reclaimed;
 
 	/*

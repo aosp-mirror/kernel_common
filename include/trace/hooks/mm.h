@@ -106,18 +106,21 @@ DECLARE_HOOK(android_vh_do_madvise_blk_plug,
 DECLARE_HOOK(android_vh_shrink_inactive_list_blk_plug,
 	TP_PROTO(bool *do_plug),
 	TP_ARGS(do_plug));
+DECLARE_HOOK(android_vh_shrink_lruvec_blk_plug,
+	TP_PROTO(bool *do_plug),
+	TP_ARGS(do_plug));
 DECLARE_HOOK(android_vh_reclaim_pages_plug,
 	TP_PROTO(bool *do_plug),
 	TP_ARGS(do_plug));
 DECLARE_HOOK(android_vh_zap_pte_range_tlb_start,
-	TP_PROTO(void *unused),
-	TP_ARGS(unused));
+	TP_PROTO(void *ret),
+	TP_ARGS(ret));
 DECLARE_HOOK(android_vh_zap_pte_range_tlb_force_flush,
 	TP_PROTO(struct page *page, bool *flush),
 	TP_ARGS(page, flush));
 DECLARE_HOOK(android_vh_zap_pte_range_tlb_end,
-	TP_PROTO(void *unused),
-	TP_ARGS(unused));
+	TP_PROTO(void *ret),
+	TP_ARGS(ret));
 DECLARE_HOOK(android_vh_skip_lru_disable,
 	TP_PROTO(bool *skip),
 	TP_ARGS(skip));
