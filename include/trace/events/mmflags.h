@@ -49,7 +49,7 @@
 	{(unsigned long)__GFP_RECLAIM,		"__GFP_RECLAIM"},	\
 	{(unsigned long)__GFP_DIRECT_RECLAIM,	"__GFP_DIRECT_RECLAIM"},\
 	{(unsigned long)__GFP_KSWAPD_RECLAIM,	"__GFP_KSWAPD_RECLAIM"},\
-	{(unsigned long)__GFP_NO_INIT_ON_ALLOC,	"__GFP_NO_INIT_ON_ALLOC"}\
+	{(unsigned long)__GFP_NO_INIT_ON_ALLOC,	"__GFP_NO_INIT_ON_ALLOC"},\
 	{(unsigned long)__GFP_ZEROTAGS,		"__GFP_ZEROTAGS"},	\
 	{(unsigned long)__GFP_SKIP_KASAN_POISON,"__GFP_SKIP_KASAN_POISON"}\
 
