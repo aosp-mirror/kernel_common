@@ -26,8 +26,8 @@
 #include <asm/debug-monitors.h>
 #include <asm/processor.h>
 
-#include <nvhe/fixed_config.h>
 #include <nvhe/mem_protect.h>
+#include <nvhe/pkvm.h>
 
 /* Non-VHE specific context */
 DEFINE_PER_CPU(struct kvm_host_data, kvm_host_data);
@@ -54,18 +54,6 @@ static void __activate_traps(struct kvm_vcpu *vcpu)
 
 	write_sysreg(val, cptr_el2);
 	write_sysreg(__this_cpu_read(kvm_hyp_vector), vbar_el2);
-
-	if (cpus_have_final_cap(ARM64_SME)) {
-		val = read_sysreg_s(SYS_HFGRTR_EL2);
-		val &= ~(HFGxTR_EL2_nTPIDR2_EL0_MASK |
-			 HFGxTR_EL2_nSMPRI_EL1_MASK);
-		write_sysreg_s(val, SYS_HFGRTR_EL2);
-
-		val = read_sysreg_s(SYS_HFGWTR_EL2);
-		val &= ~(HFGxTR_EL2_nTPIDR2_EL0_MASK |
-			 HFGxTR_EL2_nSMPRI_EL1_MASK);
-		write_sysreg_s(val, SYS_HFGWTR_EL2);
-	}
 
 	if (cpus_have_final_cap(ARM64_WORKAROUND_SPECULATIVE_AT)) {
 		struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
@@ -109,20 +97,6 @@ static void __deactivate_traps(struct kvm_vcpu *vcpu)
 	__deactivate_traps_common(vcpu);
 
 	write_sysreg(this_cpu_ptr(&kvm_init_params)->hcr_el2, hcr_el2);
-
-	if (cpus_have_final_cap(ARM64_SME)) {
-		u64 val;
-
-		val = read_sysreg_s(SYS_HFGRTR_EL2);
-		val |= HFGxTR_EL2_nTPIDR2_EL0_MASK |
-			HFGxTR_EL2_nSMPRI_EL1_MASK;
-		write_sysreg_s(val, SYS_HFGRTR_EL2);
-
-		val = read_sysreg_s(SYS_HFGWTR_EL2);
-		val |= HFGxTR_EL2_nTPIDR2_EL0_MASK |
-			HFGxTR_EL2_nSMPRI_EL1_MASK;
-		write_sysreg_s(val, SYS_HFGWTR_EL2);
-	}
 
 	cptr = CPTR_EL2_DEFAULT;
 	if (vcpu_has_sve(vcpu) && (vcpu->arch.fp_state == FP_STATE_GUEST_OWNED))
@@ -217,6 +191,7 @@ static const exit_handler_fn hyp_exit_handlers[] = {
 
 static const exit_handler_fn pvm_exit_handlers[] = {
 	[0 ... ESR_ELx_EC_MAX]		= NULL,
+	[ESR_ELx_EC_HVC64]		= kvm_handle_pvm_hvc64,
 	[ESR_ELx_EC_SYS64]		= kvm_handle_pvm_sys64,
 	[ESR_ELx_EC_SVE]		= kvm_handle_pvm_restricted,
 	[ESR_ELx_EC_FP_ASIMD]		= kvm_hyp_handle_fpsimd,
@@ -227,7 +202,7 @@ static const exit_handler_fn pvm_exit_handlers[] = {
 
 static const exit_handler_fn *kvm_get_exit_handler_array(struct kvm_vcpu *vcpu)
 {
-	if (unlikely(kvm_vm_is_protected(kern_hyp_va(vcpu->kvm))))
+	if (unlikely(vcpu_is_protected(vcpu)))
 		return pvm_exit_handlers;
 
 	return hyp_exit_handlers;
@@ -246,9 +221,7 @@ static const exit_handler_fn *kvm_get_exit_handler_array(struct kvm_vcpu *vcpu)
  */
 static void early_exit_filter(struct kvm_vcpu *vcpu, u64 *exit_code)
 {
-	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-
-	if (kvm_vm_is_protected(kvm) && vcpu_mode_is_32bit(vcpu)) {
+	if (unlikely(vcpu_is_protected(vcpu) && vcpu_mode_is_32bit(vcpu))) {
 		/*
 		 * As we have caught the guest red-handed, decide that it isn't
 		 * fit for purpose anymore by making the vcpu invalid. The VMM

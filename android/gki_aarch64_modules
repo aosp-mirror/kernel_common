@@ -1,2 +1,10 @@
 mm/zsmalloc.ko
 drivers/block/zram/zram.ko
+drivers/net/can/dev/can-dev.ko
+drivers/net/can/vcan.ko
+drivers/net/can/slcan.ko
+net/can/can-raw.ko
+net/can/can-bcm.ko
+net/can/can-gw.ko
+net/wireless/cfg80211.ko
+net/mac80211/mac80211.ko

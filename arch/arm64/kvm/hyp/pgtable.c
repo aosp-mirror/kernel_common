@@ -47,7 +47,7 @@
 					 KVM_PTE_LEAF_ATTR_HI_S2_XN)
 
 #define KVM_INVALID_PTE_OWNER_MASK	GENMASK(9, 2)
-#define KVM_MAX_OWNER_ID		1
+#define KVM_MAX_OWNER_ID		FIELD_MAX(KVM_INVALID_PTE_OWNER_MASK)
 
 struct kvm_pgtable_walk_data {
 	struct kvm_pgtable		*pgt;
@@ -56,8 +56,6 @@ struct kvm_pgtable_walk_data {
 	u64				addr;
 	u64				end;
 };
-
-#define KVM_PHYS_INVALID (-1ULL)
 
 static bool kvm_phys_is_valid(u64 phys)
 {
@@ -120,16 +118,6 @@ static bool kvm_pte_table(kvm_pte_t pte, u32 level)
 		return false;
 
 	return FIELD_GET(KVM_PTE_TYPE, pte) == KVM_PTE_TYPE_TABLE;
-}
-
-static kvm_pte_t kvm_phys_to_pte(u64 pa)
-{
-	kvm_pte_t pte = pa & KVM_PTE_ADDR_MASK;
-
-	if (PAGE_SHIFT == 16)
-		pte |= FIELD_PREP(KVM_PTE_ADDR_51_48, pa >> 48);
-
-	return pte;
 }
 
 static kvm_pte_t *kvm_pte_follow(kvm_pte_t pte, struct kvm_pgtable_mm_ops *mm_ops)
@@ -700,12 +688,12 @@ static void stage2_put_pte(kvm_pte_t *ptep, struct kvm_s2_mmu *mmu, u64 addr,
 static bool stage2_pte_cacheable(struct kvm_pgtable *pgt, kvm_pte_t pte)
 {
 	u64 memattr = pte & KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR;
-	return memattr == KVM_S2_MEMATTR(pgt, NORMAL);
+	return kvm_pte_valid(pte) && memattr == KVM_S2_MEMATTR(pgt, NORMAL);
 }
 
 static bool stage2_pte_executable(kvm_pte_t pte)
 {
-	return !(pte & KVM_PTE_LEAF_ATTR_HI_S2_XN);
+	return kvm_pte_valid(pte) && !(pte & KVM_PTE_LEAF_ATTR_HI_S2_XN);
 }
 
 static bool stage2_leaf_mapping_allowed(u64 addr, u64 end, u32 level,
@@ -744,20 +732,28 @@ static int stage2_map_walker_try_leaf(u64 addr, u64 end, u32 level,
 		if (!stage2_pte_needs_update(old, new))
 			return -EAGAIN;
 
+		/*
+		 * If we're only changing software bits, then we don't need to
+		 * do anything else/
+		 */
+		if (!((old ^ new) & ~KVM_PTE_LEAF_ATTR_HI_SW))
+			goto out_set_pte;
+
 		stage2_put_pte(ptep, data->mmu, addr, level, mm_ops);
 	}
 
 	/* Perform CMOs before installation of the guest stage-2 PTE */
 	if (mm_ops->dcache_clean_inval_poc && stage2_pte_cacheable(pgt, new))
 		mm_ops->dcache_clean_inval_poc(kvm_pte_follow(new, mm_ops),
-						granule);
-
+					       granule);
 	if (mm_ops->icache_inval_pou && stage2_pte_executable(new))
 		mm_ops->icache_inval_pou(kvm_pte_follow(new, mm_ops), granule);
 
-	smp_store_release(ptep, new);
 	if (stage2_pte_is_counted(new))
 		mm_ops->get_page(ptep);
+
+out_set_pte:
+	smp_store_release(ptep, new);
 	if (kvm_phys_is_valid(phys))
 		data->phys += granule;
 	return 0;
@@ -1148,7 +1144,7 @@ static int stage2_flush_walker(u64 addr, u64 end, u32 level, kvm_pte_t *ptep,
 	struct kvm_pgtable_mm_ops *mm_ops = pgt->mm_ops;
 	kvm_pte_t pte = *ptep;
 
-	if (!kvm_pte_valid(pte) || !stage2_pte_cacheable(pgt, pte))
+	if (!stage2_pte_cacheable(pgt, pte))
 		return 0;
 
 	if (mm_ops->dcache_clean_inval_poc)
@@ -1198,6 +1194,15 @@ int __kvm_pgtable_stage2_init(struct kvm_pgtable *pgt, struct kvm_s2_mmu *mmu,
 	/* Ensure zeroed PGD pages are visible to the hardware walker */
 	dsb(ishst);
 	return 0;
+}
+
+size_t kvm_pgtable_stage2_pgd_size(u64 vtcr)
+{
+	u32 ia_bits = VTCR_EL2_IPA(vtcr);
+	u32 sl0 = FIELD_GET(VTCR_EL2_SL0_MASK, vtcr);
+	u32 start_level = VTCR_EL2_TGRAN_SL0_BASE - sl0;
+
+	return kvm_pgd_pages(ia_bits, start_level) * PAGE_SIZE;
 }
 
 static int stage2_free_walker(u64 addr, u64 end, u32 level, kvm_pte_t *ptep,
