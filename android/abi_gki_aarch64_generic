@@ -2280,6 +2280,7 @@
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_show_max_freq
   __traceiter_android_vh_shrink_inactive_list_blk_plug
+  __traceiter_android_vh_shrink_lruvec_blk_plug
   __traceiter_android_vh_skip_lru_disable
   __traceiter_android_vh_snd_compr_use_pause_in_drain
   __traceiter_android_vh_sound_usb_support_cpu_suspend
@@ -2415,6 +2416,7 @@
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_show_max_freq
   __tracepoint_android_vh_shrink_inactive_list_blk_plug
+  __tracepoint_android_vh_shrink_lruvec_blk_plug
   __tracepoint_android_vh_skip_lru_disable
   __tracepoint_android_vh_snd_compr_use_pause_in_drain
   __tracepoint_android_vh_sound_usb_support_cpu_suspend
