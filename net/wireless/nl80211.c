@@ -792,10 +792,6 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 				 NL80211_EHT_MIN_CAPABILITY_LEN,
 				 NL80211_EHT_MAX_CAPABILITY_LEN),
 	[NL80211_ATTR_DISABLE_EHT] = { .type = NLA_FLAG },
-	[NL80211_ATTR_MAX_NUM_AKM_SUITES] =
-		NLA_POLICY_RANGE(NLA_U16,
-				 NL80211_MAX_NR_AKM_SUITES,
-				 CFG80211_MAX_NUM_AKM_SUITES),
 };
 
 /* policy for the key attributes */
@@ -2893,10 +2889,6 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			goto nla_put_failure;
 
 		if (nl80211_put_mbssid_support(&rdev->wiphy, msg))
-			goto nla_put_failure;
-
-		if (nla_put_u16(msg, NL80211_ATTR_MAX_NUM_AKM_SUITES,
-				rdev->wiphy.max_num_akm_suites))
 			goto nla_put_failure;
 
 		/* done */
@@ -10278,7 +10270,7 @@ static int nl80211_crypto_settings(struct cfg80211_registered_device *rdev,
 		if (len % sizeof(u32))
 			return -EINVAL;
 
-		if (settings->n_akm_suites > rdev->wiphy.max_num_akm_suites)
+		if (settings->n_akm_suites > NL80211_MAX_NR_AKM_SUITES)
 			return -EINVAL;
 
 		memcpy(settings->akm_suites, data, len);
@@ -16369,7 +16361,7 @@ static struct genl_family nl80211_fam __ro_after_init = {
 	.name = NL80211_GENL_NAME,	/* have users key off the name instead */
 	.hdrsize = 0,			/* no private header */
 	.version = 1,			/* no particular meaning now */
-	.maxattr = NL80211_ATTR_MAX_NUM_AKM_SUITES,
+	.maxattr = NL80211_ATTR_DISABLE_EHT,
 	.policy = nl80211_policy,
 	.netnsok = true,
 	.pre_doit = nl80211_pre_doit,
