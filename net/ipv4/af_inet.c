@@ -1678,7 +1678,12 @@ static const struct net_protocol igmp_protocol = {
 };
 #endif
 
-static const struct net_protocol tcp_protocol = {
+/* thinking of making this const? Don't.
+ * early_demux can change based on sysctl.
+ */
+static struct net_protocol tcp_protocol = {
+	.early_demux	=	tcp_v4_early_demux,
+	.early_demux_handler =  tcp_v4_early_demux,
 	.handler	=	tcp_v4_rcv,
 	.err_handler	=	tcp_v4_err,
 	.no_policy	=	1,
@@ -1686,7 +1691,12 @@ static const struct net_protocol tcp_protocol = {
 	.icmp_strict_tag_validation = 1,
 };
 
-static const struct net_protocol udp_protocol = {
+/* thinking of making this const? Don't.
+ * early_demux can change based on sysctl.
+ */
+static struct net_protocol udp_protocol = {
+	.early_demux =	udp_v4_early_demux,
+	.early_demux_handler =	udp_v4_early_demux,
 	.handler =	udp_rcv,
 	.err_handler =	udp_err,
 	.no_policy =	1,
