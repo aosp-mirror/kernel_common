@@ -9,6 +9,7 @@ drivers/usb/serial/ftdi_sio.ko
 net/can/can-raw.ko
 net/can/can-bcm.ko
 net/can/can-gw.ko
+net/8021q/8021q.ko
 net/wireless/cfg80211.ko
 net/mac80211/mac80211.ko
 net/tipc/tipc.ko
