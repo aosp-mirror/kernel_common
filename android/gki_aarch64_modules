@@ -11,3 +11,5 @@ net/can/can-bcm.ko
 net/can/can-gw.ko
 net/wireless/cfg80211.ko
 net/mac80211/mac80211.ko
+net/tipc/tipc.ko
+net/tipc/diag.ko
