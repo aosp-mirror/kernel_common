@@ -2051,8 +2051,6 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	spin_lock_irq(&pgdat->lru_lock);
 
 	move_pages_to_lru(lruvec, &page_list);
-	if (do_plug)
-		blk_finish_plug(&plug);
 
 	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
 	lru_note_cost(lruvec, file, stat.nr_pageout);
@@ -2063,6 +2061,9 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	__count_vm_events(PGSTEAL_ANON + file, nr_reclaimed);
 
 	spin_unlock_irq(&pgdat->lru_lock);
+
+	if (do_plug)
+		blk_finish_plug(&plug);
 
 	mem_cgroup_uncharge_list(&page_list);
 	free_unref_page_list(&page_list);
