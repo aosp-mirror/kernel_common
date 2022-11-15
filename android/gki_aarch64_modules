@@ -6,6 +6,10 @@ drivers/net/can/slcan.ko
 drivers/usb/class/cdc-acm.ko
 drivers/usb/serial/usbserial.ko
 drivers/usb/serial/ftdi_sio.ko
+drivers/bluetooth/hci_uart.ko
+drivers/bluetooth/btsdio.ko
+drivers/bluetooth/btbcm.ko
+drivers/bluetooth/btqca.ko
 net/can/can-raw.ko
 net/can/can-bcm.ko
 net/can/can-gw.ko
