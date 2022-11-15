@@ -29,6 +29,10 @@
   __arch_copy_to_user
   arch_freq_scale
   arch_timer_read_counter
+  arm_smccc_1_1_get_conduit
+  arm_smccc_1_2_hvc
+  arm_smccc_1_2_smc
+  arm_smccc_get_version
   arm64_const_caps_ready
   arm64_use_ng_mappings
   __arm_smccc_hvc
@@ -179,7 +183,9 @@
   contig_page_data
   _copy_from_iter
   copy_from_kernel_nofault
+  copy_from_user_toio
   _copy_to_iter
+  copy_to_user_fromio
   __cpu_active_mask
   cpu_all_bits
   cpu_bit_bitmap
@@ -317,6 +323,7 @@
   device_init_wakeup
   device_link_add
   device_link_remove
+  device_match_any
   device_node_to_regmap
   device_property_present
   device_property_read_string
@@ -345,8 +352,10 @@
   devm_clk_register
   devm_devfreq_add_device
   devm_devfreq_register_notifier
+  devm_devfreq_register_opp_notifier
   devm_devfreq_remove_device
   devm_devfreq_unregister_notifier
+  devm_devfreq_unregister_opp_notifier
   devm_extcon_dev_allocate
   devm_extcon_dev_register
   devm_extcon_register_notifier
@@ -611,6 +620,7 @@
   drm_dp_dpcd_write
   drm_dp_link_train_channel_eq_delay
   drm_dp_link_train_clock_recovery_delay
+  drm_dp_read_dpcd_caps
   drm_edid_duplicate
   drm_edid_to_sad
   drm_encoder_cleanup
@@ -656,6 +666,7 @@
   drm_mode_probed_add
   drm_mode_set_crtcinfo
   drm_mode_set_name
+  drm_mode_validate_size
   drm_mode_vrefresh
   drm_object_attach_property
   drm_open
@@ -674,6 +685,7 @@
   drm_property_create_blob
   drm_property_create_range
   drm_property_lookup_blob
+  drm_property_replace_global_blob
   drm_read
   drm_release
   drm_universal_plane_init
@@ -760,6 +772,8 @@
   fwnode_property_read_string
   fwnode_property_read_u32_array
   fwnode_property_read_u64_array
+  g_audio_cleanup
+  g_audio_setup
   gcd
   generic_file_llseek
   generic_handle_domain_irq
@@ -792,6 +806,21 @@
   get_each_dmabuf
   __get_free_pages
   get_governor_parent_kobj
+  gether_cleanup
+  gether_connect
+  gether_disconnect
+  gether_get_dev_addr
+  gether_get_host_addr
+  gether_get_host_addr_u8
+  gether_get_ifname
+  gether_get_qmult
+  gether_register_netdev
+  gether_set_dev_addr
+  gether_set_gadget
+  gether_set_host_addr
+  gether_set_ifname
+  gether_set_qmult
+  gether_setup_name_default
   get_kernel_pages
   get_pid_task
   get_random_bytes
@@ -835,8 +864,16 @@
   handle_nested_irq
   handle_simple_irq
   have_governor_per_policy
+  hdmi_spd_infoframe_init
+  hdmi_spd_infoframe_pack
   hex_asc
   hex_to_bin
+  hid_add_device
+  hid_allocate_device
+  hid_debug
+  hid_destroy_device
+  hid_input_report
+  hid_parse_report
   hrtimer_active
   hrtimer_cancel
   hrtimer_forward
@@ -1029,6 +1066,7 @@
   kstrtoint_from_user
   kstrtol_from_user
   kstrtoll
+  kstrtos16
   kstrtou16
   kstrtou8
   kstrtouint
@@ -1051,6 +1089,7 @@
   kthread_stop
   kthread_worker_fn
   ktime_get
+  ktime_get_coarse_ts64
   ktime_get_mono_fast_ns
   ktime_get_raw
   ktime_get_raw_ts64
@@ -1072,6 +1111,7 @@
   led_trigger_remove
   led_update_brightness
   led_update_flash_brightness
+  linear_range_get_max_value
   linear_range_get_selector_within
   linear_range_get_value
   __list_add_valid
@@ -1388,6 +1428,7 @@
   phy_exit
   phy_get
   phy_init
+  phy_loopback
   phy_power_off
   phy_power_on
   phy_print_status
@@ -1528,8 +1569,12 @@
   rb_next
   rb_prev
   rb_replace_node
+  rc_allocate_device
+  rc_free_device
+  rc_register_device
   rcu_idle_enter
   rcu_idle_exit
+  rc_unregister_device
   __rcu_read_lock
   __rcu_read_unlock
   rdev_get_dev
@@ -1557,6 +1602,7 @@
   register_shrinker
   register_syscore_ops
   register_sysctl_table
+  register_tracepoint_module_notifier
   register_virtio_device
   register_virtio_driver
   regmap_bulk_read
@@ -1755,6 +1801,7 @@
   skb_put
   skb_queue_tail
   skb_realloc_headroom
+  skb_split
   skb_trim
   smp_call_function
   smp_call_function_single
@@ -1935,6 +1982,7 @@
   trace_event_reg
   trace_handle_return
   __traceiter_android_rvh_after_enqueue_task
+  __traceiter_android_rvh_audio_usb_offload_disconnect
   __traceiter_android_rvh_can_migrate_task
   __traceiter_android_rvh_commit_creds
   __traceiter_android_rvh_cpu_overutilized
@@ -1990,6 +2038,7 @@
   __traceiter_android_vh_rwsem_init
   __traceiter_android_vh_rwsem_wake
   __traceiter_android_vh_rwsem_write_finished
+  __traceiter_android_vh_sched_pelt_multiplier
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_set_memory_nx
   __traceiter_android_vh_set_memory_rw
@@ -2065,6 +2114,7 @@
   __tracepoint_android_vh_rwsem_init
   __tracepoint_android_vh_rwsem_wake
   __tracepoint_android_vh_rwsem_write_finished
+  __tracepoint_android_vh_sched_pelt_multiplier
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_set_memory_nx
   __tracepoint_android_vh_set_memory_rw
@@ -2096,13 +2146,17 @@
   tracing_off
   try_module_get
   try_wait_for_completion
+  tty_chars_in_buffer
   tty_driver_flush_buffer
   tty_flip_buffer_push
   tty_insert_flip_string_fixed_flag
+  tty_ldisc_flush
   tty_register_ldisc
+  tty_set_termios
   tty_termios_baud_rate
   tty_termios_encode_baud_rate
   tty_unregister_ldisc
+  tty_write_room
   typec_mux_get_drvdata
   typec_mux_register
   typec_mux_set
@@ -2123,6 +2177,14 @@
   uart_get_baud_rate
   uart_get_divisor
   uart_update_timeout
+  u_audio_get_mute
+  u_audio_get_volume
+  u_audio_set_mute
+  u_audio_set_volume
+  u_audio_start_capture
+  u_audio_start_playback
+  u_audio_stop_capture
+  u_audio_stop_playback
   __ubsan_handle_cfi_check_fail_abort
   uclamp_eff_value
   __udelay
@@ -2227,9 +2289,13 @@
   usb_get_maximum_speed
   usb_get_role_switch_default_mode
   usb_gstrings_attach
+  usb_hcd_end_port_resume
   usb_hcd_is_primary_hcd
   usb_hcd_poll_rh_status
+  usb_hcd_start_port_resume
+  usb_hub_clear_tt_buffer
   usb_interface_id
+  usb_wakeup_notification
   usbnet_change_mtu
   usbnet_disconnect
   usbnet_get_drvinfo
@@ -2501,6 +2567,7 @@
   pci_set_power_state
   pci_unregister_driver
   _raw_spin_trylock_bh
+  radix_tree_maybe_preload
   register_inetaddr_notifier
   regmap_multi_reg_write
   regmap_register_patch
@@ -2508,6 +2575,8 @@
   rtnl_is_locked
   sched_setattr
   sched_set_fifo_low
+  sg_pcopy_from_buffer
+  sg_pcopy_to_buffer
   skb_copy
   skb_pull_rcsum
   skb_queue_head
