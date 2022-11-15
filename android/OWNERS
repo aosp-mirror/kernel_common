@@ -1,6 +1,5 @@
 # If we ever add another OWNERS above this directory, it's likely to be
 # more permissive, so don't inherit from it
-set noparent
 include kernel/common:android-mainline:/OWNERS_DrNo
 
 # Downstream boards maintained directly in this manifest branch
