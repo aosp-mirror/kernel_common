@@ -13,10 +13,11 @@ drivers/bluetooth/btqca.ko
 net/can/can-raw.ko
 net/can/can-bcm.ko
 net/can/can-gw.ko
-net/bluetooth/rfcomm/rfcomm.ko
-net/bluetooth/hidp/hidp.ko
 net/8021q/8021q.ko
 net/wireless/cfg80211.ko
+net/bluetooth/bluetooth.ko
+net/bluetooth/rfcomm/rfcomm.ko
+net/bluetooth/hidp/hidp.ko
 net/mac80211/mac80211.ko
 net/tipc/tipc.ko
 net/tipc/diag.ko
