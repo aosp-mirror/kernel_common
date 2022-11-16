@@ -244,20 +244,14 @@ define_db845c(
     ],
 )
 
-# TODO(b/258259749): Convert rockpi4 to mixed build
 kernel_build(
     name = "rockpi4",
     outs = [
-        "Image",
-        "System.map",
-        "modules.builtin",
-        "modules.builtin.modinfo",
         "rk3399-rock-pi-4b.dtb",
-        "vmlinux",
-        "vmlinux.symvers",
     ],
+    base_kernel = "//common:kernel_aarch64",
     build_config = "build.config.rockpi4",
-    module_outs = COMMON_GKI_MODULES_LIST + [
+    module_outs = [
         # keep sorted
         "drivers/block/virtio_blk.ko",
         "drivers/char/hw_random/virtio-rng.ko",
