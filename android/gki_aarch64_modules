@@ -21,4 +21,5 @@ net/bluetooth/hidp/hidp.ko
 net/mac80211/mac80211.ko
 net/tipc/tipc.ko
 net/tipc/diag.ko
+net/rfkill/rfkill.ko
 net/nfc/nfc.ko
