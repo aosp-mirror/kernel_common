@@ -1809,6 +1809,7 @@
   resume_cpus
   return_address
   revalidate_disk_size
+  reweight_task
   rfkill_alloc
   rfkill_destroy
   rfkill_init_sw_state
