@@ -15,6 +15,7 @@ net/can/can-bcm.ko
 net/can/can-gw.ko
 net/8021q/8021q.ko
 net/wireless/cfg80211.ko
+net/ieee802154/6lowpan/ieee802154_6lowpan.ko
 net/bluetooth/bluetooth.ko
 net/bluetooth/rfcomm/rfcomm.ko
 net/bluetooth/hidp/hidp.ko
@@ -22,4 +23,12 @@ net/mac80211/mac80211.ko
 net/tipc/tipc.ko
 net/tipc/diag.ko
 net/rfkill/rfkill.ko
+net/6lowpan/6lowpan.ko
+net/6lowpan/nhc_dest.ko
+net/6lowpan/nhc_fragment.ko
+net/6lowpan/nhc_hop.ko
+net/6lowpan/nhc_ipv6.ko
+net/6lowpan/nhc_mobility.ko
+net/6lowpan/nhc_routing.ko
+net/6lowpan/nhc_udp.ko
 net/nfc/nfc.ko
