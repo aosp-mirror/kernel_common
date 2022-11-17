@@ -956,6 +956,7 @@
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpu_cgroup_can_attach
   __traceiter_android_rvh_dequeue_task
+  __traceiter_android_rvh_do_sched_yield
   __traceiter_android_rvh_enqueue_task
   __traceiter_android_rvh_find_busiest_queue
   __traceiter_android_rvh_find_lowest_rq
@@ -986,6 +987,7 @@
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpu_cgroup_can_attach
   __tracepoint_android_rvh_dequeue_task
+  __tracepoint_android_rvh_do_sched_yield
   __tracepoint_android_rvh_enqueue_task
   __tracepoint_android_rvh_find_busiest_queue
   __tracepoint_android_rvh_find_lowest_rq
