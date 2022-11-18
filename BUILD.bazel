@@ -67,10 +67,13 @@ define_db845c(
     ],
     gki_modules_list = [
         # keep sorted
+        "//common:kernel_aarch64/can.ko",
         "//common:kernel_aarch64/can-bcm.ko",
         "//common:kernel_aarch64/can-dev.ko",
         "//common:kernel_aarch64/can-gw.ko",
         "//common:kernel_aarch64/can-raw.ko",
+        "//common:kernel_aarch64/libarc4.ko",
+        "//common:kernel_aarch64/rfkill.ko",
         "//common:kernel_aarch64/slcan.ko",
         "//common:kernel_aarch64/vcan.ko",
     ],
