@@ -1680,20 +1680,17 @@ static int issue_discard_thread(void *data)
 	set_freezable();
 
 	do {
+		wait_event_interruptible_timeout(*q,
+				kthread_should_stop() || freezing(current) ||
+				dcc->discard_wake,
+				msecs_to_jiffies(wait_ms));
+
 		if (sbi->gc_mode == GC_URGENT_HIGH ||
 			!f2fs_available_free_memory(sbi, DISCARD_CACHE))
 			__init_discard_policy(sbi, &dpolicy, DPOLICY_FORCE, 1);
 		else
 			__init_discard_policy(sbi, &dpolicy, DPOLICY_BG,
 						dcc->discard_granularity);
-
-		if (!atomic_read(&dcc->discard_cmd_cnt))
-		       wait_ms = dpolicy.max_interval;
-
-		wait_event_interruptible_timeout(*q,
-				kthread_should_stop() || freezing(current) ||
-				dcc->discard_wake,
-				msecs_to_jiffies(wait_ms));
 
 		if (dcc->discard_wake)
 			dcc->discard_wake = 0;
@@ -1708,12 +1705,11 @@ static int issue_discard_thread(void *data)
 			continue;
 		if (kthread_should_stop())
 			return 0;
-		if (is_sbi_flag_set(sbi, SBI_NEED_FSCK)) {
+		if (is_sbi_flag_set(sbi, SBI_NEED_FSCK) ||
+			!atomic_read(&dcc->discard_cmd_cnt)) {
 			wait_ms = dpolicy.max_interval;
 			continue;
 		}
-		if (!atomic_read(&dcc->discard_cmd_cnt))
-			continue;
 
 		sb_start_intwrite(sbi->sb);
 
@@ -1728,6 +1724,8 @@ static int issue_discard_thread(void *data)
 		} else {
 			wait_ms = dpolicy.max_interval;
 		}
+		if (!atomic_read(&dcc->discard_cmd_cnt))
+			wait_ms = dpolicy.max_interval;
 
 		sb_end_intwrite(sbi->sb);
 
