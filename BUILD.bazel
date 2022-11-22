@@ -524,7 +524,6 @@ ddk_headers(
         "drivers/dma-buf/heaps/deferred-free-helper.h",
         "drivers/dma-buf/heaps/page_pool.h",
         "drivers/dma/dmaengine.h",
-        "drivers/gpu/drm/virtio/virtgpu_trace.h",
         "drivers/pci/controller/dwc/pcie-designware.h",
         "drivers/pinctrl/core.h",
         "drivers/pinctrl/samsung/pinctrl-samsung.h",
