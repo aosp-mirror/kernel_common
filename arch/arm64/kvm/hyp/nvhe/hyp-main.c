@@ -37,6 +37,16 @@ DEFINE_PER_CPU(struct kvm_nvhe_init_params, kvm_init_params);
 
 void __kvm_hyp_host_forward_smc(struct kvm_cpu_context *host_ctxt);
 
+static int pkvm_refill_memcache(struct pkvm_hyp_vcpu *hyp_vcpu)
+{
+	struct pkvm_hyp_vm *hyp_vm = pkvm_hyp_vcpu_to_hyp_vm(hyp_vcpu);
+	u64 nr_pages = VTCR_EL2_LVLS(hyp_vm->kvm.arch.vtcr) - 1;
+	struct kvm_vcpu *host_vcpu = hyp_vcpu->host_vcpu;
+
+	return refill_memcache(&hyp_vcpu->vcpu.arch.pkvm_memcache, nr_pages,
+			       &host_vcpu->arch.pkvm_memcache);
+}
+
 typedef void (*hyp_entry_exit_handler_fn)(struct pkvm_hyp_vcpu *);
 
 static void handle_pvm_entry_wfx(struct pkvm_hyp_vcpu *hyp_vcpu)
@@ -89,9 +99,14 @@ static void handle_pvm_entry_hvc64(struct pkvm_hyp_vcpu *hyp_vcpu)
 	u32 fn = smccc_get_function(&hyp_vcpu->vcpu);
 
 	switch (fn) {
+	case ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_MAP_FUNC_ID:
+		pkvm_refill_memcache(hyp_vcpu);
+		break;
 	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_SHARE_FUNC_ID:
 		fallthrough;
 	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_UNSHARE_FUNC_ID:
+		fallthrough;
+	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_RELINQUISH_FUNC_ID:
 		vcpu_set_reg(&hyp_vcpu->vcpu, 0, SMCCC_RET_SUCCESS);
 		break;
 	default:
@@ -260,7 +275,13 @@ static void handle_pvm_exit_hvc64(struct pkvm_hyp_vcpu *hyp_vcpu)
 	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_SHARE_FUNC_ID:
 		fallthrough;
 	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_UNSHARE_FUNC_ID:
+		fallthrough;
+	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_RELINQUISH_FUNC_ID:
 		n = 4;
+		break;
+
+	case ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_MAP_FUNC_ID:
+		n = 3;
 		break;
 
 	case PSCI_1_1_FN_SYSTEM_RESET2:
@@ -298,11 +319,7 @@ static void handle_pvm_exit_dabt(struct pkvm_hyp_vcpu *hyp_vcpu)
 {
 	struct kvm_vcpu *host_vcpu = hyp_vcpu->host_vcpu;
 
-	/*
-	 * For now, we treat all data aborts as MMIO since we have no knowledge
-	 * of the memslot configuration at EL2.
-	 */
-	hyp_vcpu->vcpu.mmio_needed = true;
+	hyp_vcpu->vcpu.mmio_needed = __pkvm_check_ioguard_page(hyp_vcpu);
 
 	if (hyp_vcpu->vcpu.mmio_needed) {
 		/* r0 as transfer register between the guest and the host. */
@@ -487,6 +504,57 @@ static void __flush_hyp_vcpu(struct pkvm_hyp_vcpu *hyp_vcpu)
 	__copy_vcpu_state(hyp_vcpu->host_vcpu, &hyp_vcpu->vcpu);
 }
 
+static void flush_debug_state(struct pkvm_hyp_vcpu *hyp_vcpu)
+{
+	struct kvm_vcpu *vcpu = &hyp_vcpu->vcpu;
+	struct kvm_vcpu *host_vcpu = hyp_vcpu->host_vcpu;
+	u64 mdcr_el2 = READ_ONCE(host_vcpu->arch.mdcr_el2);
+
+	/*
+	 * Propagate the monitor debug configuration of the vcpu from host.
+	 * Preserve HPMN, which is set-up by some knowledgeable bootcode.
+	 * Ensure that MDCR_EL2_E2PB_MASK and MDCR_EL2_E2TB_MASK are clear,
+	 * as guests should not be able to access profiling and trace buffers.
+	 * Ensure that RES0 bits are clear.
+	 */
+	mdcr_el2 &= ~(MDCR_EL2_RES0 |
+		      MDCR_EL2_HPMN_MASK |
+		      (MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT) |
+		      (MDCR_EL2_E2TB_MASK << MDCR_EL2_E2TB_SHIFT));
+	vcpu->arch.mdcr_el2 = read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK;
+	vcpu->arch.mdcr_el2 |= mdcr_el2;
+
+	vcpu->arch.pmu = host_vcpu->arch.pmu;
+	vcpu->guest_debug = READ_ONCE(host_vcpu->guest_debug);
+
+	if (!kvm_vcpu_needs_debug_regs(vcpu))
+		return;
+
+	__vcpu_save_guest_debug_regs(vcpu);
+
+	/* Switch debug_ptr to the external_debug_state if done by the host. */
+	if (kern_hyp_va(READ_ONCE(host_vcpu->arch.debug_ptr)) ==
+	    &host_vcpu->arch.external_debug_state)
+		vcpu->arch.debug_ptr = &host_vcpu->arch.external_debug_state;
+
+	/* Propagate any special handling for single step from host. */
+	vcpu_write_sys_reg(vcpu, vcpu_read_sys_reg(host_vcpu, MDSCR_EL1),
+						   MDSCR_EL1);
+	*vcpu_cpsr(vcpu) = *vcpu_cpsr(host_vcpu);
+}
+
+static void sync_debug_state(struct pkvm_hyp_vcpu *hyp_vcpu)
+{
+	struct kvm_vcpu *vcpu = &hyp_vcpu->vcpu;
+	struct kvm_vcpu *host_vcpu = hyp_vcpu->host_vcpu;
+
+	if (!kvm_vcpu_needs_debug_regs(vcpu))
+		return;
+
+	__vcpu_restore_guest_debug_regs(vcpu);
+	vcpu->arch.debug_ptr = &host_vcpu->arch.vcpu_debug_state;
+}
+
 static void flush_hyp_vcpu(struct pkvm_hyp_vcpu *hyp_vcpu)
 {
 	struct kvm_vcpu *host_vcpu = hyp_vcpu->host_vcpu;
@@ -505,11 +573,11 @@ static void flush_hyp_vcpu(struct pkvm_hyp_vcpu *hyp_vcpu)
 		if (vcpu_get_flag(host_vcpu, PKVM_HOST_STATE_DIRTY))
 			__flush_hyp_vcpu(hyp_vcpu);
 
+		hyp_vcpu->vcpu.arch.iflags = READ_ONCE(host_vcpu->arch.iflags);
+		flush_debug_state(hyp_vcpu);
+
 		hyp_vcpu->vcpu.arch.hcr_el2 = HCR_GUEST_FLAGS & ~(HCR_RW | HCR_TWI | HCR_TWE);
 		hyp_vcpu->vcpu.arch.hcr_el2 |= READ_ONCE(host_vcpu->arch.hcr_el2);
-
-		hyp_vcpu->vcpu.arch.mdcr_el2 = host_vcpu->arch.mdcr_el2;
-		hyp_vcpu->vcpu.arch.debug_ptr = kern_hyp_va(host_vcpu->arch.debug_ptr);
 	}
 
 	hyp_vcpu->vcpu.arch.vsesr_el2 = host_vcpu->arch.vsesr_el2;
@@ -545,6 +613,9 @@ static void sync_hyp_vcpu(struct pkvm_hyp_vcpu *hyp_vcpu, u32 exit_reason)
 	struct kvm_vcpu *host_vcpu = hyp_vcpu->host_vcpu;
 	hyp_entry_exit_handler_fn ec_handler;
 	u8 esr_ec;
+
+	if (!pkvm_hyp_vcpu_is_protected(hyp_vcpu))
+		sync_debug_state(hyp_vcpu);
 
 	/*
 	 * Don't sync the vcpu GPR/sysreg state after a run. Instead,
@@ -765,16 +836,6 @@ static void handle___kvm_vcpu_run(struct kvm_cpu_context *host_ctxt)
 	}
 out:
 	cpu_reg(host_ctxt, 1) =  ret;
-}
-
-static int pkvm_refill_memcache(struct pkvm_hyp_vcpu *hyp_vcpu)
-{
-	struct pkvm_hyp_vm *hyp_vm = pkvm_hyp_vcpu_to_hyp_vm(hyp_vcpu);
-	u64 nr_pages = VTCR_EL2_LVLS(hyp_vm->kvm.arch.vtcr) - 1;
-	struct kvm_vcpu *host_vcpu = hyp_vcpu->host_vcpu;
-
-	return refill_memcache(&hyp_vcpu->vcpu.arch.pkvm_memcache, nr_pages,
-			       &host_vcpu->arch.pkvm_memcache);
 }
 
 static void handle___pkvm_host_map_guest(struct kvm_cpu_context *host_ctxt)

@@ -217,9 +217,9 @@ int pkvm_create_hyp_vm(struct kvm *host_kvm)
 
 void pkvm_destroy_hyp_vm(struct kvm *host_kvm)
 {
-	struct kvm_pinned_page *ppage, *tmp;
+	struct kvm_pinned_page *ppage;
 	struct mm_struct *mm = current->mm;
-	struct list_head *ppages;
+	struct rb_node *node;
 
 	if (host_kvm->arch.pkvm.handle) {
 		WARN_ON(kvm_call_hyp_nvhe(__pkvm_teardown_vm,
@@ -229,15 +229,17 @@ void pkvm_destroy_hyp_vm(struct kvm *host_kvm)
 	host_kvm->arch.pkvm.handle = 0;
 	free_hyp_memcache(&host_kvm->arch.pkvm.teardown_mc);
 
-	ppages = &host_kvm->arch.pkvm.pinned_pages;
-	list_for_each_entry_safe(ppage, tmp, ppages, link) {
+	node = rb_first(&host_kvm->arch.pkvm.pinned_pages);
+	while (node) {
+		ppage = rb_entry(node, struct kvm_pinned_page, node);
 		WARN_ON(kvm_call_hyp_nvhe(__pkvm_host_reclaim_page,
 					  page_to_pfn(ppage->page)));
 		cond_resched();
 
 		account_locked_vm(mm, 1, false);
 		unpin_user_pages_dirty_lock(&ppage->page, 1, true);
-		list_del(&ppage->link);
+		node = rb_next(node);
+		rb_erase(&ppage->node, &host_kvm->arch.pkvm.pinned_pages);
 		kfree(ppage);
 	}
 }
@@ -255,6 +257,41 @@ int pkvm_init_host_vm(struct kvm *host_kvm, unsigned long type)
 	host_kvm->arch.pkvm.pvmfw_load_addr = PVMFW_INVALID_LOAD_ADDR;
 	host_kvm->arch.pkvm.enabled = true;
 	return 0;
+}
+
+static int rb_ppage_cmp(const void *key, const struct rb_node *node)
+{
+       struct kvm_pinned_page *p = container_of(node, struct kvm_pinned_page, node);
+       phys_addr_t ipa = (phys_addr_t)key;
+
+       return (ipa < p->ipa) ? -1 : (ipa > p->ipa);
+}
+
+void pkvm_host_reclaim_page(struct kvm *host_kvm, phys_addr_t ipa)
+{
+	struct kvm_pinned_page *ppage;
+	struct mm_struct *mm = current->mm;
+	struct rb_node *node;
+
+	write_lock(&host_kvm->mmu_lock);
+	node = rb_find((void *)ipa, &host_kvm->arch.pkvm.pinned_pages,
+		       rb_ppage_cmp);
+	if (node)
+		rb_erase(node, &host_kvm->arch.pkvm.pinned_pages);
+	write_unlock(&host_kvm->mmu_lock);
+
+	WARN_ON(!node);
+	if (!node)
+		return;
+
+	ppage = container_of(node, struct kvm_pinned_page, node);
+
+	WARN_ON(kvm_call_hyp_nvhe(__pkvm_host_reclaim_page,
+				  page_to_pfn(ppage->page)));
+
+	account_locked_vm(mm, 1, false);
+	unpin_user_pages_dirty_lock(&ppage->page, 1, true);
+	kfree(ppage);
 }
 
 static int __init pkvm_firmware_rmem_err(struct reserved_mem *rmem,

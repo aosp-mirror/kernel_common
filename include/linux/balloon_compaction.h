@@ -43,6 +43,7 @@
 #include <linux/err.h>
 #include <linux/fs.h>
 #include <linux/list.h>
+#include <linux/mem_relinquish.h>
 
 /*
  * Balloon device information descriptor.
@@ -103,6 +104,7 @@ static inline void balloon_page_insert(struct balloon_dev_info *balloon,
 	__SetPageMovable(page, balloon->inode->i_mapping);
 	set_page_private(page, (unsigned long)balloon);
 	list_add(&page->lru, &balloon->pages);
+	page_relinquish(page);
 }
 
 /*
@@ -147,6 +149,7 @@ static inline void balloon_page_insert(struct balloon_dev_info *balloon,
 {
 	__SetPageOffline(page);
 	list_add(&page->lru, &balloon->pages);
+	page_relinquish(page);
 }
 
 static inline void balloon_page_delete(struct page *page)

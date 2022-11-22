@@ -21,6 +21,11 @@
 #include <linux/magic.h>
 #include <linux/pseudo_fs.h>
 #include <linux/page_reporting.h>
+#include <linux/mem_relinquish.h>
+
+static bool pkvm;
+module_param(pkvm, bool, 0);
+MODULE_PARM_DESC(pkvm, "Running on PKVM. Must use MEM_RELINQUISH.");
 
 /*
  * Balloon device works in 4K page units.  So each page is pointed to by
@@ -560,11 +565,15 @@ static int init_vqs(struct virtio_balloon *vb)
 		virtqueue_kick(vb->stats_vq);
 	}
 
-	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_FREE_PAGE_HINT))
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_FREE_PAGE_HINT)) {
 		vb->free_page_vq = vqs[VIRTIO_BALLOON_VQ_FREE_PAGE];
+		virtqueue_disable_dma_api_for_buffers(vb->free_page_vq);
+	}
 
-	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_REPORTING))
+	if (virtio_has_feature(vb->vdev, VIRTIO_BALLOON_F_REPORTING)) {
 		vb->reporting_vq = vqs[VIRTIO_BALLOON_VQ_REPORTING];
+		virtqueue_disable_dma_api_for_buffers(vb->reporting_vq);
+	}
 
 	return 0;
 }
@@ -883,6 +892,12 @@ static int virtballoon_probe(struct virtio_device *vdev)
 	struct virtio_balloon *vb;
 	int err;
 
+	if (pkvm && !kvm_has_memrelinquish_services()) {
+		dev_err(&vdev->dev, "%s failure: pkvm but no memrelinquish\n",
+			__func__);
+		return -EINVAL;
+	}
+
 	if (!vdev->config->get) {
 		dev_err(&vdev->dev, "%s failure: config access disabled\n",
 			__func__);
@@ -1136,7 +1151,6 @@ static int virtballoon_validate(struct virtio_device *vdev)
 	else if (!virtio_has_feature(vdev, VIRTIO_BALLOON_F_PAGE_POISON))
 		__virtio_clear_bit(vdev, VIRTIO_BALLOON_F_REPORTING);
 
-	__virtio_clear_bit(vdev, VIRTIO_F_ACCESS_PLATFORM);
 	return 0;
 }
 
