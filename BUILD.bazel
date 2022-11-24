@@ -65,18 +65,6 @@ define_db845c(
         "arch/arm64/boot/dts/qcom/qrb5165-rb5.dtb",
         "arch/arm64/boot/dts/qcom/sdm845-db845c.dtb",
     ],
-    gki_modules_list = [
-        # keep sorted
-        "//common:kernel_aarch64/can.ko",
-        "//common:kernel_aarch64/can-bcm.ko",
-        "//common:kernel_aarch64/can-dev.ko",
-        "//common:kernel_aarch64/can-gw.ko",
-        "//common:kernel_aarch64/can-raw.ko",
-        "//common:kernel_aarch64/libarc4.ko",
-        "//common:kernel_aarch64/rfkill.ko",
-        "//common:kernel_aarch64/slcan.ko",
-        "//common:kernel_aarch64/vcan.ko",
-    ],
     module_outs = [
         # keep sorted
         "crypto/michael_mic.ko",
@@ -211,13 +199,11 @@ define_db845c(
         "drivers/usb/typec/qcom-pmic-typec.ko",
         "drivers/watchdog/pm8916_wdt.ko",
         "drivers/watchdog/qcom-wdt.ko",
-        "net/mac80211/mac80211.ko",
         "net/qrtr/ns.ko",
         "net/qrtr/qrtr.ko",
         "net/qrtr/qrtr-mhi.ko",
         "net/qrtr/qrtr-smd.ko",
         "net/qrtr/qrtr-tun.ko",
-        "net/wireless/cfg80211.ko",
         "sound/soc/codecs/snd-soc-dmic.ko",
         "sound/soc/codecs/snd-soc-hdmi-codec.ko",
         "sound/soc/codecs/snd-soc-lpass-va-macro.ko",
