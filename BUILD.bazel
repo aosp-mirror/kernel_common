@@ -437,8 +437,8 @@ ddk_headers(
     # from. In other words, these are the `-I` option to the C compiler.
     # These are prepended to LINUXINCLUDE.
     linux_includes = [
-        "arch/arm64/include",
-        "arch/arm64/include/uapi",
+        "arch/arm/include",
+        "arch/arm/include/uapi",
         "include",
         "include/uapi",
     ],
