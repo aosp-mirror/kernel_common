@@ -170,6 +170,48 @@ TRACE_EVENT(trusty_enqueue_nop,
 	TP_printk("arg1=0x%x, arg2=0x%x, arg3=0x%x", __entry->arg1, __entry->arg2, __entry->arg3)
 );
 
+#define CPUNICE_CAUSE_LIST (			\
+	cpu_nice(CAUSE_DEFAULT)	\
+	cpu_nice(CAUSE_USE_HIGH_WQ)		\
+	cpu_nice(CAUSE_TRUSTY_REQ)	\
+	cpu_nice_end(CAUSE_NOP_ESCALATE)	\
+	)
+
+#undef cpu_nice
+#undef cpu_nice_end
+
+#define cpu_nice_define_enum(x)	(TRACE_DEFINE_ENUM(CPUNICE_##x);)
+#define cpu_nice(x)		DELETE_PAREN(cpu_nice_define_enum(x))
+#define cpu_nice_end(x)		DELETE_PAREN(cpu_nice_define_enum(x))
+
+DELETE_PAREN(CPUNICE_CAUSE_LIST)
+
+#undef cpu_nice
+#undef cpu_nice_end
+
+#define cpu_nice(x)	{ CPUNICE_##x, #x },
+#define cpu_nice_end(x)	{ CPUNICE_##x, #x }
+
+#define cpunice_show_cause(x)	\
+	__print_symbolic(x, DELETE_PAREN(CPUNICE_CAUSE_LIST))
+
+TRACE_EVENT(trusty_change_cpu_nice,
+	TP_PROTO(s32 cur_nice, s32 req_nice, u32 cause_id),
+	TP_ARGS(cur_nice, req_nice, cause_id),
+	TP_STRUCT__entry(
+		__field(s32, cur_nice)
+		__field(s32, req_nice)
+		__field(u32, cause_id)
+	),
+	TP_fast_assign(
+		__entry->cur_nice = cur_nice;
+		__entry->req_nice = req_nice;
+		__entry->cause_id = cause_id;
+	),
+	TP_printk("%d->%d (%s)", __entry->cur_nice, __entry->req_nice,
+			cpunice_show_cause(__entry->cause_id))
+);
+
 TRACE_EVENT(trusty_reclaim_memory,
 	TP_PROTO(u64 id),
 	TP_ARGS(id),
