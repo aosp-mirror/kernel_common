@@ -292,7 +292,7 @@ static int amba_probe(struct device *dev)
 		dev_pm_domain_detach(dev, true);
 	} while (0);
 
-	return ret;
+	return 0;
 }
 
 static int amba_remove(struct device *dev)
