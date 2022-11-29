@@ -127,7 +127,8 @@ static inline void __free_hyp_memcache(struct kvm_hyp_memcache *mc,
 		free_fn(pop_hyp_memcache(mc, to_va), arg);
 }
 
-void free_hyp_memcache(struct kvm_hyp_memcache *mc);
+void free_hyp_memcache(struct kvm_hyp_memcache *mc, struct kvm *kvm);
+void free_hyp_stage2_memcache(struct kvm_hyp_memcache *mc, struct kvm *kvm);
 int topup_hyp_memcache(struct kvm_vcpu *vcpu);
 
 struct kvm_vmid {
@@ -183,6 +184,7 @@ typedef unsigned int pkvm_handle_t;
 struct kvm_protected_vm {
 	pkvm_handle_t handle;
 	struct kvm_hyp_memcache teardown_mc;
+	struct kvm_hyp_memcache teardown_stage2_mc;
 	struct rb_root pinned_pages;
 	gpa_t pvmfw_load_addr;
 	bool enabled;
@@ -360,6 +362,7 @@ struct kvm_host_data {
 struct kvm_host_psci_config {
 	/* PSCI version used by host. */
 	u32 version;
+	u32 smccc_version;
 
 	/* Function IDs used by host if version is v0.1. */
 	struct psci_0_1_function_ids function_ids_0_1;
@@ -378,6 +381,29 @@ extern s64 kvm_nvhe_sym(hyp_physvirt_offset);
 
 extern u64 kvm_nvhe_sym(hyp_cpu_logical_map)[NR_CPUS];
 #define hyp_cpu_logical_map CHOOSE_NVHE_SYM(hyp_cpu_logical_map)
+
+enum pkvm_iommu_driver_id {
+	PKVM_IOMMU_DRIVER_S2MPU,
+	PKVM_IOMMU_DRIVER_SYSMMU_SYNC,
+	PKVM_IOMMU_NR_DRIVERS,
+};
+
+enum pkvm_iommu_pm_event {
+	PKVM_IOMMU_PM_SUSPEND,
+	PKVM_IOMMU_PM_RESUME,
+};
+
+int pkvm_iommu_driver_init(enum pkvm_iommu_driver_id drv_id, void *data, size_t size);
+int pkvm_iommu_register(struct device *dev, enum pkvm_iommu_driver_id drv_id,
+			phys_addr_t pa, size_t size, struct device *parent);
+int pkvm_iommu_suspend(struct device *dev);
+int pkvm_iommu_resume(struct device *dev);
+
+int pkvm_iommu_s2mpu_register(struct device *dev, phys_addr_t pa);
+int pkvm_iommu_sysmmu_sync_register(struct device *dev, phys_addr_t pa,
+				    struct device *parent);
+/* Reject future calls to pkvm_iommu_driver_init() and pkvm_iommu_register(). */
+int pkvm_iommu_finalize(void);
 
 struct vcpu_reset_state {
 	unsigned long	pc;
@@ -823,6 +849,8 @@ static inline bool __vcpu_write_sys_reg_to_cpu(u64 val, int reg)
 
 struct kvm_vm_stat {
 	struct kvm_vm_stat_generic generic;
+	atomic64_t protected_hyp_mem;
+	atomic64_t protected_shared_mem;
 };
 
 struct kvm_vcpu_stat {

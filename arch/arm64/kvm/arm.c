@@ -212,6 +212,10 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
 
 	kvm_destroy_vcpus(kvm);
 
+	if (atomic64_read(&kvm->stat.protected_hyp_mem))
+		pr_warn("%lluB of donations to the nVHE hyp are missing\n",
+			atomic64_read(&kvm->stat.protected_hyp_mem));
+
 	kvm_unshare_hyp(kvm, kvm + 1);
 }
 
@@ -467,7 +471,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 		static_branch_dec(&userspace_irqchip_in_use);
 
 	if (is_protected_kvm_enabled())
-		free_hyp_memcache(&vcpu->arch.pkvm_memcache);
+		free_hyp_stage2_memcache(&vcpu->arch.pkvm_memcache, vcpu->kvm);
 	else
 		kvm_mmu_free_memory_cache(&vcpu->arch.mmu_page_cache);
 
@@ -1909,6 +1913,7 @@ static bool init_psci_relay(void)
 	}
 
 	kvm_host_psci_config.version = psci_ops.get_version();
+	kvm_host_psci_config.smccc_version = arm_smccc_get_version();
 
 	if (kvm_host_psci_config.version == PSCI_VERSION(0, 1)) {
 		kvm_host_psci_config.function_ids_0_1 = get_psci_0_1_function_ids();

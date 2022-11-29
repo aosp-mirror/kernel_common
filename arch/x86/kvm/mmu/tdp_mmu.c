@@ -267,6 +267,16 @@ static void handle_changed_spte_dirty_log(struct kvm *kvm, int as_id, gfn_t gfn,
 	}
 }
 
+static void tdp_account_mmu_page(struct kvm *kvm, struct kvm_mmu_page *sp)
+{
+	kvm_account_pgtable_pages((void *)sp->spt, +1);
+}
+
+static void tdp_unaccount_mmu_page(struct kvm *kvm, struct kvm_mmu_page *sp)
+{
+	kvm_account_pgtable_pages((void *)sp->spt, -1);
+}
+
 /**
  * tdp_mmu_link_page - Add a new page to the list of pages used by the TDP MMU
  *
@@ -283,6 +293,7 @@ static void tdp_mmu_link_page(struct kvm *kvm, struct kvm_mmu_page *sp,
 	if (account_nx)
 		account_huge_nx_page(kvm, sp);
 	spin_unlock(&kvm->arch.tdp_mmu_pages_lock);
+	tdp_account_mmu_page(kvm, sp);
 }
 
 /**
@@ -297,6 +308,7 @@ static void tdp_mmu_link_page(struct kvm *kvm, struct kvm_mmu_page *sp,
 static void tdp_mmu_unlink_page(struct kvm *kvm, struct kvm_mmu_page *sp,
 				bool shared)
 {
+	tdp_unaccount_mmu_page(kvm, sp);
 	if (shared)
 		spin_lock(&kvm->arch.tdp_mmu_pages_lock);
 	else

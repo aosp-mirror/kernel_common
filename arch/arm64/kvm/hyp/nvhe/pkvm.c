@@ -467,8 +467,8 @@ static void init_pkvm_hyp_vm(struct kvm *host_kvm, struct pkvm_hyp_vm *hyp_vm,
 		pvmfw_load_addr = READ_ONCE(host_kvm->arch.pkvm.pvmfw_load_addr);
 	hyp_vm->kvm.arch.pkvm.pvmfw_load_addr = pvmfw_load_addr;
 
-	hyp_vm->kvm.arch.mmu.last_vcpu_ran = last_ran;
-	memset(hyp_vm->kvm.arch.mmu.last_vcpu_ran, -1, pkvm_get_last_ran_size());
+	hyp_vm->kvm.arch.mmu.last_vcpu_ran = (int __percpu *)last_ran;
+	memset(last_ran, -1, pkvm_get_last_ran_size());
 }
 
 static int init_pkvm_hyp_vcpu(struct pkvm_hyp_vcpu *hyp_vcpu,
@@ -654,7 +654,7 @@ static void unmap_donated_memory_noclear(void *va, size_t size)
  *
  * Unmaps the donated memory from the host at stage 2.
  *
- * kvm: A pointer to the host's struct kvm.
+ * host_kvm: A pointer to the host's struct kvm.
  * vm_hva: The host va of the area being donated for the VM state.
  *	   Must be page aligned.
  * pgd_hva: The host va of the area being donated for the stage-2 PGD for
@@ -669,7 +669,7 @@ int __pkvm_init_vm(struct kvm *host_kvm, unsigned long vm_hva,
 		   unsigned long pgd_hva, unsigned long last_ran_hva)
 {
 	struct pkvm_hyp_vm *hyp_vm = NULL;
-	void *last_ran = NULL;
+	int *last_ran = NULL;
 	size_t vm_size, pgd_size, last_ran_size;
 	unsigned int nr_vcpus;
 	void *pgd = NULL;
@@ -798,9 +798,11 @@ teardown_donated_memory(struct kvm_hyp_memcache *mc, void *addr, size_t size)
 
 int __pkvm_teardown_vm(pkvm_handle_t handle)
 {
+	struct kvm_hyp_memcache *mc, *stage2_mc;
 	size_t vm_size, last_ran_size;
-	struct kvm_hyp_memcache *mc;
+	int __percpu *last_vcpu_ran;
 	struct pkvm_hyp_vm *hyp_vm;
+	struct kvm *host_kvm;
 	unsigned int idx;
 	int err;
 
@@ -816,19 +818,21 @@ int __pkvm_teardown_vm(pkvm_handle_t handle)
 		goto err_unlock;
 	}
 
+	host_kvm = hyp_vm->host_kvm;
+
 	/* Ensure the VMID is clean before it can be reallocated */
 	__kvm_tlb_flush_vmid(&hyp_vm->kvm.arch.mmu);
 	remove_vm_table_entry(handle);
 	hyp_spin_unlock(&vm_table_lock);
 
+	mc = &host_kvm->arch.pkvm.teardown_mc;
+	stage2_mc = &host_kvm->arch.pkvm.teardown_stage2_mc;
+
 	/* Reclaim guest pages (including page-table pages) */
-	mc = &hyp_vm->host_kvm->arch.pkvm.teardown_mc;
-	reclaim_guest_pages(hyp_vm, mc);
+	reclaim_guest_pages(hyp_vm, stage2_mc);
 	unpin_host_vcpus(hyp_vm->vcpus, hyp_vm->nr_vcpus);
 
 	/* Push the metadata pages to the teardown memcache */
-	hyp_unpin_shared_mem(hyp_vm->host_kvm, hyp_vm->host_kvm + 1);
-
 	for (idx = 0; idx < hyp_vm->nr_vcpus; ++idx) {
 		struct pkvm_hyp_vcpu *hyp_vcpu = hyp_vm->vcpus[idx];
 		struct kvm_hyp_memcache *vcpu_mc;
@@ -837,19 +841,21 @@ int __pkvm_teardown_vm(pkvm_handle_t handle)
 		vcpu_mc = &hyp_vcpu->vcpu.arch.pkvm_memcache;
 		while (vcpu_mc->nr_pages) {
 			addr = pop_hyp_memcache(vcpu_mc, hyp_phys_to_virt);
-			push_hyp_memcache(mc, addr, hyp_virt_to_phys);
+			push_hyp_memcache(stage2_mc, addr, hyp_virt_to_phys);
 			unmap_donated_memory_noclear(addr, PAGE_SIZE);
 		}
 
 		teardown_donated_memory(mc, hyp_vcpu, sizeof(*hyp_vcpu));
 	}
 
+	last_vcpu_ran = hyp_vm->kvm.arch.mmu.last_vcpu_ran;
 	last_ran_size = pkvm_get_last_ran_size();
-	teardown_donated_memory(mc, hyp_vm->kvm.arch.mmu.last_vcpu_ran,
+	teardown_donated_memory(mc, (__force void *)last_vcpu_ran,
 				last_ran_size);
 
 	vm_size = pkvm_get_hyp_vm_size(hyp_vm->kvm.created_vcpus);
 	teardown_donated_memory(mc, hyp_vm, vm_size);
+	hyp_unpin_shared_mem(host_kvm, host_kvm + 1);
 	return 0;
 
 err_unlock:

@@ -12,9 +12,11 @@
 #include <asm/kvm_pkvm.h>
 #include <asm/stage2_pgtable.h>
 
+#include <hyp/adjust_pc.h>
 #include <hyp/fault.h>
 
 #include <nvhe/gfp.h>
+#include <nvhe/iommu.h>
 #include <nvhe/memory.h>
 #include <nvhe/mem_protect.h>
 #include <nvhe/mm.h>
@@ -412,6 +414,20 @@ int __pkvm_prot_finalize(void)
 	return 0;
 }
 
+int host_stage2_unmap_dev_locked(phys_addr_t start, u64 size)
+{
+	int ret;
+
+	hyp_assert_lock_held(&host_mmu.lock);
+
+	ret = kvm_pgtable_stage2_unmap(&host_mmu.pgt, start, size);
+	if (ret)
+		return ret;
+
+	pkvm_iommu_host_stage2_idmap(start, start + size, 0);
+	return 0;
+}
+
 static int host_stage2_unmap_dev_all(void)
 {
 	struct kvm_pgtable *pgt = &host_mmu.pgt;
@@ -422,11 +438,11 @@ static int host_stage2_unmap_dev_all(void)
 	/* Unmap all non-memory regions to recycle the pages */
 	for (i = 0; i < hyp_memblock_nr; i++, addr = reg->base + reg->size) {
 		reg = &hyp_memory[i];
-		ret = kvm_pgtable_stage2_unmap(pgt, addr, reg->base - addr);
+		ret = host_stage2_unmap_dev_locked(addr, reg->base - addr);
 		if (ret)
 			return ret;
 	}
-	return kvm_pgtable_stage2_unmap(pgt, addr, BIT(pgt->ia_bits) - addr);
+	return host_stage2_unmap_dev_locked(addr, BIT(pgt->ia_bits) - addr);
 }
 
 struct kvm_mem_range {
@@ -497,10 +513,19 @@ static bool range_is_memory(u64 start, u64 end)
 }
 
 static inline int __host_stage2_idmap(u64 start, u64 end,
-				      enum kvm_pgtable_prot prot)
+				      enum kvm_pgtable_prot prot,
+				      bool update_iommu)
 {
-	return kvm_pgtable_stage2_map(&host_mmu.pgt, start, end - start, start,
-				      prot, &host_s2_pool);
+	int ret;
+
+	ret = kvm_pgtable_stage2_map(&host_mmu.pgt, start, end - start, start,
+				     prot, &host_s2_pool);
+	if (ret)
+		return ret;
+
+	if (update_iommu)
+		pkvm_iommu_host_stage2_idmap(start, end, prot);
+	return 0;
 }
 
 /*
@@ -561,9 +586,9 @@ static int host_stage2_adjust_range(u64 addr, struct kvm_mem_range *range)
 }
 
 int host_stage2_idmap_locked(phys_addr_t addr, u64 size,
-			     enum kvm_pgtable_prot prot)
+			     enum kvm_pgtable_prot prot, bool update_iommu)
 {
-	return host_stage2_try(__host_stage2_idmap, addr, addr + size, prot);
+	return host_stage2_try(__host_stage2_idmap, addr, addr + size, prot, update_iommu);
 }
 
 #define KVM_INVALID_PTE_OWNER_MASK	GENMASK(9, 2)
@@ -576,14 +601,22 @@ static kvm_pte_t kvm_init_invalid_leaf_owner(u8 owner_id)
 int host_stage2_set_owner_locked(phys_addr_t addr, u64 size, u8 owner_id)
 {
 	kvm_pte_t annotation;
+	enum kvm_pgtable_prot prot;
+	int ret;
 
 	if (owner_id > KVM_MAX_OWNER_ID)
 		return -EINVAL;
 
 	annotation = kvm_init_invalid_leaf_owner(owner_id);
 
-	return host_stage2_try(kvm_pgtable_stage2_annotate, &host_mmu.pgt,
-			       addr, size, &host_s2_pool, annotation);
+	ret = host_stage2_try(kvm_pgtable_stage2_annotate, &host_mmu.pgt,
+			      addr, size, &host_s2_pool, annotation);
+	if (ret)
+		return ret;
+
+	prot = owner_id == PKVM_ID_HOST ? PKVM_HOST_MEM_PROT : 0;
+	pkvm_iommu_host_stage2_idmap(addr, addr + size, prot);
+	return 0;
 }
 
 static bool host_stage2_force_pte_cb(u64 addr, u64 end, enum kvm_pgtable_prot prot)
@@ -615,18 +648,25 @@ static int host_stage2_idmap(u64 addr)
 	enum kvm_pgtable_prot prot;
 	int ret;
 
-	prot = is_memory ? PKVM_HOST_MEM_PROT : PKVM_HOST_MMIO_PROT;
+	hyp_assert_lock_held(&host_mmu.lock);
 
-	host_lock_component();
+	prot = is_memory ? PKVM_HOST_MEM_PROT : PKVM_HOST_MMIO_PROT;
+	/*
+	 * Adjust against IOMMU devices first. host_stage2_adjust_range() should
+	 * be called last for proper alignment.
+	 */
+	if (!is_memory) {
+		ret = pkvm_iommu_host_stage2_adjust_range(addr, &range.start,
+							  &range.end);
+		if (ret)
+			return ret;
+	}
+
 	ret = host_stage2_adjust_range(addr, &range);
 	if (ret)
-		goto unlock;
+		return ret;
 
-	ret = host_stage2_idmap_locked(range.start, range.end - range.start, prot);
-unlock:
-	host_unlock_component();
-
-	return ret;
+	return host_stage2_idmap_locked(range.start, range.end - range.start, prot, false);
 }
 
 static void host_inject_abort(struct kvm_cpu_context *host_ctxt)
@@ -673,17 +713,35 @@ static void host_inject_abort(struct kvm_cpu_context *host_ctxt)
 	write_sysreg_el2(spsr, SYS_SPSR);
 }
 
+static bool is_dabt(u64 esr)
+{
+	return ESR_ELx_EC(esr) == ESR_ELx_EC_DABT_LOW;
+}
+
 void handle_host_mem_abort(struct kvm_cpu_context *host_ctxt)
 {
 	struct kvm_vcpu_fault_info fault;
 	u64 esr, addr;
-	int ret = 0;
+	int ret = -EPERM;
 
 	esr = read_sysreg_el2(SYS_ESR);
 	BUG_ON(!__get_fault_info(esr, &fault));
 
 	addr = (fault.hpfar_el2 & HPFAR_MASK) << 8;
-	ret = host_stage2_idmap(addr);
+	addr |= fault.far_el2 & FAR_MASK;
+
+	host_lock_component();
+
+	/* Check if an IOMMU device can handle the DABT. */
+	if (is_dabt(esr) && !addr_is_memory(addr) &&
+	    pkvm_iommu_host_dabt_handler(host_ctxt, esr, addr))
+		ret = 0;
+
+	/* If not handled, attempt to map the page. */
+	if (ret == -EPERM)
+		ret = host_stage2_idmap(addr);
+
+	host_unlock_component();
 
 	if (ret == -EPERM)
 		host_inject_abort(host_ctxt);
@@ -790,7 +848,7 @@ static int __host_set_page_state_range(u64 addr, u64 size,
 {
 	enum kvm_pgtable_prot prot = pkvm_mkstate(PKVM_HOST_MEM_PROT, state);
 
-	return host_stage2_idmap_locked(addr, size, prot);
+	return host_stage2_idmap_locked(addr, size, prot, true);
 }
 
 static int host_request_owned_transition(u64 *completer_addr,
@@ -1261,6 +1319,13 @@ static int check_share(struct pkvm_mem_share *share)
 	case PKVM_ID_GUEST:
 		ret = guest_ack_share(completer_addr, tx, share->completer_prot);
 		break;
+	case PKVM_ID_FFA:
+		/*
+		 * We only check the host; the secure side will check the other
+		 * end when we forward the FFA call.
+		 */
+		ret = 0;
+		break;
 	default:
 		ret = -EINVAL;
 	}
@@ -1297,6 +1362,13 @@ static int __do_share(struct pkvm_mem_share *share)
 		break;
 	case PKVM_ID_GUEST:
 		ret = guest_complete_share(completer_addr, tx, share->completer_prot);
+		break;
+	case PKVM_ID_FFA:
+		/*
+		 * We're not responsible for any secure page-tables, so there's
+		 * nothing to do here.
+		 */
+		ret = 0;
 		break;
 	default:
 		ret = -EINVAL;
@@ -1352,6 +1424,10 @@ static int check_unshare(struct pkvm_mem_share *share)
 	case PKVM_ID_HYP:
 		ret = hyp_ack_unshare(completer_addr, tx);
 		break;
+	case PKVM_ID_FFA:
+		/* See check_share() */
+		ret = 0;
+		break;
 	default:
 		ret = -EINVAL;
 	}
@@ -1385,6 +1461,10 @@ static int __do_unshare(struct pkvm_mem_share *share)
 		break;
 	case PKVM_ID_HYP:
 		ret = hyp_complete_unshare(completer_addr, tx);
+		break;
+	case PKVM_ID_FFA:
+		/* See __do_share() */
+		ret = 0;
 		break;
 	default:
 		ret = -EINVAL;
@@ -1433,7 +1513,7 @@ static int check_donation(struct pkvm_mem_donation *donation)
 	if (ret)
 		return ret;
 
-	switch (tx->completer.id){
+	switch (tx->completer.id) {
 	case PKVM_ID_HOST:
 		ret = host_ack_donation(completer_addr, tx);
 		break;
@@ -1470,7 +1550,7 @@ static int __do_donate(struct pkvm_mem_donation *donation)
 	if (ret)
 		return ret;
 
-	switch (tx->completer.id){
+	switch (tx->completer.id) {
 	case PKVM_ID_HOST:
 		ret = host_complete_donation(completer_addr, tx);
 		break;
@@ -1816,6 +1896,53 @@ int __pkvm_host_donate_guest(u64 pfn, u64 gfn, struct pkvm_hyp_vcpu *vcpu)
 	ret = do_donate(&donation);
 
 	guest_unlock_component(vm);
+	host_unlock_component();
+
+	return ret;
+}
+
+int __pkvm_host_share_ffa(u64 pfn, u64 nr_pages)
+{
+	int ret;
+	struct pkvm_mem_share share = {
+		.tx	= {
+			.nr_pages	= nr_pages,
+			.initiator	= {
+				.id	= PKVM_ID_HOST,
+				.addr	= hyp_pfn_to_phys(pfn),
+			},
+			.completer	= {
+				.id	= PKVM_ID_FFA,
+			},
+		},
+	};
+
+	host_lock_component();
+	ret = do_share(&share);
+	host_unlock_component();
+
+	return ret;
+}
+
+
+int __pkvm_host_unshare_ffa(u64 pfn, u64 nr_pages)
+{
+	int ret;
+	struct pkvm_mem_share share = {
+		.tx	= {
+			.nr_pages	= nr_pages,
+			.initiator	= {
+				.id	= PKVM_ID_HOST,
+				.addr	= hyp_pfn_to_phys(pfn),
+			},
+			.completer	= {
+				.id	= PKVM_ID_FFA,
+			},
+		},
+	};
+
+	host_lock_component();
+	ret = do_unshare(&share);
 	host_unlock_component();
 
 	return ret;

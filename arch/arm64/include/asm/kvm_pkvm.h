@@ -7,7 +7,9 @@
 #ifndef __ARM64_KVM_PKVM_H__
 #define __ARM64_KVM_PKVM_H__
 
+#include <linux/arm_ffa.h>
 #include <linux/memblock.h>
+#include <linux/scatterlist.h>
 #include <asm/kvm_pgtable.h>
 #include <asm/sysreg.h>
 
@@ -329,6 +331,42 @@ static inline unsigned long host_s2_pgtable_pages(void)
 	res += __hyp_pgtable_max_pages(SZ_1G >> PAGE_SHIFT);
 
 	return res;
+}
+
+#define KVM_FFA_MBOX_NR_PAGES	1
+
+/*
+ * Maximum number of consitutents allowed in a descriptor. This number is
+ * arbitrary, see comment below on SG_MAX_SEGMENTS in hyp_ffa_proxy_pages().
+ */
+#define KVM_FFA_MAX_NR_CONSTITUENTS	4096
+
+static inline unsigned long hyp_ffa_proxy_pages(void)
+{
+	size_t desc_max;
+
+	/*
+	 * SG_MAX_SEGMENTS is supposed to bound the number of elements in an
+	 * sglist, which should match the number of consituents in the
+	 * corresponding FFA descriptor. As such, the EL2 buffer needs to be
+	 * large enough to hold a descriptor with SG_MAX_SEGMENTS consituents
+	 * at least. But the kernel's DMA code doesn't enforce the limit, and
+	 * it is sometimes abused, so let's allow larger descriptors and hope
+	 * for the best.
+	 */
+	BUILD_BUG_ON(KVM_FFA_MAX_NR_CONSTITUENTS < SG_MAX_SEGMENTS);
+
+	/*
+	 * The hypervisor FFA proxy needs enough memory to buffer a fragmented
+	 * descriptor returned from EL3 in response to a RETRIEVE_REQ call.
+	 */
+	desc_max = sizeof(struct ffa_mem_region) +
+		   sizeof(struct ffa_mem_region_attributes) +
+		   sizeof(struct ffa_composite_mem_region) +
+		   KVM_FFA_MAX_NR_CONSTITUENTS * sizeof(struct ffa_mem_region_addr_range);
+
+	/* Plus a page each for the hypervisor's RX and TX mailboxes. */
+	return (2 * KVM_FFA_MBOX_NR_PAGES) + DIV_ROUND_UP(desc_max, PAGE_SIZE);
 }
 
 #endif	/* __ARM64_KVM_PKVM_H__ */

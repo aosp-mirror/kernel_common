@@ -11,16 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
+load("//build/kernel/kleaf:common_kernels.bzl", "define_common_kernels", "define_db845c")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_headers", "kernel_build", "kernel_images", "kernel_modules_install")
+load(":modules.bzl", "COMMON_GKI_MODULES_LIST")
+
 package(
     default_visibility = [
         "//visibility:public",
     ],
 )
-
-load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
-load("//build/kernel/kleaf:common_kernels.bzl", "define_common_kernels", "define_db845c")
-load("//build/kernel/kleaf:kernel.bzl", "ddk_headers", "kernel_build", "kernel_images", "kernel_modules_install")
-load(":modules.bzl", "COMMON_GKI_MODULES_LIST")
 
 _aarch64_additional_kmi_symbol_lists = [
     # keep sorted
@@ -64,18 +64,6 @@ define_db845c(
     outs = [
         "arch/arm64/boot/dts/qcom/qrb5165-rb5.dtb",
         "arch/arm64/boot/dts/qcom/sdm845-db845c.dtb",
-    ],
-    gki_modules_list = [
-        # keep sorted
-        "//common:kernel_aarch64/can.ko",
-        "//common:kernel_aarch64/can-bcm.ko",
-        "//common:kernel_aarch64/can-dev.ko",
-        "//common:kernel_aarch64/can-gw.ko",
-        "//common:kernel_aarch64/can-raw.ko",
-        "//common:kernel_aarch64/libarc4.ko",
-        "//common:kernel_aarch64/rfkill.ko",
-        "//common:kernel_aarch64/slcan.ko",
-        "//common:kernel_aarch64/vcan.ko",
     ],
     module_outs = [
         # keep sorted
@@ -211,13 +199,11 @@ define_db845c(
         "drivers/usb/typec/qcom-pmic-typec.ko",
         "drivers/watchdog/pm8916_wdt.ko",
         "drivers/watchdog/qcom-wdt.ko",
-        "net/mac80211/mac80211.ko",
         "net/qrtr/ns.ko",
         "net/qrtr/qrtr.ko",
         "net/qrtr/qrtr-mhi.ko",
         "net/qrtr/qrtr-smd.ko",
         "net/qrtr/qrtr-tun.ko",
-        "net/wireless/cfg80211.ko",
         "sound/soc/codecs/snd-soc-dmic.ko",
         "sound/soc/codecs/snd-soc-hdmi-codec.ko",
         "sound/soc/codecs/snd-soc-lpass-va-macro.ko",
@@ -353,9 +339,9 @@ copy_to_dist_dir(
 # - --allow-undeclared-modules must be used so modules are not declared or copied.
 # - No dist target because these are build tests. We don't care about the artifacts.
 
-# tools/bazel build --allow_undeclared_modules //common:allmodconfig_aarch64
+# tools/bazel build --allow_undeclared_modules //common:kernel_aarch64_allmodconfig
 kernel_build(
-    name = "allmodconfig_aarch64",
+    name = "kernel_aarch64_allmodconfig",
     # Hack to actually check the build.
     # Otherwise, Bazel thinks that there are no output files, and skip building.
     outs = [".config"],
@@ -363,9 +349,9 @@ kernel_build(
     visibility = ["//visibility:private"],
 )
 
-# tools/bazel build --allow_undeclared_modules //common:allmodconfig_x86_64
+# tools/bazel build --allow_undeclared_modules //common:kernel_x86_64_allmodconfig
 kernel_build(
-    name = "allmodconfig_x86_64",
+    name = "kernel_x86_64_allmodconfig",
     # Hack to actually check the build.
     # Otherwise, Bazel thinks that there are no output files, and skip building.
     outs = [".config"],
@@ -373,9 +359,9 @@ kernel_build(
     visibility = ["//visibility:private"],
 )
 
-# tools/bazel build --allow_undeclared_modules //common:allmodconfig_arm
+# tools/bazel build --allow_undeclared_modules //common:kernel_arm_allmodconfig
 kernel_build(
-    name = "allmodconfig_arm",
+    name = "kernel_arm_allmodconfig",
     # Hack to actually check the build.
     # Otherwise, Bazel thinks that there are no output files, and skip building.
     outs = [".config"],
@@ -394,6 +380,15 @@ alias(
 ddk_headers(
     name = "all_headers_aarch64",
     hdrs = [":all_headers_allowlist_aarch64"] + select({
+        "//build/kernel/kleaf:allow_ddk_unsafe_headers_set": [":all_headers_unsafe"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+ddk_headers(
+    name = "all_headers_arm",
+    hdrs = [":all_headers_allowlist_arm"] + select({
         "//build/kernel/kleaf:allow_ddk_unsafe_headers_set": [":all_headers_unsafe"],
         "//conditions:default": [],
     }),
@@ -433,6 +428,24 @@ ddk_headers(
 )
 
 ddk_headers(
+    name = "all_headers_allowlist_arm",
+    hdrs = [
+        ":all_headers_allowlist_arm_globs",
+        ":all_headers_allowlist_common_globs",
+    ],
+    # The list of include directories where source files can #include headers
+    # from. In other words, these are the `-I` option to the C compiler.
+    # These are prepended to LINUXINCLUDE.
+    linux_includes = [
+        "arch/arm64/include",
+        "arch/arm64/include/uapi",
+        "include",
+        "include/uapi",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+ddk_headers(
     name = "all_headers_allowlist_x86_64",
     hdrs = [
         ":all_headers_allowlist_common_globs",
@@ -455,6 +468,13 @@ ddk_headers(
 # are safe to use.
 # These are separate filegroup targets so the all_headers_allowlist_* are
 # more friendly to batch BUILD file update tools like buildozer.
+
+# globs() for arm only
+filegroup(
+    name = "all_headers_allowlist_arm_globs",
+    srcs = glob(["arch/arm/include/**/*.h"]),
+    visibility = ["//visibility:private"],
+)
 
 # globs() for arm64 only
 filegroup(
@@ -490,7 +510,6 @@ ddk_headers(
         "drivers/dma-buf/heaps/deferred-free-helper.h",
         "drivers/dma-buf/heaps/page_pool.h",
         "drivers/dma/dmaengine.h",
-        "drivers/gpu/drm/virtio/virtgpu_trace.h",
         "drivers/pci/controller/dwc/pcie-designware.h",
         "drivers/pinctrl/core.h",
         "drivers/pinctrl/samsung/pinctrl-samsung.h",

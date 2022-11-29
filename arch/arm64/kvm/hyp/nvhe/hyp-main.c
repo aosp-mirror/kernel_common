@@ -15,6 +15,8 @@
 #include <asm/kvm_hyp.h>
 #include <asm/kvm_mmu.h>
 
+#include <nvhe/ffa.h>
+#include <nvhe/iommu.h>
 #include <nvhe/mem_protect.h>
 #include <nvhe/mm.h>
 #include <nvhe/pkvm.h>
@@ -693,6 +695,7 @@ static void handle___pkvm_vcpu_load(struct kvm_cpu_context *host_ctxt)
 	DECLARE_REG(unsigned int, vcpu_idx, host_ctxt, 2);
 	DECLARE_REG(u64, hcr_el2, host_ctxt, 3);
 	struct pkvm_hyp_vcpu *hyp_vcpu;
+	int __percpu *last_vcpu_ran;
 	int *last_ran;
 
 	if (!is_protected_kvm_enabled())
@@ -707,7 +710,8 @@ static void handle___pkvm_vcpu_load(struct kvm_cpu_context *host_ctxt)
 	 * vcpu from the same VM has previously run on the same physical CPU,
 	 * nuke the relevant contexts.
 	 */
-	last_ran = &hyp_vcpu->vcpu.arch.hw_mmu->last_vcpu_ran[hyp_smp_processor_id()];
+	last_vcpu_ran = hyp_vcpu->vcpu.arch.hw_mmu->last_vcpu_ran;
+	last_ran = (__force int *) &last_vcpu_ran[hyp_smp_processor_id()];
 	if (*last_ran != hyp_vcpu->vcpu.vcpu_id) {
 		__kvm_flush_cpu_context(hyp_vcpu->vcpu.arch.hw_mmu);
 		*last_ran = hyp_vcpu->vcpu.vcpu_id;
@@ -1107,6 +1111,43 @@ static void handle___pkvm_teardown_vm(struct kvm_cpu_context *host_ctxt)
 	cpu_reg(host_ctxt, 1) = __pkvm_teardown_vm(handle);
 }
 
+static void handle___pkvm_iommu_driver_init(struct kvm_cpu_context *host_ctxt)
+{
+	DECLARE_REG(enum pkvm_iommu_driver_id, id, host_ctxt, 1);
+	DECLARE_REG(void *, data, host_ctxt, 2);
+	DECLARE_REG(size_t, size, host_ctxt, 3);
+
+	cpu_reg(host_ctxt, 1) = __pkvm_iommu_driver_init(id, data, size);
+}
+
+static void handle___pkvm_iommu_register(struct kvm_cpu_context *host_ctxt)
+{
+	DECLARE_REG(unsigned long, dev_id, host_ctxt, 1);
+	DECLARE_REG(enum pkvm_iommu_driver_id, drv_id, host_ctxt, 2);
+	DECLARE_REG(phys_addr_t, dev_pa, host_ctxt, 3);
+	DECLARE_REG(size_t, dev_size, host_ctxt, 4);
+	DECLARE_REG(unsigned long, parent_id, host_ctxt, 5);
+	DECLARE_REG(void *, mem, host_ctxt, 6);
+	DECLARE_REG(size_t, mem_size, host_ctxt, 7);
+
+	cpu_reg(host_ctxt, 1) = __pkvm_iommu_register(dev_id, drv_id, dev_pa,
+						      dev_size, parent_id,
+						      mem, mem_size);
+}
+
+static void handle___pkvm_iommu_pm_notify(struct kvm_cpu_context *host_ctxt)
+{
+	DECLARE_REG(unsigned long, dev_id, host_ctxt, 1);
+	DECLARE_REG(enum pkvm_iommu_pm_event, event, host_ctxt, 2);
+
+	cpu_reg(host_ctxt, 1) = __pkvm_iommu_pm_notify(dev_id, event);
+}
+
+static void handle___pkvm_iommu_finalize(struct kvm_cpu_context *host_ctxt)
+{
+	cpu_reg(host_ctxt, 1) = __pkvm_iommu_finalize();
+}
+
 typedef void (*hcall_t)(struct kvm_cpu_context *);
 
 #define HANDLE_FUNC(x)	[__KVM_HOST_SMCCC_FUNC_##x] = (hcall_t)handle_##x
@@ -1141,6 +1182,10 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__pkvm_vcpu_load),
 	HANDLE_FUNC(__pkvm_vcpu_put),
 	HANDLE_FUNC(__pkvm_vcpu_sync_state),
+	HANDLE_FUNC(__pkvm_iommu_driver_init),
+	HANDLE_FUNC(__pkvm_iommu_register),
+	HANDLE_FUNC(__pkvm_iommu_pm_notify),
+	HANDLE_FUNC(__pkvm_iommu_finalize),
 };
 
 static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
@@ -1188,6 +1233,8 @@ static void handle_host_smc(struct kvm_cpu_context *host_ctxt)
 	bool handled;
 
 	handled = kvm_host_psci_handler(host_ctxt);
+	if (!handled)
+		handled = kvm_host_ffa_handler(host_ctxt);
 	if (!handled)
 		default_host_smc_handler(host_ctxt);
 

@@ -11,7 +11,9 @@
 #include <asm/kvm_pkvm.h>
 
 #include <nvhe/early_alloc.h>
+#include <nvhe/ffa.h>
 #include <nvhe/gfp.h>
+#include <nvhe/iommu.h>
 #include <nvhe/memory.h>
 #include <nvhe/mem_protect.h>
 #include <nvhe/mm.h>
@@ -30,6 +32,7 @@ static void *vmemmap_base;
 static void *vm_table_base;
 static void *hyp_pgt_base;
 static void *host_s2_pgt_base;
+static void *ffa_proxy_pages;
 static struct kvm_pgtable_mm_ops pkvm_pgtable_mm_ops;
 static struct hyp_pool hpool;
 
@@ -57,6 +60,11 @@ static int divide_memory_pool(void *virt, unsigned long size)
 	nr_pages = host_s2_pgtable_pages();
 	host_s2_pgt_base = hyp_early_alloc_contig(nr_pages);
 	if (!host_s2_pgt_base)
+		return -ENOMEM;
+
+	nr_pages = hyp_ffa_proxy_pages();
+	ffa_proxy_pages = hyp_early_alloc_contig(nr_pages);
+	if (!ffa_proxy_pages)
 		return -ENOMEM;
 
 	return 0;
@@ -240,7 +248,7 @@ static int fix_host_ownership_walker(u64 addr, u64 end, u32 level,
 		return -EINVAL;
 	}
 
-	return host_stage2_idmap_locked(phys, PAGE_SIZE, prot);
+	return host_stage2_idmap_locked(phys, PAGE_SIZE, prot, false);
 }
 
 static int fix_hyp_pgtable_refcnt_walker(u64 addr, u64 end, u32 level,
@@ -332,6 +340,10 @@ void __noreturn __pkvm_init_finalise(void)
 		goto out;
 
 	ret = hyp_create_pcpu_fixmap();
+	if (ret)
+		goto out;
+
+	ret = hyp_ffa_init(ffa_proxy_pages);
 	if (ret)
 		goto out;
 
