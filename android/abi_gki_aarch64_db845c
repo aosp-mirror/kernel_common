@@ -401,6 +401,7 @@
   strlcpy
   strlen
   strncpy
+  strscpy_pad
   __sw_hweight32
   __sw_hweight64
   synchronize_irq
