@@ -16,6 +16,7 @@ _aarch64_additional_kmi_symbol_lists = [
     "android/abi_gki_aarch64_db845c",
     "android/abi_gki_aarch64_exynos",
     "android/abi_gki_aarch64_pixel",
+    "android/abi_gki_aarch64_virtual_device",
 ]
 
 define_common_kernels(target_configs = {
