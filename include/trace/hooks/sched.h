@@ -291,6 +291,10 @@ DECLARE_RESTRICTED_HOOK(android_rvh_cpumask_any_and_distribute,
 		const struct cpumask *new_mask, int *dest_cpu),
 	TP_ARGS(p, cpu_valid_mask, new_mask, dest_cpu), 1);
 
+DECLARE_RESTRICTED_HOOK(android_rvh_do_sched_yield,
+	TP_PROTO(struct rq *rq),
+	TP_ARGS(rq), 1);
+
 DECLARE_HOOK(android_vh_free_task,
 	TP_PROTO(struct task_struct *p),
 	TP_ARGS(p));
