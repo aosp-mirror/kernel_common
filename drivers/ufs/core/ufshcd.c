@@ -4552,7 +4552,7 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 		QUERY_FLAG_IDN_FDEVICEINIT, 0, NULL);
 	if (err) {
 		dev_err(hba->dev,
-			"%s setting fDeviceInit flag failed with error %d\n",
+			"%s: setting fDeviceInit flag failed with error %d\n",
 			__func__, err);
 		goto out;
 	}
@@ -4569,11 +4569,11 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 
 	if (err) {
 		dev_err(hba->dev,
-				"%s reading fDeviceInit flag failed with error %d\n",
+				"%s: reading fDeviceInit flag failed with error %d\n",
 				__func__, err);
 	} else if (flag_res) {
 		dev_err(hba->dev,
-				"%s fDeviceInit was not cleared by the device\n",
+				"%s: fDeviceInit was not cleared by the device\n",
 				__func__);
 		err = -EBUSY;
 	}
@@ -5421,6 +5421,26 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 	}
 }
 
+/* Any value that is not an existing queue number is fine for this constant. */
+enum {
+	UFSHCD_POLL_FROM_INTERRUPT_CONTEXT = -1
+};
+
+static void ufshcd_clear_polled(struct ufs_hba *hba,
+				unsigned long *completed_reqs)
+{
+	int tag;
+
+	for_each_set_bit(tag, completed_reqs, hba->nutrs) {
+		struct scsi_cmnd *cmd = hba->lrb[tag].cmd;
+
+		if (!cmd)
+			continue;
+		if (scsi_cmd_to_rq(cmd)->cmd_flags & REQ_HIPRI)
+			__clear_bit(tag, completed_reqs);
+	}
+}
+
 /*
  * Returns > 0 if one or more commands have been completed or 0 if no
  * requests have been completed.
@@ -5437,13 +5457,17 @@ static int ufshcd_poll(struct Scsi_Host *shost, unsigned int queue_num)
 	WARN_ONCE(completed_reqs & ~hba->outstanding_reqs,
 		  "completed: %#lx; outstanding: %#lx\n", completed_reqs,
 		  hba->outstanding_reqs);
+	if (queue_num == UFSHCD_POLL_FROM_INTERRUPT_CONTEXT) {
+		/* Do not complete polled requests from interrupt context. */
+		ufshcd_clear_polled(hba, &completed_reqs);
+	}
 	hba->outstanding_reqs &= ~completed_reqs;
 	spin_unlock_irqrestore(&hba->outstanding_lock, flags);
 
 	if (completed_reqs)
 		__ufshcd_transfer_req_compl(hba, completed_reqs);
 
-	return completed_reqs;
+	return completed_reqs != 0;
 }
 
 /**
@@ -5474,7 +5498,7 @@ static irqreturn_t ufshcd_transfer_req_compl(struct ufs_hba *hba)
 	 * Ignore the ufshcd_poll() return value and return IRQ_HANDLED since we
 	 * do not want polling to trigger spurious interrupt complaints.
 	 */
-	ufshcd_poll(hba->host, 0);
+	ufshcd_poll(hba->host, UFSHCD_POLL_FROM_INTERRUPT_CONTEXT);
 
 	return IRQ_HANDLED;
 }
@@ -8908,7 +8932,7 @@ static int ufshcd_set_dev_pwr_mode(struct ufs_hba *hba,
 
 static int ufshcd_link_state_transition(struct ufs_hba *hba,
 					enum uic_link_state req_link_state,
-					int check_for_bkops)
+					bool check_for_bkops)
 {
 	int ret = 0;
 
@@ -9059,7 +9083,7 @@ static void ufshcd_hba_vreg_set_hpm(struct ufs_hba *hba)
 static int __ufshcd_wl_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 {
 	int ret = 0;
-	int check_for_bkops;
+	bool check_for_bkops;
 	enum ufs_pm_level pm_lvl;
 	enum ufs_dev_pwr_mode req_dev_pwr_mode;
 	enum uic_link_state req_link_state;
