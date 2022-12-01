@@ -9,6 +9,7 @@
 #include <linux/udp.h>
 #include <linux/ip.h>
 #include <linux/pm_runtime.h>
+#include <linux/pci.h>
 #include <net/pkt_sched.h>
 
 #include <net/ipv6.h>
@@ -4932,6 +4933,9 @@ u32 igc_rd32(struct igc_hw *hw, u32 reg)
 	u8 __iomem *hw_addr = READ_ONCE(hw->hw_addr);
 	u32 value = 0;
 
+	if (IGC_REMOVED(hw_addr))
+		return ~value;
+
 	value = readl(&hw_addr[reg]);
 
 	/* reads should not return all F's */
@@ -5040,6 +5044,10 @@ static int igc_probe(struct pci_dev *pdev,
 		goto err_pci_reg;
 
 	pci_enable_pcie_error_reporting(pdev);
+
+	err = pci_enable_ptm(pdev, NULL);
+	if (err < 0)
+		dev_info(&pdev->dev, "PCIe PTM not supported by PCIe bus/controller\n");
 
 	pci_set_master(pdev);
 
