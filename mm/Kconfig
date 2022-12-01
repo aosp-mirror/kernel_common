@@ -843,7 +843,7 @@ config SPECULATIVE_PAGE_FAULT
        bool "Speculative page faults"
        default y
        depends on ARCH_SUPPORTS_SPECULATIVE_PAGE_FAULT
-       depends on MMU && SMP
+       depends on MMU && SMP && !NUMA
        help
          Try to handle user space page faults without holding the mmap_sem.
 
@@ -919,8 +919,8 @@ config ANON_VMA_NAME
 config LRU_GEN
 	bool "Multi-Gen LRU"
 	depends on MMU
-	# the following options can use up the spare bits in page flags
-	depends on !MAXSMP && (64BIT || !SPARSEMEM || SPARSEMEM_VMEMMAP)
+	# make sure page->flags has enough spare bits
+	depends on 64BIT || !SPARSEMEM || SPARSEMEM_VMEMMAP
 	help
 	  A high performance LRU implementation to overcommit memory. See
 	  Documentation/admin-guide/mm/multigen_lru.rst for details.
