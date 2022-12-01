@@ -3137,6 +3137,7 @@ void reweight_task(struct task_struct *p, int prio)
 	reweight_entity(cfs_rq, se, weight);
 	load->inv_weight = sched_prio_to_wmult[prio];
 }
+EXPORT_SYMBOL_GPL(reweight_task);
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 #ifdef CONFIG_SMP
@@ -4111,6 +4112,7 @@ static inline void update_misfit_status(struct task_struct *p, struct rq *rq)
 {
 	bool need_update = true;
 
+	trace_android_rvh_update_misfit_status(p, rq, &need_update);
 	if (!static_branch_unlikely(&sched_asym_cpucapacity) || !need_update)
 		return;
 

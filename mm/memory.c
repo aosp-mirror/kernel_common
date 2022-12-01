@@ -1241,15 +1241,18 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 	pte_t *start_pte;
 	pte_t *pte;
 	swp_entry_t entry;
+	int v_ret = 0;
 
 	tlb_change_page_size(tlb, PAGE_SIZE);
 again:
+	trace_android_vh_zap_pte_range_tlb_start(&v_ret);
 	init_rss_vec(rss);
 	start_pte = pte_offset_map_lock(mm, pmd, addr, &ptl);
 	pte = start_pte;
 	flush_tlb_batched_pending(mm);
 	arch_enter_lazy_mmu_mode();
 	do {
+		bool flush = false;
 		pte_t ptent = *pte;
 		if (pte_none(ptent))
 			continue;
@@ -1290,8 +1293,9 @@ again:
 			page_remove_rmap(page, false);
 			if (unlikely(page_mapcount(page) < 0))
 				print_bad_pte(vma, addr, ptent, page);
+			trace_android_vh_zap_pte_range_tlb_force_flush(page, &flush);
 			if (unlikely(__tlb_remove_page(tlb, page)) ||
-				     lru_cache_disabled()) {
+				     lru_cache_disabled() || flush) {
 				force_flush = 1;
 				addr += PAGE_SIZE;
 				break;
@@ -1359,6 +1363,7 @@ again:
 		tlb_flush_mmu(tlb);
 	}
 
+	trace_android_vh_zap_pte_range_tlb_end(&v_ret);
 	if (addr != end) {
 		cond_resched();
 		goto again;
@@ -1470,7 +1475,6 @@ void unmap_page_range(struct mmu_gather *tlb,
 	unsigned long next;
 
 	BUG_ON(addr >= end);
-	vm_write_begin(vma);
 	tlb_start_vma(tlb, vma);
 	pgd = pgd_offset(vma->vm_mm, addr);
 	do {
@@ -1480,7 +1484,6 @@ void unmap_page_range(struct mmu_gather *tlb,
 		next = zap_p4d_range(tlb, vma, pgd, addr, next, details);
 	} while (pgd++, addr = next, addr != end);
 	tlb_end_vma(tlb, vma);
-	vm_write_end(vma);
 }
 
 
@@ -3361,6 +3364,8 @@ static vm_fault_t do_wp_page(struct vm_fault *vmf)
 
 	if (userfaultfd_pte_wp(vma, *vmf->pte)) {
 		pte_unmap_unlock(vmf->pte, vmf->ptl);
+		if (vmf->flags & FAULT_FLAG_SPECULATIVE)
+			return VM_FAULT_RETRY;
 		return handle_userfault(vmf, VM_UFFD_WP);
 	}
 
@@ -3572,6 +3577,11 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	int exclusive = 0;
 	vm_fault_t ret;
 	void *shadow = NULL;
+
+	if (vmf->flags & FAULT_FLAG_SPECULATIVE) {
+		pte_unmap(vmf->pte);
+		return VM_FAULT_RETRY;
+	}
 
 	ret = pte_unmap_same(vmf);
 	if (ret) {
@@ -3831,6 +3841,10 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	if (vmf->vma_flags & VM_SHARED)
 		return VM_FAULT_SIGBUS;
 
+	/* Do not check unstable pmd, if it's changed will retry later */
+	if (vmf->flags & FAULT_FLAG_SPECULATIVE)
+		goto skip_pmd_checks;
+
 	/*
 	 * Use pte_alloc() instead of pte_alloc_map().  We can't run
 	 * pte_offset_map() on pmds where a huge pmd might be created
@@ -3848,6 +3862,7 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	if (unlikely(pmd_trans_unstable(vmf->pmd)))
 		return 0;
 
+skip_pmd_checks:
 	/* Use the zero-page for reads */
 	if (!(vmf->flags & FAULT_FLAG_WRITE) &&
 			!mm_forbids_zeropage(vma->vm_mm)) {
@@ -3955,6 +3970,10 @@ static vm_fault_t __do_fault(struct vm_fault *vmf)
 	struct vm_area_struct *vma = vmf->vma;
 	vm_fault_t ret;
 
+	/* Do not check unstable pmd, if it's changed will retry later */
+	if (vmf->flags & FAULT_FLAG_SPECULATIVE)
+		goto skip_pmd_checks;
+
 	/*
 	 * Preallocate pte before we take page_lock because this might lead to
 	 * deadlocks for memcg reclaim which waits for pages under writeback:
@@ -3977,6 +3996,7 @@ static vm_fault_t __do_fault(struct vm_fault *vmf)
 		smp_wmb(); /* See comment in __pte_alloc() */
 	}
 
+skip_pmd_checks:
 	ret = vma->vm_ops->fault(vmf);
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY |
 			    VM_FAULT_DONE_COW)))
@@ -4152,7 +4172,11 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 			return ret;
 	}
 
-	if (pmd_none(*vmf->pmd) && !(vmf->flags & FAULT_FLAG_SPECULATIVE)) {
+	/* Do not check unstable pmd, if it's changed will retry later */
+	if (vmf->flags & FAULT_FLAG_SPECULATIVE)
+		goto skip_pmd_checks;
+
+	if (pmd_none(*vmf->pmd)) {
 		if (PageTransCompound(page)) {
 			ret = do_set_pmd(vmf, page);
 			if (ret != VM_FAULT_FALLBACK)
@@ -4176,6 +4200,7 @@ vm_fault_t finish_fault(struct vm_fault *vmf)
 	if (pmd_devmap_trans_unstable(vmf->pmd))
 		return 0;
 
+skip_pmd_checks:
 	if (!pte_map_lock(vmf))
 		return VM_FAULT_RETRY;
 
@@ -4275,7 +4300,8 @@ static vm_fault_t do_fault_around(struct vm_fault *vmf)
 	end_pgoff = min3(end_pgoff, vma_pages(vmf->vma) + vmf->vma->vm_pgoff - 1,
 			start_pgoff + nr_pages - 1);
 
-	if (pmd_none(*vmf->pmd)) {
+	if (!(vmf->flags & FAULT_FLAG_SPECULATIVE) &&
+	    pmd_none(*vmf->pmd)) {
 		vmf->prealloc_pte = pte_alloc_one(vmf->vma->vm_mm);
 		if (!vmf->prealloc_pte)
 			return VM_FAULT_OOM;
@@ -4633,16 +4659,11 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 	pte_t entry;
 	vm_fault_t ret = 0;
 
+	/* Do not check unstable pmd, if it's changed will retry later */
+	if (vmf->flags & FAULT_FLAG_SPECULATIVE)
+		goto skip_pmd_checks;
+
 	if (unlikely(pmd_none(*vmf->pmd))) {
-		/*
-		 * In the case of the speculative page fault handler we abort
-		 * the speculative path immediately as the pmd is probably
-		 * in the way to be converted in a huge one. We will try
-		 * again holding the mmap_sem (which implies that the collapse
-		 * operation is done).
-		 */
-		if (vmf->flags & FAULT_FLAG_SPECULATIVE)
-			return VM_FAULT_RETRY;
 		/*
 		 * Leave __pte_alloc() until later: because vm_ops->fault may
 		 * want to allocate huge page, and if we expose page table
@@ -4650,7 +4671,7 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 		 * concurrent faults and from rmap lookups.
 		 */
 		vmf->pte = NULL;
-	} else if (!(vmf->flags & FAULT_FLAG_SPECULATIVE)) {
+	} else {
 		/*
 		 * If a huge pmd materialized under us just retry later.  Use
 		 * pmd_trans_unstable() via pmd_devmap_trans_unstable() instead
@@ -4692,6 +4713,7 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 		}
 	}
 
+skip_pmd_checks:
 	if (!vmf->pte) {
 		if (vma_is_anonymous(vmf->vma))
 			return do_anonymous_page(vmf);
@@ -4976,11 +4998,13 @@ static vm_fault_t ___handle_speculative_fault(struct mm_struct *mm,
 	vmf.vma_flags = READ_ONCE(vmf.vma->vm_flags);
 	vmf.vma_page_prot = READ_ONCE(vmf.vma->vm_page_prot);
 
+#ifdef CONFIG_USERFAULTFD
 	/* Can't call userland page fault handler in the speculative path */
-	if (unlikely(vmf.vma_flags & VM_UFFD_MISSING)) {
+	if (unlikely(vmf.vma_flags & __VM_UFFD_FLAGS)) {
 		trace_spf_vma_notsup(_RET_IP_, vmf.vma, address);
 		return VM_FAULT_RETRY;
 	}
+#endif
 
 	if (vmf.vma_flags & VM_GROWSDOWN || vmf.vma_flags & VM_GROWSUP) {
 		/*
@@ -5019,11 +5043,10 @@ static vm_fault_t ___handle_speculative_fault(struct mm_struct *mm,
 	pol = __get_vma_policy(vmf.vma, address);
 	if (!pol)
 		pol = get_task_policy(current);
-	if (!pol)
-		if (pol && pol->mode == MPOL_INTERLEAVE) {
-			trace_spf_vma_notsup(_RET_IP_, vmf.vma, address);
-			return VM_FAULT_RETRY;
-		}
+	if (pol && pol->mode == MPOL_INTERLEAVE) {
+		trace_spf_vma_notsup(_RET_IP_, vmf.vma, address);
+		return VM_FAULT_RETRY;
+	}
 #endif
 
 	/*
