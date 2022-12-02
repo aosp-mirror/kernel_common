@@ -637,6 +637,15 @@ enum ufshcd_quirks {
 	 * keys were stored in it.
 	 */
 	UFSHCD_QUIRK_KEYS_IN_PRDT			= 1 << 22,
+
+	/*
+	 * The host page size exceeds the maximum DMA segment size.
+	 * Since the UFSHCI standard requires that host controllers support
+	 * values up to 256 KiB in the Data Byte Count (DBC) and Common Data
+	 * Size (CDS) fields, this quirk only needs to be set for non-compliant
+	 * host controllers.
+	 */
+	UFSHCD_QUIRK_SUB_PAGE_SEGMENTS			= 1 << 23,
 };
 
 enum ufshcd_caps {
