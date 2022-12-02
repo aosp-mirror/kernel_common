@@ -26,6 +26,15 @@ menuconfig BLOCK
 
 if BLOCK
 
+config BLK_SUB_PAGE_SEGMENTS
+       bool "Support segments smaller than the page size"
+       default n
+       help
+	  Most storage controllers support DMA segments larger than the typical
+	  size of a virtual memory page. Some embedded controllers only support
+	  DMA segments smaller than the page size. Enable this option to support
+	  such controllers.
+
 config BLK_RQ_ALLOC_TIME
 	bool
 
