@@ -52,6 +52,17 @@ void blk_free_flush_queue(struct blk_flush_queue *q);
 
 void blk_freeze_queue(struct request_queue *q);
 
+#ifdef CONFIG_BLK_SUB_PAGE_SEGMENTS
+unsigned int blk_segments(const struct queue_limits *limits,
+			  unsigned int bytes);
+#else
+static inline unsigned int blk_segments(const struct queue_limits *limits,
+					unsigned int bytes)
+{
+	return 1;
+}
+#endif
+
 static inline bool biovec_phys_mergeable(struct request_queue *q,
 		struct bio_vec *vec1, struct bio_vec *vec2)
 {
