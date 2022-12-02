@@ -264,7 +264,8 @@ static struct bio *blk_bio_segment_split(struct request_queue *q,
 		if (nsegs < max_segs &&
 		    sectors + (bv.bv_len >> 9) <= max_sectors &&
 		    bv.bv_offset + bv.bv_len <= PAGE_SIZE) {
-			nsegs++;
+			/* single-page bvec optimization */
+			nsegs += blk_segments(&q->limits, bv.bv_len);
 			sectors += bv.bv_len >> 9;
 		} else if (bvec_split_segs(q, &bv, &nsegs, &sectors, max_segs,
 					 max_sectors)) {
@@ -315,18 +316,19 @@ void __blk_queue_split(struct bio **bio, unsigned int *nr_segs)
 		break;
 	default:
 		/*
-		 * All drivers must accept single-segments bios that are <=
-		 * PAGE_SIZE.  This is a quick and dirty check that relies on
-		 * the fact that bi_io_vec[0] is always valid if a bio has data.
-		 * The check might lead to occasional false negatives when bios
-		 * are cloned, but compared to the performance impact of cloned
-		 * bios themselves the loop below doesn't matter anyway.
+		 * Check whether bio splitting can be skipped. This check
+		 * may trigger the bio splitting code even if splitting is not
+		 * necessary.
 		 */
 		if (!q->limits.chunk_sectors &&
 		    (*bio)->bi_vcnt == 1 &&
+#ifdef CONFIG_BLK_SUB_PAGE_SEGMENTS
+		    (*bio)->bi_io_vec->bv_len <= q->limits.max_segment_size &&
+#endif
 		    ((*bio)->bi_io_vec[0].bv_len +
 		     (*bio)->bi_io_vec[0].bv_offset) <= PAGE_SIZE) {
-			*nr_segs = 1;
+			*nr_segs = blk_segments(&q->limits,
+						(*bio)->bi_io_vec[0].bv_len);
 			break;
 		}
 		split = blk_bio_segment_split(q, *bio, &q->bio_split, nr_segs);
@@ -499,7 +501,8 @@ static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
 			    __blk_segment_map_sg_merge(q, &bvec, &bvprv, sg))
 				goto next_bvec;
 
-			if (bvec.bv_offset + bvec.bv_len <= PAGE_SIZE)
+			if (bvec.bv_offset + bvec.bv_len <= PAGE_SIZE &&
+			    bvec.bv_len <= q->limits.max_segment_size)
 				nsegs += __blk_bvec_map_sg(bvec, sglist, sg);
 			else
 				nsegs += blk_bvec_map_sg(q, &bvec, sglist, sg);
