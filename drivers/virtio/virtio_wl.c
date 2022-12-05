@@ -1,17 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  *  Wayland Virtio Driver
- *  Copyright (C) 2017 Google, Inc.
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
+ *  Copyright (C) 2022 Google, Inc.
  */
 
 /*
@@ -40,7 +30,6 @@
  */
 
 #include <linux/anon_inodes.h>
-#include <linux/cdev.h>
 #include <linux/compat.h>
 #include <linux/completion.h>
 #include <linux/dma-buf.h>
@@ -50,12 +39,12 @@
 #include <linux/fs.h>
 #include <linux/idr.h>
 #include <linux/kfifo.h>
+#include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/poll.h>
 #include <linux/scatterlist.h>
 #include <linux/syscalls.h>
-#include <linux/uaccess.h>
 #include <linux/virtio.h>
 #include <linux/virtio_dma_buf.h>
 #include <linux/virtio_wl.h>
@@ -63,10 +52,8 @@
 
 #include <uapi/linux/dma-buf.h>
 
-#ifdef CONFIG_DRM_VIRTIO_GPU
 #define SEND_VIRTGPU_RESOURCES
 #include <linux/sync_file.h>
-#endif
 
 #define VFD_ILLEGAL_SIGN_BIT 0x80000000
 #define VFD_HOST_VFD_ID_BIT 0x40000000
@@ -80,7 +67,6 @@ struct virtwl_vfd_qentry {
 };
 
 struct virtwl_vfd {
-	struct kobject kobj;
 	struct mutex lock;
 
 	struct virtwl_info *vi;
@@ -104,10 +90,9 @@ struct virtwl_vfd {
 };
 
 struct virtwl_info {
-	dev_t dev_num;
-	struct device *dev;
-	struct class *class;
-	struct cdev cdev;
+	char name[16];
+	struct miscdevice miscdev;
+	struct virtio_device *vdev;
 
 	struct mutex vq_locks[VIRTWL_QUEUE_COUNT];
 	struct virtqueue *vqs[VIRTWL_QUEUE_COUNT];
@@ -170,7 +155,7 @@ static int vq_return_inbuf_locked(struct virtqueue *vq, void *buffer)
 
 	ret = virtqueue_add_inbuf(vq, sg, 1, buffer, GFP_KERNEL);
 	if (ret) {
-		pr_warn("virtwl: failed to give inbuf to host: %d\n", ret);
+		dev_warn(&vq->vdev->dev, "failed to give inbuf to host: %d\n", ret);
 		return ret;
 	}
 
@@ -251,14 +236,14 @@ static void virtwl_fence_release_handler(struct work_struct *work)
 		list_del_init(&vfd->fence_release_entry);
 		ret = do_vfd_close(vfd);
 		if (ret)
-			pr_warn("virtwl: failed to release vfd id %u: %d\n",
-				vfd_id, ret);
+			dev_warn(&vi->vdev->dev, "failed to release vfd id %u: %d\n",
+				 vfd_id, ret);
 	}
 }
 
 static const char *virtwl_fence_driver_name(struct dma_fence *fence)
 {
-	return "virtio_wl";
+	return KBUILD_MODNAME;
 }
 
 static void virtwl_fence_release(struct dma_fence *f)
@@ -286,7 +271,7 @@ static const struct dma_fence_ops virtwl_fence_ops = {
 	.release = virtwl_fence_release,
 };
 
-static bool vq_handle_new(struct virtwl_info *vi,
+static void vq_handle_new(struct virtwl_info *vi,
 			  struct virtio_wl_ctrl_vfd_new *new, unsigned int len)
 {
 	struct virtwl_vfd *vfd;
@@ -294,16 +279,16 @@ static bool vq_handle_new(struct virtwl_info *vi,
 	int ret;
 
 	if (id == 0)
-		return true; /* return the inbuf to vq */
+		return;
 
 	if (!(id & VFD_HOST_VFD_ID_BIT) || (id & VFD_ILLEGAL_SIGN_BIT)) {
-		pr_warn("virtwl: received a vfd with invalid id: %u\n", id);
-		return true; /* return the inbuf to vq */
+		dev_warn(&vi->vdev->dev, "received a vfd with invalid id: %u\n", id);
+		return;
 	}
 
 	vfd = virtwl_vfd_alloc(vi);
 	if (!vfd)
-		return true; /* return the inbuf to vq */
+		return;
 
 	vfd->id = id;
 	vfd->size = new->size;
@@ -316,11 +301,11 @@ static bool vq_handle_new(struct virtwl_info *vi,
 
 	if (ret <= 0) {
 		virtwl_vfd_free(vfd);
-		pr_warn("virtwl: failed to place received vfd: %d\n", ret);
-		return true; /* return the inbuf to vq */
+		dev_warn(&vi->vdev->dev, "failed to place received vfd: %d\n", ret);
+		return;
 	}
 
-	return true; /* return the inbuf to vq */
+	return;
 }
 
 static bool vq_handle_recv(struct virtwl_info *vi,
@@ -337,19 +322,19 @@ static bool vq_handle_recv(struct virtwl_info *vi,
 	mutex_unlock(&vi->vfds_lock);
 
 	if (!vfd) {
-		pr_warn("virtwl: recv for unknown vfd_id %u\n", recv->vfd_id);
+		dev_warn(&vi->vdev->dev, "recv for unknown vfd_id %u\n", recv->vfd_id);
 		return true; /* return the inbuf to vq */
 	}
 
 	if (vfd->flags & VIRTIO_WL_VFD_FENCE) {
-		pr_warn("virtwl: recv for fence vfd_id %u\n", recv->vfd_id);
+		dev_warn(&vi->vdev->dev, "recv for fence vfd_id %u\n", recv->vfd_id);
 		return true; /* return the inbuf to vq */
 	}
 
 	qentry = kzalloc(sizeof(*qentry), GFP_KERNEL);
 	if (!qentry) {
 		mutex_unlock(&vfd->lock);
-		pr_warn("virtwl: failed to allocate qentry for vfd\n");
+		dev_warn(&vi->vdev->dev, "failed to allocate qentry for vfd\n");
 		return true; /* return the inbuf to vq */
 	}
 
@@ -363,7 +348,7 @@ static bool vq_handle_recv(struct virtwl_info *vi,
 	return false; /* no return the inbuf to vq */
 }
 
-static bool vq_handle_hup(struct virtwl_info *vi,
+static void vq_handle_hup(struct virtwl_info *vi,
 			   struct virtio_wl_ctrl_vfd *vfd_hup,
 			   unsigned int len)
 {
@@ -376,12 +361,12 @@ static bool vq_handle_hup(struct virtwl_info *vi,
 	mutex_unlock(&vi->vfds_lock);
 
 	if (!vfd) {
-		pr_warn("virtwl: hup for unknown vfd_id %u\n", vfd_hup->vfd_id);
-		return true; /* return the inbuf to vq */
+		dev_warn(&vi->vdev->dev, "hup for unknown vfd_id %u\n", vfd_hup->vfd_id);
+		return;
 	}
 
 	if (vfd->hungup)
-		pr_warn("virtwl: hup for hungup vfd_id %u\n", vfd_hup->vfd_id);
+		dev_warn(&vi->vdev->dev, "hup for hungup vfd_id %u\n", vfd_hup->vfd_id);
 
 	vfd->hungup = true;
 
@@ -397,8 +382,6 @@ static bool vq_handle_hup(struct virtwl_info *vi,
 	}
 
 	mutex_unlock(&vfd->lock);
-
-	return true;
 }
 
 static bool vq_dispatch_hdr(struct virtwl_info *vi, unsigned int len,
@@ -411,20 +394,19 @@ static bool vq_dispatch_hdr(struct virtwl_info *vi, unsigned int len,
 
 	switch (hdr->type) {
 	case VIRTIO_WL_CMD_VFD_NEW:
-		return_vq = vq_handle_new(vi,
-					  (struct virtio_wl_ctrl_vfd_new *)hdr,
-					  len);
+		vq_handle_new(vi, (struct virtio_wl_ctrl_vfd_new *)hdr, len);
+		return_vq = true;
 		break;
 	case VIRTIO_WL_CMD_VFD_RECV:
 		return_vq = vq_handle_recv(vi,
 			(struct virtio_wl_ctrl_vfd_recv *)hdr, len);
 		break;
 	case VIRTIO_WL_CMD_VFD_HUP:
-		return_vq = vq_handle_hup(vi, (struct virtio_wl_ctrl_vfd *)hdr,
-					  len);
+		vq_handle_hup(vi, (struct virtio_wl_ctrl_vfd *)hdr, len);
+		return_vq = true;
 		break;
 	default:
-		pr_warn("virtwl: unhandled ctrl command: %u\n", hdr->type);
+		dev_warn(&vi->vdev->dev, "unhandled ctrl command: %u\n", hdr->type);
 		break;
 	}
 
@@ -435,7 +417,7 @@ static bool vq_dispatch_hdr(struct virtwl_info *vi, unsigned int len,
 	ret = vq_return_inbuf_locked(vq, hdr);
 	mutex_unlock(vq_lock);
 	if (ret) {
-		pr_warn("virtwl: failed to return inbuf to host: %d\n", ret);
+		dev_warn(&vi->vdev->dev, "failed to return inbuf to host: %d\n", ret);
 		kfree(hdr);
 	}
 
@@ -679,8 +661,8 @@ static size_t vfd_out_vfds_locked(struct virtwl_vfd *vfd,
 			if (vfds[read_count]) {
 				read_count++;
 			} else {
-				pr_warn("virtwl: received a vfd with unrecognized id: %u\n",
-					vfd_id);
+				dev_warn(&vi->vdev->dev, "received a vfd with unrecognized id: %u\n",
+					 vfd_id);
 			}
 			qentry->vfd_offset++;
 		}
@@ -717,8 +699,8 @@ static int do_vfd_close(struct virtwl_vfd *vfd)
 	ret = vq_queue_out(vi, &out_sg, &in_sg, &finish_completion,
 			   false /* block */);
 	if (ret) {
-		pr_warn("virtwl: failed to queue close vfd id %u: %d\n",
-			vfd->id,
+		dev_warn(&vi->vdev->dev, "failed to queue close vfd id %u: %d\n",
+			 vfd->id,
 			ret);
 		goto free_ctrl_close;
 	}
@@ -884,6 +866,33 @@ static int encode_vfd_ids_foreign(struct virtwl_vfd **vfds,
 }
 #endif
 
+static int vmalloc_to_sgt(void *data, uint32_t size, struct sg_table *sgt)
+{
+	int ret, s, i;
+	struct scatterlist *sg;
+	struct page *pg;
+
+	ret = sg_alloc_table(sgt, DIV_ROUND_UP(size, PAGE_SIZE), GFP_KERNEL);
+	if (ret)
+		return -ENOMEM;
+
+	for_each_sgtable_sg(sgt, sg, i) {
+		pg = vmalloc_to_page(data);
+		if (!pg) {
+			sg_free_table(sgt);
+			return -EFAULT;
+		}
+
+		s = min_t(int, PAGE_SIZE, size);
+		sg_set_page(sg, pg, s, 0);
+
+		size -= s;
+		data += s;
+	}
+
+	return 0;
+}
+
 static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 					       u32 len, int *vfd_fds)
 {
@@ -906,7 +915,6 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 	struct scatterlist out_sg;
 	struct scatterlist in_sg;
 	struct sg_table sgt;
-	struct vm_struct *area;
 	bool vmalloced;
 	int ret;
 	int i;
@@ -1048,15 +1056,13 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 		ret = vq_queue_out(vi, &out_sg, &in_sg, &finish_completion,
 		    filp->f_flags & O_NONBLOCK);
 	} else {
-		area = find_vm_area(ctrl_send);
-		ret = sg_alloc_table_from_pages(&sgt, area->pages,
-		    area->nr_pages, 0, ctrl_send_size, GFP_KERNEL);
-		if (ret)
+		ret = vmalloc_to_sgt(ctrl_send, ctrl_send_size, &sgt);
+		if (ret < 0)
 			goto free_ctrl_send;
 
 		sg_init_table(&in_sg, 1);
-		sg_set_page(&in_sg, area->pages[0],
-		    sizeof(struct virtio_wl_ctrl_hdr), 0);
+		sg_set_page(&in_sg, sg_page(sgt.sgl),
+			    sizeof(struct virtio_wl_ctrl_hdr), 0);
 
 		ret = vq_queue_out(vi, sgt.sgl, &in_sg, &finish_completion,
 		    filp->f_flags & O_NONBLOCK);
@@ -1114,9 +1120,8 @@ static int virtwl_vfd_dmabuf_sync(struct file *filp, u32 flags)
 	ret = vq_queue_out(vi, &out_sg, &in_sg, &finish_completion,
 			   false /* block */);
 	if (ret) {
-		pr_warn("virtwl: failed to queue dmabuf sync vfd id %u: %d\n",
-			vfd->id,
-			ret);
+		dev_warn(&vi->vdev->dev, "failed to queue dmabuf sync vfd id %u: %d\n",
+			 vfd->id, ret);
 		goto free_ctrl_dmabuf_sync;
 	}
 
@@ -1206,15 +1211,15 @@ static int virtwl_vfd_release(struct inode *inodep, struct file *filp)
 	 */
 	ret = do_vfd_close(vfd);
 	if (ret)
-		pr_warn("virtwl: failed to release vfd id %u: %d\n", vfd_id,
-			ret);
+		dev_warn(&vfd->vi->vdev->dev, "failed to release vfd id %u: %d\n",
+			 vfd_id, ret);
 	return 0;
 }
 
 static int virtwl_open(struct inode *inodep, struct file *filp)
 {
-	struct virtwl_info *vi = container_of(inodep->i_cdev,
-					      struct virtwl_info, cdev);
+	struct virtwl_info *vi = container_of(filp->private_data,
+					      struct virtwl_info, miscdev);
 
 	filp->private_data = vi;
 
@@ -1351,11 +1356,6 @@ static long virtwl_ioctl_send(struct file *filp, void __user *ptr)
 	if (ret)
 		return -EFAULT;
 
-	/* Early check for user error; do_send still uses copy_from_user. */
-	ret = !access_ok(user_data, ioctl_send.len);
-	if (ret)
-		return -EFAULT;
-
 	return virtwl_vfd_send(filp, user_data, ioctl_send.len, ioctl_send.fds);
 }
 
@@ -1367,6 +1367,7 @@ static long virtwl_ioctl_recv(struct file *filp, void __user *ptr)
 	size_t vfd_count = VIRTWL_SEND_MAX_ALLOCS;
 	struct virtwl_vfd *vfds[VIRTWL_SEND_MAX_ALLOCS] = { 0 };
 	int fds[VIRTWL_SEND_MAX_ALLOCS];
+	struct file *files[VIRTWL_SEND_MAX_ALLOCS] = { 0 };
 	size_t i;
 	int ret = 0;
 
@@ -1374,11 +1375,6 @@ static long virtwl_ioctl_recv(struct file *filp, void __user *ptr)
 		fds[i] = -1;
 
 	ret = copy_from_user(&ioctl_recv, ptr, sizeof(struct virtwl_ioctl_txn));
-	if (ret)
-		return -EFAULT;
-
-	/* Early check for user error. */
-	ret = !access_ok(user_data, ioctl_recv.len);
 	if (ret)
 		return -EFAULT;
 
@@ -1395,6 +1391,9 @@ static long virtwl_ioctl_recv(struct file *filp, void __user *ptr)
 	}
 
 	for (i = 0; i < vfd_count; i++) {
+		struct file *file;
+		int flags;
+
 		if (vfds[i]->flags & VIRTIO_WL_VFD_FENCE) {
 			struct virtwl_vfd *vfd = filp->private_data;
 			struct virtwl_info *vi = vfd->vi;
@@ -1430,23 +1429,25 @@ static long virtwl_ioctl_recv(struct file *filp, void __user *ptr)
 				dma_fence_signal_locked(&fence->base);
 			spin_unlock(&vi->fence_lock);
 
-			ret = get_unused_fd_flags(O_CLOEXEC);
-			if (ret < 0) {
-				fput(sync->file);
-				goto free_vfds;
-			}
-			fd_install(ret, sync->file);
+			file = sync->file;
+			flags = O_CLOEXEC;
 		} else {
-			ret = anon_inode_getfd("[virtwl_vfd]", &virtwl_vfd_fops,
-					       vfds[i], virtwl_vfd_file_flags(vfds[i])
-					       | O_CLOEXEC);
+			flags = virtwl_vfd_file_flags(vfds[i]) | O_CLOEXEC;
+			file = anon_inode_getfile("[virtwl_vfd]", &virtwl_vfd_fops,
+						  vfds[i], flags);
 		}
 
-		if (ret < 0)
+		if (IS_ERR(file)) {
+			ret = PTR_ERR(file);
 			goto free_vfds;
+		}
 
 		vfds[i] = NULL;
-		fds[i] = ret;
+		files[i] = file;
+
+		fds[i] = get_unused_fd_flags(flags);
+		if (fds[i] < 0)
+			goto free_vfds;
 	}
 
 	ret = copy_to_user(user_fds, fds, sizeof(int) * VIRTWL_SEND_MAX_ALLOCS);
@@ -1455,14 +1456,19 @@ static long virtwl_ioctl_recv(struct file *filp, void __user *ptr)
 		goto free_vfds;
 	}
 
+	for (i = 0; i < vfd_count; i++)
+		fd_install(fds[i], files[i]);
+
 	return 0;
 
 free_vfds:
 	for (i = 0; i < vfd_count; i++) {
 		if (vfds[i])
 			do_vfd_close(vfds[i]);
+		if (files[i])
+			fput(files[i]);
 		if (fds[i] >= 0)
-			__close_fd(current->files, fds[i]);
+			put_unused_fd(fds[i]);
 	}
 	return ret;
 }
@@ -1505,12 +1511,8 @@ static long virtwl_ioctl_new(struct file *filp, void __user *ptr,
 	struct virtwl_vfd *vfd;
 	struct virtwl_ioctl_new ioctl_new = {};
 	size_t size = min(in_size, sizeof(ioctl_new));
-	int ret;
-
-	/* Early check for user error. */
-	ret = !access_ok(ptr, size);
-	if (ret)
-		return -EFAULT;
+	struct file *file;
+	int ret, flags;
 
 	ret = copy_from_user(&ioctl_new, ptr, size);
 	if (ret)
@@ -1520,27 +1522,39 @@ static long virtwl_ioctl_new(struct file *filp, void __user *ptr,
 	if (IS_ERR(vfd))
 		return PTR_ERR(vfd);
 
-	ret = anon_inode_getfd("[virtwl_vfd]", &virtwl_vfd_fops, vfd,
-			       virtwl_vfd_file_flags(vfd) | O_CLOEXEC);
-	if (ret < 0) {
-		do_vfd_close(vfd);
-		return ret;
+	flags = virtwl_vfd_file_flags(vfd) | O_CLOEXEC;
+	file = anon_inode_getfile("[virtwl_vfd]", &virtwl_vfd_fops, vfd, flags);
+	if (IS_ERR(file)) {
+		ret = PTR_ERR(file);
+		goto err_close_vfd;
 	}
 
+	ret = get_unused_fd_flags(flags);
+	if (ret < 0)
+		goto err_put_file;
 	ioctl_new.fd = ret;
+
 	ret = copy_to_user(ptr, &ioctl_new, size);
-	if (ret) {
-		/* The release operation will handle freeing this alloc */
-		ksys_close(ioctl_new.fd);
-		return -EFAULT;
-	}
+	if (ret)
+		goto err_put_fd;
+
+	fd_install(ioctl_new.fd, file);
 
 	return 0;
+
+err_put_fd:
+	put_unused_fd(ioctl_new.fd);
+err_put_file:
+	fput(file);
+err_close_vfd:
+	do_vfd_close(vfd);
+	return ret;
 }
 
-static long virtwl_ioctl_ptr(struct file *filp, unsigned int cmd,
-			     void __user *ptr)
+static long virtwl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
+	void __user *ptr = (void __user *)arg;
+
 	if (filp->f_op == &virtwl_vfd_fops)
 		return virtwl_vfd_ioctl(filp, cmd, ptr);
 
@@ -1552,31 +1566,10 @@ static long virtwl_ioctl_ptr(struct file *filp, unsigned int cmd,
 	}
 }
 
-static long virtwl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
-{
-	return virtwl_ioctl_ptr(filp, cmd, (void __user *)arg);
-}
-
-#ifdef CONFIG_COMPAT
-static long virtwl_ioctl_compat(struct file *filp, unsigned int cmd,
-				unsigned long arg)
-{
-	return virtwl_ioctl_ptr(filp, cmd, compat_ptr(arg));
-}
-#else
-#define virtwl_ioctl_compat NULL
-#endif
-
-static int virtwl_release(struct inode *inodep, struct file *filp)
-{
-	return 0;
-}
-
 static const struct file_operations virtwl_fops = {
 	.open = virtwl_open,
 	.unlocked_ioctl = virtwl_ioctl,
-	.compat_ioctl = virtwl_ioctl_compat,
-	.release = virtwl_release,
+	.compat_ioctl = virtwl_ioctl,
 };
 
 static const struct file_operations virtwl_vfd_fops = {
@@ -1585,7 +1578,7 @@ static const struct file_operations virtwl_vfd_fops = {
 	.mmap = virtwl_vfd_mmap,
 	.poll = virtwl_vfd_poll,
 	.unlocked_ioctl = virtwl_ioctl,
-	.compat_ioctl = virtwl_ioctl_compat,
+	.compat_ioctl = virtwl_ioctl,
 	.release = virtwl_vfd_release,
 };
 
@@ -1596,42 +1589,26 @@ static int probe_common(struct virtio_device *vdev)
 	struct virtwl_info *vi = NULL;
 	vq_callback_t *vq_callbacks[] = { vq_in_cb, vq_out_cb };
 	static const char * const vq_names[] = { "in", "out" };
+	static atomic_t virtwl_num = ATOMIC_INIT(-1);
 
 	vi = kzalloc(sizeof(struct virtwl_info), GFP_KERNEL);
 	if (!vi)
 		return -ENOMEM;
 
 	vdev->priv = vi;
+	vi->vdev = vdev;
 
-	ret = alloc_chrdev_region(&vi->dev_num, 0, 1, "wl");
+	snprintf(vi->name, sizeof(vi->name), "wl%d", atomic_inc_return(&virtwl_num));
+	vi->miscdev.minor = MISC_DYNAMIC_MINOR;
+	vi->miscdev.name = vi->name;
+	vi->miscdev.parent = &vdev->dev;
+	vi->miscdev.fops = &virtwl_fops;
+
+	ret = misc_register(&vi->miscdev);
 	if (ret) {
-		ret = -ENOMEM;
-		pr_warn("virtwl: failed to allocate wl chrdev region: %d\n",
-			ret);
+		dev_warn(&vdev->dev, "failed to add virtio wayland misc device to system: %d\n",
+			 ret);
 		goto free_vi;
-	}
-
-	vi->class = class_create(THIS_MODULE, "wl");
-	if (IS_ERR(vi->class)) {
-		ret = PTR_ERR(vi->class);
-		pr_warn("virtwl: failed to create wl class: %d\n", ret);
-		goto unregister_region;
-
-	}
-
-	vi->dev = device_create(vi->class, NULL, vi->dev_num, vi, "wl%d", 0);
-	if (IS_ERR(vi->dev)) {
-		ret = PTR_ERR(vi->dev);
-		pr_warn("virtwl: failed to create wl0 device: %d\n", ret);
-		goto destroy_class;
-	}
-
-	cdev_init(&vi->cdev, &virtwl_fops);
-	ret = cdev_add(&vi->cdev, vi->dev_num, 1);
-	if (ret) {
-		pr_warn("virtwl: failed to add virtio wayland character device to system: %d\n",
-			ret);
-		goto destroy_device;
 	}
 
 	for (i = 0; i < VIRTWL_QUEUE_COUNT; i++)
@@ -1640,9 +1617,8 @@ static int probe_common(struct virtio_device *vdev)
 	ret = virtio_find_vqs(vdev, VIRTWL_QUEUE_COUNT, vi->vqs, vq_callbacks,
 			      vq_names, NULL);
 	if (ret) {
-		pr_warn("virtwl: failed to find virtio wayland queues: %d\n",
-			ret);
-		goto del_cdev;
+		dev_warn(&vdev->dev, "failed to find virtio wayland queues: %d\n", ret);
+		goto unregister_dev;
 	}
 
 	INIT_LIST_HEAD(&vi->fence_release_list);
@@ -1661,24 +1637,17 @@ static int probe_common(struct virtio_device *vdev)
 	/* lock is unneeded as we have unique ownership */
 	ret = vq_fill_locked(vi->vqs[VIRTWL_VQ_IN]);
 	if (ret) {
-		pr_warn("virtwl: failed to fill in virtqueue: %d", ret);
-		goto del_cdev;
+		dev_warn(&vdev->dev, "failed to fill in virtqueue: %d", ret);
+		goto unregister_dev;
 	}
 
 	virtio_device_ready(vdev);
 	virtqueue_kick(vi->vqs[VIRTWL_VQ_IN]);
 
-
 	return 0;
 
-del_cdev:
-	cdev_del(&vi->cdev);
-destroy_device:
-	put_device(vi->dev);
-destroy_class:
-	class_destroy(vi->class);
-unregister_region:
-	unregister_chrdev_region(vi->dev_num, 0);
+unregister_dev:
+	misc_deregister(&vi->miscdev);
 free_vi:
 	kfree(vi);
 	return ret;
@@ -1688,10 +1657,7 @@ static void remove_common(struct virtio_device *vdev)
 {
 	struct virtwl_info *vi = vdev->priv;
 
-	cdev_del(&vi->cdev);
-	put_device(vi->dev);
-	class_destroy(vi->class);
-	unregister_chrdev_region(vi->dev_num, 0);
+	misc_deregister(&vi->miscdev);
 	kfree(vi);
 }
 
