@@ -217,6 +217,9 @@ struct virtio_video_buffer {
 	uuid_t uuid;
 	uint32_t num_planes;
 	uint32_t plane_offsets[VIRTIO_VIDEO_MAX_PLANES];
+
+	/* Overrides the timestamp from vb2 */
+	uint64_t timestamp;
 };
 
 static inline gfp_t

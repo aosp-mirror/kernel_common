@@ -27,6 +27,12 @@ static void virtio_video_enc_buf_queue(struct vb2_buffer *vb)
 {
 	struct vb2_v4l2_buffer *v4l2_vb = to_vb2_v4l2_buffer(vb);
 	struct virtio_video_stream *stream = vb2_get_drv_priv(vb->vb2_queue);
+	struct virtio_video_buffer *virtio_vb = to_virtio_vb(vb);
+
+	/* Converting timestamp to usec for encoder to keep compatibility
+	 * with lower layers
+	 */
+	virtio_vb->timestamp = vb->timestamp / 1000;
 
 	v4l2_m2m_buf_queue(stream->fh.m2m_ctx, v4l2_vb);
 
