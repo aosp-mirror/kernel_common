@@ -940,6 +940,10 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 		switch (vvd->type) {
 		case VIRTIO_VIDEO_DEVICE_ENCODER:
 			vb->planes[0].bytesused = size;
+			/* Converting timestamp from usec to nsec after adopting
+			 * it to needs of lower layers
+			 */
+			vb->timestamp = timestamp * 1000;
 			break;
 		case VIRTIO_VIDEO_DEVICE_DECODER:
 			p_info = &stream->out_info;
@@ -960,10 +964,10 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 					vb->planes[i].bytesused =
 						p_info->plane_format[i].plane_size;
 			}
+			vb->timestamp = timestamp;
 			break;
 		}
 
-		vb->timestamp = timestamp;
 	}
 
 	v4l2_m2m_buf_done(v4l2_vb, done_state);
