@@ -1240,7 +1240,7 @@ static void ieee80211_chswitch_post_beacon(struct ieee80211_sub_if_data *sdata)
 		return;
 	}
 
-	cfg80211_ch_switch_notify(sdata->dev, &sdata->reserved_chandef);
+	cfg80211_ch_switch_notify(sdata->dev, &sdata->reserved_chandef, 0);
 }
 
 void ieee80211_chswitch_done(struct ieee80211_vif *vif, bool success)
@@ -1441,7 +1441,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_sub_if_data *sdata,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
 	mutex_unlock(&local->mtx);
 
-	cfg80211_ch_switch_started_notify(sdata->dev, &csa_ie.chandef,
+	cfg80211_ch_switch_started_notify(sdata->dev, &csa_ie.chandef, 0,
 					  csa_ie.count, csa_ie.mode);
 
 	if (local->ops->channel_switch) {
@@ -2877,8 +2877,13 @@ static void ieee80211_destroy_assoc_data(struct ieee80211_sub_if_data *sdata,
 		ieee80211_vif_release_channel(sdata);
 		mutex_unlock(&sdata->local->mtx);
 
-		if (abandon)
-			cfg80211_abandon_assoc(sdata->dev, assoc_data->bss);
+		if (abandon) {
+			struct cfg80211_assoc_failure data = {
+				.bss[0] = assoc_data->bss,
+			};
+
+			cfg80211_assoc_failure(sdata->dev, &data);
+		}
 	}
 
 	kfree(assoc_data);
@@ -3255,7 +3260,7 @@ static bool ieee80211_twt_req_supported(const struct sta_info *sta,
 	if (!(elems->ext_capab[9] & WLAN_EXT_CAPA10_TWT_RESPONDER_SUPPORT))
 		return false;
 
-	return sta->sta.he_cap.he_cap_elem.mac_cap_info[0] &
+	return sta->sta.deflink.he_cap.he_cap_elem.mac_cap_info[0] &
 		IEEE80211_HE_MAC_CAP0_TWT_RES;
 }
 
@@ -3282,7 +3287,7 @@ static bool ieee80211_twt_bcast_support(struct ieee80211_sub_if_data *sdata,
 					    ieee80211_vif_type_p2p(&sdata->vif));
 
 	return bss_conf->he_support &&
-		(sta->sta.he_cap.he_cap_elem.mac_cap_info[2] &
+		(sta->sta.deflink.he_cap.he_cap_elem.mac_cap_info[2] &
 			IEEE80211_HE_MAC_CAP2_BCAST_TWT) &&
 		own_he_cap &&
 		(own_he_cap->he_cap_elem.mac_cap_info[2] &
@@ -3500,7 +3505,7 @@ static bool ieee80211_assoc_success(struct ieee80211_sub_if_data *sdata,
 						  elems->he_6ghz_capa,
 						  sta);
 
-		bss_conf->he_support = sta->sta.he_cap.has_he;
+		bss_conf->he_support = sta->sta.deflink.he_cap.has_he;
 		if (elems->rsnx && elems->rsnx_len &&
 		    (elems->rsnx[0] & WLAN_RSNX_CAPA_PROTECTED_TWT) &&
 		    wiphy_ext_feature_isset(local->hw.wiphy,
@@ -3582,7 +3587,7 @@ static bool ieee80211_assoc_success(struct ieee80211_sub_if_data *sdata,
 		nss = *elems->opmode_notif & IEEE80211_OPMODE_NOTIF_RX_NSS_MASK;
 		nss >>= IEEE80211_OPMODE_NOTIF_RX_NSS_SHIFT;
 		nss += 1;
-		sta->sta.rx_nss = nss;
+		sta->sta.deflink.rx_nss = nss;
 	}
 
 	rate_control_rate_init(sta);
@@ -3688,7 +3693,7 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_mgd_assoc_data *assoc_data = ifmgd->assoc_data;
 	u16 capab_info, status_code, aid;
 	struct ieee802_11_elems *elems;
-	int ac, uapsd_queues = -1;
+	int ac;
 	u8 *pos;
 	bool reassoc;
 	struct cfg80211_bss *cbss;
@@ -3697,6 +3702,9 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 		.u.mlme.data = ASSOC_EVENT,
 	};
 	struct ieee80211_prep_tx_info info = {};
+	struct cfg80211_rx_assoc_resp resp = {
+		.uapsd_queues = -1,
+	};
 
 	sdata_assert_lock(sdata);
 
@@ -3775,8 +3783,12 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 	} else {
 		if (!ieee80211_assoc_success(sdata, cbss, mgmt, len, elems)) {
 			/* oops -- internal error -- send timeout for now */
+			struct cfg80211_assoc_failure data = {
+				.timeout = true,
+				.bss[0] = cbss,
+			};
 			ieee80211_destroy_assoc_data(sdata, false, false);
-			cfg80211_assoc_timeout(sdata->dev, cbss);
+			cfg80211_assoc_failure(sdata->dev, &data);
 			goto notify_driver;
 		}
 		event.u.mlme.status = MLME_SUCCESS;
@@ -3791,16 +3803,20 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 		ieee80211_destroy_assoc_data(sdata, true, false);
 
 		/* get uapsd queues configuration */
-		uapsd_queues = 0;
+		resp.uapsd_queues = 0;
 		for (ac = 0; ac < IEEE80211_NUM_ACS; ac++)
 			if (sdata->tx_conf[ac].uapsd)
-				uapsd_queues |= ieee80211_ac_to_qos_mask[ac];
+				resp.uapsd_queues |= ieee80211_ac_to_qos_mask[ac];
 
 		info.success = 1;
 	}
 
-	cfg80211_rx_assoc_resp(sdata->dev, cbss, (u8 *)mgmt, len, uapsd_queues,
-			       ifmgd->assoc_req_ies, ifmgd->assoc_req_ies_len);
+	resp.links[0].bss = cbss;
+	resp.buf = (u8 *)mgmt;
+	resp.len = len;
+	resp.req_ies = ifmgd->assoc_req_ies;
+	resp.req_ies_len = ifmgd->assoc_req_ies_len;
+	cfg80211_rx_assoc_resp(sdata->dev, &resp);
 notify_driver:
 	drv_mgd_complete_tx(sdata->local, sdata, &info);
 	kfree(elems);
@@ -4633,9 +4649,13 @@ void ieee80211_sta_work(struct ieee80211_sub_if_data *sdata)
 				.u.mlme.data = ASSOC_EVENT,
 				.u.mlme.status = MLME_TIMEOUT,
 			};
+			struct cfg80211_assoc_failure data = {
+				.bss[0] = bss,
+				.timeout = true,
+			};
 
 			ieee80211_destroy_assoc_data(sdata, false, false);
-			cfg80211_assoc_timeout(sdata->dev, bss);
+			cfg80211_assoc_failure(sdata->dev, &data);
 			drv_event_callback(sdata->local, sdata, &event);
 		}
 	} else if (ifmgd->assoc_data && ifmgd->assoc_data->timeout_started)
@@ -4735,9 +4755,9 @@ static void ieee80211_sta_conn_mon_timer(struct timer_list *t)
 	if (!sta)
 		return;
 
-	timeout = sta->status_stats.last_ack;
-	if (time_before(sta->status_stats.last_ack, sta->rx_stats.last_rx))
-		timeout = sta->rx_stats.last_rx;
+	timeout = sta->deflink.status_stats.last_ack;
+	if (time_before(sta->deflink.status_stats.last_ack, sta->deflink.rx_stats.last_rx))
+		timeout = sta->deflink.rx_stats.last_rx;
 	timeout += IEEE80211_CONNECTION_IDLE_TIME;
 
 	/* If timeout is after now, then update timer to fire at
@@ -5312,7 +5332,7 @@ static int ieee80211_prep_connection(struct ieee80211_sub_if_data *sdata,
 		}
 
 		if (rates)
-			new_sta->sta.supp_rates[cbss->channel->band] = rates;
+			new_sta->sta.deflink.supp_rates[cbss->channel->band] = rates;
 		else
 			sdata_info(sdata,
 				   "No rates found, keeping mandatory only\n");
@@ -5953,20 +5973,16 @@ int ieee80211_mgd_disassoc(struct ieee80211_sub_if_data *sdata,
 	u8 bssid[ETH_ALEN];
 	u8 frame_buf[IEEE80211_DEAUTH_FRAME_LEN];
 
-	/*
-	 * cfg80211 should catch this ... but it's racy since
-	 * we can receive a disassoc frame, process it, hand it
-	 * to cfg80211 while that's in a locked section already
-	 * trying to tell us that the user wants to disconnect.
-	 */
-	if (ifmgd->associated != req->bss)
-		return -ENOLINK;
+	if (!ifmgd->associated ||
+	    memcmp(ifmgd->associated->bssid, req->ap_addr, ETH_ALEN))
+		return -ENOTCONN;
 
 	sdata_info(sdata,
 		   "disassociating from %pM by local choice (Reason: %u=%s)\n",
-		   req->bss->bssid, req->reason_code, ieee80211_get_reason_code_string(req->reason_code));
+		   req->ap_addr, req->reason_code,
+		   ieee80211_get_reason_code_string(req->reason_code));
 
-	memcpy(bssid, req->bss->bssid, ETH_ALEN);
+	memcpy(bssid, req->ap_addr, ETH_ALEN);
 	ieee80211_set_disassoc(sdata, IEEE80211_STYPE_DISASSOC,
 			       req->reason_code, !req->local_state_change,
 			       frame_buf);
@@ -5996,8 +6012,13 @@ void ieee80211_mgd_stop(struct ieee80211_sub_if_data *sdata)
 	sdata_lock(sdata);
 	if (ifmgd->assoc_data) {
 		struct cfg80211_bss *bss = ifmgd->assoc_data->bss;
+		struct cfg80211_assoc_failure data = {
+			.bss[0] = bss,
+			.timeout = true,
+		};
+
 		ieee80211_destroy_assoc_data(sdata, false, false);
-		cfg80211_assoc_timeout(sdata->dev, bss);
+		cfg80211_assoc_failure(sdata->dev, &data);
 	}
 	if (ifmgd->auth_data)
 		ieee80211_destroy_auth_data(sdata, false);

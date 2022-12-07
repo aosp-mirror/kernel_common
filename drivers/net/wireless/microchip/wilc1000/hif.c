@@ -467,14 +467,25 @@ void *wilc_parse_join_bss_param(struct cfg80211_bss *bss,
 
 	rsn_ie = cfg80211_find_ie(WLAN_EID_RSN, ies->data, ies->len);
 	if (rsn_ie) {
+		int rsn_ie_len = sizeof(struct element) + rsn_ie[1];
 		int offset = 8;
 
-		param->mode_802_11i = 2;
-		param->rsn_found = true;
 		/* extract RSN capabilities */
-		offset += (rsn_ie[offset] * 4) + 2;
-		offset += (rsn_ie[offset] * 4) + 2;
-		memcpy(param->rsn_cap, &rsn_ie[offset], 2);
+		if (offset < rsn_ie_len) {
+			/* skip over pairwise suites */
+			offset += (rsn_ie[offset] * 4) + 2;
+
+			if (offset < rsn_ie_len) {
+				/* skip over authentication suites */
+				offset += (rsn_ie[offset] * 4) + 2;
+
+				if (offset + 1 < rsn_ie_len) {
+					param->mode_802_11i = 2;
+					param->rsn_found = true;
+					memcpy(param->rsn_cap, &rsn_ie[offset], 2);
+				}
+			}
+		}
 	}
 
 	if (param->rsn_found) {
@@ -795,15 +806,15 @@ static void wilc_hif_pack_sta_param(u8 *cur_byte, const u8 *mac,
 	put_unaligned_le16(params->aid, cur_byte);
 	cur_byte += 2;
 
-	*cur_byte++ = params->supported_rates_len;
-	if (params->supported_rates_len > 0)
-		memcpy(cur_byte, params->supported_rates,
-		       params->supported_rates_len);
-	cur_byte += params->supported_rates_len;
+	*cur_byte++ = params->link_sta_params.supported_rates_len;
+	if (params->link_sta_params.supported_rates_len > 0)
+		memcpy(cur_byte, params->link_sta_params.supported_rates,
+		       params->link_sta_params.supported_rates_len);
+	cur_byte += params->link_sta_params.supported_rates_len;
 
-	if (params->ht_capa) {
+	if (params->link_sta_params.ht_capa) {
 		*cur_byte++ = true;
-		memcpy(cur_byte, params->ht_capa,
+		memcpy(cur_byte, params->link_sta_params.ht_capa,
 		       sizeof(struct ieee80211_ht_cap));
 	} else {
 		*cur_byte++ = false;
@@ -1809,7 +1820,8 @@ int wilc_add_station(struct wilc_vif *vif, const u8 *mac,
 
 	wid.id = WID_ADD_STA;
 	wid.type = WID_BIN;
-	wid.size = WILC_ADD_STA_LENGTH + params->supported_rates_len;
+	wid.size = WILC_ADD_STA_LENGTH +
+		   params->link_sta_params.supported_rates_len;
 	wid.val = kmalloc(wid.size, GFP_KERNEL);
 	if (!wid.val)
 		return -ENOMEM;
@@ -1894,7 +1906,8 @@ int wilc_edit_station(struct wilc_vif *vif, const u8 *mac,
 
 	wid.id = WID_EDIT_STA;
 	wid.type = WID_BIN;
-	wid.size = WILC_ADD_STA_LENGTH + params->supported_rates_len;
+	wid.size = WILC_ADD_STA_LENGTH +
+		   params->link_sta_params.supported_rates_len;
 	wid.val = kmalloc(wid.size, GFP_KERNEL);
 	if (!wid.val)
 		return -ENOMEM;

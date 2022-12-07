@@ -157,9 +157,9 @@ mt7915_get_phy_mode(struct ieee80211_vif *vif, struct ieee80211_sta *sta)
 	u8 mode = 0;
 
 	if (sta) {
-		ht_cap = &sta->ht_cap;
-		vht_cap = &sta->vht_cap;
-		he_cap = &sta->he_cap;
+		ht_cap = &sta->deflink.ht_cap;
+		vht_cap = &sta->deflink.vht_cap;
+		he_cap = &sta->deflink.he_cap;
 	} else {
 		struct ieee80211_supported_band *sband;
 
@@ -215,18 +215,18 @@ mt7915_mcu_set_sta_he_mcs(struct ieee80211_sta *sta, __le16 *he_mcs,
 {
 	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
 	struct cfg80211_chan_def *chandef = &msta->vif->phy->mt76->chandef;
-	int nss, max_nss = sta->rx_nss > 3 ? 4 : sta->rx_nss;
+	int nss, max_nss = sta->deflink.rx_nss > 3 ? 4 : sta->deflink.rx_nss;
 	u16 mcs_map;
 
 	switch (chandef->width) {
 	case NL80211_CHAN_WIDTH_80P80:
-		mcs_map = le16_to_cpu(sta->he_cap.he_mcs_nss_supp.rx_mcs_80p80);
+		mcs_map = le16_to_cpu(sta->deflink.he_cap.he_mcs_nss_supp.rx_mcs_80p80);
 		break;
 	case NL80211_CHAN_WIDTH_160:
-		mcs_map = le16_to_cpu(sta->he_cap.he_mcs_nss_supp.rx_mcs_160);
+		mcs_map = le16_to_cpu(sta->deflink.he_cap.he_mcs_nss_supp.rx_mcs_160);
 		break;
 	default:
-		mcs_map = le16_to_cpu(sta->he_cap.he_mcs_nss_supp.rx_mcs_80);
+		mcs_map = le16_to_cpu(sta->deflink.he_cap.he_mcs_nss_supp.rx_mcs_80);
 		break;
 	}
 
@@ -267,7 +267,7 @@ mt7915_mcu_set_sta_he_mcs(struct ieee80211_sta *sta, __le16 *he_mcs,
 		mcs_map |= mcs << (nss * 2);
 
 		/* only support 2ss on 160MHz */
-		if (nss > 1 && (sta->bandwidth == IEEE80211_STA_RX_BW_160))
+		if (nss > 1 && (sta->deflink.bandwidth == IEEE80211_STA_RX_BW_160))
 			break;
 	}
 
@@ -278,8 +278,8 @@ static void
 mt7915_mcu_set_sta_vht_mcs(struct ieee80211_sta *sta, __le16 *vht_mcs,
 			   const u16 *mask)
 {
-	u16 mcs_map = le16_to_cpu(sta->vht_cap.vht_mcs.rx_mcs_map);
-	int nss, max_nss = sta->rx_nss > 3 ? 4 : sta->rx_nss;
+	u16 mcs_map = le16_to_cpu(sta->deflink.vht_cap.vht_mcs.rx_mcs_map);
+	int nss, max_nss = sta->deflink.rx_nss > 3 ? 4 : sta->deflink.rx_nss;
 	u16 mcs;
 
 	for (nss = 0; nss < max_nss; nss++, mcs_map >>= 2) {
@@ -300,7 +300,7 @@ mt7915_mcu_set_sta_vht_mcs(struct ieee80211_sta *sta, __le16 *vht_mcs,
 		vht_mcs[nss] = cpu_to_le16(mcs & mask[nss]);
 
 		/* only support 2ss on 160MHz */
-		if (nss > 1 && (sta->bandwidth == IEEE80211_STA_RX_BW_160))
+		if (nss > 1 && (sta->deflink.bandwidth == IEEE80211_STA_RX_BW_160))
 			break;
 	}
 }
@@ -309,10 +309,10 @@ static void
 mt7915_mcu_set_sta_ht_mcs(struct ieee80211_sta *sta, u8 *ht_mcs,
 			  const u8 *mask)
 {
-	int nss, max_nss = sta->rx_nss > 3 ? 4 : sta->rx_nss;
+	int nss, max_nss = sta->deflink.rx_nss > 3 ? 4 : sta->deflink.rx_nss;
 
 	for (nss = 0; nss < max_nss; nss++)
-		ht_mcs[nss] = sta->ht_cap.mcs.rx_mask[nss] & mask[nss];
+		ht_mcs[nss] = sta->deflink.ht_cap.mcs.rx_mask[nss] & mask[nss];
 }
 
 static int
@@ -1477,7 +1477,7 @@ static void
 mt7915_mcu_sta_he_tlv(struct sk_buff *skb, struct ieee80211_sta *sta)
 {
 	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
-	struct ieee80211_sta_he_cap *he_cap = &sta->he_cap;
+	struct ieee80211_sta_he_cap *he_cap = &sta->deflink.he_cap;
 	struct ieee80211_he_cap_elem *elem = &he_cap->he_cap_elem;
 	enum nl80211_band band = msta->vif->phy->mt76->chandef.chan->band;
 	const u16 *mcs_mask = msta->vif->bitrate_mask.control[band].he_mcs;
@@ -1567,7 +1567,7 @@ mt7915_mcu_sta_he_tlv(struct sk_buff *skb, struct ieee80211_sta *sta)
 
 	he->he_cap = cpu_to_le32(cap);
 
-	switch (sta->bandwidth) {
+	switch (sta->deflink.bandwidth) {
 	case IEEE80211_STA_RX_BW_160:
 		if (elem->phy_cap_info[0] &
 		    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G)
@@ -1647,7 +1647,7 @@ mt7915_mcu_sta_uapsd_tlv(struct sk_buff *skb, struct ieee80211_sta *sta,
 static void
 mt7915_mcu_sta_muru_tlv(struct sk_buff *skb, struct ieee80211_sta *sta)
 {
-	struct ieee80211_sta_he_cap *he_cap = &sta->he_cap;
+	struct ieee80211_sta_he_cap *he_cap = &sta->deflink.he_cap;
 	struct ieee80211_he_cap_elem *elem = &he_cap->he_cap_elem;
 	struct sta_rec_muru *muru;
 	struct tlv *tlv;
@@ -1680,7 +1680,7 @@ mt7915_mcu_sta_muru_tlv(struct sk_buff *skb, struct ieee80211_sta *sta)
 	muru->ofdma_ul.rx_t_frame_11ac = 0;
 
 	muru->mimo_dl.vht_mu_bfee =
-		!!(sta->vht_cap.cap & IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE);
+		!!(sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE);
 	muru->mimo_dl.partial_bw_dl_mimo =
 		HE_PHY(CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO, elem->phy_cap_info[6]);
 
@@ -1699,9 +1699,9 @@ mt7915_mcu_sta_vht_tlv(struct sk_buff *skb, struct ieee80211_sta *sta)
 	tlv = mt7915_mcu_add_tlv(skb, STA_REC_VHT, sizeof(*vht));
 
 	vht = (struct sta_rec_vht *)tlv;
-	vht->vht_cap = cpu_to_le32(sta->vht_cap.cap);
-	vht->vht_rx_mcs_map = sta->vht_cap.vht_mcs.rx_mcs_map;
-	vht->vht_tx_mcs_map = sta->vht_cap.vht_mcs.tx_mcs_map;
+	vht->vht_cap = cpu_to_le32(sta->deflink.vht_cap.cap);
+	vht->vht_rx_mcs_map = sta->deflink.vht_cap.vht_mcs.rx_mcs_map;
+	vht->vht_tx_mcs_map = sta->deflink.vht_cap.vht_mcs.tx_mcs_map;
 }
 
 static void
@@ -1742,19 +1742,19 @@ mt7915_mcu_sta_tlv(struct mt7915_dev *dev, struct sk_buff *skb,
 	struct tlv *tlv;
 
 	/* starec ht */
-	if (sta->ht_cap.ht_supported) {
+	if (sta->deflink.ht_cap.ht_supported) {
 		struct sta_rec_ht *ht;
 
 		tlv = mt7915_mcu_add_tlv(skb, STA_REC_HT, sizeof(*ht));
 		ht = (struct sta_rec_ht *)tlv;
-		ht->ht_cap = cpu_to_le16(sta->ht_cap.cap);
+		ht->ht_cap = cpu_to_le16(sta->deflink.ht_cap.cap);
 
 		if (mt7915_hw_amsdu_supported(vif))
 			mt7915_mcu_sta_amsdu_tlv(skb, sta);
 	}
 
 	/* starec he */
-	if (sta->he_cap.has_he)
+	if (sta->deflink.he_cap.has_he)
 		mt7915_mcu_sta_he_tlv(skb, sta);
 
 	/* starec uapsd */
@@ -1784,29 +1784,29 @@ mt7915_mcu_wtbl_ht_tlv(struct sk_buff *skb, struct ieee80211_sta *sta,
 	struct tlv *tlv;
 
 	/* wtbl ht */
-	if (sta->ht_cap.ht_supported) {
+	if (sta->deflink.ht_cap.ht_supported) {
 		tlv = mt7915_mcu_add_nested_tlv(skb, WTBL_HT, sizeof(*ht),
 						wtbl_tlv, sta_wtbl);
 		ht = (struct wtbl_ht *)tlv;
-		ht->ldpc = !!(sta->ht_cap.cap & IEEE80211_HT_CAP_LDPC_CODING);
-		ht->af = sta->ht_cap.ampdu_factor;
-		ht->mm = sta->ht_cap.ampdu_density;
+		ht->ldpc = !!(sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_LDPC_CODING);
+		ht->af = sta->deflink.ht_cap.ampdu_factor;
+		ht->mm = sta->deflink.ht_cap.ampdu_density;
 		ht->ht = true;
 	}
 
 	/* wtbl vht */
-	if (sta->vht_cap.vht_supported) {
+	if (sta->deflink.vht_cap.vht_supported) {
 		struct wtbl_vht *vht;
 		u8 af;
 
 		tlv = mt7915_mcu_add_nested_tlv(skb, WTBL_VHT, sizeof(*vht),
 						wtbl_tlv, sta_wtbl);
 		vht = (struct wtbl_vht *)tlv;
-		vht->ldpc = !!(sta->vht_cap.cap & IEEE80211_VHT_CAP_RXLDPC);
+		vht->ldpc = !!(sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_RXLDPC);
 		vht->vht = true;
 
 		af = FIELD_GET(IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK,
-			       sta->vht_cap.cap);
+			       sta->deflink.vht_cap.cap);
 		if (ht)
 			ht->af = max_t(u8, ht->af, af);
 	}
@@ -1906,7 +1906,7 @@ static void
 mt7915_mcu_sta_bfer_ht(struct ieee80211_sta *sta, struct mt7915_phy *phy,
 		       struct sta_rec_bf *bf)
 {
-	struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
+	struct ieee80211_mcs_info *mcs = &sta->deflink.ht_cap.mcs;
 	u8 n = 0;
 
 	bf->tx_mode = MT_PHY_TYPE_HT;
@@ -1932,7 +1932,7 @@ static void
 mt7915_mcu_sta_bfer_vht(struct ieee80211_sta *sta, struct mt7915_phy *phy,
 			struct sta_rec_bf *bf, bool explicit)
 {
-	struct ieee80211_sta_vht_cap *pc = &sta->vht_cap;
+	struct ieee80211_sta_vht_cap *pc = &sta->deflink.vht_cap;
 	struct ieee80211_sta_vht_cap *vc = &phy->mt76->sband_5g.sband.vht_cap;
 	u16 mcs_map = le16_to_cpu(pc->vht_mcs.rx_mcs_map);
 	u8 nss_mcs = mt7915_mcu_get_sta_nss(mcs_map);
@@ -1952,7 +1952,7 @@ mt7915_mcu_sta_bfer_vht(struct ieee80211_sta *sta, struct mt7915_phy *phy,
 		bf->nc = min_t(u8, nss_mcs, bf->nr);
 		bf->ibf_ncol = bf->nc;
 
-		if (sta->bandwidth == IEEE80211_STA_RX_BW_160)
+		if (sta->deflink.bandwidth == IEEE80211_STA_RX_BW_160)
 			bf->nr = 1;
 	} else {
 		bf->bf_cap = MT_IBF;
@@ -1960,7 +1960,7 @@ mt7915_mcu_sta_bfer_vht(struct ieee80211_sta *sta, struct mt7915_phy *phy,
 		bf->nc = min_t(u8, nss_mcs, bf->nr);
 		bf->ibf_ncol = nss_mcs;
 
-		if (sta->bandwidth == IEEE80211_STA_RX_BW_160)
+		if (sta->deflink.bandwidth == IEEE80211_STA_RX_BW_160)
 			bf->ibf_nrow = 1;
 	}
 }
@@ -1969,7 +1969,7 @@ static void
 mt7915_mcu_sta_bfer_he(struct ieee80211_sta *sta, struct ieee80211_vif *vif,
 		       struct mt7915_phy *phy, struct sta_rec_bf *bf)
 {
-	struct ieee80211_sta_he_cap *pc = &sta->he_cap;
+	struct ieee80211_sta_he_cap *pc = &sta->deflink.he_cap;
 	struct ieee80211_he_cap_elem *pe = &pc->he_cap_elem;
 	const struct ieee80211_sta_he_cap *vc = mt7915_get_he_phy_cap(phy, vif);
 	const struct ieee80211_he_cap_elem *ve = &vc->he_cap_elem;
@@ -1991,7 +1991,7 @@ mt7915_mcu_sta_bfer_he(struct ieee80211_sta *sta, struct ieee80211_vif *vif,
 	bf->nc = min_t(u8, nss_mcs, bf->nr);
 	bf->ibf_ncol = bf->nc;
 
-	if (sta->bandwidth != IEEE80211_STA_RX_BW_160)
+	if (sta->deflink.bandwidth != IEEE80211_STA_RX_BW_160)
 		return;
 
 	/* go over for 160MHz and 80p80 */
@@ -2051,20 +2051,20 @@ mt7915_mcu_sta_bfer_tlv(struct sk_buff *skb, struct ieee80211_sta *sta,
 	 * vht: support eBF and iBF
 	 * ht: iBF only, since mac80211 lacks of eBF support
 	 */
-	if (sta->he_cap.has_he && explicit)
+	if (sta->deflink.he_cap.has_he && explicit)
 		mt7915_mcu_sta_bfer_he(sta, vif, phy, bf);
-	else if (sta->vht_cap.vht_supported)
+	else if (sta->deflink.vht_cap.vht_supported)
 		mt7915_mcu_sta_bfer_vht(sta, phy, bf, explicit);
-	else if (sta->ht_cap.ht_supported)
+	else if (sta->deflink.ht_cap.ht_supported)
 		mt7915_mcu_sta_bfer_ht(sta, phy, bf);
 	else
 		return;
 
-	bf->bw = sta->bandwidth;
-	bf->ibf_dbw = sta->bandwidth;
+	bf->bw = sta->deflink.bandwidth;
+	bf->ibf_dbw = sta->deflink.bandwidth;
 	bf->ibf_nrow = tx_ant;
 
-	if (!explicit && sta->bandwidth <= IEEE80211_STA_RX_BW_40 && !bf->nc)
+	if (!explicit && sta->deflink.bandwidth <= IEEE80211_STA_RX_BW_40 && !bf->nc)
 		bf->ibf_timeout = 0x48;
 	else
 		bf->ibf_timeout = 0x18;
@@ -2074,7 +2074,7 @@ mt7915_mcu_sta_bfer_tlv(struct sk_buff *skb, struct ieee80211_sta *sta,
 	else
 		bf->mem_20m = matrix[bf->nr][bf->nc];
 
-	switch (sta->bandwidth) {
+	switch (sta->deflink.bandwidth) {
 	case IEEE80211_STA_RX_BW_160:
 	case IEEE80211_STA_RX_BW_80:
 		bf->mem_total = bf->mem_20m * 2;
@@ -2100,13 +2100,13 @@ mt7915_mcu_sta_bfee_tlv(struct sk_buff *skb, struct ieee80211_sta *sta,
 	tlv = mt7915_mcu_add_tlv(skb, STA_REC_BFEE, sizeof(*bfee));
 	bfee = (struct sta_rec_bfee *)tlv;
 
-	if (sta->he_cap.has_he) {
-		struct ieee80211_he_cap_elem *pe = &sta->he_cap.he_cap_elem;
+	if (sta->deflink.he_cap.has_he) {
+		struct ieee80211_he_cap_elem *pe = &sta->deflink.he_cap.he_cap_elem;
 
 		nr = HE_PHY(CAP5_BEAMFORMEE_NUM_SND_DIM_UNDER_80MHZ_MASK,
 			    pe->phy_cap_info[5]);
-	} else if (sta->vht_cap.vht_supported) {
-		struct ieee80211_sta_vht_cap *pc = &sta->vht_cap;
+	} else if (sta->deflink.vht_cap.vht_supported) {
+		struct ieee80211_sta_vht_cap *pc = &sta->deflink.vht_cap;
 
 		nr = FIELD_GET(IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_MASK,
 			       pc->cap);
@@ -2133,12 +2133,12 @@ mt7915_mcu_add_txbf(struct mt7915_dev *dev, struct ieee80211_vif *vif,
 
 	phy = mvif->band_idx ? mt7915_ext_phy(dev) : &dev->phy;
 
-	if (sta->he_cap.has_he) {
+	if (sta->deflink.he_cap.has_he) {
 		struct ieee80211_he_cap_elem *pe;
 		const struct ieee80211_he_cap_elem *ve;
 		const struct ieee80211_sta_he_cap *vc;
 
-		pe = &sta->he_cap.he_cap_elem;
+		pe = &sta->deflink.he_cap.he_cap_elem;
 		vc = mt7915_get_he_phy_cap(phy, vif);
 		ve = &vc->he_cap_elem;
 
@@ -2146,11 +2146,11 @@ mt7915_mcu_add_txbf(struct mt7915_dev *dev, struct ieee80211_vif *vif,
 			   HE_PHY(CAP4_SU_BEAMFORMEE, ve->phy_cap_info[4]));
 		ebf = !!(HE_PHY(CAP3_SU_BEAMFORMER, ve->phy_cap_info[3]) &&
 			 HE_PHY(CAP4_SU_BEAMFORMEE, pe->phy_cap_info[4]));
-	} else if (sta->vht_cap.vht_supported) {
+	} else if (sta->deflink.vht_cap.vht_supported) {
 		struct ieee80211_sta_vht_cap *pc;
 		struct ieee80211_sta_vht_cap *vc;
 
-		pc = &sta->vht_cap;
+		pc = &sta->deflink.vht_cap;
 		vc = &phy->mt76->sband_5g.sband.vht_cap;
 
 		ebfee = !!((pc->cap & IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE) &&
@@ -2206,7 +2206,7 @@ mt7915_mcu_sta_rate_ctrl_tlv(struct sk_buff *skb, struct mt7915_dev *dev,
 	enum nl80211_band band = chandef->chan->band;
 	struct sta_rec_ra *ra;
 	struct tlv *tlv;
-	u32 supp_rate = sta->supp_rates[band];
+	u32 supp_rate = sta->deflink.supp_rates[band];
 	u32 cap = sta->wme ? STA_CAP_WMM : 0;
 
 	tlv = mt7915_mcu_add_tlv(skb, STA_REC_RA, sizeof(*ra));
@@ -2216,8 +2216,8 @@ mt7915_mcu_sta_rate_ctrl_tlv(struct sk_buff *skb, struct mt7915_dev *dev,
 	ra->auto_rate = true;
 	ra->phy_mode = mt7915_get_phy_mode(vif, sta);
 	ra->channel = chandef->chan->hw_value;
-	ra->bw = sta->bandwidth;
-	ra->phy.bw = sta->bandwidth;
+	ra->bw = sta->deflink.bandwidth;
+	ra->phy.bw = sta->deflink.bandwidth;
 
 	if (supp_rate) {
 		supp_rate &= mask->control[band].legacy;
@@ -2237,54 +2237,54 @@ mt7915_mcu_sta_rate_ctrl_tlv(struct sk_buff *skb, struct mt7915_dev *dev,
 		}
 	}
 
-	if (sta->ht_cap.ht_supported) {
+	if (sta->deflink.ht_cap.ht_supported) {
 		const u8 *mcs_mask = mask->control[band].ht_mcs;
 
 		ra->supp_mode |= MODE_HT;
-		ra->af = sta->ht_cap.ampdu_factor;
-		ra->ht_gf = !!(sta->ht_cap.cap & IEEE80211_HT_CAP_GRN_FLD);
+		ra->af = sta->deflink.ht_cap.ampdu_factor;
+		ra->ht_gf = !!(sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_GRN_FLD);
 
 		cap |= STA_CAP_HT;
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_SGI_20)
+		if (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_20)
 			cap |= STA_CAP_SGI_20;
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_SGI_40)
+		if (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_40)
 			cap |= STA_CAP_SGI_40;
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_TX_STBC)
+		if (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_TX_STBC)
 			cap |= STA_CAP_TX_STBC;
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_RX_STBC)
+		if (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_RX_STBC)
 			cap |= STA_CAP_RX_STBC;
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_LDPC_CODING)
+		if (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_LDPC_CODING)
 			cap |= STA_CAP_LDPC;
 
 		mt7915_mcu_set_sta_ht_mcs(sta, ra->ht_mcs, mcs_mask);
 		ra->supp_ht_mcs = *(__le32 *)ra->ht_mcs;
 	}
 
-	if (sta->vht_cap.vht_supported) {
+	if (sta->deflink.vht_cap.vht_supported) {
 		const u16 *mcs_mask = mask->control[band].vht_mcs;
 		u8 af;
 
 		ra->supp_mode |= MODE_VHT;
 		af = FIELD_GET(IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK,
-			       sta->vht_cap.cap);
+			       sta->deflink.vht_cap.cap);
 		ra->af = max_t(u8, ra->af, af);
 
 		cap |= STA_CAP_VHT;
-		if (sta->vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_80)
+		if (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_80)
 			cap |= STA_CAP_VHT_SGI_80;
-		if (sta->vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_160)
+		if (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_SHORT_GI_160)
 			cap |= STA_CAP_VHT_SGI_160;
-		if (sta->vht_cap.cap & IEEE80211_VHT_CAP_TXSTBC)
+		if (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_TXSTBC)
 			cap |= STA_CAP_VHT_TX_STBC;
-		if (sta->vht_cap.cap & IEEE80211_VHT_CAP_RXSTBC_1)
+		if (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_RXSTBC_1)
 			cap |= STA_CAP_VHT_RX_STBC;
-		if (sta->vht_cap.cap & IEEE80211_VHT_CAP_RXLDPC)
+		if (sta->deflink.vht_cap.cap & IEEE80211_VHT_CAP_RXLDPC)
 			cap |= STA_CAP_VHT_LDPC;
 
 		mt7915_mcu_set_sta_vht_mcs(sta, ra->supp_vht_mcs, mcs_mask);
 	}
 
-	if (sta->he_cap.has_he) {
+	if (sta->deflink.he_cap.has_he) {
 		ra->supp_mode |= MODE_HE;
 		cap |= STA_CAP_HE;
 	}
@@ -2318,7 +2318,7 @@ int mt7915_mcu_add_he(struct mt7915_dev *dev, struct ieee80211_vif *vif,
 	struct sk_buff *skb;
 	int len;
 
-	if (!sta->he_cap.has_he)
+	if (!sta->deflink.he_cap.has_he)
 		return 0;
 
 	len = sizeof(struct sta_req_hdr) + sizeof(struct sta_rec_he);
@@ -2368,7 +2368,7 @@ mt7915_mcu_add_mu(struct mt7915_dev *dev, struct ieee80211_vif *vif,
 	struct sk_buff *skb;
 	int ret;
 
-	if (!sta->vht_cap.vht_supported && !sta->he_cap.has_he)
+	if (!sta->deflink.vht_cap.vht_supported && !sta->deflink.he_cap.has_he)
 		return 0;
 
 	ret = mt7915_mcu_add_group(dev, vif, sta);

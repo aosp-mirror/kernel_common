@@ -880,6 +880,7 @@ static void hwsim_send_nullfunc(struct mac80211_hwsim_data *data, u8 *mac,
 	struct hwsim_vif_priv *vp = (void *)vif->drv_priv;
 	struct sk_buff *skb;
 	struct ieee80211_hdr *hdr;
+	struct ieee80211_tx_info *cb;
 
 	if (!vp->assoc)
 		return;
@@ -900,6 +901,10 @@ static void hwsim_send_nullfunc(struct mac80211_hwsim_data *data, u8 *mac,
 	memcpy(hdr->addr1, vp->bssid, ETH_ALEN);
 	memcpy(hdr->addr2, mac, ETH_ALEN);
 	memcpy(hdr->addr3, vp->bssid, ETH_ALEN);
+
+	cb = IEEE80211_SKB_CB(skb);
+	cb->control.rates[0].count = 1;
+	cb->control.rates[1].idx = -1;
 
 	rcu_read_lock();
 	mac80211_hwsim_tx_frame(data->hw, skb,
@@ -2146,7 +2151,7 @@ mac80211_hwsim_sta_rc_update(struct ieee80211_hw *hw,
 	u32 bw = U32_MAX;
 	enum nl80211_chan_width confbw = NL80211_CHAN_WIDTH_20_NOHT;
 
-	switch (sta->bandwidth) {
+	switch (sta->deflink.bandwidth) {
 #define C(_bw) case IEEE80211_STA_RX_BW_##_bw: bw = _bw; break
 	C(20);
 	C(40);
@@ -2167,7 +2172,7 @@ mac80211_hwsim_sta_rc_update(struct ieee80211_hw *hw,
 
 	WARN(bw > hwsim_get_chanwidth(confbw),
 	     "intf %pM: bad STA %pM bandwidth %d MHz (%d) > channel config %d MHz (%d)\n",
-	     vif->addr, sta->addr, bw, sta->bandwidth,
+	     vif->addr, sta->addr, bw, sta->deflink.bandwidth,
 	     hwsim_get_chanwidth(data->bw), data->bw);
 }
 

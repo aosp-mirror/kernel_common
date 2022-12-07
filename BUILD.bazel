@@ -16,6 +16,7 @@ _aarch64_additional_kmi_symbol_lists = [
     "android/abi_gki_aarch64_db845c",
     "android/abi_gki_aarch64_exynos",
     "android/abi_gki_aarch64_pixel",
+    "android/abi_gki_aarch64_virtual_device",
 ]
 
 define_common_kernels(target_configs = {
@@ -54,6 +55,9 @@ define_db845c(
         "arch/arm64/boot/dts/qcom/qrb5165-rb5.dtb",
         "arch/arm64/boot/dts/qcom/sdm845-db845c.dtb",
     ],
+    define_abi_targets = True,
+    kmi_symbol_list = "//common:android/abi_gki_aarch64_db845c",
+    kmi_symbol_list_add_only = True,
     module_outs = [
         # keep sorted
         "crypto/michael_mic.ko",

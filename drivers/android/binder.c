@@ -77,6 +77,8 @@
 #include "binder_trace.h"
 #include <trace/hooks/binder.h>
 
+#include "../../kernel/sched/sched.h"
+
 static HLIST_HEAD(binder_deferred_list);
 static DEFINE_MUTEX(binder_deferred_lock);
 
@@ -659,18 +661,27 @@ static bool binder_supported_policy(int policy)
 #ifdef CONFIG_UCLAMP_TASK
 static void set_binder_prio_uclamp(struct binder_priority *prio, struct task_struct *task)
 {
+	if (!uclamp_is_used())
+		return;
+
 	prio->uclamp[UCLAMP_MIN] = task->uclamp_req[UCLAMP_MIN].value;
 	prio->uclamp[UCLAMP_MAX] = task->uclamp_req[UCLAMP_MAX].value;
 }
 
 static void set_inherited_uclamp(struct binder_transaction *t)
 {
+	if (!uclamp_is_used())
+		return;
+
 	t->priority.uclamp[UCLAMP_MIN] = uclamp_eff_value(current, UCLAMP_MIN);
 	t->priority.uclamp[UCLAMP_MAX] = uclamp_eff_value(current, UCLAMP_MAX);
 }
 
 static bool is_uclamp_equal(struct task_struct *task, const struct binder_priority *desired)
 {
+	if (!uclamp_is_used())
+		return true;
+
 	return task->uclamp_req[UCLAMP_MIN].value == desired->uclamp[UCLAMP_MIN]
 		&& task->uclamp_req[UCLAMP_MAX].value == desired->uclamp[UCLAMP_MAX];
 }
@@ -709,10 +720,14 @@ static void binder_do_set_priority(struct binder_thread *thread,
 	bool has_cap_nice;
 	unsigned int policy = desired->sched_policy;
 	struct sched_attr attrs = {
-		.sched_flags = SCHED_FLAG_UTIL_CLAMP | SCHED_FLAG_RESET_ON_FORK,
-		.sched_util_min = desired->uclamp[UCLAMP_MIN],
-		.sched_util_max = desired->uclamp[UCLAMP_MAX],
+		.sched_flags = SCHED_FLAG_RESET_ON_FORK
 	};
+
+	if (uclamp_is_used()) {
+		attrs.sched_flags |= SCHED_FLAG_UTIL_CLAMP;
+		attrs.sched_util_min = desired->uclamp[UCLAMP_MIN];
+		attrs.sched_util_max = desired->uclamp[UCLAMP_MAX];
+	}
 
 	if (task->policy == policy && task->normal_prio == desired->prio
 		&& is_uclamp_equal(task, desired)) {
