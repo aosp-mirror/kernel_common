@@ -672,7 +672,7 @@ static void __update_extent_tree_range(struct inode *inode,
 	struct extent_tree *et = F2FS_I(inode)->extent_tree[type];
 	struct extent_node *en = NULL, *en1 = NULL;
 	struct extent_node *prev_en = NULL, *next_en = NULL;
-	struct extent_info ei, dei, prev;
+	struct extent_info ei, dei, prev = {};
 	struct rb_node **insert_p = NULL, *insert_parent = NULL;
 	unsigned int fofs = tei->fofs, len = tei->len;
 	unsigned int end = fofs + len;
