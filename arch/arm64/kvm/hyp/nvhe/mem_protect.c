@@ -717,6 +717,21 @@ static bool is_dabt(u64 esr)
 	return ESR_ELx_EC(esr) == ESR_ELx_EC_DABT_LOW;
 }
 
+static int (*perm_fault_handler)(struct kvm_cpu_context *host_ctxt, u64 esr, u64 addr);
+
+int hyp_register_host_perm_fault_handler(int (*cb)(struct kvm_cpu_context *ctxt, u64 esr, u64 addr))
+{
+	return cmpxchg(&perm_fault_handler, NULL, cb) ? -EBUSY : 0;
+}
+
+static int handle_host_perm_fault(struct kvm_cpu_context *host_ctxt, u64 esr, u64 addr)
+{
+	int (*cb)(struct kvm_cpu_context *host_ctxt, u64 esr, u64 addr);
+
+	cb = READ_ONCE(perm_fault_handler);
+	return cb ? cb(host_ctxt, esr, addr) : -EPERM;
+}
+
 void handle_host_mem_abort(struct kvm_cpu_context *host_ctxt)
 {
 	struct kvm_vcpu_fault_info fault;
@@ -741,6 +756,9 @@ void handle_host_mem_abort(struct kvm_cpu_context *host_ctxt)
 		ret = host_stage2_idmap(addr);
 
 	host_unlock_component();
+
+	if ((esr & ESR_ELx_FSC_TYPE) == FSC_PERM)
+		ret = handle_host_perm_fault(host_ctxt, esr, addr);
 
 	if (ret == -EPERM)
 		host_inject_abort(host_ctxt);
@@ -824,10 +842,17 @@ static int check_page_state_range(struct kvm_pgtable *pgt, u64 addr, u64 size,
 
 static enum pkvm_page_state host_get_page_state(kvm_pte_t pte)
 {
+	enum pkvm_page_state state = 0;
+	enum kvm_pgtable_prot prot;
+
 	if (!kvm_pte_valid(pte) && pte)
 		return PKVM_NOPAGE;
 
-	return pkvm_getstate(kvm_pgtable_stage2_pte_prot(pte));
+	prot = kvm_pgtable_stage2_pte_prot(pte);
+	if (kvm_pte_valid(pte) && ((prot & KVM_PGTABLE_PROT_RWX) != PKVM_HOST_MEM_PROT))
+		state = PKVM_PAGE_RESTRICTED_PROT;
+
+	return state | pkvm_getstate(prot);
 }
 
 static int __host_check_page_state_range(u64 addr, u64 size,
@@ -973,10 +998,17 @@ static int host_complete_donation(u64 addr, const struct pkvm_mem_transition *tx
 
 static enum pkvm_page_state hyp_get_page_state(kvm_pte_t pte)
 {
+	enum pkvm_page_state state = 0;
+	enum kvm_pgtable_prot prot;
+
 	if (!kvm_pte_valid(pte))
 		return PKVM_NOPAGE;
 
-	return pkvm_getstate(kvm_pgtable_hyp_pte_prot(pte));
+	prot = kvm_pgtable_hyp_pte_prot(pte);
+	if (kvm_pte_valid(pte) && ((prot & KVM_PGTABLE_PROT_RWX) != PAGE_HYP))
+		state = PKVM_PAGE_RESTRICTED_PROT;
+
+	return state | pkvm_getstate(prot);
 }
 
 static int __hyp_check_page_state_range(u64 addr, u64 size,
@@ -1085,10 +1117,17 @@ static int hyp_complete_donation(u64 addr,
 
 static enum pkvm_page_state guest_get_page_state(kvm_pte_t pte)
 {
+	enum pkvm_page_state state = 0;
+	enum kvm_pgtable_prot prot;
+
 	if (!kvm_pte_valid(pte))
 		return PKVM_NOPAGE;
 
-	return pkvm_getstate(kvm_pgtable_stage2_pte_prot(pte));
+	prot = kvm_pgtable_stage2_pte_prot(pte);
+	if (kvm_pte_valid(pte) && ((prot & KVM_PGTABLE_PROT_RWX) != KVM_PGTABLE_PROT_RWX))
+		state = PKVM_PAGE_RESTRICTED_PROT;
+
+	return state | pkvm_getstate(prot);
 }
 
 static int __guest_check_page_state_range(struct pkvm_hyp_vcpu *vcpu, u64 addr,
@@ -1775,6 +1814,38 @@ int __pkvm_hyp_donate_host(u64 pfn, u64 nr_pages)
 	ret = do_donate(&donation);
 
 	hyp_unlock_component();
+	host_unlock_component();
+
+	return ret;
+}
+
+int hyp_protect_host_page(u64 pfn, enum kvm_pgtable_prot prot)
+{
+	u64 addr = hyp_pfn_to_phys(pfn);
+	kvm_pte_t pte;
+	u32 level;
+	int ret;
+
+	if ((prot & KVM_PGTABLE_PROT_RWX) != prot || prot == KVM_PGTABLE_PROT_RWX)
+		return -EINVAL;
+
+	host_lock_component();
+	ret = kvm_pgtable_get_leaf(&host_mmu.pgt, addr, &pte, &level);
+	if (ret)
+		goto unlock;
+
+	if (host_get_page_state(pte) != PKVM_PAGE_OWNED) {
+		ret = -EPERM;
+		goto unlock;
+	}
+
+	/* XXX: optimize ... */
+	if (kvm_pte_valid(pte) && (level == KVM_PGTABLE_MAX_LEVELS - 1))
+		ret = kvm_pgtable_stage2_unmap(&host_mmu.pgt, addr, PAGE_SIZE);
+	if (!ret)
+		ret = host_stage2_idmap_locked(addr, PAGE_SIZE, prot, false);
+
+unlock:
 	host_unlock_component();
 
 	return ret;

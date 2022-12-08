@@ -16,6 +16,7 @@
 #include <nvhe/memory.h>
 #include <nvhe/mem_protect.h>
 #include <nvhe/mm.h>
+#include <nvhe/modules.h>
 #include <nvhe/spinlock.h>
 
 struct kvm_pgtable pkvm_pgtable;
@@ -100,6 +101,48 @@ int __pkvm_create_private_mapping(phys_addr_t phys, size_t size,
 	return err;
 }
 
+void *__pkvm_alloc_module_va(u64 nr_pages)
+{
+	unsigned long addr = 0;
+
+	pkvm_modules_lock();
+	if (pkvm_modules_enabled())
+		pkvm_alloc_private_va_range(nr_pages << PAGE_SHIFT, &addr);
+	pkvm_modules_unlock();
+
+	return (void *)addr;
+}
+
+int __pkvm_map_module_page(u64 pfn, void *va, enum kvm_pgtable_prot prot)
+{
+	int ret = -EACCES;
+
+	pkvm_modules_lock();
+
+	if (!pkvm_modules_enabled())
+		goto err;
+
+	ret = __pkvm_host_donate_hyp(pfn, 1);
+	if (ret)
+		goto err;
+
+	ret = __pkvm_create_mappings((unsigned long)va, PAGE_SIZE, hyp_pfn_to_phys(pfn), prot);
+err:
+	pkvm_modules_unlock();
+
+	return ret;
+}
+
+void __pkvm_unmap_module_page(u64 pfn, void *va)
+{
+	pkvm_modules_lock();
+	if (pkvm_modules_enabled()) {
+		WARN_ON(__pkvm_hyp_donate_host(pfn, 1));
+		pkvm_remove_mappings(va, va + PAGE_SIZE);
+	}
+	pkvm_modules_unlock();
+}
+
 int pkvm_create_mappings_locked(void *from, void *to, enum kvm_pgtable_prot prot)
 {
 	unsigned long start = (unsigned long)from;
@@ -134,6 +177,15 @@ int pkvm_create_mappings(void *from, void *to, enum kvm_pgtable_prot prot)
 	hyp_spin_unlock(&pkvm_pgd_lock);
 
 	return ret;
+}
+
+void pkvm_remove_mappings(void *from, void *to)
+{
+	unsigned long size = (unsigned long)to - (unsigned long)from;
+
+	hyp_spin_lock(&pkvm_pgd_lock);
+	WARN_ON(kvm_pgtable_hyp_unmap(&pkvm_pgtable, (u64)from, size) != size);
+	hyp_spin_unlock(&pkvm_pgd_lock);
 }
 
 int hyp_back_vmemmap(phys_addr_t back)
@@ -230,7 +282,7 @@ void *hyp_fixmap_map(phys_addr_t phys)
 	WRITE_ONCE(*ptep, pte);
 	dsb(ishst);
 
-	return (void *)slot->addr;
+	return (void *)slot->addr + offset_in_page(phys);
 }
 
 static void fixmap_clear_slot(struct hyp_fixmap_slot *slot)
