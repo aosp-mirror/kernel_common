@@ -1,4 +1,4 @@
-DEFCONFIG=x86_64_arcvm_defconfig
+DEFCONFIG=gki_defconfig
 POST_DEFCONFIG_CMDS="check_defconfig"
 
 if [ -n "${GKI_BUILD_CONFIG_FRAGMENT}" ]; then
