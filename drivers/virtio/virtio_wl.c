@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  *  Wayland Virtio Driver
- *  Copyright (C) 2022 Google, Inc.
+ *  Copyright (C) 2017-2022 Google LLC
  */
 
 /*
