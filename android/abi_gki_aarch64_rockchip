@@ -71,6 +71,7 @@
   dev_err_probe
   devfreq_recommended_opp
   dev_fwnode
+  dev_get_regmap
   device_create_file
   device_init_wakeup
   device_property_present
@@ -85,8 +86,10 @@
   devm_add_action
   devm_clk_bulk_get_all
   devm_clk_get
+  devm_clk_get_optional
   devm_clk_hw_register
   devm_clk_register
+  devm_device_add_group
   devm_gpiochip_add_data_with_key
   devm_gpiod_get
   devm_gpiod_get_index_optional
@@ -105,11 +108,14 @@
   devm_phy_get
   devm_pinctrl_get
   devm_pinctrl_register
+  devm_pinctrl_register_and_init
+  devm_platform_get_and_ioremap_resource
   devm_platform_ioremap_resource
   devm_power_supply_register
   devm_pwm_get
   devm_regmap_field_alloc
   __devm_regmap_init_i2c
+  devm_regulator_bulk_get
   devm_regulator_get
   devm_regulator_get_optional
   devm_regulator_register
@@ -148,13 +154,42 @@
   down_read
   down_write
   driver_unregister
+  drm_add_edid_modes
+  drm_add_modes_noedid
+  drm_atomic_get_new_bridge_state
+  drm_atomic_helper_bridge_destroy_state
+  drm_atomic_helper_bridge_duplicate_state
+  drm_atomic_helper_bridge_propagate_bus_fmt
+  drm_atomic_helper_bridge_reset
+  drm_atomic_helper_connector_destroy_state
+  drm_atomic_helper_connector_duplicate_state
+  drm_atomic_helper_connector_reset
+  drm_bridge_add
+  drm_bridge_attach
+  drm_bridge_detect
+  drm_bridge_get_modes
+  drm_bridge_remove
+  drm_connector_attach_encoder
+  drm_connector_cleanup
+  drm_connector_init
   drm_connector_update_edid_property
+  drm_display_info_set_bus_formats
+  __drm_err
   drm_get_edid
+  drm_helper_probe_single_connector_modes
+  drm_kms_helper_is_poll_worker
+  drm_mode_copy
   drm_mode_create
   drm_mode_duplicate
   drm_mode_probed_add
   drm_mode_set_name
   drm_mode_vrefresh
+  drm_of_find_panel_or_bridge
+  drm_panel_disable
+  drm_panel_enable
+  drm_panel_get_modes
+  drm_panel_prepare
+  drm_panel_unprepare
   enable_irq
   eth_mac_addr
   eth_platform_get_mac_address
@@ -202,6 +237,8 @@
   i2c_smbus_read_i2c_block_data
   i2c_smbus_write_byte_data
   i2c_smbus_write_i2c_block_data
+  __i2c_smbus_xfer
+  i2c_transfer
   iio_device_attach_buffer
   iio_push_to_buffers
   __init_swait_queue_head
@@ -237,9 +274,14 @@
   memmove
   memset
   memstart_addr
+  mfd_remove_devices
   mii_check_media
   mii_ethtool_gset
   mii_nway_restart
+  mipi_dsi_attach
+  mipi_dsi_detach
+  mipi_dsi_device_register_full
+  mipi_dsi_device_unregister
   mmc_of_parse
   mod_delayed_work_on
   mod_timer
@@ -270,6 +312,7 @@
   of_device_is_available
   of_device_is_compatible
   of_find_matching_node_and_match
+  of_find_mipi_dsi_host_by_node
   of_find_node_by_name
   of_find_property
   of_get_child_by_name
@@ -279,6 +322,7 @@
   of_get_parent
   of_get_property
   of_get_regulator_init_data
+  of_graph_get_remote_node
   of_iomap
   of_machine_is_compatible
   of_match_device
@@ -302,14 +346,27 @@
   phy_init
   phy_power_off
   phy_power_on
+  pinconf_generic_dt_free_map
   pinconf_generic_dt_node_to_map
   pinctrl_dev_get_drvdata
+  pinctrl_enable
+  pinctrl_generic_add_group
+  pinctrl_generic_get_group
+  pinctrl_generic_get_group_count
+  pinctrl_generic_get_group_name
+  pinctrl_generic_get_group_pins
   pinctrl_gpio_direction_input
   pinctrl_gpio_direction_output
   pinctrl_lookup_state
   pinctrl_select_state
   pinctrl_utils_free_map
+  pinmux_generic_add_function
+  pinmux_generic_get_function
+  pinmux_generic_get_function_count
+  pinmux_generic_get_function_groups
+  pinmux_generic_get_function_name
   platform_device_put
+  platform_device_register_full
   __platform_driver_probe
   __platform_driver_register
   platform_driver_unregister
@@ -363,18 +420,25 @@
   rdev_get_drvdata
   rdev_get_id
   refcount_warn_saturate
+  regcache_cache_only
+  regcache_mark_dirty
+  regcache_sync
   register_pm_notifier
   register_reboot_notifier
   regmap_bulk_read
+  regmap_bulk_write
   regmap_field_read
   regmap_field_update_bits_base
   regmap_irq_get_domain
   regmap_irq_get_virq
+  regmap_multi_reg_write
   regmap_raw_read
   regmap_raw_write
   regmap_read
   regmap_update_bits_base
   regmap_write
+  regulator_bulk_disable
+  regulator_bulk_enable
   regulator_disable
   regulator_disable_regmap
   regulator_enable
@@ -628,14 +692,11 @@
 # required by cw2017_battery.ko
   bcmp
 
+# required by cw221x_battery.ko
+  power_supply_is_system_supplied
+
 # required by display-connector.ko
-  drm_atomic_get_new_bridge_state
-  drm_atomic_helper_bridge_destroy_state
-  drm_atomic_helper_bridge_duplicate_state
-  drm_atomic_helper_bridge_reset
-  drm_bridge_add
   drm_bridge_hpd_notify
-  drm_bridge_remove
   drm_probe_ddc
   i2c_put_adapter
   of_get_i2c_adapter_by_node
@@ -676,8 +737,6 @@
   bitmap_find_next_zero_area_off
   __bitmap_set
   debugfs_create_regset32
-  devm_platform_get_and_ioremap_resource
-  devm_regulator_bulk_get
   dma_map_page_attrs
   dma_unmap_page_attrs
   hrtimer_cancel
@@ -690,8 +749,6 @@
   kmem_cache_free
   phy_reset
   _raw_spin_trylock
-  regulator_bulk_disable
-  regulator_bulk_enable
   usb_add_gadget_udc
   usb_del_gadget_udc
   usb_ep_set_maxpacket_limit
@@ -759,6 +816,19 @@
   irq_set_chained_handler_and_data
   of_pinctrl_get
 
+# required by i2c-mux.ko
+  i2c_adapter_type
+  i2c_add_adapter
+  i2c_add_numbered_adapter
+  i2c_del_adapter
+  i2c_smbus_xfer
+  __i2c_transfer
+  rt_mutex_lock
+  rt_mutex_trylock
+  rt_mutex_unlock
+  sysfs_create_link
+  sysfs_remove_link
+
 # required by industrialio-triggered-buffer.ko
   iio_alloc_pollfunc
   iio_dealloc_pollfunc
@@ -775,6 +845,15 @@
   iio_buffer_init
   iio_buffer_put
   __kfifo_to_user
+
+# required by maxim-max96745.ko
+  devm_extcon_dev_allocate
+  devm_extcon_dev_register
+  extcon_set_state
+  extcon_set_state_sync
+
+# required by maxim-max96755f.ko
+  irq_modify_status
 
 # required by nvmem-rockchip-otp.ko
   devm_clk_bulk_get
@@ -807,23 +886,17 @@
 
 # required by panel-simple.ko
   devm_backlight_device_register
-  drm_add_edid_modes
   drm_bus_flags_from_videomode
   drm_connector_set_panel_orientation
-  drm_display_info_set_bus_formats
   drm_display_mode_from_videomode
   drm_panel_add
-  drm_panel_disable
   drm_panel_init
   drm_panel_of_backlight
   drm_panel_remove
-  drm_panel_unprepare
-  mipi_dsi_attach
   mipi_dsi_compression_mode
   mipi_dsi_dcs_get_display_brightness
   mipi_dsi_dcs_set_display_brightness
   mipi_dsi_dcs_write_buffer
-  mipi_dsi_detach
   mipi_dsi_driver_register_full
   mipi_dsi_driver_unregister
   mipi_dsi_generic_write
@@ -848,15 +921,24 @@
   clk_bulk_put
   of_genpd_add_provider_onecell
   panic
+  param_get_bool
+  param_set_bool
   pm_clk_add_clk
   pm_genpd_add_subdomain
   pm_genpd_init
   pm_genpd_remove
+  pm_wq
   strrchr
 
 # required by pwm-regulator.ko
   pwm_adjust_config
   regulator_map_voltage_iterate
+
+# required by rk1000-core.ko
+  mfd_add_devices
+
+# required by rk1000.ko
+  of_find_i2c_device_by_node
 
 # required by rk806-core.ko
   devm_regmap_add_irq_chip
@@ -873,7 +955,6 @@
   gpiod_is_active_low
 
 # required by rk808.ko
-  mfd_remove_devices
   platform_device_add
   platform_device_alloc
   pm_power_off_prepare
@@ -889,7 +970,6 @@
   cpufreq_unregister_notifier
   dev_pm_opp_put_prop_name
   dev_pm_opp_set_supported_hw
-  platform_device_register_full
 
 # required by rockchip-cpuinfo.ko
   nvmem_cell_get
@@ -966,6 +1046,7 @@
 # required by rockchip_system_monitor.ko
   add_cpu
   bitmap_parselist
+  compat_only_sysfs_link_entry_to_kobj
   dev_pm_opp_find_freq_floor
   dev_pm_qos_add_request
   dev_pm_qos_remove_request
@@ -998,7 +1079,6 @@
   component_unbind_all
   device_link_add
   device_link_del
-  devm_clk_get_optional
   dma_buf_attach
   dma_buf_detach
   dma_buf_map_attachment
@@ -1006,7 +1086,6 @@
   dma_buf_unmap_attachment
   dma_get_sgtable_attrs
   dma_mmap_attrs
-  drm_add_modes_noedid
   drm_atomic_commit
   drm_atomic_get_connector_state
   drm_atomic_get_crtc_state
@@ -1020,7 +1099,6 @@
   drm_atomic_helper_commit_modeset_enables
   drm_atomic_helper_commit_planes
   __drm_atomic_helper_connector_destroy_state
-  drm_atomic_helper_connector_destroy_state
   __drm_atomic_helper_connector_duplicate_state
   __drm_atomic_helper_connector_reset
   __drm_atomic_helper_crtc_destroy_state
@@ -1042,8 +1120,8 @@
   drm_atomic_set_mode_for_crtc
   drm_atomic_state_alloc
   __drm_atomic_state_free
+  drm_bridge_chain_mode_set
   drm_compat_ioctl
-  drm_connector_cleanup
   drm_connector_list_iter_begin
   drm_connector_list_iter_end
   drm_connector_list_iter_next
@@ -1067,7 +1145,6 @@
   drm_dev_register
   drm_dev_unregister
   drm_encoder_cleanup
-  __drm_err
   drm_event_reserve_init_locked
   drm_flip_work_cleanup
   drm_flip_work_commit
@@ -1107,7 +1184,6 @@
   drm_get_format_info
   drm_get_format_name
   drm_helper_mode_fill_fb_struct
-  drm_helper_probe_single_connector_modes
   drm_ioctl
   drm_kms_helper_poll_enable
   drm_kms_helper_poll_fini
@@ -1123,7 +1199,6 @@
   drm_mode_config_helper_resume
   drm_mode_config_helper_suspend
   drm_mode_config_reset
-  drm_mode_copy
   drm_mode_create_tv_properties
   drm_mode_crtc_set_gamma_size
   drm_mode_debug_printmodeline
@@ -1211,7 +1286,6 @@
 
 # required by rtc-rk808.ko
   devm_rtc_allocate_device
-  regmap_bulk_write
   __rtc_register_device
   rtc_time64_to_tm
   rtc_update_irq
@@ -1241,6 +1315,16 @@
 # required by sgm41542_charger.ko
   strncpy
 
+# required by sii902x.ko
+  drm_detect_hdmi_monitor
+  drm_display_mode_to_videomode
+  drm_hdmi_avi_infoframe_from_display_mode
+  drm_helper_hpd_irq_event
+  hdmi_audio_infoframe_pack
+  hdmi_avi_infoframe_pack
+  of_graph_parse_endpoint
+  of_property_read_variable_u8_array
+
 # required by smsc95xx.ko
   csum_partial
   ethtool_op_get_ts_info
@@ -1262,6 +1346,21 @@
   phy_start
   phy_stop
   usb_autopm_get_interface_no_resume
+
+# required by snd-soc-hdmi-codec.ko
+  devm_snd_soc_register_component
+  hdmi_audio_infoframe_init
+  snd_ctl_add
+  snd_ctl_new1
+  snd_pcm_add_chmap_ctls
+  snd_pcm_create_iec958_consumer_default
+  snd_pcm_fill_iec958_consumer
+  snd_pcm_fill_iec958_consumer_hw_params
+  snd_pcm_format_width
+  snd_pcm_hw_constraint_eld
+  snd_pcm_stop
+  snd_soc_dapm_add_routes
+  snd_soc_jack_report
 
 # required by tcpci_husb311.ko
   i2c_smbus_read_word_data
@@ -1298,7 +1397,6 @@
   typec_get_negotiated_svdm_version
 
 # required by ucs12cm0.ko
-  i2c_transfer
   irq_get_irq_data
 
 # required by usblp.ko
