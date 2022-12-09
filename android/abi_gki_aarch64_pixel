@@ -1304,8 +1304,6 @@
   pin_user_pages_remote
   pktgen_xfrm_outer_mode_output
   pkvm_iommu_resume
-  pkvm_iommu_s2mpu_init
-  pkvm_iommu_s2mpu_register
   pkvm_iommu_suspend
   __pkvm_load_el2_module
   __pkvm_register_el2_call
