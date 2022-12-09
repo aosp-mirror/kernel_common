@@ -63,6 +63,7 @@
   clk_set_phase
   clk_set_rate
   clk_unprepare
+  clk_unregister
   compat_ptr_ioctl
   complete
   __const_udelay
@@ -115,6 +116,7 @@
   _dev_info
   __dev_kfree_skb_any
   devm_add_action
+  devm_clk_bulk_get
   devm_clk_bulk_get_all
   devm_clk_get
   devm_clk_get_optional
@@ -142,6 +144,8 @@
   devm_nvmem_register
   devm_of_clk_add_hw_provider
   devm_of_phy_get
+  __devm_of_phy_provider_register
+  devm_phy_create
   devm_phy_get
   devm_phy_optional_get
   devm_pinctrl_get
@@ -149,6 +153,7 @@
   devm_pinctrl_register_and_init
   devm_platform_get_and_ioremap_resource
   devm_platform_ioremap_resource
+  devm_platform_ioremap_resource_byname
   devm_power_supply_register
   devm_pwm_get
   devm_regmap_field_alloc
@@ -295,11 +300,13 @@
   extcon_get_state
   extcon_register_notifier
   extcon_set_property_capability
+  extcon_set_state
   extcon_set_state_sync
   extcon_unregister_notifier
   find_next_bit
   find_next_zero_bit
   finish_wait
+  flush_delayed_work
   flush_work
   flush_workqueue
   free_irq
@@ -308,6 +315,7 @@
   freq_qos_add_request
   freq_qos_remove_request
   freq_qos_update_request
+  fwnode_get_name
   fwnode_handle_put
   gcd
   generic_handle_irq
@@ -400,6 +408,7 @@
   __log_write_mmio
   mdiobus_read
   mdiobus_write
+  media_entity_remote_pad
   memcpy
   memmove
   memset
@@ -433,6 +442,7 @@
   noop_llseek
   nr_cpu_ids
   ns_to_timespec64
+  nvmem_cell_get
   nvmem_cell_put
   nvmem_cell_read
   of_address_to_resource
@@ -466,11 +476,14 @@
   of_graph_get_remote_port_parent
   of_graph_parse_endpoint
   of_iomap
+  of_irq_get_byname
   of_machine_is_compatible
   of_match_device
   of_match_node
+  of_node_name_eq
   of_nvmem_cell_get
   of_parse_phandle
+  of_phy_simple_xlate
   of_property_count_elems_of_size
   of_property_match_string
   of_property_read_string
@@ -479,6 +492,7 @@
   of_property_read_variable_u32_array
   of_property_read_variable_u8_array
   of_regulator_match
+  of_usb_get_dr_mode_by_phy
   panic_notifier_list
   param_ops_bool
   param_ops_int
@@ -544,6 +558,7 @@
   __pm_runtime_set_status
   __pm_runtime_suspend
   __pm_runtime_use_autosuspend
+  __pm_stay_awake
   pm_wakeup_ws_event
   power_supply_am_i_supplied
   power_supply_changed
@@ -568,6 +583,7 @@
   queue_delayed_work_on
   queue_work_on
   ___ratelimit
+  rational_best_approximation
   _raw_spin_lock
   _raw_spin_lock_bh
   _raw_spin_lock_irq
@@ -686,6 +702,9 @@
   trace_raw_output_prep
   trace_seq_printf
   try_module_get
+  typec_switch_get_drvdata
+  typec_switch_register
+  typec_switch_unregister
   __udelay
   update_devfreq
   up_read
@@ -747,11 +766,16 @@
   usb_submit_urb
   usb_unpoison_urb
   usleep_range
+  v4l2_async_notifier_cleanup
+  v4l2_async_notifier_init
+  v4l2_async_register_subdev
+  v4l2_async_subdev_notifier_register
   vabits_actual
   vmap
   wait_for_completion_timeout
   __wake_up
   wakeup_source_add
+  wakeup_source_remove
   __warn_printk
 
 # required by act8865-regulator.ko
@@ -819,10 +843,8 @@
   clk_register_fixed_factor
   clk_register_gate
   clk_register_mux_table
-  clk_unregister
   match_string
   of_clk_src_onecell_get
-  rational_best_approximation
   register_restart_handler
   reset_controller_register
 
@@ -1033,9 +1055,6 @@
   iio_buffer_put
   __kfifo_to_user
 
-# required by maxim-max96745.ko
-  extcon_set_state
-
 # required by nvme-core.ko
   add_uevent_var
   alloc_chrdev_region
@@ -1179,9 +1198,6 @@
   sysfs_remove_file_from_group
   wait_for_completion_io_timeout
 
-# required by nvmem-rockchip-otp.ko
-  devm_clk_bulk_get
-
 # required by ohci-hcd.ko
   default_llseek
   gen_pool_dma_alloc_align
@@ -1239,7 +1255,6 @@
 # required by pcierockchiphost.ko
   devm_pci_alloc_host_bridge
   devm_pci_remap_cfg_resource
-  devm_platform_ioremap_resource_byname
   dummy_irq_chip
   jiffies_to_usecs
   of_pci_get_max_link_speed
@@ -1247,6 +1262,42 @@
   pci_remove_root_bus
   pci_stop_root_bus
   regulator_get_current_limit
+
+# required by phy-rockchip-csi2-dphy.ko
+  media_create_pad_link
+  media_entity_pads_init
+  v4l2_ctrl_find
+  v4l2_ctrl_g_ctrl
+  v4l2_querymenu
+  v4l2_subdev_call_wrappers
+  v4l2_subdev_init
+
+# required by phy-rockchip-inno-dsidphy.ko
+  phy_mipi_dphy_config_validate
+
+# required by phy-rockchip-inno-usb2.ko
+  devm_extcon_register_notifier
+  extcon_sync
+
+# required by phy-rockchip-inno-usb3.ko
+  atomic_notifier_call_chain
+  strcasecmp
+  usb_add_phy
+
+# required by phy-rockchip-samsung-hdptx-hdmi.ko
+  of_platform_device_create
+
+# required by phy-rockchip-typec.ko
+  extcon_get_property
+
+# required by phy-rockchip-usb.ko
+  __of_reset_control_get
+
+# required by phy-rockchip-usbdp.ko
+  typec_mux_get_drvdata
+  typec_mux_register
+  typec_mux_unregister
+  usb_get_maximum_speed
 
 # required by pinctrl-rockchip.ko
   of_find_node_by_phandle
@@ -1318,9 +1369,6 @@
   cpufreq_unregister_notifier
   dev_pm_opp_put_prop_name
   dev_pm_opp_set_supported_hw
-
-# required by rockchip-cpuinfo.ko
-  nvmem_cell_get
 
 # required by rockchip-dfi.ko
   devm_devfreq_event_add_edev
@@ -1395,7 +1443,6 @@
 
 # required by rockchip_pwm_remotectl.ko
   __tasklet_hi_schedule
-  wakeup_source_remove
 
 # required by rockchip_saradc.ko
   iio_get_time_ns
@@ -1612,7 +1659,6 @@
   drm_writeback_connector_init
   drm_writeback_queue_job
   drm_writeback_signal_completion
-  fwnode_get_name
   gen_pool_add_owner
   gen_pool_alloc_algo_owner
   gen_pool_create
@@ -1813,3 +1859,20 @@
   usb_match_one_id
   usb_show_dynids
   usb_store_new_id
+
+# required by v4l2-fwnode.ko
+  fwnode_device_is_available
+  fwnode_graph_get_next_endpoint
+  fwnode_graph_get_port_parent
+  fwnode_graph_get_remote_endpoint
+  fwnode_graph_get_remote_port_parent
+  fwnode_graph_parse_endpoint
+  fwnode_property_get_reference_args
+  fwnode_property_present
+  fwnode_property_read_string
+  fwnode_property_read_u32_array
+  fwnode_property_read_u64_array
+  kstrdup_const
+  v4l2_async_notifier_add_fwnode_subdev
+  v4l2_async_notifier_add_subdev
+  v4l2_async_notifier_unregister
