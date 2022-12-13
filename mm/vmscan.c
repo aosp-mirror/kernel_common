@@ -4282,7 +4282,6 @@ done:
 	VM_WARN_ON_ONCE(max_seq != READ_ONCE(lrugen->max_seq));
 
 	inc_max_seq(lruvec, can_swap, full_scan);
-	sysfs_notify(mm_kobj, "lru_gen", "admin");
 	/* either this sees any waiters or they will see updated max_seq */
 	if (wq_has_sleeper(&lruvec->mm_state.wait))
 		wake_up_all(&lruvec->mm_state.wait);
