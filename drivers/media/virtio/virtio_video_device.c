@@ -1240,6 +1240,7 @@ static int virtio_video_device_release(struct file *file)
 	struct virtio_video_device *vvd = video_drvdata(file);
 	struct virtio_video *vv = vvd->vv;
 
+	cancel_work_sync(&stream->work);
 	virtio_video_stream_id_put(vv, stream);
 
 	v4l2_fh_del(&stream->fh);
