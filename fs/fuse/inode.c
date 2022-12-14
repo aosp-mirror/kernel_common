@@ -2027,45 +2027,17 @@ static void fuse_fs_cleanup(void)
 
 static struct kobject *fuse_kobj;
 
-/*
- * TODO Remove this once fuse-bpf is upstreamed
- *
- * The version numbers give us the ability to tune user mode behavior to the
- * specific non-upstreamed version of fuse-bpf
- *
- * bpf_prog_type_fuse exports the bpf_prog_type_fuse 'constant', which cannot be
- * constant until the code is upstreamed
- */
-static ssize_t fuse_bpf_major_version_show(struct kobject *kobj,
-				       struct kobj_attribute *attr, char *buff)
-{
-	return sysfs_emit(buff, "%d\n", FUSE_BPF_MAJOR_VERSION);
-}
-
-static ssize_t fuse_bpf_minor_version_show(struct kobject *kobj,
-				       struct kobj_attribute *attr, char *buff)
-{
-	return sysfs_emit(buff, "%d\n", FUSE_BPF_MINOR_VERSION);
-}
-
+/* TODO Remove this once BPF_PROG_TYPE_FUSE is upstreamed */
 static ssize_t bpf_prog_type_fuse_show(struct kobject *kobj,
 				       struct kobj_attribute *attr, char *buff)
 {
 	return sysfs_emit(buff, "%d\n", BPF_PROG_TYPE_FUSE);
 }
 
-static struct kobj_attribute fuse_bpf_major_version_attr =
-		__ATTR_RO(fuse_bpf_major_version);
-
-static struct kobj_attribute fuse_bpf_minor_version_attr =
-		__ATTR_RO(fuse_bpf_minor_version);
-
 static struct kobj_attribute bpf_prog_type_fuse_attr =
 		__ATTR_RO(bpf_prog_type_fuse);
 
 static struct attribute *bpf_attributes[] = {
-	&fuse_bpf_major_version_attr.attr,
-	&fuse_bpf_minor_version_attr.attr,
 	&bpf_prog_type_fuse_attr.attr,
 	NULL,
 };
