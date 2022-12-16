@@ -3,8 +3,8 @@
 #define __LINUX_BITS_H
 
 #include <linux/const.h>
-#ifdef __GENKSYMS__
 #include <vdso/bits.h>
+#ifdef __GENKSYMS__
 /*
  * Old version of this macro to preserve the CRC signatures of some drm symbols.
  * Crazy but true...
@@ -14,7 +14,6 @@
 #else
 #include <asm/bitsperlong.h>
 
-#define BIT(nr)			(UL(1) << (nr))
 #define BIT_ULL(nr)		(ULL(1) << (nr))
 #define BIT_MASK(nr)		(UL(1) << ((nr) % BITS_PER_LONG))
 #endif
