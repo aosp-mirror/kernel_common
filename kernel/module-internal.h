@@ -32,9 +32,14 @@ extern int mod_verify_sig(const void *mod, struct load_info *info);
 
 #ifdef CONFIG_MODULE_SIG_PROTECT
 extern bool gki_is_module_unprotected_symbol(const char *name);
+extern bool gki_is_module_protected_export(const char *name);
 #else
 static inline bool gki_is_module_unprotected_symbol(const char *name)
 {
 	return 1;
+}
+static inline bool gki_is_module_protected_export(const char *name)
+{
+	return 0;
 }
 #endif /* CONFIG_MODULE_SIG_PROTECT */
