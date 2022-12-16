@@ -44,6 +44,36 @@ typedef u64 kvm_pte_t;
 
 #define KVM_PHYS_INVALID		(-1ULL)
 
+#define KVM_PTE_TYPE			BIT(1)
+#define KVM_PTE_TYPE_BLOCK		0
+#define KVM_PTE_TYPE_PAGE		1
+#define KVM_PTE_TYPE_TABLE		1
+
+#define KVM_PTE_LEAF_ATTR_LO		GENMASK(11, 2)
+
+#define KVM_PTE_LEAF_ATTR_LO_S1_ATTRIDX	GENMASK(4, 2)
+#define KVM_PTE_LEAF_ATTR_LO_S1_AP	GENMASK(7, 6)
+#define KVM_PTE_LEAF_ATTR_LO_S1_AP_RO	3
+#define KVM_PTE_LEAF_ATTR_LO_S1_AP_RW	1
+#define KVM_PTE_LEAF_ATTR_LO_S1_SH	GENMASK(9, 8)
+#define KVM_PTE_LEAF_ATTR_LO_S1_SH_IS	3
+#define KVM_PTE_LEAF_ATTR_LO_S1_AF	BIT(10)
+
+#define KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR	GENMASK(5, 2)
+#define KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R	BIT(6)
+#define KVM_PTE_LEAF_ATTR_LO_S2_S2AP_W	BIT(7)
+#define KVM_PTE_LEAF_ATTR_LO_S2_SH	GENMASK(9, 8)
+#define KVM_PTE_LEAF_ATTR_LO_S2_SH_IS	3
+#define KVM_PTE_LEAF_ATTR_LO_S2_AF	BIT(10)
+
+#define KVM_PTE_LEAF_ATTR_HI		GENMASK(63, 51)
+
+#define KVM_PTE_LEAF_ATTR_HI_SW		GENMASK(58, 55)
+
+#define KVM_PTE_LEAF_ATTR_HI_S1_XN	BIT(54)
+
+#define KVM_PTE_LEAF_ATTR_HI_S2_XN	BIT(54)
+
 static inline bool kvm_pte_valid(kvm_pte_t pte)
 {
 	return pte & KVM_PTE_VALID;
@@ -85,6 +115,17 @@ static inline u64 kvm_granule_size(u32 level)
 static inline bool kvm_level_supports_block_mapping(u32 level)
 {
 	return level >= KVM_PGTABLE_MIN_BLOCK_LEVEL;
+}
+
+static inline bool kvm_pte_table(kvm_pte_t pte, u32 level)
+{
+	if (level == KVM_PGTABLE_MAX_LEVELS - 1)
+		return false;
+
+	if (!kvm_pte_valid(pte))
+		return false;
+
+	return FIELD_GET(KVM_PTE_TYPE, pte) == KVM_PTE_TYPE_TABLE;
 }
 
 /**
@@ -169,6 +210,24 @@ enum kvm_pgtable_prot {
 #define PKVM_HOST_MEM_PROT	KVM_PGTABLE_PROT_RWX
 #define PKVM_HOST_MMIO_PROT	KVM_PGTABLE_PROT_RW
 
+#define KVM_HOST_S2_DEFAULT_ATTR   (KVM_PTE_LEAF_ATTR_HI |	\
+				    KVM_PTE_LEAF_ATTR_LO)
+
+#define KVM_HOST_S2_DEFAULT_MEM_PTE		\
+	(KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR |	\
+	KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R |	\
+	KVM_PTE_LEAF_ATTR_LO_S2_S2AP_W |	\
+	KVM_PTE_LEAF_ATTR_LO_S2_SH	|	\
+	KVM_PTE_LEAF_ATTR_LO_S2_AF)
+
+#define KVM_HOST_S2_DEFAULT_MMIO_PTE		\
+	(KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR |	\
+	KVM_PTE_LEAF_ATTR_HI_S2_XN |		\
+	KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R |	\
+	KVM_PTE_LEAF_ATTR_LO_S2_S2AP_W |	\
+	KVM_PTE_LEAF_ATTR_LO_S2_SH |		\
+	KVM_PTE_LEAF_ATTR_LO_S2_AF)
+
 #define PAGE_HYP		KVM_PGTABLE_PROT_RW
 #define PAGE_HYP_EXEC		(KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_X)
 #define PAGE_HYP_RO		(KVM_PGTABLE_PROT_R)
@@ -176,6 +235,22 @@ enum kvm_pgtable_prot {
 
 typedef bool (*kvm_pgtable_force_pte_cb_t)(u64 addr, u64 end,
 					   enum kvm_pgtable_prot prot);
+
+typedef bool (*kvm_pgtable_pte_is_counted_cb_t)(kvm_pte_t pte, u32 level);
+
+/**
+ * struct kvm_pgtable_pte_ops - PTE callbacks.
+ * @force_pte_cb:		Force the mapping granularity to pages and
+ *				return true if we support this instead of
+ *				block mappings.
+ * @pte_is_counted_cb		Verify the attributes of the @pte argument
+ *				and return true if the descriptor needs to be
+ *				refcounted, otherwise return false.
+ */
+struct kvm_pgtable_pte_ops {
+	kvm_pgtable_force_pte_cb_t		force_pte_cb;
+	kvm_pgtable_pte_is_counted_cb_t		pte_is_counted_cb;
+};
 
 /**
  * struct kvm_pgtable - KVM page-table.
@@ -185,8 +260,7 @@ typedef bool (*kvm_pgtable_force_pte_cb_t)(u64 addr, u64 end,
  * @mm_ops:		Memory management callbacks.
  * @mmu:		Stage-2 KVM MMU struct. Unused for stage-1 page-tables.
  * @flags:		Stage-2 page-table flags.
- * @force_pte_cb:	Function that returns true if page level mappings must
- *			be used instead of block mappings.
+ * @pte_ops:		PTE callbacks.
  */
 struct kvm_pgtable {
 	u32					ia_bits;
@@ -197,7 +271,7 @@ struct kvm_pgtable {
 	/* Stage-2 only */
 	struct kvm_s2_mmu			*mmu;
 	enum kvm_pgtable_stage2_flags		flags;
-	kvm_pgtable_force_pte_cb_t		force_pte_cb;
+	struct kvm_pgtable_pte_ops		*pte_ops;
 };
 
 /**
@@ -326,18 +400,17 @@ size_t kvm_pgtable_stage2_pgd_size(u64 vtcr);
  * @mmu:	S2 MMU context for this S2 translation
  * @mm_ops:	Memory management callbacks.
  * @flags:	Stage-2 configuration flags.
- * @force_pte_cb: Function that returns true if page level mappings must
- *		be used instead of block mappings.
+ * @pte_ops:	PTE callbacks.
  *
  * Return: 0 on success, negative error code on failure.
  */
 int __kvm_pgtable_stage2_init(struct kvm_pgtable *pgt, struct kvm_s2_mmu *mmu,
 			      struct kvm_pgtable_mm_ops *mm_ops,
 			      enum kvm_pgtable_stage2_flags flags,
-			      kvm_pgtable_force_pte_cb_t force_pte_cb);
+			      struct kvm_pgtable_pte_ops *pte_ops);
 
-#define kvm_pgtable_stage2_init(pgt, mmu, mm_ops) \
-	__kvm_pgtable_stage2_init(pgt, mmu, mm_ops, 0, NULL)
+#define kvm_pgtable_stage2_init(pgt, mmu, mm_ops, pte_ops) \
+	__kvm_pgtable_stage2_init(pgt, mmu, mm_ops, 0, pte_ops)
 
 /**
  * kvm_pgtable_stage2_destroy() - Destroy an unused guest stage-2 page-table.

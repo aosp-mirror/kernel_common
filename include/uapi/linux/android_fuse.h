@@ -10,9 +10,6 @@
 #include <stdint.h>
 #endif
 
-#define FUSE_BPF_MAJOR_VERSION 1
-#define FUSE_BPF_MINOR_VERSION 0
-
 #define FUSE_ACTION_KEEP	0
 #define FUSE_ACTION_REMOVE	1
 #define FUSE_ACTION_REPLACE	2
