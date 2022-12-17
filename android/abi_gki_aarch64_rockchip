@@ -2,6 +2,7 @@
 # commonly used symbols
   add_timer
   add_uevent_var
+  aes_encrypt
   alloc_chrdev_region
   __alloc_disk_node
   __alloc_pages_nodemask
@@ -104,6 +105,7 @@
   cpufreq_register_governor
   cpufreq_register_notifier
   cpufreq_unregister_governor
+  cpu_have_feature
   __cpuhp_remove_state
   __cpuhp_setup_state
   cpu_hwcap_keys
@@ -118,11 +120,31 @@
   cpus_read_unlock
   crc16
   crc32_le
+  crypto_aead_decrypt
+  crypto_aead_encrypt
+  crypto_aead_setkey
+  crypto_ahash_setkey
+  crypto_alloc_aead
+  crypto_alloc_ahash
+  crypto_alloc_skcipher
+  crypto_cipher_encrypt_one
   crypto_destroy_tfm
+  crypto_inc
+  __crypto_memneq
+  crypto_register_aead
   crypto_register_alg
   crypto_register_scomp
+  crypto_register_shash
+  crypto_register_template
+  crypto_skcipher_decrypt
+  crypto_skcipher_encrypt
+  crypto_skcipher_setkey
+  crypto_unregister_aead
   crypto_unregister_alg
   crypto_unregister_scomp
+  crypto_unregister_shash
+  crypto_unregister_template
+  __crypto_xor
   debugfs_create_dir
   debugfs_create_file
   debugfs_create_regset32
@@ -250,7 +272,9 @@
   disable_irq_nosync
   dma_alloc_attrs
   dma_buf_attach
+  dma_buf_begin_cpu_access
   dma_buf_detach
+  dma_buf_end_cpu_access
   dma_buf_export
   dma_buf_fd
   dma_buf_get
@@ -422,9 +446,11 @@
   find_next_zero_bit
   find_vma
   finish_wait
+  flush_dcache_page
   flush_delayed_work
   flush_work
   flush_workqueue
+  fpsimd_context_busy
   fput
   free_irq
   __free_pages
@@ -455,6 +481,7 @@
   __get_free_pages
   get_random_bytes
   get_unused_fd_flags
+  get_user_pages_remote
   get_zeroed_page
   gic_nonsecure_priorities
   gpiochip_add_pin_range
@@ -557,12 +584,15 @@
   jiffies_to_msecs
   kasan_flag_enabled
   kasprintf
+  kernel_neon_begin
+  kernel_neon_end
   __kfifo_alloc
   __kfifo_free
   __kfifo_in
   __kfifo_out
   kfree
   kfree_const
+  kfree_sensitive
   kimage_voffset
   __kmalloc
   kmalloc_caches
@@ -872,6 +902,7 @@
   rtc_read_time
   rtc_tm_to_time64
   rtc_valid_tm
+  scatterwalk_map_and_copy
   sched_clock
   schedule
   schedule_timeout
@@ -893,6 +924,9 @@
   sg_alloc_table
   sg_alloc_table_from_pages
   sg_free_table
+  sg_init_one
+  sg_init_table
+  sg_nents
   sg_next
   single_open
   single_release
@@ -902,6 +936,12 @@
   skb_push
   skb_put
   skb_trim
+  skcipher_alloc_instance_simple
+  skcipher_register_instance
+  skcipher_walk_aead_decrypt
+  skcipher_walk_aead_encrypt
+  skcipher_walk_done
+  skcipher_walk_virt
   snprintf
   __spi_register_driver
   spi_sync
@@ -1112,6 +1152,9 @@
   input_set_poll_interval
   input_setup_polling
 
+# required by aes-ce-ccm.ko
+  ce_aes_expandkey
+
 # required by analogix_dp.ko
   drm_dp_start_crc
   drm_dp_stop_crc
@@ -1224,8 +1267,22 @@
   devm_blk_ksm_init
   mmc_cqe_request_done
 
+# required by cryptodev.ko
+  crypto_aead_setauthsize
+  crypto_ahash_final
+  crypto_alloc_akcipher
+  krealloc
+  proc_dointvec
+  register_sysctl_table
+  sg_last
+  unregister_sysctl_table
+
 # required by cw221x_battery.ko
   power_supply_is_system_supplied
+
+# required by des_generic.ko
+  crypto_register_algs
+  crypto_unregister_algs
 
 # required by display-connector.ko
   drm_probe_ddc
@@ -1333,6 +1390,10 @@
 
 # required by gc2145.ko
   v4l2_ctrl_subdev_log_status
+
+# required by ghash-ce.ko
+  aes_expandkey
+  gf128mul_lle
 
 # required by gl620a.ko
   __alloc_skb
@@ -1538,7 +1599,6 @@
   pci_sriov_configure_simple
   pci_unregister_driver
   pm_suspend_global_flags
-  sg_init_table
   __sw_hweight64
   sysfs_remove_file_from_group
   wait_for_completion_io_timeout
@@ -1718,7 +1778,6 @@
   dma_fence_get_status
   dma_fence_wait_timeout
   free_iova_fast
-  get_user_pages_remote
   idr_alloc_cyclic
   idr_preload
   kstrdup_quotable_cmdline
@@ -1764,6 +1823,27 @@
   dma_heap_get_drvdata
   dma_heap_put
 
+# required by rk_crypto.ko
+  crypto_ahash_digest
+  crypto_dequeue_request
+  crypto_enqueue_request
+  crypto_init_queue
+  crypto_register_ahash
+  crypto_register_akcipher
+  crypto_register_skcipher
+  crypto_req_done
+  crypto_unregister_ahash
+  crypto_unregister_akcipher
+  crypto_unregister_skcipher
+  rsa_parse_priv_key
+  rsa_parse_pub_key
+  scatterwalk_ffwd
+  sg_copy_from_buffer
+  sg_copy_to_buffer
+  sg_nents_for_len
+  sg_pcopy_from_buffer
+  sg_pcopy_to_buffer
+
 # required by rk_headset_irq_hook_adc.ko
   iio_read_channel_raw
 
@@ -1788,9 +1868,7 @@
   dev_pm_domain_attach
   dev_pm_opp_get_freq
   disable_hardirq
-  dma_buf_begin_cpu_access
   dma_buf_begin_cpu_access_partial
-  dma_buf_end_cpu_access
   dma_buf_end_cpu_access_partial
   __fdget
   iommu_device_unregister
@@ -2108,6 +2186,11 @@
   sdhci_remove_host
   sdhci_request
 
+# required by sha1-ce.ko
+  crypto_sha1_finup
+  crypto_sha1_update
+  irq_stat
+
 # required by sii902x.ko
   hdmi_avi_infoframe_pack
 
@@ -2308,7 +2391,6 @@
   crypto_has_alg
   disk_end_io_acct
   disk_start_io_acct
-  flush_dcache_page
   free_percpu
   fsync_bdev
   kstrtou16
