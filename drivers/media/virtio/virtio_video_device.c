@@ -1051,7 +1051,10 @@ static void virtio_video_worker(struct work_struct *work)
 		stream->src_cleared = false;
 		src_vb = v4l2_m2m_src_buf_remove(stream->fh.m2m_ctx);
 	}
+	/* Inform about finishing processing buffers in case that drain is waiting */
+	vv->v4l2_m2m_src_queue_empty = true;
 	mutex_unlock(src_vq->lock);
+	wake_up(&vv->wq);
 
 	v4l2_m2m_job_finish(vvd->m2m_dev, stream->fh.m2m_ctx);
 }

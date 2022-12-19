@@ -156,6 +156,7 @@ struct virtio_video {
 
 	int debug;
 	int use_dma_mem;
+	bool v4l2_m2m_src_queue_empty;
 };
 
 struct virtio_video_device {
