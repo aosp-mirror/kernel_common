@@ -366,6 +366,20 @@ static int virtio_video_encoder_cmd(struct file *file, void *fh,
 			goto unlock;
 		}
 
+		/* Drain request can not be started if not all buffers from
+		 * v4l2_m2m source queue have been placed on virtqueue already,
+		 * therefore if there are still buffers that need to be
+		 * processed, drain call must wait until virtio_video_worker
+		 * finish placing them.
+		 */
+		mutex_lock(src_vq->lock);
+		if (v4l2_m2m_next_src_buf(stream->fh.m2m_ctx) != NULL) {
+			vv->v4l2_m2m_src_queue_empty = false;
+			mutex_unlock(src_vq->lock);
+			wait_event(vv->wq, vv->v4l2_m2m_src_queue_empty);
+		} else {
+			mutex_unlock(src_vq->lock);
+		}
 		ret = virtio_video_cmd_stream_drain(vv, stream->stream_id);
 		if (ret) {
 			v4l2_err(&vv->v4l2_dev, "failed to drain stream\n");
