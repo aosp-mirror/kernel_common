@@ -231,21 +231,20 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 	inode = d_inode_rcu(entry);
 	if (inode && fuse_is_bad(inode))
 		goto invalid;
-
 #ifdef CONFIG_FUSE_BPF
 	/* TODO: Do we need bpf support for revalidate?
 	 * If the lower filesystem says the entry is invalid, FUSE probably shouldn't
 	 * try to fix that without going through the normal lookup path...
 	 */
-	if (get_fuse_dentry(entry)->backing_path.dentry) {
+	else if (get_fuse_dentry(entry)->backing_path.dentry) {
 		ret = fuse_revalidate_backing(entry, flags);
 		if (ret <= 0) {
 			goto out;
 		}
 	}
 #endif
-	if (time_before64(fuse_dentry_time(entry), get_jiffies_64()) ||
-		 (flags & LOOKUP_REVAL)) {
+	else if (time_before64(fuse_dentry_time(entry), get_jiffies_64()) ||
+		 (flags & (LOOKUP_EXCL | LOOKUP_REVAL))) {
 		struct fuse_entry_out outarg;
 		struct fuse_entry_bpf bpf_arg;
 		FUSE_ARGS(args);
