@@ -1365,6 +1365,9 @@ static struct inode *f2fs_alloc_inode(struct super_block *sb)
 {
 	struct f2fs_inode_info *fi;
 
+	if (time_to_inject(F2FS_SB(sb), FAULT_SLAB_ALLOC))
+		return NULL;
+
 	fi = f2fs_kmem_cache_alloc(f2fs_inode_cachep,
 				GFP_F2FS_ZERO, false, F2FS_SB(sb));
 	if (!fi)
@@ -2596,10 +2599,8 @@ retry:
 
 int f2fs_dquot_initialize(struct inode *inode)
 {
-	if (time_to_inject(F2FS_I_SB(inode), FAULT_DQUOT_INIT)) {
-		f2fs_show_injection_info(F2FS_I_SB(inode), FAULT_DQUOT_INIT);
+	if (time_to_inject(F2FS_I_SB(inode), FAULT_DQUOT_INIT))
 		return -ESRCH;
-	}
 
 	return dquot_initialize(inode);
 }
