@@ -521,8 +521,6 @@ struct sdhci_host {
 
 	unsigned int clock;	/* Current clock (MHz) */
 	u8 pwr;			/* Current voltage */
-	u8 drv_type;		/* Current UHS-I driver type */
-	bool reinit_uhs;	/* Force UHS-related re-initialization */
 
 	bool runtime_suspended;	/* Host is runtime suspended */
 	bool bus_on;		/* Bus power prevents runtime suspend */
@@ -611,7 +609,9 @@ struct sdhci_host {
 
 	u64			data_timeout;
 
-	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_USE2(1,
+			  u8 drv_type,		/* Current UHS-I driver type */
+			  bool reinit_uhs);	/* Force UHS-related re-initialization */
 
 	unsigned long private[] ____cacheline_aligned;
 };
