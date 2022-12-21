@@ -367,7 +367,13 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 			this_cpu_write(sgi_intid, irqstat);
 		}
 
-		handle_domain_irq(gic->domain, irqnr, regs);
+		if (handle_domain_irq(gic->domain, irqnr, regs)) {
+			pr_warn_once("GIC: Unexpected interrupt, %d, received!\n", irqnr);
+			if (static_branch_likely(&supports_deactivate_key))
+				writel_relaxed(irqstat, cpu_base + GIC_CPU_DEACTIVATE);
+			else
+				writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
+		}
 	} while (1);
 }
 
