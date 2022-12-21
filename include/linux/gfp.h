@@ -41,21 +41,21 @@ struct vm_area_struct;
 #define ___GFP_ACCOUNT		0x400000u
 #define ___GFP_ZEROTAGS		0x800000u
 #define ___GFP_SKIP_KASAN_POISON	0x1000000u
+#define ___GFP_NO_INIT_ON_ALLOC	 0x2000000u
 #ifdef CONFIG_CMA
-#define ___GFP_CMA		0x2000000u
+#define ___GFP_CMA		0x4000000u
 #else
 #define ___GFP_CMA		0
 #endif
 #ifdef CONFIG_LOCKDEP
 #ifdef CONFIG_CMA
-#define ___GFP_NOLOCKDEP	0x4000000u
+#define ___GFP_NOLOCKDEP	0x8000000u
 #else
-#define ___GFP_NOLOCKDEP	0x2000000u
+#define ___GFP_NOLOCKDEP	0x4000000u
 #endif
 #else
 #define ___GFP_NOLOCKDEP	0
 #endif
-#define ___GFP_NO_INIT_ON_ALLOC	 0x8000000u
 
 /* If the above are modified, __GFP_BITS_SHIFT may need updating */
 
