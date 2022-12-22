@@ -247,9 +247,9 @@ static inline bool lru_gen_add_page(struct lruvec *lruvec, struct page *page, bo
 	lru_gen_update_size(lruvec, page, -1, gen);
 	/* for rotate_reclaimable_page() */
 	if (reclaiming)
-		list_add_tail(&page->lru, &lrugen->lists[gen][type][zone]);
+		list_add_tail(&page->lru, &lrugen->pages[gen][type][zone]);
 	else
-		list_add(&page->lru, &lrugen->lists[gen][type][zone]);
+		list_add(&page->lru, &lrugen->pages[gen][type][zone]);
 
 	return true;
 }
