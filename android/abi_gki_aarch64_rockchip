@@ -2131,6 +2131,13 @@
   pwm_free
   pwm_request
 
+# required by pwrseq_simple.ko
+  bitmap_alloc
+  devm_gpiod_get_array
+  gpiod_set_array_value_cansleep
+  mmc_pwrseq_register
+  mmc_pwrseq_unregister
+
 # required by reboot-mode.ko
   devres_release
   kernel_kobj
