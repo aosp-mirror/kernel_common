@@ -1499,15 +1499,21 @@ static int exynos_ufs_probe(struct platform_device *pdev)
 	const struct ufs_hba_variant_ops *vops = &ufs_hba_exynos_ops;
 	const struct exynos_ufs_drv_data *drv_data =
 		device_get_match_data(dev);
+	struct ufs_hba *hba;
 
 	if (drv_data && drv_data->vops)
 		vops = drv_data->vops;
 
 	err = ufshcd_pltfrm_init(pdev, vops);
-	if (err)
+	if (err) {
 		dev_err(dev, "ufshcd_pltfrm_init() failed %d\n", err);
+		return err;
+	}
 
-	return err;
+	hba = dev_get_drvdata(dev);
+	hba->host->max_segment_size = 4096;
+
+	return 0;
 }
 
 static int exynos_ufs_remove(struct platform_device *pdev)
