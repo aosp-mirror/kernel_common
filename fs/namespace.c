@@ -3936,7 +3936,7 @@ static int can_idmap_mount(const struct mount_kattr *kattr, struct mount *mnt)
 	 * mapping. It makes things simpler and callers can just create
 	 * another bind-mount they can idmap if they want to.
 	 */
-	if (is_idmapped_mnt(m))
+	if (mnt_user_ns(m) != &init_user_ns)
 		return -EPERM;
 
 	/* The underlying filesystem doesn't support idmapped mounts yet. */

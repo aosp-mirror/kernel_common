@@ -80,7 +80,7 @@ static void show_mnt_opts(struct seq_file *m, struct vfsmount *mnt)
 			seq_puts(m, fs_infop->str);
 	}
 
-	if (is_idmapped_mnt(mnt))
+	if (mnt_user_ns(mnt) != &init_user_ns)
 		seq_puts(m, ",idmapped");
 }
 
