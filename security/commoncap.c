@@ -24,7 +24,6 @@
 #include <linux/user_namespace.h>
 #include <linux/binfmts.h>
 #include <linux/personality.h>
-#include <linux/mnt_idmapping.h>
 
 /*
  * If a non-root user executes a setuid-root binary in
