@@ -1697,18 +1697,10 @@ static inline void inode_fsgid_set(struct inode *inode,
 static inline bool fsuidgid_has_mapping(struct super_block *sb,
 					struct user_namespace *mnt_userns)
 {
-	struct user_namespace *fs_userns = sb->s_user_ns;
-	kuid_t kuid;
-	kgid_t kgid;
+	struct user_namespace *s_user_ns = sb->s_user_ns;
 
-	kuid = mapped_fsuid(mnt_userns);
-	if (!uid_valid(kuid))
-		return false;
-	kgid = mapped_fsgid(mnt_userns);
-	if (!gid_valid(kgid))
-		return false;
-	return kuid_has_mapping(fs_userns, kuid) &&
-	       kgid_has_mapping(fs_userns, kgid);
+	return kuid_has_mapping(s_user_ns, mapped_fsuid(mnt_userns)) &&
+	       kgid_has_mapping(s_user_ns, mapped_fsgid(mnt_userns));
 }
 
 extern struct timespec64 current_time(struct inode *inode);
