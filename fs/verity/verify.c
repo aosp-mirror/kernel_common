@@ -39,16 +39,6 @@ static void hash_at_level(const struct merkle_tree_params *params,
 		   (params->log_blocksize - params->log_arity);
 }
 
-/* Extract a hash from a hash page */
-static void extract_hash(struct page *hpage, unsigned int hoffset,
-			 unsigned int hsize, u8 *out)
-{
-	void *virt = kmap_atomic(hpage);
-
-	memcpy(out, virt + hoffset, hsize);
-	kunmap_atomic(virt);
-}
-
 static inline int cmp_hashes(const struct fsverity_info *vi,
 			     const u8 *want_hash, const u8 *real_hash,
 			     pgoff_t index, int level)
@@ -129,7 +119,7 @@ static bool verify_page(struct inode *inode, const struct fsverity_info *vi,
 		}
 
 		if (PageChecked(hpage)) {
-			extract_hash(hpage, hoffset, hsize, _want_hash);
+			memcpy_from_page(_want_hash, hpage, hoffset, hsize);
 			want_hash = _want_hash;
 			put_page(hpage);
 			pr_debug_ratelimited("Hash page already checked, want %s:%*phN\n",
@@ -158,7 +148,7 @@ descend:
 		if (err)
 			goto out;
 		SetPageChecked(hpage);
-		extract_hash(hpage, hoffset, hsize, _want_hash);
+		memcpy_from_page(_want_hash, hpage, hoffset, hsize);
 		want_hash = _want_hash;
 		put_page(hpage);
 		pr_debug("Verified hash page at level %d, now want %s:%*phN\n",
@@ -210,9 +200,8 @@ EXPORT_SYMBOL_GPL(fsverity_verify_page);
  * @bio: the bio to verify
  *
  * Verify a set of pages that have just been read from a verity file.  The pages
- * must be pagecache pages that are still locked and not yet uptodate.  Pages
- * that fail verification are set to the Error state.  Verification is skipped
- * for pages already in the Error state, e.g. due to fscrypt decryption failure.
+ * must be pagecache pages that are still locked and not yet uptodate.  If a
+ * page fails verification, then bio->bi_status is set to an error status.
  *
  * This is a helper function for use by the ->readpages() method of filesystems
  * that issue bios to read data directly into the page cache.  Filesystems that
@@ -254,9 +243,10 @@ void fsverity_verify_bio(struct bio *bio)
 		unsigned long level0_ra_pages =
 			min(max_ra_pages, params->level0_blocks - level0_index);
 
-		if (!PageError(page) &&
-		    !verify_page(inode, vi, req, page, level0_ra_pages))
-			SetPageError(page);
+		if (!verify_page(inode, vi, req, page, level0_ra_pages)) {
+			bio->bi_status = BLK_STS_IOERR;
+			break;
+		}
 	}
 
 	fsverity_free_hash_request(params->hash_alg, req);
