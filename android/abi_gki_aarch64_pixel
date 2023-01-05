@@ -1303,6 +1303,8 @@
   pin_user_pages_fast
   pin_user_pages_remote
   pktgen_xfrm_outer_mode_output
+  pkvm_iommu_driver_init
+  pkvm_iommu_register
   pkvm_iommu_resume
   pkvm_iommu_suspend
   __pkvm_load_el2_module
