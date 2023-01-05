@@ -14,7 +14,6 @@
 
 #define pr_fmt(fmt) "fs-verity: " fmt
 
-#include <crypto/sha2.h>
 #include <linux/fsverity.h>
 #include <linux/mempool.h>
 
@@ -26,12 +25,6 @@ struct ahash_request;
  */
 #define FS_VERITY_MAX_LEVELS		8
 
-/*
- * Largest digest size among all hash algorithms supported by fs-verity.
- * Currently assumed to be <= size of fsverity_descriptor::root_hash.
- */
-#define FS_VERITY_MAX_DIGEST_SIZE	SHA512_DIGEST_SIZE
-
 /* A hash algorithm supported by fs-verity */
 struct fsverity_hash_alg {
 	struct crypto_ahash *tfm; /* hash tfm, allocated on demand */
@@ -39,6 +32,11 @@ struct fsverity_hash_alg {
 	unsigned int digest_size; /* digest size in bytes, e.g. 32 for SHA-256 */
 	unsigned int block_size;  /* block size in bytes, e.g. 64 for SHA-256 */
 	mempool_t req_pool;	  /* mempool with a preallocated hash request */
+	/*
+	 * The HASH_ALGO_* constant for this algorithm.  This is different from
+	 * FS_VERITY_HASH_ALG_*, which uses a different numbering scheme.
+	 */
+	enum hash_algo algo_id;
 };
 
 /* Merkle tree parameters: hash algorithm, initial hash state, and topology */
@@ -122,16 +120,14 @@ int fsverity_init_merkle_tree_params(struct merkle_tree_params *params,
 				     const u8 *salt, size_t salt_size);
 
 struct fsverity_info *fsverity_create_info(const struct inode *inode,
-					   struct fsverity_descriptor *desc,
-					   size_t desc_size);
+					   struct fsverity_descriptor *desc);
 
 void fsverity_set_info(struct inode *inode, struct fsverity_info *vi);
 
 void fsverity_free_info(struct fsverity_info *vi);
 
 int fsverity_get_descriptor(struct inode *inode,
-			    struct fsverity_descriptor **desc_ret,
-			    size_t *desc_size_ret);
+			    struct fsverity_descriptor **desc_ret);
 
 int __init fsverity_init_info_cache(void);
 void __init fsverity_exit_info_cache(void);

@@ -318,14 +318,11 @@ void fscrypt_generate_iv(union fscrypt_iv *iv, u64 lblk_num,
 			 const struct fscrypt_info *ci);
 
 /* fname.c */
-int fscrypt_fname_encrypt(const struct inode *inode, const struct qstr *iname,
-			  u8 *out, unsigned int olen);
-bool fscrypt_fname_encrypted_size(const union fscrypt_policy *policy,
-				  u32 orig_len, u32 max_len,
-				  u32 *encrypted_len_ret);
+bool __fscrypt_fname_encrypted_size(const union fscrypt_policy *policy,
+				    u32 orig_len, u32 max_len,
+				    u32 *encrypted_len_ret);
 
 /* hkdf.c */
-
 struct fscrypt_hkdf {
 	struct crypto_shash *hmac_tfm;
 };
@@ -498,13 +495,7 @@ struct fscrypt_master_key_secret {
 struct fscrypt_master_key {
 
 	/*
-	 * Back-pointer to the super_block of the filesystem to which this
-	 * master key has been added.  Only valid if ->mk_active_refs > 0.
-	 */
-	struct super_block			*mk_sb;
-
-	/*
-	 * Link in ->mk_sb->s_master_keys->key_hashtable.
+	 * Link in ->s_master_keys->key_hashtable.
 	 * Only valid if ->mk_active_refs > 0.
 	 */
 	struct hlist_node			mk_node;
@@ -515,7 +506,7 @@ struct fscrypt_master_key {
 	/*
 	 * Active and structural reference counts.  An active ref guarantees
 	 * that the struct continues to exist, continues to be in the keyring
-	 * ->mk_sb->s_master_keys, and that any embedded subkeys (e.g.
+	 * ->s_master_keys, and that any embedded subkeys (e.g.
 	 * ->mk_direct_keys) that have been prepared continue to exist.
 	 * A structural ref only guarantees that the struct continues to exist.
 	 *
@@ -628,7 +619,8 @@ static inline int master_key_spec_len(const struct fscrypt_key_specifier *spec)
 
 void fscrypt_put_master_key(struct fscrypt_master_key *mk);
 
-void fscrypt_put_master_key_activeref(struct fscrypt_master_key *mk);
+void fscrypt_put_master_key_activeref(struct super_block *sb,
+				      struct fscrypt_master_key *mk);
 
 struct fscrypt_master_key *
 fscrypt_find_master_key(struct super_block *sb,
