@@ -190,7 +190,7 @@ int aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
 	u32 rc, i, j;
 	int err;
 
-#if defined(CONFIG_CRYPTO_FIPS140) && !defined(BUILD_FIPS140_KO)
+#ifndef __DISABLE_EXPORTS
 	err = -(MAX_ERRNO + 1);
 	trace_android_vh_aes_expandkey(ctx, in_key, key_len, &err);
 	if (err != -(MAX_ERRNO + 1))
@@ -269,7 +269,7 @@ void aes_encrypt(const struct crypto_aes_ctx *ctx, u8 *out, const u8 *in)
 	int rounds = 6 + ctx->key_length / 4;
 	u32 st0[4], st1[4];
 	int round;
-#if defined(CONFIG_CRYPTO_FIPS140) && !defined(BUILD_FIPS140_KO)
+#ifndef __DISABLE_EXPORTS
 	int hook_inuse = 0;
 
 	trace_android_vh_aes_encrypt(ctx, out, in, &hook_inuse);
@@ -327,7 +327,7 @@ void aes_decrypt(const struct crypto_aes_ctx *ctx, u8 *out, const u8 *in)
 	int rounds = 6 + ctx->key_length / 4;
 	u32 st0[4], st1[4];
 	int round;
-#if defined(CONFIG_CRYPTO_FIPS140) && !defined(BUILD_FIPS140_KO)
+#ifndef __DISABLE_EXPORTS
 	int hook_inuse = 0;
 
 	trace_android_vh_aes_decrypt(ctx, out, in, &hook_inuse);

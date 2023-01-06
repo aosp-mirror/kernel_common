@@ -201,7 +201,7 @@ void sha256(const u8 *data, unsigned int len, u8 *out)
 {
 	struct sha256_state sctx;
 
-#if defined(CONFIG_CRYPTO_FIPS140) && !defined(BUILD_FIPS140_KO)
+#ifndef __DISABLE_EXPORTS
 	int hook_inuse = 0;
 
 	trace_android_vh_sha256(data, len, out, &hook_inuse);
