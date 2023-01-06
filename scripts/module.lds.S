@@ -33,7 +33,7 @@ SECTIONS {
 
 	__patchable_function_entries : { *(__patchable_function_entries) }
 
-#ifdef CONFIG_CRYPTO_FIPS140_MOD
+#if IS_ENABLED(CONFIG_CRYPTO_FIPS140_MOD)
 	/*
 	 * The FIPS140 module incorporates copies of builtin code, which gets
 	 * integrity checked at module load time, and registered in a way that

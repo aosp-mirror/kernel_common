@@ -34,8 +34,9 @@ config CRYPTO_FIPS
 	  this is.
 
 config CRYPTO_FIPS140_MOD
-	bool "Enable FIPS 140 cryptographic module"
-	depends on MODULES && ARM64 && ARM64_MODULE_PLTS && LTO_CLANG
+	tristate "Enable FIPS 140 cryptographic module"
+	depends on ARM64 && ARM64_MODULE_PLTS && LTO_CLANG
+	depends on m
 	help
 	  This option enables building a loadable module fips140.ko, which
 	  contains various crypto algorithms that are also built into vmlinux.
