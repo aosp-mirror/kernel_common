@@ -203,7 +203,8 @@ obj-$(CONFIG_CRYPTO_SIMD) += crypto_simd.o
 
 ifneq ($(CONFIG_CRYPTO_FIPS140_MOD),)
 
-FIPS140_CFLAGS := -D__DISABLE_EXPORTS -DBUILD_FIPS140_KO -include fips140-defs.h
+FIPS140_CFLAGS := -D__DISABLE_EXPORTS -DBUILD_FIPS140_KO \
+		  -include $(srctree)/crypto/fips140-defs.h
 
 CFLAGS_jitterentropy-fips.o := -O0
 KASAN_SANITIZE_jitterentropy-fips.o = n
