@@ -291,6 +291,10 @@ static void __init unapply_text_relocations(void *section, int section_size,
 
 		switch (ELF64_R_TYPE(rela->r_info)) {
 #ifdef CONFIG_ARM64
+		case R_AARCH64_ABS32: /* for KCFI */
+			*place = 0;
+			break;
+
 		case R_AARCH64_JUMP26:
 		case R_AARCH64_CALL26:
 			*place &= ~GENMASK(25, 0);
