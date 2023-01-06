@@ -62,7 +62,7 @@ SECTIONS {
 	}
 #endif
 
-#ifdef CONFIG_LTO_CLANG
+#if defined(CONFIG_LTO_CLANG) || IS_ENABLED(CONFIG_CRYPTO_FIPS140_MOD)
 	/*
 	 * With CONFIG_LTO_CLANG, LLD always enables -fdata-sections and
 	 * -ffunction-sections, which increases the size of the final module.
