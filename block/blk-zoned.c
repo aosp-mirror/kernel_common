@@ -57,20 +57,7 @@ EXPORT_SYMBOL_GPL(blk_zone_cond_str);
  */
 bool blk_req_needs_zone_write_lock(struct request *rq)
 {
-	if (!rq->q->seq_zones_wlock)
-		return false;
-
-	if (blk_rq_is_passthrough(rq))
-		return false;
-
-	switch (req_op(rq)) {
-	case REQ_OP_WRITE_ZEROES:
-	case REQ_OP_WRITE_SAME:
-	case REQ_OP_WRITE:
-		return blk_rq_zone_is_seq(rq);
-	default:
-		return false;
-	}
+	return rq->q->seq_zones_wlock && blk_rq_is_seq_zone_write(rq);
 }
 EXPORT_SYMBOL_GPL(blk_req_needs_zone_write_lock);
 
