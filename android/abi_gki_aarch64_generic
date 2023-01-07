@@ -865,6 +865,7 @@
   find_next_zero_bit
   find_pid_ns
   find_task_by_vpid
+  find_vm_area
   find_vma
   find_vpid
   finish_wait
