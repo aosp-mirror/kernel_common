@@ -723,6 +723,15 @@ static inline unsigned int blk_queue_zone_no(struct request_queue *q,
 	return sector >> ilog2(q->limits.chunk_sectors);
 }
 
+/**
+ * blk_queue_zone_is_seq() - Whether a logical block is in a sequential zone.
+ * @q: Request queue pointer.
+ * @sector: Offset from start of block device in 512 byte units.
+ *
+ * Return: true if and only if @q refers to a zoned block device and
+ * @sector refers either to a sequential write required or a sequential
+ * write preferred zone.
+ */
 static inline bool blk_queue_zone_is_seq(struct request_queue *q,
 					 sector_t sector)
 {
@@ -1000,6 +1009,13 @@ static inline unsigned int blk_rq_zone_no(struct request *rq)
 	return blk_queue_zone_no(rq->q, blk_rq_pos(rq));
 }
 
+/**
+ * blk_rq_zone_is_seq() - Whether a request is for a sequential zone.
+ * @rq: Request pointer.
+ *
+ * Return: true if and only if blk_rq_pos(@rq) refers either to a sequential
+ * write required or a sequential write preferred zone.
+ */
 static inline unsigned int blk_rq_zone_is_seq(struct request *rq)
 {
 	return blk_queue_zone_is_seq(rq->q, blk_rq_pos(rq));
