@@ -11956,6 +11956,11 @@ static inline int find_new_ilb(void)
 {
 	const struct cpumask *hk_mask;
 	int ilb_cpu;
+	int new_ilb = nr_cpu_ids;
+
+	trace_android_rvh_find_new_ilb(nohz.idle_cpus_mask, &new_ilb);
+	if (new_ilb != nr_cpu_ids)
+		return new_ilb;
 
 	hk_mask = housekeeping_cpumask(HK_TYPE_MISC);
 
