@@ -4670,11 +4670,150 @@ static int stacked_mount_test(const char *mount_dir)
 	result = TEST_SUCCESS;
 out:
 	/* Cleanup */
-	rmdir(mount_dir);
 	rmdir(backing_dir);
 	free(backing_dir);
 	return result;
 }
+
+static int throttled_read_doesnt_block_read_test(const char *mount_dir)
+{
+	struct test_file file = {
+		  .name = "file",
+		  .size = INCFS_DATA_FILE_BLOCK_SIZE,
+	};
+	int result = TEST_FAILURE;
+	char *backing_dir = NULL;
+	int cmd_fd = -1;
+	char *filename = NULL;
+	int fd = -1;
+	int pid = -1;
+	int status;
+	struct timespec start;
+	struct incfs_per_uid_read_timeouts purt_set[] = {
+		{
+			.uid = 2,
+			.min_time_us = 0,
+			.min_pending_time_us = 2000000,
+			.max_pending_time_us = 2000000,
+		},
+	};
+	struct incfs_set_read_timeouts_args srt = {
+		ptr_to_u64(purt_set),
+		sizeof(purt_set)
+	};
+	char buffer[4096];
+
+	TEST(backing_dir = create_backing_dir(mount_dir), backing_dir);
+	TESTSYSCALL(mount_fs_opt(mount_dir, backing_dir,
+			 "read_timeout_ms=10000,report_uid", false));
+	TEST(cmd_fd = open_commands_file(mount_dir), cmd_fd != -1);
+	TESTEQUAL(emit_file(cmd_fd, NULL, file.name, &file.id,
+				    file.size, NULL), 0);
+
+	TESTEQUAL(ioctl(cmd_fd, INCFS_IOC_SET_READ_TIMEOUTS, &srt), 0);
+
+	TEST(filename = concat_file_name(mount_dir, file.name), filename);
+	TEST(fd = open(filename, O_RDONLY | O_CLOEXEC), fd != -1);
+
+	TEST(pid = fork(), pid != -1);
+	if (pid == 0) {
+		TESTEQUAL(setuid(2), 0);
+		TESTEQUAL(pread(fd, buffer, sizeof(buffer), 0), sizeof(buffer));
+		exit(0);
+	}
+
+	sleep(1);
+	TESTEQUAL(emit_test_file_data(mount_dir, &file), 0);
+	TESTEQUAL(clock_gettime(CLOCK_MONOTONIC, &start), 0);
+	TESTEQUAL(pread(fd, buffer, sizeof(buffer), 0), sizeof(buffer));
+	TESTEQUAL(is_close(&start, 0), 0);
+
+	TESTNE(wait(&status), -1);
+	TESTEQUAL(status, 0);
+	TESTEQUAL(is_close(&start, 1000), 0);
+	result = TEST_SUCCESS;
+out:
+	close(fd);
+	free(filename);
+	close(cmd_fd);
+	umount(mount_dir);
+	rmdir(backing_dir);
+	free(backing_dir);
+	return result;
+}
+
+static int throttled_mmap_doesnt_block_mmap_test(const char *mount_dir)
+{
+	struct test_file file = {
+		  .name = "file",
+		  .size = INCFS_DATA_FILE_BLOCK_SIZE,
+	};
+	int result = TEST_FAILURE;
+	char *backing_dir = NULL;
+	int cmd_fd = -1;
+	char *filename = NULL;
+	int fd = -1;
+	char *addr = (void *)-1;
+	int pid = -1;
+	int status;
+	struct timespec start;
+	struct incfs_per_uid_read_timeouts purt_set[] = {
+		{
+			.uid = 2,
+			.min_time_us = 0,
+			.min_pending_time_us = 2000000,
+			.max_pending_time_us = 2000000,
+		},
+	};
+	struct incfs_set_read_timeouts_args srt = {
+		ptr_to_u64(purt_set),
+		sizeof(purt_set)
+	};
+
+	TEST(backing_dir = create_backing_dir(mount_dir), backing_dir);
+	TESTSYSCALL(mount_fs_opt(mount_dir, backing_dir,
+			 "read_timeout_ms=10000,report_uid", false));
+	TEST(cmd_fd = open_commands_file(mount_dir), cmd_fd != -1);
+	TESTEQUAL(emit_file(cmd_fd, NULL, file.name, &file.id,
+				    file.size, NULL), 0);
+
+	TESTEQUAL(ioctl(cmd_fd, INCFS_IOC_SET_READ_TIMEOUTS, &srt), 0);
+
+	TEST(filename = concat_file_name(mount_dir, file.name), filename);
+	TEST(fd = open(filename, O_RDONLY | O_CLOEXEC), fd != -1);
+	TEST(addr = mmap(NULL, file.size, PROT_READ, MAP_PRIVATE, fd, 0),
+	     addr != (void *) -1);
+
+	TEST(pid = fork(), pid != -1);
+	if (pid == 0) {
+		TESTEQUAL(setuid(2), 0);
+		TESTEQUAL(addr[0], 57);
+		exit(0);
+	}
+
+	sleep(1);
+	TESTEQUAL(emit_test_file_data(mount_dir, &file), 0);
+	TESTEQUAL(clock_gettime(CLOCK_MONOTONIC, &start), 0);
+	TESTEQUAL(addr[0], 57);
+	TESTEQUAL(is_close(&start, 0), 0);
+
+	TESTNE(wait(&status), -1);
+	TESTEQUAL(status, 0);
+	TESTEQUAL(is_close(&start, 1000), 0);
+
+	result = TEST_SUCCESS;
+out:
+	if (addr != (void *) -1)
+		munmap(addr, file.size);
+	close(fd);
+	free(filename);
+	close(cmd_fd);
+	umount(mount_dir);
+	rmdir(backing_dir);
+	free(backing_dir);
+	return result;
+}
+
 
 static char *setup_mount_dir()
 {
@@ -4844,6 +4983,8 @@ int main(int argc, char *argv[])
 		MAKE_TEST(sysfs_test),
 		MAKE_TEST(sysfs_rename_test),
 		MAKE_TEST(stacked_mount_test),
+		MAKE_TEST(throttled_read_doesnt_block_read_test),
+		MAKE_TEST(throttled_mmap_doesnt_block_mmap_test),
 	};
 #undef MAKE_TEST
 	bool run_test[ARRAY_SIZE(cases)];
