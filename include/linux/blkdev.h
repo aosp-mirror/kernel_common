@@ -1635,12 +1635,7 @@ static inline enum blk_zoned_model bdev_zoned_model(struct block_device *bdev)
 
 static inline bool bdev_is_zoned(struct block_device *bdev)
 {
-	struct request_queue *q = bdev_get_queue(bdev);
-
-	if (q)
-		return blk_queue_is_zoned(q);
-
-	return false;
+	return blk_queue_is_zoned(bdev_get_queue(bdev));
 }
 
 static inline sector_t bdev_zone_sectors(struct block_device *bdev)
