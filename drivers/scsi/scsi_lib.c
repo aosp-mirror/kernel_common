@@ -1811,6 +1811,9 @@ void __scsi_init_queue(struct Scsi_Host *shost, struct request_queue *q)
 	blk_queue_max_segments(q, min_t(unsigned short, shost->sg_tablesize,
 					SG_MAX_SEGMENTS));
 
+	if (shost->max_segment_size && shost->max_segment_size < PAGE_SIZE)
+		blk_queue_flag_set(QUEUE_FLAG_SUB_PAGE_SEGMENTS, q);
+
 	if (scsi_host_prot_dma(shost)) {
 		shost->sg_prot_tablesize =
 			min_not_zero(shost->sg_prot_tablesize,
