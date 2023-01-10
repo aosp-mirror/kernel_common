@@ -36,6 +36,9 @@
 #include <linux/jiffies.h>
 #include <trace/events/cma.h>
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/mm.h>
+
 #include "cma.h"
 
 struct cma cma_areas[MAX_CMA_AREAS];
@@ -51,6 +54,7 @@ unsigned long cma_get_size(const struct cma *cma)
 {
 	return cma->count << PAGE_SHIFT;
 }
+EXPORT_SYMBOL_GPL(cma_get_size);
 
 const char *cma_get_name(const struct cma *cma)
 {
@@ -423,13 +427,13 @@ static inline void cma_debug_show_areas(struct cma *cma) { }
  * @cma:   Contiguous memory region for which the allocation is performed.
  * @count: Requested number of pages.
  * @align: Requested alignment of pages (in PAGE_SIZE order).
- * @no_warn: Avoid printing message about failed allocation
+ * @gfp_mask: GFP mask to use during the cma allocation.
  *
  * This function allocates part of contiguous memory on specific
  * contiguous memory area.
  */
 struct page *cma_alloc(struct cma *cma, unsigned long count,
-		       unsigned int align, bool no_warn)
+		       unsigned int align, gfp_t gfp_mask)
 {
 	unsigned long mask, offset;
 	unsigned long pfn = -1;
@@ -440,12 +444,16 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 	int ret = -ENOMEM;
 	int num_attempts = 0;
 	int max_retries = 5;
+	s64 ts;
+	struct cma_alloc_info cma_info = {0};
+
+	trace_android_vh_cma_alloc_start(&ts);
 
 	if (!cma || !cma->count || !cma->bitmap)
 		goto out;
 
-	pr_debug("%s(cma %p, count %lu, align %d)\n", __func__, (void *)cma,
-		 count, align);
+	pr_debug("%s(cma %p, count %lu, align %d gfp_mask 0x%x)\n", __func__,
+			(void *)cma, count, align, gfp_mask);
 
 	if (!count)
 		goto out;
@@ -461,6 +469,8 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 		goto out;
 
 	for (;;) {
+		struct acr_info info = {0};
+
 		spin_lock_irq(&cma->lock);
 		bitmap_no = bitmap_find_next_zero_area_off(cma->bitmap,
 				bitmap_maxno, start, bitmap_count, mask,
@@ -469,7 +479,8 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 			if ((num_attempts < max_retries) && (ret == -EBUSY)) {
 				spin_unlock_irq(&cma->lock);
 
-				if (fatal_signal_pending(current))
+				if (fatal_signal_pending(current) ||
+				    (gfp_mask & __GFP_NORETRY))
 					break;
 
 				/*
@@ -499,8 +510,18 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 
 		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
 		mutex_lock(&cma_mutex);
-		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
-				     GFP_KERNEL | (no_warn ? __GFP_NOWARN : 0));
+		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA, gfp_mask, &info);
+		cma_info.nr_migrated += info.nr_migrated;
+		cma_info.nr_reclaimed += info.nr_reclaimed;
+		cma_info.nr_mapped += info.nr_mapped;
+		if (info.err) {
+			if (info.err & ACR_ERR_ISOLATE)
+				cma_info.nr_isolate_fail++;
+			if (info.err & ACR_ERR_MIGRATE)
+				cma_info.nr_migrate_fail++;
+			if (info.err & ACR_ERR_TEST)
+				cma_info.nr_test_fail++;
+		}
 		mutex_unlock(&cma_mutex);
 		if (ret == 0) {
 			page = pfn_to_page(pfn);
@@ -516,11 +537,20 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 
 		trace_cma_alloc_busy_retry(cma->name, pfn, pfn_to_page(pfn),
 					   count, align);
-		/* try again with a bit different memory target */
-		start = bitmap_no + mask + 1;
+
+		if (info.failed_pfn && gfp_mask & __GFP_NORETRY) {
+			/* try again from following failed page */
+			start = (pfn_max_align_up(info.failed_pfn + 1) -
+				 cma->base_pfn) >> cma->order_per_bit;
+
+		} else {
+			/* try again with a bit different memory target */
+			start = bitmap_no + mask + 1;
+		}
 	}
 
 	trace_cma_alloc_finish(cma->name, pfn, page, count, align);
+	trace_cma_alloc_info(cma->name, page, count, align, &cma_info);
 
 	/*
 	 * CMA can allocate multiple page blocks, which results in different
@@ -532,7 +562,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 			page_kasan_tag_reset(page + i);
 	}
 
-	if (ret && !no_warn) {
+	if (ret && !(gfp_mask & __GFP_NOWARN)) {
 		pr_err_ratelimited("%s: %s: alloc failed, req-size: %lu pages, ret: %d\n",
 				   __func__, cma->name, count, ret);
 		cma_debug_show_areas(cma);
@@ -540,10 +570,11 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 
 	pr_debug("%s(): returned %p\n", __func__, page);
 out:
+	trace_android_vh_cma_alloc_finish(cma, page, count, align, gfp_mask, ts);
 	if (page) {
 		count_vm_event(CMA_ALLOC_SUCCESS);
 		cma_sysfs_account_success_pages(cma, count);
-	} else {
+	} else if (!(gfp_mask & __GFP_NORETRY)) {
 		count_vm_event(CMA_ALLOC_FAIL);
 		if (cma)
 			cma_sysfs_account_fail_pages(cma, count);

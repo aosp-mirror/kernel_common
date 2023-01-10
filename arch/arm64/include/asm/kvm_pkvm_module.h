@@ -8,6 +8,12 @@
 
 typedef void (*dyn_hcall_t)(struct kvm_cpu_context *);
 
+enum pkvm_psci_notification {
+	PKVM_PSCI_CPU_SUSPEND,
+	PKVM_PSCI_SYSTEM_SUSPEND,
+	PKVM_PSCI_CPU_ENTRY,
+};
+
 struct pkvm_module_ops {
 	int (*create_private_mapping)(phys_addr_t phys, size_t size,
 				      enum kvm_pgtable_prot prot,
@@ -17,9 +23,16 @@ struct pkvm_module_ops {
 	void (*putx64)(u64 num);
 	void *(*fixmap_map)(phys_addr_t phys);
 	void (*fixmap_unmap)(void);
+	void *(*linear_map_early)(phys_addr_t phys, size_t size, enum kvm_pgtable_prot prot);
+	void (*linear_unmap_early)(void *addr, size_t size);
 	void (*flush_dcache_to_poc)(void *addr, size_t size);
 	int (*register_host_perm_fault_handler)(int (*cb)(struct kvm_cpu_context *ctxt, u64 esr, u64 addr));
 	int (*protect_host_page)(u64 pfn, enum kvm_pgtable_prot prot);
+	int (*register_host_smc_handler)(bool (*cb)(struct kvm_cpu_context *));
+	int (*register_default_trap_handler)(bool (*cb)(struct kvm_cpu_context *));
+	int (*register_illegal_abt_notifier)(void (*cb)(struct kvm_cpu_context *));
+	int (*register_psci_notifier)(void (*cb)(enum pkvm_psci_notification, struct kvm_cpu_context *));
+	int (*register_hyp_panic_notifier)(void (*cb)(struct kvm_cpu_context *host_ctxt));
 };
 
 struct pkvm_module_section {
@@ -39,10 +52,12 @@ struct pkvm_el2_module {
 	int (*init)(const struct pkvm_module_ops *ops);
 };
 
-#ifdef MODULE
 int __pkvm_load_el2_module(struct pkvm_el2_module *mod, struct module *this,
 			   unsigned long *token);
 
+int __pkvm_register_el2_call(dyn_hcall_t hfn, unsigned long token,
+			     unsigned long hyp_text_kern_va);
+#ifdef MODULE
 /*
  * function_nocfi() does not work with function pointers, hence the macro in
  * lieu of a function.
@@ -76,9 +91,6 @@ int __pkvm_load_el2_module(struct pkvm_el2_module *mod, struct module *this,
 									\
 	__pkvm_load_el2_module(&mod, THIS_MODULE, token);		\
 })
-
-int __pkvm_register_el2_call(dyn_hcall_t hfn, unsigned long token,
-			     unsigned long hyp_text_kern_va);
 
 #define pkvm_register_el2_mod_call(hfn, token)				\
 ({									\

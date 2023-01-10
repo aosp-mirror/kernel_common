@@ -15,6 +15,7 @@
 #include <linux/swapops.h>
 #include <linux/thread_info.h>
 #include <linux/types.h>
+#include <linux/uaccess.h>
 #include <linux/uio.h>
 
 #include <asm/barrier.h>
@@ -47,15 +48,6 @@ static void mte_sync_page_tags(struct page *page, pte_t old_pte,
 	if (!pte_is_tagged)
 		return;
 
-	page_kasan_tag_reset(page);
-	/*
-	 * We need smp_wmb() in between setting the flags and clearing the
-	 * tags because if another thread reads page->flags and builds a
-	 * tagged address out of it, there is an actual dependency to the
-	 * memory access, but on the current thread we do not guarantee that
-	 * the new page->flags are visible before the tags were updated.
-	 */
-	smp_wmb();
 	/*
 	 * Test PG_mte_tagged again in case it was racing with another
 	 * set_pte_at().
@@ -247,6 +239,11 @@ static void mte_update_gcr_excl(struct task_struct *task)
 		SYS_GCR_EL1);
 }
 
+#ifdef CONFIG_KASAN_HW_TAGS
+/* Only called from assembly, silence sparse */
+void __init kasan_hw_tags_enable(struct alt_instr *alt, __le32 *origptr,
+				 __le32 *updptr, int nr_inst);
+
 void __init kasan_hw_tags_enable(struct alt_instr *alt, __le32 *origptr,
 				 __le32 *updptr, int nr_inst)
 {
@@ -255,6 +252,7 @@ void __init kasan_hw_tags_enable(struct alt_instr *alt, __le32 *origptr,
 	if (kasan_hw_tags_enabled())
 		*updptr = cpu_to_le32(aarch64_insn_gen_nop());
 }
+#endif
 
 void mte_thread_init_user(void)
 {
@@ -276,6 +274,9 @@ void mte_thread_switch(struct task_struct *next)
 
 	mte_update_sctlr_user(next);
 	mte_update_gcr_excl(next);
+
+	/* TCO may not have been disabled on exception entry for the current task. */
+	mte_disable_tco_entry(next);
 
 	/*
 	 * Check if an async tag exception occurred at EL1.
@@ -599,3 +600,32 @@ static int register_mte_tcf_preferred_sysctl(void)
 	return 0;
 }
 subsys_initcall(register_mte_tcf_preferred_sysctl);
+
+/*
+ * Return 0 on success, the number of bytes not probed otherwise.
+ */
+size_t mte_probe_user_range(const char __user *uaddr, size_t size)
+{
+	const char __user *end = uaddr + size;
+	int err = 0;
+	char val;
+
+	__raw_get_user(val, uaddr, err);
+	if (err)
+		return size;
+
+	uaddr = PTR_ALIGN(uaddr, MTE_GRANULE_SIZE);
+	while (uaddr < end) {
+		/*
+		 * A read is sufficient for mte, the caller should have probed
+		 * for the pte write permission if required.
+		 */
+		__raw_get_user(val, uaddr, err);
+		if (err)
+			return end - uaddr;
+		uaddr += MTE_GRANULE_SIZE;
+	}
+	(void)val;
+
+	return 0;
+}

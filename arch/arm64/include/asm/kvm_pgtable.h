@@ -184,7 +184,7 @@ enum kvm_pgtable_stage2_flags {
  * @KVM_PGTABLE_PROT_W:		Write permission.
  * @KVM_PGTABLE_PROT_R:		Read permission.
  * @KVM_PGTABLE_PROT_DEVICE:	Device attributes.
- * @KVM_PGTABLE_PROT_NC:	Normal non-cacheable attributes.
+ * @KVM_PGTABLE_PROT_NC:       Normal non-cacheable attributes.
  * @KVM_PGTABLE_PROT_SW0:	Software bit 0.
  * @KVM_PGTABLE_PROT_SW1:	Software bit 1.
  * @KVM_PGTABLE_PROT_SW2:	Software bit 2.
@@ -209,24 +209,6 @@ enum kvm_pgtable_prot {
 
 #define PKVM_HOST_MEM_PROT	KVM_PGTABLE_PROT_RWX
 #define PKVM_HOST_MMIO_PROT	KVM_PGTABLE_PROT_RW
-
-#define KVM_HOST_S2_DEFAULT_ATTR   (KVM_PTE_LEAF_ATTR_HI |	\
-				    KVM_PTE_LEAF_ATTR_LO)
-
-#define KVM_HOST_S2_DEFAULT_MEM_PTE		\
-	(KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR |	\
-	KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R |	\
-	KVM_PTE_LEAF_ATTR_LO_S2_S2AP_W |	\
-	KVM_PTE_LEAF_ATTR_LO_S2_SH	|	\
-	KVM_PTE_LEAF_ATTR_LO_S2_AF)
-
-#define KVM_HOST_S2_DEFAULT_MMIO_PTE		\
-	(KVM_PTE_LEAF_ATTR_LO_S2_MEMATTR |	\
-	KVM_PTE_LEAF_ATTR_HI_S2_XN |		\
-	KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R |	\
-	KVM_PTE_LEAF_ATTR_LO_S2_S2AP_W |	\
-	KVM_PTE_LEAF_ATTR_LO_S2_SH |		\
-	KVM_PTE_LEAF_ATTR_LO_S2_AF)
 
 #define PAGE_HYP		KVM_PGTABLE_PROT_RW
 #define PAGE_HYP_EXEC		(KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_X)
