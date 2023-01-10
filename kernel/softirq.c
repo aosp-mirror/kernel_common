@@ -332,10 +332,9 @@ restart:
 			goto restart;
 	}
 
-#ifdef CONFIG_RT_SOFTINT_OPTIMIZATION
 	if (pending | deferred)
 		wakeup_softirqd();
-#endif
+
 	lockdep_softirq_end(in_hardirq);
 	account_irq_exit_time(current);
 	__local_bh_enable(SOFTIRQ_OFFSET);
