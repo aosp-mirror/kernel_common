@@ -33,15 +33,10 @@ config CRYPTO_FIPS
 	  certification.  You should say no unless you know what
 	  this is.
 
-# CRYPTO_FIPS140 just enables the support in the kernel for loading fips140.ko.
-# The module still needs to be built and loaded if you need FIPS 140 compliance.
-config CRYPTO_FIPS140
-	def_bool y
-	depends on MODULES && ARM64 && ARM64_MODULE_PLTS
-
 config CRYPTO_FIPS140_MOD
-	bool "Enable FIPS 140 cryptographic module"
-	depends on LTO_CLANG && CRYPTO_FIPS140
+	tristate "Enable FIPS 140 cryptographic module"
+	depends on ARM64 && ARM64_MODULE_PLTS
+	depends on m
 	help
 	  This option enables building a loadable module fips140.ko, which
 	  contains various crypto algorithms that are also built into vmlinux.

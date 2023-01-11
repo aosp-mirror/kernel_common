@@ -203,16 +203,18 @@ obj-$(CONFIG_CRYPTO_SIMD) += crypto_simd.o
 
 ifneq ($(CONFIG_CRYPTO_FIPS140_MOD),)
 
-FIPS140_CFLAGS := -D__DISABLE_EXPORTS -DBUILD_FIPS140_KO -include fips140-defs.h
+FIPS140_CFLAGS := -DBUILD_FIPS140_KO -include $(srctree)/crypto/fips140-defs.h
 
 CFLAGS_jitterentropy-fips.o := -O0
 KASAN_SANITIZE_jitterentropy-fips.o = n
 UBSAN_SANITIZE_jitterentropy-fips.o = n
 
+# Compile an extra copy of various crypto algorithms into the fips140 module.
 #
-# Create a separate FIPS archive containing a duplicate of each builtin generic
-# module that is in scope for FIPS 140-2 certification
-#
+# Note: the module will still work if some files are removed from here.
+# However, it may affect FIPS certifiability.  Don't remove files from here
+# without considering impact on FIPS certifiability.
+
 crypto-fips-objs := drbg.o ecb.o cbc.o ctr.o cts.o gcm.o xts.o hmac.o cmac.o \
 		    gf128mul.o aes_generic.o lib-crypto-aes.o \
 		    jitterentropy.o jitterentropy-kcapi.o \
@@ -223,8 +225,6 @@ crypto-fips-objs := $(foreach o,$(crypto-fips-objs),$(o:.o=-fips.o))
 # get the arch to add its objects to $(crypto-fips-objs)
 include $(srctree)/arch/$(ARCH)/crypto/Kbuild.fips140
 
-extra-$(CONFIG_CRYPTO_FIPS140_MOD) += crypto-fips.a
-
 $(obj)/%-fips.o: KBUILD_CFLAGS += $(FIPS140_CFLAGS)
 $(obj)/%-fips.o: $(src)/%.c FORCE
 	$(call if_changed_rule,cc_o_c)
@@ -233,15 +233,12 @@ $(obj)/lib-%-fips.o: $(srctree)/lib/%.c FORCE
 $(obj)/lib-crypto-%-fips.o: $(srctree)/lib/crypto/%.c FORCE
 	$(call if_changed_rule,cc_o_c)
 
-$(obj)/crypto-fips.a: $(addprefix $(obj)/,$(crypto-fips-objs)) FORCE
-	$(call if_changed,ar_and_symver)
-
 fips140-objs := \
 	fips140-alg-registration.o \
 	fips140-module.o \
 	fips140-refs.o \
 	fips140-selftests.o \
-	crypto-fips.a
+	$(crypto-fips-objs)
 fips140-$(CONFIG_CRYPTO_FIPS140_MOD_EVAL_TESTING) += \
 	fips140-eval-testing.o
 obj-m += fips140.o

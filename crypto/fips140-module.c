@@ -14,6 +14,12 @@
  * don't need to meet these requirements.
  */
 
+/*
+ * Since this .c file is the real entry point of fips140.ko, it needs to be
+ * compiled normally, so undo the hacks that were done in fips140-defs.h.
+ */
+#define MODULE
+#undef KBUILD_MODFILE
 #undef __DISABLE_EXPORTS
 
 #include <linux/ctype.h>
@@ -291,6 +297,10 @@ static void __init unapply_text_relocations(void *section, int section_size,
 
 		switch (ELF64_R_TYPE(rela->r_info)) {
 #ifdef CONFIG_ARM64
+		case R_AARCH64_ABS32: /* for KCFI */
+			*place = 0;
+			break;
+
 		case R_AARCH64_JUMP26:
 		case R_AARCH64_CALL26:
 			*place &= ~GENMASK(25, 0);
