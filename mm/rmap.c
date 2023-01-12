@@ -72,7 +72,6 @@
 #include <linux/page_idle.h>
 #include <linux/memremap.h>
 #include <linux/userfaultfd_k.h>
-#include <linux/mm_inline.h>
 
 #include <asm/tlbflush.h>
 
