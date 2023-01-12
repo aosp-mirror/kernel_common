@@ -4704,7 +4704,7 @@ static ssize_t show_lru_gen_admin(struct kobject *kobj, struct kobj_attribute *a
 	} while ((memcg = mem_cgroup_iter(NULL, memcg, NULL)));
 
 	if (buf_len >= PAGE_SIZE)
-		buf_len = PAGE_SIZE - 1;
+		buf = PAGE_SIZE - 1;
 	buf[buf_len] = 0;
 
 	kvfree(path);
