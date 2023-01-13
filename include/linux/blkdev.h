@@ -1046,6 +1046,11 @@ static inline bool blk_rq_is_seq_zone_write(struct request *rq)
 		return false;
 	}
 }
+#else /* CONFIG_BLK_DEV_ZONED */
+static inline bool blk_rq_is_seq_zone_write(struct request *rq)
+{
+	return false;
+}
 #endif /* CONFIG_BLK_DEV_ZONED */
 
 /*
