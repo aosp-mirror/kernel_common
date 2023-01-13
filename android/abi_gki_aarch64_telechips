@@ -477,6 +477,7 @@
   mfd_add_devices
   mfd_remove_devices
   regmap_del_irq_chip
+  regmap_irq_chip_get_base
 
 # required by da9062-regulator.ko
   devm_regmap_field_alloc
@@ -994,6 +995,7 @@
 # required by tcc_adma_pcm.ko
   snd_pcm_lib_preallocate_free_for_all
   snd_pcm_lib_preallocate_pages_for_all
+  snd_pcm_hw_constraint_pow2
 
 # required by tcc_audio_chmux.ko
   sysfs_create_files
@@ -1234,3 +1236,15 @@
   __of_reset_control_get
   platform_device_register
   reset_control_put
+
+# required by tcc-clk.ko
+  of_clk_parent_fill
+
+# required by mali_kbase.ko
+  register_oom_notifier
+  unregister_oom_notifier
+  dma_resv_get_fences_rcu
+
+# required by sdhci-tcc.ko
+  sdhci_execute_tuning
+  sdhci_set_uhs_signaling
