@@ -38,7 +38,7 @@
 #include <asm/cputype.h>
 #include <asm/sysreg.h>
 
-#define CTR_L1IP(ctr)		SYS_FIELD_GET(CTR_EL0, L1Ip, ctr)
+#define CTR_L1IP(ctr)		(((ctr) >> CTR_EL0_L1Ip_SHIFT) & CTR_EL0_L1Ip_MASK)
 
 #define ICACHEF_ALIASING	0
 #define ICACHEF_VPIPT		1
