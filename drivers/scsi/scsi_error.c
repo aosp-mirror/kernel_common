@@ -671,6 +671,12 @@ enum scsi_disposition scsi_check_sense(struct scsi_cmnd *scmd)
 		fallthrough;
 
 	case ILLEGAL_REQUEST:
+		/*
+		 * Unaligned write command. Retry immediately to handle
+		 * out-of-order zoned writes.
+		 */
+		if (sshdr.asc == 0x21 && sshdr.ascq == 0x04)
+			return NEEDS_RETRY;
 		if (sshdr.asc == 0x20 || /* Invalid command operation code */
 		    sshdr.asc == 0x21 || /* Logical block address out of range */
 		    sshdr.asc == 0x22 || /* Invalid function */

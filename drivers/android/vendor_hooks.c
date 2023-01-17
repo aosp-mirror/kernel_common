@@ -30,6 +30,7 @@
 #include <trace/hooks/ftrace_dump.h>
 #include <trace/hooks/ufshcd.h>
 #include <trace/hooks/block.h>
+#include <trace/hooks/buffer.h>
 #include <trace/hooks/cgroup.h>
 #include <trace/hooks/sys.h>
 #include <trace/hooks/iommu.h>
@@ -275,7 +276,20 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mem_cgroup_free);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mem_cgroup_alloc);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cma_alloc_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cma_alloc_finish);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cma_alloc_adjust);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_enable_thermal_genl_check);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mm_compaction_begin);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mm_compaction_end);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pagevec_drain);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_zap_pte_range_tlb_start);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_zap_pte_range_tlb_force_flush);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_zap_pte_range_tlb_end);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_bh_lru_install);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_skip_lru_disable);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_madvise_blk_plug);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_inactive_list_blk_plug);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_lruvec_blk_plug);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_reclaim_pages_plug);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_tcpci_override_toggling);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_typec_tcpci_get_vbus);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_store_partner_src_caps);
