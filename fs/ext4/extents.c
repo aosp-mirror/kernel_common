@@ -2381,8 +2381,8 @@ ext4_ext_put_gap_in_cache(struct inode *inode, ext4_lblk_t hole_start,
 {
 	struct extent_status es;
 
-	ext4_es_find_delayed_extent_range(inode, hole_start,
-					  hole_start + hole_len - 1, &es);
+	ext4_es_find_extent_range(inode, &ext4_es_is_delayed, hole_start,
+				  hole_start + hole_len - 1, &es);
 	if (es.es_len) {
 		/* There's delayed extent containing lblock? */
 		if (es.es_lblk <= hole_start)
@@ -3853,39 +3853,6 @@ out:
 }
 
 /**
- * ext4_find_delalloc_range: find delayed allocated block in the given range.
- *
- * Return 1 if there is a delalloc block in the range, otherwise 0.
- */
-int ext4_find_delalloc_range(struct inode *inode,
-			     ext4_lblk_t lblk_start,
-			     ext4_lblk_t lblk_end)
-{
-	struct extent_status es;
-
-	ext4_es_find_delayed_extent_range(inode, lblk_start, lblk_end, &es);
-	if (es.es_len == 0)
-		return 0; /* there is no delay extent in this tree */
-	else if (es.es_lblk <= lblk_start &&
-		 lblk_start < es.es_lblk + es.es_len)
-		return 1;
-	else if (lblk_start <= es.es_lblk && es.es_lblk <= lblk_end)
-		return 1;
-	else
-		return 0;
-}
-
-int ext4_find_delalloc_cluster(struct inode *inode, ext4_lblk_t lblk)
-{
-	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
-	ext4_lblk_t lblk_start, lblk_end;
-	lblk_start = EXT4_LBLK_CMASK(sbi, lblk);
-	lblk_end = lblk_start + sbi->s_cluster_ratio - 1;
-
-	return ext4_find_delalloc_range(inode, lblk_start, lblk_end);
-}
-
-/**
  * Determines how many complete clusters (out of those specified by the 'map')
  * are under delalloc and were reserved quota for.
  * This function is called when we are writing out the blocks that were
@@ -3943,7 +3910,8 @@ get_reserved_cluster_alloc(struct inode *inode, ext4_lblk_t lblk_start,
 		lblk_from = EXT4_LBLK_CMASK(sbi, lblk_start);
 		lblk_to = lblk_from + c_offset - 1;
 
-		if (ext4_find_delalloc_range(inode, lblk_from, lblk_to))
+		if (ext4_es_scan_range(inode, &ext4_es_is_delayed, lblk_from,
+				       lblk_to))
 			allocated_clusters--;
 	}
 
@@ -3953,7 +3921,8 @@ get_reserved_cluster_alloc(struct inode *inode, ext4_lblk_t lblk_start,
 		lblk_from = lblk_start + num_blks;
 		lblk_to = lblk_from + (sbi->s_cluster_ratio - c_offset) - 1;
 
-		if (ext4_find_delalloc_range(inode, lblk_from, lblk_to))
+		if (ext4_es_scan_range(inode, &ext4_es_is_delayed, lblk_from,
+				       lblk_to))
 			allocated_clusters--;
 	}
 
@@ -5108,8 +5077,10 @@ static int ext4_find_delayed_extent(struct inode *inode,
 	ext4_lblk_t block, next_del;
 
 	if (newes->es_pblk == 0) {
-		ext4_es_find_delayed_extent_range(inode, newes->es_lblk,
-				newes->es_lblk + newes->es_len - 1, &es);
+		ext4_es_find_extent_range(inode, &ext4_es_is_delayed,
+					  newes->es_lblk,
+					  newes->es_lblk + newes->es_len - 1,
+					  &es);
 
 		/*
 		 * No extent in extent-tree contains block @newes->es_pblk,
@@ -5130,7 +5101,8 @@ static int ext4_find_delayed_extent(struct inode *inode,
 	}
 
 	block = newes->es_lblk + newes->es_len;
-	ext4_es_find_delayed_extent_range(inode, block, EXT_MAX_BLOCKS, &es);
+	ext4_es_find_extent_range(inode, &ext4_es_is_delayed, block,
+				  EXT_MAX_BLOCKS, &es);
 	if (es.es_len == 0)
 		next_del = EXT_MAX_BLOCKS;
 	else
@@ -5990,4 +5962,91 @@ ext4_swap_extents(handle_t *handle, struct inode *inode1,
 		path1 = path2 = NULL;
 	}
 	return replaced_count;
+}
+
+/*
+ * ext4_clu_mapped - determine whether any block in a logical cluster has
+ *                   been mapped to a physical cluster
+ *
+ * @inode - file containing the logical cluster
+ * @lclu - logical cluster of interest
+ *
+ * Returns 1 if any block in the logical cluster is mapped, signifying
+ * that a physical cluster has been allocated for it.  Otherwise,
+ * returns 0.  Can also return negative error codes.  Derived from
+ * ext4_ext_map_blocks().
+ */
+int ext4_clu_mapped(struct inode *inode, ext4_lblk_t lclu)
+{
+	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+	struct ext4_ext_path *path;
+	int depth, mapped = 0, err = 0;
+	struct ext4_extent *extent;
+	ext4_lblk_t first_lblk, first_lclu, last_lclu;
+
+	/*
+	 * if data can be stored inline, the logical cluster isn't
+	 * mapped - no physical clusters have been allocated, and the
+	 * file has no extents
+	 */
+	if (ext4_test_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA))
+		return 0;
+
+	/* search for the extent closest to the first block in the cluster */
+	path = ext4_find_extent(inode, EXT4_C2B(sbi, lclu), NULL, 0);
+	if (IS_ERR(path)) {
+		err = PTR_ERR(path);
+		path = NULL;
+		goto out;
+	}
+
+	depth = ext_depth(inode);
+
+	/*
+	 * A consistent leaf must not be empty.  This situation is possible,
+	 * though, _during_ tree modification, and it's why an assert can't
+	 * be put in ext4_find_extent().
+	 */
+	if (unlikely(path[depth].p_ext == NULL && depth != 0)) {
+		EXT4_ERROR_INODE(inode,
+		    "bad extent address - lblock: %lu, depth: %d, pblock: %lld",
+				 (unsigned long) EXT4_C2B(sbi, lclu),
+				 depth, path[depth].p_block);
+		err = -EFSCORRUPTED;
+		goto out;
+	}
+
+	extent = path[depth].p_ext;
+
+	/* can't be mapped if the extent tree is empty */
+	if (extent == NULL)
+		goto out;
+
+	first_lblk = le32_to_cpu(extent->ee_block);
+	first_lclu = EXT4_B2C(sbi, first_lblk);
+
+	/*
+	 * Three possible outcomes at this point - found extent spanning
+	 * the target cluster, to the left of the target cluster, or to the
+	 * right of the target cluster.  The first two cases are handled here.
+	 * The last case indicates the target cluster is not mapped.
+	 */
+	if (lclu >= first_lclu) {
+		last_lclu = EXT4_B2C(sbi, first_lblk +
+				     ext4_ext_get_actual_len(extent) - 1);
+		if (lclu <= last_lclu) {
+			mapped = 1;
+		} else {
+			first_lblk = ext4_ext_next_allocated_block(path);
+			first_lclu = EXT4_B2C(sbi, first_lblk);
+			if (lclu == first_lclu)
+				mapped = 1;
+		}
+	}
+
+out:
+	ext4_ext_drop_refs(path);
+	kfree(path);
+
+	return err ? err : mapped;
 }
