@@ -297,12 +297,13 @@ static int virtpvclock_restore(struct virtio_device *vdev)
 
 static int virtpvclock_validate(struct virtio_device *vdev)
 {
+	uint32_t rating;
+
 	if (!virtio_has_feature(vdev, VIRTIO_PVCLOCK_F_CLOCKSOURCE_RATING))
 		return 0;
 
-	uint32_t rating =
-		virtio_cread32(vdev, offsetof(struct virtio_pvclock_config,
-					      clocksource_rating));
+	rating = virtio_cread32(vdev, offsetof(struct virtio_pvclock_config,
+					       clocksource_rating));
 	if (rating > MAX_CLOCKSOURCE_RATING) {
 		dev_warn(
 			&vdev->dev,
