@@ -1334,7 +1334,7 @@ static int virtio_video_device_register(struct virtio_video_device *vvd)
 		return ret;
 	}
 
-	ret = video_register_device(vd, VFL_TYPE_VIDEO, 0);
+	ret = video_register_device_no_warn(vd, VFL_TYPE_VIDEO, 0);
 	if (ret) {
 		v4l2_err(&vv->v4l2_dev, "failed to register video device\n");
 		return ret;
