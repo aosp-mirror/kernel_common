@@ -36,6 +36,13 @@
 	SMC_FASTCALL64_NR(SMC_ENTITY_SHARED_MEMORY, nr)
 
 /**
+ * FF-A specification mentions explicitly about '4K pages'. This should
+ * not be confused with the kernel PAGE_SIZE, which is the translation
+ * granule kernel is configured and may be one among 4K, 16K and 64K.
+ */
+#define FFA_PAGE_SIZE		SZ_4K
+
+/**
  * typedef ffa_endpoint_id16_t - Endpoint ID
  *
  * Current implementation only supports VMIDs. FFA spec also support stream

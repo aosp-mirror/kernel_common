@@ -349,7 +349,7 @@ int trusty_transfer_memory(struct device *dev, u64 *id,
 		emad->comp_mrd_offset = comp_mrd_offset;
 		emad->reserved_8_15 = 0;
 	}
-	comp_mrd->total_page_count = len / PAGE_SIZE;
+	comp_mrd->total_page_count = len / FFA_PAGE_SIZE;
 	comp_mrd->address_range_count = nents;
 	comp_mrd->reserved_8_15 = 0;
 
@@ -364,7 +364,7 @@ int trusty_transfer_memory(struct device *dev, u64 *id,
 
 		for (i = 0; i < lcount; i++) {
 			cons_mrd[i].address = sg_dma_address(sg);
-			cons_mrd[i].page_count = sg_dma_len(sg) / PAGE_SIZE;
+			cons_mrd[i].page_count = sg_dma_len(sg) / FFA_PAGE_SIZE;
 			cons_mrd[i].reserved_12_15 = 0;
 			sg = sg_next(sg);
 		}
@@ -617,6 +617,14 @@ static int trusty_init_msg_buf(struct trusty_state *s, struct device *dev)
 	s->ffa_local_id = smc_ret.r2;
 	s->ffa_remote_id = 0x8000;
 
+	/*
+	 * The pKVM hypervisor uses the same page size as the host, including for
+	 * stage-2 mappings. So the rx/tx buffers need to be page-sized multiple,
+	 * and page-aligned.
+	 *
+	 * TODO: This can be made more generic by discovering the required size
+	 * through SMC_FC_FFA_FEATURES later.
+	 */
 	s->ffa_tx = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!s->ffa_tx) {
 		ret = -ENOMEM;
@@ -639,8 +647,8 @@ static int trusty_init_msg_buf(struct trusty_state *s, struct device *dev)
 		goto err_unaligned_rx_buf;
 	}
 
-	smc_ret = trusty_smc8(SMC_FCZ_FFA_RXTX_MAP, tx_paddr, rx_paddr, 1, 0,
-			      0, 0, 0);
+	smc_ret = trusty_smc8(SMC_FCZ_FFA_RXTX_MAP, tx_paddr, rx_paddr,
+				PAGE_SIZE / FFA_PAGE_SIZE, 0, 0, 0, 0);
 	if (smc_ret.r0 != SMC_FC_FFA_SUCCESS) {
 		dev_err(s->dev, "%s: SMC_FCZ_FFA_RXTX_MAP failed 0x%lx 0x%lx 0x%lx\n",
 			__func__, smc_ret.r0, smc_ret.r1, smc_ret.r2);

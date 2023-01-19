@@ -210,7 +210,7 @@ static struct tipc_msg_buf *vds_alloc_msg_buf(struct tipc_virtio_dev *vds,
 {
 	int ret;
 	struct tipc_msg_buf *mb;
-	size_t sz = vds->msg_buf_max_sz;
+	size_t sz = ALIGN(vds->msg_buf_max_sz, PAGE_SIZE);
 	pgprot_t pgprot = share_write ? PAGE_KERNEL : PAGE_KERNEL_RO;
 
 	/* allocate tracking structure */
