@@ -3088,13 +3088,6 @@ out:
 	return err;
 }
 
-static bool __has_curseg_space(struct f2fs_sb_info *sbi,
-					struct curseg_info *curseg)
-{
-	return curseg->next_blkoff < f2fs_usable_blks_in_seg(sbi,
-							curseg->segno);
-}
-
 int f2fs_rw_hint_to_seg_type(enum rw_hint hint)
 {
 	switch (hint) {
@@ -3236,6 +3229,7 @@ void f2fs_allocate_data_block(struct f2fs_sb_info *sbi, struct page *page,
 	unsigned long long old_mtime;
 	bool from_gc = (type == CURSEG_ALL_DATA_ATGC);
 	struct seg_entry *se = NULL;
+	bool segment_full = false;
 
 	f2fs_down_read(&SM_I(sbi)->curseg_lock);
 
@@ -3262,6 +3256,8 @@ void f2fs_allocate_data_block(struct f2fs_sb_info *sbi, struct page *page,
 		if (F2FS_OPTION(sbi).fs_mode == FS_MODE_FRAGMENT_BLK)
 			f2fs_randomize_chunk(sbi, curseg);
 	}
+	if (curseg->next_blkoff >= f2fs_usable_blks_in_seg(sbi, curseg->segno))
+		segment_full = true;
 	stat_inc_block_count(sbi, curseg);
 
 	if (from_gc) {
@@ -3280,10 +3276,11 @@ void f2fs_allocate_data_block(struct f2fs_sb_info *sbi, struct page *page,
 	if (GET_SEGNO(sbi, old_blkaddr) != NULL_SEGNO)
 		update_sit_entry(sbi, old_blkaddr, -1);
 
-	if (!__has_curseg_space(sbi, curseg)) {
-		/*
-		 * Flush out current segment and replace it with new segment.
-		 */
+	/*
+	 * If the current segment is full, flush it out and replace it with a
+	 * new segment.
+	 */
+	if (segment_full) {
 		if (from_gc) {
 			get_atssr_segment(sbi, type, se->type,
 						AT_SSR, se->mtime);
