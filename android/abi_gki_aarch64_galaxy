@@ -47,6 +47,7 @@
   blkcg_root
   blkg_lookup_slowpath
   bsearch
+  copy_from_kernel_nofault
   create_function_device
   driver_find
   dump_align
