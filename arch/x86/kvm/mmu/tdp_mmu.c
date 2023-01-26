@@ -609,7 +609,7 @@ static inline int tdp_mmu_zap_spte_atomic(struct kvm *kvm,
 	if (ret)
 		return ret;
 
-	kvm_flush_remote_tlbs_with_address(kvm, iter->gfn,
+	kvm_flush_remote_tlbs_range(kvm, iter->gfn,
 					   KVM_PAGES_PER_HPAGE(iter->level));
 
 	/*
@@ -1050,7 +1050,7 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 		return RET_PF_RETRY;
 	else if (is_shadow_present_pte(iter->old_spte) &&
 		 !is_last_spte(iter->old_spte, iter->level))
-		kvm_flush_remote_tlbs_with_address(vcpu->kvm, sp->gfn,
+		kvm_flush_remote_tlbs_range(vcpu->kvm, sp->gfn,
 						   KVM_PAGES_PER_HPAGE(iter->level + 1));
 
 	/*
