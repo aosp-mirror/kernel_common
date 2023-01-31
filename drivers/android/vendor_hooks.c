@@ -30,6 +30,8 @@
 #include <trace/hooks/creds.h>
 #include <trace/hooks/selinux.h>
 #include <trace/hooks/syscall_check.h>
+#include <trace/hooks/gic.h>
+#include <trace/hooks/gic_v3.h>
 #include <trace/hooks/timer.h>
 
 /*
@@ -81,5 +83,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_override_creds);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_revert_creds);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_check_mmap_file);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_check_file_open);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_gic_set_affinity);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_gic_v3_affinity_init);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_check_bpf_syscall);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_timer_calc_index);
