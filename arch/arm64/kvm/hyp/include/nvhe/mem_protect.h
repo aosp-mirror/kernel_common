@@ -30,8 +30,8 @@ enum pkvm_page_state {
 					  KVM_PGTABLE_PROT_SW1,
 
 	/* Meta-states which aren't encoded directly in the PTE's SW bits */
-	PKVM_NOPAGE,
-	PKVM_PAGE_RESTRICTED_PROT,
+	PKVM_NOPAGE			= BIT(0),
+	PKVM_PAGE_RESTRICTED_PROT	= BIT(1),
 };
 
 #define PKVM_PAGE_STATE_PROT_MASK	(KVM_PGTABLE_PROT_SW0 | KVM_PGTABLE_PROT_SW1)
@@ -100,6 +100,7 @@ int hyp_pin_shared_mem(void *from, void *to);
 void hyp_unpin_shared_mem(void *from, void *to);
 void reclaim_guest_pages(struct pkvm_hyp_vm *vm, struct kvm_hyp_memcache *mc);
 int hyp_protect_host_page(u64 pfn, enum kvm_pgtable_prot prot);
+int host_stage2_get_leaf(phys_addr_t phys, kvm_pte_t *ptep, u32 *level);
 int refill_memcache(struct kvm_hyp_memcache *mc, unsigned long min_pages,
 		    struct kvm_hyp_memcache *host_mc);
 

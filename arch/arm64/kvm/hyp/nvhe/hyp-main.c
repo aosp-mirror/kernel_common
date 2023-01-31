@@ -13,6 +13,7 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_host.h>
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_hypevents.h>
 #include <asm/kvm_mmu.h>
 
 #include <nvhe/ffa.h>
@@ -21,6 +22,7 @@
 #include <nvhe/modules.h>
 #include <nvhe/mm.h>
 #include <nvhe/pkvm.h>
+#include <nvhe/trace.h>
 #include <nvhe/trap_handler.h>
 
 #include <linux/irqchip/arm-gic-v3.h>
@@ -1177,7 +1179,7 @@ static void handle___pkvm_map_module_page(struct kvm_cpu_context *host_ctxt)
 	DECLARE_REG(void *, va, host_ctxt, 2);
 	DECLARE_REG(enum kvm_pgtable_prot, prot, host_ctxt, 3);
 
-	cpu_reg(host_ctxt, 1) = (u64)__pkvm_map_module_page(pfn, va, prot);
+	cpu_reg(host_ctxt, 1) = (u64)__pkvm_map_module_page(pfn, va, prot, false);
 }
 
 static void handle___pkvm_unmap_module_page(struct kvm_cpu_context *host_ctxt)
@@ -1208,6 +1210,43 @@ handle___pkvm_close_module_registration(struct kvm_cpu_context *host_ctxt)
 	cpu_reg(host_ctxt, 1) = __pkvm_close_module_registration();
 }
 
+static void handle___pkvm_start_tracing(struct kvm_cpu_context *host_ctxt)
+{
+	 DECLARE_REG(unsigned long, pack_hva, host_ctxt, 1);
+	 DECLARE_REG(size_t, pack_size, host_ctxt, 2);
+
+	 cpu_reg(host_ctxt, 1) = __pkvm_start_tracing(pack_hva, pack_size);
+}
+
+static void handle___pkvm_stop_tracing(struct kvm_cpu_context *host_ctxt)
+{
+	__pkvm_stop_tracing();
+
+	cpu_reg(host_ctxt, 1) = 0;
+}
+
+static void handle___pkvm_rb_swap_reader_page(struct kvm_cpu_context *host_ctxt)
+{
+	DECLARE_REG(int, cpu, host_ctxt, 1);
+
+	cpu_reg(host_ctxt, 1) = __pkvm_rb_swap_reader_page(cpu);
+}
+
+static void handle___pkvm_rb_update_footers(struct kvm_cpu_context *host_ctxt)
+{
+	DECLARE_REG(int, cpu, host_ctxt, 1);
+
+	cpu_reg(host_ctxt, 1) = __pkvm_rb_update_footers(cpu);
+}
+
+static void handle___pkvm_enable_event(struct kvm_cpu_context *host_ctxt)
+{
+	DECLARE_REG(unsigned short, id, host_ctxt, 1);
+	DECLARE_REG(bool, enable, host_ctxt, 2);
+
+	cpu_reg(host_ctxt, 1) = __pkvm_enable_event(id, enable);
+}
+
 static void handle___pkvm_host_set_stage2_memattr(struct kvm_cpu_context *host_ctxt)
 {
 	DECLARE_REG(phys_addr_t, phys, host_ctxt, 1);
@@ -1233,6 +1272,13 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__kvm_tlb_flush_vmid_ipa),
 	HANDLE_FUNC(__kvm_tlb_flush_vmid),
 	HANDLE_FUNC(__kvm_flush_cpu_context),
+
+	HANDLE_FUNC(__pkvm_alloc_module_va),
+	HANDLE_FUNC(__pkvm_map_module_page),
+	HANDLE_FUNC(__pkvm_unmap_module_page),
+	HANDLE_FUNC(__pkvm_init_module),
+	HANDLE_FUNC(__pkvm_register_hcall),
+	HANDLE_FUNC(__pkvm_close_module_registration),
 	HANDLE_FUNC(__pkvm_prot_finalize),
 
 	HANDLE_FUNC(__pkvm_host_share_hyp),
@@ -1254,14 +1300,29 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__pkvm_iommu_register),
 	HANDLE_FUNC(__pkvm_iommu_pm_notify),
 	HANDLE_FUNC(__pkvm_iommu_finalize),
-	HANDLE_FUNC(__pkvm_alloc_module_va),
-	HANDLE_FUNC(__pkvm_map_module_page),
-	HANDLE_FUNC(__pkvm_unmap_module_page),
-	HANDLE_FUNC(__pkvm_init_module),
-	HANDLE_FUNC(__pkvm_register_hcall),
-	HANDLE_FUNC(__pkvm_close_module_registration),
+	HANDLE_FUNC(__pkvm_start_tracing),
+	HANDLE_FUNC(__pkvm_stop_tracing),
+	HANDLE_FUNC(__pkvm_rb_swap_reader_page),
+	HANDLE_FUNC(__pkvm_rb_update_footers),
+	HANDLE_FUNC(__pkvm_enable_event),
 	HANDLE_FUNC(__pkvm_host_set_stage2_memattr),
 };
+
+unsigned long pkvm_priv_hcall_limit __ro_after_init = __KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize;
+
+int reset_pkvm_priv_hcall_limit(void)
+{
+	unsigned long *addr;
+
+	if (pkvm_priv_hcall_limit == __KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize)
+		return -EACCES;
+
+	addr = hyp_fixmap_map(__hyp_pa(&pkvm_priv_hcall_limit));
+	*addr = KVM_HOST_SMCCC_FUNC(__pkvm_prot_finalize);
+	hyp_fixmap_unmap();
+
+	return 0;
+}
 
 static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
 {
@@ -1282,7 +1343,7 @@ static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
 	 * returns -EPERM after the first call for a given CPU.
 	 */
 	if (static_branch_unlikely(&kvm_protected_mode_initialized))
-		hcall_min = __KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize;
+		hcall_min = pkvm_priv_hcall_limit;
 
 	id -= KVM_HOST_SMCCC_ID(0);
 
@@ -1296,14 +1357,23 @@ static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
 	cpu_reg(host_ctxt, 0) = SMCCC_RET_SUCCESS;
 	hfn(host_ctxt);
 
+	trace_host_hcall(id, 0);
+
 	return;
 inval:
+	trace_host_hcall(id, 1);
 	cpu_reg(host_ctxt, 0) = SMCCC_RET_NOT_SUPPORTED;
 }
 
 static void handle_host_smc(struct kvm_cpu_context *host_ctxt)
 {
+	DECLARE_REG(u64, func_id, host_ctxt, 0);
+	struct pkvm_hyp_vcpu *hyp_vcpu;
 	bool handled;
+
+	hyp_vcpu = pkvm_get_loaded_hyp_vcpu();
+	if (hyp_vcpu && hyp_vcpu->vcpu.arch.fp_state == FP_STATE_GUEST_OWNED)
+		fpsimd_host_restore();
 
 	handled = kvm_host_psci_handler(host_ctxt);
 	if (!handled)
@@ -1313,6 +1383,8 @@ static void handle_host_smc(struct kvm_cpu_context *host_ctxt)
 	if (!handled)
 		__kvm_hyp_host_forward_smc(host_ctxt);
 
+	trace_host_smc(func_id, !handled);
+
 	/* SMC was trapped, move ELR past the current PC. */
 	kvm_skip_host_instr();
 }
@@ -1320,6 +1392,8 @@ static void handle_host_smc(struct kvm_cpu_context *host_ctxt)
 void handle_trap(struct kvm_cpu_context *host_ctxt)
 {
 	u64 esr = read_sysreg_el2(SYS_ESR);
+
+	trace_hyp_enter();
 
 	switch (ESR_ELx_EC(esr)) {
 	case ESR_ELx_EC_HVC64:
@@ -1339,4 +1413,6 @@ void handle_trap(struct kvm_cpu_context *host_ctxt)
 	default:
 		BUG_ON(!READ_ONCE(default_trap_handler) || !default_trap_handler(host_ctxt));
 	}
+
+	trace_hyp_exit();
 }

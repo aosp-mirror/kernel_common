@@ -27,6 +27,8 @@
 #define CREATE_TRACE_POINTS
 #include "trace_arm.h"
 
+#include "hyp_trace.h"
+
 #include <linux/uaccess.h>
 #include <asm/ptrace.h>
 #include <asm/mman.h>
@@ -2020,6 +2022,8 @@ static void kvm_hyp_init_symbols(void)
 	kvm_nvhe_sym(smccc_trng_available) = smccc_trng_available;
 }
 
+int kvm_hyp_init_events(void);
+
 static int kvm_hyp_init_protection(u32 hyp_va_bits)
 {
 	void *addr = phys_to_virt(hyp_mem_base);
@@ -2206,6 +2210,11 @@ static int init_hyp_mode(void)
 	}
 
 	kvm_hyp_init_symbols();
+
+	/* TODO: Real .h interface */
+#ifdef CONFIG_TRACING
+	kvm_hyp_init_events();
+#endif
 
 	if (is_protected_kvm_enabled()) {
 		init_cpu_logical_map();
@@ -2403,6 +2412,10 @@ int kvm_arch_init(void *opaque)
 			kvm_err("Failed to finalize Hyp protection\n");
 			goto out_hyp;
 		}
+
+		err = init_hyp_tracefs();
+		if (err)
+			kvm_err("Failed to initialize Hyp tracing\n");
 	}
 
 	if (is_protected_kvm_enabled()) {

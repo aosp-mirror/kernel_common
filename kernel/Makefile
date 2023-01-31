@@ -56,7 +56,7 @@ obj-$(CONFIG_FREEZER) += freezer.o
 obj-$(CONFIG_PROFILING) += profile.o
 obj-$(CONFIG_STACKTRACE) += stacktrace.o
 obj-y += time/
-obj-$(CONFIG_FUTEX) += futex.o
+obj-$(CONFIG_FUTEX) += futex/
 obj-$(CONFIG_GENERIC_ISA_DMA) += dma.o
 obj-$(CONFIG_SMP) += smp.o
 ifneq ($(CONFIG_SMP),y)
@@ -166,12 +166,20 @@ clean-files := kheaders_data.tar.xz kheaders.md5
 $(obj)/gki_module.o: $(obj)/gki_module_protected_exports.h \
 			$(obj)/gki_module_unprotected.h
 
-$(obj)/gki_module_unprotected.h: $(srctree)/scripts/gen_gki_modules_headers.sh \
-	                         $(if $(wildcard ${OUT_DIR}/abi_symbollist.raw), ${OUT_DIR}/abi_symbollist.raw)
+ALL_KMI_SYMBOLS := all_kmi_symbols
+
+$(obj)/gki_module_unprotected.h: $(ALL_KMI_SYMBOLS) \
+				$(srctree)/scripts/gen_gki_modules_headers.sh
 	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/gen_gki_modules_headers.sh $@ \
-	"$(srctree)"
+	"$(srctree)" \
+	$(ALL_KMI_SYMBOLS)
+
+# Generate symbol list with union of all symbol list for arm64; empty for others
+$(ALL_KMI_SYMBOLS): $(if $(filter arm64,$(ARCH)),$(wildcard $(srctree)/android/abi_gki_aarch64*),)
+	$(if $(strip $^),cat $^ > $(ALL_KMI_SYMBOLS), echo "" > $(ALL_KMI_SYMBOLS))
 
 $(obj)/gki_module_protected_exports.h: $(srctree)/android/abi_gki_protected_exports \
 				$(srctree)/scripts/gen_gki_modules_headers.sh
 	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/gen_gki_modules_headers.sh $@ \
-	"$(srctree)"
+	"$(srctree)" \
+	$<

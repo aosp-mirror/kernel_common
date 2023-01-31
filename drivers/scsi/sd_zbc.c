@@ -274,6 +274,17 @@ int sd_zbc_report_zones(struct gendisk *disk, sector_t sector,
 
 	while (zone_idx < nr_zones && lba < sdkp->capacity) {
 		ret = sd_zbc_do_report_zones(sdkp, buf, buflen, lba, true);
+		if (ret && zone_idx) {
+			sd_printk(KERN_WARNING, sdkp,
+				  "ZBC violation: %llu LBAs are not associated with a zone (zone length %llu)\n",
+				  sdkp->capacity - lba, zone_length);
+			sdkp->capacity = lba;
+			set_capacity_and_notify(disk,
+				logical_to_sectors(sdkp->device,
+						   sdkp->capacity));
+			ret = 0;
+			break;
+		}
 		if (ret)
 			goto out;
 
