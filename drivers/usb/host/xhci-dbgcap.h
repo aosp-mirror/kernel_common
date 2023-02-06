@@ -71,7 +71,7 @@ struct dbc_str_descs {
 };
 
 #define DBC_PROTOCOL			1	/* GNU Remote Debug Command */
-#define DBC_VENDOR_ID			0x1d6b	/* Linux Foundation 0x1d6b */
+#define DBC_VENDOR_ID			0x18d1	/* Google Inc. 0x18d1 */
 #define DBC_PRODUCT_ID			0x0010	/* device 0010 */
 #define DBC_DEVICE_REV			0x0010	/* 0.10 */
 
