@@ -211,8 +211,6 @@ struct ufs_qcom_host {
 	struct reset_controller_dev rcdev;
 
 	struct gpio_desc *device_reset;
-
-	u32 hs_gear;
 };
 
 static inline u32
