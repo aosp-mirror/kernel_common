@@ -1316,7 +1316,8 @@ static void ufshcd_clock_scaling_unprepare(struct ufs_hba *hba, bool scale_up)
 	up_write(&hba->clk_scaling_lock);
 
 	/* Enable Write Booster if we have scaled up else disable it */
-	ufshcd_wb_toggle(hba, scale_up);
+	if (ufshcd_enable_wb_if_scaling_up(hba))
+		ufshcd_wb_toggle(hba, scale_up);
 
 	mutex_unlock(&hba->wb_mutex);
 
@@ -1370,12 +1371,6 @@ static int ufshcd_devfreq_scale(struct ufs_hba *hba, bool scale_up)
 			ufshcd_scale_clks(hba, false);
 			goto out_unprepare;
 		}
-	}
-
-	/* Enable Write Booster if we have scaled up else disable it */
-	if (ufshcd_enable_wb_if_scaling_up(hba)) {
-		downgrade_write(&hba->clk_scaling_lock);
-		ufshcd_wb_toggle(hba, scale_up);
 	}
 
 out_unprepare:
