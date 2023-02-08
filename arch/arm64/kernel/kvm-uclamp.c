@@ -5,6 +5,7 @@
  */
 
 #include <linux/arm-smccc.h>
+#include <linux/cache.h>
 #include <linux/init.h>
 #include <linux/lockdep.h>
 #include <linux/uclamp_kvm.h>
