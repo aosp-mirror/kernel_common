@@ -849,7 +849,7 @@ int fscrypt_set_test_dummy_encryption(struct super_block *sb, const char *arg,
 		.string = arg ? (char *)arg : "",
 	};
 	return fscrypt_parse_test_dummy_encryption(&param, dummy_policy) ?:
-		fscrypt_add_test_dummy_key(sb, dummy_policy);
+		-EINVAL;
 }
 EXPORT_SYMBOL_GPL(fscrypt_set_test_dummy_encryption);
 
