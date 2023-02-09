@@ -1311,12 +1311,12 @@ out:
 	return ret;
 }
 
-static void ufshcd_clock_scaling_unprepare(struct ufs_hba *hba, bool scale_up)
+static void ufshcd_clock_scaling_unprepare(struct ufs_hba *hba, int err, bool scale_up)
 {
 	up_write(&hba->clk_scaling_lock);
 
 	/* Enable Write Booster if we have scaled up else disable it */
-	if (ufshcd_enable_wb_if_scaling_up(hba))
+	if (ufshcd_enable_wb_if_scaling_up(hba) && !err)
 		ufshcd_wb_toggle(hba, scale_up);
 
 	mutex_unlock(&hba->wb_mutex);
@@ -1374,7 +1374,7 @@ static int ufshcd_devfreq_scale(struct ufs_hba *hba, bool scale_up)
 	}
 
 out_unprepare:
-	ufshcd_clock_scaling_unprepare(hba, scale_up);
+	ufshcd_clock_scaling_unprepare(hba, ret, scale_up);
 	return ret;
 }
 
@@ -1774,7 +1774,7 @@ EXPORT_SYMBOL_GPL(ufshcd_freeze_scsi_devs);
 /* Resume processing of SCSI commands. */
 void ufshcd_unfreeze_scsi_devs(struct ufs_hba *hba)
 {
-	ufshcd_clock_scaling_unprepare(hba, true);
+	ufshcd_clock_scaling_unprepare(hba, 0, true);
 }
 EXPORT_SYMBOL_GPL(ufshcd_unfreeze_scsi_devs);
 
