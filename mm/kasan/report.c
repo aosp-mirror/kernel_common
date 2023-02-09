@@ -407,7 +407,7 @@ static void complete_report_info(struct kasan_report_info *info)
 		info->first_bad_addr = addr;
 
 	page = kasan_addr_to_page(addr);
-	if (page && page->slab_cache) {
+	if (page && PageSlab(page) && page->slab_cache) {
 		info->cache = page->slab_cache;
 		info->object = nearest_obj(info->cache, page, addr);
 	} else
