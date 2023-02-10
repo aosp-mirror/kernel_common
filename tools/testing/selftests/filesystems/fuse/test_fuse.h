@@ -15,6 +15,8 @@
 #include <sys/statfs.h>
 #include <sys/types.h>
 
+#include <include/uapi/linux/fuse.h>
+
 #define PAGE_SIZE 4096
 #define FUSE_POSTFILTER 0x20000
 
@@ -52,6 +54,7 @@ int s_creat(struct s pathname, mode_t mode);
 int s_mkfifo(struct s pathname, mode_t mode);
 int s_stat(struct s pathname, struct stat *st);
 int s_statfs(struct s pathname, struct statfs *st);
+int s_fuse_attr(struct s pathname, struct fuse_attr *fuse_attr_out);
 DIR *s_opendir(struct s pathname);
 int s_getxattr(struct s pathname, const char name[], void *value, size_t size,
 	       ssize_t *ret_size);
@@ -261,7 +264,7 @@ int delete_dir_tree(const char *dir_path, bool remove_root);
 			((struct fuse_out_header *)bytes_out)->len);	\
 	} while (false)
 
-#define TESTFUSEINIT()							\
+#define TESTFUSEINITFLAGS(fuse_connection_flags)			\
 	do {								\
 		DECL_FUSE_IN(init);					\
 									\
@@ -272,7 +275,7 @@ int delete_dir_tree(const char *dir_path, bool remove_root);
 			.major = FUSE_KERNEL_VERSION,			\
 			.minor = FUSE_KERNEL_MINOR_VERSION,		\
 			.max_readahead = 4096,				\
-			.flags = 0,					\
+			.flags = fuse_connection_flags,			\
 			.max_background = 0,				\
 			.congestion_threshold = 0,			\
 			.max_write = 4096,				\
@@ -281,6 +284,9 @@ int delete_dir_tree(const char *dir_path, bool remove_root);
 			.map_alignment = 4096,				\
 		}));							\
 	} while (false)
+
+#define TESTFUSEINIT()							\
+	TESTFUSEINITFLAGS(0)
 
 #define DECL_FUSE_IN(name)						\
 	struct fuse_##name##_in *name##_in =				\

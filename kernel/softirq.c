@@ -31,6 +31,10 @@
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(irq_handler_entry);
 EXPORT_TRACEPOINT_SYMBOL_GPL(irq_handler_exit);
+EXPORT_TRACEPOINT_SYMBOL_GPL(softirq_entry);
+EXPORT_TRACEPOINT_SYMBOL_GPL(softirq_exit);
+EXPORT_TRACEPOINT_SYMBOL_GPL(tasklet_entry);
+EXPORT_TRACEPOINT_SYMBOL_GPL(tasklet_exit);
 
 /*
    - No shared variables, all the data are CPU local.
@@ -328,10 +332,9 @@ restart:
 			goto restart;
 	}
 
-#ifdef CONFIG_RT_SOFTINT_OPTIMIZATION
 	if (pending | deferred)
 		wakeup_softirqd();
-#endif
+
 	lockdep_softirq_end(in_hardirq);
 	account_irq_exit_time(current);
 	__local_bh_enable(SOFTIRQ_OFFSET);

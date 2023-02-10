@@ -63,10 +63,6 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
 
-#undef CREATE_TRACE_POINTS
-#include <trace/hooks/module.h>
-#include <trace/hooks/memory.h>
-
 #ifndef ARCH_SHF_SMALL
 #define ARCH_SHF_SMALL 0
 #endif
@@ -2263,10 +2259,6 @@ static void free_module(struct module *mod)
 
 	/* This may be empty, but that's OK */
 	module_arch_freeing_init(mod);
-	trace_android_vh_set_memory_rw((unsigned long)mod->init_layout.base,
-		(mod->init_layout.size)>>PAGE_SHIFT);
-	trace_android_vh_set_memory_nx((unsigned long)mod->init_layout.base,
-		(mod->init_layout.size)>>PAGE_SHIFT);
 	module_memfree(mod->init_layout.base);
 	kfree(mod->args);
 	percpu_modfree(mod);
@@ -2275,10 +2267,6 @@ static void free_module(struct module *mod)
 	lockdep_free_key_range(mod->core_layout.base, mod->core_layout.size);
 
 	/* Finally, free the core (containing the module structure) */
-	trace_android_vh_set_memory_rw((unsigned long)mod->core_layout.base,
-		(mod->core_layout.size)>>PAGE_SHIFT);
-	trace_android_vh_set_memory_nx((unsigned long)mod->core_layout.base,
-		(mod->core_layout.size)>>PAGE_SHIFT);
 	module_memfree(mod->core_layout.base);
 }
 
@@ -2296,6 +2284,15 @@ void *__symbol_get(const char *symbol)
 	return sym ? (void *)kernel_symbol_value(sym) : NULL;
 }
 EXPORT_SYMBOL_GPL(__symbol_get);
+
+static bool module_init_layout_section(const char *sname)
+{
+#ifndef CONFIG_MODULE_UNLOAD
+	if (module_exit_section(sname))
+		return true;
+#endif
+	return module_init_section(sname);
+}
 
 /*
  * Ensure that an exported symbol [global namespace] does not already exist
@@ -2520,7 +2517,7 @@ static void layout_sections(struct module *mod, struct load_info *info)
 			if ((s->sh_flags & masks[m][0]) != masks[m][0]
 			    || (s->sh_flags & masks[m][1])
 			    || s->sh_entsize != ~0UL
-			    || module_init_section(sname))
+			    || module_init_layout_section(sname))
 				continue;
 			s->sh_entsize = get_offset(mod, &mod->core_layout.size, s, i);
 			pr_debug("\t%s\n", sname);
@@ -2553,7 +2550,7 @@ static void layout_sections(struct module *mod, struct load_info *info)
 			if ((s->sh_flags & masks[m][0]) != masks[m][0]
 			    || (s->sh_flags & masks[m][1])
 			    || s->sh_entsize != ~0UL
-			    || !module_init_section(sname))
+			    || !module_init_layout_section(sname))
 				continue;
 			s->sh_entsize = (get_offset(mod, &mod->init_layout.size, s, i)
 					 | INIT_OFFSET_MASK);
@@ -3210,11 +3207,6 @@ static int rewrite_section_headers(struct load_info *info, int flags)
 		   temporary image. */
 		shdr->sh_addr = (size_t)info->hdr + shdr->sh_offset;
 
-#ifndef CONFIG_MODULE_UNLOAD
-		/* Don't load .exit sections */
-		if (module_exit_section(info->secstrings+shdr->sh_name))
-			shdr->sh_flags &= ~(unsigned long)SHF_ALLOC;
-#endif
 	}
 
 	/* Track but don't keep modinfo and version sections. */
@@ -3655,15 +3647,7 @@ static void module_deallocate(struct module *mod, struct load_info *info)
 {
 	percpu_modfree(mod);
 	module_arch_freeing_init(mod);
-	trace_android_vh_set_memory_rw((unsigned long)mod->init_layout.base,
-		(mod->init_layout.size)>>PAGE_SHIFT);
-	trace_android_vh_set_memory_nx((unsigned long)mod->init_layout.base,
-		(mod->init_layout.size)>>PAGE_SHIFT);
 	module_memfree(mod->init_layout.base);
-	trace_android_vh_set_memory_rw((unsigned long)mod->core_layout.base,
-		(mod->core_layout.size)>>PAGE_SHIFT);
-	trace_android_vh_set_memory_nx((unsigned long)mod->core_layout.base,
-		(mod->core_layout.size)>>PAGE_SHIFT);
 	module_memfree(mod->core_layout.base);
 }
 
@@ -3806,13 +3790,8 @@ static noinline int do_init_module(struct module *mod)
 	rcu_assign_pointer(mod->kallsyms, &mod->core_kallsyms);
 #endif
 	module_enable_ro(mod, true);
-	trace_android_vh_set_module_permit_after_init(mod);
 	mod_tree_remove_init(mod);
 	module_arch_freeing_init(mod);
-	trace_android_vh_set_memory_rw((unsigned long)mod->init_layout.base,
-		(mod->init_layout.size)>>PAGE_SHIFT);
-	trace_android_vh_set_memory_nx((unsigned long)mod->init_layout.base,
-		(mod->init_layout.size)>>PAGE_SHIFT);
 	mod->init_layout.base = NULL;
 	mod->init_layout.size = 0;
 	mod->init_layout.ro_size = 0;
@@ -3919,7 +3898,6 @@ static int complete_formation(struct module *mod, struct load_info *info)
 	module_enable_ro(mod, false);
 	module_enable_nx(mod);
 	module_enable_x(mod);
-	trace_android_vh_set_module_permit_before_init(mod);
 
 	/* Mark state as coming so strong_try_module_get() ignores us,
 	 * but kallsyms etc. can see us. */

@@ -11,6 +11,7 @@
  * mechanism for vendor modules to hook and extend functionality
  */
 struct pt_regs;
+
 DECLARE_RESTRICTED_HOOK(android_rvh_die_kernel_fault,
 	TP_PROTO(struct pt_regs *regs, unsigned int esr, unsigned long addr, const char *msg),
 	TP_ARGS(regs, esr, addr, msg), 1);

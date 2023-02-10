@@ -394,6 +394,35 @@ int s_rename(struct s oldpathname, struct s newpathname)
 	return res;
 }
 
+int s_fuse_attr(struct s pathname, struct fuse_attr *fuse_attr_out)
+{
+
+	struct stat st;
+	int result = TEST_FAILURE;
+
+	TESTSYSCALL(s_stat(pathname, &st));
+
+	fuse_attr_out->ino = st.st_ino;
+	fuse_attr_out->mode = st.st_mode;
+	fuse_attr_out->nlink = st.st_nlink;
+	fuse_attr_out->uid = st.st_uid;
+	fuse_attr_out->gid = st.st_gid;
+	fuse_attr_out->rdev = st.st_rdev;
+	fuse_attr_out->size = st.st_size;
+	fuse_attr_out->blksize = st.st_blksize;
+	fuse_attr_out->blocks = st.st_blocks;
+	fuse_attr_out->atime = st.st_atime;
+	fuse_attr_out->mtime = st.st_mtime;
+	fuse_attr_out->ctime = st.st_ctime;
+	fuse_attr_out->atimensec = UINT32_MAX;
+	fuse_attr_out->mtimensec = UINT32_MAX;
+	fuse_attr_out->ctimensec = UINT32_MAX;
+
+	result = TEST_SUCCESS;
+out:
+	return result;
+}
+
 struct s tracing_folder(void)
 {
 	struct s trace = {0};

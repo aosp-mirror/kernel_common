@@ -514,3 +514,26 @@ int error_test(struct fuse_bpf_args *fa)
 	}
 }
 
+SEC("test_readdirplus")
+int readdirplus_test(struct fuse_bpf_args *fa)
+{
+	switch (fa->opcode) {
+	case FUSE_READDIR | FUSE_PREFILTER: {
+		return 0;
+	}
+	}
+	return FUSE_BPF_BACKING;
+}
+
+SEC("test_lookup_postfilter")
+int lookuppostfilter_test(struct fuse_bpf_args *fa)
+{
+	switch(fa->opcode) {
+	case FUSE_LOOKUP | FUSE_PREFILTER:
+		return FUSE_BPF_BACKING | FUSE_BPF_POST_FILTER;
+	case FUSE_LOOKUP | FUSE_POSTFILTER:
+		return FUSE_BPF_USER_FILTER;
+	default:
+		return FUSE_BPF_BACKING;
+	}
+}

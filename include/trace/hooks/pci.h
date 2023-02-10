@@ -6,6 +6,9 @@
 #if !defined(_TRACE_HOOK_PCI_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_PCI_H
 #include <trace/hooks/vendor_hooks.h>
+
+struct pci_dev;
+
 /*
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality

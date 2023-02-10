@@ -57,9 +57,9 @@ if arg_contain --version "$@"; then
 fi
 
 if arg_contain -E "$@"; then
-	# For scripts/gcc-version.sh; This emulates GCC 20.0.0
+	# For scripts/cc-version.sh; This emulates GCC 20.0.0
 	if arg_contain - "$@"; then
-		sed 's/^__GNUC__$/20/; s/^__GNUC_MINOR__$/0/; s/^__GNUC_PATCHLEVEL__$/0/'
+		sed -n '/^GCC/{s/__GNUC__/20/; s/__GNUC_MINOR__/0/; s/__GNUC_PATCHLEVEL__/0/; p;}'
 		exit 0
 	else
 		echo "no input files" >&2
@@ -83,12 +83,8 @@ fi
 
 # To set GCC_PLUGINS
 if arg_contain -print-file-name=plugin "$@"; then
-	plugin_dir=$(mktemp -d)
-
-	mkdir -p $plugin_dir/include
-	touch $plugin_dir/include/plugin-version.h
-
-	echo $plugin_dir
+	# Use $0 to find the in-tree dummy directory
+	echo "$(dirname "$(readlink -f "$0")")/dummy-plugin-dir"
 	exit 0
 fi
 

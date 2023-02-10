@@ -20,6 +20,8 @@ static bool fuse_use_readdirplus(struct inode *dir, struct dir_context *ctx)
 
 	if (!fc->do_readdirplus)
 		return false;
+	if (fi->nodeid == 0)
+		return false;
 	if (!fc->readdirplus_auto)
 		return true;
 	if (test_and_clear_bit(FUSE_I_ADVISE_RDPLUS, &fi->state))
@@ -573,7 +575,8 @@ int fuse_readdir(struct file *file, struct dir_context *ctx)
 
 #ifdef CONFIG_FUSE_BPF
 	struct fuse_err_ret fer;
-	bool force_again, allow_force;
+	bool allow_force;
+	bool force_again = false;
 	bool is_continued = false;
 
 again:

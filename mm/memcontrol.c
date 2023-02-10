@@ -5330,8 +5330,8 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 	memcg->deferred_split_queue.split_queue_len = 0;
 #endif
 	idr_replace(&mem_cgroup_idr, memcg, memcg->id.id);
-	trace_android_vh_mem_cgroup_alloc(memcg);
 	lru_gen_init_memcg(memcg);
+	trace_android_vh_mem_cgroup_alloc(memcg);
 	return memcg;
 fail:
 	mem_cgroup_id_remove(memcg);
@@ -6229,9 +6229,10 @@ static void mem_cgroup_move_task(void)
 #ifdef CONFIG_LRU_GEN
 static void mem_cgroup_attach(struct cgroup_taskset *tset)
 {
+	struct task_struct *task;
 	struct cgroup_subsys_state *css;
-	struct task_struct *task = NULL;
 
+	/* find the first leader if there is any */
 	cgroup_taskset_for_each_leader(task, css, tset)
 		break;
 
@@ -6239,7 +6240,7 @@ static void mem_cgroup_attach(struct cgroup_taskset *tset)
 		return;
 
 	task_lock(task);
-	if (task->mm && task->mm->owner == task)
+	if (task->mm && READ_ONCE(task->mm->owner) == task)
 		lru_gen_migrate_mm(task->mm);
 	task_unlock(task);
 }
@@ -7150,7 +7151,7 @@ static int __init cgroup_memory(char *s)
 		if (!strcmp(token, "nokmem"))
 			cgroup_memory_nokmem = true;
 	}
-	return 0;
+	return 1;
 }
 __setup("cgroup.memory=", cgroup_memory);
 

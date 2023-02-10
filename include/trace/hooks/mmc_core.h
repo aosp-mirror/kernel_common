@@ -9,9 +9,9 @@
 
 #include <trace/hooks/vendor_hooks.h>
 
-struct mmc_host;
-struct mmc_card;
 struct sdhci_host;
+struct mmc_card;
+struct mmc_host;
 
 DECLARE_HOOK(android_vh_mmc_blk_reset,
 	     TP_PROTO(struct mmc_host *host, int err, bool *allow),

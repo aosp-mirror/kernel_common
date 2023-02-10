@@ -31,6 +31,7 @@
 #include <linux/swapops.h>
 #include <linux/shmem_fs.h>
 #include <linux/mmu_notifier.h>
+#include <trace/hooks/mm.h>
 
 #include <asm/tlb.h>
 
@@ -442,8 +443,11 @@ regular_page:
 			continue;
 		}
 
-		/* Do not interfere with other mappings of this page */
-		if (page_mapcount(page) != 1)
+		/*
+		 * Do not interfere with other mappings of this page and
+		 * non-LRU page.
+		 */
+		if (!PageLRU(page) || page_mapcount(page) != 1)
 			continue;
 
 		VM_BUG_ON_PAGE(PageTransCompound(page), page);
@@ -497,11 +501,9 @@ static void madvise_cold_page_range(struct mmu_gather *tlb,
 		.tlb = tlb,
 	};
 
-	vm_write_begin(vma);
 	tlb_start_vma(tlb, vma);
 	walk_page_range(vma->vm_mm, addr, end, &cold_walk_ops, &walk_private);
 	tlb_end_vma(tlb, vma);
-	vm_write_end(vma);
 }
 
 static long madvise_cold(struct vm_area_struct *vma,
@@ -532,11 +534,9 @@ static void madvise_pageout_page_range(struct mmu_gather *tlb,
 		.tlb = tlb,
 	};
 
-	vm_write_begin(vma);
 	tlb_start_vma(tlb, vma);
 	walk_page_range(vma->vm_mm, addr, end, &cold_walk_ops, &walk_private);
 	tlb_end_vma(tlb, vma);
-	vm_write_end(vma);
 }
 
 static inline bool can_do_pageout(struct vm_area_struct *vma)
@@ -739,12 +739,10 @@ static int madvise_free_single_vma(struct vm_area_struct *vma,
 	update_hiwater_rss(mm);
 
 	mmu_notifier_invalidate_range_start(&range);
-	vm_write_begin(vma);
 	tlb_start_vma(&tlb, vma);
 	walk_page_range(vma->vm_mm, range.start, range.end,
 			&madvise_free_walk_ops, &tlb);
 	tlb_end_vma(&tlb, vma);
-	vm_write_end(vma);
 	mmu_notifier_invalidate_range_end(&range);
 	tlb_finish_mmu(&tlb, range.start, range.end);
 
@@ -1266,6 +1264,7 @@ int do_madvise(struct mm_struct *mm, unsigned long start, size_t len_in, int beh
 	int write;
 	size_t len;
 	struct blk_plug plug;
+	bool do_plug = true;
 
 	start = untagged_addr(start);
 
@@ -1300,10 +1299,13 @@ int do_madvise(struct mm_struct *mm, unsigned long start, size_t len_in, int beh
 		mmap_read_lock(mm);
 	}
 
-	blk_start_plug(&plug);
+	trace_android_vh_do_madvise_blk_plug(behavior, &do_plug);
+	if (do_plug)
+		blk_start_plug(&plug);
 	error = madvise_walk_vmas(mm, start, end, behavior,
 			madvise_vma_behavior);
-	blk_finish_plug(&plug);
+	if (do_plug)
+		blk_finish_plug(&plug);
 	if (write)
 		mmap_write_unlock(mm);
 	else

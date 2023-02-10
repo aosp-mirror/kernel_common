@@ -43,6 +43,9 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/pagemap.h>
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/mm.h>
+
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
@@ -267,6 +270,7 @@ static bool pagevec_add_and_need_flush(struct pagevec *pvec, struct page *page)
 			lru_cache_disabled())
 		ret = true;
 
+	trace_android_vh_pagevec_drain(page, &ret);
 	return ret;
 }
 
@@ -423,33 +427,31 @@ static void __lru_cache_activate_page(struct page *page)
 #ifdef CONFIG_LRU_GEN
 static void page_inc_refs(struct page *page)
 {
-	unsigned long refs;
-	unsigned long old_flags, new_flags;
+	unsigned long new_flags, old_flags;
 
 	if (PageUnevictable(page))
 		return;
 
+	if (!PageReferenced(page)) {
+		SetPageReferenced(page);
+		return;
+	}
+
+	if (!PageWorkingset(page)) {
+		SetPageWorkingset(page);
+		return;
+	}
+
 	/* see the comment on MAX_NR_TIERS */
 	do {
-		new_flags = old_flags = READ_ONCE(page->flags);
+		old_flags = READ_ONCE(page->flags);
+		new_flags = old_flags & LRU_REFS_MASK;
+		if (new_flags == LRU_REFS_MASK)
+			break;
 
-		if (!(new_flags & BIT(PG_referenced))) {
-			new_flags |= BIT(PG_referenced);
-			continue;
-		}
-
-		if (!(new_flags & BIT(PG_workingset))) {
-			new_flags |= BIT(PG_workingset);
-			continue;
-		}
-
-		refs = new_flags & LRU_REFS_MASK;
-		refs = min(refs + BIT(LRU_REFS_PGOFF), LRU_REFS_MASK);
-
-		new_flags &= ~LRU_REFS_MASK;
-		new_flags |= refs;
-	} while (new_flags != old_flags &&
-		 cmpxchg(&page->flags, old_flags, new_flags) != old_flags);
+		new_flags += BIT(LRU_REFS_PGOFF);
+		new_flags |= old_flags & ~LRU_REFS_MASK;
+	} while (cmpxchg(&page->flags, old_flags, new_flags) != old_flags);
 }
 #else
 static void page_inc_refs(struct page *page)

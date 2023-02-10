@@ -9,9 +9,9 @@
 
 #include <trace/hooks/vendor_hooks.h>
 
-struct blk_mq_tag_set;
 struct blk_mq_tags;
 struct blk_mq_alloc_data;
+struct blk_mq_tag_set;
 
 DECLARE_HOOK(android_vh_blk_alloc_rqs,
 	TP_PROTO(size_t *rq_size, struct blk_mq_tag_set *set,

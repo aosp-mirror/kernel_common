@@ -11,6 +11,7 @@
  * mechanism for vendor modules to hook and extend functionality
  */
 struct worker;
+
 DECLARE_HOOK(android_vh_create_worker,
 	TP_PROTO(struct worker *worker, struct workqueue_attrs *attrs),
 	TP_ARGS(worker, attrs));

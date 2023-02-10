@@ -10,18 +10,26 @@
  * Following tracepoints are not exported in tracefs and provide a
  * mechanism for vendor modules to hook and extend functionality
  */
+
+/* needed for enum freq_qos_req_types */
+#include <linux/pm_qos.h>
+
+struct freq_constraints;
+struct freq_qos_request;
 struct task_struct;
+
 DECLARE_HOOK(android_vh_try_to_freeze_todo,
 	TP_PROTO(unsigned int todo, unsigned int elapsed_msecs, bool wq_busy),
 	TP_ARGS(todo, elapsed_msecs, wq_busy));
+
+DECLARE_HOOK(android_vh_try_to_freeze_todo_logging,
+	TP_PROTO(bool *logging_on),
+	TP_ARGS(logging_on));
 
 DECLARE_HOOK(android_vh_try_to_freeze_todo_unfrozen,
 	TP_PROTO(struct task_struct *p),
 	TP_ARGS(p));
 
-enum freq_qos_req_type;
-struct freq_qos_request;
-struct freq_constraints;
 
 DECLARE_HOOK(android_vh_freq_qos_add_request,
 	TP_PROTO(struct freq_constraints *qos, struct freq_qos_request *req,
