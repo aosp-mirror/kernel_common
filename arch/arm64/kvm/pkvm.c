@@ -28,6 +28,7 @@
 #include <linux/init_syscalls.h>
 
 #include "hyp_constants.h"
+#include "hyp_trace.h"
 
 DEFINE_STATIC_KEY_FALSE(kvm_protected_mode_initialized);
 
@@ -829,6 +830,7 @@ int __pkvm_load_el2_module(struct module *this, unsigned long *token)
 		{ &mod->text, KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_X },
 		{ &mod->bss, KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_W },
 		{ &mod->rodata, KVM_PGTABLE_PROT_R },
+		{ &mod->event_ids, KVM_PGTABLE_PROT_R },
 		{ &mod->data, KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_W },
 	};
 	void *start, *end, *hyp_va;
@@ -892,6 +894,12 @@ int __pkvm_load_el2_module(struct module *this, unsigned long *token)
 	 * inaccessible.
 	 */
 	kmemleak_free_part(start, size);
+
+	ret = hyp_trace_init_mod_events(mod->hyp_events,
+					mod->event_ids.start,
+					mod->nr_hyp_events);
+	if (ret)
+		kvm_err("Failed to init module events: %d\n", ret);
 
 	ret = pkvm_map_module_sections(secs_map + secs_first, hyp_va,
 				       ARRAY_SIZE(secs_map) - secs_first);
