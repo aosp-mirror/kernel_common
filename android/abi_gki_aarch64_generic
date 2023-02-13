@@ -2590,6 +2590,7 @@
   usb_role_switch_unregister
   usb_speed_string
   usb_string_id
+  usb_udc_vbus_handler
   usb_unregister_notify
   __usecs_to_jiffies
   usleep_range
@@ -2699,6 +2700,7 @@
   wait_for_completion_interruptible_timeout
   wait_for_completion_killable
   wait_for_completion_timeout
+  wait_on_page_bit
   wait_woken
   __wake_up
   __wake_up_locked
