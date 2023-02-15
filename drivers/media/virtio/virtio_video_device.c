@@ -194,8 +194,8 @@ static int virtio_video_buf_init_guest_pages(struct vb2_buffer *vb)
 		}
 	}
 
-	v4l2_dbg(1, vv->debug, &vv->v4l2_dev, "mem entries:\n");
-	if (vv->debug >= 1) {
+	v4l2_dbg(1, *vv->debug, &vv->v4l2_dev, "mem entries:\n");
+	if (*vv->debug >= 1) {
 		for (i = 0; i < nents; i++)
 			pr_debug("\t%03i: addr=%llx length=%u\n", i,
 					ents[i].addr, ents[i].length);
@@ -569,7 +569,7 @@ int virtio_video_g_selection(struct file *file, void *fh,
 		sel->r.height = info->crop.height;
 		break;
 	default:
-		v4l2_dbg(1, vvd->vv->debug, &vvd->vv->v4l2_dev,
+		v4l2_dbg(1, *vvd->vv->debug, &vvd->vv->v4l2_dev,
 			 "unsupported/invalid selection target: %d\n",
 			sel->target);
 		return -EINVAL;

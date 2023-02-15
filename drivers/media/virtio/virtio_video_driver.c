@@ -151,7 +151,7 @@ static int virtio_video_probe(struct virtio_device *vdev)
 		return -ENOMEM;
 
 	vv->vdev = vdev;
-	vv->debug = debug;
+	vv->debug = &debug;
 	vv->use_dma_mem = use_dma_mem;
 	vdev->priv = vv;
 

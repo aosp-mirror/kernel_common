@@ -265,13 +265,13 @@ static int virtio_video_decoder_cmd(struct file *file, void *fh,
 					 V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
 
 		if (!vb2_is_streaming(src_vq)) {
-			v4l2_dbg(1, vv->debug,
+			v4l2_dbg(1, *vv->debug,
 				 &vv->v4l2_dev, "output is not streaming\n");
 			return 0;
 		}
 
 		if (!vb2_is_streaming(dst_vq)) {
-			v4l2_dbg(1, vv->debug,
+			v4l2_dbg(1, *vv->debug,
 				 &vv->v4l2_dev, "capture is not streaming\n");
 			return 0;
 		}

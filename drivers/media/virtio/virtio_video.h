@@ -154,7 +154,7 @@ struct virtio_video {
 	bool supp_non_contig;
 	struct list_head devices_list;
 
-	int debug;
+	int *debug;
 	int use_dma_mem;
 	bool v4l2_m2m_src_queue_empty;
 
@@ -424,6 +424,8 @@ uint32_t virtio_video_v4l2_control_to_virtio(uint32_t v4l2_control);
 uint32_t virtio_video_v4l2_profile_to_virtio(uint32_t v4l2_profile);
 uint32_t virtio_video_v4l2_level_to_virtio(uint32_t v4l2_level);
 uint32_t virtio_video_v4l2_bitrate_mode_to_virtio(uint32_t v4l2_bitrate_mode);
+
+const char *virtio_video_cmd_type_name(int type);
 
 struct video_format_frame *
 virtio_video_find_format(struct virtio_video_stream *stream,

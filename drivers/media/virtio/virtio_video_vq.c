@@ -133,7 +133,7 @@ static void reclaim_vbufs(struct virtqueue *vq, struct list_head *reclaim_list)
 		freed++;
 	}
 	if (freed == 0)
-		v4l2_dbg(1, vv->debug, &vv->v4l2_dev,
+		v4l2_dbg(1, *vv->debug, &vv->v4l2_dev,
 			 "zero vbufs reclaimed\n");
 }
 
@@ -227,6 +227,7 @@ void virtio_video_dequeue_cmd_func(struct work_struct *work)
 			     commandq.dequeue_work);
 	struct list_head reclaim_list;
 	struct virtio_video_vbuffer *entry, *tmp;
+	struct virtio_video_cmd_hdr *req;
 	struct virtio_video_cmd_hdr *resp;
 
 	INIT_LIST_HEAD(&reclaim_list);
@@ -239,13 +240,17 @@ void virtio_video_dequeue_cmd_func(struct work_struct *work)
 	spin_unlock(&vv->commandq.qlock);
 
 	list_for_each_entry_safe(entry, tmp, &reclaim_list, list) {
+		req = (struct virtio_video_cmd_hdr *)entry->buf;
 		resp = (struct virtio_video_cmd_hdr *)entry->resp_buf;
-		if (resp->type >=
-		    cpu_to_le32(VIRTIO_VIDEO_RESP_ERR_INVALID_OPERATION))
-			v4l2_dbg(1, vv->debug, &vv->v4l2_dev,
-				 "response 0x%x\n", le32_to_cpu(resp->type));
 
 		trace_virtio_video_cmd_done((struct virtio_video_cmd_hdr *) entry->buf);
+
+		v4l2_dbg(1, *vv->debug, &vv->v4l2_dev,
+			 "cmd: %-30s (0x%x) response: %-30s (0x%x)",
+			 virtio_video_cmd_type_name(le32_to_cpu(req->type)),
+			 le32_to_cpu(req->type),
+			 virtio_video_cmd_type_name(le32_to_cpu(resp->type)),
+			 le32_to_cpu(resp->type));
 
 		if (entry->resp_cb)
 			entry->resp_cb(vv, entry);
@@ -326,8 +331,15 @@ static int virtio_video_queue_cmd_buffer(struct virtio_video *vv,
 					  struct virtio_video_vbuffer *vbuf)
 {
 	int ret;
+	struct virtio_video_cmd_hdr *hdr;
 
 	trace_virtio_video_cmd((struct virtio_video_cmd_hdr *) vbuf->buf);
+
+	hdr = (struct virtio_video_cmd_hdr *)vbuf->buf;
+	v4l2_dbg(1, *vv->debug, &vv->v4l2_dev,
+		 "cmd: %-30s (0x%x)",
+		 virtio_video_cmd_type_name(le32_to_cpu(hdr->type)),
+		 le32_to_cpu(hdr->type));
 
 	spin_lock(&vv->commandq.qlock);
 	ret = virtio_video_queue_cmd_buffer_locked(vv, vbuf);

@@ -228,7 +228,7 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 					 c_fmt->level->min);
 			break;
 		default:
-			v4l2_dbg(1, vv->debug,
+			v4l2_dbg(1, *vv->debug,
 				 &vv->v4l2_dev, "unsupported format\n");
 			break;
 		}
@@ -355,13 +355,13 @@ static int virtio_video_encoder_cmd(struct file *file, void *fh,
 					 V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
 
 		if (!vb2_is_streaming(src_vq)) {
-			v4l2_dbg(1, vv->debug,
+			v4l2_dbg(1, *vv->debug,
 				 &vv->v4l2_dev, "output is not streaming\n");
 			goto unlock;
 		}
 
 		if (!vb2_is_streaming(dst_vq)) {
-			v4l2_dbg(1, vv->debug,
+			v4l2_dbg(1, *vv->debug,
 				 &vv->v4l2_dev, "capture is not streaming\n");
 			goto unlock;
 		}
