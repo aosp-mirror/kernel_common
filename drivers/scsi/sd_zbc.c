@@ -346,7 +346,7 @@ static blk_status_t sd_zbc_cmnd_checks(struct scsi_cmnd *cmd)
 	if (sdkp->device->changed)
 		return BLK_STS_IOERR;
 
-	if (sector & (sd_zbc_zone_sectors(sdkp) - 1))
+	if (!bdev_is_zone_start(sdkp->disk->part0, sector))
 		/* Unaligned request */
 		return BLK_STS_IOERR;
 
@@ -756,13 +756,6 @@ static int sd_zbc_check_capacity(struct scsi_disk *sdkp, unsigned char *buf,
 		zone_blocks = sdkp->zone_starting_lba_gran;
 	}
 
-	if (!is_power_of_2(zone_blocks)) {
-		sd_printk(KERN_ERR, sdkp,
-			  "Zone size %llu is not a power of two.\n",
-			  zone_blocks);
-		return -EINVAL;
-	}
-
 	*zblocks = zone_blocks;
 
 	return 0;
@@ -770,10 +763,13 @@ static int sd_zbc_check_capacity(struct scsi_disk *sdkp, unsigned char *buf,
 
 static void sd_zbc_print_zones(struct scsi_disk *sdkp)
 {
+	u64 remainder;
+
 	if (!sd_is_zoned(sdkp) || !sdkp->capacity)
 		return;
 
-	if (sdkp->capacity & (sdkp->zone_info.zone_blocks - 1))
+	div64_u64_rem(sdkp->capacity, sdkp->zone_info.zone_blocks, &remainder);
+	if (remainder)
 		sd_printk(KERN_NOTICE, sdkp,
 			  "%u zones of %u logical blocks + 1 runt zone\n",
 			  sdkp->zone_info.nr_zones - 1,
@@ -967,7 +963,7 @@ int sd_zbc_read_zones(struct scsi_disk *sdkp, u8 buf[SD_BUF_SIZE])
 	else
 		blk_queue_max_open_zones(q, sdkp->zones_max_open);
 	blk_queue_max_active_zones(q, 0);
-	nr_zones = round_up(sdkp->capacity, zone_blocks) >> ilog2(zone_blocks);
+	nr_zones = div64_u64(sdkp->capacity + zone_blocks - 1, zone_blocks);
 
 	/*
 	 * Per ZBC and ZAC specifications, writes in sequential write required

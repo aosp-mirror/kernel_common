@@ -25,10 +25,14 @@
   cdev_device_add
   cdev_device_del
   cdev_init
+  __cfg80211_alloc_event_skb
+  __cfg80211_alloc_reply_skb
   cfg80211_find_elem_match
   cfg80211_find_vendor_elem
   cfg80211_get_bss
   cfg80211_put_bss
+  __cfg80211_send_event_skb
+  cfg80211_vendor_cmd_reply
   __cfi_slowpath_diag
   __check_object_size
   clk_bulk_disable
@@ -120,6 +124,7 @@
   devm_platform_ioremap_resource
   devm_pm_opp_of_add_table
   devm_pm_opp_set_clkname
+  devm_pm_runtime_enable
   devm_regmap_add_irq_chip
   devm_regmap_field_alloc
   __devm_regmap_init
@@ -235,7 +240,6 @@
   gpiochip_generic_request
   gpiochip_get_data
   gpiochip_remove
-  gpiod_direction_output
   gpiod_direction_output_raw
   gpiod_get_value_cansleep
   gpiod_set_consumer_name
@@ -417,6 +421,8 @@
   __netdev_alloc_skb
   netif_napi_add
   __netif_napi_del
+  __nla_parse
+  nla_put
   no_llseek
   nr_cpu_ids
   nvmem_cell_get
@@ -448,7 +454,6 @@
   of_graph_get_remote_node
   of_graph_parse_endpoint
   of_icc_xlate_onecell
-  of_iomap
   of_irq_get
   of_irq_get_byname
   of_match_device
@@ -500,6 +505,7 @@
   platform_driver_unregister
   platform_get_irq
   platform_get_irq_byname
+  platform_get_irq_optional
   platform_get_resource
   platform_get_resource_byname
   pm_genpd_add_subdomain
@@ -1010,7 +1016,6 @@
 # required by lpass-gfm-sm8250.ko
   __clk_mux_determine_rate
   devm_pm_clk_create
-  devm_pm_runtime_enable
   of_pm_clk_add_clks
   pm_clk_resume
   pm_clk_suspend
@@ -1301,7 +1306,6 @@
   generic_file_llseek
   get_pid_task
   get_unused_fd_flags
-  gpiod_direction_input
   gpiod_get_value
   hdmi_audio_infoframe_pack
   hdmi_infoframe_pack
@@ -1455,6 +1459,7 @@
 
 # required by phy-qcom-qmp.ko
   devm_get_clk_from_child
+  devm_of_iomap
   __of_reset_control_get
 
 # required by phy-qcom-qusb2.ko
@@ -1541,6 +1546,7 @@
   irq_domain_disconnect_hierarchy
   irq_domain_set_hwirq_and_chip
   irq_domain_update_bus_token
+  of_iomap
   platform_irqchip_probe
 
 # required by qcom-pmic-typec.ko
@@ -1580,9 +1586,6 @@
   of_thermal_get_ntrips
   of_thermal_get_trip_points
   of_thermal_is_trip_valid
-
-# required by qcom-wdt.ko
-  platform_get_irq_optional
 
 # required by qcom_aoss.ko
   clk_hw_unregister
@@ -1776,6 +1779,9 @@
 # required by snd-soc-wcd934x.ko
   kstrndup
 
+# required by snd-soc-wsa881x.ko
+  gpiod_direction_output
+
 # required by socinfo.ko
   add_device_randomness
   soc_device_register
@@ -1831,7 +1837,9 @@
   __sg_page_iter_next
 
 # required by ufs_qcom.ko
+  insert_resource
   phy_set_mode_ext
+  remove_resource
   ufshcd_dme_configure_adapt
   ufshcd_dme_get_attr
   ufshcd_dme_set_attr
@@ -1846,8 +1854,11 @@
   ufshcd_runtime_resume
   ufshcd_runtime_suspend
   ufshcd_suspend_prepare
+  ufshcd_system_freeze
+  ufshcd_system_restore
   ufshcd_system_resume
   ufshcd_system_suspend
+  ufshcd_system_thaw
   ufshcd_uic_hibern8_enter
   ufshcd_uic_hibern8_exit
 
@@ -1861,8 +1872,7 @@
   mfd_remove_devices
 
 # preserved by --additions-only
-  __nla_parse
-  nla_put
+  gpiod_direction_input
   rtnl_lock
   rtnl_unlock
   snd_soc_get_volsw_sx

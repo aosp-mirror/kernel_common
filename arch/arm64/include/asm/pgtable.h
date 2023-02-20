@@ -1031,7 +1031,7 @@ static inline void arch_swap_invalidate_area(int type)
 static inline void arch_swap_restore(swp_entry_t entry, struct page *page)
 {
 	if (system_supports_mte() && mte_restore_tags(entry, page))
-		set_bit(PG_mte_tagged, &page->flags);
+		set_page_mte_tagged(page);
 }
 
 #endif /* CONFIG_ARM64_MTE */
