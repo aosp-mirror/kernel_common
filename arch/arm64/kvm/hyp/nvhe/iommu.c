@@ -466,8 +466,6 @@ int __pkvm_iommu_finalize(int err)
 		ret = -EPERM;
 	hyp_spin_unlock(&iommu_registration_lock);
 
-	__pkvm_close_late_module_registration();
-
 	return ret;
 }
 
