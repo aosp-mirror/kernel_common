@@ -18,7 +18,8 @@ mtk_t7xx-y:=	t7xx_pci.o \
 		t7xx_netdev.o \
 		t7xx_pci_rescan.o \
 		t7xx_port_devlink.o \
-		t7xx_port_ap_msg.o
+		t7xx_port_ap_msg.o \
+		t7xx_uevent.o
 
 mtk_t7xx-$(CONFIG_WWAN_DEBUGFS) += \
 		t7xx_port_trace.o \
