@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/types.h>
+#include <asm/intel-family.h>
 
 #include "vsec.h"
 
@@ -372,6 +373,10 @@ static int intel_vsec_pci_probe(struct pci_dev *pdev, const struct pci_device_id
 	info = (struct intel_vsec_platform_info *)id->driver_data;
 	if (!info)
 		return -EINVAL;
+
+	if((boot_cpu_data.x86_model == INTEL_FAM6_METEORLAKE_L) &&
+			(boot_cpu_data.x86_stepping == 1))
+		info->quirks |= VSEC_QUIRK_TABLE_SHIFT;
 
 	if (intel_vsec_walk_dvsec(pdev, info))
 		have_devices = true;
