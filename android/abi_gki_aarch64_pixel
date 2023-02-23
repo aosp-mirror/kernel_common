@@ -92,10 +92,10 @@
   blocking_notifier_call_chain
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
-  bpf_trace_run1
   bpf_trace_run10
   bpf_trace_run11
   bpf_trace_run12
+  bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
@@ -631,6 +631,7 @@
   drm_crtc_handle_vblank
   drm_crtc_init_with_planes
   drm_crtc_send_vblank_event
+  drm_crtc_vblank_count
   drm_crtc_vblank_count_and_time
   drm_crtc_vblank_get
   drm_crtc_vblank_off
@@ -741,10 +742,13 @@
   dump_backtrace
   dump_stack
   dw_handle_msi_irq
+  dw_pcie_find_capability
   dw_pcie_host_init
   dw_pcie_read
+  dw_pcie_read_dbi
   dw_pcie_setup_rc
   dw_pcie_write
+  dw_pcie_write_dbi
   __dynamic_dev_dbg
   __dynamic_pr_debug
   em_cpu_get
@@ -781,8 +785,9 @@
   _find_next_bit
   find_pid_ns
   find_task_by_vpid
-  find_vm_area
   __find_vma
+  find_vm_area
+  find_vpid
   finish_wait
   flush_dcache_page
   flush_delayed_work
@@ -857,6 +862,7 @@
   get_random_u32
   get_sg_io_hdr
   get_task_cred
+  get_task_mm
   get_thermal_instance
   get_unused_fd_flags
   get_user_pages
@@ -1064,8 +1070,8 @@
   irq_work_queue
   irq_work_sync
   is_vmalloc_addr
-  jiffies
   jiffies64_to_msecs
+  jiffies
   jiffies_to_msecs
   jiffies_to_usecs
   kasan_flag_enabled
@@ -1188,8 +1194,8 @@
   memparse
   memremap
   mem_section
-  memset
   memset64
+  memset
   __memset_io
   memstart_addr
   memunmap
@@ -1217,6 +1223,7 @@
   __mmap_lock_do_trace_released
   __mmap_lock_do_trace_start_locking
   __mmdrop
+  mmput
   mod_delayed_work_on
   mod_timer
   __module_get
@@ -1265,8 +1272,8 @@
   nla_find
   nla_memcpy
   __nla_parse
-  nla_put
   nla_put_64bit
+  nla_put
   nla_put_nohdr
   nla_reserve
   nla_strscpy
@@ -1442,6 +1449,7 @@
   pin_user_pages_remote
   pktgen_xfrm_outer_mode_output
   pkvm_iommu_driver_init
+  pkvm_iommu_finalize
   pkvm_iommu_register
   pkvm_iommu_resume
   pkvm_iommu_suspend
@@ -1718,6 +1726,7 @@
   scsi_device_put
   scsi_ioctl
   scsi_ioctl_block_when_processing_errors
+  scsi_logging_level
   scsi_normalize_sense
   __scsi_print_sense
   scsi_register_interface
@@ -2026,8 +2035,11 @@
   __traceiter_android_rvh_sched_fork
   __traceiter_android_rvh_select_task_rq_fair
   __traceiter_android_rvh_select_task_rq_rt
+  __traceiter_android_rvh_set_cpus_allowed_by_task
   __traceiter_android_rvh_set_iowait
   __traceiter_android_rvh_set_task_cpu
+  __traceiter_android_rvh_show_max_freq
+  __traceiter_android_rvh_typec_tcpci_get_vbus
   __traceiter_android_rvh_uclamp_eff_get
   __traceiter_android_rvh_ufs_complete_init
   __traceiter_android_rvh_ufs_reprogram_all_keys
@@ -2042,9 +2054,14 @@
   __traceiter_android_vh_dup_task_struct
   __traceiter_android_vh_enable_thermal_genl_check
   __traceiter_android_vh_ipi_stop
+  __traceiter_android_vh_sched_setaffinity_early
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_sysrq_crash
+  __traceiter_android_vh_typec_store_partner_src_caps
+  __traceiter_android_vh_typec_tcpci_override_toggling
+  __traceiter_android_vh_typec_tcpm_get_timer
+  __traceiter_android_vh_typec_tcpm_log
   __traceiter_android_vh_ufs_check_int_errors
   __traceiter_android_vh_ufs_compl_command
   __traceiter_android_vh_ufs_fill_prdt
@@ -2054,6 +2071,7 @@
   __traceiter_android_vh_ufs_send_uic_command
   __traceiter_android_vh_ufs_update_sdev
   __traceiter_android_vh_ufs_update_sysfs
+  __traceiter_android_vh_use_amu_fie
   __traceiter_clock_set_rate
   __traceiter_cpu_frequency
   __traceiter_device_pm_callback_end
@@ -2097,8 +2115,11 @@
   __tracepoint_android_rvh_sched_fork
   __tracepoint_android_rvh_select_task_rq_fair
   __tracepoint_android_rvh_select_task_rq_rt
+  __tracepoint_android_rvh_set_cpus_allowed_by_task
   __tracepoint_android_rvh_set_iowait
   __tracepoint_android_rvh_set_task_cpu
+  __tracepoint_android_rvh_show_max_freq
+  __tracepoint_android_rvh_typec_tcpci_get_vbus
   __tracepoint_android_rvh_uclamp_eff_get
   __tracepoint_android_rvh_ufs_complete_init
   __tracepoint_android_rvh_ufs_reprogram_all_keys
@@ -2113,9 +2134,14 @@
   __tracepoint_android_vh_dup_task_struct
   __tracepoint_android_vh_enable_thermal_genl_check
   __tracepoint_android_vh_ipi_stop
+  __tracepoint_android_vh_sched_setaffinity_early
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_sysrq_crash
+  __tracepoint_android_vh_typec_store_partner_src_caps
+  __tracepoint_android_vh_typec_tcpci_override_toggling
+  __tracepoint_android_vh_typec_tcpm_get_timer
+  __tracepoint_android_vh_typec_tcpm_log
   __tracepoint_android_vh_ufs_check_int_errors
   __tracepoint_android_vh_ufs_compl_command
   __tracepoint_android_vh_ufs_fill_prdt
@@ -2125,6 +2151,7 @@
   __tracepoint_android_vh_ufs_send_uic_command
   __tracepoint_android_vh_ufs_update_sdev
   __tracepoint_android_vh_ufs_update_sysfs
+  __tracepoint_android_vh_use_amu_fie
   __tracepoint_clock_set_rate
   __tracepoint_cpu_frequency
   __tracepoint_device_pm_callback_end
