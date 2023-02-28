@@ -39,6 +39,7 @@ struct vdso_data *arch_get_vdso_data(void *vvar_page)
 #undef EMIT_VVAR
 
 unsigned int vclocks_used __read_mostly;
+EXPORT_SYMBOL_GPL(vclocks_used);
 
 #if defined(CONFIG_X86_64)
 unsigned int __read_mostly vdso64_enabled = 1;

@@ -147,4 +147,16 @@ config VIRTIO_WL
 
 	 If unsure, say 'N'.
 
+config VIRTIO_PVCLOCK
+	tristate "Virtio pvclock driver"
+	depends on VIRTIO
+	depends on X86
+	select PARAVIRT_CLOCK
+	help
+	 This driver supports virtio pvclock devices.
+	 It helps emulating CLOCK_BOOTTIME behavior around host's suspend / resume
+	 without actually suspends the guest with the hypervisor's support.
+
+	 If unsure, say M.
+
 endif # VIRTIO_MENU

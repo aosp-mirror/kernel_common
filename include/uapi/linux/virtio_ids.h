@@ -55,5 +55,6 @@
 /* Chrome OS-specific devices */
 #define VIRTIO_ID_WL           63 /* virtio wayland */
 #define VIRTIO_ID_TPM          62 /* virtio tpm */
+#define VIRTIO_ID_PVCLOCK        61 /* virtio pvclock (experimental id) */
 
 #endif /* _LINUX_VIRTIO_IDS_H */

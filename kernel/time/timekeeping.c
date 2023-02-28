@@ -1720,7 +1720,10 @@ bool timekeeping_rtc_skipsuspend(void)
 {
 	return persistent_clock_exists;
 }
+#endif
 
+#if (defined(CONFIG_PM_SLEEP) && defined(CONFIG_RTC_HCTOSYS_DEVICE)) || \
+	defined(CONFIG_VIRTIO_PVCLOCK)
 /**
  * timekeeping_inject_sleeptime64 - Adds suspend interval to timeekeeping values
  * @delta: pointer to a timespec64 delta value
@@ -1754,6 +1757,7 @@ void timekeeping_inject_sleeptime64(const struct timespec64 *delta)
 	/* signal hrtimers about time change */
 	clock_was_set();
 }
+EXPORT_SYMBOL_GPL(timekeeping_inject_sleeptime64);
 #endif
 
 /**
