@@ -35,7 +35,6 @@
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 
-#include <kselftest.h>
 #include <include/uapi/linux/fsverity.h>
 
 #include "utils.h"
