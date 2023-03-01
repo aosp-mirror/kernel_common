@@ -502,13 +502,41 @@ err_clear_bit:
 	return ret;
 }
 
+struct devlink_info_req {
+	struct sk_buff *msg;
+	void (*version_cb)(const char *version_name,
+			   enum devlink_info_version_type version_type,
+			   void *version_cb_priv);
+	void *version_cb_priv;
+};
+
+struct devlink_flash_component_lookup_ctx {
+	const char *lookup_name;
+	bool lookup_name_found;
+};
+
+static int t7xx_devlink_info_get_loopback(struct devlink *devlink, struct devlink_info_req *req,
+					  struct netlink_ext_ack *extack)
+{
+	struct devlink_flash_component_lookup_ctx *lookup_ctx = req->version_cb_priv;
+	int ret;
+
+	if (!req)
+		return t7xx_devlink_info_get(devlink, req, extack);
+
+	ret = devlink_info_version_running_put_ext(req, lookup_ctx->lookup_name,
+						   "1.0", DEVLINK_INFO_VERSION_TYPE_COMPONENT);
+
+	return ret;
+}
+
 /* Call back function for devlink ops */
 static const struct devlink_ops devlink_flash_ops = {
 	.supported_flash_update_params = DEVLINK_SUPPORT_FLASH_UPDATE_OVERWRITE_MASK,
 	.flash_update = t7xx_devlink_flash_update,
 	.reload_actions = BIT(DEVLINK_RELOAD_ACTION_DRIVER_REINIT) |
 			  BIT(DEVLINK_RELOAD_ACTION_FW_ACTIVATE),
-	.info_get = t7xx_devlink_info_get,
+	.info_get = t7xx_devlink_info_get_loopback,
 	.reload_down = t7xx_devlink_reload_down,
 	.reload_up = t7xx_devlink_reload_up,
 };
