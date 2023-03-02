@@ -4051,8 +4051,11 @@ static int f2fs_ioc_decompress_file(struct file *filp)
 		if (ret < 0)
 			break;
 
-		if (get_dirty_pages(inode) >= blk_per_seg)
-			filemap_fdatawrite(inode->i_mapping);
+		if (get_dirty_pages(inode) >= blk_per_seg) {
+			ret = filemap_fdatawrite(inode->i_mapping);
+			if (ret < 0)
+				break;
+		}
 
 		count -= len;
 		page_idx += len;
@@ -4122,8 +4125,11 @@ static int f2fs_ioc_compress_file(struct file *filp)
 		if (ret < 0)
 			break;
 
-		if (get_dirty_pages(inode) >= blk_per_seg)
-			filemap_fdatawrite(inode->i_mapping);
+		if (get_dirty_pages(inode) >= blk_per_seg) {
+			ret = filemap_fdatawrite(inode->i_mapping);
+			if (ret < 0)
+				break;
+		}
 
 		count -= len;
 		page_idx += len;
