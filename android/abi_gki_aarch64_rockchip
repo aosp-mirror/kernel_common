@@ -2560,6 +2560,9 @@
   sdhci_remove_host
   sdhci_request
 
+# required by sensorbox.ko
+  kernel_sigaction
+
 # required by sensor_dev.ko
   class_create_file_ns
   class_remove_file_ns
