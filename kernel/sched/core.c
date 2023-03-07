@@ -80,6 +80,7 @@
 #define CREATE_TRACE_POINTS
 #include <linux/sched/rseq_api.h>
 #include <trace/events/sched.h>
+#include <trace/events/ipi.h>
 #undef CREATE_TRACE_POINTS
 
 #include "sched.h"
@@ -98,6 +99,8 @@
 #include <trace/hooks/sched.h>
 #include <trace/hooks/dtask.h>
 #include <trace/hooks/cgroup.h>
+
+EXPORT_TRACEPOINT_SYMBOL_GPL(ipi_send_cpumask);
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -3876,10 +3879,12 @@ void send_call_function_single_ipi(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
 
-	if (!set_nr_if_polling(rq->idle))
+	if (!set_nr_if_polling(rq->idle)) {
+		trace_ipi_send_cpumask(cpumask_of(cpu), _RET_IP_, NULL);
 		arch_send_call_function_single_ipi(cpu);
-	else
+	} else {
 		trace_sched_wake_idle_without_ipi(cpu);
+	}
 }
 
 /*

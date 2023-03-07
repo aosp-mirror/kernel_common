@@ -51,7 +51,6 @@
 #include <asm/ptrace.h>
 #include <asm/virt.h>
 
-#define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
 #undef CREATE_TRACE_POINTS
 #include <trace/hooks/debug.h>
