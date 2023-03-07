@@ -27,6 +27,7 @@
 
 struct trusty_state;
 static struct platform_driver trusty_driver;
+static int trusty_cpuhp_slot = -1;
 
 static bool use_high_wq;
 module_param(use_high_wq, bool, 0660);
@@ -50,6 +51,7 @@ struct trusty_state {
 	u32 api_version;
 	bool trusty_panicked;
 	struct device *dev;
+	struct hlist_node cpuhp_node;
 	struct trusty_work __percpu *nop_works;
 	struct list_head nop_queue;
 	spinlock_t nop_lock; /* protects nop_queue */
@@ -882,6 +884,9 @@ static void nop_work_func(struct trusty_work *tw)
 		dev_dbg(s->dev, "%s: %x %x %x\n",
 			__func__, args[0], args[1], args[2]);
 
+		if (kthread_should_park())
+			kthread_parkme();
+
 		preempt_disable();
 
 		if (tw != this_cpu_ptr(s->nop_works)) {
@@ -989,12 +994,43 @@ static int trusty_nop_thread(void *context)
 
 		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
 
+		if (kthread_should_park())
+			kthread_parkme();
+
 		/* process work */
 		work_func(tw);
 	};
 	remove_wait_queue(&tw->nop_event_wait, &wait);
 
 	return ret;
+}
+
+static int trusty_cpu_up(unsigned int cpu, struct hlist_node *node)
+{
+	struct trusty_state *s;
+	struct trusty_work *tw;
+
+	s = container_of(node, struct trusty_state, cpuhp_node);
+	tw = this_cpu_ptr(s->nop_works);
+	kthread_unpark(tw->nop_thread);
+
+	dev_dbg(s->dev, "cpu %d up\n", cpu);
+
+	return 0;
+}
+
+static int trusty_cpu_down(unsigned int cpu, struct hlist_node *node)
+{
+	struct trusty_state *s;
+	struct trusty_work *tw;
+
+	s = container_of(node, struct trusty_state, cpuhp_node);
+	tw = this_cpu_ptr(s->nop_works);
+
+	dev_dbg(s->dev, "cpu %d down\n", cpu);
+	kthread_park(tw->nop_thread);
+
+	return 0;
 }
 
 static int trusty_probe(struct platform_device *pdev)
@@ -1063,17 +1099,22 @@ static int trusty_probe(struct platform_device *pdev)
 	for_each_possible_cpu(cpu) {
 		struct trusty_work *tw = per_cpu_ptr(s->nop_works, cpu);
 
-		tw->nop_thread = kthread_create(trusty_nop_thread, tw,
-						"trusty-nop-%d", cpu);
+		tw->nop_thread = kthread_create_on_cpu(trusty_nop_thread, tw,
+						       cpu, "trusty-nop-%d");
 		if (IS_ERR(tw->nop_thread)) {
 			ret = PTR_ERR(tw->nop_thread);
 			dev_err(s->dev, "%s: failed to create thread for cpu= %d (%p)\n",
 					__func__, cpu, tw->nop_thread);
 			goto err_thread_create;
 		}
+		kthread_park(tw->nop_thread);
+	}
 
-		kthread_bind(tw->nop_thread, cpu);
-		wake_up_process(tw->nop_thread);
+	ret = cpuhp_state_add_instance(trusty_cpuhp_slot, &s->cpuhp_node);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "cpuhp_state_add_instance failed %d\n",
+			ret);
+		goto err_add_cpuhp_instance;
 	}
 
 	s->trusty_sched_share_state = trusty_register_sched_share(&pdev->dev);
@@ -1087,6 +1128,8 @@ static int trusty_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_children:
+	cpuhp_state_remove_instance(trusty_cpuhp_slot, &s->cpuhp_node);
+err_add_cpuhp_instance:
 err_thread_create:
 	for_each_possible_cpu(cpu) {
 		struct trusty_work *tw = per_cpu_ptr(s->nop_works, cpu);
@@ -1117,6 +1160,8 @@ static int trusty_remove(struct platform_device *pdev)
 	trusty_unregister_sched_share(s->trusty_sched_share_state);
 
 	device_for_each_child(&pdev->dev, NULL, trusty_remove_child);
+
+	cpuhp_state_remove_instance(trusty_cpuhp_slot, &s->cpuhp_node);
 
 	for_each_possible_cpu(cpu) {
 		struct trusty_work *tw = per_cpu_ptr(s->nop_works, cpu);
@@ -1153,12 +1198,35 @@ static struct platform_driver trusty_driver = {
 
 static int __init trusty_driver_init(void)
 {
-	return platform_driver_register(&trusty_driver);
+	int ret;
+
+	/* allocate dynamic cpuhp state slot */
+	ret = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN,
+				      "trusty:online",
+				      trusty_cpu_up,
+				      trusty_cpu_down);
+	if (ret < 0)
+		return ret;
+
+	trusty_cpuhp_slot = ret;
+
+	ret = platform_driver_register(&trusty_driver);
+	if (ret < 0)
+		goto err_driver_register;
+
+	return 0;
+
+err_driver_register:
+	cpuhp_remove_multi_state(trusty_cpuhp_slot);
+	trusty_cpuhp_slot = -1;
+	return ret;
 }
 
 static void __exit trusty_driver_exit(void)
 {
 	platform_driver_unregister(&trusty_driver);
+	cpuhp_remove_multi_state(trusty_cpuhp_slot);
+	trusty_cpuhp_slot = -1;
 }
 
 subsys_initcall(trusty_driver_init);
