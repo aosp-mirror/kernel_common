@@ -35,6 +35,8 @@ static int nop_nice_value = -20; /* default to highest */
 module_param(nop_nice_value, int, 0660);
 
 struct trusty_work {
+	struct trusty_state *s;
+	unsigned int cpu;
 	struct task_struct *nop_thread;
 	wait_queue_head_t nop_event_wait;
 	int signaled;
@@ -789,9 +791,10 @@ static bool dequeue_nop(struct trusty_state *s, u32 *args)
 	return ret;
 }
 
-static void locked_nop_work_func(struct trusty_state *s)
+static void locked_nop_work_func(struct trusty_work *tw)
 {
 	int ret;
+	struct trusty_state *s = tw->s;
 
 	ret = trusty_std_call32(s->dev, SMC_SC_LOCKED_NOP, 0, 0, 0);
 	if (ret != 0)
@@ -858,12 +861,13 @@ static void trusty_adjust_nice_nopreempt(struct trusty_state *s, bool do_nop)
 	local_irq_restore(flags);
 }
 
-static void nop_work_func(struct trusty_state *s)
+static void nop_work_func(struct trusty_work *tw)
 {
 	int ret;
 	bool do_nop;
 	u32 args[3];
 	u32 last_arg0;
+	struct trusty_state *s = tw->s;
 
 	do_nop = dequeue_nop(s, args);
 
@@ -879,6 +883,12 @@ static void nop_work_func(struct trusty_state *s)
 			__func__, args[0], args[1], args[2]);
 
 		preempt_disable();
+
+		if (tw != this_cpu_ptr(s->nop_works)) {
+			dev_warn_ratelimited(s->dev,
+					     "trusty-nop-%d ran on wrong cpu, %u\n",
+					     tw->cpu, smp_processor_id());
+		}
 
 		last_arg0 = args[0];
 		ret = trusty_std_call32(s->dev, SMC_SC_NOP,
@@ -960,9 +970,9 @@ EXPORT_SYMBOL(trusty_dequeue_nop);
 
 static int trusty_nop_thread(void *context)
 {
-	struct trusty_state *s = context;
-	struct trusty_work *tw = this_cpu_ptr(s->nop_works);
-	void (*work_func)(struct trusty_state *s);
+	struct trusty_work *tw = context;
+	struct trusty_state *s = tw->s;
+	void (*work_func)(struct trusty_work *tw);
 	int ret = 0;
 
 	DEFINE_WAIT_FUNC(wait, woken_wake_function);
@@ -980,7 +990,7 @@ static int trusty_nop_thread(void *context)
 		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
 
 		/* process work */
-		work_func(s);
+		work_func(tw);
 	};
 	remove_wait_queue(&tw->nop_event_wait, &wait);
 
@@ -1043,6 +1053,8 @@ static int trusty_probe(struct platform_device *pdev)
 	for_each_possible_cpu(cpu) {
 		struct trusty_work *tw = per_cpu_ptr(s->nop_works, cpu);
 
+		tw->s = s;
+		tw->cpu = cpu;
 		tw->nop_thread = ERR_PTR(-EINVAL);
 		init_waitqueue_head(&tw->nop_event_wait);
 		tw->signaled = false;
@@ -1051,8 +1063,8 @@ static int trusty_probe(struct platform_device *pdev)
 	for_each_possible_cpu(cpu) {
 		struct trusty_work *tw = per_cpu_ptr(s->nop_works, cpu);
 
-		tw->nop_thread = kthread_create(trusty_nop_thread, s,
-				"trusty-nop-%d", cpu);
+		tw->nop_thread = kthread_create(trusty_nop_thread, tw,
+						"trusty-nop-%d", cpu);
 		if (IS_ERR(tw->nop_thread)) {
 			ret = PTR_ERR(tw->nop_thread);
 			dev_err(s->dev, "%s: failed to create thread for cpu= %d (%p)\n",
