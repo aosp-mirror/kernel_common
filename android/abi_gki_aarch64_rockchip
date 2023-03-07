@@ -2635,6 +2635,13 @@
 # required by snd-soc-rockchip-i2s.ko
   of_prop_next_string
 
+# required by snd-soc-rockchip-multi-dais.ko
+  snd_soc_component_initialize
+  snd_soc_add_component
+  snd_soc_rtdcom_lookup
+  snd_pcm_format_size
+  snd_hwparams_to_dma_slave_config
+
 # required by snd-soc-rockchip-multicodecs.ko
   of_parse_phandle_with_fixed_args
   round_jiffies_relative
