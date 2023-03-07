@@ -1359,6 +1359,15 @@
 # required by aes-ce-ccm.ko
   ce_aes_expandkey
 
+# required by aic_btusb.ko
+  usb_interrupt_msg
+  usb_disable_autosuspend
+  __pskb_copy_fclone
+
+# required by aic_load_fw.ko
+  send_sig
+  wait_for_completion_killable_timeout
+
 # required by analogix_dp.ko
   drm_dp_start_crc
   drm_dp_stop_crc
@@ -2538,6 +2547,9 @@
   devm_rtc_allocate_device
   __rtc_register_device
   rtc_update_irq
+
+# required by rtkm.ko
+  stack_trace_print
 
 # required by sdhci-of-arasan.ko
   __sdhci_add_host
