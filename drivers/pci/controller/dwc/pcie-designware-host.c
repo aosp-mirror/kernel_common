@@ -410,10 +410,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
 		ret = pci->ops->start_link(pci);
 		if (ret)
 			goto err_free_msi;
-	}
 
-	/* Ignore errors, the link may come up later */
-	dw_pcie_wait_for_link(pci);
+		/* Ignore errors, the link may come up later */
+		dw_pcie_wait_for_link(pci);
+	}
 
 	bridge->sysdata = pp;
 
