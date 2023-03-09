@@ -1359,6 +1359,21 @@
 # required by aes-ce-ccm.ko
   ce_aes_expandkey
 
+# required by aic8800_fdrv.ko
+  cfg80211_cqm_rssi_notify
+  cfg80211_cqm_pktloss_notify
+  cfg80211_rx_unexpected_4addr_frame
+  cfg80211_notify_new_peer_candidate
+  cfg80211_ft_event
+  cfg80211_report_obss_beacon_khz
+  ieee80211_amsdu_to_8023s
+  skb_append
+  cfg80211_probe_status
+  cfg80211_ch_switch_started_notify
+  ieee80211_chandef_to_operating_class
+  cfg80211_cac_event
+  cfg80211_radar_event
+
 # required by aic_btusb.ko
   usb_interrupt_msg
   usb_disable_autosuspend
@@ -2880,6 +2895,18 @@
 
 # required by vl6180.ko
   iio_read_const_attr
+
+# required by wlan_mt7663_usb.ko
+  cfg80211_assoc_timeout
+  skb_pull_rcsum
+  sched_set_normal
+  cfg80211_tx_mlme_mgmt
+  cfg80211_rx_mlme_mgmt
+  cfg80211_rx_assoc_resp
+  usb_string
+  usb_anchor_empty
+  usb_reset_endpoint
+  dev_valid_name
 
 # required by zram.ko
   __alloc_percpu
