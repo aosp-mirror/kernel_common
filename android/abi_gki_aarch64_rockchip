@@ -2862,6 +2862,20 @@
   usb_show_dynids
   usb_store_new_id
 
+# required by usb_audio.ko
+  usb_composite_probe
+  usb_get_function_instance
+  usb_string_ids_tab
+  usb_add_config
+  usb_gadget_connect
+  usb_put_function
+  usb_get_function
+  usb_composite_overwrite_options
+  usb_gadget_disconnect
+  usb_remove_function
+  usb_composite_unregister
+  usb_ep_autoconfig_reset
+
 # required by v4l2-fwnode.ko
   fwnode_device_is_available
   fwnode_graph_get_next_endpoint
