@@ -162,6 +162,7 @@
   class_interface_unregister
   __class_register
   class_unregister
+  cleancache_register_ops
   clear_page
   __ClearPageMovable
   clk_disable
@@ -188,6 +189,7 @@
   cma_alloc
   cma_for_each_area
   cma_get_name
+  cma_get_size
   cma_release
   compat_ptr_ioctl
   complete
@@ -292,6 +294,7 @@
   crypto_skcipher_setkey
   __crypto_xor
   csum_ipv6_magic
+  csum_partial
   csum_tcpudp_nofold
   _ctype
   debugfs_attr_read
@@ -2424,6 +2427,11 @@
   wireless_nlevent_flush
   woken_wake_function
   work_busy
+  __xa_erase
+  xa_load
+  xas_find
+  xas_pause
+  __xa_store
   __xfrm_state_destroy
   xfrm_state_lookup_byspi
   xfrm_stateonly_find
