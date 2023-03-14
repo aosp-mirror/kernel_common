@@ -1871,6 +1871,8 @@
   snd_soc_runtime_set_dai_fmt
   snd_soc_unregister_card
   snd_soc_unregister_component
+  snd_usb_register_platform_ops
+  snd_usb_unregister_platform_ops
   snprintf
   soc_device_register
   __sock_create
@@ -2442,6 +2444,7 @@
   xfrm_state_lookup_byspi
   xfrm_stateonly_find
   xhci_gen_setup
+  xhci_get_endpoint_index
   xhci_init_driver
   xhci_resume
   xhci_run
