@@ -210,6 +210,7 @@ SECTIONS
 		__hyp_events_start = .;
 		*(_hyp_events)
 		__hyp_events_end = .;
+		. = ALIGN(PAGE_SIZE);
 	}
 #endif
 
