@@ -74,6 +74,31 @@ struct tipc_msg_hdr {
 	u8 data[];
 } __packed;
 
+/*
+ * struct tipc_ctrl_msg_types - Types of control messages
+ * @TIPC_CTRL_MSGTYPE_GO_ONLINE:
+ * @TIPC_CTRL_MSGTYPE_GO_OFFLINE:
+ * @TIPC_CTRL_MSGTYPE_CONN_REQ:
+ * @TIPC_CTRL_MSGTYPE_CONN_RSP:
+ * @TIPC_CTRL_MSGTYPE_DISC_REQ:
+ * @TIPC_CTRL_MSGTYPE_RELEASE:
+ * @TIPC_CTRL_MSGTYPE_REUSE_MSGBUF_REQ: Turn on reuse feature in Trusty to
+ *                                      avoid map/unmap on each message. This
+ *                                      driver maintains lists of what has
+ *                                      already been allocated and which are
+ *                                      free (rx/tx remain separate due to
+ *                                      differing share permissions).
+ * @TIPC_CTRL_MSGTYPE_REUSE_MSGBUF_RSP: Confirmation that reuse feature
+ *                                      has been enabled. Backward compatibility:
+ *                                      If Trusty does not support, this will
+ *                                      never be received (and Trusty log will
+ *                                      indicate that an unsupported control
+ *                                      message type was received).
+ * @TIPC_CTRL_MSGTYPE_UNMAP_REQ: Request unmap of a buffer with the
+ *                               provided id so that it can be reclaimed
+ * @TIPC_CTRL_MSGTYPE_UNMAP_RSP: Result of unmap request; success results in
+ *                               an FF-A reclaim
+ */
 enum tipc_ctrl_msg_types {
 	TIPC_CTRL_MSGTYPE_GO_ONLINE = 1,
 	TIPC_CTRL_MSGTYPE_GO_OFFLINE,
@@ -81,6 +106,10 @@ enum tipc_ctrl_msg_types {
 	TIPC_CTRL_MSGTYPE_CONN_RSP,
 	TIPC_CTRL_MSGTYPE_DISC_REQ,
 	TIPC_CTRL_MSGTYPE_RELEASE,
+	TIPC_CTRL_MSGTYPE_REUSE_MSGBUF_REQ,
+	TIPC_CTRL_MSGTYPE_REUSE_MSGBUF_RSP,
+	TIPC_CTRL_MSGTYPE_UNMAP_REQ,
+	TIPC_CTRL_MSGTYPE_UNMAP_RSP,
 };
 
 struct tipc_ctrl_msg {
@@ -109,6 +138,15 @@ struct tipc_release_body {
 	trusty_shared_mem_id_t id;
 } __packed;
 
+struct tipc_unmap_req_body {
+	trusty_shared_mem_id_t id;
+} __packed;
+
+struct tipc_unmap_rsp_body {
+	int32_t result;
+	trusty_shared_mem_id_t id;
+} __packed;
+
 struct tipc_cdev_node {
 	struct cdev cdev;
 	struct device *dev;
@@ -132,6 +170,14 @@ struct tipc_virtio_dev {
 	size_t msg_buf_max_sz;
 	unsigned int free_msg_buf_cnt;
 	struct list_head free_buf_list;
+	struct mutex free_rx_lock; /* protection for free_rx_queue/free_rx_cnt */
+	unsigned int free_rx_cnt;
+	struct list_head free_rx_queue;
+	struct mutex reclaim_list_lock;
+	struct list_head reclaim_in_progress;
+	wait_queue_head_t reclaim_done;
+	bool reuse_msgbuf;
+	struct shrinker mb_shrinker;
 	wait_queue_head_t sendq;
 	struct idr addr_idr;
 	enum tipc_device_state state;
@@ -184,6 +230,167 @@ static struct virtio_device *default_vdev;
 
 static DEFINE_IDR(tipc_devices);
 static DEFINE_MUTEX(tipc_devices_lock);
+
+/* forward declarations */
+static int tipc_chan_queue_ctrlmsg(struct tipc_chan *chan, u32 msg_type,
+		u32 body_len, u8 *body);
+static void vds_free_msg_buf(struct tipc_virtio_dev *vds,
+			     struct tipc_msg_buf *mb);
+
+/**
+ * vds_get_list_to_unmap() - Gather free entries to tell Trusty to unmap
+ *
+ * @vds: pointer to tipc's virtio state
+ * @list: list of buffers to take from (input)
+ * @list_to_unmap: list to populate with buffers to unmap (output)
+ *                 a request hasn't yet been sent to Trusty
+ * @request_cnt: number of buffers to unmap (<=0 to unmap entire list)
+ *
+ * Entries have to move from used list to free list to temporary list
+ * to reclaim_in_progress list. The temporary list is necessary to
+ * prevent holding the lock to the list while IPC is performed with
+ * Trusty. This function moves a requested count from free list to
+ * temporary list with safety checks.
+ *
+ * Context: while holding lock to list
+ * Return: number of buffers added to list_to_unmap
+ */
+static int vds_get_list_to_unmap(struct tipc_virtio_dev *vds,
+		struct list_head *list, struct list_head *list_to_unmap,
+		const int request_cnt)
+{
+	int actual_cnt = 0;
+	struct list_head *tmp_list;
+
+	/* find last entry that needs to move */
+	list_for_each(tmp_list, list) {
+		actual_cnt++;
+		if (request_cnt > 0 && actual_cnt >= request_cnt)
+			break;
+	}
+
+	/* move it all at once */
+	list_cut_position(list_to_unmap, list, tmp_list);
+
+	return actual_cnt;
+}
+
+/**
+ * vds_start_unmap() - Initiate unmap by sending request to Trusty
+ *
+ * @vds: pointer to tipc's virtio state
+ * @list_to_unmap: list to tell Trusty to unmap now. Empty upon return
+ *
+ * Unmapping requires IPC to Trusty, so without any locks held, send
+ * requests for each mailbox entry in the list.
+ *
+ * Once Trusty responds to unmap request, the buffer is freed in
+ * _handle_unmap_rsp()
+ *
+ * Context: while not holding locks that would interfer with sending
+ *          or receiving messages.
+ * Return: actual count of successful unmap requests sent to Trusty
+ */
+static int vds_start_unmap(struct tipc_virtio_dev *vds,
+		struct list_head *list_to_unmap)
+{
+	int actual_cnt = 0;
+	struct tipc_msg_buf *mb;
+	struct list_head *tmp_list, *next_pos;
+	struct tipc_unmap_req_body body;
+
+	list_for_each_safe(tmp_list, next_pos, list_to_unmap) {
+		mb = list_entry(tmp_list, struct tipc_msg_buf, node);
+
+		if (vds->reuse_msgbuf) {
+			dev_dbg(&vds->vdev->dev,
+					"%s: reclaim in progress id= %lu sg= %p dev_addr= %p\n",
+					__func__, mb->buf_id, &mb->sg,
+					sg_dma_address(&mb->sg));
+
+			/* move from local list to reclaim in progress list */
+			mutex_lock(&vds->reclaim_list_lock);
+			list_move_tail(&mb->node, &vds->reclaim_in_progress);
+			mutex_unlock(&vds->reclaim_list_lock);
+
+			/* trigger unmap on Trusty; reclaim upon successful response */
+			body.id = mb->buf_id;
+			tipc_chan_queue_ctrlmsg(NULL, TIPC_CTRL_MSGTYPE_UNMAP_REQ,
+					sizeof(body), (u8 *)&body);
+		} else {
+			/* trusty doesn't support reuse and has already unmapped */
+			vds_free_msg_buf(vds, mb);
+		}
+
+		actual_cnt++;
+	}
+
+	return actual_cnt;
+}
+
+/*
+ * vds_reduce_buf_cnt() - Apply reduce request to rx and tx buffers
+ *
+ * @vds: pointer to tipc's virtio state
+ * @reduce_cnt: requested count of buffers to unmap/free
+ *
+ * There are virtio buffers allocated for rx and tx, so request to
+ * shrink or clean up must be across both. This just initiates
+ * the unmap via a request to Trusty, which must be followed up
+ * with a reclaim/free.
+ *
+ * Return: actual count for which an unmap request was sent
+ */
+static unsigned long vds_reduce_buf_cnt(struct tipc_virtio_dev *vds,
+		unsigned long reduce_cnt)
+{
+	unsigned long shrink_cnt = 0;
+	struct list_head *list;
+	struct mutex *lock;
+	unsigned int *list_cnt;
+	unsigned long reduce_ratio_1000x; /* floating point not available */
+	unsigned long list_reduce_cnt;
+	LIST_HEAD(list_to_unmap); /* temp because pending request to Trusty */
+	int ret;
+
+	/* spread request across free rx and tx lists ratiometrically */
+	/* NOTE: not perfect as counts can change before locks are held below */
+	reduce_ratio_1000x = (1000 * vds->free_msg_buf_cnt) / vds->free_rx_cnt;
+
+	/* loop through rx list, then through tx list */
+	lock = &vds->free_rx_lock;
+	list = &vds->free_rx_queue;
+	list_cnt = &vds->free_rx_cnt;
+	if (reduce_ratio_1000x > 1000)
+		list_reduce_cnt = (reduce_cnt * 1000) / reduce_ratio_1000x;
+	else
+		list_reduce_cnt = (reduce_cnt * reduce_ratio_1000x) / 1000;
+
+	while (list) {
+		/* move enough entries from free buf list into list to be umapped */
+		mutex_lock(lock);
+		ret = vds_get_list_to_unmap(vds, list, &list_to_unmap, list_reduce_cnt);
+		if (ret > 0)
+			*(list_cnt) -= ret;
+		mutex_unlock(lock);
+
+		/* select second list or exit loop */
+		if (list == &vds->free_rx_queue) {
+			lock = &vds->lock;
+			list = &vds->free_buf_list;
+			list_cnt = &vds->free_msg_buf_cnt;
+			list_reduce_cnt = reduce_cnt - list_reduce_cnt;
+		} else
+			list = NULL;
+	}
+
+	/* now initiate unmap->reclaim process on list entries */
+	ret = vds_start_unmap(vds, &list_to_unmap);
+	if (ret > 0)
+		shrink_cnt += ret;
+
+	return shrink_cnt;
+}
 
 static int _match_any(int id, void *p, void *data)
 {
@@ -267,16 +474,15 @@ static void vds_free_msg_buf(struct tipc_virtio_dev *vds,
 }
 
 static void vds_free_msg_buf_list(struct tipc_virtio_dev *vds,
-				  struct list_head *list)
+				  struct mutex *lock, struct list_head *list)
 {
-	struct tipc_msg_buf *mb = NULL;
+	LIST_HEAD(list_to_unmap); /* temp because pending request to Trusty */
 
-	mb = list_first_entry_or_null(list, struct tipc_msg_buf, node);
-	while (mb) {
-		list_del(&mb->node);
-		vds_free_msg_buf(vds, mb);
-		mb = list_first_entry_or_null(list, struct tipc_msg_buf, node);
-	}
+	mutex_lock(lock);
+	vds_get_list_to_unmap(vds, list, &list_to_unmap, 0);
+	mutex_unlock(lock);
+
+	vds_start_unmap(vds, &list_to_unmap);
 }
 
 static inline void mb_reset(struct tipc_msg_buf *mb)
@@ -732,13 +938,37 @@ EXPORT_SYMBOL(tipc_create_channel);
 
 struct tipc_msg_buf *tipc_chan_get_rxbuf(struct tipc_chan *chan)
 {
+	struct tipc_msg_buf *mb = NULL;
+
+	/* if possible, use already allocated (and mapped) buffer */
+	mutex_lock(&chan->vds->free_rx_lock);
+	if (chan->vds->free_rx_cnt) {
+		mb = list_first_entry_or_null(&chan->vds->free_rx_queue,
+				struct tipc_msg_buf, node);
+	}
+
+	if (mb) {
+		list_del(&mb->node);
+		chan->vds->free_rx_cnt--;
+	}
+
+	mutex_unlock(&chan->vds->free_rx_lock);
+
+	if (mb)
+		return mb;
+
+	/* otherwise, allocate new because virtio needs a buffer */
 	return vds_alloc_msg_buf(chan->vds, true);
 }
 EXPORT_SYMBOL(tipc_chan_get_rxbuf);
 
 void tipc_chan_put_rxbuf(struct tipc_chan *chan, struct tipc_msg_buf *mb)
 {
-	vds_free_msg_buf(chan->vds, mb);
+	/* put it on free list */
+	mutex_lock(&chan->vds->free_rx_lock);
+	list_add_tail(&mb->node, &chan->vds->free_rx_queue);
+	chan->vds->free_rx_cnt++;
+	mutex_unlock(&chan->vds->free_rx_lock);
 }
 EXPORT_SYMBOL(tipc_chan_put_rxbuf);
 
@@ -789,6 +1019,51 @@ int tipc_chan_queue_msg(struct tipc_chan *chan, struct tipc_msg_buf *mb)
 }
 EXPORT_SYMBOL(tipc_chan_queue_msg);
 
+static int tipc_chan_queue_ctrlmsg(struct tipc_chan *chan, u32 msg_type,
+		u32 body_len, u8 *body)
+{
+	int err;
+	struct tipc_ctrl_msg *msg;
+	struct tipc_msg_buf *txbuf = NULL;
+	struct tipc_virtio_dev *vds;
+	int local;
+
+	if (chan) {
+		vds = chan->vds;
+		local = chan->local;
+	} else {
+		if (!default_vdev)
+			return -ENOTCONN;
+		vds = default_vdev->priv;
+		local = TIPC_CTRL_ADDR;
+	}
+
+	/* get tx buffer */
+	txbuf = vds_get_txbuf(vds, TXBUF_TIMEOUT);
+	if (IS_ERR(txbuf))
+		return PTR_ERR(txbuf);
+
+	/* reserve space for control message */
+	msg = mb_put_data(txbuf, sizeof(*msg) + body_len);
+
+	msg->type = msg_type;
+	msg->body_len = body_len;
+	memcpy(msg->body, body, body_len);
+
+	fill_msg_hdr(txbuf, local, TIPC_CTRL_ADDR);
+	err = vds_queue_txbuf(vds, txbuf);
+	if (err) {
+		/* release buffer */
+		vds_put_txbuf(vds, txbuf);
+
+		/* this should never happen */
+		dev_err(&vds->vdev->dev,
+			"%s: failed to queue ctrl msg (%d)\n",
+			__func__, err);
+	}
+
+	return err;
+}
 
 int tipc_chan_connect(struct tipc_chan *chan, const char *name)
 {
@@ -967,16 +1242,16 @@ static struct tipc_msg_buf *dn_handle_msg(void *data,
 	if (dn->state == TIPC_CONNECTED) {
 		/* buffer received from trusty */
 		trace_trusty_ipc_rx(dn->chan, rxbuf);
-		/* get new buffer */
+		/* get new buffer for virtio to use for next msg */
 		newbuf = tipc_chan_get_rxbuf(dn->chan);
 		if (newbuf) {
-			/* queue an old buffer and return a new one */
+			/* queue full buffer and return a new one for virtio to use */
 			list_add_tail(&rxbuf->node, &dn->rx_msg_queue);
 			wake_up_interruptible(&dn->readq);
 		} else {
 			/*
-			 * return an old buffer effectively discarding
-			 * incoming message
+			 * return a used buffer for virtio to use for next msg,
+			 * effectively discarding incoming message
 			 */
 			dev_err(&dn->chan->vds->vdev->dev,
 				"%s: discard incoming message\n", __func__);
@@ -1636,8 +1911,10 @@ static int tipc_release(struct inode *inode, struct file *filp)
 
 	dn_shutdown(dn);
 
-	/* free all pending buffers */
-	vds_free_msg_buf_list(dn->chan->vds, &dn->rx_msg_queue);
+	/* put all pending buffers back on free list for reuse by another channel */
+	mutex_lock(&dn->chan->vds->free_rx_lock);
+	list_splice_init(&dn->rx_msg_queue, &dn->chan->vds->free_rx_queue);
+	mutex_unlock(&dn->chan->vds->free_rx_lock);
 
 	/* shutdown channel  */
 	tipc_chan_shutdown(dn->chan);
@@ -1787,6 +2064,9 @@ static void _go_online(struct tipc_virtio_dev *vds)
 	create_cdev_node(vds, &vds->cdev_node);
 
 	dev_info(&vds->vdev->dev, "is online\n");
+
+	/* tell Trusty to reuse message buffers */
+	tipc_chan_queue_ctrlmsg(NULL, TIPC_CTRL_MSGTYPE_REUSE_MSGBUF_REQ, 0, NULL);
 }
 
 static void _go_offline(struct tipc_virtio_dev *vds)
@@ -1858,6 +2138,77 @@ static void _handle_conn_rsp(struct tipc_virtio_dev *vds,
 		mutex_unlock(&chan->lock);
 		kref_put(&chan->refcount, _free_chan);
 	}
+}
+
+/**
+ * _handle_unmap_rsp() - Free virtio buffers after unmapped by Trusty
+ *
+ * @vds: pointer to tipc's virtio state
+ * @rsp: body of unmap response from Trusty
+ * @len: length of response body
+ *
+ * Once the buffer is no longer used by Trusty, it can be reclaimed
+ * in the FF-A layer and freed. This function is called when a
+ * response from Trusty to unmap request is received. The unmap
+ * request is sent in vds_start_unmap()
+ *
+ * Return: void
+ */
+static void _handle_unmap_rsp(struct tipc_virtio_dev *vds,
+			     struct tipc_unmap_rsp_body *rsp, size_t len)
+{
+	struct tipc_msg_buf *mb = NULL;
+	struct list_head *tmp_list, *next_pos;
+	bool reclaim_now_empty = false;
+
+	if (sizeof(*rsp) != len) {
+		dev_err(&vds->vdev->dev, "%s: Invalid response length %zd\n",
+			__func__, len);
+		return;
+	}
+
+	if (rsp->result == -2) {
+		/* Trusty ERR_NOT_FOUND .... remove it from our list */
+	} else if (rsp->result != 0) {
+		dev_err(&vds->vdev->dev, "%s: Trusty failed to unmap %d\n",
+			__func__, rsp->result);
+		return;
+	}
+
+	/* look up msg buf using id */
+	mutex_lock(&vds->reclaim_list_lock);
+	list_for_each_safe(tmp_list, next_pos, &vds->reclaim_in_progress) {
+		mb = list_entry(tmp_list, struct tipc_msg_buf, node);
+
+		if (mb->buf_id == rsp->id) {
+			if (!list_is_first(tmp_list, &vds->reclaim_in_progress)) {
+				dev_warn(&vds->vdev->dev,
+						"%s: unmap response out of order id= %lu, result= %d\n",
+						__func__, rsp->id, rsp->result);
+			}
+			list_del(&mb->node);
+			break;
+		}
+
+		mb = NULL; /* in case this is the last entry */
+	}
+	if (list_empty(&vds->reclaim_in_progress))
+		reclaim_now_empty = true;
+	mutex_unlock(&vds->reclaim_list_lock);
+
+	if (!mb) {
+		dev_err(&vds->vdev->dev, "%s: msg buf not found for id= %lu, result= %d\n",
+				__func__, rsp->id, rsp->result);
+		return;
+	}
+
+	dev_dbg(&vds->vdev->dev, "%s: calling reclaim on id= %ld sg= %p dev_addr= %p\n",
+			__func__, rsp->id, &mb->sg, sg_dma_address(&mb->sg));
+
+	vds_free_msg_buf(vds, mb);
+
+	if (reclaim_now_empty)
+		wake_up(&vds->reclaim_done);
 }
 
 static void _handle_disc_req(struct tipc_virtio_dev *vds,
@@ -1946,6 +2297,16 @@ static void _handle_ctrl_msg(struct tipc_virtio_dev *vds,
 
 	case TIPC_CTRL_MSGTYPE_GO_OFFLINE:
 		_go_offline(vds);
+		break;
+
+	case TIPC_CTRL_MSGTYPE_REUSE_MSGBUF_RSP:
+		dev_info(&vds->vdev->dev, "TIPC reusing mapped message buffers\n");
+		vds->reuse_msgbuf = true;
+		break;
+
+	case TIPC_CTRL_MSGTYPE_UNMAP_RSP:
+		_handle_unmap_rsp(vds, (struct tipc_unmap_rsp_body *)msg->body,
+				 msg->body_len);
 		break;
 
 	case TIPC_CTRL_MSGTYPE_CONN_RSP:
@@ -2119,6 +2480,47 @@ static void _txvq_cb(struct virtqueue *txvq)
 	}
 }
 
+static unsigned long
+tipc_shrink_count(struct shrinker *shrink, struct shrink_control *sc)
+{
+	unsigned long vds_actual_free_cnt;
+	struct tipc_virtio_dev *vds =
+			container_of(shrink, struct tipc_virtio_dev, mb_shrinker);
+	long ret;
+
+	vds_actual_free_cnt = vds->free_msg_buf_cnt + vds->free_rx_cnt;
+
+	/* reserve 2 in each list, then report half because shrinker
+	 * is very aggressive; which will cause thrashing during heavy TIPC
+	 * traffic due to shrinker free followed immediately by remapping
+	 */
+	if (vds_actual_free_cnt > 4)
+		ret = (vds_actual_free_cnt - 4) / 2;
+	else
+		ret = 0; /* below shrinkable limit; tell shrinker to stop */
+
+	dev_dbg(&vds->vdev->dev, "%s: reporting %d free message buffers (actual= %d)\n",
+			__func__, ret, vds_actual_free_cnt);
+
+	return (unsigned long)ret;
+}
+
+static unsigned long
+tipc_shrink_scan(struct shrinker *shrink, struct shrink_control *sc)
+{
+	struct tipc_virtio_dev *vds =
+			container_of(shrink, struct tipc_virtio_dev, mb_shrinker);
+	unsigned long ret;
+
+	ret = vds_reduce_buf_cnt(vds, sc->nr_to_scan);
+
+	dev_dbg(&vds->vdev->dev, "%s: freed %d; asked to free %d of %d\n", __func__,
+			ret, sc->nr_to_scan,
+			vds->free_msg_buf_cnt + vds->free_rx_cnt);
+
+	return ret;
+}
+
 static int tipc_virtio_probe(struct virtio_device *vdev)
 {
 	int err, i;
@@ -2139,6 +2541,11 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 	kref_init(&vds->refcount);
 	init_waitqueue_head(&vds->sendq);
 	INIT_LIST_HEAD(&vds->free_buf_list);
+	mutex_init(&vds->free_rx_lock);
+	INIT_LIST_HEAD(&vds->free_rx_queue);
+	mutex_init(&vds->reclaim_list_lock);
+	INIT_LIST_HEAD(&vds->reclaim_in_progress);
+	init_waitqueue_head(&vds->reclaim_done);
 	idr_init(&vds->addr_idr);
 	vds->shared_handles = RB_ROOT;
 	dma_coerce_mask_and_coherent(&vds->vdev->dev,
@@ -2189,9 +2596,21 @@ static int tipc_virtio_probe(struct virtio_device *vdev)
 	vdev->priv = vds;
 	vds->state = VDS_OFFLINE;
 
+	vds->mb_shrinker.count_objects = tipc_shrink_count;
+	vds->mb_shrinker.scan_objects = tipc_shrink_scan;
+	vds->mb_shrinker.seeks = DEFAULT_SEEKS;
+	vds->mb_shrinker.batch = 0;
+
+	err = register_shrinker(&vds->mb_shrinker);
+	if (err) {
+		pr_err("failed to register shrinker: %d\n", err);
+		goto err_register_shrinker;
+	}
+
 	dev_dbg(&vdev->dev, "%s: done\n", __func__);
 	return 0;
 
+err_register_shrinker:
 err_free_rx_buffers:
 	_cleanup_vq(vds, vds->rxvq);
 err_find_vqs:
@@ -2202,6 +2621,23 @@ err_find_vqs:
 static void tipc_virtio_remove(struct virtio_device *vdev)
 {
 	struct tipc_virtio_dev *vds = vdev->priv;
+	int ret;
+
+	/* freeing msg buffers requires IPC if vds->reuse_msgbuf is set */
+	vds_free_msg_buf_list(vds, &vds->lock, &vds->free_buf_list);
+	vds_free_msg_buf_list(vds, &vds->free_rx_lock, &vds->free_rx_queue);
+
+	/* now wait for Trusty to respond to all unmap requests */
+	if (vds->reuse_msgbuf) {
+		dev_dbg(&vds->vdev->dev, "waiting for Trusty to unmap buffers\n");
+		/* this could never finish, but there's no other way */
+		ret = wait_event_timeout(vds->reclaim_done,
+				list_empty(&vds->reclaim_in_progress),
+				msecs_to_jiffies(30));
+		if (!ret)
+			dev_warn(&vds->vdev->dev,
+					"timed out waiting for Trusty to unmap buffers\n");
+	}
 
 	_go_offline(vds);
 
@@ -2216,7 +2652,6 @@ static void tipc_virtio_remove(struct virtio_device *vdev)
 
 	_cleanup_vq(vds, vds->rxvq);
 	_cleanup_vq(vds, vds->txvq);
-	vds_free_msg_buf_list(vds, &vds->free_buf_list);
 
 	vdev->config->del_vqs(vds->vdev);
 
