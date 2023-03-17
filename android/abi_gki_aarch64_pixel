@@ -1962,6 +1962,7 @@
   sysfs_create_link
   sysfs_emit
   sysfs_emit_at
+  __sysfs_match_string
   sysfs_notify
   sysfs_remove_file_ns
   sysfs_remove_group
