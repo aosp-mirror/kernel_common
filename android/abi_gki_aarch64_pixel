@@ -1,4 +1,5 @@
 [abi_symbol_list]
+  activate_task
   add_cpu
   add_timer
   add_timer_on
@@ -158,6 +159,7 @@
   cfg80211_vendor_cmd_reply
   __cfi_slowpath_diag
   __check_object_size
+  check_preempt_curr
   __class_create
   class_destroy
   class_interface_unregister
@@ -298,6 +300,7 @@
   csum_partial
   csum_tcpudp_nofold
   _ctype
+  deactivate_task
   debugfs_attr_read
   debugfs_attr_write
   debugfs_create_atomic_t
@@ -1765,6 +1768,7 @@
   set_page_dirty
   set_page_dirty_lock
   __SetPageMovable
+  set_task_cpu
   set_user_nice
   sg_alloc_table
   sg_alloc_table_from_pages_segment
@@ -2048,6 +2052,7 @@
   __traceiter_android_rvh_preempt_disable
   __traceiter_android_rvh_preempt_enable
   __traceiter_android_rvh_sched_fork
+  __traceiter_android_rvh_sched_newidle_balance
   __traceiter_android_rvh_select_task_rq_fair
   __traceiter_android_rvh_select_task_rq_rt
   __traceiter_android_rvh_set_iowait
@@ -2127,6 +2132,7 @@
   __tracepoint_android_rvh_preempt_disable
   __tracepoint_android_rvh_preempt_enable
   __tracepoint_android_rvh_sched_fork
+  __tracepoint_android_rvh_sched_newidle_balance
   __tracepoint_android_rvh_select_task_rq_fair
   __tracepoint_android_rvh_select_task_rq_rt
   __tracepoint_android_rvh_set_iowait
