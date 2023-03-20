@@ -5,9 +5,9 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 
-#include <include/uapi/linux/incrementalfs.h>
+#include <kselftest.h>
 
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
+#include <include/uapi/linux/incrementalfs.h>
 
 #define __packed __attribute__((__packed__))
 

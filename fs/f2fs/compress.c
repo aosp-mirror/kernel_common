@@ -240,7 +240,7 @@ static int lz4_init_compress_ctx(struct compress_ctx *cc)
 	unsigned int size = LZ4_MEM_COMPRESS;
 
 #ifdef CONFIG_F2FS_FS_LZ4HC
-	if (F2FS_I(cc->inode)->i_compress_flag >> COMPRESS_LEVEL_OFFSET)
+	if (F2FS_I(cc->inode)->i_compress_level)
 		size = LZ4HC_MEM_COMPRESS;
 #endif
 
@@ -266,8 +266,7 @@ static void lz4_destroy_compress_ctx(struct compress_ctx *cc)
 #ifdef CONFIG_F2FS_FS_LZ4HC
 static int lz4hc_compress_pages(struct compress_ctx *cc)
 {
-	unsigned char level = F2FS_I(cc->inode)->i_compress_flag >>
-						COMPRESS_LEVEL_OFFSET;
+	unsigned char level = F2FS_I(cc->inode)->i_compress_level;
 	int len;
 
 	if (level)
@@ -339,8 +338,7 @@ static int zstd_init_compress_ctx(struct compress_ctx *cc)
 	ZSTD_CStream *stream;
 	void *workspace;
 	unsigned int workspace_size;
-	unsigned char level = F2FS_I(cc->inode)->i_compress_flag >>
-						COMPRESS_LEVEL_OFFSET;
+	unsigned char level = F2FS_I(cc->inode)->i_compress_level;
 
 	if (!level)
 		level = F2FS_ZSTD_DEFAULT_CLEVEL;
@@ -563,7 +561,7 @@ module_param(num_compress_pages, uint, 0444);
 MODULE_PARM_DESC(num_compress_pages,
 		"Number of intermediate compress pages to preallocate");
 
-int f2fs_init_compress_mempool(void)
+int __init f2fs_init_compress_mempool(void)
 {
 	compress_page_pool = mempool_create_page_pool(num_compress_pages, 0);
 	return compress_page_pool ? 0 : -ENOMEM;
@@ -689,9 +687,7 @@ static int f2fs_compress_pages(struct compress_ctx *cc)
 	vm_unmap_ram(cc->cbuf, cc->nr_cpages);
 	vm_unmap_ram(cc->rbuf, cc->cluster_size);
 
-	for (i = 0; i < cc->nr_cpages; i++) {
-		if (i < new_nr_cpages)
-			continue;
+	for (i = new_nr_cpages; i < cc->nr_cpages; i++) {
 		f2fs_compress_free_page(cc->cpages[i]);
 		cc->cpages[i] = NULL;
 	}
@@ -1069,7 +1065,7 @@ retry:
 		if (ret)
 			goto out;
 		if (bio)
-			f2fs_submit_bio(sbi, bio, DATA);
+			f2fs_submit_read_bio(sbi, bio, DATA);
 
 		ret = f2fs_init_compress_ctx(cc);
 		if (ret)
@@ -1214,10 +1210,11 @@ static int f2fs_write_compressed_pages(struct compress_ctx *cc,
 		.page = NULL,
 		.encrypted_page = NULL,
 		.compressed_page = NULL,
-		.submitted = false,
+		.submitted = 0,
 		.io_type = io_type,
 		.io_wbc = wbc,
-		.encrypted = fscrypt_inode_uses_fs_layer_crypto(cc->inode),
+		.encrypted = fscrypt_inode_uses_fs_layer_crypto(cc->inode) ?
+									1 : 0,
 	};
 	struct dnode_of_data dn;
 	struct node_info ni;
@@ -1227,7 +1224,7 @@ static int f2fs_write_compressed_pages(struct compress_ctx *cc,
 	loff_t psize;
 	int i, err;
 
-	/* we should bypass data pages to proceed the kworkder jobs */
+	/* we should bypass data pages to proceed the kworker jobs */
 	if (unlikely(f2fs_cp_error(sbi))) {
 		mapping_set_error(cc->rpages[0]->mapping, -EIO);
 		goto out_free;
