@@ -1549,6 +1549,7 @@
   proc_mkdir_data
   proc_remove
   proc_set_size
+  proc_symlink
   pskb_expand_head
   __pskb_pull_tail
   ___pskb_trim
