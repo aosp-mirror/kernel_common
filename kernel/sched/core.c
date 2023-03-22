@@ -100,6 +100,7 @@
 #include <trace/hooks/dtask.h>
 #include <trace/hooks/cgroup.h>
 
+EXPORT_TRACEPOINT_SYMBOL_GPL(ipi_send_cpu);
 EXPORT_TRACEPOINT_SYMBOL_GPL(ipi_send_cpumask);
 
 /*
