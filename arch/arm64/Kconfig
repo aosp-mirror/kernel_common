@@ -1031,6 +1031,11 @@ config SOCIONEXT_SYNQUACER_PREITS
 
 	  If unsure, say Y.
 
+config ANDROID_ARM64_WORKAROUND_DMA_BEYOND_POC
+	bool "Remove cacheable aliases of non-cacheable DMA buffers at stage-2"
+	default y
+	depends on KVM
+
 endmenu
 
 

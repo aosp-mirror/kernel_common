@@ -9,6 +9,9 @@
 #define arch_vmap_pud_supported arch_vmap_pud_supported
 static inline bool arch_vmap_pud_supported(pgprot_t prot)
 {
+	if (prot_needs_stage2_update(prot))
+		return false;
+
 	/*
 	 * Only 4k granule supports level 1 block mappings.
 	 * SW table walks can't handle removal of intermediate entries.
@@ -20,6 +23,9 @@ static inline bool arch_vmap_pud_supported(pgprot_t prot)
 #define arch_vmap_pmd_supported arch_vmap_pmd_supported
 static inline bool arch_vmap_pmd_supported(pgprot_t prot)
 {
+	if (prot_needs_stage2_update(prot))
+		return false;
+
 	/* See arch_vmap_pud_supported() */
 	return !IS_ENABLED(CONFIG_PTDUMP_DEBUGFS);
 }
