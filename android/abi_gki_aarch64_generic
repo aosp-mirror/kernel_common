@@ -1502,6 +1502,7 @@
   __page_frag_cache_drain
   page_frag_free
   page_mapping
+  page_pinner_inited
   __page_pinner_put_page
   panic
   panic_notifier_list
