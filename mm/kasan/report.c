@@ -94,7 +94,7 @@ static void end_report(unsigned long *flags, unsigned long addr)
 	pr_err("==================================================================\n");
 	add_taint(TAINT_BAD_PAGE, LOCKDEP_NOW_UNRELIABLE);
 	spin_unlock_irqrestore(&report_lock, *flags);
-	if (panic_on_warn) {
+	if (!test_bit(KASAN_BIT_MULTI_SHOT, &kasan_flags)) {
 		/*
 		 * This thread may hit another WARN() in the panic path.
 		 * Resetting this prevents additional WARN() from panicking the
@@ -102,7 +102,7 @@ static void end_report(unsigned long *flags, unsigned long addr)
 		 * panic_mutex in panic().
 		 */
 		panic_on_warn = 0;
-		panic("panic_on_warn set ...\n");
+		check_panic_on_warn("KASAN");
 	}
 	kasan_enable_current();
 }
