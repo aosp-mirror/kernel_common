@@ -843,6 +843,7 @@
   gen_pool_destroy
   gen_pool_first_fit_align
   gen_pool_free_owner
+  gen_pool_has_addr
   gen_pool_set_algo
   gen_pool_size
   get_cpu_device
@@ -1393,6 +1394,9 @@
   of_translate_address
   of_usb_host_tpl_support
   page_endio
+  page_frag_alloc_align
+  __page_frag_cache_drain
+  page_frag_free
   page_mapping
   page_pinner_inited
   __page_pinner_put_page
