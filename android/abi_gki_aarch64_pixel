@@ -309,6 +309,7 @@
   debugfs_create_dir
   debugfs_create_file
   debugfs_create_size_t
+  debugfs_create_symlink
   debugfs_create_u16
   debugfs_create_u32
   debugfs_create_u64
