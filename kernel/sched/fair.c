@@ -3766,8 +3766,6 @@ static void attach_entity_load_avg(struct cfs_rq *cfs_rq, struct sched_entity *s
 
 	trace_android_rvh_attach_entity_load_avg(cfs_rq, se);
 
-	trace_android_rvh_attach_entity_load_avg(cfs_rq, se);
-
 	enqueue_load_avg(cfs_rq, se);
 	cfs_rq->avg.util_avg += se->avg.util_avg;
 	cfs_rq->avg.util_sum += se->avg.util_sum;
