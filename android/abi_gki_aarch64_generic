@@ -1,4 +1,5 @@
 [abi_symbol_list]
+  activate_task
   add_cpu
   add_timer
   add_timer_on
@@ -16,6 +17,7 @@
   alloc_chrdev_region
   __alloc_disk_node
   alloc_etherdev_mqs
+  alloc_iova_fast
   alloc_netdev_mqs
   alloc_pages_exact
   __alloc_pages_nodemask
@@ -352,6 +354,7 @@
   csum_tcpudp_nofold
   _ctype
   datagram_poll
+  deactivate_task
   debugfs_attr_read
   debugfs_attr_write
   debugfs_create_atomic_t
@@ -865,8 +868,8 @@
   find_next_zero_bit
   find_pid_ns
   find_task_by_vpid
-  find_vm_area
   find_vma
+  find_vm_area
   find_vpid
   finish_wait
   firmware_request_nowarn
@@ -878,6 +881,7 @@
   frame_vector_create
   frame_vector_destroy
   frame_vector_to_pages
+  free_iova_fast
   free_irq
   free_netdev
   __free_pages
@@ -910,11 +914,13 @@
   gen_pool_add_owner
   gen_pool_alloc_algo_owner
   gen_pool_avail
+  gen_pool_best_fit
   gen_pool_create
   gen_pool_destroy
   gen_pool_first_fit_align
   gen_pool_free_owner
   gen_pool_has_addr
+  gen_pool_set_algo
   gen_pool_size
   get_cpu_device
   get_cpu_idle_time
@@ -1060,6 +1066,7 @@
   inc_zone_page_state
   in_egroup_p
   init_dummy_netdev
+  init_iova_domain
   init_net
   init_pid_ns
   init_pseudo
@@ -1240,6 +1247,7 @@
   kthread_bind_mask
   kthread_cancel_delayed_work_sync
   kthread_cancel_work_sync
+  kthread_create_on_cpu
   kthread_create_on_node
   kthread_create_worker
   kthread_delayed_work_timer_fn
@@ -1248,10 +1256,14 @@
   kthread_flush_worker
   __kthread_init_worker
   kthread_mod_delayed_work
+  kthread_park
+  kthread_parkme
   kthread_queue_delayed_work
   kthread_queue_work
+  kthread_should_park
   kthread_should_stop
   kthread_stop
+  kthread_unpark
   kthread_worker_fn
   ktime_get
   ktime_get_mono_fast_ns
@@ -1490,6 +1502,7 @@
   __page_frag_cache_drain
   page_frag_free
   page_mapping
+  page_pinner_inited
   __page_pinner_put_page
   panic
   panic_notifier_list
@@ -1620,6 +1633,7 @@
   pm_runtime_forbid
   pm_runtime_force_resume
   pm_runtime_force_suspend
+  pm_runtime_get_if_active
   __pm_runtime_idle
   pm_runtime_irq_safe
   __pm_runtime_resume
@@ -1670,6 +1684,7 @@
   __put_cred
   put_device
   put_disk
+  put_iova_domain
   __put_page
   put_pid
   put_sg_io_hdr
@@ -1693,6 +1708,7 @@
   ___ratelimit
   raw_notifier_call_chain
   raw_notifier_chain_register
+  raw_notifier_chain_unregister
   _raw_read_lock
   _raw_read_lock_bh
   _raw_read_lock_irq
@@ -1907,6 +1923,7 @@
   set_page_dirty
   set_page_dirty_lock
   __SetPageMovable
+  set_task_cpu
   set_user_nice
   sg_alloc_table
   sg_alloc_table_from_pages
@@ -2236,6 +2253,7 @@
   __traceiter_android_rvh_prepare_prio_fork
   __traceiter_android_rvh_remove_entity_load_avg
   __traceiter_android_rvh_sched_fork
+  __traceiter_android_rvh_sched_newidle_balance
   __traceiter_android_rvh_select_task_rq_fair
   __traceiter_android_rvh_select_task_rq_rt
   __traceiter_android_rvh_set_iowait
@@ -2372,6 +2390,7 @@
   __tracepoint_android_rvh_prepare_prio_fork
   __tracepoint_android_rvh_remove_entity_load_avg
   __tracepoint_android_rvh_sched_fork
+  __tracepoint_android_rvh_sched_newidle_balance
   __tracepoint_android_rvh_select_task_rq_fair
   __tracepoint_android_rvh_select_task_rq_rt
   __tracepoint_android_rvh_set_iowait
@@ -2591,6 +2610,7 @@
   usb_role_switch_unregister
   usb_speed_string
   usb_string_id
+  usb_udc_vbus_handler
   usb_unregister_notify
   __usecs_to_jiffies
   usleep_range
@@ -2700,6 +2720,7 @@
   wait_for_completion_interruptible_timeout
   wait_for_completion_killable
   wait_for_completion_timeout
+  wait_on_page_bit
   wait_woken
   __wake_up
   __wake_up_locked
