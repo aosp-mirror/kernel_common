@@ -1577,6 +1577,7 @@
   ___ratelimit
   raw_notifier_call_chain
   raw_notifier_chain_register
+  raw_notifier_chain_unregister
   _raw_read_lock
   _raw_read_lock_bh
   _raw_read_lock_irqsave
