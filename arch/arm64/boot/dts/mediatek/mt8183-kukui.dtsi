@@ -310,6 +310,8 @@
 };
 
 &gpu {
+	/* supply-names property is non-standard */
+	supply-names = "mali";
 	mali-supply = <&mt6358_vgpu_reg>;
 };
 
