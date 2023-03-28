@@ -2097,7 +2097,9 @@
   __traceiter_android_vh_meminfo_proc_show
   __traceiter_android_vh_mm_compaction_begin
   __traceiter_android_vh_mm_compaction_end
+  __traceiter_android_vh_pagecache_get_page
   __traceiter_android_vh_resume_end
+  __traceiter_android_vh_rmqueue
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_sysrq_crash
@@ -2189,7 +2191,9 @@
   __tracepoint_android_vh_meminfo_proc_show
   __tracepoint_android_vh_mm_compaction_begin
   __tracepoint_android_vh_mm_compaction_end
+  __tracepoint_android_vh_pagecache_get_page
   __tracepoint_android_vh_resume_end
+  __tracepoint_android_vh_rmqueue
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_sysrq_crash
