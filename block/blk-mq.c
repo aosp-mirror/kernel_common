@@ -17,7 +17,6 @@
 #include <linux/workqueue.h>
 #include <linux/smp.h>
 #include <linux/llist.h>
-#include <linux/list_sort.h>
 #include <linux/cpu.h>
 #include <linux/cache.h>
 #include <linux/sched/sysctl.h>
@@ -460,7 +459,8 @@ struct request *blk_mq_alloc_request_hctx(struct request_queue *q,
 	 * allocator for this for the rare use case of a command tied to
 	 * a specific queue.
 	 */
-	if (WARN_ON_ONCE(!(flags & (BLK_MQ_REQ_NOWAIT | BLK_MQ_REQ_RESERVED))))
+	if (WARN_ON_ONCE(!(flags & BLK_MQ_REQ_NOWAIT)) ||
+	    WARN_ON_ONCE(!(flags & BLK_MQ_REQ_RESERVED)))
 		return ERR_PTR(-EINVAL);
 
 	if (hctx_idx >= q->nr_hw_queues)
@@ -1903,20 +1903,6 @@ void blk_mq_insert_requests(struct blk_mq_hw_ctx *hctx, struct blk_mq_ctx *ctx,
 	spin_unlock(&ctx->lock);
 }
 
-static int plug_rq_cmp(void *priv, const struct list_head *a,
-		       const struct list_head *b)
-{
-	struct request *rqa = container_of(a, struct request, queuelist);
-	struct request *rqb = container_of(b, struct request, queuelist);
-
-	if (rqa->mq_ctx != rqb->mq_ctx)
-		return rqa->mq_ctx > rqb->mq_ctx;
-	if (rqa->mq_hctx != rqb->mq_hctx)
-		return rqa->mq_hctx > rqb->mq_hctx;
-
-	return blk_rq_pos(rqa) > blk_rq_pos(rqb);
-}
-
 void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 {
 	LIST_HEAD(list);
@@ -1924,10 +1910,6 @@ void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 	if (list_empty(&plug->mq_list))
 		return;
 	list_splice_init(&plug->mq_list, &list);
-
-	if (plug->rq_count > 2 && plug->multiple_queues)
-		list_sort(NULL, &list, plug_rq_cmp);
-
 	plug->rq_count = 0;
 
 	do {

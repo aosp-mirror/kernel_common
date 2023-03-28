@@ -32,6 +32,7 @@
 #include <linux/sched.h>
 #include <linux/pgtable.h>
 #include <linux/kasan.h>
+#include <linux/page_pinner.h>
 #include <linux/android_kabi.h>
 
 struct mempolicy;
@@ -682,6 +683,15 @@ struct vm_operations_struct {
 	ANDROID_KABI_RESERVE(4);
 };
 
+static inline void INIT_VMA(struct vm_area_struct *vma)
+{
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+	/* Start from 0 to use atomic_inc_unless_negative() in get_vma() */
+	atomic_set(&vma->file_ref_count, 0);
+#endif
+	INIT_LIST_HEAD(&vma->anon_vma_chain);
+}
+
 static inline void vma_init(struct vm_area_struct *vma, struct mm_struct *mm)
 {
 	static const struct vm_operations_struct dummy_vm_ops = {};
@@ -689,11 +699,7 @@ static inline void vma_init(struct vm_area_struct *vma, struct mm_struct *mm)
 	memset(vma, 0, sizeof(*vma));
 	vma->vm_mm = mm;
 	vma->vm_ops = &dummy_vm_ops;
-#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
-        /* Start from 0 to use atomic_inc_unless_negative() in get_vma() */
-	atomic_set(&vma->file_ref_count, 0);
-#endif
-	INIT_LIST_HEAD(&vma->anon_vma_chain);
+	INIT_VMA(vma);
 }
 
 static inline void vma_set_anonymous(struct vm_area_struct *vma)
@@ -788,8 +794,13 @@ struct inode;
  */
 static inline int put_page_testzero(struct page *page)
 {
+	int ret;
+
 	VM_BUG_ON_PAGE(page_ref_count(page) == 0, page);
-	return page_ref_dec_and_test(page);
+	ret = page_ref_dec_and_test(page);
+	page_pinner_put_page(page);
+
+	return ret;
 }
 
 /*

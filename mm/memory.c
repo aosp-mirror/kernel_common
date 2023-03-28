@@ -217,6 +217,23 @@ struct vm_area_struct *get_vma(struct mm_struct *mm, unsigned long addr)
 
 	rcu_read_lock();
 	vma = find_vma_from_tree(mm, addr);
+
+	/*
+	 * atomic_inc_unless_negative() also protects from races with
+	 * fast mremap.
+	 *
+	 * If there is a concurrent fast mremap, bail out since the entire
+	 * PMD/PUD subtree may have been remapped.
+	 *
+	 * This is usually safe for conventional mremap since it takes the
+	 * PTE locks as does SPF. However fast mremap only takes the lock
+	 * at the PMD/PUD level which is ok as it is done with the mmap
+	 * write lock held. But since SPF, as the term implies forgoes,
+	 * taking the mmap read lock and also cannot take PTL lock at the
+	 * larger PMD/PUD granualrity, since it would introduce huge
+	 * contention in the page fault path; fall back to regular fault
+	 * handling.
+	 */
 	if (vma) {
 		if (vma->vm_start > addr ||
 		    !atomic_inc_unless_negative(&vma->file_ref_count))
@@ -236,6 +253,11 @@ void put_vma(struct vm_area_struct *vma)
 		vm_area_free_no_check(vma);
 }
 
+#if ALLOC_SPLIT_PTLOCKS
+static void wait_for_smp_sync(void *arg)
+{
+}
+#endif
 #endif	/* CONFIG_SPECULATIVE_PAGE_FAULT */
 
 /*
@@ -255,6 +277,14 @@ static void free_pte_range(struct mmu_gather *tlb, pmd_t *pmd,
 	 */
 	spinlock_t *ptl = pmd_lock(tlb->mm, pmd);
 	spin_unlock(ptl);
+#if ALLOC_SPLIT_PTLOCKS
+	/*
+	 * The __pte_map_lock can still be working on the ->ptl in the read side
+	 * critical section while ->ptl is freed which results into the use-after
+	 * -free. Sync it using the smp_call_().
+	 */
+	smp_call_function(wait_for_smp_sync, NULL, 1);
+#endif
 #endif
 	pmd_clear(pmd);
 	pte_free_tlb(tlb, token, addr);
