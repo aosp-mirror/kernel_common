@@ -191,7 +191,6 @@
   gpiochip_generic_request
   gpiochip_get_data
   gpiochip_remove
-  gpiod_direction_output
   gpiod_direction_output_raw
   gpiod_set_consumer_name
   gpiod_set_raw_value
@@ -981,9 +980,12 @@
   drm_atomic_private_obj_fini
   drm_atomic_private_obj_init
   drm_bridge_attach
+  drm_bridge_connector_enable_hpd
+  drm_bridge_connector_init
+  drm_bridge_detect
+  drm_bridge_hpd_notify
   drm_compat_ioctl
   drm_connector_has_possible_encoder
-  drm_connector_init_with_ddc
   drm_connector_list_iter_begin
   drm_connector_list_iter_end
   drm_connector_list_iter_next
@@ -1130,7 +1132,6 @@
   generic_file_llseek
   get_pid_task
   get_unused_fd_flags
-  gpiod_direction_input
   gpiod_get_value
   gpiod_set_value
   hdmi_audio_infoframe_pack
@@ -1381,6 +1382,7 @@
   srcu_notifier_chain_unregister
 
 # required by qcom_geni_serial.ko
+  devm_krealloc
   dev_pm_clear_wake_irq
   dev_pm_set_dedicated_wake_irq
   oops_in_progress
@@ -1593,6 +1595,9 @@
   of_clk_add_provider
   of_clk_src_simple_get
 
+# required by snd-soc-wsa881x.ko
+  gpiod_direction_output
+
 # required by socinfo.ko
   add_device_randomness
   soc_device_register
@@ -1674,11 +1679,13 @@
   mfd_remove_devices
 
 # preserved by --additions-only
+  drm_connector_init_with_ddc
   eth_platform_get_mac_address
   ethtool_op_get_link
   ethtool_op_get_ts_info
   eth_validate_addr
   generic_mii_ioctl
+  gpiod_direction_input
   idr_alloc_u32
   mii_ethtool_get_link_ksettings
   mii_ethtool_gset
