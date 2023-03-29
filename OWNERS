@@ -13,4 +13,5 @@ include kernel/common:android-mainline:/OWNERS_DrNo
 
 richardfung@google.com
 suleiman@google.com
+ynaffit@google.com
 yulilin@google.com
