@@ -1348,9 +1348,6 @@
   serial8250_unregister_port
   serial8250_update_uartclk
 
-# required by 8822ce.ko
-  netdev_set_default_ethtool_ops
-
 # required by act8865-regulator.ko
   regulator_set_pull_down_regmap
 
@@ -1874,9 +1871,6 @@
   regulator_register_notifier
   regulator_unregister_notifier
 
-# required by it662x.ko
-  snd_pcm_rate_to_rate_bit
-
 # required by kalmia.ko
   usb_bulk_msg
 
@@ -1895,18 +1889,6 @@
 
 # required by lzo.ko
   lzo1x_1_compress
-
-# moal.ko
-  cpu_latency_qos_request_active
-  cfg80211_auth_timeout
-  in4_pton
-  iw_handler_set_spy
-  iw_handler_get_spy
-  iw_handler_set_thrspy
-  iw_handler_get_thrspy
-  cfg80211_report_wowlan_wakeup
-  sdio_release_irq
-  sdio_claim_irq
 
 # required by nvme-core.ko
   bd_set_nr_sectors
@@ -2607,7 +2589,6 @@
 
 # required by sensorbox.ko
   kernel_sigaction
-  hidraw_report_event
 
 # required by sensor_dev.ko
   class_create_file_ns
@@ -2818,9 +2799,6 @@
 # required by timer-rockchip.ko
   clockevents_config_and_register
   irq_of_parse_and_map
-
-# required by touchE.ko
-  schedule_hrtimeout
 
 # required by tps65132-regulator.ko
   regulator_set_active_discharge_regmap
