@@ -2788,9 +2788,6 @@
   skb_tstamp_tx
   synchronize_net
 
-# required by swopwm.ko
-  devm_of_pwm_get
-
 # required by sw_sync.ko
   dma_fence_free
   dma_fence_signal_locked
