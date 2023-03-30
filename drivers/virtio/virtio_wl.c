@@ -996,10 +996,10 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 	ctrl_send_size = sizeof(*ctrl_send) + vfd_ids_size + len;
 	vmalloced = false;
 	if (ctrl_send_size < PAGE_SIZE)
-		ctrl_send = kzalloc(ctrl_send_size, GFP_KERNEL);
+		ctrl_send = kmalloc(ctrl_send_size, GFP_KERNEL);
 	else {
 		vmalloced = true;
-		ctrl_send = vzalloc(ctrl_send_size);
+		ctrl_send = vmalloc(ctrl_send_size);
 	}
 	if (!ctrl_send) {
 		ret = -ENOMEM;
@@ -1010,6 +1010,7 @@ static int virtwl_vfd_send(struct file *filp, const char __user *buffer,
 	out_buffer = (u8 *)ctrl_send + ctrl_send_size - len;
 
 	ctrl_send->hdr.type = VIRTIO_WL_CMD_VFD_SEND;
+	ctrl_send->hdr.flags = 0;
 #ifdef SEND_VIRTGPU_RESOURCES
 	if (foreign_id) {
 		struct virtio_wl_ctrl_vfd_send_vfd *v1 = NULL;
