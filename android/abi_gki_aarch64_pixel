@@ -2012,7 +2012,6 @@
   tcpci_register_port
   tcpci_unregister_port
   tcpm_cc_change
-  tcpm_is_debouncing
   tcpm_pd_hard_reset
   tcpm_pd_receive
   tcpm_pd_transmit_complete
