@@ -17,7 +17,6 @@
   alloc_chrdev_region
   __alloc_disk_node
   alloc_etherdev_mqs
-  alloc_iova_fast
   alloc_netdev_mqs
   alloc_pages_exact
   __alloc_pages_nodemask
@@ -881,7 +880,6 @@
   frame_vector_create
   frame_vector_destroy
   frame_vector_to_pages
-  free_iova_fast
   free_irq
   free_netdev
   __free_pages
@@ -914,13 +912,11 @@
   gen_pool_add_owner
   gen_pool_alloc_algo_owner
   gen_pool_avail
-  gen_pool_best_fit
   gen_pool_create
   gen_pool_destroy
   gen_pool_first_fit_align
   gen_pool_free_owner
   gen_pool_has_addr
-  gen_pool_set_algo
   gen_pool_size
   get_cpu_device
   get_cpu_idle_time
@@ -1066,7 +1062,6 @@
   inc_zone_page_state
   in_egroup_p
   init_dummy_netdev
-  init_iova_domain
   init_net
   init_pid_ns
   init_pseudo
@@ -1683,7 +1678,6 @@
   __put_cred
   put_device
   put_disk
-  put_iova_domain
   __put_page
   put_pid
   put_sg_io_hdr
