@@ -336,7 +336,7 @@ static struct request *blk_mq_rq_ctx_init(struct blk_mq_alloc_data *data,
 	data->ctx->rq_dispatched[op_is_sync(data->cmd_flags)]++;
 	refcount_set(&rq->ref, 1);
 
-	if (!op_is_flush(data->cmd_flags)) {
+	if ((data->cmd_flags & REQ_OP_MASK) != REQ_OP_FLUSH) {
 		struct elevator_queue *e = data->q->elevator;
 
 		rq->elv.icq = NULL;
@@ -370,11 +370,10 @@ static struct request *__blk_mq_alloc_request(struct blk_mq_alloc_data *data)
 
 	if (e) {
 		/*
-		 * Flush/passthrough requests are special and go directly to the
-		 * dispatch list. Don't include reserved tags in the
-		 * limiting, as it isn't useful.
+		 * Do not limit the depth for passthrough requests nor for flush
+		 * requests nor for requests with a reserved tag.
 		 */
-		if (!op_is_flush(data->cmd_flags) &&
+		if ((data->cmd_flags & REQ_OP_MASK) != REQ_OP_FLUSH &&
 		    !blk_op_is_passthrough(data->cmd_flags) &&
 		    e->type->ops.limit_depth &&
 		    !(data->flags & BLK_MQ_REQ_RESERVED))

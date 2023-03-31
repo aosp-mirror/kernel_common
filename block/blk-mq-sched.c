@@ -425,7 +425,7 @@ static bool blk_mq_sched_bypass_insert(struct request *rq)
 	 * passthrough request is added to scheduler queue, there isn't any
 	 * chance to dispatch it given we prioritize requests in hctx->dispatch.
 	 */
-	return (rq->rq_flags & RQF_FLUSH_SEQ) || blk_rq_is_passthrough(rq);
+	return req_op(rq) == REQ_OP_FLUSH || blk_rq_is_passthrough(rq);
 }
 
 void blk_mq_sched_insert_request(struct request *rq, bool at_head,
