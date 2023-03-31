@@ -283,6 +283,7 @@
   cpufreq_remove_update_util_hook
   cpufreq_table_index_unsorted
   cpufreq_this_cpu_can_update
+  cpufreq_update_util_data
   __cpuhp_remove_state
   __cpuhp_setup_state
   __cpuhp_setup_state_cpuslocked
@@ -2105,6 +2106,7 @@
   sscanf
   __stack_chk_fail
   static_key_disable
+  static_key_enable
   static_key_slow_dec
   static_key_slow_inc
   stop_machine
@@ -2202,6 +2204,7 @@
   thermal_cdev_update
   thermal_cooling_device_unregister
   thermal_of_cooling_device_register
+  thermal_pressure
   thermal_zone_device_disable
   thermal_zone_device_enable
   thermal_zone_device_is_enabled
@@ -2251,6 +2254,7 @@
   __traceiter_android_rvh_preempt_enable
   __traceiter_android_rvh_prepare_prio_fork
   __traceiter_android_rvh_remove_entity_load_avg
+  __traceiter_android_rvh_rtmutex_prepare_setprio
   __traceiter_android_rvh_sched_fork
   __traceiter_android_rvh_sched_newidle_balance
   __traceiter_android_rvh_select_task_rq_fair
@@ -2267,6 +2271,7 @@
   __traceiter_android_rvh_ufs_reprogram_all_keys
   __traceiter_android_rvh_update_blocked_fair
   __traceiter_android_rvh_update_load_avg
+  __traceiter_android_rvh_update_misfit_status
   __traceiter_android_rvh_update_rq_clock_pelt
   __traceiter_android_rvh_update_rt_rq_load_avg
   __traceiter_android_rvh_util_est_update
@@ -2388,6 +2393,7 @@
   __tracepoint_android_rvh_preempt_enable
   __tracepoint_android_rvh_prepare_prio_fork
   __tracepoint_android_rvh_remove_entity_load_avg
+  __tracepoint_android_rvh_rtmutex_prepare_setprio
   __tracepoint_android_rvh_sched_fork
   __tracepoint_android_rvh_sched_newidle_balance
   __tracepoint_android_rvh_select_task_rq_fair
@@ -2404,6 +2410,7 @@
   __tracepoint_android_rvh_ufs_reprogram_all_keys
   __tracepoint_android_rvh_update_blocked_fair
   __tracepoint_android_rvh_update_load_avg
+  __tracepoint_android_rvh_update_misfit_status
   __tracepoint_android_rvh_update_rq_clock_pelt
   __tracepoint_android_rvh_update_rt_rq_load_avg
   __tracepoint_android_rvh_util_est_update
