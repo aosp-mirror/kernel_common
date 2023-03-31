@@ -1648,6 +1648,18 @@
 			power-domain-names = "core0", "core1", "core2";
 
 			operating-points-v2 = <&gpu_opp_table>;
+
+			power_model@0 {
+				compatible = "arm,mali-simple-power-model";
+				static-coefficient = <2427750>;
+				dynamic-coefficient = <4687>;
+				ts = <20000 2000 (-20) 2>;
+				thermal-zone = "cpu_thermal";
+			};
+			power_model@1 {
+				compatible = "arm,mali-g72-power-model";
+				scale = <15000>;
+			};
 		};
 
 		mmsys: syscon@14000000 {
