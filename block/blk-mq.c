@@ -788,15 +788,7 @@ static void blk_mq_requeue_work(struct work_struct *work)
 
 		rq->rq_flags &= ~RQF_SOFTBARRIER;
 		list_del_init(&rq->queuelist);
-		/*
-		 * If RQF_DONTPREP, rq has contained some driver specific
-		 * data, so insert it to hctx dispatch list to avoid any
-		 * merge.
-		 */
-		if (rq->rq_flags & RQF_DONTPREP)
-			blk_mq_request_bypass_insert(rq, false, false);
-		else
-			blk_mq_sched_insert_request(rq, true, false, false);
+		blk_mq_sched_insert_request(rq, /*at_head=*/true, false, false);
 	}
 
 	while (!list_empty(&rq_list)) {
@@ -1411,13 +1403,30 @@ out:
 		/* For non-shared tags, the RESTART check will suffice */
 		bool no_tag = prep == PREP_DISPATCH_NO_TAG &&
 			(hctx->flags & BLK_MQ_F_TAG_QUEUE_SHARED);
+		LIST_HEAD(for_sched);
+		struct request *next;
 
 		if (nr_budgets)
 			blk_mq_release_budgets(q, list);
 
+		if (q->elevator)
+			list_for_each_entry_safe(rq, next, list, queuelist)
+				if (!blk_mq_sched_bypass_insert(rq))
+					list_move_tail(&rq->queuelist,
+						       &for_sched);
+
 		spin_lock(&hctx->lock);
 		list_splice_tail_init(list, &hctx->dispatch);
 		spin_unlock(&hctx->lock);
+
+		if (q->elevator && !list_empty(&for_sched)) {
+			if (q->elevator->type->ops.requeue_request)
+				list_for_each_entry(rq, &for_sched, queuelist)
+					q->elevator->type->ops.
+						requeue_request(rq);
+			q->elevator->type->ops.insert_requests(hctx, &for_sched,
+						       /*at_head=*/true);
+		}
 
 		/*
 		 * Order adding requests to hctx->dispatch and checking
