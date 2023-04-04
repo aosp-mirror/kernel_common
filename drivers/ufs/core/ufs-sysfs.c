@@ -805,7 +805,11 @@ UFS_GEOMETRY_DESC_PARAM(wb_max_wb_luns, _WB_MAX_WB_LUNS, 1);
 UFS_GEOMETRY_DESC_PARAM(wb_buff_cap_adj, _WB_BUFF_CAP_ADJ, 1);
 UFS_GEOMETRY_DESC_PARAM(wb_sup_red_type, _WB_SUP_RED_TYPE, 1);
 UFS_GEOMETRY_DESC_PARAM(wb_sup_wb_type, _WB_SUP_WB_TYPE, 1);
-
+#ifdef CONFIG_BLK_DEV_ZONED
+UFS_GEOMETRY_DESC_PARAM(max_zoned_lu_cnt, _MAX_ZONED_LU_CNT, 1);
+UFS_GEOMETRY_DESC_PARAM(zone_alloc_unit, _ZONE_ALLOC_UNIT, 8);
+UFS_GEOMETRY_DESC_PARAM(zone_size, _ZONE_SIZE, 8);
+#endif
 
 static struct attribute *ufs_sysfs_geometry_descriptor[] = {
 	&dev_attr_raw_device_capacity.attr,
@@ -846,6 +850,11 @@ static struct attribute *ufs_sysfs_geometry_descriptor[] = {
 	&dev_attr_wb_buff_cap_adj.attr,
 	&dev_attr_wb_sup_red_type.attr,
 	&dev_attr_wb_sup_wb_type.attr,
+#ifdef CONFIG_BLK_DEV_ZONED
+	&dev_attr_max_zoned_lu_cnt.attr,
+	&dev_attr_zone_alloc_unit.attr,
+	&dev_attr_zone_size.attr,
+#endif
 	NULL,
 };
 

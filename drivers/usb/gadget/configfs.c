@@ -16,7 +16,7 @@
 #include <linux/usb/ch9.h>
 
 #ifdef CONFIG_USB_CONFIGFS_F_ACC
-extern int acc_ctrlrequest(struct usb_composite_dev *cdev,
+extern int acc_ctrlrequest_composite(struct usb_composite_dev *cdev,
 				const struct usb_ctrlrequest *ctrl);
 void acc_disconnect(void);
 #endif
@@ -448,10 +448,9 @@ static int config_usb_cfg_link(
 	struct usb_composite_dev *cdev = cfg->c.cdev;
 	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
 
-	struct config_group *group = to_config_group(usb_func_ci);
-	struct usb_function_instance *fi = container_of(group,
-			struct usb_function_instance, group);
-	struct usb_function_instance *a_fi;
+	struct usb_function_instance *fi =
+			to_usb_function_instance(usb_func_ci);
+	struct usb_function_instance *a_fi = NULL, *iter;
 	struct usb_function *f;
 	int ret;
 
@@ -461,11 +460,19 @@ static int config_usb_cfg_link(
 	 * from another gadget or a random directory.
 	 * Also a function instance can only be linked once.
 	 */
-	list_for_each_entry(a_fi, &gi->available_func, cfs_list) {
-		if (a_fi == fi)
-			break;
+
+	if (gi->composite.gadget_driver.udc_name) {
+		ret = -EINVAL;
+		goto out;
 	}
-	if (a_fi != fi) {
+
+	list_for_each_entry(iter, &gi->available_func, cfs_list) {
+		if (iter != fi)
+			continue;
+		a_fi = iter;
+		break;
+	}
+	if (!a_fi) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -499,9 +506,8 @@ static void config_usb_cfg_unlink(
 	struct usb_composite_dev *cdev = cfg->c.cdev;
 	struct gadget_info *gi = container_of(cdev, struct gadget_info, cdev);
 
-	struct config_group *group = to_config_group(usb_func_ci);
-	struct usb_function_instance *fi = container_of(group,
-			struct usb_function_instance, group);
+	struct usb_function_instance *fi =
+			to_usb_function_instance(usb_func_ci);
 	struct usb_function *f;
 
 	/*
@@ -922,18 +928,18 @@ static int os_desc_link(struct config_item *os_desc_ci,
 	struct gadget_info *gi = container_of(to_config_group(os_desc_ci),
 					struct gadget_info, os_desc_group);
 	struct usb_composite_dev *cdev = &gi->cdev;
-	struct config_usb_cfg *c_target =
-		container_of(to_config_group(usb_cfg_ci),
-			     struct config_usb_cfg, group);
-	struct usb_configuration *c;
+	struct config_usb_cfg *c_target = to_config_usb_cfg(usb_cfg_ci);
+	struct usb_configuration *c = NULL, *iter;
 	int ret;
 
 	mutex_lock(&gi->lock);
-	list_for_each_entry(c, &cdev->configs, list) {
-		if (c == &c_target->c)
-			break;
+	list_for_each_entry(iter, &cdev->configs, list) {
+		if (iter != &c_target->c)
+			continue;
+		c = iter;
+		break;
 	}
-	if (c != &c_target->c) {
+	if (!c) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -1562,7 +1568,7 @@ static int android_setup(struct usb_gadget *gadget,
 
 #ifdef CONFIG_USB_CONFIGFS_F_ACC
 	if (value < 0)
-		value = acc_ctrlrequest(cdev, c);
+		value = acc_ctrlrequest_composite(cdev, c);
 #endif
 
 	if (value < 0)

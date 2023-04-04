@@ -113,7 +113,7 @@ static inline unsigned long __dl_bw_capacity(int i)
  */
 static inline unsigned long dl_bw_capacity(int i)
 {
-	if (!static_branch_unlikely(&sched_asym_cpucapacity) &&
+	if (!sched_asym_cpucap_active() &&
 	    capacity_orig_of(i) == SCHED_CAPACITY_SCALE) {
 		return dl_bw_cpus(i) << SCHED_CAPACITY_SHIFT;
 	} else {
@@ -1710,7 +1710,7 @@ select_task_rq_dl(struct task_struct *p, int cpu, int flags)
 	 * Take the capacity of the CPU into account to
 	 * ensure it fits the requirement of the task.
 	 */
-	if (static_branch_unlikely(&sched_asym_cpucapacity))
+	if (sched_asym_cpucap_active())
 		select_rq |= !dl_task_fits_capacity(p, cpu);
 
 	if (select_rq) {
@@ -1853,8 +1853,7 @@ static void set_next_task_dl(struct rq *rq, struct task_struct *p, bool first)
 	deadline_queue_push_tasks(rq);
 }
 
-static struct sched_dl_entity *pick_next_dl_entity(struct rq *rq,
-						   struct dl_rq *dl_rq)
+static struct sched_dl_entity *pick_next_dl_entity(struct dl_rq *dl_rq)
 {
 	struct rb_node *left = rb_first_cached(&dl_rq->root);
 
@@ -1873,7 +1872,7 @@ static struct task_struct *pick_task_dl(struct rq *rq)
 	if (!sched_dl_runnable(rq))
 		return NULL;
 
-	dl_se = pick_next_dl_entity(rq, dl_rq);
+	dl_se = pick_next_dl_entity(dl_rq);
 	BUG_ON(!dl_se);
 	p = dl_task_of(dl_se);
 

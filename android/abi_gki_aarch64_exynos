@@ -1563,7 +1563,6 @@
   srcu_notifier_chain_unregister
   sscanf
   __stack_chk_fail
-  start_backtrace
   static_key_slow_dec
   static_key_slow_inc
   stop_one_cpu_nowait

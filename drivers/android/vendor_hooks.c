@@ -68,6 +68,7 @@
 #include <trace/hooks/evdev.h>
 #include <trace/hooks/ipv4.h>
 #include <trace/hooks/signal.h>
+#include <trace/hooks/suspend.h>
 #include <trace/hooks/typec.h>
 
 /*
@@ -290,6 +291,10 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_madvise_blk_plug);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_inactive_list_blk_plug);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_lruvec_blk_plug);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_reclaim_pages_plug);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_use_amu_fie);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_resume_begin);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_resume_end);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_early_resume_begin);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_tcpci_override_toggling);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_typec_tcpci_get_vbus);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_store_partner_src_caps);

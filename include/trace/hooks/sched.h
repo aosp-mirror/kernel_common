@@ -298,11 +298,6 @@ DECLARE_RESTRICTED_HOOK(android_rvh_check_preempt_wakeup,
 	TP_ARGS(rq, p, preempt, nopreempt, wake_flags, se, pse, next_buddy_marked,
 			granularity), 1);
 
-DECLARE_RESTRICTED_HOOK(android_rvh_set_cpus_allowed_ptr_locked,
-	TP_PROTO(const struct cpumask *cpu_valid_mask, const struct cpumask *new_mask,
-		 unsigned int *dest_cpu),
-	TP_ARGS(cpu_valid_mask, new_mask, dest_cpu), 1);
-
 DECLARE_RESTRICTED_HOOK(android_rvh_set_cpus_allowed_by_task,
 	TP_PROTO(const struct cpumask *cpu_valid_mask, const struct cpumask *new_mask,
 		 struct task_struct *p, unsigned int *dest_cpu),
@@ -430,13 +425,6 @@ DECLARE_RESTRICTED_HOOK(android_rvh_update_rt_rq_load_avg,
 	TP_PROTO(u64 now, struct rq *rq, struct task_struct *tsk, int running),
 	TP_ARGS(now, rq, tsk, running), 1);
 
-DECLARE_RESTRICTED_HOOK(android_rvh_set_cpus_allowed_comm,
-	TP_PROTO(struct task_struct *p, const struct cpumask *new_mask),
-	TP_ARGS(p, new_mask), 1);
-
-DECLARE_HOOK(android_vh_sched_setaffinity_early,
-	TP_PROTO(struct task_struct *p, const struct cpumask *new_mask, int *retval),
-	TP_ARGS(p, new_mask, retval));
 /* macro versions of hooks are no longer required */
 
 #endif /* _TRACE_HOOK_SCHED_H */

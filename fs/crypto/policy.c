@@ -53,8 +53,7 @@ int fscrypt_policy_to_key_spec(const union fscrypt_policy *policy,
 	}
 }
 
-static const union fscrypt_policy *
-fscrypt_get_dummy_policy(struct super_block *sb)
+const union fscrypt_policy *fscrypt_get_dummy_policy(struct super_block *sb)
 {
 	if (!sb->s_cop->get_dummy_policy)
 		return NULL;
@@ -849,8 +848,7 @@ int fscrypt_set_test_dummy_encryption(struct super_block *sb, const char *arg,
 		.type = fs_value_is_string,
 		.string = arg ? (char *)arg : "",
 	};
-	return fscrypt_parse_test_dummy_encryption(&param, dummy_policy) ?:
-		fscrypt_add_test_dummy_key(sb, dummy_policy);
+	return fscrypt_parse_test_dummy_encryption(&param, dummy_policy);
 }
 EXPORT_SYMBOL_GPL(fscrypt_set_test_dummy_encryption);
 

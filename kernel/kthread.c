@@ -524,6 +524,7 @@ struct task_struct *kthread_create_on_cpu(int (*threadfn)(void *data),
 	to_kthread(p)->cpu = cpu;
 	return p;
 }
+EXPORT_SYMBOL(kthread_create_on_cpu);
 
 void kthread_set_per_cpu(struct task_struct *k, int cpu)
 {
@@ -541,6 +542,7 @@ void kthread_set_per_cpu(struct task_struct *k, int cpu)
 	kthread->cpu = cpu;
 	set_bit(KTHREAD_IS_PER_CPU, &kthread->flags);
 }
+EXPORT_SYMBOL_GPL(kthread_set_per_cpu);
 
 bool kthread_is_per_cpu(struct task_struct *p)
 {

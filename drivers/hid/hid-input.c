@@ -709,6 +709,14 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			break;
 		}
 
+		if ((usage->hid & 0xf0) == 0xa0) {	/* SystemControl */
+			switch (usage->hid & 0xf) {
+			case 0x9: map_key_clear(KEY_MICMUTE); break;
+			default: goto ignore;
+			}
+			break;
+		}
+
 		if ((usage->hid & 0xf0) == 0xb0) {	/* SC - Display */
 			switch (usage->hid & 0xf) {
 			case 0x05: map_key_clear(KEY_SWITCHVIDEOMODE); break;
@@ -1119,6 +1127,16 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			return;
 		}
 		goto unknown;
+	case HID_UP_CAMERA:
+		switch (usage->hid & HID_USAGE) {
+		case 0x020:
+			map_key_clear(KEY_CAMERA_FOCUS);	break;
+		case 0x021:
+			map_key_clear(KEY_CAMERA);		break;
+		default:
+			goto ignore;
+		}
+		break;
 
 	case HID_UP_HPVENDOR:	/* Reported on a Dutch layout HP5308 */
 		set_bit(EV_REP, input->evbit);

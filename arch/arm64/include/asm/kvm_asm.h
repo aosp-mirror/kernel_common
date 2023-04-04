@@ -63,12 +63,22 @@ enum __kvm_host_smccc_func {
 	__KVM_HOST_SMCCC_FUNC___kvm_tlb_flush_vmid_ipa,
 	__KVM_HOST_SMCCC_FUNC___kvm_tlb_flush_vmid,
 	__KVM_HOST_SMCCC_FUNC___kvm_flush_cpu_context,
+
+	/*
+	 * __pkvm_alloc_module_va may temporarily serve as the privileged hcall
+	 * limit when module loading is enabled, see early_pkvm_enable_modules().
+	 */
+	__KVM_HOST_SMCCC_FUNC___pkvm_alloc_module_va,
+	__KVM_HOST_SMCCC_FUNC___pkvm_map_module_page,
+	__KVM_HOST_SMCCC_FUNC___pkvm_unmap_module_page,
+	__KVM_HOST_SMCCC_FUNC___pkvm_init_module,
+	__KVM_HOST_SMCCC_FUNC___pkvm_register_hcall,
+	__KVM_HOST_SMCCC_FUNC___pkvm_close_module_registration,
 	__KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize,
 
 	/* Hypercalls available after pKVM finalisation */
 	__KVM_HOST_SMCCC_FUNC___pkvm_host_share_hyp,
 	__KVM_HOST_SMCCC_FUNC___pkvm_host_unshare_hyp,
-	__KVM_HOST_SMCCC_FUNC___pkvm_host_reclaim_page,
 	__KVM_HOST_SMCCC_FUNC___pkvm_host_map_guest,
 	__KVM_HOST_SMCCC_FUNC___kvm_adjust_pc,
 	__KVM_HOST_SMCCC_FUNC___kvm_vcpu_run,
@@ -77,7 +87,9 @@ enum __kvm_host_smccc_func {
 	__KVM_HOST_SMCCC_FUNC___vgic_v3_restore_vmcr_aprs,
 	__KVM_HOST_SMCCC_FUNC___pkvm_init_vm,
 	__KVM_HOST_SMCCC_FUNC___pkvm_init_vcpu,
-	__KVM_HOST_SMCCC_FUNC___pkvm_teardown_vm,
+	__KVM_HOST_SMCCC_FUNC___pkvm_start_teardown_vm,
+	__KVM_HOST_SMCCC_FUNC___pkvm_finalize_teardown_vm,
+	__KVM_HOST_SMCCC_FUNC___pkvm_reclaim_dying_guest_page,
 	__KVM_HOST_SMCCC_FUNC___pkvm_vcpu_load,
 	__KVM_HOST_SMCCC_FUNC___pkvm_vcpu_put,
 	__KVM_HOST_SMCCC_FUNC___pkvm_vcpu_sync_state,
@@ -85,12 +97,12 @@ enum __kvm_host_smccc_func {
 	__KVM_HOST_SMCCC_FUNC___pkvm_iommu_register,
 	__KVM_HOST_SMCCC_FUNC___pkvm_iommu_pm_notify,
 	__KVM_HOST_SMCCC_FUNC___pkvm_iommu_finalize,
-	__KVM_HOST_SMCCC_FUNC___pkvm_register_hcall,
-	__KVM_HOST_SMCCC_FUNC___pkvm_alloc_module_va,
-	__KVM_HOST_SMCCC_FUNC___pkvm_map_module_page,
-	__KVM_HOST_SMCCC_FUNC___pkvm_unmap_module_page,
-	__KVM_HOST_SMCCC_FUNC___pkvm_init_module,
-	__KVM_HOST_SMCCC_FUNC___pkvm_close_module_registration,
+	__KVM_HOST_SMCCC_FUNC___pkvm_load_tracing,
+	__KVM_HOST_SMCCC_FUNC___pkvm_teardown_tracing,
+	__KVM_HOST_SMCCC_FUNC___pkvm_enable_tracing,
+	__KVM_HOST_SMCCC_FUNC___pkvm_rb_swap_reader_page,
+	__KVM_HOST_SMCCC_FUNC___pkvm_rb_update_footers,
+	__KVM_HOST_SMCCC_FUNC___pkvm_enable_event,
 	__KVM_HOST_SMCCC_FUNC___pkvm_host_set_stage2_memattr,
 
 	/*

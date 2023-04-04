@@ -655,7 +655,7 @@ enum {
 
 struct iocb_resource {
 	u8 res_type;
-	u8 pad;
+	u8  exch_cnt;
 	u16 iocb_cnt;
 };
 
@@ -3707,6 +3707,10 @@ struct qla_fw_resources {
 	u16 iocbs_limit;
 	u16 iocbs_qp_limit;
 	u16 iocbs_used;
+	u16 exch_total;
+	u16 exch_limit;
+	u16 exch_used;
+	u16 pad;
 };
 
 #define QLA_IOCB_PCT_LIMIT 95
@@ -5117,17 +5121,17 @@ struct secure_flash_update_block_pk {
 		(test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) || \
 			 test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags))
 
-#define QLA_VHA_MARK_BUSY(__vha, __bail) do {		\
-	atomic_inc(&__vha->vref_count);			\
-	mb();						\
-	if (__vha->flags.delete_progress) {		\
-		atomic_dec(&__vha->vref_count);		\
-		wake_up(&__vha->vref_waitq);		\
-		__bail = 1;				\
-	} else {					\
-		__bail = 0;				\
-	}						\
-} while (0)
+static inline bool qla_vha_mark_busy(scsi_qla_host_t *vha)
+{
+	atomic_inc(&vha->vref_count);
+	mb();
+	if (vha->flags.delete_progress) {
+		atomic_dec(&vha->vref_count);
+		wake_up(&vha->vref_waitq);
+		return true;
+	}
+	return false;
+}
 
 #define QLA_VHA_MARK_NOT_BUSY(__vha) do {		\
 	atomic_dec(&__vha->vref_count);			\
