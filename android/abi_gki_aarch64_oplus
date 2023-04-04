@@ -107,6 +107,21 @@
   __traceiter_android_vh_cpufreq_target
   __traceiter_android_vh_do_send_sig_info
   __traceiter_android_vh_drain_all_pages_bypass
+  __traceiter_android_vh_free_task
+  __traceiter_android_vh_irqtime_account_process_tick
+  __traceiter_android_vh_mem_cgroup_alloc
+  __traceiter_android_vh_mem_cgroup_css_offline
+  __traceiter_android_vh_mem_cgroup_css_online
+  __traceiter_android_vh_mem_cgroup_free
+  __traceiter_android_vh_mem_cgroup_id_remove
+  __traceiter_android_vh_mutex_unlock_slowpath
+  __traceiter_android_vh_mutex_wait_finish
+  __traceiter_android_vh_mutex_wait_start
+  __traceiter_android_vh_page_referenced_check_bypass
+  __traceiter_android_vh_rwsem_wake
+  __traceiter_android_vh_shrink_slab_bypass
+  __traceiter_android_vh_sync_txn_recvd
+  __traceiter_cpu_frequency_limits
   __tracepoint_android_rvh_check_preempt_tick
   __tracepoint_android_rvh_dequeue_entity
   __tracepoint_android_rvh_enqueue_entity
@@ -131,6 +146,21 @@
   __tracepoint_android_vh_cpufreq_target
   __tracepoint_android_vh_do_send_sig_info
   __tracepoint_android_vh_drain_all_pages_bypass
+  __tracepoint_android_vh_free_task
+  __tracepoint_android_vh_irqtime_account_process_tick
+  __tracepoint_android_vh_mem_cgroup_alloc
+  __tracepoint_android_vh_mem_cgroup_css_offline
+  __tracepoint_android_vh_mem_cgroup_css_online
+  __tracepoint_android_vh_mem_cgroup_free
+  __tracepoint_android_vh_mem_cgroup_id_remove
+  __tracepoint_android_vh_mutex_unlock_slowpath
+  __tracepoint_android_vh_mutex_wait_finish
+  __tracepoint_android_vh_mutex_wait_start
+  __tracepoint_android_vh_page_referenced_check_bypass
+  __tracepoint_android_vh_rwsem_wake
+  __tracepoint_android_vh_shrink_slab_bypass
+  __tracepoint_android_vh_sync_txn_recvd
+  __tracepoint_cpu_frequency_limits
   __trace_puts
   try_to_free_mem_cgroup_pages
   unregister_kprobe
