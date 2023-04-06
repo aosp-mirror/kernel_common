@@ -60,6 +60,8 @@ struct virtio_balloon_config {
 	};
 	/* Stores PAGE_POISON if page poisoning is in use */
 	__le32 poison_val;
+	/* WSS field is part of proposed spec extension (b/273973298). */
+	__le32 wss_num_bins;
 	/* allocation size for balloon page, order to use, e.g. 0=>4k, 9=>2MB. etc.*/
 	__le32 hugepage_order;
 };
