@@ -145,11 +145,9 @@ static unsigned long trusty_std_call_helper(struct device *dev,
 		local_irq_disable();
 
 		/* tell Trusty scheduler what the current priority is */
-		if (s->trusty_sched_share_state) {
-			WARN_ON_ONCE(current->policy != SCHED_NORMAL);
-			trusty_set_actual_nice(smp_processor_id(),
-					s->trusty_sched_share_state, task_nice(current));
-		}
+		WARN_ON_ONCE(current->policy != SCHED_NORMAL);
+		trusty_set_actual_nice(smp_processor_id(),
+				s->trusty_sched_share_state, task_nice(current));
 
 		atomic_notifier_call_chain(&s->notifier, TRUSTY_CALL_PREPARE,
 					   NULL);
@@ -835,14 +833,9 @@ static void trusty_adjust_nice_nopreempt(struct trusty_state *s, bool do_nop)
 		cause_id = CPUNICE_CAUSE_USE_HIGH_WQ;
 	} else {
 		/* read trusty request for this cpu if available */
-		if (s->trusty_sched_share_state) {
-			req_nice = trusty_get_requested_nice(smp_processor_id(),
-					s->trusty_sched_share_state);
-			cause_id = CPUNICE_CAUSE_TRUSTY_REQ;
-		} else {
-			/* (unlikely case) default to current */
-			req_nice = LINUX_NICE_FOR_TRUSTY_PRIORITY_NORMAL;
-		}
+		req_nice = trusty_get_requested_nice(smp_processor_id(),
+				s->trusty_sched_share_state);
+		cause_id = CPUNICE_CAUSE_TRUSTY_REQ;
 	}
 
 	/* ensure priority will not be lower than system request
@@ -1118,7 +1111,12 @@ static int trusty_probe(struct platform_device *pdev)
 		goto err_add_cpuhp_instance;
 	}
 
-	s->trusty_sched_share_state = trusty_register_sched_share(&pdev->dev);
+	ret = trusty_alloc_sched_share(&pdev->dev, &s->trusty_sched_share_state);
+	if (ret) {
+		dev_err(s->dev, "%s: unabled to allocate sched memory (%d)\n",
+				__func__, ret);
+		goto err_alloc_sched_share;
+	}
 
 	ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
 	if (ret < 0) {
@@ -1126,9 +1124,16 @@ static int trusty_probe(struct platform_device *pdev)
 		goto err_add_children;
 	}
 
+	/* attempt to share; it is optional for compatibility with Trusty
+	 * versions that don't support priority sharing
+	 */
+	trusty_register_sched_share(s->dev, s->trusty_sched_share_state);
+
 	return 0;
 
 err_add_children:
+	trusty_free_sched_share(s->trusty_sched_share_state);
+err_alloc_sched_share:
 	cpuhp_state_remove_instance(trusty_cpuhp_slot, &s->cpuhp_node);
 err_add_cpuhp_instance:
 err_thread_create:
@@ -1170,6 +1175,8 @@ static int trusty_remove(struct platform_device *pdev)
 		kthread_stop(tw->nop_thread);
 	}
 	free_percpu(s->nop_works);
+
+	trusty_free_sched_share(s->trusty_sched_share_state);
 
 	mutex_destroy(&s->share_memory_msg_lock);
 	mutex_destroy(&s->smc_lock);

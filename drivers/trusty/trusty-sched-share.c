@@ -31,88 +31,55 @@ struct trusty_sched_share_state {
 	u32 mem_size;
 	u32 buf_size;
 	u32 num_pages;
+	bool is_registered;
+	bool vm_is_shared;
 };
 
-static int
-trusty_sched_share_resources_allocate(struct trusty_sched_share_state *share_state)
+static inline struct trusty_percpu_data *trusty_get_trusty_percpu_data(
+		struct trusty_sched_shared *tsh, int cpu_num)
 {
-	struct scatterlist *sg;
-	struct trusty_sched_shared *shared;
-	unsigned char *mem;
-	trusty_shared_mem_id_t mem_id;
-	int result = 0;
-	int i;
-
-	share_state->mem_size = sizeof(struct trusty_sched_shared) +
-				nr_cpu_ids * sizeof(struct trusty_percpu_data);
-	share_state->num_pages =
-		round_up(share_state->mem_size, PAGE_SIZE) / PAGE_SIZE;
-	share_state->buf_size = share_state->num_pages * PAGE_SIZE;
-
-	dev_dbg(share_state->dev,
-		"%s: mem_size=%d,  num_pages=%d,  buf_size=%d", __func__,
-		share_state->mem_size, share_state->num_pages,
-		share_state->buf_size);
-
-	share_state->sg = kcalloc(share_state->num_pages,
-				  sizeof(*share_state->sg), GFP_KERNEL);
-	if (!share_state->sg) {
-		result = ENOMEM;
-		goto err_rsrc_alloc_sg;
-	}
-
-	mem = vzalloc(share_state->buf_size);
-	if (!mem) {
-		result = -ENOMEM;
-		goto err_rsrc_alloc_mem;
-	}
-	share_state->sched_shared_vm = mem;
-	dev_dbg(share_state->dev, "%s: sched_shared_vm=%p  size=%d\n",
-		__func__, share_state->sched_shared_vm, share_state->buf_size);
-
-	sg_init_table(share_state->sg, share_state->num_pages);
-	for_each_sg(share_state->sg, sg, share_state->num_pages, i) {
-		struct page *pg = vmalloc_to_page(mem + (i * PAGE_SIZE));
-
-		if (!pg) {
-			result = -ENOMEM;
-			goto err_rsrc_sg_lookup;
-		}
-		sg_set_page(sg, pg, PAGE_SIZE, 0);
-	}
-
-	result = trusty_share_memory(share_state->dev, &mem_id, share_state->sg,
-				     share_state->num_pages, PAGE_KERNEL);
-	if (result != 0) {
-		dev_err(share_state->dev, "trusty_share_memory failed: %d\n",
-			result);
-		goto err_rsrc_share_mem;
-	}
-	dev_dbg(share_state->dev, "%s: sched_shared_mem_id=0x%llx", __func__,
-		mem_id);
-	share_state->sched_shared_mem_id = mem_id;
-
-	shared = (struct trusty_sched_shared *)share_state->sched_shared_vm;
-	shared->hdr_size = sizeof(struct trusty_sched_shared);
-	shared->percpu_data_size = sizeof(struct trusty_percpu_data);
-
-	return result;
-
-err_rsrc_share_mem:
-err_rsrc_sg_lookup:
-	vfree(share_state->sched_shared_vm);
-err_rsrc_alloc_mem:
-	kfree(share_state->sg);
-err_rsrc_alloc_sg:
-	return result;
+	return (struct trusty_percpu_data *)((unsigned char *)tsh +
+			sizeof(struct trusty_sched_shared) +
+			(cpu_num * sizeof(struct trusty_percpu_data)));
 }
 
-struct trusty_sched_share_state *trusty_register_sched_share(struct device *device)
+static void trusty_sched_share_reclaim_memory(
+		struct trusty_sched_share_state *sched_share_state)
 {
-	int result = 0;
+	int result;
+
+	if (!sched_share_state->vm_is_shared) {
+		dev_warn(sched_share_state->dev,
+				"%s called unexpectedly when vm not shared\n", __func__);
+		return;
+	}
+
+	result = trusty_reclaim_memory(sched_share_state->dev,
+				       sched_share_state->sched_shared_mem_id,
+				       sched_share_state->sg,
+				       sched_share_state->num_pages);
+	if (result != 0) {
+		dev_err(sched_share_state->dev,
+			"trusty_reclaim_memory() failed: ret=%d mem_id=0x%llx\n",
+			result, sched_share_state->sched_shared_mem_id);
+		/*
+		 * It is not safe to free this memory if trusty_reclaim_memory()
+		 * failed. Leak it in that case.
+		 */
+		dev_err(sched_share_state->dev,
+			"WARNING: leaking some allocated resources!!\n");
+	} else {
+		sched_share_state->vm_is_shared = false;
+	}
+}
+
+int trusty_alloc_sched_share(struct device *device,
+		struct trusty_sched_share_state **state)
+{
 	struct trusty_sched_share_state *sched_share_state = NULL;
 	struct trusty_sched_shared *shared;
 	uint sched_share_state_size;
+	unsigned int cpu;
 
 	sched_share_state_size = sizeof(*sched_share_state);
 
@@ -120,17 +87,93 @@ struct trusty_sched_share_state *trusty_register_sched_share(struct device *devi
 	if (!sched_share_state)
 		goto err_sched_state_alloc;
 	sched_share_state->dev = device;
+	sched_share_state->is_registered = false;
+	sched_share_state->vm_is_shared = false;
 
-	result = trusty_sched_share_resources_allocate(sched_share_state);
-	if (result)
+	sched_share_state->mem_size = sizeof(struct trusty_sched_shared) +
+				nr_cpu_ids * sizeof(struct trusty_percpu_data);
+	sched_share_state->num_pages =
+		round_up(sched_share_state->mem_size, PAGE_SIZE) / PAGE_SIZE;
+	sched_share_state->buf_size = sched_share_state->num_pages * PAGE_SIZE;
+
+	dev_dbg(sched_share_state->dev,
+		"%s: mem_size=%d,  num_pages=%d,  buf_size=%d", __func__,
+		sched_share_state->mem_size, sched_share_state->num_pages,
+		sched_share_state->buf_size);
+
+	sched_share_state->sched_shared_vm = vzalloc(sched_share_state->buf_size);
+	if (!sched_share_state->sched_shared_vm)
 		goto err_resources_alloc;
+	dev_dbg(sched_share_state->dev, "%s: sched_shared_vm=%p  size=%d\n",
+		__func__, sched_share_state->sched_shared_vm, sched_share_state->buf_size);
 
 	shared = (struct trusty_sched_shared *)sched_share_state->sched_shared_vm;
 	shared->cpu_count = nr_cpu_ids;
+	shared->hdr_size = sizeof(struct trusty_sched_shared);
+	shared->percpu_data_size = sizeof(struct trusty_percpu_data);
+
+	for_each_possible_cpu(cpu) {
+		trusty_get_trusty_percpu_data(shared, cpu)->ask_shadow_priority
+				= TRUSTY_SHADOW_PRIORITY_NORMAL;
+	}
+
+	*state = sched_share_state;
+	return 0;
+
+err_resources_alloc:
+	kfree(sched_share_state);
+err_sched_state_alloc:
+	return -ENOMEM;
+}
+
+void trusty_register_sched_share(struct device *device,
+		struct trusty_sched_share_state *sched_share_state)
+{
+	int result = 0;
+	struct scatterlist *sg;
+	unsigned char *mem = sched_share_state->sched_shared_vm;
+	trusty_shared_mem_id_t mem_id;
+	int i;
+
+	/* allocate and initialize scatterlist */
+	sched_share_state->sg = kcalloc(sched_share_state->num_pages,
+				  sizeof(*sched_share_state->sg), GFP_KERNEL);
+	if (!sched_share_state->sg) {
+		result = -ENOMEM;
+		dev_err(sched_share_state->dev, "%s: failed to alloc sg\n", __func__);
+		goto err_rsrc_alloc_sg;
+	}
+
+	sg_init_table(sched_share_state->sg, sched_share_state->num_pages);
+	for_each_sg(sched_share_state->sg, sg, sched_share_state->num_pages, i) {
+		struct page *pg = vmalloc_to_page(mem + (i * PAGE_SIZE));
+
+		if (!pg) {
+			result = -ENOMEM;
+			dev_err(sched_share_state->dev, "%s: failed to map page i= %d\n",
+					__func__, i);
+			goto err_rsrc_sg_lookup;
+		}
+		sg_set_page(sg, pg, PAGE_SIZE, 0);
+	}
+
+	/* share memory with Trusty */
+	result = trusty_share_memory(sched_share_state->dev, &mem_id, sched_share_state->sg,
+				     sched_share_state->num_pages, PAGE_KERNEL);
+	if (result != 0) {
+		dev_err(sched_share_state->dev, "trusty_share_memory failed: %d\n",
+			result);
+		goto err_rsrc_share_mem;
+	}
+	dev_dbg(sched_share_state->dev, "%s: sched_shared_mem_id=0x%llx", __func__,
+		mem_id);
+	sched_share_state->sched_shared_mem_id = mem_id;
+	sched_share_state->vm_is_shared = true;
 
 	dev_dbg(device, "%s: calling api SMC_SC_SCHED_SHARE_REGISTER...\n",
 		__func__);
 
+	/* tell sched share code on Trusty side to share priorities */
 	result = trusty_std_call32(
 		sched_share_state->dev, SMC_SC_SCHED_SHARE_REGISTER,
 		(u32)sched_share_state->sched_shared_mem_id,
@@ -151,40 +194,26 @@ struct trusty_sched_share_state *trusty_register_sched_share(struct device *devi
 	dev_dbg(device, "%s: sched_share_state=%llx\n", __func__,
 		(u64)sched_share_state);
 
-	return sched_share_state;
+	sched_share_state->is_registered = true;
+
+	return;
 
 err_smc_std_call32:
-	result = trusty_reclaim_memory(sched_share_state->dev,
-				       sched_share_state->sched_shared_mem_id,
-				       sched_share_state->sg,
-				       sched_share_state->num_pages);
-	if (result != 0) {
-		dev_err(sched_share_state->dev,
-			"trusty_reclaim_memory() failed: ret=%d mem_id=0x%llx\n",
-			result, sched_share_state->sched_shared_mem_id);
-		/*
-		 * It is not safe to free this memory if trusty_reclaim_memory()
-		 * failed. Leak it in that case.
-		 */
-		dev_err(sched_share_state->dev,
-			"WARNING: leaking some allocated resources!!\n");
-	} else {
-		vfree(sched_share_state->sched_shared_vm);
-	}
+	trusty_sched_share_reclaim_memory(sched_share_state);
+err_rsrc_share_mem:
+err_rsrc_sg_lookup:
 	kfree(sched_share_state->sg);
-err_resources_alloc:
-	kfree(sched_share_state);
-	dev_warn(sched_share_state->dev,
-		 "Trusty-Sched_Share API not available.\n");
-err_sched_state_alloc:
-	return NULL;
+	sched_share_state->sg = NULL;
+err_rsrc_alloc_sg:
+	return;
+
 }
 
 void trusty_unregister_sched_share(struct trusty_sched_share_state *sched_share_state)
 {
 	int result;
 
-	if (!sched_share_state)
+	if (!sched_share_state->is_registered)
 		return;
 
 	/* ask Trusty to release the Trusty-side resources */
@@ -197,25 +226,18 @@ void trusty_unregister_sched_share(struct trusty_sched_share_state *sched_share_
 			"call SMC_SC_SCHED_SHARE_UNREGISTER failed, error=%d\n",
 			result);
 	}
-	result = trusty_reclaim_memory(sched_share_state->dev,
-				       sched_share_state->sched_shared_mem_id,
-				       sched_share_state->sg,
-				       sched_share_state->num_pages);
-	if (result) {
-		dev_err(sched_share_state->dev,
-			"trusty_reclaim_memory() failed: ret=%d mem_id=0x%llx\n",
-			result, sched_share_state->sched_shared_mem_id);
-		/*
-		 * It is not safe to free this memory if trusty_reclaim_memory()
-		 * failed. Leak it in that case.
-		 */
-		dev_err(sched_share_state->dev,
-			"WARNING: leaking some allocated resources!!\n");
-	} else {
-		vfree(sched_share_state->sched_shared_vm);
-	}
+
+
+	trusty_sched_share_reclaim_memory(sched_share_state);
 
 	kfree(sched_share_state->sg);
+}
+
+void trusty_free_sched_share(struct trusty_sched_share_state *sched_share_state)
+{
+	if (!sched_share_state->vm_is_shared)
+		vfree(sched_share_state->sched_shared_vm);
+
 	kfree(sched_share_state);
 }
 
@@ -237,13 +259,6 @@ static inline int map_trusty_prio_to_linux_nice(int trusty_prio)
 	}
 
 	return new_nice;
-}
-
-static inline struct trusty_percpu_data *trusty_get_trusty_percpu_data(
-		struct trusty_sched_shared *tsh, int cpu_num)
-{
-	return (struct trusty_percpu_data *)((unsigned char *)tsh + tsh->hdr_size +
-			(cpu_num * tsh->percpu_data_size));
 }
 
 int trusty_get_requested_nice(unsigned int cpu_num, struct trusty_sched_share_state *tcpu_state)

@@ -13,8 +13,12 @@
 
 struct trusty_sched_share_state;
 
-struct trusty_sched_share_state *trusty_register_sched_share(struct device *device);
+int trusty_alloc_sched_share(struct device *device,
+		struct trusty_sched_share_state **state);
+void trusty_register_sched_share(struct device *device,
+		struct trusty_sched_share_state *sched_share_state);
 void trusty_unregister_sched_share(struct trusty_sched_share_state *sched_share_state);
+void trusty_free_sched_share(struct trusty_sched_share_state *sched_share_state);
 
 int trusty_get_requested_nice(unsigned int cpu_num, struct trusty_sched_share_state *tcpu_state);
 int trusty_set_actual_nice(unsigned int cpu_num, struct trusty_sched_share_state *tcpu_state,
