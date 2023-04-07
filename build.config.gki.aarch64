@@ -21,6 +21,7 @@ android/abi_gki_aarch64_virtual_device
 android/abi_gki_aarch64_db845c
 android/abi_gki_aarch64_hikey960
 android/abi_gki_aarch64_rockchip
+android/abi_gki_aarch64_rtkstb
 "
 
 FILES="${FILES}

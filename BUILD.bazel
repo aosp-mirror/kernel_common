@@ -19,6 +19,7 @@ _aarch64_additional_kmi_symbol_lists = [
     "android/abi_gki_aarch64_generic",
     "android/abi_gki_aarch64_hikey960",
     "android/abi_gki_aarch64_rockchip",
+    "android/abi_gki_aarch64_rtkstb",
     "android/abi_gki_aarch64_type_visibility",
     "android/abi_gki_aarch64_virtual_device",
 ]
