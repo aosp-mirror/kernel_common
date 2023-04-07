@@ -173,6 +173,7 @@ void __init kvm_hyp_reserve(void)
 	hyp_mem_pages += hyp_vm_table_pages();
 	hyp_mem_pages += hyp_vmemmap_pages(STRUCT_HYP_PAGE_SIZE);
 	hyp_mem_pages += hyp_ffa_proxy_pages();
+	hyp_mem_pages += hyp_host_fp_pages(num_possible_cpus());
 
 	/*
 	 * Try to allocate a PMD-aligned region to reduce TLB pressure once
@@ -777,6 +778,7 @@ int __pkvm_load_el2_module(struct module *this, unsigned long *token)
 		{ &mod->data, KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_W },
 	};
 	void *start, *end, *hyp_va;
+	struct arm_smccc_res res;
 	kvm_nvhe_reloc_t *endrel;
 	int ret, i, secs_first;
 	size_t offset, size;
@@ -806,12 +808,14 @@ int __pkvm_load_el2_module(struct module *this, unsigned long *token)
 	end = secs_map[ARRAY_SIZE(secs_map) - 1].sec->end;
 	size = end - start;
 
-	hyp_va = (void *)kvm_call_hyp_nvhe(__pkvm_alloc_module_va, size >> PAGE_SHIFT);
-	if (!hyp_va) {
+	arm_smccc_1_1_hvc(KVM_HOST_SMCCC_FUNC(__pkvm_alloc_module_va),
+			  size >> PAGE_SHIFT, &res);
+	if (res.a0 != SMCCC_RET_SUCCESS || !res.a1) {
 		kvm_err("Failed to allocate hypervisor VA space for EL2 module\n");
 		module_put(this);
-		return -ENOMEM;
+		return res.a0 == SMCCC_RET_SUCCESS ? -ENOMEM : -EPERM;
 	}
+	hyp_va = (void *)res.a1;
 
 	/*
 	 * The token can be used for other calls related to this module.

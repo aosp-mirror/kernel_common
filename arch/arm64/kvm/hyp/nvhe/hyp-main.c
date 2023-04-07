@@ -30,14 +30,6 @@
 
 #include "../../sys_regs.h"
 
-/*
- * Host FPSIMD state. Written to when the guest accesses its own FPSIMD state,
- * and read when the guest state is live and we need to switch back to the host.
- *
- * Only valid when (fp_state == FP_STATE_GUEST_OWNED) in the hyp vCPU structure.
- */
-static DEFINE_PER_CPU(struct user_fpsimd_state, loaded_host_fpsimd_state);
-
 DEFINE_PER_CPU(struct kvm_nvhe_init_params, kvm_init_params);
 
 void __kvm_hyp_host_forward_smc(struct kvm_cpu_context *host_ctxt);
@@ -687,16 +679,24 @@ static void fpsimd_host_restore(void)
 
 	if (unlikely(is_protected_kvm_enabled())) {
 		struct pkvm_hyp_vcpu *hyp_vcpu = pkvm_get_loaded_hyp_vcpu();
-		struct user_fpsimd_state *host_fpsimd_state;
+		struct kvm_vcpu *vcpu = &hyp_vcpu->vcpu;
 
-		host_fpsimd_state = this_cpu_ptr(&loaded_host_fpsimd_state);
-
-		if (vcpu_has_sve(&hyp_vcpu->vcpu))
+		if (vcpu_has_sve(vcpu))
 			__hyp_sve_save_guest(hyp_vcpu);
 		else
 			__fpsimd_save_state(&hyp_vcpu->vcpu.arch.ctxt.fp_regs);
 
-		__fpsimd_restore_state(host_fpsimd_state);
+		if (system_supports_sve()) {
+			struct kvm_host_sve_state *sve_state = get_host_sve_state(vcpu);
+
+			write_sysreg_el1(sve_state->zcr_el1, SYS_ZCR);
+			pkvm_set_max_sve_vq();
+			__sve_restore_state(sve_state->sve_regs +
+					    sve_ffr_offset(kvm_host_sve_max_vl),
+					    &sve_state->fpsr);
+		} else {
+			__fpsimd_restore_state(get_host_fpsimd_state(vcpu));
+		}
 
 		hyp_vcpu->vcpu.arch.fp_state = FP_STATE_HOST_OWNED;
 	}
@@ -733,7 +733,6 @@ static void handle___pkvm_vcpu_load(struct kvm_cpu_context *host_ctxt)
 		*last_ran = hyp_vcpu->vcpu.vcpu_id;
 	}
 
-	hyp_vcpu->vcpu.arch.host_fpsimd_state = this_cpu_ptr(&loaded_host_fpsimd_state);
 	hyp_vcpu->vcpu.arch.fp_state = FP_STATE_HOST_OWNED;
 
 	if (pkvm_hyp_vcpu_is_protected(hyp_vcpu)) {
@@ -1342,7 +1341,7 @@ int reset_pkvm_priv_hcall_limit(void)
 		return -EACCES;
 
 	addr = hyp_fixmap_map(__hyp_pa(&pkvm_priv_hcall_limit));
-	*addr = KVM_HOST_SMCCC_FUNC(__pkvm_prot_finalize);
+	*addr = __KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize;
 	hyp_fixmap_unmap();
 
 	return 0;
