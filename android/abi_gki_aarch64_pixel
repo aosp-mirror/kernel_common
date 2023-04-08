@@ -2034,6 +2034,8 @@
   tcpm_pd_hard_reset
   tcpm_pd_receive
   tcpm_pd_transmit_complete
+  tcpm_port_clean
+  tcpm_port_is_toggling
   tcpm_sink_frs
   tcpm_sourcing_vbus
   tcpm_update_sink_capabilities
