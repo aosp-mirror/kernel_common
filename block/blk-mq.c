@@ -2596,6 +2596,7 @@ static int blk_mq_hctx_notify_online(unsigned int cpu, struct hlist_node *node)
 static int blk_mq_hctx_notify_dead(unsigned int cpu, struct hlist_node *node)
 {
 	struct blk_mq_hw_ctx *hctx;
+	struct request *rq, *next;
 	struct blk_mq_ctx *ctx;
 	LIST_HEAD(tmp);
 	enum hctx_type type;
@@ -2617,9 +2618,9 @@ static int blk_mq_hctx_notify_dead(unsigned int cpu, struct hlist_node *node)
 	if (list_empty(&tmp))
 		return 0;
 
-	spin_lock(&hctx->lock);
-	list_splice_tail_init(&tmp, &hctx->dispatch);
-	spin_unlock(&hctx->lock);
+	list_for_each_entry_safe(rq, next, &tmp, queuelist)
+		blk_mq_requeue_request(rq, false);
+	blk_mq_kick_requeue_list(hctx->queue);
 
 	blk_mq_run_hw_queue(hctx, true);
 	return 0;
