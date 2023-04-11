@@ -1297,7 +1297,7 @@ static ssize_t fuse_cache_write_iter(struct kiocb *iocb, struct iov_iter *from)
 			return err;
 
 		if (!fc->handle_killpriv ||
-		    !should_remove_suid(file->f_path.dentry))
+		    !setattr_should_drop_suidgid(file_inode(file)))
 			return generic_file_write_iter(iocb, from);
 
 		/* Fall back to unbuffered write to remove suid/sgid bits */

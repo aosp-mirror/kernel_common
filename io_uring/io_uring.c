@@ -496,6 +496,7 @@ struct io_poll_iocb {
 	struct file			*file;
 	struct wait_queue_head		*head;
 	__poll_t			events;
+	int				retries;
 	struct wait_queue_entry		wait;
 };
 
@@ -1102,7 +1103,8 @@ static int __io_register_rsrc_update(struct io_ring_ctx *ctx, unsigned type,
 				     unsigned nr_args);
 static void io_clean_op(struct io_kiocb *req);
 static struct file *io_file_get(struct io_ring_ctx *ctx,
-				struct io_kiocb *req, int fd, bool fixed);
+				struct io_kiocb *req, int fd, bool fixed,
+				unsigned int issue_flags);
 static void __io_queue_sqe(struct io_kiocb *req);
 static void io_rsrc_put_work(struct work_struct *work);
 
@@ -2469,6 +2471,15 @@ static inline unsigned int io_put_rw_kbuf(struct io_kiocb *req)
 
 static inline bool io_run_task_work(void)
 {
+	/*
+	 * PF_IO_WORKER never returns to userspace, so check here if we have
+	 * notify work that needs processing.
+	 */
+	if (current->flags & PF_IO_WORKER &&
+	    test_thread_flag(TIF_NOTIFY_RESUME)) {
+		__set_current_state(TASK_RUNNING);
+		tracehook_notify_resume(NULL);
+	}
 	if (test_thread_flag(TIF_NOTIFY_SIGNAL) || current->task_works) {
 		__set_current_state(TASK_RUNNING);
 		tracehook_notify_signal();
@@ -3985,7 +3996,7 @@ static int io_tee(struct io_kiocb *req, unsigned int issue_flags)
 		return -EAGAIN;
 
 	in = io_file_get(req->ctx, req, sp->splice_fd_in,
-				  (sp->flags & SPLICE_F_FD_IN_FIXED));
+			 (sp->flags & SPLICE_F_FD_IN_FIXED), issue_flags);
 	if (!in) {
 		ret = -EBADF;
 		goto done;
@@ -4025,7 +4036,7 @@ static int io_splice(struct io_kiocb *req, unsigned int issue_flags)
 		return -EAGAIN;
 
 	in = io_file_get(req->ctx, req, sp->splice_fd_in,
-				  (sp->flags & SPLICE_F_FD_IN_FIXED));
+			 (sp->flags & SPLICE_F_FD_IN_FIXED), issue_flags);
 	if (!in) {
 		ret = -EBADF;
 		goto done;
@@ -4995,7 +5006,7 @@ static int io_recvmsg_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	sr->umsg = u64_to_user_ptr(READ_ONCE(sqe->addr));
 	sr->len = READ_ONCE(sqe->len);
 	sr->bgid = READ_ONCE(sqe->buf_group);
-	sr->msg_flags = READ_ONCE(sqe->msg_flags) | MSG_NOSIGNAL;
+	sr->msg_flags = READ_ONCE(sqe->msg_flags);
 	if (sr->msg_flags & MSG_DONTWAIT)
 		req->flags |= REQ_F_NOWAIT;
 
@@ -5749,6 +5760,14 @@ enum {
 	IO_APOLL_READY
 };
 
+/*
+ * We can't reliably detect loops in repeated poll triggers and issue
+ * subsequently failing. But rather than fail these immediately, allow a
+ * certain amount of retries before we give up. Given that this condition
+ * should _rarely_ trigger even once, we should be fine with a larger value.
+ */
+#define APOLL_MAX_RETRY		128
+
 static int io_arm_poll_handler(struct io_kiocb *req)
 {
 	const struct io_op_def *def = &io_op_defs[req->opcode];
@@ -5759,8 +5778,6 @@ static int io_arm_poll_handler(struct io_kiocb *req)
 	int ret;
 
 	if (!req->file || !file_can_poll(req->file))
-		return IO_APOLL_ABORTED;
-	if ((req->flags & (REQ_F_POLLED|REQ_F_PARTIAL_IO)) == REQ_F_POLLED)
 		return IO_APOLL_ABORTED;
 	if (!def->pollin && !def->pollout)
 		return IO_APOLL_ABORTED;
@@ -5779,11 +5796,16 @@ static int io_arm_poll_handler(struct io_kiocb *req)
 	if (req->flags & REQ_F_POLLED) {
 		apoll = req->apoll;
 		kfree(apoll->double_poll);
+		if (unlikely(!--apoll->poll.retries)) {
+			apoll->double_poll = NULL;
+			return IO_APOLL_ABORTED;
+		}
 	} else {
 		apoll = kmalloc(sizeof(*apoll), GFP_ATOMIC);
+		if (unlikely(!apoll))
+			return IO_APOLL_ABORTED;
+		apoll->poll.retries = APOLL_MAX_RETRY;
 	}
-	if (unlikely(!apoll))
-		return IO_APOLL_ABORTED;
 	apoll->double_poll = NULL;
 	req->apoll = apoll;
 	req->flags |= REQ_F_POLLED;
@@ -6886,13 +6908,16 @@ static void io_fixed_file_set(struct io_fixed_file *file_slot, struct file *file
 }
 
 static inline struct file *io_file_get_fixed(struct io_ring_ctx *ctx,
-					     struct io_kiocb *req, int fd)
+					     struct io_kiocb *req, int fd,
+					     unsigned int issue_flags)
 {
-	struct file *file;
+	struct file *file = NULL;
 	unsigned long file_ptr;
 
+	io_ring_submit_lock(ctx, !(issue_flags & IO_URING_F_NONBLOCK));
+
 	if (unlikely((unsigned int)fd >= ctx->nr_user_files))
-		return NULL;
+		goto out;
 	fd = array_index_nospec(fd, ctx->nr_user_files);
 	file_ptr = io_fixed_file_slot(&ctx->file_table, fd)->file_ptr;
 	file = (struct file *) (file_ptr & FFS_MASK);
@@ -6900,6 +6925,8 @@ static inline struct file *io_file_get_fixed(struct io_ring_ctx *ctx,
 	/* mask in overlapping REQ_F and FFS bits */
 	req->flags |= (file_ptr << REQ_F_NOWAIT_READ_BIT);
 	io_req_set_rsrc_node(req);
+out:
+	io_ring_submit_unlock(ctx, !(issue_flags & IO_URING_F_NONBLOCK));
 	return file;
 }
 
@@ -6917,10 +6944,11 @@ static struct file *io_file_get_normal(struct io_ring_ctx *ctx,
 }
 
 static inline struct file *io_file_get(struct io_ring_ctx *ctx,
-				       struct io_kiocb *req, int fd, bool fixed)
+				       struct io_kiocb *req, int fd, bool fixed,
+				       unsigned int issue_flags)
 {
 	if (fixed)
-		return io_file_get_fixed(ctx, req, fd);
+		return io_file_get_fixed(ctx, req, fd, issue_flags);
 	else
 		return io_file_get_normal(ctx, req, fd);
 }
@@ -7142,7 +7170,8 @@ static int io_init_req(struct io_ring_ctx *ctx, struct io_kiocb *req,
 
 	if (io_op_defs[req->opcode].needs_file) {
 		req->file = io_file_get(ctx, req, READ_ONCE(sqe->fd),
-					(sqe_flags & IOSQE_FIXED_FILE));
+					(sqe_flags & IOSQE_FIXED_FILE),
+					IO_URING_F_NONBLOCK);
 		if (unlikely(!req->file))
 			ret = -EBADF;
 	}
@@ -9050,14 +9079,17 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 	pret = pin_user_pages(ubuf, nr_pages, FOLL_WRITE | FOLL_LONGTERM,
 			      pages, vmas);
 	if (pret == nr_pages) {
+		struct file *file = vmas[0]->vm_file;
+
 		/* don't support file backed memory */
 		for (i = 0; i < nr_pages; i++) {
-			struct vm_area_struct *vma = vmas[i];
-
-			if (vma_is_shmem(vma))
+			if (vmas[i]->vm_file != file) {
+				ret = -EINVAL;
+				break;
+			}
+			if (!file)
 				continue;
-			if (vma->vm_file &&
-			    !is_file_hugepages(vma->vm_file)) {
+			if (!vma_is_shmem(vmas[i]) && !is_file_hugepages(file)) {
 				ret = -EOPNOTSUPP;
 				break;
 			}
@@ -9683,6 +9715,7 @@ static void io_uring_try_cancel_requests(struct io_ring_ctx *ctx,
 			while (!list_empty_careful(&ctx->iopoll_list)) {
 				io_iopoll_try_reap_events(ctx);
 				ret = true;
+				cond_resched();
 			}
 		}
 
