@@ -1348,6 +1348,9 @@
   serial8250_unregister_port
   serial8250_update_uartclk
 
+# required by 8822ce.ko
+  netdev_set_default_ethtool_ops
+
 # required by act8865-regulator.ko
   regulator_set_pull_down_regmap
 
@@ -1608,6 +1611,10 @@
   of_clk_add_hw_provider
   of_clk_hw_simple_get
 
+# required by clk-out.ko
+  __clk_hw_register_gate
+  of_clk_parent_fill
+
 # required by clk-rk628.ko
   devm_reset_controller_register
 
@@ -1702,6 +1709,9 @@
 
 # required by dm9601.ko
   mii_link_ok
+
+# required by dw-dp.ko
+  hdmi_drm_infoframe_pack_only
 
 # required by dw-hdmi-hdcp.ko
   kstrtobool
@@ -1871,6 +1881,9 @@
   regulator_register_notifier
   regulator_unregister_notifier
 
+# required by it662x.ko
+  snd_pcm_rate_to_rate_bit
+
 # required by kalmia.ko
   usb_bulk_msg
 
@@ -1889,6 +1902,18 @@
 
 # required by lzo.ko
   lzo1x_1_compress
+
+# moal.ko
+  cpu_latency_qos_request_active
+  cfg80211_auth_timeout
+  in4_pton
+  iw_handler_set_spy
+  iw_handler_get_spy
+  iw_handler_set_thrspy
+  iw_handler_get_thrspy
+  cfg80211_report_wowlan_wakeup
+  sdio_release_irq
+  sdio_claim_irq
 
 # required by nvme-core.ko
   bd_set_nr_sectors
@@ -2589,6 +2614,7 @@
 
 # required by sensorbox.ko
   kernel_sigaction
+  hidraw_report_event
 
 # required by sensor_dev.ko
   class_create_file_ns
@@ -2601,6 +2627,13 @@
 
 # required by sii902x.ko
   hdmi_avi_infoframe_pack
+
+# required by skw.ko
+  cfg80211_check_combinations
+  cfg80211_cqm_beacon_loss_notify
+  cfg80211_reg_can_beacon_relax
+  cfg80211_shutdown_all_interfaces
+  netdev_alloc_frag
 
 # required by smsc95xx.ko
   csum_partial
@@ -2643,6 +2676,7 @@
   snd_soc_dapm_new_widgets
 
 # required by snd-soc-rockchip-i2s-tdm.ko
+  clk_has_parent
   clk_is_match
   pm_runtime_forbid
   snd_pcm_stop_xrun
@@ -2769,6 +2803,9 @@
   skb_tstamp_tx
   synchronize_net
 
+# required by swopwm.ko
+  devm_of_pwm_get
+
 # required by sw_sync.ko
   dma_fence_free
   dma_fence_signal_locked
@@ -2799,6 +2836,9 @@
 # required by timer-rockchip.ko
   clockevents_config_and_register
   irq_of_parse_and_map
+
+# required by touchE.ko
+  schedule_hrtimeout
 
 # required by tps65132-regulator.ko
   regulator_set_active_discharge_regmap
