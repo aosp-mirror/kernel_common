@@ -2080,6 +2080,7 @@
   __traceiter_android_rvh_do_undefinstr
   __traceiter_android_rvh_enqueue_task
   __traceiter_android_rvh_enqueue_task_fair
+  __traceiter_android_rvh_find_busiest_group
   __traceiter_android_rvh_find_energy_efficient_cpu
   __traceiter_android_rvh_irqs_disable
   __traceiter_android_rvh_irqs_enable
@@ -2180,6 +2181,7 @@
   __tracepoint_android_rvh_do_undefinstr
   __tracepoint_android_rvh_enqueue_task
   __tracepoint_android_rvh_enqueue_task_fair
+  __tracepoint_android_rvh_find_busiest_group
   __tracepoint_android_rvh_find_energy_efficient_cpu
   __tracepoint_android_rvh_irqs_disable
   __tracepoint_android_rvh_irqs_enable

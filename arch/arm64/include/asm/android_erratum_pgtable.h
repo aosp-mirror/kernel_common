@@ -1,4 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (C) 2023 - Google LLC
+ * Author: Will Deacon <willdeacon@google.com>
+ */
 #ifndef _ASM_ARM64_ANDROID_ERRATUM_PGTABLE_H
 #define _ASM_ARM64_ANDROID_ERRATUM_PGTABLE_H
 

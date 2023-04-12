@@ -1,5 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0 */
-
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) 2023 - Google LLC
+ * Author: Will Deacon <willdeacon@google.com>
+ */
 #include <asm/kvm_host.h>
 #include <asm/pgtable.h>
 
@@ -35,7 +38,7 @@ pkvm_host_early_nc_regions[PKVM_HOST_MAX_EARLY_NC_REGIONS];
 
 static void pkvm_host_track_early_nc_mapping(phys_addr_t addr)
 {
-	static int idx = 0;
+	static int idx /*= 0*/;
 	struct pkvm_host_nc_region *reg = &pkvm_host_early_nc_regions[idx];
 
 	if (reg->start == reg->end) {
