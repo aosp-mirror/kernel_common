@@ -139,6 +139,13 @@ void dump_cpu_features(void)
 	pr_emerg("0x%*pb\n", ARM64_NCAPS, &cpu_hwcaps);
 }
 
+#define ARM64_CPUID_FIELDS(reg, field, min_value)			\
+		.sys_reg = SYS_##reg,							\
+		.field_pos = reg##_##field##_SHIFT,						\
+		.field_width = reg##_##field##_WIDTH,						\
+		.sign = reg##_##field##_SIGNED,							\
+		.min_field_value = reg##_##field##_##min_value,
+
 #define __ARM64_FTR_BITS(SIGNED, VISIBLE, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
 	{						\
 		.sign = SIGNED,				\
