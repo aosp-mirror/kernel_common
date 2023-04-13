@@ -287,6 +287,8 @@
   _ctype
   current_time
   current_umask
+  devm_alloc_etherdev_mqs
+  __dev_get_by_name
   drm_atomic_helper_async_commit
   drm_atomic_helper_commit_tail_rpm
   __drm_atomic_helper_connector_reset
@@ -308,6 +310,20 @@
   drm_property_add_enum
   drm_property_destroy
   drm_self_refresh_helper_update_avg_times
+  eth_header
+  eth_header_parse
+  filemap_fdatawait_range
+  filemap_fdatawrite
+  filemap_fdatawrite_range
+  filemap_flush
+  filemap_write_and_wait_range
+  flow_block_cb_setup_simple
+  flow_rule_match_basic
+  flow_rule_match_ipv4_addrs
+  flow_rule_match_ports
+  flow_rule_match_vlan
+  generic_file_mmap
+  __generic_file_write_iter
   genphy_aneg_done
   genphy_read_status
   genphy_restart_aneg
@@ -315,6 +331,9 @@
   genphy_soft_reset
   genphy_suspend
   genphy_update_link
+  get_kernel_pages
+  get_pfnblock_flags_mask
+  grab_cache_page_write_begin
   hdmi_avi_infoframe_init
   hdmi_drm_infoframe_init
   hdmi_drm_infoframe_pack
@@ -322,6 +341,11 @@
   hdmi_spd_infoframe_pack
   hdmi_vendor_infoframe_init
   hdmi_vendor_infoframe_pack
+  high_memory
+  __ipv6_addr_type
+  iwe_stream_add_event
+  iwe_stream_add_point
+  iwe_stream_add_value
   mdiobus_alloc_size
   mdiobus_free
   mdiobus_get_phy
@@ -330,10 +354,23 @@
   mdiobus_write
   mdio_device_create
   mdio_device_free
+  mod_node_page_state
   netdev_alert
-  of_mdio_find_bus
+  netdev_printk
+  netdev_rss_key_fill
+  noop_backing_dev_info
+  of_get_phy_mode
   __of_mdiobus_register
+  of_mdio_find_bus
   of_phy_is_fixed_link
+  pagecache_get_page
+  pagecache_write_begin
+  pagecache_write_end
+  page_pool_alloc_pages
+  page_pool_create
+  page_pool_destroy
+  page_pool_put_page
+  page_pool_release_page
   phylink_connect_phy
   phylink_create
   phylink_destroy
@@ -365,10 +402,15 @@
   phy_init_eee
   phy_print_status
   phy_trigger_machine
+  __pskb_copy_fclone
   ptp_clock_event
   ptp_clock_index
   ptp_clock_register
   ptp_clock_unregister
+  read_cache_page
+  rfkill_set_sw_state
+  skb_pull_rcsum
+  skb_scrub_packet
   snd_pcm_kernel_ioctl
   snd_pcm_lib_default_mmap
   snd_pcm_rate_to_rate_bit
@@ -381,6 +423,10 @@
   snd_soc_of_get_slot_mask
   snd_soc_of_parse_audio_simple_widgets
   snd_soc_of_parse_tdm_slot
+  truncate_inode_pages_final
+  truncate_pagecache
+  truncate_setsize
+  unpin_user_pages
   v4l2_ctrl_subscribe_event
   v4l2_device_register_subdev
   v4l2_device_unregister_subdev
@@ -392,3 +438,25 @@
   v4l2_m2m_ioctl_expbuf
   v4l2_src_change_event_subscribe
   vb2_dma_contig_memops
+  vmalloc_to_pfn
+  vm_insert_page
+  vm_unmap_aliases
+  wireless_send_event
+  xdp_rxq_info_is_reg
+  xdp_rxq_info_unreg_mem_model
+  xp_alloc
+  xp_dma_map
+  xp_dma_sync_for_cpu_slow
+  xp_dma_sync_for_device_slow
+  xp_dma_unmap
+  xp_free
+  xp_raw_get_dma
+  xp_set_rxq_info
+  xsk_clear_rx_need_wakeup
+  xsk_get_pool_from_qid
+  xsk_set_rx_need_wakeup
+  xsk_set_tx_need_wakeup
+  xsk_tx_completed
+  xsk_tx_peek_desc
+  xsk_tx_release
+  xsk_uses_need_wakeup
