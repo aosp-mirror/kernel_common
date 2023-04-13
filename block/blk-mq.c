@@ -1876,6 +1876,8 @@ void blk_mq_request_bypass_insert(struct request *rq, bool at_head,
 {
 	struct blk_mq_hw_ctx *hctx = rq->mq_hctx;
 
+	WARN_ON_ONCE(rq->q->elevator && blk_rq_is_seq_zoned_write(rq));
+
 	spin_lock(&hctx->lock);
 	if (at_head)
 		list_add(&rq->queuelist, &hctx->dispatch);
