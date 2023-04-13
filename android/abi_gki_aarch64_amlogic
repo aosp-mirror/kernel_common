@@ -287,8 +287,17 @@
   _ctype
   current_time
   current_umask
+  __device_reset
   devm_alloc_etherdev_mqs
+  devm_clk_hw_register_clkdev
+  devm_of_pwm_get
+  devm_pwm_get
   __dev_get_by_name
+  dev_pm_opp_free_cpufreq_table
+  dev_pm_opp_get_opp_table
+  dev_pm_opp_init_cpufreq_table
+  dev_pm_opp_of_add_table_indexed
+  dev_pm_opp_put_opp_table
   drm_atomic_helper_async_commit
   drm_atomic_helper_commit_tail_rpm
   __drm_atomic_helper_connector_reset
@@ -312,6 +321,8 @@
   drm_self_refresh_helper_update_avg_times
   eth_header
   eth_header_parse
+  extcon_dev_register
+  extcon_set_state
   filemap_fdatawait_range
   filemap_fdatawrite
   filemap_fdatawrite_range
@@ -333,6 +344,7 @@
   genphy_update_link
   get_kernel_pages
   get_pfnblock_flags_mask
+  gpiod_get_index
   grab_cache_page_write_begin
   hdmi_avi_infoframe_init
   hdmi_drm_infoframe_init
@@ -342,10 +354,23 @@
   hdmi_vendor_infoframe_init
   hdmi_vendor_infoframe_pack
   high_memory
+  hwspin_lock_register
+  hwspin_lock_unregister
+  iio_buffer_init
+  iio_buffer_put
+  iio_device_attach_buffer
+  iio_get_time_ns
+  iio_push_to_buffers
   __ipv6_addr_type
   iwe_stream_add_event
   iwe_stream_add_point
   iwe_stream_add_value
+  led_trigger_blink_oneshot
+  led_trigger_event
+  led_trigger_register
+  led_trigger_register_simple
+  led_trigger_unregister
+  led_trigger_unregister_simple
   mdiobus_alloc_size
   mdiobus_free
   mdiobus_get_phy
@@ -354,6 +379,14 @@
   mdiobus_write
   mdio_device_create
   mdio_device_free
+  mmc_card_is_blockaddr
+  __mmc_claim_host
+  mmc_detect_change
+  mmc_release_host
+  mmc_set_data_timeout
+  mmc_switch
+  mmc_sw_reset
+  mmc_wait_for_req
   mod_node_page_state
   netdev_alert
   netdev_printk
@@ -363,6 +396,7 @@
   __of_mdiobus_register
   of_mdio_find_bus
   of_phy_is_fixed_link
+  of_reset_control_array_get
   pagecache_get_page
   pagecache_write_begin
   pagecache_write_end
@@ -407,8 +441,38 @@
   ptp_clock_index
   ptp_clock_register
   ptp_clock_unregister
+  pwm_adjust_config
+  pwm_apply_state
   read_cache_page
+  regulator_list_voltage
+  regulator_map_voltage_iterate
   rfkill_set_sw_state
+  rtc_add_group
+  sdio_align_size
+  sdio_claim_host
+  sdio_claim_irq
+  sdio_disable_func
+  sdio_enable_func
+  sdio_f0_readb
+  sdio_f0_writeb
+  sdio_get_host_pm_caps
+  sdio_readb
+  sdio_readl
+  sdio_readsb
+  sdio_readw
+  sdio_register_driver
+  sdio_release_host
+  sdio_release_irq
+  sdio_retune_crc_disable
+  sdio_retune_crc_enable
+  sdio_retune_hold_now
+  sdio_retune_release
+  sdio_set_host_pm_flags
+  sdio_unregister_driver
+  sdio_writeb
+  sdio_writel
+  sdio_writesb
+  sdio_writew
   skb_pull_rcsum
   skb_scrub_packet
   snd_pcm_kernel_ioctl
@@ -423,9 +487,16 @@
   snd_soc_of_get_slot_mask
   snd_soc_of_parse_audio_simple_widgets
   snd_soc_of_parse_tdm_slot
+  spi_alloc_device
+  spi_busnum_to_master
+  spi_mem_adjust_op_size
+  spi_mem_default_supports_op
+  spi_mem_supports_op
+  spi_new_device
   truncate_inode_pages_final
   truncate_pagecache
   truncate_setsize
+  uart_insert_char
   unpin_user_pages
   v4l2_ctrl_subscribe_event
   v4l2_device_register_subdev
