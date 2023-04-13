@@ -308,6 +308,13 @@
   drm_property_add_enum
   drm_property_destroy
   drm_self_refresh_helper_update_avg_times
+  genphy_aneg_done
+  genphy_read_status
+  genphy_restart_aneg
+  genphy_resume
+  genphy_soft_reset
+  genphy_suspend
+  genphy_update_link
   hdmi_avi_infoframe_init
   hdmi_drm_infoframe_init
   hdmi_drm_infoframe_pack
@@ -315,6 +322,53 @@
   hdmi_spd_infoframe_pack
   hdmi_vendor_infoframe_init
   hdmi_vendor_infoframe_pack
+  mdiobus_alloc_size
+  mdiobus_free
+  mdiobus_get_phy
+  mdiobus_read
+  mdiobus_unregister
+  mdiobus_write
+  mdio_device_create
+  mdio_device_free
+  netdev_alert
+  of_mdio_find_bus
+  __of_mdiobus_register
+  of_phy_is_fixed_link
+  phylink_connect_phy
+  phylink_create
+  phylink_destroy
+  phylink_disconnect_phy
+  phylink_ethtool_get_eee
+  phylink_ethtool_get_pauseparam
+  phylink_ethtool_get_wol
+  phylink_ethtool_ksettings_get
+  phylink_ethtool_ksettings_set
+  phylink_ethtool_nway_reset
+  phylink_ethtool_set_eee
+  phylink_ethtool_set_pauseparam
+  phylink_ethtool_set_wol
+  phylink_get_eee_err
+  phylink_mii_ioctl
+  phylink_of_phy_connect
+  phylink_resume
+  phylink_set_pcs
+  phylink_set_port_modes
+  phylink_speed_down
+  phylink_speed_up
+  phylink_start
+  phylink_stop
+  phylink_suspend
+  phy_attached_info
+  phy_drivers_register
+  phy_drivers_unregister
+  phy_error
+  phy_init_eee
+  phy_print_status
+  phy_trigger_machine
+  ptp_clock_event
+  ptp_clock_index
+  ptp_clock_register
+  ptp_clock_unregister
   snd_pcm_kernel_ioctl
   snd_pcm_lib_default_mmap
   snd_pcm_rate_to_rate_bit
