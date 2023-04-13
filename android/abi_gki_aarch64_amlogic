@@ -288,6 +288,7 @@
   current_time
   current_umask
   default_wake_function
+  dentry_path_raw
   des_expand_key
   device_get_phy_mode
   __device_reset
@@ -306,8 +307,10 @@
   dev_pm_opp_of_add_table_indexed
   dev_pm_opp_put_opp_table
   dev_pm_set_wake_irq
+  discard_new_inode
   dma_contiguous_default_area
   down_timeout
+  dput
   drm_atomic_helper_async_commit
   drm_atomic_helper_commit_tail_rpm
   __drm_atomic_helper_connector_reset
@@ -329,16 +332,27 @@
   drm_property_add_enum
   drm_property_destroy
   drm_self_refresh_helper_update_avg_times
+  drop_nlink
+  d_find_alias
+  d_instantiate
+  d_make_root
+  d_obtain_alias
+  d_splice_alias
+  end_buffer_read_sync
   eth_header
   eth_header_parse
   extcon_dev_register
   extcon_set_state
   fault_in_iov_iter_readable
+  fiemap_fill_next_extent
+  fiemap_prep
   filemap_fdatawait_range
   filemap_fdatawrite
   filemap_fdatawrite_range
   filemap_flush
   filemap_write_and_wait_range
+  file_remove_privs
+  file_update_time
   _find_last_bit
   flow_block_cb_setup_simple
   flow_rule_match_basic
@@ -346,6 +360,9 @@
   flow_rule_match_ports
   flow_rule_match_vlan
   flush_signals
+  fs_param_is_string
+  fs_param_is_u32
+  __fs_parse
   fwnode_device_is_available
   fwnode_graph_get_next_endpoint
   fwnode_graph_get_port_parent
@@ -355,8 +372,15 @@
   fwnode_handle_get
   fwnode_property_get_reference_args
   fwnode_property_read_u64_array
+  generic_block_bmap
+  generic_fh_to_dentry
+  generic_fh_to_parent
+  generic_file_fsync
   generic_file_mmap
   __generic_file_write_iter
+  generic_permission
+  generic_read_dir
+  generic_write_end
   genphy_aneg_done
   genphy_read_status
   genphy_restart_aneg
@@ -365,6 +389,7 @@
   genphy_suspend
   genphy_update_link
   gen_pool_virt_to_phys
+  __getblk_gfp
   get_device_system_crosststamp
   get_kernel_pages
   get_pfnblock_flags_mask
@@ -381,17 +406,32 @@
   high_memory
   hwspin_lock_register
   hwspin_lock_unregister
+  iget5_locked
+  iget_failed
+  ihold
   iio_buffer_init
   iio_buffer_put
   iio_device_attach_buffer
   iio_get_time_ns
   iio_push_to_buffers
+  ilookup
+  inc_nlink
+  init_special_inode
+  inode_dio_wait
+  inode_init_once
+  inode_init_owner
+  inode_needs_sync
+  inode_newsize_ok
+  inode_nohighmem
+  insert_inode_locked
+  invalidate_inode_buffers
   ioremap_cache
   iov_iter_init
   iov_iter_zero
   __ipv6_addr_type
   irq_create_fwspec_mapping
   irq_domain_free_irqs_parent
+  is_bad_inode
   iwe_stream_add_event
   iwe_stream_add_point
   iwe_stream_add_value
@@ -401,6 +441,7 @@
   __kfifo_in_r
   __kfifo_out_r
   __kfifo_to_user
+  kfree_link
   kill_pid
   led_trigger_blink_oneshot
   led_trigger_event
@@ -408,7 +449,14 @@
   led_trigger_register_simple
   led_trigger_unregister
   led_trigger_unregister_simple
+  ll_rw_block
+  load_nls
   lockref_get
+  __lock_buffer
+  logfc
+  make_bad_inode
+  mark_buffer_dirty
+  __mark_inode_dirty
   mdiobus_alloc_size
   mdiobus_free
   mdiobus_get_phy
@@ -426,9 +474,14 @@
   mmc_sw_reset
   mmc_wait_for_req
   mod_node_page_state
+  mpage_readahead
+  mpage_readpage
+  mpage_writepages
+  names_cachep
   netdev_alert
   netdev_printk
   netdev_rss_key_fill
+  new_inode
   next_arg
   nla_append
   noop_backing_dev_info
@@ -497,6 +550,7 @@
   rb_last
   read_cache_page
   read_sanitised_ftr_reg
+  register_filesystem
   register_module_notifier
   register_wide_hw_breakpoint
   regmap_irq_chip_get_base
@@ -530,6 +584,11 @@
   sdio_writel
   sdio_writesb
   sdio_writew
+  setattr_copy
+  setattr_prepare
+  set_bh_page
+  set_nlink
+  __set_page_dirty_buffers
   sg_copy_from_buffer
   sg_copy_to_buffer
   sg_nents
@@ -558,7 +617,11 @@
   spi_new_device
   stack_trace_print
   strchrnul
+  submit_bh
   symbol_put_addr
+  sync_dirty_buffer
+  sync_inode_metadata
+  sync_mapping_buffers
   __traceiter_android_vh_iommu_iovad_free_iova
   __traceiter_android_vh_sched_show_task
   __tracepoint_android_vh_iommu_iovad_free_iova
@@ -567,9 +630,14 @@
   truncate_pagecache
   truncate_setsize
   uart_insert_char
+  unlock_buffer
+  unlock_new_inode
   unpin_user_pages
+  unregister_filesystem
   unregister_module_notifier
   unregister_wide_hw_breakpoint
+  utf16s_to_utf8s
+  utf8_to_utf32
   uuid_null
   v4l2_ctrl_subscribe_event
   v4l2_device_register_subdev
@@ -585,7 +653,9 @@
   vmalloc_to_pfn
   vm_insert_page
   vm_unmap_aliases
+  __wait_on_buffer
   wireless_send_event
+  write_inode_now
   xdp_rxq_info_is_reg
   xdp_rxq_info_unreg_mem_model
   xp_alloc
