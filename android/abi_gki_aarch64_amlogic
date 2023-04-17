@@ -114,6 +114,7 @@
   cfg80211_calculate_bitrate
   cfg80211_chandef_create
   cfg80211_ch_switch_notify
+  cfg80211_ch_switch_started_notify
   cfg80211_connect_done
   cfg80211_del_sta_sinfo
   cfg80211_disconnected
