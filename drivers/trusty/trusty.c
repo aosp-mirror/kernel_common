@@ -20,6 +20,7 @@
 #include <linux/scatterlist.h>
 #include <linux/dma-mapping.h>
 
+#include "trusty-irq.h"
 #include "trusty-smc.h"
 #include "trusty-trace.h"
 #include "trusty-sched-share-api.h"
@@ -1208,13 +1209,21 @@ static int __init trusty_driver_init(void)
 {
 	int ret;
 
+	/*
+	 * Initialize trusty_irq_driver first since trusty_probe makes an
+	 * std-call at the end where interrupts might be needed.
+	 */
+	ret = trusty_irq_driver_init();
+	if (ret < 0)
+		return ret;
+
 	/* allocate dynamic cpuhp state slot */
 	ret = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN,
 				      "trusty:online",
 				      trusty_cpu_up,
 				      trusty_cpu_down);
 	if (ret < 0)
-		return ret;
+		goto err_cpuhp_setup;
 
 	trusty_cpuhp_slot = ret;
 
@@ -1227,6 +1236,8 @@ static int __init trusty_driver_init(void)
 err_driver_register:
 	cpuhp_remove_multi_state(trusty_cpuhp_slot);
 	trusty_cpuhp_slot = -1;
+err_cpuhp_setup:
+	trusty_irq_driver_exit();
 	return ret;
 }
 
@@ -1235,6 +1246,7 @@ static void __exit trusty_driver_exit(void)
 	platform_driver_unregister(&trusty_driver);
 	cpuhp_remove_multi_state(trusty_cpuhp_slot);
 	trusty_cpuhp_slot = -1;
+	trusty_irq_driver_exit();
 }
 
 subsys_initcall(trusty_driver_init);

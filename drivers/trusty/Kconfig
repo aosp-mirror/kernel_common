@@ -22,16 +22,17 @@ config TRUSTY
 if TRUSTY
 
 config TRUSTY_IRQ
-	tristate "Trusty IRQ support"
+	bool "Trusty IRQ support"
 	default y
 	help
-	  Enable forwarding of IRQs from Linux to Trusty.  This module retrieves
+	  Enable forwarding of IRQs from Linux to Trusty.  This driver retrieves
 	  from Trusty a list of IRQs that Trusty uses, and it registers handlers
 	  for them which notify Trusty that the IRQ has been received.
 
-	  If you build this as a module, it will be called trusty-irq.
+	  If you build the trusty core driver as a module, this will be part of the
+	  trusty-core module.
 
-	  Usually this is needed for Trusty to work, so say 'y' or 'm'.
+	  Usually this is needed for Trusty to work, so say 'y'.
 
 config TRUSTY_LOG
 	tristate "Trusty log support"
