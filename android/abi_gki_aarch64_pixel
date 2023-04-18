@@ -94,10 +94,10 @@
   blocking_notifier_call_chain
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
+  bpf_trace_run1
   bpf_trace_run10
   bpf_trace_run11
   bpf_trace_run12
-  bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
@@ -1101,8 +1101,8 @@
   irq_work_queue
   irq_work_sync
   is_vmalloc_addr
-  jiffies64_to_msecs
   jiffies
+  jiffies64_to_msecs
   jiffies_to_msecs
   jiffies_to_usecs
   kasan_flag_enabled
@@ -1231,8 +1231,8 @@
   memparse
   memremap
   mem_section
-  memset64
   memset
+  memset64
   __memset_io
   memstart_addr
   memunmap
@@ -1311,8 +1311,8 @@
   nla_find
   nla_memcpy
   __nla_parse
-  nla_put_64bit
   nla_put
+  nla_put_64bit
   nla_put_nohdr
   nla_reserve
   nla_strscpy
@@ -2068,12 +2068,14 @@
   trace_event_reg
   trace_handle_return
   __traceiter_android_rvh_arm64_serror_panic
+  __traceiter_android_rvh_attach_entity_load_avg
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpu_cgroup_online
   __traceiter_android_rvh_cpu_overutilized
   __traceiter_android_rvh_dequeue_task
   __traceiter_android_rvh_dequeue_task_fair
+  __traceiter_android_rvh_detach_entity_load_avg
   __traceiter_android_rvh_die_kernel_fault
   __traceiter_android_rvh_do_mem_abort
   __traceiter_android_rvh_do_ptrauth_fault
@@ -2090,6 +2092,7 @@
   __traceiter_android_rvh_post_init_entity_util_avg
   __traceiter_android_rvh_preempt_disable
   __traceiter_android_rvh_preempt_enable
+  __traceiter_android_rvh_remove_entity_load_avg
   __traceiter_android_rvh_rtmutex_prepare_setprio
   __traceiter_android_rvh_sched_fork
   __traceiter_android_rvh_sched_newidle_balance
@@ -2103,6 +2106,8 @@
   __traceiter_android_rvh_uclamp_eff_get
   __traceiter_android_rvh_ufs_complete_init
   __traceiter_android_rvh_ufs_reprogram_all_keys
+  __traceiter_android_rvh_update_blocked_fair
+  __traceiter_android_rvh_update_load_avg
   __traceiter_android_rvh_update_misfit_status
   __traceiter_android_rvh_update_rt_rq_load_avg
   __traceiter_android_rvh_util_est_update
@@ -2169,12 +2174,14 @@
   __traceiter_suspend_resume
   trace_output_call
   __tracepoint_android_rvh_arm64_serror_panic
+  __tracepoint_android_rvh_attach_entity_load_avg
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpu_cgroup_online
   __tracepoint_android_rvh_cpu_overutilized
   __tracepoint_android_rvh_dequeue_task
   __tracepoint_android_rvh_dequeue_task_fair
+  __tracepoint_android_rvh_detach_entity_load_avg
   __tracepoint_android_rvh_die_kernel_fault
   __tracepoint_android_rvh_do_mem_abort
   __tracepoint_android_rvh_do_ptrauth_fault
@@ -2191,6 +2198,7 @@
   __tracepoint_android_rvh_post_init_entity_util_avg
   __tracepoint_android_rvh_preempt_disable
   __tracepoint_android_rvh_preempt_enable
+  __tracepoint_android_rvh_remove_entity_load_avg
   __tracepoint_android_rvh_rtmutex_prepare_setprio
   __tracepoint_android_rvh_sched_fork
   __tracepoint_android_rvh_sched_newidle_balance
@@ -2204,6 +2212,8 @@
   __tracepoint_android_rvh_uclamp_eff_get
   __tracepoint_android_rvh_ufs_complete_init
   __tracepoint_android_rvh_ufs_reprogram_all_keys
+  __tracepoint_android_rvh_update_blocked_fair
+  __tracepoint_android_rvh_update_load_avg
   __tracepoint_android_rvh_update_misfit_status
   __tracepoint_android_rvh_update_rt_rq_load_avg
   __tracepoint_android_rvh_util_est_update
