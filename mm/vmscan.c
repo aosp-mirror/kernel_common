@@ -3547,7 +3547,10 @@ static int should_skip_vma(unsigned long start, unsigned long end, struct mm_wal
 	if (is_vm_hugetlb_page(vma))
 		return true;
 
-	if (vma->vm_flags & (VM_LOCKED | VM_SPECIAL | VM_SEQ_READ | VM_RAND_READ))
+	if (!vma_has_recency(vma))
+		return true;
+
+	if (vma->vm_flags & (VM_LOCKED | VM_SPECIAL))
 		return true;
 
 	if (vma == get_gate_vma(vma->vm_mm))
@@ -3791,7 +3794,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long next, struct vm_area
 			goto next;
 
 		if (!pmd_trans_huge(pmd[i])) {
-			if (IS_ENABLED(CONFIG_ARCH_HAS_NONLEAF_PMD_YOUNG) &&
+			if (arch_has_hw_nonleaf_pmd_young() &&
 			    get_cap(LRU_GEN_NONLEAF_YOUNG))
 				pmdp_test_and_clear_young(vma, addr, pmd + i);
 			goto next;
@@ -3889,14 +3892,14 @@ restart:
 #endif
 		walk->mm_stats[MM_NONLEAF_TOTAL]++;
 
-#ifdef CONFIG_ARCH_HAS_NONLEAF_PMD_YOUNG
-		if (get_cap(LRU_GEN_NONLEAF_YOUNG)) {
+		if (arch_has_hw_nonleaf_pmd_young() &&
+		    get_cap(LRU_GEN_NONLEAF_YOUNG)) {
 			if (!pmd_young(val))
 				continue;
 
 			walk_pmd_range_locked(pud, addr, vma, args, bitmap, &pos);
 		}
-#endif
+
 		if (!walk->force_scan && !test_bloom_filter(walk->lruvec, walk->max_seq, pmd + i))
 			continue;
 
@@ -4190,7 +4193,7 @@ static bool try_to_inc_max_seq(struct lruvec *lruvec, unsigned long max_seq,
 	 * handful of PTEs. Spreading the work out over a period of time usually
 	 * is less efficient, but it avoids bursty page faults.
 	 */
-	if (!force_scan && !(arch_has_hw_pte_young() && get_cap(LRU_GEN_MM_WALK))) {
+	if (!arch_has_hw_pte_young() || !get_cap(LRU_GEN_MM_WALK)) {
 		success = iterate_mm_list_nowalk(lruvec, max_seq);
 		goto done;
 	}
@@ -5370,7 +5373,7 @@ static ssize_t show_enabled(struct kobject *kobj, struct kobj_attribute *attr, c
 	if (arch_has_hw_pte_young() && get_cap(LRU_GEN_MM_WALK))
 		caps |= BIT(LRU_GEN_MM_WALK);
 
-	if (IS_ENABLED(CONFIG_ARCH_HAS_NONLEAF_PMD_YOUNG) && get_cap(LRU_GEN_NONLEAF_YOUNG))
+	if (arch_has_hw_nonleaf_pmd_young() && get_cap(LRU_GEN_NONLEAF_YOUNG))
 		caps |= BIT(LRU_GEN_NONLEAF_YOUNG);
 
 	return snprintf(buf, PAGE_SIZE, "0x%04x\n", caps);
