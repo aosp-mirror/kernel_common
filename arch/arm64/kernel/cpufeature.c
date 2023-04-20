@@ -1698,9 +1698,6 @@ bool cpu_has_amu_feat(int cpu)
 	return cpumask_test_cpu(cpu, &amu_cpus);
 }
 
-/* Initialize the use of AMU counters for frequency invariance */
-extern void init_cpu_freq_invariance_counters(void);
-
 static void cpu_amu_enable(struct arm64_cpu_capabilities const *cap)
 {
 	if (has_cpuid_feature(cap, SCOPE_LOCAL_CPU)) {
@@ -1710,7 +1707,7 @@ static void cpu_amu_enable(struct arm64_cpu_capabilities const *cap)
 
 		/* 0 reference values signal broken/disabled counters */
 		if (!this_cpu_has_cap(ARM64_WORKAROUND_2457168))
-			init_cpu_freq_invariance_counters();
+			update_freq_counters_refs();
 	}
 }
 
