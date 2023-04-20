@@ -1146,6 +1146,8 @@ patternProperties:
     description: Videostrong Technology Co., Ltd.
   "^virtio,.*":
     description: Virtual I/O Device Specification, developed by the OASIS consortium
+  "^virtual,.*":
+    description: Virtual Device.
   "^vishay,.*":
     description: Vishay Intertechnology, Inc
   "^vitesse,.*":
