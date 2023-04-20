@@ -176,8 +176,9 @@ TRACE_EVENT(trusty_ipc_read,
 TRACE_EVENT(trusty_ipc_read_end,
 	TP_PROTO(struct tipc_chan *chan,
 		int len_or_err,
-		struct tipc_msg_buf *rxbuf),
-	TP_ARGS(chan, len_or_err, rxbuf),
+		trusty_shared_mem_id_t buf_id,
+		size_t shm_cnt),
+	TP_ARGS(chan, len_or_err, buf_id, shm_cnt),
 	TP_STRUCT__entry(
 		__field(int, len_or_err)
 		__field(u32, chan)
@@ -189,8 +190,8 @@ TRACE_EVENT(trusty_ipc_read_end,
 		__entry->len_or_err = len_or_err;
 		__entry->chan = chan ? chan->local : ~0U;
 		memcpy(__entry->srv_name, chan ? chan->srv_name : "", MAX_SRV_NAME_LEN);
-		__entry->buf_id = rxbuf ? rxbuf->buf_id : ~0ULL;
-		__entry->shm_cnt = rxbuf ? rxbuf->shm_cnt : 0;
+		__entry->buf_id = buf_id;
+		__entry->shm_cnt = shm_cnt;
 	),
 	TP_printk("len_or_err=%d chan=%u srv_name=%s buf_id=0x%llx shm_cnt=%zu",
 		__entry->len_or_err, __entry->chan, __entry->srv_name,

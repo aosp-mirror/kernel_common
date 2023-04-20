@@ -1505,6 +1505,8 @@ static ssize_t tipc_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
 	ssize_t ret;
 	size_t len;
+	trusty_shared_mem_id_t buf_id = ~0ULL;
+	size_t shm_cnt = 0;
 	struct tipc_msg_buf *mb = NULL;
 	struct file *filp = iocb->ki_filp;
 	struct tipc_dn_chan *dn = filp->private_data;
@@ -1539,6 +1541,8 @@ static ssize_t tipc_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 	mb = list_first_entry(&dn->rx_msg_queue, struct tipc_msg_buf, node);
 
+	buf_id = mb->buf_id;
+	shm_cnt = mb->shm_cnt;
 	len = mb_avail_data(mb);
 	if (len > iov_iter_count(iter)) {
 		ret = -EMSGSIZE;
@@ -1555,7 +1559,7 @@ static ssize_t tipc_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	tipc_chan_put_rxbuf(dn->chan, mb);
 
 out:
-	trace_trusty_ipc_read_end(dn->chan, ret, mb);
+	trace_trusty_ipc_read_end(dn->chan, ret, buf_id, shm_cnt);
 	mutex_unlock(&dn->lock);
 	return ret;
 }
