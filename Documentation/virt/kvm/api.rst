@@ -6418,6 +6418,18 @@ regardless of what has actually been exposed through the CPUID leaf.
 This capability indicates that KVM supports getting the
 frequency of the current CPU that the vCPU thread is running on.
 
+8.41 KVM_CAP_UTIL_HINT
+----------------------
+
+:Architectures: arm64
+
+This capability indicates that the KVM supports taking utilization
+hints from the guest. Utilization is represented as a value from 0-1024
+where 1024 represents the highest performance point across all physical CPUs
+after normalizing for architecture. This is useful when guests are tracking
+workload on its vCPUs. Util hints allow the host to make more accurate
+frequency selections and task placement for vCPU threads.
+
 9. Known KVM API problems
 =========================
 

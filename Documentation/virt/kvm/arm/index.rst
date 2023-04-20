@@ -11,3 +11,4 @@ ARM
    psci
    pvtime
    get_cur_cpufreq
+   util_hint
