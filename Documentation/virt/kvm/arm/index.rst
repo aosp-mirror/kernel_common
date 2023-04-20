@@ -10,4 +10,3 @@ ARM
    hyp-abi
    psci
    pvtime
-   uclamp
