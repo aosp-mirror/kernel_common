@@ -10,3 +10,4 @@ ARM
    hyp-abi
    psci
    pvtime
+   get_cur_cpufreq
