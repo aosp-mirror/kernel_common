@@ -280,6 +280,8 @@
 };
 
 &gpu {
+	/* supply-names property is non-standard */
+	supply-names = "mali";
 	mali-supply = <&mt6315_7_vbuck1>;
 	status = "okay";
 };
