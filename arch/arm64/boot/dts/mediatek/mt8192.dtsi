@@ -1389,6 +1389,19 @@
 			operating-points-v2 = <&gpu_opp_table>;
 
 			status = "disabled";
+
+			power_model@0 {
+				compatible = "arm,mali-simple-power-model";
+				static-coefficient = <162868>;
+				dynamic-coefficient = <2649>;
+				ts = <(-199560) 37873 (-665) 9>;
+				thermal-zone = "soc_max";
+			};
+
+			power_model@1 {
+				compatible = "arm,mali-tnax-power-model";
+				scale = <5>;
+			};
 		};
 
 		mfgcfg: clock-controller@13fbf000 {
