@@ -5990,6 +5990,7 @@ void si_meminfo(struct sysinfo *val)
 	val->totalhigh = totalhigh_pages();
 	val->freehigh = nr_free_highpages();
 	val->mem_unit = PAGE_SIZE;
+	trace_android_vh_si_meminfo(val);
 }
 
 EXPORT_SYMBOL(si_meminfo);
