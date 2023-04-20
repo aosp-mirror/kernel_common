@@ -2134,6 +2134,7 @@
   __traceiter_android_vh_rmqueue
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
+  __traceiter_android_vh_si_meminfo
   __traceiter_android_vh_sysrq_crash
   __traceiter_android_vh_ufs_check_int_errors
   __traceiter_android_vh_ufs_compl_command
@@ -2237,6 +2238,7 @@
   __tracepoint_android_vh_rmqueue
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
+  __tracepoint_android_vh_si_meminfo
   __tracepoint_android_vh_sysrq_crash
   __tracepoint_android_vh_ufs_check_int_errors
   __tracepoint_android_vh_ufs_compl_command
