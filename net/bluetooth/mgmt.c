@@ -9260,18 +9260,21 @@ static int floss_get_sco_codec_capabilities(struct sock *sk,
 				total_size += sizeof(struct mgmt_bt_codec);
 			break;
 		case MGMT_SCO_CODEC_MSBC:
-			hci_dev_lock(hdev);
-			list_for_each_entry(c, &hdev->local_codecs, list) {
-				/* 0x01 - HCI Transport (Codec supported over BR/EDR SCO and eSCO)
-				 * 0x05 - mSBC Codec ID
-				 */
-				if (c->transport != 0x01 || c->id != 0x05)
-					continue;
+			if (wbs_supported) {
+				hci_dev_lock(hdev);
+				list_for_each_entry(c, &hdev->local_codecs, list) {
+					/* 0x01 - HCI Transport (Codec supported over
+					 *          BR/EDR SCO and eSCO)
+					 * 0x05 - mSBC Codec ID
+					 */
+					if (c->transport != 0x01 || c->id != 0x05)
+						continue;
 
-				total_size += sizeof(struct mgmt_bt_codec) + c->caps->len;
-				break;
+					total_size += sizeof(struct mgmt_bt_codec) + c->caps->len;
+					break;
+				}
+				hci_dev_unlock(hdev);
 			}
-			hci_dev_unlock(hdev);
 			break;
 		default:
 			bt_dev_dbg(hdev, "Unknown codec %d", cp->codecs[i]);
@@ -9305,28 +9308,31 @@ static int floss_get_sco_codec_capabilities(struct sock *sk,
 			}
 			break;
 		case MGMT_SCO_CODEC_MSBC:
-			hci_dev_lock(hdev);
-			list_for_each_entry(c, &hdev->local_codecs, list) {
-				if (c->transport != 0x01 || c->id != 0x05)
-					continue;
+			if (wbs_supported) {
+				hci_dev_lock(hdev);
+				list_for_each_entry(c, &hdev->local_codecs, list) {
+					if (c->transport != 0x01 || c->id != 0x05)
+						continue;
 
-				/* Need to read the support from the controller and then assign
-				 * to TRUE for now by default enable it as TRUE
-				 */
-				rp->offload_capable = true;
+					/* Need to read the support from the controller
+					 * and then assign to TRUE for now by default
+					 * enable it as TRUE
+					 */
+					rp->offload_capable = true;
 
-				if (hdev->get_data_path_id)
-					hdev->get_data_path_id(hdev, &rc->data_path);
+					if (hdev->get_data_path_id)
+						hdev->get_data_path_id(hdev, &rc->data_path);
 
-				rc->codec = cp->codecs[i];
-				rc->packet_size = c->len;
-				rc->data_length = c->caps->len;
-				memcpy(rc->data, c->caps, c->caps->len);
-				ptr += sizeof(struct mgmt_bt_codec) + c->caps->len;
-				num_rp_codecs++;
-				break;
+					rc->codec = cp->codecs[i];
+					rc->packet_size = c->len;
+					rc->data_length = c->caps->len;
+					memcpy(rc->data, c->caps, c->caps->len);
+					ptr += sizeof(struct mgmt_bt_codec) + c->caps->len;
+					num_rp_codecs++;
+					break;
+				}
+				hci_dev_unlock(hdev);
 			}
-			hci_dev_unlock(hdev);
 			break;
 		default:
 			break;
