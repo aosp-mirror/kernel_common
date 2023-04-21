@@ -933,6 +933,13 @@ struct mgmt_rp_get_vs_opcode {
 	__u16	opcode;
 } __packed;
 
+#define MGMT_OP_NOTIFY_SUSPEND_STATE	0x0103
+struct mgmt_cp_notify_suspend_state {
+	__u16 hci_id;
+	__u8 suspended;
+} __packed;
+#define MGMT_NOTIFY_SUSPEND_STATE_SIZE	0x3
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;

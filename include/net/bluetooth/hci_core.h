@@ -685,6 +685,7 @@ struct hci_dev {
 				     __u8 **vnd_data);
 	bool (*is_quality_report_evt)(struct sk_buff *skb);
 	bool (*pull_quality_report_data)(struct sk_buff *skb);
+	void (*do_wakeup)(struct hci_dev *hdev);
 
 	ANDROID_KABI_RESERVE(1);
 	ANDROID_KABI_RESERVE(2);

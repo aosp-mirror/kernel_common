@@ -9439,6 +9439,37 @@ static int floss_get_vs_opcode(struct sock *sk, struct hci_dev *hdev,
 	return err;
 }
 
+static int floss_notify_suspend_state(struct sock *sk, struct hci_dev *hdev, void *data, u16 len)
+{
+	struct mgmt_cp_notify_suspend_state *cp = data;
+	struct hci_dev *found_hdev;
+
+	bt_dev_dbg(hdev, "sock %p", sk);
+
+	found_hdev = floss_get_hdev(cp->hci_id);
+	if (found_hdev)
+		hdev = found_hdev;
+
+	// Make sure we have a valid hdev.
+	if (!hdev) {
+		BT_DBG("Cannot find hdev 0x%4.4x", cp->hci_id);
+		return mgmt_cmd_status(sk, 0, MGMT_OP_NOTIFY_SUSPEND_STATE,
+				       MGMT_STATUS_INVALID_INDEX);
+	}
+
+	if (cp->suspended != 0x00 && cp->suspended != 0x01)
+		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_NOTIFY_SUSPEND_STATE,
+				       MGMT_STATUS_INVALID_PARAMS);
+
+	hci_dev_lock(hdev);
+
+	hdev->suspended = cp->suspended;
+
+	hci_dev_unlock(hdev);
+
+	return 0;
+}
+
 static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ NULL }, /* 0x0000 (no command) */
 	{ read_version,            MGMT_READ_VERSION_SIZE,
@@ -9588,6 +9619,10 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 						HCI_MGMT_NO_HDEV |
 						HCI_MGMT_UNTRUSTED },
 	{ floss_get_vs_opcode,     MGMT_GET_VS_OPCODE_SIZE,
+						HCI_MGMT_NO_HDEV |
+						HCI_MGMT_UNTRUSTED },
+	{ floss_notify_suspend_state,
+				   MGMT_NOTIFY_SUSPEND_STATE_SIZE,
 						HCI_MGMT_NO_HDEV |
 						HCI_MGMT_UNTRUSTED },
 };

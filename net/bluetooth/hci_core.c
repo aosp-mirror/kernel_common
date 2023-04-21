@@ -4127,6 +4127,10 @@ static void hci_rx_work(struct work_struct *work)
 		 */
 		if (hci_dev_test_flag(hdev, HCI_USER_CHANNEL) &&
 		    !test_bit(HCI_INIT, &hdev->flags)) {
+			if (hdev->suspended) {
+				if (hdev->do_wakeup)
+					hdev->do_wakeup(hdev);
+			}
 			kfree_skb(skb);
 			continue;
 		}
