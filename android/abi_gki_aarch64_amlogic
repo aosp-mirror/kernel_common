@@ -383,7 +383,9 @@
   devm_kvasprintf
   devm_nvmem_cell_get
   devm_of_clk_add_hw_provider
+  devm_of_phy_get
   devm_of_pwm_get
+  devm_pci_alloc_host_bridge
   devm_pci_remap_cfg_resource
   devm_phy_get
   devm_pinctrl_get
@@ -783,6 +785,7 @@
   generic_file_splice_read
   __generic_file_write_iter
   generic_fillattr
+  generic_handle_irq
   generic_permission
   generic_read_dir
   generic_write_checks
@@ -856,6 +859,8 @@
   gpio_request
   gpio_to_desc
   grab_cache_page_write_begin
+  handle_fasteoi_irq
+  handle_simple_irq
   handle_sysrq
   hdmi_audio_infoframe_init
   hdmi_audio_infoframe_pack
@@ -973,14 +978,21 @@
   irq_chip_unmask_parent
   irq_create_fwspec_mapping
   irq_dispose_mapping
+  __irq_domain_add
   irq_domain_alloc_irqs_parent
   irq_domain_create_hierarchy
   irq_domain_free_irqs_parent
   irq_domain_get_irq_data
+  irq_domain_remove
   irq_domain_set_hwirq_and_chip
+  irq_domain_set_info
   irq_find_matching_fwspec
   irq_of_parse_and_map
+  __irq_resolve_mapping
   irq_set_affinity_hint
+  irq_set_chained_handler_and_data
+  __irq_set_handler
+  irq_set_handler_data
   irq_set_irq_wake
   irq_stat
   irq_to_desc
@@ -1311,6 +1323,8 @@
   page_endio
   __page_mapcount
   page_mapping
+  page_pinner_inited
+  __page_pinner_put_page
   page_pool_alloc_pages
   page_pool_create
   page_pool_destroy
@@ -1338,10 +1352,17 @@
   pci_generic_config_read
   pci_generic_config_write
   pci_get_device
+  pci_host_probe
   pci_lock_rescan_remove
+  pci_msi_create_irq_domain
+  pci_msi_enabled
+  pci_msi_mask_irq
+  pci_msi_unmask_irq
   pci_read_config_dword
+  pci_remove_root_bus
   pci_rescan_bus
   pci_stop_and_remove_bus_device_locked
+  pci_stop_root_bus
   pci_unlock_rescan_remove
   pci_write_config_dword
   PDE_DATA
@@ -1397,6 +1418,7 @@
   pin_user_pages_fast
   pin_user_pages_remote
   platform_device_add
+  platform_device_add_data
   platform_device_add_resources
   platform_device_alloc
   platform_device_del
@@ -1523,6 +1545,8 @@
   register_filesystem
   register_inet6addr_notifier
   register_inetaddr_notifier
+  register_kprobe
+  register_kretprobe
   register_module_notifier
   register_netdev
   register_netdevice
@@ -1574,6 +1598,7 @@
   reset_control_deassert
   reset_control_put
   reset_control_reset
+  return_address
   rfkill_alloc
   rfkill_blocked
   rfkill_destroy
@@ -1885,7 +1910,9 @@
   thermal_zone_get_zone_by_name
   thermal_zone_of_sensor_unregister
   time64_to_tm
+  timespec64_to_jiffies
   _totalram_pages
+  trace_clock_local
   trace_event_buffer_commit
   trace_event_buffer_reserve
   trace_event_ignore_this_pid
@@ -1898,6 +1925,7 @@
   __traceiter_android_rvh_gic_v3_set_affinity
   __traceiter_android_rvh_place_entity
   __traceiter_android_rvh_replace_next_task_fair
+  __traceiter_android_rvh_schedule
   __traceiter_android_rvh_select_task_rq_rt
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
@@ -1918,6 +1946,7 @@
   __tracepoint_android_rvh_gic_v3_set_affinity
   __tracepoint_android_rvh_place_entity
   __tracepoint_android_rvh_replace_next_task_fair
+  __tracepoint_android_rvh_schedule
   __tracepoint_android_rvh_select_task_rq_rt
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
