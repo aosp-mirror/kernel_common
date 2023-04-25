@@ -565,6 +565,7 @@
   driver_register
   driver_remove_file
   driver_unregister
+  drm_add_edid_modes
   drm_add_modes_noedid
   drm_atomic_add_affected_connectors
   drm_atomic_add_affected_planes
@@ -590,7 +591,10 @@
   drm_atomic_helper_commit_planes
   drm_atomic_helper_commit_tail
   __drm_atomic_helper_connector_destroy_state
+  drm_atomic_helper_connector_destroy_state
   __drm_atomic_helper_connector_duplicate_state
+  drm_atomic_helper_connector_duplicate_state
+  drm_atomic_helper_connector_reset
   __drm_atomic_helper_crtc_destroy_state
   __drm_atomic_helper_crtc_duplicate_state
   __drm_atomic_helper_crtc_reset
@@ -634,6 +638,7 @@
   drm_connector_list_iter_next
   drm_connector_register
   drm_connector_unregister
+  drm_connector_update_edid_property
   drm_crtc_arm_vblank_event
   drm_crtc_cleanup
   __drm_crtc_commit_free
@@ -653,7 +658,21 @@
   drm_dev_register
   drm_dev_unregister
   drm_display_mode_to_videomode
+  drm_do_get_edid
+  drm_dp_aux_init
+  drm_dp_bw_code_to_link_rate
+  drm_dp_channel_eq_ok
+  drm_dp_clock_recovery_ok
+  drm_dp_dpcd_read
+  drm_dp_dpcd_read_link_status
+  drm_dp_dpcd_write
+  drm_dp_get_adjust_request_pre_emphasis
+  drm_dp_get_adjust_request_voltage
+  drm_dp_link_rate_to_bw_code
+  drm_dp_read_sink_count
   drm_dsc_pps_payload_pack
+  drm_edid_get_monitor_name
+  drm_edid_to_sad
   drm_encoder_cleanup
   drm_encoder_init
   __drm_err
@@ -682,10 +701,13 @@
   drm_kms_helper_hotplug_event
   drm_kms_helper_poll_fini
   drm_kms_helper_poll_init
+  drm_match_cea_mode
   drmm_kmalloc
   drmm_mode_config_init
   drm_mode_config_reset
   drm_mode_convert_to_umode
+  drm_mode_copy
+  drm_mode_destroy
   drm_mode_duplicate
   drm_mode_equal
   drm_mode_equal_no_clocks
@@ -2157,6 +2179,7 @@
   __traceiter_cpu_frequency
   __traceiter_device_pm_callback_end
   __traceiter_device_pm_callback_start
+  __traceiter_dwc3_readl
   __traceiter_gpu_mem_total
   __traceiter_irq_handler_entry
   __traceiter_irq_handler_exit
@@ -2266,6 +2289,7 @@
   __tracepoint_cpu_frequency
   __tracepoint_device_pm_callback_end
   __tracepoint_device_pm_callback_start
+  __tracepoint_dwc3_readl
   __tracepoint_gpu_mem_total
   __tracepoint_irq_handler_entry
   __tracepoint_irq_handler_exit
