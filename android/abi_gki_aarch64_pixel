@@ -38,6 +38,7 @@
   arm64_const_caps_ready
   arm64_use_ng_mappings
   __arm_smccc_smc
+  __arm_smccc_sve_check
   async_schedule_node_domain
   async_synchronize_full_domain
   atomic_notifier_call_chain
@@ -94,10 +95,10 @@
   blocking_notifier_call_chain
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
-  bpf_trace_run1
   bpf_trace_run10
   bpf_trace_run11
   bpf_trace_run12
+  bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
@@ -1101,8 +1102,8 @@
   irq_work_queue
   irq_work_sync
   is_vmalloc_addr
-  jiffies
   jiffies64_to_msecs
+  jiffies
   jiffies_to_msecs
   jiffies_to_usecs
   kasan_flag_enabled
@@ -1231,8 +1232,8 @@
   memparse
   memremap
   mem_section
-  memset
   memset64
+  memset
   __memset_io
   memstart_addr
   memunmap
@@ -1311,8 +1312,8 @@
   nla_find
   nla_memcpy
   __nla_parse
-  nla_put
   nla_put_64bit
+  nla_put
   nla_put_nohdr
   nla_reserve
   nla_strscpy
@@ -1707,7 +1708,9 @@
   __request_percpu_irq
   __request_region
   request_threaded_irq
+  resched_curr
   return_address
+  reweight_task
   rfkill_alloc
   rfkill_blocked
   rfkill_destroy
@@ -2092,6 +2095,7 @@
   __traceiter_android_rvh_post_init_entity_util_avg
   __traceiter_android_rvh_preempt_disable
   __traceiter_android_rvh_preempt_enable
+  __traceiter_android_rvh_prepare_prio_fork
   __traceiter_android_rvh_remove_entity_load_avg
   __traceiter_android_rvh_rtmutex_prepare_setprio
   __traceiter_android_rvh_sched_fork
@@ -2100,7 +2104,9 @@
   __traceiter_android_rvh_select_task_rq_rt
   __traceiter_android_rvh_set_cpus_allowed_by_task
   __traceiter_android_rvh_set_iowait
+  __traceiter_android_rvh_setscheduler
   __traceiter_android_rvh_set_task_cpu
+  __traceiter_android_rvh_set_user_nice
   __traceiter_android_rvh_show_max_freq
   __traceiter_android_rvh_typec_tcpci_get_vbus
   __traceiter_android_rvh_uclamp_eff_get
@@ -2129,9 +2135,9 @@
   __traceiter_android_vh_pagecache_get_page
   __traceiter_android_vh_resume_end
   __traceiter_android_vh_rmqueue
-  __traceiter_android_vh_sched_setaffinity_early
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
+  __traceiter_android_vh_si_meminfo
   __traceiter_android_vh_sysrq_crash
   __traceiter_android_vh_typec_store_partner_src_caps
   __traceiter_android_vh_typec_tcpci_override_toggling
@@ -2198,6 +2204,7 @@
   __tracepoint_android_rvh_post_init_entity_util_avg
   __tracepoint_android_rvh_preempt_disable
   __tracepoint_android_rvh_preempt_enable
+  __tracepoint_android_rvh_prepare_prio_fork
   __tracepoint_android_rvh_remove_entity_load_avg
   __tracepoint_android_rvh_rtmutex_prepare_setprio
   __tracepoint_android_rvh_sched_fork
@@ -2206,7 +2213,9 @@
   __tracepoint_android_rvh_select_task_rq_rt
   __tracepoint_android_rvh_set_cpus_allowed_by_task
   __tracepoint_android_rvh_set_iowait
+  __tracepoint_android_rvh_setscheduler
   __tracepoint_android_rvh_set_task_cpu
+  __tracepoint_android_rvh_set_user_nice
   __tracepoint_android_rvh_show_max_freq
   __tracepoint_android_rvh_typec_tcpci_get_vbus
   __tracepoint_android_rvh_uclamp_eff_get
@@ -2235,9 +2244,9 @@
   __tracepoint_android_vh_pagecache_get_page
   __tracepoint_android_vh_resume_end
   __tracepoint_android_vh_rmqueue
-  __tracepoint_android_vh_sched_setaffinity_early
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
+  __tracepoint_android_vh_si_meminfo
   __tracepoint_android_vh_sysrq_crash
   __tracepoint_android_vh_typec_store_partner_src_caps
   __tracepoint_android_vh_typec_tcpci_override_toggling

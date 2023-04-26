@@ -20,6 +20,7 @@
   get_option
   get_random_u64
   get_slabinfo
+  get_wchan
   gpiod_to_chip
   I_BDEV
   iio_channel_get
@@ -107,6 +108,7 @@
   __traceiter_android_vh_cpufreq_target
   __traceiter_android_vh_do_send_sig_info
   __traceiter_android_vh_drain_all_pages_bypass
+  __traceiter_android_vh_exit_signal
   __traceiter_android_vh_free_task
   __traceiter_android_vh_irqtime_account_process_tick
   __traceiter_android_vh_mem_cgroup_alloc
@@ -122,6 +124,11 @@
   __traceiter_android_vh_shrink_slab_bypass
   __traceiter_android_vh_sync_txn_recvd
   __traceiter_cpu_frequency_limits
+  __traceiter_sched_stat_blocked
+  __traceiter_sched_stat_iowait
+  __traceiter_sched_stat_sleep
+  __traceiter_sched_stat_wait
+  __traceiter_sched_waking
   __tracepoint_android_rvh_check_preempt_tick
   __tracepoint_android_rvh_dequeue_entity
   __tracepoint_android_rvh_enqueue_entity
@@ -146,6 +153,7 @@
   __tracepoint_android_vh_cpufreq_target
   __tracepoint_android_vh_do_send_sig_info
   __tracepoint_android_vh_drain_all_pages_bypass
+  __tracepoint_android_vh_exit_signal
   __tracepoint_android_vh_free_task
   __tracepoint_android_vh_irqtime_account_process_tick
   __tracepoint_android_vh_mem_cgroup_alloc
@@ -162,6 +170,11 @@
   __tracepoint_android_vh_sync_txn_recvd
   __tracepoint_cpu_frequency_limits
   __trace_puts
+  __tracepoint_sched_stat_blocked
+  __tracepoint_sched_stat_iowait
+  __tracepoint_sched_stat_sleep
+  __tracepoint_sched_stat_wait
+  __tracepoint_sched_waking
   try_to_free_mem_cgroup_pages
   unregister_kprobe
   unregister_kretprobe
@@ -174,4 +187,4 @@
   wait_for_completion_io_timeout
   wait_for_completion_killable_timeout
   wakeup_source_remove
-
+  wq_worker_comm
