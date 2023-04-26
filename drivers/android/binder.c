@@ -665,12 +665,21 @@ static void set_binder_prio_uclamp(struct binder_priority *prio, struct task_str
 		return;
 
 	if (task) {
-		prio->uclamp[UCLAMP_MIN] = uclamp_eff_value(task, UCLAMP_MIN);
-		prio->uclamp[UCLAMP_MAX] = uclamp_eff_value(task, UCLAMP_MAX);
+		prio->uclamp[UCLAMP_MIN] = task->uclamp_req[UCLAMP_MIN].value;
+		prio->uclamp[UCLAMP_MAX] = task->uclamp_req[UCLAMP_MAX].value;
 	} else {
 		prio->uclamp[UCLAMP_MIN] = 0;
 		prio->uclamp[UCLAMP_MAX] = SCHED_CAPACITY_SCALE;
 	}
+}
+
+static void set_inherited_uclamp(struct binder_transaction *t)
+{
+	if (!uclamp_is_used())
+		return;
+
+	t->priority.uclamp[UCLAMP_MIN] = uclamp_eff_value(current, UCLAMP_MIN);
+	t->priority.uclamp[UCLAMP_MAX] = uclamp_eff_value(current, UCLAMP_MAX);
 }
 
 static bool is_uclamp_equal(struct task_struct *task, const struct binder_priority *desired)
@@ -684,6 +693,7 @@ static bool is_uclamp_equal(struct task_struct *task, const struct binder_priori
 
 #else
 static void set_binder_prio_uclamp(struct binder_priority *prio, struct task_struct *task) { }
+static void set_inherited_uclamp(struct binder_transaction *t) { }
 static bool is_uclamp_equal(struct task_struct *task, const struct binder_priority *desired)
 {
 	return true;
@@ -3355,7 +3365,7 @@ static void binder_transaction(struct binder_proc *proc,
 	}
 
 	if (!(t->flags & TF_ONE_WAY))
-		set_binder_prio_uclamp(&t->priority, current);
+		set_inherited_uclamp(t);
 
 	if (target_node && target_node->txn_security_ctx) {
 		u32 secid;
