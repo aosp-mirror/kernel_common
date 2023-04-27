@@ -2788,6 +2788,7 @@
 
 # required by wcn_bsp.ko
   gpiod_set_value
+  in_aton
   memdup_user
   pci_disable_device
   pci_disable_msi
