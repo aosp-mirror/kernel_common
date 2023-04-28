@@ -241,14 +241,14 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 	 * If the lower filesystem says the entry is invalid, FUSE probably shouldn't
 	 * try to fix that without going through the normal lookup path...
 	 */
-	else if (get_fuse_dentry(entry)->backing_path.dentry) {
+	if (get_fuse_dentry(entry)->backing_path.dentry) {
 		ret = fuse_revalidate_backing(entry, flags);
 		if (ret <= 0) {
 			goto out;
 		}
 	}
 #endif
-	else if (time_before64(fuse_dentry_time(entry), get_jiffies_64()) ||
+	if (time_before64(fuse_dentry_time(entry), get_jiffies_64()) ||
 		 (flags & (LOOKUP_EXCL | LOOKUP_REVAL))) {
 		struct fuse_entry_out outarg;
 		struct fuse_entry_bpf bpf_arg;
