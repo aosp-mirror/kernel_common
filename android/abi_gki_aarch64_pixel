@@ -95,10 +95,10 @@
   blocking_notifier_call_chain
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
-  bpf_trace_run1
   bpf_trace_run10
   bpf_trace_run11
   bpf_trace_run12
+  bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
@@ -1125,8 +1125,8 @@
   irq_work_queue
   irq_work_sync
   is_vmalloc_addr
-  jiffies
   jiffies64_to_msecs
+  jiffies
   jiffies_to_msecs
   jiffies_to_usecs
   kasan_flag_enabled
@@ -1255,8 +1255,8 @@
   memparse
   memremap
   mem_section
-  memset
   memset64
+  memset
   __memset_io
   memstart_addr
   memunmap
@@ -1335,8 +1335,8 @@
   nla_find
   nla_memcpy
   __nla_parse
-  nla_put
   nla_put_64bit
+  nla_put
   nla_put_nohdr
   nla_reserve
   nla_strscpy
@@ -2129,6 +2129,7 @@
   __traceiter_android_rvh_set_task_cpu
   __traceiter_android_rvh_set_user_nice
   __traceiter_android_rvh_show_max_freq
+  __traceiter_android_rvh_typec_tcpci_get_vbus
   __traceiter_android_rvh_uclamp_eff_get
   __traceiter_android_rvh_ufs_complete_init
   __traceiter_android_rvh_ufs_reprogram_all_keys
@@ -2159,6 +2160,11 @@
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_si_meminfo
   __traceiter_android_vh_sysrq_crash
+  __traceiter_android_vh_typec_store_partner_src_caps
+  __traceiter_android_vh_typec_tcpci_override_toggling
+  __traceiter_android_vh_typec_tcpm_get_timer
+  __traceiter_android_vh_typec_tcpm_log
+  __traceiter_android_vh_typec_tcpm_modify_src_caps
   __traceiter_android_vh_ufs_check_int_errors
   __traceiter_android_vh_ufs_compl_command
   __traceiter_android_vh_ufs_fill_prdt
@@ -2234,6 +2240,7 @@
   __tracepoint_android_rvh_set_task_cpu
   __tracepoint_android_rvh_set_user_nice
   __tracepoint_android_rvh_show_max_freq
+  __tracepoint_android_rvh_typec_tcpci_get_vbus
   __tracepoint_android_rvh_uclamp_eff_get
   __tracepoint_android_rvh_ufs_complete_init
   __tracepoint_android_rvh_ufs_reprogram_all_keys
@@ -2264,6 +2271,11 @@
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_si_meminfo
   __tracepoint_android_vh_sysrq_crash
+  __tracepoint_android_vh_typec_store_partner_src_caps
+  __tracepoint_android_vh_typec_tcpci_override_toggling
+  __tracepoint_android_vh_typec_tcpm_get_timer
+  __tracepoint_android_vh_typec_tcpm_log
+  __tracepoint_android_vh_typec_tcpm_modify_src_caps
   __tracepoint_android_vh_ufs_check_int_errors
   __tracepoint_android_vh_ufs_compl_command
   __tracepoint_android_vh_ufs_fill_prdt
