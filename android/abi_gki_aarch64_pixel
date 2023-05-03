@@ -95,10 +95,10 @@
   blocking_notifier_call_chain
   blocking_notifier_chain_register
   blocking_notifier_chain_unregister
+  bpf_trace_run1
   bpf_trace_run10
   bpf_trace_run11
   bpf_trace_run12
-  bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
@@ -309,6 +309,7 @@
   debugfs_create_bool
   debugfs_create_dir
   debugfs_create_file
+  debugfs_create_file_unsafe
   debugfs_create_size_t
   debugfs_create_symlink
   debugfs_create_u16
@@ -1126,8 +1127,8 @@
   irq_work_queue
   irq_work_sync
   is_vmalloc_addr
-  jiffies64_to_msecs
   jiffies
+  jiffies64_to_msecs
   jiffies_to_msecs
   jiffies_to_usecs
   kasan_flag_enabled
@@ -1256,8 +1257,8 @@
   memparse
   memremap
   mem_section
-  memset64
   memset
+  memset64
   __memset_io
   memstart_addr
   memunmap
@@ -1336,8 +1337,8 @@
   nla_find
   nla_memcpy
   __nla_parse
-  nla_put_64bit
   nla_put
+  nla_put_64bit
   nla_put_nohdr
   nla_reserve
   nla_strscpy
@@ -1989,6 +1990,7 @@
   strlen
   strncasecmp
   strncat
+  strnchr
   strncmp
   strncpy
   strncpy_from_user
