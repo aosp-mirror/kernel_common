@@ -122,6 +122,10 @@
   __traceiter_android_vh_mutex_wait_finish
   __traceiter_android_vh_mutex_wait_start
   __traceiter_android_vh_page_referenced_check_bypass
+  __traceiter_android_vh_record_mutex_lock_starttime
+  __traceiter_android_vh_record_pcpu_rwsem_starttime
+  __traceiter_android_vh_record_rtmutex_lock_starttime
+  __traceiter_android_vh_record_rwsem_lock_starttime
   __traceiter_android_vh_rwsem_wake
   __traceiter_android_vh_sched_stat_runtime_rt
   __traceiter_android_vh_shrink_slab_bypass
@@ -170,6 +174,10 @@
   __tracepoint_android_vh_mutex_wait_finish
   __tracepoint_android_vh_mutex_wait_start
   __tracepoint_android_vh_page_referenced_check_bypass
+  __tracepoint_android_vh_record_mutex_lock_starttime
+  __tracepoint_android_vh_record_pcpu_rwsem_starttime
+  __tracepoint_android_vh_record_rtmutex_lock_starttime
+  __tracepoint_android_vh_record_rwsem_lock_starttime
   __tracepoint_android_vh_rwsem_wake
   __tracepoint_android_vh_sched_stat_runtime_rt
   __tracepoint_android_vh_shrink_slab_bypass
