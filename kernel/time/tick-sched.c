@@ -1384,6 +1384,8 @@ static void tick_nohz_handler(struct clock_event_device *dev)
 	tick_sched_do_timer(ts, now);
 	tick_sched_handle(ts, regs);
 
+	ts->last_tick = now;
+
 	if (unlikely(ts->tick_stopped)) {
 		/*
 		 * The clockevent device is not reprogrammed, so change the
@@ -1394,6 +1396,7 @@ static void tick_nohz_handler(struct clock_event_device *dev)
 		return;
 	}
 
+	hrtimer_set_expires(&ts->sched_timer, ts->last_tick);
 	hrtimer_forward(&ts->sched_timer, now, TICK_NSEC);
 	tick_program_event(hrtimer_get_expires(&ts->sched_timer), 1);
 }
