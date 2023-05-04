@@ -2027,12 +2027,14 @@
   usb_add_phy_dev
   usb_create_hcd
   usb_del_gadget_udc
+  usb_disable_autosuspend
   usb_ep_set_maxpacket_limit
   usb_gadget_probe_driver
   usb_gadget_unregister_driver
   usb_hcd_check_unlink_urb
   usb_hcd_giveback_urb
   usb_hcd_resume_root_hub
+  usb_interrupt_msg
   usb_put_hcd
   usb_remove_hcd
   __usecs_to_jiffies

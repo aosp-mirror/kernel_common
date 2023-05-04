@@ -10,7 +10,9 @@ FRAGMENT_CONFIG=${KERNEL_DIR}/arch/arm64/configs/rockpi4_gki.fragment
 PRE_DEFCONFIG_CMDS="KCONFIG_CONFIG=${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/${DEFCONFIG} ${ROOT_DIR}/${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -r ${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/gki_defconfig ${ROOT_DIR}/${FRAGMENT_CONFIG}"
 POST_DEFCONFIG_CMDS="rm ${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/${DEFCONFIG}"
 
-MAKE_GOALS="${MAKE_GOALS}
+MAKE_GOALS="
+Image
+modules
 rockchip/rk3399-rock-pi-4b.dtb
 "
 

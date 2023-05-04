@@ -4,7 +4,6 @@
 #define TRACE_INCLUDE_PATH trace/hooks
 #if !defined(_TRACE_HOOK_TYPEC_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_TYPEC_H
-#include <linux/usb/pd.h>
 #include <trace/hooks/vendor_hooks.h>
 /*
  * Following tracepoints are not exported in tracefs and provide a
@@ -44,13 +43,17 @@ DECLARE_HOOK(android_vh_typec_tcpm_get_timer,
 	TP_ARGS(state, timer, msecs));
 
 DECLARE_HOOK(android_vh_typec_store_partner_src_caps,
-	TP_PROTO(struct tcpm_port *port, unsigned int *nr_source_caps,
-		 u32 (*source_caps)[PDO_MAX_OBJECTS]),
-	TP_ARGS(port, nr_source_caps, source_caps));
+	TP_PROTO(unsigned int *nr_source_caps, u32 (*source_caps)[]),
+	TP_ARGS(nr_source_caps, source_caps));
+
+DECLARE_HOOK(android_vh_typec_tcpm_modify_src_caps,
+	TP_PROTO(unsigned int *nr_src_pdo, u32 (*src_pdo)[], bool *modified),
+	TP_ARGS(nr_src_pdo, src_pdo, modified));
 
 DECLARE_HOOK(android_vh_typec_tcpm_log,
 	TP_PROTO(const char *log, bool *bypass),
 	TP_ARGS(log, bypass));
-#endif /* _TRACE_HOOK_UFSHCD_H */
+
+#endif /* _TRACE_HOOK_TYPEC_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>

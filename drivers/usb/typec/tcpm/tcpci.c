@@ -180,13 +180,14 @@ static int tcpci_start_toggling(struct tcpc_dev *tcpc,
 	int ret;
 	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
 	unsigned int reg = TCPC_ROLE_CTRL_DRP;
-	int override_toggling = 0;
 
 	if (port_type != TYPEC_PORT_DRP)
 		return -EOPNOTSUPP;
 
 	/* Handle vendor drp toggling */
 	if (tcpci->data->start_drp_toggling) {
+		int override_toggling = 0;
+
 		trace_android_vh_typec_tcpci_override_toggling(tcpci, tcpci->data,
 							       &override_toggling);
 		ret = tcpci->data->start_drp_toggling(tcpci, tcpci->data, cc);

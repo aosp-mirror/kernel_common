@@ -483,6 +483,7 @@
   __devres_alloc_node
   devres_free
   dev_set_name
+  dev_vprintk_emit
   _dev_warn
   disable_irq
   disable_irq_nosync
@@ -508,6 +509,7 @@
   dmabuf_page_pool_create
   dmabuf_page_pool_destroy
   dmabuf_page_pool_free
+  dmabuf_page_pool_get_size
   dma_buf_put
   dma_buf_unmap_attachment
   dma_buf_vmap
@@ -2165,6 +2167,7 @@
   __traceiter_android_vh_typec_tcpci_override_toggling
   __traceiter_android_vh_typec_tcpm_get_timer
   __traceiter_android_vh_typec_tcpm_log
+  __traceiter_android_vh_typec_tcpm_modify_src_caps
   __traceiter_android_vh_ufs_check_int_errors
   __traceiter_android_vh_ufs_compl_command
   __traceiter_android_vh_ufs_fill_prdt
@@ -2275,6 +2278,7 @@
   __tracepoint_android_vh_typec_tcpci_override_toggling
   __tracepoint_android_vh_typec_tcpm_get_timer
   __tracepoint_android_vh_typec_tcpm_log
+  __tracepoint_android_vh_typec_tcpm_modify_src_caps
   __tracepoint_android_vh_ufs_check_int_errors
   __tracepoint_android_vh_ufs_compl_command
   __tracepoint_android_vh_ufs_fill_prdt

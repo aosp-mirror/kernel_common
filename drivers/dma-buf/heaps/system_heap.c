@@ -493,16 +493,13 @@ static struct dma_buf *system_heap_allocate(struct dma_heap *heap,
 static long system_get_pool_size(struct dma_heap *heap)
 {
 	int i;
-	long num_pages = 0;
-	struct dmabuf_page_pool **pool;
+	unsigned long num_bytes = 0;
+	struct dmabuf_page_pool **pool = pools;
 
-	pool = pools;
-	for (i = 0; i < NUM_ORDERS; i++, pool++) {
-		num_pages += ((*pool)->count[POOL_LOWPAGE] +
-			      (*pool)->count[POOL_HIGHPAGE]) << (*pool)->order;
-	}
+	for (i = 0; i < NUM_ORDERS; i++, pool++)
+		num_bytes += dmabuf_page_pool_get_size(*pool);
 
-	return num_pages << PAGE_SHIFT;
+	return num_bytes;
 }
 
 static const struct dma_heap_ops system_heap_ops = {
