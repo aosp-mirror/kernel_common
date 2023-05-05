@@ -1447,6 +1447,7 @@
   panic
   panic_notifier_list
   param_array_ops
+  param_get_int
   param_ops_bool
   param_ops_byte
   param_ops_charp
