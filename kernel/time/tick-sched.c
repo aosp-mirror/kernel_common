@@ -955,8 +955,17 @@ static void tick_nohz_stop_tick(struct tick_sched *ts, int cpu)
 		hrtimer_start(&ts->sched_timer, tick,
 			      HRTIMER_MODE_ABS_PINNED_HARD);
 	} else {
-		hrtimer_set_expires(&ts->sched_timer, tick);
-		tick_program_event(tick, 1);
+		/*
+		 * hrtimer_set_expires() may have previously set the expiry
+		 * well into the future, however an unrelated wakeup + timer
+		 * queuing means now the hrtimer needs to be backtracked, or
+		 * we'll just miss events. Back track it to last_tick, and
+		 * then use hrtimer_forward to forward it past 'tick'.
+		 */
+		hrtimer_set_expires(&ts->sched_timer, ts->last_tick);
+		hrtimer_forward(&ts->sched_timer, tick, TICK_NSEC);
+		ts->next_tick = hrtimer_get_expires(&ts->sched_timer);
+		tick_program_event(ts->next_tick, 1);
 	}
 }
 
