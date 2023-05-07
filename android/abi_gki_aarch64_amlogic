@@ -108,37 +108,6 @@
   cdev_init
   cec_notifier_set_phys_addr
   cec_notifier_set_phys_addr_from_edid
-  __cfg80211_alloc_event_skb
-  __cfg80211_alloc_reply_skb
-  cfg80211_assoc_failure
-  cfg80211_calculate_bitrate
-  cfg80211_chandef_create
-  cfg80211_ch_switch_notify
-  cfg80211_ch_switch_started_notify
-  cfg80211_connect_done
-  cfg80211_del_sta_sinfo
-  cfg80211_disconnected
-  cfg80211_ft_event
-  cfg80211_get_bss
-  cfg80211_gtk_rekey_notify
-  cfg80211_ibss_joined
-  cfg80211_inform_bss_frame_data
-  cfg80211_mgmt_tx_status_ext
-  cfg80211_michael_mic_failure
-  cfg80211_new_sta
-  cfg80211_pmksa_candidate_notify
-  cfg80211_put_bss
-  cfg80211_ready_on_channel
-  cfg80211_remain_on_channel_expired
-  cfg80211_roamed
-  cfg80211_rx_mgmt_ext
-  cfg80211_rx_unprot_mlme_mgmt
-  cfg80211_scan_done
-  cfg80211_sched_scan_results
-  __cfg80211_send_event_skb
-  cfg80211_tdls_oper_request
-  cfg80211_unlink_bss
-  cfg80211_vendor_cmd_reply
   __cfi_slowpath_diag
   __check_object_size
   __class_create
@@ -916,10 +885,6 @@
   idr_get_next
   idr_remove
   idr_replace
-  ieee80211_channel_to_freq_khz
-  ieee80211_freq_khz_to_channel
-  ieee80211_get_channel_khz
-  ieee80211_hdrlen
   iget5_locked
   iget_failed
   ihold
@@ -1582,8 +1547,6 @@
   regulator_map_voltage_iterate
   regulator_put
   regulator_set_voltage
-  regulatory_hint
-  regulatory_set_wiphy_regd_sync
   release_firmware
   __release_region
   release_resource
@@ -2157,10 +2120,6 @@
   wakeup_source_unregister
   __wake_up_sync
   __warn_printk
-  wiphy_free
-  wiphy_new_nm
-  wiphy_register
-  wiphy_unregister
   wireless_nlevent_flush
   wireless_send_event
   work_busy
