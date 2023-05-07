@@ -116,11 +116,17 @@
   __traceiter_android_vh_cpufreq_fast_switch
   __traceiter_android_vh_cpufreq_resolve_freq
   __traceiter_android_vh_cpufreq_target
+  __traceiter_android_vh_do_futex
   __traceiter_android_vh_do_send_sig_info
   __traceiter_android_vh_drain_all_pages_bypass
   __traceiter_android_vh_exit_signal
   __traceiter_android_vh_free_task
   __traceiter_android_vh_futex_sleep_start
+  __traceiter_android_vh_futex_wait_end
+  __traceiter_android_vh_futex_wait_start
+  __traceiter_android_vh_futex_wake_this
+  __traceiter_android_vh_futex_wake_traverse_plist
+  __traceiter_android_vh_futex_wake_up_q_finish
   __traceiter_android_vh_irqtime_account_process_tick
   __traceiter_android_vh_map_util_freq_new
   __traceiter_android_vh_mem_cgroup_alloc
@@ -186,11 +192,17 @@
   __tracepoint_android_vh_cpufreq_fast_switch
   __tracepoint_android_vh_cpufreq_resolve_freq
   __tracepoint_android_vh_cpufreq_target
+  __tracepoint_android_vh_do_futex
   __tracepoint_android_vh_do_send_sig_info
   __tracepoint_android_vh_drain_all_pages_bypass
   __tracepoint_android_vh_exit_signal
   __tracepoint_android_vh_free_task
   __tracepoint_android_vh_futex_sleep_start
+  __tracepoint_android_vh_futex_wait_end
+  __tracepoint_android_vh_futex_wait_start
+  __tracepoint_android_vh_futex_wake_this
+  __tracepoint_android_vh_futex_wake_traverse_plist
+  __tracepoint_android_vh_futex_wake_up_q_finish
   __tracepoint_android_vh_irqtime_account_process_tick
   __tracepoint_android_vh_map_util_freq_new
   __tracepoint_android_vh_mem_cgroup_alloc
