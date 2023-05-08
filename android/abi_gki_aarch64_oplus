@@ -160,6 +160,7 @@
   __traceiter_sched_stat_sleep
   __traceiter_sched_stat_wait
   __traceiter_sched_waking
+  __traceiter_task_rename
   __tracepoint_android_rvh_check_preempt_tick
   __tracepoint_android_rvh_dequeue_entity
   __tracepoint_android_rvh_enqueue_entity
@@ -237,6 +238,7 @@
   __tracepoint_sched_stat_sleep
   __tracepoint_sched_stat_wait
   __tracepoint_sched_waking
+  __tracepoint_task_rename
   try_to_free_mem_cgroup_pages
   unregister_kprobe
   unregister_kretprobe
