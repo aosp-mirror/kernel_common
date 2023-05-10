@@ -459,6 +459,7 @@
   kernel_kobj
   kernel_neon_begin
   kernel_neon_end
+  kernel_sock_shutdown
   kern_mount
   kern_unmount
   __kfifo_alloc
