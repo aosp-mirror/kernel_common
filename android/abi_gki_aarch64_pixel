@@ -2062,6 +2062,7 @@
   trace_handle_return
   __traceiter_android_rvh_arm64_serror_panic
   __traceiter_android_rvh_attach_entity_load_avg
+  __traceiter_android_rvh_audio_usb_offload_disconnect
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpu_cgroup_online
@@ -2109,6 +2110,7 @@
   __traceiter_android_rvh_usb_dev_suspend
   __traceiter_android_rvh_util_est_update
   __traceiter_android_vh_arch_set_freq_scale
+  __traceiter_android_vh_audio_usb_offload_connect
   __traceiter_android_vh_binder_restore_priority
   __traceiter_android_vh_binder_set_priority
   __traceiter_android_vh_cma_alloc_finish
@@ -2180,6 +2182,7 @@
   trace_output_call
   __tracepoint_android_rvh_arm64_serror_panic
   __tracepoint_android_rvh_attach_entity_load_avg
+  __tracepoint_android_rvh_audio_usb_offload_disconnect
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpu_cgroup_online
@@ -2227,6 +2230,7 @@
   __tracepoint_android_rvh_usb_dev_suspend
   __tracepoint_android_rvh_util_est_update
   __tracepoint_android_vh_arch_set_freq_scale
+  __tracepoint_android_vh_audio_usb_offload_connect
   __tracepoint_android_vh_binder_restore_priority
   __tracepoint_android_vh_binder_set_priority
   __tracepoint_android_vh_cma_alloc_finish
