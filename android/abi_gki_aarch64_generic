@@ -866,6 +866,7 @@
   find_pid_ns
   find_task_by_vpid
   find_vma
+  find_vm_area
   find_vpid
   finish_wait
   firmware_request_nowarn
@@ -1619,6 +1620,7 @@
   pm_runtime_forbid
   pm_runtime_force_resume
   pm_runtime_force_suspend
+  pm_runtime_get_if_active
   __pm_runtime_idle
   pm_runtime_irq_safe
   __pm_runtime_resume
@@ -1692,6 +1694,7 @@
   ___ratelimit
   raw_notifier_call_chain
   raw_notifier_chain_register
+  raw_notifier_chain_unregister
   _raw_read_lock
   _raw_read_lock_bh
   _raw_read_lock_irq
@@ -2590,6 +2593,7 @@
   usb_role_switch_unregister
   usb_speed_string
   usb_string_id
+  usb_udc_vbus_handler
   usb_unregister_notify
   __usecs_to_jiffies
   usleep_range
@@ -2699,6 +2703,7 @@
   wait_for_completion_interruptible_timeout
   wait_for_completion_killable
   wait_for_completion_timeout
+  wait_on_page_bit
   wait_woken
   __wake_up
   __wake_up_locked

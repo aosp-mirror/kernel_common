@@ -175,7 +175,8 @@ struct v4l2_subdev *v4l2_i2c_new_subdev_board(struct v4l2_device *v4l2_dev,
  *
  * @sd: pointer to &struct v4l2_subdev
  * @client: pointer to struct i2c_client
- * @devname: the name of the device; if NULL, the I²C device's name will be used
+ * @devname: the name of the device; if NULL, the I²C device drivers's name
+ *           will be used
  * @postfix: sub-device specific string to put right after the I²C device name;
  *	     may be NULL
  */
@@ -518,6 +519,31 @@ int v4l2_fill_pixfmt(struct v4l2_pix_format *pixfmt, u32 pixelformat,
 		     u32 width, u32 height);
 int v4l2_fill_pixfmt_mp(struct v4l2_pix_format_mplane *pixfmt, u32 pixelformat,
 			u32 width, u32 height);
+
+/**
+ * v4l2_get_link_freq - Get link rate from transmitter
+ *
+ * @handler: The transmitter's control handler
+ * @mul: The multiplier between pixel rate and link frequency. Bits per pixel on
+ *	 D-PHY, samples per clock on parallel. 0 otherwise.
+ * @div: The divisor between pixel rate and link frequency. Number of data lanes
+ *	 times two on D-PHY, 1 on parallel. 0 otherwise.
+ *
+ * This function is intended for obtaining the link frequency from the
+ * transmitter sub-devices. It returns the link rate, either from the
+ * V4L2_CID_LINK_FREQ control implemented by the transmitter, or value
+ * calculated based on the V4L2_CID_PIXEL_RATE implemented by the transmitter.
+ *
+ * Returns link frequency on success, otherwise a negative error code:
+ *	-ENOENT: Link frequency or pixel rate control not found
+ *	-EINVAL: Invalid link frequency value
+ */
+s64 v4l2_get_link_freq(struct v4l2_ctrl_handler *handler, unsigned int mul,
+		       unsigned int div);
+
+void v4l2_simplify_fraction(u32 *numerator, u32 *denominator,
+		unsigned int n_terms, unsigned int threshold);
+u32 v4l2_fraction_to_interval(u32 numerator, u32 denominator);
 
 static inline u64 v4l2_buffer_get_timestamp(const struct v4l2_buffer *buf)
 {
