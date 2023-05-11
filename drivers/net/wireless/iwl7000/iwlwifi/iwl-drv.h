@@ -108,9 +108,6 @@ int iwl_drv_switch_op_mode(struct iwl_drv *drv, const char *new_op_name);
 #define EXPORT_SYMBOL_IF_IWLWIFI_KUNIT(sym)
 #define VISIBLE_IF_IWLWIFI_KUNIT static
 
-/* max retry for init flow */
-#define IWL_MAX_INIT_RETRY 2
-
 #define FW_NAME_PRE_BUFSIZE	64
 struct iwl_trans;
 const char *iwl_drv_get_fwname_pre(struct iwl_trans *trans, char *buf);
