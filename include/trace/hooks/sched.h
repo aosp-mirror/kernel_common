@@ -349,6 +349,11 @@ DECLARE_HOOK(android_vh_finish_update_load_avg_se,
 	TP_PROTO(struct sched_entity *se, int flags),
 	TP_ARGS(se, flags));
 
+DECLARE_HOOK(android_vh_uclamp_validate,
+	TP_PROTO(struct task_struct *p, const struct sched_attr *attr,
+		 int *ret, bool *done),
+	TP_ARGS(p, attr, ret, done));
+
 DECLARE_HOOK(android_vh_dup_task_struct,
 	TP_PROTO(struct task_struct *tsk, struct task_struct *orig),
 	TP_ARGS(tsk, orig));
