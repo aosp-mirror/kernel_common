@@ -379,6 +379,11 @@ DECLARE_RESTRICTED_HOOK(android_rvh_util_est_update,
 	TP_PROTO(struct cfs_rq *cfs_rq, struct task_struct *p, bool task_sleep, int *ret),
 	TP_ARGS(cfs_rq, p, task_sleep, ret), 1);
 
+DECLARE_HOOK(android_vh_uclamp_validate,
+	TP_PROTO(struct task_struct *p, const struct sched_attr *attr,
+		 bool user, int *ret, bool *done),
+	TP_ARGS(p, attr, user, ret, done));
+
 DECLARE_HOOK(android_vh_setscheduler_uclamp,
 	TP_PROTO(struct task_struct *tsk, int clamp_id, unsigned int value),
 	TP_ARGS(tsk, clamp_id, value));
