@@ -96,6 +96,11 @@ define_db845c(
     define_abi_targets = True,
     kmi_symbol_list = "//common:android/abi_gki_aarch64_db845c",
     kmi_symbol_list_add_only = True,
+    make_goals = [
+        "modules",
+        "qcom/sdm845-db845c.dtb",
+        "qcom/qrb5165-rb5.dtb",
+    ],
     module_outs = [
         # keep sorted
         "crypto/michael_mic.ko",
@@ -277,6 +282,11 @@ kernel_build(
     build_config = "build.config.rockpi4",
     collect_unstripped_modules = True,
     kmi_symbol_list = "//common:android/abi_gki_rockpi4",
+    make_goals = [
+        "Image",
+        "modules",
+        "rockchip/rk3399-rock-pi-4b.dtb",
+    ],
     module_outs = COMMON_GKI_MODULES_LIST + [
         # keep sorted
         "drivers/block/virtio_blk.ko",
