@@ -75,6 +75,7 @@
 
 #include "binder_internal.h"
 #include "binder_trace.h"
+#include "binder_pick_impl.h"
 
 static HLIST_HEAD(binder_deferred_list);
 static DEFINE_MUTEX(binder_deferred_lock);
@@ -6770,6 +6771,10 @@ static int __init binder_init(void)
 	struct hlist_node *tmp;
 	char *device_names = NULL;
 	const struct binder_debugfs_entry *db_entry;
+
+	if (binder_use_rust)
+		return 0;
+	binder_driver_initialized = true;
 
 	ret = binder_alloc_shrinker_init();
 	if (ret)
