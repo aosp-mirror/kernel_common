@@ -213,24 +213,4 @@ struct snd_usb_stream {
 	struct list_head list;
 };
 
-struct snd_usb_platform_ops {
-	void (*connect_cb)(struct snd_usb_audio *chip);
-	void (*disconnect_cb)(struct snd_usb_audio *chip);
-	void (*suspend_cb)(struct usb_interface *intf, pm_message_t message);
-};
-
-#if IS_ENABLED(CONFIG_SND_USB_AUDIO)
-int snd_usb_register_platform_ops(struct snd_usb_platform_ops *ops);
-int snd_usb_unregister_platform_ops(void);
-#else
-int snd_usb_register_platform_ops(struct snd_usb_platform_ops *ops)
-{
-	return -EOPNOTSUPP;
-}
-
-int snd_usb_unregister_platform_ops(void)
-{
-	return -EOPNOTSUPP;
-}
-#endif /* IS_ENABLED(CONFIG_SND_USB_AUDIO) */
 #endif /* __USBAUDIO_CARD_H */
