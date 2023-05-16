@@ -482,6 +482,7 @@
   dmabuf_page_pool_free
   dmabuf_page_pool_get_size
   dma_buf_put
+  dma_buf_set_name
   dma_buf_unmap_attachment
   dma_buf_vmap
   dma_buf_vunmap
