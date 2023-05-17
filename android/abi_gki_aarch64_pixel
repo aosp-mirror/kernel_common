@@ -128,36 +128,6 @@
   cdev_device_add
   cdev_device_del
   cdev_init
-  __cfg80211_alloc_event_skb
-  __cfg80211_alloc_reply_skb
-  cfg80211_chandef_create
-  cfg80211_ch_switch_notify
-  cfg80211_connect_done
-  cfg80211_del_sta_sinfo
-  cfg80211_disconnected
-  cfg80211_external_auth_request
-  cfg80211_find_elem_match
-  cfg80211_get_bss
-  cfg80211_ibss_joined
-  cfg80211_inform_bss_frame_data
-  cfg80211_mgmt_tx_status_ext
-  cfg80211_michael_mic_failure
-  cfg80211_new_sta
-  cfg80211_port_authorized
-  cfg80211_put_bss
-  cfg80211_ready_on_channel
-  cfg80211_register_netdevice
-  cfg80211_remain_on_channel_expired
-  cfg80211_roamed
-  cfg80211_rx_mgmt_ext
-  cfg80211_scan_done
-  cfg80211_sched_scan_results
-  cfg80211_sched_scan_stopped_locked
-  __cfg80211_send_event_skb
-  cfg80211_unlink_bss
-  cfg80211_unregister_wdev
-  cfg80211_update_owe_info_event
-  cfg80211_vendor_cmd_reply
   __cfi_slowpath_diag
   __check_object_size
   check_preempt_curr
@@ -512,6 +482,7 @@
   dmabuf_page_pool_free
   dmabuf_page_pool_get_size
   dma_buf_put
+  dma_buf_set_name
   dma_buf_unmap_attachment
   dma_buf_vmap
   dma_buf_vunmap
@@ -1008,9 +979,6 @@
   idr_get_next
   idr_preload
   idr_remove
-  ieee80211_channel_to_freq_khz
-  ieee80211_freq_khz_to_channel
-  ieee80211_get_channel_khz
   ieee802154_alloc_hw
   ieee802154_free_hw
   ieee802154_register_hw
@@ -1720,9 +1688,6 @@
   regulator_set_voltage
   regulator_set_voltage_sel_regmap
   regulator_unregister
-  regulatory_hint
-  regulatory_set_wiphy_regd
-  regulatory_set_wiphy_regd_sync
   release_firmware
   __release_region
   remap_pfn_range
@@ -1941,8 +1906,6 @@
   snd_soc_runtime_set_dai_fmt
   snd_soc_unregister_card
   snd_soc_unregister_component
-  snd_usb_register_platform_ops
-  snd_usb_unregister_platform_ops
   snprintf
   soc_device_register
   __sock_create
@@ -2100,6 +2063,7 @@
   trace_handle_return
   __traceiter_android_rvh_arm64_serror_panic
   __traceiter_android_rvh_attach_entity_load_avg
+  __traceiter_android_rvh_audio_usb_offload_disconnect
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpu_cgroup_online
@@ -2147,6 +2111,7 @@
   __traceiter_android_rvh_usb_dev_suspend
   __traceiter_android_rvh_util_est_update
   __traceiter_android_vh_arch_set_freq_scale
+  __traceiter_android_vh_audio_usb_offload_connect
   __traceiter_android_vh_binder_restore_priority
   __traceiter_android_vh_binder_set_priority
   __traceiter_android_vh_cma_alloc_finish
@@ -2218,6 +2183,7 @@
   trace_output_call
   __tracepoint_android_rvh_arm64_serror_panic
   __tracepoint_android_rvh_attach_entity_load_avg
+  __tracepoint_android_rvh_audio_usb_offload_disconnect
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpu_cgroup_online
@@ -2265,6 +2231,7 @@
   __tracepoint_android_rvh_usb_dev_suspend
   __tracepoint_android_rvh_util_est_update
   __tracepoint_android_vh_arch_set_freq_scale
+  __tracepoint_android_vh_audio_usb_offload_connect
   __tracepoint_android_vh_binder_restore_priority
   __tracepoint_android_vh_binder_set_priority
   __tracepoint_android_vh_cma_alloc_finish
@@ -2570,10 +2537,6 @@
   watchdog_register_device
   watchdog_set_restart_priority
   watchdog_unregister_device
-  wiphy_free
-  wiphy_new_nm
-  wiphy_register
-  wiphy_unregister
   wireless_nlevent_flush
   woken_wake_function
   work_busy

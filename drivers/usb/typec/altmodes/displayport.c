@@ -510,7 +510,7 @@ static ssize_t pin_assignment_show(struct device *dev,
 
 	mutex_unlock(&dp->lock);
 
-	/* get_current_pin_assignments can return 0 */
+	/* get_current_pin_assignments can return 0 when no matching pin assignments are found */
 	if (len == 0)
 		len++;
 
