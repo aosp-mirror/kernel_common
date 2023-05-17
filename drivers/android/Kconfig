@@ -64,6 +64,11 @@ config ANDROID_BINDERFS_C
 	depends on ANDROID_BINDER_IPC_C && ANDROID_BINDERFS
 	default y
 
+config ANDROID_BINDERFS_RUST
+	bool
+	depends on ANDROID_BINDER_IPC_RUST && ANDROID_BINDERFS
+	default y
+
 config ANDROID_BINDER_DEVICES
 	string "Android Binder devices"
 	depends on ANDROID_BINDER_IPC
