@@ -2046,6 +2046,7 @@
   thermal_zone_device_unregister
   thermal_zone_device_update
   thermal_zone_get_temp
+  thermal_zone_get_zone_by_name
   thermal_zone_of_sensor_register
   thermal_zone_of_sensor_unregister
   thread_group_cputime_adjusted
