@@ -14,3 +14,4 @@ ARM
    pvtime
    ptp_kvm
    mmio-guard
+   get_cur_cpufreq

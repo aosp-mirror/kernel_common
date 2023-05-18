@@ -3,6 +3,9 @@
 
 #include <linux/arm-smccc.h>
 #include <linux/kvm_host.h>
+#include <linux/cpufreq.h>
+#include <linux/sched.h>
+#include <uapi/linux/sched/types.h>
 
 #include <asm/kvm_emulate.h>
 #include <asm/stage2_pgtable.h>
@@ -24,6 +27,15 @@
 	}								\
 	f;								\
 })
+
+static void kvm_sched_get_cur_cpufreq(struct kvm_vcpu *vcpu, u64 *val)
+{
+	unsigned long ret_freq;
+
+	ret_freq = cpufreq_get(task_cpu(current));
+
+	val[0] = ret_freq;
+}
 
 static void kvm_ptp_get_time(struct kvm_vcpu *vcpu, u64 *val)
 {
@@ -130,6 +142,8 @@ static bool kvm_smccc_test_fw_bmap(struct kvm_vcpu *vcpu, u32 func_id)
 	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_RELINQUISH_FUNC_ID:
 		return test_bit(ARM_SMCCC_KVM_FUNC_MEM_RELINQUISH,
 				&smccc_feat->vendor_hyp_bmap);
+	case ARM_SMCCC_VENDOR_HYP_KVM_GET_CUR_CPUFREQ_FUNC_ID:
+		return true;
 	default:
 		return false;
 	}
@@ -364,6 +378,8 @@ int kvm_smccc_call_handler(struct kvm_vcpu *vcpu)
 		break;
 	case ARM_SMCCC_VENDOR_HYP_KVM_FEATURES_FUNC_ID:
 		val[0] = smccc_feat->vendor_hyp_bmap;
+		val[ARM_SMCCC_KVM_FUNC_GET_CUR_CPUFREQ / 32] |=
+			BIT(ARM_SMCCC_KVM_FUNC_GET_CUR_CPUFREQ % 32);
 		break;
 	case ARM_SMCCC_VENDOR_HYP_KVM_PTP_FUNC_ID:
 		kvm_ptp_get_time(vcpu, val);
@@ -381,6 +397,9 @@ int kvm_smccc_call_handler(struct kvm_vcpu *vcpu)
 			PAGE_SIZE : -PAGE_SIZE,
 			&vcpu->kvm->stat.protected_shared_mem);
 		val[0] = SMCCC_RET_SUCCESS;
+		break;
+	case ARM_SMCCC_VENDOR_HYP_KVM_GET_CUR_CPUFREQ_FUNC_ID:
+		kvm_sched_get_cur_cpufreq(vcpu, val);
 		break;
 	case ARM_SMCCC_TRNG_VERSION:
 	case ARM_SMCCC_TRNG_FEATURES:
