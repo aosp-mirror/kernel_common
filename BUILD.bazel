@@ -11,6 +11,7 @@ package(
 
 _aarch64_additional_kmi_symbol_lists = [
     # keep sorted
+    "android/abi_gki_aarch64_asr",
     "android/abi_gki_aarch64_core",
     "android/abi_gki_aarch64_db845c",
     "android/abi_gki_aarch64_exynos",
