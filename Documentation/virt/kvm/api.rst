@@ -8481,6 +8481,18 @@ block sizes is exposed in KVM_CAP_ARM_SUPPORTED_BLOCK_SIZES as a
 64-bit bitmap (each bit describing a block size). The default value is
 0, to disable the eager page splitting.
 
+8.41 KVM_CAP_UTIL_HINT
+----------------------
+
+:Architectures: arm64
+
+This capability indicates that the KVM supports taking utilization
+hints from the guest. Utilization is represented as a value from 0-1024
+where 1024 represents the highest performance point across all physical CPUs
+after normalizing for architecture. This is useful when guests are tracking
+workload on its vCPUs. Util hints allow the host to make more accurate
+frequency selections and task placement for vCPU threads.
+
 9. Known KVM API problems
 =========================
 

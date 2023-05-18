@@ -266,6 +266,7 @@ static int kvm_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_GET_CUR_CPUFREQ:
 	case KVM_CAP_IRQFD_RESAMPLE:
 	case KVM_CAP_COUNTER_OFFSET:
+	case KVM_CAP_UTIL_HINT:
 		r = 1;
 		break;
 	case KVM_CAP_ARM_NISV_TO_USER:
