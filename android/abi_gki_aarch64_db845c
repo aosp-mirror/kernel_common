@@ -97,6 +97,7 @@
   devm_add_action
   devm_clk_bulk_get
   devm_clk_bulk_get_all
+  devm_clk_bulk_get_optional
   devm_clk_get
   devm_clk_get_optional
   devm_clk_hw_register
@@ -521,7 +522,6 @@
   __pm_runtime_set_status
   __pm_runtime_suspend
   __pm_runtime_use_autosuspend
-  preempt_schedule
   preempt_schedule_notrace
   prepare_to_wait_event
   _printk
@@ -806,7 +806,6 @@
 
 # required by ath10k_snoc.ko
   __bitmap_clear
-  devm_clk_bulk_get_optional
   iommu_map
 
 # required by ath11k.ko
@@ -934,6 +933,7 @@
   kthread_parkme
   kthread_should_park
   kthread_unpark
+  preempt_schedule
   rcu_barrier
   wait_for_completion
 
@@ -1828,6 +1828,7 @@
   dmabuf_page_pool_create
   dmabuf_page_pool_destroy
   dmabuf_page_pool_free
+  dmabuf_page_pool_get_size
   dma_heap_add
   dma_heap_get_dev
   dma_heap_get_name

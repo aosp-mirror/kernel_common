@@ -317,9 +317,8 @@ void *hyp_fixmap_map_nc(phys_addr_t phys)
 
 	pte = *ptep;
 	pte &= ~kvm_phys_to_pte(KVM_PHYS_INVALID);
-	pte |= kvm_phys_to_pte(phys) | KVM_PTE_VALID;
-	pte &= ~KVM_PTE_LEAF_ATTR_LO_S1_ATTRIDX;
-	pte |= FIELD_PREP(KVM_PTE_LEAF_ATTR_LO_S1_ATTRIDX, MT_NORMAL_NC);
+	pte |= kvm_phys_to_pte(phys) | KVM_PTE_VALID |
+	       FIELD_PREP(KVM_PTE_LEAF_ATTR_LO_S1_ATTRIDX, MT_NORMAL_NC);
 	WRITE_ONCE(*ptep, pte);
 	dsb(ishst);
 
@@ -331,6 +330,7 @@ static void fixmap_clear_slot(struct hyp_fixmap_slot *slot)
 	kvm_pte_t *ptep = slot->ptep;
 	u64 addr = slot->addr;
 
+	/* Zap the memory type too. MT_NORMAL is 0 so the fixmap is cacheable by default */
 	WRITE_ONCE(*ptep, *ptep & ~(KVM_PTE_VALID | KVM_PTE_LEAF_ATTR_LO_S1_ATTRIDX));
 
 	/*

@@ -131,7 +131,6 @@
 
 /* SVE register access */
 .macro __init_el2_nvhe_sve
-#ifdef CONFIG_ARM64_SVE
 	mrs	x1, id_aa64pfr0_el1
 	ubfx	x1, x1, #ID_AA64PFR0_EL1_SVE_SHIFT, #4
 	cbz	x1, .Lskip_sve_\@
@@ -142,7 +141,6 @@
 	mov	x1, #ZCR_ELx_LEN_MASK		// SVE: Enable full vector
 	msr_s	SYS_ZCR_EL2, x1			// length for EL1.
 .Lskip_sve_\@:
-#endif /* CONFIG_ARM64_SVE */
 .endm
 
 /* SME register access and priority mapping */

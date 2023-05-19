@@ -629,9 +629,66 @@ static bool host_stage2_pte_is_counted(kvm_pte_t pte, u32 level)
 }
 
 #define DEFERRED_MEMATTR_NOTE	(1ULL << 24)
-static int resolve_stage2_prot_from_stage1(struct kvm_vcpu_fault_info *fault,
-					   u64 addr, enum kvm_pgtable_prot *prot,
-					   struct kvm_mem_range *range)
+#ifdef CONFIG_ANDROID_ARM64_WORKAROUND_DMA_BEYOND_POC
+static enum pkvm_page_state host_get_page_state(kvm_pte_t pte, u64 addr);
+
+int __pkvm_host_set_stage2_memattr(phys_addr_t phys, bool force_nc)
+{
+	kvm_pte_t pte;
+	int ret = 0;
+
+	if (!static_branch_unlikely(&pkvm_force_nc))
+		return -ENOENT;
+
+	phys = ALIGN_DOWN(phys, PAGE_SIZE);
+	hyp_spin_lock(&host_mmu.lock);
+
+	ret = kvm_pgtable_get_leaf(&host_mmu.pgt, phys, &pte, NULL);
+	if (ret)
+		goto unlock;
+
+	if (!addr_is_memory(phys)) {
+		ret = -EIO;
+		goto unlock;
+	}
+
+	if (!kvm_pte_valid(pte) && pte) {
+		switch (pte) {
+		case DEFERRED_MEMATTR_NOTE:
+			break;
+		default:
+			ret = -EPERM;
+		}
+	} else if (host_get_page_state(pte, phys) != PKVM_PAGE_OWNED) {
+		ret = -EPERM;
+	}
+
+	if (ret)
+		goto unlock;
+
+	if (force_nc) {
+		ret = host_stage2_idmap_locked(phys, PAGE_SIZE,
+					       PKVM_HOST_MEM_PROT |
+					       KVM_PGTABLE_PROT_NC,
+					       false);
+		if (ret)
+			goto unlock;
+
+		kvm_flush_dcache_to_poc(hyp_fixmap_map_nc(phys), PAGE_SIZE);
+		hyp_fixmap_unmap();
+	} else {
+		ret = kvm_pgtable_stage2_annotate(&host_mmu.pgt, phys,
+						  PAGE_SIZE, &host_s2_pool,
+						  DEFERRED_MEMATTR_NOTE);
+	}
+unlock:
+	hyp_spin_unlock(&host_mmu.lock);
+	return ret;
+}
+
+static int handle_memattr_annotation(struct kvm_vcpu_fault_info *fault,
+				     u64 addr, enum kvm_pgtable_prot *prot,
+				     struct kvm_mem_range *range)
 {
 	u64 par, oldpar;
 
@@ -663,6 +720,14 @@ static int resolve_stage2_prot_from_stage1(struct kvm_vcpu_fault_info *fault,
 
 	return 0;
 }
+#else
+static int handle_memattr_annotation(struct kvm_vcpu_fault_info *fault,
+				     u64 addr, enum kvm_pgtable_prot *prot,
+				     struct kvm_mem_range *range)
+{
+	return -EPERM;
+}
+#endif
 
 static int host_stage2_idmap(struct kvm_vcpu_fault_info *fault, u64 addr)
 {
@@ -686,12 +751,16 @@ static int host_stage2_idmap(struct kvm_vcpu_fault_info *fault, u64 addr)
 		if (!is_memory)
 			return -EPERM;
 
-		if (pte != DEFERRED_MEMATTR_NOTE)
+		switch (pte) {
+		case DEFERRED_MEMATTR_NOTE:
+			ret = handle_memattr_annotation(fault, addr, &prot,
+							&range);
+			if (ret)
+				return ret;
+			break;
+		default:
 			return -EPERM;
-
-		ret = resolve_stage2_prot_from_stage1(fault, addr, &prot, &range);
-		if (ret)
-			return ret;
+		}
 	}
 
 	/*
@@ -709,11 +778,7 @@ static int host_stage2_idmap(struct kvm_vcpu_fault_info *fault, u64 addr)
 	if (ret)
 		return ret;
 
-	ret = host_stage2_idmap_locked(range.start, range.end - range.start, prot, false);
-	if (ret)
-		return ret;
-
-	return 0;
+	return host_stage2_idmap_locked(range.start, range.end - range.start, prot, false);
 }
 
 static void (*illegal_abt_notifier)(struct kvm_cpu_context *host_ctxt);
@@ -883,9 +948,6 @@ static int __check_page_state_visitor(u64 addr, u64 end, u32 level,
 	struct check_walk_data *d = arg;
 	kvm_pte_t pte = *ptep;
 
-	if (kvm_pte_valid(pte) && !addr_is_allowed_memory(kvm_pte_to_phys(pte)))
-		return -EINVAL;
-
 	return d->get_page_state(pte, addr) == d->desired ? 0 : -EPERM;
 }
 
@@ -909,6 +971,9 @@ static enum pkvm_page_state host_get_page_state(kvm_pte_t pte, u64 addr)
 
 	if (is_memory && hyp_phys_to_page(addr)->flags & MODULE_OWNED_PAGE)
 	       return PKVM_MODULE_DONT_TOUCH;
+
+	if (!addr_is_allowed_memory(addr))
+		return PKVM_NOPAGE;
 
 	if (!kvm_pte_valid(pte) && pte)
 		return PKVM_NOPAGE;
@@ -2322,56 +2387,5 @@ int host_stage2_get_leaf(phys_addr_t phys, kvm_pte_t *ptep, u32 *level)
 	ret = kvm_pgtable_get_leaf(&host_mmu.pgt, phys, ptep, level);
 	host_unlock_component();
 
-	return ret;
-}
-
-int __pkvm_host_set_stage2_memattr(phys_addr_t phys, bool force_nc)
-{
-	kvm_pte_t pte;
-	int ret = 0;
-
-	phys = ALIGN_DOWN(phys, PAGE_SIZE);
-	host_lock_component();
-
-	ret = kvm_pgtable_get_leaf(&host_mmu.pgt, phys, &pte, NULL);
-	if (ret)
-		goto unlock;
-
-	if (!addr_is_memory(phys)) {
-		ret = -EIO;
-		goto unlock;
-	}
-
-	if (!kvm_pte_valid(pte) && pte) {
-		switch (pte) {
-		case DEFERRED_MEMATTR_NOTE:
-			break;
-		default:
-			ret = -EPERM;
-		}
-	} else if (host_get_page_state(pte, phys) != PKVM_PAGE_OWNED) {
-		ret = -EPERM;
-	}
-
-	if (ret)
-		goto unlock;
-
-	if (force_nc) {
-		ret = host_stage2_idmap_locked(phys, PAGE_SIZE,
-					       PKVM_HOST_MEM_PROT |
-					       KVM_PGTABLE_PROT_NC,
-					       false);
-		if (ret)
-			goto unlock;
-
-		kvm_flush_dcache_to_poc(hyp_fixmap_map_nc(phys), PAGE_SIZE);
-		hyp_fixmap_unmap();
-	} else {
-		ret = kvm_pgtable_stage2_annotate(&host_mmu.pgt, phys,
-						  PAGE_SIZE, &host_s2_pool,
-						  DEFERRED_MEMATTR_NOTE);
-	}
-unlock:
-	host_unlock_component();
 	return ret;
 }

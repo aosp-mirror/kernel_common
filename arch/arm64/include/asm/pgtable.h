@@ -312,61 +312,7 @@ static inline void __check_racy_pte_update(struct mm_struct *mm, pte_t *ptep,
 		     __func__, pte_val(old_pte), pte_val(pte));
 }
 
-#ifdef CONFIG_ARM64_WORKAROUND_DMA_BEYOND_POC
-extern int pkvm_host_register_early_nc_mappings(void);
-extern void pkvm_host_set_stage2_memattr(phys_addr_t addr, bool force_nc);
-
-DECLARE_STATIC_KEY_FALSE(pkvm_force_nc);
-static inline bool prot_needs_stage2_update(pgprot_t prot)
-{
-	pteval_t val = pgprot_val(prot);
-
-	if (!static_branch_unlikely(&pkvm_force_nc))
-		return 0;
-
-	return (val & PTE_ATTRINDX_MASK) == PTE_ATTRINDX(MT_NORMAL_NC);
-}
-
-static inline void arm64_update_cacheable_aliases(pte_t *ptep, pte_t pte)
-{
-	pte_t old_pte = READ_ONCE(*ptep);
-	bool force_nc;
-
-	if (!static_branch_unlikely(&pkvm_force_nc))
-		return;
-
-	if (pte_valid(old_pte) == pte_valid(pte))
-		return;
-
-	if (!pte_valid(pte)) {
-		force_nc = false;
-		pte = old_pte;
-	} else {
-		force_nc = true;
-	}
-
-	if ((pte_val(pte) & PTE_ATTRINDX_MASK) == PTE_ATTRINDX(MT_NORMAL_NC))
-		pkvm_host_set_stage2_memattr(__pte_to_phys(pte), force_nc);
-}
-
-#define set_pmd_at(mm, addr, pmdp, pmd) do {				\
-	WARN_ON(prot_needs_stage2_update(__pgprot(pmd_val(pmd))));	\
-	set_pte_at(mm, addr, (pte_t *)pmdp, pmd_pte(pmd));		\
-} while (0)
-
-#define set_pud_at(mm, addr, pudp, pud) do {				\
-	WARN_ON(prot_needs_stage2_update(__pgprot(pud_val(pud))));	\
-	set_pte_at(mm, addr, (pte_t *)pudp, pud_pte(pud));		\
-} while (0)
-
-#else
-static inline int pkvm_host_register_early_nc_mappings(void) { return 0; }
-static inline void arm64_update_cacheable_aliases(pte_t *ptep, pte_t pte) { }
-static inline bool prot_needs_stage2_update(pgprot_t prot) { return false; }
-
-#define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, (pte_t *)pmdp, pmd_pte(pmd))
-#define set_pud_at(mm, addr, pudp, pud)	set_pte_at(mm, addr, (pte_t *)pudp, pud_pte(pud))
-#endif /* CONFIG_ARM64_WORKAROUND_DMA_BEYOND_POC */
+#include <asm/android_erratum_pgtable.h>
 
 static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 			      pte_t *ptep, pte_t pte)
@@ -541,6 +487,14 @@ static inline pmd_t pmd_mkdevmap(pmd_t pmd)
 #define __phys_to_pud_val(phys)	__phys_to_pte_val(phys)
 #define pud_pfn(pud)		((__pud_to_phys(pud) & PUD_MASK) >> PAGE_SHIFT)
 #define pfn_pud(pfn,prot)	__pud(__phys_to_pud_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+
+#ifndef set_pmd_at
+#define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, (pte_t *)pmdp, pmd_pte(pmd))
+#endif
+
+#ifndef set_pud_at
+#define set_pud_at(mm, addr, pudp, pud)	set_pte_at(mm, addr, (pte_t *)pudp, pud_pte(pud))
+#endif
 
 #define __p4d_to_phys(p4d)	__pte_to_phys(p4d_pte(p4d))
 #define __phys_to_p4d_val(phys)	__phys_to_pte_val(phys)

@@ -183,8 +183,10 @@ static bool backing_data_changed(struct fuse_inode *fi, struct dentry *entry,
 	int err;
 	bool ret = true;
 
-	if (!entry)
-		return false;
+	if (!entry) {
+		ret = false;
+		goto put_backing_file;
+	}
 
 	get_fuse_backing_path(entry, &new_backing_path);
 	new_backing_inode = fi->backing_inode;
@@ -207,6 +209,9 @@ put_bpf:
 put_inode:
 	iput(new_backing_inode);
 	path_put(&new_backing_path);
+put_backing_file:
+	if (bpf_arg->backing_file)
+		fput(bpf_arg->backing_file);
 	return ret;
 }
 #endif
@@ -245,7 +250,7 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 	}
 #endif
 	if (time_before64(fuse_dentry_time(entry), get_jiffies_64()) ||
-		 (flags & (LOOKUP_EXCL | LOOKUP_REVAL))) {
+		 (flags & (LOOKUP_EXCL | LOOKUP_REVAL | LOOKUP_RENAME_TARGET))) {
 		struct fuse_entry_out outarg;
 		struct fuse_entry_bpf bpf_arg;
 		FUSE_ARGS(args);
@@ -395,7 +400,7 @@ static struct vfsmount *fuse_dentry_automount(struct path *path)
  * look up paths on its own. Instead, we handle the lookup as a special case
  * inside of the write request.
  */
-static void fuse_dentry_canonical_path(const struct path *path,
+static int fuse_dentry_canonical_path(const struct path *path,
 				       struct path *canonical_path)
 {
 	struct inode *inode = d_inode(path->dentry);
@@ -414,12 +419,12 @@ static void fuse_dentry_canonical_path(const struct path *path,
 			       fuse_canonical_path_finalize, path,
 			       canonical_path);
 	if (fer.ret)
-		return;
+		return PTR_ERR(fer.result);
 #endif
 
 	path_name = (char *)get_zeroed_page(GFP_KERNEL);
 	if (!path_name)
-		goto default_path;
+		return -ENOMEM;
 
 	args.opcode = FUSE_CANONICAL_PATH;
 	args.nodeid = get_node_id(inode);
@@ -433,11 +438,14 @@ static void fuse_dentry_canonical_path(const struct path *path,
 	err = fuse_simple_request(fm, &args);
 	free_page((unsigned long)path_name);
 	if (err > 0)
-		return;
-default_path:
+		return 0;
+	if (err < 0)
+		return err;
+
 	canonical_path->dentry = path->dentry;
 	canonical_path->mnt = path->mnt;
 	path_get(canonical_path);
+	return 0;
 }
 
 const struct dentry_operations fuse_dentry_operations = {
@@ -521,7 +529,7 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, const struct qstr *name
 		backing_inode = backing_file->f_inode;
 		*inode = fuse_iget_backing(sb, outarg->nodeid, backing_inode);
 		if (!*inode)
-			goto bpf_arg_out;
+			goto out;
 
 		err = fuse_handle_backing(&bpf_arg,
 				&get_fuse_inode(*inode)->backing_inode,
@@ -532,8 +540,6 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, const struct qstr *name
 		err = fuse_handle_bpf_prog(&bpf_arg, NULL, &get_fuse_inode(*inode)->bpf);
 		if (err)
 			goto out;
-bpf_arg_out:
-		fput(backing_file);
 	} else
 #endif
 	{
@@ -565,6 +571,8 @@ out_queue_forget:
  out_put_forget:
 	kfree(forget);
  out:
+	if (bpf_arg.backing_file)
+		fput(bpf_arg.backing_file);
 	return err;
 }
 
@@ -649,6 +657,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 	struct fuse_entry_out outentry;
 	struct fuse_inode *fi;
 	struct fuse_file *ff;
+	bool trunc = flags & O_TRUNC;
 
 	/* Userspace expects S_IFREG in create mode */
 	BUG_ON((mode & S_IFMT) != S_IFREG);
@@ -687,7 +696,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 	inarg.mode = mode;
 	inarg.umask = current_umask();
 
-	if (fm->fc->handle_killpriv_v2 && (flags & O_TRUNC) &&
+	if (fm->fc->handle_killpriv_v2 && trunc &&
 	    !(flags & O_EXCL) && !capable(CAP_FSETID)) {
 		inarg.open_flags |= FUSE_OPEN_KILL_SUIDGID;
 	}
@@ -737,6 +746,10 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 	} else {
 		file->private_data = ff;
 		fuse_finish_open(inode, file);
+		if (fm->fc->atomic_o_trunc && trunc)
+			truncate_pagecache(inode, 0);
+		else if (!(ff->open_flags & FOPEN_KEEP_CACHE))
+			invalidate_inode_pages2(inode->i_mapping);
 	}
 	return err;
 
