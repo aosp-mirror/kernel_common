@@ -969,6 +969,9 @@
   i3c_master_register
   i3c_master_set_info
   i3c_master_unregister
+  i3c_driver_unregister
+  i3c_driver_register_with_owner
+  i3c_device_do_priv_xfers
   ida_alloc_range
   ida_destroy
   ida_free
