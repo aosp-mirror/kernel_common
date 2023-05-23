@@ -521,7 +521,6 @@ struct request_queue {
 
 	struct list_head	requeue_list;
 	spinlock_t		requeue_lock;
-	struct delayed_work	requeue_work;
 
 	struct mutex		sysfs_lock;
 	struct mutex		sysfs_dir_lock;
