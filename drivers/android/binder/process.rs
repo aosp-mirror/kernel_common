@@ -15,17 +15,22 @@
 use kernel::{
     bindings,
     error::Error,
-    fs::File,
+    fs::file::{self, File},
     list::{ListArc, ListLinks},
     mm,
     prelude::*,
+    rbtree::{self, RBTree, RBTreeNodeReservation},
     sync::poll::PollTable,
     sync::{Arc, ArcBorrow, SpinLock},
+    task::Task,
+    types::ARef,
     uaccess::{UserSlice, UserSliceReader},
     workqueue::{self, Work},
 };
 
-use crate::{context::Context, defs::*};
+use crate::{context::Context, defs::*, thread::Thread};
+
+use core::mem::take;
 
 // bitflags for defer_work.
 const PROC_DEFER_FLUSH: u8 = 1;
@@ -34,6 +39,14 @@ const PROC_DEFER_RELEASE: u8 = 2;
 /// The fields of `Process` protected by the spinlock.
 pub(crate) struct ProcessInner {
     is_dead: bool,
+    threads: RBTree<i32, Arc<Thread>>,
+
+    /// The number of requested threads that haven't registered yet.
+    requested_thread_count: u32,
+    /// The maximum number of threads used by the process thread pool.
+    max_threads: u32,
+    /// The number of threads the started and registered with the thread pool.
+    started_thread_count: u32,
 
     /// Bitmap of deferred work to do.
     defer_work: u8,
@@ -43,8 +56,22 @@ impl ProcessInner {
     fn new() -> Self {
         Self {
             is_dead: false,
+            threads: RBTree::new(),
+            requested_thread_count: 0,
+            max_threads: 0,
+            started_thread_count: 0,
             defer_work: 0,
         }
+    }
+
+    fn register_thread(&mut self) -> bool {
+        if self.requested_thread_count == 0 {
+            return false;
+        }
+
+        self.requested_thread_count -= 1;
+        self.started_thread_count += 1;
+        true
     }
 }
 
@@ -56,6 +83,9 @@ impl ProcessInner {
 #[pin_data]
 pub(crate) struct Process {
     pub(crate) ctx: Arc<Context>,
+
+    // The task leader (process).
+    pub(crate) task: ARef<Task>,
 
     #[pin]
     pub(crate) inner: SpinLock<ProcessInner>,
@@ -111,6 +141,7 @@ impl Process {
             try_pin_init!(Process {
                 ctx,
                 inner <- kernel::new_spinlock!(ProcessInner::new(), "Process::inner"),
+                task: kernel::current!().group_leader().into(),
                 defer_work <- kernel::new_work!("Process::defer_work"),
                 links <- ListLinks::new(),
             }),
@@ -123,6 +154,67 @@ impl Process {
         Ok(process)
     }
 
+    fn get_current_thread(self: ArcBorrow<'_, Self>) -> Result<Arc<Thread>> {
+        let id = {
+            let current = kernel::current!();
+            if !core::ptr::eq(current.group_leader(), &*self.task) {
+                pr_err!("get_current_thread was called from the wrong process.");
+                return Err(EINVAL);
+            }
+            current.pid()
+        };
+
+        {
+            let inner = self.inner.lock();
+            if let Some(thread) = inner.threads.get(&id) {
+                return Ok(thread.clone());
+            }
+        }
+
+        // Allocate a new `Thread` without holding any locks.
+        let reservation = RBTreeNodeReservation::new(GFP_KERNEL)?;
+        let ta: Arc<Thread> = Thread::new(id, self.into())?;
+
+        let mut inner = self.inner.lock();
+        match inner.threads.entry(id) {
+            rbtree::Entry::Vacant(entry) => {
+                entry.insert(ta.clone(), reservation);
+                Ok(ta)
+            }
+            rbtree::Entry::Occupied(_entry) => {
+                pr_err!("Cannot create two threads with the same id.");
+                Err(EINVAL)
+            }
+        }
+    }
+
+    fn version(&self, data: UserSlice) -> Result {
+        data.writer().write(&BinderVersion::current())
+    }
+
+    pub(crate) fn register_thread(&self) -> bool {
+        self.inner.lock().register_thread()
+    }
+
+    fn remove_thread(&self, thread: Arc<Thread>) {
+        self.inner.lock().threads.remove(&thread.id);
+        thread.release();
+    }
+
+    fn set_max_threads(&self, max: u32) {
+        self.inner.lock().max_threads = max;
+    }
+
+    pub(crate) fn needs_thread(&self) -> bool {
+        let mut inner = self.inner.lock();
+        let ret =
+            inner.requested_thread_count == 0 && inner.started_thread_count < inner.max_threads;
+        if ret {
+            inner.requested_thread_count += 1
+        }
+        ret
+    }
+
     fn deferred_flush(&self) {
         // NOOP for now.
     }
@@ -131,10 +223,17 @@ impl Process {
         self.inner.lock().is_dead = true;
 
         self.ctx.deregister_process(&self);
-    }
 
-    fn version(&self, data: UserSlice) -> Result {
-        data.writer().write(&BinderVersion::current())
+        // Move the threads out of `inner` so that we can iterate over them without holding the
+        // lock.
+        let mut inner = self.inner.lock();
+        let threads = take(&mut inner.threads);
+        drop(inner);
+
+        // Release all threads.
+        for thread in threads.values() {
+            thread.release();
+        }
     }
 }
 
@@ -144,12 +243,18 @@ impl Process {
     ///
     /// The kernel will only read from the pointer that userspace provided to us.
     fn ioctl_write_only(
-        _this: ArcBorrow<'_, Process>,
+        this: ArcBorrow<'_, Process>,
         _file: &File,
-        _cmd: u32,
-        _reader: &mut UserSliceReader,
+        cmd: u32,
+        reader: &mut UserSliceReader,
     ) -> Result {
-        Err(EINVAL)
+        let thread = this.get_current_thread()?;
+        match cmd {
+            bindings::BINDER_SET_MAX_THREADS => this.set_max_threads(reader.read()?),
+            bindings::BINDER_THREAD_EXIT => this.remove_thread(thread),
+            _ => return Err(EINVAL),
+        }
+        Ok(())
     }
 
     /// Ioctls that are read/write from the perspective of userspace.
@@ -157,12 +262,16 @@ impl Process {
     /// The kernel will both read from and write to the pointer that userspace provided to us.
     fn ioctl_write_read(
         this: ArcBorrow<'_, Process>,
-        _file: &File,
+        file: &File,
         cmd: u32,
         data: UserSlice,
     ) -> Result {
+        let thread = this.get_current_thread()?;
+        let blocking = (file.flags() & file::flags::O_NONBLOCK) == 0;
         match cmd {
+            bindings::BINDER_WRITE_READ => thread.write_read(data, blocking)?,
             bindings::BINDER_VERSION => this.version(data)?,
+            bindings::BINDER_GET_EXTENDED_ERROR => thread.get_extended_error(data)?,
             _ => return Err(EINVAL),
         }
         Ok(())
