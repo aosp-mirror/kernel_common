@@ -1348,6 +1348,9 @@
   serial8250_unregister_port
   serial8250_update_uartclk
 
+# required by 8822ce.ko
+  netdev_set_default_ethtool_ops
+
 # required by act8865-regulator.ko
   regulator_set_pull_down_regmap
 
@@ -1358,6 +1361,30 @@
 
 # required by aes-ce-ccm.ko
   ce_aes_expandkey
+
+# required by aic8800_fdrv.ko
+  cfg80211_cqm_rssi_notify
+  cfg80211_cqm_pktloss_notify
+  cfg80211_rx_unexpected_4addr_frame
+  cfg80211_notify_new_peer_candidate
+  cfg80211_ft_event
+  cfg80211_report_obss_beacon_khz
+  ieee80211_amsdu_to_8023s
+  skb_append
+  cfg80211_probe_status
+  cfg80211_ch_switch_started_notify
+  ieee80211_chandef_to_operating_class
+  cfg80211_cac_event
+  cfg80211_radar_event
+
+# required by aic_btusb.ko
+  usb_interrupt_msg
+  usb_disable_autosuspend
+  __pskb_copy_fclone
+
+# required by aic_load_fw.ko
+  send_sig
+  wait_for_completion_killable_timeout
 
 # required by analogix_dp.ko
   drm_dp_start_crc
@@ -1584,6 +1611,10 @@
   of_clk_add_hw_provider
   of_clk_hw_simple_get
 
+# required by clk-out.ko
+  __clk_hw_register_gate
+  of_clk_parent_fill
+
 # required by clk-rk628.ko
   devm_reset_controller_register
 
@@ -1678,6 +1709,9 @@
 
 # required by dm9601.ko
   mii_link_ok
+
+# required by dw-dp.ko
+  hdmi_drm_infoframe_pack_only
 
 # required by dw-hdmi-hdcp.ko
   kstrtobool
@@ -1847,6 +1881,9 @@
   regulator_register_notifier
   regulator_unregister_notifier
 
+# required by it662x.ko
+  snd_pcm_rate_to_rate_bit
+
 # required by kalmia.ko
   usb_bulk_msg
 
@@ -1865,6 +1902,18 @@
 
 # required by lzo.ko
   lzo1x_1_compress
+
+# moal.ko
+  cpu_latency_qos_request_active
+  cfg80211_auth_timeout
+  in4_pton
+  iw_handler_set_spy
+  iw_handler_get_spy
+  iw_handler_set_thrspy
+  iw_handler_get_thrspy
+  cfg80211_report_wowlan_wakeup
+  sdio_release_irq
+  sdio_claim_irq
 
 # required by nvme-core.ko
   bd_set_nr_sectors
@@ -2143,6 +2192,15 @@
   gpiod_set_array_value_cansleep
   mmc_pwrseq_register
   mmc_pwrseq_unregister
+
+# required by r8168.ko
+  pci_set_mwi
+  pci_clear_mwi
+  proc_get_parent_data
+  skb_checksum_help
+  __skb_gso_segment
+  remove_proc_subtree
+  pci_choose_state
 
 # required by reboot-mode.ko
   devres_release
@@ -2530,6 +2588,9 @@
   __rtc_register_device
   rtc_update_irq
 
+# required by rtkm.ko
+  stack_trace_print
+
 # required by sdhci-of-arasan.ko
   __sdhci_add_host
   sdhci_cleanup_host
@@ -2551,6 +2612,10 @@
   sdhci_remove_host
   sdhci_request
 
+# required by sensorbox.ko
+  kernel_sigaction
+  hidraw_report_event
+
 # required by sensor_dev.ko
   class_create_file_ns
   class_remove_file_ns
@@ -2562,6 +2627,13 @@
 
 # required by sii902x.ko
   hdmi_avi_infoframe_pack
+
+# required by skw.ko
+  cfg80211_check_combinations
+  cfg80211_cqm_beacon_loss_notify
+  cfg80211_reg_can_beacon_relax
+  cfg80211_shutdown_all_interfaces
+  netdev_alloc_frag
 
 # required by smsc95xx.ko
   csum_partial
@@ -2604,12 +2676,20 @@
   snd_soc_dapm_new_widgets
 
 # required by snd-soc-rockchip-i2s-tdm.ko
+  clk_has_parent
   clk_is_match
   pm_runtime_forbid
   snd_pcm_stop_xrun
 
 # required by snd-soc-rockchip-i2s.ko
   of_prop_next_string
+
+# required by snd-soc-rockchip-multi-dais.ko
+  snd_soc_component_initialize
+  snd_soc_add_component
+  snd_soc_rtdcom_lookup
+  snd_pcm_format_size
+  snd_hwparams_to_dma_slave_config
 
 # required by snd-soc-rockchip-multicodecs.ko
   of_parse_phandle_with_fixed_args
@@ -2723,6 +2803,9 @@
   skb_tstamp_tx
   synchronize_net
 
+# required by swopwm.ko
+  devm_of_pwm_get
+
 # required by sw_sync.ko
   dma_fence_free
   dma_fence_signal_locked
@@ -2753,6 +2836,9 @@
 # required by timer-rockchip.ko
   clockevents_config_and_register
   irq_of_parse_and_map
+
+# required by touchE.ko
+  schedule_hrtimeout
 
 # required by tps65132-regulator.ko
   regulator_set_active_discharge_regmap
@@ -2816,6 +2902,20 @@
   usb_show_dynids
   usb_store_new_id
 
+# required by usb_audio.ko
+  usb_composite_probe
+  usb_get_function_instance
+  usb_string_ids_tab
+  usb_add_config
+  usb_gadget_connect
+  usb_put_function
+  usb_get_function
+  usb_composite_overwrite_options
+  usb_gadget_disconnect
+  usb_remove_function
+  usb_composite_unregister
+  usb_ep_autoconfig_reset
+
 # required by v4l2-fwnode.ko
   fwnode_device_is_available
   fwnode_graph_get_next_endpoint
@@ -2849,6 +2949,18 @@
 
 # required by vl6180.ko
   iio_read_const_attr
+
+# required by wlan_mt7663_usb.ko
+  cfg80211_assoc_timeout
+  skb_pull_rcsum
+  sched_set_normal
+  cfg80211_tx_mlme_mgmt
+  cfg80211_rx_mlme_mgmt
+  cfg80211_rx_assoc_resp
+  usb_string
+  usb_anchor_empty
+  usb_reset_endpoint
+  dev_valid_name
 
 # required by zram.ko
   __alloc_percpu
