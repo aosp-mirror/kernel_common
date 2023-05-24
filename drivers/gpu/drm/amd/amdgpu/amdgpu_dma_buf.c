@@ -38,6 +38,7 @@
 #include "amdgpu_xgmi.h"
 #include <drm/amdgpu_drm.h>
 #include <drm/ttm/ttm_tt.h>
+#include <drm/drm_drv.h>
 #include <linux/dma-buf.h>
 #include <linux/dma-fence-array.h>
 #include <linux/pci-p2pdma.h>
@@ -274,6 +275,49 @@ const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.vmap = drm_gem_dmabuf_vmap,
 	.vunmap = drm_gem_dmabuf_vunmap,
 };
+
+int amdgpu_try_dma_buf_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	struct drm_file *priv = filp->private_data;
+	struct drm_device *dev = priv->minor->dev;
+	struct amdgpu_device *adev = drm_to_adev(dev);
+	struct ttm_device *bdev = &adev->mman.bdev;
+	struct ttm_buffer_object *tbo = NULL;
+	struct drm_gem_object *obj = NULL;
+	struct drm_vma_offset_node *node;
+	int ret;
+
+	if (drm_dev_is_unplugged(dev))
+		return -ENODEV;
+
+	drm_vma_offset_lock_lookup(bdev->vma_manager);
+	node = drm_vma_offset_exact_lookup_locked(bdev->vma_manager,
+						  vma->vm_pgoff,
+						  vma_pages(vma));
+
+	if (likely(node)) {
+		tbo = container_of(node, struct ttm_buffer_object,
+				   base.vma_node);
+		tbo = ttm_bo_get_unless_zero(tbo);
+	}
+	drm_vma_offset_unlock_lookup(bdev->vma_manager);
+
+	if (!tbo)
+		return -EINVAL;
+
+	obj = &tbo->base;
+
+	if (!obj->import_attach) {
+		ret = -EINVAL;
+		goto done;
+	}
+
+	ret = dma_buf_mmap(obj->import_attach->dmabuf, vma, 0);
+
+done:
+	ttm_bo_put(tbo);
+	return ret;
+}
 
 /**
  * amdgpu_gem_prime_export - &drm_driver.gem_prime_export implementation

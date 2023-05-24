@@ -31,6 +31,8 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf);
 bool amdgpu_dmabuf_is_xgmi_accessible(struct amdgpu_device *adev,
 				      struct amdgpu_bo *bo);
+int amdgpu_try_dma_buf_mmap(struct file *filp,
+			    struct vm_area_struct *vma);
 
 extern const struct dma_buf_ops amdgpu_dmabuf_ops;
 
