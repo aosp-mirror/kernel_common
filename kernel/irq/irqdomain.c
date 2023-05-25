@@ -240,14 +240,14 @@ static void __irq_domain_publish(struct irq_domain *domain)
  * Allocates and initializes an irq_domain structure.
  * Returns pointer to IRQ domain, or NULL on failure.
  */
-struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode, int size,
+struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode, unsigned int size,
 				    irq_hw_number_t hwirq_max, int direct_max,
 				    const struct irq_domain_ops *ops,
 				    void *host_data)
 {
 	struct irq_domain *domain;
 
-	domain = __irq_domain_create(fwnode, (unsigned int)size, hwirq_max, direct_max,
+	domain = __irq_domain_create(fwnode, size, hwirq_max, direct_max,
 				     ops, host_data);
 	if (domain)
 		__irq_domain_publish(domain);
