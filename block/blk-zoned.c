@@ -57,7 +57,7 @@ EXPORT_SYMBOL_GPL(blk_zone_cond_str);
  */
 bool blk_req_needs_zone_write_lock(struct request *rq)
 {
-	return rq->q->seq_zones_wlock && blk_rq_is_seq_zone_write(rq);
+	return rq->q->seq_zones_wlock && blk_rq_is_seq_zoned_write(rq);
 }
 EXPORT_SYMBOL_GPL(blk_req_needs_zone_write_lock);
 
