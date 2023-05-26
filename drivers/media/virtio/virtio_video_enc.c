@@ -27,6 +27,12 @@ static void virtio_video_enc_buf_queue(struct vb2_buffer *vb)
 {
 	struct vb2_v4l2_buffer *v4l2_vb = to_vb2_v4l2_buffer(vb);
 	struct virtio_video_stream *stream = vb2_get_drv_priv(vb->vb2_queue);
+	struct virtio_video_buffer *virtio_vb = to_virtio_vb(vb);
+
+	/* Converting timestamp to usec for encoder to keep compatibility
+	 * with lower layers
+	 */
+	virtio_vb->timestamp = vb->timestamp / 1000;
 
 	v4l2_m2m_buf_queue(stream->fh.m2m_ctx, v4l2_vb);
 
@@ -222,7 +228,7 @@ int virtio_video_enc_init_ctrls(struct virtio_video_stream *stream)
 					 c_fmt->level->min);
 			break;
 		default:
-			v4l2_dbg(1, vv->debug,
+			v4l2_dbg(1, *vv->debug,
 				 &vv->v4l2_dev, "unsupported format\n");
 			break;
 		}
@@ -349,17 +355,31 @@ static int virtio_video_encoder_cmd(struct file *file, void *fh,
 					 V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
 
 		if (!vb2_is_streaming(src_vq)) {
-			v4l2_dbg(1, vv->debug,
+			v4l2_dbg(1, *vv->debug,
 				 &vv->v4l2_dev, "output is not streaming\n");
 			goto unlock;
 		}
 
 		if (!vb2_is_streaming(dst_vq)) {
-			v4l2_dbg(1, vv->debug,
+			v4l2_dbg(1, *vv->debug,
 				 &vv->v4l2_dev, "capture is not streaming\n");
 			goto unlock;
 		}
 
+		/* Drain request can not be started if not all buffers from
+		 * v4l2_m2m source queue have been placed on virtqueue already,
+		 * therefore if there are still buffers that need to be
+		 * processed, drain call must wait until virtio_video_worker
+		 * finish placing them.
+		 */
+		mutex_lock(src_vq->lock);
+		if (v4l2_m2m_next_src_buf(stream->fh.m2m_ctx) != NULL) {
+			vv->v4l2_m2m_src_queue_empty = false;
+			mutex_unlock(src_vq->lock);
+			wait_event(vv->wq, vv->v4l2_m2m_src_queue_empty);
+		} else {
+			mutex_unlock(src_vq->lock);
+		}
 		ret = virtio_video_cmd_stream_drain(vv, stream->stream_id);
 		if (ret) {
 			v4l2_err(&vv->v4l2_dev, "failed to drain stream\n");
@@ -464,12 +484,17 @@ static int virtio_video_enc_try_framerate(struct virtio_video_stream *stream,
 					  unsigned int fps)
 {
 	int rate_idx;
+	struct video_format_info *info = &stream->in_info;
 	struct video_format_frame *frame = NULL;
 
-	if (stream->current_frame == NULL)
+	frame = virtio_video_find_format(stream,
+					 V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE,
+					 info->fourcc_format,
+					 info->frame_width,
+					 info->frame_height);
+	if (IS_ERR_OR_NULL(frame))
 		return -EINVAL;
 
-	frame = stream->current_frame;
 	for (rate_idx = 0; rate_idx < frame->frame.num_rates; rate_idx++) {
 		struct virtio_video_format_range *frame_rate =
 			&frame->frame_rates[rate_idx];
@@ -497,14 +522,23 @@ static int virtio_video_enc_g_parm(struct file *file, void *priv,
 	struct v4l2_outputparm *out = &a->parm.output;
 	struct v4l2_fract *timeperframe = &out->timeperframe;
 
-	if (!V4L2_TYPE_IS_OUTPUT(a->type)) {
+	switch (a->type) {
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+		virtio_video_timeperframe_from_info(&stream->in_info,
+						    timeperframe);
+		break;
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
+		virtio_video_timeperframe_from_info(&stream->out_info,
+						    timeperframe);
+		break;
+	default:
 		v4l2_err(&vv->v4l2_dev,
-			 "getting FPS is only possible for the output queue\n");
+			 "getting FPS is only possible for the output or capture queue\n");
 		return -EINVAL;
+
 	}
 
 	out->capability = V4L2_CAP_TIMEPERFRAME;
-	virtio_video_timeperframe_from_info(&stream->in_info, timeperframe);
 
 	return 0;
 }
@@ -529,7 +563,7 @@ static int virtio_video_enc_s_parm(struct file *file, void *priv,
 	if (!timeperframe->denominator)
 		timeperframe->denominator = stps.denominator;
 
-	if (V4L2_TYPE_IS_OUTPUT(a->type)) {
+	if (a->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
 		if (!timeperframe->denominator) {
 			frame_rate = 0;
 		} else {
@@ -563,6 +597,14 @@ static int virtio_video_enc_s_parm(struct file *file, void *priv,
 	return 0;
 }
 
+static int virtio_video_enc_try_fmt(struct file *file, void *fh,
+				  struct v4l2_format *f)
+{
+	struct virtio_video_stream *stream = file2stream(file);
+
+	return virtio_video_try_fmt(stream, f);
+}
+
 static const struct v4l2_ioctl_ops virtio_video_enc_ioctl_ops = {
 	.vidioc_querycap	= virtio_video_querycap,
 
@@ -573,12 +615,18 @@ static const struct v4l2_ioctl_ops virtio_video_enc_ioctl_ops = {
 	.vidioc_g_fmt_vid_cap_mplane	= virtio_video_g_fmt,
 	.vidioc_s_fmt_vid_cap_mplane	= virtio_video_enc_s_fmt,
 
+	.vidioc_try_fmt_vid_cap		= virtio_video_enc_try_fmt,
+	.vidioc_try_fmt_vid_cap_mplane	= virtio_video_enc_try_fmt,
+
 	.vidioc_enum_fmt_vid_out = virtio_video_enc_enum_fmt_vid_out,
 	.vidioc_g_fmt_vid_out	= virtio_video_g_fmt,
 	.vidioc_s_fmt_vid_out	= virtio_video_enc_s_fmt,
 
 	.vidioc_g_fmt_vid_out_mplane	= virtio_video_g_fmt,
 	.vidioc_s_fmt_vid_out_mplane	= virtio_video_enc_s_fmt,
+
+	.vidioc_try_fmt_vid_out		= virtio_video_enc_try_fmt,
+	.vidioc_try_fmt_vid_out_mplane	= virtio_video_enc_try_fmt,
 
 	.vidioc_try_encoder_cmd	= virtio_video_try_encoder_cmd,
 	.vidioc_encoder_cmd	= virtio_video_encoder_cmd,

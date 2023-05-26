@@ -194,8 +194,8 @@ static int virtio_video_buf_init_guest_pages(struct vb2_buffer *vb)
 		}
 	}
 
-	v4l2_dbg(1, vv->debug, &vv->v4l2_dev, "mem entries:\n");
-	if (vv->debug >= 1) {
+	v4l2_dbg(1, *vv->debug, &vv->v4l2_dev, "mem entries:\n");
+	if (*vv->debug >= 1) {
 		for (i = 0; i < nents; i++)
 			pr_debug("\t%03i: addr=%llx length=%u\n", i,
 					ents[i].addr, ents[i].length);
@@ -434,8 +434,13 @@ int virtio_video_enum_framemintervals(struct file *file, void *fh,
 	} else {
 		f->stepwise.min.numerator = 1;
 		f->stepwise.min.denominator = frate->max;
-		f->stepwise.max.numerator = 1;
-		f->stepwise.max.denominator = frate->min;
+		if (frate->min != 0) {
+			f->stepwise.max.numerator = 1;
+			f->stepwise.max.denominator = frate->min;
+		} else {
+			f->stepwise.max.numerator = U32_MAX;
+			f->stepwise.max.denominator = 1;
+		}
 		f->stepwise.step.numerator = 1;
 		f->stepwise.step.denominator = frate->step;
 		if (frate->step == 1)
@@ -564,7 +569,7 @@ int virtio_video_g_selection(struct file *file, void *fh,
 		sel->r.height = info->crop.height;
 		break;
 	default:
-		v4l2_dbg(1, vvd->vv->debug, &vvd->vv->v4l2_dev,
+		v4l2_dbg(1, *vvd->vv->debug, &vvd->vv->v4l2_dev,
 			 "unsupported/invalid selection target: %d\n",
 			sel->target);
 		return -EINVAL;
@@ -594,50 +599,45 @@ int virtio_video_s_selection(struct file *file, void *fh,
 	return 0;
 }
 
-int virtio_video_try_fmt(struct virtio_video_stream *stream,
-			 struct v4l2_format *f)
+struct video_format_frame *
+virtio_video_find_format(struct virtio_video_stream *stream,
+			 uint32_t type, uint32_t pixelformat,
+			 uint32_t frame_width, uint32_t frame_height)
 {
 	int i, idx = 0;
-	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
 	struct virtio_video_device *vvd = to_virtio_vd(stream->video_dev);
 	struct video_format *fmt = NULL;
-	bool found = false;
 	struct video_format_frame *frm = NULL;
 	struct virtio_video_format_frame *frame = NULL;
 
-	if (V4L2_TYPE_IS_OUTPUT(f->type))
-		fmt = find_video_format(&vvd->input_fmt_list,
-					pix_mp->pixelformat);
-	else
+	switch (type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
 		fmt = find_video_format(&vvd->output_fmt_list,
-					pix_mp->pixelformat);
-
-	if (!fmt) {
-		if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
-			virtio_video_format_from_info(&stream->out_info,
-						      pix_mp);
-		else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
-			virtio_video_format_from_info(&stream->in_info,
-						      pix_mp);
-		else
-			return -EINVAL;
-		return 0;
+					pixelformat);
+		break;
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+		fmt = find_video_format(&vvd->input_fmt_list,
+					pixelformat);
+		break;
+	default:
+		return ERR_PTR(EINVAL);
 	}
 
+	if (!fmt)
+		return NULL;
 	/* For coded formats whose metadata are in steram */
-	if (pix_mp->width == 0 && pix_mp->height == 0)  {
-		stream->current_frame = &fmt->frames[0];
-		return 0;
+	if (frame_width == 0 && frame_height == 0)  {
+		return &fmt->frames[0];
 	}
 
-	for (i = 0; i < fmt->desc.num_frames && !found; i++) {
+	for (i = 0; i < fmt->desc.num_frames; i++) {
 		frm = &fmt->frames[i];
 		frame = &frm->frame;
-		if (!within_range(frame->width.min, pix_mp->width,
+		if (!within_range(frame->width.min, frame_width,
 				  frame->width.max))
 			continue;
 
-		if (!within_range(frame->height.min, pix_mp->height,
+		if (!within_range(frame->height.min, frame_height,
 				  frame->height.max))
 			continue;
 		idx = i;
@@ -645,32 +645,54 @@ int virtio_video_try_fmt(struct virtio_video_stream *stream,
 		 * Try to find a more suitable frame size. Go with the current
 		 * one otherwise.
 		 */
-		if (needs_alignment(pix_mp->width, frame->width.step))
+		if (needs_alignment(frame_width, frame->width.step))
 			continue;
 
-		if (needs_alignment(pix_mp->height, frame->height.step))
+		if (needs_alignment(frame_height, frame->height.step))
 			continue;
 
-		stream->current_frame = frm;
-		found = true;
+		return frm;
 	}
 
-	if (!found) {
-		frm = &fmt->frames[idx];
-		frame = &frm->frame;
-		pix_mp->width = clamp(pix_mp->width, frame->width.min,
-				      frame->width.max);
-		if (frame->width.step != 0)
-			pix_mp->width = ALIGN(pix_mp->width, frame->width.step);
+	frm = &fmt->frames[idx];
+	frame = &frm->frame;
+	frame_width = clamp(frame_width, frame->width.min,
+			      frame->width.max);
+	if (frame->width.step != 0)
+		frame_width = ALIGN(frame_width, frame->width.step);
 
-		pix_mp->height = clamp(pix_mp->height, frame->height.min,
-				       frame->height.max);
-		if (frame->height.step != 0)
-			pix_mp->height = ALIGN(pix_mp->height,
-					       frame->height.step);
-		stream->current_frame = frm;
+	frame_height = clamp(frame_height, frame->height.min,
+			     frame->height.max);
+	if (frame->height.step != 0)
+		frame_height = ALIGN(frame_height,
+				     frame->height.step);
+	return frm;
+}
+
+int virtio_video_try_fmt(struct virtio_video_stream *stream,
+			 struct v4l2_format *f)
+{
+	struct video_format_frame *frame;
+	struct video_format_info *info;
+
+	switch (f->type) {
+	case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
+		info = &stream->out_info;
+		break;
+	case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
+		info = &stream->in_info;
+		break;
+	default:
+		return -EINVAL;
 	}
 
+	frame = virtio_video_find_format(stream, f->type, info->fourcc_format,
+					 info->frame_width, info->frame_height);
+	if (frame != NULL)
+		return PTR_ERR_OR_ZERO(frame);
+
+	/* Given format is not supported, returning current */
+	virtio_video_format_from_info(info, &f->fmt.pix_mp);
 	return 0;
 }
 
@@ -723,23 +745,24 @@ int virtio_video_reqbufs(struct file *file, void *priv,
 				 VIRTIO_VIDEO_F_RESOURCE_VIRTIO_OBJECT)))
 		return -EINVAL;
 
-	if (rb->count == 0)
+	if (rb->count == 0) {
 		virtio_video_queue_free(vvd->vv, stream, vq->type);
-
-	/*
-	 * The memory type of the queue has been set, inform the host.
-	 * This needs to be done before calling v4l2_m2m_reqbufs() as it may
-	 * start creating host resources immediately, and we need the memory
-	 * type to be the correct one when that happens.
-	 */
-	if (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT)
-		params = &stream->in_info;
-	else
-		params = &stream->out_info;
-	params->resource_type = mem_type;
-	ret = virtio_video_cmd_set_params(vv, stream, params, queue_type);
-	if (ret)
-		return ret;
+	} else {
+		/*
+		 * The memory type of the queue has been set, inform the host.
+		 * This needs to be done before calling v4l2_m2m_reqbufs() as it may
+		 * start creating host resources immediately, and we need the memory
+		 * type to be the correct one when that happens.
+		 */
+		if (queue_type == VIRTIO_VIDEO_QUEUE_TYPE_INPUT)
+			params = &stream->in_info;
+		else
+			params = &stream->out_info;
+		params->resource_type = mem_type;
+		ret = virtio_video_cmd_set_params(vv, stream, params, queue_type);
+		if (ret)
+			return ret;
+	}
 
 	return v4l2_m2m_reqbufs(file, m2m_ctx, rb);
 }
@@ -918,6 +941,10 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 		switch (vvd->type) {
 		case VIRTIO_VIDEO_DEVICE_ENCODER:
 			vb->planes[0].bytesused = size;
+			/* Converting timestamp from usec to nsec after adopting
+			 * it to needs of lower layers
+			 */
+			vb->timestamp = timestamp * 1000;
 			break;
 		case VIRTIO_VIDEO_DEVICE_DECODER:
 			p_info = &stream->out_info;
@@ -938,10 +965,10 @@ void virtio_video_buf_done(struct virtio_video_buffer *virtio_vb,
 					vb->planes[i].bytesused =
 						p_info->plane_format[i].plane_size;
 			}
+			vb->timestamp = timestamp;
 			break;
 		}
 
-		vb->timestamp = timestamp;
 	}
 
 	v4l2_m2m_buf_done(v4l2_vb, done_state);
@@ -1024,7 +1051,10 @@ static void virtio_video_worker(struct work_struct *work)
 		stream->src_cleared = false;
 		src_vb = v4l2_m2m_src_buf_remove(stream->fh.m2m_ctx);
 	}
+	/* Inform about finishing processing buffers in case that drain is waiting */
+	vv->v4l2_m2m_src_queue_empty = true;
 	mutex_unlock(src_vq->lock);
+	wake_up(&vv->wq);
 
 	v4l2_m2m_job_finish(vvd->m2m_dev, stream->fh.m2m_ctx);
 }
@@ -1103,11 +1133,14 @@ static int virtio_video_device_open(struct file *file)
 		goto err_stream_get_params;
 	}
 
-	ret = virtio_video_cmd_get_control(vv, stream,
-					   VIRTIO_VIDEO_CONTROL_LEVEL);
-	if (ret) {
-		v4l2_err(&vv->v4l2_dev, "failed to get stream level\n");
-		goto err_stream_get_params;
+	if (vvd->type == VIRTIO_VIDEO_DEVICE_DECODER &&
+	    stream->in_info.fourcc_format == VIRTIO_VIDEO_FORMAT_H264) {
+		ret = virtio_video_cmd_get_control(vv, stream,
+						   VIRTIO_VIDEO_CONTROL_LEVEL);
+		if (ret) {
+			v4l2_err(&vv->v4l2_dev, "failed to get stream level\n");
+			goto err_stream_get_params;
+		}
 	}
 
 	if (vvd->type == VIRTIO_VIDEO_DEVICE_ENCODER) {
@@ -1210,6 +1243,7 @@ static int virtio_video_device_release(struct file *file)
 	struct virtio_video_device *vvd = video_drvdata(file);
 	struct virtio_video *vv = vvd->vv;
 
+	cancel_work_sync(&stream->work);
 	virtio_video_stream_id_put(vv, stream);
 
 	v4l2_fh_del(&stream->fh);
@@ -1300,7 +1334,7 @@ static int virtio_video_device_register(struct virtio_video_device *vvd)
 		return ret;
 	}
 
-	ret = video_register_device(vd, VFL_TYPE_VIDEO, 0);
+	ret = video_register_device_no_warn(vd, VFL_TYPE_VIDEO, 0);
 	if (ret) {
 		v4l2_err(&vv->v4l2_dev, "failed to register video device\n");
 		return ret;

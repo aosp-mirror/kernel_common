@@ -34,6 +34,14 @@ int dpu_rm_destroy(struct dpu_rm *rm)
 {
 	int i;
 
+	for (i = 0; i < ARRAY_SIZE(rm->dspp_blks); i++) {
+		struct dpu_hw_dspp *hw;
+
+		if (rm->dspp_blks[i]) {
+			hw = to_dpu_hw_dspp(rm->dspp_blks[i]);
+			dpu_hw_dspp_destroy(hw);
+		}
+	}
 	for (i = 0; i < ARRAY_SIZE(rm->pingpong_blks); i++) {
 		struct dpu_hw_pingpong *hw;
 
@@ -623,6 +631,11 @@ int dpu_rm_get_assigned_resources(struct dpu_rm *rm,
 		if (num_blks == blks_size) {
 			DPU_ERROR("More than %d resources assigned to enc %d\n",
 				  blks_size, enc_id);
+			break;
+		}
+		if (!hw_blks[i]) {
+			DPU_ERROR("Allocated resource %d unavailable to assign to enc %d\n",
+				  type, enc_id);
 			break;
 		}
 		blks[num_blks++] = hw_blks[i];

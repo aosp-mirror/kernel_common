@@ -206,7 +206,7 @@ failure:
  * to distribute these over the length of the file, entry[0] maps index x,
  * entry[1] maps index x + skip, entry[2] maps index x + 2 * skip, and so on.
  * The larger the file, the greater the skip factor.  The skip factor is
- * limited to the size of the metadata cache (SQUASHFS_CACHED_BLKS) to ensure
+ * limited to the size of the metadata cache (squashfs_cached_blks) to ensure
  * the number of metadata blocks that need to be read fits into the cache.
  * If the skip factor is limited in this way then the file will use multiple
  * slots.
@@ -215,7 +215,7 @@ static inline int calculate_skip(u64 blocks)
 {
 	u64 skip = blocks / ((SQUASHFS_META_ENTRIES + 1)
 		 * SQUASHFS_META_INDEXES);
-	return min((u64) SQUASHFS_CACHED_BLKS - 1, skip + 1);
+	return min((u64) squashfs_cached_blks() - 1, skip + 1);
 }
 
 

@@ -42,7 +42,7 @@ static struct rcu_ctrlblk rcu_ctrlblk = {
 
 void rcu_barrier(void)
 {
-	wait_rcu_gp(call_rcu);
+	wait_rcu_gp(call_rcu_flush);
 }
 EXPORT_SYMBOL(rcu_barrier);
 

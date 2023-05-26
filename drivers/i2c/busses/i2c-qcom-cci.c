@@ -558,7 +558,7 @@ static int cci_probe(struct platform_device *pdev)
 		cci->master[idx].adap.quirks = &cci->data->quirks;
 		cci->master[idx].adap.algo = &cci_algo;
 		cci->master[idx].adap.dev.parent = dev;
-		cci->master[idx].adap.dev.of_node = child;
+		cci->master[idx].adap.dev.of_node = of_node_get(child);
 		cci->master[idx].master = idx;
 		cci->master[idx].cci = cci;
 
@@ -638,26 +638,33 @@ static int cci_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto error;
 
-	for (i = 0; i < cci->data->num_masters; i++) {
-		if (!cci->master[i].cci)
-			continue;
-
-		ret = i2c_add_adapter(&cci->master[i].adap);
-		if (ret < 0)
-			goto error_i2c;
-	}
-
 	pm_runtime_set_autosuspend_delay(dev, MSEC_PER_SEC);
 	pm_runtime_use_autosuspend(dev);
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
 
+	for (i = 0; i < cci->data->num_masters; i++) {
+		if (!cci->master[i].cci)
+			continue;
+
+		ret = i2c_add_adapter(&cci->master[i].adap);
+		if (ret < 0) {
+			of_node_put(cci->master[i].adap.dev.of_node);
+			goto error_i2c;
+		}
+	}
+
 	return 0;
 
 error_i2c:
-	for (; i >= 0; i--) {
-		if (cci->master[i].cci)
+	pm_runtime_disable(dev);
+	pm_runtime_dont_use_autosuspend(dev);
+
+	for (--i ; i >= 0; i--) {
+		if (cci->master[i].cci) {
 			i2c_del_adapter(&cci->master[i].adap);
+			of_node_put(cci->master[i].adap.dev.of_node);
+		}
 	}
 error:
 	disable_irq(cci->irq);
@@ -673,8 +680,10 @@ static int cci_remove(struct platform_device *pdev)
 	int i;
 
 	for (i = 0; i < cci->data->num_masters; i++) {
-		if (cci->master[i].cci)
+		if (cci->master[i].cci) {
 			i2c_del_adapter(&cci->master[i].adap);
+			of_node_put(cci->master[i].adap.dev.of_node);
+		}
 		cci_halt(cci, i);
 	}
 

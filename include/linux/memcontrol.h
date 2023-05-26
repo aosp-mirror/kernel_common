@@ -197,12 +197,10 @@ struct obj_cgroup {
 	struct mem_cgroup *memcg;
 	atomic_t nr_charged_bytes;
 	union {
-		struct list_head list;
+		struct list_head list; /* protected by objcg_lock */
 		struct rcu_head rcu;
 	};
 };
-
-struct lru_gen_mm_list;
 
 /*
  * The memory controller data structure. The memory controller controls both
@@ -302,7 +300,8 @@ struct mem_cgroup {
 	int kmemcg_id;
 	enum memcg_kmem_state kmem_state;
 	struct obj_cgroup __rcu *objcg;
-	struct list_head objcg_list; /* list of inherited objcgs */
+	/* list of inherited objcgs, protected by objcg_lock */
+	struct list_head objcg_list;
 #endif
 
 	MEMCG_PADDING(_pad2_);
@@ -333,11 +332,12 @@ struct mem_cgroup {
 	struct deferred_split deferred_split_queue;
 #endif
 
+	ANDROID_OEM_DATA(1);
 #ifdef CONFIG_LRU_GEN
-	struct lru_gen_mm_list *mm_list;
+	/* per-memcg mm_struct list */
+	struct lru_gen_mm_list mm_list;
 #endif
 
-	ANDROID_OEM_DATA(1);
 	struct mem_cgroup_per_node *nodeinfo[0];
 	/* WARNING: nodeinfo must be the last member here */
 };
@@ -349,6 +349,9 @@ struct mem_cgroup {
 #define MEMCG_CHARGE_BATCH 32U
 
 extern struct mem_cgroup *root_mem_cgroup;
+
+struct lruvec *page_to_lruvec(struct page *page, pg_data_t *pgdat);
+void do_traversal_all_lruvec(void);
 
 static __always_inline bool memcg_stat_item_in_bytes(int idx)
 {
@@ -740,6 +743,23 @@ static inline unsigned long memcg_page_state_local(struct mem_cgroup *memcg,
 
 void __mod_memcg_state(struct mem_cgroup *memcg, int idx, int val);
 
+/* try to stablize page_memcg() for all the pages in a memcg */
+static inline bool mem_cgroup_trylock_pages(struct mem_cgroup *memcg)
+{
+	rcu_read_lock();
+
+	if (mem_cgroup_disabled() || !atomic_read(&memcg->moving_account))
+		return true;
+
+	rcu_read_unlock();
+	return false;
+}
+
+static inline void mem_cgroup_unlock_pages(void)
+{
+	rcu_read_unlock();
+}
+
 /* idx can be of type enum memcg_stat_item or node_stat_item */
 static inline void mod_memcg_state(struct mem_cgroup *memcg,
 				   int idx, int val)
@@ -974,6 +994,15 @@ void split_page_memcg(struct page *head, unsigned int nr);
 
 struct mem_cgroup;
 
+static inline struct lruvec *page_to_lruvec(struct page *page, pg_data_t *pgdat)
+{
+	return NULL;
+}
+
+static inline void do_traversal_all_lruvec(void)
+{
+}
+
 static inline bool mem_cgroup_is_root(struct mem_cgroup *memcg)
 {
 	return true;
@@ -1147,17 +1176,25 @@ mem_cgroup_print_oom_meminfo(struct mem_cgroup *memcg)
 
 static inline struct mem_cgroup *lock_page_memcg(struct page *page)
 {
-	/* to match page_memcg_rcu() */
-	rcu_read_lock();
 	return NULL;
 }
 
 static inline void __unlock_page_memcg(struct mem_cgroup *memcg)
 {
-	rcu_read_unlock();
 }
 
 static inline void unlock_page_memcg(struct page *page)
+{
+}
+
+static inline bool mem_cgroup_trylock_pages(struct mem_cgroup *memcg)
+{
+	/* to match page_memcg_rcu() */
+	rcu_read_lock();
+	return true;
+}
+
+static inline void mem_cgroup_unlock_pages(void)
 {
 	rcu_read_unlock();
 }

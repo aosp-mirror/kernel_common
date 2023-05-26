@@ -160,6 +160,9 @@ static struct sk_buff *xfrm4_beet_gso_segment(struct xfrm_state *x,
 			skb_shinfo(skb)->gso_type |= SKB_GSO_TCPV4;
 	}
 
+	if (proto == IPPROTO_IPV6)
+		skb_shinfo(skb)->gso_type |= SKB_GSO_IPXIP4;
+
 	__skb_pull(skb, skb_transport_offset(skb));
 	ops = rcu_dereference(inet_offloads[proto]);
 	if (likely(ops && ops->callbacks.gso_segment))
@@ -308,6 +311,9 @@ static int esp_xmit(struct xfrm_state *x, struct sk_buff *skb,  netdev_features_
 		else
 			xo->seq.low += skb_shinfo(skb)->gso_segs;
 	}
+
+	if (xo->seq.low < seq)
+		xo->seq.hi++;
 
 	esp.seqno = cpu_to_be64(seq + ((u64)xo->seq.hi << 32));
 
