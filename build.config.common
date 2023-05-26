@@ -3,7 +3,9 @@
 LLVM=1
 DEPMOD=depmod
 CLANG_PREBUILT_BIN=prebuilts/clang/host/linux-x86/clang-${CLANG_VERSION}/bin
+CLANGTOOLS_PREBUILT_BIN=prebuilts/clang-tools/linux-x86/bin
 BUILDTOOLS_PREBUILT_BIN=build/kernel/build-tools/path/linux-x86
+RUST_PREBUILT_BIN=prebuilts/rust/linux-x86/${RUSTC_VERSION}/bin
 DTC=${ROOT_DIR}/${BUILDTOOLS_PREBUILT_BIN}/dtc
 
 KCFLAGS="${KCFLAGS} -D__ANDROID_COMMON_KERNEL__"

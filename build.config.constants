@@ -1,7 +1,5 @@
 BRANCH=android-mainline
 CLANG_VERSION=r475365b
 RUSTC_VERSION=1.68.0
-CLANGTOOLS_PREBUILT_BIN=prebuilts/clang-tools/linux-x86/bin
-RUST_PREBUILT_BIN=prebuilts/rust/linux-x86/${RUSTC_VERSION}/bin
 AARCH64_NDK_TRIPLE=aarch64-linux-android31
 X86_64_NDK_TRIPLE=x86_64-linux-android31
