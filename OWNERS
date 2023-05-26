@@ -1,4 +1,3 @@
-include chromiumos/owners:v1:/kernel/OWNERS.all
 raging@google.com
 richardfung@google.com
 ynaffit@google.com
