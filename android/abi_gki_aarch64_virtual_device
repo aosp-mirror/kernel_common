@@ -1,6 +1,7 @@
 [abi_symbol_list]
 # commonly used symbols
   alloc_etherdev_mqs
+  alloc_netdev_mqs
   __alloc_pages
   __alloc_skb
   alloc_workqueue
@@ -11,12 +12,17 @@
   arm64_const_caps_ready
   arm64_use_ng_mappings
   bcmp
+  bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
+  bpf_trace_run4
+  bpf_trace_run5
+  bpf_trace_run6
   bt_err
   bt_info
   bt_warn
   build_skb
+  cancel_delayed_work
   cancel_delayed_work_sync
   cancel_work_sync
   __cfi_slowpath_diag
@@ -34,8 +40,11 @@
   consume_skb
   cpu_hwcap_keys
   cpu_hwcaps
+  cpumask_next
   cpu_number
   __cpu_online_mask
+  crc32_le
+  csum_partial
   debugfs_attr_read
   debugfs_attr_write
   debugfs_create_devm_seqfile
@@ -46,9 +55,13 @@
   debugfs_remove
   delayed_work_timer_fn
   del_timer
+  del_timer_sync
   destroy_workqueue
+  dev_alloc_name
+  dev_close
   dev_driver_string
   _dev_err
+  __dev_get_by_index
   device_create
   device_create_file
   device_init_wakeup
@@ -64,6 +77,7 @@
   devm_kmalloc
   devm_request_threaded_irq
   _dev_notice
+  _dev_printk
   dev_queue_xmit
   _dev_warn
   dma_alloc_attrs
@@ -133,14 +147,18 @@
   drm_simple_encoder_init
   drm_vblank_init
   ether_setup
+  eth_mac_addr
   ethtool_op_get_link
   ethtool_op_get_ts_info
   eth_type_trans
   eth_validate_addr
   event_triggers_call
   fd_install
+  _find_first_bit
+  _find_next_bit
   finish_wait
   firmware_request_nowarn
+  flush_delayed_work
   flush_work
   flush_workqueue
   fput
@@ -148,6 +166,9 @@
   free_netdev
   __free_pages
   free_pages
+  genlmsg_put
+  genl_register_family
+  genl_unregister_family
   get_device
   __get_free_pages
   get_random_bytes
@@ -167,26 +188,9 @@
   hrtimer_start_range_ns
   ida_alloc_range
   ida_free
-  ieee80211_alloc_hw_nm
-  ieee80211_beacon_cntdwn_is_complete
-  ieee80211_beacon_get_tim
-  ieee80211_csa_finish
-  ieee80211_free_hw
-  ieee80211_free_txskb
-  ieee80211_get_buffered_bc
-  ieee80211_get_hdrlen_from_skb
-  ieee80211_get_tx_rates
-  ieee80211_iterate_active_interfaces_atomic
-  ieee80211_queue_delayed_work
-  ieee80211_radar_detected
-  ieee80211_register_hw
-  ieee80211_send_bar
-  ieee80211_sta_register_airtime
-  ieee80211_stop_queues
-  ieee80211_stop_tx_ba_cb_irqsafe
-  ieee80211_tx_status_ext
-  ieee80211_unregister_hw
-  ieee80211_wake_queues
+  idr_alloc
+  idr_remove
+  init_net
   __init_swait_queue_head
   init_timer_key
   init_wait_entry
@@ -203,12 +207,15 @@
   iounmap
   is_vmalloc_addr
   jiffies
+  jiffies_to_msecs
   kasan_flag_enabled
   kfree
+  kfree_sensitive
   kfree_skb_reason
   kimage_voffset
   __kmalloc
   kmalloc_caches
+  kmalloc_order_trace
   kmem_cache_alloc_trace
   kmemdup
   kstrndup
@@ -220,6 +227,7 @@
   ktime_get
   ktime_get_with_offset
   kvfree
+  kvfree_call_rcu
   kvmalloc_node
   __list_add_valid
   __list_del_entry_valid
@@ -230,6 +238,7 @@
   memstart_addr
   misc_deregister
   misc_register
+  mod_delayed_work_on
   mod_timer
   module_layout
   __msecs_to_jiffies
@@ -245,6 +254,7 @@
   napi_gro_receive
   __napi_schedule
   napi_schedule_prep
+  __netdev_alloc_skb
   netdev_err
   netdev_info
   netdev_rx_handler_register
@@ -257,15 +267,21 @@
   netif_device_detach
   netif_napi_add
   __netif_napi_del
+  netif_receive_skb_list
   netif_rx
   netif_schedule_queue
   netif_tx_stop_all_queues
   netif_tx_wake_queue
+  netlink_broadcast
+  netlink_register_notifier
+  netlink_unicast
+  netlink_unregister_notifier
   net_ratelimit
   nf_conntrack_destroy
+  nla_memcpy
   __nla_parse
-  nla_put_64bit
   nla_put
+  nla_put_64bit
   no_llseek
   nonseekable_open
   noop_llseek
@@ -279,6 +295,7 @@
   page_pinner_inited
   __page_pinner_put_page
   param_ops_bool
+  param_ops_charp
   param_ops_int
   param_ops_uint
   passthru_features_check
@@ -315,6 +332,7 @@
   prepare_to_wait_event
   print_hex_dump
   _printk
+  pskb_expand_head
   __pskb_pull_tail
   ___pskb_trim
   put_device
@@ -333,12 +351,15 @@
   _raw_spin_unlock_bh
   _raw_spin_unlock_irq
   _raw_spin_unlock_irqrestore
+  rb_erase
+  rb_insert_color
   __rcu_read_lock
   __rcu_read_unlock
   refcount_warn_saturate
   register_netdev
   register_netdevice
   register_netdevice_notifier
+  register_pernet_device
   register_virtio_device
   register_virtio_driver
   __regmap_init
@@ -347,11 +368,17 @@
   remap_pfn_range
   request_firmware
   request_threaded_irq
+  rhashtable_insert_slow
+  __rht_bucket_nested
+  rht_bucket_nested
+  rht_bucket_nested_insert
+  rtnl_is_locked
   rtnl_lock
   rtnl_unlock
   sched_set_fifo_low
   schedule
   schedule_timeout
+  scnprintf
   seq_lseek
   seq_printf
   seq_puts
@@ -376,11 +403,17 @@
   single_open
   single_release
   skb_add_rx_frag
+  skb_clone
+  skb_copy
+  skb_copy_bits
+  skb_copy_expand
   skb_dequeue
   __skb_pad
   skb_pull
   skb_push
   skb_put
+  skb_queue_head
+  skb_queue_purge
   skb_queue_tail
   skb_to_sgvec
   skb_trim
@@ -393,17 +426,25 @@
   strcasecmp
   strchr
   strcmp
+  strcpy
   strlcpy
   strlen
   strncpy
   strscpy
+  __sw_hweight16
+  __sw_hweight32
   __sw_hweight8
   sync_file_create
   synchronize_irq
   synchronize_net
+  synchronize_rcu
   sysfs_create_group
   sysfs_remove_group
+  sysfs_remove_link
+  system_freezable_wq
   system_wq
+  __tasklet_schedule
+  tasklet_setup
   tasklet_unlock_wait
   trace_event_buffer_commit
   trace_event_buffer_reserve
@@ -416,8 +457,10 @@
   __ubsan_handle_cfi_check_fail_abort
   __udelay
   unregister_netdev
+  unregister_netdevice_many
   unregister_netdevice_notifier
   unregister_netdevice_queue
+  unregister_pernet_device
   unregister_virtio_device
   unregister_virtio_driver
   usb_add_hcd
@@ -446,6 +489,7 @@
   usb_reset_device
   usb_submit_urb
   usb_unanchor_urb
+  __usecs_to_jiffies
   usleep_range_state
   vabits_actual
   vfree
@@ -570,6 +614,55 @@
   usb_scuttle_anchored_urbs
   usb_set_interface
 
+# required by cfg80211.ko
+  bpf_trace_run10
+  bpf_trace_run7
+  bpf_trace_run8
+  __class_register
+  class_unregister
+  _ctype
+  debugfs_rename
+  __dev_change_net_namespace
+  dev_get_by_index
+  device_add
+  device_del
+  device_initialize
+  device_rename
+  dev_set_name
+  gcd
+  genlmsg_multicast_allns
+  get_net_ns_by_fd
+  get_net_ns_by_pid
+  inet_csk_get_port
+  init_uts_ns
+  key_create_or_update
+  key_put
+  keyring_alloc
+  ktime_get_coarse_with_offset
+  memcmp
+  netif_rx_ni
+  net_ns_type_operations
+  nla_find
+  nla_reserve
+  __nla_validate
+  of_prop_next_u32
+  __put_net
+  request_firmware_nowait
+  rfkill_alloc
+  rfkill_blocked
+  rfkill_destroy
+  rfkill_register
+  rfkill_resume_polling
+  rfkill_set_hw_state_reason
+  rfkill_unregister
+  __sock_create
+  sock_release
+  sysfs_create_link
+  system_power_efficient_wq
+  trace_print_array_seq
+  verify_pkcs7_signature
+  wireless_nlevent_flush
+
 # required by clk-vexpress-osc.ko
   clk_hw_set_rate_range
   devm_of_clk_add_hw_provider
@@ -584,7 +677,6 @@
 
 # required by dummy_hcd.ko
   ktime_get_ts64
-  scnprintf
   strstr
   usb_add_gadget_udc
   usb_del_gadget_udc
@@ -600,8 +692,6 @@
   dql_reset
   ethtool_convert_legacy_u32_to_link_mode
   ethtool_convert_link_mode_to_legacy_u32
-  _find_first_bit
-  _find_next_bit
   msleep_interruptible
   napi_get_frags
   napi_gro_frags
@@ -619,14 +709,11 @@
   pci_wake_from_d3
   pcix_get_mmrbc
   pcix_set_mmrbc
-  pskb_expand_head
-  skb_copy_bits
   system_state
   vzalloc
 
 # required by failover.ko
   netdev_master_upper_dev_link
-  rtnl_is_locked
 
 # required by goldfish_address_space.ko
   memremap
@@ -665,54 +752,80 @@
 # required by hci_vhci.ko
   _copy_from_iter
   iov_iter_revert
-  skb_queue_head
-  skb_queue_purge
+
+# required by mac80211.ko
+  __alloc_percpu_gfp
+  arc4_crypt
+  arc4_setkey
+  call_rcu
+  __cpu_possible_mask
+  crc32_be
+  crypto_aead_decrypt
+  crypto_aead_encrypt
+  crypto_aead_setauthsize
+  crypto_aead_setkey
+  crypto_alloc_aead
+  crypto_alloc_shash
+  crypto_alloc_skcipher
+  crypto_destroy_tfm
+  __crypto_memneq
+  crypto_shash_digest
+  crypto_shash_finup
+  crypto_shash_setkey
+  crypto_shash_update
+  crypto_skcipher_decrypt
+  crypto_skcipher_encrypt
+  crypto_skcipher_setkey
+  __crypto_xor
+  dev_fetch_sw_netstats
+  free_percpu
+  get_random_u32
+  __hw_addr_init
+  __hw_addr_sync
+  __hw_addr_unsync
+  idr_destroy
+  idr_find
+  idr_for_each
+  idr_get_next
+  kernel_param_lock
+  kernel_param_unlock
+  kfree_skb_list
+  ktime_get_seconds
+  netdev_set_default_ethtool_ops
+  netif_receive_skb
+  __per_cpu_offset
+  prandom_bytes
+  rb_next
+  rb_prev
+  rcu_barrier
+  register_inet6addr_notifier
+  register_inetaddr_notifier
+  rhashtable_free_and_destroy
+  rhltable_init
+  round_jiffies
+  round_jiffies_relative
+  round_jiffies_up
+  skb_checksum_help
+  skb_clone_sk
+  skb_complete_wifi_ack
+  skb_ensure_writable
+  __skb_get_hash
+  __skb_gso_segment
+  __sw_hweight64
+  tasklet_kill
+  unregister_inet6addr_notifier
+  unregister_inetaddr_notifier
 
 # required by mac80211_hwsim.ko
-  alloc_netdev_mqs
-  __cfg80211_alloc_event_skb
-  __cfg80211_alloc_reply_skb
-  __cfg80211_send_event_skb
-  cfg80211_vendor_cmd_reply
-  dev_alloc_name
   device_bind_driver
   device_release_driver
   dst_release
-  eth_mac_addr
-  genlmsg_put
   genl_notify
-  genl_register_family
-  genl_unregister_family
-  ieee80211_probereq_get
-  ieee80211_ready_on_channel
-  ieee80211_remain_on_channel_expired
-  ieee80211_rx_irqsafe
-  ieee80211_scan_completed
-  ieee80211_tx_prepare_skb
-  ieee80211_tx_status_irqsafe
-  init_net
-  jiffies_to_msecs
-  __netdev_alloc_skb
-  netlink_broadcast
-  netlink_register_notifier
-  netlink_unicast
-  netlink_unregister_notifier
   net_namespace_list
-  nla_memcpy
-  register_pernet_device
-  regulatory_hint
   rhashtable_destroy
   rhashtable_init
-  rhashtable_insert_slow
-  __rht_bucket_nested
-  rht_bucket_nested
-  rht_bucket_nested_insert
   schedule_timeout_interruptible
-  skb_copy
-  skb_copy_expand
   __skb_ext_put
-  unregister_pernet_device
-  wiphy_apply_custom_regulatory
 
 # required by mt76-usb.ko
   usb_init_urb
@@ -725,29 +838,13 @@
   debugfs_create_file_unsafe
   devm_kmemdup
   dev_set_threaded
-  idr_alloc
-  idr_remove
-  ieee80211_calc_rx_airtime
-  ieee80211_find_sta_by_ifaddr
-  ieee80211_get_key_rx_seq
-  ieee80211_next_txq
-  ieee80211_return_txq
-  ieee80211_rx_list
-  ieee80211_sta_eosp
-  ieee80211_sta_pspoll
-  ieee80211_sta_ps_transition
-  ieee80211_sta_uapsd_trigger
-  ieee80211_tx_dequeue
-  ieee80211_txq_schedule_start
   init_dummy_netdev
   __ioread32_copy
   __iowrite32_copy
   kthread_parkme
   kthread_should_park
-  kvfree_call_rcu
   led_classdev_register_ext
   led_classdev_unregister
-  netif_receive_skb_list
   of_get_child_by_name
   of_get_mac_address
   of_get_next_child
@@ -755,24 +852,13 @@
   pci_disable_link_state
   pcie_capability_clear_and_set_word
   pcie_capability_read_word
-  rfc1042_header
-  wiphy_read_of_freq_limits
 
 # required by mt76x02-lib.ko
-  bpf_trace_run1
   debugfs_create_bool
-  ieee80211_calc_tx_airtime
-  ieee80211_hdrlen
-  ieee80211_iter_keys_rcu
-  ieee80211_restart_hw
   __kfifo_init
-  __tasklet_schedule
-  tasklet_setup
-  wiphy_to_ieee80211_hw
 
 # required by mt76x02-usb.ko
   hrtimer_active
-  ieee80211_iterate_interfaces
   system_highpri_wq
 
 # required by nd_virtio.ko
@@ -784,7 +870,6 @@
 
 # required by net_failover.ko
   call_netdevice_notifiers
-  dev_close
   dev_get_stats
   dev_mc_sync_multiple
   dev_mc_unsync
@@ -839,7 +924,6 @@
 # required by psmouse.ko
   bus_register_notifier
   bus_unregister_notifier
-  del_timer_sync
   device_add_groups
   device_remove_groups
   i2c_adapter_type
@@ -925,7 +1009,6 @@
   of_platform_populate
   of_root
   regmap_exit
-  __usecs_to_jiffies
 
 # required by vexpress-sysreg.ko
   bgpio_init
@@ -939,29 +1022,15 @@
   kstrtoll
   platform_bus
   sockfd_lookup
-  sysfs_remove_link
   usb_speed_string
 
 # required by virt_wifi.ko
-  cfg80211_connect_done
-  cfg80211_disconnected
-  cfg80211_inform_bss_data
-  cfg80211_put_bss
-  cfg80211_scan_done
-  __dev_get_by_index
-  _dev_printk
   __module_get
   module_put
   netdev_upper_dev_link
   netif_stacked_transfer_operstate
   rtnl_link_register
   rtnl_link_unregister
-  skb_clone
-  unregister_netdevice_many
-  wiphy_free
-  wiphy_new_nm
-  wiphy_register
-  wiphy_unregister
 
 # required by virtio-gpu.ko
   __devm_request_region
@@ -1039,7 +1108,6 @@
   drm_universal_plane_init
   __get_task_comm
   iomem_resource
-  kmalloc_order_trace
   kmem_cache_alloc
   kmem_cache_create
   kmem_cache_destroy
@@ -1082,7 +1150,6 @@
   __SetPageMovable
   si_mem_available
   si_meminfo
-  system_freezable_wq
   unregister_oom_notifier
   unregister_shrinker
   virtqueue_disable_dma_api_for_buffers
@@ -1175,7 +1242,6 @@
   __cpuhp_setup_state
   __cpuhp_state_add_instance
   __cpuhp_state_remove_instance
-  cpumask_next
   cpumask_next_wrap
   cpus_read_lock
   cpus_read_unlock
@@ -1251,7 +1317,6 @@
   wait_for_completion_interruptible_timeout
 
 # required by vkms.ko
-  crc32_le
   __devm_drm_dev_alloc
   devres_open_group
   devres_release_group
@@ -1290,7 +1355,6 @@
 
 # required by vmw_vsock_virtio_transport.ko
   sk_error_report
-  synchronize_rcu
   virtio_transport_connect
   virtio_transport_deliver_tap_pkt
   virtio_transport_destruct
@@ -1336,14 +1400,10 @@
   __blk_alloc_disk
   blk_queue_flag_clear
   capable
-  __class_register
-  class_unregister
   contig_page_data
-  __cpu_possible_mask
   crypto_alloc_base
   crypto_comp_compress
   crypto_comp_decompress
-  crypto_destroy_tfm
   crypto_has_alg
   dec_zone_page_state
   disk_end_io_acct
@@ -1351,13 +1411,9 @@
   down_read
   down_write
   flush_dcache_page
-  free_percpu
   fsync_bdev
   hex_asc_upper
   hex_to_bin
-  idr_destroy
-  idr_find
-  idr_for_each
   inc_zone_page_state
   __init_rwsem
   kstrdup
@@ -1365,17 +1421,14 @@
   kstrtoull
   memset64
   mutex_is_locked
-  netif_rx_ni
   page_endio
   page_mapping
-  __per_cpu_offset
   _raw_read_lock
   _raw_read_unlock
   _raw_write_lock
   _raw_write_unlock
   set_capacity
   sock_efree
-  strcpy
   sysfs_streq
   tty_hangup
   tty_mode_ioctl

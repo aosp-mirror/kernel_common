@@ -108,37 +108,6 @@
   cdev_init
   cec_notifier_set_phys_addr
   cec_notifier_set_phys_addr_from_edid
-  __cfg80211_alloc_event_skb
-  __cfg80211_alloc_reply_skb
-  cfg80211_assoc_failure
-  cfg80211_calculate_bitrate
-  cfg80211_chandef_create
-  cfg80211_ch_switch_notify
-  cfg80211_ch_switch_started_notify
-  cfg80211_connect_done
-  cfg80211_del_sta_sinfo
-  cfg80211_disconnected
-  cfg80211_ft_event
-  cfg80211_get_bss
-  cfg80211_gtk_rekey_notify
-  cfg80211_ibss_joined
-  cfg80211_inform_bss_frame_data
-  cfg80211_mgmt_tx_status_ext
-  cfg80211_michael_mic_failure
-  cfg80211_new_sta
-  cfg80211_pmksa_candidate_notify
-  cfg80211_put_bss
-  cfg80211_ready_on_channel
-  cfg80211_remain_on_channel_expired
-  cfg80211_roamed
-  cfg80211_rx_mgmt_ext
-  cfg80211_rx_unprot_mlme_mgmt
-  cfg80211_scan_done
-  cfg80211_sched_scan_results
-  __cfg80211_send_event_skb
-  cfg80211_tdls_oper_request
-  cfg80211_unlink_bss
-  cfg80211_vendor_cmd_reply
   __cfi_slowpath_diag
   __check_object_size
   __class_create
@@ -283,9 +252,9 @@
   crypto_unregister_shash
   crypto_unregister_skcipher
   __crypto_xor
+  css_next_descendant_pre
   csum_ipv6_magic
   csum_partial
-  css_next_descendant_pre
   _ctype
   current_time
   current_umask
@@ -353,6 +322,7 @@
   __dev_kfree_skb_any
   devm_add_action
   devm_alloc_etherdev_mqs
+  devm_blk_crypto_profile_init
   devm_clk_bulk_get_all
   devm_clk_get
   devm_clk_get_optional
@@ -744,9 +714,9 @@
   flow_rule_match_vlan
   flush_dcache_page
   flush_delayed_work
+  flush_signals
   flush_work
   flush_workqueue
-  flush_signals
   fpsimd_context_busy
   fput
   free_irq
@@ -916,10 +886,6 @@
   idr_get_next
   idr_remove
   idr_replace
-  ieee80211_channel_to_freq_khz
-  ieee80211_freq_khz_to_channel
-  ieee80211_get_channel_khz
-  ieee80211_hdrlen
   iget5_locked
   iget_failed
   ihold
@@ -1153,6 +1119,9 @@
   mmc_alloc_host
   mmc_card_is_blockaddr
   __mmc_claim_host
+  mmc_cmdq_disable
+  mmc_cmdq_enable
+  mmc_cqe_request_done
   mmc_detect_change
   mmc_free_host
   mmc_gpio_get_cd
@@ -1305,6 +1274,7 @@
   of_property_read_string
   of_property_read_string_helper
   of_property_read_u32_index
+  of_property_read_u64
   of_property_read_variable_u16_array
   of_property_read_variable_u32_array
   of_property_read_variable_u8_array
@@ -1351,6 +1321,8 @@
   param_ops_ushort
   param_set_charp
   param_set_copystring
+  pci_disable_device
+  pci_enable_device
   pci_find_next_bus
   pci_generic_config_read
   pci_generic_config_write
@@ -1582,8 +1554,6 @@
   regulator_map_voltage_iterate
   regulator_put
   regulator_set_voltage
-  regulatory_hint
-  regulatory_set_wiphy_regd_sync
   release_firmware
   __release_region
   release_resource
@@ -1747,9 +1717,9 @@
   skb_trim
   skb_tstamp_tx
   skip_spaces
+  smpboot_register_percpu_thread
   smp_call_function
   smp_call_function_single
-  smpboot_register_percpu_thread
   snd_ctl_add
   snd_ctl_boolean_mono_info
   snd_ctl_enum_info
@@ -1936,6 +1906,7 @@
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
   __traceiter_android_vh_dump_throttled_rt_tasks
+  __traceiter_android_vh_ftrace_format_check
   __traceiter_android_vh_iommu_iovad_free_iova
   __traceiter_android_vh_mem_cgroup_alloc
   __traceiter_android_vh_rmqueue
@@ -1961,6 +1932,7 @@
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
   __tracepoint_android_vh_dump_throttled_rt_tasks
+  __tracepoint_android_vh_ftrace_format_check
   __tracepoint_android_vh_iommu_iovad_free_iova
   __tracepoint_android_vh_mem_cgroup_alloc
   __tracepoint_android_vh_rmqueue
@@ -2038,18 +2010,35 @@
   usb_add_gadget_udc
   usb_add_hcd
   usb_add_phy_dev
+  usb_alloc_urb
+  usb_anchor_urb
+  usb_autopm_get_interface
+  usb_autopm_put_interface
+  usb_control_msg
   usb_create_hcd
   usb_del_gadget_udc
+  usb_deregister
   usb_disable_autosuspend
+  usb_driver_claim_interface
+  usb_driver_release_interface
   usb_ep_set_maxpacket_limit
+  usb_free_urb
   usb_gadget_probe_driver
   usb_gadget_unregister_driver
+  usb_get_from_anchor
   usb_hcd_check_unlink_urb
   usb_hcd_giveback_urb
   usb_hcd_resume_root_hub
+  usb_ifnum_to_if
   usb_interrupt_msg
+  usb_kill_anchored_urbs
   usb_put_hcd
+  usb_register_driver
   usb_remove_hcd
+  usb_scuttle_anchored_urbs
+  usb_set_interface
+  usb_submit_urb
+  usb_unanchor_urb
   __usecs_to_jiffies
   usleep_range_state
   utf16s_to_utf8s
@@ -2157,10 +2146,6 @@
   wakeup_source_unregister
   __wake_up_sync
   __warn_printk
-  wiphy_free
-  wiphy_new_nm
-  wiphy_register
-  wiphy_unregister
   wireless_nlevent_flush
   wireless_send_event
   work_busy
