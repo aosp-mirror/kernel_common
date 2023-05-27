@@ -23,7 +23,11 @@ int main(void)
 #endif
 	DEFINE(SPINLOCK_SIZE, sizeof(spinlock_t));
 #ifdef CONFIG_LRU_GEN
-	DEFINE(LRU_GEN_WIDTH, order_base_2(CONFIG_NR_LRU_GENS + 1));
+	DEFINE(LRU_GEN_WIDTH, order_base_2(MAX_NR_GENS + 1));
+	DEFINE(__LRU_REFS_WIDTH, MAX_NR_TIERS - 2);
+#else
+	DEFINE(LRU_GEN_WIDTH, 0);
+	DEFINE(__LRU_REFS_WIDTH, 0);
 #endif
 	/* End of constants */
 

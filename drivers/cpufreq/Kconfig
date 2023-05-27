@@ -231,6 +231,19 @@ config CPUFREQ_DT
 
 	  If in doubt, say N.
 
+config CPUFREQ_KVM
+        tristate "KVM cpufreq driver"
+        help
+          This adds a virtualized KVM cpufreq driver for guest kernels that
+	  uses hypercalls to communicate with the host. It sends utilization
+	  updates to the host and gets used to schedule vCPU threads and
+	  select CPU frequency. If a VM does not support a virtualized FIE
+	  such as AMUs, it updates the frequency scaling factor by polling
+	  host CPU frequency to enable accurate Per-Entity Load Tracking
+	  for tasks running in the guest.
+
+	  If in doubt, say N.
+
 config CPUFREQ_DT_PLATDEV
 	bool
 	help

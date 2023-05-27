@@ -15,8 +15,6 @@
 #include <linux/page-flags-layout.h>
 #include <linux/workqueue.h>
 #include <linux/seqlock.h>
-#include <linux/nodemask.h>
-#include <linux/mmdebug.h>
 #include <linux/android_kabi.h>
 
 #include <asm/mmu.h>
@@ -600,24 +598,24 @@ struct mm_struct {
 #ifdef CONFIG_IOMMU_SUPPORT
 		u32 pasid;
 #endif
-#ifdef CONFIG_LRU_GEN
-		struct {
-			/* the node of a global or per-memcg mm_struct list */
-			struct list_head list;
-#ifdef CONFIG_MEMCG
-			/* points to the memcg of the owner task above */
-			struct mem_cgroup *memcg;
-#endif
-			/* whether this mm_struct has been used since the last walk */
-			nodemask_t nodes;
-#ifndef CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH
-			/* the number of CPUs using this mm_struct */
-			atomic_t nr_cpus;
-#endif
-		} lrugen;
-#endif
 
 		ANDROID_KABI_RESERVE(1);
+#ifdef CONFIG_LRU_GEN
+		struct {
+			/* this mm_struct is on lru_gen_mm_list */
+			struct list_head list;
+			/*
+			 * Set when switching to this mm_struct, as a hint of
+			 * whether it has been used since the last time per-node
+			 * page table walkers cleared the corresponding bits.
+			 */
+			unsigned long bitmap;
+#ifdef CONFIG_MEMCG
+			/* points to the memcg of "owner" above */
+			struct mem_cgroup *memcg;
+#endif
+		} lru_gen;
+#endif /* CONFIG_LRU_GEN */
 	} __randomize_layout;
 
 	/*
@@ -646,56 +644,39 @@ static inline cpumask_t *mm_cpumask(struct mm_struct *mm)
 
 #ifdef CONFIG_LRU_GEN
 
+struct lru_gen_mm_list {
+	/* mm_struct list for page table walkers */
+	struct list_head fifo;
+	/* protects the list above */
+	spinlock_t lock;
+};
+
 void lru_gen_add_mm(struct mm_struct *mm);
 void lru_gen_del_mm(struct mm_struct *mm);
 #ifdef CONFIG_MEMCG
-int lru_gen_alloc_mm_list(struct mem_cgroup *memcg);
-void lru_gen_free_mm_list(struct mem_cgroup *memcg);
 void lru_gen_migrate_mm(struct mm_struct *mm);
 #endif
 
 static inline void lru_gen_init_mm(struct mm_struct *mm)
 {
-	INIT_LIST_HEAD(&mm->lrugen.list);
+	INIT_LIST_HEAD(&mm->lru_gen.list);
+	mm->lru_gen.bitmap = 0;
 #ifdef CONFIG_MEMCG
-	mm->lrugen.memcg = NULL;
+	mm->lru_gen.memcg = NULL;
 #endif
-#ifndef CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH
-	atomic_set(&mm->lrugen.nr_cpus, 0);
-#endif
-	nodes_clear(mm->lrugen.nodes);
 }
 
-/* Track the usage of each mm_struct so that we can skip inactive ones. */
-static inline void lru_gen_switch_mm(struct mm_struct *old, struct mm_struct *new)
+static inline void lru_gen_use_mm(struct mm_struct *mm)
 {
-	/* exclude init_mm, efi_mm, etc. */
-	if (!core_kernel_data((unsigned long)old)) {
-		nodes_setall(old->lrugen.nodes);
-#ifndef CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH
-		atomic_dec(&old->lrugen.nr_cpus);
-#endif
-	}
-
-	if (!core_kernel_data((unsigned long)new)) {
-		VM_BUG_ON_MM(new == &init_mm, new);
-#ifndef CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH
-		atomic_inc(&new->lrugen.nr_cpus);
-#endif
-	}
+	/*
+	 * When the bitmap is set, page reclaim knows this mm_struct has been
+	 * used since the last time it cleared the bitmap. So it might be worth
+	 * walking the page tables of this mm_struct to clear the accessed bit.
+	 */
+	WRITE_ONCE(mm->lru_gen.bitmap, -1);
 }
 
-/* Return whether this mm_struct is being used on any CPUs. */
-static inline bool lru_gen_mm_is_active(struct mm_struct *mm)
-{
-#ifdef CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH
-	return !cpumask_empty(mm_cpumask(mm));
-#else
-	return atomic_read(&mm->lrugen.nr_cpus);
-#endif
-}
-
-#else /* CONFIG_LRU_GEN */
+#else /* !CONFIG_LRU_GEN */
 
 static inline void lru_gen_add_mm(struct mm_struct *mm)
 {
@@ -706,15 +687,6 @@ static inline void lru_gen_del_mm(struct mm_struct *mm)
 }
 
 #ifdef CONFIG_MEMCG
-static inline int lru_gen_alloc_mm_list(struct mem_cgroup *memcg)
-{
-	return 0;
-}
-
-static inline void lru_gen_free_mm_list(struct mem_cgroup *memcg)
-{
-}
-
 static inline void lru_gen_migrate_mm(struct mm_struct *mm)
 {
 }
@@ -724,13 +696,8 @@ static inline void lru_gen_init_mm(struct mm_struct *mm)
 {
 }
 
-static inline void lru_gen_switch_mm(struct mm_struct *old, struct mm_struct *new)
+static inline void lru_gen_use_mm(struct mm_struct *mm)
 {
-}
-
-static inline bool lru_gen_mm_is_active(struct mm_struct *mm)
-{
-	return false;
 }
 
 #endif /* CONFIG_LRU_GEN */

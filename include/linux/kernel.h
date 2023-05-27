@@ -47,6 +47,8 @@
  */
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
 
+#define PTR_IF(cond, ptr)	((cond) ? (ptr) : NULL)
+
 #define u64_to_user_ptr(x) (		\
 {					\
 	typecheck(u64, (x));		\
@@ -320,6 +322,7 @@ extern long (*panic_blink)(int state);
 __printf(1, 2)
 void panic(const char *fmt, ...) __noreturn __cold;
 void nmi_panic(struct pt_regs *regs, const char *msg);
+void check_panic_on_warn(const char *origin);
 extern void oops_enter(void);
 extern void oops_exit(void);
 extern bool oops_may_print(void);
@@ -520,12 +523,6 @@ static inline u32 int_sqrt64(u64 x)
 }
 #endif
 
-#ifdef CONFIG_SMP
-extern unsigned int sysctl_oops_all_cpu_backtrace;
-#else
-#define sysctl_oops_all_cpu_backtrace 0
-#endif /* CONFIG_SMP */
-
 extern void bust_spinlocks(int yes);
 extern int panic_timeout;
 extern unsigned long panic_print;
@@ -635,7 +632,11 @@ static inline char *hex_byte_pack_upper(char *buf, u8 byte)
 	return buf;
 }
 
+#ifdef __GENKSYMS__
 extern int hex_to_bin(char ch);
+#else
+extern int hex_to_bin(unsigned char ch);
+#endif
 extern int __must_check hex2bin(u8 *dst, const char *src, size_t count);
 extern char *bin2hex(char *dst, const void *src, size_t count);
 

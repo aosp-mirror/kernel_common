@@ -24,6 +24,7 @@
 #include <linux/pagemap.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/magic.h>
 #include <linux/xattr.h>
 
@@ -36,6 +37,15 @@
 
 static struct file_system_type squashfs_fs_type;
 static const struct super_operations squashfs_super_ops;
+
+static unsigned int cached_blks = 8;
+module_param(cached_blks, uint, 0644);
+MODULE_PARM_DESC(cached_blks, "Metadata squashfs cache size");
+
+unsigned int squashfs_cached_blks(void)
+{
+	return cached_blks;
+}
 
 static const struct squashfs_decompressor *supported_squashfs_filesystem(
 	struct fs_context *fc,
@@ -195,7 +205,7 @@ static int squashfs_fill_super(struct super_block *sb, struct fs_context *fc)
 	err = -ENOMEM;
 
 	msblk->block_cache = squashfs_cache_init("metadata",
-			SQUASHFS_CACHED_BLKS, SQUASHFS_METADATA_SIZE);
+			squashfs_cached_blks(), SQUASHFS_METADATA_SIZE);
 	if (msblk->block_cache == NULL)
 		goto failed_mount;
 

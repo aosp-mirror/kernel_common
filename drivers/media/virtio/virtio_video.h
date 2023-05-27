@@ -154,8 +154,12 @@ struct virtio_video {
 	bool supp_non_contig;
 	struct list_head devices_list;
 
-	int debug;
+	int *debug;
 	int use_dma_mem;
+	bool v4l2_m2m_src_queue_empty;
+
+	struct workqueue_struct *workqueue;
+	struct work_struct init_work;
 };
 
 struct virtio_video_device {
@@ -205,7 +209,6 @@ struct virtio_video_stream {
 	bool src_destroyed;
 	bool dst_destroyed;
 	struct work_struct work;
-	struct video_format_frame *current_frame;
 	struct mutex event_mutex;
 };
 
@@ -218,6 +221,9 @@ struct virtio_video_buffer {
 	uuid_t uuid;
 	uint32_t num_planes;
 	uint32_t plane_offsets[VIRTIO_VIDEO_MAX_PLANES];
+
+	/* Overrides the timestamp from vb2 */
+	uint64_t timestamp;
 };
 
 static inline gfp_t
@@ -419,6 +425,12 @@ uint32_t virtio_video_v4l2_profile_to_virtio(uint32_t v4l2_profile);
 uint32_t virtio_video_v4l2_level_to_virtio(uint32_t v4l2_level);
 uint32_t virtio_video_v4l2_bitrate_mode_to_virtio(uint32_t v4l2_bitrate_mode);
 
+const char *virtio_video_cmd_type_name(int type);
+
+struct video_format_frame *
+virtio_video_find_format(struct virtio_video_stream *stream,
+			 uint32_t type, uint32_t pixelformat,
+			 uint32_t frame_width, uint32_t frame_height);
 struct video_format *find_video_format(struct list_head *fmts_list,
 				       uint32_t fourcc);
 void virtio_video_format_from_info(struct video_format_info *info,
