@@ -361,9 +361,11 @@
   debugfs_create_atomic_t
   debugfs_create_blob
   debugfs_create_bool
+  debugfs_create_devm_seqfile
   debugfs_create_dir
   debugfs_create_file
   debugfs_create_size_t
+  debugfs_create_symlink
   debugfs_create_u16
   debugfs_create_u32
   debugfs_create_u64
@@ -1474,6 +1476,7 @@
   of_parse_phandle_with_fixed_args
   of_phandle_iterator_init
   of_phandle_iterator_next
+  of_platform_depopulate
   of_platform_populate
   of_property_count_elems_of_size
   of_property_match_string
@@ -2325,6 +2328,7 @@
   __traceiter_android_vh_typec_tcpm_get_timer
   __traceiter_android_vh_typec_tcpm_log
   __traceiter_android_vh_typec_tcpm_modify_src_caps
+  __traceiter_android_vh_uclamp_validate
   __traceiter_android_vh_ufs_check_int_errors
   __traceiter_android_vh_ufs_compl_command
   __traceiter_android_vh_ufs_fill_prdt
@@ -2346,6 +2350,8 @@
   __traceiter_dwc3_readl
   __traceiter_dwc3_writel
   __traceiter_gpu_mem_total
+  __traceiter_hrtimer_expire_entry
+  __traceiter_hrtimer_expire_exit
   __traceiter_irq_handler_entry
   __traceiter_irq_handler_exit
   __traceiter_mm_vmscan_direct_reclaim_begin
@@ -2366,6 +2372,8 @@
   __traceiter_softirq_entry
   __traceiter_softirq_exit
   __traceiter_suspend_resume
+  __traceiter_workqueue_execute_end
+  __traceiter_workqueue_execute_start
   trace_output_call
   __tracepoint_android_rvh_arm64_serror_panic
   __tracepoint_android_rvh_attach_entity_load_avg
@@ -2464,6 +2472,7 @@
   __tracepoint_android_vh_typec_tcpm_get_timer
   __tracepoint_android_vh_typec_tcpm_log
   __tracepoint_android_vh_typec_tcpm_modify_src_caps
+  __tracepoint_android_vh_uclamp_validate
   __tracepoint_android_vh_ufs_check_int_errors
   __tracepoint_android_vh_ufs_compl_command
   __tracepoint_android_vh_ufs_fill_prdt
@@ -2485,6 +2494,8 @@
   __tracepoint_dwc3_readl
   __tracepoint_dwc3_writel
   __tracepoint_gpu_mem_total
+  __tracepoint_hrtimer_expire_entry
+  __tracepoint_hrtimer_expire_exit
   __tracepoint_irq_handler_entry
   __tracepoint_irq_handler_exit
   __tracepoint_mm_vmscan_direct_reclaim_begin
@@ -2507,6 +2518,8 @@
   __tracepoint_softirq_entry
   __tracepoint_softirq_exit
   __tracepoint_suspend_resume
+  __tracepoint_workqueue_execute_end
+  __tracepoint_workqueue_execute_start
   trace_print_array_seq
   trace_print_bitmask_seq
   trace_print_flags_seq
