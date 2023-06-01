@@ -98,6 +98,7 @@
 #include <trace/hooks/gup.h>
 #include <trace/hooks/pci.h>
 #include <trace/hooks/suspend.h>
+#include <trace/hooks/dmabuf.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -283,6 +284,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_set_memory_nx);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_set_memory_ro);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_set_memory_rw);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_util_est_update);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_uclamp_validate);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_meminfo_proc_show);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_exit_mm);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_get_from_fragment_pool);
@@ -409,6 +411,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh___get_user_pages_remote);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_get_user_pages);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_internal_get_user_pages_fast);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pin_user_pages);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_dmabuf_heap_flags_validation);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_attach_entity_load_avg);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_detach_entity_load_avg);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_update_load_avg);
