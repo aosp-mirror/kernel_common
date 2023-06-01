@@ -301,7 +301,9 @@ DEFINE_IDTENTRY_SYSVEC(sysvec_kvm_hv_callback)
 		wrmsrl(MSR_KVM_ASYNC_PF_ACK, 1);
 	}
 
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
 	timekeeping_inject_virtual_suspend_time(kvm_get_suspend_time());
+#endif
 
 	set_irq_regs(old_regs);
 }
