@@ -99,8 +99,9 @@ typedef __u32 __bitwise req_flags_t;
 #define RQF_TIMED_OUT		((__force req_flags_t)(1 << 21))
 
 /* flags that prevent us from merging requests: */
-#define RQF_NOMERGE_FLAGS \
-	(RQF_STARTED | RQF_SOFTBARRIER | RQF_FLUSH_SEQ | RQF_SPECIAL_PAYLOAD)
+#define RQF_NOMERGE_FLAGS						\
+	(RQF_STARTED | RQF_SOFTBARRIER | RQF_FLUSH_SEQ | RQF_DONTPREP |	\
+	 RQF_SPECIAL_PAYLOAD)
 
 /*
  * Request state for blk-mq.
@@ -1031,13 +1032,13 @@ static inline unsigned int blk_rq_zone_is_seq(struct request *rq)
 }
 
 /**
- * blk_rq_is_seq_zone_write() - Whether @rq is a write request for a sequential zone.
+ * blk_rq_is_seq_zoned_write() - Whether @rq needs write serialization.
  * @rq: Request to examine.
  *
  * In this context sequential zone means either a sequential write required or
  * to a sequential write preferred zone.
  */
-static inline bool blk_rq_is_seq_zone_write(struct request *rq)
+static inline bool blk_rq_is_seq_zoned_write(struct request *rq)
 {
 	switch (req_op(rq)) {
 	case REQ_OP_WRITE_ZEROES:
@@ -1049,7 +1050,7 @@ static inline bool blk_rq_is_seq_zone_write(struct request *rq)
 	}
 }
 #else /* CONFIG_BLK_DEV_ZONED */
-static inline bool blk_rq_is_seq_zone_write(struct request *rq)
+static inline bool blk_rq_is_seq_zoned_write(struct request *rq)
 {
 	return false;
 }

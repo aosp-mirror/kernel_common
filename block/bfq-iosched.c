@@ -5197,6 +5197,10 @@ void bfq_put_queue(struct bfq_queue *bfqq)
 	if (bfqq->bfqd && bfqq->bfqd->last_completed_rq_bfqq == bfqq)
 		bfqq->bfqd->last_completed_rq_bfqq = NULL;
 
+	WARN_ON_ONCE(!list_empty(&bfqq->fifo));
+	WARN_ON_ONCE(!RB_EMPTY_ROOT(&bfqq->sort_list));
+	WARN_ON_ONCE(bfqq->dispatched);
+
 	kmem_cache_free(bfq_pool, bfqq);
 	bfqg_and_blkg_put(bfqg);
 }
@@ -6895,6 +6899,8 @@ static void bfq_exit_queue(struct elevator_queue *e)
 	list_for_each_entry_safe(bfqq, n, &bfqd->idle_list, bfqq_list)
 		bfq_deactivate_bfqq(bfqd, bfqq, false, false);
 	spin_unlock_irq(&bfqd->lock);
+
+	WARN_ON_ONCE(bfqd->rq_in_driver);
 
 	hrtimer_cancel(&bfqd->idle_slice_timer);
 

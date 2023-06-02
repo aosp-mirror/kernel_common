@@ -463,6 +463,9 @@ SYM_FUNC_START_LOCAL(__primary_switched)
 	ret					// to __primary_switch()
 0:
 #endif
+#ifdef CONFIG_UNWIND_PATCH_PAC_INTO_SCS
+	bl	scs_patch_vmlinux
+#endif
 	bl	switch_to_vhe			// Prefer VHE if possible
 	ldp	x29, x30, [sp], #16
 	bl	start_kernel
