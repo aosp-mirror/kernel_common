@@ -1680,7 +1680,6 @@
   sock_recv_errqueue
   sock_recvmsg
   __sock_recv_timestamp
-  __sock_recv_ts_and_drops
   __sock_recv_wifi_status
   sock_register
   sock_release
