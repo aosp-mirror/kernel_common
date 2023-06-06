@@ -613,7 +613,7 @@ static ssize_t vfd_out_locked(struct virtwl_vfd *vfd, char __user *buffer,
 			      size_t len)
 {
 	struct virtwl_vfd_qentry *qentry, *next;
-	ssize_t read_count = 0;
+	size_t read_count = 0;
 
 	list_for_each_entry_safe(qentry, next, &vfd->in_queue, list) {
 		struct virtio_wl_ctrl_vfd_recv *recv =
@@ -621,18 +621,20 @@ static ssize_t vfd_out_locked(struct virtwl_vfd *vfd, char __user *buffer,
 		size_t recv_offset = sizeof(*recv) + recv->vfd_count *
 				     sizeof(__le32) + qentry->data_offset;
 		u8 *buf = (u8 *)recv + recv_offset;
-		ssize_t to_read = (ssize_t)qentry->len - (ssize_t)recv_offset;
+		size_t to_read = (size_t)qentry->len - recv_offset;
+
+		/* Detect underflow caused by invalid recv->vfd_count value. */
+		if (to_read > (size_t)qentry->len)
+			return -EIO;
 
 		if (qentry->hdr->type != VIRTIO_WL_CMD_VFD_RECV)
 			continue;
 
-		if ((to_read + read_count) > len)
+		if (len - read_count < to_read)
 			to_read = len - read_count;
 
-		if (copy_to_user(buffer + read_count, buf, to_read)) {
-			read_count = -EFAULT;
-			break;
-		}
+		if (copy_to_user(buffer + read_count, buf, to_read))
+			return -EFAULT;
 
 		read_count += to_read;
 
