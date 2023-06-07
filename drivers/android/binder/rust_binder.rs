@@ -7,13 +7,15 @@
 use kernel::{
     bindings::{self, seq_file},
     fs::File,
+    list::{HasListLinks, ListArc, ListArcSafe, ListLinksSelfPtr, TryNewListArc},
     prelude::*,
     sync::poll::PollTable,
     sync::Arc,
-    types::ForeignOwnable,
+    types::{AsBytes, ForeignOwnable},
+    uaccess::UserSliceWriter,
 };
 
-use crate::{context::Context, process::Process};
+use crate::{context::Context, process::Process, thread::Thread};
 
 mod context;
 mod defs;
@@ -28,6 +30,112 @@ module! {
     author: "Wedson Almeida Filho, Alice Ryhl",
     description: "Android Binder",
     license: "GPL",
+}
+
+/// Provides a single place to write Binder return values via the
+/// supplied `UserSliceWriter`.
+pub(crate) struct BinderReturnWriter {
+    writer: UserSliceWriter,
+}
+
+#[allow(dead_code)]
+impl BinderReturnWriter {
+    fn new(writer: UserSliceWriter) -> Self {
+        BinderReturnWriter { writer }
+    }
+
+    /// Write a return code back to user space.
+    /// Should be a `BR_` constant from [`defs`] e.g. [`defs::BR_TRANSACTION_COMPLETE`].
+    fn write_code(&mut self, code: u32) -> Result {
+        self.writer.write(&code)
+    }
+
+    /// Write something *other than* a return code to user space.
+    fn write_payload<T: AsBytes>(&mut self, payload: &T) -> Result {
+        self.writer.write(payload)
+    }
+}
+
+/// Specifies how a type should be delivered to the read part of a BINDER_WRITE_READ ioctl.
+///
+/// When a value is pushed to the todo list for a process or thread, it is stored as a trait object
+/// with the type `Arc<dyn DeliverToRead>`. Trait objects are a Rust feature that lets you
+/// implement dynamic dispatch over many different types. This lets us store many different types
+/// in the todo list.
+trait DeliverToRead: ListArcSafe + Send + Sync {
+    /// Performs work. Returns true if remaining work items in the queue should be processed
+    /// immediately, or false if it should return to caller before processing additional work
+    /// items.
+    fn do_work(self: DArc<Self>, thread: &Thread, writer: &mut BinderReturnWriter) -> Result<bool>;
+
+    /// Cancels the given work item. This is called instead of [`DeliverToRead::do_work`] when work
+    /// won't be delivered.
+    fn cancel(self: DArc<Self>);
+
+    /// Should we use `wake_up_interruptible_sync` or `wake_up_interruptible` when scheduling this
+    /// work item?
+    ///
+    /// Generally only set to true for non-oneway transactions.
+    fn should_sync_wakeup(&self) -> bool;
+}
+
+// Wrapper around a `DeliverToRead` with linked list links.
+#[pin_data]
+struct DTRWrap<T: ?Sized> {
+    #[pin]
+    links: ListLinksSelfPtr<DTRWrap<dyn DeliverToRead>>,
+    #[pin]
+    wrapped: T,
+}
+kernel::list::impl_has_list_links_self_ptr! {
+    impl HasSelfPtr<DTRWrap<dyn DeliverToRead>> for DTRWrap<dyn DeliverToRead> { self.links }
+}
+kernel::list::impl_list_arc_safe! {
+    impl{T: ListArcSafe + ?Sized} ListArcSafe<0> for DTRWrap<T> {
+        tracked_by wrapped: T;
+    }
+}
+kernel::list::impl_list_item! {
+    impl ListItem<0> for DTRWrap<dyn DeliverToRead> {
+        using ListLinksSelfPtr;
+    }
+}
+
+impl<T: ?Sized> core::ops::Deref for DTRWrap<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.wrapped
+    }
+}
+
+impl<T: ?Sized> core::ops::Receiver for DTRWrap<T> {}
+
+type DArc<T> = kernel::sync::Arc<DTRWrap<T>>;
+type DLArc<T> = kernel::list::ListArc<DTRWrap<T>>;
+
+impl<T: ListArcSafe> DTRWrap<T> {
+    #[allow(dead_code)]
+    fn arc_try_new(val: T) -> Result<DLArc<T>, alloc::alloc::AllocError> {
+        ListArc::pin_init(
+            try_pin_init!(Self {
+                links <- ListLinksSelfPtr::new(),
+                wrapped: val,
+            }),
+            GFP_KERNEL,
+        )
+        .map_err(|_| alloc::alloc::AllocError)
+    }
+
+    #[allow(dead_code)]
+    fn arc_pin_init(init: impl PinInit<T>) -> Result<DLArc<T>, kernel::error::Error> {
+        ListArc::pin_init(
+            try_pin_init!(Self {
+                links <- ListLinksSelfPtr::new(),
+                wrapped <- init,
+            }),
+            GFP_KERNEL,
+        )
+    }
 }
 
 struct BinderModule {}
