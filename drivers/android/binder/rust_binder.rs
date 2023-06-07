@@ -20,6 +20,7 @@ use crate::{context::Context, process::Process, thread::Thread};
 mod context;
 mod defs;
 mod error;
+mod node;
 mod process;
 mod thread;
 mod trace;
@@ -38,7 +39,6 @@ pub(crate) struct BinderReturnWriter {
     writer: UserSliceWriter,
 }
 
-#[allow(dead_code)]
 impl BinderReturnWriter {
     fn new(writer: UserSliceWriter) -> Self {
         BinderReturnWriter { writer }
@@ -114,6 +114,13 @@ type DArc<T> = kernel::sync::Arc<DTRWrap<T>>;
 type DLArc<T> = kernel::list::ListArc<DTRWrap<T>>;
 
 impl<T: ListArcSafe> DTRWrap<T> {
+    fn new(val: impl PinInit<T>) -> impl PinInit<Self> {
+        pin_init!(Self {
+            links <- ListLinksSelfPtr::new(),
+            wrapped <- val,
+        })
+    }
+
     #[allow(dead_code)]
     fn arc_try_new(val: T) -> Result<DLArc<T>, alloc::alloc::AllocError> {
         ListArc::pin_init(
@@ -126,7 +133,6 @@ impl<T: ListArcSafe> DTRWrap<T> {
         .map_err(|_| alloc::alloc::AllocError)
     }
 
-    #[allow(dead_code)]
     fn arc_pin_init(init: impl PinInit<T>) -> Result<DLArc<T>, kernel::error::Error> {
         ListArc::pin_init(
             try_pin_init!(Self {

@@ -16,7 +16,7 @@ use kernel::{
     uaccess::UserSlice,
 };
 
-use crate::{defs::*, process::Process, DLArc, DTRWrap, DeliverToRead};
+use crate::{defs::*, process::Process, BinderReturnWriter, DLArc, DTRWrap, DeliverToRead};
 
 use core::mem::size_of;
 
@@ -92,7 +92,6 @@ impl InnerThread {
         ret
     }
 
-    #[allow(dead_code)]
     fn push_work(&mut self, work: DLArc<dyn DeliverToRead>) -> PushWorkRes {
         if self.is_dead {
             PushWorkRes::FailedDead(work)
@@ -105,7 +104,6 @@ impl InnerThread {
 
     /// Used to push work items that do not need to be processed immediately and can wait until the
     /// thread gets another work item.
-    #[allow(dead_code)]
     fn push_work_deferred(&mut self, work: DLArc<dyn DeliverToRead>) {
         self.work_list.push_back(work);
     }
@@ -297,7 +295,6 @@ impl Thread {
     /// Push the provided work item to be delivered to user space via this thread.
     ///
     /// Returns whether the item was successfully pushed. This can only fail if the thread is dead.
-    #[allow(dead_code)]
     pub(crate) fn push_work(&self, work: DLArc<dyn DeliverToRead>) -> PushWorkRes {
         let sync = work.should_sync_wakeup();
 
@@ -314,6 +311,10 @@ impl Thread {
         res
     }
 
+    pub(crate) fn push_work_deferred(&self, work: DLArc<dyn DeliverToRead>) {
+        self.inner.lock().push_work_deferred(work);
+    }
+
     fn write(self: &Arc<Self>, req: &mut BinderWriteRead) -> Result {
         let write_start = req.write_buffer.wrapping_add(req.write_consumed);
         let write_len = req.write_size - req.write_consumed;
@@ -323,6 +324,28 @@ impl Thread {
             let before = reader.len();
             let cmd = reader.read::<u32>()?;
             match cmd {
+                BC_INCREFS => {
+                    self.process
+                        .as_arc_borrow()
+                        .update_ref(reader.read()?, true, false)?
+                }
+                BC_ACQUIRE => {
+                    self.process
+                        .as_arc_borrow()
+                        .update_ref(reader.read()?, true, true)?
+                }
+                BC_RELEASE => {
+                    self.process
+                        .as_arc_borrow()
+                        .update_ref(reader.read()?, false, true)?
+                }
+                BC_DECREFS => {
+                    self.process
+                        .as_arc_borrow()
+                        .update_ref(reader.read()?, false, false)?
+                }
+                BC_INCREFS_DONE => self.process.inc_ref_done(&mut reader, false)?,
+                BC_ACQUIRE_DONE => self.process.inc_ref_done(&mut reader, true)?,
                 BC_REGISTER_LOOPER => {
                     let valid = self.process.register_thread();
                     self.inner.lock().looper_register(valid);
@@ -344,7 +367,8 @@ impl Thread {
     fn read(self: &Arc<Self>, req: &mut BinderWriteRead, wait: bool) -> Result {
         let read_start = req.read_buffer.wrapping_add(req.read_consumed);
         let read_len = req.read_size - req.read_consumed;
-        let mut writer = UserSlice::new(read_start as _, read_len as _).writer();
+        let mut writer =
+            BinderReturnWriter::new(UserSlice::new(read_start as _, read_len as _).writer());
         let (in_pool, use_proc_queue) = {
             let inner = self.inner.lock();
             (inner.is_looper(), inner.should_use_process_work_queue())
@@ -359,7 +383,7 @@ impl Thread {
         // BR_SPAWN_LOOPER if we need to.
         let mut has_noop_placeholder = false;
         if req.read_consumed == 0 {
-            if let Err(err) = writer.write(&BR_NOOP) {
+            if let Err(err) = writer.write_code(BR_NOOP) {
                 pr_warn!("Failure when writing BR_NOOP at beginning of buffer.");
                 return Err(err);
             }
