@@ -1731,7 +1731,7 @@ static void ufshcd_ungate_work(struct work_struct *work)
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	if (hba->clk_gating.state == CLKS_ON) {
 		spin_unlock_irqrestore(hba->host->host_lock, flags);
-		goto unblock_reqs;
+		return;
 	}
 
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
@@ -1754,8 +1754,6 @@ static void ufshcd_ungate_work(struct work_struct *work)
 		}
 		hba->clk_gating.is_suspended = false;
 	}
-unblock_reqs:
-	ufshcd_scsi_unblock_requests(hba);
 }
 
 /*
@@ -1784,15 +1782,16 @@ EXPORT_SYMBOL_GPL(ufshcd_unfreeze_scsi_devs);
  * @hba: per adapter instance
  * @async: This indicates whether caller should ungate clocks asynchronously.
  */
-int ufshcd_hold(struct ufs_hba *hba, bool async)
+void ufshcd_hold(struct ufs_hba *hba, bool async)
 {
-	int rc = 0;
 	bool flush_result;
 	unsigned long flags;
 
+	WARN_ON_ONCE(async);
+
 	if (!ufshcd_is_clkgating_allowed(hba) ||
 	    !hba->clk_gating.is_initialized)
-		goto out;
+		return;
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	hba->clk_gating.active_reqs++;
 
@@ -1809,15 +1808,10 @@ start:
 		 */
 		if (ufshcd_can_hibern8_during_gating(hba) &&
 		    ufshcd_is_link_hibern8(hba)) {
-			if (async) {
-				rc = -EAGAIN;
-				hba->clk_gating.active_reqs--;
-				break;
-			}
 			spin_unlock_irqrestore(hba->host->host_lock, flags);
 			flush_result = flush_work(&hba->clk_gating.ungate_work);
 			if (hba->clk_gating.is_suspended && !flush_result)
-				goto out;
+				return;
 			spin_lock_irqsave(hba->host->host_lock, flags);
 			goto start;
 		}
@@ -1839,21 +1833,14 @@ start:
 		hba->clk_gating.state = REQ_CLKS_ON;
 		trace_ufshcd_clk_gating(dev_name(hba->dev),
 					hba->clk_gating.state);
-		if (queue_work(hba->clk_gating.clk_gating_workq,
-			       &hba->clk_gating.ungate_work))
-			ufshcd_scsi_block_requests(hba);
+		queue_work(hba->clk_gating.clk_gating_workq,
+			   &hba->clk_gating.ungate_work);
 		/*
 		 * fall through to check if we should wait for this
 		 * work to be done or not.
 		 */
 		fallthrough;
 	case REQ_CLKS_ON:
-		if (async) {
-			rc = -EAGAIN;
-			hba->clk_gating.active_reqs--;
-			break;
-		}
-
 		spin_unlock_irqrestore(hba->host->host_lock, flags);
 		flush_work(&hba->clk_gating.ungate_work);
 		/* Make sure state is CLKS_ON before returning */
@@ -1865,8 +1852,6 @@ start:
 		break;
 	}
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
-out:
-	return rc;
 }
 EXPORT_SYMBOL_GPL(ufshcd_hold);
 
@@ -2902,12 +2887,6 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	WARN_ONCE(tag < 0 || tag >= hba->nutrs, "Invalid tag %d\n", tag);
 
-	/*
-	 * Allows the UFS error handler to wait for prior ufshcd_queuecommand()
-	 * calls.
-	 */
-	rcu_read_lock();
-
 	switch (hba->ufshcd_state) {
 	case UFSHCD_STATE_OPERATIONAL:
 		break;
@@ -2953,13 +2932,7 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	hba->req_abort_count = 0;
 
-	err = ufshcd_hold(hba, true);
-	if (err) {
-		err = SCSI_MLQUEUE_HOST_BUSY;
-		goto out;
-	}
-	WARN_ON(ufshcd_is_clkgating_allowed(hba) &&
-		(hba->clk_gating.state != CLKS_ON));
+	ufshcd_hold(hba, false);
 
 	lrbp = &hba->lrb[tag];
 	lrbp->cmd = cmd;
@@ -2994,8 +2967,6 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	ufshcd_send_command(hba, tag, hwq);
 
 out:
-	rcu_read_unlock();
-
 	if (ufs_trigger_eh()) {
 		unsigned long flags;
 
@@ -6257,6 +6228,19 @@ static void ufshcd_clk_scaling_suspend(struct ufs_hba *hba, bool suspend)
 	}
 }
 
+/* Wait for ongoing ufshcd_queuecommand() calls to finish. */
+static void ufshcd_wait_for_queuecommand(struct ufs_hba *hba)
+{
+	struct request_queue *q = hba->ufs_device_wlun->request_queue;
+	struct blk_mq_hw_ctx *hctx;
+	int i;
+
+	WARN_ON_ONCE(!(hba->host->tag_set.flags & BLK_MQ_F_BLOCKING));
+
+	queue_for_each_hw_ctx(q, hctx, i)
+		synchronize_srcu(hctx->srcu);
+}
+
 static void ufshcd_err_handling_prepare(struct ufs_hba *hba)
 {
 	ufshcd_rpm_get_sync(hba);
@@ -6288,8 +6272,7 @@ static void ufshcd_err_handling_prepare(struct ufs_hba *hba)
 		ufshcd_clk_scaling_allow(hba, false);
 	}
 	ufshcd_scsi_block_requests(hba);
-	/* Drain ufshcd_queuecommand() */
-	synchronize_rcu();
+	ufshcd_wait_for_queuecommand(hba);
 	cancel_work_sync(&hba->eeh_work);
 }
 
@@ -8811,6 +8794,7 @@ static struct scsi_host_template ufshcd_driver_template = {
 	.max_sectors		= (1 << 20) / SECTOR_SIZE, /* 1 MiB */
 	.max_host_blocked	= 1,
 	.track_queue_depth	= 1,
+	.queuecommand_may_block	= true,
 	.sdev_groups		= ufshcd_driver_groups,
 	.rpm_autosuspend_delay	= RPM_AUTOSUSPEND_DELAY_MS,
 };
