@@ -32,7 +32,7 @@ void sk_stream_write_space(struct sock *sk)
 	struct socket *sock = sk->sk_socket;
 	struct socket_wq *wq;
 
-	if (__sk_stream_is_writeable(sk, 1) && sock) {
+	if (sk_stream_is_writeable(sk) && sock) {
 		clear_bit(SOCK_NOSPACE, &sock->flags);
 
 		rcu_read_lock();
