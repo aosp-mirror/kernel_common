@@ -672,6 +672,9 @@ asmlinkage __visible void __init start_kernel(void)
 	if (late_time_init)
 		late_time_init();
 	calibrate_delay();
+
+	arch_cpu_finalize_init();
+
 	pidmap_init();
 	anon_vma_init();
 	acpi_early_init();
@@ -697,8 +700,6 @@ asmlinkage __visible void __init start_kernel(void)
 	taskstats_init_early();
 	delayacct_init();
 
-
-	arch_cpu_finalize_init();
 
 	acpi_subsystem_init();
 	arch_post_acpi_subsys_init();
