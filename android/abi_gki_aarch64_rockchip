@@ -3004,3 +3004,7 @@
   _raw_write_unlock
   __SetPageMovable
   unlock_page
+
+#required by ch341.ko
+  tty_termios_hw_change
+  tty_put_char
