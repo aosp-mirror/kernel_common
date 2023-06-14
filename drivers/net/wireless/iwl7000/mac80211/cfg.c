@@ -5232,6 +5232,19 @@ static int ieee80211_set_hw_timestamp(struct wiphy *wiphy,
 }
 #endif
 
+#if CFG80211_VERSION >= KERNEL_VERSION(6,8,0)
+static int
+ieee80211_set_ttlm(struct wiphy *wiphy, struct net_device *dev,
+		   struct cfg80211_ttlm_params *params)
+{
+	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
+
+	return ieee80211_req_neg_ttlm(sdata, params);
+}
+#endif
+
 #endif
 const struct cfg80211_ops mac80211_config_ops = {
 	.add_virtual_intf = ieee80211_add_iface,
@@ -5395,5 +5408,8 @@ const struct cfg80211_ops mac80211_config_ops = {
 #endif
 #if CFG80211_VERSION >= KERNEL_VERSION(6,4,0)
 	.set_hw_timestamp = ieee80211_set_hw_timestamp,
+#endif
+#if CFG80211_VERSION >= KERNEL_VERSION(6,8,0)
+	.set_ttlm = ieee80211_set_ttlm,
 #endif
 };
