@@ -538,6 +538,8 @@ SYM_INNER_LABEL(init_el2, SYM_L_LOCAL)
 	mov	x2, xzr
 2:
 	msr	elr_el2, lr
+	__init_el2_nvhe_prepare_eret
+
 	mov	w0, #BOOT_CPU_MODE_EL2
 	orr	x0, x0, x2
 	eret
