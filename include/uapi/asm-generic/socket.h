@@ -126,6 +126,8 @@
 
 #define SO_BUF_LOCK		72
 
+#define SO_RCVMARK		75
+
 #if !defined(__KERNEL__)
 
 #if __BITS_PER_LONG == 64 || (defined(__x86_64__) && defined(__ILP32__))

@@ -1858,6 +1858,7 @@
   snd_jack_set_key
   snd_pcm_format_physical_width
   snd_pcm_format_width
+  snd_pcm_hw_constraint_integer
   snd_pcm_hw_constraint_list
   snd_pcm_lib_free_pages
   snd_pcm_lib_ioctl
@@ -1907,6 +1908,7 @@
   snd_soc_register_card
   snd_soc_register_component
   snd_soc_runtime_set_dai_fmt
+  snd_soc_set_runtime_hwparams
   snd_soc_unregister_card
   snd_soc_unregister_component
   snprintf

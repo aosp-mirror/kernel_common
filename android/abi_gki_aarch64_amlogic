@@ -86,6 +86,7 @@
   bpf_trace_run5
   bpf_trace_run6
   bpf_trace_run7
+  bpf_trace_run8
   bpf_warn_invalid_xdp_action
   __bread_gfp
   __brelse
@@ -452,6 +453,7 @@
   dma_fence_default_wait
   dma_fence_free
   dma_fence_get_status
+  dma_fence_get_stub
   dma_fence_init
   dma_fence_release
   dma_fence_remove_callback
@@ -1787,6 +1789,7 @@
   spi_busnum_to_master
   spi_controller_resume
   spi_controller_suspend
+  spi_finalize_current_message
   spi_finalize_current_transfer
   spi_mem_adjust_op_size
   spi_mem_default_supports_op
@@ -1815,6 +1818,7 @@
   strcpy
   strcspn
   stream_open
+  strim
   strlcpy
   strlen
   strncasecmp
