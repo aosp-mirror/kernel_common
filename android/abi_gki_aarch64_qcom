@@ -1426,6 +1426,7 @@
   kernel_read
   kernel_write
   kern_path
+  kill_anon_super
   kobject_add
   kobject_init
   kobj_sysfs_ops
