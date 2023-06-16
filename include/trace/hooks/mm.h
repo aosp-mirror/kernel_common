@@ -117,6 +117,10 @@ DECLARE_HOOK(android_vh_mm_compaction_begin,
 DECLARE_HOOK(android_vh_mm_compaction_end,
 	TP_PROTO(struct compact_control *cc, long vendor_ret),
 	TP_ARGS(cc, vendor_ret));
+DECLARE_HOOK(android_vh_tune_mmap_readaround,
+	TP_PROTO(unsigned int ra_pages, pgoff_t pgoff,
+		pgoff_t *start, unsigned int *size, unsigned int *async_size),
+	TP_ARGS(ra_pages, pgoff, start, size, async_size));
 struct mem_cgroup;
 DECLARE_HOOK(android_vh_mem_cgroup_alloc,
 	TP_PROTO(struct mem_cgroup *memcg),
