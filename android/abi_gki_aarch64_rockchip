@@ -2091,6 +2091,11 @@
   pci_stop_root_bus
   regulator_get_current_limit
 
+# required by pciexxx.ko
+  pci_reset_function
+  pci_disable_msix
+  pci_enable_msix_range
+
 # required by phy-rockchip-inno-dsidphy.ko
   phy_mipi_dphy_config_validate
 
