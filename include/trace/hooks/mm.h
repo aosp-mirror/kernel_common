@@ -86,6 +86,10 @@ DECLARE_HOOK(android_vh_cma_drain_all_pages_bypass,
 DECLARE_HOOK(android_vh_pcplist_add_cma_pages_bypass,
 	TP_PROTO(int migratetype, bool *bypass),
 	TP_ARGS(migratetype, bypass));
+DECLARE_HOOK(android_vh_tune_mmap_readaround,
+	TP_PROTO(unsigned int ra_pages, pgoff_t pgoff,
+		pgoff_t *start, unsigned int *size, unsigned int *async_size),
+	TP_ARGS(ra_pages, pgoff, start, size, async_size));
 DECLARE_HOOK(android_vh_mmap_region,
 	TP_PROTO(struct vm_area_struct *vma, unsigned long addr),
 	TP_ARGS(vma, addr));
