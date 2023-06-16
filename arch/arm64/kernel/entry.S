@@ -297,7 +297,7 @@ alternative_if ARM64_HAS_ADDRESS_AUTH
 alternative_else_nop_endif
 1:
 
-	scs_load tsk, x20
+	scs_load_current
 	.else
 	add	x21, sp, #S_FRAME_SIZE
 	get_current_task tsk
@@ -530,9 +530,7 @@ SYM_CODE_END(__swpan_exit_el0)
 
 	.macro	irq_stack_entry
 	mov	x19, sp			// preserve the original sp
-#ifdef CONFIG_SHADOW_CALL_STACK
-	mov	x24, scs_sp		// preserve the original shadow stack
-#endif
+	scs_save tsk			// preserve the original shadow stack
 
 	/*
 	 * Compare sp with the base of the task stack.
@@ -566,9 +564,7 @@ SYM_CODE_END(__swpan_exit_el0)
 	 */
 	.macro	irq_stack_exit
 	mov	sp, x19
-#ifdef CONFIG_SHADOW_CALL_STACK
-	mov	scs_sp, x24
-#endif
+	scs_load_current
 	.endm
 
 /* GPRs used by entry code */
@@ -1122,7 +1118,7 @@ SYM_FUNC_START(cpu_switch_to)
 	msr	sp_el0, x1
 	ptrauth_keys_install_kernel x1, x8, x9, x10
 	scs_save x0, x8
-	scs_load x1, x8
+	scs_load_current
 	ret
 SYM_FUNC_END(cpu_switch_to)
 NOKPROBE(cpu_switch_to)
