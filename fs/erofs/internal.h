@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2017-2018 HUAWEI, Inc.
  *             https://www.huawei.com/
- * Created by Gao Xiang <gaoxiang25@huawei.com>
+ * Copyright (C) 2021, Alibaba Cloud
  */
 #ifndef __EROFS_INTERNAL_H
 #define __EROFS_INTERNAL_H
@@ -16,6 +16,7 @@
 #include <linux/magic.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/iomap.h>
 #include "erofs_fs.h"
 
 /* redefine pr_fmt "erofs: " */
@@ -46,7 +47,16 @@ typedef u64 erofs_off_t;
 /* data type for filesystem-wide blocks number */
 typedef u32 erofs_blk_t;
 
-struct erofs_fs_context {
+struct erofs_device_info {
+	char *path;
+	struct block_device *bdev;
+	struct dax_device *dax_dev;
+
+	u32 blocks;
+	u32 mapped_blkaddr;
+};
+
+struct erofs_mount_opts {
 #ifdef CONFIG_EROFS_FS_ZIP
 	/* current strategy of how to use managed cache */
 	unsigned char cache_strategy;
@@ -59,6 +69,18 @@ struct erofs_fs_context {
 	unsigned int mount_opt;
 };
 
+struct erofs_dev_context {
+	struct idr tree;
+	struct rw_semaphore rwsem;
+
+	unsigned int extra_devices;
+};
+
+struct erofs_fs_context {
+	struct erofs_mount_opts opt;
+	struct erofs_dev_context *devs;
+};
+
 /* all filesystem-wide lz4 configurations */
 struct erofs_sb_lz4_info {
 	/* # of pages needed for EROFS lz4 rolling decompression */
@@ -68,6 +90,7 @@ struct erofs_sb_lz4_info {
 };
 
 struct erofs_sb_info {
+	struct erofs_mount_opts opt;	/* options */
 #ifdef CONFIG_EROFS_FS_ZIP
 	/* list for all registered superblocks, mainly for shrinker */
 	struct list_head list;
@@ -84,11 +107,16 @@ struct erofs_sb_info {
 
 	struct erofs_sb_lz4_info lz4;
 #endif	/* CONFIG_EROFS_FS_ZIP */
-	u32 blocks;
+	struct erofs_dev_context *devs;
+	struct dax_device *dax_dev;
+	u64 total_blocks;
+	u32 primarydevice_blocks;
+
 	u32 meta_blkaddr;
 #ifdef CONFIG_EROFS_FS_XATTR
 	u32 xattr_blkaddr;
 #endif
+	u16 device_id_mask;	/* valid bits of device id to be used */
 
 	/* inode slot unit size in bit shift */
 	unsigned char islotbits;
@@ -106,8 +134,6 @@ struct erofs_sb_info {
 	u8 volume_name[16];             /* volume name */
 	u32 feature_compat;
 	u32 feature_incompat;
-
-	struct erofs_fs_context ctx;	/* options */
 };
 
 #define EROFS_SB(sb) ((struct erofs_sb_info *)(sb)->s_fs_info)
@@ -116,10 +142,12 @@ struct erofs_sb_info {
 /* Mount flags set via mount options or defaults */
 #define EROFS_MOUNT_XATTR_USER		0x00000010
 #define EROFS_MOUNT_POSIX_ACL		0x00000020
+#define EROFS_MOUNT_DAX_ALWAYS		0x00000040
+#define EROFS_MOUNT_DAX_NEVER		0x00000080
 
-#define clear_opt(ctx, option)	((ctx)->mount_opt &= ~EROFS_MOUNT_##option)
-#define set_opt(ctx, option)	((ctx)->mount_opt |= EROFS_MOUNT_##option)
-#define test_opt(ctx, option)	((ctx)->mount_opt & EROFS_MOUNT_##option)
+#define clear_opt(opt, option)	((opt)->mount_opt &= ~EROFS_MOUNT_##option)
+#define set_opt(opt, option)	((opt)->mount_opt |= EROFS_MOUNT_##option)
+#define test_opt(opt, option)	((opt)->mount_opt & EROFS_MOUNT_##option)
 
 enum {
 	EROFS_ZIP_CACHE_DISABLED,
@@ -233,6 +261,7 @@ static inline bool erofs_sb_has_##name(struct erofs_sb_info *sbi) \
 EROFS_FEATURE_FUNCS(lz4_0padding, incompat, INCOMPAT_LZ4_0PADDING)
 EROFS_FEATURE_FUNCS(compr_cfgs, incompat, INCOMPAT_COMPR_CFGS)
 EROFS_FEATURE_FUNCS(big_pcluster, incompat, INCOMPAT_BIG_PCLUSTER)
+EROFS_FEATURE_FUNCS(device_table, incompat, INCOMPAT_DEVICE_TABLE)
 EROFS_FEATURE_FUNCS(sb_chksum, compat, COMPAT_SB_CHKSUM)
 
 /* atomic flag definitions */
@@ -258,6 +287,10 @@ struct erofs_inode {
 
 	union {
 		erofs_blk_t raw_blkaddr;
+		struct {
+			unsigned short	chunkformat;
+			unsigned char	chunkbits;
+		};
 #ifdef CONFIG_EROFS_FS_ZIP
 		struct {
 			unsigned short z_advise;
@@ -330,7 +363,7 @@ extern const struct address_space_operations z_erofs_aops;
  * of the corresponding uncompressed data in the file.
  */
 enum {
-	BH_Zipped = BH_PrivateStart,
+	BH_Encoded = BH_PrivateStart,
 	BH_FullMapped,
 };
 
@@ -338,8 +371,8 @@ enum {
 #define EROFS_MAP_MAPPED	(1 << BH_Mapped)
 /* Located in metadata (could be copied from bd_inode) */
 #define EROFS_MAP_META		(1 << BH_Meta)
-/* The extent has been compressed */
-#define EROFS_MAP_ZIPPED	(1 << BH_Zipped)
+/* The extent is encoded */
+#define EROFS_MAP_ENCODED	(1 << BH_Encoded)
 /* The length of extent is full */
 #define EROFS_MAP_FULL_MAPPED	(1 << BH_FullMapped)
 
@@ -347,6 +380,8 @@ struct erofs_map_blocks {
 	erofs_off_t m_pa, m_la;
 	u64 m_plen, m_llen;
 
+	unsigned short m_deviceid;
+	char m_algorithmformat;
 	unsigned int m_flags;
 
 	struct page *mpage;
@@ -354,8 +389,22 @@ struct erofs_map_blocks {
 
 /* Flags used by erofs_map_blocks_flatmode() */
 #define EROFS_GET_BLOCKS_RAW    0x0001
+/*
+ * Used to get the exact decompressed length, e.g. fiemap (consider lookback
+ * approach instead if possible since it's more metadata lightweight.)
+ */
+#define EROFS_GET_BLOCKS_FIEMAP	0x0002
+/* Used to map the whole extent if non-negligible data is requested for LZMA */
+#define EROFS_GET_BLOCKS_READMORE	0x0004
+
+enum {
+	Z_EROFS_COMPRESSION_SHIFTED = Z_EROFS_COMPRESSION_MAX,
+	Z_EROFS_COMPRESSION_RUNTIME_MAX
+};
 
 /* zmap.c */
+extern const struct iomap_ops z_erofs_iomap_report_ops;
+
 #ifdef CONFIG_EROFS_FS_ZIP
 int z_erofs_fill_inode(struct inode *inode);
 int z_erofs_map_blocks_iter(struct inode *inode,
@@ -371,8 +420,20 @@ static inline int z_erofs_map_blocks_iter(struct inode *inode,
 }
 #endif	/* !CONFIG_EROFS_FS_ZIP */
 
+struct erofs_map_dev {
+	struct block_device *m_bdev;
+	struct dax_device *m_daxdev;
+
+	erofs_off_t m_pa;
+	unsigned int m_deviceid;
+};
+
 /* data.c */
+extern const struct file_operations erofs_file_fops;
 struct page *erofs_get_meta_page(struct super_block *sb, erofs_blk_t blkaddr);
+int erofs_map_dev(struct super_block *sb, struct erofs_map_dev *dev);
+int erofs_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+		 u64 start, u64 len);
 
 /* inode.c */
 static inline unsigned long erofs_inode_hash(erofs_nid_t nid)
@@ -424,7 +485,14 @@ void erofs_pcpubuf_init(void);
 void erofs_pcpubuf_exit(void);
 
 /* utils.c / zdata.c */
-struct page *erofs_allocpage(struct list_head *pool, gfp_t gfp);
+struct page *erofs_allocpage(struct page **pagepool, gfp_t gfp);
+static inline void erofs_pagepool_add(struct page **pagepool,
+		struct page *page)
+{
+	set_page_private(page, (unsigned long)*pagepool);
+	*pagepool = page;
+}
+void erofs_release_pages(struct page **pagepool);
 
 #ifdef CONFIG_EROFS_FS_ZIP
 int erofs_workgroup_put(struct erofs_workgroup *grp);
@@ -441,8 +509,7 @@ int __init z_erofs_init_zip_subsystem(void);
 void z_erofs_exit_zip_subsystem(void);
 int erofs_try_to_free_all_cached_pages(struct erofs_sb_info *sbi,
 				       struct erofs_workgroup *egrp);
-int erofs_try_to_free_cached_page(struct address_space *mapping,
-				  struct page *page);
+int erofs_try_to_free_cached_page(struct page *page);
 int z_erofs_load_lz4_config(struct super_block *sb,
 			    struct erofs_super_block *dsb,
 			    struct z_erofs_lz4_cfgs *lz4, int len);
@@ -465,7 +532,26 @@ static inline int z_erofs_load_lz4_config(struct super_block *sb,
 }
 #endif	/* !CONFIG_EROFS_FS_ZIP */
 
+#ifdef CONFIG_EROFS_FS_ZIP_LZMA
+int z_erofs_lzma_init(void);
+void z_erofs_lzma_exit(void);
+int z_erofs_load_lzma_config(struct super_block *sb,
+			     struct erofs_super_block *dsb,
+			     struct z_erofs_lzma_cfgs *lzma, int size);
+#else
+static inline int z_erofs_lzma_init(void) { return 0; }
+static inline int z_erofs_lzma_exit(void) { return 0; }
+static inline int z_erofs_load_lzma_config(struct super_block *sb,
+			     struct erofs_super_block *dsb,
+			     struct z_erofs_lzma_cfgs *lzma, int size) {
+	if (lzma) {
+		erofs_err(sb, "lzma algorithm isn't enabled");
+		return -EINVAL;
+	}
+	return 0;
+}
+#endif	/* !CONFIG_EROFS_FS_ZIP */
+
 #define EFSCORRUPTED    EUCLEAN         /* Filesystem is corrupted */
 
 #endif	/* __EROFS_INTERNAL_H */
-
