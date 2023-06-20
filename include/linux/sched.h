@@ -526,7 +526,7 @@ struct sched_statistics {
 	u64				nr_wakeups_passive;
 	u64				nr_wakeups_idle;
 #endif
-};
+} ____cacheline_aligned;
 
 struct sched_entity {
 	/* For load-balancing: */
@@ -541,8 +541,6 @@ struct sched_entity {
 	u64				prev_sum_exec_runtime;
 
 	u64				nr_migrations;
-
-	struct sched_statistics		statistics;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	int				depth;
@@ -816,6 +814,8 @@ struct task_struct {
 	 */
 	struct uclamp_se		uclamp[UCLAMP_CNT];
 #endif
+
+	struct sched_statistics         stats;
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* List of struct preempt_notifier: */
@@ -1829,7 +1829,9 @@ current_restore_flags(unsigned long orig_flags, unsigned long flags)
 }
 
 extern int cpuset_cpumask_can_shrink(const struct cpumask *cur, const struct cpumask *trial);
-extern int task_can_attach(struct task_struct *p, const struct cpumask *cs_effective_cpus);
+extern int task_can_attach(struct task_struct *p);
+extern int dl_bw_alloc(int cpu, u64 dl_bw);
+extern void dl_bw_free(int cpu, u64 dl_bw);
 
 #ifdef CONFIG_RT_SOFTINT_OPTIMIZATION
 extern bool cpupri_check_rt(void);
