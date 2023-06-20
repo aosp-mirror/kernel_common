@@ -3013,3 +3013,58 @@
 #required by ch341.ko
   tty_termios_hw_change
   tty_put_char
+
+# required by au0828.ko
+  media_device_unregister_entity_notify
+  media_device_delete
+  media_device_usb_allocate
+  media_device_register_entity_notify
+  __media_entity_setup_link
+  __media_pipeline_start
+  __media_pipeline_stop
+  v4l2_i2c_new_subdev
+  param_ops_short
+  vb2_video_unregister_device
+  v4l2_device_disconnect
+  v4l2_device_put
+  usb_unlink_urb
+  v4l2_mc_create_media_graph
+  v4l_enable_media_source
+  _vb2_fop_release
+  v4l_disable_media_source
+
+# required by cx2341x.ko
+  __v4l2_ctrl_grab
+  v4l2_ctrl_query_fill
+  v4l2_ctrl_get_menu
+  v4l2_ctrl_cluster
+  v4l2_ctrl_activate
+
+# required by cx25840.ko
+  v4l2_ctrl_handler_log_status
+
+# required by cx231xx.ko
+  v4l2_ctrl_add_handler
+  v4l2_ctrl_radio_filter
+  __media_device_usb_init
+  v4l2_s_ctrl
+  usb_clear_halt
+
+# required by cx231xx-alsa.ko
+  _snd_pcm_stream_lock_irqsave
+  snd_card_free_when_closed
+  snd_pcm_stream_unlock_irqrestore
+
+# required by dvb-core.ko
+  media_create_pad_links
+  media_get_pad_index
+  media_create_intf_link
+  media_devnode_create
+  media_devnode_remove
+  crc32_be
+  eth_header
+  eth_header_parse
+
+# required by si2157.ko
+  media_device_register_entity
+  media_device_unregister_entity
