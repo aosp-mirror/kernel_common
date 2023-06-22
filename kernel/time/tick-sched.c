@@ -1420,6 +1420,38 @@ static inline void tick_nohz_activate(struct tick_sched *ts, int mode)
 		timers_update_nohz();
 }
 
+#if defined CONFIG_HIGH_RES_TIMERS && CONFIG_HZ >= 1000
+/**
+ * tick_nohz_hres_to_lres - switch from Highres to Lowres
+ */
+void tick_nohz_hres_to_lres(void)
+{
+	ktime_t next_tick;
+	struct tick_sched *ts = this_cpu_ptr(&tick_cpu_sched);
+	struct tick_device *td = this_cpu_ptr(&tick_cpu_device);
+
+	if (WARN_ON(ts->nohz_mode != NOHZ_MODE_HIGHRES))
+		return;
+
+	WARN_ON(td->mode != TICKDEV_MODE_ONESHOT);
+	WARN_ON(clockevent_get_state(td->evtdev) != CLOCK_EVT_STATE_ONESHOT);
+	td->evtdev->event_handler = tick_nohz_handler;
+
+	hrtimer_cancel(&ts->sched_timer);
+	hrtimer_set_expires(&ts->sched_timer, ts->last_tick);
+
+	/* Forward the time to expire in the future */
+	hrtimer_forward(&ts->sched_timer, ktime_get(), TICK_NSEC);
+	next_tick = hrtimer_get_expires(&ts->sched_timer);
+
+	tick_program_event(next_tick, 1);
+	tick_nohz_activate(ts, NOHZ_MODE_LOWRES);
+
+	if (ts->tick_stopped)
+		ts->next_tick = next_tick;
+}
+#endif
+
 /**
  * tick_nohz_switch_to_nohz - switch to nohz mode
  */

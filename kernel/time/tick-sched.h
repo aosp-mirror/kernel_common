@@ -119,4 +119,10 @@ __tick_broadcast_oneshot_control(enum tick_broadcast_state state)
 }
 #endif
 
+#if defined CONFIG_NO_HZ_COMMON && defined CONFIG_HIGH_RES_TIMERS && CONFIG_HZ >= 1000
+extern void tick_nohz_hres_to_lres(void);
+#else
+static inline void tick_nohz_hres_to_lres(void) { }
+#endif
+
 #endif
