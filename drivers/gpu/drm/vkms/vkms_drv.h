@@ -3,6 +3,7 @@
 #ifndef _VKMS_DRV_H_
 #define _VKMS_DRV_H_
 
+#include <linux/configfs.h>
 #include <linux/hrtimer.h>
 
 #include <drm/drm.h>
@@ -10,6 +11,7 @@
 #include <drm/drm_gem.h>
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_encoder.h>
+#include <drm/drm_plane.h>
 #include <drm/drm_writeback.h>
 
 #define XRES_MIN    10
@@ -138,14 +140,65 @@ struct vkms_config {
 	bool overlay;
 };
 
+struct vkms_config_links {
+	struct config_group group;
+	unsigned long linked_object_bitmap;
+};
+
+struct vkms_config_connector {
+	struct config_group config_group;
+	struct vkms_config_links possible_encoders;
+};
+
+struct vkms_config_crtc {
+	struct config_group config_group;
+	unsigned long crtc_config_idx;
+};
+
+struct vkms_config_encoder {
+	struct config_group config_group;
+	struct vkms_config_links possible_crtcs;
+	unsigned long encoder_config_idx;
+};
+
+struct vkms_config_plane {
+	struct vkms_configfs *configfs;
+	struct config_group config_group;
+	struct vkms_config_links possible_crtcs;
+	enum drm_plane_type type;
+};
+
+struct vkms_configfs {
+	/* Directory group containing connector configs, e.g. /config/vkms/device/ */
+	struct config_group device_group;
+	/* Directory group containing connector configs, e.g. /config/vkms/device/connectors/ */
+	struct config_group connectors_group;
+	/* Directory group containing CRTC configs, e.g. /config/vkms/device/crtcs/ */
+	struct config_group crtcs_group;
+	/* Directory group containing encoder configs, e.g. /config/vkms/device/encoders/ */
+	struct config_group encoders_group;
+	/* Directory group containing plane configs, e.g. /config/vkms/device/planes/ */
+	struct config_group planes_group;
+
+	unsigned long allocated_crtcs;
+	unsigned long allocated_encoders;
+
+	struct mutex lock;
+
+	/* The platform device if this is registered, otherwise NULL */
+	struct vkms_device *vkms_device;
+};
+
 struct vkms_device_setup {
-	bool is_default;
+	// Is NULL in the case of the default card.
+	struct vkms_configfs *configfs;
 };
 
 struct vkms_device {
 	struct drm_device drm;
 	struct platform_device *platform;
-	bool is_default;
+	// Is NULL in the case of the default card.
+	struct vkms_configfs *configfs;
 	struct vkms_output output;
 	struct vkms_config config;
 };
@@ -164,11 +217,42 @@ struct vkms_device {
 #define to_vkms_plane_state(target)\
 	container_of(target, struct vkms_plane_state, base.base)
 
+#define item_to_configfs(item) \
+	container_of(to_config_group(item), struct vkms_configfs, device_group)
+
+#define item_to_config_connector(item)                                    \
+	container_of(to_config_group(item), struct vkms_config_connector, \
+		     config_group)
+
+#define item_to_config_crtc(item)                                    \
+	container_of(to_config_group(item), struct vkms_config_crtc, \
+		     config_group)
+
+#define item_to_config_encoder(item)                                    \
+	container_of(to_config_group(item), struct vkms_config_encoder, \
+		     config_group)
+
+#define item_to_config_plane(item)                                    \
+	container_of(to_config_group(item), struct vkms_config_plane, \
+		     config_group)
+
+#define item_to_config_links(item) \
+	container_of(to_config_group(item), struct vkms_config_links, group)
+
+#define plane_item_to_configfs(item)                                         \
+	container_of(to_config_group(item->ci_parent), struct vkms_configfs, \
+		     planes_group)
+
+/* Devices */
+struct vkms_device *vkms_add_device(struct vkms_configfs *configfs);
+void vkms_remove_device(struct vkms_device *vkms_device);
+
 /* CRTC */
 struct vkms_crtc *vkms_crtc_init(struct vkms_device *vkmsdev,
 				 struct drm_plane *primary,
 				 struct drm_plane *cursor);
 
+int vkms_output_init(struct vkms_device *vkmsdev);
 int vkms_output_init_default(struct vkms_device *vkmsdev);
 
 struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
@@ -190,5 +274,9 @@ void vkms_writeback_row(struct vkms_writeback_job *wb, const struct line_buffer 
 /* Writeback */
 int vkms_enable_writeback_connector(struct vkms_device *vkmsdev,
 				    struct vkms_crtc *vkms_crtc);
+
+/* ConfigFS Support */
+int vkms_init_configfs(void);
+void vkms_unregister_configfs(void);
 
 #endif /* _VKMS_DRV_H_ */

@@ -9,8 +9,10 @@
  * the GPU in DRM API tests.
  */
 
-#include "asm-generic/errno-base.h"
+#include <linux/configfs.h>
 #include <linux/device.h>
+#include <linux/dma-mapping.h>
+#include <linux/err.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
@@ -172,8 +174,8 @@ static int vkms_modeset_init(struct vkms_device *vkmsdev)
 	dev->mode_config.preferred_depth = 0;
 	dev->mode_config.helper_private = &vkms_mode_config_helpers;
 
-	return vkmsdev->is_default ? vkms_output_init_default(vkmsdev) :
-				     -EINVAL;
+	return vkmsdev->configfs ? vkms_output_init(vkmsdev) :
+				   vkms_output_init_default(vkmsdev);
 }
 
 static int vkms_platform_probe(struct platform_device *pdev)
@@ -184,8 +186,10 @@ static int vkms_platform_probe(struct platform_device *pdev)
 	void *grp;
 
 	grp = devres_open_group(&pdev->dev, NULL, GFP_KERNEL);
-	if (!grp)
+	if (!grp) {
+		DRM_ERROR("Could not open devres group\n");
 		return -ENOMEM;
+	}
 
 	vkms_device = devm_drm_dev_alloc(&pdev->dev, &vkms_driver,
 					 struct vkms_device, drm);
@@ -198,7 +202,7 @@ static int vkms_platform_probe(struct platform_device *pdev)
 	vkms_device->config.cursor = enable_cursor;
 	vkms_device->config.writeback = enable_writeback;
 	vkms_device->config.overlay = enable_overlay;
-	vkms_device->is_default = vkms_device_setup->is_default;
+	vkms_device->configfs = vkms_device_setup->configfs;
 
 	ret = dma_coerce_mask_and_coherent(vkms_device->drm.dev,
 					   DMA_BIT_MASK(64));
@@ -258,12 +262,43 @@ static struct platform_driver vkms_platform_driver = {
 	.driver.name = DRIVER_NAME,
 };
 
+struct vkms_device *vkms_add_device(struct vkms_configfs *configfs)
+{
+	struct device *dev = NULL;
+	struct platform_device *pdev;
+	int max_id = 1;
+	struct vkms_device_setup vkms_device_setup = {
+		.configfs = configfs,
+	};
+
+	while ((dev = platform_find_device_by_driver(
+			dev, &vkms_platform_driver.driver))) {
+		pdev = to_platform_device(dev);
+		max_id = max(max_id, pdev->id);
+	}
+
+	pdev = platform_device_register_data(NULL, DRIVER_NAME, max_id + 1,
+					     &vkms_device_setup,
+					     sizeof(vkms_device_setup));
+	if (IS_ERR(pdev)) {
+		DRM_ERROR("Unable to register vkms device'\n");
+		return ERR_PTR(PTR_ERR(pdev));
+	}
+
+	return platform_get_drvdata(pdev);
+}
+
+void vkms_remove_device(struct vkms_device *vkms_device)
+{
+	platform_device_unregister(vkms_device->platform);
+}
+
 static int __init vkms_init(void)
 {
 	int ret;
 	struct platform_device *pdev;
 	struct vkms_device_setup vkms_device_setup = {
-		.is_default = true,
+		.configfs = NULL,
 	};
 
 	ret = platform_driver_register(&vkms_platform_driver);
@@ -281,12 +316,21 @@ static int __init vkms_init(void)
 		return PTR_ERR(pdev);
 	}
 
+	ret = vkms_init_configfs();
+	if (ret) {
+		DRM_ERROR("Unable to initialize configfs\n");
+		platform_device_unregister(pdev);
+		platform_driver_unregister(&vkms_platform_driver);
+	}
+
 	return 0;
 }
 
 static void __exit vkms_exit(void)
 {
 	struct device *dev;
+
+	vkms_unregister_configfs();
 
 	while ((dev = platform_find_device_by_driver(
 			NULL, &vkms_platform_driver.driver))) {

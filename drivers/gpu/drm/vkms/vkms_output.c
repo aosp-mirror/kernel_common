@@ -176,3 +176,8 @@ err_planes:
 
 	return ret;
 }
+
+int vkms_output_init(struct vkms_device *vkmsdev)
+{
+	return -EOPNOTSUPP;
+}
