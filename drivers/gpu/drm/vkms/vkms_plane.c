@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0+
 
 #include <linux/iosys-map.h>
+#include <linux/stdarg.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
@@ -215,20 +216,25 @@ static const struct drm_plane_helper_funcs vkms_plane_helper_funcs = {
 };
 
 struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
-				   enum drm_plane_type type)
+				   enum drm_plane_type type, char *name, ...)
 {
 	struct drm_device *dev = &vkmsdev->drm;
 	struct vkms_output *output = &vkmsdev->output;
 	struct vkms_plane *plane;
+	va_list va;
 	int ret;
 
 	if (output->num_planes >= VKMS_MAX_PLANES)
 		return ERR_PTR(-ENOMEM);
 
 	plane = &output->planes[output->num_planes++];
+
+	va_start(va, name);
 	ret = drm_universal_plane_init(dev, &plane->base, 0, &vkms_plane_funcs,
 				       vkms_formats, ARRAY_SIZE(vkms_formats),
-				       NULL, type, NULL);
+				       NULL, type, name, va);
+	va_end(va);
+
 	if (ret)
 		return ERR_PTR(ret);
 
