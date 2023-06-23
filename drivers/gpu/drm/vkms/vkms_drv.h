@@ -23,6 +23,10 @@
 
 #define NUM_OVERLAY_PLANES 8
 
+
+#define VKMS_MAX_OUTPUT_OBJECTS 16
+#define VKMS_MAX_PLANES (3 * VKMS_MAX_OUTPUT_OBJECTS)
+
 #define VKMS_LUT_SIZE 256
 
 struct vkms_frame_info {
@@ -66,6 +70,27 @@ struct vkms_plane {
 	struct drm_plane base;
 };
 
+struct vkms_crtc {
+	struct drm_crtc base;
+
+	struct drm_writeback_connector wb_connector;
+	struct hrtimer vblank_hrtimer;
+	ktime_t period_ns;
+	struct drm_pending_vblank_event *event;
+	/* ordered wq for composer_work */
+	struct workqueue_struct *composer_workq;
+	/* protects concurrent access to composer */
+	spinlock_t lock;
+	/* guarantees that if the composer is enabled, a job will be queued */
+	struct mutex enabled_lock;
+
+	/* protected by @enabled_lock */
+	bool composer_enabled;
+	struct vkms_crtc_state *composer_state;
+
+	spinlock_t composer_lock;
+};
+
 struct vkms_color_lut {
 	struct drm_color_lut *base;
 	size_t lut_length;
@@ -97,23 +122,14 @@ struct vkms_crtc_state {
 };
 
 struct vkms_output {
-	struct drm_crtc crtc;
-	struct drm_encoder encoder;
-	struct drm_connector connector;
-	struct drm_writeback_connector wb_connector;
-	struct hrtimer vblank_hrtimer;
-	ktime_t period_ns;
-	struct drm_pending_vblank_event *event;
-	/* ordered wq for composer_work */
-	struct workqueue_struct *composer_workq;
-	/* protects concurrent access to composer */
-	spinlock_t lock;
-
-	/* protected by @lock */
-	bool composer_enabled;
-	struct vkms_crtc_state *composer_state;
-
-	spinlock_t composer_lock;
+	int num_crtcs;
+	struct vkms_crtc crtcs[VKMS_MAX_OUTPUT_OBJECTS];
+	int num_encoders;
+	struct drm_encoder encoders[VKMS_MAX_OUTPUT_OBJECTS];
+	int num_connectors;
+	struct drm_connector connectors[VKMS_MAX_OUTPUT_OBJECTS];
+	int num_planes;
+	struct vkms_plane planes[VKMS_MAX_PLANES];
 };
 
 struct vkms_device;
@@ -131,11 +147,13 @@ struct vkms_device {
 	struct vkms_config config;
 };
 
-#define drm_crtc_to_vkms_output(target) \
-	container_of(target, struct vkms_output, crtc)
+#define drm_crtc_to_vkms_crtc(crtc) container_of(crtc, struct vkms_crtc, base)
 
 #define drm_device_to_vkms_device(target) \
 	container_of(target, struct vkms_device, drm)
+
+#define timer_to_vkms_crtc(timer) \
+	container_of(timer, struct vkms_crtc, vblank_hrtimer)
 
 #define to_vkms_crtc_state(target)\
 	container_of(target, struct vkms_crtc_state, base)
@@ -144,13 +162,14 @@ struct vkms_device {
 	container_of(target, struct vkms_plane_state, base.base)
 
 /* CRTC */
-int vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
-		   struct drm_plane *primary, struct drm_plane *cursor);
+struct vkms_crtc *vkms_crtc_init(struct vkms_device *vkmsdev,
+				 struct drm_plane *primary,
+				 struct drm_plane *cursor);
 
 int vkms_output_init(struct vkms_device *vkmsdev, int index);
 
 struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
-				   enum drm_plane_type type, int index);
+				   enum drm_plane_type type);
 
 /* CRC Support */
 const char *const *vkms_get_crc_sources(struct drm_crtc *crtc,
@@ -161,11 +180,12 @@ int vkms_verify_crc_source(struct drm_crtc *crtc, const char *source_name,
 
 /* Composer Support */
 void vkms_composer_worker(struct work_struct *work);
-void vkms_set_composer(struct vkms_output *out, bool enabled);
+void vkms_set_composer(struct vkms_crtc *vkms_crtc, bool enabled);
 void vkms_compose_row(struct line_buffer *stage_buffer, struct vkms_plane_state *plane, int y);
 void vkms_writeback_row(struct vkms_writeback_job *wb, const struct line_buffer *src_buffer, int y);
 
 /* Writeback */
-int vkms_enable_writeback_connector(struct vkms_device *vkmsdev);
+int vkms_enable_writeback_connector(struct vkms_device *vkmsdev,
+				    struct vkms_crtc *vkms_crtc);
 
 #endif /* _VKMS_DRV_H_ */

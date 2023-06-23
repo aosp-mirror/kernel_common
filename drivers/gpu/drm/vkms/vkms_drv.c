@@ -57,8 +57,8 @@ static void vkms_release(struct drm_device *dev)
 {
 	struct vkms_device *vkms = drm_device_to_vkms_device(dev);
 
-	if (vkms->output.composer_workq)
-		destroy_workqueue(vkms->output.composer_workq);
+	for (int i = 0; i < vkms->output.num_crtcs; i++)
+		destroy_workqueue(vkms->output.crtcs[i].composer_workq);
 }
 
 static void vkms_atomic_commit_tail(struct drm_atomic_state *old_state)
@@ -203,15 +203,15 @@ static int vkms_platform_probe(struct platform_device *pdev)
 		goto out_release_group;
 	}
 
-	ret = drm_vblank_init(&vkms_device->drm, 1);
-	if (ret) {
-		DRM_ERROR("Failed to vblank\n");
-		goto out_release_group;
-	}
-
 	ret = vkms_modeset_init(vkms_device);
 	if (ret) {
 		DRM_ERROR("Unable to initialize modesetting\n");
+		goto out_release_group;
+	}
+
+	ret = drm_vblank_init(&vkms_device->drm, vkms_device->output.num_crtcs);
+	if (ret) {
+		DRM_ERROR("Failed to vblank\n");
 		goto out_release_group;
 	}
 
