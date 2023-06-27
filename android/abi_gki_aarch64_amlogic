@@ -44,6 +44,7 @@
   __bitmap_and
   __bitmap_andnot
   __bitmap_clear
+  bitmap_find_next_zero_area_off
   bitmap_free
   __bitmap_or
   __bitmap_set
@@ -1039,6 +1040,7 @@
   kstrtouint
   kstrtouint_from_user
   kstrtoull
+  kthread_bind
   kthread_create_on_node
   __kthread_init_worker
   kthread_queue_work
@@ -1112,6 +1114,7 @@
   __memset_io
   memstart_addr
   memunmap
+  migrate_pages
   misc_deregister
   misc_register
   __mmap_lock_do_trace_acquire_returned
@@ -1298,6 +1301,7 @@
   page_endio
   __page_mapcount
   page_mapping
+  __page_pinner_failure_detect
   page_pinner_inited
   __page_pinner_put_page
   page_pool_alloc_pages
@@ -1459,6 +1463,7 @@
   ptp_clock_index
   ptp_clock_register
   ptp_clock_unregister
+  putback_movable_pages
   put_device
   __put_net
   __put_page
@@ -1615,6 +1620,7 @@
   schedule
   schedule_timeout
   schedule_timeout_interruptible
+  schedule_timeout_killable
   scnprintf
   sdio_align_size
   sdio_claim_host
@@ -2127,6 +2133,7 @@
   vmalloc_to_pfn
   vmalloc_user
   vmap
+  vm_event_states
   vmf_insert_pfn_prot
   vm_insert_page
   vm_unmap_aliases
