@@ -366,6 +366,14 @@ impl<T: AlwaysRefCounted> ARef<T> {
             _p: PhantomData,
         }
     }
+
+    /// Convert this [`ARef`] into a raw pointer.
+    ///
+    /// The caller retains ownership of the refcount that this `ARef` used to own.
+    pub fn into_raw(me: Self) -> NonNull<T> {
+        let me = core::mem::ManuallyDrop::new(me);
+        me.ptr
+    }
 }
 
 impl<T: AlwaysRefCounted> Clone for ARef<T> {
