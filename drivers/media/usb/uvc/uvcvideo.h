@@ -138,8 +138,9 @@ struct uvc_control_mapping {
 			    u8 *data_out);
 	void (*set)(struct uvc_control_mapping *mapping, s32 value,
 		    u8 *data);
-	int (*set_compound)(struct uvc_control_mapping *mapping, const u8 *data_in,
-			    u8 *data);
+	int (*set_compound)(struct uvc_control_mapping *mapping,
+			    const u8 *data_in, const u8 *data_min,
+			    const u8 *data_max, u8 *data);
 };
 
 struct uvc_control {
@@ -304,6 +305,13 @@ struct uvc_streaming_header {
 	u8 bTriggerSupport;
 	u8 bTriggerUsage;
 };
+
+struct uvc_rect {
+	u16 top;
+	u16 left;
+	u16 bottom;
+	u16 right;
+} __packed;
 
 enum uvc_buffer_state {
 	UVC_BUF_STATE_IDLE	= 0,

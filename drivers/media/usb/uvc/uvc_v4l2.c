@@ -1096,7 +1096,10 @@ static int uvc_ioctl_query_ext_ctrl(struct file *file, void *fh,
 	qec->step = qc.step;
 	qec->default_value = qc.default_value;
 	qec->flags = qc.flags;
-	qec->elem_size = 4;
+	if (qc.type == V4L2_CTRL_TYPE_RECT)
+		qec->elem_size = sizeof(struct v4l2_rect);
+	else
+		qec->elem_size = 4;
 	qec->elems = 1;
 	qec->nr_of_dims = 0;
 	memset(qec->dims, 0, sizeof(qec->dims));

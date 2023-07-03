@@ -358,6 +358,24 @@ static const struct uvc_control_info uvc_ctrls[] = {
 		.flags		= UVC_CTRL_FLAG_GET_CUR
 				| UVC_CTRL_FLAG_AUTO_UPDATE,
 	},
+	/*
+	 * UVC_CTRL_FLAG_AUTO_UPDATE is needed because the RoI may get updated
+	 * by sensors.
+	 * "This RoI should be the same as specified in most recent SET_CUR
+	 * except in the case where the 'Auto Detect and Track' and/or
+	 * 'Image Stabilization' bit have been set."
+	 * 4.2.2.1.20 Digital Region of Interest (ROI) Control
+	 */
+	{
+		.entity		= UVC_GUID_UVC_CAMERA,
+		.selector	= UVC_CT_REGION_OF_INTEREST_CONTROL,
+		.index		= 21,
+		.size		= 10,
+		.flags		= UVC_CTRL_FLAG_SET_CUR | UVC_CTRL_FLAG_GET_CUR
+				| UVC_CTRL_FLAG_GET_MIN | UVC_CTRL_FLAG_GET_MAX
+				| UVC_CTRL_FLAG_GET_DEF
+				| UVC_CTRL_FLAG_AUTO_UPDATE,
+	},
 };
 
 static const u32 uvc_control_classes[] = {
@@ -457,6 +475,70 @@ static void uvc_ctrl_set_rel_speed(struct uvc_control_mapping *mapping,
 
 	data[first] = value == 0 ? 0 : (value > 0) ? 1 : 0xff;
 	data[first+1] = min_t(int, abs(value), 0xff);
+}
+
+static int uvc_to_v4l2_rect(struct v4l2_rect *v4l2_rect,
+			    const struct uvc_rect *uvc_rect)
+{
+	if (uvc_rect->bottom < uvc_rect->top ||
+	    uvc_rect->right < uvc_rect->left)
+		return -EINVAL;
+
+	v4l2_rect->top = uvc_rect->top;
+	v4l2_rect->left = uvc_rect->left;
+	v4l2_rect->height = uvc_rect->bottom - uvc_rect->top + 1;
+	v4l2_rect->width = uvc_rect->right - uvc_rect->left + 1;
+	return 0;
+}
+
+static int v4l2_to_uvc_rect(struct uvc_rect *uvc_rect,
+			    const struct v4l2_rect *min_rect,
+			    const struct v4l2_rect *max_rect,
+			    struct v4l2_rect *v4l2_rect)
+{
+	v4l2_rect->left = clamp_t(s32, v4l2_rect->left, 0, max_rect->width);
+	v4l2_rect->top = clamp_t(s32, v4l2_rect->top, 0, max_rect->height);
+	v4l2_rect->height = clamp_t(s32, v4l2_rect->height,
+				    min_rect->height, max_rect->height);
+	v4l2_rect->width = clamp_t(s32, v4l2_rect->width,
+				   min_rect->width, max_rect->width);
+
+	uvc_rect->top = v4l2_rect->top;
+	uvc_rect->left = v4l2_rect->left;
+	uvc_rect->bottom = v4l2_rect->height + v4l2_rect->top - 1;
+	uvc_rect->right = v4l2_rect->width + v4l2_rect->left - 1;
+	return 0;
+}
+
+static int uvc_get_compound_rect(struct uvc_control_mapping *mapping,
+				 const u8 *data, u8 *data_out)
+{
+	struct uvc_rect *uvc_rect;
+
+	uvc_rect = (struct uvc_rect *)(data + mapping->offset / 8);
+	return uvc_to_v4l2_rect((struct v4l2_rect *)data_out, uvc_rect);
+}
+
+static int uvc_set_compound_rect(struct uvc_control_mapping *mapping,
+				 const u8 *data_in, const u8 *data_min,
+				 const u8 *data_max, u8 *data)
+{
+	struct uvc_rect *uvc_rect;
+	struct v4l2_rect min_rect, max_rect;
+	int ret;
+
+	uvc_rect = (struct uvc_rect *)(data + mapping->offset / 8);
+
+	ret = uvc_get_compound_rect(mapping, data_min, (u8 *)&min_rect);
+	if (ret)
+		return ret;
+
+	ret = uvc_get_compound_rect(mapping, data_max, (u8 *)&max_rect);
+	if (ret)
+		return ret;
+
+	return v4l2_to_uvc_rect(uvc_rect, &min_rect, &max_rect,
+				(struct v4l2_rect *)data_in);
 }
 
 static const struct uvc_control_mapping uvc_ctrl_mappings[] = {
@@ -748,6 +830,29 @@ static const struct uvc_control_mapping uvc_ctrl_mappings[] = {
 		.v4l2_type	= V4L2_CTRL_TYPE_BOOLEAN,
 		.data_type	= UVC_CTRL_DATA_TYPE_BOOLEAN,
 	},
+	{
+		.id		= V4L2_CID_UVC_REGION_OF_INTEREST_RECT,
+		.entity		= UVC_GUID_UVC_CAMERA,
+		.selector	= UVC_CT_REGION_OF_INTEREST_CONTROL,
+		.v4l2_size	= sizeof(struct v4l2_rect) * 8,
+		.data_size	= sizeof(struct uvc_rect) * 8,
+		.offset		= 0,
+		.v4l2_type	= V4L2_CTRL_TYPE_RECT,
+		.data_type	= UVC_CTRL_DATA_TYPE_RECT,
+		.get_compound	= uvc_get_compound_rect,
+		.set_compound	= uvc_set_compound_rect,
+		.name		= "Region Of Interest Rectangle",
+	},
+	{
+		.id		= V4L2_CID_UVC_REGION_OF_INTEREST_AUTO,
+		.entity		= UVC_GUID_UVC_CAMERA,
+		.selector	= UVC_CT_REGION_OF_INTEREST_CONTROL,
+		.data_size	= 16,
+		.offset		= 64,
+		.v4l2_type	= V4L2_CTRL_TYPE_BITMASK,
+		.data_type	= UVC_CTRL_DATA_TYPE_BITMASK,
+		.name		= "Region Of Interest Auto Controls",
+	},
 };
 
 const struct uvc_control_mapping uvc_ctrl_power_line_mapping_limited = {
@@ -900,7 +1005,8 @@ static int uvc_get_compound(struct uvc_control_mapping *mapping, const u8 *data,
  * and mapping->data_size stored at 'data'.
  */
 static int uvc_set_compound(struct uvc_control_mapping *mapping,
-			    const u8 *data_in, u8 *data)
+			    const u8 *data_in, const u8 *data_min,
+			    const u8 *data_max, u8 *data)
 {
 	memcpy(data + mapping->offset / 8, data_in, mapping->data_size / 8);
 	return 0;
@@ -2090,6 +2196,8 @@ static int __uvc_ctrl_set_compound(struct uvc_control_mapping *mapping,
 		goto out;
 
 	ret = mapping->set_compound(mapping, data,
+			uvc_ctrl_data(ctrl, UVC_CTRL_DATA_MIN),
+			uvc_ctrl_data(ctrl, UVC_CTRL_DATA_MAX),
 			uvc_ctrl_data(ctrl, UVC_CTRL_DATA_CURRENT));
 
 	__uvc_ctrl_get_compound(mapping, ctrl, UVC_CTRL_DATA_CURRENT, xctrl);
@@ -2218,6 +2326,13 @@ int uvc_ctrl_set(struct uvc_fh *handle,
 		mapping->set(mapping, value,
 			     uvc_ctrl_data(ctrl, UVC_CTRL_DATA_CURRENT));
 	} else {
+		/* Populates min/max value cache for clamping. */
+		if (!ctrl->cached) {
+			ret = uvc_ctrl_populate_cache(chain, ctrl);
+			if (ret < 0)
+				return ret;
+		}
+
 		ret = __uvc_ctrl_set_compound(mapping, xctrl, ctrl);
 		if (ret < 0)
 			return ret;
@@ -2640,12 +2755,21 @@ static int __uvc_ctrl_add_mapping(struct uvc_video_chain *chain,
 	}
 
 	if (uvc_ctrl_mapping_is_compound(map)) {
-		if (map->data_size != map->v4l2_size)
-			return -EINVAL;
+		switch (map->v4l2_type) {
+		case V4L2_CTRL_TYPE_RECT:
+			/* Only supports 4 bytes-aligned data. */
+			if (WARN_ON(map->offset % 32))
+				return -EINVAL;
+			break;
+		default:
+			if (WARN_ON(map->data_size != map->v4l2_size))
+				return -EINVAL;
 
-		/* Only supports byte-aligned data. */
-		if (WARN_ON(map->offset % 8 || map->data_size % 8))
-			return -EINVAL;
+			/* Only supports byte-aligned data. */
+			if (WARN_ON(map->offset % 8 || map->data_size % 8))
+				return -EINVAL;
+		}
+
 	}
 
 	if (!map->get && !uvc_ctrl_mapping_is_compound(map))
