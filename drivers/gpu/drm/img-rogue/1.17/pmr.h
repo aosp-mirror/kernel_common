@@ -507,6 +507,24 @@ PMRUnrefPMR(PMR *psPMR);
 PVRSRV_ERROR
 PMRUnrefUnlockPMR(PMR *psPMR);
 
+/*
+ * PMRCpuMapCountIncr()
+ *
+ * Increment count of the number of current CPU mappings of the PMR.
+ *
+ */
+void
+PMRCpuMapCountIncr(PMR *psPMR);
+
+/*
+ * PMRCpuMapCountDecr()
+ *
+ * Decrement count of the number of current CPU mappings of the PMR.
+ *
+ */
+void
+PMRCpuMapCountDecr(PMR *psPMR);
+
 PPVRSRV_DEVICE_NODE
 PMR_DeviceNode(const PMR *psPMR);
 

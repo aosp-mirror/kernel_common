@@ -116,6 +116,14 @@ static void MMapPMROpen(struct vm_area_struct *ps_vma)
 		PVR_DPF((PVR_DBG_ERROR, "%s: Could not lock down physical addresses, aborting.", __func__));
 		PMRUnrefPMR(psPMR);
 	}
+	else
+	{
+		/* MMapPMROpen() is call when a process is forked, but only if
+		 * mappings are to be inherited so increment mapping count of the
+		 * PMR to prevent its layout cannot be changed (if sparse).
+		 */
+		PMRCpuMapCountIncr(psPMR);
+	}
 }
 
 static void MMapPMRClose(struct vm_area_struct *ps_vma)
@@ -144,6 +152,8 @@ static void MMapPMRClose(struct vm_area_struct *ps_vma)
 #endif
 
 	PMRUnlockSysPhysAddresses(psPMR);
+	/* Decrement the mapping count before Unref of PMR (as Unref could destroy the PMR) */
+	PMRCpuMapCountDecr(psPMR);
 	PMRUnrefPMR(psPMR);
 }
 
@@ -575,6 +585,11 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 	/* record the stats */
 	MMapStatsAddOrUpdatePMR(psPMR, uiLength);
 #endif
+
+	/* Increment mapping count of the PMR so that its layout cannot be
+	 * changed (if sparse).
+	 */
+	PMRCpuMapCountIncr(psPMR);
 
 	return PVRSRV_OK;
 
