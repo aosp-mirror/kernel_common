@@ -363,6 +363,24 @@ PVRSRV_ERROR
 DevmemIntUnreserveRange(DEVMEMINT_RESERVATION *psDevmemReservation);
 
 /*************************************************************************/ /*!
+@Function       DevmemIntReservationAcquire
+@Description    Acquire a reference to the provided device memory reservation.
+@Return         IMG_TRUE if referenced and IMG_FALSE in case of error
+*/ /**************************************************************************/
+IMG_BOOL
+DevmemIntReservationAcquire(DEVMEMINT_RESERVATION *psDevmemReservation);
+
+/*************************************************************************/ /*!
+@Function       DevmemIntReservationRelease
+@Description    Release the reference to the provided device memory reservation.
+            If this is the last reference which was taken then the
+                reservation will be freed.
+@Return         None.
+*/ /**************************************************************************/
+void
+DevmemIntReservationRelease(DEVMEMINT_RESERVATION *psDevmemReservation);
+
+/*************************************************************************/ /*!
 @Function       DevmemIntChangeSparse
 @Description    Changes the sparse allocations of a PMR by allocating and freeing
                 pages and changing their corresponding CPU and GPU mappings.

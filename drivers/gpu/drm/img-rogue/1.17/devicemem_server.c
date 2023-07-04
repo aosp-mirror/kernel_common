@@ -270,7 +270,7 @@ DevmemIntPinValidate(DEVMEMINT_MAPPING *psDevmemMapping, PMR *psPMR)
 @Description    Acquire a reference to the provided device memory reservation.
 @Return         IMG_TRUE if referenced and IMG_FALSE in case of error
 */ /**************************************************************************/
-static INLINE IMG_BOOL DevmemIntReservationAcquire(DEVMEMINT_RESERVATION *psDevmemReservation)
+IMG_BOOL DevmemIntReservationAcquire(DEVMEMINT_RESERVATION *psDevmemReservation)
 {
 	IMG_BOOL bSuccess;
 
@@ -299,7 +299,7 @@ static INLINE IMG_BOOL DevmemIntReservationAcquire(DEVMEMINT_RESERVATION *psDevm
                 reservation will be freed.
 @Return         None.
 */ /**************************************************************************/
-static INLINE void DevmemIntReservationRelease(DEVMEMINT_RESERVATION *psDevmemReservation)
+void DevmemIntReservationRelease(DEVMEMINT_RESERVATION *psDevmemReservation)
 {
 	OSLockAcquire(psDevmemReservation->hLock);
 
