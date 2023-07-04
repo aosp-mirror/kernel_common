@@ -1831,7 +1831,11 @@ PVRSRV_ERROR RGXCreateFreeList(CONNECTION_DATA      *psConnection,
 	/* Initialise host data structures */
 	psFreeList->psDevInfo = psDevInfo;
 	psFreeList->psConnection = psConnection;
+
 	psFreeList->psFreeListPMR = psFreeListPMR;
+	/* Ref the PMR to prevent resource beeing destroyed before use */
+	PMRRefPMR(psFreeList->psFreeListPMR);
+
 	psFreeList->uiFreeListPMROffset = uiFreeListPMROffset;
 	psFreeList->psFWFreelistMemDesc = psFWFreelistMemDesc;
 	eError = RGXSetFirmwareAddress(&psFreeList->sFreeListFWDevVAddr, psFWFreelistMemDesc, 0, RFW_FWADDR_FLAG_NONE);
@@ -1972,6 +1976,7 @@ FWFreeListCpuMap:
 
 ErrorSetFwAddr:
 	DevmemFwUnmapAndFree(psDevInfo, psFWFreelistMemDesc);
+	PMRUnrefPMR(psFreeList->psFreeListPMR);
 
 FWFreeListAlloc:
 	OSFreeMem(psFreeList);
@@ -2062,6 +2067,9 @@ PVRSRV_ERROR RGXDestroyFreeList(RGX_FREELIST *psFreeList)
 	/* consistency checks */
 	PVR_ASSERT(dllist_is_empty(&psFreeList->sMemoryBlockInitHead));
 	PVR_ASSERT(psFreeList->ui32CurrentFLPages == 0);
+
+	/* Remove reference from the PMR resource */
+	PMRUnrefPMR(psFreeList->psFreeListPMR);
 
 	/* free Freelist */
 	OSFreeMem(psFreeList);
