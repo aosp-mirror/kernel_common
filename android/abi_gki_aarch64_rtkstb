@@ -11,13 +11,20 @@
   __arm_smccc_smc
   bpf_trace_run1
   bpf_trace_run2
+  cancel_delayed_work
+  cancel_delayed_work_sync
   cancel_work_sync
   cdev_add
+  cdev_alloc
   cdev_del
   cdev_init
+  cec_notifier_conn_register
+  cec_notifier_set_phys_addr
+  cec_notifier_set_phys_addr_from_edid
   __cfi_slowpath_diag
   __check_object_size
   __class_create
+  class_create_file_ns
   class_destroy
   clk_disable
   clk_enable
@@ -41,7 +48,10 @@
   __cpu_online_mask
   debugfs_create_dir
   debugfs_create_file
+  debugfs_lookup
+  debugfs_remove
   delayed_work_timer_fn
+  del_timer
   del_timer_sync
   desc_to_gpio
   destroy_workqueue
@@ -83,6 +93,7 @@
   dma_buf_detach
   dma_buf_export
   dma_buf_fd
+  dma_buf_get
   dma_buf_map_attachment
   dma_buf_put
   dma_buf_set_name
@@ -103,8 +114,10 @@
   dma_unmap_page_attrs
   dma_unmap_sg_attrs
   down
+  down_interruptible
   event_triggers_call
   fasync_helper
+  _find_first_bit
   _find_next_bit
   find_pid_ns
   finish_wait
@@ -118,14 +131,23 @@
   gen_pool_create
   gen_pool_free_owner
   gen_pool_set_algo
+  get_device
   get_zeroed_page
   gic_nonsecure_priorities
   gpiod_direction_input
   gpiod_direction_output
+  gpiod_direction_output_raw
   gpiod_get_value
   gpiod_put
   gpiod_set_debounce
   gpiod_to_irq
+  gpio_to_desc
+  hrtimer_cancel
+  hrtimer_forward
+  __hrtimer_get_remaining
+  hrtimer_init
+  hrtimer_start_range_ns
+  hrtimer_try_to_cancel
   __hwspin_unlock
   i2c_del_driver
   i2c_get_adapter
@@ -140,6 +162,7 @@
   init_timer_key
   init_wait_entry
   __init_waitqueue_head
+  __ioremap
   iounmap
   __irq_domain_add
   irq_get_irq_data
@@ -166,10 +189,16 @@
   kobject_put
   kobject_uevent
   kobject_uevent_env
+  kstrtoint
   kstrtoll
   kstrtouint
   kstrtoull
+  kthread_create_on_node
+  kthread_should_stop
+  kthread_stop
   ktime_get
+  ktime_get_mono_fast_ns
+  ktime_get_ts64
   __list_add_valid
   __list_del_entry_valid
   memcpy
@@ -179,7 +208,13 @@
   memstart_addr
   misc_deregister
   misc_register
+  mmc_add_host
+  mmc_alloc_host
+  mmc_free_host
+  mmc_gpio_get_cd
   mmc_of_parse
+  mmc_remove_host
+  mmc_request_done
   mmc_send_tuning
   mmc_wait_for_cmd
   mod_timer
@@ -189,22 +224,27 @@
   __mutex_init
   mutex_lock
   mutex_unlock
+  __ndelay
   nonseekable_open
   nvmem_cell_get
   nvmem_cell_put
   nvmem_cell_read
   of_address_to_resource
+  of_alias_get_id
   of_clk_add_provider
   of_clk_del_provider
   of_clk_get
   of_clk_src_simple_get
   of_device_get_match_data
   of_device_is_available
+  of_device_is_compatible
   of_find_compatible_node
   of_find_device_by_node
   of_find_node_opts_by_path
   of_find_property
   of_get_child_by_name
+  of_get_compatible_child
+  of_get_named_gpio_flags
   of_get_next_child
   of_get_property
   of_get_regulator_init_data
@@ -214,30 +254,39 @@
   of_match_node
   of_nvmem_cell_get
   of_parse_phandle
+  of_platform_depopulate
   of_platform_populate
   of_property_count_elems_of_size
   of_property_read_string
   of_property_read_string_helper
   of_property_read_u32_index
   of_property_read_variable_u32_array
+  of_property_read_variable_u8_array
+  panic
   param_ops_int
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   pid_task
   pinctrl_lookup_state
   pinctrl_select_state
+  platform_bus_type
   platform_device_register_full
   platform_device_unregister
   __platform_driver_register
   platform_driver_unregister
   platform_get_irq
   platform_get_resource
+  platform_get_resource_byname
   __pm_runtime_disable
   pm_runtime_enable
   pm_runtime_force_resume
   pm_runtime_force_suspend
+  __pm_runtime_idle
   __pm_runtime_resume
+  pm_runtime_set_autosuspend_delay
   __pm_runtime_set_status
+  __pm_runtime_suspend
+  __pm_runtime_use_autosuspend
   power_supply_register
   power_supply_unregister
   preempt_schedule_notrace
@@ -250,9 +299,12 @@
   queue_work_on
   raw_notifier_call_chain
   raw_notifier_chain_register
+  raw_notifier_chain_unregister
   _raw_spin_lock
+  _raw_spin_lock_bh
   _raw_spin_lock_irqsave
   _raw_spin_unlock
+  _raw_spin_unlock_bh
   _raw_spin_unlock_irqrestore
   rdev_get_drvdata
   refcount_warn_saturate
@@ -275,6 +327,7 @@
   rpmsg_send
   rtc_time64_to_tm
   rtc_tm_to_time64
+  schedule
   schedule_timeout
   scnprintf
   sdhci_add_host
@@ -291,23 +344,40 @@
   seq_puts
   seq_read
   sg_free_table
+  sg_init_one
   sg_next
   single_open
   single_release
   skb_dequeue
   skb_put
   skb_queue_tail
+  snd_card_free
+  snd_card_new
+  snd_card_register
+  snd_ctl_add
+  snd_ctl_new1
+  snd_pcm_add_chmap_ctls
+  snd_pcm_alt_chmaps
+  snd_pcm_lib_ioctl
+  snd_pcm_new
+  snd_pcm_period_elapsed
+  snd_pcm_set_ops
+  snd_pcm_suspend_all
   snprintf
   soc_device_match
   sprintf
+  sscanf
   __stack_chk_fail
   strcmp
   strlen
   strncmp
   strncpy
   strscpy
+  strstr
   syscon_node_to_regmap
   syscon_regmap_lookup_by_phandle
+  syscon_regmap_lookup_by_phandle_args
+  sysfs_create_files
   sysfs_create_group
   sysfs_remove_group
   system_state
@@ -321,11 +391,17 @@
   trace_event_raw_init
   trace_event_reg
   trace_handle_return
+  __traceiter_dwc3_readl
+  __tracepoint_dwc3_readl
   trace_raw_output_prep
   __ubsan_handle_cfi_check_fail_abort
   unregister_chrdev_region
   unregister_reboot_notifier
   up
+  usb_add_phy_dev
+  usb_debug_root
+  usb_remove_phy
+  usb_role_switch_set_role
   usleep_range_state
   vabits_actual
   vfree
@@ -336,6 +412,7 @@
   wait_for_completion
   wait_for_completion_timeout
   __wake_up
+  wake_up_process
   __warn_printk
 
 # required by apw8889-regulator.ko
@@ -356,14 +433,15 @@
   regulator_set_voltage_sel_regmap
   strcasecmp
 
+# required by buflock.ko
+  __get_task_comm
+  simple_read_from_buffer
+
 # required by clk-det.ko
   __clk_get_hw
   devm_clk_hw_unregister
   devm_of_clk_del_provider
   of_clk_hw_simple_get
-
-# required by clk-rtd1619b-cc.ko
-  of_device_is_compatible
 
 # required by clk-rtk.ko
   clk_hw_get_name
@@ -386,6 +464,69 @@
   dma_contiguous_default_area
   sg_alloc_table_from_pages_segment
 
+# required by cqhci.ko
+  devm_blk_crypto_profile_init
+  dmam_alloc_attrs
+  dmam_free_coherent
+  mmc_cqe_request_done
+
+# required by dpi_core.ko
+  mod_delayed_work_on
+  round_jiffies
+  system_freezable_wq
+  thermal_zone_get_temp
+  thermal_zone_get_zone_by_name
+
+# required by dw_mmc_cqe-rtk.ko
+  clk_set_phase
+  __mmc_claim_host
+  mmc_cmdq_disable
+  mmc_cmdq_enable
+  mmc_hw_reset
+  mmc_release_host
+  mmc_switch
+  mmc_wait_for_req
+
+# required by dw_mmc_cqe.ko
+  device_property_read_u32_array
+  down_write
+  __init_rwsem
+  mmc_gpio_get_ro
+  mmc_regulator_get_supply
+  up_write
+
+# required by dwc3-rtk-debugfs.ko
+  __of_get_address
+  of_translate_address
+
+# required by dwc3-rtk.ko
+  dev_fwnode
+  strchrnul
+  __traceiter_dwc3_writel
+  __tracepoint_dwc3_writel
+  usb_get_dr_mode
+  usb_role_switch_get_drvdata
+  usb_role_switch_get_role
+  usb_role_switch_register
+  usb_role_switch_unregister
+
+# required by extcon-rtk-type-c.ko
+  devm_extcon_dev_allocate
+  devm_extcon_dev_register
+  extcon_set_property
+  extcon_set_property_capability
+  extcon_set_state
+  extcon_sync
+  flush_delayed_work
+  gpio_free
+  gpio_request
+  skip_spaces
+  typec_get_drvdata
+  typec_register_port
+  typec_set_data_role
+  typec_set_pwr_role
+  typec_unregister_port
+
 # required by gpio-rtd.ko
   gpiochip_add_data_with_key
   handle_simple_irq
@@ -395,21 +536,14 @@
   pinctrl_gpio_request
   pinctrl_gpio_set_config
 
-# required by hdcp.ko
-  cancel_delayed_work
-
 # required by hdmitx.ko
   bpf_trace_run4
-  cec_notifier_conn_register
-  cec_notifier_set_phys_addr
-  cec_notifier_set_phys_addr_from_edid
   disable_irq
   driver_for_each_device
   enable_irq
   gpiod_set_value
   krealloc
   reset_control_release
-  schedule
   trace_print_symbols_seq
 
 # required by i2c-rtk.ko
@@ -420,7 +554,6 @@
   i2c_generic_scl_recovery
   i2c_parse_fw_timings
   i2c_recover_bus
-  of_alias_get_id
 
 # required by irq-realtek-mux.ko
   handle_level_irq
@@ -509,6 +642,9 @@
   devm_phy_create
   of_phy_simple_xlate
 
+# required by phy-rtk-usb3.ko
+  of_property_read_variable_u16_array
+
 # required by pinctrl-rtd.ko
   pinconf_generic_dt_node_to_map
   pinctrl_dev_get_drvdata
@@ -516,10 +652,8 @@
   pinctrl_utils_free_map
 
 # required by pwm-rtk.ko
-  kstrtoint
   pwmchip_add
   pwmchip_remove
-  sscanf
 
 # required by r8169soc.ko
   alloc_etherdev_mqs
@@ -576,7 +710,6 @@
   __memcpy_toio
   of_get_next_available_child
   rpmsg_register_device
-  strstr
 
 # required by rtc-rtk.ko
   device_init_wakeup
@@ -588,6 +721,10 @@
 # required by rtd-rng.ko
   hwrng_register
   hwrng_unregister
+
+# required by rtd13xx-ve1.ko
+  dev_pm_domain_attach_by_id
+  dev_pm_domain_detach
 
 # required by rtk-gpu_wrap.ko
   devm_of_platform_populate
@@ -601,30 +738,35 @@
   rc_repeat
   register_pm_notifier
 
-# required by rtk-jpu.ko
-  panic
-
 # required by rtk-reboot.ko
   register_restart_handler
 
 # required by rtk-sdmmc.ko
-  del_timer
   down_trylock
   flush_workqueue
   kmalloc_order_trace
-  mmc_add_host
-  mmc_alloc_host
   mmc_detect_change
-  mmc_free_host
-  mmc_remove_host
-  mmc_request_done
   sg_copy_from_buffer
   sg_copy_to_buffer
-  sg_init_one
   sg_init_table
 
+# required by rtk-usb-manager.ko
+  class_compat_create_link
+  class_compat_register
+  class_compat_remove_link
+  class_compat_unregister
+  device_attach
+  device_release_driver
+  extcon_find_edev_by_node
+  extcon_get_property
+  extcon_get_state
+  extcon_register_notifier
+  gpiod_get_from_of_node
+  usb_register_notify
+  usb_role_switch_find_by_fwnode
+  usb_unregister_notify
+
 # required by rtk_bootstatus.ko
-  syscon_regmap_lookup_by_phandle_args
   sysfs_create_link
 
 # required by rtk_cec.ko
@@ -648,10 +790,8 @@
   dev_pm_opp_put_prop_name
   dev_pm_opp_set_prop_name
   get_cpu_device
-  platform_bus_type
 
 # required by rtk_drm.ko
-  cancel_delayed_work_sync
   component_add
   component_bind_all
   component_del
@@ -767,25 +907,30 @@
   drm_universal_plane_init
   drm_vblank_init
   gpiod_get_raw_value
-  gpio_to_desc
   hdmi_avi_infoframe_pack
   kmemdup
-  kthread_create_on_node
-  kthread_should_stop
-  kthread_stop
   ktime_get_raw
-  of_get_named_gpio_flags
   __platform_register_drivers
   platform_unregister_drivers
   _raw_spin_lock_irq
   _raw_spin_unlock_irq
   schedule_timeout_uninterruptible
   __sw_hweight8
-  sysfs_create_files
-  wake_up_process
 
-# required by rtk_fwdbg.ko
-  __register_chrdev
+# required by rtk_fan.ko
+  __platform_driver_probe
+  pwm_apply_state
+  pwm_get
+
+# required by rtk_fss.ko
+  devm_platform_ioremap_resource
+  of_get_parent
+
+# required by rtk_gic_extension.ko
+  __cpuhp_remove_state
+  __cpuhp_setup_state
+  cpu_pm_register_notifier
+  cpu_pm_unregister_notifier
 
 # required by rtk_gpc.ko
   atomic_notifier_chain_register
@@ -796,7 +941,6 @@
   devm_clk_bulk_get_all
   of_genpd_add_provider_simple
   panic_notifier_list
-  platform_get_resource_byname
   pm_genpd_init
   pm_genpd_remove
 
@@ -809,7 +953,6 @@
   devm_platform_get_and_ioremap_resource
 
 # required by rtk_krpc_agent.ko
-  get_device
   rpmsg_create_ept
   rpmsg_destroy_ept
 
@@ -834,7 +977,6 @@
   __bitmap_set
   __bitmap_weight
   bitmap_zalloc
-  class_create_file_ns
   debugfs_attr_read
   debugfs_attr_write
   debugfs_create_symlink
@@ -842,11 +984,9 @@
   __devres_alloc_node
   devres_find
   devres_release
-  dma_buf_get
   dma_heap_get_dev
   dma_set_coherent_mask
   dma_set_mask
-  _find_first_bit
   _find_last_bit
   generic_file_llseek
   gen_pool_avail
@@ -882,13 +1022,9 @@
   regulator_suspend_enable
 
 # required by rtk_pm_suspend.ko
-  __ioremap
   memchr
 
 # required by rtk_rpc_mem.ko
-  of_platform_depopulate
-  _raw_spin_lock_bh
-  _raw_spin_unlock_bh
   __register_rpmsg_driver
   unregister_rpmsg_driver
 
@@ -897,14 +1033,12 @@
 
 # required by rtk_tee_mem_api.ko
   platform_find_device_by_driver
-  raw_notifier_chain_unregister
 
 # required by rtk_tp.ko
   of_n_addr_cells
-  __pm_runtime_idle
 
-# required by rtk_urpc_service.ko
-  cdev_alloc
+# required by rtk_ve3_uart.ko
+  devm_clk_put
 
 # required by rtk_wdt.ko
   platform_get_irq_optional
@@ -914,7 +1048,6 @@
   watchdog_unregister_device
 
 # required by sdhci-of-rtkstb.ko
-  mmc_gpio_get_cd
   sdhci_set_clock
   sdhci_set_ios
 
@@ -932,28 +1065,8 @@
   pm_clk_destroy
 
 # required by snd-soc-realtek.ko
-  hrtimer_cancel
-  hrtimer_forward
-  __hrtimer_get_remaining
-  hrtimer_init
-  hrtimer_start_range_ns
-  hrtimer_try_to_cancel
-  ktime_get_ts64
-  __ndelay
   param_array_ops
   param_ops_bool
-  snd_card_free
-  snd_card_new
-  snd_card_register
-  snd_ctl_add
-  snd_ctl_new1
-  snd_pcm_add_chmap_ctls
-  snd_pcm_alt_chmaps
-  snd_pcm_lib_ioctl
-  snd_pcm_new
-  snd_pcm_period_elapsed
-  snd_pcm_set_ops
-  snd_pcm_suspend_all
 
 # required by tee.ko
   add_uevent_var
