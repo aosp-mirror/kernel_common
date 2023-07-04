@@ -31,6 +31,8 @@
 #define UVC_CTRL_FLAG_AUTO_UPDATE	(1 << 7)
 /* Control supports asynchronous reporting */
 #define UVC_CTRL_FLAG_ASYNCHRONOUS	(1 << 8)
+/* Control's default, minimum and maximum values should not be cached */
+#define UVC_CTRL_FLAG_NO_CACHE		(1 << 9)
 
 #define UVC_CTRL_FLAG_GET_RANGE \
 	(UVC_CTRL_FLAG_GET_CUR | UVC_CTRL_FLAG_GET_MIN | \
@@ -50,6 +52,8 @@
 #define V4L2_UVC_REGION_OF_INTEREST_AUTO_DETECT_AND_TRACK	(1 << 5)
 #define V4L2_UVC_REGION_OF_INTEREST_AUTO_IMAGE_STABILIZATION	(1 << 6)
 #define V4L2_UVC_REGION_OF_INTEREST_AUTO_HIGHER_QUALITY		(1 << 7)
+
+#define V4L2_CID_UVC_REGION_OF_INTEREST_RECT_RELATIVE	(V4L2_CID_CAMERA_UVC_BASE + 3)
 
 struct uvc_menu_info {
 	__u32 value;

@@ -517,6 +517,10 @@ static const struct uvc_control_info uvc_ctrls[] = {
 	 * except in the case where the 'Auto Detect and Track' and/or
 	 * 'Image Stabilization' bit have been set."
 	 * 4.2.2.1.20 Digital Region of Interest (ROI) Control
+	 *
+	 * UVC_CTRL_FLAG_NO_CACHE is needed because the RoI max/min values may
+	 * get updated when resolution changes for
+	 * V4L2_CID_UVC_REGION_OF_INTEREST_RECT_RELATIVE.
 	 */
 	{
 		.entity		= UVC_GUID_UVC_CAMERA,
@@ -526,7 +530,8 @@ static const struct uvc_control_info uvc_ctrls[] = {
 		.flags		= UVC_CTRL_FLAG_SET_CUR | UVC_CTRL_FLAG_GET_CUR
 				| UVC_CTRL_FLAG_GET_MIN | UVC_CTRL_FLAG_GET_MAX
 				| UVC_CTRL_FLAG_GET_DEF
-				| UVC_CTRL_FLAG_AUTO_UPDATE,
+				| UVC_CTRL_FLAG_AUTO_UPDATE
+				| UVC_CTRL_FLAG_NO_CACHE,
 		.init		= uvc_ctrl_init_roi,
 	},
 };
@@ -649,12 +654,18 @@ static int v4l2_to_uvc_rect(struct uvc_rect *uvc_rect,
 			    const struct v4l2_rect *max_rect,
 			    struct v4l2_rect *v4l2_rect)
 {
-	v4l2_rect->left = clamp_t(s32, v4l2_rect->left, 0, max_rect->width);
-	v4l2_rect->top = clamp_t(s32, v4l2_rect->top, 0, max_rect->height);
-	v4l2_rect->height = clamp_t(s32, v4l2_rect->height,
-				    min_rect->height, max_rect->height);
-	v4l2_rect->width = clamp_t(s32, v4l2_rect->width,
-				   min_rect->width, max_rect->width);
+	if (min_rect && max_rect) {
+		v4l2_rect->left =
+			clamp_t(s32, v4l2_rect->left, 0, max_rect->width);
+		v4l2_rect->top =
+			clamp_t(s32, v4l2_rect->top, 0, max_rect->height);
+		v4l2_rect->height =
+			clamp_t(s32, v4l2_rect->height,
+				min_rect->height, max_rect->height);
+		v4l2_rect->width =
+			clamp_t(s32, v4l2_rect->width,
+				min_rect->width, max_rect->width);
+	}
 
 	uvc_rect->top = v4l2_rect->top;
 	uvc_rect->left = v4l2_rect->left;
@@ -691,6 +702,19 @@ static int uvc_set_compound_rect(struct uvc_control_mapping *mapping,
 		return ret;
 
 	return v4l2_to_uvc_rect(uvc_rect, &min_rect, &max_rect,
+				(struct v4l2_rect *)data_in);
+}
+
+static int
+uvc_set_compound_rect_no_clamp(struct uvc_control_mapping *mapping,
+			       const u8 *data_in, const u8 *data_min,
+			       const u8 *data_max, u8 *data)
+{
+	struct uvc_rect *uvc_rect;
+
+	uvc_rect = (struct uvc_rect *)(data + mapping->offset / 8);
+
+	return v4l2_to_uvc_rect(uvc_rect, NULL, NULL,
 				(struct v4l2_rect *)data_in);
 }
 
@@ -984,6 +1008,19 @@ static const struct uvc_control_mapping uvc_ctrl_mappings[] = {
 		.data_type	= UVC_CTRL_DATA_TYPE_BOOLEAN,
 	},
 	{
+		.id		= V4L2_CID_UVC_REGION_OF_INTEREST_AUTO,
+		.entity		= UVC_GUID_UVC_CAMERA,
+		.selector	= UVC_CT_REGION_OF_INTEREST_CONTROL,
+		.data_size	= 16,
+		.offset		= 64,
+		.v4l2_type	= V4L2_CTRL_TYPE_BITMASK,
+		.data_type	= UVC_CTRL_DATA_TYPE_BITMASK,
+		.name		= "Region Of Interest Auto Controls",
+	},
+};
+
+static const struct uvc_control_mapping uvc_ctrl_mappings_roi_rect[] = {
+	{
 		.id		= V4L2_CID_UVC_REGION_OF_INTEREST_RECT,
 		.entity		= UVC_GUID_UVC_CAMERA,
 		.selector	= UVC_CT_REGION_OF_INTEREST_CONTROL,
@@ -997,14 +1034,17 @@ static const struct uvc_control_mapping uvc_ctrl_mappings[] = {
 		.name		= "Region Of Interest Rectangle",
 	},
 	{
-		.id		= V4L2_CID_UVC_REGION_OF_INTEREST_AUTO,
+		.id		= V4L2_CID_UVC_REGION_OF_INTEREST_RECT_RELATIVE,
 		.entity		= UVC_GUID_UVC_CAMERA,
 		.selector	= UVC_CT_REGION_OF_INTEREST_CONTROL,
-		.data_size	= 16,
-		.offset		= 64,
-		.v4l2_type	= V4L2_CTRL_TYPE_BITMASK,
-		.data_type	= UVC_CTRL_DATA_TYPE_BITMASK,
-		.name		= "Region Of Interest Auto Controls",
+		.v4l2_size	= sizeof(struct v4l2_rect) * 8,
+		.data_size	= sizeof(struct uvc_rect) * 8,
+		.offset		= 0,
+		.v4l2_type	= V4L2_CTRL_TYPE_RECT,
+		.data_type	= UVC_CTRL_DATA_TYPE_RECT,
+		.get_compound	= uvc_get_compound_rect,
+		.set_compound	= uvc_set_compound_rect_no_clamp,
+		.name		= "Region Of Interest Rectangle Relative",
 	},
 };
 
@@ -1183,7 +1223,9 @@ static int uvc_ctrl_populate_cache(struct uvc_video_chain *chain,
 		}
 	}
 
-	ctrl->cached = 1;
+	if (!(ctrl->info.flags & UVC_CTRL_FLAG_NO_CACHE))
+		ctrl->cached = 1;
+
 	return 0;
 }
 
@@ -3033,6 +3075,35 @@ static void uvc_ctrl_prune_entity(struct uvc_device *dev,
 	}
 }
 
+static const u8 uvc_chrome_os_guid[16] = UVC_GUID_EXT_CHROME_OS_XU;
+
+/* Control: CROSXU_ROI_COORDINATE_SYSTEM
+ * 0: Absolute (global sensor coordinate)
+ * 1: Relative (relative to resolution)
+ */
+static bool uvc_ctrl_is_relative_roi(struct uvc_video_chain *chain)
+{
+	struct uvc_entity *entity;
+	u8 *data = kmalloc(1, GFP_KERNEL);
+	int ret = 0;
+
+	if (data == NULL)
+		return false;
+
+	list_for_each_entry(entity, &chain->entities, chain) {
+		if (!uvc_entity_match_guid(entity, uvc_chrome_os_guid))
+			continue;
+
+		ret = uvc_query_ctrl(chain->dev, UVC_GET_CUR, entity->id,
+			chain->dev->intfnum, 0x1, data, 1);
+		ret = (ret == 0) && (*data == 1);
+		break;
+	}
+
+	kfree(data);
+	return ret;
+}
+
 /*
  * Add control information and hardcoded stock control mappings to the given
  * device.
@@ -3108,6 +3179,14 @@ static void uvc_ctrl_init_ctrl(struct uvc_video_chain *chain,
 		if (uvc_entity_match_guid(ctrl->entity, mapping->entity) &&
 		    ctrl->info.selector == mapping->selector)
 			__uvc_ctrl_add_mapping(chain, ctrl, mapping);
+	}
+
+	if (ctrl->info.selector == UVC_CT_REGION_OF_INTEREST_CONTROL) {
+		const struct uvc_control_mapping *mapping =
+			uvc_ctrl_is_relative_roi(chain) ?
+			&uvc_ctrl_mappings_roi_rect[1] :
+			&uvc_ctrl_mappings_roi_rect[0];
+		__uvc_ctrl_add_mapping(chain, ctrl, mapping);
 	}
 
 	/* Finally process version-specific mappings. */
