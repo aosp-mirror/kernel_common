@@ -638,6 +638,13 @@ PVRSRV_ERROR RGXGrowFreeList(RGX_FREELIST *psFreeList,
 		size_t uiNumBytes;
 		PVRSRV_ERROR res;
 		IMG_HANDLE hMapHandle;
+		IMG_DEVMEM_SIZE_T uiPMRSize;
+
+		PMR_LogicalSize(psFreeList->psFreeListPMR, &uiPMRSize);
+
+		/* Check for overflow. Validate size and offset. */
+		PVR_GOTO_IF_INVALID_PARAM(psFreeList->uiFreeListPMROffset + ui32MapSize > psFreeList->uiFreeListPMROffset, eError, ErrorPopulateFreelist);
+		PVR_GOTO_IF_INVALID_PARAM(psFreeList->uiFreeListPMROffset + ui32MapSize <= uiPMRSize, eError, ErrorPopulateFreelist);
 
 		/* Map both the FL and the shadow FL */
 		res = PMRAcquireKernelMappingData(psFreeList->psFreeListPMR, psFreeList->uiFreeListPMROffset, ui32MapSize,
@@ -1833,7 +1840,7 @@ PVRSRV_ERROR RGXCreateFreeList(CONNECTION_DATA      *psConnection,
 	psFreeList->psConnection = psConnection;
 
 	psFreeList->psFreeListPMR = psFreeListPMR;
-	/* Ref the PMR to prevent resource beeing destroyed before use */
+	/* Ref the PMR to prevent resource being destroyed before use */
 	PMRRefPMR(psFreeList->psFreeListPMR);
 
 	psFreeList->uiFreeListPMROffset = uiFreeListPMROffset;
