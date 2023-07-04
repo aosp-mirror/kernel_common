@@ -1426,10 +1426,11 @@ DevmemIntAcquireRemoteCtx(PMR *psPMR,
 		psCtxExport = IMG_CONTAINER_OF(psListNode, DEVMEMINT_CTX_EXPORT, sNode);
 		if (psCtxExport->psPMR == psPMR)
 		{
-			OSWRLockReleaseRead(g_hExportCtxListLock);
 			DevmemIntCtxAcquire(psCtxExport->psDevmemCtx);
 			*ppsContext = psCtxExport->psDevmemCtx;
 			*phPrivData = psCtxExport->psDevmemCtx->hPrivData;
+
+			OSWRLockReleaseRead(g_hExportCtxListLock);
 
 			/* PMR should have been already exported to import it
 			 * If a PMR is exported, its immutable and the same is
