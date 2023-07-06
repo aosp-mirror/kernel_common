@@ -145,7 +145,7 @@ We want to be able to manipulate vkms instances without having to reload the
 module. Such configuration can be added as extensions to vkms's ConfigFS
 support. Use-cases:
 
-- Hotplug/hotremove connectors on the fly (to be able to test DP MST handling
+- Hotremove connectors on the fly (to be able to test DP MST handling
   of compositors).
 
 - Change output configuration: Plug/unplug screens, change EDID, allow changing
