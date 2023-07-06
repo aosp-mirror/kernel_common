@@ -637,7 +637,6 @@ impl Thread {
         })
     }
 
-    #[allow(dead_code)]
     fn oneway_transaction_inner(self: &Arc<Self>, tr: &BinderTransactionDataSg) -> BinderResult {
         // SAFETY: The `handle` field is valid for all possible byte values, so reading from the
         // union is okay.
@@ -669,9 +668,7 @@ impl Thread {
                 BC_TRANSACTION => {
                     let tr = reader.read::<BinderTransactionData>()?.with_buffers_size(0);
                     if tr.transaction_data.flags & TF_ONE_WAY != 0 {
-                        // TODO: Allow sending oneway transactions when they are serialized.
-                        //self.transaction(&tr, Self::oneway_transaction_inner);
-                        return Err(EINVAL);
+                        self.transaction(&tr, Self::oneway_transaction_inner);
                     } else {
                         self.transaction(&tr, Self::transaction_inner);
                     }
@@ -679,9 +676,7 @@ impl Thread {
                 BC_TRANSACTION_SG => {
                     let tr = reader.read::<BinderTransactionDataSg>()?;
                     if tr.transaction_data.flags & TF_ONE_WAY != 0 {
-                        // TODO: Allow sending oneway transactions when they are serialized.
-                        //self.transaction(&tr, Self::oneway_transaction_inner);
-                        return Err(EINVAL);
+                        self.transaction(&tr, Self::oneway_transaction_inner);
                     } else {
                         self.transaction(&tr, Self::transaction_inner);
                     }
