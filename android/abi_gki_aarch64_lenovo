@@ -498,12 +498,15 @@
   free_pages_exact
   free_percpu
   free_percpu_irq
+  fw_devlink_purge_absent_suppliers
+  fwnode_connection_find_match
   fwnode_find_reference
   fwnode_get_next_child_node
   fwnode_handle_get
   fwnode_handle_put
   fwnode_property_present
   fwnode_property_read_string
+  fwnode_property_read_u16_array
   fwnode_property_read_u32_array
   gcd
   gen_pool_virt_to_phys
@@ -547,6 +550,7 @@
   hrtimer_forward
   hrtimer_init
   hrtimer_start_range_ns
+  i2c_freq_mode_string
   ida_alloc_range
   ida_destroy
   ida_free
@@ -1265,6 +1269,7 @@
   __traceiter_android_rvh_sched_exec
   __traceiter_android_rvh_sched_setaffinity
   __traceiter_android_rvh_tick_entry
+  __traceiter_android_rvh_tk_based_time_sync
   __traceiter_android_rvh_try_to_wake_up
   __traceiter_android_rvh_try_to_wake_up_success
   __traceiter_android_rvh_ttwu_cond
@@ -1290,6 +1295,7 @@
   __tracepoint_android_rvh_sched_exec
   __tracepoint_android_rvh_sched_setaffinity
   __tracepoint_android_rvh_tick_entry
+  __tracepoint_android_rvh_tk_based_time_sync
   __tracepoint_android_rvh_try_to_wake_up
   __tracepoint_android_rvh_try_to_wake_up_success
   __tracepoint_android_rvh_ttwu_cond
@@ -1322,6 +1328,7 @@
   up
   up_read
   up_write
+  usb_role_switch_get
   usb_speed_string
   usleep_range_state
   uuid_null
