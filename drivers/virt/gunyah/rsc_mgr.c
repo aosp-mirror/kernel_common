@@ -123,7 +123,7 @@ struct gh_rm_connection {
 
 /**
  * struct gh_rm - private data for communicating w/Gunyah resource manager
- * @dev: pointer to device
+ * @dev: pointer to RM platform device
  * @tx_ghrsc: message queue resource to TX to RM
  * @rx_ghrsc: message queue resource to RX from RM
  * @msgq: mailbox instance of TX/RX resources above
@@ -160,10 +160,10 @@ struct gh_rm {
 };
 
 /**
- * gh_rm_remap_error() - Remap Gunyah resource manager errors into a Linux error code
+ * gh_rm_error_remap() - Remap Gunyah resource manager errors into a Linux error code
  * @rm_error: "Standard" return value from Gunyah resource manager
  */
-static inline int gh_rm_remap_error(enum gh_rm_error rm_error)
+static inline int gh_rm_error_remap(enum gh_rm_error rm_error)
 {
 	switch (rm_error) {
 	case GH_RM_ERROR_OK:
@@ -226,7 +226,7 @@ static int gh_rm_irq_domain_alloc(struct irq_domain *d, unsigned int virq, unsig
 				 void *arg)
 {
 	struct gh_irq_chip_data *chip_data, *spec = arg;
-	struct irq_fwspec parent_fwspec;
+	struct irq_fwspec parent_fwspec = {};
 	struct gh_rm *rm = d->host_data;
 	u32 gh_virq = spec->gh_virq;
 	int ret;
@@ -309,7 +309,9 @@ struct gh_resource *gh_rm_alloc_resource(struct gh_rm *rm, struct gh_rm_hyp_reso
 		if (ret < 0) {
 			dev_err(rm->dev,
 				"Failed to allocate interrupt for resource %d label: %d: %d\n",
-				ghrsc->type, ghrsc->rm_label, ghrsc->irq);
+				ghrsc->type, ghrsc->rm_label, ret);
+			kfree(ghrsc);
+			return NULL;
 		} else {
 			ghrsc->irq = ret;
 		}
@@ -417,7 +419,7 @@ static void gh_rm_process_notif(struct gh_rm *rm, void *msg, size_t msg_size)
 	rm->active_rx_connection = connection;
 }
 
-static void gh_rm_process_rply(struct gh_rm *rm, void *msg, size_t msg_size)
+static void gh_rm_process_reply(struct gh_rm *rm, void *msg, size_t msg_size)
 {
 	struct gh_rm_rpc_reply_hdr *reply_hdr = msg;
 	struct gh_rm_connection *connection;
@@ -514,7 +516,7 @@ static void gh_rm_msgq_rx_data(struct mbox_client *cl, void *mssg)
 		gh_rm_process_notif(rm, msg, msg_size);
 		break;
 	case RM_RPC_TYPE_REPLY:
-		gh_rm_process_rply(rm, msg, msg_size);
+		gh_rm_process_reply(rm, msg, msg_size);
 		break;
 	case RM_RPC_TYPE_CONTINUATION:
 		gh_rm_process_cont(rm, rm->active_rx_connection, msg, msg_size);
@@ -631,9 +633,10 @@ out:
  * Context: Process context. Will sleep waiting for reply.
  * Return: 0 on success. <0 if error.
  */
-int gh_rm_call(struct gh_rm *rm, u32 message_id, void *req_buf, size_t req_buf_size,
+int gh_rm_call(void *_rm, u32 message_id, const void *req_buf, size_t req_buf_size,
 		void **resp_buf, size_t *resp_buf_size)
 {
+	struct gh_rm *rm = _rm;
 	struct gh_rm_connection *connection;
 	u32 seq_id;
 	int ret;
@@ -664,10 +667,10 @@ int gh_rm_call(struct gh_rm *rm, u32 message_id, void *req_buf, size_t req_buf_s
 	if (ret < 0)
 		goto out;
 
-	/* Wait for response */
-	ret = wait_for_completion_interruptible(&connection->reply.seq_done);
-	if (ret)
-		goto out;
+	/* Wait for response. Uninterruptible because rollback based on what RM did to VM
+	 * requires us to know how RM handled the call.
+	 */
+	wait_for_completion(&connection->reply.seq_done);
 
 	/* Check for internal (kernel) error waiting for the response */
 	if (connection->reply.ret) {
@@ -681,8 +684,7 @@ int gh_rm_call(struct gh_rm *rm, u32 message_id, void *req_buf, size_t req_buf_s
 	if (connection->reply.rm_error != GH_RM_ERROR_OK) {
 		dev_warn(rm->dev, "RM rejected message %08x. Error: %d\n", message_id,
 			connection->reply.rm_error);
-		dump_stack();
-		ret = gh_rm_remap_error(connection->reply.rm_error);
+		ret = gh_rm_error_remap(connection->reply.rm_error);
 		kfree(connection->payload);
 		goto out;
 	}
@@ -708,14 +710,18 @@ free:
 EXPORT_SYMBOL_GPL(gh_rm_call);
 
 
-int gh_rm_notifier_register(struct gh_rm *rm, struct notifier_block *nb)
+int gh_rm_notifier_register(void *_rm, struct notifier_block *nb)
 {
+	struct gh_rm *rm = _rm;
+
 	return blocking_notifier_chain_register(&rm->nh, nb);
 }
 EXPORT_SYMBOL_GPL(gh_rm_notifier_register);
 
-int gh_rm_notifier_unregister(struct gh_rm *rm, struct notifier_block *nb)
+int gh_rm_notifier_unregister(void *_rm, struct notifier_block *nb)
 {
+	struct gh_rm *rm = _rm;
+
 	return blocking_notifier_chain_unregister(&rm->nh, nb);
 }
 EXPORT_SYMBOL_GPL(gh_rm_notifier_unregister);
@@ -908,7 +914,6 @@ err_misc_device:
 err_irq_domain:
 	irq_domain_remove(rm->irq_domain);
 err_msgq:
-	mbox_free_channel(gh_msgq_chan(&rm->msgq));
 	gh_msgq_remove(&rm->msgq);
 err_cache:
 	kmem_cache_destroy(rm->cache);
@@ -923,7 +928,6 @@ static int gh_rm_drv_remove(struct platform_device *pdev)
 	auxiliary_device_uninit(&rm->adev);
 	misc_deregister(&rm->miscdev);
 	irq_domain_remove(rm->irq_domain);
-	mbox_free_channel(gh_msgq_chan(&rm->msgq));
 	gh_msgq_remove(&rm->msgq);
 	kmem_cache_destroy(rm->cache);
 
