@@ -872,6 +872,7 @@
   get_random_bytes
   get_random_u32
   get_sg_io_hdr
+  __get_task_comm
   get_task_cred
   get_task_mm
   get_thermal_instance
