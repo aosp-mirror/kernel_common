@@ -545,6 +545,8 @@
   drm_add_modes_noedid
   drm_atomic_add_affected_connectors
   drm_atomic_add_affected_planes
+  drm_atomic_bridge_chain_disable
+  drm_atomic_bridge_chain_post_disable
   drm_atomic_commit
   drm_atomic_get_connector_state
   drm_atomic_get_crtc_state
@@ -555,6 +557,7 @@
   drm_atomic_helper_bridge_destroy_state
   drm_atomic_helper_bridge_duplicate_state
   drm_atomic_helper_bridge_reset
+  drm_atomic_helper_calc_timestamping_constants
   drm_atomic_helper_check_modeset
   drm_atomic_helper_check_planes
   drm_atomic_helper_check_plane_state
@@ -586,6 +589,7 @@
   drm_atomic_helper_setup_commit
   drm_atomic_helper_shutdown
   drm_atomic_helper_swap_state
+  drm_atomic_helper_update_legacy_modeset_state
   drm_atomic_helper_update_plane
   drm_atomic_helper_wait_for_dependencies
   drm_atomic_helper_wait_for_fences
