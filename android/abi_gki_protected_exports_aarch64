@@ -178,6 +178,7 @@ lowpan_register_netdev
 lowpan_register_netdevice
 lowpan_unregister_netdev
 lowpan_unregister_netdevice
+macsec_pn_wrapped
 mii_check_gmii_support
 mii_check_link
 mii_check_media
