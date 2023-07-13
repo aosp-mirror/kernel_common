@@ -212,10 +212,6 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
 
 	kvm_destroy_vcpus(kvm);
 
-	if (atomic64_read(&kvm->stat.protected_hyp_mem))
-		pr_warn("%lluB of donations to the nVHE hyp are missing\n",
-			atomic64_read(&kvm->stat.protected_hyp_mem));
-
 	kvm_unshare_hyp(kvm, kvm + 1);
 }
 
@@ -463,7 +459,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 		static_branch_dec(&userspace_irqchip_in_use);
 
 	if (is_protected_kvm_enabled())
-		free_hyp_memcache(&vcpu->arch.pkvm_memcache, vcpu->kvm);
+		free_hyp_memcache(&vcpu->arch.pkvm_memcache);
 	else
 		kvm_mmu_free_memory_cache(&vcpu->arch.mmu_page_cache);
 

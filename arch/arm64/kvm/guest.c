@@ -29,8 +29,7 @@
 #include "trace.h"
 
 const struct _kvm_stats_desc kvm_vm_stats_desc[] = {
-	KVM_GENERIC_VM_STATS(),
-	STATS_DESC_ICOUNTER(VM, protected_hyp_mem),
+	KVM_GENERIC_VM_STATS()
 };
 
 const struct kvm_stats_header kvm_vm_stats_header = {
