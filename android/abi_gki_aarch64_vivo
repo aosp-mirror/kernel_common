@@ -3204,7 +3204,6 @@
   page_pool_destroy
   page_pool_put_defragged_page
   page_pool_release_page
-  page_relinquish
   page_reporting_register
   page_reporting_unregister
   panic
@@ -4948,7 +4947,6 @@
   virtqueue_add_sgs
   virtqueue_detach_unused_buf
   virtqueue_disable_cb
-  virtqueue_disable_dma_api_for_buffers
   virtqueue_enable_cb
   virtqueue_enable_cb_delayed
   virtqueue_enable_cb_prepare

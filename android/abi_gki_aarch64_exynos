@@ -1460,8 +1460,6 @@
 # required by exynos-hypervisor.ko
   __arm_smccc_hvc
   kimage_vaddr
-  __pkvm_load_el2_module
-  __pkvm_register_el2_call
 
 # required by exynos-itmon-v2.ko
   int_pow
