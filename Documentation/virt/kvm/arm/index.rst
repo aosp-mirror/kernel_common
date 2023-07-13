@@ -9,6 +9,5 @@ ARM
 
    fw-pseudo-registers
    hyp-abi
-   hypercalls
    pvtime
    ptp_kvm
