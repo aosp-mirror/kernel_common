@@ -446,7 +446,6 @@ int vgic_lazy_init(struct kvm *kvm)
 int kvm_vgic_map_resources(struct kvm *kvm)
 {
 	struct vgic_dist *dist = &kvm->arch.vgic;
-	enum vgic_type type;
 	gpa_t dist_base;
 	int ret = 0;
 
@@ -461,13 +460,10 @@ int kvm_vgic_map_resources(struct kvm *kvm)
 	if (!irqchip_in_kernel(kvm))
 		goto out;
 
-	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2) {
+	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
 		ret = vgic_v2_map_resources(kvm);
-		type = VGIC_V2;
-	} else {
+	else
 		ret = vgic_v3_map_resources(kvm);
-		type = VGIC_V3;
-	}
 
 	if (ret) {
 		__kvm_vgic_destroy(kvm);
@@ -477,7 +473,8 @@ int kvm_vgic_map_resources(struct kvm *kvm)
 	dist_base = dist->vgic_dist_base;
 	mutex_unlock(&kvm->arch.config_lock);
 
-	ret = vgic_register_dist_iodev(kvm, dist_base, type);
+	ret = vgic_register_dist_iodev(kvm, dist_base,
+				       kvm_vgic_global_state.type);
 	if (ret) {
 		kvm_err("Unable to register VGIC dist MMIO regions\n");
 		kvm_vgic_destroy(kvm);
