@@ -42,25 +42,14 @@ static void __pkvm_linear_unmap_early(void *addr, size_t size)
 	atomic_sub(size, &early_lm_pages);
 }
 
-void __pkvm_close_module_registration(void)
+int __pkvm_close_module_registration(void)
 {
 	/*
 	 * Page ownership tracking might go out of sync if there are stale
 	 * entries in pKVM's linear map range, so they must really be gone by
 	 * now.
 	 */
-	WARN_ON_ONCE(atomic_read(&early_lm_pages));
-
-	/*
-	 * Nothing else to do, module loading HVCs are only accessible before
-	 * deprivilege
-	 */
-}
-
-int __pkvm_close_late_module_registration(void)
-{
-	__pkvm_close_module_registration();
-
+	WARN_ON(atomic_read(&early_lm_pages));
 	return reset_pkvm_priv_hcall_limit();
 
 	/* The fuse is blown! No way back until reset */
