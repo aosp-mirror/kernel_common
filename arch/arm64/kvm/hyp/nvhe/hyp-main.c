@@ -172,44 +172,19 @@ static void handle___pkvm_vcpu_put(struct kvm_cpu_context *host_ctxt)
 		pkvm_put_hyp_vcpu(hyp_vcpu);
 }
 
-static struct kvm_vcpu *__get_host_hyp_vcpus(struct kvm_vcpu *arg,
-					     struct pkvm_hyp_vcpu **hyp_vcpup)
-{
-	struct kvm_vcpu *host_vcpu = kern_hyp_va(arg);
-	struct pkvm_hyp_vcpu *hyp_vcpu = NULL;
-
-	if (unlikely(is_protected_kvm_enabled())) {
-		hyp_vcpu = pkvm_get_loaded_hyp_vcpu();
-
-		if (!hyp_vcpu || hyp_vcpu->host_vcpu != host_vcpu) {
-			hyp_vcpu = NULL;
-			host_vcpu = NULL;
-		}
-	}
-
-	*hyp_vcpup = hyp_vcpu;
-	return host_vcpu;
-}
-
-#define get_host_hyp_vcpus(ctxt, regnr, hyp_vcpup)			\
-	({								\
-		DECLARE_REG(struct kvm_vcpu *, __vcpu, ctxt, regnr);	\
-		__get_host_hyp_vcpus(__vcpu, hyp_vcpup);		\
-	})
-
 static void handle___kvm_vcpu_run(struct kvm_cpu_context *host_ctxt)
 {
-	struct pkvm_hyp_vcpu *hyp_vcpu;
-	struct kvm_vcpu *host_vcpu;
+	DECLARE_REG(struct kvm_vcpu *, host_vcpu, host_ctxt, 1);
 	int ret;
 
-	host_vcpu = get_host_hyp_vcpus(host_ctxt, 1, &hyp_vcpu);
-	if (!host_vcpu) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if (unlikely(is_protected_kvm_enabled())) {
+		struct pkvm_hyp_vcpu *hyp_vcpu = pkvm_get_loaded_hyp_vcpu();
 
-	if (unlikely(hyp_vcpu)) {
+		if (!hyp_vcpu) {
+			ret = -EINVAL;
+			goto out;
+		}
+
 		flush_hyp_vcpu(hyp_vcpu);
 
 		ret = __kvm_vcpu_run(&hyp_vcpu->vcpu);
@@ -217,7 +192,7 @@ static void handle___kvm_vcpu_run(struct kvm_cpu_context *host_ctxt)
 		sync_hyp_vcpu(hyp_vcpu);
 	} else {
 		/* The host is fully trusted, run its vCPU directly. */
-		ret = __kvm_vcpu_run(host_vcpu);
+		ret = __kvm_vcpu_run(kern_hyp_va(host_vcpu));
 	}
 out:
 	cpu_reg(host_ctxt, 1) =  ret;
