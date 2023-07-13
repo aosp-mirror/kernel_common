@@ -9,7 +9,6 @@
 
 struct page;
 
-bool kvm_has_memrelinquish_services(void);
 void page_relinquish(struct page *page);
 
 #endif	/* __ASM_MEM_RELINQUISH_H */
