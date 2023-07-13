@@ -872,14 +872,20 @@ int pkvm_load_pvmfw_pages(struct pkvm_hyp_vm *vm, u64 ipa, phys_addr_t phys,
 
 	npages = size >> PAGE_SHIFT;
 	while (npages--) {
+		void *dst;
+
+		dst = hyp_fixmap_map(phys);
+		if (!dst)
+			return -EINVAL;
+
 		/*
 		 * No need for cache maintenance here, as the pgtable code will
 		 * take care of this when installing the pte in the guest's
 		 * stage-2 page table.
 		 */
-		memcpy(hyp_fixmap_map(phys), src, PAGE_SIZE);
-		hyp_fixmap_unmap();
+		memcpy(dst, src, PAGE_SIZE);
 
+		hyp_fixmap_unmap();
 		src += PAGE_SIZE;
 		phys += PAGE_SIZE;
 	}
