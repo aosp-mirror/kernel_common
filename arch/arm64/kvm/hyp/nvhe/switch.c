@@ -7,6 +7,7 @@
 #include <hyp/switch.h>
 #include <hyp/sysreg-sr.h>
 
+#include <linux/arm-smccc.h>
 #include <linux/kvm_host.h>
 #include <linux/types.h>
 #include <linux/jump_label.h>
