@@ -176,7 +176,12 @@ typedef unsigned int pkvm_handle_t;
 
 struct kvm_protected_vm {
 	pkvm_handle_t handle;
-	struct kvm_hyp_memcache teardown_mc;
+
+	struct {
+		void *pgd;
+		void *vm;
+		void *vcpus[KVM_MAX_VCPUS];
+	} hyp_donations;
 };
 
 struct kvm_arch {
