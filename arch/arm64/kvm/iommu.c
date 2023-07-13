@@ -19,7 +19,7 @@ int pkvm_iommu_driver_init(u64 drv, void *data, size_t size)
 EXPORT_SYMBOL_GPL(pkvm_iommu_driver_init);
 
 int pkvm_iommu_register(struct device *dev, u64 drv, phys_addr_t pa,
-			size_t size, struct device *parent, u8 flags)
+			size_t size, struct device *parent)
 {
 	void *mem;
 	int ret;
@@ -30,14 +30,15 @@ int pkvm_iommu_register(struct device *dev, u64 drv, phys_addr_t pa,
 	 * We assume that hyp never allocates more than a page per hypcall.
 	 */
 	ret = kvm_call_hyp_nvhe(__pkvm_iommu_register, dev_to_id(dev),
-				drv, pa, size, dev_to_id(parent), flags, NULL);
+				drv, pa, size, dev_to_id(parent), NULL, 0);
 	if (ret == -ENOMEM) {
 		mem = (void *)__get_free_page(GFP_KERNEL);
 		if (!mem)
 			return -ENOMEM;
 
 		ret = kvm_call_hyp_nvhe(__pkvm_iommu_register, dev_to_id(dev),
-					drv, pa, size, dev_to_id(parent), flags, mem);
+					drv, pa, size, dev_to_id(parent),
+					mem, PAGE_SIZE);
 	}
 	return ret;
 }

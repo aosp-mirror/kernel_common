@@ -329,8 +329,8 @@ out_unlock:
 
 int __pkvm_iommu_register(unsigned long dev_id, unsigned long drv_id,
 			  phys_addr_t dev_pa, size_t dev_size,
-			  unsigned long parent_id, u8 flags,
-			  void *kern_mem_va)
+			  unsigned long parent_id,
+			  void *kern_mem_va, size_t mem_size)
 {
 	struct pkvm_iommu *dev = NULL;
 	struct pkvm_iommu_driver *drv;
@@ -364,15 +364,16 @@ int __pkvm_iommu_register(unsigned long dev_id, unsigned long drv_id,
 	 * Accept memory donation if the host is providing new memory.
 	 * Note: We do not return the memory even if there is an error later.
 	 */
-	if (kern_mem_va) {
+	if (kern_mem_va && mem_size) {
 		mem_va = kern_hyp_va(kern_mem_va);
 
-		if (!PAGE_ALIGNED(mem_va)) {
+		if (!PAGE_ALIGNED(mem_va) || !PAGE_ALIGNED(mem_size)) {
 			ret = -EINVAL;
 			goto out_unlock;
 		}
 
-		ret = __pkvm_host_donate_hyp(hyp_virt_to_pfn(mem_va), 1);
+		ret = __pkvm_host_donate_hyp(hyp_virt_to_pfn(mem_va),
+					     mem_size >> PAGE_SHIFT);
 		if (ret)
 			goto out_unlock;
 	}
@@ -380,7 +381,7 @@ int __pkvm_iommu_register(unsigned long dev_id, unsigned long drv_id,
 	host_lock_component();
 
 	/* Allocate memory for the new device entry. */
-	dev = alloc_iommu(drv, mem_va, PAGE_SIZE);
+	dev = alloc_iommu(drv, mem_va, mem_size);
 	if (!dev) {
 		ret = -ENOMEM;
 		goto out_free;
@@ -393,7 +394,6 @@ int __pkvm_iommu_register(unsigned long dev_id, unsigned long drv_id,
 		.ops = drv->ops,
 		.pa = dev_pa,
 		.size = dev_size,
-		.flags = flags,
 	};
 
 	if (!validate_against_existing_iommus(dev)) {
