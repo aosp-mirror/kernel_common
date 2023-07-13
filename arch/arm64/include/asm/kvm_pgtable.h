@@ -200,22 +200,6 @@ enum kvm_pgtable_prot {
 typedef bool (*kvm_pgtable_force_pte_cb_t)(u64 addr, u64 end,
 					   enum kvm_pgtable_prot prot);
 
-typedef bool (*kvm_pgtable_pte_is_counted_cb_t)(kvm_pte_t pte, u32 level);
-
-/**
- * struct kvm_pgtable_pte_ops - PTE callbacks.
- * @force_pte_cb:		Force the mapping granularity to pages and
- *				return true if we support this instead of
- *				block mappings.
- * @pte_is_counted_cb		Verify the attributes of the @pte argument
- *				and return true if the descriptor needs to be
- *				refcounted, otherwise return false.
- */
-struct kvm_pgtable_pte_ops {
-	kvm_pgtable_force_pte_cb_t		force_pte_cb;
-	kvm_pgtable_pte_is_counted_cb_t		pte_is_counted_cb;
-};
-
 /**
  * struct kvm_pgtable - KVM page-table.
  * @ia_bits:		Maximum input address size, in bits.
@@ -224,7 +208,8 @@ struct kvm_pgtable_pte_ops {
  * @mm_ops:		Memory management callbacks.
  * @mmu:		Stage-2 KVM MMU struct. Unused for stage-1 page-tables.
  * @flags:		Stage-2 page-table flags.
- * @pte_ops:		PTE callbacks.
+ * @force_pte_cb:	Function that returns true if page level mappings must
+ *			be used instead of block mappings.
  */
 struct kvm_pgtable {
 	u32					ia_bits;
@@ -235,7 +220,7 @@ struct kvm_pgtable {
 	/* Stage-2 only */
 	struct kvm_s2_mmu			*mmu;
 	enum kvm_pgtable_stage2_flags		flags;
-	struct kvm_pgtable_pte_ops		*pte_ops;
+	kvm_pgtable_force_pte_cb_t		force_pte_cb;
 };
 
 /**
@@ -364,17 +349,18 @@ size_t kvm_pgtable_stage2_pgd_size(u64 vtcr);
  * @mmu:	S2 MMU context for this S2 translation
  * @mm_ops:	Memory management callbacks.
  * @flags:	Stage-2 configuration flags.
- * @pte_ops:	PTE callbacks.
+ * @force_pte_cb: Function that returns true if page level mappings must
+ *		be used instead of block mappings.
  *
  * Return: 0 on success, negative error code on failure.
  */
 int __kvm_pgtable_stage2_init(struct kvm_pgtable *pgt, struct kvm_s2_mmu *mmu,
 			      struct kvm_pgtable_mm_ops *mm_ops,
 			      enum kvm_pgtable_stage2_flags flags,
-			      struct kvm_pgtable_pte_ops *pte_ops);
+			      kvm_pgtable_force_pte_cb_t force_pte_cb);
 
-#define kvm_pgtable_stage2_init(pgt, mmu, mm_ops, pte_ops) \
-	__kvm_pgtable_stage2_init(pgt, mmu, mm_ops, 0, pte_ops)
+#define kvm_pgtable_stage2_init(pgt, mmu, mm_ops) \
+	__kvm_pgtable_stage2_init(pgt, mmu, mm_ops, 0, NULL)
 
 /**
  * kvm_pgtable_stage2_destroy() - Destroy an unused guest stage-2 page-table.
