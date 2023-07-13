@@ -880,24 +880,14 @@ void kvm_free_stage2_pgd(struct kvm_s2_mmu *mmu)
 	}
 }
 
-static void hyp_mc_free_fn(void *addr, void *args)
+static void hyp_mc_free_fn(void *addr, void *unused)
 {
-	bool account_stage2 = (bool)args;
-
-	if (account_stage2)
-		kvm_account_pgtable_pages(addr, -1);
-
 	free_page((unsigned long)addr);
 }
 
 static void *hyp_mc_alloc_fn(void *unused)
 {
-	void *addr = (void *)__get_free_page(GFP_KERNEL_ACCOUNT);
-
-	if (addr)
-		kvm_account_pgtable_pages(addr, 1);
-
-	return addr;
+	return (void *)__get_free_page(GFP_KERNEL_ACCOUNT);
 }
 
 static void account_hyp_memcache(struct kvm_hyp_memcache *mc,
@@ -918,9 +908,7 @@ static void account_hyp_memcache(struct kvm_hyp_memcache *mc,
 	}
 }
 
-static void __free_account_hyp_memcache(struct kvm_hyp_memcache *mc,
-					struct kvm *kvm,
-					bool account_stage2)
+void free_hyp_memcache(struct kvm_hyp_memcache *mc, struct kvm *kvm)
 {
 	unsigned long prev_nr_pages;
 
@@ -928,25 +916,8 @@ static void __free_account_hyp_memcache(struct kvm_hyp_memcache *mc,
 		return;
 
 	prev_nr_pages = mc->nr_pages;
-	__free_hyp_memcache(mc, hyp_mc_free_fn, kvm_host_va,
-			    (void *)account_stage2);
+	__free_hyp_memcache(mc, hyp_mc_free_fn, kvm_host_va, NULL);
 	account_hyp_memcache(mc, prev_nr_pages, kvm);
-}
-
-void free_hyp_memcache(struct kvm_hyp_memcache *mc, struct kvm *kvm)
-{
-	__free_account_hyp_memcache(mc, kvm, false);
-}
-
-/*
- * All pages donated to the hypervisor through kvm_hyp_memcache are for the
- * stage-2 page table. However, kvm_hyp_memcache is also a vehicule to retrieve
- * meta-data from the hypervisor, hence the need for a stage2 specific free
- * function.
- */
-void free_hyp_stage2_memcache(struct kvm_hyp_memcache *mc, struct kvm *kvm)
-{
-	__free_account_hyp_memcache(mc, kvm, true);
 }
 
 int topup_hyp_memcache(struct kvm_vcpu *vcpu)

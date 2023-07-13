@@ -128,7 +128,6 @@ static inline void __free_hyp_memcache(struct kvm_hyp_memcache *mc,
 }
 
 void free_hyp_memcache(struct kvm_hyp_memcache *mc, struct kvm *kvm);
-void free_hyp_stage2_memcache(struct kvm_hyp_memcache *mc, struct kvm *kvm);
 int topup_hyp_memcache(struct kvm_vcpu *vcpu);
 
 struct kvm_vmid {
@@ -184,7 +183,6 @@ typedef unsigned int pkvm_handle_t;
 struct kvm_protected_vm {
 	pkvm_handle_t handle;
 	struct kvm_hyp_memcache teardown_mc;
-	struct kvm_hyp_memcache teardown_stage2_mc;
 	struct rb_root pinned_pages;
 	gpa_t pvmfw_load_addr;
 	bool enabled;
