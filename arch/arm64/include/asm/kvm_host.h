@@ -398,12 +398,8 @@ int pkvm_iommu_register(struct device *dev, u64 drv,
 int pkvm_iommu_suspend(struct device *dev);
 int pkvm_iommu_resume(struct device *dev);
 
-/*
- * Reject future calls to pkvm_iommu_driver_init() and pkvm_iommu_register()
- * and report errors if found. Incase of errors pKVM can take proper actions
- * as erasing pvmfw.
- */
-int pkvm_iommu_finalize(int err);
+/* Reject future calls to pkvm_iommu_driver_init() and pkvm_iommu_register(). */
+int pkvm_iommu_finalize(void);
 
 struct vcpu_reset_state {
 	unsigned long	pc;
