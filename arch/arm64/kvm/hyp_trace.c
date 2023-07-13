@@ -398,9 +398,6 @@ static void *ht_next(struct seq_file *m, void *v, loff_t *pos)
 
 	(*pos)++;
 
-	if (!iter->buf_iter)
-		return NULL;
-
 	evt = ring_buffer_iter_peek(iter->buf_iter, &ts);
 	if (!evt)
 		return NULL;
@@ -418,8 +415,7 @@ static void *ht_start(struct seq_file *m, loff_t *pos)
 	struct ht_iterator *iter = m->private;
 
 	if (*pos == 0) {
-		if (iter->buf_iter)
-			ring_buffer_iter_reset(iter->buf_iter);
+		ring_buffer_iter_reset(iter->buf_iter);
 		(*pos)++;
 		iter->ent = NULL;
 
@@ -443,12 +439,10 @@ static int ht_show(struct seq_file *m, void *v)
 	struct ht_iterator *iter = v;
 
 	if (!iter->ent) {
-		unsigned long entries = 0, overrun = 0;
+		unsigned long entries, overrun;
 
-		if (hyp_trace_buffer) {
-			entries = ring_buffer_entries_cpu(hyp_trace_buffer, iter->cpu);
-			overrun = ring_buffer_overrun_cpu(hyp_trace_buffer, iter->cpu);
-		}
+		entries = ring_buffer_entries_cpu(hyp_trace_buffer, iter->cpu);
+		overrun = ring_buffer_overrun_cpu(hyp_trace_buffer, iter->cpu);
 
 		seq_printf(m, "# entries-in-buffer/entries-written: %lu/%lu\n",
 			  entries, overrun + entries);
@@ -475,14 +469,16 @@ static int hyp_trace_open(struct inode *inode, struct file *file)
 
 	mutex_lock(&hyp_trace_lock);
 
+	if (!hyp_trace_buffer) {
+		ret = -ENODEV;
+		goto unlock;
+	}
+
 	iter = __seq_open_private(file, &hyp_trace_ops, sizeof(*iter));
 	if (!iter) {
 		ret = -ENOMEM;
 		goto unlock;
 	}
-
-	if (!hyp_trace_buffer)
-		goto unlock_and_read;
 
 	iter->buf_iter = ring_buffer_read_prepare(hyp_trace_buffer, cpu, GFP_KERNEL);
 	if (!iter->buf_iter) {
@@ -495,7 +491,7 @@ static int hyp_trace_open(struct inode *inode, struct file *file)
 
 	ring_buffer_read_prepare_sync();
 	ring_buffer_read_start(iter->buf_iter);
-unlock_and_read:
+
 	hyp_trace_readers++;
 unlock:
 	mutex_unlock(&hyp_trace_lock);
@@ -508,8 +504,7 @@ int hyp_trace_release(struct inode *inode, struct file *file)
 	struct seq_file *m = file->private_data;
 	struct ht_iterator *iter = m->private;
 
-	if (iter->buf_iter)
-		ring_buffer_read_finish(iter->buf_iter);
+	ring_buffer_read_finish(iter->buf_iter);
 
 	mutex_lock(&hyp_trace_lock);
 	hyp_trace_readers--;
