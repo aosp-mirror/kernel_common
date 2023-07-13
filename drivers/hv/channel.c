@@ -19,7 +19,6 @@
 #include <linux/interrupt.h>
 #include <linux/set_memory.h>
 #include <asm/page.h>
-#include <asm/mem_encrypt.h>
 #include <asm/mshyperv.h>
 
 #include "hyperv_vmbus.h"
