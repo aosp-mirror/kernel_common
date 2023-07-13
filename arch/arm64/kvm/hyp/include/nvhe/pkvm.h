@@ -121,16 +121,14 @@ static inline bool pkvm_hyp_vm_has_pvmfw(struct pkvm_hyp_vm *vm)
 	return vm->kvm.arch.pkvm.pvmfw_load_addr != PVMFW_INVALID_LOAD_ADDR;
 }
 
-static inline bool pkvm_ipa_range_has_pvmfw(struct pkvm_hyp_vm *vm,
-					    u64 ipa_start, u64 ipa_end)
+static inline bool pkvm_ipa_in_pvmfw_region(struct pkvm_hyp_vm *vm, u64 ipa)
 {
 	struct kvm_protected_vm *pkvm = &vm->kvm.arch.pkvm;
-	u64 pvmfw_load_end = pkvm->pvmfw_load_addr + pvmfw_size;
 
 	if (!pkvm_hyp_vm_has_pvmfw(vm))
 		return false;
 
-	return ipa_end > pkvm->pvmfw_load_addr && ipa_start < pvmfw_load_end;
+	return ipa - pkvm->pvmfw_load_addr < pvmfw_size;
 }
 
 int pkvm_load_pvmfw_pages(struct pkvm_hyp_vm *vm, u64 ipa, phys_addr_t phys,
