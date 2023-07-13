@@ -457,10 +457,7 @@ static void handle___pkvm_host_map_guest(struct kvm_cpu_context *host_ctxt)
 	if (ret)
 		goto out;
 
-	if (pkvm_hyp_vcpu_is_protected(hyp_vcpu))
-		ret = __pkvm_host_donate_guest(pfn, gfn, hyp_vcpu);
-	else
-		ret = __pkvm_host_share_guest(pfn, gfn, hyp_vcpu);
+	ret = __pkvm_host_share_guest(pfn, gfn, hyp_vcpu);
 out:
 	cpu_reg(host_ctxt, 1) =  ret;
 }
