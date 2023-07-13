@@ -16,7 +16,6 @@
 #include <hyp/fault.h>
 
 #include <nvhe/gfp.h>
-#include <nvhe/iommu.h>
 #include <nvhe/memory.h>
 #include <nvhe/mem_protect.h>
 #include <nvhe/mm.h>
