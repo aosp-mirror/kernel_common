@@ -5,7 +5,6 @@
  */
 
 #include <linux/arm-smccc.h>
-#include <linux/mem_relinquish.h>
 #include <linux/memory.h>
 #include <linux/mm.h>
 #include <linux/types.h>
