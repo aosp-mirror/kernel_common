@@ -301,7 +301,7 @@ static int fix_hyp_pgtable_refcnt(void)
 				&walker);
 }
 
-static int select_iommu_ops(enum kvm_iommu_driver driver)
+int select_iommu_ops(enum kvm_iommu_driver driver)
 {
 	switch (driver) {
 	case KVM_IOMMU_DRIVER_NONE:
