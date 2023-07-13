@@ -173,9 +173,8 @@ struct kvm_smccc_features {
 };
 
 struct kvm_pinned_page {
-	struct rb_node		node;
+	struct list_head	link;
 	struct page		*page;
-	u64			ipa;
 };
 
 typedef unsigned int pkvm_handle_t;
@@ -183,7 +182,7 @@ typedef unsigned int pkvm_handle_t;
 struct kvm_protected_vm {
 	pkvm_handle_t handle;
 	struct kvm_hyp_memcache teardown_mc;
-	struct rb_root pinned_pages;
+	struct list_head pinned_pages;
 	gpa_t pvmfw_load_addr;
 	bool enabled;
 };
