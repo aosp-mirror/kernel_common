@@ -59,8 +59,6 @@ static DEFINE_STATIC_KEY_FALSE(ioremap_guard_key);
 static DEFINE_XARRAY(ioremap_guard_array);
 static DEFINE_MUTEX(ioremap_guard_lock);
 
-static size_t guard_granule;
-
 static bool ioremap_guard;
 static int __init ioremap_guard_setup(char *str)
 {
@@ -84,7 +82,6 @@ static void fixup_fixmap(void)
 void kvm_init_ioremap_services(void)
 {
 	struct arm_smccc_res res;
-	size_t granule;
 
 	if (!ioremap_guard)
 		return;
@@ -98,18 +95,12 @@ void kvm_init_ioremap_services(void)
 
 	arm_smccc_1_1_invoke(ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_INFO_FUNC_ID,
 			     0, 0, 0, &res);
-	granule = res.a0;
-	if (granule > PAGE_SIZE || !granule || (granule & (granule - 1))) {
-		pr_warn("KVM MMIO guard initialization failed: "
-			"guard granule (%lu), page size (%lu)\n",
-			granule, PAGE_SIZE);
+	if (res.a0 != PAGE_SIZE)
 		return;
-	}
 
 	arm_smccc_1_1_invoke(ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_ENROLL_FUNC_ID,
 			     &res);
 	if (res.a0 == SMCCC_RET_SUCCESS) {
-		guard_granule = granule;
 		static_branch_enable(&ioremap_guard_key);
 		fixup_fixmap();
 		pr_info("Using KVM MMIO guard for ioremap\n");
@@ -120,24 +111,20 @@ void kvm_init_ioremap_services(void)
 
 void ioremap_phys_range_hook(phys_addr_t phys_addr, size_t size, pgprot_t prot)
 {
-	int guard_shift;
-
 	if (!static_branch_unlikely(&ioremap_guard_key))
 		return;
-
-	guard_shift = __builtin_ctzl(guard_granule);
 
 	mutex_lock(&ioremap_guard_lock);
 
 	while (size) {
-		u64 guard_fn = phys_addr >> guard_shift;
+		u64 pfn = phys_addr >> PAGE_SHIFT;
 		struct ioremap_guard_ref *ref;
 		struct arm_smccc_res res;
 
 		if (pfn_valid(__phys_to_pfn(phys_addr)))
 			goto next;
 
-		ref = xa_load(&ioremap_guard_array, guard_fn);
+		ref = xa_load(&ioremap_guard_array, pfn);
 		if (ref) {
 			refcount_inc(&ref->count);
 			goto next;
@@ -154,7 +141,7 @@ void ioremap_phys_range_hook(phys_addr_t phys_addr, size_t size, pgprot_t prot)
 			ref = kzalloc(sizeof(*ref), GFP_KERNEL);
 		if (ref) {
 			refcount_set(&ref->count, 1);
-			if (xa_err(xa_store(&ioremap_guard_array, guard_fn, ref,
+			if (xa_err(xa_store(&ioremap_guard_array, pfn, ref,
 					    GFP_KERNEL))) {
 				kfree(ref);
 				ref = NULL;
@@ -166,14 +153,14 @@ void ioremap_phys_range_hook(phys_addr_t phys_addr, size_t size, pgprot_t prot)
 		if (res.a0 != SMCCC_RET_SUCCESS) {
 			pr_warn_ratelimited("Failed to register %llx\n",
 					    phys_addr);
-			xa_erase(&ioremap_guard_array, guard_fn);
+			xa_erase(&ioremap_guard_array, pfn);
 			kfree(ref);
 			goto out;
 		}
 
 	next:
-		size -= guard_granule;
-		phys_addr += guard_granule;
+		size -= PAGE_SIZE;
+		phys_addr += PAGE_SIZE;
 	}
 out:
 	mutex_unlock(&ioremap_guard_lock);
@@ -181,22 +168,19 @@ out:
 
 void iounmap_phys_range_hook(phys_addr_t phys_addr, size_t size)
 {
-	int guard_shift;
-
 	if (!static_branch_unlikely(&ioremap_guard_key))
 		return;
 
 	VM_BUG_ON(phys_addr & ~PAGE_MASK || size & ~PAGE_MASK);
-	guard_shift = __builtin_ctzl(guard_granule);
 
 	mutex_lock(&ioremap_guard_lock);
 
 	while (size) {
-		u64 guard_fn = phys_addr >> guard_shift;
+		u64 pfn = phys_addr >> PAGE_SHIFT;
 		struct ioremap_guard_ref *ref;
 		struct arm_smccc_res res;
 
-		ref = xa_load(&ioremap_guard_array, guard_fn);
+		ref = xa_load(&ioremap_guard_array, pfn);
 		if (!ref) {
 			pr_warn_ratelimited("%llx not tracked, left mapped\n",
 					    phys_addr);
@@ -206,7 +190,7 @@ void iounmap_phys_range_hook(phys_addr_t phys_addr, size_t size)
 		if (!refcount_dec_and_test(&ref->count))
 			goto next;
 
-		xa_erase(&ioremap_guard_array, guard_fn);
+		xa_erase(&ioremap_guard_array, pfn);
 		kfree(ref);
 
 		arm_smccc_1_1_hvc(ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_UNMAP_FUNC_ID,
@@ -218,8 +202,8 @@ void iounmap_phys_range_hook(phys_addr_t phys_addr, size_t size)
 		}
 
 	next:
-		size -= guard_granule;
-		phys_addr += guard_granule;
+		size -= PAGE_SIZE;
+		phys_addr += PAGE_SIZE;
 	}
 out:
 	mutex_unlock(&ioremap_guard_lock);
