@@ -4,7 +4,6 @@
 
 #include <linux/mm.h>
 #include <linux/poll.h>
-#include <linux/ring_buffer_ext.h>
 #include <linux/seq_file.h>
 
 #include <asm/local.h>
@@ -141,14 +140,6 @@ __ring_buffer_alloc(unsigned long size, unsigned flags, struct lock_class_key *k
 	__ring_buffer_alloc((size), (flags), &__key);	\
 })
 
-struct ring_buffer_ext_cb {
-	int (*update_footers)(int cpu);
-	int (*swap_reader)(int cpu);
-};
-
-struct trace_buffer *
-ring_buffer_alloc_ext(unsigned long size, struct ring_buffer_ext_cb *cb);
-
 int ring_buffer_wait(struct trace_buffer *buffer, int cpu, int full);
 __poll_t ring_buffer_poll_wait(struct trace_buffer *buffer, int cpu,
 			  struct file *filp, poll_table *poll_table, int full);
@@ -262,9 +253,5 @@ int trace_rb_cpu_prepare(unsigned int cpu, struct hlist_node *node);
 #else
 #define trace_rb_cpu_prepare	NULL
 #endif
-
-size_t trace_buffer_pack_size(struct trace_buffer *trace_buffer);
-int trace_buffer_pack(struct trace_buffer *trace_buffer, struct trace_buffer_pack *pack);
-int ring_buffer_poke(struct trace_buffer *buffer, int cpu);
 
 #endif /* _LINUX_RING_BUFFER_H */
