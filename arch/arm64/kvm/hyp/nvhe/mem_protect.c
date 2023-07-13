@@ -2027,26 +2027,18 @@ static int restrict_host_page_perms(u64 addr, kvm_pte_t pte, u32 level, enum kvm
 int module_change_host_page_prot(u64 pfn, enum kvm_pgtable_prot prot)
 {
 	u64 addr = hyp_pfn_to_phys(pfn);
-	struct hyp_page *page = NULL;
+	struct hyp_page *page;
 	kvm_pte_t pte;
 	u32 level;
 	int ret;
 
-	if ((prot & KVM_PGTABLE_PROT_RWX) != prot)
+	if ((prot & KVM_PGTABLE_PROT_RWX) != prot || !addr_is_memory(addr))
 		return -EINVAL;
 
 	host_lock_component();
 	ret = kvm_pgtable_get_leaf(&host_mmu.pgt, addr, &pte, &level);
 	if (ret)
 		goto unlock;
-
-	/*
-	 * There is no hyp_vmemmap covering MMIO regions, which makes tracking
-	 * of module-owned MMIO regions hard, so we trust the modules not to
-	 * mess things up.
-	 */
-	if (!addr_is_memory(addr))
-		goto update;
 
 	ret = -EPERM;
 	page = hyp_phys_to_page(addr);
@@ -2062,15 +2054,14 @@ int module_change_host_page_prot(u64 pfn, enum kvm_pgtable_prot prot)
 		goto unlock;
 	}
 
-update:
-	if (prot == default_host_prot(!!page))
+	if (prot == KVM_PGTABLE_PROT_RWX)
 		ret = host_stage2_set_owner_locked(addr, PAGE_SIZE, PKVM_ID_HOST);
 	else if (!prot)
 		ret = host_stage2_set_owner_locked(addr, PAGE_SIZE, PKVM_ID_PROTECTED);
 	else
 		ret = restrict_host_page_perms(addr, pte, level, prot);
 
-	if (ret || !page)
+	if (ret)
 		goto unlock;
 
 	if (prot != KVM_PGTABLE_PROT_RWX)
