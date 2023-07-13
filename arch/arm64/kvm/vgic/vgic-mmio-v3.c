@@ -769,13 +769,10 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
 	struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
 	struct vgic_redist_region *rdreg;
 	gpa_t rd_base;
-	int ret = 0;
-
-	lockdep_assert_held(&kvm->slots_lock);
-	mutex_lock(&kvm->arch.config_lock);
+	int ret;
 
 	if (!IS_VGIC_ADDR_UNDEF(vgic_cpu->rd_iodev.base_addr))
-		goto out_unlock;
+		return 0;
 
 	/*
 	 * We may be creating VCPUs before having set the base address for the
@@ -785,12 +782,10 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
 	 */
 	rdreg = vgic_v3_rdist_free_slot(&vgic->rd_regions);
 	if (!rdreg)
-		goto out_unlock;
+		return 0;
 
-	if (!vgic_v3_check_base(kvm)) {
-		ret = -EINVAL;
-		goto out_unlock;
-	}
+	if (!vgic_v3_check_base(kvm))
+		return -EINVAL;
 
 	vgic_cpu->rdreg = rdreg;
 	vgic_cpu->rdreg_index = rdreg->free_index;
@@ -804,20 +799,16 @@ int vgic_register_redist_iodev(struct kvm_vcpu *vcpu)
 	rd_dev->nr_regions = ARRAY_SIZE(vgic_v3_rd_registers);
 	rd_dev->redist_vcpu = vcpu;
 
-	mutex_unlock(&kvm->arch.config_lock);
-
+	mutex_lock(&kvm->slots_lock);
 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, rd_base,
 				      2 * SZ_64K, &rd_dev->dev);
+	mutex_unlock(&kvm->slots_lock);
+
 	if (ret)
 		return ret;
 
-	/* Protected by slots_lock */
 	rdreg->free_index++;
 	return 0;
-
-out_unlock:
-	mutex_unlock(&kvm->arch.config_lock);
-	return ret;
 }
 
 static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
@@ -843,10 +834,12 @@ static int vgic_register_all_redist_iodevs(struct kvm *kvm)
 		/* The current c failed, so iterate over the previous ones. */
 		int i;
 
+		mutex_lock(&kvm->slots_lock);
 		for (i = 0; i < c; i++) {
 			vcpu = kvm_get_vcpu(kvm, i);
 			vgic_unregister_redist_iodev(vcpu);
 		}
+		mutex_unlock(&kvm->slots_lock);
 	}
 
 	return ret;
@@ -945,9 +938,7 @@ int vgic_v3_set_redist_base(struct kvm *kvm, u32 index, u64 addr, u32 count)
 {
 	int ret;
 
-	mutex_lock(&kvm->arch.config_lock);
 	ret = vgic_v3_alloc_redist_region(kvm, index, addr, count);
-	mutex_unlock(&kvm->arch.config_lock);
 	if (ret)
 		return ret;
 
@@ -959,10 +950,8 @@ int vgic_v3_set_redist_base(struct kvm *kvm, u32 index, u64 addr, u32 count)
 	if (ret) {
 		struct vgic_redist_region *rdreg;
 
-		mutex_lock(&kvm->arch.config_lock);
 		rdreg = vgic_v3_rdist_region_from_index(kvm, index);
 		vgic_v3_free_redist_region(rdreg);
-		mutex_unlock(&kvm->arch.config_lock);
 		return ret;
 	}
 
