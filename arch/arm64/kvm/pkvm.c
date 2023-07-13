@@ -773,7 +773,6 @@ int __pkvm_load_el2_module(struct module *this, unsigned long *token)
 		{ &mod->data, KVM_PGTABLE_PROT_R | KVM_PGTABLE_PROT_W },
 	};
 	void *start, *end, *hyp_va;
-	struct arm_smccc_res res;
 	kvm_nvhe_reloc_t *endrel;
 	int ret, i, secs_first;
 	size_t offset, size;
@@ -803,14 +802,12 @@ int __pkvm_load_el2_module(struct module *this, unsigned long *token)
 	end = secs_map[ARRAY_SIZE(secs_map) - 1].sec->end;
 	size = end - start;
 
-	arm_smccc_1_1_hvc(KVM_HOST_SMCCC_FUNC(__pkvm_alloc_module_va),
-			  size >> PAGE_SHIFT, &res);
-	if (res.a0 != SMCCC_RET_SUCCESS || !res.a1) {
+	hyp_va = (void *)kvm_call_hyp_nvhe(__pkvm_alloc_module_va, size >> PAGE_SHIFT);
+	if (!hyp_va) {
 		kvm_err("Failed to allocate hypervisor VA space for EL2 module\n");
 		module_put(this);
-		return res.a0 == SMCCC_RET_SUCCESS ? -ENOMEM : -EPERM;
+		return -ENOMEM;
 	}
-	hyp_va = (void *)res.a1;
 
 	/*
 	 * The token can be used for other calls related to this module.
