@@ -244,7 +244,6 @@ static inline int pkvm_get_max_wrps(void)
 
 enum pkvm_moveable_reg_type {
 	PKVM_MREG_MEMORY,
-	PKVM_MREG_PROTECTED_RANGE,
 };
 
 struct pkvm_moveable_reg {
