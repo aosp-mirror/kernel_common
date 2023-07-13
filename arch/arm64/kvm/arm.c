@@ -37,7 +37,6 @@
 #include <asm/kvm_arm.h>
 #include <asm/kvm_asm.h>
 #include <asm/kvm_mmu.h>
-#include <asm/kvm_pkvm.h>
 #include <asm/kvm_emulate.h>
 #include <asm/sections.h>
 
@@ -151,10 +150,6 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	if (ret)
 		goto out_free_stage2_pgd;
 
-	ret = pkvm_init_host_vm(kvm);
-	if (ret)
-		goto out_free_stage2_pgd;
-
 	if (!zalloc_cpumask_var(&kvm->arch.supported_cpus, GFP_KERNEL)) {
 		ret = -ENOMEM;
 		goto out_free_stage2_pgd;
@@ -191,9 +186,6 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
 	free_cpumask_var(kvm->arch.supported_cpus);
 
 	kvm_vgic_destroy(kvm);
-
-	if (is_protected_kvm_enabled())
-		pkvm_destroy_hyp_vm(kvm);
 
 	kvm_destroy_vcpus(kvm);
 
@@ -576,12 +568,6 @@ int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
 	ret = kvm_arm_pmu_v3_enable(vcpu);
 	if (ret)
 		return ret;
-
-	if (is_protected_kvm_enabled()) {
-		ret = pkvm_create_hyp_vm(kvm);
-		if (ret)
-			return ret;
-	}
 
 	if (!irqchip_in_kernel(kvm)) {
 		/*
