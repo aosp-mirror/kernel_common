@@ -7,7 +7,6 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/scatterlist.h>
-#include <linux/mem_relinquish.h>
 
 #include "page_reporting.h"
 #include "internal.h"
@@ -121,7 +120,7 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 	unsigned int page_len = PAGE_SIZE << order;
 	struct page *page, *next;
 	long budget;
-	int i, err = 0;
+	int err = 0;
 
 	/*
 	 * Perform early check, if free area is empty there is
@@ -175,10 +174,6 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 			/* Add page to scatter list */
 			--(*offset);
 			sg_set_page(&sgl[*offset], page, page_len, 0);
-
-			/* Notify hyp that these pages are reclaimable. */
-			for (i = 0; i < (1<<order); i++)
-				page_relinquish(page+i);
 
 			continue;
 		}
