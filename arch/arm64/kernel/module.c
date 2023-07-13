@@ -513,13 +513,9 @@ static int module_init_hyp(const Elf_Ehdr *hdr, const Elf_Shdr *sechdrs,
 #ifdef CONFIG_KVM
 	const Elf_Shdr *s;
 
-	/*
-	 * If the .hyp.text is missing or empty, this is not a hypervisor
-	 * module so ignore the rest of it.
-	 */
 	s = find_section(hdr, sechdrs, ".hyp.text");
-	if (!s || !s->sh_size)
-		return 0;
+	if (!s)
+		return -ENOEXEC;
 
 	mod->arch.hyp.text = (struct pkvm_module_section) {
 		.start	= (void *)s->sh_addr,
