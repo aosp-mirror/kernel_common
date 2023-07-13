@@ -1796,7 +1796,7 @@ int __pkvm_host_donate_guest(u64 pfn, u64 gfn, struct pkvm_hyp_vcpu *vcpu)
 	return ret;
 }
 
-void hyp_poison_page(phys_addr_t phys)
+static void hyp_zero_page(phys_addr_t phys)
 {
 	void *addr = hyp_fixmap_map(phys);
 
@@ -1835,7 +1835,7 @@ int __pkvm_host_reclaim_page(u64 pfn)
 	}
 
 	if (page->flags & HOST_PAGE_NEED_POISONING) {
-		hyp_poison_page(addr);
+		hyp_zero_page(addr);
 		page->flags &= ~HOST_PAGE_NEED_POISONING;
 	}
 
