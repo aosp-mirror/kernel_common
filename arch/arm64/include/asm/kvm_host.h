@@ -115,8 +115,6 @@ struct kvm_smccc_features {
 	unsigned long vendor_hyp_bmap;
 };
 
-typedef unsigned int pkvm_handle_t;
-
 struct kvm_arch {
 	struct kvm_s2_mmu mmu;
 
@@ -168,12 +166,6 @@ struct kvm_arch {
 
 	/* Hypercall features firmware registers' descriptor */
 	struct kvm_smccc_features smccc_feat;
-
-	/*
-	 * For an untrusted host VM, 'pkvm_handle' is used to lookup
-	 * the associated pKVM instance in the hypervisor.
-	 */
-	pkvm_handle_t pkvm_handle;
 };
 
 struct kvm_vcpu_fault_info {
