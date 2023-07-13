@@ -15,7 +15,6 @@ struct pkvm_module_ops {
 	void (*putx64)(u64 num);
 	void *(*fixmap_map)(phys_addr_t phys);
 	void (*fixmap_unmap)(void);
-	void (*flush_dcache_to_poc)(void *addr, size_t size);
 };
 
 struct pkvm_module_section {
