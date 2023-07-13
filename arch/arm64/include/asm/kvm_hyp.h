@@ -114,8 +114,7 @@ void __noreturn __hyp_do_panic(struct kvm_cpu_context *host_ctxt, u64 spsr,
 void __pkvm_init_switch_pgd(phys_addr_t phys, unsigned long size,
 			    phys_addr_t pgd, void *sp, void *cont_fn);
 int __pkvm_init(phys_addr_t phys, unsigned long size, unsigned long nr_cpus,
-		unsigned long *per_cpu_base, u32 hyp_va_bits,
-		enum kvm_iommu_driver iommu_driver);
+		unsigned long *per_cpu_base, u32 hyp_va_bits);
 void __noreturn __host_enter(struct kvm_cpu_context *host_ctxt);
 #endif
 
@@ -131,10 +130,5 @@ extern u64 kvm_nvhe_sym(id_aa64mmfr2_el1_sys_val);
 extern unsigned long kvm_nvhe_sym(__icache_flags);
 extern unsigned int kvm_nvhe_sym(kvm_arm_vmid_bits);
 extern bool kvm_nvhe_sym(smccc_trng_available);
-struct kvm_iommu_ops {
-	int (*init)(void);
-};
-
-extern struct kvm_iommu_ops kvm_iommu_ops;
 
 #endif /* __ARM64_KVM_HYP_H__ */
