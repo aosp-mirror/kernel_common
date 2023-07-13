@@ -427,7 +427,7 @@ static void ht_print_trace_cpu(struct ht_iterator *iter)
 
 extern struct trace_event *ftrace_find_event(int type);
 
-static int ht_print_trace_fmt(struct ht_iterator *iter)
+static void ht_print_trace_fmt(struct ht_iterator *iter)
 {
 	struct trace_event *e;
 
@@ -435,16 +435,18 @@ static int ht_print_trace_fmt(struct ht_iterator *iter)
 		trace_seq_printf(&iter->seq, "CPU:%d [LOST %lu EVENTS]\n",
 				 iter->ent_cpu, iter->lost_events);
 
+	/* TODO: format bin/hex/raw */
+
 	ht_print_trace_cpu(iter);
 	ht_print_trace_time(iter);
 
 	e = ftrace_find_event(iter->ent->id);
-	if (e)
+	if (e) {
 		e->funcs->trace((struct trace_iterator *)iter, 0, e);
-	else
-		trace_seq_printf(&iter->seq, "Unknown event id %d\n", iter->ent->id);
+		return;
+	}
 
-	return trace_seq_has_overflowed(&iter->seq) ? -EOVERFLOW : 0;
+	trace_seq_printf(&iter->seq, "Unknown event id %d\n", iter->ent->id);
 };
 
 static struct ring_buffer_event *ht_next_event(struct ht_iterator *iter,
@@ -816,10 +818,6 @@ hyp_trace_pipe_read(struct file *file, char __user *ubuf,
 	struct ht_iterator *iter = (struct ht_iterator *)file->private_data;
 	int ret;
 
-	/* seq_buf buffer size */
-	if (cnt != PAGE_SIZE)
-		return -EINVAL;
-
 	trace_seq_init(&iter->seq);
 again:
 	ret = ring_buffer_wait(hyp_trace_buffer, iter->cpu, 0);
@@ -828,13 +826,7 @@ again:
 
 	hyp_trace_read_start(iter->cpu);
 	while (ht_next_pipe_event(iter)) {
-		int prev_len = iter->seq.seq.len;
-
-		if (ht_print_trace_fmt(iter)) {
-			iter->seq.seq.len = prev_len;
-			break;
-		}
-
+		ht_print_trace_fmt(iter);
 		ring_buffer_consume(hyp_trace_buffer, iter->ent_cpu, NULL,
 				    NULL);
 	}
