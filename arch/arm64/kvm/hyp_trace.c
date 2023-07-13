@@ -228,16 +228,12 @@ static int hyp_start_tracing(void)
 	if (ret)
 		goto end_buffer_teardown;
 
-	ret = kvm_call_hyp_nvhe(__pkvm_load_tracing, (unsigned long)pack, pack_size);
-	if (ret)
-		goto end_backing_teardown;
-
-	ret = kvm_call_hyp_nvhe(__pkvm_enable_tracing, true);
+	ret = kvm_call_hyp_nvhe(__pkvm_start_tracing, (unsigned long)pack, pack_size);
 	if (!ret) {
 		hyp_trace_on = true;
 		goto end_free_pack;
 	}
-end_backing_teardown:
+
 	bpage_backing_teardown();
 end_buffer_teardown:
 	trace_buffer_teardown(&pack->trace_buffer_pack);
@@ -254,7 +250,7 @@ static void hyp_stop_tracing(void)
 	if (!hyp_trace_buffer || !hyp_trace_on)
 		return;
 
-	ret = kvm_call_hyp_nvhe(__pkvm_teardown_tracing);
+	ret = kvm_call_hyp_nvhe(__pkvm_stop_tracing);
 	if (ret) {
 		WARN_ON(1);
 		return;
