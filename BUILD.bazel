@@ -72,12 +72,8 @@ filegroup(
 
 define_common_kernels(target_configs = {
     "kernel_aarch64": {
-        "kmi_symbol_list_strict_mode": True,
+        "kmi_symbol_list_strict_mode": False,
         "module_implicit_outs": COMMON_GKI_MODULES_LIST,
-        "kmi_symbol_list": "android/abi_gki_aarch64",
-        "additional_kmi_symbol_lists": [":aarch64_additional_kmi_symbol_lists"],
-        "protected_exports_list": "android/abi_gki_protected_exports_aarch64",
-        "protected_modules_list": "android/gki_aarch64_protected_modules",
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
     },
     "kernel_aarch64_16k": {
@@ -88,10 +84,6 @@ define_common_kernels(target_configs = {
     "kernel_aarch64_debug": {
         "kmi_symbol_list_strict_mode": False,
         "module_implicit_outs": COMMON_GKI_MODULES_LIST,
-        "kmi_symbol_list": "android/abi_gki_aarch64",
-        "additional_kmi_symbol_lists": [":aarch64_additional_kmi_symbol_lists"],
-        "protected_exports_list": "android/abi_gki_protected_exports_aarch64",
-        "protected_modules_list": "android/gki_aarch64_protected_modules",
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
     },
     "kernel_riscv64": {
@@ -102,15 +94,11 @@ define_common_kernels(target_configs = {
     "kernel_x86_64": {
         "kmi_symbol_list_strict_mode": False,
         "module_implicit_outs": COMMON_GKI_MODULES_LIST,
-        "protected_exports_list": "android/abi_gki_protected_exports_x86_64",
-        "protected_modules_list": "android/gki_x86_64_protected_modules",
         "make_goals": _GKI_X86_64_MAKE_GOALS,
     },
     "kernel_x86_64_debug": {
         "kmi_symbol_list_strict_mode": False,
         "module_implicit_outs": COMMON_GKI_MODULES_LIST,
-        "protected_exports_list": "android/abi_gki_protected_exports_x86_64",
-        "protected_modules_list": "android/gki_x86_64_protected_modules",
         "make_goals": _GKI_X86_64_MAKE_GOALS,
     },
 })
