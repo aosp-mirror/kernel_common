@@ -47,6 +47,7 @@
   bitmap_find_next_zero_area_off
   bitmap_free
   __bitmap_or
+  bitmap_parselist
   __bitmap_set
   __bitmap_shift_left
   __bitmap_shift_right
@@ -1324,6 +1325,8 @@
   panic_notifier_list
   param_array_ops
   param_get_charp
+  param_get_hexint
+  param_get_int
   param_get_string
   param_ops_bool
   param_ops_byte
@@ -1338,6 +1341,8 @@
   param_ops_ushort
   param_set_charp
   param_set_copystring
+  param_set_hexint
+  param_set_int
   pci_disable_device
   pci_enable_device
   pci_find_next_bus
@@ -1526,6 +1531,7 @@
   rdev_get_drvdata
   read_cache_page
   read_sanitised_ftr_reg
+  rebuild_sched_domains
   refcount_warn_saturate
   __refrigerator
   regcache_cache_only
