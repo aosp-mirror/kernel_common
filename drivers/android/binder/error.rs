@@ -47,8 +47,26 @@ impl From<Error> for BinderError {
     }
 }
 
+impl From<kernel::alloc::AllocError> for BinderError {
+    fn from(_: kernel::alloc::AllocError) -> Self {
+        Self {
+            reply: BR_FAILED_REPLY,
+            source: Some(ENOMEM),
+        }
+    }
+}
+
 impl From<core::alloc::AllocError> for BinderError {
     fn from(_: core::alloc::AllocError) -> Self {
+        Self {
+            reply: BR_FAILED_REPLY,
+            source: Some(ENOMEM),
+        }
+    }
+}
+
+impl From<alloc::collections::TryReserveError> for BinderError {
+    fn from(_: alloc::collections::TryReserveError) -> Self {
         Self {
             reply: BR_FAILED_REPLY,
             source: Some(ENOMEM),
