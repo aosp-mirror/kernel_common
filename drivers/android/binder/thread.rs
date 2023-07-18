@@ -9,7 +9,7 @@
 
 use kernel::{
     bindings,
-    fs::File,
+    fs::{File, LocalFile},
     list::{AtomicListArcTracker, List, ListArc, ListLinks, TryNewListArc},
     prelude::*,
     security,
@@ -602,6 +602,7 @@ impl Thread {
         offset: usize,
         object: BinderObjectRef<'_>,
         view: &mut AllocationView<'_>,
+        allow_fds: bool,
         sg_state: &mut ScatterGatherState,
     ) -> BinderResult {
         match object {
@@ -627,9 +628,34 @@ impl Thread {
                 security::binder_transfer_binder(&self.process.cred, &view.alloc.process.cred)?;
                 view.transfer_binder_object(offset, obj, strong, node)?;
             }
-            BinderObjectRef::Fd(_obj) => {
-                pr_warn!("Using unsupported binder object type fd.");
-                return Err(EINVAL.into());
+            BinderObjectRef::Fd(obj) => {
+                if !allow_fds {
+                    return Err(EPERM.into());
+                }
+
+                // SAFETY: `fd` is a `u32`; any bit pattern is a valid representation.
+                let fd = unsafe { obj.__bindgen_anon_1.fd };
+                let file = LocalFile::fget(fd)?;
+                // SAFETY: The binder driver never calls `fdget_pos` and this code runs from an
+                // ioctl, so there are no active calls to `fdget_pos` on this thread.
+                let file = unsafe { LocalFile::assume_no_fdget_pos(file) };
+                security::binder_transfer_file(
+                    &self.process.cred,
+                    &view.alloc.process.cred,
+                    &file,
+                )?;
+
+                let mut obj_write = BinderFdObject::default();
+                obj_write.hdr.type_ = BINDER_TYPE_FD;
+                // This will be overwritten with the actual fd when the transaction is received.
+                obj_write.__bindgen_anon_1.fd = u32::MAX;
+                obj_write.cookie = obj.cookie;
+                view.write::<BinderFdObject>(offset, &obj_write)?;
+
+                const FD_FIELD_OFFSET: usize =
+                    ::core::mem::offset_of!(bindings::binder_fd_object, __bindgen_anon_1.fd)
+                        as usize;
+                view.alloc.info_add_fd(file, offset + FD_FIELD_OFFSET)?;
             }
             BinderObjectRef::Ptr(obj) => {
                 let obj_length = obj.length.try_into().map_err(|_| EINVAL)?;
@@ -781,6 +807,7 @@ impl Thread {
         &self,
         to_process: Arc<Process>,
         tr: &BinderTransactionDataSg,
+        allow_fds: bool,
         txn_security_ctx_offset: Option<&mut usize>,
     ) -> BinderResult<NewAllocation> {
         let trd = &tr.transaction_data;
@@ -883,7 +910,14 @@ impl Thread {
 
                 let mut object = BinderObject::read_from(&mut buffer_reader)?;
 
-                match self.translate_object(index, offset, object.as_ref(), &mut view, sg_state) {
+                match self.translate_object(
+                    index,
+                    offset,
+                    object.as_ref(),
+                    &mut view,
+                    allow_fds,
+                    sg_state,
+                ) {
                     Ok(()) => end_of_previous_object = offset + object.size(),
                     Err(err) => {
                         pr_warn!("Error while translating object.");
@@ -1073,7 +1107,8 @@ impl Thread {
         (|| -> BinderResult<_> {
             let completion = DTRWrap::arc_try_new(DeliverCode::new(BR_TRANSACTION_COMPLETE))?;
             let process = orig.from.process.clone();
-            let reply = Transaction::new_reply(self, process, tr)?;
+            let allow_fds = orig.flags & TF_ACCEPT_FDS != 0;
+            let reply = Transaction::new_reply(self, process, tr, allow_fds)?;
             self.inner.lock().push_work(completion);
             orig.from.deliver_reply(Ok(reply), &orig);
             Ok(())

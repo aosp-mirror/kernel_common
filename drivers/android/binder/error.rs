@@ -47,6 +47,12 @@ impl From<Error> for BinderError {
     }
 }
 
+impl From<kernel::fs::file::BadFdError> for BinderError {
+    fn from(source: kernel::fs::file::BadFdError) -> Self {
+        BinderError::from(Error::from(source))
+    }
+}
+
 impl From<kernel::alloc::AllocError> for BinderError {
     fn from(_: kernel::alloc::AllocError) -> Self {
         Self {
