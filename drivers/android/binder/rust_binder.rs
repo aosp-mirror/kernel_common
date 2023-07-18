@@ -131,7 +131,6 @@ impl<T: ListArcSafe> DTRWrap<T> {
         })
     }
 
-    #[allow(dead_code)]
     fn arc_try_new(val: T) -> Result<DLArc<T>, alloc::alloc::AllocError> {
         ListArc::pin_init(
             try_pin_init!(Self {
