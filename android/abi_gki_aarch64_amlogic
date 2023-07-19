@@ -1343,6 +1343,7 @@
   param_set_copystring
   param_set_hexint
   param_set_int
+  pci_choose_state
   pci_disable_device
   pci_enable_device
   pci_find_next_bus
@@ -1358,9 +1359,11 @@
   pci_read_config_dword
   pci_remove_root_bus
   pci_rescan_bus
+  pci_set_power_state
   pci_stop_and_remove_bus_device_locked
   pci_stop_root_bus
   pci_unlock_rescan_remove
+  pci_write_config_byte
   pci_write_config_dword
   PDE_DATA
   __per_cpu_offset
@@ -1928,12 +1931,14 @@
   __traceiter_android_rvh_check_preempt_tick
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_do_sea
+  __traceiter_android_rvh_enqueue_task
   __traceiter_android_rvh_gic_v3_set_affinity
   __traceiter_android_rvh_iommu_setup_dma_ops
   __traceiter_android_rvh_place_entity
   __traceiter_android_rvh_replace_next_task_fair
   __traceiter_android_rvh_schedule
   __traceiter_android_rvh_select_task_rq_rt
+  __traceiter_android_rvh_tick_entry
   __traceiter_android_vh_cma_drain_all_pages_bypass
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
@@ -1949,18 +1954,21 @@
   __traceiter_mmap_lock_acquire_returned
   __traceiter_mmap_lock_released
   __traceiter_mmap_lock_start_locking
+  __traceiter_sched_switch
   __traceiter_xdp_exception
   trace_output_call
   __tracepoint_android_rvh_arm64_serror_panic
   __tracepoint_android_rvh_check_preempt_tick
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_do_sea
+  __tracepoint_android_rvh_enqueue_task
   __tracepoint_android_rvh_gic_v3_set_affinity
   __tracepoint_android_rvh_iommu_setup_dma_ops
   __tracepoint_android_rvh_place_entity
   __tracepoint_android_rvh_replace_next_task_fair
   __tracepoint_android_rvh_schedule
   __tracepoint_android_rvh_select_task_rq_rt
+  __tracepoint_android_rvh_tick_entry
   __tracepoint_android_vh_cma_drain_all_pages_bypass
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
@@ -1978,6 +1986,7 @@
   __tracepoint_mmap_lock_start_locking
   tracepoint_probe_register
   tracepoint_probe_unregister
+  __tracepoint_sched_switch
   __tracepoint_xdp_exception
   trace_print_array_seq
   trace_print_flags_seq
