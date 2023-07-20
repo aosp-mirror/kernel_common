@@ -2,7 +2,6 @@
 
 // Copyright (C) 2024 Google LLC.
 
-#![allow(dead_code)]
 //! Logic for closing files in a deferred manner.
 //!
 //! This file could make sense to have in `kernel::fs`, but it was rejected for being too

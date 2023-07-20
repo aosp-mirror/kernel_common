@@ -16,6 +16,7 @@ use kernel::{
 };
 
 use crate::{
+    deferred_close::DeferredFdCloser,
     defs::*,
     node::{Node, NodeRef},
     process::Process,
@@ -169,16 +170,36 @@ impl Allocation {
         self.get_or_init_info().target_node = Some(target_node);
     }
 
-    pub(crate) fn info_add_fd(&mut self, file: ARef<File>, buffer_offset: usize) -> Result {
+    /// Reserve enough space to push at least `num_fds` fds.
+    pub(crate) fn info_add_fd_reserve(&mut self, num_fds: usize) -> Result {
+        self.get_or_init_info()
+            .file_list
+            .files_to_translate
+            .reserve(num_fds, GFP_KERNEL)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn info_add_fd(
+        &mut self,
+        file: ARef<File>,
+        buffer_offset: usize,
+        close_on_free: bool,
+    ) -> Result {
         self.get_or_init_info().file_list.files_to_translate.push(
             FileEntry {
                 file,
                 buffer_offset,
+                close_on_free,
             },
             GFP_KERNEL,
         )?;
 
         Ok(())
+    }
+
+    pub(crate) fn set_info_close_on_free(&mut self, cof: FdsCloseOnFree) {
+        self.get_or_init_info().file_list.close_on_free = cof.0;
     }
 
     pub(crate) fn translate_fds(&mut self) -> Result<TranslatedFds> {
@@ -188,10 +209,15 @@ impl Allocation {
         };
 
         let files = core::mem::take(&mut file_list.files_to_translate);
+
+        let num_close_on_free = files.iter().filter(|entry| entry.close_on_free).count();
+        let mut close_on_free = Vec::with_capacity(num_close_on_free, GFP_KERNEL)?;
+
         let mut reservations = Vec::with_capacity(files.len(), GFP_KERNEL)?;
         for file_info in files {
             let res = FileDescriptorReservation::get_unused_fd_flags(bindings::O_CLOEXEC)?;
-            self.write::<u32>(file_info.buffer_offset, &res.reserved_fd())?;
+            let fd = res.reserved_fd();
+            self.write::<u32>(file_info.buffer_offset, &fd)?;
             reservations.push(
                 Reservation {
                     res,
@@ -199,9 +225,25 @@ impl Allocation {
                 },
                 GFP_KERNEL,
             )?;
+            if file_info.close_on_free {
+                close_on_free.push(fd, GFP_KERNEL)?;
+            }
         }
 
-        Ok(TranslatedFds { reservations })
+        Ok(TranslatedFds {
+            reservations,
+            close_on_free: FdsCloseOnFree(close_on_free),
+        })
+    }
+
+    /// Should the looper return to userspace when freeing this allocation?
+    pub(crate) fn looper_need_return_on_free(&self) -> bool {
+        // Closing fds involves pushing task_work for execution when we return to userspace. Hence,
+        // we should return to userspace asap if we are closing fds.
+        match self.allocation_info {
+            Some(ref info) => !info.file_list.close_on_free.is_empty(),
+            None => false,
+        }
     }
 }
 
@@ -225,6 +267,21 @@ impl Drop for Allocation {
                         pr_warn!("Error cleaning up object at offset {}\n", i)
                     }
                 }
+            }
+
+            for &fd in &info.file_list.close_on_free {
+                let closer = match DeferredFdCloser::new(GFP_KERNEL) {
+                    Ok(closer) => closer,
+                    Err(kernel::alloc::AllocError) => {
+                        // Ignore allocation failures.
+                        break;
+                    }
+                };
+
+                // Here, we ignore errors. The operation can fail if the fd is not valid, or if the
+                // method is called from a kthread. However, this is always called from a syscall,
+                // so the latter case cannot happen, and we don't care about the first case.
+                let _ = closer.close_fd(fd);
             }
 
             if info.clear_on_free {
@@ -503,6 +560,7 @@ impl BinderObject {
 #[derive(Default)]
 struct FileList {
     files_to_translate: Vec<FileEntry>,
+    close_on_free: Vec<u32>,
 }
 
 struct FileEntry {
@@ -510,10 +568,15 @@ struct FileEntry {
     file: ARef<File>,
     /// The offset in the buffer where the file descriptor is stored.
     buffer_offset: usize,
+    /// Whether this fd should be closed when the allocation is freed.
+    close_on_free: bool,
 }
 
 pub(crate) struct TranslatedFds {
     reservations: Vec<Reservation>,
+    /// If commit is called, then these fds should be closed. (If commit is not called, then they
+    /// shouldn't be closed.)
+    close_on_free: FdsCloseOnFree,
 }
 
 struct Reservation {
@@ -525,12 +588,17 @@ impl TranslatedFds {
     pub(crate) fn new() -> Self {
         Self {
             reservations: Vec::new(),
+            close_on_free: FdsCloseOnFree(Vec::new()),
         }
     }
 
-    pub(crate) fn commit(self) {
+    pub(crate) fn commit(self) -> FdsCloseOnFree {
         for entry in self.reservations {
             entry.res.fd_install(entry.file);
         }
+
+        self.close_on_free
     }
 }
+
+pub(crate) struct FdsCloseOnFree(Vec<u32>);
