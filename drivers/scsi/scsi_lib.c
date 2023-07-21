@@ -304,11 +304,6 @@ void scsi_device_unbusy(struct scsi_device *sdev, struct scsi_cmnd *cmd)
 	cmd->budget_token = -1;
 }
 
-static void scsi_kick_queue(struct request_queue *q)
-{
-	blk_mq_run_hw_queues(q, false);
-}
-
 /*
  * Called for single_lun devices on IO completion. Clear starget_sdev_user,
  * and call blk_run_queue for all the scsi_devices on the target -
@@ -333,7 +328,7 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	 * but in most cases, we will be first. Ideally, each LU on the
 	 * target would get some limited time or requests on the target.
 	 */
-	scsi_kick_queue(current_sdev->request_queue);
+	blk_mq_run_hw_queues(current_sdev->request_queue, false);
 
 	spin_lock_irqsave(shost->host_lock, flags);
 	if (starget->starget_sdev_user)
@@ -346,7 +341,7 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 			continue;
 
 		spin_unlock_irqrestore(shost->host_lock, flags);
-		scsi_kick_queue(sdev->request_queue);
+		blk_mq_run_hw_queues(sdev->request_queue, false);
 		spin_lock_irqsave(shost->host_lock, flags);
 
 		scsi_device_put(sdev);
@@ -433,7 +428,7 @@ static void scsi_starved_list_run(struct Scsi_Host *shost)
 			continue;
 		spin_unlock_irqrestore(shost->host_lock, flags);
 
-		scsi_kick_queue(slq);
+		blk_mq_run_hw_queues(slq, false);
 		blk_put_queue(slq);
 
 		spin_lock_irqsave(shost->host_lock, flags);
