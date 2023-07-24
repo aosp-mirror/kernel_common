@@ -64,6 +64,18 @@ config LD_VERSION
 config LD_IS_LLD
 	def_bool $(success,test "$(ld-name)" = LLD)
 
+config AS_IS_GNU
+	def_bool $(success,test "$(as-name)" = GNU)
+
+config AS_IS_LLVM
+	def_bool $(success,test "$(as-name)" = LLVM)
+
+config AS_VERSION
+	int
+	# Use clang version if this is the integrated assembler
+	default CLANG_VERSION if AS_IS_LLVM
+	default $(as-version)
+
 config LLD_VERSION
 	int
 	default $(ld-version) if LD_IS_LLD
