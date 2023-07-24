@@ -22,9 +22,11 @@ pub_no_prefix!(
     BR_REPLY,
     BR_DEAD_REPLY,
     BR_FAILED_REPLY,
+    BR_FROZEN_REPLY,
     BR_NOOP,
     BR_SPAWN_LOOPER,
     BR_TRANSACTION_COMPLETE,
+    BR_TRANSACTION_PENDING_FROZEN,
     BR_OK,
     BR_ERROR,
     BR_INCREFS,
@@ -125,6 +127,8 @@ decl_wrapper!(
 );
 decl_wrapper!(BinderWriteRead, bindings::binder_write_read);
 decl_wrapper!(BinderVersion, bindings::binder_version);
+decl_wrapper!(BinderFrozenStatusInfo, bindings::binder_frozen_status_info);
+decl_wrapper!(BinderFreezeInfo, bindings::binder_freeze_info);
 decl_wrapper!(ExtendedError, bindings::binder_extended_error);
 
 impl BinderVersion {
