@@ -540,6 +540,25 @@ impl Node {
         }
     }
 
+    /// Finds an outdated transaction that the given transaction can replace.
+    ///
+    /// If one is found, it is removed from the list and returned.
+    pub(crate) fn take_outdated_transaction(
+        &self,
+        new: &Transaction,
+        guard: &mut Guard<'_, ProcessInner, SpinLockBackend>,
+    ) -> Option<DLArc<Transaction>> {
+        let inner = self.inner.access_mut(guard);
+        let mut cursor_opt = inner.oneway_todo.cursor_front();
+        while let Some(cursor) = cursor_opt {
+            if new.can_replace(&cursor.current()) {
+                return Some(cursor.remove());
+            }
+            cursor_opt = cursor.next();
+        }
+        None
+    }
+
     /// This is split into a separate function since it's called by both `Node::do_work` and
     /// `NodeWrapper::do_work`.
     fn do_work_locked(

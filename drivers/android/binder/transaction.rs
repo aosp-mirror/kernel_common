@@ -200,6 +200,9 @@ impl Transaction {
     ///
     /// Not used for replies.
     pub(crate) fn submit(self: DLArc<Self>) -> BinderResult {
+        // Defined before `process_inner` so that the destructor runs after releasing the lock.
+        let mut _t_outdated = None;
+
         let oneway = self.flags & TF_ONE_WAY != 0;
         let process = self.to.clone();
         let mut process_inner = process.inner.lock();
@@ -210,6 +213,10 @@ impl Transaction {
             if let Some(target_node) = self.target_node.clone() {
                 if process_inner.is_frozen {
                     process_inner.async_recv = true;
+                    if self.flags & TF_UPDATE_TXN != 0 {
+                        _t_outdated =
+                            target_node.take_outdated_transaction(&self, &mut process_inner);
+                    }
                 }
                 match target_node.submit_oneway(self, &mut process_inner) {
                     Ok(()) => {}
@@ -254,6 +261,25 @@ impl Transaction {
                 Err(err)
             }
         }
+    }
+
+    /// Check whether one oneway transaction can supersede another.
+    pub(crate) fn can_replace(&self, old: &Transaction) -> bool {
+        if self.from.process.task.pid() != old.from.process.task.pid() {
+            return false;
+        }
+
+        if self.flags & old.flags & (TF_ONE_WAY | TF_UPDATE_TXN) != (TF_ONE_WAY | TF_UPDATE_TXN) {
+            return false;
+        }
+
+        let target_node_match = match (self.target_node.as_ref(), old.target_node.as_ref()) {
+            (None, None) => true,
+            (Some(tn1), Some(tn2)) => Arc::ptr_eq(tn1, tn2),
+            _ => false,
+        };
+
+        self.code == old.code && self.flags == old.flags && target_node_match
     }
 
     fn prepare_file_list(&self) -> Result<TranslatedFds> {
