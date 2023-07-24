@@ -5277,6 +5277,11 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 		goto out;
 	}
 
+	if ((flags & FAULT_FLAG_VMA_LOCK) && !vma_is_anonymous(vma)) {
+		vma_end_read(vma);
+		return VM_FAULT_RETRY;
+	}
+
 	/*
 	 * Enable the memcg OOM handling for faults triggered in user
 	 * space.  Kernel faults are handled more gracefully.
@@ -5446,10 +5451,6 @@ struct vm_area_struct *lock_vma_under_rcu(struct mm_struct *mm,
 retry:
 	vma = mas_walk(&mas);
 	if (!vma)
-		goto inval;
-
-	/* Only anonymous vmas are supported for now */
-	if (!vma_is_anonymous(vma))
 		goto inval;
 
 	if (!vma_start_read(vma))
