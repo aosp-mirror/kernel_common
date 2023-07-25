@@ -36,3 +36,6 @@
   sdhci_set_uhs_signaling
   sdhci_suspend_host
 
+# required by vh_sched.ko
+  __traceiter_android_vh_map_util_freq
+  __tracepoint_android_vh_map_util_freq
