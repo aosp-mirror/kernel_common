@@ -652,6 +652,7 @@
   drm_dp_read_sink_count
   drm_dsc_pps_payload_pack
   drm_edid_get_monitor_name
+  drm_edid_is_valid
   drm_edid_to_sad
   drm_encoder_cleanup
   drm_encoder_init
