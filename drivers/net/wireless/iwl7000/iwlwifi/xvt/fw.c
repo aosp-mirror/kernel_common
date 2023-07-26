@@ -208,6 +208,7 @@ static int iwl_xvt_load_ucode_wait_alive(struct iwl_xvt *xvt,
 	ret = iwl_wait_notification(&xvt->notif_wait, &alive_wait,
 				    XVT_UCODE_ALIVE_TIMEOUT);
 	if (ret) {
+		IWL_ERR(xvt, "XVT: ret:%d\n", ret);
 		iwl_fw_set_current_image(&xvt->fwrt, old_type);
 		return ret;
 	}
@@ -221,8 +222,8 @@ static int iwl_xvt_load_ucode_wait_alive(struct iwl_xvt *xvt,
 	/* fresh firmware was loaded */
 	xvt->fw_error = false;
 
-	ret = iwl_pnvm_load(xvt->trans, &xvt->notif_wait,
-			    &xvt->fw->ucode_capa);
+	ret = iwl_xvt_pnvm_load(xvt->trans, &xvt->notif_wait,
+				&xvt->fw->ucode_capa);
 	if (ret) {
 		IWL_ERR(xvt, "Timeout waiting for PNVM load!\n");
 		iwl_fw_set_current_image(&xvt->fwrt, old_type);

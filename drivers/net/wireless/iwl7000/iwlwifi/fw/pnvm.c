@@ -411,3 +411,66 @@ int iwl_pnvm_load(struct iwl_trans *trans,
 				     MVM_UCODE_PNVM_TIMEOUT);
 }
 IWL_EXPORT_SYMBOL(iwl_pnvm_load);
+
+#if IS_ENABLED(CPTCFG_IWLXVT)
+
+#define LMPM2_NIC_ISR6		0xA02E38
+#define LMPM2_NIC_EN_VEC_6	0xA02E18
+
+int iwl_xvt_pnvm_load(struct iwl_trans *trans,
+		      struct iwl_notif_wait_data *notif_wait,
+		      const struct iwl_ucode_capabilities *capa)
+{
+	u32 reg_value_nic_en_isr6_bd = 0;
+	u32 reg_value_nic_en_isr6_bw = 0;
+	u32 reg_value_nic_en_isr6_aw = 0;
+
+	u32 reg_lmpm2_nic_isr6_bd = 0;
+	u32 reg_lmpm2_nic_isr6_bw = 0;
+	u32 reg_lmpm2_nic_isr6_aw = 0;
+	int ret;
+	struct iwl_notification_wait pnvm_wait;
+	static const u16 ntf_cmds[] = { WIDE_ID(REGULATORY_AND_NVM_GROUP,
+						PNVM_INIT_COMPLETE_NTFY) };
+
+	/* if the SKU_ID is empty, there's nothing to do */
+	if (!trans->sku_id[0] && !trans->sku_id[1] && !trans->sku_id[2])
+		return 0;
+
+	iwl_pnvm_load_pnvm_to_trans(trans, capa);
+	iwl_pnvm_load_reduce_power_to_trans(trans, capa);
+
+	iwl_init_notification_wait(notif_wait, &pnvm_wait,
+				   ntf_cmds, ARRAY_SIZE(ntf_cmds),
+				   iwl_pnvm_complete_fn, trans);
+
+	reg_value_nic_en_isr6_bd = iwl_read_umac_prph(trans,
+						      LMPM2_NIC_EN_VEC_6);
+	reg_lmpm2_nic_isr6_bd = iwl_read_umac_prph(trans, LMPM2_NIC_ISR6);
+
+	/* kick the doorbell */
+	iwl_write_umac_prph(trans, UREG_DOORBELL_TO_ISR6,
+			    UREG_DOORBELL_TO_ISR6_PNVM);
+
+	reg_value_nic_en_isr6_bw = iwl_read_umac_prph(trans,
+						      LMPM2_NIC_EN_VEC_6);
+	reg_lmpm2_nic_isr6_bw = iwl_read_umac_prph(trans, LMPM2_NIC_ISR6);
+
+	ret = iwl_wait_notification(notif_wait, &pnvm_wait,
+				    MVM_UCODE_PNVM_TIMEOUT);
+
+	reg_value_nic_en_isr6_aw = iwl_read_umac_prph(trans,
+						      LMPM2_NIC_EN_VEC_6);
+	reg_lmpm2_nic_isr6_aw = iwl_read_umac_prph(trans, LMPM2_NIC_ISR6);
+
+	IWL_INFO(trans, "DOORBELL en_bd:0x%x en_bw:0x%x en_aw:0x%x\n",
+		 reg_value_nic_en_isr6_bd, reg_value_nic_en_isr6_bw,
+		 reg_value_nic_en_isr6_aw);
+	IWL_INFO(trans, "DOORBELL lm_bd:0x%x lm_bw:0x%x lm_aw:0x%x ret:%d\n",
+		 reg_lmpm2_nic_isr6_bd, reg_lmpm2_nic_isr6_bw,
+		 reg_lmpm2_nic_isr6_aw, ret);
+
+	return ret;
+}
+IWL_EXPORT_SYMBOL(iwl_xvt_pnvm_load);
+#endif /* CPTCFG_IWLXVT */
