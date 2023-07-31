@@ -2,7 +2,7 @@
 
 // Copyright (C) 2024 Google LLC.
 
-use kernel::{list::ListArc, prelude::*, sync::UniqueArc};
+use kernel::{list::ListArc, prelude::*, seq_file::SeqFile, seq_print, sync::UniqueArc};
 
 use crate::{node::Node, thread::Thread, BinderReturnWriter, DArc, DLArc, DTRWrap, DeliverToRead};
 
@@ -62,5 +62,18 @@ impl DeliverToRead for NodeWrapper {
 
     fn should_sync_wakeup(&self) -> bool {
         false
+    }
+
+    #[inline(never)]
+    fn debug_print(&self, m: &mut SeqFile, prefix: &str, _tprefix: &str) -> Result<()> {
+        seq_print!(
+            m,
+            "{}node work {}: u{:016x} c{:016x}\n",
+            prefix,
+            self.node.debug_id,
+            self.node.ptr,
+            self.node.cookie,
+        );
+        Ok(())
     }
 }

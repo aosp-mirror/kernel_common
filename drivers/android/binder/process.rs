@@ -21,6 +21,8 @@ use kernel::{
     mm,
     prelude::*,
     rbtree::{self, RBTree, RBTreeNode, RBTreeNodeReservation},
+    seq_file::SeqFile,
+    seq_print,
     sync::poll::PollTable,
     sync::{
         lock::Guard, Arc, ArcBorrow, CondVar, CondVarTimeoutResult, Mutex, SpinLock, UniqueArc,
@@ -303,6 +305,7 @@ impl ProcessInner {
 /// Used to keep track of a node that this process has a handle to.
 #[pin_data]
 pub(crate) struct NodeRefInfo {
+    debug_id: usize,
     /// The refcount that this process owns to the node.
     node_ref: ListArcField<NodeRef, { Self::LIST_PROC }>,
     death: ListArcField<Option<DArc<NodeDeath>>, { Self::LIST_PROC }>,
@@ -312,7 +315,7 @@ pub(crate) struct NodeRefInfo {
     /// The handle for this `NodeRefInfo`.
     handle: u32,
     /// The process that has a handle to the node.
-    process: Arc<Process>,
+    pub(crate) process: Arc<Process>,
 }
 
 impl NodeRefInfo {
@@ -323,6 +326,7 @@ impl NodeRefInfo {
 
     fn new(node_ref: NodeRef, handle: u32, process: Arc<Process>) -> impl PinInit<Self> {
         pin_init!(Self {
+            debug_id: super::next_debug_id(),
             node_ref: ListArcField::new(node_ref),
             death: ListArcField::new(None),
             links <- ListLinks::new(),
@@ -474,6 +478,134 @@ impl Process {
         process.ctx.register_process(list_process);
 
         Ok(process)
+    }
+
+    #[inline(never)]
+    pub(crate) fn debug_print_stats(&self, m: &mut SeqFile, ctx: &Context) -> Result<()> {
+        seq_print!(m, "proc {}\n", self.task.pid_in_current_ns());
+        seq_print!(m, "context {}\n", &*ctx.name);
+
+        let inner = self.inner.lock();
+        seq_print!(m, "  threads: {}\n", inner.threads.iter().count());
+        seq_print!(
+            m,
+            "  requested threads: {}+{}/{}\n",
+            inner.requested_thread_count,
+            inner.started_thread_count,
+            inner.max_threads,
+        );
+        if let Some(mapping) = &inner.mapping {
+            seq_print!(
+                m,
+                "  free oneway space: {}\n",
+                mapping.alloc.free_oneway_space()
+            );
+            seq_print!(m, "  buffers: {}\n", mapping.alloc.count_buffers());
+        }
+        seq_print!(
+            m,
+            "  outstanding transactions: {}\n",
+            inner.outstanding_txns
+        );
+        seq_print!(m, "  nodes: {}\n", inner.nodes.iter().count());
+        drop(inner);
+
+        {
+            let mut refs = self.node_refs.lock();
+            let (mut count, mut weak, mut strong) = (0, 0, 0);
+            for r in refs.by_handle.values_mut() {
+                let node_ref = r.node_ref();
+                let (nstrong, nweak) = node_ref.get_count();
+                count += 1;
+                weak += nweak;
+                strong += nstrong;
+            }
+            seq_print!(m, "  refs: {count} s {strong} w {weak}\n");
+        }
+
+        Ok(())
+    }
+
+    #[inline(never)]
+    pub(crate) fn debug_print(
+        &self,
+        m: &mut SeqFile,
+        ctx: &Context,
+        print_all: bool,
+    ) -> Result<()> {
+        seq_print!(m, "proc {}\n", self.task.pid_in_current_ns());
+        seq_print!(m, "context {}\n", &*ctx.name);
+
+        let mut all_threads = Vec::new();
+        let mut all_nodes = Vec::new();
+        loop {
+            let inner = self.inner.lock();
+            let num_threads = inner.threads.iter().count();
+            let num_nodes = inner.nodes.iter().count();
+
+            if all_threads.capacity() < num_threads || all_nodes.capacity() < num_nodes {
+                drop(inner);
+                all_threads.reserve(num_threads, GFP_KERNEL)?;
+                all_nodes.reserve(num_nodes, GFP_KERNEL)?;
+                continue;
+            }
+
+            for thread in inner.threads.values() {
+                assert!(all_threads.len() < all_threads.capacity());
+                let _ = all_threads.push(thread.clone(), GFP_ATOMIC);
+            }
+
+            for node in inner.nodes.values() {
+                assert!(all_nodes.len() < all_nodes.capacity());
+                let _ = all_nodes.push(node.clone(), GFP_ATOMIC);
+            }
+
+            break;
+        }
+
+        for thread in all_threads {
+            thread.debug_print(m, print_all)?;
+        }
+
+        let mut inner = self.inner.lock();
+        for node in all_nodes {
+            if print_all || node.has_oneway_transaction(&mut inner) {
+                node.full_debug_print(m, &mut inner)?;
+            }
+        }
+        drop(inner);
+
+        if print_all {
+            let mut refs = self.node_refs.lock();
+            for r in refs.by_handle.values_mut() {
+                let node_ref = r.node_ref();
+                let dead = node_ref.node.owner.inner.lock().is_dead;
+                let (strong, weak) = node_ref.get_count();
+                let debug_id = node_ref.node.debug_id;
+
+                seq_print!(
+                    m,
+                    "  ref {}: desc {} {}node {debug_id} s {strong} w {weak}",
+                    r.debug_id,
+                    r.handle,
+                    if dead { "dead " } else { "" },
+                );
+            }
+        }
+
+        let inner = self.inner.lock();
+        for work in &inner.work {
+            work.debug_print(m, "  ", "  pending transaction ")?;
+        }
+        for _death in &inner.delivered_deaths {
+            seq_print!(m, "  has delivered dead binder\n");
+        }
+        if let Some(mapping) = &inner.mapping {
+            mapping.alloc.debug_print(m)?;
+        }
+        drop(inner);
+
+        Ok(())
     }
 
     /// Attempts to fetch a work item from the process queue.
@@ -793,6 +925,7 @@ impl Process {
 
     pub(crate) fn buffer_alloc(
         self: &Arc<Self>,
+        debug_id: usize,
         size: usize,
         is_oneway: bool,
         from_pid: i32,
@@ -804,10 +937,11 @@ impl Process {
         let mapping = inner.mapping.as_mut().ok_or_else(BinderError::new_dead)?;
         let offset = mapping
             .alloc
-            .reserve_new(size, is_oneway, from_pid, alloc)?;
+            .reserve_new(debug_id, size, is_oneway, from_pid, alloc)?;
 
         let res = Allocation::new(
             self.clone(),
+            debug_id,
             offset,
             size,
             mapping.address + offset,
@@ -843,9 +977,10 @@ impl Process {
         let mut inner = self.inner.lock();
         let mapping = inner.mapping.as_mut()?;
         let offset = ptr.checked_sub(mapping.address)?;
-        let (size, odata) = mapping.alloc.reserve_existing(offset).ok()?;
+        let (size, debug_id, odata) = mapping.alloc.reserve_existing(offset).ok()?;
         let mut alloc = Allocation::new(
             self.clone(),
+            debug_id,
             offset,
             size,
             ptr,
@@ -1122,15 +1257,23 @@ impl Process {
         if let Some(mut mapping) = omapping {
             let address = mapping.address;
             let oneway_spam_detected = mapping.alloc.oneway_spam_detected;
-            mapping.alloc.take_for_each(|offset, size, odata| {
-                let ptr = offset + address;
-                let mut alloc =
-                    Allocation::new(self.clone(), offset, size, ptr, oneway_spam_detected);
-                if let Some(data) = odata {
-                    alloc.set_info(data);
-                }
-                drop(alloc)
-            });
+            mapping
+                .alloc
+                .take_for_each(|offset, size, debug_id, odata| {
+                    let ptr = offset + address;
+                    let mut alloc = Allocation::new(
+                        self.clone(),
+                        debug_id,
+                        offset,
+                        size,
+                        ptr,
+                        oneway_spam_detected,
+                    );
+                    if let Some(data) = odata {
+                        alloc.set_info(data);
+                    }
+                    drop(alloc)
+                });
         }
 
         // Drop all references. We do this dance with `swap` to avoid destroying the references

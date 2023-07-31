@@ -13,6 +13,8 @@ use kernel::{
     list::{AtomicListArcTracker, List, ListArc, ListLinks, TryNewListArc},
     prelude::*,
     security,
+    seq_file::SeqFile,
+    seq_print,
     sync::poll::{PollCondVar, PollTable},
     sync::{Arc, SpinLock},
     task::Task,
@@ -464,6 +466,40 @@ impl Thread {
             }),
             GFP_KERNEL,
         )
+    }
+
+    #[inline(never)]
+    pub(crate) fn debug_print(self: &Arc<Self>, m: &mut SeqFile, print_all: bool) -> Result<()> {
+        let inner = self.inner.lock();
+
+        if print_all || inner.current_transaction.is_some() || !inner.work_list.is_empty() {
+            seq_print!(
+                m,
+                "  thread {}: l {:02x} need_return {}\n",
+                self.id,
+                inner.looper_flags,
+                inner.looper_need_return,
+            );
+        }
+
+        let mut t_opt = inner.current_transaction.clone();
+        while let Some(t) = t_opt {
+            if Arc::ptr_eq(&t.from, self) {
+                t.debug_print_inner(m, "    outgoing transaction ");
+                t_opt = t.from_parent.clone();
+            } else if Arc::ptr_eq(&t.to, &self.process) {
+                t.debug_print_inner(m, "    incoming transaction ");
+                t_opt = t.find_from(self);
+            } else {
+                t.debug_print_inner(m, "    bad transaction ");
+                t_opt = None;
+            }
+        }
+
+        for work in &inner.work_list {
+            work.debug_print(m, "    ", "    pending transaction ")?;
+        }
+        Ok(())
     }
 
     pub(crate) fn get_extended_error(&self, data: UserSlice) -> Result {
@@ -990,6 +1026,7 @@ impl Thread {
         &self,
         to_process: Arc<Process>,
         tr: &BinderTransactionDataSg,
+        debug_id: usize,
         allow_fds: bool,
         txn_security_ctx_offset: Option<&mut usize>,
     ) -> BinderResult<NewAllocation> {
@@ -1030,17 +1067,18 @@ impl Thread {
             size_of::<usize>(),
         );
         let secctx_off = aligned_data_size + aligned_offsets_size + aligned_buffers_size;
-        let mut alloc = match to_process.buffer_alloc(len, is_oneway, self.process.task.pid()) {
-            Ok(alloc) => alloc,
-            Err(err) => {
-                pr_warn!(
-                    "Failed to allocate buffer. len:{}, is_oneway:{}",
-                    len,
-                    is_oneway
-                );
-                return Err(err);
-            }
-        };
+        let mut alloc =
+            match to_process.buffer_alloc(debug_id, len, is_oneway, self.process.task.pid()) {
+                Ok(alloc) => alloc,
+                Err(err) => {
+                    pr_warn!(
+                        "Failed to allocate buffer. len:{}, is_oneway:{}",
+                        len,
+                        is_oneway
+                    );
+                    return Err(err);
+                }
+            };
 
         // SAFETY: This accesses a union field, but it's okay because the field's type is valid for
         // all bit-patterns.
@@ -1623,6 +1661,16 @@ impl DeliverToRead for ThreadError {
 
     fn should_sync_wakeup(&self) -> bool {
         false
+    }
+
+    fn debug_print(&self, m: &mut SeqFile, prefix: &str, _tprefix: &str) -> Result<()> {
+        seq_print!(
+            m,
+            "{}transaction error: {}\n",
+            prefix,
+            self.error_code.load(Ordering::Relaxed)
+        );
+        Ok(())
     }
 }
 

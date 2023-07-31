@@ -56,11 +56,14 @@ pub(crate) struct Allocation {
     allocation_info: Option<AllocationInfo>,
     free_on_drop: bool,
     pub(crate) oneway_spam_detected: bool,
+    #[allow(dead_code)]
+    pub(crate) debug_id: usize,
 }
 
 impl Allocation {
     pub(crate) fn new(
         process: Arc<Process>,
+        debug_id: usize,
         offset: usize,
         size: usize,
         ptr: usize,
@@ -71,6 +74,7 @@ impl Allocation {
             offset,
             size,
             ptr,
+            debug_id,
             oneway_spam_detected,
             allocation_info: None,
             free_on_drop: true,

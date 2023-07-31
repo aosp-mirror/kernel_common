@@ -10,6 +10,8 @@ use kernel::{
     fs::File,
     list::{HasListLinks, ListArc, ListArcSafe, ListLinksSelfPtr, TryNewListArc},
     prelude::*,
+    seq_file::SeqFile,
+    seq_print,
     sync::poll::PollTable,
     sync::Arc,
     types::{AsBytes, ForeignOwnable},
@@ -18,7 +20,7 @@ use kernel::{
 
 use crate::{context::Context, page_range::Shrinker, process::Process, thread::Thread};
 
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 mod allocation;
 mod context;
@@ -40,6 +42,12 @@ module! {
     author: "Wedson Almeida Filho, Alice Ryhl",
     description: "Android Binder",
     license: "GPL",
+}
+
+fn next_debug_id() -> usize {
+    static NEXT_DEBUG_ID: AtomicUsize = AtomicUsize::new(0);
+
+    NEXT_DEBUG_ID.fetch_add(1, Ordering::Relaxed)
 }
 
 /// Provides a single place to write Binder return values via the
@@ -94,6 +102,8 @@ trait DeliverToRead: ListArcSafe + Send + Sync {
     ///
     /// Generally only set to true for non-oneway transactions.
     fn should_sync_wakeup(&self) -> bool;
+
+    fn debug_print(&self, m: &mut SeqFile, prefix: &str, transaction_prefix: &str) -> Result<()>;
 }
 
 // Wrapper around a `DeliverToRead` with linked list links.
@@ -203,6 +213,19 @@ impl DeliverToRead for DeliverCode {
 
     fn should_sync_wakeup(&self) -> bool {
         false
+    }
+
+    fn debug_print(&self, m: &mut SeqFile, prefix: &str, _tprefix: &str) -> Result<()> {
+        seq_print!(m, "{}", prefix);
+        if self.skip.load(Ordering::Relaxed) {
+            seq_print!(m, "(skipped) ");
+        }
+        if self.code == defs::BR_TRANSACTION_COMPLETE {
+            seq_print!(m, "transaction complete\n");
+        } else {
+            seq_print!(m, "transaction error: {}\n", self.code);
+        }
+        Ok(())
     }
 }
 
@@ -403,25 +426,43 @@ unsafe extern "C" fn rust_binder_flush(
 
 #[no_mangle]
 unsafe extern "C" fn rust_binder_stats_show(
-    _: *mut seq_file,
+    ptr: *mut seq_file,
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
+    // SAFETY: The caller ensures that the pointer is valid and exclusive for the duration in which
+    // this method is called.
+    let m = unsafe { SeqFile::from_raw(ptr) };
+    if let Err(err) = rust_binder_stats_show_impl(m) {
+        seq_print!(m, "failed to generate state: {:?}\n", err);
+    }
     0
 }
 
 #[no_mangle]
 unsafe extern "C" fn rust_binder_state_show(
-    _: *mut seq_file,
+    ptr: *mut seq_file,
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
+    // SAFETY: The caller ensures that the pointer is valid and exclusive for the duration in which
+    // this method is called.
+    let m = unsafe { SeqFile::from_raw(ptr) };
+    if let Err(err) = rust_binder_state_show_impl(m) {
+        seq_print!(m, "failed to generate state: {:?}\n", err);
+    }
     0
 }
 
 #[no_mangle]
 unsafe extern "C" fn rust_binder_transactions_show(
-    _: *mut seq_file,
+    ptr: *mut seq_file,
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
+    // SAFETY: The caller ensures that the pointer is valid and exclusive for the duration in which
+    // this method is called.
+    let m = unsafe { SeqFile::from_raw(ptr) };
+    if let Err(err) = rust_binder_transactions_show_impl(m) {
+        seq_print!(m, "failed to generate state: {:?}\n", err);
+    }
     0
 }
 
@@ -431,4 +472,42 @@ unsafe extern "C" fn rust_binder_transaction_log_show(
     _: *mut core::ffi::c_void,
 ) -> core::ffi::c_int {
     0
+}
+
+fn rust_binder_transactions_show_impl(m: &mut SeqFile) -> Result<()> {
+    seq_print!(m, "binder transactions:\n");
+    let contexts = context::get_all_contexts()?;
+    for ctx in contexts {
+        let procs = ctx.get_all_procs()?;
+        for proc in procs {
+            proc.debug_print(m, &ctx, false)?;
+            seq_print!(m, "\n");
+        }
+    }
+    Ok(())
+}
+
+fn rust_binder_stats_show_impl(m: &mut SeqFile) -> Result<()> {
+    seq_print!(m, "binder state:\n");
+    let contexts = context::get_all_contexts()?;
+    for ctx in contexts {
+        let procs = ctx.get_all_procs()?;
+        for proc in procs {
+            proc.debug_print_stats(m, &ctx)?;
+            seq_print!(m, "\n");
+        }
+    }
+    Ok(())
+}
+fn rust_binder_state_show_impl(m: &mut SeqFile) -> Result<()> {
+    seq_print!(m, "binder state:\n");
+    let contexts = context::get_all_contexts()?;
+    for ctx in contexts {
+        let procs = ctx.get_all_procs()?;
+        for proc in procs {
+            proc.debug_print(m, &ctx, true)?;
+            seq_print!(m, "\n");
+        }
+    }
+    Ok(())
 }

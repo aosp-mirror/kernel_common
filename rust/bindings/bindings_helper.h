@@ -27,6 +27,7 @@
 #include <linux/rust_binder.h>
 #include <linux/sched.h>
 #include <linux/security.h>
+#include <linux/seq_file.h>
 #include <linux/shrinker.h>
 #include <linux/slab.h>
 #include <linux/task_work.h>
