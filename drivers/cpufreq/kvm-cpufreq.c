@@ -198,6 +198,7 @@ static struct cpufreq_driver cpufreq_kvm_driver = {
 	.target_index	= kvm_cpufreq_target_index,
 	.fast_switch	= kvm_cpufreq_fast_switch,
 	.attr		= cpufreq_generic_attr,
+	.flags		= CPUFREQ_NEED_INITIAL_FREQ_CHECK,
 };
 
 static int kvm_cpufreq_driver_probe(struct platform_device *pdev)
