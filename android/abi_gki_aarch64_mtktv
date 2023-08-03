@@ -1,4 +1,40 @@
 [abi_symbol_list]
+  net_selftest
+  net_selftest_get_count
+  net_selftest_get_strings
+  of_cpufreq_cooling_register
+  path_put
+  perf_event_sysfs_show
+  phy_connect
+  phy_disconnect
+  phy_do_ioctl_running
+  phy_ethtool_get_link_ksettings
+  phy_ethtool_nway_reset
+  phy_ethtool_set_link_ksettings
+  phy_start
+  phy_stop
+  phy_suspend
+  pid_vnr
+  pinconf_generic_dump_config
+  pinctrl_count_index_with_args
+  pinctrl_generic_add_group
+  pinctrl_generic_get_group_count
+  pinctrl_generic_get_group_name
+  pinctrl_generic_get_group_pins
+  pinctrl_generic_remove_group
+  pinctrl_parse_index_with_args
+  pinctrl_register_and_init
+  pinmux_generic_add_function
+  pinmux_generic_get_function
+  pinmux_generic_get_function_count
+  pinmux_generic_get_function_groups
+  pinmux_generic_get_function_name
+  pinmux_generic_remove_function
+  proc_set_user
+  regulator_set_mode
+  regulator_set_voltage_time
+  sb_min_blocksize
+  schedule_hrtimeout
   pwm_free
   pwm_request
   serial8250_do_pm
