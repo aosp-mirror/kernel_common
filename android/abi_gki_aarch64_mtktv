@@ -1,4 +1,52 @@
 [abi_symbol_list]
+  __traceiter_android_vh_oom_check_panic
+  __tracepoint_android_vh_oom_check_panic
+  irqchip_fwnode_ops
+  system_freezable_power_efficient_wq
+  tracepoint_srcu
+  __devm_mdiobus_register
+  __insert_inode_hash
+  __mdiobus_register
+  __sock_recv_cmsgs
+  __trace_bputs
+  __traceiter_android_vh_oom_check_panic
+  _trace_android_vh_record_pcpu_rwsem_starttime
+  block_is_partially_uptodate
+  buffer_migrate_page
+  igrab
+  iio_read_channel_scale
+  invalidate_bh_lrus
+  io_schedule
+  jiffies64_to_nsecs
+  kern_path
+  kmsg_dump_register
+  kmsg_dump_unregister
+  kstrtoul_from_user
+  led_init_default_state_get
+  lzo1x_1_compress
+  lzo1x_decompress_safe
+  media_create_intf_link
+  media_create_pad_links
+  media_device_register_entity
+  media_device_register_entity_notify
+  media_device_unregister_entity
+  media_devnode_create
+  media_devnode_remove
+  media_entity_find_link
+  media_get_pad_index
+  mount_bdev
+  seq_list_next
+  seq_list_start
+  seq_open_private
+  sprint_symbol_no_offset
+  stack_trace_save_regs
+  store_sampling_rate
+  sysfs_merge_group
+  sysfs_unmerge_group
+  trace_array_destroy
+  trace_array_get_by_name
+  trace_array_init_printk
+  trace_array_printk
   clk_bulk_put_all
   clk_register_divider_table
   console_verbose
