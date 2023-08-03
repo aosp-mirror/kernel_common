@@ -1,4 +1,26 @@
 [abi_symbol_list]
+  pwm_free
+  pwm_request
+  serial8250_do_pm
+  serial8250_do_set_termios
+  serial8250_do_shutdown
+  serial8250_do_startup
+  serial8250_get_port
+  serial8250_modem_status
+  serial8250_register_8250_port
+  serial8250_resume_port
+  serial8250_rpm_get
+  serial8250_rpm_put
+  serial8250_rpm_put_tx
+  serial8250_rx_chars
+  serial8250_suspend_port
+  serial8250_tx_chars
+  serial8250_unregister_port
+  sk_capable
+  snd_compress_new
+  snd_ctl_find_id
+  snd_pcm_format_big_endian
+  snd_pcm_format_name
   usb_altnum_to_altsetting
   usb_anchor_empty
   usb_control_msg_recv
