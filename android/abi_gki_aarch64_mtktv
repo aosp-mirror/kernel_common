@@ -1,4 +1,36 @@
 [abi_symbol_list]
+  clk_bulk_put_all
+  clk_register_divider_table
+  console_verbose
+  cpufreq_dbs_governor_exit
+  cpufreq_dbs_governor_init
+  cpufreq_dbs_governor_limits
+  cpufreq_dbs_governor_start
+  cpufreq_dbs_governor_stop
+  cpufreq_update_policy
+  d_add_ci
+  dbs_update
+  dev_get_tstats64
+  device_match_of_node
+  device_node_to_regmap
+  devm_devfreq_remove_device
+  devm_extcon_register_notifier
+  devm_gpiod_get_index_optional
+  devm_hwspin_lock_unregister
+  devm_mdiobus_alloc_size
+  drm_atomic_state_default_clear
+  drm_display_mode_from_videomode
+  end_page_writeback
+  eth_platform_get_mac_address
+  ftrace_dump
+  gen_pool_dma_alloc
+  gen_pool_get
+  generic_error_remove_page
+  gov_update_cpu_data
+  gpiochip_find
+  gpiod_is_active_low
+  idr_alloc_u32
+  idr_get_next_ul
   net_selftest
   net_selftest_get_count
   net_selftest_get_strings
