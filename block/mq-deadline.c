@@ -355,8 +355,7 @@ deadline_fifo_request(struct deadline_data *dd, struct dd_per_prio *per_prio,
 		return NULL;
 
 	rq = rq_entry_fifo(per_prio->fifo_list[data_dir].next);
-	if (data_dir == DD_READ || !blk_queue_is_zoned(rq->q) ||
-	    blk_queue_pipeline_zoned_writes(rq->q))
+	if (data_dir == DD_READ || !blk_queue_is_zoned(rq->q))
 		return rq;
 
 	/*
@@ -401,8 +400,7 @@ deadline_next_request(struct deadline_data *dd, struct dd_per_prio *per_prio,
 	if (!rq)
 		return NULL;
 
-	if (data_dir == DD_READ || !blk_queue_is_zoned(rq->q) ||
-	    blk_queue_pipeline_zoned_writes(rq->q))
+	if (data_dir == DD_READ || !blk_queue_is_zoned(rq->q))
 		return rq;
 
 	/*
@@ -530,9 +528,8 @@ dispatch_find_request:
 	}
 
 	/*
-	 * For a zoned block device that requires write serialization, if we
-	 * only have writes queued and none of them can be dispatched, rq will
-	 * be NULL.
+	 * For a zoned block device, if we only have writes queued and none of
+	 * them can be dispatched, rq will be NULL.
 	 */
 	if (!rq)
 		return NULL;
@@ -934,8 +931,7 @@ static void dd_finish_request(struct request *rq)
 
 	atomic_inc(&per_prio->stats.completed);
 
-	if (blk_queue_is_zoned(rq->q) &&
-	    !blk_queue_pipeline_zoned_writes(q)) {
+	if (blk_queue_is_zoned(q)) {
 		unsigned long flags;
 
 		spin_lock_irqsave(&dd->zone_lock, flags);
