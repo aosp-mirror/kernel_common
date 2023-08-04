@@ -532,6 +532,7 @@ inline int vma_expand(struct ma_state *mas, struct vm_area_struct *vma,
 	bool remove_next = false;
 	struct vm_area_struct *anon_dup = NULL;
 
+	vma_start_write(vma);
 	if (next && (vma != next) && (end == next->vm_end)) {
 		remove_next = true;
 		/* Lock the VMA  before removing it */
@@ -540,7 +541,6 @@ inline int vma_expand(struct ma_state *mas, struct vm_area_struct *vma,
 			int error;
 
 			anon_vma = next->anon_vma;
-			vma_start_write(vma);
 			vma->anon_vma = anon_vma;
 			error = anon_vma_clone(vma, next);
 			if (error)
@@ -559,7 +559,6 @@ inline int vma_expand(struct ma_state *mas, struct vm_area_struct *vma,
 	if (mas_preallocate(mas, vma, GFP_KERNEL))
 		goto nomem;
 
-	vma_start_write(vma);
 	vma_adjust_trans_huge(vma, start, end, 0);
 
 	if (file) {
@@ -2430,6 +2429,9 @@ int __split_vma(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	if (new->vm_ops && new->vm_ops->open)
 		new->vm_ops->open(new);
+
+	vma_start_write(vma);
+	vma_start_write(new);
 
 	if (new_below)
 		err = vma_adjust(vma, addr, vma->vm_end, vma->vm_pgoff +
