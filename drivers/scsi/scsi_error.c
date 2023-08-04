@@ -675,11 +675,8 @@ enum scsi_disposition scsi_check_sense(struct scsi_cmnd *scmd)
 		 * Unaligned write command. This indicates that zoned writes got
 		 * reordered. Retry after all pending commands have completed.
 		 */
-		if (sshdr.asc == 0x21 && sshdr.ascq == 0x04) {
-			return scsi_cmd_retry_allowed(scmd) &&
-				!scsi_noretry_cmd(scmd) ? NEEDS_DELAYED_RETRY :
-				SUCCESS;
-		}
+		if (sshdr.asc == 0x21 && sshdr.ascq == 0x04)
+			return NEEDS_DELAYED_RETRY;
 		if (sshdr.asc == 0x20 || /* Invalid command operation code */
 		    sshdr.asc == 0x21 || /* Logical block address out of range */
 		    sshdr.asc == 0x22 || /* Invalid function */
