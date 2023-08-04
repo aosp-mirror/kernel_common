@@ -122,6 +122,8 @@
  */
 #define EQ_DEPTH_COEFF				2
 
+#define CQ_BANKID_MASK GENMASK(1, 0)
+
 enum {
 	SERV_TYPE_RC,
 	SERV_TYPE_UC,
