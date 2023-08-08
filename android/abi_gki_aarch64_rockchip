@@ -1632,6 +1632,7 @@
   clk_hw_register_composite
   clk_hw_round_rate
   clk_hw_set_parent
+  clk_hw_unregister_composite
   clk_mux_ops
   clk_mux_ro_ops
   clk_register_divider_table
