@@ -39,3 +39,7 @@
 # required by vh_sched.ko
   __traceiter_android_vh_map_util_freq
   __tracepoint_android_vh_map_util_freq
+
+# required by asr_drm.ko
+  clk_set_rate_exclusive
+  clk_rate_exclusive_put
