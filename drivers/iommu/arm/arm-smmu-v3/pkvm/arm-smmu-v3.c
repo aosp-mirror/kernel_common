@@ -49,6 +49,7 @@ struct hyp_arm_smmu_v3_device *kvm_hyp_arm_smmu_v3_smmus;
 struct hyp_arm_smmu_v3_domain {
 	struct kvm_hyp_iommu_domain     *domain;
 	struct kvm_hyp_iommu            *iommu;
+	u32				type;
 };
 
 #define for_each_smmu(smmu) \
@@ -708,7 +709,7 @@ out_unlock:
 	return ret;
 }
 
-int smmu_alloc_domain(struct kvm_hyp_iommu_domain *domain)
+int smmu_alloc_domain(struct kvm_hyp_iommu_domain *domain, u32 type)
 {
 	struct hyp_arm_smmu_v3_domain *smmu_domain;
 
@@ -718,6 +719,8 @@ int smmu_alloc_domain(struct kvm_hyp_iommu_domain *domain)
 
 	/* Can't do much without the IOMMU. */
 	smmu_domain->domain = domain;
+	smmu_domain->type = type;
+
 	domain->priv = (void *)smmu_domain;
 
 	return 0;
