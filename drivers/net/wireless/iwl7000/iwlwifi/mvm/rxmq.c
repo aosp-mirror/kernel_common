@@ -6,6 +6,9 @@
  */
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#ifdef CONFIG_HSR
+#include <linux/hsr_main.h>
+#endif
 #include "iwl-trans.h"
 #include "mvm.h"
 #include "fw-api.h"
@@ -127,6 +130,19 @@ static int iwl_mvm_create_skb(struct iwl_mvm *mvm, struct sk_buff *skb,
 	 */
 	headlen = (len <= skb_tailroom(skb)) ? len :
 					       hdrlen + crypt_len + 8;
+
+#ifdef CONFIG_HSR
+	/* When the packet has the PRP/HSR header, pull in the extra bytes so
+	 * the skb header will include also the SNAP header.
+	 */
+	if (headlen + HSR_HLEN < len) {
+		__be16 *proto = (void *)((u8 *)hdr + hdrlen + crypt_len + 6 +
+					 pad_len);
+
+		if (*proto == htons(ETH_P_HSR) || *proto == htons(ETH_P_PRP))
+			headlen += HSR_HLEN;
+	}
+#endif
 
 	/* The firmware may align the packet to DWORD.
 	 * The padding is inserted after the IV.
