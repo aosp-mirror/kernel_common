@@ -611,6 +611,7 @@
   drm_bridge_remove
   drm_compat_ioctl
   drm_connector_attach_encoder
+  drm_connector_attach_max_bpc_property
   drm_connector_cleanup
   drm_connector_init
   drm_connector_list_iter_begin
