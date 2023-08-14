@@ -76,9 +76,7 @@ Package-related topology information in the kernel:
     The maximum possible number of packages in the system. Helpful for per
     package facilities to preallocate per package information.
 
-  - cpu_llc_id:
-
-    A per-CPU variable containing:
+  - cpuinfo_x86.topo.llc_id:
 
       - On Intel, the first APIC ID of the list of CPUs sharing the Last Level
         Cache
