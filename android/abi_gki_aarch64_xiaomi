@@ -311,3 +311,7 @@
   __traceiter_android_rvh_before_do_sched_yield
   __tracepoint_android_rvh_before_do_sched_yield
 
+#required by lock_optimization module
+  __traceiter_android_vh_record_pcpu_rwsem_time_early
+  __tracepoint_android_vh_record_pcpu_rwsem_time_early
+
