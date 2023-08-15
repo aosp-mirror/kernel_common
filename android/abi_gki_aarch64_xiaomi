@@ -121,6 +121,12 @@
   ioc_lookup_icq
   bdi_dev_name
 
+#required by mq-deadline module
+  blk_mq_debugfs_rq_show
+  seq_list_start
+  seq_list_next
+  __blk_mq_debugfs_rq_show
+
 #required by cs35l41 module
   regmap_raw_write_async
   snd_soc_bytes_tlv_callback
