@@ -872,6 +872,7 @@
   get_random_bytes
   get_random_u32
   get_sg_io_hdr
+  __get_task_comm
   get_task_cred
   get_task_mm
   get_thermal_instance
@@ -2043,6 +2044,8 @@
   tcpm_sourcing_vbus
   tcpm_update_sink_capabilities
   tcpm_vbus_change
+  teo_cpu_get_util_threshold
+  teo_cpu_set_util_threshold
   thermal_cdev_update
   thermal_cooling_device_unregister
   thermal_of_cooling_device_register
