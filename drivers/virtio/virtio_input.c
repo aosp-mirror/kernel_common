@@ -9,6 +9,8 @@
 #include <uapi/linux/virtio_ids.h>
 #include <uapi/linux/virtio_input.h>
 
+#define RUMBLE_EFFECT_TYPE 0xFFFF
+
 struct virtio_input {
 	struct virtio_device       *vdev;
 	struct input_dev           *idev;
@@ -209,12 +211,70 @@ static void virtinput_fill_evt(struct virtio_input *vi)
 	spin_unlock_irqrestore(&vi->lock, flags);
 }
 
+static int virtinput_ff_upload(
+    struct input_dev *dev, struct ff_effect *effect, struct ff_effect *old) {
+  struct virtio_input *vi;
+  s32 value;
+  int ret;
+
+  if (effect->type == FF_RUMBLE) {
+    vi = input_get_drvdata(dev);
+    pr_debug("virtinput_ff_upload FF_RUMBLE strong: %d, weak: %d",
+             effect->u.rumble.strong_magnitude, effect->u.rumble.weak_magnitude);
+
+    value = effect->u.rumble.strong_magnitude << 16 | effect->u.rumble.weak_magnitude;
+    ret = virtinput_send_status(vi, RUMBLE_EFFECT_TYPE, effect->id, value);
+    if (ret != 0) {
+      dev_err(&dev->dev, "virtinput_ff_upload virtinput_send_status error: %d", ret);
+    }
+    return ret;
+  } else {
+    dev_warn(&dev->dev,
+             "virtinput_ff_upload did not receive effect type FF_RUMBLE. \
+             Instead received event type: %d",
+             effect->type);
+  }
+  return 0;
+}
+
+static int virtinput_ff_erase(struct input_dev *dev, int effect_id) {
+  dev_info(&dev->dev, "virtinput_ff_erase called with effect_id: %d", effect_id);
+  return 0;
+}
+
+static int virtinput_ff_playback(struct input_dev *dev, int effect_id, int value) {
+  struct virtio_input *vi;
+  int ret;
+  pr_debug("virtinput_ff_playback called with effect_id: %d, value: %d", effect_id, value);
+  vi = input_get_drvdata(dev);
+
+  ret = virtinput_send_status(vi, EV_FF, effect_id, value);
+  if (ret != 0) {
+    dev_info(&dev->dev, "virtinput_ff_playback virtinput_send_status error: %d", ret);
+  }
+  return ret;
+}
+
+static void virtinput_ff_set_gain(struct input_dev *dev, u16 gain) {
+  dev_info(&dev->dev, "virtinput_ff_set_gain called with gain: %d", gain);
+}
+
+static void virtinput_ff_set_autocenter(struct input_dev *dev, u16 magnitude) {
+  dev_info(&dev->dev, "virtinput_ff_set_autocenter called with magnitude: %d", magnitude);
+}
+
+static void virtinput_ff_destroy(struct ff_device *ff) {
+  printk(KERN_INFO "virtinput_ff_destroy called");
+}
+
 static int virtinput_probe(struct virtio_device *vdev)
 {
 	struct virtio_input *vi;
 	unsigned long flags;
 	size_t size;
 	int abs, err;
+        int error;
+        struct ff_device *ff;
 
 	if (!virtio_has_feature(vdev, VIRTIO_F_VERSION_1))
 		return -ENODEV;
@@ -292,6 +352,8 @@ static int virtinput_probe(struct virtio_device *vdev)
 			   vi->idev->ledbit, LED_CNT);
 	virtinput_cfg_bits(vi, VIRTIO_INPUT_CFG_EV_BITS, EV_SND,
 			   vi->idev->sndbit, SND_CNT);
+	virtinput_cfg_bits(vi, VIRTIO_INPUT_CFG_EV_BITS, EV_FF,
+			   vi->idev->ffbit, FF_CNT);
 
 	if (test_bit(EV_ABS, vi->idev->evbit)) {
 		for (abs = 0; abs < ABS_CNT; abs++) {
@@ -300,6 +362,25 @@ static int virtinput_probe(struct virtio_device *vdev)
 			virtinput_cfg_abs(vi, abs);
 		}
 	}
+
+        if (test_bit(FF_RUMBLE, vi->idev->ffbit)) {
+          dev_info(&vi->idev->dev, "Creating FF device for %s", vi->idev->name);
+          error = input_ff_create(vi->idev, FF_MAX_EFFECTS);
+
+          if (!error) {
+            ff = vi->idev->ff;
+
+            ff->upload = virtinput_ff_upload;
+            ff->erase = virtinput_ff_erase;
+            ff->playback = virtinput_ff_playback;
+            ff->set_gain = virtinput_ff_set_gain;
+            ff->set_autocenter = virtinput_ff_set_autocenter;
+            ff->destroy = virtinput_ff_destroy;
+          } else {
+            dev_err(&vi->idev->dev, "input_ff_create error: %d. Won't create ff device.", error);
+          }
+        }
+
 
 	virtio_device_ready(vdev);
 	vi->ready = true;
