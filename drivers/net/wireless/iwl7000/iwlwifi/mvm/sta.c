@@ -2547,7 +2547,7 @@ int iwl_mvm_add_mcast_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 
 	if (WARN_ON(vif->type != NL80211_IFTYPE_AP &&
 		    vif->type != NL80211_IFTYPE_ADHOC))
-		return -ENOTSUPP;
+		return -EOPNOTSUPP;
 
 	/*
 	 * In IBSS, ieee80211_check_queues() sets the cab_queue to be
@@ -3232,7 +3232,7 @@ int iwl_mvm_sta_tx_agg_oper(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		 * should be updated as well.
 		 */
 		if (buf_size < IWL_FRAME_LIMIT)
-			return -ENOTSUPP;
+			return -EOPNOTSUPP;
 
 		ret = iwl_mvm_sta_tx_agg(mvm, sta, tid, queue, true);
 		if (ret)

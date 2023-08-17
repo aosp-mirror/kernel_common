@@ -212,7 +212,7 @@ int iwl_drv_switch_op_mode(struct iwl_drv *drv, const char *new_op_name)
 	if (!iwl_drv_xvt_mode_supported(drv->fw.type, idx)) {
 		IWL_ERR(drv, "Op mode %s is not supported by the loaded fw\n",
 			new_op_name);
-		return -ENOTSUPP;
+		return -EOPNOTSUPP;
 	}
 
 	/* Recording new op mode state */
