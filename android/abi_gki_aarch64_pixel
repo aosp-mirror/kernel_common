@@ -534,6 +534,7 @@
   down_read_trylock
   down_trylock
   down_write
+  d_path
   drain_workqueue
   driver_create_file
   driver_register
@@ -2144,6 +2145,7 @@
   __traceiter_android_vh_pagecache_get_page
   __traceiter_android_vh_resume_end
   __traceiter_android_vh_rmqueue
+  __traceiter_android_vh_sched_setaffinity_early
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
   __traceiter_android_vh_si_meminfo
@@ -2270,6 +2272,7 @@
   __tracepoint_android_vh_pagecache_get_page
   __tracepoint_android_vh_resume_end
   __tracepoint_android_vh_rmqueue
+  __tracepoint_android_vh_sched_setaffinity_early
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
   __tracepoint_android_vh_si_meminfo
