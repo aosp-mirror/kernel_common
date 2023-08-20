@@ -2159,4 +2159,6 @@ static inline void backport_led_trigger_blink(struct led_trigger *trigger,
 static inline void cfg80211_schedule_channels_check(struct net_device *netdev)
 {
 }
+#define NL80211_EXT_FEATURE_DFS_CONCURRENT -1
+#define NL80211_RRF_DFS_CONCURRENT 0
 #endif
