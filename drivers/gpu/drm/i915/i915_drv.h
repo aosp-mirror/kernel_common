@@ -445,6 +445,8 @@ static inline struct intel_gt *to_gt(struct drm_i915_private *i915)
 	(MEDIA_VER(i915) >= (from) && MEDIA_VER(i915) <= (until))
 
 #define DISPLAY_VER(i915)	(DISPLAY_RUNTIME_INFO(i915)->ip.ver)
+#define DISPLAY_VER_FULL(i915)	IP_VER(DISPLAY_RUNTIME_INFO(i915)->ip.ver, \
+				       DISPLAY_RUNTIME_INFO(i915)->ip.rel)
 #define IS_DISPLAY_VER(i915, from, until) \
 	(DISPLAY_VER(i915) >= (from) && DISPLAY_VER(i915) <= (until))
 
@@ -662,13 +664,32 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 #define IS_XEHPSDV_GRAPHICS_STEP(__i915, since, until) \
 	(IS_XEHPSDV(__i915) && IS_GRAPHICS_STEP(__i915, since, until))
 
-#define IS_MTL_DISPLAY_STEP(__i915, since, until) \
-	(IS_METEORLAKE(__i915) && \
-	 IS_DISPLAY_STEP(__i915, since, until))
+#define IS_MTL_GRAPHICS_STEP(__i915, variant, since, until) \
+	(IS_SUBPLATFORM(__i915, INTEL_METEORLAKE, INTEL_SUBPLATFORM_##variant) && \
+	 IS_GRAPHICS_STEP(__i915, since, until))
 
-#define IS_DG2_DISPLAY_STEP(__i915, since, until) \
-	(IS_DG2(__i915) && \
-	 IS_DISPLAY_STEP(__i915, since, until))
+#define IS_MTL_MEDIA_STEP(__i915, since, until) \
+	(IS_METEORLAKE(__i915) && \
+	 IS_MEDIA_STEP(__i915, since, until))
+
+/*
+ * DG2 hardware steppings are a bit unusual.  The hardware design was forked to
+ * create three variants (G10, G11, and G12) which each have distinct
+ * workaround sets.  The G11 and G12 forks of the DG2 design reset the GT
+ * stepping back to "A0" for their first iterations, even though they're more
+ * similar to a G10 B0 stepping and G10 C0 stepping respectively in terms of
+ * functionality and workarounds.  However the display stepping does not reset
+ * in the same manner --- a specific stepping like "B0" has a consistent
+ * meaning regardless of whether it belongs to a G10, G11, or G12 DG2.
+ *
+ * TLDR:  All GT workarounds and stepping-specific logic must be applied in
+ * relation to a specific subplatform (G10/G11/G12), whereas display workarounds
+ * and stepping-specific logic will be applied with a general DG2-wide stepping
+ * number.
+ */
+#define IS_DG2_GRAPHICS_STEP(__i915, variant, since, until) \
+	(IS_SUBPLATFORM(__i915, INTEL_DG2, INTEL_SUBPLATFORM_##variant) && \
+	 IS_GRAPHICS_STEP(__i915, since, until))
 
 #define IS_PVC_BD_STEP(__i915, since, until) \
 	(IS_PONTEVECCHIO(__i915) && \
