@@ -1,5 +1,6 @@
 [abi_symbol_list]
 # commonly used symbols
+  add_wait_queue
   alloc_etherdev_mqs
   alloc_netdev_mqs
   __alloc_pages
@@ -11,13 +12,16 @@
   __arch_copy_from_user
   __arch_copy_to_user
   arm64_use_ng_mappings
+  autoremove_wake_function
   bcmp
   bpf_trace_run1
+  bpf_trace_run10
   bpf_trace_run2
   bpf_trace_run3
   bpf_trace_run4
   bpf_trace_run5
   bpf_trace_run6
+  bpf_trace_run8
   bt_err
   bt_info
   bt_warn
@@ -37,6 +41,8 @@
   complete
   __const_udelay
   consume_skb
+  _copy_from_iter
+  _copy_to_iter
   cpu_hwcaps
   cpu_number
   __cpu_online_mask
@@ -93,6 +99,7 @@
   dma_sync_single_for_device
   dma_unmap_sg_attrs
   do_trace_netlink_extack
+  down_write
   drm_add_modes_noedid
   drm_atomic_get_crtc_state
   drm_atomic_helper_check
@@ -155,6 +162,7 @@
   ethtool_op_get_ts_info
   eth_type_trans
   eth_validate_addr
+  eventfd_signal
   fd_install
   _find_first_bit
   finish_wait
@@ -210,6 +218,8 @@
   input_unregister_device
   ioremap_prot
   iounmap
+  iov_iter_init
+  iov_iter_revert
   irq_set_irq_wake
   is_vmalloc_addr
   jiffies
@@ -221,6 +231,7 @@
   kimage_voffset
   __kmalloc
   kmalloc_caches
+  kmalloc_large
   kmalloc_trace
   kmemdup
   kstrndup
@@ -238,6 +249,7 @@
   __list_add_valid
   __list_del_entry_valid
   __local_bh_enable_ip
+  lock_sock_nested
   log_post_read_mmio
   log_post_write_mmio
   log_read_mmio
@@ -250,7 +262,9 @@
   misc_register
   mod_delayed_work_on
   mod_timer
+  __module_get
   module_layout
+  module_put
   __msecs_to_jiffies
   msleep
   __mutex_init
@@ -320,6 +334,7 @@
   pci_unregister_driver
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
+  pin_user_pages_fast
   platform_device_add
   platform_device_add_data
   platform_device_alloc
@@ -334,6 +349,7 @@
   pm_wakeup_dev_event
   preempt_schedule
   preempt_schedule_notrace
+  prepare_to_wait
   prepare_to_wait_event
   _printk
   __pskb_pull_tail
@@ -364,7 +380,9 @@
   __regmap_init
   regmap_write
   release_firmware
+  release_sock
   remap_pfn_range
+  remove_wait_queue
   request_firmware
   request_threaded_irq
   rhashtable_insert_slow
@@ -417,6 +435,8 @@
   skb_queue_tail
   skb_to_sgvec
   skb_trim
+  sk_error_report
+  sk_free
   snprintf
   sprintf
   sscanf
@@ -451,6 +471,7 @@
   trace_handle_return
   trace_raw_output_prep
   __trace_trigger_soft_disabled
+  unpin_user_pages_dirty_lock
   unregister_netdev
   unregister_netdevice_many
   unregister_netdevice_notifier
@@ -458,6 +479,7 @@
   unregister_pernet_device
   unregister_virtio_device
   unregister_virtio_driver
+  up_write
   usb_add_hcd
   usb_alloc_urb
   usb_anchor_urb
@@ -513,9 +535,12 @@
   vring_del_virtqueue
   vring_interrupt
   vring_transport_features
+  wait_for_completion
+  wait_woken
   __wake_up
   wake_up_process
   __warn_printk
+  woken_wake_function
 
 # required by ambakmi.ko
   amba_release_regions
@@ -611,9 +636,7 @@
   usb_set_interface
 
 # required by cfg80211.ko
-  bpf_trace_run10
   bpf_trace_run7
-  bpf_trace_run8
   __class_register
   class_unregister
   _ctype
@@ -713,10 +736,6 @@
   power_supply_register
   power_supply_unregister
 
-# required by goldfish_pipe.ko
-  pin_user_pages_fast
-  unpin_user_pages_dirty_lock
-
 # required by goldfish_sync.ko
   dma_fence_default_wait
   dma_fence_free
@@ -747,10 +766,8 @@
   usb_control_msg_send
 
 # required by hci_vhci.ko
-  _copy_from_iter
   hci_resume_dev
   hci_suspend_dev
-  iov_iter_revert
 
 # required by mac80211.ko
   __alloc_percpu_gfp
@@ -790,7 +807,6 @@
   kernel_param_lock
   kernel_param_unlock
   kfree_skb_list_reason
-  kmalloc_large
   ktime_get_seconds
   netdev_set_default_ethtool_ops
   netif_receive_skb
@@ -1026,9 +1042,30 @@
   strchr
   usb_speed_string
 
+# required by vhost.ko
+  cgroup_attach_task_all
+  eventfd_ctx_fdget
+  eventfd_ctx_put
+  eventfd_fget
+  get_task_mm
+  iov_iter_advance
+  kthread_unuse_mm
+  kthread_use_mm
+  llist_add_batch
+  llist_reverse_order
+  __mmdrop
+  mmput
+  param_ops_ushort
+
+# required by vhost_iotlb.ko
+  __rb_erase_color
+  __rb_insert_augmented
+  rb_next
+
+# required by vhost_vsock.ko
+  compat_ptr_ioctl
+
 # required by virt_wifi.ko
-  __module_get
-  module_put
   netdev_upper_dev_link
   netif_stacked_transfer_operstate
   rtnl_link_register
@@ -1218,7 +1255,6 @@
   __splice_from_pipe
   unlock_page
   __unregister_chrdev
-  wait_for_completion
 
 # required by virtio_mmio.ko
   device_for_each_child
@@ -1326,6 +1362,34 @@
   snd_pcm_set_ops
   wait_for_completion_interruptible_timeout
 
+# required by virtiofs.ko
+  deactivate_locked_super
+  flush_dcache_page
+  fs_param_is_enum
+  __fs_parse
+  fuse_conn_destroy
+  fuse_conn_init
+  fuse_dequeue_forget
+  fuse_dev_alloc
+  fuse_dev_free
+  fuse_dev_install
+  fuse_fill_super_common
+  fuse_free_conn
+  fuse_get_unique
+  fuse_init_fs_context_submount
+  fuse_len_args
+  fuse_mount_destroy
+  fuse_mount_remove
+  fuse_request_end
+  fuse_send_init
+  kill_anon_super
+  lockref_get
+  memchr
+  register_filesystem
+  set_anon_super_fc
+  sget_fc
+  unregister_filesystem
+
 # required by vkms.ko
   __devm_drm_dev_alloc
   devres_open_group
@@ -1362,8 +1426,79 @@
   drm_writeback_queue_job
   drm_writeback_signal_completion
 
-# required by vmw_vsock_virtio_transport.ko
-  sk_error_report
+# required by vmw_vsock_virtio_transport_common.ko
+  trace_print_symbols_seq
+
+# required by vsock.ko
+  capable
+  __copy_overflow
+  get_random_u32
+  init_user_ns
+  ns_capable_noaudit
+  proto_register
+  proto_unregister
+  __put_cred
+  _raw_write_lock_bh
+  _raw_write_unlock_bh
+  security_sk_clone
+  security_sock_graft
+  sk_alloc
+  sock_copy_user_timeval
+  sock_get_timeout
+  sock_init_data
+  sock_no_accept
+  sock_no_ioctl
+  sock_no_listen
+  sock_no_mmap
+  sock_no_sendpage
+  sock_no_socketpair
+  sock_queue_rcv_skb_reason
+  sock_register
+  sock_unregister
+  try_module_get
+
+# preserved by --additions-only
+  __alloc_percpu
+  bdev_end_io_acct
+  bdev_start_io_acct
+  bio_endio
+  bio_end_io_acct_remapped
+  bio_start_io_acct
+  __blk_alloc_disk
+  blk_queue_flag_clear
+  blk_queue_flag_set
+  can_bus_off
+  can_change_state
+  contig_page_data
+  crypto_alloc_base
+  crypto_comp_compress
+  crypto_comp_decompress
+  crypto_has_alg
+  dec_zone_page_state
+  down_read
+  folio_wait_bit
+  hex_asc_upper
+  hex_to_bin
+  inc_zone_page_state
+  __init_rwsem
+  kstrdup
+  kstrtou16
+  kstrtoull
+  memset64
+  mutex_is_locked
+  page_endio
+  _raw_read_lock
+  _raw_read_unlock
+  _raw_write_lock
+  _raw_write_unlock
+  set_capacity
+  sock_efree
+  sync_blockdev
+  sysfs_streq
+  tty_mode_ioctl
+  tty_register_ldisc
+  tty_unregister_ldisc
+  up_read
   virtio_transport_connect
   virtio_transport_deliver_tap_pkt
   virtio_transport_destruct
@@ -1400,51 +1535,4 @@
   vsock_core_register
   vsock_core_unregister
   vsock_for_each_connected_socket
-
-# preserved by --additions-only
-  __alloc_percpu
-  bdev_end_io_acct
-  bdev_start_io_acct
-  bio_endio
-  bio_end_io_acct_remapped
-  bio_start_io_acct
-  __blk_alloc_disk
-  blk_queue_flag_clear
-  blk_queue_flag_set
-  can_bus_off
-  can_change_state
-  capable
-  contig_page_data
-  crypto_alloc_base
-  crypto_comp_compress
-  crypto_comp_decompress
-  crypto_has_alg
-  dec_zone_page_state
-  down_read
-  down_write
-  flush_dcache_page
-  folio_wait_bit
-  hex_asc_upper
-  hex_to_bin
-  inc_zone_page_state
-  __init_rwsem
-  kstrdup
-  kstrtou16
-  kstrtoull
-  memset64
-  mutex_is_locked
-  page_endio
-  _raw_read_lock
-  _raw_read_unlock
-  _raw_write_lock
-  _raw_write_unlock
-  set_capacity
-  sock_efree
-  sync_blockdev
-  sysfs_streq
-  tty_mode_ioctl
-  tty_register_ldisc
-  tty_unregister_ldisc
-  up_read
-  up_write
   vzalloc
