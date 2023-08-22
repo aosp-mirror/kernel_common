@@ -2208,6 +2208,7 @@
   __traceiter_sched_switch
   __traceiter_sched_util_est_cfs_tp
   __traceiter_sched_util_est_se_tp
+  __traceiter_sched_wakeup
   __traceiter_softirq_entry
   __traceiter_softirq_exit
   __traceiter_suspend_resume
@@ -2343,6 +2344,7 @@
   __tracepoint_sched_switch
   __tracepoint_sched_util_est_cfs_tp
   __tracepoint_sched_util_est_se_tp
+  __tracepoint_sched_wakeup
   __tracepoint_softirq_entry
   __tracepoint_softirq_exit
   __tracepoint_suspend_resume
