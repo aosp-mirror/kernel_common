@@ -785,6 +785,16 @@
   soc_device_register
   soc_device_unregister
 
+# required by rtk_cma_accelerator.ko
+  __traceiter_android_vh_calc_alloc_flags
+  __traceiter_android_vh_cma_alloc_busy_info
+  __traceiter_android_vh_cma_alloc_finish
+  __traceiter_android_vh_cma_alloc_start
+  __tracepoint_android_vh_calc_alloc_flags
+  __tracepoint_android_vh_cma_alloc_busy_info
+  __tracepoint_android_vh_cma_alloc_finish
+  __tracepoint_android_vh_cma_alloc_start
+
 # required by rtk_cpu_volt_sel.ko
   bus_register_notifier
   dev_pm_opp_put_prop_name
