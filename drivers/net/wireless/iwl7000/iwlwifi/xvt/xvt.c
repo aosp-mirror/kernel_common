@@ -354,7 +354,7 @@ static void iwl_xvt_stop(struct iwl_op_mode *op_mode)
 
 static void iwl_xvt_reclaim_and_free(struct iwl_xvt *xvt,
 				     struct tx_meta_data *tx_data,
-				     u16 txq_id, u16 ssn)
+				     u16 txq_id, u16 ssn, bool is_flush)
 {
 	struct sk_buff_head skbs;
 	struct sk_buff *skb;
@@ -362,7 +362,7 @@ static void iwl_xvt_reclaim_and_free(struct iwl_xvt *xvt,
 
 	__skb_queue_head_init(&skbs);
 
-	iwl_trans_reclaim(xvt->trans, txq_id, ssn, &skbs);
+	iwl_trans_reclaim(xvt->trans, txq_id, ssn, &skbs, is_flush);
 
 	while (!skb_queue_empty(&skbs)) {
 		skb = __skb_dequeue(&skbs);
@@ -459,7 +459,8 @@ static void iwl_xvt_txpath_flush(struct iwl_xvt *xvt,
 			if (!tx_data)
 				continue;
 
-			iwl_xvt_reclaim_and_free(xvt, tx_data, queue_num, read_after);
+			iwl_xvt_reclaim_and_free(xvt, tx_data, queue_num,
+						 read_after, true);
 		}
 	}
 }
@@ -482,7 +483,7 @@ static void iwl_xvt_rx_tx_cmd_single(struct iwl_xvt *xvt,
 	if (unlikely(status != TX_STATUS_SUCCESS))
 		IWL_WARN(xvt, "got error TX_RSP status %#x\n", status);
 
-	iwl_xvt_reclaim_and_free(xvt, tx_data, txq_id, ssn);
+	iwl_xvt_reclaim_and_free(xvt, tx_data, txq_id, ssn, false);
 }
 
 static void iwl_xvt_rx_tx_cmd_handler(struct iwl_xvt *xvt,
@@ -519,7 +520,7 @@ static void iwl_xvt_rx_ba_notif(struct iwl_xvt *xvt,
 		if (!tx_data)
 			return;
 
-		iwl_xvt_reclaim_and_free(xvt, tx_data, queue, tfd_idx);
+		iwl_xvt_reclaim_and_free(xvt, tx_data, queue, tfd_idx, false);
 out:
 		IWL_DEBUG_TX_REPLY(xvt,
 				   "BA_NOTIFICATION Received from sta_id = %d, flags %x, sent:%d, acked:%d\n",
@@ -537,7 +538,7 @@ out:
 	if (!tx_data)
 		return;
 
-	iwl_xvt_reclaim_and_free(xvt, tx_data, scd_flow, scd_ssn);
+	iwl_xvt_reclaim_and_free(xvt, tx_data, scd_flow, scd_ssn, false);
 
 	IWL_DEBUG_TX_REPLY(xvt, "ba_notif from %pM, sta_id = %d\n",
 			   ba_notif->sta_addr, ba_notif->sta_id);
