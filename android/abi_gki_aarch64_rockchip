@@ -2208,6 +2208,10 @@
   remove_proc_subtree
   pci_choose_state
 
+# required by wlan_mt7902_usb.ko
+  cfg80211_cqm_txe_notify
+  ieee80211_operating_class_to_band
+
 # required by reboot-mode.ko
   devres_release
   kernel_kobj
