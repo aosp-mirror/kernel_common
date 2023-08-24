@@ -59,7 +59,10 @@ void blk_execute_rq_nowait(struct gendisk *bd_disk, struct request *rq,
 	 * don't check dying flag for MQ because the request won't
 	 * be reused after dying flag is set
 	 */
-	blk_mq_sched_insert_request(rq, at_head, true, false);
+	blk_mq_sched_insert_request(rq, at_head, true,
+				    rq->mq_hctx->flags & BLK_MQ_F_BLOCKING &&
+				    rq->cmd_flags & REQ_NOWAIT);
+
 }
 EXPORT_SYMBOL_GPL(blk_execute_rq_nowait);
 

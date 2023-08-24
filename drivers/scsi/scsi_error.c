@@ -27,6 +27,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/jiffies.h>
+#include <linux/list_sort.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -672,14 +673,15 @@ enum scsi_disposition scsi_check_sense(struct scsi_cmnd *scmd)
 
 	case ILLEGAL_REQUEST:
 		/*
-		 * Unaligned write command. This indicates that zoned writes got
-		 * reordered. Retry after all pending commands have completed.
+		 * Unaligned write command. This may indicate that zoned writes
+		 * have been received by the device in the wrong order. If zone
+		 * write locking is disabled, retry after all pending commands
+		 * have completed.
 		 */
-		if (sshdr.asc == 0x21 && sshdr.ascq == 0x04) {
-			return scsi_cmd_retry_allowed(scmd) &&
-				!scsi_noretry_cmd(scmd) ? NEEDS_DELAYED_RETRY :
-				SUCCESS;
-		}
+		if (sshdr.asc == 0x21 && sshdr.ascq == 0x04 &&
+		    blk_queue_no_zone_write_lock(scsi_cmd_to_rq(scmd)->q))
+			return NEEDS_DELAYED_RETRY;
+
 		if (sshdr.asc == 0x20 || /* Invalid command operation code */
 		    sshdr.asc == 0x21 || /* Logical block address out of range */
 		    sshdr.asc == 0x22 || /* Invalid function */
@@ -2138,6 +2140,25 @@ void scsi_eh_ready_devs(struct Scsi_Host *shost,
 }
 EXPORT_SYMBOL_GPL(scsi_eh_ready_devs);
 
+/*
+ * Returns a negative value if @_a has a lower starting sector than @_b, zero if
+ * both have the same starting sector and a positive value otherwise.
+ */
+static int scsi_cmp_sector(void *priv, const struct list_head *_a,
+			   const struct list_head *_b)
+{
+	struct scsi_cmnd *a = list_entry(_a, typeof(*a), eh_entry);
+	struct scsi_cmnd *b = list_entry(_b, typeof(*b), eh_entry);
+	const sector_t pos_a = blk_rq_pos(scsi_cmd_to_rq(a));
+	const sector_t pos_b = blk_rq_pos(scsi_cmd_to_rq(b));
+
+	if (pos_a < pos_b)
+		return -1;
+	if (pos_a > pos_b)
+		return 1;
+	return 0;
+}
+
 /**
  * scsi_eh_flush_done_q - finish processed commands or retry them.
  * @done_q:	list_head of processed commands.
@@ -2145,6 +2166,13 @@ EXPORT_SYMBOL_GPL(scsi_eh_ready_devs);
 void scsi_eh_flush_done_q(struct list_head *done_q)
 {
 	struct scsi_cmnd *scmd, *next;
+
+	/*
+	 * Sort pending SCSI commands in starting sector order. This is
+	 * important if one of the SCSI devices associated with @shost is a
+	 * zoned block device for which zone write locking is disabled.
+	 */
+	list_sort(NULL, done_q, scsi_cmp_sector);
 
 	list_for_each_entry_safe(scmd, next, done_q, eh_entry) {
 		list_del_init(&scmd->eh_entry);

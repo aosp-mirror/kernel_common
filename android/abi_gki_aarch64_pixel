@@ -226,6 +226,8 @@
   cpuhp_tasks_frozen
   cpu_hwcap_keys
   cpu_hwcaps
+  cpuidle_driver_state_disabled
+  cpuidle_get_driver
   cpu_latency_qos_add_request
   cpu_latency_qos_remove_request
   cpu_latency_qos_update_request
@@ -534,6 +536,7 @@
   down_read_trylock
   down_trylock
   down_write
+  d_path
   drain_workqueue
   driver_create_file
   driver_register
@@ -543,6 +546,8 @@
   drm_add_modes_noedid
   drm_atomic_add_affected_connectors
   drm_atomic_add_affected_planes
+  drm_atomic_bridge_chain_disable
+  drm_atomic_bridge_chain_post_disable
   drm_atomic_commit
   drm_atomic_get_connector_state
   drm_atomic_get_crtc_state
@@ -553,6 +558,7 @@
   drm_atomic_helper_bridge_destroy_state
   drm_atomic_helper_bridge_duplicate_state
   drm_atomic_helper_bridge_reset
+  drm_atomic_helper_calc_timestamping_constants
   drm_atomic_helper_check_modeset
   drm_atomic_helper_check_planes
   drm_atomic_helper_check_plane_state
@@ -584,6 +590,7 @@
   drm_atomic_helper_setup_commit
   drm_atomic_helper_shutdown
   drm_atomic_helper_swap_state
+  drm_atomic_helper_update_legacy_modeset_state
   drm_atomic_helper_update_plane
   drm_atomic_helper_wait_for_dependencies
   drm_atomic_helper_wait_for_fences
@@ -605,6 +612,7 @@
   drm_bridge_remove
   drm_compat_ioctl
   drm_connector_attach_encoder
+  drm_connector_attach_max_bpc_property
   drm_connector_cleanup
   drm_connector_init
   drm_connector_list_iter_begin
@@ -646,6 +654,7 @@
   drm_dp_read_sink_count
   drm_dsc_pps_payload_pack
   drm_edid_get_monitor_name
+  drm_edid_is_valid
   drm_edid_to_sad
   drm_encoder_cleanup
   drm_encoder_init
@@ -872,6 +881,7 @@
   get_random_bytes
   get_random_u32
   get_sg_io_hdr
+  __get_task_comm
   get_task_cred
   get_task_mm
   get_thermal_instance
@@ -1578,6 +1588,7 @@
   pskb_expand_head
   __pskb_pull_tail
   ___pskb_trim
+  push_cpu_stop
   __put_cred
   put_device
   put_iova_domain
@@ -1949,6 +1960,7 @@
   static_key_slow_dec
   static_key_slow_inc
   stop_machine
+  stop_one_cpu_nowait
   strcasecmp
   strcat
   strchr
@@ -2041,6 +2053,8 @@
   tcpm_sourcing_vbus
   tcpm_update_sink_capabilities
   tcpm_vbus_change
+  teo_cpu_get_util_threshold
+  teo_cpu_set_util_threshold
   thermal_cdev_update
   thermal_cooling_device_unregister
   thermal_of_cooling_device_register
@@ -2070,6 +2084,7 @@
   __traceiter_android_rvh_arm64_serror_panic
   __traceiter_android_rvh_attach_entity_load_avg
   __traceiter_android_rvh_audio_usb_offload_disconnect
+  __traceiter_android_rvh_can_migrate_task
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpu_cgroup_online
@@ -2087,6 +2102,7 @@
   __traceiter_android_rvh_enqueue_task_fair
   __traceiter_android_rvh_find_busiest_group
   __traceiter_android_rvh_find_energy_efficient_cpu
+  __traceiter_android_rvh_find_lowest_rq
   __traceiter_android_rvh_irqs_disable
   __traceiter_android_rvh_irqs_enable
   __traceiter_android_rvh_panic_unhandled
@@ -2125,6 +2141,7 @@
   __traceiter_android_vh_cma_alloc_start
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
+  __traceiter_android_vh_do_madvise_blk_plug
   __traceiter_android_vh_dump_throttled_rt_tasks
   __traceiter_android_vh_dup_task_struct
   __traceiter_android_vh_early_resume_begin
@@ -2135,10 +2152,14 @@
   __traceiter_android_vh_mm_compaction_begin
   __traceiter_android_vh_mm_compaction_end
   __traceiter_android_vh_pagecache_get_page
+  __traceiter_android_vh_reclaim_pages_plug
   __traceiter_android_vh_resume_end
   __traceiter_android_vh_rmqueue
+  __traceiter_android_vh_sched_setaffinity_early
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
+  __traceiter_android_vh_shrink_inactive_list_blk_plug
+  __traceiter_android_vh_shrink_lruvec_blk_plug
   __traceiter_android_vh_si_meminfo
   __traceiter_android_vh_sound_usb_support_cpu_suspend
   __traceiter_android_vh_sysrq_crash
@@ -2194,6 +2215,7 @@
   __tracepoint_android_rvh_arm64_serror_panic
   __tracepoint_android_rvh_attach_entity_load_avg
   __tracepoint_android_rvh_audio_usb_offload_disconnect
+  __tracepoint_android_rvh_can_migrate_task
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpu_cgroup_online
@@ -2211,6 +2233,7 @@
   __tracepoint_android_rvh_enqueue_task_fair
   __tracepoint_android_rvh_find_busiest_group
   __tracepoint_android_rvh_find_energy_efficient_cpu
+  __tracepoint_android_rvh_find_lowest_rq
   __tracepoint_android_rvh_irqs_disable
   __tracepoint_android_rvh_irqs_enable
   __tracepoint_android_rvh_panic_unhandled
@@ -2249,6 +2272,7 @@
   __tracepoint_android_vh_cma_alloc_start
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
+  __tracepoint_android_vh_do_madvise_blk_plug
   __tracepoint_android_vh_dump_throttled_rt_tasks
   __tracepoint_android_vh_dup_task_struct
   __tracepoint_android_vh_early_resume_begin
@@ -2259,10 +2283,14 @@
   __tracepoint_android_vh_mm_compaction_begin
   __tracepoint_android_vh_mm_compaction_end
   __tracepoint_android_vh_pagecache_get_page
+  __tracepoint_android_vh_reclaim_pages_plug
   __tracepoint_android_vh_resume_end
   __tracepoint_android_vh_rmqueue
+  __tracepoint_android_vh_sched_setaffinity_early
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
+  __tracepoint_android_vh_shrink_inactive_list_blk_plug
+  __tracepoint_android_vh_shrink_lruvec_blk_plug
   __tracepoint_android_vh_si_meminfo
   __tracepoint_android_vh_sound_usb_support_cpu_suspend
   __tracepoint_android_vh_sysrq_crash
