@@ -2114,7 +2114,7 @@ void wiphy_delayed_work_cancel(struct wiphy *wiphy,
 #endif
 
 /* older cfg80211 requires wdev to be locked */
-#if CFG80211_VERSION < KERNEL_VERSION(6,6,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 #define sdata_lock_old_cfg80211(sdata) mutex_lock(&(sdata)->wdev.mtx)
 #define sdata_unlock_old_cfg80211(sdata) mutex_unlock(&(sdata)->wdev.mtx)
 #define WRAP_LOCKED(sym) wdev_locked_ ## sym

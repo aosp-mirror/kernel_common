@@ -123,7 +123,7 @@ static inline void drv_set_wakeup(struct ieee80211_local *local,
 {
 	might_sleep();
 	/* this doesn't really matter - nothing interesting happens here */
-#if CFG80211_VERSION >= KERNEL_VERSION(6,6,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
 	lockdep_assert_wiphy(local->hw.wiphy);
 #endif
 
