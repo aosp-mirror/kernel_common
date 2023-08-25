@@ -292,17 +292,16 @@ RGXCreateTransferContext_exit:
 			 * This should never fail... */
 			PVR_ASSERT((eError == PVRSRV_OK) || (eError == PVRSRV_ERROR_RETRY));
 
-			/* Avoid freeing/destroying/releasing the resource a second time below */
-			psTransferContextInt = NULL;
 			/* Release now we have cleaned up creation handles. */
 			UnlockHandle(psConnection->psHandleBase);
 
 		}
 
-		if (psTransferContextInt)
+		else if (psTransferContextInt)
 		{
 			PVRSRVRGXDestroyTransferContextKM(psTransferContextInt);
 		}
+
 	}
 
 	/* Allocated space should be equal to the last updated offset */

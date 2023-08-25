@@ -340,17 +340,16 @@ DevmemIntAcquireRemoteCtx_exit:
 			 * This should never fail... */
 			PVR_ASSERT((eError == PVRSRV_OK) || (eError == PVRSRV_ERROR_RETRY));
 
-			/* Avoid freeing/destroying/releasing the resource a second time below */
-			psContextInt = NULL;
 			/* Release now we have cleaned up creation handles. */
 			UnlockHandle(psConnection->psHandleBase);
 
 		}
 
-		if (psContextInt)
+		else if (psContextInt)
 		{
 			DevmemIntCtxDestroy(psContextInt);
 		}
+
 	}
 
 	return 0;

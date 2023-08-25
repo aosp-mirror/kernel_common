@@ -190,10 +190,36 @@ DICreateContext_exit:
 
 	if (psDICreateContextOUT->eError != PVRSRV_OK)
 	{
-		if (psContextInt)
+		if (psDICreateContextOUT->hContext)
+		{
+			PVRSRV_ERROR eError;
+
+			/* Lock over handle creation cleanup. */
+			LockHandle(psConnection->psHandleBase);
+
+			eError = PVRSRVDestroyHandleUnlocked(psConnection->psHandleBase,
+							     (IMG_HANDLE) psDICreateContextOUT->
+							     hContext,
+							     PVRSRV_HANDLE_TYPE_DI_CONTEXT);
+			if (unlikely((eError != PVRSRV_OK) && (eError != PVRSRV_ERROR_RETRY)))
+			{
+				PVR_DPF((PVR_DBG_ERROR,
+					 "%s: %s", __func__, PVRSRVGetErrorString(eError)));
+			}
+			/* Releasing the handle should free/destroy/release the resource.
+			 * This should never fail... */
+			PVR_ASSERT((eError == PVRSRV_OK) || (eError == PVRSRV_ERROR_RETRY));
+
+			/* Release now we have cleaned up creation handles. */
+			UnlockHandle(psConnection->psHandleBase);
+
+		}
+
+		else if (psContextInt)
 		{
 			DIDestroyContextKM(psContextInt);
 		}
+
 	}
 
 	/* Allocated space should be equal to the last updated offset */

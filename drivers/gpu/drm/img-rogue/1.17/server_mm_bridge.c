@@ -238,18 +238,17 @@ PMRExportPMR_exit:
 			 * This should never fail... */
 			PVR_ASSERT((eError == PVRSRV_OK) || (eError == PVRSRV_ERROR_RETRY));
 
-			/* Avoid freeing/destroying/releasing the resource a second time below */
-			psPMRExportInt = NULL;
 			/* Release now we have cleaned up creation handles. */
 			UnlockHandle(psConnection->psProcessHandleBase->psHandleBase);
 		}
 
-		if (psPMRExportInt)
+		else if (psPMRExportInt)
 		{
 			LockHandle(KERNEL_HANDLE_BASE);
 			PMRUnexportPMR(psPMRExportInt);
 			UnlockHandle(KERNEL_HANDLE_BASE);
 		}
+
 	}
 
 	return 0;
@@ -1536,17 +1535,16 @@ DevmemIntCtxCreate_exit:
 			 * This should never fail... */
 			PVR_ASSERT((eError == PVRSRV_OK) || (eError == PVRSRV_ERROR_RETRY));
 
-			/* Avoid freeing/destroying/releasing the resource a second time below */
-			psDevMemServerContextInt = NULL;
 			/* Release now we have cleaned up creation handles. */
 			UnlockHandle(psConnection->psHandleBase);
 
 		}
 
-		if (psDevMemServerContextInt)
+		else if (psDevMemServerContextInt)
 		{
 			DevmemIntCtxDestroy(psDevMemServerContextInt);
 		}
+
 	}
 
 	return 0;
