@@ -210,14 +210,14 @@ bool iwl_rfi_dlvr_supported(struct iwl_mvm *mvm, bool so_rfi_mode)
 
 int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 			    struct iwl_rfi_lut_entry *rfi_ddr_table,
-			    bool is_set_master_cmd)
+			    bool is_set_master_cmd, bool force_send_table)
 {
 	struct iwl_rfi_config_cmd *cmd = NULL;
 	bool rfi_ddr_support;
 	bool rfi_dlvr_support;
 	bool old_force_rfi = mvm->force_enable_rfi;
 	bool so_rfi_mode;
-	int ret;
+	int ret = 0;
 	struct iwl_host_cmd hcmd = {
 		.id = WIDE_ID(SYSTEM_GROUP, RFI_CONFIG_CMD),
 		.dataflags[0] = IWL_HCMD_DFL_DUP,
@@ -257,6 +257,12 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 	IWL_DEBUG_FW(mvm, "wlan is %s rfi master\n",
 		     mvm->rfi_wlan_master ? "" : "Not");
 
+	/* Drop stored rfi_config_cmd buffer when there is change in master */
+	if (is_set_master_cmd) {
+		kfree(mvm->iwl_prev_rfi_config_cmd);
+		mvm->iwl_prev_rfi_config_cmd = NULL;
+	}
+
 	/* Zero iwl_rfi_config_cmd is legal for FW API and since it has
 	 * rfi_memory_support equal to 0, it will disable all RFIm operation
 	 * in the FW.
@@ -264,23 +270,55 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 	 * user-space requested to stop RFIm.
 	 */
 	if (!rfi_ddr_table && !mvm->rfi_wlan_master) {
-		IWL_DEBUG_FW(mvm, "Sending zero DDR superset table\n");
-		goto send_empty_cmd;
+		if (force_send_table || !mvm->iwl_prev_rfi_config_cmd ||
+		    memcmp(mvm->iwl_prev_rfi_config_cmd, cmd, sizeof(*cmd))) {
+			IWL_DEBUG_FW(mvm, "Sending zero DDR superset table\n");
+			goto send_empty_cmd;
+		} else {
+			IWL_DEBUG_FW(mvm, "Skip RFI_CONFIG_CMD sending\n");
+			goto out;
+		}
 	}
 
 	if (rfi_ddr_support) {
 		cmd->rfi_memory_support = cpu_to_le32(RFI_DDR_SUPPORTED_MSK);
-		/* in case no table is passed, use the default one */
-		if (!rfi_ddr_table) {
-			IWL_DEBUG_FW(mvm,
-				     "Sending default DDR superset table\n");
-			memcpy(cmd->table, iwl_rfi_ddr_table,
-			       sizeof(cmd->table));
-		} else {
+
+		/* don't send RFI_CONFIG_CMD to FW when DDR table passed by
+		 * caller and previously sent table is same.
+		 */
+		if (!force_send_table && rfi_ddr_table &&
+		    mvm->iwl_prev_rfi_config_cmd &&
+		    !memcmp(rfi_ddr_table, mvm->iwl_prev_rfi_config_cmd->table,
+			    sizeof(mvm->iwl_prev_rfi_config_cmd->table))) {
+			IWL_DEBUG_FW(mvm, "Skip RFI_CONFIG_CMD sending\n");
+			goto out;
+		/* send RFI_CONFIG_CMD to FW with OEM ddr table */
+		} else if (rfi_ddr_table) {
 			IWL_DEBUG_FW(mvm, "Sending oem DDR superset table\n");
 			memcpy(cmd->table, rfi_ddr_table, sizeof(cmd->table));
 			/* notify FW the table is not the default one */
 			cmd->oem = 1;
+		/* send previous RFI_CONFIG_CMD once again as FW lost RFI DDR
+		 * table in reset
+		 */
+		} else if (mvm->iwl_prev_rfi_config_cmd && force_send_table) {
+			IWL_DEBUG_FW(mvm,
+				     "Sending buffered %s DDR superset table\n",
+				     mvm->iwl_prev_rfi_config_cmd->oem ?
+					"oem" : "default");
+			memcpy(cmd->table, mvm->iwl_prev_rfi_config_cmd->table,
+			       sizeof(cmd->table));
+			cmd->oem = mvm->iwl_prev_rfi_config_cmd->oem;
+		/* don't send previous RFI_CONFIG_CMD as FW has same table */
+		} else if (mvm->iwl_prev_rfi_config_cmd) {
+			IWL_DEBUG_FW(mvm, "Skip RFI_CONFIG_CMD sending\n");
+			goto out;
+		/* send default ddr table for the first time */
+		} else {
+			IWL_DEBUG_FW(mvm,
+				     "Sending default DDR superset table\n");
+			memcpy(cmd->table, iwl_rfi_ddr_table,
+			       sizeof(cmd->table));
 		}
 	}
 
@@ -289,10 +327,16 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 
 send_empty_cmd:
 	ret = iwl_mvm_send_cmd(mvm, &hcmd);
-
-	if (ret)
+	kfree(mvm->iwl_prev_rfi_config_cmd);
+	if (ret) {
+		mvm->iwl_prev_rfi_config_cmd = NULL;
 		IWL_ERR(mvm, "Failed to send RFI config cmd %d\n", ret);
+	} else {
+		mvm->iwl_prev_rfi_config_cmd = cmd;
+		cmd = NULL;
+	}
 
+out:
 	kfree(cmd);
 	return ret;
 }

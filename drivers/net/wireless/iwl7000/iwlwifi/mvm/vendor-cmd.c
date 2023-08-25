@@ -558,7 +558,7 @@ static int iwl_vendor_rfi_ddr_set_table(struct wiphy *wiphy,
 	}
 
 	mutex_lock(&mvm->mutex);
-	err = iwl_rfi_send_config_cmd(mvm, rfi_ddr_table, false);
+	err = iwl_rfi_send_config_cmd(mvm, rfi_ddr_table, false, false);
 	mutex_unlock(&mvm->mutex);
 	if (err)
 		IWL_ERR(mvm, "Failed to send rfi table to FW, error %d\n", err);
@@ -628,7 +628,7 @@ static int iwl_vendor_rfi_set_cnvi_master(struct wiphy *wiphy,
 		 */
 		if (mvm->fw_rfi_state == IWL_RFI_PMC_SUPPORTED ||
 		    mvm->rfi_wlan_master)
-			err = iwl_rfi_send_config_cmd(mvm, NULL, true);
+			err = iwl_rfi_send_config_cmd(mvm, NULL, true, false);
 	} else {
 		IWL_ERR(mvm,
 			"Wlan RFI master configuration is same as old:%d\n",
