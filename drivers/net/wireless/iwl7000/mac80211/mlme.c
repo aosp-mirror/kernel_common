@@ -5825,8 +5825,7 @@ static void ieee80211_ml_reconf_work(struct wiphy *wiphy,
 
 out:
 	if (!ret)
-		cfg80211_cqm_links_state_change_notify(sdata->dev,
-						       sdata->u.mgd.removed_links);
+		cfg80211_links_removed(sdata->dev, sdata->u.mgd.removed_links);
 	else
 		__ieee80211_disconnect_locked(sdata);
 

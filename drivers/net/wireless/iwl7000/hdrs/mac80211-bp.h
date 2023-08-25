@@ -2029,8 +2029,7 @@ _ieee80211_set_sband_iftype_data(struct ieee80211_supported_band *sband,
 #define cfg80211_req_link_disabled(req, link)	0
 #define NL80211_RRF_NO_EHT 0
 static inline void
-cfg80211_cqm_links_state_change_notify(struct net_device *dev,
-				       u16 removed_links)
+cfg80211_links_removed(struct net_device *dev, u16 removed_links)
 {
 }
 #else
@@ -2120,14 +2119,13 @@ void wiphy_delayed_work_cancel(struct wiphy *wiphy,
 #define WRAP_LOCKED(sym) wdev_locked_ ## sym
 
 static inline void
-WRAP_LOCKED(cfg80211_cqm_links_state_change_notify)(struct net_device *dev,
-						    u16 removed_links)
+WRAP_LOCKED(cfg80211_links_removed)(struct net_device *dev, u16 removed_links)
 {
 	mutex_lock(&dev->ieee80211_ptr->mtx);
-	cfg80211_cqm_links_state_change_notify(dev, removed_links);
+	cfg80211_links_removed(dev, removed_links);
 	mutex_unlock(&dev->ieee80211_ptr->mtx);
 }
-#define cfg80211_cqm_links_state_change_notify WRAP_LOCKED(cfg80211_cqm_links_state_change_notify)
+#define cfg80211_links_removed WRAP_LOCKED(cfg80211_links_removed)
 #else
 #define sdata_lock_old_cfg80211(sdata) do {} while (0)
 #define sdata_unlock_old_cfg80211(sdata) do {} while (0)
