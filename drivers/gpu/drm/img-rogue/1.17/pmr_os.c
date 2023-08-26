@@ -355,17 +355,14 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 	IMG_BOOL bUseMixedMap = IMG_FALSE;
 	IMG_BOOL bUseVMInsertPage = IMG_FALSE;
 
+	/* if writeable but not shared mapping is requested then fail */
+	PVR_RETURN_IF_INVALID_PARAM(((ps_vma->vm_flags & VM_WRITE) == 0) ||
+	                            ((ps_vma->vm_flags & VM_SHARED) != 0));
+
 	eError = PMRLockSysPhysAddresses(psPMR);
 	if (eError != PVRSRV_OK)
 	{
 		goto e0;
-	}
-
-	if (((ps_vma->vm_flags & VM_WRITE) != 0) &&
-		((ps_vma->vm_flags & VM_SHARED) == 0))
-	{
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto e1;
 	}
 
 	sPageProt = vm_get_page_prot(ps_vma->vm_flags);
