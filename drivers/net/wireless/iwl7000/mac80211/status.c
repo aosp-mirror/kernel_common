@@ -675,7 +675,6 @@ static void ieee80211_handle_smps_status(struct ieee80211_sub_if_data *sdata,
 					 bool acked, u16 status_data)
 {
 	u16 sub_data = u16_get_bits(status_data, IEEE80211_STATUS_SUBDATA_MASK);
-	struct ieee80211_local *local = sdata->local;
 	enum ieee80211_smps_mode smps_mode = sub_data & 3;
 	int link_id = (sub_data >> 2);
 	struct ieee80211_link_data *link;
@@ -705,7 +704,7 @@ static void ieee80211_handle_smps_status(struct ieee80211_sub_if_data *sdata,
 	 * associated yet.
 	 */
 	link->smps_mode = smps_mode;
-	wiphy_work_queue(local->hw.wiphy, &link->u.mgd.recalc_smps);
+	wiphy_work_queue(sdata->local->hw.wiphy, &link->u.mgd.recalc_smps);
 }
 
 static void ieee80211_report_used_skb(struct ieee80211_local *local,
