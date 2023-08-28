@@ -84,6 +84,7 @@
   _dev_notice
   _dev_printk
   __dev_queue_xmit
+  dev_set_name
   _dev_warn
   dma_alloc_attrs
   dma_buf_export
@@ -183,6 +184,7 @@
   get_device
   __get_free_pages
   get_random_bytes
+  __get_task_comm
   get_unused_fd_flags
   gic_nonsecure_priorities
   gpiod_put
@@ -201,6 +203,7 @@
   ida_free
   idr_alloc
   idr_destroy
+  idr_find
   idr_get_next
   idr_remove
   init_net
@@ -233,6 +236,10 @@
   kmalloc_caches
   kmalloc_large
   kmalloc_trace
+  kmem_cache_alloc
+  kmem_cache_create
+  kmem_cache_destroy
+  kmem_cache_free
   kmemdup
   kstrndup
   kstrtobool_from_user
@@ -536,6 +543,7 @@
   vring_interrupt
   vring_transport_features
   wait_for_completion
+  wait_for_completion_timeout
   wait_woken
   __wake_up
   wake_up_process
@@ -647,7 +655,6 @@
   device_del
   device_initialize
   device_rename
-  dev_set_name
   gcd
   genlmsg_multicast_allns
   get_net_ns_by_fd
@@ -802,7 +809,6 @@
   __hw_addr_init
   __hw_addr_sync
   __hw_addr_unsync
-  idr_find
   idr_for_each
   kernel_param_lock
   kernel_param_unlock
@@ -980,7 +986,6 @@
   cec_s_phys_addr
   cec_transmit_attempt_done_ts
   cec_unregister_adapter
-  wait_for_completion_timeout
 
 # required by rtc-test.ko
   add_timer
@@ -1145,13 +1150,8 @@
   __drm_printfn_seq_file
   __drm_puts_seq_file
   drm_send_event
-  __get_task_comm
   iomem_resource
   is_virtio_device
-  kmem_cache_alloc
-  kmem_cache_create
-  kmem_cache_destroy
-  kmem_cache_free
   memdup_user
   sync_file_get_fence
   __traceiter_dma_fence_emit
@@ -1361,6 +1361,66 @@
   snd_pcm_set_managed_buffer_all
   snd_pcm_set_ops
   wait_for_completion_interruptible_timeout
+
+# required by virtio_video.ko
+  idr_preload
+  v4l2_ctrl_handler_init_class
+  v4l2_ctrl_handler_setup
+  v4l2_ctrl_new_std
+  v4l2_ctrl_new_std_menu
+  v4l2_ctrl_subscribe_event
+  v4l2_device_register
+  v4l2_device_unregister
+  v4l2_event_queue_fh
+  v4l2_event_unsubscribe
+  v4l2_fh_add
+  v4l2_fh_del
+  v4l2_fh_exit
+  v4l2_fh_init
+  v4l2_m2m_buf_remove
+  v4l2_m2m_ctx_init
+  v4l2_m2m_ctx_release
+  v4l2_m2m_fop_mmap
+  v4l2_m2m_fop_poll
+  v4l2_m2m_get_vq
+  v4l2_m2m_init
+  v4l2_m2m_ioctl_create_bufs
+  v4l2_m2m_ioctl_dqbuf
+  v4l2_m2m_ioctl_expbuf
+  v4l2_m2m_ioctl_prepare_buf
+  v4l2_m2m_ioctl_qbuf
+  v4l2_m2m_ioctl_querybuf
+  v4l2_m2m_ioctl_streamoff
+  v4l2_m2m_ioctl_streamon
+  v4l2_m2m_job_finish
+  v4l2_m2m_release
+  v4l2_m2m_reqbufs
+  v4l2_src_change_event_subscribe
+  vb2_buffer_done
+  vb2_dma_contig_memops
+  vb2_dma_sg_memops
+  vb2_fop_mmap
+  vb2_fop_poll
+  vb2_ioctl_create_bufs
+  vb2_ioctl_dqbuf
+  vb2_ioctl_expbuf
+  vb2_ioctl_prepare_buf
+  vb2_ioctl_qbuf
+  vb2_ioctl_querybuf
+  vb2_ioctl_reqbufs
+  vb2_ioctl_streamoff
+  vb2_ioctl_streamon
+  vb2_ops_wait_finish
+  vb2_ops_wait_prepare
+  vb2_plane_cookie
+  vb2_queue_init
+  vb2_queue_release
+  vb2_wait_for_all_buffers
+  video_devdata
+  video_device_release_empty
+  video_ioctl2
+  __video_register_device
+  video_unregister_device
 
 # required by virtiofs.ko
   deactivate_locked_super
