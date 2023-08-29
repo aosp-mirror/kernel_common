@@ -2585,7 +2585,7 @@ intel_sdvo_select_ddc_bus(struct intel_sdvo *sdvo,
 			  struct intel_sdvo_connector *connector)
 {
 	struct drm_i915_private *dev_priv = to_i915(sdvo->base.base.dev);
-	struct sdvo_device_mapping *mapping;
+	const struct sdvo_device_mapping *mapping;
 	int ddc_bus;
 
 	if (sdvo->base.port == PORT_B)
@@ -2608,7 +2608,7 @@ static void
 intel_sdvo_select_i2c_bus(struct intel_sdvo *sdvo)
 {
 	struct drm_i915_private *dev_priv = to_i915(sdvo->base.base.dev);
-	struct sdvo_device_mapping *mapping;
+	const struct sdvo_device_mapping *mapping;
 	u8 pin;
 
 	if (sdvo->base.port == PORT_B)
@@ -2653,7 +2653,7 @@ static u8
 intel_sdvo_get_slave_addr(struct intel_sdvo *sdvo)
 {
 	struct drm_i915_private *dev_priv = to_i915(sdvo->base.base.dev);
-	struct sdvo_device_mapping *my_mapping, *other_mapping;
+	const struct sdvo_device_mapping *my_mapping, *other_mapping;
 
 	if (sdvo->base.port == PORT_B) {
 		my_mapping = &dev_priv->display.vbt.sdvo_mappings[0];
