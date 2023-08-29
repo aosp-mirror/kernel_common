@@ -10,6 +10,7 @@
 #include <linux/blk_types.h>
 #include <linux/blk-mq.h>
 #include <linux/blkdev.h>
+#include <linux/capability.h>
 #include <linux/cred.h>
 #include <linux/errname.h>
 #include <linux/ethtool.h>
@@ -33,6 +34,7 @@
 #include <trace/events/rust_binder.h>
 #include <uapi/linux/android/binder.h>
 #include <uapi/linux/android/binderfs.h>
+#include <uapi/linux/sched/types.h>
 
 /* `bindgen` gets confused at certain things. */
 const size_t RUST_CONST_HELPER_ARCH_SLAB_MINALIGN = ARCH_SLAB_MINALIGN;

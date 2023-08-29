@@ -314,6 +314,13 @@ int rust_helper_security_binder_transfer_file(const struct cred *from,
 EXPORT_SYMBOL_GPL(rust_helper_security_binder_transfer_file);
 #endif
 
+unsigned long rust_helper_task_rlimit(const struct task_struct *task,
+				      unsigned int limit)
+{
+	return task_rlimit(task, limit);
+}
+EXPORT_SYMBOL_GPL(rust_helper_task_rlimit);
+
 void rust_helper_mmgrab(struct mm_struct *mm)
 {
 	mmgrab(mm);

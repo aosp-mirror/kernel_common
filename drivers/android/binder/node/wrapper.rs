@@ -58,6 +58,7 @@ impl DeliverToRead for NodeWrapper {
     }
 
     fn cancel(self: DArc<Self>) {}
+    fn on_thread_selected(&self, _thread: &Thread) {}
 
     fn should_sync_wakeup(&self) -> bool {
         false
