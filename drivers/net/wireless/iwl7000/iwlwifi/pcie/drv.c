@@ -341,7 +341,7 @@ MODULE_DEVICE_TABLE(pci, iwl_hw_card_ids);
 		      IWL_CFG_ANY, IWL_CFG_ANY, IWL_CFG_ANY, IWL_CFG_ANY, IWL_CFG_ANY,  \
 		      IWL_CFG_ANY, _cfg, _name)
 
-static const struct iwl_dev_info iwl_dev_info_table[] = {
+VISIBLE_IF_IWLWIFI_KUNIT const struct iwl_dev_info iwl_dev_info_table[] = {
 #if IS_ENABLED(CPTCFG_IWLMVM)
 /* 9000 */
 	IWL_DEV_INFO(0x2526, 0x1550, iwl9260_2ac_cfg, iwl9260_killer_1550_name),
@@ -937,6 +937,7 @@ static const struct iwl_dev_info iwl_dev_info_table[] = {
 		      iwl_cfg_sc, iwl_sc_name),
 #endif /* CPTCFG_IWLMVM */
 };
+EXPORT_SYMBOL_IF_IWLWIFI_KUNIT(iwl_dev_info_table);
 
 /*
  * Read rf id and cdb info from prph register and store it
@@ -1055,7 +1056,7 @@ out:
 /* PCI registers */
 #define PCI_CFG_RETRY_TIMEOUT	0x041
 
-static const struct iwl_dev_info *
+VISIBLE_IF_IWLWIFI_KUNIT const struct iwl_dev_info *
 iwl_pci_find_dev_info(u16 device, u16 subsystem_device,
 		      u16 mac_type, u8 mac_step, u16 rf_type, u8 cdb,
 		      u8 jacket, u8 rf_id, u8 no_160, u8 cores, u8 rf_step)
@@ -1117,6 +1118,7 @@ iwl_pci_find_dev_info(u16 device, u16 subsystem_device,
 
 	return NULL;
 }
+EXPORT_SYMBOL_IF_IWLWIFI_KUNIT(iwl_pci_find_dev_info);
 
 static int iwl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
