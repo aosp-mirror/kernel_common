@@ -1561,7 +1561,10 @@ static void __blk_mq_delay_run_hw_queue(struct blk_mq_hw_ctx *hctx, bool async,
 	if (unlikely(blk_mq_hctx_stopped(hctx)))
 		return;
 
-	if (!async && cpumask_test_cpu(raw_smp_processor_id(), hctx->cpumask)) {
+	if (!async &&
+	    !(hctx->flags & BLK_MQ_F_BLOCKING &&
+	      blk_queue_is_zoned(hctx->queue)) &&
+	    cpumask_test_cpu(raw_smp_processor_id(), hctx->cpumask)) {
 		__blk_mq_run_hw_queue(hctx);
 		return;
 	}
