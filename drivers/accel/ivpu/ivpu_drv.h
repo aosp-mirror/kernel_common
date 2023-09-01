@@ -123,6 +123,7 @@ struct ivpu_device {
 		int jsm;
 		int tdr;
 		int reschedule_suspend;
+		int autosuspend;
 	} timeout;
 };
 
