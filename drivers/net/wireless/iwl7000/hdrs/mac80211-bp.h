@@ -54,6 +54,18 @@ csa_counter_offsets_presp(struct cfg80211_csa_settings *s)
 	return s->counter_offsets_presp;
 }
 
+#if CFG80211_VERSION <= KERNEL_VERSION(6,8,0)
+bool
+ieee80211_uhb_power_type_valid(struct ieee80211_mgmt *mgmt, size_t len,
+			       struct ieee80211_channel *channel);
+
+#define IEEE80211_CHAN_NO_UHB_VLP_CLIENT BIT(21)
+#define IEEE80211_CHAN_NO_UHB_AFC_CLIENT BIT(22)
+
+#define NL80211_RRF_NO_UHB_VLP_CLIENT BIT(22)
+#define NL80211_RRF_NO_UHB_AFC_CLIENT BIT(23)
+#endif
+
 #if CFG80211_VERSION < KERNEL_VERSION(5,18,0)
 #define IEEE80211_CHAN_NO_HE 0
 #define IEEE80211_CHAN_NO_EHT 0
