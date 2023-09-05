@@ -55,8 +55,6 @@
 #include "stream.h"
 #include "media.h"
 
-#include <trace/hooks/audio_usboffload.h>
-
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("USB Audio");
 MODULE_LICENSE("GPL");
@@ -119,56 +117,6 @@ MODULE_PARM_DESC(skip_validation, "Skip unit descriptor validation (default: no)
 static DEFINE_MUTEX(register_mutex);
 static struct snd_usb_audio *usb_chip[SNDRV_CARDS];
 static struct usb_driver usb_audio_driver;
-static struct snd_usb_audio_vendor_ops *usb_vendor_ops;
-
-int snd_vendor_set_ops(struct snd_usb_audio_vendor_ops *ops)
-{
-	if ((!ops->set_interface) ||
-	    (!ops->set_pcm_intf) ||
-	    (!ops->set_pcm_connection))
-		return -EINVAL;
-
-	usb_vendor_ops = ops;
-	return 0;
-}
-EXPORT_SYMBOL_GPL(snd_vendor_set_ops);
-
-struct snd_usb_audio_vendor_ops *snd_vendor_get_ops(void)
-{
-	return usb_vendor_ops;
-}
-
-int snd_vendor_set_interface(struct usb_device *udev,
-			     struct usb_host_interface *intf,
-			     int iface, int alt)
-{
-	struct snd_usb_audio_vendor_ops *ops = snd_vendor_get_ops();
-
-	if (ops)
-		return ops->set_interface(udev, intf, iface, alt);
-	return 0;
-}
-
-int snd_vendor_set_pcm_intf(struct usb_interface *intf, int iface, int alt,
-			    int direction, struct snd_usb_substream *subs)
-{
-	struct snd_usb_audio_vendor_ops *ops = snd_vendor_get_ops();
-
-	if (ops)
-		return ops->set_pcm_intf(intf, iface, alt, direction, subs);
-	return 0;
-}
-
-int snd_vendor_set_pcm_connection(struct usb_device *udev,
-				  enum snd_vendor_pcm_open_close onoff,
-				  int direction)
-{
-	struct snd_usb_audio_vendor_ops *ops = snd_vendor_get_ops();
-
-	if (ops)
-		return ops->set_pcm_connection(udev, onoff, direction);
-	return 0;
-}
 
 /*
  * disconnect streams
@@ -911,8 +859,6 @@ static int usb_audio_probe(struct usb_interface *intf,
 	if (chip->quirk_flags & QUIRK_FLAG_DISABLE_AUTOSUSPEND)
 		usb_disable_autosuspend(interface_to_usbdev(intf));
 
-	trace_android_vh_audio_usb_offload_connect(intf, chip);
-
 	/*
 	 * For devices with more than one control interface, we assume the
 	 * first contains the audio controls. We might need a more specific
@@ -998,8 +944,6 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 		return;
 
 	card = chip->card;
-
-	trace_android_rvh_audio_usb_offload_disconnect(intf);
 
 	mutex_lock(&register_mutex);
 	if (atomic_inc_return(&chip->shutdown) == 1) {
@@ -1102,7 +1046,6 @@ int snd_usb_autoresume(struct snd_usb_audio *chip)
 	}
 	return 0;
 }
-EXPORT_SYMBOL_GPL(snd_usb_autoresume);
 
 void snd_usb_autosuspend(struct snd_usb_audio *chip)
 {
@@ -1116,7 +1059,6 @@ void snd_usb_autosuspend(struct snd_usb_audio *chip)
 	for (i = 0; i < chip->num_interfaces; i++)
 		usb_autopm_put_interface(chip->intf[i]);
 }
-EXPORT_SYMBOL_GPL(snd_usb_autosuspend);
 
 static int usb_audio_suspend(struct usb_interface *intf, pm_message_t message)
 {

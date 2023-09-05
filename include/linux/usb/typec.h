@@ -4,7 +4,6 @@
 #define __LINUX_USB_TYPEC_H
 
 #include <linux/types.h>
-#include <linux/android_kabi.h>
 
 /* USB Type-C Specification releases */
 #define USB_TYPEC_REV_1_0	0x100 /* 1.0 */
@@ -238,9 +237,6 @@ struct typec_operations {
 			     enum typec_port_type type);
 	struct usb_power_delivery **(*pd_get)(struct typec_port *port);
 	int (*pd_set)(struct typec_port *port, struct usb_power_delivery *pd);
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
 };
 
 enum usb_pd_svdm_ver {
@@ -281,9 +277,6 @@ struct typec_capability {
 	struct usb_power_delivery *pd;
 
 	const struct typec_operations	*ops;
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
 };
 
 /* Specific to try_role(). Indicates the user want's to clear the preference. */

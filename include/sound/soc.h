@@ -19,7 +19,6 @@
 #include <linux/kernel.h>
 #include <linux/regmap.h>
 #include <linux/log2.h>
-#include <linux/android_kabi.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/compress_driver.h>
@@ -254,14 +253,6 @@
 	.get = xhandler_get, .put = xhandler_put, \
 	.private_value = SOC_DOUBLE_R_VALUE(reg_left, reg_right, xshift, \
 					    xmax, xinvert) }
-#define SOC_SINGLE_MULTI_EXT(xname, xreg, xshift, xmax, xinvert, xcount,\
-	xhandler_get, xhandler_put) \
-{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
-	.info = snd_soc_info_multi_ext, \
-	.get = xhandler_get, .put = xhandler_put, \
-	.private_value = (unsigned long)&(struct soc_multi_mixer_control) \
-		{.reg = xreg, .shift = xshift, .rshift = xshift, .max = xmax, \
-		.count = xcount, .platform_max = xmax, .invert = xinvert} }
 #define SOC_SINGLE_EXT_TLV(xname, xreg, xshift, xmax, xinvert,\
 	 xhandler_get, xhandler_put, tlv_array) \
 {	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
@@ -615,8 +606,6 @@ int snd_soc_get_strobe(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol);
 int snd_soc_put_strobe(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol);
-int snd_soc_info_multi_ext(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_info *uinfo);
 
 /* SoC PCM stream information */
 struct snd_soc_pcm_stream {
@@ -763,8 +752,6 @@ struct snd_soc_dai_link {
 #ifdef CONFIG_SND_SOC_TOPOLOGY
 	struct snd_soc_dobj dobj; /* For topology */
 #endif
-
-	ANDROID_KABI_RESERVE(1);
 };
 
 static inline struct snd_soc_dai_link_component*
@@ -1033,11 +1020,6 @@ struct snd_soc_card {
 	unsigned int component_chaining:1;
 
 	void *drvdata;
-
-	ANDROID_KABI_RESERVE(1);
-	ANDROID_KABI_RESERVE(2);
-	ANDROID_KABI_RESERVE(3);
-	ANDROID_KABI_RESERVE(4);
 };
 #define for_each_card_prelinks(card, i, link)				\
 	for ((i) = 0;							\
@@ -1118,9 +1100,6 @@ struct snd_soc_pcm_runtime {
 	unsigned int fe_compr:1; /* for Dynamic PCM */
 
 	int num_components;
-
-	ANDROID_KABI_RESERVE(1);
-
 	struct snd_soc_component *components[]; /* CPU/Codec/Platform */
 };
 /* see soc_new_pcm_runtime()  */
@@ -1160,8 +1139,6 @@ struct soc_mixer_control {
 #ifdef CONFIG_SND_SOC_TOPOLOGY
 	struct snd_soc_dobj dobj;
 #endif
-
-	ANDROID_KABI_RESERVE(1);
 };
 
 struct soc_bytes {
@@ -1188,11 +1165,6 @@ struct soc_mreg_control {
 	unsigned int regbase, regcount, nbits, invert;
 };
 
-struct soc_multi_mixer_control {
-	int min, max, platform_max, count;
-	unsigned int reg, rreg, shift, rshift, invert;
-};
-
 /* enumerated kcontrol */
 struct soc_enum {
 	int reg;
@@ -1206,8 +1178,6 @@ struct soc_enum {
 #ifdef CONFIG_SND_SOC_TOPOLOGY
 	struct snd_soc_dobj dobj;
 #endif
-
-	ANDROID_KABI_RESERVE(1);
 };
 
 static inline bool snd_soc_volsw_is_stereo(struct soc_mixer_control *mc)
