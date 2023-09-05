@@ -19,7 +19,6 @@ use kernel::{
     fs::file::{self, File},
     list::{List, ListArc, ListArcField, ListLinks},
     mm,
-    page::Page,
     prelude::*,
     rbtree::{self, RBTree, RBTreeNode, RBTreeNodeReservation},
     sync::poll::PollTable,
@@ -38,6 +37,7 @@ use crate::{
     defs::*,
     error::{BinderError, BinderResult},
     node::{CouldNotDeliverCriticalIncrement, CritIncrWrapper, Node, NodeDeath, NodeRef},
+    page_range::ShrinkablePageRange,
     prio::{self, BinderPriority},
     range_alloc::{self, RangeAllocator},
     thread::{PushWorkRes, Thread},
@@ -49,17 +49,12 @@ use core::mem::take;
 struct Mapping {
     address: usize,
     alloc: RangeAllocator<AllocationInfo>,
-    pages: Arc<Vec<Page>>,
 }
 
 impl Mapping {
-    fn new(address: usize, size: usize, pages: Arc<Vec<Page>>) -> Result<Self> {
+    fn new(address: usize, size: usize) -> Result<Self> {
         let alloc = RangeAllocator::new(size)?;
-        Ok(Self {
-            address,
-            alloc,
-            pages,
-        })
+        Ok(Self { address, alloc })
     }
 }
 
@@ -398,6 +393,9 @@ pub(crate) struct Process {
 
     pub(crate) default_priority: BinderPriority,
 
+    #[pin]
+    pub(crate) pages: ShrinkablePageRange,
+
     // Waitqueue of processes waiting for all outstanding transactions to be
     // processed.
     #[pin]
@@ -462,6 +460,7 @@ impl Process {
                 cred,
                 default_priority: prio::get_default_prio_from_task(current),
                 inner <- kernel::new_spinlock!(ProcessInner::new(), "Process::inner"),
+                pages <- ShrinkablePageRange::new(&super::BINDER_SHRINKER),
                 node_refs <- kernel::new_mutex!(ProcessNodeRefs::new(), "Process::node_refs"),
                 freeze_wait <- kernel::new_condvar!("Process::freeze_wait"),
                 task: current.group_leader().into(),
@@ -798,20 +797,46 @@ impl Process {
         is_oneway: bool,
         from_pid: i32,
     ) -> BinderResult<NewAllocation> {
+        use kernel::page::PAGE_SIZE;
+
         let alloc = range_alloc::ReserveNewBox::try_new()?;
         let mut inner = self.inner.lock();
         let mapping = inner.mapping.as_mut().ok_or_else(BinderError::new_dead)?;
         let offset = mapping
             .alloc
             .reserve_new(size, is_oneway, from_pid, alloc)?;
-        Ok(NewAllocation(Allocation::new(
+
+        let res = Allocation::new(
             self.clone(),
             offset,
             size,
             mapping.address + offset,
-            mapping.pages.clone(),
             mapping.alloc.oneway_spam_detected,
-        )))
+        );
+        drop(inner);
+
+        // This allocation will be marked as in use until the `Allocation` is used to free it.
+        //
+        // This method can't be called while holding a lock, so we release the lock first. It's
+        // okay for several threads to use the method on the same index at the same time. In that
+        // case, one of the calls will allocate the given page (if missing), and the other call
+        // will wait for the other call to finish allocating the page.
+        //
+        // We will not call `stop_using_range` in parallel with this on the same page, because the
+        // allocation can only be removed via the destructor of the `Allocation` object that we
+        // currently own.
+        match self.pages.use_range(
+            offset / PAGE_SIZE,
+            (offset + size + (PAGE_SIZE - 1)) / PAGE_SIZE,
+        ) {
+            Ok(()) => {}
+            Err(err) => {
+                pr_warn!("use_range failure {:?}", err);
+                return Err(err.into());
+            }
+        }
+
+        Ok(NewAllocation(res))
     }
 
     pub(crate) fn buffer_get(self: &Arc<Self>, ptr: usize) -> Option<Allocation> {
@@ -824,7 +849,6 @@ impl Process {
             offset,
             size,
             ptr,
-            mapping.pages.clone(),
             mapping.alloc.oneway_spam_detected,
         );
         if let Some(data) = odata {
@@ -836,18 +860,29 @@ impl Process {
     pub(crate) fn buffer_raw_free(&self, ptr: usize) {
         let mut inner = self.inner.lock();
         if let Some(ref mut mapping) = &mut inner.mapping {
-            if ptr < mapping.address
-                || mapping
-                    .alloc
-                    .reservation_abort(ptr - mapping.address)
-                    .is_err()
-            {
-                pr_warn!(
-                    "Pointer {:x} failed to free, base = {:x}\n",
-                    ptr,
-                    mapping.address
-                );
-            }
+            let offset = match ptr.checked_sub(mapping.address) {
+                Some(offset) => offset,
+                None => return,
+            };
+
+            let freed_range = match mapping.alloc.reservation_abort(offset) {
+                Ok(freed_range) => freed_range,
+                Err(_) => {
+                    pr_warn!(
+                        "Pointer {:x} failed to free, base = {:x}\n",
+                        ptr,
+                        mapping.address
+                    );
+                    return;
+                }
+            };
+
+            // No more allocations in this range. Mark them as not in use.
+            //
+            // Must be done before we release the lock so that `use_range` is not used on these
+            // indices until `stop_using_range` returns.
+            self.pages
+                .stop_using_range(freed_range.start_page_idx, freed_range.end_page_idx);
         }
     }
 
@@ -862,34 +897,16 @@ impl Process {
 
     fn create_mapping(&self, vma: &mut mm::virt::VmArea) -> Result {
         use kernel::page::PAGE_SIZE;
-        let size = core::cmp::min(vma.end() - vma.start(), bindings::SZ_4M as usize);
-        let page_count = size / PAGE_SIZE;
-
-        // Allocate and map all pages.
-        //
-        // N.B. If we fail halfway through mapping these pages, the kernel will unmap them.
-        let mut pages = Vec::with_capacity(page_count, GFP_KERNEL)?;
-        let mut address = vma.start();
-        for _ in 0..page_count {
-            let page = Page::alloc_page(GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO)?;
-            vma.vm_insert_page(address, &page)?;
-            pages.push(page, GFP_KERNEL)?;
-            address += PAGE_SIZE;
+        let size = usize::min(vma.end() - vma.start(), bindings::SZ_4M as usize);
+        let mapping = Mapping::new(vma.start(), size)?;
+        let page_count = self.pages.register_with_vma(vma)?;
+        if page_count * PAGE_SIZE != size {
+            return Err(EINVAL);
         }
 
-        let ref_pages = Arc::new(pages, GFP_KERNEL)?;
-        let mapping = Mapping::new(vma.start(), size, ref_pages)?;
+        // Save range allocator for later.
+        self.inner.lock().mapping = Some(mapping);
 
-        // Save pages for later.
-        let mut inner = self.inner.lock();
-        match &inner.mapping {
-            None => inner.mapping = Some(mapping),
-            Some(_) => {
-                drop(inner);
-                drop(mapping);
-                return Err(EBUSY);
-            }
-        }
         Ok(())
     }
 
@@ -1104,18 +1121,11 @@ impl Process {
         let omapping = self.inner.lock().mapping.take();
         if let Some(mut mapping) = omapping {
             let address = mapping.address;
-            let pages = mapping.pages.clone();
             let oneway_spam_detected = mapping.alloc.oneway_spam_detected;
             mapping.alloc.take_for_each(|offset, size, odata| {
                 let ptr = offset + address;
-                let mut alloc = Allocation::new(
-                    self.clone(),
-                    offset,
-                    size,
-                    ptr,
-                    pages.clone(),
-                    oneway_spam_detected,
-                );
+                let mut alloc =
+                    Allocation::new(self.clone(), offset, size, ptr, oneway_spam_detected);
                 if let Some(data) = odata {
                     alloc.set_info(data);
                 }

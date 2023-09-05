@@ -16,7 +16,7 @@ use kernel::{
     uaccess::UserSliceWriter,
 };
 
-use crate::{context::Context, process::Process, thread::Thread};
+use crate::{context::Context, page_range::Shrinker, process::Process, thread::Thread};
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -26,6 +26,7 @@ mod deferred_close;
 mod defs;
 mod error;
 mod node;
+mod page_range;
 mod prio;
 mod process;
 mod range_alloc;
@@ -210,6 +211,9 @@ const fn ptr_align(value: usize) -> usize {
     (value + size) & !size
 }
 
+// SAFETY: We call register in `init`.
+static BINDER_SHRINKER: Shrinker = unsafe { Shrinker::new() };
+
 struct BinderModule {}
 
 impl kernel::Module for BinderModule {
@@ -232,6 +236,8 @@ impl kernel::Module for BinderModule {
             }
             binder_driver_initialized = true;
         }
+
+        BINDER_SHRINKER.register(kernel::c_str!("android-binder"))?;
 
         // SAFETY: The module is being loaded, so we can initialize binderfs.
         #[cfg(CONFIG_ANDROID_BINDERFS_RUST)]
