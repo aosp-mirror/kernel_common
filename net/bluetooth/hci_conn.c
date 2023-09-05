@@ -619,7 +619,8 @@ static void hci_conn_timeout(struct work_struct *work)
 
 	BT_DBG("hcon %p state %s", conn, state_to_string(conn->state));
 
-	WARN_ON(refcnt < 0);
+	if (refcnt < 0)
+		pr_warn("hcon refcount is %d\n", refcnt);
 
 	/* FIXME: It was observed that in pairing failed scenario, refcnt
 	 * drops below 0. Probably this is because l2cap_conn_del calls
