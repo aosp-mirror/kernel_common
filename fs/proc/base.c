@@ -3696,7 +3696,7 @@ static const struct pid_entry tid_base_stuff[] = {
 	ONE("ksm_stat",  S_IRUSR, proc_pid_ksm_stat),
 #endif
 #ifdef CONFIG_PROC_LATSENSE
-	REG("latency_sensitive",  S_IRUGO|S_IWUSR, proc_tid_latsense_operations),
+	REG("latency_sensitive",  S_IRUGO|S_IWUGO, proc_tid_latsense_operations),
 #endif
 #ifdef CONFIG_CPU_FREQ_TIMES
 	ONE("time_in_state", 0444, proc_time_in_state_show),

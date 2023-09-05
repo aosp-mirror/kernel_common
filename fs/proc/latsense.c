@@ -9,6 +9,7 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
+#include <linux/ptrace.h>
 #include <linux/sched/task.h>
 #include <linux/sched/latsense.h>
 #include <linux/proc_fs.h>
@@ -72,9 +73,32 @@ sched_latsense_write(struct file *file, const char __user *buf,
 	return count;
 }
 
+static int sched_latsense_access(struct inode *inode, fmode_t mode)
+{
+	struct task_struct *p;
+	int ret;
+
+	if (!(mode & FMODE_WRITE))
+		return 0;
+
+	ret = -EACCES;
+	p = get_proc_task(inode);
+	if (ptrace_may_access(p, PTRACE_MODE_ATTACH_REALCREDS) ||
+			capable(CAP_SYS_NICE)) {
+		ret = 0;
+	}
+
+	put_task_struct(p);
+	return ret;
+}
+
 static int sched_latsense_open(struct inode *inode, struct file *filp)
 {
 	int ret;
+
+	ret = sched_latsense_access(inode, filp->f_mode);
+	if (ret < 0)
+		return ret;
 
 	ret = single_open(filp, sched_latsense_show, NULL);
 	if (!ret) {
