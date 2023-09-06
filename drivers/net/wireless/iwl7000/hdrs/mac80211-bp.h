@@ -2154,3 +2154,9 @@ static inline void backport_led_trigger_blink(struct led_trigger *trigger,
 }
 #define led_trigger_blink LINUX_BACKPORT(led_trigger_blink)
 #endif
+
+#if CFG80211_VERSION < KERNEL_VERSION(6,8,0)
+static inline void cfg80211_schedule_channels_check(struct net_device *netdev)
+{
+}
+#endif
