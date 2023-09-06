@@ -99,6 +99,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_udp_enqueue_schedule_skb);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_build_skb_around);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_refrigerator);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_send_sig_info);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_killed_process);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mutex_wait_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mutex_wait_finish);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mutex_init);
