@@ -311,6 +311,17 @@ static inline void debugfs_create_xul(const char *name, umode_t mode,
 #define efi_rt_services_supported(...) efi_enabled(EFI_RUNTIME_SERVICES)
 #endif
 
+#if LINUX_VERSION_IS_LESS(5,10,0)
+#define DECLARE_TRACEPOINT(tp) \
+	extern struct tracepoint __tracepoint_##tp
+#ifdef CONFIG_TRACEPOINTS
+# define tracepoint_enabled(tp) \
+	static_key_false(&(__tracepoint_##tp).key)
+#else
+# define tracepoint_enabled(tracepoint) false
+#endif
+#endif /* < 5.10 */
+
 #if LINUX_VERSION_IS_LESS(5,11,0)
 
 enum rfkill_hard_block_reasons {

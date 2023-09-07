@@ -7,12 +7,12 @@
  *****************************************************************************/
 
 #ifndef __IWLWIFI_DEVICE_TRACE
+#define __IWLWIFI_DEVICE_TRACE
 #include <linux/skbuff.h>
 #include <linux/ieee80211.h>
 #include <net/cfg80211.h>
 #include <net/mac80211.h>
 #include "iwl-trans.h"
-#if !defined(__IWLWIFI_DEVICE_TRACE)
 static inline bool iwl_trace_data(struct sk_buff *skb)
 {
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
@@ -70,13 +70,9 @@ static inline size_t iwl_rx_trace_len(const struct iwl_trans *trans,
 	return sizeof(__le32) + sizeof(*cmd) + trans->rx_mpdu_cmd_hdr_size +
 		ieee80211_hdrlen(hdr->frame_control);
 }
-#endif
-
-#define __IWLWIFI_DEVICE_TRACE
 
 #include <linux/tracepoint.h>
 #include <linux/device.h>
-
 
 #if !defined(CPTCFG_IWLWIFI_DEVICE_TRACING) || defined(__CHECKER__)
 #undef TRACE_EVENT
@@ -98,4 +94,16 @@ static inline void trace_ ## name(proto) {}
 #include "iwl-devtrace-data.h"
 #include "iwl-devtrace-iwlwifi.h"
 
+DECLARE_TRACEPOINT(iwlwifi_dev_rx);
+DECLARE_TRACEPOINT(iwlwifi_dev_rx_data);
+
+void __trace_iwlwifi_dev_rx(struct iwl_trans *trans, void *pkt, size_t len);
+
+static inline void maybe_trace_iwlwifi_dev_rx(struct iwl_trans *trans,
+					      void *pkt, size_t len)
+{
+	if (tracepoint_enabled(iwlwifi_dev_rx) ||
+	    tracepoint_enabled(iwlwifi_dev_rx_data))
+		__trace_iwlwifi_dev_rx(trans, pkt, len);
+}
 #endif /* __IWLWIFI_DEVICE_TRACE */
