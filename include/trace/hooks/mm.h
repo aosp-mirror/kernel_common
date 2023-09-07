@@ -142,6 +142,10 @@ DECLARE_HOOK(android_vh_mem_cgroup_css_offline,
 DECLARE_HOOK(android_vh_si_meminfo,
 	TP_PROTO(struct sysinfo *val),
 	TP_ARGS(val));
+DECLARE_HOOK(android_vh_cma_alloc_bypass,
+	TP_PROTO(struct cma *cma, unsigned long count, unsigned int align,
+		gfp_t gfp_mask, struct page **page, bool *bypass),
+	TP_ARGS(cma, count, align, gfp_mask, page, bypass));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
