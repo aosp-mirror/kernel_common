@@ -700,6 +700,21 @@ enum iwl_statistics_subcmd_ids {
 	 *	statistics &struct iwl_system_statistics_part1_notif_oper
 	 */
 	STATISTICS_OPER_PART1_NOTIF = 0x1,
+
+	/**
+	 * @STATISTICS_OPER_PART2_NOTIF: Notification about operational part2
+	 */
+	STATISTICS_OPER_PART2_NOTIF = 0x2,
+
+	/**
+	 * @STATISTICS_OPER_PART3_NOTIF: Notification about operational part3
+	 */
+	STATISTICS_OPER_PART3_NOTIF = 0x3,
+
+	/**
+	 * @STATISTICS_OPER_PART4_NOTIF: Notification about operational part4
+	 */
+	STATISTICS_OPER_PART4_NOTIF = 0x4,
 };
 
 #endif /* __iwl_fw_api_commands_h__ */

@@ -149,9 +149,40 @@ void iwl_xvt_send_user_rx_notif(struct iwl_xvt *xvt,
 			iwl_xvt_user_send_notif(xvt, IWL_XVT_CMD_TX_CMD_RESP,
 						data, size, GFP_ATOMIC);
 		break;
+	case WIDE_ID(STATISTICS_GROUP, STATISTICS_OPER_NOTIF):
+		iwl_xvt_user_send_notif(xvt,
+					IWL_TM_USER_CMD_NOTIF_STATS_OPER,
+					data, size, GFP_ATOMIC);
+		break;
+	case WIDE_ID(STATISTICS_GROUP, STATISTICS_OPER_PART1_NOTIF):
+		iwl_xvt_user_send_notif(xvt,
+					IWL_TM_USER_CMD_NOTIF_STATS_OPER_PART1,
+					data, size, GFP_ATOMIC);
+		break;
+	case WIDE_ID(STATISTICS_GROUP, STATISTICS_OPER_PART2_NOTIF):
+		iwl_xvt_user_send_notif(xvt,
+					IWL_TM_USER_CMD_NOTIF_STATS_OPER_PART2,
+					data, size, GFP_ATOMIC);
+		break;
+	case WIDE_ID(STATISTICS_GROUP, STATISTICS_OPER_PART3_NOTIF):
+		iwl_xvt_user_send_notif(xvt,
+					IWL_TM_USER_CMD_NOTIF_STATS_OPER_PART3,
+					data, size, GFP_ATOMIC);
+		break;
+	case WIDE_ID(STATISTICS_GROUP, STATISTICS_OPER_PART4_NOTIF):
+		iwl_xvt_user_send_notif(xvt,
+					IWL_TM_USER_CMD_NOTIF_STATS_OPER_PART4,
+					data, size, GFP_ATOMIC);
+		break;
+	case WIDE_ID(SYSTEM_GROUP, SYSTEM_STATISTICS_END_NOTIF):
+		iwl_xvt_user_send_notif(xvt,
+					IWL_TM_USER_CMD_NOTIF_STATS_END,
+					data, size, GFP_ATOMIC);
+		break;
 	default:
-		IWL_DEBUG_INFO(xvt, "xVT mode RX command 0x%x not handled\n",
-			       pkt->hdr.cmd);
+		IWL_DEBUG_INFO(xvt,
+			       "xVT mode RX group 0x%x command 0x%x not handled\n",
+			       pkt->hdr.group_id, pkt->hdr.cmd);
 	}
 }
 
