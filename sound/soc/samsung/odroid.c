@@ -34,7 +34,7 @@ static int odroid_card_fe_startup(struct snd_pcm_substream *substream)
 static int odroid_card_fe_hw_params(struct snd_pcm_substream *substream,
 				      struct snd_pcm_hw_params *params)
 {
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 	struct odroid_priv *priv = snd_soc_card_get_drvdata(rtd->card);
 	unsigned long flags;
 	int ret = 0;
@@ -55,7 +55,7 @@ static const struct snd_soc_ops odroid_card_fe_ops = {
 static int odroid_card_be_hw_params(struct snd_pcm_substream *substream,
 				      struct snd_pcm_hw_params *params)
 {
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 	struct odroid_priv *priv = snd_soc_card_get_drvdata(rtd->card);
 	unsigned int pll_freq, rclk_freq, rfs;
 	unsigned long flags;
@@ -97,7 +97,7 @@ static int odroid_card_be_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 
 	if (rtd->dai_link->num_codecs > 1) {
-		struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 1);
+		struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 1);
 
 		ret = snd_soc_dai_set_sysclk(codec_dai, 0, rclk_freq,
 					     SND_SOC_CLOCK_IN);
@@ -114,7 +114,7 @@ static int odroid_card_be_hw_params(struct snd_pcm_substream *substream,
 
 static int odroid_card_be_trigger(struct snd_pcm_substream *substream, int cmd)
 {
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 	struct odroid_priv *priv = snd_soc_card_get_drvdata(rtd->card);
 	unsigned long flags;
 
