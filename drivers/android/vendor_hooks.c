@@ -48,8 +48,6 @@
 #include <trace/hooks/futex.h>
 #include <trace/hooks/fips140.h>
 #include <trace/hooks/dmabuf.h>
-#include <trace/hooks/gic.h>
-#include <trace/hooks/gic_v3.h>
 #include <trace/hooks/timer.h>
 #include <trace/hooks/topology.h>
 #include <trace/hooks/hung_task.h>
@@ -205,9 +203,6 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_aes_expandkey);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_aes_encrypt);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_aes_decrypt);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_timer_calc_index);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_gic_v3_set_affinity);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_gic_set_affinity);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_gic_v3_affinity_init);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_check_uninterrupt_tasks);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_check_uninterrupt_tasks_done);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_meminfo_proc_show);
@@ -229,8 +224,6 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_do_el1_fpac);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_panic_unhandled);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_arm64_serror_panic);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_disable_thermal_cooling_stats);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_gic_resume);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_gic_v3_suspend);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_kswapd_per_node);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_typec_tcpci_override_toggling);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_typec_tcpci_get_vbus);

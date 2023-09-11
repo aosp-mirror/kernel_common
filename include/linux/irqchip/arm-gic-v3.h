@@ -641,20 +641,6 @@ int its_init(struct fwnode_handle *handle, struct rdists *rdists,
 	     struct irq_domain *domain);
 int mbi_init(struct fwnode_handle *fwnode, struct irq_domain *parent);
 
-struct gic_chip_data_v3 {
-	struct fwnode_handle	*fwnode;
-	void __iomem		*dist_base;
-	struct redist_region	*redist_regions;
-	struct rdists		rdists;
-	struct irq_domain	*domain;
-	u64			redist_stride;
-	u32			nr_redist_regions;
-	u64			flags;
-	bool			has_rss;
-	unsigned int		ppi_nr;
-	struct partition_desc	**ppi_descs;
-};
-
 static inline bool gic_enable_sre(void)
 {
 	u32 val;
@@ -669,12 +655,6 @@ static inline bool gic_enable_sre(void)
 
 	return !!(val & ICC_SRE_EL1_SRE);
 }
-void gic_v3_dist_init(void);
-void gic_v3_cpu_init(void);
-void gic_v3_dist_wait_for_rwp(void);
-void gic_v3_resume(void);
-
-void gic_v3_resume(void);
 
 #endif
 
