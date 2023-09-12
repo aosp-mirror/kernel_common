@@ -24,7 +24,7 @@ config VIDEOBUF2_VMALLOC
 	select DMA_SHARED_BUFFER
 
 config VIDEOBUF2_DMA_SG
-	tristate
+	tristate ""
 	select VIDEOBUF2_CORE
 	select VIDEOBUF2_MEMOPS
 
