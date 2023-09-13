@@ -806,6 +806,7 @@
   component_bind_all
   component_del
   component_master_del
+  devm_extcon_dev_free
   component_unbind_all
   devm_gpio_request_one
   dma_buf_begin_cpu_access
