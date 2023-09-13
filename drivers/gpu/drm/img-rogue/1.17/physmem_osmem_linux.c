@@ -1120,6 +1120,34 @@ eExit:
 #endif /* defined(PVR_LINUX_PHYSMEM_ZERO_ALL_PAGES) */
 }
 
+static bool _PagesHaveOtherRefs(struct page **ppsPageArray, IMG_UINT32 uiNumPages)
+{
+	IMG_UINT32 ui32pageIndex;
+
+	PVR_DPF_ENTERED;
+
+	if (!ppsPageArray)
+	{
+		PVR_DPF_RETURN_RC(false);
+	}
+
+	/* Iterate pages in ppsPageArray and return false if any are found
+	 * to have page_count() > 1. */
+	for (ui32pageIndex = 0; ui32pageIndex < uiNumPages; ui32pageIndex++)
+	{
+		struct page *psPage = ppsPageArray[ui32pageIndex];
+
+		if (page_count(psPage) > 1)
+		{
+			PVR_DPF((PVR_DBG_MESSAGE,
+			         "%s: page %d in page array found with page_count() of %d\n",
+			         __func__, ui32pageIndex, page_count(psPage)));
+			PVR_DPF_RETURN_RC(true);
+		}
+	}
+
+	PVR_DPF_RETURN_RC(false);
+}
 
 /* Put page array to the page pool.
  * Handles locking and checks whether the pages are
@@ -1145,6 +1173,12 @@ _PutPagesToPoolLocked(IMG_UINT32 ui32CPUCacheFlags,
 		IMG_UINT32 *puiCounter;
 		struct list_head *psPoolHead;
 
+		if (_PagesHaveOtherRefs(ppsPageArray, uiNumPages))
+		{
+			/* Pages still have other references, so
+			 * must not be put into our pool. */
+			goto eExitFalse;
+		}
 
 		_PagePoolLock();
 
