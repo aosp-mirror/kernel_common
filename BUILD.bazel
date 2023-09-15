@@ -8,6 +8,7 @@ load(
     "//build/kernel/kleaf:kernel.bzl",
     "checkpatch",
     "ddk_headers",
+    "kernel_abi",
     "kernel_build",
     "kernel_images",
     "kernel_modules_install",
@@ -387,6 +388,12 @@ alias(
         "//build/kernel/kleaf:kgdb_is_true": "db845c_with_kgdb",
         "//conditions:default": "db845c_no_kgdb",
     }),
+)
+
+kernel_abi(
+    name = "db845c_abi",
+    kernel_build = ":db845c",
+    kmi_symbol_list_add_only = True,
 )
 
 kernel_modules_install(
