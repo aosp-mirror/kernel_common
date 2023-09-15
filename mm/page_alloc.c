@@ -3591,7 +3591,6 @@ void free_unref_page(struct page *page, unsigned int order)
 			free_one_page(page_zone(page), page, pfn, order, migratetype, FPI_NONE);
 			return;
 		}
-		migratetype = MIGRATE_MOVABLE;
 		if (migratetype == MIGRATE_HIGHATOMIC)
 			migratetype = MIGRATE_MOVABLE;
 	}
