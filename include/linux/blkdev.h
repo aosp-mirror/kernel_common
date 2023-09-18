@@ -99,9 +99,8 @@ typedef __u32 __bitwise req_flags_t;
 #define RQF_TIMED_OUT		((__force req_flags_t)(1 << 21))
 
 /* flags that prevent us from merging requests: */
-#define RQF_NOMERGE_FLAGS						\
-	(RQF_STARTED | RQF_SOFTBARRIER | RQF_FLUSH_SEQ | RQF_DONTPREP |	\
-	 RQF_SPECIAL_PAYLOAD)
+#define RQF_NOMERGE_FLAGS \
+	(RQF_STARTED | RQF_SOFTBARRIER | RQF_FLUSH_SEQ | RQF_SPECIAL_PAYLOAD)
 
 /*
  * Request state for blk-mq.
