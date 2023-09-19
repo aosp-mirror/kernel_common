@@ -16,7 +16,7 @@ static const struct mfp_test_case {
 	bool sta, mfp, decrypted, unicast, assoc;
 	u8 category;
 	u8 stype;
-	int result;
+	ieee80211_rx_result result;
 } accept_mfp_cases[] = {
 	/* regular public action */
 	{
@@ -24,14 +24,14 @@ static const struct mfp_test_case {
 		.stype = IEEE80211_STYPE_ACTION,
 		.category = WLAN_CATEGORY_PUBLIC,
 		.unicast = true,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	{
 		.desc = "public action: accept multicast from unknown peer",
 		.stype = IEEE80211_STYPE_ACTION,
 		.category = WLAN_CATEGORY_PUBLIC,
 		.unicast = false,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	{
 		.desc = "public action: accept unicast without MFP",
@@ -39,7 +39,7 @@ static const struct mfp_test_case {
 		.category = WLAN_CATEGORY_PUBLIC,
 		.unicast = true,
 		.sta = true,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	{
 		.desc = "public action: accept multicast without MFP",
@@ -47,7 +47,7 @@ static const struct mfp_test_case {
 		.category = WLAN_CATEGORY_PUBLIC,
 		.unicast = false,
 		.sta = true,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	{
 		.desc = "public action: drop unicast with MFP",
@@ -56,7 +56,7 @@ static const struct mfp_test_case {
 		.unicast = true,
 		.sta = true,
 		.mfp = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_UNICAST_PUB_ACTION,
 	},
 	{
 		.desc = "public action: accept multicast with MFP",
@@ -65,7 +65,7 @@ static const struct mfp_test_case {
 		.unicast = false,
 		.sta = true,
 		.mfp = true,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	/* protected dual of public action */
 	{
@@ -73,14 +73,14 @@ static const struct mfp_test_case {
 		.stype = IEEE80211_STYPE_ACTION,
 		.category = WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION,
 		.unicast = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_DUAL,
 	},
 	{
 		.desc = "protected dual: drop multicast from unknown peer",
 		.stype = IEEE80211_STYPE_ACTION,
 		.category = WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION,
 		.unicast = false,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_DUAL,
 	},
 	{
 		.desc = "protected dual: drop unicast without MFP",
@@ -88,7 +88,7 @@ static const struct mfp_test_case {
 		.category = WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION,
 		.unicast = true,
 		.sta = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_DUAL,
 	},
 	{
 		.desc = "protected dual: drop multicast without MFP",
@@ -96,7 +96,7 @@ static const struct mfp_test_case {
 		.category = WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION,
 		.unicast = false,
 		.sta = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_DUAL,
 	},
 	{
 		.desc = "protected dual: drop undecrypted unicast with MFP",
@@ -105,7 +105,7 @@ static const struct mfp_test_case {
 		.unicast = true,
 		.sta = true,
 		.mfp = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_DUAL,
 	},
 	{
 		.desc = "protected dual: drop undecrypted multicast with MFP",
@@ -114,7 +114,7 @@ static const struct mfp_test_case {
 		.unicast = false,
 		.sta = true,
 		.mfp = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_DUAL,
 	},
 	{
 		.desc = "protected dual: accept unicast with MFP",
@@ -124,7 +124,7 @@ static const struct mfp_test_case {
 		.unicast = true,
 		.sta = true,
 		.mfp = true,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	{
 		.desc = "protected dual: accept multicast with MFP",
@@ -134,7 +134,7 @@ static const struct mfp_test_case {
 		.unicast = false,
 		.sta = true,
 		.mfp = true,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	/* deauth/disassoc before keys are set */
 	{
@@ -143,7 +143,7 @@ static const struct mfp_test_case {
 		.sta = true,
 		.mfp = true,
 		.unicast = true,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	{
 		.desc = "disassoc: accept unicast with MFP but w/o key",
@@ -151,7 +151,7 @@ static const struct mfp_test_case {
 		.sta = true,
 		.mfp = true,
 		.unicast = true,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	/* non-public robust action frame ... */
 	{
@@ -160,7 +160,7 @@ static const struct mfp_test_case {
 		.category = WLAN_CATEGORY_BACK,
 		.unicast = true,
 		.sta = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_ROBUST_ACTION,
 	},
 	{
 		.desc = "BA action: drop unprotected after assoc",
@@ -169,7 +169,7 @@ static const struct mfp_test_case {
 		.unicast = true,
 		.sta = true,
 		.mfp = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_UCAST_MGMT,
 	},
 	{
 		.desc = "BA action: accept unprotected without MFP",
@@ -179,7 +179,7 @@ static const struct mfp_test_case {
 		.sta = true,
 		.assoc = true,
 		.mfp = false,
-		.result = 0,
+		.result = RX_CONTINUE,
 	},
 	{
 		.desc = "BA action: drop unprotected with MFP",
@@ -188,7 +188,7 @@ static const struct mfp_test_case {
 		.unicast = true,
 		.sta = true,
 		.mfp = true,
-		.result = -EACCES,
+		.result = RX_DROP_U_UNPROT_UCAST_MGMT,
 	},
 };
 
@@ -252,8 +252,8 @@ static void accept_mfp(struct kunit *test)
 	}
 
 	KUNIT_EXPECT_EQ(test,
-			ieee80211_drop_unencrypted_mgmt(&rx),
-			params->result);
+			(__force u32)ieee80211_drop_unencrypted_mgmt(&rx),
+			(__force u32)params->result);
 }
 
 static struct kunit_case mfp_test_cases[] = {

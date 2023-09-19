@@ -2681,7 +2681,7 @@ ieee80211_eht_cap_ie_to_sta_eht_cap(struct ieee80211_sub_if_data *sdata,
 #if IS_ENABLED(CPTCFG_MAC80211_KUNIT_TEST)
 #define EXPORT_SYMBOL_IF_MAC80211_KUNIT(sym) EXPORT_SYMBOL(sym)
 #define VISIBLE_IF_MAC80211_KUNIT
-int ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx);
+ieee80211_rx_result ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx);
 #else
 #define EXPORT_SYMBOL_IF_MAC80211_KUNIT(sym)
 #define VISIBLE_IF_MAC80211_KUNIT static
