@@ -4497,7 +4497,7 @@ static void rtw89_phy_edcca_init(struct rtw89_dev *rtwdev)
 
 void rtw89_phy_dm_init(struct rtw89_dev *rtwdev)
 {
-	const struct rtw89_chip_info *chip = rtwdev->chip;
+	const struct rtw89_rfe_parms *rfe_parms = rtwdev->rfe_parms;
 
 	rtw89_phy_stat_init(rtwdev);
 
@@ -4515,7 +4515,7 @@ void rtw89_phy_dm_init(struct rtw89_dev *rtwdev)
 
 	rtw89_phy_init_rf_nctl(rtwdev);
 	rtw89_chip_rfk_init(rtwdev);
-	rtw89_load_txpwr_table(rtwdev, chip->byr_table);
+	rtw89_load_txpwr_table(rtwdev, rfe_parms->byr_tbl);
 	rtw89_chip_set_txpwr_ctrl(rtwdev);
 	rtw89_chip_power_trim(rtwdev);
 	rtw89_chip_cfg_txrx_path(rtwdev);
