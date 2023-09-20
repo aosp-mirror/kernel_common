@@ -2011,9 +2011,11 @@ _ieee80211_set_sband_iftype_data(struct ieee80211_supported_band *sband,
 #if CFG80211_VERSION < KERNEL_VERSION(6,6,0)
 #define cfg80211_scan_request_tsf_report_link_id(req)             -1
 #define cfg80211_scan_request_set_tsf_report_link_id(req, ink_id) do {} while (0)
+#define cfg80211_scan_request_check_tsf_report_link_id(req, mask) false
 #else
 #define cfg80211_scan_request_tsf_report_link_id(req)	  (req)->tsf_report_link_id
 #define cfg80211_scan_request_set_tsf_report_link_id(req, v) (req)->tsf_report_link_id = (v)
+#define cfg80211_scan_request_check_tsf_report_link_id(req, mask) ((mask) & BIT((req)->tsf_report_link_id))
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(4,19,0)

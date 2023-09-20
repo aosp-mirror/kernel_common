@@ -733,8 +733,7 @@ static int __ieee80211_start_scan(struct ieee80211_sub_if_data *sdata,
 	 */
 	if (ieee80211_vif_is_mld(&sdata->vif)) {
 		if (cfg80211_scan_request_tsf_report_link_id(req) >= 0) {
-			if (!(sdata->vif.active_links &
-			      BIT(cfg80211_scan_request_tsf_report_link_id(req))))
+			if (!(cfg80211_scan_request_check_tsf_report_link_id(req, sdata->vif.active_links)))
 				return -EINVAL;
 		} else {
 			cfg80211_scan_request_set_tsf_report_link_id(req,
