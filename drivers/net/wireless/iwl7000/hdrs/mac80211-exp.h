@@ -21,7 +21,9 @@
 #define thermal_zone_device_priv __iwl7000_thermal_zone_device_priv
 #endif /* < 6.4 */
 #endif
-#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
+#define wiphy_work_flush __iwl7000_wiphy_work_flush
+#define wiphy_delayed_work_flush __iwl7000_wiphy_delayed_work_flush
 #define wiphy_work_queue __iwl7000_wiphy_work_queue
 #define wiphy_work_cancel __iwl7000_wiphy_work_cancel
 #define wiphy_delayed_work_timer __iwl7000_wiphy_delayed_work_timer
@@ -33,6 +35,8 @@
 #endif
 #if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
 #define cfg80211_defragment_element __iwl7000_cfg80211_defragment_element
+#endif
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 #define ieee80211_fragment_element __iwl7000_ieee80211_fragment_element
 #endif
 #define ieee80211_csa_finish __iwl7000_ieee80211_csa_finish

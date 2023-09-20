@@ -177,7 +177,9 @@ ssize_t cfg80211_defragment_element(const struct element *elem, const u8 *ies,
 	return copied;
 }
 EXPORT_SYMBOL(cfg80211_defragment_element);
+#endif
 
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 void ieee80211_fragment_element(struct sk_buff *skb, u8 *len_pos, u8 frag_id)
 {
 	unsigned int elem_len;

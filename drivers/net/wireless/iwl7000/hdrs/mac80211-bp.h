@@ -1023,8 +1023,6 @@ int ieee80211_get_vht_max_nss(struct ieee80211_vht_cap *cap,
 ssize_t cfg80211_defragment_element(const struct element *elem, const u8 *ies,
 				    size_t ieslen, u8 *data, size_t data_len,
 				    u8 frag_id);
-
-void ieee80211_fragment_element(struct sk_buff *skb, u8 *len_pos, u8 frag_id);
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(5,8,0)
@@ -1996,19 +1994,7 @@ static inline void backport_netif_napi_add(struct net_device *dev,
 #define netif_napi_add LINUX_BACKPORT(netif_napi_add)
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
-static inline void
-_ieee80211_set_sband_iftype_data(struct ieee80211_supported_band *sband,
-				 const struct ieee80211_sband_iftype_data *iftd,
-				 u16 n_iftd)
-{
-#if CFG80211_VERSION >= KERNEL_VERSION(4,19,0)
-	sband->iftype_data = iftd;
-	sband->n_iftype_data = n_iftd;
-#endif
-}
-
-#if CFG80211_VERSION < KERNEL_VERSION(6,6,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 #define cfg80211_scan_request_tsf_report_link_id(req)             -1
 #define cfg80211_scan_request_set_tsf_report_link_id(req, ink_id) do {} while (0)
 #define cfg80211_scan_request_check_tsf_report_link_id(req, mask) false
@@ -2018,16 +2004,7 @@ _ieee80211_set_sband_iftype_data(struct ieee80211_supported_band *sband,
 #define cfg80211_scan_request_check_tsf_report_link_id(req, mask) ((mask) & BIT((req)->tsf_report_link_id))
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(4,19,0)
-#define for_each_sband_iftype_data(sband, i, iftd)	\
-	for (; 0 ;)
-#else
-#define for_each_sband_iftype_data(sband, i, iftd)	\
-	for (i = 0, iftd = &(sband)->iftype_data[i];	\
-	     i < (sband)->n_iftype_data;		\
-	     i++, iftd = &(sband)->iftype_data[i])
-#endif /* CFG80211_VERSION < KERNEL_VERSION(4,19,0) */
-
+#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
 #define cfg80211_req_link_disabled(req, link)	0
 #define NL80211_RRF_NO_EHT 0
 static inline void
@@ -2073,6 +2050,20 @@ LINUX_BACKPORT(kfree_skb_reason)(struct sk_buff *skb, u32 reason)
 #define kfree_skb_reason LINUX_BACKPORT(kfree_skb_reason)
 #endif
 
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
+void ieee80211_fragment_element(struct sk_buff *skb, u8 *len_pos, u8 frag_id);
+
+static inline void
+_ieee80211_set_sband_iftype_data(struct ieee80211_supported_band *sband,
+				 const struct ieee80211_sband_iftype_data *iftd,
+				 u16 n_iftd)
+{
+#if CFG80211_VERSION >= KERNEL_VERSION(4,19,0)
+	sband->iftype_data = iftd;
+	sband->n_iftype_data = n_iftd;
+#endif
+}
+
 #if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
 struct wiphy_work;
 typedef void (*wiphy_work_func_t)(struct wiphy *, struct wiphy_work *);
@@ -2089,17 +2080,16 @@ static inline void wiphy_work_init(struct wiphy_work *work,
 	work->func = func;
 }
 
-void wiphy_work_queue(struct wiphy *wiphy, struct wiphy_work *work);
-void wiphy_work_cancel(struct wiphy *wiphy, struct wiphy_work *work);
-
 struct wiphy_delayed_work {
 	struct wiphy_work work;
 	struct wiphy *wiphy;
 	struct timer_list timer;
 };
+#endif
 
 void wiphy_delayed_work_timer(struct timer_list *t);
 
+#define wiphy_delayed_work_init LINUX_BACKPORT(wiphy_delayed_work_init)
 static inline void wiphy_delayed_work_init(struct wiphy_delayed_work *dwork,
 					   wiphy_work_func_t func)
 {
@@ -2107,15 +2097,30 @@ static inline void wiphy_delayed_work_init(struct wiphy_delayed_work *dwork,
 	wiphy_work_init(&dwork->work, func);
 }
 
+void wiphy_work_queue(struct wiphy *wiphy, struct wiphy_work *work);
+void wiphy_work_cancel(struct wiphy *wiphy, struct wiphy_work *work);
+
 void wiphy_delayed_work_queue(struct wiphy *wiphy,
 			      struct wiphy_delayed_work *dwork,
 			      unsigned long delay);
 void wiphy_delayed_work_cancel(struct wiphy *wiphy,
 			       struct wiphy_delayed_work *dwork);
-#endif
+
+void wiphy_work_flush(struct wiphy *wiphy, struct wiphy_work *work);
+void wiphy_delayed_work_flush(struct wiphy *wiphy,
+			      struct wiphy_delayed_work *work);
+
+#if CFG80211_VERSION < KERNEL_VERSION(4,19,0)
+#define for_each_sband_iftype_data(sband, i, iftd)	\
+	for (; 0 ;)
+#else
+#define for_each_sband_iftype_data(sband, i, iftd)	\
+	for (i = 0, iftd = &(sband)->iftype_data[i];	\
+	     i < (sband)->n_iftype_data;		\
+	     i++, iftd = &(sband)->iftype_data[i])
+#endif /* CFG80211_VERSION < KERNEL_VERSION(4,19,0) */
 
 /* older cfg80211 requires wdev to be locked */
-#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 #define sdata_lock_old_cfg80211(sdata) mutex_lock(&(sdata)->wdev.mtx)
 #define sdata_unlock_old_cfg80211(sdata) mutex_unlock(&(sdata)->wdev.mtx)
 #define WRAP_LOCKED(sym) wdev_locked_ ## sym

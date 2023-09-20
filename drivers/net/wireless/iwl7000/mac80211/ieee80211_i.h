@@ -1372,7 +1372,7 @@ struct ieee80211_local {
 #else
 	unsigned int probe_req_reg;
 #endif
-#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 	struct work_struct wiphy_work;
 	struct list_head wiphy_work_list;
 	spinlock_t wiphy_work_lock;
@@ -2655,12 +2655,9 @@ u32 ieee80211_calc_expected_tx_airtime(struct ieee80211_hw *hw,
 #define debug_noinline
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 void wiphy_work_setup(struct ieee80211_local *local);
 void wiphy_work_teardown(struct ieee80211_local *local);
-void wiphy_work_flush(struct wiphy *wiphy, struct wiphy_work *work);
-void wiphy_delayed_work_flush(struct wiphy *wiphy,
-			       struct wiphy_delayed_work *work);
 #endif
 
 void ieee80211_init_frag_cache(struct ieee80211_fragment_cache *cache);

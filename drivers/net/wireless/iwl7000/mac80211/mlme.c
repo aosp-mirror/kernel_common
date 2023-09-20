@@ -8033,7 +8033,7 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 					     assoc_data->link[i].bss, true,
 					     &assoc_data->link[i].conn_flags);
 		if (err) {
-#if CFG80211_VERSION >= KERNEL_VERSION(6, 5, 0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
 			req->links[i].error = err;
 #endif
 			goto err_clear;

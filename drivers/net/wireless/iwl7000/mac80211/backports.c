@@ -296,7 +296,7 @@ bool cfg80211_valid_disable_subchannel_bitmap(u16 *bitmap,
 
 #endif /* < 6.3  */
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 #include "mac80211/ieee80211_i.h"
 
 static void cfg80211_wiphy_work(struct work_struct *work)
@@ -373,6 +373,7 @@ void wiphy_work_flush(struct wiphy *wiphy, struct wiphy_work *end)
 	}
 	spin_unlock_irqrestore(&local->wiphy_work_lock, flags);
 }
+EXPORT_SYMBOL(wiphy_work_flush);
 
 void wiphy_delayed_work_flush(struct wiphy *wiphy,
 			      struct wiphy_delayed_work *dwork)
@@ -380,6 +381,7 @@ void wiphy_delayed_work_flush(struct wiphy *wiphy,
 	del_timer_sync(&dwork->timer);
 	wiphy_work_flush(wiphy, &dwork->work);
 }
+EXPORT_SYMBOL(wiphy_delayed_work_flush);
 
 void wiphy_work_teardown(struct ieee80211_local *local)
 {
