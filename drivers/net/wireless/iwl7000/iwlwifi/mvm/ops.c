@@ -351,7 +351,8 @@ static const struct iwl_rx_handlers iwl_mvm_rx_handlers[] = {
 #endif /* CPTCFG_IWLMVM_VENDOR_CMDS */
 
 	RX_HANDLER(BT_PROFILE_NOTIFICATION, iwl_mvm_rx_bt_coex_notif,
-		   RX_HANDLER_ASYNC_LOCKED, struct iwl_bt_coex_profile_notif),
+		   RX_HANDLER_ASYNC_LOCKED_WIPHY,
+		   struct iwl_bt_coex_profile_notif),
 	RX_HANDLER_NO_SIZE(BEACON_NOTIFICATION, iwl_mvm_rx_beacon_notif,
 			   RX_HANDLER_ASYNC_LOCKED),
 	RX_HANDLER_NO_SIZE(STATISTICS_NOTIFICATION, iwl_mvm_rx_statistics,
@@ -359,7 +360,7 @@ static const struct iwl_rx_handlers iwl_mvm_rx_handlers[] = {
 
 	RX_HANDLER_GRP(STATISTICS_GROUP, STATISTICS_OPER_NOTIF,
 		       iwl_mvm_handle_rx_system_oper_stats,
-		       RX_HANDLER_ASYNC_LOCKED,
+		       RX_HANDLER_ASYNC_LOCKED_WIPHY,
 		       struct iwl_system_statistics_notif_oper),
 	RX_HANDLER_GRP(STATISTICS_GROUP, STATISTICS_OPER_PART1_NOTIF,
 		       iwl_mvm_handle_rx_system_oper_part1_stats,
