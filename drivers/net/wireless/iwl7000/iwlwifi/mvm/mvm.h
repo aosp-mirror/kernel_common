@@ -1252,6 +1252,7 @@ struct iwl_mvm {
 	bool force_enable_rfi;
 	bool statistics_clear;
 	struct iwl_rfi_config_cmd *iwl_prev_rfi_config_cmd;
+	bool bios_enable_rfi;
 };
 
 /* Extract MVM priv from op_mode and _hw */
@@ -2493,8 +2494,7 @@ u32 iwl_mvm_get_sec_flags(struct iwl_mvm *mvm,
 
 /* 11ax Softap Test Mode */
 
-bool iwl_rfi_ddr_supported(struct iwl_mvm *mvm, bool so_rfi_mode);
-bool iwl_rfi_dlvr_supported(struct iwl_mvm *mvm, bool so_rfi_mode);
+bool iwl_rfi_supported(struct iwl_mvm *mvm, bool so_rfi_mode, bool is_ddr);
 int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 			    struct iwl_rfi_lut_entry *rfi_table,
 			    bool is_set_master_cmd, bool force_send_table);
@@ -2805,8 +2805,7 @@ int iwl_mvm_set_hw_timestamp(struct ieee80211_hw *hw,
 			     struct cfg80211_set_hw_timestamp *hwts);
 int iwl_mvm_update_mu_groups(struct iwl_mvm *mvm, struct ieee80211_vif *vif);
 void iwl_mvm_set_twt_testmode(struct iwl_mvm *mvm);
-u8 iwl_mvm_eval_dsm_rfi_ddr(struct iwl_mvm *mvm);
-u8 iwl_mvm_eval_dsm_rfi_dlvr(struct iwl_mvm *mvm);
+bool iwl_mvm_eval_dsm_rfi(struct iwl_mvm *mvm);
 bool iwl_mvm_enable_fils(struct iwl_mvm *mvm,
 			 struct ieee80211_chanctx_conf *ctx);
 void iwl_mvm_mld_select_links(struct iwl_mvm *mvm, struct ieee80211_vif *vif,

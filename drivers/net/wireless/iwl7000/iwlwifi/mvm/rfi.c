@@ -163,47 +163,24 @@ static inline bool iwl_rfi_enabled_by_mac_type(struct iwl_mvm *mvm,
 	return enable_rfi;
 }
 
-bool iwl_rfi_ddr_supported(struct iwl_mvm *mvm, bool so_rfi_mode)
+bool iwl_rfi_supported(struct iwl_mvm *mvm, bool so_rfi_mode, bool is_ddr)
 {
-	u8 dsm_rfi_ddr = iwl_mvm_eval_dsm_rfi_ddr(mvm);
 	bool rfi_enable_mac_type = iwl_rfi_enabled_by_mac_type(mvm,
 							       so_rfi_mode);
 	bool ddr_capa = fw_has_capa(&mvm->fw->ucode_capa,
 				    IWL_UCODE_TLV_CAPA_RFI_DDR_SUPPORT);
-
-	IWL_DEBUG_FW(mvm,
-		     "FW has RFI DDR capability:%s DDR enabled in BIOS:%s\n",
-		     ddr_capa ? "yes" : "no",
-		     dsm_rfi_ddr == DSM_VALUE_RFI_DDR_ENABLE ? "yes" : "no");
-	IWL_DEBUG_FW(mvm,
-		     "HW is integrated:%s rfi_enabled:%s fw_rfi_state:%d\n",
-		     mvm->trans->trans_cfg->integrated ? "yes" : "no",
-		     rfi_enable_mac_type ? "yes" : "no", mvm->fw_rfi_state);
-
-	return ddr_capa && dsm_rfi_ddr == DSM_VALUE_RFI_DDR_ENABLE &&
-		rfi_enable_mac_type && mvm->trans->trans_cfg->integrated &&
-		mvm->fw_rfi_state == IWL_RFI_PMC_SUPPORTED;
-}
-
-bool iwl_rfi_dlvr_supported(struct iwl_mvm *mvm, bool so_rfi_mode)
-{
-	u8 dsm_rfi_dlvr = iwl_mvm_eval_dsm_rfi_dlvr(mvm);
-	bool rfi_enable_mac_type = iwl_rfi_enabled_by_mac_type(mvm,
-							       so_rfi_mode);
 	bool dlvr_capa = fw_has_capa(&mvm->fw->ucode_capa,
 				     IWL_UCODE_TLV_CAPA_RFI_DLVR_SUPPORT);
 
-	IWL_DEBUG_FW(mvm,
-		     "FW has RFI DLVR capability:%s DLVR enabled in BIOS:%s\n",
-		     dlvr_capa ? "yes" : "no",
-		     dsm_rfi_dlvr == DSM_VALUE_RFI_DLVR_ENABLE ? "yes" : "no");
+	IWL_DEBUG_FW(mvm, "FW has RFI DDR capability:%s DLVR capability:%s\n",
+		     ddr_capa ? "yes" : "no", dlvr_capa ? "yes" : "no");
 
 	IWL_DEBUG_FW(mvm,
 		     "HW is integrated:%s rfi_enabled:%s fw_rfi_state:%d\n",
 		     mvm->trans->trans_cfg->integrated ? "yes" : "no",
 		     rfi_enable_mac_type ? "yes" : "no", mvm->fw_rfi_state);
 
-	return dlvr_capa && dsm_rfi_dlvr == DSM_VALUE_RFI_DLVR_ENABLE &&
+	return (is_ddr ? ddr_capa : dlvr_capa) && mvm->bios_enable_rfi &&
 		rfi_enable_mac_type && mvm->trans->trans_cfg->integrated &&
 		mvm->fw_rfi_state == IWL_RFI_PMC_SUPPORTED;
 }
@@ -241,8 +218,8 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 		so_rfi_mode = mvm->force_enable_rfi;
 	}
 
-	rfi_ddr_support = iwl_rfi_ddr_supported(mvm, so_rfi_mode);
-	rfi_dlvr_support = iwl_rfi_dlvr_supported(mvm, so_rfi_mode);
+	rfi_ddr_support = iwl_rfi_supported(mvm, so_rfi_mode, true);
+	rfi_dlvr_support = iwl_rfi_supported(mvm, so_rfi_mode, false);
 
 	if (!rfi_ddr_support && !rfi_dlvr_support)
 		return -EOPNOTSUPP;
@@ -351,7 +328,7 @@ struct iwl_rfi_freq_table_resp_cmd *iwl_rfi_get_freq_table(struct iwl_mvm *mvm)
 		.flags = CMD_WANT_SKB,
 	};
 
-	if (!iwl_rfi_ddr_supported(mvm, mvm->force_enable_rfi))
+	if (!iwl_rfi_supported(mvm, mvm->force_enable_rfi, true))
 		return ERR_PTR(-EOPNOTSUPP);
 
 	mutex_lock(&mvm->mutex);

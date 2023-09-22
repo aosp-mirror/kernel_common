@@ -140,7 +140,7 @@ enum iwl_dsm_funcs_rev_0 {
 	DSM_FUNC_ACTIVATE_CHANNEL = 8,
 	DSM_FUNC_FORCE_DISABLE_CHANNELS = 9,
 	DSM_FUNC_ENERGY_DETECTION_THRESHOLD = 10,
-	DSM_FUNC_RFI_DLVR_CONFIG = 11
+	DSM_FUNC_RFI_CONFIG = 11
 };
 
 enum iwl_dsm_values_srd {
@@ -157,23 +157,13 @@ enum iwl_dsm_values_indonesia {
 	DSM_VALUE_INDONESIA_MAX
 };
 
-/* CNV internal DSM functions / definitions */
-
-enum iwl_dsm_internal_funcs {
-	DSM_INTERNAL_FUNC_RFI_DDR_ENABLE = 3,
+enum iwl_dsm_values_rfi {
+	DSM_VALUE_RFI_DLVR_DISABLE	= BIT(0),
+	DSM_VALUE_RFI_DDR_DISABLE	= BIT(1),
 };
 
-enum iwl_dsm_values_rfi_ddr {
-	DSM_VALUE_RFI_DDR_ENABLE,
-	DSM_VALUE_RFI_DDR_DISABLE,
-	DSM_VALUE_RFI_DDR_MAX
-};
-
-enum iwl_dsm_values_rfi_dlvr {
-	DSM_VALUE_RFI_DLVR_ENABLE,
-	DSM_VALUE_RFI_DLVR_DISABLE,
-	DSM_VALUE_RFI_DLVR_MAX
-};
+#define DSM_VALUE_RFI_DISABLE	(DSM_VALUE_RFI_DLVR_DISABLE |\
+				 DSM_VALUE_RFI_DDR_DISABLE)
 
 enum iwl_dsm_masks_reg {
 	DSM_MASK_CHINA_22_REG = BIT(2)
@@ -184,7 +174,6 @@ enum iwl_dsm_masks_reg {
 struct iwl_fw_runtime;
 
 extern const guid_t iwl_guid;
-extern const guid_t iwl_internal_guid;
 
 int iwl_acpi_get_dsm_u8(struct device *dev, int rev, int func,
 			const guid_t *guid, u8 *value);

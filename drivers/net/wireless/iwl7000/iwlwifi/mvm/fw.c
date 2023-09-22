@@ -1398,58 +1398,37 @@ static void iwl_mvm_tas_init(struct iwl_mvm *mvm)
 		IWL_DEBUG_RADIO(mvm, "failed to send TAS_CONFIG (%d)\n", ret);
 }
 
-u8 iwl_mvm_eval_dsm_rfi_dlvr(struct iwl_mvm *mvm)
+bool iwl_mvm_eval_dsm_rfi(struct iwl_mvm *mvm)
 {
-	u8 value;
+	u8 value = 0;
+	/* default behaviour is disabled */
+	bool bios_enable_rfi = false;
+	int ret  = iwl_acpi_get_dsm_u8(mvm->fwrt.dev, 0,
+				       DSM_FUNC_RFI_CONFIG, &iwl_guid,
+				       &value);
 
-	int ret = iwl_acpi_get_dsm_u8(mvm->fwrt.dev, 0,
-				      DSM_FUNC_RFI_DLVR_CONFIG, &iwl_guid,
-				      &value);
 	if (ret < 0) {
-		IWL_DEBUG_RADIO(mvm, "Failed to get DSM RFI DLVR, ret=%d\n",
-				ret);
-
-	} else if (value >= DSM_VALUE_RFI_DLVR_MAX) {
-		IWL_DEBUG_RADIO(mvm,
-				"DSM RFI DLVR got invalid value, value=%d\n",
-				value);
-
-	} else if (value == DSM_VALUE_RFI_DLVR_ENABLE) {
-		IWL_DEBUG_RADIO(mvm, "DSM RFI DLVR is evaluated to enable\n");
-		return DSM_VALUE_RFI_DLVR_ENABLE;
+		IWL_DEBUG_RADIO(mvm, "Failed to get DSM RFI, ret=%d\n", ret);
+		return bios_enable_rfi;
 	}
 
-	IWL_DEBUG_RADIO(mvm, "DSM RFI DLVR is disabled\n");
-
-	/* default behaviour is disabled */
-	return DSM_VALUE_RFI_DLVR_DISABLE;
-}
-
-u8 iwl_mvm_eval_dsm_rfi_ddr(struct iwl_mvm *mvm)
-{
-	u8 value;
-
-	int ret = iwl_acpi_get_dsm_u8(mvm->fwrt.dev, 0,
-				      DSM_INTERNAL_FUNC_RFI_DDR_ENABLE,
-				      &iwl_internal_guid, &value);
-	if (ret < 0) {
-		IWL_DEBUG_RADIO(mvm, "Failed to get DSM RFI DDR, ret=%d\n",
-				ret);
-
-	} else if (value >= DSM_VALUE_RFI_DDR_MAX) {
+	value &= DSM_VALUE_RFI_DISABLE;
+	/* RFI BIOS CONFIG value can be 0 or 3 only.
+	 * i.e 0 means DDR and DLVR enabled. 3 means DDR and DLVR disabled.
+	 * 1 and 2 are invalid BIOS configurations, So, it's not possible to
+	 * disable ddr/dlvr separately.
+	 */
+	if (!value) {
+		IWL_DEBUG_RADIO(mvm, "DSM RFI is evaluated to enable\n");
+		bios_enable_rfi = true;
+	} else if (value == DSM_VALUE_RFI_DISABLE) {
+		IWL_DEBUG_RADIO(mvm, "DSM RFI is evaluated to disable\n");
+	} else {
 		IWL_DEBUG_RADIO(mvm,
-				"DSM RFI DDR got invalid value, value=%d\n",
-				value);
-
-	} else if (value == DSM_VALUE_RFI_DDR_ENABLE) {
-		IWL_DEBUG_RADIO(mvm, "DSM RFI DDR is evaluated to enable\n");
-		return DSM_VALUE_RFI_DDR_ENABLE;
+				"DSM RFI got invalid value, value=%d\n", value);
 	}
 
-	IWL_DEBUG_RADIO(mvm, "DSM RFI DDR is disabled\n");
-
-	/* default behaviour is disabled */
-	return DSM_VALUE_RFI_DDR_DISABLE;
+	return bios_enable_rfi;
 }
 
 static void iwl_mvm_lari_cfg(struct iwl_mvm *mvm)
@@ -1655,14 +1634,9 @@ static void iwl_mvm_lari_cfg(struct iwl_mvm *mvm)
 {
 }
 
-u8 iwl_mvm_eval_dsm_rfi_ddr(struct iwl_mvm *mvm)
+bool iwl_mvm_eval_dsm_rfi(struct iwl_mvm *mvm)
 {
-	return DSM_VALUE_RFI_DDR_DISABLE;
-}
-
-u8 iwl_mvm_eval_dsm_rfi_dlvr(struct iwl_mvm *mvm)
-{
-	return DSM_VALUE_RFI_DLVR_DISABLE;
+	return false;
 }
 
 void iwl_mvm_get_acpi_tables(struct iwl_mvm *mvm)

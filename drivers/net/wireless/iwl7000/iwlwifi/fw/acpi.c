@@ -15,11 +15,6 @@ const guid_t iwl_guid = GUID_INIT(0xF21202BF, 0x8F78, 0x4DC6,
 				  0x8E, 0x28, 0x5A, 0xDE);
 IWL_EXPORT_SYMBOL(iwl_guid);
 
-const guid_t iwl_internal_guid = GUID_INIT(0x7266172C, 0x220B, 0x4B29,
-					   0x81, 0x4F, 0x75, 0xE4,
-					   0xDD, 0x26, 0xB5, 0xFD);
-IWL_EXPORT_SYMBOL(iwl_internal_guid);
-
 static const struct dmi_system_id dmi_ppag_approved_list[] = {
 	{ .ident = "HP",
 	  .matches = {

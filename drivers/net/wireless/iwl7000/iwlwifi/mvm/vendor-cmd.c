@@ -422,13 +422,13 @@ static int iwl_vendor_rfim_get_capa(struct wiphy *wiphy,
 		return -ENOMEM;
 
 	if (mvm->trans->trans_cfg->integrated) {
-		if (iwl_rfi_ddr_supported(mvm, mvm->force_enable_rfi))
+		if (iwl_rfi_supported(mvm, mvm->force_enable_rfi, true))
 			capa = IWL_MVM_RFI_DDR_CAPA_ALL;
 		else
 			capa = IWL_MVM_RFI_DDR_CAPA_CNVI;
 	}
 
-	if (iwl_rfi_dlvr_supported(mvm, mvm->force_enable_rfi))
+	if (iwl_rfi_supported(mvm, mvm->force_enable_rfi, false))
 		capa |= IWL_MVM_RFI_DLVR_CAPA;
 
 	IWL_DEBUG_FW(mvm, "RFIm capabilities:%04x\n", capa);
