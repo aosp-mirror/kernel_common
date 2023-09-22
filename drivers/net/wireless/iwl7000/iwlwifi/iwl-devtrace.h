@@ -94,16 +94,20 @@ static inline void trace_ ## name(proto) {}
 #include "iwl-devtrace-data.h"
 #include "iwl-devtrace-iwlwifi.h"
 
+#ifdef CPTCFG_IWLWIFI_DEVICE_TRACING
 DECLARE_TRACEPOINT(iwlwifi_dev_rx);
 DECLARE_TRACEPOINT(iwlwifi_dev_rx_data);
+#endif
 
 void __trace_iwlwifi_dev_rx(struct iwl_trans *trans, void *pkt, size_t len);
 
 static inline void maybe_trace_iwlwifi_dev_rx(struct iwl_trans *trans,
 					      void *pkt, size_t len)
 {
+#ifdef CPTCFG_IWLWIFI_DEVICE_TRACING
 	if (tracepoint_enabled(iwlwifi_dev_rx) ||
 	    tracepoint_enabled(iwlwifi_dev_rx_data))
 		__trace_iwlwifi_dev_rx(trans, pkt, len);
+#endif
 }
 #endif /* __IWLWIFI_DEVICE_TRACE */
