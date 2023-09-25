@@ -517,6 +517,7 @@
   drm_atomic_helper_check
   drm_atomic_helper_cleanup_planes
   drm_atomic_helper_commit_cleanup_done
+  drm_atomic_helper_commit_duplicated_state
   drm_atomic_helper_commit_tail
   drm_atomic_helper_commit_tail_rpm
   __drm_atomic_helper_connector_destroy_state
@@ -528,6 +529,7 @@
   __drm_atomic_helper_crtc_destroy_state
   __drm_atomic_helper_crtc_duplicate_state
   drm_atomic_helper_disable_plane
+  drm_atomic_helper_duplicate_state
   drm_atomic_helper_page_flip
   __drm_atomic_helper_plane_destroy_state
   __drm_atomic_helper_plane_duplicate_state
@@ -635,6 +637,7 @@
   drm_modeset_drop_locks
   drm_modeset_lock
   drm_modeset_lock_all
+  drm_modeset_lock_all_ctx
   drm_modeset_unlock
   drm_modeset_unlock_all
   drm_mode_vrefresh
@@ -712,6 +715,7 @@
   find_get_pid
   _find_last_bit
   _find_next_bit
+  find_task_by_vpid
   __find_vma
   find_vm_area
   find_vpid
@@ -810,6 +814,7 @@
   get_random_bytes
   get_random_u32
   get_random_u64
+  __get_task_comm
   get_tree_bdev
   get_unused_fd_flags
   get_user_pages
@@ -1722,6 +1727,7 @@
   sg_next
   __sg_page_iter_next
   __sg_page_iter_start
+  sg_pcopy_to_buffer
   show_class_attr_string
   show_regs
   simple_attr_open
@@ -1965,6 +1971,8 @@
   __traceiter_android_vh_iommu_iovad_free_iova
   __traceiter_android_vh_ipi_stop
   __traceiter_android_vh_mem_cgroup_alloc
+  __traceiter_android_vh_printk_caller
+  __traceiter_android_vh_printk_caller_id
   __traceiter_android_vh_rmqueue
   __traceiter_android_vh_sched_show_task
   __traceiter_android_vh_set_module_permit_after_init
@@ -2000,6 +2008,8 @@
   __tracepoint_android_vh_iommu_iovad_free_iova
   __tracepoint_android_vh_ipi_stop
   __tracepoint_android_vh_mem_cgroup_alloc
+  __tracepoint_android_vh_printk_caller
+  __tracepoint_android_vh_printk_caller_id
   __tracepoint_android_vh_rmqueue
   __tracepoint_android_vh_sched_show_task
   __tracepoint_android_vh_set_module_permit_after_init
@@ -2054,6 +2064,7 @@
   unregister_blkdev
   __unregister_chrdev
   unregister_chrdev_region
+  unregister_die_notifier
   unregister_filesystem
   unregister_inet6addr_notifier
   unregister_inetaddr_notifier
@@ -2096,6 +2107,9 @@
   usb_get_from_anchor
   usb_hcd_check_unlink_urb
   usb_hcd_giveback_urb
+  usb_hcd_is_primary_hcd
+  usb_hcd_link_urb_to_ep
+  usb_hcd_map_urb_for_dma
   usb_hcd_resume_root_hub
   usb_ifnum_to_if
   usb_interrupt_msg
@@ -2240,6 +2254,7 @@
   xdp_rxq_info_unreg
   xdp_rxq_info_unreg_mem_model
   xdp_warn
+  xhci_get_ep_ctx
   xp_alloc
   xp_dma_map
   xp_dma_sync_for_cpu_slow
