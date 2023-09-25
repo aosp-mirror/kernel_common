@@ -371,6 +371,18 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_BAD_MAPPING, e0);
 	}
 
+	uiLog2PageSize = PMR_GetLog2Contiguity(psPMR);
+
+	/* Check the number of PFNs to be mapped is valid. */
+	uiNumOfPFNs = uiLength >> uiLog2PageSize;
+	if (uiNumOfPFNs == 0)
+	{
+		PVR_LOG_VA(PVR_DBG_ERROR,
+		           "uiLength is invalid. Must be >= %u.",
+		           1 << uiLog2PageSize);
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_BAD_MAPPING, e0);
+	}
+
 	eError = PMRLockSysPhysAddresses(psPMR);
 	if (eError != PVRSRV_OK)
 	{
@@ -429,16 +441,13 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 	/* Don't allow mapping to be inherited across a process fork */
 	vm_flags_set(ps_vma, VM_DONTCOPY);
 
+#if defined(PMR_OS_USE_VM_INSERT_PAGE)
 	/* Is this mmap targeting non order-zero pages or does it use pfn mappings?
 	 * If yes, don't use vm_insert_page */
-	uiLog2PageSize = PMR_GetLog2Contiguity(psPMR);
-
-#if defined(PMR_OS_USE_VM_INSERT_PAGE)
 	bUseVMInsertPage = (uiLog2PageSize == PAGE_SHIFT) && (PMR_GetType(psPMR) != PMR_TYPE_EXTMEM);
 #endif
 
 	/* Can we use stack allocations */
-	uiNumOfPFNs = uiLength >> uiLog2PageSize;
 	if (uiNumOfPFNs > PMR_MAX_TRANSLATION_STACK_ALLOC)
 	{
 		psCpuPAddr = OSAllocMem(uiNumOfPFNs * sizeof(*psCpuPAddr));

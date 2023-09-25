@@ -52,12 +52,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /*
  *  Supported log2 page size values for RGX_GENERAL_NON_4K_HEAP_ID
  */
-#define RGX_HEAP_4KB_PAGE_SHIFT					(12U)
-#define RGX_HEAP_16KB_PAGE_SHIFT				(14U)
-#define RGX_HEAP_64KB_PAGE_SHIFT				(16U)
-#define RGX_HEAP_256KB_PAGE_SHIFT				(18U)
-#define RGX_HEAP_1MB_PAGE_SHIFT					(20U)
-#define RGX_HEAP_2MB_PAGE_SHIFT					(21U)
+#define RGX_HEAP_PAGE_SHIFTS_DEF \
+	X(4KB, 12U) \
+	X(16KB, 14U) \
+	X(64KB, 16U) \
+	X(256KB, 18U) \
+	X(1MB, 20U) \
+	X(2MB, 21U)
+
+typedef enum RGX_HEAP_PAGE_SHIFTS_TAG
+{
+#define X(_name, _shift) RGX_HEAP_ ## _name ## _PAGE_SHIFT = _shift,
+	RGX_HEAP_PAGE_SHIFTS_DEF
+#undef X
+} RGX_HEAP_PAGE_SHIFTS;
 
 struct _PVRSRV_DEVICE_NODE_;
 struct _CONNECTION_DATA_;

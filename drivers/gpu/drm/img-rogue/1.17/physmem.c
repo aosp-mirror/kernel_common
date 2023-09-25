@@ -297,11 +297,18 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	/* Protect against ridiculous page sizes */
-	if (uiLog2AllocPageSize > RGX_HEAP_2MB_PAGE_SHIFT)
+	/* Protect against invalid page sizes */
+	switch (uiLog2AllocPageSize)
 	{
-		PVR_DPF((PVR_DBG_ERROR, "Page size is too big: 2^%u.", uiLog2AllocPageSize));
-		return PVRSRV_ERROR_INVALID_PARAMS;
+		#define X(_name, _shift) case _shift:
+			RGX_HEAP_PAGE_SHIFTS_DEF
+		#undef X
+			break;
+		default:
+			PVR_LOG_VA(PVR_DBG_ERROR,
+			           "page size of %u is invalid.",
+			           1 << uiLog2AllocPageSize);
+			return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	/* Range check of the alloc size */
