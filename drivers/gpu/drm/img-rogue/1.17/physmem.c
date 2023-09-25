@@ -289,12 +289,10 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 	IMG_BOOL bIsSparse = (ui32NumVirtChunks != ui32NumPhysChunks ||
 			ui32NumVirtChunks > 1) ? IMG_TRUE : IMG_FALSE;
 
-	if (ui32NumPhysChunks == 0 && ui32NumVirtChunks == 0)
+	if (ui32NumVirtChunks == 0)
 	{
-		PVR_DPF((PVR_DBG_ERROR,
-				"%s: Number of physical chunks and number of virtual chunks "
-				"cannot be both 0",
-				__func__));
+		PVR_DPF((PVR_DBG_ERROR, "%s: Number of virtual chunks cannot be 0",
+		         __func__));
 
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}

@@ -354,10 +354,22 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 	IMG_BOOL *pbValid;
 	IMG_BOOL bUseMixedMap = IMG_FALSE;
 	IMG_BOOL bUseVMInsertPage = IMG_FALSE;
+	IMG_DEVMEM_SIZE_T uiPmrVirtualSize;
 
 	/* if writeable but not shared mapping is requested then fail */
 	PVR_RETURN_IF_INVALID_PARAM(((ps_vma->vm_flags & VM_WRITE) == 0) ||
 	                            ((ps_vma->vm_flags & VM_SHARED) != 0));
+
+	uiLength = ps_vma->vm_end - ps_vma->vm_start;
+
+	PMR_LogicalSize(psPMR, &uiPmrVirtualSize);
+
+	/* Check early if the requested mapping size doesn't exceed the virtual
+	 * PMR size. */
+	if (uiPmrVirtualSize < uiLength)
+	{
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_BAD_MAPPING, e0);
+	}
 
 	eError = PMRLockSysPhysAddresses(psPMR);
 	if (eError != PVRSRV_OK)
@@ -416,8 +428,6 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 
 	/* Don't allow mapping to be inherited across a process fork */
 	vm_flags_set(ps_vma, VM_DONTCOPY);
-
-	uiLength = ps_vma->vm_end - ps_vma->vm_start;
 
 	/* Is this mmap targeting non order-zero pages or does it use pfn mappings?
 	 * If yes, don't use vm_insert_page */
