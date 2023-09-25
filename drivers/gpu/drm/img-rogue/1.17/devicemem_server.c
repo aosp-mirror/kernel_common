@@ -1127,6 +1127,14 @@ DevmemIntChangeSparse(DEVMEMINT_HEAP *psDevmemHeap,
 	IMG_UINT32 uiMapPageCount = ui32AllocPageCount;
 	IMG_UINT32 uiUnmapPageCount = ui32FreePageCount;
 
+	if (uiLog2HeapContiguity > uiLog2PMRContiguity)
+	{
+		PVR_DPF((PVR_DBG_ERROR,
+		        "%s: Invalid PMR Contiguity for given DevmemHeap.",
+		        __func__));
+		return PVRSRV_ERROR_PMR_INCOMPATIBLE_CONTIGUITY;
+	}
+
 	/* Special case:
 	 * Adjust indices if we map into a heap that uses smaller page sizes
 	 * than the physical allocation itself.
