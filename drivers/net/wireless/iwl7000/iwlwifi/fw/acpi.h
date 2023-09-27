@@ -157,9 +157,11 @@ enum iwl_dsm_values_indonesia {
 	DSM_VALUE_INDONESIA_MAX
 };
 
-/* DSM RFI uses a different GUID, so need separate definitions */
+/* CNV internal DSM functions / definitions */
 
-#define DSM_RFI_DDR_FUNC_ENABLE 3
+enum iwl_dsm_internal_funcs {
+	DSM_INTERNAL_FUNC_RFI_DDR_ENABLE = 3,
+};
 
 enum iwl_dsm_values_rfi_ddr {
 	DSM_VALUE_RFI_DDR_ENABLE,
@@ -182,7 +184,7 @@ enum iwl_dsm_masks_reg {
 struct iwl_fw_runtime;
 
 extern const guid_t iwl_guid;
-extern const guid_t iwl_rfi_guid;
+extern const guid_t iwl_internal_guid;
 
 int iwl_acpi_get_dsm_u8(struct device *dev, int rev, int func,
 			const guid_t *guid, u8 *value);

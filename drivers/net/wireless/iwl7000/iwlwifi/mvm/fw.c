@@ -1429,8 +1429,9 @@ u8 iwl_mvm_eval_dsm_rfi_ddr(struct iwl_mvm *mvm)
 {
 	u8 value;
 
-	int ret = iwl_acpi_get_dsm_u8(mvm->fwrt.dev, 0, DSM_RFI_DDR_FUNC_ENABLE,
-				      &iwl_rfi_guid, &value);
+	int ret = iwl_acpi_get_dsm_u8(mvm->fwrt.dev, 0,
+				      DSM_INTERNAL_FUNC_RFI_DDR_ENABLE,
+				      &iwl_internal_guid, &value);
 	if (ret < 0) {
 		IWL_DEBUG_RADIO(mvm, "Failed to get DSM RFI DDR, ret=%d\n",
 				ret);
