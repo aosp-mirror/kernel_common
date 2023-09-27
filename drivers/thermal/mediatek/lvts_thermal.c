@@ -1243,7 +1243,7 @@ static int lvts_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int lvts_remove(struct platform_device *pdev)
+static void lvts_remove(struct platform_device *pdev)
 {
 	struct lvts_domain *lvts_td;
 	int i;
@@ -1254,8 +1254,6 @@ static int lvts_remove(struct platform_device *pdev)
 		lvts_ctrl_set_enable(&lvts_td->lvts_ctrl[i], false);
 
 	lvts_debugfs_exit(lvts_td);
-
-	return 0;
 }
 
 static const struct lvts_ctrl_data mt8195_lvts_mcu_data_ctrl[] = {
@@ -1356,7 +1354,7 @@ MODULE_DEVICE_TABLE(of, lvts_of_match);
 
 static struct platform_driver lvts_driver = {
 	.probe = lvts_probe,
-	.remove = lvts_remove,
+	.remove_new = lvts_remove,
 	.driver = {
 		.name = "mtk-lvts-thermal",
 		.of_match_table = lvts_of_match,
