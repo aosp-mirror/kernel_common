@@ -20,6 +20,7 @@ load(
     "android_filegroup",
     "checkpatch",
     "ddk_headers",
+    "ddk_headers_archive",
     "kernel_build",
     "kernel_images",
     "kernel_modules_install",
@@ -110,6 +111,7 @@ define_common_kernels(target_configs = {
     "kernel_aarch64": {
         "module_implicit_outs": get_gki_modules_list("arm64"),
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
+        "ddk_headers_archive": ":kernel_aarch64_ddk_headers_archive",
         "extra_dist": [":test_mappings_zip"],
     },
     "kernel_riscv64": {
@@ -919,6 +921,14 @@ ddk_headers(
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
+)
+
+ddk_headers_archive(
+    name = "kernel_aarch64_ddk_headers_archive",
+    srcs = [
+        "all_headers_aarch64",
+    ],
+    visibility = ["//visibility:private"],
 )
 
 ddk_headers(
