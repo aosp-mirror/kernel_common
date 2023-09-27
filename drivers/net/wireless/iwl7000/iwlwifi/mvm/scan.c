@@ -2384,7 +2384,7 @@ iwl_mvm_scan_umac_fill_general_p_v12(struct iwl_mvm *mvm,
 
 	mvm->scan_link_id = 0;
 
-	if (version < 12) {
+	if (version < 16) {
 		gp->scan_start_mac_or_link_id = scan_vif->id;
 	} else {
 		struct iwl_mvm_vif_link_info *link_info =
