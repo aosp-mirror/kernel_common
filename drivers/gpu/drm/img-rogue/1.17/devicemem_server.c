@@ -135,6 +135,28 @@ struct _DEVMEMINT_MAPPING_
 	IMG_UINT32 uiNumPages;
 };
 
+/*! Object representing a virtual range reservation and mapping between
+ * the virtual range and a set of PMRs.
+ *
+ * The physical allocations may be mapped entirely or partially to the entire
+ * or partial virtual range. */
+struct _DEVMEMXINT_RESERVATION_
+{
+	/*! Pointer to a device memory heap this reservation is made on. */
+	struct _DEVMEMINT_HEAP_ *psDevmemHeap;
+	/*! Base device virtual address of this reservation. */
+	IMG_DEV_VIRTADDR sBase;
+	/*! Size of this reservation (in bytes). */
+	IMG_DEVMEM_SIZE_T uiLength;
+	/*! Lock for protecting concurrent operations on the mapping. */
+	POS_LOCK hLock;
+	/*! Array of PMRs of size `uiNumPages`. This array represents how the
+	 *  physical memory is mapped to the virtual range. Each entry in the array
+	 *  represents to one device page which means that one PMR may be spread
+	 *  across many indices. */
+	PMR **ppsPMR;
+};
+
 struct _DEVMEMINT_PF_NOTIFY_
 {
 	IMG_UINT32  ui32PID;
@@ -714,33 +736,14 @@ DevmemIntMapPages(DEVMEMINT_RESERVATION *psReservation,
                   PVRSRV_MEMALLOCFLAGS_T uiFlags,
                   IMG_DEV_VIRTADDR sDevVAddrBase)
 {
-	PVRSRV_ERROR eError;
+	PVR_UNREFERENCED_PARAMETER(psReservation);
+	PVR_UNREFERENCED_PARAMETER(psPMR);
+	PVR_UNREFERENCED_PARAMETER(ui32PageCount);
+	PVR_UNREFERENCED_PARAMETER(ui32PhysicalPgOffset);
+	PVR_UNREFERENCED_PARAMETER(uiFlags);
+	PVR_UNREFERENCED_PARAMETER(sDevVAddrBase);
 
-	PVR_LOG_RETURN_IF_INVALID_PARAM((ui32PageCount < PMR_MAX_SUPPORTED_PAGE_COUNT), "ui32PageCount");
-	PVR_LOG_RETURN_IF_INVALID_PARAM((ui32PhysicalPgOffset < PMR_MAX_SUPPORTED_PAGE_COUNT), "ui32PhysicalPgOffset");
-
-	if (psReservation->psDevmemHeap->uiLog2PageSize > PMR_GetLog2Contiguity(psPMR))
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-		         "%s: Device heap and PMR have incompatible Log2Contiguity (%u - %u). "
-		         "PMR contiguity must be a multiple of the heap contiguity!",
-		         __func__,
-		         psReservation->psDevmemHeap->uiLog2PageSize,
-		         PMR_GetLog2Contiguity(psPMR)));
-		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, e0);
-	}
-
-	eError = MMU_MapPages(psReservation->psDevmemHeap->psDevmemCtx->psMMUContext,
-	                      uiFlags,
-	                      sDevVAddrBase,
-	                      psPMR,
-	                      ui32PhysicalPgOffset,
-	                      ui32PageCount,
-	                      NULL,
-	                      psReservation->psDevmemHeap->uiLog2PageSize);
-
-e0:
-	return eError;
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
 }
 
 PVRSRV_ERROR
@@ -748,16 +751,222 @@ DevmemIntUnmapPages(DEVMEMINT_RESERVATION *psReservation,
                     IMG_DEV_VIRTADDR sDevVAddrBase,
                     IMG_UINT32 ui32PageCount)
 {
-	PVR_LOG_RETURN_IF_INVALID_PARAM((ui32PageCount < PMR_MAX_SUPPORTED_PAGE_COUNT), "ui32PageCount");
+	PVR_UNREFERENCED_PARAMETER(psReservation);
+	PVR_UNREFERENCED_PARAMETER(sDevVAddrBase);
+	PVR_UNREFERENCED_PARAMETER(ui32PageCount);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+}
+
+static INLINE IMG_UINT32
+_ReservationPageCount(DEVMEMXINT_RESERVATION *psRsrv)
+{
+	return psRsrv->uiLength >> psRsrv->psDevmemHeap->uiLog2PageSize;
+}
+
+static INLINE IMG_DEV_VIRTADDR
+_ReservationPageAddress(DEVMEMXINT_RESERVATION *psRsrv, IMG_UINT32 uiVirtPageOffset)
+{
+	IMG_DEV_VIRTADDR sAddr = {
+		.uiAddr = psRsrv->sBase.uiAddr + (uiVirtPageOffset << psRsrv->psDevmemHeap->uiLog2PageSize)
+	};
+
+	return sAddr;
+}
+
+PVRSRV_ERROR
+DevmemXIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
+                       IMG_DEV_VIRTADDR sAllocationDevVAddr,
+                       IMG_DEVMEM_SIZE_T uiAllocationSize,
+                       DEVMEMXINT_RESERVATION **ppsRsrv)
+{
+	DEVMEMXINT_RESERVATION *psRsrv;
+	IMG_UINT32 uiNumPages;
+	PVRSRV_ERROR eError;
+
+	if (!DevmemIntHeapAcquire(psDevmemHeap))
+	{
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_REFCOUNT_OVERFLOW, ErrorReturnError);
+	}
+
+	/* align address to full device page size */
+	uiAllocationSize = PVR_ALIGN(uiAllocationSize, IMG_UINT64_C(1) << psDevmemHeap->uiLog2PageSize);
+	uiNumPages = uiAllocationSize >> psDevmemHeap->uiLog2PageSize;
+
+	PVR_LOG_GOTO_IF_INVALID_PARAM(uiNumPages <= PMR_MAX_SUPPORTED_PAGE_COUNT, eError,
+	                              ErrorUnreferenceHeap);
+
+	psRsrv = OSAllocZMem(sizeof(*psRsrv->ppsPMR) * uiNumPages + sizeof(*psRsrv));
+	PVR_LOG_GOTO_IF_NOMEM(psRsrv, eError, ErrorUnreferenceHeap);
+
+	eError = OSLockCreate(&psRsrv->hLock);
+	PVR_LOG_GOTO_IF_ERROR(eError, "OSLockCreate", ErrorFreeReservation);
+
+	psRsrv->sBase = sAllocationDevVAddr;
+	psRsrv->uiLength = uiAllocationSize;
+	psRsrv->ppsPMR = IMG_OFFSET_ADDR(psRsrv, sizeof(*psRsrv));
+
+	eError = MMU_Alloc(psDevmemHeap->psDevmemCtx->psMMUContext,
+	                   uiAllocationSize,
+	                   &uiAllocationSize,
+	                   0, /* IMG_UINT32 uiProtFlags */
+	                   0, /* alignment is n/a since we supply devvaddr */
+	                   &sAllocationDevVAddr,
+	                   psDevmemHeap->uiLog2PageSize);
+	PVR_GOTO_IF_ERROR(eError, ErrorDestroyLock);
+
+	/* since we supplied the virt addr, MMU_Alloc shouldn't have
+	   chosen a new one for us */
+	PVR_ASSERT(sAllocationDevVAddr.uiAddr == psRsrv->sBase.uiAddr);
+
+	psRsrv->psDevmemHeap = psDevmemHeap;
+	*ppsRsrv = psRsrv;
+
+	return PVRSRV_OK;
+
+ErrorDestroyLock:
+	OSLockDestroy(psRsrv->hLock);
+ErrorFreeReservation:
+	OSFreeMem(psRsrv);
+ErrorUnreferenceHeap:
+	DevmemIntHeapRelease(psDevmemHeap);
+ErrorReturnError:
+	return eError;
+}
+
+PVRSRV_ERROR
+DevmemXIntUnreserveRange(DEVMEMXINT_RESERVATION *psRsrv)
+{
+	IMG_UINT32 i;
+
+	MMU_Free(psRsrv->psDevmemHeap->psDevmemCtx->psMMUContext,
+	         psRsrv->sBase,
+	         psRsrv->uiLength,
+	         psRsrv->psDevmemHeap->uiLog2PageSize);
+
+	/* No need to lock the mapping here since this is a handle destruction path which can not be
+	 * executed while there are outstanding handle lookups, i.e. other operations are performed
+	 * on the mapping. Bridge and handle framework also make sure this path can also not be executed
+	 * concurrently. */
+
+	for (i = 0; i < _ReservationPageCount(psRsrv); i++)
+	{
+		if (psRsrv->ppsPMR[i] != NULL)
+		{
+			PMRUnrefPMR2(psRsrv->ppsPMR[i]);
+		}
+	}
+
+	/* Don't bother with refcount on reservation, as a reservation only ever
+	 * holds one mapping, so we directly decrement the refcount on the heap
+	 * instead.
+	 * Function will print an error if the heap could not be unreferenced. */
+	DevmemIntHeapRelease(psRsrv->psDevmemHeap);
+
+	OSLockDestroy(psRsrv->hLock);
+	OSFreeMem(psRsrv);
+
+	return PVRSRV_OK;
+}
+
+PVRSRV_ERROR
+DevmemXIntMapPages(DEVMEMXINT_RESERVATION *psRsrv,
+                   PMR *psPMR,
+                   IMG_UINT32 uiPageCount,
+                   IMG_UINT32 uiPhysPageOffset,
+                   PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                   IMG_UINT32 uiVirtPageOffset)
+{
+	PVRSRV_ERROR eError;
+	IMG_UINT32 uiPMRMaxChunkCount = PMRGetMaxChunkCount(psPMR);
+	DEVMEMINT_HEAP *psDevmemHeap = psRsrv->psDevmemHeap;
+	IMG_UINT32 uiLog2PageSize = psDevmemHeap->uiLog2PageSize;
+	IMG_UINT32 i;
+
+	PVR_LOG_RETURN_IF_INVALID_PARAM(uiPageCount <= uiPMRMaxChunkCount, "uiPageCount");
+	PVR_LOG_RETURN_IF_INVALID_PARAM(uiPhysPageOffset < uiPMRMaxChunkCount, "uiPhysPageOffset");
+	/* The range is not valid for the given virtual descriptor */
+	PVR_LOG_RETURN_IF_FALSE((uiVirtPageOffset + uiPageCount) <= _ReservationPageCount(psRsrv),
+	                        "mapping offset out of range", PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE);
+	PVR_LOG_RETURN_IF_FALSE((uiFlags & ~PVRSRV_MEMALLOCFLAGS_DEVMEMX_VIRTUAL_MASK) == 0,
+	                        "invalid flags", PVRSRV_ERROR_INVALID_FLAGS);
+
+	if (uiLog2PageSize > PMR_GetLog2Contiguity(psPMR))
+	{
+		PVR_DPF((PVR_DBG_ERROR, "%s: Device heap and PMR have incompatible "
+		        "Log2Contiguity (%u - %u). PMR contiguity must be a multiple "
+		        "of the heap contiguity!", __func__, uiLog2PageSize,
+		        PMR_GetLog2Contiguity(psPMR)));
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	OSLockAcquire(psRsrv->hLock);
+
+	eError = MMU_MapPages(psDevmemHeap->psDevmemCtx->psMMUContext,
+	                      uiFlags,
+	                      _ReservationPageAddress(psRsrv, uiVirtPageOffset),
+	                      psPMR,
+	                      uiPhysPageOffset,
+	                      uiPageCount,
+	                      NULL,
+	                      psDevmemHeap->uiLog2PageSize);
+	PVR_GOTO_IF_ERROR(eError, ErrUnlock);
+
+	for (i = uiVirtPageOffset; i < (uiVirtPageOffset + uiPageCount); i++)
+	{
+		PMRRefPMR2(psPMR);
+
+		if (psRsrv->ppsPMR[i] != NULL)
+		{
+			PMRUnrefPMR2(psRsrv->ppsPMR[i]);
+		}
+
+		psRsrv->ppsPMR[i] = psPMR;
+	}
+
+	OSLockRelease(psRsrv->hLock);
+
+	return PVRSRV_OK;
+
+ErrUnlock:
+	OSLockRelease(psRsrv->hLock);
+
+	return eError;
+}
+
+PVRSRV_ERROR
+DevmemXIntUnmapPages(DEVMEMXINT_RESERVATION *psRsrv,
+                     IMG_UINT32 uiVirtPageOffset,
+                     IMG_UINT32 uiPageCount)
+{
+
+	DEVMEMINT_HEAP *psDevmemHeap = psRsrv->psDevmemHeap;
+	IMG_UINT32 i;
+
+	PVR_LOG_RETURN_IF_FALSE((uiVirtPageOffset + uiPageCount) <= _ReservationPageCount(psRsrv),
+	                        "mapping offset out of range", PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE);
+
+	OSLockAcquire(psRsrv->hLock);
 
 	/* Unmap the pages and mark them invalid in the MMU PTE */
-	MMU_UnmapPages(psReservation->psDevmemHeap->psDevmemCtx->psMMUContext,
+	MMU_UnmapPages(psDevmemHeap->psDevmemCtx->psMMUContext,
 	               0,
-	               sDevVAddrBase,
-	               ui32PageCount,
+	               _ReservationPageAddress(psRsrv, uiVirtPageOffset),
+	               uiPageCount,
 	               NULL,
-	               psReservation->psDevmemHeap->uiLog2PageSize,
+	               psDevmemHeap->uiLog2PageSize,
 	               0);
+
+	for (i = uiVirtPageOffset; i < (uiVirtPageOffset + uiPageCount); i++)
+	{
+		if (psRsrv->ppsPMR[i] != NULL)
+		{
+			PMRUnrefPMR2(psRsrv->ppsPMR[i]);
+			psRsrv->ppsPMR[i] = NULL;
+		}
+	}
+
+	OSLockRelease(psRsrv->hLock);
 
 	return PVRSRV_OK;
 }

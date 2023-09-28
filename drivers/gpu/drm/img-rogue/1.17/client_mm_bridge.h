@@ -262,4 +262,26 @@ IMG_INTERNAL PVRSRV_ERROR BridgeGetHeapPhysMemUsagePkd(IMG_HANDLE hBridge,
 						       PHYS_HEAP_MEM_STATS_PKD *
 						       psapPhysHeapMemStats);
 
+IMG_INTERNAL PVRSRV_ERROR BridgeDevmemXIntReserveRange(IMG_HANDLE hBridge,
+						       IMG_HANDLE hDevmemServerHeap,
+						       IMG_DEV_VIRTADDR sAddress,
+						       IMG_DEVMEM_SIZE_T uiLength,
+						       IMG_HANDLE * phReservation);
+
+IMG_INTERNAL PVRSRV_ERROR BridgeDevmemXIntUnreserveRange(IMG_HANDLE hBridge,
+							 IMG_HANDLE hReservation);
+
+IMG_INTERNAL PVRSRV_ERROR BridgeDevmemXIntMapPages(IMG_HANDLE hBridge,
+						   IMG_HANDLE hReservation,
+						   IMG_HANDLE hPMR,
+						   IMG_UINT32 ui32PageCount,
+						   IMG_UINT32 ui32PhysPageOffset,
+						   PVRSRV_MEMALLOCFLAGS_T uiFlags,
+						   IMG_UINT32 ui32VirtPageOffset);
+
+IMG_INTERNAL PVRSRV_ERROR BridgeDevmemXIntUnmapPages(IMG_HANDLE hBridge,
+						     IMG_HANDLE hReservation,
+						     IMG_UINT32 ui32VirtPageOffset,
+						     IMG_UINT32 ui32PageCount);
+
 #endif /* CLIENT_MM_BRIDGE_H */

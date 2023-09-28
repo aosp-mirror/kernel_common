@@ -505,6 +505,29 @@ PVRSRV_ERROR
 PMRUnrefPMR(PMR *psPMR);
 
 /*
+ * PMRRefPMR2()
+ *
+ * Take a reference on the passed in PMR.
+ *
+ * This function does not perform address locking as opposed to PMRRefPMR().
+ */
+void
+PMRRefPMR2(PMR *psPMR);
+
+/*
+ * PMRUnrefPMR2()
+ *
+ * This undoes a call to any of the PhysmemNew* family of APIs
+ * (i.e. any PMR factory "constructor").
+ *
+ * This relinquishes a reference to the PMR, and, where the refcount
+ * reaches 0, causes the PMR to be destroyed (calling the finalizer
+ * callback on the PMR, if there is one)
+ */
+void
+PMRUnrefPMR2(PMR *psPMR);
+
+/*
  * PMRUnrefUnlockPMR()
  *
  * Same as above but also unlocks the PMR.
@@ -576,6 +599,15 @@ PMR_GetMappingTable(const PMR *psPMR);
 
 IMG_UINT32
 PMR_GetLog2Contiguity(const PMR *psPMR);
+
+/*
+ * PMRGetMaxChunkCount
+ *
+ * Given a PMR, calculate the maximum number of chunks supported by
+ * the PMR from the contiguity and return it.
+ */
+IMG_UINT32
+PMRGetMaxChunkCount(const PMR *psPMR);
 
 const IMG_CHAR *
 PMR_GetAnnotation(const PMR *psPMR);

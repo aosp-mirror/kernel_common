@@ -59,6 +59,7 @@ typedef struct _DEVMEMINT_HEAP_ DEVMEMINT_HEAP;
 
 typedef struct _DEVMEMINT_RESERVATION_ DEVMEMINT_RESERVATION;
 typedef struct _DEVMEMINT_MAPPING_ DEVMEMINT_MAPPING;
+typedef struct _DEVMEMXINT_RESERVATION_ DEVMEMXINT_RESERVATION;
 typedef struct _DEVMEMINT_PF_NOTIFY_ DEVMEMINT_PF_NOTIFY;
 
 
@@ -379,6 +380,85 @@ DevmemIntReservationAcquire(DEVMEMINT_RESERVATION *psDevmemReservation);
 */ /**************************************************************************/
 void
 DevmemIntReservationRelease(DEVMEMINT_RESERVATION *psDevmemReservation);
+
+/*************************************************************************/ /*!
+ * @Function    DevmemXIntReserveRange()
+ * @Description Indicates that the specified range should be reserved from the
+ *              given heap.
+ *
+ *              In turn causes the page tables to be allocated to cover the
+ *              specified range.
+ *
+ *              If you call DevmemIntReserveRange() (and the call succeeds)
+ *              then you are promising that you shall later call
+ *              DevmemIntUnreserveRange().
+ *
+ * @Input       psDevmemHeap        Pointer to the heap the reservation is made
+ *                                  on
+ * @Input       sAllocationDevVAddr Virtual address of the reservation
+ * @Input       uiAllocationSize    Size of the reservation (in bytes)
+ * @Input       ppsRsrv             Return pointer to the reservation object
+ *
+ * @Return      PVRSRV_ERROR
+*/ /**************************************************************************/
+PVRSRV_ERROR
+DevmemXIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
+                       IMG_DEV_VIRTADDR sAllocationDevVAddr,
+                       IMG_DEVMEM_SIZE_T uiAllocationSize,
+                       DEVMEMXINT_RESERVATION **ppsRsrv);
+
+/*************************************************************************/ /*!
+ * @Function    DevmemXIntUnreserveRange()
+ * @Description Undoes the state change caused by DevmemXIntReserveRage()
+ *
+ * @Input       psRsrv             Reservation handle for the range
+ *
+ * @Return      PVRSRV_ERROR
+*/ /**************************************************************************/
+PVRSRV_ERROR
+DevmemXIntUnreserveRange(DEVMEMXINT_RESERVATION *psRsrv);
+
+/*************************************************************************/ /*!
+ * @Function    DevmemXIntMapPages()
+ * @Description Maps an arbitrary amount of pages from a PMR to a reserved range
+ *              and takes references on the PMR.
+ *
+ * @Input       psRsrv             Reservation handle for the range
+ * @Input       psPMR              PMR that is mapped
+ * @Input       uiPageCount        Number of consecutive pages that are
+ *                                 mapped
+ * @Input       uiPhysPageOffset   Logical offset in the PMR (measured in pages)
+ * @Input       uiFlags            Mapping flags
+ * @Input       uiVirtPageOffset   Offset from the reservation base to start the
+ *                                 mapping from (measured in pages)
+ *
+ * @Return      PVRSRV_ERROR
+*/ /**************************************************************************/
+PVRSRV_ERROR
+DevmemXIntMapPages(DEVMEMXINT_RESERVATION *psRsrv,
+                   PMR *psPMR,
+                   IMG_UINT32 uiPageCount,
+                   IMG_UINT32 uiPhysPageOffset,
+                   PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                   IMG_UINT32 uiVirtPageOffset);
+
+/*************************************************************************/ /*!
+ * @Function    DevmemXIntUnmapPages()
+ * @Description Unmaps an arbitrary amount of pages from a reserved range and
+ *              releases references on associated PMRs.
+ *
+ * @Input       psRsrv             Reservation handle for the range
+ * @Input       uiVirtPageOffset   Offset from the reservation base to start the
+ *                                 mapping from (measured in pages)
+ * @Input       uiPageCount        Number of consecutive pages that are
+ *                                 unmapped
+ *
+ * @Return      PVRSRV_ERROR
+*/ /**************************************************************************/
+PVRSRV_ERROR
+DevmemXIntUnmapPages(DEVMEMXINT_RESERVATION *psRsrv,
+                     IMG_UINT32 uiVirtPageOffset,
+                     IMG_UINT32 uiPageCount);
 
 /*************************************************************************/ /*!
 @Function       DevmemIntChangeSparse

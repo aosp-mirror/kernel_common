@@ -1756,6 +1756,20 @@ PMRUnrefPMR(PMR *psPMR)
 	return PVRSRV_OK;
 }
 
+void
+PMRRefPMR2(PMR *psPMR)
+{
+	PVR_ASSERT(psPMR != NULL);
+	_Ref(psPMR);
+}
+
+void
+PMRUnrefPMR2(PMR *psPMR)
+{
+	PVR_ASSERT(psPMR != NULL);
+	_UnrefAndMaybeDestroy(psPMR);
+}
+
 PVRSRV_ERROR
 PMRUnrefUnlockPMR(PMR *psPMR)
 {
@@ -1963,6 +1977,15 @@ PMR_GetLog2Contiguity(const PMR *psPMR)
 {
 	PVR_ASSERT(psPMR != NULL);
 	return psPMR->uiLog2ContiguityGuarantee;
+}
+
+IMG_UINT32 PMRGetMaxChunkCount(const PMR *psPMR)
+{
+       PVR_ASSERT(psPMR != NULL);
+
+       /* Only 4k pages are supported */
+       return (PMR_MAX_SUPPORTED_PAGE_COUNT *
+	       (4 * 1024) >> psPMR->uiLog2ContiguityGuarantee);
 }
 
 const IMG_CHAR *
