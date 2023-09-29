@@ -115,6 +115,7 @@ struct _DEVMEMINT_HEAP_
 {
 	struct _DEVMEMINT_CTX_ *psDevmemCtx;
 	IMG_UINT32 uiLog2PageSize;
+	IMG_DEV_VIRTADDR sBaseAddr;
 	ATOMIC_T uiRefCount;
 };
 
@@ -627,6 +628,7 @@ DevmemIntHeapCreate(DEVMEMINT_CTX *psDevmemCtx,
 	}
 
 	psDevmemHeap->uiLog2PageSize = uiLog2DataPageSize;
+	psDevmemHeap->sBaseAddr = sHeapBaseAddr;
 
 	*ppsDevmemHeapPtr = psDevmemHeap;
 
@@ -774,6 +776,41 @@ _ReservationPageAddress(DEVMEMXINT_RESERVATION *psRsrv, IMG_UINT32 uiVirtPageOff
 	return sAddr;
 }
 
+static INLINE PVRSRV_ERROR ReserveRangeParamValidation(DEVMEMINT_HEAP *psDevmemHeap,
+                                                       IMG_DEV_VIRTADDR sAllocationDevVAddr,
+                                                       IMG_DEVMEM_SIZE_T uiAllocationSize)
+{
+	IMG_DEV_VIRTADDR sLastReserveAddr;
+	IMG_UINT64 ui64InvalidSizeMask = (1 << psDevmemHeap->uiLog2PageSize) - 1;
+
+	PVR_LOG_RETURN_IF_INVALID_PARAM(psDevmemHeap != NULL, "psDevmemHeap");
+
+	sLastReserveAddr.uiAddr = sAllocationDevVAddr.uiAddr + uiAllocationSize - 1;
+
+	/* Check that the requested address is not less than the base address of the heap. */
+	if (sAllocationDevVAddr.uiAddr < psDevmemHeap->sBaseAddr.uiAddr)
+	{
+		PVR_LOG_VA(PVR_DBG_ERROR,
+			"sAllocationDevVAddr ("IMG_DEV_VIRTADDR_FMTSPEC") is invalid! "
+			"Must be greater or equal to "IMG_DEV_VIRTADDR_FMTSPEC,
+			sAllocationDevVAddr.uiAddr,
+			psDevmemHeap->sBaseAddr.uiAddr);
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	/* Check the allocation size is valid (must be page granular). */
+	if ((uiAllocationSize & ui64InvalidSizeMask) != 0 || uiAllocationSize == 0)
+	{
+		PVR_LOG_VA(PVR_DBG_ERROR,
+			"uiAllocationSize ("IMG_DEVMEM_SIZE_FMTSPEC") is invalid! Must a multiple of %u and greater than 0",
+			uiAllocationSize,
+			1 << psDevmemHeap->uiLog2PageSize);
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	return PVRSRV_OK;
+}
+
 PVRSRV_ERROR
 DevmemXIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
                        IMG_DEV_VIRTADDR sAllocationDevVAddr,
@@ -784,17 +821,19 @@ DevmemXIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
 	IMG_UINT32 uiNumPages;
 	PVRSRV_ERROR eError;
 
+	PVR_LOG_RETURN_IF_INVALID_PARAM(ppsRsrv != NULL, "ppsRsrv");
+
+	eError = ReserveRangeParamValidation(psDevmemHeap,
+	                                     sAllocationDevVAddr,
+	                                     uiAllocationSize);
+	PVR_LOG_RETURN_IF_ERROR(eError, "ReserveRangeParamValidation");
+
 	if (!DevmemIntHeapAcquire(psDevmemHeap))
 	{
 		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_REFCOUNT_OVERFLOW, ErrorReturnError);
 	}
 
-	/* align address to full device page size */
-	uiAllocationSize = PVR_ALIGN(uiAllocationSize, IMG_UINT64_C(1) << psDevmemHeap->uiLog2PageSize);
 	uiNumPages = uiAllocationSize >> psDevmemHeap->uiLog2PageSize;
-
-	PVR_LOG_GOTO_IF_INVALID_PARAM(uiNumPages <= PMR_MAX_SUPPORTED_PAGE_COUNT, eError,
-	                              ErrorUnreferenceHeap);
 
 	psRsrv = OSAllocZMem(sizeof(*psRsrv->ppsPMR) * uiNumPages + sizeof(*psRsrv));
 	PVR_LOG_GOTO_IF_NOMEM(psRsrv, eError, ErrorUnreferenceHeap);
@@ -883,8 +922,8 @@ DevmemXIntMapPages(DEVMEMXINT_RESERVATION *psRsrv,
 	IMG_UINT32 uiLog2PageSize = psDevmemHeap->uiLog2PageSize;
 	IMG_UINT32 i;
 
-	PVR_LOG_RETURN_IF_INVALID_PARAM(uiPageCount <= uiPMRMaxChunkCount, "uiPageCount");
-	PVR_LOG_RETURN_IF_INVALID_PARAM(uiPhysPageOffset < uiPMRMaxChunkCount, "uiPhysPageOffset");
+	PVR_LOG_RETURN_IF_INVALID_PARAM((uiPageCount + uiPhysPageOffset) <= uiPMRMaxChunkCount, "uiPageCount+uiPhysPageOffset");
+
 	/* The range is not valid for the given virtual descriptor */
 	PVR_LOG_RETURN_IF_FALSE((uiVirtPageOffset + uiPageCount) <= _ReservationPageCount(psRsrv),
 	                        "mapping offset out of range", PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE);
@@ -1204,6 +1243,13 @@ DevmemIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
 {
 	PVRSRV_ERROR eError;
 	DEVMEMINT_RESERVATION *psReservation;
+
+	PVR_LOG_RETURN_IF_INVALID_PARAM(ppsReservationPtr != NULL, "ppsReservationPtr");
+
+	eError = ReserveRangeParamValidation(psDevmemHeap,
+	                                     sAllocationDevVAddr,
+	                                     uiAllocationSize);
+	PVR_LOG_RETURN_IF_ERROR(eError, "ReserveRangeParamValidation");
 
 	if (!DevmemIntHeapAcquire(psDevmemHeap))
 	{
