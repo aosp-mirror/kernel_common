@@ -673,6 +673,7 @@ static void ieee80211_ibss_disconnect(struct ieee80211_sub_if_data *sdata)
 	struct ieee80211_local *local = sdata->local;
 	struct cfg80211_bss *cbss;
 	struct beacon_data *presp;
+	struct sta_info *sta;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
@@ -692,6 +693,18 @@ static void ieee80211_ibss_disconnect(struct ieee80211_sub_if_data *sdata)
 	ifibss->state = IEEE80211_IBSS_MLME_SEARCH;
 
 	sta_info_flush(sdata);
+
+	spin_lock_bh(&ifibss->incomplete_lock);
+	while (!list_empty(&ifibss->incomplete_stations)) {
+		sta = list_first_entry(&ifibss->incomplete_stations,
+				       struct sta_info, list);
+		list_del(&sta->list);
+		spin_unlock_bh(&ifibss->incomplete_lock);
+
+		sta_info_free(local, sta);
+		spin_lock_bh(&ifibss->incomplete_lock);
+	}
+	spin_unlock_bh(&ifibss->incomplete_lock);
 
 	netif_carrier_off(sdata->dev);
 
@@ -1179,8 +1192,22 @@ void ieee80211_ibss_rx_no_sta(struct ieee80211_sub_if_data *sdata,
 			      u32 supp_rates)
 {
 	struct ieee80211_if_ibss *ifibss = &sdata->u.ibss;
+	struct ieee80211_local *local = sdata->local;
+	struct sta_info *sta;
 	struct ieee80211_chanctx_conf *chanctx_conf;
-	struct sk_buff *skb;
+	struct ieee80211_supported_band *sband;
+	enum nl80211_bss_scan_width scan_width;
+	int band;
+
+	/*
+	 * XXX: Consider removing the least recently used entry and
+	 * 	allow new one to be added.
+	 */
+	if (local->num_sta >= IEEE80211_IBSS_MAX_STA_ENTRIES) {
+		net_info_ratelimited("%s: No room for a new IBSS STA entry %pM\n",
+				    sdata->name, addr);
+		return;
+	}
 
 	if (ifibss->state == IEEE80211_IBSS_MLME_SEARCH)
 		return;
@@ -1194,14 +1221,23 @@ void ieee80211_ibss_rx_no_sta(struct ieee80211_sub_if_data *sdata,
 		rcu_read_unlock();
 		return;
 	}
-
-	skb = ieee80211_build_probe_req(sdata, sdata->vif.addr, addr, bssid,
-					(u32)-1, chanctx_conf->def.chan,
-					ifibss->ssid, ifibss->ssid_len, NULL, 0,
-					IEEE80211_PROBE_FLAG_DIRECTED);
-	if (skb)
-		ieee80211_tx_skb(sdata, skb);
+	band = chanctx_conf->def.chan->band;
+	scan_width = cfg80211_chandef_to_scan_width(&chanctx_conf->def);
 	rcu_read_unlock();
+
+	sta = sta_info_alloc(sdata, addr, GFP_ATOMIC);
+	if (!sta)
+		return;
+
+	/* make sure mandatory rates are always added */
+	sband = local->hw.wiphy->bands[band];
+	sta->sta.deflink.supp_rates[band] = supp_rates |
+			ieee80211_mandatory_rates(sband, scan_width);
+
+	spin_lock(&ifibss->incomplete_lock);
+	list_add(&sta->list, &ifibss->incomplete_stations);
+	spin_unlock(&ifibss->incomplete_lock);
+	wiphy_work_queue(local->hw.wiphy, &sdata->work);
 }
 
 static void ieee80211_ibss_sta_expire(struct ieee80211_sub_if_data *sdata)
@@ -1636,6 +1672,7 @@ void ieee80211_ibss_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 void ieee80211_ibss_work(struct ieee80211_sub_if_data *sdata)
 {
 	struct ieee80211_if_ibss *ifibss = &sdata->u.ibss;
+	struct sta_info *sta;
 
 	/*
 	 * Work could be scheduled after scan or similar
@@ -1644,6 +1681,19 @@ void ieee80211_ibss_work(struct ieee80211_sub_if_data *sdata)
 	 */
 	if (!ifibss->ssid_len)
 		return;
+
+	spin_lock_bh(&ifibss->incomplete_lock);
+	while (!list_empty(&ifibss->incomplete_stations)) {
+		sta = list_first_entry(&ifibss->incomplete_stations,
+				       struct sta_info, list);
+		list_del(&sta->list);
+		spin_unlock_bh(&ifibss->incomplete_lock);
+
+		ieee80211_ibss_finish_sta(sta);
+		rcu_read_unlock();
+		spin_lock_bh(&ifibss->incomplete_lock);
+	}
+	spin_unlock_bh(&ifibss->incomplete_lock);
 
 	switch (ifibss->state) {
 	case IEEE80211_IBSS_MLME_SEARCH:
@@ -1671,6 +1721,8 @@ void ieee80211_ibss_setup_sdata(struct ieee80211_sub_if_data *sdata)
 	struct ieee80211_if_ibss *ifibss = &sdata->u.ibss;
 
 	timer_setup(&ifibss->timer, ieee80211_ibss_timer, 0);
+	INIT_LIST_HEAD(&ifibss->incomplete_stations);
+	spin_lock_init(&ifibss->incomplete_lock);
 	wiphy_work_init(&ifibss->csa_connection_drop_work,
 			ieee80211_csa_connection_drop_work);
 }

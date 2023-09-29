@@ -609,6 +609,9 @@ struct ieee80211_if_ibss {
 	struct ieee80211_ht_cap ht_capa; /* configured ht-cap over-rides */
 	struct ieee80211_ht_cap ht_capa_mask; /* Valid parts of ht_capa */
 
+	spinlock_t incomplete_lock;
+	struct list_head incomplete_stations;
+
 	enum {
 		IEEE80211_IBSS_MLME_SEARCH,
 		IEEE80211_IBSS_MLME_JOINED,
