@@ -4612,7 +4612,7 @@ static int smack_inode_copy_up(struct dentry *dentry, struct cred **new)
 	/*
 	 * Get label from overlay inode and set it in create_sid
 	 */
-	isp = d_inode(dentry->d_parent)->i_security;
+	isp = d_inode(dentry)->i_security;
 	skp = isp->smk_inode;
 	tsp->smk_task = skp;
 	*new = new_creds;
