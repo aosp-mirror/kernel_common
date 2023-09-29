@@ -62,7 +62,7 @@ enum iwl_dhc_umac_integration_table {
 struct iwl_dhc_cmd {
 	__le32 length;
 	__le32 index_and_mask;
-	__le32 data[0];
+	__le32 data[];
 } __packed; /* DHC_CMD_API_S */
 
 /**
