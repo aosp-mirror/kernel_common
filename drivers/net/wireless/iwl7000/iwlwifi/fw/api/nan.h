@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
  * Copyright (C) 2015-2017 Intel Deutschland GmbH
- * Copyright (C) 2018, 2022 Intel Corporation
+ * Copyright (C) 2018, 2022-2023 Intel Corporation
  */
 #ifndef __iwl_fw_api_nan_h__
 #define __iwl_fw_api_nan_h__
@@ -251,7 +251,7 @@ struct iwl_nan_add_func_cmd_v2 {
 	u8 cipher_suite_id;
 	__le16 security_ctx_len;
 	__le16 sdea_ctrl;
-	u8 data[0];
+	u8 data[];
 } __packed; /* NAN_DISCO_FUNC_FIXED_CMD_API_S_VER_2 */
 
 /**
@@ -264,7 +264,7 @@ struct iwl_nan_add_func_cmd_v2 {
 struct iwl_nan_add_func_cmd {
 	struct iwl_nan_add_func_common cmn;
 	u8 reserved[2];
-	u8 data[0];
+	u8 data[];
 } __packed; /* NAN_DISCO_FUNC_FIXED_CMD_API_S_VER_1 */
 
 enum iwl_nan_add_func_resp_status {
@@ -340,7 +340,7 @@ struct iwl_nan_disc_evt_notify_v1 {
 	u8 peer_instance;
 	u8 service_info_len;
 	__le32 attrs_len;
-	u8 buf[0];
+	u8 buf[];
 } __packed; /* NAN_DISCO_EVENT_NTFY_API_S_VER_1 */
 
 /**
@@ -355,7 +355,7 @@ struct iwl_nan_sec_ctxt_info {
 	u8 type;
 	u8 reserved;
 	__le16 len;
-	u8 buf[0];
+	u8 buf[];
 } __packed; /* NAN_DISCO_SEC_CTXT_ID_API_S_VER_1 */
 
 /**
@@ -384,7 +384,7 @@ struct iwl_nan_disc_info {
 	__le16 sec_ctxt_len;
 	u8 cipher_suite_ids;
 	u8 sdea_update_indicator;
-	u8 buf[0];
+	u8 buf[];
 } __packed; /* NAN_DISCO_INFO_API_S_VER_1 */
 
 /**
@@ -404,7 +404,7 @@ struct iwl_nan_disc_evt_notify_v2 {
 	__le16 reserved1;
 	__le32 match_len;
 	__le32 avail_attrs_len;
-	u8 buf[0];
+	u8 buf[];
 } __packed; /* NAN_DISCO_EVENT_NTFY_API_S_VER_2 */
 
 /* NAN function termination reasons */
