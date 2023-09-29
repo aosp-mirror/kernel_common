@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
  * Copyright (C) 2017 Intel Deutschland GmbH
+ * Copyright (C) 2023 Intel Corporation
  */
 #ifndef __iwl_fw_api_testing_h__
 #define __iwl_fw_api_testing_h__
@@ -56,7 +57,7 @@ struct iwl_fips_test_cmd {
 	__le16 reserved;
 	u8 nonce[FIPS_MAX_NONCE_LEN];
 	u8 reserved2[3];
-	u8 payload[0];
+	u8 payload[];
 } __packed; /* AES_SEC_TEST_VECTOR_HDR_API_S_VER_1 */
 
 /**
@@ -78,7 +79,7 @@ enum iwl_fips_test_status {
  */
 struct iwl_fips_test_resp {
 	__le32 len;
-	u8 payload[0];
+	u8 payload[];
 } __packed; /* AES_SEC_TEST_VECTOR_RESP_API_S_VER_1 */
 
 #endif
