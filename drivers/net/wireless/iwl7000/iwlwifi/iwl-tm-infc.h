@@ -589,7 +589,7 @@ struct iwl_xvt_tx_queue_cfg {
 struct iwl_xvt_driver_command_req {
 	__u32 command_id;
 	__u32 max_out_length;
-	__u8 input_data[0];
+	__u8 input_data[];
 } __packed __aligned(4);
 
 /**
@@ -601,7 +601,7 @@ struct iwl_xvt_driver_command_req {
 struct iwl_xvt_driver_command_resp {
 	__u32 command_id;
 	__u32 length;
-	__u8 resp_data[0];
+	__u8 resp_data[];
 } __packed __aligned(4);
 
 /**
@@ -880,7 +880,7 @@ struct iwl_xvt_get_fw_tlv_data_request {
 */
 struct iwl_xvt_fw_tlv_data_response {
 	u32 bytes_len;
-	u8 data[0];
+	u8 data[];
 } __packed __aligned(4);
 
 /**
