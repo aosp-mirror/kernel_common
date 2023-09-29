@@ -976,6 +976,10 @@ UnsetDispatchTableEntry(IMG_UINT32 ui32BridgeGroup, IMG_UINT32 ui32Index)
  * @param pszIOCName
  * @param pfFunction
  * @param pszFunctionName
+ * @param hBridgeLock
+ * @param pszBridgeLockName
+ * @param ui32InBufferSize
+ * @param ui32OutBufferSize
  *
  * @return
  ********************************************************************************/
@@ -986,7 +990,9 @@ _SetDispatchTableEntry(IMG_UINT32 ui32BridgeGroup,
 					   BridgeWrapperFunction pfFunction,
 					   const IMG_CHAR *pszFunctionName,
 					   POS_LOCK hBridgeLock,
-					   const IMG_CHAR *pszBridgeLockName)
+					   const IMG_CHAR *pszBridgeLockName,
+					   IMG_UINT32 ui32InBufferSize,
+					   IMG_UINT32 ui32OutBufferSize)
 {
 	static IMG_UINT32 ui32PrevIndex = IMG_UINT32_MAX;		/* -1 */
 
@@ -1103,6 +1109,8 @@ _SetDispatchTableEntry(IMG_UINT32 ui32BridgeGroup,
 	{
 		g_BridgeDispatchTable[ui32Index].pfFunction = pfFunction;
 		g_BridgeDispatchTable[ui32Index].hBridgeLock = hBridgeLock;
+		g_BridgeDispatchTable[ui32Index].ui32InBufferSize = ui32InBufferSize;
+		g_BridgeDispatchTable[ui32Index].ui32OutBufferSize = ui32OutBufferSize;
 #if defined(DEBUG_BRIDGE_KM)
 		g_BridgeDispatchTable[ui32Index].pszIOCName = pszIOCName;
 		g_BridgeDispatchTable[ui32Index].pszFunctionName = pszFunctionName;
@@ -1266,6 +1274,17 @@ PVRSRV_ERROR BridgedDispatchKM(CONNECTION_DATA * psConnection,
 	g_BridgeGlobalStats.ui32IOCTLCount++;
 #endif
 
+	if (psBridgePackageKM->ui32InBufferSize != g_BridgeDispatchTable[ui32DispatchTableEntryIndex].ui32InBufferSize ||
+	    psBridgePackageKM->ui32OutBufferSize != g_BridgeDispatchTable[ui32DispatchTableEntryIndex].ui32OutBufferSize)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "%s: Bridge buffer sizes mismatch! "
+		        "In: User(%u), Kernel(%u) - Out: User(%u), Kernel(%u)",
+		        __func__,
+		        psBridgePackageKM->ui32InBufferSize, g_BridgeDispatchTable[ui32DispatchTableEntryIndex].ui32InBufferSize,
+		        psBridgePackageKM->ui32OutBufferSize, g_BridgeDispatchTable[ui32DispatchTableEntryIndex].ui32OutBufferSize));
+		PVR_GOTO_WITH_ERROR(err, PVRSRV_ERROR_BRIDGE_EINVAL, return_error);
+	}
+
 	if (g_BridgeDispatchTable[ui32DispatchTableEntryIndex].hBridgeLock != NULL)
 	{
 		OSLockAcquire(g_BridgeDispatchTable[ui32DispatchTableEntryIndex].hBridgeLock);
@@ -1285,23 +1304,7 @@ PVRSRV_ERROR BridgedDispatchKM(CONNECTION_DATA * psConnection,
 	ui64TimeStart = OSClockns64();
 #endif
 
-	if (psBridgePackageKM->ui32InBufferSize > PVRSRV_MAX_BRIDGE_IN_SIZE)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Bridge input buffer too small "
-		        "(data size %u, buffer size %u)!", __func__,
-		        psBridgePackageKM->ui32InBufferSize, PVRSRV_MAX_BRIDGE_IN_SIZE));
-		PVR_GOTO_WITH_ERROR(err, PVRSRV_ERROR_BRIDGE_ERANGE, unlock_and_return_error);
-	}
-
 #if !defined(INTEGRITY_OS)
-	if (psBridgePackageKM->ui32OutBufferSize > PVRSRV_MAX_BRIDGE_OUT_SIZE)
-	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Bridge output buffer too small "
-		        "(data size %u, buffer size %u)!", __func__,
-		        psBridgePackageKM->ui32OutBufferSize, PVRSRV_MAX_BRIDGE_OUT_SIZE));
-		PVR_GOTO_WITH_ERROR(err, PVRSRV_ERROR_BRIDGE_ERANGE, unlock_and_return_error);
-	}
-
 	if ((CopyFromUserWrapper (psConnection,
 							  ui32DispatchTableEntryIndex,
 							  psBridgeIn,

@@ -606,19 +606,27 @@ PVRSRV_ERROR InitDIBridge(void)
 {
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_DI, PVRSRV_BRIDGE_DI_DICREATECONTEXT,
-			      PVRSRVBridgeDICreateContext, NULL);
+			      PVRSRVBridgeDICreateContext, NULL,
+			      sizeof(PVRSRV_BRIDGE_IN_DICREATECONTEXT),
+			      sizeof(PVRSRV_BRIDGE_OUT_DICREATECONTEXT));
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_DI, PVRSRV_BRIDGE_DI_DIDESTROYCONTEXT,
-			      PVRSRVBridgeDIDestroyContext, NULL);
+			      PVRSRVBridgeDIDestroyContext, NULL,
+			      sizeof(PVRSRV_BRIDGE_IN_DIDESTROYCONTEXT),
+			      sizeof(PVRSRV_BRIDGE_OUT_DIDESTROYCONTEXT));
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_DI, PVRSRV_BRIDGE_DI_DIREADENTRY,
-			      PVRSRVBridgeDIReadEntry, NULL);
+			      PVRSRVBridgeDIReadEntry, NULL, sizeof(PVRSRV_BRIDGE_IN_DIREADENTRY),
+			      sizeof(PVRSRV_BRIDGE_OUT_DIREADENTRY));
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_DI, PVRSRV_BRIDGE_DI_DIWRITEENTRY,
-			      PVRSRVBridgeDIWriteEntry, NULL);
+			      PVRSRVBridgeDIWriteEntry, NULL, sizeof(PVRSRV_BRIDGE_IN_DIWRITEENTRY),
+			      sizeof(PVRSRV_BRIDGE_OUT_DIWRITEENTRY));
 
 	SetDispatchTableEntry(PVRSRV_BRIDGE_DI, PVRSRV_BRIDGE_DI_DILISTALLENTRIES,
-			      PVRSRVBridgeDIListAllEntries, NULL);
+			      PVRSRVBridgeDIListAllEntries, NULL,
+			      sizeof(PVRSRV_BRIDGE_IN_DILISTALLENTRIES),
+			      sizeof(PVRSRV_BRIDGE_OUT_DILISTALLENTRIES));
 
 	return PVRSRV_OK;
 }
