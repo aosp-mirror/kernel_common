@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
- * Copyright (C) 2005-2014, 2018 Intel Corporation
+ * Copyright (C) 2005-2014, 2018, 2023 Intel Corporation
  * Copyright (C) 2015-2017 Intel Deutschland GmbH
  */
 #ifndef __fw_api_h__
@@ -82,7 +82,7 @@ struct xvt_debug_cmd {
 
 struct xvt_debug_res {
 	__le32 dw_num;
-	__le32 data[0];
+	__le32 data[];
 }; /* DEBUG_XVT_RES_API_S_VER_1 */
 
 #endif /* __fw_api_h__ */
