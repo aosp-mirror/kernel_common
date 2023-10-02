@@ -1599,7 +1599,7 @@ struct hci_conn *hci_connect_le_scan(struct hci_dev *hdev, bdaddr_t *dst,
 		bt_dev_info(hdev, "Skipping le scan before connect");
 
 		return hci_connect_le(hdev, dst, dst_type,
-				sec_level, false,
+				false, sec_level,
 				HCI_LE_CONN_TIMEOUT,
 				HCI_ROLE_MASTER);
 	}
