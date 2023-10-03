@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2012-2014, 2019-2022 Intel Corporation
+ * Copyright (C) 2012-2014, 2019-2023 Intel Corporation
  * Copyright (C) 2013-2014 Intel Mobile Communications GmbH
  * Copyright (C) 2015-2016 Intel Deutschland GmbH
  */
@@ -646,7 +646,6 @@ static int iwl_mvm_tzone_set_trip_temp(struct thermal_zone_device *device,
 				       int trip, int temp)
 {
 	struct iwl_mvm *mvm = thermal_zone_device_priv(device);
-	struct iwl_mvm_thermal_device *tzone;
 	int ret;
 
 	mutex_lock(&mvm->mutex);
@@ -659,12 +658,6 @@ static int iwl_mvm_tzone_set_trip_temp(struct thermal_zone_device *device,
 
 	if ((temp / 1000) > S16_MAX) {
 		ret = -EINVAL;
-		goto out;
-	}
-
-	tzone = &mvm->tz_device;
-	if (!tzone) {
-		ret = -EIO;
 		goto out;
 	}
 
