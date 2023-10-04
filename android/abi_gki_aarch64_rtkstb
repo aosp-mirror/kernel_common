@@ -913,6 +913,8 @@
   drm_property_create_range
   drm_read
   drm_release
+  drm_scdc_read
+  drm_scdc_write
   drm_scdc_set_high_tmds_clock_ratio
   drm_scdc_set_scrambling
   drm_universal_plane_init
