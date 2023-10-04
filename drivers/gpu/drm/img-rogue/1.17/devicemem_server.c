@@ -338,9 +338,17 @@ void DevmemIntReservationRelease(DEVMEMINT_RESERVATION *psDevmemReservation)
 		 */
 		if (--psDevmemReservation->i32RefCount == DEVMEMRESERVATION_REFCOUNT_MIN)
 		{
+			DEVMEMINT_HEAP *psDevmemHeap = psDevmemReservation->psDevmemHeap;
+
+			MMU_Free(psDevmemHeap->psDevmemCtx->psMMUContext,
+			         psDevmemReservation->sBase,
+			         psDevmemReservation->uiLength,
+			         psDevmemHeap->uiLog2PageSize);
+
 			/* Destroy lock */
 			OSLockRelease(psDevmemReservation->hLock);
 			OSLockDestroy(psDevmemReservation->hLock);
+			DevmemIntHeapRelease(psDevmemReservation->psDevmemHeap);
 			OSFreeMem(psDevmemReservation);
 			goto exit_noderef;
 		}
@@ -1307,18 +1315,8 @@ ErrorReturnError:
 PVRSRV_ERROR
 DevmemIntUnreserveRange(DEVMEMINT_RESERVATION *psReservation)
 {
-	IMG_DEV_VIRTADDR sBase        = psReservation->sBase;
-	IMG_UINT32 uiLength           = psReservation->uiLength;
-	DEVMEMINT_HEAP *psDevmemHeap  = psReservation->psDevmemHeap;
-	IMG_UINT32 uiLog2DataPageSize = psDevmemHeap->uiLog2PageSize;
-
-	MMU_Free(psDevmemHeap->psDevmemCtx->psMMUContext,
-	         sBase,
-	         uiLength,
-	         uiLog2DataPageSize);
 
 	DevmemIntReservationRelease(psReservation);
-	DevmemIntHeapRelease(psDevmemHeap);
 
 	return PVRSRV_OK;
 }
