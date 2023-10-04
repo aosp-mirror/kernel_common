@@ -147,6 +147,7 @@ static inline bool is_error_page(struct page *page)
 #define KVM_REQ_PENDING_TIMER     2
 #define KVM_REQ_UNHALT            3
 #define KVM_REQ_VM_BUGGED         (4 | KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+#define KVM_REQ_VCPU_PV_SCHED     6
 #define KVM_REQUEST_ARCH_BASE     8
 
 #define KVM_ARCH_REQ_FLAGS(nr, flags) ({ \
@@ -1515,5 +1516,18 @@ static inline void kvm_handle_signal_exit(struct kvm_vcpu *vcpu)
 	vcpu->stat.signal_exits++;
 }
 #endif /* CONFIG_KVM_XFER_TO_GUEST_WORK */
+
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+int kvm_vcpu_set_sched(struct kvm_vcpu *vcpu, union vcpu_sched_attr attr);
+union vcpu_sched_attr kvm_vcpu_get_sched(struct kvm_vcpu *vcpu);
+
+static inline bool kvm_vcpu_sched_enabled(struct kvm_vcpu *vcpu)
+{
+	return kvm_arch_vcpu_pv_sched_enabled(&vcpu->arch);
+}
+void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type);
+#else
+static inline void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type) { }
+#endif
 
 #endif
