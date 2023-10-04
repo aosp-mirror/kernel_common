@@ -5,6 +5,8 @@
 #include <linux/livepatch.h>
 #include <linux/audit.h>
 
+#include <linux/kvm_para.h>
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/syscalls.h>
 
@@ -194,6 +196,17 @@ static void exit_to_user_mode_prepare(struct pt_regs *regs)
 	unsigned long ti_work = READ_ONCE(current_thread_info()->flags);
 
 	lockdep_assert_irqs_disabled();
+
+	/*
+	 * Guest requests a boost when preemption is disabled but does not request
+	 * an immediate unboost when preemption is enabled back. There is a chance
+	 * that we are boosted here. Unboost if needed.
+	 */
+	if (pv_sched_enabled()) {
+		pv_sched_vcpu_kerncs_unboost(PVSCHED_KERNCS_BOOST_ALL, true);
+		pv_sched_vcpu_update(current->policy, current->rt_priority,
+				task_nice(current), false);
+	}
 
 	if (unlikely(ti_work & EXIT_TO_USER_MODE_WORK))
 		ti_work = exit_to_user_mode_loop(regs, ti_work);

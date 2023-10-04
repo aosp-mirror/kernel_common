@@ -380,6 +380,14 @@ static void kvm_guest_cpu_init(void)
 		wrmsrl(MSR_KVM_PV_EOI_EN, pa);
 	}
 
+#ifdef CONFIG_PARAVIRT_SCHED
+	if (pv_sched_enabled()) {
+		unsigned long pa = pv_sched_pa() | KVM_MSR_ENABLED;
+
+		wrmsrl(MSR_KVM_PV_SCHED, pa);
+	}
+#endif
+
 	if (has_steal_clock)
 		kvm_register_steal_time();
 
@@ -752,6 +760,14 @@ static void __init kvm_guest_init(void)
 	    kvm_para_has_feature(KVM_FEATURE_HOST_SUSPEND_TIME))
 		alloc_intr_gate(HYPERVISOR_CALLBACK_VECTOR,
 				asm_sysvec_kvm_hv_callback);
+
+#ifdef CONFIG_PARAVIRT_SCHED
+	if (kvm_para_has_feature(KVM_FEATURE_PV_SCHED)) {
+		pr_info("KVM host has PV_SCHED!\n");
+		pv_sched_enable();
+	} else
+		pr_info("KVM host does not support PV_SCHED!\n");
+#endif
 
 #ifdef CONFIG_SMP
 	smp_ops.smp_prepare_boot_cpu = kvm_smp_prepare_boot_cpu;
