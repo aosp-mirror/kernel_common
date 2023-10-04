@@ -169,6 +169,91 @@ unsigned int sysctl_iowait_apply_ticks = 10;
 
 __read_mostly int scheduler_running;
 
+#ifdef CONFIG_PARAVIRT_SCHED
+#include <linux/kvm_para.h>
+
+DEFINE_STATIC_KEY_FALSE(__pv_sched_enabled);
+
+DEFINE_PER_CPU_DECRYPTED(struct pv_sched_data, pv_sched) __aligned(64);
+
+unsigned long pv_sched_pa(void)
+{
+	return slow_virt_to_phys(this_cpu_ptr(&pv_sched));
+}
+
+static inline int __normal_prio(int policy, int rt_prio, int nice);
+static inline int __pv_sched_equal_prio(union vcpu_sched_attr a1,
+		union vcpu_sched_attr a2)
+{
+	return (__normal_prio(a1.sched_policy, a1.rt_priority, a1.sched_nice) ==
+		__normal_prio(a2.sched_policy, a2.rt_priority, a2.sched_nice));
+}
+
+static inline void __pv_sched_vcpu_attr_update(union vcpu_sched_attr attr,
+		bool lazy)
+{
+	union vcpu_sched_attr status_attr;
+
+	status_attr.pad = this_cpu_read(pv_sched.attr[PV_SCHEDATTR_HOST].pad);
+	if (!status_attr.enabled || (status_attr.kern_cs == attr.kern_cs &&
+			__pv_sched_equal_prio(attr, status_attr)))
+		return;
+
+	this_cpu_write(pv_sched.attr[PV_SCHEDATTR_GUEST].pad, attr.pad);
+
+	if (!lazy)
+		kvm_pv_sched_notify_host();
+}
+
+void pv_sched_vcpu_update(int policy, int prio, int nice, bool lazy)
+{
+	union vcpu_sched_attr attr = {
+		.sched_policy = policy,
+		.rt_priority = prio,
+		.sched_nice = nice
+	};
+	attr.kern_cs = this_cpu_read(pv_sched.attr[PV_SCHEDATTR_GUEST].kern_cs);
+	__pv_sched_vcpu_attr_update(attr, lazy);
+}
+
+void pv_sched_vcpu_kerncs_boost_lazy(int boost_type)
+{
+	union vcpu_sched_attr attr;
+
+	attr.pad = this_cpu_read(pv_sched.attr[PV_SCHEDATTR_GUEST].pad);
+	attr.kern_cs |= boost_type;
+	__pv_sched_vcpu_attr_update(attr, true);
+}
+
+void pv_sched_vcpu_kerncs_unboost(int boost_type, bool lazy)
+{
+	union vcpu_sched_attr attr;
+
+	attr.pad = this_cpu_read(pv_sched.attr[PV_SCHEDATTR_GUEST].pad);
+	attr.kern_cs &= ~boost_type;
+	__pv_sched_vcpu_attr_update(attr, lazy);
+}
+
+/*
+ * Share the preemption enabled/disabled status with host. This will not incur a
+ * VMEXIT and acts as a lazy boost/unboost mechanism - host will check this on
+ * the next VMEXIT for boost/unboost decisions.
+ * XXX: Lazy unboosting may allow cfs tasks to run on RT vcpu till next VMEXIT.
+ */
+static inline void pv_sched_update_preempt_status(bool preempt_disabled)
+{
+	if (!pv_sched_enabled())
+		return;
+
+	if (preempt_disabled)
+		pv_sched_vcpu_kerncs_boost_lazy(PVSCHED_KERNCS_BOOST_PREEMPT_DISABLED);
+	else
+		pv_sched_vcpu_kerncs_unboost(PVSCHED_KERNCS_BOOST_PREEMPT_DISABLED, true);
+}
+#else
+static inline void pv_sched_update_preempt_status(bool preempt_disabled) {}
+#endif
+
 #ifdef CONFIG_SCHED_CORE
 
 DEFINE_STATIC_KEY_FALSE(__sched_core_enabled);
@@ -2164,6 +2249,17 @@ EXPORT_SYMBOL_GPL(get_wchan);
 
 static inline void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
 {
+	/*
+	 * TODO: currently request for boosting remote vcpus is not implemented. So
+	 * we boost only if this enqueue happens for this cpu.
+	 * This is not a big problem though, target cpu gets an IPI and then gets
+	 * boosted by the host. Posted interrupts is an exception where target vcpu
+	 * will not get boosted immediately, but on the next schedule().
+	 */
+	if (pv_sched_enabled() && this_rq() == rq &&
+			sched_class_above(p->sched_class, &fair_sched_class))
+		pv_sched_vcpu_update(p->policy, p->rt_priority, 0, true);
+
 	if (!(flags & ENQUEUE_NOCLOCK))
 		update_rq_clock(rq);
 
@@ -5987,8 +6083,14 @@ static inline void sched_tick_start(int cpu) { }
 static inline void sched_tick_stop(int cpu) { }
 #endif
 
-#if defined(CONFIG_PREEMPTION) && (defined(CONFIG_DEBUG_PREEMPT) || \
-				defined(CONFIG_TRACE_PREEMPT_TOGGLE))
+/*
+ * PARAVIRT_SCHED enabled guest passes the preemption state to host.
+ * So we piggy back on the following functions to keep track of the
+ * preemption state.
+ */
+#if (defined(CONFIG_PREEMPTION) && (defined(CONFIG_DEBUG_PREEMPT) || \
+			defined(CONFIG_TRACE_PREEMPT_TOGGLE)) || \
+			defined(CONFIG_PARAVIRT_SCHED))
 /*
  * If the value passed in is equal to the current preempt count
  * then we just disabled preemption. Start timing the latency.
@@ -5996,11 +6098,12 @@ static inline void sched_tick_stop(int cpu) { }
 static inline void preempt_latency_start(int val)
 {
 	if (preempt_count() == val) {
-		unsigned long ip = get_lock_parent_ip();
 #ifdef CONFIG_DEBUG_PREEMPT
-		current->preempt_disable_ip = ip;
+		current->preempt_disable_ip = get_lock_parent_ip();
 #endif
-		trace_preempt_off(CALLER_ADDR0, ip);
+		pv_sched_update_preempt_status(true);
+
+		trace_preempt_off(CALLER_ADDR0, get_lock_parent_ip());
 	}
 }
 
@@ -6032,8 +6135,10 @@ NOKPROBE_SYMBOL(preempt_count_add);
  */
 static inline void preempt_latency_stop(int val)
 {
-	if (preempt_count() == val)
+	if (preempt_count() == val) {
+		pv_sched_update_preempt_status(false);
 		trace_preempt_on(CALLER_ADDR0, get_lock_parent_ip());
+	}
 }
 
 void preempt_count_sub(int val)
@@ -6841,6 +6946,17 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 #endif
 
 	trace_android_rvh_schedule(prev, next, rq);
+	if (pv_sched_enabled()) {
+		int lazy = true;
+
+		/*
+		 * Synchronous unboost.
+		 */
+		if (task_is_realtime(next) || NICE_TO_PRIO(task_nice(next)) < DEFAULT_PRIO)
+			lazy = false;
+		pv_sched_vcpu_update(next->policy, next->rt_priority, task_nice(next), lazy);
+	}
+
 	if (likely(prev != next)) {
 		rq->nr_switches++;
 		/*

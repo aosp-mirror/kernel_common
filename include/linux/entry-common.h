@@ -7,8 +7,13 @@
 #include <linux/syscalls.h>
 #include <linux/seccomp.h>
 #include <linux/sched.h>
+#include <linux/tick.h>
+
+#include <linux/kvm_para.h>
 
 #include <asm/entry-common.h>
+
+#include <linux/highmem-internal.h>
 
 /*
  * Define dummy _TIF work flags if not defined by the architecture or for
@@ -257,6 +262,54 @@ static __always_inline void arch_exit_to_user_mode(void) { }
  * Invoked from exit_to_user_mode_loop().
  */
 void arch_do_signal_or_restart(struct pt_regs *regs);
+
+/**
+ * exit_to_user_mode_loop - do any pending work before leaving to user space
+ */
+unsigned long exit_to_user_mode_loop(struct pt_regs *regs,
+				     unsigned long ti_work);
+
+/**
+ * exit_to_user_mode_prepare - call exit_to_user_mode_loop() if required
+ * @regs:	Pointer to pt_regs on entry stack
+ *
+ * 1) check that interrupts are disabled
+ * 2) call tick_nohz_user_enter_prepare()
+ * 3) call exit_to_user_mode_loop() if any flags from
+ *    EXIT_TO_USER_MODE_WORK are set
+ * 4) check that interrupts are still disabled
+ */
+static __always_inline void exit_to_user_mode_prepare(struct pt_regs *regs)
+{
+	unsigned long ti_work;
+
+	lockdep_assert_irqs_disabled();
+
+	/*
+	* Guest requests a boost when preemption is disabled but does not request
+	* an immediate unboost when preemption is enabled back. There is a chance
+	* that we are boosted here. Unboost if needed.
+	*/
+	if (pv_sched_enabled()) {
+		pv_sched_vcpu_kerncs_unboost(PVSCHED_KERNCS_BOOST_ALL, true);
+		pv_sched_vcpu_update(current->policy, current->rt_priority,
+				task_nice(current), false);
+	}
+
+	/* Flush pending rcuog wakeup before the last need_resched() check */
+	tick_nohz_user_enter_prepare();
+
+	ti_work = read_thread_flags();
+	if (unlikely(ti_work & EXIT_TO_USER_MODE_WORK))
+		ti_work = exit_to_user_mode_loop(regs, ti_work);
+
+	arch_exit_to_user_mode_prepare(regs, ti_work);
+
+	/* Ensure that kernel state is sane for a return to userspace */
+	kmap_assert_nomap();
+	lockdep_assert_irqs_disabled();
+	lockdep_sys_exit();
+}
 
 /**
  * exit_to_user_mode - Fixup state when exiting to user mode
