@@ -798,7 +798,8 @@ static void blk_mq_process_requeue_list(struct blk_mq_hw_ctx *hctx)
 	spin_unlock_irq(&q->requeue_lock);
 
 	list_for_each_entry_safe(rq, next, &at_head, queuelist)
-		blk_mq_sched_insert_request(rq, /*at_head=*/true, false, false);
+		blk_mq_sched_insert_request(rq, /*at_head=*/
+			!blk_rq_is_seq_zoned_write(rq), false, false);
 
 	list_for_each_entry_safe(rq, next, &at_tail, queuelist)
 		blk_mq_sched_insert_request(rq, false, false, false);
