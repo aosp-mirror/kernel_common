@@ -796,7 +796,8 @@ static void blk_mq_requeue_work(struct work_struct *work)
 		if (rq->rq_flags & RQF_DONTPREP)
 			blk_mq_request_bypass_insert(rq, false, false);
 		else
-			blk_mq_sched_insert_request(rq, true, false, false);
+			blk_mq_sched_insert_request(rq, /*at_head=*/
+				!blk_rq_is_seq_zoned_write(rq), false, false);
 	}
 
 	while (!list_empty(&rq_list)) {
