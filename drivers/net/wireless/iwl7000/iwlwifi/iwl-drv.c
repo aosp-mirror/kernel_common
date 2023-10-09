@@ -1593,9 +1593,13 @@ fw_dbg_conf:
 		case IWL_UCODE_TLV_CURRENT_PC:
 			if (tlv_len < sizeof(struct iwl_pc_data))
 				goto invalid_tlv_len;
-			drv->trans->dbg.num_pc = tlv_len / sizeof(struct iwl_pc_data);
-			drv->trans->dbg.pc_data = kmemdup(tlv_data, tlv_len, GFP_KERNEL);
-		break;
+			drv->trans->dbg.pc_data =
+				kmemdup(tlv_data, tlv_len, GFP_KERNEL);
+			if (!drv->trans->dbg.pc_data)
+				return -ENOMEM;
+			drv->trans->dbg.num_pc =
+				tlv_len / sizeof(struct iwl_pc_data);
+			break;
 		default:
 			IWL_DEBUG_INFO(drv, "unknown TLV: %d\n", tlv_type);
 			break;
