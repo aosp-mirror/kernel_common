@@ -108,7 +108,8 @@ static void MMapPMROpen(struct vm_area_struct *ps_vma)
 			 psPMR));
 
 	/* In case we get called anyway let's do things right by increasing the refcount and
-	 * locking down the physical addresses. */
+	 * locking down the physical addresses.
+	 */
 	PMRRefPMR(psPMR);
 
 	if (PMRLockSysPhysAddresses(psPMR) != PVRSRV_OK)
@@ -383,12 +384,24 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_BAD_MAPPING, e0);
 	}
 
+	/*
+	 * Take a reference on the PMR so that it can't be freed while mapped
+	 * into the user process.
+	 */
+	PMRRefPMR(psPMR);
+
 	eError = PMRLockSysPhysAddresses(psPMR);
 	if (eError != PVRSRV_OK)
 	{
-		goto e0;
+		goto ErrUnrefPMR;
 	}
 
+	/* Increment mapping count of the PMR so that its layout cannot be
+	 * changed (if sparse).
+	 */
+	PMRLockPMR(psPMR);
+
+	PMRCpuMapCountIncr(psPMR);
 	sPageProt = vm_get_page_prot(ps_vma->vm_flags);
 
 	eError = DevmemCPUCacheMode(psDevNode,
@@ -396,7 +409,7 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 	                            &ui32CPUCacheFlags);
 	if (eError != PVRSRV_OK)
 	{
-		goto e0;
+		goto e1;
 	}
 
 	switch (ui32CPUCacheFlags)
@@ -591,22 +604,12 @@ OSMMapPMRGeneric(PMR *psPMR, PMR_MMAP_DATA pOSMMapData)
 	/* Install open and close handlers for ref-counting */
 	ps_vma->vm_ops = &gsMMapOps;
 
-	/*
-	 * Take a reference on the PMR so that it can't be freed while mapped
-	 * into the user process.
-	 */
-	PMRRefPMR(psPMR);
-
 #if defined(PVRSRV_ENABLE_LINUX_MMAP_STATS)
 	/* record the stats */
 	MMapStatsAddOrUpdatePMR(psPMR, uiLength);
 #endif
 
-	/* Increment mapping count of the PMR so that its layout cannot be
-	 * changed (if sparse).
-	 */
-	PMRCpuMapCountIncr(psPMR);
-
+	PMRUnlockPMR(psPMR);
 	return PVRSRV_OK;
 
 	/* Error exit paths follow */
@@ -621,7 +624,11 @@ e2:
 		OSFreeMem(psCpuPAddr);
 	}
 e1:
+	PMRCpuMapCountDecr(psPMR);
+	PMRUnlockPMR(psPMR);
 	PMRUnlockSysPhysAddresses(psPMR);
+ErrUnrefPMR:
+	PMRUnrefPMR(psPMR);
 e0:
 	return eError;
 }

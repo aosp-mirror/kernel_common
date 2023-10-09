@@ -325,6 +325,18 @@ struct _PMR_PAGELIST_
 	struct _PMR_ *psReferencePMR;
 };
 
+void
+PMRLockPMR(PMR *psPMR)
+{
+	OSLockAcquire(psPMR->hLock);
+}
+
+void
+PMRUnlockPMR(PMR *psPMR)
+{
+	OSLockRelease(psPMR->hLock);
+}
+
 #if defined(PDUMP)
 static INLINE IMG_BOOL _IsHostDevicePMR(const PMR *const psPMR)
 {
@@ -2124,6 +2136,16 @@ PVRSRV_ERROR PMR_ChangeSparseMem(PMR *psPMR,
 {
 	PVRSRV_ERROR eError;
 
+	PMRLockPMR(psPMR);
+
+	if (!PMR_IsSparse(psPMR))
+	{
+		PVR_DPF((PVR_DBG_ERROR,
+		        "%s: Invalid non-sparse PMR", __func__));
+		PMRUnlockPMR(psPMR);
+		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
+	}
+
 	if ((IMG_TRUE == psPMR->bNoLayoutChange) || _PMR_IsMapped(psPMR))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
@@ -2131,6 +2153,7 @@ PVRSRV_ERROR PMR_ChangeSparseMem(PMR *psPMR,
 				__func__,
 				psPMR->bNoLayoutChange ? 'Y' : 'n',
 				_PMR_IsMapped(psPMR) ? 'Y' : 'n'));
+		PMRUnlockPMR(psPMR);
 		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
 	}
 
@@ -2139,6 +2162,7 @@ PVRSRV_ERROR PMR_ChangeSparseMem(PMR *psPMR,
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: This type of sparse PMR cannot be changed.",
 				__func__));
+		PMRUnlockPMR(psPMR);
 		return PVRSRV_ERROR_NOT_IMPLEMENTED;
 	}
 
@@ -2190,6 +2214,7 @@ PVRSRV_ERROR PMR_ChangeSparseMem(PMR *psPMR,
 #endif
 
 e0:
+	PMRUnlockPMR(psPMR);
 	return eError;
 }
 
@@ -2203,12 +2228,14 @@ PVRSRV_ERROR PMR_ChangeSparseMemCPUMap(PMR *psPMR,
 {
 	PVRSRV_ERROR eError;
 
+	PMRLockPMR(psPMR);
 	if ((NULL == psPMR->psFuncTab) ||
 			(NULL == psPMR->psFuncTab->pfnChangeSparseMemCPUMap))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: This type of sparse PMR cannot be changed.",
 				__func__));
+		PMRUnlockPMR(psPMR);
 		return PVRSRV_ERROR_NOT_IMPLEMENTED;
 	}
 
@@ -2217,6 +2244,7 @@ PVRSRV_ERROR PMR_ChangeSparseMemCPUMap(PMR *psPMR,
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: This PMR layout cannot be changed",
 				__func__));
+		PMRUnlockPMR(psPMR);
 		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
 	}
 
@@ -2228,6 +2256,7 @@ PVRSRV_ERROR PMR_ChangeSparseMemCPUMap(PMR *psPMR,
 	                                                    ui32FreePageCount,
 	                                                    pai32FreeIndices);
 
+	PMRUnlockPMR(psPMR);
 	return eError;
 }
 
