@@ -1156,6 +1156,7 @@
   mmc_detect_change
   mmc_free_host
   mmc_gpio_get_cd
+  mmc_gpiod_request_cd
   mmc_of_parse
   mmc_regulator_get_supply
   mmc_regulator_set_ocr
