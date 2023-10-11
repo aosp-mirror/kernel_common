@@ -372,7 +372,7 @@ static ssize_t size_show(struct device *dev,
 {
 	struct cacheinfo *this_leaf = dev_get_drvdata(dev);
 
-	return sysfs_emit(buf, "%uK\n", this_leaf->size >> 10);
+	return sprintf(buf, "%uK\n", this_leaf->size >> 10);
 }
 
 static ssize_t shared_cpumap_show_func(struct device *dev, bool list, char *buf)
@@ -402,11 +402,11 @@ static ssize_t type_show(struct device *dev,
 
 	switch (this_leaf->type) {
 	case CACHE_TYPE_DATA:
-		return sysfs_emit(buf, "Data\n");
+		return sprintf(buf, "Data\n");
 	case CACHE_TYPE_INST:
-		return sysfs_emit(buf, "Instruction\n");
+		return sprintf(buf, "Instruction\n");
 	case CACHE_TYPE_UNIFIED:
-		return sysfs_emit(buf, "Unified\n");
+		return sprintf(buf, "Unified\n");
 	default:
 		return -EINVAL;
 	}
@@ -420,11 +420,11 @@ static ssize_t allocation_policy_show(struct device *dev,
 	int n = 0;
 
 	if ((ci_attr & CACHE_READ_ALLOCATE) && (ci_attr & CACHE_WRITE_ALLOCATE))
-		n = sysfs_emit(buf, "ReadWriteAllocate\n");
+		n = sprintf(buf, "ReadWriteAllocate\n");
 	else if (ci_attr & CACHE_READ_ALLOCATE)
-		n = sysfs_emit(buf, "ReadAllocate\n");
+		n = sprintf(buf, "ReadAllocate\n");
 	else if (ci_attr & CACHE_WRITE_ALLOCATE)
-		n = sysfs_emit(buf, "WriteAllocate\n");
+		n = sprintf(buf, "WriteAllocate\n");
 	return n;
 }
 
@@ -436,9 +436,9 @@ static ssize_t write_policy_show(struct device *dev,
 	int n = 0;
 
 	if (ci_attr & CACHE_WRITE_THROUGH)
-		n = sysfs_emit(buf, "WriteThrough\n");
+		n = sprintf(buf, "WriteThrough\n");
 	else if (ci_attr & CACHE_WRITE_BACK)
-		n = sysfs_emit(buf, "WriteBack\n");
+		n = sprintf(buf, "WriteBack\n");
 	return n;
 }
 

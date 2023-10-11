@@ -73,13 +73,13 @@ static ssize_t soc_info_get(struct device *dev,
 	struct soc_device *soc_dev = container_of(dev, struct soc_device, dev);
 
 	if (attr == &dev_attr_machine)
-		return sysfs_emit(buf, "%s\n", soc_dev->attr->machine);
+		return sprintf(buf, "%s\n", soc_dev->attr->machine);
 	if (attr == &dev_attr_family)
-		return sysfs_emit(buf, "%s\n", soc_dev->attr->family);
+		return sprintf(buf, "%s\n", soc_dev->attr->family);
 	if (attr == &dev_attr_revision)
-		return sysfs_emit(buf, "%s\n", soc_dev->attr->revision);
+		return sprintf(buf, "%s\n", soc_dev->attr->revision);
 	if (attr == &dev_attr_soc_id)
-		return sysfs_emit(buf, "%s\n", soc_dev->attr->soc_id);
+		return sprintf(buf, "%s\n", soc_dev->attr->soc_id);
 
 	return -EINVAL;
 
