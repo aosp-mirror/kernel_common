@@ -1339,6 +1339,7 @@
   vfree
   __vmalloc
   vmalloc
+  vmalloc_array
   vmalloc_user
   vmap
   vmf_insert_pfn_prot
