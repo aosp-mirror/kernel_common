@@ -3113,6 +3113,13 @@ static void iwl_fw_dbg_collect_sync(struct iwl_fw_runtime *fwrt, u8 wk_idx)
 			 "WRT: Data collection disabled by iwl-dbg-cfg.ini\n");
 		goto out;
 	}
+	if (fwrt->trans->dbg_cfg.wrt_filter_timepoints &&
+	    !(fwrt->trans->dbg_cfg.wrt_filter_timepoints &
+	      BIT(le32_to_cpu(dump_data->trig->time_point)))) {
+		IWL_INFO(fwrt,
+			 "WRT: Data collection disabled by iwl-dbg-cfg.ini timepoints\n");
+		goto out;
+	}
 #endif
 
 	iwl_fw_dbg_stop_restart_recording(fwrt, &params, true);

@@ -44,6 +44,7 @@ struct iwl_dbg_cfg {
 	IWL_MOD_PARAM(bool, xvt_default_mode)
 #endif
 	IWL_DBG_CFG_NODEF(bool, disable_wrt_dump)
+	IWL_DBG_CFG_NODEF(u32, wrt_filter_timepoints)
 	IWL_DBG_CFG_NODEF(bool, disable_52GHz)
 	IWL_DBG_CFG_NODEF(bool, disable_24GHz)
 	IWL_DBG_CFG_DEF(bool, FW_MISBEHAVE_NMI,
