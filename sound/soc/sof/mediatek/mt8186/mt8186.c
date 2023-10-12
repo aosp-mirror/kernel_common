@@ -342,7 +342,7 @@ err_adsp_off:
 	return ret;
 }
 
-static int mt8186_dsp_remove(struct snd_sof_dev *sdev)
+static void mt8186_dsp_remove(struct snd_sof_dev *sdev)
 {
 	struct adsp_priv *priv = sdev->pdata->hw_pdata;
 
@@ -350,8 +350,6 @@ static int mt8186_dsp_remove(struct snd_sof_dev *sdev)
 	mt8186_sof_hifixdsp_shutdown(sdev);
 	adsp_sram_power_off(sdev);
 	mt8186_adsp_clock_off(sdev);
-
-	return 0;
 }
 
 static int mt8186_dsp_shutdown(struct snd_sof_dev *sdev)
