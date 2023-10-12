@@ -501,7 +501,7 @@ err_slow_clk:
 	return err;
 }
 
-static void atmel_tcb_pwm_remove(struct platform_device *pdev)
+static int atmel_tcb_pwm_remove(struct platform_device *pdev)
 {
 	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
 
@@ -511,6 +511,8 @@ static void atmel_tcb_pwm_remove(struct platform_device *pdev)
 	clk_put(tcbpwm->gclk);
 	clk_put(tcbpwm->clk);
 	clk_put(tcbpwm->slow_clk);
+
+	return 0;
 }
 
 static const struct of_device_id atmel_tcb_pwm_dt_ids[] = {
@@ -564,7 +566,7 @@ static struct platform_driver atmel_tcb_pwm_driver = {
 		.pm = &atmel_tcb_pwm_pm_ops,
 	},
 	.probe = atmel_tcb_pwm_probe,
-	.remove_new = atmel_tcb_pwm_remove,
+	.remove = atmel_tcb_pwm_remove,
 };
 module_platform_driver(atmel_tcb_pwm_driver);
 
