@@ -17,6 +17,26 @@ static void __kvm_flush_dcache_to_poc(void *addr, size_t size)
 	kvm_flush_dcache_to_poc((unsigned long)addr, (unsigned long)size);
 }
 
+static void __update_hcr_el2(unsigned long set_mask, unsigned long clear_mask)
+{
+	struct kvm_nvhe_init_params *params = this_cpu_ptr(&kvm_init_params);
+
+	params->hcr_el2 |= set_mask;
+	params->hcr_el2 &= ~clear_mask;
+	__kvm_flush_dcache_to_poc(params, sizeof(*params));
+	write_sysreg(params->hcr_el2, hcr_el2);
+}
+
+static void __update_hfgwtr_el2(unsigned long set_mask, unsigned long clear_mask)
+{
+	struct kvm_nvhe_init_params *params = this_cpu_ptr(&kvm_init_params);
+
+	params->hfgwtr_el2 |= set_mask;
+	params->hfgwtr_el2 &= ~clear_mask;
+	__kvm_flush_dcache_to_poc(params, sizeof(*params));
+	write_sysreg_s(params->hfgwtr_el2, SYS_HFGWTR_EL2);
+}
+
 static atomic_t early_lm_pages;
 static void *__pkvm_linear_map_early(phys_addr_t phys, size_t size, enum kvm_pgtable_prot prot)
 {
@@ -57,13 +77,9 @@ void __pkvm_close_module_registration(void)
 	 */
 }
 
-int __pkvm_close_late_module_registration(void)
+static int __pkvm_module_host_donate_hyp(u64 pfn, u64 nr_pages)
 {
-	__pkvm_close_module_registration();
-
-	return reset_pkvm_priv_hcall_limit();
-
-	/* The fuse is blown! No way back until reset */
+	return ___pkvm_host_donate_hyp(pfn, nr_pages, true);
 }
 
 const struct pkvm_module_ops module_ops = {
@@ -78,6 +94,8 @@ const struct pkvm_module_ops module_ops = {
 	.linear_map_early = __pkvm_linear_map_early,
 	.linear_unmap_early = __pkvm_linear_unmap_early,
 	.flush_dcache_to_poc = __kvm_flush_dcache_to_poc,
+	.update_hcr_el2 = __update_hcr_el2,
+	.update_hfgwtr_el2 = __update_hfgwtr_el2,
 	.register_host_perm_fault_handler = hyp_register_host_perm_fault_handler,
 	.host_stage2_mod_prot = module_change_host_page_prot,
 	.host_stage2_get_leaf = host_stage2_get_leaf,
@@ -86,7 +104,7 @@ const struct pkvm_module_ops module_ops = {
 	.register_illegal_abt_notifier = __pkvm_register_illegal_abt_notifier,
 	.register_psci_notifier = __pkvm_register_psci_notifier,
 	.register_hyp_panic_notifier = __pkvm_register_hyp_panic_notifier,
-	.host_donate_hyp = __pkvm_host_donate_hyp,
+	.host_donate_hyp = __pkvm_module_host_donate_hyp,
 	.hyp_donate_host = __pkvm_hyp_donate_host,
 	.host_share_hyp = __pkvm_host_share_hyp,
 	.host_unshare_hyp = __pkvm_host_unshare_hyp,

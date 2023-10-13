@@ -2,20 +2,12 @@
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.aarch64
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.gki
 
-MAKE_GOALS="
-Image
-modules
-Image.lz4
-Image.gz
-"
-
 FILES="${FILES}
 arch/arm64/boot/Image.lz4
 arch/arm64/boot/Image.gz
 "
 
 BUILD_SYSTEM_DLKM=1
-MODULES_LIST=${ROOT_DIR}/${KERNEL_DIR}/android/gki_system_dlkm_modules
 
 BUILD_GKI_CERTIFICATION_TOOLS=1
 

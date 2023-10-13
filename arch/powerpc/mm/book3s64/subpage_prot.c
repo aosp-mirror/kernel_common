@@ -143,6 +143,7 @@ static int subpage_walk_pmd_entry(pmd_t *pmd, unsigned long addr,
 
 static const struct mm_walk_ops subpage_walk_ops = {
 	.pmd_entry	= subpage_walk_pmd_entry,
+	.walk_lock	= PGWALK_WRLOCK_VERIFY,
 };
 
 static void subpage_mark_vma_nohuge(struct mm_struct *mm, unsigned long addr,
@@ -156,7 +157,7 @@ static void subpage_mark_vma_nohuge(struct mm_struct *mm, unsigned long addr,
 	 * VM_NOHUGEPAGE and split them.
 	 */
 	for_each_vma_range(vmi, vma, addr + len) {
-		vma->vm_flags |= VM_NOHUGEPAGE;
+		vm_flags_set(vma, VM_NOHUGEPAGE);
 		walk_page_vma(vma, &subpage_walk_ops, NULL);
 	}
 }

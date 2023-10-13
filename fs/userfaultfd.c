@@ -113,7 +113,7 @@ static void userfaultfd_set_vm_flags(struct vm_area_struct *vma,
 {
 	const bool uffd_wp_changed = (vma->vm_flags ^ flags) & VM_UFFD_WP;
 
-	vma->vm_flags = flags;
+	vm_flags_reset(vma, flags);
 	/*
 	 * For shared mappings, we want to enable writenotify while
 	 * userfaultfd-wp is enabled (see vma_wants_writenotify()). We'll simply
@@ -247,18 +247,17 @@ static inline struct uffd_msg userfault_msg(unsigned long address,
  * hugepmd ranges.
  */
 static inline bool userfaultfd_huge_must_wait(struct userfaultfd_ctx *ctx,
-					 struct vm_area_struct *vma,
-					 unsigned long address,
-					 unsigned long flags,
-					 unsigned long reason)
+					      struct vm_fault *vmf,
+					      unsigned long reason)
 {
+	struct vm_area_struct *vma = vmf->vma;
 	struct mm_struct *mm = ctx->mm;
 	pte_t *ptep, pte;
 	bool ret = true;
 
-	mmap_assert_locked(mm);
+	assert_fault_locked(vmf);
 
-	ptep = huge_pte_offset(mm, address, vma_mmu_pagesize(vma));
+	ptep = huge_pte_offset(mm, vmf->address, vma_mmu_pagesize(vma));
 
 	if (!ptep)
 		goto out;
@@ -280,10 +279,8 @@ out:
 }
 #else
 static inline bool userfaultfd_huge_must_wait(struct userfaultfd_ctx *ctx,
-					 struct vm_area_struct *vma,
-					 unsigned long address,
-					 unsigned long flags,
-					 unsigned long reason)
+					      struct vm_fault *vmf,
+					      unsigned long reason)
 {
 	return false;	/* should never get here */
 }
@@ -297,11 +294,11 @@ static inline bool userfaultfd_huge_must_wait(struct userfaultfd_ctx *ctx,
  * threads.
  */
 static inline bool userfaultfd_must_wait(struct userfaultfd_ctx *ctx,
-					 unsigned long address,
-					 unsigned long flags,
+					 struct vm_fault *vmf,
 					 unsigned long reason)
 {
 	struct mm_struct *mm = ctx->mm;
+	unsigned long address = vmf->address;
 	pgd_t *pgd;
 	p4d_t *p4d;
 	pud_t *pud;
@@ -309,7 +306,7 @@ static inline bool userfaultfd_must_wait(struct userfaultfd_ctx *ctx,
 	pte_t *pte;
 	bool ret = true;
 
-	mmap_assert_locked(mm);
+	assert_fault_locked(vmf);
 
 	pgd = pgd_offset(mm, address);
 	if (!pgd_present(*pgd))
@@ -416,7 +413,7 @@ vm_fault_t handle_userfault(struct vm_fault *vmf, unsigned long reason)
 	 * Coredumping runs without mmap_lock so we can only check that
 	 * the mmap_lock is held, if PF_DUMPCORE was not set.
 	 */
-	mmap_assert_locked(mm);
+	assert_fault_locked(vmf);
 
 	ctx = vmf->vma->vm_userfaultfd_ctx.ctx;
 	if (!ctx)
@@ -523,13 +520,10 @@ vm_fault_t handle_userfault(struct vm_fault *vmf, unsigned long reason)
 	spin_unlock_irq(&ctx->fault_pending_wqh.lock);
 
 	if (!is_vm_hugetlb_page(vmf->vma))
-		must_wait = userfaultfd_must_wait(ctx, vmf->address, vmf->flags,
-						  reason);
+		must_wait = userfaultfd_must_wait(ctx, vmf, reason);
 	else
-		must_wait = userfaultfd_huge_must_wait(ctx, vmf->vma,
-						       vmf->address,
-						       vmf->flags, reason);
-	mmap_read_unlock(mm);
+		must_wait = userfaultfd_huge_must_wait(ctx, vmf, reason);
+	release_fault_lock(vmf);
 
 	if (likely(must_wait && !READ_ONCE(ctx->released))) {
 		wake_up_poll(&ctx->fd_wqh, EPOLLIN);
@@ -632,6 +626,7 @@ static void userfaultfd_event_wait_completion(struct userfaultfd_ctx *ctx,
 		mmap_write_lock(mm);
 		for_each_vma(vmi, vma) {
 			if (vma->vm_userfaultfd_ctx.ctx == release_new_ctx) {
+				vma_start_write(vma);
 				vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 				userfaultfd_set_vm_flags(vma,
 							 vma->vm_flags & ~__VM_UFFD_FLAGS);
@@ -667,6 +662,7 @@ int dup_userfaultfd(struct vm_area_struct *vma, struct list_head *fcs)
 
 	octx = vma->vm_userfaultfd_ctx.ctx;
 	if (!octx || !(octx->features & UFFD_FEATURE_EVENT_FORK)) {
+		vma_start_write(vma);
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 		userfaultfd_set_vm_flags(vma, vma->vm_flags & ~__VM_UFFD_FLAGS);
 		return 0;
@@ -748,6 +744,7 @@ void mremap_userfaultfd_prep(struct vm_area_struct *vma,
 		atomic_inc(&ctx->mmap_changing);
 	} else {
 		/* Drop uffd context if remap feature not enabled */
+		vma_start_write(vma);
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 		userfaultfd_set_vm_flags(vma, vma->vm_flags & ~__VM_UFFD_FLAGS);
 	}
@@ -817,31 +814,26 @@ static bool has_unmap_ctx(struct userfaultfd_ctx *ctx, struct list_head *unmaps,
 	return false;
 }
 
-int userfaultfd_unmap_prep(struct mm_struct *mm, unsigned long start,
+int userfaultfd_unmap_prep(struct vm_area_struct *vma, unsigned long start,
 			   unsigned long end, struct list_head *unmaps)
 {
-	VMA_ITERATOR(vmi, mm, start);
-	struct vm_area_struct *vma;
+	struct userfaultfd_unmap_ctx *unmap_ctx;
+	struct userfaultfd_ctx *ctx = vma->vm_userfaultfd_ctx.ctx;
 
-	for_each_vma_range(vmi, vma, end) {
-		struct userfaultfd_unmap_ctx *unmap_ctx;
-		struct userfaultfd_ctx *ctx = vma->vm_userfaultfd_ctx.ctx;
+	if (!ctx || !(ctx->features & UFFD_FEATURE_EVENT_UNMAP) ||
+	    has_unmap_ctx(ctx, unmaps, start, end))
+		return 0;
 
-		if (!ctx || !(ctx->features & UFFD_FEATURE_EVENT_UNMAP) ||
-		    has_unmap_ctx(ctx, unmaps, start, end))
-			continue;
+	unmap_ctx = kzalloc(sizeof(*unmap_ctx), GFP_KERNEL);
+	if (!unmap_ctx)
+		return -ENOMEM;
 
-		unmap_ctx = kzalloc(sizeof(*unmap_ctx), GFP_KERNEL);
-		if (!unmap_ctx)
-			return -ENOMEM;
-
-		userfaultfd_ctx_get(ctx);
-		atomic_inc(&ctx->mmap_changing);
-		unmap_ctx->ctx = ctx;
-		unmap_ctx->start = start;
-		unmap_ctx->end = end;
-		list_add_tail(&unmap_ctx->list, unmaps);
-	}
+	userfaultfd_ctx_get(ctx);
+	atomic_inc(&ctx->mmap_changing);
+	unmap_ctx->ctx = ctx;
+	unmap_ctx->start = start;
+	unmap_ctx->end = end;
+	list_add_tail(&unmap_ctx->list, unmaps);
 
 	return 0;
 }
@@ -911,6 +903,7 @@ static int userfaultfd_release(struct inode *inode, struct file *file)
 			prev = vma;
 		}
 
+		vma_start_write(vma);
 		userfaultfd_set_vm_flags(vma, new_flags);
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 	}
@@ -1479,6 +1472,7 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 		 * the next vma was merged into the current one and
 		 * the current one has not been updated yet.
 		 */
+		vma_start_write(vma);
 		userfaultfd_set_vm_flags(vma, new_flags);
 		vma->vm_userfaultfd_ctx.ctx = ctx;
 
@@ -1667,6 +1661,7 @@ static int userfaultfd_unregister(struct userfaultfd_ctx *ctx,
 		 * the next vma was merged into the current one and
 		 * the current one has not been updated yet.
 		 */
+		vma_start_write(vma);
 		userfaultfd_set_vm_flags(vma, new_flags);
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
 
@@ -1966,8 +1961,10 @@ static int userfaultfd_api(struct userfaultfd_ctx *ctx,
 	ret = -EFAULT;
 	if (copy_from_user(&uffdio_api, buf, sizeof(uffdio_api)))
 		goto out;
-	/* Ignore unsupported features (userspace built against newer kernel) */
-	features = uffdio_api.features & UFFD_API_FEATURES;
+	features = uffdio_api.features;
+	ret = -EINVAL;
+	if (uffdio_api.api != UFFD_API || (features & ~UFFD_API_FEATURES))
+		goto err_out;
 	ret = -EPERM;
 	if ((features & UFFD_FEATURE_EVENT_FORK) && !capable(CAP_SYS_PTRACE))
 		goto err_out;

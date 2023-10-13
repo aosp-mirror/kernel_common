@@ -34,7 +34,6 @@ static void *vm_table_base;
 static void *hyp_pgt_base;
 static void *host_s2_pgt_base;
 static void *ffa_proxy_pages;
-static void *hyp_host_fp_base;
 static struct kvm_pgtable_mm_ops pkvm_pgtable_mm_ops;
 static struct hyp_pool hpool;
 
@@ -69,10 +68,21 @@ static int divide_memory_pool(void *virt, unsigned long size)
 	if (!ffa_proxy_pages)
 		return -ENOMEM;
 
-	nr_pages = hyp_host_fp_pages(hyp_nr_cpus);
-	hyp_host_fp_base = hyp_early_alloc_contig(nr_pages);
-	if (!hyp_host_fp_base)
-		return -ENOMEM;
+	return 0;
+}
+
+static int create_hyp_host_fp_mappings(void)
+{
+	void *start, *end;
+	int ret, i;
+
+	for (i = 0; i < hyp_nr_cpus; i++) {
+		start = (void *)kern_hyp_va(kvm_arm_hyp_host_fp_state[i]);
+		end = start + PAGE_ALIGN(pkvm_host_fp_state_size());
+		ret = pkvm_create_mappings(start, end, PAGE_HYP);
+		if (ret)
+			return ret;
+	}
 
 	return 0;
 }
@@ -163,6 +173,8 @@ static int recreate_hyp_mappings(phys_addr_t phys, unsigned long size,
 		/* Update stack_hyp_va to end of the stack's private VA range */
 		params->stack_hyp_va = hyp_addr + (2 * PAGE_SIZE);
 	}
+
+	create_hyp_host_fp_mappings();
 
 	/*
 	 * Map the host sections RO in the hypervisor, but transfer the
@@ -277,6 +289,29 @@ static int fix_hyp_pgtable_refcnt_walker(u64 addr, u64 end, u32 level,
 	return 0;
 }
 
+static int pin_table_walker(u64 addr, u64 end, u32 level, kvm_pte_t *ptep,
+			    enum kvm_pgtable_walk_flags flag, void * const arg)
+{
+	struct kvm_pgtable_mm_ops *mm_ops = arg;
+	kvm_pte_t pte = *ptep;
+
+	if (kvm_pte_valid(pte))
+		mm_ops->get_page(kvm_pte_follow(pte, mm_ops));
+
+	return 0;
+}
+
+static int pin_host_tables(void)
+{
+	struct kvm_pgtable_walker walker = {
+		.cb	= pin_table_walker,
+		.flags	= KVM_PGTABLE_WALK_TABLE_POST,
+		.arg	= &host_mmu.mm_ops,
+	};
+
+	return kvm_pgtable_walk(&host_mmu.pgt, 0, BIT(host_mmu.pgt.ia_bits), &walker);
+}
+
 static int fix_host_ownership(void)
 {
 	struct kvm_pgtable_walker walker = {
@@ -318,7 +353,9 @@ static int unmap_protected_regions(void)
 		reg = &pkvm_moveable_regs[i];
 		if (reg->type != PKVM_MREG_PROTECTED_RANGE)
 			continue;
-		ret = host_stage2_protect_pages_locked(reg->start, reg->size);
+
+		ret = host_stage2_set_owner_locked(reg->start, reg->size,
+						   PKVM_ID_PROTECTED);
 		if (ret)
 			return ret;
 	}
@@ -355,10 +392,6 @@ void __noreturn __pkvm_init_finalise(void)
 	};
 	pkvm_pgtable.mm_ops = &pkvm_pgtable_mm_ops;
 
-	ret = fix_host_ownership();
-	if (ret)
-		goto out;
-
 	ret = fix_hyp_pgtable_refcnt();
 	if (ret)
 		goto out;
@@ -367,7 +400,15 @@ void __noreturn __pkvm_init_finalise(void)
 	if (ret)
 		goto out;
 
+	ret = fix_host_ownership();
+	if (ret)
+		goto out;
+
 	ret = unmap_protected_regions();
+	if (ret)
+		goto out;
+
+	ret = pin_host_tables();
 	if (ret)
 		goto out;
 
@@ -376,7 +417,6 @@ void __noreturn __pkvm_init_finalise(void)
 		goto out;
 
 	pkvm_hyp_vm_table_init(vm_table_base);
-	pkvm_hyp_host_fp_init(hyp_host_fp_base);
 out:
 	/*
 	 * We tail-called to here from handle___pkvm_init() and will not return,

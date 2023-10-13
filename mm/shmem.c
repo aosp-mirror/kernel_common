@@ -83,6 +83,7 @@ static struct vfsmount *shm_mnt;
 #include <linux/userfaultfd_k.h>
 #include <linux/rmap.h>
 #include <linux/uuid.h>
+#include <linux/android_vendor.h>
 
 #include <linux/uaccess.h>
 
@@ -804,14 +805,16 @@ unsigned long shmem_partial_swap_usage(struct address_space *mapping,
 	XA_STATE(xas, &mapping->i_pages, start);
 	struct page *page;
 	unsigned long swapped = 0;
+	unsigned long max = end - 1;
 
 	rcu_read_lock();
-	xas_for_each(&xas, page, end - 1) {
+	xas_for_each(&xas, page, max) {
 		if (xas_retry(&xas, page))
 			continue;
 		if (xa_is_value(page))
 			swapped++;
-
+		if (xas.xa_index == max)
+			break;
 		if (need_resched()) {
 			xas_pause(&xas);
 			cond_resched_rcu();
@@ -2296,7 +2299,7 @@ static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 		return ret;
 
 	/* arm64 - allow memory tagging on RAM-based files */
-	vma->vm_flags |= VM_MTE_ALLOWED;
+	vm_flags_set(vma, VM_MTE_ALLOWED);
 
 	file_accessed(file);
 	vma->vm_ops = &shmem_vm_ops;
@@ -2352,6 +2355,7 @@ static struct inode *shmem_get_inode(struct super_block *sb, struct inode *dir,
 		inode->i_generation = get_random_u32();
 		info = SHMEM_I(inode);
 		memset(info, 0, (char *)inode - (char *)info);
+		android_init_vendor_data(info, 1);
 		spin_lock_init(&info->lock);
 		atomic_set(&info->stop_eviction, 0);
 		info->seals = F_SEAL_SEAL;

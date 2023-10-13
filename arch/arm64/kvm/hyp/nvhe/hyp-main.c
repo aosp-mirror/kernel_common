@@ -39,7 +39,12 @@ static bool (*default_trap_handler)(struct kvm_cpu_context *host_ctxt);
 
 int __pkvm_register_host_smc_handler(bool (*cb)(struct kvm_cpu_context *))
 {
-	return cmpxchg(&default_host_smc_handler, NULL, cb) ? -EBUSY : 0;
+	/*
+	 * Paired with smp_load_acquire(&default_host_smc_handler) in
+	 * handle_host_smc(). Ensure memory stores happening during a pKVM module
+	 * init are observed before executing the callback.
+	 */
+	return cmpxchg_release(&default_host_smc_handler, NULL, cb) ? -EBUSY : 0;
 }
 
 int __pkvm_register_default_trap_handler(bool (*cb)(struct kvm_cpu_context *))
@@ -1212,12 +1217,6 @@ static void handle___pkvm_register_hcall(struct kvm_cpu_context *host_ctxt)
 	cpu_reg(host_ctxt, 1) = __pkvm_register_hcall(hfn_hyp_va);
 }
 
-static void
-handle___pkvm_close_module_registration(struct kvm_cpu_context *host_ctxt)
-{
-	cpu_reg(host_ctxt, 1) = __pkvm_close_late_module_registration();
-}
-
 static void handle___pkvm_load_tracing(struct kvm_cpu_context *host_ctxt)
 {
 	 DECLARE_REG(unsigned long, pack_hva, host_ctxt, 1);
@@ -1290,13 +1289,11 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__kvm_tlb_flush_vmid_ipa),
 	HANDLE_FUNC(__kvm_tlb_flush_vmid),
 	HANDLE_FUNC(__kvm_flush_cpu_context),
-
 	HANDLE_FUNC(__pkvm_alloc_module_va),
 	HANDLE_FUNC(__pkvm_map_module_page),
 	HANDLE_FUNC(__pkvm_unmap_module_page),
 	HANDLE_FUNC(__pkvm_init_module),
 	HANDLE_FUNC(__pkvm_register_hcall),
-	HANDLE_FUNC(__pkvm_close_module_registration),
 	HANDLE_FUNC(__pkvm_prot_finalize),
 
 	HANDLE_FUNC(__pkvm_host_share_hyp),
@@ -1330,22 +1327,6 @@ static const hcall_t host_hcall[] = {
 #endif
 };
 
-unsigned long pkvm_priv_hcall_limit __ro_after_init = __KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize;
-
-int reset_pkvm_priv_hcall_limit(void)
-{
-	unsigned long *addr;
-
-	if (pkvm_priv_hcall_limit == __KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize)
-		return -EACCES;
-
-	addr = hyp_fixmap_map(__hyp_pa(&pkvm_priv_hcall_limit));
-	*addr = __KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize;
-	hyp_fixmap_unmap();
-
-	return 0;
-}
-
 static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
 {
 	DECLARE_REG(unsigned long, id, host_ctxt, 0);
@@ -1365,7 +1346,7 @@ static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
 	 * returns -EPERM after the first call for a given CPU.
 	 */
 	if (static_branch_unlikely(&kvm_protected_mode_initialized))
-		hcall_min = pkvm_priv_hcall_limit;
+		hcall_min = __KVM_HOST_SMCCC_FUNC___pkvm_prot_finalize;
 
 	id -= KVM_HOST_SMCCC_ID(0);
 
@@ -1400,12 +1381,16 @@ static void handle_host_smc(struct kvm_cpu_context *host_ctxt)
 	handled = kvm_host_psci_handler(host_ctxt);
 	if (!handled)
 		handled = kvm_host_ffa_handler(host_ctxt);
-	if (!handled && READ_ONCE(default_host_smc_handler))
+	if (!handled && smp_load_acquire(&default_host_smc_handler))
 		handled = default_host_smc_handler(host_ctxt);
-	if (!handled)
-		__kvm_hyp_host_forward_smc(host_ctxt);
 
 	trace_host_smc(func_id, !handled);
+
+	if (!handled) {
+		trace_hyp_exit();
+		__kvm_hyp_host_forward_smc(host_ctxt);
+		trace_hyp_enter();
+	}
 
 	/* SMC was trapped, move ELR past the current PC. */
 	kvm_skip_host_instr();

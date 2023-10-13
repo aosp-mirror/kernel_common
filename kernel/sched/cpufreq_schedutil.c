@@ -148,7 +148,8 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	unsigned long next_freq = 0;
 
 	util = map_util_perf(util);
-	trace_android_vh_map_util_freq(util, freq, max, &next_freq);
+	trace_android_vh_map_util_freq(util, freq, max, &next_freq, policy,
+			&sg_policy->need_freq_update);
 	if (next_freq)
 		freq = next_freq;
 	else
@@ -602,6 +603,7 @@ static int sugov_kthread_create(struct sugov_policy *sg_policy)
 	if (policy->fast_switch_enabled)
 		return 0;
 
+	trace_android_vh_set_sugov_sched_attr(&attr);
 	kthread_init_work(&sg_policy->work, sugov_work);
 	kthread_init_worker(&sg_policy->worker);
 	thread = kthread_create(kthread_worker_fn, &sg_policy->worker,

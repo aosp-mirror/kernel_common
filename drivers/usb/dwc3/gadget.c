@@ -2645,13 +2645,16 @@ static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 		 * device-initiated disconnect requires a core soft reset
 		 * (DCTL.CSftRst) before enabling the run/stop bit.
 		 */
-		dwc3_core_soft_reset(dwc);
+		ret = dwc3_core_soft_reset(dwc);
+		if (ret)
+			goto done;
 
 		dwc3_event_buffers_setup(dwc);
 		__dwc3_gadget_start(dwc);
 		ret = dwc3_gadget_run_stop(dwc, true);
 	}
 
+done:
 	pm_runtime_put(dwc->dev);
 
 	return ret;
@@ -3835,6 +3838,8 @@ static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 {
 	int			reg;
 
+	dwc->suspended = false;
+
 	dwc3_gadget_set_link_state(dwc, DWC3_LINK_STATE_RX_DET);
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
@@ -3856,6 +3861,8 @@ static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 {
 	u32			reg;
+
+	dwc->suspended = false;
 
 	/*
 	 * Ideally, dwc3_reset_gadget() would trigger the function
@@ -4073,6 +4080,9 @@ static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
 
 static void dwc3_gadget_wakeup_interrupt(struct dwc3 *dwc)
 {
+
+	dwc->suspended = false;
+
 	/*
 	 * TODO take core out of low power mode when that's
 	 * implemented.
@@ -4188,8 +4198,10 @@ static void dwc3_gadget_suspend_interrupt(struct dwc3 *dwc,
 {
 	enum dwc3_link_state next = evtinfo & DWC3_LINK_STATE_MASK;
 
-	if (dwc->link_state != next && next == DWC3_LINK_STATE_U3)
+	if (!dwc->suspended && next == DWC3_LINK_STATE_U3) {
+		dwc->suspended = true;
 		dwc3_suspend_gadget(dwc);
+	}
 
 	dwc->link_state = next;
 }

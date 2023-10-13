@@ -11,10 +11,23 @@
   atomic_notifier_chain_unregister
   __bitmap_weight
   bitmap_zalloc
+  blkcg_activate_policy
+  blkcg_deactivate_policy
+  blkcg_policy_register
+  blkcg_policy_unregister
+  blkcg_root
   blkdev_get_by_dev
   blkdev_get_by_path
   blkdev_issue_flush
   blkdev_put
+  blk_mq_sched_mark_restart_hctx
+  blk_mq_sched_try_insert_merge
+  blk_mq_sched_try_merge
+  blk_queue_rq_timeout
+  blk_req_needs_zone_write_lock
+  __blk_req_zone_write_lock
+  __blk_req_zone_write_unlock
+  blk_stat_enable_accounting
   cache_line_size
   cancel_delayed_work_sync
   __check_object_size
@@ -22,6 +35,7 @@
   class_create_file_ns
   class_find_device
   class_remove_file_ns
+  cleancache_register_ops
   __const_udelay
   copy_from_kernel_nofault
   cpu_hwcaps
@@ -34,11 +48,13 @@
   crypto_comp_compress
   crypto_comp_decompress
   crypto_destroy_tfm
+  css_next_descendant_pre
   _ctype
   debugfs_create_file
   debugfs_remove
   delayed_work_timer_fn
   del_timer
+  _dev_alert
   _dev_err
   device_create
   device_destroy
@@ -47,6 +63,7 @@
   _dev_info
   __devm_alloc_percpu
   devm_bitmap_zalloc
+  devm_clk_get_optional_enabled
   devm_gen_pool_create
   devm_gpiod_get_index
   devm_ioremap
@@ -62,6 +79,18 @@
   dma_alloc_attrs
   dma_free_attrs
   down_write
+  dummy_irq_chip
+  elevator_alloc
+  elv_bio_merge_ok
+  elv_rb_add
+  elv_rb_del
+  elv_rb_find
+  elv_rb_former_request
+  elv_rb_latter_request
+  elv_register
+  elv_rqhash_add
+  elv_rqhash_del
+  elv_unregister
   emergency_restart
   file_ra_state_init
   file_write_and_wait_range
@@ -71,6 +100,8 @@
   __free_pages
   free_pages
   free_pages_exact
+  fsnotify
+  __fsnotify_parent
   generic_file_read_iter
   generic_mii_ioctl
   generic_perform_write
@@ -103,6 +134,7 @@
   I_BDEV
   iio_channel_get
   iio_channel_release
+  iio_read_channel_raw
   init_task
   init_timer_key
   input_close_device
@@ -114,12 +146,17 @@
   ioremap_prot
   iounmap
   iov_iter_kvec
+  __irq_domain_alloc_fwnode
+  irq_domain_free_fwnode
   jiffies
   kasan_flag_enabled
   kasprintf
   kernel_cpustat
+  kernel_neon_begin
+  kernel_neon_end
   kernfs_find_and_get_ns
   kfree
+  __kfree_skb
   kimage_vaddr
   kimage_voffset
   __kmalloc
@@ -132,6 +169,7 @@
   kobject_put
   kstrdup
   kstrtoint
+  kstrtos16
   kstrtouint
   kstrtoull
   kthread_create_on_node
@@ -160,9 +198,11 @@
   mutex_lock
   mutex_unlock
   name_to_dev_t
+  netlink_ack
   nr_cpu_ids
   nsec_to_clock_t
   of_address_to_resource
+  of_css
   of_find_compatible_node
   of_find_node_opts_by_path
   of_find_property
@@ -189,12 +229,16 @@
   param_ops_ullong
   param_set_uint
   __per_cpu_offset
+  phy_connect_direct
+  phy_find_first
+  phy_get_pause
   phy_resolve_aneg_linkmode
   phy_start_aneg
   pinctrl_get
   pinctrl_put
   __platform_driver_register
   platform_driver_unregister
+  platform_get_ethdev_address
   preempt_schedule
   print_hex_dump
   _printk
@@ -219,12 +263,14 @@
   register_reboot_notifier
   register_restart_handler
   register_syscore_ops
+  regulator_get_current_limit
   remove_cpu
   rtc_class_open
   rtc_read_time
   rtc_time64_to_tm
   rtc_tm_to_time64
   runqueues
+  sbitmap_queue_min_shallow_depth
   sched_clock
   sched_show_task
   scnprintf
@@ -237,6 +283,11 @@
   simple_strtol
   single_open
   single_release
+  skb_copy_ubufs
+  smpboot_register_percpu_thread
+  smpboot_unregister_percpu_thread
+  snd_soc_add_card_controls
+  snd_soc_find_dai
   snd_soc_info_volsw_sx
   snd_soc_put_volsw_sx
   snprintf
@@ -244,6 +295,7 @@
   sprintf
   sscanf
   __stack_chk_fail
+  stack_trace_save_regs
   stpcpy
   strcmp
   strim
@@ -265,6 +317,12 @@
   system_long_wq
   system_unbound_wq
   sys_tz
+  tcp_register_congestion_control
+  tcp_reno_cong_avoid
+  tcp_reno_ssthresh
+  tcp_reno_undo_cwnd
+  tcp_slow_start
+  tcp_unregister_congestion_control
   time64_to_tm
   __traceiter_android_rvh_arm64_serror_panic
   __traceiter_android_rvh_die_kernel_fault
@@ -277,8 +335,13 @@
   __traceiter_android_rvh_report_bug
   __traceiter_android_vh_ipi_stop
   __traceiter_android_vh_is_fpsimd_save
+  __traceiter_android_vh_madvise_pageout_swap_entry
+  __traceiter_android_vh_madvise_swapin_walk_pmd_entry
+  __traceiter_android_vh_meminfo_cache_adjust
   __traceiter_android_vh_mutex_wait_finish
   __traceiter_android_vh_mutex_wait_start
+  __traceiter_android_vh_process_madvise_end
+  __traceiter_android_vh_ptype_head
   __traceiter_android_vh_rtmutex_wait_finish
   __traceiter_android_vh_rtmutex_wait_start
   __traceiter_android_vh_rwsem_read_wait_finish
@@ -286,14 +349,22 @@
   __traceiter_android_vh_rwsem_write_wait_finish
   __traceiter_android_vh_rwsem_write_wait_start
   __traceiter_android_vh_sched_show_task
+  __traceiter_android_vh_show_smap
+  __traceiter_android_vh_si_mem_available_adjust
+  __traceiter_android_vh_si_meminfo_adjust
+  __traceiter_android_vh_smaps_pte_entry
   __traceiter_android_vh_try_to_freeze_todo
   __traceiter_android_vh_try_to_freeze_todo_unfrozen
   __traceiter_android_vh_watchdog_timer_softlockup
+  __traceiter_android_vh_wq_lockup_pool
+  __traceiter_block_rq_insert
   __traceiter_console
+  __traceiter_error_report_end
   __traceiter_hrtimer_expire_entry
   __traceiter_hrtimer_expire_exit
   __traceiter_irq_handler_entry
   __traceiter_irq_handler_exit
+  __traceiter_kfree_skb
   __traceiter_sched_switch
   __traceiter_workqueue_execute_start
   __tracepoint_android_rvh_arm64_serror_panic
@@ -307,8 +378,13 @@
   __tracepoint_android_rvh_report_bug
   __tracepoint_android_vh_ipi_stop
   __tracepoint_android_vh_is_fpsimd_save
+  __tracepoint_android_vh_madvise_pageout_swap_entry
+  __tracepoint_android_vh_madvise_swapin_walk_pmd_entry
+  __tracepoint_android_vh_meminfo_cache_adjust
   __tracepoint_android_vh_mutex_wait_finish
   __tracepoint_android_vh_mutex_wait_start
+  __tracepoint_android_vh_process_madvise_end
+  __tracepoint_android_vh_ptype_head
   __tracepoint_android_vh_rtmutex_wait_finish
   __tracepoint_android_vh_rtmutex_wait_start
   __tracepoint_android_vh_rwsem_read_wait_finish
@@ -316,14 +392,22 @@
   __tracepoint_android_vh_rwsem_write_wait_finish
   __tracepoint_android_vh_rwsem_write_wait_start
   __tracepoint_android_vh_sched_show_task
+  __tracepoint_android_vh_show_smap
+  __tracepoint_android_vh_si_mem_available_adjust
+  __tracepoint_android_vh_si_meminfo_adjust
+  __tracepoint_android_vh_smaps_pte_entry
   __tracepoint_android_vh_try_to_freeze_todo
   __tracepoint_android_vh_try_to_freeze_todo_unfrozen
   __tracepoint_android_vh_watchdog_timer_softlockup
+  __tracepoint_android_vh_wq_lockup_pool
+  __tracepoint_block_rq_insert
+  __tracepoint_error_report_end
   __tracepoint_console
   __tracepoint_hrtimer_expire_entry
   __tracepoint_hrtimer_expire_exit
   __tracepoint_irq_handler_entry
   __tracepoint_irq_handler_exit
+  __tracepoint_kfree_skb
   tracepoint_probe_register
   tracepoint_probe_unregister
   __tracepoint_sched_switch
@@ -334,7 +418,9 @@
   unregister_restart_handler
   unregister_syscore_ops
   up_write
+  usb_alloc_dev
   usb_gstrings_attach
+  usb_set_configuration
   usbnet_get_endpoints
   usbnet_link_change
   usb_set_device_state
