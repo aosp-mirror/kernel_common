@@ -876,7 +876,7 @@
   of_get_next_child
   of_prop_next_string
   pci_disable_link_state
-  pcie_capability_clear_and_set_word
+  pcie_capability_clear_and_set_word_locked
   pcie_capability_read_word
   radix_tree_tagged
   __skb_pad
