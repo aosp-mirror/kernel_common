@@ -44,7 +44,7 @@ static bool kvm_nvhe_stack_kern_va(unsigned long *addr,
 
 	switch (type) {
 	case STACK_TYPE_HYP:
-		kern_base = (unsigned long)*this_cpu_ptr(&kvm_arm_hyp_stack_page);
+		kern_base = (unsigned long)*this_cpu_ptr(&kvm_arm_hyp_stack_base);
 		hyp_base = (unsigned long)stacktrace_info->stack_base;
 		break;
 	case STACK_TYPE_OVERFLOW:
@@ -79,7 +79,7 @@ static bool on_hyp_stack(unsigned long sp, unsigned long size,
 	struct kvm_nvhe_stacktrace_info *stacktrace_info
 				= this_cpu_ptr_nvhe_sym(kvm_stacktrace_info);
 	unsigned long low = (unsigned long)stacktrace_info->stack_base;
-	unsigned long high = low + PAGE_SIZE;
+	unsigned long high = low + NVHE_STACK_SIZE;
 
 	return on_stack(sp, size, low, high, STACK_TYPE_HYP, info);
 }
