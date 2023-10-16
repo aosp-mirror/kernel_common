@@ -5310,6 +5310,9 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 					 struct ieee80211_mgmt *mgmt,
 					 size_t len)
 {
+#if CFG80211_VERSION >= KERNEL_VERSION(6,0,0) && CFG80211_VERSION < KERNEL_VERSION(6,6,0)
+	u8 link_addrs[IEEE80211_MLD_MAX_NUM_LINKS][ETH_ALEN];
+#endif
 	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
 	struct ieee80211_mgd_assoc_data *assoc_data = ifmgd->assoc_data;
 	u16 capab_info, status_code, aid;
@@ -5483,18 +5486,26 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 	for (link_id = 0; link_id < IEEE80211_MLD_MAX_NUM_LINKS; link_id++) {
 		struct ieee80211_link_data *link;
 
-		link = sdata_dereference(sdata->link[link_id], sdata);
-		if (!link)
-			continue;
-
 		if (!assoc_data->link[link_id].bss)
 			continue;
 
 		resp.links[link_id].bss = assoc_data->link[link_id].bss;
-		resp.links[link_id].addr = link->conf->addr;
+#if CFG80211_VERSION >= KERNEL_VERSION(6,0,0) && CFG80211_VERSION < KERNEL_VERSION(6,6,0)
+		ether_addr_copy(link_addrs[link_id],
+				assoc_data->link[link_id].addr);
+		resp.links[link_id].addr = link_addrs[link_id];
+#else
+		ether_addr_copy(resp.links[link_id].addr,
+				assoc_data->link[link_id].addr);
+#endif
 #if CFG80211_VERSION >= KERNEL_VERSION(6,2,0)
 		resp.links[link_id].status = assoc_data->link[link_id].status;
 #endif
+
+		link = sdata_dereference(sdata->link[link_id], sdata);
+		if (!link)
+			continue;
+
 		/* get uapsd queues configuration - same for all links */
 		resp.uapsd_queues = 0;
 		for (ac = 0; ac < IEEE80211_NUM_ACS; ac++)
