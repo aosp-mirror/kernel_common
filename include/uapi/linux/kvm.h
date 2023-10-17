@@ -1056,6 +1056,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_GET_CUR_CPUFREQ 512
 #define KVM_CAP_UTIL_HINT 513
 #define KVM_CAP_GET_CPUFREQ_TBL 514
+#define KVM_CAP_PV_SCHED	600
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -1712,5 +1713,9 @@ struct kvm_hyperv_eventfd {
 
 #define KVM_DIRTY_LOG_MANUAL_PROTECT_ENABLE    (1 << 0)
 #define KVM_DIRTY_LOG_INITIALLY_SET            (1 << 1)
+
+/* Available with KVM_CAP_PV_SCHED */
+#define KVM_SET_PV_SCHED_ENABLED	_IOW(KVMIO, 0xe0, int)
+#define KVM_GET_PV_SCHED_ENABLED	_IOR(KVMIO, 0xe1, int)
 
 #endif /* __LINUX_KVM_H */
