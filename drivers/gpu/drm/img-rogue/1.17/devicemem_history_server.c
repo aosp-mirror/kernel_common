@@ -1872,7 +1872,7 @@ static int DevicememHistoryPrintAllWrapper(OSDI_IMPL_ENTRY *psEntry,
 static PVRSRV_ERROR CreateRecords(void)
 {
 	gsDevicememHistoryData.sRecords.pasAllocations =
-			OSAllocMem(sizeof(RECORD_ALLOCATION) * ALLOCATION_LIST_NUM_ENTRIES);
+			OSAllocZMem(sizeof(RECORD_ALLOCATION) * ALLOCATION_LIST_NUM_ENTRIES);
 
 	PVR_RETURN_IF_NOMEM(gsDevicememHistoryData.sRecords.pasAllocations);
 
