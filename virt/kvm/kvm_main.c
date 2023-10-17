@@ -99,6 +99,61 @@ unsigned int halt_poll_ns_shrink;
 module_param(halt_poll_ns_shrink, uint, 0644);
 EXPORT_SYMBOL_GPL(halt_poll_ns_shrink);
 
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+__read_mostly DEFINE_STATIC_KEY_FALSE(kvm_pv_sched);
+EXPORT_SYMBOL_GPL(kvm_pv_sched);
+
+static int set_kvm_pv_sched(const char *val, const struct kernel_param *cp)
+{
+	struct kvm *kvm;
+	char *s = strstrip((char *)val);
+	bool new_val, old_val = static_key_enabled(&kvm_pv_sched);
+
+	if (!strcmp(s, "0"))
+		new_val = 0;
+	else if (!strcmp(s, "1"))
+		new_val = 1;
+	else
+		return -EINVAL;
+
+	/*
+	 * We have three factors that determine the feature status for a vcpu:
+	 * - Global static key: kvm_pv_sched
+	 * - Per vm: kvm->pv_sched_enabled
+	 * - Per vcpu: vcpu->arch.pv_sched.msr_val
+	 * We check this in order to determine the feature status. On both enable
+	 * and disable path, we modify this in the same order. This is to avoid
+	 * races which otherwise would need boosting path locking.
+	 */
+	if (old_val != new_val) {
+		mutex_lock(&kvm_lock);
+		if (new_val)
+			static_branch_enable(&kvm_pv_sched);
+		else
+			static_branch_disable(&kvm_pv_sched);
+
+		list_for_each_entry(kvm, &vm_list, vm_list)
+			kvm_set_pv_sched_enabled(kvm, !old_val);
+		mutex_unlock(&kvm_lock);
+	}
+
+	return 0;
+}
+
+static int get_kvm_pv_sched(char *buf, const struct kernel_param *cp)
+{
+	return sprintf(buf, "%s\n",
+			static_key_enabled(&kvm_pv_sched) ? "1" : "0");
+}
+
+static const struct kernel_param_ops kvm_pv_sched_ops = {
+	.set = set_kvm_pv_sched,
+	.get = get_kvm_pv_sched
+};
+
+module_param_cb(kvm_pv_sched, &kvm_pv_sched_ops, NULL, 0644);
+#endif
+
 /*
  * Allow non-refcounted struct pages and non-struct page memory to
  * be mapped without MMU notifier protection.
@@ -1271,6 +1326,9 @@ static struct kvm *kvm_create_vm(unsigned long type, const char *fdname)
 
 	BUILD_BUG_ON(KVM_MEM_SLOTS_NUM > SHRT_MAX);
 
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+	kvm->pv_sched_enabled = true;
+#endif
 	/*
 	 * Force subsequent debugfs file creations to fail if the VM directory
 	 * is not created (by kvm_create_vm_debugfs()).
@@ -4864,6 +4922,9 @@ static int kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	case KVM_CAP_CHECK_EXTENSION_VM:
 	case KVM_CAP_ENABLE_CAP_VM:
 	case KVM_CAP_HALT_POLL:
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+	case KVM_CAP_PV_SCHED:
+#endif
 		return 1;
 #ifdef CONFIG_KVM_MMIO
 	case KVM_CAP_COALESCED_MMIO:
@@ -5291,6 +5352,30 @@ static long kvm_vm_ioctl(struct file *filp,
 	case KVM_GET_STATS_FD:
 		r = kvm_vm_ioctl_get_stats_fd(kvm);
 		break;
+#ifdef CONFIG_KVM_PRIVATE_MEM
+	case KVM_CREATE_GUEST_MEMFD: {
+		struct kvm_create_guest_memfd guest_memfd;
+
+		r = -EFAULT;
+		if (copy_from_user(&guest_memfd, argp, sizeof(guest_memfd)))
+			goto out;
+
+		r = kvm_gmem_create(kvm, &guest_memfd);
+		break;
+	}
+#endif
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+	case KVM_SET_PV_SCHED_ENABLED:
+		r = -EINVAL;
+		if (arg == 0 || arg == 1) {
+			kvm_set_pv_sched_enabled(kvm, arg);
+			r = 0;
+		}
+		break;
+	case KVM_GET_PV_SCHED_ENABLED:
+		r = kvm->pv_sched_enabled;
+		break;
+#endif
 	default:
 		r = kvm_arch_vm_ioctl(filp, ioctl, arg);
 	}
