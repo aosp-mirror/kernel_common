@@ -26,6 +26,8 @@
 #include <linux/tick.h>
 #include <linux/irq.h>
 
+#include <linux/kvm_para.h>
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>
 
@@ -281,6 +283,9 @@ asmlinkage __visible void __softirq_entry __do_softirq(void)
 	__local_bh_disable_ip(_RET_IP_, SOFTIRQ_OFFSET);
 	in_hardirq = lockdep_softirq_start();
 
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_boost_lazy(PVSCHED_KERNCS_BOOST_SOFTIRQ);
+
 restart:
 	/* Reset the pending bitmask before enabling irqs */
 	set_softirq_pending(deferred);
@@ -332,6 +337,10 @@ restart:
 	if (pending | deferred)
 		wakeup_softirqd();
 #endif
+
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_unboost(PVSCHED_KERNCS_BOOST_SOFTIRQ, true);
+
 	lockdep_softirq_end(in_hardirq);
 	account_irq_exit_time(current);
 	__local_bh_enable(SOFTIRQ_OFFSET);

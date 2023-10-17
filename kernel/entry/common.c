@@ -308,6 +308,11 @@ noinstr irqentry_state_t irqentry_enter(struct pt_regs *regs)
 		.exit_rcu = false,
 	};
 
+	instrumentation_begin();
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_boost_lazy(PVSCHED_KERNCS_BOOST_IRQ);
+	instrumentation_end();
+
 	if (user_mode(regs)) {
 		irqentry_enter_from_user_mode(regs);
 		return ret;
@@ -383,6 +388,11 @@ noinstr void irqentry_exit(struct pt_regs *regs, irqentry_state_t state)
 {
 	lockdep_assert_irqs_disabled();
 
+	instrumentation_begin();
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_unboost(PVSCHED_KERNCS_BOOST_IRQ, true);
+	instrumentation_end();
+
 	/* Check whether this returns to user mode */
 	if (user_mode(regs)) {
 		irqentry_exit_to_user_mode(regs);
@@ -433,6 +443,10 @@ irqentry_state_t noinstr irqentry_nmi_enter(struct pt_regs *regs)
 	instrumentation_begin();
 	trace_hardirqs_off_finish();
 	ftrace_nmi_enter();
+
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_boost_lazy(PVSCHED_KERNCS_BOOST_IRQ);
+
 	instrumentation_end();
 
 	return irq_state;
@@ -446,6 +460,10 @@ void noinstr irqentry_nmi_exit(struct pt_regs *regs, irqentry_state_t irq_state)
 		trace_hardirqs_on_prepare();
 		lockdep_hardirqs_on_prepare(CALLER_ADDR0);
 	}
+
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_unboost(PVSCHED_KERNCS_BOOST_IRQ, true);
+
 	instrumentation_end();
 
 	rcu_nmi_exit();
