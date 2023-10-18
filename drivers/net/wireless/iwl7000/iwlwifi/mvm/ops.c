@@ -669,6 +669,7 @@ static const struct iwl_hcmd_names iwl_mvm_debug_names[] = {
 	HCMD_NAME(BUFFER_ALLOCATION),
 	HCMD_NAME(GET_TAS_STATUS),
 	HCMD_NAME(FW_DUMP_COMPLETE_CMD),
+	HCMD_NAME(FW_CLEAR_BUFFER),
 	HCMD_NAME(MFU_ASSERT_DUMP_NTF),
 };
 
