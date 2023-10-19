@@ -20,6 +20,7 @@ properties:
     enum:
       - mediatek,mt8186-mt6366-rt1019-rt5682s-sound
       - mediatek,mt8186-mt6366-rt5682s-max98360-sound
+      - mediatek,mt8186-mt6366-rt5650-sound
 
   audio-routing:
     $ref: /schemas/types.yaml#/definitions/non-unique-string-array
