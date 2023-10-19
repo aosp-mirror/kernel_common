@@ -717,10 +717,11 @@ static const struct ieee80211_sband_iftype_data iwl_he_eht_capa[] = {
 					IEEE80211_EHT_PHY_CAP4_POWER_BOOST_FACT_SUPP |
 					IEEE80211_EHT_PHY_CAP4_EHT_MU_PPDU_4_EHT_LTF_08_GI,
 				.phy_cap_info[5] =
+					FIELD_PREP_CONST(IEEE80211_EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_MASK,
+							 IEEE80211_EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_16US) |
 					IEEE80211_EHT_PHY_CAP5_NON_TRIG_CQI_FEEDBACK |
 					IEEE80211_EHT_PHY_CAP5_TX_LESS_242_TONE_RU_SUPP |
-					IEEE80211_EHT_PHY_CAP5_RX_LESS_242_TONE_RU_SUPP |
-					IEEE80211_EHT_PHY_CAP5_PPE_THRESHOLD_PRESENT,
+					IEEE80211_EHT_PHY_CAP5_RX_LESS_242_TONE_RU_SUPP,
 				.phy_cap_info[6] =
 					IEEE80211_EHT_PHY_CAP6_MCS15_SUPP_MASK |
 					IEEE80211_EHT_PHY_CAP6_EHT_DUP_6GHZ_SUPP,
@@ -754,6 +755,9 @@ static const struct ieee80211_sband_iftype_data iwl_he_eht_capa[] = {
 			/*
 			 * PPE thresholds for NSS = 2, and RU index bitmap set
 			 * to 0xc.
+			 * Note: just for stating what we want, not present in
+			 * the transmitted data due to not including
+			 * IEEE80211_EHT_PHY_CAP5_PPE_THRESHOLD_PRESENT.
 			 */
 			.eht_ppe_thres = {0xc1, 0x0e, 0xe0 }
 		},
@@ -824,7 +828,8 @@ static const struct ieee80211_sband_iftype_data iwl_he_eht_capa[] = {
 					IEEE80211_EHT_PHY_CAP0_242_TONE_RU_GT20MHZ |
 					IEEE80211_EHT_PHY_CAP0_NDP_4_EHT_LFT_32_GI,
 				.phy_cap_info[5] =
-					IEEE80211_EHT_PHY_CAP5_PPE_THRESHOLD_PRESENT,
+					FIELD_PREP_CONST(IEEE80211_EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_MASK,
+							 IEEE80211_EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_16US),
 			},
 
 			/* For all MCS and bandwidth, set 2 NSS for both Tx and
@@ -852,6 +857,9 @@ static const struct ieee80211_sband_iftype_data iwl_he_eht_capa[] = {
 			/*
 			 * PPE thresholds for NSS = 2, and RU index bitmap set
 			 * to 0xc.
+			 * Note: just for stating what we want, not present in
+			 * the transmitted data due to not including
+			 * IEEE80211_EHT_PHY_CAP5_PPE_THRESHOLD_PRESENT.
 			 */
 			.eht_ppe_thres = {0xc1, 0x0e, 0xe0 }
 		},
@@ -1345,7 +1353,9 @@ static void iwl_init_eht_band_override(struct iwl_trans *trans,
 		}
 
 #if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
-		IWL_COPY_BIN(eht_ppe_thres, eht_cap.eht_ppe_thres);
+		if (IWL_COPY_BIN(eht_ppe_thres, eht_cap.eht_ppe_thres))
+			cfg_eht_cap(iftype_data)->eht_cap_elem.phy_cap_info[5] |=
+					IEEE80211_EHT_PHY_CAP5_PPE_THRESHOLD_PRESENT;
 #endif
 #if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 		IWL_COPY_BIN(eht_mac_cap, eht_cap.eht_cap_elem.mac_cap_info);
