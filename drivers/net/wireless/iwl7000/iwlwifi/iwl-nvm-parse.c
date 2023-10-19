@@ -1167,23 +1167,38 @@ static bool iwl_he_mcs_greater(u16 a, u16 b)
 	return false;
 }
 
-#define IWL_COPY_BIN(bin, field_name) do { \
-	typeof(trans->dbg_cfg.bin) *_bin = &trans->dbg_cfg.bin; \
-	typeof(_bin->len) _len = _bin->len; \
-	typeof(iftype_data->field_name) *_field = &iftype_data->field_name; \
-\
-	if (!_len) \
-		break; \
-	if (_len > sizeof(*_field)) {\
-		IWL_ERR(trans, \
-			"Wrong " #bin " len %u, should be max %zu for " #field_name "\n", \
-			_len, sizeof(*_field)); \
-		break; \
-	} \
-	if (_len != sizeof(*_field)) \
-		memset(_field, 0, sizeof(*_field)); \
-	memcpy(_field, _bin->data, _len); \
-} while (0)
+static inline bool check_size_ok(struct iwl_trans *trans,
+				 size_t field_size, size_t len,
+				 const char *bin_name, const char *field_name)
+{
+	if (!len)
+		return false;
+
+	if (len > field_size) {
+		IWL_ERR(trans,
+			"Wrong %s len %zu, should be max %zu for %s\n",
+			bin_name, len, field_size, field_name);
+		return false;
+	}
+
+	return true;
+}
+
+#define IWL_COPY_BIN(bin, field) ({					\
+	typeof(trans->dbg_cfg.bin) *_bin = &trans->dbg_cfg.bin;		\
+	typeof(_bin->len) _len = _bin->len;				\
+	typeof(iftype_data->field) *_field = &iftype_data->field;	\
+	bool _result = check_size_ok(trans, sizeof(*_field), _len,	\
+				     #bin, #field);			\
+									\
+	if (_result) {							\
+		if (_len != sizeof(*_field))				\
+			memset(_field, 0, sizeof(*_field));		\
+		memcpy(_field, _bin->data, _len);			\
+	}								\
+									\
+	_result;							\
+})
 
 static void iwl_init_he_override(struct iwl_trans *trans,
 				 struct ieee80211_supported_band *sband)
