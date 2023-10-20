@@ -5313,7 +5313,7 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 					 struct ieee80211_mgmt *mgmt,
 					 size_t len)
 {
-#if CFG80211_VERSION >= KERNEL_VERSION(6,0,0) && CFG80211_VERSION < KERNEL_VERSION(6,6,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,0,0) && CFG80211_VERSION < KERNEL_VERSION(6,5,7)
 	u8 link_addrs[IEEE80211_MLD_MAX_NUM_LINKS][ETH_ALEN];
 #endif
 	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
@@ -5493,7 +5493,7 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 			continue;
 
 		resp.links[link_id].bss = assoc_data->link[link_id].bss;
-#if CFG80211_VERSION >= KERNEL_VERSION(6,0,0) && CFG80211_VERSION < KERNEL_VERSION(6,6,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,0,0) && CFG80211_VERSION < KERNEL_VERSION(6,5,7)
 		ether_addr_copy(link_addrs[link_id],
 				assoc_data->link[link_id].addr);
 		resp.links[link_id].addr = link_addrs[link_id];
