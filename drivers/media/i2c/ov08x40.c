@@ -160,6 +160,18 @@ static const struct ov08x40_reg mipi_data_rate_800mbps[] = {
 	{0x6002, 0x2e},
 };
 
+static const struct ov08x40_reg mipi_si_changed_regs[] = {
+	{0x481b, 0x2c}, /* HS Exit: Data Tx TEOT - reducing 8ns */
+	{0x4826, 0x42}, /* HS Entry: Data Tx TREOT - raising 8ns */
+	{0x4829, 0x54}, /* HS Exit: Data Tx TREOT - reducing 8ns */
+	{0x4885, 0x1f}, /* driving strength change */
+};
+
+struct ov08x40_reg_list si_regs = {
+	.regs = mipi_si_changed_regs,
+	.num_of_regs = ARRAY_SIZE(mipi_si_changed_regs),
+};
+
 static const struct ov08x40_reg mode_3856x2416_regs[] = {
 	{0x5000, 0x5d},
 	{0x5001, 0x20},
@@ -2916,6 +2928,11 @@ static int ov08x40_start_streaming(struct ov08x40 *ov08x)
 		dev_err(&client->dev, "%s failed to set plls\n", __func__);
 		return ret;
 	}
+
+	/* Apply SI change to current project */
+	reg_list = &si_regs;
+
+	ov08x40_write_reg_list(ov08x, reg_list);
 
 	/* Apply default values of current mode */
 	reg_list = &ov08x->cur_mode->reg_list;
