@@ -837,9 +837,8 @@ static int _fuse_atomic_open(struct inode *dir, struct dentry *entry,
 	 * TODO(b/312315630): add free_ext_value(&args) once the upstream kernel
 	 * patch: "fuse: add request extension" is merged.
 	 */
-	if (err == -ENOSYS || err == -ELOOP) {
-		if (unlikely(err == -ENOSYS))
-			fc->no_open_atomic = 1;
+	if (err == -ENOSYS) {
+		fc->no_open_atomic = 1;
 		goto free_and_fallback;
 	}
 
@@ -939,15 +938,23 @@ static int _fuse_atomic_open(struct inode *dir, struct dentry *entry,
 		}
 	}
 
-	if (S_ISDIR(mode))
+	if (S_ISDIR(mode) || S_ISDIR(outentry.attr.mode))
 		ff->open_flags &= ~FOPEN_DIRECT_IO;
-	err = finish_open(file, entry, generic_file_open);
-	if (err) {
-		fi = get_fuse_inode(inode);
-		fuse_sync_release(fi, ff, flags);
-	} else {
-		file->private_data = ff;
-		fuse_finish_open(inode, file);
+
+	if (S_ISLNK(outentry.attr.mode)) {
+		err = finish_no_open(file, entry);
+		if (!alias)
+			dget(entry);
+	} else  {
+		err = finish_open(file, entry, generic_file_open);
+		if (err) {
+			fi = get_fuse_inode(inode);
+			fuse_sync_release(fi, ff, flags);
+		} else {
+			file->private_data = ff;
+			fuse_finish_open(inode, file);
+		}
+		dput(alias);
 	}
 
 	kfree(forget);
@@ -956,8 +963,6 @@ static int _fuse_atomic_open(struct inode *dir, struct dentry *entry,
 		d_lookup_done(switched_entry);
 		dput(switched_entry);
 	}
-
-	dput(alias);
 
 	return err;
 
