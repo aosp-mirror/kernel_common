@@ -73,6 +73,7 @@ struct rpc_clnt {
 #endif
 	struct rpc_xprt_iter	cl_xpi;
 	const struct cred	*cl_cred;
+	struct super_block *pipefs_sb;
 };
 
 /*
