@@ -2783,6 +2783,7 @@ static int srp_abort(struct scsi_cmnd *scmnd)
 	u32 tag;
 	u16 ch_idx;
 	struct srp_rdma_ch *ch;
+	int ret;
 
 	shost_printk(KERN_ERR, target->scsi_host, "SRP abort called\n");
 
@@ -2796,14 +2797,19 @@ static int srp_abort(struct scsi_cmnd *scmnd)
 	shost_printk(KERN_ERR, target->scsi_host,
 		     "Sending SRP abort for tag %#x\n", tag);
 	if (srp_send_tsk_mgmt(ch, tag, scmnd->device->lun,
-			      SRP_TSK_ABORT_TASK, NULL) == 0) {
+			      SRP_TSK_ABORT_TASK, NULL) == 0)
+		ret = SUCCESS;
+	else if (target->rport->state == SRP_RPORT_LOST)
+		ret = FAST_IO_FAIL;
+	else
+		ret = FAILED;
+	if (ret == SUCCESS) {
 		srp_free_req(ch, req, scmnd, 0);
-		return SUCCESS;
+		scmnd->result = DID_ABORT << 16;
+		scsi_done(scmnd);
 	}
-	if (target->rport->state == SRP_RPORT_LOST)
-		return FAST_IO_FAIL;
 
-	return FAILED;
+	return ret;
 }
 
 static int srp_reset_device(struct scsi_cmnd *scmnd)
