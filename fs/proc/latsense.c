@@ -76,13 +76,15 @@ sched_latsense_write(struct file *file, const char __user *buf,
 static int sched_latsense_access(struct inode *inode, fmode_t mode)
 {
 	struct task_struct *p;
-	int ret;
+	int ret = -EACCES;
 
 	if (!(mode & FMODE_WRITE))
 		return 0;
 
-	ret = -EACCES;
 	p = get_proc_task(inode);
+	if (!p)
+		return -ESRCH;
+
 	if (ptrace_may_access(p, PTRACE_MODE_ATTACH_REALCREDS) ||
 			capable(CAP_SYS_NICE)) {
 		ret = 0;
