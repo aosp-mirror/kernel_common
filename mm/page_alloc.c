@@ -68,6 +68,8 @@
 #undef CREATE_TRACE_POINTS
 #include <trace/hooks/mm.h>
 
+EXPORT_TRACEPOINT_SYMBOL_GPL(mm_page_alloc);
+
 /* Free Page Internal flags: for internal, non-pcp variants of free_pages(). */
 typedef int __bitwise fpi_t;
 
