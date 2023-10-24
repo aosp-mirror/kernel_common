@@ -755,14 +755,10 @@ restart:
 
 	/* normal [4.15.1.2] or error [4.15.1.1] completion */
 	if (likely ((status & (STS_INT|STS_ERR)) != 0)) {
-		if (likely ((status & STS_ERR) == 0)) {
+		if (likely ((status & STS_ERR) == 0))
 			INCR(ehci->stats.normal);
-		} else {
-			/* Force to check port status */
-			if (ehci->has_ci_pec_bug)
-				status |= STS_PCD;
+		else
 			INCR(ehci->stats.error);
-		}
 		bh = 1;
 	}
 
