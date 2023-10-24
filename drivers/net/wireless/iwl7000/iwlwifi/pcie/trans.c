@@ -3656,7 +3656,6 @@ struct iwl_trans *iwl_trans_pcie_alloc(struct pci_dev *pdev,
 	int ret, addr_size;
 	const struct iwl_trans_ops *ops = &trans_ops_pcie_gen2;
 	void __iomem * const *table;
-	static int max_retry = 0;
 	u32 bar0;
 
 	if (!cfg_trans->gen2)
@@ -3755,10 +3754,6 @@ struct iwl_trans *iwl_trans_pcie_alloc(struct pci_dev *pdev,
 	trans->hw_rev = iwl_read32(trans, CSR_HW_REV);
 	if (trans->hw_rev == 0xffffffff) {
 		dev_err(&pdev->dev, "HW_REV=0xFFFFFFFF, PCI issues?\n");
-		if (max_retry <= IWL_MAX_INIT_RETRY) {
-			iwl_trans_pcie_remove(trans, true);
-			max_retry++;
-		}
 		ret = -EIO;
 		goto out_no_pci;
 	}
