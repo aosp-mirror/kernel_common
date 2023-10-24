@@ -42,6 +42,9 @@
 #define IEEE80211_ASSOC_TIMEOUT_SHORT	(CPTCFG_IWL_TIMEOUT_FACTOR * HZ / 10)
 #define IEEE80211_ASSOC_MAX_TRIES	3
 
+#define IEEE80211_ADV_TTLM_SAFETY_BUFFER_MS msecs_to_jiffies(100)
+#define IEEE80211_ADV_TTLM_ST_UNDERFLOW 0xff00
+
 static int max_nullfunc_tries = 2;
 module_param(max_nullfunc_tries, int, 0644);
 MODULE_PARM_DESC(max_nullfunc_tries,
@@ -6032,6 +6035,13 @@ ieee80211_parse_adv_t2l(struct ieee80211_sub_if_data *sdata,
 	pos++;
 
 	t2l_map_info->switch_time = get_unaligned_le16(pos);
+
+	/* Since t2l_map_info->switch_time == 0 means no switch time, bump it
+	 * by 1.
+	 */
+	if (!t2l_map_info->switch_time)
+		t2l_map_info->switch_time = 1;
+
 	pos += 2;
 
 	if (control & IEEE80211_T2L_MAP_CONTROL_EXPECTED_DUR_PRESENT) {
@@ -6126,25 +6136,46 @@ static void ieee80211_process_adv_t2l_map(struct ieee80211_sub_if_data *sdata,
 		}
 
 		if (t2l_map_info.switch_time) {
-			u32 st_us, delay = 0;
-			u32 ts_l26 = beacon_ts & GENMASK(25, 0);
+			u16 beacon_ts_tu, st_tu, delay;
+			u32 delay_jiffies;
+			u64 mask;
 
 			/* The t2l map switch time is indicated with a partial
-			 * TSF value, convert it to TSF and calc the delay
-			 * to the start time.
+			 * TSF value (bits 10 to 25), get the partial beacon TS
+			 * as well, and calc the delay to the start time.
 			 */
-			st_us = ieee80211_tu_to_usec(t2l_map_info.switch_time);
-			if (st_us > ts_l26)
-				delay = st_us - ts_l26;
+			mask = GENMASK_ULL(25, 10);
+			beacon_ts_tu = (beacon_ts & mask) >> 10;
+			st_tu = t2l_map_info.switch_time;
+			delay = st_tu - beacon_ts_tu;
+
+			/*
+			 * If the switch time is far in the future, then it
+			 * could also be the previous switch still being
+			 * announced.
+			 * We can simply ignore it for now, if it is a future
+			 * switch the AP will continue to announce it anyway.
+			 */
+			if (delay > IEEE80211_ADV_TTLM_ST_UNDERFLOW)
+				return;
+
+			delay_jiffies = TU_TO_JIFFIES(delay);
+
+			/* Link switching can take time, so schedule it
+			 * 100ms before to be ready on time
+			 */
+			if (delay_jiffies > IEEE80211_ADV_TTLM_SAFETY_BUFFER_MS)
+				delay_jiffies -=
+					IEEE80211_ADV_TTLM_SAFETY_BUFFER_MS;
 			else
-				continue;
+				delay_jiffies = 0;
 
 			sdata->u.mgd.t2l_map_info = t2l_map_info;
 			wiphy_delayed_work_cancel(sdata->local->hw.wiphy,
 						  &sdata->u.mgd.t2l_map_work);
 			wiphy_delayed_work_queue(sdata->local->hw.wiphy,
 						 &sdata->u.mgd.t2l_map_work,
-						 usecs_to_jiffies(delay));
+						 delay_jiffies);
 			return;
 		}
 	}
