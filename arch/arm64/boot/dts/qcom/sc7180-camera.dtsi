@@ -68,7 +68,7 @@
 			};
 		};
 
-		msm_cam_smmu_jpeg {
+		smmu_jpeg: msm_cam_smmu_jpeg {
 			compatible = "qcom,msm-cam-smmu-cb";
 			iommus = <&apps_smmu 0xd80 0x20>,
 				<&apps_smmu  0xda0 0x20>;
@@ -863,6 +863,7 @@
 		cam_jpeg_enc: qcom,jpegenc@ac4e000 {
 			cell-index = <0>;
 			compatible = "qcom,cam_jpeg_enc";
+			smmu_intf = <&smmu_jpeg>;
 			reg-names = "jpege_hw";
 			reg = <0 0xac4e000 0 0x4000>;
 			reg-cam-base = <0x4e000>;
