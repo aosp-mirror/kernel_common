@@ -154,20 +154,25 @@ EXPORT_SYMBOL_GPL(typec_altmode_exit);
  *
  * Notifies the partner of @adev about Attention command.
  */
-int typec_altmode_attention(struct typec_altmode *adev, u32 vdo)
+void typec_altmode_attention(struct typec_altmode *adev, u32 vdo)
 {
 	struct altmode *partner = to_altmode(adev)->partner;
 	struct typec_altmode *pdev;
 
+	/*
+	 * If partner is NULL then a NULL pointer error occurs when
+	 * dereferencing pdev and its operations. The original upstream commit
+	 * changes the return type so the tcpm can log when this occurs, but
+	 * due to KMI restrictions we can only silently prevent the error for
+	 * now.
+	 */
 	if (!partner)
-		return -ENODEV;
+		return;
 
 	pdev = &partner->adev;
 
 	if (pdev->ops && pdev->ops->attention)
 		pdev->ops->attention(pdev, vdo);
-
-	return 0;
 }
 EXPORT_SYMBOL_GPL(typec_altmode_attention);
 

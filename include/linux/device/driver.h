@@ -133,6 +133,7 @@ extern struct device_driver *driver_find(const char *name,
 					 struct bus_type *bus);
 extern int driver_probe_done(void);
 extern void wait_for_device_probe(void);
+extern void flush_deferred_probe_now(void);
 
 /* sysfs interface for exporting driver attributes */
 

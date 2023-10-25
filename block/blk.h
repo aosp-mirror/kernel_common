@@ -17,6 +17,17 @@
 
 extern struct dentry *blk_debugfs_root;
 
+struct internal_request_queue {
+	struct request_queue	q;
+	struct delayed_work	requeue_work;
+};
+
+static inline struct internal_request_queue *
+to_internal_q(struct request_queue *q)
+{
+	return container_of(q, struct internal_request_queue, q);
+}
+
 struct blk_flush_queue {
 	unsigned int		flush_pending_idx:1;
 	unsigned int		flush_running_idx:1;

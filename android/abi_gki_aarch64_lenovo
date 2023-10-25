@@ -557,6 +557,7 @@
   idr_alloc
   idr_find
   idr_remove
+  iio_get_channel_type
   init_net
   init_pid_ns
   __init_rwsem
@@ -1338,6 +1339,7 @@
   vfree
   __vmalloc
   vmalloc
+  vmalloc_array
   vmalloc_user
   vmap
   vmf_insert_pfn_prot

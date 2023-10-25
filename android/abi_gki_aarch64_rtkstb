@@ -464,6 +464,33 @@
   dma_contiguous_default_area
   sg_alloc_table_from_pages_segment
 
+# required by cpufreq-dt.ko
+  cpufreq_enable_boost_support
+  cpufreq_freq_attr_scaling_available_freqs
+  cpufreq_freq_attr_scaling_boost_freqs
+  cpufreq_generic_frequency_table_verify
+  cpufreq_generic_get
+  cpufreq_generic_suspend
+  cpufreq_register_driver
+  cpufreq_unregister_driver
+  cpumask_next
+  __cpu_possible_mask
+  dev_pm_opp_free_cpufreq_table
+  dev_pm_opp_get_max_transition_latency
+  dev_pm_opp_get_opp_count
+  dev_pm_opp_get_sharing_cpus
+  dev_pm_opp_get_suspend_opp_freq
+  dev_pm_opp_init_cpufreq_table
+  dev_pm_opp_of_cpumask_add_table
+  dev_pm_opp_of_cpumask_remove_table
+  dev_pm_opp_of_get_sharing_cpus
+  dev_pm_opp_of_register_em
+  dev_pm_opp_put_regulators
+  dev_pm_opp_set_rate
+  dev_pm_opp_set_regulators
+  dev_pm_opp_set_sharing_cpus
+  policy_has_boost_freq
+
 # required by cqhci.ko
   devm_blk_crypto_profile_init
   dmam_alloc_attrs
@@ -785,6 +812,16 @@
   soc_device_register
   soc_device_unregister
 
+# required by rtk_cma_accelerator.ko
+  __traceiter_android_vh_calc_alloc_flags
+  __traceiter_android_vh_cma_alloc_busy_info
+  __traceiter_android_vh_cma_alloc_finish
+  __traceiter_android_vh_cma_alloc_start
+  __tracepoint_android_vh_calc_alloc_flags
+  __tracepoint_android_vh_cma_alloc_busy_info
+  __tracepoint_android_vh_cma_alloc_finish
+  __tracepoint_android_vh_cma_alloc_start
+
 # required by rtk_cpu_volt_sel.ko
   bus_register_notifier
   dev_pm_opp_put_prop_name
@@ -796,6 +833,7 @@
   component_bind_all
   component_del
   component_master_del
+  devm_extcon_dev_free
   component_unbind_all
   devm_gpio_request_one
   dma_buf_begin_cpu_access
@@ -902,6 +940,8 @@
   drm_property_create_range
   drm_read
   drm_release
+  drm_scdc_read
+  drm_scdc_write
   drm_scdc_set_high_tmds_clock_ratio
   drm_scdc_set_scrambling
   drm_universal_plane_init
@@ -1050,6 +1090,7 @@
 # required by sdhci-of-rtkstb.ko
   sdhci_set_clock
   sdhci_set_ios
+  sdhci_request
 
 # required by sdhci-rtk.ko
   sdhci_adma_write_desc

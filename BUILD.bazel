@@ -15,7 +15,7 @@ load(
     "kernel_unstripped_modules_archive",
     "merged_kernel_uapi_headers",
 )
-load(":modules.bzl", "COMMON_GKI_MODULES_LIST")
+load(":modules.bzl", "get_gki_modules_list")
 
 package(
     default_visibility = [
@@ -40,10 +40,49 @@ checkpatch(
     checkpatch_pl = "scripts/checkpatch.pl",
 )
 
-write_file(
+# Deprecated - Use arch specific files from below.
+alias(
     name = "gki_system_dlkm_modules",
-    out = "android/gki_system_dlkm_modules",
-    content = COMMON_GKI_MODULES_LIST + [
+    actual = "gki_system_dlkm_modules_arm64",
+    deprecation = """
+    Common list for all architectures is deprecated.
+    Instead use the file corresponding to the architecture used:
+    i.e. `gki_system_dlkm_modules_{arch}`
+    """,
+)
+
+alias(
+    name = "android/gki_system_dlkm_modules",
+    actual = "android/gki_system_dlkm_modules_arm64",
+    deprecation = """
+    Common list for all architectures is deprecated.
+    Instead use the file corresponding to the architecture used:
+    i.e. `gki_system_dlkm_modules_{arch}`
+    """,
+)
+
+write_file(
+    name = "gki_system_dlkm_modules_arm64",
+    out = "android/gki_system_dlkm_modules_arm64",
+    content = get_gki_modules_list("arm64") + [
+        # Ensure new line at the end.
+        "",
+    ],
+)
+
+write_file(
+    name = "gki_system_dlkm_modules_x86_64",
+    out = "android/gki_system_dlkm_modules_x86_64",
+    content = get_gki_modules_list("x86_64") + [
+        # Ensure new line at the end.
+        "",
+    ],
+)
+
+write_file(
+    name = "gki_system_dlkm_modules_risc64",
+    out = "android/gki_system_dlkm_modules_riscv64",
+    content = get_gki_modules_list("riscv64") + [
         # Ensure new line at the end.
         "",
     ],
@@ -57,12 +96,16 @@ filegroup(
         "android/abi_gki_aarch64_db845c",
         "android/abi_gki_aarch64_exynos",
         "android/abi_gki_aarch64_fips140",
+        "android/abi_gki_aarch64_kunit",
         "android/abi_gki_aarch64_lenovo",
+        "android/abi_gki_aarch64_mtkott",
         "android/abi_gki_aarch64_mtktv",
         "android/abi_gki_aarch64_oplus",
         "android/abi_gki_aarch64_pixel",
+        "android/abi_gki_aarch64_qcom",
         "android/abi_gki_aarch64_rtkstb",
         "android/abi_gki_aarch64_rtktv",
+        "android/abi_gki_aarch64_tuxera",
         "android/abi_gki_aarch64_virtual_device",
         "android/abi_gki_aarch64_xiaomi",
         "android/abi_gki_aarch64_zeku",
@@ -73,41 +116,41 @@ filegroup(
 define_common_kernels(target_configs = {
     "kernel_aarch64": {
         "kmi_symbol_list_strict_mode": True,
-        "module_implicit_outs": COMMON_GKI_MODULES_LIST,
         "kmi_symbol_list": "android/abi_gki_aarch64",
         "kmi_symbol_list_add_only": True,
         "additional_kmi_symbol_lists": [":aarch64_additional_kmi_symbol_lists"],
         "protected_exports_list": "android/abi_gki_protected_exports_aarch64",
         "protected_modules_list": "android/gki_aarch64_protected_modules",
+        "module_implicit_outs": get_gki_modules_list("arm64"),
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
     },
     "kernel_aarch64_16k": {
         "kmi_symbol_list_strict_mode": False,
-        "module_implicit_outs": COMMON_GKI_MODULES_LIST,
+        "module_implicit_outs": get_gki_modules_list("arm64"),
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
     },
     "kernel_aarch64_debug": {
         "kmi_symbol_list_strict_mode": False,
-        "module_implicit_outs": COMMON_GKI_MODULES_LIST,
         "kmi_symbol_list": "android/abi_gki_aarch64",
         "kmi_symbol_list_add_only": True,
         "additional_kmi_symbol_lists": [":aarch64_additional_kmi_symbol_lists"],
         "protected_exports_list": "android/abi_gki_protected_exports_aarch64",
         "protected_modules_list": "android/gki_aarch64_protected_modules",
+        "module_implicit_outs": get_gki_modules_list("arm64"),
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
     },
     "kernel_x86_64": {
         "kmi_symbol_list_strict_mode": False,
-        "module_implicit_outs": COMMON_GKI_MODULES_LIST,
         "protected_exports_list": "android/abi_gki_protected_exports_x86_64",
         "protected_modules_list": "android/gki_x86_64_protected_modules",
+        "module_implicit_outs": get_gki_modules_list("x86_64"),
         "make_goals": _GKI_X86_64_MAKE_GOALS,
     },
     "kernel_x86_64_debug": {
         "kmi_symbol_list_strict_mode": False,
-        "module_implicit_outs": COMMON_GKI_MODULES_LIST,
         "protected_exports_list": "android/abi_gki_protected_exports_x86_64",
         "protected_modules_list": "android/gki_x86_64_protected_modules",
+        "module_implicit_outs": get_gki_modules_list("x86_64"),
         "make_goals": _GKI_X86_64_MAKE_GOALS,
     },
 })
@@ -439,7 +482,7 @@ kernel_build(
         "modules",
         "rockchip/rk3399-rock-pi-4b.dtb",
     ],
-    module_outs = COMMON_GKI_MODULES_LIST + _ROCKPI4_MODULE_OUTS + _ROCKPI4_WATCHDOG_MODULE_OUTS,
+    module_outs = get_gki_modules_list("arm64") + _ROCKPI4_MODULE_OUTS + _ROCKPI4_WATCHDOG_MODULE_OUTS,
     visibility = ["//visibility:private"],
 )
 
@@ -463,7 +506,7 @@ kernel_build(
         "modules",
         "rockchip/rk3399-rock-pi-4b.dtb",
     ],
-    module_outs = COMMON_GKI_MODULES_LIST + _ROCKPI4_MODULE_OUTS,
+    module_outs = get_gki_modules_list("arm64") + _ROCKPI4_MODULE_OUTS,
     visibility = ["//visibility:private"],
 )
 
@@ -570,6 +613,70 @@ kernel_build(
     arch = "arm",
     build_config = "build.config.allmodconfig.arm",
     visibility = ["//visibility:private"],
+)
+
+# KUnit test targets
+
+# Modules defined by tools/testing/kunit/configs/android/kunit_defconfig
+_KUNIT_COMMON_MODULES = [
+    # keep sorted
+    "drivers/rtc/lib_test.ko",
+    "fs/ext4/ext4-inode-test.ko",
+    "fs/fat/fat_test.ko",
+    "kernel/time/time_test.ko",
+    "lib/kunit/kunit-example-test.ko",
+    "lib/kunit/kunit-test.ko",
+    "mm/kfence/kfence_test.ko",
+    "sound/soc/soc-topology-test.ko",
+]
+
+kernel_build(
+    name = "kunit_aarch64",
+    outs = [],
+    arch = "arm64",
+    base_kernel = ":kernel_aarch64",
+    build_config = "build.config.kunit.aarch64",
+    defconfig_fragments = [
+        "tools/testing/kunit/configs/android/kunit_defconfig",
+    ],
+    kmi_symbol_list = "android/abi_gki_aarch64_kunit",
+    make_goals = ["modules"],
+    module_outs = _KUNIT_COMMON_MODULES,
+)
+
+copy_to_dist_dir(
+    name = "kunit_aarch64_dist",
+    data = [":kunit_aarch64"],
+    dist_dir = "out/kunit_aarch64/dist",
+    flat = True,
+    log = "info",
+)
+
+kernel_abi(
+    name = "kunit_aarch64_abi",
+    kernel_build = ":kunit_aarch64",
+    kmi_symbol_list_add_only = True,
+)
+
+kernel_build(
+    name = "kunit_x86_64",
+    outs = [],
+    arch = "x86_64",
+    base_kernel = ":kernel_x86_64",
+    build_config = "build.config.kunit.x86_64",
+    defconfig_fragments = [
+        "tools/testing/kunit/configs/android/kunit_defconfig",
+    ],
+    make_goals = ["modules"],
+    module_outs = _KUNIT_COMMON_MODULES,
+)
+
+copy_to_dist_dir(
+    name = "kunit_x86_64_dist",
+    data = [":kunit_x86_64"],
+    dist_dir = "out/kunit_x86_64/dist",
+    flat = True,
+    log = "info",
 )
 
 # DDK Headers

@@ -279,6 +279,7 @@
   debugfs_attr_write
   debugfs_create_atomic_t
   debugfs_create_bool
+  debugfs_create_devm_seqfile
   debugfs_create_dir
   debugfs_create_file
   debugfs_create_file_unsafe
@@ -365,6 +366,7 @@
   devm_clk_get
   devm_clk_get_optional
   devm_clk_put
+  devm_device_add_group
   devm_device_add_groups
   __devm_drm_dev_alloc
   devm_drm_panel_bridge_add_typed
@@ -611,7 +613,9 @@
   drm_bridge_chain_mode_set
   drm_bridge_remove
   drm_compat_ioctl
+  drm_connector_atomic_hdr_metadata_equal
   drm_connector_attach_encoder
+  drm_connector_attach_hdr_output_metadata_property
   drm_connector_attach_max_bpc_property
   drm_connector_cleanup
   drm_connector_init
@@ -678,6 +682,7 @@
   drm_gem_vm_close
   drm_gem_vm_open
   drm_get_format_info
+  drm_hdmi_infoframe_set_hdr_metadata
   drm_helper_mode_fill_fb_struct
   drm_helper_probe_single_connector_modes
   drm_ioctl
@@ -928,6 +933,7 @@
   handle_simple_irq
   handle_sysrq
   have_governor_per_policy
+  hdmi_drm_infoframe_pack_only
   hex2bin
   hex_dump_to_buffer
   hex_to_bin
@@ -2114,6 +2120,7 @@
   __traceiter_android_rvh_rtmutex_prepare_setprio
   __traceiter_android_rvh_sched_fork
   __traceiter_android_rvh_sched_newidle_balance
+  __traceiter_android_rvh_sched_setaffinity
   __traceiter_android_rvh_schedule
   __traceiter_android_rvh_select_task_rq_fair
   __traceiter_android_rvh_select_task_rq_rt
@@ -2152,6 +2159,8 @@
   __traceiter_android_vh_mm_compaction_begin
   __traceiter_android_vh_mm_compaction_end
   __traceiter_android_vh_pagecache_get_page
+  __traceiter_android_vh_prio_inheritance
+  __traceiter_android_vh_prio_restore
   __traceiter_android_vh_reclaim_pages_plug
   __traceiter_android_vh_resume_end
   __traceiter_android_vh_rmqueue
@@ -2183,6 +2192,7 @@
   __traceiter_android_vh_use_amu_fie
   __traceiter_clock_set_rate
   __traceiter_cpu_frequency
+  __traceiter_cpu_idle
   __traceiter_device_pm_callback_end
   __traceiter_device_pm_callback_start
   __traceiter_dwc3_readl
@@ -2206,6 +2216,7 @@
   __traceiter_sched_switch
   __traceiter_sched_util_est_cfs_tp
   __traceiter_sched_util_est_se_tp
+  __traceiter_sched_wakeup
   __traceiter_softirq_entry
   __traceiter_softirq_exit
   __traceiter_suspend_resume
@@ -2245,6 +2256,7 @@
   __tracepoint_android_rvh_rtmutex_prepare_setprio
   __tracepoint_android_rvh_sched_fork
   __tracepoint_android_rvh_sched_newidle_balance
+  __tracepoint_android_rvh_sched_setaffinity
   __tracepoint_android_rvh_schedule
   __tracepoint_android_rvh_select_task_rq_fair
   __tracepoint_android_rvh_select_task_rq_rt
@@ -2283,6 +2295,8 @@
   __tracepoint_android_vh_mm_compaction_begin
   __tracepoint_android_vh_mm_compaction_end
   __tracepoint_android_vh_pagecache_get_page
+  __tracepoint_android_vh_prio_inheritance
+  __tracepoint_android_vh_prio_restore
   __tracepoint_android_vh_reclaim_pages_plug
   __tracepoint_android_vh_resume_end
   __tracepoint_android_vh_rmqueue
@@ -2314,6 +2328,7 @@
   __tracepoint_android_vh_use_amu_fie
   __tracepoint_clock_set_rate
   __tracepoint_cpu_frequency
+  __tracepoint_cpu_idle
   __tracepoint_device_pm_callback_end
   __tracepoint_device_pm_callback_start
   __tracepoint_dwc3_readl
@@ -2339,6 +2354,7 @@
   __tracepoint_sched_switch
   __tracepoint_sched_util_est_cfs_tp
   __tracepoint_sched_util_est_se_tp
+  __tracepoint_sched_wakeup
   __tracepoint_softirq_entry
   __tracepoint_softirq_exit
   __tracepoint_suspend_resume

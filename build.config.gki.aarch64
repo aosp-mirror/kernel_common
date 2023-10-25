@@ -6,6 +6,9 @@ FILES="${FILES}
 arch/arm64/boot/Image.lz4
 arch/arm64/boot/Image.gz
 "
+ADDITIONAL_KMI_SYMBOL_LISTS="
+android/abi_gki_aarch64_qcom
+"
 
 BUILD_SYSTEM_DLKM=1
 

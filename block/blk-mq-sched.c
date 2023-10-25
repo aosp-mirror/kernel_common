@@ -412,7 +412,7 @@ bool blk_mq_sched_try_insert_merge(struct request_queue *q, struct request *rq,
 }
 EXPORT_SYMBOL_GPL(blk_mq_sched_try_insert_merge);
 
-bool blk_mq_sched_bypass_insert(struct request *rq)
+static bool blk_mq_sched_bypass_insert(struct request *rq)
 {
 	/*
 	 * dispatch flush and passthrough rq directly
