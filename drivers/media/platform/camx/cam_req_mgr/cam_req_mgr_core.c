@@ -2601,12 +2601,12 @@ static int __cam_req_mgr_setup_link_info(struct cam_req_mgr_core_link *link,
 	uint32_t                                subscribe_event = 0;
 	if (link_info->version == VERSION_1) {
 		if (link_info->u.link_info_v1.num_devices >
-			CAM_REQ_MGR_MAX_HANDLES)
+			CAM_REQ_MGR_MAX_DEVICES)
 			return -EPERM;
 		}
 	else if (link_info->version == VERSION_2) {
 		if (link_info->u.link_info_v2.num_devices >
-			CAM_REQ_MGR_MAX_HANDLES_V2)
+			CAM_REQ_MGR_MAX_DEVICES)
 			return -EPERM;
 		}
 	mutex_init(&link->req.lock);
@@ -2923,7 +2923,7 @@ int cam_req_mgr_link(struct cam_req_mgr_ver_info *link_info)
 		CAM_DBG(CAM_CRM, "NULL pointer");
 		return -EINVAL;
 	}
-	if (link_info->u.link_info_v1.num_devices > CAM_REQ_MGR_MAX_HANDLES) {
+	if (link_info->u.link_info_v1.num_devices > CAM_REQ_MGR_MAX_DEVICES) {
 		CAM_ERR(CAM_CRM, "Invalid num devices %d",
 			link_info->u.link_info_v1.num_devices);
 		return -EINVAL;
@@ -3032,7 +3032,7 @@ int cam_req_mgr_link_v2(struct cam_req_mgr_ver_info *link_info)
 		return -EINVAL;
 	}
 	if (link_info->u.link_info_v2.num_devices >
-		CAM_REQ_MGR_MAX_HANDLES_V2) {
+		CAM_REQ_MGR_MAX_DEVICES) {
 		CAM_ERR(CAM_CRM, "Invalid num devices %d",
 			link_info->u.link_info_v2.num_devices);
 		return -EINVAL;

@@ -38,6 +38,7 @@
  */
 #define CAM_REQ_MGR_MAX_HANDLES           64
 #define CAM_REQ_MGR_MAX_HANDLES_V2        128
+#define CAM_REQ_MGR_MAX_DEVICES           16
 #define MAX_LINKS_PER_SESSION             2
 
 /* V4L event type which user space will subscribe to */
