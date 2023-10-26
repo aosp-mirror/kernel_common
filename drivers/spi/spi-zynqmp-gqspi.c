@@ -1221,7 +1221,7 @@ remove_master:
  *
  * Return:	0 Always
  */
-static void zynqmp_qspi_remove(struct platform_device *pdev)
+static int zynqmp_qspi_remove(struct platform_device *pdev)
 {
 	struct zynqmp_qspi *xqspi = platform_get_drvdata(pdev);
 
@@ -1234,6 +1234,7 @@ static void zynqmp_qspi_remove(struct platform_device *pdev)
 	pm_runtime_set_suspended(&pdev->dev);
 	clk_disable_unprepare(xqspi->refclk);
 	clk_disable_unprepare(xqspi->pclk);
+	return 0;
 }
 
 static const struct of_device_id zynqmp_qspi_of_match[] = {
@@ -1245,7 +1246,7 @@ MODULE_DEVICE_TABLE(of, zynqmp_qspi_of_match);
 
 static struct platform_driver zynqmp_qspi_driver = {
 	.probe = zynqmp_qspi_probe,
-	.remove_new = zynqmp_qspi_remove,
+	.remove = zynqmp_qspi_remove,
 	.driver = {
 		.name = "zynqmp-qspi",
 		.of_match_table = zynqmp_qspi_of_match,
