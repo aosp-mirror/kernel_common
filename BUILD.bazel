@@ -160,7 +160,7 @@ _DB845C_MODULE_OUTS = [
     "crypto/michael_mic.ko",
     "drivers/base/regmap/regmap-sdw.ko",
     "drivers/base/regmap/regmap-slimbus.ko",
-    "drivers/bus/mhi/core/mhi.ko",
+    "drivers/bus/mhi/host/mhi.ko",
     "drivers/clk/qcom/clk-qcom.ko",
     "drivers/clk/qcom/clk-rpmh.ko",
     "drivers/clk/qcom/clk-spmi-pmic-div.ko",
