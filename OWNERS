@@ -1,12 +1,31 @@
 set noparent
 
-# GKI Dr. No Enforcement is active on this branch. Approval of one of the Dr.
-# No reviewers is required following a regular CodeReview+2 vote of a code
-# reviewer.
-#
-# See the GKI release documentation (go/gki-dr-no) for further details.
-#
-# The expanded list of reviewers can be found at:
-# https://android.googlesource.com/kernel/common/+/android-mainline/OWNERS_DrNo
+# This is pKVM experimental branch.
+# OWNERS copied from packages/modules/Virtualization/OWNERS
 
-include kernel/common:android-mainline:/OWNERS_DrNo
+# If you are not a member of the project please send review requests
+# to one of those listed below.
+dbrazdil@google.com
+jiyong@google.com
+smoreland@google.com
+willdeacon@google.com
+
+# Other owners
+alanstokes@google.com
+aliceywang@google.com
+inseob@google.com
+jaewan@google.com
+jakobvukalovic@google.com
+jeffv@google.com
+jooyung@google.com
+keirf@google.com
+ptosi@google.com
+qperret@google.com
+qwandor@google.com
+sebastianene@google.com
+seungjaeyoo@google.com
+shikhapanwar@google.com
+smostafa@google.com
+tabba@google.com
+vdonnefort@google.com
+victorhsieh@google.com
