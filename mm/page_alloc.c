@@ -81,6 +81,8 @@
 #include "shuffle.h"
 #include "page_reporting.h"
 
+EXPORT_TRACEPOINT_SYMBOL_GPL(mm_page_alloc);
+
 /* Free Page Internal flags: for internal, non-pcp variants of free_pages(). */
 typedef int __bitwise fpi_t;
 
