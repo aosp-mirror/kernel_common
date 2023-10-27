@@ -1128,6 +1128,9 @@
   kernel_restart
   kern_mount
   kern_unmount
+  kernfs_find_and_get_ns
+  kernfs_notify
+  kernfs_put
   key_create_or_update
   key_put
   keyring_alloc
