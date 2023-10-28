@@ -15,6 +15,7 @@ struct ivpu_hw_ops {
 	int (*power_down)(struct ivpu_device *vdev);
 	int (*reset)(struct ivpu_device *vdev);
 	bool (*is_idle)(struct ivpu_device *vdev);
+	int (*wait_for_idle)(struct ivpu_device *vdev);
 	void (*wdt_disable)(struct ivpu_device *vdev);
 	void (*diagnose_failure)(struct ivpu_device *vdev);
 	u32 (*reg_pll_freq_get)(struct ivpu_device *vdev);
@@ -85,6 +86,11 @@ static inline int ivpu_hw_boot_fw(struct ivpu_device *vdev)
 static inline bool ivpu_hw_is_idle(struct ivpu_device *vdev)
 {
 	return vdev->hw->ops->is_idle(vdev);
+};
+
+static inline int ivpu_hw_wait_for_idle(struct ivpu_device *vdev)
+{
+	return vdev->hw->ops->wait_for_idle(vdev);
 };
 
 static inline int ivpu_hw_power_down(struct ivpu_device *vdev)

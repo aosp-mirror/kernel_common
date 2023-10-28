@@ -37,7 +37,7 @@
 #define TIMEOUT_US		     (150 * USEC_PER_MSEC)
 #define PWR_ISLAND_STATUS_TIMEOUT_US (5 * USEC_PER_MSEC)
 #define PLL_TIMEOUT_US		     (1500 * USEC_PER_MSEC)
-#define IDLE_TIMEOUT_US		     (500 * USEC_PER_MSEC)
+#define IDLE_TIMEOUT_US		     (5 * USEC_PER_MSEC)
 
 #define ICB_0_IRQ_MASK ((REG_FLD(VPU_37XX_HOST_SS_ICB_STATUS_0, HOST_IPC_FIFO_INT)) | \
 			(REG_FLD(VPU_37XX_HOST_SS_ICB_STATUS_0, MMU_IRQ_0_INT)) | \
@@ -96,6 +96,7 @@ static void ivpu_hw_timeouts_init(struct ivpu_device *vdev)
 	vdev->timeout.tdr = 2000;
 	vdev->timeout.reschedule_suspend = 10;
 	vdev->timeout.autosuspend = 10;
+	vdev->timeout.d0i3_entry_msg = 5;
 }
 
 static int ivpu_pll_wait_for_cmd_send(struct ivpu_device *vdev)
@@ -720,6 +721,11 @@ static bool ivpu_hw_37xx_is_idle(struct ivpu_device *vdev)
 	       REG_TEST_FLD(VPU_37XX_BUTTRESS_VPU_STATUS, IDLE, val);
 }
 
+static int ivpu_hw_37xx_wait_for_idle(struct ivpu_device *vdev)
+{
+	return REGB_POLL_FLD(VPU_37XX_BUTTRESS_VPU_STATUS, IDLE, 0x1, IDLE_TIMEOUT_US);
+}
+
 static void ivpu_hw_37xx_save_d0i3_entry_timestamp(struct ivpu_device *vdev)
 {
 	vdev->hw->d0i3_entry_host_ts = ktime_get_boottime();
@@ -1006,6 +1012,7 @@ const struct ivpu_hw_ops ivpu_hw_37xx_ops = {
 	.info_init = ivpu_hw_37xx_info_init,
 	.power_up = ivpu_hw_37xx_power_up,
 	.is_idle = ivpu_hw_37xx_is_idle,
+	.wait_for_idle = ivpu_hw_37xx_wait_for_idle,
 	.power_down = ivpu_hw_37xx_power_down,
 	.reset = ivpu_hw_37xx_reset,
 	.boot_fw = ivpu_hw_37xx_boot_fw,
