@@ -49,11 +49,8 @@ iwl_parse_nvm_data(struct iwl_trans *trans, const struct iwl_cfg *cfg,
  */
 struct ieee80211_regdomain *
 iwl_parse_nvm_mcc_info(struct device *dev, const struct iwl_cfg *cfg,
-#if CFG80211_VERSION <= KERNEL_VERSION(6,8,0)
-		       struct iwl_nvm_data *nvm_data,
-#endif
 		       int num_of_ch, __le32 *channels, u16 fw_mcc,
-		       u16 geo_info, u32 cap, u8 resp_ver, bool uats_enabled);
+		       u16 geo_info, u32 cap, u8 resp_ver);
 
 /**
  * struct iwl_nvm_section - describes an NVM section in memory.

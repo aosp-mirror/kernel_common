@@ -211,15 +211,11 @@ struct ieee80211_regdomain *iwl_mvm_get_regdomain(struct wiphy *wiphy,
 	IWL_DEBUG_LAR(mvm, "MCC update response version: %d\n", resp_ver);
 
 	regd = iwl_parse_nvm_mcc_info(mvm->trans->dev, mvm->cfg,
-#if CFG80211_VERSION <= KERNEL_VERSION(6,8,0)
-				      mvm->nvm_data,
-#endif
 				      __le32_to_cpu(resp->n_channels),
 				      resp->channels,
 				      __le16_to_cpu(resp->mcc),
 				      __le16_to_cpu(resp->geo_info),
-				      le32_to_cpu(resp->cap), resp_ver,
-				      mvm->fwrt.uats_enabled);
+				      le32_to_cpu(resp->cap), resp_ver);
 	/* Store the return source id */
 	src_id = resp->source_id;
 	if (IS_ERR_OR_NULL(regd)) {

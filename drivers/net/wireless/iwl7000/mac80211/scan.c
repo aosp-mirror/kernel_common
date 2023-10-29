@@ -231,14 +231,8 @@ ieee80211_bss_info_update(struct ieee80211_local *local,
 	}
 	rcu_read_unlock();
 
-#if CFG80211_VERSION <= KERNEL_VERSION(6,8,0)
-	if (!ieee80211_uhb_power_type_valid(mgmt, len, channel))cbss = NULL;
-	else
-#endif
-
-		cbss = cfg80211_inform_bss_frame_data(local->hw.wiphy,
-						      &bss_meta,
-						      mgmt, len, GFP_ATOMIC);
+	cbss = cfg80211_inform_bss_frame_data(local->hw.wiphy, &bss_meta,
+					      mgmt, len, GFP_ATOMIC);
 #if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
 	if (cbss) {
 		struct cfg80211_bss *non_tx_cbss;
