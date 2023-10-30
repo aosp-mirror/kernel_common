@@ -465,6 +465,9 @@ struct fuse_file_lock {
 #define FUSE_PASSTHROUGH (1 << 31)
 #endif
 
+/* to avoid conflicts, non-upstream flags should be in the rightmost bits */
+#define FUSE_PASSTHROUGH	(1ULL << 63)
+
 /**
  * CUSE INIT request/reply flags
  *
