@@ -114,6 +114,10 @@ ap_ts_pen_1v8: &i2c4 {
 	status = "disabled";
 };
 
+&mdp {
+	chromium-enable-overlays;
+};
+
 &panel {
 	compatible = "boe,nv110wtm-n61";
 };
