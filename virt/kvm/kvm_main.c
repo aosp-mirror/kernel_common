@@ -3038,13 +3038,15 @@ int kvm_vcpu_set_sched(struct kvm_vcpu *vcpu, union vcpu_sched_attr attr)
 	struct pid *pid;
 	struct task_struct *vcpu_task = NULL;
 	int max_rt_prio = kvm_arch_vcpu_kerncs_prio(&vcpu->arch);
+	union vcpu_sched_attr default_attr = kvm_arch_vcpu_default_sched_attr(&vcpu->arch);
 
 retry_disable:
 	/*
-	 * If the feature is disabled, revert to CFS.
+	 * If the feature is disabled, or a boost request comes when throttled, revert to CFS.
 	 */
-	if (!kvm_vcpu_sched_enabled(vcpu))
-		attr = kvm_arch_vcpu_default_sched_attr(&vcpu->arch);
+	if (!kvm_vcpu_sched_enabled(vcpu) || (kvm_arch_vcpu_is_throttled(&vcpu->arch) &&
+		(attr.kern_cs || kvm_arch_vcpu_normalprio_cmp(&vcpu->arch, attr) < 0)))
+		attr = default_attr;
 
 	policy = attr.sched_policy;
 	rt_prio = attr.rt_priority;
