@@ -738,6 +738,22 @@ struct vcpu_pv_sched {
 	 */
 	int kern_cs_prio;
 	int kern_cs_policy;
+	struct hrtimer boost_thr_timer;
+	u8 boosted;
+	u8 throttled;
+	/*
+	 * nanoseconds since last task prio boost or throttle.
+	 */
+	u64 taskprio_ns;
+	/*
+	 * nanoseconds since last kernel critical section
+	 * boost or throttle.
+	 */
+	u64 kerncs_ns;
+	/*
+	 * Timestamp for last VMENTRY.
+	 */
+	ktime_t vmentry_ts;
 	u64 msr_val;
 	struct gfn_to_hva_cache data;
 };
@@ -2283,6 +2299,15 @@ int memslot_rmap_alloc(struct kvm_memory_slot *slot, unsigned long npages);
 #define VCPU_KERN_CS_PRIO	8
 #define VCPU_KERN_CS_POLICY	SCHED_RR
 
+/*
+ * Vcpu boosted for servicing kernel critical section.
+ */
+#define KVM_PVSCHED_BOOST_KERNCS	0x1
+/*
+ * Vcpu boosted to match priority of running task in the vcpu.
+ */
+#define KVM_PVSCHED_BOOST_TASKPRIO	0x2
+
 static inline bool kvm_arch_vcpu_pv_sched_enabled(struct kvm_vcpu_arch *arch)
 {
 	return arch->pv_sched.msr_val;
@@ -2329,11 +2354,45 @@ static inline int kvm_arch_vcpu_normalprio_cmp(struct kvm_vcpu_arch *arch,
 		return -1;
 }
 
+static inline bool kvm_arch_vcpu_is_throttled(struct kvm_vcpu_arch *arch)
+{
+	return arch->pv_sched.throttled;
+}
+
+static inline bool kvm_arch_vcpu_is_boosted(struct kvm_vcpu_arch *arch)
+{
+	return arch->pv_sched.normal_prio < arch->pv_sched.default_normal_prio;
+}
+
 static inline void kvm_arch_vcpu_set_sched_attr(struct kvm_vcpu_arch *arch,
 		union vcpu_sched_attr attr)
 {
+	u8 boost_type = KVM_PVSCHED_BOOST_TASKPRIO;
+	int normal_prio = __sched_normal_prio(attr);
+
+	/*
+	 * If current priority of the vcpu task is same as its
+	 * previous priority, we need not update arch->pv_sched.
+	 */
+	if (normal_prio == arch->pv_sched.normal_prio)
+		return;
+
 	arch->pv_sched.attr = attr;
 	arch->pv_sched.normal_prio = __sched_normal_prio(attr);
+
+	if (attr.kern_cs)
+		boost_type = KVM_PVSCHED_BOOST_KERNCS;
+
+	if (kvm_arch_vcpu_is_boosted(arch)) {
+		arch->pv_sched.boosted |= boost_type;
+		if (!attr.kern_cs) {
+			arch->pv_sched.boosted &= ~KVM_PVSCHED_BOOST_KERNCS;
+			arch->pv_sched.kerncs_ns = 0;
+		}
+	} else if (arch->pv_sched.boosted) {
+		arch->pv_sched.boosted = 0;
+		arch->pv_sched.taskprio_ns = arch->pv_sched.kerncs_ns = 0;
+	}
 }
 
 static inline void kvm_arch_vcpu_set_default_sched_attr(struct kvm_vcpu_arch *arch,

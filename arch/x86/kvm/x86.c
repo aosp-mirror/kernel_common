@@ -200,6 +200,25 @@ module_param(eager_page_split, bool, 0644);
 static bool __read_mostly mitigate_smt_rsb;
 module_param(mitigate_smt_rsb, bool, 0444);
 
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+/*
+ * Maximum allowable boosted time for a guest kernel critical section.
+ */
+unsigned int pvsched_max_kerncs_us = 3000;
+module_param(pvsched_max_kerncs_us, uint, 0644);
+
+/*
+ * Maximum allowable boosted time for a guest task.
+ */
+unsigned int pvsched_max_taskprio_us = 500000;
+module_param(pvsched_max_taskprio_us, uint, 0644);
+
+static enum hrtimer_restart boost_throttle_timer_fn(struct hrtimer *data)
+{
+	return HRTIMER_NORESTART;
+}
+#endif
+
 /*
  * Restoring the host value for MSRs that are only consumed when running in
  * usermode, e.g. SYSCALL MSRs and TSC_AUX, can be deferred until the CPU
@@ -10657,6 +10676,86 @@ static void kvm_adjust_suspend_time(struct kvm_vcpu *vcpu)
 #endif
 
 #ifdef CONFIG_PARAVIRT_SCHED_KVM
+static inline void kvm_vcpu_pvsched_update_vmenter(struct kvm_vcpu_arch *arch)
+{
+	u64 max_ns = 0;
+	u64 elapsed_ns = 0;
+	ktime_t expire;
+	u64 max_taskprio_ns = pvsched_max_taskprio_us * NSEC_PER_USEC;
+	u64 max_kerncs_ns = pvsched_max_kerncs_us * NSEC_PER_USEC;
+
+	arch->pv_sched.vmentry_ts = ktime_get();
+	if (!arch->pv_sched.boosted && !arch->pv_sched.throttled)
+		return;
+
+	if (arch->pv_sched.boosted) {
+		if (arch->pv_sched.boosted & KVM_PVSCHED_BOOST_KERNCS) {
+			max_ns = max_kerncs_ns;
+			elapsed_ns = arch->pv_sched.kerncs_ns;
+		} else {
+			max_ns = max_taskprio_ns;
+			elapsed_ns = arch->pv_sched.taskprio_ns;
+		}
+	} else if (arch->pv_sched.throttled) {
+		if (arch->pv_sched.throttled & KVM_PVSCHED_BOOST_KERNCS) {
+			max_ns = max_kerncs_ns;
+			elapsed_ns = arch->pv_sched.kerncs_ns;
+		} else {
+			max_ns = max_taskprio_ns;
+			elapsed_ns = arch->pv_sched.taskprio_ns;
+		}
+	}
+	WARN_ON(max_ns <= elapsed_ns);
+	expire = ktime_add_ns(arch->pv_sched.vmentry_ts, max_ns - elapsed_ns);
+	hrtimer_start(&arch->pv_sched.boost_thr_timer, expire, HRTIMER_MODE_ABS_HARD);
+}
+
+static inline void kvm_vcpu_pvsched_update_vmexit(struct kvm_vcpu_arch *arch)
+{
+	u64 delta;
+	u64 max_ns;
+	u64 elapsed_ns;
+	ktime_t now = ktime_get();
+	u64 max_kerncs_ns = pvsched_max_kerncs_us * NSEC_PER_USEC;
+	u64 max_taskprio_ns = pvsched_max_taskprio_us * NSEC_PER_USEC;
+
+	hrtimer_cancel(&arch->pv_sched.boost_thr_timer);
+
+	delta = ktime_sub_ns(now, arch->pv_sched.vmentry_ts);
+	if (arch->pv_sched.boosted) {
+		u8 thr_type;
+
+		arch->pv_sched.taskprio_ns += delta;
+		if (arch->pv_sched.boosted & KVM_PVSCHED_BOOST_KERNCS) {
+			elapsed_ns = arch->pv_sched.kerncs_ns += delta;
+			max_ns = max_kerncs_ns;
+			thr_type = KVM_PVSCHED_BOOST_KERNCS;
+		} else {
+			elapsed_ns = arch->pv_sched.taskprio_ns;
+			max_ns = max_taskprio_ns;
+			thr_type = KVM_PVSCHED_BOOST_TASKPRIO;
+		}
+		if (elapsed_ns >= max_ns) {
+			arch->pv_sched.throttled = thr_type;
+			arch->pv_sched.boosted = 0;
+			arch->pv_sched.kerncs_ns = arch->pv_sched.taskprio_ns = 0;
+		}
+	} else if (arch->pv_sched.throttled) {
+		if (arch->pv_sched.throttled & KVM_PVSCHED_BOOST_KERNCS) {
+			elapsed_ns = arch->pv_sched.kerncs_ns += delta;
+			max_ns = max_kerncs_ns;
+		} else {
+			elapsed_ns = arch->pv_sched.taskprio_ns += delta;
+			max_ns = max_taskprio_ns;
+		}
+
+		if (elapsed_ns >= max_ns) {
+			arch->pv_sched.throttled = 0;
+			arch->pv_sched.kerncs_ns = arch->pv_sched.taskprio_ns = 0;
+		}
+	}
+}
+
 /*
  * Update the host area of PV_SCHED with the vcpu task sched parameters
  * so that guest can utilize it if needed.
@@ -10677,6 +10776,8 @@ static inline void kvm_vcpu_do_pv_sched(struct kvm_vcpu *vcpu)
 	if (!kvm_vcpu_sched_enabled(vcpu))
 		return;
 
+	kvm_vcpu_pvsched_update_vmexit(&vcpu->arch);
+
 	if (kvm_cpu_has_pending_timer(vcpu) || kvm_cpu_has_interrupt(vcpu))
 		kvm_vcpu_boost(vcpu, PVSCHED_KERNCS_BOOST_IRQ);
 	else {
@@ -10694,11 +10795,23 @@ static void kvm_vcpu_pv_sched_init(struct kvm_vcpu *vcpu)
 	kvm_arch_vcpu_set_kerncs_prio(&vcpu->arch, VCPU_KERN_CS_PRIO);
 	kvm_arch_vcpu_set_kerncs_policy(&vcpu->arch, VCPU_KERN_CS_POLICY);
 	kvm_arch_vcpu_set_default_sched_attr(&vcpu->arch, kvm_vcpu_get_sched(vcpu));
+
+	hrtimer_init(&vcpu->arch.pv_sched.boost_thr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_HARD);
+	vcpu->arch.pv_sched.boost_thr_timer.function = boost_throttle_timer_fn;
+}
+
+static void kvm_vcpu_pv_sched_fini(struct kvm_vcpu *vcpu)
+{
+	hrtimer_cancel(&vcpu->arch.pv_sched.boost_thr_timer);
 }
 #else
 static inline void record_vcpu_pv_sched(struct kvm_vcpu *vcpu) { }
 static inline void kvm_vcpu_do_pv_sched(struct kvm_vcpu *vcpu) { }
 static inline void kvm_vcpu_pv_sched_init(struct kvm_vcpu *vcpu) { }
+static inline void kvm_vcpu_pv_sched_fini(struct kvm_vcpu *vcpu) { }
+
+static inline void kvm_vcpu_pvsched_update_vmenter(struct kvm_vcpu_arch *arch) { }
+static inline void kvm_vcpu_pvsched_update_vmexit(struct kvm_vcpu_arch *arch) { }
 #endif
 
 /*
@@ -10976,6 +11089,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		set_debugreg(0, 7);
 	}
 
+	kvm_vcpu_pvsched_update_vmenter(&vcpu->arch);
 	guest_timing_enter_irqoff();
 
 	for (;;) {
