@@ -222,6 +222,7 @@
   memremap
   memset
   memstart_addr
+  memunmap
   mii_ethtool_gset
   mii_nway_restart
   misc_deregister
@@ -401,6 +402,7 @@
   strlcpy
   strlen
   strncpy
+  strscpy
   strscpy_pad
   __sw_hweight32
   __sw_hweight64
@@ -602,7 +604,6 @@
   skb_copy
   skb_realloc_headroom
   strlcat
-  strscpy
   __sw_hweight16
   __sw_hweight8
   synchronize_net
@@ -617,8 +618,8 @@
   pci_clear_master
   pci_disable_device
   pci_disable_msi
+  pcie_capability_clear_and_set_word
   pcie_capability_read_word
-  pcie_capability_write_word
   pci_enable_device
   pci_enable_msi
   pci_iomap
@@ -970,7 +971,6 @@
   kvmalloc_node
   llist_add_batch
   memparse
-  memunmap
   mipi_dsi_create_packet
   mipi_dsi_host_register
   mipi_dsi_host_unregister
@@ -1433,3 +1433,6 @@
   of_device_modalias
   of_device_request_module
   __request_module
+
+# preserved by --additions-only
+  pcie_capability_write_word
