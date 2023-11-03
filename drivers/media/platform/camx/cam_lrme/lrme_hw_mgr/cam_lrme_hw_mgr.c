@@ -121,6 +121,11 @@ static int cam_lrme_mgr_util_packet_validate(struct cam_packet *packet,
 		return -EINVAL;
 	}
 
+	if (packet->num_cmd_buf > CAM_LRME_MAX_HW_ENTRIES) {
+		CAM_ERR(CAM_LRME, "invalid num_cmd_buf: %d", packet->num_cmd_buf);
+		return -EINVAL;
+	}
+
 	cmd_desc = (struct cam_cmd_buf_desc *)((uint8_t *)&packet->payload +
 		packet->cmd_buf_offset);
 
@@ -917,6 +922,7 @@ static int cam_lrme_mgr_hw_prepare_update(void *hw_mgr_priv,
 		goto error;
 	}
 
+	args->max_hw_update_entries = CAM_LRME_MAX_HW_ENTRIES;
 	rc = cam_lrme_mgr_util_packet_validate(args->packet, args->remain_len);
 	if (rc) {
 		CAM_ERR(CAM_LRME, "Error in packet validation %d", rc);
