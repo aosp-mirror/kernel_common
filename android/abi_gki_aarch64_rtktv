@@ -498,6 +498,7 @@
   hex_asc
   hex_dump_to_buffer
   hex_to_bin
+  hid_open_report
   high_memory
   hrtimer_cancel
   hrtimer_init
