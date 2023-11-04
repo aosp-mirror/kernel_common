@@ -882,33 +882,33 @@ static int iwl_xvt_sar_geo_init(struct iwl_xvt *xvt)
 	 * element name is misleading, as it doesn't contain the table
 	 * revision number, but whether the South Korea variation
 	 * should be used.
-	 * This must be done after calling iwl_sar_geo_init().
+	 * This must be done after calling iwl_sar_geo_fill_table().
 	 */
 	if (cmd_ver == 5) {
 		len = sizeof(cmd.v5);
 		n_bands = ARRAY_SIZE(cmd.v5.table[0]);
 		cmd.v5.table_revision = cpu_to_le32(sk);
-		n_profiles = ACPI_NUM_GEO_PROFILES_REV3;
+		n_profiles = BIOS_GEO_MAX_PROFILE_NUM;
 	} else if (cmd_ver == 4) {
 		len = sizeof(cmd.v4);
 		n_bands = ARRAY_SIZE(cmd.v4.table[0]);
 		cmd.v4.table_revision = cpu_to_le32(sk);
-		n_profiles = ACPI_NUM_GEO_PROFILES_REV3;
+		n_profiles = BIOS_GEO_MAX_PROFILE_NUM;
 	} else if (cmd_ver == 3) {
 		len = sizeof(cmd.v3);
 		n_bands = ARRAY_SIZE(cmd.v3.table[0]);
 		cmd.v3.table_revision = cpu_to_le32(sk);
-		n_profiles = ACPI_NUM_GEO_PROFILES;
+		n_profiles = BIOS_GEO_MIN_PROFILE_NUM;
 	} else if (fw_has_api(&xvt->fwrt.fw->ucode_capa,
 			      IWL_UCODE_TLV_API_SAR_TABLE_VER)) {
 		len =  sizeof(cmd.v2);
 		n_bands = ARRAY_SIZE(cmd.v2.table[0]);
 		cmd.v2.table_revision = cpu_to_le32(sk);
-		n_profiles = ACPI_NUM_GEO_PROFILES;
+		n_profiles = BIOS_GEO_MIN_PROFILE_NUM;
 	} else {
 		len = sizeof(cmd.v1);
 		n_bands = ARRAY_SIZE(cmd.v1.table[0]);
-		n_profiles = ACPI_NUM_GEO_PROFILES;
+		n_profiles = BIOS_GEO_MIN_PROFILE_NUM;
 	}
 
 	BUILD_BUG_ON(offsetof(struct iwl_geo_tx_power_profiles_cmd_v1, table) !=
@@ -920,8 +920,8 @@ static int iwl_xvt_sar_geo_init(struct iwl_xvt *xvt)
 		     offsetof(struct iwl_geo_tx_power_profiles_cmd_v4, table) !=
 		     offsetof(struct iwl_geo_tx_power_profiles_cmd_v5, table));
 	/* the table is at the same position for all versions, so set use v1 */
-	ret = iwl_sar_geo_init(&xvt->fwrt, &cmd.v1.table[0][0],
-			       n_bands, n_profiles);
+	ret = iwl_sar_geo_fill_table(&xvt->fwrt, &cmd.v1.table[0][0],
+				     n_bands, n_profiles);
 
 	/*
 	 * It is a valid scenario to not support SAR, or miss wgds table,
@@ -1064,8 +1064,8 @@ int iwl_xvt_sar_select_profile(struct iwl_xvt *xvt, int prof_a, int prof_b)
 	/* all structs have the same common part, add it */
 	len += sizeof(cmd.common);
 
-	if (iwl_sar_select_profile(&xvt->fwrt, per_chain, IWL_NUM_CHAIN_TABLES,
-				   n_subbands, prof_a, prof_b))
+	if (iwl_sar_fill_profile(&xvt->fwrt, per_chain, IWL_NUM_CHAIN_TABLES,
+				 n_subbands, prof_a, prof_b))
 		return -ENOENT;
 
 	IWL_DEBUG_RADIO(xvt, "Sending REDUCE_TX_POWER_CMD per chain\n");
@@ -1076,7 +1076,7 @@ static int iwl_xvt_sar_init(struct iwl_xvt *xvt)
 {
 	int ret;
 
-	ret = iwl_sar_get_wrds_table(&xvt->fwrt);
+	ret = iwl_acpi_get_wrds_table(&xvt->fwrt);
 	if (ret < 0) {
 		IWL_DEBUG_RADIO(xvt,
 				"WRDS SAR BIOS table invalid or unavailable. (%d)\n",
@@ -1084,7 +1084,7 @@ static int iwl_xvt_sar_init(struct iwl_xvt *xvt)
 		/*
 		 * If not available, don't fail and don't bother with EWRD and
 		 * WGDS */
-		if (!iwl_sar_get_wgds_table(&xvt->fwrt)) {
+		if (!iwl_acpi_get_wgds_table(&xvt->fwrt)) {
 			/*
 			 * If basic SAR is not available, we check for WGDS,
 			 * which should *not* be available either.  If it is
@@ -1094,7 +1094,7 @@ static int iwl_xvt_sar_init(struct iwl_xvt *xvt)
 			IWL_ERR(xvt, "BIOS contains WGDS but no WRDS\n");
 		}
 	} else {
-		ret = iwl_sar_get_ewrd_table(&xvt->fwrt);
+		ret = iwl_acpi_get_ewrd_table(&xvt->fwrt);
 		/* if EWRD is not available, we can still use
 		 * WRDS, so don't fail */
 		if (ret < 0)
@@ -1104,7 +1104,7 @@ static int iwl_xvt_sar_init(struct iwl_xvt *xvt)
 
 		/* read geo SAR table */
 		if (iwl_sar_geo_support(&xvt->fwrt)) {
-			ret = iwl_sar_get_wgds_table(&xvt->fwrt);
+			ret = iwl_acpi_get_wgds_table(&xvt->fwrt);
 			if (ret < 0)
 				IWL_DEBUG_RADIO(xvt,
 						"Geo SAR BIOS table invalid or unavailable. (%d)\n",
@@ -1133,7 +1133,7 @@ int iwl_xvt_init_sar_tables(struct iwl_xvt *xvt)
 
 	if (ret == 0) {
 		ret = iwl_xvt_sar_geo_init(xvt);
-	} else if (ret > 0 && !iwl_sar_get_wgds_table(&xvt->fwrt)) {
+	} else if (ret > 0 && !iwl_acpi_get_wgds_table(&xvt->fwrt)) {
 		/*
 		 * If basic SAR is not available, we check for WGDS,
 		 * which should *not* be available either.  If it is

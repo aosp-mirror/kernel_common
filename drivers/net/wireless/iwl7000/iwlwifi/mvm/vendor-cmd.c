@@ -1080,7 +1080,7 @@ static int iwl_mvm_vendor_get_sar_profile_info(struct wiphy *wiphy,
 	int i;
 	u32 n_profiles = 0;
 
-	for (i = 0; i < ACPI_SAR_PROFILE_NUM; i++) {
+	for (i = 0; i < BIOS_SAR_MAX_PROFILE_NUM; i++) {
 		if (mvm->fwrt.sar_profiles[i].enabled)
 			n_profiles++;
 	}
@@ -1105,7 +1105,7 @@ static int iwl_mvm_vendor_put_geo_profile(struct iwl_mvm *mvm, struct sk_buff *s
 {
 	int i;
 
-	for (i = 0; i < ACPI_GEO_NUM_BANDS_REV2; i++) {
+	for (i = 0; i < BIOS_GEO_MAX_NUM_BANDS; i++) {
 		struct nlattr *nl_band = nla_nest_start(skb, i + 1);
 
 		if (!nl_band)
@@ -1239,7 +1239,7 @@ static int iwl_mvm_vendor_sar_get_table(struct wiphy *wiphy,
 		return -ENOBUFS;
 	}
 
-	for (prof = 0; prof < ACPI_SAR_PROFILE_NUM; prof++) {
+	for (prof = 0; prof < BIOS_SAR_MAX_PROFILE_NUM; prof++) {
 		struct nlattr *nl_profile;
 
 		if (!mvm->fwrt.sar_profiles[prof].enabled)
@@ -1252,8 +1252,8 @@ static int iwl_mvm_vendor_sar_get_table(struct wiphy *wiphy,
 		}
 
 		/* put info per chain */
-		for (chain = 0; chain < ACPI_SAR_NUM_CHAINS_REV2; chain++) {
-			if (nla_put(skb, chain + 1, ACPI_SAR_NUM_SUB_BANDS_REV2,
+		for (chain = 0; chain < BIOS_SAR_MAX_CHAINS_PER_PROFILE; chain++) {
+			if (nla_put(skb, chain + 1, BIOS_SAR_MAX_SUB_BANDS_NUM,
 				    mvm->fwrt.sar_profiles[prof].chains[chain].subbands)) {
 				ret = -ENOBUFS;
 				goto err;
@@ -1302,7 +1302,7 @@ static int iwl_mvm_vendor_geo_sar_get_table(struct wiphy *wiphy,
 	}
 
 	/* get each profile */
-	for (i = 0; i < ACPI_NUM_GEO_PROFILES; i++) {
+	for (i = 0; i < BIOS_GEO_MAX_PROFILE_NUM; i++) {
 		struct nlattr *nl_profile = nla_nest_start(skb, i + 1);
 
 		if (!nl_profile) {
