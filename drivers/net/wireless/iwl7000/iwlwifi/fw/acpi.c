@@ -743,7 +743,7 @@ int iwl_acpi_get_wgds_table(struct iwl_fw_runtime *fwrt)
 			.revisions = BIT(3),
 			.bands = ACPI_GEO_NUM_BANDS_REV2,
 			.profiles = ACPI_NUM_GEO_PROFILES_REV3,
-			.min_profiles = 3,
+			.min_profiles = BIOS_GEO_MIN_PROFILE_NUM,
 		},
 		{
 			.revisions = BIT(2),

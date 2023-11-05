@@ -2470,7 +2470,7 @@ int iwl_mvm_nan_config_nan_faw_cmd(struct iwl_mvm *mvm,
 int iwl_mvm_sar_select_profile(struct iwl_mvm *mvm, int prof_a, int prof_b);
 int iwl_mvm_get_sar_geo_profile(struct iwl_mvm *mvm);
 int iwl_mvm_ppag_send_cmd(struct iwl_mvm *mvm);
-void iwl_mvm_get_acpi_tables(struct iwl_mvm *mvm);
+void iwl_mvm_get_bios_tables(struct iwl_mvm *mvm);
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
 void iwl_mvm_link_sta_add_debugfs(struct ieee80211_hw *hw,
 				  struct ieee80211_vif *vif,

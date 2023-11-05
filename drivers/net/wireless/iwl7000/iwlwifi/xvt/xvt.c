@@ -21,6 +21,7 @@
 #include "iwl-prph.h"
 #include "fw/dbg.h"
 #include "fw/api/rx.h"
+#include "fw/uefi.h"
 
 #define DRV_DESCRIPTION	"Intel(R) xVT driver for Linux"
 MODULE_DESCRIPTION(DRV_DESCRIPTION);
@@ -1075,7 +1076,7 @@ static int iwl_xvt_sar_init(struct iwl_xvt *xvt)
 {
 	int ret;
 
-	ret = iwl_acpi_get_wrds_table(&xvt->fwrt);
+	ret = iwl_bios_get_wrds_table(&xvt->fwrt);
 	if (ret < 0) {
 		IWL_DEBUG_RADIO(xvt,
 				"WRDS SAR BIOS table invalid or unavailable. (%d)\n",
@@ -1083,7 +1084,7 @@ static int iwl_xvt_sar_init(struct iwl_xvt *xvt)
 		/*
 		 * If not available, don't fail and don't bother with EWRD and
 		 * WGDS */
-		if (!iwl_acpi_get_wgds_table(&xvt->fwrt)) {
+		if (!iwl_bios_get_wgds_table(&xvt->fwrt)) {
 			/*
 			 * If basic SAR is not available, we check for WGDS,
 			 * which should *not* be available either.  If it is
@@ -1093,7 +1094,7 @@ static int iwl_xvt_sar_init(struct iwl_xvt *xvt)
 			IWL_ERR(xvt, "BIOS contains WGDS but no WRDS\n");
 		}
 	} else {
-		ret = iwl_acpi_get_ewrd_table(&xvt->fwrt);
+		ret = iwl_bios_get_ewrd_table(&xvt->fwrt);
 		/* if EWRD is not available, we can still use
 		 * WRDS, so don't fail */
 		if (ret < 0)
@@ -1103,7 +1104,7 @@ static int iwl_xvt_sar_init(struct iwl_xvt *xvt)
 
 		/* read geo SAR table */
 		if (iwl_sar_geo_support(&xvt->fwrt)) {
-			ret = iwl_acpi_get_wgds_table(&xvt->fwrt);
+			ret = iwl_bios_get_wgds_table(&xvt->fwrt);
 			if (ret < 0)
 				IWL_DEBUG_RADIO(xvt,
 						"Geo SAR BIOS table invalid or unavailable. (%d)\n",
@@ -1132,7 +1133,7 @@ int iwl_xvt_init_sar_tables(struct iwl_xvt *xvt)
 
 	if (ret == 0) {
 		ret = iwl_xvt_sar_geo_init(xvt);
-	} else if (ret > 0 && !iwl_acpi_get_wgds_table(&xvt->fwrt)) {
+	} else if (ret > 0 && !iwl_bios_get_wgds_table(&xvt->fwrt)) {
 		/*
 		 * If basic SAR is not available, we check for WGDS,
 		 * which should *not* be available either.  If it is
