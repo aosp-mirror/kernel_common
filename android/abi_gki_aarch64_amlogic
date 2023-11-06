@@ -47,6 +47,7 @@
   bitmap_find_next_zero_area_off
   bitmap_free
   __bitmap_or
+  bitmap_parselist
   __bitmap_set
   __bitmap_shift_left
   __bitmap_shift_right
@@ -354,6 +355,7 @@
   devm_kmemdup
   devm_kstrdup
   devm_kvasprintf
+  devm_mbox_controller_register
   devm_nvmem_cell_get
   devm_of_clk_add_hw_provider
   devm_of_phy_get
@@ -708,6 +710,7 @@
   _find_last_bit
   _find_next_bit
   __find_vma
+  find_vm_area
   find_vpid
   finish_wait
   flow_block_cb_setup_simple
@@ -783,7 +786,9 @@
   gen_pool_create
   gen_pool_destroy
   gen_pool_first_fit_align
+  gen_pool_first_fit_order_align
   gen_pool_free_owner
+  gen_pool_has_addr
   gen_pool_set_algo
   gen_pool_size
   gen_pool_virt_to_phys
@@ -933,6 +938,10 @@
   invalidate_bdev
   invalidate_inode_buffers
   iomem_resource
+  iommu_device_register
+  iommu_device_sysfs_add
+  iommu_device_sysfs_remove
+  iommu_device_unregister
   __ioremap
   ioremap_cache
   iounmap
@@ -1085,10 +1094,12 @@
   mark_buffer_dirty
   __mark_inode_dirty
   mbox_chan_received_data
+  mbox_chan_txdone
   mbox_controller_register
   mbox_controller_unregister
   mbox_free_channel
   mbox_request_channel
+  mbox_request_channel_byname
   mbox_send_message
   mdiobus_alloc_size
   mdiobus_free
@@ -1098,6 +1109,10 @@
   mdiobus_write
   mdio_device_create
   mdio_device_free
+  media_create_pad_link
+  media_entity_remote_pad
+  media_pipeline_start
+  media_pipeline_stop
   memchr
   memcmp
   memcpy
@@ -1192,6 +1207,7 @@
   netif_schedule_queue
   netif_set_real_num_rx_queues
   netif_set_real_num_tx_queues
+  netif_set_xps_queue
   netif_tx_stop_all_queues
   netif_tx_wake_queue
   netlink_broadcast
@@ -1313,6 +1329,9 @@
   panic_notifier_list
   param_array_ops
   param_get_charp
+  param_get_hexint
+  param_get_int
+  param_get_short
   param_get_string
   param_ops_bool
   param_ops_byte
@@ -1327,6 +1346,9 @@
   param_ops_ushort
   param_set_charp
   param_set_copystring
+  param_set_hexint
+  param_set_int
+  pci_choose_state
   pci_disable_device
   pci_enable_device
   pci_find_next_bus
@@ -1342,9 +1364,11 @@
   pci_read_config_dword
   pci_remove_root_bus
   pci_rescan_bus
+  pci_set_power_state
   pci_stop_and_remove_bus_device_locked
   pci_stop_root_bus
   pci_unlock_rescan_remove
+  pci_write_config_byte
   pci_write_config_dword
   PDE_DATA
   __per_cpu_offset
@@ -1398,6 +1422,7 @@
   pin_user_pages
   pin_user_pages_fast
   pin_user_pages_remote
+  platform_bus_type
   platform_device_add
   platform_device_add_data
   platform_device_add_resources
@@ -1514,6 +1539,7 @@
   rdev_get_drvdata
   read_cache_page
   read_sanitised_ftr_reg
+  rebuild_sched_domains
   refcount_warn_saturate
   __refrigerator
   regcache_cache_only
@@ -1588,6 +1614,7 @@
   rfkill_set_hw_state_reason
   rfkill_set_sw_state
   rfkill_unregister
+  rfs_needed
   rhashtable_free_and_destroy
   rhashtable_insert_slow
   rhltable_init
@@ -1597,6 +1624,8 @@
   round_jiffies
   round_jiffies_relative
   round_jiffies_up
+  rps_cpu_mask
+  rps_sock_flow_table
   rtc_add_group
   rtc_time64_to_tm
   rtc_tm_to_time64
@@ -1877,6 +1906,7 @@
   system_freezing_cnt
   system_highpri_wq
   system_power_efficient_wq
+  system_unbound_wq
   system_wq
   sys_tz
   __tasklet_hi_schedule
@@ -1907,11 +1937,14 @@
   __traceiter_android_rvh_check_preempt_tick
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_do_sea
+  __traceiter_android_rvh_enqueue_task
   __traceiter_android_rvh_gic_v3_set_affinity
+  __traceiter_android_rvh_iommu_setup_dma_ops
   __traceiter_android_rvh_place_entity
   __traceiter_android_rvh_replace_next_task_fair
   __traceiter_android_rvh_schedule
   __traceiter_android_rvh_select_task_rq_rt
+  __traceiter_android_rvh_tick_entry
   __traceiter_android_vh_cma_drain_all_pages_bypass
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
@@ -1927,17 +1960,21 @@
   __traceiter_mmap_lock_acquire_returned
   __traceiter_mmap_lock_released
   __traceiter_mmap_lock_start_locking
+  __traceiter_sched_switch
   __traceiter_xdp_exception
   trace_output_call
   __tracepoint_android_rvh_arm64_serror_panic
   __tracepoint_android_rvh_check_preempt_tick
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_do_sea
+  __tracepoint_android_rvh_enqueue_task
   __tracepoint_android_rvh_gic_v3_set_affinity
+  __tracepoint_android_rvh_iommu_setup_dma_ops
   __tracepoint_android_rvh_place_entity
   __tracepoint_android_rvh_replace_next_task_fair
   __tracepoint_android_rvh_schedule
   __tracepoint_android_rvh_select_task_rq_rt
+  __tracepoint_android_rvh_tick_entry
   __tracepoint_android_vh_cma_drain_all_pages_bypass
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
@@ -1955,6 +1992,7 @@
   __tracepoint_mmap_lock_start_locking
   tracepoint_probe_register
   tracepoint_probe_unregister
+  __tracepoint_sched_switch
   __tracepoint_xdp_exception
   trace_print_array_seq
   trace_print_flags_seq
@@ -2055,17 +2093,22 @@
   utf8_to_utf32
   uuid_null
   v4l2_ctrl_add_handler
+  v4l2_ctrl_find
   v4l2_ctrl_handler_free
   v4l2_ctrl_handler_init_class
   v4l2_ctrl_handler_setup
   v4l2_ctrl_new_custom
+  v4l2_ctrl_new_int_menu
   v4l2_ctrl_new_std
+  __v4l2_ctrl_s_ctrl
+  __v4l2_ctrl_s_ctrl_int64
   v4l2_ctrl_subscribe_event
   v4l2_device_register
   v4l2_device_register_subdev
   v4l2_device_unregister
   v4l2_device_unregister_subdev
   v4l2_event_queue_fh
+  v4l2_event_subdev_unsubscribe
   v4l2_event_subscribe
   v4l2_event_unsubscribe
   v4l2_fh_add
@@ -2073,6 +2116,7 @@
   v4l2_fh_exit
   v4l2_fh_init
   v4l2_fh_open
+  __v4l2_find_nearest_size
   v4l2_i2c_subdev_init
   v4l2_m2m_buf_queue
   v4l2_m2m_buf_remove
@@ -2095,6 +2139,7 @@
   v4l2_m2m_release
   v4l2_m2m_try_schedule
   v4l2_src_change_event_subscribe
+  v4l2_subdev_link_validate
   v4l_bound_align_image
   vabits_actual
   vb2_buffer_done
@@ -2107,6 +2152,7 @@
   vb2_ioctl_create_bufs
   vb2_ioctl_dqbuf
   vb2_ioctl_expbuf
+  vb2_ioctl_prepare_buf
   vb2_ioctl_qbuf
   vb2_ioctl_querybuf
   vb2_ioctl_reqbufs
@@ -2151,6 +2197,7 @@
   wait_for_completion_timeout
   __wait_on_buffer
   wait_on_page_bit
+  wait_woken
   __wake_up
   wake_up_process
   wakeup_source_register

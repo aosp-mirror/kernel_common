@@ -252,6 +252,7 @@
   dmabuf_page_pool_get_size
   dma_buf_put
   dma_contiguous_default_area
+  dma_fence_array_ops
   dma_fence_context_alloc
   dma_fence_default_wait
   dma_fence_init
@@ -617,6 +618,7 @@
   kobject_create_and_add
   kobject_put
   kobject_uevent_env
+  ksize
   kstrdup
   kstrtobool
   kstrtoint
@@ -631,6 +633,7 @@
   kthread_should_stop
   kthread_stop
   kthread_unpark
+  ktime_add_safe
   ktime_get
   ktime_get_coarse_with_offset
   ktime_get_mono_fast_ns
@@ -803,6 +806,7 @@
   param_ops_string
   param_ops_uint
   param_ops_ulong
+  pci_choose_state
   __per_cpu_offset
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
@@ -977,6 +981,7 @@
   seq_printf
   seq_puts
   seq_read
+  seq_vprintf
   setattr_copy
   setattr_prepare
   set_bh_page

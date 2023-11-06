@@ -537,8 +537,7 @@ static int blk_revalidate_zone_cb(struct blk_zone *zone, unsigned int idx,
 		break;
 	case BLK_ZONE_TYPE_SEQWRITE_REQ:
 	case BLK_ZONE_TYPE_SEQWRITE_PREF:
-		if (!blk_queue_pipeline_zoned_writes(q) &&
-		    !args->seq_zones_wlock) {
+		if (!args->seq_zones_wlock) {
 			args->seq_zones_wlock =
 				blk_alloc_zone_bitmap(q->node, args->nr_zones);
 			if (!args->seq_zones_wlock)

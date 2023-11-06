@@ -160,13 +160,9 @@ struct usb_phy {
 
 	ANDROID_VENDOR_DATA(1);
 
-	/*
-	 * Reserved slot 0 here is seserved for a notify_port_status callback addition that narrowly
-	 * missed the ABI freeze deadline due to upstream review disussions.  See
-	 * https://lore.kernel.org/linux-usb/20230607062500.24669-1-stanley_chang@realtek.com/
-	 * for details.  All other slots are for "normal" future ABI breaks in LTS updates
-	 */
-	ANDROID_KABI_RESERVE(0);
+	/* notify phy port status change */
+	ANDROID_KABI_USE(0, int (*notify_port_status)(struct usb_phy *x, int port,
+						      u16 portstatus, u16 portchange));
 	ANDROID_KABI_RESERVE(1);
 	ANDROID_KABI_RESERVE(2);
 	ANDROID_KABI_RESERVE(3);
@@ -328,6 +324,15 @@ usb_phy_set_wakeup(struct usb_phy *x, bool enabled)
 {
 	if (x && x->set_wakeup)
 		return x->set_wakeup(x, enabled);
+	else
+		return 0;
+}
+
+static inline int
+usb_phy_notify_port_status(struct usb_phy *x, int port, u16 portstatus, u16 portchange)
+{
+	if (x && x->notify_port_status)
+		return x->notify_port_status(x, port, portstatus, portchange);
 	else
 		return 0;
 }

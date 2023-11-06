@@ -1561,11 +1561,12 @@ static void __blk_mq_delay_run_hw_queue(struct blk_mq_hw_ctx *hctx, bool async,
 	if (unlikely(blk_mq_hctx_stopped(hctx)))
 		return;
 
-	if (!async && !(hctx->flags & BLK_MQ_F_BLOCKING)) {
-		if (cpumask_test_cpu(raw_smp_processor_id(), hctx->cpumask)) {
-			__blk_mq_run_hw_queue(hctx);
-			return;
-		}
+	if (!async &&
+	    !(hctx->flags & BLK_MQ_F_BLOCKING &&
+	      blk_queue_is_zoned(hctx->queue)) &&
+	    cpumask_test_cpu(raw_smp_processor_id(), hctx->cpumask)) {
+		__blk_mq_run_hw_queue(hctx);
+		return;
 	}
 
 	kblockd_mod_delayed_work_on(blk_mq_hctx_next_cpu(hctx), &hctx->run_work,
@@ -1768,7 +1769,7 @@ void blk_mq_start_hw_queue(struct blk_mq_hw_ctx *hctx)
 {
 	clear_bit(BLK_MQ_S_STOPPED, &hctx->state);
 
-	blk_mq_run_hw_queue(hctx, false);
+	blk_mq_run_hw_queue(hctx, hctx->flags & BLK_MQ_F_BLOCKING);
 }
 EXPORT_SYMBOL(blk_mq_start_hw_queue);
 
@@ -1798,7 +1799,8 @@ void blk_mq_start_stopped_hw_queues(struct request_queue *q, bool async)
 	int i;
 
 	queue_for_each_hw_ctx(q, hctx, i)
-		blk_mq_start_stopped_hw_queue(hctx, async);
+		blk_mq_start_stopped_hw_queue(hctx, async ||
+					(hctx->flags & BLK_MQ_F_BLOCKING));
 }
 EXPORT_SYMBOL(blk_mq_start_stopped_hw_queues);
 
