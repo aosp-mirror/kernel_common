@@ -63,6 +63,7 @@ static inline bool is_via_compact_memory(int order) { return false; }
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/compaction.h>
+#undef CREATE_TRACE_POINTS
 
 #define block_start_pfn(pfn, order)	round_down(pfn, 1UL << (order))
 #define block_end_pfn(pfn, order)	ALIGN((pfn) + 1, 1UL << (order))
@@ -1388,6 +1389,7 @@ isolate_migratepages_range(struct compact_control *cc, unsigned long start_pfn,
 }
 
 #endif /* CONFIG_COMPACTION || CONFIG_CMA */
+#include <trace/hooks/mm.h>
 #ifdef CONFIG_COMPACTION
 
 static bool suitable_migration_source(struct compact_control *cc,
@@ -1717,6 +1719,7 @@ static void isolate_freepages(struct compact_control *cc)
 	unsigned long block_end_pfn;	/* end of current pageblock */
 	unsigned long low_pfn;	     /* lowest pfn scanner is able to scan */
 	unsigned int stride;
+	bool bypass = false;
 
 	/* Try a small search of the free lists for a candidate */
 	fast_isolate_freepages(cc);
@@ -1777,6 +1780,10 @@ static void isolate_freepages(struct compact_control *cc)
 
 		/* If isolation recently failed, do not retry */
 		if (!isolation_suitable(cc, page))
+			continue;
+
+		trace_android_vh_isolate_freepages(cc, page, &bypass);
+		if (bypass)
 			continue;
 
 		/* Found a block suitable for isolating free pages from. */
