@@ -236,7 +236,6 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 	inode = d_inode_rcu(entry);
 	if (inode && fuse_is_bad(inode))
 		goto invalid;
-
 #ifdef CONFIG_FUSE_BPF
 	/* TODO: Do we need bpf support for revalidate?
 	 * If the lower filesystem says the entry is invalid, FUSE probably shouldn't
@@ -250,7 +249,7 @@ static int fuse_dentry_revalidate(struct dentry *entry, unsigned int flags)
 	}
 #endif
 	if (time_before64(fuse_dentry_time(entry), get_jiffies_64()) ||
-		 (flags & LOOKUP_REVAL)) {
+		 (flags & (LOOKUP_EXCL | LOOKUP_REVAL))) {
 		struct fuse_entry_out outarg;
 		struct fuse_entry_bpf bpf_arg;
 		FUSE_ARGS(args);
@@ -1741,17 +1740,6 @@ static int fuse_dir_open(struct inode *inode, struct file *file)
 
 static int fuse_dir_release(struct inode *inode, struct file *file)
 {
-#ifdef CONFIG_FUSE_BPF
-	struct fuse_err_ret fer;
-
-	fer = fuse_bpf_backing(inode, struct fuse_release_in,
-		       fuse_releasedir_initialize, fuse_release_backing,
-		       fuse_release_finalize,
-		       inode, file);
-	if (fer.ret)
-		return PTR_ERR(fer.result);
-#endif
-
 	fuse_release_common(file, true);
 	return 0;
 }

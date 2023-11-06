@@ -573,6 +573,9 @@ static int rtentry_to_fib_config(struct net *net, int cmd, struct rtentry *rt,
 			cfg->fc_scope = RT_SCOPE_UNIVERSE;
 	}
 
+	if (!cfg->fc_table)
+		cfg->fc_table = RT_TABLE_MAIN;
+
 	if (cmd == SIOCDELRT)
 		return 0;
 
@@ -829,6 +832,9 @@ static int rtm_to_fib_config(struct net *net, struct sk_buff *skb,
 			       "Nexthop configuration can not contain both GATEWAY and VIA");
 		return -EINVAL;
 	}
+
+	if (!cfg->fc_table)
+		cfg->fc_table = RT_TABLE_MAIN;
 
 	return 0;
 errout:
