@@ -19,20 +19,25 @@ static void fuse_file_accessed(struct file *dst_file, struct file *src_file)
 {
 	struct inode *dst_inode;
 	struct inode *src_inode;
-	struct timespec64 dst_ts;
-	struct timespec64 src_ts;
+	struct timespec64 dst_ctime_ts;
+	struct timespec64 src_ctime_ts;
+	struct timespec64 dst_mtime_ts;
+	struct timespec64 src_mtime_ts;
 
 	if (dst_file->f_flags & O_NOATIME)
 		return;
 
 	dst_inode = file_inode(dst_file);
 	src_inode = file_inode(src_file);
-	dst_ts = inode_get_ctime(dst_inode);
-	src_ts = inode_get_ctime(src_inode);
+	dst_ctime_ts = inode_get_ctime(dst_inode);
+	src_ctime_ts = inode_get_ctime(src_inode);
+	dst_mtime_ts = inode_get_mtime(dst_inode);
+	src_mtime_ts = inode_get_mtime(src_inode);
 
-	if ((!timespec64_equal(&dst_inode->i_mtime, &src_inode->i_mtime) ||
-	     !timespec64_equal(&dst_ts, &src_ts))) {
-		dst_inode->i_mtime = src_inode->i_mtime;
+
+	if ((!timespec64_equal(&dst_mtime_ts, &src_mtime_ts) ||
+	     !timespec64_equal(&dst_ctime_ts, &src_ctime_ts))) {
+		inode_set_mtime_to_ts(dst_inode, inode_get_mtime(src_inode));
 		inode_set_ctime_to_ts(dst_inode, inode_get_ctime(src_inode));
 	}
 
@@ -44,8 +49,8 @@ static void fuse_copyattr(struct file *dst_file, struct file *src_file)
 	struct inode *dst = file_inode(dst_file);
 	struct inode *src = file_inode(src_file);
 
-	dst->i_atime = src->i_atime;
-	dst->i_mtime = src->i_mtime;
+	inode_set_atime_to_ts(dst, inode_get_atime(src));
+	inode_set_mtime_to_ts(dst, inode_get_mtime(src));
 	inode_set_ctime_to_ts(dst, inode_get_ctime(src));
 	i_size_write(dst, i_size_read(src));
 }
