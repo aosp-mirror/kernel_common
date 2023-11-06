@@ -361,8 +361,8 @@ static int inode_set(struct inode *inode, void *opaque)
 	node->n_backing_inode = backing_inode;
 	node->n_mount_info = get_mount_info(inode->i_sb);
 	inode_set_ctime_to_ts(inode, inode_get_ctime(backing_inode));
-	inode->i_mtime = backing_inode->i_mtime;
-	inode->i_atime = backing_inode->i_atime;
+	inode_set_mtime_to_ts(inode, inode_get_mtime(backing_inode));
+	inode_set_atime_to_ts(inode, inode_get_atime(backing_inode));
 	inode->i_ino = backing_inode->i_ino;
 	if (backing_inode->i_ino < INCFS_START_INO_RANGE) {
 		pr_warn("incfs: ino conflict with backing FS %ld\n",
