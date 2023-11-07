@@ -399,7 +399,7 @@ static inline unsigned long cpu_kernelmode_gs_base(int cpu)
 	return (unsigned long)per_cpu(fixed_percpu_data.gs_base, cpu);
 }
 
-extern asmlinkage void ignore_sysret(void);
+extern asmlinkage void entry_SYSCALL32_ignore(void);
 
 /* Save actual FS/GS selectors and bases to current->thread */
 void current_save_fsgs(void);
@@ -723,14 +723,6 @@ enum mds_mitigations {
 	MDS_MITIGATION_FULL,
 	MDS_MITIGATION_VMWERV,
 };
-
-#ifdef CONFIG_X86_SGX
-int arch_memory_failure(unsigned long pfn, int flags);
-#define arch_memory_failure arch_memory_failure
-
-bool arch_is_platform_page(u64 paddr);
-#define arch_is_platform_page arch_is_platform_page
-#endif
 
 extern bool gds_ucode_mitigated(void);
 
