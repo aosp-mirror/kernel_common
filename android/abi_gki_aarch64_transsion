@@ -1,0 +1,5 @@
+[abi_symbol_list]
+  avenrun
+  kstat
+  kernel_cpustat
+  vm_event_states

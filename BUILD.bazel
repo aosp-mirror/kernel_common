@@ -105,6 +105,7 @@ filegroup(
         "android/abi_gki_aarch64_qcom",
         "android/abi_gki_aarch64_rtkstb",
         "android/abi_gki_aarch64_rtktv",
+        "android/abi_gki_aarch64_transsion",
         "android/abi_gki_aarch64_tuxera",
         "android/abi_gki_aarch64_virtual_device",
         "android/abi_gki_aarch64_xiaomi",
