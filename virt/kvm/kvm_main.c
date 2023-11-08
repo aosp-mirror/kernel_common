@@ -57,6 +57,9 @@
 #include <asm/ioctl.h>
 #include <linux/uaccess.h>
 
+#include <linux/sched.h>
+#include <uapi/linux/sched/types.h>
+
 #include "coalesced_mmio.h"
 #include "async_pf.h"
 #include "kvm_mm.h"
@@ -3798,6 +3801,148 @@ bool kvm_vcpu_wake_up(struct kvm_vcpu *vcpu)
 	return false;
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_wake_up);
+
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+union vcpu_sched_attr kvm_vcpu_get_sched(struct kvm_vcpu *vcpu)
+{
+	union vcpu_sched_attr attr = { 0 };
+	struct pid *pid;
+	struct task_struct *vcpu_task = NULL;
+
+	rcu_read_lock();
+	pid = rcu_dereference(vcpu->pid);
+	if (pid)
+		vcpu_task = get_pid_task(pid, PIDTYPE_PID);
+	rcu_read_unlock();
+	if (vcpu_task == NULL)
+		return attr;
+
+	attr.sched_policy = vcpu_task->policy;
+	if (vcpu_task->policy == SCHED_RR || vcpu_task->policy == SCHED_FIFO)
+		attr.rt_priority = vcpu_task->rt_priority;
+	else
+		attr.sched_nice = task_nice(vcpu_task);
+
+	put_task_struct(vcpu_task);
+
+	return attr;
+}
+
+ /*
+  * Check if we need to act on the boost/unboost request.
+  * Returns true if:
+  * - caller is requesting boost and vcpu is boosted, or
+  * - caller is requesting unboost and vcpu is not boosted.
+  */
+static inline bool __needs_set_sched(struct kvm_vcpu *vcpu, int policy, int prio, int nice)
+{
+	union vcpu_sched_attr attr = {
+		.sched_policy = policy,
+		.rt_priority = prio,
+		.sched_nice = nice
+	};
+
+	return kvm_arch_vcpu_normalprio_cmp(&vcpu->arch, attr);
+}
+
+int kvm_vcpu_set_sched(struct kvm_vcpu *vcpu, union vcpu_sched_attr attr)
+{
+	int rt_prio;
+	int nice;
+	int policy;
+	int ret = 0;
+	struct pid *pid;
+	struct task_struct *vcpu_task = NULL;
+	int max_rt_prio = kvm_arch_vcpu_kerncs_prio(&vcpu->arch);
+
+retry_disable:
+	/*
+	 * If the feature is disabled, revert to CFS.
+	 */
+	if (!kvm_vcpu_sched_enabled(vcpu))
+		attr = kvm_arch_vcpu_default_sched_attr(&vcpu->arch);
+
+	policy = attr.sched_policy;
+	rt_prio = attr.rt_priority;
+	nice = attr.sched_nice;
+	if (attr.kern_cs || policy == SCHED_DEADLINE) {
+		nice = 0;
+		policy = kvm_arch_vcpu_kerncs_policy(&vcpu->arch);
+		rt_prio = max_rt_prio;
+	} else if (policy == SCHED_FIFO || policy == SCHED_RR) {
+		nice = 0;
+		if (rt_prio > max_rt_prio)
+			rt_prio = max_rt_prio;
+	} else {
+		rt_prio = 0;
+	}
+
+	rcu_read_lock();
+	pid = rcu_dereference(vcpu->pid);
+	if (pid)
+		vcpu_task = get_pid_task(pid, PIDTYPE_PID);
+	rcu_read_unlock();
+	if (vcpu_task == NULL)
+		return -KVM_EINVAL;
+
+	/*
+	 * This might be called from interrupt context.
+	 * Since we do not use rt-mutexes, we can safely call
+	 * sched_setscheduler_pi_nocheck with pi = false.
+	 * NOTE: If in future, we use rt-mutexes, this should
+	 * be modified to use a tasklet to do boost/unboost.
+	 */
+	WARN_ON_ONCE(vcpu_task->pi_top_task);
+	if (__needs_set_sched(vcpu, policy, rt_prio, nice)) {
+		struct sched_attr sattr = {
+			.sched_policy = policy,
+			.sched_nice = nice,
+			.sched_priority = rt_prio,
+		};
+		ret = sched_setattr_pi_nocheck(vcpu_task, &sattr, false);
+	}
+
+	/*
+	 * values to return to guest.
+	 */
+	attr.sched_policy = vcpu_task->policy;
+	if (task_is_realtime(vcpu_task))
+		attr.rt_priority = vcpu_task->rt_priority;
+	else
+		attr.sched_nice = task_nice(vcpu_task);
+
+	put_task_struct(vcpu_task);
+
+	attr.enabled = kvm_vcpu_sched_enabled(vcpu);
+	/*
+	 * If the feature is disabled, we set it in the priority field to let the guest know.
+	 */
+	if (!attr.enabled) {
+		/*
+		 * There could be a race where the disable path disabled the feature
+		 * but we did the boost without knowing that disable was in progress.
+		 * Unboost again.
+		 */
+		if (attr.sched_policy != SCHED_NORMAL || attr.sched_nice != 0)
+			goto retry_disable;
+	}
+
+	kvm_arch_vcpu_set_sched_attr(&vcpu->arch, attr);
+	kvm_make_request(KVM_REQ_VCPU_PV_SCHED, vcpu);
+
+	return ret;
+}
+
+void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type)
+{
+	union vcpu_sched_attr attr = {
+		.kern_cs = boost_type
+	};
+
+	kvm_vcpu_set_sched(vcpu, attr);
+}
+EXPORT_SYMBOL_GPL(kvm_vcpu_boost);
+#endif
 
 #ifndef CONFIG_S390
 /*

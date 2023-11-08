@@ -1164,6 +1164,8 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
 			     (1 << KVM_FEATURE_POLL_CONTROL) |
 			     (1 << KVM_FEATURE_PV_SCHED_YIELD) |
 			     (1 << KVM_FEATURE_ASYNC_PF_INT);
+		if (IS_ENABLED(CONFIG_PARAVIRT_SCHED_KVM))
+			entry->eax |= (1 << KVM_FEATURE_PV_SCHED);
 
 #ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING
 		entry->eax |= (1 << KVM_FEATURE_HOST_SUSPEND_TIME);

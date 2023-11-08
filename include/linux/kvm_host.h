@@ -169,6 +169,7 @@ static inline bool is_error_page(struct page *page)
 #define KVM_REQ_UNBLOCK			2
 #define KVM_REQ_DIRTY_RING_SOFT_FULL	3
 #define KVM_REQ_SUSPEND_TIME_ADJ	5
+#define KVM_REQ_VCPU_PV_SCHED		6
 #define KVM_REQUEST_ARCH_BASE		8
 
 /*
@@ -2414,5 +2415,19 @@ static inline u64 vcpu_suspend_time_injected(struct kvm_vcpu *vcpu)
 	return 0;
 }
 #endif /* CONFIG_KVM_VIRT_SUSPEND_TIMING */
+
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+int kvm_vcpu_set_sched(struct kvm_vcpu *vcpu, union vcpu_sched_attr attr);
+union vcpu_sched_attr kvm_vcpu_get_sched(struct kvm_vcpu *vcpu);
+
+static inline bool kvm_vcpu_sched_enabled(struct kvm_vcpu *vcpu)
+{
+	return kvm_arch_vcpu_pv_sched_enabled(&vcpu->arch);
+}
+
+void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type);
+#else
+static inline void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type) { }
+#endif
 
 #endif
