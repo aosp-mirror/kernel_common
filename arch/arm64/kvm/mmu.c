@@ -1207,7 +1207,7 @@ static int pkvm_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		 * prevent try_to_unmap() from succeeding.
 		 */
 		ret = -EIO;
-		goto dec_account;
+		goto unpin;
 	}
 
 	spin_lock(&kvm->mmu_lock);
@@ -1216,7 +1216,7 @@ static int pkvm_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	if (ret) {
 		if (ret == -EAGAIN)
 			ret = 0;
-		goto unpin;
+		goto unlock;
 	}
 
 	ppage->page = page;
@@ -1226,8 +1226,9 @@ static int pkvm_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 
 	return 0;
 
-unpin:
+unlock:
 	spin_unlock(&kvm->mmu_lock);
+unpin:
 	unpin_user_pages(&page, 1);
 dec_account:
 	account_locked_vm(mm, 1, false);
