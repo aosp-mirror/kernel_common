@@ -71,7 +71,7 @@ u32 iwl_mvm_get_sta_ampdu_dens(struct ieee80211_link_sta *link_sta,
 		mpdu_dens = link_sta->ht_cap.ampdu_density;
 	}
 
-	if (nl80211_is_6ghz(link_conf->chandef.chan->band)) {
+	if (nl80211_is_6ghz(link_conf->chanreq.oper.chan->band)) {
 		/* overwrite HT values on 6 GHz */
 		mpdu_dens = le16_get_bits(link_sta->he_6ghz_capa.capa,
 					  IEEE80211_HE_6GHZ_CAP_MIN_MPDU_START);
@@ -207,7 +207,7 @@ int iwl_mvm_sta_send_to_fw(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 	}
 
 	if (sta->deflink.ht_cap.ht_supported ||
-	    nl80211_is_6ghz(mvm_sta->vif->bss_conf.chandef.chan->band))
+	    nl80211_is_6ghz(mvm_sta->vif->bss_conf.chanreq.oper.chan->band))
 		add_sta_cmd.station_flags_msk |=
 			cpu_to_le32(STA_FLG_MAX_AGG_SIZE_MSK |
 				    STA_FLG_AGG_MPDU_DENS_MSK);
