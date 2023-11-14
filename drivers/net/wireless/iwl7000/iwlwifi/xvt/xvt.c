@@ -1170,7 +1170,7 @@ int iwl_xvt_init_ppag_tables(struct iwl_xvt *xvt)
 {
 	int ret;
 
-	ret = iwl_acpi_get_ppag_table(&xvt->fwrt);
+	ret = iwl_bios_get_ppag_table(&xvt->fwrt);
 	if (ret < 0) {
 		IWL_DEBUG_RADIO(xvt,
 				"PPAG BIOS table invalid or unavailable. (%d)\n",
