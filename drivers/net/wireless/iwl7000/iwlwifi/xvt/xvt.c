@@ -882,7 +882,6 @@ static int iwl_xvt_sar_geo_init(struct iwl_xvt *xvt)
 	 * element name is misleading, as it doesn't contain the table
 	 * revision number, but whether the South Korea variation
 	 * should be used.
-	 * This must be done after calling iwl_sar_geo_fill_table().
 	 */
 	if (cmd_ver == 5) {
 		len = sizeof(cmd.v5);
