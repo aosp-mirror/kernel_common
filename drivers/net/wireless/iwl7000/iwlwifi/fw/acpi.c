@@ -960,6 +960,7 @@ read_table:
 		}
 	}
 
+	iwl_bios_print_ppag(fwrt);
 	ret = 0;
 
 out_free:

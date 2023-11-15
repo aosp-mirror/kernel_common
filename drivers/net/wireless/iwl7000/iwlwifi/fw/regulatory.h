@@ -91,6 +91,9 @@ struct iwl_ppag_chain {
 
 struct iwl_fw_runtime;
 
+/* Print the PPAG table as read from BIOS */
+void iwl_bios_print_ppag(struct iwl_fw_runtime *fwrt);
+
 bool iwl_sar_geo_support(struct iwl_fw_runtime *fwrt);
 
 int iwl_sar_geo_fill_table(struct iwl_fw_runtime *fwrt,

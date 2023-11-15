@@ -339,3 +339,20 @@ bool iwl_is_ppag_approved(struct iwl_fw_runtime *fwrt)
 	return true;
 }
 IWL_EXPORT_SYMBOL(iwl_is_ppag_approved);
+
+/* Print the PPAG table as read from BIOS */
+void iwl_bios_print_ppag(struct iwl_fw_runtime *fwrt)
+{
+	int i, j;
+
+	IWL_DEBUG_RADIO(fwrt, "PPAG table as read from BIOS:\n");
+	IWL_DEBUG_RADIO(fwrt, "PPAG revision = %d\n", fwrt->ppag_ver);
+	IWL_DEBUG_RADIO(fwrt, "PPAG flags = 0x%x\n", fwrt->ppag_flags);
+
+	for (i = 0; i < IWL_NUM_CHAIN_LIMITS; i++)
+		for (j = 0; j < BIOS_SAR_MAX_SUB_BANDS_NUM; j++)
+			IWL_DEBUG_RADIO(fwrt,
+					"ppag_chains[%d].subbands[%d] = %d\n",
+					i, j,
+					fwrt->ppag_chains[i].subbands[j]);
+}
