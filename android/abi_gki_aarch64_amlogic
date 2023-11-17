@@ -22,6 +22,8 @@
   __arch_clear_user
   __arch_copy_from_user
   __arch_copy_to_user
+  argv_free
+  argv_split
   arm64_const_caps_ready
   arm64_use_ng_mappings
   __arm_smccc_hvc
@@ -1738,6 +1740,8 @@
   sdio_writesb
   sdio_writew
   send_sig
+  seq_list_next
+  seq_list_start
   seq_lseek
   seq_open
   seq_printf
@@ -2009,6 +2013,7 @@
   __traceiter_android_rvh_select_task_rq_rt
   __traceiter_android_rvh_tick_entry
   __traceiter_android_vh_alloc_pages_entry
+  __traceiter_android_vh_calc_alloc_flags
   __traceiter_android_vh_cma_alloc_bypass
   __traceiter_android_vh_cma_drain_all_pages_bypass
   __traceiter_android_vh_cpu_idle_enter
@@ -2058,6 +2063,7 @@
   __tracepoint_android_rvh_select_task_rq_rt
   __tracepoint_android_rvh_tick_entry
   __tracepoint_android_vh_alloc_pages_entry
+  __tracepoint_android_vh_calc_alloc_flags
   __tracepoint_android_vh_cma_alloc_bypass
   __tracepoint_android_vh_cma_drain_all_pages_bypass
   __tracepoint_android_vh_cpu_idle_enter
@@ -2172,11 +2178,13 @@
   usb_del_gadget
   usb_del_gadget_udc
   usb_deregister
+  usb_deregister_dev
   usb_disabled
   usb_disable_autosuspend
   usb_driver_claim_interface
   usb_driver_release_interface
   usb_ep_set_maxpacket_limit
+  usb_find_interface
   usb_free_urb
   usb_gadget_giveback_request
   usb_gadget_map_request_by_dev
@@ -2185,6 +2193,7 @@
   usb_gadget_udc_reset
   usb_gadget_unmap_request_by_dev
   usb_gadget_unregister_driver
+  usb_get_dev
   usb_get_dr_mode
   usb_get_from_anchor
   usb_get_maximum_speed
@@ -2209,10 +2218,15 @@
   usb_initialize_gadget
   usb_interrupt_msg
   usb_kill_anchored_urbs
+  usb_kill_urb
+  usb_lock_device_for_reset
   usb_phy_set_charger_current
+  usb_put_dev
   usb_put_hcd
+  usb_register_dev
   usb_register_driver
   usb_remove_hcd
+  usb_reset_device
   usb_role_switch_get_drvdata
   usb_role_switch_register
   usb_role_switch_unregister
@@ -2221,6 +2235,7 @@
   usb_set_interface
   usb_submit_urb
   usb_unanchor_urb
+  usb_unlink_urb
   usb_wakeup_notification
   __usecs_to_jiffies
   usleep_range_state
