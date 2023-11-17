@@ -311,6 +311,7 @@ static inline void iwl7000_convert_survey_info(struct survey_info *survey,
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,1,0)
+#define ASSOC_REQ_DISABLE_EHT BIT(5)
 #define NL80211_EXT_FEATURE_POWERED_ADDR_CHANGE -1
 #endif /* CFG80211_VERSION < KERNEL_VERSION(6,1,0) */
 
