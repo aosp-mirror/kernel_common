@@ -1087,13 +1087,13 @@ static ssize_t iwl_dbgfs_tas_get_status_read(struct file *file,
 			 le16_to_cpu(rsp->curr_mcc));
 
 	pos += scnprintf(pos, endpos - pos, "\tBlock List Countries:");
-	for (i = 0; i < APCI_WTAS_BLACK_LIST_MAX; i++)
+	for (i = 0; i < IWL_WTAS_BLACK_LIST_MAX; i++)
 		pos += scnprintf(pos, endpos - pos, " 0x%x", le16_to_cpu(rsp->block_list[i]));
 
 	pos += scnprintf(pos, endpos - pos, "\n\tVendor: %s\n",
 			 dmi_get_system_info(DMI_SYS_VENDOR));
 	pos += scnprintf(pos, endpos - pos, "\tVendor In Approved List: %s\n",
-			 iwl_mvm_is_vendor_in_approved_list() ? "YES" : "NO");
+			 iwl_is_tas_approved() ? "YES" : "NO");
 	pos += scnprintf(pos, endpos - pos, "\tDo TAS Support Dual Radio?: %s\n",
 			 rsp->in_dual_radio ? "TRUE" : "FALSE");
 
