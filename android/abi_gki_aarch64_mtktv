@@ -44,9 +44,11 @@
   bio_start_io_acct
   __bitmap_clear
   __bitmap_complement
+  bitmap_find_free_region
   bitmap_find_next_zero_area_off
   bitmap_from_arr32
   bitmap_print_to_pagebuf
+  bitmap_release_region
   __bitmap_set
   bitmap_to_arr32
   __bitmap_weight
@@ -187,6 +189,7 @@
   contig_page_data
   _copy_from_iter
   copy_from_kernel_nofault
+  copy_page
   _copy_to_iter
   cpu_bit_bitmap
   cpufreq_cpu_get_raw
@@ -395,8 +398,11 @@
   __devm_mdiobus_register
   devm_of_phy_get_by_index
   __devm_of_phy_provider_register
+  devm_pci_alloc_host_bridge
   devm_phy_create
+  devm_phy_optional_get
   devm_pinctrl_get
+  devm_pinctrl_put
   devm_pwm_get
   __devm_regmap_init_i2c
   devm_regulator_bulk_get
@@ -405,6 +411,7 @@
   devm_request_any_context_irq
   __devm_request_region
   devm_request_threaded_irq
+  __devm_reset_control_get
   devm_rtc_allocate_device
   __devm_rtc_register_device
   devm_snd_soc_register_card
@@ -469,6 +476,7 @@
   dma_buf_unmap_attachment
   dma_buf_vmap
   dma_buf_vunmap
+  dma_contiguous_default_area
   dma_fence_add_callback
   dma_fence_array_create
   dma_fence_array_ops
@@ -699,6 +707,7 @@
   generic_file_open
   generic_file_read_iter
   generic_file_splice_read
+  generic_handle_domain_irq
   generic_handle_irq
   generic_mii_ioctl
   generic_read_dir
@@ -761,6 +770,7 @@
   gpio_to_desc
   gre_add_protocol
   gre_del_protocol
+  handle_edge_irq
   handle_fasteoi_irq
   handle_simple_irq
   handle_sysrq
@@ -895,6 +905,7 @@
   __ipv6_addr_type
   ipv6_dev_find
   ipv6_stub
+  irq_chip_ack_parent
   irq_chip_eoi_parent
   irqchip_fwnode_ops
   irq_chip_mask_parent
@@ -902,15 +913,23 @@
   irq_chip_set_type_parent
   irq_chip_set_vcpu_affinity_parent
   irq_chip_unmask_parent
+  irq_dispose_mapping
+  __irq_domain_add
   irq_domain_alloc_irqs_parent
   irq_domain_create_hierarchy
   irq_domain_free_irqs_common
+  irq_domain_get_irq_data
+  irq_domain_remove
   irq_domain_set_hwirq_and_chip
+  irq_domain_set_info
   irq_find_matching_fwspec
   irq_get_irq_data
   irq_of_parse_and_map
   __irq_resolve_mapping
   irq_set_affinity_hint
+  irq_set_chained_handler_and_data
+  irq_set_chip_and_handler_name
+  irq_set_chip_data
   __irq_set_handler
   irq_set_irq_wake
   irq_to_desc
@@ -1067,6 +1086,7 @@
   __memcpy_toio
   memdup_user
   memmove
+  memory_read_from_buffer
   memparse
   memremap
   memscan
@@ -1269,6 +1289,17 @@
   param_ops_ulong
   param_ops_ushort
   path_put
+  pci_generic_config_read32
+  pci_generic_config_write32
+  pci_host_probe
+  pci_lock_rescan_remove
+  pci_msi_create_irq_domain
+  pci_msi_mask_irq
+  pci_msi_unmask_irq
+  pci_pio_to_address
+  pci_remove_root_bus
+  pci_stop_root_bus
+  pci_unlock_rescan_remove
   PDE_DATA
   __percpu_down_read
   percpu_down_write
@@ -1345,6 +1376,7 @@
   __platform_register_drivers
   platform_unregister_drivers
   __pm_relax
+  pm_relax
   __pm_runtime_disable
   pm_runtime_enable
   pm_runtime_force_resume
@@ -1356,6 +1388,7 @@
   __pm_runtime_suspend
   __pm_runtime_use_autosuspend
   __pm_stay_awake
+  pm_stay_awake
   pm_wakeup_ws_event
   pm_wq
   power_supply_changed
@@ -1507,6 +1540,8 @@
   __request_module
   __request_region
   request_threaded_irq
+  reset_control_assert
+  reset_control_deassert
   rfkill_alloc
   rfkill_blocked
   rfkill_destroy
@@ -1543,10 +1578,13 @@
   rproc_add_carveout
   rproc_alloc
   rproc_boot
+  rproc_da_to_va
   rproc_del
   rproc_free
+  rproc_get_by_child
   rproc_mem_entry_init
   rproc_of_resm_mem_entry_init
+  rproc_report_crash
   rproc_shutdown
   rproc_vq_interrupt
   rtc_add_group
@@ -1800,6 +1838,7 @@
   __spi_alloc_controller
   spi_finalize_current_message
   spi_new_device
+  spi_register_controller
   __spi_register_driver
   spi_setup
   spi_sync
