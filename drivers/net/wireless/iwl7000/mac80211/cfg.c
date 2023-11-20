@@ -3740,12 +3740,10 @@ cfg80211_beacon_dup(struct cfg80211_beacon_data *beacon)
 						    new_beacon->mbssid_ies,
 						    beacon->mbssid_ies);
 #if CFG80211_VERSION >= KERNEL_VERSION(6,4,0)
-#if CFG80211_VERSION >= KERNEL_VERSION(6,4,0)
 		if (beacon->rnr_ies && beacon->rnr_ies->cnt)
 			pos += ieee80211_copy_rnr_beacon(pos,
 							 new_beacon->rnr_ies,
 							 beacon->rnr_ies);
-#endif
 #endif
 	}
 #endif
