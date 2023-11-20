@@ -2139,6 +2139,7 @@
   __traceiter_android_rvh_ufs_reprogram_all_keys
   __traceiter_android_rvh_update_blocked_fair
   __traceiter_android_rvh_update_load_avg
+  __traceiter_android_rvh_update_load_sum
   __traceiter_android_rvh_update_misfit_status
   __traceiter_android_rvh_update_rt_rq_load_avg
   __traceiter_android_rvh_usb_dev_suspend
@@ -2276,6 +2277,7 @@
   __tracepoint_android_rvh_ufs_reprogram_all_keys
   __tracepoint_android_rvh_update_blocked_fair
   __tracepoint_android_rvh_update_load_avg
+  __tracepoint_android_rvh_update_load_sum
   __tracepoint_android_rvh_update_misfit_status
   __tracepoint_android_rvh_update_rt_rq_load_avg
   __tracepoint_android_rvh_usb_dev_suspend
