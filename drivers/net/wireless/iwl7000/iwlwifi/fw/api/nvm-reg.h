@@ -489,7 +489,7 @@ union iwl_tas_config_cmd {
 	struct iwl_tas_config_cmd_v4 v4;
 };
 /**
- * enum iwl_lari_configs - bit masks for the various LARI config operations
+ * enum iwl_lari_config_masks - bit masks for the various LARI config operations
  * @LARI_CONFIG_DISABLE_11AC_UKRAINE_MSK: disable 11ac in ukraine
  * @LARI_CONFIG_CHANGE_ETSI_TO_PASSIVE_MSK: ETSI 5.8GHz SRD passive scan
  * @LARI_CONFIG_CHANGE_ETSI_TO_DISABLED_MSK: ETSI 5.8GHz SRD disabled

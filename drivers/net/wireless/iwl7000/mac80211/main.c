@@ -323,7 +323,7 @@ static void ieee80211_tasklet_handler(struct tasklet_struct *t)
 			break;
 		case IEEE80211_TX_STATUS_MSG:
 			skb->pkt_type = 0;
-			ieee80211_tx_status(&local->hw, skb);
+			ieee80211_tx_status_skb(&local->hw, skb);
 			break;
 		default:
 			WARN(1, "mac80211: Packet is of unknown type %d\n",
@@ -1482,6 +1482,7 @@ int ieee80211_register_hw(struct ieee80211_hw *hw)
 	ieee80211_remove_interfaces(local);
 	rtnl_unlock();
  fail_rate:
+	ieee80211_txq_teardown_flows(local);
  fail_flows:
 	ieee80211_led_exit(local);
 	destroy_workqueue(local->workqueue);
@@ -1517,6 +1518,8 @@ void ieee80211_unregister_hw(struct ieee80211_hw *hw)
 	 * more and the tasklet is killed.
 	 */
 	ieee80211_remove_interfaces(local);
+
+	ieee80211_txq_teardown_flows(local);
 
 #if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
 	wiphy_lock(local->hw.wiphy);

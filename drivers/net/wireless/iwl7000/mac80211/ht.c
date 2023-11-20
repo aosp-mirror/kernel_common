@@ -364,26 +364,26 @@ void ieee80211_ba_session_work(struct wiphy *wiphy, struct wiphy_work *work)
 
 	for (tid = 0; tid < IEEE80211_NUM_TIDS; tid++) {
 		if (test_and_clear_bit(tid, sta->ampdu_mlme.tid_rx_timer_expired))
-			___ieee80211_stop_rx_ba_session(
+			__ieee80211_stop_rx_ba_session(
 				sta, tid, WLAN_BACK_RECIPIENT,
 				WLAN_REASON_QSTA_TIMEOUT, true);
 
 		if (test_and_clear_bit(tid,
 				       sta->ampdu_mlme.tid_rx_stop_requested))
-			___ieee80211_stop_rx_ba_session(
+			__ieee80211_stop_rx_ba_session(
 				sta, tid, WLAN_BACK_RECIPIENT,
 				WLAN_REASON_UNSPECIFIED, true);
 
 		if (!blocked &&
 		    test_and_clear_bit(tid,
 				       sta->ampdu_mlme.tid_rx_manage_offl))
-			___ieee80211_start_rx_ba_session(sta, 0, 0, 0, 1, tid,
-							 IEEE80211_MAX_AMPDU_BUF_HT,
-							 false, true, NULL);
+			__ieee80211_start_rx_ba_session(sta, 0, 0, 0, 1, tid,
+							IEEE80211_MAX_AMPDU_BUF_HT,
+							false, true, NULL);
 
 		if (test_and_clear_bit(tid + IEEE80211_NUM_TIDS,
 				       sta->ampdu_mlme.tid_rx_manage_offl))
-			___ieee80211_stop_rx_ba_session(
+			__ieee80211_stop_rx_ba_session(
 				sta, tid, WLAN_BACK_RECIPIENT,
 				0, false);
 

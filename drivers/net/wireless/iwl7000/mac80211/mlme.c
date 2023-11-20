@@ -841,7 +841,6 @@ static void ieee80211_assoc_add_rates(struct sk_buff *skb,
 				      struct ieee80211_supported_band *sband,
 				      struct ieee80211_mgd_assoc_data *assoc_data)
 {
-	unsigned int shift = ieee80211_chanwidth_get_shift(width);
 	unsigned int rates_len, supp_rates_len;
 	u32 rates = 0;
 	int i, count;
@@ -880,8 +879,7 @@ static void ieee80211_assoc_add_rates(struct sk_buff *skb,
 	count = 0;
 	for (i = 0; i < sband->n_bitrates; i++) {
 		if (BIT(i) & rates) {
-			int rate = DIV_ROUND_UP(sband->bitrates[i].bitrate,
-						5 * (1 << shift));
+			int rate = DIV_ROUND_UP(sband->bitrates[i].bitrate, 5);
 			*pos++ = (u8)rate;
 			if (++count == 8)
 				break;
@@ -897,8 +895,7 @@ static void ieee80211_assoc_add_rates(struct sk_buff *skb,
 			if (BIT(i) & rates) {
 				int rate;
 
-				rate = DIV_ROUND_UP(sband->bitrates[i].bitrate,
-						    5 * (1 << shift));
+				rate = DIV_ROUND_UP(sband->bitrates[i].bitrate, 5);
 				*pos++ = (u8)rate;
 			}
 		}
@@ -3097,9 +3094,9 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 	memset(sdata->vif.bss_conf.tx_pwr_env, 0,
 	       sizeof(sdata->vif.bss_conf.tx_pwr_env));
 
-	memset(&sdata->u.mgd.t2l_map_info, 0,
-	       sizeof(sdata->u.mgd.t2l_map_info));
-	wiphy_delayed_work_cancel(sdata->local->hw.wiphy, &ifmgd->t2l_map_work);
+	memset(&sdata->u.mgd.ttlm_info, 0,
+	       sizeof(sdata->u.mgd.ttlm_info));
+	wiphy_delayed_work_cancel(sdata->local->hw.wiphy, &ifmgd->ttlm_work);
 	wiphy_delayed_work_cancel(sdata->local->hw.wiphy,
 				  &ifmgd->neg_ttlm_timeout_work);
 	ieee80211_vif_set_links(sdata, 0, 0);
@@ -3912,8 +3909,7 @@ static void ieee80211_get_rates(struct ieee80211_supported_band *sband,
 				u8 *supp_rates, unsigned int supp_rates_len,
 				u32 *rates, u32 *basic_rates,
 				bool *have_higher_than_11mbit,
-				int *min_rate, int *min_rate_index,
-				int shift)
+				int *min_rate, int *min_rate_index)
 {
 	int i, j;
 
@@ -3921,7 +3917,7 @@ static void ieee80211_get_rates(struct ieee80211_supported_band *sband,
 		int rate = supp_rates[i] & 0x7f;
 		bool is_basic = !!(supp_rates[i] & 0x80);
 
-		if ((rate * 5 * (1 << shift)) > 110)
+		if ((rate * 5) > 110)
 			*have_higher_than_11mbit = true;
 
 		/*
@@ -3945,7 +3941,7 @@ static void ieee80211_get_rates(struct ieee80211_supported_band *sband,
 
 			br = &sband->bitrates[j];
 
-			brate = DIV_ROUND_UP(br->bitrate, (1 << shift) * 5);
+			brate = DIV_ROUND_UP(br->bitrate, 5);
 			if (brate == rate) {
 				*rates |= BIT(j);
 				if (is_basic)
@@ -4420,8 +4416,6 @@ static int ieee80211_mgd_setup_link_sta(struct ieee80211_link_data *link,
 	u32 rates = 0, basic_rates = 0;
 	bool have_higher_than_11mbit = false;
 	int min_rate = INT_MAX, min_rate_index = -1;
-	/* this is clearly wrong for MLO but we'll just remove it later */
-	int shift = ieee80211_vif_get_shift(&sdata->vif);
 	struct ieee80211_supported_band *sband;
 
 	memcpy(link_sta->addr, cbss->bssid, ETH_ALEN);
@@ -4437,7 +4431,7 @@ static int ieee80211_mgd_setup_link_sta(struct ieee80211_link_data *link,
 
 	ieee80211_get_rates(sband, bss->supp_rates, bss->supp_rates_len,
 			    &rates, &basic_rates, &have_higher_than_11mbit,
-			    &min_rate, &min_rate_index, shift);
+			    &min_rate, &min_rate_index);
 
 	/*
 	 * This used to be a workaround for basic rates missing
@@ -5352,7 +5346,11 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 		.u.mlme.data = ASSOC_EVENT,
 	};
 	struct ieee80211_prep_tx_info info = {};
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
 	struct cfg80211_rx_assoc_resp resp = {
+#else
+	struct cfg80211_rx_assoc_resp_data resp = {
+#endif
 		.uapsd_queues = -1,
 	};
 	u8 ap_mld_addr[ETH_ALEN] __aligned(2);
@@ -5428,8 +5426,7 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 	    elems->timeout_int->type == WLAN_TIMEOUT_ASSOC_COMEBACK) {
 		u32 tu, ms;
 
-		ieee80211_assoc_comeback(sdata->dev, assoc_data,
-					 le32_to_cpu(elems->timeout_int->value));
+		ieee80211_assoc_comeback(sdata->dev, assoc_data, le32_to_cpu(elems->timeout_int->value));
 
 		tu = le32_to_cpu(elems->timeout_int->value);
 		ms = tu * 1024 / 1000;
@@ -5512,8 +5509,7 @@ static void ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 
 		resp.links[link_id].bss = assoc_data->link[link_id].bss;
 #if CFG80211_VERSION >= KERNEL_VERSION(6,0,0) && CFG80211_VERSION < KERNEL_VERSION(6,5,7)
-		ether_addr_copy(link_addrs[link_id],
-				assoc_data->link[link_id].addr);
+		ether_addr_copy(link_addrs[link_id], assoc_data->link[link_id].addr);
 		resp.links[link_id].addr = link_addrs[link_id];
 #else
 		ether_addr_copy(resp.links[link_id].addr,
@@ -6025,11 +6021,11 @@ static void ieee80211_tid_to_link_map_work(struct wiphy *wiphy,
 	u16 new_active_links, new_dormant_links;
 	struct ieee80211_sub_if_data *sdata =
 		container_of(work, struct ieee80211_sub_if_data,
-			     u.mgd.t2l_map_work.work);
+			     u.mgd.ttlm_work.work);
 
-	new_active_links = sdata->u.mgd.t2l_map_info.map &
+	new_active_links = sdata->u.mgd.ttlm_info.map &
 			   sdata->vif.valid_links;
-	new_dormant_links = ~sdata->u.mgd.t2l_map_info.map &
+	new_dormant_links = ~sdata->u.mgd.ttlm_info.map &
 			    sdata->vif.valid_links;
 
 	ieee80211_vif_set_links(sdata, sdata->vif.valid_links, 0);
@@ -6037,11 +6033,11 @@ static void ieee80211_tid_to_link_map_work(struct wiphy *wiphy,
 				     0))
 		return;
 
-	sdata->u.mgd.t2l_map_info.active = true;
-	sdata->u.mgd.t2l_map_info.switch_time = 0;
+	sdata->u.mgd.ttlm_info.active = true;
+	sdata->u.mgd.ttlm_info.switch_time = 0;
 }
 
-static u16 ieee80211_get_t2l_map(u8 bm_size, u8 *data)
+static u16 ieee80211_get_ttlm(u8 bm_size, u8 *data)
 {
 	if (bm_size == 1)
 		return *data;
@@ -6051,8 +6047,8 @@ static u16 ieee80211_get_t2l_map(u8 bm_size, u8 *data)
 
 static int
 ieee80211_parse_adv_t2l(struct ieee80211_sub_if_data *sdata,
-			const struct ieee80211_t2l_map_elem *t2l_map,
-			struct ieee80211_adv_t2l_map_info *t2l_map_info)
+			const struct ieee80211_ttlm_elem *ttlm,
+			struct ieee80211_adv_ttlm_info *ttlm_info)
 {
 	/* The element size was already validated in
 	 * ieee80211_tid_to_link_map_size_ok()
@@ -6060,16 +6056,16 @@ ieee80211_parse_adv_t2l(struct ieee80211_sub_if_data *sdata,
 	u8 control, link_map_presence, map_size, tid;
 	u8 *pos;
 
-	memset(t2l_map_info, 0, sizeof(*t2l_map_info));
-	pos = (void *)t2l_map->optional;
-	control	= t2l_map->control;
+	memset(ttlm_info, 0, sizeof(*ttlm_info));
+	pos = (void *)ttlm->optional;
+	control	= ttlm->control;
 
-	if ((control & IEEE80211_T2L_MAP_CONTROL_DEF_LINK_MAP) ||
-	    !(control & IEEE80211_T2L_MAP_CONTROL_SWITCH_TIME_PRESENT))
+	if ((control & IEEE80211_TTLM_CONTROL_DEF_LINK_MAP) ||
+	    !(control & IEEE80211_TTLM_CONTROL_SWITCH_TIME_PRESENT))
 		return 0;
 
-	if ((control & IEEE80211_T2L_MAP_CONTROL_DIRECTION) !=
-	    IEEE80211_T2L_MAP_DIRECTION_BOTH) {
+	if ((control & IEEE80211_TTLM_CONTROL_DIRECTION) !=
+	    IEEE80211_TTLM_DIRECTION_BOTH) {
 		sdata_info(sdata, "Invalid advertised T2L map direction\n");
 		return -EINVAL;
 	}
@@ -6077,22 +6073,22 @@ ieee80211_parse_adv_t2l(struct ieee80211_sub_if_data *sdata,
 	link_map_presence = *pos;
 	pos++;
 
-	t2l_map_info->switch_time = get_unaligned_le16(pos);
+	ttlm_info->switch_time = get_unaligned_le16(pos);
 
-	/* Since t2l_map_info->switch_time == 0 means no switch time, bump it
+	/* Since ttlm_info->switch_time == 0 means no switch time, bump it
 	 * by 1.
 	 */
-	if (!t2l_map_info->switch_time)
-		t2l_map_info->switch_time = 1;
+	if (!ttlm_info->switch_time)
+		ttlm_info->switch_time = 1;
 
 	pos += 2;
 
-	if (control & IEEE80211_T2L_MAP_CONTROL_EXPECTED_DUR_PRESENT) {
-		t2l_map_info->duration = pos[0] | pos[1] << 8 | pos[2] << 16;
+	if (control & IEEE80211_TTLM_CONTROL_EXPECTED_DUR_PRESENT) {
+		ttlm_info->duration = pos[0] | pos[1] << 8 | pos[2] << 16;
 		pos += 3;
 	}
 
-	if (control & IEEE80211_T2L_MAP_CONTROL_LINK_MAP_SIZE)
+	if (control & IEEE80211_TTLM_CONTROL_LINK_MAP_SIZE)
 		map_size = 1;
 	else
 		map_size = 2;
@@ -6107,8 +6103,8 @@ ieee80211_parse_adv_t2l(struct ieee80211_sub_if_data *sdata,
 		return -EINVAL;
 	}
 
-	t2l_map_info->map = ieee80211_get_t2l_map(map_size, pos);
-	if (!t2l_map_info->map) {
+	ttlm_info->map = ieee80211_get_ttlm(map_size, pos);
+	if (!ttlm_info->map) {
 		sdata_info(sdata,
 			   "Invalid advertised T2L map for TID 0\n");
 		return -EINVAL;
@@ -6117,9 +6113,9 @@ ieee80211_parse_adv_t2l(struct ieee80211_sub_if_data *sdata,
 	pos += map_size;
 
 	for (tid = 1; tid < 8; tid++) {
-		u16 map = ieee80211_get_t2l_map(map_size, pos);
+		u16 map = ieee80211_get_ttlm(map_size, pos);
 
-		if (map != t2l_map_info->map) {
+		if (map != ttlm_info->map) {
 			sdata_info(sdata, "Invalid advertised T2L map for tid %d\n",
 				   tid);
 			return -EINVAL;
@@ -6130,9 +6126,9 @@ ieee80211_parse_adv_t2l(struct ieee80211_sub_if_data *sdata,
 	return 0;
 }
 
-static void ieee80211_process_adv_t2l_map(struct ieee80211_sub_if_data *sdata,
-					  struct ieee802_11_elems *elems,
-					  u64 beacon_ts)
+static void ieee80211_process_adv_ttlm(struct ieee80211_sub_if_data *sdata,
+				       struct ieee802_11_elems *elems,
+				       u64 beacon_ts)
 {
 	u8 i;
 	int ret;
@@ -6140,14 +6136,14 @@ static void ieee80211_process_adv_t2l_map(struct ieee80211_sub_if_data *sdata,
 	if (!ieee80211_vif_is_mld(&sdata->vif))
 		return;
 
-	if (!elems->t2l_map_num) {
-		if (sdata->u.mgd.t2l_map_info.switch_time) {
+	if (!elems->ttlm_num) {
+		if (sdata->u.mgd.ttlm_info.switch_time) {
 			/* if a planned TID-to-link mapping was cancelled -
 			 * abort it
 			 */
 			wiphy_delayed_work_cancel(sdata->local->hw.wiphy,
-						  &sdata->u.mgd.t2l_map_work);
-		} else if (sdata->u.mgd.t2l_map_info.active) {
+						  &sdata->u.mgd.ttlm_work);
+		} else if (sdata->u.mgd.ttlm_info.active) {
 			/* if no TID-to-link element, set to default mapping in
 			 * which all TIDs are mapped to all setup links
 			 */
@@ -6161,24 +6157,24 @@ static void ieee80211_process_adv_t2l_map(struct ieee80211_sub_if_data *sdata,
 			ieee80211_vif_cfg_change_notify(sdata,
 							BSS_CHANGED_MLD_VALID_LINKS);
 		}
-		memset(&sdata->u.mgd.t2l_map_info, 0,
-		       sizeof(sdata->u.mgd.t2l_map_info));
+		memset(&sdata->u.mgd.ttlm_info, 0,
+		       sizeof(sdata->u.mgd.ttlm_info));
 		return;
 	}
 
-	for (i = 0; i < elems->t2l_map_num; i++) {
-		struct ieee80211_adv_t2l_map_info t2l_map_info;
+	for (i = 0; i < elems->ttlm_num; i++) {
+		struct ieee80211_adv_ttlm_info ttlm_info;
 		u32 res;
 
-		res = ieee80211_parse_adv_t2l(sdata, elems->t2l_map[i],
-					      &t2l_map_info);
+		res = ieee80211_parse_adv_t2l(sdata, elems->ttlm[i],
+					      &ttlm_info);
 
 		if (res) {
-			__ieee80211_disconnect_locked(sdata);
+			__ieee80211_disconnect_unlocked(sdata);
 			return;
 		}
 
-		if (t2l_map_info.switch_time) {
+		if (ttlm_info.switch_time) {
 			u16 beacon_ts_tu, st_tu, delay;
 			u32 delay_jiffies;
 			u64 mask;
@@ -6189,7 +6185,7 @@ static void ieee80211_process_adv_t2l_map(struct ieee80211_sub_if_data *sdata,
 			 */
 			mask = GENMASK_ULL(25, 10);
 			beacon_ts_tu = (beacon_ts & mask) >> 10;
-			st_tu = t2l_map_info.switch_time;
+			st_tu = ttlm_info.switch_time;
 			delay = st_tu - beacon_ts_tu;
 
 			/*
@@ -6213,11 +6209,11 @@ static void ieee80211_process_adv_t2l_map(struct ieee80211_sub_if_data *sdata,
 			else
 				delay_jiffies = 0;
 
-			sdata->u.mgd.t2l_map_info = t2l_map_info;
+			sdata->u.mgd.ttlm_info = ttlm_info;
 			wiphy_delayed_work_cancel(sdata->local->hw.wiphy,
-						  &sdata->u.mgd.t2l_map_work);
+						  &sdata->u.mgd.ttlm_work);
 			wiphy_delayed_work_queue(sdata->local->hw.wiphy,
-						 &sdata->u.mgd.t2l_map_work,
+						 &sdata->u.mgd.ttlm_work,
 						 delay_jiffies);
 			return;
 		}
@@ -6551,8 +6547,8 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_link_data *link,
 	}
 
 	ieee80211_ml_reconfiguration(sdata, elems);
-	ieee80211_process_adv_t2l_map(sdata, elems,
-				      le64_to_cpu(mgmt->u.beacon.timestamp));
+	ieee80211_process_adv_ttlm(sdata, elems,
+				   le64_to_cpu(mgmt->u.beacon.timestamp));
 
 	ieee80211_link_info_change_notify(sdata, link, changed);
 free:
@@ -6603,21 +6599,21 @@ static void
 ieee80211_neg_t2l_add_suggested_map(struct sk_buff *skb,
 				    struct ieee80211_neg_ttlm *neg_ttlm)
 {
-	u8 i, direction[IEEE80211_T2L_MAP_MAX_CNT];
+	u8 i, direction[IEEE80211_TTLM_MAX_CNT];
 
 	if (memcmp(neg_ttlm->downlink, neg_ttlm->uplink,
 		   sizeof(neg_ttlm->downlink))) {
-		direction[0] = IEEE80211_T2L_MAP_DIRECTION_DOWN;
-		direction[1] = IEEE80211_T2L_MAP_DIRECTION_UP;
+		direction[0] = IEEE80211_TTLM_DIRECTION_DOWN;
+		direction[1] = IEEE80211_TTLM_DIRECTION_UP;
 	} else {
-		direction[0] = IEEE80211_T2L_MAP_DIRECTION_BOTH;
+		direction[0] = IEEE80211_TTLM_DIRECTION_BOTH;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(direction); i++) {
 		u8 tid, len, map_ind = 0, *len_pos, *map_ind_pos, *pos;
 		__le16 map;
 
-		len = sizeof(struct ieee80211_t2l_map_elem) + 1 + 1;
+		len = sizeof(struct ieee80211_ttlm_elem) + 1 + 1;
 
 		pos = skb_put(skb, len + 2);
 		*pos++ = WLAN_EID_EXTENSION;
@@ -6626,7 +6622,7 @@ ieee80211_neg_t2l_add_suggested_map(struct sk_buff *skb,
 		*pos++ = direction[i];
 		map_ind_pos = pos++;
 		for (tid = 0; tid < IEEE80211_TTLM_NUM_TIDS; tid++) {
-			map = direction[i] == IEEE80211_T2L_MAP_DIRECTION_UP ?
+			map = direction[i] == IEEE80211_TTLM_DIRECTION_UP ?
 				cpu_to_le16(neg_ttlm->uplink[tid]) :
 				cpu_to_le16(neg_ttlm->downlink[tid]);
 			if (!map)
@@ -6640,7 +6636,7 @@ ieee80211_neg_t2l_add_suggested_map(struct sk_buff *skb,
 		*map_ind_pos = map_ind;
 		*len_pos = len;
 
-		if (direction[i] == IEEE80211_T2L_MAP_DIRECTION_BOTH)
+		if (direction[i] == IEEE80211_TTLM_DIRECTION_BOTH)
 			break;
 	}
 }
@@ -6654,7 +6650,7 @@ ieee80211_send_neg_ttlm_req(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_mgmt *mgmt;
 	struct sk_buff *skb;
 	int hdr_len = offsetofend(struct ieee80211_mgmt, u.action.u.ttlm_req);
-	int ttlm_max_len = 2 + 1 + sizeof(struct ieee80211_t2l_map_elem) + 1 +
+	int ttlm_max_len = 2 + 1 + sizeof(struct ieee80211_ttlm_elem) + 1 +
 		2 * 2 * IEEE80211_TTLM_NUM_TIDS;
 
 	skb = dev_alloc_skb(local->tx_headroom + hdr_len + ttlm_max_len);
@@ -6723,7 +6719,7 @@ ieee80211_send_neg_ttlm_res(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_mgmt *mgmt;
 	struct sk_buff *skb;
 	int hdr_len = offsetofend(struct ieee80211_mgmt, u.action.u.ttlm_res);
-	int ttlm_max_len = 2 + 1 + sizeof(struct ieee80211_t2l_map_elem) + 1 +
+	int ttlm_max_len = 2 + 1 + sizeof(struct ieee80211_ttlm_elem) + 1 +
 		2 * 2 * IEEE80211_TTLM_NUM_TIDS;
 
 	skb = dev_alloc_skb(local->tx_headroom + hdr_len + ttlm_max_len);
@@ -6765,7 +6761,7 @@ ieee80211_send_neg_ttlm_res(struct ieee80211_sub_if_data *sdata,
 
 static int
 ieee80211_parse_neg_ttlm(struct ieee80211_sub_if_data *sdata,
-			 const struct ieee80211_t2l_map_elem *ttlm,
+			 const struct ieee80211_ttlm_elem *ttlm,
 			 struct ieee80211_neg_ttlm *neg_ttlm,
 			 u8 *direction)
 {
@@ -6782,32 +6778,32 @@ ieee80211_parse_neg_ttlm(struct ieee80211_sub_if_data *sdata,
 	/* mapping switch time and expected duration fields are not expected
 	 * in case of negotiated TTLM
 	 */
-	if (control & (IEEE80211_T2L_MAP_CONTROL_SWITCH_TIME_PRESENT |
-		       IEEE80211_T2L_MAP_CONTROL_EXPECTED_DUR_PRESENT)) {
+	if (control & (IEEE80211_TTLM_CONTROL_SWITCH_TIME_PRESENT |
+		       IEEE80211_TTLM_CONTROL_EXPECTED_DUR_PRESENT)) {
 		mlme_dbg(sdata,
 			 "Invalid TTLM element in negotiated TTLM request\n");
 		return -EINVAL;
 	}
 
-	if (control & IEEE80211_T2L_MAP_CONTROL_DEF_LINK_MAP) {
+	if (control & IEEE80211_TTLM_CONTROL_DEF_LINK_MAP) {
 		for (tid = 0; tid < IEEE80211_TTLM_NUM_TIDS; tid++) {
 			neg_ttlm->downlink[tid] = sdata->vif.valid_links;
 			neg_ttlm->uplink[tid] = sdata->vif.valid_links;
 		}
-		*direction = IEEE80211_T2L_MAP_DIRECTION_BOTH;
+		*direction = IEEE80211_TTLM_DIRECTION_BOTH;
 		return 0;
 	}
 
-	*direction = u8_get_bits(control, IEEE80211_T2L_MAP_CONTROL_DIRECTION);
-	if (*direction != IEEE80211_T2L_MAP_DIRECTION_DOWN &&
-	    *direction != IEEE80211_T2L_MAP_DIRECTION_UP &&
-	    *direction != IEEE80211_T2L_MAP_DIRECTION_BOTH)
+	*direction = u8_get_bits(control, IEEE80211_TTLM_CONTROL_DIRECTION);
+	if (*direction != IEEE80211_TTLM_DIRECTION_DOWN &&
+	    *direction != IEEE80211_TTLM_DIRECTION_UP &&
+	    *direction != IEEE80211_TTLM_DIRECTION_BOTH)
 		return -EINVAL;
 
 	link_map_presence = *pos;
 	pos++;
 
-	if (control & IEEE80211_T2L_MAP_CONTROL_LINK_MAP_SIZE)
+	if (control & IEEE80211_TTLM_CONTROL_LINK_MAP_SIZE)
 		map_size = 1;
 	else
 		map_size = 2;
@@ -6816,7 +6812,7 @@ ieee80211_parse_neg_ttlm(struct ieee80211_sub_if_data *sdata,
 		u16 map;
 
 		if (link_map_presence & BIT(tid)) {
-			map = ieee80211_get_t2l_map(map_size, pos);
+			map = ieee80211_get_ttlm(map_size, pos);
 			if (!map) {
 				mlme_dbg(sdata,
 					 "No active links for TID %d", tid);
@@ -6827,14 +6823,14 @@ ieee80211_parse_neg_ttlm(struct ieee80211_sub_if_data *sdata,
 		}
 
 		switch (*direction) {
-		case IEEE80211_T2L_MAP_DIRECTION_BOTH:
+		case IEEE80211_TTLM_DIRECTION_BOTH:
 			neg_ttlm->downlink[tid] = map;
 			neg_ttlm->uplink[tid] = map;
 			break;
-		case IEEE80211_T2L_MAP_DIRECTION_DOWN:
+		case IEEE80211_TTLM_DIRECTION_DOWN:
 			neg_ttlm->downlink[tid] = map;
 			break;
-		case IEEE80211_T2L_MAP_DIRECTION_UP:
+		case IEEE80211_TTLM_DIRECTION_UP:
 			neg_ttlm->uplink[tid] = map;
 			break;
 		default:
@@ -6848,13 +6844,13 @@ ieee80211_parse_neg_ttlm(struct ieee80211_sub_if_data *sdata,
 void ieee80211_process_neg_ttlm_req(struct ieee80211_sub_if_data *sdata,
 				    struct ieee80211_mgmt *mgmt, size_t len)
 {
-	u8 dialog_token, direction[IEEE80211_T2L_MAP_MAX_CNT] = {}, i;
+	u8 dialog_token, direction[IEEE80211_TTLM_MAX_CNT] = {}, i;
 	size_t ies_len;
 	enum ieee80211_neg_ttlm_res ttlm_res = NEG_TTLM_RES_ACCEPT;
 	struct ieee802_11_elems *elems = NULL;
 	struct ieee80211_neg_ttlm neg_ttlm = {};
 
-	BUILD_BUG_ON(ARRAY_SIZE(direction) != ARRAY_SIZE(elems->t2l_map));
+	BUILD_BUG_ON(ARRAY_SIZE(direction) != ARRAY_SIZE(elems->ttlm));
 
 	if (!ieee80211_vif_is_mld(&sdata->vif))
 		return;
@@ -6869,18 +6865,18 @@ void ieee80211_process_neg_ttlm_req(struct ieee80211_sub_if_data *sdata,
 		goto out;
 	}
 
-	for (i = 0; i < elems->t2l_map_num; i++) {
-		if (ieee80211_parse_neg_ttlm(sdata, elems->t2l_map[i],
+	for (i = 0; i < elems->ttlm_num; i++) {
+		if (ieee80211_parse_neg_ttlm(sdata, elems->ttlm[i],
 					     &neg_ttlm, &direction[i]) ||
-		    (direction[i] == IEEE80211_T2L_MAP_DIRECTION_BOTH &&
-		     elems->t2l_map_num != 1)) {
+		    (direction[i] == IEEE80211_TTLM_DIRECTION_BOTH &&
+		     elems->ttlm_num != 1)) {
 			ttlm_res = NEG_TTLM_RES_REJECT;
 			goto out;
 		}
 	}
 
-	if (!elems->t2l_map_num ||
-	    (elems->t2l_map_num == 2 && direction[0] == direction[1])) {
+	if (!elems->ttlm_num ||
+	    (elems->ttlm_num == 2 && direction[0] == direction[1])) {
 		ttlm_res = NEG_TTLM_RES_REJECT;
 		goto out;
 	}
@@ -7581,7 +7577,7 @@ void ieee80211_sta_setup_sdata(struct ieee80211_sub_if_data *sdata)
 	timer_setup(&ifmgd->conn_mon_timer, ieee80211_sta_conn_mon_timer, 0);
 	wiphy_delayed_work_init(&ifmgd->tx_tspec_wk,
 				ieee80211_sta_handle_tspec_ac_params_wk);
-	wiphy_delayed_work_init(&ifmgd->t2l_map_work,
+	wiphy_delayed_work_init(&ifmgd->ttlm_work,
 				ieee80211_tid_to_link_map_work);
 	wiphy_delayed_work_init(&ifmgd->neg_ttlm_timeout_work,
 				ieee80211_neg_ttlm_timeout_work);
@@ -8696,7 +8692,7 @@ void ieee80211_mgd_stop(struct ieee80211_sub_if_data *sdata)
 				  &ifmgd->tdls_peer_del_work);
 	wiphy_delayed_work_cancel(sdata->local->hw.wiphy,
 				  &ifmgd->ml_reconf_work);
-	wiphy_delayed_work_cancel(sdata->local->hw.wiphy, &ifmgd->t2l_map_work);
+	wiphy_delayed_work_cancel(sdata->local->hw.wiphy, &ifmgd->ttlm_work);
 	wiphy_delayed_work_cancel(sdata->local->hw.wiphy,
 				  &ifmgd->neg_ttlm_timeout_work);
 

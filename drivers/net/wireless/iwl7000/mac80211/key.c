@@ -870,8 +870,10 @@ int ieee80211_key_link(struct ieee80211_key *key,
 		 * the same cipher. Enforce the assumption for pairwise keys.
 		 */
 		if ((alt_key && alt_key->conf.cipher != key->conf.cipher) ||
-		    (old_key && old_key->conf.cipher != key->conf.cipher))
-			return -EOPNOTSUPP;
+		    (old_key && old_key->conf.cipher != key->conf.cipher)) {
+			ret = -EOPNOTSUPP;
+			goto out;
+		}
 	} else if (sta) {
 		struct link_sta_info *link_sta = &sta->deflink;
 		int link_id = key->conf.link_id;
@@ -879,8 +881,10 @@ int ieee80211_key_link(struct ieee80211_key *key,
 		if (link_id >= 0) {
 			link_sta = rcu_dereference_protected(sta->link[link_id],
 							     lockdep_is_held(&sta->local->hw.wiphy->mtx));
-			if (!link_sta)
-				return -ENOLINK;
+			if (!link_sta) {
+				ret = -ENOLINK;
+				goto out;
+			}
 		}
 
 		old_key = wiphy_dereference(sdata->local->hw.wiphy,
@@ -896,8 +900,10 @@ int ieee80211_key_link(struct ieee80211_key *key,
 
 	/* Non-pairwise keys must also not switch the cipher on rekey */
 	if (!pairwise) {
-		if (old_key && old_key->conf.cipher != key->conf.cipher)
-			return -EOPNOTSUPP;
+		if (old_key && old_key->conf.cipher != key->conf.cipher) {
+			ret = -EOPNOTSUPP;
+			goto out;
+		}
 	}
 
 	/*
@@ -905,8 +911,8 @@ int ieee80211_key_link(struct ieee80211_key *key,
 	 * new version of the key to avoid nonce reuse or replay issues.
 	 */
 	if (ieee80211_key_identical(sdata, old_key, key)) {
-		ieee80211_key_free_unused(key);
-		return 0;
+		ret = -EALREADY;
+		goto out;
 	}
 
 	key->local = sdata->local;
@@ -930,6 +936,10 @@ int ieee80211_key_link(struct ieee80211_key *key,
 		ieee80211_key_free(key, delay_tailroom);
 	}
 
+	key = NULL;
+
+out:
+	ieee80211_key_free_unused(key);
 	return ret;
 }
 

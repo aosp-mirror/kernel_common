@@ -307,6 +307,13 @@ static inline u16 ieee80211_sn_sub(u16 sn1, u16 sn2)
 #define IEEE80211_TRIGGER_TYPE_BQRP		0x6
 #define IEEE80211_TRIGGER_TYPE_NFRP		0x7
 
+/* UL-bandwidth within common_info of trigger frame */
+#define IEEE80211_TRIGGER_ULBW_MASK		0xc0000
+#define IEEE80211_TRIGGER_ULBW_20MHZ		0x0
+#define IEEE80211_TRIGGER_ULBW_40MHZ		0x1
+#define IEEE80211_TRIGGER_ULBW_80MHZ		0x2
+#define IEEE80211_TRIGGER_ULBW_160_80P80MHZ	0x3
+
 struct ieee80211_hdr {
 	__le16 frame_control;
 	__le16 duration_id;
@@ -951,17 +958,24 @@ struct ieee80211_wide_bw_chansw_ie {
  * @dtim_count: DTIM Count
  * @dtim_period: DTIM Period
  * @bitmap_ctrl: Bitmap Control
+ * @required_octet: "Syntatic sugar" to force the struct size to the
+ *                  minimum valid size when carried in a non-S1G PPDU
  * @virtual_map: Partial Virtual Bitmap
  *
  * This structure represents the payload of the "TIM element" as
- * described in IEEE Std 802.11-2020 section 9.4.2.5.
+ * described in IEEE Std 802.11-2020 section 9.4.2.5. Note that this
+ * definition is only applicable when the element is carried in a
+ * non-S1G PPDU. When the TIM is carried in an S1G PPDU, the Bitmap
+ * Control and Partial Virtual Bitmap may not be present.
  */
 struct ieee80211_tim_ie {
 	u8 dtim_count;
 	u8 dtim_period;
 	u8 bitmap_ctrl;
-	/* variable size: 1 - 251 bytes */
-	u8 virtual_map[1];
+	union {
+		u8 required_octet;
+		DECLARE_FLEX_ARRAY(u8, virtual_map);
+	};
 } __packed;
 
 /**
@@ -1239,19 +1253,26 @@ struct ieee80211_twt_setup {
 	u8 params[];
 } __packed;
 
-#define IEEE80211_T2L_MAP_MAX_CNT			2
-#define IEEE80211_T2L_MAP_CONTROL_DIRECTION		0x03
-#define IEEE80211_T2L_MAP_CONTROL_DEF_LINK_MAP		0x04
-#define IEEE80211_T2L_MAP_CONTROL_SWITCH_TIME_PRESENT	0x08
-#define IEEE80211_T2L_MAP_CONTROL_EXPECTED_DUR_PRESENT	0x10
-#define IEEE80211_T2L_MAP_CONTROL_LINK_MAP_SIZE		0x20
+#define IEEE80211_TTLM_MAX_CNT				2
+#define IEEE80211_TTLM_CONTROL_DIRECTION		0x03
+#define IEEE80211_TTLM_CONTROL_DEF_LINK_MAP		0x04
+#define IEEE80211_TTLM_CONTROL_SWITCH_TIME_PRESENT	0x08
+#define IEEE80211_TTLM_CONTROL_EXPECTED_DUR_PRESENT	0x10
+#define IEEE80211_TTLM_CONTROL_LINK_MAP_SIZE		0x20
 
-#define IEEE80211_T2L_MAP_DIRECTION_DOWN		0
-#define IEEE80211_T2L_MAP_DIRECTION_UP			1
-#define IEEE80211_T2L_MAP_DIRECTION_BOTH		2
+#define IEEE80211_TTLM_DIRECTION_DOWN		0
+#define IEEE80211_TTLM_DIRECTION_UP		1
+#define IEEE80211_TTLM_DIRECTION_BOTH		2
 
-struct ieee80211_t2l_map_elem {
-	/* the second part of control field is in optional[] */
+/**
+ * struct ieee80211_ttlm_elem - TID-To-Link Mapping element
+ *
+ * Defined in section 9.4.2.314 in P802.11be_D4
+ *
+ * @control: the first part of control field
+ * @optional: the second part of control field
+ */
+struct ieee80211_ttlm_elem {
 	u8 control;
 	u8 optional[];
 } __packed;
@@ -4523,12 +4544,11 @@ static inline bool ieee80211_check_tim(const struct ieee80211_tim_ie *tim,
 /**
  * ieee80211_get_tdls_action - get tdls packet action (or -1, if not tdls packet)
  * @skb: the skb containing the frame, length will not be checked
- * @hdr_size: the size of the ieee80211_hdr that starts at skb->data
  *
  * This function assumes the frame is a data frame, and that the network header
  * is in the correct place.
  */
-static inline int ieee80211_get_tdls_action(struct sk_buff *skb, u32 hdr_size)
+static inline int ieee80211_get_tdls_action(struct sk_buff *skb)
 {
 	if (!skb_is_nonlinear(skb) &&
 	    skb->len > (skb_network_offset(skb) + 2)) {
@@ -5264,7 +5284,7 @@ static inline bool ieee80211_mle_reconf_sta_prof_size_ok(const u8 *data,
 
 static inline bool ieee80211_tid_to_link_map_size_ok(const u8 *data, size_t len)
 {
-	const struct ieee80211_t2l_map_elem *t2l = (const void *)data;
+	const struct ieee80211_ttlm_elem *t2l = (const void *)data;
 	u8 control, fixed = sizeof(*t2l), elem_len = 0;
 
 	if (len < fixed)
@@ -5272,19 +5292,19 @@ static inline bool ieee80211_tid_to_link_map_size_ok(const u8 *data, size_t len)
 
 	control = t2l->control;
 
-	if (control & IEEE80211_T2L_MAP_CONTROL_SWITCH_TIME_PRESENT)
+	if (control & IEEE80211_TTLM_CONTROL_SWITCH_TIME_PRESENT)
 		elem_len += 2;
-	if (control & IEEE80211_T2L_MAP_CONTROL_EXPECTED_DUR_PRESENT)
+	if (control & IEEE80211_TTLM_CONTROL_EXPECTED_DUR_PRESENT)
 		elem_len += 3;
 
-	if (!(control & IEEE80211_T2L_MAP_CONTROL_DEF_LINK_MAP)) {
+	if (!(control & IEEE80211_TTLM_CONTROL_DEF_LINK_MAP)) {
 		u8 bm_size;
 
 		elem_len += 1;
 		if (len < fixed + elem_len)
 			return false;
 
-		if (control & IEEE80211_T2L_MAP_CONTROL_LINK_MAP_SIZE)
+		if (control & IEEE80211_TTLM_CONTROL_LINK_MAP_SIZE)
 			bm_size = 1;
 		else
 			bm_size = 2;
