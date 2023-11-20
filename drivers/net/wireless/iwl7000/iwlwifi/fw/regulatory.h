@@ -94,9 +94,15 @@ struct iwl_ppag_chain {
 	s8 subbands[BIOS_SAR_MAX_SUB_BANDS_NUM];
 };
 
-struct iwl_fw_runtime;
+struct iwl_tas_data {
+	__le32 block_list_size;
+	__le32 block_list_array[IWL_WTAS_BLACK_LIST_MAX];
+	u8 override_tas_iec;
+	u8 enable_tas_iec;
+	u8 usa_tas_uhb_allowed;
+};
 
-union iwl_tas_config_cmd;
+struct iwl_fw_runtime;
 
 /* Print the PPAG table as read from BIOS */
 void iwl_bios_print_ppag(struct iwl_fw_runtime *fwrt);
@@ -120,7 +126,7 @@ bool iwl_is_ppag_approved(struct iwl_fw_runtime *fwrt);
 bool iwl_is_tas_approved(void);
 
 int iwl_parse_tas_selection(struct iwl_fw_runtime *fwrt,
-			    union iwl_tas_config_cmd *cmd, int fw_ver,
+			    struct iwl_tas_data *tas_data,
 			    const u32 tas_selection);
 
 int iwl_bios_get_wrds_table(struct iwl_fw_runtime *fwrt);
