@@ -932,6 +932,93 @@ static int iwl_xvt_sar_geo_init(struct iwl_xvt *xvt)
 
 	return iwl_xvt_send_cmd_pdu(xvt, cmd_id, 0, len, &cmd);
 }
+
+void iwl_xvt_lari_cfg(struct iwl_xvt *xvt)
+{
+	int ret;
+	u32 value;
+	struct iwl_lari_config_change_cmd_v7 cmd = {};
+	u8 cmd_ver = iwl_fw_lookup_cmd_ver(xvt->fw,
+					   WIDE_ID(REGULATORY_AND_NVM_GROUP,
+						   LARI_CONFIG_CHANGE), 1);
+
+	cmd.config_bitmap = iwl_acpi_get_lari_config_bitmap(&xvt->fwrt);
+
+	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
+				   DSM_FUNC_ENABLE_UNII4_CHAN,
+				   &iwl_guid, &value);
+	if (!ret)
+		cmd.oem_unii4_allow_bitmap = cpu_to_le32(value);
+
+	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
+				   DSM_FUNC_ACTIVATE_CHANNEL,
+				   &iwl_guid, &value);
+	if (!ret) {
+		if (cmd_ver < 8)
+			value &= ~ACTIVATE_5G2_IN_WW_MASK;
+		cmd.chan_state_active_bitmap = cpu_to_le32(value);
+	}
+
+	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
+				   DSM_FUNC_ENERGY_DETECTION_THRESHOLD,
+				   &iwl_guid, &value);
+	if (!ret)
+		cmd.edt_bitmap = cpu_to_le32(value);
+
+	if (cmd.config_bitmap ||
+	    cmd.oem_uhb_allow_bitmap ||
+	    cmd.oem_unii4_allow_bitmap ||
+	    cmd.edt_bitmap) {
+		size_t cmd_size;
+
+		switch (cmd_ver) {
+		case 8:
+		case 7:
+			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v7);
+			break;
+		case 6:
+			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v6);
+			break;
+		case 5:
+			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v5);
+			break;
+		case 4:
+			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v4);
+			break;
+		case 3:
+			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v3);
+			break;
+		case 2:
+			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v2);
+			break;
+		default:
+			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v1);
+			break;
+		}
+
+		IWL_DEBUG_RADIO(xvt,
+				"sending LARI_CONFIG_CHANGE, config_bitmap=0x%x, oem_11ax_allow_bitmap=0x%x\n",
+				le32_to_cpu(cmd.config_bitmap),
+				le32_to_cpu(cmd.oem_11ax_allow_bitmap));
+		IWL_DEBUG_RADIO(xvt,
+				"sending LARI_CONFIG_CHANGE, oem_unii4_allow_bitmap=0x%x, chan_state_active_bitmap=0x%x, cmd_ver=%d\n",
+				le32_to_cpu(cmd.oem_unii4_allow_bitmap),
+				le32_to_cpu(cmd.chan_state_active_bitmap),
+				cmd_ver);
+		IWL_DEBUG_RADIO(xvt,
+				"sending LARI_CONFIG_CHANGE, edt_bitmap=0x%x\n",
+				le32_to_cpu(cmd.edt_bitmap));
+
+		ret = iwl_xvt_send_cmd_pdu(xvt,
+					   WIDE_ID(REGULATORY_AND_NVM_GROUP,
+						   LARI_CONFIG_CHANGE),
+					0, cmd_size, &cmd);
+
+		if (ret < 0)
+			IWL_DEBUG_RADIO(xvt, "Failed to send LARI_CONFIG_CHANGE (%d)\n",
+					ret);
+	}
+}
 #else /* CONFIG_ACPI */
 static int iwl_xvt_sar_geo_init(struct iwl_xvt *xvt)
 {
@@ -941,7 +1028,6 @@ static int iwl_xvt_sar_geo_init(struct iwl_xvt *xvt)
 void iwl_xvt_lari_cfg(struct iwl_xvt *xvt)
 {
 }
-
 #endif /* CONFIG_ACPI */
 
 int iwl_xvt_sar_select_profile(struct iwl_xvt *xvt, int prof_a, int prof_b)
@@ -1122,91 +1208,4 @@ void iwl_xvt_txpath_flush_send_cmd(struct iwl_xvt *xvt, u32 sta_id, u16 tids)
 	}
 
 	iwl_xvt_txpath_flush(xvt, cmd.resp_pkt);
-}
-
-void iwl_xvt_lari_cfg(struct iwl_xvt *xvt)
-{
-	int ret;
-	u32 value;
-	struct iwl_lari_config_change_cmd_v7 cmd = {};
-	u8 cmd_ver = iwl_fw_lookup_cmd_ver(xvt->fw,
-					   WIDE_ID(REGULATORY_AND_NVM_GROUP,
-						   LARI_CONFIG_CHANGE), 1);
-
-	cmd.config_bitmap = iwl_acpi_get_lari_config_bitmap(&xvt->fwrt);
-
-	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
-				   DSM_FUNC_ENABLE_UNII4_CHAN,
-				   &iwl_guid, &value);
-	if (!ret)
-		cmd.oem_unii4_allow_bitmap = cpu_to_le32(value);
-
-	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
-				   DSM_FUNC_ACTIVATE_CHANNEL,
-				   &iwl_guid, &value);
-	if (!ret) {
-		if (cmd_ver < 8)
-			value &= ~ACTIVATE_5G2_IN_WW_MASK;
-		cmd.chan_state_active_bitmap = cpu_to_le32(value);
-	}
-
-	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
-				   DSM_FUNC_ENERGY_DETECTION_THRESHOLD,
-				   &iwl_guid, &value);
-	if (!ret)
-		cmd.edt_bitmap = cpu_to_le32(value);
-
-	if (cmd.config_bitmap ||
-	    cmd.oem_uhb_allow_bitmap ||
-	    cmd.oem_unii4_allow_bitmap ||
-	    cmd.edt_bitmap) {
-		size_t cmd_size;
-
-		switch (cmd_ver) {
-		case 8:
-		case 7:
-			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v7);
-			break;
-		case 6:
-			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v6);
-			break;
-		case 5:
-			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v5);
-			break;
-		case 4:
-			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v4);
-			break;
-		case 3:
-			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v3);
-			break;
-		case 2:
-			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v2);
-			break;
-		default:
-			cmd_size = sizeof(struct iwl_lari_config_change_cmd_v1);
-			break;
-		}
-
-		IWL_DEBUG_RADIO(xvt,
-				"sending LARI_CONFIG_CHANGE, config_bitmap=0x%x, oem_11ax_allow_bitmap=0x%x\n",
-				le32_to_cpu(cmd.config_bitmap),
-				le32_to_cpu(cmd.oem_11ax_allow_bitmap));
-		IWL_DEBUG_RADIO(xvt,
-				"sending LARI_CONFIG_CHANGE, oem_unii4_allow_bitmap=0x%x, chan_state_active_bitmap=0x%x, cmd_ver=%d\n",
-				le32_to_cpu(cmd.oem_unii4_allow_bitmap),
-				le32_to_cpu(cmd.chan_state_active_bitmap),
-				cmd_ver);
-		IWL_DEBUG_RADIO(xvt,
-				"sending LARI_CONFIG_CHANGE, edt_bitmap=0x%x\n",
-				le32_to_cpu(cmd.edt_bitmap));
-
-		ret = iwl_xvt_send_cmd_pdu(xvt,
-					   WIDE_ID(REGULATORY_AND_NVM_GROUP,
-						   LARI_CONFIG_CHANGE),
-					0, cmd_size, &cmd);
-
-		if (ret < 0)
-			IWL_DEBUG_RADIO(xvt, "Failed to send LARI_CONFIG_CHANGE (%d)\n",
-					ret);
-	}
 }
