@@ -2035,8 +2035,6 @@ void *thermal_zone_device_priv(struct thermal_zone_device *tzd);
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,3,0)
-bool ieee80211_valid_disable_subchannel_bitmap(u16 *bitmap,
-					       enum nl80211_chan_width bw);
 bool cfg80211_valid_disable_subchannel_bitmap(u16 *bitmap,
 					      struct cfg80211_chan_def *chandef);
 #define ieee80211_amsdu_to_8023s(skb, list, addr, type, headroom, check_sa, check_da, mesh) \

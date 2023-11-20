@@ -256,8 +256,8 @@ static const struct ieee80211_per_bw_puncturing_values per_bw_puncturing[] = {
 	IEEE80211_PER_BW_VALID_PUNCTURING_VALUES(320)
 };
 
-bool ieee80211_valid_disable_subchannel_bitmap(u16 *bitmap,
-					       enum nl80211_chan_width bw)
+static bool
+ieee80211_valid_disable_subchannel_bitmap(u16 *bitmap, enum nl80211_chan_width bw)
 {
 	u32 idx, i;
 
