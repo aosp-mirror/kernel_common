@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (C) 2021 The Android Open Source Project
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
@@ -607,6 +608,12 @@ _KUNIT_CLK_MODULES = [
     "drivers/clk/clk_test.ko",
 ]
 
+_KUNIT_X86_64_MODULES = _KUNIT_COMMON_MODULES
+
+_KUNIT_ARM64_MODULES = _KUNIT_COMMON_MODULES + _KUNIT_CLK_MODULES
+
+_KUNIT_RISCV64_MODULES = _KUNIT_COMMON_MODULES + _KUNIT_CLK_MODULES
+
 kernel_build(
     name = "kunit_aarch64",
     srcs = [":kernel_aarch64_sources"],
@@ -619,7 +626,7 @@ kernel_build(
         "tools/testing/kunit/configs/android/kunit_clk_defconfig",
     ],
     make_goals = ["modules"],
-    module_outs = _KUNIT_COMMON_MODULES + _KUNIT_CLK_MODULES,
+    module_outs = _KUNIT_ARM64_MODULES,
 )
 
 copy_to_dist_dir(
@@ -642,7 +649,7 @@ kernel_build(
         # x86_64 does not set CONFIG_COMMON_CLK
     ],
     make_goals = ["modules"],
-    module_outs = _KUNIT_COMMON_MODULES,
+    module_outs = _KUNIT_X86_64_MODULES,
 )
 
 copy_to_dist_dir(
@@ -665,7 +672,7 @@ kernel_build(
         "tools/testing/kunit/configs/android/kunit_clk_defconfig",
     ],
     make_goals = ["modules"],
-    module_outs = _KUNIT_COMMON_MODULES + _KUNIT_CLK_MODULES,
+    module_outs = _KUNIT_RISCV64_MODULES,
 )
 
 copy_to_dist_dir(
@@ -674,6 +681,55 @@ copy_to_dist_dir(
     dist_dir = "out/kunit_riscv64/dist",
     flat = True,
     log = "info",
+)
+
+_KUNIT_DIR = "testcases/kunit"
+
+[
+    copy_file(
+        name = "_x86_64_{}_copy".format(m),
+        src = ":kunit_x86_64/{}".format(m),
+        out = paths.join(_KUNIT_DIR, "x86_64", m),
+        visibility = ["//visibility:private"],
+    )
+    for m in _KUNIT_X86_64_MODULES
+]
+
+[
+    copy_file(
+        name = "_arm64_{}_copy".format(m),
+        src = ":kunit_aarch64/{}".format(m),
+        out = paths.join(_KUNIT_DIR, "arm64", m),
+        visibility = ["//visibility:private"],
+    )
+    for m in _KUNIT_ARM64_MODULES
+]
+
+copy_file(
+    name = "kunit_gen_config",
+    src = select(
+        {
+            ":x86_64": "tools/testing/kunit/android/config_x86_64.xml",
+            ":arm64": "tools/testing/kunit/android/config_arm64.xml",
+        },
+        no_match_error = "Unsupported arch for kunit_gen_config",
+    ),
+    out = paths.join(_KUNIT_DIR, "kunit.config"),
+    visibility = ["//visibility:private"],
+)
+
+android_filegroup(
+    name = "kunit_tests_x86_64",
+    srcs = [":kunit_gen_config"] + [":_x86_64_{}_copy".format(m) for m in _KUNIT_X86_64_MODULES],
+    cpu = "x86_64",
+    visibility = ["//visibility:private"],
+)
+
+android_filegroup(
+    name = "kunit_tests_arm64",
+    srcs = [":kunit_gen_config"] + [":_arm64_{}_copy".format(m) for m in _KUNIT_ARM64_MODULES],
+    cpu = "arm64",
+    visibility = ["//visibility:private"],
 )
 
 # DDK Headers
@@ -1059,12 +1115,18 @@ android_filegroup(
 
 zip_archive(
     name = "tests_zip_x86_64",
-    srcs = [":kselftest_tests_x86_64"],
+    srcs = [
+        ":kselftest_tests_x86_64",
+        ":kunit_tests_x86_64",
+    ],
     out = "tests.zip",
 )
 
 zip_archive(
     name = "tests_zip_arm64",
-    srcs = [":kselftest_tests_arm64"],
+    srcs = [
+        ":kselftest_tests_arm64",
+        ":kunit_tests_arm64",
+    ],
     out = "tests.zip",
 )
