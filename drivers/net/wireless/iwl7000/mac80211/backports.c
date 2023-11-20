@@ -219,12 +219,6 @@ EXPORT_SYMBOL_GPL(thermal_zone_device_priv);
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,1,0)
-/*
- * How many Beacon frames need to have been used in average signal strength
- * before starting to indicate signal change events.
- */
-#define IEEE80211_SIGNAL_AVE_MIN_COUNT	4
-
 struct ieee80211_per_bw_puncturing_values {
 	u8 len;
 	const u16 *valid_values;
