@@ -13,7 +13,6 @@ config IWL7000
 
 	# things mac80211 selects
 	select CRYPTO
-	select CRYPTO_ARC4
 	select CRYPTO_AES
 	select CRYPTO_CCM
 	select CRC32
