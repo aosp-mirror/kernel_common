@@ -4984,7 +4984,7 @@ void ieee80211_color_collision_detection_work(struct work_struct *work)
 			     color_collision_detect_work);
 	struct ieee80211_sub_if_data *sdata = link->sdata;
 
-#if CFG80211_VERSION >= KERNEL_VERSION(5,19,0) && CFG80211_VERSION < KERNEL_VERSION(6,3,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(5,19,0) && CFG80211_VERSION < KERNEL_VERSION(6,1,0)
 	cfg80211_obss_color_collision_notify(sdata->dev, link->color_bitmap, GFP_ATOMIC);
 #elif CFG80211_VERSION >= KERNEL_VERSION(5,15,0)
 	cfg80211_obss_color_collision_notify(sdata->dev, link->color_bitmap);

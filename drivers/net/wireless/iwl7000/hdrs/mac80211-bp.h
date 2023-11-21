@@ -1313,17 +1313,7 @@ LINUX_BACKPORT(cfg80211_ch_switch_started_notify)(struct net_device *dev,
 	cfg80211_ch_switch_started_notify(dev, chandef, count, quiet);
 }
 #define cfg80211_ch_switch_started_notify LINUX_BACKPORT(cfg80211_ch_switch_started_notify)
-#elif CFG80211_VERSION < KERNEL_VERSION(6,3,0)
-static inline void
-LINUX_BACKPORT(cfg80211_ch_switch_started_notify)(struct net_device *dev,
-						  struct cfg80211_chan_def *chandef,
-						  unsigned int link_id, u8 count,
-						  bool quiet, u16 punct_bitmap)
-{
-	cfg80211_ch_switch_started_notify(dev, chandef, link_id, count, quiet);
-}
-#define cfg80211_ch_switch_started_notify LINUX_BACKPORT(cfg80211_ch_switch_started_notify)
-#endif /* < 6.3.0 */
+#endif /* < 6.1.0 */
 
 #ifndef ETH_TLEN
 #define ETH_TLEN	2		/* Octets in ethernet type field */
@@ -1818,9 +1808,7 @@ struct cfg80211_set_hw_timestamp {
 #define set_hw_timestamp_max_peers(hw, val)	(hw)->wiphy->hw_timestamp_max_peers = val
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,3,0) & CFG80211_VERSION >= KERNEL_VERSION(6,0,0)
-#define cfg80211_ch_switch_notify(dev, chandef, link_id, punct_bitmap) cfg80211_ch_switch_notify(dev, chandef, link_id)
-#elif CFG80211_VERSION < KERNEL_VERSION(6,0,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,0,0)
 #define cfg80211_ch_switch_notify(dev, chandef, link_id, punct_bitmap) cfg80211_ch_switch_notify(dev, chandef)
 #endif
 
@@ -1988,7 +1976,7 @@ iwl7000_cfg80211_rx_control_port(struct net_device *dev, struct sk_buff *skb,
 #define cfg80211_rx_control_port iwl7000_cfg80211_rx_control_port
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,2,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,1,0)
 #define cfg80211_txq_params_link_id(params)			0
 #define cfg80211_bss_params_link_id(params)			-1
 #else
@@ -2034,11 +2022,9 @@ void *thermal_zone_device_priv(struct thermal_zone_device *tzd);
 #endif
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,3,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,1,0)
 bool cfg80211_valid_disable_subchannel_bitmap(u16 *bitmap,
 					      struct cfg80211_chan_def *chandef);
-#define ieee80211_amsdu_to_8023s(skb, list, addr, type, headroom, check_sa, check_da, mesh) \
-	ieee80211_amsdu_to_8023s(skb, list, addr, type, headroom, check_sa, check_da)
 #endif /* < 6.3  */
 
 #if LINUX_VERSION_IS_LESS(6,4,0)
@@ -2074,7 +2060,7 @@ _ieee80211_set_sband_iftype_data(struct ieee80211_supported_band *sband,
 #endif
 }
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,1,0)
 struct wiphy_work;
 typedef void (*wiphy_work_func_t)(struct wiphy *, struct wiphy_work *);
 

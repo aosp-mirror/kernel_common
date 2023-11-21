@@ -218,7 +218,7 @@ EXPORT_SYMBOL_GPL(thermal_zone_device_priv);
 #endif /* < 6.4 */
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,3,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,1,0)
 /*
  * How many Beacon frames need to have been used in average signal strength
  * before starting to indicate signal change events.
