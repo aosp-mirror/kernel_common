@@ -20,8 +20,6 @@
 
 #include "version.h"
 
-#define BACKPORTS_BUILD_TSTAMP __DATE__ " " __TIME__
-
 /* Dummy RHEL macros */
 #define RHEL_RELEASE_CODE 0
 #define RHEL_RELEASE_VERSION(a,b) 1

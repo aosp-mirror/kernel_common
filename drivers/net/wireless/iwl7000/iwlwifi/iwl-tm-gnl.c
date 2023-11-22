@@ -380,8 +380,6 @@ static int iwl_tm_gnl_get_build_info(struct iwl_trans *trans,
 	strncpy(resp->branch_time, BACKPORTS_BRANCH_TSTAMP,
 		sizeof(resp->branch_time));
 #endif
-	strncpy(resp->build_time, BACKPORTS_BUILD_TSTAMP,
-		sizeof(resp->build_time));
 
 	return 0;
 }
