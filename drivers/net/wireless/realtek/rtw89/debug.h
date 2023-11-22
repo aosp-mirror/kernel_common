@@ -73,6 +73,12 @@ static inline void rtw89_hex_dump(struct rtw89_dev *rtwdev,
 
 	print_hex_dump_bytes(prefix_str, DUMP_PREFIX_OFFSET, buf, len);
 }
+
+static inline bool rtw89_debug_is_enabled(struct rtw89_dev *rtwdev,
+					  enum rtw89_debug_mask mask)
+{
+	return !!(rtw89_debug_mask & mask);
+}
 #else
 static inline void rtw89_debug(struct rtw89_dev *rtwdev,
 			       enum rtw89_debug_mask mask,
@@ -81,6 +87,11 @@ static inline void rtw89_hex_dump(struct rtw89_dev *rtwdev,
 				  enum rtw89_debug_mask mask,
 				  const char *prefix_str,
 				  const void *buf, size_t len) {}
+static inline bool rtw89_debug_is_enabled(struct rtw89_dev *rtwdev,
+					  enum rtw89_debug_mask mask)
+{
+	return false;
+}
 #endif
 
 #endif
