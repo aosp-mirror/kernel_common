@@ -1151,7 +1151,7 @@ static int iwl_xvt_ppag_send_cmd(struct iwl_xvt *xvt)
 	union iwl_ppag_table_cmd cmd;
 	int ret, cmd_size;
 
-	ret = iwl_read_ppag_table(&xvt->fwrt, &cmd, &cmd_size);
+	ret = iwl_fill_ppag_table(&xvt->fwrt, &cmd, &cmd_size);
 	if (ret < 0)
 		return ret;
 
