@@ -1177,7 +1177,7 @@ int iwl_xvt_init_ppag_tables(struct iwl_xvt *xvt)
 				ret);
 	}
 
-	if (!(iwl_acpi_is_ppag_approved(&xvt->fwrt)))
+	if (!(iwl_is_ppag_approved(&xvt->fwrt)))
 		return 0;
 
 	return iwl_xvt_ppag_send_cmd(xvt);
