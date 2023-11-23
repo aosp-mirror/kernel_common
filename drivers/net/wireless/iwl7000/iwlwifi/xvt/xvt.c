@@ -1153,7 +1153,7 @@ static int iwl_xvt_ppag_send_cmd(struct iwl_xvt *xvt)
 
 	ret = iwl_fill_ppag_table(&xvt->fwrt, &cmd, &cmd_size);
 	if (ret < 0)
-		return ret;
+		return 0;
 
 	IWL_DEBUG_RADIO(xvt, "Sending PER_PLATFORM_ANT_GAIN_CMD\n");
 	ret = iwl_xvt_send_cmd_pdu(xvt, WIDE_ID(PHY_OPS_GROUP,
@@ -1175,6 +1175,7 @@ int iwl_xvt_init_ppag_tables(struct iwl_xvt *xvt)
 		IWL_DEBUG_RADIO(xvt,
 				"PPAG BIOS table invalid or unavailable. (%d)\n",
 				ret);
+		return 0;
 	}
 
 	if (!(iwl_is_ppag_approved(&xvt->fwrt)))
