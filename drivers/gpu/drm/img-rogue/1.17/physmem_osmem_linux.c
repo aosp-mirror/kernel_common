@@ -3552,29 +3552,14 @@ PMRChangeSparseMemOSMem(PMR_IMPL_PRIVDATA pPriv,
 			goto e0;
 		}
 
-		if (SPARSE_REMAP_MEM != (uiFlags & SPARSE_REMAP_MEM))
+		if ((NULL != psPageArray[uiAllocpgidx]) ||
+		    (TRANSLATION_INVALID != psPMRMapTable->aui32Translation[uiAllocpgidx]))
 		{
-			if ((NULL != psPageArray[uiAllocpgidx]) ||
-			    (TRANSLATION_INVALID != psPMRMapTable->aui32Translation[uiAllocpgidx]))
-			{
-				eError = PVRSRV_ERROR_INVALID_PARAMS;
-				PVR_DPF((PVR_DBG_ERROR,
-				         "%s: Trying to allocate already allocated page again",
-				         __func__));
-				goto e0;
-			}
-		}
-		else
-		{
-			if ((NULL == psPageArray[uiAllocpgidx]) ||
-			    (TRANSLATION_INVALID == psPMRMapTable->aui32Translation[uiAllocpgidx]) )
-			{
-				eError = PVRSRV_ERROR_INVALID_PARAMS;
-				PVR_DPF((PVR_DBG_ERROR,
-				         "%s: Unable to remap memory due to missing page",
-				         __func__));
-				goto e0;
-			}
+			eError = PVRSRV_ERROR_INVALID_PARAMS;
+			PVR_DPF((PVR_DBG_ERROR,
+			         "%s: Trying to allocate already allocated page again",
+			         __func__));
+			goto e0;
 		}
 	}
 
@@ -3620,30 +3605,13 @@ PMRChangeSparseMemOSMem(PMR_IMPL_PRIVDATA pPriv,
 			psDMAPhysArray[uiAllocpgidx] = psDMAPhysArray[uiFreepgidx];
 		}
 
-		/* Is remap mem used in real world scenario? Should it be turned to a
-		 *  debug feature? The condition check needs to be out of loop, will be
-		 *  done at later point though after some analysis */
-		if (SPARSE_REMAP_MEM != (uiFlags & SPARSE_REMAP_MEM))
+		psPMRMapTable->aui32Translation[uiFreepgidx] = TRANSLATION_INVALID;
+		psPMRMapTable->aui32Translation[uiAllocpgidx] = uiAllocpgidx;
+		psPageArray[uiFreepgidx] = NULL;
+		if (bCMA)
 		{
-			psPMRMapTable->aui32Translation[uiFreepgidx] = TRANSLATION_INVALID;
-			psPMRMapTable->aui32Translation[uiAllocpgidx] = uiAllocpgidx;
-			psPageArray[uiFreepgidx] = NULL;
-			if (bCMA)
-			{
-				psDMAVirtArray[uiFreepgidx] = NULL;
-				psDMAPhysArray[uiFreepgidx] = (dma_addr_t)0;
-			}
-		}
-		else
-		{
-			psPMRMapTable->aui32Translation[uiFreepgidx] = uiFreepgidx;
-			psPMRMapTable->aui32Translation[uiAllocpgidx] = uiAllocpgidx;
-			psPageArray[uiFreepgidx] = psPage;
-			if (bCMA)
-			{
-				psDMAVirtArray[uiFreepgidx] = pvDMAVAddr;
-				psDMAPhysArray[uiFreepgidx] = psDMAPAddr;
-			}
+			psDMAVirtArray[uiFreepgidx] = NULL;
+			psDMAPhysArray[uiFreepgidx] = (dma_addr_t)0;
 		}
 	}
 
