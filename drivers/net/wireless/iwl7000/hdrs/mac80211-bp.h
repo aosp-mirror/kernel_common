@@ -2159,7 +2159,7 @@ static inline void backport_led_trigger_blink(struct led_trigger *trigger,
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,8,0)
-static inline void cfg80211_schedule_channels_check(struct net_device *netdev)
+static inline void cfg80211_schedule_channels_check(struct wireless_dev *wdev)
 {
 }
 #define NL80211_EXT_FEATURE_DFS_CONCURRENT -1
