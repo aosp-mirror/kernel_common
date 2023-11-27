@@ -5052,7 +5052,8 @@ static inline u16 ieee80211_mle_get_eml_cap(const u8 *data)
  * The element is assumed to be of the correct type (BASIC) and big enough,
  * this must be checked using ieee80211_mle_type_ok().
  *
- * If the MLD capabilies and operations is not present, 0 will be returned.
+ * If the MLD capabilities and operations field is not present, 0 will be
+ * returned.
  */
 static inline u16 ieee80211_mle_get_mld_capa_op(const u8 *data)
 {
