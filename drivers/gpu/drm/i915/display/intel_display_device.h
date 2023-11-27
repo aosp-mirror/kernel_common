@@ -50,7 +50,7 @@ struct drm_printer;
 #define HAS_DSC_MST(__i915)		(DISPLAY_VER(__i915) >= 12 && HAS_DSC(__i915))
 #define HAS_FBC(i915)			(DISPLAY_RUNTIME_INFO(i915)->fbc_mask != 0)
 #define HAS_FPGA_DBG_UNCLAIMED(i915)	(DISPLAY_INFO(i915)->has_fpga_dbg)
-#define HAS_FW_BLC(i915)		(DISPLAY_VER(i915) > 2)
+#define HAS_FW_BLC(i915)		(DISPLAY_VER(i915) >= 3)
 #define HAS_GMBUS_IRQ(i915)		(DISPLAY_VER(i915) >= 4)
 #define HAS_GMBUS_BURST_READ(i915)	(DISPLAY_VER(i915) >= 10 || IS_KABYLAKE(i915))
 #define HAS_GMCH(i915)			(DISPLAY_INFO(i915)->has_gmch)
