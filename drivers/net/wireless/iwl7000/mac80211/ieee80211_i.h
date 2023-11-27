@@ -2502,6 +2502,8 @@ u8 *ieee80211_add_wmm_info_ie(u8 *buf, u8 qosinfo);
 void ieee80211_add_s1g_capab_ie(struct ieee80211_sub_if_data *sdata,
 				struct ieee80211_sta_s1g_cap *caps,
 				struct sk_buff *skb);
+#else
+#define ieee80211_add_s1g_capab_ie(sdata, caps, skb) do { } while (0)
 #endif /* CFG80211_VERSION >= KERNEL_VERSION(5,10,0) */
 void ieee80211_add_aid_request_ie(struct ieee80211_sub_if_data *sdata,
 				  struct sk_buff *skb);

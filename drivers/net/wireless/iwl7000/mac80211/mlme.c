@@ -1201,12 +1201,10 @@ static size_t ieee80211_assoc_link_elems(struct ieee80211_sub_if_data *sdata,
 	if (!(assoc_data->link[link_id].conn_flags & IEEE80211_CONN_DISABLE_EHT))
 		ieee80211_add_eht_ie(sdata, skb, sband);
 
-#if CFG80211_VERSION >= KERNEL_VERSION(5,10,0)
 	if (nl80211_is_s1ghz(sband->band)) {
 		ieee80211_add_aid_request_ie(sdata, skb);
 		ieee80211_add_s1g_capab_ie(sdata, &sband->s1g_cap, skb);
 	}
-#endif
 
 #if CFG80211_VERSION >= KERNEL_VERSION(5,14,0)
 	if (iftd && iftd->vendor_elems.data && iftd->vendor_elems.len)
