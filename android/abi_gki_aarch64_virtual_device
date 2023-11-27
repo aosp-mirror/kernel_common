@@ -204,6 +204,7 @@
   idr_alloc
   idr_destroy
   idr_find
+  idr_for_each
   idr_get_next
   idr_remove
   init_net
@@ -249,6 +250,7 @@
   kthread_stop
   kthread_unpark
   ktime_get
+  ktime_get_ts64
   ktime_get_with_offset
   kvfree
   kvfree_call_rcu
@@ -435,7 +437,6 @@
   skb_copy_expand
   skb_dequeue
   skb_pull
-  skb_pull_data
   skb_push
   skb_put
   skb_queue_head
@@ -467,7 +468,6 @@
   sysfs_remove_group
   sysfs_remove_link
   system_freezable_wq
-  system_unbound_wq
   system_wq
   __tasklet_schedule
   tasklet_setup
@@ -517,6 +517,21 @@
   usb_unanchor_urb
   __usecs_to_jiffies
   usleep_range_state
+  v4l2_ctrl_handler_init_class
+  v4l2_ctrl_handler_setup
+  v4l2_ctrl_subscribe_event
+  v4l2_device_register
+  v4l2_device_unregister
+  v4l2_event_unsubscribe
+  v4l2_fh_add
+  v4l2_fh_del
+  v4l2_fh_exit
+  v4l2_fh_init
+  vfree
+  video_devdata
+  video_ioctl2
+  __video_register_device
+  video_unregister_device
   virtio_break_device
   virtio_check_driver_offered_feature
   virtio_config_changed
@@ -538,6 +553,7 @@
   virtqueue_kick
   virtqueue_kick_prepare
   virtqueue_notify
+  vmalloc
   vmalloc_to_page
   vm_get_page_prot
   vring_create_virtqueue
@@ -610,6 +626,9 @@
   out_of_line_wait_on_bit_timeout
   request_firmware_direct
   wake_up_bit
+
+# required by btrtl.ko
+  skb_pull_data
 
 # required by btusb.ko
   btbcm_set_bdaddr
@@ -688,6 +707,7 @@
   sock_release
   sysfs_create_link
   system_power_efficient_wq
+  system_unbound_wq
   trace_print_array_seq
   verify_pkcs7_signature
   wireless_nlevent_flush
@@ -724,7 +744,6 @@
   cpufreq_unregister_driver
 
 # required by dummy_hcd.ko
-  ktime_get_ts64
   strstr
   usb_add_gadget_udc
   usb_del_gadget_udc
@@ -811,7 +830,6 @@
   __hw_addr_init
   __hw_addr_sync
   __hw_addr_unsync
-  idr_for_each
   kernel_param_lock
   kernel_param_unlock
   kfree_skb_list_reason
@@ -1011,8 +1029,6 @@
   dma_sync_sg_for_cpu
   __sg_page_iter_next
   __sg_page_iter_start
-  vfree
-  vmalloc
   vmap
   vunmap
 
@@ -1021,6 +1037,21 @@
   param_ops_ulong
   print_hex_dump
   sock_recvmsg
+
+# required by v4l2loopback.ko
+  kstrtoull
+  mutex_lock_killable
+  param_array_ops
+  v4l2_ctrl_handler_free
+  v4l2_ctrl_new_custom
+  v4l2_event_pending
+  v4l2_event_queue
+  v4l2_event_subscribe
+  v4l2_format_info
+  video_device_alloc
+  video_device_release
+  vm_insert_page
+  vzalloc
 
 # required by vexpress-config.ko
   devres_add
@@ -1366,19 +1397,9 @@
 
 # required by virtio_video.ko
   idr_preload
-  v4l2_ctrl_handler_init_class
-  v4l2_ctrl_handler_setup
   v4l2_ctrl_new_std
   v4l2_ctrl_new_std_menu
-  v4l2_ctrl_subscribe_event
-  v4l2_device_register
-  v4l2_device_unregister
   v4l2_event_queue_fh
-  v4l2_event_unsubscribe
-  v4l2_fh_add
-  v4l2_fh_del
-  v4l2_fh_exit
-  v4l2_fh_init
   v4l2_m2m_buf_remove
   v4l2_m2m_ctx_init
   v4l2_m2m_ctx_release
@@ -1418,11 +1439,7 @@
   vb2_queue_init
   vb2_queue_release
   vb2_wait_for_all_buffers
-  video_devdata
   video_device_release_empty
-  video_ioctl2
-  __video_register_device
-  video_unregister_device
 
 # required by virtiofs.ko
   deactivate_locked_super
@@ -1489,6 +1506,7 @@
   drm_writeback_signal_completion
 
 # required by vmw_vsock_virtio_transport_common.ko
+  sock_efree
   trace_print_symbols_seq
 
 # required by vsock.ko
@@ -1545,7 +1563,6 @@
   __init_rwsem
   kstrdup
   kstrtou16
-  kstrtoull
   memset64
   mutex_is_locked
   page_endio
@@ -1554,11 +1571,9 @@
   _raw_write_lock
   _raw_write_unlock
   set_capacity
-  sock_efree
   sync_blockdev
   sysfs_streq
   tty_mode_ioctl
   tty_register_ldisc
   tty_unregister_ldisc
   up_read
-  vzalloc
