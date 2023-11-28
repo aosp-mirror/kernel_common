@@ -591,6 +591,7 @@
   reset_control_reset
   round_jiffies_up
   rpmsg_register_device
+  rpmsg_register_device_override
   rpmsg_send
   rpmsg_unregister_device
   rproc_add
