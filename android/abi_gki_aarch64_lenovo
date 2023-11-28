@@ -1017,6 +1017,7 @@
   regulator_disable
   regulator_enable
   regulator_get_bypass_regmap
+  regulator_get_linear_step
   regulator_get_optional
   regulator_is_enabled
   regulator_put
@@ -1106,6 +1107,7 @@
   skb_queue_purge
   skb_queue_tail
   skb_trim
+  smp_call_function_any
   smp_call_function_single
   snd_card_ref
   snd_card_register
