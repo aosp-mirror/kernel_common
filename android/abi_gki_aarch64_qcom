@@ -57,6 +57,7 @@
   badblocks_set
   badblocks_show
   badblocks_store
+  __balance_callbacks
   balance_push_callback
   bdev_check_media_change
   bdevname
