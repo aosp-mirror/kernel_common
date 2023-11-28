@@ -532,7 +532,7 @@ static bool iwl_mvm_use_host_rate(struct iwl_mvm *mvm,
 	if (unlikely(info->control.flags & IEEE80211_TX_CTRL_RATE_INJECT))
 		return true;
 
-	if (likely(ieee80211_is_data(hdr->frame_control) ||
+	if (likely(ieee80211_is_data(hdr->frame_control) &&
 		   mvmsta->sta_state >= IEEE80211_STA_AUTHORIZED))
 		return false;
 
