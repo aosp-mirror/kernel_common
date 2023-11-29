@@ -14,6 +14,7 @@ ADDITIONAL_KMI_SYMBOL_LISTS="
 android/abi_gki_aarch64_virtual_device
 android/abi_gki_aarch64_virtual_device_removed
 android/abi_gki_aarch64_type_visibility
+android/abi_gki_aarch64_arg
 android/abi_gki_aarch64_db845c
 android/abi_gki_aarch64_exynos
 android/abi_gki_aarch64_exynosauto
@@ -41,6 +42,7 @@ android/abi_gki_aarch64_sunxi
 android/abi_gki_aarch64_pasa
 android/abi_gki_aarch64_zeku
 android/abi_gki_aarch64_lenovo
+android/abi_gki_aarch64_transsion
 "
 
 FILES="${FILES}
@@ -50,6 +52,7 @@ arch/arm64/boot/Image.gz
 
 # Update BUILD.bazel, define_common_kernels() if the value is not 1.
 TRIM_NONLISTED_KMI=${TRIM_NONLISTED_KMI:-1}
+KMI_SYMBOL_LIST_ADD_ONLY=1
 KMI_SYMBOL_LIST_STRICT_MODE=${KMI_SYMBOL_LIST_STRICT_MODE:-1}
 KMI_ENFORCED=1
 

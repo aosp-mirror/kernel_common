@@ -98,6 +98,11 @@ DECLARE_HOOK(android_vh_record_pcpu_rwsem_starttime,
 	TP_PROTO(struct task_struct *tsk, unsigned long settime_jiffies),
 	TP_ARGS(tsk, settime_jiffies));
 
+struct percpu_rw_semaphore;
+DECLARE_HOOK(android_vh_percpu_rwsem_wq_add,
+	TP_PROTO(struct percpu_rw_semaphore *sem, bool reader),
+	TP_ARGS(sem, reader));
+
 struct rt_mutex_waiter;
 struct ww_acquire_ctx;
 DECLARE_HOOK(android_vh_task_blocks_on_rtmutex,
@@ -108,6 +113,19 @@ DECLARE_HOOK(android_vh_task_blocks_on_rtmutex,
 DECLARE_HOOK(android_vh_rtmutex_waiter_prio,
 	TP_PROTO(struct task_struct *task, int *waiter_prio),
 	TP_ARGS(task, waiter_prio));
+
+DECLARE_HOOK(android_vh_exit_signal_whether_wake,
+	TP_PROTO(struct task_struct *p, bool *wake),
+	TP_ARGS(p, wake));
+
+DECLARE_HOOK(android_vh_exit_check,
+	TP_PROTO(struct task_struct *p),
+	TP_ARGS(p));
+
+DECLARE_HOOK(android_vh_freeze_whether_wake,
+	TP_PROTO(struct task_struct *t, bool *wake),
+	TP_ARGS(t, wake));
+
 #endif /* _TRACE_HOOK_DTASK_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>
