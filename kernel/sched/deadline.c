@@ -17,8 +17,8 @@
  */
 #include "sched.h"
 #include "pelt.h"
-#include <trace/hooks/sched.h>
 #include <linux/cpuset.h>
+#include <trace/hooks/sched.h>
 
 struct dl_bandwidth def_dl_bandwidth;
 
