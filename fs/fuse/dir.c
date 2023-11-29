@@ -8,6 +8,7 @@
 
 #include "fuse_i.h"
 
+#include <linux/fuse.h>
 #include <linux/pagemap.h>
 #include <linux/file.h>
 #include <linux/fs_context.h>
@@ -878,6 +879,13 @@ static int _fuse_atomic_open(struct inode *dir, struct dentry *entry,
 			fuse_queue_forget(fc, forget, outentry.nodeid, 1);
 			goto out_err;
 		}
+	}
+
+	if (ff->fh == 0) {
+		if (ff->open_flags & FOPEN_KEEP_CACHE)
+			fc->no_open = 1;
+		if (ff->open_flags & FOPEN_CACHE_DIR)
+			fc->no_opendir = 1;
 	}
 
 	/* prevent racing/parallel lookup on a negative hashed */
