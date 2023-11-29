@@ -544,6 +544,7 @@
   devres_alloc_node
   devres_free
   dev_set_name
+  dev_vprintk_emit
   _dev_warn
   disable_irq
   disable_irq_nosync
@@ -1188,6 +1189,9 @@
   kernel_recvmsg
   kernel_restart
   kernel_sendmsg
+  kernfs_find_and_get_ns
+  kernfs_notify
+  kernfs_put
   kern_mount
   kern_unmount
   __kfifo_alloc
