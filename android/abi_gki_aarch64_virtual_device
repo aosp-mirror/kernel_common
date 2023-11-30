@@ -1533,6 +1533,7 @@
   sock_no_sendpage
   sock_no_socketpair
   sock_queue_rcv_skb_reason
+  sock_recv_errqueue
   sock_register
   sock_unregister
   try_module_get
