@@ -464,7 +464,7 @@ __le32 iwl_get_lari_config_bitmap(struct iwl_fw_runtime *fwrt)
 	case IWL_CFG_RF_TYPE_HR2:
 	case IWL_CFG_RF_TYPE_JF1:
 	case IWL_CFG_RF_TYPE_JF2:
-		ret = iwl_acpi_get_dsm(fwrt, DSM_FUNC_ENABLE_INDONESIA_5G2,
+		ret = iwl_bios_get_dsm(fwrt, DSM_FUNC_ENABLE_INDONESIA_5G2,
 				       &val);
 
 		if (!ret && val == DSM_VALUE_INDONESIA_ENABLE)
@@ -475,7 +475,7 @@ __le32 iwl_get_lari_config_bitmap(struct iwl_fw_runtime *fwrt)
 		break;
 	}
 
-	ret = iwl_acpi_get_dsm(fwrt, DSM_FUNC_DISABLE_SRD, &val);
+	ret = iwl_bios_get_dsm(fwrt, DSM_FUNC_DISABLE_SRD, &val);
 	if (!ret) {
 		if (val == DSM_VALUE_SRD_PASSIVE)
 			config_bitmap |=
@@ -487,7 +487,7 @@ __le32 iwl_get_lari_config_bitmap(struct iwl_fw_runtime *fwrt)
 
 	if (fw_has_capa(&fwrt->fw->ucode_capa,
 			IWL_UCODE_TLV_CAPA_CHINA_22_REG_SUPPORT)) {
-		ret = iwl_acpi_get_dsm(fwrt, DSM_FUNC_REGULATORY_CONFIG,
+		ret = iwl_bios_get_dsm(fwrt, DSM_FUNC_REGULATORY_CONFIG,
 				       &val);
 		/*
 		 * China 2022 enable if the BIOS object does not exist or
@@ -501,3 +501,10 @@ __le32 iwl_get_lari_config_bitmap(struct iwl_fw_runtime *fwrt)
 	return config_bitmap;
 }
 IWL_EXPORT_SYMBOL(iwl_get_lari_config_bitmap);
+
+int iwl_bios_get_dsm(struct iwl_fw_runtime *fwrt, enum iwl_dsm_funcs func,
+		     u32 *value)
+{
+	GET_BIOS_TABLE(dsm, fwrt, func, value);
+}
+IWL_EXPORT_SYMBOL(iwl_bios_get_dsm);
