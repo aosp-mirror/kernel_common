@@ -942,7 +942,7 @@ void iwl_xvt_lari_cfg(struct iwl_xvt *xvt)
 					   WIDE_ID(REGULATORY_AND_NVM_GROUP,
 						   LARI_CONFIG_CHANGE), 1);
 
-	cmd.config_bitmap = iwl_acpi_get_lari_config_bitmap(&xvt->fwrt);
+	cmd.config_bitmap = iwl_get_lari_config_bitmap(&xvt->fwrt);
 
 	ret = iwl_acpi_get_dsm(&xvt->fwrt, DSM_FUNC_ENABLE_UNII4_CHAN, &value);
 	if (!ret)
