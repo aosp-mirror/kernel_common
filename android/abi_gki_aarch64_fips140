@@ -128,6 +128,7 @@
   strlcpy
   strlen
   strncmp
+  strscpy
   __traceiter_android_vh_aes_decrypt
   __traceiter_android_vh_aes_encrypt
   __traceiter_android_vh_aes_expandkey
