@@ -944,24 +944,19 @@ void iwl_xvt_lari_cfg(struct iwl_xvt *xvt)
 
 	cmd.config_bitmap = iwl_acpi_get_lari_config_bitmap(&xvt->fwrt);
 
-	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
-				   DSM_FUNC_ENABLE_UNII4_CHAN,
-				   &iwl_guid, &value);
+	ret = iwl_acpi_get_dsm(&xvt->fwrt, DSM_FUNC_ENABLE_UNII4_CHAN, &value);
 	if (!ret)
 		cmd.oem_unii4_allow_bitmap = cpu_to_le32(value);
 
-	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
-				   DSM_FUNC_ACTIVATE_CHANNEL,
-				   &iwl_guid, &value);
+	ret = iwl_acpi_get_dsm(&xvt->fwrt, DSM_FUNC_ACTIVATE_CHANNEL, &value);
 	if (!ret) {
 		if (cmd_ver < 8)
 			value &= ~ACTIVATE_5G2_IN_WW_MASK;
 		cmd.chan_state_active_bitmap = cpu_to_le32(value);
 	}
 
-	ret = iwl_acpi_get_dsm_u32(xvt->fwrt.dev, 0,
-				   DSM_FUNC_ENERGY_DETECTION_THRESHOLD,
-				   &iwl_guid, &value);
+	ret = iwl_acpi_get_dsm(&xvt->fwrt, DSM_FUNC_ENERGY_DETECTION_THRESHOLD,
+			       &value);
 	if (!ret)
 		cmd.edt_bitmap = cpu_to_le32(value);
 
