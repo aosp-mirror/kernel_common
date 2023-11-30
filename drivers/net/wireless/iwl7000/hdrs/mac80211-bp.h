@@ -1994,7 +1994,7 @@ static inline void backport_netif_napi_add(struct net_device *dev,
 #define netif_napi_add LINUX_BACKPORT(netif_napi_add)
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,8,0)
 #define cfg80211_scan_request_tsf_report_link_id(req)             -1
 #define cfg80211_scan_request_set_tsf_report_link_id(req, ink_id) do {} while (0)
 #define cfg80211_scan_request_check_tsf_report_link_id(req, mask) false
