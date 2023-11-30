@@ -171,6 +171,9 @@ DECLARE_HOOK(android_vh_alloc_pages_entry,
 DECLARE_HOOK(android_vh_isolate_freepages,
 	TP_PROTO(struct compact_control *cc, struct page *page, bool *bypass),
 	TP_ARGS(cc, page, bypass));
+DECLARE_HOOK(android_vh_ptep_clear_flush_young,
+	TP_PROTO(bool *skip),
+	TP_ARGS(skip));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
