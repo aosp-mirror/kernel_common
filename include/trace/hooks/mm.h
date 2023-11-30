@@ -134,6 +134,9 @@ DECLARE_HOOK(android_vh_mem_cgroup_css_offline,
 DECLARE_HOOK(android_vh_si_meminfo,
 	TP_PROTO(struct sysinfo *val),
 	TP_ARGS(val));
+DECLARE_HOOK(android_vh_ptep_clear_flush_young,
+	TP_PROTO(bool *skip),
+	TP_ARGS(skip));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
