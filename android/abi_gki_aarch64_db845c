@@ -422,10 +422,6 @@
   qcom_smem_state_unregister
   queue_delayed_work_on
   queue_work_on
-  radix_tree_delete
-  radix_tree_insert
-  radix_tree_lookup
-  radix_tree_next_chunk
   ___ratelimit
   rational_best_approximation
   _raw_spin_lock
@@ -477,6 +473,7 @@
   reset_control_put
   reset_control_reset
   rpmsg_register_device
+  rpmsg_register_device_override
   rpmsg_send
   rpmsg_unregister_device
   rproc_add
@@ -551,6 +548,7 @@
   strncpy
   strnlen
   strpbrk
+  strscpy
   strscpy_pad
   strsep
   __sw_hweight32
@@ -725,7 +723,6 @@
   skb_queue_head
   skb_realloc_headroom
   strlcat
-  strscpy
   __sw_hweight16
   __sw_hweight8
   thermal_cooling_device_register
@@ -738,8 +735,8 @@
   pci_clear_master
   pci_disable_device
   pci_disable_msi
+  pcie_capability_clear_and_set_word
   pcie_capability_read_word
-  pcie_capability_write_word
   pci_enable_device
   pci_enable_msi
   pci_iomap
@@ -1217,10 +1214,6 @@
   tty_termios_baud_rate
   tty_termios_encode_baud_rate
 
-# required by ns.ko
-  kernel_bind
-  radix_tree_iter_resume
-
 # required by nvmem_qfprom.ko
   devm_nvmem_register
 
@@ -1446,10 +1439,16 @@
   autoremove_wake_function
   datagram_poll
   do_wait_intr_irq
+  kernel_bind
   lock_sock_nested
   proto_register
   proto_unregister
+  radix_tree_delete
+  radix_tree_insert
   radix_tree_iter_delete
+  radix_tree_iter_resume
+  radix_tree_lookup
+  radix_tree_next_chunk
   _raw_write_lock_bh
   _raw_write_unlock_bh
   refcount_dec_and_mutex_lock
@@ -1696,6 +1695,7 @@
   netdev_warn
   netif_carrier_on
   of_clk_get_by_name
+  pcie_capability_write_word
   snd_pcm_create_iec958_consumer_hw_params
   snd_soc_get_volsw_sx
   snd_soc_info_volsw_sx
