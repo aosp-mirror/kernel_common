@@ -176,6 +176,21 @@ struct binder_buffer *binder_alloc_prepare_to_free(struct binder_alloc *alloc,
 	return buffer;
 }
 
+static inline void
+binder_set_installed_page(struct binder_lru_page *lru_page,
+			  struct page *page)
+{
+	/* Pairs with acquire in binder_get_installed_page() */
+	smp_store_release(&lru_page->page_ptr, page);
+}
+
+static inline struct page *
+binder_get_installed_page(struct binder_lru_page *lru_page)
+{
+	/* Pairs with release in binder_set_installed_page() */
+	return smp_load_acquire(&lru_page->page_ptr);
+}
+
 static void binder_free_page_range(struct binder_alloc *alloc,
 				   unsigned long start, unsigned long end)
 {
@@ -190,6 +205,9 @@ static void binder_free_page_range(struct binder_alloc *alloc,
 
 		index = (page_addr - alloc->buffer) / PAGE_SIZE;
 		page = &alloc->pages[index];
+
+		if (!binder_get_installed_page(page))
+			continue;
 
 		trace_binder_free_lru_start(alloc, index);
 
@@ -210,7 +228,14 @@ static int binder_install_single_page(struct binder_alloc *alloc,
 	if (!mmget_not_zero(alloc->vma_vm_mm))
 		return -ESRCH;
 
+	/*
+	 * Protected with mmap_sem in write mode as multiple tasks
+	 * might race to install the same page.
+	 */
 	mmap_write_lock(alloc->vma_vm_mm);
+	if (binder_get_installed_page(lru_page))
+		goto out;
+
 	if (!alloc->vma) {
 		pr_err("%d: %s failed, no vma\n", alloc->pid, __func__);
 		ret = -ESRCH;
@@ -233,15 +258,50 @@ static int binder_install_single_page(struct binder_alloc *alloc,
 		goto out;
 	}
 
-	lru_page->page_ptr = page;
+	/* Mark page installation complete and safe to use */
+	binder_set_installed_page(lru_page, page);
 out:
 	mmap_write_unlock(alloc->vma_vm_mm);
 	mmput_async(alloc->vma_vm_mm);
 	return ret;
 }
 
-static int binder_allocate_page_range(struct binder_alloc *alloc,
-				      unsigned long start, unsigned long end)
+static int binder_install_buffer_pages(struct binder_alloc *alloc,
+				       struct binder_buffer *buffer,
+				       size_t size)
+{
+	struct binder_lru_page *page;
+	unsigned long start, final;
+	unsigned long page_addr;
+
+	start = buffer->user_data & PAGE_MASK;
+	final = PAGE_ALIGN(buffer->user_data + size);
+
+	for (page_addr = start; page_addr < final; page_addr += PAGE_SIZE) {
+		unsigned long index;
+		int ret;
+
+		index = (page_addr - alloc->buffer) / PAGE_SIZE;
+		page = &alloc->pages[index];
+
+		if (binder_get_installed_page(page))
+			continue;
+
+		trace_binder_alloc_page_start(alloc, index);
+
+		ret = binder_install_single_page(alloc, page, page_addr);
+		if (ret)
+			return ret;
+
+		trace_binder_alloc_page_end(alloc, index);
+	}
+
+	return 0;
+}
+
+/* The range of pages should exclude those shared with other buffers */
+static void binder_allocate_page_range(struct binder_alloc *alloc,
+				       unsigned long start, unsigned long end)
 {
 	struct binder_lru_page *page;
 	unsigned long page_addr;
@@ -250,15 +310,11 @@ static int binder_allocate_page_range(struct binder_alloc *alloc,
 			   "%d: allocate pages %lx-%lx\n",
 			   alloc->pid, start, end);
 
-	if (end <= start)
-		return 0;
-
 	trace_binder_update_page_range(alloc, true, start, end);
 
 	for (page_addr = start; page_addr < end; page_addr += PAGE_SIZE) {
 		unsigned long index;
 		bool on_lru;
-		int ret;
 
 		index = (page_addr - alloc->buffer) / PAGE_SIZE;
 		page = &alloc->pages[index];
@@ -273,21 +329,9 @@ static int binder_allocate_page_range(struct binder_alloc *alloc,
 			continue;
 		}
 
-		trace_binder_alloc_page_start(alloc, index);
-
-		ret = binder_install_single_page(alloc, page, page_addr);
-		if (ret) {
-			binder_free_page_range(alloc, start, page_addr);
-			return ret;
-		}
-
 		if (index + 1 > alloc->pages_high)
 			alloc->pages_high = index + 1;
-
-		trace_binder_alloc_page_end(alloc, index);
 	}
-
-	return 0;
 }
 
 static inline void binder_alloc_set_vma(struct binder_alloc *alloc,
@@ -406,7 +450,6 @@ static struct binder_buffer *binder_alloc_new_buf_locked(
 	unsigned long has_page_addr;
 	unsigned long end_page_addr;
 	size_t buffer_size;
-	int ret;
 
 	trace_android_vh_binder_alloc_new_buf_locked(size, &alloc->free_async_space, is_async);
 
@@ -452,18 +495,14 @@ static struct binder_buffer *binder_alloc_new_buf_locked(
 		     "%d: binder_alloc_buf size %zd got buffer %pK size %zd\n",
 		      alloc->pid, size, buffer, buffer_size);
 
-	has_page_addr = (buffer->user_data + buffer_size) & PAGE_MASK;
 	WARN_ON(n && buffer_size != size);
+
+	has_page_addr = (buffer->user_data + buffer_size) & PAGE_MASK;
 	end_page_addr = PAGE_ALIGN(buffer->user_data + size);
 	if (end_page_addr > has_page_addr)
 		end_page_addr = has_page_addr;
-	ret = binder_allocate_page_range(alloc, PAGE_ALIGN(buffer->user_data),
-					 end_page_addr);
-	if (ret) {
-		buffer = ERR_PTR(ret);
-		goto out;
-	}
-
+	binder_allocate_page_range(alloc, PAGE_ALIGN(buffer->user_data),
+				   end_page_addr);
 	if (buffer_size != size) {
 		new_buffer->user_data = buffer->user_data + size;
 		list_add(&new_buffer->entry, &buffer->entry);
@@ -541,6 +580,7 @@ struct binder_buffer *binder_alloc_new_buf(struct binder_alloc *alloc,
 {
 	struct binder_buffer *buffer, *next;
 	size_t size;
+	int ret;
 
 	/* Check binder_alloc is fully initialized */
 	if (!binder_alloc_get_vma(alloc)) {
@@ -577,6 +617,11 @@ struct binder_buffer *binder_alloc_new_buf(struct binder_alloc *alloc,
 	buffer->pid = current->tgid;
 	mutex_unlock(&alloc->mutex);
 
+	ret = binder_install_buffer_pages(alloc, buffer, size);
+	if (ret) {
+		binder_alloc_free_buf(alloc, buffer);
+		buffer = ERR_PTR(ret);
+	}
 out:
 	return buffer;
 }
