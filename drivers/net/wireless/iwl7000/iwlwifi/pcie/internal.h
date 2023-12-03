@@ -846,7 +846,6 @@ void iwl_pcie_conf_msix_hw(struct iwl_trans_pcie *trans_pcie);
 int iwl_pcie_alloc_dma_ptr(struct iwl_trans *trans,
 			   struct iwl_dma_ptr *ptr, size_t size);
 void iwl_pcie_free_dma_ptr(struct iwl_trans *trans, struct iwl_dma_ptr *ptr);
-int iwl_trans_pcie_power_device_off(struct iwl_trans_pcie *trans_pcie);
 void iwl_pcie_apply_destination(struct iwl_trans *trans);
 
 /* common functions that are used by gen3 transport */
