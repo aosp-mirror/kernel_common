@@ -270,11 +270,6 @@ int iwl_mvm_mac_ctxt_init(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 		goto exit_fail;
 	}
 
-#ifdef CPTCFG_IWLWIFI_DEBUG_SESSION_PROT_FAIL
-	/* The third failure will send a udev event to user space */
-	mvmvif->session_prot_fail_num = 2;
-#endif
-
 	if (data.preferred_tsf != NUM_TSF_IDS)
 		mvmvif->tsf_id = data.preferred_tsf;
 	else

@@ -12,28 +12,10 @@
 
 #include "iwl-modparams.h"
 
-#ifdef CPTCFG_IWLWIFI_DEBUG_SESSION_PROT_FAIL
-extern u32 iwlwifi_debug_session_prot_debug_level;
-static inline void iwl_debug_session_prot(bool val)
-{
-	/* TX_REPLY | TX | DROP */
-	if (val)
-		iwlwifi_debug_session_prot_debug_level =
-			0x40000000 | 0x00800000 | 0x00002000;
-	else
-		iwlwifi_debug_session_prot_debug_level = 0;
-}
-#endif
-
 static inline bool iwl_have_debug_level(u32 level)
 {
 #ifdef CPTCFG_IWLWIFI_DEBUG
-#ifdef CPTCFG_IWLWIFI_DEBUG_SESSION_PROT_FAIL
-	return (iwlwifi_mod_params.debug_level |
-		iwlwifi_debug_session_prot_debug_level) & level;
-#else
 	return iwlwifi_mod_params.debug_level & level;
-#endif
 #else
 	return false;
 #endif

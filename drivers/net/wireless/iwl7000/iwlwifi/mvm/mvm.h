@@ -473,13 +473,6 @@ struct iwl_mvm_vif {
 	} bcn_prot;
 
 	u16 max_tx_op;
-#ifdef CPTCFG_IWLWIFI_DEBUG_SESSION_PROT_FAIL
-	/**
-	 * @session_prot_fail_num: number of failed session protection cases
-	 *	to collect firmware debug data for
-	 */
-	u8 session_prot_fail_num;
-#endif
 
 	struct iwl_mvm_vif_link_info deflink;
 	struct iwl_mvm_vif_link_info *link[IEEE80211_MLD_MAX_NUM_LINKS];
