@@ -318,4 +318,26 @@ PVRSRVPhysHeapGetMemInfoPkdKM(CONNECTION_DATA *psConnection,
 			   PVRSRV_PHYS_HEAP *paePhysHeapID,
 			   PHYS_HEAP_MEM_STATS_PKD *paPhysHeapMemStats);
 
+/*************************************************************************/ /*!
+@Function       PhysMemValidateParams
+@Description    Checks the PMR creation parameters
+                adjusts them if possible and necessary
+@Input          ui32NumPhysChunks      Number of physical chunks.
+@Input          ui32NumPhysChunks      Number of virtual chunks.
+@Input          uiFlags                Allocation flags.
+@Inout          puiLog2AllocPageSize   Log2 of alllocation page size.
+                                       May be adjusted.
+@Inout          puiSize                Size of the allocation.
+                                       May be adjusted.
+@Inout          puiChunkSize           Size of a backed or unbacked chunk
+@Return         PVRSRV_OK if parameters are valid.
+*/ /**************************************************************************/
+PVRSRV_ERROR
+PhysMemValidateParams(IMG_UINT32 ui32NumPhysChunks,
+                      IMG_UINT32 ui32NumVirtChunks,
+                      PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                      IMG_UINT32 *puiLog2AllocPageSize,
+                      IMG_DEVMEM_SIZE_T *puiSize,
+                      PMR_SIZE_T *puiChunkSize);
+
 #endif /* SRVSRV_PHYSMEM_H */

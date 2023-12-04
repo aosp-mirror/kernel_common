@@ -274,12 +274,12 @@ void DevPhysMemFree(PVRSRV_DEVICE_NODE *psDevNode,
 
 
 /* Checks the input parameters and adjusts them if possible and necessary */
-static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
-                                           IMG_UINT32 ui32NumVirtChunks,
-                                           PVRSRV_MEMALLOCFLAGS_T uiFlags,
-                                           IMG_UINT32 *puiLog2AllocPageSize,
-                                           IMG_DEVMEM_SIZE_T *puiSize,
-                                           PMR_SIZE_T *puiChunkSize)
+PVRSRV_ERROR PhysMemValidateParams(IMG_UINT32 ui32NumPhysChunks,
+                                   IMG_UINT32 ui32NumVirtChunks,
+                                   PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                                   IMG_UINT32 *puiLog2AllocPageSize,
+                                   IMG_DEVMEM_SIZE_T *puiSize,
+                                   PMR_SIZE_T *puiChunkSize)
 {
 	IMG_UINT32 uiLog2AllocPageSize = *puiLog2AllocPageSize;
 	IMG_DEVMEM_SIZE_T uiSize = *puiSize;
@@ -486,12 +486,12 @@ PhysmemNewRamBackedPMR_direct(CONNECTION_DATA *psConnection,
 
 	PVR_UNREFERENCED_PARAMETER(uiAnnotationLength);
 
-	eError = _ValidateParams(ui32NumPhysChunks,
-	                         ui32NumVirtChunks,
-	                         uiFlags,
-	                         &uiLog2AllocPageSize,
-	                         &uiSize,
-	                         &uiChunkSize);
+	eError = PhysMemValidateParams(ui32NumPhysChunks,
+	                               ui32NumVirtChunks,
+	                               uiFlags,
+	                               &uiLog2AllocPageSize,
+	                               &uiSize,
+	                               &uiChunkSize);
 	PVR_RETURN_IF_ERROR(eError);
 
 	eError = _DevPhysHeapFromFlags(uiFlags, &ePhysHeapIdx);
