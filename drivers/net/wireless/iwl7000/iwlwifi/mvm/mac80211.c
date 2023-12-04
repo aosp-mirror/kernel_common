@@ -2670,10 +2670,6 @@ void iwl_mvm_cfg_he_sta(struct iwl_mvm *mvm,
 			(vif->bss_conf.uora_ocw_range >> 3) & 0x7;
 	}
 
-	if (vif->bss_conf.eht_puncturing)
-		flags |= STA_CTXT_EHT_PUNCTURE_MASK_VALID;
-	sta_ctxt_cmd.puncture_mask = cpu_to_le16(vif->bss_conf.eht_puncturing);
-
 	if (!iwl_mvm_is_nic_ack_enabled(mvm, vif))
 		flags |= STA_CTXT_HE_NIC_NOT_ACK_ENABLED;
 
@@ -2870,9 +2866,7 @@ static void iwl_mvm_bss_info_changed_station(struct iwl_mvm *mvm,
 	 */
 	if (changes & BSS_CHANGED_ASSOC && vif->cfg.assoc) {
 		if ((vif->bss_conf.he_support &&
-		     !iwlwifi_mod_params.disable_11ax) ||
-		    (vif->bss_conf.eht_support &&
-		     !iwlwifi_mod_params.disable_11be))
+		     !iwlwifi_mod_params.disable_11ax))
 			send_he_cmd = true;
 
 		iwl_mvm_mac_ctxt_recalc_tsf_id(mvm, vif);
@@ -2881,16 +2875,7 @@ static void iwl_mvm_bss_info_changed_station(struct iwl_mvm *mvm,
 	/* Update MU EDCA params */
 	if (changes & BSS_CHANGED_QOS && mvmvif->associated &&
 	    vif->cfg.assoc &&
-	    ((vif->bss_conf.he_support &&
-	      !iwlwifi_mod_params.disable_11ax) ||
-	     (vif->bss_conf.eht_support &&
-	      !iwlwifi_mod_params.disable_11be)))
-		send_he_cmd = true;
-
-	/* Update EHT Puncturing info */
-	if (changes & BSS_CHANGED_EHT_PUNCTURING && mvmvif->associated &&
-	    vif->cfg.assoc && vif->bss_conf.eht_support &&
-	    !iwlwifi_mod_params.disable_11be)
+	    (vif->bss_conf.he_support && !iwlwifi_mod_params.disable_11ax))
 		send_he_cmd = true;
 
 	if (send_he_cmd)
@@ -3955,10 +3940,8 @@ iwl_mvm_sta_state_auth_to_assoc(struct ieee80211_hw *hw,
 		 * the default bss_conf
 		 */
 		if (!mvm->mld_api_is_used &&
-		    ((vif->bss_conf.he_support &&
-		      !iwlwifi_mod_params.disable_11ax) ||
-		    (vif->bss_conf.eht_support &&
-		     !iwlwifi_mod_params.disable_11be)))
+		    (vif->bss_conf.he_support &&
+		     !iwlwifi_mod_params.disable_11ax))
 			iwl_mvm_cfg_he_sta(mvm, vif, mvm_sta->deflink.sta_id);
 	} else if (vif->type == NL80211_IFTYPE_STATION) {
 		iwl_mvm_vif_set_he_support(hw, vif, sta, true);
