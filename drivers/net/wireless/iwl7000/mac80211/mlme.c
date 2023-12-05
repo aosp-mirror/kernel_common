@@ -4260,7 +4260,7 @@ static bool ieee80211_assoc_config_link(struct ieee80211_link_data *link,
 
 		he_6ghz_oper = ieee80211_he_6ghz_oper(elems->he_operation);
 
-		if (he_6ghz_oper) {
+		if (is_6ghz && he_6ghz_oper) {
 			switch (u8_get_bits(he_6ghz_oper->control,
 					    IEEE80211_HE_6GHZ_OPER_CTRL_REG_INFO)) {
 			case IEEE80211_6GHZ_CTRL_REG_LPI_AP:
@@ -4276,9 +4276,9 @@ static bool ieee80211_assoc_config_link(struct ieee80211_link_data *link,
 				bss_conf->power_type = IEEE80211_REG_UNSET_AP;
 				break;
 			}
-		} else {
+		} else if (is_6ghz) {
 			link_info(link,
-				  "HE 6GHz operation missing (on %d MHz), expect issues\n",
+				  "HE 6 GHz operation missing (on %d MHz), expect issues\n",
 				  bss_conf->chandef.chan->center_freq);
 		}
 
