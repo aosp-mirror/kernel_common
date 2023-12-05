@@ -462,3 +462,103 @@ void wiphy_delayed_work_cancel(struct wiphy *wiphy,
 }
 EXPORT_SYMBOL_GPL(wiphy_delayed_work_cancel);
 #endif /* CFG80211_VERSION < KERNEL_VERSION(6,5,0) */
+
+#if CFG80211_VERSION < KERNEL_VERSION(6,8,0)
+static int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width)
+{
+	int mhz;
+
+	switch (chan_width) {
+#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
+	case NL80211_CHAN_WIDTH_1:
+		/* keep code in case of fall-through (spatch generated) */
+#endif
+		mhz = 1;
+		break;
+#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
+	case NL80211_CHAN_WIDTH_2:
+		/* keep code in case of fall-through (spatch generated) */
+#endif
+		mhz = 2;
+		break;
+#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
+	case NL80211_CHAN_WIDTH_4:
+		/* keep code in case of fall-through (spatch generated) */
+#endif
+		mhz = 4;
+		break;
+#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
+	case NL80211_CHAN_WIDTH_8:
+		/* keep code in case of fall-through (spatch generated) */
+#endif
+		mhz = 8;
+		break;
+#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
+	case NL80211_CHAN_WIDTH_16:
+		/* keep code in case of fall-through (spatch generated) */
+#endif
+		mhz = 16;
+		break;
+	case NL80211_CHAN_WIDTH_5:
+		mhz = 5;
+		break;
+	case NL80211_CHAN_WIDTH_10:
+		mhz = 10;
+		break;
+	case NL80211_CHAN_WIDTH_20:
+	case NL80211_CHAN_WIDTH_20_NOHT:
+		mhz = 20;
+		break;
+	case NL80211_CHAN_WIDTH_40:
+		mhz = 40;
+		break;
+	case NL80211_CHAN_WIDTH_80P80:
+	case NL80211_CHAN_WIDTH_80:
+		mhz = 80;
+		break;
+	case NL80211_CHAN_WIDTH_160:
+		mhz = 160;
+		break;
+#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
+	case NL80211_CHAN_WIDTH_320:
+		mhz = 320;
+		break;
+#endif
+	default:
+		WARN_ON_ONCE(1);
+		return -1;
+	}
+	return mhz;
+}
+
+static int cfg80211_chandef_get_width(const struct cfg80211_chan_def *c)
+{
+	return nl80211_chan_width_to_mhz(c->width);
+}
+
+int cfg80211_chandef_primary_freq(const struct cfg80211_chan_def *c,
+				  enum nl80211_chan_width primary_chan_width)
+{
+	int pri_width = nl80211_chan_width_to_mhz(primary_chan_width);
+	int width = cfg80211_chandef_get_width(c);
+	u32 control = c->chan->center_freq;
+	u32 center = c->center_freq1;
+
+	if (WARN_ON_ONCE(pri_width < 0 || width < 0))
+		return -1;
+
+	/* not intended to be called this way, can't determine */
+	if (WARN_ON_ONCE(pri_width > width))
+		return -1;
+
+	while (width > pri_width) {
+		if (control > center)
+			center += width / 4;
+		else
+			center -= width / 4;
+		width /= 2;
+	}
+
+	return center;
+}
+#endif /* cfg < 6.8 */

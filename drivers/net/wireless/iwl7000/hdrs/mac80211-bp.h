@@ -2303,3 +2303,7 @@ ssize_t wiphy_locked_debugfs_write(struct wiphy *wiphy, struct file *file,
 #endif
 #endif /* < 6.7.0 */
 
+#if CFG80211_VERSION < KERNEL_VERSION(6,8,0)
+int cfg80211_chandef_primary_freq(const struct cfg80211_chan_def *chandef,
+				  enum nl80211_chan_width primary_width);
+#endif /* cfg < 6.8 */
