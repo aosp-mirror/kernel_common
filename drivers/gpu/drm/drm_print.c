@@ -486,7 +486,7 @@ void drm_trace_init(void)
 {
 	int ret;
 
-	trace_arr = trace_array_get_by_name("drm", NULL);
+	trace_arr = trace_array_get_by_name("drm", "");
 	if (!trace_arr)
 		return;
 
