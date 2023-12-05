@@ -3898,7 +3898,6 @@ bool ieee80211_chandef_he_6ghz_oper(struct ieee80211_sub_if_data *sdata,
 	const struct ieee80211_sta_eht_cap *eht_cap;
 	struct cfg80211_chan_def he_chandef = *chandef;
 	const struct ieee80211_he_6ghz_oper *he_6ghz_oper;
-	struct ieee80211_bss_conf *bss_conf = &sdata->vif.bss_conf;
 	bool support_80_80, support_160, support_320;
 	u8 he_phy_cap, eht_phy_cap;
 	u32 freq;
@@ -3934,13 +3933,8 @@ bool ieee80211_chandef_he_6ghz_oper(struct ieee80211_sub_if_data *sdata,
 		eht_oper = NULL;
 
 	he_6ghz_oper = ieee80211_he_6ghz_oper(he_oper);
-
-	if (!he_6ghz_oper) {
-		sdata_info(sdata,
-			   "HE 6GHz operation missing (on %d MHz), expect issues\n",
-			   chandef->chan->center_freq);
+	if (!he_6ghz_oper)
 		return false;
-	}
 
 	/*
 	 * The EHT operation IE does not contain the primary channel so the
@@ -3957,19 +3951,6 @@ bool ieee80211_chandef_he_6ghz_oper(struct ieee80211_sub_if_data *sdata,
 			   he_6ghz_oper->primary, freq,
 			   sdata->local->hw.wiphy->bands[NL80211_BAND_6GHZ]);
 		return false;
-	}
-
-	switch (u8_get_bits(he_6ghz_oper->control,
-			    IEEE80211_HE_6GHZ_OPER_CTRL_REG_INFO)) {
-	case IEEE80211_6GHZ_CTRL_REG_LPI_AP:
-		bss_conf->power_type = IEEE80211_REG_LPI_AP;
-		break;
-	case IEEE80211_6GHZ_CTRL_REG_SP_AP:
-		bss_conf->power_type = IEEE80211_REG_SP_AP;
-		break;
-	default:
-		bss_conf->power_type = IEEE80211_REG_UNSET_AP;
-		break;
 	}
 
 	if (!eht_oper ||
