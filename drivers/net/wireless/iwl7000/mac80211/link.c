@@ -2,7 +2,7 @@
 /*
  * MLO link handling
  *
- * Copyright (C) 2022-2023 Intel Corporation
+ * Copyright (C) 2022-2024 Intel Corporation
  */
 #include <linux/slab.h>
 #include <linux/kernel.h>
@@ -425,8 +425,7 @@ static int _ieee80211_set_active_links(struct ieee80211_sub_if_data *sdata,
 						  BSS_CHANGED_BANDWIDTH |
 						  BSS_CHANGED_TWT |
 						  BSS_CHANGED_HE_OBSS_PD |
-						  BSS_CHANGED_HE_BSS_COLOR |
-						  BSS_CHANGED_EHT_PUNCTURING);
+						  BSS_CHANGED_HE_BSS_COLOR);
 	}
 
 	old_active = sdata->vif.active_links;

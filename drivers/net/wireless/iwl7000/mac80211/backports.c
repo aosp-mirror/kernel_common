@@ -1,6 +1,6 @@
 /*
  * Copyright(c) 2015 - 2017 Intel Deutschland GmbH
- * Copyright (C) 2018, 2020, 2022-2023 Intel Corporation
+ * Copyright (C) 2018, 2020, 2022-2024 Intel Corporation
  *
  * Backport functionality introduced in Linux 4.4.
  *
@@ -517,13 +517,15 @@ static int cfg80211_chandef_get_width(const struct cfg80211_chan_def *c)
 	return nl80211_chan_width_to_mhz(c->width);
 }
 
-int cfg80211_chandef_primary_freq(const struct cfg80211_chan_def *c,
-				  enum nl80211_chan_width primary_chan_width)
+int cfg80211_chandef_primary(const struct cfg80211_chan_def *c,
+			     enum nl80211_chan_width primary_chan_width,
+			     u16 *punctured)
 {
 	int pri_width = nl80211_chan_width_to_mhz(primary_chan_width);
 	int width = cfg80211_chandef_get_width(c);
 	u32 control = c->chan->center_freq;
 	u32 center = c->center_freq1;
+	u16 _punct = 0;
 
 	if (WARN_ON_ONCE(pri_width < 0 || width < 0))
 		return -1;
@@ -532,11 +534,21 @@ int cfg80211_chandef_primary_freq(const struct cfg80211_chan_def *c,
 	if (WARN_ON_ONCE(pri_width > width))
 		return -1;
 
+	if (!punctured)
+		punctured = &_punct;
+
+	*punctured = chandef_punctured(c);
+
 	while (width > pri_width) {
-		if (control > center)
+		unsigned int bits_to_drop = width / 20 / 2;
+
+		if (control > center) {
 			center += width / 4;
-		else
+			*punctured >>= bits_to_drop;
+		} else {
 			center -= width / 4;
+			*punctured &= (1 << bits_to_drop) - 1;
+		}
 		width /= 2;
 	}
 

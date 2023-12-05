@@ -1,7 +1,7 @@
 /*
  * ChromeOS backport definitions
  * Copyright (C) 2015-2017 Intel Deutschland GmbH
- * Copyright (C) 2018-2023 Intel Corporation
+ * Copyright (C) 2018-2024 Intel Corporation
  */
 #include <linux/if_ether.h>
 #include <net/cfg80211.h>
@@ -1290,7 +1290,7 @@ static inline void
 LINUX_BACKPORT(cfg80211_ch_switch_started_notify)(struct net_device *dev,
 						  struct cfg80211_chan_def *chandef,
 						  unsigned int link_id, u8 count,
-						  bool quiet, u16 punct_bitmap)
+						  bool quiet)
 {
 	cfg80211_ch_switch_started_notify(dev, chandef, count);
 }
@@ -1301,12 +1301,22 @@ static inline void
 LINUX_BACKPORT(cfg80211_ch_switch_started_notify)(struct net_device *dev,
 						  struct cfg80211_chan_def *chandef,
 						  unsigned int link_id, u8 count,
-						  bool quiet, u16 punct_bitmap)
+						  bool quiet)
 {
 	cfg80211_ch_switch_started_notify(dev, chandef, count, quiet);
 }
 #define cfg80211_ch_switch_started_notify LINUX_BACKPORT(cfg80211_ch_switch_started_notify)
-#endif /* < 6.1.0 */
+#elif CFG80211_VERSION < KERNEL_VERSION(6,9,0)
+static inline void
+LINUX_BACKPORT(cfg80211_ch_switch_started_notify)(struct net_device *dev,
+						  struct cfg80211_chan_def *chandef,
+						  unsigned int link_id, u8 count,
+						  bool quiet)
+{
+	cfg80211_ch_switch_started_notify(dev, chandef, link_id, count, quiet, 0);
+}
+#define cfg80211_ch_switch_started_notify LINUX_BACKPORT(cfg80211_ch_switch_started_notify)
+#endif
 
 #ifndef ETH_TLEN
 #define ETH_TLEN	2		/* Octets in ethernet type field */
@@ -1776,7 +1786,9 @@ struct cfg80211_set_hw_timestamp {
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,0,0)
-#define cfg80211_ch_switch_notify(dev, chandef, link_id, punct_bitmap) cfg80211_ch_switch_notify(dev, chandef)
+#define cfg80211_ch_switch_notify(dev, chandef, link_id) cfg80211_ch_switch_notify(dev, chandef)
+#elif CFG80211_VERSION < KERNEL_VERSION(6,9,0)
+#define cfg80211_ch_switch_notify(dev, chandef, link_id) cfg80211_ch_switch_notify(dev, chandef, link_id, 0)
 #endif
 
 #ifdef CONFIG_THERMAL
@@ -2270,7 +2282,36 @@ ssize_t wiphy_locked_debugfs_write(struct wiphy *wiphy, struct file *file,
 #endif
 #endif /* < 6.7.0 */
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,8,0)
-int cfg80211_chandef_primary_freq(const struct cfg80211_chan_def *chandef,
-				  enum nl80211_chan_width primary_width);
+#if CFG80211_VERSION < KERNEL_VERSION(6,9,0)
+int cfg80211_chandef_primary(const struct cfg80211_chan_def *chandef,
+			     enum nl80211_chan_width primary_width,
+			     u16 *punctured);
+static inline void chandef_clear_punctured(struct cfg80211_chan_def *chandef)
+{
+}
+
+static inline u16 chandef_punctured(const struct cfg80211_chan_def *chandef)
+{
+	return 0;
+}
+
+static inline u16 *chandef_punctured_ptr(struct cfg80211_chan_def *chandef)
+{
+	return NULL;
+}
+#else
+static inline void chandef_clear_punctured(struct cfg80211_chan_def *chandef)
+{
+	chandef->punctured = 0;
+}
+
+static inline u16 chandef_punctured(const struct cfg80211_chan_def *chandef)
+{
+	return chandef->punctured;
+}
+
+static inline u16 *chandef_punctured_ptr(struct cfg80211_chan_def *chandef)
+{
+	return &chandef->punctured;
+}
 #endif /* cfg < 6.8 */

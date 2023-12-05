@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * mac80211 - channel management
- * Copyright 2020 - 2023 Intel Corporation
+ * Copyright 2020 - 2024 Intel Corporation
  */
 
 #include <linux/nl80211.h>
@@ -515,8 +515,12 @@ static void _ieee80211_change_chanctx(struct ieee80211_local *local,
 	WARN_ON(ieee80211_chanctx_refcount(local, ctx) > 1 &&
 		!cfg80211_chandef_compatible(&ctx->conf.def, &chanreq->oper));
 
-	if (!cfg80211_chandef_identical(&ctx->conf.def, &chanreq->oper))
-		changed |= IEEE80211_CHANCTX_CHANGE_WIDTH;
+	if (!cfg80211_chandef_identical(&ctx->conf.def, &chanreq->oper)) {
+		if (ctx->conf.def.width != chanreq->oper.width)
+			changed |= IEEE80211_CHANCTX_CHANGE_WIDTH;
+		if (chandef_punctured(&ctx->conf.def) != chandef_punctured(&chanreq->oper))
+			changed |= IEEE80211_CHANCTX_CHANGE_PUNCTURING;
+	}
 	if (!cfg80211_chandef_identical(&ctx->conf.ap, &chanreq->ap))
 		changed |= IEEE80211_CHANCTX_CHANGE_AP;
 	ctx->conf.def = *chandef;
