@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2012-2014, 2018-2023 Intel Corporation
+ * Copyright (C) 2012-2014, 2018-2024 Intel Corporation
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
  * Copyright (C) 2016-2017 Intel Deutschland GmbH
  */
@@ -510,7 +510,6 @@ static void iwl_mvm_phy_filter_init(struct iwl_mvm *mvm,
 #endif
 }
 
-#if defined(CONFIG_ACPI) && defined(CONFIG_EFI)
 static void iwl_mvm_uats_init(struct iwl_mvm *mvm)
 {
 	u8 cmd_ver;
@@ -590,17 +589,6 @@ static int iwl_mvm_sgom_init(struct iwl_mvm *mvm)
 
 	return ret;
 }
-#else
-
-static int iwl_mvm_sgom_init(struct iwl_mvm *mvm)
-{
-	return 0;
-}
-
-static void iwl_mvm_uats_init(struct iwl_mvm *mvm)
-{
-}
-#endif
 
 static int iwl_send_phy_cfg_cmd(struct iwl_mvm *mvm)
 {
