@@ -335,6 +335,8 @@
   stack_depot_fetch
   stack_depot_save
   stack_trace_save
+  static_key_enable
+  static_key_disable
   strcmp
   strcpy
   strlcpy
