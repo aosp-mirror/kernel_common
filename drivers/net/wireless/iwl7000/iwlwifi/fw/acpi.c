@@ -330,7 +330,6 @@ out_free:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_acpi_get_tas_table);
 
 int iwl_acpi_get_mcc(struct iwl_fw_runtime *fwrt, char *mcc)
 {
@@ -391,7 +390,6 @@ out_free:
 out:
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_acpi_get_pwr_limit);
 
 int iwl_acpi_get_eckv(struct iwl_fw_runtime *fwrt, u32 *extl_clk)
 {
@@ -546,7 +544,6 @@ out_free:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_acpi_get_wrds_table);
 
 int iwl_acpi_get_ewrd_table(struct iwl_fw_runtime *fwrt)
 {
@@ -655,7 +652,6 @@ out_free:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_acpi_get_ewrd_table);
 
 int iwl_acpi_get_wgds_table(struct iwl_fw_runtime *fwrt)
 {
@@ -810,7 +806,6 @@ out_free:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_acpi_get_wgds_table);
 
 int iwl_acpi_get_ppag_table(struct iwl_fw_runtime *fwrt)
 {
@@ -890,7 +885,6 @@ out_free:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_acpi_get_ppag_table);
 
 void iwl_acpi_get_phy_filters(struct iwl_fw_runtime *fwrt,
 			      struct iwl_phy_specific_cfg *filters)

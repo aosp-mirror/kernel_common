@@ -272,12 +272,11 @@ u8 *iwl_uefi_get_reduced_power(struct iwl_trans *trans, size_t *len)
 	unsigned long package_size;
 	u8 *data;
 
-	package = (struct pnvm_sku_package *)
-		iwl_uefi_get_verified_variable(trans,
-					       IWL_UEFI_REDUCED_POWER_NAME,
-					       "Reduced Power",
-						sizeof(*package),
-						&package_size);
+	package = iwl_uefi_get_verified_variable(trans,
+						 IWL_UEFI_REDUCED_POWER_NAME,
+						 "Reduced Power",
+						 sizeof(*package),
+						 &package_size);
 	if (IS_ERR(package))
 		return ERR_CAST(package);
 
@@ -318,9 +317,8 @@ void iwl_uefi_get_step_table(struct iwl_trans *trans)
 	if (trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_AX210)
 		return;
 
-	data = (struct uefi_cnv_common_step_data *)
-		iwl_uefi_get_verified_variable(trans, IWL_UEFI_STEP_NAME,
-					       "STEP", sizeof(*data), NULL);
+	data = iwl_uefi_get_verified_variable(trans, IWL_UEFI_STEP_NAME,
+					      "STEP", sizeof(*data), NULL);
 	if (IS_ERR(data))
 		return;
 
@@ -374,9 +372,8 @@ void iwl_uefi_get_sgom_table(struct iwl_trans *trans,
 	if (!fwrt->geo_enabled)
 		return;
 
-	data = (struct uefi_cnv_wlan_sgom_data *)
-		iwl_uefi_get_verified_variable(trans, IWL_UEFI_SGOM_NAME,
-					       "SGOM", sizeof(*data), NULL);
+	data = iwl_uefi_get_verified_variable(trans, IWL_UEFI_SGOM_NAME,
+					      "SGOM", sizeof(*data), NULL);
 	if (IS_ERR(data))
 		return;
 
@@ -405,9 +402,8 @@ int iwl_uefi_get_uats_table(struct iwl_trans *trans,
 	struct uefi_cnv_wlan_uats_data *data;
 	int ret;
 
-	data = (struct uefi_cnv_wlan_uats_data *)
-		iwl_uefi_get_verified_variable(trans, IWL_UEFI_UATS_NAME,
-					       "UATS", sizeof(*data), NULL);
+	data = iwl_uefi_get_verified_variable(trans, IWL_UEFI_UATS_NAME,
+					      "UATS", sizeof(*data), NULL);
 	if (IS_ERR(data))
 		return -EINVAL;
 
@@ -439,9 +435,8 @@ int iwl_uefi_get_wrds_table(struct iwl_fw_runtime *fwrt)
 	struct uefi_cnv_var_wrds *data;
 	int ret = 0;
 
-	data = (struct uefi_cnv_var_wrds *)
-		iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_WRDS_NAME,
-					       "WRDS", sizeof(*data), NULL);
+	data = iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_WRDS_NAME,
+					      "WRDS", sizeof(*data), NULL);
 	if (IS_ERR(data))
 		return -EINVAL;
 
@@ -460,16 +455,14 @@ out:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_uefi_get_wrds_table);
 
 int iwl_uefi_get_ewrd_table(struct iwl_fw_runtime *fwrt)
 {
 	struct uefi_cnv_var_ewrd *data;
 	int i, ret = 0;
 
-	data = (struct uefi_cnv_var_ewrd *)
-		iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_EWRD_NAME,
-					       "EWRD", sizeof(*data), NULL);
+	data = iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_EWRD_NAME,
+					      "EWRD", sizeof(*data), NULL);
 	if (IS_ERR(data))
 		return -EINVAL;
 
@@ -497,16 +490,14 @@ out:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_uefi_get_ewrd_table);
 
 int iwl_uefi_get_wgds_table(struct iwl_fw_runtime *fwrt)
 {
 	struct uefi_cnv_var_wgds *data;
 	int i, ret = 0;
 
-	data = (struct uefi_cnv_var_wgds *)
-		iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_WGDS_NAME,
-					       "WGDS", sizeof(*data), NULL);
+	data = iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_WGDS_NAME,
+					      "WGDS", sizeof(*data), NULL);
 	if (IS_ERR(data))
 		return -EINVAL;
 
@@ -536,16 +527,14 @@ out:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_uefi_get_wgds_table);
 
 int iwl_uefi_get_ppag_table(struct iwl_fw_runtime *fwrt)
 {
 	struct uefi_cnv_var_ppag *data;
 	int ret = 0;
 
-	data = (struct uefi_cnv_var_ppag *)
-		iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_PPAG_NAME,
-					       "PPAG", sizeof(*data), NULL);
+	data = iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_PPAG_NAME,
+					      "PPAG", sizeof(*data), NULL);
 	if (IS_ERR(data))
 		return -EINVAL;
 
@@ -568,7 +557,6 @@ out:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_uefi_get_ppag_table);
 
 int iwl_uefi_get_tas_table(struct iwl_fw_runtime *fwrt,
 			   struct iwl_tas_data *tas_data)
@@ -576,9 +564,10 @@ int iwl_uefi_get_tas_table(struct iwl_fw_runtime *fwrt,
 	struct uefi_cnv_var_wtas *uefi_tas;
 	int ret = 0, enabled, i;
 
-	uefi_tas = (struct uefi_cnv_var_wtas *)
-		iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_WTAS_NAME,
-					       "WTAS", sizeof(*uefi_tas), NULL);
+	uefi_tas = iwl_uefi_get_verified_variable(fwrt->trans,
+						  IWL_UEFI_WTAS_NAME,
+						  "WTAS", sizeof(*uefi_tas),
+						  NULL);
 	if (IS_ERR(uefi_tas))
 		return -EINVAL;
 
@@ -618,7 +607,6 @@ out:
 	kfree(uefi_tas);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_uefi_get_tas_table);
 
 int iwl_uefi_get_pwr_limit(struct iwl_fw_runtime *fwrt,
 			   u64 *dflt_pwr_limit)
@@ -626,9 +614,8 @@ int iwl_uefi_get_pwr_limit(struct iwl_fw_runtime *fwrt,
 	struct uefi_cnv_var_splc *data;
 	int ret = 0;
 
-	data = (struct uefi_cnv_var_splc *)
-		iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_SPLC_NAME,
-					       "SPLC", sizeof(*data), NULL);
+	data = iwl_uefi_get_verified_variable(fwrt->trans, IWL_UEFI_SPLC_NAME,
+					      "SPLC", sizeof(*data), NULL);
 	if (IS_ERR(data))
 		return -EINVAL;
 
@@ -643,7 +630,6 @@ out:
 	kfree(data);
 	return ret;
 }
-IWL_EXPORT_SYMBOL(iwl_uefi_get_pwr_limit);
 
 int iwl_uefi_get_mcc(struct iwl_fw_runtime *fwrt, char *mcc)
 {
