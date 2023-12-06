@@ -178,9 +178,7 @@ struct iwl_fw_runtime {
 	bool sgom_enabled;
 	struct iwl_uats_table_cmd uats_table;
 	bool uats_enabled;
-#ifdef CONFIG_ACPI
 	u8 uefi_tables_lock_status;
-#endif
 };
 
 void iwl_fw_runtime_init(struct iwl_fw_runtime *fwrt, struct iwl_trans *trans,
