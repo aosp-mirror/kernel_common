@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (C) 2021 The Android Open Source Project
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load(
     "@rules_pkg//pkg:mappings.bzl",
+    "pkg_filegroup",
     "pkg_files",
     "strip_prefix",
 )
@@ -776,6 +778,68 @@ copy_to_dist_dir(
     dist_dir = "out/kunit_riscv64/dist",
     flat = True,
     log = "info",
+)
+
+_KUNIT_DIR = "testcases/kunit"
+
+pkg_files(
+    name = "kunit_arm64_stripped",
+    srcs = [":kunit_aarch64"],
+    prefix = "arm64",
+    strip_prefix = paths.join(
+        strip_prefix.from_pkg(),
+        "kunit_aarch64",
+    ),
+    visibility = ["//visibility:private"],
+)
+
+pkg_files(
+    name = "kunit_arm64_test_config",
+    srcs = [":tools/testing/kunit/android/config_arm64.xml"],
+    renames = {
+        "tools/testing/kunit/android/config_arm64.xml": "kunit.config",
+    },
+    visibility = ["//visibility:private"],
+)
+
+pkg_filegroup(
+    name = "kunit_tests_arm64_pkg_files",
+    srcs = [
+        ":kunit_arm64_stripped",
+        ":kunit_arm64_test_config",
+    ],
+    prefix = _KUNIT_DIR,
+    visibility = ["//visibility:private"],
+)
+
+pkg_files(
+    name = "kunit_x86_64_stripped",
+    srcs = [":kunit_x86_64"],
+    prefix = "x86_64",
+    strip_prefix = paths.join(
+        strip_prefix.from_pkg(),
+        "kunit_x86_64",
+    ),
+    visibility = ["//visibility:private"],
+)
+
+pkg_files(
+    name = "kunit_x86_64_test_config",
+    srcs = [":tools/testing/kunit/android/config_x86_64.xml"],
+    renames = {
+        "tools/testing/kunit/android/config_x86_64.xml": "kunit.config",
+    },
+    visibility = ["//visibility:private"],
+)
+
+pkg_filegroup(
+    name = "kunit_tests_x86_64_pkg_files",
+    srcs = [
+        ":kunit_x86_64_stripped",
+        ":kunit_x86_64_test_config",
+    ],
+    prefix = _KUNIT_DIR,
+    visibility = ["//visibility:private"],
 )
 
 # DDK Headers
@@ -2341,13 +2405,19 @@ pkg_files(
 
 pkg_zip(
     name = "tests_zip_x86_64",
-    srcs = [":kselftest_tests_x86_64_pkg_files"],
+    srcs = [
+        ":kselftest_tests_x86_64_pkg_files",
+        ":kunit_tests_x86_64_pkg_files",
+    ],
     out = "x86_64/tests.zip",
 )
 
 pkg_zip(
     name = "tests_zip_arm64",
-    srcs = [":kselftest_tests_arm64_pkg_files"],
+    srcs = [
+        ":kselftest_tests_arm64_pkg_files",
+        ":kunit_tests_arm64_pkg_files",
+    ],
     out = "arm64/tests.zip",
 )
 
