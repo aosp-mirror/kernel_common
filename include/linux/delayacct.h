@@ -170,35 +170,109 @@ static inline void delayacct_thrashing_end(void)
 }
 
 #else
+extern void _trace_android_vh_delayacct_set_flag(struct task_struct *p, int flag);
+extern void _trace_android_vh_delayacct_clear_flag(struct task_struct *p, int flag);
+extern void _trace_android_rvh_delayacct_init(void);
+extern void _trace_android_rvh_delayacct_tsk_init(struct task_struct *tsk);
+extern void _trace_android_rvh_delayacct_tsk_free(struct task_struct *tsk);
+extern void _trace_android_vh_delayacct_blkio_start(void);
+extern void _trace_android_vh_delayacct_blkio_end(struct task_struct *p);
+extern void _trace_android_vh_delayacct_add_tsk(struct taskstats *d,
+						struct task_struct *tsk,
+						int *ret);
+extern void _trace_android_vh_delayacct_blkio_ticks(struct task_struct *tsk, __u64 *ret);
+extern void _trace_android_vh_delayacct_is_task_waiting_on_io(struct task_struct *p, int *ret);
+extern void _trace_android_vh_delayacct_freepages_start(void);
+extern void _trace_android_vh_delayacct_freepages_end(void);
+extern void _trace_android_vh_delayacct_thrashing_start(void);
+extern void _trace_android_vh_delayacct_thrashing_end(void);
+extern void set_delayacct_enabled(bool enabled);
+extern bool get_delayacct_enabled(void);
+
 static inline void delayacct_set_flag(struct task_struct *p, int flag)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_set_flag(p, flag);
+}
 static inline void delayacct_clear_flag(struct task_struct *p, int flag)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_clear_flag(p, flag);
+}
+
 static inline void delayacct_init(void)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_rvh_delayacct_init();
+}
 static inline void delayacct_tsk_init(struct task_struct *tsk)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_rvh_delayacct_tsk_init(tsk);
+}
 static inline void delayacct_tsk_free(struct task_struct *tsk)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_rvh_delayacct_tsk_free(tsk);
+}
 static inline void delayacct_blkio_start(void)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_blkio_start();
+}
 static inline void delayacct_blkio_end(struct task_struct *p)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_blkio_end(p);
+}
 static inline int delayacct_add_tsk(struct taskstats *d,
 					struct task_struct *tsk)
-{ return 0; }
+{
+	int ret = 0;
+
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_add_tsk(d, tsk, &ret);
+
+	return ret;
+}
 static inline __u64 delayacct_blkio_ticks(struct task_struct *tsk)
-{ return 0; }
+{
+	__u64 ret = 0;
+
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_blkio_ticks(tsk, &ret);
+
+	return ret;
+}
 static inline int delayacct_is_task_waiting_on_io(struct task_struct *p)
-{ return 0; }
+{
+	int ret = 0;
+
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_is_task_waiting_on_io(p, &ret);
+
+	return ret;
+}
 static inline void delayacct_freepages_start(void)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_freepages_start();
+}
 static inline void delayacct_freepages_end(void)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_freepages_end();
+}
 static inline void delayacct_thrashing_start(void)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_thrashing_start();
+}
 static inline void delayacct_thrashing_end(void)
-{}
+{
+	if (get_delayacct_enabled())
+		_trace_android_vh_delayacct_thrashing_end();
+}
 
 #endif /* CONFIG_TASK_DELAY_ACCT */
 
