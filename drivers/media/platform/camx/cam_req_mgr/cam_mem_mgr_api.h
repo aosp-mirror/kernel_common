@@ -106,11 +106,6 @@ int cam_mem_get_cpu_buf(int32_t buf_handle, uintptr_t *vaddr_ptr,
  */
 void cam_mem_put_cpu_buf(int32_t buf_handle);
 
-static inline bool cam_mem_is_secure_buf(int32_t buf_handle)
-{
-	return false;
-}
-
 /**
  * @brief: Reserves a memory region
  *

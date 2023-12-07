@@ -181,7 +181,6 @@ int cam_packet_util_process_patches(struct cam_packet *packet,
 	size_t     src_buf_size;
 	int        i;
 	int        rc = 0;
-	int32_t    hdl;
 	uint64_t   requestId;
 	uint32_t   num_patches;
 
@@ -196,10 +195,8 @@ int cam_packet_util_process_patches(struct cam_packet *packet,
 			sizeof(struct cam_patch_desc));
 
 	for (i = 0; i < packet->num_patches; i++) {
-		hdl = cam_mem_is_secure_buf(patch_desc[i].src_buf_hdl) ?
-			sec_mmu_hdl : iommu_hdl;
 		rc = cam_mem_get_io_buf(patch_desc[i].src_buf_hdl,
-			hdl, &iova_addr, &src_buf_size);
+			iommu_hdl, &iova_addr, &src_buf_size);
 		if (rc < 0) {
 			CAM_ERR(CAM_UTIL,
 				"unable to get src buf address ReqId: %llu, num_patches = %d",

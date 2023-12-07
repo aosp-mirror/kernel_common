@@ -4479,7 +4479,6 @@ static void cam_ife_mgr_print_io_bufs(struct cam_packet *packet,
 	int        i;
 	int        j;
 	int        rc = 0;
-	int32_t    mmu_hdl;
 
 	struct cam_buf_io_cfg  *io_cfg = NULL;
 
@@ -4516,11 +4515,8 @@ static void cam_ife_mgr_print_io_bufs(struct cam_packet *packet,
 				io_cfg[i].format,
 				io_cfg[i].direction);
 
-			mmu_hdl = cam_mem_is_secure_buf(
-				io_cfg[i].mem_handle[j]) ? sec_mmu_hdl :
-				iommu_hdl;
 			rc = cam_mem_get_io_buf(io_cfg[i].mem_handle[j],
-				mmu_hdl, &iova_addr, &src_buf_size);
+				iommu_hdl, &iova_addr, &src_buf_size);
 			if (rc < 0) {
 				CAM_ERR(CAM_ISP,
 					"get src buf address fail mem_handle 0x%x",

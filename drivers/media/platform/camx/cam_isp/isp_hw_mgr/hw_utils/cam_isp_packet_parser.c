@@ -489,7 +489,7 @@ int cam_isp_add_io_buffers(
 	size_t                              size;
 	int32_t                             hdl;
 	int                                 mmu_hdl;
-	bool                                mode, is_buf_secure;
+	bool                                mode;
 	uint64_t                            req_id;
 
 	io_cfg = (struct cam_buf_io_cfg *) ((uint8_t *)
@@ -620,18 +620,12 @@ int cam_isp_add_io_buffers(
 						sizeof(bool)))
 					return -EINVAL;
 
-				is_buf_secure = cam_mem_is_secure_buf(hdl);
-				if ((mode == CAM_SECURE_MODE_SECURE) &&
-					is_buf_secure) {
-					mmu_hdl = sec_iommu_hdl;
-				} else if (
-					(mode == CAM_SECURE_MODE_NON_SECURE) &&
-					(!is_buf_secure)) {
+				if (mode == CAM_SECURE_MODE_NON_SECURE) {
 					mmu_hdl = iommu_hdl;
 				} else {
 					CAM_ERR_RATE_LIMIT(CAM_ISP,
-						"Invalid hdl: port mode[%u], buf mode[%u]",
-						mode, is_buf_secure);
+						"Invalid hdl: port mode[%u]",
+						mode);
 					return -EINVAL;
 				}
 
@@ -755,18 +749,12 @@ int cam_isp_add_io_buffers(
 						sizeof(bool)))
 					return -EINVAL;
 
-				is_buf_secure = cam_mem_is_secure_buf(hdl);
-				if ((mode == CAM_SECURE_MODE_SECURE) &&
-					is_buf_secure) {
-					mmu_hdl = sec_iommu_hdl;
-				} else if (
-					(mode == CAM_SECURE_MODE_NON_SECURE) &&
-					(!is_buf_secure)) {
+				if (mode == CAM_SECURE_MODE_NON_SECURE) {
 					mmu_hdl = iommu_hdl;
 				} else {
 					CAM_ERR_RATE_LIMIT(CAM_ISP,
-						"Invalid hdl: port mode[%u], buf mode[%u]",
-						mode, is_buf_secure);
+						"Invalid hdl: port mode[%u]",
+						mode);
 					return -EINVAL;
 				}
 
