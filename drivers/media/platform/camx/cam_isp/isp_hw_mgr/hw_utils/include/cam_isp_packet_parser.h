@@ -126,8 +126,6 @@ int cam_isp_add_command_buffers(
  *                         index and update the HW entries list
  *
  * @iommu_hdl:             Iommu handle to get the IO buf from memory manager
- * @sec_iommu_hdl:         Secure iommu handle to get the IO buf from
- *                         memory manager
  * @prepare:               Contain the  packet and HW update variables
  * @base_idx:              Base or dev index of the IFE/VFE HW instance
  * @kmd_buf_info:          Kmd buffer to store the change base command
@@ -143,7 +141,6 @@ int cam_isp_add_command_buffers(
  */
 int cam_isp_add_io_buffers(
 	int                                   iommu_hdl,
-	int                                   sec_iommu_hdl,
 	struct cam_hw_prepare_update_args    *prepare,
 	uint32_t                              base_idx,
 	struct cam_kmd_buf_info              *kmd_buf_info,

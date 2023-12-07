@@ -624,7 +624,7 @@ err_after_dq_free_list:
 }
 
 static void cam_jpeg_mgr_print_io_bufs(struct cam_packet *packet,
-	int32_t iommu_hdl, int32_t sec_mmu_hdl, uint32_t pf_buf_info,
+	int32_t iommu_hdl, uint32_t pf_buf_info,
 	bool *mem_found)
 {
 	uint64_t   iova_addr;
@@ -756,7 +756,7 @@ static int cam_jpeg_mgr_prepare_hw_update(void *hw_mgr_priv,
 		(void *)packet, (void *)cmd_desc,
 		sizeof(struct cam_cmd_buf_desc));
 
-	rc = cam_packet_util_process_patches(packet, hw_mgr->iommu_hdl, -1, 0);
+	rc = cam_packet_util_process_patches(packet, hw_mgr->iommu_hdl, 0);
 	if (rc) {
 		CAM_ERR(CAM_JPEG, "Patch processing failed %d", rc);
 		return rc;
@@ -1636,7 +1636,6 @@ static int cam_jpeg_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 		cam_jpeg_mgr_print_io_bufs(
 			hw_cmd_args->u.pf_args.pf_data.packet,
 			hw_mgr->iommu_hdl,
-			hw_mgr->iommu_sec_hdl,
 			hw_cmd_args->u.pf_args.buf_info,
 			hw_cmd_args->u.pf_args.mem_found);
 		break;

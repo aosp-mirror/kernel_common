@@ -461,7 +461,6 @@ int cam_isp_add_command_buffers(
 
 int cam_isp_add_io_buffers(
 	int                                   iommu_hdl,
-	int                                   sec_iommu_hdl,
 	struct cam_hw_prepare_update_args    *prepare,
 	uint32_t                              base_idx,
 	struct cam_kmd_buf_info              *kmd_buf_info,

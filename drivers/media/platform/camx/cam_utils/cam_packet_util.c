@@ -169,7 +169,7 @@ rel_kmd_buf:
 }
 
 int cam_packet_util_process_patches(struct cam_packet *packet,
-	int32_t iommu_hdl, int32_t sec_mmu_hdl, int pf_dump_flag)
+	int32_t iommu_hdl, int pf_dump_flag)
 {
 	struct cam_patch_desc *patch_desc = NULL;
 	dma_addr_t iova_addr;

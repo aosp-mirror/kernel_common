@@ -4313,7 +4313,6 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 
 	rc = cam_packet_util_process_patches(prepare->packet,
 		hw_mgr->mgr_common.cmd_iommu_hdl,
-		hw_mgr->mgr_common.cmd_iommu_hdl_secure,
 		0);
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Patch ISP packet failed.");
@@ -4361,7 +4360,6 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 
 		/* get IO buffers */
 		rc = cam_isp_add_io_buffers(hw_mgr->mgr_common.img_iommu_hdl,
-			hw_mgr->mgr_common.img_iommu_hdl_secure,
 			prepare, ctx->base[i].idx,
 			&kmd_buf, ctx->res_list_ife_out,
 			&ctx->res_list_ife_in_rd,
@@ -4471,7 +4469,7 @@ static int cam_ife_mgr_sof_irq_debug(
 }
 
 static void cam_ife_mgr_print_io_bufs(struct cam_packet *packet,
-	int32_t iommu_hdl, int32_t sec_mmu_hdl, uint32_t pf_buf_info,
+	int32_t iommu_hdl, uint32_t pf_buf_info,
 	bool *mem_found)
 {
 	uint64_t   iova_addr;
@@ -4633,7 +4631,6 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 		cam_ife_mgr_print_io_bufs(
 			hw_cmd_args->u.pf_args.pf_data.packet,
 			hw_mgr->mgr_common.img_iommu_hdl,
-			hw_mgr->mgr_common.img_iommu_hdl_secure,
 			hw_cmd_args->u.pf_args.buf_info,
 			hw_cmd_args->u.pf_args.mem_found);
 		break;
