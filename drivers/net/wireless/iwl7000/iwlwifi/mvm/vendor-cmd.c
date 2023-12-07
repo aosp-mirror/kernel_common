@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2012-2014, 2018-2023 Intel Corporation
+ * Copyright (C) 2012-2014, 2018-2024 Intel Corporation
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
  * Copyright (C) 2016-2017 Intel Deutschland GmbH
  */
@@ -1010,7 +1010,6 @@ free:
 	return err;
 }
 
-#ifdef CONFIG_ACPI
 static int iwl_mvm_vendor_set_dynamic_txp_profile(struct wiphy *wiphy,
 						  struct wireless_dev *wdev,
 						  const void *data,
@@ -1362,8 +1361,6 @@ err:
 	kfree_skb(skb);
 	return ret;
 }
-
-#endif
 
 static const struct nla_policy
 iwl_mvm_vendor_fips_hw_policy[NUM_IWL_VENDOR_FIPS_TEST_VECTOR_HW] = {
@@ -1938,7 +1935,6 @@ static const struct wiphy_vendor_command iwl_mvm_vendor_commands[] = {
 		.maxattr = MAX_IWL_MVM_VENDOR_ATTR,
 #endif
 	},
-#ifdef CONFIG_ACPI
 	{
 		.info = {
 			.vendor_id = INTEL_OUI,
@@ -2038,7 +2034,6 @@ static const struct wiphy_vendor_command iwl_mvm_vendor_commands[] = {
 		.maxattr = MAX_IWL_MVM_VENDOR_ATTR,
 #endif
 	},
-#endif
 	{
 		.info = {
 			.vendor_id = INTEL_OUI,
