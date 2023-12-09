@@ -2740,6 +2740,11 @@ static int __cam_req_mgr_setup_link_info(struct cam_req_mgr_core_link *link,
 			 */
 			__cam_req_mgr_add_tbl_to_link(&link->req.l_tbl, pd_tbl);
 		}
+
+		/* dev_mask is a signed integer, we're good only up to bit 30 */
+		if (pd_tbl->dev_count + 1 > BITS_PER_TYPE(pd_tbl->dev_count) - 1)
+			goto error;
+
 		dev->dev_bit = pd_tbl->dev_count++;
 		dev->pd_tbl = pd_tbl;
 		pd_tbl->dev_mask |= (1 << dev->dev_bit);
