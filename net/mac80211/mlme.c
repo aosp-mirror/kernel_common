@@ -134,6 +134,7 @@ ieee80211_handle_puncturing_bitmap(struct ieee80211_link_data *link,
 				   u16 bitmap, u64 *changed)
 {
 	struct cfg80211_chan_def *chandef = &link->conf->chandef;
+	struct ieee80211_local *local = link->sdata->local;
 	u16 extracted;
 	u64 _changed = 0;
 
@@ -146,7 +147,9 @@ ieee80211_handle_puncturing_bitmap(struct ieee80211_link_data *link,
 							 bitmap);
 
 		if (cfg80211_valid_disable_subchannel_bitmap(&bitmap,
-							     chandef))
+							     chandef) &&
+		    !(bitmap && ieee80211_hw_check(&local->hw,
+						   DISALLOW_PUNCTURING)))
 			break;
 		link->u.mgd.conn_flags |=
 			ieee80211_chandef_downgrade(chandef);
@@ -5689,6 +5692,7 @@ static bool ieee80211_config_puncturing(struct ieee80211_link_data *link,
 					const struct ieee80211_eht_operation *eht_oper,
 					u64 *changed)
 {
+	struct ieee80211_local *local = link->sdata->local;
 	u16 bitmap = 0, extracted;
 
 	if ((eht_oper->params & IEEE80211_EHT_OPER_INFO_PRESENT) &&
@@ -5719,6 +5723,9 @@ static bool ieee80211_config_puncturing(struct ieee80211_link_data *link,
 			  link->conf->chandef.width);
 		return false;
 	}
+
+	if (bitmap && ieee80211_hw_check(&local->hw, DISALLOW_PUNCTURING))
+		return false;
 
 	ieee80211_handle_puncturing_bitmap(link, eht_oper, bitmap, changed);
 	return true;
@@ -7459,7 +7466,8 @@ ieee80211_setup_assoc_link(struct ieee80211_sub_if_data *sdata,
 
 			bitmap = get_unaligned_le16(disable_subchannel_bitmap);
 			if (cfg80211_valid_disable_subchannel_bitmap(&bitmap,
-								     &link->conf->chandef))
+								     &link->conf->chandef) &&
+			    !(bitmap && ieee80211_hw_check(&local->hw, DISALLOW_PUNCTURING)))
 				ieee80211_handle_puncturing_bitmap(link,
 								   eht_oper,
 								   bitmap,
