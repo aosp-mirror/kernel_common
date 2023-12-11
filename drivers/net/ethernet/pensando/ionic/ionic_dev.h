@@ -136,6 +136,7 @@ struct ionic_dev {
 	unsigned long last_hb_time;
 	u32 last_hb;
 	u8 last_fw_status;
+	u8 opcode;
 
 	u64 __iomem *db_pages;
 	dma_addr_t phy_db_pages;
