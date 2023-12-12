@@ -23,120 +23,148 @@
 #include "debugfs_netdev.h"
 #include "driver-ops.h"
 
+struct ieee80211_if_read_sdata_data {
+	ssize_t (*format)(const struct ieee80211_sub_if_data *, char *, int);
+	struct ieee80211_sub_if_data *sdata;
+};
+
+static ssize_t ieee80211_if_read_sdata_handler(struct wiphy *wiphy,
+					       struct file *file,
+					       char *buf,
+					       size_t bufsize,
+					       void *data)
+{
+	struct ieee80211_if_read_sdata_data *d = data;
+
+	return d->format(d->sdata, buf, bufsize);
+}
+
 static ssize_t ieee80211_if_read_sdata(
-	struct ieee80211_sub_if_data *sdata,
+	struct file *file,
 	char __user *userbuf,
 	size_t count, loff_t *ppos,
 	ssize_t (*format)(const struct ieee80211_sub_if_data *sdata, char *, int))
 {
+	struct ieee80211_sub_if_data *sdata = file->private_data;
+	struct ieee80211_if_read_sdata_data data = {
+		.format = format,
+		.sdata = sdata,
+	};
 	char buf[200];
-	ssize_t ret = -EINVAL;
 
-#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
-	wiphy_lock(sdata->local->hw.wiphy);
-#else
-	rtnl_lock();
-#endif
-	ret = (*format)(sdata, buf, sizeof(buf));
-#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
-	wiphy_unlock(sdata->local->hw.wiphy);
-#else
-	rtnl_unlock();
-#endif
+	return wiphy_locked_debugfs_read(sdata->local->hw.wiphy,
+					 file, buf, sizeof(buf),
+					 userbuf, count, ppos,
+					 ieee80211_if_read_sdata_handler,
+					 &data);
+}
 
-	if (ret >= 0)
-		ret = simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+struct ieee80211_if_write_sdata_data {
+	ssize_t (*write)(struct ieee80211_sub_if_data *, const char *, int);
+	struct ieee80211_sub_if_data *sdata;
+};
 
-	return ret;
+static ssize_t ieee80211_if_write_sdata_handler(struct wiphy *wiphy,
+						struct file *file,
+						char *buf,
+						size_t count,
+						void *data)
+{
+	struct ieee80211_if_write_sdata_data *d = data;
+
+	return d->write(d->sdata, buf, count);
 }
 
 static ssize_t ieee80211_if_write_sdata(
-	struct ieee80211_sub_if_data *sdata,
+	struct file *file,
 	const char __user *userbuf,
 	size_t count, loff_t *ppos,
 	ssize_t (*write)(struct ieee80211_sub_if_data *sdata, const char *, int))
 {
+	struct ieee80211_sub_if_data *sdata = file->private_data;
+	struct ieee80211_if_write_sdata_data data = {
+		.write = write,
+		.sdata = sdata,
+	};
 	char buf[64];
-	ssize_t ret;
 
-	if (count >= sizeof(buf))
-		return -E2BIG;
+	return wiphy_locked_debugfs_write(sdata->local->hw.wiphy,
+					  file, buf, sizeof(buf),
+					  userbuf, count,
+					  ieee80211_if_write_sdata_handler,
+					  &data);
+}
 
-	if (copy_from_user(buf, userbuf, count))
-		return -EFAULT;
-	buf[count] = '\0';
+struct ieee80211_if_read_link_data {
+	ssize_t (*format)(const struct ieee80211_link_data *, char *, int);
+	struct ieee80211_link_data *link;
+};
 
-#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
-	wiphy_lock(sdata->local->hw.wiphy);
-#else
-	rtnl_lock();
-#endif
-	ret = (*write)(sdata, buf, count);
-#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
-	wiphy_unlock(sdata->local->hw.wiphy);
-#else
-	rtnl_unlock();
-#endif
+static ssize_t ieee80211_if_read_link_handler(struct wiphy *wiphy,
+					      struct file *file,
+					      char *buf,
+					      size_t bufsize,
+					      void *data)
+{
+	struct ieee80211_if_read_link_data *d = data;
 
-	return ret;
+	return d->format(d->link, buf, bufsize);
 }
 
 static ssize_t ieee80211_if_read_link(
-	struct ieee80211_link_data *link,
+	struct file *file,
 	char __user *userbuf,
 	size_t count, loff_t *ppos,
 	ssize_t (*format)(const struct ieee80211_link_data *link, char *, int))
 {
+	struct ieee80211_link_data *link = file->private_data;
+	struct ieee80211_if_read_link_data data = {
+		.format = format,
+		.link = link,
+	};
 	char buf[200];
-	ssize_t ret = -EINVAL;
 
-#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
-	wiphy_lock(link->sdata->local->hw.wiphy);
-#else
-	rtnl_lock();
-#endif
-	ret = (*format)(link, buf, sizeof(buf));
-#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
-	wiphy_unlock(link->sdata->local->hw.wiphy);
-#else
-	rtnl_unlock();
-#endif
+	return wiphy_locked_debugfs_read(link->sdata->local->hw.wiphy,
+					 file, buf, sizeof(buf),
+					 userbuf, count, ppos,
+					 ieee80211_if_read_link_handler,
+					 &data);
+}
 
-	if (ret >= 0)
-		ret = simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+struct ieee80211_if_write_link_data {
+	ssize_t (*write)(struct ieee80211_link_data *, const char *, int);
+	struct ieee80211_link_data *link;
+};
 
-	return ret;
+static ssize_t ieee80211_if_write_link_handler(struct wiphy *wiphy,
+					       struct file *file,
+					       char *buf,
+					       size_t count,
+					       void *data)
+{
+	struct ieee80211_if_write_sdata_data *d = data;
+
+	return d->write(d->sdata, buf, count);
 }
 
 static ssize_t ieee80211_if_write_link(
-	struct ieee80211_link_data *link,
+	struct file *file,
 	const char __user *userbuf,
 	size_t count, loff_t *ppos,
 	ssize_t (*write)(struct ieee80211_link_data *link, const char *, int))
 {
+	struct ieee80211_link_data *link = file->private_data;
+	struct ieee80211_if_write_link_data data = {
+		.write = write,
+		.link = link,
+	};
 	char buf[64];
-	ssize_t ret;
 
-	if (count >= sizeof(buf))
-		return -E2BIG;
-
-	if (copy_from_user(buf, userbuf, count))
-		return -EFAULT;
-	buf[count] = '\0';
-
-#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
-	wiphy_lock(link->sdata->local->hw.wiphy);
-#else
-	rtnl_lock();
-#endif
-	ret = (*write)(link, buf, count);
-#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
-	wiphy_unlock(link->sdata->local->hw.wiphy);
-#else
-	rtnl_unlock();
-#endif
-
-	return ret;
+	return wiphy_locked_debugfs_write(link->sdata->local->hw.wiphy,
+					  file, buf, sizeof(buf),
+					  userbuf, count,
+					  ieee80211_if_write_link_handler,
+					  &data);
 }
 
 #define IEEE80211_IF_FMT(name, type, field, format_string)		\
@@ -206,7 +234,7 @@ static ssize_t ieee80211_if_read_##name(struct file *file,		\
 					char __user *userbuf,		\
 					size_t count, loff_t *ppos)	\
 {									\
-	return ieee80211_if_read_sdata(file->private_data,		\
+	return ieee80211_if_read_sdata(file,				\
 				       userbuf, count, ppos,		\
 				       ieee80211_if_fmt_##name);	\
 }
@@ -216,7 +244,7 @@ static ssize_t ieee80211_if_write_##name(struct file *file,		\
 					 const char __user *userbuf,	\
 					 size_t count, loff_t *ppos)	\
 {									\
-	return ieee80211_if_write_sdata(file->private_data, userbuf,	\
+	return ieee80211_if_write_sdata(file, userbuf,			\
 					count, ppos,			\
 					ieee80211_if_parse_##name);	\
 }
@@ -244,7 +272,7 @@ static ssize_t ieee80211_if_read_##name(struct file *file,		\
 					char __user *userbuf,		\
 					size_t count, loff_t *ppos)	\
 {									\
-	return ieee80211_if_read_link(file->private_data,		\
+	return ieee80211_if_read_link(file,				\
 				      userbuf, count, ppos,		\
 				      ieee80211_if_fmt_##name);	\
 }
@@ -254,7 +282,7 @@ static ssize_t ieee80211_if_write_##name(struct file *file,		\
 					 const char __user *userbuf,	\
 					 size_t count, loff_t *ppos)	\
 {									\
-	return ieee80211_if_write_link(file->private_data, userbuf,	\
+	return ieee80211_if_write_link(file, userbuf,			\
 				       count, ppos,			\
 				       ieee80211_if_parse_##name);	\
 }

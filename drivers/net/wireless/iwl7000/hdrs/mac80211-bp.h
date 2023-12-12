@@ -2208,5 +2208,97 @@ static inline bool LINUX_BACKPORT(napi_schedule)(struct napi_struct *n)
 	return false;
 }
 #define napi_schedule LINUX_BACKPORT(napi_schedule)
+
+#ifdef CONFIG_CFG80211_DEBUGFS
+/**
+ * wiphy_locked_debugfs_read - do a locked read in debugfs
+ * @wiphy: the wiphy to use
+ * @file: the file being read
+ * @buf: the buffer to fill and then read from
+ * @bufsize: size of the buffer
+ * @userbuf: the user buffer to copy to
+ * @count: read count
+ * @ppos: read position
+ * @handler: the read handler to call (under wiphy lock)
+ * @data: additional data to pass to the read handler
+ */
+static inline
+ssize_t wiphy_locked_debugfs_read(struct wiphy *wiphy, struct file *file,
+				  char *buf, size_t bufsize,
+				  char __user *userbuf, size_t count,
+				  loff_t *ppos,
+				  ssize_t (*handler)(struct wiphy *wiphy,
+						     struct file *file,
+						     char *buf,
+						     size_t bufsize,
+						     void *data),
+				  void *data)
+{
+	ssize_t ret = -EINVAL;
+
+#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
+	wiphy_lock(wiphy);
+#else
+	rtnl_lock();
+#endif
+	ret = handler(wiphy, file, buf, bufsize, data);
+#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
+	wiphy_unlock(wiphy);
+#else
+	rtnl_unlock();
+#endif
+
+	if (ret >= 0)
+		ret = simple_read_from_buffer(userbuf, count, ppos, buf, ret);
+
+	return ret;
+}
+
+/**
+ * wiphy_locked_debugfs_write - do a locked write in debugfs
+ * @wiphy: the wiphy to use
+ * @file: the file being written to
+ * @buf: the buffer to copy the user data to
+ * @bufsize: size of the buffer
+ * @userbuf: the user buffer to copy from
+ * @count: read count
+ * @handler: the write handler to call (under wiphy lock)
+ * @data: additional data to pass to the write handler
+ */
+static inline
+ssize_t wiphy_locked_debugfs_write(struct wiphy *wiphy, struct file *file,
+				   char *buf, size_t bufsize,
+				   const char __user *userbuf, size_t count,
+				   ssize_t (*handler)(struct wiphy *wiphy,
+						      struct file *file,
+						      char *buf,
+						      size_t count,
+						      void *data),
+				   void *data)
+{
+	ssize_t ret;
+
+	if (count >= sizeof(buf))
+		return -E2BIG;
+
+	if (copy_from_user(buf, userbuf, count))
+		return -EFAULT;
+	buf[count] = '\0';
+
+#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
+	wiphy_lock(wiphy);
+#else
+	rtnl_lock();
+#endif
+	ret = handler(wiphy, file, buf, bufsize, data);
+#if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
+	wiphy_unlock(wiphy);
+#else
+	rtnl_unlock();
+#endif
+
+	return ret;
+}
+#endif
 #endif /* < 6.7.0 */
 
