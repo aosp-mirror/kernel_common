@@ -1447,6 +1447,25 @@ static inline struct hci_conn *hci_lookup_le_connect(struct hci_dev *hdev)
 	return NULL;
 }
 
+static inline struct hci_conn *hci_lookup_connect(struct hci_dev *hdev)
+{
+	struct hci_conn_hash *h = &hdev->conn_hash;
+	struct hci_conn  *c;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(c, &h->list, list) {
+		if (c->state == BT_CONNECT) {
+			rcu_read_unlock();
+			return c;
+		}
+	}
+
+	rcu_read_unlock();
+
+	return NULL;
+}
+
 /* Returns true if an le connection is in the scanning state */
 static inline bool hci_is_le_conn_scanning(struct hci_dev *hdev)
 {
