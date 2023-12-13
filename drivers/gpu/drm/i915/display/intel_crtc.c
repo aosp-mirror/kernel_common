@@ -470,6 +470,7 @@ static int intel_mode_vblank_start(const struct drm_display_mode *mode)
 }
 
 struct intel_vblank_evade_ctx {
+	struct intel_crtc *crtc;
 	int min, max, vblank_start;
 	bool need_vlv_dsi_wa;
 };
@@ -482,6 +483,8 @@ static void intel_vblank_evade_init(const struct intel_crtc_state *old_crtc_stat
 	struct drm_i915_private *i915 = to_i915(crtc->base.dev);
 	const struct intel_crtc_state *crtc_state;
 	const struct drm_display_mode *adjusted_mode;
+
+	evade->crtc = crtc;
 
 	evade->need_vlv_dsi_wa = (IS_VALLEYVIEW(i915) || IS_CHERRYVIEW(i915)) &&
 		intel_crtc_has_type(new_crtc_state, INTEL_OUTPUT_DSI);
@@ -529,60 +532,15 @@ static void intel_vblank_evade_init(const struct intel_crtc_state *old_crtc_stat
 		evade->min -= adjusted_mode->crtc_vblank_start - adjusted_mode->crtc_vdisplay;
 }
 
-/**
- * intel_pipe_update_start() - start update of a set of display registers
- * @state: the atomic state
- * @crtc: the crtc
- *
- * Mark the start of an update to pipe registers that should be updated
- * atomically regarding vblank. If the next vblank will happens within
- * the next 100 us, this function waits until the vblank passes.
- *
- * After a successful call to this function, interrupts will be disabled
- * until a subsequent call to intel_pipe_update_end(). That is done to
- * avoid random delays.
- */
-void intel_pipe_update_start(struct intel_atomic_state *state,
-			     struct intel_crtc *crtc)
+/* must be called with vblank interrupt already enabled! */
+static int intel_vblank_evade(struct intel_vblank_evade_ctx *evade)
 {
-	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
-	const struct intel_crtc_state *old_crtc_state =
-		intel_atomic_get_old_crtc_state(state, crtc);
-	struct intel_crtc_state *new_crtc_state =
-		intel_atomic_get_new_crtc_state(state, crtc);
+	struct intel_crtc *crtc = evade->crtc;
+	struct drm_i915_private *i915 = to_i915(crtc->base.dev);
 	long timeout = msecs_to_jiffies_timeout(1);
-	int scanline;
 	wait_queue_head_t *wq = drm_crtc_vblank_waitqueue(&crtc->base);
-	struct intel_vblank_evade_ctx evade;
 	DEFINE_WAIT(wait);
-
-	intel_psr_lock(new_crtc_state);
-
-	if (new_crtc_state->do_async_flip)
-		return;
-
-	if (intel_crtc_needs_vblank_work(new_crtc_state))
-		intel_crtc_vblank_work_init(new_crtc_state);
-
-	intel_vblank_evade_init(old_crtc_state, new_crtc_state, &evade);
-	if (evade.min <= 0 || evade.max <= 0)
-		goto irq_disable;
-
-	if (drm_WARN_ON(&dev_priv->drm, drm_crtc_vblank_get(&crtc->base)))
-		goto irq_disable;
-
-	/*
-	 * Wait for psr to idle out after enabling the VBL interrupts
-	 * VBL interrupts will start the PSR exit and prevent a PSR
-	 * re-entry as well.
-	 */
-	intel_psr_wait_for_idle_locked(new_crtc_state);
-
-	local_irq_disable();
-
-	crtc->debug.min_vbl = evade.min;
-	crtc->debug.max_vbl = evade.max;
-	trace_intel_pipe_update_start(crtc);
+	int scanline;
 
 	for (;;) {
 		/*
@@ -593,11 +551,11 @@ void intel_pipe_update_start(struct intel_atomic_state *state,
 		prepare_to_wait(wq, &wait, TASK_UNINTERRUPTIBLE);
 
 		scanline = intel_get_crtc_scanline(crtc);
-		if (scanline < evade.min || scanline > evade.max)
+		if (scanline < evade->min || scanline > evade->max)
 			break;
 
 		if (!timeout) {
-			drm_err(&dev_priv->drm,
+			drm_err(&i915->drm,
 				"Potential atomic update failure on pipe %c\n",
 				pipe_name(crtc->pipe));
 			break;
@@ -627,8 +585,65 @@ void intel_pipe_update_start(struct intel_atomic_state *state,
 	 *
 	 * FIXME figure out if BXT+ DSI suffers from this as well
 	 */
-	while (evade.need_vlv_dsi_wa && scanline == evade.vblank_start)
+	while (evade->need_vlv_dsi_wa && scanline == evade->vblank_start)
 		scanline = intel_get_crtc_scanline(crtc);
+
+	return scanline;
+}
+
+/**
+ * intel_pipe_update_start() - start update of a set of display registers
+ * @state: the atomic state
+ * @crtc: the crtc
+ *
+ * Mark the start of an update to pipe registers that should be updated
+ * atomically regarding vblank. If the next vblank will happens within
+ * the next 100 us, this function waits until the vblank passes.
+ *
+ * After a successful call to this function, interrupts will be disabled
+ * until a subsequent call to intel_pipe_update_end(). That is done to
+ * avoid random delays.
+ */
+void intel_pipe_update_start(struct intel_atomic_state *state,
+			     struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	const struct intel_crtc_state *old_crtc_state =
+		intel_atomic_get_old_crtc_state(state, crtc);
+	struct intel_crtc_state *new_crtc_state =
+		intel_atomic_get_new_crtc_state(state, crtc);
+	struct intel_vblank_evade_ctx evade;
+	int scanline;
+
+	intel_psr_lock(new_crtc_state);
+
+	if (new_crtc_state->do_async_flip)
+		return;
+
+	if (intel_crtc_needs_vblank_work(new_crtc_state))
+		intel_crtc_vblank_work_init(new_crtc_state);
+
+	intel_vblank_evade_init(old_crtc_state, new_crtc_state, &evade);
+	if (evade.min <= 0 || evade.max <= 0)
+		goto irq_disable;
+
+	if (drm_WARN_ON(&dev_priv->drm, drm_crtc_vblank_get(&crtc->base)))
+		goto irq_disable;
+
+	/*
+	 * Wait for psr to idle out after enabling the VBL interrupts
+	 * VBL interrupts will start the PSR exit and prevent a PSR
+	 * re-entry as well.
+	 */
+	intel_psr_wait_for_idle_locked(new_crtc_state);
+
+	local_irq_disable();
+
+	crtc->debug.min_vbl = evade.min;
+	crtc->debug.max_vbl = evade.max;
+	trace_intel_pipe_update_start(crtc);
+
+	scanline = intel_vblank_evade(&evade);
 
 	drm_crtc_vblank_put(&crtc->base);
 
