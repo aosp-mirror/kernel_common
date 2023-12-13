@@ -2426,8 +2426,16 @@ static inline bool kvm_vcpu_sched_enabled(struct kvm_vcpu *vcpu)
 }
 
 void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type);
+
+static inline void kvm_vcpu_kick_boost(struct kvm_vcpu *vcpu)
+{
+	kvm_vcpu_boost(vcpu, PVSCHED_KERNCS_BOOST_IRQ);
+	kvm_vcpu_kick(vcpu);
+}
 #else
 static inline void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type) { }
+
+#define kvm_vcpu_kick_boost kvm_vcpu_kick
 #endif
 
 #endif

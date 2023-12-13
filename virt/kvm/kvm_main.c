@@ -3657,6 +3657,14 @@ bool kvm_vcpu_block(struct kvm_vcpu *vcpu)
 		if (kvm_vcpu_check_block(vcpu) < 0)
 			break;
 
+		/*
+		 * Boost before scheduling out. Wakeup happens only on
+		 * an event or a signal and hence it is beneficial to
+		 * be scheduled ASAP. Ultimately, guest gets to idle loop
+		 * and then will request deboost.
+		 */
+		kvm_vcpu_boost(vcpu, PVSCHED_KERNCS_BOOST_IDLE);
+
 		waited = true;
 		schedule();
 	}
