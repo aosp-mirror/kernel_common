@@ -632,50 +632,23 @@ static struct bus_type rpmsg_bus = {
 	.remove		= rpmsg_dev_remove,
 };
 
-/*
- * A helper for registering rpmsg device with driver override and name.
- * Drivers should not be using it, but instead rpmsg_register_device().
- */
-int rpmsg_register_device_override(struct rpmsg_device *rpdev,
-				   const char *driver_override)
+int rpmsg_register_device(struct rpmsg_device *rpdev)
 {
 	struct device *dev = &rpdev->dev;
 	int ret;
-
-	if (driver_override)
-		strcpy(rpdev->id.name, driver_override);
 
 	dev_set_name(&rpdev->dev, "%s.%s.%d.%d", dev_name(dev->parent),
 		     rpdev->id.name, rpdev->src, rpdev->dst);
 
 	rpdev->dev.bus = &rpmsg_bus;
 
-	device_initialize(dev);
-	if (driver_override) {
-		ret = driver_set_override(dev, &rpdev->driver_override,
-					  driver_override,
-					  strlen(driver_override));
-		if (ret) {
-			dev_err(dev, "device_set_override failed: %d\n", ret);
-			return ret;
-		}
-	}
-
-	ret = device_add(dev);
+	ret = device_register(&rpdev->dev);
 	if (ret) {
-		dev_err(dev, "device_add failed: %d\n", ret);
-		kfree(rpdev->driver_override);
-		rpdev->driver_override = NULL;
+		dev_err(dev, "device_register failed: %d\n", ret);
 		put_device(&rpdev->dev);
 	}
 
 	return ret;
-}
-EXPORT_SYMBOL(rpmsg_register_device_override);
-
-int rpmsg_register_device(struct rpmsg_device *rpdev)
-{
-	return rpmsg_register_device_override(rpdev, NULL);
 }
 EXPORT_SYMBOL(rpmsg_register_device);
 
