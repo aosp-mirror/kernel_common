@@ -5584,7 +5584,7 @@ void intel_dp_process_phy_request(struct intel_dp *intel_dp)
 	intel_dp_autotest_phy_ddi_enable(intel_dp, data->num_lanes);
 
 	drm_dp_set_phy_test_pattern(&intel_dp->aux, data,
-				    link_status[DP_DPCD_REV]);
+				    intel_dp->dpcd[DP_DPCD_REV]);
 }
 
 static u8 intel_dp_autotest_phy_pattern(struct intel_dp *intel_dp)
