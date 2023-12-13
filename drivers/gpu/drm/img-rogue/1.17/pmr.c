@@ -535,14 +535,27 @@ IMG_BOOL PMRIsPMRLive(PMR *psPMR)
 static IMG_UINT32
 _Ref(PMR *psPMR)
 {
-	PVR_ASSERT(OSAtomicRead(&psPMR->iRefCount) >= 0);
+	if (OSAtomicRead(&psPMR->iRefCount) == 0)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "pmr.c: Ref Count == 0 PMR: @0x%p Annot: %s",
+		                        psPMR,
+		                        psPMR->szAnnotation));
+		OSWarnOn(1);
+	}
 	return OSAtomicIncrement(&psPMR->iRefCount);
 }
 
 static IMG_UINT32
 _Unref(PMR *psPMR)
 {
-	PVR_ASSERT(OSAtomicRead(&psPMR->iRefCount) > 0);
+	if (OSAtomicRead(&psPMR->iRefCount) <= 0)
+	{
+		PVR_DPF((PVR_DBG_ERROR, "pmr.c: Unref Count <= 0 PMR: @0x%p Annot: %s RefCount: %d",
+		                        psPMR,
+		                        psPMR->szAnnotation,
+		                        (IMG_INT32) OSAtomicRead(&psPMR->iRefCount)));
+		OSWarnOn(1);
+	}
 	return OSAtomicDecrement(&psPMR->iRefCount);
 }
 
@@ -1817,8 +1830,8 @@ PMRCpuMapCountDecr(PMR *psPMR)
 	}
 }
 
-static IMG_BOOL
-_PMR_IsMapped(PMR *psPMR)
+IMG_BOOL
+PMR_IsCpuMapped(PMR *psPMR)
 {
 	PVR_ASSERT(psPMR != NULL);
 
@@ -1979,13 +1992,10 @@ PMR_GetLog2Contiguity(const PMR *psPMR)
 	return psPMR->uiLog2ContiguityGuarantee;
 }
 
-IMG_UINT32 PMRGetMaxChunkCount(const PMR *psPMR)
+IMG_UINT32 PMRGetMaxChunkCount(PMR *psPMR)
 {
-       PVR_ASSERT(psPMR != NULL);
-
-       /* Only 4k pages are supported */
-       return (PMR_MAX_SUPPORTED_PAGE_COUNT *
-	       (4 * 1024) >> psPMR->uiLog2ContiguityGuarantee);
+	PVR_ASSERT(psPMR != NULL);
+	return (PMR_MAX_SUPPORTED_SIZE >> psPMR->uiLog2ContiguityGuarantee);
 }
 
 const IMG_CHAR *
@@ -2169,13 +2179,13 @@ PVRSRV_ERROR PMR_ChangeSparseMem(PMR *psPMR,
 		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
 	}
 
-	if ((IMG_TRUE == psPMR->bNoLayoutChange) || _PMR_IsMapped(psPMR))
+	if (PMR_IsMemLayoutFixed(psPMR) || PMR_IsCpuMapped(psPMR))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 				"%s: This PMR layout cannot be changed - psPMR->bNoLayoutChange=%c, _PMR_IsMapped()=%c",
 				__func__,
 				psPMR->bNoLayoutChange ? 'Y' : 'n',
-				_PMR_IsMapped(psPMR) ? 'Y' : 'n'));
+				PMR_IsCpuMapped(psPMR) ? 'Y' : 'n'));
 		PMRUnlockPMR(psPMR);
 		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
 	}

@@ -198,10 +198,8 @@ typedef struct {
 	DEVMEM_MEMDESC			*psFWZSBufferMemDesc;
 	RGXFWIF_DEV_VIRTADDR	sZSBufferFWDevVAddr;
 
-	DEVMEMINT_RESERVATION	*psReservation;
+	DEVMEMINT_RESERVATION2	*psReservation;
 	PMR						*psPMR;
-	DEVMEMINT_MAPPING		*psMapping;
-	PVRSRV_MEMALLOCFLAGS_T	uiMapFlags;
 	IMG_UINT32				ui32ZSBufferID;
 	IMG_UINT32				ui32RefCount;
 	IMG_BOOL				bOnDemand;
@@ -265,6 +263,13 @@ PVRSRV_ERROR RGXCreateZSBufferKM(CONNECTION_DATA			*psConnection,
                                  PMR						*psPMR,
                                  PVRSRV_MEMALLOCFLAGS_T		uiMapFlags,
                                  RGX_ZSBUFFER_DATA			**ppsZSBuffer);
+
+PVRSRV_ERROR RGXCreateZSBufferKM2(CONNECTION_DATA * psConnection,
+                                 PVRSRV_DEVICE_NODE	*psDeviceNode,
+                                 DEVMEMINT_RESERVATION2	*psReservation,
+                                 PMR					*psPMR,
+                                 PVRSRV_MEMALLOCFLAGS_T		uiMapFlags,
+                                 RGX_ZSBUFFER_DATA **ppsZSBuffer);
 
 /*
 	RGXDestroyZSBufferKM

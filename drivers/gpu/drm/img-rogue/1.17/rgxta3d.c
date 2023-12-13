@@ -2095,6 +2095,23 @@ PVRSRV_ERROR RGXCreateZSBufferKM(CONNECTION_DATA * psConnection,
 		PVRSRV_MEMALLOCFLAGS_T	uiMapFlags,
 		RGX_ZSBUFFER_DATA **ppsZSBuffer)
 {
+	PVR_UNREFERENCED_PARAMETER(psConnection);
+	PVR_UNREFERENCED_PARAMETER(psDeviceNode);
+	PVR_UNREFERENCED_PARAMETER(psReservation);
+	PVR_UNREFERENCED_PARAMETER(psPMR);
+	PVR_UNREFERENCED_PARAMETER(uiMapFlags);
+	PVR_UNREFERENCED_PARAMETER(ppsZSBuffer);
+
+	return PVRSRV_ERROR_NOT_IMPLEMENTED;
+}
+
+PVRSRV_ERROR RGXCreateZSBufferKM2(CONNECTION_DATA * psConnection,
+                                 PVRSRV_DEVICE_NODE	*psDeviceNode,
+                                 DEVMEMINT_RESERVATION2	*psReservation,
+                                 PMR					*psPMR,
+                                 PVRSRV_MEMALLOCFLAGS_T		uiMapFlags,
+                                 RGX_ZSBUFFER_DATA **ppsZSBuffer)
+{
 	PVRSRV_ERROR				eError;
 	PVRSRV_RGXDEV_INFO			*psDevInfo = psDeviceNode->pvDevice;
 	RGXFWIF_PRBUFFER			*psFWZSBuffer;
@@ -2131,14 +2148,11 @@ PVRSRV_ERROR RGXCreateZSBufferKM(CONNECTION_DATA * psConnection,
 	/* Obtain reference to PMR */
 	PMRRefPMR(psZSBuffer->psPMR);
 
-	psZSBuffer->uiMapFlags = uiMapFlags;
 	psZSBuffer->ui32RefCount = 0;
 	psZSBuffer->bOnDemand = bOnDemand;
 	if (bOnDemand)
 	{
 		/* psZSBuffer->ui32ZSBufferID set below with lock... */
-		psZSBuffer->psMapping = NULL;
-
 		OSLockAcquire(psDevInfo->hLockZSBuffer);
 		psZSBuffer->ui32ZSBufferID = psDevInfo->ui32ZSBufferCurrID++;
 		dllist_add_to_tail(&psDevInfo->sZSBufferHead, &psZSBuffer->sNode);
@@ -2314,22 +2328,17 @@ RGXBackingZSBuffer(RGX_ZSBUFFER_DATA *psZSBuffer)
 		{
 			IMG_HANDLE hDevmemHeap;
 
-			PVR_ASSERT(psZSBuffer->psMapping == NULL);
-
 			/* Get Heap */
 			eError = DevmemServerGetHeapHandle(psZSBuffer->psReservation, &hDevmemHeap);
-			PVR_ASSERT(psZSBuffer->psMapping == NULL);
 			if (unlikely(hDevmemHeap == (IMG_HANDLE)NULL))
 			{
 				OSLockRelease(hLockZSBuffer);
 				return PVRSRV_ERROR_INVALID_HEAP;
 			}
 
-			eError = DevmemIntMapPMR(hDevmemHeap,
-					psZSBuffer->psReservation,
-					psZSBuffer->psPMR,
-					psZSBuffer->uiMapFlags,
-					&psZSBuffer->psMapping);
+		eError = DevmemIntMapPMR2(hDevmemHeap,
+		                         psZSBuffer->psReservation,
+		                         psZSBuffer->psPMR);
 			if (eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR,
@@ -2425,9 +2434,7 @@ RGXUnbackingZSBuffer(RGX_ZSBUFFER_DATA *psZSBuffer)
 	{
 		if (psZSBuffer->ui32RefCount == 1)
 		{
-			PVR_ASSERT(psZSBuffer->psMapping);
-
-			eError = DevmemIntUnmapPMR(psZSBuffer->psMapping);
+			eError = DevmemIntUnmapPMR2(psZSBuffer->psReservation);
 			if (eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR,

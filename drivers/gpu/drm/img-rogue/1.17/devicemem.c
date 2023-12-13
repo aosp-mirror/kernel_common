@@ -316,7 +316,7 @@ DeviceMemChangeSparse(DEVMEM_MEMDESC *psMemDesc,
 	IMG_HANDLE hPMR;
 	IMG_HANDLE hSrvDevMemHeap;
 	POS_LOCK hLock;
-	IMG_DEV_VIRTADDR sDevVAddr;
+	IMG_HANDLE hReservation;
 	IMG_CPU_VIRTADDR pvCpuVAddr;
 	DEVMEM_PROPERTIES_T uiProperties;
 
@@ -329,7 +329,7 @@ DeviceMemChangeSparse(DEVMEM_MEMDESC *psMemDesc,
 	hDevConnection = psImport->hDevConnection;
 	hPMR = psImport->hPMR;
 	hLock = psImport->hLock;
-	sDevVAddr = psImport->sDeviceImport.sDevVAddr;
+	hReservation = psImport->sDeviceImport.hReservation;
 	pvCpuVAddr = psImport->sCPUImport.pvCPUVAddr;
 
 	if (NULL == hDevConnection)
@@ -344,7 +344,7 @@ DeviceMemChangeSparse(DEVMEM_MEMDESC *psMemDesc,
 		goto e0;
 	}
 
-	if ((uiSparseFlags & SPARSE_RESIZE_BOTH) && (0 == sDevVAddr.uiAddr))
+	if ((uiSparseFlags & SPARSE_RESIZE_BOTH) && (hReservation == LACK_OF_RESERVATION_POISON))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: Invalid Device Virtual Map", __func__));
 		goto e0;
@@ -388,21 +388,43 @@ DeviceMemChangeSparse(DEVMEM_MEMDESC *psMemDesc,
 	}
 #endif
 
+	/* If we got here the validation check above for hReservation was successful
+	 * meaning the memdesc must have been mapped. Therefore the psHeap is also
+	 * valid. */
+	PVR_ASSERT(psImport->sDeviceImport.psHeap != NULL);
+
 	hSrvDevMemHeap = psImport->sDeviceImport.psHeap->hDevMemServerHeap;
 
 	OSLockAcquire(hLock);
 
-	eError = BridgeChangeSparseMem(GetBridgeHandle(hDevConnection),
-			hSrvDevMemHeap,
-			hPMR,
-			ui32AllocPageCount,
-			paui32AllocPageIndices,
-			ui32FreePageCount,
-			pauiFreePageIndices,
-			uiSparseFlags,
-			psImport->uiFlags,
-			sDevVAddr,
-			(IMG_UINT64)((uintptr_t)pvCpuVAddr));
+	eError = BridgeChangeSparseMem2(GetBridgeHandle(hDevConnection),
+	                                hSrvDevMemHeap,
+	                                hPMR,
+	                                ui32AllocPageCount,
+	                                paui32AllocPageIndices,
+	                                ui32FreePageCount,
+	                                pauiFreePageIndices,
+	                                uiSparseFlags,
+	                                hReservation,
+	                                (IMG_UINT64) ((uintptr_t) pvCpuVAddr));
+	if (eError == PVRSRV_ERROR_BRIDGE_CALL_FAILED)
+	{
+		/* Try the original bridge function */
+		IMG_DEV_VIRTADDR sDevVAddr = psImport->sDeviceImport.sDevVAddr;
+		PVR_ASSERT(sDevVAddr.uiAddr != 0);
+
+		eError = BridgeChangeSparseMem(GetBridgeHandle(hDevConnection),
+		                               hSrvDevMemHeap,
+		                               hPMR,
+		                               ui32AllocPageCount,
+		                               paui32AllocPageIndices,
+		                               ui32FreePageCount,
+		                               pauiFreePageIndices,
+		                               uiSparseFlags,
+		                               psImport->uiFlags,
+		                               sDevVAddr,
+		                               (IMG_UINT64) ((uintptr_t) pvCpuVAddr));
+	}
 
 	OSLockRelease(hLock);
 

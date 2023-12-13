@@ -58,6 +58,8 @@ typedef struct _DEVMEMINT_CTX_EXPORT_ DEVMEMINT_CTX_EXPORT;
 typedef struct _DEVMEMINT_HEAP_ DEVMEMINT_HEAP;
 
 typedef struct _DEVMEMINT_RESERVATION_ DEVMEMINT_RESERVATION;
+typedef struct _DEVMEMINT_RESERVATION2_ DEVMEMINT_RESERVATION2;
+
 typedef struct _DEVMEMINT_MAPPING_ DEVMEMINT_MAPPING;
 typedef struct _DEVMEMXINT_RESERVATION_ DEVMEMXINT_RESERVATION;
 typedef struct _DEVMEMINT_PF_NOTIFY_ DEVMEMINT_PF_NOTIFY;
@@ -146,7 +148,7 @@ DevmemServerGetImportHandle(DEVMEM_MEMDESC *psMemDesc,
  *
  */
 PVRSRV_ERROR
-DevmemServerGetHeapHandle(DEVMEMINT_RESERVATION *psReservation,
+DevmemServerGetHeapHandle(DEVMEMINT_RESERVATION2 *psReservation,
                           IMG_HANDLE *phHeap);
 
 /*
@@ -297,6 +299,11 @@ DevmemIntMapPMR(DEVMEMINT_HEAP *psDevmemHeap,
                 PMR *psPMR,
                 PVRSRV_MEMALLOCFLAGS_T uiMapFlags,
                 DEVMEMINT_MAPPING **ppsMappingPtr);
+
+PVRSRV_ERROR
+DevmemIntMapPMR2(DEVMEMINT_HEAP *psDevmemHeap,
+                DEVMEMINT_RESERVATION2 *psReservation,
+                PMR *psPMR);
 /*
  * DevmemIntUnmapPMR()
  *
@@ -304,6 +311,9 @@ DevmemIntMapPMR(DEVMEMINT_HEAP *psDevmemHeap,
  */
 PVRSRV_ERROR
 DevmemIntUnmapPMR(DEVMEMINT_MAPPING *psMapping);
+
+PVRSRV_ERROR
+DevmemIntUnmapPMR2(DEVMEMINT_RESERVATION2 *psReservation);
 
 /* DevmemIntMapPages()
  *
@@ -340,6 +350,9 @@ DevmemIntUnmapPages(DEVMEMINT_RESERVATION *psReservation,
                     IMG_DEV_VIRTADDR sDevVAddrBase,
                     IMG_UINT32 ui32PageCount);
 
+PVRSRV_ERROR
+DevmemIntUnreserveRangeAndUnmapPMR2(DEVMEMINT_RESERVATION2 *psReservation);
+
 /*
  * DevmemIntReserveRange()
  *
@@ -355,6 +368,13 @@ DevmemIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
                       IMG_DEV_VIRTADDR sAllocationDevVAddr,
                       IMG_DEVMEM_SIZE_T uiAllocationSize,
                       DEVMEMINT_RESERVATION **ppsReservationPtr);
+
+PVRSRV_ERROR
+DevmemIntReserveRange2(DEVMEMINT_HEAP *psDevmemHeap,
+                      IMG_DEV_VIRTADDR sAllocationDevVAddr,
+                      IMG_DEVMEM_SIZE_T uiAllocationSize,
+                      PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                      DEVMEMINT_RESERVATION2 **ppsReservationPtr);
 /*
  * DevmemIntUnreserveRange()
  *
@@ -363,13 +383,16 @@ DevmemIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
 PVRSRV_ERROR
 DevmemIntUnreserveRange(DEVMEMINT_RESERVATION *psDevmemReservation);
 
+PVRSRV_ERROR
+DevmemIntUnreserveRange2(DEVMEMINT_RESERVATION2 *psDevmemReservation);
+
 /*************************************************************************/ /*!
 @Function       DevmemIntReservationAcquire
 @Description    Acquire a reference to the provided device memory reservation.
 @Return         IMG_TRUE if referenced and IMG_FALSE in case of error
 */ /**************************************************************************/
 IMG_BOOL
-DevmemIntReservationAcquire(DEVMEMINT_RESERVATION *psDevmemReservation);
+DevmemIntReservationAcquire(DEVMEMINT_RESERVATION2 *psDevmemReservation);
 
 /*************************************************************************/ /*!
 @Function       DevmemIntReservationRelease
@@ -379,7 +402,7 @@ DevmemIntReservationAcquire(DEVMEMINT_RESERVATION *psDevmemReservation);
 @Return         None.
 */ /**************************************************************************/
 void
-DevmemIntReservationRelease(DEVMEMINT_RESERVATION *psDevmemReservation);
+DevmemIntReservationRelease(DEVMEMINT_RESERVATION2 *psDevmemReservation);
 
 /*************************************************************************/ /*!
  * @Function    DevmemXIntReserveRange()
@@ -494,6 +517,17 @@ DevmemIntChangeSparse(DEVMEMINT_HEAP *psDevmemHeap,
                       PVRSRV_MEMALLOCFLAGS_T uiFlags,
                       IMG_DEV_VIRTADDR sDevVAddrBase,
                       IMG_UINT64 sCpuVAddrBase);
+
+PVRSRV_ERROR
+DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
+                       PMR *psPMR,
+                       IMG_UINT32 ui32AllocPageCount,
+                       IMG_UINT32 *pai32AllocIndices,
+                       IMG_UINT32 ui32FreePageCount,
+                       IMG_UINT32 *pai32FreeIndices,
+                       SPARSE_MEM_RESIZE_FLAGS uiSparseFlags,
+                       DEVMEMINT_RESERVATION2 *psReservation,
+                       IMG_UINT64 sCpuVAddrBase);
 
 /*
  * DevmemIntFlushDevSLCRange()

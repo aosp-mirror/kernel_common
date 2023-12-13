@@ -2363,6 +2363,122 @@ RGXSetRenderContextProperty_exit:
 	return 0;
 }
 
+static PVRSRV_ERROR _RGXCreateZSBuffer2pssZSBufferKMIntRelease(void *pvData)
+{
+	PVRSRV_ERROR eError;
+	eError = RGXDestroyZSBufferKM((RGX_ZSBUFFER_DATA *) pvData);
+	return eError;
+}
+
+static IMG_INT
+PVRSRVBridgeRGXCreateZSBuffer2(IMG_UINT32 ui32DispatchTableEntry,
+			       IMG_UINT8 * psRGXCreateZSBuffer2IN_UI8,
+			       IMG_UINT8 * psRGXCreateZSBuffer2OUT_UI8,
+			       CONNECTION_DATA * psConnection)
+{
+	PVRSRV_BRIDGE_IN_RGXCREATEZSBUFFER2 *psRGXCreateZSBuffer2IN =
+	    (PVRSRV_BRIDGE_IN_RGXCREATEZSBUFFER2 *) IMG_OFFSET_ADDR(psRGXCreateZSBuffer2IN_UI8, 0);
+	PVRSRV_BRIDGE_OUT_RGXCREATEZSBUFFER2 *psRGXCreateZSBuffer2OUT =
+	    (PVRSRV_BRIDGE_OUT_RGXCREATEZSBUFFER2 *) IMG_OFFSET_ADDR(psRGXCreateZSBuffer2OUT_UI8,
+								     0);
+
+	IMG_HANDLE hReservation = psRGXCreateZSBuffer2IN->hReservation;
+	DEVMEMINT_RESERVATION2 *psReservationInt = NULL;
+	IMG_HANDLE hPMR = psRGXCreateZSBuffer2IN->hPMR;
+	PMR *psPMRInt = NULL;
+	RGX_ZSBUFFER_DATA *pssZSBufferKMInt = NULL;
+
+	/* Lock over handle lookup. */
+	LockHandle(psConnection->psHandleBase);
+
+	/* Look up the address from the handle */
+	psRGXCreateZSBuffer2OUT->eError =
+	    PVRSRVLookupHandleUnlocked(psConnection->psHandleBase,
+				       (void **)&psReservationInt,
+				       hReservation,
+				       PVRSRV_HANDLE_TYPE_DEVMEMINT_RESERVATION2, IMG_TRUE);
+	if (unlikely(psRGXCreateZSBuffer2OUT->eError != PVRSRV_OK))
+	{
+		UnlockHandle(psConnection->psHandleBase);
+		goto RGXCreateZSBuffer2_exit;
+	}
+
+	/* Look up the address from the handle */
+	psRGXCreateZSBuffer2OUT->eError =
+	    PVRSRVLookupHandleUnlocked(psConnection->psHandleBase,
+				       (void **)&psPMRInt,
+				       hPMR, PVRSRV_HANDLE_TYPE_PHYSMEM_PMR, IMG_TRUE);
+	if (unlikely(psRGXCreateZSBuffer2OUT->eError != PVRSRV_OK))
+	{
+		UnlockHandle(psConnection->psHandleBase);
+		goto RGXCreateZSBuffer2_exit;
+	}
+	/* Release now we have looked up handles. */
+	UnlockHandle(psConnection->psHandleBase);
+
+	psRGXCreateZSBuffer2OUT->eError =
+	    RGXCreateZSBufferKM2(psConnection, OSGetDevNode(psConnection),
+				 psReservationInt,
+				 psPMRInt, psRGXCreateZSBuffer2IN->uiMapFlags, &pssZSBufferKMInt);
+	/* Exit early if bridged call fails */
+	if (unlikely(psRGXCreateZSBuffer2OUT->eError != PVRSRV_OK))
+	{
+		goto RGXCreateZSBuffer2_exit;
+	}
+
+	/* Lock over handle creation. */
+	LockHandle(psConnection->psHandleBase);
+
+	psRGXCreateZSBuffer2OUT->eError = PVRSRVAllocHandleUnlocked(psConnection->psHandleBase,
+								    &psRGXCreateZSBuffer2OUT->
+								    hsZSBufferKM,
+								    (void *)pssZSBufferKMInt,
+								    PVRSRV_HANDLE_TYPE_RGX_FWIF_ZSBUFFER,
+								    PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
+								    (PFN_HANDLE_RELEASE) &
+								    _RGXCreateZSBuffer2pssZSBufferKMIntRelease);
+	if (unlikely(psRGXCreateZSBuffer2OUT->eError != PVRSRV_OK))
+	{
+		UnlockHandle(psConnection->psHandleBase);
+		goto RGXCreateZSBuffer2_exit;
+	}
+
+	/* Release now we have created handles. */
+	UnlockHandle(psConnection->psHandleBase);
+
+RGXCreateZSBuffer2_exit:
+
+	/* Lock over handle lookup cleanup. */
+	LockHandle(psConnection->psHandleBase);
+
+	/* Unreference the previously looked up handle */
+	if (psReservationInt)
+	{
+		PVRSRVReleaseHandleUnlocked(psConnection->psHandleBase,
+					    hReservation,
+					    PVRSRV_HANDLE_TYPE_DEVMEMINT_RESERVATION2);
+	}
+
+	/* Unreference the previously looked up handle */
+	if (psPMRInt)
+	{
+		PVRSRVReleaseHandleUnlocked(psConnection->psHandleBase,
+					    hPMR, PVRSRV_HANDLE_TYPE_PHYSMEM_PMR);
+	}
+	/* Release now we have cleaned up look up handles. */
+	UnlockHandle(psConnection->psHandleBase);
+
+	if (psRGXCreateZSBuffer2OUT->eError != PVRSRV_OK)
+	{
+		if (pssZSBufferKMInt)
+		{
+			RGXDestroyZSBufferKM(pssZSBufferKMInt);
+		}
+	}
+
+	return 0;
+}
+
 /* ***************************************************************************
  * Server bridge dispatch related glue
  */
@@ -2447,6 +2563,11 @@ PVRSRV_ERROR InitRGXTA3DBridge(void)
 			      sizeof(PVRSRV_BRIDGE_IN_RGXSETRENDERCONTEXTPROPERTY),
 			      sizeof(PVRSRV_BRIDGE_OUT_RGXSETRENDERCONTEXTPROPERTY));
 
+	SetDispatchTableEntry(PVRSRV_BRIDGE_RGXTA3D, PVRSRV_BRIDGE_RGXTA3D_RGXCREATEZSBUFFER2,
+			      PVRSRVBridgeRGXCreateZSBuffer2, NULL,
+			      sizeof(PVRSRV_BRIDGE_IN_RGXCREATEZSBUFFER2),
+			      sizeof(PVRSRV_BRIDGE_OUT_RGXCREATEZSBUFFER2));
+
 	return PVRSRV_OK;
 }
 
@@ -2488,5 +2609,7 @@ void DeinitRGXTA3DBridge(void)
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_RGXTA3D,
 				PVRSRV_BRIDGE_RGXTA3D_RGXSETRENDERCONTEXTPROPERTY);
+
+	UnsetDispatchTableEntry(PVRSRV_BRIDGE_RGXTA3D, PVRSRV_BRIDGE_RGXTA3D_RGXCREATEZSBUFFER2);
 
 }

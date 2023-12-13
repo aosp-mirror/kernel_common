@@ -807,7 +807,6 @@ PVRSRV_ERROR DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 	RA_BASE_T uiAllocatedAddr;
 	RA_LENGTH_T uiAllocatedSize;
 	IMG_DEV_VIRTADDR sBase;
-	IMG_HANDLE hReservation;
 	PVRSRV_ERROR eError;
 	IMG_UINT uiAlign;
 	IMG_BOOL bDestroyed = IMG_FALSE;
@@ -1013,33 +1012,49 @@ PVRSRV_ERROR DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 		}
 		else
 		{
+			PVRSRV_MEMALLOCFLAGS_T uiFlags;
+			uiFlags = psImport->uiFlags & PVRSRV_MEMALLOCFLAGS_PERMAPPINGFLAGSMASK;
+
 			/* Setup page tables for the allocated VM space */
-			eError = BridgeDevmemIntReserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+			eError = BridgeDevmemIntReserveRange2(GetBridgeHandle(psHeap->psCtx->hDevConnection),
 					psHeap->hDevMemServerHeap,
 					sBase,
 					uiAllocatedSize,
-					&hReservation);
+					uiFlags,
+					&psDeviceImport->hReservation);
+			if (eError == PVRSRV_ERROR_BRIDGE_CALL_FAILED)
+			{
+				eError = BridgeDevmemIntReserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+						psHeap->hDevMemServerHeap,
+						sBase,
+						uiAllocatedSize,
+						&psDeviceImport->hReservation);
+			}
 			PVR_GOTO_IF_ERROR(eError, failReserve);
 
 			if (bMap)
 			{
-				PVRSRV_MEMALLOCFLAGS_T uiMapFlags;
-
-				uiMapFlags = psImport->uiFlags & PVRSRV_MEMALLOCFLAGS_PERMAPPINGFLAGSMASK;
-
-				/* Actually map the PMR to allocated VM space */
-				eError = BridgeDevmemIntMapPMR(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+				eError = BridgeDevmemIntMapPMR2(GetBridgeHandle(psHeap->psCtx->hDevConnection),
 						psHeap->hDevMemServerHeap,
-						hReservation,
-						psImport->hPMR,
-						uiMapFlags,
-						&psDeviceImport->hMapping);
+						psDeviceImport->hReservation,
+						psImport->hPMR);
+				if (eError == PVRSRV_OK)
+				{
+					psDeviceImport->hMapping = LACK_OF_MAPPING_POISON;
+				}
+				else if (eError == PVRSRV_ERROR_BRIDGE_CALL_FAILED)
+				{
+					eError = BridgeDevmemIntMapPMR(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+							psHeap->hDevMemServerHeap,
+							psDeviceImport->hReservation,
+							psImport->hPMR,
+							uiFlags,
+							&psDeviceImport->hMapping);
+				}
 				PVR_GOTO_IF_ERROR(eError, failMap);
 
 				psDeviceImport->bMapped = IMG_TRUE;
 			}
-
-			psDeviceImport->hReservation = hReservation;
 		}
 
 		/* Setup device mapping specific parts of the mapping info */
@@ -1064,8 +1079,15 @@ PVRSRV_ERROR DevmemImportStructDevMap(DEVMEM_HEAP *psHeap,
 failMap:
 	if (!psHeap->bPremapped)
 	{
-		BridgeDevmemIntUnreserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
-				hReservation);
+		PVRSRV_ERROR eError2;
+
+		eError2 = BridgeDevmemIntUnreserveRange2(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+				psDeviceImport->hReservation);
+		if (eError2 == PVRSRV_ERROR_BRIDGE_CALL_FAILED)
+		{
+			eError2 = BridgeDevmemIntUnreserveRange(GetBridgeHandle(psHeap->psCtx->hDevConnection),
+												   psDeviceImport->hReservation);
+		}
 	}
 failReserve:
 	if (ui64OptionalMapAddress == 0)
@@ -1116,17 +1138,34 @@ IMG_BOOL DevmemImportStructDevUnmap(DEVMEM_IMPORT *psImport)
 		{
 			if (psDeviceImport->bMapped)
 			{
+				if (psDeviceImport->hMapping == LACK_OF_MAPPING_POISON)
+				{
+					eError = DestroyServerResource(psImport->hDevConnection,
+												   NULL,
+												   BridgeDevmemIntUnmapPMR2,
+												   psDeviceImport->hReservation);
+					PVR_ASSERT(eError == PVRSRV_OK);
+				}
+				else
+				{
+					eError = DestroyServerResource(psImport->hDevConnection,
+												   NULL,
+												   BridgeDevmemIntUnmapPMR,
+												   psDeviceImport->hMapping);
+					PVR_ASSERT(eError == PVRSRV_OK);
+				}
+			}
+			eError = DestroyServerResource(psImport->hDevConnection,
+										NULL,
+										BridgeDevmemIntUnreserveRange2,
+										psDeviceImport->hReservation);
+			if (eError == PVRSRV_ERROR_BRIDGE_CALL_FAILED)
+			{
 				eError = DestroyServerResource(psImport->hDevConnection,
 				                               NULL,
-				                               BridgeDevmemIntUnmapPMR,
-				                               psDeviceImport->hMapping);
-				PVR_ASSERT(eError == PVRSRV_OK);
+				                               BridgeDevmemIntUnreserveRange,
+				                               psDeviceImport->hReservation);
 			}
-
-			eError = DestroyServerResource(psImport->hDevConnection,
-			                               NULL,
-			                               BridgeDevmemIntUnreserveRange,
-			                               psDeviceImport->hReservation);
 			PVR_ASSERT(eError == PVRSRV_OK);
 		}
 
