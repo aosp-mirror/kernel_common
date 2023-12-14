@@ -1315,6 +1315,7 @@
   mod_delayed_work_on
   mod_node_page_state
   mod_timer
+  mod_timer_pending
   __module_get
   module_layout
   module_put
