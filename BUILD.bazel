@@ -1433,7 +1433,6 @@ cc_binary_with_abi(
     }),
     includes = [
         "tools/testing/selftests",
-        "tools/testing/selftests/mm",
     ],
     linkopts = ["-nostartfiles"],
     path_prefix = _KSELFTEST_DIR,
