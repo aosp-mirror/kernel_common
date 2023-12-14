@@ -1379,6 +1379,15 @@ PVRSRV_ERROR DevicememHistorySparseChangeKM(PMR *psPMR,
 	PVRSRV_ERROR eError;
 	IMG_BOOL bCreated;
 
+	if (!PMRValidateSize((IMG_UINT64) ui32AllocPageCount << ui32Log2PageSize))
+	{
+		PVR_LOG_VA(PVR_DBG_ERROR,
+				 "PMR size exceeds limit #Chunks: %u ChunkSz %"IMG_UINT64_FMTSPECX"",
+				 ui32AllocPageCount,
+				 (IMG_UINT64) 1ULL << ui32Log2PageSize);
+		return PVRSRV_ERROR_PMR_TOO_LARGE;
+	}
+
 	if ((ui32AllocationIndex != DEVICEMEM_HISTORY_ALLOC_INDEX_NONE) &&
 		!CHECK_ALLOC_INDEX(ui32AllocationIndex))
 	{

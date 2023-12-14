@@ -913,10 +913,10 @@ static INLINE PVRSRV_ERROR ReserveRangeParamValidation(DEVMEMINT_HEAP *psDevmemH
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	if (uiAllocationSize >= PMR_MAX_SUPPORTED_SIZE)
+	if (uiAllocationSize > PMR_MAX_SUPPORTED_SIZE)
 	{
 		PVR_LOG_VA(PVR_DBG_ERROR,
-			"uiAllocationSize must be less than the max PMR size ("
+			"uiAllocationSize must be less than or equal to the max PMR size ("
 			IMG_DEVMEM_SIZE_FMTSPEC")",
 			PMR_MAX_SUPPORTED_SIZE);
 
@@ -1197,7 +1197,7 @@ DevmemIntMapPMR2(DEVMEMINT_HEAP *psDevmemHeap,
 	IMG_UINT32 uiLog2HeapContiguity = psReservation->psDevmemHeap->uiLog2PageSize;
 	PVRSRV_MEMALLOCFLAGS_T uiMapFlags = psReservation->uiFlags;
 	IMG_BOOL bIsSparse = IMG_FALSE, bNeedBacking = IMG_FALSE;
-	PVRSRV_DEVICE_NODE *psDevNode;
+	PVRSRV_DEVICE_NODE *psDevNode = psReservation->psDevmemHeap->psDevmemCtx->psDevNode;
 	PMR_FLAGS_T uiPMRFlags;
 	PVRSRV_DEF_PAGE *psDefPage;
 	IMG_CHAR *pszPageName;
@@ -1208,7 +1208,10 @@ DevmemIntMapPMR2(DEVMEMINT_HEAP *psDevmemHeap,
 
 	PVR_UNREFERENCED_PARAMETER(psDevmemHeap);
 
-	PVR_RETURN_IF_INVALID_PARAM(psReservation->psMappedPMR == NULL);
+	PMR_LogicalSize(psPMR, &uiPMRLogicalSize);
+
+	PVR_LOG_RETURN_IF_INVALID_PARAM(psReservation->psMappedPMR == NULL, "psReservation");
+	PVR_LOG_RETURN_IF_INVALID_PARAM(uiPMRLogicalSize == psReservation->uiLength, "psPMR logical size");
 
 	if (uiLog2HeapContiguity > PMR_GetLog2Contiguity(psPMR))
 	{
@@ -1218,17 +1221,6 @@ DevmemIntMapPMR2(DEVMEMINT_HEAP *psDevmemHeap,
 		         __func__,
 		         uiLog2HeapContiguity,
 		         PMR_GetLog2Contiguity(psPMR) ));
-		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, ErrorReturnError);
-	}
-	psDevNode = psReservation->psDevmemHeap->psDevmemCtx->psDevNode;
-
-	PMR_LogicalSize(psPMR, &uiPMRLogicalSize);
-	if (uiPMRLogicalSize > psReservation->uiLength || uiPMRLogicalSize == 0)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			"%s: A PMRs logical size should not be greater than the reservation's"
-			" length nor equal to 0",
-			__func__));
 		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_INVALID_PARAMS, ErrorReturnError);
 	}
 
@@ -1714,6 +1706,65 @@ DevmemIntChangeSparse(DEVMEMINT_HEAP *psDevmemHeap,
 	return PVRSRV_ERROR_NOT_IMPLEMENTED;
 }
 
+static PVRSRV_ERROR
+DevmemIntValidateSparsePMRIndices(IMG_UINT32 ui32PMRLogicalChunkCount,
+                                  IMG_UINT32 *paui32LogicalIndices,
+                                  IMG_UINT32 ui32LogicalIndiceCount)
+{
+	IMG_UINT32 i;
+	IMG_UINT8 *paui8TrackedIndices;
+	IMG_UINT32 ui32AllocSize;
+	PVRSRV_ERROR eError = PVRSRV_OK;
+
+	PVR_ASSERT(ui32PMRLogicalChunkCount != 0);
+	PVR_ASSERT(paui32LogicalIndices != NULL);
+	PVR_ASSERT(ui32LogicalIndiceCount != 0 && ui32LogicalIndiceCount <= ui32PMRLogicalChunkCount);
+
+	ui32AllocSize = LOG2_DIV(ui32PMRLogicalChunkCount, 3);
+	if (LOG2_MOD(ui32PMRLogicalChunkCount, 3) != 0)
+	{
+		++ui32AllocSize;
+	}
+
+	paui8TrackedIndices = OSAllocZMem(ui32AllocSize);
+	if (paui8TrackedIndices == NULL)
+	{
+		return PVRSRV_ERROR_OUT_OF_MEMORY;
+	}
+
+	for (i = 0; i < ui32LogicalIndiceCount; i++)
+	{
+		IMG_UINT32 ui32LogicalIndex = paui32LogicalIndices[i];
+
+		if (ui32LogicalIndex >= ui32PMRLogicalChunkCount)
+		{
+			PVR_DPF((PVR_DBG_ERROR,
+			         "%s: Reservation index %u is OOB",
+			         __func__,
+			         ui32LogicalIndex));
+
+			eError = PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE;
+			break;
+		}
+
+		if (BIT_ISSET(paui8TrackedIndices[LOG2_DIV(ui32LogicalIndex, 3)], LOG2_MOD(ui32LogicalIndex, 3)))
+		{
+			PVR_DPF((PVR_DBG_ERROR,
+			         "%s: Duplicate index found: %u",
+			         __func__,
+			         ui32LogicalIndex));
+
+			eError = PVRSRV_ERROR_PMR_INVALID_MAP_INDEX_ARRAY;
+			break;
+		}
+
+		BIT_SET(paui8TrackedIndices[LOG2_DIV(ui32LogicalIndex, 3)], LOG2_MOD(ui32LogicalIndex, 3));
+	}
+
+	OSFreeMem(paui8TrackedIndices);
+	return eError;
+}
+
 PVRSRV_ERROR
 DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
                        PMR *psPMR,
@@ -1730,49 +1781,41 @@ DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
 	IMG_UINT32 uiLog2PMRContiguity;
 	IMG_UINT32 uiLog2HeapContiguity;
 	IMG_UINT32 uiOrderDiff;
-	IMG_UINT32 uiPagesPerOrder;
 	PVRSRV_MEMALLOCFLAGS_T uiFlags;
 
 	IMG_UINT32 *pai32MapIndices;
 	IMG_UINT32 *pai32UnmapIndices;
 	IMG_UINT32 uiMapPageCount;
 	IMG_UINT32 uiUnmapPageCount;
-	IMG_UINT32 uiReservationExtent;
+
+	IMG_UINT64 ui64PMRLogicalSize;
+	IMG_UINT32 ui32LogicalChunkCount;
 
 	PVR_UNREFERENCED_PARAMETER(psDevmemHeap);
 
-	uiReservationExtent = _DevmemReservationPageCount(psReservation);
+	PMR_LogicalSize(psPMR, &ui64PMRLogicalSize);
+	ui32LogicalChunkCount = ui64PMRLogicalSize >> PMR_GetLog2Contiguity(psPMR);
 
-	if (uiSparseFlags & SPARSE_RESIZE_ALLOC)
+	/* Ensure a PMR has been mapped to this reservation. */
+	PVR_LOG_RETURN_IF_INVALID_PARAM(psReservation->psMappedPMR != NULL, "psReservation");
+
 	{
-		PVR_LOG_RETURN_IF_INVALID_PARAM(ui32AllocPageCount != 0,
-		                                "ui32AllocPageCount");
+		IMG_UINT64 ui64PMRUID;
+		IMG_UINT64 ui64ResPMRUID;
 
-		PVR_LOG_RETURN_IF_FALSE(ui32AllocPageCount <= uiReservationExtent,
-		                        "ui32AllocPageCount is invalid",
-		                        PVRSRV_ERROR_PMR_BAD_MAPPINGTABLE_SIZE);
+		/* Check the PMR that was used during mapping is being used now. */
+		(void)PMRGetUID(psPMR, &ui64PMRUID);
+		(void)PMRGetUID(psReservation->psMappedPMR, &ui64ResPMRUID);
+		if (ui64ResPMRUID != ui64PMRUID)
+		{
+			PVR_DPF((PVR_DBG_ERROR,
+				"%s: Reservation doesn't represent virtual range associated"
+				" with given mapped PMR", __func__));
+			return PVRSRV_ERROR_INVALID_PARAMS;
+		}
 	}
 
-	if (uiSparseFlags & SPARSE_RESIZE_FREE)
-	{
-		PVR_LOG_RETURN_IF_INVALID_PARAM(ui32FreePageCount != 0,
-		                                "ui32FreePageCount");
-
-		PVR_LOG_RETURN_IF_FALSE(ui32FreePageCount <= uiReservationExtent,
-		                        "ui32FreePageCount is invalid",
-		                        PVRSRV_ERROR_PMR_BAD_MAPPINGTABLE_SIZE);
-	}
-
-	uiLog2PMRContiguity = PMR_GetLog2Contiguity(psPMR);
-	uiLog2HeapContiguity = psReservation->psDevmemHeap->uiLog2PageSize;
-	uiOrderDiff = uiLog2PMRContiguity - uiLog2HeapContiguity;
-	uiPagesPerOrder = 1 << uiOrderDiff;
-	uiFlags = psReservation->uiFlags;
-
-	pai32MapIndices = pai32AllocIndices;
-	pai32UnmapIndices = pai32FreeIndices;
-	uiMapPageCount = ui32AllocPageCount;
-	uiUnmapPageCount = ui32FreePageCount;
+	psPMR = psReservation->psMappedPMR;
 
 	if (!PMR_IsSparse(psPMR))
 	{
@@ -1782,12 +1825,26 @@ DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	if (uiLog2HeapContiguity > uiLog2PMRContiguity)
+	uiLog2PMRContiguity = PMR_GetLog2Contiguity(psPMR);
+	uiLog2HeapContiguity = psReservation->psDevmemHeap->uiLog2PageSize;
+
+	/* This is check is made in DevmemIntMapPMR - no need to do it again in release. */
+	PVR_ASSERT(uiLog2HeapContiguity <= uiLog2PMRContiguity);
+
+	if (uiSparseFlags & SPARSE_RESIZE_ALLOC)
 	{
-		PVR_DPF((PVR_DBG_ERROR,
-				"%s: Invalid PMR Contiguity for given DevmemHeap.",
-				__func__));
-		return PVRSRV_ERROR_PMR_INCOMPATIBLE_CONTIGUITY;
+		PVR_LOG_RETURN_IF_INVALID_PARAM(ui32AllocPageCount != 0, "ui32AllocPageCount");
+		PVR_LOG_RETURN_IF_FALSE(ui32AllocPageCount <= ui32LogicalChunkCount,
+		                        "ui32AllocPageCount is invalid",
+		                        PVRSRV_ERROR_PMR_BAD_MAPPINGTABLE_SIZE);
+	}
+
+	if (uiSparseFlags & SPARSE_RESIZE_FREE)
+	{
+		PVR_LOG_RETURN_IF_INVALID_PARAM(ui32FreePageCount != 0, "ui32FreePageCount");
+		PVR_LOG_RETURN_IF_FALSE(ui32FreePageCount <= ui32LogicalChunkCount,
+		                        "ui32FreePageCount is invalid",
+		                        PVRSRV_ERROR_PMR_BAD_MAPPINGTABLE_SIZE);
 	}
 
 	if (PMR_IsMemLayoutFixed(psPMR) || PMR_IsCpuMapped(psPMR))
@@ -1800,51 +1857,14 @@ DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
 		return PVRSRV_ERROR_PMR_NOT_PERMITTED;
 	}
 
+	uiFlags = psReservation->uiFlags;
 	eError = DevmemValidateFlags(psPMR, uiFlags);
 	PVR_LOG_GOTO_IF_ERROR(eError, "DevmemValidateFlags", e0);
 
-	/* Special case:
-	 * Adjust indices if we map into a heap that uses smaller page sizes
-	 * than the physical allocation itself.
-	 * The incoming parameters are all based on the page size of the PMR
-	 * but the mapping functions expects parameters to be in terms of heap page sizes. */
-	if (uiOrderDiff != 0)
-	{
-		IMG_UINT32 uiPgIdx, uiPgOffset;
-
-		uiMapPageCount = (uiMapPageCount << uiOrderDiff);
-		uiUnmapPageCount = (uiUnmapPageCount << uiOrderDiff);
-
-		pai32MapIndices = OSAllocMem(uiMapPageCount * sizeof(*pai32MapIndices));
-		PVR_GOTO_IF_NOMEM(pai32MapIndices, eError, e0);
-
-		pai32UnmapIndices = OSAllocMem(uiUnmapPageCount * sizeof(*pai32UnmapIndices));
-		if (!pai32UnmapIndices)
-		{
-			OSFreeMem(pai32MapIndices);
-			PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_OUT_OF_MEMORY, e0);
-		}
-
-		/* Every chunk index needs to be translated from physical indices
-		 * into heap based indices. */
-		for (uiPgIdx = 0; uiPgIdx < ui32AllocPageCount; uiPgIdx++)
-		{
-			for (uiPgOffset = 0; uiPgOffset < uiPagesPerOrder; uiPgOffset++)
-			{
-				pai32MapIndices[uiPgIdx*uiPagesPerOrder + uiPgOffset] =
-						pai32AllocIndices[uiPgIdx]*uiPagesPerOrder + uiPgOffset;
-			}
-		}
-
-		for (uiPgIdx = 0; uiPgIdx < ui32FreePageCount; uiPgIdx++)
-		{
-			for (uiPgOffset = 0; uiPgOffset < uiPagesPerOrder; uiPgOffset++)
-			{
-				pai32UnmapIndices[uiPgIdx*uiPagesPerOrder + uiPgOffset] =
-						pai32FreeIndices[uiPgIdx]*uiPagesPerOrder + uiPgOffset;
-			}
-		}
-	}
+	pai32MapIndices = pai32AllocIndices;
+	pai32UnmapIndices = pai32FreeIndices;
+	uiMapPageCount = ui32AllocPageCount;
+	uiUnmapPageCount = ui32FreePageCount;
 
 	OSLockAcquire(psReservation->hLock);
 
@@ -1867,98 +1887,107 @@ DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
 	 */
 	if (uiSparseFlags & SPARSE_RESIZE_BOTH)
 	{
-		IMG_UINT64 ui64PMRUID;
-		IMG_UINT64 ui64ResPMRUID;
-
-		if (psReservation->psMappedPMR == NULL)
-		{
-			PVR_DPF((PVR_DBG_ERROR,
-				"%s: Reservation has not been mapped with PMR",
-				__func__));
-			PVR_GOTO_WITH_ERROR(eError,
-			                    PVRSRV_ERROR_INVALID_PARAMS,
-			                    e1);
-		}
-
-		/* Check the same PMR that was previously being used for the 
-		 * reservation is being used now. */
-		PMRGetUID(psPMR, &ui64PMRUID);
-		PMRGetUID(psReservation->psMappedPMR, &ui64ResPMRUID);
-		if (ui64ResPMRUID != ui64PMRUID)
-		{
-			PVR_DPF((PVR_DBG_ERROR,
-				"%s: Reservation doesn't represent virtual range associated"
-				" with given mapped PMR", __func__));
-			PVR_GOTO_WITH_ERROR(eError,
-			                    PVRSRV_ERROR_INVALID_PARAMS,
-			                    e1);
-		}
-
 		/* Pre check free indices against reservation given */
 		if (uiSparseFlags & SPARSE_RESIZE_FREE)
 		{
-			IMG_UINT32 i;
-
-			for (i = 0; i < ui32FreePageCount; i++)
-			{
-				IMG_UINT32 uiCurrentIndex = pai32FreeIndices[i];
-				IMG_BOOL bIsMapped;
-
-				if (uiCurrentIndex >= uiReservationExtent)
-				{
-					PVR_DPF((PVR_DBG_ERROR,
-						"%s: Reservation index %u is OOB",
-						__func__,
-						uiCurrentIndex));
-					PVR_GOTO_WITH_ERROR(eError,
-					                    PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE,
-					                    e1);
-				}
-
-				bIsMapped = DevmemIntReservationIsIndexMapped(psReservation,
-				                                              uiCurrentIndex);
-				if (!bIsMapped)
-				{
-					PVR_DPF((PVR_DBG_ERROR,
-						"%s: Reservation index %u is not mapped into the reservation",
-						__func__,
-						uiCurrentIndex));
-					PVR_GOTO_WITH_ERROR(eError,
-					                    PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE,
-					                    e1);
-				}
-			}
+			eError = DevmemIntValidateSparsePMRIndices(ui32LogicalChunkCount,
+			                                           pai32FreeIndices,
+			                                           ui32FreePageCount);
+			PVR_LOG_GOTO_IF_ERROR(eError, "DevmemIntValidateSparsePMRIndices", e0);
 		}
 
 		/* Pre check alloc indices against reservation given */
 		if (uiSparseFlags & SPARSE_RESIZE_ALLOC)
 		{
-			IMG_UINT32 i;
+			eError = DevmemIntValidateSparsePMRIndices(ui32LogicalChunkCount,
+			                                           pai32AllocIndices,
+			                                           ui32AllocPageCount);
+			PVR_LOG_GOTO_IF_ERROR(eError, "DevmemIntValidateSparsePMRIndices", e0);
+		}
 
-			for (i = 0; i < ui32AllocPageCount; i++)
+		uiOrderDiff = uiLog2PMRContiguity - uiLog2HeapContiguity;
+
+		/* Special case:
+		 * Adjust indices if we map into a heap that uses smaller page sizes
+		 * than the physical allocation itself.
+		 * The incoming parameters are all based on the page size of the PMR
+		 * but the mapping functions expects parameters to be in terms of heap page sizes. */
+		if (uiOrderDiff != 0)
+		{
+			IMG_UINT32 uiPgIdx, uiPgOffset;
+			IMG_UINT32 uiPagesPerOrder = 1 << uiOrderDiff;
+
+			uiMapPageCount = (uiMapPageCount << uiOrderDiff);
+			uiUnmapPageCount = (uiUnmapPageCount << uiOrderDiff);
+
+			pai32MapIndices = OSAllocMem(uiMapPageCount * sizeof(*pai32MapIndices));
+			PVR_GOTO_IF_NOMEM(pai32MapIndices, eError, e0);
+
+			pai32UnmapIndices = OSAllocMem(uiUnmapPageCount * sizeof(*pai32UnmapIndices));
+			if (!pai32UnmapIndices)
 			{
-				IMG_UINT32 uiCurrentIndex = pai32AllocIndices[i];
-				IMG_BOOL bIsMapped;
+				OSFreeMem(pai32MapIndices);
+				PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_OUT_OF_MEMORY, e0);
+			}
 
-				if (uiCurrentIndex >= uiReservationExtent)
+			/* Every chunk index needs to be translated from physical indices
+			* into heap based indices. */
+			for (uiPgIdx = 0; uiPgIdx < ui32AllocPageCount; uiPgIdx++)
+			{
+				for (uiPgOffset = 0; uiPgOffset < uiPagesPerOrder; uiPgOffset++)
+				{
+					pai32MapIndices[uiPgIdx*uiPagesPerOrder + uiPgOffset] =
+							pai32AllocIndices[uiPgIdx]*uiPagesPerOrder + uiPgOffset;
+				}
+			}
+
+			for (uiPgIdx = 0; uiPgIdx < ui32FreePageCount; uiPgIdx++)
+			{
+				for (uiPgOffset = 0; uiPgOffset < uiPagesPerOrder; uiPgOffset++)
+				{
+					pai32UnmapIndices[uiPgIdx*uiPagesPerOrder + uiPgOffset] =
+							pai32FreeIndices[uiPgIdx]*uiPagesPerOrder + uiPgOffset;
+				}
+			}
+		}
+
+		/* Validate the virtual indices to be freed. */
+		if (uiSparseFlags & SPARSE_RESIZE_FREE)
+		{
+			IMG_UINT32 i;
+			for (i = 0; i < uiUnmapPageCount; i++)
+			{
+				IMG_BOOL bIsMapped = DevmemIntReservationIsIndexMapped(psReservation,
+				                                                       pai32UnmapIndices[i]);
+				if (!bIsMapped)
 				{
 					PVR_DPF((PVR_DBG_ERROR,
-						"%s: Reservation index %u is OOB",
+						"%s: Reservation index %u is not mapped into the reservation",
 						__func__,
-						uiCurrentIndex));
-					PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_DEVICEMEM_OUT_OF_RANGE, e1);
+						pai32UnmapIndices[i]));
+					PVR_GOTO_WITH_ERROR(eError,
+					                    PVRSRV_ERROR_DEVICEMEM_NO_MAPPING,
+					                    e1);
 				}
+			}
+		}
 
-				bIsMapped = DevmemIntReservationIsIndexMapped(psReservation,
-				                                              uiCurrentIndex);
+		/* Validate the virtual indices to be allocated. */
+		if (uiSparseFlags & SPARSE_RESIZE_ALLOC)
+		{
+			IMG_UINT32 i;
+			for (i = 0; i < uiMapPageCount; i++)
+			{
+				IMG_BOOL bIsMapped = DevmemIntReservationIsIndexMapped(psReservation,
+				                                                       pai32MapIndices[i]);
 				if (bIsMapped)
 				{
 					PVR_DPF((PVR_DBG_ERROR,
-						"%s: Reservation index %u is already mapped into the reservation",
+						"%s: Reservation index %u is mapped into the reservation",
 						__func__,
-						uiCurrentIndex));
+						pai32MapIndices[i]));
 					PVR_GOTO_WITH_ERROR(eError,
-					                    PVRSRV_ERROR_PMR_BAD_MAPPINGTABLE_SIZE,
+					                    PVRSRV_ERROR_DEVICEMEM_ALREADY_MAPPED,
 					                    e1);
 				}
 			}
@@ -1998,9 +2027,9 @@ DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
 			                uiLog2HeapContiguity,
 			                uiPMRFlags);
 
-			for (i = 0; i < ui32FreePageCount; i++)
+			for (i = 0; i < uiUnmapPageCount; i++)
 			{
-				IMG_UINT32 uiIndex = pai32FreeIndices[i];
+				IMG_UINT32 uiIndex = pai32UnmapIndices[i];
 
 				if (DevmemIntReservationIsIndexMapped(psReservation, uiIndex))
 				{
@@ -2033,19 +2062,17 @@ DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
 				goto e1;
 			}
 
-			for (i = 0; i < ui32AllocPageCount; i++)
+			for (i = 0; i < uiMapPageCount; i++)
 			{
-				IMG_UINT32 uiIndex = pai32AllocIndices[i];
+				IMG_UINT32 uiIndex = pai32MapIndices[i];
 
-				PMRRefPMR2(psReservation->psMappedPMR);
-
-				if (DevmemIntReservationIsIndexMapped(psReservation, uiIndex))
+				if (!DevmemIntReservationIsIndexMapped(psReservation, uiIndex))
 				{
-					PMRUnrefPMR2(psReservation->psMappedPMR);
+					PMRRefPMR2(psReservation->psMappedPMR);
+					DevmemIntReservationSetMappingIndex(psReservation,
+					                                    uiIndex,
+					                                    IMG_TRUE);
 				}
-				DevmemIntReservationSetMappingIndex(psReservation,
-				                                    uiIndex,
-				                                    IMG_TRUE);
 			}
 		}
 	}
@@ -2074,8 +2101,6 @@ DevmemIntChangeSparse2(DEVMEMINT_HEAP *psDevmemHeap,
 #endif
 
 e1:
-	OSLockRelease(psReservation->hLock);
-
 	if (pai32MapIndices != pai32AllocIndices)
 	{
 		OSFreeMem(pai32MapIndices);
@@ -2085,6 +2110,7 @@ e1:
 		OSFreeMem(pai32UnmapIndices);
 	}
 e0:
+	OSLockRelease(psReservation->hLock);
 	return eError;
 }
 

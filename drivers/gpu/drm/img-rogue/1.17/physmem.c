@@ -306,19 +306,19 @@ PVRSRV_ERROR PhysMemValidateParams(IMG_UINT32 ui32NumPhysChunks,
 			break;
 		default:
 			PVR_LOG_VA(PVR_DBG_ERROR,
-			           "page size of %u is invalid.",
-			           1 << uiLog2AllocPageSize);
+			           "page size of %" IMG_UINT64_FMTSPEC " is invalid.",
+			           IMG_UINT64_C(1) << uiLog2AllocPageSize);
 			return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
 	/* Range check of the alloc size */
-	if (uiSize >= 0x1000000000ULL)
+	if (!PMRValidateSize(uiSize))
 	{
-		PVR_DPF((PVR_DBG_ERROR,
-				 "%s: Cancelling allocation request of over 64 GB. "
-				 "This is likely a bug."
-				, __func__));
-		return PVRSRV_ERROR_INVALID_PARAMS;
+		PVR_LOG_VA(PVR_DBG_ERROR,
+				 "PMR size exceeds limit #Chunks: %u ChunkSz %"IMG_UINT64_FMTSPECX"",
+				 ui32NumVirtChunks,
+				 (IMG_UINT64)IMG_UINT64_C(1) << uiLog2AllocPageSize);
+		return PVRSRV_ERROR_PMR_TOO_LARGE;
 	}
 
 	/* Fail if requesting coherency on one side but uncached on the other */
@@ -378,7 +378,9 @@ PVRSRV_ERROR PhysMemValidateParams(IMG_UINT32 ui32NumPhysChunks,
 					 "%s: Total alloc size (%#" IMG_UINT64_FMTSPECx ") "
 					 "is not equal to virtual chunks * chunk size "
 					 "(%#" IMG_UINT64_FMTSPECx ")",
-					__func__, uiSize, ui32NumVirtChunks * uiChunkSize));
+					 __func__,
+					 uiSize,
+					 (IMG_UINT64)ui32NumVirtChunks << uiLog2AllocPageSize));
 
 			return PVRSRV_ERROR_PMR_NOT_PAGE_MULTIPLE;
 		}

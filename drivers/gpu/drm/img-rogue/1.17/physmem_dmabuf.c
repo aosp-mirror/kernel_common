@@ -563,6 +563,7 @@ PhysmemCreateNewDmaBufBackedPMR(PHYS_HEAP *psHeap,
 	struct sg_table *table;
 	IMG_UINT32 uiSglOffset;
 	IMG_CHAR pszAnnotation[DEVMEM_ANNOTATION_MAX_LEN];
+	IMG_UINT32 ui32ActualDmaBufPageCount;
 
 	bZeroOnAlloc = PVRSRV_CHECK_ZERO_ON_ALLOC(uiFlags);
 	bPoisonOnAlloc = PVRSRV_CHECK_POISON_ON_ALLOC(uiFlags);
@@ -575,6 +576,16 @@ PhysmemCreateNewDmaBufBackedPMR(PHYS_HEAP *psHeap,
 	{
 		/* Zero on Alloc and Poison on Alloc are mutually exclusive */
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
+		goto errReturn;
+	}
+
+	if (!PMRValidateSize((IMG_UINT64) ui32NumVirtChunks * uiChunkSize))
+	{
+		PVR_LOG_VA(PVR_DBG_ERROR,
+				 "PMR size exceeds limit #Chunks: %u ChunkSz %"IMG_UINT64_FMTSPECX"",
+				 ui32NumVirtChunks,
+				 uiChunkSize);
+		eError = PVRSRV_ERROR_PMR_TOO_LARGE;
 		goto errReturn;
 	}
 
@@ -645,16 +656,19 @@ PhysmemCreateNewDmaBufBackedPMR(PHYS_HEAP *psHeap,
 		goto errUnmap;
 	}
 
-	if (WARN_ON(ui32PageCount != ui32NumPhysChunks * uiPagesPerChunk))
+	/* Obtain actual page count of dma buf */
+	ui32ActualDmaBufPageCount = psAttachment->dmabuf->size / PAGE_SIZE;
+
+	if (WARN_ON(ui32ActualDmaBufPageCount < ui32NumPhysChunks * uiPagesPerChunk))
 	{
-		PVR_DPF((PVR_DBG_ERROR, "%s: Requested physical chunks and actual "
-				"number of physical dma buf pages don't match",
+		PVR_DPF((PVR_DBG_ERROR, "%s: Requested physical chunks greater than "
+				"number of physical dma buf pages",
 				 __func__));
 		eError = PVRSRV_ERROR_INVALID_PARAMS;
 		goto errUnmap;
 	}
 
-	psPrivData->ui32PhysPageCount = ui32PageCount;
+	psPrivData->ui32PhysPageCount = ui32ActualDmaBufPageCount;
 	psPrivData->psSgTable = table;
 	ui32PageCount = 0;
 	sg = table->sgl;

@@ -103,6 +103,18 @@ typedef struct _PMR_EXPORT_ PMR_EXPORT;
 typedef struct _PMR_PAGELIST_ PMR_PAGELIST;
 
 /*
+ * PMRValidateSize
+ *
+ * Given a size value, check the value against the max supported
+ * PMR size of 1GB. Return IMG_FALSE if size exceeds max, IMG_TRUE
+ * otherwise.
+ */
+static inline IMG_BOOL PMRValidateSize(IMG_UINT64 uiSize)
+{
+	return (uiSize > PMR_MAX_SUPPORTED_SIZE) ? IMG_FALSE : IMG_TRUE;
+}
+
+/*
  * PMRCreatePMR
  *
  * Not to be called directly, only via implementations of PMR
