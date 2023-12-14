@@ -59,10 +59,12 @@ struct spi_imx_data;
 
 struct spi_imx_devtype_data {
 	void (*intctrl)(struct spi_imx_data *, int);
+	int (*prepare_message)(struct spi_imx_data *, struct spi_message *);
 	int (*config)(struct spi_device *);
 	void (*trigger)(struct spi_imx_data *);
 	int (*rx_available)(struct spi_imx_data *);
 	void (*reset)(struct spi_imx_data *);
+	void (*setup_wml)(struct spi_imx_data *);
 	void (*disable)(struct spi_imx_data *);
 	bool has_dmamode;
 	bool has_slavemode;
@@ -216,7 +218,6 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
 			 struct spi_transfer *transfer)
 {
 	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
-	unsigned int bytes_per_word, i;
 
 	if (!master->dma_rx)
 		return false;
@@ -224,14 +225,6 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
 	if (spi_imx->slave_mode)
 		return false;
 
-	bytes_per_word = spi_imx_bytes_per_word(transfer->bits_per_word);
-
-	for (i = spi_imx->devtype_data->fifo_size / 2; i > 0; i--) {
-		if (!(transfer->len % (i * bytes_per_word)))
-			break;
-	}
-
-	spi_imx->wml = i;
 	spi_imx->dynamic_burst = 0;
 
 	return true;
@@ -502,11 +495,12 @@ static void mx51_ecspi_disable(struct spi_imx_data *spi_imx)
 	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
 }
 
-static int mx51_ecspi_config(struct spi_device *spi)
+static int mx51_ecspi_prepare_message(struct spi_imx_data *spi_imx,
+				      struct spi_message *msg)
 {
-	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+	struct spi_device *spi = msg->spi;
 	u32 ctrl = MX51_ECSPI_CTRL_ENABLE;
-	u32 clk = spi_imx->speed_hz, delay, reg;
+	u32 testreg;
 	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
 
 	/* set Master or Slave mode */
@@ -521,19 +515,21 @@ static int mx51_ecspi_config(struct spi_device *spi)
 	if (spi->mode & SPI_READY)
 		ctrl |= MX51_ECSPI_CTRL_DRCTL(spi_imx->spi_drctl);
 
-	/* set clock speed */
-	ctrl |= mx51_ecspi_clkdiv(spi_imx, spi_imx->speed_hz, &clk);
-	spi_imx->spi_bus_clk = clk;
-
 	/* set chip select to use */
 	ctrl |= MX51_ECSPI_CTRL_CS(spi->chip_select);
 
-	if (spi_imx->slave_mode && is_imx53_ecspi(spi_imx))
-		ctrl |= (spi_imx->slave_burst * 8 - 1)
-			<< MX51_ECSPI_CTRL_BL_OFFSET;
+	/*
+	 * The ctrl register must be written first, with the EN bit set other
+	 * registers must not be written to.
+	 */
+	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
+
+	testreg = readl(spi_imx->base + MX51_ECSPI_TESTREG);
+	if (spi->mode & SPI_LOOP)
+		testreg |= MX51_ECSPI_TESTREG_LBC;
 	else
-		ctrl |= (spi_imx->bits_per_word - 1)
-			<< MX51_ECSPI_CTRL_BL_OFFSET;
+		testreg &= ~MX51_ECSPI_TESTREG_LBC;
+	writel(testreg, spi_imx->base + MX51_ECSPI_TESTREG);
 
 	/*
 	 * eCSPI burst completion by Chip Select signal in Slave mode
@@ -557,25 +553,42 @@ static int mx51_ecspi_config(struct spi_device *spi)
 		cfg &= ~MX51_ECSPI_CONFIG_SCLKPOL(spi->chip_select);
 		cfg &= ~MX51_ECSPI_CONFIG_SCLKCTL(spi->chip_select);
 	}
+
 	if (spi->mode & SPI_CS_HIGH)
 		cfg |= MX51_ECSPI_CONFIG_SSBPOL(spi->chip_select);
 	else
 		cfg &= ~MX51_ECSPI_CONFIG_SSBPOL(spi->chip_select);
 
+	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
+
+	return 0;
+}
+
+static int mx51_ecspi_config(struct spi_device *spi)
+{
+	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+	u32 ctrl = readl(spi_imx->base + MX51_ECSPI_CTRL);
+	u32 clk = spi_imx->speed_hz, delay;
+
+	/* Clear BL field and set the right value */
+	ctrl &= ~MX51_ECSPI_CTRL_BL_MASK;
+	if (spi_imx->slave_mode && is_imx53_ecspi(spi_imx))
+		ctrl |= (spi_imx->slave_burst * 8 - 1)
+			<< MX51_ECSPI_CTRL_BL_OFFSET;
+	else
+		ctrl |= (spi_imx->bits_per_word - 1)
+			<< MX51_ECSPI_CTRL_BL_OFFSET;
+
+	/* set clock speed */
+	ctrl &= ~(0xf << MX51_ECSPI_CTRL_POSTDIV_OFFSET |
+		  0xf << MX51_ECSPI_CTRL_PREDIV_OFFSET);
+	ctrl |= mx51_ecspi_clkdiv(spi_imx, spi_imx->speed_hz, &clk);
+	spi_imx->spi_bus_clk = clk;
+
 	if (spi_imx->usedma)
 		ctrl |= MX51_ECSPI_CTRL_SMC;
 
-	/* CTRL register always go first to bring out controller from reset */
 	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
-
-	reg = readl(spi_imx->base + MX51_ECSPI_TESTREG);
-	if (spi->mode & SPI_LOOP)
-		reg |= MX51_ECSPI_TESTREG_LBC;
-	else
-		reg &= ~MX51_ECSPI_TESTREG_LBC;
-	writel(reg, spi_imx->base + MX51_ECSPI_TESTREG);
-
-	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
 
 	/*
 	 * Wait until the changes in the configuration register CONFIGREG
@@ -594,18 +607,20 @@ static int mx51_ecspi_config(struct spi_device *spi)
 	else			/* SCLK is _very_ slow */
 		usleep_range(delay, delay + 10);
 
+	return 0;
+}
+
+static void mx51_setup_wml(struct spi_imx_data *spi_imx)
+{
 	/*
 	 * Configure the DMA register: setup the watermark
 	 * and enable DMA request.
 	 */
-
-	writel(MX51_ECSPI_DMA_RX_WML(spi_imx->wml) |
+	writel(MX51_ECSPI_DMA_RX_WML(spi_imx->wml - 1) |
 		MX51_ECSPI_DMA_TX_WML(spi_imx->wml) |
 		MX51_ECSPI_DMA_RXT_WML(spi_imx->wml) |
 		MX51_ECSPI_DMA_TEDEN | MX51_ECSPI_DMA_RXDEN |
 		MX51_ECSPI_DMA_RXTDEN, spi_imx->base + MX51_ECSPI_DMA);
-
-	return 0;
 }
 
 static int mx51_ecspi_rx_available(struct spi_imx_data *spi_imx)
@@ -670,6 +685,12 @@ static void mx31_trigger(struct spi_imx_data *spi_imx)
 	reg = readl(spi_imx->base + MXC_CSPICTRL);
 	reg |= MX31_CSPICTRL_XCH;
 	writel(reg, spi_imx->base + MXC_CSPICTRL);
+}
+
+static int mx31_prepare_message(struct spi_imx_data *spi_imx,
+				struct spi_message *msg)
+{
+	return 0;
 }
 
 static int mx31_config(struct spi_device *spi)
@@ -768,6 +789,12 @@ static void mx21_trigger(struct spi_imx_data *spi_imx)
 	writel(reg, spi_imx->base + MXC_CSPICTRL);
 }
 
+static int mx21_prepare_message(struct spi_imx_data *spi_imx,
+				struct spi_message *msg)
+{
+	return 0;
+}
+
 static int mx21_config(struct spi_device *spi)
 {
 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
@@ -837,6 +864,12 @@ static void mx1_trigger(struct spi_imx_data *spi_imx)
 	writel(reg, spi_imx->base + MXC_CSPICTRL);
 }
 
+static int mx1_prepare_message(struct spi_imx_data *spi_imx,
+			       struct spi_message *msg)
+{
+	return 0;
+}
+
 static int mx1_config(struct spi_device *spi)
 {
 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
@@ -871,6 +904,7 @@ static void mx1_reset(struct spi_imx_data *spi_imx)
 
 static struct spi_imx_devtype_data imx1_cspi_devtype_data = {
 	.intctrl = mx1_intctrl,
+	.prepare_message = mx1_prepare_message,
 	.config = mx1_config,
 	.trigger = mx1_trigger,
 	.rx_available = mx1_rx_available,
@@ -884,6 +918,7 @@ static struct spi_imx_devtype_data imx1_cspi_devtype_data = {
 
 static struct spi_imx_devtype_data imx21_cspi_devtype_data = {
 	.intctrl = mx21_intctrl,
+	.prepare_message = mx21_prepare_message,
 	.config = mx21_config,
 	.trigger = mx21_trigger,
 	.rx_available = mx21_rx_available,
@@ -898,6 +933,7 @@ static struct spi_imx_devtype_data imx21_cspi_devtype_data = {
 static struct spi_imx_devtype_data imx27_cspi_devtype_data = {
 	/* i.mx27 cspi shares the functions with i.mx21 one */
 	.intctrl = mx21_intctrl,
+	.prepare_message = mx21_prepare_message,
 	.config = mx21_config,
 	.trigger = mx21_trigger,
 	.rx_available = mx21_rx_available,
@@ -911,6 +947,7 @@ static struct spi_imx_devtype_data imx27_cspi_devtype_data = {
 
 static struct spi_imx_devtype_data imx31_cspi_devtype_data = {
 	.intctrl = mx31_intctrl,
+	.prepare_message = mx31_prepare_message,
 	.config = mx31_config,
 	.trigger = mx31_trigger,
 	.rx_available = mx31_rx_available,
@@ -925,6 +962,7 @@ static struct spi_imx_devtype_data imx31_cspi_devtype_data = {
 static struct spi_imx_devtype_data imx35_cspi_devtype_data = {
 	/* i.mx35 and later cspi shares the functions with i.mx31 one */
 	.intctrl = mx31_intctrl,
+	.prepare_message = mx31_prepare_message,
 	.config = mx31_config,
 	.trigger = mx31_trigger,
 	.rx_available = mx31_rx_available,
@@ -938,10 +976,12 @@ static struct spi_imx_devtype_data imx35_cspi_devtype_data = {
 
 static struct spi_imx_devtype_data imx51_ecspi_devtype_data = {
 	.intctrl = mx51_ecspi_intctrl,
+	.prepare_message = mx51_ecspi_prepare_message,
 	.config = mx51_ecspi_config,
 	.trigger = mx51_ecspi_trigger,
 	.rx_available = mx51_ecspi_rx_available,
 	.reset = mx51_ecspi_reset,
+	.setup_wml = mx51_setup_wml,
 	.fifo_size = 64,
 	.has_dmamode = true,
 	.dynamic_burst = true,
@@ -952,6 +992,7 @@ static struct spi_imx_devtype_data imx51_ecspi_devtype_data = {
 
 static struct spi_imx_devtype_data imx53_ecspi_devtype_data = {
 	.intctrl = mx51_ecspi_intctrl,
+	.prepare_message = mx51_ecspi_prepare_message,
 	.config = mx51_ecspi_config,
 	.trigger = mx51_ecspi_trigger,
 	.rx_available = mx51_ecspi_rx_available,
@@ -1149,7 +1190,6 @@ static int spi_imx_setupxfer(struct spi_device *spi,
 				 struct spi_transfer *t)
 {
 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-	int ret;
 
 	if (!t)
 		return 0;
@@ -1189,12 +1229,6 @@ static int spi_imx_setupxfer(struct spi_device *spi,
 		spi_imx->usedma = 1;
 	else
 		spi_imx->usedma = 0;
-
-	if (spi_imx->usedma) {
-		ret = spi_imx_dma_configure(spi->master);
-		if (ret)
-			return ret;
-	}
 
 	if (is_imx53_ecspi(spi_imx) && spi_imx->slave_mode) {
 		spi_imx->rx = mx53_ecspi_rx_slave;
@@ -1300,6 +1334,31 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
 	unsigned long timeout;
 	struct spi_master *master = spi_imx->bitbang.master;
 	struct sg_table *tx = &transfer->tx_sg, *rx = &transfer->rx_sg;
+	struct scatterlist *last_sg = sg_last(rx->sgl, rx->nents);
+	unsigned int bytes_per_word, i;
+	int ret;
+
+	/* Get the right burst length from the last sg to ensure no tail data */
+	bytes_per_word = spi_imx_bytes_per_word(transfer->bits_per_word);
+	for (i = spi_imx->devtype_data->fifo_size / 2; i > 0; i--) {
+		if (!(sg_dma_len(last_sg) % (i * bytes_per_word)))
+			break;
+	}
+	/* Use 1 as wml in case no available burst length got */
+	if (i == 0)
+		i = 1;
+
+	spi_imx->wml =  i;
+
+	ret = spi_imx_dma_configure(master);
+	if (ret)
+		return ret;
+
+	if (!spi_imx->devtype_data->setup_wml) {
+		dev_err(spi_imx->dev, "No setup_wml()?\n");
+		return -EINVAL;
+	}
+	spi_imx->devtype_data->setup_wml(spi_imx);
 
 	/*
 	 * The TX DMA setup starts the transfer, so make sure RX is configured
@@ -1486,7 +1545,13 @@ spi_imx_prepare_message(struct spi_master *master, struct spi_message *msg)
 		return ret;
 	}
 
-	return 0;
+	ret = spi_imx->devtype_data->prepare_message(spi_imx, msg);
+	if (ret) {
+		clk_disable(spi_imx->clk_ipg);
+		clk_disable(spi_imx->clk_per);
+	}
+
+	return ret;
 }
 
 static int
