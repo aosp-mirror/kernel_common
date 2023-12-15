@@ -312,6 +312,7 @@
   device_for_each_child
   device_get_child_node_count
   device_get_match_data
+  device_get_next_child_node
   device_get_phy_mode
   device_initialize
   device_init_wakeup
@@ -343,6 +344,7 @@
   devm_extcon_dev_allocate
   devm_extcon_dev_register
   devm_free_irq
+  devm_fwnode_gpiod_get_index
   devm_gpiod_get
   devm_gpiod_get_index
   devm_gpiod_get_optional
@@ -362,6 +364,7 @@
   devm_kmemdup
   devm_kstrdup
   devm_kvasprintf
+  devm_led_classdev_register_ext
   devm_mbox_controller_register
   devm_nvmem_cell_get
   devm_of_clk_add_hw_provider
@@ -714,6 +717,7 @@
   extcon_find_edev_by_node
   extcon_get_edev_by_phandle
   extcon_get_extcon_dev
+  extcon_get_state
   extcon_register_notifier
   extcon_unregister_notifier
   extcon_set_state
@@ -848,6 +852,7 @@
   gpiochip_generic_free
   gpiochip_generic_request
   gpiochip_get_data
+  gpiod_cansleep
   gpiod_count
   gpiod_direction_input
   gpiod_direction_output
@@ -1107,6 +1112,7 @@
   kvmalloc_node
   led_classdev_register_ext
   led_classdev_unregister
+  led_init_default_state_get
   led_trigger_blink_oneshot
   led_trigger_event
   led_trigger_register
@@ -1155,6 +1161,7 @@
   memcpy
   __memcpy_fromio
   __memcpy_toio
+  mem_dump_obj
   memdup_user
   memmove
   memory_cgrp_subsys_enabled_key
@@ -1705,6 +1712,7 @@
   sched_setscheduler
   sched_setscheduler_nocheck
   sched_show_task
+  sched_uclamp_used
   schedule
   schedule_timeout
   schedule_timeout_interruptible
@@ -1792,6 +1800,7 @@
   single_open
   single_open_size
   single_release
+  si_swapinfo
   skb_add_rx_frag
   skb_checksum_help
   skb_clone
@@ -2127,6 +2136,7 @@
   uart_update_timeout
   uart_write_wakeup
   __ubsan_handle_cfi_check_fail_abort
+  uclamp_eff_value
   __udelay
   __uio_register_device
   uio_unregister_device
@@ -2184,6 +2194,7 @@
   usb_driver_claim_interface
   usb_driver_release_interface
   usb_ep_set_maxpacket_limit
+  usb_ep_type_string
   usb_find_interface
   usb_free_urb
   usb_gadget_giveback_request
