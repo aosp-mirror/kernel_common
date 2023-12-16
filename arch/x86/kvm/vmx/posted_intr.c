@@ -221,7 +221,7 @@ void pi_wakeup_handler(void)
 		struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
 
 		if (pi_test_on(pi_desc) == 1)
-			kvm_vcpu_kick(vcpu);
+			kvm_vcpu_kick_boost(vcpu);
 	}
 	raw_spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, cpu));
 }
