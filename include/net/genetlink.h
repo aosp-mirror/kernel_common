@@ -14,7 +14,6 @@
  */
 struct genl_multicast_group {
 	char			name[GENL_NAMSIZ];
-	u8			flags;
 };
 
 struct genl_ops;
