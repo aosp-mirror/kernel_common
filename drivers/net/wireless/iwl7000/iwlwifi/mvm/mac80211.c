@@ -594,6 +594,9 @@ int iwl_mvm_mac_setup_register(struct iwl_mvm *mvm)
 
 	if (fw_has_capa(&mvm->fw->ucode_capa,
 			IWL_UCODE_TLV_CAPA_SPP_AMSDU_SUPPORT))
+#ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
+	if (!mvm->trans->dbg_cfg.MVM_DISABLE_SPP_AMSDU_ADV)
+#endif
 		wiphy_ext_feature_set(hw->wiphy,
 				      NL80211_EXT_FEATURE_SPP_AMSDU_SUPPORT);
 

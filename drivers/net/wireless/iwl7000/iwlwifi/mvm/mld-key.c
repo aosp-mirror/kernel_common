@@ -108,6 +108,15 @@ u32 iwl_mvm_get_sec_flags(struct iwl_mvm *mvm,
 	if (keyconf->flags & IEEE80211_KEY_FLAG_SPP_AMSDU)
 		flags |= IWL_SEC_KEY_FLAG_SPP_AMSDU;
 
+#ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
+	if (mvm->trans->dbg_cfg.MVM_SPP_AMSDU_ACTIVATE >= 0) {
+		if (mvm->trans->dbg_cfg.MVM_SPP_AMSDU_ACTIVATE)
+			flags |= IWL_SEC_KEY_FLAG_SPP_AMSDU;
+		else
+			flags &= ~IWL_SEC_KEY_FLAG_SPP_AMSDU;
+	}
+#endif
+
 	return flags;
 }
 
