@@ -3054,7 +3054,7 @@ int iwl_mvm_sched_scan_start(struct iwl_mvm *mvm,
 	for (i = 0; i < params.n_channels; i++) {
 		struct ieee80211_channel *channel = params.channels[i];
 
-		if (nl80211_is_6ghz(channel->band) &&
+		if (channel->band == NL80211_BAND_6GHZ &&
 		    !cfg80211_channel_is_psc(channel)) {
 			non_psc_included = true;
 			break;
@@ -3070,7 +3070,7 @@ int iwl_mvm_sched_scan_start(struct iwl_mvm *mvm,
 			return -ENOMEM;
 
 		for (i = j = 0; i < params.n_channels; i++) {
-			if (nl80211_is_6ghz(params.channels[i]->band) &&
+			if (params.channels[i]->band == NL80211_BAND_6GHZ &&
 			    !cfg80211_channel_is_psc(params.channels[i]))
 				continue;
 			params.channels[j++] = params.channels[i];

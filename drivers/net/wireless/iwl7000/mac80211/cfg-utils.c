@@ -225,7 +225,7 @@ ieee80211_uhb_power_type_valid(struct ieee80211_mgmt *mgmt, size_t len,
 			       u.probe_resp.variable);
 	ielen = len - min_hdr_len;
 
-	if (!nl80211_is_6ghz(channel->band))
+	if (channel->band != NL80211_BAND_6GHZ)
 		return true;
 
 	tmp = cfg80211_find_ext_elem(WLAN_EID_EXT_HE_OPERATION,

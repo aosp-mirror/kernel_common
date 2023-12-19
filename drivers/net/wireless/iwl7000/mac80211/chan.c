@@ -369,11 +369,11 @@ _ieee80211_recalc_chanctx_min_def(struct ieee80211_local *local,
 	/* don't optimize non-20MHz based and radar_enabled confs */
 	if (ctx->conf.def.width == NL80211_CHAN_WIDTH_5 ||
 	    ctx->conf.def.width == NL80211_CHAN_WIDTH_10 ||
-	    nl80211_is_s1ghz_width(ctx->conf.def.width, NL80211_CHAN_WIDTH_1) ||
-	    nl80211_is_s1ghz_width(ctx->conf.def.width, NL80211_CHAN_WIDTH_2) ||
-	    nl80211_is_s1ghz_width(ctx->conf.def.width, NL80211_CHAN_WIDTH_4) ||
-	    nl80211_is_s1ghz_width(ctx->conf.def.width, NL80211_CHAN_WIDTH_8) ||
-	    nl80211_is_s1ghz_width(ctx->conf.def.width, NL80211_CHAN_WIDTH_16) ||
+	    ctx->conf.def.width == NL80211_CHAN_WIDTH_1 ||
+	    ctx->conf.def.width == NL80211_CHAN_WIDTH_2 ||
+	    ctx->conf.def.width == NL80211_CHAN_WIDTH_4 ||
+	    ctx->conf.def.width == NL80211_CHAN_WIDTH_8 ||
+	    ctx->conf.def.width == NL80211_CHAN_WIDTH_16 ||
 	    ctx->conf.radar_enabled) {
 		ctx->conf.min_def = ctx->conf.def;
 		return 0;
@@ -488,16 +488,14 @@ static void _ieee80211_change_chanctx(struct ieee80211_local *local,
 	u32 changed = 0;
 
 	/* expected to handle only 20/40/80/160/320 channel widths */
-	switch (chandef->width) {
+	switch((int)chandef->width) {
 	case NL80211_CHAN_WIDTH_20_NOHT:
 	case NL80211_CHAN_WIDTH_20:
 	case NL80211_CHAN_WIDTH_40:
 	case NL80211_CHAN_WIDTH_80:
 	case NL80211_CHAN_WIDTH_80P80:
 	case NL80211_CHAN_WIDTH_160:
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
-#endif
 		break;
 	default:
 		WARN_ON(1);

@@ -255,18 +255,16 @@ ieee80211_valid_disable_subchannel_bitmap(u16 *bitmap, enum nl80211_chan_width b
 {
 	u32 idx, i;
 
-	switch (bw) {
+	switch((int)bw) {
 	case NL80211_CHAN_WIDTH_80:
 		idx = 0;
 		break;
 	case NL80211_CHAN_WIDTH_160:
 		idx = 1;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		idx = 2;
 		break;
-#endif
 	default:
 		*bitmap = 0;
 		break;
@@ -468,35 +466,20 @@ static int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width)
 {
 	int mhz;
 
-	switch (chan_width) {
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
+	switch((int)chan_width) {
 	case NL80211_CHAN_WIDTH_1:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		mhz = 1;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_2:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		mhz = 2;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_4:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		mhz = 4;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_8:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		mhz = 8;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_16:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		mhz = 16;
 		break;
 	case NL80211_CHAN_WIDTH_5:
@@ -519,11 +502,9 @@ static int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width)
 	case NL80211_CHAN_WIDTH_160:
 		mhz = 160;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		mhz = 320;
 		break;
-#endif
 	default:
 		WARN_ON_ONCE(1);
 		return -1;

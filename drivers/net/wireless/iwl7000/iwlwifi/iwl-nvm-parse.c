@@ -882,7 +882,7 @@ static void iwl_init_he_6ghz_capa(struct iwl_trans *trans,
 	u32 exp;
 	int i;
 
-	if (!nl80211_is_6ghz(sband->band))
+	if (sband->band != NL80211_BAND_6GHZ)
 		return;
 
 	/* grab HT/VHT capabilities and calculate HE 6 GHz capabilities */
@@ -939,7 +939,7 @@ iwl_nvm_fixup_sband_iftd(struct iwl_trans *trans,
 	/* Advertise an A-MPDU exponent extension based on
 	 * operating band
 	 */
-	if (nl80211_is_6ghz(sband->band) && cfg_eht_cap_has_eht(iftype_data))
+	if (sband->band == NL80211_BAND_6GHZ && cfg_eht_cap_has_eht(iftype_data))
 		iftype_data->he_cap.he_cap_elem.mac_cap_info[3] |=
 			IEEE80211_HE_MAC_CAP3_MAX_AMPDU_LEN_EXP_EXT_2;
 	else if (sband->band != NL80211_BAND_2GHZ)
@@ -959,10 +959,7 @@ iwl_nvm_fixup_sband_iftd(struct iwl_trans *trans,
 					       IEEE80211_EHT_MAC_CAP0_MAX_MPDU_LEN_MASK);
 #endif
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,4,0)
 	case NL80211_BAND_6GHZ:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 #if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 		if (!no_320) {
 			cfg_eht_cap(iftype_data)->eht_cap_elem.phy_cap_info[0] |=
@@ -1143,17 +1140,14 @@ static void iwl_init_he_hw_capab(struct iwl_trans *trans,
 	BUILD_BUG_ON(sizeof(data->iftd.high) != sizeof(iwl_he_eht_capa));
 	BUILD_BUG_ON(sizeof(data->iftd.uhb) != sizeof(iwl_he_eht_capa));
 
-	switch (sband->band) {
+	switch((int)sband->band) {
 	case NL80211_BAND_2GHZ:
 		iftype_data = data->iftd.low;
 		break;
 	case NL80211_BAND_5GHZ:
 		iftype_data = data->iftd.high;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,4,0)
 	case NL80211_BAND_6GHZ:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		iftype_data = data->iftd.uhb;
 		break;
 	default:
@@ -1394,7 +1388,7 @@ static void iwl_init_eht_band_override(struct iwl_trans *trans,
 #endif
 		}
 
-		if (trans->dbg_cfg.eht_disable_320 || !nl80211_is_6ghz(sband->band)) {
+		if (trans->dbg_cfg.eht_disable_320 || sband->band != NL80211_BAND_6GHZ) {
 			memset(&cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._320,
 			       0,
 			       sizeof(cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._320));
@@ -2109,7 +2103,7 @@ iwl_parse_nvm_mcc_info(struct device *dev, const struct iwl_cfg *cfg,
 							     cfg, uats_enabled);
 
 #if CFG80211_VERSION <= KERNEL_VERSION(6,8,0)
-		if (nl80211_is_6ghz(band)) {
+		if (band == NL80211_BAND_6GHZ) {
 			chan->flags |= IEEE80211_CHAN_NO_UHB_VLP_CLIENT | IEEE80211_CHAN_NO_UHB_AFC_CLIENT;
 			if (ch_flags & NVM_CHANNEL_AFC)
 				chan->flags &= ~IEEE80211_CHAN_NO_UHB_AFC_CLIENT;

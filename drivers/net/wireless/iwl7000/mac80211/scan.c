@@ -991,7 +991,7 @@ static void ieee80211_scan_state_set_channel(struct ieee80211_local *local,
 	/* For scanning on the S1G band, detect the channel width according to
 	 * the channel being scanned.
 	 */
-	if (nl80211_is_s1ghz(chan->band)) {
+	if (chan->band == NL80211_BAND_S1GHZ) {
 		local->scan_chandef.width = ieee80211_s1g_channel_width(chan);
 		goto set_channel;
 	}
@@ -1204,7 +1204,7 @@ int ieee80211_request_ibss_scan(struct ieee80211_sub_if_data *sdata,
 
 		for (band = 0; band < NUM_NL80211_BANDS; band++) {
 			if (!local->hw.wiphy->bands[band] ||
-			    nl80211_is_6ghz(band))
+			    band == NL80211_BAND_6GHZ)
 				continue;
 
 			max_n = local->hw.wiphy->bands[band]->n_channels;

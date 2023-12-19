@@ -1105,7 +1105,7 @@ bool iwl_mvm_enable_fils(struct iwl_mvm *mvm,
 	if (cfg80211_channel_is_psc(ctx->def.chan))
 		return true;
 
-	return (nl80211_is_6ghz(ctx->def.chan->band) &&
+	return (ctx->def.chan->band == NL80211_BAND_6GHZ &&
 		ctx->def.width >= NL80211_CHAN_WIDTH_80);
 }
 

@@ -990,16 +990,8 @@ static inline void cfg80211_bss_iter(struct wiphy *wiphy,
 #endif /* CFG80211_VERSION < KERNEL_VERSION(5,3,0) */
 
 #if CFG80211_VERSION < KERNEL_VERSION(5,4,0)
-static inline bool nl80211_is_6ghz(enum nl80211_band band)
-{
-	return false;
-}
-#else
-static inline bool nl80211_is_6ghz(enum nl80211_band band)
-{
-	return band == NL80211_BAND_6GHZ;
-}
-#endif /* CFG80211_VERSION < KERNEL_VERSION(5,4,0) */
+#define NL80211_BAND_6GHZ 3
+#endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(5,7,0)
 #define ieee80211_preamble_he() 0
@@ -1326,14 +1318,6 @@ static inline bool cfg80211_channel_is_psc(struct ieee80211_channel *chan)
 	return false;
 }
 #elif CFG80211_VERSION < KERNEL_VERSION(5,8,0)
-/**
- * cfg80211_channel_is_psc - Check if the channel is a 6 GHz PSC
- * @chan: control channel to check
- *
- * The Preferred Scanning Channels (PSC) are defined in
- * Draft IEEE P802.11ax/D5.0, 26.17.2.3.3
- */
-#
 static inline bool cfg80211_channel_is_psc(struct ieee80211_channel *chan)
 {
 	if (chan->band != NL80211_BAND_6GHZ)
@@ -1341,7 +1325,6 @@ static inline bool cfg80211_channel_is_psc(struct ieee80211_channel *chan)
 
 	return ieee80211_frequency_to_channel(chan->center_freq) % 16 == 5;
 }
-
 #endif /* < 5.8.0 */
 
 #if LINUX_VERSION_IS_LESS(5,9,0)
@@ -1374,33 +1357,12 @@ tasklet_setup(struct tasklet_struct *t,
 #endif /* < 5.4.0 */
 
 #if CFG80211_VERSION < KERNEL_VERSION(5,9,0)
-static inline bool nl80211_is_s1ghz(enum nl80211_band band)
-{
-	return false;
-}
-
+#define NL80211_BAND_S1GHZ 4
 #define NL80211_CHAN_WIDTH_1 8
 #define NL80211_CHAN_WIDTH_2 9
 #define NL80211_CHAN_WIDTH_4 10
 #define NL80211_CHAN_WIDTH_8 11
 #define NL80211_CHAN_WIDTH_16 12
-
-static inline bool nl80211_is_s1ghz_width(enum nl80211_chan_width w1,
-					  enum nl80211_chan_width w2)
-{
-	return false;
-}
-#else /* CFG80211_VERSION < 5.9.0 */
-static inline bool nl80211_is_s1ghz(enum nl80211_band band)
-{
-	return band == NL80211_BAND_S1GHZ;
-}
-
-static inline bool nl80211_is_s1ghz_width(enum nl80211_chan_width w1,
-					  enum nl80211_chan_width w2)
-{
-	return w1 == w2;
-}
 #endif /* CFG80211_VERSION < 5.9.0 */
 
 #if LINUX_VERSION_IS_LESS(4,19,0)
@@ -1655,6 +1617,10 @@ static inline void eth_hw_addr_set(struct net_device *dev, const u8 *addr)
 	ether_addr_copy(dev->dev_addr, addr);
 }
 #endif /* LINUX_VERSION_IS_LESS(5,15,0) */
+
+#if CFG80211_VERSION < KERNEL_VERSION(5,16,0)
+#define NL80211_BAND_LC	5
+#endif
 
 #if LINUX_VERSION_IS_LESS(5,16,0)
 #define skb_ext_reset LINUX_BACKPORT(skb_get_dsfield)

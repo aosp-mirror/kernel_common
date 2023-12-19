@@ -2518,15 +2518,12 @@ void iwl_rfi_support_notif_handler(struct iwl_mvm *mvm,
 
 static inline u8 iwl_mvm_phy_band_from_nl80211(enum nl80211_band band)
 {
-	switch (band) {
+	switch((int)band) {
 	case NL80211_BAND_2GHZ:
 		return PHY_BAND_24;
 	case NL80211_BAND_5GHZ:
 		return PHY_BAND_5;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,4,0)
 	case NL80211_BAND_6GHZ:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		return PHY_BAND_6;
 	default:
 		WARN_ONCE(1, "Unsupported band (%u)\n", band);

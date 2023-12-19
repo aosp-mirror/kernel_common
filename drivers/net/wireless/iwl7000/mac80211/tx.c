@@ -72,7 +72,7 @@ static __le16 ieee80211_duration(struct ieee80211_tx_data *tx,
 	erp = txrate->flags & IEEE80211_RATE_ERP_G;
 
 	/* device is expected to do this */
-	if (nl80211_is_s1ghz(sband->band))
+	if (sband->band == NL80211_BAND_S1GHZ)
 		return 0;
 
 	/*
@@ -144,21 +144,16 @@ static __le16 ieee80211_duration(struct ieee80211_tx_data *tx,
 		if (tx->sdata->vif.bss_conf.basic_rates & BIT(i))
 			rate = r->bitrate;
 
-		switch (sband->band) {
+		switch((int)sband->band) {
 		case NL80211_BAND_2GHZ:
-#if CFG80211_VERSION >= KERNEL_VERSION(5,16,0)
 		case NL80211_BAND_LC:
 			if (tx->sdata->deflink.operating_11g_mode)
 				flag = IEEE80211_RATE_MANDATORY_G;
 			else
 				flag = IEEE80211_RATE_MANDATORY_B;
 			break;
-#endif /* CFG80211_VERSION >= KERNEL_VERSION(5,16,0) */
 		case NL80211_BAND_5GHZ:
-#if CFG80211_VERSION >= KERNEL_VERSION(5,4,0)
 		case NL80211_BAND_6GHZ:
-			/* keep code in case of fall-through (spatch generated) */
-#endif
 			flag = IEEE80211_RATE_MANDATORY_A;
 			break;
 		default:
@@ -4973,7 +4968,7 @@ static void __ieee80211_beacon_add_tim(struct ieee80211_sub_if_data *sdata,
 	} else {
 		*pos++ = aid0; /* Bitmap control */
 
-		if (!nl80211_is_s1ghz(ieee80211_get_link_sband(link)->band)) {
+		if (ieee80211_get_link_sband(link)->band != NL80211_BAND_S1GHZ) {
 			tim[1] = 4;
 			/* Part Virt Bitmap */
 			skb_put_u8(skb, 0);

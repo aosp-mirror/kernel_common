@@ -648,9 +648,8 @@ __sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 		if (!hw->wiphy->bands[i])
 			continue;
 
-		switch (i) {
+		switch((int)i) {
 		case NL80211_BAND_2GHZ:
-#if CFG80211_VERSION >= KERNEL_VERSION(5,16,0)
 		case NL80211_BAND_LC:
 			/*
 			 * We use both here, even if we cannot really know for
@@ -664,7 +663,6 @@ __sta_info_alloc(struct ieee80211_sub_if_data *sdata,
 			mandatory = IEEE80211_RATE_MANDATORY_B |
 				    IEEE80211_RATE_MANDATORY_G;
 			break;
-#endif /* CFG80211_VERSION >= KERNEL_VERSION(5,16,0) */
 		case NL80211_BAND_5GHZ:
 			mandatory = IEEE80211_RATE_MANDATORY_A;
 			break;

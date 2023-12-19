@@ -369,7 +369,7 @@ ieee80211_sta_cap_rx_bw(struct link_sta_info *link_sta)
 		link_conf = rcu_dereference(sdata->vif.link_conf[link_id]);
 
 		if (eht_cap->has_eht &&
-		    nl80211_is_6ghz(link_conf->chanreq.oper.chan->band)) {
+		    link_conf->chanreq.oper.chan->band == NL80211_BAND_6GHZ) {
 			info = eht_cap->eht_cap_elem.phy_cap_info[0];
 
 			if (info & IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ) {
@@ -482,7 +482,7 @@ ieee80211_sta_rx_bw_to_chan_width(struct link_sta_info *link_sta)
 enum ieee80211_sta_rx_bandwidth
 ieee80211_chan_width_to_rx_bw(enum nl80211_chan_width width)
 {
-	switch (width) {
+	switch((int)width) {
 	case NL80211_CHAN_WIDTH_20_NOHT:
 	case NL80211_CHAN_WIDTH_20:
 		return IEEE80211_STA_RX_BW_20;
@@ -493,10 +493,8 @@ ieee80211_chan_width_to_rx_bw(enum nl80211_chan_width width)
 	case NL80211_CHAN_WIDTH_160:
 	case NL80211_CHAN_WIDTH_80P80:
 		return IEEE80211_STA_RX_BW_160;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		return IEEE80211_STA_RX_BW_320;
-#endif
 	default:
 		WARN_ON_ONCE(1);
 		return IEEE80211_STA_RX_BW_20;

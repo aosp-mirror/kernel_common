@@ -564,7 +564,7 @@ ieee80211_tdls_add_setup_start_ies(struct ieee80211_link_data *link,
 		pos = ieee80211_ie_build_he_cap(NULL, he_cap, pos, pos + cap_size);
 
 		/* Build HE 6Ghz capa IE from sband */
-		if (nl80211_is_6ghz(sband->band)) {
+		if (sband->band == NL80211_BAND_6GHZ) {
 			cap_size = 2 + 1 + sizeof(struct ieee80211_he_6ghz_capa);
 			pos = skb_put(skb, cap_size);
 			he_6ghz_capa =

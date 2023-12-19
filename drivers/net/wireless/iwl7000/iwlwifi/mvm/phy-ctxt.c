@@ -11,7 +11,7 @@
 /* Maps the driver specific channel width definition to the fw values */
 u8 iwl_mvm_get_channel_width(const struct cfg80211_chan_def *chandef)
 {
-	switch (chandef->width) {
+	switch((int)chandef->width) {
 	case NL80211_CHAN_WIDTH_20_NOHT:
 	case NL80211_CHAN_WIDTH_20:
 		return IWL_PHY_CHANNEL_MODE20;
@@ -21,10 +21,8 @@ u8 iwl_mvm_get_channel_width(const struct cfg80211_chan_def *chandef)
 		return IWL_PHY_CHANNEL_MODE80;
 	case NL80211_CHAN_WIDTH_160:
 		return IWL_PHY_CHANNEL_MODE160;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		return IWL_PHY_CHANNEL_MODE320;
-#endif
 	default:
 		WARN(1, "Invalid channel width=%u", chandef->width);
 		return IWL_PHY_CHANNEL_MODE20;

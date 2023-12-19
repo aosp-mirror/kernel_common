@@ -2062,7 +2062,7 @@ static int ieee80211_build_preq_ies_band(struct ieee80211_sub_if_data *sdata,
 
 	/* For direct scan add S1G IE and consider its override bits */
 #if CFG80211_VERSION >= KERNEL_VERSION(6,4,0)
-	if (nl80211_is_s1ghz(band)) {
+	if (band == NL80211_BAND_S1GHZ) {
 		if (end - pos < 2 + sizeof(struct ieee80211_s1g_cap))
 			goto out_err;
 		pos = ieee80211_ie_build_s1g_cap(pos, &sband->s1g_cap);
@@ -3436,7 +3436,7 @@ u8 *ieee80211_ie_build_ht_oper(u8 *pos, struct ieee80211_sta_ht_cap *ht_cap,
 	ht_oper = (struct ieee80211_ht_operation *)pos;
 	ht_oper->primary_chan = ieee80211_frequency_to_channel(
 					chandef->chan->center_freq);
-	switch (chandef->width) {
+	switch((int)chandef->width) {
 	case NL80211_CHAN_WIDTH_160:
 	case NL80211_CHAN_WIDTH_80P80:
 	case NL80211_CHAN_WIDTH_80:
@@ -3446,12 +3446,10 @@ u8 *ieee80211_ie_build_ht_oper(u8 *pos, struct ieee80211_sta_ht_cap *ht_cap,
 		else
 			ht_oper->ht_param = IEEE80211_HT_PARAM_CHA_SEC_BELOW;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		/* HT information element should not be included on 6GHz */
 		WARN_ON(1);
 		return pos;
-#endif
 	default:
 		ht_oper->ht_param = IEEE80211_HT_PARAM_CHA_SEC_NONE;
 		break;
@@ -3481,7 +3479,7 @@ void ieee80211_ie_build_wide_bw_cs(u8 *pos,
 	*pos++ = WLAN_EID_WIDE_BW_CHANNEL_SWITCH;	/* EID */
 	*pos++ = 3;					/* IE length */
 	/* New channel width */
-	switch (chandef->width) {
+	switch((int)chandef->width) {
 	case NL80211_CHAN_WIDTH_80:
 		*pos++ = IEEE80211_VHT_CHANWIDTH_80MHZ;
 		break;
@@ -3491,12 +3489,10 @@ void ieee80211_ie_build_wide_bw_cs(u8 *pos,
 	case NL80211_CHAN_WIDTH_80P80:
 		*pos++ = IEEE80211_VHT_CHANWIDTH_80P80MHZ;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		/* The behavior is not defined for 320 MHz channels */
 		WARN_ON(1);
 		fallthrough;
-#endif
 	default:
 		*pos++ = IEEE80211_VHT_CHANWIDTH_USE_HT;
 	}
@@ -3526,7 +3522,7 @@ u8 *ieee80211_ie_build_vht_oper(u8 *pos, struct ieee80211_sta_vht_cap *vht_cap,
 	else
 		vht_oper->center_freq_seg1_idx = 0x00;
 
-	switch (chandef->width) {
+	switch((int)chandef->width) {
 	case NL80211_CHAN_WIDTH_160:
 		/*
 		 * Convert 160 MHz channel width to new style as interop
@@ -3549,12 +3545,10 @@ u8 *ieee80211_ie_build_vht_oper(u8 *pos, struct ieee80211_sta_vht_cap *vht_cap,
 	case NL80211_CHAN_WIDTH_80:
 		vht_oper->chan_width = IEEE80211_VHT_CHANWIDTH_80MHZ;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		/* VHT information element should not be included on 6GHz */
 		WARN_ON(1);
 		return pos;
-#endif
 	default:
 		vht_oper->chan_width = IEEE80211_VHT_CHANWIDTH_USE_HT;
 		break;
@@ -3573,7 +3567,7 @@ u8 *ieee80211_ie_build_he_oper(u8 *pos, struct cfg80211_chan_def *chandef)
 	u32 he_oper_params;
 	u8 ie_len = 1 + sizeof(struct ieee80211_he_operation);
 
-	if (nl80211_is_6ghz(chandef->chan->band))
+	if (chandef->chan->band == NL80211_BAND_6GHZ)
 		ie_len += sizeof(struct ieee80211_he_6ghz_oper);
 
 	*pos++ = WLAN_EID_EXTENSION;
@@ -3587,7 +3581,7 @@ u8 *ieee80211_ie_build_he_oper(u8 *pos, struct cfg80211_chan_def *chandef)
 				IEEE80211_HE_OPERATION_ER_SU_DISABLE);
 	he_oper_params |= u32_encode_bits(1,
 				IEEE80211_HE_OPERATION_BSS_COLOR_DISABLED);
-	if (nl80211_is_6ghz(chandef->chan->band))
+	if (chandef->chan->band == NL80211_BAND_6GHZ)
 		he_oper_params |= u32_encode_bits(1,
 				IEEE80211_HE_OPERATION_6GHZ_OP_INFO);
 
@@ -3598,7 +3592,7 @@ u8 *ieee80211_ie_build_he_oper(u8 *pos, struct cfg80211_chan_def *chandef)
 	he_oper->he_mcs_nss_set = cpu_to_le16(0xffff);
 	pos += sizeof(struct ieee80211_he_operation);
 
-	if (!nl80211_is_6ghz(chandef->chan->band))
+	if (chandef->chan->band != NL80211_BAND_6GHZ)
 		goto out;
 
 	/* TODO add VHT operational */
@@ -3614,8 +3608,7 @@ u8 *ieee80211_ie_build_he_oper(u8 *pos, struct cfg80211_chan_def *chandef)
 	else
 		he_6ghz_op->ccfs1 = 0;
 
-	switch (chandef->width) {
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
+	switch((int)chandef->width) {
 	case NL80211_CHAN_WIDTH_320:
 		/*
 		 * TODO: mesh operation is not defined over 6GHz 320 MHz
@@ -3623,7 +3616,6 @@ u8 *ieee80211_ie_build_he_oper(u8 *pos, struct cfg80211_chan_def *chandef)
 		 */
 		WARN_ON(1);
 		break;
-#endif
 	case NL80211_CHAN_WIDTH_160:
 		/* Convert 160 MHz channel width to new style as interop
 		 * workaround.
@@ -3694,8 +3686,7 @@ u8 *ieee80211_ie_build_eht_oper(u8 *pos, struct cfg80211_chan_def *chandef,
 	else
 		eht_oper_info->ccfs1 = 0;
 
-	switch (chandef->width) {
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
+	switch((int)chandef->width) {
 	case NL80211_CHAN_WIDTH_320:
 		chan_width = IEEE80211_EHT_OPER_CHAN_WIDTH_320MHZ;
 		eht_oper_info->ccfs1 = eht_oper_info->ccfs0;
@@ -3704,7 +3695,6 @@ u8 *ieee80211_ie_build_eht_oper(u8 *pos, struct cfg80211_chan_def *chandef,
 		else
 			eht_oper_info->ccfs0 += 16;
 		break;
-#endif
 	case NL80211_CHAN_WIDTH_160:
 		eht_oper_info->ccfs1 = eht_oper_info->ccfs0;
 		if (chandef->chan->center_freq < chandef->center_freq1)
@@ -3933,7 +3923,7 @@ bool ieee80211_chandef_he_6ghz_oper(struct ieee80211_local *local,
 	const struct ieee80211_he_6ghz_oper *he_6ghz_oper;
 	u32 freq;
 
-	if (!nl80211_is_6ghz(chandef->chan->band))
+	if (chandef->chan->band != NL80211_BAND_6GHZ)
 		return true;
 
 	if (!he_oper)
@@ -4005,7 +3995,7 @@ bool ieee80211_chandef_he_6ghz_oper(struct ieee80211_local *local,
 }
 #endif
 
-#if CFG80211_VERSION >= KERNEL_VERSION(5,10,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(5,8,0)
 bool ieee80211_chandef_s1g_oper(const struct ieee80211_s1g_oper_ie *oper,
 				struct cfg80211_chan_def *chandef)
 {
@@ -4041,7 +4031,12 @@ bool ieee80211_chandef_s1g_oper(const struct ieee80211_s1g_oper_ie *oper,
 
 	return true;
 }
-#endif /* CFG80211_VERSION >= KERNEL_VERSION(5,10,0) */
+#else
+bool ieee80211_chandef_s1g_oper(const struct ieee80211_s1g_oper_ie *oper,
+				struct cfg80211_chan_def *chandef){
+	return false;
+}
+#endif
 
 int ieee80211_parse_bitrates(enum nl80211_chan_width width,
 			     const struct ieee80211_supported_band *sband,
@@ -4433,7 +4428,7 @@ void ieee80211_chandef_downgrade(struct cfg80211_chan_def *c,
 	if (!conn)
 		conn = &_ignored;
 
-	switch (c->width) {
+	switch((int)c->width) {
 	default:
 	case NL80211_CHAN_WIDTH_20_NOHT:
 		WARN_ON_ONCE(1);
@@ -4465,32 +4460,15 @@ void ieee80211_chandef_downgrade(struct cfg80211_chan_def *c,
 		new_primary_width = NL80211_CHAN_WIDTH_80;
 		conn->bw_limit = IEEE80211_CONN_BW_LIMIT_80;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		new_primary_width = NL80211_CHAN_WIDTH_160;
 		conn->bw_limit = IEEE80211_CONN_BW_LIMIT_160;
 		break;
-#endif
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_1:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_2:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_4:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_8:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
 	case NL80211_CHAN_WIDTH_16:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		WARN_ON_ONCE(1);
 		/* keep c->width */
 		conn->mode = IEEE80211_CONN_MODE_S1G;
@@ -5186,7 +5164,7 @@ const char *ieee80211_conn_mode_str(enum ieee80211_conn_mode mode)
 enum ieee80211_conn_bw_limit
 ieee80211_min_bw_limit_from_chandef(struct cfg80211_chan_def *chandef)
 {
-	switch (chandef->width) {
+	switch((int)chandef->width) {
 	case NL80211_CHAN_WIDTH_20_NOHT:
 	case NL80211_CHAN_WIDTH_20:
 		return IEEE80211_CONN_BW_LIMIT_20;
@@ -5197,10 +5175,8 @@ ieee80211_min_bw_limit_from_chandef(struct cfg80211_chan_def *chandef)
 	case NL80211_CHAN_WIDTH_80P80:
 	case NL80211_CHAN_WIDTH_160:
 		return IEEE80211_CONN_BW_LIMIT_160;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,18,0)
 	case NL80211_CHAN_WIDTH_320:
 		return IEEE80211_CONN_BW_LIMIT_320;
-#endif
 	default:
 		WARN(1, "unhandled chandef width %d\n", chandef->width);
 		return IEEE80211_CONN_BW_LIMIT_20;

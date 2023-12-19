@@ -53,7 +53,7 @@ void rate_control_rate_init(struct sta_info *sta)
 	sband = local->hw.wiphy->bands[chanctx_conf->def.chan->band];
 
 	/* TODO: check for minstrel_s1g ? */
-	if (nl80211_is_s1ghz(sband->band)) {
+	if (sband->band == NL80211_BAND_S1GHZ) {
 		ieee80211_s1g_sta_rate_init(sta);
 		rcu_read_unlock();
 		return;
@@ -282,7 +282,7 @@ void ieee80211_check_rate_mask(struct ieee80211_link_data *link)
 		return;
 
 	band = link->conf->chanreq.oper.chan->band;
-	if (nl80211_is_s1ghz(band)) {
+	if (band == NL80211_BAND_S1GHZ) {
 		/* TODO */
 		return;
 	}
@@ -318,7 +318,7 @@ static void rc_send_low_basicrate(struct ieee80211_tx_rate *rate,
 {
 	u8 i;
 
-	if (nl80211_is_s1ghz(sband->band)) {
+	if (sband->band == NL80211_BAND_S1GHZ) {
 		/* TODO */
 		rate->flags |= IEEE80211_TX_RC_S1G_MCS;
 		rate->idx = 0;
@@ -352,7 +352,7 @@ static void __rate_control_send_low(struct ieee80211_hw *hw,
 	u32 rate_flags =
 		ieee80211_chandef_rate_flags(&hw->conf.chandef);
 
-	if (nl80211_is_s1ghz(sband->band)) {
+	if (sband->band == NL80211_BAND_S1GHZ) {
 		info->control.rates[0].flags |= IEEE80211_TX_RC_S1G_MCS;
 		info->control.rates[0].idx = 0;
 		return;

@@ -2543,10 +2543,8 @@ void ieee80211_add_s1g_capab_ie(struct ieee80211_sub_if_data *sdata,
 void ieee80211_add_aid_request_ie(struct ieee80211_sub_if_data *sdata,
 				  struct sk_buff *skb);
 #if CFG80211_VERSION >= KERNEL_VERSION(6,4,0)
-#if CFG80211_VERSION >= KERNEL_VERSION(6,4,0)
 u8 *ieee80211_ie_build_s1g_cap(u8 *pos, struct ieee80211_sta_s1g_cap *s1g_cap);
 #endif
-#endif /* CFG80211_VERSION >= KERNEL_VERSION(6,4,0) */
 
 /* channel management */
 bool ieee80211_chandef_ht_oper(const struct ieee80211_ht_operation *ht_oper,

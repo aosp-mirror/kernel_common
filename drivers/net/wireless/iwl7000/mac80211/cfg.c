@@ -1523,7 +1523,8 @@ static int ieee80211_start_ap(struct wiphy *wiphy, struct net_device *dev,
 	link_conf->he_bss_color = params->he_bss_color;
 #endif
 #if CFG80211_VERSION >= KERNEL_VERSION(5,10,0)
-	sdata->vif.cfg.s1g = nl80211_is_s1ghz(params->chandef.chan->band);
+	sdata->vif.cfg.s1g = params->chandef.chan->band ==
+				  NL80211_BAND_S1GHZ;
 #endif
 
 	sdata->vif.cfg.ssid_len = params->ssid_len;
@@ -2868,7 +2869,7 @@ static int ieee80211_change_bss(struct wiphy *wiphy,
 
 	if (!link->conf->use_short_slot &&
 	    (sband->band == NL80211_BAND_5GHZ ||
-	     nl80211_is_6ghz(sband->band))) {
+	     sband->band == NL80211_BAND_6GHZ)) {
 		link->conf->use_short_slot = true;
 		changed |= BSS_CHANGED_ERP_SLOT;
 	}

@@ -252,7 +252,7 @@ ieee80211_determine_ap_chan(struct ieee80211_sub_if_data *sdata,
 	};
 
 	/* get special S1G case out of the way */
-	if (nl80211_is_s1ghz(sband->band)) {
+	if (sband->band == NL80211_BAND_S1GHZ) {
 		if (!ieee80211_chandef_s1g_oper(elems->s1g_oper, chandef)) {
 			sdata_info(sdata,
 				   "Missing S1G Operation Element? Trying operating == primary\n");
@@ -263,7 +263,7 @@ ieee80211_determine_ap_chan(struct ieee80211_sub_if_data *sdata,
 	}
 
 	/* get special 6 GHz case out of the way */
-	if (nl80211_is_6ghz(sband->band)) {
+	if (sband->band == NL80211_BAND_6GHZ) {
 		enum ieee80211_conn_mode mode = IEEE80211_CONN_MODE_EHT;
 
 		/* this is an error */
@@ -704,20 +704,14 @@ again:
 
 	sband = sdata->local->hw.wiphy->bands[channel->band];
 
-	switch (channel->band) {
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
+	switch((int)channel->band) {
 	case NL80211_BAND_S1GHZ:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		if (WARN_ON(ap_mode != IEEE80211_CONN_MODE_S1G)) {
 			ret = -EINVAL;
 			goto free;
 		}
 		return elems;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,4,0)
 	case NL80211_BAND_6GHZ:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		if (ap_mode < IEEE80211_CONN_MODE_HE) {
 			sdata_info(sdata,
 				   "Rejecting non-HE 6/7 GHz connection");
@@ -1447,7 +1441,7 @@ static size_t ieee80211_assoc_link_elems(struct ieee80211_sub_if_data *sdata,
 	    ieee80211_hw_check(&local->hw, SPECTRUM_MGMT))
 		*capab |= WLAN_CAPABILITY_SPECTRUM_MGMT;
 
-	if (!nl80211_is_s1ghz(sband->band))
+	if (sband->band != NL80211_BAND_S1GHZ)
 		ieee80211_assoc_add_rates(skb, width, sband, assoc_data);
 
 	if (*capab & WLAN_CAPABILITY_SPECTRUM_MGMT ||
@@ -1472,7 +1466,7 @@ static size_t ieee80211_assoc_link_elems(struct ieee80211_sub_if_data *sdata,
 	 * (for now?) apply this restriction only on the (new) 6 GHz band.
 	 */
 	if (*capab & WLAN_CAPABILITY_SPECTRUM_MGMT &&
-	    (!nl80211_is_6ghz(sband->band) ||
+	    (sband->band != NL80211_BAND_6GHZ ||
 	     !ext_capa || ext_capa->datalen < 1 ||
 	     !(ext_capa->data[0] & WLAN_EXT_CAPA1_EXT_CHANNEL_SWITCHING))) {
 		/* TODO: get this in reg domain format */
@@ -1493,7 +1487,7 @@ static size_t ieee80211_assoc_link_elems(struct ieee80211_sub_if_data *sdata,
 					       extra_elems_len,
 					       offset);
 
-	if (!nl80211_is_6ghz(sband->band) &&
+	if (sband->band != NL80211_BAND_6GHZ &&
 	    assoc_data->link[link_id].conn.mode >= IEEE80211_CONN_MODE_HT) {
 		ieee80211_add_ht_ie(sdata, skb,
 				    assoc_data->link[link_id].ap_ht_param,
@@ -1507,7 +1501,7 @@ static size_t ieee80211_assoc_link_elems(struct ieee80211_sub_if_data *sdata,
 						extra_elems_len,
 						offset);
 
-	if (!nl80211_is_6ghz(sband->band) &&
+	if (sband->band != NL80211_BAND_6GHZ &&
 	    assoc_data->link[link_id].conn.mode >= IEEE80211_CONN_MODE_VHT) {
 		bool mu_mimo_owner =
 			ieee80211_add_vht_ie(sdata, skb, sband,
@@ -1548,7 +1542,7 @@ static size_t ieee80211_assoc_link_elems(struct ieee80211_sub_if_data *sdata,
 	if (assoc_data->link[link_id].conn.mode >= IEEE80211_CONN_MODE_EHT)
 		ieee80211_add_eht_ie(sdata, skb, sband);
 
-	if (nl80211_is_s1ghz(sband->band)) {
+	if (sband->band == NL80211_BAND_S1GHZ) {
 		ieee80211_add_aid_request_ie(sdata, skb);
 		ieee80211_add_s1g_capab_ie(sdata, &sband->s1g_cap, skb);
 	}
@@ -1811,7 +1805,7 @@ static int ieee80211_send_assoc(struct ieee80211_sub_if_data *sdata)
 			sizeof(struct ieee80211_he_mcs_nss_supp) +
 			IEEE80211_HE_PPE_THRES_MAX_LEN;
 
-		if (nl80211_is_6ghz(sband->band))
+		if (sband->band == NL80211_BAND_6GHZ)
 			size += 2 + 1 + sizeof(struct ieee80211_he_6ghz_capa);
 
 		size += 2 + 1 + sizeof(struct ieee80211_eht_cap_elem) +
@@ -2407,24 +2401,19 @@ ieee80211_find_80211h_pwr_constr(struct ieee80211_sub_if_data *sdata,
 	triplet = (void *)(country_ie + 3);
 	country_ie_len -= 3;
 
-	switch (channel->band) {
+	switch((int)channel->band) {
 	default:
 		WARN_ON_ONCE(1);
 		fallthrough;
 	case NL80211_BAND_2GHZ:
 	case NL80211_BAND_60GHZ:
-#if CFG80211_VERSION >= KERNEL_VERSION(5,16,0)
 	case NL80211_BAND_LC:
 		chan_increment = 1;
 		break;
-#endif /* CFG80211_VERSION >= KERNEL_VERSION(5,16,0) */
 	case NL80211_BAND_5GHZ:
 		chan_increment = 4;
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,4,0)
 	case NL80211_BAND_6GHZ:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		/*
 		 * In the 6 GHz band, the "maximum transmit power level"
 		 * field in the triplets is reserved, and thus will be
@@ -3079,7 +3068,7 @@ static u64 ieee80211_handle_bss_capability(struct ieee80211_link_data *link,
 
 	use_short_slot = !!(capab & WLAN_CAPABILITY_SHORT_SLOT_TIME);
 	if (sband->band == NL80211_BAND_5GHZ ||
-	    nl80211_is_6ghz(sband->band))
+	    sband->band == NL80211_BAND_6GHZ)
 		use_short_slot = true;
 
 	if (use_protection != bss_conf->use_cts_prot) {
@@ -4377,8 +4366,8 @@ static bool ieee80211_assoc_config_link(struct ieee80211_link_data *link,
 		.from_ap = true,
 	};
 	bool is_5ghz = cbss->channel->band == NL80211_BAND_5GHZ;
-	bool is_6ghz = nl80211_is_6ghz(cbss->channel->band);
-	bool is_s1g = nl80211_is_s1ghz(cbss->channel->band);
+	bool is_6ghz = cbss->channel->band == NL80211_BAND_6GHZ;
+	bool is_s1g = cbss->channel->band == NL80211_BAND_S1GHZ;
 	const struct cfg80211_bss_ies *bss_ies = NULL;
 	struct ieee80211_supported_band *sband;
 	struct ieee802_11_elems *elems;
@@ -4793,7 +4782,7 @@ static int ieee80211_mgd_setup_link_sta(struct ieee80211_link_data *link,
 	memcpy(link_sta->pub->addr, cbss->bssid, ETH_ALEN);
 
 	/* TODO: S1G Basic Rate Set is expressed elsewhere */
-	if (nl80211_is_s1ghz(cbss->channel->band)) {
+	if (cbss->channel->band == NL80211_BAND_S1GHZ) {
 		ieee80211_s1g_sta_rate_init(sta);
 		return 0;
 	}
@@ -4943,12 +4932,12 @@ ieee80211_determine_our_sta_mode(struct ieee80211_sub_if_data *sdata,
 {
 	struct ieee80211_sta_ht_cap sta_ht_cap = sband->ht_cap;
 	bool is_5ghz = sband->band == NL80211_BAND_5GHZ;
-	bool is_6ghz = nl80211_is_6ghz(sband->band);
+	bool is_6ghz = sband->band == NL80211_BAND_6GHZ;
 	const struct ieee80211_sta_he_cap *he_cap;
 	const struct ieee80211_sta_eht_cap *eht_cap;
 	struct ieee80211_sta_vht_cap vht_cap;
 
-	if (nl80211_is_s1ghz(sband->band)) {
+	if (sband->band == NL80211_BAND_S1GHZ) {
 		conn->mode = IEEE80211_CONN_MODE_S1G;
 		conn->bw_limit = IEEE80211_CONN_BW_LIMIT_20;
 		mlme_dbg(sdata, "operating as S1G STA\n");
@@ -5070,7 +5059,7 @@ ieee80211_determine_our_sta_mode(struct ieee80211_sub_if_data *sdata,
 	conn->mode = IEEE80211_CONN_MODE_HE;
 
 	/* check bandwidth */
-	switch (sband->band) {
+	switch((int)sband->band) {
 	default:
 	case NL80211_BAND_2GHZ:
 		if (he_cap->he_cap_elem.phy_cap_info[0] &
@@ -5097,10 +5086,7 @@ ieee80211_determine_our_sta_mode(struct ieee80211_sub_if_data *sdata,
 					 "no 160 MHz HE cap in 5 GHz, limiting to 80 MHz\n");
 		}
 		break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,4,0)
 	case NL80211_BAND_6GHZ:
-		/* keep code in case of fall-through (spatch generated) */
-#endif
 		if (he_cap->he_cap_elem.phy_cap_info[0] &
 		    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G)
 			break;
@@ -5155,7 +5141,7 @@ static int ieee80211_prep_channel(struct ieee80211_sub_if_data *sdata,
 				  struct ieee80211_conn_settings *conn)
 {
 	struct ieee80211_local *local = sdata->local;
-	bool is_6ghz = nl80211_is_6ghz(cbss->channel->band);
+	bool is_6ghz = cbss->channel->band == NL80211_BAND_6GHZ;
 	struct ieee80211_chan_req chanreq = {};
 	struct ieee802_11_elems *elems;
 	int ret;
@@ -5757,7 +5743,7 @@ static void ieee80211_rx_mgmt_probe_resp(struct ieee80211_link_data *link,
 		return;
 
 	if (!ether_addr_equal(mgmt->da, sdata->vif.addr) &&
-	    (!nl80211_is_6ghz(channel->band) ||
+	    (channel->band != NL80211_BAND_6GHZ ||
 	     !is_broadcast_ether_addr(mgmt->da)))
 		return; /* ignore ProbeResp to foreign address */
 
@@ -8420,7 +8406,7 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 				goto err_free;
 			}
 
-			if (nl80211_is_s1ghz(link_cbss->channel->band)) {
+			if (link_cbss->channel->band == NL80211_BAND_S1GHZ) {
 				err = -EINVAL;
 				goto err_free;
 			}
@@ -8459,14 +8445,14 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 		struct ieee80211_bss *bss = (void *)cbss->priv;
 
 		memcpy(assoc_data->link[0].addr, sdata->vif.addr, ETH_ALEN);
-		assoc_data->s1g = nl80211_is_s1ghz(cbss->channel->band);
+		assoc_data->s1g = cbss->channel->band == NL80211_BAND_S1GHZ;
 
 		memcpy(assoc_data->ap_addr, cbss->bssid, ETH_ALEN);
 
 		assoc_data->wmm = bss->wmm_used &&
 				  (local->hw.queues >= IEEE80211_NUM_ACS);
 
-		if (nl80211_is_6ghz(cbss->channel->band) &&
+		if (cbss->channel->band == NL80211_BAND_6GHZ &&
 		    req->flags & (ASSOC_REQ_DISABLE_HT |
 				  ASSOC_REQ_DISABLE_VHT |
 				  ASSOC_REQ_DISABLE_HE)) {
