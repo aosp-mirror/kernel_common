@@ -148,6 +148,8 @@ struct _RGX_FREELIST_ {
 	PMR						*psFreeListPMR;
 	IMG_DEVMEM_OFFSET_T		uiFreeListPMROffset;
 
+	DEVMEMINT_RESERVATION2* psFreeListReservation;
+
 	/* Freelist config */
 	IMG_UINT32				ui32MaxFLPages;
 	IMG_UINT32				ui32InitFLPages;
@@ -340,6 +342,19 @@ PVRSRV_ERROR RGXCreateFreeList(CONNECTION_DATA		*psConnection,
 							   PMR					*psFreeListPMR,
 							   IMG_DEVMEM_OFFSET_T	uiFreeListPMROffset,
 							   RGX_FREELIST			**ppsFreeList);
+
+/* Create free list */
+PVRSRV_ERROR RGXCreateFreeList2(CONNECTION_DATA      *psConnection,
+                               PVRSRV_DEVICE_NODE	*psDeviceNode,
+                               IMG_HANDLE			hMemCtxPrivData,
+                               IMG_UINT32			ui32MaxFLPages,
+                               IMG_UINT32			ui32InitFLPages,
+                               IMG_UINT32			ui32GrowFLPages,
+                               IMG_UINT32           ui32GrowParamThreshold,
+                               RGX_FREELIST			*psGlobalFreeList,
+                               IMG_BOOL				bCheckFreelist,
+                               DEVMEMINT_RESERVATION2* psFreeListReservation,
+                               RGX_FREELIST			**ppsFreeList);
 
 /* Destroy free list */
 PVRSRV_ERROR RGXDestroyFreeList(RGX_FREELIST *psFreeList);

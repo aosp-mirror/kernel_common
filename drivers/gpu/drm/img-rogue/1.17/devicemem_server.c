@@ -1408,6 +1408,20 @@ ErrorReturnError:
 }
 
 PVRSRV_ERROR
+DevmemIntGetReservationData(DEVMEMINT_RESERVATION2* psReservation, PMR** ppsPMR, IMG_DEV_VIRTADDR* psDevVAddr)
+{
+	/* Reservation might not have a PMR if a mapping was not yet performed */
+	if (psReservation->psMappedPMR == NULL)
+	{
+		return PVRSRV_ERROR_INVALID_PARAMS;
+	}
+
+	psDevVAddr->uiAddr = psReservation->sBase.uiAddr;
+	*ppsPMR = psReservation->psMappedPMR;
+	return PVRSRV_OK;
+}
+
+PVRSRV_ERROR
 DevmemIntUnmapPMR(DEVMEMINT_MAPPING *psMapping)
 {
 	PVR_UNREFERENCED_PARAMETER(psMapping);

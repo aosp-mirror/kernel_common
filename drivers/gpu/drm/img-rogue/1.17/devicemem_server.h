@@ -386,23 +386,8 @@ DevmemIntUnreserveRange(DEVMEMINT_RESERVATION *psDevmemReservation);
 PVRSRV_ERROR
 DevmemIntUnreserveRange2(DEVMEMINT_RESERVATION2 *psDevmemReservation);
 
-/*************************************************************************/ /*!
-@Function       DevmemIntReservationAcquire
-@Description    Acquire a reference to the provided device memory reservation.
-@Return         IMG_TRUE if referenced and IMG_FALSE in case of error
-*/ /**************************************************************************/
-IMG_BOOL
-DevmemIntReservationAcquire(DEVMEMINT_RESERVATION2 *psDevmemReservation);
-
-/*************************************************************************/ /*!
-@Function       DevmemIntReservationRelease
-@Description    Release the reference to the provided device memory reservation.
-            If this is the last reference which was taken then the
-                reservation will be freed.
-@Return         None.
-*/ /**************************************************************************/
-void
-DevmemIntReservationRelease(DEVMEMINT_RESERVATION2 *psDevmemReservation);
+PVRSRV_ERROR
+DevmemIntGetReservationData(DEVMEMINT_RESERVATION2* psReservation, PMR** ppsPMR, IMG_DEV_VIRTADDR* psDevVAddr);
 
 /*************************************************************************/ /*!
  * @Function    DevmemXIntReserveRange()
@@ -440,6 +425,24 @@ DevmemXIntReserveRange(DEVMEMINT_HEAP *psDevmemHeap,
 */ /**************************************************************************/
 PVRSRV_ERROR
 DevmemXIntUnreserveRange(DEVMEMXINT_RESERVATION *psRsrv);
+
+/*************************************************************************/ /*!
+@Function       DevmemIntReservationAcquire
+@Description    Acquire a reference to the provided device memory reservation.
+@Return         IMG_TRUE if referenced and IMG_FALSE in case of error
+*/ /**************************************************************************/
+IMG_BOOL
+DevmemIntReservationAcquire(DEVMEMINT_RESERVATION2 *psDevmemReservation);
+
+/*************************************************************************/ /*!
+@Function       DevmemIntReservationRelease
+@Description    Release the reference to the provided device memory reservation.
+            If this is the last reference which was taken then the
+                reservation will be freed.
+@Return         None.
+*/ /**************************************************************************/
+void
+DevmemIntReservationRelease(DEVMEMINT_RESERVATION2 *psDevmemReservation);
 
 /*************************************************************************/ /*!
  * @Function    DevmemXIntMapPages()

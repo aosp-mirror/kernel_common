@@ -320,12 +320,12 @@ PVRSRVPhysHeapGetMemInfoPkdKM(CONNECTION_DATA *psConnection,
 
 /*************************************************************************/ /*!
 @Function       PhysMemValidateParams
-@Description    Checks the PMR creation parameters
-                adjusts them if possible and necessary
+@Description    Checks the PMR creation parameters and adjusts them
+                if possible and necessary
 @Input          ui32NumPhysChunks      Number of physical chunks.
-@Input          ui32NumPhysChunks      Number of virtual chunks.
+@Input          ui32NumVirtChunks      Number of virtual chunks.
 @Input          uiFlags                Allocation flags.
-@Inout          puiLog2AllocPageSize   Log2 of alllocation page size.
+@Inout          puiLog2AllocPageSize   Log2 of allocation page size.
                                        May be adjusted.
 @Inout          puiSize                Size of the allocation.
                                        May be adjusted.

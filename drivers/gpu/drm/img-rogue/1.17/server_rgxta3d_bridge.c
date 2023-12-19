@@ -406,7 +406,6 @@ PVRSRVBridgeRGXCreateHWRTDataSet(IMG_UINT32 ui32DispatchTableEntry,
 			if (unlikely(psRGXCreateHWRTDataSetOUT->eError != PVRSRV_OK))
 			{
 				IMG_UINT32 j;
-
 				/* Ensure the remaining handles are set to NULL. hKmHwRTDataSetInt2[i] was
 				 * zeroed when calling PVRSRVAllocHandleUnlocked, so we start at the next
 				 * element. If it was the last iteration, the loop doesn't run.
@@ -415,7 +414,6 @@ PVRSRVBridgeRGXCreateHWRTDataSet(IMG_UINT32 ui32DispatchTableEntry,
 				{
 					hKmHwRTDataSetInt2[j] = NULL;
 				}
-
 				UnlockHandle(psConnection->psHandleBase);
 				goto RGXCreateHWRTDataSet_exit;
 			}
@@ -2479,6 +2477,157 @@ RGXCreateZSBuffer2_exit:
 	return 0;
 }
 
+static PVRSRV_ERROR _RGXCreateFreeList2psCleanupCookieIntRelease(void *pvData)
+{
+	PVRSRV_ERROR eError;
+	eError = RGXDestroyFreeList((RGX_FREELIST *) pvData);
+	return eError;
+}
+
+static IMG_INT
+PVRSRVBridgeRGXCreateFreeList2(IMG_UINT32 ui32DispatchTableEntry,
+			       IMG_UINT8 * psRGXCreateFreeList2IN_UI8,
+			       IMG_UINT8 * psRGXCreateFreeList2OUT_UI8,
+			       CONNECTION_DATA * psConnection)
+{
+	PVRSRV_BRIDGE_IN_RGXCREATEFREELIST2 *psRGXCreateFreeList2IN =
+	    (PVRSRV_BRIDGE_IN_RGXCREATEFREELIST2 *) IMG_OFFSET_ADDR(psRGXCreateFreeList2IN_UI8, 0);
+	PVRSRV_BRIDGE_OUT_RGXCREATEFREELIST2 *psRGXCreateFreeList2OUT =
+	    (PVRSRV_BRIDGE_OUT_RGXCREATEFREELIST2 *) IMG_OFFSET_ADDR(psRGXCreateFreeList2OUT_UI8,
+								     0);
+
+	IMG_HANDLE hMemCtxPrivData = psRGXCreateFreeList2IN->hMemCtxPrivData;
+	IMG_HANDLE hMemCtxPrivDataInt = NULL;
+	IMG_HANDLE hsGlobalFreeList = psRGXCreateFreeList2IN->hsGlobalFreeList;
+	RGX_FREELIST *pssGlobalFreeListInt = NULL;
+	IMG_HANDLE hFreeListReservation = psRGXCreateFreeList2IN->hFreeListReservation;
+	DEVMEMINT_RESERVATION2 *psFreeListReservationInt = NULL;
+	RGX_FREELIST *psCleanupCookieInt = NULL;
+
+	/* Lock over handle lookup. */
+	LockHandle(psConnection->psHandleBase);
+
+	/* Look up the address from the handle */
+	psRGXCreateFreeList2OUT->eError =
+	    PVRSRVLookupHandleUnlocked(psConnection->psHandleBase,
+				       (void **)&hMemCtxPrivDataInt,
+				       hMemCtxPrivData, PVRSRV_HANDLE_TYPE_DEV_PRIV_DATA, IMG_TRUE);
+	if (unlikely(psRGXCreateFreeList2OUT->eError != PVRSRV_OK))
+	{
+		UnlockHandle(psConnection->psHandleBase);
+		goto RGXCreateFreeList2_exit;
+	}
+
+	if (psRGXCreateFreeList2IN->hsGlobalFreeList)
+	{
+		/* Look up the address from the handle */
+		psRGXCreateFreeList2OUT->eError =
+		    PVRSRVLookupHandleUnlocked(psConnection->psHandleBase,
+					       (void **)&pssGlobalFreeListInt,
+					       hsGlobalFreeList,
+					       PVRSRV_HANDLE_TYPE_RGX_FREELIST, IMG_TRUE);
+		if (unlikely(psRGXCreateFreeList2OUT->eError != PVRSRV_OK))
+		{
+			UnlockHandle(psConnection->psHandleBase);
+			goto RGXCreateFreeList2_exit;
+		}
+	}
+
+	/* Look up the address from the handle */
+	psRGXCreateFreeList2OUT->eError =
+	    PVRSRVLookupHandleUnlocked(psConnection->psHandleBase,
+				       (void **)&psFreeListReservationInt,
+				       hFreeListReservation,
+				       PVRSRV_HANDLE_TYPE_DEVMEMINT_RESERVATION2, IMG_TRUE);
+	if (unlikely(psRGXCreateFreeList2OUT->eError != PVRSRV_OK))
+	{
+		UnlockHandle(psConnection->psHandleBase);
+		goto RGXCreateFreeList2_exit;
+	}
+	/* Release now we have looked up handles. */
+	UnlockHandle(psConnection->psHandleBase);
+
+	psRGXCreateFreeList2OUT->eError =
+	    RGXCreateFreeList2(psConnection, OSGetDevNode(psConnection),
+			       hMemCtxPrivDataInt,
+			       psRGXCreateFreeList2IN->ui32MaxFLPages,
+			       psRGXCreateFreeList2IN->ui32InitFLPages,
+			       psRGXCreateFreeList2IN->ui32GrowFLPages,
+			       psRGXCreateFreeList2IN->ui32GrowParamThreshold,
+			       pssGlobalFreeListInt,
+			       psRGXCreateFreeList2IN->bbFreeListCheck,
+			       psFreeListReservationInt, &psCleanupCookieInt);
+	/* Exit early if bridged call fails */
+	if (unlikely(psRGXCreateFreeList2OUT->eError != PVRSRV_OK))
+	{
+		goto RGXCreateFreeList2_exit;
+	}
+
+	/* Lock over handle creation. */
+	LockHandle(psConnection->psHandleBase);
+
+	psRGXCreateFreeList2OUT->eError = PVRSRVAllocHandleUnlocked(psConnection->psHandleBase,
+								    &psRGXCreateFreeList2OUT->
+								    hCleanupCookie,
+								    (void *)psCleanupCookieInt,
+								    PVRSRV_HANDLE_TYPE_RGX_FREELIST,
+								    PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
+								    (PFN_HANDLE_RELEASE) &
+								    _RGXCreateFreeList2psCleanupCookieIntRelease);
+	if (unlikely(psRGXCreateFreeList2OUT->eError != PVRSRV_OK))
+	{
+		UnlockHandle(psConnection->psHandleBase);
+		goto RGXCreateFreeList2_exit;
+	}
+
+	/* Release now we have created handles. */
+	UnlockHandle(psConnection->psHandleBase);
+
+RGXCreateFreeList2_exit:
+
+	/* Lock over handle lookup cleanup. */
+	LockHandle(psConnection->psHandleBase);
+
+	/* Unreference the previously looked up handle */
+	if (hMemCtxPrivDataInt)
+	{
+		PVRSRVReleaseHandleUnlocked(psConnection->psHandleBase,
+					    hMemCtxPrivData, PVRSRV_HANDLE_TYPE_DEV_PRIV_DATA);
+	}
+
+	if (psRGXCreateFreeList2IN->hsGlobalFreeList)
+	{
+
+		/* Unreference the previously looked up handle */
+		if (pssGlobalFreeListInt)
+		{
+			PVRSRVReleaseHandleUnlocked(psConnection->psHandleBase,
+						    hsGlobalFreeList,
+						    PVRSRV_HANDLE_TYPE_RGX_FREELIST);
+		}
+	}
+
+	/* Unreference the previously looked up handle */
+	if (psFreeListReservationInt)
+	{
+		PVRSRVReleaseHandleUnlocked(psConnection->psHandleBase,
+					    hFreeListReservation,
+					    PVRSRV_HANDLE_TYPE_DEVMEMINT_RESERVATION2);
+	}
+	/* Release now we have cleaned up look up handles. */
+	UnlockHandle(psConnection->psHandleBase);
+
+	if (psRGXCreateFreeList2OUT->eError != PVRSRV_OK)
+	{
+		if (psCleanupCookieInt)
+		{
+			RGXDestroyFreeList(psCleanupCookieInt);
+		}
+	}
+
+	return 0;
+}
+
 /* ***************************************************************************
  * Server bridge dispatch related glue
  */
@@ -2568,6 +2717,11 @@ PVRSRV_ERROR InitRGXTA3DBridge(void)
 			      sizeof(PVRSRV_BRIDGE_IN_RGXCREATEZSBUFFER2),
 			      sizeof(PVRSRV_BRIDGE_OUT_RGXCREATEZSBUFFER2));
 
+	SetDispatchTableEntry(PVRSRV_BRIDGE_RGXTA3D, PVRSRV_BRIDGE_RGXTA3D_RGXCREATEFREELIST2,
+			      PVRSRVBridgeRGXCreateFreeList2, NULL,
+			      sizeof(PVRSRV_BRIDGE_IN_RGXCREATEFREELIST2),
+			      sizeof(PVRSRV_BRIDGE_OUT_RGXCREATEFREELIST2));
+
 	return PVRSRV_OK;
 }
 
@@ -2611,5 +2765,7 @@ void DeinitRGXTA3DBridge(void)
 				PVRSRV_BRIDGE_RGXTA3D_RGXSETRENDERCONTEXTPROPERTY);
 
 	UnsetDispatchTableEntry(PVRSRV_BRIDGE_RGXTA3D, PVRSRV_BRIDGE_RGXTA3D_RGXCREATEZSBUFFER2);
+
+	UnsetDispatchTableEntry(PVRSRV_BRIDGE_RGXTA3D, PVRSRV_BRIDGE_RGXTA3D_RGXCREATEFREELIST2);
 
 }

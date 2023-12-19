@@ -3405,6 +3405,20 @@ PMRWritePMPageList(/* Target PMR, offset, and length */
 		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_DEVICEMEM_INVALID_PMR_FLAGS, return_error);
 	}
 
+	/* the PMR into which we are writing must not be user CPU cacheable: */
+	if (PVRSRV_CHECK_CPU_CACHE_INCOHERENT(uiFlags) ||
+		PVRSRV_CHECK_CPU_CACHE_COHERENT(uiFlags) ||
+		PVRSRV_CHECK_CPU_CACHED(uiFlags))
+	{
+		PVR_DPF((PVR_DBG_ERROR,
+		         "Masked flags = 0x%" PVRSRV_MEMALLOCFLAGS_FMTSPEC,
+		         (PMR_FLAGS_T)(uiFlags &  PVRSRV_MEMALLOCFLAG_CPU_CACHE_MODE_MASK)));
+		PVR_DPF((PVR_DBG_ERROR,
+		         "Page list PMR allows CPU caching (0x%" PVRSRV_MEMALLOCFLAGS_FMTSPEC ")",
+		         uiFlags));
+		PVR_GOTO_WITH_ERROR(eError, PVRSRV_ERROR_DEVICEMEM_INVALID_PMR_FLAGS, return_error);
+	}
+
 	if (_PMRIsSparse(psPageListPMR))
 	{
 		PVR_LOG_GOTO_WITH_ERROR("psPageListPMR", eError, PVRSRV_ERROR_INVALID_PARAMS, return_error);
