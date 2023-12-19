@@ -133,6 +133,7 @@ static __le16 ieee80211_duration(struct ieee80211_tx_data *tx,
 	mrate = sband->bitrates[0].bitrate;
 	for (i = 0; i < sband->n_bitrates; i++) {
 		struct ieee80211_rate *r = &sband->bitrates[i];
+		u32 flag;
 
 		if (r->bitrate > txrate->bitrate)
 			break;
@@ -146,35 +147,28 @@ static __le16 ieee80211_duration(struct ieee80211_tx_data *tx,
 		switch (sband->band) {
 		case NL80211_BAND_2GHZ:
 #if CFG80211_VERSION >= KERNEL_VERSION(5,16,0)
-		case NL80211_BAND_LC: {
-			u32 flag;
+		case NL80211_BAND_LC:
 			if (tx->sdata->deflink.operating_11g_mode)
 				flag = IEEE80211_RATE_MANDATORY_G;
 			else
 				flag = IEEE80211_RATE_MANDATORY_B;
-			if (r->flags & flag)
-				mrate = r->bitrate;
 			break;
-		}
 #endif /* CFG80211_VERSION >= KERNEL_VERSION(5,16,0) */
 		case NL80211_BAND_5GHZ:
 #if CFG80211_VERSION >= KERNEL_VERSION(5,4,0)
 		case NL80211_BAND_6GHZ:
 			/* keep code in case of fall-through (spatch generated) */
 #endif
-			if (r->flags & IEEE80211_RATE_MANDATORY_A)
-				mrate = r->bitrate;
+			flag = IEEE80211_RATE_MANDATORY_A;
 			break;
-#if CFG80211_VERSION >= KERNEL_VERSION(5,9,0)
-		case NL80211_BAND_S1GHZ:
-			/* keep code in case of fall-through (spatch generated) */
-#endif
-		case NL80211_BAND_60GHZ:
-			/* TODO, for now fall through */
-		case NUM_NL80211_BANDS:
+		default:
+			flag = 0;
 			WARN_ON(1);
 			break;
 		}
+
+		if (r->flags & flag)
+			mrate = r->bitrate;
 	}
 	if (rate == -1) {
 		/* No matching basic rate found; use highest suitable mandatory
