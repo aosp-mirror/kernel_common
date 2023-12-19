@@ -43,7 +43,6 @@ struct lockdep_map { };
 #include <crypto/algapi.h>
 #include <linux/pci.h>
 #include <linux/if_vlan.h>
-#include <linux/overflow.h>
 #include "net/fq.h"
 
 #include <hdrs/net/dropreason.h>
@@ -205,13 +204,6 @@ static const struct attribute_group _name##_group = {		\
 };								\
 static inline void init_##_name##_attrs(void) {}		\
 __ATTRIBUTE_GROUPS(_name)
-
-/* avoid conflicts with other headers */
-#if LINUX_VERSION_IS_LESS(6,1,0)
-#ifdef is_signed_type
-#undef is_signed_type
-#endif
-#endif /* LINUX_VERSION_IS_LESS(6,1,0) */
 
 int __alloc_bucket_spinlocks(spinlock_t **locks, unsigned int *lock_mask,
 			     size_t max_size, unsigned int cpu_mult,
