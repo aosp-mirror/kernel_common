@@ -209,9 +209,9 @@ nfnl_hook_entries_head(u8 pf, unsigned int hook, struct net *net, const char *de
 		break;
 	case NFPROTO_BRIDGE:
 #ifdef CONFIG_NETFILTER_FAMILY_BRIDGE
-		if (hook >= ARRAY_SIZE(net->nf.hooks_bridge))
+		if (hook >= NF_INET_NUMHOOKS)
 			return ERR_PTR(-EINVAL);
-		hook_head = rcu_dereference(net->nf.hooks_bridge[hook]);
+		hook_head = rcu_dereference(get_nf_hooks_bridge(net)[hook]);
 #endif
 		break;
 #ifdef CONFIG_NETFILTER_INGRESS
