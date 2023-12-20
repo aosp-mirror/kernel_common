@@ -194,7 +194,8 @@ void watchdog_hardlockup_check(unsigned int cpu, struct pt_regs *regs)
 
 		if (sysctl_hardlockup_all_cpu_backtrace) {
 			trigger_allbutcpu_cpu_backtrace(cpu);
-			clear_bit_unlock(0, &hard_lockup_nmi_warn);
+			if (!hardlockup_panic)
+				clear_bit_unlock(0, &hard_lockup_nmi_warn);
 		}
 
 		if (hardlockup_panic)
@@ -550,7 +551,8 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 
 		if (softlockup_all_cpu_backtrace) {
 			trigger_allbutcpu_cpu_backtrace(smp_processor_id());
-			clear_bit_unlock(0, &soft_lockup_nmi_warn);
+			if (!softlockup_panic)
+				clear_bit_unlock(0, &soft_lockup_nmi_warn);
 		}
 
 		trace_android_vh_watchdog_timer_softlockup(duration, regs, !!softlockup_panic);
