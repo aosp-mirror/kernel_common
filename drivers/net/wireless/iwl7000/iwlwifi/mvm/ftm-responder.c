@@ -12,6 +12,8 @@ struct iwl_mvm_pasn_sta {
 	struct list_head list;
 	struct iwl_mvm_int_sta int_sta;
 	u8 addr[ETH_ALEN];
+
+	/* must be last as it followed by buffer holding the key */
 	struct ieee80211_key_conf keyconf;
 };
 
@@ -368,7 +370,7 @@ int iwl_mvm_ftm_respoder_add_pasn_sta(struct iwl_mvm *mvm,
 	}
 
 	if (tk && tk_len) {
-		sta = kzalloc(sizeof(*sta), GFP_KERNEL);
+		sta = kzalloc(sizeof(*sta) + tk_len, GFP_KERNEL);
 		if (!sta)
 			return -ENOBUFS;
 
