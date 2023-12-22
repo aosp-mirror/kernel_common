@@ -2158,6 +2158,9 @@ struct cfg80211_ttlm_params {
 #define NL80211_EXT_FEATURE_SPP_AMSDU_SUPPORT -1
 #define ASSOC_REQ_SPP_AMSDU BIT(7)
 #define NL80211_STA_FLAG_SPP_AMSDU 8
+bool ieee80211_operating_class_to_chandef(u8 operating_class,
+					  struct ieee80211_channel *chan,
+					  struct cfg80211_chan_def *chandef);
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
