@@ -148,6 +148,16 @@ void _iwl_trans_pcie_gen2_stop_device(struct iwl_trans *trans)
 	/* tell the device to stop sending interrupts */
 	iwl_disable_interrupts(trans);
 
+	/*
+	 * This will crash the firmware before we reset the MAC. This way,
+	 * the MAC reset doesn't race with the firmware.
+	 * Note that we just disabled the interrupts, the driver will not
+	 * handle the firmware crash.
+	 * This problem has been reported on AX210 and newer.
+	 */
+	if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210)
+		iwl_force_nmi(trans);
+
 	/* device going down, Stop using ICT table */
 	iwl_pcie_disable_ict(trans);
 
