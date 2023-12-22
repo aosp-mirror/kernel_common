@@ -1941,7 +1941,9 @@ struct xhci_hcd {
 
 	void			*dbc;
 
-	ANDROID_KABI_RESERVE(1);
+	/* Used for bug 194461020 */
+	ANDROID_KABI_USE(1, struct xhci_vendor_ops *vendor_ops);
+
 	ANDROID_KABI_RESERVE(2);
 	ANDROID_KABI_RESERVE(3);
 	ANDROID_KABI_RESERVE(4);
@@ -1963,6 +1965,14 @@ struct xhci_driver_overrides {
 	void (*reset_bandwidth)(struct usb_hcd *, struct usb_device *);
 	int (*update_hub_device)(struct usb_hcd *hcd, struct usb_device *hdev,
 			    struct usb_tt *tt, gfp_t mem_flags);
+	int (*address_device)(struct usb_hcd *hcd, struct usb_device *udev);
+	int (*bus_suspend)(struct usb_hcd *hcd);
+	int (*bus_resume)(struct usb_hcd *hcd);
+
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
+	ANDROID_KABI_RESERVE(3);
+	ANDROID_KABI_RESERVE(4);
 };
 
 #define	XHCI_CFC_DELAY		10
@@ -2288,6 +2298,11 @@ struct xhci_vendor_ops {
 	void (*alloc_container_ctx)(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx,
 				    int type, gfp_t flags);
 	void (*free_container_ctx)(struct xhci_hcd *xhci, struct xhci_container_ctx *ctx);
+
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
+	ANDROID_KABI_RESERVE(3);
+	ANDROID_KABI_RESERVE(4);
 };
 
 struct xhci_vendor_ops *xhci_vendor_get_ops(struct xhci_hcd *xhci);

@@ -78,6 +78,7 @@ struct cgroup_subsys memory_cgrp_subsys __read_mostly;
 EXPORT_SYMBOL(memory_cgrp_subsys);
 
 struct mem_cgroup *root_mem_cgroup __read_mostly;
+EXPORT_SYMBOL_GPL(root_mem_cgroup);
 
 /* Active memory cgroup to use from an interrupt context */
 DEFINE_PER_CPU(struct mem_cgroup *, int_active_memcg);
@@ -827,6 +828,7 @@ void __mod_lruvec_state(struct lruvec *lruvec, enum node_stat_item idx,
 	if (!mem_cgroup_disabled())
 		__mod_memcg_lruvec_state(lruvec, idx, val);
 }
+EXPORT_SYMBOL_GPL(__mod_lruvec_state);
 
 void __mod_lruvec_page_state(struct page *page, enum node_stat_item idx,
 			     int val)
@@ -1392,6 +1394,7 @@ void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
 	if (nr_pages > 0)
 		*lru_size += nr_pages;
 }
+EXPORT_SYMBOL_GPL(mem_cgroup_update_lru_size);
 
 /**
  * mem_cgroup_margin - calculate chargeable space of a memory cgroup
@@ -5966,6 +5969,7 @@ static int mem_cgroup_count_precharge_pte_range(pmd_t *pmd,
 
 static const struct mm_walk_ops precharge_walk_ops = {
 	.pmd_entry	= mem_cgroup_count_precharge_pte_range,
+	.walk_lock	= PGWALK_RDLOCK,
 };
 
 static unsigned long mem_cgroup_count_precharge(struct mm_struct *mm)
@@ -6242,6 +6246,7 @@ put:			/* get_mctgt_type() gets the page */
 
 static const struct mm_walk_ops charge_walk_ops = {
 	.pmd_entry	= mem_cgroup_move_charge_pte_range,
+	.walk_lock	= PGWALK_RDLOCK,
 };
 
 static void mem_cgroup_move_charge(void)
