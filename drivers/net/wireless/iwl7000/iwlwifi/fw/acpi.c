@@ -165,7 +165,7 @@ int iwl_acpi_get_dsm(struct iwl_fw_runtime *fwrt,
 
 	BUILD_BUG_ON(ARRAY_SIZE(acpi_dsm_size) != DSM_FUNC_NUM_FUNCS);
 
-	if (WARN_ON(func > ARRAY_SIZE(acpi_dsm_size)))
+	if (WARN_ON(func >= ARRAY_SIZE(acpi_dsm_size)))
 		return -EINVAL;
 
 	expected_size = acpi_dsm_size[func];
