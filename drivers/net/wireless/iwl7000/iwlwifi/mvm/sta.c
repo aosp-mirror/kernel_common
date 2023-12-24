@@ -92,8 +92,9 @@ u32 iwl_mvm_get_sta_ampdu_dens(struct ieee80211_link_sta *link_sta,
 	 * Capabilities element
 	 */
 	if (link_sta->he_cap.has_he)
-		agg_size += u8_get_bits(link_sta->he_cap.he_cap_elem.mac_cap_info[3],
-					IEEE80211_HE_MAC_CAP3_MAX_AMPDU_LEN_EXP_MASK);
+		agg_size +=
+			u8_get_bits(link_sta->he_cap.he_cap_elem.mac_cap_info[3],
+				    IEEE80211_HE_MAC_CAP3_MAX_AMPDU_LEN_EXP_MASK);
 
 	if (cfg_eht_cap_has_eht(link_sta))
 		agg_size += u8_get_bits(cfg_eht_cap(link_sta)->eht_cap_elem.mac_cap_info[1],
@@ -1850,8 +1851,7 @@ int iwl_mvm_add_sta(struct iwl_mvm *mvm,
 			.type = mvm_sta->sta_type,
 		};
 
-		/*
-		 * First add an empty station since allocating
+		/* First add an empty station since allocating
 		 * a queue requires a valid station
 		 */
 		ret = iwl_mvm_add_int_sta_common(mvm, &tmp_sta, sta->addr,
@@ -2024,15 +2024,17 @@ bool iwl_mvm_sta_del(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		     struct ieee80211_link_sta *link_sta, int *ret)
 {
 	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
-	struct iwl_mvm_vif_link_info *mvm_link = mvmvif->link[link_sta->link_id];
+	struct iwl_mvm_vif_link_info *mvm_link =
+		mvmvif->link[link_sta->link_id];
 	struct iwl_mvm_sta *mvm_sta = iwl_mvm_sta_from_mac80211(sta);
 	struct iwl_mvm_link_sta *mvm_link_sta;
 	u8 sta_id;
 
 	lockdep_assert_held(&mvm->mutex);
 
-	mvm_link_sta = rcu_dereference_protected(mvm_sta->link[link_sta->link_id],
-						 lockdep_is_held(&mvm->mutex));
+	mvm_link_sta =
+		rcu_dereference_protected(mvm_sta->link[link_sta->link_id],
+					  lockdep_is_held(&mvm->mutex));
 	sta_id = mvm_link_sta->sta_id;
 
 	/* If there is a TXQ still marked as reserved - free it */
@@ -2983,7 +2985,6 @@ int iwl_mvm_sta_rx_agg(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 		/* synchronize all rx queues so we can safely delete */
 		iwl_mvm_free_reorder(mvm, baid_data);
 		timer_shutdown_sync(&baid_data->session_timer);
-
 		RCU_INIT_POINTER(mvm->baid_map[baid], NULL);
 		kfree_rcu(baid_data, rcu_head);
 		IWL_DEBUG_HT(mvm, "BAID %d is free\n", baid);
@@ -3298,7 +3299,8 @@ out:
 	 * aggregation sessions and our default value.
 	 */
 	mvmsta->deflink.lq_sta.rs_drv.pers.max_agg_bufsize =
-		min(mvmsta->deflink.lq_sta.rs_drv.pers.max_agg_bufsize, buf_size);
+		min(mvmsta->deflink.lq_sta.rs_drv.pers.max_agg_bufsize,
+		    buf_size);
 	mvmsta->deflink.lq_sta.rs_drv.lq.agg_frame_cnt_limit =
 		mvmsta->deflink.lq_sta.rs_drv.pers.max_agg_bufsize;
 

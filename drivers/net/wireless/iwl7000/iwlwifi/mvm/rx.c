@@ -204,9 +204,9 @@ static void iwl_mvm_rx_handle_tcm(struct iwl_mvm *mvm,
 {
 	struct iwl_mvm_sta *mvmsta;
 	struct iwl_mvm_tcm_mac *mdata;
-	struct iwl_mvm_vif *mvmvif;
 	int mac;
 	int ac = IEEE80211_AC_BE; /* treat non-QoS as BE */
+	struct iwl_mvm_vif *mvmvif;
 	/* expected throughput in 100Kbps, single stream, 20 MHz */
 	static const u8 thresh_tpt[] = {
 		9, 18, 30, 42, 60, 78, 90, 96, 120, 135,
@@ -233,10 +233,11 @@ static void iwl_mvm_rx_handle_tcm(struct iwl_mvm *mvm,
 		mdata->rx.last_ampdu_ref = mvm->ampdu_ref;
 		mdata->rx.airtime += le16_to_cpu(phy_info->frame_time);
 	}
-	mvmvif = iwl_mvm_vif_from_mac80211(mvmsta->vif);
 
 	if (!(rate_n_flags & (RATE_MCS_HT_MSK_V1 | RATE_MCS_VHT_MSK_V1)))
 		return;
+
+	mvmvif = iwl_mvm_vif_from_mac80211(mvmsta->vif);
 
 	if (mdata->opened_rx_ba_sessions ||
 	    mdata->uapsd_nonagg_detect.detected ||

@@ -1050,12 +1050,11 @@ static unsigned long iwl_mvm_calc_tcm_stats(struct iwl_mvm *mvm,
 		if (!mvm->tcm.result.low_latency[mac] && handle_uapsd)
 			iwl_mvm_check_uapsd_agg_expected_tpt(mvm, uapsd_elapsed,
 							     mac);
-
 		/* clear old data */
-		memset(&mdata->rx.airtime, 0, sizeof(mdata->rx.airtime));
-		memset(&mdata->tx.airtime, 0, sizeof(mdata->tx.airtime));
 		if (handle_uapsd)
 			mdata->uapsd_nonagg_detect.rx_bytes = 0;
+		memset(&mdata->rx.airtime, 0, sizeof(mdata->rx.airtime));
+		memset(&mdata->tx.airtime, 0, sizeof(mdata->tx.airtime));
 	}
 
 	load = iwl_mvm_tcm_load(mvm, total_airtime, elapsed);

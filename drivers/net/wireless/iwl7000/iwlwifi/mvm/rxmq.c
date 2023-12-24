@@ -1514,7 +1514,7 @@ static void iwl_mvm_decode_eht_phy_data(struct iwl_mvm *mvm,
 					     IEEE80211_RADIOTAP_EHT_USIG_COMMON_UL_DL);
 		usig->common |= LE32_DEC_ENC(data0,
 					     IWL_RX_PHY_DATA0_EHT_BSS_COLOR_MASK,
-						 IEEE80211_RADIOTAP_EHT_USIG_COMMON_BSS_COLOR);
+					     IEEE80211_RADIOTAP_EHT_USIG_COMMON_BSS_COLOR);
 	} else {
 		usig->common |= LE32_DEC_ENC(usig_a1,
 					     IWL_RX_USIG_A1_UL_FLAG,
@@ -1550,10 +1550,13 @@ static void iwl_mvm_decode_eht_phy_data(struct iwl_mvm *mvm,
 	iwl_mvm_decode_eht_ru(mvm, rx_status, eht);
 
 	/* We only get here in case of IWL_RX_MPDU_PHY_TSF_OVERLOAD is set
-	 * which is on only in case of monitor mode so no need to check monitor mode */
+	 * which is on only in case of monitor mode so no need to check monitor
+	 * mode
+	 */
 	eht->known |= cpu_to_le32(IEEE80211_RADIOTAP_EHT_KNOWN_PRIMARY_80);
-	eht->data[1] |= le32_encode_bits(mvm->monitor_p80,
-					 IEEE80211_RADIOTAP_EHT_DATA1_PRIMARY_80);
+	eht->data[1] |=
+		le32_encode_bits(mvm->monitor_p80,
+				 IEEE80211_RADIOTAP_EHT_DATA1_PRIMARY_80);
 
 	usig->common |= cpu_to_le32(IEEE80211_RADIOTAP_EHT_USIG_COMMON_TXOP_KNOWN);
 	if (phy_data->with_data)
@@ -1584,8 +1587,10 @@ static void iwl_mvm_decode_eht_phy_data(struct iwl_mvm *mvm,
 	usig->common |= LE32_DEC_ENC(data0, IWL_RX_PHY_DATA0_EHT_PHY_VER,
 				     IEEE80211_RADIOTAP_EHT_USIG_COMMON_PHY_VER);
 
-	/* TODO: what about TB - IWL_RX_PHY_DATA1_EHT_TB_PILOT_TYPE,
-				 IWL_RX_PHY_DATA1_EHT_TB_LOW_SS */
+	/*
+	 * TODO: what about TB - IWL_RX_PHY_DATA1_EHT_TB_PILOT_TYPE,
+	 *			 IWL_RX_PHY_DATA1_EHT_TB_LOW_SS
+	 */
 
 	eht->known |= cpu_to_le32(IEEE80211_RADIOTAP_EHT_KNOWN_EHT_LTF);
 	eht->data[0] |= LE32_DEC_ENC(data1, IWL_RX_PHY_DATA1_EHT_SIG_LTF_NUM,
@@ -1609,6 +1614,7 @@ static void iwl_mvm_rx_eht(struct iwl_mvm *mvm, struct sk_buff *skb,
 	struct ieee80211_radiotap_eht *eht;
 	struct ieee80211_radiotap_eht_usig *usig;
 	size_t eht_len = sizeof(*eht);
+
 	u32 rate_n_flags = phy_data->rate_n_flags;
 	u32 he_type = rate_n_flags & RATE_MCS_HE_TYPE_MSK;
 	/* EHT and HE have the same valus for LTF */
@@ -1625,7 +1631,8 @@ static void iwl_mvm_rx_eht(struct iwl_mvm *mvm, struct sk_buff *skb,
 	usig = iwl_mvm_radiotap_put_tlv(skb, IEEE80211_RADIOTAP_EHT_USIG,
 					sizeof(*usig));
 	rx_status->flag |= RX_FLAG_RADIOTAP_TLV_AT_END;
-	usig->common |= cpu_to_le32(IEEE80211_RADIOTAP_EHT_USIG_COMMON_BW_KNOWN);
+	usig->common |=
+		cpu_to_le32(IEEE80211_RADIOTAP_EHT_USIG_COMMON_BW_KNOWN);
 
 	/* specific handling for 320MHz */
 	bw = FIELD_GET(RATE_MCS_CHAN_WIDTH_MSK, rate_n_flags);
@@ -1712,7 +1719,7 @@ static void iwl_mvm_rx_eht(struct iwl_mvm *mvm, struct sk_buff *skb,
 		eht->data[7] |=
 			le32_encode_bits(le32_get_bits(phy_data->rx_vec[2],
 						       RX_NO_DATA_RX_VEC2_EHT_NSTS_MSK),
-						 IEEE80211_RADIOTAP_EHT_DATA7_NSS_S);
+					 IEEE80211_RADIOTAP_EHT_DATA7_NSS_S);
 		if (rate_n_flags & RATE_MCS_BF_MSK)
 			eht->data[7] |=
 				cpu_to_le32(IEEE80211_RADIOTAP_EHT_DATA7_BEAMFORMED_S);
@@ -1734,7 +1741,8 @@ static void iwl_mvm_rx_eht(struct iwl_mvm *mvm, struct sk_buff *skb,
 
 		eht->user_info[0] |= cpu_to_le32
 			(FIELD_PREP(IEEE80211_RADIOTAP_EHT_USER_INFO_MCS,
-				    FIELD_GET(RATE_VHT_MCS_RATE_CODE_MSK, rate_n_flags)) |
+				    FIELD_GET(RATE_VHT_MCS_RATE_CODE_MSK,
+					      rate_n_flags)) |
 			 FIELD_PREP(IEEE80211_RADIOTAP_EHT_USER_INFO_NSS_O,
 				    FIELD_GET(RATE_MCS_NSS_MSK, rate_n_flags)));
 	}
