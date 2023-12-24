@@ -865,7 +865,7 @@ iwl_mvm_stat_iterator_all_links(struct iwl_mvm *mvm,
 
 		mvmvif = iwl_mvm_vif_from_mac80211(bss_conf->vif);
 		link_info = mvmvif->link[link_id];
-		if (!mvmvif || link_info)
+		if (!link_info)
 			continue;
 
 		link_stats = &per_link[fw_link_id];
