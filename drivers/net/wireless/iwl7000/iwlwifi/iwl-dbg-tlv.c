@@ -293,7 +293,7 @@ static int iwl_dbg_tlv_alloc_trigger(struct iwl_trans *trans,
 	trans->dbg.last_tp_resetfw = 0xFF;
 
 	new_tlv = iwl_dbg_tlv_add(tlv, &trans->dbg.time_point[tp].trig_list);
-	if (!tlv)
+	if (!new_tlv)
 		return -ENOMEM;
 
 	if (!le32_to_cpu(trig->occurrences)) {
