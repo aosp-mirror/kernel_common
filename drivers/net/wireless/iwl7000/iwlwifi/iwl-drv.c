@@ -1259,7 +1259,7 @@ fw_dbg_conf:
 			minor = le32_to_cpup(ptr++);
 			local_comp = le32_to_cpup(ptr);
 
-			if (strncmp(drv->fw.human_readable, "stream:", 7))
+			if (major >= 35)
 				snprintf(drv->fw.fw_version,
 					 sizeof(drv->fw.fw_version),
 					"%u.%08x.%u %s", major, minor,
