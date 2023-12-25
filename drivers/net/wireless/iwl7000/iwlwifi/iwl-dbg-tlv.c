@@ -754,8 +754,8 @@ static void iwl_dbg_tlv_apply_buffers(struct iwl_fw_runtime *fwrt)
 		ret = iwl_dbg_tlv_apply_buffer(fwrt, i);
 		if (ret)
 			IWL_WARN(fwrt,
-				"WRT: Failed to apply DRAM buffer for allocation id %d, ret=%d\n",
-				i, ret);
+				 "WRT: Failed to apply DRAM buffer for allocation id %d, ret=%d\n",
+				 i, ret);
 	}
 }
 

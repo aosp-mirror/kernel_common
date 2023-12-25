@@ -962,7 +962,8 @@ static void get_crf_id(struct iwl_trans *iwl_trans)
 	iwl_trans->hw_crf_id = iwl_read_prph_no_grab(iwl_trans, sd_reg_ver_addr);
 
 	/* Read cnv info */
-	iwl_trans->hw_cnv_id = iwl_read_prph_no_grab(iwl_trans, CNVI_AUX_MISC_CHIP);
+	iwl_trans->hw_cnv_id =
+		iwl_read_prph_no_grab(iwl_trans, CNVI_AUX_MISC_CHIP);
 
 	/* In BZ, the MAC step must be read from the CNVI aux register */
 	if (CSR_HW_REV_TYPE(iwl_trans->hw_rev) == IWL_CFG_MAC_TYPE_BZ) {

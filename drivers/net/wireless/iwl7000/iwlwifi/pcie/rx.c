@@ -699,7 +699,7 @@ static void iwl_pcie_free_rxq_dma(struct iwl_trans *trans,
 	rxq->used_bd = NULL;
 }
 
-static inline size_t iwl_pcie_rb_stts_size(struct iwl_trans *trans)
+static size_t iwl_pcie_rb_stts_size(struct iwl_trans *trans)
 {
 	bool use_rx_td = (trans->trans_cfg->device_family >=
 			  IWL_DEVICE_FAMILY_AX210);
@@ -1122,6 +1122,7 @@ static int _iwl_pcie_rx_init(struct iwl_trans *trans)
 		       sizeof(__le16) : sizeof(struct iwl_rb_status));
 
 		iwl_pcie_rx_init_rxb_lists(rxq);
+
 		spin_unlock_bh(&rxq->lock);
 
 		if (!rxq->napi.poll) {
@@ -1134,6 +1135,7 @@ static int _iwl_pcie_rx_init(struct iwl_trans *trans)
 				       poll);
 			napi_enable(&rxq->napi);
 		}
+
 	}
 
 	/* move the pool to the default queue and allocator ownerships */

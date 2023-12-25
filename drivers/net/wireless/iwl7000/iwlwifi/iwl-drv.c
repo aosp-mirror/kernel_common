@@ -2405,16 +2405,18 @@ MODULE_PARM_DESC(power_level,
 module_param_named(disable_11ac, iwlwifi_mod_params.disable_11ac, bool, 0444);
 MODULE_PARM_DESC(disable_11ac, "Disable VHT capabilities (default: false)");
 
-module_param_named(disable_11ax, iwlwifi_mod_params.disable_11ax, bool, 0444);
+module_param_named(remove_when_gone,
+		   iwlwifi_mod_params.remove_when_gone, bool,
+		   0444);
+MODULE_PARM_DESC(remove_when_gone,
+		 "Remove dev from PCIe bus if it is deemed inaccessible (default: false)");
+
+module_param_named(disable_11ax, iwlwifi_mod_params.disable_11ax, bool,
+		   S_IRUGO);
 MODULE_PARM_DESC(disable_11ax, "Disable HE capabilities (default: false)");
 
 module_param_named(disable_msix, iwlwifi_mod_params.disable_msix, bool, 0444);
 MODULE_PARM_DESC(disable_msix, "Disable MSI-X and use MSI instead (default: false)");
-
-module_param_named(remove_when_gone,
-		   iwlwifi_mod_params.remove_when_gone, bool, 0444);
-MODULE_PARM_DESC(remove_when_gone,
-		 "Remove dev from PCIe bus if it is deemed inaccessible (default: false)");
 
 module_param_named(disable_11be, iwlwifi_mod_params.disable_11be, bool, 0444);
 MODULE_PARM_DESC(disable_11be, "Disable EHT capabilities (default: false)");

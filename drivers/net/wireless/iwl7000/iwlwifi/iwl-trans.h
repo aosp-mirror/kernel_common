@@ -312,7 +312,6 @@ enum iwl_d3_status {
  * @STATUS_TRANS_GOING_IDLE: shutting down the trans, only special commands
  *	are sent
  * @STATUS_TRANS_IDLE: the trans is idle - general commands are not to be sent
- * @STATUS_TA_ACTIVE: target access is in progress
  * @STATUS_TRANS_DEAD: trans is dead - avoid any read/write operation
  * @STATUS_SUPPRESS_CMD_ERROR_ONCE: suppress "FW error in SYNC CMD" once,
  *	e.g. for testing
@@ -327,7 +326,6 @@ enum iwl_trans_status {
 	STATUS_FW_ERROR,
 	STATUS_TRANS_GOING_IDLE,
 	STATUS_TRANS_IDLE,
-	STATUS_TA_ACTIVE,
 	STATUS_TRANS_DEAD,
 	STATUS_SUPPRESS_CMD_ERROR_ONCE,
 };
@@ -482,6 +480,7 @@ struct iwl_trans_rxq_dma_data {
  * struct iwl_pnvm_image - contains info about the parsed pnvm image
  * @chunks: array of pointers to pnvm payloads and their sizes
  * @n_chunks: the number of the pnvm payloads.
+ * @version: the version of the loaded PNVM image
  */
 struct iwl_pnvm_image {
 	struct {
@@ -749,8 +748,8 @@ struct iwl_dram_data {
 
 /**
  * struct iwl_dram_regions - DRAM regions container structure
- * @drams: array of several DRAM areas that contains the
- *	pnvm/power reduction table payloads.
+ * @drams: array of several DRAM areas that contains the pnvm and power
+ *	reduction table payloads.
  * @n_regions: number of DRAM regions that were allocated
  * @prph_scratch_mem_desc: points to a structure allocated in dram,
  *	designed to show FW where all the payloads are.
@@ -1684,24 +1683,8 @@ static inline bool iwl_trans_is_hw_error_value(u32 val)
 /*****************************************************
 * driver (transport) register/unregister functions
 ******************************************************/
-/* PCI */
-#ifdef CONFIG_PCI
 int __must_check iwl_pci_register_driver(void);
 void iwl_pci_unregister_driver(void);
 void iwl_trans_pcie_remove(struct iwl_trans *trans, bool rescan);
-#else
-static inline int __must_check iwl_pci_register_driver(void)
-{
-	return 0;
-}
-
-static inline void iwl_pci_unregister_driver(void)
-{
-}
-
-static inline void iwl_trans_pcie_remove(struct iwl_trans *trans, bool rescan)
-{
-}
-#endif /* CONFIG_PCI */
 
 #endif /* __iwl_trans_h__ */
