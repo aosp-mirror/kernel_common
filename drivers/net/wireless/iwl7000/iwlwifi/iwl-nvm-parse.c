@@ -929,8 +929,9 @@ iwl_nvm_fixup_sband_iftd(struct iwl_trans *trans,
 	bool is_ap = iftype_data->types_mask & BIT(NL80211_IFTYPE_AP);
 	bool no_320;
 
-	no_320 = !trans->trans_cfg->integrated &&
-		 trans->pcie_link_speed < PCI_EXP_LNKSTA_CLS_8_0GB;
+	no_320 = (!trans->trans_cfg->integrated &&
+		 trans->pcie_link_speed < PCI_EXP_LNKSTA_CLS_8_0GB) ||
+		 trans->reduced_cap_sku;
 
 	if (!data->sku_cap_11be_enable || iwlwifi_mod_params.disable_11be)
 		cfg_eht_cap_set_has_eht(iftype_data, false);
@@ -1117,6 +1118,16 @@ iwl_nvm_fixup_sband_iftd(struct iwl_trans *trans,
 		iftype_data->he_cap.he_cap_elem.phy_cap_info[0] &=
 			~IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G;
 
+	if (trans->reduced_cap_sku) {
+		memset(&cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._320, 0,
+		       sizeof(cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._320));
+		cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._80.rx_tx_mcs13_max_nss = 0;
+		cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._160.rx_tx_mcs13_max_nss = 0;
+		cfg_eht_cap(iftype_data)->eht_cap_elem.phy_cap_info[8] &=
+				~IEEE80211_EHT_PHY_CAP8_RX_4096QAM_WIDER_BW_DL_OFDMA;
+		cfg_eht_cap(iftype_data)->eht_cap_elem.phy_cap_info[2] &=
+				~IEEE80211_EHT_PHY_CAP2_SOUNDING_DIM_320MHZ_MASK;
+	}
 }
 
 static void iwl_init_he_hw_capab(struct iwl_trans *trans,
@@ -1383,22 +1394,12 @@ static void iwl_init_eht_band_override(struct iwl_trans *trans,
 #endif
 		}
 
-		if (trans->dbg_cfg.eht_disable_320 ||
-		    trans->reduced_cap_sku ||
-		    !nl80211_is_6ghz(sband->band)) {
+		if (trans->dbg_cfg.eht_disable_320 || !nl80211_is_6ghz(sband->band)) {
 			memset(&cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._320,
 			       0,
 			       sizeof(cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._320));
 			cfg_eht_cap(iftype_data)->eht_cap_elem.phy_cap_info[0] &=
 					~IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ;
-		}
-		if (trans->reduced_cap_sku) {
-			cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._80.rx_tx_mcs13_max_nss = 0;
-			cfg_eht_cap(iftype_data)->eht_mcs_nss_supp.bw._160.rx_tx_mcs13_max_nss = 0;
-			cfg_eht_cap(iftype_data)->eht_cap_elem.phy_cap_info[8] &=
-					~IEEE80211_EHT_PHY_CAP8_RX_4096QAM_WIDER_BW_DL_OFDMA;
-			cfg_eht_cap(iftype_data)->eht_cap_elem.phy_cap_info[2] &=
-					~IEEE80211_EHT_PHY_CAP2_SOUNDING_DIM_320MHZ_MASK;
 		}
 	}
 }
