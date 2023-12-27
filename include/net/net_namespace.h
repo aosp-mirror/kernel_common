@@ -195,14 +195,14 @@ struct ext_net {
 
 #ifdef CONFIG_NETFILTER_FAMILY_BRIDGE
 extern struct net init_net;
-extern struct nf_hook_entries *init_nf_hooks_bridgep;
+extern struct nf_hook_entries **init_nf_hooks_bridgep;
 
 static inline struct nf_hook_entries __rcu **get_nf_hooks_bridge(const struct net *net)
 {
 	struct ext_net *ext_net;
 
 	if (net == &init_net)
-		return &init_nf_hooks_bridgep;
+		return init_nf_hooks_bridgep;
 	ext_net = container_of(net, struct ext_net, net);
 	return ext_net->hooks_bridge;
 }
