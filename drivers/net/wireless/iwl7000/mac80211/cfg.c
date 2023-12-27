@@ -1944,10 +1944,10 @@ static int sta_link_apply_parameters(struct ieee80211_local *local,
 
 #if CFG80211_VERSION >= KERNEL_VERSION(6,0,0)
 	/*
-	 * If there are no changes, then accept a link that doesn't exist,
+	 * If there are no changes, then accept a link that exist,
 	 * unless it's a new link.
 	 */
-	if (params->link_id < 0 && !new_link &&
+	if (params->link_id >= 0 && !new_link &&
 	    !params->link_mac && !params->txpwr_set &&
 	    !params->supported_rates_len &&
 	    !params->ht_capa && !params->vht_capa &&
