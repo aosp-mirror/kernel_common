@@ -1337,11 +1337,6 @@ static int hci_connect_le_sync(struct hci_dev *hdev, void *data)
 {
 	struct le_conn_data *conn_data = data;
 	struct hci_conn *conn;
-	u16 handle = PTR_UINT(data);
-
-	conn = hci_conn_hash_lookup_handle(hdev, handle);
-	if (!conn)
-		return 0;
 
 	if (!conn_data) {
 		bt_dev_err(hdev, "conn_data is NULL");
