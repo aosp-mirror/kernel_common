@@ -604,6 +604,8 @@ static void tasdev_fw_ready(const struct firmware *fmw, void *context)
 	tasdevice_tuning_switch(tas_hda->priv, 0);
 	tas_hda->priv->playback_started = true;
 
+	tasdevice_tuning_switch(tas_hda->priv, 0);
+
 out:
 	mutex_unlock(&tas_hda->priv->codec_lock);
 	if (fmw)
