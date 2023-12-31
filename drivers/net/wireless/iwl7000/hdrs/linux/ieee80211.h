@@ -4953,7 +4953,7 @@ static inline u8 ieee80211_mle_common_size(const u8 *data)
 
 /**
  * ieee80211_mle_get_link_id - returns the link ID
- * @mle: the basic multi link element
+ * @data: the basic multi link element
  *
  * The element is assumed to be of the correct type (BASIC) and big enough,
  * this must be checked using ieee80211_mle_type_ok().
