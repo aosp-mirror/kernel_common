@@ -1898,7 +1898,7 @@ struct ieee80211_vif_cfg {
  *	this TID is not included.
  * @uplink: bitmap of active links per TID for uplink, or 0 if mapping for this
  *	TID is not included.
- * @bool: info is valid or not.
+ * @valid: info is valid or not.
  */
 struct ieee80211_neg_ttlm {
 	u16 downlink[IEEE80211_TTLM_NUM_TIDS];

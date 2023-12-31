@@ -6729,8 +6729,8 @@ static void ieee80211_neg_ttlm_timeout_work(struct wiphy *wiphy,
 }
 
 static void
-ieee80211_neg_t2l_add_suggested_map(struct sk_buff *skb,
-				    struct ieee80211_neg_ttlm *neg_ttlm)
+ieee80211_neg_ttlm_add_suggested_map(struct sk_buff *skb,
+				     struct ieee80211_neg_ttlm *neg_ttlm)
 {
 	u8 i, direction[IEEE80211_TTLM_MAX_CNT];
 
@@ -6802,7 +6802,7 @@ ieee80211_send_neg_ttlm_req(struct ieee80211_sub_if_data *sdata,
 	mgmt->u.action.u.ttlm_req.action_code =
 		WLAN_PROTECTED_EHT_ACTION_TTLM_REQ;
 	mgmt->u.action.u.ttlm_req.dialog_token = dialog_token;
-	ieee80211_neg_t2l_add_suggested_map(skb, neg_ttlm);
+	ieee80211_neg_ttlm_add_suggested_map(skb, neg_ttlm);
 	ieee80211_tx_skb(sdata, skb);
 }
 
@@ -6885,7 +6885,7 @@ ieee80211_send_neg_ttlm_res(struct ieee80211_sub_if_data *sdata,
 	case NEG_TTLM_RES_SUGGEST_PREFERRED:
 		mgmt->u.action.u.ttlm_res.status_code =
 			WLAN_STATUS_PREF_TID_TO_LINK_MAPPING_SUGGESTED;
-		ieee80211_neg_t2l_add_suggested_map(skb, neg_ttlm);
+		ieee80211_neg_ttlm_add_suggested_map(skb, neg_ttlm);
 		break;
 	}
 
