@@ -8338,6 +8338,14 @@ F:	Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
 F:	drivers/spi/spi-fsl-dspi.c
 F:	include/linux/spi/spi-fsl-dspi.h
 
+FREESCALE eDMA DRIVER
+M:	Frank Li <Frank.Li@nxp.com>
+L:	imx@lists.linux.dev
+L:	dmaengine@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/dma/fsl,edma.yaml
+F:	drivers/dma/fsl-edma*.*
+
 FREESCALE ENETC ETHERNET DRIVERS
 M:	Claudiu Manoil <claudiu.manoil@nxp.com>
 M:	Vladimir Oltean <vladimir.oltean@nxp.com>
@@ -17679,15 +17687,6 @@ M:	GR-Linux-NIC-Dev@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/qlogic/qlcnic/
-
-QLOGIC QLGE 10Gb ETHERNET DRIVER
-M:	Manish Chopra <manishc@marvell.com>
-M:	GR-Linux-NIC-Dev@marvell.com
-M:	Coiby Xu <coiby.xu@gmail.com>
-L:	netdev@vger.kernel.org
-S:	Supported
-F:	Documentation/networking/device_drivers/qlogic/qlge.rst
-F:	drivers/staging/qlge/
 
 QM1D1B0004 MEDIA DRIVER
 M:	Akihiro Tsukada <tskd08@gmail.com>
