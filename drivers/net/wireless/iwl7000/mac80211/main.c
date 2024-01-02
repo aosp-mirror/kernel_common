@@ -1768,6 +1768,39 @@ static struct drop_reason_list drop_reason_list_unusable = {
 	.n_reasons = ARRAY_SIZE(drop_reasons_unusable),
 };
 
+#if LINUX_VERSION_IS_LESS(6,4,0)
+void kfree_skb_reason_mac80211(struct sk_buff *skb, ieee80211_rx_result res)
+{
+	kfree_skb_reason(skb, (__force u32)res);
+	trace_skb_drop(skb, res);
+}
+
+const char * drop_reason_string(ieee80211_rx_result res)
+{
+	struct drop_reason_list *list = NULL;
+	u32 r = (__force u32)res;
+
+	switch (u32_get_bits(r, SKB_DROP_REASON_SUBSYS_MASK)) {
+	case SKB_DROP_REASON_SUBSYS_MAC80211_UNUSABLE:
+		list = &drop_reason_list_unusable;
+		break;
+	case SKB_DROP_REASON_SUBSYS_MAC80211_MONITOR:
+		list = &drop_reason_list_monitor;
+		break;
+	}
+
+	if (!list)
+		return NULL;
+
+	r &= ~SKB_DROP_REASON_SUBSYS_MASK;
+
+	if (r >= list->n_reasons)
+		return NULL;
+
+	return list->reasons[r];
+}
+#endif
+
 static int __init ieee80211_init(void)
 {
 	struct sk_buff *skb;

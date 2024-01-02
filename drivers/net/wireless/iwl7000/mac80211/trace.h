@@ -284,6 +284,32 @@ TRACE_EVENT(drv_return_u64,
 	TP_printk(LOCAL_PR_FMT " - %llu", LOCAL_PR_ARG, __entry->ret)
 );
 
+#if LINUX_VERSION_IS_LESS(6,4,0)
+void kfree_skb_reason_mac80211(struct sk_buff *skb, ieee80211_rx_result res);
+const char *drop_reason_string(ieee80211_rx_result reason);
+
+TRACE_EVENT(skb_drop,
+	TP_PROTO(struct sk_buff *skb, ieee80211_rx_result reason),
+	TP_ARGS(skb, reason),
+	TP_STRUCT__entry(
+		__field(void *, skb)
+		__field(u32, reason)
+		__array(char, reason_str, 35)
+	),
+	TP_fast_assign(
+		const char *r = drop_reason_string(reason);
+
+		__entry->skb = skb;
+		__entry->reason = reason;
+		strscpy(__entry->reason_str, r ?: "",
+			sizeof(__entry->reason_str));
+	),
+	TP_printk("skb:%p, reason=0x%x (%s)",
+		  __entry->skb, __entry->reason,
+		  __entry->reason_str)
+);
+#endif
+
 DEFINE_EVENT(local_only_evt, drv_start,
 	TP_PROTO(struct ieee80211_local *local),
 	TP_ARGS(local)
