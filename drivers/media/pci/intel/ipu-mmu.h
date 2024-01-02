@@ -69,8 +69,8 @@ int ipu_mmu_hw_init(struct ipu_mmu *mmu);
 int ipu_mmu_hw_cleanup(struct ipu_mmu *mmu);
 int ipu_mmu_map(struct ipu_mmu_info *mmu_info, unsigned long iova,
 		phys_addr_t paddr, size_t size);
-size_t ipu_mmu_unmap(struct ipu_mmu_info *mmu_info, unsigned long iova,
-		     size_t size);
+void ipu_mmu_unmap(struct ipu_mmu_info *mmu_info, unsigned long iova,
+		   size_t size);
 phys_addr_t ipu_mmu_iova_to_phys(struct ipu_mmu_info *mmu_info,
 				 dma_addr_t iova);
 #endif
