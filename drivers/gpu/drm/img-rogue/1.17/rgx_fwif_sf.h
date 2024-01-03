@@ -342,6 +342,7 @@ X(235, RGXFW_GROUP_MAIN, RGXFW_SF_MAIN_COMPUTE_FINISHED_PIPELINE, "Compute finis
 X(236, RGXFW_GROUP_MAIN, RGXFW_SF_MAIN_KICK_TDM_PIPELINE, "Kick TDM: Kick ID %u FWCtx 0x%08.8x @ %d, Base 0x%08x%08x. (PID:%d, prio:%d, frame:%d, ext:0x%08x, int:0x%08x)", 10) \
 X(237, RGXFW_GROUP_MAIN, RGXFW_SF_MAIN_KICK_RAY_PIPELINE, "Kick Ray: Kick ID %u FWCtx 0x%08.8x @ %d. (PID:%d, prio:%d, frame:%d, ext:0x%08x, int:0x%08x)", 8)\
 X(238, RGXFW_GROUP_MAIN, RGXFW_SF_MAIN_RAY_FINISHED_PIPELINE, "Ray finished: Kick ID %u ", 1) \
+X(288, RGXFW_GROUP_MAIN, RGXFW_SF_MAIN_ZERO_LM, "Zeroing local memory after context storing FWCtx = 0x%08.8x", 1) \
 \
 X(  1, RGXFW_GROUP_MTS, RGXFW_SF_MTS_BG_KICK_DEPRECATED, "Bg Task DM = %u, counted = %d", 2) \
 X(  2, RGXFW_GROUP_MTS, RGXFW_SF_MTS_BG_COMPLETE_DEPRECATED, "Bg Task complete DM = %u", 1) \
