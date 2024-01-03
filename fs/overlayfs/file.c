@@ -15,8 +15,6 @@
 #include <linux/fs.h>
 #include "overlayfs.h"
 
-#define OVL_IOCB_MASK (IOCB_DSYNC | IOCB_HIPRI | IOCB_NOWAIT | IOCB_SYNC)
-
 struct ovl_aio_req {
 	struct kiocb iocb;
 	refcount_t ref;
@@ -266,6 +264,22 @@ static void ovl_file_accessed(struct file *file)
 	touch_atime(&file->f_path);
 }
 
+static rwf_t ovl_iocb_to_rwf(int ifl)
+{
+	rwf_t flags = 0;
+
+	if (ifl & IOCB_NOWAIT)
+		flags |= RWF_NOWAIT;
+	if (ifl & IOCB_HIPRI)
+		flags |= RWF_HIPRI;
+	if (ifl & IOCB_DSYNC)
+		flags |= RWF_DSYNC;
+	if (ifl & IOCB_SYNC)
+		flags |= RWF_SYNC;
+
+	return flags;
+}
+
 static inline void ovl_aio_put(struct ovl_aio_req *aio_req)
 {
 	if (refcount_dec_and_test(&aio_req->ref)) {
@@ -322,8 +336,7 @@ static ssize_t ovl_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	old_cred = ovl_override_creds(file_inode(file)->i_sb);
 	if (is_sync_kiocb(iocb)) {
 		ret = vfs_iter_read(real.file, iter, &iocb->ki_pos,
-				    iocb_to_rw_flags(iocb->ki_flags,
-						     OVL_IOCB_MASK));
+				    ovl_iocb_to_rwf(iocb->ki_flags));
 	} else {
 		struct ovl_aio_req *aio_req;
 
@@ -391,7 +404,7 @@ static ssize_t ovl_write_iter(struct kiocb *iocb, struct iov_iter *iter)
 	if (is_sync_kiocb(iocb)) {
 		file_start_write(real.file);
 		ret = vfs_iter_write(real.file, iter, &iocb->ki_pos,
-				     iocb_to_rw_flags(ifl, OVL_IOCB_MASK));
+				     ovl_iocb_to_rwf(ifl));
 		file_end_write(real.file);
 		/* Update size */
 		ovl_copyattr(inode);
