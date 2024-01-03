@@ -78,8 +78,7 @@ static int ipu6_isys_gpc_global_enable_set(void *data, u64 val)
 			isys_gpcs->gpc[i].route = 0;
 			isys_gpcs->gpc[i].source = 0;
 		}
-		pm_runtime_mark_last_busy(&isys->adev->dev);
-		pm_runtime_put_autosuspend(&isys->adev->dev);
+		pm_runtime_put(&isys->adev->dev);
 	} else {
 		/*
 		 * Set gpc reg and start all gpc here.

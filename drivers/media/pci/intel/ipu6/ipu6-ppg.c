@@ -511,7 +511,7 @@ void ipu_psys_enter_power_gating(struct ipu_psys *psys)
 				continue;
 			}
 
-			ret = pm_runtime_put_autosuspend(&psys->adev->dev);
+			ret = pm_runtime_put(&psys->adev->dev);
 			if (ret < 0) {
 				dev_err(&psys->adev->dev,
 					"failed to power gating off\n");

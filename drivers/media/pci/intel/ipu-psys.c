@@ -39,20 +39,15 @@ module_param(async_fw_init, bool, 0664);
 MODULE_PARM_DESC(async_fw_init, "Enable asynchronous firmware initialization");
 
 #define IPU_PSYS_NUM_DEVICES		4
-#define IPU_PSYS_AUTOSUSPEND_DELAY	2000
 
 #ifdef CONFIG_PM
 static int psys_runtime_pm_resume(struct device *dev);
 static int psys_runtime_pm_suspend(struct device *dev);
 #else
-#define pm_runtime_dont_use_autosuspend(d)
-#define pm_runtime_use_autosuspend(d)
-#define pm_runtime_set_autosuspend_delay(d, f)	0
 #define pm_runtime_get_sync(d)			0
 #define pm_runtime_put(d)			0
 #define pm_runtime_put_sync(d)			0
 #define pm_runtime_put_noidle(d)		0
-#define pm_runtime_put_autosuspend(d)		0
 #endif
 
 static dev_t ipu_psys_dev_t;
@@ -889,10 +884,6 @@ static int psys_runtime_pm_resume(struct device *dev)
 	if (!psys)
 		return 0;
 
-	/*
-	 * In runtime autosuspend mode, if the psys is in power on state, no
-	 * need to resume again.
-	 */
 	spin_lock_irqsave(&psys->ready_lock, flags);
 	if (psys->ready) {
 		spin_unlock_irqrestore(&psys->ready_lock, flags);
@@ -1423,11 +1414,6 @@ static int ipu_psys_probe(struct ipu_bus_device *adev)
 	strlcpy(psys->caps.dev_model, IPU_MEDIA_DEV_MODEL_NAME,
 		sizeof(psys->caps.dev_model));
 
-	pm_runtime_set_autosuspend_delay(&psys->adev->dev,
-					 IPU_PSYS_AUTOSUSPEND_DELAY);
-	pm_runtime_use_autosuspend(&psys->adev->dev);
-	pm_runtime_mark_last_busy(&psys->adev->dev);
-
 	mutex_unlock(&ipu_psys_mutex);
 
 #ifdef CONFIG_DEBUG_FS
@@ -1486,8 +1472,6 @@ static void ipu_psys_remove(struct ipu_bus_device *adev)
 		psys->sched_cmd_thread = NULL;
 	}
 
-	pm_runtime_dont_use_autosuspend(&psys->adev->dev);
-
 	mutex_lock(&ipu_psys_mutex);
 
 	list_for_each_entry_safe(kpg, kpg0, &psys->pgs, list) {
@@ -1542,8 +1526,7 @@ static irqreturn_t psys_isr_threaded(struct ipu_bus_device *adev)
 		ipu_psys_handle_events(psys);
 	}
 
-	pm_runtime_mark_last_busy(&psys->adev->dev);
-	pm_runtime_put_autosuspend(&psys->adev->dev);
+	pm_runtime_put(&psys->adev->dev);
 	mutex_unlock(&psys->mutex);
 
 	return status ? IRQ_HANDLED : IRQ_NONE;
