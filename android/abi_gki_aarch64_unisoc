@@ -1112,6 +1112,7 @@
   __traceiter_android_rvh_select_task_rq_rt
   __traceiter_android_rvh_setscheduler
   __traceiter_android_rvh_set_task_cpu
+  __traceiter_android_rvh_set_task_comm
   __traceiter_android_rvh_set_user_nice
   __traceiter_android_rvh_tick_entry
   __traceiter_android_rvh_try_to_wake_up
@@ -1208,6 +1209,7 @@
   __tracepoint_android_rvh_select_task_rq_rt
   __tracepoint_android_rvh_setscheduler
   __tracepoint_android_rvh_set_task_cpu
+  __tracepoint_android_rvh_set_task_comm
   __tracepoint_android_rvh_set_user_nice
   __tracepoint_android_rvh_tick_entry
   __tracepoint_android_rvh_try_to_wake_up
