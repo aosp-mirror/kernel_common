@@ -1516,7 +1516,7 @@ int add_memory_subsection(int nid, u64 start, u64 size)
 	nid = memory_add_physaddr_to_nid(start);
 
 	if (IS_ENABLED(CONFIG_ARCH_KEEP_MEMBLOCK))
-		memblock_add_node(start, size, nid);
+		memblock_add_node(start, size, nid, MEMBLOCK_NONE);
 
 	ret = arch_add_memory(nid, start, size, &params);
 	if (ret) {
