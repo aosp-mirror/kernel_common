@@ -28,6 +28,8 @@
 #include "intel_opregion.h"
 #include "intel_wm_types.h"
 
+struct task_struct;
+
 struct drm_i915_private;
 struct drm_property;
 struct drm_property_blob;
@@ -302,6 +304,11 @@ struct intel_display {
 		struct llist_head free_list;
 		struct work_struct free_work;
 	} atomic_helper;
+
+	struct {
+		bool any_task_allowed;
+		struct task_struct *allowed_task;
+	} access;
 
 	struct {
 		/* backlight registers and fields in struct intel_panel */
