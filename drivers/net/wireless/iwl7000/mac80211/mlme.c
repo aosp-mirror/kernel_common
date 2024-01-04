@@ -7,7 +7,7 @@
  * Copyright 2007, Michael Wu <flamingice@sourmilk.net>
  * Copyright 2013-2014  Intel Mobile Communications GmbH
  * Copyright (C) 2015 - 2017 Intel Deutschland GmbH
- * Copyright (C) 2018 - 2023 Intel Corporation
+ * Copyright (C) 2018 - 2024 Intel Corporation
  */
 
 #include <linux/delay.h>
@@ -3258,6 +3258,7 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 
 	/* other links will be destroyed */
 	sdata->deflink.u.mgd.bss = NULL;
+	sdata->deflink.smps_mode = IEEE80211_SMPS_OFF;
 
 	netif_carrier_off(sdata->dev);
 
@@ -5199,9 +5200,6 @@ static int ieee80211_prep_channel(struct ieee80211_sub_if_data *sdata,
 	link->needed_rx_chains = min(ieee80211_max_rx_chains(link, cbss),
 				     local->rx_chains);
 	rcu_read_unlock();
-
-	/* will change later if needed */
-	link->smps_mode = IEEE80211_SMPS_OFF;
 
 	/*
 	 * If this fails (possibly due to channel context sharing
@@ -7739,6 +7737,7 @@ void ieee80211_mgd_setup_link(struct ieee80211_link_data *link)
 
 	link->u.mgd.p2p_noa_index = -1;
 	link->conf->bssid = link->u.mgd.bssid;
+	link->smps_mode = IEEE80211_SMPS_OFF;
 
 	wiphy_work_init(&link->u.mgd.request_smps_work,
 			ieee80211_request_smps_mgd_work);
