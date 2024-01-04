@@ -8348,6 +8348,12 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 	assoc_data->ssid_len = ssid_elem->datalen;
 	rcu_read_unlock();
 
+	if (cfg80211_req_ap_mld_addr(req))
+		memcpy(assoc_data->ap_addr, cfg80211_req_ap_mld_addr(req),
+		       ETH_ALEN);
+	else
+		memcpy(assoc_data->ap_addr, cbss->bssid, ETH_ALEN);
+
 	if (ifmgd->associated) {
 		u8 frame_buf[IEEE80211_DEAUTH_FRAME_LEN];
 
@@ -8436,8 +8442,6 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 			}
 		}
 
-		memcpy(assoc_data->ap_addr, cfg80211_req_ap_mld_addr(req),
-		       ETH_ALEN);
 		assoc_data->wmm = true;
 	} else {
 		struct ieee80211_supported_band *sband;
@@ -8445,8 +8449,6 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 		memcpy(assoc_data->link[0].addr, sdata->vif.addr, ETH_ALEN);
 		assoc_data->s1g = cbss->channel->band == NL80211_BAND_S1GHZ;
-
-		memcpy(assoc_data->ap_addr, cbss->bssid, ETH_ALEN);
 
 		assoc_data->wmm = bss->wmm_used &&
 				  (local->hw.queues >= IEEE80211_NUM_ACS);
