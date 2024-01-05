@@ -16,8 +16,29 @@
 /* maximum size needed for holding an integer */
 #define ITOA_MAX_LEN 12
 
+/**
+ * gzvm_vcpu_wakeup_all - wakes up all vCPUs associated with the specified
+ * gzvm.
+ * @gzvm: Pointer to gzvm structure.
+ */
+void gzvm_vcpu_wakeup_all(struct gzvm *gzvm)
+{
+	for (int i = 0; i < GZVM_MAX_VCPUS; i++) {
+		if (gzvm->vcpus[i]) {
+			gzvm->vcpus[i]->idle_events.virtio_irq += 1;
+			rcuwait_wake_up(&gzvm->vcpus[i]->wait);
+		}
+	}
+}
+
 static enum hrtimer_restart gzvm_vtimer_expire(struct hrtimer *hrt)
 {
+	struct gzvm_vcpu *vcpu;
+
+	vcpu = container_of(hrt, struct gzvm_vcpu, gzvm_vtimer);
+
+	gzvm_vcpu_wakeup_all(vcpu->gzvm);
+
 	return HRTIMER_NORESTART;
 }
 
@@ -111,7 +132,7 @@ static bool gzvm_vcpu_handle_mmio(struct gzvm_vcpu *vcpu)
 static long gzvm_vcpu_run(struct gzvm_vcpu *vcpu, void __user *argp)
 {
 	bool need_userspace = false;
-	u64 exit_reason = 0;
+	u64 exit_reason;
 
 	if (copy_from_user(vcpu->run, argp, sizeof(struct gzvm_vcpu_run)))
 		return -EFAULT;
@@ -159,6 +180,9 @@ static long gzvm_vcpu_run(struct gzvm_vcpu *vcpu, void __user *argp)
 		case GZVM_EXIT_IRQ:
 			fallthrough;
 		case GZVM_EXIT_GZ:
+			break;
+		case GZVM_EXIT_IDLE:
+			gzvm_handle_guest_idle(vcpu);
 			break;
 		case GZVM_EXIT_UNKNOWN:
 			fallthrough;
