@@ -1646,6 +1646,8 @@ static int check_memory_region_flags(const struct kvm_userspace_memory_region *m
 	valid_flags |= KVM_MEM_READONLY;
 #endif
 
+	valid_flags |= KVM_MEM_NON_COHERENT_DMA;
+
 	if (mem->flags & ~valid_flags)
 		return -EINVAL;
 
@@ -2109,7 +2111,8 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	} else { /* Modify an existing slot. */
 		if ((mem->userspace_addr != old->userspace_addr) ||
 		    (npages != old->npages) ||
-		    ((mem->flags ^ old->flags) & KVM_MEM_READONLY))
+		    ((mem->flags ^ old->flags) &
+		     (KVM_MEM_READONLY | KVM_MEM_NON_COHERENT_DMA)))
 			return -EINVAL;
 
 		if (base_gfn != old->base_gfn)
@@ -4692,6 +4695,7 @@ static int kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	case KVM_CAP_USER_MEMORY:
 	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
 	case KVM_CAP_JOIN_MEMORY_REGIONS_WORKS:
+	case KVM_CAP_USER_CONFIGURE_NONCOHERENT_DMA:
 	case KVM_CAP_INTERNAL_ERROR_DATA:
 #ifdef CONFIG_HAVE_KVM_MSI
 	case KVM_CAP_SIGNAL_MSI:
