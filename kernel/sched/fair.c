@@ -62,6 +62,7 @@ unsigned int sysctl_sched_tunable_scaling = SCHED_TUNABLESCALING_LOG;
  * (default: 0.75 msec * (1 + ilog(ncpus)), units: nanoseconds)
  */
 unsigned int sysctl_sched_min_granularity			= 750000ULL;
+EXPORT_SYMBOL_GPL(sysctl_sched_min_granularity);
 static unsigned int normalized_sysctl_sched_min_granularity	= 750000ULL;
 
 /*
