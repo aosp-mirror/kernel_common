@@ -87,7 +87,7 @@
   dev_driver_string
   _dev_err
   dev_err_probe
-  dev_fwnode
+  __dev_fwnode
   dev_get_regmap
   device_add
   device_del
