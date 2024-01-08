@@ -524,7 +524,9 @@
   drm_atomic_commit
   drm_atomic_get_connector_state
   drm_atomic_get_crtc_state
+  drm_atomic_get_new_bridge_state
   drm_atomic_get_new_connector_for_encoder
+  drm_atomic_get_new_private_obj_state
   drm_atomic_get_plane_state
   drm_atomic_get_private_obj_state
   drm_atomic_helper_async_commit
@@ -532,6 +534,10 @@
   drm_atomic_helper_cleanup_planes
   drm_atomic_helper_commit_cleanup_done
   drm_atomic_helper_commit_duplicated_state
+  drm_atomic_helper_commit_hw_done
+  drm_atomic_helper_commit_modeset_disables
+  drm_atomic_helper_commit_modeset_enables
+  drm_atomic_helper_commit_planes
   drm_atomic_helper_commit_tail
   drm_atomic_helper_commit_tail_rpm
   __drm_atomic_helper_connector_destroy_state
@@ -544,6 +550,7 @@
   __drm_atomic_helper_crtc_duplicate_state
   drm_atomic_helper_disable_plane
   drm_atomic_helper_duplicate_state
+  drm_atomic_helper_fake_vblank
   drm_atomic_helper_page_flip
   __drm_atomic_helper_plane_destroy_state
   __drm_atomic_helper_plane_duplicate_state
@@ -559,6 +566,7 @@
   drm_atomic_helper_update_plane
   drm_atomic_helper_wait_for_dependencies
   drm_atomic_helper_wait_for_fences
+  drm_atomic_helper_wait_for_vblanks
   drm_atomic_private_obj_init
   drm_atomic_set_crtc_for_connector
   drm_atomic_set_crtc_for_plane
@@ -605,6 +613,7 @@
   drm_encoder_init
   __drm_err
   drm_format_info
+  drm_format_info_min_pitch
   drm_framebuffer_cleanup
   drm_framebuffer_init
   drm_framebuffer_lookup
@@ -806,6 +815,11 @@
   genl_register_family
   genl_unregister_family
   genphy_aneg_done
+  __genphy_config_aneg
+  genphy_handle_interrupt_no_ack
+  genphy_read_abilities
+  genphy_read_mmd_unsupported
+  genphy_write_mmd_unsupported
   genphy_read_status
   genphy_restart_aneg
   genphy_resume
@@ -1148,8 +1162,10 @@
   mdiobus_free
   mdiobus_get_phy
   mdiobus_read
+  __mdiobus_read
   mdiobus_unregister
   mdiobus_write
+  __mdiobus_write
   mdio_device_create
   mdio_device_free
   media_create_pad_link
@@ -1431,6 +1447,7 @@
   perf_trace_run_bpf_submit
   pfn_is_map_memory
   phy_attached_info
+  phy_basic_t1_features
   phy_drivers_register
   phy_drivers_unregister
   phy_error
@@ -1461,13 +1478,22 @@
   phylink_start
   phylink_stop
   phylink_suspend
+  phy_modify
+  __phy_modify
+  phy_modify_changed
+  phy_modify_paged
+  phy_modify_paged_changed
   phy_pm_runtime_get_sync
   phy_pm_runtime_put_sync
   phy_power_off
   phy_power_on
   phy_print_status
+  phy_read_paged
+  phy_restore_page
+  phy_select_page
   phy_set_mode_ext
   phy_trigger_machine
+  phy_write_paged
   pid_task
   pinconf_generic_dt_free_map
   pinconf_generic_dt_node_to_map
