@@ -762,9 +762,6 @@ void ieee80211_recalc_chanctx_chantype(struct ieee80211_local *local,
 			return;
 	}
 
-	if (!compat)
-		return;
-
 	ieee80211_change_chanctx(local, ctx, ctx, compat);
 }
 
