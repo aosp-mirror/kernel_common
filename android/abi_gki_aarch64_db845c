@@ -388,10 +388,6 @@
   __memset_io
   memstart_addr
   memunmap
-  mipi_dsi_attach
-  mipi_dsi_detach
-  mipi_dsi_device_register_full
-  mipi_dsi_device_unregister
   misc_deregister
   misc_register
   mod_delayed_work_on
@@ -474,7 +470,6 @@
   pci_disable_device
   pcie_capability_clear_and_set_word
   pcie_capability_read_word
-  pcie_capability_write_word
   pci_enable_device
   pci_iomap
   pci_iounmap
@@ -1020,7 +1015,15 @@
 # required by lmh.ko
   of_cpu_node_to_id
 
+# required by lontium-lt9611.ko
+  mipi_dsi_attach
+  mipi_dsi_detach
+  mipi_dsi_device_register_full
+  mipi_dsi_device_unregister
+
 # required by lontium-lt9611uxc.ko
+  devm_mipi_dsi_attach
+  devm_mipi_dsi_device_register_full
   print_hex_dump
   regmap_noinc_read
   regmap_noinc_write
@@ -1326,7 +1329,6 @@
   drm_mode_destroy
   drm_mode_duplicate
   drm_mode_object_find
-  drm_mode_object_put
   drm_mode_probed_add
   drm_modeset_acquire_fini
   drm_modeset_acquire_init
@@ -1934,7 +1936,9 @@
   mfd_remove_devices
 
 # preserved by --additions-only
+  drm_mode_object_put
   gpiod_direction_input
+  pcie_capability_write_word
   snd_soc_get_volsw_sx
   snd_soc_info_volsw_sx
   snd_soc_put_volsw_sx
