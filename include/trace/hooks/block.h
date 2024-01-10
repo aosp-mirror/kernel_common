@@ -26,6 +26,7 @@ struct blk_mq_hw_ctx;
 struct bio;
 struct request_queue;
 struct request;
+struct blk_plug;
 
 DECLARE_HOOK(android_vh_blk_alloc_rqs,
 	TP_PROTO(size_t *rq_size, struct blk_mq_tag_set *set,
@@ -97,6 +98,14 @@ DECLARE_HOOK(android_vh_blk_mq_alloc_tag_set,
 DECLARE_HOOK(android_vh_blk_mq_update_nr_requests,
 	TP_PROTO(bool *skip, struct request_queue *q),
 	TP_ARGS(skip, q));
+
+DECLARE_RESTRICTED_HOOK(android_rvh_blk_allocated_queue_init,
+	TP_PROTO(bool *skip, struct request_queue *q),
+	TP_ARGS(skip, q), 1);
+
+DECLARE_RESTRICTED_HOOK(android_rvh_blk_flush_plug_list,
+	TP_PROTO(struct blk_plug *plug, bool from_schedule),
+	TP_ARGS(plug, from_schedule), 1);
 
 #endif /* _TRACE_HOOK_BLOCK_H */
 
