@@ -22,6 +22,7 @@ struct blk_mq_tag_set;
 /* struct blk_mq_tag_set */
 #include <linux/blk-mq.h>
 #endif /* __GENKSYMS__ */
+struct bio;
 
 DECLARE_HOOK(android_vh_blk_alloc_rqs,
 	TP_PROTO(size_t *rq_size, struct blk_mq_tag_set *set,
@@ -32,6 +33,10 @@ DECLARE_HOOK(android_vh_blk_rq_ctx_init,
 	TP_PROTO(struct request *rq, struct blk_mq_tags *tags,
 		struct blk_mq_alloc_data *data, u64 alloc_time_ns),
 	TP_ARGS(rq, tags, data, alloc_time_ns));
+
+DECLARE_HOOK(android_vh_bio_free,
+	TP_PROTO(struct bio *bio),
+	TP_ARGS(bio));
 
 #endif /* _TRACE_HOOK_BLOCK_H */
 
