@@ -526,6 +526,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_blk_mq_exit_queue);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_blk_mq_alloc_tag_set);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_blk_allocated_queue_init);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_blk_flush_plug_list);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_blk_alloc_flush_queue);
 /*
  * For type visibility
  */
