@@ -135,10 +135,10 @@ ieee80211_chanctx_compatible(struct ieee80211_chanctx *ctx,
 static const struct ieee80211_chan_req *
 ieee80211_chanctx_reserved_chanreq(struct ieee80211_local *local,
 				   struct ieee80211_chanctx *ctx,
-				   const struct ieee80211_chan_req *req)
+				   const struct ieee80211_chan_req *req,
+				   struct ieee80211_chan_req *tmp)
 {
 	struct ieee80211_link_data *link;
-	struct ieee80211_chan_req tmp;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
@@ -146,7 +146,7 @@ ieee80211_chanctx_reserved_chanreq(struct ieee80211_local *local,
 		return NULL;
 
 	list_for_each_entry(link, &ctx->reserved_links, reserved_chanctx_list) {
-		req = ieee80211_chanreq_compatible(&link->reserved, req, &tmp);
+		req = ieee80211_chanreq_compatible(&link->reserved, req, tmp);
 		if (!req)
 			break;
 	}
@@ -189,14 +189,14 @@ ieee80211_chanctx_can_reserve(struct ieee80211_local *local,
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
-	if (!ieee80211_chanctx_reserved_chanreq(local, ctx, req))
+	if (!ieee80211_chanctx_reserved_chanreq(local, ctx, req, &tmp))
 		return false;
 
 	if (!ieee80211_chanctx_non_reserved_chandef(local, ctx, req, &tmp))
 		return false;
 
 	if (!list_empty(&ctx->reserved_links) &&
-	    ieee80211_chanctx_reserved_chanreq(local, ctx, req))
+	    ieee80211_chanctx_reserved_chanreq(local, ctx, req, &tmp))
 		return true;
 
 	return false;
@@ -570,7 +570,7 @@ ieee80211_find_chanctx(struct ieee80211_local *local,
 			continue;
 
 		compat = ieee80211_chanctx_reserved_chanreq(local, ctx,
-							    compat);
+							    compat, &tmp);
 		if (!compat)
 			continue;
 
@@ -1895,7 +1895,8 @@ int ieee80211_link_change_chanreq(struct ieee80211_link_data *link,
 
 	switch (ctx->replace_state) {
 	case IEEE80211_CHANCTX_REPLACE_NONE:
-		if (!ieee80211_chanctx_reserved_chanreq(local, ctx, compat))
+		if (!ieee80211_chanctx_reserved_chanreq(local, ctx, compat,
+							&tmp))
 			return -EBUSY;
 		break;
 	case IEEE80211_CHANCTX_WILL_BE_REPLACED:
