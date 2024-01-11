@@ -162,9 +162,7 @@ static inline void *scsi_cmd_priv(struct scsi_cmnd *cmd)
 /* make sure not to use it with passthrough commands */
 static inline struct scsi_driver *scsi_cmd_to_driver(struct scsi_cmnd *cmd)
 {
-	struct request *rq = scsi_cmd_to_rq(cmd);
-
-	return *(struct scsi_driver **)rq->rq_disk->private_data;
+	return *(struct scsi_driver **)cmd->request->rq_disk->private_data;
 }
 
 extern void scsi_finish_command(struct scsi_cmnd *cmd);
@@ -228,14 +226,14 @@ static inline int scsi_sg_copy_to_buffer(struct scsi_cmnd *cmd,
 
 static inline sector_t scsi_get_sector(struct scsi_cmnd *scmd)
 {
-	return blk_rq_pos(scsi_cmd_to_rq(scmd));
+	return blk_rq_pos(scmd->request);
 }
 
 static inline sector_t scsi_get_lba(struct scsi_cmnd *scmd)
 {
 	unsigned int shift = ilog2(scmd->device->sector_size) - SECTOR_SHIFT;
 
-	return blk_rq_pos(scsi_cmd_to_rq(scmd)) >> shift;
+	return blk_rq_pos(scmd->request) >> shift;
 }
 
 /*
