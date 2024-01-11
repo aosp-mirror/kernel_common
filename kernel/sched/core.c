@@ -200,6 +200,7 @@ static inline void __pv_sched_vcpu_attr_update(union vcpu_sched_attr attr,
 		return;
 
 	this_cpu_write(pv_sched.attr[PV_SCHEDATTR_GUEST].pad, attr.pad);
+	trace_sched_pvsched_vcpu_update(&attr);
 
 	if (!lazy)
 		kvm_pv_sched_notify_host();

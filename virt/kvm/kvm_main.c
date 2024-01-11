@@ -3982,6 +3982,7 @@ retry_disable:
 	put_task_struct(vcpu_task);
 
 	attr.enabled = kvm_vcpu_sched_enabled(vcpu);
+	trace_kvm_pvsched_schedattr(ret, &attr);
 	/*
 	 * If the feature is disabled, we set it in the priority field to let the guest know.
 	 */
@@ -3997,6 +3998,8 @@ retry_disable:
 
 	kvm_arch_vcpu_set_sched_attr(&vcpu->arch, attr);
 	kvm_make_request(KVM_REQ_VCPU_PV_SCHED, vcpu);
+	trace_kvm_pvsched_vcpu_state(kvm_arch_vcpu_is_boosted(&vcpu->arch),
+			kvm_arch_vcpu_is_throttled(&vcpu->arch));
 
 	return ret;
 }

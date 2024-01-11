@@ -504,6 +504,129 @@ TRACE_EVENT(kvm_test_age_hva,
 	TP_printk("mmu notifier test age hva: %#016lx", __entry->hva)
 );
 
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+TRACE_EVENT(kvm_pvsched_hrtimer_start,
+	TP_PROTO(unsigned long long expire, struct vcpu_pv_sched *pv_sched),
+	TP_ARGS(expire, pv_sched),
+
+	TP_STRUCT__entry(
+		__field(unsigned long long,	expire)
+		__field(int,	boosted)
+		__field(int,	throttled)
+	),
+
+	TP_fast_assign(
+		__entry->expire = expire;
+		__entry->boosted = pv_sched->boosted;
+		__entry->throttled = pv_sched->throttled;
+	),
+
+	TP_printk("expire: %llu, boosted: %x, throttled: %x",
+		__entry->expire, __entry->boosted, __entry->throttled)
+);
+
+TRACE_EVENT(kvm_pvsched_hrtimer_expire,
+	TP_PROTO(struct vcpu_pv_sched *pv_sched),
+	TP_ARGS(pv_sched),
+
+	TP_STRUCT__entry(
+		__field(int,	boosted)
+		__field(int,	throttled)
+	),
+
+	TP_fast_assign(
+		__entry->boosted = pv_sched->boosted;
+		__entry->throttled = pv_sched->throttled;
+	),
+
+	TP_printk("boosted: %x, throttled: %x",
+		__entry->boosted, __entry->throttled)
+);
+
+TRACE_EVENT(kvm_pvsched_throttled,
+	TP_PROTO(struct vcpu_pv_sched *pv_sched, unsigned long long elapsed_ns,
+		unsigned long long max_ns),
+	TP_ARGS(pv_sched, elapsed_ns, max_ns),
+
+	TP_STRUCT__entry(
+		__field(int,			boosted)
+		__field(unsigned long long,	elapsed_ns)
+		__field(unsigned long long,	max_ns)
+	),
+
+	TP_fast_assign(
+		__entry->boosted = pv_sched->boosted;
+		__entry->elapsed_ns = elapsed_ns;
+		__entry->max_ns = max_ns;
+	),
+
+	TP_printk("boosted: %x, boosted_ns: %llu, max_boost_ns: %llu",
+		__entry->boosted, __entry->elapsed_ns, __entry->max_ns)
+);
+
+TRACE_EVENT(kvm_pvsched_unthrottled,
+	TP_PROTO(struct vcpu_pv_sched *pv_sched, unsigned long long elapsed_ns,
+		unsigned long long max_ns),
+	TP_ARGS(pv_sched, elapsed_ns, max_ns),
+
+	TP_STRUCT__entry(
+		__field(int,			throttled)
+		__field(unsigned long long,	elapsed_ns)
+		__field(unsigned long long,	max_ns)
+	),
+
+	TP_fast_assign(
+		__entry->throttled = pv_sched->throttled;
+		__entry->elapsed_ns = elapsed_ns;
+		__entry->max_ns = max_ns;
+	),
+
+	TP_printk("throttled: %x, throttled_ns: %llu, max_boost_ns: %llu",
+		__entry->throttled, __entry->elapsed_ns, __entry->max_ns)
+);
+
+TRACE_EVENT(kvm_pvsched_vcpu_state,
+	TP_PROTO(int boosted, int throttled),
+	TP_ARGS(boosted, throttled),
+
+	TP_STRUCT__entry(
+		__field(int,	boosted)
+		__field(int,	throttled)
+	),
+
+	TP_fast_assign(
+		__entry->boosted = boosted;
+		__entry->throttled = throttled;
+	),
+
+	TP_printk("boosted: %x, throttled: %x", __entry->boosted, __entry->throttled)
+);
+
+TRACE_EVENT(kvm_pvsched_schedattr,
+	TP_PROTO(int call_loc, union vcpu_sched_attr *attr),
+	TP_ARGS(call_loc, attr),
+
+	TP_STRUCT__entry(
+		__field(int,	call_loc)
+		__field(int,	sched_policy)
+		__field(int,	rt_priority)
+		__field(int,	sched_nice)
+		__field(int,	kern_cs)
+	),
+
+	TP_fast_assign(
+		__entry->call_loc = call_loc;
+		__entry->sched_policy = attr->sched_policy;
+		__entry->rt_priority = attr->rt_priority;
+		__entry->sched_nice = attr->sched_nice;
+		__entry->kern_cs = attr->kern_cs;
+	),
+
+	TP_printk("call_loc: %d, policy: %d, rt_prio: %d, nice: %d, kerncs=%x",
+		__entry->call_loc, __entry->sched_policy, __entry->rt_priority,
+		__entry->sched_nice, __entry->kern_cs)
+);
+#endif
 #endif /* _TRACE_KVM_MAIN_H */
 
 /* This part must be outside protection */
