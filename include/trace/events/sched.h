@@ -677,6 +677,32 @@ DECLARE_TRACE(sched_update_nr_running_tp,
 	TP_PROTO(struct rq *rq, int change),
 	TP_ARGS(rq, change));
 
+#ifdef CONFIG_PARAVIRT_SCHED
+#include <linux/kvm_para.h>
+TRACE_EVENT(sched_pvsched_vcpu_update,
+	TP_PROTO(union vcpu_sched_attr *attr),
+	TP_ARGS(attr),
+
+	TP_STRUCT__entry(
+		__field(int,	sched_policy)
+		__field(int,	rt_priority)
+		__field(int,	sched_nice)
+		__field(int,	kern_cs)
+	),
+
+	TP_fast_assign(
+		__entry->sched_policy = attr->sched_policy;
+		__entry->rt_priority = attr->rt_priority;
+		__entry->sched_nice = attr->sched_nice;
+		__entry->kern_cs = attr->kern_cs;
+	),
+
+	TP_printk("policy: %d, rt_prio: %d, nice: %d, kerncs=%x",
+		__entry->sched_policy, __entry->rt_priority,
+		__entry->sched_nice, __entry->kern_cs)
+);
+#endif /* CONFIG_PARAVIRT_SCHED */
+
 #endif /* _TRACE_SCHED_H */
 
 /* This part must be outside protection */

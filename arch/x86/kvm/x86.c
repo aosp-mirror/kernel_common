@@ -178,6 +178,9 @@ module_param(pvsched_max_taskprio_us, uint, 0644);
 
 static enum hrtimer_restart boost_throttle_timer_fn(struct hrtimer *data)
 {
+	struct vcpu_pv_sched *pv_sched = container_of(data, struct vcpu_pv_sched, boost_thr_timer);
+
+	trace_kvm_pvsched_hrtimer_expire(pv_sched);
 	return HRTIMER_NORESTART;
 }
 #endif
@@ -9158,6 +9161,7 @@ static inline void kvm_vcpu_pvsched_update_vmenter(struct kvm_vcpu_arch *arch)
 	WARN_ON(max_ns <= elapsed_ns);
 	expire = ktime_add_ns(arch->pv_sched.vmentry_ts, max_ns - elapsed_ns);
 	hrtimer_start(&arch->pv_sched.boost_thr_timer, expire, HRTIMER_MODE_ABS_HARD);
+	trace_kvm_pvsched_hrtimer_start(expire, &arch->pv_sched);
 }
 
 static inline void kvm_vcpu_pvsched_update_vmexit(struct kvm_vcpu_arch *arch)
@@ -9186,6 +9190,7 @@ static inline void kvm_vcpu_pvsched_update_vmexit(struct kvm_vcpu_arch *arch)
 			thr_type = KVM_PVSCHED_BOOST_TASKPRIO;
 		}
 		if (elapsed_ns >= max_ns) {
+			trace_kvm_pvsched_throttled(&arch->pv_sched, elapsed_ns, max_ns);
 			arch->pv_sched.throttled = thr_type;
 			arch->pv_sched.boosted = 0;
 			arch->pv_sched.kerncs_ns = arch->pv_sched.taskprio_ns = 0;
@@ -9200,6 +9205,7 @@ static inline void kvm_vcpu_pvsched_update_vmexit(struct kvm_vcpu_arch *arch)
 		}
 
 		if (elapsed_ns >= max_ns) {
+			trace_kvm_pvsched_unthrottled(&arch->pv_sched, elapsed_ns, max_ns);
 			arch->pv_sched.throttled = 0;
 			arch->pv_sched.kerncs_ns = arch->pv_sched.taskprio_ns = 0;
 		}
@@ -9212,8 +9218,11 @@ static inline void kvm_vcpu_pvsched_update_vmexit(struct kvm_vcpu_arch *arch)
  */
 static void record_vcpu_pv_sched(struct kvm_vcpu *vcpu)
 {
+	union vcpu_sched_attr *attr = &vcpu->arch.pv_sched.attr;
 	if (!kvm_arch_vcpu_pv_sched_enabled(&vcpu->arch))
 		return;
+
+	trace_kvm_pvsched_schedattr(1, attr);
 
 	pagefault_disable();
 	kvm_write_guest_offset_cached(vcpu->kvm, &vcpu->arch.pv_sched.data,
@@ -9236,6 +9245,7 @@ static inline void kvm_vcpu_do_pv_sched(struct kvm_vcpu *vcpu)
 		if (kvm_read_guest_offset_cached(vcpu->kvm, &vcpu->arch.pv_sched.data,
 					&attr, PV_SCHEDATTR_GUEST_OFFSET, sizeof(attr)))
 			return;
+		trace_kvm_pvsched_schedattr(2, &attr);
 		kvm_vcpu_set_sched(vcpu, attr);
 	}
 }
