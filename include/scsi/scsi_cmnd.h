@@ -95,6 +95,7 @@ struct scsi_cmnd {
 	unsigned char prot_op;
 	unsigned char prot_type;
 	unsigned char prot_flags;
+	enum scsi_cmnd_submitter submitter;
 
 	unsigned short cmd_len;
 	enum dma_data_direction sc_data_direction;
@@ -150,7 +151,7 @@ struct scsi_cmnd {
 	unsigned char tag;	/* SCSI-II queued command tag */
 	unsigned int extra_len;	/* length of alignment and padding */
 
-	ANDROID_KABI_USE(1, enum scsi_cmnd_submitter submitter);
+	ANDROID_KABI_RESERVE(1);
 	ANDROID_KABI_RESERVE(2);
 	ANDROID_KABI_RESERVE(3);
 	ANDROID_KABI_RESERVE(4);
