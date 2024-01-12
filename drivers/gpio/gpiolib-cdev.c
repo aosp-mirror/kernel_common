@@ -2123,7 +2123,10 @@ static int lineinfo_unwatch(struct gpio_chardev_data *cdev, void __user *ip)
 	return 0;
 }
 
-static long gpio_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
+/*
+ * gpio_ioctl() - ioctl handler for the GPIO chardev
+ */
+static long gpio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct gpio_chardev_data *cdev = file->private_data;
 	struct gpio_device *gdev = cdev->gdev;
@@ -2158,17 +2161,6 @@ static long gpio_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned lo
 	default:
 		return -EINVAL;
 	}
-}
-
-/*
- * gpio_ioctl() - ioctl handler for the GPIO chardev
- */
-static long gpio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-{
-	struct gpio_chardev_data *cdev = file->private_data;
-
-	return call_ioctl_locked(file, cmd, arg, cdev->gdev,
-				 gpio_ioctl_unlocked);
 }
 
 #ifdef CONFIG_COMPAT
