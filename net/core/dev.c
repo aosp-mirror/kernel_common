@@ -1126,7 +1126,9 @@ static int __dev_alloc_name(struct net *net, const char *name, char *res)
 	if (i == max_netdevices)
 		return -ENFILE;
 
-	snprintf(res, IFNAMSIZ, name, i);
+	/* 'res' and 'name' could overlap, use 'buf' as an intermediate buffer */
+	strscpy(buf, name, IFNAMSIZ);
+	snprintf(res, IFNAMSIZ, buf, i);
 	return i;
 }
 
