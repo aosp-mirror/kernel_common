@@ -539,7 +539,6 @@
   vring_del_virtqueue
   vring_interrupt
   vring_transport_features
-  wait_for_completion
   wait_for_completion_timeout
   __wake_up
   wake_up_process
@@ -1254,6 +1253,7 @@
   __splice_from_pipe
   unlock_page
   __unregister_chrdev
+  wait_for_completion
 
 # required by virtio_mmio.ko
   device_for_each_child
@@ -1407,34 +1407,6 @@
   vb2_wait_for_all_buffers
   video_device_release_empty
 
-# required by virtiofs.ko
-  deactivate_locked_super
-  flush_dcache_page
-  fs_param_is_enum
-  __fs_parse
-  fuse_conn_destroy
-  fuse_conn_init
-  fuse_dequeue_forget
-  fuse_dev_alloc
-  fuse_dev_free
-  fuse_dev_install
-  fuse_fill_super_common
-  fuse_free_conn
-  fuse_get_unique
-  fuse_init_fs_context_submount
-  fuse_len_args
-  fuse_mount_destroy
-  fuse_mount_remove
-  fuse_request_end
-  fuse_send_init
-  kill_anon_super
-  lockref_get
-  memchr
-  register_filesystem
-  set_anon_super_fc
-  sget_fc
-  unregister_filesystem
-
 # required by vkms.ko
   __devm_drm_dev_alloc
   devres_open_group
@@ -1534,13 +1506,32 @@
   crypto_comp_compress
   crypto_comp_decompress
   crypto_has_alg
+  deactivate_locked_super
   dec_zone_page_state
   down_read
   eventfd_ctx_fdget
   eventfd_ctx_put
   eventfd_fget
   eventfd_signal
+  flush_dcache_page
   folio_wait_bit
+  fs_param_is_enum
+  __fs_parse
+  fuse_conn_destroy
+  fuse_conn_init
+  fuse_dequeue_forget
+  fuse_dev_alloc
+  fuse_dev_free
+  fuse_dev_install
+  fuse_fill_super_common
+  fuse_free_conn
+  fuse_get_unique
+  fuse_init_fs_context_submount
+  fuse_len_args
+  fuse_mount_destroy
+  fuse_mount_remove
+  fuse_request_end
+  fuse_send_init
   get_random_u32
   get_task_mm
   hex_asc_upper
@@ -1550,13 +1541,16 @@
   init_user_ns
   iov_iter_advance
   iov_iter_init
+  kill_anon_super
   kstrdup
   kstrtou16
   kthread_unuse_mm
   kthread_use_mm
   llist_add_batch
   llist_reverse_order
+  lockref_get
   lock_sock_nested
+  memchr
   memset64
   __mmdrop
   mmput
@@ -1577,11 +1571,14 @@
   __rb_erase_color
   __rb_insert_augmented
   rb_next
+  register_filesystem
   release_sock
   remove_wait_queue
   security_sk_clone
   security_sock_graft
+  set_anon_super_fc
   set_capacity
+  sget_fc
   sk_alloc
   sk_free
   sock_copy_user_timeval
@@ -1605,6 +1602,7 @@
   tty_mode_ioctl
   tty_register_ldisc
   tty_unregister_ldisc
+  unregister_filesystem
   up_read
   wait_woken
   woken_wake_function
