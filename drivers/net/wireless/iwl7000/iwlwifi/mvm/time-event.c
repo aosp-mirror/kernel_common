@@ -45,12 +45,8 @@ void iwl_mvm_te_clear_data(struct iwl_mvm *mvm,
 	te_data->link_id = -1;
 }
 
-void iwl_mvm_roc_done_wk(struct work_struct *wk)
+static void iwl_mvm_cleanup_roc(struct iwl_mvm *mvm)
 {
-	struct iwl_mvm *mvm = container_of(wk, struct iwl_mvm, roc_done_wk);
-
-	mutex_lock(&mvm->mutex);
-
 	/*
 	 * Clear the ROC_RUNNING status bit.
 	 * This will cause the TX path to drop offchannel transmissions.
@@ -110,7 +106,7 @@ void iwl_mvm_roc_done_wk(struct work_struct *wk)
 
 		if (mvm->mld_api_is_used) {
 			iwl_mvm_mld_rm_aux_sta(mvm);
-			goto out_unlock;
+			return;
 		}
 
 		/* In newer version of this command an aux station is added only
@@ -119,8 +115,14 @@ void iwl_mvm_roc_done_wk(struct work_struct *wk)
 		if (iwl_mvm_has_new_station_api(mvm->fw))
 			iwl_mvm_rm_aux_sta(mvm);
 	}
+}
 
-out_unlock:
+void iwl_mvm_roc_done_wk(struct work_struct *wk)
+{
+	struct iwl_mvm *mvm = container_of(wk, struct iwl_mvm, roc_done_wk);
+
+	mutex_lock(&mvm->mutex);
+	iwl_mvm_cleanup_roc(mvm);
 	mutex_unlock(&mvm->mutex);
 }
 
@@ -1237,9 +1239,7 @@ void iwl_mvm_stop_roc(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 		} else {
 			iwl_mvm_roc_station_remove(mvm, mvmvif);
 		}
-		iwl_mvm_roc_finished(mvm);
-
-		return;
+		goto cleanup_roc;
 	}
 
 	te_data = iwl_mvm_get_roc_te(mvm);
@@ -1254,7 +1254,17 @@ void iwl_mvm_stop_roc(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 		iwl_mvm_remove_time_event(mvm, mvmvif, te_data);
 	else
 		iwl_mvm_remove_aux_roc_te(mvm, mvmvif, te_data);
-	iwl_mvm_roc_finished(mvm);
+
+cleanup_roc:
+	/*
+	 * In case we get here before the ROC event started,
+	 * (so the status bit isn't set) set it here so iwl_mvm_cleanup_roc will
+	 * cleanup things properly
+	 */
+	set_bit(vif->type == NL80211_IFTYPE_P2P_DEVICE ?
+		IWL_MVM_STATUS_ROC_RUNNING : IWL_MVM_STATUS_ROC_AUX_RUNNING,
+		&mvm->status);
+	iwl_mvm_cleanup_roc(mvm);
 }
 
 void iwl_mvm_remove_csa_period(struct iwl_mvm *mvm,
