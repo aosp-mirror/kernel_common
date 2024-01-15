@@ -5036,10 +5036,6 @@ ieee80211_determine_our_sta_mode(struct ieee80211_sub_if_data *sdata,
 	}
 
 	/* we have EHT */
-	if (req && req->flags & ASSOC_REQ_DISABLE_EHT) {
-		mlme_dbg(sdata, "EHT disabled by flag, limiting to HE\n");
-		goto out;
-	}
 
 	conn->mode = IEEE80211_CONN_MODE_EHT;
 
