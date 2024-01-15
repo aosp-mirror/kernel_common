@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
- * Copyright (C) 2010-2014, 2018-2022 Intel Corporation
+ * Copyright (C) 2010-2014, 2018-2024 Intel Corporation
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
  * Copyright (C) 2015-2017 Intel Deutschland GmbH
- * Copyright (C) 2023 Intel Corporation
  */
 #ifndef __iwl_tm_infc__
 #define __iwl_tm_infc__
@@ -41,7 +40,6 @@ enum iwl_tm_gnl_cmd_t {
 #define IWL_XVT_TX_MODULATED_INFINITE (0)
 
 #define IWL_XVT_MAX_MAC_HEADER_LENGTH (36)
-#define IWL_XVT_MAX_NUM_OF_FRAMES (32)
 
 /*
  * Periphery registers absolute lower bound. This is used in order to
@@ -759,7 +757,7 @@ struct iwl_xvt_tx_start {
 	u8 reserved1;
 	u16 reserved2;
 	struct tx_cmd_commom_data tx_data;
-	struct tx_cmd_frame_data frames_data[IWL_XVT_MAX_NUM_OF_FRAMES];
+	struct tx_cmd_frame_data frames_data[];
 } __packed __aligned(4);
 
 /**
