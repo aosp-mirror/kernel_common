@@ -42,7 +42,7 @@ struct vm_area_struct *find_dst_vma(struct mm_struct *dst_mm,
 	 * enforce the VM_MAYWRITE check done at uffd registration
 	 * time.
 	 */
-	if (!dst_vma->vm_userfaultfd_ctx.ctx)
+	if (!rcu_access_pointer(dst_vma->vm_userfaultfd_ctx.ctx))
 		return NULL;
 
 	return dst_vma;
