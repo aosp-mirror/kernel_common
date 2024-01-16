@@ -297,9 +297,9 @@ static int mtk_mfg_bind_device_resource(struct mtk_mfg *mfg)
 	}
 
 #if defined(CONFIG_DEVFREQ_THERMAL)
-	mfg->tz = thermal_zone_get_zone_by_name("cpu_thermal");
+	mfg->tz = thermal_zone_get_zone_by_name("cpu-thermal");
 	if (IS_ERR(mfg->tz)) {
-		dev_err(dev, "Failed to get cpu_thermal zone\n");
+		dev_err(dev, "Failed to get cpu-thermal zone\n");
 		return PTR_ERR(mfg->tz);
 	}
 #endif
