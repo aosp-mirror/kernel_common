@@ -3,7 +3,7 @@
  *
  * Copyright 2007-2009	Johannes Berg <johannes@sipsolutions.net>
  * Copyright 2013-2014  Intel Mobile Communications GmbH
- * Copyright (C) 2018-2020, 2022-2023 Intel Corporation
+ * Copyright (C) 2018-2020, 2022-2024 Intel Corporation
  */
 #include <linux/export.h>
 #include <net/cfg80211.h>
@@ -244,10 +244,10 @@ ieee80211_uhb_power_type_valid(struct ieee80211_mgmt *mgmt, size_t len,
 				return true;
 			case IEEE80211_6GHZ_CTRL_REG_SP_AP:
 				return !(channel->flags &
-					 IEEE80211_CHAN_NO_UHB_AFC_CLIENT);
+					 IEEE80211_CHAN_NO_6GHZ_AFC_CLIENT);
 			case IEEE80211_6GHZ_CTRL_REG_VLP_AP:
 				return !(channel->flags &
-					 IEEE80211_CHAN_NO_UHB_VLP_CLIENT);
+					 IEEE80211_CHAN_NO_6GHZ_VLP_CLIENT);
 		}
 	}
 	return false;
