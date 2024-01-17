@@ -1916,7 +1916,7 @@ void f2fs_flush_inline_data(struct f2fs_sb_info *sbi)
 		for (i = 0; i < nr_pages; i++) {
 			struct page *page = pvec.pages[i];
 
-			if (!IS_DNODE(page))
+			if (!IS_INODE(page))
 				continue;
 
 			lock_page(page);
