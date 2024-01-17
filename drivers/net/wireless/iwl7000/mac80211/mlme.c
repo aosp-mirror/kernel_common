@@ -3108,6 +3108,7 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 	/* other links will be destroyed */
 	sdata->deflink.conf->bss = NULL;
 	sdata->deflink.smps_mode = IEEE80211_SMPS_OFF;
+	sdata->deflink.conf->channel_util = -1;
 
 	netif_carrier_off(sdata->dev);
 
@@ -6446,6 +6447,9 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_link_data *link,
 		erp_valid = false;
 	}
 
+	bss_conf->channel_util =
+		elems->bss_load ? elems->bss_load->channel_util : -1;
+
 	if (!ieee80211_is_s1g_beacon(hdr->frame_control))
 		changed |= ieee80211_handle_bss_capability(link,
 				le16_to_cpu(mgmt->u.beacon.capab_info),
@@ -7566,6 +7570,7 @@ void ieee80211_mgd_setup_link(struct ieee80211_link_data *link)
 	link->u.mgd.p2p_noa_index = -1;
 	link->conf->bssid = link->u.mgd.bssid;
 	link->smps_mode = IEEE80211_SMPS_OFF;
+	link->conf->channel_util = -1;
 
 	wiphy_work_init(&link->u.mgd.request_smps_work,
 			ieee80211_request_smps_mgd_work);
