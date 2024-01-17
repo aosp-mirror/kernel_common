@@ -279,16 +279,21 @@ bpf_trampoline_get_progs(const struct bpf_trampoline *tr, int *total, bool *ip_a
 	return tlinks;
 }
 
-static void __bpf_tramp_image_put_deferred(struct work_struct *work)
+static void bpf_tramp_image_free(struct bpf_tramp_image *im)
 {
-	struct bpf_tramp_image *im;
-
-	im = container_of(work, struct bpf_tramp_image, work);
 	bpf_image_ksym_del(&im->ksym);
 	bpf_jit_free_exec(im->image);
 	bpf_jit_uncharge_modmem(PAGE_SIZE);
 	percpu_ref_exit(&im->pcref);
 	kfree_rcu(im, rcu);
+}
+
+static void __bpf_tramp_image_put_deferred(struct work_struct *work)
+{
+	struct bpf_tramp_image *im;
+
+	im = container_of(work, struct bpf_tramp_image, work);
+	bpf_tramp_image_free(im);
 }
 
 /* callback, fexit step 3 or fentry step 2 */
@@ -466,7 +471,7 @@ again:
 					  &tr->func.model, tr->flags, tlinks,
 					  tr->func.addr);
 	if (err < 0)
-		goto out;
+		goto out_free;
 
 	set_memory_ro((long)im->image, 1);
 	set_memory_x((long)im->image, 1);
@@ -497,7 +502,7 @@ again:
 	}
 #endif
 	if (err)
-		goto out;
+		goto out_free;
 
 	if (tr->cur_image)
 		bpf_tramp_image_put(tr->cur_image);
@@ -509,6 +514,10 @@ out:
 		tr->flags = orig_flags;
 	kfree(tlinks);
 	return err;
+
+out_free:
+	bpf_tramp_image_free(im);
+	goto out;
 }
 
 static enum bpf_tramp_prog_type bpf_attach_type_to_tramp(struct bpf_prog *prog)
@@ -868,7 +877,7 @@ static __always_inline u64 notrace bpf_prog_start_time(void)
  * [2..MAX_U64] - execute bpf prog and record execution time.
  *     This is start time.
  */
-u64 notrace __bpf_prog_enter(struct bpf_prog *prog, struct bpf_tramp_run_ctx *run_ctx)
+static u64 notrace __bpf_prog_enter_recur(struct bpf_prog *prog, struct bpf_tramp_run_ctx *run_ctx)
 	__acquires(RCU)
 {
 	rcu_read_lock();
@@ -905,7 +914,8 @@ static void notrace update_prog_stats(struct bpf_prog *prog,
 	}
 }
 
-void notrace __bpf_prog_exit(struct bpf_prog *prog, u64 start, struct bpf_tramp_run_ctx *run_ctx)
+static void notrace __bpf_prog_exit_recur(struct bpf_prog *prog, u64 start,
+					  struct bpf_tramp_run_ctx *run_ctx)
 	__releases(RCU)
 {
 	bpf_reset_run_ctx(run_ctx->saved_run_ctx);
@@ -916,8 +926,8 @@ void notrace __bpf_prog_exit(struct bpf_prog *prog, u64 start, struct bpf_tramp_
 	rcu_read_unlock();
 }
 
-u64 notrace __bpf_prog_enter_lsm_cgroup(struct bpf_prog *prog,
-					struct bpf_tramp_run_ctx *run_ctx)
+static u64 notrace __bpf_prog_enter_lsm_cgroup(struct bpf_prog *prog,
+					       struct bpf_tramp_run_ctx *run_ctx)
 	__acquires(RCU)
 {
 	/* Runtime stats are exported via actual BPF_LSM_CGROUP
@@ -931,8 +941,8 @@ u64 notrace __bpf_prog_enter_lsm_cgroup(struct bpf_prog *prog,
 	return NO_START_TIME;
 }
 
-void notrace __bpf_prog_exit_lsm_cgroup(struct bpf_prog *prog, u64 start,
-					struct bpf_tramp_run_ctx *run_ctx)
+static void notrace __bpf_prog_exit_lsm_cgroup(struct bpf_prog *prog, u64 start,
+					       struct bpf_tramp_run_ctx *run_ctx)
 	__releases(RCU)
 {
 	bpf_reset_run_ctx(run_ctx->saved_run_ctx);
@@ -941,24 +951,24 @@ void notrace __bpf_prog_exit_lsm_cgroup(struct bpf_prog *prog, u64 start,
 	rcu_read_unlock();
 }
 
-u64 notrace __bpf_prog_enter_sleepable(struct bpf_prog *prog, struct bpf_tramp_run_ctx *run_ctx)
+u64 notrace __bpf_prog_enter_sleepable_recur(struct bpf_prog *prog,
+					     struct bpf_tramp_run_ctx *run_ctx)
 {
 	rcu_read_lock_trace();
 	migrate_disable();
 	might_fault();
 
+	run_ctx->saved_run_ctx = bpf_set_run_ctx(&run_ctx->run_ctx);
+
 	if (unlikely(this_cpu_inc_return(*(prog->active)) != 1)) {
 		bpf_prog_inc_misses_counter(prog);
 		return 0;
 	}
-
-	run_ctx->saved_run_ctx = bpf_set_run_ctx(&run_ctx->run_ctx);
-
 	return bpf_prog_start_time();
 }
 
-void notrace __bpf_prog_exit_sleepable(struct bpf_prog *prog, u64 start,
-				       struct bpf_tramp_run_ctx *run_ctx)
+void notrace __bpf_prog_exit_sleepable_recur(struct bpf_prog *prog, u64 start,
+					     struct bpf_tramp_run_ctx *run_ctx)
 {
 	bpf_reset_run_ctx(run_ctx->saved_run_ctx);
 
@@ -968,8 +978,30 @@ void notrace __bpf_prog_exit_sleepable(struct bpf_prog *prog, u64 start,
 	rcu_read_unlock_trace();
 }
 
-u64 notrace __bpf_prog_enter_struct_ops(struct bpf_prog *prog,
-					struct bpf_tramp_run_ctx *run_ctx)
+static u64 notrace __bpf_prog_enter_sleepable(struct bpf_prog *prog,
+					      struct bpf_tramp_run_ctx *run_ctx)
+{
+	rcu_read_lock_trace();
+	migrate_disable();
+	might_fault();
+
+	run_ctx->saved_run_ctx = bpf_set_run_ctx(&run_ctx->run_ctx);
+
+	return bpf_prog_start_time();
+}
+
+static void notrace __bpf_prog_exit_sleepable(struct bpf_prog *prog, u64 start,
+					      struct bpf_tramp_run_ctx *run_ctx)
+{
+	bpf_reset_run_ctx(run_ctx->saved_run_ctx);
+
+	update_prog_stats(prog, start);
+	migrate_enable();
+	rcu_read_unlock_trace();
+}
+
+static u64 notrace __bpf_prog_enter(struct bpf_prog *prog,
+				    struct bpf_tramp_run_ctx *run_ctx)
 	__acquires(RCU)
 {
 	rcu_read_lock();
@@ -980,8 +1012,8 @@ u64 notrace __bpf_prog_enter_struct_ops(struct bpf_prog *prog,
 	return bpf_prog_start_time();
 }
 
-void notrace __bpf_prog_exit_struct_ops(struct bpf_prog *prog, u64 start,
-					struct bpf_tramp_run_ctx *run_ctx)
+static void notrace __bpf_prog_exit(struct bpf_prog *prog, u64 start,
+				    struct bpf_tramp_run_ctx *run_ctx)
 	__releases(RCU)
 {
 	bpf_reset_run_ctx(run_ctx->saved_run_ctx);
@@ -999,6 +1031,36 @@ void notrace __bpf_tramp_enter(struct bpf_tramp_image *tr)
 void notrace __bpf_tramp_exit(struct bpf_tramp_image *tr)
 {
 	percpu_ref_put(&tr->pcref);
+}
+
+bpf_trampoline_enter_t bpf_trampoline_enter(const struct bpf_prog *prog)
+{
+	bool sleepable = prog->aux->sleepable;
+
+	if (bpf_prog_check_recur(prog))
+		return sleepable ? __bpf_prog_enter_sleepable_recur :
+			__bpf_prog_enter_recur;
+
+	if (resolve_prog_type(prog) == BPF_PROG_TYPE_LSM &&
+	    prog->expected_attach_type == BPF_LSM_CGROUP)
+		return __bpf_prog_enter_lsm_cgroup;
+
+	return sleepable ? __bpf_prog_enter_sleepable : __bpf_prog_enter;
+}
+
+bpf_trampoline_exit_t bpf_trampoline_exit(const struct bpf_prog *prog)
+{
+	bool sleepable = prog->aux->sleepable;
+
+	if (bpf_prog_check_recur(prog))
+		return sleepable ? __bpf_prog_exit_sleepable_recur :
+			__bpf_prog_exit_recur;
+
+	if (resolve_prog_type(prog) == BPF_PROG_TYPE_LSM &&
+	    prog->expected_attach_type == BPF_LSM_CGROUP)
+		return __bpf_prog_exit_lsm_cgroup;
+
+	return sleepable ? __bpf_prog_exit_sleepable : __bpf_prog_exit;
 }
 
 int __weak

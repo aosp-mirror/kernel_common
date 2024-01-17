@@ -674,6 +674,8 @@ re_probe:
 
 		device_remove(dev);
 		driver_sysfs_remove(dev);
+		if (dev->bus && dev->bus->dma_cleanup)
+			dev->bus->dma_cleanup(dev);
 		device_unbind_cleanup(dev);
 
 		goto re_probe;
@@ -718,7 +720,12 @@ static int really_probe_debug(struct device *dev, struct device_driver *drv)
 	calltime = ktime_get();
 	ret = really_probe(dev, drv);
 	rettime = ktime_get();
-	pr_debug("probe of %s returned %d after %lld usecs\n",
+	/*
+	 * Don't change this to pr_debug() because that requires
+	 * CONFIG_DYNAMIC_DEBUG and we want a simple 'initcall_debug' on the
+	 * kernel commandline to print this all the time at the debug level.
+	 */
+	printk(KERN_DEBUG "probe of %s returned %d after %lld usecs\n",
 		 dev_name(dev), ret, ktime_us_delta(rettime, calltime));
 	return ret;
 }
@@ -753,6 +760,29 @@ void wait_for_device_probe(void)
 	async_synchronize_full();
 }
 EXPORT_SYMBOL_GPL(wait_for_device_probe);
+
+/**
+ * flush_deferred_probe_now
+ *
+ * This function should be used sparingly. It's meant for when we need to flush
+ * the deferred probe list at earlier initcall levels. Really meant only for KVM
+ * needs. This function should never be exported because it makes no sense for
+ * modules to call this.
+ */
+void flush_deferred_probe_now(void)
+{
+	/*
+	 * Really shouldn't using this if deferred probe has already been
+	 * enabled
+	 */
+	if (WARN_ON(driver_deferred_probe_enable))
+		return;
+
+	driver_deferred_probe_enable = true;
+	driver_deferred_probe_trigger();
+	wait_for_device_probe();
+	driver_deferred_probe_enable = false;
+}
 
 static int __driver_probe_device(struct device_driver *drv, struct device *dev)
 {

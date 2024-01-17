@@ -416,17 +416,18 @@ static inline void cma_debug_show_areas(struct cma *cma) { }
 #endif
 
 /**
- * cma_alloc() - allocate pages from contiguous area
+ * __cma_alloc() - allocate pages from contiguous area
  * @cma:   Contiguous memory region for which the allocation is performed.
  * @count: Requested number of pages.
  * @align: Requested alignment of pages (in PAGE_SIZE order).
- * @no_warn: Avoid printing message about failed allocation
+ * @gfp_mask: GFP mask to use during the cma allocation.
  *
- * This function allocates part of contiguous memory on specific
- * contiguous memory area.
+ * This function is same with cma_alloc but supports gfp_mask.
+ * Currently, the gfp_mask supports only __GFP_NOWARN and __GFP_NORETRY.
+ * If user passes other flags, it fails the allocation.
  */
-struct page *cma_alloc(struct cma *cma, unsigned long count,
-		       unsigned int align, bool no_warn)
+struct page *__cma_alloc(struct cma *cma, unsigned long count,
+		       unsigned int align, gfp_t gfp_mask)
 {
 	unsigned long mask, offset;
 	unsigned long pfn = -1;
@@ -437,6 +438,13 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 	int ret = -ENOMEM;
 	int num_attempts = 0;
 	int max_retries = 5;
+	const char *name = cma ? cma->name : NULL;
+
+	trace_cma_alloc_start(name, count, align);
+
+	if (WARN_ON_ONCE((gfp_mask & GFP_KERNEL) == 0 ||
+		(gfp_mask & ~(GFP_KERNEL|__GFP_NOWARN|__GFP_NORETRY)) != 0))
+		goto out;
 
 	if (!cma || !cma->count || !cma->bitmap)
 		goto out;
@@ -446,8 +454,6 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 
 	if (!count)
 		goto out;
-
-	trace_cma_alloc_start(cma->name, count, align);
 
 	mask = cma_bitmap_aligned_mask(cma, align);
 	offset = cma_bitmap_aligned_offset(cma, align);
@@ -466,7 +472,8 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 			if ((num_attempts < max_retries) && (ret == -EBUSY)) {
 				spin_unlock_irq(&cma->lock);
 
-				if (fatal_signal_pending(current))
+				if (fatal_signal_pending(current) ||
+				    (gfp_mask & __GFP_NORETRY))
 					break;
 
 				/*
@@ -496,8 +503,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 
 		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
 		mutex_lock(&cma_mutex);
-		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
-				     GFP_KERNEL | (no_warn ? __GFP_NOWARN : 0));
+		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA, gfp_mask);
 		mutex_unlock(&cma_mutex);
 		if (ret == 0) {
 			page = pfn_to_page(pfn);
@@ -517,8 +523,6 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 		start = bitmap_no + mask + 1;
 	}
 
-	trace_cma_alloc_finish(cma->name, pfn, page, count, align);
-
 	/*
 	 * CMA can allocate multiple page blocks, which results in different
 	 * blocks being marked with different tags. Reset the tags to ignore
@@ -529,7 +533,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 			page_kasan_tag_reset(page + i);
 	}
 
-	if (ret && !no_warn) {
+	if (ret && !(gfp_mask & __GFP_NOWARN)) {
 		pr_err_ratelimited("%s: %s: alloc failed, req-size: %lu pages, ret: %d\n",
 				   __func__, cma->name, count, ret);
 		cma_debug_show_areas(cma);
@@ -537,6 +541,7 @@ struct page *cma_alloc(struct cma *cma, unsigned long count,
 
 	pr_debug("%s(): returned %p\n", __func__, page);
 out:
+	trace_cma_alloc_finish(name, pfn, page, count, align);
 	if (page) {
 		count_vm_event(CMA_ALLOC_SUCCESS);
 		cma_sysfs_account_success_pages(cma, count);
@@ -547,6 +552,24 @@ out:
 	}
 
 	return page;
+}
+EXPORT_SYMBOL_GPL(__cma_alloc);
+
+/**
+ * cma_alloc() - allocate pages from contiguous area
+ * @cma:   Contiguous memory region for which the allocation is performed.
+ * @count: Requested number of pages.
+ * @align: Requested alignment of pages (in PAGE_SIZE order).
+ * @no_warn: Avoid printing message about failed allocation
+ *
+ * This function allocates part of contiguous memory on specific
+ * contiguous memory area.
+ */
+struct page *cma_alloc(struct cma *cma, unsigned long count,
+		       unsigned int align, bool no_warn)
+{
+	return __cma_alloc(cma, count, align, GFP_KERNEL |
+				(no_warn ? __GFP_NOWARN : 0));
 }
 EXPORT_SYMBOL_GPL(cma_alloc);
 

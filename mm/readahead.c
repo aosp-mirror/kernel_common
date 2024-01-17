@@ -167,6 +167,7 @@ static void read_pages(struct readahead_control *rac)
 		psi_memstall_enter(&rac->_pflags);
 	blk_start_plug(&plug);
 
+	trace_android_vh_read_pages(rac);
 	if (aops->readahead) {
 		aops->readahead(rac);
 		/*
@@ -590,6 +591,8 @@ static void ondemand_readahead(struct readahead_control *ractl,
 	 */
 	if (req_size > max_pages && bdi->io_pages > max_pages)
 		max_pages = min(req_size, bdi->io_pages);
+
+	trace_android_vh_ra_tuning_max_page(ractl, &max_pages);
 
 	/*
 	 * start of file

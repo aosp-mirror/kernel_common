@@ -1345,7 +1345,6 @@ static int flock_test(const char *mount_dir)
 	int fuse_dev = -1;
 	int fd = -1, fd2 = -1;
 	int backing_fd = -1;
-	char *addr = NULL;
 
 	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
 	     src_fd != -1);
@@ -2010,6 +2009,155 @@ static int bpf_test_lookup_postfilter(const char *mount_dir)
 	return result;
 }
 
+/**
+ * Test that a file made via create_and_open correctly gets the bpf assigned
+ * from the negative lookup
+ * bpf blocks file open, but also removes itself from children
+ * This test will fail if the 'remove' is unsuccessful
+ */
+static int bpf_test_create_and_remove_bpf(const char *mount_dir)
+{
+	const char *file = "file";
+
+	int result = TEST_FAILURE;
+	int src_fd = -1;
+	int bpf_fd = -1;
+	int fuse_dev = -1;
+	int fd = -1;
+	int fd2 = -1;
+
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TESTEQUAL(install_elf_bpf("test_bpf.bpf", "test_create_remove", &bpf_fd,
+				  NULL, NULL), 0);
+	TESTEQUAL(mount_fuse_no_init(mount_dir, bpf_fd, src_fd, &fuse_dev), 0);
+	TEST(fd = s_creat(s_path(s(mount_dir), s(file)), 0777),
+	     fd != -1);
+	TEST(fd2 = s_open(s_path(s(mount_dir), s(file)), O_RDONLY),
+	     fd2 != -1);
+
+	result = TEST_SUCCESS;
+out:
+	close(fd2);
+	close(fd);
+	close(fuse_dev);
+	close(bpf_fd);
+	close(src_fd);
+	umount(mount_dir);
+	return result;
+}
+
+static int bpf_test_mkdir_and_remove_bpf(const char *mount_dir)
+{
+	const char *dir = "dir";
+
+	int result = TEST_FAILURE;
+	int src_fd = -1;
+	int bpf_fd = -1;
+	int fuse_dev = -1;
+	int fd = -1;
+	int fd2 = -1;
+
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TESTEQUAL(install_elf_bpf("test_bpf.bpf", "test_mkdir_remove", &bpf_fd,
+				  NULL, NULL), 0);
+	TESTEQUAL(mount_fuse_no_init(mount_dir, bpf_fd, src_fd, &fuse_dev), 0);
+	TEST(fd = s_mkdir(s_path(s(mount_dir), s(dir)), 0777),
+	     fd != -1);
+	TEST(fd2 = s_open(s_path(s(mount_dir), s(dir)), O_RDONLY),
+	     fd2 != -1);
+
+	result = TEST_SUCCESS;
+out:
+	close(fd2);
+	close(fd);
+	close(fuse_dev);
+	close(bpf_fd);
+	close(src_fd);
+	umount(mount_dir);
+	return result;
+}
+
+static int bpf_test_readahead(const char *mount_dir)
+{
+	const char *file_name = "file";
+
+	int result = TEST_FAILURE;
+	int file_fd = -1;
+	int src_fd = -1;
+	int fuse_dev = -1;
+
+	TEST(file_fd = s_creat(s_path(s(ft_src), s(file_name)), 0777),
+	     file_fd != -1);
+	TESTSYSCALL(fallocate(file_fd, 0, 0, 4096));
+	TESTSYSCALL(close(file_fd));
+	file_fd = -1;
+
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TEST(fuse_dev = open("/dev/fuse", O_RDWR | O_CLOEXEC), fuse_dev != -1);
+	TESTEQUAL(mount_fuse(mount_dir, -1, src_fd, &fuse_dev), 0);
+
+	TEST(file_fd = s_open(s_path(s(mount_dir), s(file_name)), O_RDONLY),
+	     file_fd != -1);
+	TESTSYSCALL(posix_fadvise(file_fd, 0, 4096, POSIX_FADV_WILLNEED));
+	usleep(1000);
+	TESTSYSCALL(close(file_fd));
+	file_fd = -1;
+	result = TEST_SUCCESS;
+out:
+	umount(mount_dir);
+	close(fuse_dev);
+	close(src_fd);
+	close(file_fd);
+	return result;
+}
+
+/**
+ * Test that fuse passthrough correctly traverses a mount point on the lower fs
+ */
+static int bpf_test_follow_mounts(const char *mount_dir)
+{
+	const char *bind_src = "bind_src";
+	const char *bind_dst = "bind_dst";
+	const char *file = "file";
+	int fd = -1;
+	int src_fd = -1;
+	int result = TEST_FAILURE;
+
+	TESTSYSCALL(s_mkdir(s_path(s(ft_src), s(bind_src)), 0777));
+	TESTSYSCALL(s_mkdir(s_path(s(ft_src), s(bind_dst)), 0777));
+	TEST(fd = s_creat(s_pathn(3, s(ft_src), s(bind_src), s(file)), 0777),
+	     fd != -1);
+	TESTSYSCALL(close(fd));
+	fd = -1;
+	TESTSYSCALL(s_mount(s_path(s(ft_src), s(bind_src)),
+			    s_path(s(ft_src), s(bind_dst)),
+			    s(NULL), MS_BIND, s(NULL)));
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TESTEQUAL(mount_fuse_no_init(mount_dir, -1, src_fd, NULL), 0);
+	TEST(fd = s_open(s_pathn(3, s(mount_dir), s(bind_src), s(file)),
+			 O_RDONLY),
+	     fd != -1);
+	TESTSYSCALL(close(fd));
+	fd = -1;
+	TEST(fd = s_open(s_pathn(3, s(mount_dir), s(bind_dst), s(file)),
+			 O_RDONLY),
+	     fd != -1);
+	TESTSYSCALL(close(fd));
+	fd = -1;
+
+	result = TEST_SUCCESS;
+out:
+	umount(mount_dir);
+	close(src_fd);
+	s_umount(s_path(s(ft_src), s(bind_dst)));
+	close(fd);
+	return result;
+}
+
 static void parse_range(const char *ranges, bool *run_test, size_t tests)
 {
 	size_t i;
@@ -2137,6 +2285,10 @@ int main(int argc, char *argv[])
 		MAKE_TEST(bpf_test_revalidate_handle_backing_fd),
 		MAKE_TEST(bpf_test_lookup_postfilter),
 		MAKE_TEST(flock_test),
+		MAKE_TEST(bpf_test_create_and_remove_bpf),
+		MAKE_TEST(bpf_test_mkdir_and_remove_bpf),
+		MAKE_TEST(bpf_test_readahead),
+		MAKE_TEST(bpf_test_follow_mounts),
 	};
 #undef MAKE_TEST
 

@@ -39,6 +39,8 @@
 #include <linux/rculist.h>
 #include <net/busy_poll.h>
 
+#include <trace/hooks/fs.h>
+
 /*
  * LOCKING:
  * There are three level of locking required by epoll :
@@ -1373,15 +1375,20 @@ static int ep_create_wakeup_source(struct epitem *epi)
 {
 	struct name_snapshot n;
 	struct wakeup_source *ws;
+	char ws_name[64];
 
+	strlcpy(ws_name, "eventpoll", sizeof(ws_name));
+	trace_android_vh_ep_create_wakeup_source(ws_name, sizeof(ws_name));
 	if (!epi->ep->ws) {
-		epi->ep->ws = wakeup_source_register(NULL, "eventpoll");
+		epi->ep->ws = wakeup_source_register(NULL, ws_name);
 		if (!epi->ep->ws)
 			return -ENOMEM;
 	}
 
 	take_dentry_name_snapshot(&n, epi->ffd.file->f_path.dentry);
-	ws = wakeup_source_register(NULL, n.name.name);
+	strlcpy(ws_name, n.name.name, sizeof(ws_name));
+	trace_android_vh_ep_create_wakeup_source(ws_name, sizeof(ws_name));
+	ws = wakeup_source_register(NULL, ws_name);
 	release_dentry_name_snapshot(&n);
 
 	if (!ws)
@@ -1760,7 +1767,11 @@ static int ep_autoremove_wake_function(struct wait_queue_entry *wq_entry,
 {
 	int ret = default_wake_function(wq_entry, mode, sync, key);
 
-	list_del_init(&wq_entry->entry);
+	/*
+	 * Pairs with list_empty_careful in ep_poll, and ensures future loop
+	 * iterations see the cause of this wakeup.
+	 */
+	list_del_init_careful(&wq_entry->entry);
 	return ret;
 }
 
