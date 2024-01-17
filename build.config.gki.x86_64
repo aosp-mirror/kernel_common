@@ -1,6 +1,7 @@
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.common
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.x86_64
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.gki
+. ${ROOT_DIR}/${KERNEL_DIR}/build.config.experimental
 
 BUILD_SYSTEM_DLKM=1
 

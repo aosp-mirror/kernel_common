@@ -1,0 +1,9 @@
+DEFCONFIG=microdroid_gki_defconfig
+FRAGMENT_CONFIG=${KERNEL_DIR}/arch/${ARCH%%_64}/configs/microdroid_gki.fragment
+PRE_DEFCONFIG_CMDS="mkdir -p \${OUT_DIR}/arch/${ARCH%%_64}/configs && \
+    KCONFIG_CONFIG=\${OUT_DIR}/arch/${ARCH%%_64}/configs/${DEFCONFIG} \
+        ${ROOT_DIR}/${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -r \
+        ${ROOT_DIR}/${KERNEL_DIR}/arch/${ARCH%%_64}/configs/gki_defconfig \
+        ${ROOT_DIR}/${FRAGMENT_CONFIG} && \
+    true"
+POST_DEFCONFIG_CMDS=""
