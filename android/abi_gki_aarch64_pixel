@@ -625,6 +625,7 @@
   drm_bridge_remove
   drm_compat_ioctl
   drm_connector_atomic_hdr_metadata_equal
+  drm_connector_attach_content_protection_property
   drm_connector_attach_encoder
   drm_connector_attach_hdr_output_metadata_property
   drm_connector_attach_max_bpc_property
@@ -693,6 +694,7 @@
   drm_gem_vm_close
   drm_gem_vm_open
   drm_get_format_info
+  drm_hdcp_update_content_protection
   drm_hdmi_infoframe_set_hdr_metadata
   drm_helper_mode_fill_fb_struct
   drm_helper_probe_single_connector_modes
@@ -1141,11 +1143,11 @@
   kernel_param_lock
   kernel_param_unlock
   kernel_restart
-  kern_mount
-  kern_unmount
   kernfs_find_and_get_ns
   kernfs_notify
   kernfs_put
+  kern_mount
+  kern_unmount
   key_create_or_update
   key_put
   keyring_alloc
@@ -1246,6 +1248,7 @@
   log_threaded_irq_wakeup_reason
   loops_per_jiffy
   mac_pton
+  max_load_balance_interval
   mbox_chan_received_data
   mbox_controller_register
   mbox_controller_unregister
@@ -1689,6 +1692,7 @@
   register_inet6addr_notifier
   register_inetaddr_notifier
   register_kernel_break_hook
+  register_kretprobe
   register_netdev
   register_netdevice
   register_netdevice_notifier
@@ -1990,6 +1994,7 @@
   srcu_notifier_chain_unregister
   sscanf
   __stack_chk_fail
+  static_key_count
   static_key_disable
   static_key_enable
   static_key_slow_dec
@@ -2038,6 +2043,7 @@
   syscon_regmap_lookup_by_phandle
   sysctl_sched_features
   sysctl_sched_latency
+  sysctl_sched_min_granularity
   sysfs_add_file_to_group
   sysfs_add_link_to_group
   sysfs_create_file_ns
@@ -2455,6 +2461,7 @@
   unregister_chrdev_region
   unregister_inet6addr_notifier
   unregister_inetaddr_notifier
+  unregister_kretprobe
   unregister_netdev
   unregister_netdevice_many
   unregister_netdevice_notifier
@@ -2507,6 +2514,7 @@
   usb_put_hcd
   usb_register_notify
   usb_remove_hcd
+  usb_role_string
   usb_role_switch_get_drvdata
   usb_role_switch_register
   usb_role_switch_unregister
