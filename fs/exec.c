@@ -74,7 +74,9 @@
 #include "internal.h"
 
 #include <trace/events/sched.h>
+#ifndef __GENKSYMS__
 #include <trace/hooks/sched.h>
+#endif
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(task_rename);
 
