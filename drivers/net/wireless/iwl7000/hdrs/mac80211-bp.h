@@ -2285,6 +2285,12 @@ ssize_t wiphy_locked_debugfs_write(struct wiphy *wiphy, struct file *file,
 #endif
 #endif /* < 6.7.0 */
 
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,2)
+#define cfg80211_bss_proberesp_ecsa_stuck(bss) false
+#else
+#define cfg80211_bss_proberesp_ecsa_stuck(bss) (bss->proberesp_ecsa_stuck)
+#endif
+
 #if CFG80211_VERSION < KERNEL_VERSION(6,9,0)
 int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width);
 int cfg80211_chandef_primary(const struct cfg80211_chan_def *chandef,
