@@ -2219,6 +2219,12 @@ void iwl_mvm_rx_ba_notif(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
 				 tfd_cnt, pkt_len))
 			return;
 
+		IWL_DEBUG_TX_REPLY(mvm,
+				   "BA_NOTIFICATION Received from sta_id = %d, flags %x, sent:%d, acked:%d\n",
+				   sta_id, le32_to_cpu(ba_res->flags),
+				   le16_to_cpu(ba_res->txed),
+				   le16_to_cpu(ba_res->done));
+
 		rcu_read_lock();
 
 		mvmsta = iwl_mvm_sta_from_staid_rcu(mvm, sta_id);
@@ -2254,12 +2260,6 @@ void iwl_mvm_rx_ba_notif(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
 			iwl_mvm_tx_airtime(mvm, mvmsta,
 					   le32_to_cpu(ba_res->wireless_time));
 		rcu_read_unlock();
-
-		IWL_DEBUG_TX_REPLY(mvm,
-				   "BA_NOTIFICATION Received from sta_id = %d, flags %x, sent:%d, acked:%d\n",
-				   sta_id, le32_to_cpu(ba_res->flags),
-				   le16_to_cpu(ba_res->txed),
-				   le16_to_cpu(ba_res->done));
 		return;
 	}
 
@@ -2291,9 +2291,6 @@ void iwl_mvm_rx_ba_notif(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
 
 	rcu_read_unlock();
 
-	iwl_mvm_tx_reclaim(mvm, sta_id, tid, txq, index, &ba_info,
-			   tid_data->rate_n_flags, false);
-
 	IWL_DEBUG_TX_REPLY(mvm,
 			   "BA_NOTIFICATION Received from %pM, sta_id = %d\n",
 			   ba_notif->sta_addr, ba_notif->sta_id);
@@ -2306,6 +2303,9 @@ void iwl_mvm_rx_ba_notif(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
 
 	IWL_DEBUG_TX_REPLY(mvm, "reduced txp from ba notif %d\n",
 			   ba_notif->reduced_txp);
+
+	iwl_mvm_tx_reclaim(mvm, sta_id, tid, txq, index, &ba_info,
+			   tid_data->rate_n_flags, false);
 }
 
 /*
