@@ -888,26 +888,17 @@ struct mgmt_cp_mesh_send_cancel {
 #define MGMT_SCO_CODEC_MSBC_TRANSPARENT		0x2
 #define MGMT_SCO_CODEC_MSBC			0x3
 
-struct mgmt_bt_codec {
-	__u8	codec;
-	__u8	packet_size;
-	__u8	data_path;
-	__u32	data_length;
-	__u8	data[];
-} __packed;
-
 struct mgmt_cp_get_codec_capabilities {
 	__u16	hci_id;
-	__u32	num_codecs;
-	__u8	codecs[];
 } __packed;
-#define MGMT_GET_SCO_CODEC_CAPABILITIES_SIZE	0x6
+#define MGMT_GET_SCO_CODEC_CAPABILITIES_SIZE	0x2
 
 struct mgmt_rp_get_codec_capabilities {
-	__u16			hci_id;
-	__u8			offload_capable;
-	__u32			num_codecs;
-	struct mgmt_bt_codec	codecs[];
+	__u16	hci_id;
+	__u8	transparent_wbs_supported;
+	// This refers to the offload path when it's non-zero.
+	__u8	hci_data_path_id;
+	__u32	wbs_pkt_len;
 } __packed;
 
 #define MGMT_OP_NOTIFY_SCO_CONNECTION_CHANGE	0x0101
