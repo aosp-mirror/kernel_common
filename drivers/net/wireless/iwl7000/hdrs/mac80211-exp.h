@@ -30,6 +30,9 @@
 #define wiphy_delayed_work_queue __iwl7000_wiphy_delayed_work_queue
 #define wiphy_delayed_work_cancel __iwl7000_wiphy_delayed_work_cancel
 #endif /* CFG80211_VERSION < KERNEL_VERSION(6,5,0) */
+#if CFG80211_VERSION < KERNEL_VERSION(6,8,0)
+#define nl80211_chan_width_to_mhz __iwl7000_nl80211_chan_width_to_mhz
+#endif /* cfg < 6.8 */
 #if CFG80211_VERSION < KERNEL_VERSION(5,6,0)
 #define ieee80211_get_vht_max_nss __iwl7000_ieee80211_get_vht_max_nss
 #endif
