@@ -2521,6 +2521,12 @@ struct iwl_rfi_freq_table_resp_cmd *iwl_rfi_get_freq_table(struct iwl_mvm *mvm);
 void iwl_rfi_support_notif_handler(struct iwl_mvm *mvm,
 				   struct iwl_rx_cmd_buffer *rxb);
 
+static inline bool iwl_mvm_fw_rfi_state_supported(struct iwl_mvm *mvm)
+{
+	return mvm->fw_rfi_state == IWL_RFI_PMC_SUPPORTED ||
+	       mvm->fw_rfi_state == IWL_RFI_DDR_SUBSET_TABLE_READY;
+}
+
 static inline u8 iwl_mvm_phy_band_from_nl80211(enum nl80211_band band)
 {
 	switch((int)band) {

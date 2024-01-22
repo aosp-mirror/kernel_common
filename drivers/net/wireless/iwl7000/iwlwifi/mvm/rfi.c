@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2020 - 2023 Intel Corporation
+ * Copyright (C) 2020 - 2024 Intel Corporation
  */
 
 #include "mvm.h"
@@ -182,7 +182,7 @@ bool iwl_rfi_supported(struct iwl_mvm *mvm, bool so_rfi_mode, bool is_ddr)
 
 	return (is_ddr ? ddr_capa : dlvr_capa) && mvm->bios_enable_rfi &&
 		rfi_enable_mac_type && mvm->trans->trans_cfg->integrated &&
-		mvm->fw_rfi_state == IWL_RFI_PMC_SUPPORTED;
+		iwl_mvm_fw_rfi_state_supported(mvm);
 }
 
 int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
@@ -356,6 +356,9 @@ void iwl_rfi_support_notif_handler(struct iwl_mvm *mvm,
 
 	mvm->fw_rfi_state = le32_to_cpu(notif->reason);
 	switch (mvm->fw_rfi_state) {
+	case IWL_RFI_DDR_SUBSET_TABLE_READY:
+		IWL_DEBUG_FW(mvm, "RFIm, DDR subset table ready\n");
+		break;
 	case IWL_RFI_PMC_SUPPORTED:
 		IWL_DEBUG_FW(mvm, "RFIm, PMC supported\n");
 		break;

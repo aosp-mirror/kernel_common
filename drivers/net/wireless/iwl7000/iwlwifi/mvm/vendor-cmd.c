@@ -626,8 +626,7 @@ static int iwl_vendor_rfi_set_cnvi_master(struct wiphy *wiphy,
 		/* By-pass sending of RFI_CONFIG command, if user space
 		 * takes control when "fw_rfi_state" is not PMC_SUPPORTED.
 		 */
-		if (mvm->fw_rfi_state == IWL_RFI_PMC_SUPPORTED ||
-		    mvm->rfi_wlan_master)
+		if (mvm->rfi_wlan_master || iwl_mvm_fw_rfi_state_supported(mvm))
 			err = iwl_rfi_send_config_cmd(mvm, NULL, true, false);
 	} else {
 		IWL_ERR(mvm,

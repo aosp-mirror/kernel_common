@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
- * Copyright (C) 2020-2021, 2023 Intel Corporation
+ * Copyright (C) 2020-2021, 2023-2024 Intel Corporation
  */
 #ifndef __iwl_fw_api_rfi_h__
 #define __iwl_fw_api_rfi_h__
@@ -80,6 +80,7 @@ struct iwl_rfi_freq_table_resp_cmd {
  * @IWL_RFI_MAX_RESETS_DONE: Failure due to max resets
  * @IWL_RFI_PMC_SUPPORTED: PMC supported
  * @IWL_RFI_PMC_NOT_SUPPORTED: PMC not supported
+ * @IWL_RFI_DDR_SUBSET_TABLE_READY: PMC supported and DDR subset table is ready
  */
 enum iwl_rfi_support_reason {
 	IWL_RFI_RESET_FAILURE_SEND_TO_PEER,
@@ -88,6 +89,7 @@ enum iwl_rfi_support_reason {
 	IWL_RFI_MAX_RESETS_DONE,
 	IWL_RFI_PMC_SUPPORTED,
 	IWL_RFI_PMC_NOT_SUPPORTED,
+	IWL_RFI_DDR_SUBSET_TABLE_READY,
 };
 
 /**
