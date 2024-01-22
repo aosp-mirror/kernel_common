@@ -2615,8 +2615,14 @@ static ssize_t iwl_dbgfs_rfi_freq_table_write(struct iwl_mvm *mvm, char *buf,
  * the table; So, need 5 chars for the "freq: " part and each tuple afterwards
  * needs 6 characters for numbers and 5 for the punctuation around.
  */
-#define IWL_RFI_BUF_SIZE (IWL_RFI_LUT_INSTALLED_SIZE *\
-				(5 + IWL_RFI_LUT_ENTRY_CHANNELS_NUM * (6 + 5)))
+#define IWL_RFI_DDR_BUF_SIZE (IWL_RFI_DDR_LUT_INSTALLED_SIZE *\
+				(5 + IWL_RFI_DDR_LUT_ENTRY_CHANNELS_NUM *\
+					(6 + 5)))
+#define IWL_RFI_DLVR_BUF_SIZE (IWL_RFI_DLVR_LUT_INSTALLED_SIZE *\
+				(5 + IWL_RFI_DLVR_LUT_ENTRY_CHANNELS_NUM *\
+					(6 + 5)))
+/* Extra 32 for "DDR and DLVR table" message */
+#define IWL_RFI_BUF_SIZE (IWL_RFI_DDR_BUF_SIZE + IWL_RFI_DLVR_BUF_SIZE + 32)
 
 static ssize_t iwl_dbgfs_rfi_freq_table_read(struct file *file,
 					     char __user *user_buf,
@@ -2625,34 +2631,62 @@ static ssize_t iwl_dbgfs_rfi_freq_table_read(struct file *file,
 	struct iwl_mvm *mvm = file->private_data;
 	struct iwl_rfi_freq_table_resp_cmd *resp;
 	u32 status;
-	char buf[IWL_RFI_BUF_SIZE];
-	int i, j, pos = 0;
+	char *buf;
+	int i, j, pos = 0, bufsz = IWL_RFI_BUF_SIZE;
+	size_t ret;
+	u8 notif_ver = iwl_fw_lookup_notif_ver(mvm->fw, SYSTEM_GROUP,
+					       RFI_GET_FREQ_TABLE_CMD, 0);
 
 	resp = iwl_rfi_get_freq_table(mvm);
 	if (IS_ERR(resp))
 		return PTR_ERR(resp);
 
+	buf = kzalloc(bufsz, GFP_KERNEL);
+	if (!buf) {
+		kfree(resp);
+		return -ENOMEM;
+	}
+
 	status = le32_to_cpu(resp->status);
 	if (status != RFI_FREQ_TABLE_OK) {
-		scnprintf(buf, IWL_RFI_BUF_SIZE, "status = %d\n", status);
+		pos = scnprintf(buf, bufsz, "status = %d\n", status);
 		goto out;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(resp->table); i++) {
-		pos += scnprintf(buf + pos, IWL_RFI_BUF_SIZE - pos, "%d: ",
-				 resp->table[i].freq);
+	pos = scnprintf(buf + pos, bufsz - pos, "DDR table:\n");
+	for (i = 0; i < ARRAY_SIZE(resp->ddr_table); i++) {
+		pos += scnprintf(buf + pos, bufsz - pos, "%u: ",
+				 le16_to_cpu(resp->ddr_table[i].freq));
 
-		for (j = 0; j < ARRAY_SIZE(resp->table[i].channels); j++)
-			pos += scnprintf(buf + pos, IWL_RFI_BUF_SIZE - pos,
-					 "(%d, %d) ",
-					 resp->table[i].channels[j],
-					 resp->table[i].bands[j]);
-		pos += scnprintf(buf + pos, IWL_RFI_BUF_SIZE - pos, "\n");
+		for (j = 0; j < ARRAY_SIZE(resp->ddr_table[0].channels); j++)
+			pos += scnprintf(buf + pos, bufsz - pos,
+					 "(%u, %u) ",
+					 resp->ddr_table[i].channels[j],
+					 resp->ddr_table[i].bands[j]);
+		pos += scnprintf(buf + pos, bufsz - pos, "\n");
+	}
+
+	if (notif_ver < 2)
+		goto out;
+
+	pos += scnprintf(buf + pos, bufsz - pos, "DLVR table:\n");
+	for (i = 0; i < ARRAY_SIZE(resp->dlvr_table); i++) {
+		pos += scnprintf(buf + pos, bufsz - pos, "%u: ",
+				 le16_to_cpu(resp->dlvr_table[i].freq));
+
+		for (j = 0; j < ARRAY_SIZE(resp->dlvr_table[0].channels); j++)
+			pos += scnprintf(buf + pos, bufsz - pos,
+					 "(%u, %u) ",
+					 resp->dlvr_table[i].channels[j],
+					 resp->dlvr_table[i].bands[j]);
+		pos += scnprintf(buf + pos, bufsz - pos, "\n");
 	}
 
 out:
 	kfree(resp);
-	return simple_read_from_buffer(user_buf, count, ppos, buf, pos);
+	ret = simple_read_from_buffer(user_buf, count, ppos, buf, pos);
+	kfree(buf);
+	return ret;
 }
 
 MVM_DEBUGFS_READ_WRITE_FILE_OPS(prph_reg, 64);

@@ -446,7 +446,7 @@ static int iwl_vendor_rfi_ddr_get_table(struct wiphy *wiphy,
 {
 	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
-	struct iwl_rfi_freq_table_resp_cmd *resp;
+	struct iwl_rfi_freq_table_resp_cmd_v1 *resp;
 	struct sk_buff *skb = NULL;
 	struct nlattr *rfim_info;
 	int i, ret;
@@ -474,15 +474,15 @@ static int iwl_vendor_rfi_ddr_get_table(struct wiphy *wiphy,
 		goto err;
 	}
 
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < ARRAY_SIZE(resp->ddr_table); i++) {
 		if (nla_put_u16(skb, IWL_MVM_VENDOR_ATTR_RFIM_FREQ,
-				le16_to_cpu(resp->table[i].freq)) ||
+				le16_to_cpu(resp->ddr_table[i].freq)) ||
 		    nla_put(skb, IWL_MVM_VENDOR_ATTR_RFIM_CHANNELS,
-			    sizeof(resp->table[i].channels),
-			    resp->table[i].channels) ||
+			    sizeof(resp->ddr_table[i].channels),
+			    resp->ddr_table[i].channels) ||
 		    nla_put(skb, IWL_MVM_VENDOR_ATTR_RFIM_BANDS,
-			    sizeof(resp->table[i].bands),
-			    resp->table[i].bands)) {
+			    sizeof(resp->ddr_table[i].bands),
+			    resp->ddr_table[i].bands)) {
 			ret = -ENOBUFS;
 			goto err;
 		}
@@ -505,7 +505,7 @@ static int iwl_vendor_rfi_ddr_set_table(struct wiphy *wiphy,
 {
 	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
-	struct iwl_rfi_lut_entry *rfi_ddr_table = NULL;
+	struct iwl_rfi_ddr_lut_entry *rfi_ddr_table = NULL;
 	struct nlattr **tb;
 	struct nlattr *attr;
 	int rem, err = 0;

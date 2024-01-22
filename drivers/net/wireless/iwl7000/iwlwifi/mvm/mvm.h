@@ -2521,9 +2521,9 @@ u32 iwl_mvm_get_sec_flags(struct iwl_mvm *mvm,
 
 bool iwl_rfi_supported(struct iwl_mvm *mvm, bool so_rfi_mode, bool is_ddr);
 int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
-			    struct iwl_rfi_lut_entry *rfi_table,
+			    struct iwl_rfi_ddr_lut_entry *rfi_table,
 			    bool is_set_master_cmd, bool force_send_table);
-struct iwl_rfi_freq_table_resp_cmd *iwl_rfi_get_freq_table(struct iwl_mvm *mvm);
+void *iwl_rfi_get_freq_table(struct iwl_mvm *mvm);
 void iwl_rfi_support_notif_handler(struct iwl_mvm *mvm,
 				   struct iwl_rx_cmd_buffer *rxb);
 

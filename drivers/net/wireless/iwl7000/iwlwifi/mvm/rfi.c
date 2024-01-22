@@ -11,7 +11,7 @@
  * frequency values in the adjusted format.
  */
 static const
-struct iwl_rfi_lut_entry iwl_rfi_ddr_table[IWL_RFI_DDR_LUT_SIZE] = {
+struct iwl_rfi_ddr_lut_entry iwl_rfi_ddr_table[IWL_RFI_DDR_LUT_SIZE] = {
 	/* frequency 2600MHz */
 	{cpu_to_le16(156), {34, 36, 38, 40, 42, 50},
 	      {PHY_BAND_5, PHY_BAND_5, PHY_BAND_5, PHY_BAND_5, PHY_BAND_5,
@@ -186,7 +186,7 @@ bool iwl_rfi_supported(struct iwl_mvm *mvm, bool so_rfi_mode, bool is_ddr)
 }
 
 int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
-			    struct iwl_rfi_lut_entry *rfi_ddr_table,
+			    struct iwl_rfi_ddr_lut_entry *rfi_ddr_table,
 			    bool is_set_master_cmd, bool force_send_table)
 {
 	struct iwl_rfi_config_cmd *cmd = NULL;
@@ -265,14 +265,16 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 		 */
 		if (!force_send_table && rfi_ddr_table &&
 		    mvm->iwl_prev_rfi_config_cmd &&
-		    !memcmp(rfi_ddr_table, mvm->iwl_prev_rfi_config_cmd->table,
-			    sizeof(mvm->iwl_prev_rfi_config_cmd->table))) {
+		    !memcmp(rfi_ddr_table,
+			    mvm->iwl_prev_rfi_config_cmd->ddr_table,
+			    sizeof(mvm->iwl_prev_rfi_config_cmd->ddr_table))) {
 			IWL_DEBUG_FW(mvm, "Skip RFI_CONFIG_CMD sending\n");
 			goto out;
 		/* send RFI_CONFIG_CMD to FW with OEM ddr table */
 		} else if (rfi_ddr_table) {
 			IWL_DEBUG_FW(mvm, "Sending oem DDR superset table\n");
-			memcpy(cmd->table, rfi_ddr_table, sizeof(cmd->table));
+			memcpy(cmd->ddr_table, rfi_ddr_table,
+			       sizeof(cmd->ddr_table));
 			/* notify FW the table is not the default one */
 			cmd->oem = 1;
 		/* send previous RFI_CONFIG_CMD once again as FW lost RFI DDR
@@ -283,8 +285,9 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 				     "Sending buffered %s DDR superset table\n",
 				     mvm->iwl_prev_rfi_config_cmd->oem ?
 					"oem" : "default");
-			memcpy(cmd->table, mvm->iwl_prev_rfi_config_cmd->table,
-			       sizeof(cmd->table));
+			memcpy(cmd->ddr_table,
+			       mvm->iwl_prev_rfi_config_cmd->ddr_table,
+			       sizeof(cmd->ddr_table));
 			cmd->oem = mvm->iwl_prev_rfi_config_cmd->oem;
 		/* don't send previous RFI_CONFIG_CMD as FW has same table */
 		} else if (mvm->iwl_prev_rfi_config_cmd) {
@@ -294,8 +297,8 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
 		} else {
 			IWL_DEBUG_FW(mvm,
 				     "Sending default DDR superset table\n");
-			memcpy(cmd->table, iwl_rfi_ddr_table,
-			       sizeof(cmd->table));
+			memcpy(cmd->ddr_table, iwl_rfi_ddr_table,
+			       sizeof(cmd->ddr_table));
 		}
 	}
 
@@ -318,15 +321,25 @@ out:
 	return ret;
 }
 
-struct iwl_rfi_freq_table_resp_cmd *iwl_rfi_get_freq_table(struct iwl_mvm *mvm)
+void *iwl_rfi_get_freq_table(struct iwl_mvm *mvm)
 {
-	struct iwl_rfi_freq_table_resp_cmd *resp;
-	int resp_size = sizeof(*resp);
+	void *resp;
+	int resp_size;
 	int ret;
 	struct iwl_host_cmd cmd = {
 		.id = WIDE_ID(SYSTEM_GROUP, RFI_GET_FREQ_TABLE_CMD),
 		.flags = CMD_WANT_SKB,
 	};
+	u8 notif_ver = iwl_fw_lookup_notif_ver(mvm->fw, SYSTEM_GROUP,
+					       RFI_GET_FREQ_TABLE_CMD,
+					       IWL_FW_CMD_VER_UNKNOWN);
+
+	if (notif_ver == 1)
+		resp_size = sizeof(struct iwl_rfi_freq_table_resp_cmd_v1);
+	else if (notif_ver == 2)
+		resp_size = sizeof(struct iwl_rfi_freq_table_resp_cmd);
+	else
+		return ERR_PTR(-EOPNOTSUPP);
 
 	if (!iwl_rfi_supported(mvm, mvm->force_enable_rfi, true))
 		return ERR_PTR(-EOPNOTSUPP);
