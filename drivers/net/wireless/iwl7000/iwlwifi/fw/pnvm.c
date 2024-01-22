@@ -463,12 +463,12 @@ int iwl_xvt_pnvm_load(struct iwl_trans *trans,
 						      LMPM2_NIC_EN_VEC_6);
 	reg_lmpm2_nic_isr6_aw = iwl_read_umac_prph(trans, LMPM2_NIC_ISR6);
 
-	IWL_INFO(trans, "DOORBELL en_bd:0x%x en_bw:0x%x en_aw:0x%x\n",
-		 reg_value_nic_en_isr6_bd, reg_value_nic_en_isr6_bw,
-		 reg_value_nic_en_isr6_aw);
-	IWL_INFO(trans, "DOORBELL lm_bd:0x%x lm_bw:0x%x lm_aw:0x%x ret:%d\n",
-		 reg_lmpm2_nic_isr6_bd, reg_lmpm2_nic_isr6_bw,
-		 reg_lmpm2_nic_isr6_aw, ret);
+	IWL_ERR(trans, "DOORBELL en_bd:0x%x en_bw:0x%x en_aw:0x%x\n",
+		reg_value_nic_en_isr6_bd, reg_value_nic_en_isr6_bw,
+		reg_value_nic_en_isr6_aw);
+	IWL_ERR(trans, "DOORBELL lm_bd:0x%x lm_bw:0x%x lm_aw:0x%x ret:%d\n",
+		reg_lmpm2_nic_isr6_bd, reg_lmpm2_nic_isr6_bw,
+		reg_lmpm2_nic_isr6_aw, ret);
 
 	return ret;
 }
