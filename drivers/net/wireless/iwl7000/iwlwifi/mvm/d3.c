@@ -1266,18 +1266,7 @@ static int __iwl_mvm_suspend(struct ieee80211_hw *hw,
 	mutex_lock(&mvm->mutex);
 
 	primary_link = iwl_mvm_get_primary_link(vif);
-	if (ieee80211_vif_is_mld(vif) && vif->cfg.assoc &&
-	    mvmvif->esr_active) {
-		/*
-		 * Select the 'best' link. May need to revisit, it seems
-		 * better to not optimize for throughput but rather
-		 * range, reliability and power here - and select
-		 * 2.4 GHz ...
-		 */
-		ret = ieee80211_set_active_links(vif, BIT(primary_link));
-		if (ret)
-			return ret;
-	}
+	iwl_mvm_block_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_WOWLAN, primary_link);
 
 	set_bit(IWL_MVM_STATUS_IN_D3, &mvm->status);
 
@@ -3466,6 +3455,8 @@ static int __iwl_mvm_resume(struct iwl_mvm *mvm, bool test)
 		if (ret < 0)
 			goto err;
 	}
+
+	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_WOWLAN);
 
 	/* after the successful handshake, we're out of D3 */
 	mvm->trans->system_pm_mode = IWL_PLAT_PM_MODE_DISABLED;
