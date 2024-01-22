@@ -341,7 +341,7 @@ int virtio_video_cmd_resource_create_object(
 	struct virtio_video_object_entry *ents);
 int virtio_video_cmd_resource_destroy_all(struct virtio_video *vv,
 					  struct virtio_video_stream *stream,
-					  uint32_t queue_type);
+					  enum virtio_video_queue_type queue_type);
 int virtio_video_cmd_resource_queue(struct virtio_video *vv, uint32_t stream_id,
 				    struct virtio_video_buffer *virtio_vb,
 				    uint32_t data_size[], uint8_t num_data_size,
