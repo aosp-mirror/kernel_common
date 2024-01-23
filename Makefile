@@ -168,6 +168,10 @@ endif
 
 mixed-build-prefix = $(if $(KBUILD_MIXED_TREE),$(KBUILD_MIXED_TREE)/)
 export KBUILD_MIXED_TREE
+# This is a hack for kleaf to set mixed-build-prefix within the execution of a make rule, e.g.
+# within __modinst_pre.
+# TODO(b/205893923): Revert this hack once it is properly handled.
+export mixed-build-prefix
 
 # backward compatibility
 KBUILD_EXTRA_WARN ?= $(KBUILD_ENABLE_EXTRA_GCC_CHECKS)
