@@ -843,8 +843,15 @@ static int _fuse_atomic_open(struct inode *dir, struct dentry *entry,
 		goto free_and_fallback;
 	}
 
-	if (!err && !outentry.nodeid)
+	if (!err && !outentry.nodeid) {
+		if (outentry.entry_valid) {
+			inode = NULL;
+			d_splice_alias(inode, entry);
+			fuse_change_entry_timeout(entry, &outentry);
+			goto free_and_no_open;
+		}
 		err = -ENOENT;
+	}
 
 	if (err)
 		goto out_free_ff;
@@ -991,6 +998,10 @@ free_and_fallback:
 	kfree(forget);
 fallback:
 	return fuse_create_open(dir, entry, file, flags, mode);
+free_and_no_open:
+	fuse_file_free(ff);
+	kfree(forget);
+	return finish_no_open(file, entry);
 }
 
 static int fuse_atomic_open(struct inode *dir, struct dentry *entry,
