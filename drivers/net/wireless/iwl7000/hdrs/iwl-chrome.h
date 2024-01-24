@@ -316,6 +316,9 @@ static inline void debugfs_create_xul(const char *name, umode_t mode,
 
 #if LINUX_VERSION_IS_LESS(5,11,0)
 
+#define KHZ_PER_MHZ		1000UL
+#define HZ_PER_MHZ		1000000UL
+
 enum rfkill_hard_block_reasons {
 	RFKILL_HARD_BLOCK_SIGNAL        = 1 << 0,
 	RFKILL_HARD_BLOCK_NOT_OWNER     = 1 << 1,

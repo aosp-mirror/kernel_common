@@ -1582,6 +1582,8 @@ int ieee80211_register_hw(struct ieee80211_hw *hw)
 	debugfs_hw_add(local);
 	rate_control_add_debugfs(local);
 
+	ieee80211_check_wbrf_support(local);
+
 	rtnl_lock();
 #if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
 	wiphy_lock(hw->wiphy);

@@ -1539,6 +1539,9 @@ static inline u64 skb_get_kcov_handle(struct sk_buff *skb)
 #ifndef CONFIG_LOCKDEP
 /* upstream since 5.11 in this exact same way - calls compile away */
 int lockdep_is_held(const void *);
+
+#define HZ_PER_KHZ		1000UL
+#define KHZ_PER_MHZ		1000UL
 #endif
 
 static inline void dev_sw_netstats_tx_add(struct net_device *dev,
@@ -2283,6 +2286,7 @@ ssize_t wiphy_locked_debugfs_write(struct wiphy *wiphy, struct file *file,
 #endif /* < 6.7.0 */
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,9,0)
+int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width);
 int cfg80211_chandef_primary(const struct cfg80211_chan_def *chandef,
 			     enum nl80211_chan_width primary_width,
 			     u16 *punctured);

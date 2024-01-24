@@ -462,7 +462,7 @@ EXPORT_SYMBOL_GPL(wiphy_delayed_work_cancel);
 #endif /* CFG80211_VERSION < KERNEL_VERSION(6,5,0) */
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,8,0)
-static int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width)
+int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width)
 {
 	int mhz;
 

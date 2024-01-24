@@ -239,6 +239,7 @@ static void accept_mfp(struct kunit *test)
 		set_bit(WLAN_STA_ASSOC, &sta._flags);
 
 	rx.skb = kunit_zalloc_skb(test, 128, GFP_KERNEL);
+	KUNIT_ASSERT_NOT_NULL(test, rx.skb);
 	status = IEEE80211_SKB_RXCB(rx.skb);
 
 	if (params->decrypted) {

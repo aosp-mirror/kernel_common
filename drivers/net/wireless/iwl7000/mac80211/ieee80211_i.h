@@ -92,11 +92,14 @@ enum ieee80211_status_data {
 	IEEE80211_STATUS_SUBDATA_MASK	= 0xff0,
 };
 
-/*
- * Keep a station's queues on the active list for deficit accounting purposes
- * if it was active or queued during the last 100ms
- */
-#define AIRTIME_ACTIVE_DURATION (HZ / 10)
+static inline bool
+ieee80211_sta_keep_active(struct sta_info *sta, u8 ac)
+{
+	/* Keep a station's queues on the active list for deficit accounting
+	 * purposes if it was active or queued during the last 100ms.
+	 */
+	return time_before_eq(jiffies, sta->airtime[ac].last_active + HZ / 10);
+}
 
 struct ieee80211_bss {
 	u32 device_ts_beacon, device_ts_presp;
@@ -1618,6 +1621,8 @@ struct ieee80211_local {
 
 	/* extended capabilities provided by mac80211 */
 	u8 ext_capa[8];
+
+	bool wbrf_supported;
 };
 
 static inline struct ieee80211_sub_if_data *
@@ -2707,10 +2712,15 @@ void ieee80211_process_neg_ttlm_res(struct ieee80211_sub_if_data *sdata,
 int ieee80211_req_neg_ttlm(struct ieee80211_sub_if_data *sdata,
 			   struct cfg80211_ttlm_params *params);
 
+void ieee80211_check_wbrf_support(struct ieee80211_local *local);
+void ieee80211_add_wbrf(struct ieee80211_local *local, struct cfg80211_chan_def *chandef);
+void ieee80211_remove_wbrf(struct ieee80211_local *local, struct cfg80211_chan_def *chandef);
+
 #if IS_ENABLED(CPTCFG_MAC80211_KUNIT_TEST)
 #define EXPORT_SYMBOL_IF_MAC80211_KUNIT(sym) EXPORT_SYMBOL_IF_KUNIT(sym)
 #define VISIBLE_IF_MAC80211_KUNIT
-ieee80211_rx_result ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx);
+ieee80211_rx_result
+ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx);
 #else
 #define EXPORT_SYMBOL_IF_MAC80211_KUNIT(sym)
 #define VISIBLE_IF_MAC80211_KUNIT static

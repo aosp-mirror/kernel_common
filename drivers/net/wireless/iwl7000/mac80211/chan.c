@@ -523,11 +523,16 @@ static void _ieee80211_change_chanctx(struct ieee80211_local *local,
 	}
 	if (!cfg80211_chandef_identical(&ctx->conf.ap, &chanreq->ap))
 		changed |= IEEE80211_CHANCTX_CHANGE_AP;
+
+	ieee80211_remove_wbrf(local, &ctx->conf.def);
+
 	ctx->conf.def = *chandef;
 	ctx->conf.ap = chanreq->ap;
 
 	/* check if min chanctx also changed */
 	changed |= _ieee80211_recalc_chanctx_min_def(local, ctx, rsvd_for);
+
+	ieee80211_add_wbrf(local, &ctx->conf.def);
 
 	drv_change_chanctx(local, ctx, changed);
 
@@ -650,6 +655,8 @@ static int ieee80211_add_chanctx(struct ieee80211_local *local,
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
+	ieee80211_add_wbrf(local, &ctx->conf.def);
+
 	/* turn idle off *before* setting channel -- some drivers need that */
 	changed = ieee80211_idle_off(local);
 	if (changed)
@@ -696,6 +703,8 @@ static void ieee80211_del_chanctx(struct ieee80211_local *local,
 	drv_remove_chanctx(local, ctx);
 
 	ieee80211_recalc_idle(local);
+
+	ieee80211_remove_wbrf(local, &ctx->conf.def);
 }
 
 static void ieee80211_free_chanctx(struct ieee80211_local *local,
