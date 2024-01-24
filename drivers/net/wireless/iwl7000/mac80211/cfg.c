@@ -4110,10 +4110,6 @@ __ieee80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 	if (sdata->wdev.cac_started)
 		return -EBUSY;
 
-	if (cfg80211_chandef_identical(&chanreq.oper,
-				       &sdata->vif.bss_conf.chanreq.oper))
-		return -EINVAL;
-
 	if (chandef_punctured(&chanreq.oper) && !sdata->vif.bss_conf.eht_support)
 		return -EINVAL;
 
