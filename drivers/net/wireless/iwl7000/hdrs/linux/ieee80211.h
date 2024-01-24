@@ -2802,6 +2802,10 @@ struct ieee80211_he_6ghz_oper {
 #define IEEE80211_MAX_NUM_PWR_LEVEL	8
 
 #define IEEE80211_TPE_MAX_POWER_COUNT	8
+#define IEEE80211_TPE_MAX_EIRP_COUNT		3
+#define IEEE80211_TPE_MAX_EIRP_PSD_COUNT	4
+#define IEEE80211_TPE_MAX_INTER_COUNT		4
+#define IEEE80211_TPE_MAX_CAT_COUNT		2
 
 /* transmit power interpretation type of transmit power envelope element */
 enum ieee80211_tx_power_intrpt_type {
@@ -2809,6 +2813,12 @@ enum ieee80211_tx_power_intrpt_type {
 	IEEE80211_TPE_LOCAL_EIRP_PSD,
 	IEEE80211_TPE_REG_CLIENT_EIRP,
 	IEEE80211_TPE_REG_CLIENT_EIRP_PSD,
+};
+
+/* category type of transmit power envelope element */
+enum ieee80211_tx_power_category {
+	IEEE80211_TPE_CAT_DEFAULT,
+	IEEE80211_TPE_CAT_SUB_DEV,
 };
 
 /**
@@ -2828,6 +2838,54 @@ struct ieee80211_tx_pwr_env {
 #define IEEE80211_TX_PWR_ENV_INFO_COUNT 0x7
 #define IEEE80211_TX_PWR_ENV_INFO_INTERPRET 0x38
 #define IEEE80211_TX_PWR_ENV_INFO_CATEGORY 0xC0
+
+/**
+ * ieee80211_tx_pwr_env_ok - validate the TPE element
+ * @pos: TPE element contents
+ * @elen: length of TPE element
+ * return: true if elen and parameter is in valid range
+ */
+static inline bool
+ieee80211_tx_pwr_env_ok(const u8 *pos, u8 elen)
+{
+	u8 count;
+	u8 interpret;
+	u8 category;
+	const struct ieee80211_tx_pwr_env *tx_pwr_env = (const void *)pos;
+	u8 info_len = offsetofend(typeof(*tx_pwr_env), tx_power_info);
+
+	if (elen < info_len)
+		return false;
+
+	count = u8_get_bits(tx_pwr_env->tx_power_info,
+			    IEEE80211_TX_PWR_ENV_INFO_COUNT);
+	interpret = u8_get_bits(tx_pwr_env->tx_power_info,
+				IEEE80211_TX_PWR_ENV_INFO_INTERPRET);
+	category = u8_get_bits(tx_pwr_env->tx_power_info,
+			       IEEE80211_TX_PWR_ENV_INFO_CATEGORY);
+
+	if (category > IEEE80211_TPE_CAT_SUB_DEV)
+		return false;
+
+	switch (interpret) {
+	case IEEE80211_TPE_LOCAL_EIRP:
+	case IEEE80211_TPE_REG_CLIENT_EIRP:
+		if (count > IEEE80211_TPE_MAX_EIRP_COUNT)
+			return false;
+		info_len += count + 1;
+		break;
+	case IEEE80211_TPE_LOCAL_EIRP_PSD:
+	case IEEE80211_TPE_REG_CLIENT_EIRP_PSD:
+		if (count > IEEE80211_TPE_MAX_EIRP_PSD_COUNT)
+			return false;
+		info_len += (count == 0 ? 1 : 1 << (count - 1));
+		break;
+	default:
+		return false;
+	}
+
+	return elen >= info_len;
+}
 
 /*
  * ieee80211_he_oper_size - calculate 802.11ax HE Operations IE size

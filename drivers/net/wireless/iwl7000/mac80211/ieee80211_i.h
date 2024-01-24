@@ -1729,7 +1729,8 @@ struct ieee802_11_elems {
 	const struct ieee80211_he_spr *he_spr;
 	const struct ieee80211_mu_edca_param_set *mu_edca_param_set;
 	const struct ieee80211_he_6ghz_capa *he_6ghz_capa;
-	const struct ieee80211_tx_pwr_env *tx_pwr_env[IEEE80211_TPE_MAX_IE_COUNT];
+	const struct ieee80211_tx_pwr_env *tx_pwr_env[IEEE80211_TPE_MAX_INTER_COUNT]
+						     [IEEE80211_TPE_MAX_CAT_COUNT];
 	const u8 *uora_element;
 	const u8 *mesh_id;
 	const u8 *peering;
@@ -1786,8 +1787,8 @@ struct ieee802_11_elems {
 	u8 perr_len;
 	u8 country_elem_len;
 	u8 bssid_index_len;
-	u8 tx_pwr_env_len[IEEE80211_TPE_MAX_IE_COUNT];
-	u8 tx_pwr_env_num;
+	u8 tx_pwr_env_len[IEEE80211_TPE_MAX_INTER_COUNT]
+			 [IEEE80211_TPE_MAX_CAT_COUNT];
 	u8 eht_cap_len;
 
 	/* mult-link element can be de-fragmented and thus u8 is not sufficient */

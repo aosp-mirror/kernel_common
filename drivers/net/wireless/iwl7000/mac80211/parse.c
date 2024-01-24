@@ -171,6 +171,22 @@ ieee80211_parse_extension_element(u32 *crc,
 		*crc = crc32_be(*crc, (void *)elem, elem->datalen + 2);
 }
 
+static void
+ieee80211_parse_tpe_element(struct ieee802_11_elems *elems,
+			    const u8 *pos, u8 elen)
+{
+	if (ieee80211_tx_pwr_env_ok(pos, elen)) {
+		const struct ieee80211_tx_pwr_env *tx_pwr_env = (const void *)pos;
+		u8 inte = u8_get_bits(tx_pwr_env->tx_power_info,
+				      IEEE80211_TX_PWR_ENV_INFO_INTERPRET);
+		u8 cat = u8_get_bits(tx_pwr_env->tx_power_info,
+				     IEEE80211_TX_PWR_ENV_INFO_CATEGORY);
+
+		elems->tx_pwr_env[inte][cat] = tx_pwr_env;
+		elems->tx_pwr_env_len[inte][cat] = elen;
+	}
+}
+
 static u32
 _ieee802_11_parse_elems_full(struct ieee80211_elems_parse_params *params,
 			     struct ieee802_11_elems *elems,
@@ -559,16 +575,7 @@ _ieee802_11_parse_elems_full(struct ieee80211_elems_parse_params *params,
 			elems->rsnx_len = elen;
 			break;
 		case WLAN_EID_TX_POWER_ENVELOPE:
-			if (elen < 1 ||
-			    elen > sizeof(struct ieee80211_tx_pwr_env))
-				break;
-
-			if (elems->tx_pwr_env_num >= ARRAY_SIZE(elems->tx_pwr_env))
-				break;
-
-			elems->tx_pwr_env[elems->tx_pwr_env_num] = (void *)pos;
-			elems->tx_pwr_env_len[elems->tx_pwr_env_num] = elen;
-			elems->tx_pwr_env_num++;
+			ieee80211_parse_tpe_element(elems, pos, elen);
 			break;
 		case WLAN_EID_EXTENSION:
 			ieee80211_parse_extension_element(calc_crc ?
