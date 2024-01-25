@@ -244,6 +244,9 @@ void init_build_id(struct module *mod, const struct load_info *info)
  */
 static inline int is_arm_mapping_symbol(const char *str)
 {
+	if (!strncmp("__kvm_nvhe_", str, 11))
+		str += 11;
+
 	if (str[0] == '.' && str[1] == 'L')
 		return true;
 	return str[0] == '$' && strchr("axtd", str[1]) &&
