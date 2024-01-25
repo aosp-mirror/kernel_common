@@ -1837,8 +1837,11 @@ static int ov08x40_start_streaming(struct ov08x40 *ov08x)
 	if (ov08x->cur_mode->exposure_shift == 1) {
 		ret = ov08x40_burst_fill_regs(ov08x, OV08X40_REG_XTALK_FIRST_A,
 					      OV08X40_REG_XTALK_LAST_A, 0x75);
-		ret = ov08x40_burst_fill_regs(ov08x, OV08X40_REG_XTALK_FIRST_B,
-					      OV08X40_REG_XTALK_LAST_B, 0x75);
+		if (ret == 0)
+			ret = ov08x40_burst_fill_regs(ov08x,
+						      OV08X40_REG_XTALK_FIRST_B,
+						      OV08X40_REG_XTALK_LAST_B,
+						      0x75);
 	}
 
 	if (ret) {
