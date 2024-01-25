@@ -984,11 +984,24 @@ static int mtk_drm_sys_prepare(struct device *dev)
 		return 0;
 }
 
+static void mtk_drm_mark_ctm_changed(struct drm_atomic_state *state)
+{
+	struct drm_crtc_state *crtc_state;
+	struct drm_crtc *crtc;
+	int i;
+
+	for_each_new_crtc_in_state(state, crtc, crtc_state, i)
+		crtc_state->color_mgmt_changed = true;
+}
+
 static void mtk_drm_sys_complete(struct device *dev)
 {
 	struct mtk_drm_private *private = dev_get_drvdata(dev);
 	struct drm_device *drm = private->drm;
 	int ret = 0;
+
+	/* make sure CTM gets re-applied on resume */
+	mtk_drm_mark_ctm_changed(drm->mode_config.suspend_state);
 
 	if (private->drm_master)
 		ret = drm_mode_config_helper_resume(drm);
