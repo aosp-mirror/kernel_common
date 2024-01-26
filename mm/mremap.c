@@ -226,7 +226,7 @@ static inline bool trylock_vma_ref_count(struct vm_area_struct *vma)
 	 * If we have the only reference, swap the refcount to -1. This
 	 * will prevent other concurrent references by get_vma() for SPFs.
 	 */
-	return atomic_cmpxchg(&vma->file_ref_count, 0, -1) == 0;
+	return atomic_cmpxchg_acquire(&vma->file_ref_count, 0, -1) == 0;
 }
 
 /*
@@ -234,12 +234,13 @@ static inline bool trylock_vma_ref_count(struct vm_area_struct *vma)
  */
 static inline void unlock_vma_ref_count(struct vm_area_struct *vma)
 {
+	int old = atomic_xchg_release(&vma->file_ref_count, 0);
+
 	/*
 	 * This should only be called after a corresponding,
 	 * successful trylock_vma_ref_count().
 	 */
-	VM_BUG_ON_VMA(atomic_cmpxchg(&vma->file_ref_count, -1, 0) != -1,
-		      vma);
+	VM_BUG_ON_VMA(old != -1, vma);
 }
 #else	/* !CONFIG_SPECULATIVE_PAGE_FAULT */
 static inline bool trylock_vma_ref_count(struct vm_area_struct *vma)
