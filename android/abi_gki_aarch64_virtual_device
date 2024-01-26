@@ -737,6 +737,7 @@
   kasprintf
   kobject_create_and_add
   pm_runtime_get_if_in_use
+  pm_runtime_get_if_active
   __pm_runtime_set_status
   regcache_cache_only
   regcache_sync
