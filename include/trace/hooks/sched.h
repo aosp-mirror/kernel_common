@@ -85,6 +85,10 @@ DECLARE_RESTRICTED_HOOK(android_rvh_set_user_nice,
 	TP_PROTO(struct task_struct *p, long *nice, bool *allowed),
 	TP_ARGS(p, nice, allowed), 1);
 
+DECLARE_RESTRICTED_HOOK(android_rvh_set_user_nice_locked,
+	TP_PROTO(struct task_struct *p, long *nice),
+	TP_ARGS(p, nice), 1);
+
 DECLARE_RESTRICTED_HOOK(android_rvh_setscheduler,
 	TP_PROTO(struct task_struct *p),
 	TP_ARGS(p), 1);
@@ -433,6 +437,11 @@ DECLARE_RESTRICTED_HOOK(android_rvh_detach_entity_load_avg,
 DECLARE_RESTRICTED_HOOK(android_rvh_update_load_avg,
 	TP_PROTO(u64 now, struct cfs_rq *cfs_rq, struct sched_entity *se),
 	TP_ARGS(now, cfs_rq, se), 1);
+
+
+DECLARE_RESTRICTED_HOOK(android_rvh_update_load_sum,
+	TP_PROTO(struct sched_avg *sa, u64 *delta, unsigned int *sched_pelt_lshift),
+	TP_ARGS(sa, delta, sched_pelt_lshift), 1);
 
 DECLARE_RESTRICTED_HOOK(android_rvh_remove_entity_load_avg,
 	TP_PROTO(struct cfs_rq *cfs_rq, struct sched_entity *se),

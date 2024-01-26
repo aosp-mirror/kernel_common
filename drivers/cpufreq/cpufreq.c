@@ -1445,6 +1445,8 @@ static int cpufreq_online(unsigned int cpu)
 			goto out_destroy_policy;
 		}
 
+		trace_android_vh_cpufreq_online(policy);
+
 		blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 				CPUFREQ_CREATE_POLICY, policy);
 	}

@@ -24,6 +24,10 @@ DECLARE_HOOK(android_vh_use_amu_fie,
 	TP_PROTO(bool *use_amu_fie),
 	TP_ARGS(use_amu_fie));
 
+DECLARE_RESTRICTED_HOOK(android_rvh_update_thermal_stats,
+	TP_PROTO(int cpu),
+	TP_ARGS(cpu), 1);
+
 #endif /* _TRACE_HOOK_TOPOLOGY_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>

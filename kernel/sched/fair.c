@@ -62,6 +62,7 @@ unsigned int sysctl_sched_tunable_scaling = SCHED_TUNABLESCALING_LOG;
  * (default: 0.75 msec * (1 + ilog(ncpus)), units: nanoseconds)
  */
 unsigned int sysctl_sched_min_granularity			= 750000ULL;
+EXPORT_SYMBOL_GPL(sysctl_sched_min_granularity);
 static unsigned int normalized_sysctl_sched_min_granularity	= 750000ULL;
 
 /*
@@ -4665,7 +4666,13 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	s64 delta;
 	bool skip_preempt = false;
 
-	ideal_runtime = sched_slice(cfs_rq, curr);
+	/*
+	 * When many tasks blow up the sched_period; it is possible that
+	 * sched_slice() reports unusually large results (when many tasks are
+	 * very light for example). Therefore impose a maximum.
+	 */
+	ideal_runtime = min_t(u64, sched_slice(cfs_rq, curr), sysctl_sched_latency);
+
 	delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
 	trace_android_rvh_check_preempt_tick(current, &ideal_runtime, &skip_preempt,
 			delta_exec, cfs_rq, curr, sysctl_sched_min_granularity);

@@ -4855,10 +4855,11 @@ static inline struct callback_head *splice_balance_callbacks(struct rq *rq)
 	return __splice_balance_callbacks(rq, true);
 }
 
-static void __balance_callbacks(struct rq *rq)
+void __balance_callbacks(struct rq *rq)
 {
 	do_balance_callbacks(rq, __splice_balance_callbacks(rq, false));
 }
+EXPORT_SYMBOL_GPL(__balance_callbacks);
 
 static inline void balance_callbacks(struct rq *rq, struct callback_head *head)
 {
@@ -7122,6 +7123,10 @@ void set_user_nice(struct task_struct *p, long nice)
 	 */
 	rq = task_rq_lock(p, &rf);
 	update_rq_clock(rq);
+
+	trace_android_rvh_set_user_nice_locked(p, &nice);
+	if (task_nice(p) == nice)
+		goto out_unlock;
 
 	/*
 	 * The RT priorities are set via sched_setscheduler(), but we still

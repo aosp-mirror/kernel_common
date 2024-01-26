@@ -215,10 +215,11 @@ static void gic_do_wait_for_rwp(void __iomem *base, u32 bit)
 }
 
 /* Wait for completion of a distributor change */
-static void gic_dist_wait_for_rwp(void)
+void gic_v3_dist_wait_for_rwp(void)
 {
 	gic_do_wait_for_rwp(gic_data.dist_base, GICD_CTLR_RWP);
 }
+EXPORT_SYMBOL_GPL(gic_v3_dist_wait_for_rwp);
 
 /* Wait for completion of a redistributor change */
 static void gic_redist_wait_for_rwp(void)
@@ -357,7 +358,7 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
 		rwp_wait = gic_redist_wait_for_rwp;
 	} else {
 		base = gic_data.dist_base;
-		rwp_wait = gic_dist_wait_for_rwp;
+		rwp_wait = gic_v3_dist_wait_for_rwp;
 	}
 
 	writel_relaxed(mask, base + offset + (index / 32) * 4);
@@ -589,7 +590,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 		rwp_wait = gic_redist_wait_for_rwp;
 	} else {
 		base = gic_data.dist_base;
-		rwp_wait = gic_dist_wait_for_rwp;
+		rwp_wait = gic_v3_dist_wait_for_rwp;
 	}
 
 	offset = convert_offset_index(d, GICD_ICFGR, &index);
@@ -792,7 +793,7 @@ static bool gic_has_group0(void)
 	return val != 0;
 }
 
-static void __init gic_dist_init(void)
+void gic_v3_dist_init(void)
 {
 	unsigned int i;
 	u64 affinity;
@@ -801,7 +802,7 @@ static void __init gic_dist_init(void)
 
 	/* Disable the distributor */
 	writel_relaxed(0, base + GICD_CTLR);
-	gic_dist_wait_for_rwp();
+	gic_v3_dist_wait_for_rwp();
 
 	/*
 	 * Configure SPIs as non-secure Group-1. This will only matter
@@ -828,7 +829,7 @@ static void __init gic_dist_init(void)
 		writel_relaxed(GICD_INT_DEF_PRI_X4, base + GICD_IPRIORITYRnE + i);
 
 	/* Now do the common stuff, and wait for the distributor to drain */
-	gic_dist_config(base, GIC_LINE_NR, gic_dist_wait_for_rwp);
+	gic_dist_config(base, GIC_LINE_NR, gic_v3_dist_wait_for_rwp);
 
 	val = GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1;
 	if (gic_data.rdists.gicd_typer2 & GICD_TYPER2_nASSGIcap) {
@@ -854,6 +855,7 @@ static void __init gic_dist_init(void)
 		gic_write_irouter(affinity, base + GICD_IROUTERnE + i * 8);
 	}
 }
+EXPORT_SYMBOL_GPL(gic_v3_dist_init);
 
 static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
 {
@@ -1135,7 +1137,7 @@ static int gic_dist_supports_lpis(void)
 		!gicv3_nolpi);
 }
 
-static void gic_cpu_init(void)
+void gic_v3_cpu_init(void)
 {
 	void __iomem *rbase;
 	int i;
@@ -1162,6 +1164,7 @@ static void gic_cpu_init(void)
 	/* initialise system registers */
 	gic_cpu_sys_reg_init();
 }
+EXPORT_SYMBOL_GPL(gic_v3_cpu_init);
 
 #ifdef CONFIG_SMP
 
@@ -1170,7 +1173,7 @@ static void gic_cpu_init(void)
 
 static int gic_starting_cpu(unsigned int cpu)
 {
-	gic_cpu_init();
+	gic_v3_cpu_init();
 
 	if (gic_dist_supports_lpis())
 		its_cpu_init();
@@ -1312,7 +1315,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	if (enabled)
 		gic_unmask_irq(d);
 	else
-		gic_dist_wait_for_rwp();
+		gic_v3_dist_wait_for_rwp();
 
 	irq_data_update_effective_affinity(d, cpumask_of(cpu));
 
@@ -1364,8 +1367,15 @@ void gic_resume(void)
 }
 EXPORT_SYMBOL_GPL(gic_resume);
 
+static int gic_v3_suspend(void)
+{
+	trace_android_vh_gic_v3_suspend(&gic_data);
+	return 0;
+}
+
 static struct syscore_ops gic_syscore_ops = {
 	.resume = gic_resume,
+	.suspend = gic_v3_suspend,
 };
 
 static void gic_syscore_init(void)
@@ -1376,6 +1386,7 @@ static void gic_syscore_init(void)
 #else
 static inline void gic_syscore_init(void) { }
 void gic_resume(void) { }
+static int gic_v3_suspend(void) { return 0; }
 #endif
 
 
@@ -1884,8 +1895,8 @@ static int __init gic_init_bases(void __iomem *dist_base,
 
 	gic_update_rdist_properties();
 
-	gic_dist_init();
-	gic_cpu_init();
+	gic_v3_dist_init();
+	gic_v3_cpu_init();
 	gic_smp_init();
 	gic_cpu_pm_init();
 	gic_syscore_init();

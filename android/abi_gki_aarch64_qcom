@@ -57,6 +57,7 @@
   badblocks_set
   badblocks_show
   badblocks_store
+  __balance_callbacks
   balance_push_callback
   bdev_check_media_change
   bdevname
@@ -824,6 +825,9 @@
   get_user_ifreq
   get_zeroed_page
   gf128mul_lle
+  gic_v3_cpu_init
+  gic_v3_dist_init
+  gic_v3_dist_wait_for_rwp
   gov_attr_set_init
   gov_attr_set_put
   governor_sysfs_ops
@@ -1311,6 +1315,7 @@
   mod_delayed_work_on
   mod_node_page_state
   mod_timer
+  mod_timer_pending
   __module_get
   module_layout
   module_put
@@ -2248,6 +2253,7 @@
   __traceiter_android_rvh_update_cpu_capacity
   __traceiter_android_rvh_update_cpus_allowed
   __traceiter_android_rvh_update_misfit_status
+  __traceiter_android_rvh_update_thermal_stats
   __traceiter_android_rvh_wake_up_new_task
   __traceiter_android_vh_audio_usb_offload_connect
   __traceiter_android_vh_binder_restore_priority
@@ -2268,6 +2274,7 @@
   __traceiter_android_vh_ftrace_size_check
   __traceiter_android_vh_gic_resume
   __traceiter_android_vh_handle_tlb_conf
+  __traceiter_android_vh_gic_v3_suspend
   __traceiter_android_vh_ipi_stop
   __traceiter_android_vh_jiffies_update
   __traceiter_android_vh_kswapd_per_node
@@ -2356,6 +2363,7 @@
   __tracepoint_android_rvh_update_cpu_capacity
   __tracepoint_android_rvh_update_cpus_allowed
   __tracepoint_android_rvh_update_misfit_status
+  __tracepoint_android_rvh_update_thermal_stats
   __tracepoint_android_rvh_wake_up_new_task
   __tracepoint_android_vh_audio_usb_offload_connect
   __tracepoint_android_vh_binder_restore_priority
@@ -2376,6 +2384,7 @@
   __tracepoint_android_vh_ftrace_size_check
   __tracepoint_android_vh_gic_resume
   __tracepoint_android_vh_handle_tlb_conf
+  __tracepoint_android_vh_gic_v3_suspend
   __tracepoint_android_vh_ipi_stop
   __tracepoint_android_vh_jiffies_update
   __tracepoint_android_vh_kswapd_per_node

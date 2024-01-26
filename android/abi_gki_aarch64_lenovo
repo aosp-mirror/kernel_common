@@ -372,6 +372,7 @@
   driver_register
   driver_unregister
   drm_add_modes_noedid
+  drm_atomic_get_crtc_state
   drm_atomic_helper_check
   drm_atomic_helper_cleanup_planes
   drm_atomic_helper_commit
@@ -394,8 +395,11 @@
   drm_atomic_helper_shutdown
   drm_atomic_helper_update_plane
   drm_atomic_helper_wait_for_flip_done
+  drm_atomic_helper_wait_for_vblanks
   drm_compat_ioctl
+  drm_connector_atomic_hdr_metadata_equal
   drm_connector_attach_encoder
+  drm_connector_attach_hdr_output_metadata_property
   drm_connector_cleanup
   drm_connector_init
   drm_connector_unregister
@@ -429,9 +433,11 @@
   drm_gem_prime_mmap
   drm_gem_vm_close
   drm_gem_vm_open
+  drm_hdmi_infoframe_set_hdr_metadata
   drm_helper_hpd_irq_event
   drm_helper_probe_single_connector_modes
   drm_ioctl
+  drm_kms_helper_hotplug_event
   drm_kms_helper_poll_fini
   drm_kms_helper_poll_init
   drmm_mode_config_init
@@ -443,6 +449,7 @@
   drm_mode_set_name
   drm_object_attach_property
   drm_of_component_match_add
+  drm_of_component_probe
   drm_of_find_possible_crtcs
   drm_open
   drm_panel_add
@@ -453,6 +460,7 @@
   drm_plane_cleanup
   drm_plane_create_alpha_property
   drm_plane_create_blend_mode_property
+  drm_plane_create_color_properties
   drm_plane_create_rotation_property
   drm_plane_create_zpos_immutable_property
   drm_poll
@@ -545,6 +553,8 @@
   handle_level_irq
   handle_simple_irq
   hashlen_string
+  hdmi_drm_infoframe_pack_only
+  hdmi_infoframe_pack
   hrtimer_active
   hrtimer_cancel
   hrtimer_forward
@@ -718,6 +728,7 @@
   mipi_dsi_packet_format_is_long
   misc_deregister
   misc_register
+  mmc_app_cmd
   __mmdrop
   mod_delayed_work_on
   mod_timer
@@ -1007,6 +1018,7 @@
   regulator_disable
   regulator_enable
   regulator_get_bypass_regmap
+  regulator_get_linear_step
   regulator_get_optional
   regulator_is_enabled
   regulator_put
@@ -1042,6 +1054,7 @@
   scnprintf
   sdhci_calc_clk
   sdhci_enable_clk
+  sdhci_execute_tuning
   sdhci_pltfm_clk_get_max_clock
   sdhci_pltfm_pmops
   sdhci_pltfm_suspend
@@ -1096,6 +1109,7 @@
   skb_queue_purge
   skb_queue_tail
   skb_trim
+  smp_call_function_any
   smp_call_function_single
   snd_card_ref
   snd_card_register
@@ -1266,6 +1280,7 @@
   __traceiter_android_rvh_flush_task
   __traceiter_android_rvh_migrate_queued_task
   __traceiter_android_rvh_new_task_stats
+  __traceiter_android_rvh_sched_balance_rt
   __traceiter_android_rvh_sched_cpu_dying
   __traceiter_android_rvh_sched_cpu_starting
   __traceiter_android_rvh_sched_exec
@@ -1279,7 +1294,10 @@
   __traceiter_android_rvh_update_cpus_allowed
   __traceiter_android_rvh_wake_up_new_task
   __traceiter_android_vh_binder_wakeup_ilocked
+  __traceiter_android_vh_cpufreq_online
+  __traceiter_android_vh_dup_task_struct
   __traceiter_android_vh_update_topology_flags_workfn
+  __traceiter_android_vh_use_amu_fie
   __traceiter_binder_transaction_received
   __traceiter_cpu_frequency_limits
   __tracepoint_android_rvh_account_irq
@@ -1292,6 +1310,7 @@
   __tracepoint_android_rvh_flush_task
   __tracepoint_android_rvh_migrate_queued_task
   __tracepoint_android_rvh_new_task_stats
+  __tracepoint_android_rvh_sched_balance_rt
   __tracepoint_android_rvh_sched_cpu_dying
   __tracepoint_android_rvh_sched_cpu_starting
   __tracepoint_android_rvh_sched_exec
@@ -1305,7 +1324,10 @@
   __tracepoint_android_rvh_update_cpus_allowed
   __tracepoint_android_rvh_wake_up_new_task
   __tracepoint_android_vh_binder_wakeup_ilocked
+  __tracepoint_android_vh_cpufreq_online
+  __tracepoint_android_vh_dup_task_struct
   __tracepoint_android_vh_update_topology_flags_workfn
+  __tracepoint_android_vh_use_amu_fie
   __tracepoint_binder_transaction_received
   __tracepoint_cpu_frequency_limits
   try_module_get
