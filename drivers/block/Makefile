@@ -41,4 +41,6 @@ obj-$(CONFIG_BLK_DEV_RNBD)	+= rnbd/
 
 obj-$(CONFIG_BLK_DEV_NULL_BLK)	+= null_blk/
 
+obj-$(CONFIG_RAM_BLK)	+= ram_blk/
+
 swim_mod-y	:= swim.o swim_asm.o

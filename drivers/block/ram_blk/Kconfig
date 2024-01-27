@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Ram block device driver configuration
+#
+
+config CONFIG_RAM_BLK
+	tristate "Ram block driver to debug request details such as segments"
+	default m
