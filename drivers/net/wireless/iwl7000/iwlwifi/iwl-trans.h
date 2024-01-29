@@ -1089,7 +1089,6 @@ struct iwl_trans {
 	const struct iwl_cfg_trans_params *trans_cfg;
 	const struct iwl_cfg *cfg;
 	struct iwl_drv *drv;
-	struct iwl_tm_gnl_dev *tmdev;
 	enum iwl_trans_state state;
 	unsigned long status;
 
@@ -1145,6 +1144,13 @@ struct iwl_trans {
 	enum iwl_plat_pm_mode system_pm_mode;
 
 #ifdef CPTCFG_IWLWIFI_DEVICE_TESTMODE
+	/**
+	 * @tmdev: testmode device data structure
+	 */
+	struct iwl_tm_gnl_dev *tmdev;
+	/**
+	 * @testmode: additional testmode data
+	 */
 	struct iwl_testmode testmode;
 #endif
 
