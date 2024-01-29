@@ -41,6 +41,15 @@
 #include "inode_mark.h"
 #include "utils.h"
 
+static int allow_overlayfs;
+
+static int __init allow_overlayfs_set(char *__unused)
+{
+	allow_overlayfs = 1;
+	return 1;
+}
+__setup("chromiumos.allow_overlayfs", allow_overlayfs_set);
+
 #if defined(CONFIG_SECURITY_CHROMIUMOS_NO_UNPRIVILEGED_UNSAFE_MOUNTS) || \
 	defined(CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT)
 static void report(const char *origin, const struct path *path, char *operation)
@@ -82,6 +91,13 @@ static int chromiumos_security_sb_mount(const char *dev_name,
 					const char *type, unsigned long flags,
 					void *data)
 {
+	if (!allow_overlayfs && type && !strcmp(type, "overlay")) {
+		report("sb_mount", path, "Overlayfs mounts prohibited");
+		pr_notice("sb_mount dev=%s type=%s flags=%#lx\n",
+			  dev_name, type, flags);
+		return -EPERM;
+	}
+
 #ifdef CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
 	if (!(path->link_count & PATH_LINK_COUNT_VALID)) {
 		WARN(1, "No link count available");
