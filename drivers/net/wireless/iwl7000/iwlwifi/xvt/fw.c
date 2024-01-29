@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2005-2014, 2018-2023 Intel Corporation
+ * Copyright (C) 2005-2014, 2018-2024 Intel Corporation
  * Copyright (C) 2015-2017 Intel Deutschland GmbH
  */
 #include "iwl-trans.h"
@@ -187,14 +187,15 @@ static int iwl_xvt_load_ucode_wait_alive(struct iwl_xvt *xvt,
 	if (!fw)
 		return -EINVAL;
 
+	if (xvt->sw_stack_cfg.fw_dbg_flags & ~IWL_XVT_DBG_FLAGS_NO_DEFAULT_TXQ)
+		return -EOPNOTSUPP;
+
 	iwl_init_notification_wait(&xvt->notif_wait, &alive_wait,
 				   alive_cmd, ARRAY_SIZE(alive_cmd),
 				   iwl_alive_fn, &alive_data);
 
-	ret = iwl_trans_start_fw_dbg(xvt->trans, fw,
-				     ucode_type == IWL_UCODE_INIT,
-				     (xvt->sw_stack_cfg.fw_dbg_flags &
-				     ~IWL_XVT_DBG_FLAGS_NO_DEFAULT_TXQ));
+	ret = iwl_trans_start_fw(xvt->trans, fw,
+				 ucode_type == IWL_UCODE_INIT);
 	if (ret) {
 		iwl_fw_set_current_image(&xvt->fwrt, old_type);
 		iwl_remove_notification(&xvt->notif_wait, &alive_wait);

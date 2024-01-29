@@ -196,15 +196,6 @@ static void iwl_xvt_led_disable(struct iwl_xvt *xvt)
 	iwl_write32(xvt->trans, CSR_LED_REG, CSR_LED_REG_TURN_OFF);
 }
 
-static int iwl_xvt_sdio_io_toggle(struct iwl_xvt *xvt,
-				 struct iwl_tm_data *data_in,
-				 struct iwl_tm_data *data_out)
-{
-	struct iwl_tm_sdio_io_toggle *sdio_io_toggle = data_in->data;
-
-	return iwl_trans_test_mode_cmd(xvt->trans, sdio_io_toggle->enable);
-}
-
 /**
  * iwl_xvt_read_sv_drop - read SV drop version
  * @xvt: xvt data
@@ -2389,10 +2380,6 @@ int iwl_xvt_user_cmd_execute(struct iwl_testmode *testmode, u32 cmd,
 
 	case IWL_TM_USER_CMD_GET_DEVICE_INFO:
 		ret = iwl_xvt_get_dev_info(xvt, data_in, data_out);
-		break;
-
-	case IWL_TM_USER_CMD_SV_IO_TOGGLE:
-		ret = iwl_xvt_sdio_io_toggle(xvt, data_in, data_out);
 		break;
 
 	/* xVT cases */
