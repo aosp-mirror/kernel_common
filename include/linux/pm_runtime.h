@@ -64,6 +64,8 @@ static inline int pm_runtime_get_if_in_use(struct device *dev)
 	return pm_runtime_get_if_active(dev, false);
 }
 
+extern int devm_pm_runtime_enable(struct device *dev);
+
 static inline void pm_suspend_ignore_children(struct device *dev, bool enable)
 {
 	dev->power.ignore_children = enable;
@@ -159,6 +161,8 @@ static inline void pm_runtime_enable(struct device *dev) {}
 static inline void __pm_runtime_disable(struct device *dev, bool c) {}
 static inline void pm_runtime_allow(struct device *dev) {}
 static inline void pm_runtime_forbid(struct device *dev) {}
+
+static inline int devm_pm_runtime_enable(struct device *dev) { return 0; }
 
 static inline void pm_suspend_ignore_children(struct device *dev, bool enable) {}
 static inline void pm_runtime_get_noresume(struct device *dev) {}
