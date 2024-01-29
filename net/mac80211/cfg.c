@@ -911,9 +911,11 @@ static int ieee80211_set_monitor_channel(struct wiphy *wiphy,
 {
 	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
-	int ret;
+	struct ieee80211_chan_req chanreq = { .oper = *chandef };
+	int ret = 0;
 
-	if (cfg80211_chandef_identical(&local->monitor_chandef, chandef))
+	if (cfg80211_chandef_identical(&local->monitor_chanreq.oper,
+				       &chanreq.oper))
 		return 0;
 
 	sdata = wiphy_dereference(local->hw.wiphy,
@@ -921,17 +923,17 @@ static int ieee80211_set_monitor_channel(struct wiphy *wiphy,
 	if (!sdata)
 		goto done;
 
-	if (cfg80211_chandef_identical(&sdata->vif.bss_conf.chandef, chandef))
+	if (cfg80211_chandef_identical(&sdata->vif.bss_conf.chanreq.oper,
+				       &chanreq.oper))
 		return 0;
 
 	ieee80211_link_release_channel(&sdata->deflink);
-	ret = ieee80211_link_use_channel(&sdata->deflink,
-					 chandef,
+	ret = ieee80211_link_use_channel(&sdata->deflink, &chanreq,
 					 IEEE80211_CHANCTX_EXCLUSIVE);
 	if (ret)
 		return ret;
 done:
-	local->monitor_chandef = *chandef;
+	local->monitor_chanreq = chanreq;
 	return 0;
 }
 
@@ -1268,6 +1270,7 @@ static int ieee80211_start_ap(struct wiphy *wiphy, struct net_device *dev,
 	unsigned int link_id = params->beacon.link_id;
 	struct ieee80211_link_data *link;
 	struct ieee80211_bss_conf *link_conf;
+	struct ieee80211_chan_req chanreq = { .oper = params->chandef };
 
 	link = sdata_dereference(sdata->link[link_id], sdata);
 	if (!link)
@@ -1378,8 +1381,7 @@ static int ieee80211_start_ap(struct wiphy *wiphy, struct net_device *dev,
 			return err;
 	}
 
-	mutex_lock(&local->mtx);
-	err = ieee80211_link_use_channel(link, &params->chandef,
+	err = ieee80211_link_use_channel(link, &chanreq,
 					 IEEE80211_CHANCTX_SHARED);
 	if (!err)
 		ieee80211_link_copy_chanctx_to_vlans(link, false);
@@ -1636,7 +1638,7 @@ static int ieee80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 					  BSS_CHANGED_BEACON_ENABLED);
 
 	if (sdata->wdev.cac_started) {
-		chandef = link_conf->chandef;
+		chandef = link_conf->chanreq.oper;
 		cancel_delayed_work_sync(&link->dfs_cac_timer_work);
 		cfg80211_cac_event(sdata->dev, &chandef,
 				   NL80211_RADAR_CAC_ABORTED,
@@ -1838,7 +1840,7 @@ static int sta_link_apply_parameters(struct ieee80211_local *local,
 
 	if (params->supported_rates &&
 	    params->supported_rates_len) {
-		ieee80211_parse_bitrates(link->conf->chandef.width,
+		ieee80211_parse_bitrates(link->conf->chanreq.oper.width,
 					 sband, params->supported_rates,
 					 params->supported_rates_len,
 					 &link_sta->pub->supp_rates[sband->band]);
@@ -2627,6 +2629,7 @@ static int ieee80211_join_mesh(struct wiphy *wiphy, struct net_device *dev,
 			       const struct mesh_setup *setup)
 {
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_chan_req chanreq = { .oper = setup->chandef };
 	struct ieee80211_if_mesh *ifmsh = &sdata->u.mesh;
 	int err;
 
@@ -2642,7 +2645,7 @@ static int ieee80211_join_mesh(struct wiphy *wiphy, struct net_device *dev,
 	sdata->deflink.needed_rx_chains = sdata->local->rx_chains;
 
 	mutex_lock(&sdata->local->mtx);
-	err = ieee80211_link_use_channel(&sdata->deflink, &setup->chandef,
+	err = ieee80211_link_use_channel(&sdata->deflink, &chanreq,
 					 IEEE80211_CHANCTX_SHARED);
 	mutex_unlock(&sdata->local->mtx);
 	if (err)
@@ -2686,7 +2689,7 @@ static int ieee80211_change_bss(struct wiphy *wiphy,
 		return -EINVAL;
 
 	if (params->basic_rates) {
-		if (!ieee80211_parse_bitrates(link->conf->chandef.width,
+		if (!ieee80211_parse_bitrates(link->conf->chanreq.oper.width,
 					      wiphy->bands[sband->band],
 					      params->basic_rates,
 					      params->basic_rates_len,
@@ -3192,7 +3195,7 @@ int __ieee80211_request_smps_mgd(struct ieee80211_sub_if_data *sdata,
 	 * the new value until we associate.
 	 */
 	if (!sdata->u.mgd.associated ||
-	    link->conf->chandef.width == NL80211_CHAN_WIDTH_20_NOHT)
+	    link->conf->chanreq.oper.width == NL80211_CHAN_WIDTH_20_NOHT)
 		return 0;
 
 	ap = link->u.mgd.bssid;
@@ -3347,9 +3350,11 @@ static int ieee80211_set_bitrate_mask(struct wiphy *wiphy,
 	 * so at a basic rate so that all clients can receive it.
 	 */
 	if (rcu_access_pointer(sdata->vif.bss_conf.chanctx_conf) &&
-	    sdata->vif.bss_conf.chandef.chan) {
+	    sdata->vif.bss_conf.chanreq.oper.chan) {
 		u32 basic_rates = sdata->vif.bss_conf.basic_rates;
-		enum nl80211_band band = sdata->vif.bss_conf.chandef.chan->band;
+		enum nl80211_band band;
+
+		band = sdata->vif.bss_conf.chanreq.oper.chan->band;
 
 		if (!(mask->control[band].legacy & basic_rates))
 			return -EINVAL;
@@ -3401,6 +3406,7 @@ static int ieee80211_start_radar_detection(struct wiphy *wiphy,
 					   u32 cac_time_ms)
 {
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_chan_req chanreq = { .oper = *chandef };
 	struct ieee80211_local *local = sdata->local;
 	int err;
 
@@ -3414,7 +3420,7 @@ static int ieee80211_start_radar_detection(struct wiphy *wiphy,
 	sdata->deflink.smps_mode = IEEE80211_SMPS_OFF;
 	sdata->deflink.needed_rx_chains = local->rx_chains;
 
-	err = ieee80211_link_use_channel(&sdata->deflink, chandef,
+	err = ieee80211_link_use_channel(&sdata->deflink, &chanreq,
 					 IEEE80211_CHANCTX_SHARED);
 	if (err)
 		goto out_unlock;
@@ -3668,8 +3674,8 @@ static int __ieee80211_csa_finalize(struct ieee80211_sub_if_data *sdata)
 		return ieee80211_link_use_reserved_context(&sdata->deflink);
 	}
 
-	if (!cfg80211_chandef_identical(&sdata->vif.bss_conf.chandef,
-					&sdata->deflink.csa_chandef))
+	if (!cfg80211_chandef_identical(&sdata->vif.bss_conf.chanreq.oper,
+					&sdata->deflink.csa_chanreq.oper))
 		return -EINVAL;
 
 	sdata->vif.bss_conf.csa_active = false;
@@ -3696,7 +3702,7 @@ static int __ieee80211_csa_finalize(struct ieee80211_sub_if_data *sdata)
 	if (err)
 		return err;
 
-	cfg80211_ch_switch_notify(sdata->dev, &sdata->deflink.csa_chandef, 0,
+	cfg80211_ch_switch_notify(sdata->dev, &sdata->deflink.csa_chanreq.oper, 0,
 				  sdata->vif.bss_conf.eht_puncturing);
 
 	return 0;
@@ -3835,7 +3841,7 @@ static int ieee80211_set_csa_beacon(struct ieee80211_sub_if_data *sdata,
 		struct ieee80211_if_mesh *ifmsh = &sdata->u.mesh;
 
 		/* changes into another band are not supported */
-		if (sdata->vif.bss_conf.chandef.chan->band !=
+		if (sdata->vif.bss_conf.chanreq.oper.chan->band !=
 		    params->chandef.chan->band)
 			return -EINVAL;
 
@@ -3883,6 +3889,7 @@ __ieee80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 			   struct cfg80211_csa_settings *params)
 {
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_chan_req chanreq = { .oper = params->chandef };
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_channel_switch ch_switch;
 	struct ieee80211_chanctx_conf *conf;
@@ -3899,8 +3906,8 @@ __ieee80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 	if (sdata->wdev.cac_started)
 		return -EBUSY;
 
-	if (cfg80211_chandef_identical(&params->chandef,
-				       &sdata->vif.bss_conf.chandef))
+	if (cfg80211_chandef_identical(&chanreq.oper,
+				       &sdata->vif.bss_conf.chanreq.oper))
 		return -EINVAL;
 
 	/* don't allow another channel switch if one is already active. */
@@ -3926,14 +3933,14 @@ __ieee80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 	ch_switch.timestamp = 0;
 	ch_switch.device_timestamp = 0;
 	ch_switch.block_tx = params->block_tx;
-	ch_switch.chandef = params->chandef;
+	ch_switch.chandef = chanreq.oper;
 	ch_switch.count = params->count;
 
 	err = drv_pre_channel_switch(sdata, &ch_switch);
 	if (err)
 		goto out;
 
-	err = ieee80211_link_reserve_chanctx(&sdata->deflink, &params->chandef,
+	err = ieee80211_link_reserve_chanctx(&sdata->deflink, &chanreq,
 					     chanctx->mode,
 					     params->radar_required);
 	if (err)
@@ -3959,7 +3966,7 @@ __ieee80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 	if (params->punct_bitmap && !sdata->vif.bss_conf.eht_support)
 		goto out;
 
-	sdata->deflink.csa_chandef = params->chandef;
+	sdata->deflink.csa_chanreq = chanreq; 
 	sdata->deflink.csa_block_tx = params->block_tx;
 	sdata->vif.bss_conf.csa_active = true;
 	sdata->vif.bss_conf.csa_punct_bitmap = params->punct_bitmap;
@@ -3969,14 +3976,15 @@ __ieee80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
 
 	cfg80211_ch_switch_started_notify(sdata->dev,
-					  &sdata->deflink.csa_chandef, 0,
+					  &sdata->deflink.csa_chanreq.oper, 0,
 					  params->count, params->block_tx,
 					  sdata->vif.bss_conf.csa_punct_bitmap);
 
 	if (changed) {
 		ieee80211_link_info_change_notify(sdata, &sdata->deflink,
 						  changed);
-		drv_channel_switch_beacon(sdata, &params->chandef);
+		drv_channel_switch_beacon(sdata,
+					  &sdata->deflink.csa_chanreq.oper);
 	} else {
 		/* if the beacon didn't change, we can finalize immediately */
 		ieee80211_csa_finalize(sdata);
@@ -4227,12 +4235,12 @@ static int ieee80211_cfg_get_channel(struct wiphy *wiphy,
 
 	chanctx_conf = rcu_dereference(link->conf->chanctx_conf);
 	if (chanctx_conf) {
-		*chandef = link->conf->chandef;
+		*chandef = link->conf->chanreq.oper;
 		ret = 0;
 	} else if (local->open_count > 0 &&
 		   local->open_count == local->monitors &&
 		   sdata->vif.type == NL80211_IFTYPE_MONITOR) {
-		*chandef = local->monitor_chandef;
+		*chandef = local->monitor_chanreq.oper;
 		ret = 0;
 	}
 out:
@@ -4280,12 +4288,13 @@ static int ieee80211_set_ap_chanwidth(struct wiphy *wiphy,
 {
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	struct ieee80211_link_data *link;
+	struct ieee80211_chan_req chanreq = { .oper = *chandef };
 	int ret;
 	u64 changed = 0;
 
 	link = sdata_dereference(sdata->link[link_id], sdata);
 
-	ret = ieee80211_link_change_bandwidth(link, chandef, &changed);
+	ret = ieee80211_link_change_chanreq(link, &chanreq, &changed);
 	if (ret == 0)
 		ieee80211_link_info_change_notify(sdata, link, changed);
 
