@@ -582,7 +582,7 @@ int mesh_add_he_cap_ie(struct ieee80211_sub_if_data *sdata,
 		return -ENOMEM;
 
 	pos = skb_put(skb, ie_len);
-	ieee80211_ie_build_he_cap(0, pos, he_cap, pos + ie_len);
+	ieee80211_ie_build_he_cap(NULL, he_cap, pos, pos + ie_len);
 
 	return 0;
 }
@@ -1294,7 +1294,7 @@ ieee80211_mesh_process_chnswitch(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_if_mesh *ifmsh = &sdata->u.mesh;
 	struct ieee80211_supported_band *sband;
 	int err;
-	ieee80211_conn_flags_t conn_flags = 0;
+	struct ieee80211_conn_settings conn = ieee80211_conn_settings_unlimited;
 	u32 vht_cap_info = 0;
 
 	sdata_assert_lock(sdata);
@@ -1305,13 +1305,16 @@ ieee80211_mesh_process_chnswitch(struct ieee80211_sub_if_data *sdata,
 
 	switch (sdata->vif.bss_conf.chandef.width) {
 	case NL80211_CHAN_WIDTH_20_NOHT:
-		conn_flags |= IEEE80211_CONN_DISABLE_HT;
-		fallthrough;
+		conn.mode = IEEE80211_CONN_MODE_LEGACY;
+		conn.bw_limit = IEEE80211_CONN_BW_LIMIT_20;
+		break;
 	case NL80211_CHAN_WIDTH_20:
-		conn_flags |= IEEE80211_CONN_DISABLE_40MHZ;
-		fallthrough;
+		conn.mode = IEEE80211_CONN_MODE_HT;
+		conn.bw_limit = IEEE80211_CONN_BW_LIMIT_20;
+		break;
 	case NL80211_CHAN_WIDTH_40:
-		conn_flags |= IEEE80211_CONN_DISABLE_VHT;
+		conn.mode = IEEE80211_CONN_MODE_HT;
+		conn.bw_limit = IEEE80211_CONN_BW_LIMIT_40;
 		break;
 	default:
 		break;
@@ -1323,8 +1326,8 @@ ieee80211_mesh_process_chnswitch(struct ieee80211_sub_if_data *sdata,
 
 	memset(&params, 0, sizeof(params));
 	err = ieee80211_parse_ch_switch_ie(sdata, elems, sband->band,
-					   vht_cap_info,
-					   conn_flags, sdata->vif.addr,
+					   vht_cap_info, &conn,
+					   sdata->vif.addr,
 					   &csa_ie);
 	if (err < 0)
 		return false;
