@@ -911,37 +911,28 @@ static int ieee80211_set_monitor_channel(struct wiphy *wiphy,
 {
 	struct ieee80211_local *local = wiphy_priv(wiphy);
 	struct ieee80211_sub_if_data *sdata;
-	int ret = 0;
+	int ret;
 
 	if (cfg80211_chandef_identical(&local->monitor_chandef, chandef))
 		return 0;
 
-	if (local->use_chanctx) {
-		sdata = wiphy_dereference(local->hw.wiphy,
-					  local->monitor_sdata);
-		if (sdata) {
-			sdata_lock(sdata);
-			mutex_lock(&local->mtx);
-			ieee80211_link_release_channel(&sdata->deflink);
-			ret = ieee80211_link_use_channel(&sdata->deflink,
-							 chandef,
-							 IEEE80211_CHANCTX_EXCLUSIVE);
-			mutex_unlock(&local->mtx);
-			sdata_unlock(sdata);
-		}
-	} else {
-		mutex_lock(&local->mtx);
-		if (local->open_count == local->monitors) {
-			local->_oper_chandef = *chandef;
-			ieee80211_hw_config(local, 0);
-		}
-		mutex_unlock(&local->mtx);
-	}
+	sdata = wiphy_dereference(local->hw.wiphy,
+				  local->monitor_sdata);
+	if (!sdata)
+		goto done;
 
-	if (ret == 0)
-		local->monitor_chandef = *chandef;
+	if (cfg80211_chandef_identical(&sdata->vif.bss_conf.chandef, chandef))
+		return 0;
 
-	return ret;
+	ieee80211_link_release_channel(&sdata->deflink);
+	ret = ieee80211_link_use_channel(&sdata->deflink,
+					 chandef,
+					 IEEE80211_CHANCTX_EXCLUSIVE);
+	if (ret)
+		return ret;
+done:
+	local->monitor_chandef = *chandef;
+	return 0;
 }
 
 static int
@@ -3118,7 +3109,7 @@ static int ieee80211_get_tx_power(struct wiphy *wiphy,
 	if (local->ops->get_txpower)
 		return drv_get_txpower(local, sdata, dbm);
 
-	if (!local->use_chanctx)
+	if (local->emulate_chanctx)
 		*dbm = local->hw.conf.power_level;
 	else
 		*dbm = sdata->vif.bss_conf.txpower;
@@ -4241,10 +4232,7 @@ static int ieee80211_cfg_get_channel(struct wiphy *wiphy,
 	} else if (local->open_count > 0 &&
 		   local->open_count == local->monitors &&
 		   sdata->vif.type == NL80211_IFTYPE_MONITOR) {
-		if (local->use_chanctx)
-			*chandef = local->monitor_chandef;
-		else
-			*chandef = local->_oper_chandef;
+		*chandef = local->monitor_chandef;
 		ret = 0;
 	}
 out:

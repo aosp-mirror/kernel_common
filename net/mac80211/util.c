@@ -2468,9 +2468,6 @@ static void ieee80211_assign_chanctx(struct ieee80211_local *local,
 	struct ieee80211_chanctx_conf *conf;
 	struct ieee80211_chanctx *ctx;
 
-	if (!local->use_chanctx)
-		return;
-
 	mutex_lock(&local->chanctx_mtx);
 	conf = rcu_dereference_protected(link->conf->chanctx_conf,
 					 lockdep_is_held(&local->chanctx_mtx));
@@ -2700,22 +2697,20 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 	}
 
 	/* add channel contexts */
-	if (local->use_chanctx) {
-		mutex_lock(&local->chanctx_mtx);
-		list_for_each_entry(ctx, &local->chanctx_list, list)
-			if (ctx->replace_state !=
-			    IEEE80211_CHANCTX_REPLACES_OTHER)
-				WARN_ON(drv_add_chanctx(local, ctx));
-		mutex_unlock(&local->chanctx_mtx);
+	list_for_each_entry(ctx, &local->chanctx_list, list)
+		if (ctx->replace_state != IEEE80211_CHANCTX_REPLACES_OTHER)
+			WARN_ON(drv_add_chanctx(local, ctx));
 
-		sdata = wiphy_dereference(local->hw.wiphy,
-					  local->monitor_sdata);
-		if (sdata && ieee80211_sdata_running(sdata))
-			ieee80211_assign_chanctx(local, sdata, &sdata->deflink);
-	}
+	sdata = wiphy_dereference(local->hw.wiphy, local->monitor_sdata);
+	if (sdata && ieee80211_sdata_running(sdata))
+		ieee80211_assign_chanctx(local, sdata, &sdata->deflink);
 
 	/* reconfigure hardware */
-	ieee80211_hw_config(local, ~0);
+	ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_LISTEN_INTERVAL |
+				   IEEE80211_CONF_CHANGE_MONITOR |
+				   IEEE80211_CONF_CHANGE_PS |
+				   IEEE80211_CONF_CHANGE_RETRY_LIMITS |
+				   IEEE80211_CONF_CHANGE_IDLE);
 
 	ieee80211_configure_filter(local);
 
