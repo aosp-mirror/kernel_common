@@ -2161,6 +2161,9 @@ struct cfg80211_ttlm_params {
 bool ieee80211_operating_class_to_chandef(u8 operating_class,
 					  struct ieee80211_channel *chan,
 					  struct cfg80211_chan_def *chandef);
+#define cfg80211_csa_settings_link_id(csa)	0
+#else
+#define cfg80211_csa_settings_link_id(csa)	(csa)->link_id
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
