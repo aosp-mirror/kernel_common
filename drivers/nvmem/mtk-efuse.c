@@ -90,7 +90,6 @@ static int mtk_efuse_probe(struct platform_device *pdev)
 	econfig.size = resource_size(res);
 	econfig.priv = priv;
 	econfig.dev = dev;
-	econfig.name = "mtk-efuse";
 	if (pdata->uses_post_processing)
 		econfig.layout = &mtk_efuse_layout;
 	nvmem = devm_nvmem_register(dev, &econfig);
