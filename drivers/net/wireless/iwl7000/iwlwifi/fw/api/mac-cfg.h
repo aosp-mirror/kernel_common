@@ -316,6 +316,8 @@ enum iwl_mac_config_filter_flags {
  *	ACK-enabled AGG, (i.e. both BACK and non-BACK frames in single AGG).
  *	If the NIC is not ACK_ENABLED it may use the EOF-bit in first non-0
  *	len delim to determine if AGG or single.
+ * @client: client mac data
+ * @p2p_dev: mac data for p2p device
  */
 struct iwl_mac_config_cmd {
 	/* COMMON_INDEX_HDR_API_S_VER_1 */

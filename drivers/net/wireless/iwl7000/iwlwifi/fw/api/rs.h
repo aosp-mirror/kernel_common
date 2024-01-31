@@ -286,7 +286,8 @@ struct iwl_rate_mcs_info {
 	char    mcs[IWL_MAX_MCS_DISPLAY_SIZE];
 };
 
-/* These serve as indexes into
+/*
+ * These serve as indexes into
  * struct iwl_rate_info fw_rate_idx_to_plcp[IWL_RATE_COUNT];
  * TODO: avoid overlap between legacy and HT rates
  */

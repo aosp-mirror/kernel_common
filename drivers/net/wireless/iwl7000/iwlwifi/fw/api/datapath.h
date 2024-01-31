@@ -32,7 +32,8 @@ enum iwl_data_path_subcmd_ids {
 	WNM_PLATFORM_PTM_REQUEST_CMD = 0x3,
 
 	/**
-	 * @WNM_80211V_TIMING_MEASUREMENT_CONFIG_CMD: &struct iwl_time_sync_cfg_cmd
+	 * @WNM_80211V_TIMING_MEASUREMENT_CONFIG_CMD:
+	 *	&struct iwl_time_sync_cfg_cmd
 	 */
 	WNM_80211V_TIMING_MEASUREMENT_CONFIG_CMD = 0x4,
 

@@ -259,7 +259,6 @@ enum iwl_rx_mpdu_reorder_data {
 };
 
 enum iwl_rx_mpdu_phy_info {
-	IWL_RX_MPDU_PHY_8023		= BIT(0),
 	IWL_RX_MPDU_PHY_AMPDU		= BIT(5),
 	IWL_RX_MPDU_PHY_AMPDU_TOGGLE	= BIT(6),
 	IWL_RX_MPDU_PHY_SHORT_PREAMBLE	= BIT(7),

@@ -452,7 +452,7 @@ enum iwl_he_pkt_ext_constellations {
  *	For rates between low_th and high_th, need 8us PPE
  *	For rates equal or higher then the high_th, need 16us PPE
  *	Nss (0-siso, 1-mimo2) x BW (0-20MHz, 1-40MHz, 2-80MHz, 3-160MHz) x
- *	(0-low_th, 1-high_th)
+ *		(0-low_th, 1-high_th)
  */
 struct iwl_he_pkt_ext_v1 {
 	u8 pkt_ext_qam_th[MAX_HE_SUPP_NSS][MAX_CHANNEL_BW_INDX_API_D_VER_1][2];
