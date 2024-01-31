@@ -1493,10 +1493,9 @@ static void ieee80211_assoc_add_ml_elem(struct ieee80211_sub_if_data *sdata,
 	memcpy(common->mld_mac_addr, sdata->vif.addr, ETH_ALEN);
 
 	/* add EML_CAPA only if needed, see Draft P802.11be_D2.1, 35.3.17 */
-	if ((eml_capa &
+	if (eml_capa &
 	    cpu_to_le16((IEEE80211_EML_CAP_EMLSR_SUPP |
-			 IEEE80211_EML_CAP_EMLMR_SUPPORT))) &&
-	    (!(sdata->vif.driver_flags & IEEE80211_VIF_DISABLE_EML))) {
+			 IEEE80211_EML_CAP_EMLMR_SUPPORT))) {
 		common->len += 2; /* EML capabilities */
 		ml_elem->control |=
 			cpu_to_le16(IEEE80211_MLC_BASIC_PRES_EML_CAPA);

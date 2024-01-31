@@ -93,12 +93,6 @@ static int iwl_mvm_mld_mac_add_interface(struct ieee80211_hw *hw,
 		mvm->csme_vif = vif;
 	}
 
-#ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
-	if (vif->type == NL80211_IFTYPE_STATION &&
-	    mvm->trans->dbg_cfg.disable_eml)
-		vif->driver_flags |= IEEE80211_VIF_DISABLE_EML;
-#endif
-
 	goto out_unlock;
 
  out_free_bf:
