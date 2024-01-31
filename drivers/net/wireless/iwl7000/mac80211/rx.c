@@ -4472,19 +4472,8 @@ static bool ieee80211_accept_frame(struct ieee80211_rx_data *rx)
 				rate_idx = 0; /* TODO: HT/VHT rates */
 			else
 				rate_idx = status->rate_idx;
-			/*
-			 * FIXME: We should not need to avoid probe req/resp
-			 * here, but we respond with another probe request and
-			 * that can (briefly) cause traffic amplification.
-			 *
-			 * Ignoring probe responses is here is reasonable anyway
-			 * as the STA will be inserted later.
-			 */
-			if (!ieee80211_is_probe_req(hdr->frame_control) &&
-			    !ieee80211_is_probe_resp(hdr->frame_control))
-				ieee80211_ibss_rx_no_sta(sdata, bssid,
-							 hdr->addr2,
-							 BIT(rate_idx));
+			ieee80211_ibss_rx_no_sta(sdata, bssid, hdr->addr2,
+						 BIT(rate_idx));
 		}
 		return true;
 	case NL80211_IFTYPE_OCB:
