@@ -5,8 +5,6 @@ __hci_cmd_sync_sk
 __hci_cmd_sync_status
 __hci_cmd_sync_status_sk
 __nfc_alloc_vendor_cmd_reply_skb
-__traceiter_mark_victim
-__tracepoint_mark_victim
 alloc_can_err_skb
 alloc_can_skb
 alloc_candev_mqs

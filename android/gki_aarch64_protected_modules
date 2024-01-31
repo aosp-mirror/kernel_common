@@ -1,4 +1,3 @@
-drivers/android/memhealth.ko
 drivers/bluetooth/btbcm.ko
 drivers/bluetooth/btqca.ko
 drivers/bluetooth/btsdio.ko
