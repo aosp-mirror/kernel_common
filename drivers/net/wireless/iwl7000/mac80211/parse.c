@@ -527,33 +527,6 @@ _ieee802_11_parse_elems_full(struct ieee80211_elems_parse_params *params,
 			}
 			elems->pwr_constr_elem = pos;
 			break;
-		case WLAN_EID_CISCO_VENDOR_SPECIFIC:
-			/* Lots of different options exist, but we only care
-			 * about the Dynamic Transmit Power Control element.
-			 * First check for the Cisco OUI, then for the DTPC
-			 * tag (0x00).
-			 */
-			if (elen < 4) {
-				elem_parse_failed =
-					IEEE80211_PARSE_ERR_BAD_ELEM_SIZE;
-				break;
-			}
-
-			if (pos[0] != 0x00 || pos[1] != 0x40 ||
-			    pos[2] != 0x96 || pos[3] != 0x00)
-				break;
-
-			if (elen != 6) {
-				elem_parse_failed =
-					IEEE80211_PARSE_ERR_BAD_ELEM_SIZE;
-				break;
-			}
-
-			if (calc_crc)
-				crc = crc32_be(crc, pos - 2, elen + 2);
-
-			elems->cisco_dtpc_elem = pos;
-			break;
 		case WLAN_EID_ADDBA_EXT:
 			if (elen < sizeof(struct ieee80211_addba_ext_ie)) {
 				elem_parse_failed =
