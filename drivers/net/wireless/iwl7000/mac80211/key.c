@@ -1375,15 +1375,12 @@ ieee80211_gtk_rekey_add(struct ieee80211_vif *vif,
 			struct ieee80211_key_conf *keyconf)
 {
 	struct ieee80211_sub_if_data *sdata = vif_to_sdata(vif);
+	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_key *key;
 	int err;
 
-	/*
-	 * TODO: we should check for local->wowlan here, because
-	 * calling gtk_rekey_add() without being in wowlan can cause
-	 * problems, unless we refactor the code to unify
-	 * gtk_rekey_add() with gtk_rekey_notify().
-	 */
+	if (WARN_ON(!local->wowlan))
+		return ERR_PTR(-EINVAL);
 
 	if (WARN_ON(vif->type != NL80211_IFTYPE_STATION))
 		return ERR_PTR(-EINVAL);
