@@ -656,8 +656,9 @@ static void ieee80211_send_scan_probe_req(struct ieee80211_sub_if_data *sdata,
 {
 	struct sk_buff *skb;
 
-	skb = ieee80211_build_probe_req(sdata, src, dst, dst, ratemask, channel,
-					ssid, ssid_len, ie, ie_len, flags);
+	skb = ieee80211_build_probe_req(sdata, src, dst, ratemask, channel,
+					ssid, ssid_len,
+					ie, ie_len, flags);
 
 	if (skb) {
 		if (flags & IEEE80211_PROBE_FLAG_RANDOM_SN) {

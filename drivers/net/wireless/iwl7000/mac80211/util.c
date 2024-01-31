@@ -1488,7 +1488,7 @@ out:
 
 struct sk_buff *ieee80211_build_probe_req(struct ieee80211_sub_if_data *sdata,
 					  const u8 *src, const u8 *dst,
-					  const u8 *bssid, u32 ratemask,
+					  u32 ratemask,
 					  struct ieee80211_channel *chan,
 					  const u8 *ssid, size_t ssid_len,
 					  const u8 *ie, size_t ie_len,
@@ -1522,12 +1522,11 @@ struct sk_buff *ieee80211_build_probe_req(struct ieee80211_sub_if_data *sdata,
 			       ie, ie_len, BIT(chan->band),
 			       rate_masks, &chandef, flags);
 
-	mgmt = (void *)skb->data;
-	if (dst)
+	if (dst) {
+		mgmt = (struct ieee80211_mgmt *) skb->data;
 		memcpy(mgmt->da, dst, ETH_ALEN);
-
-	if (bssid)
-		memcpy(mgmt->bssid, bssid, ETH_ALEN);
+		memcpy(mgmt->bssid, dst, ETH_ALEN);
+	}
 
 	IEEE80211_SKB_CB(skb)->flags |= IEEE80211_TX_INTFL_DONT_ENCRYPT;
 
