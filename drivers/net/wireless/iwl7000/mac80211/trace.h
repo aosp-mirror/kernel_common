@@ -490,7 +490,7 @@ TRACE_EVENT(drv_vif_cfg_changed,
 
 	TP_printk(
 		LOCAL_PR_FMT  VIF_PR_FMT " changed:%#llx",
-		LOCAL_PR_ARG, VIF_PR_ARG, (unsigned long long)__entry->changed
+		LOCAL_PR_ARG, VIF_PR_ARG, __entry->changed
 	)
 );
 
@@ -564,7 +564,7 @@ TRACE_EVENT(drv_link_info_changed,
 	TP_printk(
 		LOCAL_PR_FMT  VIF_PR_FMT " link_id:%d, changed:%#llx",
 		LOCAL_PR_ARG, VIF_PR_ARG, __entry->link_id,
-		(unsigned long long)__entry->changed
+		__entry->changed
 	)
 );
 

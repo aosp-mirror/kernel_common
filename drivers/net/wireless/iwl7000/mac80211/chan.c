@@ -515,6 +515,8 @@ static void _ieee80211_change_chanctx(struct ieee80211_local *local,
 	WARN_ON(ieee80211_chanctx_refcount(local, ctx) > 1 &&
 		!cfg80211_chandef_compatible(&ctx->conf.def, &chanreq->oper));
 
+	ieee80211_remove_wbrf(local, &ctx->conf.def);
+
 	if (!cfg80211_chandef_identical(&ctx->conf.def, &chanreq->oper)) {
 		if (ctx->conf.def.width != chanreq->oper.width)
 			changed |= IEEE80211_CHANCTX_CHANGE_WIDTH;
@@ -523,9 +525,6 @@ static void _ieee80211_change_chanctx(struct ieee80211_local *local,
 	}
 	if (!cfg80211_chandef_identical(&ctx->conf.ap, &chanreq->ap))
 		changed |= IEEE80211_CHANCTX_CHANGE_AP;
-
-	ieee80211_remove_wbrf(local, &ctx->conf.def);
-
 	ctx->conf.def = *chandef;
 	ctx->conf.ap = chanreq->ap;
 

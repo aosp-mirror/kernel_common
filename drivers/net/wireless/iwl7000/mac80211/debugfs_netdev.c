@@ -711,6 +711,13 @@ static ssize_t ieee80211_if_parse_tsf(
 }
 IEEE80211_IF_FILE_RW(tsf);
 
+static ssize_t ieee80211_if_fmt_valid_links(const struct ieee80211_sub_if_data *sdata,
+					    char *buf, int buflen)
+{
+	return snprintf(buf, buflen, "0x%x\n", sdata->vif.valid_links);
+}
+IEEE80211_IF_FILE_R(valid_links);
+
 static ssize_t ieee80211_if_fmt_active_links(const struct ieee80211_sub_if_data *sdata,
 					     char *buf, int buflen)
 {
@@ -727,7 +734,6 @@ static ssize_t ieee80211_if_parse_active_links(struct ieee80211_sub_if_data *sda
 
 	return ieee80211_set_active_links(&sdata->vif, active_links) ?: buflen;
 }
-
 IEEE80211_IF_FILE_RW(active_links);
 
 IEEE80211_IF_LINK_FILE(addr, conf->addr, MAC);
@@ -840,7 +846,7 @@ static void add_sta_files(struct ieee80211_sub_if_data *sdata)
 	DEBUGFS_ADD_MODE(uapsd_queues, 0600);
 	DEBUGFS_ADD_MODE(uapsd_max_sp_len, 0600);
 	DEBUGFS_ADD_MODE(tdls_wider_bw, 0600);
-	DEBUGFS_ADD_X16(valid_links, 0400);
+	DEBUGFS_ADD_MODE(valid_links, 0400);
 	DEBUGFS_ADD_MODE(active_links, 0600);
 	DEBUGFS_ADD_X16(dormant_links, 0400);
 }

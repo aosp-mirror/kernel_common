@@ -725,7 +725,7 @@ static void ieee80211_mle_get_sta_prof(struct ieee802_11_elems *elems,
 				       u8 link_id)
 {
 	const struct ieee80211_multi_link_elem *ml = elems->ml_basic;
-	size_t ml_len = elems->ml_basic_len;
+	ssize_t ml_len = elems->ml_basic_len;
 	const struct element *sub;
 
 	if (!ml || !ml_len)

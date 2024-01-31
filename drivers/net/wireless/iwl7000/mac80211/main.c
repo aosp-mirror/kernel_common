@@ -460,8 +460,8 @@ static void ieee80211_restart_work(struct work_struct *work)
 
 	flush_workqueue(local->workqueue);
 
-	/* we might do interface manipulations, so need both */
 	rtnl_lock();
+	/* we might do interface manipulations, so need both */
 #if CFG80211_VERSION >= KERNEL_VERSION(5,12,0)
 	wiphy_lock(local->hw.wiphy);
 #endif

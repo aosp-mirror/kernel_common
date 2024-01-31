@@ -55,8 +55,8 @@ static void ieee80211_free_tid_rx(struct rcu_head *h)
 	kfree(tid_rx);
 }
 
-static void ___ieee80211_stop_rx_ba_session(struct sta_info *sta, u16 tid,
-					    u16 initiator, u16 reason, bool tx)
+void __ieee80211_stop_rx_ba_session(struct sta_info *sta, u16 tid,
+				    u16 initiator, u16 reason, bool tx)
 {
 	struct ieee80211_local *local = sta->local;
 	struct tid_ampdu_rx *tid_rx;
@@ -112,14 +112,6 @@ static void ___ieee80211_stop_rx_ba_session(struct sta_info *sta, u16 tid,
 	del_timer_sync(&tid_rx->reorder_timer);
 
 	call_rcu(&tid_rx->rcu_head, ieee80211_free_tid_rx);
-}
-
-void __ieee80211_stop_rx_ba_session(struct sta_info *sta, u16 tid,
-				    u16 initiator, u16 reason, bool tx)
-{
-	lockdep_assert_wiphy(sta->local->hw.wiphy);
-
-	___ieee80211_stop_rx_ba_session(sta, tid, initiator, reason, tx);
 }
 
 void ieee80211_stop_rx_ba_session(struct ieee80211_vif *vif, u16 ba_rx_bitmap,
@@ -250,11 +242,11 @@ static void ieee80211_send_addba_resp(struct sta_info *sta, u8 *da, u16 tid,
 	ieee80211_tx_skb(sdata, skb);
 }
 
-static void ___ieee80211_start_rx_ba_session(struct sta_info *sta,
-					     u8 dialog_token, u16 timeout,
-					     u16 start_seq_num, u16 ba_policy, u16 tid,
-					     u16 buf_size, bool tx, bool auto_seq,
-					     const struct ieee80211_addba_ext_ie *addbaext)
+void __ieee80211_start_rx_ba_session(struct sta_info *sta,
+				     u8 dialog_token, u16 timeout,
+				     u16 start_seq_num, u16 ba_policy, u16 tid,
+				     u16 buf_size, bool tx, bool auto_seq,
+				     const struct ieee80211_addba_ext_ie *addbaext)
 {
 	struct ieee80211_local *local = sta->sdata->local;
 	struct tid_ampdu_rx *tid_agg_rx;
@@ -354,9 +346,9 @@ static void ___ieee80211_start_rx_ba_session(struct sta_info *sta,
 				   sta->sta.addr, tid);
 
 		/* delete existing Rx BA session on the same tid */
-		___ieee80211_stop_rx_ba_session(sta, tid, WLAN_BACK_RECIPIENT,
-						WLAN_STATUS_UNSPECIFIED_QOS,
-						false);
+		__ieee80211_stop_rx_ba_session(sta, tid, WLAN_BACK_RECIPIENT,
+					       WLAN_STATUS_UNSPECIFIED_QOS,
+					       false);
 	}
 
 	if (ieee80211_hw_check(&local->hw, SUPPORTS_REORDERING_BUFFER)) {
@@ -441,20 +433,6 @@ end:
 		ieee80211_send_addba_resp(sta, sta->sta.addr, tid,
 					  dialog_token, status, 1, buf_size,
 					  timeout, addbaext);
-}
-
-void __ieee80211_start_rx_ba_session(struct sta_info *sta,
-				     u8 dialog_token, u16 timeout,
-				     u16 start_seq_num, u16 ba_policy,
-				     u16 tid, u16 buf_size, bool tx,
-				     bool auto_seq,
-				     const struct ieee80211_addba_ext_ie *addbaext)
-{
-	lockdep_assert_wiphy(sta->local->hw.wiphy);
-
-	___ieee80211_start_rx_ba_session(sta, dialog_token, timeout,
-					 start_seq_num, ba_policy, tid,
-					 buf_size, tx, auto_seq, addbaext);
 }
 
 void ieee80211_process_addba_request(struct ieee80211_local *local,

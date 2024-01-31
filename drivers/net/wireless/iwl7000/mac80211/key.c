@@ -6,7 +6,7 @@
  * Copyright 2007-2008	Johannes Berg <johannes@sipsolutions.net>
  * Copyright 2013-2014  Intel Mobile Communications GmbH
  * Copyright 2015-2017	Intel Deutschland GmbH
- * Copyright 2018-2020, 2022 -2023  Intel Corporation
+ * Copyright 2018-2020, 2022-2023  Intel Corporation
  */
 
 #include <crypto/utils.h>
@@ -942,7 +942,7 @@ int ieee80211_key_link(struct ieee80211_key *key,
 
 	key = NULL;
 
-out:
+ out:
 	ieee80211_key_free_unused(key);
 	return ret;
 }

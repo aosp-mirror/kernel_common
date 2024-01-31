@@ -1316,8 +1316,7 @@ static int _sta_info_move_state(struct sta_info *sta,
 	sta_dbg(sta->sdata, "moving STA %pM to state %d\n",
 		sta->sta.addr, new_state);
 
-	/*
-	 * notify the driver before the actual changes so it can
+	/* notify the driver before the actual changes so it can
 	 * fail the transition
 	 */
 	if (test_sta_flag(sta, WLAN_STA_INSERTED)) {

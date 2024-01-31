@@ -296,6 +296,7 @@ struct sta_ampdu_mlme {
 	u8 dialog_token_allocator;
 };
 
+
 /* Value to indicate no TID reservation */
 #define IEEE80211_TID_UNRESERVED	0xff
 

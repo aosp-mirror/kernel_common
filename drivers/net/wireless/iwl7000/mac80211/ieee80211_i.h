@@ -2391,6 +2391,7 @@ void ieee80211_send_4addr_nullfunc(struct ieee80211_local *local,
 				   struct ieee80211_sub_if_data *sdata);
 void ieee80211_sta_tx_notify(struct ieee80211_sub_if_data *sdata,
 			     struct ieee80211_hdr *hdr, bool ack, u16 tx_time);
+
 void ieee80211_wake_queues_by_reason(struct ieee80211_hw *hw,
 				     unsigned long queues,
 				     enum queue_stop_reason reason,
@@ -2721,4 +2722,5 @@ ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx);
 #define EXPORT_SYMBOL_IF_MAC80211_KUNIT(sym)
 #define VISIBLE_IF_MAC80211_KUNIT static
 #endif
+
 #endif /* IEEE80211_I_H */

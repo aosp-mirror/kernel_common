@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * BSS client mode implementation
  * Copyright 2003-2008, Jouni Malinen <j@w1.fi>
@@ -234,7 +235,7 @@ ieee80211_determine_ap_chan(struct ieee80211_sub_if_data *sdata,
 		 * it should be OK.
 		 */
 		sdata_info(sdata,
-			   "mismatch: center-freq: %d ht-cfreq: %d ht->primary_chan: %d band: %d - Disable HT\n",
+			   "Wrong control channel: center-freq: %d ht-cfreq: %d ht->primary_chan: %d band: %d - Disabling HT\n",
 			   channel->center_freq, ht_cfreq,
 			   ht_oper->primary_chan, channel->band);
 		return IEEE80211_CONN_MODE_LEGACY;
@@ -5839,8 +5840,7 @@ static void ieee80211_ml_reconfiguration(struct ieee80211_sub_if_data *sdata,
 	elems->ml_reconf_len = ml_len;
 	ml = elems->ml_reconf;
 
-	/*
-	 * Directly parse the sub elements as the common information doesn't
+	/* Directly parse the sub elements as the common information doesn't
 	 * hold any useful information.
 	 */
 	for_each_mle_subelement(sub, (u8 *)ml, ml_len) {
@@ -5865,8 +5865,7 @@ static void ieee80211_ml_reconfiguration(struct ieee80211_sub_if_data *sdata,
 		    IEEE80211_MLE_STA_RECONF_CONTROL_STA_MAC_ADDR_PRESENT)
 			pos += 6;
 
-		/*
-		 * According to Draft P802.11be_D3.0, the control should
+		/* According to Draft P802.11be_D3.0, the control should
 		 * include the AP Removal Timer present. If the AP Removal Timer
 		 * is not present assume immediate removal.
 		 */
@@ -6074,8 +6073,8 @@ ieee80211_parse_adv_t2l(struct ieee80211_sub_if_data *sdata,
 }
 
 static void ieee80211_process_adv_ttlm(struct ieee80211_sub_if_data *sdata,
-				       struct ieee802_11_elems *elems,
-				       u64 beacon_ts)
+					  struct ieee802_11_elems *elems,
+					  u64 beacon_ts)
 {
 	u8 i;
 	int ret;
@@ -6474,7 +6473,7 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_link_data *link,
 
 	ieee80211_ml_reconfiguration(sdata, elems);
 	ieee80211_process_adv_ttlm(sdata, elems,
-				   le64_to_cpu(mgmt->u.beacon.timestamp));
+				      le64_to_cpu(mgmt->u.beacon.timestamp));
 
 	ieee80211_link_info_change_notify(sdata, link, changed);
 free:
@@ -8191,8 +8190,8 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 	if (ieee80211_mgd_csa_in_process(sdata, cbss)) {
 		sdata_info(sdata, "AP is in CSA process, reject assoc\n");
-		kfree(assoc_data);
-		return -EINVAL;
+		err = -EINVAL;
+		goto err_free;
 	}
 
 	rcu_read_lock();
@@ -8492,9 +8491,6 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 	if (ieee80211_hw_check(&sdata->local->hw, NEED_DTIM_BEFORE_ASSOC)) {
 		const struct cfg80211_bss_ies *beacon_ies;
-
-		/* NEED_DTIM_BEFORE_ASSOC not allowed in MLO */
-		WARN_ON(cfg80211_req_ap_mld_addr(req));
 
 		rcu_read_lock();
 		beacon_ies = rcu_dereference(req->bss->beacon_ies);
