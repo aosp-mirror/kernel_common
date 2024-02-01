@@ -141,12 +141,17 @@ int ipu_isys_subdev_link_validate(struct v4l2_subdev *sd,
 
 int ipu_isys_subdev_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh);
 int ipu_isys_subdev_close(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh);
+
+#define ISYS_SUBDEV_NO_PAD	(-1)
+
 int ipu_isys_subdev_init(struct ipu_isys_subdev *asd,
 			 struct v4l2_subdev_ops *ops,
 			 unsigned int nr_ctrls,
 			 unsigned int num_pads,
 			 unsigned int num_source,
 			 unsigned int num_sink,
-			 unsigned int sd_flags);
+			 unsigned int sd_flags,
+			 int src_pad_idx,
+			 int sink_pad_idx);
 void ipu_isys_subdev_cleanup(struct ipu_isys_subdev *asd);
 #endif /* IPU_ISYS_SUBDEV_H */

@@ -252,16 +252,18 @@ int ipu_isys_tpg_init(struct ipu_isys_tpg *tpg,
 	tpg->asd.ctrl_init = ipu_isys_tpg_init_controls;
 	tpg->asd.isys = isys;
 
+	/* Note: there is no FL_SINK pad here */
 	rval = ipu_isys_subdev_init(&tpg->asd, &tpg_sd_ops, 5,
 				    NR_OF_TPG_PADS,
 				    NR_OF_TPG_SOURCE_PADS,
 				    NR_OF_TPG_SINK_PADS,
-				    V4L2_SUBDEV_FL_HAS_EVENTS);
+				    V4L2_SUBDEV_FL_HAS_EVENTS,
+				    TPG_PAD_SOURCE,
+				    ISYS_SUBDEV_NO_PAD);
 	if (rval)
 		return rval;
 
 	tpg->asd.sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
-	tpg->asd.pad[TPG_PAD_SOURCE].flags = MEDIA_PAD_FL_SOURCE;
 
 	tpg->asd.source = IPU_FW_ISYS_STREAM_SRC_MIPIGEN_PORT0 + index;
 	tpg->asd.supported_codes = tpg_supported_codes;

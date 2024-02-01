@@ -248,13 +248,12 @@ int ipu_isys_csi2_be_soc_init(struct ipu_isys_csi2_be_soc *csi2_be_soc,
 				    &csi2_be_soc_sd_ops, 0,
 				    NR_OF_CSI2_BE_SOC_PADS,
 				    NR_OF_CSI2_BE_SOC_SOURCE_PADS,
-				    NR_OF_CSI2_BE_SOC_SINK_PADS, 0);
+				    NR_OF_CSI2_BE_SOC_SINK_PADS, 0,
+				    CSI2_BE_SOC_PAD_SOURCE,
+				    CSI2_BE_SOC_PAD_SINK);
 	if (rval)
 		goto fail;
 
-	csi2_be_soc->asd.pad[CSI2_BE_SOC_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
-	csi2_be_soc->asd.pad[CSI2_BE_SOC_PAD_SOURCE].flags =
-		MEDIA_PAD_FL_SOURCE;
 	csi2_be_soc->asd.valid_tgts[CSI2_BE_SOC_PAD_SOURCE].crop = true;
 
 	for (i = 0; i < NR_OF_CSI2_BE_SOC_PADS; i++)
