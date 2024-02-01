@@ -1772,6 +1772,7 @@ int ipu_isys_video_init(struct ipu_isys_video *av,
 
 	av->pfmt = av->try_fmt_vid_mplane(av, &av->mpix);
 
+	av->initialized = true;
 	mutex_unlock(&av->mutex);
 
 	return rval;
@@ -1793,9 +1794,13 @@ out_mutex_destroy:
 
 void ipu_isys_video_cleanup(struct ipu_isys_video *av)
 {
+	if (!av->initialized)
+		return;
+
 	kfree(av->watermark);
 	video_unregister_device(&av->vdev);
 	media_entity_cleanup(&av->vdev.entity);
 	mutex_destroy(&av->mutex);
 	ipu_isys_queue_cleanup(&av->aq);
+	av->initialized = false;
 }

@@ -122,6 +122,7 @@ struct ipu_isys_video {
 	unsigned int streaming;
 	bool packed;
 	bool compression;
+	bool initialized;
 	struct v4l2_ctrl_handler ctrl_handler;
 	struct v4l2_ctrl *compression_ctrl;
 	unsigned int ts_offsets[VIDEO_MAX_PLANES];
