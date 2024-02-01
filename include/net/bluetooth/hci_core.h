@@ -1447,7 +1447,10 @@ static inline struct hci_conn *hci_lookup_le_connect(struct hci_dev *hdev)
 	return NULL;
 }
 
-static inline struct hci_conn *hci_lookup_connect(struct hci_dev *hdev)
+/* CHROMIUM only: Check if a new le connection will conflict with an ongoing
+ * connection attempt.
+ */
+static inline bool hci_lookup_le_conn_conflict(struct hci_dev *hdev)
 {
 	struct hci_conn_hash *h = &hdev->conn_hash;
 	struct hci_conn  *c;
@@ -1455,15 +1458,25 @@ static inline struct hci_conn *hci_lookup_connect(struct hci_dev *hdev)
 	rcu_read_lock();
 
 	list_for_each_entry_rcu(c, &h->list, list) {
-		if (c->state == BT_CONNECT) {
-			rcu_read_unlock();
-			return c;
+		/* Not conflicting if not in connecting state */
+		if (c->state != BT_CONNECT)
+			continue;
+
+		/* If peer is LE, in connecting state, and we're scanning, it
+		 * means we are currently looking for this device.
+		 */
+		if (c->type == LE_LINK &&
+			test_bit(HCI_CONN_SCANNING, &c->flags)) {
+			continue;
 		}
+
+		rcu_read_unlock();
+		return true;
 	}
 
 	rcu_read_unlock();
 
-	return NULL;
+	return false;
 }
 
 /* Returns true if an le connection is in the scanning state */

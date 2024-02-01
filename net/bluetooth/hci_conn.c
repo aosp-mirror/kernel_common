@@ -1382,7 +1382,7 @@ struct hci_conn *hci_connect_le(struct hci_dev *hdev, bdaddr_t *dst,
 	 * CHROMIUM: extend the restriction to BR/EDR connection to prevent
 	 * from race. Context: b/302233940.
 	 */
-	if (hci_lookup_connect(hdev))
+	if (hci_lookup_le_conn_conflict(hdev))
 		return ERR_PTR(-EBUSY);
 
 	/* If there's already a connection object but it's not in
