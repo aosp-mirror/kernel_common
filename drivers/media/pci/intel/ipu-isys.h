@@ -16,9 +16,6 @@
 #include "ipu-isys-media.h"
 #include "ipu-isys-csi2.h"
 #include "ipu-isys-csi2-be.h"
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
-#include "ipu-isys-tpg.h"
-#endif
 #include "ipu-isys-video.h"
 #include "ipu-pdata.h"
 #include "ipu-fw-isys.h"
@@ -134,9 +131,6 @@ struct ipu_isys_sensor_info {
  * @lib_mutex: optional external library mutex
  * @pdata: platform data pointer
  * @csi2: CSI-2 receivers
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
- * @tpg: test pattern generators
-#endif
  * @csi2_be: CSI-2 back-ends
  * @fw: ISYS firmware binary (unsecure firmware)
  * @fw_sgt: fw scatterlist
@@ -177,9 +171,6 @@ struct ipu_isys {
 	struct ipu_isys_pdata *pdata;
 
 	struct ipu_isys_csi2 *csi2;
-#ifdef CONFIG_VIDEO_INTEL_IPU_TPG
-	struct ipu_isys_tpg *tpg;
-#endif
 	struct ipu_isys_csi2_be csi2_be;
 	struct ipu_isys_csi2_be_soc csi2_be_soc[NR_OF_CSI2_BE_SOC_DEV];
 	const struct firmware *fw;

@@ -37,14 +37,3 @@ config VIDEO_INTEL_IPU6
 
 	  To compile this driver, say Y here! It contains 3 modules -
 	  intel_ipu6, intel_ipu6_isys and intel_ipu6_psys.
-
-config VIDEO_INTEL_IPU_TPG
-	bool "Compile for TPG driver"
-	depends on VIDEO_INTEL_IPU6
-	help
-	  If selected, TPG device nodes would be created.
-
-	  Recommended for driver developers only.
-
-	  If you want to the TPG devices exposed to user as media entity,
-	  you must select this option, otherwise no.
