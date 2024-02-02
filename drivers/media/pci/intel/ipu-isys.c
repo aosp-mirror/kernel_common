@@ -1225,6 +1225,7 @@ out_unregister_devices:
 	isys_iwake_watermark_cleanup(isys);
 	isys_unregister_devices(isys);
 out_remove_pkg_dir_shared_buffer:
+	cpu_latency_qos_remove_request(&isys->pm_qos);
 	if (!isp->secure_mode)
 		ipu_cpd_free_pkg_dir(adev, isys->pkg_dir,
 				     isys->pkg_dir_dma_addr,
