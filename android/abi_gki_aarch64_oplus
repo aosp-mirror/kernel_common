@@ -2565,6 +2565,7 @@
   __stack_chk_guard
   stack_depot_fetch
   stack_trace_save
+  static_key_enable
   static_key_disable
   static_key_slow_dec
   static_key_slow_inc
@@ -2938,6 +2939,7 @@
   __traceiter_android_vh_ufs_send_tm_command
   __traceiter_android_vh_update_page_mapcount
   __traceiter_android_vh_update_topology_flags_workfn
+  __traceiter_android_vh_vmscan_kswapd_done
   __traceiter_binder_transaction_received
   __traceiter_cpu_frequency
   __traceiter_cpu_frequency_limits
@@ -2946,6 +2948,7 @@
   __traceiter_ipi_entry
   __traceiter_ipi_raise
   __traceiter_irq_handler_entry
+  __traceiter_mm_vmscan_kswapd_wake
   __traceiter_net_dev_queue
   __traceiter_net_dev_xmit
   __traceiter_netif_receive_skb
@@ -3213,6 +3216,7 @@
   __tracepoint_android_vh_ufs_send_tm_command
   __tracepoint_android_vh_update_page_mapcount
   __tracepoint_android_vh_update_topology_flags_workfn
+  __tracepoint_android_vh_vmscan_kswapd_done
   __tracepoint_binder_transaction_received
   __tracepoint_cpu_frequency
   __tracepoint_cpu_frequency_limits
@@ -3221,6 +3225,7 @@
   __tracepoint_ipi_entry
   __tracepoint_ipi_raise
   __tracepoint_irq_handler_entry
+  __tracepoint_mm_vmscan_kswapd_wake
   __tracepoint_net_dev_queue
   __tracepoint_net_dev_xmit
   __tracepoint_netif_receive_skb
