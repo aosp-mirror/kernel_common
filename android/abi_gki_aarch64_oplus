@@ -2761,6 +2761,7 @@
   __traceiter_android_rvh_wake_up_new_task
   __traceiter_android_vh_account_task_time
   __traceiter_android_vh_add_page_to_lrulist
+  __traceiter_android_vh_adjust_alloc_flags
   __traceiter_android_vh_alloc_pages_slowpath_begin
   __traceiter_android_vh_alloc_pages_slowpath_end
   __traceiter_android_vh_allow_domain_state
@@ -3035,6 +3036,7 @@
   __tracepoint_android_rvh_wake_up_new_task
   __tracepoint_android_vh_account_task_time
   __tracepoint_android_vh_add_page_to_lrulist
+  __tracepoint_android_vh_adjust_alloc_flags
   __tracepoint_android_vh_alloc_pages_slowpath_begin
   __tracepoint_android_vh_alloc_pages_slowpath_end
   __tracepoint_android_vh_allow_domain_state
