@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
  * Copyright (C) 2017 Intel Deutschland GmbH
- * Copyright (C) 2018-2023 Intel Corporation
+ * Copyright (C) 2018-2024 Intel Corporation
  */
 #ifndef __iwl_fw_acpi__
 #define __iwl_fw_acpi__
@@ -193,10 +193,8 @@ static inline int iwl_acpi_get_ppag_table(struct iwl_fw_runtime *fwrt)
 	return -ENOENT;
 }
 
-static inline void iwl_acpi_get_phy_filters(struct iwl_fw_runtime *fwrt,
-					    struct iwl_phy_specific_cfg *filters)
-{
-}
+/* macro since the second argument doesn't always exist */
+#define iwl_acpi_get_phy_filters(fwrt, filters) do { } while (0)
 
 static inline void iwl_acpi_get_guid_lock_status(struct iwl_fw_runtime *fwrt)
 {
