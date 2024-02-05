@@ -1988,6 +1988,24 @@ int iwl_mvm_remove_link(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 int iwl_mvm_disable_link(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 			 struct ieee80211_bss_conf *link_conf);
 
+void iwl_mvm_mld_select_links(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
+			      bool valid_links_changed);
+int iwl_mvm_mld_get_primary_link(struct iwl_mvm *mvm,
+				 struct ieee80211_vif *vif,
+				 unsigned long usable_links);
+struct iwl_mvm_link_sel_data {
+	u8 link_id;
+	enum nl80211_band band;
+	enum nl80211_chan_width width;
+	bool active;
+};
+
+u8 iwl_mvm_set_link_selection_data(struct ieee80211_vif *vif,
+				   struct iwl_mvm_link_sel_data *data,
+				   unsigned long usable_links);
+bool iwl_mvm_mld_valid_link_pair(struct ieee80211_vif *vif,
+				 struct iwl_mvm_link_sel_data *a,
+				 struct iwl_mvm_link_sel_data *b);
 /* AP and IBSS */
 bool iwl_mvm_start_ap_ibss_common(struct ieee80211_hw *hw,
 				  struct ieee80211_vif *vif, int *ret);
@@ -2835,12 +2853,6 @@ void iwl_mvm_set_twt_testmode(struct iwl_mvm *mvm);
 bool iwl_mvm_eval_dsm_rfi(struct iwl_mvm *mvm);
 bool iwl_mvm_enable_fils(struct iwl_mvm *mvm,
 			 struct ieee80211_chanctx_conf *ctx);
-void iwl_mvm_mld_select_links(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
-			      bool valid_links_changed);
-int iwl_mvm_mld_get_primary_link(struct iwl_mvm *mvm,
-				 struct ieee80211_vif *vif,
-				 unsigned long usable_links);
-
 bool iwl_mvm_is_ftm_responder_chanctx(struct iwl_mvm *mvm,
 				      struct ieee80211_chanctx_conf *ctx);
 
@@ -2864,5 +2876,7 @@ int iwl_mvm_roc_add_cmd(struct iwl_mvm *mvm,
 
 /* EMLSR */
 void iwl_mvm_recalc_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif);
+bool iwl_mvm_esr_allowed_on_vif(struct iwl_mvm *mvm,
+				struct ieee80211_vif *vif);
 
 #endif /* __IWL_MVM_H__ */
