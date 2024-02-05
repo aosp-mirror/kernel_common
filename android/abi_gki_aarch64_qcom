@@ -823,6 +823,7 @@
   get_option
   get_page_owner_handle
   get_pfnblock_flags_mask
+  get_phy_device
   get_pid_task
   get_random_bytes
   get_sg_io_hdr
@@ -1352,6 +1353,7 @@
   neigh_destroy
   neigh_resolve_output
   netdev_alert
+  netdev_features_change
   netdev_rss_key_fill
   netif_receive_skb_list
   nla_find
@@ -1514,6 +1516,7 @@
   pci_msi_create_irq_domain
   pci_msi_mask_irq
   pci_msi_unmask_irq
+  pci_prepare_to_sleep
   pci_read_config_dword
   pci_read_config_word
   __pci_register_driver
@@ -1556,6 +1559,8 @@
   phy_attached_info
   phy_calibrate
   phy_config_aneg
+  phy_device_free
+  phy_device_register
   phy_drivers_register
   phy_drivers_unregister
   phy_error
@@ -1592,6 +1597,7 @@
   phylink_start
   phylink_stop
   phylink_suspend
+  phy_lookup_setting
   phy_mac_interrupt
   __phy_modify
   phy_modify
@@ -1605,6 +1611,7 @@
   phy_read_mmd
   phy_read_paged
   phy_resolve_aneg_pause
+  phy_restart_aneg
   phy_restore_page
   phy_save_page
   phy_select_page
