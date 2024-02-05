@@ -236,6 +236,7 @@ struct dentry *kernfs_node_dentry(struct kernfs_node *kn,
 static int kernfs_fill_super(struct super_block *sb, struct kernfs_fs_context *kfc)
 {
 	struct kernfs_super_info *info = kernfs_info(sb);
+	struct kernfs_root *kf_root = kfc->root;
 	struct inode *inode;
 	struct dentry *root;
 
@@ -255,9 +256,9 @@ static int kernfs_fill_super(struct super_block *sb, struct kernfs_fs_context *k
 	sb->s_shrink.seeks = 0;
 
 	/* get root inode, initialize and unlock it */
-	mutex_lock(&kernfs_mutex);
+	down_read(kernfs_rwsem(kf_root));
 	inode = kernfs_get_inode(sb, info->root->kn);
-	mutex_unlock(&kernfs_mutex);
+	up_read(kernfs_rwsem(kf_root));
 	if (!inode) {
 		pr_debug("kernfs: could not get root inode\n");
 		return -ENOMEM;
@@ -334,6 +335,7 @@ int kernfs_get_tree(struct fs_context *fc)
 
 	if (!sb->s_root) {
 		struct kernfs_super_info *info = kernfs_info(sb);
+		struct kernfs_root *root = kfc->root;
 
 		kfc->new_sb_created = true;
 
@@ -344,9 +346,9 @@ int kernfs_get_tree(struct fs_context *fc)
 		}
 		sb->s_flags |= SB_ACTIVE;
 
-		mutex_lock(&kernfs_mutex);
+		down_write(kernfs_rwsem(root));
 		list_add(&info->node, &info->root->supers);
-		mutex_unlock(&kernfs_mutex);
+		up_write(kernfs_rwsem(root));
 	}
 
 	fc->root = dget(sb->s_root);
@@ -371,10 +373,11 @@ void kernfs_free_fs_context(struct fs_context *fc)
 void kernfs_kill_sb(struct super_block *sb)
 {
 	struct kernfs_super_info *info = kernfs_info(sb);
+	struct kernfs_root *root = info->root;
 
-	mutex_lock(&kernfs_mutex);
+	down_write(kernfs_rwsem(root));
 	list_del(&info->node);
-	mutex_unlock(&kernfs_mutex);
+	up_write(kernfs_rwsem(root));
 
 	/*
 	 * Remove the superblock from fs_supers/s_instances
@@ -387,7 +390,7 @@ void kernfs_kill_sb(struct super_block *sb)
 void __init kernfs_init(void)
 {
 	kernfs_node_cache = kmem_cache_create("kernfs_node_cache",
-					      sizeof(struct kernfs_node),
+					      sizeof(struct kernfs_node_ext),
 					      0, SLAB_PANIC, NULL);
 
 	/* Creates slab cache for kernfs inode attributes */

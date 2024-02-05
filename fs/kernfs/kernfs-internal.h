@@ -13,6 +13,7 @@
 #include <linux/lockdep.h>
 #include <linux/fs.h>
 #include <linux/mutex.h>
+#include <linux/rwsem.h>
 #include <linux/xattr.h>
 
 #include <linux/kernfs.h>
@@ -49,6 +50,14 @@ static inline struct kernfs_root *kernfs_root(struct kernfs_node *kn)
 	return kn->dir.root;
 }
 
+static inline struct rw_semaphore *kernfs_rwsem(struct kernfs_root *root)
+{
+	struct kernfs_root_ext *root_ext;
+
+	root_ext = container_of(root, struct kernfs_root_ext, root);
+	return &root_ext->kernfs_rwsem;
+}
+
 /*
  * mount.c
  */
@@ -69,7 +78,7 @@ struct kernfs_super_info {
 	 */
 	const void		*ns;
 
-	/* anchored at kernfs_root->supers, protected by kernfs_mutex */
+	/* anchored at kernfs_root->supers, protected by kernfs_rwsem */
 	struct list_head	node;
 };
 #define kernfs_info(SB) ((struct kernfs_super_info *)(SB->s_fs_info))
@@ -79,6 +88,34 @@ static inline struct kernfs_node *kernfs_dentry_node(struct dentry *dentry)
 	if (d_really_is_negative(dentry))
 		return NULL;
 	return d_inode(dentry)->i_private;
+}
+
+static inline void kernfs_set_rev(struct kernfs_node *parent,
+				  struct dentry *dentry)
+{
+	struct kernfs_node_ext *node_ext;
+
+	node_ext = container_of(parent, struct kernfs_node_ext, node);
+	dentry->d_time = node_ext->rev;
+}
+
+static inline void kernfs_inc_rev(struct kernfs_node *parent)
+{
+	struct kernfs_node_ext *node_ext;
+
+	node_ext = container_of(parent, struct kernfs_node_ext, node);
+	node_ext->rev++;
+}
+
+static inline bool kernfs_dir_changed(struct kernfs_node *parent,
+				      struct dentry *dentry)
+{
+	struct kernfs_node_ext *node_ext;
+
+	node_ext = container_of(parent, struct kernfs_node_ext, node);
+	if (node_ext->rev != dentry->d_time)
+		return true;
+	return false;
 }
 
 extern const struct super_operations kernfs_sops;
@@ -99,7 +136,6 @@ int __kernfs_setattr(struct kernfs_node *kn, const struct iattr *iattr);
 /*
  * dir.c
  */
-extern struct mutex kernfs_mutex;
 extern const struct dentry_operations kernfs_dops;
 extern const struct file_operations kernfs_dir_fops;
 extern const struct inode_operations kernfs_dir_iops;

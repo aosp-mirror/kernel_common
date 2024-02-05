@@ -843,12 +843,14 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
 }
 
 #define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
+extern bool should_flush_tlb_when_young(void);
+
 static inline int ptep_clear_flush_young(struct vm_area_struct *vma,
 					 unsigned long address, pte_t *ptep)
 {
 	int young = ptep_test_and_clear_young(vma, address, ptep);
 
-	if (young) {
+	if (young && should_flush_tlb_when_young()) {
 		/*
 		 * We can elide the trailing DSB here since the worst that can
 		 * happen is that a CPU continues to use the young entry in its

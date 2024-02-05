@@ -16,6 +16,7 @@
 #include <linux/atomic.h>
 #include <linux/uidgid.h>
 #include <linux/wait.h>
+#include <linux/rwsem.h>
 #include <linux/android_kabi.h>
 
 struct file;
@@ -161,6 +162,15 @@ struct kernfs_node {
 	ANDROID_KABI_RESERVE(1);
 };
 
+struct kernfs_node_ext {
+	struct kernfs_node	node;
+	/*
+	 * Monotonic revision counter, used to identify if a directory
+	 * node has changed during negative dentry revalidation.
+	 */
+	unsigned long		rev;
+};
+
 /*
  * kernfs_syscall_ops may be specified on kernfs_create_root() to support
  * syscalls.  These optional callbacks are invoked on the matching syscalls
@@ -196,12 +206,17 @@ struct kernfs_root {
 	u32			id_highbits;
 	struct kernfs_syscall_ops *syscall_ops;
 
-	/* list of kernfs_super_info of this root, protected by kernfs_mutex */
+	/* list of kernfs_super_info of this root, protected by kernfs_rwsem */
 	struct list_head	supers;
 
 	wait_queue_head_t	deactivate_waitq;
 
 	ANDROID_KABI_RESERVE(1);
+};
+
+struct kernfs_root_ext {
+	struct kernfs_root	root;
+	struct rw_semaphore	kernfs_rwsem;
 };
 
 struct kernfs_open_file {

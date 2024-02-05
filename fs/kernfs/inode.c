@@ -105,10 +105,11 @@ int __kernfs_setattr(struct kernfs_node *kn, const struct iattr *iattr)
 int kernfs_setattr(struct kernfs_node *kn, const struct iattr *iattr)
 {
 	int ret;
+	struct kernfs_root *root = kernfs_root(kn);
 
-	mutex_lock(&kernfs_mutex);
+	down_write(kernfs_rwsem(root));
 	ret = __kernfs_setattr(kn, iattr);
-	mutex_unlock(&kernfs_mutex);
+	up_write(kernfs_rwsem(root));
 	return ret;
 }
 
@@ -116,12 +117,14 @@ int kernfs_iop_setattr(struct dentry *dentry, struct iattr *iattr)
 {
 	struct inode *inode = d_inode(dentry);
 	struct kernfs_node *kn = inode->i_private;
+	struct kernfs_root *root;
 	int error;
 
 	if (!kn)
 		return -EINVAL;
 
-	mutex_lock(&kernfs_mutex);
+	root = kernfs_root(kn);
+	down_write(kernfs_rwsem(root));
 	error = setattr_prepare(dentry, iattr);
 	if (error)
 		goto out;
@@ -134,7 +137,7 @@ int kernfs_iop_setattr(struct dentry *dentry, struct iattr *iattr)
 	setattr_copy(inode, iattr);
 
 out:
-	mutex_unlock(&kernfs_mutex);
+	up_write(kernfs_rwsem(root));
 	return error;
 }
 
@@ -188,12 +191,15 @@ int kernfs_iop_getattr(const struct path *path, struct kstat *stat,
 {
 	struct inode *inode = d_inode(path->dentry);
 	struct kernfs_node *kn = inode->i_private;
+	struct kernfs_root *root = kernfs_root(kn);
 
-	mutex_lock(&kernfs_mutex);
+	down_read(kernfs_rwsem(root));
+	spin_lock(&inode->i_lock);
 	kernfs_refresh_inode(kn, inode);
-	mutex_unlock(&kernfs_mutex);
-
 	generic_fillattr(inode, stat);
+	spin_unlock(&inode->i_lock);
+	up_read(kernfs_rwsem(root));
+
 	return 0;
 }
 
@@ -275,17 +281,23 @@ void kernfs_evict_inode(struct inode *inode)
 int kernfs_iop_permission(struct inode *inode, int mask)
 {
 	struct kernfs_node *kn;
+	struct kernfs_root *root;
+	int ret;
 
 	if (mask & MAY_NOT_BLOCK)
 		return -ECHILD;
 
 	kn = inode->i_private;
+	root = kernfs_root(kn);
 
-	mutex_lock(&kernfs_mutex);
+	down_read(kernfs_rwsem(root));
+	spin_lock(&inode->i_lock);
 	kernfs_refresh_inode(kn, inode);
-	mutex_unlock(&kernfs_mutex);
+	ret = generic_permission(inode, mask);
+	spin_unlock(&inode->i_lock);
+	up_read(kernfs_rwsem(root));
 
-	return generic_permission(inode, mask);
+	return ret;
 }
 
 int kernfs_xattr_get(struct kernfs_node *kn, const char *name,

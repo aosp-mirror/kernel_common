@@ -2275,6 +2275,7 @@
   __traceiter_android_rvh_setscheduler
   __traceiter_android_rvh_set_task_cpu
   __traceiter_android_rvh_set_user_nice
+  __traceiter_android_rvh_set_user_nice_locked
   __traceiter_android_rvh_typec_tcpci_chk_contaminant
   __traceiter_android_rvh_typec_tcpci_get_vbus
   __traceiter_android_rvh_uclamp_eff_get
@@ -2313,6 +2314,7 @@
   __traceiter_android_vh_pagecache_get_page
   __traceiter_android_vh_pagevec_drain
   __traceiter_android_vh_pin_user_pages
+  __traceiter_android_vh_ptep_clear_flush_young
   __traceiter_android_vh_rebuild_root_domains_bypass
   __traceiter_android_vh_reclaim_pages_plug
   __traceiter_android_vh_resume_end
@@ -2421,6 +2423,7 @@
   __tracepoint_android_rvh_setscheduler
   __tracepoint_android_rvh_set_task_cpu
   __tracepoint_android_rvh_set_user_nice
+  __tracepoint_android_rvh_set_user_nice_locked
   __tracepoint_android_rvh_typec_tcpci_chk_contaminant
   __tracepoint_android_rvh_typec_tcpci_get_vbus
   __tracepoint_android_rvh_uclamp_eff_get
@@ -2459,6 +2462,7 @@
   __tracepoint_android_vh_pagecache_get_page
   __tracepoint_android_vh_pagevec_drain
   __tracepoint_android_vh_pin_user_pages
+  __tracepoint_android_vh_ptep_clear_flush_young
   __tracepoint_android_vh_rebuild_root_domains_bypass
   __tracepoint_android_vh_reclaim_pages_plug
   __tracepoint_android_vh_resume_end

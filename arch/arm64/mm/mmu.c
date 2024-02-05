@@ -37,6 +37,8 @@
 #include <asm/tlbflush.h>
 #include <asm/pgalloc.h>
 
+#include <trace/hooks/mm.h>
+
 #define NO_BLOCK_MAPPINGS	BIT(0)
 #define NO_CONT_MAPPINGS	BIT(1)
 
@@ -1491,6 +1493,14 @@ int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
 int p4d_free_pud_page(p4d_t *p4d, unsigned long addr)
 {
 	return 0;	/* Don't attempt a block mapping */
+}
+
+bool should_flush_tlb_when_young(void)
+{
+	bool skip = false;
+
+	trace_android_vh_ptep_clear_flush_young(&skip);
+	return !skip;
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
