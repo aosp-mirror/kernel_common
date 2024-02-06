@@ -238,6 +238,7 @@
   clk_set_rate
   clk_sync_state
   clk_unprepare
+  clk_unregister_fixed_rate
   close_fd
   cma_alloc
   cma_release
@@ -789,6 +790,7 @@
   genphy_c45_check_and_restart_aneg
   genphy_c45_pma_setup_forced
   genphy_c45_read_status
+  genphy_handle_interrupt_no_ack
   genphy_read_abilities
   genphy_read_lpa
   genphy_read_mmd_unsupported
@@ -900,6 +902,7 @@
   hvc_remove
   hwspin_lock_free
   hwspin_lock_request_specific
+  __hw_addr_sync_dev
   __hwspin_lock_timeout
   __hwspin_unlock
   hypervisor_kobj
@@ -1260,6 +1263,7 @@
   mdiobus_free
   mdiobus_get_phy
   __mdiobus_read
+  __mdiobus_register
   mdiobus_read
   mdiobus_unregister
   __mdiobus_write
@@ -1503,6 +1507,7 @@
   pci_disable_pcie_error_reporting
   pcie_aspm_enabled
   pcie_capability_clear_and_set_word
+  pcie_capability_read_dword
   pcie_capability_read_word
   pci_enable_device
   pci_enable_pcie_error_reporting
@@ -1521,6 +1526,7 @@
   pci_read_config_word
   __pci_register_driver
   pci_request_irq
+  pci_request_regions
   pci_restore_state
   pci_save_state
   pci_set_master
@@ -1557,6 +1563,7 @@
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   phy_attached_info
+  phy_basic_t1_features
   phy_calibrate
   phy_config_aneg
   phy_device_free
@@ -1598,6 +1605,7 @@
   phylink_stop
   phylink_suspend
   phy_lookup_setting
+  phy_loopback
   phy_mac_interrupt
   __phy_modify
   phy_modify
