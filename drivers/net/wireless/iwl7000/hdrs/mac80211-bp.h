@@ -1004,6 +1004,7 @@ static inline void cfg80211_bss_iter(struct wiphy *wiphy,
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(5,13,0)
+#define NL80211_EXT_FEATURE_SECURE_LTF -1
 #define ftm_lmr_feedback(peer)		0
 #else
 #define ftm_lmr_feedback(peer)		((peer)->ftm.lmr_feedback)
@@ -2151,14 +2152,12 @@ struct cfg80211_ttlm_params {
 	u16 dlink[8];
 	u16 ulink[8];
 };
-
-#if CFG80211_VERSION < KERNEL_VERSION(6, 8, 0)
-#define NL80211_EXT_FEATURE_SPP_AMSDU_SUPPORT -1
-#define NL80211_EXT_FEATURE_SECURE_LTF -1
-#define ASSOC_REQ_SPP_AMSDU BIT(7)
-#define NL80211_STA_FLAG_SPP_AMSDU 8
 #endif
 
+#if CFG80211_VERSION < KERNEL_VERSION(6,9,0)
+#define NL80211_EXT_FEATURE_SPP_AMSDU_SUPPORT -1
+#define ASSOC_REQ_SPP_AMSDU BIT(7)
+#define NL80211_STA_FLAG_SPP_AMSDU 8
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,7,0)
