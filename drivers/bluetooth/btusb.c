@@ -4681,14 +4681,19 @@ static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
 	 */
 	if (test_bit(BTUSB_WAKEUP_AUTOSUSPEND, &data->flags)) {
 		if (PMSG_IS_AUTO(message) &&
-		    device_can_wakeup(&data->udev->dev))
+		    device_can_wakeup(&data->udev->dev)) {
 			data->udev->do_remote_wakeup = 1;
-		else if (!PMSG_IS_AUTO(message) &&
-			 (!device_may_wakeup(&data->udev->dev) ||
-			  test_bit(HCI_QUIRK_DISABLE_REMOTE_WAKE,
-				   &data->hdev->quirks))) {
-			data->udev->do_remote_wakeup = 0;
-			data->udev->reset_resume = 1;
+		} else if (!PMSG_IS_AUTO(message)) {
+			if (test_bit(HCI_QUIRK_FORCE_REMOTE_WAKE,
+				     &data->hdev->quirks)) {
+				data->udev->do_remote_wakeup = 1;
+				data->udev->reset_resume = 0;
+			} else if (!device_may_wakeup(&data->udev->dev) ||
+				   test_bit(HCI_QUIRK_DISABLE_REMOTE_WAKE,
+					    &data->hdev->quirks)) {
+				data->udev->do_remote_wakeup = 0;
+				data->udev->reset_resume = 1;
+			}
 		}
 	}
 

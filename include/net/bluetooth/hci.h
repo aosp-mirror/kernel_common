@@ -352,6 +352,12 @@ enum {
 	 * on system suspend to save power. This shouldn't be upstreamed.
 	 */
 	HCI_QUIRK_DISABLE_REMOTE_WAKE,
+
+	/* CHROMIUM-only: This quirk forces RTL8852 to always enable remote
+	 * wake on system suspend to decrease resume time, because otherwise
+	 * it would reset itself. This shouldn't be upstreamed.
+	 */
+	HCI_QUIRK_FORCE_REMOTE_WAKE,
 };
 
 /* HCI device flags */
