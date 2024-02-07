@@ -4052,11 +4052,11 @@ iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 		iwl_mvm_bt_coex_update_vif_esr(mvm, vif);
 
 		/* when client is authorized (AP station marked as such),
-		 * try to enable more links
+		 * try to enable the best link(s).
 		 */
 		if (vif->type == NL80211_IFTYPE_STATION &&
 		    !test_bit(IWL_MVM_STATUS_IN_HW_RESTART, &mvm->status))
-			iwl_mvm_mld_select_links(mvm, vif, false);
+			iwl_mvm_select_links(mvm, vif);
 	}
 
 	mvm_sta->authorized = true;
