@@ -16,6 +16,7 @@
 #include <linux/bitfield.h>
 
 #include <linux/usb/composite.h>
+#include <linux/usb/android_accessory.h>
 #include <linux/usb/otg.h>
 #include <asm/unaligned.h>
 
@@ -2046,6 +2047,23 @@ unknown:
 		}
 		f = NULL;
 
+		/*
+		 * Android: The accessory function can handle some control
+		 * requests despite not being allocated to a config. Therefore,
+		 * the upstream logic for checking req_match will not work until
+		 * the attached device issues an ACCESSORY_START command and
+		 * userspace tears down the gadget, adds the accessory function
+		 * to the config, and binds the config to the UDC again.
+		 *
+		 * To workaround the existing userspace limitiations, check to
+		 * see if the f_accessory driver can handle the ctrl request,
+		 * and if so, pass it along.
+		 */
+		if (android_acc_req_match_composite(cdev, ctrl)) {
+			value = android_acc_setup_composite(cdev, ctrl);
+			goto done;
+		}
+
 		switch (ctrl->bRequestType & USB_RECIP_MASK) {
 		case USB_RECIP_INTERFACE:
 			if (!cdev->config || intf >= MAX_CONFIG_INTERFACES)
@@ -2120,6 +2138,12 @@ static void __composite_disconnect(struct usb_gadget *gadget)
 {
 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
 	unsigned long			flags;
+
+	/*
+	 * Android: f_accessory can handle HID packets without being bound to a
+	 *  config so we unfortunately require this hook to clean it up.
+	 */
+	android_acc_disconnect();
 
 	android_set_disconnected(&cdev->android_opts);
 
