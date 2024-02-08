@@ -1137,7 +1137,7 @@ bool nft_pipapo_avx2_lookup(const struct net *net, const struct nft_set *set,
 	/* This also protects access to all data related to scratch maps */
 	kernel_fpu_begin();
 
-	scratch = *raw_cpu_ptr(m->scratch_aligned);
+	scratch = *raw_cpu_ptr(m->scratch);
 	if (unlikely(!scratch)) {
 		kernel_fpu_end();
 		return false;
