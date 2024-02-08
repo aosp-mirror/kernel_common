@@ -3715,12 +3715,17 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	void *shadow = NULL;
 
 	if (vmf->flags & FAULT_FLAG_SPECULATIVE) {
+		bool allow_swap_spf = false;
+
 		/* ksm_might_need_to_copy() needs a stable VMA, spf can't be used */
-#ifdef CONFIG_KSM
-		pte_unmap(vmf->pte);
-		count_vm_spf_event(SPF_ABORT_SWAP);
-		return VM_FAULT_RETRY;
+#ifndef CONFIG_KSM
+		trace_android_vh_do_swap_page_spf(&allow_swap_spf);
 #endif
+		if (!allow_swap_spf) {
+			pte_unmap(vmf->pte);
+			count_vm_spf_event(SPF_ABORT_SWAP);
+			return VM_FAULT_RETRY;
+		}
 	}
 
 	if (!pte_unmap_same(vma->vm_mm, vmf->pmd, vmf->pte, vmf->orig_pte)) {

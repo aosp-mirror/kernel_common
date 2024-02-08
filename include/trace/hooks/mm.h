@@ -262,6 +262,9 @@ DECLARE_HOOK(android_vh_alloc_pages_entry,
 DECLARE_HOOK(android_vh_isolate_freepages,
 	TP_PROTO(struct compact_control *cc, struct page *page, bool *bypass),
 	TP_ARGS(cc, page, bypass));
+DECLARE_HOOK(android_vh_do_swap_page_spf,
+	TP_PROTO(bool *allow_swap_spf),
+	TP_ARGS(allow_swap_spf));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
