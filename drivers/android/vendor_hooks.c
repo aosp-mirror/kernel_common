@@ -491,6 +491,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_tmpfile_create);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tmpfile_secctx);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tmpfile_create_check_inode);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tmpfile_send_open);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_swap_page_spf);
 /*
  * For type visibility
  */
