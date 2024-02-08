@@ -101,6 +101,7 @@ filegroup(
         "android/abi_gki_aarch64_mtktv",
         "android/abi_gki_aarch64_oplus",
         "android/abi_gki_aarch64_pixel",
+        "android/abi_gki_aarch64_pixel_watch",
         "android/abi_gki_aarch64_qcom",
         "android/abi_gki_aarch64_rtkstb",
         "android/abi_gki_aarch64_rtktv",
