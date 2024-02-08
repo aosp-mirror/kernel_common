@@ -841,7 +841,6 @@ ddk_headers(
         "drivers/usb/host/xhci-mvebu.h",
         "drivers/usb/host/xhci-plat.h",
         "drivers/usb/host/xhci-rcar.h",
-        "drivers/usb/typec/tcpm/tcpci.h",
     ],
     # The list of include directories where source files can #include headers
     # from. In other words, these are the `-I` option to the C compiler.
