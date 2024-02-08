@@ -1894,6 +1894,7 @@
   rpmsg_get_signals
   rpmsg_poll
   rpmsg_register_device
+  rpmsg_register_device_override
   rpmsg_rx_done
   rpmsg_send
   rpmsg_set_signals
