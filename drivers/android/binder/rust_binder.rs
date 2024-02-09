@@ -21,6 +21,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 mod allocation;
 mod context;
+mod deferred_close;
 mod defs;
 mod error;
 mod node;
