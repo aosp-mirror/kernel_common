@@ -2284,7 +2284,7 @@ ssize_t wiphy_locked_debugfs_write(struct wiphy *wiphy, struct file *file,
 #endif
 #endif /* < 6.7.0 */
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,7,2)
+#if CFG80211_VERSION < KERNEL_VERSION(6,7,5)
 #define cfg80211_bss_proberesp_ecsa_stuck(bss) false
 #else
 #define cfg80211_bss_proberesp_ecsa_stuck(bss) (bss->proberesp_ecsa_stuck)
