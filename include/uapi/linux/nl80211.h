@@ -6374,8 +6374,14 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_FILS_CRYPTO_OFFLOAD,
 	NL80211_EXT_FEATURE_RADAR_BACKGROUND,
 	NL80211_EXT_FEATURE_POWERED_ADDR_CHANGE,
+	/*
+	 * ANDROID CRC kabi preservation hack due to commits d7c1a9a0ed18
+	 * and 9b89495e479c.
+	 */
+#ifndef __GENKSYMS__
 	NL80211_EXT_FEATURE_PUNCT,
 	NL80211_EXT_FEATURE_SECURE_NAN,
+#endif
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
