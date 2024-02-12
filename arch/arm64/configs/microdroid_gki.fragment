@@ -1,4 +1,5 @@
 CONFIG_KEXEC_FILE=y
+CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off cgroup_disable=pressure ioremap_guard panic=-1 bootconfig"
 CONFIG_PARTITION_ADVANCED=y
 CONFIG_VIRTIO_VSOCKETS=y
 CONFIG_VIRTIO_BLK=y
