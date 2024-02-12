@@ -117,7 +117,65 @@ int ieee80211_get_vht_max_nss(struct ieee80211_vht_cap *cap,
 EXPORT_SYMBOL(ieee80211_get_vht_max_nss);
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,9,0)
+bool cfg80211_iter_rnr(const u8 *elems, size_t elems_len,
+		       enum cfg80211_rnr_iter_ret
+		       (*iter)(void *data, u8 type,
+			       const struct ieee80211_neighbor_ap_info *info,
+			       const u8 *tbtt_info, u8 tbtt_info_len),
+		       void *iter_data)
+{
+	const struct element *rnr;
+	const u8 *pos, *end;
+
+	for_each_element_id(rnr, WLAN_EID_REDUCED_NEIGHBOR_REPORT,
+			    elems, elems_len) {
+		const struct ieee80211_neighbor_ap_info *info;
+
+		pos = rnr->data;
+		end = rnr->data + rnr->datalen;
+
+		/* RNR IE may contain more than one NEIGHBOR_AP_INFO */
+		while (sizeof(*info) <= end - pos) {
+			u8 length, i, count;
+			u8 type;
+
+			info = (void *)pos;
+			count = u8_get_bits(info->tbtt_info_hdr,
+					    IEEE80211_AP_INFO_TBTT_HDR_COUNT) +
+				1;
+			length = info->tbtt_info_len;
+
+			pos += sizeof(*info);
+
+			if (count * length > end - pos)
+				return false;
+
+			type = u8_get_bits(info->tbtt_info_hdr,
+					   IEEE80211_AP_INFO_TBTT_HDR_TYPE);
+
+			for (i = 0; i < count; i++) {
+				switch (iter(iter_data, type, info,
+					     pos, length)) {
+				case RNR_ITER_CONTINUE:
+					break;
+				case RNR_ITER_BREAK:
+					return true;
+				case RNR_ITER_ERROR:
+					return false;
+				}
+
+				pos += length;
+			}
+		}
+
+		if (pos != end)
+			return false;
+	}
+
+	return true;
+}
+
 ssize_t cfg80211_defragment_element(const struct element *elem, const u8 *ies,
 				    size_t ieslen, u8 *data, size_t data_len,
 				    u8 frag_id)
@@ -131,20 +189,26 @@ ssize_t cfg80211_defragment_element(const struct element *elem, const u8 *ies,
 
 	/* elem might be invalid after the memmove */
 	next = (void *)(elem->data + elem->datalen);
-
 	elem_datalen = elem->datalen;
+
 	if (elem->id == WLAN_EID_EXTENSION) {
 		copied = elem->datalen - 1;
-		if (copied > data_len)
-			return -ENOSPC;
 
-		memmove(data, elem->data + 1, copied);
+		if (data) {
+			if (copied > data_len)
+				return -ENOSPC;
+
+			memmove(data, elem->data + 1, copied);
+		}
 	} else {
 		copied = elem->datalen;
-		if (copied > data_len)
-			return -ENOSPC;
 
-		memmove(data, elem->data, copied);
+		if (data) {
+			if (copied > data_len)
+				return -ENOSPC;
+
+			memmove(data, elem->data, copied);
+		}
 	}
 
 	/* Fragmented elements must have 255 bytes */
@@ -163,10 +227,13 @@ ssize_t cfg80211_defragment_element(const struct element *elem, const u8 *ies,
 
 		elem_datalen = elem->datalen;
 
-		if (copied + elem_datalen > data_len)
-			return -ENOSPC;
+		if (data) {
+			if (copied + elem_datalen > data_len)
+				return -ENOSPC;
 
-		memmove(data + copied, elem->data, elem_datalen);
+			memmove(data + copied, elem->data, elem_datalen);
+		}
+
 		copied += elem_datalen;
 
 		/* Only the last fragment may be short */

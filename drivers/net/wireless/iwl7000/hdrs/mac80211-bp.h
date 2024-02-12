@@ -1023,10 +1023,23 @@ int ieee80211_get_vht_max_nss(struct ieee80211_vht_cap *cap,
 			      unsigned int max_vht_nss);
 #endif
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,5,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,9,0)
 ssize_t cfg80211_defragment_element(const struct element *elem, const u8 *ies,
 				    size_t ieslen, u8 *data, size_t data_len,
 				    u8 frag_id);
+
+enum cfg80211_rnr_iter_ret {
+	RNR_ITER_CONTINUE,
+	RNR_ITER_BREAK,
+	RNR_ITER_ERROR,
+};
+
+bool cfg80211_iter_rnr(const u8 *elems, size_t elems_len,
+		       enum cfg80211_rnr_iter_ret
+		       (*iter)(void *data, u8 type,
+			       const struct ieee80211_neighbor_ap_info *info,
+			       const u8 *tbtt_info, u8 tbtt_info_len),
+		       void *iter_data);
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(5,8,0)

@@ -1152,6 +1152,9 @@ drv_pre_channel_switch(struct ieee80211_sub_if_data *sdata,
 	if (!check_sdata_in_driver(sdata))
 		return -EIO;
 
+	if (!ieee80211_vif_link_active(&sdata->vif, ch_switch->link_id))
+		return 0;
+
 	trace_drv_pre_channel_switch(local, sdata, ch_switch);
 	if (local->ops->pre_channel_switch)
 		ret = local->ops->pre_channel_switch(&local->hw, &sdata->vif,
@@ -1173,6 +1176,9 @@ drv_post_channel_switch(struct ieee80211_link_data *link)
 	if (!check_sdata_in_driver(sdata))
 		return -EIO;
 
+	if (!ieee80211_vif_link_active(&sdata->vif, link->link_id))
+		return 0;
+
 	trace_drv_post_channel_switch(local, sdata);
 	if (local->ops->post_channel_switch)
 		ret = local->ops->post_channel_switch(&local->hw, &sdata->vif,
@@ -1193,6 +1199,9 @@ drv_abort_channel_switch(struct ieee80211_link_data *link)
 	if (!check_sdata_in_driver(sdata))
 		return;
 
+	if (!ieee80211_vif_link_active(&sdata->vif, link->link_id))
+		return;
+
 	trace_drv_abort_channel_switch(local, sdata);
 
 	if (local->ops->abort_channel_switch)
@@ -1210,6 +1219,9 @@ drv_channel_switch_rx_beacon(struct ieee80211_sub_if_data *sdata,
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	if (!check_sdata_in_driver(sdata))
+		return;
+
+	if (!ieee80211_vif_link_active(&sdata->vif, ch_switch->link_id))
 		return;
 
 	trace_drv_channel_switch_rx_beacon(local, sdata, ch_switch);
