@@ -4131,7 +4131,9 @@ __ieee80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	struct ieee80211_chan_req chanreq = { .oper = params->chandef };
 	struct ieee80211_local *local = sdata->local;
-	struct ieee80211_channel_switch ch_switch;
+	struct ieee80211_channel_switch ch_switch = {
+		.link_id = cfg80211_csa_settings_link_id(params),
+	};
 	struct ieee80211_chanctx_conf *conf;
 	struct ieee80211_chanctx *chanctx;
 	struct ieee80211_bss_conf *link_conf;
