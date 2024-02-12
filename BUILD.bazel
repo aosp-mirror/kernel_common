@@ -795,9 +795,9 @@ pkg_files(
 
 pkg_files(
     name = "kunit_arm64_test_config",
-    srcs = [":tools/testing/kunit/android/config_arm64.xml"],
+    srcs = [":tools/testing/kunit/android/tradefed_configs/config_arm64.xml"],
     renames = {
-        "tools/testing/kunit/android/config_arm64.xml": "kunit.config",
+        "tools/testing/kunit/android/tradefed_configs/config_arm64.xml": "kunit.config",
     },
     visibility = ["//visibility:private"],
 )
@@ -825,9 +825,9 @@ pkg_files(
 
 pkg_files(
     name = "kunit_x86_64_test_config",
-    srcs = [":tools/testing/kunit/android/config_x86_64.xml"],
+    srcs = [":tools/testing/kunit/android/tradefed_configs/config_x86_64.xml"],
     renames = {
-        "tools/testing/kunit/android/config_x86_64.xml": "kunit.config",
+        "tools/testing/kunit/android/tradefed_configs/config_x86_64.xml": "kunit.config",
     },
     visibility = ["//visibility:private"],
 )
@@ -839,7 +839,7 @@ pkg_filegroup(
         ":kunit_x86_64_test_config",
     ],
     prefix = _KUNIT_DIR,
-    visibility = ["//visibility:private"],
+    #visibility = ["//visibility:private"],
 )
 
 # DDK Headers
