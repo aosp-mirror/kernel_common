@@ -1443,7 +1443,7 @@ static int snbep_pci2phy_map_init(int devid, int nodeid_loc, int idmap_loc, bool
 			 */
 			for (i = 0; i < 8; i++) {
 				if (nodeid == GIDNIDMAP(config, i)) {
-					if (topology_max_die_per_package() > 1)
+					if (topology_max_dies_per_package() > 1)
 						die_id = i;
 					else
 						die_id = topology_phys_to_logical_pkg(i);
