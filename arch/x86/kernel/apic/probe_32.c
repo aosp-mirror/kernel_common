@@ -38,7 +38,6 @@ static struct apic apic_default __ro_after_init = {
 
 	.name				= "default",
 	.probe				= probe_default,
-	.apic_id_registered		= default_apic_id_registered,
 
 	.delivery_mode			= APIC_DELIVERY_MODE_FIXED,
 	.dest_mode_logical		= true,
