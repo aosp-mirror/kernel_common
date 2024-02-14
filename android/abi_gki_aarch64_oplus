@@ -335,6 +335,8 @@
   stack_depot_fetch
   stack_depot_save
   stack_trace_save
+  static_key_enable
+  static_key_disable
   strcmp
   strcpy
   strlcpy
@@ -459,6 +461,7 @@
   __traceiter_android_vh_record_rwsem_lock_starttime
   __traceiter_android_vh_rmqueue
   __traceiter_android_vh_rtmutex_waiter_prio
+  __traceiter_android_vh_rt_mutex_steal
   __traceiter_android_vh_rwsem_can_spin_on_owner
   __traceiter_android_vh_rwsem_opt_spin_finish
   __traceiter_android_vh_rwsem_opt_spin_start
@@ -474,6 +477,7 @@
   __traceiter_android_vh_tune_swappiness
   __traceiter_android_vh_test_clear_look_around_ref
   __traceiter_android_vh_update_page_mapcount
+  __traceiter_android_vh_vmscan_kswapd_done
   __traceiter_block_bio_complete
   __traceiter_block_bio_queue
   __traceiter_block_getrq
@@ -482,6 +486,7 @@
   __traceiter_block_rq_requeue
   __traceiter_block_split
   __traceiter_mm_vmscan_direct_reclaim_begin
+  __traceiter_mm_vmscan_kswapd_wake
   __traceiter_net_dev_queue
   __traceiter_net_dev_xmit
   __traceiter_netif_receive_skb
@@ -593,6 +598,7 @@
   __tracepoint_android_vh_record_rwsem_lock_starttime
   __tracepoint_android_vh_rmqueue
   __tracepoint_android_vh_rtmutex_waiter_prio
+  __tracepoint_android_vh_rt_mutex_steal
   __tracepoint_android_vh_rwsem_can_spin_on_owner
   __tracepoint_android_vh_rwsem_opt_spin_finish
   __tracepoint_android_vh_rwsem_opt_spin_start
@@ -608,6 +614,7 @@
   __tracepoint_android_vh_tune_swappiness
   __tracepoint_android_vh_test_clear_look_around_ref
   __tracepoint_android_vh_update_page_mapcount
+  __tracepoint_android_vh_vmscan_kswapd_done
   __tracepoint_block_bio_complete
   __tracepoint_block_bio_queue
   __tracepoint_block_getrq
@@ -616,6 +623,7 @@
   __tracepoint_block_rq_requeue
   __tracepoint_block_split
   __tracepoint_mm_vmscan_direct_reclaim_begin
+  __tracepoint_mm_vmscan_kswapd_wake
   __tracepoint_net_dev_queue
   __tracepoint_net_dev_xmit
   __tracepoint_netif_receive_skb
@@ -657,3 +665,4 @@
   wq_worker_comm
   is_ashmem_file
   zero_pfn
+  is_transparent_hugepage

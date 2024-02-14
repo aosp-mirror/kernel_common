@@ -398,10 +398,6 @@
   __memset_io
   memstart_addr
   memunmap
-  mipi_dsi_attach
-  mipi_dsi_detach
-  mipi_dsi_device_register_full
-  mipi_dsi_device_unregister
   misc_deregister
   misc_register
   mod_delayed_work_on
@@ -1024,7 +1020,15 @@
 # required by lmh.ko
   of_cpu_node_to_id
 
+# required by lontium-lt9611.ko
+  mipi_dsi_attach
+  mipi_dsi_detach
+  mipi_dsi_device_register_full
+  mipi_dsi_device_unregister
+
 # required by lontium-lt9611uxc.ko
+  devm_mipi_dsi_attach
+  devm_mipi_dsi_device_register_full
   print_hex_dump
   regmap_noinc_read
   regmap_noinc_write
@@ -1276,7 +1280,6 @@
   drm_dp_link_train_channel_eq_delay
   drm_dp_link_train_clock_recovery_delay
   drm_dp_read_sink_count
-  drm_edid_block_valid
   drm_encoder_cleanup
   drm_encoder_init
   drm_flip_work_cleanup
@@ -2006,6 +2009,7 @@
 # preserved by --additions-only
   android_kmalloc_64_create
   drm_connector_init_with_ddc
+  drm_edid_block_valid
   drm_mode_object_put
   gpiod_direction_input
   led_classdev_register_ext
