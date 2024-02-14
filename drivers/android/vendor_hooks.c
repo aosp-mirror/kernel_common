@@ -31,6 +31,7 @@
 #include <net/netfilter/nf_flow_table.h>
 #include <net/smc.h>
 #include <net/tc_act/tc_gate.h>
+#include <../fs/fuse/fuse_i.h>
 #include <../fs/mount.h>
 #include <../kernel/audit.h>
 #include <../kernel/locking/mutex.h>
@@ -112,6 +113,7 @@
 #include <trace/hooks/loop.h>
 #include <trace/hooks/psi.h>
 #include <trace/hooks/delayacct.h>
+#include <trace/hooks/tmpfile.h>
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
  * associated with them) to allow external modules to probe them.
@@ -146,6 +148,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_task_blocks_on_rtmutex);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rtmutex_waiter_prio);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rtmutex_wait_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rtmutex_wait_finish);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rt_mutex_steal);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mutex_opt_spin_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mutex_opt_spin_finish);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mutex_can_spin_on_owner);
@@ -485,6 +488,13 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_delayacct_freepages_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_delayacct_freepages_end);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_delayacct_thrashing_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_delayacct_thrashing_end);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rwsem_downgrade_wake_finish);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_tmpfile_handle_op);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_tmpfile_create);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tmpfile_secctx);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tmpfile_create_check_inode);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_tmpfile_send_open);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_swap_page_spf);
 /*
  * For type visibility
  */

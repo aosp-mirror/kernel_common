@@ -211,6 +211,7 @@ extern void __register_sysctl_init(const char *path, struct ctl_table *table,
 				 const char *table_name);
 #define register_sysctl_init(path, table) __register_sysctl_init(path, table, #table)
 void do_sysctl_args(void);
+bool sysctl_is_alias(char *param);
 
 extern int pwrsw_enabled;
 extern int unaligned_enabled;
@@ -251,6 +252,11 @@ static inline void setup_sysctl_set(struct ctl_table_set *p,
 
 static inline void do_sysctl_args(void)
 {
+}
+
+static inline bool sysctl_is_alias(char *param)
+{
+	return false;
 }
 #endif /* CONFIG_SYSCTL */
 

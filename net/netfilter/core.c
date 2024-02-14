@@ -40,8 +40,8 @@ EXPORT_SYMBOL(nf_hooks_needed);
 #endif
 
 #ifdef CONFIG_NETFILTER_FAMILY_BRIDGE
-struct nf_hook_entries __rcu init_nf_hooks_bridge[NF_INET_NUMHOOKS];
-struct nf_hook_entries __rcu *init_nf_hooks_bridgep = &init_nf_hooks_bridge[0];
+struct nf_hook_entries __rcu *init_nf_hooks_bridge[NF_INET_NUMHOOKS];
+struct nf_hook_entries __rcu **init_nf_hooks_bridgep = &init_nf_hooks_bridge[0];
 EXPORT_SYMBOL_GPL(init_nf_hooks_bridgep);
 #endif
 
