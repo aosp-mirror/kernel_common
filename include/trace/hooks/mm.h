@@ -174,6 +174,9 @@ DECLARE_HOOK(android_vh_isolate_freepages,
 DECLARE_HOOK(android_vh_ptep_clear_flush_young,
 	TP_PROTO(bool *skip),
 	TP_ARGS(skip));
+DECLARE_HOOK(android_vh_do_swap_page_spf,
+	TP_PROTO(bool *allow_swap_spf),
+	TP_ARGS(allow_swap_spf));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
