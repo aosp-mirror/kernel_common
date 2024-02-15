@@ -101,6 +101,7 @@ filegroup(
         "android/abi_gki_aarch64_mtktv",
         "android/abi_gki_aarch64_oplus",
         "android/abi_gki_aarch64_pixel",
+        "android/abi_gki_aarch64_pixel_watch",
         "android/abi_gki_aarch64_qcom",
         "android/abi_gki_aarch64_rtkstb",
         "android/abi_gki_aarch64_rtktv",
@@ -776,7 +777,6 @@ ddk_headers(
         "drivers/usb/host/xhci-mvebu.h",
         "drivers/usb/host/xhci-plat.h",
         "drivers/usb/host/xhci-rcar.h",
-        "drivers/usb/typec/tcpm/tcpci.h",
     ],
     # The list of include directories where source files can #include headers
     # from. In other words, these are the `-I` option to the C compiler.

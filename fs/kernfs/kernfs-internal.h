@@ -50,6 +50,14 @@ static inline struct kernfs_root *kernfs_root(struct kernfs_node *kn)
 	return kn->dir.root;
 }
 
+static inline struct rw_semaphore *kernfs_rwsem(struct kernfs_root *root)
+{
+	struct kernfs_root_ext *root_ext;
+
+	root_ext = container_of(root, struct kernfs_root_ext, root);
+	return &root_ext->kernfs_rwsem;
+}
+
 /*
  * mount.c
  */
@@ -122,7 +130,6 @@ int __kernfs_setattr(struct kernfs_node *kn, const struct iattr *iattr);
 /*
  * dir.c
  */
-extern struct rw_semaphore kernfs_rwsem;
 extern const struct dentry_operations kernfs_dops;
 extern const struct file_operations kernfs_dir_fops;
 extern const struct inode_operations kernfs_dir_iops;

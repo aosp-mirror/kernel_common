@@ -389,3 +389,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_delayacct_freepages_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_delayacct_freepages_end);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_delayacct_thrashing_start);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_delayacct_thrashing_end);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_swap_page_spf);
