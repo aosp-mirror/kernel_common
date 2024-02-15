@@ -16,6 +16,7 @@
 #include <linux/atomic.h>
 #include <linux/uidgid.h>
 #include <linux/wait.h>
+#include <linux/rwsem.h>
 #include <linux/android_kabi.h>
 
 struct file;
@@ -207,6 +208,11 @@ struct kernfs_root {
 	wait_queue_head_t	deactivate_waitq;
 
 	ANDROID_KABI_RESERVE(1);
+};
+
+struct kernfs_root_ext {
+	struct kernfs_root	root;
+	struct rw_semaphore	kernfs_rwsem;
 };
 
 struct kernfs_open_file {
