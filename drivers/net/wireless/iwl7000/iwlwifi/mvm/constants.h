@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
- * Copyright (C) 2013-2014, 2018-2023 Intel Corporation
+ * Copyright (C) 2013-2014, 2018-2024 Intel Corporation
  * Copyright (C) 2015 Intel Deutschland GmbH
  */
 #ifndef __MVM_CONSTANTS_H
@@ -127,6 +127,7 @@
 #define IWL_MVM_MIN_BEACON_INTERVAL_TU          16
 #define IWL_MVM_ADAPTIVE_DWELL_NUM_APS_OVERRIDE 0
 #define IWL_MVM_AUTO_EML_ENABLE			true
+#define IWL_MVM_MISSED_BEACONS_EXIT_ESR_THRESH	7
 #else /* CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES */
 #define IWL_MVM_DEFAULT_PS_TX_DATA_TIMEOUT	(mvm->trans->dbg_cfg.MVM_DEFAULT_PS_TX_DATA_TIMEOUT)
 #define IWL_MVM_DEFAULT_PS_RX_DATA_TIMEOUT	(mvm->trans->dbg_cfg.MVM_DEFAULT_PS_RX_DATA_TIMEOUT)
@@ -245,6 +246,7 @@
 #define IWL_MVM_MIN_BEACON_INTERVAL_TU          (mvm->trans->dbg_cfg.MVM_MIN_BEACON_INTERVAL_TU)
 #define IWL_MVM_ADAPTIVE_DWELL_NUM_APS_OVERRIDE (mvm->trans->dbg_cfg.MVM_ADAPTIVE_DWELL_NUM_APS_OVERRIDE)
 #define IWL_MVM_AUTO_EML_ENABLE                 (mvm->trans->dbg_cfg.MVM_AUTO_EML_ENABLE)
+#define IWL_MVM_MISSED_BEACONS_EXIT_ESR_THRESH	(mvm->trans->dbg_cfg.MVM_MISSED_BEACONS_EXIT_ESR_THRESH)
 
 #endif /* CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES */
 
