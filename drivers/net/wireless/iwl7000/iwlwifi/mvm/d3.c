@@ -1154,7 +1154,8 @@ iwl_mvm_wowlan_config(struct iwl_mvm *mvm,
 	if (ret)
 		return ret;
 
-	return iwl_mvm_send_proto_offload(mvm, vif, false, true, 0);
+	return iwl_mvm_send_proto_offload(mvm, vif, false, true, 0,
+					  mvm_link->ap_sta_id);
 }
 
 static int
