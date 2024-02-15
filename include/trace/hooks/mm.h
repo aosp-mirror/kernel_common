@@ -302,6 +302,9 @@ DECLARE_HOOK(android_vh_madvise_cold_or_pageout,
 DECLARE_HOOK(android_vh_page_isolated_for_reclaim,
 	TP_PROTO(struct mm_struct *mm, struct page *page),
 	TP_ARGS(mm, page));
+DECLARE_HOOK(android_vh_should_end_madvise,
+	TP_PROTO(struct mm_struct *mm, bool *skip, bool *pageout),
+	TP_ARGS(mm, skip, pageout));
 DECLARE_HOOK(android_vh_account_swap_pages,
 	TP_PROTO(struct swap_info_struct *si, bool *skip),
 	TP_ARGS(si, skip));
@@ -359,6 +362,9 @@ DECLARE_HOOK(android_vh_madvise_cold_or_pageout_abort,
 DECLARE_HOOK(android_vh_skip_swapcache,
 	TP_PROTO(swp_entry_t entry, bool *skip),
 	TP_ARGS(entry, skip));
+DECLARE_HOOK(android_vh_do_swap_page_spf,
+	TP_PROTO(bool *allow_swap_spf),
+	TP_ARGS(allow_swap_spf));
 /* macro versions of hooks are no longer required */
 
 #endif /* _TRACE_HOOK_MM_H */
