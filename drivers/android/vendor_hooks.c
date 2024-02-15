@@ -432,3 +432,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_alloc_pages_reclaim_bypass);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_alloc_pages_failure_bypass);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_rebuild_root_domains_bypass);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ptep_clear_flush_young);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_swap_page_spf);
