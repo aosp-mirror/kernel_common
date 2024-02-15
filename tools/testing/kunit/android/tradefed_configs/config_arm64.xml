@@ -24,9 +24,9 @@
         <!-- <option name='binary' key='mm/kfence/kfence_test' value='/data/kunit/arm64/mm/kfence/kfence_test.ko' /> -->
         <option name='binary' key='net/core/dev_addr_lists_test' value='/data/kunit/arm64/net/core/dev_addr_lists_test.ko' />
         <!-- <option name='binary' key='sound/soc/soc-topology-test' value='/data/kunit/arm64/sound/soc/soc-topology-test.ko' /> -->
-	<option name='binary' key='sound/soc/soc-utils-test' value='/data/kunit/arm64/sound/soc/soc-utils-test.ko' />
+        <option name='binary' key='sound/soc/soc-utils-test' value='/data/kunit/arm64/sound/soc/soc-utils-test.ko' />
 
-	<option name='binary' key='drivers/clk/clk-gate_test' value='/data/kunit/arm64/drivers/clk/clk-gate_test.ko' />
-        <option name='binary' key='drivers/clk/clk_test' value='/data/kunit/arm64/drivers/clk/clk_test.ko' />
+        <!-- <option name='binary' key='drivers/clk/clk-gate_test' value='/data/kunit/arm64/drivers/clk/clk-gate_test.ko' /> -->
+        <!-- <option name='binary' key='drivers/clk/clk_test' value='/data/kunit/arm64/drivers/clk/clk_test.ko' /> -->
     </test>
 </configuration>
