@@ -348,11 +348,17 @@ struct iwl_mvm_vif_link_info {
 };
 
 /**
- * enum iwl_mvm_esr_disable_reason - reasons for which we can't enable EMLSR
- * @IWL_MVM_ESR_DISABLE_COEX: COEX is preventing the enablement of EMLSR
+ * enum iwl_mvm_esr_state - defines reasons for which the EMLSR is exited or
+ * blocked.
+ * The low 16 bits are used for blocking reasons, and the 16 higher bits
+ * are used for exit reasons.
+ * For the blocking reasons - use iwl_mvm_(un)block_esr(), and for the exit
+ * reasons - use iwl_mvm_exit_esr().
+ *
+ * @IWL_MVM_ESR_BLOCKED_COEX: COEX is preventing the enablement of EMLSR
  */
-enum iwl_mvm_esr_disable_reason {
-	IWL_MVM_ESR_DISABLE_COEX	= BIT(0),
+enum iwl_mvm_esr_state {
+	IWL_MVM_ESR_BLOCKED_COEX	= BIT(0),
 };
 
 /**
@@ -388,7 +394,7 @@ enum iwl_mvm_esr_disable_reason {
  * @deflink: default link data for use in non-MLO
  * @link: link data for each link in MLO
  * @esr_active: indicates eSR mode is active
- * @esr_disable_reason: a bitmap of enum iwl_mvm_esr_disable_reason
+ * @esr_disable_reason: a bitmap of &enum iwl_mvm_esr_state
  * @pm_enabled: indicates powersave is enabled
  * @primary_link: primary link in eSR. Valid only for an associated MLD vif,
  *	and in eSR mode. Valid only for a STA.
@@ -2876,8 +2882,15 @@ int iwl_mvm_roc_add_cmd(struct iwl_mvm *mvm,
 			int duration, u32 activity);
 
 /* EMLSR */
-void iwl_mvm_recalc_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif);
 bool iwl_mvm_esr_allowed_on_vif(struct iwl_mvm *mvm,
 				struct ieee80211_vif *vif);
+void iwl_mvm_block_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
+		       enum iwl_mvm_esr_state reason,
+		       u8 link_to_keep);
+void iwl_mvm_unblock_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
+			 enum iwl_mvm_esr_state reason);
+void iwl_mvm_exit_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
+		      enum iwl_mvm_esr_state reason,
+		      u8 link_to_keep);
 
 #endif /* __IWL_MVM_H__ */
