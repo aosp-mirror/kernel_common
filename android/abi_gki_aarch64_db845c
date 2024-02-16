@@ -66,7 +66,6 @@
   device_register
   device_set_wakeup_capable
   device_unregister
-  device_wakeup_enable
   _dev_info
   __dev_kfree_skb_any
   devm_add_action
@@ -236,6 +235,7 @@
   __memcpy_fromio
   memremap
   memset
+  memunmap
   misc_deregister
   misc_register
   mod_timer
@@ -425,6 +425,7 @@
   strlen
   strncmp
   strncpy
+  strscpy
   strscpy_pad
   __sw_hweight32
   __sw_hweight64
@@ -595,7 +596,6 @@
   skb_copy
   skb_realloc_headroom
   strlcat
-  strscpy
   __sw_hweight16
   __sw_hweight8
   synchronize_net
@@ -610,8 +610,8 @@
   pci_clear_master
   pci_disable_device
   pci_disable_msi
+  pcie_capability_clear_and_set_word
   pcie_capability_read_word
-  pcie_capability_write_word
   pci_enable_device
   pci_enable_msi
   pci_iomap
@@ -620,6 +620,7 @@
   pci_set_master
 
 # required by ath10k_snoc.ko
+  __bitmap_clear
   devm_regulator_get_optional
   dmam_alloc_attrs
   kernel_connect
@@ -650,6 +651,7 @@
 # required by dwc3-qcom.ko
   devm_extcon_register_notifier
   of_clk_get_parent_count
+  platform_device_del
 
 # required by dwc3.ko
   dev_fwnode
@@ -661,7 +663,6 @@
   of_usb_get_phy_mode
   phy_pm_runtime_get_sync
   phy_pm_runtime_put_sync
-  platform_device_add_data
   platform_get_irq_byname_optional
   pm_runtime_barrier
   system_freezable_wq
@@ -839,6 +840,7 @@
   devm_clk_register
   devm_devfreq_add_device
   devm_ioremap_nocache
+  devm_pm_runtime_enable
   devm_regulator_get_exclusive
   dev_pm_opp_find_freq_ceil
   dev_pm_opp_find_freq_exact
@@ -1048,7 +1050,6 @@
   kvmalloc_node
   llist_add_batch
   memparse
-  memunmap
   mipi_dsi_create_packet
   mipi_dsi_host_register
   mipi_dsi_host_unregister
@@ -1127,6 +1128,7 @@
   usb_amd_prefetch_quirk
 
 # required by ohci-platform.ko
+  device_wakeup_enable
   usb_create_hcd
 
 # required by phy-qcom-qmp.ko
@@ -1444,6 +1446,7 @@
 
 # required by xhci-hcd.ko
   add_timer
+  iommu_get_domain_for_dev
   mod_delayed_work_on
   __num_online_cpus
   param_ops_ullong
@@ -1482,3 +1485,7 @@
 # required by xhci-plat-hcd.ko
   of_usb_host_tpl_support
   __usb_create_hcd
+
+# preserved by --additions-only
+  pcie_capability_write_word
+  platform_device_add_data
