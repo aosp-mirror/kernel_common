@@ -1086,6 +1086,7 @@
   devfreq_suspend_device
   devm_clk_register
   devm_devfreq_add_device
+  devm_pm_runtime_enable
   devm_regulator_get_exclusive
   dev_pm_opp_find_freq_floor
   dev_pm_opp_get_freq
@@ -1177,7 +1178,6 @@
   drm_dp_link_rate_to_bw_code
   drm_dp_link_train_channel_eq_delay
   drm_dp_link_train_clock_recovery_delay
-  drm_edid_block_valid
   drm_encoder_cleanup
   drm_encoder_init
   drm_flip_work_cleanup
@@ -1812,6 +1812,7 @@
 
 # preserved by --additions-only
   drm_connector_init_with_ddc
+  drm_edid_block_valid
   gpiod_direction_input
   idr_alloc_u32
   of_clk_get_by_name
