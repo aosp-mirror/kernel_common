@@ -1883,12 +1883,17 @@ static inline void kvm_arch_vcpu_set_sched_attr(struct kvm_vcpu_arch *arch,
 		union vcpu_sched_attr attr)
 {
 	u8 boost_type = KVM_PVSCHED_BOOST_TASKPRIO;
+	int normal_prio = __sched_normal_prio(attr);
+
+	/*
+	 * If current priority of the vcpu task is same as its
+	 * previous priority, we need not update arch->pv_sched.
+	 */
+	if (normal_prio == arch->pv_sched.normal_prio)
+		return;
 
 	arch->pv_sched.attr = attr;
 	arch->pv_sched.normal_prio = __sched_normal_prio(attr);
-
-	if (attr.pad == arch->pv_sched.attr.pad)
-		return;
 
 	if (attr.kern_cs)
 		boost_type = KVM_PVSCHED_BOOST_KERNCS;
