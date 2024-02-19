@@ -431,7 +431,9 @@ SYM_CODE_END(__swpan_exit_el0)
 
 	.macro	irq_stack_entry
 	mov	x19, sp			// preserve the original sp
-	scs_save tsk			// preserve the original shadow stack
+#ifdef CONFIG_SHADOW_CALL_STACK
+	mov	x24, scs_sp		// preserve the original shadow stack
+#endif
 
 	/*
 	 * Compare sp with the base of the task stack.
@@ -465,7 +467,9 @@ SYM_CODE_END(__swpan_exit_el0)
 	 */
 	.macro	irq_stack_exit
 	mov	sp, x19
-	scs_load_current
+#ifdef CONFIG_SHADOW_CALL_STACK
+	mov	scs_sp, x24
+#endif
 	.endm
 
 /* GPRs used by entry code */
