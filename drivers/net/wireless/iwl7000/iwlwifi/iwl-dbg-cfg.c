@@ -47,6 +47,7 @@ const struct iwl_dbg_cfg default_dbg_config = {
 #undef IWL_MVM_MOD_PARAM
 #undef IWL_DBG_CFG_FN
 };
+EXPORT_SYMBOL_IF_IWLWIFI_KUNIT(default_dbg_config);
 
 static const char dbg_cfg_magic[] = "[IWL DEBUG CONFIG DATA]";
 
