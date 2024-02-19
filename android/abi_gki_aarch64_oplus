@@ -523,6 +523,7 @@
   __traceiter_android_vh_free_oem_binder_struct
   __traceiter_android_vh_binder_special_task
   __traceiter_android_vh_binder_free_buf
+  __traceiter_android_vh_binder_buffer_release
   __tracepoint_android_rvh_check_preempt_wakeup_ignore
   __tracepoint_android_rvh_do_serror
   __tracepoint_android_rvh_pick_next_entity
@@ -660,6 +661,7 @@
   __tracepoint_android_vh_free_oem_binder_struct
   __tracepoint_android_vh_binder_special_task
   __tracepoint_android_vh_binder_free_buf
+  __tracepoint_android_vh_binder_buffer_release
   try_to_free_mem_cgroup_pages
   __ubsan_handle_cfi_check_fail_abort
   unlock_page
