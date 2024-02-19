@@ -238,7 +238,6 @@ _ieee802_11_parse_elems_full(struct ieee80211_elems_parse_params *params,
 		case WLAN_EID_CF_PARAMS:
 		case WLAN_EID_TIM:
 		case WLAN_EID_IBSS_PARAMS:
-		case WLAN_EID_QBSS_LOAD:
 		case WLAN_EID_CHALLENGE:
 		case WLAN_EID_RSN:
 		case WLAN_EID_ERP_INFO:
@@ -330,13 +329,6 @@ _ieee802_11_parse_elems_full(struct ieee80211_elems_parse_params *params,
 				elems->tim = (void *)pos;
 				elems->tim_len = elen;
 			} else
-				elem_parse_failed =
-					IEEE80211_PARSE_ERR_BAD_ELEM_SIZE;
-			break;
-		case WLAN_EID_QBSS_LOAD:
-			if (elen == sizeof(struct ieee80211_bss_load_elem))
-				elems->bss_load = (void *)pos;
-			else
 				elem_parse_failed =
 					IEEE80211_PARSE_ERR_BAD_ELEM_SIZE;
 			break;

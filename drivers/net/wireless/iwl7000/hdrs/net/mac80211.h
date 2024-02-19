@@ -675,11 +675,6 @@ struct ieee80211_fils_discovery {
  *	processed after it switches back to %NULL.
  * @color_change_active: marks whether a color change is ongoing.
  * @color_change_color: the bss color that will be used after the change.
- * @channel_util: Channel utilization as published by the AP in the
- *	WLAN_EID_QBSS_LOAD information element. An unsigned integer in the
- *	range [0,255], when 255 means the 100% busy. Valid only for a
- *	station, and only when associated. Will be -1 if AP didn't
- *	send the element.
  * @ht_ldpc: in AP mode, indicates interface has HT LDPC capability.
  * @vht_ldpc: in AP mode, indicates interface has VHT LDPC capability.
  * @he_ldpc: in AP mode, indicates interface has HE LDPC capability.
@@ -785,8 +780,6 @@ struct ieee80211_bss_conf {
 
 	bool color_change_active;
 	u8 color_change_color;
-
-	s16 channel_util;
 
 	bool ht_ldpc;
 	bool vht_ldpc;

@@ -1765,7 +1765,6 @@ struct ieee802_11_elems {
 	const struct ieee80211_multi_link_elem *ml_reconf;
 	const struct ieee80211_bandwidth_indication *bandwidth_indication;
 	const struct ieee80211_ttlm_elem *ttlm[IEEE80211_TTLM_MAX_CNT];
-	const struct ieee80211_bss_load_elem *bss_load;
 
 	/* length of them, respectively */
 	u8 ext_capab_len;
