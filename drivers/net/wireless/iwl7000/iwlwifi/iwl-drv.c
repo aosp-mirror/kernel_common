@@ -2107,7 +2107,7 @@ struct iwl_drv *iwl_drv_start(struct iwl_trans *trans)
 	INIT_LIST_HEAD(&drv->list);
 
 #ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
-	trans->dbg_cfg = current_dbg_config;
+	trans->dbg_cfg = default_dbg_config;
 	iwl_dbg_cfg_load_ini(drv->trans->dev, &drv->trans->dbg_cfg);
 #endif
 

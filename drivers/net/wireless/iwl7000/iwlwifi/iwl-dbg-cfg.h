@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
- * Copyright (C) 2013-2015, 2018-2023 Intel Corporation
+ * Copyright (C) 2013-2015, 2018-2024 Intel Corporation
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
  */
 #if !defined(__IWL_DBG_CFG_H__) || defined(DBG_CFG_REINCLUDE)
@@ -316,7 +316,7 @@ struct iwl_dbg_cfg {
 #ifndef DBG_CFG_REINCLUDE
 };
 
-extern struct iwl_dbg_cfg current_dbg_config;
+extern const struct iwl_dbg_cfg default_dbg_config;
 void iwl_dbg_cfg_free(struct iwl_dbg_cfg *dbgcfg);
 void iwl_dbg_cfg_load_ini(struct device *dev, struct iwl_dbg_cfg *dbgcfg);
 #endif /* DBG_CFG_REINCLUDE */

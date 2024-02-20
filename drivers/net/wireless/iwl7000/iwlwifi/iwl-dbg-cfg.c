@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
- * Copyright (C) 2013-2015, 2019-2020, 2022-2023 Intel Corporation
+ * Copyright (C) 2013-2015, 2019-2020, 2022-2024 Intel Corporation
  * Copyright (C) 2016 Intel Deutschland GmbH
  */
 #include <linux/types.h>
@@ -21,7 +21,7 @@
 #include "mvm/constants.h"
 #endif
 
-struct iwl_dbg_cfg current_dbg_config = {
+const struct iwl_dbg_cfg default_dbg_config = {
 #define DBG_CFG_REINCLUDE
 #define IWL_DBG_CFG(type, name) \
 	.name = IWL_ ## name,
