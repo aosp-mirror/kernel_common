@@ -770,34 +770,22 @@ static const struct avs_hipc_spec cnl_hipc_spec = {
 
 static const struct avs_spec skl_desc = {
 	.name = "skl",
-	.min_fw_version = {
-		.major = 9,
-		.minor = 21,
-		.hotfix = 0,
-		.build = 4732,
-	},
+	.min_fw_version = { 9, 21, 0, 4732 },
 	.dsp_ops = &avs_skl_dsp_ops,
 	.core_init_mask = 1,
 	.attributes = AVS_PLATATTR_CLDMA,
-	.sram_base_offset = SKL_ADSP_SRAM_BASE_OFFSET,
-	.sram_window_size = SKL_ADSP_SRAM_WINDOW_SIZE,
-	.rom_status = SKL_ADSP_SRAM_BASE_OFFSET,
+	.sram = &skl_sram_spec,
+	.hipc = &skl_hipc_spec,
 };
 
 static const struct avs_spec apl_desc = {
 	.name = "apl",
-	.min_fw_version = {
-		.major = 9,
-		.minor = 22,
-		.hotfix = 1,
-		.build = 4323,
-	},
+	.min_fw_version = { 9, 22, 1, 4323 },
 	.dsp_ops = &avs_apl_dsp_ops,
 	.core_init_mask = 3,
 	.attributes = AVS_PLATATTR_IMR,
-	.sram_base_offset = APL_ADSP_SRAM_BASE_OFFSET,
-	.sram_window_size = APL_ADSP_SRAM_WINDOW_SIZE,
-	.rom_status = APL_ADSP_SRAM_BASE_OFFSET,
+	.sram = &apl_sram_spec,
+	.hipc = &skl_hipc_spec,
 };
 
 static const struct avs_spec cnl_desc = {
