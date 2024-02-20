@@ -13,9 +13,9 @@
 #include "path.h"
 #include "topology.h"
 
-static int __maybe_unused
-apl_enable_logs(struct avs_dev *adev, enum avs_log_enable enable, u32 aging_period,
-		u32 fifo_full_period, unsigned long resource_mask, u32 *priorities)
+#ifdef CONFIG_DEBUG_FS
+int avs_apl_enable_logs(struct avs_dev *adev, enum avs_log_enable enable, u32 aging_period,
+			u32 fifo_full_period, unsigned long resource_mask, u32 *priorities)
 {
 	struct apl_log_state_info *info;
 	u32 size, num_cores = adev->hw_cfg.dsp_cores;
@@ -47,8 +47,9 @@ apl_enable_logs(struct avs_dev *adev, enum avs_log_enable enable, u32 aging_peri
 
 	return 0;
 }
+#endif
 
-static int apl_log_buffer_status(struct avs_dev *adev, union avs_notify_msg *msg)
+int avs_apl_log_buffer_status(struct avs_dev *adev, union avs_notify_msg *msg)
 {
 	struct apl_log_buffer_layout layout;
 	void __iomem *addr, *buf;
@@ -101,7 +102,7 @@ static int apl_wait_log_entry(struct avs_dev *adev, u32 core, struct apl_log_buf
 /* reads log header and tests its type */
 #define apl_is_entry_stackdump(addr) ((readl(addr) >> 30) & 0x1)
 
-static int apl_coredump(struct avs_dev *adev, union avs_notify_msg *msg)
+int avs_apl_coredump(struct avs_dev *adev, union avs_notify_msg *msg)
 {
 	struct apl_log_buffer_layout layout;
 	void __iomem *addr, *buf;
@@ -201,7 +202,7 @@ static bool apl_lp_streaming(struct avs_dev *adev)
 	return true;
 }
 
-static bool apl_d0ix_toggle(struct avs_dev *adev, struct avs_ipc_msg *tx, bool wake)
+bool avs_apl_d0ix_toggle(struct avs_dev *adev, struct avs_ipc_msg *tx, bool wake)
 {
 	/* wake in all cases */
 	if (wake)
@@ -218,7 +219,7 @@ static bool apl_d0ix_toggle(struct avs_dev *adev, struct avs_ipc_msg *tx, bool w
 	return apl_lp_streaming(adev);
 }
 
-static int apl_set_d0ix(struct avs_dev *adev, bool enable)
+int avs_apl_set_d0ix(struct avs_dev *adev, bool enable)
 {
 	bool streaming = false;
 	int ret;
