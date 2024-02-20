@@ -363,21 +363,21 @@ enum avs_skl_log_priority {
 	AVS_SKL_LOG_VERBOSE,
 };
 
-struct skl_log_state {
+struct avs_skl_log_state {
 	u32 enable;
 	u32 min_priority;
 } __packed;
 
-struct skl_log_state_info {
+struct avs_skl_log_state_info {
 	u32 core_mask;
-	struct skl_log_state logs_core[];
+	struct avs_skl_log_state logs_core[];
 } __packed;
 
-struct apl_log_state_info {
+struct avs_apl_log_state_info {
 	u32 aging_timer_period;
 	u32 fifo_full_timer_period;
 	u32 core_mask;
-	struct skl_log_state logs_core[];
+	struct avs_skl_log_state logs_core[];
 } __packed;
 
 enum avs_icl_log_priority {

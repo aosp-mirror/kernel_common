@@ -357,21 +357,21 @@ static inline int avs_log_buffer_status_locked(struct avs_dev *adev, union avs_n
 	return ret;
 }
 
-struct apl_log_buffer_layout {
+struct avs_apl_log_buffer_layout {
 	u32 read_ptr;
 	u32 write_ptr;
 	u8 buffer[];
 } __packed;
 
-#define apl_log_payload_size(adev) \
-	(avs_log_buffer_size(adev) - sizeof(struct apl_log_buffer_layout))
+#define avs_apl_log_payload_size(adev) \
+	(avs_log_buffer_size(adev) - sizeof(struct avs_apl_log_buffer_layout))
 
-#define apl_log_payload_addr(addr) \
-	(addr + sizeof(struct apl_log_buffer_layout))
+#define avs_apl_log_payload_addr(addr) \
+	(addr + sizeof(struct avs_apl_log_buffer_layout))
 
 #ifdef CONFIG_DEBUG_FS
 #define AVS_SET_ENABLE_LOGS_OP(name) \
-	.enable_logs = name##_enable_logs
+	.enable_logs = avs_##name##_enable_logs
 
 bool avs_logging_fw(struct avs_dev *adev);
 void avs_dump_fw_log(struct avs_dev *adev, const void __iomem *src, unsigned int len);
