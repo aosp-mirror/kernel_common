@@ -268,13 +268,13 @@ int cam_io_dump(void __iomem *base_addr, uint32_t start_offset, int size)
 	p_str = line_str;
 	for (i = 0; i < size; i++) {
 		if (i % NUM_REGISTER_PER_LINE == 0) {
-			snprintf(p_str, 12, "0x%08x: ",
+			snprintf(p_str, 13, "0x%08x: ",
 				REG_OFFSET(start_offset, i));
-			p_str += 11;
+			p_str += 12;
 		}
 		data = readl_relaxed(base_addr + REG_OFFSET(start_offset, i));
-		snprintf(p_str, 10, "%08x  ", data);
-		p_str += 9;
+		snprintf(p_str, 11, "%08x  ", data);
+		p_str += 10;
 		if ((i + 1) % NUM_REGISTER_PER_LINE == 0) {
 			CAM_ERR(CAM_UTIL, "%s", line_str);
 			line_str[0] = '\0';
