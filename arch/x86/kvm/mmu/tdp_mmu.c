@@ -967,7 +967,8 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 	else
 		wrprot = make_spte(vcpu, sp, fault->slot, ACC_ALL, iter->gfn,
 				   fault->pfn, iter->old_spte, fault->prefetch, true,
-				   fault->map_writable, true, &new_spte);
+				   fault->map_writable, !!fault->accessed_page,
+				   &new_spte);
 
 	if (new_spte == iter->old_spte)
 		ret = RET_PF_SPURIOUS;

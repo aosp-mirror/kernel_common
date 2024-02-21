@@ -3091,10 +3091,16 @@ void kvm_set_page_dirty(struct page *page)
 }
 EXPORT_SYMBOL_GPL(kvm_set_page_dirty);
 
-void kvm_set_page_accessed(struct page *page)
+static void __kvm_set_page_accessed(struct page *page)
 {
 	if (kvm_is_ad_tracked_page(page))
 		mark_page_accessed(page);
+}
+
+void kvm_set_page_accessed(struct page *page)
+{
+	if (page)
+		__kvm_set_page_accessed(page);
 }
 EXPORT_SYMBOL_GPL(kvm_set_page_accessed);
 
@@ -3105,7 +3111,7 @@ void kvm_release_page_clean(struct page *page)
 	if (!page)
 		return;
 
-	kvm_set_page_accessed(page);
+	__kvm_set_page_accessed(page);
 	put_page(page);
 }
 EXPORT_SYMBOL_GPL(kvm_release_page_clean);

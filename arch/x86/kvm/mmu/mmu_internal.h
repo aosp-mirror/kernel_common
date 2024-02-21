@@ -238,6 +238,8 @@ struct kvm_page_fault {
 	kvm_pfn_t pfn;
 	hva_t hva;
 	bool map_writable;
+	/* Does NOT have an elevated refcount */
+	struct page *accessed_page;
 
 	/*
 	 * Indicates the guest is trying to write a gfn that contains one or
