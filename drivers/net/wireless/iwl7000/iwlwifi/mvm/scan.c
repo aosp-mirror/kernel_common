@@ -2874,9 +2874,11 @@ static void iwl_mvm_fill_respect_p2p_go(struct iwl_mvm *mvm,
 	}
 }
 
-int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
-			   struct cfg80211_scan_request *req,
-			   struct ieee80211_scan_ies *ies)
+static int _iwl_mvm_single_scan_start(struct iwl_mvm *mvm,
+				      struct ieee80211_vif *vif,
+				      struct cfg80211_scan_request *req,
+				      struct ieee80211_scan_ies *ies,
+				      int type)
 {
 	struct iwl_host_cmd hcmd = {
 		.len = { iwl_mvm_scan_size(mvm), },
@@ -2894,7 +2896,7 @@ int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		return -EBUSY;
 	}
 
-	ret = iwl_mvm_check_running_scans(mvm, IWL_MVM_SCAN_REGULAR);
+	ret = iwl_mvm_check_running_scans(mvm, type);
 	if (ret)
 		return ret;
 
@@ -2945,8 +2947,7 @@ int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	iwl_mvm_scan_6ghz_passive_scan(mvm, &params, vif);
 
-	uid = iwl_mvm_build_scan_cmd(mvm, vif, &hcmd, &params,
-				     IWL_MVM_SCAN_REGULAR);
+	uid = iwl_mvm_build_scan_cmd(mvm, vif, &hcmd, &params, type);
 
 	if (uid < 0)
 		return uid;
@@ -2966,7 +2967,7 @@ int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	}
 
 	IWL_DEBUG_SCAN(mvm, "Scan request was sent successfully\n");
-	mvm->scan_status |= IWL_MVM_SCAN_REGULAR;
+	mvm->scan_status |= type;
 	mvm->scan_vif = iwl_mvm_vif_from_mac80211(vif);
 
 	if (params.enable_6ghz_passive)
@@ -2976,6 +2977,14 @@ int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 			      msecs_to_jiffies(SCAN_TIMEOUT));
 
 	return 0;
+}
+
+int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
+			   struct cfg80211_scan_request *req,
+			   struct ieee80211_scan_ies *ies)
+{
+	return _iwl_mvm_single_scan_start(mvm, vif, req, ies,
+					  IWL_MVM_SCAN_REGULAR);
 }
 
 int iwl_mvm_sched_scan_start(struct iwl_mvm *mvm,
