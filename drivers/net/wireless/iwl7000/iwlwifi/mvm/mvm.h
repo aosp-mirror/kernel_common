@@ -358,7 +358,7 @@ struct iwl_mvm_vif_link_info {
  * @IWL_MVM_ESR_BLOCKED_COEX: COEX is preventing the enablement of EMLSR
  */
 enum iwl_mvm_esr_state {
-	IWL_MVM_ESR_BLOCKED_COEX	= BIT(0),
+	IWL_MVM_ESR_BLOCKED_COEX	= 0x1,
 };
 
 /**

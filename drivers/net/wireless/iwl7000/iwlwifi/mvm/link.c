@@ -714,7 +714,7 @@ void iwl_mvm_exit_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	new_active_links = BIT(link_to_keep);
 	IWL_DEBUG_INFO(mvm,
-		       "Exiting EMLSR. Reason = %d. Current active links=0x%x, new active links = 0x%x\n",
+		       "Exiting EMLSR. Reason = 0x%x. Current active links=0x%x, new active links = 0x%x\n",
 		       reason, vif->active_links, new_active_links);
 
 	ieee80211_set_active_links_async(vif, new_active_links);
@@ -735,7 +735,7 @@ void iwl_mvm_block_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		return;
 
 	if (!(mvmvif->esr_disable_reason & reason))
-		IWL_DEBUG_INFO(mvm, "Blocking EMSLR mode. reason = %d\n",
+		IWL_DEBUG_INFO(mvm, "Blocking EMSLR mode. reason = 0x%x\n",
 			       reason);
 
 	mvmvif->esr_disable_reason |= reason;
@@ -755,7 +755,7 @@ void iwl_mvm_unblock_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		return;
 
 	if (mvmvif->esr_disable_reason & reason)
-		IWL_DEBUG_INFO(mvm, "Unblocking EMSLR mode. reason = %d\n",
+		IWL_DEBUG_INFO(mvm, "Unblocking EMSLR mode. reason = 0x%x\n",
 			       reason);
 
 	mvmvif->esr_disable_reason &= ~reason;
