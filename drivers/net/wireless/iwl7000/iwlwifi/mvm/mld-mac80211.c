@@ -258,6 +258,9 @@ static int iwl_mvm_esr_mode_active(struct iwl_mvm *mvm,
 		link->phy_ctxt->rlc_disabled = true;
 	}
 
+	/* Needed for tracking RSSI */
+	iwl_mvm_request_periodic_system_statistics(mvm, true);
+
 	return ret;
 }
 
@@ -300,6 +303,7 @@ static int __iwl_mvm_mld_assign_vif_chanctx(struct iwl_mvm *mvm,
 		ret = iwl_mvm_esr_mode_active(mvm, vif);
 		if (ret) {
 			IWL_ERR(mvm, "failed to activate ESR mode (%d)\n", ret);
+			iwl_mvm_request_periodic_system_statistics(mvm, false);
 			goto out;
 		}
 	}
@@ -427,6 +431,8 @@ static int iwl_mvm_esr_mode_inactive(struct iwl_mvm *mvm,
 		if (ret)
 			break;
 	}
+
+	iwl_mvm_request_periodic_system_statistics(mvm, false);
 
 	return ret;
 }
