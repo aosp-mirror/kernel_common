@@ -1250,11 +1250,7 @@ static int cam_smmu_map_to_pool(struct iommu_domain *domain,
 	 * iommu_map_sgtable() will map the entire sgtable, even if
 	 * the assumed buffer size is smaller. Use the real buffer size
 	 * for IOVA space allocation to take care of this.
-	 *
-	 * For allocations in CAM_SMMU_REGION_SHARED region the size is zero.
 	 */
-	WARN_ON_ONCE(*size && buffer_size > *size);
-
 	*iova = gen_pool_alloc(pool, buffer_size);
 	if (!*iova)
 		return -ENOMEM;
