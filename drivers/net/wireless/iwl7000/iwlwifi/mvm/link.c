@@ -668,6 +668,8 @@ void iwl_mvm_select_links(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 		new_active_links = BIT(best_link->link_id);
 	}
 set_active:
+	IWL_DEBUG_INFO(mvm, "Link selection result: 0x%x. Primary = %d\n",
+		       new_active_links, primary_link);
 	ieee80211_set_active_links_async(vif, new_active_links);
 	mvmvif->primary_link = primary_link;
 }
