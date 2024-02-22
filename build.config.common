@@ -1,5 +1,6 @@
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.constants
 
+BRANCH=android-mainline
 LLVM=1
 DEPMOD=depmod
 CLANG_PREBUILT_BIN=prebuilts/clang/host/linux-x86/clang-${CLANG_VERSION}/bin
