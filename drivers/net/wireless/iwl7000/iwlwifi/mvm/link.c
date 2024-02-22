@@ -490,7 +490,7 @@ unsigned int iwl_mvm_get_link_grade(struct ieee80211_bss_conf *link_conf)
 		      "Invalid band (%u)\n", band))
 		return 0;
 
-	link_rssi = link_conf->bss->signal;
+	link_rssi = MBM_TO_DBM(link_conf->bss->signal);
 	/*
 	 * For 6 GHz the RSSI of the beacons is lower than
 	 * the RSSI of the data.
