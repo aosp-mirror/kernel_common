@@ -334,7 +334,7 @@ static int hyp_set_prot_attr(enum kvm_pgtable_prot prot, kvm_pte_t *ptep)
 					       KVM_PTE_LEAF_ATTR_LO_S1_AP_RO;
 	bool device = prot & KVM_PGTABLE_PROT_DEVICE;
 	u32 sh = KVM_PTE_LEAF_ATTR_LO_S1_SH_IS;
-	bool nc = prot & KVM_PGTABLE_PROT_NC;
+	bool nc = prot & KVM_PGTABLE_PROT_NORMAL_NC;
 	kvm_pte_t attr;
 	u32 mtype;
 
@@ -652,37 +652,30 @@ void kvm_tlb_flush_vmid_range(struct kvm_s2_mmu *mmu,
 static int stage2_set_prot_attr(struct kvm_pgtable *pgt, enum kvm_pgtable_prot prot,
 		kvm_pte_t *ptep)
 {
-	u64 exec_type = KVM_PTE_LEAF_ATTR_HI_S2_XN_XN;
-	bool device = prot & KVM_PGTABLE_PROT_DEVICE;
 	u32 sh = KVM_PTE_LEAF_ATTR_LO_S2_SH_IS;
-	bool nc = prot & KVM_PGTABLE_PROT_NC;
-	enum kvm_pgtable_prot exec_prot;
 	kvm_pte_t attr;
 
-	if (device)
+	switch (prot & (KVM_PGTABLE_PROT_DEVICE |
+			KVM_PGTABLE_PROT_NORMAL_NC)) {
+	case KVM_PGTABLE_PROT_DEVICE | KVM_PGTABLE_PROT_NORMAL_NC:
+		return -EINVAL;
+	case KVM_PGTABLE_PROT_DEVICE:
+		if (prot & KVM_PGTABLE_PROT_X)
+			return -EINVAL;
 		attr = KVM_S2_MEMATTR(pgt, DEVICE_nGnRE);
-	else if (nc)
-		attr = KVM_S2_MEMATTR(pgt, NORMAL_NC);
-	else
-		attr = KVM_S2_MEMATTR(pgt, NORMAL);
-
-	exec_prot = prot & (KVM_PGTABLE_PROT_X | KVM_PGTABLE_PROT_PXN | KVM_PGTABLE_PROT_UXN);
-	switch(exec_prot) {
-	case KVM_PGTABLE_PROT_X:
-		goto set_ap;
-	case KVM_PGTABLE_PROT_PXN:
-		exec_type = KVM_PTE_LEAF_ATTR_HI_S2_XN_PXN;
 		break;
-	case KVM_PGTABLE_PROT_UXN:
-		exec_type = KVM_PTE_LEAF_ATTR_HI_S2_XN_UXN;
+	case KVM_PGTABLE_PROT_NORMAL_NC:
+		if (prot & KVM_PGTABLE_PROT_X)
+			return -EINVAL;
+		attr = KVM_S2_MEMATTR(pgt, NORMAL_NC);
 		break;
 	default:
-		if (exec_prot)
-			return -EINVAL;
+		attr = KVM_S2_MEMATTR(pgt, NORMAL);
 	}
-	attr |= FIELD_PREP(KVM_PTE_LEAF_ATTR_HI_S2_XN, exec_type);
 
-set_ap:
+	if (!(prot & KVM_PGTABLE_PROT_X))
+		attr |= KVM_PTE_LEAF_ATTR_HI_S2_XN;
+
 	if (prot & KVM_PGTABLE_PROT_R)
 		attr |= KVM_PTE_LEAF_ATTR_LO_S2_S2AP_R;
 
