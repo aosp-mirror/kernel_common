@@ -676,7 +676,7 @@ __poll_t ring_buffer_poll_wait(struct ring_buffer *buffer, int cpu,
 		work = &buffer->irq_work;
 	else {
 		if (!cpumask_test_cpu(cpu, buffer->cpumask))
-			return -EINVAL;
+			return EPOLLERR;
 
 		cpu_buffer = buffer->buffers[cpu];
 		work = &cpu_buffer->irq_work;
