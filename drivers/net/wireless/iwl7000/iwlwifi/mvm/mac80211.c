@@ -4036,24 +4036,6 @@ out:
 	return callbacks->update_sta(mvm, vif, sta);
 }
 
-static void iwl_mvm_bt_coex_update_vif_esr(struct iwl_mvm *mvm,
-					   struct ieee80211_vif *vif)
-{
-	unsigned long usable_links = ieee80211_vif_usable_links(vif);
-	u8 link_id;
-
-	for_each_set_bit(link_id, &usable_links, IEEE80211_MLD_MAX_NUM_LINKS) {
-		struct ieee80211_bss_conf *link_conf =
-			link_conf_dereference_protected(vif, link_id);
-
-		if (WARN_ON_ONCE(!link_conf))
-			return;
-
-		if (link_conf->chanreq.oper.chan->band == NL80211_BAND_2GHZ)
-			iwl_mvm_bt_coex_update_link_esr(mvm, vif, link_id);
-	}
-}
-
 static void iwl_mvm_prevent_esr_done_wk(struct wiphy *wiphy,
 					struct wiphy_work *wk)
 {
@@ -4100,9 +4082,6 @@ iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 
 		wiphy_delayed_work_init(&mvmvif->prevent_esr_done_wk,
 					iwl_mvm_prevent_esr_done_wk);
-
-		/* Calculate eSR mode due to BT coex */
-		iwl_mvm_bt_coex_update_vif_esr(mvm, vif);
 
 		/* when client is authorized (AP station marked as such),
 		 * try to enable the best link(s).
