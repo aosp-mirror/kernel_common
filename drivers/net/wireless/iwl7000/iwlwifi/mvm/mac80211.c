@@ -4091,6 +4091,9 @@ iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 #endif
 		iwl_mvm_block_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_TPT, 0);
 
+		/* Block until FW notif will arrive */
+		iwl_mvm_block_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_FW, 0);
+
 		wiphy_delayed_work_init(&mvmvif->prevent_esr_done_wk,
 					iwl_mvm_prevent_esr_done_wk);
 
