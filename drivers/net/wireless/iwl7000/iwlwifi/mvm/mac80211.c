@@ -4072,7 +4072,7 @@ iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 		WARN_ON(iwl_mvm_enable_beacon_filter(mvm, vif));
 
 		mvmvif->authorized = 1;
-		mvmvif->link_selection_res = 0;
+		mvmvif->link_selection_res = vif->active_links;
 
 		callbacks->mac_ctxt_changed(mvm, vif, false);
 		iwl_mvm_mei_host_associated(mvm, vif, mvm_sta);
@@ -4139,6 +4139,9 @@ iwl_mvm_sta_state_authorized_to_assoc(struct iwl_mvm *mvm,
 
 		wiphy_delayed_work_cancel(mvm->hw->wiphy,
 					  &mvmvif->prevent_esr_done_wk);
+
+		wiphy_delayed_work_cancel(mvm->hw->wiphy,
+					  &mvmvif->mlo_int_scan_wk);
 
 		/* No need for the periodic statistics anymore */
 		if (ieee80211_vif_is_mld(vif) && mvmvif->esr_active)

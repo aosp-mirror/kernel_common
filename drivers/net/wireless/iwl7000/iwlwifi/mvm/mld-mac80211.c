@@ -4,6 +4,20 @@
  */
 #include "mvm.h"
 
+static void iwl_mvm_mlo_int_scan_wk(struct wiphy *wiphy, struct wiphy_work *wk)
+{
+	struct iwl_mvm_vif *mvmvif = container_of(wk, struct iwl_mvm_vif,
+						  mlo_int_scan_wk.work);
+	struct ieee80211_vif *vif =
+		container_of((void *)mvmvif, struct ieee80211_vif, drv_priv);
+
+	mutex_lock(&mvmvif->mvm->mutex);
+
+	iwl_mvm_int_mlo_scan(mvmvif->mvm, vif);
+
+	mutex_unlock(&mvmvif->mvm->mutex);
+}
+
 static int iwl_mvm_mld_mac_add_interface(struct ieee80211_hw *hw,
 					 struct ieee80211_vif *vif)
 {
@@ -76,6 +90,8 @@ static int iwl_mvm_mld_mac_add_interface(struct ieee80211_hw *hw,
 	iwl_mvm_tcm_add_vif(mvm, vif);
 	INIT_DELAYED_WORK(&mvmvif->csa_work,
 			  iwl_mvm_channel_switch_disconnect_wk);
+	wiphy_delayed_work_init(&mvmvif->mlo_int_scan_wk,
+				iwl_mvm_mlo_int_scan_wk);
 
 	if (vif->type == NL80211_IFTYPE_MONITOR) {
 		mvm->monitor_on = true;
