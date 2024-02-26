@@ -126,6 +126,7 @@ const struct pkvm_module_ops module_ops = {
 	.hyp_alloc_missing_donations = hyp_alloc_missing_donations,
 	.list_add_valid = __list_add_valid,
 	.list_del_entry_valid = __list_del_entry_valid,
+	.iommu_iotlb_gather_add_page = kvm_iommu_iotlb_gather_add_page,
 };
 
 int __pkvm_init_module(void *module_init)
