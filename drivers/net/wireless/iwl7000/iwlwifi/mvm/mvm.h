@@ -2042,14 +2042,6 @@ struct iwl_mvm_link_sel_data {
 	u16 grade;
 };
 
-u8 iwl_mvm_set_link_selection_data(struct ieee80211_vif *vif,
-				   struct iwl_mvm_link_sel_data *data,
-				   unsigned long usable_links,
-				   u8 *best_link_idx);
-bool iwl_mvm_mld_valid_link_pair(struct ieee80211_vif *vif,
-				 const struct iwl_mvm_link_sel_data *a,
-				 const struct iwl_mvm_link_sel_data *b);
-
 /* AP and IBSS */
 bool iwl_mvm_start_ap_ibss_common(struct ieee80211_hw *hw,
 				  struct ieee80211_vif *vif, int *ret);
