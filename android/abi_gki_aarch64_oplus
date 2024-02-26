@@ -3721,4 +3721,6 @@
   xhci_ring_cmd_db
   xhci_ring_free
   xhci_trb_virt_to_dma
+  xt_register_match
+  xt_unregister_match
   zero_pfn
