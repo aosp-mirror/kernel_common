@@ -4090,6 +4090,7 @@ iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 		WARN_ON(iwl_mvm_enable_beacon_filter(mvm, vif));
 
 		mvmvif->authorized = 1;
+		mvmvif->link_selection_res = 0;
 
 		callbacks->mac_ctxt_changed(mvm, vif, false);
 		iwl_mvm_mei_host_associated(mvm, vif, mvm_sta);
@@ -4152,6 +4153,7 @@ iwl_mvm_sta_state_authorized_to_assoc(struct iwl_mvm *mvm,
 		 * time.
 		 */
 		mvmvif->authorized = 0;
+		mvmvif->link_selection_res = 0;
 
 		/* disable beacon filtering */
 		iwl_mvm_disable_beacon_filter(mvm, vif);

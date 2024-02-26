@@ -674,6 +674,7 @@ set_active:
 		       new_active_links, primary_link);
 	ieee80211_set_active_links_async(vif, new_active_links);
 	mvmvif->primary_link = primary_link;
+	mvmvif->link_selection_res = new_active_links;
 }
 
 u8 iwl_mvm_get_primary_link(struct ieee80211_vif *vif)
