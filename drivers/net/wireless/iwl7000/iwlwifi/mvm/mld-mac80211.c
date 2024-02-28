@@ -18,6 +18,18 @@ static void iwl_mvm_mlo_int_scan_wk(struct wiphy *wiphy, struct wiphy_work *wk)
 	mutex_unlock(&mvmvif->mvm->mutex);
 }
 
+static void iwl_mvm_unblock_esr_tpt(struct wiphy *wiphy, struct wiphy_work *wk)
+{
+	struct iwl_mvm_vif *mvmvif =
+		container_of(wk, struct iwl_mvm_vif, unblock_esr_tpt_wk);
+	struct iwl_mvm *mvm = mvmvif->mvm;
+	struct ieee80211_vif *vif = iwl_mvm_get_bss_vif(mvm);
+
+	mutex_lock(&mvm->mutex);
+	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_TPT);
+	mutex_unlock(&mvm->mutex);
+}
+
 static int iwl_mvm_mld_mac_add_interface(struct ieee80211_hw *hw,
 					 struct ieee80211_vif *vif)
 {
@@ -92,6 +104,7 @@ static int iwl_mvm_mld_mac_add_interface(struct ieee80211_hw *hw,
 			  iwl_mvm_channel_switch_disconnect_wk);
 	wiphy_delayed_work_init(&mvmvif->mlo_int_scan_wk,
 				iwl_mvm_mlo_int_scan_wk);
+	wiphy_work_init(&mvmvif->unblock_esr_tpt_wk, iwl_mvm_unblock_esr_tpt);
 
 	if (vif->type == NL80211_IFTYPE_MONITOR) {
 		mvm->monitor_on = true;
@@ -243,6 +256,30 @@ static unsigned int iwl_mvm_mld_count_active_links(struct ieee80211_vif *vif)
 	return n_active;
 }
 
+static void iwl_mvm_restart_mpdu_count(struct iwl_mvm *mvm,
+				       struct iwl_mvm_vif *mvmvif)
+{
+	struct ieee80211_sta *ap_sta = mvmvif->ap_sta;
+	struct iwl_mvm_sta *mvmsta;
+
+	lockdep_assert_held(&mvm->mutex);
+
+	if (WARN_ON(!ap_sta))
+		return;
+
+	mvmsta = iwl_mvm_sta_from_mac80211(ap_sta);
+	if (!mvmsta->mpdu_counters)
+		return;
+
+	for (int q = 0; q < mvm->trans->num_rx_queues; q++) {
+		spin_lock_bh(&mvmsta->mpdu_counters[q].lock);
+		memset(mvmsta->mpdu_counters[q].per_link, 0,
+		       sizeof(mvmsta->mpdu_counters[q].per_link));
+		mvmsta->mpdu_counters[q].window_start = jiffies;
+		spin_unlock_bh(&mvmsta->mpdu_counters[q].lock);
+	}
+}
+
 static int iwl_mvm_esr_mode_active(struct iwl_mvm *mvm,
 				   struct ieee80211_vif *vif)
 {
@@ -276,6 +313,13 @@ static int iwl_mvm_esr_mode_active(struct iwl_mvm *mvm,
 
 	/* Needed for tracking RSSI */
 	iwl_mvm_request_periodic_system_statistics(mvm, true);
+
+	/*
+	 * Restart the MPDU counters and the counting window, so when the
+	 * statistics arrive (which is where we look at the counters) we
+	 * will be at the end of the window.
+	 */
+	iwl_mvm_restart_mpdu_count(mvm, mvmvif);
 
 	return ret;
 }
@@ -449,6 +493,9 @@ static int iwl_mvm_esr_mode_inactive(struct iwl_mvm *mvm,
 	}
 
 	iwl_mvm_request_periodic_system_statistics(mvm, false);
+
+	/* Start a new counting window */
+	iwl_mvm_restart_mpdu_count(mvm, mvmvif);
 
 	return ret;
 }

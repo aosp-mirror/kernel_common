@@ -4086,6 +4086,11 @@ iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 		memset(&mvmvif->last_esr_exit, 0,
 		       sizeof(mvmvif->last_esr_exit));
 
+#ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
+		if (IWL_MVM_ENTER_ESR_TPT_THRESH > 0)
+#endif
+		iwl_mvm_block_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_TPT, 0);
+
 		wiphy_delayed_work_init(&mvmvif->prevent_esr_done_wk,
 					iwl_mvm_prevent_esr_done_wk);
 
@@ -4148,6 +4153,8 @@ iwl_mvm_sta_state_authorized_to_assoc(struct iwl_mvm *mvm,
 
 		wiphy_delayed_work_cancel(mvm->hw->wiphy,
 					  &mvmvif->mlo_int_scan_wk);
+
+		wiphy_work_cancel(mvm->hw->wiphy, &mvmvif->unblock_esr_tpt_wk);
 
 		/* No need for the periodic statistics anymore */
 		if (ieee80211_vif_is_mld(vif) && mvmvif->esr_active)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2022-2023 Intel Corporation
+ * Copyright (C) 2022-2024 Intel Corporation
  */
 #include "mvm.h"
 #include "time-sync.h"
@@ -733,6 +733,18 @@ int iwl_mvm_mld_add_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	}
 
+	/* MPDUs are counted only when EMLSR is possible */
+	if (vif->type == NL80211_IFTYPE_STATION && !vif->p2p &&
+	    !sta->tdls && ieee80211_vif_is_mld(vif)) {
+		mvm_sta->mpdu_counters =
+			kcalloc(mvm->trans->num_rx_queues,
+				sizeof(*mvm_sta->mpdu_counters),
+				GFP_KERNEL);
+		if (mvm_sta->mpdu_counters)
+			for (int q = 0; q < mvm->trans->num_rx_queues; q++)
+				spin_lock_init(&mvm_sta->mpdu_counters[q].lock);
+	}
+
 	return 0;
 
 err:
@@ -858,6 +870,8 @@ int iwl_mvm_mld_rm_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		iwl_mvm_mld_free_sta_link(mvm, mvm_sta, mvm_link_sta,
 					  link_id, stay_in_fw);
 	}
+	kfree(mvm_sta->mpdu_counters);
+	mvm_sta->mpdu_counters = NULL;
 
 	return ret;
 }
