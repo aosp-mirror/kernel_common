@@ -46,6 +46,7 @@
   __traceiter_android_vh_unuse_swap_page
   __traceiter_android_vh_waiting_for_page_migration
   __traceiter_android_vh_should_end_madvise
+  __traceiter_android_vh_exit_check
   __tracepoint_android_rvh_alloc_si
   __tracepoint_android_rvh_alloc_swap_slot_cache
   __tracepoint_android_rvh_drain_slots_cache_cpu
@@ -82,4 +83,5 @@
   __tracepoint_android_vh_unuse_swap_page
   __tracepoint_android_vh_waiting_for_page_migration
   __tracepoint_android_vh_should_end_madvise
+  __tracepoint_android_vh_exit_check
   zero_pfn
