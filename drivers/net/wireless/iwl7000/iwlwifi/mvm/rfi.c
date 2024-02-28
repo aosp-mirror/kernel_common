@@ -354,10 +354,11 @@ void *iwl_rfi_get_freq_table(struct iwl_mvm *mvm)
 		return ERR_PTR(-EIO);
 
 	resp = kmemdup(cmd.resp_pkt->data, resp_size, GFP_KERNEL);
+	iwl_free_resp(&cmd);
+
 	if (!resp)
 		return ERR_PTR(-ENOMEM);
 
-	iwl_free_resp(&cmd);
 	return resp;
 }
 
