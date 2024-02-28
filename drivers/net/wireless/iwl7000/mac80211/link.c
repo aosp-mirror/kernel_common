@@ -391,8 +391,10 @@ static int _ieee80211_set_active_links(struct ieee80211_sub_if_data *sdata,
 		WARN_ON_ONCE(ret);
 	}
 
-	ret = ieee80211_key_switch_links(sdata, rem, add);
-	WARN_ON_ONCE(ret);
+	if (!local->in_reconfig) {
+		ret = ieee80211_key_switch_links(sdata, rem, add);
+		WARN_ON_ONCE(ret);
+	}
 
 	list_for_each_entry(sta, &local->sta_list, list) {
 		if (sdata != sta->sdata)
