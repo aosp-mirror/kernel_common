@@ -5877,6 +5877,9 @@ intel_dp_detect(struct drm_connector *connector,
 	if (ret == 1)
 		intel_connector->base.epoch_counter++;
 
+	if (!intel_dp_is_edp(intel_dp))
+		intel_psr_init_dpcd(intel_dp);
+
 	intel_dp_detect_dsc_caps(intel_dp, intel_connector);
 
 	intel_dp_mst_configure(intel_dp);
