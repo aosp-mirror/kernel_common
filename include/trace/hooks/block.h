@@ -113,6 +113,10 @@ DECLARE_HOOK(android_vh_blk_alloc_flush_queue,
 		 struct blk_flush_queue *fq),
 	TP_ARGS(skip, cmd_size, flags, node, fq));
 
+DECLARE_HOOK(android_vh_blk_mq_sched_insert_request,
+	TP_PROTO(bool *skip, struct request *rq),
+	TP_ARGS(skip, rq));
+
 #endif /* _TRACE_HOOK_BLOCK_H */
 
 /* This part must be outside protection */
