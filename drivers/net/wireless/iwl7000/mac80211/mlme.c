@@ -8331,10 +8331,10 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 #endif
 
 	/* keep some setup (AP STA, channel, ...) if matching */
-	if (ifmgd->auth_data)
-		match_auth = ether_addr_equal(ifmgd->auth_data->ap_addr,
-					      assoc_data->ap_addr) &&
-			     ifmgd->auth_data->link_id == cfg80211_req_link_id(req);
+	match_auth = ifmgd->auth_data &&
+		     ether_addr_equal(ifmgd->auth_data->ap_addr,
+				      assoc_data->ap_addr) &&
+		     ifmgd->auth_data->link_id == cfg80211_req_link_id(req);
 
 	if (cfg80211_req_ap_mld_addr(req)) {
 		uapsd_supported = true;
