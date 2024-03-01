@@ -1236,8 +1236,8 @@ static int ieee80211_put_preq_ies_band(struct sk_buff *skb,
 		return ieee80211_put_s1g_cap(skb, &sband->s1g_cap);
 #endif
 
-	err = ieee80211_put_srates_elem(skb, sband, 0, rate_flags, 0,
-					WLAN_EID_SUPP_RATES);
+	err = ieee80211_put_srates_elem(skb, sband, 0, rate_flags,
+					~rate_mask, WLAN_EID_SUPP_RATES);
 	if (err)
 		return err;
 
@@ -1258,8 +1258,8 @@ static int ieee80211_put_preq_ies_band(struct sk_buff *skb,
 		*offset = noffset;
 	}
 
-	err = ieee80211_put_srates_elem(skb, sband, 0, rate_flags, 0,
-					WLAN_EID_EXT_SUPP_RATES);
+	err = ieee80211_put_srates_elem(skb, sband, 0, rate_flags,
+					~rate_mask, WLAN_EID_EXT_SUPP_RATES);
 	if (err)
 		return err;
 
