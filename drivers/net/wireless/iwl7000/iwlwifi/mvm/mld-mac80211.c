@@ -1191,10 +1191,8 @@ iwl_mvm_mld_change_sta_links(struct ieee80211_hw *hw,
 	return ret;
 }
 
-bool iwl_mvm_esr_allowed_on_vif(struct iwl_mvm *mvm,
-				struct ieee80211_vif *vif)
+bool iwl_mvm_vif_has_esr_cap(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 {
-	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 	const struct wiphy_iftype_ext_capab *ext_capa;
 
 	lockdep_assert_held(&mvm->mutex);
@@ -1208,11 +1206,8 @@ bool iwl_mvm_esr_allowed_on_vif(struct iwl_mvm *mvm,
 
 	ext_capa = cfg80211_get_iftype_ext_capa(mvm->hw->wiphy,
 						ieee80211_vif_type_p2p(vif));
-	if (!ext_capa ||
-	    !(cfg80211_ext_capa_eml_capabilities(ext_capa) & IEEE80211_EML_CAP_EMLSR_SUPP))
-		return false;
-
-	return !mvmvif->esr_disable_reason;
+	return (ext_capa &&
+		(cfg80211_ext_capa_eml_capabilities(ext_capa) & IEEE80211_EML_CAP_EMLSR_SUPP));
 }
 
 static bool iwl_mvm_mld_can_activate_links(struct ieee80211_hw *hw,
@@ -1236,7 +1231,7 @@ static bool iwl_mvm_mld_can_activate_links(struct ieee80211_hw *hw,
 
 	/* If it is an eSR device, check that we can enter eSR */
 	ret = iwl_mvm_is_esr_supported(mvm->fwrt.trans) &&
-	      iwl_mvm_esr_allowed_on_vif(mvm, vif);
+	      iwl_mvm_vif_has_esr_cap(mvm, vif);
 
 unlock:
 	mutex_unlock(&mvm->mutex);
