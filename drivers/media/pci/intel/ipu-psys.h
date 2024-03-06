@@ -120,9 +120,10 @@ struct ipu_psys {
 
 struct ipu_psys_fh {
 	struct ipu_psys *psys;
-	struct mutex mutex;	/* Protects bufmap & kcmds fields */
+	struct mutex mutex;	/* Protects bufs_list & kcmds fields */
 	struct list_head list;
-	struct list_head bufmap;
+	/* Holds all buffers that this fh owns */
+	struct list_head bufs_list;
 	wait_queue_head_t wait;
 	struct ipu_psys_scheduler sched;
 };
