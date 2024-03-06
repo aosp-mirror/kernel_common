@@ -1792,7 +1792,7 @@ void cfg80211_mgmt_tx_status_ext(struct wireless_dev *wdev,
 }
 #endif /* CFG80211_VERSION < KERNEL_VERSION(5,19,0) */
 
-#if CFG80211_VERSION < KERNEL_VERSION(6,4,0)
+#if CFG80211_VERSION < KERNEL_VERSION(6,1,0)
 struct cfg80211_set_hw_timestamp {
 	const u8 *macaddr;
 	bool enable;

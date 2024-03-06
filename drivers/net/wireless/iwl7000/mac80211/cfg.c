@@ -5282,7 +5282,7 @@ ieee80211_del_link_station(struct wiphy *wiphy, struct net_device *dev,
 	return sta_del_link_station(sdata, params);
 }
 
-#if CFG80211_VERSION >= KERNEL_VERSION(6,4,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,1,0)
 static int ieee80211_set_hw_timestamp(struct wiphy *wiphy,
 				      struct net_device *dev,
 				      struct cfg80211_set_hw_timestamp *hwts)
@@ -5474,7 +5474,7 @@ const struct cfg80211_ops mac80211_config_ops = {
 	.mod_link_station = ieee80211_mod_link_station,
 	.del_link_station = ieee80211_del_link_station,
 #endif
-#if CFG80211_VERSION >= KERNEL_VERSION(6,4,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,1,0)
 	.set_hw_timestamp = ieee80211_set_hw_timestamp,
 #endif
 #if CFG80211_VERSION >= KERNEL_VERSION(6,8,0)
