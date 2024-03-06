@@ -100,8 +100,6 @@ struct ipu_psys_pg *__get_pg_buf(struct ipu_psys *psys, size_t pg_size)
 	return kpg;
 }
 
-static int ipu_psys_unmapbuf_locked(int fd, struct ipu_psys_fh *fh,
-				    struct ipu_psys_kbuffer *kbuf);
 struct ipu_psys_kbuffer *ipu_psys_lookup_kbuffer(struct ipu_psys_fh *fh, int fd)
 {
 	struct ipu_psys_kbuffer *kbuf;
@@ -459,6 +457,29 @@ static inline void ipu_psys_kbuf_unmap(struct ipu_psys_kbuffer *kbuf)
 	kbuf->sgt = NULL;
 }
 
+static int ipu_psys_unmapbuf_locked(int fd, struct ipu_psys_fh *fh,
+				    struct ipu_psys_kbuffer *kbuf)
+{
+	struct ipu_psys *psys = fh->psys;
+
+	if (!kbuf || fd != kbuf->fd) {
+		dev_err(&psys->adev->dev, "invalid kbuffer\n");
+		return -EINVAL;
+	}
+
+	/* From now on it is not safe to use this kbuffer */
+	ipu_psys_kbuf_unmap(kbuf);
+
+	list_del(&kbuf->list);
+
+	if (!kbuf->userptr)
+		kfree(kbuf);
+
+	dev_dbg(&psys->adev->dev, "%s fd %d unmapped\n", __func__, fd);
+
+	return 0;
+}
+
 static int ipu_psys_release(struct inode *inode, struct file *file)
 {
 	struct ipu_psys *psys = inode_to_ipu_psys(inode);
@@ -681,29 +702,6 @@ static long ipu_psys_mapbuf(int fd, struct ipu_psys_fh *fh)
 	dev_dbg(&fh->psys->adev->dev, "IOC_MAPBUF ret %ld\n", ret);
 
 	return ret;
-}
-
-static int ipu_psys_unmapbuf_locked(int fd, struct ipu_psys_fh *fh,
-				    struct ipu_psys_kbuffer *kbuf)
-{
-	struct ipu_psys *psys = fh->psys;
-
-	if (!kbuf || fd != kbuf->fd) {
-		dev_err(&psys->adev->dev, "invalid kbuffer\n");
-		return -EINVAL;
-	}
-
-	/* From now on it is not safe to use this kbuffer */
-	ipu_psys_kbuf_unmap(kbuf);
-
-	list_del(&kbuf->list);
-
-	if (!kbuf->userptr)
-		kfree(kbuf);
-
-	dev_dbg(&psys->adev->dev, "%s fd %d unmapped\n", __func__, fd);
-
-	return 0;
 }
 
 static long ipu_psys_unmapbuf(int fd, struct ipu_psys_fh *fh)
