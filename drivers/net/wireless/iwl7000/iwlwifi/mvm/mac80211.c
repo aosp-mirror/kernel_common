@@ -4055,6 +4055,20 @@ static void iwl_mvm_prevent_esr_done_wk(struct wiphy *wiphy,
 	mutex_unlock(&mvm->mutex);
 }
 
+static void iwl_mvm_mlo_int_scan_wk(struct wiphy *wiphy, struct wiphy_work *wk)
+{
+	struct iwl_mvm_vif *mvmvif = container_of(wk, struct iwl_mvm_vif,
+						  mlo_int_scan_wk.work);
+	struct ieee80211_vif *vif =
+		container_of((void *)mvmvif, struct ieee80211_vif, drv_priv);
+
+	mutex_lock(&mvmvif->mvm->mutex);
+
+	iwl_mvm_int_mlo_scan(mvmvif->mvm, vif);
+
+	mutex_unlock(&mvmvif->mvm->mutex);
+}
+
 static int
 iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 				      struct ieee80211_vif *vif,
@@ -4096,6 +4110,9 @@ iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 
 		wiphy_delayed_work_init(&mvmvif->prevent_esr_done_wk,
 					iwl_mvm_prevent_esr_done_wk);
+
+		wiphy_delayed_work_init(&mvmvif->mlo_int_scan_wk,
+					iwl_mvm_mlo_int_scan_wk);
 
 		/* when client is authorized (AP station marked as such),
 		 * try to enable the best link(s).
