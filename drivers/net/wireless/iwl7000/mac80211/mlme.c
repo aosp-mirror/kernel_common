@@ -2173,7 +2173,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 		.timestamp = timestamp,
 		.device_timestamp = device_timestamp,
 	};
-	unsigned long timeout;
+	unsigned long now;
 	int res;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
@@ -2363,18 +2363,28 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 					  link->link_id, csa_ie.count,
 					  csa_ie.mode);
 
-	if (local->ops->channel_switch) {
-		/* use driver's channel switch callback */
+	/* we may have to handle timeout for deactivated link in software */
+	now = jiffies;
+	link->u.mgd.csa_time = now +
+			       TU_TO_JIFFIES((max_t(int, csa_ie.count, 1) - 1) *
+					     link->conf->beacon_int);
+
+	if (ieee80211_vif_link_active(&sdata->vif, link->link_id) &&
+	    local->ops->channel_switch) {
+		/*
+		 * Use driver's channel switch callback, the driver will
+		 * later call ieee80211_chswitch_done(). It may deactivate
+		 * the link as well, we handle that elsewhere and queue
+		 * the chswitch_work for the calculated time then.
+		 */
 		drv_channel_switch(local, sdata, &ch_switch);
 		return;
 	}
 
 	/* channel switch handled in software */
-	timeout = TU_TO_JIFFIES((max_t(int, csa_ie.count, 1) - 1) *
-				link->conf->beacon_int);
 	wiphy_delayed_work_queue(local->hw.wiphy,
 				 &link->u.mgd.chswitch_work,
-				 timeout);
+				 link->u.mgd.csa_time - now);
 	return;
  drop_connection:
 	/*
