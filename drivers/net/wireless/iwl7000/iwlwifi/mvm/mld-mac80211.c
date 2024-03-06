@@ -4,19 +4,6 @@
  */
 #include "mvm.h"
 
-
-static void iwl_mvm_unblock_esr_tpt(struct wiphy *wiphy, struct wiphy_work *wk)
-{
-	struct iwl_mvm_vif *mvmvif =
-		container_of(wk, struct iwl_mvm_vif, unblock_esr_tpt_wk);
-	struct iwl_mvm *mvm = mvmvif->mvm;
-	struct ieee80211_vif *vif = iwl_mvm_get_bss_vif(mvm);
-
-	mutex_lock(&mvm->mutex);
-	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_TPT);
-	mutex_unlock(&mvm->mutex);
-}
-
 static int iwl_mvm_mld_mac_add_interface(struct ieee80211_hw *hw,
 					 struct ieee80211_vif *vif)
 {
@@ -89,8 +76,6 @@ static int iwl_mvm_mld_mac_add_interface(struct ieee80211_hw *hw,
 	iwl_mvm_tcm_add_vif(mvm, vif);
 	INIT_DELAYED_WORK(&mvmvif->csa_work,
 			  iwl_mvm_channel_switch_disconnect_wk);
-
-	wiphy_work_init(&mvmvif->unblock_esr_tpt_wk, iwl_mvm_unblock_esr_tpt);
 
 	if (vif->type == NL80211_IFTYPE_MONITOR) {
 		mvm->monitor_on = true;
