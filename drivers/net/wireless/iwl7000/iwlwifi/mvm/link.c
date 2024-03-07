@@ -918,7 +918,7 @@ void iwl_mvm_block_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		return;
 
 	if (!(mvmvif->esr_disable_reason & reason))
-		IWL_DEBUG_INFO(mvm, "Blocking EMSLR mode. reason = 0x%x\n",
+		IWL_DEBUG_INFO(mvm, "Blocking EMLSR mode. reason = 0x%x\n",
 			       reason);
 
 	mvmvif->esr_disable_reason |= reason;
@@ -978,7 +978,7 @@ void iwl_mvm_unblock_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	if (!(mvmvif->esr_disable_reason & reason))
 		return;
 
-	IWL_DEBUG_INFO(mvm, "Unblocking EMSLR mode. reason = 0x%x\n", reason);
+	IWL_DEBUG_INFO(mvm, "Unblocking EMLSR mode. reason = 0x%x\n", reason);
 
 	mvmvif->esr_disable_reason &= ~reason;
 
