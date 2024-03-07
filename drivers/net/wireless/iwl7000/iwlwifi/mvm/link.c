@@ -632,6 +632,7 @@ iwl_mvm_esr_disallowed_with_link(struct ieee80211_vif *vif,
 	return ret;
 }
 
+VISIBLE_IF_IWLWIFI_KUNIT
 bool iwl_mvm_mld_valid_link_pair(struct ieee80211_vif *vif,
 				 const struct iwl_mvm_link_sel_data *a,
 				 const struct iwl_mvm_link_sel_data *b)
