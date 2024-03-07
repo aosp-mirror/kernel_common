@@ -8655,6 +8655,14 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 	if (cfg80211_req_ap_mld_addr(req)) {
 		uapsd_supported = true;
 
+		if (req->flags & (ASSOC_REQ_DISABLE_HT |
+				  ASSOC_REQ_DISABLE_VHT |
+				  ASSOC_REQ_DISABLE_HE |
+				  ASSOC_REQ_DISABLE_EHT)) {
+			err = -EINVAL;
+			goto err_free;
+		}
+
 		for (i = 0; i < IEEE80211_MLD_MAX_NUM_LINKS; i++) {
 			struct ieee80211_supported_band *sband;
 			struct cfg80211_bss *link_cbss = cfg80211_req_link_bss(req,
@@ -8668,19 +8676,17 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 			if (!bss->wmm_used) {
 				err = -EINVAL;
-				goto err_free;
-			}
-
-			if (req->flags & (ASSOC_REQ_DISABLE_HT |
-					  ASSOC_REQ_DISABLE_VHT |
-					  ASSOC_REQ_DISABLE_HE |
-					  ASSOC_REQ_DISABLE_EHT)) {
-				err = -EINVAL;
+#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
+				req->links[i].error = err;
+#endif
 				goto err_free;
 			}
 
 			if (link_cbss->channel->band == NL80211_BAND_S1GHZ) {
 				err = -EINVAL;
+#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
+				req->links[i].error = err;
+#endif
 				goto err_free;
 			}
 
