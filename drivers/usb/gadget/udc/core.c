@@ -1414,6 +1414,11 @@ int usb_add_gadget(struct usb_gadget *gadget)
 	if (ret)
 		goto err_del_udc;
 
+	ret = sysfs_create_link(&udc->dev.kobj,
+				&gadget->dev.kobj, "gadget");
+	if (ret)
+		goto err_del_udc;
+
 	mutex_unlock(&udc_lock);
 
 	return 0;
@@ -1556,6 +1561,7 @@ void usb_del_gadget(struct usb_gadget *gadget)
 	mutex_unlock(&udc_lock);
 
 	kobject_uevent(&udc->dev.kobj, KOBJ_REMOVE);
+	sysfs_remove_link(&udc->dev.kobj, "gadget");
 	flush_work(&gadget->work);
 	device_unregister(&udc->dev);
 	device_del(&gadget->dev);
