@@ -235,7 +235,7 @@ static void iwl_mvm_restart_mpdu_count(struct iwl_mvm *mvm,
 
 	lockdep_assert_held(&mvm->mutex);
 
-	if (WARN_ON(!ap_sta))
+	if (!ap_sta)
 		return;
 
 	mvmsta = iwl_mvm_sta_from_mac80211(ap_sta);
