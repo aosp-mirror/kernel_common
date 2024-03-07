@@ -2302,7 +2302,6 @@ static int mtk_open(struct net_device *dev)
 	if (!refcount_read(&eth->dma_refcnt)) {
 		int err = mtk_start_dma(eth);
 
-		if (err)
 		if (err) {
 			phylink_disconnect_phy(mac->phylink);
 			return err;
