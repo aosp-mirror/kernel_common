@@ -585,8 +585,12 @@ iwl_mvm_ftm_put_target(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		rcu_read_unlock();
 
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
-		if (mvmvif->ftm_unprotected)
+		if (mvmvif->ftm_unprotected) {
 			target->sta_id = IWL_MVM_INVALID_STA;
+			target->initiator_ap_flags &=
+				~cpu_to_le32(IWL_INITIATOR_AP_FLAGS_PMF);
+		}
+
 #endif
 	} else {
 		target->sta_id = IWL_MVM_INVALID_STA;
