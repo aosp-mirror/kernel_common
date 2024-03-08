@@ -61,6 +61,7 @@ static enum power_supply_property cros_usbpd_charger_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX,
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,
 	POWER_SUPPLY_PROP_USB_TYPE
@@ -122,6 +123,27 @@ static int cros_usbpd_charger_ec_command(struct charger_data *charger,
 
 	kfree(msg);
 	return ret;
+}
+
+static int cros_usbpd_set_override_ports(struct charger_data *charger,
+					 int port_num)
+{
+	struct device *dev = charger->dev;
+	struct ec_params_charge_port_override req;
+	int ret;
+
+	req.override_port = port_num;
+
+	ret = cros_usbpd_charger_ec_command(charger, 0,
+		EC_CMD_PD_CHARGE_PORT_OVERRIDE,
+		(uint8_t *)&req, sizeof(req),
+		NULL, 0);
+	if (ret < 0) {
+		dev_warn(dev, "Port Override command returned 0x%x\n", ret);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static int cros_usbpd_charger_get_num_ports(struct charger_data *charger)
@@ -387,6 +409,7 @@ static int cros_usbpd_charger_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX:
 		ret = cros_usbpd_charger_get_port_status(port, true);
 		if (ret < 0) {
 			dev_err(dev, "Failed to get port status (err:0x%x)\n",
@@ -413,6 +436,9 @@ static int cros_usbpd_charger_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = port->psy_voltage_now * 1000;
+		break;
+	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX:
+		val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_USB_TYPE:
 		val->intval = port->psy_usb_type;
@@ -449,8 +475,8 @@ static int cros_usbpd_charger_set_prop(struct power_supply *psy,
 	struct port_data *port = power_supply_get_drvdata(psy);
 	struct charger_data *charger = port->charger;
 	struct device *dev = charger->dev;
+	int port_number, ret;
 	u16 intval;
-	int ret;
 
 	/* U16_MAX in mV/mA is the maximum supported value */
 	if (val->intval >= U16_MAX * 1000)
@@ -462,6 +488,17 @@ static int cros_usbpd_charger_set_prop(struct power_supply *psy,
 		intval = val->intval / 1000;
 
 	switch (psp) {
+	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX:
+		/*
+		 * A value of -1 implies switching to battery as the power
+		 * source. Any other value implies using this port as the
+		 * power source.
+		 */
+		port_number = val->intval;
+		if (port_number != -1)
+			port_number = port->port_number;
+		ret = cros_usbpd_set_override_ports(charger, port_number);
+		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 		ret = cros_usbpd_charger_set_ext_power_limit(charger, intval,
 							input_voltage_limit);
@@ -506,6 +543,7 @@ static int cros_usbpd_charger_property_is_writeable(struct power_supply *psy,
 	int ret;
 
 	switch (psp) {
+	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX:
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 	case POWER_SUPPLY_PROP_INPUT_VOLTAGE_LIMIT:
 		ret = 1;
