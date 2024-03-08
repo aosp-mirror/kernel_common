@@ -734,7 +734,8 @@ int iwl_mvm_mld_add_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	}
 
 	/* MPDUs are counted only when EMLSR is possible */
-	if (vif->type == NL80211_IFTYPE_STATION && !vif->p2p &&
+	if (!test_bit(IWL_MVM_STATUS_IN_HW_RESTART, &mvm->status) &&
+	    vif->type == NL80211_IFTYPE_STATION && !vif->p2p &&
 	    !sta->tdls && ieee80211_vif_is_mld(vif)) {
 		mvm_sta->mpdu_counters =
 			kcalloc(mvm->trans->num_rx_queues,
