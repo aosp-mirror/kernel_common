@@ -705,8 +705,10 @@ void iwl_mvm_select_links(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 	if (!mvmvif->authorized || !ieee80211_vif_is_mld(vif))
 		return;
 
-	if (!IWL_MVM_AUTO_EML_ENABLE)
+	if (!IWL_MVM_AUTO_EML_ENABLE) {
+		mvmvif->primary_link = __ffs(vif->active_links);
 		return;
+	}
 
 	/* The logic below is a simple version that doesn't suit more than 2
 	 * links
