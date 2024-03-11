@@ -322,8 +322,8 @@ ieee80211_determine_ap_chan(struct ieee80211_sub_if_data *sdata,
 					   &eht_chandef);
 
 #if CFG80211_VERSION >= KERNEL_VERSION(6,9,0)
-		chandef_punctured(&eht_chandef) =
-				ieee80211_eht_oper_dis_subchan_bitmap(eht_oper);
+		eht_chandef.punctured =
+			ieee80211_eht_oper_dis_subchan_bitmap(eht_oper);
 #else
 		if (ieee80211_eht_oper_dis_subchan_bitmap(eht_oper)) {
 			sdata_info(sdata,
