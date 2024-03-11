@@ -226,7 +226,7 @@ struct sec_entry {
 };
 
 struct segment_allocation {
-	void (*allocate_segment)(struct f2fs_sb_info *, int, bool);
+	int (*allocate_segment)(struct f2fs_sb_info *, int, bool);
 };
 
 #define MAX_SKIP_GC_COUNT			16
