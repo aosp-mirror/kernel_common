@@ -2310,6 +2310,8 @@ ssize_t wiphy_locked_debugfs_write(struct wiphy *wiphy, struct file *file,
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(6,9,0)
+#define IEEE80211_CHAN_CAN_MONITOR 0
+
 int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width);
 int cfg80211_chandef_primary(const struct cfg80211_chan_def *chandef,
 			     enum nl80211_chan_width primary_width,
