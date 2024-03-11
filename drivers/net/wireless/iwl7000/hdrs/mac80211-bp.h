@@ -1587,7 +1587,7 @@ static inline void __iwl7000_cfg80211_unregister_wdev(struct wireless_dev *wdev)
 		cfg80211_unregister_wdev(wdev);
 }
 #define cfg80211_unregister_wdev __iwl7000_cfg80211_unregister_wdev
-#define lockdep_is_wiphy_held(wiphy) 0
+#define lockdep_is_wiphy_held(wiphy) lockdep_rtnl_is_held()
 static inline bool wdev_registered(struct wireless_dev *wdev)
 {
 	return true;
