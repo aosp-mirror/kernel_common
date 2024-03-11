@@ -278,6 +278,12 @@ static int iwl_mvm_esr_mode_active(struct iwl_mvm *mvm,
 		link->phy_ctxt->rlc_disabled = true;
 	}
 
+	if (vif->active_links == mvmvif->link_selection_res &&
+	    !WARN_ON(!(vif->active_links & BIT(mvmvif->link_selection_primary))))
+		mvmvif->primary_link = mvmvif->link_selection_primary;
+	else
+		mvmvif->primary_link = __ffs(vif->active_links);
+
 	/* Needed for tracking RSSI */
 	iwl_mvm_request_periodic_system_statistics(mvm, true);
 
@@ -1209,6 +1215,14 @@ iwl_mvm_mld_change_vif_links(struct ieee80211_hw *hw,
 	if (new_links == 0) {
 		mvmvif->link[0] = &mvmvif->deflink;
 		err = iwl_mvm_add_link(mvm, vif, &vif->bss_conf);
+		if (err == 0)
+			mvmvif->primary_link = 0;
+	} else if (!(new_links & BIT(mvmvif->primary_link))) {
+		/*
+		 * Ensure we always have a valid primary_link, the real
+		 * decision happens later when PHY is activated.
+		 */
+		mvmvif->primary_link = BIT(__ffs(new_links));
 	}
 
 out_err:

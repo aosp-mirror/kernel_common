@@ -435,6 +435,7 @@ struct iwl_mvm_esr_exit {
  * @link_selection_res: bitmap of active links as it was decided in the last
  *	link selection. Valid only for a MLO vif after assoc. 0 if there wasn't
  *	any link selection yet.
+ * @link_selection_primary: primary link selected by link selection
  * @primary_link: primary link in eSR. Valid only for an associated MLD vif,
  *	and in eSR mode. Valid only for a STA.
  * @last_esr_exit: Details of the last exit from EMLSR.
@@ -542,6 +543,7 @@ struct iwl_mvm_vif {
 	u16 max_tx_op;
 
 	u16 link_selection_res;
+	u8 link_selection_primary;
 	u8 primary_link;
 	struct iwl_mvm_esr_exit last_esr_exit;
 	u8 exit_same_reason_count;

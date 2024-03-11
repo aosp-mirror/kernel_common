@@ -801,10 +801,8 @@ void iwl_mvm_select_links(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 	if (!mvmvif->authorized || !ieee80211_vif_is_mld(vif))
 		return;
 
-	if (!IWL_MVM_AUTO_EML_ENABLE) {
-		mvmvif->primary_link = __ffs(vif->active_links);
+	if (!IWL_MVM_AUTO_EML_ENABLE)
 		return;
-	}
 
 	/* The logic below is a simple version that doesn't suit more than 2
 	 * links
@@ -854,8 +852,8 @@ set_active:
 	IWL_DEBUG_INFO(mvm, "Link selection result: 0x%x. Primary = %d\n",
 		       new_active_links, primary_link);
 	ieee80211_set_active_links_async(vif, new_active_links);
-	mvmvif->primary_link = primary_link;
 	mvmvif->link_selection_res = new_active_links;
+	mvmvif->link_selection_primary = primary_link;
 }
 
 u8 iwl_mvm_get_primary_link(struct ieee80211_vif *vif)
