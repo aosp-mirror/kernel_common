@@ -359,7 +359,7 @@ struct iwl_mvm_vif_link_info {
  *	in a loop.
  * @IWL_MVM_ESR_BLOCKED_WOWLAN: WOWLAN is preventing the enablement of EMLSR
  * @IWL_MVM_ESR_BLOCKED_TPT: block EMLSR when there is not enough traffic
- *@IWL_MVM_ESR_BLOCKED_FW: FW didn't recommended/forced exit from EMLSR
+ * @IWL_MVM_ESR_BLOCKED_FW: FW didn't recommended/forced exit from EMLSR
  * @IWL_MVM_ESR_BLOCKED_NON_BSS: An active non-bssid link's preventing EMLSR
  * @IWL_MVM_ESR_EXIT_MISSED_BEACON: exited EMLSR due to missed beacons
  * @IWL_MVM_ESR_EXIT_LOW_RSSI: link is deactivated/not allowed for EMLSR
