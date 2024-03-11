@@ -33,6 +33,7 @@
   atomic_notifier_chain_register
   atomic_notifier_chain_unregister
   available_idle_cpu
+  avenrun
   balance_push_callback
   bio_add_page
   bio_alloc_bioset
