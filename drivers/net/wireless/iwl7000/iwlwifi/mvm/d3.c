@@ -1263,9 +1263,17 @@ static int __iwl_mvm_suspend(struct ieee80211_hw *hw,
 	if (IS_ERR_OR_NULL(vif))
 		return 1;
 
-	mutex_lock(&mvm->mutex);
-
 	primary_link = iwl_mvm_get_primary_link(vif);
+
+	/* leave ESR immediately, not only async with iwl_mvm_block_esr() */
+	if (ieee80211_vif_is_mld(vif)) {
+		ret = ieee80211_set_active_links(vif, BIT(primary_link));
+		if (ret)
+			return ret;
+	}
+
+	mutex_lock(&mvm->mutex);
+	/* only additionally block for consistency and to avoid concurrency */
 	iwl_mvm_block_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_WOWLAN, primary_link);
 
 	set_bit(IWL_MVM_STATUS_IN_D3, &mvm->status);

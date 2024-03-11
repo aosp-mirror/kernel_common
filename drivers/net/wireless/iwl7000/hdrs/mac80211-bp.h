@@ -1643,7 +1643,11 @@ static inline void eth_hw_addr_set(struct net_device *dev, const u8 *addr)
 {
 	ether_addr_copy(dev->dev_addr, addr);
 }
-#endif /* LINUX_VERSION_IS_LESS(5,15,0) */
+#endif
+
+#ifndef lockdep_assert
+#define lockdep_assert(x) do {} while (0)
+#endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(5,16,0)
 #define NL80211_BAND_LC	5
