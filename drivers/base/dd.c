@@ -782,7 +782,7 @@ static int really_probe_debug(struct device *dev, struct device_driver *drv)
  *
  * Should somehow figure out how to use a semaphore, not an atomic variable...
  */
-bool __init driver_probe_done(void)
+bool driver_probe_done(void)
 {
 	int local_probe_count = atomic_read(&probe_count);
 
