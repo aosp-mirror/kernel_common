@@ -1780,6 +1780,11 @@ static int cdclk_squash_divider(u16 waveform)
 	return hweight16(waveform ?: 0xffff);
 }
 
+static bool mdclk_source_is_cdclk_pll(struct drm_i915_private *i915)
+{
+	return DISPLAY_VER(i915) >= 20;
+}
+
 static bool cdclk_compute_crawl_and_squash_midpoint(struct drm_i915_private *i915,
 						    const struct intel_cdclk_config *old_cdclk_config,
 						    const struct intel_cdclk_config *new_cdclk_config,
