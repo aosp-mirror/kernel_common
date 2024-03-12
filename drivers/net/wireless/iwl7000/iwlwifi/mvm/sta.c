@@ -1846,6 +1846,18 @@ int iwl_mvm_sta_init(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	iwl_mvm_toggle_tx_ant(mvm, &mvm_sta->tx_ant);
 
+	/* MPDUs are counted only when EMLSR is possible */
+	if (vif->type == NL80211_IFTYPE_STATION && !vif->p2p &&
+	    !sta->tdls && ieee80211_vif_is_mld(vif)) {
+		mvm_sta->mpdu_counters =
+			kcalloc(mvm->trans->num_rx_queues,
+				sizeof(*mvm_sta->mpdu_counters),
+				GFP_KERNEL);
+		if (mvm_sta->mpdu_counters)
+			for (int q = 0; q < mvm->trans->num_rx_queues; q++)
+				spin_lock_init(&mvm_sta->mpdu_counters[q].lock);
+	}
+
 	return 0;
 }
 
