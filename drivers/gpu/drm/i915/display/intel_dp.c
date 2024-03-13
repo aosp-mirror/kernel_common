@@ -2981,7 +2981,8 @@ void intel_edp_backlight_on(const struct intel_crtc_state *crtc_state,
 	drm_dbg_kms(&i915->drm, "\n");
 
 	intel_backlight_enable(crtc_state, conn_state);
-	intel_pps_backlight_on(intel_dp);
+	if (!intel_dp->pps.keep_powered_off)
+		intel_pps_backlight_on(intel_dp);
 }
 
 /* Disable backlight PP control and backlight PWM. */

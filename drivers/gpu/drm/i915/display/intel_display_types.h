@@ -1679,6 +1679,11 @@ struct intel_pps {
 	bool pps_reset;
 	struct edp_power_seq pps_delays;
 	struct edp_power_seq bios_pps_delays;
+	/*
+	 * Set if the backlight power off was requested by the userspace
+	 * through the bl_power sysfs attribute.
+	 */
+	bool keep_powered_off;
 };
 
 struct intel_psr {

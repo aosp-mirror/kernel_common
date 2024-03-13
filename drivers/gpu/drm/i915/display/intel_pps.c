@@ -1092,6 +1092,8 @@ void intel_pps_backlight_power(struct intel_connector *connector, bool enable)
 	intel_wakeref_t wakeref;
 	bool is_enabled;
 
+	intel_dp->pps.keep_powered_off = !enable;
+
 	is_enabled = false;
 	with_intel_pps_lock(intel_dp, wakeref)
 		is_enabled = ilk_get_pp_control(intel_dp) & EDP_BLC_ENABLE;
