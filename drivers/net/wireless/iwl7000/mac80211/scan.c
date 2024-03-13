@@ -735,18 +735,11 @@ static int __ieee80211_start_scan(struct ieee80211_sub_if_data *sdata,
 		return -EBUSY;
 
 	/* For an MLO connection, if a link ID was specified, validate that it
-	 * is indeed active. If no link ID was specified, select one of the
-	 * active links.
+	 * is indeed active.
 	 */
-	if (ieee80211_vif_is_mld(&sdata->vif)) {
-		if (cfg80211_scan_request_tsf_report_link_id(req) >= 0) {
-			if (!(cfg80211_scan_request_check_tsf_report_link_id(req, sdata->vif.active_links)))
-				return -EINVAL;
-		} else {
-			cfg80211_scan_request_set_tsf_report_link_id(req,
-								     __ffs(sdata->vif.active_links));
-		}
-	}
+	if (ieee80211_vif_is_mld(&sdata->vif) && cfg80211_scan_request_tsf_report_link_id(req) >= 0 &&
+	    !(cfg80211_scan_request_check_tsf_report_link_id(req, sdata->vif.active_links)))
+		return -EINVAL;
 
 	if (!__ieee80211_can_leave_ch(sdata))
 		return -EBUSY;
