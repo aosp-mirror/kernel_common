@@ -1783,6 +1783,65 @@ static int iwl_mvm_alloc_bcast_mcast_sta(struct iwl_mvm *mvm,
 					IWL_STA_MULTICAST);
 }
 
+static void iwl_mvm_prevent_esr_done_wk(struct wiphy *wiphy,
+					struct wiphy_work *wk)
+{
+	struct iwl_mvm_vif *mvmvif =
+		container_of(wk, struct iwl_mvm_vif, prevent_esr_done_wk.work);
+	struct iwl_mvm *mvm = mvmvif->mvm;
+	struct ieee80211_vif *vif = iwl_mvm_get_bss_vif(mvm);
+
+	mutex_lock(&mvm->mutex);
+	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_PREVENTION);
+	mutex_unlock(&mvm->mutex);
+}
+
+static void iwl_mvm_mlo_int_scan_wk(struct wiphy *wiphy, struct wiphy_work *wk)
+{
+	struct iwl_mvm_vif *mvmvif = container_of(wk, struct iwl_mvm_vif,
+						  mlo_int_scan_wk.work);
+	struct ieee80211_vif *vif =
+		container_of((void *)mvmvif, struct ieee80211_vif, drv_priv);
+
+	mutex_lock(&mvmvif->mvm->mutex);
+
+	iwl_mvm_int_mlo_scan(mvmvif->mvm, vif);
+
+	mutex_unlock(&mvmvif->mvm->mutex);
+}
+
+static void iwl_mvm_unblock_esr_tpt(struct wiphy *wiphy, struct wiphy_work *wk)
+{
+	struct iwl_mvm_vif *mvmvif =
+		container_of(wk, struct iwl_mvm_vif, unblock_esr_tpt_wk);
+	struct iwl_mvm *mvm = mvmvif->mvm;
+	struct ieee80211_vif *vif = iwl_mvm_get_bss_vif(mvm);
+
+	mutex_lock(&mvm->mutex);
+	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_TPT);
+	mutex_unlock(&mvm->mutex);
+}
+
+void iwl_mvm_mac_init_mvmvif(struct iwl_mvm *mvm, struct iwl_mvm_vif *mvmvif)
+{
+	lockdep_assert_held(&mvm->mutex);
+
+	if (test_bit(IWL_MVM_STATUS_HW_RESTART_REQUESTED, &mvm->status))
+		return;
+
+	INIT_DELAYED_WORK(&mvmvif->csa_work,
+			  iwl_mvm_channel_switch_disconnect_wk);
+
+	wiphy_delayed_work_init(&mvmvif->prevent_esr_done_wk,
+				iwl_mvm_prevent_esr_done_wk);
+
+	wiphy_delayed_work_init(&mvmvif->mlo_int_scan_wk,
+				iwl_mvm_mlo_int_scan_wk);
+
+	wiphy_work_init(&mvmvif->unblock_esr_tpt_wk,
+			iwl_mvm_unblock_esr_tpt);
+}
+
 static int iwl_mvm_mac_add_interface(struct ieee80211_hw *hw,
 				     struct ieee80211_vif *vif)
 {
@@ -1792,6 +1851,8 @@ static int iwl_mvm_mac_add_interface(struct ieee80211_hw *hw,
 	int i;
 
 	mutex_lock(&mvm->mutex);
+
+	iwl_mvm_mac_init_mvmvif(mvm, mvmvif);
 
 	mvmvif->mvm = mvm;
 
@@ -1877,8 +1938,6 @@ static int iwl_mvm_mac_add_interface(struct ieee80211_hw *hw,
 		mvm->p2p_device_vif = vif;
 
 	iwl_mvm_tcm_add_vif(mvm, vif);
-	INIT_DELAYED_WORK(&mvmvif->csa_work,
-			  iwl_mvm_channel_switch_disconnect_wk);
 
 	if (vif->type == NL80211_IFTYPE_MONITOR) {
 		mvm->monitor_on = true;
@@ -1916,6 +1975,8 @@ out:
 void iwl_mvm_prepare_mac_removal(struct iwl_mvm *mvm,
 				 struct ieee80211_vif *vif)
 {
+	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
+
 	if (vif->type == NL80211_IFTYPE_P2P_DEVICE) {
 		/*
 		 * Flush the ROC worker which will flush the OFFCHANNEL queue.
@@ -1924,6 +1985,16 @@ void iwl_mvm_prepare_mac_removal(struct iwl_mvm *mvm,
 		 */
 		flush_work(&mvm->roc_done_wk);
 	}
+
+	wiphy_delayed_work_cancel(mvm->hw->wiphy,
+				  &mvmvif->prevent_esr_done_wk);
+
+	wiphy_delayed_work_cancel(mvm->hw->wiphy,
+				  &mvmvif->mlo_int_scan_wk);
+
+	wiphy_work_cancel(mvm->hw->wiphy, &mvmvif->unblock_esr_tpt_wk);
+
+	cancel_delayed_work_sync(&mvmvif->csa_work);
 }
 
 /* This function is doing the common part of removing the interface for
@@ -4049,45 +4120,6 @@ out:
 	return callbacks->update_sta(mvm, vif, sta);
 }
 
-static void iwl_mvm_prevent_esr_done_wk(struct wiphy *wiphy,
-					struct wiphy_work *wk)
-{
-	struct iwl_mvm_vif *mvmvif =
-		container_of(wk, struct iwl_mvm_vif, prevent_esr_done_wk.work);
-	struct iwl_mvm *mvm = mvmvif->mvm;
-	struct ieee80211_vif *vif = iwl_mvm_get_bss_vif(mvm);
-
-	mutex_lock(&mvm->mutex);
-	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_PREVENTION);
-	mutex_unlock(&mvm->mutex);
-}
-
-static void iwl_mvm_mlo_int_scan_wk(struct wiphy *wiphy, struct wiphy_work *wk)
-{
-	struct iwl_mvm_vif *mvmvif = container_of(wk, struct iwl_mvm_vif,
-						  mlo_int_scan_wk.work);
-	struct ieee80211_vif *vif =
-		container_of((void *)mvmvif, struct ieee80211_vif, drv_priv);
-
-	mutex_lock(&mvmvif->mvm->mutex);
-
-	iwl_mvm_int_mlo_scan(mvmvif->mvm, vif);
-
-	mutex_unlock(&mvmvif->mvm->mutex);
-}
-
-static void iwl_mvm_unblock_esr_tpt(struct wiphy *wiphy, struct wiphy_work *wk)
-{
-	struct iwl_mvm_vif *mvmvif =
-		container_of(wk, struct iwl_mvm_vif, unblock_esr_tpt_wk);
-	struct iwl_mvm *mvm = mvmvif->mvm;
-	struct ieee80211_vif *vif = iwl_mvm_get_bss_vif(mvm);
-
-	mutex_lock(&mvm->mutex);
-	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_TPT);
-	mutex_unlock(&mvm->mutex);
-}
-
 static int
 iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 				      struct ieee80211_vif *vif,
@@ -4131,15 +4163,6 @@ iwl_mvm_sta_state_assoc_to_authorized(struct iwl_mvm *mvm,
 
 		/* Block until FW notif will arrive */
 		iwl_mvm_block_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_FW, 0);
-
-		wiphy_delayed_work_init(&mvmvif->prevent_esr_done_wk,
-					iwl_mvm_prevent_esr_done_wk);
-
-		wiphy_delayed_work_init(&mvmvif->mlo_int_scan_wk,
-					iwl_mvm_mlo_int_scan_wk);
-
-		wiphy_work_init(&mvmvif->unblock_esr_tpt_wk,
-				iwl_mvm_unblock_esr_tpt);
 
 		/* when client is authorized (AP station marked as such),
 		 * try to enable the best link(s).
