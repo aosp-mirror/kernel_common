@@ -242,7 +242,7 @@ static void afs_kill_pages(struct address_space *mapping,
 		folio_clear_uptodate(folio);
 		folio_end_writeback(folio);
 		folio_lock(folio);
-		generic_error_remove_page(mapping, &folio->page);
+		generic_error_remove_folio(mapping, folio);
 		folio_unlock(folio);
 		folio_put(folio);
 
@@ -366,7 +366,7 @@ static void afs_store_data_success(struct afs_operation *op)
 
 	op->ctime = op->file[0].scb.status.mtime_client;
 	afs_vnode_commit_status(op, &op->file[0]);
-	if (op->error == 0) {
+	if (!afs_op_error(op)) {
 		if (!op->store.laundering)
 			afs_pages_written_back(vnode, op->store.pos, op->store.size);
 		afs_stat_v(vnode, n_stores);
@@ -428,7 +428,7 @@ try_next_key:
 
 	afs_wait_for_operation(op);
 
-	switch (op->error) {
+	switch (afs_op_error(op)) {
 	case -EACCES:
 	case -EPERM:
 	case -ENOKEY:
@@ -447,7 +447,7 @@ try_next_key:
 	}
 
 	afs_put_wb_key(wbk);
-	_leave(" = %d", op->error);
+	_leave(" = %d", afs_op_error(op));
 	return afs_put_operation(op);
 }
 
@@ -559,8 +559,7 @@ static void afs_extend_writeback(struct address_space *mapping,
 
 			if (!folio_clear_dirty_for_io(folio))
 				BUG();
-			if (folio_start_writeback(folio))
-				BUG();
+			folio_start_writeback(folio);
 			afs_folio_start_fscache(caching, folio);
 
 			*_count -= folio_nr_pages(folio);
@@ -595,8 +594,7 @@ static ssize_t afs_write_back_from_locked_folio(struct address_space *mapping,
 
 	_enter(",%lx,%llx-%llx", folio_index(folio), start, end);
 
-	if (folio_start_writeback(folio))
-		BUG();
+	folio_start_writeback(folio);
 	afs_folio_start_fscache(caching, folio);
 
 	count -= folio_nr_pages(folio);
