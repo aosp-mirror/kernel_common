@@ -1272,7 +1272,7 @@ isolate_migratepages_range(struct compact_control *cc, unsigned long start_pfn,
 					block_end_pfn, cc->zone))
 			continue;
 
-		pfn = isolate_migratepages_block(&cc_ext, pfn, block_end_pfn,
+		ret = isolate_migratepages_block(&cc_ext, pfn, block_end_pfn,
 						 ISOLATE_UNEVICTABLE);
 
 		if (ret)
