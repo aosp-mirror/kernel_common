@@ -29,6 +29,7 @@
 
 #include "hyp_constants.h"
 #include "hyp_trace.h"
+#include "kvm_ptdump.h"
 
 DEFINE_STATIC_KEY_FALSE(kvm_protected_mode_initialized);
 
@@ -444,6 +445,8 @@ static int __init finalize_pkvm(void)
 	kmemleak_free_part(__hyp_bss_start, __hyp_bss_end - __hyp_bss_start);
 	kmemleak_free_part(__hyp_rodata_start, __hyp_rodata_end - __hyp_rodata_start);
 	kmemleak_free_part_phys(hyp_mem_base, hyp_mem_size);
+
+	kvm_ptdump_host_register();
 
 	ret = pkvm_drop_host_privileges();
 	if (ret) {
