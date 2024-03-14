@@ -63,7 +63,7 @@ static int cam_mem_util_map_cpu_va(struct dma_buf *dmabuf,
 		return rc;
 	}
 
-	rc = dma_buf_vmap(dmabuf, &map);
+	rc = dma_buf_vmap_unlocked(dmabuf, &map);
 	if (rc) {
 		CAM_ERR(CAM_MEM, "Mapping failed");
 		goto err_end_cpu_access;
@@ -86,7 +86,7 @@ static int cam_mem_util_unmap_cpu_va(struct dma_buf *dmabuf,
 	int rc;
 	struct iosys_map map = IOSYS_MAP_INIT_VADDR((void *)vaddr);
 
-	dma_buf_vunmap(dmabuf, &map);
+	dma_buf_vunmap_unlocked(dmabuf, &map);
 
 	/*
 	 * dma_buf_begin_cpu_access() and
