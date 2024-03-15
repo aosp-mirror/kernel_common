@@ -65,6 +65,18 @@ static struct bus_type ipu_psys_bus = {
 	.name = IPU_PSYS_NAME,
 };
 
+static struct ipu_psys_kbuffer *ipu_psys_kbuffer_alloc(void)
+{
+	struct ipu_psys_kbuffer *kbuf;
+
+	kbuf = kzalloc(sizeof(*kbuf), GFP_KERNEL);
+	if (!kbuf)
+		return NULL;
+
+	INIT_LIST_HEAD(&kbuf->list);
+	return kbuf;
+}
+
 struct ipu_psys_pg *__get_pg_buf(struct ipu_psys *psys, size_t pg_size)
 {
 	struct ipu_psys_pg *kpg;
@@ -537,7 +549,7 @@ static int ipu_psys_getbuf(struct ipu_psys_buffer *buf, struct ipu_psys_fh *fh)
 		return -EINVAL;
 	}
 
-	kbuf = kzalloc(sizeof(*kbuf), GFP_KERNEL);
+	kbuf = ipu_psys_kbuffer_alloc();
 	if (!kbuf)
 		return -ENOMEM;
 
@@ -600,7 +612,7 @@ int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh,
 		 * is a new fd. Create a new kbuf item for this fd, and
 		 * add this kbuf to bufs_list list.
 		 */
-		kbuf = kzalloc(sizeof(*kbuf), GFP_KERNEL);
+		kbuf = ipu_psys_kbuffer_alloc();
 		if (!kbuf) {
 			ret = -ENOMEM;
 			goto mapbuf_fail;
@@ -621,7 +633,7 @@ int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh,
 		kbuf = ipu_psys_lookup_kbuffer(fh, fd);
 		/* changed external dmabuf */
 		if (!kbuf) {
-			kbuf = kzalloc(sizeof(*kbuf), GFP_KERNEL);
+			kbuf = ipu_psys_kbuffer_alloc();
 			if (!kbuf) {
 				ret = -ENOMEM;
 				goto mapbuf_fail;
