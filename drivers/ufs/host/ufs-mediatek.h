@@ -123,6 +123,8 @@ enum ufs_mtk_host_caps {
 	UFS_MTK_CAP_DISABLE_AH8                = 1 << 2,
 	UFS_MTK_CAP_BROKEN_VCC                 = 1 << 3,
 	UFS_MTK_CAP_PMC_VIA_FASTAUTO           = 1 << 6,
+	/* Control MTCMOS with RTFF */
+	UFS_MTK_CAP_RTFF_MTCMOS                = 1 << 9,
 };
 
 struct ufs_mtk_crypt_cfg {
