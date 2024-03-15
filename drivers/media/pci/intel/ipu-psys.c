@@ -73,6 +73,7 @@ static struct ipu_psys_kbuffer *ipu_psys_kbuffer_alloc(void)
 	if (!kbuf)
 		return NULL;
 
+	atomic_set(&kbuf->map_count, 0);
 	INIT_LIST_HEAD(&kbuf->list);
 	return kbuf;
 }
@@ -479,6 +480,9 @@ static int ipu_psys_unmapbuf_locked(struct ipu_psys_fh *fh,
 		return -EINVAL;
 	}
 
+	if (!atomic_dec_and_test(&kbuf->map_count))
+		return 0;
+
 	/* From now on it is not safe to use this kbuffer */
 	ipu_psys_kbuf_unmap(kbuf);
 
@@ -639,6 +643,8 @@ int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh,
 			list_add(&kbuf->list, &fh->bufs_list);
 		}
 	}
+
+	atomic_inc(&kbuf->map_count);
 
 	if (kbuf->sgt) {
 		dev_dbg(&psys->adev->dev, "fd %d has been mapped!\n", fd);

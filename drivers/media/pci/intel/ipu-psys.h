@@ -182,6 +182,8 @@ struct ipu_psys_kbuffer {
 	struct sg_table *sgt;
 	struct dma_buf_attachment *db_attach;
 	struct dma_buf *dbuf;
+	/* The number of times this buffer is mapped */
+	atomic_t map_count;
 	bool valid;	/* True when buffer is usable */
 };
 
