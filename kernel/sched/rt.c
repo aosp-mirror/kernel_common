@@ -968,6 +968,23 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
 	if (runtime == RUNTIME_INF)
 		return 0;
 
+#ifdef CONFIG_ARM64
+	/*
+	 * XXX Temporary workaround for b/307775867.
+	 * We think we ran for this long because the host suspended while we
+	 * were running, so just pretend we didn't run instead of throttling
+	 * for a long time.
+	 * The "5" was chosen so that it would be highly unlikely for this to
+	 * happen in normal operation, while being small enough to be able to
+	 * mitigate issues for shorter suspends.
+	 */
+	if (unlikely(runtime > 0 && rt_rq->rt_time >= 5 * runtime)) {
+		printk_deferred_once("suspected host suspend. cpu %d rt_time "
+		    "(%ld)\n", rq_of_rt_rq(rt_rq)->cpu, rt_rq->rt_time);
+		rt_rq->rt_time = 0;
+	}
+#endif
+
 	if (rt_rq->rt_time > runtime) {
 		struct rt_bandwidth *rt_b = sched_rt_bandwidth(rt_rq);
 
