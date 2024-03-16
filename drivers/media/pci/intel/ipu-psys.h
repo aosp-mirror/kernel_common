@@ -215,7 +215,8 @@ void ipu_psys_run_next(struct ipu_psys *psys);
 struct ipu_psys_pg *__get_pg_buf(struct ipu_psys *psys, size_t pg_size);
 struct ipu_psys_kbuffer *
 ipu_psys_lookup_kbuffer(struct ipu_psys_fh *fh, int fd);
-int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh);
+struct ipu_psys_kbuffer *
+ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh);
 struct ipu_psys_kbuffer *
 ipu_psys_lookup_kbuffer_by_kaddr(struct ipu_psys_fh *fh, void *kaddr);
 #ifdef IPU_PSYS_GPC

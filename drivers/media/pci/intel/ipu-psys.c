@@ -780,36 +780,31 @@ static void ipu_psys_kbuffer_lru(struct ipu_psys_fh *fh,
 	}
 }
 
-int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
+struct ipu_psys_kbuffer *ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 {
 	struct ipu_psys *psys = fh->psys;
 	struct ipu_psys_kbuffer *kbuf;
 	struct ipu_psys_desc *desc;
 	struct dma_buf *dbuf;
 	struct iosys_map dmap;
-	int ret;
 
 	dbuf = dma_buf_get(fd);
 	if (IS_ERR(dbuf))
-		return -EINVAL;
+		return NULL;
 
 	desc = psys_desc_lookup(fh, fd);
 	if (!desc) {
 		desc = ipu_psys_desc_alloc(fd);
-		if (!desc) {
-			ret = -ENOMEM;
+		if (!desc)
 			goto desc_alloc_fail;
-		}
 		ipu_desc_add(fh, desc);
 	}
 
 	kbuf = psys_buf_lookup(fh, fd);
 	if (!kbuf) {
 		kbuf = ipu_psys_kbuffer_alloc();
-		if (!kbuf) {
-			ret = -ENOMEM;
+		if (!kbuf)
 			goto buf_alloc_fail;
-		}
 		ipu_buffer_add(fh, kbuf);
 	}
 
@@ -843,14 +838,12 @@ int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 
 	kbuf->db_attach = dma_buf_attach(kbuf->dbuf, &psys->adev->dev);
 	if (IS_ERR(kbuf->db_attach)) {
-		ret = PTR_ERR(kbuf->db_attach);
 		dev_dbg(&psys->adev->dev, "dma buf attach failed\n");
 		goto kbuf_map_fail;
 	}
 
 	kbuf->sgt = dma_buf_map_attachment(kbuf->db_attach, DMA_BIDIRECTIONAL);
 	if (IS_ERR_OR_NULL(kbuf->sgt)) {
-		ret = -EINVAL;
 		kbuf->sgt = NULL;
 		dev_dbg(&psys->adev->dev, "dma buf map attachment failed\n");
 		goto kbuf_map_fail;
@@ -858,8 +851,7 @@ int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 
 	kbuf->dma_addr = sg_dma_address(kbuf->sgt->sgl);
 
-	ret = dma_buf_vmap(kbuf->dbuf, &dmap);
-	if (ret) {
+	if (dma_buf_vmap(kbuf->dbuf, &dmap)) {
 		dev_dbg(&psys->adev->dev, "dma buf vmap failed\n");
 		goto kbuf_map_fail;
 	}
@@ -870,7 +862,7 @@ int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 
 mapbuf_end:
 	kbuf->valid = true;
-	return 0;
+	return kbuf;
 
 kbuf_map_fail:
 	ipu_buffer_del(fh, kbuf);
@@ -886,20 +878,20 @@ buf_alloc_fail:
 desc_alloc_fail:
 	if (!IS_ERR(dbuf))
 		dma_buf_put(dbuf);
-	return ret;
+	return NULL;
 }
 
 static long ipu_psys_mapbuf(int fd, struct ipu_psys_fh *fh)
 {
-	long ret;
+	struct ipu_psys_kbuffer *kbuf;
 
 	mutex_lock(&fh->mutex);
-	ret = ipu_psys_mapbuf_locked(fd, fh);
+	kbuf = ipu_psys_mapbuf_locked(fd, fh);
 	mutex_unlock(&fh->mutex);
 
 	dev_dbg(&fh->psys->adev->dev, "IOC_MAPBUF\n");
 
-	return ret;
+	return kbuf ? 0 : -EINVAL;
 }
 
 static long ipu_psys_unmapbuf(int fd, struct ipu_psys_fh *fh)
