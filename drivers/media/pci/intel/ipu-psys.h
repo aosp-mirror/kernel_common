@@ -124,8 +124,15 @@ struct ipu_psys_fh {
 	struct list_head list;
 	/* Holds all buffers that this fh owns */
 	struct list_head bufs_list;
+	/* Holds all descriptors (fd:kbuffer associations) */
+	struct list_head descs_list;
+	struct list_head bufs_lru;
 	wait_queue_head_t wait;
 	struct ipu_psys_scheduler sched;
+
+	u32 num_bufs;
+	u32 num_descs;
+	u32 num_bufs_lru;
 };
 
 struct ipu_psys_pg {
@@ -174,17 +181,22 @@ struct ipu_dma_buf_attach {
 struct ipu_psys_kbuffer {
 	u64 len;
 	void *userptr;
-	u32 flags;
-	int fd;
 	void *kaddr;
 	struct list_head list;
 	dma_addr_t dma_addr;
 	struct sg_table *sgt;
 	struct dma_buf_attachment *db_attach;
 	struct dma_buf *dbuf;
+	u32 flags;
 	/* The number of times this buffer is mapped */
 	atomic_t map_count;
 	bool valid;	/* True when buffer is usable */
+};
+
+struct ipu_psys_desc {
+	struct ipu_psys_kbuffer	*kbuf;
+	struct list_head	list;
+	u32			fd;
 };
 
 #define inode_to_ipu_psys(inode) \
@@ -203,8 +215,7 @@ void ipu_psys_run_next(struct ipu_psys *psys);
 struct ipu_psys_pg *__get_pg_buf(struct ipu_psys *psys, size_t pg_size);
 struct ipu_psys_kbuffer *
 ipu_psys_lookup_kbuffer(struct ipu_psys_fh *fh, int fd);
-int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh,
-			   struct ipu_psys_kbuffer *kbuf);
+int ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh);
 struct ipu_psys_kbuffer *
 ipu_psys_lookup_kbuffer_by_kaddr(struct ipu_psys_fh *fh, void *kaddr);
 #ifdef IPU_PSYS_GPC
