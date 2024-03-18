@@ -1826,7 +1826,7 @@ void iwl_mvm_mac_init_mvmvif(struct iwl_mvm *mvm, struct iwl_mvm_vif *mvmvif)
 {
 	lockdep_assert_held(&mvm->mutex);
 
-	if (test_bit(IWL_MVM_STATUS_HW_RESTART_REQUESTED, &mvm->status))
+	if (test_bit(IWL_MVM_STATUS_IN_HW_RESTART, &mvm->status))
 		return;
 
 	INIT_DELAYED_WORK(&mvmvif->csa_work,
