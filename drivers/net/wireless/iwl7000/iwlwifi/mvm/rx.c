@@ -995,7 +995,7 @@ static void iwl_mvm_update_esr_mode_tpt(struct iwl_mvm *mvm)
 		 */
 		if (mvmvif->esr_active)
 			memset(mvmsta->mpdu_counters[q].per_link, 0,
-			       sizeof(struct iwl_mvm_mpdu_counter));
+			       sizeof(mvmsta->mpdu_counters[q].per_link));
 
 		spin_unlock_bh(&mvmsta->mpdu_counters[q].lock);
 	}
