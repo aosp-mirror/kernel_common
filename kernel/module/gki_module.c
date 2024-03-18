@@ -10,6 +10,8 @@
 #include <linux/printk.h>
 #include <linux/string.h>
 
+#include "internal.h"
+
 /*
  * Build time generated header files
  *
