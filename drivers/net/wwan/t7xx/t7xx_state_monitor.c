@@ -413,7 +413,7 @@ static void fsm_routine_start(struct t7xx_fsm_ctl *ctl, struct t7xx_fsm_command 
 		goto finish_command;
 	}
 
-	if (status != ctl->prev_status) {
+	if (status != ctl->prev_status || cmd->flag != 0) {
 		stage = FIELD_GET(MISC_STAGE_MASK, status);
 		switch (stage) {
 		case T7XX_DEV_STAGE_INIT:
@@ -430,10 +430,12 @@ static void fsm_routine_start(struct t7xx_fsm_ctl *ctl, struct t7xx_fsm_command 
 
 		case T7XX_DEV_STAGE_LINUX:
 			dev_info(dev, "LINUX_STAGE Entered\n");
-			t7xx_cldma_hif_hw_init(md->md_ctrl[CLDMA_ID_AP]);
-			t7xx_cldma_hif_hw_init(md->md_ctrl[CLDMA_ID_MD]);
 			t7xx_mhccif_mask_clr(md->t7xx_dev, D2H_INT_PORT_ENUM |
 					     D2H_INT_ASYNC_MD_HK | D2H_INT_ASYNC_AP_HK);
+			if (cmd->flag == 0)
+				break;
+			t7xx_cldma_hif_hw_init(md->md_ctrl[CLDMA_ID_AP]);
+			t7xx_cldma_hif_hw_init(md->md_ctrl[CLDMA_ID_MD]);
 			t7xx_port_proxy_set_cfg(md, PORT_CFG_ID_NORMAL);
 			ret = fsm_routine_starting(ctl);
 			break;
