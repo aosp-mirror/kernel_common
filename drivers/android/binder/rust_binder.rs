@@ -32,6 +32,11 @@ struct BinderModule {}
 
 impl kernel::Module for BinderModule {
     fn init(_module: &'static kernel::ThisModule) -> Result<Self> {
+        // SAFETY: This is the very first thing that happens in this module, so nothing else has
+        // called `Contexts::init` yet. Furthermore, we cannot move a value in a global, so the
+        // `Contexts` will not be moved after this call.
+        unsafe { crate::context::CONTEXTS.init() };
+
         // SAFETY: This just accesses global booleans.
         #[cfg(CONFIG_ANDROID_BINDER_IPC)]
         unsafe {
@@ -101,6 +106,7 @@ unsafe extern "C" fn rust_binder_remove_device(device: *mut core::ffi::c_void) {
         // SAFETY: The caller ensures that the `device` pointer came from a previous call to
         // `rust_binder_new_device`.
         let ctx = unsafe { Arc::<Context>::from_foreign(device) };
+        ctx.deregister();
         drop(ctx);
     }
 }
