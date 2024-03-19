@@ -961,8 +961,7 @@ iwl_mvm_stat_iterator_all_links(struct iwl_mvm *mvm,
 static void iwl_mvm_update_esr_mode_tpt(struct iwl_mvm *mvm)
 {
 	struct ieee80211_vif *bss_vif = iwl_mvm_get_bss_vif(mvm);
-	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(bss_vif);
-	struct ieee80211_sta *ap_sta;
+	struct iwl_mvm_vif *mvmvif;
 	struct iwl_mvm_sta *mvmsta;
 	unsigned long total_tx = 0, total_rx = 0;
 
@@ -971,11 +970,12 @@ static void iwl_mvm_update_esr_mode_tpt(struct iwl_mvm *mvm)
 	if (!bss_vif)
 		return;
 
-	ap_sta = iwl_mvm_vif_from_mac80211(bss_vif)->ap_sta;
-	if (!ap_sta)
+	mvmvif = iwl_mvm_vif_from_mac80211(bss_vif);
+
+	if (!mvmvif->esr_active || !mvmvif->ap_sta)
 		return;
 
-	mvmsta = iwl_mvm_sta_from_mac80211(ap_sta);
+	mvmsta = iwl_mvm_sta_from_mac80211(mvmvif->ap_sta);
 	/* We only count for the AP sta in a MLO connection */
 	if (!mvmsta->mpdu_counters)
 		return;
@@ -993,9 +993,8 @@ static void iwl_mvm_update_esr_mode_tpt(struct iwl_mvm *mvm)
 		 * In EMLSR we have statistics every 5 seconds, so we can reset
 		 * the counters upon every statistics notification.
 		 */
-		if (mvmvif->esr_active)
-			memset(mvmsta->mpdu_counters[q].per_link, 0,
-			       sizeof(mvmsta->mpdu_counters[q].per_link));
+		memset(mvmsta->mpdu_counters[q].per_link, 0,
+		       sizeof(mvmsta->mpdu_counters[q].per_link));
 
 		spin_unlock_bh(&mvmsta->mpdu_counters[q].lock);
 	}

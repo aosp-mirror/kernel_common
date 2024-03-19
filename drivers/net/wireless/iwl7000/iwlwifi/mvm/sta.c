@@ -4455,14 +4455,16 @@ void iwl_mvm_count_mpdu(struct iwl_mvm_sta *mvm_sta, u8 fw_sta_id, u32 count,
 	queue_counter = &mvm_sta->mpdu_counters[queue];
 	link_counter = &queue_counter->per_link[fw_link_id];
 
+	/*
+	 * When not in EMLSR, the window and the decision to enter EMLSR are
+	 * handled during counting, when in EMLSR - in the statistics flow
+	 */
+	if (mvmvif->esr_active)
+		return;
+
 	spin_lock_bh(&queue_counter->lock);
 
-	/*
-	 * When not in EMLSR, the window is handled during counting,
-	 * when in EMLSR - in the statistics flow
-	 */
-	if (!mvmvif->esr_active &&
-	    time_is_before_jiffies(queue_counter->window_start +
+	if (time_is_before_jiffies(queue_counter->window_start +
 					IWL_MVM_TPT_COUNT_WINDOW)) {
 		memset(queue_counter->per_link, 0,
 		       sizeof(queue_counter->per_link));
