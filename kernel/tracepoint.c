@@ -14,6 +14,7 @@
 #include <linux/sched/signal.h>
 #include <linux/sched/task.h>
 #include <linux/static_key.h>
+#include <trace/hooks/vendor_hooks.h>
 
 enum tp_func_state {
 	TP_FUNC_0,
