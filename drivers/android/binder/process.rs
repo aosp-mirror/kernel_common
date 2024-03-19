@@ -14,7 +14,9 @@
 
 use kernel::{
     bindings,
+    error::Error,
     fs::File,
+    list::{ListArc, ListLinks},
     mm,
     prelude::*,
     sync::poll::PollTable,
@@ -32,11 +34,36 @@ use crate::{context::Context, defs::*};
 #[pin_data]
 pub(crate) struct Process {
     pub(crate) ctx: Arc<Context>,
+
+    // Links for process list in Context.
+    #[pin]
+    links: ListLinks,
+}
+
+kernel::list::impl_has_list_links! {
+    impl HasListLinks<0> for Process { self.links }
+}
+kernel::list::impl_list_arc_safe! {
+    impl ListArcSafe<0> for Process { untracked; }
+}
+kernel::list::impl_list_item! {
+    impl ListItem<0> for Process {
+        using ListLinks;
+    }
 }
 
 impl Process {
     fn new(ctx: Arc<Context>) -> Result<Arc<Self>> {
-        let process = Arc::new(Process { ctx }, GFP_KERNEL)?;
+        let list_process = ListArc::pin_init::<Error>(
+            try_pin_init!(Process {
+                ctx,
+                links <- ListLinks::new(),
+            }),
+            GFP_KERNEL,
+        )?;
+
+        let process = list_process.clone_arc();
+        process.ctx.register_process(list_process);
 
         Ok(process)
     }
@@ -83,7 +110,9 @@ impl Process {
         Self::new(ctx.into())
     }
 
-    pub(crate) fn release(_this: Arc<Process>, _file: &File) {}
+    pub(crate) fn release(this: Arc<Process>, _file: &File) {
+        this.ctx.deregister_process(&this);
+    }
 
     pub(crate) fn flush(_this: ArcBorrow<'_, Process>) -> Result {
         Ok(())

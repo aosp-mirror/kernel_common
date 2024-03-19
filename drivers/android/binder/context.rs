@@ -7,8 +7,10 @@ use kernel::{
     list::{List, ListArc, ListLinks},
     prelude::*,
     str::{CStr, CString},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
+
+use crate::process::Process;
 
 // This module defines the global variable containing the list of contexts. Since the
 // `kernel::sync` bindings currently don't support mutexes in globals, we use a temporary
@@ -84,9 +86,17 @@ pub(crate) struct ContextList {
     list: List<Context>,
 }
 
+/// This struct keeps track of the processes using this context, and which process is the context
+/// manager.
+struct Manager {
+    all_procs: List<Process>,
+}
+
 /// There is one context per binder file (/dev/binder, /dev/hwbinder, etc)
 #[pin_data]
 pub(crate) struct Context {
+    #[pin]
+    manager: Mutex<Manager>,
     pub(crate) name: CString,
     #[pin]
     links: ListLinks,
@@ -111,6 +121,9 @@ impl Context {
             try_pin_init!(Context {
                 name,
                 links <- ListLinks::new(),
+                manager <- kernel::new_mutex!(Manager {
+                    all_procs: List::new(),
+                }, "Context::manager"),
             }),
             GFP_KERNEL,
         )?;
@@ -128,5 +141,22 @@ impl Context {
         // SAFETY: We never add the context to any other linked list than this one, so it is either
         // in this list, or not in any list.
         unsafe { CONTEXTS.lock().list.remove(self) };
+    }
+
+    pub(crate) fn register_process(self: &Arc<Self>, proc: ListArc<Process>) {
+        if !Arc::ptr_eq(self, &proc.ctx) {
+            pr_err!("Context::register_process called on the wrong context.");
+            return;
+        }
+        self.manager.lock().all_procs.push_back(proc);
+    }
+
+    pub(crate) fn deregister_process(self: &Arc<Self>, proc: &Process) {
+        if !Arc::ptr_eq(self, &proc.ctx) {
+            pr_err!("Context::deregister_process called on the wrong context.");
+            return;
+        }
+        // SAFETY: We just checked that this is the right list.
+        unsafe { self.manager.lock().all_procs.remove(proc) };
     }
 }
