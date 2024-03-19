@@ -13,14 +13,16 @@
 //! fully separated.
 
 use kernel::{
+    bindings,
     fs::File,
     mm,
     prelude::*,
     sync::poll::PollTable,
     sync::{Arc, ArcBorrow},
+    uaccess::{UserSlice, UserSliceReader},
 };
 
-use crate::context::Context;
+use crate::{context::Context, defs::*};
 
 /// A process using binder.
 ///
@@ -38,6 +40,41 @@ impl Process {
 
         Ok(process)
     }
+
+    fn version(&self, data: UserSlice) -> Result {
+        data.writer().write(&BinderVersion::current())
+    }
+}
+
+/// The ioctl handler.
+impl Process {
+    /// Ioctls that are write-only from the perspective of userspace.
+    ///
+    /// The kernel will only read from the pointer that userspace provided to us.
+    fn ioctl_write_only(
+        _this: ArcBorrow<'_, Process>,
+        _file: &File,
+        _cmd: u32,
+        _reader: &mut UserSliceReader,
+    ) -> Result {
+        Err(EINVAL)
+    }
+
+    /// Ioctls that are read/write from the perspective of userspace.
+    ///
+    /// The kernel will both read from and write to the pointer that userspace provided to us.
+    fn ioctl_write_read(
+        this: ArcBorrow<'_, Process>,
+        _file: &File,
+        cmd: u32,
+        data: UserSlice,
+    ) -> Result {
+        match cmd {
+            bindings::BINDER_VERSION => this.version(data)?,
+            _ => return Err(EINVAL),
+        }
+        Ok(())
+    }
 }
 
 /// The file operations supported by `Process`.
@@ -52,22 +89,28 @@ impl Process {
         Ok(())
     }
 
-    pub(crate) fn ioctl(
-        _this: ArcBorrow<'_, Process>,
-        _file: &File,
-        _cmd: u32,
-        _arg: *mut core::ffi::c_void,
-    ) -> Result<i32> {
-        Err(EINVAL)
+    pub(crate) fn ioctl(this: ArcBorrow<'_, Process>, file: &File, cmd: u32, arg: usize) -> Result {
+        use kernel::ioctl::{_IOC_DIR, _IOC_SIZE};
+        use kernel::uapi::{_IOC_READ, _IOC_WRITE};
+
+        let user_slice = UserSlice::new(arg, _IOC_SIZE(cmd));
+
+        const _IOC_READ_WRITE: u32 = _IOC_READ | _IOC_WRITE;
+
+        match _IOC_DIR(cmd) {
+            _IOC_WRITE => Self::ioctl_write_only(this, file, cmd, &mut user_slice.reader()),
+            _IOC_READ_WRITE => Self::ioctl_write_read(this, file, cmd, user_slice),
+            _ => Err(EINVAL),
+        }
     }
 
     pub(crate) fn compat_ioctl(
-        _this: ArcBorrow<'_, Process>,
-        _file: &File,
-        _cmd: u32,
-        _arg: *mut core::ffi::c_void,
-    ) -> Result<i32> {
-        Err(EINVAL)
+        this: ArcBorrow<'_, Process>,
+        file: &File,
+        cmd: u32,
+        arg: usize,
+    ) -> Result {
+        Self::ioctl(this, file, cmd, arg)
     }
 
     pub(crate) fn mmap(

@@ -16,6 +16,7 @@ use kernel::{
 use crate::{context::Context, process::Process};
 
 mod context;
+mod defs;
 mod process;
 
 module! {
@@ -144,7 +145,7 @@ unsafe extern "C" fn rust_binder_compat_ioctl(
     let f = unsafe { Arc::<Process>::borrow((*file).private_data) };
     // SAFETY: The caller ensures that the file is valid.
     match Process::compat_ioctl(f, unsafe { File::from_raw_file(file) }, cmd as _, arg as _) {
-        Ok(ret) => ret.into(),
+        Ok(()) => 0,
         Err(err) => err.to_errno().into(),
     }
 }
@@ -158,7 +159,7 @@ unsafe extern "C" fn rust_binder_unlocked_ioctl(
     let f = unsafe { Arc::<Process>::borrow((*file).private_data) };
     // SAFETY: The caller ensures that the file is valid.
     match Process::ioctl(f, unsafe { File::from_raw_file(file) }, cmd as _, arg as _) {
-        Ok(ret) => ret.into(),
+        Ok(()) => 0,
         Err(err) => err.to_errno().into(),
     }
 }
