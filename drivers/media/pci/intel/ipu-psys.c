@@ -574,12 +574,12 @@ static inline void ipu_psys_kbuf_unmap(struct ipu_psys_kbuffer *kbuf)
 		struct iosys_map dmap;
 
 		iosys_map_set_vaddr(&dmap, kbuf->kaddr);
-		dma_buf_vunmap(kbuf->dbuf, &dmap);
+		dma_buf_vunmap_unlocked(kbuf->dbuf, &dmap);
 	}
 	if (!IS_ERR_OR_NULL(kbuf->sgt))
-		dma_buf_unmap_attachment(kbuf->db_attach,
-					 kbuf->sgt,
-					 DMA_BIDIRECTIONAL);
+		dma_buf_unmap_attachment_unlocked(kbuf->db_attach,
+						  kbuf->sgt,
+						  DMA_BIDIRECTIONAL);
 	if (!IS_ERR_OR_NULL(kbuf->db_attach))
 		dma_buf_detach(kbuf->dbuf, kbuf->db_attach);
 	dma_buf_put(kbuf->dbuf);
@@ -842,7 +842,8 @@ struct ipu_psys_kbuffer *ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 		goto kbuf_map_fail;
 	}
 
-	kbuf->sgt = dma_buf_map_attachment(kbuf->db_attach, DMA_BIDIRECTIONAL);
+	kbuf->sgt = dma_buf_map_attachment_unlocked(kbuf->db_attach,
+						    DMA_BIDIRECTIONAL);
 	if (IS_ERR_OR_NULL(kbuf->sgt)) {
 		kbuf->sgt = NULL;
 		dev_dbg(&psys->adev->dev, "dma buf map attachment failed\n");
@@ -851,7 +852,7 @@ struct ipu_psys_kbuffer *ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 
 	kbuf->dma_addr = sg_dma_address(kbuf->sgt->sgl);
 
-	if (dma_buf_vmap(kbuf->dbuf, &dmap)) {
+	if (dma_buf_vmap_unlocked(kbuf->dbuf, &dmap)) {
 		dev_dbg(&psys->adev->dev, "dma buf vmap failed\n");
 		goto kbuf_map_fail;
 	}
