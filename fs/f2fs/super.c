@@ -1422,11 +1422,6 @@ default_check:
 		}
 	}
 
-	if (test_opt(sbi, DISABLE_CHECKPOINT) && f2fs_lfs_mode(sbi)) {
-		f2fs_err(sbi, "LFS is not compatible with checkpoint=disable");
-		return -EINVAL;
-	}
-
 	if (test_opt(sbi, ATGC) && f2fs_lfs_mode(sbi)) {
 		f2fs_err(sbi, "LFS is not compatible with ATGC");
 		return -EINVAL;
@@ -3361,6 +3356,14 @@ loff_t max_file_blocks(struct inode *inode)
 	leaf_count *= NIDS_PER_BLOCK;
 	result += leaf_count;
 
+	/*
+	 * For compatibility with FSCRYPT_POLICY_FLAG_IV_INO_LBLK_{64,32} with
+	 * a 4K crypto data unit, we must restrict the max filesize to what can
+	 * fit within U32_MAX + 1 data units.
+	 */
+
+	result = min(result, (((loff_t)U32_MAX + 1) * 4096) >> F2FS_BLKSIZE_BITS);
+
 	return result;
 }
 
@@ -4279,24 +4282,21 @@ static int f2fs_scan_devices(struct f2fs_sb_info *sbi)
 			sbi->aligned_blksize = false;
 
 #ifdef CONFIG_BLK_DEV_ZONED
-		if (bdev_zoned_model(FDEV(i).bdev) == BLK_ZONED_HM &&
-				!f2fs_sb_has_blkzoned(sbi)) {
-			f2fs_err(sbi, "Zoned block device feature not enabled");
-			return -EINVAL;
-		}
-		if (bdev_zoned_model(FDEV(i).bdev) != BLK_ZONED_NONE) {
+		if (bdev_is_zoned(FDEV(i).bdev)) {
+			if (!f2fs_sb_has_blkzoned(sbi)) {
+				f2fs_err(sbi, "Zoned block device feature not enabled");
+				return -EINVAL;
+			}
 			if (init_blkz_info(sbi, i)) {
 				f2fs_err(sbi, "Failed to initialize F2FS blkzone information");
 				return -EINVAL;
 			}
 			if (max_devices == 1)
 				break;
-			f2fs_info(sbi, "Mount Device [%2d]: %20s, %8u, %8x - %8x (zone: %s)",
+			f2fs_info(sbi, "Mount Device [%2d]: %20s, %8u, %8x - %8x (zone: Host-managed)",
 				  i, FDEV(i).path,
 				  FDEV(i).total_segments,
-				  FDEV(i).start_blk, FDEV(i).end_blk,
-				  bdev_zoned_model(FDEV(i).bdev) == BLK_ZONED_HA ?
-				  "Host-aware" : "Host-managed");
+				  FDEV(i).start_blk, FDEV(i).end_blk);
 			continue;
 		}
 #endif
@@ -4743,7 +4743,7 @@ try_onemore:
 #ifdef CONFIG_QUOTA
 	f2fs_recover_quota_end(sbi, quota_enabled);
 #endif
-
+reset_checkpoint:
 	/*
 	 * If the f2fs is not readonly and fsync data recovery succeeds,
 	 * check zoned block devices' write pointer consistency.
@@ -4754,7 +4754,6 @@ try_onemore:
 			goto free_meta;
 	}
 
-reset_checkpoint:
 	f2fs_init_inmem_curseg(sbi);
 
 	/* f2fs_recover_fsync_data() cleared this already */
