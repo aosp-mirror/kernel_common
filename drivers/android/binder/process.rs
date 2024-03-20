@@ -20,11 +20,33 @@ use kernel::{
     mm,
     prelude::*,
     sync::poll::PollTable,
-    sync::{Arc, ArcBorrow},
+    sync::{Arc, ArcBorrow, SpinLock},
     uaccess::{UserSlice, UserSliceReader},
+    workqueue::{self, Work},
 };
 
 use crate::{context::Context, defs::*};
+
+// bitflags for defer_work.
+const PROC_DEFER_FLUSH: u8 = 1;
+const PROC_DEFER_RELEASE: u8 = 2;
+
+/// The fields of `Process` protected by the spinlock.
+pub(crate) struct ProcessInner {
+    is_dead: bool,
+
+    /// Bitmap of deferred work to do.
+    defer_work: u8,
+}
+
+impl ProcessInner {
+    fn new() -> Self {
+        Self {
+            is_dead: false,
+            defer_work: 0,
+        }
+    }
+}
 
 /// A process using binder.
 ///
@@ -35,9 +57,20 @@ use crate::{context::Context, defs::*};
 pub(crate) struct Process {
     pub(crate) ctx: Arc<Context>,
 
+    #[pin]
+    pub(crate) inner: SpinLock<ProcessInner>,
+
+    // Work node for deferred work item.
+    #[pin]
+    defer_work: Work<Process>,
+
     // Links for process list in Context.
     #[pin]
     links: ListLinks,
+}
+
+kernel::impl_has_work! {
+    impl HasWork<Process> for Process { self.defer_work }
 }
 
 kernel::list::impl_has_list_links! {
@@ -52,11 +85,33 @@ kernel::list::impl_list_item! {
     }
 }
 
+impl workqueue::WorkItem for Process {
+    type Pointer = Arc<Process>;
+
+    fn run(me: Arc<Self>) {
+        let defer;
+        {
+            let mut inner = me.inner.lock();
+            defer = inner.defer_work;
+            inner.defer_work = 0;
+        }
+
+        if defer & PROC_DEFER_FLUSH != 0 {
+            me.deferred_flush();
+        }
+        if defer & PROC_DEFER_RELEASE != 0 {
+            me.deferred_release();
+        }
+    }
+}
+
 impl Process {
     fn new(ctx: Arc<Context>) -> Result<Arc<Self>> {
         let list_process = ListArc::pin_init::<Error>(
             try_pin_init!(Process {
                 ctx,
+                inner <- kernel::new_spinlock!(ProcessInner::new(), "Process::inner"),
+                defer_work <- kernel::new_work!("Process::defer_work"),
                 links <- ListLinks::new(),
             }),
             GFP_KERNEL,
@@ -66,6 +121,16 @@ impl Process {
         process.ctx.register_process(list_process);
 
         Ok(process)
+    }
+
+    fn deferred_flush(&self) {
+        // NOOP for now.
+    }
+
+    fn deferred_release(self: Arc<Self>) {
+        self.inner.lock().is_dead = true;
+
+        self.ctx.deregister_process(&self);
     }
 
     fn version(&self, data: UserSlice) -> Result {
@@ -111,10 +176,33 @@ impl Process {
     }
 
     pub(crate) fn release(this: Arc<Process>, _file: &File) {
-        this.ctx.deregister_process(&this);
+        let should_schedule;
+        {
+            let mut inner = this.inner.lock();
+            should_schedule = inner.defer_work == 0;
+            inner.defer_work |= PROC_DEFER_RELEASE;
+        }
+
+        if should_schedule {
+            // Ignore failures to schedule to the workqueue. Those just mean that we're already
+            // scheduled for execution.
+            let _ = workqueue::system().enqueue(this);
+        }
     }
 
-    pub(crate) fn flush(_this: ArcBorrow<'_, Process>) -> Result {
+    pub(crate) fn flush(this: ArcBorrow<'_, Process>) -> Result {
+        let should_schedule;
+        {
+            let mut inner = this.inner.lock();
+            should_schedule = inner.defer_work == 0;
+            inner.defer_work |= PROC_DEFER_FLUSH;
+        }
+
+        if should_schedule {
+            // Ignore failures to schedule to the workqueue. Those just mean that we're already
+            // scheduled for execution.
+            let _ = workqueue::system().enqueue(Arc::from(this));
+        }
         Ok(())
     }
 
