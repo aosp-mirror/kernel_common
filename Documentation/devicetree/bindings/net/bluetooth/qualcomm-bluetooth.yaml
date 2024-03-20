@@ -98,6 +98,10 @@ properties:
 
   local-bd-address: true
 
+  qcom,local-bd-address-broken:
+    type: boolean
+    description:
+      boot firmware is incorrectly passing the address in big-endian order
 
 required:
   - compatible
