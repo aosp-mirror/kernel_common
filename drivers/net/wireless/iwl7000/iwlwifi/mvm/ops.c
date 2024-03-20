@@ -486,7 +486,8 @@ static const struct iwl_rx_handlers iwl_mvm_rx_handlers[] = {
 	RX_HANDLER_NO_SIZE(DEBUG_LOG_MSG, iwl_mvm_rx_fw_logs, RX_HANDLER_SYNC),
 #endif
 	RX_HANDLER_GRP(DATA_PATH_GROUP, ESR_MODE_NOTIF,
-		       iwl_mvm_rx_esr_mode_notif, RX_HANDLER_ASYNC_LOCKED,
+		       iwl_mvm_rx_esr_mode_notif,
+		       RX_HANDLER_ASYNC_LOCKED_WIPHY,
 		       struct iwl_mvm_esr_mode_notif),
 
 	RX_HANDLER_GRP(DATA_PATH_GROUP, MONITOR_NOTIF,

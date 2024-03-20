@@ -162,10 +162,8 @@ static void iwl_mvm_esr_vif_iterator(void *_data, u8 *mac,
 	}
 }
 
-static void iwl_mvm_esr_non_bss_link(struct iwl_mvm *mvm,
-				     struct ieee80211_vif *vif,
-				     unsigned int link_id,
-				     bool active)
+int iwl_mvm_esr_non_bss_link(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
+			     unsigned int link_id, bool active)
 {
 	/* An active link of a non-station vif blocks EMLSR. Upon activation
 	 * block EMLSR on the bss vif. Upon deactivation, check if this link
@@ -179,20 +177,21 @@ static void iwl_mvm_esr_non_bss_link(struct iwl_mvm *mvm,
 	};
 
 	if (IS_ERR_OR_NULL(bss_vif))
-		return;
+		return 0;
 
-	if (active) {
-		iwl_mvm_block_esr(mvm, bss_vif,
-				  IWL_MVM_ESR_BLOCKED_NON_BSS,
-				  iwl_mvm_get_primary_link(bss_vif));
-		return;
-	}
+	if (active)
+		return iwl_mvm_block_esr_sync(mvm, bss_vif,
+					      IWL_MVM_ESR_BLOCKED_NON_BSS);
 
 	ieee80211_iterate_active_interfaces(mvm->hw,
 					    IEEE80211_IFACE_ITER_NORMAL,
 					    iwl_mvm_esr_vif_iterator, &data);
-	if (data.lift_block)
+	if (data.lift_block) {
+		mutex_lock(&mvm->mutex);
 		iwl_mvm_unblock_esr(mvm, bss_vif, IWL_MVM_ESR_BLOCKED_NON_BSS);
+		mutex_unlock(&mvm->mutex);}
+
+	return 0;
 }
 
 int iwl_mvm_link_changed(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
@@ -233,10 +232,6 @@ int iwl_mvm_link_changed(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		 */
 		if (!active && vif->type == NL80211_IFTYPE_STATION)
 			iwl_mvm_stop_session_protection(mvm, vif);
-
-		/* update EMLSR mode */
-		if (ieee80211_vif_type_p2p(vif) != NL80211_IFTYPE_STATION)
-			iwl_mvm_esr_non_bss_link(mvm, vif, link_id, active);
 	}
 
 	cmd.link_id = cpu_to_le32(link_info->fw_link_id);
@@ -1032,6 +1027,32 @@ void iwl_mvm_block_esr(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	mvmvif->esr_disable_reason |= reason;
 
 	iwl_mvm_exit_esr(mvm, vif, reason, link_to_keep);
+}
+
+int iwl_mvm_block_esr_sync(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
+			   enum iwl_mvm_esr_state reason)
+{
+	int primary_link = iwl_mvm_get_primary_link(vif);
+	int ret;
+
+	if (!IWL_MVM_AUTO_EML_ENABLE || !ieee80211_vif_is_mld(vif))
+		return 0;
+
+	/* This should be called only with blocking reasons */
+	if (WARN_ON(!(reason & IWL_MVM_BLOCK_ESR_REASONS)))
+		return 0;
+
+	/* leave ESR immediately, not only async with iwl_mvm_block_esr() */
+	ret = ieee80211_set_active_links(vif, BIT(primary_link));
+	if (ret)
+		return ret;
+
+	mutex_lock(&mvm->mutex);
+	/* only additionally block for consistency and to avoid concurrency */
+	iwl_mvm_block_esr(mvm, vif, reason, primary_link);
+	mutex_unlock(&mvm->mutex);
+
+	return 0;
 }
 
 static void iwl_mvm_esr_unblocked(struct iwl_mvm *mvm,
