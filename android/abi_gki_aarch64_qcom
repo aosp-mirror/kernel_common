@@ -763,6 +763,7 @@
   fwnode_property_present
   fwnode_property_read_string
   fwnode_property_read_u32_array
+  fw_devlink_purge_absent_suppliers
   generic_device_group
   generic_file_llseek
   generic_handle_domain_irq
