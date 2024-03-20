@@ -1219,7 +1219,7 @@ iwl_mvm_mld_change_vif_links(struct ieee80211_hw *hw,
 		 * Ensure we always have a valid primary_link, the real
 		 * decision happens later when PHY is activated.
 		 */
-		mvmvif->primary_link = BIT(__ffs(new_links));
+		mvmvif->primary_link = __ffs(new_links);
 	}
 
 out_err:
