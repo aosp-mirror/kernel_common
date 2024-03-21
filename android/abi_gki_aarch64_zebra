@@ -14,3 +14,4 @@
   sock_wfree
   dev_change_flags
   netdev_master_upper_dev_get
+  prandom_bytes
