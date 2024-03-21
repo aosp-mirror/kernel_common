@@ -13,4 +13,7 @@ FILES="
 arch/arm64/boot/dts/qcom/sdm845-db845c.dtb
 arch/arm64/boot/dts/qcom/qrb5165-rb5.dtb
 arch/arm64/boot/dts/qcom/sm8450-qrd.dtb
+arch/arm64/boot/dts/qcom/sm8550-hdk.dtb
+arch/arm64/boot/dts/qcom/sm8550-qrd.dtb
+arch/arm64/boot/dts/qcom/sm8650-qrd.dtb
 "
