@@ -4440,7 +4440,7 @@ void iwl_mvm_count_mpdu(struct iwl_mvm_sta *mvm_sta, u8 fw_sta_id, u32 count,
 	struct iwl_mvm *mvm = mvmvif->mvm;
 	struct iwl_mvm_tpt_counter *queue_counter;
 	struct iwl_mvm_mpdu_counter *link_counter;
-	u32 total_tx = 0, total_rx = 0;
+	u32 total_mpdus = 0;
 	int fw_link_id;
 
 	/* Count only for a BSS sta, and only when EMLSR is possible */
@@ -4455,14 +4455,19 @@ void iwl_mvm_count_mpdu(struct iwl_mvm_sta *mvm_sta, u8 fw_sta_id, u32 count,
 	queue_counter = &mvm_sta->mpdu_counters[queue];
 	link_counter = &queue_counter->per_link[fw_link_id];
 
+	spin_lock_bh(&queue_counter->lock);
+
+	if (tx)
+		link_counter->tx += count;
+	else
+		link_counter->rx += count;
+
 	/*
 	 * When not in EMLSR, the window and the decision to enter EMLSR are
 	 * handled during counting, when in EMLSR - in the statistics flow
 	 */
 	if (mvmvif->esr_active)
-		return;
-
-	spin_lock_bh(&queue_counter->lock);
+		goto out;
 
 	if (time_is_before_jiffies(queue_counter->window_start +
 					IWL_MVM_TPT_COUNT_WINDOW)) {
@@ -4471,21 +4476,14 @@ void iwl_mvm_count_mpdu(struct iwl_mvm_sta *mvm_sta, u8 fw_sta_id, u32 count,
 		queue_counter->window_start = jiffies;
 	}
 
-	if (tx) {
-		link_counter->tx += count;
-		for (int i = 0; i < IWL_MVM_FW_MAX_LINK_ID; i++)
-			total_tx += queue_counter->per_link[i].tx;
-		if (total_tx > IWL_MVM_ENTER_ESR_TPT_THRESH)
-			wiphy_work_queue(mvmvif->mvm->hw->wiphy,
-					 &mvmvif->unblock_esr_tpt_wk);
-	} else {
-		link_counter->rx += count;
-		for (int i = 0; i < IWL_MVM_FW_MAX_LINK_ID; i++)
-			total_rx += queue_counter->per_link[i].rx;
-		if (total_rx > IWL_MVM_ENTER_ESR_TPT_THRESH)
-			wiphy_work_queue(mvmvif->mvm->hw->wiphy,
-					 &mvmvif->unblock_esr_tpt_wk);
-	}
+	for (int i = 0; i < IWL_MVM_FW_MAX_LINK_ID; i++)
+		total_mpdus += tx ? queue_counter->per_link[i].tx :
+				    queue_counter->per_link[i].rx;
 
+	if (total_mpdus > IWL_MVM_ENTER_ESR_TPT_THRESH)
+		wiphy_work_queue(mvmvif->mvm->hw->wiphy,
+				 &mvmvif->unblock_esr_tpt_wk);
+
+out:
 	spin_unlock_bh(&queue_counter->lock);
 }
