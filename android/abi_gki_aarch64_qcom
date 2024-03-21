@@ -2714,6 +2714,8 @@
   vm_zone_stat
   vscnprintf
   vsnprintf
+  vsock_addr_init
+  vsock_remove_bound
   vunmap
   vzalloc
   wait_for_completion
