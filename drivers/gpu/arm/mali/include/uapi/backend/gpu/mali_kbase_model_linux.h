@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2019-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2022 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -19,13 +19,18 @@
  *
  */
 
-#ifndef _KBASE_BITS_H_
-#define _KBASE_BITS_H_
+/*
+ * Dummy Model interface
+ */
 
-#if (KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE)
-#include <linux/bits.h>
-#else
-#include <linux/bitops.h>
-#endif
+#ifndef _UAPI_KBASE_MODEL_LINUX_H_
+#define _UAPI_KBASE_MODEL_LINUX_H_
 
-#endif /* _KBASE_BITS_H_ */
+/* Generic model IRQs */
+#define MODEL_LINUX_JOB_IRQ (0x1 << 0)
+#define MODEL_LINUX_GPU_IRQ (0x1 << 1)
+#define MODEL_LINUX_MMU_IRQ (0x1 << 2)
+
+#define MODEL_LINUX_IRQ_MASK (MODEL_LINUX_JOB_IRQ | MODEL_LINUX_GPU_IRQ | MODEL_LINUX_MMU_IRQ)
+
+#endif /* _UAPI_KBASE_MODEL_LINUX_H_ */

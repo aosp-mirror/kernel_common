@@ -22,23 +22,21 @@
 #include <mali_kbase.h>
 #include <linux/version.h>
 #include <linux/random.h>
-#include "backend/gpu/mali_kbase_model_dummy.h"
+#include "backend/gpu/mali_kbase_model_linux.h"
+
+static struct kbase_error_atom *error_track_list;
+
+#ifdef CONFIG_MALI_ERROR_INJECT_RANDOM
 
 /** Kernel 6.1.0 has dropped prandom_u32(), use get_random_u32() */
 #if (KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE)
 #define prandom_u32 get_random_u32
 #endif
 
-static struct kbase_error_atom *error_track_list;
-
-unsigned int rand_seed;
-
 /*following error probability are set quite high in order to stress the driver*/
-unsigned int error_probability = 50;	/* to be set between 0 and 100 */
+static unsigned int error_probability = 50; /* to be set between 0 and 100 */
 /* probability to have multiple error give that there is an error */
-unsigned int multiple_error_probability = 50;
-
-#ifdef CONFIG_MALI_ERROR_INJECT_RANDOM
+static unsigned int multiple_error_probability = 50;
 
 /* all the error conditions supported by the model */
 #define TOTAL_FAULTS 27

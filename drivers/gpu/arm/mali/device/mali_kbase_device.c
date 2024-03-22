@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2010-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2010-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -35,6 +35,7 @@
 #include <mali_kbase.h>
 #include <mali_kbase_defs.h>
 #include <mali_kbase_hwaccess_instr.h>
+#include <mali_kbase_hwaccess_time.h>
 #include <mali_kbase_hw.h>
 #include <mali_kbase_config_defaults.h>
 #include "priority_control_manager.h"
@@ -191,22 +192,14 @@ static int mali_oom_notifier_handler(struct notifier_block *nb,
 	mutex_lock(&kbdev->kctx_list_lock);
 
 	list_for_each_entry(kctx, &kbdev->kctx_list, kctx_list_link) {
-		struct pid *pid_struct;
-		struct task_struct *task;
+		struct task_struct *task = kctx->task;
 		unsigned long task_alloc_total =
 			KBASE_PAGES_TO_KIB(atomic_read(&(kctx->used_pages)));
-
-		rcu_read_lock();
-		pid_struct = find_get_pid(kctx->pid);
-		task = pid_task(pid_struct, PIDTYPE_PID);
 
 		dev_err(kbdev->dev,
 			"OOM notifier: tsk %s  tgid (%u)  pid (%u) %lu kB\n",
 			task ? task->comm : "[null task]", kctx->tgid,
 			kctx->pid, task_alloc_total);
-
-		put_pid(pid_struct);
-		rcu_read_unlock();
 	}
 
 	mutex_unlock(&kbdev->kctx_list_lock);
@@ -226,11 +219,14 @@ int kbase_device_misc_init(struct kbase_device * const kbdev)
 	kbdev->cci_snoop_enabled = false;
 	np = kbdev->dev->of_node;
 	if (np != NULL) {
-		if (of_property_read_u32(np, "snoop_enable_smc",
-					&kbdev->snoop_enable_smc))
+		/* Read "-" versions of the properties and fallback to "_"
+		 * if these are not found
+		 */
+		if (of_property_read_u32(np, "snoop-enable-smc", &kbdev->snoop_enable_smc) &&
+		    of_property_read_u32(np, "snoop_enable_smc", &kbdev->snoop_enable_smc))
 			kbdev->snoop_enable_smc = 0;
-		if (of_property_read_u32(np, "snoop_disable_smc",
-					&kbdev->snoop_disable_smc))
+		if (of_property_read_u32(np, "snoop-disable-smc", &kbdev->snoop_disable_smc) &&
+		    of_property_read_u32(np, "snoop_disable_smc", &kbdev->snoop_disable_smc))
 			kbdev->snoop_disable_smc = 0;
 		/* Either both or none of the calls should be provided. */
 		if (!((kbdev->snoop_disable_smc == 0
@@ -302,13 +298,14 @@ int kbase_device_misc_init(struct kbase_device * const kbdev)
 	kbdev->pm.dvfs_period = DEFAULT_PM_DVFS_PERIOD;
 
 #if MALI_USE_CSF
-	kbdev->reset_timeout_ms = kbase_get_timeout_ms(kbdev, CSF_CSG_SUSPEND_TIMEOUT);
-#else
+	kbdev->reset_timeout_ms = kbase_get_timeout_ms(kbdev, CSF_GPU_RESET_TIMEOUT);
+#else /* MALI_USE_CSF */
 	kbdev->reset_timeout_ms = JM_DEFAULT_RESET_TIMEOUT_MS;
-#endif /* MALI_USE_CSF */
+#endif /* !MALI_USE_CSF */
 
 	kbdev->mmu_mode = kbase_mmu_mode_get_aarch64();
-
+	kbdev->mmu_or_gpu_cache_op_wait_time_ms =
+		kbase_get_timeout_ms(kbdev, MMU_AS_INACTIVE_WAIT_TIMEOUT);
 	mutex_init(&kbdev->kctx_list_lock);
 	INIT_LIST_HEAD(&kbdev->kctx_list);
 
@@ -321,6 +318,14 @@ int kbase_device_misc_init(struct kbase_device * const kbdev)
 			"Unable to register OOM notifier for Mali - but will continue\n");
 		kbdev->oom_notifier_block.notifier_call = NULL;
 	}
+
+#if MALI_USE_CSF
+#if IS_ENABLED(CONFIG_SYNC_FILE)
+	atomic_set(&kbdev->live_fence_metadata, 0);
+#endif /* IS_ENABLED(CONFIG_SYNC_FILE) */
+	atomic_set(&kbdev->fence_signal_timeout_enabled, 1);
+#endif
+
 	return 0;
 
 term_as:
@@ -344,6 +349,11 @@ void kbase_device_misc_term(struct kbase_device *kbdev)
 
 	if (kbdev->oom_notifier_block.notifier_call)
 		unregister_oom_notifier(&kbdev->oom_notifier_block);
+
+#if MALI_USE_CSF && IS_ENABLED(CONFIG_SYNC_FILE)
+	if (atomic_read(&kbdev->live_fence_metadata) > 0)
+		dev_warn(kbdev->dev, "Terminating Kbase device with live fence metadata!");
+#endif
 }
 
 void kbase_device_free(struct kbase_device *kbdev)
@@ -353,8 +363,7 @@ void kbase_device_free(struct kbase_device *kbdev)
 
 void kbase_device_id_init(struct kbase_device *kbdev)
 {
-	scnprintf(kbdev->devname, DEVNAME_SIZE, "%s%d", kbase_drv_name,
-			kbase_dev_nr);
+	scnprintf(kbdev->devname, DEVNAME_SIZE, "%s%d", KBASE_DRV_NAME, kbase_dev_nr);
 	kbdev->id = kbase_dev_nr;
 }
 

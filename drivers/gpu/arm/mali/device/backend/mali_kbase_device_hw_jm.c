@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2020-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2020-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -106,7 +106,7 @@ void kbase_gpu_interrupt(struct kbase_device *kbdev, u32 val)
 	KBASE_KTRACE_ADD(kbdev, CORE_GPU_IRQ_DONE, NULL, val);
 }
 
-#if !IS_ENABLED(CONFIG_MALI_NO_MALI)
+#if IS_ENABLED(CONFIG_MALI_REAL_HW)
 void kbase_reg_write(struct kbase_device *kbdev, u32 offset, u32 value)
 {
 	WARN_ON(!kbdev->pm.backend.gpu_powered);
@@ -124,9 +124,10 @@ KBASE_EXPORT_TEST_API(kbase_reg_write);
 
 u32 kbase_reg_read(struct kbase_device *kbdev, u32 offset)
 {
-	u32 val;
+	u32 val = 0;
 
-	WARN_ON(!kbdev->pm.backend.gpu_powered);
+	if (WARN_ON(!kbdev->pm.backend.gpu_powered))
+		return val;
 
 	val = readl(kbdev->reg + offset);
 
@@ -140,4 +141,4 @@ u32 kbase_reg_read(struct kbase_device *kbdev, u32 offset)
 	return val;
 }
 KBASE_EXPORT_TEST_API(kbase_reg_read);
-#endif /* !IS_ENABLED(CONFIG_MALI_NO_MALI) */
+#endif /* IS_ENABLED(CONFIG_MALI_REAL_HW) */

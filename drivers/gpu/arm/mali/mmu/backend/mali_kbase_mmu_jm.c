@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2019-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2019-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -63,15 +63,16 @@ void kbase_gpu_report_bus_fault_and_kill(struct kbase_context *kctx,
 	u32 const exception_data = (status >> 8) & 0xFFFFFF;
 	int const as_no = as->number;
 	unsigned long flags;
+	const uintptr_t fault_addr = fault->addr;
 
 	/* terminal fault, print info about the fault */
 	dev_err(kbdev->dev,
-		"GPU bus fault in AS%d at PA 0x%016llX\n"
+		"GPU bus fault in AS%d at PA %pK\n"
 		"raw fault status: 0x%X\n"
 		"exception type 0x%X: %s\n"
 		"exception data 0x%X\n"
 		"pid: %d\n",
-		as_no, fault->addr,
+		as_no, (void *)fault_addr,
 		status,
 		exception_type, kbase_gpu_exception_name(exception_type),
 		exception_data,
@@ -321,14 +322,14 @@ void kbase_mmu_interrupt(struct kbase_device *kbdev, u32 irq_stat)
 
 	/* remember current mask */
 	spin_lock_irqsave(&kbdev->mmu_mask_change, flags);
-	new_mask = kbase_reg_read(kbdev, MMU_REG(MMU_IRQ_MASK));
+	new_mask = kbase_reg_read(kbdev, MMU_CONTROL_REG(MMU_IRQ_MASK));
 	/* mask interrupts for now */
-	kbase_reg_write(kbdev, MMU_REG(MMU_IRQ_MASK), 0);
+	kbase_reg_write(kbdev, MMU_CONTROL_REG(MMU_IRQ_MASK), 0);
 	spin_unlock_irqrestore(&kbdev->mmu_mask_change, flags);
 
 	while (bf_bits | pf_bits) {
 		struct kbase_as *as;
-		int as_no;
+		unsigned int as_no;
 		struct kbase_context *kctx;
 		struct kbase_fault *fault;
 
@@ -354,11 +355,11 @@ void kbase_mmu_interrupt(struct kbase_device *kbdev, u32 irq_stat)
 		kctx = kbase_ctx_sched_as_to_ctx_refcount(kbdev, as_no);
 
 		/* find faulting address */
-		fault->addr = kbase_reg_read(kbdev, MMU_AS_REG(as_no,
-				AS_FAULTADDRESS_HI));
+		fault->addr = kbase_reg_read(kbdev,
+					     MMU_STAGE1_REG(MMU_AS_REG(as_no, AS_FAULTADDRESS_HI)));
 		fault->addr <<= 32;
-		fault->addr |= kbase_reg_read(kbdev, MMU_AS_REG(as_no,
-				AS_FAULTADDRESS_LO));
+		fault->addr |= kbase_reg_read(
+			kbdev, MMU_STAGE1_REG(MMU_AS_REG(as_no, AS_FAULTADDRESS_LO)));
 		/* Mark the fault protected or not */
 		fault->protected_mode = kbdev->protected_mode;
 
@@ -371,13 +372,13 @@ void kbase_mmu_interrupt(struct kbase_device *kbdev, u32 irq_stat)
 		kbase_as_fault_debugfs_new(kbdev, as_no);
 
 		/* record the fault status */
-		fault->status = kbase_reg_read(kbdev, MMU_AS_REG(as_no,
-				AS_FAULTSTATUS));
-		fault->extra_addr = kbase_reg_read(kbdev,
-				MMU_AS_REG(as_no, AS_FAULTEXTRA_HI));
+		fault->status =
+			kbase_reg_read(kbdev, MMU_STAGE1_REG(MMU_AS_REG(as_no, AS_FAULTSTATUS)));
+		fault->extra_addr =
+			kbase_reg_read(kbdev, MMU_STAGE1_REG(MMU_AS_REG(as_no, AS_FAULTEXTRA_HI)));
 		fault->extra_addr <<= 32;
-		fault->extra_addr |= kbase_reg_read(kbdev,
-				MMU_AS_REG(as_no, AS_FAULTEXTRA_LO));
+		fault->extra_addr |=
+			kbase_reg_read(kbdev, MMU_STAGE1_REG(MMU_AS_REG(as_no, AS_FAULTEXTRA_LO)));
 
 		if (kbase_as_has_bus_fault(as, fault)) {
 			/* Mark bus fault as handled.
@@ -405,9 +406,9 @@ void kbase_mmu_interrupt(struct kbase_device *kbdev, u32 irq_stat)
 
 	/* reenable interrupts */
 	spin_lock_irqsave(&kbdev->mmu_mask_change, flags);
-	tmp = kbase_reg_read(kbdev, MMU_REG(MMU_IRQ_MASK));
+	tmp = kbase_reg_read(kbdev, MMU_CONTROL_REG(MMU_IRQ_MASK));
 	new_mask |= tmp;
-	kbase_reg_write(kbdev, MMU_REG(MMU_IRQ_MASK), new_mask);
+	kbase_reg_write(kbdev, MMU_CONTROL_REG(MMU_IRQ_MASK), new_mask);
 	spin_unlock_irqrestore(&kbdev->mmu_mask_change, flags);
 
 	dev_dbg(kbdev->dev, "Leaving %s irq_stat %u\n",
@@ -423,13 +424,13 @@ int kbase_mmu_switch_to_ir(struct kbase_context *const kctx,
 	return kbase_job_slot_softstop_start_rp(kctx, reg);
 }
 
-int kbase_mmu_as_init(struct kbase_device *kbdev, int i)
+int kbase_mmu_as_init(struct kbase_device *kbdev, unsigned int i)
 {
 	kbdev->as[i].number = i;
 	kbdev->as[i].bf_data.addr = 0ULL;
 	kbdev->as[i].pf_data.addr = 0ULL;
 
-	kbdev->as[i].pf_wq = alloc_workqueue("mali_mmu%d", 0, 1, i);
+	kbdev->as[i].pf_wq = alloc_workqueue("mali_mmu%u", 0, 0, i);
 	if (!kbdev->as[i].pf_wq)
 		return -ENOMEM;
 

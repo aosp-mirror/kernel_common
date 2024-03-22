@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2020-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2020-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -118,9 +118,21 @@
 
 #define BASE_QUEUE_MAX_PRIORITY (15U)
 
-/* CQS Sync object is an array of __u32 event_mem[2], error field index is 1 */
-#define BASEP_EVENT_VAL_INDEX (0U)
-#define BASEP_EVENT_ERR_INDEX (1U)
+/* Sync32 object fields definition */
+#define BASEP_EVENT32_VAL_OFFSET (0U)
+#define BASEP_EVENT32_ERR_OFFSET (4U)
+#define BASEP_EVENT32_SIZE_BYTES (8U)
+
+/* Sync64 object fields definition */
+#define BASEP_EVENT64_VAL_OFFSET (0U)
+#define BASEP_EVENT64_ERR_OFFSET (8U)
+#define BASEP_EVENT64_SIZE_BYTES (16U)
+
+/* Sync32 object alignment, equal to its size */
+#define BASEP_EVENT32_ALIGN_BYTES (8U)
+
+/* Sync64 object alignment, equal to its size */
+#define BASEP_EVENT64_ALIGN_BYTES (16U)
 
 /* The upper limit for number of objects that could be waited/set per command.
  * This limit is now enforced as internally the error inherit inputs are
@@ -132,6 +144,9 @@
 /* CSF CSI EXCEPTION_HANDLER_FLAGS */
 #define BASE_CSF_TILER_OOM_EXCEPTION_FLAG (1u << 0)
 #define BASE_CSF_EXCEPTION_HANDLER_FLAGS_MASK (BASE_CSF_TILER_OOM_EXCEPTION_FLAG)
+
+/* Initial value for LATEST_FLUSH register */
+#define POWER_DOWN_LATEST_FLUSH_VALUE ((uint32_t)1)
 
 /**
  * enum base_kcpu_command_type - Kernel CPU queue command type.
@@ -162,7 +177,7 @@ enum base_kcpu_command_type {
 	BASE_KCPU_COMMAND_TYPE_JIT_ALLOC,
 	BASE_KCPU_COMMAND_TYPE_JIT_FREE,
 	BASE_KCPU_COMMAND_TYPE_GROUP_SUSPEND,
-	BASE_KCPU_COMMAND_TYPE_ERROR_BARRIER
+	BASE_KCPU_COMMAND_TYPE_ERROR_BARRIER,
 };
 
 /**

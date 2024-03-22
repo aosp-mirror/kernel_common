@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2021-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2021-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -23,7 +23,10 @@
 
 #include <device/mali_kbase_device.h>
 #include <mali_kbase.h>
+
+#if MALI_USE_CSF
 #define DTB_SET_SIZE 2
+#endif
 
 static bool read_setting_valid(unsigned int id, unsigned int read_setting)
 {
@@ -209,6 +212,7 @@ void kbase_pbha_write_settings(struct kbase_device *kbdev)
 	}
 }
 
+#if MALI_USE_CSF
 static int kbase_pbha_read_int_id_override_property(struct kbase_device *kbdev,
 						    const struct device_node *pbha_node)
 {
@@ -216,17 +220,28 @@ static int kbase_pbha_read_int_id_override_property(struct kbase_device *kbdev,
 	int sz, i;
 	bool valid = true;
 
-	sz = of_property_count_elems_of_size(pbha_node, "int_id_override",
-					     sizeof(u32));
+	sz = of_property_count_elems_of_size(pbha_node, "int-id-override", sizeof(u32));
+
+	if (sz == -EINVAL) {
+		/* There is no int-id-override field. Fallback to int_id_override instead */
+		sz = of_property_count_elems_of_size(pbha_node, "int_id_override", sizeof(u32));
+	}
+	if (sz == -EINVAL) {
+		/* There is no int_id_override field. This is valid - but there's nothing further
+		 * to do here.
+		 */
+		return 0;
+	}
 	if (sz <= 0 || (sz % DTB_SET_SIZE != 0)) {
 		dev_err(kbdev->dev, "Bad DTB format: pbha.int_id_override\n");
 		return -EINVAL;
 	}
-	if (of_property_read_u32_array(pbha_node, "int_id_override", dtb_data,
-				       sz) != 0) {
-		dev_err(kbdev->dev,
-			"Failed to read DTB pbha.int_id_override\n");
-		return -EINVAL;
+	if (of_property_read_u32_array(pbha_node, "int-id-override", dtb_data, sz) != 0) {
+		/* There may be no int-id-override field. Fallback to int_id_override instead */
+		if (of_property_read_u32_array(pbha_node, "int_id_override", dtb_data, sz) != 0) {
+			dev_err(kbdev->dev, "Failed to read DTB pbha.int_id_override\n");
+			return -EINVAL;
+		}
 	}
 
 	for (i = 0; valid && i < sz; i = i + DTB_SET_SIZE) {
@@ -250,17 +265,20 @@ static int kbase_pbha_read_int_id_override_property(struct kbase_device *kbdev,
 	return 0;
 }
 
-#if MALI_USE_CSF
 static int kbase_pbha_read_propagate_bits_property(struct kbase_device *kbdev,
 						   const struct device_node *pbha_node)
 {
-	u32 bits;
+	u32 bits = 0;
 	int err;
 
 	if (!kbase_hw_has_feature(kbdev, BASE_HW_FEATURE_PBHA_HWU))
 		return 0;
 
-	err = of_property_read_u32(pbha_node, "propagate_bits", &bits);
+	err = of_property_read_u32(pbha_node, "propagate-bits", &bits);
+
+	if (err == -EINVAL) {
+		err = of_property_read_u32(pbha_node, "propagate_bits", &bits);
+	}
 
 	if (err < 0) {
 		if (err != -EINVAL) {
@@ -268,6 +286,10 @@ static int kbase_pbha_read_propagate_bits_property(struct kbase_device *kbdev,
 				"DTB value for propagate_bits is improperly formed (err=%d)\n",
 				err);
 			return err;
+		} else {
+			/* Property does not exist */
+			kbdev->pbha_propagate_bits = 0;
+			return 0;
 		}
 	}
 
@@ -279,10 +301,11 @@ static int kbase_pbha_read_propagate_bits_property(struct kbase_device *kbdev,
 	kbdev->pbha_propagate_bits = bits;
 	return 0;
 }
-#endif
+#endif /* MALI_USE_CSF */
 
 int kbase_pbha_read_dtb(struct kbase_device *kbdev)
 {
+#if MALI_USE_CSF
 	const struct device_node *pbha_node;
 	int err;
 
@@ -295,12 +318,12 @@ int kbase_pbha_read_dtb(struct kbase_device *kbdev)
 
 	err = kbase_pbha_read_int_id_override_property(kbdev, pbha_node);
 
-#if MALI_USE_CSF
 	if (err < 0)
 		return err;
 
 	err = kbase_pbha_read_propagate_bits_property(kbdev, pbha_node);
-#endif
-
 	return err;
+#else
+	return 0;
+#endif
 }

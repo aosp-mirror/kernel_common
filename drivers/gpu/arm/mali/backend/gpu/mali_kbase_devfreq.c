@@ -483,7 +483,7 @@ static int kbase_devfreq_init_core_mask_table(struct kbase_device *kbdev)
 	cell = nvmem_cell_get(kbdev->dev, "volt-bin");
 
 	if (IS_ERR(cell)) {
-		dev_warn(kbdev->dev, "No volt-bin detected, using default OPP table\n");
+		dev_info(kbdev->dev, "No volt-bin detected, using default OPP table\n");
 		goto skip_volt_bin;
 	}
 
@@ -807,12 +807,6 @@ int kbase_devfreq_init(struct kbase_device *kbdev)
 
 	if (kbdev->nr_clocks == 0) {
 		dev_err(kbdev->dev, "Clock not available for devfreq\n");
-		return -ENODEV;
-	}
-
-	/* CHROMIUM: Can't do devfreq without OPP */
-	if (kbdev->opp_token <= 0) {
-		dev_err(kbdev->dev, "Uninitialized devfreq opp token\n");
 		return -ENODEV;
 	}
 

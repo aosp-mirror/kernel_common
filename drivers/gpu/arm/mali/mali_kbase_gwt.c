@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2010-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2010-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -53,9 +53,9 @@ static void kbase_gpu_gwt_setup_pages(struct kbase_context *kctx,
 					unsigned long flag)
 {
 	kbase_gpu_gwt_setup_page_permission(kctx, flag,
-				rb_first(&(kctx->reg_rbtree_same)));
+					    rb_first(&kctx->reg_zone[SAME_VA_ZONE].reg_rbtree));
 	kbase_gpu_gwt_setup_page_permission(kctx, flag,
-				rb_first(&(kctx->reg_rbtree_custom)));
+					    rb_first(&kctx->reg_zone[CUSTOM_VA_ZONE].reg_rbtree));
 }
 
 
@@ -125,14 +125,17 @@ int kbase_gpu_gwt_stop(struct kbase_context *kctx)
 	return 0;
 }
 
-
+#if (KERNEL_VERSION(5, 13, 0) <= LINUX_VERSION_CODE)
+static int list_cmp_function(void *priv, const struct list_head *a, const struct list_head *b)
+#else
 static int list_cmp_function(void *priv, struct list_head *a,
 				struct list_head *b)
+#endif
 {
-	struct kbasep_gwt_list_element *elementA = container_of(a,
-				struct kbasep_gwt_list_element, link);
-	struct kbasep_gwt_list_element *elementB = container_of(b,
-				struct kbasep_gwt_list_element, link);
+	const struct kbasep_gwt_list_element *elementA =
+		container_of(a, struct kbasep_gwt_list_element, link);
+	const struct kbasep_gwt_list_element *elementB =
+		container_of(b, struct kbasep_gwt_list_element, link);
 
 	CSTD_UNUSED(priv);
 

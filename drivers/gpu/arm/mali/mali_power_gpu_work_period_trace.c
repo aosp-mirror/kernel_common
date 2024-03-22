@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2010-2016, 2020-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -19,10 +19,10 @@
  *
  */
 
-#include "mali_kbase_strings.h"
-
-#define KBASE_DRV_NAME "mali"
-#define KBASE_TIMELINE_NAME KBASE_DRV_NAME ".timeline"
-
-const char kbase_drv_name[] = KBASE_DRV_NAME;
-const char kbase_timeline_name[] = KBASE_TIMELINE_NAME;
+/* Create the trace point if not configured in kernel */
+#ifndef CONFIG_TRACE_POWER_GPU_WORK_PERIOD
+#if IS_ENABLED(CONFIG_MALI_TRACE_POWER_GPU_WORK_PERIOD)
+#define CREATE_TRACE_POINTS
+#include "mali_power_gpu_work_period_trace.h"
+#endif /* CONFIG_MALI_TRACE_POWER_GPU_WORK_PERIOD */
+#endif

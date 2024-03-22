@@ -28,7 +28,11 @@
 #include <linux/version.h>
 #include <linux/ratelimit.h>
 #include "priority_control_manager.h"
+#if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE
 #include <linux/sched/signal.h>
+#else
+#include <linux/signal.h>
+#endif
 
 #include <mali_kbase_jm.h>
 #include <mali_kbase_kinstr_jm.h>
@@ -1085,7 +1089,9 @@ int kbase_jd_submit(struct kbase_context *kctx,
 	latest_flush = kbase_backend_get_current_flush_id(kbdev);
 
 	for (i = 0; i < nr_atoms; i++) {
-		struct base_jd_atom user_atom;
+		struct base_jd_atom user_atom = {
+			.seq_nr = 0,
+		};
 		struct base_jd_fragment user_jc_incr;
 		struct kbase_jd_atom *katom;
 
@@ -1210,8 +1216,8 @@ while (false)
 
 		mutex_unlock(&jctx->lock);
 		if (fatal_signal_pending(current)) {
-			dev_dbg(kbdev->dev, "Fatal signal pending for kctx %d_%d", kctx->tgid,
-				kctx->id);
+			dev_dbg(kbdev->dev, "Fatal signal pending for kctx %d_%d",
+				kctx->tgid, kctx->id);
 			/* We're being killed so the result code doesn't really matter  */
 			return 0;
 		}

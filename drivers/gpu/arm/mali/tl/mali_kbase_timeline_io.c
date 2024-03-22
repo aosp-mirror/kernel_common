@@ -30,19 +30,12 @@
 #include "version_compat_defs.h"
 #include <linux/anon_inodes.h>
 
-#ifndef MALI_STRIP_KBASE_DEVELOPMENT
-/* Development builds need to test instrumentation and enable unprivileged
- * processes to acquire timeline streams, in order to avoid complications
- * with configurations across multiple platforms and systems.
- *
- * Release builds, instead, shall deny access to unprivileged processes
- * because there are no use cases where they are allowed to acquire timeline
- * streams, unless they're given special permissions by a privileged process.
- */
-static int kbase_unprivileged_global_profiling = 1;
-#else
-static int kbase_unprivileged_global_profiling;
+/* Explicitly include epoll header for old kernels. Not required from 4.16. */
+#if KERNEL_VERSION(4, 16, 0) > LINUX_VERSION_CODE
+#include <uapi/linux/eventpoll.h>
 #endif
+
+static int kbase_unprivileged_global_profiling;
 
 /**
  * kbase_unprivileged_global_profiling_set - set permissions for unprivileged processes
@@ -93,7 +86,11 @@ static int kbasep_timeline_io_fsync(struct file *filp, loff_t start, loff_t end,
 
 static bool timeline_is_permitted(void)
 {
+#if KERNEL_VERSION(5, 8, 0) <= LINUX_VERSION_CODE
 	return kbase_unprivileged_global_profiling || perfmon_capable();
+#else
+	return kbase_unprivileged_global_profiling || capable(CAP_SYS_ADMIN);
+#endif
 }
 
 /**

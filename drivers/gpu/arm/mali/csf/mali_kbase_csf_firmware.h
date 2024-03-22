@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2018-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2018-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -56,7 +56,7 @@
 #define CSF_NUM_DOORBELL ((u8)24)
 
 /* Offset to the first HW doorbell page */
-#define CSF_HW_DOORBELL_PAGE_OFFSET ((u32)0x80000)
+#define CSF_HW_DOORBELL_PAGE_OFFSET ((u32)DOORBELLS_BASE)
 
 /* Size of HW Doorbell page, used to calculate the offset to subsequent pages */
 #define CSF_HW_DOORBELL_PAGE_SIZE ((u32)0x10000)
@@ -245,7 +245,6 @@ void kbase_csf_firmware_csg_input_mask(
  */
 u32 kbase_csf_firmware_csg_output(
 	const struct kbase_csf_cmd_stream_group_info *info, u32 offset);
-
 
 /**
  * struct kbase_csf_global_iface - Global CSF interface
@@ -449,6 +448,50 @@ int kbase_csf_firmware_load_init(struct kbase_device *kbdev);
  * Frees the memory allocated by kbase_csf_firmware_load_init()
  */
 void kbase_csf_firmware_unload_term(struct kbase_device *kbdev);
+
+#if IS_ENABLED(CONFIG_MALI_CORESIGHT)
+/**
+ * kbase_csf_firmware_mcu_register_write - Write to MCU register
+ *
+ * @kbdev:    Instance of a gpu platform device that implements a csf interface.
+ * @reg_addr: Register address to write into
+ * @reg_val:  Value to be written
+ *
+ * Write a desired value to a register in MCU address space.
+ *
+ * return: 0 on success, or negative on failure.
+ */
+int kbase_csf_firmware_mcu_register_write(struct kbase_device *const kbdev, u32 const reg_addr,
+					  u32 const reg_val);
+/**
+ * kbase_csf_firmware_mcu_register_read - Read from MCU register
+ *
+ * @kbdev:    Instance of a gpu platform device that implements a csf interface.
+ * @reg_addr: Register address to read from
+ * @reg_val:  Value as present in reg_addr register
+ *
+ * Read a value from MCU address space.
+ *
+ * return: 0 on success, or negative on failure.
+ */
+int kbase_csf_firmware_mcu_register_read(struct kbase_device *const kbdev, u32 const reg_addr,
+					 u32 *reg_val);
+
+/**
+ * kbase_csf_firmware_mcu_register_poll - Poll MCU register
+ *
+ * @kbdev:    Instance of a gpu platform device that implements a csf interface.
+ * @reg_addr: Register address to read from
+ * @val_mask: Value to mask the read value for comparison
+ * @reg_val:  Value to be compared against
+ *
+ * Continue to read a value from MCU address space until it matches given mask and value.
+ *
+ * return: 0 on success, or negative on failure.
+ */
+int kbase_csf_firmware_mcu_register_poll(struct kbase_device *const kbdev, u32 const reg_addr,
+					 u32 const val_mask, u32 const reg_val);
+#endif /* IS_ENABLED(CONFIG_MALI_CORESIGHT) */
 
 /**
  * kbase_csf_firmware_ping - Send the ping request to firmware.
@@ -827,6 +870,22 @@ u32 kbase_csf_firmware_get_mcu_core_pwroff_time(struct kbase_device *kbdev);
 u32 kbase_csf_firmware_set_mcu_core_pwroff_time(struct kbase_device *kbdev, u32 dur);
 
 /**
+ * kbase_csf_firmware_reset_mcu_core_pwroff_time - Reset the MCU shader Core power-off
+ *                                               time value
+ *
+ * @kbdev:   Instance of a GPU platform device that implements a CSF interface.
+ *
+ * Sets the MCU Shader Core power-off time value to the default.
+ *
+ * The configured MCU shader Core power-off timer will only have effect when the host
+ * driver has delegated the shader cores' power management to MCU.
+ *
+ * Return: the actual internal core power-off timer value in register defined
+ *         format.
+ */
+u32 kbase_csf_firmware_reset_mcu_core_pwroff_time(struct kbase_device *kbdev);
+
+/**
  * kbase_csf_interface_version - Helper function to build the full firmware
  *                               interface version in a format compatible with
  *                               GLB_VERSION register
@@ -858,5 +917,16 @@ static inline u32 kbase_csf_interface_version(u32 major, u32 minor, u32 patch)
  */
 int kbase_csf_trigger_firmware_config_update(struct kbase_device *kbdev);
 
+/**
+ * kbase_csf_firmware_req_core_dump - Request a firmware core dump
+ *
+ * @kbdev: Instance of a GPU platform device that implements a CSF interface.
+ *
+ * Request a firmware core dump and wait for for firmware to acknowledge.
+ * Firmware will enter infinite loop after the firmware core dump is created.
+ *
+ * Return: 0 if success, or negative error code on failure.
+ */
+int kbase_csf_firmware_req_core_dump(struct kbase_device *const kbdev);
 
 #endif

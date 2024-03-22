@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2011-2017, 2019-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2011-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -56,8 +56,9 @@ void kbase_context_debugfs_term(struct kbase_context *const kctx);
  *               BASEP_CONTEXT_CREATE_KERNEL_FLAGS.
  * @api_version: Application program interface version, as encoded in
  *               a single integer by the KBASE_API_VERSION macro.
- * @filp:        Pointer to the struct file corresponding to device file
- *               /dev/malixx instance, passed to the file's open method.
+ * @kfile:       Pointer to the object representing the /dev/malixx device
+ *               file instance. Shall be passed as NULL for internally created
+ *               contexts.
  *
  * Up to one context can be created for each client that opens the device file
  * /dev/malixx. Context creation is deferred until a special ioctl() system call
@@ -69,7 +70,7 @@ struct kbase_context *
 kbase_create_context(struct kbase_device *kbdev, bool is_compat,
 	base_context_create_flags const flags,
 	unsigned long api_version,
-	struct file *filp);
+	struct kbase_file *const kfile);
 
 /**
  * kbase_destroy_context - Destroy a kernel base context.
@@ -90,6 +91,19 @@ static inline bool kbase_ctx_flag(struct kbase_context *kctx,
 				      enum kbase_context_flags flag)
 {
 	return atomic_read(&kctx->flags) & flag;
+}
+
+/**
+ * kbase_ctx_compat_mode - Indicate whether a kbase context needs to operate
+ *                         in compatibility mode for 32-bit userspace.
+ * @kctx: kbase context
+ *
+ * Return: True if needs to maintain compatibility, False otherwise.
+ */
+static inline bool kbase_ctx_compat_mode(struct kbase_context *kctx)
+{
+	return !IS_ENABLED(CONFIG_64BIT) ||
+	       (IS_ENABLED(CONFIG_64BIT) && kbase_ctx_flag(kctx, KCTX_COMPAT));
 }
 
 /**

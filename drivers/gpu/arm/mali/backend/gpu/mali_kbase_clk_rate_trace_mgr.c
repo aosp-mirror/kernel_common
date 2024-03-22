@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2020-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2020-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -58,8 +58,10 @@ get_clk_rate_trace_callbacks(__maybe_unused struct kbase_device *kbdev)
 	if (WARN_ON(!kbdev) || WARN_ON(!kbdev->dev))
 		return callbacks;
 
-	arbiter_if_node =
-		of_get_property(kbdev->dev->of_node, "arbiter_if", NULL);
+	arbiter_if_node = of_get_property(kbdev->dev->of_node, "arbiter-if", NULL);
+	if (!arbiter_if_node)
+		arbiter_if_node = of_get_property(kbdev->dev->of_node, "arbiter_if", NULL);
+
 	/* Arbitration enabled, override the callback pointer.*/
 	if (arbiter_if_node)
 		callbacks = &arb_clk_rate_trace_ops;

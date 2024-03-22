@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2014-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2014-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -21,7 +21,7 @@
 
 /* AUTOMATICALLY GENERATED FILE. If you want to amend the issues/features,
  * please update base/tools/hwconfig_generator/hwc_{issues,features}.py
- * For more information see base/tools/hwconfig_generator/README
+ * For more information see base/tools/docs/hwconfig_generator.md
  */
 
 #ifndef _BASE_HWCONFIG_FEATURES_H_
@@ -40,6 +40,7 @@ enum base_hw_feature {
 	BASE_HW_FEATURE_FLUSH_INV_SHADER_OTHER,
 	BASE_HW_FEATURE_CORE_FEATURES,
 	BASE_HW_FEATURE_PBHA_HWU,
+	BASE_HW_FEATURE_LARGE_PAGE_ALLOC,
 	BASE_HW_FEATURE_END
 };
 
@@ -122,16 +123,6 @@ __attribute__((unused)) static const enum base_hw_feature base_hw_features_tBEx[
 };
 
 __attribute__((unused)) static const enum base_hw_feature base_hw_features_tBAx[] = {
-	BASE_HW_FEATURE_FLUSH_REDUCTION,
-	BASE_HW_FEATURE_PROTECTED_DEBUG_MODE,
-	BASE_HW_FEATURE_IDVS_GROUP_SIZE,
-	BASE_HW_FEATURE_L2_CONFIG,
-	BASE_HW_FEATURE_CLEAN_ONLY_SAFE,
-	BASE_HW_FEATURE_FLUSH_INV_SHADER_OTHER,
-	BASE_HW_FEATURE_END
-};
-
-__attribute__((unused)) static const enum base_hw_feature base_hw_features_tDUx[] = {
 	BASE_HW_FEATURE_FLUSH_REDUCTION,
 	BASE_HW_FEATURE_PROTECTED_DEBUG_MODE,
 	BASE_HW_FEATURE_IDVS_GROUP_SIZE,

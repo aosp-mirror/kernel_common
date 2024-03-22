@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2014-2016, 2018-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2014-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -25,12 +25,12 @@
 
 #include <linux/interrupt.h>
 
-#if !IS_ENABLED(CONFIG_MALI_NO_MALI)
+#if IS_ENABLED(CONFIG_MALI_REAL_HW)
 
 /* GPU IRQ Tags */
-#define	JOB_IRQ_TAG	0
-#define MMU_IRQ_TAG	1
-#define GPU_IRQ_TAG	2
+#define JOB_IRQ_TAG 0
+#define MMU_IRQ_TAG 1
+#define GPU_IRQ_TAG 2
 
 static void *kbase_tag(void *ptr, u32 tag)
 {
@@ -99,7 +99,7 @@ static irqreturn_t kbase_mmu_irq_handler(int irq, void *data)
 
 	atomic_inc(&kbdev->faults_pending);
 
-	val = kbase_reg_read(kbdev, MMU_REG(MMU_IRQ_STATUS));
+	val = kbase_reg_read(kbdev, MMU_CONTROL_REG(MMU_IRQ_STATUS));
 
 #ifdef CONFIG_MALI_DEBUG
 	if (!kbdev->pm.backend.driver_ready_for_irqs)
@@ -298,7 +298,7 @@ static irqreturn_t kbase_mmu_irq_test_handler(int irq, void *data)
 		return IRQ_NONE;
 	}
 
-	val = kbase_reg_read(kbdev, MMU_REG(MMU_IRQ_STATUS));
+	val = kbase_reg_read(kbdev, MMU_CONTROL_REG(MMU_IRQ_STATUS));
 
 	spin_unlock_irqrestore(&kbdev->hwaccess_lock, flags);
 
@@ -310,7 +310,7 @@ static irqreturn_t kbase_mmu_irq_test_handler(int irq, void *data)
 	kbasep_irq_test_data.triggered = 1;
 	wake_up(&kbasep_irq_test_data.wait);
 
-	kbase_reg_write(kbdev, MMU_REG(MMU_IRQ_CLEAR), val);
+	kbase_reg_write(kbdev, MMU_CONTROL_REG(MMU_IRQ_CLEAR), val);
 
 	return IRQ_HANDLED;
 }
@@ -344,8 +344,8 @@ static int kbasep_common_test_interrupt(
 		break;
 	case MMU_IRQ_TAG:
 		test_handler = kbase_mmu_irq_test_handler;
-		rawstat_offset = MMU_REG(MMU_IRQ_RAWSTAT);
-		mask_offset = MMU_REG(MMU_IRQ_MASK);
+		rawstat_offset = MMU_CONTROL_REG(MMU_IRQ_RAWSTAT);
+		mask_offset = MMU_CONTROL_REG(MMU_IRQ_MASK);
 		break;
 	case GPU_IRQ_TAG:
 		/* already tested by pm_driver - bail out */
@@ -500,4 +500,4 @@ void kbase_synchronize_irqs(struct kbase_device *kbdev)
 
 KBASE_EXPORT_TEST_API(kbase_synchronize_irqs);
 
-#endif /* !IS_ENABLED(CONFIG_MALI_NO_MALI) */
+#endif /* IS_ENABLED(CONFIG_MALI_REAL_HW) */

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2011-2018, 2020-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2011-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -277,6 +277,7 @@ typedef u32 kbase_atom_ordering_flag_t;
  * @nr_contexts_runnable:Number of contexts that can either be pulled from or
  *                       arecurrently running
  * @soft_job_timeout_ms:Value for JS_SOFT_JOB_TIMEOUT
+ * @js_free_wait_time_ms: Maximum waiting time in ms for a Job Slot to be seen free.
  * @queue_mutex: Queue Lock, used to access the Policy's queue of contexts
  *               independently of the Run Pool.
  *               Of course, you don't need the Run Pool lock to access this.
@@ -329,6 +330,8 @@ struct kbasep_js_device_data {
 	u32 nr_contexts_pullable;
 	atomic_t nr_contexts_runnable;
 	atomic_t soft_job_timeout_ms;
+	u32 js_free_wait_time_ms;
+
 	struct mutex queue_mutex;
 	/*
 	 * Run Pool mutex, for managing contexts within the runpool.
@@ -339,6 +342,30 @@ struct kbasep_js_device_data {
 	 * * the kbasep_js_kctx_info::runpool substructure
 	 */
 	struct mutex runpool_mutex;
+
+#if IS_ENABLED(CONFIG_MALI_TRACE_POWER_GPU_WORK_PERIOD)
+	/**
+	 * @gpu_metrics_timer: High-resolution timer used to periodically emit the GPU metrics
+	 *                     tracepoints for applications that are using the GPU. The timer is
+	 *                     needed for the long duration handling so that the length of work
+	 *                     period is within the allowed limit.
+	 */
+	struct hrtimer gpu_metrics_timer;
+
+	/**
+	 * @gpu_metrics_timer_needed: Flag to indicate if the @gpu_metrics_timer is needed.
+	 *                            The timer won't be started after the expiry if the flag
+	 *                            isn't set.
+	 */
+	bool gpu_metrics_timer_needed;
+
+	/**
+	 * @gpu_metrics_timer_running: Flag to indicate if the @gpu_metrics_timer is running.
+	 *                             The flag is set to false when the timer is cancelled or
+	 *                             is not restarted after the expiry.
+	 */
+	bool gpu_metrics_timer_running;
+#endif
 };
 
 /**

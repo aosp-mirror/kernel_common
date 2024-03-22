@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2019-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2019-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -52,6 +52,7 @@ static int set_timeout(struct kbase_device *const kbdev, u64 const timeout)
 	dev_dbg(kbdev->dev, "New progress timeout: %llu cycles\n", timeout);
 
 	atomic64_set(&kbdev->csf.progress_timeout, timeout);
+	kbase_device_set_timeout(kbdev, CSF_SCHED_PROTM_PROGRESS_TIMEOUT, timeout, 1);
 
 	return 0;
 }
@@ -100,7 +101,7 @@ static ssize_t progress_timeout_store(struct device * const dev,
 	if (!err) {
 		kbase_csf_scheduler_pm_active(kbdev);
 
-		err = kbase_csf_scheduler_wait_mcu_active(kbdev);
+		err = kbase_csf_scheduler_killable_wait_mcu_active(kbdev);
 		if (!err)
 			err = kbase_csf_firmware_set_timeout(kbdev, timeout);
 
@@ -147,8 +148,14 @@ int kbase_csf_timeout_init(struct kbase_device *const kbdev)
 	int err;
 
 #if IS_ENABLED(CONFIG_OF)
-	err = of_property_read_u64(kbdev->dev->of_node,
-		"progress_timeout", &timeout);
+	/* Read "progress-timeout" property and fallback to "progress_timeout"
+	 * if not found.
+	 */
+	err = of_property_read_u64(kbdev->dev->of_node, "progress-timeout", &timeout);
+
+	if (err == -EINVAL)
+		err = of_property_read_u64(kbdev->dev->of_node, "progress_timeout", &timeout);
+
 	if (!err)
 		dev_info(kbdev->dev, "Found progress_timeout = %llu in Devicetree\n",
 			timeout);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2020-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2020-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -442,8 +442,9 @@ static const char *kutf_clk_trace_do_get_platform(
 #if defined(CONFIG_MALI_ARBITER_SUPPORT) && defined(CONFIG_OF)
 	struct kutf_clk_rate_trace_fixture_data *data = context->fixture;
 
-	arbiter_if_node =
-		of_get_property(data->kbdev->dev->of_node, "arbiter_if", NULL);
+	arbiter_if_node = of_get_property(data->kbdev->dev->of_node, "arbiter-if", NULL);
+	if (!arbiter_if_node)
+		arbiter_if_node = of_get_property(data->kbdev->dev->of_node, "arbiter_if", NULL);
 #endif
 	if (arbiter_if_node) {
 		power_node = of_find_compatible_node(NULL, NULL,

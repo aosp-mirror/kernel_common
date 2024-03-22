@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2019-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2019-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -101,7 +101,7 @@ static void wait_csg_slots_status_update_finish(struct kbase_device *kbdev,
 	}
 }
 
-static void update_active_groups_status(struct kbase_device *kbdev, struct seq_file *file)
+void kbase_csf_debugfs_update_active_groups_status(struct kbase_device *kbdev)
 {
 	u32 max_csg_slots = kbdev->csf.global_iface.group_num;
 	DECLARE_BITMAP(used_csgs, MAX_SUPPORTED_CSGS) = { 0 };
@@ -117,6 +117,8 @@ static void update_active_groups_status(struct kbase_device *kbdev, struct seq_f
 	 * status of all on-slot groups when MCU sleep request is sent to it.
 	 */
 	if (kbdev->csf.scheduler.state == SCHED_SLEEPING) {
+		/* Wait for the MCU sleep request to complete. */
+		kbase_pm_wait_for_desired_state(kbdev);
 		bitmap_copy(csg_slots_status_updated,
 			    kbdev->csf.scheduler.csg_inuse_bitmap, max_csg_slots);
 		return;
@@ -285,7 +287,8 @@ static void kbasep_csf_scheduler_dump_active_cs_trace(struct seq_file *file,
 static void kbasep_csf_scheduler_dump_active_queue(struct seq_file *file,
 		struct kbase_queue *queue)
 {
-	u32 *addr;
+	u64 *addr;
+	u32 *addr32;
 	u64 cs_extract;
 	u64 cs_insert;
 	u32 cs_active;
@@ -307,12 +310,14 @@ static void kbasep_csf_scheduler_dump_active_queue(struct seq_file *file,
 		    !queue->group))
 		return;
 
-	addr = (u32 *)queue->user_io_addr;
-	cs_insert = addr[CS_INSERT_LO/4] | ((u64)addr[CS_INSERT_HI/4] << 32);
+	addr = queue->user_io_addr;
+	cs_insert = addr[CS_INSERT_LO / sizeof(*addr)];
 
-	addr = (u32 *)(queue->user_io_addr + PAGE_SIZE);
-	cs_extract = addr[CS_EXTRACT_LO/4] | ((u64)addr[CS_EXTRACT_HI/4] << 32);
-	cs_active = addr[CS_ACTIVE/4];
+	addr = queue->user_io_addr + PAGE_SIZE / sizeof(*addr);
+	cs_extract = addr[CS_EXTRACT_LO / sizeof(*addr)];
+
+	addr32 = (u32 *)(queue->user_io_addr + PAGE_SIZE / sizeof(*addr));
+	cs_active = addr32[CS_ACTIVE / sizeof(*addr32)];
 
 #define KBASEP_CSF_DEBUGFS_CS_HEADER_USER_IO \
 	"Bind Idx,     Ringbuf addr,     Size, Prio,    Insert offset,   Extract offset, Active, Doorbell\n"
@@ -444,22 +449,20 @@ static void kbasep_csf_scheduler_dump_active_group(struct seq_file *file,
 				group->csg_nr);
 			seq_puts(file, "*** The following group-record is likely stale\n");
 		}
+			seq_puts(
+				file,
+				"GroupID, CSG NR, CSG Prio, Run State, Priority, C_EP(Alloc/Req), F_EP(Alloc/Req), T_EP(Alloc/Req), Exclusive, Idle\n");
+			seq_printf(
+				file,
+				"%7d, %6d, %8d, %9d, %8d, %11d/%3d, %11d/%3d, %11d/%3d, %9c, %4c\n",
+				group->handle, group->csg_nr, slot_priority, group->run_state,
+				group->priority, CSG_STATUS_EP_CURRENT_COMPUTE_EP_GET(ep_c),
+				CSG_STATUS_EP_REQ_COMPUTE_EP_GET(ep_r),
+				CSG_STATUS_EP_CURRENT_FRAGMENT_EP_GET(ep_c),
+				CSG_STATUS_EP_REQ_FRAGMENT_EP_GET(ep_r),
+				CSG_STATUS_EP_CURRENT_TILER_EP_GET(ep_c),
+				CSG_STATUS_EP_REQ_TILER_EP_GET(ep_r), exclusive, idle);
 
-		seq_puts(file, "GroupID, CSG NR, CSG Prio, Run State, Priority, C_EP(Alloc/Req), F_EP(Alloc/Req), T_EP(Alloc/Req), Exclusive, Idle\n");
-		seq_printf(file, "%7d, %6d, %8d, %9d, %8d, %11d/%3d, %11d/%3d, %11d/%3d, %9c, %4c\n",
-			group->handle,
-			group->csg_nr,
-			slot_priority,
-			group->run_state,
-			group->priority,
-			CSG_STATUS_EP_CURRENT_COMPUTE_EP_GET(ep_c),
-			CSG_STATUS_EP_REQ_COMPUTE_EP_GET(ep_r),
-			CSG_STATUS_EP_CURRENT_FRAGMENT_EP_GET(ep_c),
-			CSG_STATUS_EP_REQ_FRAGMENT_EP_GET(ep_r),
-			CSG_STATUS_EP_CURRENT_TILER_EP_GET(ep_c),
-			CSG_STATUS_EP_REQ_TILER_EP_GET(ep_r),
-			exclusive,
-			idle);
 	} else {
 		seq_puts(file, "GroupID, CSG NR, Run State, Priority\n");
 		seq_printf(file, "%7d, %6d, %9d, %8d\n",
@@ -497,23 +500,19 @@ static int kbasep_csf_queue_group_debugfs_show(struct seq_file *file,
 {
 	u32 gr;
 	struct kbase_context *const kctx = file->private;
-	struct kbase_device *const kbdev = kctx->kbdev;
+	struct kbase_device *kbdev;
 
 	if (WARN_ON(!kctx))
 		return -EINVAL;
+
+	kbdev = kctx->kbdev;
 
 	seq_printf(file, "MALI_CSF_CSG_DEBUGFS_VERSION: v%u\n",
 			MALI_CSF_CSG_DEBUGFS_VERSION);
 
 	mutex_lock(&kctx->csf.lock);
 	kbase_csf_scheduler_lock(kbdev);
-	if (kbdev->csf.scheduler.state == SCHED_SLEEPING) {
-		/* Wait for the MCU sleep request to complete. Please refer the
-		 * update_active_groups_status() function for the explanation.
-		 */
-		kbase_pm_wait_for_desired_state(kbdev);
-	}
-	update_active_groups_status(kbdev, file);
+	kbase_csf_debugfs_update_active_groups_status(kbdev);
 	for (gr = 0; gr < MAX_QUEUE_GROUP_NUM; gr++) {
 		struct kbase_queue_group *const group =
 			kctx->csf.queue_groups[gr];
@@ -547,13 +546,7 @@ static int kbasep_csf_scheduler_dump_active_groups(struct seq_file *file,
 			MALI_CSF_CSG_DEBUGFS_VERSION);
 
 	kbase_csf_scheduler_lock(kbdev);
-	if (kbdev->csf.scheduler.state == SCHED_SLEEPING) {
-		/* Wait for the MCU sleep request to complete. Please refer the
-		 * update_active_groups_status() function for the explanation.
-		 */
-		kbase_pm_wait_for_desired_state(kbdev);
-	}
-	update_active_groups_status(kbdev, file);
+	kbase_csf_debugfs_update_active_groups_status(kbdev);
 	for (csg_nr = 0; csg_nr < num_groups; csg_nr++) {
 		struct kbase_queue_group *const group =
 			kbdev->csf.scheduler.csg_slots[csg_nr].resident_group;

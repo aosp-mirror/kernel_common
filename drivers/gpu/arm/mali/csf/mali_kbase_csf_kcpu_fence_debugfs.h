@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2010-2016, 2020-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2018-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -18,6 +18,25 @@
  * http://www.gnu.org/licenses/gpl-2.0.html.
  *
  */
+#ifndef _KBASE_CSF_KCPU_FENCE_SIGNAL_DEBUGFS_H_
+#define _KBASE_CSF_KCPU_FENCE_SIGNAL_DEBUGFS_H_
 
-extern const char kbase_drv_name[];
-extern const char kbase_timeline_name[];
+struct kbase_device;
+
+/*
+ * kbase_csf_fence_timer_debugfs_init - Initialize fence signal timeout debugfs
+ *                                      entries.
+ * @kbdev: Kbase device.
+ *
+ * Return: 0 on success, -1 on failure.
+ */
+int kbase_csf_fence_timer_debugfs_init(struct kbase_device *kbdev);
+
+/*
+ * kbase_csf_fence_timer_debugfs_term - Terminate fence signal timeout debugfs
+ *                                      entries.
+ * @kbdev: Kbase device.
+ */
+void kbase_csf_fence_timer_debugfs_term(struct kbase_device *kbdev);
+
+#endif /* _KBASE_CSF_KCPU_FENCE_SIGNAL_DEBUGFS_H_ */

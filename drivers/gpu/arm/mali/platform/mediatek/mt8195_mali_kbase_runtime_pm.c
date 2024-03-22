@@ -11,16 +11,23 @@
  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
+#include <linux/version.h>
 #include "mali_kbase_config_platform.h"
 #include "mali_kbase_runtime_pm.h"
 
 /* list of clocks required by GPU */
 static const char * const mt8195_gpu_clks[] = {
+#if (KERNEL_VERSION(6, 1, 0) > LINUX_VERSION_CODE)
+	/* Our old downstream code defines many clocks */
 	"clk_mux",
 	"clk_main_parent",
 	"clk_sub_parent",
 	"subsys_bg3d",
 	"clk_pll_src",
+#else
+	/* Upstream binding only uses one clock */
+	NULL,
+#endif
 };
 
 const struct mtk_hw_config mt8195_hw_config = {
@@ -47,7 +54,10 @@ const struct mtk_hw_config mt8195_hw_config = {
 };
 
 struct mtk_platform_context mt8195_platform_context = {
+#if (KERNEL_VERSION(6, 1, 0) > LINUX_VERSION_CODE)
+	/* Since v6.1 all the auto-reparenting code has been merged */
 	.manual_mux_reparent = true,
+#endif
 	.config = &mt8195_hw_config,
 };
 

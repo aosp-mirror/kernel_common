@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2014-2021 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2014-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -28,27 +28,17 @@
 #include <mali_kbase_reset_gpu.h>
 #include <backend/gpu/mali_kbase_jm_internal.h>
 #include <backend/gpu/mali_kbase_js_internal.h>
+#if IS_ENABLED(CONFIG_MALI_TRACE_POWER_GPU_WORK_PERIOD)
+#include <mali_kbase_gpu_metrics.h>
 
-#if !MALI_USE_CSF
+#endif
+
 /*
  * Hold the runpool_mutex for this
  */
-static inline bool timer_callback_should_run(struct kbase_device *kbdev)
+static inline bool timer_callback_should_run(struct kbase_device *kbdev, int nr_running_ctxs)
 {
-	struct kbase_backend_data *backend = &kbdev->hwaccess.backend;
-	int nr_running_ctxs;
-
 	lockdep_assert_held(&kbdev->js_data.runpool_mutex);
-
-	/* Timer must stop if we are suspending */
-	if (backend->suspend_timer)
-		return false;
-
-	/* nr_contexts_pullable is updated with the runpool_mutex. However, the
-	 * locking in the caller gives us a barrier that ensures
-	 * nr_contexts_pullable is up-to-date for reading
-	 */
-	nr_running_ctxs = atomic_read(&kbdev->js_data.nr_contexts_runnable);
 
 #ifdef CONFIG_MALI_DEBUG
 	if (kbdev->js_data.softstop_always) {
@@ -91,7 +81,7 @@ static enum hrtimer_restart timer_callback(struct hrtimer *timer)
 	struct kbase_device *kbdev;
 	struct kbasep_js_device_data *js_devdata;
 	struct kbase_backend_data *backend;
-	int s;
+	unsigned int s;
 	bool reset_needed = false;
 
 	KBASE_DEBUG_ASSERT(timer != NULL);
@@ -273,18 +263,20 @@ static enum hrtimer_restart timer_callback(struct hrtimer *timer)
 
 	return HRTIMER_NORESTART;
 }
-#endif /* !MALI_USE_CSF */
 
 void kbase_backend_ctx_count_changed(struct kbase_device *kbdev)
 {
-#if !MALI_USE_CSF
 	struct kbasep_js_device_data *js_devdata = &kbdev->js_data;
 	struct kbase_backend_data *backend = &kbdev->hwaccess.backend;
 	unsigned long flags;
+	/* Timer must stop if we are suspending */
+	const bool suspend_timer = backend->suspend_timer;
+	const int nr_running_ctxs =
+		atomic_read(&kbdev->js_data.nr_contexts_runnable);
 
 	lockdep_assert_held(&js_devdata->runpool_mutex);
 
-	if (!timer_callback_should_run(kbdev)) {
+	if (suspend_timer || !timer_callback_should_run(kbdev, nr_running_ctxs)) {
 		/* Take spinlock to force synchronisation with timer */
 		spin_lock_irqsave(&kbdev->hwaccess_lock, flags);
 		backend->timer_running = false;
@@ -298,7 +290,8 @@ void kbase_backend_ctx_count_changed(struct kbase_device *kbdev)
 		hrtimer_cancel(&backend->scheduling_timer);
 	}
 
-	if (timer_callback_should_run(kbdev) && !backend->timer_running) {
+	if (!suspend_timer && timer_callback_should_run(kbdev, nr_running_ctxs) &&
+	    !backend->timer_running) {
 		/* Take spinlock to force synchronisation with timer */
 		spin_lock_irqsave(&kbdev->hwaccess_lock, flags);
 		backend->timer_running = true;
@@ -309,36 +302,59 @@ void kbase_backend_ctx_count_changed(struct kbase_device *kbdev)
 
 		KBASE_KTRACE_ADD_JM(kbdev, JS_POLICY_TIMER_START, NULL, NULL, 0u, 0u);
 	}
-#else /* !MALI_USE_CSF */
-	CSTD_UNUSED(kbdev);
-#endif /* !MALI_USE_CSF */
+
+#if IS_ENABLED(CONFIG_MALI_TRACE_POWER_GPU_WORK_PERIOD)
+	if (unlikely(suspend_timer)) {
+		js_devdata->gpu_metrics_timer_needed = false;
+		/* Cancel the timer as System suspend is happening */
+		hrtimer_cancel(&js_devdata->gpu_metrics_timer);
+		js_devdata->gpu_metrics_timer_running = false;
+		spin_lock_irqsave(&kbdev->hwaccess_lock, flags);
+		/* Explicitly emit the tracepoint on System suspend */
+		kbase_gpu_metrics_emit_tracepoint(kbdev, ktime_get_raw_ns());
+		spin_unlock_irqrestore(&kbdev->hwaccess_lock, flags);
+		return;
+	}
+
+	if (!nr_running_ctxs) {
+		/* Just set the flag to not restart the timer on expiry */
+		js_devdata->gpu_metrics_timer_needed = false;
+		return;
+	}
+
+	/* There are runnable contexts so the timer is needed */
+	if (!js_devdata->gpu_metrics_timer_needed) {
+		spin_lock_irqsave(&kbdev->hwaccess_lock, flags);
+		js_devdata->gpu_metrics_timer_needed = true;
+		/* No need to restart the timer if it is already running. */
+		if (!js_devdata->gpu_metrics_timer_running) {
+			hrtimer_start(&js_devdata->gpu_metrics_timer,
+				      HR_TIMER_DELAY_NSEC(kbase_gpu_metrics_get_emit_interval()),
+				      HRTIMER_MODE_REL);
+			js_devdata->gpu_metrics_timer_running = true;
+		}
+		spin_unlock_irqrestore(&kbdev->hwaccess_lock, flags);
+	}
+#endif
 }
 
 int kbase_backend_timer_init(struct kbase_device *kbdev)
 {
-#if !MALI_USE_CSF
 	struct kbase_backend_data *backend = &kbdev->hwaccess.backend;
 
 	hrtimer_init(&backend->scheduling_timer, CLOCK_MONOTONIC,
 							HRTIMER_MODE_REL);
 	backend->scheduling_timer.function = timer_callback;
 	backend->timer_running = false;
-#else /* !MALI_USE_CSF */
-	CSTD_UNUSED(kbdev);
-#endif /* !MALI_USE_CSF */
 
 	return 0;
 }
 
 void kbase_backend_timer_term(struct kbase_device *kbdev)
 {
-#if !MALI_USE_CSF
 	struct kbase_backend_data *backend = &kbdev->hwaccess.backend;
 
 	hrtimer_cancel(&backend->scheduling_timer);
-#else /* !MALI_USE_CSF */
-	CSTD_UNUSED(kbdev);
-#endif /* !MALI_USE_CSF */
 }
 
 void kbase_backend_timer_suspend(struct kbase_device *kbdev)
@@ -365,4 +381,3 @@ void kbase_backend_timeouts_changed(struct kbase_device *kbdev)
 
 	backend->timeouts_updated = true;
 }
-

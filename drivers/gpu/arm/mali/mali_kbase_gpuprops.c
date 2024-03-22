@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2011-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2011-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -49,7 +49,7 @@ static void kbase_gpuprops_construct_coherent_groups(
 	props->coherency_info.coherency = props->raw_props.mem_features;
 	props->coherency_info.num_core_groups = hweight64(props->raw_props.l2_present);
 
-	if (props->coherency_info.coherency & GROUPS_L2_COHERENT) {
+	if (props->coherency_info.coherency & MEM_FEATURES_COHERENT_CORE_GROUP_MASK) {
 		/* Group is l2 coherent */
 		group_present = props->raw_props.l2_present;
 	} else {
@@ -312,7 +312,6 @@ static void kbase_gpuprops_calculate_props(
 	struct base_gpu_props * const gpu_props, struct kbase_device *kbdev)
 {
 	int i;
-	u32 gpu_id;
 
 	/* Populate the base_gpu_props structure */
 	kbase_gpuprops_update_core_props_gpu_id(gpu_props);
@@ -362,49 +361,23 @@ static void kbase_gpuprops_calculate_props(
 		gpu_props->thread_props.tls_alloc =
 				gpu_props->raw_props.thread_tls_alloc;
 
-	/* MIDHARC-2364 was intended for tULx.
-	 * Workaround for the incorrectly applied THREAD_FEATURES to tDUx.
-	 */
-	gpu_id = kbdev->gpu_props.props.raw_props.gpu_id;
-
 #if MALI_USE_CSF
-	CSTD_UNUSED(gpu_id);
 	gpu_props->thread_props.max_registers =
-		KBASE_UBFX32(gpu_props->raw_props.thread_features,
-			     0U, 22);
+		KBASE_UBFX32(gpu_props->raw_props.thread_features, 0U, 22);
 	gpu_props->thread_props.impl_tech =
-		KBASE_UBFX32(gpu_props->raw_props.thread_features,
-			     22U, 2);
+		KBASE_UBFX32(gpu_props->raw_props.thread_features, 22U, 2);
 	gpu_props->thread_props.max_task_queue =
-		KBASE_UBFX32(gpu_props->raw_props.thread_features,
-			     24U, 8);
+		KBASE_UBFX32(gpu_props->raw_props.thread_features, 24U, 8);
 	gpu_props->thread_props.max_thread_group_split = 0;
 #else
-	if ((gpu_id & GPU_ID2_PRODUCT_MODEL) == GPU_ID2_PRODUCT_TDUX) {
-		gpu_props->thread_props.max_registers =
-			KBASE_UBFX32(gpu_props->raw_props.thread_features,
-				     0U, 22);
-		gpu_props->thread_props.impl_tech =
-			KBASE_UBFX32(gpu_props->raw_props.thread_features,
-				     22U, 2);
-		gpu_props->thread_props.max_task_queue =
-			KBASE_UBFX32(gpu_props->raw_props.thread_features,
-				     24U, 8);
-		gpu_props->thread_props.max_thread_group_split = 0;
-	} else {
-		gpu_props->thread_props.max_registers =
-			KBASE_UBFX32(gpu_props->raw_props.thread_features,
-				     0U, 16);
-		gpu_props->thread_props.max_task_queue =
-			KBASE_UBFX32(gpu_props->raw_props.thread_features,
-				     16U, 8);
-		gpu_props->thread_props.max_thread_group_split =
-			KBASE_UBFX32(gpu_props->raw_props.thread_features,
-				     24U, 6);
-		gpu_props->thread_props.impl_tech =
-			KBASE_UBFX32(gpu_props->raw_props.thread_features,
-				     30U, 2);
-	}
+	gpu_props->thread_props.max_registers =
+		KBASE_UBFX32(gpu_props->raw_props.thread_features, 0U, 16);
+	gpu_props->thread_props.max_task_queue =
+		KBASE_UBFX32(gpu_props->raw_props.thread_features, 16U, 8);
+	gpu_props->thread_props.max_thread_group_split =
+		KBASE_UBFX32(gpu_props->raw_props.thread_features, 24U, 6);
+	gpu_props->thread_props.impl_tech =
+		KBASE_UBFX32(gpu_props->raw_props.thread_features, 30U, 2);
 #endif
 
 	/* If values are not specified, then use defaults */
@@ -540,7 +513,7 @@ MODULE_PARM_DESC(override_l2_hash, "Override L2 hash config for testing");
 static u32 l2_hash_values[ASN_HASH_COUNT] = {
 	0,
 };
-static int num_override_l2_hash_values;
+static unsigned int num_override_l2_hash_values;
 module_param_array(l2_hash_values, uint, &num_override_l2_hash_values, 0000);
 MODULE_PARM_DESC(l2_hash_values, "Override L2 hash values config for testing");
 
@@ -594,7 +567,7 @@ kbase_read_l2_config_from_dt(struct kbase_device *const kbdev)
 
 	kbdev->l2_hash_values_override = false;
 	if (num_override_l2_hash_values) {
-		int i;
+		unsigned int i;
 
 		kbdev->l2_hash_values_override = true;
 		for (i = 0; i < num_override_l2_hash_values; i++)

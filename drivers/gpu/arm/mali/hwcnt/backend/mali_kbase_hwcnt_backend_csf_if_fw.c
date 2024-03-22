@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2021-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2021-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -34,13 +34,11 @@
 #include "hwcnt/backend/mali_kbase_hwcnt_backend_csf_if_fw.h"
 #include "mali_kbase_hwaccess_time.h"
 #include "backend/gpu/mali_kbase_clk_rate_trace_mgr.h"
+#include <backend/gpu/mali_kbase_model_linux.h>
 
 #include <linux/log2.h>
 #include "mali_kbase_ccswe.h"
 
-#if IS_ENABLED(CONFIG_MALI_NO_MALI)
-#include <backend/gpu/mali_kbase_model_dummy.h>
-#endif /* CONFIG_MALI_NO_MALI */
 
 /* Ring buffer virtual address start at 4GB  */
 #define KBASE_HWC_CSF_RING_BUFFER_VA_START (1ull << 32)
@@ -103,6 +101,8 @@ kbasep_hwcnt_backend_csf_if_fw_assert_lock_held(struct kbase_hwcnt_backend_csf_i
 
 static void kbasep_hwcnt_backend_csf_if_fw_lock(struct kbase_hwcnt_backend_csf_if_ctx *ctx,
 						unsigned long *flags)
+	__acquires(&(struct kbase_hwcnt_backend_csf_if_fw_ctx)
+			    ctx->kbdev->csf.scheduler.interrupt_lock)
 {
 	struct kbase_hwcnt_backend_csf_if_fw_ctx *fw_ctx;
 	struct kbase_device *kbdev;
@@ -117,6 +117,8 @@ static void kbasep_hwcnt_backend_csf_if_fw_lock(struct kbase_hwcnt_backend_csf_i
 
 static void kbasep_hwcnt_backend_csf_if_fw_unlock(struct kbase_hwcnt_backend_csf_if_ctx *ctx,
 						  unsigned long flags)
+	__releases(&(struct kbase_hwcnt_backend_csf_if_fw_ctx)
+			    ctx->kbdev->csf.scheduler.interrupt_lock)
 {
 	struct kbase_hwcnt_backend_csf_if_fw_ctx *fw_ctx;
 	struct kbase_device *kbdev;
@@ -327,7 +329,7 @@ static int kbasep_hwcnt_backend_csf_if_fw_ring_buf_alloc(
 
 	/* Get physical page for the buffer */
 	ret = kbase_mem_pool_alloc_pages(&kbdev->mem_pools.small[KBASE_MEM_GROUP_CSF_FW], num_pages,
-					 phys, false);
+					 phys, false, NULL);
 	if (ret != num_pages)
 		goto phys_mem_pool_alloc_error;
 
@@ -345,7 +347,7 @@ static int kbasep_hwcnt_backend_csf_if_fw_ring_buf_alloc(
 	/* Update MMU table */
 	ret = kbase_mmu_insert_pages(kbdev, &kbdev->csf.mcu_mmu, gpu_va_base >> PAGE_SHIFT, phys,
 				     num_pages, flags, MCU_AS_NR, KBASE_MEM_GROUP_CSF_FW,
-				     mmu_sync_info);
+				     mmu_sync_info, NULL);
 	if (ret)
 		goto mmu_insert_failed;
 
@@ -478,9 +480,10 @@ kbasep_hwcnt_backend_csf_if_fw_ring_buf_free(struct kbase_hwcnt_backend_csf_if_c
 	if (fw_ring_buf->phys) {
 		u64 gpu_va_base = KBASE_HWC_CSF_RING_BUFFER_VA_START;
 
-		WARN_ON(kbase_mmu_teardown_pages(fw_ctx->kbdev, &fw_ctx->kbdev->csf.mcu_mmu,
-						 gpu_va_base >> PAGE_SHIFT, fw_ring_buf->phys,
-						 fw_ring_buf->num_pages, MCU_AS_NR));
+		WARN_ON(kbase_mmu_teardown_firmware_pages(
+			fw_ctx->kbdev, &fw_ctx->kbdev->csf.mcu_mmu, gpu_va_base >> PAGE_SHIFT,
+			fw_ring_buf->phys, fw_ring_buf->num_pages, fw_ring_buf->num_pages,
+			MCU_AS_NR));
 
 		vunmap(fw_ring_buf->cpu_dump_base);
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2014-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2014-2023 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -62,8 +62,9 @@
  *      document
  */
 #include <mali_kbase.h>
+#include <device/mali_kbase_device.h>
 #include <gpu/mali_kbase_gpu_regmap.h>
-#include <backend/gpu/mali_kbase_model_dummy.h>
+#include <backend/gpu/mali_kbase_model_linux.h>
 #include <mali_kbase_mem_linux.h>
 
 #if MALI_USE_CSF
@@ -319,27 +320,12 @@ static const struct control_reg_values_t all_control_reg_values[] = {
 		.mmu_features = 0x2830,
 		.gpu_features_lo = 0,
 		.gpu_features_hi = 0,
-		.shader_present = DUMMY_IMPLEMENTATION_SHADER_PRESENT,
+		.shader_present = DUMMY_IMPLEMENTATION_SHADER_PRESENT_TBEX,
 		.stack_present = DUMMY_IMPLEMENTATION_STACK_PRESENT,
 	},
 	{
 		.name = "tBAx",
 		.gpu_id = GPU_ID2_MAKE(9, 14, 4, 5, 0, 0, 0),
-		.as_present = 0xFF,
-		.thread_max_threads = 0x180,
-		.thread_max_workgroup_size = 0x180,
-		.thread_max_barrier_size = 0x180,
-		.thread_features = THREAD_FEATURES_PARTIAL(0x6000, 4, 0),
-		.tiler_features = 0x809,
-		.mmu_features = 0x2830,
-		.gpu_features_lo = 0,
-		.gpu_features_hi = 0,
-		.shader_present = DUMMY_IMPLEMENTATION_SHADER_PRESENT,
-		.stack_present = DUMMY_IMPLEMENTATION_STACK_PRESENT,
-	},
-	{
-		.name = "tDUx",
-		.gpu_id = GPU_ID2_MAKE(10, 2, 0, 1, 0, 0, 0),
 		.as_present = 0xFF,
 		.thread_max_threads = 0x180,
 		.thread_max_workgroup_size = 0x180,
@@ -364,7 +350,7 @@ static const struct control_reg_values_t all_control_reg_values[] = {
 		.mmu_features = 0x2830,
 		.gpu_features_lo = 0,
 		.gpu_features_hi = 0,
-		.shader_present = DUMMY_IMPLEMENTATION_SHADER_PRESENT,
+		.shader_present = DUMMY_IMPLEMENTATION_SHADER_PRESENT_TODX,
 		.stack_present = DUMMY_IMPLEMENTATION_STACK_PRESENT,
 	},
 	{
@@ -412,7 +398,7 @@ static const struct control_reg_values_t all_control_reg_values[] = {
 		.mmu_features = 0x2830,
 		.gpu_features_lo = 0xf,
 		.gpu_features_hi = 0,
-		.shader_present = 0xFF,
+		.shader_present = DUMMY_IMPLEMENTATION_SHADER_PRESENT_TTUX,
 		.stack_present = 0xF,
 	},
 	{
@@ -428,7 +414,7 @@ static const struct control_reg_values_t all_control_reg_values[] = {
 		.mmu_features = 0x2830,
 		.gpu_features_lo = 0xf,
 		.gpu_features_hi = 0,
-		.shader_present = 0xFF,
+		.shader_present = DUMMY_IMPLEMENTATION_SHADER_PRESENT_TTIX,
 		.stack_present = 0xF,
 	},
 };
@@ -498,13 +484,6 @@ void *gpu_device_get_data(void *model)
 
 #define signal_int(m, s) m->slots[(s)].job_complete_irq_asserted = 1
 
-/* SCons should pass in a default GPU, but other ways of building (e.g.
- * in-tree) won't, so define one here in case.
- */
-#ifndef CONFIG_MALI_NO_MALI_DEFAULT_GPU
-#define CONFIG_MALI_NO_MALI_DEFAULT_GPU "tMIx"
-#endif
-
 static char *no_mali_gpu = CONFIG_MALI_NO_MALI_DEFAULT_GPU;
 module_param(no_mali_gpu, charp, 0000);
 MODULE_PARM_DESC(no_mali_gpu, "GPU to identify as");
@@ -530,17 +509,18 @@ static u32 gpu_model_get_prfcnt_value(enum kbase_ipa_core_type core_type,
 		(ipa_ctl_select_config[core_type] >> (cnt_idx * 8)) & 0xFF;
 
 	/* Currently only primary counter blocks are supported */
-	if (WARN_ON(event_index >= 64))
+	if (WARN_ON(event_index >=
+		    (KBASE_DUMMY_MODEL_COUNTER_HEADER_DWORDS + KBASE_DUMMY_MODEL_COUNTER_PER_CORE)))
 		return 0;
 
 	/* The actual events start index 4 onwards. Spec also says PRFCNT_EN,
 	 * TIMESTAMP_LO or TIMESTAMP_HI pseudo-counters do not make sense for
 	 * IPA counters. If selected, the value returned for them will be zero.
 	 */
-	if (WARN_ON(event_index <= 3))
+	if (WARN_ON(event_index < KBASE_DUMMY_MODEL_COUNTER_HEADER_DWORDS))
 		return 0;
 
-	event_index -= 4;
+	event_index -= KBASE_DUMMY_MODEL_COUNTER_HEADER_DWORDS;
 
 	spin_lock_irqsave(&performance_counters.access_lock, flags);
 
@@ -736,7 +716,7 @@ void gpu_model_glb_request_job_irq(void *model)
 	spin_lock_irqsave(&hw_error_status.access_lock, flags);
 	hw_error_status.job_irq_status |= JOB_IRQ_GLOBAL_IF;
 	spin_unlock_irqrestore(&hw_error_status.access_lock, flags);
-	gpu_device_raise_irq(model, GPU_DUMMY_JOB_IRQ);
+	gpu_device_raise_irq(model, MODEL_LINUX_JOB_IRQ);
 }
 #endif /* !MALI_USE_CSF */
 
@@ -768,7 +748,7 @@ static void init_register_statuses(struct dummy_model_t *dummy)
 	performance_counters.time = 0;
 }
 
-static void update_register_statuses(struct dummy_model_t *dummy, int job_slot)
+static void update_register_statuses(struct dummy_model_t *dummy, unsigned int job_slot)
 {
 	lockdep_assert_held(&hw_error_status.access_lock);
 
@@ -1101,7 +1081,7 @@ static const struct control_reg_values_t *find_control_reg_values(const char *gp
 	return ret;
 }
 
-void *midgard_model_create(const void *config)
+void *midgard_model_create(struct kbase_device *kbdev)
 {
 	struct dummy_model_t *dummy = NULL;
 
@@ -1118,7 +1098,12 @@ void *midgard_model_create(const void *config)
 			GPU_CONTROL_REG(L2_PRESENT_LO), dummy->control_reg_values);
 		performance_counters.shader_present = get_implementation_register(
 			GPU_CONTROL_REG(SHADER_PRESENT_LO), dummy->control_reg_values);
+
+		gpu_device_set_data(dummy, kbdev);
+
+		dev_info(kbdev->dev, "Using Dummy Model");
 	}
+
 	return dummy;
 }
 
@@ -1134,7 +1119,7 @@ static void midgard_model_get_outputs(void *h)
 	lockdep_assert_held(&hw_error_status.access_lock);
 
 	if (hw_error_status.job_irq_status)
-		gpu_device_raise_irq(dummy, GPU_DUMMY_JOB_IRQ);
+		gpu_device_raise_irq(dummy, MODEL_LINUX_JOB_IRQ);
 
 	if ((dummy->power_changed && dummy->power_changed_mask) ||
 	    (dummy->reset_completed & dummy->reset_completed_mask) ||
@@ -1145,10 +1130,10 @@ static void midgard_model_get_outputs(void *h)
 	    (dummy->flush_pa_range_completed && dummy->flush_pa_range_completed_irq_enabled) ||
 #endif
 	    (dummy->clean_caches_completed && dummy->clean_caches_completed_irq_enabled))
-		gpu_device_raise_irq(dummy, GPU_DUMMY_GPU_IRQ);
+		gpu_device_raise_irq(dummy, MODEL_LINUX_GPU_IRQ);
 
 	if (hw_error_status.mmu_irq_rawstat & hw_error_status.mmu_irq_mask)
-		gpu_device_raise_irq(dummy, GPU_DUMMY_MMU_IRQ);
+		gpu_device_raise_irq(dummy, MODEL_LINUX_MMU_IRQ);
 }
 
 static void midgard_model_update(void *h)
@@ -1215,7 +1200,7 @@ static void invalidate_active_jobs(struct dummy_model_t *dummy)
 	}
 }
 
-u8 midgard_model_write_reg(void *h, u32 addr, u32 value)
+void midgard_model_write_reg(void *h, u32 addr, u32 value)
 {
 	unsigned long flags;
 	struct dummy_model_t *dummy = (struct dummy_model_t *)h;
@@ -1225,7 +1210,7 @@ u8 midgard_model_write_reg(void *h, u32 addr, u32 value)
 #if !MALI_USE_CSF
 	if ((addr >= JOB_CONTROL_REG(JOB_SLOT0)) &&
 			(addr < (JOB_CONTROL_REG(JOB_SLOT15) + 0x80))) {
-		int slot_idx = (addr >> 7) & 0xf;
+		unsigned int slot_idx = (addr >> 7) & 0xf;
 
 		KBASE_DEBUG_ASSERT(slot_idx < NUM_SLOTS);
 		if (addr == JOB_SLOT_REG(slot_idx, JS_HEAD_NEXT_LO)) {
@@ -1387,10 +1372,10 @@ u8 midgard_model_write_reg(void *h, u32 addr, u32 value)
 		dummy->l2_config = value;
 	}
 #if MALI_USE_CSF
-	else if (addr >= GPU_CONTROL_REG(CSF_HW_DOORBELL_PAGE_OFFSET) &&
-			 addr < GPU_CONTROL_REG(CSF_HW_DOORBELL_PAGE_OFFSET +
-						(CSF_NUM_DOORBELL * CSF_HW_DOORBELL_PAGE_SIZE))) {
-		if (addr == GPU_CONTROL_REG(CSF_HW_DOORBELL_PAGE_OFFSET))
+	else if (addr >= CSF_HW_DOORBELL_PAGE_OFFSET &&
+		 addr < CSF_HW_DOORBELL_PAGE_OFFSET +
+				 (CSF_NUM_DOORBELL * CSF_HW_DOORBELL_PAGE_SIZE)) {
+		if (addr == CSF_HW_DOORBELL_PAGE_OFFSET)
 			hw_error_status.job_irq_status = JOB_IRQ_GLOBAL_IF;
 	} else if ((addr >= GPU_CONTROL_REG(SYSC_ALLOC0)) &&
 		   (addr < GPU_CONTROL_REG(SYSC_ALLOC(SYSC_ALLOC_COUNT)))) {
@@ -1418,13 +1403,13 @@ u8 midgard_model_write_reg(void *h, u32 addr, u32 value)
 		}
 	}
 #endif
-	else if (addr == MMU_REG(MMU_IRQ_MASK)) {
+	else if (addr == MMU_CONTROL_REG(MMU_IRQ_MASK)) {
 		hw_error_status.mmu_irq_mask = value;
-	} else if (addr == MMU_REG(MMU_IRQ_CLEAR)) {
+	} else if (addr == MMU_CONTROL_REG(MMU_IRQ_CLEAR)) {
 		hw_error_status.mmu_irq_rawstat &= (~value);
-	} else if ((addr >= MMU_AS_REG(0, AS_TRANSTAB_LO)) && (addr <= MMU_AS_REG(15, AS_STATUS))) {
-		int mem_addr_space = (addr - MMU_AS_REG(0, AS_TRANSTAB_LO))
-									>> 6;
+	} else if ((addr >= MMU_STAGE1_REG(MMU_AS_REG(0, AS_TRANSTAB_LO))) &&
+		   (addr <= MMU_STAGE1_REG(MMU_AS_REG(15, AS_STATUS)))) {
+		int mem_addr_space = (addr - MMU_STAGE1_REG(MMU_AS_REG(0, AS_TRANSTAB_LO))) >> 6;
 
 		switch (addr & 0x3F) {
 		case AS_COMMAND:
@@ -1608,11 +1593,9 @@ u8 midgard_model_write_reg(void *h, u32 addr, u32 value)
 	midgard_model_update(dummy);
 	midgard_model_get_outputs(dummy);
 	spin_unlock_irqrestore(&hw_error_status.access_lock, flags);
-
-	return 1;
 }
 
-u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
+void midgard_model_read_reg(void *h, u32 addr, u32 *const value)
 {
 	unsigned long flags;
 	struct dummy_model_t *dummy = (struct dummy_model_t *)h;
@@ -1937,10 +1920,9 @@ u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
 	} else if (addr >= GPU_CONTROL_REG(CYCLE_COUNT_LO)
 				&& addr <= GPU_CONTROL_REG(TIMESTAMP_HI)) {
 		*value = 0;
-	} else if (addr >= MMU_AS_REG(0, AS_TRANSTAB_LO)
-				&& addr <= MMU_AS_REG(15, AS_STATUS)) {
-		int mem_addr_space = (addr - MMU_AS_REG(0, AS_TRANSTAB_LO))
-									>> 6;
+	} else if (addr >= MMU_STAGE1_REG(MMU_AS_REG(0, AS_TRANSTAB_LO)) &&
+		   addr <= MMU_STAGE1_REG(MMU_AS_REG(15, AS_STATUS))) {
+		int mem_addr_space = (addr - MMU_STAGE1_REG(MMU_AS_REG(0, AS_TRANSTAB_LO))) >> 6;
 
 		switch (addr & 0x3F) {
 		case AS_TRANSTAB_LO:
@@ -1984,11 +1966,11 @@ u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
 			*value = 0;
 			break;
 		}
-	} else if (addr == MMU_REG(MMU_IRQ_MASK)) {
+	} else if (addr == MMU_CONTROL_REG(MMU_IRQ_MASK)) {
 		*value = hw_error_status.mmu_irq_mask;
-	} else if (addr == MMU_REG(MMU_IRQ_RAWSTAT)) {
+	} else if (addr == MMU_CONTROL_REG(MMU_IRQ_RAWSTAT)) {
 		*value = hw_error_status.mmu_irq_rawstat;
-	} else if (addr == MMU_REG(MMU_IRQ_STATUS)) {
+	} else if (addr == MMU_CONTROL_REG(MMU_IRQ_STATUS)) {
 		*value = hw_error_status.mmu_irq_mask &
 						hw_error_status.mmu_irq_rawstat;
 	}
@@ -1996,8 +1978,7 @@ u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
 	else if (addr == IPA_CONTROL_REG(STATUS)) {
 		*value = (ipa_control_timer_enabled << 31);
 	} else if ((addr >= IPA_CONTROL_REG(VALUE_CSHW_REG_LO(0))) &&
-		   (addr <= IPA_CONTROL_REG(VALUE_CSHW_REG_HI(
-				    IPA_CTL_MAX_VAL_CNT_IDX)))) {
+		   (addr <= IPA_CONTROL_REG(VALUE_CSHW_REG_HI(IPA_CTL_MAX_VAL_CNT_IDX)))) {
 		u32 counter_index =
 			(addr - IPA_CONTROL_REG(VALUE_CSHW_REG_LO(0))) >> 3;
 		bool is_low_word =
@@ -2006,8 +1987,7 @@ u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
 		*value = gpu_model_get_prfcnt_value(KBASE_IPA_CORE_TYPE_CSHW,
 						    counter_index, is_low_word);
 	} else if ((addr >= IPA_CONTROL_REG(VALUE_MEMSYS_REG_LO(0))) &&
-		   (addr <= IPA_CONTROL_REG(VALUE_MEMSYS_REG_HI(
-				    IPA_CTL_MAX_VAL_CNT_IDX)))) {
+		   (addr <= IPA_CONTROL_REG(VALUE_MEMSYS_REG_HI(IPA_CTL_MAX_VAL_CNT_IDX)))) {
 		u32 counter_index =
 			(addr - IPA_CONTROL_REG(VALUE_MEMSYS_REG_LO(0))) >> 3;
 		bool is_low_word =
@@ -2016,8 +1996,7 @@ u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
 		*value = gpu_model_get_prfcnt_value(KBASE_IPA_CORE_TYPE_MEMSYS,
 						    counter_index, is_low_word);
 	} else if ((addr >= IPA_CONTROL_REG(VALUE_TILER_REG_LO(0))) &&
-		   (addr <= IPA_CONTROL_REG(VALUE_TILER_REG_HI(
-				    IPA_CTL_MAX_VAL_CNT_IDX)))) {
+		   (addr <= IPA_CONTROL_REG(VALUE_TILER_REG_HI(IPA_CTL_MAX_VAL_CNT_IDX)))) {
 		u32 counter_index =
 			(addr - IPA_CONTROL_REG(VALUE_TILER_REG_LO(0))) >> 3;
 		bool is_low_word =
@@ -2026,8 +2005,7 @@ u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
 		*value = gpu_model_get_prfcnt_value(KBASE_IPA_CORE_TYPE_TILER,
 						    counter_index, is_low_word);
 	} else if ((addr >= IPA_CONTROL_REG(VALUE_SHADER_REG_LO(0))) &&
-		   (addr <= IPA_CONTROL_REG(VALUE_SHADER_REG_HI(
-				    IPA_CTL_MAX_VAL_CNT_IDX)))) {
+		   (addr <= IPA_CONTROL_REG(VALUE_SHADER_REG_HI(IPA_CTL_MAX_VAL_CNT_IDX)))) {
 		u32 counter_index =
 			(addr - IPA_CONTROL_REG(VALUE_SHADER_REG_LO(0))) >> 3;
 		bool is_low_word =
@@ -2035,8 +2013,6 @@ u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
 
 		*value = gpu_model_get_prfcnt_value(KBASE_IPA_CORE_TYPE_SHADER,
 						    counter_index, is_low_word);
-	} else if (addr == USER_REG(LATEST_FLUSH)) {
-		*value = 0;
 	}
 #endif
 	else if (addr == GPU_CONTROL_REG(GPU_FEATURES_LO)) {
@@ -2052,8 +2028,6 @@ u8 midgard_model_read_reg(void *h, u32 addr, u32 * const value)
 
 	spin_unlock_irqrestore(&hw_error_status.access_lock, flags);
 	CSTD_UNUSED(dummy);
-
-	return 1;
 }
 
 static u32 set_user_sample_core_type(u64 *counters, u32 *usr_data_start, u32 usr_data_offset,
