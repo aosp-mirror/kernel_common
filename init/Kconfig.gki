@@ -124,6 +124,7 @@ config GKI_HIDDEN_MEDIA_CONFIGS
 config GKI_HIDDEN_VIRTUAL_CONFIGS
 	bool "Hidden Virtual configs needed for GKI"
 	select HVC_DRIVER
+	select DIMLIB
 	help
 	  Dummy config option used to enable hidden virtual device configs.
 	  These are normally selected implicitly when a module
