@@ -2976,6 +2976,7 @@
   __traceiter_android_vh_free_oem_binder_struct
   __traceiter_android_vh_binder_special_task
   __traceiter_android_vh_binder_free_buf
+  __traceiter_android_vh_binder_buffer_release
   __tracepoint_android_rvh_account_irq
   __tracepoint_android_rvh_after_enqueue_task
   __tracepoint_android_rvh_build_perf_domains
@@ -3257,6 +3258,7 @@
   __tracepoint_android_vh_free_oem_binder_struct
   __tracepoint_android_vh_binder_special_task
   __tracepoint_android_vh_binder_free_buf
+  __tracepoint_android_vh_binder_buffer_release
   trace_print_array_seq
   trace_print_flags_seq
   trace_print_hex_seq
@@ -3721,4 +3723,6 @@
   xhci_ring_cmd_db
   xhci_ring_free
   xhci_trb_virt_to_dma
+  xt_register_match
+  xt_unregister_match
   zero_pfn
