@@ -21,7 +21,7 @@ These coverage arguments are:
 --coverage --coverage-toolchain GCOV_KERNEL --auto-collect GCOV_KERNEL_COVERAGE
 ```
 
-The following is a fulll example call running the selftests test suite that exists under the
+The following is a full example call running the selftests test suite that exists under the
 'bazel-bin/common/testcases' directory. The artifact output has been redirected to 'tf-logs'
 for easier referebce needed in the next step.
 ```
@@ -34,11 +34,11 @@ $ prebuilts/tradefed/filegroups/tradefed/tradefed.sh run commandAndExit \
 ```
 
 ## Create an lcov tracefile out of the gcov tar artifact from test run
-The previously mentioned tradefed run will produce a tar file artifact with a
-name similar to <test>_kernel_coverage_*.tar.gz. This tar file is an archive of
-all the gcov data files collected into debugfs/ from the profiled device. In
-order to make it easier to work with this data, it needs to be converted to a
-single lcov tracefile.
+The previously mentioned tradefed run will produce a tar file artifact in the
+tradefed log folder with a name similar to <test>_kernel_coverage_*.tar.gz.
+This tar file is an archive of all the gcov data files collected into debugfs/
+from the profiled device. In order to make it easier to work with this data,
+it needs to be converted to a single lcov tracefile.
 
 The script 'create-tracefile.py' facilitates this generation by handling the
 required unpacking, file path corrections and ultimate 'lcov' call.
