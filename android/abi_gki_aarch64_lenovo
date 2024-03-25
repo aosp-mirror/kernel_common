@@ -257,6 +257,7 @@
   _dev_info
   __dev_kfree_skb_any
   devm_add_action
+  devm_bitmap_zalloc
   devm_clk_get
   devm_free_irq
   devm_fwnode_gpiod_get_index
@@ -1330,6 +1331,8 @@
   __tracepoint_android_vh_use_amu_fie
   __tracepoint_binder_transaction_received
   __tracepoint_cpu_frequency_limits
+  tracing_off
+  tracing_on
   try_module_get
   __ubsan_handle_cfi_check_fail_abort
   __udelay
