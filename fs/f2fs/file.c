@@ -1253,6 +1253,8 @@ static int __clone_blkaddrs(struct inode *src_inode, struct inode *dst_inode,
 				f2fs_put_page(psrc, 1);
 				return PTR_ERR(pdst);
 			}
+			f2fs_wait_on_page_writeback(pdst, DATA, true, true);
+
 			f2fs_copy_page(psrc, pdst);
 			set_page_dirty(pdst);
 			f2fs_put_page(pdst, 1);
