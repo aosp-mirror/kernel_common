@@ -21,13 +21,13 @@ These coverage arguments are:
 --coverage --coverage-toolchain GCOV_KERNEL --auto-collect GCOV_KERNEL_COVERAGE
 ```
 
-The following is a full example call running the selftests test suite that exists under the
-'bazel-bin/common/testcases' directory. The artifact output has been redirected to 'tf-logs'
-for easier referebce needed in the next step.
+The following is a full example call running just the `kselftest_net_socket` test in the
+selftests test suite that exists under the 'bazel-bin/common/testcases' directory. The artifact
+output has been redirected to 'tf-logs' for easier reference needed in the next step.
 ```
 $ prebuilts/tradefed/filegroups/tradefed/tradefed.sh run commandAndExit \
     template/local_min --template:map test=suite/test_mapping_suite     \
-    --include-filter selftests --tests-dir=bazel-bin/common/testcases/  \
+    --include-filter 'selftests kselftest_net_socket' --tests-dir=bazel-bin/common/testcases/  \
     --primary-abi-only --log-file-path tf-logs                          \
     --coverage --coverage-toolchain GCOV_KERNEL                         \
     --auto-collect GCOV_KERNEL_COVERAGE
@@ -43,9 +43,10 @@ it needs to be converted to a single lcov tracefile.
 The script 'create-tracefile.py' facilitates this generation by handling the
 required unpacking, file path corrections and ultimate 'lcov' call.
 
-An example:
+An example where we generate a tracefile only including results from net/socket.c.
+(If no source files are specified as included, then all source file data is used):
 ```
-$ python3 common/tools/testing/android/bin/create-tracefile.py -t tf-logs/
+$ ./common/tools/testing/android/bin/create-tracefile.py -t tf-logs/ --include net/socket.c
 ```
 
 This will create a local tracefile named 'cov.info'.
@@ -53,6 +54,7 @@ This will create a local tracefile named 'cov.info'.
 
 ## Visualizing Results
 With the created tracefile there a number of different ways to view coverage data from it.
+Check out 'man lcov' for more options.
 ### 1. Text Options
 #### 1.1 Summary
 ```
@@ -65,7 +67,7 @@ Summary coverage rate:
 ```
 #### 1.2 List
 ```
-$ lcov --summary --rc lcov_branch_coverage=1 cov.info
+$ lcov --list --rc lcov_branch_coverage=1 cov.info
 Reading tracefile cov.info_fix
                                                |Lines      |Functions|Branches
 Filename                                       |Rate    Num|Rate  Num|Rate   Num
