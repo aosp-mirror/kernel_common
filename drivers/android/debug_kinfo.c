@@ -158,7 +158,7 @@ static int debug_kinfo_probe(struct platform_device *pdev)
 	info->_markers_pa = (u64)__pa_symbol((volatile void *)kallsyms_markers);
 	info->thread_size = THREAD_SIZE;
 	info->swapper_pg_dir_pa = (u64)__pa_symbol(swapper_pg_dir);
-	strlcpy(info->last_uts_release, init_utsname()->release, sizeof(info->last_uts_release));
+	strscpy(info->last_uts_release, init_utsname()->release, sizeof(info->last_uts_release));
 	info->enabled_modules_tree_lookup = IS_ENABLED(CONFIG_MODULES_TREE_LOOKUP);
 	info->mod_kallsyms_offset = offsetof(struct module, kallsyms);
 
