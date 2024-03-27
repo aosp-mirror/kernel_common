@@ -49,16 +49,13 @@ View test results
     ....
 
 Run ACK KUnit tests via tradefed
- * Build ACK KUnit tests:
-   $ tools/bazel build //common:tests_zip_arm64_dist
-
- * Unzip tests.zip (e.g. in local tmp directory):
-   $ unzip bazel-bin/common/arm64/tests.zip -d tmp
+ * Build ACK KUnit tests and install (e.g. /tmp/kunit_tests):
+   $ tools/bazel run -- //common:kunit_tests_x86_64_install -v --destdir /tmp/kunit_tests
 
  * With device connected and accessible via adb run the tests:
    $ prebuilts/tradefed/filegroups/tradefed/tradefed.sh run commandAndExit \
          template/local_min --template:map test=suite/test_mapping_suite   \
-         --include-filter kunit --tests-dir=tmp/testcases --primary-abi-only
+         --include-filter kunit --tests-dir=/tmp/kunit_tests --primary-abi-only
    ....
    =======================================================
    =============== Summary ===============
