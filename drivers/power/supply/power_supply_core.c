@@ -1185,6 +1185,7 @@ EXPORT_SYMBOL_GPL(power_supply_powers);
 static void power_supply_dev_release(struct device *dev)
 {
 	struct power_supply *psy = to_power_supply(dev);
+
 	dev_dbg(dev, "%s\n", __func__);
 	kfree(psy);
 }
@@ -1571,6 +1572,6 @@ subsys_initcall(power_supply_class_init);
 module_exit(power_supply_class_exit);
 
 MODULE_DESCRIPTION("Universal power supply monitor class");
-MODULE_AUTHOR("Ian Molton <spyro@f2s.com>, "
-	      "Szabolcs Gyurko, "
-	      "Anton Vorontsov <cbou@mail.ru>");
+MODULE_AUTHOR("Ian Molton <spyro@f2s.com>");
+MODULE_AUTHOR("Szabolcs Gyurko");
+MODULE_AUTHOR("Anton Vorontsov <cbou@mail.ru>");
