@@ -2107,13 +2107,15 @@ static int mt_resume(struct hid_device *hdev)
 static int mt_reset(struct hid_device *hdev)
 {
 	struct mt_device *td = hid_get_drvdata(hdev);
-	struct hid_haptic_device *haptic = td->haptic;
+
+	if (!td)
+		return 0;
 
 	mt_release_contacts(hdev);
 	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
 
 	if (td->is_haptic_touchpad)
-		hid_haptic_reset(hdev, haptic);
+		hid_haptic_reset(hdev, td->haptic);
 
 	return 0;
 }
