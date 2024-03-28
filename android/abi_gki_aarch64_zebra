@@ -6,3 +6,12 @@
   nla_reserve
   nla_append
   prandom_seed
+  regulatory_set_wiphy_regd_sync_rtnl
+  cfg80211_cac_event
+  cfg80211_radar_event
+  cfg80211_chandef_valid
+  kobject_add
+  sock_wfree
+  dev_change_flags
+  netdev_master_upper_dev_get
+  prandom_bytes
