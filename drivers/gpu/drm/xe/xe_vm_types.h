@@ -19,10 +19,8 @@
 
 struct xe_bo;
 struct xe_sync_entry;
+struct xe_user_fence;
 struct xe_vm;
-
-#define TEST_VM_ASYNC_OPS_ERROR
-#define FORCE_ASYNC_OP_ERROR	BIT(31)
 
 #define XE_VMA_READ_ONLY	DRM_GPUVA_USERBITS
 #define XE_VMA_DESTROYED	(DRM_GPUVA_USERBITS << 1)
@@ -32,11 +30,15 @@ struct xe_vm;
 #define XE_VMA_PTE_4K		(DRM_GPUVA_USERBITS << 5)
 #define XE_VMA_PTE_2M		(DRM_GPUVA_USERBITS << 6)
 #define XE_VMA_PTE_1G		(DRM_GPUVA_USERBITS << 7)
+#define XE_VMA_PTE_64K		(DRM_GPUVA_USERBITS << 8)
+#define XE_VMA_PTE_COMPACT	(DRM_GPUVA_USERBITS << 9)
 
 /** struct xe_userptr - User pointer */
 struct xe_userptr {
 	/** @invalidate_link: Link for the vm::userptr.invalidated list */
 	struct list_head invalidate_link;
+	/** @userptr: link into VM repin list if userptr. */
+	struct list_head repin_link;
 	/**
 	 * @notifier: MMU notifier for user pointer (invalidation call back)
 	 */
@@ -68,8 +70,6 @@ struct xe_vma {
 	 * resv.
 	 */
 	union {
-		/** @userptr: link into VM repin list if userptr. */
-		struct list_head userptr;
 		/** @rebind: link into VM if this VMA needs rebinding. */
 		struct list_head rebind;
 		/** @destroy: link to contested list when VM is being closed. */
@@ -107,9 +107,19 @@ struct xe_vma {
 	u16 pat_index;
 
 	/**
-	 * @userptr: user pointer state, only allocated for VMAs that are
-	 * user pointers
+	 * @ufence: The user fence that was provided with MAP.
+	 * Needs to be signalled before UNMAP can be processed.
 	 */
+	struct xe_user_fence *ufence;
+};
+
+/**
+ * struct xe_userptr_vma - A userptr vma subclass
+ * @vma: The vma.
+ * @userptr: Additional userptr information.
+ */
+struct xe_userptr_vma {
+	struct xe_vma vma;
 	struct xe_userptr userptr;
 };
 
@@ -285,10 +295,6 @@ struct xe_vm {
 struct xe_vma_op_map {
 	/** @vma: VMA to map */
 	struct xe_vma *vma;
-	/** @immediate: Immediate bind */
-	bool immediate;
-	/** @read_only: Read only */
-	bool read_only;
 	/** @is_null: is NULL binding */
 	bool is_null;
 	/** @pat_index: The pat index to use for this operation. */
@@ -355,11 +361,6 @@ struct xe_vma_op {
 	struct list_head link;
 	/** @flags: operation flags */
 	enum xe_vma_op_flags flags;
-
-#ifdef TEST_VM_ASYNC_OPS_ERROR
-	/** @inject_error: inject error to test async op error handling */
-	bool inject_error;
-#endif
 
 	union {
 		/** @map: VMA map operation specific data */

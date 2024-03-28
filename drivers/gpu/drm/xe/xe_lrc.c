@@ -21,10 +21,10 @@
 #include "xe_map.h"
 #include "xe_vm.h"
 
-#define CTX_VALID				(1 << 0)
-#define CTX_PRIVILEGE				(1 << 8)
-#define CTX_ADDRESSING_MODE_SHIFT		3
-#define LEGACY_64B_CONTEXT			3
+#define LRC_VALID				(1 << 0)
+#define LRC_PRIVILEGE				(1 << 8)
+#define LRC_ADDRESSING_MODE_SHIFT		3
+#define LRC_LEGACY_64B_CONTEXT			3
 
 #define ENGINE_CLASS_SHIFT			61
 #define ENGINE_INSTANCE_SHIFT			48
@@ -682,8 +682,6 @@ static void xe_lrc_set_ppgtt(struct xe_lrc *lrc, struct xe_vm *vm)
 
 #define PVC_CTX_ASID		(0x2e + 1)
 #define PVC_CTX_ACC_CTR_THOLD	(0x2a + 1)
-#define ACC_GRANULARITY_S       20
-#define ACC_NOTIFY_S            16
 
 int xe_lrc_init(struct xe_lrc *lrc, struct xe_hw_engine *hwe,
 		struct xe_exec_queue *q, struct xe_vm *vm, u32 ring_size)
@@ -754,23 +752,17 @@ int xe_lrc_init(struct xe_lrc *lrc, struct xe_hw_engine *hwe,
 	xe_lrc_write_ctx_reg(lrc, CTX_RING_CTL,
 			     RING_CTL_SIZE(lrc->ring.size) | RING_VALID);
 	if (xe->info.has_asid && vm)
-		xe_lrc_write_ctx_reg(lrc, PVC_CTX_ASID,
-				     (q->usm.acc_granularity <<
-				      ACC_GRANULARITY_S) | vm->usm.asid);
-	if (xe->info.has_usm && vm)
-		xe_lrc_write_ctx_reg(lrc, PVC_CTX_ACC_CTR_THOLD,
-				     (q->usm.acc_notify << ACC_NOTIFY_S) |
-				     q->usm.acc_trigger);
+		xe_lrc_write_ctx_reg(lrc, PVC_CTX_ASID, vm->usm.asid);
 
-	lrc->desc = CTX_VALID;
-	lrc->desc |= LEGACY_64B_CONTEXT << CTX_ADDRESSING_MODE_SHIFT;
+	lrc->desc = LRC_VALID;
+	lrc->desc |= LRC_LEGACY_64B_CONTEXT << LRC_ADDRESSING_MODE_SHIFT;
 	/* TODO: Priority */
 
 	/* While this appears to have something about privileged batches or
 	 * some such, it really just means PPGTT mode.
 	 */
 	if (vm)
-		lrc->desc |= CTX_PRIVILEGE;
+		lrc->desc |= LRC_PRIVILEGE;
 
 	if (GRAPHICS_VERx100(xe) < 1250) {
 		lrc->desc |= (u64)hwe->instance << ENGINE_INSTANCE_SHIFT;
