@@ -1447,6 +1447,7 @@ cc_binary_with_abi(
     visibility = ["//visibility:private"],
     deps = [
         ":kselftest_headers_lib",
+        ":kselftest_mm_vm_util",
         "@libcap",
     ],
 )
