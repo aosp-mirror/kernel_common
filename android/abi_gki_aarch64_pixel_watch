@@ -733,6 +733,7 @@
   dump_stack
   __dynamic_dev_dbg
   __dynamic_pr_debug
+  emergency_restart
   enable_irq
   enable_percpu_irq
   ether_setup
@@ -1088,6 +1089,7 @@
   kernel_getsockname
   kernel_kobj
   kernel_recvmsg
+  kernel_restart
   kernel_sendmsg
   kernfs_find_and_get_ns
   kernfs_notify
@@ -1267,6 +1269,7 @@
   mod_node_page_state
   mod_timer
   mod_timer_pending
+  __module_get
   module_layout
   module_put
   __msecs_to_jiffies
@@ -2441,6 +2444,9 @@
   wakeup_source_unregister
   __wake_up_sync
   __warn_printk
+  watchdog_init_timeout
+  watchdog_register_device
+  watchdog_unregister_device
   wireless_nlevent_flush
   wireless_send_event
   woken_wake_function
