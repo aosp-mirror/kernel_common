@@ -150,7 +150,7 @@ libs-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
 # Default target when executing plain make
 boot		:= arch/arm64/boot
 
-BOOT_TARGETS	:= Image vmlinuz.efi
+BOOT_TARGETS	:= Image vmlinuz.efi image.fit
 
 PHONY += $(BOOT_TARGETS)
 
@@ -165,7 +165,9 @@ ifndef KBUILD_MIXED_TREE
 all:	$(notdir $(KBUILD_IMAGE))
 endif
 
-vmlinuz.efi: Image
+image.fit: dtbs
+
+vmlinuz.efi image.fit: Image
 $(BOOT_TARGETS): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
@@ -223,6 +225,7 @@ virtconfig:
 define archhelp
   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+  echo  '  image.fit     - Flat Image Tree (arch/$(ARCH)/boot/image.fit)'
   echo  '  install       - Install uncompressed kernel'
   echo  '  zinstall      - Install compressed kernel'
   echo  '                  Install using (your) ~/bin/installkernel or'
