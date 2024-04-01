@@ -21,7 +21,6 @@
 #include <linux/iommu.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
-#include <linux/workqueue.h>
 #include <linux/genalloc.h>
 #include <linux/platform_device.h>
 #include <linux/scatterlist.h>
@@ -62,7 +61,6 @@ struct cam_smmu_work_payload {
 	unsigned long iova;
 	int flags;
 	void *token;
-	struct list_head list;
 };
 
 enum cam_iommu_type {
@@ -130,9 +128,6 @@ struct cam_iommu_cb_set {
 	struct cam_context_bank_info *cb_info;
 	u32 cb_num;
 	u32 cb_init_count;
-	struct work_struct smmu_work;
-	struct mutex payload_list_lock;
-	struct list_head payload_list;
 	u32 non_fatal_fault;
 };
 
@@ -205,25 +200,11 @@ static int cam_smmu_probe(struct platform_device *pdev);
 
 static uint32_t cam_smmu_find_closest_mapping(int idx, void *vaddr);
 
-static void cam_smmu_page_fault_work(struct work_struct *work)
+static void cam_smmu_page_fault(struct cam_smmu_work_payload *payload)
 {
 	int j;
 	int idx;
-	struct cam_smmu_work_payload *payload;
 	uint32_t buf_info;
-
-	mutex_lock(&iommu_cb_set.payload_list_lock);
-	if (list_empty(&iommu_cb_set.payload_list)) {
-		CAM_ERR(CAM_SMMU, "Payload list empty");
-		mutex_unlock(&iommu_cb_set.payload_list_lock);
-		return;
-	}
-
-	payload = list_first_entry(&iommu_cb_set.payload_list,
-		struct cam_smmu_work_payload,
-		list);
-	list_del(&payload->list);
-	mutex_unlock(&iommu_cb_set.payload_list_lock);
 
 	/* Dereference the payload to call the handler */
 	idx = payload->idx;
@@ -242,7 +223,6 @@ static void cam_smmu_page_fault_work(struct work_struct *work)
 				buf_info);
 		}
 	}
-	kfree(payload);
 }
 
 static int cam_smmu_create_debugfs_entry(void)
@@ -468,9 +448,9 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 	struct device *dev, unsigned long iova,
 	int flags, void *token)
 {
+	struct cam_smmu_work_payload payload;
 	char *cb_name;
 	int idx;
-	struct cam_smmu_work_payload *payload;
 
 	if (!token) {
 		CAM_ERR(CAM_SMMU, "Error: token is NULL");
@@ -501,23 +481,14 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 		return -EINVAL;
 	}
 
-	payload = kzalloc(sizeof(struct cam_smmu_work_payload), GFP_KERNEL);
-	if (!payload)
-		return -EINVAL;
+	payload.domain = domain;
+	payload.dev = dev;
+	payload.iova = iova;
+	payload.flags = flags;
+	payload.token = token;
+	payload.idx = idx;
 
-	payload->domain = domain;
-	payload->dev = dev;
-	payload->iova = iova;
-	payload->flags = flags;
-	payload->token = token;
-	payload->idx = idx;
-
-	mutex_lock(&iommu_cb_set.payload_list_lock);
-	list_add_tail(&payload->list, &iommu_cb_set.payload_list);
-	mutex_unlock(&iommu_cb_set.payload_list_lock);
-
-	cam_smmu_page_fault_work(&iommu_cb_set.smmu_work);
-
+	cam_smmu_page_fault(&payload);
 	return 0;
 }
 
@@ -2468,9 +2439,6 @@ static int cam_smmu_probe(struct platform_device *pdev)
 	if (rc < 0) {
 		CAM_ERR(CAM_SMMU, "Error: populating devices");
 	} else {
-		INIT_WORK(&iommu_cb_set.smmu_work, cam_smmu_page_fault_work);
-		mutex_init(&iommu_cb_set.payload_list_lock);
-		INIT_LIST_HEAD(&iommu_cb_set.payload_list);
 		pr_info("%s driver probed successfully\n", KBUILD_MODNAME);
 	}
 
