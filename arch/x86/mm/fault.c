@@ -1446,6 +1446,26 @@ trace_page_fault_entries(struct pt_regs *regs, unsigned long error_code,
 		trace_page_fault_kernel(address, regs, error_code);
 }
 
+bool kiwi_fault_logging = false;
+
+/*
+ * kiwi_fault_logging=on|off
+ * Enables detailed fault logs.
+ *
+ * on	Enable
+ * off	Disable (default)
+ */
+static int __init parse_kiwi_fault_logging(char *str)
+{
+	if (!strcmp(str, "on")) {
+		kiwi_fault_logging = true;
+	} else if (!strcmp(str, "off")) {
+		kiwi_fault_logging = false;
+	}
+	return 0;
+}
+__setup("kiwi_fault_logging=", parse_kiwi_fault_logging);
+
 static __always_inline void
 handle_page_fault(struct pt_regs *regs, unsigned long error_code,
 			      unsigned long address)
@@ -1475,6 +1495,12 @@ DEFINE_IDTENTRY_RAW_ERRORCODE(exc_page_fault)
 {
 	unsigned long address = read_cr2();
 	irqentry_state_t state;
+
+	if (unlikely(kiwi_fault_logging)) {
+	    printk(KERN_ALERT "%s[%d]: exc_page_fault at %lx ip %px sp %px error %lx",
+			current->comm, task_pid_nr(current), address,
+			(void *)regs->ip, (void *)regs->sp, error_code);
+	}
 
 	prefetchw(&current->mm->mmap_lock);
 

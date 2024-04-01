@@ -70,6 +70,8 @@
 #include <asm/proto.h>
 #endif
 
+extern bool kiwi_fault_logging;
+
 DECLARE_BITMAP(system_vectors, NR_VECTORS);
 
 static inline void cond_local_irq_enable(struct pt_regs *regs)
@@ -169,6 +171,11 @@ NOKPROBE_SYMBOL(do_trap);
 static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 	unsigned long trapnr, int signr, int sicode, void __user *addr)
 {
+	if (unlikely(kiwi_fault_logging)) {
+	    printk(KERN_ALERT "%s[%d]: do_error_trap for %s at %lx trapnr %lx signr %lx sicode %lx ip %px sp %px error %lx",
+			current->comm, task_pid_nr(current), str, addr, trapnr, signr,
+			sicode, (void *)regs->ip, (void *)regs->sp, error_code);
+	}
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "entry code didn't wake RCU");
 
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) !=
@@ -563,6 +570,12 @@ DEFINE_IDTENTRY_ERRORCODE(exc_general_protection)
 	int ret;
 
 	cond_local_irq_enable(regs);
+
+	if (unlikely(kiwi_fault_logging)) {
+	    printk(KERN_ALERT "%s[%d]: exc_general_protection ip %px sp %px error %lx",
+			current->comm, task_pid_nr(current),
+			(void *)regs->ip, (void *)regs->sp, error_code);
+	}
 
 	if (static_cpu_has(X86_FEATURE_UMIP)) {
 		if (user_mode(regs) && fixup_umip_exception(regs))
