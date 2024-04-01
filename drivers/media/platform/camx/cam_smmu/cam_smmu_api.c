@@ -518,7 +518,7 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 
 	cam_smmu_page_fault_work(&iommu_cb_set.smmu_work);
 
-	return -EINVAL;
+	return 0;
 }
 
 static void cam_smmu_reset_iommu_table(enum cam_smmu_init_dir ops)
