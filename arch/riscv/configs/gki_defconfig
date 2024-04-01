@@ -42,9 +42,11 @@ CONFIG_EXPERT=y
 # CONFIG_RSEQ is not set
 CONFIG_PROFILING=y
 CONFIG_ARCH_SUNXI=y
+CONFIG_NONPORTABLE=y
 CONFIG_SMP=y
 CONFIG_SCHED_MC=y
 CONFIG_NR_CPUS=32
+CONFIG_RISCV_EFFICIENT_UNALIGNED_ACCESS=y
 CONFIG_RANDOMIZE_BASE=y
 CONFIG_CMDLINE="console=ttynull stack_depot_disable=on cgroup_disable=pressure kasan.stacktrace=off kvm-arm.mode=protected bootconfig ioremap_guard"
 CONFIG_PM_WAKELOCKS=y
