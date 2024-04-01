@@ -54,15 +54,6 @@ struct firmware_alloc_info {
 
 static struct firmware_alloc_info icp_fw;
 
-struct cam_smmu_work_payload {
-	int idx;
-	struct iommu_domain *domain;
-	struct device *dev;
-	unsigned long iova;
-	int flags;
-	void *token;
-};
-
 enum cam_iommu_type {
 	CAM_SMMU_INVALID,
 	CAM_QSMMU,
@@ -199,31 +190,6 @@ static void cam_smmu_print_table(void);
 static int cam_smmu_probe(struct platform_device *pdev);
 
 static uint32_t cam_smmu_find_closest_mapping(int idx, void *vaddr);
-
-static void cam_smmu_page_fault(struct cam_smmu_work_payload *payload)
-{
-	int j;
-	int idx;
-	uint32_t buf_info;
-
-	/* Dereference the payload to call the handler */
-	idx = payload->idx;
-	buf_info = cam_smmu_find_closest_mapping(idx, (void *)payload->iova);
-	if (buf_info != 0)
-		CAM_INFO(CAM_SMMU, "closest buf 0x%x idx %d", buf_info, idx);
-
-	for (j = 0; j < CAM_SMMU_CB_MAX; j++) {
-		if ((iommu_cb_set.cb_info[idx].handler[j])) {
-			iommu_cb_set.cb_info[idx].handler[j](
-				payload->domain,
-				payload->dev,
-				payload->iova,
-				payload->flags,
-				iommu_cb_set.cb_info[idx].token[j],
-				buf_info);
-		}
-	}
-}
 
 static int cam_smmu_create_debugfs_entry(void)
 {
@@ -448,9 +414,9 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 	struct device *dev, unsigned long iova,
 	int flags, void *token)
 {
-	struct cam_smmu_work_payload payload;
+	uint32_t buf_info;
 	char *cb_name;
-	int idx;
+	int idx, j;
 
 	if (!token) {
 		CAM_ERR(CAM_SMMU, "Error: token is NULL");
@@ -481,14 +447,22 @@ static int cam_smmu_iommu_fault_handler(struct iommu_domain *domain,
 		return -EINVAL;
 	}
 
-	payload.domain = domain;
-	payload.dev = dev;
-	payload.iova = iova;
-	payload.flags = flags;
-	payload.token = token;
-	payload.idx = idx;
+	buf_info = cam_smmu_find_closest_mapping(idx, (void *)iova);
+	if (buf_info != 0)
+		CAM_INFO(CAM_SMMU, "closest buf 0x%x idx %d", buf_info, idx);
 
-	cam_smmu_page_fault(&payload);
+	for (j = 0; j < CAM_SMMU_CB_MAX; j++) {
+		if ((iommu_cb_set.cb_info[idx].handler[j])) {
+			iommu_cb_set.cb_info[idx].handler[j](
+				domain,
+				dev,
+				iova,
+				flags,
+				iommu_cb_set.cb_info[idx].token[j],
+				buf_info);
+		}
+	}
+
 	return 0;
 }
 
