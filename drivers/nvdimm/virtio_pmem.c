@@ -7,6 +7,8 @@
  * with libnvdimm core.
  */
 #include "virtio_pmem.h"
+#include "linux/virtio_config.h"
+#include "linux/virtio_pmem.h"
 #include "nd.h"
 
 static struct virtio_device_id id_table[] = {
@@ -81,6 +83,8 @@ static int virtio_pmem_probe(struct virtio_device *vdev)
 	ndr_desc.res = &res;
 	ndr_desc.numa_node = nid;
 	ndr_desc.flush = async_pmem_flush;
+	if (virtio_has_feature(vpmem->vdev, VIRTIO_PMEM_F_DISCARD))
+		ndr_desc.discard = virtio_pmem_discard;
 	set_bit(ND_REGION_PAGEMAP, &ndr_desc.flags);
 	set_bit(ND_REGION_ASYNC, &ndr_desc.flags);
 	nd_region = nvdimm_pmem_region_create(vpmem->nvdimm_bus, &ndr_desc);
@@ -108,7 +112,13 @@ static void virtio_pmem_remove(struct virtio_device *vdev)
 	vdev->config->reset(vdev);
 }
 
+static unsigned int features[] = {
+	VIRTIO_PMEM_F_DISCARD,
+};
+
 static struct virtio_driver virtio_pmem_driver = {
+	.feature_table			= features,
+	.feature_table_size		= ARRAY_SIZE(features),
 	.driver.name		= KBUILD_MODNAME,
 	.driver.owner		= THIS_MODULE,
 	.id_table		= id_table,

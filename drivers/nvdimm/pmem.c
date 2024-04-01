@@ -7,7 +7,9 @@
  * Copyright (c) 2015, Boaz Harrosh <boaz@plexistor.com>.
  */
 
+#include "linux/blk_types.h"
 #include <linux/blkdev.h>
+#include <linux/pagemap.h>
 #include <linux/hdreg.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
@@ -189,6 +191,21 @@ static blk_status_t pmem_do_write(struct pmem_device *pmem,
 	return rc;
 }
 
+static blk_status_t pmem_do_discard(struct pmem_device *pmem,
+			sector_t sector, unsigned int size)
+{
+	struct nd_region *nd_region = to_region(pmem);
+	phys_addr_t pmem_off = sector * 512 + pmem->data_offset;
+
+	if (!nd_region->discard)
+		return BLK_STS_NOTSUPP;
+
+	if (nd_region->discard(nd_region, pmem_off, size))
+		return BLK_STS_IOERR;
+
+	return BLK_STS_OK;
+}
+
 static blk_qc_t pmem_submit_bio(struct bio *bio)
 {
 	int ret = 0;
@@ -206,18 +223,25 @@ static blk_qc_t pmem_submit_bio(struct bio *bio)
 	do_acct = blk_queue_io_stat(bio->bi_disk->queue);
 	if (do_acct)
 		start = bio_start_io_acct(bio);
-	bio_for_each_segment(bvec, bio, iter) {
-		if (op_is_write(bio_op(bio)))
-			rc = pmem_do_write(pmem, bvec.bv_page, bvec.bv_offset,
-				iter.bi_sector, bvec.bv_len);
-		else
-			rc = pmem_do_read(pmem, bvec.bv_page, bvec.bv_offset,
-				iter.bi_sector, bvec.bv_len);
-		if (rc) {
+	if (op_is_discard(bio_op(bio))) {
+		rc = pmem_do_discard(pmem, bio->bi_iter.bi_sector, bio->bi_iter.bi_size);
+		if (rc)
 			bio->bi_status = rc;
-			break;
+	} else {
+		bio_for_each_segment(bvec, bio, iter) {
+			if (op_is_write(bio_op(bio)))
+				rc = pmem_do_write(pmem, bvec.bv_page, bvec.bv_offset,
+					iter.bi_sector, bvec.bv_len);
+			else
+				rc = pmem_do_read(pmem, bvec.bv_page, bvec.bv_offset,
+					iter.bi_sector, bvec.bv_len);
+			if (rc) {
+				bio->bi_status = rc;
+				break;
+			}
 		}
 	}
+
 	if (do_acct)
 		bio_end_io_acct(bio, start);
 
@@ -465,6 +489,11 @@ static int pmem_attach_disk(struct device *dev,
 	blk_queue_physical_block_size(q, PAGE_SIZE);
 	blk_queue_logical_block_size(q, pmem_sector_size(ndns));
 	blk_queue_max_hw_sectors(q, UINT_MAX);
+	if (nd_region->discard) {
+		blk_queue_max_discard_sectors(q, UINT_MAX);
+		blk_queue_flag_set(QUEUE_FLAG_DISCARD, q);
+		q->limits.discard_granularity = q->limits.logical_block_size;
+	}
 	blk_queue_flag_set(QUEUE_FLAG_NONROT, q);
 	if (pmem->pfn_flags & PFN_MAP)
 		blk_queue_flag_set(QUEUE_FLAG_DAX, q);

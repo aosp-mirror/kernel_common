@@ -157,6 +157,7 @@ struct nd_region {
 	struct nd_interleave_set *nd_set;
 	struct nd_percpu_lane __percpu *lane;
 	int (*flush)(struct nd_region *nd_region, struct bio *bio);
+	int (*discard)(struct nd_region *nd_region, u64 offset, u64 size);
 	struct nd_mapping mapping[];
 };
 

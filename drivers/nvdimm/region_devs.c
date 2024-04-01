@@ -1138,6 +1138,10 @@ static struct nd_region *nd_region_create(struct nvdimm_bus *nvdimm_bus,
 		nd_region->flush = ndr_desc->flush;
 	else
 		nd_region->flush = NULL;
+	if (ndr_desc->discard)
+		nd_region->discard = ndr_desc->discard;
+	else
+		nd_region->discard = NULL;
 
 	nd_device_register(dev);
 

@@ -34,27 +34,22 @@ void virtio_pmem_host_ack(struct virtqueue *vq)
 }
 EXPORT_SYMBOL_GPL(virtio_pmem_host_ack);
 
- /* The request submission function */
-static int virtio_pmem_flush(struct nd_region *nd_region)
+/* The request submission function with the request initialized from the caller */
+static int virtio_send_pmem_request(struct nd_region *nd_region,
+		struct virtio_pmem_request *req_data,
+		size_t req_size)
 {
 	struct virtio_device *vdev = nd_region->provider_data;
 	struct virtio_pmem *vpmem  = vdev->priv;
-	struct virtio_pmem_request *req_data;
 	struct scatterlist *sgs[2], sg, ret;
 	unsigned long flags;
 	int err, err1;
-
-	might_sleep();
-	req_data = kmalloc(sizeof(*req_data), GFP_KERNEL);
-	if (!req_data)
-		return -ENOMEM;
 
 	req_data->done = false;
 	init_waitqueue_head(&req_data->host_acked);
 	init_waitqueue_head(&req_data->wq_buf);
 	INIT_LIST_HEAD(&req_data->list);
-	req_data->req.type = cpu_to_le32(VIRTIO_PMEM_REQ_TYPE_FLUSH);
-	sg_init_one(&sg, &req_data->req, sizeof(req_data->req));
+	sg_init_one(&sg, &req_data->req, req_size);
 	sgs[0] = &sg;
 	sg_init_one(&ret, &req_data->resp.ret, sizeof(req_data->resp));
 	sgs[1] = &ret;
@@ -93,6 +88,24 @@ static int virtio_pmem_flush(struct nd_region *nd_region)
 		err = le32_to_cpu(req_data->resp.ret);
 	}
 
+	return err;
+}
+
+/* The flush request submission function */
+static int virtio_pmem_flush(struct nd_region *nd_region)
+{
+	struct virtio_pmem_request *req_data;
+	int err;
+
+	might_sleep();
+	req_data = kmalloc(sizeof(*req_data), GFP_KERNEL);
+	if (!req_data)
+		return -ENOMEM;
+
+	req_data->req.type.type = cpu_to_le32(VIRTIO_PMEM_REQ_TYPE_FLUSH);
+
+	err = virtio_send_pmem_request(nd_region, req_data, sizeof(req_data->req.type));
+
 	kfree(req_data);
 	return err;
 };
@@ -122,4 +135,30 @@ int async_pmem_flush(struct nd_region *nd_region, struct bio *bio)
 	return 0;
 };
 EXPORT_SYMBOL_GPL(async_pmem_flush);
+
+/* The discard request submission function */
+int virtio_pmem_discard(struct nd_region *nd_region, __u64 offset, __u64 size)
+{
+	struct virtio_pmem_request *req_data;
+	int err;
+
+	might_sleep();
+	req_data = kmalloc(sizeof(*req_data), GFP_KERNEL);
+	if (!req_data)
+		return -ENOMEM;
+
+	req_data->req.range.type = cpu_to_le32(VIRTIO_PMEM_REQ_TYPE_DISCARD);
+	req_data->req.range.start = cpu_to_le64(offset);
+	req_data->req.range.size = cpu_to_le64(size);
+
+	err = virtio_send_pmem_request(nd_region, req_data, sizeof(req_data->req.range));
+
+	kfree(req_data);
+
+	if (err)
+		return -EIO;
+
+	return 0;
+};
+EXPORT_SYMBOL_GPL(virtio_pmem_discard);
 MODULE_LICENSE("GPL");

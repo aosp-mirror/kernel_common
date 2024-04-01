@@ -128,6 +128,7 @@ struct nd_region_desc {
 	unsigned long flags;
 	struct device_node *of_node;
 	int (*flush)(struct nd_region *nd_region, struct bio *bio);
+	int (*discard)(struct nd_region *nd_region, u64 start, u64 size);
 };
 
 struct device;

@@ -16,7 +16,10 @@
 #include <linux/spinlock.h>
 
 struct virtio_pmem_request {
-	struct virtio_pmem_req req;
+	union {
+		struct virtio_pmem_req type;
+		struct virtio_pmem_range_req range;
+	} req;
 	struct virtio_pmem_resp resp;
 
 	/* Wait queue to process deferred work after ack from host */
@@ -52,4 +55,5 @@ struct virtio_pmem {
 
 void virtio_pmem_host_ack(struct virtqueue *vq);
 int async_pmem_flush(struct nd_region *nd_region, struct bio *bio);
+int virtio_pmem_discard(struct nd_region *nd_region, __u64 offset, __u64 size);
 #endif
