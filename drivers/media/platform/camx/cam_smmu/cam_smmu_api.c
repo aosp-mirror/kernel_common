@@ -2471,9 +2471,8 @@ static int cam_smmu_probe(struct platform_device *pdev)
 		INIT_WORK(&iommu_cb_set.smmu_work, cam_smmu_page_fault_work);
 		mutex_init(&iommu_cb_set.payload_list_lock);
 		INIT_LIST_HEAD(&iommu_cb_set.payload_list);
+		pr_info("%s driver probed successfully\n", KBUILD_MODNAME);
 	}
-
-	pr_info("%s driver probed successfully\n", KBUILD_MODNAME);
 
 	return rc;
 }
