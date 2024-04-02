@@ -170,7 +170,7 @@ static int cam_smmu_map_kernel_buffer_and_add_to_list(int idx,
 	dma_addr_t *paddr_ptr, size_t *len_ptr,
 	enum cam_smmu_region_id region_id);
 
-static int cam_smmu_unmap_buf(struct cam_dma_buff_info *mapping_info, int idx);
+static void cam_smmu_unmap_buf(struct cam_dma_buff_info *mapping_info, int idx);
 
 static void cam_smmu_clean_user_buffer_list(int idx);
 
@@ -1487,22 +1487,10 @@ static int cam_smmu_map_kernel_buffer_and_add_to_list(int idx,
 }
 
 /* This function can schedule, should be called outside cb_info lock scope */
-static int cam_smmu_unmap_buf(struct cam_dma_buff_info *mapping_info, int idx)
+static void cam_smmu_unmap_buf(struct cam_dma_buff_info *mapping_info, int idx)
 {
 	struct cam_context_bank_info *cb = &iommu_cb_set.cb_info[idx];
 	struct gen_pool *pool = NULL;
-
-	if ((!mapping_info->buf) || (!mapping_info->table) ||
-		(!mapping_info->attach)) {
-		CAM_ERR(CAM_SMMU,
-			"Error: Invalid params dev = %pK, table = %pK",
-			(void *)iommu_cb_set.cb_info[idx].dev,
-			(void *)mapping_info->table);
-		CAM_ERR(CAM_SMMU, "Error:dma_buf = %pK, attach = %pK",
-			(void *)mapping_info->buf,
-			(void *)mapping_info->attach);
-		return -EINVAL;
-	}
 
 	CAM_DBG(CAM_SMMU, "Removing SHARED buffer paddr = %pK, len = %zu",
 		(void *)mapping_info->paddr, mapping_info->len);
@@ -1521,7 +1509,6 @@ static int cam_smmu_unmap_buf(struct cam_dma_buff_info *mapping_info, int idx)
 
 	/* free one buffer */
 	kfree(mapping_info);
-	return 0;
 }
 
 static enum cam_smmu_buf_state cam_smmu_check_fd_in_list(int idx,
@@ -1888,9 +1875,7 @@ int cam_smmu_unmap_user_iova(int handle,
 
 	/* Unmapping one buffer from device */
 	CAM_DBG(CAM_SMMU, "SMMU: removing buffer idx = %d", idx);
-	rc = cam_smmu_unmap_buf(mapping_info, idx);
-	if (rc < 0)
-		CAM_ERR(CAM_SMMU, "Error: unmap or remove list fail");
+	cam_smmu_unmap_buf(mapping_info, idx);
 
 unmap_end:
 	mutex_unlock(&iommu_cb_set.cb_info[idx].lock);
@@ -1937,9 +1922,7 @@ int cam_smmu_unmap_kernel_iova(int handle,
 
 	/* Unmapping one buffer from device */
 	CAM_DBG(CAM_SMMU, "SMMU: removing buffer idx = %d", idx);
-	rc = cam_smmu_unmap_buf(mapping_info, idx);
-	if (rc < 0)
-		CAM_ERR(CAM_SMMU, "Error: unmap or remove list fail");
+	cam_smmu_unmap_buf(mapping_info, idx);
 
 unmap_end:
 	mutex_unlock(&iommu_cb_set.cb_info[idx].lock);
