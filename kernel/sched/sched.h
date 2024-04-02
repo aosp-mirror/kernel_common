@@ -69,7 +69,6 @@
 #include <linux/wait_bit.h>
 #include <linux/workqueue_api.h>
 #include <linux/android_vendor.h>
-#include "android.h"
 
 #include <trace/events/power.h>
 #include <trace/events/sched.h>
