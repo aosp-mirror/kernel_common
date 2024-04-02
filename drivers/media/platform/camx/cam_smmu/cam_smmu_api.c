@@ -1948,51 +1948,6 @@ unmap_end:
 }
 EXPORT_SYMBOL(cam_smmu_unmap_kernel_iova);
 
-
-int cam_smmu_put_iova(int handle, int dma_fd, struct dma_buf *dma_buf)
-{
-	int idx;
-	int rc = 0;
-	struct cam_dma_buff_info *mapping_info;
-
-	if (handle == HANDLE_INIT) {
-		CAM_ERR(CAM_SMMU, "Error: Invalid handle");
-		return -EINVAL;
-	}
-
-	/* find index in the iommu_cb_set.cb_info */
-	idx = GET_SMMU_TABLE_IDX(handle);
-	if (idx < 0 || idx >= iommu_cb_set.cb_num) {
-		CAM_ERR(CAM_SMMU,
-			"Error: handle or index invalid. idx = %d hdl = %x",
-			idx, handle);
-		return -EINVAL;
-	}
-
-	mutex_lock(&iommu_cb_set.cb_info[idx].lock);
-	if (iommu_cb_set.cb_info[idx].handle != handle) {
-		CAM_ERR(CAM_SMMU,
-			"Error: hdl is not valid, table_hdl = %x, hdl = %x",
-			iommu_cb_set.cb_info[idx].handle, handle);
-		rc = -EINVAL;
-		goto put_addr_end;
-	}
-
-	/* based on inode and index, we can find mapping info of buffer */
-	mapping_info = cam_smmu_find_mapping_by_ion_index(idx, dma_buf);
-	if (!mapping_info) {
-		CAM_ERR(CAM_SMMU, "Error: Invalid params idx = %d, fd = %d",
-			idx, dma_fd);
-		rc = -EINVAL;
-		goto put_addr_end;
-	}
-
-put_addr_end:
-	mutex_unlock(&iommu_cb_set.cb_info[idx].lock);
-	return rc;
-}
-EXPORT_SYMBOL(cam_smmu_put_iova);
-
 int cam_smmu_destroy_handle(int handle)
 {
 	int idx;

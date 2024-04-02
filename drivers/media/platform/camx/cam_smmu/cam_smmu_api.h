@@ -209,17 +209,6 @@ int cam_smmu_get_iova(int handle, int buf_fd, struct dma_buf *dma_buf,
 		      size_t *len_ptr);
 
 /**
- * @brief Unmaps memory from context bank
- *
- * @param handle: SMMU handle identifying the context bank
- * @param buf_fd: buffer fd of memory to unmap
- * @param dma_buf: DMA Buf of memory to unmap
- *
- * @return Status of operation. Negative in case of error. Zero otherwise.
- */
-int cam_smmu_put_iova(int handle, int ion_fd, struct dma_buf *dma_buf);
-
-/**
  * @brief Allocates firmware for context bank
  *
  * @param smmu_hdl: SMMU handle identifying context bank
