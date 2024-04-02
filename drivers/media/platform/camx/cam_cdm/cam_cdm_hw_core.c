@@ -600,7 +600,6 @@ static void cam_hw_cdm_iommu_fault_handler(struct iommu_domain *domain,
 		cdm_hw = (struct cam_hw_info *)token;
 		core = (struct cam_cdm *)cdm_hw->core_info;
 		atomic_inc(&core->error);
-		cam_hw_cdm_dump_core_debug_registers(cdm_hw);
 		CAM_ERR_RATE_LIMIT(CAM_CDM, "Page fault iova addr %pK\n",
 			(void *)iova);
 		cam_cdm_notify_clients(cdm_hw, CAM_CDM_CB_STATUS_PAGEFAULT,
@@ -609,7 +608,6 @@ static void cam_hw_cdm_iommu_fault_handler(struct iommu_domain *domain,
 	} else {
 		CAM_ERR(CAM_CDM, "Invalid token");
 	}
-
 }
 
 static irqreturn_t cam_hw_cdm_irq(int irq_num, void *data)
