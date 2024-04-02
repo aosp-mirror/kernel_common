@@ -27,27 +27,80 @@
 #include "cam_cdm_soc.h"
 #include "cam_cdm_core_common.h"
 
-static void cam_cdm_get_client_refcount(struct cam_cdm_client *client)
+static void client_final_put(struct kref *kref)
 {
-	mutex_lock(&client->lock);
-	CAM_DBG(CAM_CDM, "CDM client get refcount=%d",
-		client->refcount);
-	client->refcount++;
-	mutex_unlock(&client->lock);
+	struct cam_cdm_client *client;
+
+	client = container_of(kref, struct cam_cdm_client, kref);
+	kfree(client);
 }
 
-static void cam_cdm_put_client_refcount(struct cam_cdm_client *client)
+static bool cam_cdm_get_client(struct cam_cdm_client *client)
 {
-	mutex_lock(&client->lock);
-	CAM_DBG(CAM_CDM, "CDM client put refcount=%d",
-		client->refcount);
-	if (client->refcount > 0) {
-		client->refcount--;
-	} else {
-		CAM_ERR(CAM_CDM, "Refcount put when zero");
-		WARN_ON(1);
+	return kref_get_unless_zero(&client->kref);
+}
+
+static void cam_cdm_put_client(struct cam_cdm_client *client)
+{
+	kref_put(&client->kref, client_final_put);
+}
+
+struct cam_cdm_client *cam_cdm_lookup_client(struct cam_cdm *cdm, u32 idx)
+{
+	struct cam_cdm_client *client = NULL;
+
+	read_lock(&cdm->clients_lock);
+	if (cdm->clients[idx] && cam_cdm_get_client(cdm->clients[idx]))
+		client = cdm->clients[idx];
+	read_unlock(&cdm->clients_lock);
+
+	return client;
+}
+
+int cam_cdm_insert_client(struct cam_cdm *cdm, struct cam_cdm_client *client)
+{
+	int ret = -EINVAL;
+	u32 idx;
+
+	/* We should be able to grab ownership */
+	if (!cam_cdm_get_client(client))
+		return ret;
+
+	write_lock(&cdm->clients_lock);
+	for (idx = 0; idx < CAM_PER_CDM_MAX_REGISTERED_CLIENTS; idx++) {
+		if (cdm->clients[idx])
+			continue;
+
+		/* Found available slot */
+		client->handle = CAM_CDM_CREATE_CLIENT_HANDLE(cdm->index, idx);
+		cdm->clients[idx] = client;
+		ret = 0;
+		break;
 	}
-	mutex_unlock(&client->lock);
+	write_unlock(&cdm->clients_lock);
+
+	/*
+	 * Did not find the slot, drop the refcount because we don't own
+	 * the object
+	 */
+	if (ret)
+		cam_cdm_put_client(client);
+	return ret;
+}
+
+void cam_cdm_remove_client(struct cam_cdm *cdm, u32 idx)
+{
+	struct cam_cdm_client *client;
+
+	/* Remove from cdm clients table */
+	write_lock(&cdm->clients_lock);
+	client = cdm->clients[idx];
+	cdm->clients[idx] = NULL;
+	write_unlock(&cdm->clients_lock);
+
+	/* Drop cdm ownership refcount */
+	if (client)
+		cam_cdm_put_client(client);
 }
 
 bool cam_cdm_set_cam_hw_version(
@@ -147,22 +200,6 @@ int cam_cdm_get_caps(void *hw_priv,
 	return -EINVAL;
 }
 
-static int cam_cdm_find_free_client_slot(struct cam_cdm *hw)
-{
-	int i;
-
-	for (i = 0; i < CAM_PER_CDM_MAX_REGISTERED_CLIENTS; i++) {
-		if (hw->clients[i] == NULL) {
-			CAM_DBG(CAM_CDM, "Found client slot %d", i);
-			return i;
-		}
-	}
-	CAM_ERR(CAM_CDM, "No more client slots");
-
-	return -EBUSY;
-}
-
-
 void cam_cdm_notify_clients(struct cam_hw_info *cdm_hw,
 	enum cam_cdm_cb_status status, void *data)
 {
@@ -182,13 +219,16 @@ void cam_cdm_notify_clients(struct cam_hw_info *cdm_hw,
 			(struct cam_cdm_bl_cb_request_entry *)data;
 
 		client_idx = CAM_CDM_GET_CLIENT_IDX(node->client_hdl);
-		client = core->clients[client_idx];
-		if ((!client) || (client->handle != node->client_hdl)) {
+		client = cam_cdm_lookup_client(core, client_idx);
+		if (!client)
+			return;
+
+		if (client->handle != node->client_hdl) {
 			CAM_ERR(CAM_CDM, "Invalid client %pK hdl=%x", client,
 				node->client_hdl);
+			cam_cdm_put_client(client);
 			return;
 		}
-		cam_cdm_get_client_refcount(client);
 		if (client->data.cam_cdm_callback) {
 			CAM_DBG(CAM_CDM, "Calling client=%s cb cookie=%d",
 				client->data.identifier, node->cookie);
@@ -201,33 +241,35 @@ void cam_cdm_notify_clients(struct cam_hw_info *cdm_hw,
 			CAM_ERR(CAM_CDM, "No cb registered for client hdl=%x",
 				node->client_hdl);
 		}
-		cam_cdm_put_client_refcount(client);
+		cam_cdm_put_client(client);
 		return;
 	}
 
+	/*
+	 * We don't hold clients_lock here, the lookup acquires it when
+	 * needed
+	 */
 	for (i = 0; i < CAM_PER_CDM_MAX_REGISTERED_CLIENTS; i++) {
-		if (core->clients[i] != NULL) {
-			client = core->clients[i];
-			mutex_lock(&client->lock);
-			CAM_DBG(CAM_CDM, "Found client slot %d", i);
-			if (client->data.cam_cdm_callback) {
-				if (status == CAM_CDM_CB_STATUS_PAGEFAULT) {
-					unsigned long iova =
-						(unsigned long)data;
+		client = cam_cdm_lookup_client(core, i);
+		if (!client)
+			continue;
 
-					client->data.cam_cdm_callback(
-						client->handle,
+		CAM_DBG(CAM_CDM, "Found client slot %d", i);
+		if (client->data.cam_cdm_callback) {
+			if (status == CAM_CDM_CB_STATUS_PAGEFAULT) {
+				unsigned long iova = (unsigned long)data;
+
+				client->data.cam_cdm_callback(client->handle,
 						client->data.userdata,
 						CAM_CDM_CB_STATUS_PAGEFAULT,
 						(iova & 0xFFFFFFFF));
-				}
 			} else {
 				CAM_ERR(CAM_CDM,
 					"No cb registered for client hdl=%x",
 					client->handle);
 			}
-			mutex_unlock(&client->lock);
 		}
+		cam_cdm_put_client(client);
 	}
 }
 
@@ -246,29 +288,29 @@ int cam_cdm_stream_ops_internal(void *hw_priv,
 
 	core = (struct cam_cdm *)cdm_hw->core_info;
 	client_idx = CAM_CDM_GET_CLIENT_IDX(*handle);
-	client = core->clients[client_idx];
-	if (!client) {
-		CAM_ERR(CAM_CDM, "Invalid client %pK hdl=%x", client, *handle);
+
+	client = cam_cdm_lookup_client(core, client_idx);
+	if (!client)
 		return -EINVAL;
-	}
-	cam_cdm_get_client_refcount(client);
+
 	if (*handle != client->handle) {
 		CAM_ERR(CAM_CDM, "client id given handle=%x invalid", *handle);
-		cam_cdm_put_client_refcount(client);
+		cam_cdm_put_client(client);
 		return -EINVAL;
 	}
+
 	if (operation == true) {
 		if (true == client->stream_on) {
 			CAM_ERR(CAM_CDM,
 				"Invalid CDM client is already streamed ON");
-			cam_cdm_put_client_refcount(client);
+			cam_cdm_put_client(client);
 			return rc;
 		}
 	} else {
 		if (client->stream_on == false) {
 			CAM_ERR(CAM_CDM,
 				"Invalid CDM client is already streamed Off");
-			cam_cdm_put_client_refcount(client);
+			cam_cdm_put_client(client);
 			return rc;
 		}
 	}
@@ -370,7 +412,7 @@ int cam_cdm_stream_ops_internal(void *hw_priv,
 		}
 	}
 end:
-	cam_cdm_put_client_refcount(client);
+	cam_cdm_put_client(client);
 	mutex_unlock(&cdm_hw->hw_mutex);
 	return rc;
 }
@@ -405,8 +447,10 @@ int cam_cdm_process_cmd(void *hw_priv,
 	uint32_t cmd, void *cmd_args, uint32_t arg_size)
 {
 	struct cam_hw_info *cdm_hw = hw_priv;
+	struct cam_cdm_client *client;
 	struct cam_cdm *core = NULL;
 	int rc = -EINVAL;
+	int idx;
 
 	if ((!hw_priv) || (!cmd_args) ||
 		(cmd >= CAM_CDM_HW_INTF_CMD_INVALID))
@@ -416,14 +460,13 @@ int cam_cdm_process_cmd(void *hw_priv,
 	switch (cmd) {
 	case CAM_CDM_HW_INTF_CMD_SUBMIT_BL: {
 		struct cam_cdm_hw_intf_cmd_submit_bl *req;
-		int idx;
-		struct cam_cdm_client *client;
 
 		if (sizeof(struct cam_cdm_hw_intf_cmd_submit_bl) != arg_size) {
 			CAM_ERR(CAM_CDM, "Invalid CDM cmd %d arg size=%x", cmd,
 				arg_size);
 			break;
 		}
+
 		req = (struct cam_cdm_hw_intf_cmd_submit_bl *)cmd_args;
 		if ((req->data->type < 0) ||
 			(req->data->type > CAM_CDM_BL_CMD_TYPE_HW_IOVA)) {
@@ -431,39 +474,42 @@ int cam_cdm_process_cmd(void *hw_priv,
 				req->data->type);
 			break;
 		}
+
 		idx = CAM_CDM_GET_CLIENT_IDX(req->handle);
-		client = core->clients[idx];
-		if ((!client) || (req->handle != client->handle)) {
-			CAM_ERR(CAM_CDM, "Invalid client %pK hdl=%x", client,
-				req->handle);
+		client = cam_cdm_lookup_client(core, idx);
+		if (!client)
+			break;
+
+		if (req->handle != client->handle) {
+			cam_cdm_put_client(client);
 			break;
 		}
-		cam_cdm_get_client_refcount(client);
+
 		if ((req->data->flag == true) &&
 			(!client->data.cam_cdm_callback)) {
 			CAM_ERR(CAM_CDM,
 				"CDM request cb without registering cb");
-			cam_cdm_put_client_refcount(client);
+			cam_cdm_put_client(client);
 			break;
 		}
+
 		if (client->stream_on != true) {
 			CAM_ERR(CAM_CDM,
 				"Invalid CDM needs to be streamed ON first");
-			cam_cdm_put_client_refcount(client);
+			cam_cdm_put_client(client);
 			break;
 		}
+
 		if (core->id == CAM_CDM_VIRTUAL)
 			rc = cam_virtual_cdm_submit_bl(cdm_hw, req, client);
 		else
 			rc = cam_hw_cdm_submit_bl(cdm_hw, req, client);
 
-		cam_cdm_put_client_refcount(client);
+		cam_cdm_put_client(client);
 		break;
 	}
 	case CAM_CDM_HW_INTF_CMD_ACQUIRE: {
 		struct cam_cdm_acquire_data *data;
-		int idx;
-		struct cam_cdm_client *client;
 
 		if (sizeof(struct cam_cdm_acquire_data) != arg_size) {
 			CAM_ERR(CAM_CDM, "Invalid CDM cmd %d arg size=%x", cmd,
@@ -471,29 +517,17 @@ int cam_cdm_process_cmd(void *hw_priv,
 			break;
 		}
 
-		mutex_lock(&cdm_hw->hw_mutex);
-		data = (struct cam_cdm_acquire_data *)cmd_args;
-		CAM_DBG(CAM_CDM, "Trying to acquire client=%s in hw idx=%d",
-			data->identifier, core->index);
-		idx = cam_cdm_find_free_client_slot(core);
-		if ((idx < 0) || (core->clients[idx])) {
-			mutex_unlock(&cdm_hw->hw_mutex);
-			CAM_ERR(CAM_CDM,
-				"Fail to client slots, client=%s in hw idx=%d",
-			data->identifier, core->index);
-			break;
-		}
-		core->clients[idx] = kzalloc(sizeof(struct cam_cdm_client),
-			GFP_KERNEL);
-		if (!core->clients[idx]) {
-			mutex_unlock(&cdm_hw->hw_mutex);
+		client = kzalloc(sizeof(*client), GFP_KERNEL);
+		if (!client) {
 			rc = -ENOMEM;
 			break;
 		}
 
-		mutex_unlock(&cdm_hw->hw_mutex);
-		client = core->clients[idx];
-		mutex_init(&client->lock);
+		mutex_lock(&cdm_hw->hw_mutex);
+		data = (struct cam_cdm_acquire_data *)cmd_args;
+		CAM_DBG(CAM_CDM, "Trying to acquire client=%s in hw idx=%d",
+			data->identifier, core->index);
+
 		data->ops = core->ops;
 		if (core->id == CAM_CDM_VIRTUAL) {
 			data->cdm_version.major = 1;
@@ -503,12 +537,8 @@ int cam_cdm_process_cmd(void *hw_priv,
 			data->ops = cam_cdm_get_ops(0,
 					&data->cdm_version, true);
 			if (!data->ops) {
-				mutex_destroy(&client->lock);
-				mutex_lock(&cdm_hw->hw_mutex);
-				kfree(core->clients[idx]);
-				core->clients[idx] = NULL;
-				mutex_unlock(
-					&cdm_hw->hw_mutex);
+				mutex_unlock(&cdm_hw->hw_mutex);
+				kfree(client);
 				rc = -EPERM;
 				CAM_ERR(CAM_CDM, "Invalid ops for virtual cdm");
 				break;
@@ -517,25 +547,32 @@ int cam_cdm_process_cmd(void *hw_priv,
 			data->cdm_version = core->version;
 		}
 
-		cam_cdm_get_client_refcount(client);
-		mutex_lock(&client->lock);
+		mutex_init(&client->lock);
+		/* Sets kref to 1, this is "our" local ownership */
+		kref_init(&client->kref);
+		/* Complete cient initialization */
 		memcpy(&client->data, data,
-			sizeof(struct cam_cdm_acquire_data));
-		client->handle = CAM_CDM_CREATE_CLIENT_HANDLE(
-					core->index,
-					idx);
+		       sizeof(struct cam_cdm_acquire_data));
 		client->stream_on = false;
-		data->handle = client->handle;
 		CAM_DBG(CAM_CDM, "Acquired client=%s in hwidx=%d",
 			data->identifier, core->index);
-		mutex_unlock(&client->lock);
-		rc = 0;
+
+		/* Now insert it and grab cdm ownership */
+		rc = cam_cdm_insert_client(core, client);
+		/* If client inserted, copy out its handle */
+		if (!rc)
+			data->handle = client->handle;
+		mutex_unlock(&cdm_hw->hw_mutex);
+
+		/*
+		 * Drop "our" ownership. cdm table holds the refcount, if
+		 * not (insert has failed) then this is "final" put.
+		 */
+		cam_cdm_put_client(client);
 		break;
 	}
 	case CAM_CDM_HW_INTF_CMD_RELEASE: {
 		uint32_t *handle = cmd_args;
-		int idx;
-		struct cam_cdm_client *client;
 
 		if (sizeof(uint32_t) != arg_size) {
 			CAM_ERR(CAM_CDM,
@@ -545,27 +582,25 @@ int cam_cdm_process_cmd(void *hw_priv,
 		}
 		idx = CAM_CDM_GET_CLIENT_IDX(*handle);
 		mutex_lock(&cdm_hw->hw_mutex);
-		client = core->clients[idx];
-		if ((!client) || (*handle != client->handle)) {
+
+		client = cam_cdm_lookup_client(core, idx);
+		if (!client) {
+			mutex_unlock(&cdm_hw->hw_mutex);
+			break;
+		}
+
+		if (*handle != client->handle) {
 			CAM_ERR(CAM_CDM, "Invalid client %pK hdl=%x",
 				client, *handle);
 			mutex_unlock(&cdm_hw->hw_mutex);
+			cam_cdm_put_client(client);
 			break;
 		}
-		cam_cdm_put_client_refcount(client);
-		mutex_lock(&client->lock);
-		if (client->refcount != 0) {
-			CAM_ERR(CAM_CDM, "CDM Client refcount not zero %d",
-				client->refcount);
-			rc = -EPERM;
-			mutex_unlock(&client->lock);
-			mutex_unlock(&cdm_hw->hw_mutex);
-			break;
-		}
-		core->clients[idx] = NULL;
-		mutex_unlock(&client->lock);
-		mutex_destroy(&client->lock);
-		kfree(client);
+
+		cam_cdm_remove_client(core, idx);
+		/* Drop lookup refcount, this can be the final put */
+		cam_cdm_put_client(client);
+
 		mutex_unlock(&cdm_hw->hw_mutex);
 		rc = 0;
 		break;

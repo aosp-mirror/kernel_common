@@ -22,6 +22,7 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/bug.h>
+#include <linux/kref.h>
 
 #include "cam_cdm_intf_api.h"
 #include "cam_soc_util.h"
@@ -161,9 +162,9 @@ struct cam_cdm_client {
 	struct cam_cdm_acquire_data data;
 	void __iomem  *changebase_addr;
 	uint32_t stream_on;
-	uint32_t refcount;
 	struct mutex lock;
 	uint32_t handle;
+	struct kref kref;
 };
 
 /* struct cam_cdm_work_payload - struct for cdm work payload data.*/
@@ -220,6 +221,7 @@ struct cam_cdm {
 	struct cam_iommu_handle iommu_hdl;
 	struct cam_cdm_reg_offset_table *offset_tbl;
 	const struct cam_cdm_utils_ops *ops;
+	rwlock_t clients_lock;
 	struct cam_cdm_client *clients[CAM_PER_CDM_MAX_REGISTERED_CLIENTS];
 	uint8_t bl_tag;
 	atomic_t error;
@@ -227,6 +229,8 @@ struct cam_cdm {
 	struct cam_cdm_hw_mem gen_irq;
 	uint32_t cpas_handle;
 };
+
+struct cam_cdm_client *cam_cdm_lookup_client(struct cam_cdm *cdm, u32 idx);
 
 /* struct cam_cdm_private_dt_data - CDM hw custom dt data */
 struct cam_cdm_private_dt_data {

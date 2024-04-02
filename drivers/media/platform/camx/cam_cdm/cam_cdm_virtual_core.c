@@ -273,6 +273,7 @@ int cam_virtual_cdm_probe(struct platform_device *pdev)
 	cdm_core->bl_tag = 0;
 	INIT_LIST_HEAD(&cdm_core->bl_request_list);
 	init_completion(&cdm_core->reset_complete);
+	rwlock_init(&cdm_core->clients_lock);
 	cdm_hw_intf->hw_priv = cdm_hw;
 	cdm_hw_intf->hw_ops.get_hw_caps = cam_cdm_get_caps;
 	cdm_hw_intf->hw_ops.init = NULL;
