@@ -333,7 +333,7 @@ enum drm_debug_category {
 
 static inline bool drm_debug_syslog_enabled(enum drm_debug_category category)
 {
-	return unlikely(__drm_debug_syslog & category);
+	return unlikely(__drm_debug_syslog & BIT(category));
 }
 
 static inline bool drm_debug_trace_enabled(enum drm_debug_category category)
