@@ -2523,6 +2523,8 @@
   typec_set_pwr_role
   typec_unregister_partner
   typec_get_orientation
+  typec_partner_set_identity
+  typec_set_vconn_role
   uart_add_one_port
   uart_get_baud_rate
   uart_insert_char
