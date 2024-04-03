@@ -199,6 +199,8 @@
   cpu_all_bits
   cpu_bit_bitmap
   cpufreq_boost_enabled
+  cpufreq_cpu_get
+  cpufreq_cpu_put
   cpufreq_generic_attr
   cpufreq_generic_frequency_table_verify
   cpufreq_generic_suspend
@@ -2085,6 +2087,7 @@
   __traceiter_android_rvh_schedule
   __traceiter_android_rvh_select_task_rq_fair
   __traceiter_android_rvh_select_task_rq_rt
+  __traceiter_android_rvh_set_sugov_update
   __traceiter_android_rvh_tick_entry
   __traceiter_android_vh_alloc_pages_entry
   __traceiter_android_vh_alloc_pages_slowpath
@@ -2137,6 +2140,7 @@
   __tracepoint_android_rvh_schedule
   __tracepoint_android_rvh_select_task_rq_fair
   __tracepoint_android_rvh_select_task_rq_rt
+  __tracepoint_android_rvh_set_sugov_update
   __tracepoint_android_rvh_tick_entry
   __tracepoint_android_vh_alloc_pages_entry
   __tracepoint_android_vh_alloc_pages_slowpath
