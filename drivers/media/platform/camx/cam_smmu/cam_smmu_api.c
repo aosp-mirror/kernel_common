@@ -619,7 +619,7 @@ static int cam_smmu_create_add_handle_in_table(char *name,
 	return -EINVAL;
 }
 
-static struct cam_dma_buff_info *__cam_smmu_find_mapping_by_ion_index(int idx,
+static struct cam_dma_buff_info *__cam_smmu_find_mapping_by_ino_index(int idx,
 	struct dma_buf *dmabuf)
 {
 	struct cam_dma_buff_info *mapping;
@@ -1860,7 +1860,7 @@ int cam_smmu_unmap_user_iova(int handle,
 
 	cb_info_write_lock(idx);
 	/* Based on inode & index, we can find mapping info of buffer */
-	mapping_info = __cam_smmu_find_mapping_by_ion_index(idx, dma_buf);
+	mapping_info = __cam_smmu_find_mapping_by_ino_index(idx, dma_buf);
 	if (!mapping_info) {
 		cb_info_write_unlock(idx);
 		CAM_ERR(CAM_SMMU,
