@@ -28,6 +28,9 @@
 #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
 #define HWCAP_LPAE	(1 << 20)
 #define HWCAP_EVTSTRM	(1 << 21)
+#define HWCAP_FPHP	(1 << 22)
+#define HWCAP_ASIMDHP	(1 << 23)
+#define HWCAP_ASIMDDP	(1 << 24)
 
 /*
  * HWCAP2 flags - for elf_hwcap2 (in kernel) and AT_HWCAP2

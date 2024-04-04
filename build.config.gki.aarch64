@@ -29,6 +29,7 @@ android/abi_gki_aarch64_microsoft
 android/abi_gki_aarch64_moto
 android/abi_gki_aarch64_mtktv
 android/abi_gki_aarch64_mtk
+android/abi_gki_aarch64_nothing
 android/abi_gki_aarch64_qcom
 android/abi_gki_aarch64_rtktv
 android/abi_gki_aarch64_sony

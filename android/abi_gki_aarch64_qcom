@@ -763,6 +763,7 @@
   fwnode_property_present
   fwnode_property_read_string
   fwnode_property_read_u32_array
+  fw_devlink_purge_absent_suppliers
   generic_device_group
   generic_file_llseek
   generic_handle_domain_irq
@@ -2353,6 +2354,7 @@
   __traceiter_android_vh_show_suspend_epoch_val
   __traceiter_android_vh_skip_swap_map_write
   __traceiter_android_vh_timer_calc_index
+  __traceiter_android_vh_try_fixup_sea
   __traceiter_android_vh_ufs_check_int_errors
   __traceiter_android_vh_ufs_clock_scaling
   __traceiter_android_vh_ufs_compl_command
@@ -2476,6 +2478,7 @@
   __tracepoint_android_vh_show_suspend_epoch_val
   __tracepoint_android_vh_skip_swap_map_write
   __tracepoint_android_vh_timer_calc_index
+  __tracepoint_android_vh_try_fixup_sea
   __tracepoint_android_vh_ufs_check_int_errors
   __tracepoint_android_vh_ufs_clock_scaling
   __tracepoint_android_vh_ufs_compl_command
@@ -2520,6 +2523,8 @@
   typec_set_pwr_role
   typec_unregister_partner
   typec_get_orientation
+  typec_partner_set_identity
+  typec_set_vconn_role
   uart_add_one_port
   uart_get_baud_rate
   uart_insert_char
@@ -2712,6 +2717,8 @@
   vm_zone_stat
   vscnprintf
   vsnprintf
+  vsock_addr_init
+  vsock_remove_bound
   vunmap
   vzalloc
   wait_for_completion
