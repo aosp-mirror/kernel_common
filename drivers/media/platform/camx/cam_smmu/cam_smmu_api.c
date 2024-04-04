@@ -161,9 +161,6 @@ static int cam_smmu_create_iommu_handle(int idx);
 static int cam_smmu_create_add_handle_in_table(char *name,
 	int *hdl);
 
-static struct cam_dma_buff_info *cam_smmu_find_mapping_by_ion_index(int idx,
-	struct dma_buf *dma_buf);
-
 static struct cam_dma_buff_info *cam_smmu_find_mapping_by_dma_buf(int idx,
 	struct dma_buf *buf);
 
@@ -210,6 +207,11 @@ static void cb_info_write_lock(int idx)
 static void cb_info_write_unlock(int idx)
 {
 	write_unlock(&iommu_cb_set.cb_info[idx].cb_info_lock);
+}
+
+static void cb_info_assert_held_write(int idx)
+{
+	lockdep_assert_held_write(&iommu_cb_set.cb_info[idx].cb_info_lock);
 }
 
 static int cam_smmu_create_debugfs_entry(void)
@@ -620,26 +622,25 @@ static int cam_smmu_create_add_handle_in_table(char *name,
 	return -EINVAL;
 }
 
-static struct cam_dma_buff_info *cam_smmu_find_mapping_by_ion_index(int idx,
+static struct cam_dma_buff_info *__cam_smmu_find_mapping_by_ion_index(int idx,
 	struct dma_buf *dmabuf)
 {
 	struct cam_dma_buff_info *mapping;
 	unsigned long i_ino;
 
+	cb_info_assert_held_write(idx);
+
 	i_ino = file_inode(dmabuf->file)->i_ino;
-	cb_info_read_lock(idx);
 	list_for_each_entry(mapping,
 			&iommu_cb_set.cb_info[idx].smmu_buf_list,
 			list) {
 		if (mapping->i_ino == i_ino)  {
 			CAM_DBG(CAM_SMMU, "find i_ino %lu",
 				i_ino);
-			cb_info_read_unlock(idx);
 			return mapping;
 		}
 	}
 
-	cb_info_read_unlock(idx);
 	CAM_ERR(CAM_SMMU, "Error: Cannot find entry by index %d, i_ino %lu",
 		idx, i_ino);
 
@@ -1874,9 +1875,11 @@ int cam_smmu_unmap_user_iova(int handle,
 		goto unmap_end;
 	}
 
+	cb_info_write_lock(idx);
 	/* Based on inode & index, we can find mapping info of buffer */
-	mapping_info = cam_smmu_find_mapping_by_ion_index(idx, dma_buf);
+	mapping_info = __cam_smmu_find_mapping_by_ion_index(idx, dma_buf);
 	if (!mapping_info) {
+		cb_info_write_unlock(idx);
 		CAM_ERR(CAM_SMMU,
 			"Error: Invalid params idx = %d, fd = %d",
 			idx, dma_fd);
@@ -1884,12 +1887,11 @@ int cam_smmu_unmap_user_iova(int handle,
 		goto unmap_end;
 	}
 
-	/* Unmapping one buffer from device */
-	CAM_DBG(CAM_SMMU, "SMMU: removing buffer idx = %d", idx);
-	cb_info_write_lock(idx);
 	list_del_init(&mapping_info->list);
 	cb_info_write_unlock(idx);
 
+	/* Unmapping one buffer from device */
+	CAM_DBG(CAM_SMMU, "SMMU: removing buffer idx = %d", idx);
 	rc = cam_smmu_unmap_buf(mapping_info, idx);
 	if (rc < 0)
 		CAM_ERR(CAM_SMMU, "Error: unmap or remove list fail");
