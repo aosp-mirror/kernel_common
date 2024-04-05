@@ -63,7 +63,6 @@
 #include <linux/net.h>
 #include <net/sock.h>
 #include <net/af_unix.h>
-#include <net/scm.h>
 #include <linux/anon_inodes.h>
 #include <linux/sched/mm.h>
 #include <linux/uaccess.h>
@@ -264,10 +263,6 @@ struct io_ring_ctx {
 
 	struct async_list	pending_async[2];
 
-#if defined(CONFIG_UNIX)
-	struct socket		*ring_sock;
-#endif
-
 	struct list_head	task_list;
 	spinlock_t		task_lock;
 };
@@ -380,19 +375,6 @@ static void __io_free_req(struct io_kiocb *req);
 static struct kmem_cache *req_cachep;
 
 static const struct file_operations io_uring_fops;
-
-struct sock *io_uring_get_socket(struct file *file)
-{
-#if defined(CONFIG_UNIX)
-	if (file->f_op == &io_uring_fops) {
-		struct io_ring_ctx *ctx = file->private_data;
-
-		return ctx->ring_sock->sk;
-	}
-#endif
-	return NULL;
-}
-EXPORT_SYMBOL(io_uring_get_socket);
 
 static void io_ring_ctx_ref_free(struct percpu_ref *ref)
 {
@@ -3077,20 +3059,10 @@ static int io_cqring_wait(struct io_ring_ctx *ctx, int min_events,
 
 static void __io_sqe_files_unregister(struct io_ring_ctx *ctx)
 {
-#if defined(CONFIG_UNIX)
-	if (ctx->ring_sock) {
-		struct sock *sock = ctx->ring_sock->sk;
-		struct sk_buff *skb;
-
-		while ((skb = skb_dequeue(&sock->sk_receive_queue)) != NULL)
-			kfree_skb(skb);
-	}
-#else
 	int i;
 
 	for (i = 0; i < ctx->nr_user_files; i++)
 		fput(ctx->user_files[i]);
-#endif
 }
 
 static int io_sqe_files_unregister(struct io_ring_ctx *ctx)
@@ -3585,13 +3557,6 @@ static void io_ring_ctx_free(struct io_ring_ctx *ctx)
 	io_sqe_files_unregister(ctx);
 	io_eventfd_unregister(ctx);
 
-#if defined(CONFIG_UNIX)
-	if (ctx->ring_sock) {
-		ctx->ring_sock->file = NULL; /* so that iput() is called */
-		sock_release(ctx->ring_sock);
-	}
-#endif
-
 	io_mem_free(ctx->rings);
 	io_mem_free(ctx->sq_sqes);
 
@@ -3791,6 +3756,11 @@ static const struct file_operations io_uring_fops = {
 	.fasync		= io_uring_fasync,
 };
 
+bool io_is_uring_fops(struct file *file)
+{
+	return file->f_op == &io_uring_fops;
+}
+
 static int io_allocate_scq_urings(struct io_ring_ctx *ctx,
 				  struct io_uring_params *p)
 {
@@ -3838,44 +3808,25 @@ static int io_allocate_scq_urings(struct io_ring_ctx *ctx,
 /*
  * Allocate an anonymous fd, this is what constitutes the application
  * visible backing of an io_uring instance. The application mmaps this
- * fd to gain access to the SQ/CQ ring details. If UNIX sockets are enabled,
- * we have to tie this fd to a socket for file garbage collection purposes.
+ * fd to gain access to the SQ/CQ ring details.
  */
 static int io_uring_get_fd(struct io_ring_ctx *ctx)
 {
 	struct file *file;
 	int ret;
 
-#if defined(CONFIG_UNIX)
-	ret = sock_create_kern(&init_net, PF_UNIX, SOCK_RAW, IPPROTO_IP,
-				&ctx->ring_sock);
-	if (ret)
-		return ret;
-#endif
-
 	ret = get_unused_fd_flags(O_RDWR | O_CLOEXEC);
 	if (ret < 0)
-		goto err;
+		return ret;
 
 	file = anon_inode_getfile("[io_uring]", &io_uring_fops, ctx,
 					O_RDWR | O_CLOEXEC);
 	if (IS_ERR(file)) {
 		put_unused_fd(ret);
-		ret = PTR_ERR(file);
-		goto err;
+		return PTR_ERR(file);
 	}
 
-#if defined(CONFIG_UNIX)
-	ctx->ring_sock->file = file;
-	ctx->ring_sock->sk->sk_user_data = ctx;
-#endif
 	fd_install(ret, file);
-	return ret;
-err:
-#if defined(CONFIG_UNIX)
-	sock_release(ctx->ring_sock);
-	ctx->ring_sock = NULL;
-#endif
 	return ret;
 }
 
