@@ -48,8 +48,8 @@
 #include "t7xx_netdev.h"
 #include "t7xx_pci.h"
 
-#define DPMAIF_BAT_COUNT		8192
-#define DPMAIF_FRG_COUNT		4814
+#define DPMAIF_BAT_COUNT		(8192 / 2)
+#define DPMAIF_FRG_COUNT		(4814 / 2)
 #define DPMAIF_PIT_COUNT		(DPMAIF_BAT_COUNT * 2)
 
 #define DPMAIF_BAT_CNT_THRESHOLD	30
