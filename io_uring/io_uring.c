@@ -1770,10 +1770,9 @@ static void io_iopoll_req_issued(struct io_kiocb *req, unsigned int issue_flags)
 
 unsigned int io_file_get_flags(struct file *file)
 {
-	umode_t mode = file_inode(file)->i_mode;
 	unsigned int res = 0;
 
-	if (S_ISREG(mode))
+	if (S_ISREG(file_inode(file)->i_mode))
 		res |= REQ_F_ISREG;
 	if ((file->f_flags & O_NONBLOCK) || (file->f_mode & FMODE_NOWAIT))
 		res |= REQ_F_SUPPORT_NOWAIT;
