@@ -10,6 +10,8 @@
  * Author: Kalesh Singh <kaleshsingh@goole.com>
  */
 
+#include <linux/pgsize_migration.h>
+
 #include <linux/init.h>
 #include <linux/jump_label.h>
 #include <linux/kobject.h>
@@ -102,4 +104,23 @@ static int __init init_pgsize_migration(void)
 	return 0;
 };
 late_initcall(init_pgsize_migration);
+
+#if PAGE_SIZE == SZ_4K
+void vma_set_pad_pages(struct vm_area_struct *vma,
+		       unsigned long nr_pages)
+{
+	if (!is_pgsize_migration_enabled())
+		return;
+
+	vma->vm_flags |= (nr_pages << VM_PAD_SHIFT);
+}
+
+unsigned long vma_pad_pages(struct vm_area_struct *vma)
+{
+	if (!is_pgsize_migration_enabled())
+		return 0;
+
+	return vma->vm_flags >> VM_PAD_SHIFT;
+}
+#endif /* PAGE_SIZE == SZ_4K */
 #endif /* CONFIG_64BIT */
