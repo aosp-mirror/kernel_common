@@ -633,7 +633,12 @@ int pm_suspend(suspend_state_t state)
 
 	pr_info("suspend entry (%s)\n", mem_sleep_labels[state]);
 	error = enter_state(state);
-	dpm_save_errno(error);
+	if (error) {
+		suspend_stats.fail++;
+		dpm_save_failed_errno(error);
+	} else {
+		suspend_stats.success++;
+	}
 	pr_info("suspend exit\n");
 	return error;
 }
