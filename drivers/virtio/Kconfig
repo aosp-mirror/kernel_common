@@ -150,7 +150,6 @@ config VIRTIO_WL
 config VIRTIO_PVCLOCK
 	tristate "Virtio pvclock driver"
 	depends on VIRTIO
-	depends on X86
 	select PARAVIRT_CLOCK
 	help
 	 This driver supports virtio pvclock devices.

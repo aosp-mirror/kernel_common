@@ -12,7 +12,22 @@
 #include <linux/virtio.h>
 #include <linux/virtio_pvclock.h>
 #include <linux/workqueue.h>
+#ifdef CONFIG_X86
 #include <asm/pvclock.h>
+#endif
+
+#include <linux/sched_clock.h>
+
+/*
+ * On x86, virtio-pvclock creates a new clocksource, similar to kvmclock,
+ * but with the data filled out by the VMM, so that it can take host suspend
+ * into account.
+ *
+ * On ARM, we don't create a new clock source, but the VMM is responsible for
+ * making sure the architecture counter that the regular clocksource uses
+ * takes host suspend into account (by making sure it doesn't advance during
+ * host suspend).
+ */
 
 enum virtio_pvclock_vq {
 	VIRTIO_PVCLOCK_VQ_SET_PVCLOCK_PAGE,
@@ -38,6 +53,11 @@ struct virtio_pvclock {
 	dma_addr_t pvclock_page_dma_addr;
 };
 
+#ifdef CONFIG_ARM64
+struct pvclock_vsyscall_time_info {
+	int unused;
+};
+#endif
 /* CPU accessible pointer to pvclock page. */
 static struct pvclock_vsyscall_time_info *virtio_pvclock_page;
 
@@ -80,6 +100,7 @@ void update_suspend_time(struct work_struct *work)
 		 suspend_time_delta);
 }
 
+#ifdef CONFIG_X86
 static u64 virtio_pvclock_clocksource_read(struct clocksource *cs)
 {
 	u64 ret;
@@ -105,6 +126,7 @@ static struct clocksource virtio_pvclock_clocksource = {
 	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
 	.enable = virtio_pvclock_cs_enable,
 };
+#endif
 
 static void set_pvclock_page_callback(struct virtqueue *vq)
 {
@@ -117,13 +139,16 @@ static void set_pvclock_page_callback(struct virtqueue *vq)
 		return;
 	}
 
+#ifdef CONFIG_X86
 	/*
 	 * Create the actual clocksource via a work queue because we're in an
 	 * interrupt handler right now.
 	 */
 	schedule_work(&vp->create_clocksource_work);
+#endif
 }
 
+#ifdef CONFIG_X86
 static void create_clocksource(struct work_struct *work)
 {
 	struct virtio_pvclock *vp;
@@ -144,6 +169,7 @@ static void create_clocksource(struct work_struct *work)
 
 	dev_info(&vp->vdev->dev, "registered clocksource\n");
 }
+#endif
 
 static void virtpvclock_changed(struct virtio_device *vdev)
 {
@@ -158,8 +184,10 @@ static int set_pvclock_page(struct virtio_pvclock *vp)
 	int err;
 
 	vp->set_page_request.pvclock_page_pa = vp->pvclock_page_dma_addr;
+#ifdef CONFIG_X86
 	vp->set_page_request.system_time = ktime_get();
 	vp->set_page_request.tsc_timestamp = rdtsc_ordered();
+#endif
 
 	sg_init_one(&sg, &vp->set_page_request, sizeof(vp->set_page_request));
 	err = virtqueue_add_outbuf(vp->set_pvclock_page_vq, &sg, 1, vp,
@@ -222,7 +250,9 @@ static int virtpvclock_probe(struct virtio_device *vdev)
 	}
 
 	INIT_WORK(&vp->update_suspend_time_work, update_suspend_time);
+#ifdef CONFIG_X86
 	INIT_WORK(&vp->create_clocksource_work, create_clocksource);
+#endif
 	mutex_init(&vp->inject_suspend_lock);
 
 	vp->vdev = vdev;
@@ -297,6 +327,7 @@ static int virtpvclock_restore(struct virtio_device *vdev)
 
 static int virtpvclock_validate(struct virtio_device *vdev)
 {
+#ifdef CONFIG_X86
 	uint32_t rating;
 
 	if (!virtio_has_feature(vdev, VIRTIO_PVCLOCK_F_CLOCKSOURCE_RATING))
@@ -315,6 +346,7 @@ static int virtpvclock_validate(struct virtio_device *vdev)
 		dev_info(&vdev->dev, "clocksource rating set to %u\n", rating);
 		virtio_pvclock_clocksource.rating = (int)rating;
 	}
+#endif
 
 	return 0;
 }
