@@ -2519,5 +2519,5 @@ pkg_zip(
         ":test_mappings",
     ],
     out = "test_mappings.zip",
-    visibility = ["//common-modules/virtual-device:__pkg__"],
+    visibility = ["//visibility:public"],
 )
