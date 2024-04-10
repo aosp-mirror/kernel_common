@@ -697,7 +697,7 @@ static int iwl_vendor_set_nic_txpower_limit(struct wiphy *wiphy,
 
 	if (cmd_ver == 8)
 		len = sizeof(mvm->txp_cmd.v8);
-	if (cmd_ver == 6)
+	else if (cmd_ver == 6)
 		len = sizeof(mvm->txp_cmd.v6);
 	else if (fw_has_api(&mvm->fw->ucode_capa,
 			    IWL_UCODE_TLV_API_REDUCE_TX_POWER))
