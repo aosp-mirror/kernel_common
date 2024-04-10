@@ -2287,6 +2287,7 @@ void wakeup_preempt(struct rq *rq, struct task_struct *p, int flags)
 	if (task_on_rq_queued(rq->curr) && test_tsk_need_resched(rq->curr))
 		rq_clock_skip_update(rq);
 }
+EXPORT_SYMBOL_GPL(wakeup_preempt);
 
 static __always_inline
 int __task_state_match(struct task_struct *p, unsigned int state)
