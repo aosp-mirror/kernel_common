@@ -2172,7 +2172,8 @@ enum ieee80211_csa_source {
 static void
 ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 				 u64 timestamp, u32 device_timestamp,
-				 struct ieee802_11_elems *elems,
+				 struct ieee802_11_elems *full_elems,
+				 struct ieee802_11_elems *csa_elems,
 				 enum ieee80211_csa_source source)
 {
 	struct ieee80211_sub_if_data *sdata = link->sdata;
@@ -2191,7 +2192,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
-	if (elems) {
+	if (csa_elems) {
 		struct cfg80211_bss *cbss = link->conf->bss;
 		enum nl80211_band current_band;
 		struct ieee80211_bss *bss;
@@ -2202,7 +2203,8 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 		current_band = cbss->channel->band;
 		bss = (void *)cbss->priv;
 
-		res = ieee80211_parse_ch_switch_ie(sdata, elems, current_band,
+		res = ieee80211_parse_ch_switch_ie(sdata, csa_elems,
+						   current_band,
 						   bss->vht_cap_info,
 						   &link->u.mgd.conn,
 						   link->u.mgd.bssid, &csa_ie);
@@ -2215,7 +2217,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 	} else {
 		/*
 		 * If there was no per-STA profile for this link, we
-		 * get called with elems == NULL. This of course means
+		 * get called with csa_elems == NULL. This of course means
 		 * there are no CSA elements, so set res=1 indicating
 		 * no more CSA.
 		 */
@@ -2270,7 +2272,8 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 				return;
 
 			/* check in the RNR if the CSA aborted */
-			ieee80211_sta_other_link_csa_disappeared(link, elems);
+			ieee80211_sta_other_link_csa_disappeared(link,
+								 full_elems);
 			return;
 		}
 	}
@@ -6507,7 +6510,7 @@ handle:
 		 * TSF offset etc. The device_timestamp is still
 		 * correct, of course.
 		 */
-		ieee80211_sta_process_chanswitch(link, 0, 0, prof_elems,
+		ieee80211_sta_process_chanswitch(link, 0, 0, elems, prof_elems,
 						 IEEE80211_CSA_SOURCE_OTHER_LINK);
 		kfree(prof_elems);
 	}
@@ -6740,7 +6743,8 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_link_data *link,
 
 	ieee80211_sta_process_chanswitch(link, rx_status->mactime,
 					 rx_status->device_timestamp,
-					 elems, IEEE80211_CSA_SOURCE_BEACON);
+					 elems, elems,
+					 IEEE80211_CSA_SOURCE_BEACON);
 
 	/* note that after this elems->ml_basic can no longer be used fully */
 	ieee80211_mgd_check_cross_link_csa(sdata, rx_status->link_id, elems);
@@ -7285,7 +7289,7 @@ static void _ieee80211_sta_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 				ieee80211_sta_process_chanswitch(link,
 								 rx_status->mactime,
 								 rx_status->device_timestamp,
-								 elems,
+								 elems, elems,
 								 IEEE80211_CSA_SOURCE_ACTION);
 			kfree(elems);
 		} else if (mgmt->u.action.category == WLAN_CATEGORY_PUBLIC) {
@@ -7314,7 +7318,7 @@ static void _ieee80211_sta_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 				ieee80211_sta_process_chanswitch(link,
 								 rx_status->mactime,
 								 rx_status->device_timestamp,
-								 elems,
+								 elems, elems,
 								 IEEE80211_CSA_SOURCE_ACTION);
 			}
 
