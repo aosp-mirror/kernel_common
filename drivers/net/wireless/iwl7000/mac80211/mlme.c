@@ -8676,7 +8676,7 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 			if (!bss->wmm_used) {
 				err = -EINVAL;
-#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,1,0)
 				req->links[i].error = err;
 #endif
 				goto err_free;
@@ -8684,7 +8684,7 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 			if (link_cbss->channel->band == NL80211_BAND_S1GHZ) {
 				err = -EINVAL;
-#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,1,0)
 				req->links[i].error = err;
 #endif
 				goto err_free;
@@ -8715,7 +8715,7 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 			if (assoc_data->link[i].conn.mode < IEEE80211_CONN_MODE_EHT) {
 				err = -EINVAL;
-#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,1,0)
 				req->links[i].error = err;
 #endif
 				goto err_free;
@@ -8725,7 +8725,7 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 							       assoc_data, i);
 			if (err) {
 				err = -EINVAL;
-#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,1,0)
 				req->links[i].error = err;
 #endif
 				goto err_free;
@@ -8892,7 +8892,7 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 					     assoc_data->link[i].bss, true,
 					     &assoc_data->link[i].conn);
 		if (err) {
-#if CFG80211_VERSION >= KERNEL_VERSION(6,7,0)
+#if CFG80211_VERSION >= KERNEL_VERSION(6,1,0)
 			req->links[i].error = err;
 #endif
 			goto err_clear;
