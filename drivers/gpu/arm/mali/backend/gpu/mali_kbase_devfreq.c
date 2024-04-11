@@ -212,7 +212,7 @@ kbase_devfreq_target(struct device *dev, unsigned long *target_freq, u32 flags)
 	}
 
 #if IS_ENABLED(CONFIG_MTK_SVS)
-	for (i = 0; i < BASE_MAX_NR_CLOCKS_REGULATORS; i++)
+	for (i = 0; i < kbdev->nr_regulators; i++)
 		volts[i] = dev_pm_opp_get_voltage_supply(opp, i);
 #endif
 #if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE

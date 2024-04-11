@@ -67,6 +67,10 @@ config MALI_NO_MALI
 	  All calls to the simulated hardware will complete immediately as if the hardware
 	  completed the task.
 
+endchoice
+
+if MALI_NO_MALI
+
 config MALI_NO_MALI_DEFAULT_GPU
 	string "Default GPU for No Mali"
 	depends on MALI_NO_MALI
@@ -74,8 +78,7 @@ config MALI_NO_MALI_DEFAULT_GPU
 	help
 	  This option sets the default GPU to identify as for No Mali builds.
 
-
-endchoice
+endif
 
 menu "Platform specific options"
 source "$(MALI_KCONFIG_EXT_PREFIX)drivers/gpu/arm/mali/platform/Kconfig"
