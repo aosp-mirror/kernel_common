@@ -395,25 +395,26 @@ int of_device_compatible_match(const struct device_node *device,
 EXPORT_SYMBOL_GPL(of_device_compatible_match);
 
 /**
- * of_machine_is_compatible - Test root of device tree for a given compatible value
- * @compat: compatible string to look for in root node's compatible property.
+ * of_machine_compatible_match - Test root of device tree against a compatible array
+ * @compats: NULL terminated array of compatible strings to look for in root node's compatible property.
  *
- * Return: A positive integer if the root node has the given value in its
+ * Returns true if the root node has any of the given compatible values in its
  * compatible property.
  */
-int of_machine_is_compatible(const char *compat)
+bool of_machine_compatible_match(const char *const *compats)
 {
 	struct device_node *root;
 	int rc = 0;
 
 	root = of_find_node_by_path("/");
 	if (root) {
-		rc = of_device_is_compatible(root, compat);
+		rc = of_device_compatible_match(root, compats);
 		of_node_put(root);
 	}
-	return rc;
+
+	return rc != 0;
 }
-EXPORT_SYMBOL(of_machine_is_compatible);
+EXPORT_SYMBOL(of_machine_compatible_match);
 
 static bool __of_device_is_status(const struct device_node *device,
 				  const char * const*strings)
@@ -1396,8 +1397,8 @@ int of_parse_phandle_with_args_map(const struct device_node *np,
 	char *pass_name = NULL;
 	struct device_node *cur, *new = NULL;
 	const __be32 *map, *mask, *pass;
-	static const __be32 dummy_mask[] = { [0 ... MAX_PHANDLE_ARGS] = ~0 };
-	static const __be32 dummy_pass[] = { [0 ... MAX_PHANDLE_ARGS] = 0 };
+	static const __be32 dummy_mask[] = { [0 ... MAX_PHANDLE_ARGS] = cpu_to_be32(~0) };
+	static const __be32 dummy_pass[] = { [0 ... MAX_PHANDLE_ARGS] = cpu_to_be32(0) };
 	__be32 initial_match_array[MAX_PHANDLE_ARGS];
 	const __be32 *match_array = initial_match_array;
 	int i, ret, map_len, match;
