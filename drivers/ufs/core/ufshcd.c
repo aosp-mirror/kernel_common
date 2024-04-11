@@ -5540,6 +5540,7 @@ static int ufshcd_poll(struct Scsi_Host *shost, unsigned int queue_num)
 	struct ufs_hw_queue *hwq;
 
 	if (is_mcq_enabled(hba)) {
+		WARN_ON_ONCE(queue_num == UFSHCD_POLL_FROM_INTERRUPT_CONTEXT);
 		hwq = &hba->uhq[queue_num + UFSHCD_MCQ_IO_QUEUE_OFFSET];
 
 		return ufshcd_mcq_poll_cqe_lock(hba, hwq);
