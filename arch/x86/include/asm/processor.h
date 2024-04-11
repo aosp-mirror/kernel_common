@@ -20,7 +20,6 @@ struct vm86;
 #include <asm/page.h>
 #include <asm/pgtable_types.h>
 #include <asm/percpu.h>
-#include <asm/msr.h>
 #include <asm/desc_defs.h>
 #include <asm/nops.h>
 #include <asm/special_insns.h>
@@ -185,13 +184,8 @@ extern struct cpuinfo_x86	new_cpu_data;
 extern __u32			cpu_caps_cleared[NCAPINTS + NBUGINTS];
 extern __u32			cpu_caps_set[NCAPINTS + NBUGINTS];
 
-#ifdef CONFIG_SMP
 DECLARE_PER_CPU_READ_MOSTLY(struct cpuinfo_x86, cpu_info);
 #define cpu_data(cpu)		per_cpu(cpu_info, cpu)
-#else
-#define cpu_info		boot_cpu_data
-#define cpu_data(cpu)		boot_cpu_data
-#endif
 
 extern const struct seq_operations cpuinfo_op;
 
@@ -532,6 +526,9 @@ static __always_inline unsigned long current_top_of_stack(void)
 	 *  and around vm86 mode and sp0 on x86_64 is special because of the
 	 *  entry trampoline.
 	 */
+	if (IS_ENABLED(CONFIG_USE_X86_SEG_SUPPORT))
+		return this_cpu_read_const(const_pcpu_hot.top_of_stack);
+
 	return this_cpu_read_stable(pcpu_hot.top_of_stack);
 }
 
@@ -554,7 +551,7 @@ static inline void load_sp0(unsigned long sp0)
 
 unsigned long __get_wchan(struct task_struct *p);
 
-extern void select_idle_routine(const struct cpuinfo_x86 *c);
+extern void select_idle_routine(void);
 extern void amd_e400_c1e_apic_setup(void);
 
 extern unsigned long		boot_option_idle_override;
@@ -574,28 +571,6 @@ extern void load_fixmap_gdt(int);
 extern void cpu_init(void);
 extern void cpu_init_exception_handling(void);
 extern void cr4_init(void);
-
-static inline unsigned long get_debugctlmsr(void)
-{
-	unsigned long debugctlmsr = 0;
-
-#ifndef CONFIG_X86_DEBUGCTLMSR
-	if (boot_cpu_data.x86 < 6)
-		return 0;
-#endif
-	rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctlmsr);
-
-	return debugctlmsr;
-}
-
-static inline void update_debugctlmsr(unsigned long debugctlmsr)
-{
-#ifndef CONFIG_X86_DEBUGCTLMSR
-	if (boot_cpu_data.x86 < 6)
-		return;
-#endif
-	wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctlmsr);
-}
 
 extern void set_task_blockstep(struct task_struct *task, bool on);
 

@@ -12,6 +12,7 @@
 #include <linux/cpumask.h>
 #include <linux/sched.h>
 #include <linux/rcupdate.h>
+#include <linux/static_key.h>
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
 extern void __init tick_init(void);
@@ -68,6 +69,8 @@ enum tick_broadcast_state {
 	TICK_BROADCAST_EXIT,
 	TICK_BROADCAST_ENTER,
 };
+
+extern struct static_key_false arch_needs_tick_broadcast;
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
 extern void tick_broadcast_control(enum tick_broadcast_mode mode);
@@ -164,9 +167,16 @@ static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
 static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
 #endif /* !CONFIG_NO_HZ_COMMON */
 
+/*
+ * Mask of CPUs that are nohz_full.
+ *
+ * Users should be guarded by CONFIG_NO_HZ_FULL or a tick_nohz_full_cpu()
+ * check.
+ */
+extern cpumask_var_t tick_nohz_full_mask;
+
 #ifdef CONFIG_NO_HZ_FULL
 extern bool tick_nohz_full_running;
-extern cpumask_var_t tick_nohz_full_mask;
 
 static inline bool tick_nohz_full_enabled(void)
 {
