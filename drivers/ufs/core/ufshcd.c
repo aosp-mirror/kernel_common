@@ -5463,9 +5463,12 @@ static void ufshcd_release_scsi_cmd(struct ufs_hba *hba,
  * @hba: per adapter instance
  * @task_tag: the task tag of the request to be completed
  * @cqe: pointer to the completion queue entry
+ * @compl_cmd: if not NULL, check whether this command has been completed
+ *
+ * Returns: true if and only if @compl_cmd has been completed.
  */
-void ufshcd_compl_one_cqe(struct ufs_hba *hba, int task_tag,
-			  struct cq_entry *cqe)
+bool ufshcd_compl_one_cqe(struct ufs_hba *hba, int task_tag,
+			  struct cq_entry *cqe, struct scsi_cmnd *compl_cmd)
 {
 	struct ufshcd_lrb *lrbp;
 	struct scsi_cmnd *cmd;
@@ -5482,6 +5485,7 @@ void ufshcd_compl_one_cqe(struct ufs_hba *hba, int task_tag,
 		ufshcd_release_scsi_cmd(hba, lrbp);
 		/* Do not touch lrbp after scsi done */
 		cmd->scsi_done(cmd);
+		return cmd == compl_cmd;
 	} else if (lrbp->command_type == UTP_CMD_TYPE_DEV_MANAGE ||
 		   lrbp->command_type == UTP_CMD_TYPE_UFS_STORAGE) {
 		if (hba->dev_cmd.complete) {
@@ -5492,20 +5496,26 @@ void ufshcd_compl_one_cqe(struct ufs_hba *hba, int task_tag,
 			ufshcd_clk_scaling_update_busy(hba);
 		}
 	}
+	return false;
 }
 
 /**
  * __ufshcd_transfer_req_compl - handle SCSI and query command completion
  * @hba: per adapter instance
  * @completed_reqs: bitmask that indicates which requests to complete
+ * @compl_cmd: if not NULL, check whether *@compl_cmd has been completed.
+ *	Clear *@compl_cmd if it has been completed.
  */
 static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
-					unsigned long completed_reqs)
+					unsigned long completed_reqs,
+					struct scsi_cmnd **compl_cmd)
 {
 	int tag;
 
 	for_each_set_bit(tag, &completed_reqs, hba->nutrs)
-		ufshcd_compl_one_cqe(hba, tag, NULL);
+		if (ufshcd_compl_one_cqe(hba, tag, NULL,
+					 compl_cmd ? *compl_cmd : NULL))
+			*compl_cmd = NULL;
 }
 
 /* Any value that is not an existing queue number is fine for this constant. */
@@ -5532,7 +5542,8 @@ static void ufshcd_clear_polled(struct ufs_hba *hba,
  * Returns > 0 if one or more commands have been completed or 0 if no
  * requests have been completed.
  */
-static int ufshcd_poll(struct Scsi_Host *shost, unsigned int queue_num)
+static int __ufshcd_poll(struct Scsi_Host *shost, unsigned int queue_num,
+			 struct scsi_cmnd **compl_cmd)
 {
 	struct ufs_hba *hba = shost_priv(shost);
 	unsigned long completed_reqs, flags;
@@ -5543,7 +5554,7 @@ static int ufshcd_poll(struct Scsi_Host *shost, unsigned int queue_num)
 		WARN_ON_ONCE(queue_num == UFSHCD_POLL_FROM_INTERRUPT_CONTEXT);
 		hwq = &hba->uhq[queue_num + UFSHCD_MCQ_IO_QUEUE_OFFSET];
 
-		return ufshcd_mcq_poll_cqe_lock(hba, hwq);
+		return ufshcd_mcq_poll_cqe_lock(hba, hwq, compl_cmd);
 	}
 
 	spin_lock_irqsave(&hba->outstanding_lock, flags);
@@ -5560,9 +5571,14 @@ static int ufshcd_poll(struct Scsi_Host *shost, unsigned int queue_num)
 	spin_unlock_irqrestore(&hba->outstanding_lock, flags);
 
 	if (completed_reqs)
-		__ufshcd_transfer_req_compl(hba, completed_reqs);
+		__ufshcd_transfer_req_compl(hba, completed_reqs, compl_cmd);
 
 	return completed_reqs != 0;
+}
+
+static int ufshcd_poll(struct Scsi_Host *shost, unsigned int queue_num)
+{
+	return __ufshcd_poll(shost, queue_num, NULL);
 }
 
 /**
@@ -6820,7 +6836,7 @@ static irqreturn_t ufshcd_handle_mcq_cq_events(struct ufs_hba *hba)
 			ufshcd_mcq_write_cqis(hba, events, i);
 
 		if (events & UFSHCD_MCQ_CQIS_TAIL_ENT_PUSH_STS)
-			ufshcd_mcq_poll_cqe_nolock(hba, hwq);
+			ufshcd_mcq_poll_cqe_nolock(hba, hwq, NULL);
 	}
 
 	return IRQ_HANDLED;
@@ -7361,7 +7377,7 @@ static int ufshcd_eh_device_reset_handler(struct scsi_cmnd *cmd)
 		dev_err(hba->dev, "%s: failed to clear requests %#lx\n",
 			__func__, not_cleared);
 	}
-	__ufshcd_transfer_req_compl(hba, pending_reqs & ~not_cleared);
+	__ufshcd_transfer_req_compl(hba, pending_reqs & ~not_cleared, NULL);
 
 out:
 	hba->req_abort_count = 0;
@@ -7522,7 +7538,7 @@ static int ufshcd_abort(struct scsi_cmnd *cmd)
 		dev_err(hba->dev,
 		"%s: cmd was completed, but without a notifying intr, tag = %d",
 		__func__, tag);
-		__ufshcd_transfer_req_compl(hba, 1UL << tag);
+		__ufshcd_transfer_req_compl(hba, 1UL << tag, NULL);
 		goto release;
 	}
 
