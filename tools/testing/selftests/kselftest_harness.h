@@ -1156,7 +1156,7 @@ void __run_test(struct __fixture_metadata *f,
 		struct __test_metadata *t)
 {
 	struct __test_xfail *xfail;
-	char test_name[LINE_MAX];
+	char test_name[2048];
 	const char *diagnostic;
 
 	/* reset test struct */
