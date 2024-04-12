@@ -42,6 +42,7 @@
   blk_queue_write_cache
   blk_start_plug
   blk_status_to_errno
+  __break_lease
   call_rcu
   capable
   cgroup_add_dfl_cftypes
@@ -51,9 +52,11 @@
   clear_page
   __ClearPageMovable
   complete
+  config_item_init_type_name
   congestion_wait
   contig_page_data
   copy_from_kernel_nofault
+  copy_fs_struct
   cpufreq_update_util_data
   __cpuhp_remove_state
   __cpuhp_setup_state
@@ -68,6 +71,7 @@
   crypto_comp_decompress
   crypto_destroy_tfm
   crypto_has_alg
+  d_drop
   debugfs_create_dir
   debugfs_create_file
   dec_zone_page_state
@@ -76,10 +80,12 @@
   del_gendisk
   del_timer
   del_timer_sync
+  dentry_open
   destroy_workqueue
   dev_get_by_index_rcu
   device_add_disk
   devres_destroy
+  dget_parent
   disk_end_io_acct
   disk_start_io_acct
   do_traversal_all_lruvec
@@ -89,6 +95,8 @@
   down_write
   d_path
   dput
+  d_rehash
+  d_set_d_op
   dump_stack
   eventfd_ctx_fileget
   eventfd_signal
@@ -100,11 +108,17 @@
   flush_dcache_page
   flush_work
   fput
+  free_fs_struct
   __free_pages
   free_pages
   free_percpu
   fs_bio_set
+  fsnotify
+  __fsnotify_parent
+  fsstack_copy_inode_size
   fsync_bdev
+  generic_delete_inode
+  __generic_file_fsync
   genlmsg_put
   genl_register_family
   genl_unregister_family
@@ -191,6 +205,8 @@
   __list_add_valid
   __list_del_entry_valid
   __lock_page
+  lock_rename
+  lookup_one_len_unlocked
   match_string
   mem_cgroup_from_id
   memchr_inv
@@ -207,15 +223,19 @@
   misc_deregister
   misc_register
   mmput
+  mntget
   mod_node_page_state
   mod_timer
   module_layout
+  mount_nodev
   msleep
   __mutex_init
   mutex_is_locked
   mutex_lock
   mutex_trylock
   mutex_unlock
+  neigh_xmit
+  netif_receive_skb_core
   nf_ct_attach
   nf_ct_delete
   nf_register_net_hook
@@ -234,6 +254,7 @@
   nr_running
   __num_online_cpus
   of_css
+  override_creds
   page_endio
   __page_file_index
   __page_mapcount
@@ -241,6 +262,7 @@
   page_referenced
   page_to_lruvec
   param_ops_uint
+  path_get
   __per_cpu_offset
   platform_device_add
   platform_device_alloc
@@ -248,6 +270,7 @@
   platform_driver_unregister
   preempt_schedule
   preempt_schedule_notrace
+  prepare_creds
   prepare_to_wait
   prepare_to_wait_event
   prepare_to_wait_exclusive
@@ -289,8 +312,10 @@
   register_sysctl_table
   register_tcf_proto_ops
   remove_proc_subtree
+  revert_creds
   root_mem_cgroup
   rtc_read_alarm
+  __rtnl_link_register
   __rtnl_link_unregister
   sched_clock
   sched_setscheduler_nocheck
@@ -503,6 +528,7 @@
   __traceiter_android_vh_free_oem_binder_struct
   __traceiter_android_vh_binder_special_task
   __traceiter_android_vh_binder_free_buf
+  __traceiter_android_vh_binder_buffer_release
   __tracepoint_android_rvh_check_preempt_wakeup_ignore
   __tracepoint_android_rvh_do_serror
   __tracepoint_android_rvh_pick_next_entity
@@ -640,9 +666,11 @@
   __tracepoint_android_vh_free_oem_binder_struct
   __tracepoint_android_vh_binder_special_task
   __tracepoint_android_vh_binder_free_buf
+  __tracepoint_android_vh_binder_buffer_release
   try_to_free_mem_cgroup_pages
   __ubsan_handle_cfi_check_fail_abort
   unlock_page
+  unlock_rename
   unregister_blkdev
   unregister_memory_notifier
   unregister_net_sysctl_table
@@ -654,6 +682,14 @@
   up_read
   up_write
   vfree
+  vfs_create
+  vfs_getattr
+  vfs_mkdir
+  vfs_path_lookup
+  vfs_rename
+  vfs_rmdir
+  vfs_statfs
+  vfs_unlink
   vmalloc
   vmalloc_nr_pages
   vsnprintf

@@ -4933,6 +4933,17 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 		pgd_t pgdval;
 		p4d_t p4dval;
 		pud_t pudval;
+		bool uffd_missing_sigbus = false;
+
+#ifdef CONFIG_USERFAULTFD
+		/*
+		 * Only support SPF for SIGBUS+MISSING userfaults in private
+		 * anonymous VMAs.
+		 */
+		uffd_missing_sigbus = vma_is_anonymous(vma) &&
+					(vma->vm_flags & VM_UFFD_MISSING) &&
+					userfaultfd_using_sigbus(vma);
+#endif
 
 		vmf.seq = seq;
 
@@ -5012,11 +5023,19 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 
 		speculative_page_walk_end();
 
+		if (!vmf.pte && uffd_missing_sigbus)
+			return VM_FAULT_SIGBUS;
+
 		return handle_pte_fault(&vmf);
 
 	spf_fail:
 		speculative_page_walk_end();
-		return VM_FAULT_RETRY;
+		/*
+		 * Failing page-table walk is similar to page-missing so give an
+		 * opportunity to SIGBUS+MISSING userfault to handle it before
+		 * retrying with mmap_lock
+		 */
+		return uffd_missing_sigbus ? VM_FAULT_SIGBUS : VM_FAULT_RETRY;
 	}
 #endif	/* CONFIG_SPECULATIVE_PAGE_FAULT */
 
