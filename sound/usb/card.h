@@ -46,6 +46,7 @@ struct audioformat {
 
 struct snd_usb_substream;
 struct snd_usb_iface_ref;
+struct snd_usb_clock_ref;
 struct snd_usb_endpoint;
 struct snd_usb_power_domain;
 
@@ -64,6 +65,7 @@ struct snd_urb_ctx {
 struct snd_usb_endpoint {
 	struct snd_usb_audio *chip;
 	struct snd_usb_iface_ref *iface_ref;
+	struct snd_usb_clock_ref *clock_ref;
 
 	int opened;		/* open refcount; protect with chip->mutex */
 	atomic_t running;	/* running status */
@@ -129,7 +131,9 @@ struct snd_usb_endpoint {
 					   in a stream */
 	bool implicit_fb_sync;		/* syncs with implicit feedback */
 	bool lowlatency_playback;	/* low-latency playback mode */
-	bool need_setup;		/* (re-)need for configure? */
+	bool need_setup;		/* (re-)need for hw_params? */
+	bool need_prepare;		/* (re-)need for prepare? */
+	bool fixed_rate;		/* skip rate setup */
 
 	/* for hw constraints */
 	const struct audioformat *cur_audiofmt;
@@ -140,7 +144,6 @@ struct snd_usb_endpoint {
 	unsigned int cur_period_frames;
 	unsigned int cur_period_bytes;
 	unsigned int cur_buffer_periods;
-	unsigned char cur_clock;
 
 	spinlock_t lock;
 	struct list_head list;
