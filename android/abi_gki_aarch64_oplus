@@ -113,6 +113,8 @@
   free_pages
   free_percpu
   fs_bio_set
+  fsnotify
+  __fsnotify_parent
   fsstack_copy_inode_size
   fsync_bdev
   generic_delete_inode
