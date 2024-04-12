@@ -11,7 +11,7 @@
  *     parameter to reflect time remaining.
  *
  *  24 January 2000
- *     Changed sys_poll()/do_poll() to use PAGE_SIZE chunk-based allocation 
+ *     Changed sys_poll()/do_poll() to use PAGE_SIZE chunk-based allocation
  *     of fds to overcome nfds < 16390 descriptors limit (Tigran Aivazian).
  */
 
@@ -476,8 +476,7 @@ static inline void wait_key_set(poll_table *wait, unsigned long in,
 		wait->_key |= POLLOUT_SET;
 }
 
-noinline_for_stack
-static int do_select(int n, fd_set_bits *fds, struct timespec64 *end_time)
+static noinline_for_stack int do_select(int n, fd_set_bits *fds, struct timespec64 *end_time)
 {
 	ktime_t expire, *to = NULL;
 	struct poll_wqueues table;
@@ -649,7 +648,7 @@ int core_sys_select(int n, fd_set __user *inp, fd_set __user *outp,
 	/*
 	 * We need 6 bitmaps (in/out/ex for both incoming and outgoing),
 	 * since we used fdset we need to allocate memory in units of
-	 * long-words. 
+	 * long-words.
 	 */
 	size = FDS_BYTES(n);
 	bits = stack_fds;
@@ -840,7 +839,7 @@ SYSCALL_DEFINE1(old_select, struct sel_arg_struct __user *, arg)
 
 struct poll_list {
 	struct poll_list *next;
-	int len;
+	unsigned int len;
 	struct pollfd entries[];
 };
 
@@ -976,14 +975,15 @@ static int do_sys_poll(struct pollfd __user *ufds, unsigned int nfds,
 		struct timespec64 *end_time)
 {
 	struct poll_wqueues table;
-	int err = -EFAULT, fdcount, len;
+	int err = -EFAULT, fdcount;
 	/* Allocate small arguments on the stack to save memory and be
 	   faster - use long to make sure the buffer is aligned properly
 	   on 64 bit archs to avoid unaligned access */
 	long stack_pps[POLL_STACK_ALLOC/sizeof(long)];
 	struct poll_list *const head = (struct poll_list *)stack_pps;
  	struct poll_list *walk = head;
- 	unsigned long todo = nfds;
+	unsigned int todo = nfds;
+	unsigned int len;
 
 	if (nfds > rlimit(RLIMIT_NOFILE))
 		return -EINVAL;
@@ -999,9 +999,9 @@ static int do_sys_poll(struct pollfd __user *ufds, unsigned int nfds,
 					sizeof(struct pollfd) * walk->len))
 			goto out_fds;
 
-		todo -= walk->len;
-		if (!todo)
+		if (walk->len >= todo)
 			break;
+		todo -= walk->len;
 
 		len = min(todo, POLLFD_PER_PAGE);
 		walk = walk->next = kmalloc(struct_size(walk, entries, len),
@@ -1021,7 +1021,7 @@ static int do_sys_poll(struct pollfd __user *ufds, unsigned int nfds,
 
 	for (walk = head; walk; walk = walk->next) {
 		struct pollfd *fds = walk->entries;
-		int j;
+		unsigned int j;
 
 		for (j = walk->len; j; fds++, ufds++, j--)
 			unsafe_put_user(fds->revents, &ufds->revents, Efault);
