@@ -177,7 +177,7 @@ source "fs/sysfs/Kconfig"
 config FS_PID
 	bool "Pseudo filesystem for process file descriptors"
 	depends on 64BIT
-	default y
+	default n
 	help
 	  Pidfs implements advanced features for process file descriptors.
 
