@@ -2517,7 +2517,6 @@ static int cam_ife_csid_get_time_stamp(
 	const struct cam_ife_csid_reg_offset       *csid_reg;
 	struct cam_hw_soc_info                     *soc_info;
 	const struct cam_ife_csid_rdi_reg_offset   *rdi_reg;
-	struct timespec64 ts;
 	uint32_t  time_32, id;
 	uint64_t  time_delta;
 
@@ -2574,10 +2573,7 @@ static int cam_ife_csid_get_time_stamp(
 		CAM_IFE_CSID_QTIMER_DIV_FACTOR);
 
 	if (!csid_hw->prev_boot_timestamp) {
-		ts = ktime_to_timespec64(ktime_get_boottime());
-		time_stamp->boot_timestamp =
-			(uint64_t)((ts.tv_sec * 1000000000) +
-			ts.tv_nsec);
+		time_stamp->boot_timestamp = ktime_to_ns(ktime_get());
 		csid_hw->prev_qtimer_ts = 0;
 		CAM_DBG(CAM_ISP, "timestamp:%lld",
 			time_stamp->boot_timestamp);
