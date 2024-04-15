@@ -171,6 +171,7 @@ struct cam_eeprom_intf_params {
  * @memory_bytes    :   eeprom size
  * @address_bits    :   address bits
  * @regulator       :   eeprom power supply
+ * @eeprom_content  :   eeprom content, cached the first time is read
  *
  */
 struct cam_eeprom_ctrl_t {
@@ -194,6 +195,7 @@ struct cam_eeprom_ctrl_t {
 	u32 memory_bytes;
 	u32 address_bits;
 	struct regulator *reg;
+	void *eeprom_content;
 };
 
 int32_t cam_eeprom_update_i2c_info(struct cam_eeprom_ctrl_t *e_ctrl,
