@@ -2507,6 +2507,8 @@ out:
 	bh_unlock_sock(sk);
 	local_bh_enable();
 	release_sock(sk);
+	if (!sk->sk_net_refcnt)
+		inet_csk_clear_xmit_timers_sync(sk);
 	sock_put(sk);
 }
 EXPORT_SYMBOL(tcp_close);
