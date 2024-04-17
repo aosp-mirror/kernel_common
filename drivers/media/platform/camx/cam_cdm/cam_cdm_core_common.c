@@ -48,17 +48,19 @@ static void cam_cdm_put_client(struct cam_cdm_client *client)
 struct cam_cdm_client *cam_cdm_lookup_client(struct cam_cdm *cdm, u32 idx)
 {
 	struct cam_cdm_client *client = NULL;
+	unsigned long flags;
 
-	read_lock(&cdm->clients_lock);
+	read_lock_irqsave(&cdm->clients_lock, flags);
 	if (cdm->clients[idx] && cam_cdm_get_client(cdm->clients[idx]))
 		client = cdm->clients[idx];
-	read_unlock(&cdm->clients_lock);
+	read_unlock_irqrestore(&cdm->clients_lock, flags);
 
 	return client;
 }
 
 int cam_cdm_insert_client(struct cam_cdm *cdm, struct cam_cdm_client *client)
 {
+	unsigned long flags;
 	int ret = -EINVAL;
 	u32 idx;
 
@@ -66,7 +68,7 @@ int cam_cdm_insert_client(struct cam_cdm *cdm, struct cam_cdm_client *client)
 	if (!cam_cdm_get_client(client))
 		return ret;
 
-	write_lock(&cdm->clients_lock);
+	write_lock_irqsave(&cdm->clients_lock, flags);
 	for (idx = 0; idx < CAM_PER_CDM_MAX_REGISTERED_CLIENTS; idx++) {
 		if (cdm->clients[idx])
 			continue;
@@ -77,7 +79,7 @@ int cam_cdm_insert_client(struct cam_cdm *cdm, struct cam_cdm_client *client)
 		ret = 0;
 		break;
 	}
-	write_unlock(&cdm->clients_lock);
+	write_unlock_irqrestore(&cdm->clients_lock, flags);
 
 	/*
 	 * Did not find the slot, drop the refcount because we don't own
@@ -91,12 +93,13 @@ int cam_cdm_insert_client(struct cam_cdm *cdm, struct cam_cdm_client *client)
 void cam_cdm_remove_client(struct cam_cdm *cdm, u32 idx)
 {
 	struct cam_cdm_client *client;
+	unsigned long flags;
 
 	/* Remove from cdm clients table */
-	write_lock(&cdm->clients_lock);
+	write_lock_irqsave(&cdm->clients_lock, flags);
 	client = cdm->clients[idx];
 	cdm->clients[idx] = NULL;
-	write_unlock(&cdm->clients_lock);
+	write_unlock_irqrestore(&cdm->clients_lock, flags);
 
 	/* Drop cdm ownership refcount */
 	if (client)
