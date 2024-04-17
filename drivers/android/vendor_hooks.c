@@ -547,6 +547,9 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_wp_page);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_swap_page);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_anonymous_page);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_uprobes_replace_page);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_record_rwsem_reader_owned);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_clear_rwsem_reader_owned);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_clear_rwsem_writer_owned);
 /*
  * For type visibility
  */
