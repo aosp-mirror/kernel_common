@@ -1273,6 +1273,7 @@ allocate_init_user_pages_failed:
 err_bo_create:
 	unreserve_system_mem_limit(adev, size, alloc_domain, false);
 err_reserve_limit:
+	amdgpu_sync_free(&(*mem)->sync);
 	mutex_destroy(&(*mem)->lock);
 	kfree(*mem);
 	return ret;
