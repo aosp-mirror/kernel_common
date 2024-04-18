@@ -172,14 +172,9 @@ static int chromeos_invalidate_kernel_bio(struct block_device *root_bdev)
 		goto failed_to_alloc_page;
 	}
 
-	/*
-	 * Request read operation with REQ_PREFLUSH flag to ensure that the
-	 * cache of non-volatile storage device has been flushed before read is
-	 * started.
-	 */
 	if (chromeos_invalidate_kernel_submit(bio, bdev,
 					      REQ_OP_READ,
-					      REQ_SYNC | REQ_PREFLUSH,
+					      REQ_SYNC,
 					      page)) {
 		ret = -1;
 		goto failed_to_submit_read;
