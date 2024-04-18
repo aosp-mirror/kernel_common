@@ -689,14 +689,20 @@ again:
 	ap_mode = ieee80211_determine_ap_chan(sdata, channel, bss->vht_cap_info,
 					      elems, false, conn, &ap_chandef);
 
-	mlme_link_id_dbg(sdata, link_id, "determined AP %pM to be %s\n",
-			 cbss->bssid, ieee80211_conn_mode_str(ap_mode));
-
 	/* this should be impossible since parsing depends on our mode */
 	if (WARN_ON(ap_mode > conn->mode)) {
 		ret = -EINVAL;
 		goto free;
 	}
+
+	if (conn->mode != ap_mode) {
+		conn->mode = ap_mode;
+		kfree(elems);
+		goto again;
+	}
+
+	mlme_link_id_dbg(sdata, link_id, "determined AP %pM to be %s\n",
+			 cbss->bssid, ieee80211_conn_mode_str(ap_mode));
 
 	sband = sdata->local->hw.wiphy->bands[channel->band];
 
@@ -748,7 +754,6 @@ again:
 		break;
 	}
 
-	conn->mode = ap_mode;
 	*chandef = ap_chandef;
 
 	while (!cfg80211_chandef_usable(sdata->local->hw.wiphy, chandef,
