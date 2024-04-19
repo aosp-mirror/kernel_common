@@ -301,53 +301,6 @@ void avs_dsp_process_response(struct avs_dev *adev, u64 header)
 	complete(&ipc->busy_completion);
 }
 
-irqreturn_t avs_irq_handler(struct avs_dev *adev)
-{
-	struct avs_ipc *ipc = adev->ipc;
-	u32 adspis, hipc_rsp, hipc_ack;
-	irqreturn_t ret = IRQ_NONE;
-
-	adspis = snd_hdac_adsp_readl(adev, AVS_ADSP_REG_ADSPIS);
-	if (adspis == UINT_MAX || !(adspis & AVS_ADSP_ADSPIS_IPC))
-		return ret;
-
-	hipc_ack = snd_hdac_adsp_readl(adev, SKL_ADSP_REG_HIPCIE);
-	hipc_rsp = snd_hdac_adsp_readl(adev, SKL_ADSP_REG_HIPCT);
-
-	/* DSP acked host's request */
-	if (hipc_ack & SKL_ADSP_HIPCIE_DONE) {
-		/*
-		 * As an extra precaution, mask done interrupt. Code executed
-		 * due to complete() found below does not assume any masking.
-		 */
-		snd_hdac_adsp_updatel(adev, SKL_ADSP_REG_HIPCCTL,
-				      AVS_ADSP_HIPCCTL_DONE, 0);
-
-		complete(&ipc->done_completion);
-
-		/* tell DSP it has our attention */
-		snd_hdac_adsp_updatel(adev, SKL_ADSP_REG_HIPCIE,
-				      SKL_ADSP_HIPCIE_DONE,
-				      SKL_ADSP_HIPCIE_DONE);
-		/* unmask done interrupt */
-		snd_hdac_adsp_updatel(adev, SKL_ADSP_REG_HIPCCTL,
-				      AVS_ADSP_HIPCCTL_DONE,
-				      AVS_ADSP_HIPCCTL_DONE);
-		ret = IRQ_HANDLED;
-	}
-
-	/* DSP sent new response to process */
-	if (hipc_rsp & SKL_ADSP_HIPCT_BUSY) {
-		/* mask busy interrupt */
-		snd_hdac_adsp_updatel(adev, SKL_ADSP_REG_HIPCCTL,
-				      AVS_ADSP_HIPCCTL_BUSY, 0);
-
-		ret = IRQ_WAKE_THREAD;
-	}
-
-	return ret;
-}
-
 static bool avs_ipc_is_busy(struct avs_ipc *ipc)
 {
 	struct avs_dev *adev = to_avs_dev(ipc->dev);
