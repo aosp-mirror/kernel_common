@@ -5,7 +5,6 @@
 #include <net/psample.h>
 #include "en/mapping.h"
 #include "en/tc/post_act.h"
-#include "en/mod_hdr.h"
 #include "sample.h"
 #include "eswitch.h"
 #include "en_tc.h"
@@ -256,12 +255,12 @@ sample_modify_hdr_get(struct mlx5_core_dev *mdev, u32 obj_id,
 		goto err_modify_hdr;
 	}
 
-	mlx5e_mod_hdr_dealloc(&mod_acts);
+	dealloc_mod_hdr_actions(&mod_acts);
 	return modify_hdr;
 
 err_modify_hdr:
 err_post_act:
-	mlx5e_mod_hdr_dealloc(&mod_acts);
+	dealloc_mod_hdr_actions(&mod_acts);
 err_set_regc0:
 	return ERR_PTR(err);
 }

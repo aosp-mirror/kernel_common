@@ -116,9 +116,13 @@ enum {
 
 static __always_inline int trace_get_context_bit(void)
 {
-	unsigned char bit = interrupt_context_level();
+	unsigned long pc = preempt_count();
 
-	return TRACE_CTX_NORMAL - bit;
+	if (!(pc & (NMI_MASK | HARDIRQ_MASK | SOFTIRQ_OFFSET)))
+		return TRACE_CTX_NORMAL;
+	else
+		return pc & NMI_MASK ? TRACE_CTX_NMI :
+			pc & HARDIRQ_MASK ? TRACE_CTX_IRQ : TRACE_CTX_SOFTIRQ;
 }
 
 #ifdef CONFIG_FTRACE_RECORD_RECURSION

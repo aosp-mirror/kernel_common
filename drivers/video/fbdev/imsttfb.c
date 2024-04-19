@@ -1489,8 +1489,8 @@ static int imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	if (!request_mem_region(addr, size, "imsttfb")) {
 		printk(KERN_ERR "imsttfb: Can't reserve memory region\n");
-		ret = -ENODEV;
-		goto release_info;
+		framebuffer_release(info);
+		return -ENODEV;
 	}
 
 	switch (pdev->device) {
@@ -1507,39 +1507,34 @@ static int imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			printk(KERN_INFO "imsttfb: Device 0x%x unknown, "
 					 "contact maintainer.\n", pdev->device);
 			ret = -ENODEV;
-			goto release_mem_region;
+			goto error;
 	}
 
 	info->fix.smem_start = addr;
 	info->screen_base = (__u8 *)ioremap(addr, par->ramdac == IBM ?
 					    0x400000 : 0x800000);
 	if (!info->screen_base)
-		goto release_mem_region;
+		goto error;
 	info->fix.mmio_start = addr + 0x800000;
 	par->dc_regs = ioremap(addr + 0x800000, 0x1000);
 	if (!par->dc_regs)
-		goto unmap_screen_base;
+		goto error;
 	par->cmap_regs_phys = addr + 0x840000;
 	par->cmap_regs = (__u8 *)ioremap(addr + 0x840000, 0x1000);
 	if (!par->cmap_regs)
-		goto unmap_dc_regs;
+		goto error;
 	info->pseudo_palette = par->palette;
 	ret = init_imstt(info);
-	if (ret)
-		goto unmap_cmap_regs;
+	if (!ret)
+		pci_set_drvdata(pdev, info);
+	return ret;
 
-	pci_set_drvdata(pdev, info);
-	return 0;
-
-unmap_cmap_regs:
-	iounmap(par->cmap_regs);
-unmap_dc_regs:
-	iounmap(par->dc_regs);
-unmap_screen_base:
-	iounmap(info->screen_base);
-release_mem_region:
+error:
+	if (par->dc_regs)
+		iounmap(par->dc_regs);
+	if (info->screen_base)
+		iounmap(info->screen_base);
 	release_mem_region(addr, size);
-release_info:
 	framebuffer_release(info);
 	return ret;
 }

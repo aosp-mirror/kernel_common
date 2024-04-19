@@ -476,38 +476,23 @@ static int __maybe_unused xhci_plat_resume(struct device *dev)
 	int ret;
 
 	if (!device_may_wakeup(dev) && (xhci->quirks & XHCI_SUSPEND_RESUME_CLKS)) {
-		ret = clk_prepare_enable(xhci->clk);
-		if (ret)
-			return ret;
-
-		ret = clk_prepare_enable(xhci->reg_clk);
-		if (ret) {
-			clk_disable_unprepare(xhci->clk);
-			return ret;
-		}
+		clk_prepare_enable(xhci->clk);
+		clk_prepare_enable(xhci->reg_clk);
 	}
 
 	ret = xhci_priv_resume_quirk(hcd);
 	if (ret)
-		goto disable_clks;
+		return ret;
 
 	ret = xhci_resume(xhci, 0);
 	if (ret)
-		goto disable_clks;
+		return ret;
 
 	pm_runtime_disable(dev);
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
 
 	return 0;
-
-disable_clks:
-	if (!device_may_wakeup(dev) && (xhci->quirks & XHCI_SUSPEND_RESUME_CLKS)) {
-		clk_disable_unprepare(xhci->clk);
-		clk_disable_unprepare(xhci->reg_clk);
-	}
-
-	return ret;
 }
 
 static int __maybe_unused xhci_plat_runtime_suspend(struct device *dev)

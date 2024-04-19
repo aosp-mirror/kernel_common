@@ -56,7 +56,7 @@ struct snd_info_private_data {
 };
 
 static int snd_info_version_init(void);
-static void snd_info_clear_entries(struct snd_info_entry *entry);
+static void snd_info_disconnect(struct snd_info_entry *entry);
 
 /*
 
@@ -569,16 +569,11 @@ void snd_info_card_disconnect(struct snd_card *card)
 {
 	if (!card)
 		return;
-
-	proc_remove(card->proc_root_link);
-	if (card->proc_root)
-		proc_remove(card->proc_root->p);
-
 	mutex_lock(&info_mutex);
-	if (card->proc_root)
-		snd_info_clear_entries(card->proc_root);
+	proc_remove(card->proc_root_link);
 	card->proc_root_link = NULL;
-	card->proc_root = NULL;
+	if (card->proc_root)
+		snd_info_disconnect(card->proc_root);
 	mutex_unlock(&info_mutex);
 }
 
@@ -750,14 +745,15 @@ struct snd_info_entry *snd_info_create_card_entry(struct snd_card *card,
 }
 EXPORT_SYMBOL(snd_info_create_card_entry);
 
-static void snd_info_clear_entries(struct snd_info_entry *entry)
+static void snd_info_disconnect(struct snd_info_entry *entry)
 {
 	struct snd_info_entry *p;
 
 	if (!entry->p)
 		return;
 	list_for_each_entry(p, &entry->children, list)
-		snd_info_clear_entries(p);
+		snd_info_disconnect(p);
+	proc_remove(entry->p);
 	entry->p = NULL;
 }
 
@@ -774,9 +770,8 @@ void snd_info_free_entry(struct snd_info_entry * entry)
 	if (!entry)
 		return;
 	if (entry->p) {
-		proc_remove(entry->p);
 		mutex_lock(&info_mutex);
-		snd_info_clear_entries(entry);
+		snd_info_disconnect(entry);
 		mutex_unlock(&info_mutex);
 	}
 

@@ -955,10 +955,8 @@ int tcp_send_mss(struct sock *sk, int *size_goal, int flags)
  * importantly be able to generate EPOLLOUT for Edge Trigger epoll()
  * users.
  */
-void tcp_remove_empty_skb(struct sock *sk)
+void tcp_remove_empty_skb(struct sock *sk, struct sk_buff *skb)
 {
-	struct sk_buff *skb = tcp_write_queue_tail(sk);
-
 	if (skb && TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq) {
 		tcp_unlink_write_queue(skb, sk);
 		if (tcp_write_queue_empty(sk))
@@ -1111,7 +1109,7 @@ out:
 	return copied;
 
 do_error:
-	tcp_remove_empty_skb(sk);
+	tcp_remove_empty_skb(sk, tcp_write_queue_tail(sk));
 	if (copied)
 		goto out;
 out_err:
@@ -1335,7 +1333,14 @@ new_segment:
 		if (copy > msg_data_left(msg))
 			copy = msg_data_left(msg);
 
-		if (!zc) {
+		/* Where to copy to? */
+		if (skb_availroom(skb) > 0 && !zc) {
+			/* We have some space in skb head. Superb! */
+			copy = min_t(int, copy, skb_availroom(skb));
+			err = skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);
+			if (err)
+				goto do_fault;
+		} else if (!zc) {
 			bool merge = true;
 			int i = skb_shinfo(skb)->nr_frags;
 			struct page_frag *pfrag = sk_page_frag(sk);
@@ -1434,7 +1439,9 @@ out_nopush:
 	return copied + copied_syn;
 
 do_error:
-	tcp_remove_empty_skb(sk);
+	skb = tcp_write_queue_tail(sk);
+do_fault:
+	tcp_remove_empty_skb(sk, skb);
 
 	if (copied + copied_syn)
 		goto out;

@@ -596,17 +596,14 @@ static int virtio_mmio_probe(struct platform_device *pdev)
 	spin_lock_init(&vm_dev->lock);
 
 	vm_dev->base = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(vm_dev->base)) {
-		rc = PTR_ERR(vm_dev->base);
-		goto free_vm_dev;
-	}
+	if (IS_ERR(vm_dev->base))
+		return PTR_ERR(vm_dev->base);
 
 	/* Check magic value */
 	magic = readl(vm_dev->base + VIRTIO_MMIO_MAGIC_VALUE);
 	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
 		dev_warn(&pdev->dev, "Wrong magic value 0x%08lx!\n", magic);
-		rc = -ENODEV;
-		goto free_vm_dev;
+		return -ENODEV;
 	}
 
 	/* Check device version */
@@ -614,8 +611,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
 	if (vm_dev->version < 1 || vm_dev->version > 2) {
 		dev_err(&pdev->dev, "Version %ld not supported!\n",
 				vm_dev->version);
-		rc = -ENXIO;
-		goto free_vm_dev;
+		return -ENXIO;
 	}
 
 	vm_dev->vdev.id.device = readl(vm_dev->base + VIRTIO_MMIO_DEVICE_ID);
@@ -624,8 +620,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
 		 * virtio-mmio device with an ID 0 is a (dummy) placeholder
 		 * with no function. End probing now with no error reported.
 		 */
-		rc = -ENODEV;
-		goto free_vm_dev;
+		return -ENODEV;
 	}
 	vm_dev->vdev.id.vendor = readl(vm_dev->base + VIRTIO_MMIO_VENDOR_ID);
 
@@ -654,10 +649,6 @@ static int virtio_mmio_probe(struct platform_device *pdev)
 	if (rc)
 		put_device(&vm_dev->vdev.dev);
 
-	return rc;
-
-free_vm_dev:
-	kfree(vm_dev);
 	return rc;
 }
 

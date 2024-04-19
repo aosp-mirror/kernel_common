@@ -303,7 +303,7 @@ static int cx81801_open(struct tty_struct *tty)
 static void cx81801_close(struct tty_struct *tty)
 {
 	struct snd_soc_component *component = tty->disc_data;
-	struct snd_soc_dapm_context *dapm;
+	struct snd_soc_dapm_context *dapm = &component->card->dapm;
 
 	del_timer_sync(&cx81801_timer);
 
@@ -314,8 +314,6 @@ static void cx81801_close(struct tty_struct *tty)
 		return;
 
 	v253_ops.close(tty);
-
-	dapm = &component->card->dapm;
 
 	/* Revert back to default audio input/output constellation */
 	snd_soc_dapm_mutex_lock(dapm);

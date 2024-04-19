@@ -267,14 +267,13 @@ static void sysrq_handle_showallcpus(int key)
 		if (in_hardirq())
 			regs = get_irq_regs();
 
-		pr_info("CPU%d:\n", get_cpu());
+		pr_info("CPU%d:\n", smp_processor_id());
 		if (regs)
 			show_regs(regs);
 		else
 			show_stack(NULL, NULL, KERN_INFO);
 
 		schedule_work(&sysrq_showallcpus);
-		put_cpu();
 	}
 }
 

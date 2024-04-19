@@ -2560,7 +2560,6 @@ xlog_recover_process_intents(
 	for (lip = xfs_trans_ail_cursor_first(ailp, &cur, 0);
 	     lip != NULL;
 	     lip = xfs_trans_ail_cursor_next(ailp, &cur)) {
-		const struct xfs_item_ops	*ops;
 		/*
 		 * We're done when we see something other than an intent.
 		 * There should be no intents left in the AIL now.
@@ -2585,17 +2584,13 @@ xlog_recover_process_intents(
 		 * deferred ops, you /must/ attach them to the capture list in
 		 * the recover routine or else those subsequent intents will be
 		 * replayed in the wrong order!
-		 *
-		 * The recovery function can free the log item, so we must not
-		 * access lip after it returns.
 		 */
 		spin_unlock(&ailp->ail_lock);
-		ops = lip->li_ops;
-		error = ops->iop_recover(lip, &capture_list);
+		error = lip->li_ops->iop_recover(lip, &capture_list);
 		spin_lock(&ailp->ail_lock);
 		if (error) {
 			trace_xlog_intent_recovery_failed(log->l_mp, error,
-					ops->iop_recover);
+					lip->li_ops->iop_recover);
 			break;
 		}
 	}
@@ -2744,7 +2739,6 @@ xlog_recover_process_one_iunlink(
 	 * Call xlog_recover_clear_agi_bucket() to perform a transaction to
 	 * clear the inode pointer in the bucket.
 	 */
-	xfs_inodegc_flush(mp);
 	xlog_recover_clear_agi_bucket(mp, agno, bucket);
 	return NULLAGINO;
 }
@@ -3254,7 +3248,7 @@ xlog_do_log_recovery(
 	xfs_daddr_t	head_blk,
 	xfs_daddr_t	tail_blk)
 {
-	int		error;
+	int		error, i;
 
 	ASSERT(head_blk != tail_blk);
 
@@ -3262,25 +3256,37 @@ xlog_do_log_recovery(
 	 * First do a pass to find all of the cancelled buf log items.
 	 * Store them in the buf_cancel_table for use in the second pass.
 	 */
-	error = xlog_alloc_buf_cancel_table(log);
-	if (error)
-		return error;
+	log->l_buf_cancel_table = kmem_zalloc(XLOG_BC_TABLE_SIZE *
+						 sizeof(struct list_head),
+						 0);
+	for (i = 0; i < XLOG_BC_TABLE_SIZE; i++)
+		INIT_LIST_HEAD(&log->l_buf_cancel_table[i]);
 
 	error = xlog_do_recovery_pass(log, head_blk, tail_blk,
 				      XLOG_RECOVER_PASS1, NULL);
-	if (error != 0)
-		goto out_cancel;
-
+	if (error != 0) {
+		kmem_free(log->l_buf_cancel_table);
+		log->l_buf_cancel_table = NULL;
+		return error;
+	}
 	/*
 	 * Then do a second pass to actually recover the items in the log.
 	 * When it is complete free the table of buf cancel items.
 	 */
 	error = xlog_do_recovery_pass(log, head_blk, tail_blk,
 				      XLOG_RECOVER_PASS2, NULL);
-	if (!error)
-		xlog_check_buf_cancel_table(log);
-out_cancel:
-	xlog_free_buf_cancel_table(log);
+#ifdef DEBUG
+	if (!error) {
+		int	i;
+
+		for (i = 0; i < XLOG_BC_TABLE_SIZE; i++)
+			ASSERT(list_empty(&log->l_buf_cancel_table[i]));
+	}
+#endif	/* DEBUG */
+
+	kmem_free(log->l_buf_cancel_table);
+	log->l_buf_cancel_table = NULL;
+
 	return error;
 }
 

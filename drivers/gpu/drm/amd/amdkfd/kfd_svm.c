@@ -433,11 +433,11 @@ svm_range_validate_svm_bo(struct amdgpu_device *adev, struct svm_range *prange)
 
 	/* We need a new svm_bo. Spin-loop to wait for concurrent
 	 * svm_range_bo_release to finish removing this range from
-	 * its range list and set prange->svm_bo to null. After this,
-	 * it is safe to reuse the svm_bo pointer and svm_bo_list head.
+	 * its range list. After this, it is safe to reuse the
+	 * svm_bo pointer and svm_bo_list head.
 	 */
-	while (!list_empty_careful(&prange->svm_bo_list) || prange->svm_bo)
-		cond_resched();
+	while (!list_empty_careful(&prange->svm_bo_list))
+		;
 
 	return false;
 }
@@ -550,15 +550,8 @@ create_bo_failed:
 
 void svm_range_vram_node_free(struct svm_range *prange)
 {
-	/* serialize prange->svm_bo unref */
-	mutex_lock(&prange->lock);
-	/* prange->svm_bo has not been unref */
-	if (prange->ttm_res) {
-		prange->ttm_res = NULL;
-		mutex_unlock(&prange->lock);
-		svm_range_bo_unref(prange->svm_bo);
-	} else
-		mutex_unlock(&prange->lock);
+	svm_range_bo_unref(prange->svm_bo);
+	prange->ttm_res = NULL;
 }
 
 struct amdgpu_device *
@@ -698,7 +691,7 @@ svm_range_apply_attrs(struct kfd_process *p, struct svm_range *prange,
 			prange->flags &= ~attrs[i].value;
 			break;
 		case KFD_IOCTL_SVM_ATTR_GRANULARITY:
-			prange->granularity = min_t(uint32_t, attrs[i].value, 0x3F);
+			prange->granularity = attrs[i].value;
 			break;
 		default:
 			WARN_ONCE(1, "svm_range_check_attrs wasn't called?");

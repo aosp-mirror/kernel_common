@@ -21,7 +21,6 @@
   __alloc_percpu_gfp
   __alloc_skb
   alloc_workqueue
-  amba_bustype
   amba_driver_register
   amba_driver_unregister
   android_debug_symbol
@@ -179,12 +178,7 @@
   component_match_add_release
   component_unbind_all
   config_ep_by_speed
-  configfs_register_group
-  configfs_register_subsystem
-  configfs_unregister_subsystem
-  config_group_init
   config_group_init_type_name
-  config_item_set_name
   console_set_on_cmdline
   console_suspend_enabled
   console_trylock
@@ -245,9 +239,7 @@
   cpu_number
   __cpu_online_mask
   cpu_pm_register_notifier
-  cpu_pm_unregister_notifier
   __cpu_possible_mask
-  __cpu_present_mask
   cpupri_find_fitness
   cpu_scale
   cpus_read_lock
@@ -354,7 +346,6 @@
   device_init_wakeup
   device_link_add
   device_link_del
-  device_match_fwnode
   device_property_present
   device_property_read_string
   device_property_read_u32_array
@@ -475,7 +466,6 @@
   disk_end_io_acct
   disk_start_io_acct
   dma_alloc_attrs
-  dma_alloc_pages
   dma_async_device_register
   dma_async_device_unregister
   dma_async_tx_descriptor_init
@@ -512,7 +502,6 @@
   dma_fence_signal_locked
   dma_fence_wait_timeout
   dma_free_attrs
-  dma_free_pages
   dma_get_slave_caps
   dma_get_slave_channel
   dma_heap_add
@@ -625,7 +614,6 @@
   drm_bridge_remove
   drm_compat_ioctl
   drm_connector_atomic_hdr_metadata_equal
-  drm_connector_attach_content_protection_property
   drm_connector_attach_encoder
   drm_connector_attach_hdr_output_metadata_property
   drm_connector_attach_max_bpc_property
@@ -694,7 +682,6 @@
   drm_gem_vm_close
   drm_gem_vm_open
   drm_get_format_info
-  drm_hdcp_update_content_protection
   drm_hdmi_infoframe_set_hdr_metadata
   drm_helper_mode_fill_fb_struct
   drm_helper_probe_single_connector_modes
@@ -850,9 +837,6 @@
   full_name_hash
   fwnode_get_name
   fwnode_gpiod_get_index
-  fwnode_handle_get
-  fwnode_handle_put
-  fwnode_property_present
   fwnode_property_read_string
   fwnode_property_read_u32_array
   gcd
@@ -948,7 +932,6 @@
   handle_nested_irq
   handle_simple_irq
   handle_sysrq
-  hashlen_string
   have_governor_per_policy
   hdmi_drm_infoframe_pack_only
   hex2bin
@@ -1144,11 +1127,11 @@
   kernel_param_lock
   kernel_param_unlock
   kernel_restart
+  kern_mount
+  kern_unmount
   kernfs_find_and_get_ns
   kernfs_notify
   kernfs_put
-  kern_mount
-  kern_unmount
   key_create_or_update
   key_put
   keyring_alloc
@@ -1249,7 +1232,6 @@
   log_threaded_irq_wakeup_reason
   loops_per_jiffy
   mac_pton
-  max_load_balance_interval
   mbox_chan_received_data
   mbox_controller_register
   mbox_controller_unregister
@@ -1402,14 +1384,8 @@
   of_get_named_gpio_flags
   of_get_next_available_child
   of_get_next_child
-  of_get_next_parent
   of_get_property
   of_get_regulator_init_data
-  of_graph_get_next_endpoint
-  of_graph_get_port_parent
-  of_graph_get_remote_endpoint
-  of_graph_is_present
-  of_graph_parse_endpoint
   of_iomap
   of_irq_find_parent
   of_irq_get
@@ -1503,10 +1479,6 @@
   pci_write_config_word
   PDE_DATA
   __per_cpu_offset
-  perf_aux_output_begin
-  perf_aux_output_end
-  perf_aux_output_flag
-  perf_event_addr_filters_sync
   perf_event_create_kernel_counter
   perf_event_disable
   perf_event_enable
@@ -1515,7 +1487,6 @@
   perf_event_read_value
   perf_event_release_kernel
   perf_event_update_userpage
-  perf_get_aux
   perf_pmu_migrate_context
   perf_pmu_register
   perf_pmu_unregister
@@ -1693,7 +1664,6 @@
   register_inet6addr_notifier
   register_inetaddr_notifier
   register_kernel_break_hook
-  register_kretprobe
   register_netdev
   register_netdevice
   register_netdevice_notifier
@@ -1995,7 +1965,6 @@
   srcu_notifier_chain_unregister
   sscanf
   __stack_chk_fail
-  static_key_count
   static_key_disable
   static_key_enable
   static_key_slow_dec
@@ -2044,9 +2013,7 @@
   syscon_regmap_lookup_by_phandle
   sysctl_sched_features
   sysctl_sched_latency
-  sysctl_sched_min_granularity
   sysfs_add_file_to_group
-  sysfs_add_link_to_group
   sysfs_create_file_ns
   sysfs_create_files
   sysfs_create_group
@@ -2056,12 +2023,10 @@
   sysfs_emit_at
   __sysfs_match_string
   sysfs_notify
-  sysfs_remove_file_from_group
   sysfs_remove_file_ns
   sysfs_remove_group
   sysfs_remove_groups
   sysfs_remove_link
-  sysfs_remove_link_from_group
   sysfs_streq
   sysfs_update_group
   sysrq_mask
@@ -2462,7 +2427,6 @@
   unregister_chrdev_region
   unregister_inet6addr_notifier
   unregister_inetaddr_notifier
-  unregister_kretprobe
   unregister_netdev
   unregister_netdevice_many
   unregister_netdevice_notifier
@@ -2515,7 +2479,6 @@
   usb_put_hcd
   usb_register_notify
   usb_remove_hcd
-  usb_role_string
   usb_role_switch_get_drvdata
   usb_role_switch_register
   usb_role_switch_unregister

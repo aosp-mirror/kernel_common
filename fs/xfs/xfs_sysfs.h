@@ -33,15 +33,10 @@ xfs_sysfs_init(
 	const char		*name)
 {
 	struct kobject		*parent;
-	int err;
 
 	parent = parent_kobj ? &parent_kobj->kobject : NULL;
 	init_completion(&kobj->complete);
-	err = kobject_init_and_add(&kobj->kobject, ktype, parent, "%s", name);
-	if (err)
-		kobject_put(&kobj->kobject);
-
-	return err;
+	return kobject_init_and_add(&kobj->kobject, ktype, parent, "%s", name);
 }
 
 static inline void

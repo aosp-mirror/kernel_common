@@ -159,7 +159,6 @@ static int mfd_add_device(struct device *parent, int id,
 	struct platform_device *pdev;
 	struct device_node *np = NULL;
 	struct mfd_of_node_entry *of_entry, *tmp;
-	bool disabled = false;
 	int ret = -ENOMEM;
 	int platform_id;
 	int r;
@@ -197,10 +196,11 @@ static int mfd_add_device(struct device *parent, int id,
 	if (IS_ENABLED(CONFIG_OF) && parent->of_node && cell->of_compatible) {
 		for_each_child_of_node(parent->of_node, np) {
 			if (of_device_is_compatible(np, cell->of_compatible)) {
-				/* Skip 'disabled' devices */
+				/* Ignore 'disabled' devices error free */
 				if (!of_device_is_available(np)) {
-					disabled = true;
-					continue;
+					of_node_put(np);
+					ret = 0;
+					goto fail_alias;
 				}
 
 				ret = mfd_match_of_node_to_dev(pdev, np, cell);
@@ -210,17 +210,10 @@ static int mfd_add_device(struct device *parent, int id,
 				if (ret)
 					goto fail_alias;
 
-				goto match;
+				break;
 			}
 		}
 
-		if (disabled) {
-			/* Ignore 'disabled' devices error free */
-			ret = 0;
-			goto fail_alias;
-		}
-
-match:
 		if (!pdev->dev.of_node)
 			pr_warn("%s: Failed to locate of_node [id: %d]\n",
 				cell->name, platform_id);

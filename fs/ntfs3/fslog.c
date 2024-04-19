@@ -2169,10 +2169,8 @@ file_is_valid:
 
 			if (!page) {
 				page = kmalloc(log->page_size, GFP_NOFS);
-				if (!page) {
-					err = -ENOMEM;
-					goto out;
-				}
+				if (!page)
+					return -ENOMEM;
 			}
 
 			/*

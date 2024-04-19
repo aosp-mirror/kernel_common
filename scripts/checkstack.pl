@@ -142,11 +142,15 @@ $total_size = 0;
 while (my $line = <STDIN>) {
 	if ($line =~ m/$funcre/) {
 		$func = $1;
-		next if $line !~ m/^($x*)/;
+		next if $line !~ m/^($xs*)/;
 		if ($total_size > $min_stack) {
 			push @stack, "$intro$total_size\n";
 		}
-		$addr = "0x$1";
+
+		$addr = $1;
+		$addr =~ s/ /0/g;
+		$addr = "0x$addr";
+
 		$intro = "$addr $func [$file]:";
 		my $padlen = 56 - length($intro);
 		while ($padlen > 0) {

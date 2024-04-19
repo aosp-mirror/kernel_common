@@ -3416,8 +3416,7 @@ static int alloc_chain_hlocks(int req)
 		size = chain_block_size(curr);
 		if (likely(size >= req)) {
 			del_chain_block(0, size, chain_block_next(curr));
-			if (size > req)
-				add_chain_block(curr + req, size - req);
+			add_chain_block(curr + req, size - req);
 			return curr;
 		}
 	}

@@ -24,20 +24,13 @@
 #include <linux/uaccess.h>
 
 
-struct opal_prd_msg {
-	union {
-		struct opal_prd_msg_header header;
-		DECLARE_FLEX_ARRAY(u8, data);
-	};
-};
-
 /*
  * The msg member must be at the end of the struct, as it's followed by the
  * message data.
  */
 struct opal_prd_msg_queue_item {
-	struct list_head	list;
-	struct opal_prd_msg	msg;
+	struct list_head		list;
+	struct opal_prd_msg_header	msg;
 };
 
 static struct device_node *prd_node;
@@ -163,7 +156,7 @@ static ssize_t opal_prd_read(struct file *file, char __user *buf,
 	int rc;
 
 	/* we need at least a header's worth of data */
-	if (count < sizeof(item->msg.header))
+	if (count < sizeof(item->msg))
 		return -EINVAL;
 
 	if (*ppos)
@@ -193,7 +186,7 @@ static ssize_t opal_prd_read(struct file *file, char __user *buf,
 			return -EINTR;
 	}
 
-	size = be16_to_cpu(item->msg.header.size);
+	size = be16_to_cpu(item->msg.size);
 	if (size > count) {
 		err = -EINVAL;
 		goto err_requeue;
@@ -359,7 +352,7 @@ static int opal_prd_msg_notifier(struct notifier_block *nb,
 	if (!item)
 		return -ENOMEM;
 
-	memcpy(&item->msg.data, msg->params, msg_size);
+	memcpy(&item->msg, msg->params, msg_size);
 
 	spin_lock_irqsave(&opal_prd_msg_queue_lock, flags);
 	list_add_tail(&item->list, &opal_prd_msg_queue);

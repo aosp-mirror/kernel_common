@@ -1223,7 +1223,7 @@ int komeda_build_display_data_flow(struct komeda_crtc *kcrtc,
 	return 0;
 }
 
-static int
+static void
 komeda_pipeline_unbound_components(struct komeda_pipeline *pipe,
 				   struct komeda_pipeline_state *new)
 {
@@ -1243,12 +1243,8 @@ komeda_pipeline_unbound_components(struct komeda_pipeline *pipe,
 		c = komeda_pipeline_get_component(pipe, id);
 		c_st = komeda_component_get_state_and_set_user(c,
 				drm_st, NULL, new->crtc);
-		if (PTR_ERR(c_st) == -EDEADLK)
-			return -EDEADLK;
 		WARN_ON(IS_ERR(c_st));
 	}
-
-	return 0;
 }
 
 /* release unclaimed pipeline resource */
@@ -1270,8 +1266,9 @@ int komeda_release_unclaimed_resources(struct komeda_pipeline *pipe,
 	if (WARN_ON(IS_ERR_OR_NULL(st)))
 		return -EINVAL;
 
-	return komeda_pipeline_unbound_components(pipe, st);
+	komeda_pipeline_unbound_components(pipe, st);
 
+	return 0;
 }
 
 /* Since standalong disabled components must be disabled separately and in the

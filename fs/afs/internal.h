@@ -556,7 +556,6 @@ struct afs_server_entry {
 };
 
 struct afs_server_list {
-	struct rcu_head		rcu;
 	afs_volid_t		vids[AFS_MAXTYPES]; /* Volume IDs */
 	refcount_t		usage;
 	unsigned char		nr_servers;

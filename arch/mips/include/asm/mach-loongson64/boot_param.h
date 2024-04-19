@@ -14,11 +14,7 @@
 #define ADAPTER_ROM		8
 #define ACPI_TABLE		9
 #define SMBIOS_TABLE		10
-#define UMA_VIDEO_RAM		11
-#define VUMA_VIDEO_RAM		12
-#define MAX_MEMORY_TYPE		13
-
-#define MEM_SIZE_IS_IN_BYTES	(1 << 31)
+#define MAX_MEMORY_TYPE		11
 
 #define LOONGSON3_BOOT_MEM_MAP_MAX 128
 struct efi_memory_map_loongson {
@@ -121,8 +117,7 @@ struct irq_source_routing_table {
 	u64 pci_io_start_addr;
 	u64 pci_io_end_addr;
 	u64 pci_config_addr;
-	u16 dma_mask_bits;
-	u16 dma_noncoherent;
+	u32 dma_mask_bits;
 } __packed;
 
 struct interface_info {

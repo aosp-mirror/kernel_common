@@ -2075,7 +2075,6 @@ destroy_flow_table:
 	rhashtable_destroy(&tc_info->flow_table);
 free_tc_info:
 	kfree(tc_info);
-	bp->tc_info = NULL;
 	return rc;
 }
 

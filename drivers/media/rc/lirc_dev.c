@@ -287,11 +287,7 @@ static ssize_t lirc_transmit(struct file *file, const char __user *buf,
 		if (ret < 0)
 			goto out_kfree_raw;
 
-		/* drop trailing space */
-		if (!(ret % 2))
-			count = ret - 1;
-		else
-			count = ret;
+		count = ret;
 
 		txbuf = kmalloc_array(count, sizeof(unsigned int), GFP_KERNEL);
 		if (!txbuf) {

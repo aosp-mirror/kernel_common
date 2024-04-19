@@ -58,8 +58,7 @@ struct amd_geode_priv {
 
 static int geode_rng_data_read(struct hwrng *rng, u32 *data)
 {
-	struct amd_geode_priv *priv = (struct amd_geode_priv *)rng->priv;
-	void __iomem *mem = priv->membase;
+	void __iomem *mem = (void __iomem *)rng->priv;
 
 	*data = readl(mem + GEODE_RNG_DATA_REG);
 
@@ -68,8 +67,7 @@ static int geode_rng_data_read(struct hwrng *rng, u32 *data)
 
 static int geode_rng_data_present(struct hwrng *rng, int wait)
 {
-	struct amd_geode_priv *priv = (struct amd_geode_priv *)rng->priv;
-	void __iomem *mem = priv->membase;
+	void __iomem *mem = (void __iomem *)rng->priv;
 	int data, i;
 
 	for (i = 0; i < 20; i++) {

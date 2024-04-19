@@ -125,7 +125,6 @@ static void __init _register_composite(void *user,
 	struct component_clk *comp;
 	int num_parents = 0;
 	const char **parent_names = NULL;
-	const char *name;
 	int i;
 	int ret;
 
@@ -173,8 +172,7 @@ static void __init _register_composite(void *user,
 		goto cleanup;
 	}
 
-	name = ti_dt_clk_name(node);
-	clk = clk_register_composite(NULL, name,
+	clk = clk_register_composite(NULL, node->name,
 				     parent_names, num_parents,
 				     _get_hw(cclk, CLK_COMPONENT_TYPE_MUX),
 				     &ti_clk_mux_ops,
@@ -184,7 +182,7 @@ static void __init _register_composite(void *user,
 				     &ti_composite_gate_ops, 0);
 
 	if (!IS_ERR(clk)) {
-		ret = ti_clk_add_alias(clk, name);
+		ret = ti_clk_add_alias(NULL, clk, node->name);
 		if (ret) {
 			clk_unregister(clk);
 			goto cleanup;

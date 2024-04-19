@@ -1501,9 +1501,13 @@ out:
 			if (!pn_leaf && !(pn->fn_flags & RTN_RTINFO)) {
 				pn_leaf = fib6_find_prefix(info->nl_net, table,
 							   pn);
-				if (!pn_leaf)
+#if RT6_DEBUG >= 2
+				if (!pn_leaf) {
+					WARN_ON(!pn_leaf);
 					pn_leaf =
 					    info->nl_net->ipv6.fib6_null_entry;
+				}
+#endif
 				fib6_info_hold(pn_leaf);
 				rcu_assign_pointer(pn->leaf, pn_leaf);
 			}

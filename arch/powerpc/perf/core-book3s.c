@@ -1342,7 +1342,8 @@ static void power_pmu_disable(struct pmu *pmu)
 		/*
 		 * Disable instruction sampling if it was enabled
 		 */
-		val &= ~MMCRA_SAMPLE_ENABLE;
+		if (cpuhw->mmcr.mmcra & MMCRA_SAMPLE_ENABLE)
+			val &= ~MMCRA_SAMPLE_ENABLE;
 
 		/* Disable BHRB via mmcra (BHRBRD) for p10 */
 		if (ppmu->flags & PPMU_ARCH_31)
@@ -1353,7 +1354,7 @@ static void power_pmu_disable(struct pmu *pmu)
 		 * instruction sampling or BHRB.
 		 */
 		if (val != mmcra) {
-			mtspr(SPRN_MMCRA, val);
+			mtspr(SPRN_MMCRA, mmcra);
 			mb();
 			isync();
 		}

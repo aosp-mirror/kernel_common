@@ -593,7 +593,7 @@ static int kvm_mips_map_page(struct kvm_vcpu *vcpu, unsigned long gpa,
 	gfn_t gfn = gpa >> PAGE_SHIFT;
 	int srcu_idx, err;
 	kvm_pfn_t pfn;
-	pte_t *ptep, entry;
+	pte_t *ptep, entry, old_pte;
 	bool writeable;
 	unsigned long prot_bits;
 	unsigned long mmu_seq;
@@ -665,6 +665,7 @@ retry:
 	entry = pfn_pte(pfn, __pgprot(prot_bits));
 
 	/* Write the PTE */
+	old_pte = *ptep;
 	set_pte(ptep, entry);
 
 	err = 0;

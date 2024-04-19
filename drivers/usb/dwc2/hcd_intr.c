@@ -2045,17 +2045,15 @@ static void dwc2_hc_n_intr(struct dwc2_hsotg *hsotg, int chnum)
 {
 	struct dwc2_qtd *qtd;
 	struct dwc2_host_chan *chan;
-	u32 hcint, hcintraw, hcintmsk;
+	u32 hcint, hcintmsk;
 
 	chan = hsotg->hc_ptr_array[chnum];
 
-	hcintraw = dwc2_readl(hsotg, HCINT(chnum));
+	hcint = dwc2_readl(hsotg, HCINT(chnum));
 	hcintmsk = dwc2_readl(hsotg, HCINTMSK(chnum));
-	hcint = hcintraw & hcintmsk;
-	dwc2_writel(hsotg, hcint, HCINT(chnum));
-
 	if (!chan) {
 		dev_err(hsotg->dev, "## hc_ptr_array for channel is NULL ##\n");
+		dwc2_writel(hsotg, hcint, HCINT(chnum));
 		return;
 	}
 
@@ -2064,8 +2062,10 @@ static void dwc2_hc_n_intr(struct dwc2_hsotg *hsotg, int chnum)
 			 chnum);
 		dev_vdbg(hsotg->dev,
 			 "  hcint 0x%08x, hcintmsk 0x%08x, hcint&hcintmsk 0x%08x\n",
-			 hcintraw, hcintmsk, hcint);
+			 hcint, hcintmsk, hcint & hcintmsk);
 	}
+
+	dwc2_writel(hsotg, hcint, HCINT(chnum));
 
 	/*
 	 * If we got an interrupt after someone called
@@ -2076,7 +2076,8 @@ static void dwc2_hc_n_intr(struct dwc2_hsotg *hsotg, int chnum)
 		return;
 	}
 
-	chan->hcint = hcintraw;
+	chan->hcint = hcint;
+	hcint &= hcintmsk;
 
 	/*
 	 * If the channel was halted due to a dequeue, the qtd list might

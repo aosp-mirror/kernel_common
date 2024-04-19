@@ -8,7 +8,6 @@
 #include "imx28-lwe.dtsi"
 
 / {
-	model = "Liebherr XEA board";
 	compatible = "lwn,imx28-xea", "fsl,imx28";
 };
 

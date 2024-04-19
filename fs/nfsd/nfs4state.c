@@ -2686,7 +2686,7 @@ static int client_opens_release(struct inode *inode, struct file *file)
 
 	/* XXX: alternatively, we could get/drop in seq start/stop */
 	drop_client(clp);
-	return seq_release(inode, file);
+	return 0;
 }
 
 static const struct file_operations client_states_fops = {

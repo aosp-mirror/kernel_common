@@ -717,11 +717,7 @@ int init_nilfs(struct the_nilfs *nilfs, struct super_block *sb, char *data)
 			goto failed_sbh;
 		}
 		nilfs_release_super_block(nilfs);
-		if (!sb_set_blocksize(sb, blocksize)) {
-			nilfs_err(sb, "bad blocksize %d", blocksize);
-			err = -EINVAL;
-			goto out;
-		}
+		sb_set_blocksize(sb, blocksize);
 
 		err = nilfs_load_super_block(nilfs, sb, blocksize, &sbp);
 		if (err)

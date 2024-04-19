@@ -588,25 +588,24 @@ static void mlxbf_tmfifo_rxtx_word(struct mlxbf_tmfifo_vring *vring,
 
 	if (vring->cur_len + sizeof(u64) <= len) {
 		/* The whole word. */
-		if (is_rx) {
-			if (!IS_VRING_DROP(vring))
+		if (!IS_VRING_DROP(vring)) {
+			if (is_rx)
 				memcpy(addr + vring->cur_len, &data,
 				       sizeof(u64));
-		} else {
-			memcpy(&data, addr + vring->cur_len,
-			       sizeof(u64));
+			else
+				memcpy(&data, addr + vring->cur_len,
+				       sizeof(u64));
 		}
 		vring->cur_len += sizeof(u64);
 	} else {
 		/* Leftover bytes. */
-		if (is_rx) {
-			if (!IS_VRING_DROP(vring))
+		if (!IS_VRING_DROP(vring)) {
+			if (is_rx)
 				memcpy(addr + vring->cur_len, &data,
 				       len - vring->cur_len);
-		} else {
-			data = 0;
-			memcpy(&data, addr + vring->cur_len,
-			       len - vring->cur_len);
+			else
+				memcpy(&data, addr + vring->cur_len,
+				       len - vring->cur_len);
 		}
 		vring->cur_len = len;
 	}

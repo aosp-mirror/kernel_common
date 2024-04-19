@@ -139,7 +139,7 @@ static inline int kprobe_ftrace(struct kprobe *p)
  *
  */
 struct kretprobe_holder {
-	struct kretprobe __rcu *rp;
+	struct kretprobe	*rp;
 	refcount_t		ref;
 };
 
@@ -224,7 +224,10 @@ unsigned long kretprobe_trampoline_handler(struct pt_regs *regs,
 
 static nokprobe_inline struct kretprobe *get_kretprobe(struct kretprobe_instance *ri)
 {
-	return rcu_dereference_check(ri->rph->rp, rcu_read_lock_any_held());
+	RCU_LOCKDEP_WARN(!rcu_read_lock_any_held(),
+		"Kretprobe is accessed from instance under preemptive context");
+
+	return READ_ONCE(ri->rph->rp);
 }
 
 #else /* CONFIG_KRETPROBES */

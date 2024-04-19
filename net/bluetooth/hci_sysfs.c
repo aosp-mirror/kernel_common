@@ -33,7 +33,7 @@ void hci_conn_init_sysfs(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
 
-	bt_dev_dbg(hdev, "conn %p", conn);
+	BT_DBG("conn %p", conn);
 
 	conn->dev.type = &bt_link;
 	conn->dev.class = bt_class;
@@ -46,30 +46,27 @@ void hci_conn_add_sysfs(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
 
-	bt_dev_dbg(hdev, "conn %p", conn);
+	BT_DBG("conn %p", conn);
 
 	if (device_is_registered(&conn->dev))
 		return;
 
 	dev_set_name(&conn->dev, "%s:%d", hdev->name, conn->handle);
 
-	if (device_add(&conn->dev) < 0)
+	if (device_add(&conn->dev) < 0) {
 		bt_dev_err(hdev, "failed to register connection device");
+		return;
+	}
+
+	hci_dev_hold(hdev);
 }
 
 void hci_conn_del_sysfs(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
 
-	bt_dev_dbg(hdev, "conn %p", conn);
-
-	if (!device_is_registered(&conn->dev)) {
-		/* If device_add() has *not* succeeded, use *only* put_device()
-		 * to drop the reference count.
-		 */
-		put_device(&conn->dev);
+	if (!device_is_registered(&conn->dev))
 		return;
-	}
 
 	while (1) {
 		struct device *dev;
@@ -81,7 +78,9 @@ void hci_conn_del_sysfs(struct hci_conn *conn)
 		put_device(dev);
 	}
 
-	device_unregister(&conn->dev);
+	device_del(&conn->dev);
+
+	hci_dev_put(hdev);
 }
 
 static void bt_host_release(struct device *dev)

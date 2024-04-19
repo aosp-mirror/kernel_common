@@ -428,7 +428,6 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
 	dev->hw = hw;
 	dev->dev = pdev;
 	dev->drv = drv_ops;
-	dev->dma_dev = pdev;
 
 	phy = &dev->phy;
 	phy->dev = dev;

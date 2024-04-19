@@ -609,15 +609,22 @@ mlx5_tc_ct_entry_create_nat(struct mlx5_tc_ct_priv *ct_priv,
 	struct flow_action *flow_action = &flow_rule->action;
 	struct mlx5_core_dev *mdev = ct_priv->dev;
 	struct flow_action_entry *act;
+	size_t action_size;
 	char *modact;
 	int err, i;
+
+	action_size = MLX5_UN_SZ_BYTES(set_add_copy_action_in_auto);
 
 	flow_action_for_each(i, act, flow_action) {
 		switch (act->id) {
 		case FLOW_ACTION_MANGLE: {
-			modact = mlx5e_mod_hdr_alloc(mdev, ct_priv->ns_type, mod_acts);
-			if (IS_ERR(modact))
-				return PTR_ERR(modact);
+			err = alloc_mod_hdr_actions(mdev, ct_priv->ns_type,
+						    mod_acts);
+			if (err)
+				return err;
+
+			modact = mod_acts->actions +
+				 mod_acts->num_actions * action_size;
 
 			err = mlx5_tc_ct_parse_mangle_to_mod_act(act, modact);
 			if (err)
@@ -700,11 +707,11 @@ mlx5_tc_ct_entry_create_mod_hdr(struct mlx5_tc_ct_priv *ct_priv,
 		attr->modify_hdr = mlx5e_mod_hdr_get(*mh);
 	}
 
-	mlx5e_mod_hdr_dealloc(&mod_acts);
+	dealloc_mod_hdr_actions(&mod_acts);
 	return 0;
 
 err_mapping:
-	mlx5e_mod_hdr_dealloc(&mod_acts);
+	dealloc_mod_hdr_actions(&mod_acts);
 	mlx5_put_label_mapping(ct_priv, attr->ct_attr.ct_labels_id);
 	return err;
 }
@@ -1456,7 +1463,7 @@ static int tc_ct_pre_ct_add_rules(struct mlx5_ct_ft *ct_ft,
 	}
 	pre_ct->miss_rule = rule;
 
-	mlx5e_mod_hdr_dealloc(&pre_mod_acts);
+	dealloc_mod_hdr_actions(&pre_mod_acts);
 	kvfree(spec);
 	return 0;
 
@@ -1465,7 +1472,7 @@ err_miss_rule:
 err_flow_rule:
 	mlx5_modify_header_dealloc(dev, pre_ct->modify_hdr);
 err_mapping:
-	mlx5e_mod_hdr_dealloc(&pre_mod_acts);
+	dealloc_mod_hdr_actions(&pre_mod_acts);
 	kvfree(spec);
 	return err;
 }
@@ -1865,14 +1872,14 @@ __mlx5_tc_ct_flow_offload(struct mlx5_tc_ct_priv *ct_priv,
 	}
 
 	attr->ct_attr.ct_flow = ct_flow;
-	mlx5e_mod_hdr_dealloc(&pre_mod_acts);
+	dealloc_mod_hdr_actions(&pre_mod_acts);
 
 	return ct_flow->pre_ct_rule;
 
 err_insert_orig:
 	mlx5_modify_header_dealloc(priv->mdev, pre_ct_attr->modify_hdr);
 err_mapping:
-	mlx5e_mod_hdr_dealloc(&pre_mod_acts);
+	dealloc_mod_hdr_actions(&pre_mod_acts);
 	mlx5_chains_put_chain_mapping(ct_priv->chains, ct_flow->chain_mapping);
 err_get_chain:
 	kfree(ct_flow->pre_ct_attr);

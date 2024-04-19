@@ -300,7 +300,9 @@ struct sk_buff *prp_create_tagged_frame(struct hsr_frame_info *frame,
 	skb = skb_copy_expand(frame->skb_std, 0,
 			      skb_tailroom(frame->skb_std) + HSR_HLEN,
 			      GFP_ATOMIC);
-	return prp_fill_rct(skb, frame, port);
+	prp_fill_rct(skb, frame, port);
+
+	return skb;
 }
 
 static void hsr_deliver_master(struct sk_buff *skb, struct net_device *dev,

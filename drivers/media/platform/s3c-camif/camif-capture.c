@@ -1132,12 +1132,12 @@ int s3c_camif_register_video_node(struct camif_dev *camif, int idx)
 
 	ret = vb2_queue_init(q);
 	if (ret)
-		return ret;
+		goto err_vd_rel;
 
 	vp->pad.flags = MEDIA_PAD_FL_SINK;
 	ret = media_entity_pads_init(&vfd->entity, 1, &vp->pad);
 	if (ret)
-		return ret;
+		goto err_vd_rel;
 
 	video_set_drvdata(vfd, vp);
 
@@ -1170,6 +1170,8 @@ err_ctrlh_free:
 	v4l2_ctrl_handler_free(&vp->ctrl_handler);
 err_me_cleanup:
 	media_entity_cleanup(&vfd->entity);
+err_vd_rel:
+	video_device_release(vfd);
 	return ret;
 }
 

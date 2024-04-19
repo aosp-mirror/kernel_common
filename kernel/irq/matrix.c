@@ -466,16 +466,16 @@ unsigned int irq_matrix_reserved(struct irq_matrix *m)
 }
 
 /**
- * irq_matrix_allocated - Get the number of allocated non-managed irqs on the local CPU
+ * irq_matrix_allocated - Get the number of allocated irqs on the local cpu
  * @m:		Pointer to the matrix to search
  *
- * This returns number of allocated non-managed interrupts.
+ * This returns number of allocated irqs
  */
 unsigned int irq_matrix_allocated(struct irq_matrix *m)
 {
 	struct cpumap *cm = this_cpu_ptr(m->maps);
 
-	return cm->allocated - cm->managed_allocated;
+	return cm->allocated;
 }
 
 #ifdef CONFIG_GENERIC_IRQ_DEBUGFS

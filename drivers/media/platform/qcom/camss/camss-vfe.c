@@ -533,8 +533,7 @@ static int vfe_check_clock_rates(struct vfe_device *vfe)
 		struct camss_clock *clock = &vfe->clock[i];
 
 		if (!strcmp(clock->name, "vfe0") ||
-		    !strcmp(clock->name, "vfe1") ||
-		    !strcmp(clock->name, "vfe_lite")) {
+		    !strcmp(clock->name, "vfe1")) {
 			u64 min_rate = 0;
 			unsigned long rate;
 
@@ -608,7 +607,7 @@ static int vfe_get(struct vfe_device *vfe)
 	} else {
 		ret = vfe_check_clock_rates(vfe);
 		if (ret < 0)
-			goto error_pm_domain;
+			goto error_pm_runtime_get;
 	}
 	vfe->power_count++;
 
