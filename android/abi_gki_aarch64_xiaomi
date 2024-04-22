@@ -557,3 +557,21 @@
   __tracepoint_android_vh_rmqueue_smallest_bypass
   __traceiter_android_vh_free_one_page_bypass
   __tracepoint_android_vh_free_one_page_bypass
+
+#required by minetwork.ko
+  __dev_direct_xmit
+  build_skb_around
+  bpf_map_inc
+  bpf_map_put
+  bpf_redirect_info
+  dma_need_sync
+  int_active_memcg
+  napi_busy_loop
+  page_pool_put_page_bulk
+  rhashtable_walk_start_check
+  rhashtable_walk_exit
+  rhashtable_walk_stop
+  rhashtable_walk_next
+  rhashtable_walk_enter
+  sock_no_ioctl
+  sock_prot_inuse_add
