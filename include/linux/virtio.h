@@ -93,6 +93,7 @@ dma_addr_t virtqueue_get_used_addr(struct virtqueue *vq);
  * virtio_device - representation of a device using virtio
  * @index: unique position on the virtio bus
  * @failed: saved value for VIRTIO_CONFIG_S_FAILED bit (for restore)
+ * @removed: whether or not the device was removed from under us
  * @config_enabled: configuration change reporting enabled
  * @config_change_pending: configuration change reported while disabled
  * @config_lock: protects configuration change reporting
@@ -107,6 +108,7 @@ dma_addr_t virtqueue_get_used_addr(struct virtqueue *vq);
 struct virtio_device {
 	int index;
 	bool failed;
+	bool removed;
 	bool config_enabled;
 	bool config_change_pending;
 	spinlock_t config_lock;
@@ -131,12 +133,18 @@ bool is_virtio_device(struct device *dev);
 
 void virtio_break_device(struct virtio_device *dev);
 
+void virtio_device_mark_removed(struct virtio_device *dev);
+
 void virtio_config_changed(struct virtio_device *dev);
 void virtio_config_disable(struct virtio_device *dev);
 void virtio_config_enable(struct virtio_device *dev);
 #ifdef CONFIG_PM_SLEEP
 int virtio_device_freeze(struct virtio_device *dev);
 int virtio_device_restore(struct virtio_device *dev);
+bool virtio_device_can_suspend(struct virtio_device *dev);
+bool virtio_device_can_resume(struct virtio_device *dev);
+int virtio_device_suspend(struct virtio_device *dev);
+int virtio_device_resume(struct virtio_device *dev);
 #endif
 
 size_t virtio_max_dma_size(struct virtio_device *vdev);

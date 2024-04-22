@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 #include <linux/virtio.h>
+#include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/virtio_config.h>
 #include <linux/module.h>
@@ -398,6 +399,13 @@ void unregister_virtio_device(struct virtio_device *dev)
 }
 EXPORT_SYMBOL_GPL(unregister_virtio_device);
 
+void virtio_device_mark_removed(struct virtio_device *dev)
+{
+	/* Pairs with READ_ONCE() in virtio_device_set_suspend_bit(). */
+	WRITE_ONCE(dev->removed, true);
+}
+EXPORT_SYMBOL_GPL(virtio_device_mark_removed);
+
 #ifdef CONFIG_PM_SLEEP
 int virtio_device_freeze(struct virtio_device *dev)
 {
@@ -471,6 +479,58 @@ err:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(virtio_device_restore);
+
+static int virtio_device_set_suspend_bit(struct virtio_device *dev, bool enabled)
+{
+	u8 status, target;
+
+	status = dev->config->get_status(dev);
+	if (enabled)
+		target = status | VIRTIO_CONFIG_S_SUSPEND;
+	else
+		target = status & ~VIRTIO_CONFIG_S_SUSPEND;
+
+	if (target == status)
+		return 0;
+
+	dev->config->set_status(dev, target);
+
+	while ((status = dev->config->get_status(dev)) != target) {
+		if (status & VIRTIO_CONFIG_S_NEEDS_RESET)
+			return -EIO;
+		/* Pairs with WRITE_ONCE() in virtio_device_mark_removed(). */
+		if (READ_ONCE(dev->removed))
+			return -EIO;
+		msleep(10);
+	}
+	return 0;
+}
+
+bool virtio_device_can_suspend(struct virtio_device *dev)
+{
+	return virtio_has_feature(dev, VIRTIO_F_SUSPEND) &&
+	       (dev->config->get_status(dev) & VIRTIO_CONFIG_S_FEATURES_OK);
+}
+EXPORT_SYMBOL_GPL(virtio_device_can_suspend);
+
+int virtio_device_suspend(struct virtio_device *dev)
+{
+	return virtio_device_set_suspend_bit(dev, true);
+}
+EXPORT_SYMBOL_GPL(virtio_device_suspend);
+
+bool virtio_device_can_resume(struct virtio_device *dev)
+{
+	return virtio_has_feature(dev, VIRTIO_F_SUSPEND) &&
+	       (dev->config->get_status(dev) & VIRTIO_CONFIG_S_SUSPEND);
+}
+EXPORT_SYMBOL_GPL(virtio_device_can_resume);
+
+int virtio_device_resume(struct virtio_device *dev)
+{
+	return virtio_device_set_suspend_bit(dev, false);
+}
+EXPORT_SYMBOL_GPL(virtio_device_resume);
 #endif
 
 static int virtio_init(void)

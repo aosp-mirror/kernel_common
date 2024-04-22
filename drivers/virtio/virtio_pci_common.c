@@ -483,31 +483,26 @@ static int virtio_pci_restore(struct device *dev)
 	return virtio_device_restore(&vp_dev->vdev);
 }
 
-static bool vp_supports_pm_no_reset(struct device *dev)
-{
-	struct pci_dev *pci_dev = to_pci_dev(dev);
-	u16 pmcsr;
-
-	if (!pci_dev->pm_cap)
-		return false;
-
-	pci_read_config_word(pci_dev, pci_dev->pm_cap + PCI_PM_CTRL, &pmcsr);
-	if (PCI_POSSIBLE_ERROR(pmcsr)) {
-		dev_err(dev, "Unable to query pmcsr");
-		return false;
-	}
-
-	return pmcsr & PCI_PM_CTRL_NO_SOFT_RESET;
-}
-
 static int virtio_pci_suspend(struct device *dev)
 {
-	return vp_supports_pm_no_reset(dev) ? 0 : virtio_pci_freeze(dev);
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	struct virtio_pci_device *vp_dev = pci_get_drvdata(pci_dev);
+
+	if (virtio_device_can_suspend(&vp_dev->vdev))
+		return virtio_device_suspend(&vp_dev->vdev);
+
+	return virtio_pci_freeze(dev);
 }
 
 static int virtio_pci_resume(struct device *dev)
 {
-	return vp_supports_pm_no_reset(dev) ? 0 : virtio_pci_restore(dev);
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	struct virtio_pci_device *vp_dev = pci_get_drvdata(pci_dev);
+
+	if (virtio_device_can_resume(&vp_dev->vdev))
+		return virtio_device_resume(&vp_dev->vdev);
+
+	return virtio_pci_restore(dev);
 }
 
 static const struct dev_pm_ops virtio_pci_pm_ops = {
@@ -611,8 +606,11 @@ static void virtio_pci_remove(struct pci_dev *pci_dev)
 	 * Device is marked broken on surprise removal so that virtio upper
 	 * layers can abort any ongoing operation.
 	 */
-	if (!pci_device_is_present(pci_dev))
+	if (!pci_device_is_present(pci_dev)) {
 		virtio_break_device(&vp_dev->vdev);
+
+		virtio_device_mark_removed(&vp_dev->vdev);
+	}
 
 	pci_disable_sriov(pci_dev);
 
