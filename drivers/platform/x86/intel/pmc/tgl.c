@@ -304,6 +304,8 @@ int tgl_core_generic_init(struct pmc_dev *pmcdev, int pch_tp)
 		pmc->map = &tgl_h_reg_map;
 	else
 		pmc->map = &tgl_reg_map;
+	pmcdev->suspend = cnl_suspend;
+	pmcdev->resume = cnl_resume;
 
 	ret = get_primary_reg_base(pmc);
 	if (ret)
@@ -311,11 +313,6 @@ int tgl_core_generic_init(struct pmc_dev *pmcdev, int pch_tp)
 
 	pmc_core_get_low_power_modes(pmcdev);
 	pmc_core_get_tgl_lpm_reqs(pmcdev->pdev);
-	/* Due to a hardware limitation, the GBE LTR blocks PC10
-	 * when a cable is attached. Tell the PMC to ignore it.
-	 */
-	dev_dbg(&pmcdev->pdev->dev, "ignoring GBE LTR\n");
-	pmc_core_send_ltr_ignore(pmcdev, 3, 1);
 
 	return 0;
 }
