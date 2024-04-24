@@ -436,6 +436,7 @@
   __traceiter_android_vh_del_page_from_lrulist
   __traceiter_android_vh_do_futex
   __traceiter_android_vh_do_page_trylock
+  __traceiter_android_vh_do_swap_page_spf
   __traceiter_android_vh_do_traversal_lruvec
   __traceiter_android_vh_dm_bufio_shrink_scan_bypass
   __traceiter_android_vh_drain_all_pages_bypass
@@ -576,6 +577,7 @@
   __tracepoint_android_vh_dm_bufio_shrink_scan_bypass
   __tracepoint_android_vh_do_futex
   __tracepoint_android_vh_do_page_trylock
+  __tracepoint_android_vh_do_swap_page_spf
   __tracepoint_android_vh_do_traversal_lruvec
   __tracepoint_android_vh_drain_all_pages_bypass
   __tracepoint_android_vh_dup_task_struct
