@@ -46,7 +46,6 @@ struct avs_dsp_ops {
 	int (* const power)(struct avs_dev *, u32, bool);
 	int (* const reset)(struct avs_dev *, u32, bool);
 	int (* const stall)(struct avs_dev *, u32, bool);
-	irqreturn_t (* const dsp_interrupt)(struct avs_dev *);
 	irqreturn_t (* const irq_handler)(struct avs_dev *);
 	irqreturn_t (* const irq_thread)(struct avs_dev *);
 	void (* const int_control)(struct avs_dev *, bool);
@@ -282,7 +281,6 @@ int avs_dsp_disable_d0ix(struct avs_dev *adev);
 int avs_dsp_enable_d0ix(struct avs_dev *adev);
 
 irqreturn_t avs_skl_irq_thread(struct avs_dev *adev);
-void avs_skl_ipc_interrupt(struct avs_dev *adev);
 int avs_skl_log_buffer_offset(struct avs_dev *adev, u32 core);
 
 /* Firmware resources management */
