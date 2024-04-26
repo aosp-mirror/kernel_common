@@ -1924,7 +1924,8 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	 * or whatever the user passed on module init.
 	 */
 	if (amdgpu_gtt_size == -1)
-		gtt_size = ttm_tt_pages_limit() << PAGE_SHIFT;
+		gtt_size = max(ttm_tt_pages_limit() << PAGE_SHIFT,
+			       AMDGPU_DEFAULT_GTT_SIZE_MB << 20);
 	else
 		gtt_size = (uint64_t)amdgpu_gtt_size << 20;
 
