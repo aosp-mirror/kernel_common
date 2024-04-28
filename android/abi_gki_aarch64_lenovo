@@ -205,6 +205,9 @@
   cpu_topology
   crc32_le
   css_next_child
+  css_task_iter_end
+  css_task_iter_next
+  css_task_iter_start
   csum_partial
   _ctype
   debugfs_attr_read
