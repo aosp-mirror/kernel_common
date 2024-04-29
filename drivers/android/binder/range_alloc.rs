@@ -21,7 +21,6 @@ pub(crate) struct RangeAllocator<T> {
     free_tree: RBTree<FreeKey, ()>,
     size: usize,
     free_oneway_space: usize,
-    pub(crate) oneway_spam_detected: bool,
 }
 
 /// Represents a range of pages that have just become completely free.
@@ -52,7 +51,6 @@ impl<T> RangeAllocator<T> {
             free_oneway_space: size / 2,
             tree,
             free_tree,
-            oneway_spam_detected: false,
             size,
         })
     }
@@ -110,7 +108,7 @@ impl<T> RangeAllocator<T> {
         is_oneway: bool,
         pid: Pid,
         alloc: ReserveNewBox<T>,
-    ) -> Result<usize> {
+    ) -> Result<(usize, bool)> {
         // Compute new value of free_oneway_space, which is set only on success.
         let new_oneway_space = if is_oneway {
             match self.free_oneway_space.checked_sub(size) {
@@ -127,7 +125,7 @@ impl<T> RangeAllocator<T> {
         //
         // (This will short-circut, so `low_oneway_space` is
         // only called when necessary.)
-        self.oneway_spam_detected =
+        let oneway_spam_detected =
             is_oneway && new_oneway_space < self.size / 10 && self.low_oneway_space(pid);
 
         let (found_size, found_off, tree_node, free_tree_node) = match self.find_best_match(size) {
@@ -162,7 +160,7 @@ impl<T> RangeAllocator<T> {
             self.free_tree.insert(free_tree_node);
         }
 
-        Ok(found_off)
+        Ok((found_off, oneway_spam_detected))
     }
 
     pub(crate) fn reservation_abort(&mut self, offset: usize) -> Result<FreedRange> {
