@@ -11,37 +11,21 @@ use kernel::{
     task::Pid,
 };
 
+use crate::range_alloc::FreedRange;
+
 /// Keeps track of allocations in a process' mmap.
 ///
 /// Each process has an mmap where the data for incoming transactions will be placed. This struct
 /// keeps track of allocations made in the mmap. For each allocation, we store a descriptor that
 /// has metadata related to the allocation. We also keep track of available free space.
-pub(crate) struct RangeAllocator<T> {
+pub(super) struct TreeRangeAllocator<T> {
     tree: RBTree<usize, Descriptor<T>>,
     free_tree: RBTree<FreeKey, ()>,
     size: usize,
     free_oneway_space: usize,
 }
 
-/// Represents a range of pages that have just become completely free.
-#[derive(Copy, Clone)]
-pub(crate) struct FreedRange {
-    pub(crate) start_page_idx: usize,
-    pub(crate) end_page_idx: usize,
-}
-
-impl FreedRange {
-    fn interior_pages(offset: usize, size: usize) -> FreedRange {
-        FreedRange {
-            // Divide round up
-            start_page_idx: (offset + (PAGE_SIZE - 1)) / PAGE_SIZE,
-            // Divide round down
-            end_page_idx: (offset + size) / PAGE_SIZE,
-        }
-    }
-}
-
-impl<T> RangeAllocator<T> {
+impl<T> TreeRangeAllocator<T> {
     pub(crate) fn new(size: usize) -> Result<Self> {
         let mut tree = RBTree::new();
         tree.try_create_and_insert(0, Descriptor::new(0, size), GFP_KERNEL)?;
