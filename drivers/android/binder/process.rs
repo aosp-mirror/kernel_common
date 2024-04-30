@@ -43,7 +43,7 @@ use crate::{
     node::{CouldNotDeliverCriticalIncrement, CritIncrWrapper, Node, NodeDeath, NodeRef},
     page_range::ShrinkablePageRange,
     prio::{self, BinderPriority},
-    range_alloc::{self, RangeAllocator},
+    range_alloc::{RangeAllocator, ReserveNew, ReserveNewArgs},
     stats::BinderStats,
     thread::{PushWorkRes, Thread},
     BinderfsProcFile, DArc, DLArc, DTRWrap, DeliverToRead,
@@ -947,23 +947,33 @@ impl Process {
     ) -> BinderResult<NewAllocation> {
         use kernel::page::PAGE_SIZE;
 
-        let alloc = range_alloc::ReserveNewBox::try_new()?;
-        let mut inner = self.inner.lock();
-        let mapping = inner.mapping.as_mut().ok_or_else(BinderError::new_dead)?;
-        let (offset, oneway_spam_detected) = mapping
-            .alloc
-            .reserve_new(debug_id, size, is_oneway, from_pid, alloc)?;
+        let mut reserve_new_args = ReserveNewArgs {
+            debug_id,
+            size,
+            is_oneway,
+            pid: from_pid,
+            ..ReserveNewArgs::default()
+        };
 
-        let addr = mapping.address + offset;
-        drop(inner);
+        let (new_alloc, addr) = loop {
+            let mut inner = self.inner.lock();
+            let mapping = inner.mapping.as_mut().ok_or_else(BinderError::new_dead)?;
+            let alloc_request = match mapping.alloc.reserve_new(reserve_new_args)? {
+                ReserveNew::Success(new_alloc) => break (new_alloc, mapping.address),
+                ReserveNew::NeedAlloc(request) => request,
+            };
+            drop(inner);
+            // We need to allocate memory and then call `reserve_new` again.
+            reserve_new_args = alloc_request.make_alloc()?;
+        };
 
         let res = Allocation::new(
             self.clone(),
             debug_id,
-            offset,
+            new_alloc.offset,
             size,
-            addr,
-            oneway_spam_detected,
+            addr + new_alloc.offset,
+            new_alloc.oneway_spam_detected,
         );
 
         // This allocation will be marked as in use until the `Allocation` is used to free it.
@@ -977,8 +987,8 @@ impl Process {
         // allocation can only be removed via the destructor of the `Allocation` object that we
         // currently own.
         match self.pages.use_range(
-            offset / PAGE_SIZE,
-            (offset + size + (PAGE_SIZE - 1)) / PAGE_SIZE,
+            new_alloc.offset / PAGE_SIZE,
+            (new_alloc.offset + size + (PAGE_SIZE - 1)) / PAGE_SIZE,
         ) {
             Ok(()) => {}
             Err(err) => {

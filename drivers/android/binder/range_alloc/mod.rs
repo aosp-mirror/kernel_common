@@ -5,9 +5,7 @@
 use kernel::{page::PAGE_SIZE, prelude::*, seq_file::SeqFile, task::Pid};
 
 mod tree;
-use self::tree::TreeRangeAllocator;
-
-pub(crate) use self::tree::ReserveNewBox;
+use self::tree::{ReserveNewBox, TreeRangeAllocator};
 
 /// Represents a range of pages that have just become completely free.
 #[derive(Copy, Clone)]
@@ -61,18 +59,26 @@ impl<T> RangeAllocator<T> {
     }
 
     /// Try to reserve a new buffer, using the provided allocation if necessary.
-    ///
-    /// Returns the offset of the new allocation, and whether oneway spam has been detected.
-    pub(crate) fn reserve_new(
-        &mut self,
-        debug_id: usize,
-        size: usize,
-        is_oneway: bool,
-        pid: Pid,
-        alloc: ReserveNewBox<T>,
-    ) -> Result<(usize, bool)> {
+    pub(crate) fn reserve_new(&mut self, args: ReserveNewArgs<T>) -> Result<ReserveNew<T>> {
         match &mut self.inner {
-            Impl::Tree(tree) => tree.reserve_new(debug_id, size, is_oneway, pid, alloc),
+            Impl::Tree(tree) => {
+                let alloc = match args.tree_alloc {
+                    Some(alloc) => alloc,
+                    None => {
+                        return Ok(ReserveNew::NeedAlloc(ReserveNewNeedAlloc {
+                            args,
+                            need_tree_alloc: true,
+                        }));
+                    }
+                };
+                let (offset, oneway_spam_detected) =
+                    tree.reserve_new(args.debug_id, args.size, args.is_oneway, args.pid, alloc)?;
+                Ok(ReserveNew::Success(ReserveNewSuccess {
+                    offset,
+                    oneway_spam_detected,
+                    _tree_alloc: None,
+                }))
+            }
         }
     }
 
@@ -106,5 +112,48 @@ impl<T> RangeAllocator<T> {
         match &mut self.inner {
             Impl::Tree(tree) => tree.take_for_each(callback),
         }
+    }
+}
+
+/// The arguments for `reserve_new`.
+#[derive(Default)]
+pub(crate) struct ReserveNewArgs<T> {
+    pub(crate) size: usize,
+    pub(crate) is_oneway: bool,
+    pub(crate) debug_id: usize,
+    pub(crate) pid: Pid,
+    pub(crate) tree_alloc: Option<ReserveNewBox<T>>,
+}
+
+/// The return type of `ReserveNew`.
+pub(crate) enum ReserveNew<T> {
+    Success(ReserveNewSuccess<T>),
+    NeedAlloc(ReserveNewNeedAlloc<T>),
+}
+
+/// Returned by `reserve_new` when the reservation was successul.
+pub(crate) struct ReserveNewSuccess<T> {
+    pub(crate) offset: usize,
+    pub(crate) oneway_spam_detected: bool,
+
+    // If the user supplied an allocation that we did not end up using, then we return it here.
+    // The caller will kfree it outside of the lock.
+    _tree_alloc: Option<ReserveNewBox<T>>,
+}
+
+/// Returned by `reserve_new` to request the caller to make an allocation before calling the method
+/// again.
+pub(crate) struct ReserveNewNeedAlloc<T> {
+    args: ReserveNewArgs<T>,
+    need_tree_alloc: bool,
+}
+
+impl<T> ReserveNewNeedAlloc<T> {
+    /// Make the necessary allocations for another call to `reserve_new`.
+    pub(crate) fn make_alloc(mut self) -> Result<ReserveNewArgs<T>> {
+        if self.need_tree_alloc && self.args.tree_alloc.is_none() {
+            self.args.tree_alloc = Some(ReserveNewBox::try_new()?);
+        }
+        Ok(self.args)
     }
 }
