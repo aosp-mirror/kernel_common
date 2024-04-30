@@ -91,7 +91,7 @@ impl<T> TreeRangeAllocator<T> {
         size: usize,
         is_oneway: bool,
         pid: Pid,
-        alloc: ReserveNewBox<T>,
+        alloc: ReserveNewTreeAlloc<T>,
     ) -> Result<(usize, bool)> {
         // Compute new value of free_oneway_space, which is set only on success.
         let new_oneway_space = if is_oneway {
@@ -449,13 +449,13 @@ type FreeKey = (usize, usize);
 type FreeNodeRes = RBTreeNodeReservation<FreeKey, ()>;
 
 /// An allocation for use by `reserve_new`.
-pub(crate) struct ReserveNewBox<T> {
+pub(crate) struct ReserveNewTreeAlloc<T> {
     tree_node_res: RBTreeNodeReservation<usize, Descriptor<T>>,
     free_tree_node_res: FreeNodeRes,
     desc_node_res: FreeNodeRes,
 }
 
-impl<T> ReserveNewBox<T> {
+impl<T> ReserveNewTreeAlloc<T> {
     pub(crate) fn try_new() -> Result<Self> {
         let tree_node_res = RBTreeNodeReservation::new(GFP_KERNEL)?;
         let free_tree_node_res = RBTreeNodeReservation::new(GFP_KERNEL)?;

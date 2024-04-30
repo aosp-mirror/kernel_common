@@ -5,7 +5,7 @@
 use kernel::{page::PAGE_SIZE, prelude::*, seq_file::SeqFile, task::Pid};
 
 mod tree;
-use self::tree::{ReserveNewBox, TreeRangeAllocator};
+use self::tree::{ReserveNewTreeAlloc, TreeRangeAllocator};
 
 /// Represents a range of pages that have just become completely free.
 #[derive(Copy, Clone)]
@@ -122,7 +122,7 @@ pub(crate) struct ReserveNewArgs<T> {
     pub(crate) is_oneway: bool,
     pub(crate) debug_id: usize,
     pub(crate) pid: Pid,
-    pub(crate) tree_alloc: Option<ReserveNewBox<T>>,
+    pub(crate) tree_alloc: Option<ReserveNewTreeAlloc<T>>,
 }
 
 /// The return type of `ReserveNew`.
@@ -138,7 +138,7 @@ pub(crate) struct ReserveNewSuccess<T> {
 
     // If the user supplied an allocation that we did not end up using, then we return it here.
     // The caller will kfree it outside of the lock.
-    _tree_alloc: Option<ReserveNewBox<T>>,
+    _tree_alloc: Option<ReserveNewTreeAlloc<T>>,
 }
 
 /// Returned by `reserve_new` to request the caller to make an allocation before calling the method
@@ -152,7 +152,7 @@ impl<T> ReserveNewNeedAlloc<T> {
     /// Make the necessary allocations for another call to `reserve_new`.
     pub(crate) fn make_alloc(mut self) -> Result<ReserveNewArgs<T>> {
         if self.need_tree_alloc && self.args.tree_alloc.is_none() {
-            self.args.tree_alloc = Some(ReserveNewBox::try_new()?);
+            self.args.tree_alloc = Some(ReserveNewTreeAlloc::try_new()?);
         }
         Ok(self.args)
     }
