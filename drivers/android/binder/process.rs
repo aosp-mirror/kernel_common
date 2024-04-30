@@ -55,9 +55,11 @@ struct Mapping {
 }
 
 impl Mapping {
-    fn new(address: usize, size: usize) -> Result<Self> {
-        let alloc = RangeAllocator::new(size)?;
-        Ok(Self { address, alloc })
+    fn new(address: usize, size: usize) -> Self {
+        Self {
+            address,
+            alloc: RangeAllocator::new(size),
+        }
     }
 }
 
@@ -1053,7 +1055,7 @@ impl Process {
     fn create_mapping(&self, vma: &mm::virt::VmArea) -> Result {
         use kernel::page::PAGE_SIZE;
         let size = usize::min(vma.end() - vma.start(), bindings::SZ_4M as usize);
-        let mapping = Mapping::new(vma.start(), size)?;
+        let mapping = Mapping::new(vma.start(), size);
         let page_count = self.pages.register_with_vma(vma)?;
         if page_count * PAGE_SIZE != size {
             return Err(EINVAL);

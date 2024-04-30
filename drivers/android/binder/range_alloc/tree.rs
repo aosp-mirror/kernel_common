@@ -19,24 +19,47 @@ use crate::range_alloc::FreedRange;
 /// keeps track of allocations made in the mmap. For each allocation, we store a descriptor that
 /// has metadata related to the allocation. We also keep track of available free space.
 pub(super) struct TreeRangeAllocator<T> {
+    /// This collection contains descriptors for *both* ranges containing an allocation, *and* free
+    /// ranges between allocations. The free ranges get merged, so there are never two free ranges
+    /// next to each other.
     tree: RBTree<usize, Descriptor<T>>,
+    /// Contains an entry for every free range in `self.tree`. This tree sorts the ranges by size,
+    /// letting us look up the smallest range whose size is at least some lower bound.
     free_tree: RBTree<FreeKey, ()>,
     size: usize,
     free_oneway_space: usize,
 }
 
 impl<T> TreeRangeAllocator<T> {
-    pub(crate) fn new(size: usize) -> Result<Self> {
+    pub(crate) fn new(size: usize, alloc: EmptyTreeAlloc<T>) -> Self {
         let mut tree = RBTree::new();
-        tree.try_create_and_insert(0, Descriptor::new(0, size), GFP_KERNEL)?;
+        tree.insert(alloc.tree.into_node(0, Descriptor::new(0, size)));
         let mut free_tree = RBTree::new();
-        free_tree.try_create_and_insert((size, 0), (), GFP_KERNEL)?;
-        Ok(Self {
+        free_tree.insert(alloc.free_tree.into_node((size, 0), ()));
+        Self {
             free_oneway_space: size / 2,
             tree,
             free_tree,
             size,
-        })
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        let mut tree_iter = self.tree.values();
+        // There's always at least one range, because index zero is either the start of a free or
+        // allocated range.
+        let first_value = tree_iter.next().unwrap();
+        if tree_iter.next().is_some() {
+            // There are never two free ranges next to each other, so if there is more than one
+            // descriptor, then at least one of them must hold an allocated range.
+            return false;
+        }
+        // There is only one descriptor. Return true if it is for a free range.
+        first_value.state.is_none()
+    }
+
+    pub(crate) fn total_size(&self) -> usize {
+        self.size
     }
 
     pub(crate) fn free_oneway_space(&self) -> usize {
@@ -482,5 +505,20 @@ impl<T> ReserveNewTreeAlloc<T> {
             self.free_tree_node_res.into_node((size, offset), ()),
             self.desc_node_res,
         )
+    }
+}
+
+/// An allocation for an empty `TreeRangeAllocator`.
+pub(crate) struct EmptyTreeAlloc<T> {
+    tree: RBTreeNodeReservation<usize, Descriptor<T>>,
+    free_tree: RBTreeNodeReservation<FreeKey, ()>,
+}
+
+impl<T> EmptyTreeAlloc<T> {
+    pub(crate) fn try_new() -> Result<Self> {
+        Ok(Self {
+            tree: RBTreeNodeReservation::new(GFP_KERNEL)?,
+            free_tree: RBTreeNodeReservation::new(GFP_KERNEL)?,
+        })
     }
 }

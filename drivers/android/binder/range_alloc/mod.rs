@@ -5,7 +5,7 @@
 use kernel::{page::PAGE_SIZE, prelude::*, seq_file::SeqFile, task::Pid};
 
 mod tree;
-use self::tree::{ReserveNewTreeAlloc, TreeRangeAllocator};
+use self::tree::{EmptyTreeAlloc, ReserveNewTreeAlloc, TreeRangeAllocator};
 
 /// Represents a range of pages that have just become completely free.
 #[derive(Copy, Clone)]
@@ -30,43 +30,63 @@ pub(crate) struct RangeAllocator<T> {
 }
 
 enum Impl<T> {
+    Empty(usize),
     Tree(TreeRangeAllocator<T>),
 }
 
 impl<T> RangeAllocator<T> {
-    pub(crate) fn new(size: usize) -> Result<Self> {
-        Ok(Self {
-            inner: Impl::Tree(TreeRangeAllocator::new(size)?),
-        })
+    pub(crate) fn new(size: usize) -> Self {
+        Self {
+            inner: Impl::Empty(size),
+        }
     }
 
     pub(crate) fn free_oneway_space(&self) -> usize {
         match &self.inner {
+            Impl::Empty(size) => size / 2,
             Impl::Tree(tree) => tree.free_oneway_space(),
         }
     }
 
     pub(crate) fn count_buffers(&self) -> usize {
         match &self.inner {
+            Impl::Empty(_size) => 0,
             Impl::Tree(tree) => tree.count_buffers(),
         }
     }
 
     pub(crate) fn debug_print(&self, m: &mut SeqFile) -> Result<()> {
         match &self.inner {
+            Impl::Empty(_size) => Ok(()),
             Impl::Tree(tree) => tree.debug_print(m),
         }
     }
 
     /// Try to reserve a new buffer, using the provided allocation if necessary.
-    pub(crate) fn reserve_new(&mut self, args: ReserveNewArgs<T>) -> Result<ReserveNew<T>> {
+    pub(crate) fn reserve_new(&mut self, mut args: ReserveNewArgs<T>) -> Result<ReserveNew<T>> {
         match &mut self.inner {
+            Impl::Empty(size) => {
+                let empty_tree = match args.empty_tree_alloc.take() {
+                    Some(empty_tree) => TreeRangeAllocator::new(*size, empty_tree),
+                    None => {
+                        return Ok(ReserveNew::NeedAlloc(ReserveNewNeedAlloc {
+                            args,
+                            need_empty_tree_alloc: true,
+                            need_tree_alloc: true,
+                        }))
+                    }
+                };
+
+                self.inner = Impl::Tree(empty_tree);
+                self.reserve_new(args)
+            }
             Impl::Tree(tree) => {
                 let alloc = match args.tree_alloc {
                     Some(alloc) => alloc,
                     None => {
                         return Ok(ReserveNew::NeedAlloc(ReserveNewNeedAlloc {
                             args,
+                            need_empty_tree_alloc: false,
                             need_tree_alloc: true,
                         }));
                     }
@@ -76,6 +96,7 @@ impl<T> RangeAllocator<T> {
                 Ok(ReserveNew::Success(ReserveNewSuccess {
                     offset,
                     oneway_spam_detected,
+                    _empty_tree_alloc: args.empty_tree_alloc,
                     _tree_alloc: None,
                 }))
             }
@@ -85,13 +106,21 @@ impl<T> RangeAllocator<T> {
     /// Deletes the allocations at `offset`.
     pub(crate) fn reservation_abort(&mut self, offset: usize) -> Result<FreedRange> {
         match &mut self.inner {
-            Impl::Tree(tree) => tree.reservation_abort(offset),
+            Impl::Empty(_size) => Err(EINVAL),
+            Impl::Tree(tree) => {
+                let freed_range = tree.reservation_abort(offset)?;
+                if tree.is_empty() {
+                    self.inner = Impl::Empty(tree.total_size());
+                }
+                Ok(freed_range)
+            }
         }
     }
 
     /// Called when an allocation is no longer in use by the kernel.
     pub(crate) fn reservation_commit(&mut self, offset: usize, data: Option<T>) -> Result {
         match &mut self.inner {
+            Impl::Empty(_size) => Err(EINVAL),
             Impl::Tree(tree) => tree.reservation_commit(offset, data),
         }
     }
@@ -101,6 +130,7 @@ impl<T> RangeAllocator<T> {
     /// Returns the size of the existing entry and the data associated with it.
     pub(crate) fn reserve_existing(&mut self, offset: usize) -> Result<(usize, usize, Option<T>)> {
         match &mut self.inner {
+            Impl::Empty(_size) => Err(EINVAL),
             Impl::Tree(tree) => tree.reserve_existing(offset),
         }
     }
@@ -110,6 +140,7 @@ impl<T> RangeAllocator<T> {
     /// This destroys the range allocator. Used only during shutdown.
     pub(crate) fn take_for_each<F: Fn(usize, usize, usize, Option<T>)>(&mut self, callback: F) {
         match &mut self.inner {
+            Impl::Empty(_size) => {}
             Impl::Tree(tree) => tree.take_for_each(callback),
         }
     }
@@ -122,6 +153,7 @@ pub(crate) struct ReserveNewArgs<T> {
     pub(crate) is_oneway: bool,
     pub(crate) debug_id: usize,
     pub(crate) pid: Pid,
+    pub(crate) empty_tree_alloc: Option<EmptyTreeAlloc<T>>,
     pub(crate) tree_alloc: Option<ReserveNewTreeAlloc<T>>,
 }
 
@@ -138,6 +170,7 @@ pub(crate) struct ReserveNewSuccess<T> {
 
     // If the user supplied an allocation that we did not end up using, then we return it here.
     // The caller will kfree it outside of the lock.
+    _empty_tree_alloc: Option<EmptyTreeAlloc<T>>,
     _tree_alloc: Option<ReserveNewTreeAlloc<T>>,
 }
 
@@ -145,12 +178,16 @@ pub(crate) struct ReserveNewSuccess<T> {
 /// again.
 pub(crate) struct ReserveNewNeedAlloc<T> {
     args: ReserveNewArgs<T>,
+    need_empty_tree_alloc: bool,
     need_tree_alloc: bool,
 }
 
 impl<T> ReserveNewNeedAlloc<T> {
     /// Make the necessary allocations for another call to `reserve_new`.
     pub(crate) fn make_alloc(mut self) -> Result<ReserveNewArgs<T>> {
+        if self.need_empty_tree_alloc && self.args.empty_tree_alloc.is_none() {
+            self.args.empty_tree_alloc = Some(EmptyTreeAlloc::try_new()?);
+        }
         if self.need_tree_alloc && self.args.tree_alloc.is_none() {
             self.args.tree_alloc = Some(ReserveNewTreeAlloc::try_new()?);
         }
