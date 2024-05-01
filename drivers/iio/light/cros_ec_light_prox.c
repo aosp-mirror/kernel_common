@@ -529,22 +529,28 @@ static int cros_ec_light_prox_probe(struct platform_device *pdev)
 	state->core.read_ec_sensors_data = cros_ec_sensors_read_cmd;
 
 	if (num_channels > CROS_EC_LIGHT_PROX_MIN_CHANNELS) {
-		u8 sensor_num = state->core.param.info.sensor_num;
-
 		ret = cros_ec_sensors_core_register(dev, indio_dev,
 				cros_ec_light_push_data);
 		if (ret)
 			return ret;
 
-		ret = cros_ec_sensorhub_register_push_data(
-				sensor_hub, sensor_num + 1,
-				indio_dev,
-				cros_ec_light_push_data_rgb);
-		if (ret)
-			return ret;
+		// Register the RGB callback if sensor FIFO is supported.
+		// Register a callback to cleanup when the sensor/driver is removed.
+		if (cros_ec_check_features(sensor_hub->ec, EC_FEATURE_MOTION_SENSE_FIFO)) {
+			u8 sensor_num = state->core.param.info.sensor_num;
 
-		return devm_add_action_or_reset(dev, cros_ec_light_clean_callback,
-				pdev);
+			ret = cros_ec_sensorhub_register_push_data(
+					sensor_hub, sensor_num + 1,
+					indio_dev,
+					cros_ec_light_push_data_rgb);
+			if (ret)
+				return ret;
+
+			return devm_add_action_or_reset(dev, cros_ec_light_clean_callback,
+					pdev);
+		} else {
+			return 0;
+		}
 	} else {
 		return cros_ec_sensors_core_register(dev, indio_dev,
 				cros_ec_sensors_push_data);
