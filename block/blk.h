@@ -16,6 +16,7 @@
 #define BLK_MAX_TIMEOUT		(5 * HZ)
 
 extern struct dentry *blk_debugfs_root;
+DECLARE_STATIC_KEY_FALSE(blk_sub_page_limits);
 
 struct internal_request_queue {
 	struct request_queue	q;
@@ -61,6 +62,15 @@ struct blk_flush_queue *blk_alloc_flush_queue(int node, int cmd_size,
 					      gfp_t flags);
 void blk_free_flush_queue(struct blk_flush_queue *q);
 
+static inline bool blk_queue_sub_page_limits(const struct queue_limits *lim)
+{
+	return static_branch_unlikely(&blk_sub_page_limits) &&
+		lim->sub_page_limits;
+}
+
+int blk_sub_page_limit_queues_get(void *data, u64 *val);
+void blk_disable_sub_page_limits(struct queue_limits *q);
+
 void blk_freeze_queue(struct request_queue *q);
 void __blk_mq_unfreeze_queue(struct request_queue *q, bool force_atomic);
 void blk_queue_start_drain(struct request_queue *q);
@@ -69,6 +79,24 @@ void blk_queue_start_drain(struct request_queue *q);
 struct bio_vec *bvec_alloc(mempool_t *pool, unsigned short *nr_vecs,
 		gfp_t gfp_mask);
 void bvec_free(mempool_t *pool, struct bio_vec *bv, unsigned short nr_vecs);
+
+/* Number of DMA segments required to transfer @bytes data. */
+static inline unsigned int blk_segments(const struct queue_limits *limits,
+					unsigned int bytes)
+{
+	if (!blk_queue_sub_page_limits(limits))
+		return 1;
+
+	{
+		const unsigned int mss = limits->max_segment_size;
+
+		if (bytes <= mss)
+			return 1;
+		if (is_power_of_2(mss))
+			return round_up(bytes, mss) >> ilog2(mss);
+		return (bytes + mss - 1) / mss;
+	}
+}
 
 static inline bool biovec_phys_mergeable(struct request_queue *q,
 		struct bio_vec *vec1, struct bio_vec *vec2)

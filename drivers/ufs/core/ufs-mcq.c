@@ -268,23 +268,29 @@ static int ufshcd_mcq_get_tag(struct ufs_hba *hba,
 	return div_u64(addr, sizeof(struct utp_transfer_cmd_desc));
 }
 
-static void ufshcd_mcq_process_cqe(struct ufs_hba *hba,
-					    struct ufs_hw_queue *hwq)
+/* Returns true if and only if @compl_cmd has been completed. */
+static bool ufshcd_mcq_process_cqe(struct ufs_hba *hba,
+				   struct ufs_hw_queue *hwq,
+				   struct scsi_cmnd *compl_cmd)
 {
 	struct cq_entry *cqe = ufshcd_mcq_cur_cqe(hwq);
 	int tag = ufshcd_mcq_get_tag(hba, hwq, cqe);
 
-	ufshcd_compl_one_cqe(hba, tag, cqe);
+	return ufshcd_compl_one_cqe(hba, tag, cqe, compl_cmd);
 }
 
+/* Clears *@compl_cmd if and only if *@compl_cmd has been completed. */
 unsigned long ufshcd_mcq_poll_cqe_nolock(struct ufs_hba *hba,
-					 struct ufs_hw_queue *hwq)
+					 struct ufs_hw_queue *hwq,
+					 struct scsi_cmnd **compl_cmd)
 {
 	unsigned long completed_reqs = 0;
 
 	ufshcd_mcq_update_cq_tail_slot(hwq);
 	while (!ufshcd_mcq_is_cq_empty(hwq)) {
-		ufshcd_mcq_process_cqe(hba, hwq);
+		if (ufshcd_mcq_process_cqe(hba, hwq,
+					   compl_cmd ? *compl_cmd : NULL))
+			*compl_cmd = NULL;
 		ufshcd_mcq_inc_cq_head_slot(hwq);
 		completed_reqs++;
 	}
@@ -294,15 +300,16 @@ unsigned long ufshcd_mcq_poll_cqe_nolock(struct ufs_hba *hba,
 
 	return completed_reqs;
 }
-EXPORT_SYMBOL_GPL(ufshcd_mcq_poll_cqe_nolock);
 
+/* Clears *@compl_cmd if and only if *@compl_cmd has been completed. */
 unsigned long ufshcd_mcq_poll_cqe_lock(struct ufs_hba *hba,
-				       struct ufs_hw_queue *hwq)
+				       struct ufs_hw_queue *hwq,
+				       struct scsi_cmnd **compl_cmd)
 {
 	unsigned long completed_reqs, flags;
 
 	spin_lock_irqsave(&hwq->cq_lock, flags);
-	completed_reqs = ufshcd_mcq_poll_cqe_nolock(hba, hwq);
+	completed_reqs = ufshcd_mcq_poll_cqe_nolock(hba, hwq, compl_cmd);
 	spin_unlock_irqrestore(&hwq->cq_lock, flags);
 
 	return completed_reqs;

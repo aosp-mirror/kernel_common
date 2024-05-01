@@ -192,6 +192,7 @@
   copy_page
   _copy_to_iter
   cpu_bit_bitmap
+  cpufreq_boost_enabled
   cpufreq_cpu_get_raw
   cpufreq_dbs_governor_exit
   cpufreq_dbs_governor_init
@@ -199,6 +200,8 @@
   cpufreq_dbs_governor_start
   cpufreq_dbs_governor_stop
   __cpufreq_driver_target
+  cpufreq_freq_attr_scaling_available_freqs
+  cpufreq_freq_attr_scaling_boost_freqs
   cpufreq_generic_attr
   cpufreq_generic_frequency_table_verify
   cpufreq_register_driver
@@ -352,6 +355,7 @@
   device_register
   device_remove_file
   device_rename
+  device_set_wakeup_capable
   device_set_wakeup_enable
   device_unregister
   _dev_info
@@ -403,8 +407,10 @@
   devm_phy_optional_get
   devm_pinctrl_get
   devm_pinctrl_put
+  devm_platform_ioremap_resource
   devm_pwm_get
   __devm_regmap_init_i2c
+  __devm_regmap_init_mmio_clk
   devm_regulator_bulk_get
   devm_regulator_get
   devm_regulator_register
@@ -523,6 +529,7 @@
   d_obtain_alias
   do_exit
   do_trace_netlink_extack
+  do_wait_intr
   down
   downgrade_write
   down_interruptible
@@ -563,6 +570,7 @@
   drm_atomic_helper_wait_for_fences
   drm_atomic_state_default_clear
   __drm_atomic_state_free
+  drm_bridge_add
   drm_compat_ioctl
   drm_connector_attach_encoder
   drm_connector_cleanup
@@ -582,6 +590,11 @@
   drm_dev_alloc
   drm_dev_register
   drm_display_mode_from_videomode
+  drm_dp_aux_init
+  drm_dp_channel_eq_ok
+  drm_dp_clock_recovery_ok
+  drm_dp_dpcd_read
+  drm_dp_dpcd_write
   drm_encoder_cleanup
   drm_encoder_init
   __drm_err
@@ -994,11 +1007,14 @@
   kmsg_dump_register
   kmsg_dump_rewind
   kmsg_dump_unregister
+  kobject_add
   kobject_create_and_add
   kobject_del
+  kobject_init
   kobject_init_and_add
   kobject_put
   kobject_uevent
+  kobj_sysfs_ops
   krealloc
   kstrdup
   kstrndup
@@ -1013,13 +1029,18 @@
   kstrtoul_from_user
   kstrtoull
   kthread_bind
+  kthread_cancel_work_sync
   kthread_create_on_node
+  kthread_flush_worker
+  __kthread_init_worker
   kthread_park
   kthread_parkme
+  kthread_queue_work
   kthread_should_park
   kthread_should_stop
   kthread_stop
   kthread_unpark
+  kthread_worker_fn
   ktime_get
   ktime_get_coarse_ts64
   ktime_get_coarse_with_offset
@@ -1208,6 +1229,7 @@
   of_address_to_resource
   of_clk_add_provider
   of_clk_get
+  of_clk_get_by_name
   of_clk_get_from_provider
   of_clk_src_onecell_get
   of_count_phandle_with_args
@@ -1382,6 +1404,7 @@
   pm_runtime_force_resume
   pm_runtime_force_suspend
   __pm_runtime_idle
+  pm_runtime_no_callbacks
   __pm_runtime_resume
   pm_runtime_set_autosuspend_delay
   __pm_runtime_set_status
@@ -1488,6 +1511,7 @@
   __register_blkdev
   __register_chrdev
   register_chrdev_region
+  register_die_notifier
   register_filesystem
   register_inet6addr_notifier
   register_inetaddr_notifier
@@ -1569,6 +1593,7 @@
   rpmsg_create_ept
   rpmsg_find_device
   rpmsg_register_device
+  rpmsg_register_device_override
   rpmsg_release_channel
   rpmsg_send
   rpmsg_sendto
@@ -1759,6 +1784,7 @@
   snd_ctl_notify
   snd_devm_card_new
   snd_ecards_limit
+  snd_hwdep_new
   snd_info_get_line
   snd_interval_refine
   snd_pcm_format_big_endian
@@ -1871,6 +1897,7 @@
   strncat
   strncmp
   strncpy
+  strndup_user
   strnlen
   strnstr
   strpbrk
@@ -2015,6 +2042,7 @@
   tty_termios_baud_rate
   tty_termios_copy_hw
   tty_termios_encode_baud_rate
+  tty_termios_hw_change
   tty_unregister_device
   tty_unregister_driver
   tty_unregister_ldisc
@@ -2041,6 +2069,7 @@
   unregister_blkdev
   __unregister_chrdev
   unregister_chrdev_region
+  unregister_die_notifier
   unregister_filesystem
   unregister_inet6addr_notifier
   unregister_inetaddr_notifier
@@ -2131,6 +2160,13 @@
   usb_role_switch_get_drvdata
   usb_role_switch_register
   usb_role_switch_unregister
+  usb_serial_deregister_drivers
+  usb_serial_generic_close
+  usb_serial_generic_get_icount
+  usb_serial_generic_open
+  usb_serial_generic_throttle
+  usb_serial_generic_unthrottle
+  usb_serial_register_drivers
   usb_set_interface
   usb_show_dynids
   usb_speed_string
@@ -2281,6 +2317,7 @@
   wait_woken
   __wake_up
   wake_up_bit
+  __wake_up_locked
   wake_up_process
   wakeup_source_add
   wakeup_source_create

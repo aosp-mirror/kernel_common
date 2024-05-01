@@ -15,6 +15,8 @@ struct blk_mq_debugfs_attr {
 	const struct seq_operations *seq_ops;
 };
 
+void blk_mq_debugfs_init(void);
+
 int __blk_mq_debugfs_rq_show(struct seq_file *m, struct request *rq);
 int blk_mq_debugfs_rq_show(struct seq_file *m, void *v);
 
@@ -36,6 +38,10 @@ void blk_mq_debugfs_register_rqos(struct rq_qos *rqos);
 void blk_mq_debugfs_unregister_rqos(struct rq_qos *rqos);
 void blk_mq_debugfs_unregister_queue_rqos(struct request_queue *q);
 #else
+static inline void blk_mq_debugfs_init(void)
+{
+}
+
 static inline void blk_mq_debugfs_register(struct request_queue *q)
 {
 }

@@ -58,6 +58,7 @@
 #include <linux/delayacct.h>
 #include <linux/init.h>
 #include <linux/pfn_t.h>
+#include <linux/pgsize_migration.h>
 #include <linux/writeback.h>
 #include <linux/memcontrol.h>
 #include <linux/mmu_notifier.h>
@@ -4461,7 +4462,7 @@ static vm_fault_t do_fault_around(struct vm_fault *vmf)
 	end_pgoff = start_pgoff -
 		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)) +
 		PTRS_PER_PTE - 1;
-	end_pgoff = min3(end_pgoff, vma_pages(vmf->vma) + vmf->vma->vm_pgoff - 1,
+	end_pgoff = min3(end_pgoff, vma_data_pages(vmf->vma) + vmf->vma->vm_pgoff - 1,
 			start_pgoff + nr_pages - 1);
 
 	if (!(vmf->flags & FAULT_FLAG_SPECULATIVE) &&
@@ -4939,6 +4940,17 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 		pgd_t pgdval;
 		p4d_t p4dval;
 		pud_t pudval;
+		bool uffd_missing_sigbus = false;
+
+#ifdef CONFIG_USERFAULTFD
+		/*
+		 * Only support SPF for SIGBUS+MISSING userfaults in private
+		 * anonymous VMAs.
+		 */
+		uffd_missing_sigbus = vma_is_anonymous(vma) &&
+					(vma->vm_flags & VM_UFFD_MISSING) &&
+					userfaultfd_using_sigbus(vma);
+#endif
 
 		vmf.seq = seq;
 
@@ -5018,11 +5030,19 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 
 		speculative_page_walk_end();
 
+		if (!vmf.pte && uffd_missing_sigbus)
+			return VM_FAULT_SIGBUS;
+
 		return handle_pte_fault(&vmf);
 
 	spf_fail:
 		speculative_page_walk_end();
-		return VM_FAULT_RETRY;
+		/*
+		 * Failing page-table walk is similar to page-missing so give an
+		 * opportunity to SIGBUS+MISSING userfault to handle it before
+		 * retrying with mmap_lock
+		 */
+		return uffd_missing_sigbus ? VM_FAULT_SIGBUS : VM_FAULT_RETRY;
 	}
 #endif	/* CONFIG_SPECULATIVE_PAGE_FAULT */
 

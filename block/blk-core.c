@@ -46,7 +46,11 @@
 #include <trace/events/block.h>
 
 #include "blk.h"
+
 #include "blk-mq.h"
+#ifndef __GENKSYMS__
+#include "blk-mq-debugfs.h"
+#endif
 #include "blk-mq-sched.h"
 #include "blk-pm.h"
 #ifndef __GENKSYMS__
@@ -1786,6 +1790,7 @@ int __init blk_dev_init(void)
 		sizeof(struct internal_request_queue), 0, SLAB_PANIC, NULL);
 
 	blk_debugfs_root = debugfs_create_dir("block", NULL);
+	blk_mq_debugfs_init();
 
 	return 0;
 }

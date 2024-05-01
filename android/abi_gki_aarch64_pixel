@@ -1106,6 +1106,7 @@
   io_schedule_timeout
   iounmap
   iov_iter_bvec
+  iov_iter_kvec
   ip_send_check
   iput
   __irq_alloc_descs
@@ -1837,6 +1838,7 @@
   seq_putc
   seq_puts
   seq_read
+  seq_read_iter
   seq_release
   seq_release_private
   seq_write

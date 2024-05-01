@@ -811,6 +811,8 @@ static void blk_release_queue(struct kobject *kobj)
 
 	blk_queue_free_zone_bitmaps(q);
 
+	blk_disable_sub_page_limits(&q->limits);
+
 	if (queue_is_mq(q))
 		blk_mq_release(q);
 
