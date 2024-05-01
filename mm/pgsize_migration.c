@@ -326,7 +326,7 @@ void show_map_pad_vma(struct vm_area_struct *vma, struct vm_area_struct *pad,
 	if (smaps)
 		((show_pad_smaps_fn)func)(m, pad);
 	else
-		((show_pad_smaps_fn)func)(m, pad);
+		((show_pad_maps_fn)func)(m, pad);
 
 	kfree(pad);
 	kfree(vma);
