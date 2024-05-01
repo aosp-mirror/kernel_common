@@ -7,6 +7,9 @@ use kernel::{page::PAGE_SIZE, prelude::*, seq_file::SeqFile, task::Pid};
 mod tree;
 use self::tree::{EmptyTreeAlloc, ReserveNewTreeAlloc, TreeRangeAllocator};
 
+mod array;
+use self::array::ArrayRangeAllocator;
+
 /// Represents a range of pages that have just become completely free.
 #[derive(Copy, Clone)]
 pub(crate) struct FreedRange {
@@ -25,12 +28,30 @@ impl FreedRange {
     }
 }
 
+struct Range<T> {
+    offset: usize,
+    size: usize,
+    is_oneway: bool,
+    is_reserved: bool,
+    pid: Pid,
+    debug_id: usize,
+    data: Option<T>,
+}
+
+impl<T> Range<T> {
+    fn endpoint(&self) -> usize {
+        self.offset + self.size
+    }
+}
+
 pub(crate) struct RangeAllocator<T> {
     inner: Impl<T>,
 }
 
 enum Impl<T> {
     Empty(usize),
+    #[allow(dead_code)]
+    Array(ArrayRangeAllocator<T>),
     Tree(TreeRangeAllocator<T>),
 }
 
@@ -44,6 +65,7 @@ impl<T> RangeAllocator<T> {
     pub(crate) fn free_oneway_space(&self) -> usize {
         match &self.inner {
             Impl::Empty(size) => size / 2,
+            Impl::Array(array) => array.free_oneway_space(),
             Impl::Tree(tree) => tree.free_oneway_space(),
         }
     }
@@ -51,6 +73,7 @@ impl<T> RangeAllocator<T> {
     pub(crate) fn count_buffers(&self) -> usize {
         match &self.inner {
             Impl::Empty(_size) => 0,
+            Impl::Array(array) => array.count_buffers(),
             Impl::Tree(tree) => tree.count_buffers(),
         }
     }
@@ -58,6 +81,7 @@ impl<T> RangeAllocator<T> {
     pub(crate) fn debug_print(&self, m: &mut SeqFile) -> Result<()> {
         match &self.inner {
             Impl::Empty(_size) => Ok(()),
+            Impl::Array(array) => array.debug_print(m),
             Impl::Tree(tree) => tree.debug_print(m),
         }
     }
@@ -79,6 +103,17 @@ impl<T> RangeAllocator<T> {
 
                 self.inner = Impl::Tree(empty_tree);
                 self.reserve_new(args)
+            }
+            Impl::Array(array) if array.is_full() => todo!(),
+            Impl::Array(array) => {
+                let offset =
+                    array.reserve_new(args.debug_id, args.size, args.is_oneway, args.pid)?;
+                Ok(ReserveNew::Success(ReserveNewSuccess {
+                    offset,
+                    oneway_spam_detected: false,
+                    _empty_tree_alloc: args.empty_tree_alloc,
+                    _tree_alloc: args.tree_alloc,
+                }))
             }
             Impl::Tree(tree) => {
                 let alloc = match args.tree_alloc {
@@ -107,6 +142,7 @@ impl<T> RangeAllocator<T> {
     pub(crate) fn reservation_abort(&mut self, offset: usize) -> Result<FreedRange> {
         match &mut self.inner {
             Impl::Empty(_size) => Err(EINVAL),
+            Impl::Array(array) => array.reservation_abort(offset),
             Impl::Tree(tree) => {
                 let freed_range = tree.reservation_abort(offset)?;
                 if tree.is_empty() {
@@ -121,6 +157,7 @@ impl<T> RangeAllocator<T> {
     pub(crate) fn reservation_commit(&mut self, offset: usize, data: Option<T>) -> Result {
         match &mut self.inner {
             Impl::Empty(_size) => Err(EINVAL),
+            Impl::Array(array) => array.reservation_commit(offset, data),
             Impl::Tree(tree) => tree.reservation_commit(offset, data),
         }
     }
@@ -131,6 +168,7 @@ impl<T> RangeAllocator<T> {
     pub(crate) fn reserve_existing(&mut self, offset: usize) -> Result<(usize, usize, Option<T>)> {
         match &mut self.inner {
             Impl::Empty(_size) => Err(EINVAL),
+            Impl::Array(array) => array.reserve_existing(offset),
             Impl::Tree(tree) => tree.reserve_existing(offset),
         }
     }
@@ -141,6 +179,7 @@ impl<T> RangeAllocator<T> {
     pub(crate) fn take_for_each<F: Fn(usize, usize, usize, Option<T>)>(&mut self, callback: F) {
         match &mut self.inner {
             Impl::Empty(_size) => {}
+            Impl::Array(array) => array.take_for_each(callback),
             Impl::Tree(tree) => tree.take_for_each(callback),
         }
     }
