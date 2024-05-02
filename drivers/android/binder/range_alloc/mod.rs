@@ -5,10 +5,10 @@
 use kernel::{page::PAGE_SIZE, prelude::*, seq_file::SeqFile, task::Pid};
 
 mod tree;
-use self::tree::{EmptyTreeAlloc, FromArrayAllocs, ReserveNewTreeAlloc, TreeRangeAllocator};
+use self::tree::{FromArrayAllocs, ReserveNewTreeAlloc, TreeRangeAllocator};
 
 mod array;
-use self::array::ArrayRangeAllocator;
+use self::array::{ArrayRangeAllocator, EmptyArrayAlloc};
 
 /// The array implementation must switch to the tree if it wants to go beyond this number of
 /// ranges.
@@ -54,7 +54,6 @@ pub(crate) struct RangeAllocator<T> {
 
 enum Impl<T> {
     Empty(usize),
-    #[allow(dead_code)]
     Array(ArrayRangeAllocator<T>),
     Tree(TreeRangeAllocator<T>),
 }
@@ -94,19 +93,19 @@ impl<T> RangeAllocator<T> {
     pub(crate) fn reserve_new(&mut self, mut args: ReserveNewArgs<T>) -> Result<ReserveNew<T>> {
         match &mut self.inner {
             Impl::Empty(size) => {
-                let empty_tree = match args.empty_tree_alloc.take() {
-                    Some(empty_tree) => TreeRangeAllocator::new(*size, empty_tree),
+                let empty_array = match args.empty_array_alloc.take() {
+                    Some(empty_array) => ArrayRangeAllocator::new(*size, empty_array),
                     None => {
                         return Ok(ReserveNew::NeedAlloc(ReserveNewNeedAlloc {
                             args,
-                            need_empty_tree_alloc: true,
+                            need_empty_array_alloc: true,
                             need_new_tree_alloc: false,
-                            need_tree_alloc: true,
+                            need_tree_alloc: false,
                         }))
                     }
                 };
 
-                self.inner = Impl::Tree(empty_tree);
+                self.inner = Impl::Array(empty_array);
                 self.reserve_new(args)
             }
             Impl::Array(array) if array.is_full() => {
@@ -115,7 +114,7 @@ impl<T> RangeAllocator<T> {
                     None => {
                         return Ok(ReserveNew::NeedAlloc(ReserveNewNeedAlloc {
                             args,
-                            need_empty_tree_alloc: false,
+                            need_empty_array_alloc: false,
                             need_new_tree_alloc: true,
                             need_tree_alloc: true,
                         }))
@@ -134,7 +133,7 @@ impl<T> RangeAllocator<T> {
                 Ok(ReserveNew::Success(ReserveNewSuccess {
                     offset,
                     oneway_spam_detected: false,
-                    _empty_tree_alloc: args.empty_tree_alloc,
+                    _empty_array_alloc: args.empty_array_alloc,
                     _new_tree_alloc: args.new_tree_alloc,
                     _tree_alloc: args.tree_alloc,
                 }))
@@ -145,7 +144,7 @@ impl<T> RangeAllocator<T> {
                     None => {
                         return Ok(ReserveNew::NeedAlloc(ReserveNewNeedAlloc {
                             args,
-                            need_empty_tree_alloc: false,
+                            need_empty_array_alloc: false,
                             need_new_tree_alloc: false,
                             need_tree_alloc: true,
                         }));
@@ -156,7 +155,7 @@ impl<T> RangeAllocator<T> {
                 Ok(ReserveNew::Success(ReserveNewSuccess {
                     offset,
                     oneway_spam_detected,
-                    _empty_tree_alloc: args.empty_tree_alloc,
+                    _empty_array_alloc: args.empty_array_alloc,
                     _new_tree_alloc: args.new_tree_alloc,
                     _tree_alloc: None,
                 }))
@@ -218,7 +217,7 @@ pub(crate) struct ReserveNewArgs<T> {
     pub(crate) is_oneway: bool,
     pub(crate) debug_id: usize,
     pub(crate) pid: Pid,
-    pub(crate) empty_tree_alloc: Option<EmptyTreeAlloc<T>>,
+    pub(crate) empty_array_alloc: Option<EmptyArrayAlloc<T>>,
     pub(crate) new_tree_alloc: Option<FromArrayAllocs<T>>,
     pub(crate) tree_alloc: Option<ReserveNewTreeAlloc<T>>,
 }
@@ -236,7 +235,7 @@ pub(crate) struct ReserveNewSuccess<T> {
 
     // If the user supplied an allocation that we did not end up using, then we return it here.
     // The caller will kfree it outside of the lock.
-    _empty_tree_alloc: Option<EmptyTreeAlloc<T>>,
+    _empty_array_alloc: Option<EmptyArrayAlloc<T>>,
     _new_tree_alloc: Option<FromArrayAllocs<T>>,
     _tree_alloc: Option<ReserveNewTreeAlloc<T>>,
 }
@@ -245,7 +244,7 @@ pub(crate) struct ReserveNewSuccess<T> {
 /// again.
 pub(crate) struct ReserveNewNeedAlloc<T> {
     args: ReserveNewArgs<T>,
-    need_empty_tree_alloc: bool,
+    need_empty_array_alloc: bool,
     need_new_tree_alloc: bool,
     need_tree_alloc: bool,
 }
@@ -253,8 +252,8 @@ pub(crate) struct ReserveNewNeedAlloc<T> {
 impl<T> ReserveNewNeedAlloc<T> {
     /// Make the necessary allocations for another call to `reserve_new`.
     pub(crate) fn make_alloc(mut self) -> Result<ReserveNewArgs<T>> {
-        if self.need_empty_tree_alloc && self.args.empty_tree_alloc.is_none() {
-            self.args.empty_tree_alloc = Some(EmptyTreeAlloc::try_new()?);
+        if self.need_empty_array_alloc && self.args.empty_array_alloc.is_none() {
+            self.args.empty_array_alloc = Some(EmptyArrayAlloc::try_new(TREE_THRESHOLD)?);
         }
         if self.need_new_tree_alloc && self.args.new_tree_alloc.is_none() {
             self.args.new_tree_alloc = Some(FromArrayAllocs::try_new(TREE_THRESHOLD)?);

@@ -31,19 +31,6 @@ pub(super) struct TreeRangeAllocator<T> {
 }
 
 impl<T> TreeRangeAllocator<T> {
-    pub(crate) fn new(size: usize, alloc: EmptyTreeAlloc<T>) -> Self {
-        let mut tree = RBTree::new();
-        tree.insert(alloc.tree.into_node(0, Descriptor::new(0, size)));
-        let mut free_tree = RBTree::new();
-        free_tree.insert(alloc.free_tree.into_node((size, 0), ()));
-        Self {
-            free_oneway_space: size / 2,
-            tree,
-            free_tree,
-            size,
-        }
-    }
-
     pub(crate) fn from_array(
         size: usize,
         ranges: &mut Vec<Range<T>>,
@@ -595,20 +582,5 @@ impl<T> FromArrayAllocs<T> {
         }
 
         Ok(Self { tree, free_tree })
-    }
-}
-
-/// An allocation for an empty `TreeRangeAllocator`.
-pub(crate) struct EmptyTreeAlloc<T> {
-    tree: RBTreeNodeReservation<usize, Descriptor<T>>,
-    free_tree: RBTreeNodeReservation<FreeKey, ()>,
-}
-
-impl<T> EmptyTreeAlloc<T> {
-    pub(crate) fn try_new() -> Result<Self> {
-        Ok(Self {
-            tree: RBTreeNodeReservation::new(GFP_KERNEL)?,
-            free_tree: RBTreeNodeReservation::new(GFP_KERNEL)?,
-        })
     }
 }

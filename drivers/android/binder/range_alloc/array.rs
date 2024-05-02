@@ -37,6 +37,14 @@ struct FindEmptyRes {
 }
 
 impl<T> ArrayRangeAllocator<T> {
+    pub(crate) fn new(size: usize, alloc: EmptyArrayAlloc<T>) -> Self {
+        Self {
+            ranges: alloc.ranges,
+            size,
+            free_oneway_space: size / 2,
+        }
+    }
+
     pub(crate) fn free_oneway_space(&self) -> usize {
         self.free_oneway_space
     }
@@ -223,6 +231,18 @@ impl<T> ArrayRangeAllocator<T> {
                 callback(range.offset, range.size, range.debug_id, range.data.take());
             }
         }
+    }
+}
+
+pub(crate) struct EmptyArrayAlloc<T> {
+    ranges: Vec<Range<T>>,
+}
+
+impl<T> EmptyArrayAlloc<T> {
+    pub(crate) fn try_new(capacity: usize) -> Result<Self> {
+        Ok(Self {
+            ranges: Vec::with_capacity(capacity, GFP_KERNEL)?,
+        })
     }
 }
 
