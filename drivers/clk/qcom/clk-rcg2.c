@@ -1170,6 +1170,7 @@ static int clk_rcg2_shared_init(struct clk_hw *hw)
 }
 
 const struct clk_ops clk_rcg2_shared_ops = {
+	.init = clk_rcg2_shared_init,
 	.enable = clk_rcg2_shared_enable,
 	.disable = clk_rcg2_shared_disable,
 	.get_parent = clk_rcg2_shared_get_parent,
