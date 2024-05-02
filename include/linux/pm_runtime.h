@@ -62,6 +62,8 @@ extern void pm_runtime_drop_link(struct device_link *link);
 
 extern int devm_pm_runtime_enable(struct device *dev);
 
+extern int devm_pm_runtime_enable(struct device *dev);
+
 static inline void pm_suspend_ignore_children(struct device *dev, bool enable)
 {
 	dev->power.ignore_children = enable;
