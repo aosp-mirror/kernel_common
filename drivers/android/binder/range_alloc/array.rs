@@ -22,7 +22,7 @@ pub(super) struct ArrayRangeAllocator<T> {
     /// store the free ranges.
     ///
     /// Sorted by offset.
-    ranges: Vec<Range<T>>,
+    pub(super) ranges: Vec<Range<T>>,
     size: usize,
     free_oneway_space: usize,
 }

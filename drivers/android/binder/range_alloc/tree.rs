@@ -11,7 +11,7 @@ use kernel::{
     task::Pid,
 };
 
-use crate::range_alloc::FreedRange;
+use crate::range_alloc::{FreedRange, Range};
 
 /// Keeps track of allocations in a process' mmap.
 ///
@@ -42,6 +42,72 @@ impl<T> TreeRangeAllocator<T> {
             free_tree,
             size,
         }
+    }
+
+    pub(crate) fn from_array(
+        size: usize,
+        ranges: &mut Vec<Range<T>>,
+        alloc: &mut FromArrayAllocs<T>,
+    ) -> Self {
+        let mut tree = TreeRangeAllocator {
+            tree: RBTree::new(),
+            free_tree: RBTree::new(),
+            size,
+            free_oneway_space: size / 2,
+        };
+
+        let mut free_offset = 0;
+        for range in ranges.drain(..) {
+            let free_size = range.offset - free_offset;
+            if free_size > 0 {
+                let free_node = alloc.free_tree.pop().unwrap();
+                tree.free_tree
+                    .insert(free_node.into_node((free_size, free_offset), ()));
+                let tree_node = alloc.tree.pop().unwrap();
+                tree.tree.insert(
+                    tree_node.into_node(free_offset, Descriptor::new(free_offset, free_size)),
+                );
+            }
+            free_offset = range.endpoint();
+
+            if range.is_oneway {
+                tree.free_oneway_space = tree.free_oneway_space.saturating_sub(range.size);
+            }
+
+            let free_res = alloc.free_tree.pop().unwrap();
+            let tree_node = alloc.tree.pop().unwrap();
+            let mut desc = Descriptor::new(range.offset, range.size);
+            if range.is_reserved {
+                desc.state = Some(DescriptorState::Reserved(Reservation {
+                    debug_id: range.debug_id,
+                    is_oneway: range.is_oneway,
+                    pid: range.pid,
+                    free_res,
+                }));
+            } else {
+                desc.state = Some(DescriptorState::Allocated(Allocation {
+                    debug_id: range.debug_id,
+                    is_oneway: range.is_oneway,
+                    pid: range.pid,
+                    free_res,
+                    data: range.data,
+                }));
+            }
+            tree.tree.insert(tree_node.into_node(range.offset, desc));
+        }
+
+        // After the last range, we may need a free range.
+        if free_offset < size {
+            let free_size = size - free_offset;
+            let free_node = alloc.free_tree.pop().unwrap();
+            tree.free_tree
+                .insert(free_node.into_node((free_size, free_offset), ()));
+            let tree_node = alloc.tree.pop().unwrap();
+            tree.tree
+                .insert(tree_node.into_node(free_offset, Descriptor::new(free_offset, free_size)));
+        }
+
+        tree
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -505,6 +571,30 @@ impl<T> ReserveNewTreeAlloc<T> {
             self.free_tree_node_res.into_node((size, offset), ()),
             self.desc_node_res,
         )
+    }
+}
+
+/// An allocation for creating a tree from an `ArrayRangeAllocator`.
+pub(crate) struct FromArrayAllocs<T> {
+    tree: Vec<RBTreeNodeReservation<usize, Descriptor<T>>>,
+    free_tree: Vec<RBTreeNodeReservation<FreeKey, ()>>,
+}
+
+impl<T> FromArrayAllocs<T> {
+    pub(crate) fn try_new(len: usize) -> Result<Self> {
+        let num_descriptors = 2 * len + 1;
+
+        let mut tree = Vec::with_capacity(num_descriptors, GFP_KERNEL)?;
+        for _ in 0..num_descriptors {
+            tree.push(RBTreeNodeReservation::new(GFP_KERNEL)?, GFP_KERNEL)?;
+        }
+
+        let mut free_tree = Vec::with_capacity(num_descriptors, GFP_KERNEL)?;
+        for _ in 0..num_descriptors {
+            free_tree.push(RBTreeNodeReservation::new(GFP_KERNEL)?, GFP_KERNEL)?;
+        }
+
+        Ok(Self { tree, free_tree })
     }
 }
 
