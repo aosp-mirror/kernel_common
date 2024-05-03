@@ -423,7 +423,8 @@ static int show_map(struct seq_file *m, void *v)
 	struct vm_area_struct *pad_vma = get_pad_vma(v);
 	struct vm_area_struct *vma = get_data_vma(v);
 
-	show_map_vma(m, vma);
+	if (vma_pages(vma))
+		show_map_vma(m, vma);
 
 	show_map_pad_vma(vma, pad_vma, m, show_map_vma);
 
@@ -913,7 +914,6 @@ static void show_smap_vma(struct seq_file *m, void *v)
 	if (arch_pkeys_enabled())
 		seq_printf(m, "ProtectionKey:  %8u\n", vma_pkey(vma));
 	show_smap_vma_flags(m, vma);
-
 }
 
 static int show_smap(struct seq_file *m, void *v)
@@ -921,7 +921,8 @@ static int show_smap(struct seq_file *m, void *v)
 	struct vm_area_struct *pad_vma = get_pad_vma(v);
 	struct vm_area_struct *vma = get_data_vma(v);
 
-	show_smap_vma(m, vma);
+	if (vma_pages(vma))
+		show_smap_vma(m, vma);
 
 	show_map_pad_vma(vma, pad_vma, m, (show_pad_vma_fn)show_smap_vma);
 
