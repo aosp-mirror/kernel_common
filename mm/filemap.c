@@ -1711,7 +1711,8 @@ __sched int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 		if (flags & FAULT_FLAG_RETRY_NOWAIT)
 			return 0;
 
-		mmap_read_unlock(mm);
+		if (!(flags & FAULT_FLAG_SPECULATIVE))
+			mmap_read_unlock(mm);
 		if (flags & FAULT_FLAG_KILLABLE)
 			wait_on_page_locked_killable(page);
 		else
@@ -1723,7 +1724,8 @@ __sched int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 
 		ret = __lock_page_killable(page);
 		if (ret) {
-			mmap_read_unlock(mm);
+			if (!(flags & FAULT_FLAG_SPECULATIVE))
+				mmap_read_unlock(mm);
 			return 0;
 		}
 	} else {
