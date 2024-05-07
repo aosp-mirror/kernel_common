@@ -968,9 +968,8 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
 	if (runtime == RUNTIME_INF)
 		return 0;
 
-#ifdef CONFIG_ARM64
 	/*
-	 * XXX Temporary workaround for b/307775867.
+	 * XXX Temporary workaround for b/307775867 and b/336912980.
 	 * We think we ran for this long because the host suspended while we
 	 * were running, so just pretend we didn't run instead of throttling
 	 * for a long time.
@@ -983,7 +982,6 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
 		    "(%ld)\n", rq_of_rt_rq(rt_rq)->cpu, rt_rq->rt_time);
 		rt_rq->rt_time = 0;
 	}
-#endif
 
 	if (rt_rq->rt_time > runtime) {
 		struct rt_bandwidth *rt_b = sched_rt_bandwidth(rt_rq);
