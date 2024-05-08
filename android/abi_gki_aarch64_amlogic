@@ -295,6 +295,7 @@
   del_timer
   del_timer_sync
   dentry_path_raw
+  desc_to_gpio
   des_expand_key
   destroy_workqueue
   dev_alloc_name
@@ -316,6 +317,7 @@
   device_create
   device_create_file
   device_create_managed_software_node
+  device_create_with_groups
   device_del
   device_destroy
   device_for_each_child
@@ -439,6 +441,7 @@
   devres_add
   __devres_alloc_node
   devres_free
+  devres_release
   dev_set_name
   _dev_warn
   d_find_alias
@@ -643,6 +646,7 @@
   drm_gem_prime_import
   drm_gem_prime_mmap
   drm_gem_vm_close
+  drm_get_format_info
   drm_hdcp_update_content_protection
   drm_helper_hpd_irq_event
   drm_helper_mode_fill_fb_struct
@@ -879,12 +883,16 @@
   gpiochip_generic_free
   gpiochip_generic_request
   gpiochip_get_data
+  gpiochip_line_is_valid
+  gpiochip_lock_as_irq
+  gpiochip_unlock_as_irq
   gpiod_cansleep
   gpiod_count
   gpiod_direction_input
   gpiod_direction_output
   gpiod_direction_output_raw
   gpiod_get
+  gpiod_get_direction
   gpiod_get_index
   gpiod_get_index_optional
   gpiod_get_optional
@@ -1062,6 +1070,9 @@
   kernel_param_unlock
   kernel_restart
   kernel_sigaction
+  kernfs_find_and_get_ns
+  kernfs_notify
+  kernfs_put
   kern_mount
   kern_unmount
   key_create_or_update
@@ -1718,6 +1729,7 @@
   remove_cpu
   remove_proc_entry
   remove_wait_queue
+  request_any_context_irq
   request_firmware
   request_firmware_nowait
   __request_module
@@ -2058,10 +2070,14 @@
   task_sched_runtime
   thermal_cooling_device_unregister
   thermal_of_cooling_device_register
+  thermal_zone_bind_cooling_device
+  thermal_zone_device_disable
+  thermal_zone_device_enable
   thermal_zone_device_unregister
   thermal_zone_device_update
   thermal_zone_get_zone_by_name
   thermal_zone_of_sensor_unregister
+  thermal_zone_unbind_cooling_device
   time64_to_tm
   timespec64_to_jiffies
   _totalram_pages
