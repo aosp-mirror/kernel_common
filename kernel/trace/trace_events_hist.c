@@ -3587,7 +3587,6 @@ static void track_data_destroy(struct hist_trigger_data *hist_data,
 			       struct action_data *data)
 {
 	destroy_hist_field(data->track_data.track_var, 0);
-	destroy_hist_field(data->track_data.var_ref, 0);
 
 	kfree(data->track_data.var_str);
 
