@@ -15,3 +15,9 @@ tkjos@google.com
 
 # The following OWNERS can review changes in android-mainline-riscv64.
 prashanthsw@google.com
+
+# Test mapping changes can be made by anyone
+per-file */TEST_MAPPING = *
+
+# Test config xml can be made by anyone
+per-file */*.xml = *
