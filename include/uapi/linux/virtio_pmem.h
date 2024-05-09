@@ -15,7 +15,7 @@
 #include <linux/virtio_config.h>
 
 /* Feature bits */
-#define VIRTIO_PMEM_F_DISCARD	31 /* CHROMIUM: DISCARD is supported */
+#define VIRTIO_PMEM_F_DISCARD	63 /* CHROMIUM: DISCARD is supported */
 
 struct virtio_pmem_config {
 	__le64 start;
@@ -23,7 +23,7 @@ struct virtio_pmem_config {
 };
 
 #define VIRTIO_PMEM_REQ_TYPE_FLUSH      0
-#define VIRTIO_PMEM_REQ_TYPE_DISCARD    31 /* CHROMIUM: DISCARD command */
+#define VIRTIO_PMEM_REQ_TYPE_DISCARD    U32_MAX /* CHROMIUM: DISCARD command */
 
 struct virtio_pmem_resp {
 	/* Host return status corresponding to pmem request */
