@@ -342,7 +342,7 @@ static int parse_probe_vars(char *arg, const struct fetch_type *t,
 			f->fn = t->fetch[FETCH_MTD_retval];
 		else
 			ret = -EINVAL;
-	} else if (strncmp(arg, "stack", 5) == 0) {
+	} else if (str_has_prefix(arg, "stack")) {
 		if (arg[5] == '\0') {
 			if (strcmp(t->name, DEFAULT_FETCH_TYPE_STR))
 				return -EINVAL;
