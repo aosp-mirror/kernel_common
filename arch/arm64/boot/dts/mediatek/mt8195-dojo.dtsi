@@ -12,6 +12,8 @@
 			max-brightness = <1023>;
 		};
 	};
+
+	/delete-node/ rt1019p;
 };
 
 &cros_ec {
@@ -38,7 +40,7 @@
 	max98390_r: max98390@38 {
 		compatible = "maxim,max98390";
 		reg = <0x38>;
-		reset-gpios = <&pio 100 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&pio 100 GPIO_ACTIVE_LOW>;
 		maxim,dsm_param_name = "dsm_param_R_Google_Dojo.bin";
 		status = "okay";
 	};
@@ -123,6 +125,7 @@
 };
 
 &audio_codec {
+	compatible = "realtek,rt5682s";
 	realtek,amic-delay-ms = <250>;
 	status = "okay";
 };
