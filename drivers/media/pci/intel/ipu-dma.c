@@ -318,11 +318,7 @@ static int ipu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 	if (size > info->size)
 		return -EFAULT;
 
-	for (i = 0; i < count; i++)
-		vm_insert_page(vma, vma->vm_start + (i << PAGE_SHIFT),
-			       info->pages[i]);
-
-	return 0;
+	return vm_insert_pages(vma, vma->vm_start, info->pages, &count);
 }
 
 static void ipu_dma_unmap_sg(struct device *dev,
