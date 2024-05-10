@@ -23,7 +23,7 @@ BAD_TAG_MSG = 'Bad subject tag for patch touching ChromeOS specific files'
 
 UPSTREAM_TAGS = ('FROMLIST:', 'UPSTREAM:', 'FROMGIT:', 'BACKPORT:')
 OTHER_TAGS = ('CHROMIUM:', 'WIP:', 'TEST:', 'TEST-ONLY:', 'Revert', 'Reland',
-              'FIXUP:', 'DO-NOT-SUBMIT')
+              'Reapply', 'FIXUP:', 'DO-NOT-SUBMIT')
 
 CHROMEOS_FILES = ('chromeos/', 'OWNERS', 'PRESUBMIT.cfg', 'unblocked_terms.txt')
 
