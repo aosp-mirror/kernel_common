@@ -1,8 +1,6 @@
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM fs
 
-#undef TRACE_INCLUDE_PATH
-
 #if !defined(_TRACE_FS_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_FS_H
 
