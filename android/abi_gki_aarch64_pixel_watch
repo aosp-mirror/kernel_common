@@ -740,6 +740,7 @@
   eth_mac_addr
   eth_type_trans
   event_triggers_call
+  extcon_find_edev_by_node
   extcon_get_edev_by_phandle
   extcon_get_edev_name
   extcon_get_property
