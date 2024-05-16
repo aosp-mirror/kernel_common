@@ -669,4 +669,6 @@ config DM_USER
 
 	  If unsure, say N.
 
+source "drivers/md/dm-vdo/Kconfig"
+
 endif # MD
