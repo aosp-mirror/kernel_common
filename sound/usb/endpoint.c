@@ -41,7 +41,6 @@ struct snd_usb_iface_ref {
 struct snd_usb_clock_ref {
 	unsigned char clock;
 	atomic_t locked;
-	int opened;
 	int rate;
 	bool need_setup;
 	struct list_head list;
@@ -813,7 +812,6 @@ snd_usb_endpoint_open(struct snd_usb_audio *chip,
 				ep = NULL;
 				goto unlock;
 			}
-			ep->clock_ref->opened++;
 		}
 
 		ep->cur_audiofmt = fp;
@@ -939,10 +937,8 @@ void snd_usb_endpoint_close(struct snd_usb_audio *chip,
 		endpoint_set_interface(chip, ep, false);
 
 	if (!--ep->opened) {
-		if (ep->clock_ref) {
-			if (!--ep->clock_ref->opened)
-				ep->clock_ref->rate = 0;
-		}
+		if (ep->clock_ref && !atomic_read(&ep->clock_ref->locked))
+			ep->clock_ref->rate = 0;
 		ep->iface = 0;
 		ep->altsetting = 0;
 		ep->cur_audiofmt = NULL;
@@ -1667,7 +1663,8 @@ void snd_usb_endpoint_stop(struct snd_usb_endpoint *ep, bool keep_pending)
 			WRITE_ONCE(ep->sync_source->sync_sink, NULL);
 		stop_urbs(ep, false, keep_pending);
 		if (ep->clock_ref)
-			atomic_dec(&ep->clock_ref->locked);
+			if (!atomic_dec_return(&ep->clock_ref->locked))
+				ep->clock_ref->rate = 0;
 
 		trace_android_vh_audio_usb_offload_ep_action(ep, false);
 	}
