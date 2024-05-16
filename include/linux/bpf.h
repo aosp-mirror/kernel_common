@@ -175,11 +175,7 @@ struct bpf_map {
 	 */
 	atomic64_t refcnt ____cacheline_aligned;
 	atomic64_t usercnt;
-	/* rcu is used before freeing and work is only used during freeing */
-	union {
-		struct work_struct work;
-		struct rcu_head rcu;
-	};
+	struct work_struct work;
 	struct mutex freeze_mutex;
 #ifdef __GENKSYMS__
 	/* Preserve the CRC change that commit 33fe044f6a9e ("bpf: Fix toctou on
@@ -189,7 +185,6 @@ struct bpf_map {
 #else
 	atomic64_t writecnt;
 #endif
-	bool free_after_mult_rcu_gp;
 };
 
 static inline bool map_value_has_spin_lock(const struct bpf_map *map)
