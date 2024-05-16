@@ -1430,6 +1430,8 @@
   _raw_write_lock
   _raw_write_unlock
   set_capacity
+  sg_copy_from_buffer
+  sg_copy_to_buffer
   sock_efree
   sysfs_streq
   tty_hangup
