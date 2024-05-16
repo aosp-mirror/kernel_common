@@ -831,7 +831,6 @@ snd_usb_endpoint_open(struct snd_usb_audio *chip,
 
 		ep->implicit_fb_sync = fp->implicit_fb;
 		ep->need_setup = true;
-		ep->need_prepare = true;
 
 		usb_audio_dbg(chip, "  channels=%d, rate=%d, format=%s, period_bytes=%d, periods=%d, implicit_fb=%d\n",
 			      ep->cur_channels, ep->cur_rate,
@@ -959,7 +958,7 @@ EXPORT_SYMBOL_GPL(snd_usb_endpoint_close);
 /* Prepare for suspening EP, called from the main suspend handler */
 void snd_usb_endpoint_suspend(struct snd_usb_endpoint *ep)
 {
-	ep->need_prepare = true;
+	ep->need_setup = true;
 	if (ep->iface_ref)
 		ep->iface_ref->need_setup = true;
 	if (ep->clock_ref)
@@ -1342,12 +1341,9 @@ int snd_usb_endpoint_set_params(struct snd_usb_audio *chip,
 				struct snd_usb_endpoint *ep)
 {
 	const struct audioformat *fmt = ep->cur_audiofmt;
-	int err = 0;
+	int err;
 
 	mutex_lock(&chip->mutex);
-	if (!ep->need_setup)
-		goto unlock;
-
 	/* release old buffers, if any */
 	err = release_urbs(ep, false);
 	if (err < 0)
@@ -1396,11 +1392,8 @@ int snd_usb_endpoint_set_params(struct snd_usb_audio *chip,
 	ep->curframesize = ep->curpacksize / ep->cur_frame_bytes;
 
 	err = update_clock_ref_rate(chip, ep);
-	if (err >= 0) {
-		ep->need_setup = false;
+	if (err >= 0)
 		err = 0;
-	}
-
  unlock:
 	mutex_unlock(&chip->mutex);
 	return err;
@@ -1450,7 +1443,7 @@ int snd_usb_endpoint_prepare(struct snd_usb_audio *chip,
 	mutex_lock(&chip->mutex);
 	if (WARN_ON(!ep->iface_ref))
 		goto unlock;
-	if (!ep->need_prepare)
+	if (!ep->need_setup)
 		goto unlock;
 
 	/* If the interface has been already set up, just set EP parameters */
@@ -1504,7 +1497,7 @@ int snd_usb_endpoint_prepare(struct snd_usb_audio *chip,
 	ep->iface_ref->need_setup = false;
 
  done:
-	ep->need_prepare = false;
+	ep->need_setup = false;
 	err = 1;
 
 unlock:
