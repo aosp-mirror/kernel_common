@@ -602,7 +602,7 @@ int power_supply_get_by_phandle_array(struct device_node *np,
 	param.psy = psy;
 	param.psy_size = size;
 	param.psy_count = 0;
-	ret = class_for_each_device(power_supply_class, NULL, &param,
+	ret = class_for_each_device(&power_supply_class, NULL, &param,
 				    power_supply_match_device_node_array);
 
 	of_node_put(power_supply_np);
