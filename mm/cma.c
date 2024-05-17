@@ -14,11 +14,6 @@
 
 #define pr_fmt(fmt) "cma: " fmt
 
-#ifdef CONFIG_CMA_DEBUG
-#ifndef DEBUG
-#  define DEBUG
-#endif
-#endif
 #define CREATE_TRACE_POINTS
 
 #include <linux/memblock.h>
@@ -391,7 +386,6 @@ err:
 	return ret;
 }
 
-#ifdef CONFIG_CMA_DEBUG
 static void cma_debug_show_areas(struct cma *cma)
 {
 	unsigned long next_zero_bit, next_set_bit, nr_zero;
@@ -416,9 +410,6 @@ static void cma_debug_show_areas(struct cma *cma)
 	pr_cont("=> %lu free of %lu total pages\n", nr_total, cma->count);
 	spin_unlock_irq(&cma->lock);
 }
-#else
-static inline void cma_debug_show_areas(struct cma *cma) { }
-#endif
 
 /**
  * __cma_alloc() - allocate pages from contiguous area
@@ -441,6 +432,7 @@ struct page *__cma_alloc(struct cma *cma, unsigned long count,
 	unsigned long i;
 	struct page *page = NULL;
 	int ret = -ENOMEM;
+	const char *name = cma ? cma->name : NULL;
 	int num_attempts = 0;
 	int max_retries = 5;
 
@@ -448,16 +440,16 @@ struct page *__cma_alloc(struct cma *cma, unsigned long count,
 		(gfp_mask & ~(GFP_KERNEL|__GFP_NOWARN|__GFP_NORETRY)) != 0))
 		goto out;
 
+	trace_cma_alloc_start(name, count, align);
+
 	if (!cma || !cma->count || !cma->bitmap)
-		goto out;
+		return page;
 
 	pr_debug("%s(cma %p, name: %s, count %lu, align %d)\n", __func__,
 		(void *)cma, cma->name, count, align);
 
 	if (!count)
-		goto out;
-
-	trace_cma_alloc_start(cma->name, count, align);
+		return page;
 
 	mask = cma_bitmap_aligned_mask(cma, align);
 	offset = cma_bitmap_aligned_offset(cma, align);
@@ -465,7 +457,7 @@ struct page *__cma_alloc(struct cma *cma, unsigned long count,
 	bitmap_count = cma_bitmap_pages_to_bits(cma, count);
 
 	if (bitmap_count > bitmap_maxno)
-		goto out;
+		return page;
 
 	for (;;) {
 		spin_lock_irq(&cma->lock);
@@ -527,8 +519,6 @@ struct page *__cma_alloc(struct cma *cma, unsigned long count,
 		start = bitmap_no + mask + 1;
 	}
 
-	trace_cma_alloc_finish(cma->name, pfn, page, count, align, ret);
-
 	/*
 	 * CMA can allocate multiple page blocks, which results in different
 	 * blocks being marked with different tags. Reset the tags to ignore
@@ -546,14 +536,13 @@ struct page *__cma_alloc(struct cma *cma, unsigned long count,
 	}
 
 	pr_debug("%s(): returned %p\n", __func__, page);
-out:
+	trace_cma_alloc_finish(name, pfn, page, count, align, ret);
 	if (page) {
 		count_vm_event(CMA_ALLOC_SUCCESS);
 		cma_sysfs_account_success_pages(cma, count);
 	} else {
 		count_vm_event(CMA_ALLOC_FAIL);
-		if (cma)
-			cma_sysfs_account_fail_pages(cma, count);
+		cma_sysfs_account_fail_pages(cma, count);
 	}
 
 	return page;
@@ -623,6 +612,7 @@ bool cma_release(struct cma *cma, const struct page *pages,
 
 	free_contig_range(pfn, count);
 	cma_clear_bitmap(cma, pfn, count);
+	cma_sysfs_account_release_pages(cma, count);
 	trace_cma_release(cma->name, pfn, pages, count);
 
 	return true;
