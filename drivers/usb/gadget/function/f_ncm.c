@@ -1205,9 +1205,11 @@ static int ncm_unwrap_ntb(struct gether *port,
 	int		dgram_counter;
 	int		to_process = skb->len;
 	struct f_ncm_opts *ncm_opts;
+	struct ncm_vendor_opts *ncm_vopts;
 
 	ncm_opts = container_of(port->func.fi, struct f_ncm_opts, func_inst);
-	frame_max = ncm_opts->max_segment_size;
+	ncm_vopts = container_of(ncm_opts, struct ncm_vendor_opts, opts);
+	frame_max = ncm_vopts->max_segment_size;
 
 parse_ntb:
 	tmp = (__le16 *)ntb_ptr;
@@ -1459,11 +1461,13 @@ static int ncm_bind(struct usb_configuration *c, struct usb_function *f)
 	int			status = 0;
 	struct usb_ep		*ep;
 	struct f_ncm_opts	*ncm_opts;
+	struct ncm_vendor_opts	*ncm_vopts;
 
 	if (!can_support_ecm(cdev->gadget))
 		return -EINVAL;
 
 	ncm_opts = container_of(f->fi, struct f_ncm_opts, func_inst);
+	ncm_vopts = container_of(ncm_opts, struct ncm_vendor_opts, opts);
 
 	if (cdev->use_os_string) {
 		f->os_desc_table = kzalloc(sizeof(*f->os_desc_table),
@@ -1477,7 +1481,7 @@ static int ncm_bind(struct usb_configuration *c, struct usb_function *f)
 	mutex_lock(&ncm_opts->lock);
 	gether_set_gadget(ncm_opts->net, cdev->gadget);
 	if (!ncm_opts->bound) {
-		ncm_opts->net->mtu = (ncm_opts->max_segment_size - ETH_HLEN);
+		ncm_opts->net->mtu = (ncm_vopts->max_segment_size - ETH_HLEN);
 		status = gether_register_netdev(ncm_opts->net);
 	}
 	mutex_unlock(&ncm_opts->lock);
@@ -1522,7 +1526,7 @@ static int ncm_bind(struct usb_configuration *c, struct usb_function *f)
 	ncm_data_intf.bInterfaceNumber = status;
 	ncm_union_desc.bSlaveInterface0 = status;
 
-	ecm_desc.wMaxSegmentSize = cpu_to_le16(ncm_opts->max_segment_size);
+	ecm_desc.wMaxSegmentSize = cpu_to_le16(ncm_vopts->max_segment_size);
 
 	status = -ENODEV;
 
@@ -1632,10 +1636,13 @@ static ssize_t ncm_opts_max_segment_size_show(struct config_item *item,
 					      char *page)
 {
 	struct f_ncm_opts *opts = to_f_ncm_opts(item);
+	struct ncm_vendor_opts *vopts;
 	u16 segment_size;
 
+	vopts = container_of(opts, struct ncm_vendor_opts, opts);
+
 	mutex_lock(&opts->lock);
-	segment_size = opts->max_segment_size;
+	segment_size = vopts->max_segment_size;
 	mutex_unlock(&opts->lock);
 
 	return sysfs_emit(page, "%u\n", segment_size);
@@ -1645,8 +1652,11 @@ static ssize_t ncm_opts_max_segment_size_store(struct config_item *item,
 					       const char *page, size_t len)
 {
 	struct f_ncm_opts *opts = to_f_ncm_opts(item);
+	struct ncm_vendor_opts *vopts;
 	u16 segment_size;
 	int ret;
+
+	vopts = container_of(opts, struct ncm_vendor_opts, opts);
 
 	mutex_lock(&opts->lock);
 	if (opts->refcnt) {
@@ -1663,7 +1673,7 @@ static ssize_t ncm_opts_max_segment_size_store(struct config_item *item,
 		goto out;
 	}
 
-	opts->max_segment_size = segment_size;
+	vopts->max_segment_size = segment_size;
 	ret = len;
 out:
 	mutex_unlock(&opts->lock);
@@ -1702,14 +1712,16 @@ static void ncm_free_inst(struct usb_function_instance *f)
 
 static struct usb_function_instance *ncm_alloc_inst(void)
 {
+	struct ncm_vendor_opts *vopts;
 	struct f_ncm_opts *opts;
 	struct usb_os_desc *descs[1];
 	char *names[1];
 	struct config_group *ncm_interf_group;
 
-	opts = kzalloc(sizeof(*opts), GFP_KERNEL);
-	if (!opts)
+	vopts = kzalloc(sizeof(*vopts), GFP_KERNEL);
+	if (!vopts)
 		return ERR_PTR(-ENOMEM);
+	opts = &vopts->opts;
 	opts->ncm_os_desc.ext_compat_id = opts->ncm_ext_compat_id;
 
 	mutex_init(&opts->lock);
@@ -1720,7 +1732,7 @@ static struct usb_function_instance *ncm_alloc_inst(void)
 		kfree(opts);
 		return ERR_CAST(net);
 	}
-	opts->max_segment_size = ETH_FRAME_LEN;
+	vopts->max_segment_size = ETH_FRAME_LEN;
 	INIT_LIST_HEAD(&opts->ncm_os_desc.ext_prop);
 
 	descs[0] = &opts->ncm_os_desc;
