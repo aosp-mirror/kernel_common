@@ -617,7 +617,7 @@ stm32_rproc_get_loaded_rsc_table(struct rproc *rproc, size_t *table_sz)
 done:
 	/* Assuming the resource table fits in 1kB is fair */
 	*table_sz = RSC_TBL_SIZE;
-	return (__force struct resource_table *)ddata->rsc_va;
+	return (struct resource_table *)ddata->rsc_va;
 }
 
 static const struct rproc_ops st_rproc_ops = {
