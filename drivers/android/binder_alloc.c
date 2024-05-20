@@ -977,7 +977,7 @@ void binder_alloc_print_allocated(struct seq_file *m,
 	binder_alloc_lock(alloc);
 	for (n = rb_first(&alloc->allocated_buffers); n; n = rb_next(n)) {
 		buffer = rb_entry(n, struct binder_buffer, rb_node);
-		seq_printf(m, "  buffer %d: %lx size %zd:%zd:%zd %s\n",
+		seq_printf(m, "  buffer %d: %tx size %zd:%zd:%zd %s\n",
 			   buffer->debug_id,
 			   buffer->user_data - alloc->buffer,
 			   buffer->data_size, buffer->offsets_size,
