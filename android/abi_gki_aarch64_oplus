@@ -254,6 +254,8 @@
   nr_running
   __num_online_cpus
   of_css
+  osq_lock
+  osq_unlock
   override_creds
   page_endio
   __page_file_index
@@ -436,6 +438,7 @@
   __traceiter_android_vh_del_page_from_lrulist
   __traceiter_android_vh_do_futex
   __traceiter_android_vh_do_page_trylock
+  __traceiter_android_vh_do_swap_page_spf
   __traceiter_android_vh_do_traversal_lruvec
   __traceiter_android_vh_dm_bufio_shrink_scan_bypass
   __traceiter_android_vh_drain_all_pages_bypass
@@ -488,6 +491,8 @@
   __traceiter_android_vh_rtmutex_waiter_prio
   __traceiter_android_vh_rt_mutex_steal
   __traceiter_android_vh_rwsem_can_spin_on_owner
+  __traceiter_android_vh_rwsem_direct_rsteal
+  __traceiter_android_vh_rwsem_optimistic_rspin
   __traceiter_android_vh_rwsem_opt_spin_finish
   __traceiter_android_vh_rwsem_opt_spin_start
   __traceiter_android_vh_rwsem_wake_finish
@@ -495,6 +500,7 @@
   __traceiter_android_vh_sched_show_task
   __traceiter_android_vh_sched_stat_runtime_rt
   __traceiter_android_vh_show_mapcount_pages
+  __traceiter_android_vh_shrink_node_memcgs
   __traceiter_android_vh_sync_txn_recvd
   __traceiter_android_vh_task_blocks_on_rtmutex
   __traceiter_android_vh_tune_inactive_ratio
@@ -575,6 +581,7 @@
   __tracepoint_android_vh_dm_bufio_shrink_scan_bypass
   __tracepoint_android_vh_do_futex
   __tracepoint_android_vh_do_page_trylock
+  __tracepoint_android_vh_do_swap_page_spf
   __tracepoint_android_vh_do_traversal_lruvec
   __tracepoint_android_vh_drain_all_pages_bypass
   __tracepoint_android_vh_dup_task_struct
@@ -626,6 +633,8 @@
   __tracepoint_android_vh_rtmutex_waiter_prio
   __tracepoint_android_vh_rt_mutex_steal
   __tracepoint_android_vh_rwsem_can_spin_on_owner
+  __tracepoint_android_vh_rwsem_direct_rsteal
+  __tracepoint_android_vh_rwsem_optimistic_rspin
   __tracepoint_android_vh_rwsem_opt_spin_finish
   __tracepoint_android_vh_rwsem_opt_spin_start
   __tracepoint_android_vh_rwsem_wake_finish
@@ -633,6 +642,7 @@
   __tracepoint_android_vh_sched_show_task
   __tracepoint_android_vh_sched_stat_runtime_rt
   __tracepoint_android_vh_show_mapcount_pages
+  __tracepoint_android_vh_shrink_node_memcgs
   __tracepoint_android_vh_sync_txn_recvd
   __tracepoint_android_vh_task_blocks_on_rtmutex
   __tracepoint_android_vh_tune_inactive_ratio

@@ -2111,6 +2111,7 @@
   sock_unregister
   sort
   __spi_alloc_controller
+  spi_add_device
   spi_register_controller
   spi_unregister_controller
   spmi_controller_add

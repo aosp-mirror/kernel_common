@@ -250,7 +250,12 @@
   devfreq_remove_governor
   devfreq_update_interval
   dev_fwnode
+  dev_forward_skb
   dev_get_stats
+  dev_mc_sync
+  dev_pre_changeaddr_notify
+  dev_set_allmulti
+  dev_uc_sync
   device_add_disk
   device_create
   device_create_file
@@ -948,6 +953,8 @@
   ioremap_cache
   iounmap
   iput
+  ip6_route_input_lookup
+  ip_route_input_noref
   __irq_alloc_descs
   irq_chip_ack_parent
   irq_chip_mask_parent
@@ -1127,6 +1134,7 @@
   netdev_err
   netdev_increment_features
   netdev_info
+  netdev_is_rx_handler_busy
   netdev_lower_state_changed
   netdev_master_upper_dev_link
   netdev_notify_peers
@@ -1539,6 +1547,8 @@
   register_chrdev_region
   register_console
   register_die_notifier
+  register_inet6addr_validator_notifier
+  register_inetaddr_validator_notifier
   register_module_notifier
   register_netdev
   register_netdevice_notifier
@@ -1946,6 +1956,8 @@
   __unregister_chrdev
   unregister_chrdev_region
   unregister_console
+  unregister_inet6addr_validator_notifier
+  unregister_inetaddr_validator_notifier
   unregister_netdev
   unregister_netdevice_notifier
   unregister_netdevice_queue
