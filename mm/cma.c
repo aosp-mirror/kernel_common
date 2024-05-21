@@ -438,7 +438,7 @@ struct page *__cma_alloc(struct cma *cma, unsigned long count,
 
 	if (WARN_ON_ONCE((gfp_mask & GFP_KERNEL) == 0 ||
 		(gfp_mask & ~(GFP_KERNEL|__GFP_NOWARN|__GFP_NORETRY)) != 0))
-		goto out;
+		return page;
 
 	trace_cma_alloc_start(name, count, align);
 
