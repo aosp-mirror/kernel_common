@@ -3555,6 +3555,7 @@ R:	Brian Foster <bfoster@redhat.com>
 L:	linux-bcachefs@vger.kernel.org
 S:	Supported
 C:	irc://irc.oftc.net/bcache
+T:	git https://evilpiepirate.org/git/bcachefs.git
 F:	fs/bcachefs/
 
 BDISP ST MEDIA DRIVER
@@ -15508,7 +15509,6 @@ M:	Ryusuke Konishi <konishi.ryusuke@gmail.com>
 L:	linux-nilfs@vger.kernel.org
 S:	Supported
 W:	https://nilfs.sourceforge.io/
-W:	https://nilfs.osdn.jp/
 T:	git https://github.com/konis/nilfs2.git
 F:	Documentation/filesystems/nilfs2.rst
 F:	fs/nilfs2/
