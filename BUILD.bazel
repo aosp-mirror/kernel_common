@@ -324,6 +324,7 @@ _DB845C_MODULE_OUTS = [
     "drivers/phy/qualcomm/phy-qcom-qmp-pcie-msm8996.ko",
     "drivers/phy/qualcomm/phy-qcom-qmp-ufs.ko",
     "drivers/phy/qualcomm/phy-qcom-qmp-usb.ko",
+    "drivers/phy/qualcomm/phy-qcom-qmp-usbc.ko",
     "drivers/phy/qualcomm/phy-qcom-qusb2.ko",
     "drivers/phy/qualcomm/phy-qcom-snps-eusb2.ko",
     "drivers/phy/qualcomm/phy-qcom-snps-femto-v2.ko",
