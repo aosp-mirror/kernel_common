@@ -218,6 +218,10 @@ int x509_note_sig_algo(void *context, size_t hdrlen, unsigned char tag,
 		ctx->cert->sig->hash_algo = "sha224";
 		goto rsa_pkcs1;
 
+	case OID_id_ecdsa_with_sha1:
+		ctx->cert->sig->hash_algo = "sha1";
+		goto ecdsa;
+
 	case OID_id_rsassa_pkcs1_v1_5_with_sha3_256:
 		ctx->cert->sig->hash_algo = "sha3-256";
 		goto rsa_pkcs1;
@@ -229,10 +233,6 @@ int x509_note_sig_algo(void *context, size_t hdrlen, unsigned char tag,
 	case OID_id_rsassa_pkcs1_v1_5_with_sha3_512:
 		ctx->cert->sig->hash_algo = "sha3-512";
 		goto rsa_pkcs1;
-
-	case OID_id_ecdsa_with_sha1:
-		ctx->cert->sig->hash_algo = "sha1";
-		goto ecdsa;
 
 	case OID_id_ecdsa_with_sha224:
 		ctx->cert->sig->hash_algo = "sha224";
