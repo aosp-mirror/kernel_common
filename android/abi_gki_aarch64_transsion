@@ -10,6 +10,17 @@
   swapcache_free_entries
   swap_type_to_swap_info
   blkcg_schedule_throttle
+  _atomic_dec_and_lock_irqsave
+  bio_uninit
+  blk_mq_kick_requeue_list
+  blk_rq_init
+  errno_to_blk_status
+  ioc_lookup_icq
+  sbitmap_finish_wait
+  sbitmap_prepare_to_wait
+  sbitmap_queue_wake_all
+  scsi_command_normalize_sense
+  ufshcd_release_scsi_cmd
   __traceiter_android_rvh_alloc_si
   __traceiter_android_rvh_alloc_swap_slot_cache
   __traceiter_android_rvh_drain_slots_cache_cpu
