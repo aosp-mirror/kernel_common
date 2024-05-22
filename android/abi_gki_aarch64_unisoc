@@ -2973,6 +2973,9 @@
   watchdog_init_timeout
 
 # required by sprd_wlan_combo.ko
+  crypto_default_rng
+  crypto_get_default_rng
+  crypto_put_default_rng
   __netdev_alloc_frag_align
   printk_timed_ratelimit
 
