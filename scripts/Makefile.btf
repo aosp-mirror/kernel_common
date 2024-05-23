@@ -10,7 +10,7 @@ endif
 
 pahole-flags-$(call test-ge, $(pahole-ver), 121)	+= --btf_gen_floats
 
-pahole-flags-$(call test-ge, $(pahole-ver), 122)	+= -j
+pahole-flags-$(call test-ge, $(pahole-ver), 122)	+= -j1
 
 pahole-flags-$(CONFIG_PAHOLE_HAS_LANG_EXCLUDE)		+= --lang_exclude=rust
 
