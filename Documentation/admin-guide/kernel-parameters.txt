@@ -4683,6 +4683,44 @@
 	printk.time=	Show timing data prefixed to each printk message line
 			Format: <bool>  (1/Y/y=enable, 0/N/n=disable)
 
+	proc_mem.restrict_foll_force= [KNL]
+			Format: {all | ptracer}
+			Restricts the use of the FOLL_FORCE flag for /proc/*/mem access.
+			If restricted, the FOLL_FORCE flag will not be added to vm accesses.
+			Can be one of:
+			- 'all' restricts all access unconditionally.
+			- 'ptracer' allows access only for ptracer processes.
+			If not specified, FOLL_FORCE is always used.
+
+	proc_mem.restrict_open_read= [KNL]
+			Format: {all | ptracer}
+			Allows restricting read access to /proc/*/mem files during open().
+			Depending on restriction level, open for reads return -EACCES.
+			Can be one of:
+			- 'all' restricts all access unconditionally.
+			- 'ptracer' allows access only for ptracer processes.
+			If not specified, then basic file permissions continue to apply.
+
+	proc_mem.restrict_open_write= [KNL]
+			Format: {all | ptracer}
+			Allows restricting write access to /proc/*/mem files during open().
+			Depending on restriction level, open for writes return -EACCES.
+			Can be one of:
+			- 'all' restricts all access unconditionally.
+			- 'ptracer' allows access only for ptracer processes.
+			If not specified, then basic file permissions continue to apply.
+
+	proc_mem.restrict_write= [KNL]
+			Format: {all | ptracer}
+			Allows restricting write access to /proc/*/mem after the files
+			have been opened, during the actual write calls. This is useful for
+			systems which can't block writes earlier during open().
+			Depending on restriction level, writes will return -EACCES.
+			Can be one of:
+			- 'all' restricts all access unconditionally.
+			- 'ptracer' allows access only for ptracer processes.
+			If not specified, then basic file permissions continue to apply.
+
 	processor.max_cstate=	[HW,ACPI]
 			Limit processor to maximum C-state
 			max_cstate=9 overrides any DMI blacklist limit.
