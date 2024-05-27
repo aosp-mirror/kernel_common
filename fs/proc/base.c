@@ -153,12 +153,6 @@ struct pid_entry {
 		NULL, &proc_pid_attr_operations,	\
 		{ .lsm = LSM })
 
-#ifdef CONFIG_SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
-# define PROC_PID_MEM_MODE S_IRUSR
-#else
-# define PROC_PID_MEM_MODE S_IRUSR|S_IWUSR
-#endif
-
 /*
  * Count the number of hardlinks for the pid_entry table, excluding the .
  * and .. links.
@@ -917,11 +911,7 @@ static ssize_t mem_read(struct file *file, char __user *buf,
 static ssize_t mem_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
-#ifdef CONFIG_SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
-	return -EACCES;
-#else
 	return mem_rw(file, (char __user*)buf, count, ppos, 1);
-#endif
 }
 
 loff_t mem_lseek(struct file *file, loff_t offset, int orig)
@@ -3293,7 +3283,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_NUMA
 	REG("numa_maps",  S_IRUGO, proc_pid_numa_maps_operations),
 #endif
-	REG("mem",        PROC_PID_MEM_MODE, proc_mem_operations),
+	REG("mem",        S_IRUSR|S_IWUSR, proc_mem_operations),
 	LNK("cwd",        proc_cwd_link),
 	LNK("root",       proc_root_link),
 	LNK("exe",        proc_exe_link),
@@ -3649,7 +3639,7 @@ static const struct pid_entry tid_base_stuff[] = {
 #ifdef CONFIG_NUMA
 	REG("numa_maps", S_IRUGO, proc_pid_numa_maps_operations),
 #endif
-	REG("mem",       PROC_PID_MEM_MODE, proc_mem_operations),
+	REG("mem",       S_IRUSR|S_IWUSR, proc_mem_operations),
 	LNK("cwd",       proc_cwd_link),
 	LNK("root",      proc_root_link),
 	LNK("exe",       proc_exe_link),
