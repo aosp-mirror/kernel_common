@@ -6,6 +6,7 @@ BIN_DIR=common/tools/testing/android/bin
 ACLOUD=$BIN_DIR/acloudb.sh
 TRADEFED=prebuilts/tradefed/filegroups/tradefed/tradefed.sh
 TESTSDIR=bazel-bin/common/
+LOG_DIR=${TMPDIR:-/tmp}/kselftest_$USER/$(date +%Y%m%d_%H%M%S)
 
 print_help() {
     echo "Usage: $0 [OPTIONS]"
@@ -20,6 +21,7 @@ print_help() {
     echo "                        If serial is specified, cuttlefish device launch will be skipped"
     echo "  -t, --test=TEST_NAME  The test target name. Can be repeated"
     echo "                        If test is not specified, all kselftests will be run"
+    echo "  --gcov                Collect coverage data from the test result"
     echo "  -h, --help            Display this help message and exit"
     echo ""
     echo "Examples:"
@@ -38,6 +40,7 @@ SERIAL_NUMBER=
 MODULE_NAME="selftests"
 TEST_FILTERS=
 SELECTED_TESTS=
+GCOV=false
 
 while test $# -gt 0; do
     case "$1" in
@@ -108,15 +111,24 @@ while test $# -gt 0; do
             TEST_FILTERS+="--include-filter '$MODULE_NAME $TEST_NAME'"
             shift
             ;;
+        --gcov)
+            GCOV=true
+            shift
+            ;;
         *)
             ;;
     esac
 done
 
 if $BUILD_KERNEL; then
+    BUILD_FLAGS=
+    if $GCOV; then
+        BUILD_FLAGS+=" --gcov"
+    fi
     echo "Building kernel..."
     # TODO: add support to build kernel for physical device
-    $BAZEL run //common-modules/virtual-device:virtual_device_x86_64_dist --  --dist_dir=$DIST_DIR
+    $BAZEL run $BUILD_FLAGS //common-modules/virtual-device:virtual_device_x86_64_dist -- \
+     --dist_dir=$DIST_DIR
 fi
 
 if $LAUNCH_CVD; then
@@ -161,13 +173,26 @@ fi
 
 tf_cli="$TRADEFED run commandAndExit template/local_min \
 --template:map test=suite/test_mapping_suite \
-$TEST_FILTERS --tests-dir=$TESTSDIR --primary-abi-only -s $SERIAL_NUMBER"
+$TEST_FILTERS --tests-dir=$TESTSDIR --log-file-path=$LOG_DIR \
+--primary-abi-only -s $SERIAL_NUMBER"
 
-echo "Runing tradefed command: $tf_cli"
+if $GCOV; then
+    tf_cli+=" --coverage --coverage-toolchain GCOV_KERNEL --auto-collect GCOV_KERNEL_COVERAGE"
+fi
+
+echo "Running tradefed command: $tf_cli"
 
 eval $tf_cli
 
+echo "Test finished. Log directory: $LOG_DIR"
+
 if $LAUNCH_CVD && $KILL_CVD; then
-    echo "Test finished. Deleting cvd instance $INSTANCE_NAME ..."
+    echo "Deleting cvd instance $INSTANCE_NAME ..."
     $ACLOUD delete --instance-names $INSTANCE_NAME
+fi
+
+if $GCOV; then
+    echo "Creating tracefile ..."
+    common/tools/testing/android/bin/create-tracefile.py -t $LOG_DIR -o $LOG_DIR/cov.info && \
+    echo "Created tracefile at $LOG_DIR/cov.info"
 fi
