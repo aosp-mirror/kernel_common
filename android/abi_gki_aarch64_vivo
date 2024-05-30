@@ -2378,6 +2378,8 @@
   __traceiter_android_vh_mmc_blk_mq_rw_recovery
   __traceiter_android_vh_mmc_blk_reset
   __traceiter_android_vh_mmc_gpio_cd_irqt
+  __traceiter_android_vh_oom_swapmem_gather_finish
+  __traceiter_android_vh_oom_swapmem_gather_init
   __traceiter_android_vh_printk_hotplug
   __traceiter_android_vh_rproc_recovery
   __traceiter_android_vh_scheduler_tick
@@ -2386,6 +2388,9 @@
   __traceiter_android_vh_show_resume_epoch_val
   __traceiter_android_vh_show_suspend_epoch_val
   __traceiter_android_vh_shrink_slab_bypass
+  __traceiter_android_vh_swapmem_gather_add_bypass
+  __traceiter_android_vh_swapmem_gather_finish
+  __traceiter_android_vh_swapmem_gather_init
   __traceiter_android_vh_timer_calc_index
   __traceiter_android_vh_try_to_unmap_one
   __traceiter_android_vh_tune_scan_type
@@ -2497,6 +2502,8 @@
   __tracepoint_android_vh_mmc_blk_mq_rw_recovery
   __tracepoint_android_vh_mmc_blk_reset
   __tracepoint_android_vh_mmc_gpio_cd_irqt
+  __tracepoint_android_vh_oom_swapmem_gather_finish
+  __tracepoint_android_vh_oom_swapmem_gather_init
   __tracepoint_android_vh_printk_hotplug
   __tracepoint_android_vh_rproc_recovery
   __tracepoint_android_vh_scheduler_tick
@@ -2505,6 +2512,9 @@
   __tracepoint_android_vh_show_resume_epoch_val
   __tracepoint_android_vh_show_suspend_epoch_val
   __tracepoint_android_vh_shrink_slab_bypass
+  __tracepoint_android_vh_swapmem_gather_add_bypass
+  __tracepoint_android_vh_swapmem_gather_finish
+  __tracepoint_android_vh_swapmem_gather_init
   __tracepoint_android_vh_timer_calc_index
   __tracepoint_android_vh_try_to_unmap_one
   __tracepoint_android_vh_tune_scan_type

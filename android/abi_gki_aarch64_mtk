@@ -1147,6 +1147,7 @@
   match_hex
   match_int
   match_token
+  match_uint
   mbox_chan_received_data
   mbox_client_txdone
   mbox_controller_register
@@ -1401,6 +1402,7 @@
   oops_in_progress
   page_endio
   page_mapping
+  page_symlink_inode_operations
   panic
   panic_notifier_list
   param_array_ops
