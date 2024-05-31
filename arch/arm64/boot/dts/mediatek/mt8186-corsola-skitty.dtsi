@@ -38,3 +38,7 @@
 &usb_c1 {
 	status = "disabled";
 };
+
+&target {
+	temperature = <76000>;
+};
