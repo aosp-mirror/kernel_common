@@ -39,6 +39,7 @@
 #include <asm/suspend.h>
 #include <asm/sysreg.h>
 #include <asm/virt.h>
+#include <linux/kfence.h>
 
 /*
  * Hibernate core relies on this value being 0 on resume, and marks it
@@ -473,7 +474,8 @@ static void _copy_pte(pte_t *dst_ptep, pte_t *src_ptep, unsigned long addr)
 		 * the temporary mappings we use during restore.
 		 */
 		set_pte(dst_ptep, pte_mkwrite(pte));
-	} else if (debug_pagealloc_enabled() && !pte_none(pte)) {
+	} else if ((debug_pagealloc_enabled() ||
+                    is_kfence_address((void *)addr)) && !pte_none(pte)) {
 		/*
 		 * debug_pagealloc will removed the PTE_VALID bit if
 		 * the page isn't in use by the resume kernel. It may have
