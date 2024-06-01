@@ -10,6 +10,7 @@
   snd_soc_get_volsw_range
   snd_soc_info_volsw_range
   snd_soc_put_volsw_range
+  snd_compr_stop_error
 
 # required by cs35l45_dlkm.ko
   devm_snd_soc_register_component
