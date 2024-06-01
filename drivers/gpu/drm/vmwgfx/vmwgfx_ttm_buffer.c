@@ -37,25 +37,11 @@ static const struct ttm_place vram_placement_flags = {
 	.flags = TTM_PL_FLAG_CACHED
 };
 
-static const struct ttm_place vram_ne_placement_flags = {
-	.fpfn = 0,
-	.lpfn = 0,
-	.mem_type = TTM_PL_VRAM,
-	.flags = TTM_PL_FLAG_CACHED | TTM_PL_FLAG_NO_EVICT
-};
-
 static const struct ttm_place sys_placement_flags = {
 	.fpfn = 0,
 	.lpfn = 0,
 	.mem_type = TTM_PL_SYSTEM,
 	.flags = TTM_PL_FLAG_CACHED
-};
-
-static const struct ttm_place sys_ne_placement_flags = {
-	.fpfn = 0,
-	.lpfn = 0,
-	.mem_type = TTM_PL_SYSTEM,
-	.flags = TTM_PL_FLAG_CACHED | TTM_PL_FLAG_NO_EVICT
 };
 
 static const struct ttm_place gmr_placement_flags = {
@@ -77,13 +63,6 @@ static const struct ttm_place mob_placement_flags = {
 	.lpfn = 0,
 	.mem_type = VMW_PL_MOB,
 	.flags = TTM_PL_FLAG_CACHED
-};
-
-static const struct ttm_place mob_ne_placement_flags = {
-	.fpfn = 0,
-	.lpfn = 0,
-	.mem_type = VMW_PL_MOB,
-	.flags = TTM_PL_FLAG_CACHED | TTM_PL_FLAG_NO_EVICT
 };
 
 struct ttm_placement vmw_vram_placement = {
@@ -158,25 +137,11 @@ struct ttm_placement vmw_vram_sys_placement = {
 	.busy_placement = &sys_placement_flags
 };
 
-struct ttm_placement vmw_vram_ne_placement = {
-	.num_placement = 1,
-	.placement = &vram_ne_placement_flags,
-	.num_busy_placement = 1,
-	.busy_placement = &vram_ne_placement_flags
-};
-
 struct ttm_placement vmw_sys_placement = {
 	.num_placement = 1,
 	.placement = &sys_placement_flags,
 	.num_busy_placement = 1,
 	.busy_placement = &sys_placement_flags
-};
-
-struct ttm_placement vmw_sys_ne_placement = {
-	.num_placement = 1,
-	.placement = &sys_ne_placement_flags,
-	.num_busy_placement = 1,
-	.busy_placement = &sys_ne_placement_flags
 };
 
 static const struct ttm_place evictable_placement_flags[] = {
@@ -241,13 +206,6 @@ struct ttm_placement vmw_mob_placement = {
 	.num_busy_placement = 1,
 	.placement = &mob_placement_flags,
 	.busy_placement = &mob_placement_flags
-};
-
-struct ttm_placement vmw_mob_ne_placement = {
-	.num_placement = 1,
-	.num_busy_placement = 1,
-	.placement = &mob_ne_placement_flags,
-	.busy_placement = &mob_ne_placement_flags
 };
 
 struct ttm_placement vmw_nonfixed_placement = {
@@ -817,11 +775,9 @@ int vmw_bo_create_and_populate(struct vmw_private *dev_priv,
 	struct ttm_buffer_object *bo;
 	int ret;
 
-	ret = ttm_bo_create(&dev_priv->bdev, bo_size,
-			    ttm_bo_type_device,
-			    &vmw_sys_ne_placement,
-			    0, false, &bo);
-
+	ret = vmw_bo_create_kernel(dev_priv, bo_size,
+				   &vmw_sys_placement,
+				   &bo);
 	if (unlikely(ret != 0))
 		return ret;
 
