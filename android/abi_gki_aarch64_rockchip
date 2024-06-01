@@ -2216,6 +2216,9 @@
   devres_release
   kernel_kobj
 
+# required by xd_charger_framework.ko
+  kernel_power_off
+
 # required by rfkill-rk.ko
   kstrtoll
   rfkill_init_sw_state
