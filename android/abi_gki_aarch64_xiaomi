@@ -1,0 +1,76 @@
+#required by millet.ko
+  __traceiter_android_vh_binder_wait_for_work
+  __tracepoint_android_vh_binder_wait_for_work
+  __traceiter_android_vh_do_send_sig_info
+  __traceiter_android_vh_binder_preset
+  __traceiter_android_vh_binder_trans
+  __traceiter_android_vh_binder_reply
+  __traceiter_android_vh_binder_alloc_new_buf_locked
+  __traceiter_android_rvh_refrigerator
+  __tracepoint_android_vh_do_send_sig_info
+  __tracepoint_android_vh_binder_preset
+  __tracepoint_android_vh_binder_trans
+  __tracepoint_android_vh_binder_reply
+  __tracepoint_android_vh_binder_alloc_new_buf_locked
+  __tracepoint_android_rvh_refrigerator
+  freezer_cgrp_subsys
+
+#required by mi_sched.ko
+  __traceiter_android_vh_free_task
+  __tracepoint_android_vh_free_task
+  __traceiter_android_vh_scheduler_tick
+  __tracepoint_android_vh_scheduler_tick
+  jiffies_64
+  free_uid
+  find_user
+
+#required by migt.ko
+  __traceiter_android_rvh_after_enqueue_task
+  __traceiter_android_rvh_after_dequeue_task
+  __traceiter_android_vh_map_util_freq
+  __tracepoint_android_rvh_after_enqueue_task
+  __tracepoint_android_rvh_after_dequeue_task
+  __tracepoint_android_vh_map_util_freq
+  __traceiter_android_vh_map_util_freq_new
+  __tracepoint_android_vh_map_util_freq_new
+
+#required by turbo.ko
+
+#required by fas.ko
+  __traceiter_android_rvh_check_preempt_tick
+  __traceiter_android_rvh_dequeue_entity
+  __traceiter_android_rvh_enqueue_entity
+  __tracepoint_android_rvh_check_preempt_tick
+  __tracepoint_android_rvh_dequeue_entity
+  __tracepoint_android_rvh_enqueue_entity
+
+#required by metis.ko module
+  __traceiter_android_vh_rwsem_read_wait_start
+  __traceiter_android_vh_rwsem_write_wait_start
+  __traceiter_android_vh_mutex_wait_start
+  __traceiter_android_vh_alter_mutex_list_add
+  __traceiter_android_rvh_cpuset_fork
+  __traceiter_android_vh_sched_setaffinity_early
+  __traceiter_android_rvh_set_cpus_allowed_comm
+  __traceiter_android_rvh_dequeue_task
+  __tracepoint_android_vh_rwsem_read_wait_start
+  __tracepoint_android_vh_rwsem_write_wait_start
+  __tracepoint_android_vh_mutex_wait_start
+  __tracepoint_android_vh_alter_mutex_list_add
+  __tracepoint_android_rvh_cpuset_fork
+  __tracepoint_android_vh_sched_setaffinity_early
+  __tracepoint_android_rvh_set_cpus_allowed_comm
+  __tracepoint_android_rvh_dequeue_task
+  cpuset_cpus_allowed
+
+#required by mi_freqwdg.ko
+  __traceiter_android_vh_freq_qos_remove_request
+  __traceiter_android_vh_freq_qos_update_request
+  __traceiter_android_vh_freq_qos_add_request
+  __traceiter_android_rvh_entity_tick
+  __traceiter_android_rvh_dequeue_task_fair
+  __tracepoint_android_vh_freq_qos_remove_request
+  __tracepoint_android_vh_freq_qos_update_request
+  __tracepoint_android_vh_freq_qos_add_request
+  __tracepoint_android_rvh_dequeue_task_fair
+  __tracepoint_android_rvh_entity_tick
