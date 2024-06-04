@@ -62,8 +62,7 @@ static unsigned long elf_hash(const unsigned char *name)
 	while (*name)
 	{
 		h = (h << 4) + *name++;
-		g = h & 0xf0000000;
-		if (h)
+		if (g = h & 0xf0000000)
 			h ^= g >> 24;
 		h &= ~g;
 	}
