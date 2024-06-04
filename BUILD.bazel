@@ -1597,6 +1597,7 @@ cc_binary_with_abi(
     ],
     copts = [
         "-D_GNU_SOURCE",
+        "-Wno-macro-redefined",
     ],
     includes = ["tools/testing/selftests"],
     path_prefix = _KSELFTEST_DIR,
