@@ -86,7 +86,8 @@ static void frwr_mr_recycle(struct rpcrdma_mr *mr)
 	frwr_mr_release(mr);
 }
 
-/* frwr_reset - Place MRs back on the free list
+/**
+ * frwr_reset - Place MRs back on @req's free list
  * @req: request to reset
  *
  * Used after a failed marshal. For FRWR, this means the MRs
