@@ -2146,6 +2146,17 @@
   usb_lock_device_for_reset
   usb_match_id
   usb_match_one_id
+  usbnet_cdc_unbind
+  usbnet_disconnect
+  usbnet_generic_cdc_bind
+  usbnet_open
+  usbnet_probe
+  usbnet_resume
+  usbnet_skb_return
+  usbnet_start_xmit
+  usbnet_stop
+  usbnet_suspend
+  usbnet_tx_timeout
   usb_poison_urb
   usb_put_dev
   usb_put_hcd
