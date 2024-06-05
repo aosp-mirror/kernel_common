@@ -5,7 +5,7 @@ BAZEL=tools/bazel
 BIN_DIR=common/tools/testing/android/bin
 ACLOUD=$BIN_DIR/acloudb.sh
 TRADEFED=prebuilts/tradefed/filegroups/tradefed/tradefed.sh
-TESTSDIR=bazel-bin/common/
+TESTSDIR=$PWD/out/tests
 LOG_DIR=$PWD/out/test_logs/$(date +%Y%m%d_%H%M%S)
 JDK_PATH=prebuilts/jdk/jdk11/linux-x86
 
@@ -26,7 +26,7 @@ print_help() {
     echo ""
     echo "Examples:"
     echo "$0"
-    echo "$0 -t kselftest_size_test_get_size -t kselftest_binderfs_binderfs_test"
+    echo "$0 -t regmap-kunit.ko -t lib_test.ko"
     echo "$0 -s 127.0.0.1:45549"
     echo ""
     exit 0
@@ -37,7 +37,7 @@ LAUNCH_CVD=true
 KILL_CVD=true
 DIST_DIR=/tmp/kernel_dist
 SERIAL_NUMBER=
-MODULE_NAME="selftests"
+MODULE_NAME="kunit"
 TEST_FILTERS=
 SELECTED_TESTS=
 
@@ -118,8 +118,14 @@ done
 if $BUILD_KERNEL; then
     echo "Building kernel..."
     # TODO: add support to build kernel for physical device
-    $BAZEL run $BUILD_FLAGS //common-modules/virtual-device:virtual_device_x86_64_dist -- \
-     --dist_dir=$DIST_DIR
+    $BAZEL run //common-modules/virtual-device:virtual_device_x86_64_dist --  --dist_dir=$DIST_DIR
+    exit_code=$?
+    if [ $exit_code -eq 0 ]; then
+        echo "Command succeeded"
+    else
+        echo "Command failed with exit code $exit_code"
+        exit 1
+    fi
     exit_code=$?
     if [ $exit_code -eq 0 ]; then
         echo "Build kernel succeeded"
@@ -148,29 +154,30 @@ fi
 
 echo "Get abi from device $SERIAL_NUMBER"
 ABI=$(adb -s $SERIAL_NUMBER shell getprop ro.product.cpu.abi)
-echo "Building kselftests according to device $SERIAL_NUMBER ro.product.cpu.abi $ABI ..."
+echo "Building kunit tests according to device $SERIAL_NUMBER ro.product.cpu.abi $ABI ..."
+# $ tools/bazel run -- //common:kunit_tests_x86_64_install -v --destdir /tmp/kunit_tests
 case $ABI in
-    arm64*)
-        $BAZEL build //common:kselftest_tests_arm64
-        ;;
-    x86_64*)
-        $BAZEL build //common:kselftest_tests_x86_64
-        ;;
-    *)
-        echo "$ABI not supported"
-        exit 1
-        ;;
+	arm64*)
+		$BAZEL run //common:kunit_tests_arm64 -- -v --destdir $TESTSDIR
+		;;
+	x86_64*)
+		$BAZEL run //common:kunit_tests_x86_64 -- -v --destdir $TESTSDIR
+		;;
+	*)
+		echo "$ABI not supported"
+		exit 1
+		;;
 esac
 exit_code=$?
 if [ $exit_code -eq 0 ]; then
-    echo "Build kselftest succeeded"
+    echo "Build kunit succeeded"
 else
-    echo "Build kselftest failed with exit code $exit_code"
+    echo "Build kunit failed with exit code $exit_code"
     exit 1
 fi
 
 if [ -z "$SELECTED_TESTS" ]; then
-    echo "Running all kselftests with device $SERIAL_NUMBER..."
+    echo "Running all KUnit tests with device $SERIAL_NUMBER..."
     TEST_FILTERS="--include-filter $MODULE_NAME"
 else
     echo "Running $SELECTED_TESTS with device $SERIAL_NUMBER ..."
