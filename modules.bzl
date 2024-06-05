@@ -134,3 +134,61 @@ def get_gki_modules_list(arch = None):
         ))
 
     return gki_modules_list
+
+_KUNIT_FRAMEWORK_MODULES = [
+    "lib/kunit/kunit.ko",
+]
+
+# Common Kunit test modules
+_KUNIT_COMMON_MODULES_LIST = [
+    # keep sorted
+    "drivers/base/regmap/regmap-kunit.ko",
+    "drivers/base/regmap/regmap-ram.ko",
+    "drivers/base/regmap/regmap-raw-ram.ko",
+    "drivers/hid/hid-uclogic-test.ko",
+    "drivers/iio/test/iio-test-format.ko",
+    "drivers/input/tests/input_test.ko",
+    "drivers/rtc/lib_test.ko",
+    "fs/ext4/ext4-inode-test.ko",
+    "fs/fat/fat_test.ko",
+    "kernel/time/time_test.ko",
+    "lib/kunit/kunit-example-test.ko",
+    "lib/kunit/kunit-test.ko",
+    # "mm/kfence/kfence_test.ko",
+    "net/core/dev_addr_lists_test.ko",
+    "sound/soc/soc-topology-test.ko",
+    "sound/soc/soc-utils-test.ko",
+]
+
+# KUnit test module for arm64 only
+_KUNIT_CLK_MODULES_LIST = [
+    "drivers/clk/clk-gate_test.ko",
+    "drivers/clk/clk_test.ko",
+]
+
+# buildifier: disable=unnamed-macro
+def get_kunit_modules_list(arch = None):
+    """ Provides the list of GKI modules.
+
+    Args:
+      arch: One of [arm, arm64, i386, x86_64].
+
+    Returns:
+      The list of KUnit modules for the given |arch|.
+    """
+    kunit_modules_list = _KUNIT_FRAMEWORK_MODULES + _KUNIT_COMMON_MODULES_LIST
+    if arch == "arm":
+        kunit_modules_list += _KUNIT_CLK_MODULES_LIST
+    elif arch == "arm64":
+        kunit_modules_list += _KUNIT_CLK_MODULES_LIST
+    elif arch == "i386":
+        kunit_modules_list += []
+    elif arch == "x86_64":
+        kunit_modules_list += []
+    else:
+        fail("{}: arch {} not supported. Use one of [arm, arm64, i386, x86_64]".format(
+            str(native.package_relative_label(":x")).removesuffix(":x"),
+            arch,
+        ))
+
+    return kunit_modules_list

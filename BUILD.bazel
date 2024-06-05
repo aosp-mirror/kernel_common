@@ -3,8 +3,10 @@
 
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_pkg//pkg:install.bzl", "pkg_install")
 load(
     "@rules_pkg//pkg:mappings.bzl",
+    "pkg_filegroup",
     "pkg_files",
     "strip_prefix",
 )
@@ -25,7 +27,7 @@ load(
     "merged_kernel_uapi_headers",
 )
 load(":abi.bzl", "cc_binary_with_abi")
-load(":modules.bzl", "get_gki_modules_list")
+load(":modules.bzl", "get_gki_modules_list", "get_kunit_modules_list")
 
 package(
     default_visibility = [
@@ -74,6 +76,7 @@ alias(
 write_file(
     name = "gki_system_dlkm_modules_arm64",
     out = "android/gki_system_dlkm_modules_arm64",
+    # Do not built kunit modules into system_dlkm
     content = get_gki_modules_list("arm64") + [
         # Ensure new line at the end.
         "",
@@ -83,6 +86,7 @@ write_file(
 write_file(
     name = "gki_system_dlkm_modules_x86_64",
     out = "android/gki_system_dlkm_modules_x86_64",
+    # Do not built kunit modules into system_dlkm
     content = get_gki_modules_list("x86_64") + [
         # Ensure new line at the end.
         "",
@@ -128,7 +132,7 @@ define_common_kernels(target_configs = {
         "trim_nonlisted_kmi": True,
         "protected_exports_list": "android/abi_gki_protected_exports_aarch64",
         "protected_modules_list": "android/gki_aarch64_protected_modules",
-        "module_implicit_outs": get_gki_modules_list("arm64"),
+        "module_implicit_outs": get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
         "ddk_headers_archive": ":kernel_aarch64_ddk_headers_archive",
         "extra_dist": [
@@ -138,13 +142,13 @@ define_common_kernels(target_configs = {
     },
     "kernel_aarch64_16k": {
         "kmi_symbol_list_strict_mode": False,
-        "module_implicit_outs": get_gki_modules_list("arm64"),
+        "module_implicit_outs": get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
         "extra_dist": [":test_mappings_zip"],
     },
     "kernel_x86_64": {
         "kmi_symbol_list_strict_mode": False,
-        "module_implicit_outs": get_gki_modules_list("x86_64"),
+        "module_implicit_outs": get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
         "make_goals": _GKI_X86_64_MAKE_GOALS,
         "extra_dist": [
             ":test_mappings_zip",
@@ -608,7 +612,7 @@ kernel_build(
         "modules",
         "rk3399-rock-pi-4b.dtb",
     ],
-    module_outs = get_gki_modules_list("arm64") + _ROCKPI4_MODULE_OUTS + _ROCKPI4_WATCHDOG_MODULE_OUTS,
+    module_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64") + _ROCKPI4_MODULE_OUTS + _ROCKPI4_WATCHDOG_MODULE_OUTS,
     visibility = ["//visibility:private"],
 )
 
@@ -632,7 +636,7 @@ kernel_build(
         "modules",
         "rk3399-rock-pi-4b.dtb",
     ],
-    module_outs = get_gki_modules_list("arm64") + _ROCKPI4_MODULE_OUTS,
+    module_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64") + _ROCKPI4_MODULE_OUTS,
     visibility = ["//visibility:private"],
 )
 
@@ -746,77 +750,84 @@ kernel_build(
 )
 
 # KUnit test targets
+_KUNIT_DIR = "testcases/kunit"
 
-# Modules defined by tools/testing/kunit/configs/android/kunit_defconfig
-_KUNIT_COMMON_MODULES = [
-    # keep sorted
-    "drivers/base/regmap/regmap-kunit.ko",
-    "drivers/base/regmap/regmap-ram.ko",
-    "drivers/base/regmap/regmap-raw-ram.ko",
-    "drivers/hid/hid-uclogic-test.ko",
-    "drivers/iio/test/iio-test-format.ko",
-    "drivers/input/tests/input_test.ko",
-    "drivers/rtc/lib_test.ko",
-    "fs/ext4/ext4-inode-test.ko",
-    "fs/fat/fat_test.ko",
-    "kernel/time/time_test.ko",
-    "lib/kunit/kunit-example-test.ko",
-    "lib/kunit/kunit-test.ko",
-    "mm/kfence/kfence_test.ko",
-    "net/core/dev_addr_lists_test.ko",
-    "sound/soc/soc-topology-test.ko",
-    "sound/soc/soc-utils-test.ko",
-]
-
-_KUNIT_CLK_MODULES = [
-    "drivers/clk/clk-gate_test.ko",
-    "drivers/clk/clk_test.ko",
-]
-
-kernel_build(
-    name = "kunit_aarch64",
-    srcs = [":kernel_aarch64_sources"],
-    outs = [],
-    arch = "arm64",
-    base_kernel = ":kernel_aarch64",
-    build_config = "build.config.kunit.aarch64",
-    defconfig_fragments = [
-        "tools/testing/kunit/configs/android/kunit_defconfig",
-        "tools/testing/kunit/configs/android/kunit_clk_defconfig",
+pkg_files(
+    name = "kunit_tests_config_arm64",
+    srcs = [
+        "tools/testing/kunit/android/tradefed_configs/config_arm64.xml",
     ],
-    make_goals = ["modules"],
-    module_outs = _KUNIT_COMMON_MODULES + _KUNIT_CLK_MODULES,
+    renames = {
+        "tools/testing/kunit/android/tradefed_configs/config_arm64.xml": _KUNIT_DIR + "/kunit.config",
+    },
+    visibility = ["//visibility:private"],
 )
 
-copy_to_dist_dir(
-    name = "kunit_aarch64_dist",
-    data = [":kunit_aarch64"],
-    dist_dir = "out/kunit_aarch64/dist",
-    flat = True,
-    log = "info",
-)
-
-kernel_build(
-    name = "kunit_x86_64",
-    srcs = [":kernel_x86_64_sources"],
-    outs = [],
-    arch = "x86_64",
-    base_kernel = ":kernel_x86_64",
-    build_config = "build.config.kunit.x86_64",
-    defconfig_fragments = [
-        "tools/testing/kunit/configs/android/kunit_defconfig",
-        # x86_64 does not set CONFIG_COMMON_CLK
+pkg_files(
+    name = "kunit_tests_config_x86_64",
+    srcs = [
+        "tools/testing/kunit/android/tradefed_configs/config_x86_64.xml",
     ],
-    make_goals = ["modules"],
-    module_outs = _KUNIT_COMMON_MODULES,
+    renames = {
+        "tools/testing/kunit/android/tradefed_configs/config_x86_64.xml": _KUNIT_DIR + "/kunit.config",
+    },
+    visibility = ["//visibility:private"],
 )
 
-copy_to_dist_dir(
-    name = "kunit_x86_64_dist",
-    data = [":kunit_x86_64"],
-    dist_dir = "out/kunit_x86_64/dist",
-    flat = True,
-    log = "info",
+pkg_files(
+    name = "kunit_modules_arm64",
+    srcs = [
+        ":kernel_aarch64/" + e
+        for e in get_kunit_modules_list("arm64")
+    ],
+    prefix = _KUNIT_DIR + "/arm64",
+    visibility = ["//visibility:private"],
+)
+
+pkg_files(
+    name = "kunit_modules_x86_64",
+    srcs = [
+        ":kernel_x86_64/" + e
+        for e in get_kunit_modules_list("x86_64")
+    ],
+    prefix = _KUNIT_DIR + "/x86_64/",
+    visibility = ["//visibility:private"],
+)
+
+pkg_filegroup(
+    name = "kunit_tests_arm64_pgk_files",
+    srcs = [
+        ":kunit_modules_arm64",
+        ":kunit_tests_config_arm64",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+pkg_filegroup(
+    name = "kunit_tests_x86_64_pkg_files",
+    srcs = [
+        ":kunit_modules_x86_64",
+        ":kunit_tests_config_x86_64",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+# KUnit build rules for local execution workflow
+# Run by bazel run //common:kunit_tests_arm64 -- -v --destdir /tmp/kernel_tests/
+pkg_install(
+    name = "kunit_tests_arm64",
+    srcs = [
+        ":kunit_tests_arm64_pkg_files",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kunit_tests_x86_64",
+    srcs = [
+        ":kunit_tests_x86_64_pkg_files",
+    ],
+    visibility = ["//visibility:private"],
 )
 
 # DDK Headers
@@ -1357,6 +1368,7 @@ cc_binary_with_abi(
     visibility = ["//visibility:private"],
     deps = [
         ":kselftest_headers_lib",
+        ":kselftest_mm_vm_util",
         "@libcap",
     ],
 )
@@ -1446,8 +1458,15 @@ cc_binary_with_abi(
 cc_library(
     name = "kselftest_mm_vm_util",
     srcs = ["tools/testing/selftests/mm/vm_util.c"],
-    hdrs = ["tools/testing/selftests/mm/vm_util.h"],
+    hdrs = [
+        "include/uapi/linux/fs.h",
+        "tools/testing/selftests/mm/vm_util.h",
+    ],
     copts = _KSELFTEST_COPTS,
+    includes = [
+        "include/uapi/",
+        "tools/testing/selftests",
+    ],
     visibility = ["//visibility:private"],
     deps = [
         ":kselftest_headers_lib",
@@ -2279,14 +2298,20 @@ pkg_files(
 
 pkg_zip(
     name = "tests_zip_x86_64",
-    srcs = [":kselftest_tests_x86_64_pkg_files"],
+    srcs = [
+        ":kselftest_tests_x86_64_pkg_files",
+        ":kunit_tests_x86_64_pkg_files",
+    ],
     out = "x86_64/tests.zip",
     visibility = ["//visibility:public"],
 )
 
 pkg_zip(
     name = "tests_zip_arm64",
-    srcs = [":kselftest_tests_arm64_pkg_files"],
+    srcs = [
+        ":kselftest_tests_arm64_pkg_files",
+        ":kunit_tests_arm64_pgk_files",
+    ],
     out = "arm64/tests.zip",
     visibility = ["//visibility:public"],
 )
