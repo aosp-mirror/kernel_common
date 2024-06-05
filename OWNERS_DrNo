@@ -22,3 +22,7 @@ szuweilin@google.com #{LAST_RESORT_SUGGESTION}
 # Backup
 sspatil@google.com #{LAST_RESORT_SUGGESTION}
 malchev@google.com #{LAST_RESORT_SUGGESTION}
+
+# Give DrNo Exceptions to TEST_MAPPING or test xml configs
+per-file */TEST_MAPPING = *
+per-file */*.xml = *
