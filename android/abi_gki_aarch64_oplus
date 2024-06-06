@@ -130,6 +130,9 @@
   get_task_mm
   get_user_pages_remote
   get_wchan
+  gnet_stats_copy_basic
+  gnet_stats_copy_queue
+  __gnet_stats_copy_queue
   idr_alloc
   idr_destroy
   idr_find
@@ -236,6 +239,7 @@
   mutex_unlock
   neigh_xmit
   netif_receive_skb_core
+  __netif_schedule
   nf_ct_attach
   nf_ct_delete
   nf_register_net_hook
@@ -250,6 +254,7 @@
   nla_reserve_64bit
   nla_reserve
   nonseekable_open
+  noop_qdisc
   nr_cpu_ids
   nr_running
   __num_online_cpus
@@ -266,6 +271,7 @@
   param_ops_uint
   path_get
   __per_cpu_offset
+  pfifo_qdisc_ops
   platform_device_add
   platform_device_alloc
   platform_device_put
@@ -282,10 +288,20 @@
   proc_create_data
   proc_mkdir
   proc_remove
+  psched_ratecfg_precompute
   public_key_verify_signature
   put_disk
   __put_page
   __put_task_struct
+  __qdisc_calculate_pkt_len
+  qdisc_create_dflt
+  qdisc_hash_add
+  qdisc_put
+  qdisc_reset
+  qdisc_tree_reduce_backlog
+  qdisc_watchdog_cancel
+  qdisc_watchdog_init
+  qdisc_watchdog_schedule_range_ns
   queue_delayed_work_on
   queue_work_on
   radix_tree_delete
@@ -385,6 +401,9 @@
   sys_tz
   task_active_pid_ns
   tcf_action_exec
+  tcf_block_get
+  tcf_block_put
+  tcf_classify
   tcf_exts_destroy
   tcf_exts_dump
   tcf_exts_dump_stats
