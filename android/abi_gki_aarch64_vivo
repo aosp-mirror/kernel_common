@@ -24,6 +24,7 @@
   sched_setattr_nocheck
   schedule_timeout_killable
   set_blocksize
+  skb_orphan_partial
   static_key_enable
   submit_bh
   __kmalloc_node
@@ -120,6 +121,7 @@
   __traceiter_sched_waking
   __traceiter_sys_exit
   __traceiter_task_rename
+  __traceiter_tcp_retransmit_skb
   __traceiter_workqueue_execute_end
   __traceiter_workqueue_execute_start
   __tracepoint_android_rvh_alloc_and_link_pwqs
@@ -213,6 +215,7 @@
   __tracepoint_sched_waking
   __tracepoint_sys_exit
   __tracepoint_task_rename
+  __tracepoint_tcp_retransmit_skb
   __tracepoint_workqueue_execute_end
   __tracepoint_workqueue_execute_start
   ucsi_send_command
