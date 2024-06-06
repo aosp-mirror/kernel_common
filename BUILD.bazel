@@ -1256,7 +1256,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_requeue_pi_mismatched_ops.c"],
     out = "futex_requeue_pi_mismatched_ops",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1277,7 +1277,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_requeue_pi_signal_restart.c"],
     out = "futex_requeue_pi_signal_restart",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1298,7 +1298,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_requeue_pi.c"],
     out = "futex_requeue_pi",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1319,7 +1319,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_requeue.c"],
     out = "futex_requeue",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1340,7 +1340,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_wait_private_mapped_file.c"],
     out = "futex_wait_private_mapped_file",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1361,7 +1361,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_wait_timeout.c"],
     out = "futex_wait_timeout",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1382,7 +1382,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_wait_uninitialized_heap.c"],
     out = "futex_wait_uninitialized_heap",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1403,7 +1403,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_wait_wouldblock.c"],
     out = "futex_wait_wouldblock",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1424,7 +1424,7 @@ cc_binary_with_abi(
     srcs = ["tools/testing/selftests/futex/functional/futex_wait.c"],
     out = "futex_wait",
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-pthread",
     ],
     includes = [
@@ -1578,7 +1578,7 @@ cc_library(
         "tools/testing/selftests/mm/vm_util.h",
     ],
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
     ],
     includes = [
         "include/uapi/",
@@ -1596,7 +1596,7 @@ cc_binary_with_abi(
         "tools/testing/selftests/mm/thuge-gen.c",
     ],
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
         "-Wno-macro-redefined",
     ],
     includes = ["tools/testing/selftests"],
@@ -1616,7 +1616,7 @@ cc_binary_with_abi(
         "tools/testing/selftests/mm/transhuge-stress.c",
     ],
     copts = [
-        "-D_GNU_SOURCE",
+        "-D_GNU_SOURCE=",
     ],
     includes = [
         "tools/testing/selftests",
