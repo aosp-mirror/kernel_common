@@ -25,6 +25,14 @@ use crate::{
     BinderReturnWriter, DArc, DLArc, DTRWrap, DeliverToRead,
 };
 
+use core::mem::offset_of;
+use kernel::bindings::rb_transaction_layout;
+pub(crate) const TRANSACTION_LAYOUT: rb_transaction_layout = rb_transaction_layout {
+    debug_id: offset_of!(Transaction, debug_id),
+    code: offset_of!(Transaction, code),
+    flags: offset_of!(Transaction, flags),
+};
+
 #[pin_data(PinnedDrop)]
 pub(crate) struct Transaction {
     pub(crate) debug_id: usize,
@@ -265,7 +273,7 @@ impl Transaction {
     ///
     /// Not used for replies.
     pub(crate) fn submit(self: DLArc<Self>) -> BinderResult {
-        crate::trace::trace_transaction(self.debug_id, false);
+        crate::trace::trace_transaction(false, &self);
 
         // Defined before `process_inner` so that the destructor runs after releasing the lock.
         let mut _t_outdated = None;

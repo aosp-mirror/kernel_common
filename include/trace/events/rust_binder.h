@@ -46,17 +46,23 @@ DEFINE_EVENT(rust_binder_function_return_class, name,	\
 DEFINE_RBINDER_FUNCTION_RETURN_EVENT(rust_binder_ioctl_done);
 
 TRACE_EVENT(rust_binder_transaction,
-	TP_PROTO(int debug_id, bool reply),
-	TP_ARGS(debug_id, reply),
+	TP_PROTO(bool reply, rust_binder_transaction t),
+	TP_ARGS(reply, t),
 	TP_STRUCT__entry(
 		__field(int, debug_id)
 		__field(int, reply)
+		__field(unsigned int, code)
+		__field(unsigned int, flags)
 	),
 	TP_fast_assign(
-		__entry->debug_id = debug_id;
 		__entry->reply = reply;
+		__entry->debug_id = rust_binder_transaction_debug_id(t);
+		__entry->code = rust_binder_transaction_code(t);
+		__entry->flags = rust_binder_transaction_flags(t);
 	),
-	TP_printk("transaction=%d reply=%d", __entry->debug_id, __entry->reply)
+	TP_printk("transaction=%d reply=%d flags=0x%x code=0x%x",
+		__entry->debug_id, __entry->reply, __entry->flags,
+		__entry->code)
 );
 
 #endif /* _RUST_BINDER_TRACE_H */
