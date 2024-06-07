@@ -27,7 +27,7 @@ use crate::{
 
 #[pin_data(PinnedDrop)]
 pub(crate) struct Transaction {
-    debug_id: usize,
+    pub(crate) debug_id: usize,
     target_node: Option<DArc<Node>>,
     pub(crate) from_parent: Option<DArc<Transaction>>,
     pub(crate) from: Arc<Thread>,
@@ -265,6 +265,8 @@ impl Transaction {
     ///
     /// Not used for replies.
     pub(crate) fn submit(self: DLArc<Self>) -> BinderResult {
+        crate::trace::trace_transaction(self.debug_id, false);
+
         // Defined before `process_inner` so that the destructor runs after releasing the lock.
         let mut _t_outdated = None;
 

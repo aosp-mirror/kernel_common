@@ -45,6 +45,20 @@ DEFINE_EVENT(rust_binder_function_return_class, name,	\
 
 DEFINE_RBINDER_FUNCTION_RETURN_EVENT(rust_binder_ioctl_done);
 
+TRACE_EVENT(rust_binder_transaction,
+	TP_PROTO(int debug_id, bool reply),
+	TP_ARGS(debug_id, reply),
+	TP_STRUCT__entry(
+		__field(int, debug_id)
+		__field(int, reply)
+	),
+	TP_fast_assign(
+		__entry->debug_id = debug_id;
+		__entry->reply = reply;
+	),
+	TP_printk("transaction=%d reply=%d", __entry->debug_id, __entry->reply)
+);
+
 #endif /* _RUST_BINDER_TRACE_H */
 
 /* This part must be outside protection */
