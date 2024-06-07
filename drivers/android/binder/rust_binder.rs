@@ -18,6 +18,7 @@ use crate::{context::Context, process::Process};
 mod context;
 mod defs;
 mod process;
+mod trace;
 
 module! {
     type: BinderModule,

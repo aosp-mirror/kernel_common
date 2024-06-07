@@ -93,15 +93,20 @@ impl Process {
         use kernel::ioctl::{_IOC_DIR, _IOC_SIZE};
         use kernel::uapi::{_IOC_READ, _IOC_WRITE};
 
+        crate::trace::trace_ioctl(cmd, arg as usize);
+
         let user_slice = UserSlice::new(arg, _IOC_SIZE(cmd));
 
         const _IOC_READ_WRITE: u32 = _IOC_READ | _IOC_WRITE;
 
-        match _IOC_DIR(cmd) {
+        let res = match _IOC_DIR(cmd) {
             _IOC_WRITE => Self::ioctl_write_only(this, file, cmd, &mut user_slice.reader()),
             _IOC_READ_WRITE => Self::ioctl_write_read(this, file, cmd, user_slice),
             _ => Err(EINVAL),
-        }
+        };
+
+        crate::trace::trace_ioctl_done(res);
+        res
     }
 
     pub(crate) fn compat_ioctl(
