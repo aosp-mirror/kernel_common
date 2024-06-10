@@ -2768,7 +2768,7 @@ intel_dp_audio_compute_config(struct intel_encoder *encoder,
 		    str_yes_no(pipe_config->sdp_split_enable));
 }
 
-void intel_dp_queue_modeset_retry_work(struct intel_connector *connector)
+static void intel_dp_queue_modeset_retry_work(struct intel_connector *connector)
 {
 	struct drm_i915_private *i915 = to_i915(connector->base.dev);
 
@@ -2777,6 +2777,7 @@ void intel_dp_queue_modeset_retry_work(struct intel_connector *connector)
 		drm_connector_put(&connector->base);
 }
 
+/* NOTE: @state is only valid for MST links and can be %NULL for SST. */
 void
 intel_dp_queue_modeset_retry_for_link(struct intel_atomic_state *state,
 				      struct intel_encoder *encoder,
@@ -2785,6 +2786,7 @@ intel_dp_queue_modeset_retry_for_link(struct intel_atomic_state *state,
 	struct intel_connector *connector;
 	struct intel_digital_connector_state *conn_state;
 	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
+	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
 	int i;
 
 	if (!intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST)) {
@@ -2792,6 +2794,9 @@ intel_dp_queue_modeset_retry_for_link(struct intel_atomic_state *state,
 
 		return;
 	}
+
+	if (drm_WARN_ON(&i915->drm, !state))
+		return;
 
 	for_each_new_intel_connector_in_state(state, connector, conn_state, i) {
 		if (!conn_state->base.crtc)
