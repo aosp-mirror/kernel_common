@@ -1141,14 +1141,6 @@ static const struct uvc_control_mapping uvc_ctrl_mappings_roi_rect[] = {
 	},
 };
 
-static const struct uvc_control_mapping *uvc_ctrl_mappings_uvc11[] = {
-	NULL, /* Sentinel */
-};
-
-static const struct uvc_control_mapping *uvc_ctrl_mappings_uvc15[] = {
-	NULL, /* Sentinel */
-};
-
 /* ------------------------------------------------------------------------
  * Terminal and unit management
  */
@@ -3166,7 +3158,6 @@ static bool uvc_ctrl_is_relative_roi(struct uvc_video_chain *chain)
 static void uvc_ctrl_init_ctrl(struct uvc_video_chain *chain,
 			       struct uvc_control *ctrl)
 {
-	const struct uvc_control_mapping **mappings;
 	unsigned int i;
 
 	/*
@@ -3249,18 +3240,6 @@ static void uvc_ctrl_init_ctrl(struct uvc_video_chain *chain,
 			&uvc_ctrl_mappings_roi_rect[1] :
 			&uvc_ctrl_mappings_roi_rect[0];
 		__uvc_ctrl_add_mapping(chain, ctrl, mapping);
-	}
-
-	/* Finally process version-specific mappings. */
-	mappings = chain->dev->uvc_version < 0x0150
-		 ? uvc_ctrl_mappings_uvc11 : uvc_ctrl_mappings_uvc15;
-
-	for (i = 0; mappings[i]; ++i) {
-		const struct uvc_control_mapping *mapping = mappings[i];
-
-		if (uvc_entity_match_guid(ctrl->entity, mapping->entity) &&
-		    ctrl->info.selector == mapping->selector)
-			__uvc_ctrl_add_mapping(chain, ctrl, mapping);
 	}
 }
 
