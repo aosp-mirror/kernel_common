@@ -792,6 +792,7 @@ out:
 	rcu_read_unlock();
 	return pool;
 }
+EXPORT_SYMBOL_GPL(swiotlb_find_pool);
 
 /**
  * swiotlb_del_pool() - remove an IO TLB pool from a device
