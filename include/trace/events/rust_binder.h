@@ -50,18 +50,30 @@ TRACE_EVENT(rust_binder_transaction,
 	TP_ARGS(reply, t),
 	TP_STRUCT__entry(
 		__field(int, debug_id)
+		__field(int, target_node)
+		__field(int, from_proc)
+		__field(int, to_proc)
 		__field(int, reply)
 		__field(unsigned int, code)
 		__field(unsigned int, flags)
 	),
 	TP_fast_assign(
-		__entry->reply = reply;
+		rust_binder_thread from_thread = rust_binder_transaction_from_thread(t);
+		rust_binder_process from = rust_binder_thread_proc(from_thread);
+		rust_binder_process to = rust_binder_transaction_to_proc(t);
+		rust_binder_node target_node = rust_binder_transaction_target_node(t);
+
 		__entry->debug_id = rust_binder_transaction_debug_id(t);
+		__entry->target_node = target_node ? rust_binder_node_debug_id(target_node) : 0;
+		__entry->from_proc = rust_binder_process_task(from)->pid;
+		__entry->to_proc = rust_binder_process_task(to)->pid;
+		__entry->reply = reply;
 		__entry->code = rust_binder_transaction_code(t);
 		__entry->flags = rust_binder_transaction_flags(t);
 	),
-	TP_printk("transaction=%d reply=%d flags=0x%x code=0x%x",
-		__entry->debug_id, __entry->reply, __entry->flags,
+	TP_printk("transaction=%d target_node=%d dest_proc=%d from_proc=%d reply=%d flags=0x%x code=0x%x",
+		__entry->debug_id, __entry->target_node, __entry->to_proc,
+		__entry->from_proc, __entry->reply, __entry->flags,
 		__entry->code)
 );
 

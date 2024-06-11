@@ -31,6 +31,9 @@ pub(crate) const TRANSACTION_LAYOUT: rb_transaction_layout = rb_transaction_layo
     debug_id: offset_of!(Transaction, debug_id),
     code: offset_of!(Transaction, code),
     flags: offset_of!(Transaction, flags),
+    from_thread: offset_of!(Transaction, from),
+    to_proc: offset_of!(Transaction, to),
+    target_node: offset_of!(Transaction, target_node),
 };
 
 #[pin_data(PinnedDrop)]
