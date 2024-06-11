@@ -14,6 +14,7 @@ declare_trace! {
     unsafe fn rust_binder_ioctl(cmd: c_uint, arg: c_ulong);
     unsafe fn rust_binder_ioctl_done(ret: c_int);
     unsafe fn rust_binder_transaction(reply: bool, t: rust_binder_transaction);
+    unsafe fn rust_binder_transaction_received(t: rust_binder_transaction);
 }
 
 #[inline]
@@ -45,4 +46,10 @@ pub(crate) fn trace_ioctl_done(ret: Result) {
 pub(crate) fn trace_transaction(reply: bool, t: &Transaction) {
     // SAFETY: The raw transaction is valid for the duration of this call.
     unsafe { rust_binder_transaction(reply, raw_transaction(t)) }
+}
+
+#[inline]
+pub(crate) fn trace_transaction_received(t: &Transaction) {
+    // SAFETY: The raw transaction is valid for the duration of this call.
+    unsafe { rust_binder_transaction_received(raw_transaction(t)) }
 }
