@@ -96,6 +96,20 @@ TRACE_EVENT(rust_binder_transaction,
 		__entry->code)
 );
 
+TRACE_EVENT(rust_binder_transaction_thread_selected,
+	TP_PROTO(rust_binder_transaction t, rust_binder_thread thread),
+	TP_ARGS(t, thread),
+	TP_STRUCT__entry(
+		__field(int, debug_id)
+		__field(int, to_thread)
+	),
+	TP_fast_assign(
+		__entry->debug_id = rust_binder_transaction_debug_id(t);
+		__entry->to_thread = rust_binder_thread_id(thread);
+	),
+	TP_printk("transaction=%d thread=%d", __entry->debug_id, __entry->to_thread)
+);
+
 TRACE_EVENT(rust_binder_transaction_received,
 	TP_PROTO(rust_binder_transaction t),
 	TP_ARGS(t),

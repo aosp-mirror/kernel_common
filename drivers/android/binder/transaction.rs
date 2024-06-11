@@ -487,6 +487,8 @@ impl DeliverToRead for Transaction {
             return;
         }
 
+        crate::trace::trace_transaction_thread_selected(self, to_thread);
+
         let node_prio = target_node.node_prio();
         let mut desired = self.priority;
 
