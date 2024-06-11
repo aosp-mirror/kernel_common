@@ -81,3 +81,7 @@
   __tracepoint_android_rvh_hw_protection_shutdown
   __traceiter_android_rvh_bpf_int_jit_compile_ro
   __tracepoint_android_rvh_bpf_int_jit_compile_ro
+  __traceiter_android_vh_sk_alloc
+  __tracepoint_android_vh_sk_alloc
+  __traceiter_android_vh_sk_free
+  __tracepoint_android_vh_sk_free
