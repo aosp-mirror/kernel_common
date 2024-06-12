@@ -44,6 +44,8 @@ DEFINE_EVENT(rust_binder_function_return_class, name,	\
 	TP_ARGS(ret))
 
 DEFINE_RBINDER_FUNCTION_RETURN_EVENT(rust_binder_ioctl_done);
+DEFINE_RBINDER_FUNCTION_RETURN_EVENT(rust_binder_read_done);
+DEFINE_RBINDER_FUNCTION_RETURN_EVENT(rust_binder_write_done);
 
 TRACE_EVENT(rust_binder_wait_for_work,
 	TP_PROTO(bool proc_work, bool transaction_stack, bool thread_todo),

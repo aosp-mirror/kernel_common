@@ -1554,8 +1554,11 @@ impl Thread {
         let mut req = reader.read::<BinderWriteRead>()?;
 
         // Go through the write buffer.
+        let mut ret = Ok(());
         if req.write_size > 0 {
-            if let Err(err) = self.write(&mut req) {
+            ret = self.write(&mut req);
+            crate::trace::trace_write_done(ret);
+            if let Err(err) = ret {
                 pr_warn!(
                     "Write failure {:?} in pid:{}",
                     err,
@@ -1564,14 +1567,14 @@ impl Thread {
                 req.read_consumed = 0;
                 writer.write(&req)?;
                 self.inner.lock().looper_need_return = false;
-                return Err(err);
+                return ret;
             }
         }
 
         // Go through the work queue.
-        let mut ret = Ok(());
         if req.read_size > 0 {
             ret = self.read(&mut req, wait);
+            crate::trace::trace_read_done(ret);
             if ret.is_err() && ret != Err(EINTR) {
                 pr_warn!(
                     "Read failure {:?} in pid:{}",

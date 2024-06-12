@@ -13,6 +13,8 @@ use core::ffi::{c_int, c_uint, c_ulong};
 declare_trace! {
     unsafe fn rust_binder_ioctl(cmd: c_uint, arg: c_ulong);
     unsafe fn rust_binder_ioctl_done(ret: c_int);
+    unsafe fn rust_binder_read_done(ret: c_int);
+    unsafe fn rust_binder_write_done(ret: c_int);
     unsafe fn rust_binder_wait_for_work(proc_work: bool, transaction_stack: bool, thread_todo: bool);
     unsafe fn rust_binder_transaction(reply: bool, t: rust_binder_transaction);
     unsafe fn rust_binder_transaction_received(t: rust_binder_transaction);
@@ -47,6 +49,18 @@ pub(crate) fn trace_ioctl(cmd: u32, arg: usize) {
 pub(crate) fn trace_ioctl_done(ret: Result) {
     // SAFETY: Always safe to call.
     unsafe { rust_binder_ioctl_done(to_errno(ret)) }
+}
+
+#[inline]
+pub(crate) fn trace_read_done(ret: Result) {
+    // SAFETY: Always safe to call.
+    unsafe { rust_binder_read_done(to_errno(ret)) }
+}
+
+#[inline]
+pub(crate) fn trace_write_done(ret: Result) {
+    // SAFETY: Always safe to call.
+    unsafe { rust_binder_write_done(to_errno(ret)) }
 }
 
 #[inline]
