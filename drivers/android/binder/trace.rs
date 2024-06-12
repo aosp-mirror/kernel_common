@@ -4,8 +4,9 @@
 
 use crate::{thread::Thread, transaction::Transaction};
 
-use kernel::bindings::{rust_binder_thread, rust_binder_transaction};
+use kernel::bindings::{rust_binder_thread, rust_binder_transaction, task_struct};
 use kernel::error::Result;
+use kernel::task::Task;
 use kernel::tracepoint::declare_trace;
 
 use core::ffi::{c_int, c_uint, c_ulong};
@@ -15,6 +16,7 @@ declare_trace! {
     unsafe fn rust_binder_ioctl_done(ret: c_int);
     unsafe fn rust_binder_read_done(ret: c_int);
     unsafe fn rust_binder_write_done(ret: c_int);
+    unsafe fn rust_binder_set_priority(thread: *mut task_struct, desired_prio: c_int, new_prio: c_int);
     unsafe fn rust_binder_wait_for_work(proc_work: bool, transaction_stack: bool, thread_todo: bool);
     unsafe fn rust_binder_transaction(reply: bool, t: rust_binder_transaction);
     unsafe fn rust_binder_transaction_received(t: rust_binder_transaction);
@@ -61,6 +63,12 @@ pub(crate) fn trace_read_done(ret: Result) {
 pub(crate) fn trace_write_done(ret: Result) {
     // SAFETY: Always safe to call.
     unsafe { rust_binder_write_done(to_errno(ret)) }
+}
+
+#[inline]
+pub(crate) fn trace_set_priority(thread: &Task, desired_prio: c_int, new_prio: c_int) {
+    // SAFETY: The pointer to the task is valid for the duration of this call.
+    unsafe { rust_binder_set_priority(thread.as_raw(), desired_prio, new_prio) }
 }
 
 #[inline]
