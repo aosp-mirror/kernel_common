@@ -1401,7 +1401,7 @@ static void mt7925_link_info_changed(struct ieee80211_hw *hw,
 
 		if (slottime != phy->slottime) {
 			phy->slottime = slottime;
-			mt7925_mcu_set_timing(phy, vif);
+			mt7925_mcu_set_timing(phy, info);
 		}
 	}
 
