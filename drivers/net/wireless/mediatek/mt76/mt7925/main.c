@@ -388,7 +388,7 @@ static void mt7925_roc_iter(void *priv, u8 *mac,
 	struct mt792x_vif *mvif = (struct mt792x_vif *)vif->drv_priv;
 	struct mt792x_phy *phy = priv;
 
-	mt7925_mcu_abort_roc(phy, mvif, phy->roc_token_id);
+	mt7925_mcu_abort_roc(phy, &mvif->bss_conf, phy->roc_token_id);
 }
 
 void mt7925_roc_work(struct work_struct *work)
@@ -409,7 +409,8 @@ void mt7925_roc_work(struct work_struct *work)
 	ieee80211_remain_on_channel_expired(phy->mt76->hw);
 }
 
-static int mt7925_abort_roc(struct mt792x_phy *phy, struct mt792x_vif *vif)
+static int mt7925_abort_roc(struct mt792x_phy *phy,
+			    struct mt792x_bss_conf *mconf)
 {
 	int err = 0;
 
@@ -418,14 +419,14 @@ static int mt7925_abort_roc(struct mt792x_phy *phy, struct mt792x_vif *vif)
 
 	mt792x_mutex_acquire(phy->dev);
 	if (test_and_clear_bit(MT76_STATE_ROC, &phy->mt76->state))
-		err = mt7925_mcu_abort_roc(phy, vif, phy->roc_token_id);
+		err = mt7925_mcu_abort_roc(phy, mconf, phy->roc_token_id);
 	mt792x_mutex_release(phy->dev);
 
 	return err;
 }
 
 static int mt7925_set_roc(struct mt792x_phy *phy,
-			  struct mt792x_vif *vif,
+			  struct mt792x_bss_conf *mconf,
 			  struct ieee80211_channel *chan,
 			  int duration,
 			  enum mt7925_roc_req type)
@@ -437,7 +438,7 @@ static int mt7925_set_roc(struct mt792x_phy *phy,
 
 	phy->roc_grant = false;
 
-	err = mt7925_mcu_set_roc(phy, vif, chan, duration, type,
+	err = mt7925_mcu_set_roc(phy, mconf, chan, duration, type,
 				 ++phy->roc_token_id);
 	if (err < 0) {
 		clear_bit(MT76_STATE_ROC, &phy->mt76->state);
@@ -445,7 +446,7 @@ static int mt7925_set_roc(struct mt792x_phy *phy,
 	}
 
 	if (!wait_event_timeout(phy->roc_wait, phy->roc_grant, 4 * HZ)) {
-		mt7925_mcu_abort_roc(phy, vif, phy->roc_token_id);
+		mt7925_mcu_abort_roc(phy, mconf, phy->roc_token_id);
 		clear_bit(MT76_STATE_ROC, &phy->mt76->state);
 		err = -ETIMEDOUT;
 	}
@@ -465,7 +466,8 @@ static int mt7925_remain_on_channel(struct ieee80211_hw *hw,
 	int err;
 
 	mt792x_mutex_acquire(phy->dev);
-	err = mt7925_set_roc(phy, mvif, chan, duration, MT7925_ROC_REQ_ROC);
+	err = mt7925_set_roc(phy, &mvif->bss_conf,
+			     chan, duration, MT7925_ROC_REQ_ROC);
 	mt792x_mutex_release(phy->dev);
 
 	return err;
@@ -477,7 +479,7 @@ static int mt7925_cancel_remain_on_channel(struct ieee80211_hw *hw,
 	struct mt792x_vif *mvif = (struct mt792x_vif *)vif->drv_priv;
 	struct mt792x_phy *phy = mt792x_hw_phy(hw);
 
-	return mt7925_abort_roc(phy, mvif);
+	return mt7925_abort_roc(phy, &mvif->bss_conf);
 }
 
 static int mt7925_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
@@ -1346,7 +1348,8 @@ static void mt7925_mgd_prepare_tx(struct ieee80211_hw *hw,
 		       jiffies_to_msecs(HZ);
 
 	mt792x_mutex_acquire(dev);
-	mt7925_set_roc(mvif->phy, mvif, mvif->bss_conf.mt76.ctx->def.chan, duration,
+	mt7925_set_roc(mvif->phy, &mvif->bss_conf,
+		       mvif->bss_conf.mt76.ctx->def.chan, duration,
 		       MT7925_ROC_REQ_JOIN);
 	mt792x_mutex_release(dev);
 }
@@ -1357,7 +1360,7 @@ static void mt7925_mgd_complete_tx(struct ieee80211_hw *hw,
 {
 	struct mt792x_vif *mvif = (struct mt792x_vif *)vif->drv_priv;
 
-	mt7925_abort_roc(mvif->phy, mvif);
+	mt7925_abort_roc(mvif->phy, &mvif->bss_conf);
 }
 
 static void mt7925_vif_cfg_changed(struct ieee80211_hw *hw,
