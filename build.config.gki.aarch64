@@ -11,6 +11,7 @@ TIDY_ABI=1
 KMI_SYMBOL_LIST=android/abi_gki_aarch64
 ADDITIONAL_KMI_SYMBOL_LISTS="
 android/abi_gki_aarch64_type_visibility
+android/abi_gki_aarch64_arg
 android/abi_gki_aarch64_core
 android/abi_gki_aarch64_db845c
 android/abi_gki_aarch64_exynos
