@@ -107,6 +107,8 @@ struct mtk_composite {
 	u8 mux_flags;
 
 	signed char num_parents;
+
+	bool need_runtime_pm;
 };
 
 #define MUX_GATE_FLAGS_2(_id, _name, _parents, _reg, _shift,		\
