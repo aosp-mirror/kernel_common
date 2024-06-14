@@ -2489,10 +2489,7 @@ static int sdhci_get_cd(struct mmc_host *mmc)
 static int sdhci_check_ro(struct sdhci_host *host)
 {
 	bool allow_invert = false;
-	unsigned long flags;
 	int is_readonly;
-
-	spin_lock_irqsave(&host->lock, flags);
 
 	if (host->flags & SDHCI_DEVICE_DEAD) {
 		is_readonly = 0;
@@ -2507,8 +2504,6 @@ static int sdhci_check_ro(struct sdhci_host *host)
 				& SDHCI_WRITE_PROTECT);
 		allow_invert = true;
 	}
-
-	spin_unlock_irqrestore(&host->lock, flags);
 
 	if (is_readonly >= 0 &&
 	    allow_invert &&
