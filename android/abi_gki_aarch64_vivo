@@ -2367,6 +2367,7 @@
   __traceiter_android_vh_ftrace_oops_enter
   __traceiter_android_vh_ftrace_oops_exit
   __traceiter_android_vh_ftrace_size_check
+  __traceiter_android_vh_fuse_request_end
   __traceiter_android_vh_gic_resume
   __traceiter_android_vh_ipi_stop
   __traceiter_android_vh_irqtime_account_process_tick
@@ -2382,6 +2383,7 @@
   __traceiter_android_vh_oom_swapmem_gather_finish
   __traceiter_android_vh_oom_swapmem_gather_init
   __traceiter_android_vh_printk_hotplug
+  __traceiter_android_vh_queue_request_and_unlock
   __traceiter_android_vh_rproc_recovery
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_sdhci_get_cd
@@ -2492,6 +2494,7 @@
   __tracepoint_android_vh_ftrace_oops_enter
   __tracepoint_android_vh_ftrace_oops_exit
   __tracepoint_android_vh_ftrace_size_check
+  __tracepoint_android_vh_fuse_request_end
   __tracepoint_android_vh_gic_resume
   __tracepoint_android_vh_ipi_stop
   __tracepoint_android_vh_irqtime_account_process_tick
@@ -2507,6 +2510,7 @@
   __tracepoint_android_vh_oom_swapmem_gather_finish
   __tracepoint_android_vh_oom_swapmem_gather_init
   __tracepoint_android_vh_printk_hotplug
+  __tracepoint_android_vh_queue_request_and_unlock
   __tracepoint_android_vh_rproc_recovery
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_sdhci_get_cd
