@@ -56,6 +56,8 @@
   tty_set_ldisc
   tty_kclose
   __kfifo_len_r
+  __traceiter_android_vh_killed_process
+  __tracepoint_android_vh_killed_process
   __traceiter_android_vh_rwsem_write_wait_finish
   __tracepoint_android_vh_rwsem_write_wait_finish
   __tracepoint_android_rvh_cpuinfo_c_show
