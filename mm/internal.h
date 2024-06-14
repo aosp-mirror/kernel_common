@@ -1455,11 +1455,6 @@ static inline struct page *folio_dst_page(struct folio *src, int i)
 	return (void *)(src->_dst_ul[i] & ~SRC_PAGE_USAGE_MASK);
 }
 #ifdef CONFIG_64BIT
-/* VM is sealed, in vm_flags */
-#define VM_SEALED	_BITUL(63)
-#endif
-
-#ifdef CONFIG_64BIT
 static inline int can_do_mseal(unsigned long flags)
 {
 	if (flags)
