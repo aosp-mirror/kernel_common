@@ -78,7 +78,7 @@ DEFINE_BINDER_FUNCTION_RETURN_EVENT(binder_read_done);
 
 TRACE_EVENT(binder_set_priority,
 	TP_PROTO(int proc, int thread, unsigned int old_prio,
-		 unsigned int desired_prio, unsigned int new_prio),
+		 unsigned int new_prio, unsigned int desired_prio),
 	TP_ARGS(proc, thread, old_prio, new_prio, desired_prio),
 
 	TP_STRUCT__entry(
