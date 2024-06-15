@@ -9,6 +9,7 @@
   __traceiter_android_vh_rwsem_init
   __traceiter_android_vh_rwsem_wake
   __traceiter_android_vh_rwsem_write_finished
+  __traceiter_android_vh_do_swap_page_spf
   __traceiter_android_vh_tune_fault_around_bytes
   __tracepoint_android_rvh_dma_buf_stats_teardown
   __tracepoint_android_vh_alter_mutex_list_add
@@ -20,4 +21,5 @@
   __tracepoint_android_vh_rwsem_init
   __tracepoint_android_vh_rwsem_wake
   __tracepoint_android_vh_rwsem_write_finished
+  __tracepoint_android_vh_do_swap_page_spf
   __tracepoint_android_vh_tune_fault_around_bytes
