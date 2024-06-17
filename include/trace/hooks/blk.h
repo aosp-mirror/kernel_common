@@ -16,6 +16,9 @@ struct gendisk;
 DECLARE_HOOK(android_vh_bd_link_disk_holder,
 	TP_PROTO(struct block_device *bdev, struct gendisk *disk),
 	TP_ARGS(bdev, disk));
+DECLARE_HOOK(android_vh_blk_fill_rwbs,
+	TP_PROTO(char *rwbs, unsigned int opf),
+	TP_ARGS(rwbs, opf));
 
 struct path;
 struct vfsmount;
