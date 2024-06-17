@@ -10,7 +10,7 @@
 #include <linux/buffer_head.h>
 #include <linux/tracepoint.h>
 
-#define RWBS_LEN	8
+#define RWBS_LEN	10
 
 #ifdef CONFIG_BUFFER_HEAD
 DECLARE_EVENT_CLASS(block_buffer,
