@@ -207,6 +207,11 @@ static int davinci_gpio_probe(struct platform_device *pdev)
 	else
 		nirq = DIV_ROUND_UP(ngpio, 16);
 
+	if (nirq > MAX_INT_PER_BANK) {
+		dev_err(dev, "Too many IRQs!\n");
+		return -EINVAL;
+	}
+
 	nbank = DIV_ROUND_UP(ngpio, 32);
 	chips = devm_kcalloc(dev,
 			     nbank, sizeof(struct davinci_gpio_controller),
