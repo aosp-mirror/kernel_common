@@ -2109,6 +2109,8 @@ static int __io_submit_sqe(struct io_ring_ctx *ctx, struct io_kiocb *req,
 
 	switch (req->submit.opcode) {
 	case IORING_OP_NOP:
+		if (READ_ONCE(s->sqe->rw_flags))
+			return -EINVAL;
 		ret = io_nop(req, req->user_data);
 		break;
 	case IORING_OP_READV:
