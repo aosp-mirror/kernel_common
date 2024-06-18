@@ -169,9 +169,16 @@ static unsigned int sysctl_numa_balancing_promote_rate_limit = 65536;
  * The minimum load balance interval in jiffies that must pass before a
  * a periodic or nohz-idle balance happens.
  */
+#ifdef CONFIG_X86
+static unsigned long __read_mostly sysctl_sched_min_load_balance_interval = 16UL;
+#else
 static unsigned long __read_mostly sysctl_sched_min_load_balance_interval = 1UL;
-
+#endif
+#ifdef CONFIG_X86
+DEFINE_STATIC_KEY_FALSE(sched_aggressive_next_balance);
+#else
 DEFINE_STATIC_KEY_TRUE(sched_aggressive_next_balance);
+#endif
 #endif
 
 #ifdef CONFIG_SYSCTL
