@@ -2,7 +2,7 @@
 
 KMI_GENERATION=8
 
-BRANCH=android15-6.6
+BRANCH=android15-6.6-pkvm_experimental
 LLVM=1
 DEPMOD=depmod
 CLANG_PREBUILT_BIN=prebuilts/clang/host/linux-x86/clang-${CLANG_VERSION}/bin
