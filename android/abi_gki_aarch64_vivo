@@ -2392,6 +2392,7 @@
   __traceiter_android_vh_record_rwsem_reader_owned
   __traceiter_android_vh_record_rwsem_writer_owned
   __traceiter_android_vh_rproc_recovery
+  __traceiter_android_vh_rwsem_read_trylock_failed
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_sdhci_get_cd
   __traceiter_android_vh_sd_update_bus_speed_mode
@@ -2526,6 +2527,7 @@
   __tracepoint_android_vh_record_rwsem_reader_owned
   __tracepoint_android_vh_record_rwsem_writer_owned
   __tracepoint_android_vh_rproc_recovery
+  __tracepoint_android_vh_rwsem_read_trylock_failed
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_sdhci_get_cd
   __tracepoint_android_vh_sd_update_bus_speed_mode
