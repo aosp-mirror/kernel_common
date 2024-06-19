@@ -2435,6 +2435,7 @@
   __traceiter_sched_overutilized_tp
   __traceiter_sched_switch
   __traceiter_suspend_resume
+  __traceiter_sys_exit
   __traceiter_usb_gadget_connect
   __traceiter_usb_gadget_disconnect
   __tracepoint_android_rvh_account_irq
@@ -2573,6 +2574,7 @@
   __tracepoint_sched_overutilized_tp
   __tracepoint_sched_switch
   __tracepoint_suspend_resume
+  __tracepoint_sys_exit
   __tracepoint_usb_gadget_connect
   __tracepoint_usb_gadget_disconnect
   trace_print_array_seq
