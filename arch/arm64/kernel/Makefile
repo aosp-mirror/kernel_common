@@ -85,8 +85,6 @@ CFLAGS_REMOVE_patch-scs.o		+= $(CC_FLAGS_LTO)
 $(obj)/vdso-wrap.o: $(obj)/vdso/vdso.so
 $(obj)/vdso32-wrap.o: $(obj)/vdso32/vdso.so
 
-obj-$(CONFIG_ALT_SYSCALL)		+= alt-syscall.o
-
 obj-y					+= probes/
 obj-y					+= head.o
 extra-y					+= vmlinux.lds
