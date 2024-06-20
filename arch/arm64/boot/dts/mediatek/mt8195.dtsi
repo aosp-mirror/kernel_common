@@ -2996,6 +2996,7 @@
 
 		jpgdec-master {
 			compatible = "mediatek,mt8195-jpgdec";
+			status = "disabled";
 			power-domains = <&spm MT8195_POWER_DOMAIN_VDEC1>;
 			iommus = <&iommu_vdo M4U_PORT_L19_JPGDEC_WDMA0>,
 				 <&iommu_vdo M4U_PORT_L19_JPGDEC_BSDMA0>,
