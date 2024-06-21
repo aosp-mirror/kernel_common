@@ -62,10 +62,37 @@ int sof_ipc4_set_pipeline_state(struct snd_sof_dev *sdev, u32 instance_id, u32 s
 }
 EXPORT_SYMBOL(sof_ipc4_set_pipeline_state);
 
+static void sof_ipc4_add_pipeline_by_priority(struct ipc4_pipeline_set_state_data *trigger_list,
+					      struct snd_sof_widget *pipe_widget,
+					      s8 *pipe_priority, bool ascend)
+{
+	struct sof_ipc4_pipeline *pipeline = pipe_widget->private;
+	int i, j;
+
+	for (i = 0; i < trigger_list->count; i++) {
+		/* add pipeline from low priority to high */
+		if (ascend && pipeline->priority < pipe_priority[i])
+			break;
+		/* add pipeline from high priority to low */
+		else if (!ascend && pipeline->priority > pipe_priority[i])
+			break;
+	}
+
+	for (j = trigger_list->count - 1; j >= i; j--) {
+		trigger_list->pipeline_instance_ids[j + 1] = trigger_list->pipeline_instance_ids[j];
+		pipe_priority[j + 1] = pipe_priority[j];
+	}
+
+	trigger_list->pipeline_instance_ids[i] = pipe_widget->instance_id;
+	trigger_list->count++;
+	pipe_priority[i] = pipeline->priority;
+}
+
 static void
 sof_ipc4_add_pipeline_to_trigger_list(struct snd_sof_dev *sdev, int state,
 				      struct snd_sof_pipeline *spipe,
-				      struct ipc4_pipeline_set_state_data *trigger_list)
+				      struct ipc4_pipeline_set_state_data *trigger_list,
+				      s8 *pipe_priority)
 {
 	struct snd_sof_widget *pipe_widget = spipe->pipe_widget;
 	struct sof_ipc4_pipeline *pipeline = pipe_widget->private;
@@ -80,20 +107,20 @@ sof_ipc4_add_pipeline_to_trigger_list(struct snd_sof_dev *sdev, int state,
 		 * for the first time
 		 */
 		if (spipe->started_count == spipe->paused_count)
-			trigger_list->pipeline_instance_ids[trigger_list->count++] =
-				pipe_widget->instance_id;
+			sof_ipc4_add_pipeline_by_priority(trigger_list, pipe_widget, pipe_priority,
+							  false);
 		break;
 	case SOF_IPC4_PIPE_RESET:
 		/* RESET if the pipeline is neither running nor paused */
 		if (!spipe->started_count && !spipe->paused_count)
-			trigger_list->pipeline_instance_ids[trigger_list->count++] =
-				pipe_widget->instance_id;
+			sof_ipc4_add_pipeline_by_priority(trigger_list, pipe_widget, pipe_priority,
+							  true);
 		break;
 	case SOF_IPC4_PIPE_PAUSED:
 		/* Pause the pipeline only when its started_count is 1 more than paused_count */
 		if (spipe->paused_count == (spipe->started_count - 1))
-			trigger_list->pipeline_instance_ids[trigger_list->count++] =
-				pipe_widget->instance_id;
+			sof_ipc4_add_pipeline_by_priority(trigger_list, pipe_widget, pipe_priority,
+							  true);
 		break;
 	default:
 		break;
@@ -280,7 +307,7 @@ static int sof_ipc4_trigger_pipelines(struct snd_soc_component *component,
 				      struct snd_pcm_substream *substream, int state, int cmd)
 {
 	struct snd_sof_dev *sdev = snd_soc_component_get_drvdata(component);
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 	struct snd_sof_pcm_stream_pipeline_list *pipeline_list;
 	struct sof_ipc4_fw_data *ipc4_data = sdev->private;
 	struct ipc4_pipeline_set_state_data *trigger_list;
@@ -288,6 +315,7 @@ static int sof_ipc4_trigger_pipelines(struct snd_soc_component *component,
 	struct sof_ipc4_pipeline *pipeline;
 	struct snd_sof_pipeline *spipe;
 	struct snd_sof_pcm *spcm;
+	u8 *pipe_priority;
 	int ret;
 	int i;
 
@@ -320,6 +348,12 @@ static int sof_ipc4_trigger_pipelines(struct snd_soc_component *component,
 	if (!trigger_list)
 		return -ENOMEM;
 
+	pipe_priority = kzalloc(pipeline_list->count, GFP_KERNEL);
+	if (!pipe_priority) {
+		kfree(trigger_list);
+		return -ENOMEM;
+	}
+
 	mutex_lock(&ipc4_data->pipeline_state_mutex);
 
 	/*
@@ -334,12 +368,14 @@ static int sof_ipc4_trigger_pipelines(struct snd_soc_component *component,
 	if (state == SOF_IPC4_PIPE_RUNNING || state == SOF_IPC4_PIPE_RESET)
 		for (i = pipeline_list->count - 1; i >= 0; i--) {
 			spipe = pipeline_list->pipelines[i];
-			sof_ipc4_add_pipeline_to_trigger_list(sdev, state, spipe, trigger_list);
+			sof_ipc4_add_pipeline_to_trigger_list(sdev, state, spipe, trigger_list,
+							      pipe_priority);
 		}
 	else
 		for (i = 0; i < pipeline_list->count; i++) {
 			spipe = pipeline_list->pipelines[i];
-			sof_ipc4_add_pipeline_to_trigger_list(sdev, state, spipe, trigger_list);
+			sof_ipc4_add_pipeline_to_trigger_list(sdev, state, spipe, trigger_list,
+							      pipe_priority);
 		}
 
 	/* return if all pipelines are in the requested state already */
@@ -400,6 +436,7 @@ skip_pause_transition:
 free:
 	mutex_unlock(&ipc4_data->pipeline_state_mutex);
 	kfree(trigger_list);
+	kfree(pipe_priority);
 	return ret;
 }
 
@@ -529,7 +566,7 @@ static int sof_ipc4_pcm_dai_link_fixup(struct snd_soc_pcm_runtime *rtd,
 	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, SOF_AUDIO_PCM_DRV_NAME);
 	struct snd_sof_dai *dai = snd_sof_find_dai(component, rtd->dai_link->name);
 	struct snd_sof_dev *sdev = snd_soc_component_get_drvdata(component);
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
 	struct sof_ipc4_copier *ipc4_copier;
 	bool use_chain_dma = false;
 	int dir;
@@ -715,7 +752,7 @@ static int sof_ipc4_pcm_hw_params(struct snd_soc_component *component,
 				  struct snd_sof_platform_stream_params *platform_params)
 {
 	struct snd_sof_dev *sdev = snd_soc_component_get_drvdata(component);
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 	struct sof_ipc4_timestamp_info *time_info;
 	struct snd_sof_pcm *spcm;
 
@@ -776,7 +813,7 @@ static snd_pcm_sframes_t sof_ipc4_pcm_delay(struct snd_soc_component *component,
 					    struct snd_pcm_substream *substream)
 {
 	struct snd_sof_dev *sdev = snd_soc_component_get_drvdata(component);
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 	struct sof_ipc4_timestamp_info *time_info;
 	struct sof_ipc4_llp_reading_slot llp;
 	snd_pcm_uframes_t head_ptr, tail_ptr;

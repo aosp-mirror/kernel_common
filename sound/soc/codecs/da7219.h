@@ -808,6 +808,7 @@ struct da7219_priv {
 	struct snd_soc_component *component;
 	struct da7219_aad_priv *aad;
 	struct da7219_pdata *pdata;
+	struct work_struct srm_work;
 
 	bool wakeup_source;
 	struct regulator_bulk_data supplies[DA7219_NUM_SUPPLIES];
