@@ -654,6 +654,7 @@ static void native_machine_emergency_restart(void)
 		switch (reboot_type) {
 		case BOOT_ACPI:
 			acpi_reboot();
+			mdelay(15);
 			reboot_type = BOOT_KBD;
 			break;
 

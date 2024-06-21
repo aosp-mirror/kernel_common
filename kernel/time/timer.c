@@ -1903,14 +1903,16 @@ static u64 cmp_next_hrtimer_event(u64 basem, u64 expires)
 		return basem;
 
 	/*
-	 * Round up to the next jiffie. High resolution timers are
-	 * off, so the hrtimers are expired in the tick and we need to
-	 * make sure that this tick really expires the timer to avoid
-	 * a ping pong of the nohz stop code.
+	 * Previously we were rounding up to the next jiffie as when
+	 * high resolution timers are off, the hrtimers are expired in
+	 * the tick and we need to make sure that this tick really expires
+	 * the timer to avoid a ping pong of the nohz stop code.
 	 *
-	 * Use DIV_ROUND_UP_ULL to prevent gcc calling __divdi3
+	 * However, the nohz stop code uses hrtimer_forward() for the
+	 * low res case, which makes sure that we already do a rounding
+	 * there. So need to round to TICK_NSEC here.
 	 */
-	return DIV_ROUND_UP_ULL(nextevt, TICK_NSEC) * TICK_NSEC;
+	return nextevt;
 }
 
 /**

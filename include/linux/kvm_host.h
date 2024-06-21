@@ -97,6 +97,7 @@
 #define KVM_PFN_ERR_HWPOISON	(KVM_PFN_ERR_MASK + 1)
 #define KVM_PFN_ERR_RO_FAULT	(KVM_PFN_ERR_MASK + 2)
 #define KVM_PFN_ERR_SIGPENDING	(KVM_PFN_ERR_MASK + 3)
+#define KVM_PFN_ERR_NEEDS_IO	(KVM_PFN_ERR_MASK + 4)
 
 /*
  * error pfns indicate that the gfn is in slot but faild to
@@ -167,6 +168,7 @@ static inline bool is_error_page(struct page *page)
 #define KVM_REQ_VM_DEAD			(1 | KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
 #define KVM_REQ_UNBLOCK			2
 #define KVM_REQ_DIRTY_RING_SOFT_FULL	3
+#define KVM_REQ_SUSPEND_TIME_ADJ	5
 #define KVM_REQUEST_ARCH_BASE		8
 
 /*
@@ -293,6 +295,7 @@ struct kvm_host_map {
 	void *hva;
 	kvm_pfn_t pfn;
 	kvm_pfn_t gfn;
+	bool is_refcounted_page;
 };
 
 /*
@@ -363,6 +366,11 @@ struct kvm_vcpu {
 		struct list_head done;
 		spinlock_t lock;
 	} async_pf;
+#endif
+
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING
+	u64 suspend_time_ns;
+	spinlock_t suspend_time_ns_lock;
 #endif
 
 #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
@@ -808,6 +816,11 @@ struct kvm {
 	struct notifier_block pm_notifier;
 #endif
 	char stats_id[KVM_STATS_NAME_SIZE];
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING
+	u64 suspend_time_ns;
+	spinlock_t suspend_time_ns_lock;
+	u64 base_offs_boot_ns;
+#endif
 };
 
 #define kvm_err(fmt, ...) \
@@ -1177,6 +1190,55 @@ unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot, gfn_t gfn,
 void kvm_release_page_clean(struct page *page);
 void kvm_release_page_dirty(struct page *page);
 
+void kvm_set_page_accessed(struct page *page);
+void kvm_set_page_dirty(struct page *page);
+
+struct kvm_follow_pfn {
+	const struct kvm_memory_slot *slot;
+	gfn_t gfn;
+	/* FOLL_* flags modifying lookup behavior. */
+	unsigned int flags;
+	/* Whether this function can sleep. */
+	bool atomic;
+	/* Try to create a writable mapping even for a read fault. */
+	bool try_map_writable;
+	/*
+	 * Usage of the returned pfn will be guared by a mmu notifier. If
+	 * FOLL_GET is not set, this must be true.
+	 */
+	bool guarded_by_mmu_notifier;
+	/*
+	 * When false, do not return pfns for non-refcounted struct pages.
+	 *
+	 * This allows callers to continue to rely on the legacy behavior
+	 * where pfs returned by gfn_to_pfn can be safely passed to
+	 * kvm_release_pfn without worrying about corrupting the refcount of
+	 * non-refcounted pages.
+	 *
+	 * Callers that opt into non-refcount struct pages need to track
+	 * whether or not the returned pages are refcounted and avoid touching
+	 * them when they are not. Some architectures may not have enough
+	 * free space in PTEs to do this.
+	 */
+	bool allow_non_refcounted_struct_page;
+
+	/* Outputs of kvm_follow_pfn */
+	hva_t hva;
+	bool writable;
+	/*
+	 * Non-NULL if the returned pfn is for a page with a valid refcount,
+	 * NULL if the returned pfn has no struct page or if the struct page is
+	 * not being refcounted (e.g. tail pages of non-compound higher order
+	 * allocations from IO/PFNMAP mappings).
+	 *
+	 * NOTE: This will still be set if FOLL_GET is not specified, but the
+	 *       returned page will not have an elevated refcount.
+	 */
+	struct page *refcounted_page;
+};
+
+kvm_pfn_t kvm_follow_pfn(struct kvm_follow_pfn *kfp);
+
 kvm_pfn_t gfn_to_pfn(struct kvm *kvm, gfn_t gfn);
 kvm_pfn_t gfn_to_pfn_prot(struct kvm *kvm, gfn_t gfn, bool write_fault,
 		      bool *writable);
@@ -1191,7 +1253,6 @@ void kvm_release_pfn_dirty(kvm_pfn_t pfn);
 void kvm_set_pfn_dirty(kvm_pfn_t pfn);
 void kvm_set_pfn_accessed(kvm_pfn_t pfn);
 
-void kvm_release_pfn(kvm_pfn_t pfn, bool dirty);
 int kvm_read_guest_page(struct kvm *kvm, gfn_t gfn, void *data, int offset,
 			int len);
 int kvm_read_guest(struct kvm *kvm, gpa_t gpa, void *data, unsigned long len);
@@ -2317,5 +2378,41 @@ static inline void kvm_account_pgtable_pages(void *virt, int nr)
 
 /* Max number of entries allowed for each kvm dirty ring */
 #define  KVM_DIRTY_RING_MAX_ENTRIES  65536
+
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING
+bool virt_suspend_time_enabled(struct kvm *kvm);
+void kvm_write_suspend_time(struct kvm *kvm);
+int kvm_init_suspend_time_ghc(struct kvm *kvm, gpa_t gpa);
+static inline u64 kvm_total_suspend_time(struct kvm *kvm)
+{
+	return ktime_get_offs_boot_ns() - kvm->base_offs_boot_ns;
+}
+
+static inline u64 vcpu_suspend_time_injected(struct kvm_vcpu *vcpu)
+{
+	return vcpu->suspend_time_ns;
+}
+#else
+static inline bool virt_suspend_time_enabled(struct kvm *kvm)
+{
+	return 0;
+}
+static inline void kvm_write_suspend_time(struct kvm *kvm)
+{
+}
+static inline int kvm_init_suspend_time_ghc(struct kvm *kvm, gpa_t gpa)
+{
+	return 1;
+}
+static inline u64 kvm_total_suspend_time(struct kvm *kvm)
+{
+	return 0;
+}
+
+static inline u64 vcpu_suspend_time_injected(struct kvm_vcpu *vcpu)
+{
+	return 0;
+}
+#endif /* CONFIG_KVM_VIRT_SUSPEND_TIMING */
 
 #endif

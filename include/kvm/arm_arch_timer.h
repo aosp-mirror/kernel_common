@@ -152,4 +152,7 @@ static inline bool has_cntpoff(void)
 	return (has_vhe() && cpus_have_final_cap(ARM64_HAS_ECV_CNTPOFF));
 }
 
+/* Nedded for debugfs */
+u64 timer_get_offset(struct arch_timer_context *ctxt);
+
 #endif

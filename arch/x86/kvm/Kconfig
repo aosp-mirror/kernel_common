@@ -154,4 +154,17 @@ config KVM_PROVE_MMU
 config KVM_EXTERNAL_WRITE_TRACKING
 	bool
 
+config KVM_VIRT_SUSPEND_TIMING
+	bool "Host support for virtual suspend time injection"
+	depends on KVM=y && HAVE_KVM_PM_NOTIFIER
+	default n
+	help
+	 This option makes the host's suspension reflected on the guest's clocks.
+	 In other words, guest's CLOCK_MONOTONIC will stop and
+	 CLOCK_BOOTTIME keeps running during the host's suspension.
+	 This feature will only be effective when both guest and host support
+	 this feature. For the guest side, see KVM_VIRT_SUSPEND_TIMING_GUEST.
+
+	 If unsure, say N.
+
 endif # VIRTUALIZATION
