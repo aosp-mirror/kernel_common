@@ -74,6 +74,10 @@
 #define UVC_QUIRK_FORCE_BPP		0x00001000
 #define UVC_QUIRK_WAKE_AUTOSUSPEND	0x00002000
 
+#define UVC_QUIRK_FORCE_RESUME		0x20000000
+#define UVC_QUIRK_DISABLE_AUTOSUSPEND	0x40000000
+#define UVC_QUIRK_PRIVACY_DURING_STREAM	0x80000000
+
 /* Format flags */
 #define UVC_FMT_FLAG_COMPRESSED		0x00000001
 #define UVC_FMT_FLAG_STREAM		0x00000002
@@ -226,6 +230,9 @@ struct uvc_entity {
 			u8  *bmControls;
 			struct gpio_desc *gpio_privacy;
 			int irq;
+			struct mutex event_mutex;
+			int last_event_val;
+			bool is_gpio_ready;
 		} gpio;
 	};
 
@@ -253,6 +260,14 @@ struct uvc_frame {
 	u32 dwDefaultFrameInterval;
 	const u32 *dwFrameInterval;
 };
+
+struct uvc_roi {
+	u16 wROI_Top;
+	u16 wROI_Left;
+	u16 wROI_Bottom;
+	u16 wROI_Right;
+	u16 bmAutoControls;
+} __packed;
 
 struct uvc_format {
 	u8 type;
@@ -717,6 +732,9 @@ extern const struct v4l2_file_operations uvc_fops;
 int uvc_mc_register_entities(struct uvc_video_chain *chain);
 void uvc_mc_cleanup_entity(struct uvc_entity *entity);
 
+/* Privacy gpio */
+void uvc_gpio_event(struct uvc_device *dev);
+
 /* Video */
 int uvc_video_init(struct uvc_streaming *stream);
 int uvc_video_suspend(struct uvc_streaming *stream);
@@ -760,6 +778,7 @@ int uvc_query_v4l2_menu(struct uvc_video_chain *chain,
 int uvc_ctrl_add_mapping(struct uvc_video_chain *chain,
 			 const struct uvc_control_mapping *mapping);
 int uvc_ctrl_init_device(struct uvc_device *dev);
+void uvc_ctrl_stop_device(struct uvc_device *dev);
 void uvc_ctrl_cleanup_device(struct uvc_device *dev);
 int uvc_ctrl_restore_values(struct uvc_device *dev);
 bool uvc_ctrl_status_event_async(struct urb *urb, struct uvc_video_chain *chain,
@@ -807,5 +826,7 @@ void uvc_debugfs_cleanup_stream(struct uvc_streaming *stream);
 
 size_t uvc_video_stats_dump(struct uvc_streaming *stream, char *buf,
 			    size_t size);
+
+struct uvc_roi *uvc_ctrl_roi(struct uvc_video_chain *chain, u8 query);
 
 #endif

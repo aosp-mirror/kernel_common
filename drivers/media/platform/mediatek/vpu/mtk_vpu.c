@@ -349,7 +349,22 @@ int vpu_ipi_send(struct platform_device *pdev,
 		}
 	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
 
-	memcpy_toio(send_obj->share_buf, buf, len);
+	/*
+	 * On Arm64, the _memcpy_(to/from)io do byte-size access as long as address or length are
+	 * not 8 aligned. Since access to the vpu iomem must be 4 aligned, byte-size access is
+	 * not allowed and cause processing to fail. Therefore make sure the length
+	 * sent to memcpy_toio is a multiply of 8.
+	 */
+	if (len % 8 != 0) {
+		unsigned char data[sizeof(send_obj->share_buf)];
+
+		memset(data + len, 0, sizeof(data) - len);
+		memcpy(data, buf, len);
+		memcpy_toio(send_obj->share_buf, data, round_up(len, 8));
+	} else {
+		memcpy_toio(send_obj->share_buf, buf, len);
+	}
+
 	writel(len, &send_obj->len);
 	writel(id, &send_obj->id);
 

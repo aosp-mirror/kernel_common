@@ -167,9 +167,15 @@ void v4l2_async_nf_init(struct v4l2_async_notifier *notifier,
  *
  * This function initializes the notifier @asc_list. It must be called
  * before adding a subdevice to a notifier, using one of:
- * v4l2_async_nf_add_fwnode_remote(), v4l2_async_nf_add_fwnode() or
- * v4l2_async_nf_add_i2c().
+ * v4l2_async_nf_add_fwnode_remote(),
+ * v4l2_async_nf_add_fwnode(),
+ * v4l2_async_nf_add_i2c(),
+ * __v4l2_async_nf_add_subdev() or
+ * v4l2_async_nf_parse_fwnode_endpoints().
  */
+int __v4l2_async_nf_add_subdev(struct v4l2_async_notifier *notifier,
+                              struct v4l2_async_connection *asd);
+
 void v4l2_async_subdev_nf_init(struct v4l2_async_notifier *notifier,
 			       struct v4l2_subdev *sd);
 
@@ -295,8 +301,12 @@ void v4l2_async_nf_unregister(struct v4l2_async_notifier *notifier);
  * Release memory resources related to a notifier, including the async
  * connections allocated for the purposes of the notifier but not the notifier
  * itself. The user is responsible for calling this function to clean up the
- * notifier after calling v4l2_async_nf_add_fwnode_remote(),
- * v4l2_async_nf_add_fwnode() or v4l2_async_nf_add_i2c().
+ * notifier after calling
+ * v4l2_async_nf_add_fwnode_remote(),
+ * v4l2_async_nf_add_fwnode(),
+ * v4l2_async_nf_add_i2c(),
+ * __v4l2_async_nf_add_subdev() or
+ * v4l2_async_nf_parse_fwnode_endpoints().
  *
  * There is no harm from calling v4l2_async_nf_cleanup() in other
  * cases as long as its memory has been zeroed after it has been
