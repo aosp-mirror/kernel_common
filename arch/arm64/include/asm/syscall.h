@@ -17,6 +17,8 @@ extern const syscall_fn_t sys_call_table[];
 extern const syscall_fn_t compat_sys_call_table[];
 #endif
 
+#define sys_call_ptr_t syscall_fn_t	/* Needed for alt-syscall	*/
+
 static inline int syscall_get_nr(struct task_struct *task,
 				 struct pt_regs *regs)
 {

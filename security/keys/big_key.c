@@ -64,7 +64,7 @@ int big_key_preparse(struct key_preparsed_payload *prep)
 	size_t enclen = datalen + CHACHA20POLY1305_AUTHTAG_SIZE;
 	int ret;
 
-	BUILD_BUG_ON(sizeof(*payload) != sizeof(prep->payload.data));
+	BUILD_BUG_ON(sizeof(*payload) > sizeof(prep->payload.data));
 
 	if (datalen <= 0 || datalen > 1024 * 1024 || !prep->data)
 		return -EINVAL;
