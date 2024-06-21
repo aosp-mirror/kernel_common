@@ -1583,21 +1583,6 @@ struct link_station_del_parameters {
 };
 
 /**
- * struct cfg80211_ttlm_params: TID to link mapping parameters
- *
- * Used for setting a TID to link mapping.
- *
- * @dlink: Downlink TID to link mapping, as defined in section 9.4.2.314
- *     (TID-To-Link Mapping element) in Draft P802.11be_D4.0.
- * @ulink: Uplink TID to link mapping, as defined in section 9.4.2.314
- *     (TID-To-Link Mapping element) in Draft P802.11be_D4.0.
- */
-struct cfg80211_ttlm_params {
-	u16 dlink[8];
-	u16 ulink[8];
-};
-
-/**
  * struct station_parameters - station parameters
  *
  * Used to change and create a new station.
@@ -2764,13 +2749,6 @@ enum cfg80211_signal_type {
  *	the BSS that requested the scan in which the beacon/probe was received.
  * @chains: bitmask for filled values in @chain_signal.
  * @chain_signal: per-chain signal strength of last received BSS in dBm.
- * @restrict_use: restrict usage, if not set, assume @use_for is
- *	%NL80211_BSS_USE_FOR_NORMAL.
- * @use_for: bitmap of possible usage for this BSS, see
- *	&enum nl80211_bss_use_for
- * @cannot_use_reasons: the reasons (bitmap) for not being able to connect,
- *	if @restrict_use is set and @use_for is zero (empty); may be 0 for
- *	unspecified reasons; see &enum nl80211_bss_cannot_use_reasons
  * @drv_data: Data to be passed through to @inform_bss
  */
 struct cfg80211_inform_bss {
@@ -2782,9 +2760,6 @@ struct cfg80211_inform_bss {
 	u8 parent_bssid[ETH_ALEN] __aligned(2);
 	u8 chains;
 	s8 chain_signal[IEEE80211_MAX_CHAINS];
-
-	u8 restrict_use:1, use_for:7;
-	u8 cannot_use_reasons;
 
 	void *drv_data;
 };
@@ -2838,11 +2813,6 @@ struct cfg80211_bss_ies {
  * @chain_signal: per-chain signal strength of last received BSS in dBm.
  * @bssid_index: index in the multiple BSS set
  * @max_bssid_indicator: max number of members in the BSS set
- * @use_for: bitmap of possible usage for this BSS, see
- *	&enum nl80211_bss_use_for
- * @cannot_use_reasons: the reasons (bitmap) for not being able to connect,
- *	if @restrict_use is set and @use_for is zero (empty); may be 0 for
- *	unspecified reasons; see &enum nl80211_bss_cannot_use_reasons
  * @priv: private area for driver use, has at least wiphy->bss_priv_size bytes
  */
 struct cfg80211_bss {
@@ -2868,9 +2838,6 @@ struct cfg80211_bss {
 
 	u8 bssid_index;
 	u8 max_bssid_indicator;
-
-	u8 use_for;
-	u8 cannot_use_reasons;
 
 	ANDROID_KABI_RESERVE(1);
 
@@ -4474,7 +4441,6 @@ struct mgmt_frame_regs {
  * @del_link_station: Remove a link of a station.
  *
  * @set_hw_timestamp: Enable/disable HW timestamping of TM/FTM frames.
- * @set_ttlm: set the TID to link mapping.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -4834,8 +4800,6 @@ struct cfg80211_ops {
 				    struct link_station_del_parameters *params);
 	int	(*set_hw_timestamp)(struct wiphy *wiphy, struct net_device *dev,
 				    struct cfg80211_set_hw_timestamp *hwts);
-	int	(*set_ttlm)(struct wiphy *wiphy, struct net_device *dev,
-			    struct cfg80211_ttlm_params *params);
 
 	ANDROID_KABI_RESERVE(1);
 	ANDROID_KABI_RESERVE(2);
@@ -4898,10 +4862,6 @@ struct cfg80211_ops {
  * @WIPHY_FLAG_NOTIFY_REGDOM_BY_DRIVER: The device could handle reg notify for
  *	NL80211_REGDOM_SET_BY_DRIVER.
  * @WIPHY_FLAG_DISABLE_WEXT: disable wireless extensions for this device
- * @WIPHY_FLAG_CHANNEL_CHANGE_ON_BEACON: reg_call_notifier() is called if driver
- *	set this flag to update channels on beacon hints.
- * @WIPHY_FLAG_SUPPORTS_NSTR_NONPRIMARY: support connection to non-primary link
- *	of an NSTR mobile AP MLD.
  */
 enum wiphy_flags {
 	WIPHY_FLAG_SUPPORTS_EXT_KEK_KCK		= BIT(0),
@@ -4916,7 +4876,7 @@ enum wiphy_flags {
 	WIPHY_FLAG_DISABLE_WEXT			= BIT(9),
 	WIPHY_FLAG_MESH_AUTH			= BIT(10),
 	WIPHY_FLAG_SUPPORTS_EXT_KCK_32          = BIT(11),
-	WIPHY_FLAG_SUPPORTS_NSTR_NONPRIMARY	= BIT(12),
+	/* use hole at 12 */
 	WIPHY_FLAG_SUPPORTS_FW_ROAM		= BIT(13),
 	WIPHY_FLAG_AP_UAPSD			= BIT(14),
 	WIPHY_FLAG_SUPPORTS_TDLS		= BIT(15),
@@ -4929,7 +4889,6 @@ enum wiphy_flags {
 	WIPHY_FLAG_SUPPORTS_5_10_MHZ		= BIT(22),
 	WIPHY_FLAG_HAS_CHANNEL_SWITCH		= BIT(23),
 	WIPHY_FLAG_NOTIFY_REGDOM_BY_DRIVER	= BIT(24),
-	WIPHY_FLAG_CHANNEL_CHANGE_ON_BEACON     = BIT(25),
 };
 
 /**
@@ -7206,25 +7165,6 @@ cfg80211_inform_bss(struct wiphy *wiphy,
 }
 
 /**
- * __cfg80211_get_bss - get a BSS reference
- * @wiphy: the wiphy this BSS struct belongs to
- * @channel: the channel to search on (or %NULL)
- * @bssid: the desired BSSID (or %NULL)
- * @ssid: the desired SSID (or %NULL)
- * @ssid_len: length of the SSID (or 0)
- * @bss_type: type of BSS, see &enum ieee80211_bss_type
- * @privacy: privacy filter, see &enum ieee80211_privacy
- * @use_for: indicates which use is intended
- */
-struct cfg80211_bss *__cfg80211_get_bss(struct wiphy *wiphy,
-					struct ieee80211_channel *channel,
-					const u8 *bssid,
-					const u8 *ssid, size_t ssid_len,
-					enum ieee80211_bss_type bss_type,
-					enum ieee80211_privacy privacy,
-					u32 use_for);
-
-/**
  * cfg80211_get_bss - get a BSS reference
  * @wiphy: the wiphy this BSS struct belongs to
  * @channel: the channel to search on (or %NULL)
@@ -7233,20 +7173,13 @@ struct cfg80211_bss *__cfg80211_get_bss(struct wiphy *wiphy,
  * @ssid_len: length of the SSID (or 0)
  * @bss_type: type of BSS, see &enum ieee80211_bss_type
  * @privacy: privacy filter, see &enum ieee80211_privacy
- *
- * This version implies regular usage, %NL80211_BSS_USE_FOR_NORMAL.
  */
-static inline struct cfg80211_bss *
-cfg80211_get_bss(struct wiphy *wiphy, struct ieee80211_channel *channel,
-		 const u8 *bssid, const u8 *ssid, size_t ssid_len,
-		 enum ieee80211_bss_type bss_type,
-		 enum ieee80211_privacy privacy)
-{
-	return __cfg80211_get_bss(wiphy, channel, bssid, ssid, ssid_len,
-				  bss_type, privacy,
-				  NL80211_BSS_USE_FOR_NORMAL);
-}
-
+struct cfg80211_bss *cfg80211_get_bss(struct wiphy *wiphy,
+				      struct ieee80211_channel *channel,
+				      const u8 *bssid,
+				      const u8 *ssid, size_t ssid_len,
+				      enum ieee80211_bss_type bss_type,
+				      enum ieee80211_privacy privacy);
 static inline struct cfg80211_bss *
 cfg80211_get_ibss(struct wiphy *wiphy,
 		  struct ieee80211_channel *channel,
@@ -8839,7 +8772,9 @@ int cfg80211_register_netdevice(struct net_device *dev);
  */
 static inline void cfg80211_unregister_netdevice(struct net_device *dev)
 {
+#if IS_ENABLED(CONFIG_CFG80211)
 	cfg80211_unregister_wdev(dev->ieee80211_ptr);
+#endif
 }
 
 /**
