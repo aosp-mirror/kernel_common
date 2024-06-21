@@ -258,12 +258,12 @@ static inline int ovl_do_symlink(struct ovl_fs *ofs,
 static inline ssize_t ovl_do_getxattr(const struct path *path, const char *name,
 				      void *value, size_t size)
 {
+	struct inode *ip = d_inode(path->dentry);
 	int err, len;
 
 	WARN_ON(path->dentry->d_sb != path->mnt->mnt_sb);
 
-	err = vfs_getxattr(mnt_idmap(path->mnt), path->dentry,
-			       name, value, size);
+	err = __vfs_getxattr(mnt_idmap(path->mnt), path->dentry, ip, name, value, size, XATTR_NOSECURITY);
 	len = (value && err > 0) ? err : 0;
 
 	pr_debug("getxattr(%pd2, \"%s\", \"%*pE\", %zu, 0) = %i\n",

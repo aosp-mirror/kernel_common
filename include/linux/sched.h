@@ -844,6 +844,10 @@ struct task_struct {
 
 	struct sched_statistics         stats;
 
+#ifdef CONFIG_PROC_LATSENSE
+	int proc_latency_sensitive;
+#endif
+
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* List of struct preempt_notifier: */
 	struct hlist_head		preempt_notifiers;

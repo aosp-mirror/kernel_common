@@ -108,3 +108,9 @@ config PROC_PID_ARCH_STATUS
 config PROC_CPU_RESCTRL
 	def_bool n
 	depends on PROC_FS
+
+config PROC_LATSENSE
+	def_bool y
+	depends on PROC_FS && UCLAMP_TASK
+	help
+	Enable /proc/pid/tasks/tid latency sensitive scheduler attribute
