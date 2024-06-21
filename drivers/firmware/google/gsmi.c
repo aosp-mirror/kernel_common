@@ -31,6 +31,7 @@
 #include <linux/module.h>
 #include <linux/ucs2_string.h>
 #include <linux/suspend.h>
+#include <linux/thermal.h>
 
 #define GSMI_SHUTDOWN_CLEAN	0	/* Clean Shutdown */
 /* TODO(mikew@google.com): Tie in HARDLOCKUP_DETECTOR with NMIWDT */
@@ -42,6 +43,7 @@
 #define GSMI_SHUTDOWN_SOFTWDT	6	/* Software Watchdog */
 #define GSMI_SHUTDOWN_MBE	7	/* Uncorrected ECC */
 #define GSMI_SHUTDOWN_TRIPLE	8	/* Triple Fault */
+#define GSMI_SHUTDOWN_THERMAL	9	/* Critical Thermal Threshold */
 
 #define DRIVER_VERSION		"1.0"
 #define GSMI_GUID_SIZE		16
@@ -699,6 +701,18 @@ static struct notifier_block gsmi_panic_notifier = {
 	.notifier_call = gsmi_panic_callback,
 };
 
+static int gsmi_thermal_callback(struct notifier_block *nb,
+				 unsigned long reason, void *arg)
+{
+	if (reason == THERMAL_TRIP_CRITICAL)
+		gsmi_shutdown_reason(GSMI_SHUTDOWN_THERMAL);
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block gsmi_thermal_notifier = {
+	.notifier_call = gsmi_thermal_callback
+};
+
 /*
  * This hash function was blatantly copied from include/linux/hash.h.
  * It is used by this driver to obfuscate a board name that requires a
@@ -1038,6 +1052,7 @@ static __init int gsmi_init(void)
 	}
 #endif
 
+	register_thermal_notifier(&gsmi_thermal_notifier);
 	register_reboot_notifier(&gsmi_reboot_notifier);
 	register_die_notifier(&gsmi_die_notifier);
 	atomic_notifier_chain_register(&panic_notifier_list,
@@ -1065,6 +1080,7 @@ out_err:
 
 static void __exit gsmi_exit(void)
 {
+	unregister_thermal_notifier(&gsmi_thermal_notifier);
 	unregister_reboot_notifier(&gsmi_reboot_notifier);
 	unregister_die_notifier(&gsmi_die_notifier);
 	atomic_notifier_chain_unregister(&panic_notifier_list,
