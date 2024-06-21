@@ -1118,6 +1118,10 @@ static int nl80211_msg_put_channel(struct sk_buff *msg, struct wiphy *wiphy,
 	if (nla_put_u32(msg, NL80211_FREQUENCY_ATTR_OFFSET, chan->freq_offset))
 		goto nla_put_failure;
 
+	if ((chan->flags & IEEE80211_CHAN_PSD) &&
+	    nla_put_s8(msg, NL80211_FREQUENCY_ATTR_PSD, chan->psd))
+		goto nla_put_failure;
+
 	if ((chan->flags & IEEE80211_CHAN_DISABLED) &&
 	    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_DISABLED))
 		goto nla_put_failure;
@@ -8584,6 +8588,11 @@ static int nl80211_put_regdom(const struct ieee80211_regdomain *regdom,
 				reg_rule->dfs_cac_ms))
 			goto nla_put_failure;
 
+		if ((reg_rule->flags & NL80211_RRF_PSD) &&
+		    nla_put_s8(msg, NL80211_ATTR_POWER_RULE_PSD,
+			       reg_rule->psd))
+			goto nla_put_failure;
+
 		nla_nest_end(msg, nl_reg_rule);
 	}
 
@@ -11031,8 +11040,9 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 
 		if (cfg80211_find_ext_elem(WLAN_EID_EXT_NON_INHERITANCE,
 					   req.ie, req.ie_len)) {
-			GENL_SET_ERR_MSG(info,
-					 "non-inheritance makes no sense");
+			NL_SET_ERR_MSG_ATTR(info->extack,
+					    info->attrs[NL80211_ATTR_IE],
+					    "non-inheritance makes no sense");
 			return -EINVAL;
 		}
 	}
@@ -11157,6 +11167,7 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 
 			if (!attrs[NL80211_ATTR_MLO_LINK_ID]) {
 				err = -EINVAL;
+				NL_SET_BAD_ATTR(info->extack, link);
 				goto free;
 			}
 
@@ -11164,6 +11175,7 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 			/* cannot use the same link ID again */
 			if (req.links[link_id].bss) {
 				err = -EINVAL;
+				NL_SET_BAD_ATTR(info->extack, link);
 				goto free;
 			}
 			req.links[link_id].bss =
@@ -11172,6 +11184,8 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 			if (IS_ERR(req.links[link_id].bss)) {
 				err = PTR_ERR(req.links[link_id].bss);
 				req.links[link_id].bss = NULL;
+				NL_SET_ERR_MSG_ATTR(info->extack,
+						    link, "Error fetching BSS for link");
 				goto free;
 			}
 
@@ -11184,8 +11198,9 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 				if (cfg80211_find_elem(WLAN_EID_FRAGMENT,
 						       req.links[link_id].elems,
 						       req.links[link_id].elems_len)) {
-					GENL_SET_ERR_MSG(info,
-							 "cannot deal with fragmentation");
+					NL_SET_ERR_MSG_ATTR(info->extack,
+							    attrs[NL80211_ATTR_IE],
+							    "cannot deal with fragmentation");
 					err = -EINVAL;
 					goto free;
 				}
@@ -11193,8 +11208,9 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 				if (cfg80211_find_ext_elem(WLAN_EID_EXT_NON_INHERITANCE,
 							   req.links[link_id].elems,
 							   req.links[link_id].elems_len)) {
-					GENL_SET_ERR_MSG(info,
-							 "cannot deal with non-inheritance");
+					NL_SET_ERR_MSG_ATTR(info->extack,
+							    attrs[NL80211_ATTR_IE],
+							    "cannot deal with non-inheritance");
 					err = -EINVAL;
 					goto free;
 				}
@@ -11238,6 +11254,9 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 
 	err = nl80211_crypto_settings(rdev, info, &req.crypto, 1);
 	if (!err) {
+		struct nlattr *link;
+		int rem = 0;
+
 		wdev_lock(dev->ieee80211_ptr);
 
 		err = cfg80211_mlme_assoc(rdev, dev, &req);
@@ -11250,6 +11269,34 @@ static int nl80211_associate(struct sk_buff *skb, struct genl_info *info)
 		}
 
 		wdev_unlock(dev->ieee80211_ptr);
+
+		/* Report error from first problematic link */
+		if (info->attrs[NL80211_ATTR_MLO_LINKS]) {
+			nla_for_each_nested(link,
+					    info->attrs[NL80211_ATTR_MLO_LINKS],
+					    rem) {
+				struct nlattr *link_id_attr =
+					nla_find_nested(link, NL80211_ATTR_MLO_LINK_ID);
+
+				if (!link_id_attr)
+					continue;
+
+				link_id = nla_get_u8(link_id_attr);
+
+				if (link_id == req.link_id)
+					continue;
+
+				if (!req.links[link_id].error ||
+				    WARN_ON(req.links[link_id].error > 0))
+					continue;
+
+				WARN_ON(err >= 0);
+
+				NL_SET_BAD_ATTR(info->extack, link);
+				err = req.links[link_id].error;
+				break;
+			}
+		}
 	}
 
 free:

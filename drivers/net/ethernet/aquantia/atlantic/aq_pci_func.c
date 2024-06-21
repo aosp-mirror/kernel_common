@@ -117,6 +117,14 @@ static int aq_pci_probe_get_hw_by_id(struct pci_dev *pdev,
 	if (i == ARRAY_SIZE(hw_atl_boards))
 		return -EINVAL;
 
+	/* b/190008710
+	 * ChromeOS security team ran fuzz testing against B1 HW version.
+	 * However, hw_atl_ops_b1 is an alias for hw_atl_ops_b0 (see
+	 * hw_atl/hw_atl_b0.h). This check enables *both* HW versions.
+	 */
+	if (*ops != &hw_atl_ops_b1)
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -486,4 +494,3 @@ void aq_pci_func_unregister_driver(void)
 {
 	pci_unregister_driver(&aq_pci_ops);
 }
-
