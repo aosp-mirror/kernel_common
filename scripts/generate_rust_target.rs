@@ -173,7 +173,20 @@ fn main() {
 
     // `llvm-target`s are taken from `scripts/Makefile.clang`.
     if cfg.has("ARM64") {
-        panic!("arm64 uses the builtin rustc aarch64-unknown-none target");
+        ts.push("arch", "aarch64");
+        ts.push(
+            "data-layout",
+            "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+        );
+        ts.push("disable-redzone", true);
+        let mut features = "+v8a,+strict-align,+neon,+fp-armv8".to_string();
+        if cfg.has("SHADOW_CALL_STACK") {
+            features += ",+reserve-x18";
+        }
+        ts.push("features", features);
+        ts.push("llvm-target", "aarch64-linux-gnu");
+        ts.push("supported-sanitizers", ["kcfi"]);
+        ts.push("target-pointer-width", "64");
     } else if cfg.has("X86_64") {
         ts.push("arch", "x86_64");
         ts.push(
