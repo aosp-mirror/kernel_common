@@ -1,0 +1,254 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2022 Google LLC
+ */
+
+/dts-v1/;
+#include "mt8186-corsola.dtsi"
+
+/ {
+	max98357a: max98357a {
+		status = "okay";
+
+		compatible = "maxim,max98357a";
+		sdmode-gpios = <&pio 150 0>;
+		#sound-dai-cells = <0>;
+	};
+};
+
+&dsi_out {
+	remote-endpoint = <&anx7625_in>;
+};
+
+&dpi_out {
+	remote-endpoint = <&anx7625_dp_in>;
+};
+
+&i2c0 {
+	clock-frequency = <400000>;
+
+	anx_bridge: anx7625@58 {
+		compatible = "analogix,anx7625";
+		reg = <0x58>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&anx7625_pins>;
+		panel_flags = <1>;
+		enable-gpios = <&pio 96 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&pio 98 GPIO_ACTIVE_HIGH>;
+		vdd10-supply = <&pp1000_edpbrdg>;
+		vdd18-supply = <&pp1800_edpbrdg_dx>;
+		vdd33-supply = <&pp3300_edp_dx>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			anx7625_in: endpoint {
+				remote-endpoint = <&dsi_out>;
+				data-lanes = <0 1 2 3>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			anx7625_out: endpoint {
+				remote-endpoint = <&panel_in>;
+			};
+		};
+
+		aux-bus {
+			panel: panel {
+				compatible = "edp-panel";
+				power-supply = <&pp3300_disp_x>;
+				backlight = <&backlight_lcd0>;
+
+				port {
+					panel_in: endpoint {
+						remote-endpoint = <&anx7625_out>;
+					};
+				};
+			};
+		};
+	};
+};
+
+&i2c1 {
+	touchscreen@10 {
+		compatible = "hid-over-i2c";
+		reg = <0x10>;
+		interrupt-parent = <&pio>;
+		interrupts = <12 IRQ_TYPE_LEVEL_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&touchscreen_pins>;
+		post-power-on-delay-ms = <10>;
+		hid-descr-addr = <0x0001>;
+		vdd-supply = <&pp3300_s3>;
+        };
+};
+
+&i2c2 {
+	trackpad@2c {
+		compatible = "hid-over-i2c";
+		reg = <0x2c>;
+		hid-descr-addr = <0x20>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&trackpad_pins>;
+		interrupts-extended = <&pio 11 IRQ_TYPE_LEVEL_LOW>;
+		vcc-supply = <&pp3300_s3>;
+		wakeup-source;
+	};
+};
+
+&i2c3 {
+	clock-frequency = <400000>;
+
+	anx_bridge_dp: anx7625-dp@58 {
+		compatible = "analogix,anx7625";
+		reg = <0x58>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&anx7625_dp_pins>;
+		interrupt-parent = <&pio>;
+		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
+		enable-gpios = <&pio 176 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&pio 177 GPIO_ACTIVE_HIGH>;
+		vdd10-supply = <&pp1100_dpbrdg>;
+		vdd18-supply = <&pp1800_dpbrdg_dx>;
+		vdd33-supply = <&pp3300_dpbrdg_dx>;
+		analogix,audio-enable;
+		anx,tx-rx-to-two-ports;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#sound-dai-cells = <0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				anx7625_dp_in: endpoint {
+					bus-type = <7>;
+					remote-endpoint = <&dpi_out>;
+				};
+			};
+		};
+
+		switches {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			switch@0 {
+				compatible = "typec-switch";
+				reg = <0>;
+				mode-switch;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						anx_typec0: endpoint {
+							remote-endpoint = <&typec_port0>;
+						};
+					};
+				};
+			};
+
+			switch@1 {
+				compatible = "typec-switch";
+				reg = <1>;
+				mode-switch;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						anx_typec1: endpoint {
+							remote-endpoint = <&typec_port1>;
+						};
+					};
+				};
+			};
+		};
+	};
+};
+
+&i2c5 {
+	da7219: da7219@1a {
+		pinctrl-names = "default";
+		pinctrl-0 = <&da7219_pins>;
+		compatible = "dlg,da7219";
+		reg = <0x1a>;
+		interrupt-parent = <&pio>;
+		interrupts = <17 IRQ_TYPE_LEVEL_LOW 17 0>;
+		dlg,micbias-lvl = <2600>;
+		dlg,mic-amp-in-sel = "diff";
+		VDD-supply = <&pp1800_alw>;
+		VDDMIC-supply = <&pp3300_alw>;
+		VDDIO-supply = <&pp1800_alw>;
+		#sound-dai-cells = <0>;
+
+		da7219-aad {
+			dlg,adc-1bit-rpt = <1>;
+			dlg,btn-avg = <4>;
+			dlg,btn-cfg = <50>;
+			dlg,mic-det-thr = <500>;
+			dlg,jack-ins-deb = <20>;
+			dlg,jack-det-rate = "32ms_64ms";
+			dlg,jack-rem-deb = <1>;
+			dlg,a-d-btn-thr = <0xa>;
+			dlg,d-b-btn-thr = <0x16>;
+			dlg,b-c-btn-thr = <0x21>;
+			dlg,c-mic-btn-thr = <0x3E>;
+		};
+	};
+};
+
+&mmc1_pins_uhs {
+	pins-clk {
+		drive-strength = <MTK_DRIVE_8mA>;
+	};
+};
+
+&pio {
+	/* dp brigde anx7625bh */
+	anx7625_dp_pins: anx7625bh-pins {
+		pins1 {
+			pinmux = <PINMUX_GPIO176__FUNC_GPIO176>,
+				 <PINMUX_GPIO177__FUNC_GPIO177>;
+			output-low;
+		};
+
+		pins2 {
+			pinmux = <PINMUX_GPIO8__FUNC_GPIO8>;
+			input-enable;
+			bias-pull-up;
+		};
+	};
+};
+
+&sound {
+	status = "okay";
+
+	compatible = "mediatek,mt8186-mt6366-da7219-max98357-sound";
+	mediatek,adsp = <&adsp>;
+
+	playback-codecs {
+		sound-dai = <&anx_bridge_dp>,
+			    <&max98357a>;
+	};
+
+	headset-codec {
+		sound-dai = <&da7219>;
+	};
+};
+
+&typec_port0 {
+	remote-endpoint = <&anx_typec0>;
+};
+
+&typec_port1 {
+	remote-endpoint = <&anx_typec1>;
+};

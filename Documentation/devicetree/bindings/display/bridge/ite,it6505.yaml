@@ -96,14 +96,47 @@ properties:
       - port@0
       - port@1
 
+  switches:
+    type: object
+    description: Set of switches controlling DisplayPort traffic on
+      outgoing RX/TX lanes to Type C ports.
+    additionalProperties: false
+
+    properties:
+      '#address-cells':
+        const: 1
+
+      '#size-cells':
+        const: 0
+
+    patternProperties:
+      '^switch@[01]$':
+        $ref: /schemas/usb/typec-switch.yaml#
+        unevaluatedProperties: false
+
+        properties:
+          reg:
+            maxItems: 1
+
+        required:
+          - reg
+
+    required:
+      - switch@0
+
 required:
   - compatible
   - ovdd-supply
   - pwr18-supply
   - interrupts
   - reset-gpios
-  - extcon
   - ports
+
+oneOf:
+  - required:
+      - extcon
+  - required:
+      - switches
 
 additionalProperties: false
 
@@ -143,6 +176,44 @@ examples:
                     it6505_out: endpoint {
                         remote-endpoint = <&dp_in>;
                         data-lanes = <0 1>;
+                    };
+                };
+            };
+
+            switches {
+                #address-cells = <1>;
+                #size-cells = <0>;
+                switch@0 {
+                    compatible = "typec-switch";
+                    reg = <0>;
+                    mode-switch;
+
+                    ports {
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        port@0 {
+                            reg = <0>;
+                            ite_typec0: endpoint {
+                                remote-endpoint = <&typec_port0>;
+                            };
+                        };
+                    };
+                };
+
+                switch@1 {
+                    compatible = "typec-switch";
+                    reg = <1>;
+                    mode-switch;
+
+                    ports {
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        port@0 {
+                            reg = <0>;
+                            ite_typec1: endpoint {
+                                remote-endpoint = <&typec_port1>;
+                            };
+                        };
                     };
                 };
             };

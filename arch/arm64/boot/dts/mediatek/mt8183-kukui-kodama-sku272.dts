@@ -9,6 +9,7 @@
 
 /dts-v1/;
 #include "mt8183-kukui-kodama.dtsi"
+#include "mt8183-kukui-kodama-camera-gc5035.dtsi"
 
 / {
 	model = "MediaTek kodama sku272 board";

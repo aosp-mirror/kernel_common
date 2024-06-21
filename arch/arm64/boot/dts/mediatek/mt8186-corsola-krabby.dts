@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2022 Google LLC
+ */
+
+/dts-v1/;
+#include "mt8186-corsola-krabby.dtsi"
+
+/ {
+	model = "Google Krabby board";
+	compatible = "google,corsola", "google,krabby", "mediatek,mt8186";
+};

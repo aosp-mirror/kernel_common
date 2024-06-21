@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2021 Google LLC
+ */
+
+/dts-v1/;
+#include "mt8186-corsola-kingler.dtsi"
+
+/ {
+	model = "Google Kingler board";
+	compatible = "google,corsola", "google,kingler", "mediatek,mt8186";
+};

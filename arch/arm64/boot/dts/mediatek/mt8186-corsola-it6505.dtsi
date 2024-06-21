@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2022 Google LLC
+ */
+
+&typec_port0 {
+	remote-endpoint = <&ite_typec0>;
+};
+
+&typec_port1 {
+	remote-endpoint = <&ite_typec1>;
+};
+
+&dpi_out {
+	remote-endpoint = <&it6505_in>;
+};
+
+&pio {
+	it6505_pins: it6505-pins {
+		pins-hpd {
+			pinmux = <PINMUX_GPIO10__FUNC_GPIO10>;
+			input-enable;
+			bias-pull-up;
+		};
+
+		pins-int {
+			pinmux = <PINMUX_GPIO8__FUNC_GPIO8>;
+			input-enable;
+			bias-pull-up;
+		};
+
+		pins-reset {
+			pinmux = <PINMUX_GPIO177__FUNC_GPIO177>;
+			output-low;
+			bias-pull-up;
+		};
+	};
+};
+
+&i2c3 {
+	clock-frequency = <100000>;
+
+	it6505dptx: it6505dptx@5c {
+		status = "okay";
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#sound-dai-cells = <0>;
+		compatible = "ite,it6505";
+		interrupt-parent = <&pio>;
+		interrupts = <8 IRQ_TYPE_LEVEL_LOW 8 0>;
+		reg = <0x5c>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&it6505_pins>;
+		ovdd-supply = <&mt6366_vsim2_reg>;
+		pwr18-supply = <&pp1800_dpbrdg_dx>;
+		reset-gpios = <&pio 177 0>;
+		hpd-gpios = <&pio 10 0>;
+		no-laneswap;
+		data-lanes = <2>;
+		max-pixel-clock-khz = <150000>;
+
+		port {
+			it6505_in: endpoint {
+				remote-endpoint = <&dpi_out>;
+			};
+		};
+
+		switches {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			switch@0 {
+				compatible = "typec-switch";
+				reg = <0>;
+				mode-switch;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						ite_typec0: endpoint {
+							remote-endpoint = <&typec_port0>;
+						};
+					};
+				};
+			};
+
+			switch@1 {
+				compatible = "typec-switch";
+				reg = <1>;
+				mode-switch;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						ite_typec1: endpoint {
+							remote-endpoint = <&typec_port1>;
+						};
+					};
+				};
+			};
+		};
+	};
+};
