@@ -26,6 +26,7 @@
 #include <linux/pci.h>
 
 #include <drm/amdgpu_drm.h>
+#include <asm/processor.h>
 
 #include "amdgpu.h"
 #include "amdgpu_atombios.h"
@@ -203,10 +204,32 @@ static const struct amdgpu_video_codec_info yc_video_codecs_decode_array[] = {
 	{codec_info_build(AMDGPU_INFO_VIDEO_CAPS_CODEC_IDX_AV1, 8192, 4352, 0)},
 };
 
+#ifdef CONFIG_X86
+// AMD x86 APU only
+
+/* Yellow Carp*/
+static const struct amdgpu_video_codec_info yc_video_codecs_decode_array_athlon[] = {
+	{codec_info_build(AMDGPU_INFO_VIDEO_CAPS_CODEC_IDX_MPEG4_AVC, 4096, 4906, 52)},
+	{codec_info_build(AMDGPU_INFO_VIDEO_CAPS_CODEC_IDX_HEVC, 8192, 4352, 186)},
+	{codec_info_build(AMDGPU_INFO_VIDEO_CAPS_CODEC_IDX_VP9, 8192, 4352, 0)},
+	{codec_info_build(AMDGPU_INFO_VIDEO_CAPS_CODEC_IDX_JPEG, 4096, 4096, 0)},
+	{codec_info_build(AMDGPU_INFO_VIDEO_CAPS_CODEC_IDX_AV1, 4096, 4096, 0)},
+};
+#endif
+
 static const struct amdgpu_video_codecs yc_video_codecs_decode = {
 	.codec_count = ARRAY_SIZE(yc_video_codecs_decode_array),
 	.codec_array = yc_video_codecs_decode_array,
 };
+
+#ifdef CONFIG_X86
+// AMD x86 APU only
+
+static const struct amdgpu_video_codecs yc_video_codecs_decode_athlon = {
+	.codec_count = ARRAY_SIZE(yc_video_codecs_decode_array_athlon),
+	.codec_array = yc_video_codecs_decode_array_athlon,
+};
+#endif
 
 static int nv_query_video_codecs(struct amdgpu_device *adev, bool encode,
 				 const struct amdgpu_video_codecs **codecs)
@@ -214,7 +237,7 @@ static int nv_query_video_codecs(struct amdgpu_device *adev, bool encode,
 	if (adev->vcn.num_vcn_inst == hweight8(adev->vcn.harvest_config))
 		return -EINVAL;
 
-	switch (adev->ip_versions[UVD_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, UVD_HWIP, 0)) {
 	case IP_VERSION(3, 0, 0):
 	case IP_VERSION(3, 0, 64):
 	case IP_VERSION(3, 0, 192):
@@ -254,9 +277,17 @@ static int nv_query_video_codecs(struct amdgpu_device *adev, bool encode,
 	case IP_VERSION(3, 1, 1):
 	case IP_VERSION(3, 1, 2):
 		if (encode)
-			*codecs = &sc_video_codecs_encode;
-		else
-			*codecs = &yc_video_codecs_decode;
+			*codecs = &nv_video_codecs_encode;
+		else {
+			// TODO(b/259179978): Remove this provision once Skyrim's 8K is fixed.
+#ifdef CONFIG_X86
+			// AMD x86 APU only
+			if (strstr(boot_cpu_data.x86_model_id, "Athlon"))
+				*codecs = &yc_video_codecs_decode_athlon;
+			else
+#endif
+				*codecs = &yc_video_codecs_decode;
+		}
 		return 0;
 	case IP_VERSION(3, 0, 33):
 		if (encode)
@@ -453,7 +484,7 @@ nv_asic_reset_method(struct amdgpu_device *adev)
 		dev_warn(adev->dev, "Specified reset method:%d isn't supported, using AUTO instead.\n",
 				  amdgpu_reset_method);
 
-	switch (adev->ip_versions[MP1_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, MP1_HWIP, 0)) {
 	case IP_VERSION(11, 5, 0):
 	case IP_VERSION(13, 0, 1):
 	case IP_VERSION(13, 0, 3):
@@ -669,7 +700,7 @@ static int nv_common_early_init(void *handle)
 	/* TODO: split the GC and PG flags based on the relevant IP version for which
 	 * they are relevant.
 	 */
-	switch (adev->ip_versions[GC_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
 	case IP_VERSION(10, 1, 10):
 		adev->cg_flags = AMD_CG_SUPPORT_GFX_MGCG |
 			AMD_CG_SUPPORT_GFX_CGCG |
@@ -1073,7 +1104,7 @@ static int nv_common_set_clockgating_state(void *handle,
 	if (amdgpu_sriov_vf(adev))
 		return 0;
 
-	switch (adev->ip_versions[NBIO_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, NBIO_HWIP, 0)) {
 	case IP_VERSION(2, 3, 0):
 	case IP_VERSION(2, 3, 1):
 	case IP_VERSION(2, 3, 2):

@@ -254,6 +254,7 @@ static int udl_handle_damage(struct drm_framebuffer *fb,
 static const uint32_t udl_primary_plane_formats[] = {
 	DRM_FORMAT_RGB565,
 	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_ARGB8888,
 };
 
 static const uint64_t udl_primary_plane_fmtmods[] = {
@@ -409,8 +410,23 @@ static int udl_connector_helper_get_modes(struct drm_connector *connector)
 	return 0;
 }
 
+static enum drm_mode_status udl_connector_helper_mode_valid(struct drm_connector *connector,
+			  struct drm_display_mode *mode)
+{
+	int con_type = connector->connector_type;
+
+	if ((con_type == DRM_MODE_CONNECTOR_DVII ||
+	     con_type == DRM_MODE_CONNECTOR_DVID ||
+	     con_type == DRM_MODE_CONNECTOR_DVIA) &&
+	    mode->clock > 165000)
+		return MODE_CLOCK_HIGH;
+
+	return 0;
+}
+
 static const struct drm_connector_helper_funcs udl_connector_helper_funcs = {
 	.get_modes = udl_connector_helper_get_modes,
+	.mode_valid = udl_connector_helper_mode_valid,
 };
 
 static int udl_get_edid_block(void *data, u8 *buf, unsigned int block, size_t len)

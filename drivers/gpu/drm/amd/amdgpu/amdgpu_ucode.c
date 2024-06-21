@@ -664,6 +664,16 @@ const char *amdgpu_ucode_name(enum AMDGPU_UCODE_ID ucode_id)
 		return "DMCUB";
 	case AMDGPU_UCODE_ID_CAP:
 		return "CAP";
+	case AMDGPU_UCODE_ID_VPE_CTX:
+		return "VPE_CTX";
+	case AMDGPU_UCODE_ID_VPE_CTL:
+		return "VPE_CTL";
+	case AMDGPU_UCODE_ID_VPE:
+		return "VPE";
+	case AMDGPU_UCODE_ID_UMSCH_MM_UCODE:
+		return "UMSCH_MM_UCODE";
+	case AMDGPU_UCODE_ID_UMSCH_MM_DATA:
+		return "UMSCH_MM_DATA";
 	default:
 		return "UNKNOWN UCODE";
 	}
@@ -749,6 +759,8 @@ static int amdgpu_ucode_init_single_fw(struct amdgpu_device *adev,
 	const struct mes_firmware_header_v1_0 *mes_hdr = NULL;
 	const struct sdma_firmware_header_v2_0 *sdma_hdr = NULL;
 	const struct imu_firmware_header_v1_0 *imu_hdr = NULL;
+	const struct vpe_firmware_header_v1_0 *vpe_hdr = NULL;
+	const struct umsch_mm_firmware_header_v1_0 *umsch_mm_hdr = NULL;
 	u8 *ucode_addr;
 
 	if (!ucode->fw)
@@ -768,6 +780,7 @@ static int amdgpu_ucode_init_single_fw(struct amdgpu_device *adev,
 	mes_hdr = (const struct mes_firmware_header_v1_0 *)ucode->fw->data;
 	sdma_hdr = (const struct sdma_firmware_header_v2_0 *)ucode->fw->data;
 	imu_hdr = (const struct imu_firmware_header_v1_0 *)ucode->fw->data;
+	vpe_hdr = (const struct vpe_firmware_header_v1_0 *)ucode->fw->data;
 
 	if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) {
 		switch (ucode->ucode_id) {
@@ -950,6 +963,26 @@ static int amdgpu_ucode_init_single_fw(struct amdgpu_device *adev,
 			ucode_addr = (u8 *)ucode->fw->data +
 				le32_to_cpu(cpv2_hdr->data_offset_bytes);
 			break;
+		case AMDGPU_UCODE_ID_VPE_CTX:
+			ucode->ucode_size = le32_to_cpu(vpe_hdr->ctx_ucode_size_bytes);
+			ucode_addr = (u8 *)ucode->fw->data +
+				le32_to_cpu(vpe_hdr->header.ucode_array_offset_bytes);
+			break;
+		case AMDGPU_UCODE_ID_VPE_CTL:
+			ucode->ucode_size = le32_to_cpu(vpe_hdr->ctl_ucode_size_bytes);
+			ucode_addr = (u8 *)ucode->fw->data +
+				le32_to_cpu(vpe_hdr->ctl_ucode_offset);
+			break;
+		case AMDGPU_UCODE_ID_UMSCH_MM_UCODE:
+			ucode->ucode_size = le32_to_cpu(umsch_mm_hdr->umsch_mm_ucode_size_bytes);
+			ucode_addr = (u8 *)ucode->fw->data +
+				le32_to_cpu(umsch_mm_hdr->header.ucode_array_offset_bytes);
+			break;
+		case AMDGPU_UCODE_ID_UMSCH_MM_DATA:
+			ucode->ucode_size = le32_to_cpu(umsch_mm_hdr->umsch_mm_ucode_data_size_bytes);
+			ucode_addr = (u8 *)ucode->fw->data +
+				le32_to_cpu(umsch_mm_hdr->umsch_mm_ucode_data_offset_bytes);
+			break;
 		default:
 			ucode->ucode_size = le32_to_cpu(header->ucode_size_bytes);
 			ucode_addr = (u8 *)ucode->fw->data +
@@ -1061,7 +1094,7 @@ int amdgpu_ucode_init_bo(struct amdgpu_device *adev)
 static const char *amdgpu_ucode_legacy_naming(struct amdgpu_device *adev, int block_type)
 {
 	if (block_type == MP0_HWIP) {
-		switch (adev->ip_versions[MP0_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, MP0_HWIP, 0)) {
 		case IP_VERSION(9, 0, 0):
 			switch (adev->asic_type) {
 			case CHIP_VEGA10:
@@ -1112,7 +1145,7 @@ static const char *amdgpu_ucode_legacy_naming(struct amdgpu_device *adev, int bl
 			return "yellow_carp";
 		}
 	} else if (block_type == MP1_HWIP) {
-		switch (adev->ip_versions[MP1_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, MP1_HWIP, 0)) {
 		case IP_VERSION(9, 0, 0):
 		case IP_VERSION(10, 0, 0):
 		case IP_VERSION(10, 0, 1):
@@ -1138,7 +1171,7 @@ static const char *amdgpu_ucode_legacy_naming(struct amdgpu_device *adev, int bl
 			return "aldebaran_smc";
 		}
 	} else if (block_type == SDMA0_HWIP) {
-		switch (adev->ip_versions[SDMA0_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, SDMA0_HWIP, 0)) {
 		case IP_VERSION(4, 0, 0):
 			return "vega10_sdma";
 		case IP_VERSION(4, 0, 1):
@@ -1182,7 +1215,7 @@ static const char *amdgpu_ucode_legacy_naming(struct amdgpu_device *adev, int bl
 			return "vangogh_sdma";
 		}
 	} else if (block_type == UVD_HWIP) {
-		switch (adev->ip_versions[UVD_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, UVD_HWIP, 0)) {
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
 			if (adev->apu_flags & AMD_APU_IS_RAVEN2)
@@ -1207,7 +1240,8 @@ static const char *amdgpu_ucode_legacy_naming(struct amdgpu_device *adev, int bl
 		case IP_VERSION(3, 0, 0):
 		case IP_VERSION(3, 0, 64):
 		case IP_VERSION(3, 0, 192):
-			if (adev->ip_versions[GC_HWIP][0] == IP_VERSION(10, 3, 0))
+			if (amdgpu_ip_version(adev, GC_HWIP, 0) ==
+			    IP_VERSION(10, 3, 0))
 				return "sienna_cichlid_vcn";
 			return "navy_flounder_vcn";
 		case IP_VERSION(3, 0, 2):
@@ -1220,7 +1254,7 @@ static const char *amdgpu_ucode_legacy_naming(struct amdgpu_device *adev, int bl
 			return "yellow_carp_vcn";
 		}
 	} else if (block_type == GC_HWIP) {
-		switch (adev->ip_versions[GC_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
 		case IP_VERSION(9, 0, 1):
 			return "vega10";
 		case IP_VERSION(9, 2, 1):
@@ -1273,7 +1307,7 @@ void amdgpu_ucode_ip_version_decode(struct amdgpu_device *adev, int block_type, 
 	int maj, min, rev;
 	char *ip_name;
 	const char *legacy;
-	uint32_t version = adev->ip_versions[block_type][0];
+	uint32_t version = amdgpu_ip_version(adev, block_type, 0);
 
 	legacy = amdgpu_ucode_legacy_naming(adev, block_type);
 	if (legacy) {
@@ -1296,6 +1330,9 @@ void amdgpu_ucode_ip_version_decode(struct amdgpu_device *adev, int block_type, 
 		break;
 	case UVD_HWIP:
 		ip_name = "vcn";
+		break;
+	case VPE_HWIP:
+		ip_name = "vpe";
 		break;
 	default:
 		BUG();

@@ -129,6 +129,34 @@ struct drm_virtgpu_resource_info {
 	__u32 blob_mem;
 };
 
+/* CHROMIUM */
+struct drm_virtgpu_resource_info_cros {
+	__u32 bo_handle;
+	__u32 res_handle;
+	__u32 size;
+
+/* Always returns res_handle, size, and blob_mem.
+ * !! RETURN SEMANTICS ARE CHANGED BY THIS COMMIT.
+ * !! User space changes are likely required for anything relying on
+ * !! getting extended info from VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT.
+ */
+#define VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT 0
+/* Always returns res_handle, size, and "extended info".
+ * !! Produces an error (EINVAL) for blob resources created with blob_mem ==
+ * !! VIRTGPU_BLOB_MEM_GUEST, which doesn't use host storage.
+ */
+#define VIRTGPU_RESOURCE_INFO_TYPE_EXTENDED 1
+	union {
+		__u32 type; /* in, VIRTGPU_RESOURCE_INFO_TYPE_* */
+		__u32 blob_mem;
+		__u32 stride;
+		__u32 strides[4]; /* strides[0] is accessible with stride. */
+	};
+	__u32 num_planes;
+	__u32 offsets[4];
+	__u64 format_modifier;
+};
+
 struct drm_virtgpu_3d_box {
 	__u32 x;
 	__u32 y;
@@ -236,6 +264,11 @@ struct drm_virtgpu_context_init {
 #define DRM_IOCTL_VIRTGPU_RESOURCE_INFO \
 	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_RESOURCE_INFO, \
 		 struct drm_virtgpu_resource_info)
+
+/* same ioctl number as DRM_IOCTL_VIRTGPU_RESOURCE_INFO */
+#define DRM_IOCTL_VIRTGPU_RESOURCE_INFO_CROS \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_RESOURCE_INFO, \
+		 struct drm_virtgpu_resource_info_cros)
 
 #define DRM_IOCTL_VIRTGPU_TRANSFER_FROM_HOST \
 	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_TRANSFER_FROM_HOST,	\

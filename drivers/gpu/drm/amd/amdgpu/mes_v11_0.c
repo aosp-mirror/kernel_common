@@ -47,6 +47,9 @@ MODULE_FIRMWARE("amdgpu/gc_11_0_3_mes1.bin");
 MODULE_FIRMWARE("amdgpu/gc_11_0_4_mes.bin");
 MODULE_FIRMWARE("amdgpu/gc_11_0_4_mes_2.bin");
 MODULE_FIRMWARE("amdgpu/gc_11_0_4_mes1.bin");
+MODULE_FIRMWARE("amdgpu/gc_11_5_0_mes_2.bin");
+MODULE_FIRMWARE("amdgpu/gc_11_5_0_mes1.bin");
+
 
 static int mes_v11_0_hw_fini(void *handle);
 static int mes_v11_0_kiq_hw_init(struct amdgpu_device *adev);
@@ -1313,7 +1316,7 @@ static int mes_v11_0_late_init(void *handle)
 
 	/* it's only intended for use in mes_self_test case, not for s0ix and reset */
 	if (!amdgpu_in_reset(adev) && !adev->in_s0ix && !adev->in_suspend &&
-	    (adev->ip_versions[GC_HWIP][0] != IP_VERSION(11, 0, 3)))
+	    (amdgpu_ip_version(adev, GC_HWIP, 0) != IP_VERSION(11, 0, 3)))
 		amdgpu_mes_self_test(adev);
 
 	return 0;

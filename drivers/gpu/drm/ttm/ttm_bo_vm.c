@@ -351,8 +351,6 @@ void ttm_bo_vm_open(struct vm_area_struct *vma)
 {
 	struct ttm_buffer_object *bo = vma->vm_private_data;
 
-	WARN_ON(bo->bdev->dev_mapping != vma->vm_file->f_mapping);
-
 	ttm_bo_get(bo);
 }
 EXPORT_SYMBOL(ttm_bo_vm_open);

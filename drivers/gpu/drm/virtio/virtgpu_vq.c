@@ -977,7 +977,45 @@ void virtio_gpu_cmd_context_detach_resource(struct virtio_gpu_device *vgdev,
 	virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
 }
 
-void
+static void virtio_gpu_cmd_resource_create_cb(struct virtio_gpu_device *vgdev,
+					      struct virtio_gpu_vbuffer *vbuf)
+{
+	struct virtio_gpu_resp_resource_plane_info *resp =
+		(struct virtio_gpu_resp_resource_plane_info *)vbuf->resp_buf;
+	struct virtio_gpu_object *obj =
+		(struct virtio_gpu_object *)vbuf->data_buf;
+	uint32_t resp_type = le32_to_cpu(resp->hdr.type);
+	int i;
+
+	/*
+	 * Keeps the data_buf, which points to this virtio_gpu_object, from
+	 * getting kfree'd after this cb returns.
+	 */
+	vbuf->data_buf = NULL;
+
+	switch (resp_type) {
+	case VIRTIO_GPU_RESP_OK_RESOURCE_PLANE_INFO:
+	case VIRTIO_GPU_RESP_OK_RESOURCE_PLANE_INFO_LEGACY:
+		break;
+	default:
+		goto finish_pending;
+	}
+
+	obj->num_planes = le32_to_cpu(resp->num_planes);
+	obj->format_modifier = le64_to_cpu(resp->format_modifier);
+
+	for (i = 0; i < obj->num_planes; i++) {
+		obj->strides[i] = le32_to_cpu(resp->strides[i]);
+		obj->offsets[i] = le32_to_cpu(resp->offsets[i]);
+	}
+
+finish_pending:
+	obj->create_callback_done = true;
+	drm_gem_object_put(&obj->base.base);
+	wake_up_all(&vgdev->resp_wq);
+}
+
+int
 virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
 				  struct virtio_gpu_object *bo,
 				  struct virtio_gpu_object_params *params,
@@ -986,8 +1024,15 @@ virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
 {
 	struct virtio_gpu_resource_create_3d *cmd_p;
 	struct virtio_gpu_vbuffer *vbuf;
+	struct virtio_gpu_resp_resource_plane_info *resp_buf;
 
-	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
+	resp_buf = kzalloc(sizeof(*resp_buf), GFP_KERNEL);
+	if (!resp_buf)
+		return -ENOMEM;
+
+	cmd_p = virtio_gpu_alloc_cmd_resp(vgdev,
+		virtio_gpu_cmd_resource_create_cb, &vbuf, sizeof(*cmd_p),
+		sizeof(struct virtio_gpu_resp_resource_plane_info), resp_buf);
 	memset(cmd_p, 0, sizeof(*cmd_p));
 	vbuf->objs = objs;
 
@@ -1005,9 +1050,16 @@ virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
 	cmd_p->nr_samples = cpu_to_le32(params->nr_samples);
 	cmd_p->flags = cpu_to_le32(params->flags);
 
+	/* Reuse the data_buf pointer for the object pointer. */
+	vbuf->data_buf = bo;
+	bo->create_callback_done = false;
+	drm_gem_object_get(&bo->base.base);
+
 	virtio_gpu_queue_fenced_ctrl_buffer(vgdev, vbuf, fence);
 
 	bo->created = true;
+
+	return 0;
 }
 
 void virtio_gpu_cmd_transfer_to_host_3d(struct virtio_gpu_device *vgdev,

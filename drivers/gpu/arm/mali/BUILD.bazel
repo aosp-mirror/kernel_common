@@ -1,0 +1,59 @@
+# This program is free software and is provided to you under the terms of the
+# GNU General Public License version 2 as published by the Free Software
+# Foundation, and any use by you of this program is subject to the terms
+# of such GNU license.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, you can access it online at
+# http://www.gnu.org/licenses/gpl-2.0.html.
+#
+#
+
+load(
+    "//build/kernel/kleaf:kernel.bzl",
+    "kernel_module",
+)
+
+_midgard_modules = [
+    "mali_kbase.ko",
+]
+
+kernel_module(
+    name = "midgard",
+    srcs = glob([
+        "**/*.c",
+        "**/*.h",
+        "**/*Kbuild",
+        "**/*Makefile",
+    ]) + [
+        "//common:kernel_headers",
+        "//common-modules/mali:headers",
+        "//common-modules/mali/drivers/xen/arm:xen",
+        "//common-modules/mali/drivers/gpu/arm/arbitration:arbitration",
+    ],
+    outs = _midgard_modules,
+    kernel_build = "//common:kernel_aarch64",
+    visibility = [
+        "//common:__pkg__",
+        "//common-modules/mali:__subpackages__",
+    ],
+    deps = [
+        "//common-modules/mali/drivers/base/arm:base",
+    ],
+)
+
+filegroup(
+    name = "midgard_kconfig",
+    srcs = glob([
+        "**/*Kconfig",
+    ]),
+    visibility = [
+        "//common:__pkg__",
+        "//common-modules/mali:__subpackages__",
+    ],
+)

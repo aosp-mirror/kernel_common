@@ -275,7 +275,6 @@ int intel_display_driver_probe_nogem(struct drm_i915_private *i915)
 {
 	struct drm_device *dev = &i915->drm;
 	enum pipe pipe;
-	struct intel_crtc *crtc;
 	int ret;
 
 	if (!HAS_DISPLAY(i915))
@@ -309,8 +308,6 @@ int intel_display_driver_probe_nogem(struct drm_i915_private *i915)
 	intel_display_driver_init_hw(i915);
 	intel_dpll_update_ref_clks(i915);
 
-	intel_hdcp_component_init(i915);
-
 	if (i915->display.cdclk.max_cdclk_freq == 0)
 		intel_update_max_cdclk(i915);
 
@@ -325,11 +322,7 @@ int intel_display_driver_probe_nogem(struct drm_i915_private *i915)
 	intel_acpi_assign_connector_fwnodes(i915);
 	drm_modeset_unlock_all(dev);
 
-	for_each_intel_crtc(dev, crtc) {
-		if (!to_intel_crtc_state(crtc->base.state)->uapi.active)
-			continue;
-		intel_crtc_initial_plane_config(crtc);
-	}
+	intel_initial_plane_config(i915);
 
 	/*
 	 * Make sure hardware watermarks really match the state we read out.
@@ -349,6 +342,13 @@ int intel_display_driver_probe(struct drm_i915_private *i915)
 
 	if (!HAS_DISPLAY(i915))
 		return 0;
+
+	/*
+	 * This will bind stuff into ggtt, so it needs to be done after
+	 * the BIOS fb takeover and whatever else magic ggtt reservations
+	 * happen during gem/ggtt init.
+	 */
+	intel_hdcp_component_init(i915);
 
 	/*
 	 * Force all active planes to recompute their states. So that on
@@ -377,6 +377,8 @@ int intel_display_driver_probe(struct drm_i915_private *i915)
 
 void intel_display_driver_register(struct drm_i915_private *i915)
 {
+	struct drm_printer p = drm_debug_printer("i915 display info:");
+
 	if (!HAS_DISPLAY(i915))
 		return;
 
@@ -404,6 +406,9 @@ void intel_display_driver_register(struct drm_i915_private *i915)
 	 * fbdev->async_cookie.
 	 */
 	drm_kms_helper_poll_init(&i915->drm);
+
+	intel_display_device_info_print(DISPLAY_INFO(i915),
+					DISPLAY_RUNTIME_INFO(i915), &p);
 }
 
 /* part #1: call before irq uninstall */
