@@ -75,6 +75,7 @@ int read_def_system_config(struct sock *sk, struct hci_dev *hdev, void *data,
 		HDEV_PARAM_U16(le_conn_latency);
 		HDEV_PARAM_U16(le_supv_timeout);
 		HDEV_PARAM_U16(def_le_autoconnect_timeout);
+		HDEV_PARAM_U16(eir_max_name_len);
 		HDEV_PARAM_U16(advmon_allowlist_duration);
 		HDEV_PARAM_U16(advmon_no_filter_duration);
 		HDEV_PARAM_U8(enable_advmon_interleave_scan);
@@ -108,6 +109,7 @@ int read_def_system_config(struct sock *sk, struct hci_dev *hdev, void *data,
 		TLV_SET_U16(0x001a, le_supv_timeout),
 		TLV_SET_U16_JIFFIES_TO_MSECS(0x001b,
 					     def_le_autoconnect_timeout),
+		TLV_SET_U16(0x001c, eir_max_name_len),
 		TLV_SET_U16(0x001d, advmon_allowlist_duration),
 		TLV_SET_U16(0x001e, advmon_no_filter_duration),
 		TLV_SET_U8(0x001f, enable_advmon_interleave_scan),
@@ -184,6 +186,7 @@ int set_def_system_config(struct sock *sk, struct hci_dev *hdev, void *data,
 		case 0x0019:
 		case 0x001a:
 		case 0x001b:
+		case 0x001c:
 		case 0x001d:
 		case 0x001e:
 			exp_type_len = sizeof(u16);
@@ -304,6 +307,9 @@ int set_def_system_config(struct sock *sk, struct hci_dev *hdev, void *data,
 		case 0x0001b:
 			hdev->def_le_autoconnect_timeout =
 					msecs_to_jiffies(TLV_GET_LE16(buffer));
+			break;
+		case 0x0001c:
+			hdev->eir_max_name_len = TLV_GET_LE16(buffer);
 			break;
 		case 0x0001d:
 			hdev->advmon_allowlist_duration = TLV_GET_LE16(buffer);

@@ -129,6 +129,7 @@ struct msft_data {
 	struct list_head address_filters;
 	__u8 resuming;
 	__u8 suspending;
+	__u8 active_scan;
 	__u8 filter_enabled;
 	/* To synchronize add/remove address filter and monitor device event.*/
 	struct mutex filter_lock;
@@ -447,14 +448,14 @@ static int msft_remove_monitor_sync(struct hci_dev *hdev,
 }
 
 /* This function requires the caller holds hci_req_sync_lock */
-int msft_suspend_sync(struct hci_dev *hdev)
+static void remove_all_monitors(struct hci_dev *hdev)
 {
 	struct msft_data *msft = hdev->msft_data;
 	struct adv_monitor *monitor;
 	int handle = 0;
 
 	if (!msft || !msft_monitor_supported(hdev))
-		return 0;
+		return;
 
 	msft->suspending = true;
 
@@ -470,6 +471,12 @@ int msft_suspend_sync(struct hci_dev *hdev)
 
 	/* All monitors have been removed */
 	msft->suspending = false;
+}
+
+/* This function requires the caller holds hci_req_sync_lock */
+int msft_suspend_sync(struct hci_dev *hdev)
+{
+	remove_all_monitors(hdev);
 
 	return 0;
 }
@@ -506,6 +513,7 @@ static bool msft_monitor_pattern_valid(struct adv_monitor *monitor)
 static int msft_add_monitor_sync(struct hci_dev *hdev,
 				 struct adv_monitor *monitor)
 {
+	struct msft_data *msft = hdev->msft_data;
 	struct msft_cp_le_monitor_advertisement *cp;
 	struct msft_le_monitor_advertisement_pattern_data *pattern_data;
 	struct msft_monitor_advertisement_handle_data *handle_data;
@@ -533,7 +541,16 @@ static int msft_add_monitor_sync(struct hci_dev *hdev,
 	cp->rssi_high = monitor->rssi.high_threshold;
 	cp->rssi_low = monitor->rssi.low_threshold;
 	cp->rssi_low_interval = (u8)monitor->rssi.low_threshold_timeout;
-	cp->rssi_sampling_period = monitor->rssi.sampling_period;
+
+	/* Some controllers apply Sampling Period even while active scanning.
+	 * So, to keep the behavior consistent across all controllers, don't
+	 * use Sampling Period during active scanning to force the controller
+	 * to report all advertisements even if it matches the monitor.
+	 */
+	if (msft->active_scan)
+		cp->rssi_sampling_period = 0;
+	else
+		cp->rssi_sampling_period = monitor->rssi.sampling_period;
 
 	cp->cond_type = MSFT_MONITOR_ADVERTISEMENT_TYPE_PATTERN;
 
@@ -1194,6 +1211,28 @@ int msft_set_filter_enable(struct hci_dev *hdev, bool enable)
 	msft_le_set_advertisement_filter_enable_cb(hdev, &cp, err);
 
 	return 0;
+}
+
+/* This function requires the caller holds hci_req_sync_lock */
+void msft_set_active_scan(struct hci_dev *hdev, bool enable)
+{
+	struct msft_data *msft = hdev->msft_data;
+
+	if (!msft)
+		return;
+
+	/* Remove all monitors */
+	remove_all_monitors(hdev);
+
+	/* Clear all tracked devices */
+	hci_dev_lock(hdev);
+	hdev->advmon_pend_notify = false;
+	msft_monitor_device_del(hdev, 0, NULL, 0, true);
+	hci_dev_unlock(hdev);
+
+	/* Update active scan and reregister all monitors */
+	msft->active_scan = enable;
+	reregister_monitor(hdev);
 }
 
 bool msft_curve_validity(struct hci_dev *hdev)

@@ -133,6 +133,8 @@ static const u16 mgmt_commands[] = {
 	MGMT_OP_MESH_READ_FEATURES,
 	MGMT_OP_MESH_SEND,
 	MGMT_OP_MESH_SEND_CANCEL,
+	MGMT_OP_GET_SCO_CODEC_CAPABILITIES,
+	MGMT_OP_NOTIFY_SCO_CONNECTION_CHANGE,
 };
 
 static const u16 mgmt_events[] = {
@@ -279,7 +281,7 @@ static const u8 mgmt_status_table[] = {
 	MGMT_STATUS_INVALID_PARAMS,	/* Unsuitable Connection Interval */
 	MGMT_STATUS_TIMEOUT,		/* Directed Advertising Timeout */
 	MGMT_STATUS_AUTH_FAILED,	/* Terminated Due to MIC Failure */
-	MGMT_STATUS_CONNECT_FAILED,	/* Connection Establishment Failed */
+	MGMT_STATUS_CONNECT_NOT_ESTD,	/* Connection Establishment Failed */
 	MGMT_STATUS_CONNECT_FAILED,	/* MAC Connection Failed */
 };
 
@@ -4627,6 +4629,12 @@ static int set_rpa_resolution_func(struct sock *sk, struct hci_dev *hdev,
 				       MGMT_OP_SET_EXP_FEATURE,
 				       MGMT_STATUS_INVALID_INDEX);
 
+	/* Controller does not support LL privacy */
+	if (!ll_privacy_capable(hdev))
+		return mgmt_cmd_status(sk, hdev->id,
+				       MGMT_OP_SET_EXP_FEATURE,
+				       MGMT_STATUS_NOT_SUPPORTED);
+
 	/* Changes can only be made when controller is powered down */
 	if (hdev_is_powered(hdev))
 		return mgmt_cmd_status(sk, hdev->id,
@@ -4958,20 +4966,26 @@ static int set_exp_feature(struct sock *sk, struct hci_dev *hdev,
 			       MGMT_STATUS_NOT_SUPPORTED);
 }
 
-static u32 get_params_flags(struct hci_dev *hdev,
-			    struct hci_conn_params *params)
+int mgmt_quality_report(struct hci_dev *hdev, struct sk_buff *skb,
+			u8 quality_spec)
 {
-	u32 flags = hdev->conn_flags;
+	struct mgmt_ev_quality_report *ev;
+	size_t ev_len;
+	int err;
 
-	/* Devices using RPAs can only be programmed in the acceptlist if
-	 * LL Privacy has been enable otherwise they cannot mark
-	 * HCI_CONN_FLAG_REMOTE_WAKEUP.
-	 */
-	if ((flags & HCI_CONN_FLAG_REMOTE_WAKEUP) && !use_ll_privacy(hdev) &&
-	    hci_find_irk_by_addr(hdev, &params->addr, params->addr_type))
-		flags &= ~HCI_CONN_FLAG_REMOTE_WAKEUP;
+	/* The ev comes with a variable-length data field. */
+	ev_len = sizeof(*ev) + skb->len;
+	ev = kmalloc(ev_len, GFP_KERNEL);
+	if (!ev)
+		return -ENOMEM;
 
-	return flags;
+	ev->quality_spec = quality_spec;
+	ev->data_len = skb->len;
+	memcpy(ev->data, skb->data, skb->len);
+	err = mgmt_event(MGMT_EV_QUALITY_REPORT, hdev, ev, ev_len, NULL);
+	kfree(ev);
+
+	return err;
 }
 
 static int get_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
@@ -5008,7 +5022,6 @@ static int get_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
 		if (!params)
 			goto done;
 
-		supported_flags = get_params_flags(hdev, params);
 		current_flags = params->flags;
 	}
 
@@ -5076,36 +5089,25 @@ static int set_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
 			bt_dev_warn(hdev, "No such BR/EDR device %pMR (0x%x)",
 				    &cp->addr.bdaddr, cp->addr.type);
 		}
+	} else {
+		params = hci_conn_params_lookup(hdev, &cp->addr.bdaddr,
+						le_addr_type(cp->addr.type));
+		if (params) {
+			WRITE_ONCE(params->flags, current_flags);
+			status = MGMT_STATUS_SUCCESS;
 
-		goto unlock;
+			/* Update passive scan if HCI_CONN_FLAG_DEVICE_PRIVACY
+			 * has been set.
+			 */
+			if (params->flags & HCI_CONN_FLAG_DEVICE_PRIVACY)
+				hci_update_passive_scan(hdev);
+		} else {
+			bt_dev_warn(hdev, "No such LE device %pMR (0x%x)",
+				    &cp->addr.bdaddr,
+				    le_addr_type(cp->addr.type));
+		}
 	}
 
-	params = hci_conn_params_lookup(hdev, &cp->addr.bdaddr,
-					le_addr_type(cp->addr.type));
-	if (!params) {
-		bt_dev_warn(hdev, "No such LE device %pMR (0x%x)",
-			    &cp->addr.bdaddr, le_addr_type(cp->addr.type));
-		goto unlock;
-	}
-
-	supported_flags = get_params_flags(hdev, params);
-
-	if ((supported_flags | current_flags) != supported_flags) {
-		bt_dev_warn(hdev, "Bad flag given (0x%x) vs supported (0x%0x)",
-			    current_flags, supported_flags);
-		goto unlock;
-	}
-
-	WRITE_ONCE(params->flags, current_flags);
-	status = MGMT_STATUS_SUCCESS;
-
-	/* Update passive scan if HCI_CONN_FLAG_DEVICE_PRIVACY
-	 * has been set.
-	 */
-	if (params->flags & HCI_CONN_FLAG_DEVICE_PRIVACY)
-		hci_update_passive_scan(hdev);
-
-unlock:
 	hci_dev_unlock(hdev);
 
 done:
@@ -9173,6 +9175,174 @@ static int get_adv_size_info(struct sock *sk, struct hci_dev *hdev,
 				 MGMT_STATUS_SUCCESS, &rp, sizeof(rp));
 }
 
+static struct hci_dev *floss_get_hdev(u16 hci_id)
+{
+	struct hci_dev *hdev = NULL;
+	struct hci_dev *d;
+
+	read_lock(&hci_dev_list_lock);
+
+	// find the corresponding hci device.
+	list_for_each_entry(d, &hci_dev_list, list) {
+		if (d->id == hci_id) {
+			hdev = d;
+			break;
+		}
+	}
+	read_unlock(&hci_dev_list_lock);
+
+	return hdev;
+}
+
+static int floss_get_sco_codec_capabilities(struct sock *sk,
+					    struct hci_dev *hdev,
+					    void *data, u16 data_len)
+{
+	struct mgmt_cp_get_codec_capabilities *cp = data;
+	struct mgmt_rp_get_codec_capabilities rp;
+	struct hci_dev *found_hdev;
+
+	found_hdev = floss_get_hdev(cp->hci_id);
+	if (found_hdev)
+		hdev = found_hdev;
+
+	// Make sure we have a valid hdev.
+	if (!hdev)
+		return -EINVAL;
+
+	rp.hci_id = hdev->id;
+	rp.transparent_wbs_supported =
+		test_bit(HCI_QUIRK_WIDEBAND_SPEECH_SUPPORTED, &hdev->quirks);
+	rp.hci_data_path_id = 0;
+	if (hdev->get_data_path_id)
+		hdev->get_data_path_id(hdev, &rp.hci_data_path_id);
+	rp.wbs_pkt_len = hdev->wbs_pkt_len;
+
+	return mgmt_cmd_complete(sk, MGMT_INDEX_NONE,
+				 MGMT_OP_GET_SCO_CODEC_CAPABILITIES,
+				 MGMT_STATUS_SUCCESS, &rp, sizeof(rp));
+}
+
+static int floss_notify_sco_connection_change(struct sock *sk,
+					      struct hci_dev *hdev,
+					      void *data, u16 data_len)
+{
+	struct mgmt_cp_notify_sco_connection_change *cp = data;
+
+	struct hci_conn *conn;
+	int notify;
+	struct hci_dev *found_hdev;
+
+	found_hdev = floss_get_hdev(cp->hci_id);
+	if (found_hdev)
+		hdev = found_hdev;
+
+	// Make sure we have a valid hdev.
+	if (!hdev)
+		return -EINVAL;
+
+	/* We only need to notify the driver if it listens for it. */
+	if (!hdev->notify)
+		return 0;
+
+	/* We only notify for the first connected or disconnected change for a
+	 * given device.
+	 */
+	conn = hci_conn_hash_lookup_ba(hdev, SCO_LINK, &cp->addr.bdaddr);
+	if (cp->connected && !conn) {
+		conn = hci_conn_add_unset(hdev, SCO_LINK, &cp->addr.bdaddr, 0);
+		if (!conn)
+			return -ENOMEM;
+
+		notify = (cp->codec == MGMT_SCO_CODEC_MSBC_TRANSPARENT) ?
+					HCI_NOTIFY_ENABLE_SCO_TRANSP :
+					HCI_NOTIFY_ENABLE_SCO_CVSD;
+		hdev->notify(hdev, notify);
+	} else if (!cp->connected && conn) {
+		hci_conn_del(conn);
+		hdev->notify(hdev, HCI_NOTIFY_DISABLE_SCO);
+	}
+
+	return 0;
+}
+
+/* The user space provides the value of vendor_specification. For example,
+ * the user space wants to query what the opcode for MSFT extension is,
+ * It provides MGMT_VS_OPCODE_MSFT as vendor_specification. For now,
+ * the only possible value of vendor_specification is MGMT_VS_OPCODE_MSFT.
+ */
+static int floss_get_vs_opcode(struct sock *sk, struct hci_dev *hdev,
+			       void *data, u16 data_len)
+{
+	struct mgmt_cp_get_vs_opcode *cp = data;
+	struct mgmt_rp_get_vs_opcode rp;
+	u16 hci_id;
+	u16 vendor_specification;
+	int err;
+	struct hci_dev *found_hdev;
+
+	hci_id = __le16_to_cpu(cp->hci_id);
+	vendor_specification = __le16_to_cpu(cp->vendor_specification);
+
+	found_hdev = floss_get_hdev(cp->hci_id);
+	if (found_hdev)
+		hdev = found_hdev;
+
+	// Make sure we have a valid hdev.
+	if (!hdev) {
+		BT_INFO("Cannot find hdev 0x%4.4x", hci_id);
+		return mgmt_cmd_status(sk, hci_id, MGMT_OP_GET_VS_OPCODE,
+				       MGMT_STATUS_INVALID_INDEX);
+	}
+	rp.hci_id = hdev->id;
+
+	switch (vendor_specification) {
+#if IS_ENABLED(CONFIG_BT_MSFTEXT)
+	case MGMT_VS_OPCODE_MSFT:
+		rp.opcode = hdev->msft_opcode;
+		break;
+#endif
+	default:
+		rp.opcode = HCI_OP_NOP;
+	}
+
+	err = mgmt_cmd_complete(sk, MGMT_INDEX_NONE,
+				MGMT_OP_GET_VS_OPCODE,
+				MGMT_STATUS_SUCCESS, &rp, sizeof(rp));
+	return err;
+}
+
+static int floss_notify_suspend_state(struct sock *sk, struct hci_dev *hdev, void *data, u16 len)
+{
+	struct mgmt_cp_notify_suspend_state *cp = data;
+	struct hci_dev *found_hdev;
+
+	bt_dev_dbg(hdev, "sock %p", sk);
+
+	found_hdev = floss_get_hdev(cp->hci_id);
+	if (found_hdev)
+		hdev = found_hdev;
+
+	// Make sure we have a valid hdev.
+	if (!hdev) {
+		BT_DBG("Cannot find hdev 0x%4.4x", cp->hci_id);
+		return mgmt_cmd_status(sk, 0, MGMT_OP_NOTIFY_SUSPEND_STATE,
+				       MGMT_STATUS_INVALID_INDEX);
+	}
+
+	if (cp->suspended != 0x00 && cp->suspended != 0x01)
+		return mgmt_cmd_status(sk, hdev->id, MGMT_OP_NOTIFY_SUSPEND_STATE,
+				       MGMT_STATUS_INVALID_PARAMS);
+
+	hci_dev_lock(hdev);
+
+	hdev->suspended = cp->suspended;
+
+	hci_dev_unlock(hdev);
+
+	return 0;
+}
+
 static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ NULL }, /* 0x0000 (no command) */
 	{ read_version,            MGMT_READ_VERSION_SIZE,
@@ -9305,6 +9475,28 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ mesh_send,               MGMT_MESH_SEND_SIZE,
 						HCI_MGMT_VAR_LEN },
 	{ mesh_send_cancel,        MGMT_MESH_SEND_CANCEL_SIZE },
+
+	/* CHROMIUM specific floss handlers start here.
+	 *
+	 * Let the mgmt handler opcodes for floss start from 0x0100
+	 * to avoid collision with the upstream new ones.
+	 */
+	[MGMT_OP_GET_SCO_CODEC_CAPABILITIES] = {
+	floss_get_sco_codec_capabilities,
+				   MGMT_GET_SCO_CODEC_CAPABILITIES_SIZE,
+						HCI_MGMT_NO_HDEV |
+						HCI_MGMT_UNTRUSTED },
+	{ floss_notify_sco_connection_change,
+				   MGMT_NOTIFY_SCO_CONNECTION_CHANGE_SIZE,
+						HCI_MGMT_NO_HDEV |
+						HCI_MGMT_UNTRUSTED },
+	{ floss_get_vs_opcode,     MGMT_GET_VS_OPCODE_SIZE,
+						HCI_MGMT_NO_HDEV |
+						HCI_MGMT_UNTRUSTED },
+	{ floss_notify_suspend_state,
+				   MGMT_NOTIFY_SUSPEND_STATE_SIZE,
+						HCI_MGMT_NO_HDEV |
+						HCI_MGMT_UNTRUSTED },
 };
 
 void mgmt_index_added(struct hci_dev *hdev)

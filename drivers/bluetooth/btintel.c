@@ -1538,6 +1538,45 @@ static int btintel_register_devcoredump_support(struct hci_dev *hdev)
 	return err;
 }
 
+#define INTEL_PREFIX		0x8087
+#define TELEMETRY_CODE		0x03
+
+struct intel_prefix_evt_data {
+	__le16 vendor_prefix;
+	__u8 code;
+	__u8 data[0];   /* a number of struct intel_tlv subevents */
+} __packed;
+
+bool btintel_is_quality_report_evt(struct sk_buff *skb)
+{
+	struct intel_prefix_evt_data *ev;
+	u16 vendor_prefix;
+
+	if (skb->len < sizeof(struct intel_prefix_evt_data))
+		return false;
+
+	ev = (struct intel_prefix_evt_data *)skb->data;
+	vendor_prefix = __le16_to_cpu(ev->vendor_prefix);
+
+	return vendor_prefix == INTEL_PREFIX && ev->code == TELEMETRY_CODE;
+}
+EXPORT_SYMBOL_GPL(btintel_is_quality_report_evt);
+
+bool btintel_pull_quality_report_data(struct sk_buff *skb)
+{
+	skb_pull(skb, sizeof(struct intel_prefix_evt_data));
+
+	/* A telemetry event contains at least one intel_tlv subevent. */
+	if (skb->len < sizeof(struct intel_tlv)) {
+		BT_ERR("Telemetry event length %u too short (at least %zu)",
+		       skb->len, sizeof(struct intel_tlv));
+		return false;
+	}
+
+	return true;
+}
+EXPORT_SYMBOL_GPL(btintel_pull_quality_report_data);
+
 static const struct firmware *btintel_legacy_rom_get_fw(struct hci_dev *hdev,
 					       struct intel_version *ver)
 {
@@ -1846,6 +1885,11 @@ static int btintel_download_wait(struct hci_dev *hdev, ktime_t calltime, int mse
 		return -ETIMEDOUT;
 	}
 
+	if (btintel_test_flag(hdev, INTEL_FIRMWARE_VERIFY_FAILED)) {
+		bt_dev_err(hdev, "Firmware secure verification failed");
+		return -EAGAIN;
+	}
+
 	if (btintel_test_flag(hdev, INTEL_FIRMWARE_FAILED)) {
 		bt_dev_err(hdev, "Firmware loading failed");
 		return -ENOEXEC;
@@ -2107,7 +2151,7 @@ download:
 	 * of this device.
 	 */
 	err = btintel_download_wait(hdev, calltime, 5000);
-	if (err == -ETIMEDOUT)
+	if (err == -ETIMEDOUT || err == -EAGAIN)
 		btintel_reset_to_bootloader(hdev);
 
 done:
@@ -2299,7 +2343,7 @@ static int btintel_prepare_fw_download_tlv(struct hci_dev *hdev,
 	 * of this device.
 	 */
 	err = btintel_download_wait(hdev, calltime, 5000);
-	if (err == -ETIMEDOUT)
+	if (err == -ETIMEDOUT || err == -EAGAIN)
 		btintel_reset_to_bootloader(hdev);
 
 done:
@@ -2728,8 +2772,10 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 	set_bit(HCI_QUIRK_SIMULTANEOUS_DISCOVERY, &hdev->quirks);
 	set_bit(HCI_QUIRK_NON_PERSISTENT_DIAG, &hdev->quirks);
 
-	/* Set up the quality report callback for Intel devices */
+	/* Set up the quality report callbacks for Intel devices */
 	hdev->set_quality_report = btintel_set_quality_report;
+	hdev->is_quality_report_evt = btintel_is_quality_report_evt;
+	hdev->pull_quality_report_data = btintel_pull_quality_report_data;
 
 	/* For Legacy device, check the HW platform value and size */
 	if (skb->len == sizeof(ver) && skb->data[1] == 0x37) {
@@ -2773,6 +2819,12 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 			err = btintel_legacy_rom_setup(hdev, &ver);
 			break;
 		case 0x0b:      /* SfP */
+			/* Apply the device specific controller quirk
+			 *
+			 * Use packet size 24 for the chip
+			 */
+			hdev->wbs_pkt_len = 24;
+			fallthrough;
 		case 0x11:      /* JfP */
 		case 0x12:      /* ThP */
 		case 0x13:      /* HrP */
@@ -3055,8 +3107,15 @@ void btintel_secure_send_result(struct hci_dev *hdev,
 	if (len != sizeof(*evt))
 		return;
 
-	if (evt->result)
-		btintel_set_flag(hdev, INTEL_FIRMWARE_FAILED);
+	if (evt->result) {
+		bt_dev_err(hdev, "Intel Secure Send Results event result: %u status: %u",
+			   evt->result, evt->status);
+
+		if (evt->result == 3)
+			btintel_set_flag(hdev, INTEL_FIRMWARE_VERIFY_FAILED);
+		else
+			btintel_set_flag(hdev, INTEL_FIRMWARE_FAILED);
+	}
 
 	if (btintel_test_and_clear_flag(hdev, INTEL_DOWNLOADING) &&
 	    btintel_test_flag(hdev, INTEL_FIRMWARE_LOADED))
