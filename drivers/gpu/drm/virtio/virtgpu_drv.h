@@ -87,6 +87,14 @@ struct virtio_gpu_object_params {
 struct virtio_gpu_object {
 	struct drm_gem_shmem_object base;
 	uint32_t hw_res_handle;
+
+	bool create_callback_done;
+	/* These variables are only valid if create_callback_done is true */
+	uint32_t num_planes;
+	uint64_t format_modifier;
+	uint32_t strides[4];
+	uint32_t offsets[4];
+
 	bool dumb;
 	bool created;
 	bool host3d_blob, guest_blob;
@@ -386,7 +394,7 @@ void virtio_gpu_cmd_transfer_to_host_3d(struct virtio_gpu_device *vgdev,
 					struct drm_virtgpu_3d_box *box,
 					struct virtio_gpu_object_array *objs,
 					struct virtio_gpu_fence *fence);
-void
+int
 virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
 				  struct virtio_gpu_object *bo,
 				  struct virtio_gpu_object_params *params,

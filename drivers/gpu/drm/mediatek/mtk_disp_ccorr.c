@@ -85,6 +85,10 @@ static u16 mtk_ctm_s31_32_to_s1_n(u64 in, u32 n)
 {
 	u16 r;
 
+	/* DRM S31.32 is sign-magnitude, but HW S1.n is twos-complement */
+	if (in & BIT_ULL(63))
+		in = 1 + ~(in & ~BIT_ULL(63));
+
 	/* Sign bit. */
 	r = in & BIT_ULL(63) ? BIT(n + 1) : 0;
 

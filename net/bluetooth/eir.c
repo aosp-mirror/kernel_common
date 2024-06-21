@@ -175,18 +175,20 @@ static u8 *create_uuid128_list(struct hci_dev *hdev, u8 *data, ptrdiff_t len)
 void eir_create(struct hci_dev *hdev, u8 *data)
 {
 	u8 *ptr = data;
+	u8 size_remaining = HCI_MAX_EIR_LENGTH;
 	size_t name_len;
 
 	name_len = strnlen(hdev->dev_name, sizeof(hdev->dev_name));
 
 	if (name_len > 0) {
 		/* EIR Data type */
-		if (name_len > 48) {
-			name_len = 48;
+		if (name_len > min_t(u16, (HCI_MAX_EIR_LENGTH - 2),
+				     hdev->eir_max_name_len)) {
+			name_len = min_t(u16, (HCI_MAX_EIR_LENGTH - 2),
+					 hdev->eir_max_name_len);
 			ptr[1] = EIR_NAME_SHORT;
-		} else {
+		} else
 			ptr[1] = EIR_NAME_COMPLETE;
-		}
 
 		/* EIR Data length */
 		ptr[0] = name_len + 1;
@@ -194,17 +196,21 @@ void eir_create(struct hci_dev *hdev, u8 *data)
 		memcpy(ptr + 2, hdev->dev_name, name_len);
 
 		ptr += (name_len + 2);
+		size_remaining -= (name_len + 2);
 	}
 
-	if (hdev->inq_tx_power != HCI_TX_POWER_INVALID) {
+	if (hdev->inq_tx_power != HCI_TX_POWER_INVALID &&
+	    size_remaining >= 3) {
 		ptr[0] = 2;
 		ptr[1] = EIR_TX_POWER;
 		ptr[2] = (u8)hdev->inq_tx_power;
 
 		ptr += 3;
+		size_remaining -= 3;
 	}
 
-	if (hdev->devid_source > 0) {
+	if (hdev->devid_source > 0 &&
+	    size_remaining >= 10) {
 		ptr[0] = 9;
 		ptr[1] = EIR_DEVICE_ID;
 
@@ -214,11 +220,16 @@ void eir_create(struct hci_dev *hdev, u8 *data)
 		put_unaligned_le16(hdev->devid_version, ptr + 8);
 
 		ptr += 10;
+		size_remaining -= 10;
 	}
 
-	ptr = create_uuid16_list(hdev, ptr, HCI_MAX_EIR_LENGTH - (ptr - data));
-	ptr = create_uuid32_list(hdev, ptr, HCI_MAX_EIR_LENGTH - (ptr - data));
-	ptr = create_uuid128_list(hdev, ptr, HCI_MAX_EIR_LENGTH - (ptr - data));
+	ptr = create_uuid16_list(hdev, ptr, size_remaining);
+	size_remaining = HCI_MAX_EIR_LENGTH - (ptr - data);
+
+	ptr = create_uuid32_list(hdev, ptr, size_remaining);
+	size_remaining = HCI_MAX_EIR_LENGTH - (ptr - data);
+
+	ptr = create_uuid128_list(hdev, ptr, size_remaining);
 }
 
 u8 eir_create_per_adv_data(struct hci_dev *hdev, u8 instance, u8 *ptr)

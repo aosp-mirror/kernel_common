@@ -49,6 +49,11 @@ struct conn_handle_t {
 	__u16 handle;
 };
 
+struct le_conn_data {
+	bdaddr_t dst;
+	u8 dst_type;
+};
+
 static const struct sco_param esco_param_cvsd[] = {
 	{ EDR_ESCO_MASK & ~ESCO_2EV3, 0x000a,	0x01 }, /* S3 */
 	{ EDR_ESCO_MASK & ~ESCO_2EV3, 0x0007,	0x01 }, /* S2 */
@@ -208,8 +213,6 @@ static void hci_acl_create_connection(struct hci_conn *conn)
 	conn->role = HCI_ROLE_MASTER;
 
 	conn->attempt++;
-
-	conn->link_policy = hdev->link_policy;
 
 	memset(&cp, 0, sizeof(cp));
 	bacpy(&cp.bdaddr, &conn->dst);
@@ -616,7 +619,8 @@ static void hci_conn_timeout(struct work_struct *work)
 
 	BT_DBG("hcon %p state %s", conn, state_to_string(conn->state));
 
-	WARN_ON(refcnt < 0);
+	if (refcnt < 0)
+		pr_warn("hcon refcount is %d\n", refcnt);
 
 	/* FIXME: It was observed that in pairing failed scenario, refcnt
 	 * drops below 0. Probably this is because l2cap_conn_del calls
@@ -961,6 +965,7 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst,
 	conn->tx_power = HCI_TX_POWER_INVALID;
 	conn->max_tx_power = HCI_TX_POWER_INVALID;
 	conn->sync_handle = HCI_SYNC_HANDLE_INVALID;
+	conn->link_policy = hdev->link_policy;
 
 	set_bit(HCI_CONN_POWER_SAVE, &conn->flags);
 	conn->disc_timeout = HCI_DISCONN_TIMEOUT;
@@ -1283,6 +1288,8 @@ u8 hci_conn_set_handle(struct hci_conn *conn, u16 handle)
 
 static void create_le_conn_complete(struct hci_dev *hdev, void *data, int err)
 {
+
+	struct le_conn_data *conn_data = data;
 	struct hci_conn *conn;
 	u16 handle = PTR_UINT(data);
 
@@ -1292,7 +1299,21 @@ static void create_le_conn_complete(struct hci_dev *hdev, void *data, int err)
 
 	bt_dev_dbg(hdev, "err %d", err);
 
+	if (!conn_data) {
+		bt_dev_err(hdev, "conn_data is NULL");
+		return;
+	}
+
 	hci_dev_lock(hdev);
+
+	conn = hci_conn_hash_lookup_le(hdev, &conn_data->dst, conn_data->dst_type);
+
+	if (!conn) {
+		bt_dev_err(hdev,
+			   "can't find conn with addr:%pMR,type:%d, skip the connection",
+			   &conn_data->dst, conn_data->dst_type);
+		goto done;
+	}
 
 	if (!err) {
 		hci_connect_le_scan_cleanup(conn, 0x00);
@@ -1308,17 +1329,28 @@ static void create_le_conn_complete(struct hci_dev *hdev, void *data, int err)
 	hci_conn_failed(conn, bt_status(err));
 
 done:
+	kfree(conn_data);
 	hci_dev_unlock(hdev);
 }
 
 static int hci_connect_le_sync(struct hci_dev *hdev, void *data)
 {
+	struct le_conn_data *conn_data = data;
 	struct hci_conn *conn;
-	u16 handle = PTR_UINT(data);
 
-	conn = hci_conn_hash_lookup_handle(hdev, handle);
-	if (!conn)
-		return 0;
+	if (!conn_data) {
+		bt_dev_err(hdev, "conn_data is NULL");
+		return -ECONNABORTED;
+	}
+
+	conn = hci_conn_hash_lookup_le(hdev, &conn_data->dst, conn_data->dst_type);
+
+	if (!conn) {
+		bt_dev_err(hdev,
+			   "can't find conn with addr:%pMR,type:%d, skip the connection",
+			   &conn_data->dst, conn_data->dst_type);
+		return -ECONNABORTED;
+	}
 
 	bt_dev_dbg(hdev, "conn %p", conn);
 
@@ -1334,6 +1366,7 @@ struct hci_conn *hci_connect_le(struct hci_dev *hdev, bdaddr_t *dst,
 {
 	struct hci_conn *conn;
 	struct smp_irk *irk;
+	struct le_conn_data *conn_data;
 	int err;
 
 	/* Let's make sure that le is enabled.*/
@@ -1346,8 +1379,10 @@ struct hci_conn *hci_connect_le(struct hci_dev *hdev, bdaddr_t *dst,
 
 	/* Since the controller supports only one LE connection attempt at a
 	 * time, we return -EBUSY if there is any connection attempt running.
+	 * CHROMIUM: extend the restriction to BR/EDR connection to prevent
+	 * from race. Context: b/302233940.
 	 */
-	if (hci_lookup_le_connect(hdev))
+	if (hci_lookup_le_conn_conflict(hdev))
 		return ERR_PTR(-EBUSY);
 
 	/* If there's already a connection object but it's not in
@@ -1394,11 +1429,20 @@ struct hci_conn *hci_connect_le(struct hci_dev *hdev, bdaddr_t *dst,
 	conn->sec_level = BT_SECURITY_LOW;
 	conn->conn_timeout = conn_timeout;
 
-	err = hci_cmd_sync_queue(hdev, hci_connect_le_sync,
-				 UINT_PTR(conn->handle),
+	conn->state = BT_CONNECT;
+	clear_bit(HCI_CONN_SCANNING, &conn->flags);
+
+	conn_data = kmalloc(sizeof(*conn_data), GFP_KERNEL);
+	if (!conn_data)
+		return ERR_PTR(-ENOMEM);
+	bacpy(&conn_data->dst, dst);
+	conn_data->dst_type = dst_type;
+
+	err = hci_cmd_sync_queue(hdev, hci_connect_le_sync, conn_data,
 				 create_le_conn_complete);
 	if (err) {
 		hci_conn_del(conn);
+		kfree(conn_data);
 		return ERR_PTR(err);
 	}
 
@@ -1565,6 +1609,7 @@ struct hci_conn *hci_connect_le_scan(struct hci_dev *hdev, bdaddr_t *dst,
 				     enum conn_reasons conn_reason)
 {
 	struct hci_conn *conn;
+	struct smp_irk *irk;
 
 	/* Let's make sure that le is enabled.*/
 	if (!hci_dev_test_flag(hdev, HCI_LE_ENABLED)) {
@@ -1588,6 +1633,20 @@ struct hci_conn *hci_connect_le_scan(struct hci_dev *hdev, bdaddr_t *dst,
 		if (conn->pending_sec_level < sec_level)
 			conn->pending_sec_level = sec_level;
 		goto done;
+	}
+
+	/* If we don't have an Irk or that we have a recent rpa, skip the extra
+	 * scan and try to connect immediately.
+	 */
+	irk = hci_find_irk_by_addr(hdev, dst, dst_type);
+	if (!irk ||
+	    time_before(jiffies, irk->rpa_timestamp + msecs_to_jiffies(2000))) {
+		bt_dev_info(hdev, "Skipping le scan before connect");
+
+		return hci_connect_le(hdev, dst, dst_type,
+				false, sec_level,
+				HCI_LE_CONN_TIMEOUT,
+				HCI_ROLE_MASTER);
 	}
 
 	BT_DBG("requesting refresh of dst_addr");
@@ -1628,6 +1687,12 @@ struct hci_conn *hci_connect_acl(struct hci_dev *hdev, bdaddr_t *dst,
 
 		return ERR_PTR(-EOPNOTSUPP);
 	}
+
+	/* CHROMIUM: Prevent race caused by concurrent BREDR and LE connection.
+	 * Context: b/302233940.
+	 */
+	if (hci_lookup_le_connect(hdev))
+		return ERR_PTR(-EBUSY);
 
 	/* Reject outgoing connection to device with same BD ADDR against
 	 * CVE-2020-26555

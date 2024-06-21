@@ -357,21 +357,21 @@ enum avs_skl_log_priority {
 	AVS_SKL_LOG_VERBOSE,
 };
 
-struct skl_log_state {
+struct avs_skl_log_state {
 	u32 enable;
 	u32 min_priority;
 } __packed;
 
-struct skl_log_state_info {
+struct avs_skl_log_state_info {
 	u32 core_mask;
-	struct skl_log_state logs_core[];
+	struct avs_skl_log_state logs_core[];
 } __packed;
 
-struct apl_log_state_info {
+struct avs_apl_log_state_info {
 	u32 aging_timer_period;
 	u32 fifo_full_timer_period;
 	u32 core_mask;
-	struct skl_log_state logs_core[];
+	struct avs_skl_log_state logs_core[];
 } __packed;
 
 int avs_ipc_set_enable_logs(struct avs_dev *adev, u8 *log_info, size_t size);
@@ -722,9 +722,9 @@ struct avs_copier_gtw_cfg {
 	union avs_connector_node_id node_id;
 	u32 dma_buffer_size;
 	u32 config_length;
-	struct {
+	union {
 		union avs_gtw_attributes attrs;
-		u32 blob[];
+		DECLARE_FLEX_ARRAY(u32, blob);
 	} config;
 } __packed;
 

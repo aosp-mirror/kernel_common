@@ -40,6 +40,7 @@ struct rt5682_platform_data {
 	bool dmic_clk_driving_high;
 
 	const char *dai_clk_names[RT5682_DAI_NUM_CLKS];
+	const char *mclk_name;
 };
 
 #endif

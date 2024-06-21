@@ -1629,6 +1629,7 @@ struct rtw89_btc_wl_info {
 	u8 port_id[RTW89_WIFI_ROLE_MLME_MAX];
 	u8 rssi_level;
 	u8 cn_report;
+	u8 coex_mode;
 
 	bool scbd_change;
 	u32 scbd;
@@ -1736,6 +1737,7 @@ struct rtw89_btc_bt_info {
 	union rtw89_btc_bt_rfk_info_map rfk_info;
 
 	u8 raw_info[BTC_BTINFO_MAX]; /* raw bt info from mailbox */
+	u8 rssi_level;
 
 	u32 scbd;
 	u32 feature;
@@ -1752,7 +1754,8 @@ struct rtw89_btc_bt_info {
 	u32 hi_lna_rx: 1;
 	u32 scan_rx_low_pri: 1;
 	u32 scan_info_update: 1;
-	u32 rsvd: 20;
+	u32 lna_constrain: 3;
+	u32 rsvd: 17;
 };
 
 struct rtw89_btc_cx {
@@ -2428,18 +2431,22 @@ struct rtw89_btc_dm {
 	u32 noisy_level: 3;
 	u32 coex_info_map: 8;
 	u32 bt_only: 1;
-	u32 wl_btg_rx: 1;
+	u32 wl_btg_rx: 2;
 	u32 trx_para_level: 8;
 	u32 wl_stb_chg: 1;
 	u32 pta_owner: 1;
+
 	u32 tdma_instant_excute: 1;
+	u32 wl_btg_rx_rb: 2;
 
 	u16 slot_dur[CXST_MAX];
 
 	u8 run_reason;
 	u8 run_action;
 
+	u8 wl_pre_agc: 2;
 	u8 wl_lna2: 1;
+	u8 wl_pre_agc_rb: 2;
 };
 
 struct rtw89_btc_ctrl {
@@ -3060,11 +3067,13 @@ struct rtw89_chip_ops {
 			       enum rtw89_phy_idx phy_idx);
 	int (*init_txpwr_unit)(struct rtw89_dev *rtwdev, enum rtw89_phy_idx phy_idx);
 	u8 (*get_thermal)(struct rtw89_dev *rtwdev, enum rtw89_rf_path rf_path);
-	void (*ctrl_btg)(struct rtw89_dev *rtwdev, bool btg);
+	void (*ctrl_btg_bt_rx)(struct rtw89_dev *rtwdev, bool en,
+			       enum rtw89_phy_idx phy_idx);
 	void (*query_ppdu)(struct rtw89_dev *rtwdev,
 			   struct rtw89_rx_phy_ppdu *phy_ppdu,
 			   struct ieee80211_rx_status *status);
-	void (*bb_ctrl_btc_preagc)(struct rtw89_dev *rtwdev, bool bt_en);
+	void (*ctrl_nbtg_bt_tx)(struct rtw89_dev *rtwdev, bool en,
+				enum rtw89_phy_idx phy_idx);
 	void (*cfg_txrx_path)(struct rtw89_dev *rtwdev);
 	void (*set_txpwr_ul_tb_offset)(struct rtw89_dev *rtwdev,
 				       s8 pw_ofst, enum rtw89_mac_idx mac_idx);
@@ -5106,13 +5115,13 @@ static inline void rtw89_chip_query_ppdu(struct rtw89_dev *rtwdev,
 		chip->ops->query_ppdu(rtwdev, phy_ppdu, status);
 }
 
-static inline void rtw89_chip_bb_ctrl_btc_preagc(struct rtw89_dev *rtwdev,
-						 bool bt_en)
+static inline void rtw89_ctrl_nbtg_bt_tx(struct rtw89_dev *rtwdev, bool en,
+					 enum rtw89_phy_idx phy_idx)
 {
 	const struct rtw89_chip_info *chip = rtwdev->chip;
 
-	if (chip->ops->bb_ctrl_btc_preagc)
-		chip->ops->bb_ctrl_btc_preagc(rtwdev, bt_en);
+	if (chip->ops->ctrl_nbtg_bt_tx)
+		chip->ops->ctrl_nbtg_bt_tx(rtwdev, en, phy_idx);
 }
 
 static inline void rtw89_chip_cfg_txrx_path(struct rtw89_dev *rtwdev)
@@ -5150,12 +5159,13 @@ static inline u8 rtw89_regd_get(struct rtw89_dev *rtwdev, u8 band)
 	return regd->txpwr_regd[band];
 }
 
-static inline void rtw89_ctrl_btg(struct rtw89_dev *rtwdev, bool btg)
+static inline void rtw89_ctrl_btg_bt_rx(struct rtw89_dev *rtwdev, bool en,
+					enum rtw89_phy_idx phy_idx)
 {
 	const struct rtw89_chip_info *chip = rtwdev->chip;
 
-	if (chip->ops->ctrl_btg)
-		chip->ops->ctrl_btg(rtwdev, btg);
+	if (chip->ops->ctrl_btg_bt_rx)
+		chip->ops->ctrl_btg_bt_rx(rtwdev, en, phy_idx);
 }
 
 static inline

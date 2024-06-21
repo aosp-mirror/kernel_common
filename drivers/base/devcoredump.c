@@ -329,7 +329,7 @@ void dev_coredumpm(struct device *dev, struct module *owner,
 	struct devcd_entry *devcd;
 	struct device *existing;
 
-	if (devcd_disabled)
+	if (devcd_disabled || dev->coredump_disabled)
 		goto free;
 
 	existing = class_find_device(&devcd_class, NULL, dev,

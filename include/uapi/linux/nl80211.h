@@ -1314,11 +1314,6 @@
  *	Multi-Link reconfiguration. %NL80211_ATTR_MLO_LINKS is used to provide
  *	information about the removed STA MLD setup links.
  *
- * @NL80211_CMD_SET_TID_TO_LINK_MAPPING: Set the TID to Link Mapping for a
- *      non-AP MLD station. The %NL80211_ATTR_MLO_TTLM_DLINK and
- *      %NL80211_ATTR_MLO_TTLM_ULINK attributes are used to specify the
- *      TID to Link mapping for downlink/uplink traffic.
- *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1573,8 +1568,6 @@ enum nl80211_commands {
 	NL80211_CMD_SET_HW_TIMESTAMP,
 
 	NL80211_CMD_LINKS_REMOVED,
-
-	NL80211_CMD_SET_TID_TO_LINK_MAPPING,
 
 	/* add new commands above here */
 
@@ -2822,19 +2815,6 @@ enum nl80211_commands {
  * @NL80211_ATTR_MLO_LINK_DISABLED: Flag attribute indicating that the link is
  *	disabled.
  *
- * @NL80211_ATTR_BSS_DUMP_INCLUDE_USE_DATA: Include BSS usage data, i.e.
- *	include BSSes that can only be used in restricted scenarios and/or
- *	cannot be used at all.
- *
- * @NL80211_ATTR_MLO_TTLM_DLINK: Binary attribute specifying the downlink TID to
- *      link mapping. The length is 8 * sizeof(u16). For each TID the link
- *      mapping is as defined in section 9.4.2.314 (TID-To-Link Mapping element)
- *      in Draft P802.11be_D4.0.
- * @NL80211_ATTR_MLO_TTLM_ULINK: Binary attribute specifying the uplink TID to
- *      link mapping. The length is 8 * sizeof(u16). For each TID the link
- *      mapping is as defined in section 9.4.2.314 (TID-To-Link Mapping element)
- *      in Draft P802.11be_D4.0.
- *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -3372,11 +3352,6 @@ enum nl80211_attrs {
 	NL80211_ATTR_EMA_RNR_ELEMS,
 
 	NL80211_ATTR_MLO_LINK_DISABLED,
-
-	NL80211_ATTR_BSS_DUMP_INCLUDE_USE_DATA,
-
-	NL80211_ATTR_MLO_TTLM_DLINK,
-	NL80211_ATTR_MLO_TTLM_ULINK,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -4238,6 +4213,8 @@ enum nl80211_wmm_rule {
  *	as the primary or any of the secondary channels isn't possible
  * @NL80211_FREQUENCY_ATTR_NO_EHT: EHT operation is not allowed on this channel
  *	in current regulatory domain.
+ * @NL80211_FREQUENCY_ATTR_PSD: Power spectral density (in dBm) that
+ *	is allowed on this channel in current regulatory domain.
  * @NL80211_FREQUENCY_ATTR_MAX: highest frequency attribute number
  *	currently defined
  * @__NL80211_FREQUENCY_ATTR_AFTER_LAST: internal use
@@ -4276,6 +4253,7 @@ enum nl80211_frequency_attr {
 	NL80211_FREQUENCY_ATTR_16MHZ,
 	NL80211_FREQUENCY_ATTR_NO_320MHZ,
 	NL80211_FREQUENCY_ATTR_NO_EHT,
+	NL80211_FREQUENCY_ATTR_PSD,
 
 	/* keep last */
 	__NL80211_FREQUENCY_ATTR_AFTER_LAST,
@@ -4376,6 +4354,8 @@ enum nl80211_reg_type {
  * 	a given frequency range. The value is in mBm (100 * dBm).
  * @NL80211_ATTR_DFS_CAC_TIME: DFS CAC time in milliseconds.
  *	If not present or 0 default CAC time will be used.
+ * @NL80211_ATTR_POWER_RULE_PSD: power spectral density (in dBm).
+ *	This could be negative.
  * @NL80211_REG_RULE_ATTR_MAX: highest regulatory rule attribute number
  *	currently defined
  * @__NL80211_REG_RULE_ATTR_AFTER_LAST: internal use
@@ -4392,6 +4372,8 @@ enum nl80211_reg_rule_attr {
 	NL80211_ATTR_POWER_RULE_MAX_EIRP,
 
 	NL80211_ATTR_DFS_CAC_TIME,
+
+	NL80211_ATTR_POWER_RULE_PSD,
 
 	/* keep last */
 	__NL80211_REG_RULE_ATTR_AFTER_LAST,
@@ -4476,6 +4458,7 @@ enum nl80211_sched_scan_match_attr {
  * @NL80211_RRF_NO_HE: HE operation not allowed
  * @NL80211_RRF_NO_320MHZ: 320MHz operation not allowed
  * @NL80211_RRF_NO_EHT: EHT operation not allowed
+ * @NL80211_RRF_PSD: Ruleset has power spectral density value
  */
 enum nl80211_reg_rule_flags {
 	NL80211_RRF_NO_OFDM		= 1<<0,
@@ -4496,6 +4479,7 @@ enum nl80211_reg_rule_flags {
 	NL80211_RRF_NO_HE		= 1<<17,
 	NL80211_RRF_NO_320MHZ		= 1<<18,
 	NL80211_RRF_NO_EHT		= 1<<19,
+	NL80211_RRF_PSD			= 1<<20,
 };
 
 #define NL80211_RRF_PASSIVE_SCAN	NL80211_RRF_NO_IR
@@ -5033,30 +5017,6 @@ enum nl80211_bss_scan_width {
 };
 
 /**
- * enum nl80211_bss_use_for - bitmap indicating possible BSS use
- * @NL80211_BSS_USE_FOR_NORMAL: Use this BSS for normal "connection",
- *	including IBSS/MBSS depending on the type.
- * @NL80211_BSS_USE_FOR_MLD_LINK: This BSS can be used as a link in an
- *	MLO connection. Note that for an MLO connection, all links including
- *	the assoc link must have this flag set, and the assoc link must
- *	additionally have %NL80211_BSS_USE_FOR_NORMAL set.
- */
-enum nl80211_bss_use_for {
-	NL80211_BSS_USE_FOR_NORMAL = 1 << 0,
-	NL80211_BSS_USE_FOR_MLD_LINK = 1 << 1,
-};
-
-/**
- * enum nl80211_bss_cannot_use_reasons - reason(s) connection to a
- *	BSS isn't possible
- * @NL80211_BSS_CANNOT_USE_NSTR_NONPRIMARY: NSTR nonprimary links aren't
- *	supported by the device, and this BSS entry represents one.
- */
-enum nl80211_bss_cannot_use_reasons {
-	NL80211_BSS_CANNOT_USE_NSTR_NONPRIMARY	= 1 << 0,
-};
-
-/**
  * enum nl80211_bss - netlink attributes for a BSS
  *
  * @__NL80211_BSS_INVALID: invalid
@@ -5108,14 +5068,6 @@ enum nl80211_bss_cannot_use_reasons {
  * @NL80211_BSS_FREQUENCY_OFFSET: frequency offset in KHz
  * @NL80211_BSS_MLO_LINK_ID: MLO link ID of the BSS (u8).
  * @NL80211_BSS_MLD_ADDR: MLD address of this BSS if connected to it.
- * @NL80211_BSS_USE_FOR: u32 bitmap attribute indicating what the BSS can be
- *	used for, see &enum nl80211_bss_use_for.
- * @NL80211_BSS_CANNOT_USE_REASONS: Indicates the reason that this BSS cannot
- *	be used for all or some of the possible uses by the device reporting it,
- *	even though its presence was detected.
- *	This is a u64 attribute containing a bitmap of values from
- *	&enum nl80211_cannot_use_reasons, note that the attribute may be missing
- *	if no reasons are specified.
  * @__NL80211_BSS_AFTER_LAST: internal
  * @NL80211_BSS_MAX: highest BSS attribute
  */
@@ -5143,8 +5095,6 @@ enum nl80211_bss {
 	NL80211_BSS_FREQUENCY_OFFSET,
 	NL80211_BSS_MLO_LINK_ID,
 	NL80211_BSS_MLD_ADDR,
-	NL80211_BSS_USE_FOR,
-	NL80211_BSS_CANNOT_USE_REASONS,
 
 	/* keep last */
 	__NL80211_BSS_AFTER_LAST,

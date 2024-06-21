@@ -115,7 +115,8 @@ int ovl_check_fb_len(struct ovl_fb *fb, int fb_len)
 static struct ovl_fh *ovl_get_fh(struct ovl_fs *ofs, struct dentry *upperdentry,
 				 enum ovl_xattr ox)
 {
-	int res, err;
+	ssize_t res;
+	int err;
 	struct ovl_fh *fh = NULL;
 
 	res = ovl_getxattr_upper(ofs, upperdentry, ox, NULL, 0);
@@ -150,10 +151,10 @@ out:
 	return NULL;
 
 fail:
-	pr_warn_ratelimited("failed to get origin (%i)\n", res);
+	pr_warn_ratelimited("failed to get origin (%zi)\n", res);
 	goto out;
 invalid:
-	pr_warn_ratelimited("invalid origin (%*phN)\n", res, fh);
+	pr_warn_ratelimited("invalid origin (%*phN)\n", (int)res, fh);
 	goto out;
 }
 

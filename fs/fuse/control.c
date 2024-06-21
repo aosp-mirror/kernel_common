@@ -64,6 +64,33 @@ static ssize_t fuse_conn_waiting_read(struct file *file, char __user *buf,
 	return simple_read_from_buffer(buf, len, ppos, tmp, size);
 }
 
+static ssize_t fuse_conn_file_system_read(struct file *file, char __user *buf,
+					  size_t len, loff_t *ppos)
+{
+	char tmp[32];
+	size_t size;
+
+	if (!*ppos) {
+		struct fuse_conn *fc = fuse_ctl_file_conn_get(file);
+
+		if (!fc)
+			return 0;
+		down_read(&fc->killsb);
+		if (!list_empty(&fc->mounts)) {
+			struct fuse_mount *fm;
+
+			fm = list_first_entry(&fc->mounts, struct fuse_mount, fc_entry);
+			file->private_data = (void *)fm->sb->s_type->name;
+		} else {
+			file->private_data = "(NULL)";
+		}
+		up_read(&fc->killsb);
+		fuse_conn_put(fc);
+	}
+	size = sprintf(tmp, "%.30s\n", (char *)file->private_data);
+	return simple_read_from_buffer(buf, len, ppos, tmp, size);
+}
+
 static ssize_t fuse_conn_limit_read(struct file *file, char __user *buf,
 				    size_t len, loff_t *ppos, unsigned val)
 {
@@ -210,6 +237,12 @@ static const struct file_operations fuse_conn_congestion_threshold_ops = {
 	.llseek = no_llseek,
 };
 
+static const struct file_operations fuse_conn_file_system_ops = {
+	.open = nonseekable_open,
+	.read = fuse_conn_file_system_read,
+	.llseek = no_llseek,
+};
+
 static struct dentry *fuse_ctl_add_dentry(struct dentry *parent,
 					  struct fuse_conn *fc,
 					  const char *name,
@@ -278,7 +311,9 @@ int fuse_ctl_add_conn(struct fuse_conn *fc)
 				 1, NULL, &fuse_conn_max_background_ops) ||
 	    !fuse_ctl_add_dentry(parent, fc, "congestion_threshold",
 				 S_IFREG | 0600, 1, NULL,
-				 &fuse_conn_congestion_threshold_ops))
+				 &fuse_conn_congestion_threshold_ops) ||
+	    !fuse_ctl_add_dentry(parent, fc, "filesystem", S_IFREG | 0400, 1,
+				 NULL, &fuse_conn_file_system_ops))
 		goto err;
 
 	return 0;

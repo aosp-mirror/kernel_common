@@ -674,6 +674,18 @@ config PAGE_REPORTING
 	  those pages to another entity, such as a hypervisor, so that the
 	  memory can be freed within the host for other uses.
 
+config PROCESS_RECLAIM
+	bool "Enable process reclaim"
+	depends on PROC_FS && MMU
+	help
+	  It allows to reclaim pages of the process by /proc/pid/reclaim.
+
+	  (echo file > /proc/PID/reclaim) reclaims file-backed pages only.
+	  (echo anon > /proc/PID/reclaim) reclaims anonymous pages only.
+	  (echo all > /proc/PID/reclaim) reclaims all pages (except shmem).
+	  (echo shmem > /proc/PID/reclaim) reclaims shmem pages only.
+
+	  Any other value is ignored.
 #
 # support for page migration
 #
@@ -760,6 +772,23 @@ config DEFAULT_MMAP_MIN_ADDR
 
 	  This value can be changed after boot using the
 	  /proc/sys/vm/mmap_min_addr tunable.
+
+config MMAP_NOEXEC_TAINT
+	int "Turns on tainting of mmap()d files from noexec mountpoints"
+	default 1 if MMU
+	default 0 if !MMU
+	help
+	  By default, the ability to change the protections of a virtual
+	  memory area to allow execution depend on if the vma has the
+	  VM_MAYEXEC flag.  When mapping regions from files, VM_MAYEXEC
+	  will be unset if the containing mountpoint is mounted MNT_NOEXEC.
+	  By setting the value to 0, any mmap()d region may be later
+	  mprotect()d with PROT_EXEC.
+
+	  If unsure, keep the value set to 1.
+
+	  This value can be changed after boot using the
+	  /proc/sys/vm/mmap_noexec_taint tunable.
 
 config ARCH_SUPPORTS_MEMORY_FAILURE
 	bool
@@ -854,6 +883,12 @@ choice
 	  madvise(MADV_HUGEPAGE) but it won't risk to increase the
 	  memory footprint of applications without a guaranteed
 	  benefit.
+
+	config TRANSPARENT_HUGEPAGE_NEVER
+		bool "never"
+	help
+	  Disable Transparent Hugepage by default. It can still be
+	  enabled at runtime via sysfs.
 endchoice
 
 config THP_SWAP

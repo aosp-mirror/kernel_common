@@ -880,6 +880,10 @@ static void sched_debug_header(struct seq_file *m)
 		"sysctl_sched_tunable_scaling",
 		sysctl_sched_tunable_scaling,
 		sched_tunable_scaling_names[sysctl_sched_tunable_scaling]);
+#ifdef CONFIG_SCHED_CORE
+	SEQ_printf(m, "  .%-40s: %d\n", "core_sched_enabled",
+		   !!static_branch_likely(&__sched_core_enabled));
+#endif
 	SEQ_printf(m, "\n");
 }
 
@@ -1108,6 +1112,10 @@ void proc_sched_show_task(struct task_struct *p, struct pid_namespace *ns,
 		t1 = cpu_clock(this_cpu);
 		__PS("clock-delta", t1-t0);
 	}
+
+#ifdef CONFIG_SCHED_CORE
+	__PS("core_cookie", p->core_cookie);
+#endif
 
 	sched_show_numa(p, m);
 }

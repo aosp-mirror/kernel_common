@@ -143,6 +143,7 @@ static const char * const iio_modifier_names[] = {
 	[IIO_MOD_PITCH] = "pitch",
 	[IIO_MOD_YAW] = "yaw",
 	[IIO_MOD_ROLL] = "roll",
+	[IIO_MOD_DOUBLE_TAP] = "double_tap",
 };
 
 /* relies on pairs of these shared then separate */

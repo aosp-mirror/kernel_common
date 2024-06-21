@@ -666,6 +666,15 @@ static struct ctl_table netns_core_table[] = {
 	},
 #endif
 	{
+		.procname	= "android_paranoid",
+		.data		= &init_net.core.sysctl_android_paranoid,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
+		.proc_handler	= proc_dointvec_minmax
+	},
+	{
 		.procname	= "somaxconn",
 		.data		= &init_net.core.sysctl_somaxconn,
 		.maxlen		= sizeof(int),
@@ -701,6 +710,8 @@ __setup("fb_tunnels=", fb_tunnels_only_for_init_net_sysctl_setup);
 static __net_init int sysctl_core_net_init(struct net *net)
 {
 	struct ctl_table *tbl, *tmp;
+
+	net->core.sysctl_android_paranoid = 0;
 
 	tbl = netns_core_table;
 	if (!net_eq(net, &init_net)) {

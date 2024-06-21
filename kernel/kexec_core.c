@@ -1268,6 +1268,13 @@ int kernel_kexec(void)
 	} else
 #endif
 	{
+		error = freeze_processes();
+		if (error) {
+			error = -EBUSY;
+			goto Unlock;
+
+		}
+
 		kexec_in_progress = true;
 		kernel_restart_prepare("kexec reboot");
 		migrate_to_reboot_cpu();

@@ -6,6 +6,10 @@
 /dts-v1/;
 #include "mt8183-kukui-jacuzzi.dtsi"
 
+&cpu_thermal {
+        sustainable-power = <4500>; /* milliwatts */
+};
+
 &mt6358codec {
 	mediatek,dmic-mode = <1>; /* one-wire */
 };
@@ -25,3 +29,6 @@
 	};
 };
 
+&i2c2 {
+	i2c-scl-internal-delay-ns = <21500>;
+};

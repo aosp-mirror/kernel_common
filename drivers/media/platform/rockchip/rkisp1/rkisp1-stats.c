@@ -15,7 +15,7 @@
 
 #define RKISP1_STATS_DEV_NAME	RKISP1_DRIVER_NAME "_stats"
 
-#define RKISP1_ISP_STATS_REQ_BUFS_MIN 2
+#define RKISP1_ISP_STATS_REQ_BUFS_MIN 0
 #define RKISP1_ISP_STATS_REQ_BUFS_MAX 8
 
 static int rkisp1_stats_enum_fmt_meta_cap(struct file *file, void *priv,

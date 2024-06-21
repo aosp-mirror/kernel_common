@@ -291,9 +291,6 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 			tty->termios.c_cflag = uport->cons->cflag;
 			tty->termios.c_ispeed = uport->cons->ispeed;
 			tty->termios.c_ospeed = uport->cons->ospeed;
-			uport->cons->cflag = 0;
-			uport->cons->ispeed = 0;
-			uport->cons->ospeed = 0;
 		}
 		/*
 		 * Initialise the hardware port settings.

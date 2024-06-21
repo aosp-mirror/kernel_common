@@ -1060,6 +1060,9 @@ out:
 	return err;
 }
 
+/* When set to true, allow set/drop master ioctls as normal user */
+bool drm_master_relax;
+
 static const struct file_operations drm_stub_fops = {
 	.owner = THIS_MODULE,
 	.open = drm_stub_open,
@@ -1071,15 +1074,18 @@ static void drm_core_exit(void)
 	drm_privacy_screen_lookup_exit();
 	accel_core_exit();
 	unregister_chrdev(DRM_MAJOR, "drm");
-	debugfs_remove(drm_debugfs_root);
+	debugfs_remove_recursive(drm_debugfs_root);
 	drm_sysfs_destroy();
 	idr_destroy(&drm_minors_idr);
 	drm_connector_ida_destroy();
+	drm_trace_cleanup();
 }
 
 static int __init drm_core_init(void)
 {
 	int ret;
+
+	drm_trace_init();
 
 	drm_connector_ida_init();
 	idr_init(&drm_minors_idr);
@@ -1092,6 +1098,9 @@ static int __init drm_core_init(void)
 	}
 
 	drm_debugfs_root = debugfs_create_dir("dri", NULL);
+
+	debugfs_create_bool("drm_master_relax", S_IRUSR | S_IWUSR,
+			    drm_debugfs_root, &drm_master_relax);
 
 	ret = register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops);
 	if (ret < 0)

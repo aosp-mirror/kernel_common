@@ -51,6 +51,12 @@ To disable the driver, use ::
 
   sudo modprobe -r vkms
 
+Configuration With ConfigFS
+===========================
+
+.. kernel-doc:: drivers/gpu/drm/vkms/vkms_configfs.c
+   :doc: ConfigFS Support for VKMS
+
 Testing With IGT
 ================
 
@@ -135,21 +141,15 @@ project.
 Runtime Configuration
 ---------------------
 
-We want to be able to reconfigure vkms instance without having to reload the
-module. Use/Test-cases:
+We want to be able to manipulate vkms instances without having to reload the
+module. Such configuration can be added as extensions to vkms's ConfigFS
+support. Use-cases:
 
-- Hotplug/hotremove connectors on the fly (to be able to test DP MST handling
+- Hotremove connectors on the fly (to be able to test DP MST handling
   of compositors).
-
-- Configure planes/crtcs/connectors (we'd need some code to have more than 1 of
-  them first).
 
 - Change output configuration: Plug/unplug screens, change EDID, allow changing
   the refresh rate.
-
-The currently proposed solution is to expose vkms configuration through
-configfs. All existing module options should be supported through configfs
-too.
 
 Writeback support
 -----------------

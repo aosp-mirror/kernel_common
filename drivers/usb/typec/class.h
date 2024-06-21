@@ -9,6 +9,7 @@
 
 struct typec_mux;
 struct typec_switch;
+struct usb_device;
 
 struct typec_plug {
 	struct device			dev;
@@ -38,6 +39,9 @@ struct typec_partner {
 	enum usb_pd_svdm_ver		svdm_version;
 
 	struct usb_power_delivery	*pd;
+
+	void (*attach)(struct typec_partner *partner, struct device *dev);
+	void (*deattach)(struct typec_partner *partner, struct device *dev);
 	ANDROID_KABI_RESERVE(1);
 };
 
@@ -63,6 +67,18 @@ struct typec_port {
 
 	const struct typec_capability	*cap;
 	const struct typec_operations   *ops;
+
+	struct typec_connector		con;
+
+	/*
+	 * REVISIT: Only USB devices for now. If there are others, these need to
+	 * be converted into a list.
+	 *
+	 * NOTE: These may be registered first before the typec_partner, so they
+	 * will always have to be kept here instead of struct typec_partner.
+	 */
+	struct device			*usb2_dev;
+	struct device			*usb3_dev;
 	ANDROID_KABI_RESERVE(1);
 };
 

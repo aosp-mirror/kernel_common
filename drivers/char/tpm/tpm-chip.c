@@ -292,7 +292,7 @@ int tpm_class_shutdown(struct device *dev)
 	struct tpm_chip *chip = container_of(dev, struct tpm_chip, dev);
 
 	down_write(&chip->ops_sem);
-	if (chip->flags & TPM_CHIP_FLAG_TPM2) {
+	if (chip->ops && (chip->flags & TPM_CHIP_FLAG_TPM2)) {
 		if (!tpm_chip_start(chip)) {
 			tpm2_shutdown(chip, TPM2_SU_CLEAR);
 			tpm_chip_stop(chip);
@@ -546,6 +546,7 @@ static int tpm_add_hwrng(struct tpm_chip *chip)
 		 "tpm-rng-%d", chip->dev_num);
 	chip->hwrng.name = chip->hwrng_name;
 	chip->hwrng.read = tpm_hwrng_read;
+	chip->hwrng.quality = 1000;
 	return hwrng_register(&chip->hwrng);
 }
 

@@ -3,6 +3,8 @@
 #ifndef _VKMS_DRV_H_
 #define _VKMS_DRV_H_
 
+#include "drm/drm_connector.h"
+#include <linux/configfs.h>
 #include <linux/hrtimer.h>
 
 #include <drm/drm.h>
@@ -10,6 +12,7 @@
 #include <drm/drm_gem.h>
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_encoder.h>
+#include <drm/drm_plane.h>
 #include <drm/drm_writeback.h>
 
 #define XRES_MIN    10
@@ -22,6 +25,10 @@
 #define YRES_MAX  8192
 
 #define NUM_OVERLAY_PLANES 8
+
+
+#define VKMS_MAX_OUTPUT_OBJECTS 16
+#define VKMS_MAX_PLANES (3 * VKMS_MAX_OUTPUT_OBJECTS)
 
 #define VKMS_LUT_SIZE 256
 
@@ -66,6 +73,27 @@ struct vkms_plane {
 	struct drm_plane base;
 };
 
+struct vkms_crtc {
+	struct drm_crtc base;
+
+	struct drm_writeback_connector wb_connector;
+	struct hrtimer vblank_hrtimer;
+	ktime_t period_ns;
+	struct drm_pending_vblank_event *event;
+	/* ordered wq for composer_work */
+	struct workqueue_struct *composer_workq;
+	/* protects concurrent access to composer */
+	spinlock_t lock;
+	/* guarantees that if the composer is enabled, a job will be queued */
+	struct mutex enabled_lock;
+
+	/* protected by @enabled_lock */
+	bool composer_enabled;
+	struct vkms_crtc_state *composer_state;
+
+	spinlock_t composer_lock;
+};
+
 struct vkms_color_lut {
 	struct drm_color_lut *base;
 	size_t lut_length;
@@ -97,47 +125,94 @@ struct vkms_crtc_state {
 };
 
 struct vkms_output {
-	struct drm_crtc crtc;
-	struct drm_encoder encoder;
-	struct drm_connector connector;
-	struct drm_writeback_connector wb_connector;
-	struct hrtimer vblank_hrtimer;
-	ktime_t period_ns;
-	struct drm_pending_vblank_event *event;
-	/* ordered wq for composer_work */
-	struct workqueue_struct *composer_workq;
-	/* protects concurrent access to composer */
-	spinlock_t lock;
-
-	/* protected by @lock */
-	bool composer_enabled;
-	struct vkms_crtc_state *composer_state;
-
-	spinlock_t composer_lock;
+	int num_crtcs;
+	struct vkms_crtc crtcs[VKMS_MAX_OUTPUT_OBJECTS];
+	int num_encoders;
+	struct drm_encoder encoders[VKMS_MAX_OUTPUT_OBJECTS];
+	int num_connectors;
+	struct drm_connector connectors[VKMS_MAX_OUTPUT_OBJECTS];
+	int num_planes;
+	struct vkms_plane planes[VKMS_MAX_PLANES];
 };
-
-struct vkms_device;
 
 struct vkms_config {
 	bool writeback;
 	bool cursor;
 	bool overlay;
-	/* only set when instantiated */
-	struct vkms_device *dev;
+};
+
+struct vkms_config_links {
+	struct config_group group;
+	unsigned long linked_object_bitmap;
+};
+
+struct vkms_config_connector {
+	struct config_group config_group;
+	struct drm_connector *connector;
+	struct vkms_config_links possible_encoders;
+	bool connected;
+};
+
+struct vkms_config_crtc {
+	struct config_group config_group;
+	unsigned long crtc_config_idx;
+};
+
+struct vkms_config_encoder {
+	struct config_group config_group;
+	struct vkms_config_links possible_crtcs;
+	unsigned long encoder_config_idx;
+};
+
+struct vkms_config_plane {
+	struct vkms_configfs *configfs;
+	struct config_group config_group;
+	struct vkms_config_links possible_crtcs;
+	enum drm_plane_type type;
+};
+
+struct vkms_configfs {
+	/* Directory group containing connector configs, e.g. /config/vkms/device/ */
+	struct config_group device_group;
+	/* Directory group containing connector configs, e.g. /config/vkms/device/connectors/ */
+	struct config_group connectors_group;
+	/* Directory group containing CRTC configs, e.g. /config/vkms/device/crtcs/ */
+	struct config_group crtcs_group;
+	/* Directory group containing encoder configs, e.g. /config/vkms/device/encoders/ */
+	struct config_group encoders_group;
+	/* Directory group containing plane configs, e.g. /config/vkms/device/planes/ */
+	struct config_group planes_group;
+
+	unsigned long allocated_crtcs;
+	unsigned long allocated_encoders;
+
+	struct mutex lock;
+
+	/* The platform device if this is registered, otherwise NULL */
+	struct vkms_device *vkms_device;
+};
+
+struct vkms_device_setup {
+	// Is NULL in the case of the default card.
+	struct vkms_configfs *configfs;
 };
 
 struct vkms_device {
 	struct drm_device drm;
 	struct platform_device *platform;
+	// Is NULL in the case of the default card.
+	struct vkms_configfs *configfs;
 	struct vkms_output output;
-	const struct vkms_config *config;
+	struct vkms_config config;
 };
 
-#define drm_crtc_to_vkms_output(target) \
-	container_of(target, struct vkms_output, crtc)
+#define drm_crtc_to_vkms_crtc(crtc) container_of(crtc, struct vkms_crtc, base)
 
 #define drm_device_to_vkms_device(target) \
 	container_of(target, struct vkms_device, drm)
+
+#define timer_to_vkms_crtc(timer) \
+	container_of(timer, struct vkms_crtc, vblank_hrtimer)
 
 #define to_vkms_crtc_state(target)\
 	container_of(target, struct vkms_crtc_state, base)
@@ -145,14 +220,50 @@ struct vkms_device {
 #define to_vkms_plane_state(target)\
 	container_of(target, struct vkms_plane_state, base.base)
 
-/* CRTC */
-int vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
-		   struct drm_plane *primary, struct drm_plane *cursor);
+#define item_to_configfs(item) \
+	container_of(to_config_group(item), struct vkms_configfs, device_group)
 
-int vkms_output_init(struct vkms_device *vkmsdev, int index);
+#define connector_item_to_configfs(item)                                     \
+	container_of(to_config_group(item->ci_parent), struct vkms_configfs, \
+		     connectors_group)
+
+#define item_to_config_connector(item)                                    \
+	container_of(to_config_group(item), struct vkms_config_connector, \
+		     config_group)
+
+#define item_to_config_crtc(item)                                    \
+	container_of(to_config_group(item), struct vkms_config_crtc, \
+		     config_group)
+
+#define item_to_config_encoder(item)                                    \
+	container_of(to_config_group(item), struct vkms_config_encoder, \
+		     config_group)
+
+#define item_to_config_plane(item)                                    \
+	container_of(to_config_group(item), struct vkms_config_plane, \
+		     config_group)
+
+#define item_to_config_links(item) \
+	container_of(to_config_group(item), struct vkms_config_links, group)
+
+#define plane_item_to_configfs(item)                                         \
+	container_of(to_config_group(item->ci_parent), struct vkms_configfs, \
+		     planes_group)
+
+/* Devices */
+struct vkms_device *vkms_add_device(struct vkms_configfs *configfs);
+void vkms_remove_device(struct vkms_device *vkms_device);
+
+/* CRTC */
+struct vkms_crtc *vkms_crtc_init(struct vkms_device *vkmsdev,
+				 struct drm_plane *primary,
+				 struct drm_plane *cursor, const char *name);
+
+int vkms_output_init(struct vkms_device *vkmsdev);
+int vkms_output_init_default(struct vkms_device *vkmsdev);
 
 struct vkms_plane *vkms_plane_init(struct vkms_device *vkmsdev,
-				   enum drm_plane_type type, int index);
+				   enum drm_plane_type type, char* name, ...);
 
 /* CRC Support */
 const char *const *vkms_get_crc_sources(struct drm_crtc *crtc,
@@ -163,11 +274,20 @@ int vkms_verify_crc_source(struct drm_crtc *crtc, const char *source_name,
 
 /* Composer Support */
 void vkms_composer_worker(struct work_struct *work);
-void vkms_set_composer(struct vkms_output *out, bool enabled);
+void vkms_set_composer(struct vkms_crtc *vkms_crtc, bool enabled);
 void vkms_compose_row(struct line_buffer *stage_buffer, struct vkms_plane_state *plane, int y);
 void vkms_writeback_row(struct vkms_writeback_job *wb, const struct line_buffer *src_buffer, int y);
 
 /* Writeback */
-int vkms_enable_writeback_connector(struct vkms_device *vkmsdev);
+int vkms_enable_writeback_connector(struct vkms_device *vkmsdev,
+				    struct vkms_crtc *vkms_crtc);
+
+/* ConfigFS Support */
+int vkms_init_configfs(void);
+void vkms_unregister_configfs(void);
+
+/* Connector hotplugging */
+enum drm_connector_status vkms_connector_detect(struct drm_connector *connector,
+						bool force);
 
 #endif /* _VKMS_DRV_H_ */

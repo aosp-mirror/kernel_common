@@ -38,6 +38,9 @@
 #include "internal.h"
 #include <trace/hooks/syscall_check.h>
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/fs_trace.h>
+
 int do_truncate(struct mnt_idmap *idmap, struct dentry *dentry,
 		loff_t length, unsigned int time_attrs, struct file *filp)
 {
@@ -1445,6 +1448,7 @@ static long do_sys_openat2(int dfd, const char __user *filename,
 			fd = PTR_ERR(f);
 		} else {
 			fd_install(fd, f);
+			trace_do_sys_open(tmp->name, how->flags, how->mode);
 		}
 	}
 	putname(tmp);

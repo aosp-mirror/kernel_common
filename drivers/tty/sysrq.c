@@ -51,6 +51,7 @@
 #include <linux/syscalls.h>
 #include <linux/of.h>
 #include <linux/rcupdate.h>
+#include <linux/delay.h>
 
 #include <asm/ptrace.h>
 #include <asm/irq_regs.h>
@@ -454,6 +455,64 @@ static const struct sysrq_key_op sysrq_unrt_op = {
 	.enable_mask	= SYSRQ_ENABLE_RTNICE,
 };
 
+/* send a signal to a process named comm if it has a certain parent */
+/* if parent is NULL, send to the first matching process */
+static void sysrq_x_cros_signal_process(char *comm, char *parent, int sig)
+{
+	struct task_struct *p;
+
+	read_lock(&tasklist_lock);
+	for_each_process(p) {
+		if (p->flags & (PF_KTHREAD | PF_EXITING))
+			continue;
+		if (is_global_init(p))
+			continue;
+		if (strncmp(p->comm, comm, TASK_COMM_LEN))
+			continue;
+		if (parent && strncmp(p->parent->comm, parent, TASK_COMM_LEN))
+			continue;
+
+		printk(KERN_INFO "%s: signal %d %s pid %u tgid %u\n",
+		       __func__, sig, comm, p->pid, p->tgid);
+		do_send_sig_info(sig, SEND_SIG_PRIV, p, PIDTYPE_MAX);
+	}
+	read_unlock(&tasklist_lock);
+}
+
+/* how many seconds do we wait for subsequent keypresses after the first */
+#define CROS_SYSRQ_WAIT 20
+
+static void sysrq_handle_cros_xkey(u8 key)
+{
+	static unsigned long first_jiffies = INITIAL_JIFFIES - CROS_SYSRQ_WAIT * HZ;
+	static unsigned int xkey_iteration;
+
+	if (time_after(jiffies, first_jiffies + CROS_SYSRQ_WAIT * HZ)) {
+		first_jiffies = jiffies;
+		xkey_iteration = 0;
+	} else {
+		xkey_iteration++;
+	}
+
+	if (!xkey_iteration) {
+		sysrq_x_cros_signal_process("chrome", "session_manager",
+					    SIGABRT);
+	} else {
+		sysrq_handle_showstate_blocked(key);
+		sysrq_handle_sync(key);
+		/* Delay for a bit to give time for sync to complete */
+		mdelay(1000);
+		panic("ChromeOS X Key");
+	}
+}
+
+static struct sysrq_key_op sysrq_cros_xkey = {
+	.handler	= sysrq_handle_cros_xkey,
+	.help_msg	= "Cros-dump-and-crash",
+	.action_msg	= "Cros dump and crash",
+	.enable_mask	= SYSRQ_ENABLE_CROS_XKEY,
+};
+
 /* Key Operations table and lock */
 static DEFINE_SPINLOCK(sysrq_key_table_lock);
 
@@ -502,7 +561,8 @@ static const struct sysrq_key_op *sysrq_key_table[62] = {
 	/* x: May be registered on mips for TLB dump */
 	/* x: May be registered on ppc/powerpc for xmon */
 	/* x: May be registered on sparc64 for global PMU dump */
-	NULL,				/* x */
+	/* x: On Chrome OS, this is the dump and crash key */
+	&sysrq_cros_xkey,		/* x */
 	/* y: May be registered on sparc64 for global register dump */
 	NULL,				/* y */
 	&sysrq_ftrace_dump_op,		/* z */
@@ -659,8 +719,10 @@ struct sysrq_state {
 	unsigned int alt_use;
 	unsigned int shift;
 	unsigned int shift_use;
+	unsigned int sysrq_use;
 	bool active;
 	bool need_reinject;
+	bool reinject_release_alt;
 	bool reinjecting;
 
 	/* reset sequence handling */
@@ -800,24 +862,55 @@ static void sysrq_reinject_alt_sysrq(struct work_struct *work)
 			container_of(work, struct sysrq_state, reinject_work);
 	struct input_handle *handle = &sysrq->handle;
 	unsigned int alt_code = sysrq->alt_use;
+	unsigned int sysrq_code = sysrq->sysrq_use;
 
-	if (sysrq->need_reinject) {
-		/* we do not want the assignment to be reordered */
-		sysrq->reinjecting = true;
-		mb();
+	/*
+	 * Try to "restore" the events that we suppressed when user
+	 * activated SysRq mode. We start by sending the SysRq press,
+	 * followed by release of either SysRq or Alt, depending on
+	 * what has been actually released.
+	 */
 
-		/* Simulate press and release of Alt + SysRq */
-		input_inject_event(handle, EV_KEY, alt_code, 1);
-		input_inject_event(handle, EV_KEY, KEY_SYSRQ, 1);
-		input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
+	/* we do not want the assignment to be reordered */
+	sysrq->reinjecting = true;
+	mb();
 
-		input_inject_event(handle, EV_KEY, KEY_SYSRQ, 0);
-		input_inject_event(handle, EV_KEY, alt_code, 0);
-		input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
-
-		mb();
-		sysrq->reinjecting = false;
+	if (sysrq->reinject_release_alt) {
+		/*
+		 * Alt was released, which means that SysRq is still
+		 * down. Force it's state to be "released" so our
+		 * "press" event isn't swallowed by the input core.
+		 */
+		spin_lock_irq(&handle->dev->event_lock);
+		clear_bit(sysrq_code, handle->dev->key);
+		spin_unlock_irq(&handle->dev->event_lock);
 	}
+
+	/* Now "restore" previously suppressed SysRq press event */
+	input_inject_event(handle, EV_KEY, sysrq_code, 1);
+	input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
+
+	if (sysrq->reinject_release_alt) {
+		/*
+		 * Force alt key state to be "pressed" since the key
+		 * actually been released, but event was suppressed,
+		 * and we want to re-send the event.
+		 */
+		spin_lock_irq(&handle->dev->event_lock);
+		set_bit(alt_code, handle->dev->key);
+		spin_unlock_irq(&handle->dev->event_lock);
+
+		/* And now release it */
+		input_inject_event(handle, EV_KEY, alt_code, 0);
+	} else {
+		/* And release SysRq key */
+		input_inject_event(handle, EV_KEY, sysrq_code, 0);
+	}
+
+	input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
+
+	mb();
+	sysrq->reinjecting = false;
 }
 
 static bool sysrq_handle_keypress(struct sysrq_state *sysrq,
@@ -854,29 +947,35 @@ static bool sysrq_handle_keypress(struct sysrq_state *sysrq,
 		break;
 
 	case KEY_SYSRQ:
-		if (value == 1 && sysrq->alt != KEY_RESERVED) {
+	case KEY_F10:
+	case KEY_VOLUMEUP:
+		if (!value) {
+			if (code == sysrq->sysrq_use) {
+				/* SysRq is being released */
+				sysrq->active = false;
+				sysrq->alt = KEY_RESERVED;
+			}
+		} else if (value != 1) {
+			/* Ignore autorepeats */
+		} else if (sysrq->active && code != sysrq->sysrq_use) {
+			/*
+			 * We pressed the *other* SysRq, which means the
+			 * sequence is not "pure" and we no longer want to
+			 * re-inject it.
+			 */
+			sysrq->need_reinject = false;
+		} else if (sysrq->alt != KEY_RESERVED) {
 			sysrq->active = true;
 			sysrq->alt_use = sysrq->alt;
 			/* either RESERVED (for released) or actual code */
 			sysrq->shift_use = sysrq->shift;
+			sysrq->sysrq_use = code;
 			/*
 			 * If nothing else will be pressed we'll need
 			 * to re-inject Alt-SysRq keysroke.
 			 */
 			sysrq->need_reinject = true;
 		}
-
-		/*
-		 * Pretend that sysrq was never pressed at all. This
-		 * is needed to properly handle KGDB which will try
-		 * to release all keys after exiting debugger. If we
-		 * do not clear key bit it KGDB will end up sending
-		 * release events for Alt and SysRq, potentially
-		 * triggering print screen function.
-		 */
-		if (sysrq->active)
-			clear_bit(KEY_SYSRQ, sysrq->handle.dev->key);
-
 		break;
 
 	default:
@@ -890,8 +989,6 @@ static bool sysrq_handle_keypress(struct sysrq_state *sysrq,
 		}
 		break;
 	}
-
-	suppress = sysrq->active;
 
 	if (!sysrq->active) {
 
@@ -911,18 +1008,28 @@ static bool sysrq_handle_keypress(struct sysrq_state *sysrq,
 		else
 			clear_bit(code, sysrq->key_down);
 
-		if (was_active)
-			schedule_work(&sysrq->reinject_work);
+		if (was_active) {
+			clear_bit(sysrq->sysrq_use, sysrq->handle.dev->key);
+			suppress = true;
+
+			if (sysrq->need_reinject) {
+				sysrq->reinject_release_alt =
+					code == sysrq->alt_use;
+				schedule_work(&sysrq->reinject_work);
+			}
+		} else {
+			suppress = false;
+		}
 
 		/* Check for reset sequence */
 		sysrq_detect_reset_sequence(sysrq, code, value);
-
-	} else if (value == 0 && test_and_clear_bit(code, sysrq->key_down)) {
+	} else {
 		/*
 		 * Pass on release events for keys that was pressed before
 		 * entering SysRq mode.
 		 */
-		suppress = false;
+		suppress = value != 0 ||
+			   !test_and_clear_bit(code, sysrq->key_down);
 	}
 
 	return suppress;

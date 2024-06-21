@@ -1498,11 +1498,13 @@ EXPORT_SYMBOL(drm_atomic_check_only);
 int drm_atomic_commit(struct drm_atomic_state *state)
 {
 	struct drm_mode_config *config = &state->dev->mode_config;
-	struct drm_printer p = drm_info_printer(state->dev->dev);
 	int ret;
 
-	if (drm_debug_enabled(DRM_UT_STATE))
+	if (drm_debug_enabled(DRM_UT_STATE)) {
+		struct drm_printer p;
+		p = drm_debug_category_printer(DRM_UT_STATE, "commit_state");
 		drm_atomic_print_new_state(state, &p);
+	}
 
 	ret = drm_atomic_check_only(state);
 	if (ret)

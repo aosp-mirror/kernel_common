@@ -10,6 +10,7 @@
 #include <linux/adreno-smmu-priv.h>
 #include <linux/clk.h>
 #include <linux/devfreq.h>
+#include <linux/input.h>
 #include <linux/interconnect.h>
 #include <linux/pm_opp.h>
 #include <linux/regulator/consumer.h>
@@ -96,11 +97,19 @@ struct msm_gpu_funcs {
 
 /* Additional state for iommu faults: */
 struct msm_gpu_fault_info {
-	u64 ttbr0;
+	struct adreno_smmu_fault_info smmu_info;
 	unsigned long iova;
 	int flags;
 	const char *type;
 	const char *block;
+
+	/* Information about what we think/expect is the current SMMU state,
+	 * for example expected_ttbr0 should match smmu_info.ttbr0 which
+	 * was read back from SMMU registers.
+	 */
+	phys_addr_t pgtbl_ttbr0;
+	u64 ptes[4];
+	int asid;
 };
 
 /**
@@ -255,6 +264,10 @@ struct msm_gpu {
 #define DRM_MSM_HANGCHECK_DEFAULT_PERIOD 500 /* in ms */
 #define DRM_MSM_HANGCHECK_PROGRESS_RETRIES 3
 	struct timer_list hangcheck_timer;
+
+	/* work for waking GPU on input: */
+	struct kthread_work boost_work;
+	struct input_handler boost_handler;
 
 	/* Fault info for most recent iova fault: */
 	struct msm_gpu_fault_info fault_info;

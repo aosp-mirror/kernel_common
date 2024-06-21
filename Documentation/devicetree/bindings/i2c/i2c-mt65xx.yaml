@@ -99,6 +99,9 @@ properties:
   vbus-supply:
     description: Phandle to the regulator providing power to SCL/SDA
 
+  mediatek,default-timing-adjust:
+    decription: use default timing calculation, no timing adjustment.
+
 required:
   - compatible
   - reg

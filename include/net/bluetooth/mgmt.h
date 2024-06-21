@@ -45,6 +45,7 @@
 #define MGMT_STATUS_RFKILLED		0x12
 #define MGMT_STATUS_ALREADY_PAIRED	0x13
 #define MGMT_STATUS_PERMISSION_DENIED	0x14
+#define MGMT_STATUS_CONNECT_NOT_ESTD	0x15
 
 struct mgmt_hdr {
 	__le16	opcode;
@@ -878,6 +879,58 @@ struct mgmt_cp_mesh_send_cancel {
 } __packed;
 #define MGMT_MESH_SEND_CANCEL_SIZE	1
 
+
+/*
+ * Floss MGMT Opcodes start here.
+ */
+#define MGMT_OP_GET_SCO_CODEC_CAPABILITIES	0x0100
+#define MGMT_SCO_CODEC_CVSD			0x1
+#define MGMT_SCO_CODEC_MSBC_TRANSPARENT		0x2
+#define MGMT_SCO_CODEC_MSBC			0x3
+
+struct mgmt_cp_get_codec_capabilities {
+	__u16	hci_id;
+} __packed;
+#define MGMT_GET_SCO_CODEC_CAPABILITIES_SIZE	0x2
+
+struct mgmt_rp_get_codec_capabilities {
+	__u16	hci_id;
+	__u8	transparent_wbs_supported;
+	// This refers to the offload path when it's non-zero.
+	__u8	hci_data_path_id;
+	__u32	wbs_pkt_len;
+} __packed;
+
+#define MGMT_OP_NOTIFY_SCO_CONNECTION_CHANGE	0x0101
+struct mgmt_cp_notify_sco_connection_change {
+	__u16 hci_id;
+	struct mgmt_addr_info	addr;
+	__u8			connected;
+	__u8			codec;
+} __packed;
+#define MGMT_NOTIFY_SCO_CONNECTION_CHANGE_SIZE	0xB
+
+#define MGMT_OP_GET_VS_OPCODE			0x0102
+#define MGMT_VS_OPCODE_MSFT			0x0001
+
+struct mgmt_cp_get_vs_opcode {
+	__u16	hci_id;
+	__u16	vendor_specification;
+} __packed;
+#define MGMT_GET_VS_OPCODE_SIZE			0x4
+
+struct mgmt_rp_get_vs_opcode {
+	__u16	hci_id;
+	__u16	opcode;
+} __packed;
+
+#define MGMT_OP_NOTIFY_SUSPEND_STATE	0x0103
+struct mgmt_cp_notify_suspend_state {
+	__u16 hci_id;
+	__u8 suspended;
+} __packed;
+#define MGMT_NOTIFY_SUSPEND_STATE_SIZE	0x3
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;
@@ -1177,3 +1230,13 @@ struct mgmt_ev_mesh_device_found {
 struct mgmt_ev_mesh_pkt_cmplt {
 	__u8	handle;
 } __packed;
+
+
+/* CHROMIUM Only Events Start */
+#define MGMT_EV_QUALITY_REPORT			0x0070
+struct mgmt_ev_quality_report {
+	__u8 quality_spec;
+	__u8 data_len;
+	__u8 data[0];
+} __packed;
+/* CHROMIUM Only Events End */

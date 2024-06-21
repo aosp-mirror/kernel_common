@@ -91,6 +91,8 @@ int __thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 	lockdep_assert_held(&tz->lock);
 
 	ret = tz->ops->get_temp(tz, temp);
+	if (ret)
+		return ret;
 
 	if (IS_ENABLED(CONFIG_THERMAL_EMULATION) && tz->emul_temperature) {
 		for (count = 0; count < tz->num_trips; count++) {

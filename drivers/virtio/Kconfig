@@ -173,4 +173,12 @@ config VIRTIO_DMA_SHARED_BUFFER
 	 This option adds a flavor of dma buffers that are backed by
 	 virtio resources.
 
+config VIRTIO_WL
+	bool "Virtio Wayland driver"
+	depends on VIRTIO && MMU
+	help
+	 This driver supports proxying of a wayland socket from host to guest.
+
+	 If unsure, say 'N'.
+
 endif # VIRTIO_MENU

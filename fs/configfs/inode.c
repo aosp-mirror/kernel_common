@@ -158,6 +158,7 @@ struct inode *configfs_create(struct dentry *dentry, umode_t mode)
 	struct inode *inode = NULL;
 	struct configfs_dirent *sd;
 	struct inode *p_inode;
+	struct dentry *parent;
 
 	if (!dentry)
 		return ERR_PTR(-ENOENT);
@@ -166,6 +167,31 @@ struct inode *configfs_create(struct dentry *dentry, umode_t mode)
 		return ERR_PTR(-EEXIST);
 
 	sd = dentry->d_fsdata;
+	parent = dget_parent(dentry);
+	if (parent && !sd->s_iattr) {
+		struct configfs_dirent *sd_parent = parent->d_fsdata;
+
+		sd->s_iattr = kzalloc(sizeof(struct iattr), GFP_KERNEL);
+		if (!sd->s_iattr) {
+			dput(parent);
+			return ERR_PTR(-ENOMEM);
+		}
+
+		sd->s_iattr->ia_mode = sd->s_mode;
+		if (sd_parent && sd_parent->s_iattr) {
+			sd->s_iattr->ia_uid = sd_parent->s_iattr->ia_uid;
+			sd->s_iattr->ia_gid = sd_parent->s_iattr->ia_gid;
+		} else {
+			sd->s_iattr->ia_uid = GLOBAL_ROOT_UID;
+			sd->s_iattr->ia_gid = GLOBAL_ROOT_GID;
+		}
+		if (sd_parent && sd_parent->s_dentry && d_inode(sd_parent->s_dentry))
+			sd->s_iattr->ia_ctime = current_time(d_inode(sd_parent->s_dentry));
+		else
+			ktime_get_coarse_real_ts64(&sd->s_iattr->ia_ctime);
+		sd->s_iattr->ia_atime = sd->s_iattr->ia_mtime = sd->s_iattr->ia_ctime;
+	}
+	dput(parent);
 	inode = configfs_new_inode(mode, sd, dentry->d_sb);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);

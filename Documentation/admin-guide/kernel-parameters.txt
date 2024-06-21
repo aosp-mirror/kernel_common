@@ -829,6 +829,20 @@
 			/proc/<pid>/coredump_filter.
 			See also Documentation/filesystems/proc.rst.
 
+	coresched=	[SCHED_CORE] This feature allows the Linux scheduler
+			to force hyperthread siblings of a CPU to only execute tasks
+			concurrently on all hyperthreads that are running within the
+			same core scheduling group.
+			Possible values are:
+			'on' - Enable scheduler capability to core schedule.
+			By default, no tasks will be core scheduled, but the coresched
+			interface can be used to form groups of tasks that are forced
+			to share a core.
+			'off' - Disable scheduler capability to core schedule.
+			'secure' - Like 'on' but only enable on systems affected by
+			MDS or L1TF vulnerabilities. 'off' otherwise.
+			Default: 'secure'.
+
 	coresight_cpu_debug.enable
 			[ARM,ARM64]
 			Format: <bool>

@@ -17,4 +17,8 @@ static inline bool sched_smt_active(void) { return false; }
 
 void arch_smt_update(void);
 
+#ifdef CONFIG_SCHED_CORE
+extern struct static_key_true sched_coresched_supported;
+#endif
+
 #endif
