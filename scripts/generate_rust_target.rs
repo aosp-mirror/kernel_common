@@ -26,7 +26,11 @@ enum Value {
 
 type Object = Vec<(String, Value)>;
 
-fn comma_sep<T>(seq: &[T], formatter: &mut Formatter<'_>, f: impl Fn(&mut Formatter<'_>, &T) -> Result) -> Result {
+fn comma_sep<T>(
+    seq: &[T],
+    formatter: &mut Formatter<'_>,
+    f: impl Fn(&mut Formatter<'_>, &T) -> Result,
+) -> Result {
     if let [ref rest @ .., ref last] = seq[..] {
         for v in rest {
             f(formatter, v)?;
@@ -52,8 +56,9 @@ impl Display for Value {
             }
             Value::Object(object) => {
                 formatter.write_str("{")?;
-                comma_sep(&object[..], formatter, |formatter, v|
-                          write!(formatter, "\"{}\": {}", v.0, v.1))?;
+                comma_sep(&object[..], formatter, |formatter, v| {
+                    write!(formatter, "\"{}\": {}", v.0, v.1)
+                })?;
                 formatter.write_str("}")
             }
         }
@@ -90,7 +95,7 @@ impl From<Object> for Value {
     }
 }
 
-impl <T: Into<Value>, const N: usize> From<[T; N]> for Value {
+impl<T: Into<Value>, const N: usize> From<[T; N]> for Value {
     fn from(i: [T; N]) -> Self {
         Self::Array(i.into_iter().map(|v| v.into()).collect())
     }
