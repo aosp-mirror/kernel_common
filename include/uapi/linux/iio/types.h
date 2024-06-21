@@ -101,6 +101,7 @@ enum iio_modifier {
 	IIO_MOD_PITCH,
 	IIO_MOD_YAW,
 	IIO_MOD_ROLL,
+	IIO_MOD_DOUBLE_TAP,
 };
 
 enum iio_event_type {

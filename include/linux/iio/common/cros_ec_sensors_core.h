@@ -26,7 +26,6 @@ enum {
 
 /*
  * 4 16 bit channels are allowed.
- * Good enough for current sensors, they use up to 3 16 bit vectors.
  */
 #define CROS_EC_SAMPLE_SIZE  (sizeof(s64) * 2)
 
@@ -126,5 +125,6 @@ extern const struct dev_pm_ops cros_ec_sensors_pm_ops;
 
 /* List of extended channel specification for all sensors. */
 extern const struct iio_chan_spec_ext_info cros_ec_sensors_ext_info[];
+extern const struct iio_chan_spec_ext_info cros_ec_sensors_limited_info[];
 
 #endif  /* __CROS_EC_SENSORS_CORE_H */

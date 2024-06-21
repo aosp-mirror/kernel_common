@@ -30,3 +30,23 @@ config IIO_CROS_EC_SENSORS_LID_ANGLE
 	  convertible devices.
 	  This module is loaded when the EC can calculate the angle between the base
 	  and the lid.
+
+config IIO_CROS_EC_ACTIVITY
+	tristate "ChromeOS EC Activity Sensors"
+	depends on IIO_CROS_EC_SENSORS_CORE
+	help
+	  Module to handle activity events detections presented by the ChromeOS
+	  EC Sensor hub.
+	  Activities can be simple (low/no motion) or more complex (riding train).
+	  They are being reported by physical devices or the EC itself.
+	  Creates an IIO device to manage all activities.
+
+config IIO_CROS_EC_SENSORS_SYNC
+	tristate "ChromeOS EC Counter Sensors"
+	depends on IIO_CROS_EC_SENSORS_CORE
+	help
+	  Module to handle synchronisation sensors presented by the ChromeOS EC
+	  Sensor hub.
+	  Synchronisation sensors are counter sensors that are triggered when
+	  events occurs from other subsystems. They are use to synchronised
+	  those subsystem with existing MEMS sensors, like gyroscope.
