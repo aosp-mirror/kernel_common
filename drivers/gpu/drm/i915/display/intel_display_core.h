@@ -19,6 +19,7 @@
 #include "intel_cdclk.h"
 #include "intel_display_device.h"
 #include "intel_display_limits.h"
+#include "intel_display_params.h"
 #include "intel_display_power.h"
 #include "intel_dpll_mgr.h"
 #include "intel_fbc.h"
@@ -63,6 +64,8 @@ struct intel_display_funcs {
 				struct intel_crtc_state *);
 	void (*get_initial_plane_config)(struct intel_crtc *,
 					 struct intel_initial_plane_config *);
+	bool (*fixup_initial_plane_config)(struct intel_crtc *crtc,
+					   const struct intel_initial_plane_config *plane_config);
 	void (*crtc_enable)(struct intel_atomic_state *state,
 			    struct intel_crtc *crtc);
 	void (*crtc_disable)(struct intel_atomic_state *state,
@@ -517,6 +520,7 @@ struct intel_display {
 	struct intel_hotplug hotplug;
 	struct intel_opregion opregion;
 	struct intel_overlay *overlay;
+	struct intel_display_params params;
 	struct intel_vbt_data vbt;
 	struct intel_wm wm;
 };

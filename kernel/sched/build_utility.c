@@ -108,3 +108,7 @@
 #ifdef CONFIG_SCHED_AUTOGROUP
 # include "autogroup.c"
 #endif
+
+#ifdef CONFIG_PROC_LATSENSE
+# include "latsense.c"
+#endif

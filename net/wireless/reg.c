@@ -1589,6 +1589,8 @@ static u32 map_regdom_flags(u32 rd_flags)
 		channel_flags |= IEEE80211_CHAN_NO_320MHZ;
 	if (rd_flags & NL80211_RRF_NO_EHT)
 		channel_flags |= IEEE80211_CHAN_NO_EHT;
+	if (rd_flags & NL80211_RRF_PSD)
+		channel_flags |= IEEE80211_CHAN_PSD;
 	return channel_flags;
 }
 
@@ -1795,6 +1797,9 @@ static void handle_channel_single_rule(struct wiphy *wiphy,
 				chan->dfs_cac_ms = reg_rule->dfs_cac_ms;
 		}
 
+		if (chan->flags & IEEE80211_CHAN_PSD)
+			chan->psd = reg_rule->psd;
+
 		return;
 	}
 
@@ -1814,6 +1819,9 @@ static void handle_channel_single_rule(struct wiphy *wiphy,
 		else
 			chan->dfs_cac_ms = IEEE80211_DFS_MIN_CAC_TIME_MS;
 	}
+
+	if (chan->flags & IEEE80211_CHAN_PSD)
+		chan->psd = reg_rule->psd;
 
 	if (chan->orig_mpwr) {
 		/*
@@ -1883,6 +1891,12 @@ static void handle_channel_adjacent_rules(struct wiphy *wiphy,
 							 rrule1->dfs_cac_ms,
 							 rrule2->dfs_cac_ms);
 		}
+
+		if ((rrule1->flags & NL80211_RRF_PSD) &&
+		    (rrule2->flags & NL80211_RRF_PSD))
+			chan->psd = min_t(s8, rrule1->psd, rrule2->psd);
+		else
+			chan->flags &= ~NL80211_RRF_PSD;
 
 		return;
 	}
@@ -2151,13 +2165,6 @@ static bool reg_is_world_roaming(struct wiphy *wiphy)
 	return false;
 }
 
-static void reg_call_notifier(struct wiphy *wiphy,
-			      struct regulatory_request *request)
-{
-	if (wiphy->reg_notifier)
-		wiphy->reg_notifier(wiphy, request);
-}
-
 static void handle_reg_beacon(struct wiphy *wiphy, unsigned int chan_idx,
 			      struct reg_beacon *reg_beacon)
 {
@@ -2165,7 +2172,6 @@ static void handle_reg_beacon(struct wiphy *wiphy, unsigned int chan_idx,
 	struct ieee80211_channel *chan;
 	bool channel_changed = false;
 	struct ieee80211_channel chan_before;
-	struct regulatory_request *lr = get_last_request();
 
 	sband = wiphy->bands[reg_beacon->chan.band];
 	chan = &sband->channels[chan_idx];
@@ -2191,11 +2197,8 @@ static void handle_reg_beacon(struct wiphy *wiphy, unsigned int chan_idx,
 		channel_changed = true;
 	}
 
-	if (channel_changed) {
+	if (channel_changed)
 		nl80211_send_beacon_hint_event(wiphy, &chan_before, chan);
-		if (wiphy->flags & WIPHY_FLAG_CHANNEL_CHANGE_ON_BEACON)
-			reg_call_notifier(wiphy, lr);
-	}
 }
 
 /*
@@ -2336,6 +2339,13 @@ static void reg_process_ht_flags(struct wiphy *wiphy)
 
 	for (band = 0; band < NUM_NL80211_BANDS; band++)
 		reg_process_ht_flags_band(wiphy, wiphy->bands[band]);
+}
+
+static void reg_call_notifier(struct wiphy *wiphy,
+			      struct regulatory_request *request)
+{
+	if (wiphy->reg_notifier)
+		wiphy->reg_notifier(wiphy, request);
 }
 
 static bool reg_wdev_chan_valid(struct wiphy *wiphy, struct wireless_dev *wdev)
@@ -2580,6 +2590,9 @@ static void handle_channel_custom(struct wiphy *wiphy,
 		else
 			chan->dfs_cac_ms = IEEE80211_DFS_MIN_CAC_TIME_MS;
 	}
+
+	if (chan->flags & IEEE80211_CHAN_PSD)
+		chan->psd = reg_rule->psd;
 
 	chan->max_power = chan->max_reg_power;
 }

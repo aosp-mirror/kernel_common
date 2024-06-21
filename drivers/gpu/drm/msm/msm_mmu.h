@@ -60,5 +60,7 @@ void msm_gpummu_params(struct msm_mmu *mmu, dma_addr_t *pt_base,
 int msm_iommu_pagetable_params(struct msm_mmu *mmu, phys_addr_t *ttbr,
 		int *asid);
 struct iommu_domain_geometry *msm_iommu_get_geometry(struct msm_mmu *mmu);
+int msm_iommu_pagetable_walk(struct msm_mmu *mmu, unsigned long iova,
+			     u64 *ptes, int num_ptes);
 
 #endif /* __MSM_MMU_H__ */

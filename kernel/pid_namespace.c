@@ -321,6 +321,15 @@ int reboot_pid_ns(struct pid_namespace *pid_ns, int cmd)
 	if (pid_ns == &init_pid_ns)
 		return 0;
 
+	if (current->flags & PF_SUSPEND_TASK) {
+		/*
+		 * Attempting to signal the child_reaper won't work if it's
+		 * frozen. In this case we shutdown the system as if we were in
+		 * the init_pid_ns.
+		 */
+		return 0;
+	}
+
 	switch (cmd) {
 	case LINUX_REBOOT_CMD_RESTART2:
 	case LINUX_REBOOT_CMD_RESTART:

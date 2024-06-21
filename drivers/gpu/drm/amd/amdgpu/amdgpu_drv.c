@@ -118,6 +118,15 @@
 #define KMS_DRIVER_MINOR	54
 #define KMS_DRIVER_PATCHLEVEL	0
 
+/*
+ * amdgpu.debug module options. Are all disabled by default
+ */
+enum AMDGPU_DEBUG_MASK {
+	AMDGPU_DEBUG_VM = BIT(0),
+	AMDGPU_DEBUG_LARGEBAR = BIT(1),
+	AMDGPU_DEBUG_DISABLE_GPU_SOFT_RECOVERY = BIT(2),
+};
+
 unsigned int amdgpu_vram_limit = UINT_MAX;
 int amdgpu_vis_vram_limit;
 int amdgpu_gart_size = -1; /* auto */
@@ -140,7 +149,6 @@ int amdgpu_vm_size = -1;
 int amdgpu_vm_fragment_size = -1;
 int amdgpu_vm_block_size = -1;
 int amdgpu_vm_fault_stop;
-int amdgpu_vm_debug;
 int amdgpu_vm_update_mode = -1;
 int amdgpu_exp_hw_support;
 int amdgpu_dc = -1;
@@ -194,6 +202,9 @@ int amdgpu_use_xgmi_p2p = 1;
 int amdgpu_vcnfw_log;
 int amdgpu_sg_display = -1; /* auto */
 int amdgpu_user_partt_mode = AMDGPU_AUTO_COMPUTE_PARTITION_MODE;
+int amdgpu_umsch_mm;
+int amdgpu_seamless = -1; /* auto */
+uint amdgpu_debug_mask;
 
 static void amdgpu_drv_delayed_reset_work_handler(struct work_struct *work);
 
@@ -404,13 +415,6 @@ module_param_named(vm_block_size, amdgpu_vm_block_size, int, 0444);
  */
 MODULE_PARM_DESC(vm_fault_stop, "Stop on VM fault (0 = never (default), 1 = print first, 2 = always)");
 module_param_named(vm_fault_stop, amdgpu_vm_fault_stop, int, 0444);
-
-/**
- * DOC: vm_debug (int)
- * Debug VM handling (0 = disabled, 1 = enabled). The default is 0 (Disabled).
- */
-MODULE_PARM_DESC(vm_debug, "Debug VM handling (0 = disabled (default), 1 = enabled)");
-module_param_named(vm_debug, amdgpu_vm_debug, int, 0644);
 
 /**
  * DOC: vm_update_mode (int)
@@ -744,18 +748,6 @@ MODULE_PARM_DESC(send_sigterm,
 	"Send sigterm to HSA process on unhandled exception (0 = disable, 1 = enable)");
 
 /**
- * DOC: debug_largebar (int)
- * Set debug_largebar as 1 to enable simulating large-bar capability on non-large bar
- * system. This limits the VRAM size reported to ROCm applications to the visible
- * size, usually 256MB.
- * Default value is 0, diabled.
- */
-int debug_largebar;
-module_param(debug_largebar, int, 0444);
-MODULE_PARM_DESC(debug_largebar,
-	"Debug large-bar flag used to simulate large-bar capability on non-large bar machine (0 = disable, 1 = enable)");
-
-/**
  * DOC: halt_if_hws_hang (int)
  * Halt if HWS hang is detected. Default value, 0, disables the halt on hang.
  * Setting 1 enables halt on hang.
@@ -908,6 +900,15 @@ MODULE_PARM_DESC(sg_display, "S/G Display (-1 = auto (default), 0 = disable)");
 module_param_named(sg_display, amdgpu_sg_display, int, 0444);
 
 /**
+ * DOC: umsch_mm (int)
+ * Enable Multi Media User Mode Scheduler. This is a HW scheduling engine for VCN and VPE.
+ * (0 = disabled (default), 1 = enabled)
+ */
+MODULE_PARM_DESC(umsch_mm,
+	"Enable Multi Media User Mode Scheduler (0 = disabled (default), 1 = enabled)");
+module_param_named(umsch_mm, amdgpu_umsch_mm, int, 0444);
+
+/**
  * DOC: smu_pptable_id (int)
  * Used to override pptable id. id = 0 use VBIOS pptable.
  * id > 0 use the soft pptable with specicfied id.
@@ -937,6 +938,26 @@ module_param_named(user_partt_mode, amdgpu_user_partt_mode, uint, 0444);
  */
 module_param(enforce_isolation, bool, 0444);
 MODULE_PARM_DESC(enforce_isolation, "enforce process isolation between graphics and compute . enforce_isolation = on");
+
+/**
+ * DOC: seamless (int)
+ * Seamless boot will keep the image on the screen during the boot process.
+ */
+MODULE_PARM_DESC(seamless, "Seamless boot (-1 = auto (default), 0 = disable, 1 = enable)");
+module_param_named(seamless, amdgpu_seamless, int, 0444);
+
+/**
+ * DOC: debug_mask (uint)
+ * Debug options for amdgpu, work as a binary mask with the following options:
+ *
+ * - 0x1: Debug VM handling
+ * - 0x2: Enable simulating large-bar capability on non-large bar system. This
+ *   limits the VRAM size reported to ROCm applications to the visible
+ *   size, usually 256MB.
+ * - 0x4: Disable GPU soft recovery, always do a full reset
+ */
+MODULE_PARM_DESC(debug_mask, "debug options for amdgpu, disabled by default");
+module_param_named(debug_mask, amdgpu_debug_mask, uint, 0444);
 
 /* These devices are not supported by amdgpu.
  * They are supported by the mach64, r128, radeon drivers
@@ -2042,6 +2063,24 @@ static void amdgpu_get_secondary_funcs(struct amdgpu_device *adev)
 	}
 }
 
+static void amdgpu_init_debug_options(struct amdgpu_device *adev)
+{
+	if (amdgpu_debug_mask & AMDGPU_DEBUG_VM) {
+		pr_info("debug: VM handling debug enabled\n");
+		adev->debug_vm = true;
+	}
+
+	if (amdgpu_debug_mask & AMDGPU_DEBUG_LARGEBAR) {
+		pr_info("debug: enabled simulating large-bar capability on non-large bar system\n");
+		adev->debug_largebar = true;
+	}
+
+	if (amdgpu_debug_mask & AMDGPU_DEBUG_DISABLE_GPU_SOFT_RECOVERY) {
+		pr_info("debug: soft reset for GPU recovery disabled\n");
+		adev->debug_disable_soft_recovery = true;
+	}
+}
+
 static int amdgpu_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *ent)
 {
@@ -2222,6 +2261,8 @@ retry_init:
 			amdgpu_get_secondary_funcs(adev);
 	}
 
+	amdgpu_init_debug_options(adev);
+
 	return 0;
 
 err_pci:
@@ -2243,7 +2284,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 		pm_runtime_forbid(dev->dev);
 	}
 
-	if (adev->ip_versions[MP1_HWIP][0] == IP_VERSION(13, 0, 2) &&
+	if (amdgpu_ip_version(adev, MP1_HWIP, 0) == IP_VERSION(13, 0, 2) &&
 	    !amdgpu_sriov_vf(adev)) {
 		bool need_to_reset_gpu = false;
 
@@ -2752,7 +2793,7 @@ static const struct file_operations amdgpu_driver_kms_fops = {
 	.flush = amdgpu_flush,
 	.release = drm_release,
 	.unlocked_ioctl = amdgpu_drm_ioctl,
-	.mmap = drm_gem_mmap,
+	.mmap = amdgpu_mmap,
 	.poll = drm_poll,
 	.read = drm_read,
 #ifdef CONFIG_COMPAT

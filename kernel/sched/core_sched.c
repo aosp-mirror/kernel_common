@@ -65,7 +65,13 @@ static unsigned long sched_core_update_cookie(struct task_struct *p,
 	 * a cookie until after we've removed it, we must have core scheduling
 	 * enabled here.
 	 */
-	SCHED_WARN_ON((p->core_cookie || cookie) && !sched_core_enabled(rq));
+	/*
+     * Disable the warning that came in from upstream code. On AMD devices, core
+     * scheduling is diabled via an out of tree patch (see arch/x86/bugs.c). Thus
+     * this warning appears even though the condition is valid.
+     *
+     * SCHED_WARN_ON((p->core_cookie || cookie) && !sched_core_enabled(rq));
+     */
 
 	if (sched_core_enqueued(p))
 		sched_core_dequeue(rq, p, DEQUEUE_SAVE);
@@ -144,6 +150,9 @@ int sched_core_share_pid(unsigned int cmd, pid_t pid, enum pid_type type,
 	if (type > PIDTYPE_PGID || cmd >= PR_SCHED_CORE_MAX || pid < 0 ||
 	    (cmd != PR_SCHED_CORE_GET && uaddr))
 		return -EINVAL;
+
+	if (!static_branch_likely(&sched_coresched_supported))
+		return 0;
 
 	rcu_read_lock();
 	if (pid == 0) {

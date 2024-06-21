@@ -29,6 +29,7 @@
 #include <asm/kvm_asm.h>
 
 #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+#define __KVM_HAVE_ARCH_VCPU_DEBUGFS
 
 #define KVM_HALT_POLL_NS_DEFAULT 500000
 

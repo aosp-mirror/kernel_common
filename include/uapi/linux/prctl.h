@@ -155,6 +155,9 @@ struct prctl_mm_map {
 #define PR_SET_PTRACER 0x59616d61
 # define PR_SET_PTRACER_ANY ((unsigned long)-1)
 
+#define PR_ALT_SYSCALL 0x43724f53
+# define PR_ALT_SYSCALL_SET_SYSCALL_TABLE 1
+
 #define PR_SET_CHILD_SUBREAPER	36
 #define PR_GET_CHILD_SUBREAPER	37
 

@@ -163,6 +163,16 @@ static unsigned int sysctl_sched_cfs_bandwidth_slice		= 5000UL;
 static unsigned int sysctl_numa_balancing_promote_rate_limit = 65536;
 #endif
 
+#ifdef CONFIG_SMP
+/*
+ * The minimum load balance interval in jiffies that must pass before a
+ * a periodic or nohz-idle balance happens.
+ */
+static unsigned long __read_mostly sysctl_sched_min_load_balance_interval = 1UL;
+
+DEFINE_STATIC_KEY_TRUE(sched_aggressive_next_balance);
+#endif
+
 #ifdef CONFIG_SYSCTL
 static struct ctl_table sched_fair_sysctls[] = {
 	{
@@ -192,6 +202,22 @@ static struct ctl_table sched_fair_sysctls[] = {
 		.extra1		= SYSCTL_ZERO,
 	},
 #endif /* CONFIG_NUMA_BALANCING */
+
+#ifdef CONFIG_SMP
+	{
+		.procname	= "sched_min_load_balance_interval",
+		.data		= &sysctl_sched_min_load_balance_interval,
+		.maxlen		= sizeof(unsigned long),
+		.mode		= 0644,
+		.proc_handler	= proc_doulongvec_minmax,
+	},
+	{
+		.procname       = "sched_aggressive_next_balance",
+		.data           = &sched_aggressive_next_balance.key,
+		.mode           = 0644,
+		.proc_handler   = proc_do_static_key,
+	},
+#endif
 	{}
 };
 
@@ -4728,14 +4754,16 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf);
 
 static inline unsigned long task_util(struct task_struct *p)
 {
-	return READ_ONCE(p->se.avg.util_avg);
+	return max(READ_ONCE(p->se.avg.util_avg),
+			READ_ONCE(p->se.avg.util_guest));
 }
 
 static inline unsigned long _task_util_est(struct task_struct *p)
 {
 	struct util_est ue = READ_ONCE(p->se.avg.util_est);
 
-	return max(ue.ewma, (ue.enqueued & ~UTIL_AVG_UNCHANGED));
+	return max_t(unsigned long, READ_ONCE(p->se.avg.util_guest),
+			max(ue.ewma, (ue.enqueued & ~UTIL_AVG_UNCHANGED)));
 }
 
 static inline unsigned long task_util_est(struct task_struct *p)
@@ -6638,6 +6666,17 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	 */
 	util_est_enqueue(&rq->cfs, p);
 
+#ifdef CONFIG_SMP
+	/*
+	 * The normal code path for host thread enqueue doesn't take into
+	 * account guest task migrations when updating cpufreq util.
+	 * So, always update the cpufreq when a vCPU thread has a
+	 * non-zero util_guest value.
+	 */
+	if (READ_ONCE(p->se.avg.util_guest))
+		cpufreq_update_util(rq, 0);
+#endif
+
 	/*
 	 * If in_iowait is set, the code below may not trigger any cpufreq
 	 * utilization updates, so do it here explicitly with the IOWAIT flag
@@ -6801,7 +6840,6 @@ static struct {
 	cpumask_var_t idle_cpus_mask;
 	atomic_t nr_cpus;
 	int has_blocked;		/* Idle CPUS has blocked load */
-	int needs_update;		/* Newly idle CPUs need their next_balance collated */
 	unsigned long next_balance;     /* in jiffy units */
 	unsigned long next_blocked;	/* Next update of blocked load in jiffies */
 } nohz ____cacheline_aligned;
@@ -7859,11 +7897,16 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sy
 	unsigned long prev_delta = ULONG_MAX, best_delta = ULONG_MAX;
 	unsigned long p_util_min = uclamp_is_used() ? uclamp_eff_value(p, UCLAMP_MIN) : 0;
 	unsigned long p_util_max = uclamp_is_used() ? uclamp_eff_value(p, UCLAMP_MAX) : 1024;
+	int max_spare_cap_cpu_ls = prev_cpu, best_idle_cpu = -1;
+	unsigned long max_spare_cap_ls = 0, target_cap;
 	struct root_domain *rd = this_rq()->rd;
 	int cpu, best_energy_cpu, target = -1;
 	int prev_fits = -1, best_fits = -1;
 	unsigned long best_thermal_cap = 0;
 	unsigned long prev_thermal_cap = 0;
+	bool boosted, latency_sensitive = false;
+	unsigned int min_exit_lat = UINT_MAX;
+	struct cpuidle_state *idle;
 	struct sched_domain *sd;
 	struct perf_domain *pd;
 	struct energy_env eenv;
@@ -7888,6 +7931,12 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sy
 		return cpu;
 	}
 
+	cpu = smp_processor_id();
+	if (sync && cpumask_test_cpu(cpu, p->cpus_ptr)) {
+		rcu_read_unlock();
+		return cpu;
+	}
+
 	/*
 	 * Energy-aware wake-up happens on the lowest sched_domain starting
 	 * from sd_asym_cpucapacity spanning over this_cpu and prev_cpu.
@@ -7905,6 +7954,9 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sy
 		goto unlock;
 
 	eenv_task_busy_time(&eenv, p, prev_cpu);
+	latency_sensitive = uclamp_latency_sensitive(p);
+	boosted = uclamp_boosted(p);
+	target_cap = boosted ? 0 : ULONG_MAX;
 
 	for (; pd; pd = pd->next) {
 		unsigned long util_min = p_util_min, util_max = p_util_max;
@@ -7970,7 +8022,7 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sy
 
 			lsub_positive(&cpu_cap, util);
 
-			if (cpu == prev_cpu) {
+			if (!latency_sensitive && cpu == prev_cpu) {
 				/* Always use prev_cpu as a candidate. */
 				prev_spare_cap = cpu_cap;
 				prev_fits = fits;
@@ -7985,9 +8037,32 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sy
 				max_spare_cap_cpu = cpu;
 				max_fits = fits;
 			}
+
+			if (!latency_sensitive)
+				continue;
+
+			if (idle_cpu(cpu)) {
+				cpu_cap = capacity_orig_of(cpu);
+				if (boosted && cpu_cap < target_cap)
+					continue;
+				if (!boosted && cpu_cap > target_cap)
+					continue;
+				idle = idle_get_state(cpu_rq(cpu));
+				if (idle && idle->exit_latency > min_exit_lat &&
+						cpu_cap == target_cap)
+					continue;
+
+				if (idle)
+					min_exit_lat = idle->exit_latency;
+				target_cap = cpu_cap;
+				best_idle_cpu = cpu;
+			} else if (cpu_cap > max_spare_cap_ls) {
+				max_spare_cap_ls = cpu_cap;
+				max_spare_cap_cpu_ls = cpu;
+			}
 		}
 
-		if (max_spare_cap_cpu < 0 && prev_spare_cap < 0)
+		if (!latency_sensitive && max_spare_cap_cpu < 0 && prev_spare_cap < 0)
 			continue;
 
 		eenv_pd_busy_time(&eenv, cpus, p);
@@ -8042,6 +8117,9 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sy
 		}
 	}
 	rcu_read_unlock();
+
+	if (latency_sensitive)
+		return best_idle_cpu >= 0 ? best_idle_cpu : max_spare_cap_cpu_ls;
 
 	if ((best_fits > prev_fits) ||
 	    ((best_fits > 0) && (best_delta < prev_delta)) ||
@@ -9522,7 +9600,8 @@ void update_group_capacity(struct sched_domain *sd, int cpu)
 	unsigned long interval;
 
 	interval = msecs_to_jiffies(sd->balance_interval);
-	interval = clamp(interval, 1UL, max_load_balance_interval);
+	interval = clamp(interval, sysctl_sched_min_load_balance_interval,
+			 max_load_balance_interval);
 	sdg->sgc->next_update = jiffies + interval;
 
 	if (!child) {
@@ -11962,9 +12041,6 @@ static void nohz_balancer_kick(struct rq *rq)
 unlock:
 	rcu_read_unlock();
 out:
-	if (READ_ONCE(nohz.needs_update))
-		flags |= NOHZ_NEXT_KICK;
-
 	if (flags)
 		kick_ilb(flags);
 }
@@ -12061,13 +12137,12 @@ void nohz_balance_enter_idle(int cpu)
 	/*
 	 * Ensures that if nohz_idle_balance() fails to observe our
 	 * @idle_cpus_mask store, it must observe the @has_blocked
-	 * and @needs_update stores.
+	 * store.
 	 */
 	smp_mb__after_atomic();
 
 	set_cpu_sd_state_idle(cpu);
 
-	WRITE_ONCE(nohz.needs_update, 1);
 out:
 	/*
 	 * Each time a cpu enter idle, we assume that it has blocked load and
@@ -12115,17 +12190,13 @@ static void _nohz_idle_balance(struct rq *this_rq, unsigned int flags)
 	/*
 	 * We assume there will be no idle load after this update and clear
 	 * the has_blocked flag. If a cpu enters idle in the mean time, it will
-	 * set the has_blocked flag and trigger another update of idle load.
+	 * set the has_blocked flag and trig another update of idle load.
 	 * Because a cpu that becomes idle, is added to idle_cpus_mask before
 	 * setting the flag, we are sure to not clear the state and not
 	 * check the load of an idle cpu.
-	 *
-	 * Same applies to idle_cpus_mask vs needs_update.
 	 */
 	if (flags & NOHZ_STATS_KICK)
 		WRITE_ONCE(nohz.has_blocked, 0);
-	if (flags & NOHZ_NEXT_KICK)
-		WRITE_ONCE(nohz.needs_update, 0);
 
 	/*
 	 * Ensures that if we miss the CPU, we must see the has_blocked
@@ -12149,8 +12220,6 @@ static void _nohz_idle_balance(struct rq *this_rq, unsigned int flags)
 		if (need_resched()) {
 			if (flags & NOHZ_STATS_KICK)
 				has_blocked_load = true;
-			if (flags & NOHZ_NEXT_KICK)
-				WRITE_ONCE(nohz.needs_update, 1);
 			goto abort;
 		}
 
@@ -12332,7 +12401,7 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 	if (!READ_ONCE(this_rq->rd->overload) ||
 	    (sd && this_rq->avg_idle < sd->max_newidle_lb_cost)) {
 
-		if (sd)
+		if (static_branch_likely(&sched_aggressive_next_balance) && sd)
 			update_next_balance(sd, &next_balance);
 		rcu_read_unlock();
 
@@ -12350,7 +12419,8 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 		int continue_balancing = 1;
 		u64 domain_cost;
 
-		update_next_balance(sd, &next_balance);
+		if (static_branch_likely(&sched_aggressive_next_balance))
+			update_next_balance(sd, &next_balance);
 
 		if (this_rq->avg_idle < curr_cost + sd->max_newidle_lb_cost)
 			break;
@@ -12364,6 +12434,10 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 			t1 = sched_clock_cpu(this_cpu);
 			domain_cost = t1 - t0;
 			update_newidle_cost(sd, domain_cost);
+			if (!static_branch_likely(&sched_aggressive_next_balance)) {
+				sd->last_balance = jiffies;
+				update_next_balance(sd, &next_balance);
+			}
 
 			curr_cost += domain_cost;
 			t0 = t1;

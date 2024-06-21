@@ -38,7 +38,9 @@
 #include "t7xx_mhccif.h"
 #include "t7xx_modem_ops.h"
 #include "t7xx_pci.h"
+#include "t7xx_pci_rescan.h"
 #include "t7xx_pcie_mac.h"
+#include "t7xx_port_devlink.h"
 #include "t7xx_reg.h"
 #include "t7xx_state_monitor.h"
 
@@ -57,6 +59,26 @@ enum t7xx_pm_state {
 	MTK_PM_INIT,		/* Device initialized, but handshake not completed */
 	MTK_PM_SUSPENDED,
 	MTK_PM_RESUMED,
+};
+
+static ssize_t cold_reboot_store(struct device *dev, struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	t7xx_rescan_queue_work(pdev, true);
+	return count;
+}
+
+static DEVICE_ATTR_WO(cold_reboot);
+
+static struct attribute *cold_reboot_attr[] = {
+	&dev_attr_cold_reboot.attr,
+	NULL
+};
+
+static const struct attribute_group cold_reboot_attribute_group = {
+	.attrs = cold_reboot_attr,
 };
 
 static void t7xx_dev_set_sleep_capability(struct t7xx_pci_dev *t7xx_dev, bool enable)
@@ -108,7 +130,7 @@ static int t7xx_pci_pm_init(struct t7xx_pci_dev *t7xx_dev)
 	pm_runtime_set_autosuspend_delay(&pdev->dev, PM_AUTOSUSPEND_MS);
 	pm_runtime_use_autosuspend(&pdev->dev);
 
-	return t7xx_wait_pm_config(t7xx_dev);
+	return 0;
 }
 
 void t7xx_pci_pm_init_late(struct t7xx_pci_dev *t7xx_dev)
@@ -723,22 +745,40 @@ static int t7xx_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	t7xx_pci_infracfg_ao_calc(t7xx_dev);
 	t7xx_mhccif_init(t7xx_dev);
 
-	ret = t7xx_md_init(t7xx_dev);
+	ret = t7xx_devlink_register(t7xx_dev);
 	if (ret)
 		return ret;
 
+	ret = t7xx_md_init(t7xx_dev);
+	if (ret)
+		goto err_devlink_unregister;
+
 	t7xx_pcie_mac_interrupts_dis(t7xx_dev);
+
+	ret = sysfs_create_group(&t7xx_dev->pdev->dev.kobj,
+				 &cold_reboot_attribute_group);
+	if (ret) {
+		t7xx_md_exit(t7xx_dev);
+		goto err_devlink_unregister;
+	}
 
 	ret = t7xx_interrupt_init(t7xx_dev);
 	if (ret) {
+		sysfs_remove_group(&t7xx_dev->pdev->dev.kobj,
+				   &cold_reboot_attribute_group);
 		t7xx_md_exit(t7xx_dev);
-		return ret;
+		goto err_devlink_unregister;
 	}
 
+	t7xx_rescan_done();
 	t7xx_pcie_mac_set_int(t7xx_dev, MHCCIF_INT);
 	t7xx_pcie_mac_interrupts_en(t7xx_dev);
 
 	return 0;
+
+err_devlink_unregister:
+	t7xx_devlink_unregister(t7xx_dev);
+	return ret;
 }
 
 static void t7xx_pci_remove(struct pci_dev *pdev)
@@ -748,6 +788,10 @@ static void t7xx_pci_remove(struct pci_dev *pdev)
 
 	t7xx_dev = pci_get_drvdata(pdev);
 	t7xx_md_exit(t7xx_dev);
+	t7xx_devlink_unregister(t7xx_dev);
+
+	sysfs_remove_group(&t7xx_dev->pdev->dev.kobj,
+			   &cold_reboot_attribute_group);
 
 	for (i = 0; i < EXT_INT_NUM; i++) {
 		if (!t7xx_dev->intr_handler[i])
@@ -774,7 +818,59 @@ static struct pci_driver t7xx_pci_driver = {
 	.shutdown = t7xx_pci_shutdown,
 };
 
-module_pci_driver(t7xx_pci_driver);
+static int __init t7xx_pci_init(void)
+{
+	int ret;
+
+	t7xx_pci_dev_rescan();
+	ret = t7xx_rescan_init();
+	if (ret) {
+		pr_err("Failed to init t7xx rescan work\n");
+		return ret;
+	}
+
+	return pci_register_driver(&t7xx_pci_driver);
+}
+module_init(t7xx_pci_init);
+
+static int t7xx_always_match(struct device *dev, const void *data)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	const struct pci_device_id *id = data;
+
+	if (pci_match_id(id, pdev))
+		return 1;
+
+	return 0;
+}
+
+static void __exit t7xx_pci_cleanup(void)
+{
+	int remove_flag = 0;
+	struct device *dev;
+
+	dev = driver_find_device(&t7xx_pci_driver.driver, NULL, &t7xx_pci_table[0],
+				 t7xx_always_match);
+	if (dev) {
+		pr_debug("unregister t7xx PCIe driver while device is still exist.\n");
+		put_device(dev);
+		remove_flag = 1;
+	} else {
+		pr_debug("no t7xx PCIe driver found.\n");
+	}
+
+	pci_lock_rescan_remove();
+	pci_unregister_driver(&t7xx_pci_driver);
+	pci_unlock_rescan_remove();
+
+	t7xx_rescan_deinit();
+	if (remove_flag) {
+		pr_debug("remove t7xx PCI device\n");
+		pci_stop_and_remove_bus_device_locked(to_pci_dev(dev));
+	}
+}
+
+module_exit(t7xx_pci_cleanup);
 
 MODULE_AUTHOR("MediaTek Inc");
 MODULE_DESCRIPTION("MediaTek PCIe 5G WWAN modem T7xx driver");

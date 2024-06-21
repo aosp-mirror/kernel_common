@@ -32,6 +32,7 @@
 
 #include "i915_drv.h"
 #include "i915_reg.h"
+#include "i915_irq.h"
 #include "i915_trace.h"
 
 /**
@@ -233,6 +234,13 @@ set_context_destroyed(struct intel_context *ce)
 {
 	lockdep_assert_held(&ce->guc_state.lock);
 	ce->guc_state.sched_state |= SCHED_STATE_DESTROYED;
+}
+
+static inline void
+clr_context_destroyed(struct intel_context *ce)
+{
+	lockdep_assert_held(&ce->guc_state.lock);
+	ce->guc_state.sched_state &= ~SCHED_STATE_DESTROYED;
 }
 
 static inline bool context_pending_disable(struct intel_context *ce)
@@ -612,6 +620,8 @@ static int guc_submission_send_busy_loop(struct intel_guc *guc,
 					 u32 g2h_len_dw,
 					 bool loop)
 {
+	int ret;
+
 	/*
 	 * We always loop when a send requires a reply (i.e. g2h_len_dw > 0),
 	 * so we don't handle the case where we don't get a reply because we
@@ -622,7 +632,11 @@ static int guc_submission_send_busy_loop(struct intel_guc *guc,
 	if (g2h_len_dw)
 		atomic_inc(&guc->outstanding_submission_g2h);
 
-	return intel_guc_send_busy_loop(guc, action, len, g2h_len_dw, loop);
+	ret = intel_guc_send_busy_loop(guc, action, len, g2h_len_dw, loop);
+	if (ret)
+		atomic_dec(&guc->outstanding_submission_g2h);
+
+	return ret;
 }
 
 int intel_guc_wait_for_pending_msg(struct intel_guc *guc,
@@ -1610,6 +1624,11 @@ static void guc_flush_submissions(struct intel_guc *guc)
 	spin_unlock_irqrestore(&sched_engine->lock, flags);
 }
 
+void intel_guc_submission_flush_work(struct intel_guc *guc)
+{
+	flush_work(&guc->submission_state.destroyed_worker);
+}
+
 static void guc_flush_destroyed_contexts(struct intel_guc *guc);
 
 void intel_guc_submission_reset_prepare(struct intel_guc *guc)
@@ -1796,6 +1815,20 @@ next_context:
 	intel_context_put(parent);
 }
 
+void wake_up_all_tlb_invalidate(struct intel_guc *guc)
+{
+	struct intel_guc_tlb_wait *wait;
+	unsigned long i;
+
+	if (!intel_guc_tlb_invalidation_is_available(guc))
+		return;
+
+	xa_lock_irq(&guc->tlb_lookup);
+	xa_for_each(&guc->tlb_lookup, i, wait)
+		wake_up(&wait->wq);
+	xa_unlock_irq(&guc->tlb_lookup);
+}
+
 void intel_guc_submission_reset(struct intel_guc *guc, intel_engine_mask_t stalled)
 {
 	struct intel_context *ce;
@@ -1921,6 +1954,12 @@ void intel_guc_submission_cancel_requests(struct intel_guc *guc)
 
 	/* GuC is blown away, drop all references to contexts */
 	xa_destroy(&guc->context_lookup);
+
+	/*
+	 * Wedged GT won't respond to any TLB invalidation request. Simply
+	 * release all the blocked waiters.
+	 */
+	wake_up_all_tlb_invalidate(guc);
 }
 
 void intel_guc_submission_reset_finish(struct intel_guc *guc)
@@ -1943,10 +1982,64 @@ void intel_guc_submission_reset_finish(struct intel_guc *guc)
 	intel_guc_global_policies_update(guc);
 	enable_submission(guc);
 	intel_gt_unpark_heartbeats(guc_to_gt(guc));
+
+	/*
+	 * The full GT reset will have cleared the TLB caches and flushed the
+	 * G2H message queue; we can release all the blocked waiters.
+	 */
+	wake_up_all_tlb_invalidate(guc);
 }
 
 static void destroyed_worker_func(struct work_struct *w);
 static void reset_fail_worker_func(struct work_struct *w);
+
+bool intel_guc_tlb_invalidation_is_available(struct intel_guc *guc)
+{
+	return HAS_GUC_TLB_INVALIDATION(guc_to_gt(guc)->i915) &&
+		intel_guc_is_ready(guc);
+}
+
+static int init_tlb_lookup(struct intel_guc *guc)
+{
+	struct intel_guc_tlb_wait *wait;
+	int err;
+
+	if (!HAS_GUC_TLB_INVALIDATION(guc_to_gt(guc)->i915))
+		return 0;
+
+	xa_init_flags(&guc->tlb_lookup, XA_FLAGS_ALLOC);
+
+	wait = kzalloc(sizeof(*wait), GFP_KERNEL);
+	if (!wait)
+		return -ENOMEM;
+
+	init_waitqueue_head(&wait->wq);
+
+	/* Preallocate a shared id for use under memory pressure. */
+	err = xa_alloc_cyclic_irq(&guc->tlb_lookup, &guc->serial_slot, wait,
+				  xa_limit_32b, &guc->next_seqno, GFP_KERNEL);
+	if (err < 0) {
+		kfree(wait);
+		return err;
+	}
+
+	return 0;
+}
+
+static void fini_tlb_lookup(struct intel_guc *guc)
+{
+	struct intel_guc_tlb_wait *wait;
+
+	if (!HAS_GUC_TLB_INVALIDATION(guc_to_gt(guc)->i915))
+		return;
+
+	wait = xa_load(&guc->tlb_lookup, guc->serial_slot);
+	if (wait && wait->busy)
+		guc_err(guc, "Unexpected busy item in tlb_lookup on fini\n");
+	kfree(wait);
+
+	xa_destroy(&guc->tlb_lookup);
+}
 
 /*
  * Set up the memory resources to be shared with the GuC (via the GGTT)
@@ -1966,11 +2059,15 @@ int intel_guc_submission_init(struct intel_guc *guc)
 			return ret;
 	}
 
+	ret = init_tlb_lookup(guc);
+	if (ret)
+		goto destroy_pool;
+
 	guc->submission_state.guc_ids_bitmap =
 		bitmap_zalloc(NUMBER_MULTI_LRC_GUC_ID(guc), GFP_KERNEL);
 	if (!guc->submission_state.guc_ids_bitmap) {
 		ret = -ENOMEM;
-		goto destroy_pool;
+		goto destroy_tlb;
 	}
 
 	guc->timestamp.ping_delay = (POLL_TIME_CLKS / gt->clock_frequency + 1) * HZ;
@@ -1979,9 +2076,10 @@ int intel_guc_submission_init(struct intel_guc *guc)
 
 	return 0;
 
+destroy_tlb:
+	fini_tlb_lookup(guc);
 destroy_pool:
 	guc_lrc_desc_pool_destroy_v69(guc);
-
 	return ret;
 }
 
@@ -1994,6 +2092,7 @@ void intel_guc_submission_fini(struct intel_guc *guc)
 	guc_lrc_desc_pool_destroy_v69(guc);
 	i915_sched_engine_put(guc->sched_engine);
 	bitmap_free(guc->submission_state.guc_ids_bitmap);
+	fini_tlb_lookup(guc);
 	guc->submission_initialized = false;
 }
 
@@ -3200,12 +3299,13 @@ static void guc_context_close(struct intel_context *ce)
 	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 }
 
-static inline void guc_lrc_desc_unpin(struct intel_context *ce)
+static inline int guc_lrc_desc_unpin(struct intel_context *ce)
 {
 	struct intel_guc *guc = ce_to_guc(ce);
 	struct intel_gt *gt = guc_to_gt(guc);
 	unsigned long flags;
 	bool disabled;
+	int ret;
 
 	GEM_BUG_ON(!intel_gt_pm_is_awake(gt));
 	GEM_BUG_ON(!ctx_id_mapped(guc, ce->guc_id.id));
@@ -3216,18 +3316,41 @@ static inline void guc_lrc_desc_unpin(struct intel_context *ce)
 	spin_lock_irqsave(&ce->guc_state.lock, flags);
 	disabled = submission_disabled(guc);
 	if (likely(!disabled)) {
+		/*
+		 * Take a gt-pm ref and change context state to be destroyed.
+		 * NOTE: a G2H IRQ that comes after will put this gt-pm ref back
+		 */
 		__intel_gt_pm_get(gt);
 		set_context_destroyed(ce);
 		clr_context_registered(ce);
 	}
 	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
 	if (unlikely(disabled)) {
 		release_guc_id(guc, ce);
 		__guc_context_destroy(ce);
-		return;
+		return 0;
 	}
 
-	deregister_context(ce, ce->guc_id.id);
+	/*
+	 * GuC is active, lets destroy this context, but at this point we can still be racing
+	 * with suspend, so we undo everything if the H2G fails in deregister_context so
+	 * that GuC reset will find this context during clean up.
+	 */
+	ret = deregister_context(ce, ce->guc_id.id);
+	if (ret) {
+		spin_lock(&ce->guc_state.lock);
+		set_context_registered(ce);
+		clr_context_destroyed(ce);
+		spin_unlock(&ce->guc_state.lock);
+		/*
+		 * As gt-pm is awake at function entry, intel_wakeref_put_async merely decrements
+		 * the wakeref immediately but per function spec usage call this after unlock.
+		 */
+		intel_wakeref_put_async(&gt->wakeref);
+	}
+
+	return ret;
 }
 
 static void __guc_context_destroy(struct intel_context *ce)
@@ -3295,7 +3418,22 @@ static void deregister_destroyed_contexts(struct intel_guc *guc)
 		if (!ce)
 			break;
 
-		guc_lrc_desc_unpin(ce);
+		if (guc_lrc_desc_unpin(ce)) {
+			/*
+			 * This means GuC's CT link severed mid-way which could happen
+			 * in suspend-resume corner cases. In this case, put the
+			 * context back into the destroyed_contexts list which will
+			 * get picked up on the next context deregistration event or
+			 * purged in a GuC sanitization event (reset/unload/wedged/...).
+			 */
+			spin_lock_irqsave(&guc->submission_state.lock, flags);
+			list_add_tail(&ce->destroyed_link,
+				      &guc->submission_state.destroyed_contexts);
+			spin_unlock_irqrestore(&guc->submission_state.lock, flags);
+			/* Bail now since the list might never be emptied if h2gs fail */
+			break;
+		}
+
 	}
 }
 
@@ -3305,6 +3443,17 @@ static void destroyed_worker_func(struct work_struct *w)
 					     submission_state.destroyed_worker);
 	struct intel_gt *gt = guc_to_gt(guc);
 	int tmp;
+
+	/*
+	 * In rare cases we can get here via async context-free fence-signals that
+	 * come very late in suspend flow or very early in resume flows. In these
+	 * cases, GuC won't be ready but just skipping it here is fine as these
+	 * pending-destroy-contexts get destroyed totally at GuC reset time at the
+	 * end of suspend.. OR.. this worker can be picked up later on the next
+	 * context destruction trigger after resume-completes
+	 */
+	if (!intel_guc_is_ready(guc))
+		return;
 
 	with_intel_gt_pm(gt, tmp)
 		deregister_destroyed_contexts(guc);
@@ -4624,6 +4773,154 @@ g2h_context_lookup(struct intel_guc *guc, u32 ctx_id)
 	return ce;
 }
 
+static void wait_wake_outstanding_tlb_g2h(struct intel_guc *guc, u32 seqno)
+{
+	struct intel_guc_tlb_wait *wait;
+	unsigned long flags;
+
+	xa_lock_irqsave(&guc->tlb_lookup, flags);
+	wait = xa_load(&guc->tlb_lookup, seqno);
+
+	if (wait)
+		wake_up(&wait->wq);
+	else
+		guc_dbg(guc,
+			"Stale TLB invalidation response with seqno %d\n", seqno);
+
+	xa_unlock_irqrestore(&guc->tlb_lookup, flags);
+}
+
+int intel_guc_tlb_invalidation_done(struct intel_guc *guc,
+				    const u32 *payload, u32 len)
+{
+	if (len < 1)
+		return -EPROTO;
+
+	wait_wake_outstanding_tlb_g2h(guc, payload[0]);
+	return 0;
+}
+
+static long must_wait_woken(struct wait_queue_entry *wq_entry, long timeout)
+{
+	/*
+	 * This is equivalent to wait_woken() with the exception that
+	 * we do not wake up early if the kthread task has been completed.
+	 * As we are called from page reclaim in any task context,
+	 * we may be invoked from stopped kthreads, but we *must*
+	 * complete the wait from the HW.
+	 */
+	do {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		if (wq_entry->flags & WQ_FLAG_WOKEN)
+			break;
+
+		timeout = schedule_timeout(timeout);
+	} while (timeout);
+
+	/* See wait_woken() and woken_wake_function() */
+	__set_current_state(TASK_RUNNING);
+	smp_store_mb(wq_entry->flags, wq_entry->flags & ~WQ_FLAG_WOKEN);
+
+	return timeout;
+}
+
+static bool intel_gt_is_enabled(const struct intel_gt *gt)
+{
+	/* Check if GT is wedged or suspended */
+	if (intel_gt_is_wedged(gt) || !intel_irqs_enabled(gt->i915))
+		return false;
+	return true;
+}
+
+static int guc_send_invalidate_tlb(struct intel_guc *guc,
+				   enum intel_guc_tlb_invalidation_type type)
+{
+	struct intel_guc_tlb_wait _wq, *wq = &_wq;
+	struct intel_gt *gt = guc_to_gt(guc);
+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
+	int err;
+	u32 seqno;
+	u32 action[] = {
+		INTEL_GUC_ACTION_TLB_INVALIDATION,
+		0,
+		REG_FIELD_PREP(INTEL_GUC_TLB_INVAL_TYPE_MASK, type) |
+			REG_FIELD_PREP(INTEL_GUC_TLB_INVAL_MODE_MASK,
+				       INTEL_GUC_TLB_INVAL_MODE_HEAVY) |
+			INTEL_GUC_TLB_INVAL_FLUSH_CACHE,
+	};
+	u32 size = ARRAY_SIZE(action);
+
+	/*
+	 * Early guard against GT enablement.  TLB invalidation should not be
+	 * attempted if the GT is disabled due to suspend/wedge.
+	 */
+	if (!intel_gt_is_enabled(gt))
+		return -EINVAL;
+
+	init_waitqueue_head(&_wq.wq);
+
+	if (xa_alloc_cyclic_irq(&guc->tlb_lookup, &seqno, wq,
+				xa_limit_32b, &guc->next_seqno,
+				GFP_ATOMIC | __GFP_NOWARN) < 0) {
+		/* Under severe memory pressure? Serialise TLB allocations */
+		xa_lock_irq(&guc->tlb_lookup);
+		wq = xa_load(&guc->tlb_lookup, guc->serial_slot);
+		wait_event_lock_irq(wq->wq,
+				    !READ_ONCE(wq->busy),
+				    guc->tlb_lookup.xa_lock);
+		/*
+		 * Update wq->busy under lock to ensure only one waiter can
+		 * issue the TLB invalidation command using the serial slot at a
+		 * time. The condition is set to true before releasing the lock
+		 * so that other caller continue to wait until woken up again.
+		 */
+		wq->busy = true;
+		xa_unlock_irq(&guc->tlb_lookup);
+
+		seqno = guc->serial_slot;
+	}
+
+	action[1] = seqno;
+
+	add_wait_queue(&wq->wq, &wait);
+
+	/* This is a critical reclaim path and thus we must loop here. */
+	err = intel_guc_send_busy_loop(guc, action, size, G2H_LEN_DW_INVALIDATE_TLB, true);
+	if (err)
+		goto out;
+
+	/*
+	 * Late guard against GT enablement.  It is not an error for the TLB
+	 * invalidation to time out if the GT is disabled during the process
+	 * due to suspend/wedge.  In fact, the TLB invalidation is cancelled
+	 * in this case.
+	 */
+	if (!must_wait_woken(&wait, intel_guc_ct_max_queue_time_jiffies()) &&
+	    intel_gt_is_enabled(gt)) {
+		guc_err(guc,
+			"TLB invalidation response timed out for seqno %u\n", seqno);
+		err = -ETIME;
+	}
+out:
+	remove_wait_queue(&wq->wq, &wait);
+	if (seqno != guc->serial_slot)
+		xa_erase_irq(&guc->tlb_lookup, seqno);
+
+	return err;
+}
+
+/* Send a H2G command to invalidate the TLBs at engine level and beyond. */
+int intel_guc_invalidate_tlb_engines(struct intel_guc *guc)
+{
+	return guc_send_invalidate_tlb(guc, INTEL_GUC_TLB_INVAL_ENGINES);
+}
+
+/* Send a H2G command to invalidate the GuC's internal TLB. */
+int intel_guc_invalidate_tlb_guc(struct intel_guc *guc)
+{
+	return guc_send_invalidate_tlb(guc, INTEL_GUC_TLB_INVAL_GUC);
+}
+
 int intel_guc_deregister_done_process_msg(struct intel_guc *guc,
 					  const u32 *msg,
 					  u32 len)
@@ -4803,19 +5100,19 @@ static void guc_context_replay(struct intel_context *ce)
 static void guc_handle_context_reset(struct intel_guc *guc,
 				     struct intel_context *ce)
 {
+	bool capture = intel_context_is_schedulable(ce);
+
 	trace_intel_context_reset(ce);
 
-	guc_dbg(guc, "Got context reset notification: 0x%04X on %s, exiting = %s, banned = %s\n",
+	guc_dbg(guc, "%s context reset notification: 0x%04X on %s, exiting = %s, banned = %s\n",
+		capture ? "Got" : "Ignoring",
 		ce->guc_id.id, ce->engine->name,
 		str_yes_no(intel_context_is_exiting(ce)),
 		str_yes_no(intel_context_is_banned(ce)));
 
-	if (likely(intel_context_is_schedulable(ce))) {
+	if (capture) {
 		capture_error_state(guc, ce);
 		guc_context_replay(ce);
-	} else {
-		guc_info(guc, "Ignoring context reset notification of exiting context 0x%04X on %s",
-			 ce->guc_id.id, ce->engine->name);
 	}
 }
 

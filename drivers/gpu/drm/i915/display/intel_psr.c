@@ -32,6 +32,7 @@
 #include "intel_display_types.h"
 #include "intel_dp.h"
 #include "intel_dp_aux.h"
+#include "intel_frontbuffer.h"
 #include "intel_hdmi.h"
 #include "intel_psr.h"
 #include "intel_psr_regs.h"
@@ -177,9 +178,9 @@ static bool psr_global_enabled(struct intel_dp *intel_dp)
 
 	switch (intel_dp->psr.debug & I915_PSR_DEBUG_MODE_MASK) {
 	case I915_PSR_DEBUG_DEFAULT:
-		if (i915->params.enable_psr == -1)
+		if (i915->display.params.enable_psr == -1)
 			return connector->panel.vbt.psr.enable;
-		return i915->params.enable_psr;
+		return i915->display.params.enable_psr;
 	case I915_PSR_DEBUG_DISABLE:
 		return false;
 	default:
@@ -196,7 +197,7 @@ static bool psr2_global_enabled(struct intel_dp *intel_dp)
 	case I915_PSR_DEBUG_FORCE_PSR1:
 		return false;
 	default:
-		if (i915->params.enable_psr == 1)
+		if (i915->display.params.enable_psr == 1)
 			return false;
 		return true;
 	}
@@ -604,7 +605,7 @@ static u32 intel_psr1_get_tp_time(struct intel_dp *intel_dp)
 	if (DISPLAY_VER(dev_priv) >= 11)
 		val |= EDP_PSR_TP4_TIME_0us;
 
-	if (dev_priv->params.psr_safest_params) {
+	if (dev_priv->display.params.psr_safest_params) {
 		val |= EDP_PSR_TP1_TIME_2500us;
 		val |= EDP_PSR_TP2_TP3_TIME_2500us;
 		goto check_tp3_sel;
@@ -698,7 +699,7 @@ static u32 intel_psr2_get_tp_time(struct intel_dp *intel_dp)
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	u32 val = 0;
 
-	if (dev_priv->params.psr_safest_params)
+	if (dev_priv->display.params.psr_safest_params)
 		return EDP_PSR2_TP2_TIME_2500us;
 
 	if (connector->panel.vbt.psr.psr2_tp2_tp3_wakeup_time_us >= 0 &&
@@ -733,10 +734,10 @@ static void hsw_activate_psr2(struct intel_dp *intel_dp)
 
 	val |= EDP_PSR2_IDLE_FRAMES(psr_compute_idle_frames(intel_dp));
 
-	if (DISPLAY_VER(dev_priv) <= 13 && !IS_ALDERLAKE_P(dev_priv))
+	if (DISPLAY_VER(dev_priv) < 14 && !IS_ALDERLAKE_P(dev_priv))
 		val |= EDP_SU_TRACK_ENABLE;
 
-	if (DISPLAY_VER(dev_priv) >= 10 && DISPLAY_VER(dev_priv) <= 12)
+	if (DISPLAY_VER(dev_priv) >= 10 && DISPLAY_VER(dev_priv) < 13)
 		val |= EDP_Y_COORDINATE_ENABLE;
 
 	val |= EDP_PSR2_FRAME_BEFORE_SU(max_t(u8, intel_dp->psr.sink_sync_latency + 1, 2));
@@ -941,7 +942,7 @@ static bool intel_psr2_sel_fetch_config_valid(struct intel_dp *intel_dp,
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	if (!dev_priv->params.enable_psr2_sel_fetch &&
+	if (!dev_priv->display.params.enable_psr2_sel_fetch &&
 	    intel_dp->psr.debug != I915_PSR_DEBUG_ENABLE_SEL_FETCH) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "PSR2 sel fetch not enabled, disabled by parameter\n");
@@ -1017,7 +1018,7 @@ static bool _compute_psr2_sdp_prior_scanline_indication(struct intel_dp *intel_d
 		return true;
 
 	/* Not supported <13 / Wa_22012279113:adl-p */
-	if (DISPLAY_VER(dev_priv) <= 13 || intel_dp->edp_dpcd[0] < DP_EDP_14b)
+	if (DISPLAY_VER(dev_priv) < 14 || intel_dp->edp_dpcd[0] < DP_EDP_14b)
 		return false;
 
 	crtc_state->req_psr2_sdp_prior_scanline = true;
@@ -1054,7 +1055,7 @@ static bool _compute_psr2_wake_times(struct intel_dp *intel_dp,
 	    fast_wake_lines > max_wake_lines)
 		return false;
 
-	if (i915->params.psr_safest_params)
+	if (i915->display.params.psr_safest_params)
 		io_wake_lines = fast_wake_lines = max_wake_lines;
 
 	/* According to Bspec lower limit should be set as 7 lines. */
@@ -1111,7 +1112,7 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 	 * over PSR2.
 	 */
 	if (crtc_state->dsc.compression_enable &&
-	    (DISPLAY_VER(dev_priv) <= 13 && !IS_ALDERLAKE_P(dev_priv))) {
+	    (DISPLAY_VER(dev_priv) < 14 && !IS_ALDERLAKE_P(dev_priv))) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "PSR2 cannot be enabled since DSC is enabled\n");
 		return false;
@@ -1362,7 +1363,7 @@ static void wm_optimization_wa(struct intel_dp *intel_dp,
 	bool set_wa_bit = false;
 
 	/* Wa_14015648006 */
-	if (IS_MTL_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B0) ||
+	if (IS_DISPLAY_IP_STEP(dev_priv, IP_VER(14, 0), STEP_A0, STEP_B0) ||
 	    IS_DISPLAY_VER(dev_priv, 11, 13))
 		set_wa_bit |= crtc_state->wm_level_disabled;
 
@@ -1461,7 +1462,7 @@ static void intel_psr_enable_source(struct intel_dp *intel_dp,
 		 * All supported adlp panels have 1-based X granularity, this may
 		 * cause issues if non-supported panels are used.
 		 */
-		if (IS_MTL_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B0))
+		if (IS_DISPLAY_IP_STEP(dev_priv, IP_VER(14, 0), STEP_A0, STEP_B0))
 			intel_de_rmw(dev_priv, MTL_CHICKEN_TRANS(cpu_transcoder), 0,
 				     ADLP_1_BASED_X_GRANULARITY);
 		else if (IS_ALDERLAKE_P(dev_priv))
@@ -1469,7 +1470,7 @@ static void intel_psr_enable_source(struct intel_dp *intel_dp,
 				     ADLP_1_BASED_X_GRANULARITY);
 
 		/* Wa_16012604467:adlp,mtl[a0,b0] */
-		if (IS_MTL_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B0))
+		if (IS_DISPLAY_IP_STEP(dev_priv, IP_VER(14, 0), STEP_A0, STEP_B0))
 			intel_de_rmw(dev_priv,
 				     MTL_CLKGATE_DIS_TRANS(cpu_transcoder), 0,
 				     MTL_CLKGATE_DIS_TRANS_DMASC_GATING_DIS);
@@ -1627,7 +1628,7 @@ static void intel_psr_disable_locked(struct intel_dp *intel_dp)
 
 	if (intel_dp->psr.psr2_enabled) {
 		/* Wa_16012604467:adlp,mtl[a0,b0] */
-		if (IS_MTL_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B0))
+		if (IS_DISPLAY_IP_STEP(dev_priv, IP_VER(14, 0), STEP_A0, STEP_B0))
 			intel_de_rmw(dev_priv,
 				     MTL_CLKGATE_DIS_TRANS(cpu_transcoder),
 				     MTL_CLKGATE_DIS_TRANS_DMASC_GATING_DIS, 0);
@@ -1790,81 +1791,6 @@ static void psr_force_hw_tracking_exit(struct intel_dp *intel_dp)
 	 * than that testing will be needed.
 	 */
 	intel_de_write(dev_priv, CURSURFLIVE(intel_dp->psr.pipe), 0);
-}
-
-void intel_psr2_disable_plane_sel_fetch_arm(struct intel_plane *plane,
-					    const struct intel_crtc_state *crtc_state)
-{
-	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
-	enum pipe pipe = plane->pipe;
-
-	if (!crtc_state->enable_psr2_sel_fetch)
-		return;
-
-	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_CTL(pipe, plane->id), 0);
-}
-
-void intel_psr2_program_plane_sel_fetch_arm(struct intel_plane *plane,
-					    const struct intel_crtc_state *crtc_state,
-					    const struct intel_plane_state *plane_state)
-{
-	struct drm_i915_private *i915 = to_i915(plane->base.dev);
-	enum pipe pipe = plane->pipe;
-
-	if (!crtc_state->enable_psr2_sel_fetch)
-		return;
-
-	if (plane->id == PLANE_CURSOR)
-		intel_de_write_fw(i915, PLANE_SEL_FETCH_CTL(pipe, plane->id),
-				  plane_state->ctl);
-	else
-		intel_de_write_fw(i915, PLANE_SEL_FETCH_CTL(pipe, plane->id),
-				  PLANE_SEL_FETCH_CTL_ENABLE);
-}
-
-void intel_psr2_program_plane_sel_fetch_noarm(struct intel_plane *plane,
-					      const struct intel_crtc_state *crtc_state,
-					      const struct intel_plane_state *plane_state,
-					      int color_plane)
-{
-	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
-	enum pipe pipe = plane->pipe;
-	const struct drm_rect *clip;
-	u32 val;
-	int x, y;
-
-	if (!crtc_state->enable_psr2_sel_fetch)
-		return;
-
-	if (plane->id == PLANE_CURSOR)
-		return;
-
-	clip = &plane_state->psr2_sel_fetch_area;
-
-	val = (clip->y1 + plane_state->uapi.dst.y1) << 16;
-	val |= plane_state->uapi.dst.x1;
-	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_POS(pipe, plane->id), val);
-
-	x = plane_state->view.color_plane[color_plane].x;
-
-	/*
-	 * From Bspec: UV surface Start Y Position = half of Y plane Y
-	 * start position.
-	 */
-	if (!color_plane)
-		y = plane_state->view.color_plane[color_plane].y + clip->y1;
-	else
-		y = plane_state->view.color_plane[color_plane].y + clip->y1 / 2;
-
-	val = y << 16 | x;
-
-	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_OFFSET(pipe, plane->id),
-			  val);
-
-	/* Sizes are 0 based */
-	val = (drm_rect_height(clip) - 1) << 16;
-	val |= (drm_rect_width(&plane_state->uapi.src) >> 16) - 1;
-	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_SIZE(pipe, plane->id), val);
 }
 
 void intel_psr2_program_trans_man_trk_ctl(const struct intel_crtc_state *crtc_state)
@@ -2101,7 +2027,7 @@ int intel_psr2_sel_fetch_update(struct intel_atomic_state *state,
 		goto skip_sel_fetch_set_loop;
 
 	/* Wa_14014971492 */
-	if ((IS_MTL_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B0) ||
+	if ((IS_DISPLAY_IP_STEP(dev_priv, IP_VER(14, 0), STEP_A0, STEP_B0) ||
 	     IS_ALDERLAKE_P(dev_priv) || IS_TIGERLAKE(dev_priv)) &&
 	    crtc_state->splitter.enable)
 		pipe_clip.y1 = 0;
@@ -2126,8 +2052,19 @@ int intel_psr2_sel_fetch_update(struct intel_atomic_state *state,
 			continue;
 
 		inter = pipe_clip;
-		if (!drm_rect_intersect(&inter, &new_plane_state->uapi.dst))
+		sel_fetch_area = &new_plane_state->psr2_sel_fetch_area;
+		if (!drm_rect_intersect(&inter, &new_plane_state->uapi.dst)) {
+			sel_fetch_area->y1 = -1;
+			sel_fetch_area->y2 = -1;
+			/*
+			 * if plane sel fetch was previously enabled ->
+			 * disable it
+			 */
+			if (drm_rect_height(&old_plane_state->psr2_sel_fetch_area) > 0)
+				crtc_state->update_planes |= BIT(plane->id);
+
 			continue;
+		}
 
 		if (!psr2_sel_fetch_plane_state_supported(new_plane_state)) {
 			full_update = true;

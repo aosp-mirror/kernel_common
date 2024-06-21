@@ -350,6 +350,16 @@ static void ath11k_pci_force_wake(struct ath11k_base *ab)
 	mdelay(5);
 }
 
+static void ath11k_pci_gpio_reset(struct ath11k_base *ab)
+{
+	int val;
+
+	ath11k_pcic_write32(ab, PCIE_GPIO_CFG_REG, PCIE_GPIO_RESET_VAL);
+	mdelay(10);
+	val = ath11k_pcic_read32(ab, PCIE_GPIO_CFG_REG);
+	ath11k_dbg(ab, ATH11K_DBG_PCI, "gpio cfg: 0x%x\n", val);
+}
+
 static void ath11k_pci_sw_reset(struct ath11k_base *ab, bool power_on)
 {
 	mdelay(100);
@@ -366,6 +376,7 @@ static void ath11k_pci_sw_reset(struct ath11k_base *ab, bool power_on)
 	ath11k_pci_clear_dbg_registers(ab);
 	ath11k_pci_soc_global_reset(ab);
 	ath11k_mhi_set_mhictrl_reset(ab);
+	ath11k_pci_gpio_reset(ab);
 }
 
 static void ath11k_pci_init_qmi_ce_config(struct ath11k_base *ab)

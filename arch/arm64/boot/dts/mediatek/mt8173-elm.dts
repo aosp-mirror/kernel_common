@@ -11,5 +11,6 @@
 	chassis-type = "laptop";
 	compatible = "google,elm-rev8", "google,elm-rev7", "google,elm-rev6",
 		     "google,elm-rev5", "google,elm-rev4", "google,elm-rev3",
+		     "google,elm-rev2", "google,elm-rev1",
 		     "google,elm", "mediatek,mt8173";
 };

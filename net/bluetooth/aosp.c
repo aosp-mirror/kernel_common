@@ -208,3 +208,64 @@ int aosp_set_quality_report(struct hci_dev *hdev, bool enable)
 	else
 		return disable_quality_report(hdev);
 }
+
+#define BLUETOOTH_QUALITY_REPORT_EV		0x58
+struct bqr_data {
+	__u8 quality_report_id;
+	__u8 packet_type;
+	__le16 conn_handle;
+	__u8 conn_role;
+	__s8 tx_power_level;
+	__s8 rssi;
+	__u8 snr;
+	__u8 unused_afh_channel_count;
+	__u8 afh_select_unideal_channel_count;
+	__le16 lsto;
+	__le32 conn_piconet_clock;
+	__le32 retransmission_count;
+	__le32 no_rx_count;
+	__le32 nak_count;
+	__le32 last_tx_ack_timestamp;
+	__le32 flow_off_count;
+	__le32 last_flow_on_timestamp;
+	__le32 buffer_overflow_bytes;
+	__le32 buffer_underflow_bytes;
+
+	/* Vendor Specific Parameter */
+	__u8 vsp[0];
+} __packed;
+
+struct aosp_hci_vs_data {
+	__u8 code;
+	__u8 data[0];
+} __packed;
+
+bool aosp_is_quality_report_evt(struct sk_buff *skb)
+{
+	struct aosp_hci_vs_data *ev;
+
+	if (skb->len < sizeof(struct aosp_hci_vs_data))
+		return false;
+
+	ev = (struct aosp_hci_vs_data *)skb->data;
+
+	return ev->code == BLUETOOTH_QUALITY_REPORT_EV;
+}
+
+bool aosp_pull_quality_report_data(struct sk_buff *skb)
+{
+	size_t bqr_data_len = sizeof(struct bqr_data);
+
+	skb_pull(skb, sizeof(struct aosp_hci_vs_data));
+
+	/* skb->len is allowed to be larger than bqr_data_len to have
+	 * the Vendor Specific Parameter (vsp) field.
+	 */
+	if (skb->len < bqr_data_len) {
+		BT_ERR("AOSP evt data len %u too short (%zu expected)",
+		       skb->len, bqr_data_len);
+		return false;
+	}
+
+	return true;
+}

@@ -3519,7 +3519,12 @@ static int __net_init unix_net_init(struct net *net)
 {
 	int i;
 
-	net->unx.sysctl_max_dgram_qlen = 10;
+	/* The value was 10 in the original kernel. It is modified directly
+	 * here to give the larger value for processes inside containers, in
+	 * which the kernel does not provide a way to dynamically customize.
+	 * TODO(crbug/758081): Implement and upstream a safe way to customize.
+	 */
+	net->unx.sysctl_max_dgram_qlen = 60;
 	if (unix_sysctl_register(net))
 		goto out;
 

@@ -37,6 +37,7 @@
 #include "i915_gem_dmabuf.h"
 #include "i915_gem_mman.h"
 #include "i915_gem_object.h"
+#include "i915_gem_object_frontbuffer.h"
 #include "i915_gem_ttm.h"
 #include "i915_memcpy.h"
 #include "i915_trace.h"
@@ -104,6 +105,10 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 	INIT_LIST_HEAD(&obj->vma.list);
 
 	INIT_LIST_HEAD(&obj->mm.link);
+
+#ifdef CONFIG_PROC_FS
+	INIT_LIST_HEAD(&obj->client_link);
+#endif
 
 	INIT_LIST_HEAD(&obj->lut_list);
 	spin_lock_init(&obj->lut_lock);
@@ -292,6 +297,10 @@ void __i915_gem_free_object_rcu(struct rcu_head *head)
 		container_of(head, typeof(*obj), rcu);
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 
+	/* We need to keep this alive for RCU read access from fdinfo. */
+	if (obj->mm.n_placements > 1)
+		kfree(obj->mm.placements);
+
 	i915_gem_object_free(obj);
 
 	GEM_BUG_ON(!atomic_read(&i915->mm.free_count));
@@ -388,9 +397,6 @@ void __i915_gem_free_object(struct drm_i915_gem_object *obj)
 	if (obj->ops->release)
 		obj->ops->release(obj);
 
-	if (obj->mm.n_placements > 1)
-		kfree(obj->mm.placements);
-
 	if (obj->shares_resv_from)
 		i915_vm_resv_put(obj->shares_resv_from);
 
@@ -440,6 +446,8 @@ static void i915_gem_free_object(struct drm_gem_object *gem_obj)
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 
 	GEM_BUG_ON(i915_gem_object_is_framebuffer(obj));
+
+	i915_drm_client_remove_object(obj);
 
 	/*
 	 * Before we free the object, make sure any pure RCU-only

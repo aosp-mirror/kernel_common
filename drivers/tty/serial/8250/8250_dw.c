@@ -11,6 +11,7 @@
  */
 #include <linux/acpi.h>
 #include <linux/clk.h>
+#include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/io.h>
@@ -20,6 +21,7 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/pci.h>
 #include <linux/property.h>
 #include <linux/reset.h>
 #include <linux/slab.h>
@@ -705,10 +707,34 @@ static int dw8250_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void dw8250_configure_no_d3(struct dw8250_data *data, bool dev_flag)
+{
+	struct uart_8250_port *up = serial8250_get_port(data->data.line);
+	struct pci_dev *p_dev;
+
+	/*
+	 *	For Platforms with LPSS PCI UARTs, the parent device should
+	 *	be prevented from going into D3 for the no_console_suspend
+	 *  	flag to work as expected.
+	 */
+	if (platform_get_resource_byname(to_platform_device(up->port.dev),
+					IORESOURCE_MEM, "lpss_dev")) {
+		p_dev = (to_pci_dev(up->port.dev->parent));
+		if (p_dev && !console_suspend_enabled && uart_console(&up->port)) {
+			if (dev_flag)
+				p_dev->dev_flags |= PCI_DEV_FLAGS_NO_D3;
+			else
+				p_dev->dev_flags &= ~PCI_DEV_FLAGS_NO_D3;
+		}
+
+	}
+}
+
 static int dw8250_suspend(struct device *dev)
 {
 	struct dw8250_data *data = dev_get_drvdata(dev);
 
+	dw8250_configure_no_d3(data, true);
 	serial8250_suspend_port(data->data.line);
 
 	return 0;
@@ -719,6 +745,7 @@ static int dw8250_resume(struct device *dev)
 	struct dw8250_data *data = dev_get_drvdata(dev);
 
 	serial8250_resume_port(data->data.line);
+	dw8250_configure_no_d3(data, false);
 
 	return 0;
 }

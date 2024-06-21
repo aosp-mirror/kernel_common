@@ -40,6 +40,11 @@ static const struct snd_soc_acpi_codecs mtl_lt6911_hdmi = {
 	.codecs = {"INTC10B0"}
 };
 
+static const struct snd_soc_acpi_codecs mtl_rt5650_amp = {
+	.num_codecs = 1,
+	.codecs = {"10EC5650"}
+};
+
 struct snd_soc_acpi_mach snd_soc_acpi_intel_mtl_machines[] = {
 	{
 		.comp_ids = &mtl_rt5682_rt5682s_hp,
@@ -57,7 +62,7 @@ struct snd_soc_acpi_mach snd_soc_acpi_intel_mtl_machines[] = {
 	},
 	{
 		.comp_ids = &mtl_rt5682_rt5682s_hp,
-		.drv_name = "mtl_rt1019_rt5682",
+		.drv_name = "mtl_rt5682_def",
 		.machine_quirk = snd_soc_acpi_codec_list,
 		.quirk_data = &mtl_rt1019p_amp,
 		.sof_tplg_filename = "sof-mtl-rt1019-rt5682.tplg",
@@ -76,6 +81,19 @@ struct snd_soc_acpi_mach snd_soc_acpi_intel_mtl_machines[] = {
 		.tplg_quirk_mask = SND_SOC_ACPI_TPLG_INTEL_SSP_NUMBER |
 					SND_SOC_ACPI_TPLG_INTEL_SSP_MSB |
 					SND_SOC_ACPI_TPLG_INTEL_DMIC_NUMBER,
+	},
+	{
+		.id = "10EC5650",
+		.drv_name = "mtl_rt5682_def",
+		.machine_quirk = snd_soc_acpi_codec_list,
+		.quirk_data = &mtl_rt5650_amp,
+		.sof_tplg_filename = "sof-mtl-rt5650.tplg",
+	},
+	/* place amp-only boards in the end of table */
+	{
+		.id = "INTC10B0",
+		.drv_name = "mtl_lt6911_hdmi_ssp",
+		.sof_tplg_filename = "sof-mtl-hdmi-ssp02.tplg",
 	},
 	{},
 };

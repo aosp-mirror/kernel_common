@@ -793,10 +793,10 @@ static int ecryptfs_validate_marker(char *data)
 	m_2 = get_unaligned_be32(data + 4);
 	if ((m_1 ^ MAGIC_ECRYPTFS_MARKER) == m_2)
 		return 0;
-	ecryptfs_printk(KERN_DEBUG, "m_1 = [0x%.8x]; m_2 = [0x%.8x]; "
+	ecryptfs_printk(KERN_WARNING, "m_1 = [0x%.8x]; m_2 = [0x%.8x]; "
 			"MAGIC_ECRYPTFS_MARKER = [0x%.8x]\n", m_1, m_2,
 			MAGIC_ECRYPTFS_MARKER);
-	ecryptfs_printk(KERN_DEBUG, "(m_1 ^ MAGIC_ECRYPTFS_MARKER) = "
+	ecryptfs_printk(KERN_WARNING, "(m_1 ^ MAGIC_ECRYPTFS_MARKER) = "
 			"[0x%.8x]\n", (m_1 ^ MAGIC_ECRYPTFS_MARKER));
 	return -EINVAL;
 }
@@ -1378,6 +1378,10 @@ int ecryptfs_read_metadata(struct dentry *ecryptfs_dentry)
 		rc = ecryptfs_read_headers_virt(page_virt, crypt_stat,
 						ecryptfs_dentry,
 						ECRYPTFS_VALIDATE_HEADER_SIZE);
+	else
+		ecryptfs_printk(KERN_WARNING, "ecryptfs_read_lower failed with "
+		       "rc=%d (extent_size = %zu)\n", rc,
+		       crypt_stat->extent_size);
 	if (rc) {
 		/* metadata is not in the file header, so try xattrs */
 		memset(page_virt, 0, PAGE_SIZE);
@@ -1949,16 +1953,6 @@ out:
 	return rc;
 }
 
-static bool is_dot_dotdot(const char *name, size_t name_size)
-{
-	if (name_size == 1 && name[0] == '.')
-		return true;
-	else if (name_size == 2 && name[0] == '.' && name[1] == '.')
-		return true;
-
-	return false;
-}
-
 /**
  * ecryptfs_decode_and_decrypt_filename - converts the encoded cipher text name to decoded plaintext
  * @plaintext_name: The plaintext name
@@ -1983,21 +1977,13 @@ int ecryptfs_decode_and_decrypt_filename(char **plaintext_name,
 	size_t packet_size;
 	int rc = 0;
 
-	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES) &&
-	    !(mount_crypt_stat->flags & ECRYPTFS_ENCRYPTED_VIEW_ENABLED)) {
-		if (is_dot_dotdot(name, name_size)) {
-			rc = ecryptfs_copy_filename(plaintext_name,
-						    plaintext_name_size,
-						    name, name_size);
-			goto out;
-		}
-
-		if (name_size <= ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE ||
-		    strncmp(name, ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX,
-			    ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE)) {
-			rc = -EINVAL;
-			goto out;
-		}
+	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES)
+	    && !(mount_crypt_stat->flags & ECRYPTFS_ENCRYPTED_VIEW_ENABLED)
+	    && (name_size > ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE)
+	    && (strncmp(name, ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX,
+			ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE) == 0)) {
+		const char *orig_name = name;
+		size_t orig_name_size = name_size;
 
 		name += ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE;
 		name_size -= ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE;
@@ -2017,9 +2003,12 @@ int ecryptfs_decode_and_decrypt_filename(char **plaintext_name,
 						  decoded_name,
 						  decoded_name_size);
 		if (rc) {
-			ecryptfs_printk(KERN_DEBUG,
-					"%s: Could not parse tag 70 packet from filename\n",
-					__func__);
+			printk(KERN_INFO "%s: Could not parse tag 70 packet "
+			       "from filename; copying through filename "
+			       "as-is\n", __func__);
+			rc = ecryptfs_copy_filename(plaintext_name,
+						    plaintext_name_size,
+						    orig_name, orig_name_size);
 			goto out_free;
 		}
 	} else {

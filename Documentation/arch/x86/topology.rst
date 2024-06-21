@@ -49,11 +49,8 @@ Package-related topology information in the kernel:
 
   - cpuinfo_x86.x86_max_cores:
 
-    The number of cores in a package. This information is retrieved via CPUID.
-
-  - cpuinfo_x86.x86_max_dies:
-
-    The number of dies in a package. This information is retrieved via CPUID.
+    The maximum possible number of cores in a package. This information is
+    retrieved via CPUID.
 
   - cpuinfo_x86.cpu_die_id:
 
@@ -102,10 +99,10 @@ Core-related topology information in the kernel:
 
   - smp_num_siblings:
 
-    The number of threads in a core. The number of threads in a package can be
-    calculated by::
+    The maximum possible number of threads in a core. The maximum possible
+    number of threads in a package can be calculated by::
 
-	threads_per_package = cpuinfo_x86.x86_max_cores * smp_num_siblings
+	maximum_threads_per_package = cpuinfo_x86.x86_max_cores * smp_num_siblings
 
 
 Threads

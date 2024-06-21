@@ -12383,9 +12383,8 @@ perf_check_permission(struct perf_event_attr *attr, struct task_struct *task)
  * @group_fd:		group leader event fd
  * @flags:		perf event open flags
  */
-SYSCALL_DEFINE5(perf_event_open,
-		struct perf_event_attr __user *, attr_uptr,
-		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
+int ksys_perf_event_open(struct perf_event_attr __user * attr_uptr, pid_t pid,
+			 int cpu, int group_fd, unsigned long flags)
 {
 	struct perf_event *group_leader = NULL, *output_event = NULL;
 	struct perf_event_pmu_context *pmu_ctx;
@@ -12775,6 +12774,13 @@ err_group_fd:
 err_fd:
 	put_unused_fd(event_fd);
 	return err;
+}
+
+SYSCALL_DEFINE5(perf_event_open,
+		struct perf_event_attr __user *, attr_uptr,
+		pid_t, pid, int, cpu, int, group_fd, unsigned long, flags)
+{
+	return ksys_perf_event_open(attr_uptr, pid, cpu, group_fd, flags);
 }
 
 /**

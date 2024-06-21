@@ -392,39 +392,54 @@ static struct dentry *ecryptfs_lookup(struct inode *ecryptfs_dir_inode,
 				      unsigned int flags)
 {
 	char *encrypted_and_encoded_name = NULL;
-	struct ecryptfs_mount_crypt_stat *mount_crypt_stat;
+	size_t encrypted_and_encoded_name_size;
+	struct ecryptfs_mount_crypt_stat *mount_crypt_stat = NULL;
 	struct dentry *lower_dir_dentry, *lower_dentry;
-	const char *name = ecryptfs_dentry->d_name.name;
-	size_t len = ecryptfs_dentry->d_name.len;
 	struct dentry *res;
 	int rc = 0;
 
 	lower_dir_dentry = ecryptfs_dentry_to_lower(ecryptfs_dentry->d_parent);
-
+	lower_dentry = lookup_one_len_unlocked(ecryptfs_dentry->d_name.name,
+				      lower_dir_dentry,
+				      ecryptfs_dentry->d_name.len);
+	if (IS_ERR(lower_dentry)) {
+		ecryptfs_printk(KERN_DEBUG, "%s: lookup_one_len() returned "
+				"[%ld] on lower_dentry = [%pd]\n", __func__,
+				PTR_ERR(lower_dentry), ecryptfs_dentry);
+		res = ERR_CAST(lower_dentry);
+		goto out;
+	}
+	if (d_really_is_positive(lower_dentry))
+		goto interpose;
 	mount_crypt_stat = &ecryptfs_superblock_to_private(
 				ecryptfs_dentry->d_sb)->mount_crypt_stat;
-	if (mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES) {
-		rc = ecryptfs_encrypt_and_encode_filename(
-			&encrypted_and_encoded_name, &len,
-			mount_crypt_stat, name, len);
-		if (rc) {
-			printk(KERN_ERR "%s: Error attempting to encrypt and encode "
-			       "filename; rc = [%d]\n", __func__, rc);
-			return ERR_PTR(rc);
-		}
-		name = encrypted_and_encoded_name;
+	if (!(mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES))
+		goto interpose;
+	dput(lower_dentry);
+	rc = ecryptfs_encrypt_and_encode_filename(
+		&encrypted_and_encoded_name, &encrypted_and_encoded_name_size,
+		mount_crypt_stat, ecryptfs_dentry->d_name.name,
+		ecryptfs_dentry->d_name.len);
+	if (rc) {
+		printk(KERN_ERR "%s: Error attempting to encrypt and encode "
+		       "filename; rc = [%d]\n", __func__, rc);
+		res = ERR_PTR(rc);
+		goto out;
 	}
-
-	lower_dentry = lookup_one_len_unlocked(name, lower_dir_dentry, len);
+	lower_dentry = lookup_one_len_unlocked(encrypted_and_encoded_name,
+				      lower_dir_dentry,
+				      encrypted_and_encoded_name_size);
 	if (IS_ERR(lower_dentry)) {
 		ecryptfs_printk(KERN_DEBUG, "%s: lookup_one_len() returned "
 				"[%ld] on lower_dentry = [%s]\n", __func__,
 				PTR_ERR(lower_dentry),
-				name);
+				encrypted_and_encoded_name);
 		res = ERR_CAST(lower_dentry);
-	} else {
-		res = ecryptfs_lookup_interpose(ecryptfs_dentry, lower_dentry);
+		goto out;
 	}
+interpose:
+	res = ecryptfs_lookup_interpose(ecryptfs_dentry, lower_dentry);
+out:
 	kfree(encrypted_and_encoded_name);
 	return res;
 }
@@ -800,6 +815,12 @@ static int truncate_upper(struct dentry *dentry, struct iattr *ia,
 			       "rc = [%d]\n", rc);
 			goto out;
 		}
+		rc = ecryptfs_fsync_lower(inode, 1);
+		if (rc) {
+			printk(KERN_WARNING "Problem with ecryptfs_fsync_lower,"
+			       "continue without syncing; "
+			       "rc = [%d]\n", rc);
+		}
 		/* We are reducing the size of the ecryptfs file, and need to
 		 * know if we need to reduce the size of the lower file. */
 		lower_size_before_truncate =
@@ -1069,7 +1090,8 @@ ecryptfs_getxattr_lower(struct dentry *lower_dentry, struct inode *lower_inode,
 		goto out;
 	}
 	inode_lock(lower_inode);
-	rc = __vfs_getxattr(lower_dentry, lower_inode, name, value, size);
+	rc = __vfs_getxattr(&nop_mnt_idmap, lower_dentry, lower_inode, name,
+			    value, size, XATTR_NOSECURITY);
 	inode_unlock(lower_inode);
 out:
 	return rc;
@@ -1201,7 +1223,8 @@ const struct inode_operations ecryptfs_main_iops = {
 
 static int ecryptfs_xattr_get(const struct xattr_handler *handler,
 			      struct dentry *dentry, struct inode *inode,
-			      const char *name, void *buffer, size_t size)
+			      const char *name, void *buffer, size_t size,
+			      int flags)
 {
 	return ecryptfs_getxattr(dentry, inode, name, buffer, size);
 }

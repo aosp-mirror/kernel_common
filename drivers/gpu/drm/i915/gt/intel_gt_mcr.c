@@ -3,6 +3,7 @@
  * Copyright © 2022 Intel Corporation
  */
 
+#include "i915_drv.h"
 #include "intel_gt.h"
 #include "intel_gt_mcr.h"
 #include "intel_gt_print.h"
@@ -387,8 +388,7 @@ void intel_gt_mcr_lock(struct intel_gt *gt, unsigned long *flags)
 		 * registers.  This wakeref will be released in the unlock
 		 * routine.
 		 *
-		 * This is expected to become a formally documented/numbered
-		 * workaround soon.
+		 * Wa_22018931422
 		 */
 		intel_uncore_forcewake_get(gt->uncore, FORCEWAKE_GT);
 
@@ -436,6 +436,28 @@ void intel_gt_mcr_unlock(struct intel_gt *gt, unsigned long flags)
 
 		intel_uncore_forcewake_put(gt->uncore, FORCEWAKE_GT);
 	}
+}
+
+/**
+ * intel_gt_mcr_lock_sanitize - Sanitize MCR steering lock
+ * @gt: GT structure
+ *
+ * This will be used to sanitize the initial status of the hardware lock
+ * during driver load and resume since there won't be any concurrent access
+ * from other agents at those times, but it's possible that boot firmware
+ * may have left the lock in a bad state.
+ *
+ */
+void intel_gt_mcr_lock_sanitize(struct intel_gt *gt)
+{
+	/*
+	 * This gets called at load/resume time, so we shouldn't be
+	 * racing with other driver threads grabbing the mcr lock.
+	 */
+	lockdep_assert_not_held(&gt->mcr_lock);
+
+	if (GRAPHICS_VER_FULL(gt->i915) >= IP_VER(12, 70))
+		intel_uncore_write_fw(gt->uncore, MTL_STEER_SEMAPHORE, 0x1);
 }
 
 /**

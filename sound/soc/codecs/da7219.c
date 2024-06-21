@@ -800,9 +800,7 @@ static int da7219_dai_event(struct snd_soc_dapm_widget *w,
 	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
 	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
 	struct clk *bclk = da7219->dai_clks[DA7219_DAI_BCLK_IDX];
-	u8 pll_ctrl, pll_status;
-	int i = 0, ret;
-	bool srm_lock = false;
+	int ret;
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -826,25 +824,6 @@ static int da7219_dai_event(struct snd_soc_dapm_widget *w,
 		/* PC synchronised to DAI */
 		snd_soc_component_update_bits(component, DA7219_PC_COUNT,
 				    DA7219_PC_FREERUN_MASK, 0);
-
-		/* Slave mode, if SRM not enabled no need for status checks */
-		pll_ctrl = snd_soc_component_read(component, DA7219_PLL_CTRL);
-		if ((pll_ctrl & DA7219_PLL_MODE_MASK) != DA7219_PLL_MODE_SRM)
-			return 0;
-
-		/* Check SRM has locked */
-		do {
-			pll_status = snd_soc_component_read(component, DA7219_PLL_SRM_STS);
-			if (pll_status & DA7219_PLL_SRM_STS_SRM_LOCK) {
-				srm_lock = true;
-			} else {
-				++i;
-				msleep(50);
-			}
-		} while ((i < DA7219_SRM_CHECK_RETRIES) && (!srm_lock));
-
-		if (!srm_lock)
-			dev_warn(component->dev, "SRM failed to lock\n");
 
 		return 0;
 	case SND_SOC_DAPM_POST_PMD:
@@ -1664,12 +1643,67 @@ static int da7219_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static void da7219_check_srm_status_work(struct work_struct *work)
+{
+	struct da7219_priv *da7219 =
+		container_of(work, struct da7219_priv, srm_work);
+	struct snd_soc_component *component = da7219->component;
+
+	u8 pll_ctrl, pll_status;
+	int i = 0;
+	bool srm_lock = false;
+
+	/* Slave mode, if SRM not enabled no need for status checks */
+	pll_ctrl = snd_soc_component_read(component, DA7219_PLL_CTRL);
+	if ((pll_ctrl & DA7219_PLL_MODE_MASK) != DA7219_PLL_MODE_SRM)
+		return;
+
+	/* Check SRM has locked */
+	do {
+		pll_status = snd_soc_component_read(component,
+						DA7219_PLL_SRM_STS);
+		if (pll_status & DA7219_PLL_SRM_STS_SRM_LOCK) {
+			srm_lock = true;
+		} else {
+			++i;
+			msleep(50);
+		}
+	} while ((i < DA7219_SRM_CHECK_RETRIES) && (!srm_lock));
+
+	if (!srm_lock)
+		dev_err(component->dev, "SRM failed to lock\n");
+}
+
+static int da7219_set_dai_trigger(struct snd_pcm_substream *substream, int cmd,
+				  struct snd_soc_dai *dai)
+{
+	struct snd_soc_component *component = dai->component;
+	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+		schedule_work(&da7219->srm_work);
+		break;
+	case SNDRV_PCM_TRIGGER_RESUME:
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+
 static const struct snd_soc_dai_ops da7219_dai_ops = {
 	.hw_params	= da7219_hw_params,
 	.set_sysclk	= da7219_set_dai_sysclk,
 	.set_pll	= da7219_set_dai_pll,
 	.set_fmt	= da7219_set_dai_fmt,
 	.set_tdm_slot	= da7219_set_dai_tdm_slot,
+	.trigger	= da7219_set_dai_trigger,
 };
 
 #define DA7219_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |\
@@ -2594,6 +2628,8 @@ static void da7219_remove(struct snd_soc_component *component)
 
 	da7219_aad_exit(component);
 
+	cancel_work_sync(&da7219->srm_work);
+
 	da7219_free_dai_clks(component);
 	clk_put(da7219->mclk);
 
@@ -2699,6 +2735,9 @@ static int da7219_i2c_probe(struct i2c_client *i2c)
 	if (ret < 0) {
 		dev_err(dev, "Failed to register da7219 component: %d\n", ret);
 	}
+
+	INIT_WORK(&da7219->srm_work, da7219_check_srm_status_work);
+
 	return ret;
 }
 

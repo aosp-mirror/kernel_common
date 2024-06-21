@@ -233,6 +233,7 @@ struct venus_core {
 		u32 minor;
 		u32 rev;
 	} venus_ver;
+	unsigned long dump_core;
 };
 
 struct vdec_controls {

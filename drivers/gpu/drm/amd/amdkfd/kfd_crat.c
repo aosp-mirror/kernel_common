@@ -1522,6 +1522,7 @@ int kfd_get_gpu_cache_info(struct kfd_node *kdev, struct kfd_gpu_cache_info **pc
 		case IP_VERSION(11, 0, 2):
 		case IP_VERSION(11, 0, 3):
 		case IP_VERSION(11, 0, 4):
+		case IP_VERSION(11, 5, 0):
 			num_of_cache_types =
 				kfd_fill_gpu_cache_info_from_gfx_config(kdev->kfd, *pcache_info);
 			break;
@@ -2115,7 +2116,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
 			sub_type_hdr->length);
 
-	if (debug_largebar)
+	if (kdev->adev->debug_largebar)
 		local_mem_info.local_mem_size_private = 0;
 
 	if (local_mem_info.local_mem_size_private == 0)

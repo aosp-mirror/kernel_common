@@ -569,11 +569,15 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev);
 void pcie_aspm_exit_link_state(struct pci_dev *pdev);
 void pcie_aspm_pm_state_change(struct pci_dev *pdev, bool locked);
 void pcie_aspm_powersave_config_link(struct pci_dev *pdev);
+void pci_save_aspm_state(struct pci_dev *pdev);
+void pci_restore_aspm_state(struct pci_dev *pdev);
 #else
 static inline void pcie_aspm_init_link_state(struct pci_dev *pdev) { }
 static inline void pcie_aspm_exit_link_state(struct pci_dev *pdev) { }
 static inline void pcie_aspm_pm_state_change(struct pci_dev *pdev, bool locked) { }
 static inline void pcie_aspm_powersave_config_link(struct pci_dev *pdev) { }
+static inline void pci_save_aspm_state(struct pci_dev *pdev) { }
+static inline void pci_restore_aspm_state(struct pci_dev *pdev) { }
 #endif
 
 #ifdef CONFIG_PCIE_ECRC
@@ -773,6 +777,8 @@ extern const struct attribute_group aspm_ctrl_attr_group;
 #endif
 
 extern const struct attribute_group pci_dev_reset_method_attr_group;
+bool pci_drv_allowed_for_untrusted_devs(struct device_driver *drvr);
+bool pci_allowed_to_attach(struct pci_driver *drv, struct pci_dev *dev);
 
 #ifdef CONFIG_X86_INTEL_MID
 bool pci_use_mid_pm(void);

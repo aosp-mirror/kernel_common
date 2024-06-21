@@ -160,6 +160,23 @@ enum {
 
 #define MWIFIEX_MAC_LOCAL_ADMIN_BIT		41
 
+/* marvell vendor command and event ID */
+#define MWIFIEX_VENDOR_ID  0x005043
+
+/* vendor sub command */
+enum mwifiex_vendor_sub_command {
+	MWIFIEX_VENDOR_CMD_SET_TX_POWER_LIMIT = 0,
+	MWIFIEX_VENDOR_CMD_MAX,
+};
+
+enum mwifiex_vendor_cmd_attr {
+	MWIFIEX_VENDOR_CMD_ATTR_INVALID,
+	MWIFIEX_VENDOR_CMD_ATTR_TXP_LIMIT_24,
+	MWIFIEX_VENDOR_CMD_ATTR_TXP_LIMIT_52,
+	NUM_MWIFIEX_VENDOR_CMD_ATTR,
+	MAX_MWIFIEX_VENDOR_CMD_ATTR = NUM_MWIFIEX_VENDOR_CMD_ATTR - 1,
+};
+
 /**
  *enum mwifiex_debug_level  -  marvell wifi debug level
  */
@@ -850,6 +867,8 @@ struct mwifiex_if_ops {
 };
 
 struct mwifiex_adapter {
+	u8 lowpwr_mode_2g4;
+	u8 lowpwr_mode_5g2;
 	u8 iface_type;
 	unsigned int debug_mask;
 	struct mwifiex_iface_comb iface_limit;

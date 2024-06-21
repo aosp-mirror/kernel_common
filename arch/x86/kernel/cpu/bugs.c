@@ -46,6 +46,7 @@ static void __init md_clear_select_mitigation(void);
 static void __init taa_select_mitigation(void);
 static void __init mmio_select_mitigation(void);
 static void __init srbds_select_mitigation(void);
+static void __init coresched_select(void);
 static void __init l1d_flush_select_mitigation(void);
 static void __init srso_select_mitigation(void);
 static void __init gds_select_mitigation(void);
@@ -145,6 +146,9 @@ void __init cpu_select_mitigations(void)
 		 */
 		x86_spec_ctrl_base &= ~SPEC_CTRL_MITIGATIONS_MASK;
 	}
+
+	/* Update whether core-scheduling is needed. */
+	coresched_select();
 
 	x86_arch_cap_msr = x86_read_arch_cap_msr();
 
@@ -1889,7 +1893,7 @@ static void update_stibp_strict(void)
 /* Update the static key controlling the evaluation of TIF_SPEC_IB */
 static void update_indir_branch_cond(void)
 {
-	if (sched_smt_active())
+	if (!IS_ENABLED(CONFIG_SCHED_CORE) && sched_smt_active())
 		static_branch_enable(&switch_to_cond_stibp);
 	else
 		static_branch_disable(&switch_to_cond_stibp);
@@ -3016,3 +3020,17 @@ ssize_t cpu_show_reg_file_data_sampling(struct device *dev, struct device_attrib
 	return cpu_show_common(dev, attr, buf, X86_BUG_RFDS);
 }
 #endif
+
+/*
+ * When coresched=secure command line option is passed (default), disable core
+ * scheduling if CPU does not have MDS/L1TF vulnerability.
+ */
+static void __init coresched_select(void)
+{
+#ifdef CONFIG_SCHED_CORE
+	if (coresched_cmd_secure() &&
+	    !boot_cpu_has_bug(X86_BUG_MDS) &&
+	    !boot_cpu_has_bug(X86_BUG_L1TF))
+		static_branch_disable(&sched_coresched_supported);
+#endif
+}

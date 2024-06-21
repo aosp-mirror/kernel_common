@@ -685,6 +685,25 @@ void v4l2_async_nf_cleanup(struct v4l2_async_notifier *notifier)
 }
 EXPORT_SYMBOL_GPL(v4l2_async_nf_cleanup);
 
+int __v4l2_async_nf_add_subdev(struct v4l2_async_notifier *notifier,
+			       struct v4l2_async_connection *asd)
+{
+	int ret;
+
+	mutex_lock(&list_lock);
+
+	ret = v4l2_async_nf_match_valid(notifier, &asd->match);
+	if (ret)
+		goto unlock;
+
+	list_add_tail(&asd->asc_entry, &notifier->waiting_list);
+
+unlock:
+	mutex_unlock(&list_lock);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(__v4l2_async_nf_add_subdev);
+
 static void __v4l2_async_nf_add_connection(struct v4l2_async_notifier *notifier,
 					   struct v4l2_async_connection *asc)
 {

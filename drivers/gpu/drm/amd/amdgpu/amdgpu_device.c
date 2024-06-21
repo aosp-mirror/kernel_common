@@ -890,8 +890,8 @@ static int amdgpu_device_asic_init(struct amdgpu_device *adev)
 
 	amdgpu_asic_pre_asic_init(adev);
 
-	if (adev->ip_versions[GC_HWIP][0] == IP_VERSION(9, 4, 3) ||
-	    adev->ip_versions[GC_HWIP][0] >= IP_VERSION(11, 0, 0)) {
+	if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 3) ||
+	    amdgpu_ip_version(adev, GC_HWIP, 0) >= IP_VERSION(11, 0, 0)) {
 		amdgpu_psp_wait_for_bootloader(adev);
 		ret = amdgpu_atomfirmware_asic_init(adev, true);
 		return ret;
@@ -1244,6 +1244,41 @@ bool amdgpu_device_need_post(struct amdgpu_device *adev)
 		return false;
 
 	return true;
+}
+
+/*
+ * Check whether seamless boot is supported.
+ *
+ * So far we only support seamless boot on select ASICs.
+ * If everything goes well, we may consider expanding
+ * seamless boot to other ASICs.
+ */
+bool amdgpu_device_seamless_boot_supported(struct amdgpu_device *adev)
+{
+	switch (amdgpu_seamless) {
+	case -1:
+		break;
+	case 1:
+		return true;
+	case 0:
+		return false;
+	default:
+		DRM_ERROR("Invalid value for amdgpu.seamless: %d\n",
+			  amdgpu_seamless);
+		return false;
+	}
+
+	if (adev->mman.keep_stolen_vga_memory)
+		return false;
+
+	switch (adev->ip_versions[DCE_HWIP][0]) {
+	case IP_VERSION(3, 0, 1):
+		return true;
+	default:
+		break;
+	}
+
+	return false;
 }
 
 /*
@@ -2728,7 +2763,7 @@ static void amdgpu_device_smu_fini_early(struct amdgpu_device *adev)
 {
 	int i, r;
 
-	if (adev->ip_versions[GC_HWIP][0] > IP_VERSION(9, 0, 0))
+	if (amdgpu_ip_version(adev, GC_HWIP, 0) > IP_VERSION(9, 0, 0))
 		return;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
@@ -2981,8 +3016,10 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
 
 		/* SDMA 5.x+ is part of GFX power domain so it's covered by GFXOFF */
 		if (adev->in_s0ix &&
-		    (adev->ip_versions[SDMA0_HWIP][0] >= IP_VERSION(5, 0, 0)) &&
-		    (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_SDMA))
+		    (amdgpu_ip_version(adev, SDMA0_HWIP, 0) >=
+		     IP_VERSION(5, 0, 0)) &&
+		    (adev->ip_blocks[i].version->type ==
+		     AMD_IP_BLOCK_TYPE_SDMA))
 			continue;
 
 		/* Once swPSP provides the IMU, RLC FW binaries to TOS during cold-boot.
@@ -3686,7 +3723,8 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	 * internal path natively support atomics, set have_atomics_support to true.
 	 */
 	} else if ((adev->flags & AMD_IS_APU) &&
-		   (adev->ip_versions[GC_HWIP][0] > IP_VERSION(9, 0, 0))) {
+		   (amdgpu_ip_version(adev, GC_HWIP, 0) >
+		    IP_VERSION(9, 0, 0))) {
 		adev->have_atomics_support = true;
 	} else {
 		adev->have_atomics_support =
@@ -4109,13 +4147,15 @@ int amdgpu_device_prepare(struct drm_device *dev)
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	int i, r;
 
+	amdgpu_choose_low_power_state(adev);
+
 	if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
 		return 0;
 
 	/* Evict the majority of BOs before starting suspend sequence */
 	r = amdgpu_device_evict_resources(adev);
 	if (r)
-		return r;
+		goto unprepare;
 
 	flush_delayed_work(&adev->gfx.gfx_off_delay_work);
 
@@ -4126,10 +4166,15 @@ int amdgpu_device_prepare(struct drm_device *dev)
 			continue;
 		r = adev->ip_blocks[i].version->funcs->prepare_suspend((void *)adev);
 		if (r)
-			return r;
+			goto unprepare;
 	}
 
 	return 0;
+
+unprepare:
+	adev->in_s0ix = adev->in_s3 = false;
+
+	return r;
 }
 
 /**
@@ -5346,8 +5391,9 @@ retry:	/* Rest of adevs pre asic reset from XGMI hive. */
 			adev->asic_reset_res = r;
 
 		/* Aldebaran and gfx_11_0_3 support ras in SRIOV, so need resume ras during reset */
-		if (adev->ip_versions[GC_HWIP][0] == IP_VERSION(9, 4, 2) ||
-		    adev->ip_versions[GC_HWIP][0] == IP_VERSION(11, 0, 3))
+		if (amdgpu_ip_version(adev, GC_HWIP, 0) ==
+			    IP_VERSION(9, 4, 2) ||
+		    amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(11, 0, 3))
 			amdgpu_ras_resume(adev);
 	} else {
 		r = amdgpu_do_asic_reset(device_list_handle, reset_context);
@@ -5372,7 +5418,8 @@ skip_hw_reset:
 			drm_sched_start(&ring->sched, true);
 		}
 
-		if (adev->enable_mes && adev->ip_versions[GC_HWIP][0] != IP_VERSION(11, 0, 3))
+		if (adev->enable_mes &&
+		    amdgpu_ip_version(adev, GC_HWIP, 0) != IP_VERSION(11, 0, 3))
 			amdgpu_mes_self_test(tmp_adev);
 
 		if (!drm_drv_uses_atomic_modeset(adev_to_drm(tmp_adev)) && !job_signaled)
@@ -6049,7 +6096,7 @@ bool amdgpu_device_has_display_hardware(struct amdgpu_device *adev)
 		return true;
 	default:
 		/* IP discovery */
-		if (!adev->ip_versions[DCE_HWIP][0] ||
+		if (!amdgpu_ip_version(adev, DCE_HWIP, 0) ||
 		    (adev->harvest_ip_mask & AMD_HARVEST_IP_DMU_MASK))
 			return false;
 		return true;

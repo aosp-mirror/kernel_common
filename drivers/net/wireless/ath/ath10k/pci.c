@@ -2326,7 +2326,6 @@ int ath10k_pci_init_config(struct ath10k *ar)
 	u32 pcie_state_targ_addr = 0;
 	u32 pipe_cfg_targ_addr = 0;
 	u32 svc_to_pipe_map = 0;
-	u32 pcie_config_flags = 0;
 	u32 ealloc_value;
 	u32 ealloc_targ_addr;
 	u32 flag2_value;
@@ -2396,26 +2395,6 @@ int ath10k_pci_init_config(struct ath10k *ar)
 					sizeof(pci_target_service_to_ce_map_wlan));
 	if (ret != 0) {
 		ath10k_err(ar, "Failed to write svc/pipe map: %d\n", ret);
-		return ret;
-	}
-
-	ret = ath10k_pci_diag_read32(ar, (pcie_state_targ_addr +
-					  offsetof(struct pcie_state,
-						   config_flags)),
-				     &pcie_config_flags);
-	if (ret != 0) {
-		ath10k_err(ar, "Failed to get pcie config_flags: %d\n", ret);
-		return ret;
-	}
-
-	pcie_config_flags &= ~PCIE_CONFIG_FLAG_ENABLE_L1;
-
-	ret = ath10k_pci_diag_write32(ar, (pcie_state_targ_addr +
-					   offsetof(struct pcie_state,
-						    config_flags)),
-				      pcie_config_flags);
-	if (ret != 0) {
-		ath10k_err(ar, "Failed to write pcie config_flags: %d\n", ret);
 		return ret;
 	}
 

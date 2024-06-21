@@ -776,9 +776,6 @@ static void dg2_ctx_workarounds_init(struct intel_engine_cs *engine,
 	/* Wa_18018764978:dg2 */
 	wa_mcr_masked_en(wal, XEHP_PSS_MODE2, SCOREBOARD_STALL_FLUSH_CONTROL);
 
-	/* Wa_15010599737:dg2 */
-	wa_mcr_masked_en(wal, CHICKEN_RASTER_1, DIS_SF_ROUND_NEAREST_EVEN);
-
 	/* Wa_18019271663:dg2 */
 	wa_masked_en(wal, CACHE_MODE_1, MSAA_OPTIMIZATION_REDUC_DISABLE);
 }
@@ -1669,8 +1666,22 @@ xelpg_gt_workarounds_init(struct intel_gt *gt, struct i915_wa_list *wal)
 }
 
 static void
+wa_16021867713(struct intel_gt *gt, struct i915_wa_list *wal)
+{
+	struct intel_engine_cs *engine;
+	int id;
+
+	for_each_engine(engine, gt, id)
+		if (engine->class == VIDEO_DECODE_CLASS)
+			wa_write_or(wal, VDBOX_CGCTL3F1C(engine->mmio_base),
+				    MFXPIPE_CLKGATE_DIS);
+}
+
+static void
 xelpmp_gt_workarounds_init(struct intel_gt *gt, struct i915_wa_list *wal)
 {
+	wa_16021867713(gt, wal);
+
 	/*
 	 * Wa_14018778641
 	 * Wa_18018781329
@@ -1679,6 +1690,9 @@ xelpmp_gt_workarounds_init(struct intel_gt *gt, struct i915_wa_list *wal)
 	 * GT, the media GT's versions are regular singleton registers.
 	 */
 	wa_write_or(wal, XELPMP_GSC_MOD_CTRL, FORCE_MISS_FTLB);
+
+	/* Wa_22016670082 */
+	wa_write_or(wal, GEN12_SQCNT1, GEN12_STRICT_RAR_ENABLE);
 
 	debug_dump_steering(gt);
 }
@@ -1721,10 +1735,10 @@ gt_init_workarounds(struct intel_gt *gt, struct i915_wa_list *wal)
 	gt_tuning_settings(gt, wal);
 
 	if (gt->type == GT_MEDIA) {
-		if (MEDIA_VER(i915) >= 13)
+		if (MEDIA_VER_FULL(i915) == IP_VER(13, 0))
 			xelpmp_gt_workarounds_init(gt, wal);
 		else
-			MISSING_CASE(MEDIA_VER(i915));
+			MISSING_CASE(MEDIA_VER_FULL(i915));
 
 		return;
 	}
@@ -2338,6 +2352,14 @@ rcs_engine_wa_init(struct intel_engine_cs *engine, struct i915_wa_list *wal)
 				  LSC_L1_FLUSH_CTL_3D_DATAPORT_FLUSH_EVENTS_MASK);
 	}
 
+	if (IS_GFX_GT_IP_RANGE(gt, IP_VER(12, 70), IP_VER(12, 71)) ||
+	    IS_DG2(i915)) {
+		/* Wa_14015150844 */
+		wa_mcr_add(wal, XEHP_HDC_CHICKEN0, 0,
+			   _MASKED_BIT_ENABLE(DIS_ATOMIC_CHAINING_TYPED_WRITES),
+			   0, true);
+	}
+
 	if (IS_DG2_G11(i915) || IS_DG2_G10(i915)) {
 		/* Wa_22014600077:dg2 */
 		wa_mcr_add(wal, GEN10_CACHE_MODE_SS, 0,
@@ -2780,6 +2802,11 @@ xcs_engine_wa_init(struct intel_engine_cs *engine, struct i915_wa_list *wal)
 			 RING_SEMA_WAIT_POLL(engine->mmio_base),
 			 1);
 	}
+	/* Wa_16018031267, Wa_16018063123 */
+	if (NEEDS_FASTCOLOR_BLT_WABB(engine))
+		wa_masked_field_set(wal, ECOSKPD(engine->mmio_base),
+				    XEHP_BLITTER_SCHEDULING_MODE_MASK,
+				    XEHP_BLITTER_ROUND_ROBIN_MODE);
 }
 
 static void
@@ -2936,6 +2963,9 @@ general_render_compute_wa_init(struct intel_engine_cs *engine, struct i915_wa_li
 		 * Wa_22015475538:dg2
 		 */
 		wa_mcr_write_or(wal, LSC_CHICKEN_BIT_0_UDW, DIS_CHAIN_2XSIMD8);
+
+		/* Wa_18028616096 */
+		wa_mcr_write_or(wal, LSC_CHICKEN_BIT_0_UDW, UGM_FRAGMENT_THRESHOLD_TO_3);
 	}
 
 	if (IS_DG2_G11(i915)) {

@@ -939,8 +939,8 @@ static void virtio_fs_remove(struct virtio_device *vdev)
 static int virtio_fs_freeze(struct virtio_device *vdev)
 {
 	/* TODO need to save state here */
-	pr_warn("virtio-fs: suspend/resume not yet supported\n");
-	return -EOPNOTSUPP;
+	pr_warn("virtio-fs: suspend/resume not yet supported - proceeding anyway\n");
+	return 0;
 }
 
 static int virtio_fs_restore(struct virtio_device *vdev)

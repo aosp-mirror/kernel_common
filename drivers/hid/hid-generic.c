@@ -20,6 +20,7 @@
 #include <asm/byteorder.h>
 
 #include <linux/hid.h>
+#include "hid-ids.h"
 
 static struct hid_driver hid_generic;
 
@@ -58,7 +59,11 @@ static int hid_generic_probe(struct hid_device *hdev,
 {
 	int ret;
 
-	hdev->quirks |= HID_QUIRK_INPUT_PER_APP;
+	/* FIXME(b/157067041) : Remove this unquirk for the Logi K580. */
+	if (hdev->vendor != USB_VENDOR_ID_LOGITECH ||
+	    hdev->product != USB_DEVICE_ID_LOGITECH_K580_CHROME ||
+	    hdev->bus != BUS_BLUETOOTH)
+		hdev->quirks |= HID_QUIRK_INPUT_PER_APP;
 
 	ret = hid_parse(hdev);
 	if (ret)

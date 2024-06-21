@@ -285,6 +285,7 @@ config DRM_VKMS
 	depends on DRM && MMU
 	select DRM_KMS_HELPER
 	select DRM_GEM_SHMEM_HELPER
+	select CONFIGFS_FS
 	select CRC32
 	default n
 	help
@@ -293,6 +294,8 @@ config DRM_VKMS
 	  a VKMS.
 
 	  If M is selected the module will be called vkms.
+
+source "drivers/gpu/drm/evdi/Kconfig"
 
 source "drivers/gpu/drm/exynos/Kconfig"
 
@@ -387,6 +390,8 @@ source "drivers/gpu/drm/gud/Kconfig"
 source "drivers/gpu/drm/solomon/Kconfig"
 
 source "drivers/gpu/drm/sprd/Kconfig"
+
+source "drivers/gpu/drm/img-rogue/Kconfig"
 
 config DRM_HYPERV
 	tristate "DRM Support for Hyper-V synthetic video device"

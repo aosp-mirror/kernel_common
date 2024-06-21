@@ -294,7 +294,7 @@ int adreno_fault_handler(struct msm_gpu *gpu, unsigned long iova, int flags,
 		/* Turn off the hangcheck timer to keep it from bothering us */
 		del_timer(&gpu->hangcheck_timer);
 
-		gpu->fault_info.ttbr0 = info->ttbr0;
+		gpu->fault_info.smmu_info = *info;
 		gpu->fault_info.iova  = iova;
 		gpu->fault_info.flags = flags;
 		gpu->fault_info.type  = type;
@@ -840,19 +840,38 @@ void adreno_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 			adreno_gpu->info->revn,
 			ADRENO_CHIPID_ARGS(adreno_gpu->chip_id));
 	/*
-	 * If this is state collected due to iova fault, so fault related info
+	 * If this is state collected due to iova fault, show fault related
+	 * info
 	 *
-	 * TTBR0 would not be zero, so this is a good way to distinguish
+	 * TTBR0 would not be zero in this case, so this is a good way to
+	 * distinguish
 	 */
-	if (state->fault_info.ttbr0) {
+	if (state->fault_info.smmu_info.ttbr0) {
 		const struct msm_gpu_fault_info *info = &state->fault_info;
+		const struct adreno_smmu_fault_info *smmu_info = &info->smmu_info;
 
 		drm_puts(p, "fault-info:\n");
-		drm_printf(p, "  - ttbr0=%.16llx\n", info->ttbr0);
-		drm_printf(p, "  - iova=%.16lx\n", info->iova);
-		drm_printf(p, "  - dir=%s\n", info->flags & IOMMU_FAULT_WRITE ? "WRITE" : "READ");
-		drm_printf(p, "  - type=%s\n", info->type);
-		drm_printf(p, "  - source=%s\n", info->block);
+		drm_printf(p, "  - far: %.16llx\n", smmu_info->far);
+		drm_printf(p, "  - ttbr0: %.16llx\n", smmu_info->ttbr0);
+		drm_printf(p, "  - contextidr: %.8x\n", smmu_info->contextidr);
+		drm_printf(p, "  - fsr: %.8x\n", smmu_info->fsr);
+		drm_printf(p, "  - fsynr0: %.8x\n", smmu_info->fsynr0);
+		drm_printf(p, "  - fsynr1: %.8x\n", smmu_info->fsynr1);
+		drm_printf(p, "  - cbfrsynra: %.8x\n", smmu_info->cbfrsynra);
+		drm_printf(p, "  - iova: %.16lx\n", info->iova);
+		drm_printf(p, "  - dir: %s\n", info->flags & IOMMU_FAULT_WRITE ? "WRITE" : "READ");
+		drm_printf(p, "  - type: %s\n", info->type);
+		drm_printf(p, "  - source: %s\n", info->block);
+
+		/* Information extracted from what we think are the current
+		 * pgtables.  Hopefully the TTBR0 matches what we've extracted
+		 * from the SMMU registers in smmu_info!
+		 */
+		drm_puts(p, "pgtable-fault-info:\n");
+		drm_printf(p, "  - ttbr0: %.16llx\n", (u64)info->pgtbl_ttbr0);
+		drm_printf(p, "  - asid: %d\n", info->asid);
+		drm_printf(p, "  - ptes: %.16llx %.16llx %.16llx %.16llx\n",
+			   info->ptes[0], info->ptes[1], info->ptes[2], info->ptes[3]);
 	}
 
 	drm_printf(p, "rbbm-status: 0x%08x\n", state->rbbm_status);
