@@ -745,12 +745,14 @@ impl Thread {
         prio_state.state = PriorityState::Set;
     }
 
-    pub(crate) fn set_priority(&self, desired: &BinderPriority) {
+    pub(crate) fn set_priority(&self, desired: &BinderPriority, t: &Transaction) {
         self.do_set_priority(desired, true);
+        crate::trace::vh_set_priority(t, &self.task);
     }
 
     pub(crate) fn restore_priority(&self, desired: &BinderPriority) {
         self.do_set_priority(desired, false);
+        crate::trace::vh_restore_priority(&self.task);
     }
 
     fn translate_object(

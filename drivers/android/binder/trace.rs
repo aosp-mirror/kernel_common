@@ -17,6 +17,8 @@ declare_trace! {
     unsafe fn rust_binder_read_done(ret: c_int);
     unsafe fn rust_binder_write_done(ret: c_int);
     unsafe fn rust_binder_set_priority(thread: *mut task_struct, desired_prio: c_int, new_prio: c_int);
+    unsafe fn android_vh_rust_binder_set_priority(t: rust_binder_transaction, task: *mut task_struct);
+    unsafe fn android_vh_rust_binder_restore_priority(task: *mut task_struct);
     unsafe fn rust_binder_wait_for_work(proc_work: bool, transaction_stack: bool, thread_todo: bool);
     unsafe fn rust_binder_transaction(reply: bool, t: rust_binder_transaction);
     unsafe fn rust_binder_transaction_received(t: rust_binder_transaction);
@@ -69,6 +71,18 @@ pub(crate) fn trace_write_done(ret: Result) {
 pub(crate) fn trace_set_priority(thread: &Task, desired_prio: c_int, new_prio: c_int) {
     // SAFETY: The pointer to the task is valid for the duration of this call.
     unsafe { rust_binder_set_priority(thread.as_raw(), desired_prio, new_prio) }
+}
+
+#[inline]
+pub(crate) fn vh_set_priority(t: &Transaction, task: &Task) {
+    // SAFETY: The pointers to `t` and `task` are valid.
+    unsafe { android_vh_rust_binder_set_priority(raw_transaction(t), task.as_raw()) }
+}
+
+#[inline]
+pub(crate) fn vh_restore_priority(task: &Task) {
+    // SAFETY: The pointer to `task` is valid.
+    unsafe { android_vh_rust_binder_restore_priority(task.as_raw()) }
 }
 
 #[inline]
