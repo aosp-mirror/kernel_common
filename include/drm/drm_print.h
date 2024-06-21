@@ -36,7 +36,7 @@
 #include <drm/drm.h>
 
 /* Do *not* use outside of drm_print.[ch]! */
-extern unsigned long __drm_debug_syslog;
+extern unsigned long __drm_debug;
 extern unsigned int __drm_debug_trace;
 
 /**
@@ -87,7 +87,7 @@ void __drm_puts_coredump(struct drm_printer *p, const char *str);
 void __drm_printfn_seq_file(struct drm_printer *p, struct va_format *vaf);
 void __drm_puts_seq_file(struct drm_printer *p, const char *str);
 void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf);
-void __drm_printfn_debug_syslog(struct drm_printer *p, struct va_format *vaf);
+void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
 void __drm_printfn_trace(struct drm_printer *p, struct va_format *vaf);
 void __drm_printfn_debug_syslog_and_trace(struct drm_printer *p,
 					   struct va_format *vaf);
@@ -330,10 +330,9 @@ enum drm_debug_category {
 	 */
 	DRM_UT_DRMRES
 };
-
 static inline bool drm_debug_syslog_enabled(enum drm_debug_category category)
 {
-	return unlikely(__drm_debug_syslog & BIT(category));
+	return unlikely(__drm_debug & BIT(category));
 }
 
 static inline bool drm_debug_trace_enabled(enum drm_debug_category category)
@@ -393,7 +392,7 @@ drm_debug_category_printer(enum drm_debug_category category,
 	    drm_debug_trace_enabled(category)) {
 		p.printfn = __drm_printfn_debug_syslog_and_trace;
 	} else if (drm_debug_syslog_enabled(category)) {
-		p.printfn = __drm_printfn_debug_syslog;
+		p.printfn = __drm_printfn_debug;
 	} else if (drm_debug_trace_enabled(category)) {
 		p.printfn = __drm_printfn_trace;
 	} else {

@@ -37,11 +37,11 @@
 #include <drm/drm_print.h>
 
 /*
- * __drm_debug_syslog: Enable debug output to system logs
+ * __drm_debug: Enable debug output.
  * Bitmask of DRM_UT_x. See include/drm/drm_print.h for details.
  */
-unsigned long __drm_debug_syslog;
-EXPORT_SYMBOL(__drm_debug_syslog);
+unsigned long __drm_debug;
+EXPORT_SYMBOL(__drm_debug);
 
 /*
  * __drm_debug_trace: Enable debug output in drm tracing instance.
@@ -64,7 +64,7 @@ EXPORT_SYMBOL(__drm_debug_trace);
 MODULE_PARM_DESC(debug, DEBUG_PARM_DESC("syslog"));
 
 #if !defined(CONFIG_DRM_USE_DYNAMIC_DEBUG)
-module_param_named(debug, __drm_debug_syslog, ulong, 0600);
+module_param_named(debug, __drm_debug, ulong, 0600);
 #else
 /* classnames must match vals of enum drm_debug_category */
 DECLARE_DYNDBG_CLASSMAP(drm_debug_classes, DD_CLASS_TYPE_DISJOINT_BITS, 0,
@@ -80,7 +80,7 @@ DECLARE_DYNDBG_CLASSMAP(drm_debug_classes, DD_CLASS_TYPE_DISJOINT_BITS, 0,
 			"DRM_UT_DRMRES");
 
 static struct ddebug_class_param drm_debug_bitmap = {
-	.bits = &__drm_debug_syslog,
+	.bits = &__drm_debug,
 	.flags = "p",
 	.map = &drm_debug_classes,
 };
@@ -200,12 +200,12 @@ void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf)
 }
 EXPORT_SYMBOL(__drm_printfn_info);
 
-void __drm_printfn_debug_syslog(struct drm_printer *p, struct va_format *vaf)
+void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 {
 	/* pr_debug callsite decorations are unhelpful here */
 	printk(KERN_DEBUG "%s %pV", p->prefix, vaf);
 }
-EXPORT_SYMBOL(__drm_printfn_debug_syslog);
+EXPORT_SYMBOL(__drm_printfn_debug);
 
 void __drm_printfn_trace(struct drm_printer *p, struct va_format *vaf)
 {
