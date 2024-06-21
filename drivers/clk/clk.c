@@ -2925,11 +2925,14 @@ bool clk_has_parent(const struct clk *clk, const struct clk *parent)
 EXPORT_SYMBOL_GPL(clk_has_parent);
 
 static int clk_core_set_parent_nolock(struct clk_core *core,
-				      struct clk_core *parent)
+				      struct clk_core *parent,
+				      bool invalidate_parent)
 {
+	struct clk_core *old_parent = core->parent;
 	int ret = 0;
 	int p_index = 0;
 	unsigned long p_rate = 0;
+	int i;
 
 	lockdep_assert_held(&prepare_lock);
 
@@ -2983,6 +2986,14 @@ static int clk_core_set_parent_nolock(struct clk_core *core,
 		__clk_recalc_accuracies(core);
 	}
 
+	/* invalidate the parent cache */
+	if (!parent && invalidate_parent) {
+		for (i = 0; i < core->num_parents; i++) {
+			if (core->parents[i].core == old_parent)
+				core->parents[i].core = NULL;
+		}
+	}
+
 runtime_put:
 	clk_pm_runtime_put(core);
 
@@ -2991,7 +3002,7 @@ runtime_put:
 
 int clk_hw_set_parent(struct clk_hw *hw, struct clk_hw *parent)
 {
-	return clk_core_set_parent_nolock(hw->core, parent->core);
+	return clk_core_set_parent_nolock(hw->core, parent->core, false);
 }
 EXPORT_SYMBOL_GPL(clk_hw_set_parent);
 
@@ -3025,7 +3036,8 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 		clk_core_rate_unprotect(clk->core);
 
 	ret = clk_core_set_parent_nolock(clk->core,
-					 parent ? parent->core : NULL);
+					 parent ? parent->core : NULL,
+					 false);
 
 	if (clk->exclusive_count)
 		clk_core_rate_protect(clk->core);
@@ -3687,7 +3699,7 @@ static ssize_t current_parent_write(struct file *file, const char __user *ubuf,
 		return -ENOENT;
 
 	clk_prepare_lock();
-	err = clk_core_set_parent_nolock(core, parent);
+	err = clk_core_set_parent_nolock(core, parent, false);
 	clk_prepare_unlock();
 	if (err)
 		return err;
@@ -4588,7 +4600,8 @@ void clk_unregister(struct clk *clk)
 	if (ops == &clk_nodrv_ops) {
 		pr_err("%s: unregistered clock: %s\n", __func__,
 		       clk->core->name);
-		goto unlock;
+		clk_prepare_unlock();
+		return;
 	}
 	/*
 	 * Assign empty clock ops for consumers that might still hold
@@ -4608,7 +4621,7 @@ void clk_unregister(struct clk *clk)
 		/* Reparent all children to the orphan list. */
 		hlist_for_each_entry_safe(child, t, &clk->core->children,
 					  child_node)
-			clk_core_set_parent_nolock(child, NULL);
+			clk_core_set_parent_nolock(child, NULL, true);
 	}
 
 	clk_core_evict_parent_cache(clk->core);
@@ -4622,11 +4635,10 @@ void clk_unregister(struct clk *clk)
 	if (clk->core->protect_count)
 		pr_warn("%s: unregistering protected clock: %s\n",
 					__func__, clk->core->name);
+	clk_prepare_unlock();
 
 	kref_put(&clk->core->ref, __clk_release);
 	free_clk(clk);
-unlock:
-	clk_prepare_unlock();
 }
 EXPORT_SYMBOL_GPL(clk_unregister);
 
@@ -4785,13 +4797,11 @@ void __clk_put(struct clk *clk)
 	if (clk->min_rate > 0 || clk->max_rate < ULONG_MAX)
 		clk_set_rate_range_nolock(clk, 0, ULONG_MAX);
 
-	owner = clk->core->owner;
-	kref_put(&clk->core->ref, __clk_release);
-
 	clk_prepare_unlock();
 
+	owner = clk->core->owner;
+	kref_put(&clk->core->ref, __clk_release);
 	module_put(owner);
-
 	free_clk(clk);
 }
 

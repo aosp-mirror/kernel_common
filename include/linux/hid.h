@@ -379,6 +379,7 @@ struct hid_item {
 #define HID_QUIRK_INPUT_PER_APP			BIT(11)
 #define HID_QUIRK_X_INVERT			BIT(12)
 #define HID_QUIRK_Y_INVERT			BIT(13)
+#define HID_QUIRK_DEVICE_IS_DIGITIZER		BIT(14)
 #define HID_QUIRK_SKIP_OUTPUT_REPORTS		BIT(16)
 #define HID_QUIRK_SKIP_OUTPUT_REPORT_ID		BIT(17)
 #define HID_QUIRK_NO_OUTPUT_REPORTS_ON_INTR_EP	BIT(18)
@@ -425,6 +426,7 @@ struct hid_item {
 
 struct hid_global {
 	unsigned usage_page;
+	/* HID Global fields are constrained by spec to 32-bits */
 	__s32    logical_minimum;
 	__s32    logical_maximum;
 	__s32    physical_minimum;
@@ -491,7 +493,7 @@ struct hid_field {
 	unsigned  maxusage;		/* maximum usage index */
 	unsigned  flags;		/* main-item flags (i.e. volatile,array,constant) */
 	unsigned  report_offset;	/* bit offset in the report */
-	unsigned  report_size;		/* size of this field in the report */
+	unsigned  report_size;		/* size of this field in the report, in bits */
 	unsigned  report_count;		/* number of this field in the report */
 	unsigned  report_type;		/* (input,output,feature) */
 	__s32    *value;		/* last known value(s) */
@@ -643,9 +645,15 @@ struct hid_device {							/* device report descriptor */
 	__s32 battery_max;
 	__s32 battery_report_type;
 	__s32 battery_report_id;
+	__u64 battery_serial_number;
+	__u64 battery_new_serial_number;				/* gather entire updated 64-bit SN here for end of report */
+	char battery_serial_number_str[17];				/* Space for max 16 hex digits */
 	__s32 battery_charge_status;
 	enum hid_battery_status battery_status;
 	bool battery_avoid_query;
+	bool battery_state_changed;					/* a battery field has been changed within the current report */
+	bool battery_reported;
+	bool battery_sn_64bit;						/* whether battery S/N is 32 or 64 bits long */
 	ktime_t battery_ratelimit_time;
 #endif
 

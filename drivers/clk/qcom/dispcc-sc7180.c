@@ -705,6 +705,20 @@ static int disp_cc_sc7180_probe(struct platform_device *pdev)
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
 
+	/*
+	 * Force off 'disp_cc_mdss_rot_clk' so that the driver for the
+	 * "qcom,sc7180-mdss" compatible node can disable
+	 * 'disp_cc_mdss_mdp_clk', which in turn disables 'disp_cc_pll0',
+	 * without making this clk stuck on. When the mdss driver runtime
+	 * suspends, the mdss_gdsc will turn off. If 'disp_cc_mdss_rot_clk'
+	 * isn't off or parked on XO at this time it will wedge the GDSC and
+	 * then 'disp_cc_mdss_mdp_clk' will fail to turn on because the GDSC is
+	 * wedged.
+	 */
+	regmap_update_bits(regmap,
+			   disp_cc_mdss_rot_clk.clkr.enable_reg,
+			   disp_cc_mdss_rot_clk.clkr.enable_mask, 0);
+
 	/* 1380MHz configuration */
 	disp_cc_pll_config.l = 0x47;
 	disp_cc_pll_config.alpha = 0xe000;

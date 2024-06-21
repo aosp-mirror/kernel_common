@@ -677,6 +677,8 @@ struct device_physical_location {
  *              should be set by the subsystem / bus driver that discovered
  *              the device.
  *
+ * @coredump_disabled: Can be used to selectively enable/disable the coredump
+ *		functionality for a particular device via sysfs entry.
  * @offline_disabled: If set, the device is permanently online.
  * @offline:	Set after successful invocation of bus type's .offline().
  * @of_node_reused: Set if the device-tree node is shared with an ancestor
@@ -793,6 +795,7 @@ struct device {
 
 	enum device_removable	removable;
 
+	bool			coredump_disabled:1;
 	bool			offline_disabled:1;
 	bool			offline:1;
 	bool			of_node_reused:1;

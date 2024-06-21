@@ -53,6 +53,16 @@ static int kgdboc_reset_connect(struct input_handler *handler,
 				struct input_dev *dev,
 				const struct input_device_id *id)
 {
+	/*
+	 * Pretend that SysRq key was never pressed (in case we got here
+	 * via SysRq), otherwise as we release all they keys we'll
+	 * end up sending release events for Alt and SysRq, potentially
+	 * triggering print screen function.
+	 */
+	spin_lock_irq(&dev->event_lock);
+	clear_bit(KEY_SYSRQ, dev->key);
+	spin_unlock_irq(&dev->event_lock);
+
 	input_reset_device(dev);
 
 	/* Return an error - we do not want to bind, just to reset */

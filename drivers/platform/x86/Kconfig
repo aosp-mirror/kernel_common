@@ -1099,6 +1099,13 @@ config SEL3350_PLATFORM
 	  To compile this driver as a module, choose M here: the module
 	  will be called sel3350-platform.
 
+config VIRT_PMC
+       tristate "Virtual Power Management Controller"
+       depends on ACPI && SUSPEND && HYPERVISOR_GUEST
+       help
+         The Virtual PMC driver is meant for the guest VMs and its main
+         purpose is to notify about guest entering s2idle state.
+
 endif # X86_PLATFORM_DEVICES
 
 config P2SB

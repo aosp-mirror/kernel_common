@@ -51,6 +51,7 @@ pci_config_attr(subsystem_vendor, "0x%04x\n");
 pci_config_attr(subsystem_device, "0x%04x\n");
 pci_config_attr(revision, "0x%02x\n");
 pci_config_attr(class, "0x%06x\n");
+pci_config_attr(untrusted, "%u\n");
 
 static ssize_t irq_show(struct device *dev,
 			struct device_attribute *attr,
@@ -615,6 +616,7 @@ static struct attribute *pci_dev_attrs[] = {
 #endif
 	&dev_attr_driver_override.attr,
 	&dev_attr_ari_enabled.attr,
+	&dev_attr_untrusted.attr,
 	NULL,
 };
 
