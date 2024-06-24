@@ -2597,7 +2597,7 @@ static enum dc_status amdgpu_dm_commit_zero_streams(struct dc *dc)
 			goto fail;
 	}
 
-	res = dc_commit_streams(dc, context->streams, context->stream_count);
+	res = dc_commit_state(dc, context);
 
 fail:
 	dc_release_state(context);
@@ -2859,7 +2859,7 @@ static int dm_resume(void *handle)
 			dc_enable_dmub_outbox(adev->dm.dc);
 		}
 
-		WARN_ON(!dc_commit_streams(dm->dc, dc_state->streams, dc_state->stream_count));
+		WARN_ON(!dc_commit_state(dm->dc, dc_state));
 
 		dm_gpureset_commit_state(dm->cached_dc_state, dm);
 
@@ -8637,7 +8637,7 @@ static void amdgpu_dm_commit_streams(struct drm_atomic_state *state,
 
 	dm_enable_per_frame_crtc_master_sync(dc_state);
 	mutex_lock(&dm->dc_lock);
-	WARN_ON(!dc_commit_streams(dm->dc, dc_state->streams, dc_state->stream_count));
+	WARN_ON(!dc_commit_state(dm->dc, dc_state));
 
 	/* Allow idle optimization when vblank count is 0 for display off */
 	if (dm->active_vblank_irq_count == 0)
