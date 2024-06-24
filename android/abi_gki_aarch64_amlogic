@@ -619,10 +619,12 @@
   drm_crtc_handle_vblank
   drm_crtc_init_with_planes
   drm_crtc_send_vblank_event
+  drm_crtc_vblank_count
   drm_crtc_vblank_get
   drm_crtc_vblank_helper_get_vblank_timestamp
   drm_crtc_vblank_off
   drm_crtc_vblank_on
+  drm_crtc_vblank_put
   __drm_dbg
   drm_debugfs_create_files
   drm_dev_alloc
@@ -936,6 +938,8 @@
   hex2bin
   hex_asc
   hex_dump_to_buffer
+  __hid_register_driver
+  hid_unregister_driver
   high_memory
   hrtimer_active
   hrtimer_cancel
