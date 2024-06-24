@@ -1610,6 +1610,8 @@
 # required by exynos_thermal_v2.ko
   devm_thermal_of_zone_register
   kthread_flush_work
+  kunit_hooks
+  kunit_running
   of_get_cpu_node
   thermal_cdev_update
   thermal_cooling_device_unregister
