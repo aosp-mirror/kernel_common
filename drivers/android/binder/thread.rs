@@ -1413,6 +1413,7 @@ impl Thread {
         while reader.len() >= size_of::<u32>() && self.inner.lock().return_work.is_unused() {
             let before = reader.len();
             let cmd = reader.read::<u32>()?;
+            crate::trace::trace_command(cmd);
             match cmd {
                 BC_TRANSACTION => {
                     let tr = reader.read::<BinderTransactionData>()?.with_buffers_size(0);
