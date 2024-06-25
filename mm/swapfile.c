@@ -360,12 +360,8 @@ static void swap_cluster_schedule_discard(struct swap_info_struct *si,
 
 static void __free_cluster(struct swap_info_struct *si, struct swap_cluster_info *ci)
 {
-	if (ci->state == CLUSTER_STATE_NONFULL)
-		list_move_tail(&ci->list, &si->free_clusters);
-	else
-		list_add_tail(&ci->list, &si->free_clusters);
 	ci->state = CLUSTER_STATE_FREE;
-	ci->order = 0;
+	list_add_tail(&ci->list, &si->free_clusters);
 }
 
 /*
@@ -487,12 +483,7 @@ static void dec_cluster_info_page(struct swap_info_struct *p, struct swap_cluste
 	ci->count--;
 
 	if (!ci->count)
-		return free_cluster(p, ci);
-
-	if (ci->state == CLUSTER_STATE_SCANNED) {
-		list_add_tail(&ci->list, &p->nonfull_clusters[ci->order]);
-		ci->state = CLUSTER_STATE_NONFULL;
-	}
+		free_cluster(p, ci);
 }
 
 /*
@@ -543,25 +534,17 @@ static bool scan_swap_map_try_ssd_cluster(struct swap_info_struct *si,
 	unsigned int nr_pages = 1 << order;
 	struct percpu_cluster *cluster;
 	struct swap_cluster_info *ci;
-	unsigned int tmp, max, found = 0;
+	unsigned int tmp, max;
 
 new_cluster:
 	cluster = this_cpu_ptr(si->percpu_cluster);
 	tmp = cluster->next[order];
 	if (tmp == SWAP_NEXT_INVALID) {
-		if (!list_empty(&si->nonfull_clusters[order])) {
-			ci = list_first_entry(&si->nonfull_clusters[order], struct swap_cluster_info, list);
-			list_del(&ci->list);
-			spin_lock(&ci->lock);
-			ci->state = CLUSTER_STATE_PER_CPU;
-			spin_unlock(&ci->lock);
-			tmp = (ci - si->cluster_info) * SWAPFILE_CLUSTER;
-		} else if (!list_empty(&si->free_clusters)) {
+		if (!list_empty(&si->free_clusters)) {
 			ci = list_first_entry(&si->free_clusters, struct swap_cluster_info, list);
 			list_del(&ci->list);
 			spin_lock(&ci->lock);
 			ci->state = CLUSTER_STATE_PER_CPU;
-			ci->order = order;
 			spin_unlock(&ci->lock);
 			tmp = (ci - si->cluster_info) * SWAPFILE_CLUSTER;
 		} else if (!list_empty(&si->discard_clusters)) {
@@ -586,24 +569,21 @@ new_cluster:
 	max = min_t(unsigned long, si->max, ALIGN(tmp + 1, SWAPFILE_CLUSTER));
 	if (tmp < max) {
 		ci = lock_cluster(si, tmp);
-		while (!found && tmp < max) {
+		while (tmp < max) {
 			if (swap_range_empty(si->swap_map, tmp, nr_pages))
-				found = tmp;
+				break;
 			tmp += nr_pages;
 		}
-		if (tmp >= max) {
-			ci->state = CLUSTER_STATE_SCANNED;
-			cluster->next[order] = SWAP_NEXT_INVALID;
-		} else
-			cluster->next[order] = tmp;
-		WARN_ONCE(ci->order != order, "expecting order %d got %d", order, ci->order);
 		unlock_cluster(ci);
 	}
-	if (!found)
+	if (tmp >= max) {
+		cluster->next[order] = SWAP_NEXT_INVALID;
 		goto new_cluster;
-
-	*offset = found;
-	*scan_base = found;
+	}
+	*offset = tmp;
+	*scan_base = tmp;
+	tmp += nr_pages;
+	cluster->next[order] = tmp < max ? tmp : SWAP_NEXT_INVALID;
 	return true;
 }
 
@@ -2920,9 +2900,6 @@ static int setup_swap_map_and_extents(struct swap_info_struct *p,
 
 	INIT_LIST_HEAD(&p->free_clusters);
 	INIT_LIST_HEAD(&p->discard_clusters);
-
-	for (i = 0; i < SWAP_NR_ORDERS; i++)
-		INIT_LIST_HEAD(&p->nonfull_clusters[i]);
 
 	for (i = 0; i < swap_header->info.nr_badpages; i++) {
 		unsigned int page_nr = swap_header->info.badpages[i];
