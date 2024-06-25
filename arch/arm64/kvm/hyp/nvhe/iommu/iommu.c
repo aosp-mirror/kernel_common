@@ -331,7 +331,7 @@ size_t kvm_iommu_map_pages(pkvm_handle_t domain_id, unsigned long iova,
 	 * so far.
 	 */
 	if (pgcount)
-		__pkvm_host_unuse_dma(paddr, pgcount * pgsize);
+		__pkvm_host_unuse_dma(paddr + total_mapped, pgcount * pgsize);
 
 	domain_put(domain);
 	return total_mapped;
