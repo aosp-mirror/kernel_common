@@ -338,13 +338,6 @@ properties:
           - const: google,gru
           - const: rockchip,rk3399
 
-      - description: Google Kevin (Samsung Chromebook Plus) DVT2
-        items:
-          - const: google,kevin-rev5
-          - const: google,kevin
-          - const: google,gru
-          - const: rockchip,rk3399
-
       - description: Google Mickey (Asus Chromebit CS10)
         items:
           - const: google,veyron-mickey-rev8
