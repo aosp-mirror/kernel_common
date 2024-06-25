@@ -370,6 +370,22 @@ DECLARE_HOOK(android_vh_do_swap_page_spf,
 DECLARE_HOOK(android_vh_tune_fault_around_bytes,
 	TP_PROTO(unsigned long *fault_around_bytes),
 	TP_ARGS(fault_around_bytes));
+DECLARE_HOOK(android_vh_do_anonymous_page,
+	TP_PROTO(struct vm_area_struct *vma, struct page *page),
+	TP_ARGS(vma, page));
+DECLARE_HOOK(android_vh_do_swap_page,
+	TP_PROTO(struct page *page, pte_t *pte, struct vm_fault *vmf,
+		swp_entry_t entry),
+	TP_ARGS(page, pte, vmf, entry));
+DECLARE_HOOK(android_vh_do_wp_page,
+	TP_PROTO(struct page *page),
+	TP_ARGS(page));
+DECLARE_HOOK(android_vh_uprobes_replace_page,
+	TP_PROTO(struct page *new_page, struct page *old_page),
+	TP_ARGS(new_page, old_page));
+DECLARE_HOOK(android_vh_shmem_swapin_page,
+	TP_PROTO(struct page *page),
+	TP_ARGS(page));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
