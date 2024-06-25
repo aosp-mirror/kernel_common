@@ -355,11 +355,12 @@ impl<'a> AllocationView<'a> {
         strong: bool,
         node_ref: NodeRef,
     ) -> Result {
+        let mut newobj = FlatBinderObject::default();
+        let node = node_ref.node.clone();
         if Arc::ptr_eq(&node_ref.node.owner, &self.alloc.process) {
             // The receiving process is the owner of the node, so send it a binder object (instead
             // of a handle).
-            let (ptr, cookie) = node_ref.node.get_id();
-            let mut newobj = FlatBinderObject::default();
+            let (ptr, cookie) = node.get_id();
             newobj.hdr.type_ = if strong {
                 BINDER_TYPE_BINDER
             } else {
@@ -371,7 +372,7 @@ impl<'a> AllocationView<'a> {
             self.write(offset, &newobj)?;
             // Increment the user ref count on the node. It will be decremented as part of the
             // destruction of the buffer, when we see a binder or weak-binder object.
-            node_ref.node.update_refcount(true, 1, strong);
+            node.update_refcount(true, 1, strong);
         } else {
             // The receiving process is different from the owner, so we need to insert a handle to
             // the binder object.
@@ -380,7 +381,6 @@ impl<'a> AllocationView<'a> {
                 .process
                 .as_arc_borrow()
                 .insert_or_update_handle(node_ref, false)?;
-            let mut newobj = FlatBinderObject::default();
             newobj.hdr.type_ = if strong {
                 BINDER_TYPE_HANDLE
             } else {
@@ -398,6 +398,9 @@ impl<'a> AllocationView<'a> {
                 return Err(EINVAL);
             }
         }
+
+        crate::trace::trace_transaction_node_send(self.alloc.debug_id, &node, obj, &newobj);
+
         Ok(())
     }
 

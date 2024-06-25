@@ -19,6 +19,7 @@ typedef void *rust_binder_transaction;
 typedef void *rust_binder_thread;
 typedef void *rust_binder_process;
 typedef void *rust_binder_node;
+typedef void *rust_binder_ref_data;
 
 struct rb_transaction_layout {
 	size_t debug_id;
@@ -43,6 +44,7 @@ struct rb_process_layout {
 struct rb_node_layout {
 	size_t arc_offset;
 	size_t debug_id;
+	size_t ptr;
 };
 
 struct rust_binder_layout {
@@ -106,6 +108,10 @@ static inline struct task_struct *rust_binder_process_task(rust_binder_process t
 
 static inline size_t rust_binder_node_debug_id(rust_binder_node t) {
 	return * (size_t *) (t + RUST_BINDER_LAYOUT.n.debug_id);
+}
+
+static inline binder_uintptr_t rust_binder_node_ptr(rust_binder_node t) {
+	return * (binder_uintptr_t *) (t + RUST_BINDER_LAYOUT.n.ptr);
 }
 
 #endif

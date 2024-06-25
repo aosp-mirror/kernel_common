@@ -147,6 +147,48 @@ TRACE_EVENT(rust_binder_transaction_received,
 	TP_printk("transaction=%d", __entry->debug_id)
 );
 
+TRACE_EVENT(rust_binder_transaction_node_send,
+	TP_PROTO(int t_debug_id, rust_binder_node node,
+		const struct flat_binder_object *original,
+		const struct flat_binder_object *translated),
+	TP_ARGS(t_debug_id, node, original, translated),
+
+	TP_STRUCT__entry(
+		__field(int, debug_id)
+		__field(int, node_debug_id)
+		__field(binder_uintptr_t, node_ptr)
+		__field(int, types)
+		__field(int, original_handle)
+		__field(int, translated_handle)
+	),
+	TP_fast_assign(
+		int orig_is_handle = original->hdr.type == BINDER_TYPE_HANDLE || original->hdr.type == BINDER_TYPE_WEAK_HANDLE;
+		int orig_is_strong = original->hdr.type == BINDER_TYPE_HANDLE || original->hdr.type == BINDER_TYPE_BINDER;
+		int tran_is_handle = translated->hdr.type == BINDER_TYPE_HANDLE || translated->hdr.type == BINDER_TYPE_WEAK_HANDLE;
+		int tran_is_strong = translated->hdr.type == BINDER_TYPE_HANDLE || translated->hdr.type == BINDER_TYPE_BINDER;
+
+		__entry->debug_id = t_debug_id;
+		__entry->node_debug_id = rust_binder_node_debug_id(node);
+		__entry->node_ptr = rust_binder_node_debug_id(node);
+		__entry->types =
+			(orig_is_handle << 0) |
+			(tran_is_handle << 1) |
+			(orig_is_strong << 2) |
+			(tran_is_strong << 3);
+		__entry->original_handle = orig_is_handle ? original->handle : 0;
+		__entry->translated_handle = tran_is_handle ? original->handle : 0;
+	),
+	TP_printk("transaction=%d node=%d ptr=0x%016llx: %s%s [%d] ==> %s%s [%d]",
+		  __entry->debug_id, __entry->node_debug_id,
+		  (u64)__entry->node_ptr,
+		  (__entry->types & (1<<2)) ? "" : "weak ",
+		  (__entry->types & (1<<0)) ? "handle" : "binder",
+		  __entry->original_handle,
+		  (__entry->types & (1<<3)) ? "" : "weak ",
+		  (__entry->types & (1<<1)) ? "handle" : "binder",
+		  __entry->translated_handle)
+);
+
 #endif /* _RUST_BINDER_TRACE_H */
 
 /* This part must be outside protection */
