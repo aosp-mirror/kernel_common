@@ -802,15 +802,7 @@ static int rkisp1_vb2_buf_init(struct vb2_buffer *vb)
 
 	memset(ispbuf->buff_addr, 0, sizeof(ispbuf->buff_addr));
 	for (i = 0; i < pixm->num_planes; i++)
-		/*
-		 * TODO (https://issuetracker.google.com/issues/172216855)
-		 * The way to pass an offset with a DmaBuf is not defined
-		 * in V4L2 specification. This is a local hack to abuse
-		 * data_offset for the purpose. Replace it after the
-		 * appropriate way is defined in upstream.
-		 */
-		ispbuf->buff_addr[i] = vb2_dma_contig_plane_dma_addr(vb, i) +
-				       vb->planes[i].data_offset;
+		ispbuf->buff_addr[i] = vb2_dma_contig_plane_dma_addr(vb, i);
 
 	/* Convert to non-MPLANE */
 	if (pixm->num_planes == 1) {
