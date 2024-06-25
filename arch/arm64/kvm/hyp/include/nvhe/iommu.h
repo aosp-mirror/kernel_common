@@ -70,6 +70,8 @@ struct kvm_iommu_paddr_cache {
 	size_t		pgsize[KVM_IOMMU_PADDR_CACHE_MAX];
 };
 
+void kvm_iommu_flush_unmap_cache(struct kvm_iommu_paddr_cache *cache);
+
 /**
  * struct kvm_iommu_ops - KVM iommu ops
  * @init: init the driver called once before the kernel de-privilege

@@ -1300,14 +1300,20 @@ static void kvm_iommu_unmap_walker(struct io_pgtable_ctxt *ctxt)
 	struct kvm_iommu_walk_data *data = (struct kvm_iommu_walk_data *)ctxt->arg;
 	struct kvm_iommu_paddr_cache *cache = data->cache;
 
-	cache->paddr[cache->ptr] = ctxt->addr;
-	cache->pgsize[cache->ptr++] = ctxt->size;
-
 	/*
 	 * It is guaranteed unmap is called with max of the cache size,
 	 * see kvm_iommu_unmap_pages()
 	 */
-	WARN_ON(cache->ptr == KVM_IOMMU_PADDR_CACHE_MAX);
+	cache->paddr[cache->ptr] = ctxt->addr;
+	cache->pgsize[cache->ptr++] = ctxt->size;
+
+	/* Make more space. */
+	if(cache->ptr == KVM_IOMMU_PADDR_CACHE_MAX) {
+		/* Must invalidate TLB first. */
+		smmu_iotlb_sync(data->cookie, data->iotlb_gather);
+		iommu_iotlb_gather_init(data->iotlb_gather);
+		kvm_iommu_flush_unmap_cache(cache);
+	}
 }
 
 static size_t smmu_unmap_pages(struct kvm_hyp_iommu_domain *domain, unsigned long iova,

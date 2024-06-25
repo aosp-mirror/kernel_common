@@ -380,7 +380,7 @@ void kvm_iommu_iotlb_gather_add_page(struct kvm_hyp_iommu_domain *domain,
 	kvm_iommu_iotlb_gather_add_range(gather, iova, size);
 }
 
-static void kvm_iommu_flush_unmap_cache(struct kvm_iommu_paddr_cache *cache)
+void kvm_iommu_flush_unmap_cache(struct kvm_iommu_paddr_cache *cache)
 {
 	while (cache->ptr) {
 		cache->ptr--;

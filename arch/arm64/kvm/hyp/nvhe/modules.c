@@ -152,6 +152,7 @@ const struct pkvm_module_ops module_ops = {
 	.iommu_reclaim_pages_atomic = kvm_iommu_reclaim_pages_atomic,
 	.iommu_snapshot_host_stage2 = kvm_iommu_snapshot_host_stage2,
 	.hyp_smp_processor_id = _hyp_smp_processor_id,
+	.iommu_flush_unmap_cache = kvm_iommu_flush_unmap_cache,
 };
 
 int __pkvm_init_module(void *module_init)
