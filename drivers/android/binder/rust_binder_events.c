@@ -30,6 +30,30 @@ static const char * const binder_command_strings[] = {
 	"BC_REPLY_SG",
 };
 
+static const char * const binder_return_strings[] = {
+	"BR_ERROR",
+	"BR_OK",
+	"BR_TRANSACTION",
+	"BR_REPLY",
+	"BR_ACQUIRE_RESULT",
+	"BR_DEAD_REPLY",
+	"BR_TRANSACTION_COMPLETE",
+	"BR_INCREFS",
+	"BR_ACQUIRE",
+	"BR_RELEASE",
+	"BR_DECREFS",
+	"BR_ATTEMPT_ACQUIRE",
+	"BR_NOOP",
+	"BR_SPAWN_LOOPER",
+	"BR_FINISHED",
+	"BR_DEAD_BINDER",
+	"BR_CLEAR_DEATH_NOTIFICATION_DONE",
+	"BR_FAILED_REPLY",
+	"BR_FROZEN_REPLY",
+	"BR_ONEWAY_SPAM_SUSPECT",
+	"BR_TRANSACTION_PENDING_FROZEN"
+};
+
 #define CREATE_TRACE_POINTS
 #define CREATE_RUST_TRACE_POINTS
 #include <trace/events/rust_binder.h>

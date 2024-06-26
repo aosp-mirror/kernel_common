@@ -361,6 +361,22 @@ TRACE_EVENT(rust_binder_command,
 			  "unknown")
 );
 
+TRACE_EVENT(rust_binder_return,
+    TP_PROTO(uint32_t ret),
+    TP_ARGS(ret),
+    TP_STRUCT__entry(
+        __field(uint32_t, ret)
+    ),
+    TP_fast_assign(
+        __entry->ret = ret;
+    ),
+    TP_printk("ret=0x%x %s",
+          __entry->ret,
+          _IOC_NR(__entry->ret) < ARRAY_SIZE(binder_return_strings) ?
+              binder_return_strings[_IOC_NR(__entry->ret)] :
+              "unknown")
+);
+
 #endif /* _RUST_BINDER_TRACE_H */
 
 /* This part must be outside protection */

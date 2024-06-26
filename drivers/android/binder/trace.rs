@@ -47,6 +47,7 @@ declare_trace! {
     unsafe fn rust_binder_unmap_kernel_start(pid: c_int, page_index: usize);
     unsafe fn rust_binder_unmap_kernel_end(pid: c_int, page_index: usize);
     unsafe fn rust_binder_command(cmd: u32);
+    unsafe fn rust_binder_return(ret: u32);
 }
 
 #[inline]
@@ -221,4 +222,10 @@ define_wrapper_lru_page_class! {
 pub(crate) fn trace_command(cmd: u32) {
     // SAFETY: Trivially safe to call with primitive u32.
     unsafe { rust_binder_command(cmd) }
+}
+
+#[inline]
+pub(crate) fn trace_return(ret: u32) {
+    // SAFETY: Trivially safe to call with primitive u32.
+    unsafe { rust_binder_return(ret) }
 }
