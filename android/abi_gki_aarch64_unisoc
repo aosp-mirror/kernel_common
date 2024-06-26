@@ -17,8 +17,13 @@
   devm_extcon_register_notifier_all
   devm_hwspin_lock_request_specific
   _dev_info
+  dev_pm_opp_calc_power
+  dev_pm_opp_of_register_em
   dev_set_name
   __dynamic_netdev_dbg
+  em_dev_update_chip_binning
+  em_dev_update_perf_domain
+  em_pd_get
   finish_wait
   fortify_panic
   idr_alloc
