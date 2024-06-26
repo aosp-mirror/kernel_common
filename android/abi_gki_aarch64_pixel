@@ -63,6 +63,7 @@
   __bitmap_or
   bitmap_parse
   bitmap_parselist
+  bitmap_parse_user
   bitmap_print_to_pagebuf
   __bitmap_set
   bitmap_to_arr32
@@ -423,6 +424,7 @@
   devm_regulator_get_optional
   devm_regulator_put
   devm_regulator_register
+  devm_request_any_context_irq
   __devm_request_region
   devm_request_threaded_irq
   devm_rtc_device_register
@@ -1411,6 +1413,7 @@
   of_genpd_add_provider_simple
   of_get_child_by_name
   of_get_cpu_node
+  of_get_drm_panel_display_mode
   of_get_named_gpio
   of_get_next_available_child
   of_get_next_child
