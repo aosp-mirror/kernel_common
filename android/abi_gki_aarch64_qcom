@@ -462,6 +462,7 @@
   dma_buf_map_attachment
   dma_buf_map_attachment_unlocked
   dma_buf_put
+  dma_buf_set_name
   dma_buf_unmap_attachment
   dma_buf_unmap_attachment_unlocked
   dma_contiguous_default_area
