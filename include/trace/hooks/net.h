@@ -17,6 +17,7 @@ DECLARE_HOOK(android_vh_ptype_head,
 struct sock;
 struct msghdr;
 struct sk_buff;
+struct sockaddr_in6;
 struct net_device;
 DECLARE_RESTRICTED_HOOK(android_rvh_sk_alloc,
 	TP_PROTO(struct sock *sock), TP_ARGS(sock), 1);
@@ -56,6 +57,15 @@ DECLARE_HOOK(android_vh_dc_send_copy,
 	TP_PROTO(struct sk_buff *skb, struct net_device *dev), TP_ARGS(skb, dev));
 DECLARE_HOOK(android_vh_dc_receive,
 	TP_PROTO(struct sk_buff *skb, int *flag), TP_ARGS(skb, flag));
+DECLARE_HOOK(android_vh_tcp_v4_connect,
+	TP_PROTO(struct sock *sk, struct sockaddr *uaddr), TP_ARGS(sk, uaddr));
+DECLARE_HOOK(android_vh_tcp_v6_connect,
+	TP_PROTO(struct sock *sk, struct sockaddr *uaddr), TP_ARGS(sk, uaddr));
+DECLARE_HOOK(android_vh_udp_v4_connect,
+	TP_PROTO(struct sock *sk, __be32 daddr, __be16 dport, uint16_t family),
+	TP_ARGS(sk, daddr, dport, family));
+DECLARE_HOOK(android_vh_udp_v6_connect,
+	TP_PROTO(struct sock *sk, struct sockaddr_in6 *sin6), TP_ARGS(sk, sin6));
 DECLARE_HOOK(android_vh_tcp_rtt_estimator,
 	TP_PROTO(struct sock *sk, long mrtt_us), TP_ARGS(sk, mrtt_us));
 DECLARE_HOOK(android_vh_udp_enqueue_schedule_skb,
