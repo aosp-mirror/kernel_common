@@ -10,6 +10,69 @@ use self::tree::{FromArrayAllocs, ReserveNewTreeAlloc, TreeRangeAllocator};
 mod array;
 use self::array::{ArrayRangeAllocator, EmptyArrayAlloc};
 
+enum DescriptorState<T> {
+    Reserved(Reservation),
+    Allocated(Allocation<T>),
+}
+
+impl<T> DescriptorState<T> {
+    fn new(is_oneway: bool, debug_id: usize, pid: Pid) -> Self {
+        DescriptorState::Reserved(Reservation {
+            debug_id,
+            is_oneway,
+            pid,
+        })
+    }
+
+    fn pid(&self) -> Pid {
+        match self {
+            DescriptorState::Reserved(inner) => inner.pid,
+            DescriptorState::Allocated(inner) => inner.reservation.pid,
+        }
+    }
+
+    fn is_oneway(&self) -> bool {
+        match self {
+            DescriptorState::Reserved(inner) => inner.is_oneway,
+            DescriptorState::Allocated(inner) => inner.reservation.is_oneway,
+        }
+    }
+}
+
+struct Reservation {
+    debug_id: usize,
+    is_oneway: bool,
+    pid: Pid,
+}
+
+impl Reservation {
+    fn allocate<T>(self, data: Option<T>) -> Allocation<T> {
+        Allocation {
+            data,
+            reservation: self,
+        }
+    }
+}
+
+struct Allocation<T> {
+    reservation: Reservation,
+    data: Option<T>,
+}
+
+impl<T> Allocation<T> {
+    fn deallocate(self) -> (Reservation, Option<T>) {
+        (self.reservation, self.data)
+    }
+
+    fn debug_id(&self) -> usize {
+        self.reservation.debug_id
+    }
+
+    fn take(&mut self) -> Option<T> {
+        self.data.take()
+    }
+}
+
 /// The array implementation must switch to the tree if it wants to go beyond this number of
 /// ranges.
 const TREE_THRESHOLD: usize = 8;
