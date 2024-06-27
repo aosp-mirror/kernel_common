@@ -814,8 +814,11 @@ impl Thread {
                 const FD_FIELD_OFFSET: usize =
                     ::core::mem::offset_of!(bindings::binder_fd_object, __bindgen_anon_1.fd)
                         as usize;
-                view.alloc
-                    .info_add_fd(file, offset + FD_FIELD_OFFSET, false)?;
+
+                let field_offset = offset + FD_FIELD_OFFSET;
+                crate::trace::trace_transaction_fd_send(view.alloc.debug_id, fd, field_offset);
+
+                view.alloc.info_add_fd(file, field_offset, false)?;
             }
             BinderObjectRef::Ptr(obj) => {
                 let obj_length = obj.length.try_into().map_err(|_| EINVAL)?;
