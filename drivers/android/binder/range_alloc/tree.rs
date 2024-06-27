@@ -11,7 +11,7 @@ use kernel::{
     task::Pid,
 };
 
-use crate::range_alloc::{Allocation, DescriptorState, FreedRange, Range, Reservation};
+use crate::range_alloc::{DescriptorState, FreedRange, Range};
 
 /// Keeps track of allocations in a process' mmap.
 ///
@@ -57,35 +57,14 @@ impl<T> TreeRangeAllocator<T> {
             }
             free_offset = range.endpoint();
 
-            if range.is_oneway {
+            if range.state.is_oneway() {
                 tree.free_oneway_space = tree.free_oneway_space.saturating_sub(range.size);
             }
 
             let free_res = alloc.free_tree.pop().unwrap();
             let tree_node = alloc.tree.pop().unwrap();
             let mut desc = Descriptor::new(range.offset, range.size);
-            if range.is_reserved {
-                desc.state = Some((
-                    DescriptorState::Reserved(Reservation {
-                        debug_id: range.debug_id,
-                        is_oneway: range.is_oneway,
-                        pid: range.pid,
-                    }),
-                    free_res,
-                ));
-            } else {
-                desc.state = Some((
-                    DescriptorState::Allocated(Allocation {
-                        reservation: Reservation {
-                            debug_id: range.debug_id,
-                            is_oneway: range.is_oneway,
-                            pid: range.pid,
-                        },
-                        data: range.data,
-                    }),
-                    free_res,
-                ))
-            }
+            desc.state = Some((range.state, free_res));
             tree.tree.insert(tree_node.into_node(range.offset, desc));
         }
 

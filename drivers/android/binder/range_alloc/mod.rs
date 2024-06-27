@@ -39,6 +39,7 @@ impl<T> DescriptorState<T> {
     }
 }
 
+#[derive(Clone)]
 struct Reservation {
     debug_id: usize,
     is_oneway: bool,
@@ -98,11 +99,7 @@ impl FreedRange {
 struct Range<T> {
     offset: usize,
     size: usize,
-    is_oneway: bool,
-    is_reserved: bool,
-    pid: Pid,
-    debug_id: usize,
-    data: Option<T>,
+    state: DescriptorState<T>,
 }
 
 impl<T> Range<T> {
