@@ -183,7 +183,7 @@ SYM_FUNC_END(__host_hvc)
 .endif
 .endm
 
-.macro __host_el2_vect handler:req
+.macro invalid_host_el2_vect
 	.align 7
 
 	/*
@@ -203,7 +203,7 @@ SYM_FUNC_END(__host_hvc)
 	 * been partially clobbered by __host_enter.
 	 */
 	stp	x0, x1, [sp, #-16]!
-	b	\handler
+	b	__hyp_panic
 
 .L__hyp_sp_overflow\@:
 	/* Switch to the overflow stack */
@@ -213,10 +213,6 @@ SYM_FUNC_END(__host_hvc)
 	ASM_BUG()
 .endm
 
-.macro host_el2_sync_vect
-	__host_el2_vect __hyp_panic
-.endm
-
 .macro invalid_host_el1_vect
 	.align 7
 	mov	x0, xzr		/* restore_host = false */
@@ -224,10 +220,6 @@ SYM_FUNC_END(__host_hvc)
 	mrs	x2, elr_el2
 	mrs	x3, par_el1
 	b	__hyp_do_panic
-.endm
-
-.macro invalid_host_el2_vect
-	__host_el2_vect __hyp_panic
 .endm
 
 /*
@@ -247,7 +239,7 @@ SYM_CODE_START(__kvm_hyp_host_vector)
 	invalid_host_el2_vect			// FIQ EL2t
 	invalid_host_el2_vect			// Error EL2t
 
-	host_el2_sync_vect			// Synchronous EL2h
+	invalid_host_el2_vect			// Synchronous EL2h
 	invalid_host_el2_vect			// IRQ EL2h
 	invalid_host_el2_vect			// FIQ EL2h
 	invalid_host_el2_vect			// Error EL2h
