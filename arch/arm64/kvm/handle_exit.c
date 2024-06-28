@@ -475,16 +475,10 @@ void __noreturn __cold nvhe_hyp_panic_handler(u64 esr, u64 spsr,
 					      u64 far, u64 hpfar)
 {
 	u64 elr_in_kimg = __phys_to_kimg(elr_phys);
-	u64 kaslr_off = kaslr_offset();
-	u64 hyp_offset = elr_in_kimg - kaslr_off - elr_virt;
+	u64 hyp_offset = elr_in_kimg - kaslr_offset() - elr_virt;
 	u64 mode = spsr & PSR_MODE_MASK;
 	u64 panic_addr = elr_virt + hyp_offset;
 	u64 mod_addr = pkvm_el2_mod_kern_va(elr_virt);
-
-	if (mod_addr) {
-		panic_addr = mod_addr;
-		kaslr_off = 0;
-	}
 
 	if (mode != PSR_MODE_EL2t && mode != PSR_MODE_EL2h) {
 		kvm_err("Invalid host exception to nVHE hyp!\n");
@@ -504,12 +498,18 @@ void __noreturn __cold nvhe_hyp_panic_handler(u64 esr, u64 spsr,
 
 		if (file)
 			kvm_err("nVHE hyp BUG at: %s:%u!\n", file, line);
+		else if (mod_addr)
+			kvm_err("nVHE hyp BUG at: [<%016llx>] %pB!\n", mod_addr,
+					(void *)mod_addr);
 		else
 			kvm_err("nVHE hyp BUG at: [<%016llx>] %pB!\n", panic_addr,
-					(void *)(panic_addr + kaslr_off));
+					(void *)(panic_addr + kaslr_offset()));
+	} else if (mod_addr) {
+		kvm_err("nVHE hyp panic at: [<%016llx>] %pB!\n", mod_addr,
+				(void *)mod_addr);
 	} else {
 		kvm_err("nVHE hyp panic at: [<%016llx>] %pB!\n", panic_addr,
-				(void *)(panic_addr + kaslr_off));
+				(void *)(panic_addr + kaslr_offset()));
 	}
 
 	/* Dump the nVHE hypervisor backtrace */
