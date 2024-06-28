@@ -2651,7 +2651,6 @@ static void ath10k_sdio_remove(struct sdio_func *func)
 
 	ath10k_core_destroy(ar);
 
-	flush_workqueue(ar_sdio->workqueue);
 	destroy_workqueue(ar_sdio->workqueue);
 }
 

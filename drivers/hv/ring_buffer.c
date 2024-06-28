@@ -261,7 +261,8 @@ EXPORT_SYMBOL_GPL(hv_ringbuffer_spinlock_busy);
 
 /* Write to the ring buffer. */
 int hv_ringbuffer_write(struct vmbus_channel *channel,
-			const struct kvec *kv_list, u32 kv_count)
+			const struct kvec *kv_list, u32 kv_count,
+			u64 requestid)
 {
 	int i;
 	u32 bytes_avail_towrite;
@@ -271,6 +272,8 @@ int hv_ringbuffer_write(struct vmbus_channel *channel,
 	u64 prev_indices;
 	unsigned long flags;
 	struct hv_ring_buffer_info *outring_info = &channel->outbound;
+	struct vmpacket_descriptor *desc = kv_list[0].iov_base;
+	u64 rqst_id = VMBUS_NO_RQSTOR;
 
 	if (channel->rescind)
 		return -ENODEV;
@@ -313,6 +316,22 @@ int hv_ringbuffer_write(struct vmbus_channel *channel,
 						     kv_list[i].iov_len);
 	}
 
+	/*
+	 * Allocate the request ID after the data has been copied into the
+	 * ring buffer.  Once this request ID is allocated, the completion
+	 * path could find the data and free it.
+	 */
+
+	if (desc->flags == VMBUS_DATA_PACKET_FLAG_COMPLETION_REQUESTED) {
+		rqst_id = vmbus_next_request_id(&channel->requestor, requestid);
+		if (rqst_id == VMBUS_RQST_ERROR) {
+			spin_unlock_irqrestore(&outring_info->ring_lock, flags);
+			return -EAGAIN;
+		}
+	}
+	desc = hv_get_ring_buffer(outring_info) + old_write;
+	desc->trans_id = (rqst_id == VMBUS_NO_RQSTOR) ? requestid : rqst_id;
+
 	/* Set previous packet start */
 	prev_indices = hv_get_ring_bufferindices(outring_info);
 
@@ -332,8 +351,13 @@ int hv_ringbuffer_write(struct vmbus_channel *channel,
 
 	hv_signal_on_write(old_write, channel);
 
-	if (channel->rescind)
+	if (channel->rescind) {
+		if (rqst_id != VMBUS_NO_RQSTOR) {
+			/* Reclaim request ID to avoid leak of IDs */
+			vmbus_request_addr(&channel->requestor, rqst_id);
+		}
 		return -ENODEV;
+	}
 
 	return 0;
 }
