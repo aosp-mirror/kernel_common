@@ -1416,7 +1416,6 @@ int ufshcd_query_flag_retry(struct ufs_hba *hba,
 
 int ufshcd_bkops_ctrl(struct ufs_hba *hba, enum bkops_status status);
 
-void ufshcd_auto_hibern8_enable(struct ufs_hba *hba);
 void ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit);
 void ufshcd_fixup_dev_quirks(struct ufs_hba *hba,
 			     const struct ufs_dev_quirk *fixups);
