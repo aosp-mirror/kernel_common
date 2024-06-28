@@ -18,6 +18,8 @@
   bpf_trace_run4
   bpf_trace_run5
   bpf_trace_run6
+  blk_mq_freeze_queue
+  blk_mq_unfreeze_queue
   bt_err
   bt_info
   bt_warn
@@ -1428,6 +1430,8 @@
   _raw_write_lock
   _raw_write_unlock
   set_capacity
+  sg_copy_from_buffer
+  sg_copy_to_buffer
   sock_efree
   sysfs_streq
   tty_hangup
