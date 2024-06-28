@@ -270,6 +270,81 @@ DEFINE_EVENT(rust_binder_buffer_release_class, rust_binder_transaction_update_bu
 	TP_PROTO(int debug_id),
 	TP_ARGS(debug_id));
 
+TRACE_EVENT(rust_binder_update_page_range,
+	TP_PROTO(int pid, bool allocate, size_t start, size_t end),
+	TP_ARGS(pid, allocate, start, end),
+	TP_STRUCT__entry(
+		__field(int, proc)
+		__field(bool, allocate)
+		__field(size_t, offset)
+		__field(size_t, size)
+	),
+	TP_fast_assign(
+		__entry->proc = pid;
+		__entry->allocate = allocate;
+		__entry->offset = start;
+		__entry->size = end - start;
+	),
+	TP_printk("proc=%d allocate=%d offset=%zu size=%zu",
+		  __entry->proc, __entry->allocate,
+		  __entry->offset, __entry->size)
+);
+
+DECLARE_EVENT_CLASS(rust_binder_lru_page_class,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index),
+	TP_STRUCT__entry(
+		__field(int, proc)
+		__field(size_t, page_index)
+	),
+	TP_fast_assign(
+		__entry->proc = pid;
+		__entry->page_index = page_index;
+	),
+	TP_printk("proc=%d page_index=%zu",
+		  __entry->proc, __entry->page_index)
+);
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_alloc_lru_start,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_alloc_lru_end,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_free_lru_start,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_free_lru_end,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_alloc_page_start,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_alloc_page_end,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_unmap_user_start,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_unmap_user_end,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_unmap_kernel_start,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
+DEFINE_EVENT(rust_binder_lru_page_class, rust_binder_unmap_kernel_end,
+	TP_PROTO(int pid, size_t page_index),
+	TP_ARGS(pid, page_index));
+
 #endif /* _RUST_BINDER_TRACE_H */
 
 /* This part must be outside protection */

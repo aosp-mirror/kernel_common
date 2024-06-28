@@ -9,7 +9,7 @@ use kernel::bindings::{
     rust_binder_transaction, task_struct,
 };
 use kernel::error::Result;
-use kernel::task::Task;
+use kernel::task::{Pid, Task};
 use kernel::tracepoint::declare_trace;
 
 use core::ffi::{c_int, c_uint, c_ulong};
@@ -35,6 +35,17 @@ declare_trace! {
     unsafe fn rust_binder_transaction_buffer_release(debug_id: c_int);
     unsafe fn rust_binder_transaction_failed_buffer_release(debug_id: c_int);
     unsafe fn rust_binder_transaction_update_buffer_release(debug_id: c_int);
+    unsafe fn rust_binder_update_page_range(pid: c_int, allocate: bool, start: usize, end: usize);
+    unsafe fn rust_binder_alloc_lru_start(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_alloc_lru_end(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_free_lru_start(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_free_lru_end(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_alloc_page_start(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_alloc_page_end(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_unmap_user_start(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_unmap_user_end(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_unmap_kernel_start(pid: c_int, page_index: usize);
+    unsafe fn rust_binder_unmap_kernel_end(pid: c_int, page_index: usize);
 }
 
 #[inline]
@@ -172,4 +183,35 @@ pub(crate) fn trace_transaction_failed_buffer_release(debug_id: usize) {
 pub(crate) fn trace_transaction_update_buffer_release(debug_id: usize) {
     // SAFETY: Always safe to call.
     unsafe { rust_binder_transaction_update_buffer_release(debug_id as c_int) }
+}
+
+#[inline]
+pub(crate) fn trace_update_page_range(pid: Pid, allocate: bool, start: usize, end: usize) {
+    // SAFETY: Always safe to call.
+    unsafe { rust_binder_update_page_range(pid as c_int, allocate, start, end) }
+}
+
+macro_rules! define_wrapper_lru_page_class {
+    ($(fn $name:ident;)*) => {$(
+        kernel::macros::paste! {
+            #[inline]
+            pub(crate) fn [< trace_ $name >](pid: Pid, page_index: usize) {
+                // SAFETY: Always safe to call.
+                unsafe { [< rust_binder_ $name >](pid as c_int, page_index) }
+            }
+        }
+    )*}
+}
+
+define_wrapper_lru_page_class! {
+    fn alloc_lru_start;
+    fn alloc_lru_end;
+    fn free_lru_start;
+    fn free_lru_end;
+    fn alloc_page_start;
+    fn alloc_page_end;
+    fn unmap_user_start;
+    fn unmap_user_end;
+    fn unmap_kernel_start;
+    fn unmap_kernel_end;
 }
