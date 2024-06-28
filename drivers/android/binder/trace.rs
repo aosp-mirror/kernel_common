@@ -2,10 +2,11 @@
 
 // Copyright (C) 2024 Google LLC.
 
-use crate::{node::Node, thread::Thread, transaction::Transaction};
+use crate::{defs::BinderTransactionDataSg, node::Node, thread::Thread, transaction::Transaction};
 
 use kernel::bindings::{
-    flat_binder_object, rust_binder_node, rust_binder_thread, rust_binder_transaction, task_struct,
+    binder_transaction_data_sg, flat_binder_object, rust_binder_node, rust_binder_thread,
+    rust_binder_transaction, task_struct,
 };
 use kernel::error::Result;
 use kernel::task::Task;
@@ -30,6 +31,10 @@ declare_trace! {
                                                 trans: *const flat_binder_object);
     unsafe fn rust_binder_transaction_fd_send(t_debug_id: c_int, fd: c_int, offset: usize);
     unsafe fn rust_binder_transaction_fd_recv(t_debug_id: c_int, fd: c_int, offset: usize);
+    unsafe fn rust_binder_transaction_alloc_buf(debug_id: c_int, data: *const binder_transaction_data_sg);
+    unsafe fn rust_binder_transaction_buffer_release(debug_id: c_int);
+    unsafe fn rust_binder_transaction_failed_buffer_release(debug_id: c_int);
+    unsafe fn rust_binder_transaction_update_buffer_release(debug_id: c_int);
 }
 
 #[inline]
@@ -142,4 +147,29 @@ pub(crate) fn trace_transaction_fd_send(t_debug_id: usize, fd: u32, offset: usiz
 pub(crate) fn trace_transaction_fd_recv(t_debug_id: usize, fd: u32, offset: usize) {
     // SAFETY: This function is always safe to call.
     unsafe { rust_binder_transaction_fd_recv(t_debug_id as c_int, fd as c_int, offset) }
+}
+
+#[inline]
+pub(crate) fn trace_transaction_alloc_buf(debug_id: usize, data: &BinderTransactionDataSg) {
+    let data = data as *const BinderTransactionDataSg;
+    // SAFETY: The `data` pointer is valid.
+    unsafe { rust_binder_transaction_alloc_buf(debug_id as c_int, data.cast()) }
+}
+
+#[inline]
+pub(crate) fn trace_transaction_buffer_release(debug_id: usize) {
+    // SAFETY: Always safe to call.
+    unsafe { rust_binder_transaction_buffer_release(debug_id as c_int) }
+}
+
+#[inline]
+pub(crate) fn trace_transaction_failed_buffer_release(debug_id: usize) {
+    // SAFETY: Always safe to call.
+    unsafe { rust_binder_transaction_failed_buffer_release(debug_id as c_int) }
+}
+
+#[inline]
+pub(crate) fn trace_transaction_update_buffer_release(debug_id: usize) {
+    // SAFETY: Always safe to call.
+    unsafe { rust_binder_transaction_update_buffer_release(debug_id as c_int) }
 }

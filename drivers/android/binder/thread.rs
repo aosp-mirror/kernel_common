@@ -1099,6 +1099,8 @@ impl Thread {
                 }
             };
 
+        crate::trace::trace_transaction_alloc_buf(debug_id, tr);
+
         // SAFETY: This accesses a union field, but it's okay because the field's type is valid for
         // all bit-patterns.
         let trd_data_ptr = unsafe { &trd.data.ptr };
@@ -1442,6 +1444,7 @@ impl Thread {
                         if buffer.looper_need_return_on_free() {
                             self.inner.lock().looper_need_return = true;
                         }
+                        crate::trace::trace_transaction_buffer_release(buffer.debug_id);
                     }
                     drop(buffer);
                 }

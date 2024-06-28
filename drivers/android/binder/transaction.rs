@@ -279,7 +279,7 @@ impl Transaction {
         crate::trace::trace_transaction(false, &self);
 
         // Defined before `process_inner` so that the destructor runs after releasing the lock.
-        let mut _t_outdated = None;
+        let mut _t_outdated;
 
         let oneway = self.flags & TF_ONE_WAY != 0;
         let process = self.to.clone();
@@ -292,8 +292,15 @@ impl Transaction {
                 if process_inner.is_frozen {
                     process_inner.async_recv = true;
                     if self.flags & TF_UPDATE_TXN != 0 {
-                        _t_outdated =
-                            target_node.take_outdated_transaction(&self, &mut process_inner);
+                        if let Some(t_outdated) =
+                            target_node.take_outdated_transaction(&self, &mut process_inner)
+                        {
+                            crate::trace::trace_transaction_update_buffer_release(
+                                t_outdated.debug_id,
+                            );
+                            // Save the transaction to be dropped after locks are released.
+                            _t_outdated = t_outdated;
+                        }
                     }
                 }
                 match target_node.submit_oneway(self, &mut process_inner) {

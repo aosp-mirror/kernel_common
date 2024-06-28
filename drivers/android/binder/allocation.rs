@@ -318,7 +318,7 @@ impl core::ops::DerefMut for NewAllocation {
 
 impl Drop for NewAllocation {
     fn drop(&mut self) {
-        // This will be updated to emit a tracepoint saying that the transaction failed.
+        crate::trace::trace_transaction_failed_buffer_release(self.debug_id);
     }
 }
 

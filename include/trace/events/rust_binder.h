@@ -225,6 +225,51 @@ TRACE_EVENT(rust_binder_transaction_fd_recv,
 		  __entry->debug_id, __entry->fd, __entry->offset)
 );
 
+TRACE_EVENT(rust_binder_transaction_alloc_buf,
+	TP_PROTO(int debug_id, const struct binder_transaction_data_sg *data),
+	TP_ARGS(debug_id, data),
+
+	TP_STRUCT__entry(
+		__field(int, debug_id)
+		__field(size_t, data_size)
+		__field(size_t, offsets_size)
+		__field(size_t, extra_buffers_size)
+	),
+	TP_fast_assign(
+		__entry->debug_id = debug_id;
+		__entry->data_size = data->transaction_data.data_size;
+		__entry->offsets_size = data->transaction_data.offsets_size;
+		__entry->extra_buffers_size = data->buffers_size;
+	),
+	TP_printk("transaction=%d data_size=%zd offsets_size=%zd extra_buffers_size=%zd",
+		  __entry->debug_id, __entry->data_size, __entry->offsets_size,
+		  __entry->extra_buffers_size)
+);
+
+DECLARE_EVENT_CLASS(rust_binder_buffer_release_class,
+	TP_PROTO(int debug_id),
+	TP_ARGS(debug_id),
+	TP_STRUCT__entry(
+		__field(int, debug_id)
+	),
+	TP_fast_assign(
+		__entry->debug_id = debug_id;
+	),
+	TP_printk("transaction=%d", __entry->debug_id)
+);
+
+DEFINE_EVENT(rust_binder_buffer_release_class, rust_binder_transaction_buffer_release,
+	TP_PROTO(int debug_id),
+	TP_ARGS(debug_id));
+
+DEFINE_EVENT(rust_binder_buffer_release_class, rust_binder_transaction_failed_buffer_release,
+	TP_PROTO(int debug_id),
+	TP_ARGS(debug_id));
+
+DEFINE_EVENT(rust_binder_buffer_release_class, rust_binder_transaction_update_buffer_release,
+	TP_PROTO(int debug_id),
+	TP_ARGS(debug_id));
+
 #endif /* _RUST_BINDER_TRACE_H */
 
 /* This part must be outside protection */
