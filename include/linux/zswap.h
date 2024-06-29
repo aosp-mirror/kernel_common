@@ -35,7 +35,7 @@ static inline void zswap_swapoff(int type) {}
 
 static inline bool zswap_never_enabled(void)
 {
-	return false;
+	return true;
 }
 
 #endif
