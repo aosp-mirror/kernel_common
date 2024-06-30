@@ -4950,7 +4950,7 @@ static vm_fault_t __handle_mm_fault(struct vm_area_struct *vma,
 		 */
 		uffd_missing_sigbus = vma_is_anonymous(vma) &&
 					(vma->vm_flags & VM_UFFD_MISSING) &&
-					userfaultfd_using_sigbus(vma);
+					userfaultfd_using_sigbus(vma, seq);
 #endif
 
 		vmf.seq = seq;
