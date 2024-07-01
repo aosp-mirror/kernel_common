@@ -1867,6 +1867,7 @@
   seq_write
   set_cpus_allowed_ptr
   set_freezable
+  set_normalized_timespec64
   set_page_dirty
   set_page_dirty_lock
   set_task_cpu
