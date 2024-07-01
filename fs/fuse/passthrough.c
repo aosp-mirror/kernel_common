@@ -21,8 +21,19 @@ static void fuse_file_accessed(struct file *file)
 static void fuse_file_modified(struct file *file)
 {
 	struct inode *inode = file_inode(file);
+	struct fuse_conn *fc = get_fuse_conn(inode);
+	struct fuse_file *ff = file->private_data;
+	struct file *backing_file = fuse_file_passthrough(ff);
+	struct inode *backing_inode = file_inode(backing_file);
 
-	fuse_invalidate_attr_mask(inode, FUSE_STATX_MODSIZE);
+	if (!fc->writeback_cache) {
+		fuse_invalidate_attr_mask(inode, FUSE_STATX_MODSIZE);
+	} else {
+		inode_set_mtime_to_ts(inode, inode_get_mtime(backing_inode));
+		inode_set_ctime_to_ts(inode, inode_get_ctime(backing_inode));
+		inode->i_blocks = backing_inode->i_blocks;
+		i_size_write(inode, i_size_read(backing_inode));
+	}
 }
 
 ssize_t fuse_passthrough_read_iter(struct kiocb *iocb, struct iov_iter *iter)
