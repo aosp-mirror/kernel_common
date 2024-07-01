@@ -51,11 +51,15 @@ int fuse_file_cached_io_open(struct inode *inode, struct fuse_file *ff)
 	 * Check if inode entered passthrough io mode while waiting for parallel
 	 * dio write completion.
 	 */
+	/* Android's use case requires opening files in both passthrough and non
+	 * passthrough modes */
+#if 0
 	if (fuse_inode_backing(fi)) {
 		clear_bit(FUSE_I_CACHE_IO_MODE, &fi->state);
 		spin_unlock(&fi->lock);
 		return -ETXTBSY;
 	}
+#endif
 
 	WARN_ON(ff->iomode == IOM_UNCACHED);
 	if (ff->iomode == IOM_NONE) {
@@ -198,6 +202,7 @@ int fuse_file_io_open(struct file *file, struct inode *inode)
 {
 	struct fuse_file *ff = file->private_data;
 	struct fuse_inode *fi = get_fuse_inode(inode);
+	struct fuse_conn *fc = get_fuse_conn(inode);
 	int err;
 
 	/*
@@ -212,7 +217,7 @@ int fuse_file_io_open(struct file *file, struct inode *inode)
 	 * which is already open for passthrough.
 	 */
 	err = -EINVAL;
-	if (fuse_inode_backing(fi) && !(ff->open_flags & FOPEN_PASSTHROUGH))
+	if (fuse_inode_backing(fi) && !(ff->open_flags & FOPEN_PASSTHROUGH) && !fc->writeback_cache)
 		goto fail;
 
 	/*
