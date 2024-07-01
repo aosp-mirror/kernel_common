@@ -54,11 +54,6 @@ static int __init iommu_set_def_max_align_shift(char *str)
 early_param("iommu.max_align_shift", iommu_set_def_max_align_shift);
 #endif
 
-unsigned long iova_rcache_range(void)
-{
-	return PAGE_SIZE << (IOVA_RANGE_CACHE_MAX_SIZE - 1);
-}
-
 static int iova_cpuhp_dead(unsigned int cpu, struct hlist_node *node)
 {
 	struct iova_domain *iovad;
