@@ -798,6 +798,9 @@ static int vruntime_eligible(struct cfs_rq *cfs_rq, u64 vruntime)
 	s64 avg = cfs_rq->avg_vruntime;
 	long load = cfs_rq->avg_load;
 
+	if (!sched_feat(ENFORCE_ELIGIBILITY))
+		return 1;
+
 	if (curr && curr->on_rq) {
 		unsigned long weight = scale_load_down(curr->load.weight);
 
