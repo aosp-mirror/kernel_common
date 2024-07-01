@@ -141,6 +141,8 @@
   clk_put
   clk_set_rate
   clk_unprepare
+  clockevent_delta2ns
+  clockevents_register_device
   cma_alloc
   cma_get_name
   cma_release
@@ -999,6 +1001,7 @@
   rtnl_lock
   rtnl_unlock
   sched_clock
+  sched_clock_register
   sched_feat_names
   sched_set_fifo
   sched_set_fifo_low
