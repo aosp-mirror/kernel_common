@@ -77,6 +77,7 @@
 #include <trace/hooks/psi.h>
 #include <trace/hooks/blk.h>
 #include <trace/hooks/suspend.h>
+#include <trace/hooks/fsnotify.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -497,6 +498,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ogki_udp_unicast_rcv_skb);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ogki_udp6_unicast_rcv_skb);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ogki_kmem_cache_create_usercopy);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_init_adjust_zone_wmark);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_fsnotify_open);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_group_exit);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_node_memcgs);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_swap_writepage);

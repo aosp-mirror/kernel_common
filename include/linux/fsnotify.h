@@ -17,6 +17,9 @@
 #include <linux/slab.h>
 #include <linux/bug.h>
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/fsnotify.h>
+
 /*
  * Notify this @dir inode about a change in a child directory entry.
  * The directory entry may have turned positive or negative or its inode may
@@ -353,6 +356,7 @@ static inline void fsnotify_open(struct file *file)
 	if (file->f_flags & __FMODE_EXEC)
 		mask |= FS_OPEN_EXEC;
 
+	trace_android_vh_fsnotify_open(file, &mask);
 	fsnotify_file(file, mask);
 }
 
