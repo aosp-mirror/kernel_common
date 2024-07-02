@@ -15,6 +15,7 @@
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
 #include <linux/module.h>
+#include <linux/splice.h>
 #include <linux/swap.h>
 #include <linux/falloc.h>
 #include <linux/uio.h>
@@ -2768,15 +2769,37 @@ static int fuse_file_flock(struct file *file, int cmd, struct file_lock *fl)
 static ssize_t fuse_splice_read(struct file *in, loff_t *ppos,
 		struct pipe_inode_info *pipe, size_t len, unsigned int flags)
 {
-#ifdef CONFIG_FUSE_BPF
 	struct fuse_file *ff = in->private_data;
 
+#ifdef CONFIG_FUSE_BPF
 	/* TODO - this is simply passthrough, not a proper BPF filter */
 	if (ff->backing_file)
 		return fuse_splice_read_backing(in, ppos, pipe, len, flags);
 #endif
 
-	return filemap_splice_read(in, ppos, pipe, len, flags);
+	/* FOPEN_DIRECT_IO overrides FOPEN_PASSTHROUGH */
+	if (ff->passthrough.filp && !(ff->open_flags & FOPEN_DIRECT_IO))
+		return fuse_passthrough_splice_read(in, ppos, pipe, len, flags);
+	else
+		return filemap_splice_read(in, ppos, pipe, len, flags);
+}
+
+static ssize_t fuse_splice_write(struct pipe_inode_info *pipe, struct file *out,
+				 loff_t *ppos, size_t len, unsigned int flags)
+{
+	struct fuse_file *ff = out->private_data;
+
+#ifdef CONFIG_FUSE_BPF
+	/* TODO - this is simply passthrough, not a proper BPF filter */
+	if (ff->backing_file)
+		return fuse_splice_write_backing(pipe, out, ppos, len, flags);
+#endif
+
+	/* FOPEN_DIRECT_IO overrides FOPEN_PASSTHROUGH */
+	if (ff->passthrough.filp && !(ff->open_flags & FOPEN_DIRECT_IO))
+		return fuse_passthrough_splice_write(pipe, out, ppos, len, flags);
+	else
+		return iter_file_splice_write(pipe, out, ppos, len, flags);
 }
 
 static sector_t fuse_bmap(struct address_space *mapping, sector_t block)
@@ -3392,7 +3415,7 @@ static const struct file_operations fuse_file_operations = {
 	.get_unmapped_area = thp_get_unmapped_area,
 	.flock		= fuse_file_flock,
 	.splice_read	= fuse_splice_read,
-	.splice_write	= iter_file_splice_write,
+	.splice_write	= fuse_splice_write,
 	.unlocked_ioctl	= fuse_file_ioctl,
 	.compat_ioctl	= fuse_file_compat_ioctl,
 	.poll		= fuse_file_poll,

@@ -1467,6 +1467,11 @@ int fuse_passthrough_setup(struct fuse_conn *fc, struct fuse_file *ff,
 void fuse_passthrough_release(struct fuse_passthrough *passthrough);
 ssize_t fuse_passthrough_read_iter(struct kiocb *iocb, struct iov_iter *to);
 ssize_t fuse_passthrough_write_iter(struct kiocb *iocb, struct iov_iter *from);
+ssize_t fuse_passthrough_splice_read(struct file *in, loff_t *ppos,
+				     struct pipe_inode_info *pipe,
+				     size_t len, unsigned int flags);
+ssize_t fuse_passthrough_splice_write(struct pipe_inode_info *pipe,
+		struct file *out, loff_t *ppos, size_t len, unsigned int flags);
 ssize_t fuse_passthrough_mmap(struct file *file, struct vm_area_struct *vma);
 
 /* backing.c */
@@ -1711,6 +1716,8 @@ void *fuse_file_write_iter_finalize(struct fuse_bpf_args *fa,
 
 ssize_t fuse_splice_read_backing(struct file *in, loff_t *ppos,
 		struct pipe_inode_info *pipe, size_t len, unsigned long flags);
+ssize_t fuse_splice_write_backing(struct pipe_inode_info *pipe,
+		struct file *out, loff_t *ppos, size_t len, unsigned long flags);
 
 long fuse_backing_ioctl(struct file *file, unsigned int command, unsigned long arg, int flags);
 
