@@ -553,21 +553,6 @@ static void kmalloc_memmove_invalid_size(struct kunit *test)
 	kfree(ptr);
 }
 
-static void kmalloc_memmove_invalid_size(struct kunit *test)
-{
-	char *ptr;
-	size_t size = 64;
-	volatile size_t invalid_size = size;
-
-	ptr = kmalloc(size, GFP_KERNEL);
-	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, ptr);
-
-	memset((char *)ptr, 0, 64);
-	KUNIT_EXPECT_KASAN_FAIL(test,
-		memmove((char *)ptr, (char *)ptr + 4, invalid_size));
-	kfree(ptr);
-}
-
 static void kmalloc_uaf(struct kunit *test)
 {
 	char *ptr;
