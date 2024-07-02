@@ -551,13 +551,13 @@ static void smmu_tlb_flush_all(void *cookie)
 	hyp_read_lock(&smmu_domain->lock);
 	list_for_each_entry(iommu_node, &smmu_domain->iommu_list, list) {
 		smmu = to_smmu(iommu_node->iommu);
-		hyp_spin_lock(&smmu->iommu.lock);
+		kvm_iommu_lock(&smmu->iommu);
 		if (smmu->iommu.power_is_off && smmu->caches_clean_on_power_on) {
-			hyp_spin_unlock(&smmu->iommu.lock);
+			kvm_iommu_unlock(&smmu->iommu);
 			continue;
 		}
 		WARN_ON(smmu_send_cmd(smmu, &cmd));
-		hyp_spin_unlock(&smmu->iommu.lock);
+		kvm_iommu_unlock(&smmu->iommu);
 	}
 	hyp_read_unlock(&smmu_domain->lock);
 }
@@ -572,7 +572,7 @@ static int smmu_tlb_inv_range_smmu(struct hyp_arm_smmu_v3_device *smmu,
 	size_t inv_range = granule;
 	struct hyp_arm_smmu_v3_domain *smmu_domain = domain->priv;
 
-	hyp_spin_lock(&smmu->iommu.lock);
+	kvm_iommu_lock(&smmu->iommu);
 	if (smmu->iommu.power_is_off && smmu->caches_clean_on_power_on)
 		goto out_ret;
 
@@ -633,7 +633,7 @@ static int smmu_tlb_inv_range_smmu(struct hyp_arm_smmu_v3_device *smmu,
 
 	ret = smmu_sync_cmd(smmu);
 out_ret:
-	hyp_spin_unlock(&smmu->iommu.lock);
+	kvm_iommu_unlock(&smmu->iommu);
 	return ret;
 }
 
@@ -997,7 +997,7 @@ static int smmu_attach_dev(struct kvm_hyp_iommu *iommu, struct kvm_hyp_iommu_dom
 	struct domain_iommu_node *iommu_node = NULL;
 
 	hyp_write_lock(&smmu_domain->lock);
-	hyp_spin_lock(&iommu->lock);
+	kvm_iommu_lock(iommu);
 	dst = smmu_get_ste_ptr(smmu, sid);
 	if (!dst)
 		goto out_unlock;
@@ -1087,7 +1087,7 @@ static int smmu_attach_dev(struct kvm_hyp_iommu *iommu, struct kvm_hyp_iommu_dom
 out_unlock:
 	if (ret && iommu_node)
 		hyp_free(iommu_node);
-	hyp_spin_unlock(&iommu->lock);
+	kvm_iommu_unlock(iommu);
 	hyp_write_unlock(&smmu_domain->lock);
 	return ret;
 }
@@ -1103,7 +1103,7 @@ static int smmu_detach_dev(struct kvm_hyp_iommu *iommu, struct kvm_hyp_iommu_dom
 	u64 *cd_table, *cd;
 
 	hyp_write_lock(&smmu_domain->lock);
-	hyp_spin_lock(&iommu->lock);
+	kvm_iommu_lock(iommu);
 	dst = smmu_get_ste_ptr(smmu, sid);
 	if (!dst)
 		goto out_unlock;
@@ -1145,7 +1145,7 @@ static int smmu_detach_dev(struct kvm_hyp_iommu *iommu, struct kvm_hyp_iommu_dom
 
 	smmu_put_ref_domain(smmu, smmu_domain);
 out_unlock:
-	hyp_spin_unlock(&iommu->lock);
+	kvm_iommu_unlock(iommu);
 	hyp_write_unlock(&smmu_domain->lock);
 	return ret;
 }

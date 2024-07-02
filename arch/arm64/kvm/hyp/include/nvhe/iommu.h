@@ -6,6 +6,7 @@
 
 #include <kvm/iommu.h>
 #include <linux/io-pgtable.h>
+#include <nvhe/spinlock.h>
 
 #if IS_ENABLED(CONFIG_ARM_SMMU_V3_PKVM)
 #include <linux/io-pgtable-arm.h>
@@ -71,6 +72,28 @@ struct kvm_iommu_paddr_cache {
 };
 
 void kvm_iommu_flush_unmap_cache(struct kvm_iommu_paddr_cache *cache);
+
+static inline hyp_spinlock_t *kvm_iommu_get_lock(struct kvm_hyp_iommu *iommu)
+{
+	/* See struct kvm_hyp_iommu */
+	BUILD_BUG_ON(sizeof(iommu->lock) != sizeof(hyp_spinlock_t));
+	return (hyp_spinlock_t *)(&iommu->lock);
+}
+
+static inline void kvm_iommu_lock_init(struct kvm_hyp_iommu *iommu)
+{
+	hyp_spin_lock_init(kvm_iommu_get_lock(iommu));
+}
+
+static inline void kvm_iommu_lock(struct kvm_hyp_iommu *iommu)
+{
+	hyp_spin_lock(kvm_iommu_get_lock(iommu));
+}
+
+static inline void kvm_iommu_unlock(struct kvm_hyp_iommu *iommu)
+{
+	hyp_spin_unlock(kvm_iommu_get_lock(iommu));
+}
 
 /**
  * struct kvm_iommu_ops - KVM iommu ops
