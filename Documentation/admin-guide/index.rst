@@ -82,7 +82,6 @@ configure specific aspects of kernel behavior to your liking.
    edid
    efi-stub
    ext4
-   filesystem-monitoring
    nfs/index
    gpio/index
    highuid
