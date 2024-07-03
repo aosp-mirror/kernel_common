@@ -1009,6 +1009,7 @@ ifdef CONFIG_RUST
 # This addresses the problem that on e.g. i686, int != long, and Rust
 # maps both to i32.
 # See https://rcvalle.com/docs/rust-cfi-design-doc.pdf for details.
+$(error "Enabling Rust and CFI silently changes the KMI.")
 CC_FLAGS_CFI   += -fsanitize-cfi-icall-experimental-normalize-integers
 RS_FLAGS_CFI   := -Zsanitizer=kcfi -Zsanitizer-cfi-normalize-integers
 KBUILD_RUSTFLAGS += $(RS_FLAGS_CFI)
