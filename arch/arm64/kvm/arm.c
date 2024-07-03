@@ -384,7 +384,7 @@ static int pkvm_check_extension(struct kvm *kvm, long ext, int kvm_cap)
 		break;
 	case KVM_CAP_ARM_SVE:
 		r = kvm_cap && FIELD_GET(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_SVE),
-					 PVM_ID_AA64PFR0_RESTRICT_UNSIGNED);
+					 PVM_ID_AA64PFR0_ALLOW);
 		break;
 	case KVM_CAP_ARM_PTRAUTH_ADDRESS:
 		r = kvm_cap &&
