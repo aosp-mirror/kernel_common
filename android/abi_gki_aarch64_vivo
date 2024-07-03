@@ -286,6 +286,7 @@
   crypto_init_queue
   crypto_register_aead
   crypto_register_ahash
+  crypto_register_alg
   crypto_register_rngs
   crypto_register_skcipher
   crypto_shash_final
@@ -296,6 +297,7 @@
   crypto_skcipher_setkey
   crypto_unregister_aead
   crypto_unregister_ahash
+  crypto_unregister_alg
   crypto_unregister_rngs
   crypto_unregister_skcipher
   css_next_child
@@ -1428,6 +1430,7 @@
   __netlink_kernel_create
   netlink_kernel_release
   netlink_unicast
+  next_arg
   nla_memcpy
   __nla_parse
   nla_put_64bit
