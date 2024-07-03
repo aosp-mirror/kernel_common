@@ -1910,6 +1910,9 @@
   of_irq_get_byname
   yield
 
+# required by ntfs3.ko
+  posix_acl_create
+
 # required by nu1619_wireless_charger.ko
   regmap_bulk_read
 
