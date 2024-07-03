@@ -1328,6 +1328,8 @@
   drm_release
   drm_scdc_set_high_tmds_clock_ratio
   drm_scdc_set_scrambling
+  drm_scdc_get_scrambling_status
+  drm_hdmi_avi_infoframe_content_type
   drm_universal_plane_init
   drm_vblank_init
   enable_irq
