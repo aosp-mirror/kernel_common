@@ -491,6 +491,7 @@
   v4l2_i2c_subdev_init
   vfs_create
   vfs_getattr
+  vfs_getattr_nosec
   vfs_iter_read
   vfs_iter_write
   vfs_llseek
