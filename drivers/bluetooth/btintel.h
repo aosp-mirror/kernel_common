@@ -149,6 +149,38 @@ struct hci_ppag_enable_cmd {
 #define INTEL_TLV_DEBUG_EXCEPTION	0x02
 #define INTEL_TLV_TEST_EXCEPTION	0xDE
 
+struct btintel_cp_ddc_write {
+	u8	len;
+	__le16	id;
+	u8	data[];
+} __packed;
+
+/* Bluetooth SAR feature (BRDS), Revision 0 */
+struct btintel_sar {
+	u8	revision;
+	u32	bt_sar_bios; /* Mode of SAR control to be used, 1:enabled in bios */
+	u8	br;
+	u8	edr2;
+	u8      edr3;
+	u8      le;
+	u8      le_2mhz;
+	u8      le_lr;
+} __packed;
+
+/* Bluetooth SAR feature (BRDS), Revision 1 */
+struct btintel_sar_inc_pwr {
+	u8	revision;
+	u32	bt_sar_bios;
+	u32	inc_power_mode;  /* Increased power mode */
+	u8	sar_2400_chain_a; /* Sar power restriction LB */
+	u8	br;
+	u8	edr2;
+	u8	edr3;
+	u8	le;
+	u8	le_2mhz;
+	u8	le_lr;
+} __packed;
+
 #define INTEL_HW_PLATFORM(cnvx_bt)	((u8)(((cnvx_bt) & 0x0000ff00) >> 8))
 #define INTEL_HW_VARIANT(cnvx_bt)	((u8)(((cnvx_bt) & 0x003f0000) >> 16))
 #define INTEL_CNVX_TOP_TYPE(cnvx_top)	((cnvx_top) & 0x00000fff)
