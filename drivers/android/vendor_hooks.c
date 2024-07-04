@@ -427,3 +427,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_resume_begin);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_resume_end);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_early_resume_begin);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_enable_thermal_genl_check);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_pr_set_vma_name_bypass);
