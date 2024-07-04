@@ -179,7 +179,7 @@ fn main() {
             "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
         );
         ts.push("disable-redzone", true);
-        let mut features = "+v8a,+strict-align,+neon,+fp-armv8".to_string();
+        let mut features = "+v8a,+strict-align,-neon,-fp-armv8".to_string();
         if cfg.has("SHADOW_CALL_STACK") {
             features += ",+reserve-x18";
         }
