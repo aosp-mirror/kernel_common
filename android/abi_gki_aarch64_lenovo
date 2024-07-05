@@ -494,6 +494,7 @@
   fwnode_property_read_u32_array
   gcd
   gen_pool_virt_to_phys
+  generic_access_phys
   generic_device_group
   generic_file_llseek
   generic_handle_domain_irq
