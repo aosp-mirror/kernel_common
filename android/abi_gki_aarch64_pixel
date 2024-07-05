@@ -832,8 +832,8 @@
   frame_vector_create
   frame_vector_destroy
   frame_vector_to_pages
-  free_iova_fast
   free_hyp_memcache
+  free_iova_fast
   free_irq
   free_netdev
   __free_pages
@@ -1087,12 +1087,12 @@
   iommu_iova_to_phys
   iommu_map
   iommu_map_sg
-  io_pgtable_configure
   iommu_register_device_fault_handler
   iommu_report_device_fault
   iommu_set_fault_handler
   iommu_unmap
   iommu_unregister_device_fault_handler
+  io_pgtable_configure
   ioremap_prot
   io_schedule_timeout
   iounmap
@@ -1958,6 +1958,7 @@
   snd_soc_add_dai_controls
   snd_soc_bytes_tlv_callback
   snd_soc_card_get_kcontrol
+  snd_soc_card_get_kcontrol_locked
   snd_soc_card_jack_new_pins
   snd_soc_component_disable_pin
   snd_soc_component_enable_pin
