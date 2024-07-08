@@ -494,6 +494,7 @@ static u64 update_triggers(struct psi_group *group, u64 now, bool *update_total,
 			continue;
 
 		trace_android_vh_psi_event(t);
+		trace_android_vh_psi_update_triggers(t, now, growth);
 
 		/* Generate an event */
 		if (cmpxchg(&t->event, 0, 1) == 0) {

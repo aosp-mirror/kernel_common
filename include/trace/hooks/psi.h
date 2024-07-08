@@ -19,6 +19,10 @@ DECLARE_HOOK(android_vh_psi_group,
 	TP_PROTO(struct psi_group *group),
 	TP_ARGS(group));
 
+DECLARE_HOOK(android_vh_psi_update_triggers,
+	TP_PROTO(struct psi_trigger *t, u64 now, u64 growth),
+	TP_ARGS(t, now, growth));
+
 #endif /* _TRACE_HOOK_PSI_H */
 
 /* This part must be outside protection */
