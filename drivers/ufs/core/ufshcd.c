@@ -2636,7 +2636,16 @@ static int ufshcd_map_sg(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 
 	ufshcd_sgl_to_prdt(hba, lrbp, sg_segments, scsi_sglist(cmd));
 
-	return 0;
+	/*
+	 * TODO(b/160883801): remove this vendor hook in favor of the upstream
+	 * variant op.  This isn't possible yet because the upstream variant op
+	 * doesn't yet make it possible for the host driver to get the keyslot.
+	 */
+	err = 0;
+	trace_android_vh_ufs_fill_prdt(hba, lrbp, sg_segments, &err);
+	if (err)
+		return err;
+	return ufshcd_crypto_fill_prdt(hba, lrbp);
 }
 
 /**
