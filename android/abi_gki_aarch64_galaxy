@@ -16,6 +16,7 @@
   copy_page
   _dev_alert
   __devm_alloc_percpu
+  dma_heap_try_get_pool_size_kb
   elv_bio_merge_ok
   elv_rb_add
   elv_rb_del
