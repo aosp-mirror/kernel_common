@@ -7,6 +7,7 @@
 #define __GZVM_ARCH_COMMON_H__
 
 #include <linux/arm-smccc.h>
+#include <linux/clocksource.h>
 
 enum {
 	GZVM_FUNC_CREATE_VM = 0,
@@ -85,6 +86,10 @@ int gzvm_hypcall_wrapper(unsigned long a0, unsigned long a1,
  * @lr: The array of LRs(list registers).
  * @vtimer_offset: The offset maintained by hypervisor that is host cycle count
  *                 when guest VM startup.
+ * @vtimer_delay: The remaining time before the next timer tick is triggered
+ *                while the VM is running.
+ * @vtimer_migrate: Indicates whether the guest virtual timer needs to be
+ *                  migrated to the host software timer.
  *
  * - Keep the same layout of hypervisor data struct.
  * - Sync list registers back for acking virtual device interrupt status.
@@ -94,7 +99,17 @@ struct gzvm_vcpu_hwstate {
 	__le32 __pad;
 	__le64 lr[GIC_V3_NR_LRS];
 	__le64 vtimer_offset;
+	__le64 vtimer_delay;
+	__le32 vtimer_migrate;
 };
+
+struct timecycle {
+	u32 mult;
+	u32 shift;
+};
+
+u32 gzvm_vtimer_get_clock_mult(void);
+u32 gzvm_vtimer_get_clock_shift(void);
 
 static inline unsigned int
 assemble_vm_vcpu_tuple(u16 vmid, u16 vcpuid)
