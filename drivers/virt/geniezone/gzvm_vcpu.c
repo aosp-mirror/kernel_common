@@ -16,6 +16,28 @@
 /* maximum size needed for holding an integer */
 #define ITOA_MAX_LEN 12
 
+static enum hrtimer_restart gzvm_vtimer_expire(struct hrtimer *hrt)
+{
+	return HRTIMER_NORESTART;
+}
+
+static void gzvm_vtimer_init(struct gzvm_vcpu *vcpu)
+{
+	/* gzvm_vtimer init based on hrtimer */
+	hrtimer_init(&vcpu->gzvm_vtimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_HARD);
+	vcpu->gzvm_vtimer.function = gzvm_vtimer_expire;
+}
+
+void gzvm_vtimer_set(struct gzvm_vcpu *vcpu, u64 ns)
+{
+	hrtimer_start(&vcpu->gzvm_vtimer, ktime_add_ns(ktime_get(), ns), HRTIMER_MODE_ABS_HARD);
+}
+
+void gzvm_vtimer_release(struct gzvm_vcpu *vcpu)
+{
+	hrtimer_cancel(&vcpu->gzvm_vtimer);
+}
+
 static long gzvm_vcpu_update_one_reg(struct gzvm_vcpu *vcpu,
 				     void __user *argp,
 				     bool is_write)
@@ -194,6 +216,7 @@ static void gzvm_destroy_vcpu(struct gzvm_vcpu *vcpu)
 	if (!vcpu)
 		return;
 
+	hrtimer_cancel(&vcpu->gzvm_vtimer);
 	gzvm_arch_destroy_vcpu(vcpu->gzvm->vm_id, vcpu->vcpuid);
 	/* clean guest's data */
 	memset(vcpu->run, 0, GZVM_VCPU_RUN_MAP_SIZE);
@@ -272,6 +295,7 @@ int gzvm_vm_ioctl_create_vcpu(struct gzvm *gzvm, u32 cpuid)
 		goto free_vcpu_run;
 	gzvm->vcpus[cpuid] = vcpu;
 
+	gzvm_vtimer_init(vcpu);
 	return ret;
 
 free_vcpu_run:
