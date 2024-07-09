@@ -540,7 +540,7 @@ int vmw_validation_bo_validate_single(struct ttm_buffer_object *bo,
 	if (atomic_read(&vbo->cpu_writers))
 		return -EBUSY;
 
-	if (vbo->pin_count > 0)
+	if (vbo->base.pin_count > 0)
 		return 0;
 
 	if (validate_as_mob)
@@ -585,13 +585,13 @@ int vmw_validation_bo_validate(struct vmw_validation_context *ctx, bool intr)
 			container_of(entry->base.bo, typeof(*vbo), base);
 
 		if (entry->cpu_blit) {
-			struct ttm_operation_ctx ctx = {
+			struct ttm_operation_ctx ttm_ctx = {
 				.interruptible = intr,
 				.no_wait_gpu = false
 			};
 
 			ret = ttm_bo_validate(entry->base.bo,
-					      &vmw_nonfixed_placement, &ctx);
+					      &vmw_nonfixed_placement, &ttm_ctx);
 		} else {
 			ret = vmw_validation_bo_validate_single
 			(entry->base.bo, intr, entry->as_mob);
