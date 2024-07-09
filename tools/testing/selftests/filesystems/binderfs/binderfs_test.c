@@ -64,6 +64,7 @@ static int __do_binderfs_test(struct __test_metadata *_metadata)
 		device_path[sizeof(P_tmpdir "/binderfs_XXXXXX/") + BINDERFS_MAX_NAME];
 	static const char * const binder_features[] = {
 		"oneway_spam_detection",
+		"freeze_notification",
 	};
 
 	change_mountns(_metadata);
