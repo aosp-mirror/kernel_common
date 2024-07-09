@@ -116,6 +116,7 @@ SYM_INNER_LABEL(entry_SYSENTER_compat_after_hwframe, SYM_L_GLOBAL)
 
 	IBRS_ENTER
 	UNTRAIN_RET
+	CLEAR_BRANCH_HISTORY
 
 	/*
 	 * SYSENTER doesn't filter flags, so we need to clear NT and AC
@@ -259,6 +260,7 @@ SYM_INNER_LABEL(entry_SYSCALL_compat_after_hwframe, SYM_L_GLOBAL)
 
 	IBRS_ENTER
 	UNTRAIN_RET
+	CLEAR_BRANCH_HISTORY
 
 	movq	%rsp, %rdi
 	call	do_fast_syscall_32
@@ -319,6 +321,7 @@ sysret32_from_system_call:
 	xorl	%r9d, %r9d
 	xorl	%r10d, %r10d
 	swapgs
+	CLEAR_CPU_BUFFERS
 	sysretl
 SYM_CODE_END(entry_SYSCALL_compat)
 
@@ -421,6 +424,7 @@ SYM_CODE_START(entry_INT80_compat)
 
 	IBRS_ENTER
 	UNTRAIN_RET
+	CLEAR_BRANCH_HISTORY
 
 	movq	%rsp, %rdi
 	call	do_int80_syscall_32
