@@ -86,6 +86,8 @@
   __traceiter_android_vh_show_mem
   __traceiter_android_vh_show_smap
   __traceiter_android_vh_smaps_pte_entry
+  __traceiter_android_vh_smaps_swap_shared
+  __traceiter_android_vh_show_smap_swap_shared
   __traceiter_android_vh_try_to_freeze_todo
   __traceiter_android_vh_try_to_freeze_todo_unfrozen
   __traceiter_android_vh_tune_scan_control
@@ -130,6 +132,8 @@
   __tracepoint_android_vh_show_mem
   __tracepoint_android_vh_show_smap
   __tracepoint_android_vh_smaps_pte_entry
+  __tracepoint_android_vh_smaps_swap_shared
+  __tracepoint_android_vh_show_smap_swap_shared
   __tracepoint_android_vh_try_to_freeze_todo
   __tracepoint_android_vh_try_to_freeze_todo_unfrozen
   __tracepoint_android_vh_tune_scan_control
