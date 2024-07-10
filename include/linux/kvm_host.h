@@ -373,6 +373,7 @@ struct kvm_vcpu {
 	u64 suspend_time_ns;
 	spinlock_t suspend_time_ns_lock;
 #endif
+	bool suspended;
 
 #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
 	/*
@@ -822,6 +823,8 @@ struct kvm {
 	spinlock_t suspend_time_ns_lock;
 	u64 base_offs_boot_ns;
 #endif
+	u64 last_suspend_duration;
+	u64 suspended_time;
 #ifdef CONFIG_PARAVIRT_SCHED_KVM
 	bool pv_sched_enabled;
 #endif

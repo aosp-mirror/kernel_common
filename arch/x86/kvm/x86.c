@@ -3557,7 +3557,7 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
 	struct kvm_steal_time __user *st;
 	struct kvm_memslots *slots;
 	gpa_t gpa = vcpu->arch.st.msr_val & KVM_STEAL_VALID_BITS;
-	u64 steal;
+	u64 steal, suspend_duration;
 	u32 version;
 
 	if (kvm_xen_msr_enabled(vcpu->kvm)) {
@@ -3582,6 +3582,12 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
 		if (kvm_gfn_to_hva_cache_init(vcpu->kvm, ghc, gpa, sizeof(*st)) ||
 		    kvm_is_error_hva(ghc->hva) || !ghc->memslot)
 			return;
+	}
+
+	suspend_duration = 0;
+	if (READ_ONCE(vcpu->suspended)) {
+		suspend_duration = vcpu->kvm->last_suspend_duration;
+		vcpu->suspended = 0;
 	}
 
 	st = (struct kvm_steal_time __user *)ghc->hva;
@@ -3637,6 +3643,7 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
 	unsafe_get_user(steal, &st->steal, out);
 	steal += current->sched_info.run_delay -
 		vcpu->arch.st.last_steal;
+	steal += suspend_duration;
 	vcpu->arch.st.last_steal = current->sched_info.run_delay;
 	unsafe_put_user(steal, &st->steal, out);
 
@@ -6775,7 +6782,24 @@ static int kvm_arch_suspend_notifier(struct kvm *kvm)
 	}
 	mutex_unlock(&kvm->lock);
 
+	kvm->suspended_time = ktime_get_boottime_ns();
+
 	return ret ? NOTIFY_BAD : NOTIFY_DONE;
+}
+
+static int
+kvm_arch_resume_notifier(struct kvm *kvm)
+{
+	struct kvm_vcpu *vcpu;
+	unsigned long i;
+
+	kvm->last_suspend_duration = ktime_get_boottime_ns() -
+	    kvm->suspended_time;
+	mutex_lock(&kvm->lock);
+	kvm_for_each_vcpu(i, vcpu, kvm)
+		WRITE_ONCE(vcpu->suspended, 1);
+	mutex_unlock(&kvm->lock);
+	return NOTIFY_DONE;
 }
 
 int kvm_arch_pm_notifier(struct kvm *kvm, unsigned long state)
@@ -6784,6 +6808,9 @@ int kvm_arch_pm_notifier(struct kvm *kvm, unsigned long state)
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
 		return kvm_arch_suspend_notifier(kvm);
+	case PM_POST_HIBERNATION:
+	case PM_POST_SUSPEND:
+		return kvm_arch_resume_notifier(kvm);
 	}
 
 	return NOTIFY_DONE;
