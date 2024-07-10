@@ -15,6 +15,7 @@
   cleancache_register_ops
   copy_page
   _dev_alert
+  device_pm_wait_for_dev
   __devm_alloc_percpu
   dma_heap_try_get_pool_size_kb
   elv_bio_merge_ok
@@ -52,6 +53,7 @@
   rfkill_soft_blocked
   scsi_device_quiesce
   scsi_device_resume
+  stack_trace_save_regs
   __kfree_skb
   __traceiter_android_rvh_arm64_serror_panic
   __traceiter_android_rvh_die_kernel_fault
@@ -75,13 +77,16 @@
   __traceiter_android_vh_psi_update_triggers
   __traceiter_android_vh_ptype_head
   __traceiter_android_vh_rebalance_anon_lru_bypass
+  __traceiter_android_vh_rtmutex_wait_finish
   __traceiter_android_vh_show_mem
   __traceiter_android_vh_show_smap
   __traceiter_android_vh_smaps_pte_entry
   __traceiter_android_vh_try_to_freeze_todo
   __traceiter_android_vh_try_to_freeze_todo_unfrozen
   __traceiter_android_vh_watchdog_timer_softlockup
+  __traceiter_android_vh_wq_lockup_pool
   __traceiter_console
+  __traceiter_error_report_end
   __traceiter_workqueue_execute_start
   __traceiter_kfree_skb
   __tracepoint_android_rvh_arm64_serror_panic
@@ -106,13 +111,16 @@
   __tracepoint_android_vh_psi_update_triggers
   __tracepoint_android_vh_ptype_head
   __tracepoint_android_vh_rebalance_anon_lru_bypass
+  __tracepoint_android_vh_rtmutex_wait_finish
   __tracepoint_android_vh_show_mem
   __tracepoint_android_vh_show_smap
   __tracepoint_android_vh_smaps_pte_entry
   __tracepoint_android_vh_try_to_freeze_todo
   __tracepoint_android_vh_try_to_freeze_todo_unfrozen
   __tracepoint_android_vh_watchdog_timer_softlockup
+  __tracepoint_android_vh_wq_lockup_pool
   __tracepoint_console
+  __tracepoint_error_report_end
   __tracepoint_workqueue_execute_start
   __tracepoint_kfree_skb
   usb_set_device_state
