@@ -74,6 +74,7 @@
   __traceiter_android_vh_process_madvise
   __traceiter_android_vh_psi_update_triggers
   __traceiter_android_vh_ptype_head
+  __traceiter_android_vh_rebalance_anon_lru_bypass
   __traceiter_android_vh_show_mem
   __traceiter_android_vh_show_smap
   __traceiter_android_vh_smaps_pte_entry
@@ -104,6 +105,7 @@
   __tracepoint_android_vh_process_madvise
   __tracepoint_android_vh_psi_update_triggers
   __tracepoint_android_vh_ptype_head
+  __tracepoint_android_vh_rebalance_anon_lru_bypass
   __tracepoint_android_vh_show_mem
   __tracepoint_android_vh_show_smap
   __tracepoint_android_vh_smaps_pte_entry
