@@ -127,6 +127,22 @@
   __tracepoint_android_rvh_dequeue_task_fair
   __tracepoint_android_rvh_entity_tick
 
+#required by cpq.ko
+  elv_rb_former_request
+  elv_rb_latter_request
+  blk_mq_sched_try_merge
+  elv_rb_find
+  elv_bio_merge_ok
+  elv_rb_del
+  elv_rb_add
+  elv_rqhash_del
+  blk_mq_sched_mark_restart_hctx
+  __blk_req_zone_write_unlock
+  blk_mq_sched_try_insert_merge
+  elv_rqhash_add
+  blk_req_needs_zone_write_lock
+  __blk_req_zone_write_lock
+
 #required by cifs.ko
   add_swap_extent
   asn1_ber_decoder
