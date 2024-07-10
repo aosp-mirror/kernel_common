@@ -1201,6 +1201,7 @@
   mii_link_ok
   mii_nway_restart
   mipi_dsi_attach
+  mipi_dsi_dcs_nop
   mipi_dsi_dcs_read
   mipi_dsi_dcs_write
   mipi_dsi_dcs_write_buffer
