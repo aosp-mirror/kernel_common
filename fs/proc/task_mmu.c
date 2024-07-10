@@ -410,6 +410,7 @@ struct mem_size_stats {
 	unsigned long shmem_thp;
 	unsigned long file_thp;
 	unsigned long swap;
+	unsigned long swap_shared;
 	unsigned long writeback;
 	unsigned long same;
 	unsigned long huge;
@@ -564,6 +565,8 @@ static void smaps_pte_entry(pte_t *pte, unsigned long addr,
 
 				do_div(pss_delta, mapcount);
 				mss->swap_pss += pss_delta;
+				trace_android_vh_smaps_swap_shared(
+						&mss->swap_shared);
 			} else {
 				mss->swap_pss += (u64)PAGE_SIZE << PSS_SHIFT;
 			}
@@ -865,6 +868,7 @@ static void __show_smap(struct seq_file *m, const struct mem_size_stats *mss,
 	SEQ_PUT_DEC(" kB\nLocked:         ",
 					mss->pss_locked >> PSS_SHIFT);
 	seq_puts(m, " kB\n");
+	trace_android_vh_show_smap_swap_shared(m, mss->swap_shared);
 	trace_android_vh_show_smap(m, mss->writeback, mss->same, mss->huge);
 }
 
