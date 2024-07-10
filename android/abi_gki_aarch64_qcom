@@ -402,6 +402,7 @@
   devm_rtc_allocate_device
   __devm_rtc_register_device
   devm_snd_soc_register_component
+  devm_tegra_memory_controller_get
   devm_thermal_of_cooling_device_register
   devm_thermal_of_zone_register
   devm_usb_get_phy_by_node
@@ -1437,6 +1438,10 @@
   pm_system_wakeup
   pm_wakeup_dev_event
   pm_wakeup_ws_event
+  powercap_register_control_type
+  powercap_register_zone
+  powercap_unregister_control_type
+  powercap_unregister_zone
   power_supply_changed
   power_supply_get_by_name
   power_supply_get_drvdata
@@ -1445,10 +1450,6 @@
   power_supply_reg_notifier
   power_supply_set_property
   power_supply_unreg_notifier
-  powercap_register_control_type
-  powercap_register_zone
-  powercap_unregister_control_type
-  powercap_unregister_zone
   preempt_schedule
   preempt_schedule_notrace
   prepare_to_wait_event
@@ -1925,6 +1926,7 @@
   __task_rq_lock
   task_rq_lock
   tcp_hashinfo
+  tegra_mc_probe_device
   thermal_cdev_update
   thermal_cooling_device_register
   thermal_cooling_device_unregister
