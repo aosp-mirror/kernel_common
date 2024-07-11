@@ -26,6 +26,7 @@
   elv_rb_latter_request
   elv_rqhash_add
   elv_rqhash_del
+  free_hpage
   file_ra_state_init
   file_write_and_wait_range
   generic_perform_write
@@ -47,6 +48,7 @@
   param_get_uint
   param_set_uint
   pidfd_get_pid
+  prep_new_hpage
   proc_set_size
   pstore_register
   pstore_unregister
@@ -78,6 +80,8 @@
   __traceiter_android_vh_cache_show
   __traceiter_android_vh_cma_debug_show_areas
   __traceiter_android_vh_exit_mm
+  __traceiter_android_vh_free_pages_prepare_bypass
+  __traceiter_android_vh_free_pages_ok_bypass
   __traceiter_android_vh_is_fpsimd_save
   __traceiter_android_vh_logbuf
   __traceiter_android_vh_logbuf_pr_cont
@@ -125,6 +129,8 @@
   __tracepoint_android_vh_cache_show
   __tracepoint_android_vh_cma_debug_show_areas
   __tracepoint_android_vh_exit_mm
+  __tracepoint_android_vh_free_pages_prepare_bypass
+  __tracepoint_android_vh_free_pages_ok_bypass
   __tracepoint_android_vh_is_fpsimd_save
   __tracepoint_android_vh_logbuf
   __tracepoint_android_vh_logbuf_pr_cont
