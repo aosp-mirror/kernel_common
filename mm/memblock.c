@@ -138,10 +138,8 @@ struct memblock_type physmem = {
 };
 #endif
 
-#ifdef CONFIG_MEMBLOCK_MEMSIZE
 static long memsize_kinit;
 static bool memblock_memsize_tracking __initdata_memblock = true;
-#endif
 
 /*
  * keep a pointer to &memblock.memory in the text section to use it in
@@ -699,7 +697,6 @@ repeat:
 		memblock_merge_regions(type, start_rgn, end_rgn);
 	}
 done:
-#ifdef CONFIG_MEMBLOCK_MEMSIZE
 	if (memblock_memsize_tracking) {
 		if (new_size && type == &memblock.reserved) {
 			memblock_dbg("%s: kernel %lu %+ld\n", __func__,
@@ -707,7 +704,6 @@ done:
 			memsize_kinit += size;
 		}
 	}
-#endif
 	return 0;
 }
 
@@ -844,7 +840,6 @@ static int __init_memblock memblock_remove_range(struct memblock_type *type,
 
 	for (i = end_rgn - 1; i >= start_rgn; i--)
 		memblock_remove_region(type, i);
-#ifdef CONFIG_MEMBLOCK_MEMSIZE
 	if (memblock_memsize_tracking) {
 		if (type == &memblock.reserved) {
 			memblock_dbg("%s: kernel %lu %+ld\n", __func__,
@@ -852,7 +847,6 @@ static int __init_memblock memblock_remove_range(struct memblock_type *type,
 			memsize_kinit -= size;
 		}
 	}
-#endif
 	return 0;
 }
 
@@ -2006,8 +2000,6 @@ static int __init early_memblock(char *p)
 }
 early_param("memblock", early_memblock);
 
-#ifdef CONFIG_MEMBLOCK_MEMSIZE
-
 #define NAME_SIZE	100
 struct memsize_rgn_struct {
 	phys_addr_t	base;
@@ -2017,7 +2009,9 @@ struct memsize_rgn_struct {
 	char		name[NAME_SIZE];	/* 30/32 byte */
 };
 
-static struct memsize_rgn_struct memsize_rgn[CONFIG_MAX_MEMBLOCK_MEMSIZE] __initdata_memblock;
+#define MAX_MEMBLOCK_MEMSIZE	100
+
+static struct memsize_rgn_struct memsize_rgn[MAX_MEMBLOCK_MEMSIZE] __initdata_memblock;
 static int memsize_rgn_count __initdata_memblock;
 static long memsize_memmap;
 static unsigned long memsize_code __initdata_memblock;
@@ -2213,7 +2207,7 @@ void __init_memblock memblock_memsize_record(const char *name, phys_addr_t base,
 	if (name && memsize_state == MEMBLOCK_MEMSIZE_NONE)
 		return;
 
-	if (memsize_rgn_count == CONFIG_MAX_MEMBLOCK_MEMSIZE) {
+	if (memsize_rgn_count == MAX_MEMBLOCK_MEMSIZE) {
 		pr_err("not enough space on memsize_rgn\n");
 		return;
 	}
@@ -2282,7 +2276,6 @@ void __init memblock_memsize_detect_hole(void)
 		}
 	}
 }
-#endif /* MEMBLOCK_MEMSIZE */
 
 static void __init free_memmap(unsigned long start_pfn, unsigned long end_pfn)
 {
@@ -2396,7 +2389,6 @@ static unsigned long __init __free_memory_core(phys_addr_t start,
 	unsigned long end_pfn = min_t(unsigned long,
 				      PFN_DOWN(end), max_low_pfn);
 
-#ifdef CONFIG_MEMBLOCK_MEMSIZE
 	unsigned long start_align_up = PFN_ALIGN(start);
 	unsigned long end_align_down = PFN_PHYS(end_pfn);
 
@@ -2408,7 +2400,6 @@ static unsigned long __init __free_memory_core(phys_addr_t start,
 		if (end_pfn != max_low_pfn && end_align_down < end)
 			memblock_memsize_mod_kernel_size(end - end_align_down);
 	}
-#endif
 	if (start_pfn >= end_pfn)
 		return 0;
 
@@ -2556,7 +2547,6 @@ static int memblock_debug_show(struct seq_file *m, void *private)
 }
 DEFINE_SHOW_ATTRIBUTE(memblock_debug);
 
-#ifdef CONFIG_MEMBLOCK_MEMSIZE
 /* assume that freeing region is NOT bigger than the previous region */
 static void memblock_memsize_free(phys_addr_t free_base,
 						  phys_addr_t free_size)
@@ -2710,7 +2700,6 @@ static int memblock_memsize_show(struct seq_file *m, void *private)
 }
 
 DEFINE_SHOW_ATTRIBUTE(memblock_memsize);
-#endif
 
 static int __init memblock_init_debugfs(void)
 {
@@ -2724,14 +2713,12 @@ static int __init memblock_init_debugfs(void)
 	debugfs_create_file("physmem", 0444, root, &physmem,
 			    &memblock_debug_fops);
 #endif
-#ifdef CONFIG_MEMBLOCK_MEMSIZE
 	if (memsize_state == MEMBLOCK_MEMSIZE_DEBUGFS)
 		debugfs_create_file("memsize", 0444, root, NULL,
 				    &memblock_memsize_fops);
 	else if (memsize_state == MEMBLOCK_MEMSIZE_PROCFS)
 		proc_create_single("memsize", 0, NULL,
 				    memblock_memsize_show);
-#endif
 
 	return 0;
 }
