@@ -364,18 +364,14 @@ struct drm_connector *drm_bridge_connector_init(struct drm_device *drm,
 			panel_bridge = bridge;
 	}
 
-	if (connector_type == DRM_MODE_CONNECTOR_Unknown) {
-		kfree(bridge_connector);
+	if (connector_type == DRM_MODE_CONNECTOR_Unknown)
 		return ERR_PTR(-EINVAL);
-	}
 
 	ret = drm_connector_init_with_ddc(drm, connector,
 					  &drm_bridge_connector_funcs,
 					  connector_type, ddc);
-	if (ret) {
-		kfree(bridge_connector);
+	if (ret)
 		return ERR_PTR(ret);
-	}
 
 	drm_connector_helper_add(connector, &drm_bridge_connector_helper_funcs);
 
