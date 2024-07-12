@@ -784,6 +784,7 @@
   __hw_addr_init
   __hw_addr_sync
   __hw_addr_unsync
+  hwspin_lock_bust
   hwspin_lock_free
   hwspin_lock_request_specific
   __hwspin_lock_timeout
