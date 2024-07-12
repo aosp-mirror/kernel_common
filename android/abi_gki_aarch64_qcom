@@ -161,6 +161,7 @@
   complete_all
   completion_done
   config_ep_by_speed
+  configfs_register_default_group
   configfs_register_group
   configfs_register_subsystem
   configfs_unregister_group
