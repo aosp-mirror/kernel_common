@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2019-2023 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2019-2024 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -357,13 +357,14 @@ static struct kbase_csf_tiler_heap_chunk *alloc_new_chunk(struct kbase_context *
 	}
 
 	remove_external_chunk_mappings(kctx, chunk);
-	kbase_gpu_vm_unlock(kctx);
 
 	/* If page migration is enabled, we don't want to migrate tiler heap pages.
 	 * This does not change if the constituent pages are already marked as isolated.
 	 */
 	if (kbase_is_page_migration_enabled())
-		kbase_set_phy_alloc_page_status(chunk->region->gpu_alloc, NOT_MOVABLE);
+		kbase_set_phy_alloc_page_status(kctx, chunk->region->gpu_alloc, NOT_MOVABLE);
+
+	kbase_gpu_vm_unlock(kctx);
 
 	return chunk;
 
@@ -749,7 +750,7 @@ int kbase_csf_tiler_heap_init(struct kbase_context *const kctx, u32 const chunk_
 					  KBASE_VMAP_FLAG_PERMANENT_MAP_ACCOUNTING);
 
 		if (kbase_is_page_migration_enabled())
-			kbase_set_phy_alloc_page_status(buf_desc_reg->gpu_alloc, NOT_MOVABLE);
+			kbase_set_phy_alloc_page_status(kctx, buf_desc_reg->gpu_alloc, NOT_MOVABLE);
 
 		kbase_gpu_vm_unlock(kctx);
 
