@@ -364,6 +364,7 @@
   devm_extcon_dev_register
   devm_free_irq
   devm_fwnode_gpiod_get_index
+  devm_fwnode_pwm_get
   devm_gpiod_get
   devm_gpiod_get_index
   devm_gpiod_get_optional
@@ -971,6 +972,7 @@
   i2c_put_adapter
   i2c_register_driver
   i2c_smbus_read_byte_data
+  i2c_smbus_write_byte
   i2c_smbus_write_byte_data
   i2c_smbus_xfer
   i2c_transfer
@@ -2272,6 +2274,7 @@
   try_module_get
   try_wait_for_completion
   tty_flip_buffer_push
+  tty_termios_hw_change
   uart_add_one_port
   uart_console_device
   uart_console_write
@@ -2395,6 +2398,13 @@
   usb_role_switch_unregister
   usb_root_hub_lost_power
   usb_scuttle_anchored_urbs
+  usb_serial_deregister_drivers
+  usb_serial_generic_close
+  usb_serial_generic_get_icount
+  usb_serial_generic_open
+  usb_serial_generic_throttle
+  usb_serial_generic_unthrottle
+  usb_serial_register_drivers
   usb_set_interface
   usb_submit_urb
   usb_unanchor_urb
