@@ -1545,7 +1545,7 @@ static int guest_request_walker(const struct kvm_pgtable_visit_ctx *ctx,
 	phys_addr_t phys;
 
 	state = guest_get_page_state(pte, 0);
-	if ((data->desired_state & data->desired_mask) != state)
+	if (data->desired_state != (state & data->desired_mask))
 		return (state & PKVM_NOPAGE) ? -EFAULT : -EINVAL;
 
 	if (state & PKVM_NOPAGE) {
