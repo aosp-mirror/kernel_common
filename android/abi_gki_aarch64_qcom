@@ -663,6 +663,7 @@
   fwnode_property_read_u32_array
   gcd
   generic_device_group
+  generic_file_llseek
   generic_handle_domain_irq
   generic_handle_irq
   geni_icc_disable
