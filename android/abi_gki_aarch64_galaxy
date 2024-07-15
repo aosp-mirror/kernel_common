@@ -39,9 +39,14 @@
   gserial_suspend
   gs_free_req
   kick_all_cpus_sync
+  mas_walk
+  mas_prev
+  mas_next
+  mm_access
   netlink_ack
   param_get_uint
   param_set_uint
+  pidfd_get_pid
   proc_set_size
   pstore_register
   pstore_unregister
@@ -55,6 +60,7 @@
   scsi_device_resume
   smpboot_unregister_percpu_thread
   stack_trace_save_regs
+  swp_swapcount
   __kfree_skb
   __traceiter_android_rvh_arm64_serror_panic
   __traceiter_android_rvh_die_kernel_fault
@@ -64,6 +70,7 @@
   __traceiter_android_rvh_do_sea
   __traceiter_android_rvh_do_sp_pc_abort
   __traceiter_android_rvh_panic_unhandled
+  __traceiter_android_rvh_process_madvise_bypass
   __traceiter_android_rvh_report_bug
   __traceiter_android_vh_alloc_contig_range_not_isolated
   __traceiter_android_vh_alloc_pages_slowpath_start
@@ -110,6 +117,7 @@
   __tracepoint_android_rvh_do_sea
   __tracepoint_android_rvh_do_sp_pc_abort
   __tracepoint_android_rvh_panic_unhandled
+  __tracepoint_android_rvh_process_madvise_bypass
   __tracepoint_android_rvh_report_bug
   __tracepoint_android_vh_alloc_contig_range_not_isolated
   __tracepoint_android_vh_alloc_pages_slowpath_start
