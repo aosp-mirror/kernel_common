@@ -101,7 +101,7 @@ static __be32 nfsd3_proc_setacl(struct svc_rqst *rqstp)
 	if (error)
 		goto out_errno;
 
-	fh_lock(fh);
+	inode_lock(inode);
 
 	error = set_posix_acl(inode, ACL_TYPE_ACCESS, argp->acl_access);
 	if (error)
@@ -109,7 +109,7 @@ static __be32 nfsd3_proc_setacl(struct svc_rqst *rqstp)
 	error = set_posix_acl(inode, ACL_TYPE_DEFAULT, argp->acl_default);
 
 out_drop_lock:
-	fh_unlock(fh);
+	inode_unlock(inode);
 	fh_drop_write(fh);
 out_errno:
 	resp->status = nfserrno(error);
@@ -124,43 +124,39 @@ out:
 /*
  * XDR decode functions
  */
-static int nfs3svc_decode_getaclargs(struct svc_rqst *rqstp, __be32 *p)
+
+static bool
+nfs3svc_decode_getaclargs(struct svc_rqst *rqstp, struct xdr_stream *xdr)
 {
 	struct nfsd3_getaclargs *args = rqstp->rq_argp;
 
-	p = nfs3svc_decode_fh(p, &args->fh);
-	if (!p)
-		return 0;
-	args->mask = ntohl(*p); p++;
+	if (!svcxdr_decode_nfs_fh3(xdr, &args->fh))
+		return false;
+	if (xdr_stream_decode_u32(xdr, &args->mask) < 0)
+		return false;
 
-	return xdr_argsize_check(rqstp, p);
+	return true;
 }
 
-
-static int nfs3svc_decode_setaclargs(struct svc_rqst *rqstp, __be32 *p)
+static bool
+nfs3svc_decode_setaclargs(struct svc_rqst *rqstp, struct xdr_stream *xdr)
 {
-	struct nfsd3_setaclargs *args = rqstp->rq_argp;
-	struct kvec *head = rqstp->rq_arg.head;
-	unsigned int base;
-	int n;
+	struct nfsd3_setaclargs *argp = rqstp->rq_argp;
 
-	p = nfs3svc_decode_fh(p, &args->fh);
-	if (!p)
-		return 0;
-	args->mask = ntohl(*p++);
-	if (args->mask & ~NFS_ACL_MASK ||
-	    !xdr_argsize_check(rqstp, p))
-		return 0;
+	if (!svcxdr_decode_nfs_fh3(xdr, &argp->fh))
+		return false;
+	if (xdr_stream_decode_u32(xdr, &argp->mask) < 0)
+		return false;
+	if (argp->mask & ~NFS_ACL_MASK)
+		return false;
+	if (!nfs_stream_decode_acl(xdr, NULL, (argp->mask & NFS_ACL) ?
+				   &argp->acl_access : NULL))
+		return false;
+	if (!nfs_stream_decode_acl(xdr, NULL, (argp->mask & NFS_DFACL) ?
+				   &argp->acl_default : NULL))
+		return false;
 
-	base = (char *)p - (char *)head->iov_base;
-	n = nfsacl_decode(&rqstp->rq_arg, base, NULL,
-			  (args->mask & NFS_ACL) ?
-			  &args->acl_access : NULL);
-	if (n > 0)
-		n = nfsacl_decode(&rqstp->rq_arg, base + n, NULL,
-				  (args->mask & NFS_DFACL) ?
-				  &args->acl_default : NULL);
-	return (n > 0);
+	return true;
 }
 
 /*
@@ -168,59 +164,47 @@ static int nfs3svc_decode_setaclargs(struct svc_rqst *rqstp, __be32 *p)
  */
 
 /* GETACL */
-static int nfs3svc_encode_getaclres(struct svc_rqst *rqstp, __be32 *p)
+static bool
+nfs3svc_encode_getaclres(struct svc_rqst *rqstp, struct xdr_stream *xdr)
 {
 	struct nfsd3_getaclres *resp = rqstp->rq_resp;
 	struct dentry *dentry = resp->fh.fh_dentry;
+	struct inode *inode;
 
-	*p++ = resp->status;
-	p = nfs3svc_encode_post_op_attr(rqstp, p, &resp->fh);
-	if (resp->status == 0 && dentry && d_really_is_positive(dentry)) {
-		struct inode *inode = d_inode(dentry);
-		struct kvec *head = rqstp->rq_res.head;
-		unsigned int base;
-		int n;
-		int w;
+	if (!svcxdr_encode_nfsstat3(xdr, resp->status))
+		return false;
+	switch (resp->status) {
+	case nfs_ok:
+		inode = d_inode(dentry);
+		if (!svcxdr_encode_post_op_attr(rqstp, xdr, &resp->fh))
+			return false;
+		if (xdr_stream_encode_u32(xdr, resp->mask) < 0)
+			return false;
 
-		*p++ = htonl(resp->mask);
-		if (!xdr_ressize_check(rqstp, p))
-			return 0;
-		base = (char *)p - (char *)head->iov_base;
+		if (!nfs_stream_encode_acl(xdr, inode, resp->acl_access,
+					   resp->mask & NFS_ACL, 0))
+			return false;
+		if (!nfs_stream_encode_acl(xdr, inode, resp->acl_default,
+					   resp->mask & NFS_DFACL,
+					   NFS_ACL_DEFAULT))
+			return false;
+		break;
+	default:
+		if (!svcxdr_encode_post_op_attr(rqstp, xdr, &resp->fh))
+			return false;
+	}
 
-		rqstp->rq_res.page_len = w = nfsacl_size(
-			(resp->mask & NFS_ACL)   ? resp->acl_access  : NULL,
-			(resp->mask & NFS_DFACL) ? resp->acl_default : NULL);
-		while (w > 0) {
-			if (!*(rqstp->rq_next_page++))
-				return 0;
-			w -= PAGE_SIZE;
-		}
-
-		n = nfsacl_encode(&rqstp->rq_res, base, inode,
-				  resp->acl_access,
-				  resp->mask & NFS_ACL, 0);
-		if (n > 0)
-			n = nfsacl_encode(&rqstp->rq_res, base + n, inode,
-					  resp->acl_default,
-					  resp->mask & NFS_DFACL,
-					  NFS_ACL_DEFAULT);
-		if (n <= 0)
-			return 0;
-	} else
-		if (!xdr_ressize_check(rqstp, p))
-			return 0;
-
-	return 1;
+	return true;
 }
 
 /* SETACL */
-static int nfs3svc_encode_setaclres(struct svc_rqst *rqstp, __be32 *p)
+static bool
+nfs3svc_encode_setaclres(struct svc_rqst *rqstp, struct xdr_stream *xdr)
 {
 	struct nfsd3_attrstat *resp = rqstp->rq_resp;
 
-	*p++ = resp->status;
-	p = nfs3svc_encode_post_op_attr(rqstp, p, &resp->fh);
-	return xdr_ressize_check(rqstp, p);
+	return svcxdr_encode_nfsstat3(xdr, resp->status) &&
+		svcxdr_encode_post_op_attr(rqstp, xdr, &resp->fh);
 }
 
 /*
@@ -245,12 +229,14 @@ struct nfsd3_voidargs { int dummy; };
 static const struct svc_procedure nfsd_acl_procedures3[3] = {
 	[ACLPROC3_NULL] = {
 		.pc_func = nfsd3_proc_null,
-		.pc_decode = nfs3svc_decode_voidarg,
-		.pc_encode = nfs3svc_encode_voidres,
-		.pc_argsize = sizeof(struct nfsd3_voidargs),
-		.pc_ressize = sizeof(struct nfsd3_voidargs),
+		.pc_decode = nfssvc_decode_voidarg,
+		.pc_encode = nfssvc_encode_voidres,
+		.pc_argsize = sizeof(struct nfsd_voidargs),
+		.pc_argzero = sizeof(struct nfsd_voidargs),
+		.pc_ressize = sizeof(struct nfsd_voidres),
 		.pc_cachetype = RC_NOCACHE,
 		.pc_xdrressize = ST,
+		.pc_name = "NULL",
 	},
 	[ACLPROC3_GETACL] = {
 		.pc_func = nfsd3_proc_getacl,
@@ -258,9 +244,11 @@ static const struct svc_procedure nfsd_acl_procedures3[3] = {
 		.pc_encode = nfs3svc_encode_getaclres,
 		.pc_release = nfs3svc_release_getacl,
 		.pc_argsize = sizeof(struct nfsd3_getaclargs),
+		.pc_argzero = sizeof(struct nfsd3_getaclargs),
 		.pc_ressize = sizeof(struct nfsd3_getaclres),
 		.pc_cachetype = RC_NOCACHE,
 		.pc_xdrressize = ST+1+2*(1+ACL),
+		.pc_name = "GETACL",
 	},
 	[ACLPROC3_SETACL] = {
 		.pc_func = nfsd3_proc_setacl,
@@ -268,9 +256,11 @@ static const struct svc_procedure nfsd_acl_procedures3[3] = {
 		.pc_encode = nfs3svc_encode_setaclres,
 		.pc_release = nfs3svc_release_fhandle,
 		.pc_argsize = sizeof(struct nfsd3_setaclargs),
+		.pc_argzero = sizeof(struct nfsd3_setaclargs),
 		.pc_ressize = sizeof(struct nfsd3_attrstat),
 		.pc_cachetype = RC_NOCACHE,
 		.pc_xdrressize = ST+pAT,
+		.pc_name = "SETACL",
 	},
 };
 

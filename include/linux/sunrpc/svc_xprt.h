@@ -21,8 +21,8 @@ struct svc_xprt_ops {
 	int		(*xpo_has_wspace)(struct svc_xprt *);
 	int		(*xpo_recvfrom)(struct svc_rqst *);
 	int		(*xpo_sendto)(struct svc_rqst *);
-	int		(*xpo_read_payload)(struct svc_rqst *, unsigned int,
-					    unsigned int);
+	int		(*xpo_result_payload)(struct svc_rqst *, unsigned int,
+					      unsigned int);
 	void		(*xpo_release_rqst)(struct svc_rqst *);
 	void		(*xpo_detach)(struct svc_xprt *);
 	void		(*xpo_free)(struct svc_xprt *);
@@ -127,14 +127,16 @@ int	svc_reg_xprt_class(struct svc_xprt_class *);
 void	svc_unreg_xprt_class(struct svc_xprt_class *);
 void	svc_xprt_init(struct net *, struct svc_xprt_class *, struct svc_xprt *,
 		      struct svc_serv *);
-int	svc_create_xprt(struct svc_serv *, const char *, struct net *,
-			const int, const unsigned short, int,
-			const struct cred *);
-void	svc_xprt_do_enqueue(struct svc_xprt *xprt);
+int	svc_xprt_create(struct svc_serv *serv, const char *xprt_name,
+			struct net *net, const int family,
+			const unsigned short port, int flags,
+			const struct cred *cred);
+void	svc_xprt_destroy_all(struct svc_serv *serv, struct net *net);
+void	svc_xprt_received(struct svc_xprt *xprt);
 void	svc_xprt_enqueue(struct svc_xprt *xprt);
 void	svc_xprt_put(struct svc_xprt *xprt);
 void	svc_xprt_copy_addrs(struct svc_rqst *rqstp, struct svc_xprt *xprt);
-void	svc_close_xprt(struct svc_xprt *xprt);
+void	svc_xprt_close(struct svc_xprt *xprt);
 int	svc_port_is_privileged(struct sockaddr *sin);
 int	svc_print_xprts(char *buf, int maxlen);
 struct	svc_xprt *svc_find_xprt(struct svc_serv *serv, const char *xcl_name,

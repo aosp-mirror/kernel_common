@@ -669,7 +669,7 @@ void xdr_init_encode(struct xdr_stream *xdr, struct xdr_buf *buf, __be32 *p,
 	struct kvec *iov = buf->head;
 	int scratch_len = buf->buflen - buf->page_len - buf->tail[0].iov_len;
 
-	xdr_set_scratch_buffer(xdr, NULL, 0);
+	xdr_reset_scratch_buffer(xdr);
 	BUG_ON(scratch_len < 0);
 	xdr->buf = buf;
 	xdr->iov = iov;
@@ -691,7 +691,29 @@ void xdr_init_encode(struct xdr_stream *xdr, struct xdr_buf *buf, __be32 *p,
 EXPORT_SYMBOL_GPL(xdr_init_encode);
 
 /**
- * xdr_commit_encode - Ensure all data is written to buffer
+ * xdr_init_encode_pages - Initialize an xdr_stream for encoding into pages
+ * @xdr: pointer to xdr_stream struct
+ * @buf: pointer to XDR buffer into which to encode data
+ * @pages: list of pages to decode into
+ * @rqst: pointer to controlling rpc_rqst, for debugging
+ *
+ */
+void xdr_init_encode_pages(struct xdr_stream *xdr, struct xdr_buf *buf,
+			   struct page **pages, struct rpc_rqst *rqst)
+{
+	xdr_reset_scratch_buffer(xdr);
+
+	xdr->buf = buf;
+	xdr->page_ptr = pages;
+	xdr->iov = NULL;
+	xdr->p = page_address(*pages);
+	xdr->end = (void *)xdr->p + min_t(u32, buf->buflen, PAGE_SIZE);
+	xdr->rqst = rqst;
+}
+EXPORT_SYMBOL_GPL(xdr_init_encode_pages);
+
+/**
+ * __xdr_commit_encode - Ensure all data is written to buffer
  * @xdr: pointer to xdr_stream
  *
  * We handle encoding across page boundaries by giving the caller a
@@ -703,22 +725,25 @@ EXPORT_SYMBOL_GPL(xdr_init_encode);
  * required at the end of encoding, or any other time when the xdr_buf
  * data might be read.
  */
-inline void xdr_commit_encode(struct xdr_stream *xdr)
+void __xdr_commit_encode(struct xdr_stream *xdr)
 {
 	int shift = xdr->scratch.iov_len;
 	void *page;
 
-	if (shift == 0)
-		return;
 	page = page_address(*xdr->page_ptr);
 	memcpy(xdr->scratch.iov_base, page, shift);
 	memmove(page, page + shift, (void *)xdr->p - page);
-	xdr->scratch.iov_len = 0;
+	xdr_reset_scratch_buffer(xdr);
 }
-EXPORT_SYMBOL_GPL(xdr_commit_encode);
+EXPORT_SYMBOL_GPL(__xdr_commit_encode);
 
-static __be32 *xdr_get_next_encode_buffer(struct xdr_stream *xdr,
-		size_t nbytes)
+/*
+ * The buffer space to be reserved crosses the boundary between
+ * xdr->buf->head and xdr->buf->pages, or between two pages
+ * in xdr->buf->pages.
+ */
+static noinline __be32 *xdr_get_next_encode_buffer(struct xdr_stream *xdr,
+						   size_t nbytes)
 {
 	__be32 *p;
 	int space_left;
@@ -743,8 +768,7 @@ static __be32 *xdr_get_next_encode_buffer(struct xdr_stream *xdr,
 	 * the "scratch" iov to track any temporarily unused fragment of
 	 * space at the end of the previous buffer:
 	 */
-	xdr->scratch.iov_base = xdr->p;
-	xdr->scratch.iov_len = frag1bytes;
+	xdr_set_scratch_buffer(xdr, xdr->p, frag1bytes);
 	p = page_address(*xdr->page_ptr);
 	/*
 	 * Note this is where the next encode will start after we've
@@ -1056,8 +1080,7 @@ void xdr_init_decode(struct xdr_stream *xdr, struct xdr_buf *buf, __be32 *p,
 		     struct rpc_rqst *rqst)
 {
 	xdr->buf = buf;
-	xdr->scratch.iov_base = NULL;
-	xdr->scratch.iov_len = 0;
+	xdr_reset_scratch_buffer(xdr);
 	xdr->nwords = XDR_QUADLEN(buf->len);
 	if (buf->head[0].iov_len != 0)
 		xdr_set_iov(xdr, buf->head, buf->len);
@@ -1104,24 +1127,6 @@ static __be32 * __xdr_inline_decode(struct xdr_stream *xdr, size_t nbytes)
 	xdr->nwords -= nwords;
 	return p;
 }
-
-/**
- * xdr_set_scratch_buffer - Attach a scratch buffer for decoding data.
- * @xdr: pointer to xdr_stream struct
- * @buf: pointer to an empty buffer
- * @buflen: size of 'buf'
- *
- * The scratch buffer is used when decoding from an array of pages.
- * If an xdr_inline_decode() call spans across page boundaries, then
- * we copy the data into the scratch buffer in order to allow linear
- * access.
- */
-void xdr_set_scratch_buffer(struct xdr_stream *xdr, void *buf, size_t buflen)
-{
-	xdr->scratch.iov_base = buf;
-	xdr->scratch.iov_len = buflen;
-}
-EXPORT_SYMBOL_GPL(xdr_set_scratch_buffer);
 
 static __be32 *xdr_copy_to_scratch(struct xdr_stream *xdr, size_t nbytes)
 {
@@ -1431,6 +1436,51 @@ xdr_buf_subsegment(struct xdr_buf *buf, struct xdr_buf *subbuf,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(xdr_buf_subsegment);
+
+/**
+ * xdr_stream_subsegment - set @subbuf to a portion of @xdr
+ * @xdr: an xdr_stream set up for decoding
+ * @subbuf: the result buffer
+ * @nbytes: length of @xdr to extract, in bytes
+ *
+ * Sets up @subbuf to represent a portion of @xdr. The portion
+ * starts at the current offset in @xdr, and extends for a length
+ * of @nbytes. If this is successful, @xdr is advanced to the next
+ * position following that portion.
+ *
+ * Return values:
+ *   %true: @subbuf has been initialized, and @xdr has been advanced.
+ *   %false: a bounds error has occurred
+ */
+bool xdr_stream_subsegment(struct xdr_stream *xdr, struct xdr_buf *subbuf,
+			   unsigned int nbytes)
+{
+	unsigned int remaining, offset, len;
+
+	if (xdr_buf_subsegment(xdr->buf, subbuf, xdr_stream_pos(xdr), nbytes))
+		return false;
+
+	if (subbuf->head[0].iov_len)
+		if (!__xdr_inline_decode(xdr, subbuf->head[0].iov_len))
+			return false;
+
+	remaining = subbuf->page_len;
+	offset = subbuf->page_base;
+	while (remaining) {
+		len = min_t(unsigned int, remaining, PAGE_SIZE) - offset;
+
+		if (xdr->p == xdr->end && !xdr_set_next_buffer(xdr))
+			return false;
+		if (!__xdr_inline_decode(xdr, len))
+			return false;
+
+		remaining -= len;
+		offset = 0;
+	}
+
+	return true;
+}
+EXPORT_SYMBOL_GPL(xdr_stream_subsegment);
 
 /**
  * xdr_buf_trim - lop at most "len" bytes off the end of "buf"

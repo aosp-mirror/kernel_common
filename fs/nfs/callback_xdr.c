@@ -63,14 +63,13 @@ static __be32 nfs4_callback_null(struct svc_rqst *rqstp)
 	return htonl(NFS4_OK);
 }
 
-static int nfs4_decode_void(struct svc_rqst *rqstp, __be32 *p)
+/*
+ * svc_process_common() looks for an XDR encoder to know when
+ * not to drop a Reply.
+ */
+static bool nfs4_encode_void(struct svc_rqst *rqstp, struct xdr_stream *xdr)
 {
-	return xdr_argsize_check(rqstp, p);
-}
-
-static int nfs4_encode_void(struct svc_rqst *rqstp, __be32 *p)
-{
-	return xdr_ressize_check(rqstp, p);
+	return true;
 }
 
 static __be32 decode_string(struct xdr_stream *xdr, unsigned int *len,
@@ -984,7 +983,17 @@ static __be32 nfs4_callback_compound(struct svc_rqst *rqstp)
 
 out_invalidcred:
 	pr_warn_ratelimited("NFS: NFSv4 callback contains invalid cred\n");
-	return svc_return_autherr(rqstp, rpc_autherr_badcred);
+	rqstp->rq_auth_stat = rpc_autherr_badcred;
+	return rpc_success;
+}
+
+static int
+nfs_callback_dispatch(struct svc_rqst *rqstp, __be32 *statp)
+{
+	const struct svc_procedure *procp = rqstp->rq_procinfo;
+
+	*statp = procp->pc_func(rqstp);
+	return 1;
 }
 
 /*
@@ -1053,16 +1062,18 @@ static struct callback_op callback_ops[] = {
 static const struct svc_procedure nfs4_callback_procedures1[] = {
 	[CB_NULL] = {
 		.pc_func = nfs4_callback_null,
-		.pc_decode = nfs4_decode_void,
 		.pc_encode = nfs4_encode_void,
 		.pc_xdrressize = 1,
+		.pc_name = "NULL",
 	},
 	[CB_COMPOUND] = {
 		.pc_func = nfs4_callback_compound,
 		.pc_encode = nfs4_encode_void,
 		.pc_argsize = 256,
+		.pc_argzero = 256,
 		.pc_ressize = 256,
 		.pc_xdrressize = NFS4_CALLBACK_BUFSIZE,
+		.pc_name = "COMPOUND",
 	}
 };
 
@@ -1073,7 +1084,7 @@ const struct svc_version nfs4_callback_version1 = {
 	.vs_proc = nfs4_callback_procedures1,
 	.vs_count = nfs4_callback_count1,
 	.vs_xdrsize = NFS4_CALLBACK_XDRSIZE,
-	.vs_dispatch = NULL,
+	.vs_dispatch = nfs_callback_dispatch,
 	.vs_hidden = true,
 	.vs_need_cong_ctrl = true,
 };
@@ -1085,7 +1096,7 @@ const struct svc_version nfs4_callback_version4 = {
 	.vs_proc = nfs4_callback_procedures1,
 	.vs_count = nfs4_callback_count4,
 	.vs_xdrsize = NFS4_CALLBACK_XDRSIZE,
-	.vs_dispatch = NULL,
+	.vs_dispatch = nfs_callback_dispatch,
 	.vs_hidden = true,
 	.vs_need_cong_ctrl = true,
 };
