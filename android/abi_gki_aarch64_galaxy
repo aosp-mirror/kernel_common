@@ -93,6 +93,7 @@
   __traceiter_android_vh_watchdog_timer_softlockup
   __traceiter_android_vh_wq_lockup_pool
   __traceiter_console
+  __traceiter_consume_skb
   __traceiter_error_report_end
   __traceiter_vm_unmapped_area
   __traceiter_workqueue_execute_start
@@ -135,6 +136,7 @@
   __tracepoint_android_vh_watchdog_timer_softlockup
   __tracepoint_android_vh_wq_lockup_pool
   __tracepoint_console
+  __tracepoint_consume_skb
   __tracepoint_error_report_end
   __tracepoint_vm_unmapped_area
   __tracepoint_workqueue_execute_start
