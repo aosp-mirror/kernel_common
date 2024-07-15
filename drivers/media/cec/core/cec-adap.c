@@ -1532,51 +1532,11 @@ static void cec_claim_log_addrs(struct cec_adapter *adap, bool block)
 					   "ceccfg-%s", adap->name);
 	if (IS_ERR(adap->kthread_config)) {
 		adap->kthread_config = NULL;
-		adap->is_configuring = false;
 	} else if (block) {
 		mutex_unlock(&adap->lock);
 		wait_for_completion(&adap->config_completion);
 		mutex_lock(&adap->lock);
 	}
-}
-
-/*
- * Helper functions to enable/disable the CEC adapter.
- *
- * These functions are called with adap->lock held.
- */
-static int cec_activate_cnt_inc(struct cec_adapter *adap)
-{
-	int ret;
-
-	if (adap->activate_cnt++)
-		return 0;
-
-	/* serialize adap_enable */
-	mutex_lock(&adap->devnode.lock);
-	adap->last_initiator = 0xff;
-	adap->transmit_in_progress = false;
-	ret = adap->ops->adap_enable(adap, true);
-	if (ret)
-		adap->activate_cnt--;
-	mutex_unlock(&adap->devnode.lock);
-	return ret;
-}
-
-static void cec_activate_cnt_dec(struct cec_adapter *adap)
-{
-	if (WARN_ON(!adap->activate_cnt))
-		return;
-
-	if (--adap->activate_cnt)
-		return;
-
-	/* serialize adap_enable */
-	mutex_lock(&adap->devnode.lock);
-	WARN_ON(adap->ops->adap_enable(adap, false));
-	adap->last_initiator = 0xff;
-	adap->transmit_in_progress = false;
-	mutex_unlock(&adap->devnode.lock);
 }
 
 /* Set a new physical address and send an event notifying userspace of this.
@@ -1585,45 +1545,53 @@ static void cec_activate_cnt_dec(struct cec_adapter *adap)
  */
 void __cec_s_phys_addr(struct cec_adapter *adap, u16 phys_addr, bool block)
 {
-	bool becomes_invalid = phys_addr == CEC_PHYS_ADDR_INVALID;
-	bool is_invalid = adap->phys_addr == CEC_PHYS_ADDR_INVALID;
-
 	if (phys_addr == adap->phys_addr)
 		return;
-	if (!becomes_invalid && adap->devnode.unregistered)
+	if (phys_addr != CEC_PHYS_ADDR_INVALID && adap->devnode.unregistered)
 		return;
 
 	dprintk(1, "new physical address %x.%x.%x.%x\n",
 		cec_phys_addr_exp(phys_addr));
-	if (becomes_invalid || !is_invalid) {
+	if (phys_addr == CEC_PHYS_ADDR_INVALID ||
+	    adap->phys_addr != CEC_PHYS_ADDR_INVALID) {
 		adap->phys_addr = CEC_PHYS_ADDR_INVALID;
 		cec_post_state_event(adap);
 		cec_adap_unconfigure(adap);
-		if (becomes_invalid && adap->needs_hpd) {
-			/* Disable monitor-all/pin modes if needed */
-			if (adap->monitor_all_cnt)
-				WARN_ON(call_op(adap, adap_monitor_all_enable, false));
-			if (adap->monitor_pin_cnt)
-				WARN_ON(call_op(adap, adap_monitor_pin_enable, false));
-			cec_activate_cnt_dec(adap);
+		/* Disabling monitor all mode should always succeed */
+		if (adap->monitor_all_cnt)
+			WARN_ON(call_op(adap, adap_monitor_all_enable, false));
+		/* serialize adap_enable */
+		mutex_lock(&adap->devnode.lock);
+		if (adap->needs_hpd || list_empty(&adap->devnode.fhs)) {
+			WARN_ON(adap->ops->adap_enable(adap, false));
+			adap->transmit_in_progress = false;
 			wake_up_interruptible(&adap->kthread_waitq);
 		}
-		if (becomes_invalid)
+		mutex_unlock(&adap->devnode.lock);
+		if (phys_addr == CEC_PHYS_ADDR_INVALID)
 			return;
 	}
 
-	if (is_invalid && adap->needs_hpd) {
-		if (cec_activate_cnt_inc(adap))
+	/* serialize adap_enable */
+	mutex_lock(&adap->devnode.lock);
+	adap->last_initiator = 0xff;
+	adap->transmit_in_progress = false;
+
+	if (adap->needs_hpd || list_empty(&adap->devnode.fhs)) {
+		if (adap->ops->adap_enable(adap, true)) {
+			mutex_unlock(&adap->devnode.lock);
 			return;
-		/*
-		 * Re-enable monitor-all/pin modes if needed. We warn, but
-		 * continue if this fails as this is not a critical error.
-		 */
-		if (adap->monitor_all_cnt)
-			WARN_ON(call_op(adap, adap_monitor_all_enable, true));
-		if (adap->monitor_pin_cnt)
-			WARN_ON(call_op(adap, adap_monitor_pin_enable, true));
+		}
 	}
+
+	if (adap->monitor_all_cnt &&
+	    call_op(adap, adap_monitor_all_enable, true)) {
+		if (adap->needs_hpd || list_empty(&adap->devnode.fhs))
+			WARN_ON(adap->ops->adap_enable(adap, false));
+		mutex_unlock(&adap->devnode.lock);
+		return;
+	}
+	mutex_unlock(&adap->devnode.lock);
 
 	adap->phys_addr = phys_addr;
 	cec_post_state_event(adap);
@@ -1688,8 +1656,6 @@ int __cec_s_log_addrs(struct cec_adapter *adap,
 		return -ENODEV;
 
 	if (!log_addrs || log_addrs->num_log_addrs == 0) {
-		if (!adap->is_configuring && !adap->is_configured)
-			return 0;
 		cec_adap_unconfigure(adap);
 		adap->log_addrs.num_log_addrs = 0;
 		for (i = 0; i < CEC_MAX_LOG_ADDRS; i++)
@@ -1697,8 +1663,6 @@ int __cec_s_log_addrs(struct cec_adapter *adap,
 		adap->log_addrs.osd_name[0] = '\0';
 		adap->log_addrs.vendor_id = CEC_VENDOR_ID_NONE;
 		adap->log_addrs.cec_version = CEC_OP_CEC_VERSION_2_0;
-		if (!adap->needs_hpd)
-			cec_activate_cnt_dec(adap);
 		return 0;
 	}
 
@@ -1832,12 +1796,6 @@ int __cec_s_log_addrs(struct cec_adapter *adap,
 		       sizeof(log_addrs->features[i]));
 	}
 
-	if (!adap->needs_hpd && !adap->is_configuring && !adap->is_configured) {
-		int ret = cec_activate_cnt_inc(adap);
-
-		if (ret)
-			return ret;
-	}
 	log_addrs->log_addr_mask = adap->log_addrs.log_addr_mask;
 	adap->log_addrs = *log_addrs;
 	if (adap->phys_addr != CEC_PHYS_ADDR_INVALID)
@@ -2141,37 +2099,20 @@ skip_processing:
  */
 int cec_monitor_all_cnt_inc(struct cec_adapter *adap)
 {
-	int ret;
+	int ret = 0;
 
-	if (adap->monitor_all_cnt++)
-		return 0;
-
-	if (!adap->needs_hpd) {
-		ret = cec_activate_cnt_inc(adap);
-		if (ret) {
-			adap->monitor_all_cnt--;
-			return ret;
-		}
-	}
-
-	ret = call_op(adap, adap_monitor_all_enable, true);
-	if (ret) {
-		adap->monitor_all_cnt--;
-		if (!adap->needs_hpd)
-			cec_activate_cnt_dec(adap);
-	}
+	if (adap->monitor_all_cnt == 0)
+		ret = call_op(adap, adap_monitor_all_enable, 1);
+	if (ret == 0)
+		adap->monitor_all_cnt++;
 	return ret;
 }
 
 void cec_monitor_all_cnt_dec(struct cec_adapter *adap)
 {
-	if (WARN_ON(!adap->monitor_all_cnt))
-		return;
-	if (--adap->monitor_all_cnt)
-		return;
-	WARN_ON(call_op(adap, adap_monitor_all_enable, false));
-	if (!adap->needs_hpd)
-		cec_activate_cnt_dec(adap);
+	adap->monitor_all_cnt--;
+	if (adap->monitor_all_cnt == 0)
+		WARN_ON(call_op(adap, adap_monitor_all_enable, 0));
 }
 
 /*
@@ -2181,37 +2122,20 @@ void cec_monitor_all_cnt_dec(struct cec_adapter *adap)
  */
 int cec_monitor_pin_cnt_inc(struct cec_adapter *adap)
 {
-	int ret;
+	int ret = 0;
 
-	if (adap->monitor_pin_cnt++)
-		return 0;
-
-	if (!adap->needs_hpd) {
-		ret = cec_activate_cnt_inc(adap);
-		if (ret) {
-			adap->monitor_pin_cnt--;
-			return ret;
-		}
-	}
-
-	ret = call_op(adap, adap_monitor_pin_enable, true);
-	if (ret) {
-		adap->monitor_pin_cnt--;
-		if (!adap->needs_hpd)
-			cec_activate_cnt_dec(adap);
-	}
+	if (adap->monitor_pin_cnt == 0)
+		ret = call_op(adap, adap_monitor_pin_enable, 1);
+	if (ret == 0)
+		adap->monitor_pin_cnt++;
 	return ret;
 }
 
 void cec_monitor_pin_cnt_dec(struct cec_adapter *adap)
 {
-	if (WARN_ON(!adap->monitor_pin_cnt))
-		return;
-	if (--adap->monitor_pin_cnt)
-		return;
-	WARN_ON(call_op(adap, adap_monitor_pin_enable, false));
-	if (!adap->needs_hpd)
-		cec_activate_cnt_dec(adap);
+	adap->monitor_pin_cnt--;
+	if (adap->monitor_pin_cnt == 0)
+		WARN_ON(call_op(adap, adap_monitor_pin_enable, 0));
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -2225,7 +2149,6 @@ int cec_adap_status(struct seq_file *file, void *priv)
 	struct cec_data *data;
 
 	mutex_lock(&adap->lock);
-	seq_printf(file, "activation count: %u\n", adap->activate_cnt);
 	seq_printf(file, "configured: %d\n", adap->is_configured);
 	seq_printf(file, "configuring: %d\n", adap->is_configuring);
 	seq_printf(file, "phys_addr: %x.%x.%x.%x\n",
@@ -2240,9 +2163,6 @@ int cec_adap_status(struct seq_file *file, void *priv)
 	if (adap->monitor_all_cnt)
 		seq_printf(file, "file handles in Monitor All mode: %u\n",
 			   adap->monitor_all_cnt);
-	if (adap->monitor_pin_cnt)
-		seq_printf(file, "file handles in Monitor Pin mode: %u\n",
-			   adap->monitor_pin_cnt);
 	if (adap->tx_timeouts) {
 		seq_printf(file, "transmit timeouts: %u\n",
 			   adap->tx_timeouts);
