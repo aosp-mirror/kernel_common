@@ -2814,6 +2814,38 @@ static void proactive_compact_node(pg_data_t *pgdat)
 	}
 }
 
+/* Compact all zones within a node with MIGRATE_ASYNC */
+void compact_node_async(int nid)
+{
+	pg_data_t *pgdat = NODE_DATA(nid);
+	int zoneid;
+	struct zone *zone;
+	struct compact_control cc = {
+		.order = -1,
+		.mode = MIGRATE_ASYNC,
+		.ignore_skip_hint = true,
+		.whole_zone = true,
+		.gfp_mask = GFP_KERNEL,
+	};
+
+	for (zoneid = 0; zoneid < MAX_NR_ZONES; zoneid++) {
+		if (fatal_signal_pending(current))
+			break;
+
+		zone = &pgdat->node_zones[zoneid];
+		if (!populated_zone(zone))
+			continue;
+
+		if (!zone_can_frag(zone))
+			continue;
+
+		cc.zone = zone;
+
+		compact_zone(&cc, NULL);
+	}
+}
+EXPORT_SYMBOL_GPL(compact_node_async);
+
 /* Compact all zones within a node */
 static void compact_node(int nid)
 {
