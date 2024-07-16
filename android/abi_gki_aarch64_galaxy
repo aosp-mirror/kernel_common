@@ -13,6 +13,7 @@
   __blk_req_zone_write_unlock
   caches_clean_inval_pou
   cleancache_register_ops
+  compact_node_async
   copy_page
   _dev_alert
   device_pm_wait_for_dev
