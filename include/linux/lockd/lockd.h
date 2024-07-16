@@ -10,8 +10,6 @@
 #ifndef LINUX_LOCKD_LOCKD_H
 #define LINUX_LOCKD_LOCKD_H
 
-/* XXX: a lot of this should really be under fs/lockd. */
-
 #include <linux/in.h>
 #include <linux/in6.h>
 #include <net/ipv6.h>
@@ -156,8 +154,7 @@ struct nlm_rqst {
 struct nlm_file {
 	struct hlist_node	f_list;		/* linked list */
 	struct nfs_fh		f_handle;	/* NFS file handle */
-	struct file *		f_file[2];	/* VFS file pointers,
-						   indexed by O_ flags */
+	struct file *		f_file;		/* VFS file pointer */
 	struct nlm_share *	f_shares;	/* DOS shares */
 	struct list_head	f_blocks;	/* blocked locks */
 	unsigned int		f_locks;	/* guesstimate # of locks */
@@ -270,7 +267,6 @@ typedef int	  (*nlm_host_match_fn_t)(void *cur, struct nlm_host *ref);
 /*
  * Server-side lock handling
  */
-int		  lock_to_openmode(struct file_lock *);
 __be32		  nlmsvc_lock(struct svc_rqst *, struct nlm_file *,
 			      struct nlm_host *, struct nlm_lock *, int,
 			      struct nlm_cookie *, int);
@@ -290,9 +286,8 @@ void		  nlmsvc_locks_init_private(struct file_lock *, struct nlm_host *, pid_t);
  * File handling for the server personality
  */
 __be32		  nlm_lookup_file(struct svc_rqst *, struct nlm_file **,
-					struct nlm_lock *);
+					struct nfs_fh *);
 void		  nlm_release_file(struct nlm_file *);
-void		  nlmsvc_put_lockowner(struct nlm_lockowner *);
 void		  nlmsvc_release_lockowner(struct nlm_lock *);
 void		  nlmsvc_mark_resources(struct net *);
 void		  nlmsvc_free_host_resources(struct nlm_host *);
@@ -304,15 +299,9 @@ void		  nlmsvc_invalidate_all(void);
 int           nlmsvc_unlock_all_by_sb(struct super_block *sb);
 int           nlmsvc_unlock_all_by_ip(struct sockaddr *server_addr);
 
-static inline struct file *nlmsvc_file_file(struct nlm_file *file)
-{
-	return file->f_file[O_RDONLY] ?
-	       file->f_file[O_RDONLY] : file->f_file[O_WRONLY];
-}
-
 static inline struct inode *nlmsvc_file_inode(struct nlm_file *file)
 {
-	return locks_inode(nlmsvc_file_file(file));
+	return locks_inode(file->f_file);
 }
 
 static inline int __nlm_privileged_request4(const struct sockaddr *sap)

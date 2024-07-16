@@ -6404,8 +6404,10 @@ nfs4_xdr_dec_getacl(struct rpc_rqst *rqstp, struct xdr_stream *xdr,
 	struct compound_hdr hdr;
 	int status;
 
-	if (res->acl_scratch != NULL)
-		xdr_set_scratch_page(xdr, res->acl_scratch);
+	if (res->acl_scratch != NULL) {
+		void *p = page_address(res->acl_scratch);
+		xdr_set_scratch_buffer(xdr, p, PAGE_SIZE);
+	}
 	status = decode_compound_hdr(xdr, &hdr);
 	if (status)
 		goto out;

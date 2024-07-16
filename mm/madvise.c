@@ -553,7 +553,7 @@ static inline bool can_do_pageout(struct vm_area_struct *vma)
 	 * opens a side channel.
 	 */
 	return inode_owner_or_capable(file_inode(vma->vm_file)) ||
-	       file_permission(vma->vm_file, MAY_WRITE) == 0;
+		inode_permission(file_inode(vma->vm_file), MAY_WRITE) == 0;
 }
 
 static long madvise_pageout(struct vm_area_struct *vma,
