@@ -2035,7 +2035,7 @@ cc_binary_with_abi(
         "x86_64",
         "x86",
     ],
-    copts = _KSELFTEST_COPTS,
+    copts = _KSELFTEST_COPTS + ["-fomit-frame-pointer"],
     includes = ["tools/testing/selftests"],
     linkopts = ["-static"],
     path_prefix = _KSELFTEST_DIR,
