@@ -1910,6 +1910,9 @@
   of_irq_get_byname
   yield
 
+# required by ntfs3.ko
+  posix_acl_create
+
 # required by nu1619_wireless_charger.ko
   regmap_bulk_read
 
@@ -2095,6 +2098,7 @@
   dev_pm_opp_of_register_em
   dev_pm_opp_of_remove_table
   dev_pm_opp_put
+  dev_pm_opp_remove_table
   dma_buf_attach
   dma_buf_begin_cpu_access
   dma_buf_detach
@@ -2121,6 +2125,7 @@
   down_write
   drm_dev_unregister
   drm_gem_cma_vmap
+  drm_gem_dmabuf_export
   drm_gem_objects_lookup
   drm_gem_shmem_get_pages_sgt
   drm_gem_shmem_madvise
@@ -2170,6 +2175,7 @@
   sync_file_get_fence
   __task_pid_nr_ns
   trace_set_clr_event
+  tracing_on
   unmap_mapping_range
   unregister_shrinker
   unregister_sysctl_table

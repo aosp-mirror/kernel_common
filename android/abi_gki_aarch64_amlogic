@@ -2037,6 +2037,7 @@
   __traceiter_mmap_lock_released
   __traceiter_mmap_lock_start_locking
   __traceiter_mm_page_alloc
+  __traceiter_mm_page_free
   __traceiter_rwmmio_post_read
   __traceiter_rwmmio_post_write
   __traceiter_rwmmio_read
@@ -2086,6 +2087,7 @@
   __tracepoint_mmap_lock_released
   __tracepoint_mmap_lock_start_locking
   __tracepoint_mm_page_alloc
+  __tracepoint_mm_page_free
   tracepoint_probe_register
   tracepoint_probe_unregister
   __tracepoint_rwmmio_post_read
