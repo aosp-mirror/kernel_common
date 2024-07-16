@@ -124,9 +124,9 @@ static nokprobe_inline bool trace_kprobe_module_exist(struct trace_kprobe *tk)
 	if (!p)
 		return true;
 	*p = '\0';
-	rcu_read_lock_sched();
+	mutex_lock(&module_mutex);
 	ret = !!find_module(tk->symbol);
-	rcu_read_unlock_sched();
+	mutex_unlock(&module_mutex);
 	*p = ':';
 
 	return ret;

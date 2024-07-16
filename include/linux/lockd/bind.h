@@ -27,8 +27,7 @@ struct rpc_task;
 struct nlmsvc_binding {
 	__be32			(*fopen)(struct svc_rqst *,
 						struct nfs_fh *,
-						struct file **,
-						int mode);
+						struct file **);
 	void			(*fclose)(struct file *);
 };
 

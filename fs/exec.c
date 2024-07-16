@@ -1266,11 +1266,6 @@ int begin_new_exec(struct linux_binprm * bprm)
 	if (retval)
 		goto out;
 
-	/* Ensure the files table is not shared. */
-	retval = unshare_files();
-	if (retval)
-		goto out;
-
 	/*
 	 * Must be called _before_ exec_mmap() as bprm->mm is
 	 * not visibile until then. This also enables the update
@@ -1796,6 +1791,7 @@ static int bprm_execve(struct linux_binprm *bprm,
 		       int fd, struct filename *filename, int flags)
 {
 	struct file *file;
+	struct files_struct *displaced;
 	int retval;
 
 	/*
@@ -1803,9 +1799,13 @@ static int bprm_execve(struct linux_binprm *bprm,
 	 */
 	io_uring_task_cancel();
 
-	retval = prepare_bprm_creds(bprm);
+	retval = unshare_files(&displaced);
 	if (retval)
 		return retval;
+
+	retval = prepare_bprm_creds(bprm);
+	if (retval)
+		goto out_files;
 
 	check_unsafe_exec(bprm);
 	current->in_execve = 1;
@@ -1820,14 +1820,11 @@ static int bprm_execve(struct linux_binprm *bprm,
 	bprm->file = file;
 	/*
 	 * Record that a name derived from an O_CLOEXEC fd will be
-	 * inaccessible after exec.  This allows the code in exec to
-	 * choose to fail when the executable is not mmaped into the
-	 * interpreter and an open file descriptor is not passed to
-	 * the interpreter.  This makes for a better user experience
-	 * than having the interpreter start and then immediately fail
-	 * when it finds the executable is inaccessible.
+	 * inaccessible after exec. Relies on having exclusive access to
+	 * current->files (due to unshare_files above).
 	 */
-	if (bprm->fdpath && get_close_on_exec(fd))
+	if (bprm->fdpath &&
+	    close_on_exec(fd, rcu_dereference_raw(current->files->fdt)))
 		bprm->interp_flags |= BINPRM_FLAGS_PATH_INACCESSIBLE;
 
 	/* Set the unchanging part of bprm->cred */
@@ -1845,6 +1842,8 @@ static int bprm_execve(struct linux_binprm *bprm,
 	rseq_execve(current);
 	acct_update_integrals(current);
 	task_numa_free(current, false);
+	if (displaced)
+		put_files_struct(displaced);
 	return retval;
 
 out:
@@ -1860,6 +1859,10 @@ out:
 out_unmark:
 	current->fs->in_exec = 0;
 	current->in_execve = 0;
+
+out_files:
+	if (displaced)
+		reset_files_struct(displaced);
 
 	return retval;
 }

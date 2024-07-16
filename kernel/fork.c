@@ -3138,21 +3138,21 @@ SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
  *	the exec layer of the kernel.
  */
 
-int unshare_files(void)
+int unshare_files(struct files_struct **displaced)
 {
 	struct task_struct *task = current;
-	struct files_struct *old, *copy = NULL;
+	struct files_struct *copy = NULL;
 	int error;
 
 	error = unshare_fd(CLONE_FILES, NR_OPEN_MAX, &copy);
-	if (error || !copy)
+	if (error || !copy) {
+		*displaced = NULL;
 		return error;
-
-	old = task->files;
+	}
+	*displaced = task->files;
 	task_lock(task);
 	task->files = copy;
 	task_unlock(task);
-	put_files_struct(old);
 	return 0;
 }
 
