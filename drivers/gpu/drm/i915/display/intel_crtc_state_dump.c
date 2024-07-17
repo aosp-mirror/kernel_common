@@ -64,7 +64,7 @@ static void
 intel_dump_buffer(struct drm_i915_private *i915,
 		  const char *prefix, const u8 *buf, size_t len)
 {
-	if (!drm_debug_enabled(DRM_UT_KMS))
+	if (!drm_debug_syslog_enabled(DRM_UT_KMS))
 		return;
 
 	print_hex_dump(KERN_DEBUG, prefix, DUMP_PREFIX_NONE,
