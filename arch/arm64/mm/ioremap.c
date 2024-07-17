@@ -267,6 +267,9 @@ void ioremap_phys_range_hook(phys_addr_t phys_addr, size_t size, pgprot_t prot)
 
 	VM_BUG_ON(!PAGE_ALIGNED(phys_addr) || !PAGE_ALIGNED(size));
 
+	size = ALIGN(size, guard_granule);
+	phys_addr = ALIGN_DOWN(phys_addr, guard_granule);
+
 	mutex_lock(&ioremap_guard_lock);
 	mas_lock(&mas);
 
@@ -310,6 +313,9 @@ void iounmap_phys_range_hook(phys_addr_t phys_addr, size_t size)
 		return;
 
 	VM_BUG_ON(!PAGE_ALIGNED(phys_addr) || !PAGE_ALIGNED(size));
+
+	size = ALIGN(size, guard_granule);
+	phys_addr = ALIGN_DOWN(phys_addr, guard_granule);
 
 	mutex_lock(&ioremap_guard_lock);
 	mas_lock(&mas);

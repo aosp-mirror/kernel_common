@@ -373,6 +373,7 @@ static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
 	LIST_HEAD(folio_list);
 	bool pageout_anon_only_filter;
 	int nr;
+	swp_entry_t entry;
 
 	if (fatal_signal_pending(current))
 		return -EINTR;
@@ -467,8 +468,12 @@ regular_folio:
 		if (pte_none(ptent))
 			continue;
 
-		if (!pte_present(ptent))
+		if (!pte_present(ptent)) {
+			entry = pte_to_swp_entry(ptent);
+			trace_android_vh_madvise_pageout_swap_entry(entry,
+					swp_swapcount(entry), NULL);
 			continue;
+		}
 
 		folio = vm_normal_folio(vma, addr, ptent);
 		if (!folio || folio_is_zone_device(folio))

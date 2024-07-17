@@ -1545,7 +1545,7 @@ static int guest_request_walker(const struct kvm_pgtable_visit_ctx *ctx,
 	phys_addr_t phys;
 
 	state = guest_get_page_state(pte, 0);
-	if ((data->desired_state & data->desired_mask) != state)
+	if (data->desired_state != (state & data->desired_mask))
 		return (state & PKVM_NOPAGE) ? -EFAULT : -EINVAL;
 
 	if (state & PKVM_NOPAGE) {
@@ -2826,7 +2826,7 @@ int __pkvm_host_reclaim_page(struct pkvm_hyp_vm *vm, u64 pfn, u64 ipa, u8 order)
 	case PKVM_PAGE_OWNED:
 		WARN_ON(__host_check_page_state_range(phys, page_size, PKVM_NOPAGE));
 		hyp_poison_page(phys);
-		psci_mem_protect_dec(order);
+		psci_mem_protect_dec(1 << order);
 		break;
 	case PKVM_PAGE_SHARED_BORROWED:
 	case PKVM_PAGE_SHARED_BORROWED | PKVM_PAGE_RESTRICTED_PROT:

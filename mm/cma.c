@@ -388,12 +388,22 @@ err:
 }
 
 #ifdef CONFIG_CMA_DEBUG
+#define CMA_DEBUG_SHOW_AREAS_DEFAULT true
+#else
+#define CMA_DEBUG_SHOW_AREAS_DEFAULT false
+#endif
+
 static void cma_debug_show_areas(struct cma *cma)
 {
 	unsigned long next_zero_bit, next_set_bit, nr_zero;
 	unsigned long start = 0;
 	unsigned long nr_part, nr_total = 0;
 	unsigned long nbits = cma_bitmap_maxno(cma);
+	bool show = CMA_DEBUG_SHOW_AREAS_DEFAULT;
+
+	trace_android_vh_cma_debug_show_areas(&show);
+	if (!show)
+		return;
 
 	spin_lock_irq(&cma->lock);
 	pr_info("number of available pages: ");
@@ -412,9 +422,6 @@ static void cma_debug_show_areas(struct cma *cma)
 	pr_cont("=> %lu free of %lu total pages\n", nr_total, cma->count);
 	spin_unlock_irq(&cma->lock);
 }
-#else
-static inline void cma_debug_show_areas(struct cma *cma) { }
-#endif
 
 /**
  * __cma_alloc() - allocate pages from contiguous area

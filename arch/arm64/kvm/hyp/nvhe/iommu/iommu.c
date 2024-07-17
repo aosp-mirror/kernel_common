@@ -331,7 +331,7 @@ size_t kvm_iommu_map_pages(pkvm_handle_t domain_id, unsigned long iova,
 	 * so far.
 	 */
 	if (pgcount)
-		__pkvm_host_unuse_dma(paddr, pgcount * pgsize);
+		__pkvm_host_unuse_dma(paddr + total_mapped, pgcount * pgsize);
 
 	domain_put(domain);
 	return total_mapped;
@@ -380,7 +380,7 @@ void kvm_iommu_iotlb_gather_add_page(struct kvm_hyp_iommu_domain *domain,
 	kvm_iommu_iotlb_gather_add_range(gather, iova, size);
 }
 
-static void kvm_iommu_flush_unmap_cache(struct kvm_iommu_paddr_cache *cache)
+void kvm_iommu_flush_unmap_cache(struct kvm_iommu_paddr_cache *cache)
 {
 	while (cache->ptr) {
 		cache->ptr--;
@@ -471,13 +471,13 @@ static int iommu_power_on(struct kvm_power_domain *pd)
 	bool prev;
 	int ret;
 
-	hyp_spin_lock(&iommu->lock);
+	kvm_iommu_lock(iommu);
 	prev = iommu->power_is_off;
 	iommu->power_is_off = false;
 	ret = kvm_iommu_ops->resume ? kvm_iommu_ops->resume(iommu) : 0;
 	if (ret)
 		iommu->power_is_off = prev;
-	hyp_spin_unlock(&iommu->lock);
+	kvm_iommu_unlock(iommu);
 	return ret;
 }
 
@@ -488,13 +488,13 @@ static int iommu_power_off(struct kvm_power_domain *pd)
 	bool prev;
 	int ret;
 
-	hyp_spin_lock(&iommu->lock);
+	kvm_iommu_lock(iommu);
 	prev = iommu->power_is_off;
 	iommu->power_is_off = true;
 	ret = kvm_iommu_ops->suspend ? kvm_iommu_ops->suspend(iommu) : 0;
 	if (ret)
 		iommu->power_is_off = prev;
-	hyp_spin_unlock(&iommu->lock);
+	kvm_iommu_unlock(iommu);
 	return ret;
 }
 
@@ -505,8 +505,7 @@ static const struct kvm_power_domain_ops iommu_power_ops = {
 
 int kvm_iommu_init_device(struct kvm_hyp_iommu *iommu)
 {
-	/* See struct kvm_hyp_iommu */
-	BUILD_BUG_ON(sizeof(u32) != sizeof(hyp_spinlock_t));
+	kvm_iommu_lock_init(iommu);
 
 	return pkvm_init_power_domain(&iommu->power_domain, &iommu_power_ops);
 }

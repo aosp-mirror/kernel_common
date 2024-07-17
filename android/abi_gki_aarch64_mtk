@@ -2950,6 +2950,7 @@
   __traceiter_android_rvh_try_to_wake_up_success
   __traceiter_android_rvh_update_cpu_capacity
   __traceiter_android_rvh_update_misfit_status
+  __traceiter_android_rvh_util_est_update
   __traceiter_android_rvh_wake_up_new_task
   __traceiter_android_vh_alter_futex_plist_add
   __traceiter_android_vh_alter_rwsem_list_add
@@ -3067,6 +3068,7 @@
   __tracepoint_android_rvh_try_to_wake_up_success
   __tracepoint_android_rvh_update_cpu_capacity
   __tracepoint_android_rvh_update_misfit_status
+  __tracepoint_android_rvh_util_est_update
   __tracepoint_android_rvh_wake_up_new_task
   __tracepoint_android_vh_alter_futex_plist_add
   __tracepoint_android_vh_alter_rwsem_list_add

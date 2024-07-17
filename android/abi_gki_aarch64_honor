@@ -45,8 +45,11 @@
   nvmem_device_find
   device_match_of_node
   drop_super
+  filp_open_block
   mm_trace_rss_stat
   __kfifo_len_r
+  __traceiter_android_vh_rwsem_write_wait_finish
+  __tracepoint_android_vh_rwsem_write_wait_finish
   __tracepoint_android_rvh_cpuinfo_c_show
   __traceiter_android_rvh_cpuinfo_c_show
   __tracepoint_android_vh_dc_send_copy
@@ -77,7 +80,13 @@
   __traceiter_android_vh_si_mem_available_adjust
   __tracepoint_android_vh_si_meminfo_adjust
   __traceiter_android_vh_si_meminfo_adjust
+  __traceiter_android_vh_rwsem_write_finished
+  __tracepoint_android_vh_rwsem_write_finished
   __traceiter_android_rvh_hw_protection_shutdown
   __tracepoint_android_rvh_hw_protection_shutdown
   __traceiter_android_rvh_bpf_int_jit_compile_ro
   __tracepoint_android_rvh_bpf_int_jit_compile_ro
+  __traceiter_android_vh_sk_alloc
+  __tracepoint_android_vh_sk_alloc
+  __traceiter_android_vh_sk_free
+  __tracepoint_android_vh_sk_free

@@ -168,6 +168,8 @@
   clk_notifier_unregister
   clk_prepare
   clk_put
+  clk_rate_exclusive_get
+  clk_rate_exclusive_put
   clk_round_rate
   clk_set_parent
   clk_set_rate
@@ -445,6 +447,7 @@
   __devm_spi_alloc_controller
   devm_spi_mem_dirmap_create
   devm_spi_register_controller
+  devm_tegra_memory_controller_get
   devm_thermal_of_zone_register
   devm_usb_get_phy
   devm_usb_get_phy_by_phandle
@@ -453,9 +456,12 @@
   dev_open
   dev_pm_domain_attach_by_id
   dev_pm_domain_attach_by_name
+  dev_pm_domain_attach_list
   dev_pm_domain_detach
+  dev_pm_domain_detach_list
   dev_pm_genpd_add_notifier
   dev_pm_genpd_remove_notifier
+  dev_pm_genpd_set_performance_state
   dev_pm_opp_add_dynamic
   dev_pm_opp_clear_config
   dev_pm_opp_find_freq_ceil
@@ -1578,6 +1584,7 @@
   open_candev
   orderly_poweroff
   orderly_reboot
+  overflowuid
   page_pinner_inited
   __page_pinner_put_page
   page_pool_alloc_pages
@@ -1588,6 +1595,7 @@
   panic_notifier_list
   param_array_ops
   param_get_int
+  param_get_uint
   param_ops_bool
   param_ops_byte
   param_ops_charp
@@ -1597,6 +1605,7 @@
   param_ops_ullong
   param_ops_ulong
   param_ops_ushort
+  param_set_uint_minmax
   pci_alloc_irq_vectors
   pci_ats_supported
   pci_bus_type
@@ -2354,6 +2363,8 @@
   __tasklet_schedule
   tasklet_setup
   tasklet_unlock_wait
+  tegra_mc_probe_device
+  tegra_sku_info
   thermal_cooling_device_unregister
   thermal_of_cooling_device_register
   thermal_zone_device_priv
@@ -2689,6 +2700,7 @@
   vring_del_virtqueue
   vring_interrupt
   vring_new_virtqueue
+  vscnprintf
   vsnprintf
   vunmap
   vzalloc

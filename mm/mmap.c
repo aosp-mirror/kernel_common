@@ -62,6 +62,8 @@
 
 #include "internal.h"
 
+EXPORT_TRACEPOINT_SYMBOL_GPL(vm_unmapped_area);
+
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
 #endif

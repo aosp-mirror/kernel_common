@@ -17,8 +17,14 @@
   devm_extcon_register_notifier_all
   devm_hwspin_lock_request_specific
   _dev_info
+  dev_pm_opp_calc_power
+  dev_pm_opp_of_register_em
   dev_set_name
   __dynamic_netdev_dbg
+  em_dev_update_chip_binning
+  em_dev_update_perf_domain
+  em_pd_get
+  em_update_performance_limits
   finish_wait
   fortify_panic
   idr_alloc
@@ -27,10 +33,15 @@
   init_timer_key
   init_wait_entry
   __init_waitqueue_head
+  irq_to_desc
+  kernel_cpustat
   kfree
   __kmalloc
   kmalloc_caches
   kmalloc_trace
+  kstat
+  kstat_irqs_cpu
+  kstat_irqs_usr
   ktime_get_boot_fast_ns
   __list_add_valid_or_report
   __list_del_entry_valid_or_report
@@ -43,6 +54,9 @@
   __mutex_init
   mutex_lock
   mutex_unlock
+  nr_cpu_ids
+  nr_ipi_get
+  nr_irqs
   __per_cpu_offset
   perf_aux_output_skip
   prepare_to_wait_event

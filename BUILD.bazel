@@ -870,6 +870,8 @@ ddk_headers(
 ddk_headers(
     name = "all_headers_allowlist_aarch64",
     hdrs = [
+        "drivers/thermal/thermal_core.h",
+        "drivers/thermal/thermal_netlink.h",
         ":all_headers_allowlist_aarch64_globs",
         ":all_headers_allowlist_common_globs",
     ],
@@ -879,6 +881,7 @@ ddk_headers(
     linux_includes = [
         "arch/arm64/include",
         "arch/arm64/include/uapi",
+        "drivers/thermal",
         "include",
         "include/uapi",
     ],
@@ -1899,7 +1902,7 @@ cc_binary_with_abi(
         "x86_64",
         "x86",
     ],
-    copts = _KSELFTEST_COPTS,
+    copts = _KSELFTEST_COPTS + ["-fomit-frame-pointer"],
     includes = ["tools/testing/selftests"],
     linkopts = ["-static"],
     path_prefix = _KSELFTEST_DIR,

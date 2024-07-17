@@ -15,7 +15,9 @@
   cleancache_register_ops
   copy_page
   _dev_alert
+  device_pm_wait_for_dev
   __devm_alloc_percpu
+  dma_heap_try_get_pool_size_kb
   elv_bio_merge_ok
   elv_rb_add
   elv_rb_del
@@ -51,6 +53,8 @@
   rfkill_soft_blocked
   scsi_device_quiesce
   scsi_device_resume
+  stack_trace_save_regs
+  __kfree_skb
   __traceiter_android_rvh_arm64_serror_panic
   __traceiter_android_rvh_die_kernel_fault
   __traceiter_android_rvh_do_el1_bti
@@ -60,24 +64,40 @@
   __traceiter_android_rvh_do_sp_pc_abort
   __traceiter_android_rvh_panic_unhandled
   __traceiter_android_rvh_report_bug
+  __traceiter_android_vh_alloc_contig_range_not_isolated
+  __traceiter_android_vh_alloc_pages_slowpath_start
+  __traceiter_android_vh_alloc_pages_slowpath_end
   __traceiter_android_vh_cache_show
+  __traceiter_android_vh_cma_debug_show_areas
   __traceiter_android_vh_exit_mm
   __traceiter_android_vh_is_fpsimd_save
   __traceiter_android_vh_logbuf
   __traceiter_android_vh_logbuf_pr_cont
+  __traceiter_android_vh_madvise_pageout_swap_entry
   __traceiter_android_vh_madvise_swapin_walk_pmd_entry
   __traceiter_android_vh_meminfo_proc_show
   __traceiter_android_vh_print_slabinfo_header
   __traceiter_android_vh_process_madvise
+  __traceiter_android_vh_psi_update_triggers
   __traceiter_android_vh_ptype_head
+  __traceiter_android_vh_rebalance_anon_lru_bypass
+  __traceiter_android_vh_rtmutex_wait_finish
   __traceiter_android_vh_show_mem
   __traceiter_android_vh_show_smap
   __traceiter_android_vh_smaps_pte_entry
   __traceiter_android_vh_try_to_freeze_todo
   __traceiter_android_vh_try_to_freeze_todo_unfrozen
+  __traceiter_android_vh_use_vm_swappiness
+  __traceiter_android_vh_warn_alloc_tune_ratelimit
+  __traceiter_android_vh_warn_alloc_show_mem_bypass
   __traceiter_android_vh_watchdog_timer_softlockup
+  __traceiter_android_vh_wq_lockup_pool
   __traceiter_console
+  __traceiter_consume_skb
+  __traceiter_error_report_end
+  __traceiter_vm_unmapped_area
   __traceiter_workqueue_execute_start
+  __traceiter_kfree_skb
   __tracepoint_android_rvh_arm64_serror_panic
   __tracepoint_android_rvh_die_kernel_fault
   __tracepoint_android_rvh_do_el1_bti
@@ -87,23 +107,39 @@
   __tracepoint_android_rvh_do_sp_pc_abort
   __tracepoint_android_rvh_panic_unhandled
   __tracepoint_android_rvh_report_bug
+  __tracepoint_android_vh_alloc_contig_range_not_isolated
+  __tracepoint_android_vh_alloc_pages_slowpath_start
+  __tracepoint_android_vh_alloc_pages_slowpath_end
   __tracepoint_android_vh_cache_show
+  __tracepoint_android_vh_cma_debug_show_areas
   __tracepoint_android_vh_exit_mm
   __tracepoint_android_vh_is_fpsimd_save
   __tracepoint_android_vh_logbuf
   __tracepoint_android_vh_logbuf_pr_cont
+  __tracepoint_android_vh_madvise_pageout_swap_entry
   __tracepoint_android_vh_madvise_swapin_walk_pmd_entry
   __tracepoint_android_vh_meminfo_proc_show
   __tracepoint_android_vh_print_slabinfo_header
   __tracepoint_android_vh_process_madvise
+  __tracepoint_android_vh_psi_update_triggers
   __tracepoint_android_vh_ptype_head
+  __tracepoint_android_vh_rebalance_anon_lru_bypass
+  __tracepoint_android_vh_rtmutex_wait_finish
   __tracepoint_android_vh_show_mem
   __tracepoint_android_vh_show_smap
   __tracepoint_android_vh_smaps_pte_entry
   __tracepoint_android_vh_try_to_freeze_todo
   __tracepoint_android_vh_try_to_freeze_todo_unfrozen
+  __tracepoint_android_vh_use_vm_swappiness
+  __tracepoint_android_vh_warn_alloc_tune_ratelimit
+  __tracepoint_android_vh_warn_alloc_show_mem_bypass
   __tracepoint_android_vh_watchdog_timer_softlockup
+  __tracepoint_android_vh_wq_lockup_pool
   __tracepoint_console
+  __tracepoint_consume_skb
+  __tracepoint_error_report_end
+  __tracepoint_vm_unmapped_area
   __tracepoint_workqueue_execute_start
+  __tracepoint_kfree_skb
   usb_set_device_state
   yield

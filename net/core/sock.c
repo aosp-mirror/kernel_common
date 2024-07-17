@@ -2104,8 +2104,6 @@ static struct sock *sk_prot_alloc(struct proto *prot, gfp_t priority,
 		if (security_sk_alloc(sk, family, priority))
 			goto out_free;
 
-		trace_android_rvh_sk_alloc(sk);
-
 		if (!try_module_get(prot->owner))
 			goto out_free_sec;
 	}
@@ -2114,7 +2112,6 @@ static struct sock *sk_prot_alloc(struct proto *prot, gfp_t priority,
 
 out_free_sec:
 	security_sk_free(sk);
-	trace_android_rvh_sk_free(sk);
 out_free:
 	if (slab != NULL)
 		kmem_cache_free(slab, sk);
@@ -2133,8 +2130,8 @@ static void sk_prot_free(struct proto *prot, struct sock *sk)
 
 	cgroup_sk_free(&sk->sk_cgrp_data);
 	mem_cgroup_sk_free(sk);
+	trace_android_vh_sk_free(sk);
 	security_sk_free(sk);
-	trace_android_rvh_sk_free(sk);
 	if (slab != NULL)
 		kmem_cache_free(slab, sk);
 	else
@@ -2178,6 +2175,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 		refcount_set(&sk->sk_wmem_alloc, 1);
 
 		mem_cgroup_sk_alloc(sk);
+		trace_android_vh_sk_alloc(sk);
 		cgroup_sk_alloc(&sk->sk_cgrp_data);
 		sock_update_classid(&sk->sk_cgrp_data);
 		sock_update_netprioidx(&sk->sk_cgrp_data);

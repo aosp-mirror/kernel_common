@@ -186,13 +186,11 @@ error:
 static int fec_is_erasure(struct dm_verity *v, struct dm_verity_io *io,
 			  u8 *want_digest, u8 *data)
 {
-	if (unlikely(verity_hash(v, verity_io_hash_req(v, io),
-				 data, 1 << v->data_dev_block_bits,
-				 verity_io_real_digest(v, io), true)))
+	if (unlikely(verity_hash(v, io, data, 1 << v->data_dev_block_bits,
+				 io->tmp_digest, true)))
 		return 0;
 
-	return memcmp(verity_io_real_digest(v, io), want_digest,
-		      v->digest_size) != 0;
+	return memcmp(io->tmp_digest, want_digest, v->digest_size) != 0;
 }
 
 /*
@@ -363,7 +361,7 @@ static void fec_init_bufs(struct dm_verity *v, struct dm_verity_fec_io *fio)
  */
 static int fec_decode_rsb(struct dm_verity *v, struct dm_verity_io *io,
 			  struct dm_verity_fec_io *fio, u64 rsb, u64 offset,
-			  bool use_erasures)
+			  const u8 *want_digest, bool use_erasures)
 {
 	int r, neras = 0;
 	unsigned int pos;
@@ -388,14 +386,12 @@ static int fec_decode_rsb(struct dm_verity *v, struct dm_verity_io *io,
 	}
 
 	/* Always re-validate the corrected block against the expected hash */
-	r = verity_hash(v, verity_io_hash_req(v, io), fio->output,
-			1 << v->data_dev_block_bits,
-			verity_io_real_digest(v, io), true);
+	r = verity_hash(v, io, fio->output, 1 << v->data_dev_block_bits,
+			io->tmp_digest, true);
 	if (unlikely(r < 0))
 		return r;
 
-	if (memcmp(verity_io_real_digest(v, io), verity_io_want_digest(v, io),
-		   v->digest_size)) {
+	if (memcmp(io->tmp_digest, want_digest, v->digest_size)) {
 		DMERR_LIMIT("%s: FEC %llu: failed to correct (%d erasures)",
 			    v->data_dev->name, (unsigned long long)rsb, neras);
 		return -EILSEQ;
@@ -404,24 +400,10 @@ static int fec_decode_rsb(struct dm_verity *v, struct dm_verity_io *io,
 	return 0;
 }
 
-static int fec_bv_copy(struct dm_verity *v, struct dm_verity_io *io, u8 *data,
-		       size_t len)
-{
-	struct dm_verity_fec_io *fio = fec_io(io);
-
-	memcpy(data, &fio->output[fio->output_pos], len);
-	fio->output_pos += len;
-
-	return 0;
-}
-
-/*
- * Correct errors in a block. Copies corrected block to dest if non-NULL,
- * otherwise to a bio_vec starting from iter.
- */
+/* Correct errors in a block. Copies corrected block to dest. */
 int verity_fec_decode(struct dm_verity *v, struct dm_verity_io *io,
-		      enum verity_block_type type, sector_t block, u8 *dest,
-		      struct bvec_iter *iter)
+		      enum verity_block_type type, const u8 *want_digest,
+		      sector_t block, u8 *dest)
 {
 	int r;
 	struct dm_verity_fec_io *fio = fec_io(io);
@@ -464,19 +446,14 @@ int verity_fec_decode(struct dm_verity *v, struct dm_verity_io *io,
 	 * them first. Do a second attempt with erasures if the corruption is
 	 * bad enough.
 	 */
-	r = fec_decode_rsb(v, io, fio, rsb, offset, false);
+	r = fec_decode_rsb(v, io, fio, rsb, offset, want_digest, false);
 	if (r < 0) {
-		r = fec_decode_rsb(v, io, fio, rsb, offset, true);
+		r = fec_decode_rsb(v, io, fio, rsb, offset, want_digest, true);
 		if (r < 0)
 			goto done;
 	}
 
-	if (dest)
-		memcpy(dest, fio->output, 1 << v->data_dev_block_bits);
-	else if (iter) {
-		fio->output_pos = 0;
-		r = verity_for_bv_block(v, io, iter, fec_bv_copy);
-	}
+	memcpy(dest, fio->output, 1 << v->data_dev_block_bits);
 
 done:
 	fio->level--;

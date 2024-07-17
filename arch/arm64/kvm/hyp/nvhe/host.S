@@ -183,27 +183,26 @@ SYM_FUNC_END(__host_hvc)
 .endif
 .endm
 
-.macro __host_el2_vect handler:req
+.macro invalid_host_el2_vect
 	.align 7
 
 	/*
 	 * Test whether the SP has overflowed, without corrupting a GPR.
-	 * nVHE hypervisor stacks are aligned so that the PAGE_SHIFT bit
+	 * nVHE hypervisor stacks are aligned so that the NVHE_STACK_SHIFT bit
 	 * of SP should always be 1.
 	 */
 	add	sp, sp, x0			// sp' = sp + x0
 	sub	x0, sp, x0			// x0' = sp' - x0 = (sp + x0) - x0 = sp
-	tbz	x0, #PAGE_SHIFT, .L__hyp_sp_overflow\@
+	tbz	x0, #NVHE_STACK_SHIFT, .L__hyp_sp_overflow\@
 	sub	x0, sp, x0			// x0'' = sp' - x0' = (sp + x0) - sp = x0
 	sub	sp, sp, x0			// sp'' = sp' - x0 = (sp + x0) - x0 = sp
-	/* If a guest is loaded, panic out of it. */
+
 	/*
 	 * The panic may not be clean if the exception is taken before the host
 	 * context has been saved by __host_exit or after the hyp context has
 	 * been partially clobbered by __host_enter.
 	 */
-	stp	x0, x1, [sp, #-16]!
-	b	\handler
+	b	hyp_panic
 
 .L__hyp_sp_overflow\@:
 	/* Switch to the overflow stack */
@@ -213,10 +212,6 @@ SYM_FUNC_END(__host_hvc)
 	ASM_BUG()
 .endm
 
-.macro host_el2_sync_vect
-	__host_el2_vect __hyp_panic
-.endm
-
 .macro invalid_host_el1_vect
 	.align 7
 	mov	x0, xzr		/* restore_host = false */
@@ -224,10 +219,6 @@ SYM_FUNC_END(__host_hvc)
 	mrs	x2, elr_el2
 	mrs	x3, par_el1
 	b	__hyp_do_panic
-.endm
-
-.macro invalid_host_el2_vect
-	__host_el2_vect __hyp_panic
 .endm
 
 /*
@@ -247,7 +238,7 @@ SYM_CODE_START(__kvm_hyp_host_vector)
 	invalid_host_el2_vect			// FIQ EL2t
 	invalid_host_el2_vect			// Error EL2t
 
-	host_el2_sync_vect			// Synchronous EL2h
+	invalid_host_el2_vect			// Synchronous EL2h
 	invalid_host_el2_vect			// IRQ EL2h
 	invalid_host_el2_vect			// FIQ EL2h
 	invalid_host_el2_vect			// Error EL2h

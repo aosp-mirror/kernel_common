@@ -20,6 +20,11 @@ DECLARE_HOOK(android_vh_anon_vma_name_recog,
 DECLARE_HOOK(android_vh_restore_mm_flags,
 	TP_PROTO(struct mm_struct *mm),
 	TP_ARGS(mm));
+
+DECLARE_RESTRICTED_HOOK(android_rvh_pr_set_vma_name_bypass,
+	TP_PROTO(struct mm_struct *mm, unsigned long addr, unsigned long size,
+		      struct anon_vma_name *anon_name, int *error, bool *bypass),
+	TP_ARGS(mm, addr, size, anon_name, error, bypass), 1);
 #endif
 
 #include <trace/define_trace.h>

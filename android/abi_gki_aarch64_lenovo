@@ -141,6 +141,8 @@
   clk_put
   clk_set_rate
   clk_unprepare
+  clockevent_delta2ns
+  clockevents_register_device
   cma_alloc
   cma_get_name
   cma_release
@@ -189,6 +191,9 @@
   cpu_topology
   crc32_le
   css_next_child
+  css_task_iter_end
+  css_task_iter_next
+  css_task_iter_start
   csum_partial
   _ctype
   debugfs_attr_read
@@ -489,6 +494,7 @@
   fwnode_property_read_u32_array
   gcd
   gen_pool_virt_to_phys
+  generic_access_phys
   generic_device_group
   generic_file_llseek
   generic_handle_domain_irq
@@ -996,6 +1002,7 @@
   rtnl_lock
   rtnl_unlock
   sched_clock
+  sched_clock_register
   sched_feat_names
   sched_set_fifo
   sched_set_fifo_low
@@ -1241,6 +1248,7 @@
   __traceiter_android_rvh_update_cpu_capacity
   __traceiter_android_rvh_wake_up_new_task
   __traceiter_android_vh_dup_task_struct
+  __traceiter_android_vh_cpufreq_online
   __traceiter_android_vh_update_topology_flags_workfn
   __traceiter_binder_transaction_received
   __traceiter_cpu_frequency_limits
@@ -1266,6 +1274,7 @@
   __tracepoint_android_rvh_update_cpu_capacity
   __tracepoint_android_rvh_wake_up_new_task
   __tracepoint_android_vh_dup_task_struct
+  __tracepoint_android_vh_cpufreq_online
   __tracepoint_android_vh_update_topology_flags_workfn
   __tracepoint_binder_transaction_received
   __tracepoint_cpu_frequency_limits

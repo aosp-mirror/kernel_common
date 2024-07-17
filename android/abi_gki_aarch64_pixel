@@ -63,6 +63,7 @@
   __bitmap_or
   bitmap_parse
   bitmap_parselist
+  bitmap_parse_user
   bitmap_print_to_pagebuf
   __bitmap_set
   bitmap_to_arr32
@@ -423,6 +424,7 @@
   devm_regulator_get_optional
   devm_regulator_put
   devm_regulator_register
+  devm_request_any_context_irq
   __devm_request_region
   devm_request_threaded_irq
   devm_rtc_device_register
@@ -554,6 +556,7 @@
   down_write
   dput
   drain_workqueue
+  driver_for_each_device
   driver_register
   driver_unregister
   drm_add_edid_modes
@@ -829,6 +832,7 @@
   frame_vector_create
   frame_vector_destroy
   frame_vector_to_pages
+  free_hyp_memcache
   free_iova_fast
   free_irq
   free_netdev
@@ -1088,6 +1092,7 @@
   iommu_set_fault_handler
   iommu_unmap
   iommu_unregister_device_fault_handler
+  io_pgtable_configure
   ioremap_prot
   io_schedule_timeout
   iounmap
@@ -1153,6 +1158,14 @@
   kfree_skb_reason
   kill_fasync
   kimage_voffset
+  klist_add_head
+  klist_add_tail
+  klist_init
+  klist_iter_exit
+  klist_iter_init
+  klist_next
+  klist_node_attached
+  klist_remove
   __kmalloc
   kmalloc_caches
   kmalloc_large
@@ -1332,6 +1345,7 @@
   __netdev_alloc_skb
   netdev_err
   netdev_info
+  netdev_refcnt_read
   netdev_set_default_ethtool_ops
   netdev_state_change
   netdev_update_features
@@ -1410,6 +1424,7 @@
   of_genpd_add_provider_simple
   of_get_child_by_name
   of_get_cpu_node
+  of_get_drm_panel_display_mode
   of_get_named_gpio
   of_get_next_available_child
   of_get_next_child
@@ -1557,6 +1572,10 @@
   pin_user_pages_fast
   pin_user_pages_remote
   pktgen_xfrm_outer_mode_output
+  pkvm_iommu_resume
+  pkvm_iommu_suspend
+  __pkvm_topup_hyp_alloc
+  __pkvm_topup_hyp_alloc_mgt
   platform_bus_type
   platform_device_add
   platform_device_add_data
@@ -1655,6 +1674,7 @@
   radix_tree_iter_delete
   radix_tree_lookup
   radix_tree_next_chunk
+  raise_softirq
   ___ratelimit
   raw_notifier_call_chain
   raw_notifier_chain_register
@@ -1863,6 +1883,7 @@
   seq_write
   set_cpus_allowed_ptr
   set_freezable
+  set_normalized_timespec64
   set_page_dirty
   set_page_dirty_lock
   set_task_cpu
@@ -1946,6 +1967,7 @@
   snd_soc_add_dai_controls
   snd_soc_bytes_tlv_callback
   snd_soc_card_get_kcontrol
+  snd_soc_card_get_kcontrol_locked
   snd_soc_card_jack_new_pins
   snd_soc_component_disable_pin
   snd_soc_component_enable_pin
@@ -2204,6 +2226,8 @@
   __traceiter_android_rvh_set_user_nice_locked
   __traceiter_android_rvh_tick_entry
   __traceiter_android_rvh_uclamp_eff_get
+  __traceiter_android_rvh_ufs_complete_init
+  __traceiter_android_rvh_ufs_reprogram_all_keys
   __traceiter_android_rvh_update_blocked_fair
   __traceiter_android_rvh_update_load_avg
   __traceiter_android_rvh_update_misfit_status
@@ -2298,6 +2322,8 @@
   __tracepoint_android_rvh_set_user_nice_locked
   __tracepoint_android_rvh_tick_entry
   __tracepoint_android_rvh_uclamp_eff_get
+  __tracepoint_android_rvh_ufs_complete_init
+  __tracepoint_android_rvh_ufs_reprogram_all_keys
   __tracepoint_android_rvh_update_blocked_fair
   __tracepoint_android_rvh_update_load_avg
   __tracepoint_android_rvh_update_misfit_status

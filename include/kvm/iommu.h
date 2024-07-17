@@ -5,11 +5,6 @@
 #include <asm/kvm_host.h>
 #include <kvm/power_domain.h>
 #include <linux/io-pgtable.h>
-#ifdef __KVM_NVHE_HYPERVISOR__
-#include <nvhe/spinlock.h>
-#endif
-
-#define HYP_SPINLOCK_SIZE	4
 
 /*
  * Domain ID for identity mapped domain that the host can attach
@@ -31,10 +26,10 @@
  */
 struct kvm_hyp_iommu {
 	struct kvm_power_domain		power_domain;
-#ifdef __KVM_NVHE_HYPERVISOR__
-	hyp_spinlock_t			lock;
+#ifndef __GENKSYMS__
+	u32				lock;   /* lock size verified in kvm_iommu_get_lock.  */
 #else
-	u32				unused; /* HYP_SPINLOCK_SIZE verified at build time.  */
+	u32				unused;
 #endif
 	bool				power_is_off;
 	ANDROID_KABI_RESERVE(1);
