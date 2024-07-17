@@ -543,6 +543,7 @@ struct kvm_vcpu_arch {
  * set together with an exception...
  */
 #define KVM_ARM64_INCREMENT_PC		(1 << 9) /* Increment PC */
+#define KVM_ARM64_VCPU_IN_WFI		(1 << 14) /* WFI instruction trapped */
 #define KVM_ARM64_EXCEPT_MASK		(7 << 9) /* Target EL/MODE */
 
 /*
