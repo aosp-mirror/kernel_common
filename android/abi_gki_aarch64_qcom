@@ -749,6 +749,7 @@
   gpio_free_array
   gpio_request
   gpio_to_desc
+  groups_free
   gunyah_rm_call
   gunyah_rm_notifier_register
   gunyah_rm_notifier_unregister
