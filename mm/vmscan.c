@@ -1543,6 +1543,7 @@ static enum folio_references folio_check_references(struct folio *folio,
 	int referenced_ptes, referenced_folio;
 	unsigned long vm_flags;
 	int ret = 0;
+	bool trylock_failed = false;
 
 #ifdef CONFIG_ANDROID_VENDOR_OEM_DATA
 	trace_android_vh_page_should_be_protected(folio, sc->nr_scanned,
@@ -1552,9 +1553,13 @@ static enum folio_references folio_check_references(struct folio *folio,
 	if (ret)
 		return ret;
 
+	trace_android_vh_folio_trylock_set(folio);
 	referenced_ptes = folio_referenced(folio, 1, sc->target_mem_cgroup,
 					   &vm_flags);
 	referenced_folio = folio_test_clear_referenced(folio);
+	trace_android_vh_get_folio_trylock_result(folio, &trylock_failed);
+	if (trylock_failed)
+		return FOLIOREF_KEEP;
 
 	/*
 	 * The supposedly reclaimable folio was found to be in a VM_LOCKED vma.
@@ -2009,6 +2014,8 @@ retry:
 			if (folio_test_large(folio) && list_empty(&folio->_deferred_list))
 				flags |= TTU_SYNC;
 
+			if (!ignore_references)
+				trace_android_vh_folio_trylock_set(folio);
 			try_to_unmap(folio, flags);
 			if (folio_mapped(folio)) {
 				stat->nr_unmap_fail += nr_pages;
@@ -2139,6 +2146,7 @@ retry:
 					 * increment nr_reclaimed here (and
 					 * leave it off the LRU).
 					 */
+					trace_android_vh_folio_trylock_clear(folio);
 					nr_reclaimed += nr_pages;
 					continue;
 				}
@@ -2175,6 +2183,7 @@ free_it:
 		 * Is there need to periodically free_folio_list? It would
 		 * appear not as the counts should be low
 		 */
+		trace_android_vh_folio_trylock_clear(folio);
 		if (unlikely(folio_test_large(folio)))
 			destroy_large_folio(folio);
 		else
@@ -2674,6 +2683,7 @@ static unsigned long shrink_inactive_list(unsigned long nr_to_scan,
 		return 0;
 
 	nr_reclaimed = shrink_folio_list(&folio_list, pgdat, sc, &stat, false);
+	trace_android_vh_handle_trylock_failed_folio(&folio_list);
 
 	spin_lock_irq(&lruvec->lru_lock);
 	move_folios_to_lru(lruvec, &folio_list);
@@ -2812,6 +2822,8 @@ static void shrink_active_list(unsigned long nr_to_scan,
 		trace_android_vh_page_referenced_check_bypass(folio, nr_to_scan, lru, &bypass);
 		if (bypass)
 			goto skip_folio_referenced;
+
+		trace_android_vh_folio_trylock_set(folio);
 		/* Referenced or rmap lock contention: rotate */
 		if (folio_referenced(folio, 0, sc->target_mem_cgroup,
 				     &vm_flags) != 0) {
@@ -2825,11 +2837,13 @@ static void shrink_active_list(unsigned long nr_to_scan,
 			 * so we ignore them here.
 			 */
 			if ((vm_flags & VM_EXEC) && folio_is_file_lru(folio)) {
+				trace_android_vh_folio_trylock_clear(folio);
 				nr_rotated += folio_nr_pages(folio);
 				list_add(&folio->lru, &l_active);
 				continue;
 			}
 		}
+		trace_android_vh_folio_trylock_clear(folio);
 skip_folio_referenced:
 		folio_clear_active(folio);	/* we are de-activating */
 		folio_set_workingset(folio);
@@ -2918,6 +2932,7 @@ unsigned long reclaim_pages(struct list_head *folio_list, bool ignore_references
 
 	return nr_reclaimed;
 }
+EXPORT_SYMBOL_GPL(reclaim_pages);
 
 static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
 				 struct lruvec *lruvec, struct scan_control *sc)
