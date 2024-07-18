@@ -327,6 +327,18 @@
   device_wakeup_enable
   _dev_info
   dev_kfree_skb_any_reason
+  devl_assert_locked
+  devlink_alloc_ns
+  devlink_free
+  devlink_params_register
+  devlink_params_unregister
+  devlink_priv
+  devlink_register
+  devlink_unregister
+  devl_lock
+  devl_param_driverinit_value_get
+  devl_param_driverinit_value_set
+  devl_unlock
   __devm_add_action
   devm_alloc_etherdev_mqs
   __devm_alloc_percpu
@@ -588,6 +600,7 @@
   dpcm_end_walk_at_be
   dql_completed
   dql_reset
+  drain_workqueue
   driver_create_file
   driver_find_device
   driver_register
@@ -1010,6 +1023,8 @@
   hdmi_avi_infoframe_pack
   hdmi_drm_infoframe_init
   hdmi_drm_infoframe_pack
+  hdmi_spd_infoframe_init
+  hdmi_spd_infoframe_pack
   hdmi_vendor_infoframe_pack
   hex_dump_to_buffer
   hrtimer_active
@@ -1837,6 +1852,7 @@
   prepare_to_wait_event
   print_hex_dump
   _printk
+  priv_to_devlink
   proc_create_data
   proc_create_seq_private
   proc_create_single_data
@@ -2559,6 +2575,7 @@
   v4l2_get_link_freq
   v4l2_g_parm_cap
   v4l2_i2c_subdev_init
+  v4l2_i2c_subdev_set_name
   v4l2_m2m_buf_copy_metadata
   v4l2_m2m_buf_queue
   v4l2_m2m_buf_remove
