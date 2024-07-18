@@ -1357,10 +1357,16 @@ static void __free_pages_ok(struct page *page, unsigned int order,
 	unsigned long pfn = page_to_pfn(page);
 	struct zone *zone = page_zone(page);
 	bool skip_free_unref_page = false;
+	bool skip_free_pages_prepare = false;
+
+	trace_android_vh_free_pages_prepare_bypass(page, order,
+			fpi_flags, &skip_free_pages_prepare);
+	if (skip_free_pages_prepare)
+		goto skip_prepare;
 
 	if (!free_pages_prepare(page, order, fpi_flags))
 		return;
-
+skip_prepare:
 	/*
 	 * Calling get_pfnblock_migratetype() without spin_lock_irqsave() here
 	 * is used to avoid calling get_pfnblock_migratetype() under the lock.
