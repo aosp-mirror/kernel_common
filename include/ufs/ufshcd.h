@@ -657,15 +657,6 @@ enum ufshcd_android_quirks {
 	 * ufs_hba_variant_ops::init() must do it instead.
 	 */
 	UFSHCD_ANDROID_QUIRK_CUSTOM_CRYPTO_PROFILE	= 1 << 0,
-
-	/*
-	 * IMPORTANT: set this in hba->android_quirks, not hba->quirks!
-	 *
-	 * This quirk needs to be enabled if the host controller supports inline
-	 * encryption, but the CRYPTO_GENERAL_ENABLE bit is not implemented and
-	 * breaks the HCE sequence if used.
-	 */
-	UFSHCD_ANDROID_QUIRK_BROKEN_CRYPTO_ENABLE	= 1 << 1,
 };
 
 enum ufshcd_caps {
