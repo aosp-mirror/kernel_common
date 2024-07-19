@@ -265,6 +265,18 @@
 #define __used                          __attribute__((__used__))
 
 /*
+ * Optional: only supported since gcc >= 12
+ *
+ *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Variable-Attributes.html#index-uninitialized-variable-attribute
+ * clang: https://clang.llvm.org/docs/AttributeReference.html#uninitialized
+ */
+#if __has_attribute(__uninitialized__)
+# define __uninitialized		__attribute__((__uninitialized__))
+#else
+# define __uninitialized
+#endif
+
+/*
  *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-weak-function-attribute
  *   gcc: https://gcc.gnu.org/onlinedocs/gcc/Common-Variable-Attributes.html#index-weak-variable-attribute
  */
