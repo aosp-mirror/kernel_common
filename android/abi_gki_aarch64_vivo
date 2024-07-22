@@ -250,6 +250,8 @@
   __traceiter_android_vh_udp_enqueue_schedule_skb
   __traceiter_android_vh_build_skb_around
   __traceiter_android_rvh_bpf_skb_load_bytes
+  __traceiter_android_vh_sk_alloc
+  __traceiter_android_vh_sk_free
   __tracepoint_android_rvh_tcp_sendmsg
   __tracepoint_android_rvh_tcp_recvmsg
   __tracepoint_android_rvh_udp_sendmsg
@@ -264,6 +266,24 @@
   __tracepoint_android_vh_udp_enqueue_schedule_skb
   __tracepoint_android_vh_build_skb_around
   __tracepoint_android_rvh_bpf_skb_load_bytes
+  __tracepoint_android_vh_sk_alloc
+  __tracepoint_android_vh_sk_free
+  tcf_classify
+  __qdisc_calculate_pkt_len
+  tcf_block_get
+  qdisc_reset
+  tcf_block_put
+  qdisc_put
+  pfifo_qdisc_ops
+  qdisc_create_dflt
+  gnet_stats_add_queue
+  qdisc_tree_reduce_backlog
+  noop_qdisc
+  qdisc_hash_add
+  qdisc_offload_dump_helper
+  qdisc_offload_graft_helper
+  gnet_stats_copy_basic
+  gnet_stats_copy_queue
   debugfs_print_regs32
   blk_bio_list_merge
   blk_mq_debugfs_rq_show
