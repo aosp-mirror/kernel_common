@@ -40,7 +40,7 @@ extern int sysctl_unprivileged_userfaultfd;
 
 extern vm_fault_t handle_userfault(struct vm_fault *vmf, unsigned long reason);
 #ifdef CONFIG_SPECULATIVE_PAGE_FAULT
-extern bool userfaultfd_using_sigbus(struct vm_area_struct *vma);
+extern bool userfaultfd_using_sigbus(struct vm_fault *vmf);
 #endif
 
 /*

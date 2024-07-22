@@ -647,7 +647,7 @@ static int trans_pgd_create_copy(pgd_t **dst_pgdp, unsigned long start,
  * Memory allocated by get_safe_page() will be dealt with by the hibernate code,
  * we don't need to free it here.
  */
-int swsusp_arch_resume(void)
+int __nocfi swsusp_arch_resume(void)
 {
 	int rc;
 	void *zero_page;
