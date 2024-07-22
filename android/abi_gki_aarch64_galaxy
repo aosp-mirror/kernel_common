@@ -53,6 +53,7 @@
   rfkill_soft_blocked
   scsi_device_quiesce
   scsi_device_resume
+  smpboot_unregister_percpu_thread
   stack_trace_save_regs
   __kfree_skb
   __traceiter_android_rvh_arm64_serror_panic
