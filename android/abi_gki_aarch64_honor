@@ -78,6 +78,10 @@
   __tracepoint_android_vh_tcp_write_timeout_estab_retrans
   __traceiter_android_vh_inet_csk_clone_lock
   __tracepoint_android_vh_inet_csk_clone_lock
+  __traceiter_android_vh_tcp_clean_rtx_queue
+  __tracepoint_android_vh_tcp_clean_rtx_queue
+  __traceiter_android_vh_tcp_rcv_synack
+  __tracepoint_android_vh_tcp_rcv_synack
   __tracepoint_android_vh_si_mem_available_adjust
   __traceiter_android_vh_si_mem_available_adjust
   __tracepoint_android_vh_si_meminfo_adjust
