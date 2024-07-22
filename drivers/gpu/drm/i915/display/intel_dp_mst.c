@@ -1176,8 +1176,7 @@ static void intel_mst_pre_enable_dp(struct intel_atomic_state *state,
 	ret = drm_dp_add_payload_part1(&intel_dp->mst_mgr, mst_state,
 				       drm_atomic_get_mst_payload_state(mst_state, connector->port));
 	if (ret < 0)
-		drm_dbg_kms(&dev_priv->drm, "Failed to create MST payload for %s: %d\n",
-			    connector->base.name, ret);
+		intel_dp_queue_modeset_retry_for_link(state, &dig_port->base, pipe_config);
 
 	/*
 	 * Before Gen 12 this is not done as part of
@@ -1241,6 +1240,7 @@ static void intel_mst_enable_dp(struct intel_atomic_state *state,
 	enum transcoder trans = pipe_config->cpu_transcoder;
 	bool first_mst_stream = intel_dp->active_mst_links == 1;
 	struct intel_crtc *pipe_crtc;
+	int ret;
 
 	drm_WARN_ON(&dev_priv->drm, pipe_config->has_pch_encoder);
 
@@ -1272,8 +1272,11 @@ static void intel_mst_enable_dp(struct intel_atomic_state *state,
 	if (first_mst_stream)
 		intel_ddi_wait_for_fec_status(encoder, pipe_config, true);
 
-	drm_dp_add_payload_part2(&intel_dp->mst_mgr,
-				 drm_atomic_get_mst_payload_state(mst_state, connector->port));
+	ret = drm_dp_add_payload_part2(&intel_dp->mst_mgr,
+				       drm_atomic_get_mst_payload_state(mst_state,
+									connector->port));
+	if (ret < 0)
+		intel_dp_queue_modeset_retry_for_link(state, &dig_port->base, pipe_config);
 
 	if (DISPLAY_VER(dev_priv) >= 14 && pipe_config->fec_enable)
 		intel_de_rmw(dev_priv, MTL_CHICKEN_TRANS(trans), 0,
