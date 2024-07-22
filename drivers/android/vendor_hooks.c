@@ -65,7 +65,6 @@
 #include <trace/hooks/gzvm.h>
 #include <trace/hooks/signal.h>
 #include <trace/hooks/logbuf.h>
-#include <trace/hooks/dmabuf.h>
 #include <trace/hooks/usb.h>
 #include <trace/hooks/compaction.h>
 #include <trace/hooks/sd.h>
@@ -331,7 +330,6 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_check_folio_look_around_ref);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_look_around);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_look_around_migrate_folio);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_test_clear_look_around_ref);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_dma_buf_release);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_perf_huristic_ctrl);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_send_command_post_change);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_ufs_abort_success_ctrl);
