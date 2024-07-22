@@ -331,8 +331,6 @@ static int imx_mu_startup(struct mbox_chan *chan)
 		break;
 	}
 
-	priv->suspend = true;
-
 	return 0;
 }
 
@@ -550,8 +548,6 @@ static int imx_mu_probe(struct platform_device *pdev)
 
 	clk_disable_unprepare(priv->clk);
 
-	priv->suspend = false;
-
 	return 0;
 
 disable_runtime_pm:
@@ -614,6 +610,8 @@ static int __maybe_unused imx_mu_suspend_noirq(struct device *dev)
 	if (!priv->clk)
 		priv->xcr = imx_mu_read(priv, priv->dcfg->xCR);
 
+	priv->suspend = true;
+
 	return 0;
 }
 
@@ -631,6 +629,8 @@ static int __maybe_unused imx_mu_resume_noirq(struct device *dev)
 	 */
 	if (!imx_mu_read(priv, priv->dcfg->xCR) && !priv->clk)
 		imx_mu_write(priv, priv->xcr, priv->dcfg->xCR);
+
+	priv->suspend = false;
 
 	return 0;
 }
