@@ -359,18 +359,26 @@ static inline unsigned int userfaultfd_get_blocking_state(unsigned int flags)
 }
 
 #ifdef CONFIG_SPECULATIVE_PAGE_FAULT
-bool userfaultfd_using_sigbus(struct vm_area_struct *vma)
+bool userfaultfd_using_sigbus(struct vm_area_struct *vma, unsigned long seq)
 {
-	struct userfaultfd_ctx *ctx;
-	bool ret;
+	bool ret = false;
 
 	/*
 	 * Do it inside RCU section to ensure that the ctx doesn't
 	 * disappear under us.
 	 */
 	rcu_read_lock();
-	ctx = rcu_dereference(vma->vm_userfaultfd_ctx.ctx);
-	ret = ctx && (ctx->features & UFFD_FEATURE_SIGBUS);
+	/*
+	 * Ensure that we are not looking at dangling pointer to
+	 * userfaultfd_ctx, which could happen if userfaultfd_release() is
+	 * called after vma is copied.
+	 */
+	if (mmap_seq_read_check(vma->vm_mm, seq, SPF_ABORT_USERFAULTFD)) {
+		struct userfaultfd_ctx *ctx;
+
+		ctx = rcu_dereference(vma->vm_userfaultfd_ctx.ctx);
+		ret = ctx && (ctx->features & UFFD_FEATURE_SIGBUS);
+	}
 	rcu_read_unlock();
 	return ret;
 }

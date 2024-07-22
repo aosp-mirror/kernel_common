@@ -118,6 +118,7 @@ define_common_kernels(target_configs = {
     "kernel_aarch64": {
         "kmi_symbol_list_strict_mode": True,
         "kmi_symbol_list": "android/abi_gki_aarch64",
+        "rewrite_absolute_paths_in_config": True,
         "kmi_symbol_list_add_only": True,
         "additional_kmi_symbol_lists": [":aarch64_additional_kmi_symbol_lists"],
         "protected_exports_list": "android/abi_gki_protected_exports_aarch64",
@@ -133,6 +134,7 @@ define_common_kernels(target_configs = {
     "kernel_aarch64_debug": {
         "kmi_symbol_list_strict_mode": False,
         "kmi_symbol_list": "android/abi_gki_aarch64",
+        "rewrite_absolute_paths_in_config": True,
         "kmi_symbol_list_add_only": True,
         "additional_kmi_symbol_lists": [":aarch64_additional_kmi_symbol_lists"],
         "protected_exports_list": "android/abi_gki_protected_exports_aarch64",
