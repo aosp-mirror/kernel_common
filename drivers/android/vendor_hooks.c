@@ -75,6 +75,7 @@
 #include <trace/hooks/suspend.h>
 #include <trace/hooks/fsnotify.h>
 #include <trace/hooks/perf.h>
+#include <trace/hooks/dmabuf.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -464,3 +465,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_folio_trylock_clear);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_folio_trylock_set);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_handle_trylock_failed_folio);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_rvh_try_alloc_pages);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_dmabuf_page_pool_free_bypass);
