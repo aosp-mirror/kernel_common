@@ -5058,6 +5058,7 @@ static vm_fault_t ___handle_speculative_fault(struct mm_struct *mm,
 
 	vmf.vma_flags = READ_ONCE(vmf.vma->vm_flags);
 	vmf.vma_page_prot = READ_ONCE(vmf.vma->vm_page_prot);
+	vmf.sequence = seq;
 
 #ifdef CONFIG_USERFAULTFD
 	/*
@@ -5067,7 +5068,7 @@ static vm_fault_t ___handle_speculative_fault(struct mm_struct *mm,
 	if (unlikely(vmf.vma_flags & __VM_UFFD_FLAGS)) {
 		uffd_missing_sigbus = vma_is_anonymous(vmf.vma) &&
 					(vmf.vma_flags & VM_UFFD_MISSING) &&
-					userfaultfd_using_sigbus(vmf.vma);
+					userfaultfd_using_sigbus(&vmf);
 		if (!uffd_missing_sigbus) {
 			trace_spf_vma_notsup(_RET_IP_, vmf.vma, address);
 			return VM_FAULT_RETRY;
@@ -5193,7 +5194,6 @@ static vm_fault_t ___handle_speculative_fault(struct mm_struct *mm,
 		vmf.pte = NULL;
 	}
 
-	vmf.sequence = seq;
 	vmf.flags = flags;
 
 	local_irq_enable();
