@@ -688,6 +688,7 @@
   flush_work
   flush_workqueue
   follow_pfn
+  font_vga_8x16
   for_each_kernel_tracepoint
   fput
   fqdir_exit
