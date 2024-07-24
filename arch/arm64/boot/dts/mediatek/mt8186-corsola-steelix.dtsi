@@ -258,13 +258,6 @@
 	};
 };
 
-&anx7625_pins {
-	pins2 {
-		/delete-property/ bias-pull-up;
-		bias-disable;
-	};
-};
-
 &sound {
 	status = "okay";
 
