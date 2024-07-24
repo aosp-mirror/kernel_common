@@ -87,7 +87,7 @@
 
 		aux-bus {
 			panel: panel {
-				compatible = "edp-panel";
+				compatible = "auo,b116xw03";
 				power-supply = <&pp3300_disp_x>;
 				backlight = <&backlight_lcd0>;
 
