@@ -3071,6 +3071,7 @@
 
 		jpgenc-master {
 			compatible = "mediatek,mt8195-jpgenc";
+			status = "disabled";
 			power-domains = <&spm MT8195_POWER_DOMAIN_VENC_CORE1>;
 			iommus = <&iommu_vpp M4U_PORT_L20_JPGENC_Y_RDMA>,
 					<&iommu_vpp M4U_PORT_L20_JPGENC_C_RDMA>,
