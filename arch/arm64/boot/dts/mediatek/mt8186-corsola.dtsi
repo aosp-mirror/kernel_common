@@ -417,10 +417,6 @@
 	status = "okay";
 };
 
-&gic {
-	mediatek,broken-save-restore-fw;
-};
-
 &gpu {
 	supply-names = "mali","sram";
 	mali-supply = <&mt6366_vgpu_reg>;
