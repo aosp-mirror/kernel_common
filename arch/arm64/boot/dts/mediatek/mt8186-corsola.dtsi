@@ -422,8 +422,6 @@
 };
 
 &gpu {
-	status = "okay";
-
 	supply-names = "mali","sram";
 	mali-supply = <&mt6366_vgpu_reg>;
 	sram-supply = <&mt6366_vsram_gpu_reg>;
