@@ -775,10 +775,9 @@ skb_fail:
 EXPORT_SYMBOL(__netdev_alloc_skb);
 
 /**
- *	__napi_alloc_skb - allocate skbuff for rx in a specific NAPI instance
+ *	napi_alloc_skb - allocate skbuff for rx in a specific NAPI instance
  *	@napi: napi instance this buffer was allocated for
  *	@len: length to allocate
- *	@gfp_mask: get_free_pages mask, passed to alloc_skb and alloc_pages
  *
  *	Allocate a new sk_buff for use in NAPI receive.  This buffer will
  *	attempt to allocate the head from a special reserved region used
@@ -787,9 +786,9 @@ EXPORT_SYMBOL(__netdev_alloc_skb);
  *
  *	%NULL is returned if there is no free memory.
  */
-struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
-				 gfp_t gfp_mask)
+struct sk_buff *napi_alloc_skb(struct napi_struct *napi, unsigned int len)
 {
+	gfp_t gfp_mask = GFP_ATOMIC | __GFP_NOWARN;
 	struct napi_alloc_cache *nc;
 	struct sk_buff *skb;
 	bool pfmemalloc;
@@ -860,7 +859,7 @@ skb_success:
 skb_fail:
 	return skb;
 }
-EXPORT_SYMBOL(__napi_alloc_skb);
+EXPORT_SYMBOL(napi_alloc_skb);
 
 void skb_add_rx_frag_netmem(struct sk_buff *skb, int i, netmem_ref netmem,
 			    int off, int size, unsigned int truesize)
@@ -7062,8 +7061,8 @@ nodefer:	__kfree_skb(skb);
 	/* Make sure to trigger NET_RX_SOFTIRQ on the remote CPU
 	 * if we are unlucky enough (this seems very unlikely).
 	 */
-	if (unlikely(kick) && !cmpxchg(&sd->defer_ipi_scheduled, 0, 1))
-		smp_call_function_single_async(cpu, &sd->defer_csd);
+	if (unlikely(kick))
+		kick_defer_list_purge(sd, cpu);
 }
 
 static void skb_splice_csum_page(struct sk_buff *skb, struct page *page,

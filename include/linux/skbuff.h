@@ -3370,13 +3370,7 @@ static inline void *napi_alloc_frag_align(unsigned int fragsz,
 	return __napi_alloc_frag_align(fragsz, -align);
 }
 
-struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
-				 unsigned int length, gfp_t gfp_mask);
-static inline struct sk_buff *napi_alloc_skb(struct napi_struct *napi,
-					     unsigned int length)
-{
-	return __napi_alloc_skb(napi, length, GFP_ATOMIC);
-}
+struct sk_buff *napi_alloc_skb(struct napi_struct *napi, unsigned int length);
 void napi_consume_skb(struct sk_buff *skb, int budget);
 
 void napi_skb_free_stolen_head(struct sk_buff *skb);
@@ -4078,12 +4072,6 @@ int skb_copy_datagram_from_iter(struct sk_buff *skb, int offset,
 				 struct iov_iter *from, int len);
 int zerocopy_sg_from_iter(struct sk_buff *skb, struct iov_iter *frm);
 void skb_free_datagram(struct sock *sk, struct sk_buff *skb);
-void __skb_free_datagram_locked(struct sock *sk, struct sk_buff *skb, int len);
-static inline void skb_free_datagram_locked(struct sock *sk,
-					    struct sk_buff *skb)
-{
-	__skb_free_datagram_locked(sk, skb, 0);
-}
 int skb_kill_datagram(struct sock *sk, struct sk_buff *skb, unsigned int flags);
 int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len);
 int skb_store_bits(struct sk_buff *skb, int offset, const void *from, int len);
