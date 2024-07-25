@@ -5,25 +5,21 @@
 
 /dts-v1/;
 #include "mt8186-corsola-steelix.dtsi"
-#include "mt8186-corsola-ps8640.dtsi"
 
 / {
-	model = "Google Magneton sku393216 board";
-	compatible = "google,steelix-sku393216", "google,steelix", "mediatek,mt8186";
+	model = "Google Magneton sku393217 board";
+	compatible = "google,steelix-rev2-sku393217", "google,steelix-rev2-sku393220",
+		     "google,steelix-rev2", "google,steelix", "mediatek,mt8186";
 };
 
 &gpio_keys {
 	status = "disabled";
 };
 
-&touchscreen {
-	status = "disabled";
-};
-
 &i2c1 {
-	touchscreen_auo: touchscreen@10 {
+	touchscreen_boe: touchscreen@40 {
 		compatible = "hid-over-i2c";
-		reg = <0x10>;
+		reg = <0x40>;
 		interrupt-parent = <&pio>;
 		interrupts = <12 IRQ_TYPE_LEVEL_LOW>;
 		pinctrl-names = "default";
@@ -32,9 +28,13 @@
 		vdd-supply = <&pp3300_s3>;
 		status = "okay";
 
-		post-power-on-delay-ms = <350>;
+		post-power-on-delay-ms = <450>;
 		hid-descr-addr = <0x0001>;
 	};
+};
+
+&touchscreen {
+	status = "disabled";
 };
 
 &usb_c1 {
