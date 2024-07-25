@@ -15,12 +15,10 @@
 
 &cpu6 {
 	proc-supply = <&mt6315_6_vbuck1>;
-	sram-supply = <&mt6366_vsram_proc11_reg>;
 };
 
 &cpu7 {
 	proc-supply = <&mt6315_6_vbuck1>;
-	sram-supply = <&mt6366_vsram_proc11_reg>;
 };
 
 &mt6366codec {
