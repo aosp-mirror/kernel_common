@@ -158,7 +158,17 @@ static void xhci_dbc_giveback(struct dbc_request *req, int status)
 	spin_lock(&dbc->lock);
 }
 
-static void xhci_dbc_flush_single_request(struct dbc_request *req)
+/**
+ * xhci_dbc_flush_single_request - flushes single request
+ * @req: request to flush
+ * @status: 0 or -ERESTART - after the request is flushed it will be queued
+ *          back to the endpoint
+ *
+ *          -ESHUTDOWN - after the request is flushed it won't be queued back
+ *          to the endpoint and if it was last endpoint's request the endpoint
+ *          will stay shut
+ */
+static void xhci_dbc_flush_single_request(struct dbc_request *req, int status)
 {
 	union xhci_trb	*trb = req->trb;
 
@@ -168,21 +178,36 @@ static void xhci_dbc_flush_single_request(struct dbc_request *req)
 	trb->generic.field[3]	&= cpu_to_le32(TRB_CYCLE);
 	trb->generic.field[3]	|= cpu_to_le32(TRB_TYPE(TRB_TR_NOOP));
 
-	xhci_dbc_giveback(req, -ESHUTDOWN);
+	xhci_dbc_giveback(req, status);
 }
 
-static void xhci_dbc_flush_endpoint_requests(struct dbc_ep *dep)
+/**
+ * xhci_dbc_flush_endpoint_requests - flushes endpoint's requests
+ * @dep: endpoint to flush requests
+ * @restart: true - after being flushed, the requests will be queued back
+ *           to the endpoint and its operation will resume
+ *
+ *           false - after flushing last endpoint's request the endpoint will
+ *           stay shut
+ */
+static void xhci_dbc_flush_endpoint_requests(struct dbc_ep *dep, bool restart)
 {
+	struct list_head	*list = &dep->list_pending;
 	struct dbc_request	*req, *tmp;
+	int			status = -ESHUTDOWN;
 
-	list_for_each_entry_safe(req, tmp, &dep->list_pending, list_pending)
-		xhci_dbc_flush_single_request(req);
+	list_for_each_entry_safe(req, tmp, list, list_pending) {
+		if (restart && list_is_last(&req->list_pending, list))
+			status = -ERESTART;
+
+		xhci_dbc_flush_single_request(req, status);
+	}
 }
 
 static void xhci_dbc_flush_requests(struct xhci_dbc *dbc)
 {
-	xhci_dbc_flush_endpoint_requests(&dbc->eps[BULK_OUT]);
-	xhci_dbc_flush_endpoint_requests(&dbc->eps[BULK_IN]);
+	xhci_dbc_flush_endpoint_requests(&dbc->eps[BULK_OUT], false);
+	xhci_dbc_flush_endpoint_requests(&dbc->eps[BULK_IN], false);
 }
 
 struct dbc_request *
@@ -706,10 +731,13 @@ static void dbc_handle_xfer_event(struct xhci_dbc *dbc, union xhci_trb *event)
 	case COMP_TRB_ERROR:
 	case COMP_BABBLE_DETECTED_ERROR:
 	case COMP_USB_TRANSACTION_ERROR:
-	case COMP_STALL_ERROR:
 		dev_warn(dbc->dev, "tx error %d detected\n", comp_code);
 		status = -comp_code;
 		break;
+	case COMP_STALL_ERROR:
+		/* Restart endpoint */
+		xhci_dbc_flush_endpoint_requests(dep, true);
+		return;
 	default:
 		dev_err(dbc->dev, "unknown tx error %d\n", comp_code);
 		status = -comp_code;
@@ -811,12 +839,12 @@ static enum evtreturn xhci_dbc_do_handle_events(struct xhci_dbc *dbc)
 
 			if (ctrl & DBC_CTRL_HALT_IN_TR) {
 				dep = get_in_ep(dbc);
-				xhci_dbc_flush_endpoint_requests(dep);
+				xhci_dbc_flush_endpoint_requests(dep, false);
 			}
 
 			if (ctrl & DBC_CTRL_HALT_OUT_TR) {
 				dep = get_out_ep(dbc);
-				xhci_dbc_flush_endpoint_requests(dep);
+				xhci_dbc_flush_endpoint_requests(dep, false);
 			}
 
 			return EVT_DONE;

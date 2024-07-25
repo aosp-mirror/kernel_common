@@ -121,6 +121,7 @@ static void dbc_write_complete(struct xhci_dbc *dbc, struct dbc_request *req)
 	list_add(&req->list_pool, &port->write_pool);
 	switch (req->status) {
 	case 0:
+	case -ERESTART:
 		dbc_start_tx(port);
 		break;
 	case -ESHUTDOWN:
@@ -317,6 +318,10 @@ static void dbc_rx_push(struct tasklet_struct *t)
 			break;
 		case -ESHUTDOWN:
 			disconnect = true;
+			break;
+		case -ERESTART:
+			disconnect = false;
+			req->actual = 0;
 			break;
 		default:
 			pr_warn("ttyDBC0: unexpected RX status %d\n",
