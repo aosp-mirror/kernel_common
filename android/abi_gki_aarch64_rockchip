@@ -3093,3 +3093,14 @@
 # required by si2157.ko
   media_device_register_entity
   media_device_unregister_entity
+
+# required by usb_wwan.ko
+  usb_autopm_get_interface_async
+  usb_autopm_put_interface_async
+
+# required by option.ko
+  tty_port_tty_hangup
+
+# required by qmi_wwan_q.ko
+  arp_create
+  netdev_stats_to_stats64
