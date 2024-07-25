@@ -1436,13 +1436,6 @@
 		};
 	};
 
-	spmi_pins: spmi {
-		pins-bus {
-			pinmux = <PINMUX_GPIO183__FUNC_SPMI_SCL>,
-				 <PINMUX_GPIO184__FUNC_SPMI_SDA>;
-		};
-	};
-
 	touchscreen_pins: touchscreen-pins {
 		pin-irq {
 			pinmux = <PINMUX_GPIO12__FUNC_GPIO12>;
