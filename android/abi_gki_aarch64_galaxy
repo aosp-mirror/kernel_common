@@ -49,6 +49,7 @@
   param_get_uint
   param_set_uint
   pidfd_get_pid
+  prep_compound_page
   prep_new_hpage
   proc_set_size
   pstore_register
