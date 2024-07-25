@@ -88,6 +88,8 @@ void cw1200_unregister_bh(struct cw1200_common *priv)
 	atomic_add(1, &priv->bh_term);
 	wake_up(&priv->bh_wq);
 
+	flush_workqueue(priv->bh_workqueue);
+
 	destroy_workqueue(priv->bh_workqueue);
 	priv->bh_workqueue = NULL;
 

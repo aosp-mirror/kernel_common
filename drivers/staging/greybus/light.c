@@ -100,15 +100,15 @@ static struct led_classdev *get_channel_cdev(struct gb_channel *channel)
 static struct gb_channel *get_channel_from_mode(struct gb_light *light,
 						u32 mode)
 {
-	struct gb_channel *channel;
+	struct gb_channel *channel = NULL;
 	int i;
 
 	for (i = 0; i < light->channels_count; i++) {
 		channel = &light->channels[i];
-		if (channel->mode == mode)
-			return channel;
+		if (channel && channel->mode == mode)
+			break;
 	}
-	return NULL;
+	return channel;
 }
 
 static int __gb_lights_flash_intensity_set(struct gb_channel *channel,

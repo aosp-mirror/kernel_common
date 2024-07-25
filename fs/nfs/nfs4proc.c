@@ -10373,33 +10373,29 @@ const struct nfs4_minor_version_ops *nfs_v4_minor_ops[] = {
 static ssize_t nfs4_listxattr(struct dentry *dentry, char *list, size_t size)
 {
 	ssize_t error, error2, error3;
-	size_t left = size;
 
-	error = generic_listxattr(dentry, list, left);
+	error = generic_listxattr(dentry, list, size);
 	if (error < 0)
 		return error;
 	if (list) {
 		list += error;
-		left -= error;
+		size -= error;
 	}
 
-	error2 = nfs4_listxattr_nfs4_label(d_inode(dentry), list, left);
+	error2 = nfs4_listxattr_nfs4_label(d_inode(dentry), list, size);
 	if (error2 < 0)
 		return error2;
 
 	if (list) {
 		list += error2;
-		left -= error2;
+		size -= error2;
 	}
 
-	error3 = nfs4_listxattr_nfs4_user(d_inode(dentry), list, left);
+	error3 = nfs4_listxattr_nfs4_user(d_inode(dentry), list, size);
 	if (error3 < 0)
 		return error3;
 
-	error += error2 + error3;
-	if (size && error > size)
-		return -ERANGE;
-	return error;
+	return error + error2 + error3;
 }
 
 static void nfs4_enable_swap(struct inode *inode)

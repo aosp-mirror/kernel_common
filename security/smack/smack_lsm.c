@@ -4023,12 +4023,12 @@ static int smack_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
  * returns zero on success, an error code otherwise
  */
 static int smack_socket_getpeersec_stream(struct socket *sock,
-					  sockptr_t optval, sockptr_t optlen,
-					  unsigned int len)
+					  char __user *optval,
+					  int __user *optlen, unsigned len)
 {
 	struct socket_smack *ssp;
 	char *rcp = "";
-	u32 slen = 1;
+	int slen = 1;
 	int rc = 0;
 
 	ssp = sock->sk->sk_security;
@@ -4036,16 +4036,15 @@ static int smack_socket_getpeersec_stream(struct socket *sock,
 		rcp = ssp->smk_packet->smk_known;
 		slen = strlen(rcp) + 1;
 	}
-	if (slen > len) {
-		rc = -ERANGE;
-		goto out_len;
-	}
 
-	if (copy_to_sockptr(optval, rcp, slen))
+	if (slen > len)
+		rc = -ERANGE;
+	else if (copy_to_user(optval, rcp, slen) != 0)
 		rc = -EFAULT;
-out_len:
-	if (copy_to_sockptr(optlen, &slen, sizeof(slen)))
+
+	if (put_user(slen, optlen) != 0)
 		rc = -EFAULT;
+
 	return rc;
 }
 

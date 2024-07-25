@@ -176,12 +176,11 @@ config SUNXI_RSB
 
 config TEGRA_ACONNECT
 	tristate "Tegra ACONNECT Bus Driver"
-	depends on ARCH_TEGRA
+	depends on ARCH_TEGRA_210_SOC
 	depends on OF && PM
 	help
 	  Driver for the Tegra ACONNECT bus which is used to interface with
-	  the devices inside the Audio Processing Engine (APE) for
-	  Tegra210 and later.
+	  the devices inside the Audio Processing Engine (APE) for Tegra210.
 
 config TEGRA_GMI
 	tristate "Tegra Generic Memory Interface bus driver"

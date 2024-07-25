@@ -2493,8 +2493,8 @@ int ip_mc_msfilter(struct sock *sk, struct ip_msfilter *msf, int ifindex)
 			goto done;
 		}
 		newpsl->sl_max = newpsl->sl_count = msf->imsf_numsrc;
-		memcpy(newpsl->sl_addr, msf->imsf_slist_flex,
-		       flex_array_size(msf, imsf_slist_flex, msf->imsf_numsrc));
+		memcpy(newpsl->sl_addr, msf->imsf_slist,
+			msf->imsf_numsrc * sizeof(msf->imsf_slist[0]));
 		err = ip_mc_add_src(in_dev, &msf->imsf_multiaddr,
 			msf->imsf_fmode, newpsl->sl_count, newpsl->sl_addr, 0);
 		if (err) {
@@ -2526,10 +2526,11 @@ done:
 		err = ip_mc_leave_group(sk, &imr);
 	return err;
 }
+
 int ip_mc_msfget(struct sock *sk, struct ip_msfilter *msf,
-		 sockptr_t optval, sockptr_t optlen)
+	struct ip_msfilter __user *optval, int __user *optlen)
 {
-	int err, len, count, copycount, msf_size;
+	int err, len, count, copycount;
 	struct ip_mreqn	imr;
 	__be32 addr = msf->imsf_multiaddr;
 	struct ip_mc_socklist *pmc;
@@ -2570,17 +2571,14 @@ int ip_mc_msfget(struct sock *sk, struct ip_msfilter *msf,
 		count = psl->sl_count;
 	}
 	copycount = count < msf->imsf_numsrc ? count : msf->imsf_numsrc;
-	len = flex_array_size(psl, sl_addr, copycount);
+	len = copycount * sizeof(psl->sl_addr[0]);
 	msf->imsf_numsrc = count;
-	msf_size = IP_MSFILTER_SIZE(copycount);
-	if (copy_to_sockptr(optlen, &msf_size, sizeof(int)) ||
-	    copy_to_sockptr(optval, msf, IP_MSFILTER_SIZE(0))) {
+	if (put_user(IP_MSFILTER_SIZE(copycount), optlen) ||
+	    copy_to_user(optval, msf, IP_MSFILTER_SIZE(0))) {
 		return -EFAULT;
 	}
 	if (len &&
-	    copy_to_sockptr_offset(optval,
-				   offsetof(struct ip_msfilter, imsf_slist_flex),
-				   psl->sl_addr, len))
+	    copy_to_user(&optval->imsf_slist[0], psl->sl_addr, len))
 		return -EFAULT;
 	return 0;
 done:
@@ -2588,7 +2586,7 @@ done:
 }
 
 int ip_mc_gsfget(struct sock *sk, struct group_filter *gsf,
-		 sockptr_t optval, size_t ss_offset)
+	struct sockaddr_storage __user *p)
 {
 	int i, count, copycount;
 	struct sockaddr_in *psin;
@@ -2618,17 +2616,15 @@ int ip_mc_gsfget(struct sock *sk, struct group_filter *gsf,
 	count = psl ? psl->sl_count : 0;
 	copycount = count < gsf->gf_numsrc ? count : gsf->gf_numsrc;
 	gsf->gf_numsrc = count;
-	for (i = 0; i < copycount; i++) {
+	for (i = 0; i < copycount; i++, p++) {
 		struct sockaddr_storage ss;
 
 		psin = (struct sockaddr_in *)&ss;
 		memset(&ss, 0, sizeof(ss));
 		psin->sin_family = AF_INET;
 		psin->sin_addr.s_addr = psl->sl_addr[i];
-		if (copy_to_sockptr_offset(optval, ss_offset,
-					   &ss, sizeof(ss)))
+		if (copy_to_user(p, &ss, sizeof(ss)))
 			return -EFAULT;
-		ss_offset += sizeof(ss);
 	}
 	return 0;
 }

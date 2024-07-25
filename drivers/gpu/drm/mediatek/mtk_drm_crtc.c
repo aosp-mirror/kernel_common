@@ -84,13 +84,11 @@ static void mtk_drm_crtc_finish_page_flip(struct mtk_drm_crtc *mtk_crtc)
 	struct drm_crtc *crtc = &mtk_crtc->base;
 	unsigned long flags;
 
-	if (mtk_crtc->event) {
-		spin_lock_irqsave(&crtc->dev->event_lock, flags);
-		drm_crtc_send_vblank_event(crtc, mtk_crtc->event);
-		drm_crtc_vblank_put(crtc);
-		mtk_crtc->event = NULL;
-		spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
-	}
+	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+	drm_crtc_send_vblank_event(crtc, mtk_crtc->event);
+	drm_crtc_vblank_put(crtc);
+	mtk_crtc->event = NULL;
+	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 }
 
 static void mtk_drm_finish_page_flip(struct mtk_drm_crtc *mtk_crtc)

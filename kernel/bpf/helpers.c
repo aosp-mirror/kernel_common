@@ -278,18 +278,13 @@ static inline void __bpf_spin_unlock(struct bpf_spin_lock *lock)
 
 static DEFINE_PER_CPU(unsigned long, irqsave_flags);
 
-static inline void __bpf_spin_lock_irqsave(struct bpf_spin_lock *lock)
+notrace BPF_CALL_1(bpf_spin_lock, struct bpf_spin_lock *, lock)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
 	__bpf_spin_lock(lock);
 	__this_cpu_write(irqsave_flags, flags);
-}
-
-NOTRACE_BPF_CALL_1(bpf_spin_lock, struct bpf_spin_lock *, lock)
-{
-	__bpf_spin_lock_irqsave(lock);
 	return 0;
 }
 
@@ -300,18 +295,13 @@ const struct bpf_func_proto bpf_spin_lock_proto = {
 	.arg1_type	= ARG_PTR_TO_SPIN_LOCK,
 };
 
-static inline void __bpf_spin_unlock_irqrestore(struct bpf_spin_lock *lock)
+notrace BPF_CALL_1(bpf_spin_unlock, struct bpf_spin_lock *, lock)
 {
 	unsigned long flags;
 
 	flags = __this_cpu_read(irqsave_flags);
 	__bpf_spin_unlock(lock);
 	local_irq_restore(flags);
-}
-
-NOTRACE_BPF_CALL_1(bpf_spin_unlock, struct bpf_spin_lock *, lock)
-{
-	__bpf_spin_unlock_irqrestore(lock);
 	return 0;
 }
 
@@ -332,9 +322,9 @@ void copy_map_value_locked(struct bpf_map *map, void *dst, void *src,
 	else
 		lock = dst + map->spin_lock_off;
 	preempt_disable();
-	__bpf_spin_lock_irqsave(lock);
+	____bpf_spin_lock(lock);
 	copy_map_value(map, dst, src);
-	__bpf_spin_unlock_irqrestore(lock);
+	____bpf_spin_unlock(lock);
 	preempt_enable();
 }
 

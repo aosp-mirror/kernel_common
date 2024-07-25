@@ -1871,7 +1871,7 @@ static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,
 	 */
 
 	spkt->spkt_family = dev->type;
-	strscpy(spkt->spkt_device, dev->name, sizeof(spkt->spkt_device));
+	strlcpy(spkt->spkt_device, dev->name, sizeof(spkt->spkt_device));
 	spkt->spkt_protocol = skb->protocol;
 
 	/*
@@ -3540,7 +3540,7 @@ static int packet_getname_spkt(struct socket *sock, struct sockaddr *uaddr,
 	rcu_read_lock();
 	dev = dev_get_by_index_rcu(sock_net(sk), READ_ONCE(pkt_sk(sk)->ifindex));
 	if (dev)
-		strscpy(uaddr->sa_data, dev->name, sizeof(uaddr->sa_data));
+		strlcpy(uaddr->sa_data, dev->name, sizeof(uaddr->sa_data));
 	rcu_read_unlock();
 
 	return sizeof(*uaddr);
@@ -3951,7 +3951,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, sockptr_t optval,
 		if (val < 0 || val > 1)
 			return -EINVAL;
 
-		WRITE_ONCE(po->prot_hook.ignore_outgoing, !!val);
+		po->prot_hook.ignore_outgoing = !!val;
 		return 0;
 	}
 	case PACKET_TX_HAS_OFF:
@@ -4083,7 +4083,7 @@ static int packet_getsockopt(struct socket *sock, int level, int optname,
 		       0);
 		break;
 	case PACKET_IGNORE_OUTGOING:
-		val = READ_ONCE(po->prot_hook.ignore_outgoing);
+		val = po->prot_hook.ignore_outgoing;
 		break;
 	case PACKET_ROLLOVER_STATS:
 		if (!po->rollover)

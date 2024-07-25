@@ -321,13 +321,17 @@ static int acpi_scan_device_check(struct acpi_device *adev)
 		 * again).
 		 */
 		if (adev->handler) {
-			dev_dbg(&adev->dev, "Already enumerated\n");
-			return 0;
+			dev_warn(&adev->dev, "Already enumerated\n");
+			return -EALREADY;
 		}
 		error = acpi_bus_scan(adev->handle);
 		if (error) {
 			dev_warn(&adev->dev, "Namespace scan failure\n");
 			return error;
+		}
+		if (!adev->handler) {
+			dev_warn(&adev->dev, "Enumeration failure\n");
+			error = -ENODEV;
 		}
 	} else {
 		error = acpi_scan_device_not_present(adev);

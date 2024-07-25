@@ -1946,7 +1946,7 @@ static int profile_open_perf_events(struct profiler_bpf *obj)
 	int map_fd;
 
 	profile_perf_events = calloc(
-		obj->rodata->num_cpu * obj->rodata->num_metric, sizeof(int));
+		sizeof(int), obj->rodata->num_cpu * obj->rodata->num_metric);
 	if (!profile_perf_events) {
 		p_err("failed to allocate memory for perf_event array: %s",
 		      strerror(errno));

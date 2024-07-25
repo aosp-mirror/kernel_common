@@ -137,21 +137,14 @@ static struct notifier_block hsr_nb = {
 
 static int __init hsr_init(void)
 {
-	int err;
+	int res;
 
 	BUILD_BUG_ON(sizeof(struct hsr_tag) != HSR_HLEN);
 
-	err = register_netdevice_notifier(&hsr_nb);
-	if (err)
-		return err;
+	register_netdevice_notifier(&hsr_nb);
+	res = hsr_netlink_init();
 
-	err = hsr_netlink_init();
-	if (err) {
-		unregister_netdevice_notifier(&hsr_nb);
-		return err;
-	}
-
-	return 0;
+	return res;
 }
 
 static void __exit hsr_exit(void)

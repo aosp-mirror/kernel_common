@@ -357,7 +357,7 @@ __nvmet_fc_finish_ls_req(struct nvmet_fc_ls_req_op *lsop)
 
 	if (!lsop->req_queued) {
 		spin_unlock_irqrestore(&tgtport->lock, flags);
-		goto out_puttgtport;
+		return;
 	}
 
 	list_del(&lsop->lsreq_list);
@@ -370,7 +370,6 @@ __nvmet_fc_finish_ls_req(struct nvmet_fc_ls_req_op *lsop)
 				  (lsreq->rqstlen + lsreq->rsplen),
 				  DMA_BIDIRECTIONAL);
 
-out_puttgtport:
 	nvmet_fc_tgtport_put(tgtport);
 }
 
@@ -1101,9 +1100,6 @@ nvmet_fc_alloc_target_assoc(struct nvmet_fc_tgtport *tgtport, void *hosthandle)
 	u64 ran;
 	int idx;
 	bool needrandom = true;
-
-	if (!tgtport->pe)
-		return NULL;
 
 	assoc = kzalloc(sizeof(*assoc), GFP_KERNEL);
 	if (!assoc)
@@ -2532,9 +2528,8 @@ nvmet_fc_handle_fcp_rqst(struct nvmet_fc_tgtport *tgtport,
 
 	fod->req.cmd = &fod->cmdiubuf.sqe;
 	fod->req.cqe = &fod->rspiubuf.cqe;
-	if (!tgtport->pe)
-		goto transport_error;
-	fod->req.port = tgtport->pe->port;
+	if (tgtport->pe)
+		fod->req.port = tgtport->pe->port;
 
 	/* clear any response payload */
 	memset(&fod->rspiubuf, 0, sizeof(fod->rspiubuf));

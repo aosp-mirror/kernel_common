@@ -261,10 +261,7 @@ struct mlx5_wqe_eth_seg {
 	union {
 		struct {
 			__be16 sz;
-			union {
-				u8     start[2];
-				DECLARE_FLEX_ARRAY(u8, data);
-			};
+			u8     start[2];
 		} inline_hdr;
 		struct {
 			__be16 type;
