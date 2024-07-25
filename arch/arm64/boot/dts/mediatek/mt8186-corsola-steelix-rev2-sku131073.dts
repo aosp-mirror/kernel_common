@@ -5,11 +5,11 @@
 
 /dts-v1/;
 #include "mt8186-corsola-steelix.dtsi"
-#include "mt8186-corsola-ps8640.dtsi"
 
 / {
 	model = "Google Steelix sku131073 board";
-	compatible = "google,steelix-sku131073", "google,steelix", "mediatek,mt8186";
+	compatible = "google,steelix-rev2-sku131073", "google,steelix-rev2-sku131075",
+		     "google,steelix-rev2", "google,steelix", "mediatek,mt8186";
 };
 
 &mt6366codec {

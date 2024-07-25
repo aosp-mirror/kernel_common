@@ -5,12 +5,12 @@
 
 /dts-v1/;
 #include "mt8186-corsola-steelix.dtsi"
+#include "mt8186-corsola-ps8640.dtsi"
 
 / {
-	model = "Google Rusty sku196608/196609/196610/196611 board";
+	model = "Google Rusty sku196608/196609 board";
 	compatible = "google,steelix-sku196608", "google,steelix-sku196609",
-		     "google,steelix-sku196610", "google,steelix-sku196611",
-		     "google,steelix", "mediatek,mt8186";
+			"google,steelix", "mediatek,mt8186";
 };
 
 &gpio_keys {
