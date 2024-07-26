@@ -19,7 +19,6 @@
 #include <linux/workqueue.h>
 
 #include <drm/drm_dp_helper.h>
-#include <drm/drm_dp_aux_bus.h>
 #include <drm/drm_panel.h>
 
 #include "dp.h"
@@ -525,7 +524,7 @@ static int tegra_dpaux_probe(struct platform_device *pdev)
 	if (err < 0) {
 		dev_err(dpaux->dev, "failed to request IRQ#%u: %d\n",
 			dpaux->irq, err);
-		goto err_pm_disable;
+		return err;
 	}
 
 	disable_irq(dpaux->irq);
@@ -545,7 +544,7 @@ static int tegra_dpaux_probe(struct platform_device *pdev)
 	 */
 	err = tegra_dpaux_pad_config(dpaux, DPAUX_PADCTL_FUNC_I2C);
 	if (err < 0)
-		goto err_pm_disable;
+		return err;
 
 #ifdef CONFIG_GENERIC_PINCONF
 	dpaux->desc.name = dev_name(&pdev->dev);
@@ -558,8 +557,7 @@ static int tegra_dpaux_probe(struct platform_device *pdev)
 	dpaux->pinctrl = devm_pinctrl_register(&pdev->dev, &dpaux->desc, dpaux);
 	if (IS_ERR(dpaux->pinctrl)) {
 		dev_err(&pdev->dev, "failed to register pincontrol\n");
-		err = PTR_ERR(dpaux->pinctrl);
-		goto err_pm_disable;
+		return PTR_ERR(dpaux->pinctrl);
 	}
 #endif
 	/* enable and clear all interrupts */
@@ -572,18 +570,7 @@ static int tegra_dpaux_probe(struct platform_device *pdev)
 	list_add_tail(&dpaux->list, &dpaux_list);
 	mutex_unlock(&dpaux_lock);
 
-	err = devm_of_dp_aux_populate_ep_devices(&dpaux->aux);
-	if (err < 0) {
-		dev_err(dpaux->dev, "failed to populate AUX bus: %d\n", err);
-		goto err_pm_disable;
-	}
-
 	return 0;
-
-err_pm_disable:
-	pm_runtime_put_sync(&pdev->dev);
-	pm_runtime_disable(&pdev->dev);
-	return err;
 }
 
 static int tegra_dpaux_remove(struct platform_device *pdev)

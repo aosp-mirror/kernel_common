@@ -89,7 +89,6 @@ static int ttm_range_man_alloc(struct ttm_resource_manager *man,
 	spin_unlock(&rman->lock);
 
 	if (unlikely(ret)) {
-		ttm_resource_fini(man, *res);
 		kfree(node);
 		return ret;
 	}
@@ -109,7 +108,6 @@ static void ttm_range_man_free(struct ttm_resource_manager *man,
 	drm_mm_remove_node(&node->mm_nodes[0]);
 	spin_unlock(&rman->lock);
 
-	ttm_resource_fini(man, res);
 	kfree(node);
 }
 

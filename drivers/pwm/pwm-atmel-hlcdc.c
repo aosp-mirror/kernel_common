@@ -38,11 +38,11 @@ static inline struct atmel_hlcdc_pwm *to_atmel_hlcdc_pwm(struct pwm_chip *chip)
 	return container_of(chip, struct atmel_hlcdc_pwm, chip);
 }
 
-static int atmel_hlcdc_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+static int atmel_hlcdc_pwm_apply(struct pwm_chip *c, struct pwm_device *pwm,
 				 const struct pwm_state *state)
 {
-	struct atmel_hlcdc_pwm *atmel = to_atmel_hlcdc_pwm(chip);
-	struct atmel_hlcdc *hlcdc = atmel->hlcdc;
+	struct atmel_hlcdc_pwm *chip = to_atmel_hlcdc_pwm(c);
+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
 	unsigned int status;
 	int ret;
 
@@ -54,7 +54,7 @@ static int atmel_hlcdc_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		u32 pwmcfg;
 		int pres;
 
-		if (!atmel->errata || !atmel->errata->slow_clk_erratum) {
+		if (!chip->errata || !chip->errata->slow_clk_erratum) {
 			clk_freq = clk_get_rate(new_clk);
 			if (!clk_freq)
 				return -EINVAL;
@@ -64,7 +64,7 @@ static int atmel_hlcdc_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		}
 
 		/* Errata: cannot use slow clk on some IP revisions */
-		if ((atmel->errata && atmel->errata->slow_clk_erratum) ||
+		if ((chip->errata && chip->errata->slow_clk_erratum) ||
 		    clk_period_ns > state->period) {
 			new_clk = hlcdc->sys_clk;
 			clk_freq = clk_get_rate(new_clk);
@@ -77,8 +77,8 @@ static int atmel_hlcdc_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 		for (pres = 0; pres <= ATMEL_HLCDC_PWMPS_MAX; pres++) {
 		/* Errata: cannot divide by 1 on some IP revisions */
-			if (!pres && atmel->errata &&
-			    atmel->errata->div1_clk_erratum)
+			if (!pres && chip->errata &&
+			    chip->errata->div1_clk_erratum)
 				continue;
 
 			if ((clk_period_ns << pres) >= state->period)
@@ -90,7 +90,7 @@ static int atmel_hlcdc_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 		pwmcfg = ATMEL_HLCDC_PWMPS(pres);
 
-		if (new_clk != atmel->cur_clk) {
+		if (new_clk != chip->cur_clk) {
 			u32 gencfg = 0;
 			int ret;
 
@@ -98,8 +98,8 @@ static int atmel_hlcdc_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 			if (ret)
 				return ret;
 
-			clk_disable_unprepare(atmel->cur_clk);
-			atmel->cur_clk = new_clk;
+			clk_disable_unprepare(chip->cur_clk);
+			chip->cur_clk = new_clk;
 
 			if (new_clk == hlcdc->sys_clk)
 				gencfg = ATMEL_HLCDC_CLKPWMSEL;
@@ -160,8 +160,8 @@ static int atmel_hlcdc_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		if (ret)
 			return ret;
 
-		clk_disable_unprepare(atmel->cur_clk);
-		atmel->cur_clk = NULL;
+		clk_disable_unprepare(chip->cur_clk);
+		chip->cur_clk = NULL;
 	}
 
 	return 0;
@@ -183,32 +183,31 @@ static const struct atmel_hlcdc_pwm_errata atmel_hlcdc_pwm_sama5d3_errata = {
 #ifdef CONFIG_PM_SLEEP
 static int atmel_hlcdc_pwm_suspend(struct device *dev)
 {
-	struct atmel_hlcdc_pwm *atmel = dev_get_drvdata(dev);
+	struct atmel_hlcdc_pwm *chip = dev_get_drvdata(dev);
 
 	/* Keep the periph clock enabled if the PWM is still running. */
-	if (!pwm_is_enabled(&atmel->chip.pwms[0]))
-		clk_disable_unprepare(atmel->hlcdc->periph_clk);
+	if (pwm_is_enabled(&chip->chip.pwms[0]))
+		clk_disable_unprepare(chip->hlcdc->periph_clk);
 
 	return 0;
 }
 
 static int atmel_hlcdc_pwm_resume(struct device *dev)
 {
-	struct atmel_hlcdc_pwm *atmel = dev_get_drvdata(dev);
+	struct atmel_hlcdc_pwm *chip = dev_get_drvdata(dev);
 	struct pwm_state state;
 	int ret;
 
-	pwm_get_state(&atmel->chip.pwms[0], &state);
+	pwm_get_state(&chip->chip.pwms[0], &state);
 
 	/* Re-enable the periph clock it was stopped during suspend. */
 	if (!state.enabled) {
-		ret = clk_prepare_enable(atmel->hlcdc->periph_clk);
+		ret = clk_prepare_enable(chip->hlcdc->periph_clk);
 		if (ret)
 			return ret;
 	}
 
-	return atmel_hlcdc_pwm_apply(&atmel->chip, &atmel->chip.pwms[0],
-				     &state);
+	return atmel_hlcdc_pwm_apply(&chip->chip, &chip->chip.pwms[0], &state);
 }
 #endif
 
@@ -245,14 +244,14 @@ static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
 	struct device *dev = &pdev->dev;
-	struct atmel_hlcdc_pwm *atmel;
+	struct atmel_hlcdc_pwm *chip;
 	struct atmel_hlcdc *hlcdc;
 	int ret;
 
 	hlcdc = dev_get_drvdata(dev->parent);
 
-	atmel = devm_kzalloc(dev, sizeof(*atmel), GFP_KERNEL);
-	if (!atmel)
+	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
+	if (!chip)
 		return -ENOMEM;
 
 	ret = clk_prepare_enable(hlcdc->periph_clk);
@@ -261,31 +260,33 @@ static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
 
 	match = of_match_node(atmel_hlcdc_dt_ids, dev->parent->of_node);
 	if (match)
-		atmel->errata = match->data;
+		chip->errata = match->data;
 
-	atmel->hlcdc = hlcdc;
-	atmel->chip.ops = &atmel_hlcdc_pwm_ops;
-	atmel->chip.dev = dev;
-	atmel->chip.npwm = 1;
+	chip->hlcdc = hlcdc;
+	chip->chip.ops = &atmel_hlcdc_pwm_ops;
+	chip->chip.dev = dev;
+	chip->chip.npwm = 1;
 
-	ret = pwmchip_add(&atmel->chip);
+	ret = pwmchip_add(&chip->chip);
 	if (ret) {
 		clk_disable_unprepare(hlcdc->periph_clk);
 		return ret;
 	}
 
-	platform_set_drvdata(pdev, atmel);
+	platform_set_drvdata(pdev, chip);
 
 	return 0;
 }
 
-static void atmel_hlcdc_pwm_remove(struct platform_device *pdev)
+static int atmel_hlcdc_pwm_remove(struct platform_device *pdev)
 {
-	struct atmel_hlcdc_pwm *atmel = platform_get_drvdata(pdev);
+	struct atmel_hlcdc_pwm *chip = platform_get_drvdata(pdev);
 
-	pwmchip_remove(&atmel->chip);
+	pwmchip_remove(&chip->chip);
 
-	clk_disable_unprepare(atmel->hlcdc->periph_clk);
+	clk_disable_unprepare(chip->hlcdc->periph_clk);
+
+	return 0;
 }
 
 static const struct of_device_id atmel_hlcdc_pwm_dt_ids[] = {
@@ -300,7 +301,7 @@ static struct platform_driver atmel_hlcdc_pwm_driver = {
 		.pm = &atmel_hlcdc_pwm_pm_ops,
 	},
 	.probe = atmel_hlcdc_pwm_probe,
-	.remove_new = atmel_hlcdc_pwm_remove,
+	.remove = atmel_hlcdc_pwm_remove,
 };
 module_platform_driver(atmel_hlcdc_pwm_driver);
 

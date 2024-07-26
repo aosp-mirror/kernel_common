@@ -33,6 +33,7 @@ struct aiu_platform_data {
 };
 
 struct aiu {
+	struct clk *pclk;
 	struct clk *spdif_mclk;
 	struct aiu_interface i2s;
 	struct aiu_interface spdif;

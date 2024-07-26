@@ -1856,14 +1856,13 @@ static int am65_cpsw_nuss_init_slave_ports(struct am65_cpsw_common *common)
 		if (ret < 0) {
 			dev_err(dev, "%pOF error reading port_id %d\n",
 				port_np, ret);
-			goto of_node_put;
+			return ret;
 		}
 
 		if (!port_id || port_id > common->port_num) {
 			dev_err(dev, "%pOF has invalid port_id %u %s\n",
 				port_np, port_id, port_np->name);
-			ret = -EINVAL;
-			goto of_node_put;
+			return -EINVAL;
 		}
 
 		port = am65_common_get_port(common, port_id);
@@ -1879,10 +1878,8 @@ static int am65_cpsw_nuss_init_slave_ports(struct am65_cpsw_common *common)
 				(AM65_CPSW_NU_FRAM_PORT_OFFSET * (port_id - 1));
 
 		port->slave.mac_sl = cpsw_sl_get("am65", dev, port->port_base);
-		if (IS_ERR(port->slave.mac_sl)) {
-			ret = PTR_ERR(port->slave.mac_sl);
-			goto of_node_put;
-		}
+		if (IS_ERR(port->slave.mac_sl))
+			return PTR_ERR(port->slave.mac_sl);
 
 		port->disabled = !of_device_is_available(port_np);
 		if (port->disabled) {
@@ -1895,7 +1892,7 @@ static int am65_cpsw_nuss_init_slave_ports(struct am65_cpsw_common *common)
 			ret = PTR_ERR(port->slave.ifphy);
 			dev_err(dev, "%pOF error retrieving port phy: %d\n",
 				port_np, ret);
-			goto of_node_put;
+			return ret;
 		}
 
 		port->slave.mac_only =
@@ -1904,12 +1901,10 @@ static int am65_cpsw_nuss_init_slave_ports(struct am65_cpsw_common *common)
 		/* get phy/link info */
 		if (of_phy_is_fixed_link(port_np)) {
 			ret = of_phy_register_fixed_link(port_np);
-			if (ret) {
-				ret = dev_err_probe(dev, ret,
+			if (ret)
+				return dev_err_probe(dev, ret,
 						     "failed to register fixed-link phy %pOF\n",
 						     port_np);
-				goto of_node_put;
-			}
 			port->slave.phy_node = of_node_get(port_np);
 		} else {
 			port->slave.phy_node =
@@ -1919,15 +1914,14 @@ static int am65_cpsw_nuss_init_slave_ports(struct am65_cpsw_common *common)
 		if (!port->slave.phy_node) {
 			dev_err(dev,
 				"slave[%d] no phy found\n", port_id);
-			ret = -ENODEV;
-			goto of_node_put;
+			return -ENODEV;
 		}
 
 		ret = of_get_phy_mode(port_np, &port->slave.phy_if);
 		if (ret) {
 			dev_err(dev, "%pOF read phy-mode err %d\n",
 				port_np, ret);
-			goto of_node_put;
+			return ret;
 		}
 
 		ret = of_get_mac_address(port_np, port->slave.mac_addr);
@@ -1950,11 +1944,6 @@ static int am65_cpsw_nuss_init_slave_ports(struct am65_cpsw_common *common)
 	}
 
 	return 0;
-
-of_node_put:
-	of_node_put(port_np);
-	of_node_put(node);
-	return ret;
 }
 
 static void am65_cpsw_pcpu_stats_free(void *data)

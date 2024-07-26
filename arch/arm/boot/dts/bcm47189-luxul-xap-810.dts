@@ -26,6 +26,7 @@
 		5ghz {
 			label = "bcm53xx:blue:5ghz";
 			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-off";
 		};
 
 		system {
@@ -41,6 +42,7 @@
 		2ghz {
 			label = "bcm53xx:blue:2ghz";
 			gpios = <&pcie0_chipcommon 3 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-off";
 		};
 	};
 

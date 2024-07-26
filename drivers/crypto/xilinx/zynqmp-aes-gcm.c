@@ -231,10 +231,7 @@ static int zynqmp_handle_aes_req(struct crypto_engine *engine,
 		err = zynqmp_aes_aead_cipher(areq);
 	}
 
-	local_bh_disable();
 	crypto_finalize_aead_request(engine, areq, err);
-	local_bh_enable();
-
 	return 0;
 }
 

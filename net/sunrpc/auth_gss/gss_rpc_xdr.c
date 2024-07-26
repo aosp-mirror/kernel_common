@@ -250,8 +250,8 @@ static int gssx_dec_option_array(struct xdr_stream *xdr,
 
 	creds = kzalloc(sizeof(struct svc_cred), GFP_KERNEL);
 	if (!creds) {
-		err = -ENOMEM;
-		goto free_oa;
+		kfree(oa->data);
+		return -ENOMEM;
 	}
 
 	oa->data[0].option.data = CREDS_VALUE;
@@ -265,40 +265,29 @@ static int gssx_dec_option_array(struct xdr_stream *xdr,
 
 		/* option buffer */
 		p = xdr_inline_decode(xdr, 4);
-		if (unlikely(p == NULL)) {
-			err = -ENOSPC;
-			goto free_creds;
-		}
+		if (unlikely(p == NULL))
+			return -ENOSPC;
 
 		length = be32_to_cpup(p);
 		p = xdr_inline_decode(xdr, length);
-		if (unlikely(p == NULL)) {
-			err = -ENOSPC;
-			goto free_creds;
-		}
+		if (unlikely(p == NULL))
+			return -ENOSPC;
 
 		if (length == sizeof(CREDS_VALUE) &&
 		    memcmp(p, CREDS_VALUE, sizeof(CREDS_VALUE)) == 0) {
 			/* We have creds here. parse them */
 			err = gssx_dec_linux_creds(xdr, creds);
 			if (err)
-				goto free_creds;
+				return err;
 			oa->data[0].value.len = 1; /* presence */
 		} else {
 			/* consume uninteresting buffer */
 			err = gssx_dec_buffer(xdr, &dummy);
 			if (err)
-				goto free_creds;
+				return err;
 		}
 	}
 	return 0;
-
-free_creds:
-	kfree(creds);
-free_oa:
-	kfree(oa->data);
-	oa->data = NULL;
-	return err;
 }
 
 static int gssx_dec_status(struct xdr_stream *xdr,

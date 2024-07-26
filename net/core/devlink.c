@@ -9055,10 +9055,7 @@ EXPORT_SYMBOL_GPL(devlink_free);
 
 static void devlink_port_type_warn(struct work_struct *work)
 {
-	struct devlink_port *port = container_of(to_delayed_work(work),
-						 struct devlink_port,
-						 type_warn_dw);
-	dev_warn(port->devlink->dev, "Type was not set for devlink port.");
+	WARN(true, "Type was not set for devlink port.");
 }
 
 static bool devlink_port_type_should_warn(struct devlink_port *devlink_port)

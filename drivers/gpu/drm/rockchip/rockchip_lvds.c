@@ -572,7 +572,8 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
 		ret = -EINVAL;
 		goto err_put_port;
 	} else if (ret) {
-		dev_err_probe(dev, ret, "failed to find panel and bridge node\n");
+		DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
+		ret = -EPROBE_DEFER;
 		goto err_put_port;
 	}
 	if (lvds->panel)

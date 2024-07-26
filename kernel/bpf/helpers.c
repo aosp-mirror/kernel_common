@@ -298,7 +298,7 @@ static inline void __bpf_spin_lock_irqsave(struct bpf_spin_lock *lock)
 	__this_cpu_write(irqsave_flags, flags);
 }
 
-NOTRACE_BPF_CALL_1(bpf_spin_lock, struct bpf_spin_lock *, lock)
+notrace BPF_CALL_1(bpf_spin_lock, struct bpf_spin_lock *, lock)
 {
 	__bpf_spin_lock_irqsave(lock);
 	return 0;
@@ -320,7 +320,7 @@ static inline void __bpf_spin_unlock_irqrestore(struct bpf_spin_lock *lock)
 	local_irq_restore(flags);
 }
 
-NOTRACE_BPF_CALL_1(bpf_spin_unlock, struct bpf_spin_lock *, lock)
+notrace BPF_CALL_1(bpf_spin_unlock, struct bpf_spin_lock *, lock)
 {
 	__bpf_spin_unlock_irqrestore(lock);
 	return 0;
@@ -710,20 +710,19 @@ static int bpf_trace_copy_string(char *buf, void *unsafe_ptr, char fmt_ptype,
 /* Per-cpu temp buffers used by printf-like helpers to store the bprintf binary
  * arguments representation.
  */
-#define MAX_BPRINTF_BIN_ARGS	512
+#define MAX_BPRINTF_BUF_LEN	512
 
 /* Support executing three nested bprintf helper calls on a given CPU */
 #define MAX_BPRINTF_NEST_LEVEL	3
 struct bpf_bprintf_buffers {
-	char bin_args[MAX_BPRINTF_BIN_ARGS];
-	char buf[MAX_BPRINTF_BUF];
+	char tmp_bufs[MAX_BPRINTF_NEST_LEVEL][MAX_BPRINTF_BUF_LEN];
 };
-
-static DEFINE_PER_CPU(struct bpf_bprintf_buffers[MAX_BPRINTF_NEST_LEVEL], bpf_bprintf_bufs);
+static DEFINE_PER_CPU(struct bpf_bprintf_buffers, bpf_bprintf_bufs);
 static DEFINE_PER_CPU(int, bpf_bprintf_nest_level);
 
-static int try_get_buffers(struct bpf_bprintf_buffers **bufs)
+static int try_get_fmt_tmp_buf(char **tmp_buf)
 {
+	struct bpf_bprintf_buffers *bufs;
 	int nest_level;
 
 	preempt_disable();
@@ -733,19 +732,18 @@ static int try_get_buffers(struct bpf_bprintf_buffers **bufs)
 		preempt_enable();
 		return -EBUSY;
 	}
-	*bufs = this_cpu_ptr(&bpf_bprintf_bufs[nest_level - 1]);
+	bufs = this_cpu_ptr(&bpf_bprintf_bufs);
+	*tmp_buf = bufs->tmp_bufs[nest_level - 1];
 
 	return 0;
 }
 
-void bpf_bprintf_cleanup(struct bpf_bprintf_data *data)
+void bpf_bprintf_cleanup(void)
 {
-	if (!data->bin_args && !data->buf)
-		return;
-	if (WARN_ON_ONCE(this_cpu_read(bpf_bprintf_nest_level) == 0))
-		return;
-	this_cpu_dec(bpf_bprintf_nest_level);
-	preempt_enable();
+	if (this_cpu_read(bpf_bprintf_nest_level)) {
+		this_cpu_dec(bpf_bprintf_nest_level);
+		preempt_enable();
+	}
 }
 
 /*
@@ -754,20 +752,18 @@ void bpf_bprintf_cleanup(struct bpf_bprintf_data *data)
  * Returns a negative value if fmt is an invalid format string or 0 otherwise.
  *
  * This can be used in two ways:
- * - Format string verification only: when data->get_bin_args is false
+ * - Format string verification only: when bin_args is NULL
  * - Arguments preparation: in addition to the above verification, it writes in
- *   data->bin_args a binary representation of arguments usable by bstr_printf
- *   where pointers from BPF have been sanitized.
+ *   bin_args a binary representation of arguments usable by bstr_printf where
+ *   pointers from BPF have been sanitized.
  *
  * In argument preparation mode, if 0 is returned, safe temporary buffers are
  * allocated and bpf_bprintf_cleanup should be called to free them after use.
  */
 int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
-			u32 num_args, struct bpf_bprintf_data *data)
+			u32 **bin_args, u32 num_args)
 {
-	bool get_buffers = (data->get_bin_args && num_args) || data->get_buf;
 	char *unsafe_ptr = NULL, *tmp_buf = NULL, *tmp_buf_end, *fmt_end;
-	struct bpf_bprintf_buffers *buffers = NULL;
 	size_t sizeof_cur_arg, sizeof_cur_ip;
 	int err, i, num_spec = 0;
 	u64 cur_arg;
@@ -778,18 +774,13 @@ int bpf_bprintf_prepare(char *fmt, u32 fmt_size, const u64 *raw_args,
 		return -EINVAL;
 	fmt_size = fmt_end - fmt;
 
-	if (get_buffers && try_get_buffers(&buffers))
-		return -EBUSY;
+	if (bin_args) {
+		if (num_args && try_get_fmt_tmp_buf(&tmp_buf))
+			return -EBUSY;
 
-	if (data->get_bin_args) {
-		if (num_args)
-			tmp_buf = buffers->bin_args;
-		tmp_buf_end = tmp_buf + MAX_BPRINTF_BIN_ARGS;
-		data->bin_args = (u32 *)tmp_buf;
+		tmp_buf_end = tmp_buf + MAX_BPRINTF_BUF_LEN;
+		*bin_args = (u32 *)tmp_buf;
 	}
-
-	if (data->get_buf)
-		data->buf = buffers->buf;
 
 	for (i = 0; i < fmt_size; i++) {
 		if ((!isprint(fmt[i]) && !isspace(fmt[i])) || !isascii(fmt[i])) {
@@ -984,33 +975,33 @@ nocopy_fmt:
 	err = 0;
 out:
 	if (err)
-		bpf_bprintf_cleanup(data);
+		bpf_bprintf_cleanup();
 	return err;
 }
 
-BPF_CALL_5(bpf_snprintf, char *, str, u32, str_size, char *, fmt,
-	   const void *, args, u32, data_len)
-{
-	struct bpf_bprintf_data data = {
-		.get_bin_args	= true,
-	};
-	int err, num_args;
+#define MAX_SNPRINTF_VARARGS		12
 
-	if (data_len % 8 || data_len > MAX_BPRINTF_VARARGS * 8 ||
-	    (data_len && !args))
+BPF_CALL_5(bpf_snprintf, char *, str, u32, str_size, char *, fmt,
+	   const void *, data, u32, data_len)
+{
+	int err, num_args;
+	u32 *bin_args;
+
+	if (data_len % 8 || data_len > MAX_SNPRINTF_VARARGS * 8 ||
+	    (data_len && !data))
 		return -EINVAL;
 	num_args = data_len / 8;
 
 	/* ARG_PTR_TO_CONST_STR guarantees that fmt is zero-terminated so we
 	 * can safely give an unbounded size.
 	 */
-	err = bpf_bprintf_prepare(fmt, UINT_MAX, args, num_args, &data);
+	err = bpf_bprintf_prepare(fmt, UINT_MAX, data, &bin_args, num_args);
 	if (err < 0)
 		return err;
 
-	err = bstr_printf(str, str_size, fmt, data.bin_args);
+	err = bstr_printf(str, str_size, fmt, bin_args);
 
-	bpf_bprintf_cleanup(&data);
+	bpf_bprintf_cleanup();
 
 	return err + 1;
 }
@@ -1048,7 +1039,6 @@ struct bpf_hrtimer {
 	struct bpf_prog *prog;
 	void __rcu *callback_fn;
 	void *value;
-	struct rcu_head rcu;
 };
 
 /* the actual struct hidden inside uapi struct bpf_timer */
@@ -1270,7 +1260,6 @@ BPF_CALL_1(bpf_timer_cancel, struct bpf_timer_kern *, timer)
 
 	if (in_nmi())
 		return -EOPNOTSUPP;
-	rcu_read_lock();
 	__bpf_spin_lock_irqsave(&timer->lock);
 	t = timer->timer;
 	if (!t) {
@@ -1292,7 +1281,6 @@ out:
 	 * if it was running.
 	 */
 	ret = ret ?: hrtimer_cancel(&t->timer);
-	rcu_read_unlock();
 	return ret;
 }
 
@@ -1347,7 +1335,7 @@ out:
 	 */
 	if (this_cpu_read(hrtimer_running) != t)
 		hrtimer_cancel(&t->timer);
-	kfree_rcu(t, rcu);
+	kfree(t);
 }
 
 const struct bpf_func_proto bpf_get_current_task_proto __weak;

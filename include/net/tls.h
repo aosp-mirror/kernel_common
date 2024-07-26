@@ -120,6 +120,11 @@ struct tls_rec {
 	u8 aead_req_ctx[];
 };
 
+struct tls_msg {
+	struct strp_msg rxm;
+	u8 control;
+};
+
 struct tx_work {
 	struct delayed_work work;
 	struct sock *sk;
@@ -152,7 +157,9 @@ struct tls_sw_context_rx {
 	void (*saved_data_ready)(struct sock *sk);
 
 	struct sk_buff *recv_pkt;
+	u8 control;
 	u8 async_capable:1;
+	u8 decrypted:1;
 	atomic_t decrypt_pending;
 	/* protect crypto_wait with decrypt_pending*/
 	spinlock_t decrypt_compl_lock;
@@ -417,9 +424,7 @@ void tls_free_partial_record(struct sock *sk, struct tls_context *ctx);
 
 static inline struct tls_msg *tls_msg(struct sk_buff *skb)
 {
-	struct sk_skb_cb *scb = (struct sk_skb_cb *)skb->cb;
-
-	return &scb->tls;
+	return (struct tls_msg *)strp_msg(skb);
 }
 
 static inline bool tls_is_partially_sent_record(struct tls_context *ctx)

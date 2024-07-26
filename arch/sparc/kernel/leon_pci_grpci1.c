@@ -696,7 +696,7 @@ err1:
 	return err;
 }
 
-static const struct of_device_id grpci1_of_match[] = {
+static const struct of_device_id grpci1_of_match[] __initconst = {
 	{
 	 .name = "GAISLER_PCIFBRG",
 	 },

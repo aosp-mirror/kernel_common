@@ -80,7 +80,7 @@ static int go7007_load_encoder(struct go7007 *go)
 	const struct firmware *fw_entry;
 	char fw_name[] = "go7007/go7007fw.bin";
 	void *bounce;
-	int fw_len;
+	int fw_len, rv = 0;
 	u16 intr_val, intr_data;
 
 	if (go->boot_fw == NULL) {
@@ -109,11 +109,9 @@ static int go7007_load_encoder(struct go7007 *go)
 	    go7007_read_interrupt(go, &intr_val, &intr_data) < 0 ||
 			(intr_val & ~0x1) != 0x5a5a) {
 		v4l2_err(go, "error transferring firmware\n");
-		kfree(go->boot_fw);
-		go->boot_fw = NULL;
-		return -1;
+		rv = -1;
 	}
-	return 0;
+	return rv;
 }
 
 MODULE_FIRMWARE("go7007/go7007fw.bin");
