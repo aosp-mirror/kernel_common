@@ -2089,7 +2089,7 @@ int init_credit_return(struct hfi1_devdata *dd)
 				   "Unable to allocate credit return DMA range for NUMA %d\n",
 				   i);
 			ret = -ENOMEM;
-			goto free_cr_base;
+			goto done;
 		}
 	}
 	set_dev_node(&dd->pcidev->dev, dd->node);
@@ -2097,10 +2097,6 @@ int init_credit_return(struct hfi1_devdata *dd)
 	ret = 0;
 done:
 	return ret;
-
-free_cr_base:
-	free_credit_return(dd);
-	goto done;
 }
 
 void free_credit_return(struct hfi1_devdata *dd)

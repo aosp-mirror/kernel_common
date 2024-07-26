@@ -579,13 +579,13 @@ static int media_pipeline_explore_next_link(struct media_pipeline *pipe,
 					    struct media_pipeline_walk *walk)
 {
 	struct media_pipeline_walk_entry *entry = media_pipeline_walk_top(walk);
-	struct media_pad *origin;
+	struct media_pad *pad;
 	struct media_link *link;
 	struct media_pad *local;
 	struct media_pad *remote;
 	int ret;
 
-	origin = entry->pad;
+	pad = entry->pad;
 	link = list_entry(entry->links, typeof(*link), list);
 	media_pipeline_walk_pop(walk);
 
@@ -594,8 +594,15 @@ static int media_pipeline_explore_next_link(struct media_pipeline *pipe,
 		link->source->entity->name, link->source->index,
 		link->sink->entity->name, link->sink->index);
 
+	/* Skip links that are not enabled. */
+	if (!(link->flags & MEDIA_LNK_FL_ENABLED)) {
+		dev_dbg(walk->mdev->dev,
+			"media pipeline: skipping link (disabled)\n");
+		return 0;
+	}
+
 	/* Get the local pad and remote pad. */
-	if (link->source->entity == origin->entity) {
+	if (link->source->entity == pad->entity) {
 		local = link->source;
 		remote = link->sink;
 	} else {
@@ -607,28 +614,20 @@ static int media_pipeline_explore_next_link(struct media_pipeline *pipe,
 	 * Skip links that originate from a different pad than the incoming pad
 	 * that is not connected internally in the entity to the incoming pad.
 	 */
-	if (origin != local &&
-	    !media_entity_has_pad_interdep(origin->entity, origin->index,
-					   local->index)) {
+	if (pad != local &&
+	    !media_entity_has_pad_interdep(pad->entity, pad->index, local->index)) {
 		dev_dbg(walk->mdev->dev,
 			"media pipeline: skipping link (no route)\n");
 		return 0;
 	}
 
 	/*
-	 * Add the local pad of the link to the pipeline and push it to the
-	 * stack, if not already present.
+	 * Add the local and remote pads of the link to the pipeline and push
+	 * them to the stack, if they're not already present.
 	 */
 	ret = media_pipeline_add_pad(pipe, walk, local);
 	if (ret)
 		return ret;
-
-	/* Similarly, add the remote pad, but only if the link is enabled. */
-	if (!(link->flags & MEDIA_LNK_FL_ENABLED)) {
-		dev_dbg(walk->mdev->dev,
-			"media pipeline: skipping link (disabled)\n");
-		return 0;
-	}
 
 	ret = media_pipeline_add_pad(pipe, walk, remote);
 	if (ret)
@@ -1018,11 +1017,6 @@ media_create_pad_link(struct media_entity *source, u16 source_pad,
 	struct media_link *link;
 	struct media_link *backlink;
 
-	if (flags & MEDIA_LNK_FL_LINK_TYPE)
-		return -EINVAL;
-
-	flags |= MEDIA_LNK_FL_DATA_LINK;
-
 	if (WARN_ON(!source || !sink) ||
 	    WARN_ON(source_pad >= source->num_pads) ||
 	    WARN_ON(sink_pad >= sink->num_pads))
@@ -1038,7 +1032,7 @@ media_create_pad_link(struct media_entity *source, u16 source_pad,
 
 	link->source = &source->pads[source_pad];
 	link->sink = &sink->pads[sink_pad];
-	link->flags = flags;
+	link->flags = flags & ~MEDIA_LNK_FL_INTERFACE_LINK;
 
 	/* Initialize graph object embedded at the new link */
 	media_gobj_create(source->graph_obj.mdev, MEDIA_GRAPH_LINK,

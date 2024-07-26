@@ -56,7 +56,7 @@ __chk_nr()
 			echo "[ skip ] Feature probably not supported"
 		else
 			echo "[ fail ] expected $expected found $nr"
-			ret=${KSFT_FAIL}
+			ret=$test_cnt
 		fi
 	else
 		echo "[  ok  ]"
@@ -100,10 +100,10 @@ wait_msk_nr()
 	printf "%-50s" "$msg"
 	if [ $i -ge $timeout ]; then
 		echo "[ fail ] timeout while expecting $expected max $max last $nr"
-		ret=${KSFT_FAIL}
+		ret=$test_cnt
 	elif [ $nr != $expected ]; then
 		echo "[ fail ] expected $expected found $nr"
-		ret=${KSFT_FAIL}
+		ret=$test_cnt
 	else
 		echo "[  ok  ]"
 	fi

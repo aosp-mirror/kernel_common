@@ -896,6 +896,10 @@
 			google,usb-port-id = <0>;
 		};
 
+		cbas {
+			compatible = "google,cros-cbas";
+		};
+
 		typec {
 			compatible = "google,cros-ec-typec";
 			#address-cells = <1>;
@@ -995,4 +999,5 @@
 	};
 };
 
+#include <arm/cros-ec-keyboard.dtsi>
 #include <arm/cros-ec-sbs.dtsi>

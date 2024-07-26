@@ -49,7 +49,6 @@
 #include <linux/refcount.h>
 #include <linux/irqdomain.h>
 #include <linux/acpi.h>
-#include <linux/sizes.h>
 #include <asm/mshyperv.h>
 
 /*
@@ -466,7 +465,7 @@ struct pci_eject_response {
 	u32 status;
 } __packed;
 
-static int pci_ring_size = VMBUS_RING_SIZE(SZ_16K);
+static int pci_ring_size = (4 * PAGE_SIZE);
 
 /*
  * Driver specific state.

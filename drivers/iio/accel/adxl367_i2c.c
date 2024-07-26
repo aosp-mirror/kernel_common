@@ -11,7 +11,7 @@
 
 #include "adxl367.h"
 
-#define ADXL367_I2C_FIFO_DATA	0x18
+#define ADXL367_I2C_FIFO_DATA	0x42
 
 struct adxl367_i2c_state {
 	struct regmap *regmap;

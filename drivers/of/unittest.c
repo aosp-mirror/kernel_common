@@ -49,12 +49,6 @@ static struct unittest_results {
 	failed; \
 })
 
-#ifdef CONFIG_OF_KOBJ
-#define OF_KREF_READ(NODE) kref_read(&(NODE)->kobj.kref)
-#else
-#define OF_KREF_READ(NODE) 1
-#endif
-
 /*
  * Expected message may have a message level other than KERN_INFO.
  * Print the expected message only if the current loglevel will allow
@@ -568,7 +562,7 @@ static void __init of_unittest_parse_phandle_with_args_map(void)
 			pr_err("missing testcase data\n");
 			return;
 		}
-		prefs[i] = OF_KREF_READ(p[i]);
+		prefs[i] = kref_read(&p[i]->kobj.kref);
 	}
 
 	rc = of_count_phandle_with_args(np, "phandle-list", "#phandle-cells");
@@ -691,9 +685,9 @@ static void __init of_unittest_parse_phandle_with_args_map(void)
 	unittest(rc == -EINVAL, "expected:%i got:%i\n", -EINVAL, rc);
 
 	for (i = 0; i < ARRAY_SIZE(p); ++i) {
-		unittest(prefs[i] == OF_KREF_READ(p[i]),
+		unittest(prefs[i] == kref_read(&p[i]->kobj.kref),
 			 "provider%d: expected:%d got:%d\n",
-			 i, prefs[i], OF_KREF_READ(p[i]));
+			 i, prefs[i], kref_read(&p[i]->kobj.kref));
 		of_node_put(p[i]);
 	}
 }

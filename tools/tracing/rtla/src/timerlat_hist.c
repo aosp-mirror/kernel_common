@@ -151,7 +151,8 @@ timerlat_hist_update(struct osnoise_tool *tool, int cpu,
 	if (params->output_divisor)
 		latency = latency / params->output_divisor;
 
-	bucket = latency / data->bucket_size;
+	if (data->bucket_size)
+		bucket = latency / data->bucket_size;
 
 	if (!thread) {
 		hist = data->hist[cpu].irq;
@@ -474,11 +475,7 @@ static void timerlat_hist_usage(char *usage)
 
 	for (i = 0; msg[i]; i++)
 		fprintf(stderr, "%s\n", msg[i]);
-
-	if (usage)
-		exit(EXIT_FAILURE);
-
-	exit(EXIT_SUCCESS);
+	exit(1);
 }
 
 /*

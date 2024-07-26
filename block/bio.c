@@ -1115,16 +1115,19 @@ void __bio_release_pages(struct bio *bio, bool mark_dirty)
 	struct folio_iter fi;
 
 	bio_for_each_folio_all(fi, bio) {
-		size_t nr_pages;
+		struct page *page;
+		size_t done = 0;
 
 		if (mark_dirty) {
 			folio_lock(fi.folio);
 			folio_mark_dirty(fi.folio);
 			folio_unlock(fi.folio);
 		}
-		nr_pages = (fi.offset + fi.length - 1) / PAGE_SIZE -
-			   fi.offset / PAGE_SIZE + 1;
-		folio_put_refs(fi.folio, nr_pages);
+		page = folio_page(fi.folio, fi.offset / PAGE_SIZE);
+		do {
+			folio_put(fi.folio);
+			done += PAGE_SIZE;
+		} while (done < fi.length);
 	}
 }
 EXPORT_SYMBOL_GPL(__bio_release_pages);

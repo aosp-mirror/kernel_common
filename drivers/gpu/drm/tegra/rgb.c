@@ -214,28 +214,26 @@ int tegra_dc_rgb_probe(struct tegra_dc *dc)
 	rgb->clk = devm_clk_get(dc->dev, NULL);
 	if (IS_ERR(rgb->clk)) {
 		dev_err(dc->dev, "failed to get clock\n");
-		err = PTR_ERR(rgb->clk);
-		goto remove;
+		return PTR_ERR(rgb->clk);
 	}
 
 	rgb->clk_parent = devm_clk_get(dc->dev, "parent");
 	if (IS_ERR(rgb->clk_parent)) {
 		dev_err(dc->dev, "failed to get parent clock\n");
-		err = PTR_ERR(rgb->clk_parent);
-		goto remove;
+		return PTR_ERR(rgb->clk_parent);
 	}
 
 	err = clk_set_parent(rgb->clk, rgb->clk_parent);
 	if (err < 0) {
 		dev_err(dc->dev, "failed to set parent clock: %d\n", err);
-		goto remove;
+		return err;
 	}
 
 	rgb->pll_d_out0 = clk_get_sys(NULL, "pll_d_out0");
 	if (IS_ERR(rgb->pll_d_out0)) {
 		err = PTR_ERR(rgb->pll_d_out0);
 		dev_err(dc->dev, "failed to get pll_d_out0: %d\n", err);
-		goto remove;
+		return err;
 	}
 
 	if (dc->soc->has_pll_d2_out0) {
@@ -243,19 +241,13 @@ int tegra_dc_rgb_probe(struct tegra_dc *dc)
 		if (IS_ERR(rgb->pll_d2_out0)) {
 			err = PTR_ERR(rgb->pll_d2_out0);
 			dev_err(dc->dev, "failed to get pll_d2_out0: %d\n", err);
-			goto put_pll;
+			return err;
 		}
 	}
 
 	dc->rgb = &rgb->output;
 
 	return 0;
-
-put_pll:
-	clk_put(rgb->pll_d_out0);
-remove:
-	tegra_output_remove(&rgb->output);
-	return err;
 }
 
 int tegra_dc_rgb_remove(struct tegra_dc *dc)

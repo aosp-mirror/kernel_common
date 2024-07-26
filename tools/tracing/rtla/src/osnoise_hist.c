@@ -129,7 +129,8 @@ static void osnoise_hist_update_multiple(struct osnoise_tool *tool, int cpu,
 	if (params->output_divisor)
 		duration = duration / params->output_divisor;
 
-	bucket = duration / data->bucket_size;
+	if (data->bucket_size)
+		bucket = duration / data->bucket_size;
 
 	total_duration = duration * count;
 
@@ -471,11 +472,7 @@ static void osnoise_hist_usage(char *usage)
 
 	for (i = 0; msg[i]; i++)
 		fprintf(stderr, "%s\n", msg[i]);
-
-	if (usage)
-		exit(EXIT_FAILURE);
-
-	exit(EXIT_SUCCESS);
+	exit(1);
 }
 
 /*

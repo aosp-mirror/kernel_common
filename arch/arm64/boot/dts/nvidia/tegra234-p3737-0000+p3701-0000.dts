@@ -2024,7 +2024,7 @@
 			status = "okay";
 
 			phy-handle = <&mgbe0_phy>;
-			phy-mode = "10gbase-r";
+			phy-mode = "usxgmii";
 
 			mdio {
 				#address-cells = <1>;

@@ -74,7 +74,7 @@
 		  ##__VA_ARGS__)
 
 #define WARN_ENTRY(insn, flags, label, ...)		\
-	asm goto(					\
+	asm_volatile_goto(				\
 		"1:	" insn "\n"			\
 		EX_TABLE(1b, %l[label])			\
 		_EMIT_BUG_ENTRY				\

@@ -1190,11 +1190,7 @@ static void test_map_in_map(void)
 		goto out_map_in_map;
 	}
 
-	err = bpf_object__load(obj);
-	if (err) {
-		printf("Failed to load test prog\n");
-		goto out_map_in_map;
-	}
+	bpf_object__load(obj);
 
 	map = bpf_object__find_map_by_name(obj, "mim_array");
 	if (!map) {

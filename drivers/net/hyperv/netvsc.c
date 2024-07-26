@@ -740,10 +740,7 @@ void netvsc_device_remove(struct hv_device *device)
 	/* Disable NAPI and disassociate its context from the device. */
 	for (i = 0; i < net_device->num_chn; i++) {
 		/* See also vmbus_reset_channel_cb(). */
-		/* only disable enabled NAPI channel */
-		if (i < ndev->real_num_rx_queues)
-			napi_disable(&net_device->chan_table[i].napi);
-
+		napi_disable(&net_device->chan_table[i].napi);
 		netif_napi_del(&net_device->chan_table[i].napi);
 	}
 

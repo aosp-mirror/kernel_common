@@ -133,6 +133,7 @@
 
 			odmi: odmi@300000 {
 				compatible = "marvell,odmi-controller";
+				interrupt-controller;
 				msi-controller;
 				marvell,odmi-frames = <4>;
 				reg = <0x300000 0x4000>,

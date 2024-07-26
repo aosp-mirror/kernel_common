@@ -207,24 +207,19 @@ EXPORT_SYMBOL(drm_panel_disable);
  * The modes probed from the panel are automatically added to the connector
  * that the panel is attached to.
  *
- * Return: The number of modes available from the panel on success, or 0 on
- * failure (no modes).
+ * Return: The number of modes available from the panel on success or a
+ * negative error code on failure.
  */
 int drm_panel_get_modes(struct drm_panel *panel,
 			struct drm_connector *connector)
 {
 	if (!panel)
-		return 0;
+		return -EINVAL;
 
-	if (panel->funcs && panel->funcs->get_modes) {
-		int num;
+	if (panel->funcs && panel->funcs->get_modes)
+		return panel->funcs->get_modes(panel, connector);
 
-		num = panel->funcs->get_modes(panel, connector);
-		if (num > 0)
-			return num;
-	}
-
-	return 0;
+	return -EOPNOTSUPP;
 }
 EXPORT_SYMBOL(drm_panel_get_modes);
 

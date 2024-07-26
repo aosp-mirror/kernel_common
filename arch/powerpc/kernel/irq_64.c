@@ -230,7 +230,7 @@ again:
 	 * This allows interrupts to be unmasked without hard disabling, and
 	 * also without new hard interrupts coming in ahead of pending ones.
 	 */
-	asm goto(
+	asm_volatile_goto(
 "1:					\n"
 "		lbz	9,%0(13)	\n"
 "		cmpwi	9,0		\n"

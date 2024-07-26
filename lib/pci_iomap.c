@@ -170,8 +170,8 @@ void pci_iounmap(struct pci_dev *dev, void __iomem *p)
 
 	if (addr >= start && addr < start + IO_SPACE_LIMIT)
 		return;
-#endif
 	iounmap(p);
+#endif
 }
 EXPORT_SYMBOL(pci_iounmap);
 

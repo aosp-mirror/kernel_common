@@ -427,17 +427,10 @@ unmask:
 						  server->conn_id, server->hostname);
 	}
 smbd_done:
-	/*
-	 * there's hardly any use for the layers above to know the
-	 * actual error code here. All they should do at this point is
-	 * to retry the connection and hope it goes away.
-	 */
-	if (rc < 0 && rc != -EINTR && rc != -EAGAIN) {
+	if (rc < 0 && rc != -EINTR)
 		cifs_server_dbg(VFS, "Error %d sending data on socket to server\n",
 			 rc);
-		rc = -ECONNABORTED;
-		cifs_signal_cifsd_for_reconnect(server, false);
-	} else if (rc > 0)
+	else if (rc > 0)
 		rc = 0;
 out:
 	cifs_in_send_dec(server);
@@ -456,8 +449,8 @@ smb_send_rqst(struct TCP_Server_Info *server, int num_rqst,
 	if (!(flags & CIFS_TRANSFORM_REQ))
 		return __smb_send_rqst(server, num_rqst, rqst);
 
-	if (WARN_ON_ONCE(num_rqst > MAX_COMPOUND - 1))
-		return -EIO;
+	if (num_rqst > MAX_COMPOUND - 1)
+		return -ENOMEM;
 
 	if (!server->ops->init_transform_rq) {
 		cifs_server_dbg(VFS, "Encryption requested but transform callback is missing\n");

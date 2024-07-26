@@ -20,9 +20,6 @@ static int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
 	u32 flags = 0;
 	int err;
 
-	if (inet_sk_state_load(sk) == TCP_LISTEN)
-		return 0;
-
 	start = nla_nest_start_noflag(skb, INET_ULP_INFO_MPTCP);
 	if (!start)
 		return -EMSGSIZE;
@@ -66,7 +63,7 @@ static int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
 			sf->map_data_len) ||
 	    nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_FLAGS, flags) ||
 	    nla_put_u8(skb, MPTCP_SUBFLOW_ATTR_ID_REM, sf->remote_id) ||
-	    nla_put_u8(skb, MPTCP_SUBFLOW_ATTR_ID_LOC, subflow_get_local_id(sf))) {
+	    nla_put_u8(skb, MPTCP_SUBFLOW_ATTR_ID_LOC, sf->local_id)) {
 		err = -EMSGSIZE;
 		goto nla_failure;
 	}

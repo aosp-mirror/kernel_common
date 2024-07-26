@@ -737,9 +737,7 @@ static int sr9800_bind(struct usbnet *dev, struct usb_interface *intf)
 
 	data->eeprom_len = SR9800_EEPROM_LEN;
 
-	ret = usbnet_get_endpoints(dev, intf);
-	if (ret)
-		goto out;
+	usbnet_get_endpoints(dev, intf);
 
 	/* LED Setting Rule :
 	 * AABB:CCDD

@@ -4,8 +4,6 @@
  */
 
 #include "mt8183-kukui.dtsi"
-/* Must come after mt8183-kukui.dtsi to modify cros_ec */
-#include <arm/cros-ec-keyboard.dtsi>
 
 / {
 	panel: panel {

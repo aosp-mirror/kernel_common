@@ -32,18 +32,6 @@
 #include "ruleset.h"
 #include "setup.h"
 
-static bool is_initialized(void)
-{
-	if (likely(landlock_initialized))
-		return true;
-
-	pr_warn_once(
-		"Disabled but requested by user space. "
-		"You should enable Landlock at boot time: "
-		"https://docs.kernel.org/userspace-api/landlock.html#boot-time-configuration\n");
-	return false;
-}
-
 /**
  * copy_min_struct_from_user - Safe future-proof argument copying
  *
@@ -177,7 +165,7 @@ SYSCALL_DEFINE3(landlock_create_ruleset,
 	/* Build-time checks. */
 	build_check_abi();
 
-	if (!is_initialized())
+	if (!landlock_initialized)
 		return -EOPNOTSUPP;
 
 	if (flags) {
@@ -323,7 +311,7 @@ SYSCALL_DEFINE4(landlock_add_rule, const int, ruleset_fd,
 	struct landlock_ruleset *ruleset;
 	int res, err;
 
-	if (!is_initialized())
+	if (!landlock_initialized)
 		return -EOPNOTSUPP;
 
 	/* No flag for now. */
@@ -414,7 +402,7 @@ SYSCALL_DEFINE2(landlock_restrict_self, const int, ruleset_fd, const __u32,
 	struct landlock_cred_security *new_llcred;
 	int err;
 
-	if (!is_initialized())
+	if (!landlock_initialized)
 		return -EOPNOTSUPP;
 
 	/*

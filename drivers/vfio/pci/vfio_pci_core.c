@@ -141,8 +141,7 @@ static void vfio_pci_probe_mmaps(struct vfio_pci_core_device *vdev)
 			 * of the exclusive page in case that hot-add
 			 * device's bar is assigned into it.
 			 */
-			dummy_res =
-				kzalloc(sizeof(*dummy_res), GFP_KERNEL_ACCOUNT);
+			dummy_res = kzalloc(sizeof(*dummy_res), GFP_KERNEL);
 			if (dummy_res == NULL)
 				goto no_mmap;
 
@@ -857,7 +856,7 @@ int vfio_pci_core_register_dev_region(struct vfio_pci_core_device *vdev,
 
 	region = krealloc(vdev->region,
 			  (vdev->num_regions + 1) * sizeof(*region),
-			  GFP_KERNEL_ACCOUNT);
+			  GFP_KERNEL);
 	if (!region)
 		return -ENOMEM;
 
@@ -1638,7 +1637,7 @@ static int __vfio_pci_add_vma(struct vfio_pci_core_device *vdev,
 {
 	struct vfio_pci_mmap_vma *mmap_vma;
 
-	mmap_vma = kmalloc(sizeof(*mmap_vma), GFP_KERNEL_ACCOUNT);
+	mmap_vma = kmalloc(sizeof(*mmap_vma), GFP_KERNEL);
 	if (!mmap_vma)
 		return -ENOMEM;
 

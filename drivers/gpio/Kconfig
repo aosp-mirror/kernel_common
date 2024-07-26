@@ -678,8 +678,7 @@ config GPIO_UNIPHIER
 	  Say yes here to support UniPhier GPIOs.
 
 config GPIO_VF610
-	bool "VF610 GPIO support"
-	default y if SOC_VF610
+	def_bool y
 	depends on ARCH_MXC
 	select GPIOLIB_IRQCHIP
 	help

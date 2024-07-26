@@ -3,7 +3,6 @@
  *
  *  For licencing details see kernel-base/COPYING
  */
-#include <linux/dmi.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/export.h>
@@ -67,7 +66,6 @@ struct x86_init_ops x86_init __initdata = {
 		.probe_roms		= probe_roms,
 		.reserve_resources	= reserve_standard_io_resources,
 		.memory_setup		= e820__memory_setup_default,
-		.dmi_setup		= dmi_setup,
 	},
 
 	.mpparse = {

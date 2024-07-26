@@ -397,7 +397,6 @@ error_reg:
 	regulator_disable(chip->vcc_regulator);
 
 error:
-	mutex_unlock(&chip->mutex);
 	mutex_destroy(&chip->mutex);
 	return ret;
 }

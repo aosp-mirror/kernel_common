@@ -226,6 +226,11 @@ struct ATTRIB *mi_enum_attr(struct mft_inode *mi, struct ATTRIB *attr)
 			return NULL;
 		}
 
+		if (off + asize < off) {
+			/* overflow check */
+			return NULL;
+		}
+
 		attr = Add2Ptr(attr, asize);
 		off += asize;
 	}
@@ -248,8 +253,8 @@ struct ATTRIB *mi_enum_attr(struct mft_inode *mi, struct ATTRIB *attr)
 	if ((t32 & 0xf) || (t32 > 0x100))
 		return NULL;
 
-	/* Check overflow and boundary. */
-	if (off + asize < off || off + asize > used)
+	/* Check boundary. */
+	if (off + asize > used)
 		return NULL;
 
 	/* Check size of attribute. */
@@ -486,20 +491,8 @@ bool mi_remove_attr(struct ntfs_inode *ni, struct mft_inode *mi,
 		return false;
 
 	if (ni && is_attr_indexed(attr)) {
-		u16 links = le16_to_cpu(ni->mi.mrec->hard_links);
-		struct ATTR_FILE_NAME *fname =
-			attr->type != ATTR_NAME ?
-				NULL :
-				resident_data_ex(attr,
-						 SIZEOF_ATTRIBUTE_FILENAME);
-		if (fname && fname->type == FILE_NAME_DOS) {
-			/* Do not decrease links count deleting DOS name. */
-		} else if (!links) {
-			/* minor error. Not critical. */
-		} else {
-			ni->mi.mrec->hard_links = cpu_to_le16(links - 1);
-			ni->mi.dirty = true;
-		}
+		le16_add_cpu(&ni->mi.mrec->hard_links, -1);
+		ni->mi.dirty = true;
 	}
 
 	used -= asize;

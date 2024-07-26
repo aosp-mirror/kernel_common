@@ -366,7 +366,7 @@ static int vfio_fops_open(struct inode *inode, struct file *filep)
 {
 	struct vfio_container *container;
 
-	container = kzalloc(sizeof(*container), GFP_KERNEL_ACCOUNT);
+	container = kzalloc(sizeof(*container), GFP_KERNEL);
 	if (!container)
 		return -ENOMEM;
 

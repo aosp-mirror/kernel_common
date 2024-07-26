@@ -34,7 +34,3 @@
 &ts_10 {
 	status = "okay";
 };
-
-&watchdog {
-	/delete-property/ mediatek,disable-extrst;
-};

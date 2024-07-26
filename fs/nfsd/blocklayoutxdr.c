@@ -9,7 +9,6 @@
 
 #include "nfsd.h"
 #include "blocklayoutxdr.h"
-#include "vfs.h"
 
 #define NFSDDBG_FACILITY	NFSDDBG_PNFS
 

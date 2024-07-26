@@ -470,7 +470,7 @@ int vfio_pci_ioeventfd(struct vfio_pci_core_device *vdev, loff_t offset,
 		goto out_unlock;
 	}
 
-	ioeventfd = kzalloc(sizeof(*ioeventfd), GFP_KERNEL_ACCOUNT);
+	ioeventfd = kzalloc(sizeof(*ioeventfd), GFP_KERNEL);
 	if (!ioeventfd) {
 		ret = -ENOMEM;
 		goto out_unlock;

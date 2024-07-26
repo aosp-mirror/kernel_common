@@ -261,9 +261,9 @@ struct st_sensor_data {
 	bool hw_irq_trigger;
 	s64 hw_timestamp;
 
-	struct mutex odr_lock;
+	char buffer_data[ST_SENSORS_MAX_BUFFER_SIZE] ____cacheline_aligned;
 
-	char buffer_data[ST_SENSORS_MAX_BUFFER_SIZE] __aligned(IIO_DMA_MINALIGN);
+	struct mutex odr_lock;
 };
 
 #ifdef CONFIG_IIO_BUFFER

@@ -100,8 +100,6 @@ EXPORT_SYMBOL(ntb_unregister_client);
 
 int ntb_register_device(struct ntb_dev *ntb)
 {
-	int ret;
-
 	if (!ntb)
 		return -EINVAL;
 	if (!ntb->pdev)
@@ -122,11 +120,7 @@ int ntb_register_device(struct ntb_dev *ntb)
 	ntb->ctx_ops = NULL;
 	spin_lock_init(&ntb->ctx_lock);
 
-	ret = device_register(&ntb->dev);
-	if (ret)
-		put_device(&ntb->dev);
-
-	return ret;
+	return device_register(&ntb->dev);
 }
 EXPORT_SYMBOL(ntb_register_device);
 
