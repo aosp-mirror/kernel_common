@@ -478,6 +478,7 @@
   page_mapping
   __trace_puts
   truncate_inode_pages
+  try_to_del_timer_sync
   try_to_free_mem_cgroup_pages
   typec_mux_get_drvdata
   __udp4_lib_lookup
