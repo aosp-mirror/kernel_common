@@ -44,6 +44,7 @@ pub mod net;
 pub mod page;
 pub mod prelude;
 pub mod print;
+pub mod rbtree;
 pub mod security;
 mod static_assert;
 #[doc(hidden)]
