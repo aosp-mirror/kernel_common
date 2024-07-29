@@ -666,15 +666,6 @@ enum ufshcd_android_quirks {
 	 * breaks the HCE sequence if used.
 	 */
 	UFSHCD_ANDROID_QUIRK_BROKEN_CRYPTO_ENABLE	= 1 << 1,
-
-	/*
-	 * IMPORTANT: set this in hba->android_quirks, not hba->quirks!
-	 *
-	 * This quirk needs to be enabled if the host controller requires that
-	 * the PRDT be cleared after each encrypted request because encryption
-	 * keys were stored in it.
-	 */
-	UFSHCD_ANDROID_QUIRK_KEYS_IN_PRDT		= 1 << 2,
 };
 
 enum ufshcd_caps {
