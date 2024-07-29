@@ -275,6 +275,10 @@ struct venc_controls {
 	s32 h264_loop_filter_beta;
 	u32 h264_8x8_transform;
 
+	u32 h264_hier_enabled;
+	u32 h264_hier_p_layers;
+	u32 h264_hier_p_bitrate[6];
+
 	u32 hevc_i_qp;
 	u32 hevc_p_qp;
 	u32 hevc_b_qp;
