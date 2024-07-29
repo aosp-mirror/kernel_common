@@ -645,20 +645,6 @@ enum ufshcd_quirks {
 	UFSHCD_QUIRK_MCQ_BROKEN_RTC			= 1 << 21,
 };
 
-enum ufshcd_android_quirks {
-
-	/*
-	 * IMPORTANT: set this in hba->android_quirks, not hba->quirks!
-	 *
-	 * This quirk needs to be enabled if the host controller supports inline
-	 * encryption, but it needs to initialize the crypto capabilities in a
-	 * nonstandard way and/or it needs to override blk_crypto_ll_ops.  If
-	 * enabled, the standard code won't initialize the blk_crypto_profile;
-	 * ufs_hba_variant_ops::init() must do it instead.
-	 */
-	UFSHCD_ANDROID_QUIRK_CUSTOM_CRYPTO_PROFILE	= 1 << 0,
-};
-
 enum ufshcd_caps {
 	/* Allow dynamic clk gating */
 	UFSHCD_CAP_CLK_GATING				= 1 << 0,
@@ -986,8 +972,6 @@ struct ufs_hba {
 	enum ufs_ref_clk_freq dev_ref_clk_freq;
 
 	unsigned int quirks;	/* Deviations from standard UFSHCI spec. */
-
-	unsigned int android_quirks; /* for UFSHCD_ANDROID_QUIRK_* flags */
 
 	/* Device deviations from standard UFS device spec. */
 	unsigned int dev_quirks;
