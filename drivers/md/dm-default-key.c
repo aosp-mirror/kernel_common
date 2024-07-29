@@ -360,7 +360,7 @@ static int default_key_prepare_ioctl(struct dm_target *ti,
 
 	/* Only pass ioctls through if the device sizes match exactly. */
 	if (dkc->start != 0 ||
-	    ti->len != i_size_read(dev->bdev->bd_inode) >> SECTOR_SHIFT)
+	    ti->len != bdev_nr_sectors(dev->bdev))
 		return 1;
 	return 0;
 }
