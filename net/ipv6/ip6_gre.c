@@ -1434,7 +1434,6 @@ static const struct net_device_ops ip6gre_netdev_ops = {
 	.ndo_start_xmit		= ip6gre_tunnel_xmit,
 	.ndo_siocdevprivate	= ip6gre_tunnel_siocdevprivate,
 	.ndo_change_mtu		= ip6_tnl_change_mtu,
-	.ndo_get_stats64	= dev_get_tstats64,
 	.ndo_get_iflink		= ip6_tnl_get_iflink,
 };
 
@@ -1444,7 +1443,6 @@ static void ip6gre_dev_free(struct net_device *dev)
 
 	gro_cells_destroy(&t->gro_cells);
 	dst_cache_destroy(&t->dst_cache);
-	free_percpu(dev->tstats);
 }
 
 static void ip6gre_tunnel_setup(struct net_device *dev)
@@ -1453,6 +1451,7 @@ static void ip6gre_tunnel_setup(struct net_device *dev)
 	dev->needs_free_netdev = true;
 	dev->priv_destructor = ip6gre_dev_free;
 
+	dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
 	dev->type = ARPHRD_IP6GRE;
 
 	dev->flags |= IFF_NOARP;
@@ -1500,13 +1499,9 @@ static int ip6gre_tunnel_init_common(struct net_device *dev)
 	tunnel->net = dev_net(dev);
 	strcpy(tunnel->parms.name, dev->name);
 
-	dev->tstats = netdev_alloc_pcpu_stats(struct pcpu_sw_netstats);
-	if (!dev->tstats)
-		return -ENOMEM;
-
 	ret = dst_cache_init(&tunnel->dst_cache, GFP_KERNEL);
 	if (ret)
-		goto cleanup_alloc_pcpu_stats;
+		return ret;
 
 	ret = gro_cells_init(&tunnel->gro_cells, dev);
 	if (ret)
@@ -1530,9 +1525,6 @@ static int ip6gre_tunnel_init_common(struct net_device *dev)
 
 cleanup_dst_cache_init:
 	dst_cache_destroy(&tunnel->dst_cache);
-cleanup_alloc_pcpu_stats:
-	free_percpu(dev->tstats);
-	dev->tstats = NULL;
 	return ret;
 }
 
@@ -1864,7 +1856,6 @@ static const struct net_device_ops ip6gre_tap_netdev_ops = {
 	.ndo_set_mac_address = eth_mac_addr,
 	.ndo_validate_addr = eth_validate_addr,
 	.ndo_change_mtu = ip6_tnl_change_mtu,
-	.ndo_get_stats64 = dev_get_tstats64,
 	.ndo_get_iflink = ip6_tnl_get_iflink,
 };
 
@@ -1893,13 +1884,9 @@ static int ip6erspan_tap_init(struct net_device *dev)
 	tunnel->net = dev_net(dev);
 	strcpy(tunnel->parms.name, dev->name);
 
-	dev->tstats = netdev_alloc_pcpu_stats(struct pcpu_sw_netstats);
-	if (!dev->tstats)
-		return -ENOMEM;
-
 	ret = dst_cache_init(&tunnel->dst_cache, GFP_KERNEL);
 	if (ret)
-		goto cleanup_alloc_pcpu_stats;
+		return ret;
 
 	ret = gro_cells_init(&tunnel->gro_cells, dev);
 	if (ret)
@@ -1921,9 +1908,6 @@ static int ip6erspan_tap_init(struct net_device *dev)
 
 cleanup_dst_cache_init:
 	dst_cache_destroy(&tunnel->dst_cache);
-cleanup_alloc_pcpu_stats:
-	free_percpu(dev->tstats);
-	dev->tstats = NULL;
 	return ret;
 }
 
@@ -1934,7 +1918,6 @@ static const struct net_device_ops ip6erspan_netdev_ops = {
 	.ndo_set_mac_address =	eth_mac_addr,
 	.ndo_validate_addr =	eth_validate_addr,
 	.ndo_change_mtu =	ip6_tnl_change_mtu,
-	.ndo_get_stats64 =	dev_get_tstats64,
 	.ndo_get_iflink =	ip6_tnl_get_iflink,
 };
 
@@ -1948,6 +1931,7 @@ static void ip6gre_tap_setup(struct net_device *dev)
 	dev->needs_free_netdev = true;
 	dev->priv_destructor = ip6gre_dev_free;
 
+	dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
 	dev->priv_flags &= ~IFF_TX_SKB_SHARING;
 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
 	netif_keep_dst(dev);
@@ -2250,6 +2234,7 @@ static void ip6erspan_tap_setup(struct net_device *dev)
 	dev->needs_free_netdev = true;
 	dev->priv_destructor = ip6gre_dev_free;
 
+	dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
 	dev->priv_flags &= ~IFF_TX_SKB_SHARING;
 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
 	netif_keep_dst(dev);
