@@ -34,8 +34,10 @@ enum {
 /*
  * The RT and BE priority classes both support up to 8 priority levels.
  */
-#define IOPRIO_NR_LEVELS	8
-#define IOPRIO_BE_NR		IOPRIO_NR_LEVELS
+#define IOPRIO_NR_LEVELS		8
+#define IOPRIO_BE_NR			IOPRIO_NR_LEVELS
+#define IOPRIO_LEVEL_MASK		(IOPRIO_NR_LEVELS - 1)
+#define IOPRIO_PRIO_LEVEL(ioprio)	((ioprio) & IOPRIO_LEVEL_MASK)
 
 enum {
 	IOPRIO_WHO_PROCESS = 1,
