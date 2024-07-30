@@ -2,16 +2,33 @@ HOW TO RUN KUNIT TESTS IN ANDROID
 =================================
 
 Prerequisites
- * Pass kunit.enable=1 as a kernel command line argument
-   * This should be done in either userdebug or eng build configs. See
-     the following examples:
-       * https://android-review.git.corp.google.com/c/device/google/cuttlefish/+/2085612
-       * https://android-review.git.corp.google.com/c/kernel/google-modules/raviole-device/+/2095369
-   * For a local device you can run the following:
-      $ fastboot oem cmdline add "kunit.enable=1"
- * Run a "no trim" kernel (e.g. add `--notrim` to bazel build command)
+ * If you want to run a vendor module KUnit tests, please run the tests with a
+   "no trim" kernel (e.g. add `--notrim` to bazel build command).
 
-Run a test module
+Run test with a single shell script command:
+  $ common/tools/testing/android/bin/kunit.sh
+
+  By default, the script will build the kernel and launch an Android virtual
+  device and then run the tests. Additional options may be passed to change
+  the default behavior. The following are some examples on how to use it:
+
+  * Build kernel, launch a virtual device, run KUnit tests:
+  $ common/tools/testing/android/bin/kunit.sh
+
+  * Run KUnit tests on a connected device directly:
+  $ common/tools/testing/android/bin/kunit.sh -s 127.0.0.1:37693
+
+  * Check other available options:
+  $ common/tools/testing/android/bin/kunit.sh -h
+
+Load and run a test module on Android device manually
+ * Push the KUnit test framework module kunit.ko over to the device. For example:
+   $ adb push kunit.ko /data
+
+ * Load test module on device:
+    $ cd /data
+    $ insmod kunit.ko enable=1
+
  * Push the KUnit test module over to the device. For example using adb:
    $ adb push kunit-test-example.ko /data
 
@@ -48,7 +65,7 @@ View test results
     <truncated>
     ....
 
-Run ACK KUnit tests via tradefed
+Run KUnit tests on Android Device via test automation infrastructure tradefed
  * Build ACK KUnit tests and install (e.g. /tmp/kunit_tests):
    $ tools/bazel run -- //common:kunit_tests_x86_64_install -v --destdir /tmp/kunit_tests
 
@@ -67,7 +84,6 @@ Run ACK KUnit tests via tradefed
    ============== End of Results ==============
    ============================================
    ....
-
 
 TROUBLESHOOTING
 ===============
