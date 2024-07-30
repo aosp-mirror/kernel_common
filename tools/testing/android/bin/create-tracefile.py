@@ -54,8 +54,7 @@ def generate_lcov_tracefile(
 ) -> None:
   """Call lcov to create tracefile based on gcov data files.
 
-  A temporay helper script, 'llvm_gcov.sh', is created that points to a
-  prebuilt copy of llvm-cov.
+  A temporay helper script, 'llvm_gcov.sh', is created that points to llvm-cov.
 
   Args:
     gcov_dir: Directory that contains the extracted gcov data files as retreived
@@ -318,7 +317,7 @@ def get_kernel_repo_dir() -> str:
   return get_parent_path(this_script_full_path, 6)
 
 
-def build_config() -> {}:
+def build_config(llvm_cov_path: str) -> {}:
   """Build configuration.
 
   Returns:
@@ -328,13 +327,12 @@ def build_config() -> {}:
   config["repo_dir"] = get_kernel_repo_dir()
   config["output_dir"] = f'{config["repo_dir"]}/out'
   config["output_cov_dir"] = f'{config["output_dir"]}/coverage'
-  config["llvm_cov_prebuilt"] = (
-      f'{config["repo_dir"]}/prebuilts/clang/host/linux-x86/'
-      "llvm-binutils-stable/llvm-cov"
-  )
-  config["llvm_gcov_sh"] = (
-      f'#!/bin/bash\nexec {config["llvm_cov_prebuilt"]} gcov "$@"'
-  )
+
+  llvm_cov_path = (os.path.abspath(llvm_cov_path) if llvm_cov_path else
+                   f'{config["repo_dir"]}/prebuilts/clang/host/linux-x86/'
+                   'llvm-binutils-stable/llvm-cov')
+
+  config["llvm_gcov_sh"] = f'#!/bin/bash\nexec {llvm_cov_path} gcov "$@"'
   config["llvm_gcov_sh_filename"] = (
       f'{config["output_cov_dir"]}/tmp/llvm-gcov.sh'
   )
@@ -378,6 +376,11 @@ def main() -> None:
       ),
   )
   arg_parser.add_argument(
+      "--llvm-cov",
+      required=False,
+      help="Path to llvm-cov",
+  )
+  arg_parser.add_argument(
       "--verbose",
       action="store_true",
       default=False,
@@ -399,7 +402,11 @@ def main() -> None:
     logging.critical("       https://github.com/linux-test-project/lcov")
     sys.exit(-1)
 
-  config = build_config()
+  if args.llvm_cov and not os.path.isfile(args.llvm_cov):
+    logging.error("%s is not a file.", args.llvm_cov)
+    sys.exit(-1)
+
+  config = build_config(args.llvm_cov)
 
   gcno_mappings = read_gcno_mapping_files(
       config["output_dir"], config["repo_dir"]
