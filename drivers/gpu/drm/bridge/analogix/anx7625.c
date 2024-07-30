@@ -2635,6 +2635,17 @@ static void anx7625_typec_two_ports_update(struct anx7625_data *ctx)
 		anx7625_set_crosspoint_switch(ctx, TYPEC_ORIENTATION_REVERSE);
 }
 
+static bool _anx7625_typec_is_dp_connected(struct anx7625_data *ctx)
+{
+	int i;
+
+	for (i = 0; i < ctx->num_typec_switches; i++)
+		if (ctx->typec_ports[i].dp_connected)
+			return true;
+
+	return false;
+}
+
 static int anx7625_typec_mux_set(struct typec_mux_dev *mux,
 				 struct typec_mux_state *state)
 {
@@ -2643,24 +2654,23 @@ static int anx7625_typec_mux_set(struct typec_mux_dev *mux,
 	struct device *dev = ctx->dev;
 	bool new_dp_connected, old_dp_connected;
 
-	if (ctx->num_typec_switches == 1)
-		return 0;
+	old_dp_connected = _anx7625_typec_is_dp_connected(ctx);
 
-	old_dp_connected = ctx->typec_ports[0].dp_connected || ctx->typec_ports[1].dp_connected;
-
-	dev_dbg(dev, "mux_set dp_connected: c0=%d, c1=%d\n",
-		ctx->typec_ports[0].dp_connected, ctx->typec_ports[1].dp_connected);
-
-	data->dp_connected = (state->alt && state->alt->svid == USB_TYPEC_DP_SID &&
+	data->dp_connected = (state->alt &&
+			      state->alt->svid == USB_TYPEC_DP_SID &&
 			      state->alt->mode == USB_TYPEC_DP_MODE);
 
-	new_dp_connected = ctx->typec_ports[0].dp_connected || ctx->typec_ports[1].dp_connected;
+	new_dp_connected = _anx7625_typec_is_dp_connected(ctx);
+
+	dev_dbg(dev, "mux_set old_dp_connected=%d, new_dp_connected=%d\n",
+		old_dp_connected, new_dp_connected);
 
 	/* dp on, power on first */
 	if (!old_dp_connected && new_dp_connected)
 		pm_runtime_get_sync(dev);
 
-	anx7625_typec_two_ports_update(ctx);
+	if (ctx->num_typec_switches == 2)
+		anx7625_typec_two_ports_update(ctx);
 
 	/* dp off, power off last */
 	if (old_dp_connected && !new_dp_connected)
