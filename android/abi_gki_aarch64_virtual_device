@@ -12,8 +12,6 @@
   __arch_copy_to_user
   arm64_use_ng_mappings
   bcmp
-  blk_mq_freeze_queue
-  blk_mq_unfreeze_queue
   bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
@@ -176,6 +174,7 @@
   get_unused_fd_flags
   gpiod_put
   hci_alloc_dev_priv
+  __hci_cmd_send
   __hci_cmd_sync
   __hci_cmd_sync_ev
   hci_devcd_append
@@ -305,8 +304,6 @@
   page_pool_alloc_frag
   page_pool_destroy
   page_pool_put_defragged_page
-  page_shift_compat
-  page_shift_compat_enabled
   param_ops_bool
   param_ops_charp
   param_ops_int
@@ -587,9 +584,6 @@
   out_of_line_wait_on_bit_timeout
   request_firmware_direct
   wake_up_bit
-
-# required by btrtl.ko
-  __hci_cmd_send
 
 # required by btusb.ko
   btbcm_set_bdaddr
@@ -1249,13 +1243,13 @@
   blk_mq_end_request_batch
   blk_mq_free_request
   blk_mq_free_tag_set
+  blk_mq_freeze_queue
   blk_mq_map_queues
-  blk_mq_quiesce_queue
   blk_mq_requeue_request
   blk_mq_start_request
   blk_mq_start_stopped_hw_queues
   blk_mq_stop_hw_queue
-  blk_mq_unquiesce_queue
+  blk_mq_unfreeze_queue
   blk_mq_virtio_map_queues
   blk_queue_alignment_offset
   blk_queue_chunk_sectors
@@ -1515,3 +1509,9 @@
   vsock_core_register
   vsock_core_unregister
   vsock_for_each_connected_socket
+
+# preserved by --additions-only
+  blk_mq_quiesce_queue
+  blk_mq_unquiesce_queue
+  page_shift_compat
+  page_shift_compat_enabled
