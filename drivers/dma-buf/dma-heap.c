@@ -18,6 +18,7 @@
 #include <linux/uaccess.h>
 #include <linux/syscalls.h>
 #include <linux/dma-heap.h>
+#include <linux/page_size_compat.h>
 #include <uapi/linux/dma-heap.h>
 
 #define DEVNAME "dma_heap"
@@ -89,7 +90,7 @@ struct dma_buf *dma_heap_buffer_alloc(struct dma_heap *heap, size_t len,
 	 * Allocations from all heaps have to begin
 	 * and end on page boundaries.
 	 */
-	len = PAGE_ALIGN(len);
+	len = __PAGE_ALIGN(len);
 	if (!len)
 		return ERR_PTR(-EINVAL);
 
