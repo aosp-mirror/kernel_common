@@ -2211,7 +2211,6 @@ lookup:
 	if (!sk)
 		goto no_tcp_socket;
 
-process:
 	if (sk->sk_state == TCP_TIME_WAIT)
 		goto do_time_wait;
 
@@ -2291,6 +2290,7 @@ process:
 		}
 	}
 
+process:
 	if (static_branch_unlikely(&ip4_min_ttl)) {
 		/* min_ttl can be changed concurrently from do_ip_setsockopt() */
 		if (unlikely(iph->ttl < READ_ONCE(inet_sk(sk)->min_ttl))) {
