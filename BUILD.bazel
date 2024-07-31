@@ -795,7 +795,7 @@ pkg_files(
 )
 
 pkg_filegroup(
-    name = "kunit_tests_arm64_pgk_files",
+    name = "kunit_tests_arm64_pkg_files",
     srcs = [
         ":kunit_modules_arm64",
         ":kunit_tests_config_arm64",
@@ -2313,7 +2313,7 @@ pkg_zip(
     name = "tests_zip_arm64",
     srcs = [
         ":kselftest_tests_arm64_pkg_files",
-        ":kunit_tests_arm64_pgk_files",
+        ":kunit_tests_arm64_pkg_files",
     ],
     out = "arm64/tests.zip",
     visibility = ["//visibility:public"],
