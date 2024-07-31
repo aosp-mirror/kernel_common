@@ -63,18 +63,6 @@ static int __init parse_no_stealacc(char *arg)
 
 early_param("no-steal-acc", parse_no_stealacc);
 
-#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
-static int virt_suspend_timing_guest = 1;
-
-static int __init parse_no_virt_suspend_timing_guest(char *arg)
-{
-	virt_suspend_timing_guest = 0;
-	return 0;
-}
-
-early_param("no-vsti-guest", parse_no_virt_suspend_timing_guest);
-#endif
-
 static DEFINE_PER_CPU_DECRYPTED(struct kvm_vcpu_pv_apf_data, apf_reason) __aligned(64);
 DEFINE_PER_CPU_DECRYPTED(struct kvm_steal_time, steal_time) __aligned(64) __visible;
 static int has_steal_clock = 0;
@@ -314,8 +302,7 @@ DEFINE_IDTENTRY_SYSVEC(sysvec_kvm_hv_callback)
 	}
 
 #ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
-	if (virt_suspend_timing_guest)
-		timekeeping_inject_virtual_suspend_time(kvm_get_suspend_time());
+	timekeeping_inject_virtual_suspend_time(kvm_get_suspend_time());
 #endif
 
 	set_irq_regs(old_regs);

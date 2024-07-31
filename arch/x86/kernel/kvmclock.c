@@ -46,6 +46,18 @@ static int __init parse_no_kvmclock_vsyscall(char *arg)
 }
 early_param("no-kvmclock-vsyscall", parse_no_kvmclock_vsyscall);
 
+#ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
+static int virt_suspend_timing_guest = 1;
+
+static int __init parse_no_virt_suspend_timing_guest(char *arg)
+{
+	virt_suspend_timing_guest = 0;
+	return 0;
+}
+
+early_param("no-vsti-guest", parse_no_virt_suspend_timing_guest);
+#endif
+
 /* Aligned to page sizes to match whats mapped via vsyscalls to userspace */
 #define HV_CLOCK_SIZE	(sizeof(struct pvclock_vsyscall_time_info) * NR_CPUS)
 #define HVC_BOOT_ARRAY_SIZE \
@@ -319,7 +331,8 @@ void __init kvmclock_init(void)
 	}
 
 #ifdef CONFIG_KVM_VIRT_SUSPEND_TIMING_GUEST
-	if (kvm_para_has_feature(KVM_FEATURE_HOST_SUSPEND_TIME)) {
+	if (virt_suspend_timing_guest &&
+	    kvm_para_has_feature(KVM_FEATURE_HOST_SUSPEND_TIME)) {
 		/* Register the suspend time structure */
 		wrmsrl(MSR_KVM_HOST_SUSPEND_TIME,
 		       slow_virt_to_phys(&suspend_time) | KVM_MSR_ENABLED);
