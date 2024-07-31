@@ -1142,10 +1142,10 @@ static int fib_nl_dumprule(struct sk_buff *skb, struct netlink_callback *cb)
 	const struct nlmsghdr *nlh = cb->nlh;
 	struct net *net = sock_net(skb->sk);
 	struct fib_rules_ops *ops;
-	int err, idx = 0, family;
+	int idx = 0, family;
 
 	if (cb->strict_check) {
-		err = fib_valid_dumprule_req(nlh, cb->extack);
+		int err = fib_valid_dumprule_req(nlh, cb->extack);
 
 		if (err < 0)
 			return err;
@@ -1158,17 +1158,17 @@ static int fib_nl_dumprule(struct sk_buff *skb, struct netlink_callback *cb)
 		if (ops == NULL)
 			return -EAFNOSUPPORT;
 
-		return dump_rules(skb, cb, ops);
+		dump_rules(skb, cb, ops);
+
+		return skb->len;
 	}
 
-	err = 0;
 	rcu_read_lock();
 	list_for_each_entry_rcu(ops, &net->rules_ops, list) {
 		if (idx < cb->args[0] || !try_module_get(ops->owner))
 			goto skip;
 
-		err = dump_rules(skb, cb, ops);
-		if (err < 0)
+		if (dump_rules(skb, cb, ops) < 0)
 			break;
 
 		cb->args[1] = 0;
@@ -1178,7 +1178,7 @@ skip:
 	rcu_read_unlock();
 	cb->args[0] = idx;
 
-	return err;
+	return skb->len;
 }
 
 static void notify_rule_change(int event, struct fib_rule *rule,
@@ -1293,8 +1293,7 @@ static int __init fib_rules_init(void)
 	int err;
 	rtnl_register(PF_UNSPEC, RTM_NEWRULE, fib_nl_newrule, NULL, 0);
 	rtnl_register(PF_UNSPEC, RTM_DELRULE, fib_nl_delrule, NULL, 0);
-	rtnl_register(PF_UNSPEC, RTM_GETRULE, NULL, fib_nl_dumprule,
-		      RTNL_FLAG_DUMP_UNLOCKED);
+	rtnl_register(PF_UNSPEC, RTM_GETRULE, NULL, fib_nl_dumprule, 0);
 
 	err = register_pernet_subsys(&fib_rules_net_ops);
 	if (err < 0)
