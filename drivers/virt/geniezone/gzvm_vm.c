@@ -207,7 +207,7 @@ static int gzvm_vm_ioctl_create_device(struct gzvm *gzvm, void __user *argp)
 
 	if (gzvm_dev->attr_addr != 0 && gzvm_dev->attr_size != 0) {
 		size_t attr_size = gzvm_dev->attr_size;
-		void __user *attr_addr = (void __user *)gzvm_dev->attr_addr;
+		void __user *attr_addr = u64_to_user_ptr(gzvm_dev->attr_addr);
 
 		/* Size of device specific data should not be over a page. */
 		if (attr_size > PAGE_SIZE)

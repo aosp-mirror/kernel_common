@@ -3,7 +3,6 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 
-#include <asm/sysreg.h>
 #include <linux/anon_inodes.h>
 #include <linux/device.h>
 #include <linux/file.h>
@@ -30,7 +29,7 @@ static long gzvm_vcpu_update_one_reg(struct gzvm_vcpu *vcpu,
 	if (copy_from_user(&reg, argp, sizeof(reg)))
 		return -EFAULT;
 
-	reg_addr = (void __user *)reg.addr;
+	reg_addr = u64_to_user_ptr(reg.addr);
 	reg_size = (reg.id & GZVM_REG_SIZE_MASK) >> GZVM_REG_SIZE_SHIFT;
 	reg_size = BIT(reg_size);
 
