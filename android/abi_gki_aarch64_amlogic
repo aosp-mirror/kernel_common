@@ -811,6 +811,7 @@
   fs_param_is_string
   fs_param_is_u32
   __fs_parse
+  fs_umode_to_dtype
   fsync_bdev
   fwnode_device_is_available
   fwnode_get_name
@@ -1758,6 +1759,7 @@
   register_restart_handler
   register_shrinker
   register_syscore_ops
+  register_sysctl
   register_sysctl_table
   register_wide_hw_breakpoint
   regmap_bulk_write
@@ -2274,6 +2276,8 @@
   try_module_get
   try_wait_for_completion
   tty_flip_buffer_push
+  tty_get_char_size
+  tty_put_char
   tty_termios_hw_change
   uart_add_one_port
   uart_console_device
@@ -2335,7 +2339,9 @@
   usb_anchor_urb
   usb_autopm_get_interface
   usb_autopm_put_interface
+  usb_clear_halt
   usb_control_msg
+  usb_control_msg_recv
   __usb_create_hcd
   usb_create_hcd
   usb_debug_root
@@ -2402,8 +2408,11 @@
   usb_serial_generic_close
   usb_serial_generic_get_icount
   usb_serial_generic_open
+  usb_serial_generic_resume
   usb_serial_generic_throttle
+  usb_serial_generic_tiocmiwait
   usb_serial_generic_unthrottle
+  usb_serial_handle_dcd_change
   usb_serial_register_drivers
   usb_set_interface
   usb_submit_urb
@@ -2537,6 +2546,8 @@
   wireless_send_event
   work_busy
   write_inode_now
+  ww_mutex_lock
+  ww_mutex_unlock
   __xa_cmpxchg
   __xa_erase
   xa_find
