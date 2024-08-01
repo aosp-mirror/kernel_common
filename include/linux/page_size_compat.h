@@ -22,6 +22,12 @@
 
 #include <asm/page.h>
 
+#define __MAX_PAGE_SHIFT		14
+#define __MAX_PAGE_SIZE		(_AC(1,UL) << __MAX_PAGE_SHIFT)
+#define __MAX_PAGE_MASK		(~(__MAX_PAGE_SIZE-1))
+
+#ifndef __ASSEMBLY__
+
 #include <linux/align.h>
 #include <linux/jump_label.h>
 #include <linux/mman.h>
@@ -156,4 +162,7 @@ static __always_inline void __filemap_fixup(unsigned long addr, unsigned long pr
 }
 
 extern void __fold_filemap_fixup_entry(struct vma_iterator *iter, unsigned long *end);
+
+#endif /* !__ASSEMBLY__ */
+
 #endif /* __LINUX_PAGE_SIZE_COMPAT_H */
