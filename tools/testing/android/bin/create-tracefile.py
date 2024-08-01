@@ -17,6 +17,7 @@
 """This utility generates a single lcov tracefile from a gcov tar file."""
 
 import argparse
+import collections
 import fnmatch
 import glob
 import json
@@ -223,8 +224,22 @@ def update_multimap_from_json(
 ) -> None:
   """Reads 'to' and 'from' fields from a JSON file and updates a multimap.
 
+  'from' refers to a bazel sandbox directory.
+  'to' refers to the output directory of gcno files.
   The multimap is implemented as a dictionary of lists allowing multiple 'to'
   values for each 'from' key.
+
+  Sample input:
+  [
+    {
+      "from": "/sandbox/1/execroot/_main/out/android-mainline/common",
+      "to": "bazel-out/k8-fastbuild/bin/common/kernel_x86_64/kernel_x86_64_gcno"
+    },
+    {
+      "from": "/sandbox/2/execroot/_main/out/android-mainline/common",
+      "to": "bazel-out/k8-fastbuild/bin/common-modules/virtual-device/virtual_device_x86_64/virtual_device_x86_64_gcno"
+    }
+  ]
 
   Args:
     json_file: The path to the JSON file.
@@ -257,6 +272,29 @@ def read_gcno_mapping_files(search_dir: str, base_dir: str) -> {}:
   for filepath in glob.iglob(pattern, recursive=False):
     logging.info("Reading %s", filepath)
     update_multimap_from_json(filepath, base_dir, result_multimap)
+  return result_multimap
+
+
+def read_gcno_dir(gcno_dir: str,
+                  result_multimap: collections.defaultdict) -> None:
+  """Read a directory containing gcno_mapping and gcno files."""
+  pattern = os.path.join(gcno_dir, "gcno_mapping.*.json")
+  multimap = {}
+  for filepath in glob.iglob(pattern):
+    logging.info("Reading %s", filepath)
+    update_multimap_from_json(filepath, gcno_dir, multimap)
+  if not multimap:
+    logging.error("No gcno_mapping in %s", gcno_dir)
+
+  to_value = append_slash(os.path.abspath(gcno_dir))
+  for from_value in multimap:
+    result_multimap[from_value].append(to_value)
+
+
+def read_gcno_dirs(gcno_dirs: list) -> collections.defaultdict:
+  result_multimap = collections.defaultdict(list)
+  for gcno_dir in gcno_dirs:
+    read_gcno_dir(gcno_dir, result_multimap)
   return result_multimap
 
 
@@ -376,6 +414,14 @@ def main() -> None:
       ),
   )
   arg_parser.add_argument(
+      "--gcno-dir",
+      dest="gcno_dirs",
+      action="append",
+      default=[],
+      required=False,
+      help="Path to an extracted .gcno.tar.gz"
+  )
+  arg_parser.add_argument(
       "--llvm-cov",
       required=False,
       help="Path to llvm-cov",
@@ -406,11 +452,19 @@ def main() -> None:
     logging.error("%s is not a file.", args.llvm_cov)
     sys.exit(-1)
 
+  for gcno_dir in args.gcno_dirs:
+    if not os.path.isdir(gcno_dir):
+      logging.error("%s is not a directory.", gcno_dir)
+      sys.exit(-1)
+
   config = build_config(args.llvm_cov)
 
-  gcno_mappings = read_gcno_mapping_files(
-      config["output_dir"], config["repo_dir"]
-  )
+  if args.gcno_dirs:
+    gcno_mappings = read_gcno_dirs(args.gcno_dirs)
+  else:
+    gcno_mappings = read_gcno_mapping_files(
+        config["output_dir"], config["repo_dir"]
+    )
 
   if not gcno_mappings:
     logging.error(
