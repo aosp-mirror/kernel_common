@@ -4689,7 +4689,7 @@ struct page *__alloc_pages(gfp_t gfp, unsigned int order, int preferred_nid,
 			&alloc_gfp, &alloc_flags))
 		return NULL;
 
-	trace_android_rvh_try_alloc_pages(&page, order, gfp_zone(gfp));
+	trace_android_rvh_try_alloc_pages_gfp(&page, order, gfp, gfp_zone(gfp));
 	if (page)
 		goto out;
 	/*
