@@ -2313,6 +2313,7 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 		goto out;
 
 	sock_copy(newsk, sk);
+	trace_android_vh_sk_clone_lock(newsk);
 
 	newsk->sk_prot_creator = prot;
 
