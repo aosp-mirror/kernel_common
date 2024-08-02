@@ -4753,6 +4753,14 @@ intel_compare_buffer(const u8 *a, const u8 *b, size_t len)
 	return memcmp(a, b, len) == 0;
 }
 
+static inline void
+intel_log_infoframe(const char *level, struct device *dev,
+		    const union hdmi_infoframe *infoframe)
+{
+	if (drm_debug_syslog_enabled(DRM_UT_KMS))
+		hdmi_infoframe_log(level, dev, infoframe);
+}
+
 static void
 pipe_config_infoframe_mismatch(struct drm_i915_private *dev_priv,
 			       bool fastset, const char *name,
@@ -4766,15 +4774,15 @@ pipe_config_infoframe_mismatch(struct drm_i915_private *dev_priv,
 		drm_dbg_kms(&dev_priv->drm,
 			    "fastset requirement not met in %s infoframe\n", name);
 		drm_dbg_kms(&dev_priv->drm, "expected:\n");
-		hdmi_infoframe_log(KERN_DEBUG, dev_priv->drm.dev, a);
+		intel_log_infoframe(KERN_DEBUG, dev_priv->drm.dev, a);
 		drm_dbg_kms(&dev_priv->drm, "found:\n");
-		hdmi_infoframe_log(KERN_DEBUG, dev_priv->drm.dev, b);
+		intel_log_infoframe(KERN_DEBUG, dev_priv->drm.dev, b);
 	} else {
 		drm_err(&dev_priv->drm, "mismatch in %s infoframe\n", name);
 		drm_err(&dev_priv->drm, "expected:\n");
-		hdmi_infoframe_log(KERN_ERR, dev_priv->drm.dev, a);
+		intel_log_infoframe(KERN_ERR, dev_priv->drm.dev, a);
 		drm_err(&dev_priv->drm, "found:\n");
-		hdmi_infoframe_log(KERN_ERR, dev_priv->drm.dev, b);
+		intel_log_infoframe(KERN_ERR, dev_priv->drm.dev, b);
 	}
 }
 
@@ -4823,7 +4831,7 @@ pipe_config_buffer_mismatch(struct drm_i915_private *dev_priv,
 			    const u8 *a, const u8 *b, size_t len)
 {
 	if (fastset) {
-		if (!drm_debug_enabled(DRM_UT_KMS))
+		if (!drm_debug_syslog_enabled(DRM_UT_KMS))
 			return;
 
 		/* only dump up to the last difference */
