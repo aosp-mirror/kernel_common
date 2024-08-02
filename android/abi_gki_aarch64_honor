@@ -104,3 +104,5 @@
   __tracepoint_android_vh_sk_alloc
   __traceiter_android_vh_sk_free
   __tracepoint_android_vh_sk_free
+  __traceiter_android_vh_sk_clone_lock
+  __tracepoint_android_vh_sk_clone_lock
