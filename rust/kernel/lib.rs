@@ -27,6 +27,7 @@ compile_error!("Missing kernel configuration for conditional compilation");
 extern crate self as kernel;
 
 pub mod alloc;
+pub mod arch;
 #[cfg(CONFIG_BLOCK)]
 pub mod block;
 mod build_assert;
@@ -47,6 +48,7 @@ pub mod print;
 pub mod rbtree;
 pub mod security;
 mod static_assert;
+pub mod static_key;
 #[doc(hidden)]
 pub mod std_vendor;
 pub mod str;

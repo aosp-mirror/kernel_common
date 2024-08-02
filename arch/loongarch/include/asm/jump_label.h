@@ -13,6 +13,7 @@
 
 #define JUMP_LABEL_NOP_SIZE	4
 
+/* Changes to this asm must be reflected in `rust/kernel/arch/loongarch/jump_label.rs` */
 #define JUMP_TABLE_ENTRY				\
 	 ".pushsection	__jump_table, \"aw\"	\n\t"	\
 	 ".align	3			\n\t"	\

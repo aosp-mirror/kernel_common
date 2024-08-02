@@ -14,6 +14,7 @@
 
 #define JUMP_LABEL_NOP_SIZE 4
 
+/* Changes to this asm must be reflected in `rust/kernel/arch/riscv/jump_label.rs` */
 static __always_inline bool arch_static_branch(struct static_key * const key,
 					       const bool branch)
 {

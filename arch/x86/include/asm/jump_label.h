@@ -12,6 +12,7 @@
 #include <linux/stringify.h>
 #include <linux/types.h>
 
+/* Changes to this asm must be reflected in `rust/kernel/arch/x86/jump_label.rs` */
 #define JUMP_TABLE_ENTRY				\
 	".pushsection __jump_table,  \"aw\" \n\t"	\
 	_ASM_ALIGN "\n\t"				\
