@@ -100,6 +100,16 @@
   __tracepoint_android_rvh_hw_protection_shutdown
   __traceiter_android_rvh_bpf_int_jit_compile_ro
   __tracepoint_android_rvh_bpf_int_jit_compile_ro
+  __traceiter_android_vh_tcp_sock_error
+  __tracepoint_android_vh_tcp_sock_error
+  __traceiter_android_vh_tcp_select_window
+  __tracepoint_android_vh_tcp_select_window
+  __traceiter_android_vh_tcp_fastsyn
+  __tracepoint_android_vh_tcp_fastsyn
+  __traceiter_android_vh_tcp_state_change
+  __tracepoint_android_vh_tcp_state_change
+  __traceiter_android_vh_tcp_update_rtt
+  __tracepoint_android_vh_tcp_update_rtt
   __traceiter_android_vh_sk_alloc
   __tracepoint_android_vh_sk_alloc
   __traceiter_android_vh_sk_free
