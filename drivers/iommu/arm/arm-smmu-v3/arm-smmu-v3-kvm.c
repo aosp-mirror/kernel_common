@@ -442,8 +442,24 @@ static int kvm_arm_smmu_def_domain_type(struct device *dev)
 	return 0;
 }
 
+static bool kvm_arm_smmu_capable(struct device *dev, enum iommu_cap cap)
+{
+	struct kvm_arm_smmu_master *master = dev_iommu_priv_get(dev);
+
+	switch (cap) {
+	case IOMMU_CAP_CACHE_COHERENCY:
+		/* Assume that a coherent TCU implies coherent TBUs */
+		return master->smmu->features & ARM_SMMU_FEAT_COHERENCY;
+	case IOMMU_CAP_NOEXEC:
+	case IOMMU_CAP_DEFERRED_FLUSH:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static struct iommu_ops kvm_arm_smmu_ops = {
-	.capable		= arm_smmu_capable,
+	.capable		= kvm_arm_smmu_capable,
 	.device_group		= arm_smmu_device_group,
 	.of_xlate		= arm_smmu_of_xlate,
 	.get_resv_regions	= arm_smmu_get_resv_regions,
