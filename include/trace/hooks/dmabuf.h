@@ -14,6 +14,13 @@
 DECLARE_HOOK(android_vh_dmabuf_page_pool_free_bypass,
 		TP_PROTO(struct page *page, bool *bypass),
 		TP_ARGS(page, bypass));
+DECLARE_HOOK(android_vh_dma_heap_buffer_alloc_start,
+		TP_PROTO(const char *name, size_t len,
+			u32 fd_flags, u64 heap_flags),
+		TP_ARGS(name, len, fd_flags, heap_flags));
+DECLARE_HOOK(android_vh_dma_heap_buffer_alloc_end,
+		TP_PROTO(const char *name, size_t len),
+		TP_ARGS(name, len));
 #endif /* _TRACE_HOOK_DMABUF_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>
