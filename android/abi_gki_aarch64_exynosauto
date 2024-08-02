@@ -53,6 +53,7 @@
   device_destroy
   device_for_each_child
   device_get_match_data
+  device_initialize
   device_property_present
   device_remove_file
   device_set_wakeup_capable
@@ -94,6 +95,8 @@
   dma_set_coherent_mask
   dma_set_mask
   dma_unmap_page_attrs
+  down_write
+  dma_sync_single_for_device
   enable_irq
   ethtool_op_get_link
   eth_type_trans
@@ -161,6 +164,7 @@
   kstrtoll
   kstrtouint
   kstrtoull
+  krealloc
   kthread_create_on_node
   ktime_get
   ktime_get_mono_fast_ns
@@ -206,6 +210,7 @@
   of_alias_get_id
   of_clk_add_provider
   of_clk_del_provider
+  nsecs_to_jiffies
   of_device_get_match_data
   of_device_is_available
   of_find_compatible_node
@@ -403,9 +408,11 @@
 # required by clk_exynosauto.ko
   __clk_get_hw
   clk_hw_get_parent
+  clk_register
   clk_register_clkdev
   clk_register_fixed_factor
   clk_register_fixed_rate
+  of_clk_add_provider
   of_clk_src_onecell_get
 
 # required by cmupmucal.ko
@@ -764,6 +771,52 @@
   devm_clk_get_optional
   watchdog_init_timeout
   watchdog_set_restart_priority
+
+# required by samsung-iommu-group-v9.ko
+  iommu_group_alloc
+  iommu_group_set_name
+
+# required by samsung-secure-iova.ko
+  gen_pool_add_owner
+  gen_pool_alloc_algo_owner
+  gen_pool_avail
+  gen_pool_create
+  gen_pool_destroy
+  gen_pool_first_fit_align
+  gen_pool_free_owner
+  gen_pool_size
+
+# required by samsung_iommu_v9.ko
+  __alloc_pages
+  device_link_add
+  device_link_del
+  __free_pages
+  iommu_alloc_resv_region
+  iommu_device_register
+  iommu_device_sysfs_add
+  iommu_device_sysfs_remove
+  iommu_device_unregister
+  iommu_fwspec_add_ids
+  iommu_fwspec_free
+  iommu_group_for_each_dev
+  iommu_group_get
+  iommu_group_get_iommudata
+  iommu_group_remove_device
+  iommu_group_set_iommudata
+  iommu_report_device_fault
+  irq_to_desc
+  kasan_flag_enabled
+  kimage_voffset
+  kmem_cache_alloc
+  kmem_cache_create
+  kmem_cache_destroy
+  kmem_cache_free
+  mem_section
+  of_find_node_with_property
+  of_n_addr_cells
+  of_n_size_cells
+  preempt_schedule
+  split_page
 
 # required by snd-soc-samsung-abox-core.ko
   alloc_chrdev_region
