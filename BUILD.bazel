@@ -7,7 +7,6 @@ load(
     "@rules_pkg//pkg:mappings.bzl",
     "pkg_filegroup",
     "pkg_files",
-    "strip_prefix",
 )
 load("@rules_pkg//pkg:pkg.bzl", "pkg_zip")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
@@ -15,7 +14,6 @@ load("//build/kernel/kleaf:common_kernels.bzl", "define_common_kernels")
 load("//build/kernel/kleaf:constants.bzl", "X86_64_OUTS")
 load(
     "//build/kernel/kleaf:kernel.bzl",
-    "android_filegroup",
     "checkpatch",
     "ddk_headers",
     "ddk_headers_archive",
@@ -1986,7 +1984,7 @@ pkg_files(
     visibility = ["//visibility:private"],
 )
 
-android_filegroup(
+pkg_filegroup(
     name = "kselftest_tests_x86_64",
     srcs = [
         ":kselftest_binderfs_binderfs_test_x86_64",
@@ -2052,11 +2050,10 @@ android_filegroup(
         ":kselftest_x86_syscall_nt_x86_64",
         ":kselftest_x86_test_mremap_vdso_x86_64",
     ],
-    cpu = "x86_64",
     visibility = ["//visibility:private"],
 )
 
-android_filegroup(
+pkg_filegroup(
     name = "kselftest_tests_x86",
     srcs = [
         ":kselftest_binderfs_binderfs_test_x86",
@@ -2122,11 +2119,10 @@ android_filegroup(
         ":kselftest_x86_syscall_nt_x86",
         ":kselftest_x86_test_mremap_vdso_x86",
     ],
-    cpu = "i386",
     visibility = ["//visibility:private"],
 )
 
-android_filegroup(
+pkg_filegroup(
     name = "kselftest_tests_arm",
     srcs = [
         ":kselftest_binderfs_binderfs_test_arm",
@@ -2185,11 +2181,10 @@ android_filegroup(
         ":kselftest_vdso_vdso_test_getcpu_arm",
         ":kselftest_vdso_vdso_test_gettimeofday_arm",
     ],
-    cpu = "arm",
     visibility = ["//visibility:private"],
 )
 
-android_filegroup(
+pkg_filegroup(
     name = "kselftest_tests_arm64",
     srcs = [
         ":kselftest_binderfs_binderfs_test_arm64",
@@ -2249,35 +2244,33 @@ android_filegroup(
         ":kselftest_vdso_vdso_test_getcpu_arm64",
         ":kselftest_vdso_vdso_test_gettimeofday_arm64",
     ],
-    cpu = "arm64",
     visibility = ["//visibility:private"],
 )
 
-pkg_files(
-    name = "kselftest_tests_x86_64_pkg_files",
+pkg_filegroup(
+    name = "kselftest_tests_x86_64_pkg_filegroup",
     srcs = [
+        ":kselftest_config_x86_64",
         ":kselftest_tests_x86",
         ":kselftest_tests_x86_64",
     ],
-    strip_prefix = strip_prefix.from_pkg(),
     visibility = ["//visibility:private"],
 )
 
-pkg_files(
-    name = "kselftest_tests_arm64_pkg_files",
+pkg_filegroup(
+    name = "kselftest_tests_arm64_pkg_filegroup",
     srcs = [
+        ":kselftest_config_arm64",
         ":kselftest_tests_arm",
         ":kselftest_tests_arm64",
     ],
-    strip_prefix = strip_prefix.from_pkg(),
     visibility = ["//visibility:private"],
 )
 
 pkg_zip(
     name = "tests_zip_x86_64",
     srcs = [
-        ":kselftest_config_x86_64",
-        ":kselftest_tests_x86_64_pkg_files",
+        ":kselftest_tests_x86_64_pkg_filegroup",
         ":kunit_tests_x86_64_pkg_files",
     ],
     out = "x86_64/tests.zip",
@@ -2287,8 +2280,7 @@ pkg_zip(
 pkg_zip(
     name = "tests_zip_arm64",
     srcs = [
-        ":kselftest_config_arm64",
-        ":kselftest_tests_arm64_pkg_files",
+        ":kselftest_tests_arm64_pkg_filegroup",
         ":kunit_tests_arm64_pkg_files",
     ],
     out = "arm64/tests.zip",

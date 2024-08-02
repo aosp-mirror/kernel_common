@@ -6,8 +6,16 @@ ABI aware build rules.
 """
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
+load(
+    "@rules_pkg//pkg:mappings.bzl",
+    "pkg_files",
+    "strip_prefix",
+)
+load(
+    "//build/kernel/kleaf:kernel.bzl",
+    "android_filegroup",
+)
 
 visibility("private")
 
@@ -27,11 +35,22 @@ def _copy_with_abi(
         out = name
 
     for abi in abis:
-        copy_file(
+        cpu = abi
+        if abi == "x86":
+            cpu = "i386"
+        android_filegroup(
+            name = "{name}_{abi}_bin".format(name = name, abi = abi),
+            srcs = [":{name}".format(name = name)],
+            cpu = cpu,
+            visibility = visibility,
+        )
+        pkg_files(
             name = "{name}_{abi}".format(name = name, abi = abi),
-            src = ":{name}".format(name = name),
-            out = paths.join(path_prefix, abi, out),
-            allow_symlink = True,
+            srcs = [":{name}_{abi}_bin".format(name = name, abi = abi)],
+            renames = {
+                ":{name}_{abi}_bin".format(name = name, abi = abi): paths.join(path_prefix, abi, out),
+            },
+            strip_prefix = strip_prefix.from_pkg(),
             visibility = visibility,
         )
 
@@ -46,11 +65,11 @@ def cc_binary_with_abi(
 
     For example:
     ```
-      cc_binary_with_abi(
+    cc_binary_with_abi(
         name = "a_binary",
         abis = ["x86_64", "arm64"],
         path_prefix = "my/path",
-      )
+    )
     ```
     generates 2 rules:
     * Rule a_binary_x86_64: Builds the cc_binary and put output in my/path/x86_64/a_binary.
@@ -59,13 +78,13 @@ def cc_binary_with_abi(
     Args:
         name: the name of the build rule.
         path_prefix: [Nonconfigurable](https://bazel.build/reference/be/common-definitions#configurable-attributes).
-          The path prefix to attach to output.
+            The path prefix to attach to output.
         abis: [Nonconfigurable](https://bazel.build/reference/be/common-definitions#configurable-attributes).
-          The intended abis to generate. Default is arm64 & x86_64.
+            The intended abis to generate. Default is arm64 & x86_64.
         visibility: [Nonconfigurable](https://bazel.build/reference/be/common-definitions#configurable-attributes).
-          The visibility attribute on a target controls whether the target can be used in other packages.
+            The visibility attribute on a target controls whether the target can be used in other packages.
         out: [Nonconfigurable](https://bazel.build/reference/be/common-definitions#configurable-attributes).
-          The output filename. Default is `name`.
+            The output filename. Default is `name`.
         **kwargs: the rest args that cc_binary uses.
     """
     native.cc_binary(
