@@ -2267,6 +2267,18 @@ pkg_filegroup(
     visibility = ["//visibility:private"],
 )
 
+pkg_install(
+    name = "kselftest_tests_x86_64_install",
+    srcs = [":kselftest_tests_x86_64_pkg_filegroup"],
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kselftest_tests_arm64_install",
+    srcs = [":kselftest_tests_arm64_pkg_filegroup"],
+    visibility = ["//visibility:private"],
+)
+
 pkg_zip(
     name = "tests_zip_x86_64",
     srcs = [
