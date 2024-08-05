@@ -1243,7 +1243,7 @@ static int __iwl_mvm_suspend(struct ieee80211_hw *hw,
 		.data[0] = &d3_cfg_cmd_data,
 		.len[0] = sizeof(d3_cfg_cmd_data),
 	};
-	int ret, primary_link;
+	int ret;
 	int len __maybe_unused;
 	bool unified_image = fw_has_capa(&mvm->fw->ucode_capa,
 					 IWL_UCODE_TLV_CAPA_CNSLDTD_D3_D0_IMG);
@@ -1261,28 +1261,9 @@ static int __iwl_mvm_suspend(struct ieee80211_hw *hw,
 	if (IS_ERR_OR_NULL(vif))
 		return 1;
 
-	if (hweight16(vif->active_links) > 1) {
-		/*
-		 * Select the 'best' link.
-		 * May need to revisit, it seems better to not optimize
-		 * for throughput but rather range, reliability and
-		 * power here - and select 2.4 GHz ...
-		 */
-		primary_link = iwl_mvm_mld_get_primary_link(mvm, vif,
-							    vif->active_links);
-
-		if (WARN_ONCE(primary_link < 0, "no primary link in 0x%x\n",
-			      vif->active_links))
-			primary_link = __ffs(vif->active_links);
-
-		ret = ieee80211_set_active_links(vif, BIT(primary_link));
-		if (ret)
-			return ret;
-	} else if (vif->active_links) {
-		primary_link = __ffs(vif->active_links);
-	} else {
-		primary_link = 0;
-	}
+	ret = iwl_mvm_block_esr_sync(mvm, vif, IWL_MVM_ESR_BLOCKED_WOWLAN);
+	if (ret)
+		return ret;
 
 	mutex_lock(&mvm->mutex);
 
@@ -1292,7 +1273,7 @@ static int __iwl_mvm_suspend(struct ieee80211_hw *hw,
 
 	mvmvif = iwl_mvm_vif_from_mac80211(vif);
 
-	mvm_link = mvmvif->link[primary_link];
+	mvm_link = mvmvif->link[iwl_mvm_get_primary_link(vif)];
 	if (WARN_ON_ONCE(!mvm_link)) {
 		ret = -EINVAL;
 		goto out_noreset;
@@ -3471,6 +3452,8 @@ static int __iwl_mvm_resume(struct iwl_mvm *mvm, bool test)
 		if (ret < 0)
 			goto err;
 	}
+
+	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_WOWLAN);
 
 	/* after the successful handshake, we're out of D3 */
 	mvm->trans->system_pm_mode = IWL_PLAT_PM_MODE_DISABLED;

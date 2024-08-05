@@ -543,7 +543,7 @@ static int tnl_update_pmtu(struct net_device *dev, struct sk_buff *skb,
 		struct rt6_info *rt6;
 		__be32 daddr;
 
-		rt6 = skb_valid_dst(skb) ? (struct rt6_info *)skb_dst(skb) :
+		rt6 = skb_valid_dst(skb) ? dst_rt6_info(skb_dst(skb)) :
 					   NULL;
 		daddr = md ? dst : tunnel->parms.iph.daddr;
 
@@ -897,7 +897,7 @@ static void ip_tunnel_update(struct ip_tunnel_net *itn,
 		t->fwmark = fwmark;
 		mtu = ip_tunnel_bind_dev(dev);
 		if (set_mtu)
-			dev->mtu = mtu;
+			WRITE_ONCE(dev->mtu, mtu);
 	}
 	dst_cache_reset(&t->dst_cache);
 	netdev_state_change(dev);
@@ -1082,7 +1082,7 @@ int __ip_tunnel_change_mtu(struct net_device *dev, int new_mtu, bool strict)
 		new_mtu = max_mtu;
 	}
 
-	dev->mtu = new_mtu;
+	WRITE_ONCE(dev->mtu, new_mtu);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(__ip_tunnel_change_mtu);
@@ -1120,7 +1120,7 @@ struct net *ip_tunnel_get_link_net(const struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = netdev_priv(dev);
 
-	return tunnel->net;
+	return READ_ONCE(tunnel->net);
 }
 EXPORT_SYMBOL(ip_tunnel_get_link_net);
 

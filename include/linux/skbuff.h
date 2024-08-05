@@ -353,8 +353,6 @@ struct sk_buff;
 
 #define MAX_SKB_FRAGS CONFIG_MAX_SKB_FRAGS
 
-extern int sysctl_max_skb_frags;
-
 /* Set skb_shinfo(skb)->gso_size to this in case you want skb_segment to
  * segment using its current segmentation instead.
  */
@@ -1178,15 +1176,6 @@ static inline void skb_dst_set_noref(struct sk_buff *skb, struct dst_entry *dst)
 static inline bool skb_dst_is_noref(const struct sk_buff *skb)
 {
 	return (skb->_skb_refdst & SKB_DST_NOREF) && skb_dst(skb);
-}
-
-/**
- * skb_rtable - Returns the skb &rtable
- * @skb: buffer
- */
-static inline struct rtable *skb_rtable(const struct sk_buff *skb)
-{
-	return (struct rtable *)skb_dst(skb);
 }
 
 /* For mangling skb->pkt_type from user space side from applications
@@ -3394,7 +3383,7 @@ void __napi_kfree_skb(struct sk_buff *skb, enum skb_drop_reason reason);
  *
  * %NULL is returned if there is no free memory.
 */
-static inline struct page *__dev_alloc_pages(gfp_t gfp_mask,
+static inline struct page *__dev_alloc_pages_noprof(gfp_t gfp_mask,
 					     unsigned int order)
 {
 	/* This piece of code contains several assumptions.
@@ -3407,13 +3396,11 @@ static inline struct page *__dev_alloc_pages(gfp_t gfp_mask,
 	 */
 	gfp_mask |= __GFP_COMP | __GFP_MEMALLOC;
 
-	return alloc_pages_node(NUMA_NO_NODE, gfp_mask, order);
+	return alloc_pages_node_noprof(NUMA_NO_NODE, gfp_mask, order);
 }
+#define __dev_alloc_pages(...)	alloc_hooks(__dev_alloc_pages_noprof(__VA_ARGS__))
 
-static inline struct page *dev_alloc_pages(unsigned int order)
-{
-	return __dev_alloc_pages(GFP_ATOMIC | __GFP_NOWARN, order);
-}
+#define dev_alloc_pages(_order) __dev_alloc_pages(GFP_ATOMIC | __GFP_NOWARN, _order)
 
 /**
  * __dev_alloc_page - allocate a page for network Rx
@@ -3423,15 +3410,13 @@ static inline struct page *dev_alloc_pages(unsigned int order)
  *
  * %NULL is returned if there is no free memory.
  */
-static inline struct page *__dev_alloc_page(gfp_t gfp_mask)
+static inline struct page *__dev_alloc_page_noprof(gfp_t gfp_mask)
 {
-	return __dev_alloc_pages(gfp_mask, 0);
+	return __dev_alloc_pages_noprof(gfp_mask, 0);
 }
+#define __dev_alloc_page(...)	alloc_hooks(__dev_alloc_page_noprof(__VA_ARGS__))
 
-static inline struct page *dev_alloc_page(void)
-{
-	return dev_alloc_pages(0);
-}
+#define dev_alloc_page()	dev_alloc_pages(0)
 
 /**
  * dev_page_is_reusable - check whether a page can be reused for network Rx

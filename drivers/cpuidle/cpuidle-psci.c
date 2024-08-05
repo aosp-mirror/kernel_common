@@ -29,6 +29,7 @@
 
 #include "cpuidle-psci.h"
 #include "dt_idle_states.h"
+#include "dt_idle_genpd.h"
 
 struct psci_cpuidle_data {
 	u32 *psci_states;
@@ -229,7 +230,7 @@ static int psci_dt_cpu_init_topology(struct cpuidle_driver *drv,
 	if (IS_ENABLED(CONFIG_PREEMPT_RT))
 		return 0;
 
-	data->dev = psci_dt_attach_cpu(cpu);
+	data->dev = dt_idle_attach_cpu(cpu, "psci");
 	if (IS_ERR_OR_NULL(data->dev))
 		return PTR_ERR_OR_ZERO(data->dev);
 
@@ -316,7 +317,7 @@ static void psci_cpu_deinit_idle(int cpu)
 {
 	struct psci_cpuidle_data *data = per_cpu_ptr(&psci_cpuidle_data, cpu);
 
-	psci_dt_detach_cpu(data->dev);
+	dt_idle_detach_cpu(data->dev);
 	psci_cpuidle_use_cpuhp = false;
 }
 

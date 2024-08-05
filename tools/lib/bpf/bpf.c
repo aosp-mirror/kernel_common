@@ -105,7 +105,7 @@ int sys_bpf_prog_load(union bpf_attr *attr, unsigned int size, int attempts)
  */
 int probe_memcg_account(int token_fd)
 {
-	const size_t attr_sz = offsetofend(union bpf_attr, attach_btf_obj_fd);
+	const size_t attr_sz = offsetofend(union bpf_attr, prog_token_fd);
 	struct bpf_insn insns[] = {
 		BPF_EMIT_CALL(BPF_FUNC_ktime_get_coarse_ns),
 		BPF_EXIT_INSN(),
@@ -766,6 +766,7 @@ int bpf_link_create(int prog_fd, int target_fd,
 			return libbpf_err(-EINVAL);
 		break;
 	case BPF_TRACE_KPROBE_MULTI:
+	case BPF_TRACE_KPROBE_SESSION:
 		attr.link_create.kprobe_multi.flags = OPTS_GET(opts, kprobe_multi.flags, 0);
 		attr.link_create.kprobe_multi.cnt = OPTS_GET(opts, kprobe_multi.cnt, 0);
 		attr.link_create.kprobe_multi.syms = ptr_to_u64(OPTS_GET(opts, kprobe_multi.syms, 0));

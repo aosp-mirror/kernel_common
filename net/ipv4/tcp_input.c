@@ -72,6 +72,7 @@
 #include <linux/prefetch.h>
 #include <net/dst.h>
 #include <net/tcp.h>
+#include <net/proto_memory.h>
 #include <net/inet_common.h>
 #include <linux/ipsec.h>
 #include <asm/unaligned.h>
@@ -913,7 +914,7 @@ static void tcp_rtt_estimator(struct sock *sk, long mrtt_us)
 			tp->rtt_seq = tp->snd_nxt;
 			tp->mdev_max_us = tcp_rto_min_us(sk);
 
-			tcp_bpf_rtt(sk);
+			tcp_bpf_rtt(sk, mrtt_us, srtt);
 		}
 	} else {
 		/* no previous measure. */
@@ -923,7 +924,7 @@ static void tcp_rtt_estimator(struct sock *sk, long mrtt_us)
 		tp->mdev_max_us = tp->rttvar_us;
 		tp->rtt_seq = tp->snd_nxt;
 
-		tcp_bpf_rtt(sk);
+		tcp_bpf_rtt(sk, mrtt_us, srtt);
 	}
 	tp->srtt_us = max(1U, srtt);
 }
@@ -3541,7 +3542,7 @@ static void tcp_cong_control(struct sock *sk, u32 ack, u32 acked_sacked,
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 
 	if (icsk->icsk_ca_ops->cong_control) {
-		icsk->icsk_ca_ops->cong_control(sk, rs);
+		icsk->icsk_ca_ops->cong_control(sk, ack, flag, rs);
 		return;
 	}
 

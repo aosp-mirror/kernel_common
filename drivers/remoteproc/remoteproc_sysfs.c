@@ -261,7 +261,7 @@ static const struct attribute_group *rproc_devgroups[] = {
 	NULL
 };
 
-struct class rproc_class = {
+const struct class rproc_class = {
 	.name		= "remoteproc",
 	.dev_groups	= rproc_devgroups,
 };

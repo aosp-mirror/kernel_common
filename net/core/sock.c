@@ -127,6 +127,7 @@
 #include <net/net_namespace.h>
 #include <net/request_sock.h>
 #include <net/sock.h>
+#include <net/proto_memory.h>
 #include <linux/net_tstamp.h>
 #include <net/xfrm.h>
 #include <linux/ipsec.h>
@@ -283,7 +284,6 @@ __u32 sysctl_rmem_max __read_mostly = SK_RMEM_MAX;
 EXPORT_SYMBOL(sysctl_rmem_max);
 __u32 sysctl_wmem_default __read_mostly = SK_WMEM_MAX;
 __u32 sysctl_rmem_default __read_mostly = SK_RMEM_MAX;
-int sysctl_mem_pcpu_rsv __read_mostly = SK_MEMORY_PCPU_RESERVE;
 
 int sysctl_tstamp_allow_data __read_mostly = 1;
 
@@ -3241,8 +3241,8 @@ int sock_no_socketpair(struct socket *sock1, struct socket *sock2)
 }
 EXPORT_SYMBOL(sock_no_socketpair);
 
-int sock_no_accept(struct socket *sock, struct socket *newsock, int flags,
-		   bool kern)
+int sock_no_accept(struct socket *sock, struct socket *newsock,
+		   struct proto_accept_arg *arg)
 {
 	return -EOPNOTSUPP;
 }

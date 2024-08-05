@@ -2313,6 +2313,10 @@ static void mac80211_hwsim_beacon_tx(void *arg, u8 *mac,
 
 	if (link_conf->csa_active && ieee80211_beacon_cntdwn_is_complete(vif, link_id))
 		ieee80211_csa_finish(vif, link_id);
+
+	if (link_conf->color_change_active &&
+	    ieee80211_beacon_cntdwn_is_complete(vif, link_id))
+		ieee80211_color_change_finish(vif, link_id);
 }
 
 static enum hrtimer_restart
@@ -5323,6 +5327,8 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 
 	wiphy_ext_feature_set(hw->wiphy,
 			      NL80211_EXT_FEATURE_SCAN_MIN_PREQ_CONTENT);
+	wiphy_ext_feature_set(hw->wiphy,
+			      NL80211_EXT_FEATURE_BSS_COLOR);
 
 	hw->wiphy->interface_modes = param->iftypes;
 
@@ -6672,7 +6678,6 @@ MODULE_DEVICE_TABLE(virtio, id_table);
 
 static struct virtio_driver virtio_hwsim = {
 	.driver.name = KBUILD_MODNAME,
-	.driver.owner = THIS_MODULE,
 	.id_table = id_table,
 	.probe = hwsim_virtio_probe,
 	.remove = hwsim_virtio_remove,
@@ -6761,11 +6766,11 @@ static int __init init_mac80211_hwsim(void)
 				param.regd = &hwsim_world_regdom_custom_01;
 			break;
 		case HWSIM_REGTEST_CUSTOM_WORLD:
-			param.regd = &hwsim_world_regdom_custom_01;
+			param.regd = &hwsim_world_regdom_custom_03;
 			break;
 		case HWSIM_REGTEST_CUSTOM_WORLD_2:
 			if (i == 0)
-				param.regd = &hwsim_world_regdom_custom_01;
+				param.regd = &hwsim_world_regdom_custom_03;
 			else if (i == 1)
 				param.regd = &hwsim_world_regdom_custom_02;
 			break;

@@ -11,6 +11,10 @@ KSFT_RESULT = None
 KSFT_RESULT_ALL = True
 
 
+class KsftFailEx(Exception):
+    pass
+
+
 class KsftSkipEx(Exception):
     pass
 
@@ -53,6 +57,24 @@ def ksft_ge(a, b, comment=""):
         _fail("Check failed", a, "<", b, comment)
 
 
+class ksft_raises:
+    def __init__(self, expected_type):
+        self.exception = None
+        self.expected_type = expected_type
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            _fail(f"Expected exception {str(self.expected_type.__name__)}, none raised")
+        elif self.expected_type != exc_type:
+            _fail(f"Expected exception {str(self.expected_type.__name__)}, raised {str(exc_type.__name__)}")
+        self.exception = exc_val
+        # Suppress the exception if its the expected one
+        return self.expected_type == exc_type
+
+
 def ksft_busy_wait(cond, sleep=0.005, deadline=1, comment=""):
     end = time.monotonic() + deadline
     while True:
@@ -81,7 +103,18 @@ def ktap_result(ok, cnt=1, case="", comment=""):
     print(res)
 
 
-def ksft_run(cases, args=()):
+def ksft_run(cases=None, globs=None, case_pfx=None, args=()):
+    cases = cases or []
+
+    if globs and case_pfx:
+        for key, value in globs.items():
+            if not callable(value):
+                continue
+            for prefix in case_pfx:
+                if key.startswith(prefix):
+                    cases.append(value)
+                    break
+
     totals = {"pass": 0, "fail": 0, "skip": 0, "xfail": 0}
 
     print("KTAP version 1")

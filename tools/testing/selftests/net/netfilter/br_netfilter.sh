@@ -40,7 +40,11 @@ bcast_ping()
 	fromns="$1"
 	dstip="$2"
 
-	for i in $(seq 1 500); do
+	local packets=500
+
+	[ "$KSFT_MACHINE_SLOW" = yes ] && packets=100
+
+	for i in $(seq 1 $packets); do
 		if ! ip netns exec "$fromns" ping -q -f -b -c 1 -q "$dstip" > /dev/null 2>&1; then
 			echo "ERROR: ping -b from $fromns to $dstip"
 			ip netns exec "$ns0" nft list ruleset
@@ -124,6 +128,10 @@ table bridge filter {
 	}
 }
 EOF
+if [ "$?" -ne 0 ];then
+	echo "SKIP: could not add nftables ruleset"
+	exit $ksft_skip
+fi
 
 # place 1, 2 & 3 in same subnet, connected via ns0:br0.
 # ns4 is placed in same subnet as well, but its not

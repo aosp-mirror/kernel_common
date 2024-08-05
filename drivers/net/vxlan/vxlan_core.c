@@ -2532,7 +2532,7 @@ void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		}
 
 		if (!info) {
-			u32 rt6i_flags = ((struct rt6_info *)ndst)->rt6i_flags;
+			u32 rt6i_flags = dst_rt6_info(ndst)->rt6i_flags;
 
 			err = encap_bypass_if_local(skb, dev, vxlan, AF_INET6,
 						    dst_port, ifindex, vni,
@@ -3181,7 +3181,7 @@ static int vxlan_change_mtu(struct net_device *dev, int new_mtu)
 			return -EINVAL;
 	}
 
-	dev->mtu = new_mtu;
+	WRITE_ONCE(dev->mtu, new_mtu);
 	return 0;
 }
 
@@ -4569,7 +4569,7 @@ static struct net *vxlan_get_link_net(const struct net_device *dev)
 {
 	struct vxlan_dev *vxlan = netdev_priv(dev);
 
-	return vxlan->net;
+	return READ_ONCE(vxlan->net);
 }
 
 static struct rtnl_link_ops vxlan_link_ops __read_mostly = {
