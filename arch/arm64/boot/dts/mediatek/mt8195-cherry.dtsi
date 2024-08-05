@@ -616,6 +616,13 @@
 	};
 };
 
+&pcie0 {
+	status = "disabled";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie0_pins_default>;
+};
+
 &pcie1 {
 	status = "okay";
 
