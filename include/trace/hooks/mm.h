@@ -366,6 +366,12 @@ DECLARE_HOOK(android_vh_compact_finished,
 DECLARE_HOOK(android_vh_madvise_cold_or_pageout_abort,
 	TP_PROTO(struct vm_area_struct *vma, bool *abort_madvise),
 	TP_ARGS(vma, abort_madvise));
+DECLARE_HOOK(android_vh_zs_shrinker_adjust,
+	TP_PROTO(unsigned long *pages_to_free),
+	TP_ARGS(pages_to_free));
+DECLARE_HOOK(android_vh_zs_shrinker_bypass,
+	TP_PROTO(bool *bypass),
+	TP_ARGS(bypass));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
