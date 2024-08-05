@@ -1152,7 +1152,7 @@ struct bnxt_cp_ring_info {
 	struct bnxt_stats_mem	stats;
 	u32			hw_stats_ctx_id;
 
-	struct bnxt_sw_stats	sw_stats;
+	struct bnxt_sw_stats	*sw_stats;
 
 	struct bnxt_ring_struct	cp_ring_struct;
 
@@ -2013,6 +2013,7 @@ enum board_idx {
 	NETXTREME_E_VF_HV,
 	NETXTREME_E_P5_VF,
 	NETXTREME_E_P5_VF_HV,
+	NETXTREME_E_P7_VF,
 };
 
 struct bnxt {
@@ -2440,6 +2441,7 @@ struct bnxt {
 #define BNXT_LINK_CFG_CHANGE_SP_EVENT	21
 #define BNXT_THERMAL_THRESHOLD_SP_EVENT	22
 #define BNXT_FW_ECHO_REQUEST_SP_EVENT	23
+#define BNXT_RESTART_ULP_SP_EVENT	24
 
 	struct delayed_work	fw_reset_task;
 	int			fw_reset_state;
@@ -2736,7 +2738,6 @@ unsigned int bnxt_get_max_func_stat_ctxs(struct bnxt *bp);
 unsigned int bnxt_get_avail_stat_ctxs_for_en(struct bnxt *bp);
 unsigned int bnxt_get_max_func_cp_rings(struct bnxt *bp);
 unsigned int bnxt_get_avail_cp_rings_for_en(struct bnxt *bp);
-int bnxt_get_avail_msix(struct bnxt *bp, int num);
 int bnxt_reserve_rings(struct bnxt *bp, bool irq_re_init);
 void bnxt_tx_disable(struct bnxt *bp);
 void bnxt_tx_enable(struct bnxt *bp);

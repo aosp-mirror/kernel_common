@@ -20,6 +20,7 @@
 #include <net/transp_v6.h>
 #endif
 #include <net/mptcp.h>
+#include <net/hotdata.h>
 #include <net/xfrm.h>
 #include <asm/ioctls.h>
 #include "protocol.h"
@@ -1272,7 +1273,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 
 		i = skb_shinfo(skb)->nr_frags;
 		can_coalesce = skb_can_coalesce(skb, i, dfrag->page, offset);
-		if (!can_coalesce && i >= READ_ONCE(sysctl_max_skb_frags)) {
+		if (!can_coalesce && i >= READ_ONCE(net_hotdata.sysctl_max_skb_frags)) {
 			tcp_mark_push(tcp_sk(ssk), skb);
 			goto alloc_skb;
 		}
@@ -2569,7 +2570,7 @@ static void mptcp_check_fastclose(struct mptcp_sock *msk)
 
 		slow = lock_sock_fast(tcp_sk);
 		if (tcp_sk->sk_state != TCP_CLOSE) {
-			tcp_send_active_reset(tcp_sk, GFP_ATOMIC);
+			mptcp_send_active_reset_reason(tcp_sk);
 			tcp_set_state(tcp_sk, TCP_CLOSE);
 		}
 		unlock_sock_fast(tcp_sk, slow);
@@ -2813,7 +2814,8 @@ static void mptcp_ca_reset(struct sock *sk)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
 	tcp_assign_congestion_control(sk);
-	strcpy(mptcp_sk(sk)->ca_name, icsk->icsk_ca_ops->name);
+	strscpy(mptcp_sk(sk)->ca_name, icsk->icsk_ca_ops->name,
+		sizeof(mptcp_sk(sk)->ca_name));
 
 	/* no need to keep a reference to the ops, the name will suffice */
 	tcp_cleanup_congestion_control(sk);
@@ -3880,11 +3882,10 @@ unlock:
 }
 
 static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
-			       int flags, bool kern)
+			       struct proto_accept_arg *arg)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct sock *ssk, *newsk;
-	int err;
 
 	pr_debug("msk=%p", msk);
 
@@ -3896,9 +3897,9 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		return -EINVAL;
 
 	pr_debug("ssk=%p, listener=%p", ssk, mptcp_subflow_ctx(ssk));
-	newsk = inet_csk_accept(ssk, flags, &err, kern);
+	newsk = inet_csk_accept(ssk, arg);
 	if (!newsk)
-		return err;
+		return arg->err;
 
 	pr_debug("newsk=%p, subflow is mptcp=%d", newsk, sk_is_mptcp(newsk));
 	if (sk_is_mptcp(newsk)) {
@@ -3919,7 +3920,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		newsk = new_mptcp_sock;
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_MPCAPABLEPASSIVEACK);
 
-		newsk->sk_kern_sock = kern;
+		newsk->sk_kern_sock = arg->kern;
 		lock_sock(newsk);
 		__inet_accept(sock, newsock, newsk);
 
@@ -3948,7 +3949,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		}
 	} else {
 tcpfallback:
-		newsk->sk_kern_sock = kern;
+		newsk->sk_kern_sock = arg->kern;
 		lock_sock(newsk);
 		__inet_accept(sock, newsock, newsk);
 		/* we are being invoked after accepting a non-mp-capable
@@ -4168,7 +4169,7 @@ int __init mptcp_proto_v6_init(void)
 	int err;
 
 	mptcp_v6_prot = mptcp_prot;
-	strcpy(mptcp_v6_prot.name, "MPTCPv6");
+	strscpy(mptcp_v6_prot.name, "MPTCPv6", sizeof(mptcp_v6_prot.name));
 	mptcp_v6_prot.slab = NULL;
 	mptcp_v6_prot.obj_size = sizeof(struct mptcp6_sock);
 	mptcp_v6_prot.ipv6_pinfo_offset = offsetof(struct mptcp6_sock, np);
