@@ -67,7 +67,7 @@ static int otx2_change_mtu(struct net_device *netdev, int new_mtu)
 
 	netdev_info(netdev, "Changing MTU from %d to %d\n",
 		    netdev->mtu, new_mtu);
-	netdev->mtu = new_mtu;
+	WRITE_ONCE(netdev->mtu, new_mtu);
 
 	if (if_up)
 		err = otx2_open(netdev);
@@ -1886,9 +1886,17 @@ int otx2_open(struct net_device *netdev)
 	vec = pf->hw.nix_msixoff + NIX_LF_CINT_VEC_START;
 	for (qidx = 0; qidx < pf->hw.cint_cnt; qidx++) {
 		irq_name = &pf->hw.irq_name[vec * NAME_SIZE];
+		int name_len;
 
-		snprintf(irq_name, NAME_SIZE, "%s-rxtx-%d", pf->netdev->name,
-			 qidx);
+		name_len = snprintf(irq_name, NAME_SIZE, "%s-rxtx-%d",
+				    pf->netdev->name, qidx);
+		if (name_len >= NAME_SIZE) {
+			dev_err(pf->dev,
+				"RVUPF%d: IRQ registration failed for CQ%d, irq name is too long\n",
+				rvu_get_pf(pf->pcifunc), qidx);
+			err = -EINVAL;
+			goto err_free_cints;
+		}
 
 		err = request_irq(pci_irq_vector(pf->pdev, vec),
 				  otx2_cq_intr_handler, 0, irq_name,

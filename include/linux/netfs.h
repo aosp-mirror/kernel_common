@@ -389,6 +389,7 @@ struct netfs_cache_ops {
 };
 
 /* High-level read API. */
+ssize_t netfs_unbuffered_read_iter_locked(struct kiocb *iocb, struct iov_iter *iter);
 ssize_t netfs_unbuffered_read_iter(struct kiocb *iocb, struct iov_iter *iter);
 ssize_t netfs_buffered_read_iter(struct kiocb *iocb, struct iov_iter *iter);
 ssize_t netfs_file_read_iter(struct kiocb *iocb, struct iov_iter *iter);
@@ -399,6 +400,8 @@ ssize_t netfs_perform_write(struct kiocb *iocb, struct iov_iter *iter,
 ssize_t netfs_buffered_write_iter_locked(struct kiocb *iocb, struct iov_iter *from,
 					 struct netfs_group *netfs_group);
 ssize_t netfs_unbuffered_write_iter(struct kiocb *iocb, struct iov_iter *from);
+ssize_t netfs_unbuffered_write_iter_locked(struct kiocb *iocb, struct iov_iter *iter,
+					   struct netfs_group *netfs_group);
 ssize_t netfs_file_write_iter(struct kiocb *iocb, struct iov_iter *from);
 
 /* Address operations API */

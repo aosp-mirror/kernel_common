@@ -2916,16 +2916,32 @@ cifs_strict_readv(struct kiocb *iocb, struct iov_iter *to)
 	 * We need to hold the sem to be sure nobody modifies lock list
 	 * with a brlock that prevents reading.
 	 */
-	down_read(&cinode->lock_sem);
-	if (!cifs_find_lock_conflict(cfile, iocb->ki_pos, iov_iter_count(to),
-				     tcon->ses->server->vals->shared_lock_type,
-				     0, NULL, CIFS_READ_OP)) {
-		if (iocb->ki_flags & IOCB_DIRECT)
-			rc = netfs_unbuffered_read_iter(iocb, to);
-		else
-			rc = netfs_buffered_read_iter(iocb, to);
+	if (iocb->ki_flags & IOCB_DIRECT) {
+		rc = netfs_start_io_direct(inode);
+		if (rc < 0)
+			goto out;
+		down_read(&cinode->lock_sem);
+		if (!cifs_find_lock_conflict(
+			    cfile, iocb->ki_pos, iov_iter_count(to),
+			    tcon->ses->server->vals->shared_lock_type,
+			    0, NULL, CIFS_READ_OP))
+			rc = netfs_unbuffered_read_iter_locked(iocb, to);
+		up_read(&cinode->lock_sem);
+		netfs_end_io_direct(inode);
+	} else {
+		rc = netfs_start_io_read(inode);
+		if (rc < 0)
+			goto out;
+		down_read(&cinode->lock_sem);
+		if (!cifs_find_lock_conflict(
+			    cfile, iocb->ki_pos, iov_iter_count(to),
+			    tcon->ses->server->vals->shared_lock_type,
+			    0, NULL, CIFS_READ_OP))
+			rc = filemap_read(iocb, to, 0);
+		up_read(&cinode->lock_sem);
+		netfs_end_io_read(inode);
 	}
-	up_read(&cinode->lock_sem);
+out:
 	return rc;
 }
 
@@ -3173,6 +3189,28 @@ static void cifs_swap_deactivate(struct file *file)
 	/* do we need to unpin (or unlock) the file */
 }
 
+/**
+ * cifs_swap_rw - SMB3 address space operation for swap I/O
+ * @iocb: target I/O control block
+ * @iter: I/O buffer
+ *
+ * Perform IO to the swap-file.  This is much like direct IO.
+ */
+static int cifs_swap_rw(struct kiocb *iocb, struct iov_iter *iter)
+{
+	ssize_t ret;
+
+	WARN_ON_ONCE(iov_iter_count(iter) != PAGE_SIZE);
+
+	if (iov_iter_rw(iter) == READ)
+		ret = netfs_unbuffered_read_iter_locked(iocb, iter);
+	else
+		ret = netfs_unbuffered_write_iter_locked(iocb, iter, NULL);
+	if (ret < 0)
+		return ret;
+	return 0;
+}
+
 const struct address_space_operations cifs_addr_ops = {
 	.read_folio	= netfs_read_folio,
 	.readahead	= netfs_readahead,
@@ -3188,6 +3226,7 @@ const struct address_space_operations cifs_addr_ops = {
 	 */
 	.swap_activate	= cifs_swap_activate,
 	.swap_deactivate = cifs_swap_deactivate,
+	.swap_rw = cifs_swap_rw,
 };
 
 /*
