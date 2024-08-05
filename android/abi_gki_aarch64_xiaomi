@@ -74,6 +74,10 @@
   __tracepoint_android_vh_anon_vma_name_recog
   __tracepoint_android_vh_restore_mm_flags
   __tracepoint_android_vh_update_vma_flags
+  __traceiter_android_vh_madvise_cold_or_pageout_abort
+  __traceiter_android_vh_compact_finished
+  __tracepoint_android_vh_madvise_cold_or_pageout_abort
+  __tracepoint_android_vh_compact_finished
 
 #required by metis.ko module
   __traceiter_android_vh_rwsem_read_wait_start
