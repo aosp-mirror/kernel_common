@@ -84,6 +84,8 @@
   __traceiter_android_vh_cache_show
   __traceiter_android_vh_cma_alloc_set_max_retries
   __traceiter_android_vh_cma_debug_show_areas
+  __traceiter_android_vh_dma_heap_buffer_alloc_start
+  __traceiter_android_vh_dma_heap_buffer_alloc_end
   __traceiter_android_vh_dmabuf_page_pool_free_bypass
   __traceiter_android_vh_do_read_fault
   __traceiter_android_vh_exit_mm
@@ -148,6 +150,8 @@
   __tracepoint_android_vh_cache_show
   __tracepoint_android_vh_cma_alloc_set_max_retries
   __tracepoint_android_vh_cma_debug_show_areas
+  __tracepoint_android_vh_dma_heap_buffer_alloc_start
+  __tracepoint_android_vh_dma_heap_buffer_alloc_end
   __tracepoint_android_vh_dmabuf_page_pool_free_bypass
   __tracepoint_android_vh_do_read_fault
   __tracepoint_android_vh_exit_mm
