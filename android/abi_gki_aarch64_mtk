@@ -2556,6 +2556,8 @@
   set_capacity
   set_capacity_and_notify
   set_cpus_allowed_ptr
+  set_direct_map_default_noflush
+  set_direct_map_invalid_noflush
   set_disk_ro
   set_freezable
   set_next_entity
