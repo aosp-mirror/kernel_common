@@ -31,6 +31,14 @@ import tarfile
 
 LCOV = "lcov"
 
+# Relative to the root of the source tree..
+OUTPUT_COV_DIR = os.path.join("out", "coverage")
+
+PREBUILT_LLVM_COV_PATH = os.path.join(
+    "prebuilts", "clang", "host", "linux-x86", "llvm-binutils-stable",
+    "llvm-cov"
+)
+
 EXCLUDED_FILES = [
     "*/security/selinux/av_permissions.h",
     "*/security/selinux/flask.h",
@@ -360,7 +368,7 @@ def get_kernel_repo_dir() -> str:
   return get_parent_path(this_script_full_path, 6)
 
 
-def build_config(llvm_cov_path: str) -> {}:
+def build_config(llvm_cov_path: str, tmp_dir: str) -> {}:
   """Build configuration.
 
   Returns:
@@ -369,12 +377,14 @@ def build_config(llvm_cov_path: str) -> {}:
   config = {}
   config["repo_dir"] = get_kernel_repo_dir()
   config["output_dir"] = f'{config["repo_dir"]}/out'
-  config["output_cov_dir"] = f'{config["output_dir"]}/coverage'
+  config["output_cov_dir"] = (
+      os.path.abspath(tmp_dir) if tmp_dir else
+      os.path.join(config["repo_dir"], OUTPUT_COV_DIR)
+  )
 
   config["llvm_cov_filename"] = (
       os.path.abspath(llvm_cov_path) if llvm_cov_path else
-      f'{config["repo_dir"]}/prebuilts/clang/host/linux-x86/'
-      'llvm-binutils-stable/llvm-cov'
+      os.path.join(config["repo_dir"], PREBUILT_LLVM_COV_PATH)
   )
 
   config["llvm_gcov_sh_filename"] = (
@@ -430,7 +440,18 @@ def main() -> None:
   arg_parser.add_argument(
       "--llvm-cov",
       required=False,
-      help="Path to llvm-cov",
+      help=(
+          "Path to llvm-cov. Default: " +
+          os.path.join("<repo dir>", PREBUILT_LLVM_COV_PATH)
+      )
+  )
+  arg_parser.add_argument(
+      "--tmp-dir",
+      required=False,
+      help=(
+          "Path to the directory where the temporary files are created."
+          " Default: " + os.path.join("<repo dir>", OUTPUT_COV_DIR)
+      )
   )
   arg_parser.add_argument(
       "--verbose",
@@ -463,7 +484,7 @@ def main() -> None:
       logging.error("%s is not a directory.", gcno_dir)
       sys.exit(-1)
 
-  config = build_config(args.llvm_cov)
+  config = build_config(args.llvm_cov, args.tmp_dir)
 
   if args.gcno_dirs:
     gcno_mappings = read_gcno_dirs(args.gcno_dirs)
