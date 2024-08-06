@@ -265,8 +265,8 @@ static int dir_relative_path_resolve(
 		goto out;
 	}
 
-	error = user_path_at_empty(dir_fd, relative_path,
-		LOOKUP_FOLLOW | LOOKUP_DIRECTORY, result_path, NULL);
+	error = user_path_at(dir_fd, relative_path,
+		LOOKUP_FOLLOW | LOOKUP_DIRECTORY, result_path);
 
 out:
 	close_fd(dir_fd);
