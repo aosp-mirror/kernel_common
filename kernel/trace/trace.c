@@ -984,7 +984,6 @@ void tracing_on(void)
 {
 	tracer_tracing_on(&global_trace);
 }
-EXPORT_SYMBOL_GPL(tracing_on);
 
 
 static __always_inline void

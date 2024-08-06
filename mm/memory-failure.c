@@ -1075,7 +1075,7 @@ static bool hwpoison_user_mappings(struct page *p, unsigned long pfn,
 				unmap_success = false;
 			}
 		} else {
-			unmap_success = try_to_unmap(p, ttu);
+			unmap_success = try_to_unmap(hpage, ttu);
 		}
 	}
 	if (!unmap_success)

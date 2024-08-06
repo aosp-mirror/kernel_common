@@ -101,11 +101,8 @@ static void __save_processor_state(struct saved_context *ctxt)
 	/*
 	 * segment registers
 	 */
-#ifdef CONFIG_X86_32_LAZY_GS
 	savesegment(gs, ctxt->gs);
-#endif
 #ifdef CONFIG_X86_64
-	savesegment(gs, ctxt->gs);
 	savesegment(fs, ctxt->fs);
 	savesegment(ds, ctxt->ds);
 	savesegment(es, ctxt->es);
@@ -234,7 +231,6 @@ static void notrace __restore_processor_state(struct saved_context *ctxt)
 	wrmsrl(MSR_GS_BASE, ctxt->kernelmode_gs_base);
 #else
 	loadsegment(fs, __KERNEL_PERCPU);
-	loadsegment(gs, __KERNEL_STACK_CANARY);
 #endif
 
 	/* Restore the TSS, RO GDT, LDT, and usermode-relevant MSRs. */
@@ -257,7 +253,7 @@ static void notrace __restore_processor_state(struct saved_context *ctxt)
 	 */
 	wrmsrl(MSR_FS_BASE, ctxt->fs_base);
 	wrmsrl(MSR_KERNEL_GS_BASE, ctxt->usermode_gs_base);
-#elif defined(CONFIG_X86_32_LAZY_GS)
+#else
 	loadsegment(gs, ctxt->gs);
 #endif
 
@@ -283,19 +279,6 @@ static void notrace __restore_processor_state(struct saved_context *ctxt)
 /* Needed by apm.c */
 void notrace restore_processor_state(void)
 {
-#ifdef __clang__
-	// The following code snippet is copied from __restore_processor_state.
-	// Its purpose is to prepare GS segment before the function is called.
-	// Since the function is compiled with SCS on, it will use GS at its
-	// entry.
-	// TODO: Hack to be removed later when compiler bug is fixed.
-#ifdef CONFIG_X86_64
-	wrmsrl(MSR_GS_BASE, saved_context.kernelmode_gs_base);
-#else
-	loadsegment(fs, __KERNEL_PERCPU);
-	loadsegment(gs, __KERNEL_STACK_CANARY);
-#endif
-#endif
 	__restore_processor_state(&saved_context);
 }
 #ifdef CONFIG_X86_32

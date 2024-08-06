@@ -2218,9 +2218,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 
 		__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEPASSIVEACK);
 		local_bh_enable();
-	} else {
-		MPTCP_INC_STATS(sock_net(sk),
-				MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK);
 	}
 
 out:
@@ -2647,6 +2644,8 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 #endif
 	if (subflow->request_mptcp && mptcp_token_new_connect(ssock->sk))
 		mptcp_subflow_early_fallback(msk, subflow);
+
+	WRITE_ONCE(msk->write_seq, subflow->idsn);
 
 do_connect:
 	err = ssock->ops->connect(ssock, uaddr, addr_len, flags);
