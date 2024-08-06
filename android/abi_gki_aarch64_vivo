@@ -17,12 +17,17 @@
   kernfs_path_from_node
   __lock_buffer
   mipi_dsi_dcs_write
+  proc_mkdir_mode
   profile_event_register
   profile_event_unregister
   put_device
   regulator_get_drvdata
   sched_setattr_nocheck
   schedule_timeout_killable
+  seq_file_path
+  seq_put_decimal_ll
+  seq_put_decimal_ull
+  seq_read_iter
   set_blocksize
   skb_orphan_partial
   static_key_enable
