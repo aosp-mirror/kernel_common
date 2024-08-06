@@ -20,6 +20,9 @@ static int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
 	u32 flags = 0;
 	int err;
 
+	if (inet_sk_state_load(sk) == TCP_LISTEN)
+		return 0;
+
 	start = nla_nest_start_noflag(skb, INET_ULP_INFO_MPTCP);
 	if (!start)
 		return -EMSGSIZE;

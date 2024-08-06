@@ -1579,6 +1579,7 @@ void snd_usb_endpoint_stop(struct snd_usb_endpoint *ep, bool keep_pending)
 		if (ep->sync_source)
 			WRITE_ONCE(ep->sync_source->sync_sink, NULL);
 		stop_urbs(ep, false, keep_pending);
+
 		trace_android_vh_audio_usb_offload_ep_action(ep, false);
 	}
 }
