@@ -6350,6 +6350,9 @@ static struct timer_list wq_watchdog_timer;
 static unsigned long wq_watchdog_touched = INITIAL_JIFFIES;
 static DEFINE_PER_CPU(unsigned long, wq_watchdog_touched_cpu) = INITIAL_JIFFIES;
 
+static unsigned int wq_panic_on_stall;
+module_param_named(panic_on_stall, wq_panic_on_stall, uint, 0644);
+
 /*
  * Show workers that might prevent the processing of pending work items.
  * The only candidates are CPU-bound workers in the running state.
@@ -6399,6 +6402,16 @@ static void show_cpu_pools_hogs(void)
 	}
 
 	rcu_read_unlock();
+}
+
+static void panic_on_wq_watchdog(void)
+{
+	static unsigned int wq_stall;
+
+	if (wq_panic_on_stall) {
+		wq_stall++;
+		BUG_ON(wq_stall >= wq_panic_on_stall);
+	}
 }
 
 static void wq_watchdog_reset_touched(void)
@@ -6473,6 +6486,9 @@ static void wq_watchdog_timer_fn(struct timer_list *unused)
 
 	if (cpu_pool_stall)
 		show_cpu_pools_hogs();
+
+	if (lockup_detected)
+		panic_on_wq_watchdog();
 
 	wq_watchdog_reset_touched();
 	mod_timer(&wq_watchdog_timer, jiffies + thresh);
