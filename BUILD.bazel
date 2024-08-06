@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (C) 2021 The Android Open Source Project
 
-load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_pkg//pkg:install.bzl", "pkg_install")
 load(
@@ -2028,15 +2027,17 @@ cc_binary_with_abi(
     ],
 )
 
-copy_file(
-    name = "kselftest_gen_config",
-    src = select({
-        ":x86_64": "tools/testing/selftests/android/config_x86_64.xml",
-        ":i386": "tools/testing/selftests/android/config_x86.xml",
-        ":arm64": "tools/testing/selftests/android/config_arm64.xml",
-        ":arm": "tools/testing/selftests/android/config_arm.xml",
-    }),
-    out = _KSELFTEST_DIR + "/selftests.config",
+pkg_files(
+    name = "kselftest_config_x86_64",
+    srcs = ["tools/testing/selftests/android/config_x86_64.xml"],
+    renames = {"tools/testing/selftests/android/config_x86_64.xml": _KSELFTEST_DIR + "/selftests.config"},
+    visibility = ["//visibility:private"],
+)
+
+pkg_files(
+    name = "kselftest_config_arm64",
+    srcs = ["tools/testing/selftests/android/config_arm64.xml"],
+    renames = {"tools/testing/selftests/android/config_arm64.xml": _KSELFTEST_DIR + "/selftests.config"},
     visibility = ["//visibility:private"],
 )
 
@@ -2056,7 +2057,6 @@ android_filegroup(
         ":kselftest_futex_futex_wait_uninitialized_heap_x86_64",
         ":kselftest_futex_futex_wait_wouldblock_x86_64",
         ":kselftest_futex_futex_wait_x86_64",
-        ":kselftest_gen_config",
         ":kselftest_kcmp_kcmp_test_x86_64",
         ":kselftest_mm_compaction_test_x86_64",
         ":kselftest_mm_hugepage_mmap_x86_64",
@@ -2260,7 +2260,6 @@ android_filegroup(
         ":kselftest_futex_futex_wait_timeout_arm64",
         ":kselftest_futex_futex_wait_uninitialized_heap_arm64",
         ":kselftest_futex_futex_wait_wouldblock_arm64",
-        ":kselftest_gen_config",
         ":kselftest_kcmp_kcmp_test_arm64",
         ":kselftest_mm_compaction_test_arm64",
         ":kselftest_mm_hugepage_mmap_arm64",
@@ -2332,6 +2331,7 @@ pkg_files(
 pkg_zip(
     name = "tests_zip_x86_64",
     srcs = [
+        ":kselftest_config_x86_64",
         ":kselftest_tests_x86_64_pkg_files",
         ":kunit_tests_x86_64_pkg_files",
     ],
@@ -2342,6 +2342,7 @@ pkg_zip(
 pkg_zip(
     name = "tests_zip_arm64",
     srcs = [
+        ":kselftest_config_arm64",
         ":kselftest_tests_arm64_pkg_files",
         ":kunit_tests_arm64_pkg_files",
     ],
