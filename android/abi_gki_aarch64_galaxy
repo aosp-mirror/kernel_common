@@ -126,6 +126,8 @@
   __traceiter_android_vh_warn_alloc_show_mem_bypass
   __traceiter_android_vh_watchdog_timer_softlockup
   __traceiter_android_vh_wq_lockup_pool
+  __traceiter_android_vh_zs_shrinker_adjust
+  __traceiter_android_vh_zs_shrinker_bypass
   __traceiter_console
   __traceiter_consume_skb
   __traceiter_error_report_end
@@ -192,6 +194,8 @@
   __tracepoint_android_vh_warn_alloc_show_mem_bypass
   __tracepoint_android_vh_watchdog_timer_softlockup
   __tracepoint_android_vh_wq_lockup_pool
+  __tracepoint_android_vh_zs_shrinker_adjust
+  __tracepoint_android_vh_zs_shrinker_bypass
   __tracepoint_console
   __tracepoint_consume_skb
   __tracepoint_error_report_end
