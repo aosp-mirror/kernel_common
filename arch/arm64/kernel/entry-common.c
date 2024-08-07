@@ -785,6 +785,7 @@ static void noinstr __el0_fiq_handler_common(struct pt_regs *regs)
 
 asmlinkage void noinstr el0t_64_fiq_handler(struct pt_regs *regs)
 {
+	trace_android_rvh_fiq_dump(regs);
 	__el0_fiq_handler_common(regs);
 }
 
