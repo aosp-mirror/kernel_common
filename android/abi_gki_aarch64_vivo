@@ -69,6 +69,7 @@
   seq_read_iter
   set_blocksize
   __set_task_comm
+  set_task_ioprio
   skb_orphan_partial
   static_key_enable
   submit_bh
