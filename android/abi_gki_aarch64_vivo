@@ -68,6 +68,7 @@
   seq_put_decimal_ull
   seq_read_iter
   set_blocksize
+  set_task_ioprio
   __set_task_comm
   skb_orphan_partial
   static_key_enable
