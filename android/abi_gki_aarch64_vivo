@@ -29,6 +29,7 @@
   seq_put_decimal_ull
   seq_read_iter
   set_blocksize
+  set_task_ioprio
   skb_orphan_partial
   static_key_enable
   submit_bh
