@@ -1930,7 +1930,7 @@ config RUST
 config RUSTC_VERSION_TEXT
 	string
 	depends on RUST
-	default "$(shell,$(RUSTC) --version 2>/dev/null)"
+	default "$(shell,LC_ALL=C $(RUSTC) --version 2>/dev/null | head -n 1)"
 
 config BINDGEN_VERSION_TEXT
 	string
