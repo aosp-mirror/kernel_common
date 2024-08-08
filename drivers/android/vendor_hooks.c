@@ -399,3 +399,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_encrypt_page);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_init_aes_encrypt);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_skip_swap_map_write);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_post_image_save);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_should_end_madvise);
