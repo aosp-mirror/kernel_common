@@ -8725,7 +8725,7 @@ FREESCALE DSPI DRIVER
 M:	Vladimir Oltean <olteanv@gmail.com>
 L:	linux-spi@vger.kernel.org
 S:	Maintained
-F:	Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+F:	Documentation/devicetree/bindings/spi/fsl,dspi*.yaml
 F:	drivers/spi/spi-fsl-dspi.c
 F:	include/linux/spi/spi-fsl-dspi.h
 
@@ -20163,6 +20163,7 @@ SECURE DIGITAL HOST CONTROLLER INTERFACE (SDHCI) NXP i.MX DRIVER
 M:	Haibo Chen <haibo.chen@nxp.com>
 L:	imx@lists.linux.dev
 L:	linux-mmc@vger.kernel.org
+L:	s32@nxp.com
 S:	Maintained
 F:	drivers/mmc/host/sdhci-esdhc-imx.c
 
@@ -23708,12 +23709,6 @@ VIA RHINE NETWORK DRIVER
 M:	Kevin Brace <kevinbrace@bracecomputerlab.com>
 S:	Maintained
 F:	drivers/net/ethernet/via/via-rhine.c
-
-VIA SD/MMC CARD CONTROLLER DRIVER
-M:	Bruce Chang <brucechang@via.com.tw>
-M:	Harald Welte <HaraldWelte@viatech.com>
-S:	Maintained
-F:	drivers/mmc/host/via-sdmmc.c
 
 VIA UNICHROME(PRO)/CHROME9 FRAMEBUFFER DRIVER
 M:	Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
