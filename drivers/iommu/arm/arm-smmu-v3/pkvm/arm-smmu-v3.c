@@ -1087,11 +1087,15 @@ static int smmu_attach_dev(struct kvm_hyp_iommu *iommu, struct kvm_hyp_iommu_dom
 	WRITE_ONCE(dst[0], cpu_to_le64(ent[0]));
 	ret = smmu_sync_ste(smmu, dst, sid);
 	WARN_ON(ret);
-	if (iommu_node)
-		list_add_tail(&iommu_node->list, &smmu_domain->iommu_list);
+
 out_unlock:
-	if (ret && iommu_node)
-		hyp_free(iommu_node);
+	if (iommu_node) {
+		if (ret)
+			hyp_free(iommu_node);
+		else
+			list_add_tail(&iommu_node->list, &smmu_domain->iommu_list);
+	}
+
 	kvm_iommu_unlock(iommu);
 	hyp_write_unlock(&smmu_domain->lock);
 	return ret;
