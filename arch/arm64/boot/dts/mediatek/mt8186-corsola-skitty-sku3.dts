@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2024 Google LLC
+ */
+
+/dts-v1/;
+#include "mt8186-corsola-skitty.dtsi"
+
+/ {
+	model = "Google Skitty sku3 board";
+	compatible = "google,skitty-sku3",
+		"google,skitty", "google,corsola", "mediatek,mt8186";
+};
+
+&touchscreen {
+	compatible = "elan,ekth3500";
+};
+
+&keyboard_controller {
+	linux,keymap = <
+		MATRIX_KEY(0x04, 0x00, KEY_102ND)
+	>;
+};
