@@ -207,6 +207,7 @@ static int kvm_arm_smmu_domain_finalize(struct kvm_arm_smmu_domain *kvm_smmu_dom
 	int ret = 0;
 	struct arm_smmu_device *smmu = master->smmu;
 	struct host_arm_smmu_device *host_smmu = smmu_to_host(smmu);
+	unsigned int max_domains;
 
 	if (kvm_smmu_domain->smmu) {
 		if (kvm_smmu_domain->smmu != smmu)
@@ -225,24 +226,33 @@ static int kvm_arm_smmu_domain_finalize(struct kvm_arm_smmu_domain *kvm_smmu_dom
 		return 0;
 	}
 
-	ret = ida_alloc_range(&kvm_arm_smmu_domain_ida, KVM_IOMMU_DOMAIN_NR_START,
-			      KVM_IOMMU_MAX_DOMAINS, GFP_KERNEL);
-	if (ret < 0)
-		return ret;
-
-	kvm_smmu_domain->id = ret;
-
 	/* Default to stage-1. */
 	if (smmu->features & ARM_SMMU_FEAT_TRANS_S1) {
 		kvm_smmu_domain->type = KVM_ARM_SMMU_DOMAIN_S1;
 		kvm_smmu_domain->domain.pgsize_bitmap = host_smmu->cfg_s1.pgsize_bitmap;
 		kvm_smmu_domain->domain.geometry.aperture_end = (1UL << host_smmu->cfg_s1.ias) - 1;
+		max_domains = 1 << smmu->asid_bits;
 	} else {
 		kvm_smmu_domain->type = KVM_ARM_SMMU_DOMAIN_S2;
 		kvm_smmu_domain->domain.pgsize_bitmap = host_smmu->cfg_s2.pgsize_bitmap;
 		kvm_smmu_domain->domain.geometry.aperture_end = (1UL << host_smmu->cfg_s2.ias) - 1;
+		max_domains = 1 << smmu->vmid_bits;
 	}
 	kvm_smmu_domain->domain.geometry.force_aperture = true;
+
+	/*
+	 * The hypervisor uses the domain_id for asid/vmid so it has to be
+	 * unique, and it has to be in range of this smmu, which can be
+	 * either 8 or 16 bits, this can be improved a bit to make
+	 * 16 bit asids or vmids allocate from the end of the range to
+	 * give more chance to the smmus with 8 bits.
+	 */
+	ret = ida_alloc_range(&kvm_arm_smmu_domain_ida, KVM_IOMMU_DOMAIN_NR_START,
+			      min(KVM_IOMMU_MAX_DOMAINS, max_domains), GFP_KERNEL);
+	if (ret < 0)
+		return ret;
+
+	kvm_smmu_domain->id = ret;
 
 	ret = kvm_call_hyp_nvhe_mc(__pkvm_host_iommu_alloc_domain,
 				   kvm_smmu_domain->id, kvm_smmu_domain->type);
