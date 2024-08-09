@@ -530,13 +530,11 @@ static struct hyp_arm_smmu_v3_device *to_smmu(struct kvm_hyp_iommu *iommu)
 	return container_of(iommu, struct hyp_arm_smmu_v3_device, iommu);
 }
 
-static void smmu_tlb_flush_all(void *cookie)
+static void smmu_inv_domain(struct hyp_arm_smmu_v3_device *smmu,
+			    struct hyp_arm_smmu_v3_domain *smmu_domain)
 {
-	struct kvm_hyp_iommu_domain *domain = cookie;
-	struct hyp_arm_smmu_v3_domain *smmu_domain = domain->priv;
-	struct hyp_arm_smmu_v3_device *smmu;
-	struct domain_iommu_node *iommu_node;
-	struct arm_smmu_cmdq_ent cmd;
+	struct kvm_hyp_iommu_domain *domain = smmu_domain->domain;
+	struct arm_smmu_cmdq_ent cmd = {};
 
 	if (smmu_domain->pgtable->cfg.fmt == ARM_64_LPAE_S2) {
 		cmd.opcode = CMDQ_OP_TLBI_S12_VMALL;
@@ -544,19 +542,26 @@ static void smmu_tlb_flush_all(void *cookie)
 	} else {
 		cmd.opcode = CMDQ_OP_TLBI_NH_ASID;
 		cmd.tlbi.asid = domain->domain_id;
-		/* Domain ID is unique across all VMs. */
-		cmd.tlbi.vmid = 0;
 	}
+
+	if (smmu->iommu.power_is_off && smmu->caches_clean_on_power_on)
+		return;
+
+	WARN_ON(smmu_send_cmd(smmu, &cmd));
+}
+
+static void smmu_tlb_flush_all(void *cookie)
+{
+	struct kvm_hyp_iommu_domain *domain = cookie;
+	struct hyp_arm_smmu_v3_domain *smmu_domain = domain->priv;
+	struct hyp_arm_smmu_v3_device *smmu;
+	struct domain_iommu_node *iommu_node;
 
 	hyp_read_lock(&smmu_domain->lock);
 	list_for_each_entry(iommu_node, &smmu_domain->iommu_list, list) {
 		smmu = to_smmu(iommu_node->iommu);
 		kvm_iommu_lock(&smmu->iommu);
-		if (smmu->iommu.power_is_off && smmu->caches_clean_on_power_on) {
-			kvm_iommu_unlock(&smmu->iommu);
-			continue;
-		}
-		WARN_ON(smmu_send_cmd(smmu, &cmd));
+		smmu_inv_domain(smmu, smmu_domain);
 		kvm_iommu_unlock(&smmu->iommu);
 	}
 	hyp_read_unlock(&smmu_domain->lock);
@@ -1142,6 +1147,12 @@ static int smmu_detach_dev(struct kvm_hyp_iommu *iommu, struct kvm_hyp_iommu_dom
 
 		ret = smmu_sync_ste(smmu, dst, sid);
 	}
+
+	/*
+	 * Ensure no stale tlb enteries when domain_id
+	 * is re-used for this SMMU.
+	 */
+	smmu_inv_domain(smmu, smmu_domain);
 
 	smmu_put_ref_domain(smmu, smmu_domain);
 out_unlock:
