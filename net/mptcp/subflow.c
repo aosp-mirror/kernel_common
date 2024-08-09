@@ -80,6 +80,7 @@ static struct mptcp_sock *subflow_token_join_request(struct request_sock *req,
 		return NULL;
 	}
 	subflow_req->local_id = local_id;
+	subflow_req->request_bkup = mptcp_pm_is_backup(msk, (struct sock_common *)req);
 
 	get_random_bytes(&subflow_req->local_nonce, sizeof(u32));
 
