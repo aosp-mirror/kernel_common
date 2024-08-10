@@ -47,6 +47,14 @@
   drop_super
   filp_open_block
   mm_trace_rss_stat
+  get_slabinfo
+  xas_find
+  contpte_ptep_test_and_clear_young
+  tty_dev_name_to_number
+  tty_kopen_exclusive
+  tty_unlock
+  tty_set_ldisc
+  tty_kclose
   __kfifo_len_r
   __traceiter_android_vh_rwsem_write_wait_finish
   __tracepoint_android_vh_rwsem_write_wait_finish
