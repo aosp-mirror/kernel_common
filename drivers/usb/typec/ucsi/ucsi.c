@@ -1480,6 +1480,8 @@ int ucsi_set_sink_path(struct ucsi_connector *con, bool sink_path)
 	ret = ucsi_send_command(ucsi, command, NULL, 0);
 	if (ret < 0)
 		dev_err(con->ucsi->dev, "SET_SINK_PATH failed (%d)\n", ret);
+	else
+		ucsi_partner_task(con, ucsi_check_connection, 1, HZ);
 
 	return ret;
 }
