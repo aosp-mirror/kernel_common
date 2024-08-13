@@ -56,11 +56,20 @@ static int ucsi_psy_get_scope(struct ucsi_connector *con,
 static int ucsi_psy_get_status(struct ucsi_connector *con,
 			       union power_supply_propval *val)
 {
+	bool is_sink = (con->status.flags & UCSI_CONSTAT_PWR_DIR) == TYPEC_SINK;
+	bool sink_path_enabled = true;
+
 	val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+
+	if (con->ucsi->version >= UCSI_VERSION_2_0)
+		sink_path_enabled =
+			UCSI_CONSTAT_SINK_PATH_STATUS(con->status.pwr_status) ==
+			UCSI_CONSTAT_SINK_PATH_ENABLED;
+
 	if (con->status.flags & UCSI_CONSTAT_CONNECTED) {
-		if ((con->status.flags & UCSI_CONSTAT_PWR_DIR) == TYPEC_SINK)
+		if (is_sink && sink_path_enabled)
 			val->intval = POWER_SUPPLY_STATUS_CHARGING;
-		else
+		else if (!is_sink)
 			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 
