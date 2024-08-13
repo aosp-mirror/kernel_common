@@ -6,7 +6,7 @@
 
 #include <linux/module.h>
 #include <linux/delay.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/pm_runtime.h>
 #include <linux/power_supply.h>
 #include <linux/i2c.h>
@@ -525,7 +525,7 @@ static ssize_t charge_status_show(struct device *dev,
 		}
 	}
 
-	return sprintf(buf, "%s\n", result);
+	return sysfs_emit(buf, "%s\n", result);
 }
 static DEVICE_ATTR_RO(charge_status);
 
@@ -541,7 +541,7 @@ static ssize_t vbat_show(struct device *dev,
 	if (ret)
 		return ret;
 
-	return sprintf(buf, "%d\n", val.intval);
+	return sysfs_emit(buf, "%d\n", val.intval);
 }
 static DEVICE_ATTR_RO(vbat);
 
@@ -557,7 +557,7 @@ static ssize_t vbat_avg_show(struct device *dev,
 	if (ret)
 		return ret;
 
-	return sprintf(buf, "%d\n", val.intval);
+	return sysfs_emit(buf, "%d\n", val.intval);
 }
 static DEVICE_ATTR_RO(vbat_avg);
 
@@ -573,7 +573,7 @@ static ssize_t ibat_show(struct device *dev,
 	if (ret)
 		return ret;
 
-	return sprintf(buf, "%d\n", val.intval);
+	return sysfs_emit(buf, "%d\n", val.intval);
 }
 static DEVICE_ATTR_RO(ibat);
 
@@ -589,7 +589,7 @@ static ssize_t force_telemetry_show(struct device *dev,
 	if (ret)
 		return ret;
 
-	return sprintf(buf, "%u\n", regval & BIT(2) ? 1 : 0);
+	return sysfs_emit(buf, "%u\n", regval & BIT(2) ? 1 : 0);
 }
 
 static ssize_t force_telemetry_store(struct device *dev,
@@ -628,7 +628,7 @@ static ssize_t arm_ship_mode_show(struct device *dev,
 	if (ret)
 		return ret;
 
-	return sprintf(buf, "%u\n",
+	return sysfs_emit(buf, "%u\n",
 		regval == LTC4162L_ARM_SHIP_MODE_MAGIC ? 1 : 0);
 }
 
@@ -908,14 +908,14 @@ static const struct i2c_device_id ltc4162l_i2c_id_table[] = {
 };
 MODULE_DEVICE_TABLE(i2c, ltc4162l_i2c_id_table);
 
-static const struct of_device_id ltc4162l_of_match[] = {
+static const struct of_device_id ltc4162l_of_match[] __maybe_unused = {
 	{ .compatible = "lltc,ltc4162-l", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, ltc4162l_of_match);
 
 static struct i2c_driver ltc4162l_driver = {
-	.probe_new	= ltc4162l_probe,
+	.probe		= ltc4162l_probe,
 	.alert		= ltc4162l_alert,
 	.id_table	= ltc4162l_i2c_id_table,
 	.driver = {

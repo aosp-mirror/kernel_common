@@ -9,6 +9,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pm.h>
 
 #include <linux/pinctrl/pinctrl.h>
 
@@ -34,25 +35,11 @@
 		.gpio_base = (g),			\
 	}
 
-#define ADL_COMMUNITY(b, s, e, g, v)				\
-	{							\
-		.barno = (b),					\
-		.padown_offset = ADL_##v##_PAD_OWN,		\
-		.padcfglock_offset = ADL_##v##_PADCFGLOCK,	\
-		.hostown_offset = ADL_##v##_HOSTSW_OWN,		\
-		.is_offset = ADL_##v##_GPI_IS,			\
-		.ie_offset = ADL_##v##_GPI_IE,			\
-		.pin_base = (s),				\
-		.npins = ((e) - (s) + 1),			\
-		.gpps = (g),					\
-		.ngpps = ARRAY_SIZE(g),				\
-	}
-
 #define ADL_N_COMMUNITY(b, s, e, g)			\
-	ADL_COMMUNITY(b, s, e, g, N)
+	INTEL_COMMUNITY_GPPS(b, s, e, g, ADL_N)
 
 #define ADL_S_COMMUNITY(b, s, e, g)			\
-	ADL_COMMUNITY(b, s, e, g, S)
+	INTEL_COMMUNITY_GPPS(b, s, e, g, ADL_S)
 
 /* Alder Lake-N */
 static const struct pinctrl_pin_desc adln_pins[] = {
@@ -747,14 +734,12 @@ static const struct acpi_device_id adl_pinctrl_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, adl_pinctrl_acpi_match);
 
-static INTEL_PINCTRL_PM_OPS(adl_pinctrl_pm_ops);
-
 static struct platform_driver adl_pinctrl_driver = {
 	.probe = intel_pinctrl_probe_by_hid,
 	.driver = {
 		.name = "alderlake-pinctrl",
 		.acpi_match_table = adl_pinctrl_acpi_match,
-		.pm = &adl_pinctrl_pm_ops,
+		.pm = pm_sleep_ptr(&intel_pinctrl_pm_ops),
 	},
 };
 module_platform_driver(adl_pinctrl_driver);
@@ -762,3 +747,4 @@ module_platform_driver(adl_pinctrl_driver);
 MODULE_AUTHOR("Andy Shevchenko <andriy.shevchenko@linux.intel.com>");
 MODULE_DESCRIPTION("Intel Alder Lake PCH pinctrl/GPIO driver");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PINCTRL_INTEL);

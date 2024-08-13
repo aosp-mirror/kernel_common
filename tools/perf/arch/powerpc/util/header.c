@@ -34,17 +34,17 @@ get_cpuid_str(struct perf_pmu *pmu __maybe_unused)
 {
 	char *bufp;
 
-	if (asprintf(&bufp, "%.8lx", mfspr(SPRN_PVR)) < 0)
+	if (asprintf(&bufp, "0x%.8lx", mfspr(SPRN_PVR)) < 0)
 		bufp = NULL;
 
 	return bufp;
 }
 
-int arch_get_runtimeparam(const struct pmu_event *pe)
+int arch_get_runtimeparam(const struct pmu_metric *pm)
 {
 	int count;
 	char path[PATH_MAX] = "/devices/hv_24x7/interface/";
 
-	atoi(pe->aggr_mode) == PerChip ? strcat(path, "sockets") : strcat(path, "coresperchip");
+	strcat(path, pm->aggr_mode == PerChip ? "sockets" : "coresperchip");
 	return sysfs__read_int(path, &count) < 0 ? 1 : count;
 }

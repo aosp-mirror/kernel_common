@@ -44,7 +44,10 @@ struct hdm_i2c {
 	char name[64];
 };
 
-#define to_hdm(iface) container_of(iface, struct hdm_i2c, most_iface)
+static inline struct hdm_i2c *to_hdm(struct most_interface *iface)
+{
+	return container_of(iface, struct hdm_i2c, most_iface);
+}
 
 static irqreturn_t most_irq_handler(int, void *);
 static void pending_rx_work(struct work_struct *);
@@ -359,7 +362,7 @@ static struct i2c_driver i2c_driver = {
 	.driver = {
 		.name = "hdm_i2c",
 	},
-	.probe_new = i2c_probe,
+	.probe = i2c_probe,
 	.remove = i2c_remove,
 	.id_table = i2c_id,
 };

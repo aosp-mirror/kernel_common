@@ -10,7 +10,7 @@
 #include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/spi-mem.h>
@@ -267,7 +267,7 @@ static void f_ospi_config_indir_protocol(struct f_ospi *ospi,
 	int unit;
 
 	/* Set one chip select */
-	writel(BIT(spi->chip_select), ospi->base + OSPI_SSEL);
+	writel(BIT(spi_get_chipselect(spi, 0)), ospi->base + OSPI_SSEL);
 
 	mode = f_ospi_get_mode(ospi, op->cmd.buswidth, 1);
 	prot |= FIELD_PREP(OSPI_PROT_MODE_CODE_MASK, mode);
@@ -501,7 +501,7 @@ out:
 
 static int f_ospi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 {
-	struct f_ospi *ospi = spi_controller_get_devdata(mem->spi->master);
+	struct f_ospi *ospi = spi_controller_get_devdata(mem->spi->controller);
 	int err = 0;
 
 	switch (op->data.dir) {
@@ -526,7 +526,7 @@ static int f_ospi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 static bool f_ospi_supports_op_width(struct spi_mem *mem,
 				     const struct spi_mem_op *op)
 {
-	u8 width_available[] = { 0, 1, 2, 4, 8 };
+	static const u8 width_available[] = { 0, 1, 2, 4, 8 };
 	u8 width_op[] = { op->cmd.buswidth, op->addr.buswidth,
 			  op->dummy.buswidth, op->data.buswidth };
 	bool is_match_found;
@@ -561,12 +561,12 @@ static bool f_ospi_supports_op(struct spi_mem *mem,
 	if (!f_ospi_supports_op_width(mem, op))
 		return false;
 
-	return true;
+	return spi_mem_default_supports_op(mem, op);
 }
 
 static int f_ospi_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op)
 {
-	op->data.nbytes = min((int)op->data.nbytes, (int)(OSPI_DAT_SIZE_MAX));
+	op->data.nbytes = min_t(int, op->data.nbytes, OSPI_DAT_SIZE_MAX);
 
 	return 0;
 }
@@ -606,12 +606,12 @@ static int f_ospi_probe(struct platform_device *pdev)
 	u32 num_cs = OSPI_NUM_CS;
 	int ret;
 
-	ctlr = spi_alloc_master(dev, sizeof(*ospi));
+	ctlr = spi_alloc_host(dev, sizeof(*ospi));
 	if (!ctlr)
 		return -ENOMEM;
 
 	ctlr->mode_bits = SPI_TX_DUAL | SPI_TX_QUAD | SPI_TX_OCTAL
-		| SPI_RX_DUAL | SPI_RX_QUAD | SPI_TX_OCTAL
+		| SPI_RX_DUAL | SPI_RX_QUAD | SPI_RX_OCTAL
 		| SPI_MODE_0 | SPI_MODE_1 | SPI_LSB_FIRST;
 	ctlr->mem_ops = &f_ospi_mem_ops;
 	ctlr->bus_num = -1;
@@ -634,16 +634,10 @@ static int f_ospi_probe(struct platform_device *pdev)
 		goto err_put_ctlr;
 	}
 
-	ospi->clk = devm_clk_get(dev, NULL);
+	ospi->clk = devm_clk_get_enabled(dev, NULL);
 	if (IS_ERR(ospi->clk)) {
 		ret = PTR_ERR(ospi->clk);
 		goto err_put_ctlr;
-	}
-
-	ret = clk_prepare_enable(ospi->clk);
-	if (ret) {
-		dev_err(dev, "Failed to enable the clock\n");
-		goto err_disable_clk;
 	}
 
 	mutex_init(&ospi->mlock);
@@ -661,24 +655,17 @@ static int f_ospi_probe(struct platform_device *pdev)
 err_destroy_mutex:
 	mutex_destroy(&ospi->mlock);
 
-err_disable_clk:
-	clk_disable_unprepare(ospi->clk);
-
 err_put_ctlr:
 	spi_controller_put(ctlr);
 
 	return ret;
 }
 
-static int f_ospi_remove(struct platform_device *pdev)
+static void f_ospi_remove(struct platform_device *pdev)
 {
 	struct f_ospi *ospi = platform_get_drvdata(pdev);
 
-	clk_disable_unprepare(ospi->clk);
-
 	mutex_destroy(&ospi->mlock);
-
-	return 0;
 }
 
 static const struct of_device_id f_ospi_dt_ids[] = {
@@ -693,7 +680,7 @@ static struct platform_driver f_ospi_driver = {
 		.of_match_table = f_ospi_dt_ids,
 	},
 	.probe = f_ospi_probe,
-	.remove = f_ospi_remove,
+	.remove_new = f_ospi_remove,
 };
 module_platform_driver(f_ospi_driver);
 

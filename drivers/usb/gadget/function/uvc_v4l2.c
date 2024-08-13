@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/usb/g_uvc.h>
+#include <linux/usb/uvc.h>
 #include <linux/videodev2.h>
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
@@ -18,7 +19,6 @@
 #include <media/v4l2-dev.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ioctl.h>
-#include <media/v4l2-uvc.h>
 
 #include "f_uvc.h"
 #include "uvc.h"
@@ -27,10 +27,10 @@
 #include "uvc_v4l2.h"
 #include "uvc_configfs.h"
 
-static struct uvc_format_desc *to_uvc_format(struct uvcg_format *uformat)
+static const struct uvc_format_desc *to_uvc_format(struct uvcg_format *uformat)
 {
 	char guid[16] = UVC_GUID_FORMAT_MJPEG;
-	struct uvc_format_desc *format;
+	const struct uvc_format_desc *format;
 	struct uvcg_uncompressed *unc;
 
 	if (uformat->type == UVCG_UNCOMPRESSED) {
@@ -119,7 +119,7 @@ static struct uvcg_format *find_format_by_pix(struct uvc_device *uvc,
 	struct uvcg_format *uformat = NULL;
 
 	list_for_each_entry(format, &uvc->header->formats, entry) {
-		struct uvc_format_desc *fmtdesc = to_uvc_format(format->fmt);
+		const struct uvc_format_desc *fmtdesc = to_uvc_format(format->fmt);
 
 		if (fmtdesc->fcc == pixelformat) {
 			uformat = format->fmt;
@@ -260,12 +260,26 @@ uvc_v4l2_try_format(struct file *file, void *fh, struct v4l2_format *fmt)
 	if (!uframe)
 		return -EINVAL;
 
-	fmt->fmt.pix.width = uframe->frame.w_width;
-	fmt->fmt.pix.height = uframe->frame.w_height;
+	if (uformat->type == UVCG_UNCOMPRESSED) {
+		struct uvcg_uncompressed *u =
+			to_uvcg_uncompressed(&uformat->group.cg_item);
+		if (!u)
+			return 0;
+
+		v4l2_fill_pixfmt(&fmt->fmt.pix, fmt->fmt.pix.pixelformat,
+				 uframe->frame.w_width, uframe->frame.w_height);
+
+		if (fmt->fmt.pix.sizeimage != (uvc_v4l2_get_bytesperline(uformat, uframe) *
+						uframe->frame.w_height))
+			return -EINVAL;
+	} else {
+		fmt->fmt.pix.width = uframe->frame.w_width;
+		fmt->fmt.pix.height = uframe->frame.w_height;
+		fmt->fmt.pix.bytesperline = uvc_v4l2_get_bytesperline(uformat, uframe);
+		fmt->fmt.pix.sizeimage = uvc_get_frame_size(uformat, uframe);
+		fmt->fmt.pix.pixelformat = to_uvc_format(uformat)->fcc;
+	}
 	fmt->fmt.pix.field = V4L2_FIELD_NONE;
-	fmt->fmt.pix.bytesperline = uvc_v4l2_get_bytesperline(uformat, uframe);
-	fmt->fmt.pix.sizeimage = uvc_get_frame_size(uformat, uframe);
-	fmt->fmt.pix.pixelformat = to_uvc_format(uformat)->fcc;
 	fmt->fmt.pix.colorspace = V4L2_COLORSPACE_SRGB;
 	fmt->fmt.pix.priv = 0;
 
@@ -364,7 +378,7 @@ uvc_v4l2_enum_format(struct file *file, void *fh, struct v4l2_fmtdesc *f)
 {
 	struct video_device *vdev = video_devdata(file);
 	struct uvc_device *uvc = video_get_drvdata(vdev);
-	struct uvc_format_desc *fmtdesc;
+	const struct uvc_format_desc *fmtdesc;
 	struct uvcg_format *uformat;
 
 	if (f->index >= uvc->header->num_fmt)
@@ -374,14 +388,8 @@ uvc_v4l2_enum_format(struct file *file, void *fh, struct v4l2_fmtdesc *f)
 	if (!uformat)
 		return -EINVAL;
 
-	if (uformat->type != UVCG_UNCOMPRESSED)
-		f->flags |= V4L2_FMT_FLAG_COMPRESSED;
-
 	fmtdesc = to_uvc_format(uformat);
 	f->pixelformat = fmtdesc->fcc;
-
-	strscpy(f->description, fmtdesc->name, sizeof(f->description));
-	f->description[strlen(fmtdesc->name) - 1] = 0;
 
 	return 0;
 }
@@ -449,7 +457,7 @@ uvc_v4l2_streamon(struct file *file, void *fh, enum v4l2_buf_type type)
 		return -EINVAL;
 
 	/* Enable UVC video. */
-	ret = uvcg_video_enable(video, 1);
+	ret = uvcg_video_enable(video);
 	if (ret < 0)
 		return ret;
 
@@ -457,7 +465,7 @@ uvc_v4l2_streamon(struct file *file, void *fh, enum v4l2_buf_type type)
 	 * Complete the alternate setting selection setup phase now that
 	 * userspace is ready to provide video frames.
 	 */
-	uvc_function_setup_continue(uvc);
+	uvc_function_setup_continue(uvc, 0);
 	uvc->state = UVC_STATE_STREAMING;
 
 	return 0;
@@ -469,11 +477,18 @@ uvc_v4l2_streamoff(struct file *file, void *fh, enum v4l2_buf_type type)
 	struct video_device *vdev = video_devdata(file);
 	struct uvc_device *uvc = video_get_drvdata(vdev);
 	struct uvc_video *video = &uvc->video;
+	int ret = 0;
 
 	if (type != video->queue.queue.type)
 		return -EINVAL;
 
-	return uvcg_video_enable(video, 0);
+	ret = uvcg_video_disable(video);
+	if (ret < 0)
+		return ret;
+
+	uvc->state = UVC_STATE_CONNECTED;
+	uvc_function_setup_continue(uvc, 1);
+	return 0;
 }
 
 static int
@@ -506,7 +521,7 @@ uvc_v4l2_subscribe_event(struct v4l2_fh *fh,
 static void uvc_v4l2_disable(struct uvc_device *uvc)
 {
 	uvc_function_disconnect(uvc);
-	uvcg_video_enable(&uvc->video, 0);
+	uvcg_video_disable(&uvc->video);
 	uvcg_free_buffers(&uvc->video.queue);
 	uvc->func_connected = false;
 	wake_up_interruptible(&uvc->func_connected_queue);
@@ -653,4 +668,3 @@ const struct v4l2_file_operations uvc_v4l2_fops = {
 	.get_unmapped_area = uvcg_v4l2_get_unmapped_area,
 #endif
 };
-

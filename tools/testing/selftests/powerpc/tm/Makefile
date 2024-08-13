@@ -11,13 +11,14 @@ TEST_FILES := settings
 
 top_srcdir = ../../../../..
 include ../../lib.mk
+include ../flags.mk
 
 $(TEST_GEN_PROGS): ../harness.c ../utils.c
 
 CFLAGS += -mhtm
 
 $(OUTPUT)/tm-syscall: tm-syscall-asm.S
-$(OUTPUT)/tm-syscall: CFLAGS += -I../../../../../usr/include
+$(OUTPUT)/tm-syscall: CFLAGS += $(KHDR_INCLUDES)
 $(OUTPUT)/tm-tmspr: CFLAGS += -pthread
 $(OUTPUT)/tm-vmx-unavail: CFLAGS += -pthread -m64
 $(OUTPUT)/tm-resched-dscr: ../pmu/lib.c

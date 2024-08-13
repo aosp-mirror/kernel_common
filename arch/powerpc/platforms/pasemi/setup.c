@@ -16,7 +16,9 @@
 #include <linux/console.h>
 #include <linux/export.h>
 #include <linux/pci.h>
+#include <linux/of.h>
 #include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include <linux/gfp.h>
 #include <linux/irqdomain.h>
 
@@ -62,7 +64,7 @@ static void __noreturn pas_restart(char *cmd)
 }
 
 #ifdef CONFIG_PPC_PASEMI_NEMO
-void pas_shutdown(void)
+static void pas_shutdown(void)
 {
 	/* Set the PLD bit that makes the SB600 think the power button is being pressed */
 	void __iomem *pld_map = ioremap(0xf5000000,4096);
@@ -449,7 +451,6 @@ define_machine(pasemi) {
 	.get_irq		= mpic_get_irq,
 	.restart		= pas_restart,
 	.get_boot_time		= pas_get_boot_time,
-	.calibrate_decr		= generic_calibrate_decr,
 	.progress		= pas_progress,
 	.machine_check_exception = pas_machine_check_handler,
 };

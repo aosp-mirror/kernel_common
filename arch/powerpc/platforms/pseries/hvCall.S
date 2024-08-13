@@ -44,7 +44,7 @@ hcall_tracepoint_refcount:
 	std	r0,16(r1);					\
 	addi	r4,r1,STK_PARAM(FIRST_REG);			\
 	stdu	r1,-STACK_FRAME_MIN_SIZE(r1);			\
-	bl	__trace_hcall_entry;				\
+	bl	CFUNC(__trace_hcall_entry);			\
 	ld	r3,STACK_FRAME_MIN_SIZE+STK_PARAM(R3)(r1);	\
 	ld	r4,STACK_FRAME_MIN_SIZE+STK_PARAM(R4)(r1);	\
 	ld	r5,STACK_FRAME_MIN_SIZE+STK_PARAM(R5)(r1);	\
@@ -63,7 +63,7 @@ hcall_tracepoint_refcount:
 	std	r3,STACK_FRAME_MIN_SIZE+STK_PARAM(R3)(r1);	\
 	mr	r4,r3;						\
 	mr	r3,r0;						\
-	bl	__trace_hcall_exit;				\
+	bl	CFUNC(__trace_hcall_exit);			\
 	ld	r0,STACK_FRAME_MIN_SIZE+16(r1);			\
 	addi	r1,r1,STACK_FRAME_MIN_SIZE;			\
 	ld	r3,STK_PARAM(R3)(r1);				\
@@ -91,7 +91,7 @@ BEGIN_FTR_SECTION;						\
 	b	1f;						\
 END_FTR_SECTION(0, 1);						\
 	LOAD_REG_ADDR(r12, hcall_tracepoint_refcount) ;		\
-	std	r12,32(r1);					\
+	ld	r12,0(r12);					\
 	cmpdi	r12,0;						\
 	bne-	LABEL;						\
 1:
@@ -184,9 +184,6 @@ _GLOBAL_TOC(plpar_hcall)
 plpar_hcall_trace:
 	HCALL_INST_PRECALL(R5)
 
-	std	r4,STK_PARAM(R4)(r1)
-	mr	r0,r4
-
 	mr	r4,r5
 	mr	r5,r6
 	mr	r6,r7
@@ -196,7 +193,7 @@ plpar_hcall_trace:
 
 	HVSC
 
-	ld	r12,STK_PARAM(R4)(r1)
+	ld	r12,STACK_FRAME_MIN_SIZE+STK_PARAM(R4)(r1)
 	std	r4,0(r12)
 	std	r5,8(r12)
 	std	r6,16(r12)
@@ -295,9 +292,6 @@ _GLOBAL_TOC(plpar_hcall9)
 #ifdef CONFIG_TRACEPOINTS
 plpar_hcall9_trace:
 	HCALL_INST_PRECALL(R5)
-
-	std	r4,STK_PARAM(R4)(r1)
-	mr	r0,r4
 
 	mr	r4,r5
 	mr	r5,r6

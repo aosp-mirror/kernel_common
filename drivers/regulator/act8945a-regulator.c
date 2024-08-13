@@ -8,7 +8,7 @@
  */
 
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/regulator/driver.h>
@@ -348,6 +348,7 @@ static void act8945a_pmic_shutdown(struct platform_device *pdev)
 static struct platform_driver act8945a_pmic_driver = {
 	.driver = {
 		.name = "act8945a-regulator",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.pm = &act8945a_pm,
 	},
 	.probe = act8945a_pmic_probe,

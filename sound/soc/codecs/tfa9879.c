@@ -296,7 +296,7 @@ static int tfa9879_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id tfa9879_i2c_id[] = {
-	{ "tfa9879", 0 },
+	{ "tfa9879" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, tfa9879_i2c_id);
@@ -312,7 +312,7 @@ static struct i2c_driver tfa9879_i2c_driver = {
 		.name = "tfa9879",
 		.of_match_table = tfa9879_of_match,
 	},
-	.probe_new = tfa9879_i2c_probe,
+	.probe = tfa9879_i2c_probe,
 	.id_table = tfa9879_i2c_id,
 };
 

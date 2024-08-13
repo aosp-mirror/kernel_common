@@ -318,7 +318,7 @@ static void qlcnic_send_filter(struct qlcnic_adapter *adapter,
 
 	if (adapter->flags & QLCNIC_VLAN_FILTERING) {
 		if (protocol == ETH_P_8021Q) {
-			vh = (struct vlan_ethhdr *)skb->data;
+			vh = skb_vlan_eth_hdr(skb);
 			vlan_id = ntohs(vh->h_vlan_TCI);
 		} else if (skb_vlan_tag_present(skb)) {
 			vlan_id = skb_vlan_tag_get(skb);
@@ -446,8 +446,7 @@ static int qlcnic_tx_encap_pkt(struct qlcnic_adapter *adapter,
 	encap_descr |= skb_network_offset(skb) << 10;
 	first_desc->encap_descr = cpu_to_le16(encap_descr);
 
-	first_desc->tcp_hdr_offset = skb_inner_transport_header(skb) -
-				     skb->data;
+	first_desc->tcp_hdr_offset = skb_inner_transport_offset(skb);
 	first_desc->ip_hdr_offset = skb_inner_network_offset(skb);
 
 	qlcnic_set_tx_flags_opcode(first_desc, flags, opcode);
@@ -468,7 +467,7 @@ static int qlcnic_tx_pkt(struct qlcnic_adapter *adapter,
 	u32 producer = tx_ring->producer;
 
 	if (protocol == ETH_P_8021Q) {
-		vh = (struct vlan_ethhdr *)skb->data;
+		vh = skb_vlan_eth_hdr(skb);
 		flags = QLCNIC_FLAGS_VLAN_TAGGED;
 		vlan_tci = ntohs(vh->h_vlan_TCI);
 		protocol = ntohs(vh->h_vlan_encapsulated_proto);

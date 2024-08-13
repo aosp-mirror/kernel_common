@@ -27,6 +27,31 @@
 #ifndef __DAL_DPP_H__
 #define __DAL_DPP_H__
 
+/**
+ * DOC: overview
+ *
+ * The DPP (Display Pipe and Plane) block is the unified display data
+ * processing engine in DCN for processing graphic or video data on per DPP
+ * rectangle base. This rectangle can be a part of SLS (Single Large Surface),
+ * or a layer to be blended with other DPP, or a rectangle associated with a
+ * display tile.
+ *
+ * It provides various functions including:
+ * - graphic color keyer
+ * - graphic cursor compositing
+ * - graphic or video image source to destination scaling
+ * - image sharping
+ * - video format conversion from 4:2:0 or 4:2:2 to 4:4:4
+ * - Color Space Conversion
+ * - Host LUT gamma adjustment
+ * - Color Gamut Remap
+ * - brightness and contrast adjustment.
+ *
+ * DPP pipe consists of Converter and Cursor (CNVC), Scaler (DSCL), Color
+ * Management (CM), Output Buffer (OBUF) and Digital Bypass (DPB) module
+ * connected in a video/graphics pipeline.
+ */
+
 #include "transform.h"
 #include "cursor_reg_cache.h"
 
@@ -70,28 +95,38 @@ struct dpp_input_csc_matrix {
 };
 
 static const struct dpp_input_csc_matrix __maybe_unused dpp_input_csc_matrix[] = {
-	{COLOR_SPACE_SRGB,
-		{0x2000, 0, 0, 0, 0, 0x2000, 0, 0, 0, 0, 0x2000, 0} },
-	{COLOR_SPACE_SRGB_LIMITED,
-		{0x2000, 0, 0, 0, 0, 0x2000, 0, 0, 0, 0, 0x2000, 0} },
-	{COLOR_SPACE_YCBCR601,
-		{0x2cdd, 0x2000, 0, 0xe991, 0xe926, 0x2000, 0xf4fd, 0x10ef,
-						0, 0x2000, 0x38b4, 0xe3a6} },
-	{COLOR_SPACE_YCBCR601_LIMITED,
-		{0x3353, 0x2568, 0, 0xe400, 0xe5dc, 0x2568, 0xf367, 0x1108,
-						0, 0x2568, 0x40de, 0xdd3a} },
-	{COLOR_SPACE_YCBCR709,
-		{0x3265, 0x2000, 0, 0xe6ce, 0xf105, 0x2000, 0xfa01, 0xa7d, 0,
-						0x2000, 0x3b61, 0xe24f} },
-	{COLOR_SPACE_YCBCR709_LIMITED,
-		{0x39a6, 0x2568, 0, 0xe0d6, 0xeedd, 0x2568, 0xf925, 0x9a8, 0,
-						0x2568, 0x43ee, 0xdbb2} },
-	{COLOR_SPACE_2020_YCBCR,
-		{0x2F30, 0x2000, 0, 0xE869, 0xEDB7, 0x2000, 0xFABC, 0xBC6, 0,
-						0x2000, 0x3C34, 0xE1E6} },
-	{COLOR_SPACE_2020_RGB_LIMITEDRANGE,
-		{0x35E0, 0x255F, 0, 0xE2B3, 0xEB20, 0x255F, 0xF9FD, 0xB1E, 0,
-						0x255F, 0x44BD, 0xDB43} }
+	{ COLOR_SPACE_SRGB,
+		{ 0x2000, 0,      0,      0,
+		  0,      0x2000, 0,      0,
+		  0,      0,      0x2000, 0 } },
+	{ COLOR_SPACE_SRGB_LIMITED,
+		{ 0x2000, 0,      0,      0,
+		  0,      0x2000, 0,      0,
+		  0,      0,      0x2000, 0 } },
+	{ COLOR_SPACE_YCBCR601,
+		{ 0x2cdd, 0x2000, 0,      0xe991,
+		  0xe926, 0x2000, 0xf4fd, 0x10ef,
+		  0,      0x2000, 0x38b4, 0xe3a6 } },
+	{ COLOR_SPACE_YCBCR601_LIMITED,
+		{ 0x3353, 0x2568, 0,      0xe400,
+		  0xe5dc, 0x2568, 0xf367, 0x1108,
+		  0,      0x2568, 0x40de, 0xdd3a } },
+	{ COLOR_SPACE_YCBCR709,
+		{ 0x3265, 0x2000, 0,      0xe6ce,
+		  0xf105, 0x2000, 0xfa01, 0xa7d,
+		  0,      0x2000, 0x3b61, 0xe24f } },
+	{ COLOR_SPACE_YCBCR709_LIMITED,
+		{ 0x39a6, 0x2568, 0,      0xe0d6,
+		  0xeedd, 0x2568, 0xf925, 0x9a8,
+		  0,      0x2568, 0x43ee, 0xdbb2 } },
+	{ COLOR_SPACE_2020_YCBCR,
+		{ 0x2F30, 0x2000, 0,      0xE869,
+		  0xEDB7, 0x2000, 0xFABC, 0xBC6,
+		  0,      0x2000, 0x3C34, 0xE1E6 } },
+	{ COLOR_SPACE_2020_RGB_LIMITEDRANGE,
+		{ 0x35E0, 0x255F, 0,      0xE2B3,
+		  0xEB20, 0x255F, 0xF9FD, 0xB1E,
+		  0,      0x255F, 0x44BD, 0xDB43 } }
 };
 
 struct dpp_grph_csc_adjustment {
@@ -131,6 +166,7 @@ struct dcn_dpp_state {
 	uint32_t igam_input_format;
 	uint32_t dgam_lut_mode;
 	uint32_t rgam_lut_mode;
+	// gamut_remap data for dcn10_get_cm_states()
 	uint32_t gamut_remap_mode;
 	uint32_t gamut_remap_c11_c12;
 	uint32_t gamut_remap_c13_c14;
@@ -138,6 +174,16 @@ struct dcn_dpp_state {
 	uint32_t gamut_remap_c23_c24;
 	uint32_t gamut_remap_c31_c32;
 	uint32_t gamut_remap_c33_c34;
+	// gamut_remap data for dcn*_log_color_state()
+	struct dpp_grph_csc_adjustment gamut_remap;
+	uint32_t shaper_lut_mode;
+	uint32_t lut3d_mode;
+	uint32_t lut3d_bit_depth;
+	uint32_t lut3d_size;
+	uint32_t blnd_lut_mode;
+	uint32_t pre_dgam_mode;
+	uint32_t pre_dgam_select;
+	uint32_t gamcor_mode;
 };
 
 struct CM_bias_params {
@@ -276,10 +322,13 @@ struct dpp_funcs {
 			const struct pwl_params *params);
 	bool (*dpp_program_3dlut)(
 			struct dpp *dpp,
-			struct tetrahedral_params *params);
+			const struct tetrahedral_params *params);
 	void (*dpp_cnv_set_alpha_keyer)(
 			struct dpp *dpp_base,
 			struct cnv_color_keyer_params *color_keyer);
+
+	void (*dpp_get_gamut_remap)(struct dpp *dpp_base,
+				    struct dpp_grph_csc_adjustment *adjust);
 };
 
 

@@ -24,10 +24,11 @@ properties:
           - qcom,pm6150-gpio
           - qcom,pm6150l-gpio
           - qcom,pm6350-gpio
+          - qcom,pm6450-gpio
           - qcom,pm7250b-gpio
           - qcom,pm7325-gpio
+          - qcom,pm7550ba-gpio
           - qcom,pm8005-gpio
-          - qcom,pm8008-gpio
           - qcom,pm8018-gpio
           - qcom,pm8019-gpio
           - qcom,pm8038-gpio
@@ -40,25 +41,40 @@ properties:
           - qcom,pm8350b-gpio
           - qcom,pm8350c-gpio
           - qcom,pm8450-gpio
+          - qcom,pm8550-gpio
+          - qcom,pm8550b-gpio
+          - qcom,pm8550ve-gpio
+          - qcom,pm8550vs-gpio
           - qcom,pm8916-gpio
           - qcom,pm8917-gpio
           - qcom,pm8921-gpio
           - qcom,pm8941-gpio
           - qcom,pm8950-gpio
+          - qcom,pm8953-gpio
           - qcom,pm8994-gpio
           - qcom,pm8998-gpio
           - qcom,pma8084-gpio
+          - qcom,pmc8180-gpio
+          - qcom,pmc8180c-gpio
+          - qcom,pmd8028-gpio
+          - qcom,pmi632-gpio
           - qcom,pmi8950-gpio
           - qcom,pmi8994-gpio
           - qcom,pmi8998-gpio
+          - qcom,pmih0108-gpio
           - qcom,pmk8350-gpio
+          - qcom,pmk8550-gpio
           - qcom,pmm8155au-gpio
+          - qcom,pmm8654au-gpio
           - qcom,pmp8074-gpio
           - qcom,pmr735a-gpio
           - qcom,pmr735b-gpio
+          - qcom,pmr735d-gpio
           - qcom,pms405-gpio
           - qcom,pmx55-gpio
           - qcom,pmx65-gpio
+          - qcom,pmx75-gpio
+          - qcom,pmxr2230-gpio
 
       - enum:
           - qcom,spmi-gpio
@@ -109,8 +125,8 @@ allOf:
         compatible:
           contains:
             enum:
-              - qcom,pm8008-gpio
               - qcom,pmi8950-gpio
+              - qcom,pmr735d-gpio
     then:
       properties:
         gpio-line-names:
@@ -127,6 +143,7 @@ allOf:
               - qcom,pm8005-gpio
               - qcom,pm8450-gpio
               - qcom,pm8916-gpio
+              - qcom,pmd8028-gpio
               - qcom,pmk8350-gpio
               - qcom,pmr735a-gpio
               - qcom,pmr735b-gpio
@@ -146,6 +163,8 @@ allOf:
             enum:
               - qcom,pm8018-gpio
               - qcom,pm8019-gpio
+              - qcom,pm8550vs-gpio
+              - qcom,pmk8550-gpio
     then:
       properties:
         gpio-line-names:
@@ -160,9 +179,13 @@ allOf:
         compatible:
           contains:
             enum:
+              - qcom,pm7550ba-gpio
               - qcom,pm8226-gpio
               - qcom,pm8350b-gpio
+              - qcom,pm8550ve-gpio
               - qcom,pm8950-gpio
+              - qcom,pm8953-gpio
+              - qcom,pmi632-gpio
     then:
       properties:
         gpio-line-names:
@@ -178,6 +201,7 @@ allOf:
           contains:
             enum:
               - qcom,pm6350-gpio
+              - qcom,pm6450-gpio
               - qcom,pm8350c-gpio
     then:
       properties:
@@ -236,9 +260,12 @@ allOf:
               - qcom,pm8038-gpio
               - qcom,pm8150b-gpio
               - qcom,pm8150l-gpio
+              - qcom,pm8550-gpio
+              - qcom,pm8550b-gpio
               - qcom,pmc8180c-gpio
               - qcom,pmp8074-gpio
               - qcom,pms405-gpio
+              - qcom,pmxr2230-gpio
     then:
       properties:
         gpio-line-names:
@@ -283,7 +310,23 @@ allOf:
         compatible:
           contains:
             enum:
+              - qcom,pmih0108-gpio
+    then:
+      properties:
+        gpio-line-names:
+          minItems: 18
+          maxItems: 18
+        gpio-reserved-ranges:
+          minItems: 1
+          maxItems: 9
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
               - qcom,pmx65-gpio
+              - qcom,pmx75-gpio
     then:
       properties:
         gpio-line-names:
@@ -379,12 +422,16 @@ patternProperties:
             $ref: "#/$defs/qcom-pmic-gpio-state"
         additionalProperties: false
 
+  "-hog(-[0-9]+)?$":
+    required:
+      - gpio-hog
+
 $defs:
   qcom-pmic-gpio-state:
     type: object
     allOf:
-      - $ref: "pinmux-node.yaml"
-      - $ref: "pincfg-node.yaml"
+      - $ref: pinmux-node.yaml
+      - $ref: pincfg-node.yaml
     properties:
       pins:
         description:
@@ -394,10 +441,11 @@ $defs:
                  - gpio1-gpio10 for pm6150
                  - gpio1-gpio12 for pm6150l
                  - gpio1-gpio9 for pm6350
+                 - gpio1-gpio9 for pm6450
                  - gpio1-gpio12 for pm7250b
                  - gpio1-gpio10 for pm7325
+                 - gpio1-gpio8 for pm7550ba
                  - gpio1-gpio4 for pm8005
-                 - gpio1-gpio2 for pm8008
                  - gpio1-gpio6 for pm8018
                  - gpio1-gpio12 for pm8038
                  - gpio1-gpio40 for pm8058
@@ -411,25 +459,38 @@ $defs:
                  - gpio1-gpio8 for pm8350b
                  - gpio1-gpio9 for pm8350c
                  - gpio1-gpio4 for pm8450
+                 - gpio1-gpio12 for pm8550
+                 - gpio1-gpio12 for pm8550b
+                 - gpio1-gpio8 for pm8550ve
+                 - gpio1-gpio6 for pm8550vs
                  - gpio1-gpio38 for pm8917
                  - gpio1-gpio44 for pm8921
                  - gpio1-gpio36 for pm8941
                  - gpio1-gpio8 for pm8950 (hole on gpio3)
+                 - gpio1-gpio8 for pm8953 (hole on gpio3 and gpio6)
                  - gpio1-gpio22 for pm8994
                  - gpio1-gpio26 for pm8998
                  - gpio1-gpio22 for pma8084
+                 - gpio1-gpio4 for pmd8028
+                 - gpio1-gpio8 for pmi632
                  - gpio1-gpio2 for pmi8950
                  - gpio1-gpio10 for pmi8994
+                 - gpio1-gpio18 for pmih0108
                  - gpio1-gpio4 for pmk8350
+                 - gpio1-gpio6 for pmk8550
                  - gpio1-gpio10 for pmm8155au
+                 - gpio1-gpio12 for pmm8654au
                  - gpio1-gpio12 for pmp8074 (holes on gpio1 and gpio12)
                  - gpio1-gpio4 for pmr735a
                  - gpio1-gpio4 for pmr735b
+                 - gpio1-gpio2 for pmr735d
                  - gpio1-gpio12 for pms405 (holes on gpio1, gpio9
                                             and gpio10)
                  - gpio1-gpio11 for pmx55 (holes on gpio3, gpio7, gpio10
                                             and gpio11)
                  - gpio1-gpio16 for pmx65
+                 - gpio1-gpio16 for pmx75
+                 - gpio1-gpio12 for pmxr2230
 
         items:
           pattern: "^gpio([0-9]+)$"
@@ -511,6 +572,7 @@ $defs:
 
 examples:
   - |
+    #include <dt-bindings/gpio/gpio.h>
     #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 
     pm8921_gpio: gpio@150 {
@@ -533,6 +595,13 @@ examples:
           qcom,drive-strength = <PMIC_GPIO_STRENGTH_NO>;
           power-source = <PM8921_GPIO_S4>;
         };
+      };
+
+      otg-hog {
+        gpio-hog;
+        gpios = <35 GPIO_ACTIVE_HIGH>;
+        output-high;
+        line-name = "otg-gpio";
       };
     };
 ...

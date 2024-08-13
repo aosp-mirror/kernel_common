@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2012-2014, 2018-2022 Intel Corporation
+ * Copyright (C) 2012-2014, 2018-2024 Intel Corporation
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
  * Copyright (C) 2016-2017 Intel Deutschland GmbH
  */
@@ -450,9 +450,9 @@ static void iwl_mvm_wowlan_get_rsc_v5_data(struct ieee80211_hw *hw,
 }
 
 static int iwl_mvm_wowlan_config_rsc_tsc(struct iwl_mvm *mvm,
-					 struct ieee80211_vif *vif)
+					 struct ieee80211_vif *vif,
+					 struct iwl_mvm_vif_link_info *mvm_link)
 {
-	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 	int ver = iwl_fw_lookup_cmd_ver(mvm->fw, WOWLAN_TSC_RSC_PARAM,
 					IWL_FW_CMD_VER_UNKNOWN);
 	int ret;
@@ -461,16 +461,14 @@ static int iwl_mvm_wowlan_config_rsc_tsc(struct iwl_mvm *mvm,
 		struct wowlan_key_rsc_v5_data data = {};
 		int i;
 
-		data.rsc = kmalloc(sizeof(*data.rsc), GFP_KERNEL);
+		data.rsc = kzalloc(sizeof(*data.rsc), GFP_KERNEL);
 		if (!data.rsc)
 			return -ENOMEM;
-
-		memset(data.rsc, 0xff, sizeof(*data.rsc));
 
 		for (i = 0; i < ARRAY_SIZE(data.rsc->mcast_key_id_map); i++)
 			data.rsc->mcast_key_id_map[i] =
 				IWL_MCAST_KEY_MAP_INVALID;
-		data.rsc->sta_id = cpu_to_le32(mvmvif->ap_sta_id);
+		data.rsc->sta_id = cpu_to_le32(mvm_link->ap_sta_id);
 
 		ieee80211_iter_keys(mvm->hw, vif,
 				    iwl_mvm_wowlan_get_rsc_v5_data,
@@ -493,7 +491,8 @@ static int iwl_mvm_wowlan_config_rsc_tsc(struct iwl_mvm *mvm,
 
 		if (ver == 4) {
 			size = sizeof(*data.rsc_tsc);
-			data.rsc_tsc->sta_id = cpu_to_le32(mvmvif->ap_sta_id);
+			data.rsc_tsc->sta_id =
+				cpu_to_le32(mvm_link->ap_sta_id);
 		} else {
 			/* ver == 2 || ver == IWL_FW_CMD_VER_UNKNOWN */
 			size = sizeof(data.rsc_tsc->params);
@@ -563,6 +562,7 @@ static void iwl_mvm_wowlan_get_tkip_data(struct ieee80211_hw *hw,
 		}
 
 		for (i = 0; i < IWL_NUM_RSC; i++) {
+			ieee80211_get_key_rx_seq(key, i, &seq);
 			/* wrapping isn't allowed, AP must rekey */
 			if (seq.tkip.iv32 > cur_rx_iv32)
 				cur_rx_iv32 = seq.tkip.iv32;
@@ -595,6 +595,12 @@ static void iwl_mvm_wowlan_gtk_type_iter(struct ieee80211_hw *hw,
 					 void *_data)
 {
 	struct wowlan_key_gtk_type_iter *data = _data;
+	__le32 *cipher = NULL;
+
+	if (key->keyidx == 4 || key->keyidx == 5)
+		cipher = &data->kek_kck_cmd->igtk_cipher;
+	if (key->keyidx == 6 || key->keyidx == 7)
+		cipher = &data->kek_kck_cmd->bigtk_cipher;
 
 	switch (key->cipher) {
 	default:
@@ -606,10 +612,13 @@ static void iwl_mvm_wowlan_gtk_type_iter(struct ieee80211_hw *hw,
 		return;
 	case WLAN_CIPHER_SUITE_BIP_GMAC_256:
 	case WLAN_CIPHER_SUITE_BIP_GMAC_128:
-		data->kek_kck_cmd->igtk_cipher = cpu_to_le32(STA_KEY_FLG_GCMP);
+		if (cipher)
+			*cipher = cpu_to_le32(STA_KEY_FLG_GCMP);
 		return;
 	case WLAN_CIPHER_SUITE_AES_CMAC:
-		data->kek_kck_cmd->igtk_cipher = cpu_to_le32(STA_KEY_FLG_CCM);
+	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+		if (cipher)
+			*cipher = cpu_to_le32(STA_KEY_FLG_CCM);
 		return;
 	case WLAN_CIPHER_SUITE_CCMP:
 		if (!sta)
@@ -666,10 +675,9 @@ static int iwl_mvm_send_patterns_v1(struct iwl_mvm *mvm,
 }
 
 static int iwl_mvm_send_patterns(struct iwl_mvm *mvm,
-				 struct ieee80211_vif *vif,
+				 struct iwl_mvm_vif_link_info *mvm_link,
 				 struct cfg80211_wowlan *wowlan)
 {
-	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 	struct iwl_wowlan_patterns_cmd *pattern_cmd;
 	struct iwl_host_cmd cmd = {
 		.id = WOWLAN_PATTERNS,
@@ -691,7 +699,7 @@ static int iwl_mvm_send_patterns(struct iwl_mvm *mvm,
 
 	pattern_cmd->n_patterns = wowlan->n_patterns;
 	if (ver >= 3)
-		pattern_cmd->sta_id = mvmvif->ap_sta_id;
+		pattern_cmd->sta_id = mvm_link->ap_sta_id;
 
 	for (i = 0; i < wowlan->n_patterns; i++) {
 		int mask_len = DIV_ROUND_UP(wowlan->patterns[i].pattern_len, 8);
@@ -721,18 +729,19 @@ static int iwl_mvm_d3_reprogram(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 	struct ieee80211_chanctx_conf *ctx;
 	u8 chains_static, chains_dynamic;
-	struct cfg80211_chan_def chandef;
+	struct cfg80211_chan_def chandef, ap_def;
 	int ret, i;
 	struct iwl_binding_cmd_v1 binding_cmd = {};
 	struct iwl_time_quota_cmd quota_cmd = {};
 	struct iwl_time_quota_data *quota;
 	u32 status;
 
-	if (WARN_ON_ONCE(iwl_mvm_is_cdb_supported(mvm)))
+	if (WARN_ON_ONCE(iwl_mvm_is_cdb_supported(mvm) ||
+			 ieee80211_vif_is_mld(vif)))
 		return -EINVAL;
 
 	/* add back the PHY */
-	if (WARN_ON(!mvmvif->phy_ctxt))
+	if (WARN_ON(!mvmvif->deflink.phy_ctxt))
 		return -EINVAL;
 
 	rcu_read_lock();
@@ -742,12 +751,13 @@ static int iwl_mvm_d3_reprogram(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		return -EINVAL;
 	}
 	chandef = ctx->def;
+	ap_def = ctx->ap;
 	chains_static = ctx->rx_chains_static;
 	chains_dynamic = ctx->rx_chains_dynamic;
 	rcu_read_unlock();
 
-	ret = iwl_mvm_phy_ctxt_add(mvm, mvmvif->phy_ctxt, &chandef,
-				   chains_static, chains_dynamic);
+	ret = iwl_mvm_phy_ctxt_add(mvm, mvmvif->deflink.phy_ctxt, &chandef,
+				   &ap_def, chains_static, chains_dynamic);
 	if (ret)
 		return ret;
 
@@ -763,12 +773,12 @@ static int iwl_mvm_d3_reprogram(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	/* add back binding - XXX refactor? */
 	binding_cmd.id_and_color =
-		cpu_to_le32(FW_CMD_ID_AND_COLOR(mvmvif->phy_ctxt->id,
-						mvmvif->phy_ctxt->color));
+		cpu_to_le32(FW_CMD_ID_AND_COLOR(mvmvif->deflink.phy_ctxt->id,
+						mvmvif->deflink.phy_ctxt->color));
 	binding_cmd.action = cpu_to_le32(FW_CTXT_ACTION_ADD);
 	binding_cmd.phy =
-		cpu_to_le32(FW_CMD_ID_AND_COLOR(mvmvif->phy_ctxt->id,
-						mvmvif->phy_ctxt->color));
+		cpu_to_le32(FW_CMD_ID_AND_COLOR(mvmvif->deflink.phy_ctxt->id,
+						mvmvif->deflink.phy_ctxt->color));
 	binding_cmd.macs[0] = cpu_to_le32(FW_CMD_ID_AND_COLOR(mvmvif->id,
 							      mvmvif->color));
 	for (i = 1; i < MAX_MACS_IN_BINDING; i++)
@@ -791,7 +801,8 @@ static int iwl_mvm_d3_reprogram(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	ret = iwl_mvm_sta_send_to_fw(mvm, ap_sta, false, 0);
 	if (ret)
 		return ret;
-	rcu_assign_pointer(mvm->fw_id_to_mac_id[mvmvif->ap_sta_id], ap_sta);
+	rcu_assign_pointer(mvm->fw_id_to_mac_id[mvmvif->deflink.ap_sta_id],
+			   ap_sta);
 
 	ret = iwl_mvm_mac_ctxt_changed(mvm, vif, false, NULL);
 	if (ret)
@@ -800,8 +811,8 @@ static int iwl_mvm_d3_reprogram(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	/* and some quota */
 	quota = iwl_mvm_quota_cmd_get_quota(mvm, &quota_cmd, 0);
 	quota->id_and_color =
-		cpu_to_le32(FW_CMD_ID_AND_COLOR(mvmvif->phy_ctxt->id,
-						mvmvif->phy_ctxt->color));
+		cpu_to_le32(FW_CMD_ID_AND_COLOR(mvmvif->deflink.phy_ctxt->id,
+						mvmvif->deflink.phy_ctxt->color));
 	quota->quota = cpu_to_le32(IWL_MVM_MAX_QUOTA);
 	quota->max_duration = cpu_to_le32(IWL_MVM_MAX_QUOTA);
 
@@ -815,7 +826,7 @@ static int iwl_mvm_d3_reprogram(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	if (ret)
 		IWL_ERR(mvm, "Failed to send quota: %d\n", ret);
 
-	if (iwl_mvm_is_lar_supported(mvm) && iwl_mvm_init_fw_regd(mvm))
+	if (iwl_mvm_is_lar_supported(mvm) && iwl_mvm_init_fw_regd(mvm, false))
 		IWL_ERR(mvm, "Failed to initialize D3 LAR information\n");
 
 	return 0;
@@ -924,6 +935,9 @@ iwl_mvm_get_wowlan_config(struct iwl_mvm *mvm,
 	wowlan_config_cmd->flags = ENABLE_L3_FILTERING |
 		ENABLE_NBNS_FILTERING | ENABLE_DHCP_FILTERING;
 
+	if (ap_sta->mfp)
+		wowlan_config_cmd->flags |= IS_11W_ASSOC;
+
 	if (iwl_fw_lookup_cmd_ver(mvm->fw, WOWLAN_CONFIGURATION, 0) < 6) {
 		/* Query the last used seqno and set it */
 		int ret = iwl_mvm_get_last_nonqos_seq(mvm, vif);
@@ -984,7 +998,8 @@ iwl_mvm_get_wowlan_config(struct iwl_mvm *mvm,
 }
 
 static int iwl_mvm_wowlan_config_key_params(struct iwl_mvm *mvm,
-					    struct ieee80211_vif *vif)
+					    struct ieee80211_vif *vif,
+					    struct iwl_mvm_vif_link_info *mvm_link)
 {
 	bool unified = fw_has_capa(&mvm->fw->ucode_capa,
 				   IWL_UCODE_TLV_CAPA_CNSLDTD_D3_D0_IMG);
@@ -1013,7 +1028,7 @@ static int iwl_mvm_wowlan_config_key_params(struct iwl_mvm *mvm,
 			return -EIO;
 	}
 
-	ret = iwl_mvm_wowlan_config_rsc_tsc(mvm, vif);
+	ret = iwl_mvm_wowlan_config_rsc_tsc(mvm, vif, mvm_link);
 	if (ret)
 		return ret;
 
@@ -1027,7 +1042,7 @@ static int iwl_mvm_wowlan_config_key_params(struct iwl_mvm *mvm,
 		if (ver == 2) {
 			size = sizeof(tkip_data.tkip);
 			tkip_data.tkip.sta_id =
-				cpu_to_le32(mvmvif->ap_sta_id);
+				cpu_to_le32(mvm_link->ap_sta_id);
 		} else if (ver == 1 || ver == IWL_FW_CMD_VER_UNKNOWN) {
 			size = sizeof(struct iwl_wowlan_tkip_params_cmd_ver_1);
 		} else {
@@ -1076,7 +1091,7 @@ static int iwl_mvm_wowlan_config_key_params(struct iwl_mvm *mvm,
 		kek_kck_cmd.kek_len = cpu_to_le16(mvmvif->rekey_data.kek_len);
 		kek_kck_cmd.replay_ctr = mvmvif->rekey_data.replay_ctr;
 		kek_kck_cmd.akm = cpu_to_le32(mvmvif->rekey_data.akm);
-		kek_kck_cmd.sta_id = cpu_to_le32(mvmvif->ap_sta_id);
+		kek_kck_cmd.sta_id = cpu_to_le32(mvm_link->ap_sta_id);
 
 		if (cmd_ver == 4) {
 			cmd_size = sizeof(struct iwl_wowlan_kek_kck_material_cmd_v4);
@@ -1109,6 +1124,7 @@ iwl_mvm_wowlan_config(struct iwl_mvm *mvm,
 		      struct cfg80211_wowlan *wowlan,
 		      struct iwl_wowlan_config_cmd *wowlan_config_cmd,
 		      struct ieee80211_vif *vif, struct iwl_mvm_vif *mvmvif,
+		      struct iwl_mvm_vif_link_info *mvm_link,
 		      struct ieee80211_sta *ap_sta)
 {
 	int ret;
@@ -1127,14 +1143,7 @@ iwl_mvm_wowlan_config(struct iwl_mvm *mvm,
 			return ret;
 	}
 
-	/*
-	 * This needs to be unlocked due to lock ordering
-	 * constraints. Since we're in the suspend path
-	 * that isn't really a problem though.
-	 */
-	mutex_unlock(&mvm->mutex);
-	ret = iwl_mvm_wowlan_config_key_params(mvm, vif);
-	mutex_lock(&mvm->mutex);
+	ret = iwl_mvm_wowlan_config_key_params(mvm, vif, mvm_link);
 	if (ret)
 		return ret;
 
@@ -1146,13 +1155,14 @@ iwl_mvm_wowlan_config(struct iwl_mvm *mvm,
 
 	if (fw_has_api(&mvm->fw->ucode_capa,
 		       IWL_UCODE_TLV_API_WOWLAN_TCP_SYN_WAKE))
-		ret = iwl_mvm_send_patterns(mvm, vif, wowlan);
+		ret = iwl_mvm_send_patterns(mvm, mvm_link, wowlan);
 	else
 		ret = iwl_mvm_send_patterns_v1(mvm, wowlan);
 	if (ret)
 		return ret;
 
-	return iwl_mvm_send_proto_offload(mvm, vif, false, true, 0);
+	return iwl_mvm_send_proto_offload(mvm, vif, false, true, 0,
+					  mvm_link->ap_sta_id);
 }
 
 static int
@@ -1227,6 +1237,7 @@ static int __iwl_mvm_suspend(struct ieee80211_hw *hw,
 	struct ieee80211_vif *vif = NULL;
 	struct iwl_mvm_vif *mvmvif = NULL;
 	struct ieee80211_sta *ap_sta = NULL;
+	struct iwl_mvm_vif_link_info *mvm_link;
 	struct iwl_d3_manager_config d3_cfg_cmd_data = {
 		/*
 		 * Program the minimum sleep time to 10 seconds, as many
@@ -1255,21 +1266,29 @@ static int __iwl_mvm_suspend(struct ieee80211_hw *hw,
 		return -EINVAL;
 	}
 
+	vif = iwl_mvm_get_bss_vif(mvm);
+	if (IS_ERR_OR_NULL(vif))
+		return 1;
+
+	ret = iwl_mvm_block_esr_sync(mvm, vif, IWL_MVM_ESR_BLOCKED_WOWLAN);
+	if (ret)
+		return ret;
+
 	mutex_lock(&mvm->mutex);
 
 	set_bit(IWL_MVM_STATUS_IN_D3, &mvm->status);
 
 	synchronize_net();
 
-	vif = iwl_mvm_get_bss_vif(mvm);
-	if (IS_ERR_OR_NULL(vif)) {
-		ret = 1;
+	mvmvif = iwl_mvm_vif_from_mac80211(vif);
+
+	mvm_link = mvmvif->link[iwl_mvm_get_primary_link(vif)];
+	if (WARN_ON_ONCE(!mvm_link)) {
+		ret = -EINVAL;
 		goto out_noreset;
 	}
 
-	mvmvif = iwl_mvm_vif_from_mac80211(vif);
-
-	if (mvmvif->ap_sta_id == IWL_MVM_INVALID_STA) {
+	if (mvm_link->ap_sta_id == IWL_MVM_INVALID_STA) {
 		/* if we're not associated, this must be netdetect */
 		if (!wowlan->nd_config) {
 			ret = 1;
@@ -1283,24 +1302,31 @@ static int __iwl_mvm_suspend(struct ieee80211_hw *hw,
 
 		mvm->net_detect = true;
 	} else {
-		struct iwl_wowlan_config_cmd wowlan_config_cmd = {};
+		struct iwl_wowlan_config_cmd wowlan_config_cmd = {
+			.offloading_tid = 0,
+		};
 
-		wowlan_config_cmd.sta_id = mvmvif->ap_sta_id;
+		wowlan_config_cmd.sta_id = mvm_link->ap_sta_id;
 
 		ap_sta = rcu_dereference_protected(
-			mvm->fw_id_to_mac_id[mvmvif->ap_sta_id],
+			mvm->fw_id_to_mac_id[mvm_link->ap_sta_id],
 			lockdep_is_held(&mvm->mutex));
 		if (IS_ERR_OR_NULL(ap_sta)) {
 			ret = -EINVAL;
 			goto out_noreset;
 		}
 
+		ret = iwl_mvm_sta_ensure_queue(
+			mvm, ap_sta->txq[wowlan_config_cmd.offloading_tid]);
+		if (ret)
+			goto out_noreset;
+
 		ret = iwl_mvm_get_wowlan_config(mvm, wowlan, &wowlan_config_cmd,
 						vif, mvmvif, ap_sta);
 		if (ret)
 			goto out_noreset;
 		ret = iwl_mvm_wowlan_config(mvm, wowlan, &wowlan_config_cmd,
-					    vif, mvmvif, ap_sta);
+					    vif, mvmvif, mvm_link, ap_sta);
 		if (ret)
 			goto out;
 
@@ -1377,6 +1403,14 @@ int iwl_mvm_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wowlan)
 	return __iwl_mvm_suspend(hw, wowlan, false);
 }
 
+struct iwl_multicast_key_data {
+	u8 key[WOWLAN_KEY_MAX_SIZE];
+	u8 len;
+	u8 flags;
+	u8 id;
+	u8 ipn[6];
+};
+
 /* converted data from the different status responses */
 struct iwl_wowlan_status_data {
 	u64 replay_ctr;
@@ -1395,7 +1429,8 @@ struct iwl_wowlan_status_data {
 		u8 key[WOWLAN_KEY_MAX_SIZE];
 		u8 len;
 		u8 flags;
-	} gtk;
+		u8 id;
+	} gtk[WOWLAN_GTK_KEYS_NUM];
 
 	struct {
 		/*
@@ -1425,12 +1460,11 @@ struct iwl_wowlan_status_data {
 		} tkip, aes;
 	} ptk;
 
-	struct {
-		u64 ipn;
-		u8 key[WOWLAN_KEY_MAX_SIZE];
-		u8 len;
-		u8 flags;
-	} igtk;
+	struct iwl_multicast_key_data igtk;
+	struct iwl_multicast_key_data bigtk[WOWLAN_BIGTK_KEYS_NUM];
+
+	int num_mlo_keys;
+	struct iwl_wowlan_mlo_gtk mlo_keys[WOWLAN_MAX_MLO_KEYS];
 
 	u8 *wake_packet;
 };
@@ -1461,7 +1495,8 @@ static void iwl_mvm_report_wakeup_reasons(struct iwl_mvm *mvm,
 			status->pattern_number;
 
 	if (reasons & (IWL_WOWLAN_WAKEUP_BY_DISCONNECTION_ON_MISSED_BEACON |
-		       IWL_WOWLAN_WAKEUP_BY_DISCONNECTION_ON_DEAUTH))
+		       IWL_WOWLAN_WAKEUP_BY_DISCONNECTION_ON_DEAUTH |
+		       IWL_WOWLAN_WAKEUP_BY_GTK_REKEY_FAILURE))
 		wakeup.disconnect = true;
 
 	if (reasons & IWL_WOWLAN_WAKEUP_BY_GTK_REKEY_FAILURE)
@@ -1484,6 +1519,9 @@ static void iwl_mvm_report_wakeup_reasons(struct iwl_mvm *mvm,
 
 	if (reasons & IWL_WOWLAN_WAKEUP_BY_REM_WAKE_WAKEUP_PACKET)
 		wakeup.tcp_match = true;
+
+	if (reasons & IWL_WAKEUP_BY_11W_UNPROTECTED_DEAUTH_OR_DISASSOC)
+		wakeup.unprot_deauth_disassoc = true;
 
 	if (status->wake_packet) {
 		int pktsize = status->wake_packet_bufsize;
@@ -1755,7 +1793,7 @@ static void iwl_mvm_set_key_rx_seq(struct ieee80211_key_conf *key,
 			s8 new_key_id = -1;
 
 			if (status->num_of_gtk_rekeys)
-				new_key_id = status->gtk.flags &
+				new_key_id = status->gtk[0].flags &
 						IWL_WOWLAN_GTK_IDX_MASK;
 
 			/* Don't install a new key's value to an old key */
@@ -1774,20 +1812,22 @@ static void iwl_mvm_set_key_rx_seq(struct ieee80211_key_conf *key,
 struct iwl_mvm_d3_gtk_iter_data {
 	struct iwl_mvm *mvm;
 	struct iwl_wowlan_status_data *status;
-	void *last_gtk;
-	u32 cipher;
-	bool find_phase, unhandled_cipher;
+	u32 gtk_cipher, igtk_cipher, bigtk_cipher;
+	bool unhandled_cipher, igtk_support, bigtk_support;
 	int num_keys;
 };
 
-static void iwl_mvm_d3_update_keys(struct ieee80211_hw *hw,
-				   struct ieee80211_vif *vif,
-				   struct ieee80211_sta *sta,
-				   struct ieee80211_key_conf *key,
-				   void *_data)
+static void iwl_mvm_d3_find_last_keys(struct ieee80211_hw *hw,
+				      struct ieee80211_vif *vif,
+				      struct ieee80211_sta *sta,
+				      struct ieee80211_key_conf *key,
+				      void *_data)
 {
 	struct iwl_mvm_d3_gtk_iter_data *data = _data;
-	struct iwl_wowlan_status_data *status = data->status;
+	int link_id = vif->active_links ? __ffs(vif->active_links) : -1;
+
+	if (link_id >= 0 && key->link_id >= 0 && link_id != key->link_id)
+		return;
 
 	if (data->unhandled_cipher)
 		return;
@@ -1802,51 +1842,438 @@ static void iwl_mvm_d3_update_keys(struct ieee80211_hw *hw,
 	case WLAN_CIPHER_SUITE_GCMP_256:
 	case WLAN_CIPHER_SUITE_TKIP:
 		/* we support these */
+		data->gtk_cipher = key->cipher;
+		break;
+	case WLAN_CIPHER_SUITE_BIP_GMAC_128:
+	case WLAN_CIPHER_SUITE_BIP_GMAC_256:
+	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+	case WLAN_CIPHER_SUITE_AES_CMAC:
+		/* we support these */
+		if (data->igtk_support &&
+		    (key->keyidx == 4 || key->keyidx == 5)) {
+			data->igtk_cipher = key->cipher;
+		} else if (data->bigtk_support &&
+			   (key->keyidx == 6 || key->keyidx == 7)) {
+			data->bigtk_cipher = key->cipher;
+		} else {
+			data->unhandled_cipher = true;
+			return;
+		}
 		break;
 	default:
-		/* everything else (even CMAC for MFP) - disconnect from AP */
+		/* everything else - disconnect from AP */
 		data->unhandled_cipher = true;
 		return;
 	}
 
 	data->num_keys++;
+}
 
-	/*
-	 * pairwise key - update sequence counters only;
-	 * note that this assumes no TDLS sessions are active
-	 */
-	if (sta) {
-		if (data->find_phase)
-			return;
+static void
+iwl_mvm_d3_set_igtk_bigtk_ipn(const struct iwl_multicast_key_data *key,
+			      struct ieee80211_key_seq *seq, u32 cipher)
+{
+	switch (cipher) {
+	case WLAN_CIPHER_SUITE_BIP_GMAC_128:
+	case WLAN_CIPHER_SUITE_BIP_GMAC_256:
+		BUILD_BUG_ON(sizeof(seq->aes_gmac.pn) != sizeof(key->ipn));
+		memcpy(seq->aes_gmac.pn, key->ipn, sizeof(seq->aes_gmac.pn));
+		break;
+	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+	case WLAN_CIPHER_SUITE_AES_CMAC:
+		BUILD_BUG_ON(sizeof(seq->aes_cmac.pn) != sizeof(key->ipn));
+		memcpy(seq->aes_cmac.pn, key->ipn, sizeof(seq->aes_cmac.pn));
+		break;
+	default:
+		WARN_ON(1);
+	}
+}
 
-		switch (key->cipher) {
-		case WLAN_CIPHER_SUITE_CCMP:
-		case WLAN_CIPHER_SUITE_GCMP:
-		case WLAN_CIPHER_SUITE_GCMP_256:
+static void
+iwl_mvm_d3_update_igtk_bigtk(struct iwl_wowlan_status_data *status,
+			     struct ieee80211_key_conf *key,
+			     struct iwl_multicast_key_data *key_data)
+{
+	if (status->num_of_gtk_rekeys && key_data->len) {
+		/* remove rekeyed key */
+		ieee80211_remove_key(key);
+	} else {
+		struct ieee80211_key_seq seq;
+
+		iwl_mvm_d3_set_igtk_bigtk_ipn(key_data,
+					      &seq,
+					      key->cipher);
+		ieee80211_set_key_rx_seq(key, 0, &seq);
+	}
+}
+
+static void iwl_mvm_d3_update_keys(struct ieee80211_hw *hw,
+				   struct ieee80211_vif *vif,
+				   struct ieee80211_sta *sta,
+				   struct ieee80211_key_conf *key,
+				   void *_data)
+{
+	struct iwl_mvm_d3_gtk_iter_data *data = _data;
+	struct iwl_wowlan_status_data *status = data->status;
+	s8 keyidx;
+	int link_id = vif->active_links ? __ffs(vif->active_links) : -1;
+
+	if (link_id >= 0 && key->link_id >= 0 && link_id != key->link_id)
+		return;
+
+	if (data->unhandled_cipher)
+		return;
+
+	switch (key->cipher) {
+	case WLAN_CIPHER_SUITE_WEP40:
+	case WLAN_CIPHER_SUITE_WEP104:
+		/* ignore WEP completely, nothing to do */
+		return;
+	case WLAN_CIPHER_SUITE_CCMP:
+	case WLAN_CIPHER_SUITE_GCMP:
+	case WLAN_CIPHER_SUITE_GCMP_256:
+		if (sta) {
 			atomic64_set(&key->tx_pn, status->ptk.aes.tx_pn);
 			iwl_mvm_set_aes_ptk_rx_seq(data->mvm, status, sta, key);
-			break;
-		case WLAN_CIPHER_SUITE_TKIP:
+			return;
+		}
+		fallthrough;
+	case WLAN_CIPHER_SUITE_TKIP:
+		if (sta) {
 			atomic64_set(&key->tx_pn, status->ptk.tkip.tx_pn);
 			iwl_mvm_set_key_rx_seq_tids(key, status->ptk.tkip.seq);
+			return;
+		}
+		keyidx = key->keyidx;
+		/* The current key is always sent by the FW, even if it wasn't
+		 * rekeyed during D3.
+		 * We remove an existing key if it has the same index as
+		 * a new key
+		 */
+		if (status->num_of_gtk_rekeys &&
+		    ((status->gtk[0].len && keyidx == status->gtk[0].id) ||
+		     (status->gtk[1].len && keyidx == status->gtk[1].id))) {
+			ieee80211_remove_key(key);
+		} else {
+			iwl_mvm_set_key_rx_seq(key, data->status, false);
+		}
+		break;
+	case WLAN_CIPHER_SUITE_BIP_GMAC_128:
+	case WLAN_CIPHER_SUITE_BIP_GMAC_256:
+	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+	case WLAN_CIPHER_SUITE_AES_CMAC:
+		if (key->keyidx == 4 || key->keyidx == 5) {
+			iwl_mvm_d3_update_igtk_bigtk(status, key,
+						     &status->igtk);
+		}
+		if (key->keyidx == 6 || key->keyidx == 7) {
+			u8 idx = key->keyidx == status->bigtk[1].id;
+
+			iwl_mvm_d3_update_igtk_bigtk(status, key,
+						     &status->bigtk[idx]);
+		}
+	}
+}
+
+struct iwl_mvm_d3_mlo_old_keys {
+	u32 cipher[IEEE80211_MLD_MAX_NUM_LINKS][WOWLAN_MLO_GTK_KEY_NUM_TYPES];
+	struct ieee80211_key_conf *key[IEEE80211_MLD_MAX_NUM_LINKS][8];
+};
+
+static void iwl_mvm_mlo_key_ciphers(struct ieee80211_hw *hw,
+				    struct ieee80211_vif *vif,
+				    struct ieee80211_sta *sta,
+				    struct ieee80211_key_conf *key,
+				    void *data)
+{
+	struct iwl_mvm_d3_mlo_old_keys *old_keys = data;
+	enum iwl_wowlan_mlo_gtk_type key_type;
+
+	if (key->link_id < 0)
+		return;
+
+	if (WARN_ON(key->link_id >= IEEE80211_MLD_MAX_NUM_LINKS ||
+		    key->keyidx >= 8))
+		return;
+
+	if (WARN_ON(old_keys->key[key->link_id][key->keyidx]))
+		return;
+
+	switch (key->cipher) {
+	case WLAN_CIPHER_SUITE_CCMP:
+	case WLAN_CIPHER_SUITE_GCMP:
+	case WLAN_CIPHER_SUITE_GCMP_256:
+		key_type = WOWLAN_MLO_GTK_KEY_TYPE_GTK;
+		break;
+	case WLAN_CIPHER_SUITE_BIP_GMAC_128:
+	case WLAN_CIPHER_SUITE_BIP_GMAC_256:
+	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+	case WLAN_CIPHER_SUITE_AES_CMAC:
+		if (key->keyidx == 4 || key->keyidx == 5) {
+			key_type = WOWLAN_MLO_GTK_KEY_TYPE_IGTK;
+			break;
+		} else if (key->keyidx == 6 || key->keyidx == 7) {
+			key_type = WOWLAN_MLO_GTK_KEY_TYPE_BIGTK;
+			break;
+		}
+		return;
+	default:
+		/* ignore WEP/TKIP or unknown ciphers */
+		return;
+	}
+
+	old_keys->cipher[key->link_id][key_type] = key->cipher;
+	old_keys->key[key->link_id][key->keyidx] = key;
+}
+
+static bool iwl_mvm_mlo_gtk_rekey(struct iwl_wowlan_status_data *status,
+				  struct ieee80211_vif *vif,
+				  struct iwl_mvm *mvm)
+{
+	int i;
+	struct iwl_mvm_d3_mlo_old_keys *old_keys;
+	bool ret = true;
+
+	IWL_DEBUG_WOWLAN(mvm, "Num of MLO Keys: %d\n", status->num_mlo_keys);
+	if (!status->num_mlo_keys)
+		return true;
+
+	old_keys = kzalloc(sizeof(*old_keys), GFP_KERNEL);
+	if (!old_keys)
+		return false;
+
+	/* find the cipher for each mlo key */
+	ieee80211_iter_keys(mvm->hw, vif, iwl_mvm_mlo_key_ciphers, old_keys);
+
+	for (i = 0; i < status->num_mlo_keys; i++) {
+		struct iwl_wowlan_mlo_gtk *mlo_key = &status->mlo_keys[i];
+		struct ieee80211_key_conf *key, *old_key;
+		struct ieee80211_key_seq seq;
+		struct {
+			struct ieee80211_key_conf conf;
+			u8 key[32];
+		} conf = {};
+		u16 flags = le16_to_cpu(mlo_key->flags);
+		int j, link_id, key_id, key_type;
+
+		link_id = u16_get_bits(flags, WOWLAN_MLO_GTK_FLAG_LINK_ID_MSK);
+		key_id = u16_get_bits(flags, WOWLAN_MLO_GTK_FLAG_KEY_ID_MSK);
+		key_type = u16_get_bits(flags,
+					WOWLAN_MLO_GTK_FLAG_KEY_TYPE_MSK);
+
+		if (!(vif->valid_links & BIT(link_id)))
+			continue;
+
+		if (WARN_ON(link_id >= IEEE80211_MLD_MAX_NUM_LINKS ||
+			    key_id >= 8 ||
+			    key_type >= WOWLAN_MLO_GTK_KEY_NUM_TYPES))
+			continue;
+
+		conf.conf.cipher = old_keys->cipher[link_id][key_type];
+		/* WARN_ON? */
+		if (!conf.conf.cipher)
+			continue;
+
+		conf.conf.keylen = 0;
+		switch (conf.conf.cipher) {
+		case WLAN_CIPHER_SUITE_CCMP:
+		case WLAN_CIPHER_SUITE_GCMP:
+			conf.conf.keylen = WLAN_KEY_LEN_CCMP;
+			break;
+		case WLAN_CIPHER_SUITE_GCMP_256:
+			conf.conf.keylen = WLAN_KEY_LEN_GCMP_256;
+			break;
+		case WLAN_CIPHER_SUITE_BIP_GMAC_128:
+			conf.conf.keylen = WLAN_KEY_LEN_BIP_GMAC_128;
+			break;
+		case WLAN_CIPHER_SUITE_BIP_GMAC_256:
+			conf.conf.keylen = WLAN_KEY_LEN_BIP_GMAC_256;
+			break;
+		case WLAN_CIPHER_SUITE_AES_CMAC:
+			conf.conf.keylen = WLAN_KEY_LEN_AES_CMAC;
+			break;
+		case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+			conf.conf.keylen = WLAN_KEY_LEN_BIP_CMAC_256;
 			break;
 		}
 
-		/* that's it for this key */
-		return;
+		if (WARN_ON(!conf.conf.keylen ||
+			    conf.conf.keylen > sizeof(conf.key)))
+			continue;
+
+		memcpy(conf.conf.key, mlo_key->key, conf.conf.keylen);
+		conf.conf.keyidx = key_id;
+
+		old_key = old_keys->key[link_id][key_id];
+		if (old_key) {
+			IWL_DEBUG_WOWLAN(mvm,
+					 "Remove MLO key id %d, link id %d\n",
+					 key_id, link_id);
+			ieee80211_remove_key(old_key);
+		}
+
+		IWL_DEBUG_WOWLAN(mvm, "Add MLO key id %d, link id %d\n",
+				 key_id, link_id);
+		key = ieee80211_gtk_rekey_add(vif, &conf.conf, link_id);
+		if (WARN_ON(IS_ERR(key))) {
+			ret = false;
+			goto out;
+		}
+
+		/*
+		 * mac80211 expects the pn in big-endian
+		 * also note that seq is a union of all cipher types
+		 * (ccmp, gcmp, cmac, gmac), and they all have the same
+		 * pn field (of length 6) so just copy it to ccmp.pn.
+		 */
+		for (j = 5; j >= 0; j--)
+			seq.ccmp.pn[5 - j] = mlo_key->pn[j];
+
+		/* group keys are non-QoS and use TID 0 */
+		ieee80211_set_key_rx_seq(key, 0, &seq);
 	}
 
-	if (data->find_phase) {
-		data->last_gtk = key;
-		data->cipher = key->cipher;
-		return;
+out:
+	kfree(old_keys);
+	return ret;
+}
+
+static bool iwl_mvm_gtk_rekey(struct iwl_wowlan_status_data *status,
+			      struct ieee80211_vif *vif,
+			      struct iwl_mvm *mvm, u32 gtk_cipher)
+{
+	int i, j;
+	struct ieee80211_key_conf *key;
+	struct {
+		struct ieee80211_key_conf conf;
+		u8 key[32];
+	} conf = {
+		.conf.cipher = gtk_cipher,
+	};
+	int link_id = vif->active_links ? __ffs(vif->active_links) : -1;
+
+	BUILD_BUG_ON(WLAN_KEY_LEN_CCMP != WLAN_KEY_LEN_GCMP);
+	BUILD_BUG_ON(sizeof(conf.key) < WLAN_KEY_LEN_CCMP);
+	BUILD_BUG_ON(sizeof(conf.key) < WLAN_KEY_LEN_GCMP_256);
+	BUILD_BUG_ON(sizeof(conf.key) < WLAN_KEY_LEN_TKIP);
+	BUILD_BUG_ON(sizeof(conf.key) < sizeof(status->gtk[0].key));
+
+	switch (gtk_cipher) {
+	case WLAN_CIPHER_SUITE_CCMP:
+	case WLAN_CIPHER_SUITE_GCMP:
+		conf.conf.keylen = WLAN_KEY_LEN_CCMP;
+		break;
+	case WLAN_CIPHER_SUITE_GCMP_256:
+		conf.conf.keylen = WLAN_KEY_LEN_GCMP_256;
+		break;
+	case WLAN_CIPHER_SUITE_TKIP:
+		conf.conf.keylen = WLAN_KEY_LEN_TKIP;
+		break;
+	default:
+		WARN_ON(1);
 	}
 
-	if (data->status->num_of_gtk_rekeys)
-		ieee80211_remove_key(key);
+	for (i = 0; i < ARRAY_SIZE(status->gtk); i++) {
+		if (!status->gtk[i].len)
+			continue;
 
-	if (data->last_gtk == key)
-		iwl_mvm_set_key_rx_seq(key, data->status, false);
+		conf.conf.keyidx = status->gtk[i].id;
+		IWL_DEBUG_WOWLAN(mvm,
+				 "Received from FW GTK cipher %d, key index %d\n",
+				 conf.conf.cipher, conf.conf.keyidx);
+		memcpy(conf.conf.key, status->gtk[i].key,
+		       sizeof(status->gtk[i].key));
+
+		key = ieee80211_gtk_rekey_add(vif, &conf.conf, link_id);
+		if (IS_ERR(key))
+			return false;
+
+		for (j = 0; j < ARRAY_SIZE(status->gtk_seq); j++) {
+			if (!status->gtk_seq[j].valid ||
+			    status->gtk_seq[j].key_id != key->keyidx)
+				continue;
+			iwl_mvm_set_key_rx_seq_idx(key, status, j);
+			break;
+		}
+		WARN_ON(j == ARRAY_SIZE(status->gtk_seq));
+	}
+
+	return true;
+}
+
+static bool
+iwl_mvm_d3_igtk_bigtk_rekey_add(struct iwl_wowlan_status_data *status,
+				struct ieee80211_vif *vif, u32 cipher,
+				struct iwl_multicast_key_data *key_data)
+{
+	struct ieee80211_key_conf *key_config;
+	struct {
+		struct ieee80211_key_conf conf;
+		u8 key[WOWLAN_KEY_MAX_SIZE];
+	} conf = {
+		.conf.cipher = cipher,
+		.conf.keyidx = key_data->id,
+	};
+	struct ieee80211_key_seq seq;
+	int link_id = vif->active_links ? __ffs(vif->active_links) : -1;
+
+	if (!key_data->len)
+		return true;
+
+	iwl_mvm_d3_set_igtk_bigtk_ipn(key_data, &seq, conf.conf.cipher);
+
+	switch (cipher) {
+	case WLAN_CIPHER_SUITE_BIP_GMAC_128:
+		conf.conf.keylen = WLAN_KEY_LEN_BIP_GMAC_128;
+		break;
+	case WLAN_CIPHER_SUITE_BIP_GMAC_256:
+		conf.conf.keylen = WLAN_KEY_LEN_BIP_GMAC_256;
+		break;
+	case WLAN_CIPHER_SUITE_AES_CMAC:
+		conf.conf.keylen = WLAN_KEY_LEN_AES_CMAC;
+		break;
+	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
+		conf.conf.keylen = WLAN_KEY_LEN_BIP_CMAC_256;
+		break;
+	default:
+		WARN_ON(1);
+	}
+	BUILD_BUG_ON(sizeof(conf.key) < sizeof(key_data->key));
+	memcpy(conf.conf.key, key_data->key, conf.conf.keylen);
+
+	key_config = ieee80211_gtk_rekey_add(vif, &conf.conf, link_id);
+	if (IS_ERR(key_config))
+		return false;
+	ieee80211_set_key_rx_seq(key_config, 0, &seq);
+
+	if (key_config->keyidx == 4 || key_config->keyidx == 5) {
+		struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
+		struct iwl_mvm_vif_link_info *mvm_link;
+
+		link_id = link_id < 0 ? 0 : link_id;
+		mvm_link = mvmvif->link[link_id];
+		mvm_link->igtk = key_config;
+	}
+
+	return true;
+}
+
+static int iwl_mvm_lookup_wowlan_status_ver(struct iwl_mvm *mvm)
+{
+	u8 notif_ver;
+
+	if (!fw_has_api(&mvm->fw->ucode_capa,
+			IWL_UCODE_TLV_API_WOWLAN_KEY_MATERIAL))
+		return 6;
+
+	/* default to 7 (when we have IWL_UCODE_TLV_API_WOWLAN_KEY_MATERIAL) */
+	notif_ver = iwl_fw_lookup_notif_ver(mvm->fw, LONG_GROUP,
+					    WOWLAN_GET_STATUSES, 0);
+	if (!notif_ver)
+		notif_ver = iwl_fw_lookup_notif_ver(mvm->fw, LEGACY_GROUP,
+						    WOWLAN_GET_STATUSES, 7);
+
+	return notif_ver;
 }
 
 static bool iwl_mvm_setup_connection_keep(struct iwl_mvm *mvm,
@@ -1858,6 +2285,7 @@ static bool iwl_mvm_setup_connection_keep(struct iwl_mvm *mvm,
 		.mvm = mvm,
 		.status = status,
 	};
+	int i;
 	u32 disconnection_reasons =
 		IWL_WOWLAN_WAKEUP_BY_DISCONNECTION_ON_MISSED_BEACON |
 		IWL_WOWLAN_WAKEUP_BY_DISCONNECTION_ON_DEAUTH;
@@ -1865,74 +2293,56 @@ static bool iwl_mvm_setup_connection_keep(struct iwl_mvm *mvm,
 	if (!status || !vif->bss_conf.bssid)
 		return false;
 
-	if (status->wakeup_reasons & disconnection_reasons)
-		return false;
+	if (iwl_mvm_lookup_wowlan_status_ver(mvm) > 6 ||
+	    iwl_fw_lookup_notif_ver(mvm->fw, PROT_OFFLOAD_GROUP,
+				    WOWLAN_INFO_NOTIFICATION,
+				    0))
+		gtkdata.igtk_support = true;
+
+	if (iwl_fw_lookup_notif_ver(mvm->fw, PROT_OFFLOAD_GROUP,
+				    WOWLAN_INFO_NOTIFICATION,
+				    0) >= 3)
+		gtkdata.bigtk_support = true;
 
 	/* find last GTK that we used initially, if any */
-	gtkdata.find_phase = true;
 	ieee80211_iter_keys(mvm->hw, vif,
-			    iwl_mvm_d3_update_keys, &gtkdata);
+			    iwl_mvm_d3_find_last_keys, &gtkdata);
 	/* not trying to keep connections with MFP/unhandled ciphers */
 	if (gtkdata.unhandled_cipher)
 		return false;
 	if (!gtkdata.num_keys)
 		goto out;
-	if (!gtkdata.last_gtk)
-		return false;
 
 	/*
 	 * invalidate all other GTKs that might still exist and update
 	 * the one that we used
 	 */
-	gtkdata.find_phase = false;
 	ieee80211_iter_keys(mvm->hw, vif,
 			    iwl_mvm_d3_update_keys, &gtkdata);
 
-	IWL_DEBUG_WOWLAN(mvm, "num of GTK rekeying %d\n",
-			 status->num_of_gtk_rekeys);
 	if (status->num_of_gtk_rekeys) {
-		struct ieee80211_key_conf *key;
-		struct {
-			struct ieee80211_key_conf conf;
-			u8 key[32];
-		} conf = {
-			.conf.cipher = gtkdata.cipher,
-			.conf.keyidx =
-				status->gtk.flags & IWL_WOWLAN_GTK_IDX_MASK,
-		};
-		__be64 replay_ctr;
+		__be64 replay_ctr = cpu_to_be64(status->replay_ctr);
 
-		IWL_DEBUG_WOWLAN(mvm,
-				 "Received from FW GTK cipher %d, key index %d\n",
-				 conf.conf.cipher, conf.conf.keyidx);
+		IWL_DEBUG_WOWLAN(mvm, "num of GTK rekeying %d\n",
+				 status->num_of_gtk_rekeys);
 
-		BUILD_BUG_ON(WLAN_KEY_LEN_CCMP != WLAN_KEY_LEN_GCMP);
-		BUILD_BUG_ON(sizeof(conf.key) < WLAN_KEY_LEN_CCMP);
-		BUILD_BUG_ON(sizeof(conf.key) < WLAN_KEY_LEN_GCMP_256);
-		BUILD_BUG_ON(sizeof(conf.key) < WLAN_KEY_LEN_TKIP);
-		BUILD_BUG_ON(sizeof(conf.key) < sizeof(status->gtk.key));
+		if (!iwl_mvm_gtk_rekey(status, vif, mvm, gtkdata.gtk_cipher))
+			return false;
 
-		memcpy(conf.conf.key, status->gtk.key, sizeof(status->gtk.key));
+		if (!iwl_mvm_d3_igtk_bigtk_rekey_add(status, vif,
+						     gtkdata.igtk_cipher,
+						     &status->igtk))
+			return false;
 
-		switch (gtkdata.cipher) {
-		case WLAN_CIPHER_SUITE_CCMP:
-		case WLAN_CIPHER_SUITE_GCMP:
-			conf.conf.keylen = WLAN_KEY_LEN_CCMP;
-			break;
-		case WLAN_CIPHER_SUITE_GCMP_256:
-			conf.conf.keylen = WLAN_KEY_LEN_GCMP_256;
-			break;
-		case WLAN_CIPHER_SUITE_TKIP:
-			conf.conf.keylen = WLAN_KEY_LEN_TKIP;
-			break;
+		for (i = 0; i < ARRAY_SIZE(status->bigtk); i++) {
+			if (!iwl_mvm_d3_igtk_bigtk_rekey_add(status, vif,
+							     gtkdata.bigtk_cipher,
+							     &status->bigtk[i]))
+				return false;
 		}
 
-		key = ieee80211_gtk_rekey_add(vif, &conf.conf);
-		if (IS_ERR(key))
+		if (!iwl_mvm_mlo_gtk_rekey(status, vif, mvm))
 			return false;
-		iwl_mvm_set_key_rx_seq(key, status, true);
-
-		replay_ctr = cpu_to_be64(status->replay_ctr);
 
 		ieee80211_gtk_rekey_notify(vif, vif->bss_conf.bssid,
 					   (void *)&replay_ctr, GFP_KERNEL);
@@ -1940,11 +2350,15 @@ static bool iwl_mvm_setup_connection_keep(struct iwl_mvm *mvm,
 
 out:
 	if (iwl_fw_lookup_notif_ver(mvm->fw, LONG_GROUP,
-				    WOWLAN_GET_STATUSES, 0) < 10) {
+				    WOWLAN_GET_STATUSES,
+				    IWL_FW_CMD_VER_UNKNOWN) < 10) {
 		mvmvif->seqno_valid = true;
 		/* +0x10 because the set API expects next-to-use, not last-used */
 		mvmvif->seqno = status->non_qos_seq_ctr + 0x10;
 	}
+
+	if (status->wakeup_reasons & disconnection_reasons)
+		return false;
 
 	return true;
 }
@@ -1952,68 +2366,173 @@ out:
 static void iwl_mvm_convert_gtk_v2(struct iwl_wowlan_status_data *status,
 				   struct iwl_wowlan_gtk_status_v2 *data)
 {
-	BUILD_BUG_ON(sizeof(status->gtk.key) < sizeof(data->key));
+	BUILD_BUG_ON(sizeof(status->gtk[0].key) < sizeof(data->key));
 	BUILD_BUG_ON(NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY +
 		     sizeof(data->tkip_mic_key) >
-		     sizeof(status->gtk.key));
+		     sizeof(status->gtk[0].key));
 
-	status->gtk.len = data->key_len;
-	status->gtk.flags = data->key_flags;
+	status->gtk[0].len = data->key_len;
+	status->gtk[0].flags = data->key_flags;
 
-	memcpy(status->gtk.key, data->key, sizeof(data->key));
+	memcpy(status->gtk[0].key, data->key, sizeof(data->key));
 
 	/* if it's as long as the TKIP encryption key, copy MIC key */
-	if (status->gtk.len == NL80211_TKIP_DATA_OFFSET_TX_MIC_KEY)
-		memcpy(status->gtk.key + NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY,
+	if (status->gtk[0].len == NL80211_TKIP_DATA_OFFSET_TX_MIC_KEY)
+		memcpy(status->gtk[0].key + NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY,
 		       data->tkip_mic_key, sizeof(data->tkip_mic_key));
 }
 
 static void iwl_mvm_convert_gtk_v3(struct iwl_wowlan_status_data *status,
 				   struct iwl_wowlan_gtk_status_v3 *data)
 {
-	/* The parts we need are identical in v2 and v3 */
-#define CHECK(_f) do {							\
-	BUILD_BUG_ON(offsetof(struct iwl_wowlan_gtk_status_v2, _f) !=	\
-		     offsetof(struct iwl_wowlan_gtk_status_v3, _f));	\
-	BUILD_BUG_ON(offsetofend(struct iwl_wowlan_gtk_status_v2, _f) !=\
-		     offsetofend(struct iwl_wowlan_gtk_status_v3, _f));	\
-} while (0)
+	int data_idx, status_idx = 0;
 
-	CHECK(key);
-	CHECK(key_len);
-	CHECK(key_flags);
-	CHECK(tkip_mic_key);
-#undef CHECK
+	BUILD_BUG_ON(sizeof(status->gtk[0].key) < sizeof(data[0].key));
+	BUILD_BUG_ON(NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY +
+		     sizeof(data[0].tkip_mic_key) >
+		     sizeof(status->gtk[0].key));
+	BUILD_BUG_ON(ARRAY_SIZE(status->gtk) < WOWLAN_GTK_KEYS_NUM);
+	for (data_idx = 0; data_idx < ARRAY_SIZE(status->gtk); data_idx++) {
+		if (!(data[data_idx].key_len))
+			continue;
+		status->gtk[status_idx].len = data[data_idx].key_len;
+		status->gtk[status_idx].flags = data[data_idx].key_flags;
+		status->gtk[status_idx].id = status->gtk[status_idx].flags &
+				    IWL_WOWLAN_GTK_IDX_MASK;
 
-	iwl_mvm_convert_gtk_v2(status, (void *)data);
+		memcpy(status->gtk[status_idx].key, data[data_idx].key,
+		       sizeof(data[data_idx].key));
+
+		/* if it's as long as the TKIP encryption key, copy MIC key */
+		if (status->gtk[status_idx].len ==
+		    NL80211_TKIP_DATA_OFFSET_TX_MIC_KEY)
+			memcpy(status->gtk[status_idx].key +
+			       NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY,
+			       data[data_idx].tkip_mic_key,
+			       sizeof(data[data_idx].tkip_mic_key));
+		status_idx++;
+	}
 }
 
 static void iwl_mvm_convert_igtk(struct iwl_wowlan_status_data *status,
 				 struct iwl_wowlan_igtk_status *data)
 {
-	const u8 *ipn = data->ipn;
+	int i;
 
 	BUILD_BUG_ON(sizeof(status->igtk.key) < sizeof(data->key));
+	BUILD_BUG_ON(sizeof(status->igtk.ipn) != sizeof(data->ipn));
+
+	if (!data->key_len)
+		return;
 
 	status->igtk.len = data->key_len;
 	status->igtk.flags = data->key_flags;
+	status->igtk.id = u32_get_bits(data->key_flags,
+				       IWL_WOWLAN_IGTK_BIGTK_IDX_MASK)
+		+ WOWLAN_IGTK_MIN_INDEX;
 
 	memcpy(status->igtk.key, data->key, sizeof(data->key));
 
-	status->igtk.ipn = ((u64)ipn[5] <<  0) |
-			   ((u64)ipn[4] <<  8) |
-			   ((u64)ipn[3] << 16) |
-			   ((u64)ipn[2] << 24) |
-			   ((u64)ipn[1] << 32) |
-			   ((u64)ipn[0] << 40);
+	/* mac80211 expects big endian for memcmp() to work, convert */
+	for (i = 0; i < sizeof(data->ipn); i++)
+		status->igtk.ipn[i] = data->ipn[sizeof(data->ipn) - i - 1];
+}
+
+static void iwl_mvm_convert_bigtk(struct iwl_wowlan_status_data *status,
+				  const struct iwl_wowlan_igtk_status *data)
+{
+	int data_idx, status_idx = 0;
+
+	BUILD_BUG_ON(ARRAY_SIZE(status->bigtk) < WOWLAN_BIGTK_KEYS_NUM);
+
+	for (data_idx = 0; data_idx < WOWLAN_BIGTK_KEYS_NUM; data_idx++) {
+		if (!data[data_idx].key_len)
+			continue;
+
+		status->bigtk[status_idx].len = data[data_idx].key_len;
+		status->bigtk[status_idx].flags = data[data_idx].key_flags;
+		status->bigtk[status_idx].id =
+			u32_get_bits(data[data_idx].key_flags,
+				     IWL_WOWLAN_IGTK_BIGTK_IDX_MASK)
+			+ WOWLAN_BIGTK_MIN_INDEX;
+
+		BUILD_BUG_ON(sizeof(status->bigtk[status_idx].key) <
+			     sizeof(data[data_idx].key));
+		BUILD_BUG_ON(sizeof(status->bigtk[status_idx].ipn) <
+			     sizeof(data[data_idx].ipn));
+
+		memcpy(status->bigtk[status_idx].key, data[data_idx].key,
+		       sizeof(data[data_idx].key));
+		memcpy(status->bigtk[status_idx].ipn, data[data_idx].ipn,
+		       sizeof(data[data_idx].ipn));
+		status_idx++;
+	}
 }
 
 static void iwl_mvm_parse_wowlan_info_notif(struct iwl_mvm *mvm,
 					    struct iwl_wowlan_info_notif *data,
 					    struct iwl_wowlan_status_data *status,
-					    u32 len)
+					    u32 len, bool has_mlo_keys)
 {
 	u32 i;
+	u32 expected_len = sizeof(*data);
+
+	if (!data) {
+		IWL_ERR(mvm, "iwl_wowlan_info_notif data is NULL\n");
+		status = NULL;
+		return;
+	}
+
+	if (has_mlo_keys)
+		expected_len += (data->num_mlo_link_keys *
+				 sizeof(status->mlo_keys[0]));
+
+	if (len < expected_len) {
+		IWL_ERR(mvm, "Invalid WoWLAN info notification!\n");
+		status = NULL;
+		return;
+	}
+
+	iwl_mvm_convert_key_counters_v5(status, &data->gtk[0].sc);
+	iwl_mvm_convert_gtk_v3(status, data->gtk);
+	iwl_mvm_convert_igtk(status, &data->igtk[0]);
+	iwl_mvm_convert_bigtk(status, data->bigtk);
+	status->replay_ctr = le64_to_cpu(data->replay_ctr);
+	status->pattern_number = le16_to_cpu(data->pattern_number);
+	for (i = 0; i < IWL_MAX_TID_COUNT; i++)
+		status->qos_seq_ctr[i] =
+			le16_to_cpu(data->qos_seq_ctr[i]);
+	status->wakeup_reasons = le32_to_cpu(data->wakeup_reasons);
+	status->num_of_gtk_rekeys =
+		le32_to_cpu(data->num_of_gtk_rekeys);
+	status->received_beacons = le32_to_cpu(data->received_beacons);
+	status->tid_tear_down = data->tid_tear_down;
+
+	if (has_mlo_keys && data->num_mlo_link_keys) {
+		status->num_mlo_keys = data->num_mlo_link_keys;
+		if (IWL_FW_CHECK(mvm,
+				 status->num_mlo_keys > WOWLAN_MAX_MLO_KEYS,
+				 "Too many mlo keys: %d, max %d\n",
+				 status->num_mlo_keys, WOWLAN_MAX_MLO_KEYS))
+			status->num_mlo_keys = WOWLAN_MAX_MLO_KEYS;
+		memcpy(status->mlo_keys, data->mlo_gtks,
+		       status->num_mlo_keys * sizeof(status->mlo_keys[0]));
+	}
+}
+
+static void
+iwl_mvm_parse_wowlan_info_notif_v2(struct iwl_mvm *mvm,
+				   struct iwl_wowlan_info_notif_v2 *data,
+				   struct iwl_wowlan_status_data *status,
+				   u32 len)
+{
+	u32 i;
+
+	if (!data) {
+		IWL_ERR(mvm, "iwl_wowlan_info_notif data is NULL\n");
+		status = NULL;
+		return;
+	}
 
 	if (len < sizeof(*data)) {
 		IWL_ERR(mvm, "Invalid WoWLAN info notification!\n");
@@ -2022,9 +2541,8 @@ static void iwl_mvm_parse_wowlan_info_notif(struct iwl_mvm *mvm,
 	}
 
 	iwl_mvm_convert_key_counters_v5(status, &data->gtk[0].sc);
-	iwl_mvm_convert_gtk_v3(status, &data->gtk[0]);
+	iwl_mvm_convert_gtk_v3(status, data->gtk);
 	iwl_mvm_convert_igtk(status, &data->igtk[0]);
-
 	status->replay_ctr = le64_to_cpu(data->replay_ctr);
 	status->pattern_number = le16_to_cpu(data->pattern_number);
 	for (i = 0; i < IWL_MAX_TID_COUNT; i++)
@@ -2130,14 +2648,9 @@ iwl_mvm_send_wowlan_get_status(struct iwl_mvm *mvm, u8 sta_id)
 	len = iwl_rx_packet_payload_len(cmd.resp_pkt);
 
 	/* default to 7 (when we have IWL_UCODE_TLV_API_WOWLAN_KEY_MATERIAL) */
-	notif_ver = iwl_fw_lookup_notif_ver(mvm->fw, LONG_GROUP,
-					    WOWLAN_GET_STATUSES, 0);
-	if (!notif_ver)
-		notif_ver = iwl_fw_lookup_notif_ver(mvm->fw, LEGACY_GROUP,
-						    WOWLAN_GET_STATUSES, 7);
+	notif_ver = iwl_mvm_lookup_wowlan_status_ver(mvm);
 
-	if (!fw_has_api(&mvm->fw->ucode_capa,
-			IWL_UCODE_TLV_API_WOWLAN_KEY_MATERIAL)) {
+	if (notif_ver < 7) {
 		struct iwl_wowlan_status_v6 *v6 = (void *)cmd.resp_pkt->data;
 
 		status = iwl_mvm_parse_wowlan_status_common_v6(mvm, v6, len);
@@ -2145,29 +2658,29 @@ iwl_mvm_send_wowlan_get_status(struct iwl_mvm *mvm, u8 sta_id)
 			goto out_free_resp;
 
 		BUILD_BUG_ON(sizeof(v6->gtk.decrypt_key) >
-			     sizeof(status->gtk.key));
+			     sizeof(status->gtk[0].key));
 		BUILD_BUG_ON(NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY +
 			     sizeof(v6->gtk.tkip_mic_key) >
-			     sizeof(status->gtk.key));
+			     sizeof(status->gtk[0].key));
 
 		/* copy GTK info to the right place */
-		memcpy(status->gtk.key, v6->gtk.decrypt_key,
+		memcpy(status->gtk[0].key, v6->gtk.decrypt_key,
 		       sizeof(v6->gtk.decrypt_key));
-		memcpy(status->gtk.key + NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY,
+		memcpy(status->gtk[0].key + NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY,
 		       v6->gtk.tkip_mic_key,
 		       sizeof(v6->gtk.tkip_mic_key));
 
 		iwl_mvm_convert_key_counters(status, &v6->gtk.rsc.all_tsc_rsc);
 
 		/* hardcode the key length to 16 since v6 only supports 16 */
-		status->gtk.len = 16;
+		status->gtk[0].len = 16;
 
 		/*
 		 * The key index only uses 2 bits (values 0 to 3) and
 		 * we always set bit 7 which means this is the
 		 * currently used key.
 		 */
-		status->gtk.flags = v6->gtk.key_index | BIT(7);
+		status->gtk[0].flags = v6->gtk.key_index | BIT(7);
 	} else if (notif_ver == 7) {
 		struct iwl_wowlan_status_v7 *v7 = (void *)cmd.resp_pkt->data;
 
@@ -2201,7 +2714,7 @@ iwl_mvm_send_wowlan_get_status(struct iwl_mvm *mvm, u8 sta_id)
 			goto out_free_resp;
 
 		iwl_mvm_convert_key_counters_v5(status, &v12->gtk[0].sc);
-		iwl_mvm_convert_gtk_v3(status, &v12->gtk[0]);
+		iwl_mvm_convert_gtk_v3(status, v12->gtk);
 		iwl_mvm_convert_igtk(status, &v12->igtk[0]);
 
 		status->tid_tear_down = v12->tid_tear_down;
@@ -2223,8 +2736,14 @@ static bool iwl_mvm_query_wakeup_reasons(struct iwl_mvm *mvm,
 					 struct iwl_wowlan_status_data *status)
 {
 	int i;
-	bool keep;
+	bool keep = false;
 	struct iwl_mvm_sta *mvm_ap_sta;
+	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
+	int link_id = vif->active_links ? __ffs(vif->active_links) : 0;
+	struct iwl_mvm_vif_link_info *mvm_link = mvmvif->link[link_id];
+
+	if (WARN_ON(!mvm_link))
+		goto out_unlock;
 
 	if (!status)
 		goto out_unlock;
@@ -2232,8 +2751,7 @@ static bool iwl_mvm_query_wakeup_reasons(struct iwl_mvm *mvm,
 	IWL_DEBUG_WOWLAN(mvm, "wakeup reason 0x%x\n",
 			 status->wakeup_reasons);
 
-	/* still at hard-coded place 0 for D3 image */
-	mvm_ap_sta = iwl_mvm_sta_from_staid_protected(mvm, 0);
+	mvm_ap_sta = iwl_mvm_sta_from_staid_protected(mvm, mvm_link->ap_sta_id);
 	if (!mvm_ap_sta)
 		goto out_unlock;
 
@@ -2251,18 +2769,12 @@ static bool iwl_mvm_query_wakeup_reasons(struct iwl_mvm *mvm,
 				     mvm_ap_sta->tid_data[i].seq_number >> 4);
 	}
 
-	/* now we have all the data we need, unlock to avoid mac80211 issues */
-	mutex_unlock(&mvm->mutex);
-
 	iwl_mvm_report_wakeup_reasons(mvm, vif, status);
 
 	keep = iwl_mvm_setup_connection_keep(mvm, vif, status);
-
-	return keep;
-
 out_unlock:
 	mutex_unlock(&mvm->mutex);
-	return false;
+	return keep;
 }
 
 #define ND_QUERY_BUF_LEN (sizeof(struct iwl_scan_offload_profile_match) * \
@@ -2575,7 +3087,11 @@ iwl_mvm_choose_query_wakeup_reasons(struct iwl_mvm *mvm,
 	/* if FW uses status notification, status shouldn't be NULL here */
 	if (!d3_data->status) {
 		struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
-		u8 sta_id = mvm->net_detect ? IWL_MVM_INVALID_STA : mvmvif->ap_sta_id;
+		u8 sta_id = mvm->net_detect ? IWL_MVM_INVALID_STA :
+					      mvmvif->deflink.ap_sta_id;
+
+		/* bug - FW with MLO has status notification */
+		WARN_ON(ieee80211_vif_is_mld(vif));
 
 		d3_data->status = iwl_mvm_send_wowlan_get_status(mvm, sta_id);
 	}
@@ -2685,7 +3201,7 @@ static void iwl_mvm_nd_match_info_handler(struct iwl_mvm *mvm,
 
 	if (results->matched_profiles) {
 		memcpy(results->matches, notif->matches, matches_len);
-		d3_data->nd_results_valid = TRUE;
+		d3_data->nd_results_valid = true;
 	}
 
 	/* no scan should be active at this point */
@@ -2700,12 +3216,16 @@ static bool iwl_mvm_wait_d3_notif(struct iwl_notif_wait_data *notif_wait,
 	struct iwl_mvm *mvm =
 		container_of(notif_wait, struct iwl_mvm, notif_wait);
 	struct iwl_d3_data *d3_data = data;
-	u32 len;
+	u32 len = iwl_rx_packet_payload_len(pkt);
 	int ret;
+	int wowlan_info_ver = iwl_fw_lookup_notif_ver(mvm->fw,
+						      PROT_OFFLOAD_GROUP,
+						      WOWLAN_INFO_NOTIFICATION,
+						      IWL_FW_CMD_VER_UNKNOWN);
+
 
 	switch (WIDE_ID(pkt->hdr.group_id, pkt->hdr.cmd)) {
 	case WIDE_ID(PROT_OFFLOAD_GROUP, WOWLAN_INFO_NOTIFICATION): {
-		struct iwl_wowlan_info_notif *notif = (void *)pkt->data;
 
 		if (d3_data->notif_received & IWL_D3_NOTIF_WOWLAN_INFO) {
 			/* We might get two notifications due to dual bss */
@@ -2714,10 +3234,42 @@ static bool iwl_mvm_wait_d3_notif(struct iwl_notif_wait_data *notif_wait,
 			break;
 		}
 
+		if (wowlan_info_ver < 2) {
+			struct iwl_wowlan_info_notif_v1 *notif_v1 =
+				(void *)pkt->data;
+			struct iwl_wowlan_info_notif_v2 *notif_v2;
+
+			notif_v2 = kmemdup(notif_v1, sizeof(*notif_v2), GFP_ATOMIC);
+
+			if (!notif_v2)
+				return false;
+
+			notif_v2->tid_tear_down = notif_v1->tid_tear_down;
+			notif_v2->station_id = notif_v1->station_id;
+			memset_after(notif_v2, 0, station_id);
+			iwl_mvm_parse_wowlan_info_notif_v2(mvm, notif_v2,
+							   d3_data->status,
+							   len);
+			kfree(notif_v2);
+
+		} else if (wowlan_info_ver == 2) {
+			struct iwl_wowlan_info_notif_v2 *notif_v2 =
+				(void *)pkt->data;
+
+			iwl_mvm_parse_wowlan_info_notif_v2(mvm, notif_v2,
+							   d3_data->status,
+							   len);
+		} else {
+			struct iwl_wowlan_info_notif *notif =
+				(void *)pkt->data;
+
+			iwl_mvm_parse_wowlan_info_notif(mvm, notif,
+							d3_data->status, len,
+							wowlan_info_ver > 3);
+		}
+
 		d3_data->notif_received |= IWL_D3_NOTIF_WOWLAN_INFO;
-		len = iwl_rx_packet_payload_len(pkt);
-		iwl_mvm_parse_wowlan_info_notif(mvm, notif, d3_data->status,
-						len);
+
 		if (d3_data->status &&
 		    d3_data->status->wakeup_reasons & IWL_WOWLAN_WAKEUP_REASON_HAS_WAKEUP_PKT)
 			/* We are supposed to get also wake packet notif */
@@ -2911,6 +3463,8 @@ static int __iwl_mvm_resume(struct iwl_mvm *mvm, bool test)
 			goto err;
 	}
 
+	iwl_mvm_unblock_esr(mvm, vif, IWL_MVM_ESR_BLOCKED_WOWLAN);
+
 	/* after the successful handshake, we're out of D3 */
 	mvm->trans->system_pm_mode = IWL_PLAT_PM_MODE_DISABLED;
 
@@ -3048,6 +3602,7 @@ static ssize_t iwl_mvm_d3_test_read(struct file *file, char __user *user_buf,
 				    size_t count, loff_t *ppos)
 {
 	struct iwl_mvm *mvm = file->private_data;
+	unsigned long end = jiffies + 60 * HZ;
 	u32 pme_asserted;
 
 	while (true) {
@@ -3061,6 +3616,12 @@ static ssize_t iwl_mvm_d3_test_read(struct file *file, char __user *user_buf,
 
 		if (msleep_interruptible(100))
 			break;
+
+		if (time_is_before_jiffies(end)) {
+			IWL_ERR(mvm,
+				"ending pseudo-D3 with timeout after ~60 seconds\n");
+			return -ETIMEDOUT;
+		}
 	}
 
 	return 0;

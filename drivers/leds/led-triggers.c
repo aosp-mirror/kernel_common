@@ -23,7 +23,7 @@
  * Nests outside led_cdev->trigger_lock
  */
 static DECLARE_RWSEM(triggers_list_lock);
-LIST_HEAD(trigger_list);
+static LIST_HEAD(trigger_list);
 
  /* Used by LED Class */
 
@@ -185,6 +185,7 @@ int led_trigger_set(struct led_classdev *led_cdev, struct led_trigger *trig)
 		led_cdev->trigger = NULL;
 		led_cdev->trigger_data = NULL;
 		led_cdev->activated = false;
+		led_cdev->flags &= ~LED_INIT_DEFAULT_TRIGGER;
 		led_set_brightness(led_cdev, LED_OFF);
 	}
 	if (trig) {
@@ -193,11 +194,11 @@ int led_trigger_set(struct led_classdev *led_cdev, struct led_trigger *trig)
 		spin_unlock(&trig->leddev_list_lock);
 		led_cdev->trigger = trig;
 
+		ret = 0;
 		if (trig->activate)
 			ret = trig->activate(led_cdev);
 		else
-			ret = 0;
-
+			led_set_brightness(led_cdev, trig->brightness);
 		if (ret)
 			goto err_activate;
 
@@ -246,9 +247,23 @@ void led_trigger_remove(struct led_classdev *led_cdev)
 }
 EXPORT_SYMBOL_GPL(led_trigger_remove);
 
+static bool led_match_default_trigger(struct led_classdev *led_cdev,
+				      struct led_trigger *trig)
+{
+	if (!strcmp(led_cdev->default_trigger, trig->name) &&
+	    trigger_relevant(led_cdev, trig)) {
+		led_cdev->flags |= LED_INIT_DEFAULT_TRIGGER;
+		led_trigger_set(led_cdev, trig);
+		return true;
+	}
+
+	return false;
+}
+
 void led_trigger_set_default(struct led_classdev *led_cdev)
 {
 	struct led_trigger *trig;
+	bool found = false;
 
 	if (!led_cdev->default_trigger)
 		return;
@@ -256,30 +271,21 @@ void led_trigger_set_default(struct led_classdev *led_cdev)
 	down_read(&triggers_list_lock);
 	down_write(&led_cdev->trigger_lock);
 	list_for_each_entry(trig, &trigger_list, next_trig) {
-		if (!strcmp(led_cdev->default_trigger, trig->name) &&
-		    trigger_relevant(led_cdev, trig)) {
-			led_cdev->flags |= LED_INIT_DEFAULT_TRIGGER;
-			led_trigger_set(led_cdev, trig);
+		found = led_match_default_trigger(led_cdev, trig);
+		if (found)
 			break;
-		}
 	}
 	up_write(&led_cdev->trigger_lock);
 	up_read(&triggers_list_lock);
+
+	/*
+	 * If default trigger wasn't found, maybe trigger module isn't loaded yet.
+	 * Once loaded it will re-probe with all led_cdev's.
+	 */
+	if (!found)
+		request_module_nowait("ledtrig:%s", led_cdev->default_trigger);
 }
 EXPORT_SYMBOL_GPL(led_trigger_set_default);
-
-void led_trigger_rename_static(const char *name, struct led_trigger *trig)
-{
-	/* new name must be on a temporary string to prevent races */
-	BUG_ON(name == trig->name);
-
-	down_write(&triggers_list_lock);
-	/* this assumes that trig->name was originaly allocated to
-	 * non constant storage */
-	strcpy((char *)trig->name, name);
-	up_write(&triggers_list_lock);
-}
-EXPORT_SYMBOL_GPL(led_trigger_rename_static);
 
 /* LED Trigger Interface */
 
@@ -309,12 +315,8 @@ int led_trigger_register(struct led_trigger *trig)
 	down_read(&leds_list_lock);
 	list_for_each_entry(led_cdev, &leds_list, node) {
 		down_write(&led_cdev->trigger_lock);
-		if (!led_cdev->trigger && led_cdev->default_trigger &&
-		    !strcmp(led_cdev->default_trigger, trig->name) &&
-		    trigger_relevant(led_cdev, trig)) {
-			led_cdev->flags |= LED_INIT_DEFAULT_TRIGGER;
-			led_trigger_set(led_cdev, trig);
-		}
+		if (!led_cdev->trigger && led_cdev->default_trigger)
+			led_match_default_trigger(led_cdev, trig);
 		up_write(&led_cdev->trigger_lock);
 	}
 	up_read(&leds_list_lock);
@@ -385,6 +387,8 @@ void led_trigger_event(struct led_trigger *trig,
 	if (!trig)
 		return;
 
+	trig->brightness = brightness;
+
 	rcu_read_lock();
 	list_for_each_entry_rcu(led_cdev, &trig->led_cdevs, trig_list)
 		led_set_brightness(led_cdev, brightness);
@@ -393,8 +397,8 @@ void led_trigger_event(struct led_trigger *trig,
 EXPORT_SYMBOL_GPL(led_trigger_event);
 
 static void led_trigger_blink_setup(struct led_trigger *trig,
-			     unsigned long *delay_on,
-			     unsigned long *delay_off,
+			     unsigned long delay_on,
+			     unsigned long delay_off,
 			     int oneshot,
 			     int invert)
 {
@@ -406,25 +410,25 @@ static void led_trigger_blink_setup(struct led_trigger *trig,
 	rcu_read_lock();
 	list_for_each_entry_rcu(led_cdev, &trig->led_cdevs, trig_list) {
 		if (oneshot)
-			led_blink_set_oneshot(led_cdev, delay_on, delay_off,
+			led_blink_set_oneshot(led_cdev, &delay_on, &delay_off,
 					      invert);
 		else
-			led_blink_set(led_cdev, delay_on, delay_off);
+			led_blink_set_nosleep(led_cdev, delay_on, delay_off);
 	}
 	rcu_read_unlock();
 }
 
 void led_trigger_blink(struct led_trigger *trig,
-		       unsigned long *delay_on,
-		       unsigned long *delay_off)
+		       unsigned long delay_on,
+		       unsigned long delay_off)
 {
 	led_trigger_blink_setup(trig, delay_on, delay_off, 0, 0);
 }
 EXPORT_SYMBOL_GPL(led_trigger_blink);
 
 void led_trigger_blink_oneshot(struct led_trigger *trig,
-			       unsigned long *delay_on,
-			       unsigned long *delay_off,
+			       unsigned long delay_on,
+			       unsigned long delay_off,
 			       int invert)
 {
 	led_trigger_blink_setup(trig, delay_on, delay_off, 1, invert);

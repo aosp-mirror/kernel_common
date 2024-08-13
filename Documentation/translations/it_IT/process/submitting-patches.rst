@@ -272,7 +272,7 @@ embargo potrebbe essere preso in considerazione per dare il tempo alle
 distribuzioni di prendere la patch e renderla disponibile ai loro utenti;
 in questo caso, ovviamente, la patch non dovrebbe essere inviata su alcuna
 lista di discussione pubblica. Leggete anche
-Documentation/admin-guide/security-bugs.rst.
+Documentation/process/security-bugs.rst.
 
 Patch che correggono bachi importanti su un kernel già rilasciato, dovrebbero
 essere inviate ai manutentori dei kernel stabili aggiungendo la seguente riga::
@@ -340,7 +340,7 @@ Assicuratevi di dire ai revisori quali cambiamenti state facendo e di
 ringraziarli per il loro tempo.  Revisionare codice è un lavoro faticoso e che
 richiede molto tempo, e a volte i revisori diventano burberi. Tuttavia, anche in
 questo caso, rispondete con educazione e concentratevi sul problema che hanno
-evidenziato. Quando inviate una version successiva ricordatevi di aggiungere un
+evidenziato. Quando inviate una versione successiva ricordatevi di aggiungere un
 ``patch changelog`` alla email di intestazione o ad ogni singola patch spiegando
 le differenze rispetto a sottomissioni precedenti (vedere
 :ref:`it_the_canonical_patch_format`).
@@ -348,6 +348,33 @@ le differenze rispetto a sottomissioni precedenti (vedere
 Leggete Documentation/translations/it_IT/process/email-clients.rst per
 le raccomandazioni sui programmi di posta elettronica e l'etichetta da usare
 sulle liste di discussione.
+
+.. _it_interleaved_replies:
+
+Rispondere alle email in riga e riducendo la citazioni
+------------------------------------------------------
+
+Nelle discussioni riguardo allo sviluppo del kernel viene fortemente scoraggiato
+l'uso di risposte in cima ai messaggi di posta elettronica. Rispondere in riga
+rende le conversazioni molto più scorrevoli. Maggiori dettagli possono essere
+trovati qui: https://en.wikipedia.org/wiki/Posting_style#Interleaved_style
+
+Come spesso citato nelle liste di discussione::
+
+  R: http://en.wikipedia.org/wiki/Top_post
+  D: Dove posso trovare informazioni riguardo alle "risposte in cima"?
+  R: Perché incasina il normale ordine con cui si legge un testo.
+  D: Perché è così terribile rispondere in cima?
+  R: Risposte in cima.
+  Q: Qual è la cosa più fastidiosa nei messaggi di posta elettronica?
+
+Allo stesso modo, per favore eliminate tutte le citazioni non necessarie per la
+vostra risposta. Questo permette di trovare più facilmente le risposte, e
+permette di risparmiare tempo e spazio. Per maggiori dettagli:
+http://daringfireball.net/2007/07/on_top ::
+
+  R: No.
+  D: Dovrei includere un blocco di citazione dopo la mia risposta?
 
 .. _it_resend_reminders:
 
@@ -429,7 +456,7 @@ poi dovete solo aggiungere una riga che dice::
 
 	Signed-off-by: Random J Developer <random@developer.example.org>
 
-usando il vostro vero nome (spiacenti, non si accettano pseudonimi o
+usando il vostro vero nome (spiacenti, non si accettano
 contributi anonimi). Questo verrà fatto automaticamente se usate
 ``git commit -s``. Anche il ripristino di uno stato precedente dovrebbe
 includere "Signed-off-by", se usate ``git revert -s`` questo verrà
@@ -532,7 +559,7 @@ manutentori che qualche verifica è stata fatta, fornisce un mezzo per trovare
 persone che possano verificare il codice in futuro, e garantisce che queste
 stesse persone ricevano credito per il loro lavoro.
 
-Reviewd-by:, invece, indica che la patch è stata revisionata ed è stata
+Reviewed-by:, invece, indica che la patch è stata revisionata ed è stata
 considerata accettabile in accordo con la dichiarazione dei revisori:
 
 Dichiarazione di svista dei revisori
@@ -563,13 +590,13 @@ una modifica che si ritiene appropriata e senza alcun problema tecnico
 importante.  Qualsiasi revisore interessato (quelli che lo hanno fatto)
 possono offrire il proprio Reviewed-by per la patch.  Questa etichetta serve
 a dare credito ai revisori e a informare i manutentori sul livello di revisione
-che è stato fatto sulla patch.  L'etichetta Reviewd-by, quando fornita da
+che è stato fatto sulla patch.  L'etichetta Reviewed-by, quando fornita da
 revisori conosciuti per la loro conoscenza sulla materia in oggetto e per la
 loro serietà nella revisione, accrescerà le probabilità che la vostra patch
 venga integrate nel kernel.
 
 Quando si riceve una email sulla lista di discussione da un tester o
-un revisore, le etichette Tested-by o Reviewd-by devono essere
+un revisore, le etichette Tested-by o Reviewed-by devono essere
 aggiunte dall'autore quando invierà nuovamente la patch. Tuttavia, se
 la patch è cambiata in modo significativo, queste etichette potrebbero
 non avere più senso e quindi andrebbero rimosse. Solitamente si tiene traccia
@@ -785,7 +812,7 @@ Riferimenti
 -----------
 
 Andrew Morton, "La patch perfetta" (tpp).
-  <http://www.ozlabs.org/~akpm/stuff/tpp.txt>
+  <https://www.ozlabs.org/~akpm/stuff/tpp.txt>
 
 Jeff Garzik, "Formato per la sottomissione di patch per il kernel Linux"
   <https://web.archive.org/web/20180829112450/http://linux.yyz.us/patch-format.html>

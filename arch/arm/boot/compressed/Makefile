@@ -22,13 +22,6 @@ ifeq ($(CONFIG_ARM_VIRT_EXT),y)
 OBJS		+= hyp-stub.o
 endif
 
-GCOV_PROFILE		:= n
-KASAN_SANITIZE		:= n
-
-# Prevents link failures: __sanitizer_cov_trace_pc() is not linked in.
-KCOV_INSTRUMENT		:= n
-UBSAN_SANITIZE		:= n
-
 #
 # Architecture dependencies
 #
@@ -107,7 +100,7 @@ ccflags-remove-$(CONFIG_FUNCTION_TRACER) += -pg
 asflags-y := -DZIMAGE
 
 # Supply kernel BSS size to the decompressor via a linker symbol.
-KBSS_SZ = $(shell echo $$(($$($(NM) $(obj)/../../../../vmlinux | \
+KBSS_SZ = $(shell echo $$(($$($(NM) vmlinux | \
 		sed -n -e 's/^\([^ ]*\) [ABD] __bss_start$$/-0x\1/p' \
 		       -e 's/^\([^ ]*\) [ABD] __bss_stop$$/+0x\1/p') )) )
 LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)

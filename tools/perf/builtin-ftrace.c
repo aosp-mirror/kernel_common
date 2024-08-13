@@ -333,7 +333,7 @@ static int set_tracing_func_irqinfo(struct perf_ftrace *ftrace)
 
 static int reset_tracing_cpu(void)
 {
-	struct perf_cpu_map *cpumap = perf_cpu_map__new(NULL);
+	struct perf_cpu_map *cpumap = perf_cpu_map__new_online_cpus();
 	int ret;
 
 	ret = set_tracing_cpumask(cpumap);
@@ -623,7 +623,7 @@ static int __cmd_ftrace(struct perf_ftrace *ftrace)
 	/* display column headers */
 	read_tracing_file_to_stdout("trace");
 
-	if (!ftrace->initial_delay) {
+	if (!ftrace->target.initial_delay) {
 		if (write_tracing_file("tracing_on", "1") < 0) {
 			pr_err("can't enable tracing\n");
 			goto out_close_fd;
@@ -632,8 +632,8 @@ static int __cmd_ftrace(struct perf_ftrace *ftrace)
 
 	evlist__start_workload(ftrace->evlist);
 
-	if (ftrace->initial_delay) {
-		usleep(ftrace->initial_delay * 1000);
+	if (ftrace->target.initial_delay > 0) {
+		usleep(ftrace->target.initial_delay * 1000);
 		if (write_tracing_file("tracing_on", "1") < 0) {
 			pr_err("can't enable tracing\n");
 			goto out_close_fd;
@@ -650,6 +650,8 @@ static int __cmd_ftrace(struct perf_ftrace *ftrace)
 				break;
 			if (fwrite(buf, n, 1, stdout) != 1)
 				break;
+			/* flush output since stdout is in full buffering mode due to pager */
+			fflush(stdout);
 		}
 	}
 
@@ -1164,8 +1166,8 @@ int cmd_ftrace(int argc, const char **argv)
 		     "Size of per cpu buffer, needs to use a B, K, M or G suffix.", parse_buffer_size),
 	OPT_BOOLEAN(0, "inherit", &ftrace.inherit,
 		    "Trace children processes"),
-	OPT_UINTEGER('D', "delay", &ftrace.initial_delay,
-		     "Number of milliseconds to wait before starting tracing after program start"),
+	OPT_INTEGER('D', "delay", &ftrace.target.initial_delay,
+		    "Number of milliseconds to wait before starting tracing after program start"),
 	OPT_PARENT(common_options),
 	};
 	const struct option latency_options[] = {
@@ -1175,7 +1177,7 @@ int cmd_ftrace(int argc, const char **argv)
 	OPT_BOOLEAN('b', "use-bpf", &ftrace.target.use_bpf,
 		    "Use BPF to measure function latency"),
 #endif
-	OPT_BOOLEAN('n', "--use-nsec", &ftrace.use_nsec,
+	OPT_BOOLEAN('n', "use-nsec", &ftrace.use_nsec,
 		    "Use nano-second histogram"),
 	OPT_PARENT(common_options),
 	};
@@ -1228,10 +1230,12 @@ int cmd_ftrace(int argc, const char **argv)
 		goto out_delete_filters;
 	}
 
+	/* Make system wide (-a) the default target. */
+	if (!argc && target__none(&ftrace.target))
+		ftrace.target.system_wide = true;
+
 	switch (subcmd) {
 	case PERF_FTRACE_TRACE:
-		if (!argc && target__none(&ftrace.target))
-			ftrace.target.system_wide = true;
 		cmd_func = __cmd_ftrace;
 		break;
 	case PERF_FTRACE_LATENCY:

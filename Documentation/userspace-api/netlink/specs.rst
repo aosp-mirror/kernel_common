@@ -15,7 +15,7 @@ kernel headers directly.
 Internally kernel uses the YAML specs to generate:
 
  - the C uAPI header
- - documentation of the protocol as a ReST file
+ - documentation of the protocol as a ReST file - see :ref:`Documentation/networking/netlink_spec/index.rst <specs>`
  - policy tables for input attribute validation
  - operation tables
 
@@ -23,6 +23,10 @@ YAML specifications can be found under ``Documentation/netlink/specs/``
 
 This document describes details of the schema.
 See :doc:`intro-specs` for a practical starting guide.
+
+All specs must be licensed under
+``((GPL-2.0 WITH Linux-syscall-note) OR BSD-3-Clause)``
+to allow for easy adoption in user space code.
 
 Compatibility levels
 ====================
@@ -64,6 +68,10 @@ The following sections describe the properties of the most modern ``genetlink``
 schema. See the documentation of :doc:`genetlink-c <c-code-gen>`
 for information on how C names are derived from name properties.
 
+See also :ref:`Documentation/core-api/netlink.rst <kernel_netlink>` for
+information on the Netlink specification properties that are only relevant to
+the kernel space and not part of the user space API.
+
 genetlink
 =========
 
@@ -77,11 +85,6 @@ name
 
 Name of the family. Name identifies the family in a unique way, since
 the Family IDs are allocated dynamically.
-
-version
-~~~~~~~
-
-Generic Netlink family version, default is 1.
 
 protocol
 ~~~~~~~~
@@ -176,6 +179,8 @@ attributes
 
 List of attributes in the set.
 
+.. _attribute_properties:
+
 Attribute properties
 --------------------
 
@@ -197,9 +202,15 @@ value
 Numerical attribute ID, used in serialized Netlink messages.
 The ``value`` property can be skipped, in which case the attribute ID
 will be the value of the previous attribute plus one (recursively)
-and ``0`` for the first attribute in the attribute set.
+and ``1`` for the first attribute in the attribute set.
 
-Note that the ``value`` of an attribute is defined only in its main set.
+Attributes (and operations) use ``1`` as the default value for the first
+entry (unlike enums in definitions which start from ``0``) because
+entry ``0`` is almost always reserved as undefined. Spec can explicitly
+set value to ``0`` if needed.
+
+Note that the ``value`` of an attribute is defined only in its main set
+(not in subsets).
 
 enum
 ~~~~
@@ -243,6 +254,23 @@ rather than depend on what is specified in the spec file.
 
 The validation policy in the kernel is formed by combining the type
 definition (``type`` and ``nested-attributes``) and the ``checks``.
+
+sub-type
+~~~~~~~~
+
+Legacy families have special ways of expressing arrays. ``sub-type`` can be
+used to define the type of array members in case array members are not
+fully defined as attributes (in a bona fide attribute space). For instance
+a C array of u32 values can be specified with ``type: binary`` and
+``sub-type: u32``. Binary types and legacy array formats are described in
+more detail in :doc:`genetlink-legacy`.
+
+display-hint
+~~~~~~~~~~~~
+
+Optional format indicator that is intended only for choosing the right
+formatting mechanism when displaying values of this type. Currently supported
+hints are ``hex``, ``mac``, ``fddi``, ``ipv4``, ``ipv6`` and ``uuid``.
 
 operations
 ----------
@@ -375,10 +403,21 @@ This section describes the attribute types supported by the ``genetlink``
 compatibility level. Refer to documentation of different levels for additional
 attribute types.
 
-Scalar integer types
+Common integer types
 --------------------
 
-Fixed-width integer types:
+``sint`` and ``uint`` represent signed and unsigned 64 bit integers.
+If the value can fit on 32 bits only 32 bits are carried in netlink
+messages, otherwise full 64 bits are carried. Note that the payload
+is only aligned to 4B, so the full 64 bit value may be unaligned!
+
+Common integer types should be preferred over fix-width types in majority
+of cases.
+
+Fix-width integer types
+-----------------------
+
+Fixed-width integer types include:
 ``u8``, ``u16``, ``u32``, ``u64``, ``s8``, ``s16``, ``s32``, ``s64``.
 
 Note that types smaller than 32 bit should be avoided as using them
@@ -387,6 +426,9 @@ See :ref:`pad_type` for padding of 64 bit attributes.
 
 The payload of the attribute is the integer in host order unless ``byte-order``
 specifies otherwise.
+
+64 bit values are usually aligned by the kernel but it is recommended
+that the user space is able to deal with unaligned values.
 
 .. _pad_type:
 

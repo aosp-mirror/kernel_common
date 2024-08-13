@@ -7,9 +7,8 @@
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/io.h>
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
-#include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
@@ -656,11 +655,9 @@ static int tegra210_mixer_platform_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int tegra210_mixer_platform_remove(struct platform_device *pdev)
+static void tegra210_mixer_platform_remove(struct platform_device *pdev)
 {
 	pm_runtime_disable(&pdev->dev);
-
-	return 0;
 }
 
 static const struct dev_pm_ops tegra210_mixer_pm_ops = {
@@ -677,7 +674,7 @@ static struct platform_driver tegra210_mixer_driver = {
 		.pm = &tegra210_mixer_pm_ops,
 	},
 	.probe = tegra210_mixer_platform_probe,
-	.remove = tegra210_mixer_platform_remove,
+	.remove_new = tegra210_mixer_platform_remove,
 };
 module_platform_driver(tegra210_mixer_driver);
 

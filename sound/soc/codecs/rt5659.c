@@ -16,7 +16,6 @@
 #include <linux/platform_device.h>
 #include <linux/spi/spi.h>
 #include <linux/acpi.h>
-#include <linux/gpio.h>
 #include <linux/gpio/consumer.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -3816,8 +3815,8 @@ static const struct regmap_config rt5659_regmap = {
 };
 
 static const struct i2c_device_id rt5659_i2c_id[] = {
-	{ "rt5658", 0 },
-	{ "rt5659", 0 },
+	{ "rt5658" },
+	{ "rt5659" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, rt5659_i2c_id);
@@ -4141,13 +4140,9 @@ static int rt5659_i2c_probe(struct i2c_client *i2c)
 	regmap_write(rt5659->regmap, RT5659_RESET, 0);
 
 	/* Check if MCLK provided */
-	rt5659->mclk = devm_clk_get(&i2c->dev, "mclk");
-	if (IS_ERR(rt5659->mclk)) {
-		if (PTR_ERR(rt5659->mclk) != -ENOENT)
-			return PTR_ERR(rt5659->mclk);
-		/* Otherwise mark the mclk pointer to NULL */
-		rt5659->mclk = NULL;
-	}
+	rt5659->mclk = devm_clk_get_optional(&i2c->dev, "mclk");
+	if (IS_ERR(rt5659->mclk))
+		return PTR_ERR(rt5659->mclk);
 
 	rt5659_calibrate(rt5659);
 
@@ -4297,7 +4292,7 @@ static int rt5659_i2c_probe(struct i2c_client *i2c)
 			rt5659_irq, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING
 			| IRQF_ONESHOT, "rt5659", rt5659);
 		if (ret)
-			dev_err(&i2c->dev, "Failed to reguest IRQ: %d\n", ret);
+			dev_err(&i2c->dev, "Failed to request IRQ: %d\n", ret);
 
 		/* Enable IRQ output for GPIO1 pin any way */
 		regmap_update_bits(rt5659->regmap, RT5659_GPIO_CTRL_1,
@@ -4340,7 +4335,7 @@ static struct i2c_driver rt5659_i2c_driver = {
 		.of_match_table = of_match_ptr(rt5659_of_match),
 		.acpi_match_table = ACPI_PTR(rt5659_acpi_match),
 	},
-	.probe_new = rt5659_i2c_probe,
+	.probe = rt5659_i2c_probe,
 	.shutdown = rt5659_i2c_shutdown,
 	.id_table = rt5659_i2c_id,
 };

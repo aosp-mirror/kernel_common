@@ -40,7 +40,7 @@ static int isp_video_capture_queue_setup(struct vb2_queue *vq,
 			unsigned int sizes[], struct device *alloc_devs[])
 {
 	struct fimc_isp *isp = vb2_get_drv_priv(vq);
-	struct v4l2_pix_format_mplane *vid_fmt = &isp->video_capture.pixfmt;
+	const struct v4l2_pix_format_mplane *vid_fmt = &isp->video_capture.pixfmt;
 	const struct fimc_fmt *fmt = isp->video_capture.format;
 	unsigned int wh, i;
 
@@ -449,17 +449,22 @@ static int isp_video_s_fmt_mplane(struct file *file, void *priv,
 static int isp_video_pipeline_validate(struct fimc_isp *isp)
 {
 	struct v4l2_subdev *sd = &isp->subdev;
-	struct v4l2_subdev_format sink_fmt, src_fmt;
 	struct media_pad *pad;
 	int ret;
 
 	while (1) {
+		struct v4l2_subdev_format sink_fmt = {
+			.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+		};
+		struct v4l2_subdev_format src_fmt = {
+			.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+		};
+
 		/* Retrieve format at the sink pad */
 		pad = &sd->entity.pads[0];
 		if (!(pad->flags & MEDIA_PAD_FL_SINK))
 			break;
 		sink_fmt.pad = pad->index;
-		sink_fmt.which = V4L2_SUBDEV_FORMAT_ACTIVE;
 		ret = v4l2_subdev_call(sd, pad, get_fmt, NULL, &sink_fmt);
 		if (ret < 0 && ret != -ENOIOCTLCMD)
 			return -EPIPE;
@@ -471,7 +476,6 @@ static int isp_video_pipeline_validate(struct fimc_isp *isp)
 
 		sd = media_entity_to_v4l2_subdev(pad->entity);
 		src_fmt.pad = pad->index;
-		src_fmt.which = V4L2_SUBDEV_FORMAT_ACTIVE;
 		ret = v4l2_subdev_call(sd, pad, get_fmt, NULL, &src_fmt);
 		if (ret < 0 && ret != -ENOIOCTLCMD)
 			return -EPIPE;

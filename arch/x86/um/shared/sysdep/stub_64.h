@@ -16,7 +16,7 @@
 #define __syscall_clobber "r11","rcx","memory"
 #define __syscall "syscall"
 
-static inline long stub_syscall0(long syscall)
+static __always_inline long stub_syscall0(long syscall)
 {
 	long ret;
 
@@ -27,7 +27,7 @@ static inline long stub_syscall0(long syscall)
 	return ret;
 }
 
-static inline long stub_syscall2(long syscall, long arg1, long arg2)
+static __always_inline long stub_syscall2(long syscall, long arg1, long arg2)
 {
 	long ret;
 
@@ -38,7 +38,8 @@ static inline long stub_syscall2(long syscall, long arg1, long arg2)
 	return ret;
 }
 
-static inline long stub_syscall3(long syscall, long arg1, long arg2, long arg3)
+static __always_inline long stub_syscall3(long syscall, long arg1, long arg2,
+					  long arg3)
 {
 	long ret;
 
@@ -50,7 +51,7 @@ static inline long stub_syscall3(long syscall, long arg1, long arg2, long arg3)
 	return ret;
 }
 
-static inline long stub_syscall4(long syscall, long arg1, long arg2, long arg3,
+static __always_inline long stub_syscall4(long syscall, long arg1, long arg2, long arg3,
 				 long arg4)
 {
 	long ret;
@@ -64,8 +65,8 @@ static inline long stub_syscall4(long syscall, long arg1, long arg2, long arg3,
 	return ret;
 }
 
-static inline long stub_syscall5(long syscall, long arg1, long arg2, long arg3,
-				 long arg4, long arg5)
+static __always_inline long stub_syscall5(long syscall, long arg1, long arg2,
+					  long arg3, long arg4, long arg5)
 {
 	long ret;
 
@@ -78,12 +79,12 @@ static inline long stub_syscall5(long syscall, long arg1, long arg2, long arg3,
 	return ret;
 }
 
-static inline void trap_myself(void)
+static __always_inline void trap_myself(void)
 {
 	__asm("int3");
 }
 
-static inline void remap_stack_and_trap(void)
+static __always_inline void remap_stack_and_trap(void)
 {
 	__asm__ volatile (
 		"movq %0,%%rax ;"
@@ -98,18 +99,18 @@ static inline void remap_stack_and_trap(void)
 		"int3"
 		: :
 		"g" (STUB_MMAP_NR),
-		"g" (~(UM_KERN_PAGE_SIZE - 1)),
+		"g" (~(STUB_DATA_PAGES * UM_KERN_PAGE_SIZE - 1)),
 		"g" (MAP_FIXED | MAP_SHARED),
 		"g" (UML_STUB_FIELD_FD),
 		"g" (UML_STUB_FIELD_OFFSET),
 		"g" (UML_STUB_FIELD_CHILD_ERR),
-		"S" (UM_KERN_PAGE_SIZE),
+		"S" (STUB_DATA_PAGES * UM_KERN_PAGE_SIZE),
 		"d" (PROT_READ | PROT_WRITE)
 		:
 		__syscall_clobber, "r10", "r8", "r9");
 }
 
-static __always_inline void *get_stub_page(void)
+static __always_inline void *get_stub_data(void)
 {
 	unsigned long ret;
 
@@ -117,7 +118,7 @@ static __always_inline void *get_stub_page(void)
 		"movq %%rsp,%0 ;"
 		"andq %1,%0"
 		: "=a" (ret)
-		: "g" (~(UM_KERN_PAGE_SIZE - 1)));
+		: "g" (~(STUB_DATA_PAGES * UM_KERN_PAGE_SIZE - 1)));
 
 	return (void *)ret;
 }

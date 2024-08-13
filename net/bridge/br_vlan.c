@@ -841,7 +841,7 @@ void br_vlan_flush(struct net_bridge *br)
 	vg = br_vlan_group(br);
 	__vlan_flush(br, NULL, vg);
 	RCU_INIT_POINTER(br->vlgrp, NULL);
-	synchronize_rcu();
+	synchronize_net();
 	__vlan_group_free(vg);
 }
 
@@ -1372,7 +1372,7 @@ void nbp_vlan_flush(struct net_bridge_port *port)
 	vg = nbp_vlan_group(port);
 	__vlan_flush(port->br, port, vg);
 	RCU_INIT_POINTER(port->vlgrp, NULL);
-	synchronize_rcu();
+	synchronize_net();
 	__vlan_group_free(vg);
 }
 
@@ -2134,6 +2134,7 @@ static const struct nla_policy br_vlan_db_policy[BRIDGE_VLANDB_ENTRY_MAX + 1] = 
 	[BRIDGE_VLANDB_ENTRY_MCAST_ROUTER]	= { .type = NLA_U8 },
 	[BRIDGE_VLANDB_ENTRY_MCAST_N_GROUPS]	= { .type = NLA_REJECT },
 	[BRIDGE_VLANDB_ENTRY_MCAST_MAX_GROUPS]	= { .type = NLA_U32 },
+	[BRIDGE_VLANDB_ENTRY_NEIGH_SUPPRESS]	= NLA_POLICY_MAX(NLA_U8, 1),
 };
 
 static int br_vlan_rtm_process_one(struct net_device *dev,

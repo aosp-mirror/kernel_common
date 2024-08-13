@@ -5,7 +5,7 @@
 
 #include <linux/clk-provider.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 
 #include "ccu_common.h"
@@ -244,6 +244,7 @@ static const struct of_device_id sun50i_h6_r_ccu_ids[] = {
 	},
 	{ }
 };
+MODULE_DEVICE_TABLE(of, sun50i_h6_r_ccu_ids);
 
 static struct platform_driver sun50i_h6_r_ccu_driver = {
 	.probe	= sun50i_h6_r_ccu_probe,

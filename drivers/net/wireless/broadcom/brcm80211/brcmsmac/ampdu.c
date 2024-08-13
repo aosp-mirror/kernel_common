@@ -143,12 +143,6 @@ struct ampdu_info {
 	struct brcms_fifo_info fifo_tb[NUM_FFPLD_FIFO];
 };
 
-/* used for flushing ampdu packets */
-struct cb_del_ampdu_pars {
-	struct ieee80211_sta *sta;
-	u16 tid;
-};
-
 static void brcms_c_scb_ampdu_update_max_txlen(struct ampdu_info *ampdu, u8 dur)
 {
 	u32 rate, mcs;
@@ -476,11 +470,9 @@ static int brcms_c_ffpld_check_txfunfl(struct brcms_c_info *wlc, int fid)
 
 void
 brcms_c_ampdu_tx_operational(struct brcms_c_info *wlc, u8 tid,
-	u8 ba_wsize,		/* negotiated ba window size (in pdu) */
 	uint max_rx_ampdu_bytes) /* from ht_cap in beacon */
 {
 	struct scb_ampdu *scb_ampdu;
-	struct scb_ampdu_tid_ini *ini;
 	struct ampdu_info *ampdu = wlc->ampdu;
 	struct scb *scb = &wlc->pri_scb;
 	scb_ampdu = &scb->scb_ampdu;
@@ -491,10 +483,6 @@ brcms_c_ampdu_tx_operational(struct brcms_c_info *wlc, u8 tid,
 		return;
 	}
 
-	ini = &scb_ampdu->ini[tid];
-	ini->tid = tid;
-	ini->scb = scb_ampdu->scb;
-	ini->ba_wsize = ba_wsize;
 	scb_ampdu->max_rx_ampdu_bytes = max_rx_ampdu_bytes;
 }
 
@@ -845,7 +833,7 @@ brcms_c_ampdu_dotxstatus_complete(struct ampdu_info *ampdu, struct scb *scb,
 	u16 seq, start_seq = 0, bindex, index, mcl;
 	u8 mcs = 0;
 	bool ba_recd = false, ack_recd = false;
-	u8 suc_mpdu = 0, tot_mpdu = 0;
+	u8 tot_mpdu = 0;
 	uint supr_status;
 	bool retry = true;
 	u16 mimoantsel = 0;
@@ -975,7 +963,6 @@ brcms_c_ampdu_dotxstatus_complete(struct ampdu_info *ampdu, struct scb *scb,
 				ieee80211_tx_status_irqsafe(wlc->pub->ieee_hw,
 							    p);
 				ack_recd = true;
-				suc_mpdu++;
 			}
 		}
 		/* either retransmit or send bar if ack not recd */

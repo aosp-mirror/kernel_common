@@ -7,11 +7,13 @@
 
 #include <linux/threads.h>
 
+#include <asm/addrspace.h>
 #include <asm/asm.h>
 #include <asm/asmmacro.h>
 #include <asm/asm-offsets.h>
 #include <asm/loongarch.h>
 #include <asm/thread_info.h>
+#include <asm/unwind_hints.h>
 
 /* Make the addition of cfi info a little easier. */
 	.macro cfi_rel_offset reg offset=0 docfi=0
@@ -34,6 +36,14 @@
 	.macro cfi_ld reg offset=0 docfi=0
 	LONG_L	\reg, sp, \offset
 	cfi_restore \reg \offset \docfi
+	.endm
+
+/* Jump to the runtime virtual address. */
+	.macro JUMP_VIRT_ADDR temp1 temp2
+	li.d	\temp1, CACHE_BASE
+	pcaddi	\temp2, 0
+	bstrins.d  \temp1, \temp2, (DMW_PABITS - 1), 0
+	jirl	zero, \temp1, 0xc
 	.endm
 
 	.macro BACKUP_T0T1
@@ -77,7 +87,7 @@
  * new value in sp.
  */
 	.macro	get_saved_sp docfi=0
-	la.abs	  t1, kernelsp
+	la_abs	  t1, kernelsp
 #ifdef CONFIG_SMP
 	csrrd	  t0, PERCPU_BASE_KS
 	LONG_ADD  t1, t1, t0
@@ -90,7 +100,7 @@
 	.endm
 
 	.macro	set_saved_sp stackp temp temp2
-	la.abs	  \temp, kernelsp
+	la.pcrel  \temp, kernelsp
 #ifdef CONFIG_SMP
 	LONG_ADD  \temp, \temp, u0
 #endif
@@ -149,6 +159,11 @@
 	cfi_st  u0, PT_R21, \docfi
 	csrrd	u0, PERCPU_BASE_KS
 9:
+#ifdef CONFIG_KGDB
+	li.w	t0, CSR_CRMD_WE
+	csrxchg	t0, t0, LOONGARCH_CSR_CRMD
+#endif
+	UNWIND_HINT_REGS
 	.endm
 
 	.macro	SAVE_ALL docfi=0
@@ -206,6 +221,7 @@
 
 	.macro	RESTORE_SP_AND_RET docfi=0
 	cfi_ld	sp, PT_R3, \docfi
+	UNWIND_HINT_FUNC
 	ertn
 	.endm
 

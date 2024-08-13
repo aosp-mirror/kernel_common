@@ -11,15 +11,17 @@
  */
 
 #include <linux/dma-buf.h>
+#include <linux/dma-direct.h>
 #include <linux/dma-mapping.h>
 #include <linux/dma-heap.h>
-#include <linux/dma-resv.h>
 #include <linux/err.h>
 #include <linux/highmem.h>
+#include <linux/iommu.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/printk.h>
 #include <linux/scatterlist.h>
-#include <linux/slab.h>
+#include <linux/swiotlb.h>
 #include <linux/vmalloc.h>
 
 static struct dma_heap *sys_heap;
@@ -46,12 +48,11 @@ struct dma_heap_attachment {
 	bool uncached;
 };
 
-#define LOW_ORDER_GFP (GFP_HIGHUSER | __GFP_ZERO | __GFP_COMP)
-#define MID_ORDER_GFP (LOW_ORDER_GFP | __GFP_NOWARN)
+#define LOW_ORDER_GFP (GFP_HIGHUSER | __GFP_ZERO)
 #define HIGH_ORDER_GFP  (((GFP_HIGHUSER | __GFP_ZERO | __GFP_NOWARN \
 				| __GFP_NORETRY) & ~__GFP_RECLAIM) \
 				| __GFP_COMP)
-static gfp_t order_flags[] = {HIGH_ORDER_GFP, MID_ORDER_GFP, LOW_ORDER_GFP};
+static gfp_t order_flags[] = {HIGH_ORDER_GFP, HIGH_ORDER_GFP, LOW_ORDER_GFP};
 /*
  * The selection of the orders used for allocation (1MB, 64K, 4K) is designed
  * to match with the sizes often found in IOMMUs. Using order 4 pages instead
@@ -60,6 +61,28 @@ static gfp_t order_flags[] = {HIGH_ORDER_GFP, MID_ORDER_GFP, LOW_ORDER_GFP};
  */
 static const unsigned int orders[] = {8, 4, 0};
 #define NUM_ORDERS ARRAY_SIZE(orders)
+
+static bool needs_swiotlb_bounce(struct device *dev, struct sg_table *table)
+{
+	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+	struct scatterlist *sg;
+	int i;
+
+	for_each_sgtable_dma_sg(table, sg, i) {
+		// SG_DMA_SWIOTLB is set only for dma-iommu, not for dma-direct
+		if (domain && IS_ENABLED(CONFIG_NEED_SG_DMA_FLAGS)) {
+			if (sg_dma_is_swiotlb(table->sgl))
+				return true;
+		} else {
+			phys_addr_t paddr = domain ?
+					    iommu_iova_to_phys(domain, sg_dma_address(sg)) :
+					    dma_to_phys(dev, sg_dma_address(sg));
+			if (is_swiotlb_buffer(dev, paddr))
+				return true;
+		}
+	}
+	return false;
+}
 
 static struct sg_table *dup_sg_table(struct sg_table *table)
 {
@@ -147,6 +170,13 @@ static struct sg_table *system_heap_map_dma_buf(struct dma_buf_attachment *attac
 	if (ret)
 		return ERR_PTR(ret);
 
+	if (a->uncached && needs_swiotlb_bounce(attachment->dev, table)) {
+		pr_err("Cannot map uncached system heap buffer for %s, as it requires SWIOTLB",
+			dev_name(attachment->dev));
+		dma_unmap_sgtable(attachment->dev, table, direction, attr);
+		return ERR_PTR(-EINVAL);
+	}
+
 	a->mapped = true;
 	return table;
 }
@@ -217,8 +247,6 @@ static int system_heap_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
 	unsigned long addr = vma->vm_start;
 	struct sg_page_iter piter;
 	int ret;
-
-	dma_resv_assert_held(dmabuf->resv);
 
 	if (buffer->uncached)
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);

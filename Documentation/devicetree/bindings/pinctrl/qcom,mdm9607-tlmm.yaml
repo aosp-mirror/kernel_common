@@ -22,26 +22,17 @@ properties:
   reg:
     maxItems: 1
 
-  interrupts: true
-  interrupt-controller: true
-  "#interrupt-cells": true
-  gpio-controller: true
+  interrupts:
+    maxItems: 1
+
   gpio-reserved-ranges: true
-  "#gpio-cells": true
-  gpio-ranges: true
-  wakeup-parent: true
-
-required:
-  - compatible
-  - reg
-
-additionalProperties: false
 
 patternProperties:
   "-state$":
     oneOf:
       - $ref: "#/$defs/qcom-mdm9607-tlmm-state"
-      - patternProperties:
+      - additionalProperties: false
+        patternProperties:
           ".*":
             $ref: "#/$defs/qcom-mdm9607-tlmm-state"
 
@@ -52,6 +43,7 @@ $defs:
       Pinctrl node's client devices use subnodes for desired pin configuration.
       Client device subnodes use below standard properties.
     $ref: qcom,tlmm-common.yaml#/$defs/qcom-tlmm-state
+    unevaluatedProperties: false
 
     properties:
       pins:
@@ -103,18 +95,14 @@ $defs:
                 uim1_clk, uim1_data, uim1_present, uim1_reset, uim2_clk,
                 uim2_data, uim2_present, uim2_reset, uim_batt, wlan_en1, ]
 
-      bias-disable: true
-      bias-pull-down: true
-      bias-pull-up: true
-      drive-strength: true
-      input-enable: true
-      output-high: true
-      output-low: true
-
     required:
       - pins
 
-    additionalProperties: false
+required:
+  - compatible
+  - reg
+
+unevaluatedProperties: false
 
 examples:
   - |

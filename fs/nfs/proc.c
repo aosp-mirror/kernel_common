@@ -396,9 +396,10 @@ nfs_proc_link(struct inode *inode, struct inode *dir, const struct qstr *name)
 }
 
 static int
-nfs_proc_symlink(struct inode *dir, struct dentry *dentry, struct page *page,
+nfs_proc_symlink(struct inode *dir, struct dentry *dentry, struct folio *folio,
 		 unsigned int len, struct iattr *sattr)
 {
+	struct page *page = &folio->page;
 	struct nfs_fh *fh;
 	struct nfs_fattr *fattr;
 	struct nfs_symlinkargs	arg = {
@@ -694,6 +695,7 @@ static int nfs_have_delegation(struct inode *inode, fmode_t flags)
 static const struct inode_operations nfs_dir_inode_operations = {
 	.create		= nfs_create,
 	.lookup		= nfs_lookup,
+	.atomic_open	= nfs_atomic_open_v23,
 	.link		= nfs_link,
 	.unlink		= nfs_unlink,
 	.symlink	= nfs_symlink,

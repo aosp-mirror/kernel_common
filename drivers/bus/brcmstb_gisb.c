@@ -96,6 +96,20 @@ static const int gisb_offsets_bcm7400[] = {
 	[ARB_ERR_CAP_MASTER]	= 0x0d8,
 };
 
+static const int gisb_offsets_bcm74165[] = {
+	[ARB_TIMER]		= 0x008,
+	[ARB_BP_CAP_CLR]	= 0x044,
+	[ARB_BP_CAP_HI_ADDR]	= -1,
+	[ARB_BP_CAP_ADDR]	= 0x048,
+	[ARB_BP_CAP_STATUS]	= 0x058,
+	[ARB_BP_CAP_MASTER]	= 0x05c,
+	[ARB_ERR_CAP_CLR]	= 0x038,
+	[ARB_ERR_CAP_HI_ADDR]	= -1,
+	[ARB_ERR_CAP_ADDR]	= 0x020,
+	[ARB_ERR_CAP_STATUS]	= 0x030,
+	[ARB_ERR_CAP_MASTER]	= 0x034,
+};
+
 static const int gisb_offsets_bcm7435[] = {
 	[ARB_TIMER]		= 0x00c,
 	[ARB_BP_CAP_CLR]	= 0x014,
@@ -393,20 +407,20 @@ static const struct of_device_id brcmstb_gisb_arb_of_match[] = {
 	{ .compatible = "brcm,bcm7400-gisb-arb", .data = gisb_offsets_bcm7400 },
 	{ .compatible = "brcm,bcm7278-gisb-arb", .data = gisb_offsets_bcm7278 },
 	{ .compatible = "brcm,bcm7038-gisb-arb", .data = gisb_offsets_bcm7038 },
+	{ .compatible = "brcm,bcm74165-gisb-arb", .data = gisb_offsets_bcm74165 },
 	{ },
 };
+MODULE_DEVICE_TABLE(of, brcmstb_gisb_arb_of_match);
 
 static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
 {
 	struct device_node *dn = pdev->dev.of_node;
 	struct brcmstb_gisb_arb_device *gdev;
 	const struct of_device_id *of_id;
-	struct resource *r;
 	int err, timeout_irq, tea_irq, bp_irq;
 	unsigned int num_masters, j = 0;
 	int i, first, last;
 
-	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	timeout_irq = platform_get_irq(pdev, 0);
 	tea_irq = platform_get_irq(pdev, 1);
 	bp_irq = platform_get_irq(pdev, 2);
@@ -418,7 +432,7 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
 	mutex_init(&gdev->lock);
 	INIT_LIST_HEAD(&gdev->next);
 
-	gdev->base = devm_ioremap_resource(&pdev->dev, r);
+	gdev->base = devm_platform_get_and_ioremap_resource(pdev, 0, NULL);
 	if (IS_ERR(gdev->base))
 		return PTR_ERR(gdev->base);
 

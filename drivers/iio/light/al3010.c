@@ -17,7 +17,7 @@
 #include <linux/bitfield.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
-#include <linux/of.h>
+#include <linux/mod_devicetable.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
@@ -229,7 +229,7 @@ static struct i2c_driver al3010_driver = {
 		.of_match_table = al3010_of_match,
 		.pm = pm_sleep_ptr(&al3010_pm_ops),
 	},
-	.probe_new	= al3010_probe,
+	.probe		= al3010_probe,
 	.id_table	= al3010_id,
 };
 module_i2c_driver(al3010_driver);

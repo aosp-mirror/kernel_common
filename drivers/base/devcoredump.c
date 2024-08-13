@@ -167,7 +167,7 @@ static int devcd_free(struct device *dev, void *data)
 	return 0;
 }
 
-static ssize_t disabled_show(struct class *class, struct class_attribute *attr,
+static ssize_t disabled_show(const struct class *class, const struct class_attribute *attr,
 			     char *buf)
 {
 	return sysfs_emit(buf, "%d\n", devcd_disabled);
@@ -197,7 +197,7 @@ static ssize_t disabled_show(struct class *class, struct class_attribute *attr,
  * so, above situation would not occur.
  */
 
-static ssize_t disabled_store(struct class *class, struct class_attribute *attr,
+static ssize_t disabled_store(const struct class *class, const struct class_attribute *attr,
 			      const char *buf, size_t count)
 {
 	long tmp = simple_strtol(buf, NULL, 10);
@@ -226,7 +226,6 @@ ATTRIBUTE_GROUPS(devcd_class);
 
 static struct class devcd_class = {
 	.name		= "devcoredump",
-	.owner		= THIS_MODULE,
 	.dev_release	= devcd_dev_release,
 	.dev_groups	= devcd_dev_groups,
 	.class_groups	= devcd_class_groups,
@@ -306,6 +305,29 @@ static ssize_t devcd_read_from_sgtable(char *buffer, loff_t offset,
 }
 
 /**
+ * dev_coredump_put - remove device coredump
+ * @dev: the struct device for the crashed device
+ *
+ * dev_coredump_put() removes coredump, if exists, for a given device from
+ * the file system and free its associated data otherwise, does nothing.
+ *
+ * It is useful for modules that do not want to keep coredump
+ * available after its unload.
+ */
+void dev_coredump_put(struct device *dev)
+{
+	struct device *existing;
+
+	existing = class_find_device(&devcd_class, NULL, dev,
+				     devcd_match_failing);
+	if (existing) {
+		devcd_free(existing, NULL);
+		put_device(existing);
+	}
+}
+EXPORT_SYMBOL_GPL(dev_coredump_put);
+
+/**
  * dev_coredumpm - create device coredump with read/free methods
  * @dev: the struct device for the crashed device
  * @owner: the module that contains the read/free functions, use %THIS_MODULE
@@ -363,6 +385,7 @@ void dev_coredumpm(struct device *dev, struct module *owner,
 	devcd->devcd_dev.class = &devcd_class;
 
 	mutex_lock(&devcd->mutex);
+	dev_set_uevent_suppress(&devcd->devcd_dev, true);
 	if (device_add(&devcd->devcd_dev))
 		goto put_device;
 
@@ -377,6 +400,8 @@ void dev_coredumpm(struct device *dev, struct module *owner,
 		              "devcoredump"))
 		dev_warn(dev, "devcoredump create_link failed\n");
 
+	dev_set_uevent_suppress(&devcd->devcd_dev, false);
+	kobject_uevent(&devcd->devcd_dev.kobj, KOBJ_ADD);
 	INIT_DELAYED_WORK(&devcd->del_wk, devcd_del);
 	schedule_delayed_work(&devcd->del_wk, DEVCD_TIMEOUT);
 	mutex_unlock(&devcd->mutex);

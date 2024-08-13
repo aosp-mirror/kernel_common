@@ -28,13 +28,13 @@
 
 static void ksz_cfg(struct ksz_device *dev, u32 addr, u8 bits, bool set)
 {
-	regmap_update_bits(dev->regmap[0], addr, bits, set ? bits : 0);
+	regmap_update_bits(ksz_regmap_8(dev), addr, bits, set ? bits : 0);
 }
 
 static void ksz_port_cfg(struct ksz_device *dev, int port, int offset, u8 bits,
 			 bool set)
 {
-	regmap_update_bits(dev->regmap[0], PORT_CTRL_ADDR(port, offset),
+	regmap_update_bits(ksz_regmap_8(dev), PORT_CTRL_ADDR(port, offset),
 			   bits, set ? bits : 0);
 }
 
@@ -49,9 +49,9 @@ static int ksz8_ind_write8(struct ksz_device *dev, u8 table, u16 addr, u8 data)
 	mutex_lock(&dev->alu_mutex);
 
 	ctrl_addr = IND_ACC_TABLE(table) | addr;
-	ret = ksz_write8(dev, regs[REG_IND_BYTE], data);
+	ret = ksz_write16(dev, regs[REG_IND_CTRL_0], ctrl_addr);
 	if (!ret)
-		ret = ksz_write16(dev, regs[REG_IND_CTRL_0], ctrl_addr);
+		ret = ksz_write8(dev, regs[REG_IND_BYTE], data);
 
 	mutex_unlock(&dev->alu_mutex);
 
@@ -96,7 +96,7 @@ static int ksz8795_change_mtu(struct ksz_device *dev, int frame_size)
 
 	if (frame_size > KSZ8_LEGAL_PACKET_SIZE)
 		ctrl2 |= SW_LEGAL_PACKET_DISABLE;
-	else if (frame_size > KSZ8863_NORMAL_PACKET_SIZE)
+	if (frame_size > KSZ8863_NORMAL_PACKET_SIZE)
 		ctrl1 |= SW_HUGE_PACKET;
 
 	ret = ksz_rmw8(dev, REG_SW_CTRL_1, SW_HUGE_PACKET, ctrl1);
@@ -127,37 +127,71 @@ int ksz8_change_mtu(struct ksz_device *dev, int port, int mtu)
 	return -EOPNOTSUPP;
 }
 
-static void ksz8795_set_prio_queue(struct ksz_device *dev, int port, int queue)
+static int ksz8_port_queue_split(struct ksz_device *dev, int port, int queues)
 {
-	u8 hi, lo;
+	u8 mask_4q, mask_2q;
+	u8 reg_4q, reg_2q;
+	u8 data_4q = 0;
+	u8 data_2q = 0;
+	int ret;
 
-	/* Number of queues can only be 1, 2, or 4. */
-	switch (queue) {
-	case 4:
-	case 3:
-		queue = PORT_QUEUE_SPLIT_4;
-		break;
-	case 2:
-		queue = PORT_QUEUE_SPLIT_2;
-		break;
-	default:
-		queue = PORT_QUEUE_SPLIT_1;
+	if (ksz_is_ksz88x3(dev)) {
+		mask_4q = KSZ8873_PORT_4QUEUE_SPLIT_EN;
+		mask_2q = KSZ8873_PORT_2QUEUE_SPLIT_EN;
+		reg_4q = REG_PORT_CTRL_0;
+		reg_2q = REG_PORT_CTRL_2;
+
+		/* KSZ8795 family switches have Weighted Fair Queueing (WFQ)
+		 * enabled by default. Enable it for KSZ8873 family switches
+		 * too. Default value for KSZ8873 family is strict priority,
+		 * which should be enabled by using TC_SETUP_QDISC_ETS, not
+		 * by default.
+		 */
+		ret = ksz_rmw8(dev, REG_SW_CTRL_3, WEIGHTED_FAIR_QUEUE_ENABLE,
+			       WEIGHTED_FAIR_QUEUE_ENABLE);
+		if (ret)
+			return ret;
+	} else {
+		mask_4q = KSZ8795_PORT_4QUEUE_SPLIT_EN;
+		mask_2q = KSZ8795_PORT_2QUEUE_SPLIT_EN;
+		reg_4q = REG_PORT_CTRL_13;
+		reg_2q = REG_PORT_CTRL_0;
+
+		/* TODO: this is legacy from initial KSZ8795 driver, should be
+		 * moved to appropriate place in the future.
+		 */
+		ret = ksz_rmw8(dev, REG_SW_CTRL_19,
+			       SW_OUT_RATE_LIMIT_QUEUE_BASED,
+			       SW_OUT_RATE_LIMIT_QUEUE_BASED);
+		if (ret)
+			return ret;
 	}
-	ksz_pread8(dev, port, REG_PORT_CTRL_0, &lo);
-	ksz_pread8(dev, port, P_DROP_TAG_CTRL, &hi);
-	lo &= ~PORT_QUEUE_SPLIT_L;
-	if (queue & PORT_QUEUE_SPLIT_2)
-		lo |= PORT_QUEUE_SPLIT_L;
-	hi &= ~PORT_QUEUE_SPLIT_H;
-	if (queue & PORT_QUEUE_SPLIT_4)
-		hi |= PORT_QUEUE_SPLIT_H;
-	ksz_pwrite8(dev, port, REG_PORT_CTRL_0, lo);
-	ksz_pwrite8(dev, port, P_DROP_TAG_CTRL, hi);
 
-	/* Default is port based for egress rate limit. */
-	if (queue != PORT_QUEUE_SPLIT_1)
-		ksz_cfg(dev, REG_SW_CTRL_19, SW_OUT_RATE_LIMIT_QUEUE_BASED,
-			true);
+	if (queues == 4)
+		data_4q = mask_4q;
+	else if (queues == 2)
+		data_2q = mask_2q;
+
+	ret = ksz_prmw8(dev, port, reg_4q, mask_4q, data_4q);
+	if (ret)
+		return ret;
+
+	return ksz_prmw8(dev, port, reg_2q, mask_2q, data_2q);
+}
+
+int ksz8_all_queues_split(struct ksz_device *dev, int queues)
+{
+	struct dsa_switch *ds = dev->ds;
+	const struct dsa_port *dp;
+
+	dsa_switch_for_each_port(dp, ds) {
+		int ret = ksz8_port_queue_split(dev, dp->index, queues);
+
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 void ksz8_r_mib_cnt(struct ksz_device *dev, int port, u16 addr, u64 *cnt)
@@ -336,34 +370,48 @@ void ksz8_port_init_cnt(struct ksz_device *dev, int port)
 	}
 }
 
-static void ksz8_r_table(struct ksz_device *dev, int table, u16 addr, u64 *data)
+static int ksz8_r_table(struct ksz_device *dev, int table, u16 addr, u64 *data)
 {
 	const u16 *regs;
 	u16 ctrl_addr;
+	int ret;
 
 	regs = dev->info->regs;
 
 	ctrl_addr = IND_ACC_TABLE(table | TABLE_READ) | addr;
 
 	mutex_lock(&dev->alu_mutex);
-	ksz_write16(dev, regs[REG_IND_CTRL_0], ctrl_addr);
-	ksz_read64(dev, regs[REG_IND_DATA_HI], data);
+	ret = ksz_write16(dev, regs[REG_IND_CTRL_0], ctrl_addr);
+	if (ret)
+		goto unlock_alu;
+
+	ret = ksz_read64(dev, regs[REG_IND_DATA_HI], data);
+unlock_alu:
 	mutex_unlock(&dev->alu_mutex);
+
+	return ret;
 }
 
-static void ksz8_w_table(struct ksz_device *dev, int table, u16 addr, u64 data)
+static int ksz8_w_table(struct ksz_device *dev, int table, u16 addr, u64 data)
 {
 	const u16 *regs;
 	u16 ctrl_addr;
+	int ret;
 
 	regs = dev->info->regs;
 
 	ctrl_addr = IND_ACC_TABLE(table) | addr;
 
 	mutex_lock(&dev->alu_mutex);
-	ksz_write64(dev, regs[REG_IND_DATA_HI], data);
-	ksz_write16(dev, regs[REG_IND_CTRL_0], ctrl_addr);
+	ret = ksz_write64(dev, regs[REG_IND_DATA_HI], data);
+	if (ret)
+		goto unlock_alu;
+
+	ret = ksz_write16(dev, regs[REG_IND_CTRL_0], ctrl_addr);
+unlock_alu:
 	mutex_unlock(&dev->alu_mutex);
+
+	return ret;
 }
 
 static int ksz8_valid_dyn_entry(struct ksz_device *dev, u8 *data)
@@ -371,39 +419,39 @@ static int ksz8_valid_dyn_entry(struct ksz_device *dev, u8 *data)
 	int timeout = 100;
 	const u32 *masks;
 	const u16 *regs;
+	int ret;
 
 	masks = dev->info->masks;
 	regs = dev->info->regs;
 
 	do {
-		ksz_read8(dev, regs[REG_IND_DATA_CHECK], data);
+		ret = ksz_read8(dev, regs[REG_IND_DATA_CHECK], data);
+		if (ret)
+			return ret;
+
 		timeout--;
 	} while ((*data & masks[DYNAMIC_MAC_TABLE_NOT_READY]) && timeout);
 
 	/* Entry is not ready for accessing. */
-	if (*data & masks[DYNAMIC_MAC_TABLE_NOT_READY]) {
-		return -EAGAIN;
-	/* Entry is ready for accessing. */
-	} else {
-		ksz_read8(dev, regs[REG_IND_DATA_8], data);
+	if (*data & masks[DYNAMIC_MAC_TABLE_NOT_READY])
+		return -ETIMEDOUT;
 
-		/* There is no valid entry in the table. */
-		if (*data & masks[DYNAMIC_MAC_TABLE_MAC_EMPTY])
-			return -ENXIO;
-	}
-	return 0;
+	/* Entry is ready for accessing. */
+	return ksz_read8(dev, regs[REG_IND_DATA_8], data);
 }
 
-int ksz8_r_dyn_mac_table(struct ksz_device *dev, u16 addr, u8 *mac_addr,
-			 u8 *fid, u8 *src_port, u8 *timestamp, u16 *entries)
+static int ksz8_r_dyn_mac_table(struct ksz_device *dev, u16 addr, u8 *mac_addr,
+				u8 *fid, u8 *src_port, u16 *entries)
 {
 	u32 data_hi, data_lo;
 	const u8 *shifts;
 	const u32 *masks;
 	const u16 *regs;
 	u16 ctrl_addr;
+	u64 buf = 0;
 	u8 data;
-	int rc;
+	int cnt;
+	int ret;
 
 	shifts = dev->info->shifts;
 	masks = dev->info->masks;
@@ -412,91 +460,106 @@ int ksz8_r_dyn_mac_table(struct ksz_device *dev, u16 addr, u8 *mac_addr,
 	ctrl_addr = IND_ACC_TABLE(TABLE_DYNAMIC_MAC | TABLE_READ) | addr;
 
 	mutex_lock(&dev->alu_mutex);
-	ksz_write16(dev, regs[REG_IND_CTRL_0], ctrl_addr);
+	ret = ksz_write16(dev, regs[REG_IND_CTRL_0], ctrl_addr);
+	if (ret)
+		goto unlock_alu;
 
-	rc = ksz8_valid_dyn_entry(dev, &data);
-	if (rc == -EAGAIN) {
-		if (addr == 0)
-			*entries = 0;
-	} else if (rc == -ENXIO) {
+	ret = ksz8_valid_dyn_entry(dev, &data);
+	if (ret)
+		goto unlock_alu;
+
+	if (data & masks[DYNAMIC_MAC_TABLE_MAC_EMPTY]) {
 		*entries = 0;
-	/* At least one valid entry in the table. */
-	} else {
-		u64 buf = 0;
-		int cnt;
-
-		ksz_read64(dev, regs[REG_IND_DATA_HI], &buf);
-		data_hi = (u32)(buf >> 32);
-		data_lo = (u32)buf;
-
-		/* Check out how many valid entry in the table. */
-		cnt = data & masks[DYNAMIC_MAC_TABLE_ENTRIES_H];
-		cnt <<= shifts[DYNAMIC_MAC_ENTRIES_H];
-		cnt |= (data_hi & masks[DYNAMIC_MAC_TABLE_ENTRIES]) >>
-			shifts[DYNAMIC_MAC_ENTRIES];
-		*entries = cnt + 1;
-
-		*fid = (data_hi & masks[DYNAMIC_MAC_TABLE_FID]) >>
-			shifts[DYNAMIC_MAC_FID];
-		*src_port = (data_hi & masks[DYNAMIC_MAC_TABLE_SRC_PORT]) >>
-			shifts[DYNAMIC_MAC_SRC_PORT];
-		*timestamp = (data_hi & masks[DYNAMIC_MAC_TABLE_TIMESTAMP]) >>
-			shifts[DYNAMIC_MAC_TIMESTAMP];
-
-		mac_addr[5] = (u8)data_lo;
-		mac_addr[4] = (u8)(data_lo >> 8);
-		mac_addr[3] = (u8)(data_lo >> 16);
-		mac_addr[2] = (u8)(data_lo >> 24);
-
-		mac_addr[1] = (u8)data_hi;
-		mac_addr[0] = (u8)(data_hi >> 8);
-		rc = 0;
+		goto unlock_alu;
 	}
+
+	ret = ksz_read64(dev, regs[REG_IND_DATA_HI], &buf);
+	if (ret)
+		goto unlock_alu;
+
+	data_hi = (u32)(buf >> 32);
+	data_lo = (u32)buf;
+
+	/* Check out how many valid entry in the table. */
+	cnt = data & masks[DYNAMIC_MAC_TABLE_ENTRIES_H];
+	cnt <<= shifts[DYNAMIC_MAC_ENTRIES_H];
+	cnt |= (data_hi & masks[DYNAMIC_MAC_TABLE_ENTRIES]) >>
+		shifts[DYNAMIC_MAC_ENTRIES];
+	*entries = cnt + 1;
+
+	*fid = (data_hi & masks[DYNAMIC_MAC_TABLE_FID]) >>
+		shifts[DYNAMIC_MAC_FID];
+	*src_port = (data_hi & masks[DYNAMIC_MAC_TABLE_SRC_PORT]) >>
+		shifts[DYNAMIC_MAC_SRC_PORT];
+
+	mac_addr[5] = (u8)data_lo;
+	mac_addr[4] = (u8)(data_lo >> 8);
+	mac_addr[3] = (u8)(data_lo >> 16);
+	mac_addr[2] = (u8)(data_lo >> 24);
+
+	mac_addr[1] = (u8)data_hi;
+	mac_addr[0] = (u8)(data_hi >> 8);
+
+unlock_alu:
 	mutex_unlock(&dev->alu_mutex);
 
-	return rc;
+	return ret;
 }
 
-int ksz8_r_sta_mac_table(struct ksz_device *dev, u16 addr,
-			 struct alu_struct *alu)
+static int ksz8_r_sta_mac_table(struct ksz_device *dev, u16 addr,
+				struct alu_struct *alu, bool *valid)
 {
 	u32 data_hi, data_lo;
 	const u8 *shifts;
 	const u32 *masks;
 	u64 data;
+	int ret;
 
 	shifts = dev->info->shifts;
 	masks = dev->info->masks;
 
-	ksz8_r_table(dev, TABLE_STATIC_MAC, addr, &data);
+	ret = ksz8_r_table(dev, TABLE_STATIC_MAC, addr, &data);
+	if (ret)
+		return ret;
+
 	data_hi = data >> 32;
 	data_lo = (u32)data;
-	if (data_hi & (masks[STATIC_MAC_TABLE_VALID] |
-			masks[STATIC_MAC_TABLE_OVERRIDE])) {
-		alu->mac[5] = (u8)data_lo;
-		alu->mac[4] = (u8)(data_lo >> 8);
-		alu->mac[3] = (u8)(data_lo >> 16);
-		alu->mac[2] = (u8)(data_lo >> 24);
-		alu->mac[1] = (u8)data_hi;
-		alu->mac[0] = (u8)(data_hi >> 8);
-		alu->port_forward =
-			(data_hi & masks[STATIC_MAC_TABLE_FWD_PORTS]) >>
-				shifts[STATIC_MAC_FWD_PORTS];
-		alu->is_override =
-			(data_hi & masks[STATIC_MAC_TABLE_OVERRIDE]) ? 1 : 0;
-		data_hi >>= 1;
-		alu->is_static = true;
-		alu->is_use_fid =
-			(data_hi & masks[STATIC_MAC_TABLE_USE_FID]) ? 1 : 0;
-		alu->fid = (data_hi & masks[STATIC_MAC_TABLE_FID]) >>
-				shifts[STATIC_MAC_FID];
+
+	if (!(data_hi & (masks[STATIC_MAC_TABLE_VALID] |
+			 masks[STATIC_MAC_TABLE_OVERRIDE]))) {
+		*valid = false;
 		return 0;
 	}
-	return -ENXIO;
+
+	alu->mac[5] = (u8)data_lo;
+	alu->mac[4] = (u8)(data_lo >> 8);
+	alu->mac[3] = (u8)(data_lo >> 16);
+	alu->mac[2] = (u8)(data_lo >> 24);
+	alu->mac[1] = (u8)data_hi;
+	alu->mac[0] = (u8)(data_hi >> 8);
+	alu->port_forward =
+		(data_hi & masks[STATIC_MAC_TABLE_FWD_PORTS]) >>
+			shifts[STATIC_MAC_FWD_PORTS];
+	alu->is_override = (data_hi & masks[STATIC_MAC_TABLE_OVERRIDE]) ? 1 : 0;
+
+	/* KSZ8795 family switches have STATIC_MAC_TABLE_USE_FID and
+	 * STATIC_MAC_TABLE_FID definitions off by 1 when doing read on the
+	 * static MAC table compared to doing write.
+	 */
+	if (ksz_is_ksz87xx(dev))
+		data_hi >>= 1;
+	alu->is_static = true;
+	alu->is_use_fid = (data_hi & masks[STATIC_MAC_TABLE_USE_FID]) ? 1 : 0;
+	alu->fid = (data_hi & masks[STATIC_MAC_TABLE_FID]) >>
+		shifts[STATIC_MAC_FID];
+
+	*valid = true;
+
+	return 0;
 }
 
-void ksz8_w_sta_mac_table(struct ksz_device *dev, u16 addr,
-			  struct alu_struct *alu)
+static int ksz8_w_sta_mac_table(struct ksz_device *dev, u16 addr,
+				struct alu_struct *alu)
 {
 	u32 data_hi, data_lo;
 	const u8 *shifts;
@@ -524,7 +587,8 @@ void ksz8_w_sta_mac_table(struct ksz_device *dev, u16 addr,
 		data_hi &= ~masks[STATIC_MAC_TABLE_OVERRIDE];
 
 	data = (u64)data_hi << 32 | data_lo;
-	ksz8_w_table(dev, TABLE_STATIC_MAC, addr, data);
+
+	return ksz8_w_table(dev, TABLE_STATIC_MAC, addr, data);
 }
 
 static void ksz8_from_vlan(struct ksz_device *dev, u32 vlan, u8 *fid,
@@ -603,59 +667,217 @@ static void ksz8_w_vlan_table(struct ksz_device *dev, u16 vid, u16 vlan)
 	ksz8_w_table(dev, TABLE_VLAN, addr, buf);
 }
 
+/**
+ * ksz879x_get_loopback - KSZ879x specific function to get loopback
+ *                        configuration status for a specific port
+ * @dev: Pointer to the device structure
+ * @port: Port number to query
+ * @val: Pointer to store the result
+ *
+ * This function reads the SMI registers to determine whether loopback mode
+ * is enabled for a specific port.
+ *
+ * Return: 0 on success, error code on failure.
+ */
+static int ksz879x_get_loopback(struct ksz_device *dev, u16 port,
+				u16 *val)
+{
+	u8 stat3;
+	int ret;
+
+	ret = ksz_pread8(dev, port, REG_PORT_STATUS_3, &stat3);
+	if (ret)
+		return ret;
+
+	if (stat3 & PORT_PHY_LOOPBACK)
+		*val |= BMCR_LOOPBACK;
+
+	return 0;
+}
+
+/**
+ * ksz879x_set_loopback - KSZ879x specific function  to set loopback mode for
+ *			  a specific port
+ * @dev: Pointer to the device structure.
+ * @port: Port number to modify.
+ * @val: Value indicating whether to enable or disable loopback mode.
+ *
+ * This function translates loopback bit of the BMCR register into the
+ * corresponding hardware register bit value and writes it to the SMI interface.
+ *
+ * Return: 0 on success, error code on failure.
+ */
+static int ksz879x_set_loopback(struct ksz_device *dev, u16 port, u16 val)
+{
+	u8 stat3 = 0;
+
+	if (val & BMCR_LOOPBACK)
+		stat3 |= PORT_PHY_LOOPBACK;
+
+	return ksz_prmw8(dev, port, REG_PORT_STATUS_3, PORT_PHY_LOOPBACK,
+			 stat3);
+}
+
+/**
+ * ksz8_r_phy_ctrl - Translates and reads from the SMI interface to a MIIM PHY
+ *		     Control register (Reg. 31).
+ * @dev: The KSZ device instance.
+ * @port: The port number to be read.
+ * @val: The value read from the SMI interface.
+ *
+ * This function reads the SMI interface and translates the hardware register
+ * bit values into their corresponding control settings for a MIIM PHY Control
+ * register.
+ *
+ * Return: 0 on success, error code on failure.
+ */
+static int ksz8_r_phy_ctrl(struct ksz_device *dev, int port, u16 *val)
+{
+	const u16 *regs = dev->info->regs;
+	u8 reg_val;
+	int ret;
+
+	*val = 0;
+
+	ret = ksz_pread8(dev, port, regs[P_LINK_STATUS], &reg_val);
+	if (ret < 0)
+		return ret;
+
+	if (reg_val & PORT_MDIX_STATUS)
+		*val |= KSZ886X_CTRL_MDIX_STAT;
+
+	ret = ksz_pread8(dev, port, REG_PORT_LINK_MD_CTRL, &reg_val);
+	if (ret < 0)
+		return ret;
+
+	if (reg_val & PORT_FORCE_LINK)
+		*val |= KSZ886X_CTRL_FORCE_LINK;
+
+	if (reg_val & PORT_POWER_SAVING)
+		*val |= KSZ886X_CTRL_PWRSAVE;
+
+	if (reg_val & PORT_PHY_REMOTE_LOOPBACK)
+		*val |= KSZ886X_CTRL_REMOTE_LOOPBACK;
+
+	return 0;
+}
+
+/**
+ * ksz8_r_phy_bmcr - Translates and reads from the SMI interface to a MIIM PHY
+ *		     Basic mode control register (Reg. 0).
+ * @dev: The KSZ device instance.
+ * @port: The port number to be read.
+ * @val: The value read from the SMI interface.
+ *
+ * This function reads the SMI interface and translates the hardware register
+ * bit values into their corresponding control settings for a MIIM PHY Basic
+ * mode control register.
+ *
+ * MIIM Bit Mapping Comparison between KSZ8794 and KSZ8873
+ * -------------------------------------------------------------------
+ * MIIM Bit                    | KSZ8794 Reg/Bit             | KSZ8873 Reg/Bit
+ * ----------------------------+-----------------------------+----------------
+ * Bit 15 - Soft Reset         | 0xF/4                       | Not supported
+ * Bit 14 - Loopback           | 0xD/0 (MAC), 0xF/7 (PHY)    ~ 0xD/0 (PHY)
+ * Bit 13 - Force 100          | 0xC/6                       = 0xC/6
+ * Bit 12 - AN Enable          | 0xC/7 (reverse logic)       ~ 0xC/7
+ * Bit 11 - Power Down         | 0xD/3                       = 0xD/3
+ * Bit 10 - PHY Isolate        | 0xF/5                       | Not supported
+ * Bit 9 - Restart AN          | 0xD/5                       = 0xD/5
+ * Bit 8 - Force Full-Duplex   | 0xC/5                       = 0xC/5
+ * Bit 7 - Collision Test/Res. | Not supported               | Not supported
+ * Bit 6 - Reserved            | Not supported               | Not supported
+ * Bit 5 - Hp_mdix             | 0x9/7                       ~ 0xF/7
+ * Bit 4 - Force MDI           | 0xD/1                       = 0xD/1
+ * Bit 3 - Disable MDIX        | 0xD/2                       = 0xD/2
+ * Bit 2 - Disable Far-End F.  | ????                        | 0xD/4
+ * Bit 1 - Disable Transmit    | 0xD/6                       = 0xD/6
+ * Bit 0 - Disable LED         | 0xD/7                       = 0xD/7
+ * -------------------------------------------------------------------
+ *
+ * Return: 0 on success, error code on failure.
+ */
+static int ksz8_r_phy_bmcr(struct ksz_device *dev, u16 port, u16 *val)
+{
+	const u16 *regs = dev->info->regs;
+	u8 restart, speed, ctrl;
+	int ret;
+
+	*val = 0;
+
+	ret = ksz_pread8(dev, port, regs[P_NEG_RESTART_CTRL], &restart);
+	if (ret)
+		return ret;
+
+	ret = ksz_pread8(dev, port, regs[P_SPEED_STATUS], &speed);
+	if (ret)
+		return ret;
+
+	ret = ksz_pread8(dev, port, regs[P_FORCE_CTRL], &ctrl);
+	if (ret)
+		return ret;
+
+	if (ctrl & PORT_FORCE_100_MBIT)
+		*val |= BMCR_SPEED100;
+
+	if (ksz_is_ksz88x3(dev)) {
+		if (restart & KSZ8873_PORT_PHY_LOOPBACK)
+			*val |= BMCR_LOOPBACK;
+
+		if ((ctrl & PORT_AUTO_NEG_ENABLE))
+			*val |= BMCR_ANENABLE;
+	} else {
+		ret = ksz879x_get_loopback(dev, port, val);
+		if (ret)
+			return ret;
+
+		if (!(ctrl & PORT_AUTO_NEG_DISABLE))
+			*val |= BMCR_ANENABLE;
+	}
+
+	if (restart & PORT_POWER_DOWN)
+		*val |= BMCR_PDOWN;
+
+	if (restart & PORT_AUTO_NEG_RESTART)
+		*val |= BMCR_ANRESTART;
+
+	if (ctrl & PORT_FORCE_FULL_DUPLEX)
+		*val |= BMCR_FULLDPLX;
+
+	if (speed & PORT_HP_MDIX)
+		*val |= KSZ886X_BMCR_HP_MDIX;
+
+	if (restart & PORT_FORCE_MDIX)
+		*val |= KSZ886X_BMCR_FORCE_MDI;
+
+	if (restart & PORT_AUTO_MDIX_DISABLE)
+		*val |= KSZ886X_BMCR_DISABLE_AUTO_MDIX;
+
+	if (restart & PORT_TX_DISABLE)
+		*val |= KSZ886X_BMCR_DISABLE_TRANSMIT;
+
+	if (restart & PORT_LED_OFF)
+		*val |= KSZ886X_BMCR_DISABLE_LED;
+
+	return 0;
+}
+
 int ksz8_r_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 *val)
 {
-	u8 restart, speed, ctrl, link;
+	u8 ctrl, link, val1, val2;
 	int processed = true;
 	const u16 *regs;
-	u8 val1, val2;
 	u16 data = 0;
-	u8 p = phy;
+	u16 p = phy;
 	int ret;
 
 	regs = dev->info->regs;
 
 	switch (reg) {
 	case MII_BMCR:
-		ret = ksz_pread8(dev, p, regs[P_NEG_RESTART_CTRL], &restart);
+		ret = ksz8_r_phy_bmcr(dev, p, &data);
 		if (ret)
 			return ret;
-
-		ret = ksz_pread8(dev, p, regs[P_SPEED_STATUS], &speed);
-		if (ret)
-			return ret;
-
-		ret = ksz_pread8(dev, p, regs[P_FORCE_CTRL], &ctrl);
-		if (ret)
-			return ret;
-
-		if (restart & PORT_PHY_LOOPBACK)
-			data |= BMCR_LOOPBACK;
-		if (ctrl & PORT_FORCE_100_MBIT)
-			data |= BMCR_SPEED100;
-		if (ksz_is_ksz88x3(dev)) {
-			if ((ctrl & PORT_AUTO_NEG_ENABLE))
-				data |= BMCR_ANENABLE;
-		} else {
-			if (!(ctrl & PORT_AUTO_NEG_DISABLE))
-				data |= BMCR_ANENABLE;
-		}
-		if (restart & PORT_POWER_DOWN)
-			data |= BMCR_PDOWN;
-		if (restart & PORT_AUTO_NEG_RESTART)
-			data |= BMCR_ANRESTART;
-		if (ctrl & PORT_FORCE_FULL_DUPLEX)
-			data |= BMCR_FULLDPLX;
-		if (speed & PORT_HP_MDIX)
-			data |= KSZ886X_BMCR_HP_MDIX;
-		if (restart & PORT_FORCE_MDIX)
-			data |= KSZ886X_BMCR_FORCE_MDI;
-		if (restart & PORT_AUTO_MDIX_DISABLE)
-			data |= KSZ886X_BMCR_DISABLE_AUTO_MDIX;
-		if (restart & PORT_TX_DISABLE)
-			data |= KSZ886X_BMCR_DISABLE_TRANSMIT;
-		if (restart & PORT_LED_OFF)
-			data |= KSZ886X_BMCR_DISABLE_LED;
 		break;
 	case MII_BMSR:
 		ret = ksz_pread8(dev, p, regs[P_LINK_STATUS], &link);
@@ -740,12 +962,10 @@ int ksz8_r_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 *val)
 				FIELD_GET(PORT_CABLE_FAULT_COUNTER_L, val2));
 		break;
 	case PHY_REG_PHY_CTRL:
-		ret = ksz_pread8(dev, p, regs[P_LINK_STATUS], &link);
+		ret = ksz8_r_phy_ctrl(dev, p, &data);
 		if (ret)
 			return ret;
 
-		if (link & PORT_MDIX_STATUS)
-			data |= KSZ886X_CTRL_MDIX_STAT;
 		break;
 	default:
 		processed = false;
@@ -757,113 +977,169 @@ int ksz8_r_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 *val)
 	return 0;
 }
 
+/**
+ * ksz8_w_phy_ctrl - Translates and writes to the SMI interface from a MIIM PHY
+ *		     Control register (Reg. 31).
+ * @dev: The KSZ device instance.
+ * @port: The port number to be configured.
+ * @val: The register value to be written.
+ *
+ * This function translates control settings from a MIIM PHY Control register
+ * into their corresponding hardware register bit values for the SMI
+ * interface.
+ *
+ * Return: 0 on success, error code on failure.
+ */
+static int ksz8_w_phy_ctrl(struct ksz_device *dev, int port, u16 val)
+{
+	u8 reg_val = 0;
+	int ret;
+
+	if (val & KSZ886X_CTRL_FORCE_LINK)
+		reg_val |= PORT_FORCE_LINK;
+
+	if (val & KSZ886X_CTRL_PWRSAVE)
+		reg_val |= PORT_POWER_SAVING;
+
+	if (val & KSZ886X_CTRL_REMOTE_LOOPBACK)
+		reg_val |= PORT_PHY_REMOTE_LOOPBACK;
+
+	ret = ksz_prmw8(dev, port, REG_PORT_LINK_MD_CTRL, PORT_FORCE_LINK |
+			PORT_POWER_SAVING | PORT_PHY_REMOTE_LOOPBACK, reg_val);
+	return ret;
+}
+
+/**
+ * ksz8_w_phy_bmcr - Translates and writes to the SMI interface from a MIIM PHY
+ *		     Basic mode control register (Reg. 0).
+ * @dev: The KSZ device instance.
+ * @port: The port number to be configured.
+ * @val: The register value to be written.
+ *
+ * This function translates control settings from a MIIM PHY Basic mode control
+ * register into their corresponding hardware register bit values for the SMI
+ * interface.
+ *
+ * MIIM Bit Mapping Comparison between KSZ8794 and KSZ8873
+ * -------------------------------------------------------------------
+ * MIIM Bit                    | KSZ8794 Reg/Bit             | KSZ8873 Reg/Bit
+ * ----------------------------+-----------------------------+----------------
+ * Bit 15 - Soft Reset         | 0xF/4                       | Not supported
+ * Bit 14 - Loopback           | 0xD/0 (MAC), 0xF/7 (PHY)    ~ 0xD/0 (PHY)
+ * Bit 13 - Force 100          | 0xC/6                       = 0xC/6
+ * Bit 12 - AN Enable          | 0xC/7 (reverse logic)       ~ 0xC/7
+ * Bit 11 - Power Down         | 0xD/3                       = 0xD/3
+ * Bit 10 - PHY Isolate        | 0xF/5                       | Not supported
+ * Bit 9 - Restart AN          | 0xD/5                       = 0xD/5
+ * Bit 8 - Force Full-Duplex   | 0xC/5                       = 0xC/5
+ * Bit 7 - Collision Test/Res. | Not supported               | Not supported
+ * Bit 6 - Reserved            | Not supported               | Not supported
+ * Bit 5 - Hp_mdix             | 0x9/7                       ~ 0xF/7
+ * Bit 4 - Force MDI           | 0xD/1                       = 0xD/1
+ * Bit 3 - Disable MDIX        | 0xD/2                       = 0xD/2
+ * Bit 2 - Disable Far-End F.  | ????                        | 0xD/4
+ * Bit 1 - Disable Transmit    | 0xD/6                       = 0xD/6
+ * Bit 0 - Disable LED         | 0xD/7                       = 0xD/7
+ * -------------------------------------------------------------------
+ *
+ * Return: 0 on success, error code on failure.
+ */
+static int ksz8_w_phy_bmcr(struct ksz_device *dev, u16 port, u16 val)
+{
+	u8 restart, speed, ctrl, restart_mask;
+	const u16 *regs = dev->info->regs;
+	int ret;
+
+	/* Do not support PHY reset function. */
+	if (val & BMCR_RESET)
+		return 0;
+
+	speed = 0;
+	if (val & KSZ886X_BMCR_HP_MDIX)
+		speed |= PORT_HP_MDIX;
+
+	ret = ksz_prmw8(dev, port, regs[P_SPEED_STATUS], PORT_HP_MDIX, speed);
+	if (ret)
+		return ret;
+
+	ctrl = 0;
+	if (ksz_is_ksz88x3(dev)) {
+		if ((val & BMCR_ANENABLE))
+			ctrl |= PORT_AUTO_NEG_ENABLE;
+	} else {
+		if (!(val & BMCR_ANENABLE))
+			ctrl |= PORT_AUTO_NEG_DISABLE;
+
+		/* Fiber port does not support auto-negotiation. */
+		if (dev->ports[port].fiber)
+			ctrl |= PORT_AUTO_NEG_DISABLE;
+	}
+
+	if (val & BMCR_SPEED100)
+		ctrl |= PORT_FORCE_100_MBIT;
+
+	if (val & BMCR_FULLDPLX)
+		ctrl |= PORT_FORCE_FULL_DUPLEX;
+
+	ret = ksz_prmw8(dev, port, regs[P_FORCE_CTRL], PORT_FORCE_100_MBIT |
+		 /* PORT_AUTO_NEG_ENABLE and PORT_AUTO_NEG_DISABLE are the same
+		  * bits
+		  */
+		 PORT_FORCE_FULL_DUPLEX | PORT_AUTO_NEG_ENABLE, ctrl);
+	if (ret)
+		return ret;
+
+	restart = 0;
+	restart_mask = PORT_LED_OFF | PORT_TX_DISABLE | PORT_AUTO_NEG_RESTART |
+		PORT_POWER_DOWN | PORT_AUTO_MDIX_DISABLE | PORT_FORCE_MDIX;
+
+	if (val & KSZ886X_BMCR_DISABLE_LED)
+		restart |= PORT_LED_OFF;
+
+	if (val & KSZ886X_BMCR_DISABLE_TRANSMIT)
+		restart |= PORT_TX_DISABLE;
+
+	if (val & BMCR_ANRESTART)
+		restart |= PORT_AUTO_NEG_RESTART;
+
+	if (val & BMCR_PDOWN)
+		restart |= PORT_POWER_DOWN;
+
+	if (val & KSZ886X_BMCR_DISABLE_AUTO_MDIX)
+		restart |= PORT_AUTO_MDIX_DISABLE;
+
+	if (val & KSZ886X_BMCR_FORCE_MDI)
+		restart |= PORT_FORCE_MDIX;
+
+	if (ksz_is_ksz88x3(dev)) {
+		restart_mask |= KSZ8873_PORT_PHY_LOOPBACK;
+
+		if (val & BMCR_LOOPBACK)
+			restart |= KSZ8873_PORT_PHY_LOOPBACK;
+	} else {
+		ret = ksz879x_set_loopback(dev, port, val);
+		if (ret)
+			return ret;
+	}
+
+	return ksz_prmw8(dev, port, regs[P_NEG_RESTART_CTRL], restart_mask,
+			 restart);
+}
+
 int ksz8_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
 {
-	u8 restart, speed, ctrl, data;
 	const u16 *regs;
-	u8 p = phy;
+	u8 ctrl, data;
+	u16 p = phy;
 	int ret;
 
 	regs = dev->info->regs;
 
 	switch (reg) {
 	case MII_BMCR:
-
-		/* Do not support PHY reset function. */
-		if (val & BMCR_RESET)
-			break;
-		ret = ksz_pread8(dev, p, regs[P_SPEED_STATUS], &speed);
+		ret = ksz8_w_phy_bmcr(dev, p, val);
 		if (ret)
 			return ret;
-
-		data = speed;
-		if (val & KSZ886X_BMCR_HP_MDIX)
-			data |= PORT_HP_MDIX;
-		else
-			data &= ~PORT_HP_MDIX;
-
-		if (data != speed) {
-			ret = ksz_pwrite8(dev, p, regs[P_SPEED_STATUS], data);
-			if (ret)
-				return ret;
-		}
-
-		ret = ksz_pread8(dev, p, regs[P_FORCE_CTRL], &ctrl);
-		if (ret)
-			return ret;
-
-		data = ctrl;
-		if (ksz_is_ksz88x3(dev)) {
-			if ((val & BMCR_ANENABLE))
-				data |= PORT_AUTO_NEG_ENABLE;
-			else
-				data &= ~PORT_AUTO_NEG_ENABLE;
-		} else {
-			if (!(val & BMCR_ANENABLE))
-				data |= PORT_AUTO_NEG_DISABLE;
-			else
-				data &= ~PORT_AUTO_NEG_DISABLE;
-
-			/* Fiber port does not support auto-negotiation. */
-			if (dev->ports[p].fiber)
-				data |= PORT_AUTO_NEG_DISABLE;
-		}
-
-		if (val & BMCR_SPEED100)
-			data |= PORT_FORCE_100_MBIT;
-		else
-			data &= ~PORT_FORCE_100_MBIT;
-		if (val & BMCR_FULLDPLX)
-			data |= PORT_FORCE_FULL_DUPLEX;
-		else
-			data &= ~PORT_FORCE_FULL_DUPLEX;
-
-		if (data != ctrl) {
-			ret = ksz_pwrite8(dev, p, regs[P_FORCE_CTRL], data);
-			if (ret)
-				return ret;
-		}
-
-		ret = ksz_pread8(dev, p, regs[P_NEG_RESTART_CTRL], &restart);
-		if (ret)
-			return ret;
-
-		data = restart;
-		if (val & KSZ886X_BMCR_DISABLE_LED)
-			data |= PORT_LED_OFF;
-		else
-			data &= ~PORT_LED_OFF;
-		if (val & KSZ886X_BMCR_DISABLE_TRANSMIT)
-			data |= PORT_TX_DISABLE;
-		else
-			data &= ~PORT_TX_DISABLE;
-		if (val & BMCR_ANRESTART)
-			data |= PORT_AUTO_NEG_RESTART;
-		else
-			data &= ~(PORT_AUTO_NEG_RESTART);
-		if (val & BMCR_PDOWN)
-			data |= PORT_POWER_DOWN;
-		else
-			data &= ~PORT_POWER_DOWN;
-		if (val & KSZ886X_BMCR_DISABLE_AUTO_MDIX)
-			data |= PORT_AUTO_MDIX_DISABLE;
-		else
-			data &= ~PORT_AUTO_MDIX_DISABLE;
-		if (val & KSZ886X_BMCR_FORCE_MDI)
-			data |= PORT_FORCE_MDIX;
-		else
-			data &= ~PORT_FORCE_MDIX;
-		if (val & BMCR_LOOPBACK)
-			data |= PORT_PHY_LOOPBACK;
-		else
-			data &= ~PORT_PHY_LOOPBACK;
-
-		if (data != restart) {
-			ret = ksz_pwrite8(dev, p, regs[P_NEG_RESTART_CTRL],
-					  data);
-			if (ret)
-				return ret;
-		}
 		break;
 	case MII_ADVERTISE:
 		ret = ksz_pread8(dev, p, regs[P_LOCAL_CTRL], &ctrl);
@@ -897,6 +1173,12 @@ int ksz8_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
 		if (val & PHY_START_CABLE_DIAG)
 			ksz_port_cfg(dev, p, REG_PORT_LINK_MD_CTRL, PORT_START_CABLE_DIAG, true);
 		break;
+
+	case PHY_REG_PHY_CTRL:
+		ret = ksz8_w_phy_ctrl(dev, p, val);
+		if (ret)
+			return ret;
+		break;
 	default:
 		break;
 	}
@@ -918,7 +1200,6 @@ void ksz8_flush_dyn_mac_table(struct ksz_device *dev, int port)
 {
 	u8 learn[DSA_MAX_PORTS];
 	int first, index, cnt;
-	struct ksz_port *p;
 	const u16 *regs;
 
 	regs = dev->info->regs;
@@ -932,9 +1213,6 @@ void ksz8_flush_dyn_mac_table(struct ksz_device *dev, int port)
 		cnt = dev->info->port_cnt;
 	}
 	for (index = first; index < cnt; index++) {
-		p = &dev->ports[index];
-		if (!p->on)
-			continue;
 		ksz_pread8(dev, index, regs[P_STP_CTRL], &learn[index]);
 		if (!(learn[index] & PORT_LEARN_DISABLE))
 			ksz_pwrite8(dev, index, regs[P_STP_CTRL],
@@ -942,9 +1220,6 @@ void ksz8_flush_dyn_mac_table(struct ksz_device *dev, int port)
 	}
 	ksz_cfg(dev, S_FLUSH_TABLE_CTRL, SW_FLUSH_DYN_MAC_TABLE, true);
 	for (index = first; index < cnt; index++) {
-		p = &dev->ports[index];
-		if (!p->on)
-			continue;
 		if (!(learn[index] & PORT_LEARN_DISABLE))
 			ksz_pwrite8(dev, index, regs[P_STP_CTRL], learn[index]);
 	}
@@ -953,49 +1228,53 @@ void ksz8_flush_dyn_mac_table(struct ksz_device *dev, int port)
 int ksz8_fdb_dump(struct ksz_device *dev, int port,
 		  dsa_fdb_dump_cb_t *cb, void *data)
 {
-	int ret = 0;
-	u16 i = 0;
+	u8 mac[ETH_ALEN];
+	u8 src_port, fid;
 	u16 entries = 0;
-	u8 timestamp = 0;
-	u8 fid;
-	u8 member;
-	struct alu_struct alu;
+	int ret, i;
 
-	do {
-		alu.is_static = false;
-		ret = ksz8_r_dyn_mac_table(dev, i, alu.mac, &fid, &member,
-					   &timestamp, &entries);
-		if (!ret && (member & BIT(port))) {
-			ret = cb(alu.mac, alu.fid, alu.is_static, data);
+	for (i = 0; i < KSZ8_DYN_MAC_ENTRIES; i++) {
+		ret = ksz8_r_dyn_mac_table(dev, i, mac, &fid, &src_port,
+					   &entries);
+		if (ret)
+			return ret;
+
+		if (i >= entries)
+			return 0;
+
+		if (port == src_port) {
+			ret = cb(mac, fid, false, data);
 			if (ret)
-				break;
+				return ret;
 		}
-		i++;
-	} while (i < entries);
-	if (i >= entries)
-		ret = 0;
+	}
 
-	return ret;
+	return 0;
 }
 
-int ksz8_mdb_add(struct ksz_device *dev, int port,
-		 const struct switchdev_obj_port_mdb *mdb, struct dsa_db db)
+static int ksz8_add_sta_mac(struct ksz_device *dev, int port,
+			    const unsigned char *addr, u16 vid)
 {
 	struct alu_struct alu;
-	int index;
+	int index, ret;
 	int empty = 0;
 
 	alu.port_forward = 0;
 	for (index = 0; index < dev->info->num_statics; index++) {
-		if (!ksz8_r_sta_mac_table(dev, index, &alu)) {
-			/* Found one already in static MAC table. */
-			if (!memcmp(alu.mac, mdb->addr, ETH_ALEN) &&
-			    alu.fid == mdb->vid)
-				break;
-		/* Remember the first empty entry. */
-		} else if (!empty) {
-			empty = index + 1;
+		bool valid;
+
+		ret = ksz8_r_sta_mac_table(dev, index, &alu, &valid);
+		if (ret)
+			return ret;
+		if (!valid) {
+			/* Remember the first empty entry. */
+			if (!empty)
+				empty = index + 1;
+			continue;
 		}
+
+		if (!memcmp(alu.mac, addr, ETH_ALEN) && alu.fid == vid)
+			break;
 	}
 
 	/* no available entry */
@@ -1006,48 +1285,73 @@ int ksz8_mdb_add(struct ksz_device *dev, int port,
 	if (index == dev->info->num_statics) {
 		index = empty - 1;
 		memset(&alu, 0, sizeof(alu));
-		memcpy(alu.mac, mdb->addr, ETH_ALEN);
+		memcpy(alu.mac, addr, ETH_ALEN);
 		alu.is_static = true;
 	}
 	alu.port_forward |= BIT(port);
-	if (mdb->vid) {
+	if (vid) {
 		alu.is_use_fid = true;
 
 		/* Need a way to map VID to FID. */
-		alu.fid = mdb->vid;
+		alu.fid = vid;
 	}
-	ksz8_w_sta_mac_table(dev, index, &alu);
 
-	return 0;
+	return ksz8_w_sta_mac_table(dev, index, &alu);
 }
 
-int ksz8_mdb_del(struct ksz_device *dev, int port,
-		 const struct switchdev_obj_port_mdb *mdb, struct dsa_db db)
+static int ksz8_del_sta_mac(struct ksz_device *dev, int port,
+			    const unsigned char *addr, u16 vid)
 {
 	struct alu_struct alu;
-	int index;
+	int index, ret;
 
 	for (index = 0; index < dev->info->num_statics; index++) {
-		if (!ksz8_r_sta_mac_table(dev, index, &alu)) {
-			/* Found one already in static MAC table. */
-			if (!memcmp(alu.mac, mdb->addr, ETH_ALEN) &&
-			    alu.fid == mdb->vid)
-				break;
-		}
+		bool valid;
+
+		ret = ksz8_r_sta_mac_table(dev, index, &alu, &valid);
+		if (ret)
+			return ret;
+		if (!valid)
+			continue;
+
+		if (!memcmp(alu.mac, addr, ETH_ALEN) && alu.fid == vid)
+			break;
 	}
 
 	/* no available entry */
 	if (index == dev->info->num_statics)
-		goto exit;
+		return 0;
 
 	/* clear port */
 	alu.port_forward &= ~BIT(port);
 	if (!alu.port_forward)
 		alu.is_static = false;
-	ksz8_w_sta_mac_table(dev, index, &alu);
 
-exit:
-	return 0;
+	return ksz8_w_sta_mac_table(dev, index, &alu);
+}
+
+int ksz8_mdb_add(struct ksz_device *dev, int port,
+		 const struct switchdev_obj_port_mdb *mdb, struct dsa_db db)
+{
+	return ksz8_add_sta_mac(dev, port, mdb->addr, mdb->vid);
+}
+
+int ksz8_mdb_del(struct ksz_device *dev, int port,
+		 const struct switchdev_obj_port_mdb *mdb, struct dsa_db db)
+{
+	return ksz8_del_sta_mac(dev, port, mdb->addr, mdb->vid);
+}
+
+int ksz8_fdb_add(struct ksz_device *dev, int port, const unsigned char *addr,
+		 u16 vid, struct dsa_db db)
+{
+	return ksz8_add_sta_mac(dev, port, addr, vid);
+}
+
+int ksz8_fdb_del(struct ksz_device *dev, int port, const unsigned char *addr,
+		 u16 vid, struct dsa_db db)
+{
+	return ksz8_del_sta_mac(dev, port, addr, vid);
 }
 
 int ksz8_port_vlan_filtering(struct ksz_device *dev, int port, bool flag,
@@ -1227,6 +1531,9 @@ static void ksz8795_cpu_interface_select(struct ksz_device *dev, int port)
 {
 	struct ksz_port *p = &dev->ports[port];
 
+	if (!ksz_is_ksz87xx(dev))
+		return;
+
 	if (!p->interface && dev->compat_interface) {
 		dev_warn(dev->dev,
 			 "Using legacy switch \"phy-mode\" property, because it is missing on port %d node. "
@@ -1240,6 +1547,7 @@ void ksz8_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 {
 	struct dsa_switch *ds = dev->ds;
 	const u32 *masks;
+	int queues;
 	u8 member;
 
 	masks = dev->info->masks;
@@ -1247,29 +1555,41 @@ void ksz8_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 	/* enable broadcast storm limit */
 	ksz_port_cfg(dev, port, P_BCAST_STORM_CTRL, PORT_BROADCAST_STORM, true);
 
-	if (!ksz_is_ksz88x3(dev))
-		ksz8795_set_prio_queue(dev, port, 4);
+	/* For KSZ88x3 enable only one queue by default, otherwise we won't
+	 * be able to get rid of PCP prios on Port 2.
+	 */
+	if (ksz_is_ksz88x3(dev))
+		queues = 1;
+	else
+		queues = dev->info->num_tx_queues;
 
-	/* disable DiffServ priority */
-	ksz_port_cfg(dev, port, P_PRIO_CTRL, PORT_DIFFSERV_ENABLE, false);
+	ksz8_port_queue_split(dev, port, queues);
 
 	/* replace priority */
 	ksz_port_cfg(dev, port, P_802_1P_CTRL,
 		     masks[PORT_802_1P_REMAPPING], false);
 
-	/* enable 802.1p priority */
-	ksz_port_cfg(dev, port, P_PRIO_CTRL, PORT_802_1P_ENABLE, true);
-
-	if (cpu_port) {
-		if (!ksz_is_ksz88x3(dev))
-			ksz8795_cpu_interface_select(dev, port);
-
+	if (cpu_port)
 		member = dsa_user_ports(ds);
-	} else {
+	else
 		member = BIT(dsa_upstream_port(ds, port));
-	}
 
 	ksz8_cfg_port_member(dev, port, member);
+}
+
+static void ksz88x3_config_rmii_clk(struct ksz_device *dev)
+{
+	struct dsa_port *cpu_dp = dsa_to_port(dev->ds, dev->cpu_port);
+	bool rmii_clk_internal;
+
+	if (!ksz_is_ksz88x3(dev))
+		return;
+
+	rmii_clk_internal = of_property_read_bool(cpu_dp->dn,
+						  "microchip,rmii-clk-internal");
+
+	ksz_cfg(dev, KSZ88X3_REG_FVID_AND_HOST_MODE,
+		KSZ88X3_PORT3_RMII_CLK_INTERNAL, rmii_clk_internal);
 }
 
 void ksz8_config_cpu_port(struct dsa_switch *ds)
@@ -1286,25 +1606,17 @@ void ksz8_config_cpu_port(struct dsa_switch *ds)
 
 	ksz_cfg(dev, regs[S_TAIL_TAG_CTRL], masks[SW_TAIL_TAG_ENABLE], true);
 
-	p = &dev->ports[dev->cpu_port];
-	p->on = 1;
-
 	ksz8_port_setup(dev, dev->cpu_port, true);
 
+	ksz8795_cpu_interface_select(dev, dev->cpu_port);
+	ksz88x3_config_rmii_clk(dev);
+
 	for (i = 0; i < dev->phy_port_cnt; i++) {
-		p = &dev->ports[i];
-
 		ksz_port_stp_state_set(ds, i, BR_STATE_DISABLED);
-
-		/* Last port may be disabled. */
-		if (i == dev->phy_port_cnt)
-			break;
-		p->on = 1;
 	}
 	for (i = 0; i < dev->phy_port_cnt; i++) {
 		p = &dev->ports[i];
-		if (!p->on)
-			continue;
+
 		if (!ksz_is_ksz88x3(dev)) {
 			ksz_pread8(dev, i, regs[P_REMOTE_STATUS], &remote);
 			if (remote & KSZ8_PORT_FIBER_MODE)
@@ -1317,6 +1629,131 @@ void ksz8_config_cpu_port(struct dsa_switch *ds)
 			ksz_port_cfg(dev, i, regs[P_STP_CTRL],
 				     PORT_FORCE_FLOW_CTRL, false);
 	}
+}
+
+/**
+ * ksz8_phy_port_link_up - Configures ports with integrated PHYs
+ * @dev: The KSZ device instance.
+ * @port: The port number to configure.
+ * @duplex: The desired duplex mode.
+ * @tx_pause: If true, enables transmit pause.
+ * @rx_pause: If true, enables receive pause.
+ *
+ * Description:
+ * The function configures flow control settings for a given port based on the
+ * desired settings and current duplex mode.
+ *
+ * According to the KSZ8873 datasheet, the PORT_FORCE_FLOW_CTRL bit in the
+ * Port Control 2 register (0x1A for Port 1, 0x22 for Port 2, 0x32 for Port 3)
+ * determines how flow control is handled on the port:
+ *    "1 = will always enable full-duplex flow control on the port, regardless
+ *         of AN result.
+ *     0 = full-duplex flow control is enabled based on AN result."
+ *
+ * This means that the flow control behavior depends on the state of this bit:
+ * - If PORT_FORCE_FLOW_CTRL is set to 1, the switch will ignore AN results and
+ *   force flow control on the port.
+ * - If PORT_FORCE_FLOW_CTRL is set to 0, the switch will enable or disable
+ *   flow control based on the AN results.
+ *
+ * However, there is a potential limitation in this configuration. It is
+ * currently not possible to force disable flow control on a port if we still
+ * advertise pause support. While such a configuration is not currently
+ * supported by Linux, and may not make practical sense, it's important to be
+ * aware of this limitation when working with the KSZ8873 and similar devices.
+ */
+static void ksz8_phy_port_link_up(struct ksz_device *dev, int port, int duplex,
+				  bool tx_pause, bool rx_pause)
+{
+	const u16 *regs = dev->info->regs;
+	u8 sctrl = 0;
+
+	/* The KSZ8795 switch differs from the KSZ8873 by supporting
+	 * asymmetric pause control. However, since a single bit is used to
+	 * control both RX and TX pause, we can't enforce asymmetric pause
+	 * control - both TX and RX pause will be either enabled or disabled
+	 * together.
+	 *
+	 * If auto-negotiation is enabled, we usually allow the flow control to
+	 * be determined by the auto-negotiation process based on the
+	 * capabilities of both link partners. However, for KSZ8873, the
+	 * PORT_FORCE_FLOW_CTRL bit may be set by the hardware bootstrap,
+	 * ignoring the auto-negotiation result. Thus, even in auto-negotiation
+	 * mode, we need to ensure that the PORT_FORCE_FLOW_CTRL bit is
+	 * properly cleared.
+	 *
+	 * In the absence of pause auto-negotiation, we will enforce symmetric
+	 * pause control for both variants of switches - KSZ8873 and KSZ8795.
+	 *
+	 * Autoneg Pause Autoneg      rx,tx	PORT_FORCE_FLOW_CTRL
+	 * 1		1		x	0
+	 * 0		1		x	0 (flow control probably disabled)
+	 * x		0		1	1 (flow control force enabled)
+	 * 1		0		0	0 (flow control still depends on
+	 *					   aneg result due to hardware)
+	 * 0		0		0	0 (flow control probably disabled)
+	 */
+	if (dev->ports[port].manual_flow && tx_pause)
+		sctrl |= PORT_FORCE_FLOW_CTRL;
+
+	ksz_prmw8(dev, port, regs[P_STP_CTRL], PORT_FORCE_FLOW_CTRL, sctrl);
+}
+
+/**
+ * ksz8_cpu_port_link_up - Configures the CPU port of the switch.
+ * @dev: The KSZ device instance.
+ * @speed: The desired link speed.
+ * @duplex: The desired duplex mode.
+ * @tx_pause: If true, enables transmit pause.
+ * @rx_pause: If true, enables receive pause.
+ *
+ * Description:
+ * The function configures flow control and speed settings for the CPU
+ * port of the switch based on the desired settings, current duplex mode, and
+ * speed.
+ */
+static void ksz8_cpu_port_link_up(struct ksz_device *dev, int speed, int duplex,
+				  bool tx_pause, bool rx_pause)
+{
+	const u16 *regs = dev->info->regs;
+	u8 ctrl = 0;
+
+	/* SW_FLOW_CTRL, SW_HALF_DUPLEX, and SW_10_MBIT bits are bootstrappable
+	 * at least on KSZ8873. They can have different values depending on your
+	 * board setup.
+	 */
+	if (tx_pause || rx_pause)
+		ctrl |= SW_FLOW_CTRL;
+
+	if (duplex == DUPLEX_HALF)
+		ctrl |= SW_HALF_DUPLEX;
+
+	/* This hardware only supports SPEED_10 and SPEED_100. For SPEED_10
+	 * we need to set the SW_10_MBIT bit. Otherwise, we can leave it 0.
+	 */
+	if (speed == SPEED_10)
+		ctrl |= SW_10_MBIT;
+
+	ksz_rmw8(dev, regs[S_BROADCAST_CTRL], SW_HALF_DUPLEX | SW_FLOW_CTRL |
+		 SW_10_MBIT, ctrl);
+}
+
+void ksz8_phylink_mac_link_up(struct phylink_config *config,
+			      struct phy_device *phydev, unsigned int mode,
+			      phy_interface_t interface, int speed, int duplex,
+			      bool tx_pause, bool rx_pause)
+{
+	struct dsa_port *dp = dsa_phylink_to_port(config);
+	struct ksz_device *dev = dp->ds->priv;
+	int port = dp->index;
+
+	/* If the port is the CPU port, apply special handling. Only the CPU
+	 * port is configured via global registers.
+	 */
+	if (dev->cpu_port == port)
+		ksz8_cpu_port_link_up(dev, speed, duplex, tx_pause, rx_pause);
+	else if (dev->info->internal_phy[port])
+		ksz8_phy_port_link_up(dev, port, duplex, tx_pause, rx_pause);
 }
 
 static int ksz8_handle_global_errata(struct dsa_switch *ds)
@@ -1347,9 +1784,7 @@ int ksz8_enable_stp_addr(struct ksz_device *dev)
 	alu.is_override = true;
 	alu.port_forward = dev->info->cpu_ports;
 
-	ksz8_w_sta_mac_table(dev, 0, &alu);
-
-	return 0;
+	return ksz8_w_sta_mac_table(dev, 0, &alu);
 }
 
 int ksz8_setup(struct dsa_switch *ds)
@@ -1369,20 +1804,18 @@ int ksz8_setup(struct dsa_switch *ds)
 	 */
 	ds->vlan_filtering_is_global = true;
 
-	ksz_cfg(dev, S_REPLACE_VID_CTRL, SW_FLOW_CTRL, true);
-
 	/* Enable automatic fast aging when link changed detected. */
 	ksz_cfg(dev, S_LINK_AGING_CTRL, SW_LINK_AUTO_AGING, true);
 
 	/* Enable aggressive back off algorithm in half duplex mode. */
-	regmap_update_bits(dev->regmap[0], REG_SW_CTRL_1,
+	regmap_update_bits(ksz_regmap_8(dev), REG_SW_CTRL_1,
 			   SW_AGGR_BACKOFF, SW_AGGR_BACKOFF);
 
 	/*
 	 * Make sure unicast VLAN boundary is set as default and
 	 * enable no excessive collision drop.
 	 */
-	regmap_update_bits(dev->regmap[0], REG_SW_CTRL_2,
+	regmap_update_bits(ksz_regmap_8(dev), REG_SW_CTRL_2,
 			   UNICAST_VLAN_BOUNDARY | NO_EXC_COLLISION_DROP,
 			   UNICAST_VLAN_BOUNDARY | NO_EXC_COLLISION_DROP);
 

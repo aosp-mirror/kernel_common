@@ -20,7 +20,6 @@
 #include <linux/err.h>
 #include <linux/device.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 
 /* Vdd / reference voltage in millivolt */
 #define MCP3021_VDD_REF_MAX	5500
@@ -102,7 +101,7 @@ static umode_t mcp3021_is_visible(const void *_data,
 	return 0444;
 }
 
-static const struct hwmon_channel_info *mcp3021_info[] = {
+static const struct hwmon_channel_info * const mcp3021_info[] = {
 	HWMON_CHANNEL_INFO(in, HWMON_I_INPUT),
 	NULL
 };
@@ -117,13 +116,12 @@ static const struct hwmon_chip_info mcp3021_chip_info = {
 	.info = mcp3021_info,
 };
 
-static const struct i2c_device_id mcp3021_id[];
-
 static int mcp3021_probe(struct i2c_client *client)
 {
 	struct mcp3021_data *data = NULL;
 	struct device_node *np = client->dev.of_node;
 	struct device *hwmon_dev;
+	enum chips type;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
 		return -ENODEV;
@@ -150,7 +148,8 @@ static int mcp3021_probe(struct i2c_client *client)
 			data->vdd = MCP3021_VDD_REF_DEFAULT;
 	}
 
-	switch (i2c_match_id(mcp3021_id, client)->driver_data) {
+	type = (uintptr_t)i2c_get_match_data(client);
+	switch (type) {
 	case mcp3021:
 		data->sar_shift = MCP3021_SAR_SHIFT;
 		data->sar_mask = MCP3021_SAR_MASK;
@@ -198,7 +197,7 @@ static struct i2c_driver mcp3021_driver = {
 		.name = "mcp3021",
 		.of_match_table = of_match_ptr(of_mcp3021_match),
 	},
-	.probe_new = mcp3021_probe,
+	.probe = mcp3021_probe,
 	.id_table = mcp3021_id,
 };
 

@@ -32,8 +32,6 @@
 
 #include "gem/i915_gem_object_types.h"
 
-enum i915_cache_level;
-
 /**
  * DOC: Global GTT views
  *
@@ -197,14 +195,15 @@ struct i915_vma {
 	struct i915_fence_reg *fence;
 
 	u64 size;
-	u64 display_alignment;
 	struct i915_page_sizes page_sizes;
 
 	/* mmap-offset associated with fencing for this vma */
 	struct i915_mmap_offset	*mmo;
 
+	u32 guard; /* padding allocated around vma->pages within the node */
 	u32 fence_size;
 	u32 fence_alignment;
+	u32 display_alignment;
 
 	/**
 	 * Count of the number of times this vma has been opened by different
@@ -291,7 +290,6 @@ struct i915_vma {
 
 	struct list_head obj_link; /* Link in the object's VMA list */
 	struct rb_node obj_node;
-	struct hlist_node obj_hash;
 
 	/** This vma's place in the eviction list */
 	struct list_head evict_link;

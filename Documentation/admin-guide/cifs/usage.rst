@@ -45,7 +45,7 @@ Installation instructions
 
 If you have built the CIFS vfs as module (successfully) simply
 type ``make modules_install`` (or if you prefer, manually copy the file to
-the modules directory e.g. /lib/modules/2.4.10-4GB/kernel/fs/cifs/cifs.ko).
+the modules directory e.g. /lib/modules/6.3.0-060300-generic/kernel/fs/smb/client/cifs.ko).
 
 If you have built the CIFS vfs into the kernel itself, follow the instructions
 for your distribution on how to install a new kernel (usually you
@@ -66,22 +66,22 @@ If cifs is built as a module, then the size and number of network buffers
 and maximum number of simultaneous requests to one server can be configured.
 Changing these from their defaults is not recommended. By executing modinfo::
 
-	modinfo kernel/fs/cifs/cifs.ko
+	modinfo <path to cifs.ko>
 
-on kernel/fs/cifs/cifs.ko the list of configuration changes that can be made
+on kernel/fs/smb/client/cifs.ko the list of configuration changes that can be made
 at module initialization time (by running insmod cifs.ko) can be seen.
 
 Recommendations
 ===============
 
-To improve security the SMB2.1 dialect or later (usually will get SMB3) is now
+To improve security the SMB2.1 dialect or later (usually will get SMB3.1.1) is now
 the new default. To use old dialects (e.g. to mount Windows XP) use "vers=1.0"
 on mount (or vers=2.0 for Windows Vista).  Note that the CIFS (vers=1.0) is
 much older and less secure than the default dialect SMB3 which includes
 many advanced security features such as downgrade attack detection
 and encrypted shares and stronger signing and authentication algorithms.
 There are additional mount options that may be helpful for SMB3 to get
-improved POSIX behavior (NB: can use vers=3.0 to force only SMB3, never 2.1):
+improved POSIX behavior (NB: can use vers=3 to force SMB3 or later, never 2.1):
 
    ``mfsymlinks`` and either ``cifsacl`` or ``modefromsid`` (usually with ``idsfromsid``)
 
@@ -399,7 +399,7 @@ A partial list of the supported mount options follows:
   sep
 		if first mount option (after the -o), overrides
 		the comma as the separator between the mount
-		parms. e.g.::
+		parameters. e.g.::
 
 			-o user=myname,password=mypassword,domain=mydom
 
@@ -715,6 +715,7 @@ DebugData		Displays information about active CIFS sessions and
 Stats			Lists summary resource usage information as well as per
 			share statistics.
 open_files		List all the open file handles on all active SMB sessions.
+mount_params            List of all mount parameters available for the module
 ======================= =======================================================
 
 Configuration pseudo-files:
@@ -722,40 +723,26 @@ Configuration pseudo-files:
 ======================= =======================================================
 SecurityFlags		Flags which control security negotiation and
 			also packet signing. Authentication (may/must)
-			flags (e.g. for NTLM and/or NTLMv2) may be combined with
+			flags (e.g. for NTLMv2) may be combined with
 			the signing flags.  Specifying two different password
 			hashing mechanisms (as "must use") on the other hand
 			does not make much sense. Default flags are::
 
-				0x07007
+				0x00C5
 
-			(NTLM, NTLMv2 and packet signing allowed).  The maximum
-			allowable flags if you want to allow mounts to servers
-			using weaker password hashes is 0x37037 (lanman,
-			plaintext, ntlm, ntlmv2, signing allowed).  Some
-			SecurityFlags require the corresponding menuconfig
-			options to be enabled.  Enabling plaintext
-			authentication currently requires also enabling
-			lanman authentication in the security flags
-			because the cifs module only supports sending
-			laintext passwords using the older lanman dialect
-			form of the session setup SMB.  (e.g. for authentication
-			using plain text passwords, set the SecurityFlags
-			to 0x30030)::
+			(NTLMv2 and packet signing allowed).  Some SecurityFlags
+			may require enabling a corresponding menuconfig option.
 
 			  may use packet signing			0x00001
 			  must use packet signing			0x01001
-			  may use NTLM (most common password hash)	0x00002
-			  must use NTLM					0x02002
 			  may use NTLMv2				0x00004
 			  must use NTLMv2				0x04004
-			  may use Kerberos security			0x00008
-			  must use Kerberos				0x08008
-			  may use lanman (weak) password hash		0x00010
-			  must use lanman password hash			0x10010
-			  may use plaintext passwords			0x00020
-			  must use plaintext passwords			0x20020
-			  (reserved for future packet encryption)	0x00040
+			  may use Kerberos security (krb5)		0x00008
+			  must use Kerberos                             0x08008
+			  may use NTLMSSP               		0x00080
+			  must use NTLMSSP           			0x80080
+			  seal (packet encryption)			0x00040
+			  must seal (not implemented yet)               0x40040
 
 cifsFYI			If set to non-zero value, additional debug information
 			will be logged to the system error log.  This field
@@ -765,7 +752,7 @@ cifsFYI			If set to non-zero value, additional debug information
 			Some debugging statements are not compiled into the
 			cifs kernel unless CONFIG_CIFS_DEBUG2 is enabled in the
 			kernel configuration. cifsFYI may be set to one or
-			nore of the following flags (7 sets them all)::
+			more of the following flags (7 sets them all)::
 
 			  +-----------------------------------------------+------+
 			  | log cifs informational messages		  | 0x01 |
@@ -863,6 +850,11 @@ module loading or during the runtime by using the interface::
 i.e.::
 
     echo "value" > /sys/module/cifs/parameters/<param>
+
+More detailed descriptions of the available module parameters and their values
+can be seen by doing:
+
+    modinfo cifs (or modinfo smb3)
 
 ================= ==========================================================
 1. enable_oplocks Enable or disable oplocks. Oplocks are enabled by default.

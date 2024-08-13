@@ -8,6 +8,7 @@
 #include <linux/err.h>
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
+#include <linux/of.h>
 #include <linux/phy.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
@@ -18,7 +19,6 @@
 #define R8A779F0_ETH_SERDES_BANK_SELECT		0x03fc
 #define R8A779F0_ETH_SERDES_TIMEOUT_US		100000
 #define R8A779F0_ETH_SERDES_NUM_RETRY_LINKUP	3
-#define R8A779F0_ETH_SERDES_NUM_RETRY_INIT	3
 
 struct r8a779f0_eth_serdes_drv_data;
 struct r8a779f0_eth_serdes_channel {
@@ -214,6 +214,10 @@ static int r8a779f0_eth_serdes_hw_init(struct r8a779f0_eth_serdes_channel *chann
 	if (dd->initialized)
 		return 0;
 
+	reset_control_reset(dd->reset);
+
+	usleep_range(1000, 2000);
+
 	ret = r8a779f0_eth_serdes_common_init_ram(dd);
 	if (ret)
 		return ret;
@@ -242,51 +246,55 @@ static int r8a779f0_eth_serdes_hw_init(struct r8a779f0_eth_serdes_channel *chann
 	if (ret)
 		return ret;
 
-	ret = r8a779f0_eth_serdes_reg_wait(&dd->channel[0], 0x0000, 0x380, BIT(15), 0);
-	if (ret)
-		return ret;
-
-	for (i = 0; i < R8A779F0_ETH_SERDES_NUM; i++) {
-		ret = r8a779f0_eth_serdes_chan_setting(&dd->channel[i]);
-		if (ret)
-			return ret;
-	}
-
-	for (i = 0; i < R8A779F0_ETH_SERDES_NUM; i++) {
-		ret = r8a779f0_eth_serdes_chan_speed(&dd->channel[i]);
-		if (ret)
-			return ret;
-	}
-
-	for (i = 0; i < R8A779F0_ETH_SERDES_NUM; i++)
-		r8a779f0_eth_serdes_write32(dd->channel[i].addr, 0x03c0, 0x380, 0x0000);
-	for (i = 0; i < R8A779F0_ETH_SERDES_NUM; i++)
-		r8a779f0_eth_serdes_write32(dd->channel[i].addr, 0x03d0, 0x380, 0x0000);
-
-	for (i = 0; i < R8A779F0_ETH_SERDES_NUM; i++) {
-		ret = r8a779f0_eth_serdes_monitor_linkup(&dd->channel[i]);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
+	return r8a779f0_eth_serdes_reg_wait(&dd->channel[0], 0x0000, 0x380, BIT(15), 0);
 }
 
 static int r8a779f0_eth_serdes_init(struct phy *p)
 {
 	struct r8a779f0_eth_serdes_channel *channel = phy_get_drvdata(p);
-	int i, ret;
+	int ret;
 
-	for (i = 0; i < R8A779F0_ETH_SERDES_NUM_RETRY_INIT; i++) {
-		ret = r8a779f0_eth_serdes_hw_init(channel);
-		if (!ret) {
-			channel->dd->initialized = true;
-			break;
-		}
-		usleep_range(1000, 2000);
-	}
+	ret = r8a779f0_eth_serdes_hw_init(channel);
+	if (!ret)
+		channel->dd->initialized = true;
 
 	return ret;
+}
+
+static int r8a779f0_eth_serdes_exit(struct phy *p)
+{
+	struct r8a779f0_eth_serdes_channel *channel = phy_get_drvdata(p);
+
+	channel->dd->initialized = false;
+
+	return 0;
+}
+
+static int r8a779f0_eth_serdes_hw_init_late(struct r8a779f0_eth_serdes_channel
+*channel)
+{
+	int ret;
+
+	ret = r8a779f0_eth_serdes_chan_setting(channel);
+	if (ret)
+		return ret;
+
+	ret = r8a779f0_eth_serdes_chan_speed(channel);
+	if (ret)
+		return ret;
+
+	r8a779f0_eth_serdes_write32(channel->addr, 0x03c0, 0x380, 0x0000);
+
+	r8a779f0_eth_serdes_write32(channel->addr, 0x03d0, 0x380, 0x0000);
+
+	return r8a779f0_eth_serdes_monitor_linkup(channel);
+}
+
+static int r8a779f0_eth_serdes_power_on(struct phy *p)
+{
+	struct r8a779f0_eth_serdes_channel *channel = phy_get_drvdata(p);
+
+	return r8a779f0_eth_serdes_hw_init_late(channel);
 }
 
 static int r8a779f0_eth_serdes_set_mode(struct phy *p, enum phy_mode mode,
@@ -319,12 +327,14 @@ static int r8a779f0_eth_serdes_set_speed(struct phy *p, int speed)
 
 static const struct phy_ops r8a779f0_eth_serdes_ops = {
 	.init		= r8a779f0_eth_serdes_init,
+	.exit		= r8a779f0_eth_serdes_exit,
+	.power_on	= r8a779f0_eth_serdes_power_on,
 	.set_mode	= r8a779f0_eth_serdes_set_mode,
 	.set_speed	= r8a779f0_eth_serdes_set_speed,
 };
 
 static struct phy *r8a779f0_eth_serdes_xlate(struct device *dev,
-					     struct of_phandle_args *args)
+					     const struct of_phandle_args *args)
 {
 	struct r8a779f0_eth_serdes_drv_data *dd = dev_get_drvdata(dev);
 
@@ -344,14 +354,7 @@ static int r8a779f0_eth_serdes_probe(struct platform_device *pdev)
 {
 	struct r8a779f0_eth_serdes_drv_data *dd;
 	struct phy_provider *provider;
-	struct resource *res;
 	int i;
-
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		dev_err(&pdev->dev, "invalid resource\n");
-		return -EINVAL;
-	}
 
 	dd = devm_kzalloc(&pdev->dev, sizeof(*dd), GFP_KERNEL);
 	if (!dd)
@@ -359,15 +362,13 @@ static int r8a779f0_eth_serdes_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, dd);
 	dd->pdev = pdev;
-	dd->addr = devm_ioremap_resource(&pdev->dev, res);
+	dd->addr = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(dd->addr))
 		return PTR_ERR(dd->addr);
 
 	dd->reset = devm_reset_control_get(&pdev->dev, NULL);
 	if (IS_ERR(dd->reset))
 		return PTR_ERR(dd->reset);
-
-	reset_control_reset(dd->reset);
 
 	for (i = 0; i < R8A779F0_ETH_SERDES_NUM; i++) {
 		struct r8a779f0_eth_serdes_channel *channel = &dd->channel[i];
@@ -393,19 +394,17 @@ static int r8a779f0_eth_serdes_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int r8a779f0_eth_serdes_remove(struct platform_device *pdev)
+static void r8a779f0_eth_serdes_remove(struct platform_device *pdev)
 {
 	pm_runtime_put(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 
 	platform_set_drvdata(pdev, NULL);
-
-	return 0;
 }
 
 static struct platform_driver r8a779f0_eth_serdes_driver_platform = {
 	.probe = r8a779f0_eth_serdes_probe,
-	.remove = r8a779f0_eth_serdes_remove,
+	.remove_new = r8a779f0_eth_serdes_remove,
 	.driver = {
 		.name = "r8a779f0_eth_serdes",
 		.of_match_table = r8a779f0_eth_serdes_of_table,

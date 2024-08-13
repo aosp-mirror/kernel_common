@@ -23,7 +23,7 @@ struct bpf_key *bpf_lookup_user_key(__u32 serial, __u64 flags) __ksym;
 void bpf_key_put(struct bpf_key *key) __ksym;
 void bpf_rcu_read_lock(void) __ksym;
 void bpf_rcu_read_unlock(void) __ksym;
-struct task_struct *bpf_task_acquire_not_zero(struct task_struct *p) __ksym;
+struct task_struct *bpf_task_acquire(struct task_struct *p) __ksym;
 void bpf_task_release(struct task_struct *p) __ksym;
 
 SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
@@ -81,7 +81,7 @@ int no_lock(void *ctx)
 {
 	struct task_struct *task, *real_parent;
 
-	/* no bpf_rcu_read_lock(), old code still works */
+	/* old style ptr_to_btf_id is not allowed in sleepable */
 	task = bpf_get_current_task_btf();
 	real_parent = task->real_parent;
 	(void)bpf_task_storage_get(&map_a, real_parent, 0, 0);
@@ -159,13 +159,8 @@ int task_acquire(void *ctx)
 		goto out;
 
 	/* acquire a reference which can be used outside rcu read lock region */
-	gparent = bpf_task_acquire_not_zero(gparent);
+	gparent = bpf_task_acquire(gparent);
 	if (!gparent)
-		/* Until we resolve the issues with using task->rcu_users, we
-		 * expect bpf_task_acquire_not_zero() to return a NULL task.
-		 * See the comment at the definition of
-		 * bpf_task_acquire_not_zero() for more details.
-		 */
 		goto out;
 
 	(void)bpf_task_storage_get(&map_a, gparent, 0, 0);
@@ -179,8 +174,6 @@ SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
 int miss_lock(void *ctx)
 {
 	struct task_struct *task;
-	struct css_set *cgroups;
-	struct cgroup *dfl_cgrp;
 
 	/* missing bpf_rcu_read_lock() */
 	task = bpf_get_current_task_btf();
@@ -195,8 +188,6 @@ SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
 int miss_unlock(void *ctx)
 {
 	struct task_struct *task;
-	struct css_set *cgroups;
-	struct cgroup *dfl_cgrp;
 
 	/* missing bpf_rcu_read_unlock() */
 	task = bpf_get_current_task_btf();
@@ -286,13 +277,13 @@ out:
 }
 
 SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
-int task_untrusted_non_rcuptr(void *ctx)
+int task_trusted_non_rcuptr(void *ctx)
 {
 	struct task_struct *task, *group_leader;
 
 	task = bpf_get_current_task_btf();
 	bpf_rcu_read_lock();
-	/* the pointer group_leader marked as untrusted */
+	/* the pointer group_leader is explicitly marked as trusted */
 	group_leader = task->real_parent->group_leader;
 	(void)bpf_task_storage_get(&map_a, group_leader, 0, 0);
 	bpf_rcu_read_unlock();
@@ -326,5 +317,125 @@ int cross_rcu_region(void *ctx)
 	bpf_rcu_read_lock();
 	(void)bpf_task_storage_get(&map_a, real_parent, 0, 0);
 	bpf_rcu_read_unlock();
+	return 0;
+}
+
+__noinline
+static int static_subprog(void *ctx)
+{
+	volatile int ret = 0;
+
+	if (bpf_get_prandom_u32())
+		return ret + 42;
+	return ret + bpf_get_prandom_u32();
+}
+
+__noinline
+int global_subprog(u64 a)
+{
+	volatile int ret = a;
+
+	return ret + static_subprog(NULL);
+}
+
+__noinline
+static int static_subprog_lock(void *ctx)
+{
+	volatile int ret = 0;
+
+	bpf_rcu_read_lock();
+	if (bpf_get_prandom_u32())
+		return ret + 42;
+	return ret + bpf_get_prandom_u32();
+}
+
+__noinline
+int global_subprog_lock(u64 a)
+{
+	volatile int ret = a;
+
+	return ret + static_subprog_lock(NULL);
+}
+
+__noinline
+static int static_subprog_unlock(void *ctx)
+{
+	volatile int ret = 0;
+
+	bpf_rcu_read_unlock();
+	if (bpf_get_prandom_u32())
+		return ret + 42;
+	return ret + bpf_get_prandom_u32();
+}
+
+__noinline
+int global_subprog_unlock(u64 a)
+{
+	volatile int ret = a;
+
+	return ret + static_subprog_unlock(NULL);
+}
+
+SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
+int rcu_read_lock_subprog(void *ctx)
+{
+	volatile int ret = 0;
+
+	bpf_rcu_read_lock();
+	if (bpf_get_prandom_u32())
+		ret += static_subprog(ctx);
+	bpf_rcu_read_unlock();
+	return 0;
+}
+
+SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
+int rcu_read_lock_global_subprog(void *ctx)
+{
+	volatile int ret = 0;
+
+	bpf_rcu_read_lock();
+	if (bpf_get_prandom_u32())
+		ret += global_subprog(ret);
+	bpf_rcu_read_unlock();
+	return 0;
+}
+
+SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
+int rcu_read_lock_subprog_lock(void *ctx)
+{
+	volatile int ret = 0;
+
+	ret += static_subprog_lock(ctx);
+	bpf_rcu_read_unlock();
+	return 0;
+}
+
+SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
+int rcu_read_lock_global_subprog_lock(void *ctx)
+{
+	volatile int ret = 0;
+
+	ret += global_subprog_lock(ret);
+	bpf_rcu_read_unlock();
+	return 0;
+}
+
+SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
+int rcu_read_lock_subprog_unlock(void *ctx)
+{
+	volatile int ret = 0;
+
+	bpf_rcu_read_lock();
+	ret += static_subprog_unlock(ctx);
+	return 0;
+}
+
+SEC("?fentry.s/" SYS_PREFIX "sys_getpgid")
+int rcu_read_lock_global_subprog_unlock(void *ctx)
+{
+	volatile int ret = 0;
+
+	bpf_rcu_read_lock();
+	ret += global_subprog_unlock(ret);
 	return 0;
 }

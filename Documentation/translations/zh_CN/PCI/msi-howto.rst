@@ -88,7 +88,7 @@ MSI功能。
 如果设备对最小数量的向量有要求，驱动程序可以传递一个min_vecs参数，设置为这个限制，
 如果PCI核不能满足最小数量的向量，将返回-ENOSPC。
 
-flags参数用来指定设备和驱动程序可以使用哪种类型的中断（PCI_IRQ_LEGACY, PCI_IRQ_MSI,
+flags参数用来指定设备和驱动程序可以使用哪种类型的中断（PCI_IRQ_INTX, PCI_IRQ_MSI,
 PCI_IRQ_MSIX）。一个方便的短语（PCI_IRQ_ALL_TYPES）也可以用来要求任何可能的中断类型。
 如果PCI_IRQ_AFFINITY标志被设置，pci_alloc_irq_vectors()将把中断分散到可用的CPU上。
 
@@ -231,3 +231,14 @@ ACPI FADT表中指明了它。在这种情况下，Linux会自动禁用MSI。有
 
 也需要检查设备驱动程序，看它是否支持MSI。例如，它可能包含对带有PCI_IRQ_MSI或
 PCI_IRQ_MSIX标志的pci_alloc_irq_vectors（）的调用。
+
+
+MSI(-X) APIs设备驱动程序列表
+============================
+
+PCI/MSI子系统有一个专门的C文件，用于其导出的设备驱动程序APIs - `drivers/pci/msi/api.c` 。
+以下是导出的函数:
+
+该API在以下内核代码中:
+
+drivers/pci/msi/api.c

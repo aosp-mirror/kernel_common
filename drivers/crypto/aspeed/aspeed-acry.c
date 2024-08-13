@@ -2,25 +2,23 @@
 /*
  * Copyright 2021 Aspeed Technology Inc.
  */
-#include <crypto/akcipher.h>
-#include <crypto/algapi.h>
 #include <crypto/engine.h>
 #include <crypto/internal/akcipher.h>
 #include <crypto/internal/rsa.h>
 #include <crypto/scatterwalk.h>
 #include <linux/clk.h>
-#include <linux/platform_device.h>
-#include <linux/module.h>
-#include <linux/of_address.h>
-#include <linux/of_irq.h>
-#include <linux/of.h>
-#include <linux/of_device.h>
-#include <linux/mfd/syscon.h>
-#include <linux/interrupt.h>
 #include <linux/count_zeros.h>
-#include <linux/err.h>
 #include <linux/dma-mapping.h>
+#include <linux/err.h>
+#include <linux/interrupt.h>
+#include <linux/kernel.h>
+#include <linux/mfd/syscon.h>
+#include <linux/module.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/slab.h>
+#include <linux/string.h>
 
 #ifdef CONFIG_CRYPTO_DEV_ASPEED_DEBUG
 #define ACRY_DBG(d, fmt, ...)	\
@@ -112,7 +110,6 @@ struct aspeed_acry_dev {
 };
 
 struct aspeed_acry_ctx {
-	struct crypto_engine_ctx	enginectx;
 	struct aspeed_acry_dev		*acry_dev;
 
 	struct rsa_key			key;
@@ -131,7 +128,7 @@ struct aspeed_acry_ctx {
 
 struct aspeed_acry_alg {
 	struct aspeed_acry_dev		*acry_dev;
-	struct akcipher_alg		akcipher;
+	struct akcipher_engine_alg	akcipher;
 };
 
 enum aspeed_rsa_key_mode {
@@ -289,7 +286,7 @@ static int aspeed_acry_rsa_ctx_copy(struct aspeed_acry_dev *acry_dev, void *buf,
 
 			if (mode == ASPEED_RSA_EXP_MODE)
 				idx = acry_dev->exp_dw_mapping[j - 1];
-			else if (mode == ASPEED_RSA_MOD_MODE)
+			else /* mode == ASPEED_RSA_MOD_MODE */
 				idx = acry_dev->mod_dw_mapping[j - 1];
 
 			dw_buf[idx] = cpu_to_le32(data);
@@ -577,7 +574,7 @@ static int aspeed_acry_rsa_init_tfm(struct crypto_akcipher *tfm)
 	const char *name = crypto_tfm_alg_name(&tfm->base);
 	struct aspeed_acry_alg *acry_alg;
 
-	acry_alg = container_of(alg, struct aspeed_acry_alg, akcipher);
+	acry_alg = container_of(alg, struct aspeed_acry_alg, akcipher.base);
 
 	ctx->acry_dev = acry_alg->acry_dev;
 
@@ -588,10 +585,6 @@ static int aspeed_acry_rsa_init_tfm(struct crypto_akcipher *tfm)
 			name, PTR_ERR(ctx->fallback_tfm));
 		return PTR_ERR(ctx->fallback_tfm);
 	}
-
-	ctx->enginectx.op.do_one_request = aspeed_acry_do_request;
-	ctx->enginectx.op.prepare_request = NULL;
-	ctx->enginectx.op.unprepare_request = NULL;
 
 	return 0;
 }
@@ -605,7 +598,7 @@ static void aspeed_acry_rsa_exit_tfm(struct crypto_akcipher *tfm)
 
 static struct aspeed_acry_alg aspeed_acry_akcipher_algs[] = {
 	{
-		.akcipher = {
+		.akcipher.base = {
 			.encrypt = aspeed_acry_rsa_enc,
 			.decrypt = aspeed_acry_rsa_dec,
 			.sign = aspeed_acry_rsa_dec,
@@ -627,6 +620,9 @@ static struct aspeed_acry_alg aspeed_acry_akcipher_algs[] = {
 				.cra_ctxsize = sizeof(struct aspeed_acry_ctx),
 			},
 		},
+		.akcipher.op = {
+			.do_one_request = aspeed_acry_do_request,
+		},
 	},
 };
 
@@ -636,10 +632,10 @@ static void aspeed_acry_register(struct aspeed_acry_dev *acry_dev)
 
 	for (i = 0; i < ARRAY_SIZE(aspeed_acry_akcipher_algs); i++) {
 		aspeed_acry_akcipher_algs[i].acry_dev = acry_dev;
-		rc = crypto_register_akcipher(&aspeed_acry_akcipher_algs[i].akcipher);
+		rc = crypto_engine_register_akcipher(&aspeed_acry_akcipher_algs[i].akcipher);
 		if (rc) {
 			ACRY_DBG(acry_dev, "Failed to register %s\n",
-				 aspeed_acry_akcipher_algs[i].akcipher.base.cra_name);
+				 aspeed_acry_akcipher_algs[i].akcipher.base.base.cra_name);
 		}
 	}
 }
@@ -649,7 +645,7 @@ static void aspeed_acry_unregister(struct aspeed_acry_dev *acry_dev)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(aspeed_acry_akcipher_algs); i++)
-		crypto_unregister_akcipher(&aspeed_acry_akcipher_algs[i].akcipher);
+		crypto_engine_unregister_akcipher(&aspeed_acry_akcipher_algs[i].akcipher);
 }
 
 /* ACRY interrupt service routine. */
@@ -712,7 +708,6 @@ static int aspeed_acry_probe(struct platform_device *pdev)
 {
 	struct aspeed_acry_dev *acry_dev;
 	struct device *dev = &pdev->dev;
-	struct resource *res;
 	int rc;
 
 	acry_dev = devm_kzalloc(dev, sizeof(struct aspeed_acry_dev),
@@ -724,13 +719,11 @@ static int aspeed_acry_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, acry_dev);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	acry_dev->regs = devm_ioremap_resource(dev, res);
+	acry_dev->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(acry_dev->regs))
 		return PTR_ERR(acry_dev->regs);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	acry_dev->acry_sram = devm_ioremap_resource(dev, res);
+	acry_dev->acry_sram = devm_platform_ioremap_resource(pdev, 1);
 	if (IS_ERR(acry_dev->acry_sram))
 		return PTR_ERR(acry_dev->acry_sram);
 
@@ -782,7 +775,10 @@ static int aspeed_acry_probe(struct platform_device *pdev)
 	acry_dev->buf_addr = dmam_alloc_coherent(dev, ASPEED_ACRY_BUFF_SIZE,
 						 &acry_dev->buf_dma_addr,
 						 GFP_KERNEL);
-	memzero_explicit(acry_dev->buf_addr, ASPEED_ACRY_BUFF_SIZE);
+	if (!acry_dev->buf_addr) {
+		rc = -ENOMEM;
+		goto err_engine_rsa_start;
+	}
 
 	aspeed_acry_register(acry_dev);
 
@@ -798,7 +794,7 @@ clk_exit:
 	return rc;
 }
 
-static int aspeed_acry_remove(struct platform_device *pdev)
+static void aspeed_acry_remove(struct platform_device *pdev)
 {
 	struct aspeed_acry_dev *acry_dev = platform_get_drvdata(pdev);
 
@@ -806,15 +802,13 @@ static int aspeed_acry_remove(struct platform_device *pdev)
 	crypto_engine_exit(acry_dev->crypt_engine_rsa);
 	tasklet_kill(&acry_dev->done_task);
 	clk_disable_unprepare(acry_dev->clk);
-
-	return 0;
 }
 
 MODULE_DEVICE_TABLE(of, aspeed_acry_of_matches);
 
 static struct platform_driver aspeed_acry_driver = {
 	.probe		= aspeed_acry_probe,
-	.remove		= aspeed_acry_remove,
+	.remove_new	= aspeed_acry_remove,
 	.driver		= {
 		.name   = KBUILD_MODNAME,
 		.of_match_table = aspeed_acry_of_matches,

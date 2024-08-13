@@ -45,7 +45,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	unsigned int process_count, queue_count, compute_queue_count, gws_queue_count;
 	unsigned int map_queue_size;
 	unsigned int max_proc_per_quantum = 1;
-	struct kfd_dev *dev = pm->dqm->dev;
+	struct kfd_node *dev = pm->dqm->dev;
 
 	process_count = pm->dqm->processes_count;
 	queue_count = pm->dqm->active_queue_count;
@@ -238,7 +238,8 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm)
 		pm->pmf = &kfd_vi_pm_funcs;
 		break;
 	default:
-		if (KFD_GC_VERSION(dqm->dev) == IP_VERSION(9, 4, 2))
+		if (KFD_GC_VERSION(dqm->dev) == IP_VERSION(9, 4, 2) ||
+		    KFD_GC_VERSION(dqm->dev) == IP_VERSION(9, 4, 3))
 			pm->pmf = &kfd_aldebaran_pm_funcs;
 		else if (KFD_GC_VERSION(dqm->dev) >= IP_VERSION(9, 0, 1))
 			pm->pmf = &kfd_v9_pm_funcs;
@@ -287,7 +288,7 @@ int pm_send_set_resources(struct packet_manager *pm,
 
 	retval = pm->pmf->set_resources(pm, buffer, res);
 	if (!retval)
-		kq_submit_packet(pm->priv_queue);
+		retval = kq_submit_packet(pm->priv_queue);
 	else
 		kq_rollback_packet(pm->priv_queue);
 
@@ -324,7 +325,7 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 	if (retval)
 		goto fail_create_runlist;
 
-	kq_submit_packet(pm->priv_queue);
+	retval = kq_submit_packet(pm->priv_queue);
 
 	mutex_unlock(&pm->lock);
 
@@ -360,9 +361,41 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 
 	retval = pm->pmf->query_status(pm, buffer, fence_address, fence_value);
 	if (!retval)
-		kq_submit_packet(pm->priv_queue);
+		retval = kq_submit_packet(pm->priv_queue);
 	else
 		kq_rollback_packet(pm->priv_queue);
+
+out:
+	mutex_unlock(&pm->lock);
+	return retval;
+}
+
+int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period)
+{
+	int retval = 0;
+	uint32_t *buffer, size;
+
+	size = pm->pmf->set_grace_period_size;
+
+	mutex_lock(&pm->lock);
+
+	if (size) {
+		kq_acquire_packet_buffer(pm->priv_queue,
+			size / sizeof(uint32_t),
+			(unsigned int **)&buffer);
+
+		if (!buffer) {
+			pr_err("Failed to allocate buffer on kernel queue\n");
+			retval = -ENOMEM;
+			goto out;
+		}
+
+		retval = pm->pmf->set_grace_period(pm, buffer, grace_period);
+		if (!retval)
+			retval = kq_submit_packet(pm->priv_queue);
+		else
+			kq_rollback_packet(pm->priv_queue);
+	}
 
 out:
 	mutex_unlock(&pm->lock);
@@ -388,7 +421,7 @@ int pm_send_unmap_queue(struct packet_manager *pm,
 
 	retval = pm->pmf->unmap_queues(pm, buffer, filter, filter_param, reset);
 	if (!retval)
-		kq_submit_packet(pm->priv_queue);
+		retval = kq_submit_packet(pm->priv_queue);
 	else
 		kq_rollback_packet(pm->priv_queue);
 

@@ -174,6 +174,15 @@ config BATTERY_PMU
 	  Say Y here to expose battery information on Apple machines
 	  through the generic battery class.
 
+config BATTERY_QCOM_BATTMGR
+	tristate "Qualcomm PMIC GLINK battery manager support"
+	depends on QCOM_PMIC_GLINK
+	select AUXILIARY_BUS
+	help
+	  Say Y here to enable the Qualcomm PMIC GLINK power supply driver,
+	  which is used on modern Qualcomm platforms to provide battery and
+	  power supply information.
+
 config BATTERY_OLPC
 	tristate "One Laptop Per Child battery"
 	depends on OLPC_EC
@@ -365,7 +374,7 @@ config AXP288_FUEL_GAUGE
 
 config BATTERY_MAX17040
 	tristate "Maxim MAX17040/17041/17043 family Fuel Gauge"
-	depends on I2C
+	depends on I2C && IIO
 	select REGMAP_I2C
 	help
 	  Driver supports Maxim fuel-gauge systems for lithium-ion (Li+)
@@ -620,6 +629,29 @@ config CHARGER_QCOM_SMBB
 	  documentation for more detail.  The base name for this driver is
 	  'pm8941_charger'.
 
+config BATTERY_PM8916_BMS_VM
+	tristate "Qualcomm PM8916 BMS-VM support"
+	depends on MFD_SPMI_PMIC || COMPILE_TEST
+	help
+	  Say Y to add support for Voltage Mode BMS block found in some
+	  Qualcomm PMICs such as PM8916. This hardware block provides
+	  battery voltage monitoring for the system.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called pm8916_bms_vm.
+
+config CHARGER_PM8916_LBC
+	tristate "Qualcomm PM8916 Linear Battery Charger support"
+	depends on MFD_SPMI_PMIC || COMPILE_TEST
+	depends on EXTCON || !EXTCON
+	help
+	  Say Y here to add support for Linear Battery Charger block
+	  found in some Qualcomm PMICs such as PM8916. This hardware
+	  blokc provides simple CC/CV battery charger.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called pm8916_lbc.
+
 config CHARGER_BQ2415X
 	tristate "TI BQ2415x battery charger driver"
 	depends on I2C
@@ -697,7 +729,7 @@ config CHARGER_BQ256XX
 
 config CHARGER_RK817
 	tristate "Rockchip RK817 PMIC Battery Charger"
-	depends on MFD_RK808
+	depends on MFD_RK8XX
 	help
 	  Say Y to include support for Rockchip RK817 Battery Charger.
 
@@ -757,6 +789,15 @@ config BATTERY_RT5033
 	  The fuelgauge calculates and determines the battery state of charge
 	  according to battery open circuit voltage.
 
+config CHARGER_RT5033
+	tristate "RT5033 battery charger support"
+	depends on MFD_RT5033
+	depends on EXTCON || !EXTCON
+	help
+	  This adds support for battery charger in Richtek RT5033 PMIC.
+	  The device supports pre-charge mode, fast charge mode and
+	  constant voltage mode.
+
 config CHARGER_RT9455
 	tristate "Richtek RT9455 battery charger driver"
 	depends on I2C
@@ -764,6 +805,41 @@ config CHARGER_RT9455
 	select REGMAP_I2C
 	help
 	  Say Y to enable support for Richtek RT9455 battery charger.
+
+config CHARGER_RT9467
+	tristate "Richtek RT9467 Battery Charger Driver"
+	depends on I2C && GPIOLIB && REGULATOR
+	select REGMAP_I2C
+	select REGMAP_IRQ
+	select LINEAR_RANGES
+	help
+	  Say Y here to enable RT9467 Battery Charger.
+	  RT9467 is a switch-mode single cell Li-Ion/Li-Polymer battery charger
+	  for portable applications. It integrates a synchronous PWM controller,
+	  power MOSFETs, input current sensing and regulation, high-accuracy
+	  voltage regulation, and charge termination. The charge current is
+	  regulated through integrated sensing resistors. It also features
+	  USB On-The-Go (OTG) support and integrates D+/D- pin for USB
+	  host/charging port detection.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called "rt9467-charger".
+
+config CHARGER_RT9471
+	tristate "Richtek RT9471 battery charger driver"
+	depends on I2C && GPIOLIB && REGULATOR
+	select REGMAP_I2C
+	select REGMAP_IRQ
+	select LINEAR_RANGES
+	help
+	  This adds support for Richtek RT9471 battery charger. RT9471 is
+	  highly-integrated switch mode battery charger which is system power
+	  patch manageable device for single cell Li-Ion and Li-polymer battery.
+	  It can support BC12 detection on DPDM, and current and voltage
+	  regulation on both charging and boost mode.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called rt9471.
 
 config CHARGER_CROS_USBPD
 	tristate "ChromeOS EC based USBPD charger"
@@ -783,6 +859,18 @@ config CHARGER_CROS_PCHG
 	  This driver gets various information about the devices connected to
 	  the peripheral charge ports from the EC and converts that into
 	  power_supply properties.
+
+config CHARGER_CROS_CONTROL
+	tristate "ChromeOS EC based charge control"
+	depends on MFD_CROS_EC_DEV
+	depends on ACPI_BATTERY
+	default MFD_CROS_EC_DEV
+	help
+	  Say Y here to enable ChromeOS EC based battery charge control.
+	  This driver can manage charge thresholds and behaviour.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called cros_charge-control.
 
 config CHARGER_SC2731
 	tristate "Spreadtrum SC2731 charger driver"
@@ -889,5 +977,24 @@ config BATTERY_UG3105
 	  Since Linux does not monitor coulomb-counter changes while the
 	  device is off or suspended, the functionality of this driver is
 	  limited to reporting capacity only.
+
+config CHARGER_QCOM_SMB2
+	tristate "Qualcomm PMI8998 PMIC charger driver"
+	depends on MFD_SPMI_PMIC
+	depends on IIO
+	help
+	  Say Y here to enable the Qualcomm PMIC Charger driver. This
+	  adds support for the SMB2 switch mode battery charger found
+	  in PMI8998 and related PMICs.
+
+config FUEL_GAUGE_MM8013
+	tristate "Mitsumi MM8013 fuel gauge driver"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  Say Y here to enable the Mitsumi MM8013 fuel gauge driver.
+	  It enables the monitoring of many battery parameters, including
+	  the state of charge, temperature, cycle count, actual and design
+	  capacity, etc.
 
 endif # POWER_SUPPLY

@@ -7,6 +7,8 @@
  */
 #ifndef _CRYPTO_AKCIPHER_H
 #define _CRYPTO_AKCIPHER_H
+
+#include <linux/atomic.h>
 #include <linux/crypto.h>
 
 /**
@@ -288,15 +290,8 @@ static inline unsigned int crypto_akcipher_maxsize(struct crypto_akcipher *tfm)
 static inline int crypto_akcipher_encrypt(struct akcipher_request *req)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
-	struct crypto_alg *calg = tfm->base.__crt_alg;
-	unsigned int src_len = req->src_len;
-	int ret;
 
-	crypto_stats_get(calg);
-	ret = alg->encrypt(req);
-	crypto_stats_akcipher_encrypt(src_len, ret, calg);
-	return ret;
+	return crypto_akcipher_alg(tfm)->encrypt(req);
 }
 
 /**
@@ -312,16 +307,45 @@ static inline int crypto_akcipher_encrypt(struct akcipher_request *req)
 static inline int crypto_akcipher_decrypt(struct akcipher_request *req)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
-	struct crypto_alg *calg = tfm->base.__crt_alg;
-	unsigned int src_len = req->src_len;
-	int ret;
 
-	crypto_stats_get(calg);
-	ret = alg->decrypt(req);
-	crypto_stats_akcipher_decrypt(src_len, ret, calg);
-	return ret;
+	return crypto_akcipher_alg(tfm)->decrypt(req);
 }
+
+/**
+ * crypto_akcipher_sync_encrypt() - Invoke public key encrypt operation
+ *
+ * Function invokes the specific public key encrypt operation for a given
+ * public key algorithm
+ *
+ * @tfm:	AKCIPHER tfm handle allocated with crypto_alloc_akcipher()
+ * @src:	source buffer
+ * @slen:	source length
+ * @dst:	destination obuffer
+ * @dlen:	destination length
+ *
+ * Return: zero on success; error code in case of error
+ */
+int crypto_akcipher_sync_encrypt(struct crypto_akcipher *tfm,
+				 const void *src, unsigned int slen,
+				 void *dst, unsigned int dlen);
+
+/**
+ * crypto_akcipher_sync_decrypt() - Invoke public key decrypt operation
+ *
+ * Function invokes the specific public key decrypt operation for a given
+ * public key algorithm
+ *
+ * @tfm:	AKCIPHER tfm handle allocated with crypto_alloc_akcipher()
+ * @src:	source buffer
+ * @slen:	source length
+ * @dst:	destination obuffer
+ * @dlen:	destination length
+ *
+ * Return: Output length on success; error code in case of error
+ */
+int crypto_akcipher_sync_decrypt(struct crypto_akcipher *tfm,
+				 const void *src, unsigned int slen,
+				 void *dst, unsigned int dlen);
 
 /**
  * crypto_akcipher_sign() - Invoke public key sign operation
@@ -336,14 +360,8 @@ static inline int crypto_akcipher_decrypt(struct akcipher_request *req)
 static inline int crypto_akcipher_sign(struct akcipher_request *req)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
-	struct crypto_alg *calg = tfm->base.__crt_alg;
-	int ret;
 
-	crypto_stats_get(calg);
-	ret = alg->sign(req);
-	crypto_stats_akcipher_sign(ret, calg);
-	return ret;
+	return crypto_akcipher_alg(tfm)->sign(req);
 }
 
 /**
@@ -363,14 +381,8 @@ static inline int crypto_akcipher_sign(struct akcipher_request *req)
 static inline int crypto_akcipher_verify(struct akcipher_request *req)
 {
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
-	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
-	struct crypto_alg *calg = tfm->base.__crt_alg;
-	int ret;
 
-	crypto_stats_get(calg);
-	ret = alg->verify(req);
-	crypto_stats_akcipher_verify(ret, calg);
-	return ret;
+	return crypto_akcipher_alg(tfm)->verify(req);
 }
 
 /**

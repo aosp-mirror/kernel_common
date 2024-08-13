@@ -101,7 +101,7 @@ void brcmf_c_set_joinpref_default(struct brcmf_if *ifp)
 
 static int brcmf_c_download(struct brcmf_if *ifp, u16 flag,
 			    struct brcmf_dload_data_le *dload_buf,
-			    u32 len)
+			    u32 len, const char *var)
 {
 	s32 err;
 
@@ -111,18 +111,18 @@ static int brcmf_c_download(struct brcmf_if *ifp, u16 flag,
 	dload_buf->len = cpu_to_le32(len);
 	dload_buf->crc = cpu_to_le32(0);
 
-	err = brcmf_fil_iovar_data_set(ifp, "clmload", dload_buf,
+	err = brcmf_fil_iovar_data_set(ifp, var, dload_buf,
 				       struct_size(dload_buf, data, len));
 
 	return err;
 }
 
-static int brcmf_c_process_clm_blob(struct brcmf_if *ifp)
+static int brcmf_c_download_blob(struct brcmf_if *ifp,
+				 const void *data, size_t size,
+				 const char *loadvar, const char *statvar)
 {
 	struct brcmf_pub *drvr = ifp->drvr;
-	struct brcmf_bus *bus = drvr->bus_if;
 	struct brcmf_dload_data_le *chunk_buf;
-	const struct firmware *clm = NULL;
 	u32 chunk_len;
 	u32 datalen;
 	u32 cumulative_len;
@@ -132,21 +132,14 @@ static int brcmf_c_process_clm_blob(struct brcmf_if *ifp)
 
 	brcmf_dbg(TRACE, "Enter\n");
 
-	err = brcmf_bus_get_blob(bus, &clm, BRCMF_BLOB_CLM);
-	if (err || !clm) {
-		brcmf_info("no clm_blob available (err=%d), device may have limited channels available\n",
-			   err);
-		return 0;
-	}
-
 	chunk_buf = kzalloc(struct_size(chunk_buf, data, MAX_CHUNK_LEN),
 			    GFP_KERNEL);
 	if (!chunk_buf) {
 		err = -ENOMEM;
-		goto done;
+		return -ENOMEM;
 	}
 
-	datalen = clm->size;
+	datalen = size;
 	cumulative_len = 0;
 	do {
 		if (datalen > MAX_CHUNK_LEN) {
@@ -155,9 +148,10 @@ static int brcmf_c_process_clm_blob(struct brcmf_if *ifp)
 			chunk_len = datalen;
 			dl_flag |= DL_END;
 		}
-		memcpy(chunk_buf->data, clm->data + cumulative_len, chunk_len);
+		memcpy(chunk_buf->data, data + cumulative_len, chunk_len);
 
-		err = brcmf_c_download(ifp, dl_flag, chunk_buf, chunk_len);
+		err = brcmf_c_download(ifp, dl_flag, chunk_buf, chunk_len,
+				       loadvar);
 
 		dl_flag &= ~DL_BEGIN;
 
@@ -166,20 +160,64 @@ static int brcmf_c_process_clm_blob(struct brcmf_if *ifp)
 	} while ((datalen > 0) && (err == 0));
 
 	if (err) {
-		bphy_err(drvr, "clmload (%zu byte file) failed (%d)\n",
-			 clm->size, err);
-		/* Retrieve clmload_status and print */
-		err = brcmf_fil_iovar_int_get(ifp, "clmload_status", &status);
+		bphy_err(drvr, "%s (%zu byte file) failed (%d)\n",
+			 loadvar, size, err);
+		/* Retrieve status and print */
+		err = brcmf_fil_iovar_int_get(ifp, statvar, &status);
 		if (err)
-			bphy_err(drvr, "get clmload_status failed (%d)\n", err);
+			bphy_err(drvr, "get %s failed (%d)\n", statvar, err);
 		else
-			brcmf_dbg(INFO, "clmload_status=%d\n", status);
+			brcmf_dbg(INFO, "%s=%d\n", statvar, status);
 		err = -EIO;
 	}
 
 	kfree(chunk_buf);
-done:
-	release_firmware(clm);
+	return err;
+}
+
+static int brcmf_c_process_clm_blob(struct brcmf_if *ifp)
+{
+	struct brcmf_pub *drvr = ifp->drvr;
+	struct brcmf_bus *bus = drvr->bus_if;
+	const struct firmware *fw = NULL;
+	s32 err;
+
+	brcmf_dbg(TRACE, "Enter\n");
+
+	err = brcmf_bus_get_blob(bus, &fw, BRCMF_BLOB_CLM);
+	if (err || !fw) {
+		brcmf_info("no clm_blob available (err=%d), device may have limited channels available\n",
+			   err);
+		return 0;
+	}
+
+	err = brcmf_c_download_blob(ifp, fw->data, fw->size,
+				    "clmload", "clmload_status");
+
+	release_firmware(fw);
+	return err;
+}
+
+static int brcmf_c_process_txcap_blob(struct brcmf_if *ifp)
+{
+	struct brcmf_pub *drvr = ifp->drvr;
+	struct brcmf_bus *bus = drvr->bus_if;
+	const struct firmware *fw = NULL;
+	s32 err;
+
+	brcmf_dbg(TRACE, "Enter\n");
+
+	err = brcmf_bus_get_blob(bus, &fw, BRCMF_BLOB_TXCAP);
+	if (err || !fw) {
+		brcmf_info("no txcap_blob available (err=%d)\n", err);
+		return 0;
+	}
+
+	brcmf_info("TxCap blob found, loading\n");
+	err = brcmf_c_download_blob(ifp, fw->data, fw->size,
+				    "txcapload", "txcapload_status");
+
+	release_firmware(fw);
 	return err;
 }
 
@@ -208,10 +246,27 @@ static const u8 brcmf_default_mac_address[ETH_ALEN] = {
 	0x00, 0x90, 0x4c, 0xc5, 0x12, 0x38
 };
 
+static int brcmf_c_process_cal_blob(struct brcmf_if *ifp)
+{
+	struct brcmf_pub *drvr = ifp->drvr;
+	struct brcmf_mp_device *settings = drvr->settings;
+	s32 err;
+
+	brcmf_dbg(TRACE, "Enter\n");
+
+	if (!settings->cal_blob || !settings->cal_size)
+		return 0;
+
+	brcmf_info("Calibration blob provided by platform, loading\n");
+	err = brcmf_c_download_blob(ifp, settings->cal_blob, settings->cal_size,
+				    "calload", "calload_status");
+	return err;
+}
+
 int brcmf_c_preinit_dcmds(struct brcmf_if *ifp)
 {
 	struct brcmf_pub *drvr = ifp->drvr;
-	s8 eventmask[BRCMF_EVENTING_MASK_LEN];
+	struct brcmf_fweh_info *fweh = drvr->fweh;
 	u8 buf[BRCMF_DCMD_SMLEN];
 	struct brcmf_bus *bus;
 	struct brcmf_rev_info_le revinfo;
@@ -291,6 +346,20 @@ int brcmf_c_preinit_dcmds(struct brcmf_if *ifp)
 		goto done;
 	}
 
+	/* Do TxCap downloading, if needed */
+	err = brcmf_c_process_txcap_blob(ifp);
+	if (err < 0) {
+		bphy_err(drvr, "download TxCap blob file failed, %d\n", err);
+		goto done;
+	}
+
+	/* Download external calibration blob, if available */
+	err = brcmf_c_process_cal_blob(ifp);
+	if (err < 0) {
+		bphy_err(drvr, "download calibration blob file failed, %d\n", err);
+		goto done;
+	}
+
 	/* query for 'ver' to get version info from firmware */
 	memset(buf, 0, sizeof(buf));
 	err = brcmf_fil_iovar_data_get(ifp, "ver", buf, sizeof(buf));
@@ -344,15 +413,21 @@ int brcmf_c_preinit_dcmds(struct brcmf_if *ifp)
 	brcmf_c_set_joinpref_default(ifp);
 
 	/* Setup event_msgs, enable E_IF */
-	err = brcmf_fil_iovar_data_get(ifp, "event_msgs", eventmask,
-				       BRCMF_EVENTING_MASK_LEN);
+	err = brcmf_fil_iovar_data_get(ifp, "event_msgs", fweh->event_mask,
+				       fweh->event_mask_len);
 	if (err) {
 		bphy_err(drvr, "Get event_msgs error (%d)\n", err);
 		goto done;
 	}
-	setbit(eventmask, BRCMF_E_IF);
-	err = brcmf_fil_iovar_data_set(ifp, "event_msgs", eventmask,
-				       BRCMF_EVENTING_MASK_LEN);
+	/*
+	 * BRCMF_E_IF can safely be used to set the appropriate bit
+	 * in the event_mask as the firmware event code is guaranteed
+	 * to match the value of BRCMF_E_IF because it is old cruft
+	 * that all vendors have.
+	 */
+	setbit(fweh->event_mask, BRCMF_E_IF);
+	err = brcmf_fil_iovar_data_set(ifp, "event_msgs", fweh->event_mask,
+				       fweh->event_mask_len);
 	if (err) {
 		bphy_err(drvr, "Set event_msgs error (%d)\n", err);
 		goto done;
@@ -487,6 +562,7 @@ struct brcmf_mp_device *brcmf_get_module_param(struct device *dev,
 		/* No platform data for this device, try OF and DMI data */
 		brcmf_dmi_probe(settings, chip, chiprev);
 		brcmf_of_probe(dev, bus_type, settings);
+		brcmf_acpi_probe(dev, bus_type, settings);
 	}
 	return settings;
 }
@@ -508,18 +584,16 @@ static int __init brcmf_common_pd_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int brcmf_common_pd_remove(struct platform_device *pdev)
+static void brcmf_common_pd_remove(struct platform_device *pdev)
 {
 	brcmf_dbg(INFO, "Enter\n");
 
 	if (brcmfmac_pdata->power_off)
 		brcmfmac_pdata->power_off();
-
-	return 0;
 }
 
 static struct platform_driver brcmf_pd = {
-	.remove		= brcmf_common_pd_remove,
+	.remove_new	= brcmf_common_pd_remove,
 	.driver		= {
 		.name	= BRCMFMAC_PDATA_NAME,
 	}

@@ -12,7 +12,7 @@ static const char * const nvme_ops[] = {
 	[nvme_cmd_read] = "Read",
 	[nvme_cmd_write_uncor] = "Write Uncorrectable",
 	[nvme_cmd_compare] = "Compare",
-	[nvme_cmd_write_zeroes] = "Write Zeros",
+	[nvme_cmd_write_zeroes] = "Write Zeroes",
 	[nvme_cmd_dsm] = "Dataset Management",
 	[nvme_cmd_verify] = "Verify",
 	[nvme_cmd_resv_register] = "Reservation Register",
@@ -21,7 +21,7 @@ static const char * const nvme_ops[] = {
 	[nvme_cmd_resv_release] = "Reservation Release",
 	[nvme_cmd_zone_mgmt_send] = "Zone Management Send",
 	[nvme_cmd_zone_mgmt_recv] = "Zone Management Receive",
-	[nvme_cmd_zone_append] = "Zone Management Append",
+	[nvme_cmd_zone_append] = "Zone Append",
 };
 
 static const char * const nvme_admin_ops[] = {
@@ -171,15 +171,15 @@ static const char * const nvme_statuses[] = {
 	[NVME_SC_HOST_ABORTED_CMD] = "Host Aborted Command",
 };
 
-const unsigned char *nvme_get_error_status_str(u16 status)
+const char *nvme_get_error_status_str(u16 status)
 {
-	status &= 0x7ff;
+	status &= NVME_SCT_SC_MASK;
 	if (status < ARRAY_SIZE(nvme_statuses) && nvme_statuses[status])
-		return nvme_statuses[status & 0x7ff];
+		return nvme_statuses[status];
 	return "Unknown";
 }
 
-const unsigned char *nvme_get_opcode_str(u8 opcode)
+const char *nvme_get_opcode_str(u8 opcode)
 {
 	if (opcode < ARRAY_SIZE(nvme_ops) && nvme_ops[opcode])
 		return nvme_ops[opcode];
@@ -187,7 +187,7 @@ const unsigned char *nvme_get_opcode_str(u8 opcode)
 }
 EXPORT_SYMBOL_GPL(nvme_get_opcode_str);
 
-const unsigned char *nvme_get_admin_opcode_str(u8 opcode)
+const char *nvme_get_admin_opcode_str(u8 opcode)
 {
 	if (opcode < ARRAY_SIZE(nvme_admin_ops) && nvme_admin_ops[opcode])
 		return nvme_admin_ops[opcode];
@@ -195,7 +195,7 @@ const unsigned char *nvme_get_admin_opcode_str(u8 opcode)
 }
 EXPORT_SYMBOL_GPL(nvme_get_admin_opcode_str);
 
-const unsigned char *nvme_get_fabrics_opcode_str(u8 opcode) {
+const char *nvme_get_fabrics_opcode_str(u8 opcode) {
 	if (opcode < ARRAY_SIZE(nvme_fabrics_ops) && nvme_fabrics_ops[opcode])
 		return nvme_fabrics_ops[opcode];
 	return "Unknown";

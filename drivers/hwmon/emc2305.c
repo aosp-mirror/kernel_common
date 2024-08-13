@@ -12,9 +12,6 @@
 #include <linux/platform_data/emc2305.h>
 #include <linux/thermal.h>
 
-static const unsigned short
-emc2305_normal_i2c[] = { 0x27, 0x2c, 0x2d, 0x2e, 0x2f, 0x4c, 0x4d, I2C_CLIENT_END };
-
 #define EMC2305_REG_DRIVE_FAIL_STATUS	0x27
 #define EMC2305_REG_VENDOR		0xfe
 #define EMC2305_FAN_MAX			0xff
@@ -50,19 +47,20 @@ enum emc230x_product_id {
 };
 
 static const struct i2c_device_id emc2305_ids[] = {
-	{ "emc2305", 0 },
-	{ "emc2303", 0 },
-	{ "emc2302", 0 },
-	{ "emc2301", 0 },
+	{ "emc2305" },
+	{ "emc2303" },
+	{ "emc2302" },
+	{ "emc2301" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, emc2305_ids);
 
 /**
- * @cdev: cooling device;
- * @curr_state: cooling current state;
- * @last_hwmon_state: last cooling state updated by hwmon subsystem;
- * @last_thermal_state: last cooling state updated by thermal subsystem;
+ * struct emc2305_cdev_data - device-specific cooling device state
+ * @cdev: cooling device
+ * @cur_state: cooling current state
+ * @last_hwmon_state: last cooling state updated by hwmon subsystem
+ * @last_thermal_state: last cooling state updated by thermal subsystem
  *
  * The 'last_hwmon_state' and 'last_thermal_state' fields are provided to support fan low limit
  * speed feature. The purpose of this feature is to provides ability to limit fan speed
@@ -86,13 +84,14 @@ struct emc2305_cdev_data {
 };
 
 /**
- * @client: i2c client;
- * @hwmon_dev: hwmon device;
- * @max_state: maximum cooling state of the cooling device;
- * @pwm_num: number of PWM channels;
- * @pwm_separate: separate PWM settings for every channel;
- * @pwm_min: array of minimum PWM per channel;
- * @cdev_data: array of cooling devices data;
+ * struct emc2305_data - device-specific data
+ * @client: i2c client
+ * @hwmon_dev: hwmon device
+ * @max_state: maximum cooling state of the cooling device
+ * @pwm_num: number of PWM channels
+ * @pwm_separate: separate PWM settings for every channel
+ * @pwm_min: array of minimum PWM per channel
+ * @cdev_data: array of cooling devices data
  */
 struct emc2305_data {
 	struct i2c_client *client;
@@ -477,7 +476,7 @@ static const struct hwmon_ops emc2305_ops = {
 	.write = emc2305_write,
 };
 
-static const struct hwmon_channel_info *emc2305_info[] = {
+static const struct hwmon_channel_info * const emc2305_info[] = {
 	HWMON_CHANNEL_INFO(fan,
 			   HWMON_F_INPUT | HWMON_F_FAULT,
 			   HWMON_F_INPUT | HWMON_F_FAULT,
@@ -609,14 +608,12 @@ static void emc2305_remove(struct i2c_client *client)
 }
 
 static struct i2c_driver emc2305_driver = {
-	.class  = I2C_CLASS_HWMON,
 	.driver = {
 		.name = "emc2305",
 	},
-	.probe_new = emc2305_probe,
+	.probe = emc2305_probe,
 	.remove	  = emc2305_remove,
 	.id_table = emc2305_ids,
-	.address_list = emc2305_normal_i2c,
 };
 
 module_i2c_driver(emc2305_driver);

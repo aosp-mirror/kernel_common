@@ -165,7 +165,7 @@ static bool lm83_regmap_is_volatile(struct device *dev, unsigned int reg)
 static const struct regmap_config lm83_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 	.volatile_reg = lm83_regmap_is_volatile,
 	.reg_read = lm83_regmap_reg_read,
 	.reg_write = lm83_regmap_reg_write,
@@ -337,7 +337,7 @@ static umode_t lm83_is_visible(const void *_data, enum hwmon_sensor_types type,
 	return 0;
 }
 
-static const struct hwmon_channel_info *lm83_info[] = {
+static const struct hwmon_channel_info * const lm83_info[] = {
 	HWMON_CHANNEL_INFO(chip, HWMON_C_ALARMS),
 	HWMON_CHANNEL_INFO(temp,
 			   HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
@@ -417,13 +417,6 @@ static int lm83_detect(struct i2c_client *client,
 	return 0;
 }
 
-static const struct i2c_device_id lm83_id[] = {
-	{ "lm83", lm83 },
-	{ "lm82", lm82 },
-	{ }
-};
-MODULE_DEVICE_TABLE(i2c, lm83_id);
-
 static int lm83_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
@@ -438,7 +431,7 @@ static int lm83_probe(struct i2c_client *client)
 	if (IS_ERR(data->regmap))
 		return PTR_ERR(data->regmap);
 
-	data->type = i2c_match_id(lm83_id, client)->driver_data;
+	data->type = (uintptr_t)i2c_get_match_data(client);
 
 	hwmon_dev = devm_hwmon_device_register_with_info(dev, client->name,
 							 data, &lm83_chip_info, NULL);
@@ -449,12 +442,19 @@ static int lm83_probe(struct i2c_client *client)
  * Driver data (common to all clients)
  */
 
+static const struct i2c_device_id lm83_id[] = {
+	{ "lm83", lm83 },
+	{ "lm82", lm82 },
+	{ }
+};
+MODULE_DEVICE_TABLE(i2c, lm83_id);
+
 static struct i2c_driver lm83_driver = {
 	.class		= I2C_CLASS_HWMON,
 	.driver = {
 		.name	= "lm83",
 	},
-	.probe_new	= lm83_probe,
+	.probe		= lm83_probe,
 	.id_table	= lm83_id,
 	.detect		= lm83_detect,
 	.address_list	= normal_i2c,

@@ -4,6 +4,35 @@
 #
 comment "USB Miscellaneous drivers"
 
+config USB_USS720
+	tristate "USS720 parport driver"
+	depends on PARPORT
+	select PARPORT_NOT_PC
+	help
+	  This driver is for USB parallel port adapters that use the Lucent
+	  Technologies USS-720 chip. These cables are plugged into your USB
+	  port and provide USB compatibility to peripherals designed with
+	  parallel port interfaces.
+
+	  The chip has two modes: automatic mode and manual mode. In automatic
+	  mode, it looks to the computer like a standard USB printer. Only
+	  printers may be connected to the USS-720 in this mode. The generic
+	  USB printer driver ("USB Printer support", above) may be used in
+	  that mode, and you can say N here if you want to use the chip only
+	  in this mode.
+
+	  Manual mode is not limited to printers, any parallel port
+	  device should work. This driver utilizes manual mode.
+	  Note however that some operations are three orders of magnitude
+	  slower than on a PCI/ISA Parallel Port, so timing critical
+	  applications might not work.
+
+	  Say Y here if you own an USS-720 USB->Parport cable and intend to
+	  connect anything other than a printer to it.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called uss720.
+
 config USB_EMI62
 	tristate "EMI 6|2m USB Audio interface support"
 	help
@@ -108,28 +137,6 @@ config USB_IDMOUSE
 
 	  See also <https://www.fs.tum.de/~echtler/idmouse/>.
 
-config USB_FTDI_ELAN
-	tristate "Elan PCMCIA CardBus Adapter USB Client"
-	help
-	  ELAN's Uxxx series of adapters are USB to PCMCIA CardBus adapters.
-	  Currently only the U132 adapter is available.
-
-	  The U132 is specifically designed for CardBus PC cards that contain
-	  an OHCI host controller. Typical PC cards are the Orange Mobile 3G
-	  Option GlobeTrotter Fusion card. The U132 adapter will *NOT* work
-	  with PC cards that do not contain an OHCI controller. To use a U132
-	  adapter you will need this "ftdi-elan" module as well as the "u132-hcd"
-	  module which is a USB host controller driver that talks to the OHCI
-	  controller within CardBus card that are inserted in the U132 adapter.
-
-	  This driver has been tested with a CardBus OHCI USB adapter, and
-	  worked with a USB PEN Drive inserted into the first USB port of
-	  the PCCARD. A rather pointless thing to do, but useful for testing.
-
-	  See also the USB_U132_HCD entry "Elan U132 Adapter Host Controller"
-
-	  It is safe to say M here.
-
 config USB_APPLEDISPLAY
 	tristate "Apple Cinema Display support"
 	select BACKLIGHT_CLASS_DEVICE
@@ -157,6 +164,19 @@ config APPLE_MFI_FASTCHARGE
 	  chargers.
 
 	  It is safe to say M here.
+
+config USB_LJCA
+	tristate "Intel La Jolla Cove Adapter support"
+	select AUXILIARY_BUS
+	depends on USB && ACPI
+	help
+	  This adds support for Intel La Jolla Cove USB-I2C/SPI/GPIO
+	  Master Adapter (LJCA). Additional drivers such as I2C_LJCA,
+	  GPIO_LJCA and SPI_LJCA must be enabled in order to use the
+	  functionality of the device.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called usb-ljca.
 
 source "drivers/usb/misc/sisusbvga/Kconfig"
 
@@ -296,18 +316,18 @@ config BRCM_USB_PINMAP
 	  signals, which are typically on dedicated pins on the chip,
 	  to any gpio.
 
-config USB_ONBOARD_HUB
-	tristate "Onboard USB hub support"
+config USB_ONBOARD_DEV
+	tristate "Onboard USB device support"
 	depends on OF
 	help
-	  Say Y here if you want to support discrete onboard USB hubs that
-	  don't require an additional control bus for initialization, but
-	  need some non-trivial form of initialization, such as enabling a
-	  power regulator. An example for such a hub is the Realtek
-	  RTS5411.
+	  Say Y here if you want to support discrete onboard USB devices
+	  that don't require an additional control bus for initialization,
+	  but need some non-trivial form of initialization, such as
+	  enabling a power regulator. An example for such device is the
+	  Realtek RTS5411 hub.
 
 	  This driver can be used as a module but its state (module vs
 	  builtin) must match the state of the USB subsystem. Enabling
 	  this config will enable the driver and it will automatically
 	  match the state of the USB subsystem. If this driver is a
-	  module it will be called onboard_usb_hub.
+	  module it will be called onboard_usb_dev.

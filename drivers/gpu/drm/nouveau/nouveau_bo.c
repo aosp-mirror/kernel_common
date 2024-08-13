@@ -28,6 +28,7 @@
  */
 
 #include <linux/dma-mapping.h>
+#include <drm/ttm/ttm_tt.h>
 
 #include "nouveau_drv.h"
 #include "nouveau_chan.h"
@@ -147,10 +148,17 @@ nouveau_bo_del_ttm(struct ttm_buffer_object *bo)
 	 * If nouveau_bo_new() allocated this buffer, the GEM object was never
 	 * initialized, so don't attempt to release it.
 	 */
-	if (bo->base.dev)
+	if (bo->base.dev) {
+		/* Gem objects not being shared with other VMs get their
+		 * dma_resv from a root GEM object.
+		 */
+		if (nvbo->no_share)
+			drm_gem_object_put(nvbo->r_obj);
+
 		drm_gem_object_release(&bo->base);
-	else
+	} else {
 		dma_resv_fini(&bo->base._resv);
+	}
 
 	kfree(nvbo);
 }
@@ -198,12 +206,12 @@ nouveau_bo_fixup_align(struct nouveau_bo *nvbo, int *align, u64 *size)
 
 struct nouveau_bo *
 nouveau_bo_alloc(struct nouveau_cli *cli, u64 *size, int *align, u32 domain,
-		 u32 tile_mode, u32 tile_flags)
+		 u32 tile_mode, u32 tile_flags, bool internal)
 {
 	struct nouveau_drm *drm = cli->drm;
 	struct nouveau_bo *nvbo;
 	struct nvif_mmu *mmu = &cli->mmu;
-	struct nvif_vmm *vmm = cli->svm.cli ? &cli->svm.vmm : &cli->vmm.vmm;
+	struct nvif_vmm *vmm = &nouveau_cli_vmm(cli)->vmm;
 	int i, pi = -1;
 
 	if (!*size) {
@@ -214,6 +222,7 @@ nouveau_bo_alloc(struct nouveau_cli *cli, u64 *size, int *align, u32 domain,
 	nvbo = kzalloc(sizeof(struct nouveau_bo), GFP_KERNEL);
 	if (!nvbo)
 		return ERR_PTR(-ENOMEM);
+
 	INIT_LIST_HEAD(&nvbo->head);
 	INIT_LIST_HEAD(&nvbo->entry);
 	INIT_LIST_HEAD(&nvbo->vma_list);
@@ -231,6 +240,8 @@ nouveau_bo_alloc(struct nouveau_cli *cli, u64 *size, int *align, u32 domain,
 			nvbo->force_coherent = true;
 	}
 
+	nvbo->contig = !(tile_flags & NOUVEAU_GEM_TILE_NONCONTIG);
+
 	if (cli->device.info.family >= NV_DEVICE_INFO_V0_FERMI) {
 		nvbo->kind = (tile_flags & 0x0000ff00) >> 8;
 		if (!nvif_mmu_kind_valid(mmu, nvbo->kind)) {
@@ -239,8 +250,7 @@ nouveau_bo_alloc(struct nouveau_cli *cli, u64 *size, int *align, u32 domain,
 		}
 
 		nvbo->comp = mmu->kind[nvbo->kind] != nvbo->kind;
-	} else
-	if (cli->device.info.family >= NV_DEVICE_INFO_V0_TESLA) {
+	} else if (cli->device.info.family >= NV_DEVICE_INFO_V0_TESLA) {
 		nvbo->kind = (tile_flags & 0x00007f00) >> 8;
 		nvbo->comp = (tile_flags & 0x00030000) >> 16;
 		if (!nvif_mmu_kind_valid(mmu, nvbo->kind)) {
@@ -251,48 +261,77 @@ nouveau_bo_alloc(struct nouveau_cli *cli, u64 *size, int *align, u32 domain,
 		nvbo->zeta = (tile_flags & 0x00000007);
 	}
 	nvbo->mode = tile_mode;
-	nvbo->contig = !(tile_flags & NOUVEAU_GEM_TILE_NONCONTIG);
 
-	/* Determine the desirable target GPU page size for the buffer. */
-	for (i = 0; i < vmm->page_nr; i++) {
-		/* Because we cannot currently allow VMM maps to fail
-		 * during buffer migration, we need to determine page
-		 * size for the buffer up-front, and pre-allocate its
-		 * page tables.
-		 *
-		 * Skip page sizes that can't support needed domains.
-		 */
-		if (cli->device.info.family > NV_DEVICE_INFO_V0_CURIE &&
-		    (domain & NOUVEAU_GEM_DOMAIN_VRAM) && !vmm->page[i].vram)
-			continue;
-		if ((domain & NOUVEAU_GEM_DOMAIN_GART) &&
-		    (!vmm->page[i].host || vmm->page[i].shift > PAGE_SHIFT))
-			continue;
+	if (!nouveau_cli_uvmm(cli) || internal) {
+		/* Determine the desirable target GPU page size for the buffer. */
+		for (i = 0; i < vmm->page_nr; i++) {
+			/* Because we cannot currently allow VMM maps to fail
+			 * during buffer migration, we need to determine page
+			 * size for the buffer up-front, and pre-allocate its
+			 * page tables.
+			 *
+			 * Skip page sizes that can't support needed domains.
+			 */
+			if (cli->device.info.family > NV_DEVICE_INFO_V0_CURIE &&
+			    (domain & NOUVEAU_GEM_DOMAIN_VRAM) && !vmm->page[i].vram)
+				continue;
+			if ((domain & NOUVEAU_GEM_DOMAIN_GART) &&
+			    (!vmm->page[i].host || vmm->page[i].shift > PAGE_SHIFT))
+				continue;
 
-		/* Select this page size if it's the first that supports
-		 * the potential memory domains, or when it's compatible
-		 * with the requested compression settings.
-		 */
-		if (pi < 0 || !nvbo->comp || vmm->page[i].comp)
+			/* Select this page size if it's the first that supports
+			 * the potential memory domains, or when it's compatible
+			 * with the requested compression settings.
+			 */
+			if (pi < 0 || !nvbo->comp || vmm->page[i].comp)
+				pi = i;
+
+			/* Stop once the buffer is larger than the current page size. */
+			if (*size >= 1ULL << vmm->page[i].shift)
+				break;
+		}
+
+		if (WARN_ON(pi < 0)) {
+			kfree(nvbo);
+			return ERR_PTR(-EINVAL);
+		}
+
+		/* Disable compression if suitable settings couldn't be found. */
+		if (nvbo->comp && !vmm->page[pi].comp) {
+			if (mmu->object.oclass >= NVIF_CLASS_MMU_GF100)
+				nvbo->kind = mmu->kind[nvbo->kind];
+			nvbo->comp = 0;
+		}
+		nvbo->page = vmm->page[pi].shift;
+	} else {
+		/* Determine the desirable target GPU page size for the buffer. */
+		for (i = 0; i < vmm->page_nr; i++) {
+			/* Because we cannot currently allow VMM maps to fail
+			 * during buffer migration, we need to determine page
+			 * size for the buffer up-front, and pre-allocate its
+			 * page tables.
+			 *
+			 * Skip page sizes that can't support needed domains.
+			 */
+			if ((domain & NOUVEAU_GEM_DOMAIN_VRAM) && !vmm->page[i].vram)
+				continue;
+			if ((domain & NOUVEAU_GEM_DOMAIN_GART) &&
+			    (!vmm->page[i].host || vmm->page[i].shift > PAGE_SHIFT))
+				continue;
+
+			/* pick the last one as it will be smallest. */
 			pi = i;
 
-		/* Stop once the buffer is larger than the current page size. */
-		if (*size >= 1ULL << vmm->page[i].shift)
-			break;
+			/* Stop once the buffer is larger than the current page size. */
+			if (*size >= 1ULL << vmm->page[i].shift)
+				break;
+		}
+		if (WARN_ON(pi < 0)) {
+			kfree(nvbo);
+			return ERR_PTR(-EINVAL);
+		}
+		nvbo->page = vmm->page[pi].shift;
 	}
-
-	if (WARN_ON(pi < 0)) {
-		kfree(nvbo);
-		return ERR_PTR(-EINVAL);
-	}
-
-	/* Disable compression if suitable settings couldn't be found. */
-	if (nvbo->comp && !vmm->page[pi].comp) {
-		if (mmu->object.oclass >= NVIF_CLASS_MMU_GF100)
-			nvbo->kind = mmu->kind[nvbo->kind];
-		nvbo->comp = 0;
-	}
-	nvbo->page = vmm->page[pi].shift;
 
 	nouveau_bo_fixup_align(nvbo, align, size);
 
@@ -305,17 +344,25 @@ nouveau_bo_init(struct nouveau_bo *nvbo, u64 size, int align, u32 domain,
 {
 	int type = sg ? ttm_bo_type_sg : ttm_bo_type_device;
 	int ret;
+	struct ttm_operation_ctx ctx = {
+		.interruptible = false,
+		.no_wait_gpu = false,
+		.resv = robj,
+	};
 
 	nouveau_bo_placement_set(nvbo, domain, 0);
 	INIT_LIST_HEAD(&nvbo->io_reserve_lru);
 
-	ret = ttm_bo_init_validate(nvbo->bo.bdev, &nvbo->bo, type,
-				   &nvbo->placement, align >> PAGE_SHIFT, false,
+	ret = ttm_bo_init_reserved(nvbo->bo.bdev, &nvbo->bo, type,
+				   &nvbo->placement, align >> PAGE_SHIFT, &ctx,
 				   sg, robj, nouveau_bo_del_ttm);
 	if (ret) {
 		/* ttm will call nouveau_bo_del_ttm if it fails.. */
 		return ret;
 	}
+
+	if (!robj)
+		ttm_bo_unreserve(&nvbo->bo);
 
 	return 0;
 }
@@ -330,7 +377,7 @@ nouveau_bo_new(struct nouveau_cli *cli, u64 size, int align,
 	int ret;
 
 	nvbo = nouveau_bo_alloc(cli, &size, &align, domain, tile_mode,
-				tile_flags);
+				tile_flags, true);
 	if (IS_ERR(nvbo))
 		return PTR_ERR(nvbo);
 
@@ -338,33 +385,17 @@ nouveau_bo_new(struct nouveau_cli *cli, u64 size, int align,
 	dma_resv_init(&nvbo->bo.base._resv);
 	drm_vma_node_reset(&nvbo->bo.base.vma_node);
 
+	/* This must be called before ttm_bo_init_reserved(). Subsequent
+	 * bo_move() callbacks might already iterate the GEMs GPUVA list.
+	 */
+	drm_gem_gpuva_init(&nvbo->bo.base);
+
 	ret = nouveau_bo_init(nvbo, size, align, domain, sg, robj);
 	if (ret)
 		return ret;
 
 	*pnvbo = nvbo;
 	return 0;
-}
-
-static void
-set_placement_list(struct ttm_place *pl, unsigned *n, uint32_t domain)
-{
-	*n = 0;
-
-	if (domain & NOUVEAU_GEM_DOMAIN_VRAM) {
-		pl[*n].mem_type = TTM_PL_VRAM;
-		pl[*n].flags = 0;
-		(*n)++;
-	}
-	if (domain & NOUVEAU_GEM_DOMAIN_GART) {
-		pl[*n].mem_type = TTM_PL_TT;
-		pl[*n].flags = 0;
-		(*n)++;
-	}
-	if (domain & NOUVEAU_GEM_DOMAIN_CPU) {
-		pl[*n].mem_type = TTM_PL_SYSTEM;
-		pl[(*n)++].flags = 0;
-	}
 }
 
 static void
@@ -394,10 +425,6 @@ set_placement_range(struct nouveau_bo *nvbo, uint32_t domain)
 			nvbo->placements[i].fpfn = fpfn;
 			nvbo->placements[i].lpfn = lpfn;
 		}
-		for (i = 0; i < nvbo->placement.num_busy_placement; ++i) {
-			nvbo->busy_placements[i].fpfn = fpfn;
-			nvbo->busy_placements[i].lpfn = lpfn;
-		}
 	}
 }
 
@@ -405,29 +432,43 @@ void
 nouveau_bo_placement_set(struct nouveau_bo *nvbo, uint32_t domain,
 			 uint32_t busy)
 {
-	struct ttm_placement *pl = &nvbo->placement;
+	unsigned int *n = &nvbo->placement.num_placement;
+	struct ttm_place *pl = nvbo->placements;
 
-	pl->placement = nvbo->placements;
-	set_placement_list(nvbo->placements, &pl->num_placement, domain);
+	domain |= busy;
 
-	pl->busy_placement = nvbo->busy_placements;
-	set_placement_list(nvbo->busy_placements, &pl->num_busy_placement,
-			   domain | busy);
+	*n = 0;
+	if (domain & NOUVEAU_GEM_DOMAIN_VRAM) {
+		pl[*n].mem_type = TTM_PL_VRAM;
+		pl[*n].flags = busy & NOUVEAU_GEM_DOMAIN_VRAM ?
+			TTM_PL_FLAG_FALLBACK : 0;
+		(*n)++;
+	}
+	if (domain & NOUVEAU_GEM_DOMAIN_GART) {
+		pl[*n].mem_type = TTM_PL_TT;
+		pl[*n].flags = busy & NOUVEAU_GEM_DOMAIN_GART ?
+			TTM_PL_FLAG_FALLBACK : 0;
+		(*n)++;
+	}
+	if (domain & NOUVEAU_GEM_DOMAIN_CPU) {
+		pl[*n].mem_type = TTM_PL_SYSTEM;
+		pl[*n].flags = busy & NOUVEAU_GEM_DOMAIN_CPU ?
+			TTM_PL_FLAG_FALLBACK : 0;
+		(*n)++;
+	}
 
+	nvbo->placement.placement = nvbo->placements;
 	set_placement_range(nvbo, domain);
 }
 
-int
-nouveau_bo_pin(struct nouveau_bo *nvbo, uint32_t domain, bool contig)
+int nouveau_bo_pin_locked(struct nouveau_bo *nvbo, uint32_t domain, bool contig)
 {
 	struct nouveau_drm *drm = nouveau_bdev(nvbo->bo.bdev);
 	struct ttm_buffer_object *bo = &nvbo->bo;
 	bool force = false, evict = false;
-	int ret;
+	int ret = 0;
 
-	ret = ttm_bo_reserve(bo, false, false, NULL);
-	if (ret)
-		return ret;
+	dma_resv_assert_held(bo->base.resv);
 
 	if (drm->client.device.info.family >= NV_DEVICE_INFO_V0_TESLA &&
 	    domain == NOUVEAU_GEM_DOMAIN_VRAM && contig) {
@@ -490,20 +531,15 @@ nouveau_bo_pin(struct nouveau_bo *nvbo, uint32_t domain, bool contig)
 out:
 	if (force && ret)
 		nvbo->contig = false;
-	ttm_bo_unreserve(bo);
 	return ret;
 }
 
-int
-nouveau_bo_unpin(struct nouveau_bo *nvbo)
+void nouveau_bo_unpin_locked(struct nouveau_bo *nvbo)
 {
 	struct nouveau_drm *drm = nouveau_bdev(nvbo->bo.bdev);
 	struct ttm_buffer_object *bo = &nvbo->bo;
-	int ret;
 
-	ret = ttm_bo_reserve(bo, false, false, NULL);
-	if (ret)
-		return ret;
+	dma_resv_assert_held(bo->base.resv);
 
 	ttm_bo_unpin(&nvbo->bo);
 	if (!nvbo->bo.pin_count) {
@@ -518,8 +554,33 @@ nouveau_bo_unpin(struct nouveau_bo *nvbo)
 			break;
 		}
 	}
+}
 
+int nouveau_bo_pin(struct nouveau_bo *nvbo, uint32_t domain, bool contig)
+{
+	struct ttm_buffer_object *bo = &nvbo->bo;
+	int ret;
+
+	ret = ttm_bo_reserve(bo, false, false, NULL);
+	if (ret)
+		return ret;
+	ret = nouveau_bo_pin_locked(nvbo, domain, contig);
 	ttm_bo_unreserve(bo);
+
+	return ret;
+}
+
+int nouveau_bo_unpin(struct nouveau_bo *nvbo)
+{
+	struct ttm_buffer_object *bo = &nvbo->bo;
+	int ret;
+
+	ret = ttm_bo_reserve(bo, false, false, NULL);
+	if (ret)
+		return ret;
+	nouveau_bo_unpin_locked(nvbo);
+	ttm_bo_unreserve(bo);
+
 	return 0;
 }
 
@@ -816,29 +877,33 @@ nouveau_bo_move_m2mf(struct ttm_buffer_object *bo, int evict,
 		mutex_lock(&cli->mutex);
 	else
 		mutex_lock_nested(&cli->mutex, SINGLE_DEPTH_NESTING);
+
 	ret = nouveau_fence_sync(nouveau_bo(bo), chan, true, ctx->interruptible);
-	if (ret == 0) {
-		ret = drm->ttm.move(chan, bo, bo->resource, new_reg);
-		if (ret == 0) {
-			ret = nouveau_fence_new(chan, false, &fence);
-			if (ret == 0) {
-				/* TODO: figure out a better solution here
-				 *
-				 * wait on the fence here explicitly as going through
-				 * ttm_bo_move_accel_cleanup somehow doesn't seem to do it.
-				 *
-				 * Without this the operation can timeout and we'll fallback to a
-				 * software copy, which might take several minutes to finish.
-				 */
-				nouveau_fence_wait(fence, false, false);
-				ret = ttm_bo_move_accel_cleanup(bo,
-								&fence->base,
-								evict, false,
-								new_reg);
-				nouveau_fence_unref(&fence);
-			}
-		}
-	}
+	if (ret)
+		goto out_unlock;
+
+	ret = drm->ttm.move(chan, bo, bo->resource, new_reg);
+	if (ret)
+		goto out_unlock;
+
+	ret = nouveau_fence_new(&fence, chan);
+	if (ret)
+		goto out_unlock;
+
+	/* TODO: figure out a better solution here
+	 *
+	 * wait on the fence here explicitly as going through
+	 * ttm_bo_move_accel_cleanup somehow doesn't seem to do it.
+	 *
+	 * Without this the operation can timeout and we'll fallback to a
+	 * software copy, which might take several minutes to finish.
+	 */
+	nouveau_fence_wait(fence, false, false);
+	ret = ttm_bo_move_accel_cleanup(bo, &fence->base, evict, false,
+					new_reg);
+	nouveau_fence_unref(&fence);
+
+out_unlock:
 	mutex_unlock(&cli->mutex);
 	return ret;
 }
@@ -921,6 +986,7 @@ static void nouveau_bo_move_ntfy(struct ttm_buffer_object *bo,
 	struct nouveau_mem *mem = new_reg ? nouveau_mem(new_reg) : NULL;
 	struct nouveau_bo *nvbo = nouveau_bo(bo);
 	struct nouveau_vma *vma;
+	long ret;
 
 	/* ttm can now (stupidly) pass the driver bos it didn't create... */
 	if (bo->destroy != nouveau_bo_del_ttm)
@@ -933,11 +999,16 @@ static void nouveau_bo_move_ntfy(struct ttm_buffer_object *bo,
 		list_for_each_entry(vma, &nvbo->vma_list, head) {
 			nouveau_vma_map(vma, mem);
 		}
+		nouveau_uvmm_bo_map_all(nvbo, mem);
 	} else {
 		list_for_each_entry(vma, &nvbo->vma_list, head) {
-			WARN_ON(ttm_bo_wait(bo, false, false));
+			ret = dma_resv_wait_timeout(bo->base.resv,
+						    DMA_RESV_USAGE_BOOKKEEP,
+						    false, 15 * HZ);
+			WARN_ON(ret <= 0);
 			nouveau_vma_unmap(vma);
 		}
+		nouveau_uvmm_bo_unmap_all(nvbo);
 	}
 
 	if (new_reg)
@@ -994,10 +1065,10 @@ nouveau_bo_move(struct ttm_buffer_object *bo, bool evict,
 {
 	struct nouveau_drm *drm = nouveau_bdev(bo->bdev);
 	struct nouveau_bo *nvbo = nouveau_bo(bo);
+	struct drm_gem_object *obj = &bo->base;
 	struct ttm_resource *old_reg = bo->resource;
 	struct nouveau_drm_tile *new_tile = NULL;
 	int ret = 0;
-
 
 	if (new_reg->mem_type == TTM_PL_TT) {
 		ret = nouveau_ttm_tt_bind(bo->bdev, bo->ttm, new_reg);
@@ -1005,13 +1076,11 @@ nouveau_bo_move(struct ttm_buffer_object *bo, bool evict,
 			return ret;
 	}
 
+	drm_gpuvm_bo_gem_evict(obj, evict);
 	nouveau_bo_move_ntfy(bo, new_reg);
 	ret = ttm_bo_wait_ctx(bo, ctx);
 	if (ret)
 		goto out_ntfy;
-
-	if (nvbo->bo.pin_count)
-		NV_WARN(drm, "Moving pinned object %p!\n", nvbo);
 
 	if (drm->client.device.info.family < NV_DEVICE_INFO_V0_TESLA) {
 		ret = nouveau_bo_vm_bind(bo, new_reg, &new_tile);
@@ -1072,6 +1141,7 @@ out:
 out_ntfy:
 	if (ret) {
 		nouveau_bo_move_ntfy(bo, bo->resource);
+		drm_gpuvm_bo_gem_evict(obj, !evict);
 	}
 	return ret;
 }
@@ -1197,6 +1267,8 @@ out:
 			drm_vma_node_unmap(&nvbo->bo.base.vma_node,
 					   bdev->dev_mapping);
 			nouveau_ttm_io_mem_free_locked(drm, nvbo->bo.resource);
+			nvbo->bo.resource->bus.offset = 0;
+			nvbo->bo.resource->bus.addr = NULL;
 			goto retry;
 		}
 
@@ -1245,11 +1317,6 @@ vm_fault_t nouveau_ttm_fault_reserve_notify(struct ttm_buffer_object *bo)
 		for (i = 0; i < nvbo->placement.num_placement; ++i) {
 			nvbo->placements[i].fpfn = 0;
 			nvbo->placements[i].lpfn = mappable;
-		}
-
-		for (i = 0; i < nvbo->placement.num_busy_placement; ++i) {
-			nvbo->busy_placements[i].fpfn = 0;
-			nvbo->busy_placements[i].lpfn = mappable;
 		}
 
 		nouveau_bo_placement_set(nvbo, NOUVEAU_GEM_DOMAIN_VRAM, 0);

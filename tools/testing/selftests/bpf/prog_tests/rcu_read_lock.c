@@ -25,10 +25,14 @@ static void test_success(void)
 
 	bpf_program__set_autoload(skel->progs.get_cgroup_id, true);
 	bpf_program__set_autoload(skel->progs.task_succ, true);
-	bpf_program__set_autoload(skel->progs.no_lock, true);
 	bpf_program__set_autoload(skel->progs.two_regions, true);
 	bpf_program__set_autoload(skel->progs.non_sleepable_1, true);
 	bpf_program__set_autoload(skel->progs.non_sleepable_2, true);
+	bpf_program__set_autoload(skel->progs.task_trusted_non_rcuptr, true);
+	bpf_program__set_autoload(skel->progs.rcu_read_lock_subprog, true);
+	bpf_program__set_autoload(skel->progs.rcu_read_lock_global_subprog, true);
+	bpf_program__set_autoload(skel->progs.rcu_read_lock_subprog_lock, true);
+	bpf_program__set_autoload(skel->progs.rcu_read_lock_subprog_unlock, true);
 	err = rcu_read_lock__load(skel);
 	if (!ASSERT_OK(err, "skel_load"))
 		goto out;
@@ -69,11 +73,14 @@ out:
 
 static const char * const inproper_region_tests[] = {
 	"miss_lock",
+	"no_lock",
 	"miss_unlock",
 	"non_sleepable_rcu_mismatch",
 	"inproper_sleepable_helper",
 	"inproper_sleepable_kfunc",
 	"nested_rcu_region",
+	"rcu_read_lock_global_subprog_lock",
+	"rcu_read_lock_global_subprog_unlock",
 };
 
 static void test_inproper_region(void)
@@ -99,7 +106,6 @@ out:
 }
 
 static const char * const rcuptr_misuse_tests[] = {
-	"task_untrusted_non_rcuptr",
 	"task_untrusted_rcuptr",
 	"cross_rcu_region",
 };
@@ -128,16 +134,7 @@ out:
 
 void test_rcu_read_lock(void)
 {
-	struct btf *vmlinux_btf;
 	int cgroup_fd;
-
-	vmlinux_btf = btf__load_vmlinux_btf();
-	if (!ASSERT_OK_PTR(vmlinux_btf, "could not load vmlinux BTF"))
-		return;
-	if (btf__find_by_name_kind(vmlinux_btf, "rcu", BTF_KIND_TYPE_TAG) < 0) {
-		test__skip();
-		goto out;
-	}
 
 	cgroup_fd = test__join_cgroup("/rcu_read_lock");
 	if (!ASSERT_GE(cgroup_fd, 0, "join_cgroup /rcu_read_lock"))
@@ -153,6 +150,5 @@ void test_rcu_read_lock(void)
 	if (test__start_subtest("negative_tests_rcuptr_misuse"))
 		test_rcuptr_misuse();
 	close(cgroup_fd);
-out:
-	btf__free(vmlinux_btf);
+out:;
 }

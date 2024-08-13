@@ -39,6 +39,7 @@ enum idh_request {
 
 	IDH_LOG_VF_ERROR       = 200,
 	IDH_READY_TO_RESET 	= 201,
+	IDH_RAS_POISON  = 202,
 };
 
 enum idh_event {
@@ -61,7 +62,9 @@ int xgpu_ai_mailbox_add_irq_id(struct amdgpu_device *adev);
 int xgpu_ai_mailbox_get_irq(struct amdgpu_device *adev);
 void xgpu_ai_mailbox_put_irq(struct amdgpu_device *adev);
 
-#define AI_MAIBOX_CONTROL_TRN_OFFSET_BYTE SOC15_REG_OFFSET(NBIO, 0, mmBIF_BX_PF0_MAILBOX_CONTROL) * 4
-#define AI_MAIBOX_CONTROL_RCV_OFFSET_BYTE SOC15_REG_OFFSET(NBIO, 0, mmBIF_BX_PF0_MAILBOX_CONTROL) * 4 + 1
+#define AI_MAIBOX_CONTROL_TRN_OFFSET_BYTE \
+	(SOC15_REG_OFFSET(NBIO, 0, mmBIF_BX_PF0_MAILBOX_CONTROL) * 4)
+#define AI_MAIBOX_CONTROL_RCV_OFFSET_BYTE \
+	(SOC15_REG_OFFSET(NBIO, 0, mmBIF_BX_PF0_MAILBOX_CONTROL) * 4 + 1)
 
 #endif

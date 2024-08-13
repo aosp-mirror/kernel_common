@@ -1480,7 +1480,7 @@ static int af9013_probe(struct i2c_client *client)
 		goto err_regmap_exit;
 	}
 	state->muxc->priv = state;
-	ret = i2c_mux_add_adapter(state->muxc, 0, 0, 0);
+	ret = i2c_mux_add_adapter(state->muxc, 0, 0);
 	if (ret)
 		goto err_regmap_exit;
 
@@ -1563,7 +1563,7 @@ static struct i2c_driver af9013_driver = {
 		.name	= "af9013",
 		.suppress_bind_attrs = true,
 	},
-	.probe_new	= af9013_probe,
+	.probe		= af9013_probe,
 	.remove		= af9013_remove,
 	.id_table	= af9013_id_table,
 };

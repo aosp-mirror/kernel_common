@@ -10,6 +10,11 @@
 #include <linux/io.h>
 #include <linux/nvmem-provider.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
+
+struct mtk_efuse_pdata {
+	bool uses_post_processing;
+};
 
 struct mtk_efuse_priv {
 	void __iomem *base;
@@ -29,6 +34,32 @@ static int mtk_reg_read(void *context,
 	return 0;
 }
 
+static int mtk_efuse_gpu_speedbin_pp(void *context, const char *id, int index,
+				     unsigned int offset, void *data, size_t bytes)
+{
+	u8 *val = data;
+
+	if (val[0] < 8)
+		val[0] = BIT(val[0]);
+
+	return 0;
+}
+
+static void mtk_efuse_fixup_dt_cell_info(struct nvmem_device *nvmem,
+					 struct nvmem_cell_info *cell)
+{
+	size_t sz = strlen(cell->name);
+
+	/*
+	 * On some SoCs, the GPU speedbin is not read as bitmask but as
+	 * a number with range [0-7] (max 3 bits): post process to use
+	 * it in OPP tables to describe supported-hw.
+	 */
+	if (cell->nbits <= 3 &&
+	    strncmp(cell->name, "gpu-speedbin", min(sz, strlen("gpu-speedbin"))) == 0)
+		cell->read_post_process = mtk_efuse_gpu_speedbin_pp;
+}
+
 static int mtk_efuse_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -36,6 +67,8 @@ static int mtk_efuse_probe(struct platform_device *pdev)
 	struct nvmem_device *nvmem;
 	struct nvmem_config econfig = {};
 	struct mtk_efuse_priv *priv;
+	const struct mtk_efuse_pdata *pdata;
+	struct platform_device *socinfo;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -45,26 +78,56 @@ static int mtk_efuse_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->base))
 		return PTR_ERR(priv->base);
 
+	pdata = device_get_match_data(dev);
+	econfig.add_legacy_fixed_of_cells = true;
 	econfig.stride = 1;
 	econfig.word_size = 1;
 	econfig.reg_read = mtk_reg_read;
 	econfig.size = resource_size(res);
 	econfig.priv = priv;
 	econfig.dev = dev;
+	if (pdata->uses_post_processing)
+		econfig.fixup_dt_cell_info = &mtk_efuse_fixup_dt_cell_info;
 	nvmem = devm_nvmem_register(dev, &econfig);
+	if (IS_ERR(nvmem))
+		return PTR_ERR(nvmem);
 
-	return PTR_ERR_OR_ZERO(nvmem);
+	socinfo = platform_device_register_data(&pdev->dev, "mtk-socinfo",
+						PLATFORM_DEVID_AUTO, NULL, 0);
+	if (IS_ERR(socinfo))
+		dev_info(dev, "MediaTek SoC Information will be unavailable\n");
+
+	platform_set_drvdata(pdev, socinfo);
+	return 0;
 }
 
+static const struct mtk_efuse_pdata mtk_mt8186_efuse_pdata = {
+	.uses_post_processing = true,
+};
+
+static const struct mtk_efuse_pdata mtk_efuse_pdata = {
+	.uses_post_processing = false,
+};
+
 static const struct of_device_id mtk_efuse_of_match[] = {
-	{ .compatible = "mediatek,mt8173-efuse",},
-	{ .compatible = "mediatek,efuse",},
+	{ .compatible = "mediatek,mt8173-efuse", .data = &mtk_efuse_pdata },
+	{ .compatible = "mediatek,mt8186-efuse", .data = &mtk_mt8186_efuse_pdata },
+	{ .compatible = "mediatek,efuse", .data = &mtk_efuse_pdata },
 	{/* sentinel */},
 };
 MODULE_DEVICE_TABLE(of, mtk_efuse_of_match);
 
+static void mtk_efuse_remove(struct platform_device *pdev)
+{
+	struct platform_device *socinfo = platform_get_drvdata(pdev);
+
+	if (!IS_ERR_OR_NULL(socinfo))
+		platform_device_unregister(socinfo);
+}
+
 static struct platform_driver mtk_efuse_driver = {
 	.probe = mtk_efuse_probe,
+	.remove_new = mtk_efuse_remove,
 	.driver = {
 		.name = "mediatek,efuse",
 		.of_match_table = mtk_efuse_of_match,

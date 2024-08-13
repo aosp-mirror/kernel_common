@@ -282,7 +282,7 @@ static int xen_grant_dma_supported(struct device *dev, u64 mask)
 static const struct dma_map_ops xen_grant_dma_ops = {
 	.alloc = xen_grant_dma_alloc,
 	.free = xen_grant_dma_free,
-	.alloc_pages = xen_grant_dma_alloc_pages,
+	.alloc_pages_op = xen_grant_dma_alloc_pages,
 	.free_pages = xen_grant_dma_free_pages,
 	.mmap = dma_common_mmap,
 	.get_sgtable = dma_common_get_sgtable,
@@ -303,6 +303,8 @@ static struct device_node *xen_dt_get_node(struct device *dev)
 		while (!pci_is_root_bus(bus))
 			bus = bus->parent;
 
+		if (!bus->bridge->parent)
+			return NULL;
 		return of_node_get(bus->bridge->parent->of_node);
 	}
 

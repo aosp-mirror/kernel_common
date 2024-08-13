@@ -8,6 +8,7 @@
 
 #include <dt-bindings/sound/microchip,pdmc.h>
 
+#include <linux/bitfield.h>
 #include <linux/clk.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -49,8 +50,6 @@
 #define MCHP_PDMC_MR_OSR256		(3 << 16)
 
 #define MCHP_PDMC_MR_SINCORDER_MASK	GENMASK(23, 20)
-#define MCHP_PDMC_MR_SINCORDER(order)	(((order) << 20) & \
-					 MCHP_PDMC_MR_SINCORDER_MASK)
 
 #define MCHP_PDMC_MR_SINC_OSR_MASK	GENMASK(27, 24)
 #define MCHP_PDMC_MR_SINC_OSR_DIS	(0 << 24)
@@ -62,8 +61,6 @@
 #define MCHP_PDMC_MR_SINC_OSR_256	(6 << 24)
 
 #define MCHP_PDMC_MR_CHUNK_MASK		GENMASK(31, 28)
-#define MCHP_PDMC_MR_CHUNK(chunk)	(((chunk) << 28) & \
-					 MCHP_PDMC_MR_CHUNK_MASK)
 
 /*
  * ---- Configuration Register (Read/Write) ----
@@ -114,6 +111,7 @@ struct mchp_pdmc {
 	struct clk *gclk;
 	u32 pdmcen;
 	u32 suspend_irq;
+	u32 startup_delay_us;
 	int mic_no;
 	int sinc_order;
 	bool audio_filter_en;
@@ -388,7 +386,6 @@ static int mchp_pdmc_open(struct snd_soc_component *component,
 	for (i = 0; i < ARRAY_SIZE(mchp_pdmc_snd_controls); i++) {
 		const struct snd_kcontrol_new *control = &mchp_pdmc_snd_controls[i];
 		struct snd_ctl_elem_id id;
-		struct snd_kcontrol *kctl;
 		int err;
 
 		if (component->name_prefix)
@@ -402,17 +399,10 @@ static int mchp_pdmc_open(struct snd_soc_component *component,
 		id.device = control->device;
 		id.subdevice = control->subdevice;
 		id.index = control->index;
-		kctl = snd_ctl_find_id(component->card->snd_card, &id);
-		if (!kctl) {
-			dev_err(component->dev, "Failed to find %s\n", control->name);
-			continue;
-		}
-		err = snd_ctl_remove(component->card->snd_card, kctl);
-		if (err < 0) {
+		err = snd_ctl_remove_id(component->card->snd_card, &id);
+		if (err < 0)
 			dev_err(component->dev, "%d: Failed to remove %s\n", err,
 				control->name);
-			continue;
-		}
 	}
 
 	return 0;
@@ -425,6 +415,7 @@ static const struct snd_soc_component_driver mchp_pdmc_dai_component = {
 	.open = &mchp_pdmc_open,
 	.close = &mchp_pdmc_close,
 	.legacy_dai_naming = 1,
+	.trigger_start = SND_SOC_TRIGGER_ORDER_LDC,
 };
 
 static const unsigned int mchp_pdmc_1mic[] = {1};
@@ -615,10 +606,10 @@ static int mchp_pdmc_hw_params(struct snd_pcm_substream *substream,
 
 	mr_val |= mchp_pdmc_mr_set_osr(dd->audio_filter_en, osr);
 
-	mr_val |= MCHP_PDMC_MR_SINCORDER(dd->sinc_order);
+	mr_val |= FIELD_PREP(MCHP_PDMC_MR_SINCORDER_MASK, dd->sinc_order);
 
 	dd->addr.maxburst = mchp_pdmc_period_to_maxburst(snd_pcm_lib_period_bytes(substream));
-	mr_val |= MCHP_PDMC_MR_CHUNK(dd->addr.maxburst);
+	mr_val |= FIELD_PREP(MCHP_PDMC_MR_CHUNK_MASK, dd->addr.maxburst);
 	dev_dbg(comp->dev, "maxburst set to %d\n", dd->addr.maxburst);
 
 	snd_soc_component_update_bits(comp, MCHP_PDMC_MR,
@@ -630,6 +621,29 @@ static int mchp_pdmc_hw_params(struct snd_pcm_substream *substream,
 	snd_soc_component_write(comp, MCHP_PDMC_CFGR, cfgr_val);
 
 	return 0;
+}
+
+static void mchp_pdmc_noise_filter_workaround(struct mchp_pdmc *dd)
+{
+	u32 tmp, steps = 16;
+
+	/*
+	 * PDMC doesn't wait for microphones' startup time thus the acquisition
+	 * may start before the microphones are ready leading to poc noises at
+	 * the beginning of capture. To avoid this, we need to wait 50ms (in
+	 * normal startup procedure) or 150 ms (worst case after resume from sleep
+	 * states) after microphones are enabled and then clear the FIFOs (by
+	 * reading the RHR 16 times) and possible interrupts before continuing.
+	 * Also, for this to work the DMA needs to be started after interrupts
+	 * are enabled.
+	 */
+	usleep_range(dd->startup_delay_us, dd->startup_delay_us + 5);
+
+	while (steps--)
+		regmap_read(dd->regmap, MCHP_PDMC_RHR, &tmp);
+
+	/* Clear interrupts. */
+	regmap_read(dd->regmap, MCHP_PDMC_ISR, &tmp);
 }
 
 static int mchp_pdmc_trigger(struct snd_pcm_substream *substream,
@@ -644,15 +658,17 @@ static int mchp_pdmc_trigger(struct snd_pcm_substream *substream,
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_START:
-		/* Enable overrun and underrun error interrupts */
-		regmap_write(dd->regmap, MCHP_PDMC_IER, dd->suspend_irq |
-			     MCHP_PDMC_IR_RXOVR | MCHP_PDMC_IR_RXUDR);
-		dd->suspend_irq = 0;
-		fallthrough;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		snd_soc_component_update_bits(cpu, MCHP_PDMC_MR,
 					      MCHP_PDMC_MR_PDMCEN_MASK,
 					      dd->pdmcen);
+
+		mchp_pdmc_noise_filter_workaround(dd);
+
+		/* Enable interrupts. */
+		regmap_write(dd->regmap, MCHP_PDMC_IER, dd->suspend_irq |
+			     MCHP_PDMC_IR_RXOVR | MCHP_PDMC_IR_RXUDR);
+		dd->suspend_irq = 0;
 		break;
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 		regmap_read(dd->regmap, MCHP_PDMC_IMR, &dd->suspend_irq);
@@ -681,13 +697,6 @@ static int mchp_pdmc_trigger(struct snd_pcm_substream *substream,
 
 	return 0;
 }
-
-static const struct snd_soc_dai_ops mchp_pdmc_dai_ops = {
-	.set_fmt	= mchp_pdmc_set_fmt,
-	.startup	= mchp_pdmc_startup,
-	.hw_params	= mchp_pdmc_hw_params,
-	.trigger	= mchp_pdmc_trigger,
-};
 
 static int mchp_pdmc_add_chmap_ctls(struct snd_pcm *pcm, struct mchp_pdmc *dd)
 {
@@ -735,16 +744,22 @@ static int mchp_pdmc_pcm_new(struct snd_soc_pcm_runtime *rtd,
 	int ret;
 
 	ret = mchp_pdmc_add_chmap_ctls(rtd->pcm, dd);
-	if (ret < 0) {
+	if (ret < 0)
 		dev_err(dd->dev, "failed to add channel map controls: %d\n", ret);
-		return ret;
-	}
 
-	return 0;
+	return ret;
 }
 
+static const struct snd_soc_dai_ops mchp_pdmc_dai_ops = {
+	.probe		= mchp_pdmc_dai_probe,
+	.set_fmt	= mchp_pdmc_set_fmt,
+	.startup	= mchp_pdmc_startup,
+	.hw_params	= mchp_pdmc_hw_params,
+	.trigger	= mchp_pdmc_trigger,
+	.pcm_new	= &mchp_pdmc_pcm_new,
+};
+
 static struct snd_soc_dai_driver mchp_pdmc_dai = {
-	.probe	= mchp_pdmc_dai_probe,
 	.capture = {
 		.stream_name	= "Capture",
 		.channels_min	= 1,
@@ -755,13 +770,12 @@ static struct snd_soc_dai_driver mchp_pdmc_dai = {
 		.formats	= SNDRV_PCM_FMTBIT_S24_LE,
 	},
 	.ops = &mchp_pdmc_dai_ops,
-	.pcm_new = &mchp_pdmc_pcm_new,
 };
 
 /* PDMC interrupt handler */
 static irqreturn_t mchp_pdmc_interrupt(int irq, void *dev_id)
 {
-	struct mchp_pdmc *dd = (struct mchp_pdmc *)dev_id;
+	struct mchp_pdmc *dd = dev_id;
 	u32 isr, msr, pending;
 	irqreturn_t ret = IRQ_NONE;
 
@@ -796,6 +810,7 @@ static bool mchp_pdmc_readable_reg(struct device *dev, unsigned int reg)
 	case MCHP_PDMC_CFGR:
 	case MCHP_PDMC_IMR:
 	case MCHP_PDMC_ISR:
+	case MCHP_PDMC_RHR:
 	case MCHP_PDMC_VER:
 		return true;
 	default:
@@ -811,6 +826,17 @@ static bool mchp_pdmc_writeable_reg(struct device *dev, unsigned int reg)
 	case MCHP_PDMC_CFGR:
 	case MCHP_PDMC_IER:
 	case MCHP_PDMC_IDR:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool mchp_pdmc_volatile_reg(struct device *dev, unsigned int reg)
+{
+	switch (reg) {
+	case MCHP_PDMC_ISR:
+	case MCHP_PDMC_RHR:
 		return true;
 	default:
 		return false;
@@ -836,6 +862,7 @@ static const struct regmap_config mchp_pdmc_regmap_config = {
 	.readable_reg	= mchp_pdmc_readable_reg,
 	.writeable_reg	= mchp_pdmc_writeable_reg,
 	.precious_reg	= mchp_pdmc_precious_reg,
+	.volatile_reg	= mchp_pdmc_volatile_reg,
 	.cache_type	= REGCACHE_FLAT,
 };
 
@@ -918,13 +945,16 @@ static int mchp_pdmc_dt_init(struct mchp_pdmc *dd)
 		dd->channel_mic_map[i].clk_edge = edge;
 	}
 
+	dd->startup_delay_us = 150000;
+	of_property_read_u32(np, "microchip,startup-delay-us", &dd->startup_delay_us);
+
 	return 0;
 }
 
 /* used to clean the channel index found on RHR's MSB */
 static int mchp_pdmc_process(struct snd_pcm_substream *substream,
 			     int channel, unsigned long hwoff,
-			     void *buf, unsigned long bytes)
+			     unsigned long bytes)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	u8 *dma_ptr = runtime->dma_area + hwoff +
@@ -1039,7 +1069,7 @@ static int mchp_pdmc_probe(struct platform_device *pdev)
 	}
 
 	ret = devm_request_irq(dev, irq, mchp_pdmc_interrupt, 0,
-			       dev_name(&pdev->dev), (void *)dd);
+			       dev_name(&pdev->dev), dd);
 	if (ret < 0) {
 		dev_err(dev, "can't register ISR for IRQ %u (ret=%i)\n",
 			irq, ret);
@@ -1091,7 +1121,7 @@ pm_runtime_suspend:
 	return ret;
 }
 
-static int mchp_pdmc_remove(struct platform_device *pdev)
+static void mchp_pdmc_remove(struct platform_device *pdev)
 {
 	struct mchp_pdmc *dd = platform_get_drvdata(pdev);
 
@@ -1099,8 +1129,6 @@ static int mchp_pdmc_remove(struct platform_device *pdev)
 		mchp_pdmc_runtime_suspend(dd->dev);
 
 	pm_runtime_disable(dd->dev);
-
-	return 0;
 }
 
 static const struct of_device_id mchp_pdmc_of_match[] = {
@@ -1125,7 +1153,7 @@ static struct platform_driver mchp_pdmc_driver = {
 		.pm		= pm_ptr(&mchp_pdmc_pm_ops),
 	},
 	.probe	= mchp_pdmc_probe,
-	.remove = mchp_pdmc_remove,
+	.remove_new = mchp_pdmc_remove,
 };
 module_platform_driver(mchp_pdmc_driver);
 

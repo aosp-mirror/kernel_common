@@ -63,6 +63,7 @@ static void find_controls(void)
 	struct card_data *card_data;
 	struct ctl_data *ctl_data;
 	snd_config_t *config;
+	char *card_name, *card_longname;
 
 	card = -1;
 	if (snd_card_next(&card) < 0 || card < 0)
@@ -83,6 +84,15 @@ static void find_controls(void)
 				       card, snd_strerror(err));
 			goto next_card;
 		}
+
+		err = snd_card_get_name(card, &card_name);
+		if (err != 0)
+			card_name = "Unknown";
+		err = snd_card_get_longname(card, &card_longname);
+		if (err != 0)
+			card_longname = "Unknown";
+		ksft_print_msg("Card %d - %s (%s)\n", card,
+			       card_name, card_longname);
 
 		/* Count controls */
 		snd_ctl_elem_list_malloc(&card_data->ctls);
@@ -128,7 +138,7 @@ static void find_controls(void)
 			err = snd_ctl_elem_info(card_data->handle,
 						ctl_data->info);
 			if (err < 0) {
-				ksft_print_msg("%s getting info for %d\n",
+				ksft_print_msg("%s getting info for %s\n",
 					       snd_strerror(err),
 					       ctl_data->name);
 			}
@@ -156,7 +166,7 @@ static void find_controls(void)
 		err = snd_ctl_poll_descriptors(card_data->handle,
 					       &card_data->pollfd, 1);
 		if (err != 1) {
-			ksft_exit_fail_msg("snd_ctl_poll_descriptors() failed for %d\n",
+			ksft_exit_fail_msg("snd_ctl_poll_descriptors() failed for card %d: %d\n",
 				       card, err);
 		}
 
@@ -178,7 +188,7 @@ static int wait_for_event(struct ctl_data *ctl, int timeout)
 {
 	unsigned short revents;
 	snd_ctl_event_t *event;
-	int count, err;
+	int err;
 	unsigned int mask = 0;
 	unsigned int ev_id;
 
@@ -309,7 +319,7 @@ static bool ctl_value_index_valid(struct ctl_data *ctl,
 		}
 
 		if (int64_val > snd_ctl_elem_info_get_max64(ctl->info)) {
-			ksft_print_msg("%s.%d value %lld more than maximum %lld\n",
+			ksft_print_msg("%s.%d value %lld more than maximum %ld\n",
 				       ctl->name, index, int64_val,
 				       snd_ctl_elem_info_get_max(ctl->info));
 			return false;
@@ -337,7 +347,7 @@ static bool ctl_value_index_valid(struct ctl_data *ctl,
 		}
 
 		if (int_val >= snd_ctl_elem_info_get_items(ctl->info)) {
-			ksft_print_msg("%s.%d value %ld more than item count %ld\n",
+			ksft_print_msg("%s.%d value %ld more than item count %u\n",
 				       ctl->name, index, int_val,
 				       snd_ctl_elem_info_get_items(ctl->info));
 			return false;
@@ -420,7 +430,9 @@ static bool strend(const char *haystack, const char *needle)
 static void test_ctl_name(struct ctl_data *ctl)
 {
 	bool name_ok = true;
-	bool check;
+
+	ksft_print_msg("%d.%d %s\n", ctl->card->card, ctl->elem,
+		       ctl->name);
 
 	/* Only boolean controls should end in Switch */
 	if (strend(ctl->name, " Switch")) {
@@ -443,6 +455,48 @@ static void test_ctl_name(struct ctl_data *ctl)
 
 	ksft_test_result(name_ok, "name.%d.%d\n",
 			 ctl->card->card, ctl->elem);
+}
+
+static void show_values(struct ctl_data *ctl, snd_ctl_elem_value_t *orig_val,
+			snd_ctl_elem_value_t *read_val)
+{
+	long long orig_int, read_int;
+	int i;
+
+	for (i = 0; i < snd_ctl_elem_info_get_count(ctl->info); i++) {
+		switch (snd_ctl_elem_info_get_type(ctl->info)) {
+		case SND_CTL_ELEM_TYPE_BOOLEAN:
+			orig_int = snd_ctl_elem_value_get_boolean(orig_val, i);
+			read_int = snd_ctl_elem_value_get_boolean(read_val, i);
+			break;
+
+		case SND_CTL_ELEM_TYPE_INTEGER:
+			orig_int = snd_ctl_elem_value_get_integer(orig_val, i);
+			read_int = snd_ctl_elem_value_get_integer(read_val, i);
+			break;
+
+		case SND_CTL_ELEM_TYPE_INTEGER64:
+			orig_int = snd_ctl_elem_value_get_integer64(orig_val,
+								    i);
+			read_int = snd_ctl_elem_value_get_integer64(read_val,
+								    i);
+			break;
+
+		case SND_CTL_ELEM_TYPE_ENUMERATED:
+			orig_int = snd_ctl_elem_value_get_enumerated(orig_val,
+								     i);
+			read_int = snd_ctl_elem_value_get_enumerated(read_val,
+								     i);
+			break;
+
+		default:
+			return;
+		}
+
+		ksft_print_msg("%s.%d orig %lld read %lld, is_volatile %d\n",
+			       ctl->name, i, orig_int, read_int,
+			       snd_ctl_elem_info_is_volatile(ctl->info));
+	}
 }
 
 static bool show_mismatch(struct ctl_data *ctl, int index,
@@ -584,12 +638,14 @@ static int write_and_verify(struct ctl_data *ctl,
 			if (err < 1) {
 				ksft_print_msg("No event generated for %s\n",
 					       ctl->name);
+				show_values(ctl, initial_val, read_val);
 				ctl->event_missing++;
 			}
 		} else {
 			if (err != 0) {
 				ksft_print_msg("Spurious event generated for %s\n",
 					       ctl->name);
+				show_values(ctl, initial_val, read_val);
 				ctl->event_spurious++;
 			}
 		}
@@ -755,7 +811,6 @@ static bool test_ctl_write_valid_enumerated(struct ctl_data *ctl)
 static void test_ctl_write_valid(struct ctl_data *ctl)
 {
 	bool pass;
-	int err;
 
 	/* If the control is turned off let's be polite */
 	if (snd_ctl_elem_info_is_inactive(ctl->info)) {
@@ -797,9 +852,7 @@ static void test_ctl_write_valid(struct ctl_data *ctl)
 	}
 
 	/* Restore the default value to minimise disruption */
-	err = write_and_verify(ctl, ctl->def_val, NULL);
-	if (err < 0)
-		pass = false;
+	write_and_verify(ctl, ctl->def_val, NULL);
 
 	ksft_test_result(pass, "write_valid.%d.%d\n",
 			 ctl->card->card, ctl->elem);
@@ -809,7 +862,6 @@ static bool test_ctl_write_invalid_value(struct ctl_data *ctl,
 					 snd_ctl_elem_value_t *val)
 {
 	int err;
-	long val_read;
 
 	/* Ideally this will fail... */
 	err = snd_ctl_elem_write(ctl->card->handle, val);
@@ -829,8 +881,7 @@ static bool test_ctl_write_invalid_value(struct ctl_data *ctl,
 
 static bool test_ctl_write_invalid_boolean(struct ctl_data *ctl)
 {
-	int err, i;
-	long val_read;
+	int i;
 	bool fail = false;
 	snd_ctl_elem_value_t *val;
 	snd_ctl_elem_value_alloca(&val);
@@ -940,8 +991,7 @@ static bool test_ctl_write_invalid_integer64(struct ctl_data *ctl)
 
 static bool test_ctl_write_invalid_enumerated(struct ctl_data *ctl)
 {
-	int err, i;
-	unsigned int val_read;
+	int i;
 	bool fail = false;
 	snd_ctl_elem_value_t *val;
 	snd_ctl_elem_value_alloca(&val);
@@ -973,7 +1023,6 @@ static bool test_ctl_write_invalid_enumerated(struct ctl_data *ctl)
 static void test_ctl_write_invalid(struct ctl_data *ctl)
 {
 	bool pass;
-	int err;
 
 	/* If the control is turned off let's be polite */
 	if (snd_ctl_elem_info_is_inactive(ctl->info)) {
@@ -1015,9 +1064,7 @@ static void test_ctl_write_invalid(struct ctl_data *ctl)
 	}
 
 	/* Restore the default value to minimise disruption */
-	err = write_and_verify(ctl, ctl->def_val, NULL);
-	if (err < 0)
-		pass = false;
+	write_and_verify(ctl, ctl->def_val, NULL);
 
 	ksft_test_result(pass, "write_invalid.%d.%d\n",
 			 ctl->card->card, ctl->elem);

@@ -15,17 +15,14 @@
 
 #if !defined(__ASSEMBLY__)
 
-#include <linux/crash_core.h>
+#include <linux/vmcore_info.h>
+#include <linux/crash_reserve.h>
 #include <asm/io.h>
 #include <linux/range.h>
 
 #include <uapi/linux/kexec.h>
 #include <linux/verification.h>
 
-/* Location of a reserved region to hold the crash kernel.
- */
-extern struct resource crashk_res;
-extern struct resource crashk_low_res;
 extern note_buf_t __percpu *crash_notes;
 
 #ifdef CONFIG_KEXEC_CORE
@@ -33,7 +30,9 @@ extern note_buf_t __percpu *crash_notes;
 #include <linux/compat.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
+#include <linux/highmem.h>
 #include <asm/kexec.h>
+#include <linux/crash_core.h>
 
 /* Verify architecture specific macros are defined */
 
@@ -190,7 +189,6 @@ int kexec_purgatory_get_set_symbol(struct kimage *image, const char *name,
 				   void *buf, unsigned int size,
 				   bool get_value);
 void *kexec_purgatory_get_symbol_addr(struct kimage *image, const char *name);
-void *kexec_image_load_default(struct kimage *image);
 
 #ifndef arch_kexec_kernel_image_probe
 static inline int
@@ -204,13 +202,6 @@ arch_kexec_kernel_image_probe(struct kimage *image, void *buf, unsigned long buf
 static inline int arch_kimage_file_post_load_cleanup(struct kimage *image)
 {
 	return kexec_image_post_load_cleanup_default(image);
-}
-#endif
-
-#ifndef arch_kexec_kernel_image_load
-static inline void *arch_kexec_kernel_image_load(struct kimage *image)
-{
-	return kexec_image_load_default(image);
 }
 #endif
 
@@ -237,21 +228,6 @@ static inline int arch_kexec_locate_mem_hole(struct kexec_buf *kbuf)
 	return kexec_locate_mem_hole(kbuf);
 }
 #endif
-
-/* Alignment required for elf header segment */
-#define ELF_CORE_HEADER_ALIGN   4096
-
-struct crash_mem {
-	unsigned int max_nr_ranges;
-	unsigned int nr_ranges;
-	struct range ranges[];
-};
-
-extern int crash_exclude_mem_range(struct crash_mem *mem,
-				   unsigned long long mstart,
-				   unsigned long long mend);
-extern int crash_prepare_elf64_headers(struct crash_mem *mem, int need_kernel_map,
-				       void **addr, unsigned long *sz);
 
 #ifndef arch_kexec_apply_relocations_add
 /*
@@ -342,6 +318,12 @@ struct kimage {
 	unsigned int preserve_context : 1;
 	/* If set, we are using file mode kexec syscall */
 	unsigned int file_mode:1;
+#ifdef CONFIG_CRASH_HOTPLUG
+	/* If set, it is safe to update kexec segments that are
+	 * excluded from SHA calculation.
+	 */
+	unsigned int hotplug_support:1;
+#endif
 
 #ifdef ARCH_HAS_KIMAGE_ARCH
 	struct kimage_arch arch;
@@ -366,6 +348,12 @@ struct kimage {
 
 	/* Information for loading purgatory */
 	struct purgatory_info purgatory_info;
+#endif
+
+#ifdef CONFIG_CRASH_HOTPLUG
+	int hp_action;
+	int elfcorehdr_index;
+	bool elfcorehdr_updated;
 #endif
 
 #ifdef CONFIG_IMA_KEXEC
@@ -394,16 +382,10 @@ extern struct page *kimage_alloc_control_pages(struct kimage *image,
 static inline int machine_kexec_post_load(struct kimage *image) { return 0; }
 #endif
 
-extern void __crash_kexec(struct pt_regs *);
-extern void crash_kexec(struct pt_regs *);
-int kexec_should_crash(struct task_struct *);
-int kexec_crash_loaded(void);
-void crash_save_cpu(struct pt_regs *regs, int cpu);
-extern int kimage_crash_copy_vmcoreinfo(struct kimage *image);
-
 extern struct kimage *kexec_image;
 extern struct kimage *kexec_crash_image;
-extern int kexec_load_disabled;
+
+bool kexec_load_permitted(int kexec_image_type);
 
 #ifndef kexec_flush_icache_page
 #define kexec_flush_icache_page(page)
@@ -411,35 +393,18 @@ extern int kexec_load_disabled;
 
 /* List of defined/legal kexec flags */
 #ifndef CONFIG_KEXEC_JUMP
-#define KEXEC_FLAGS    KEXEC_ON_CRASH
+#define KEXEC_FLAGS    (KEXEC_ON_CRASH | KEXEC_UPDATE_ELFCOREHDR | KEXEC_CRASH_HOTPLUG_SUPPORT)
 #else
-#define KEXEC_FLAGS    (KEXEC_ON_CRASH | KEXEC_PRESERVE_CONTEXT)
+#define KEXEC_FLAGS    (KEXEC_ON_CRASH | KEXEC_PRESERVE_CONTEXT | KEXEC_UPDATE_ELFCOREHDR | \
+			KEXEC_CRASH_HOTPLUG_SUPPORT)
 #endif
 
 /* List of defined/legal kexec file flags */
 #define KEXEC_FILE_FLAGS	(KEXEC_FILE_UNLOAD | KEXEC_FILE_ON_CRASH | \
-				 KEXEC_FILE_NO_INITRAMFS)
+				 KEXEC_FILE_NO_INITRAMFS | KEXEC_FILE_DEBUG)
 
 /* flag to track if kexec reboot is in progress */
 extern bool kexec_in_progress;
-
-int crash_shrink_memory(unsigned long new_size);
-ssize_t crash_get_memory_size(void);
-
-#ifndef arch_kexec_protect_crashkres
-/*
- * Protection mechanism for crashkernel reserved memory after
- * the kdump kernel is loaded.
- *
- * Provide an empty default implementation here -- architecture
- * code may override this
- */
-static inline void arch_kexec_protect_crashkres(void) { }
-#endif
-
-#ifndef arch_kexec_unprotect_crashkres
-static inline void arch_kexec_unprotect_crashkres(void) { }
-#endif
 
 #ifndef page_to_boot_pfn
 static inline unsigned long page_to_boot_pfn(struct page *page)
@@ -496,6 +461,11 @@ static inline int arch_kexec_post_alloc_pages(void *vaddr, unsigned int pages, g
 #ifndef arch_kexec_pre_free_pages
 static inline void arch_kexec_pre_free_pages(void *vaddr, unsigned int pages) { }
 #endif
+
+extern bool kexec_file_dbg_print;
+
+#define kexec_dprintk(fmt, arg...) \
+        do { if (kexec_file_dbg_print) pr_info(fmt, ##arg); } while (0)
 
 #else /* !CONFIG_KEXEC_CORE */
 struct pt_regs;

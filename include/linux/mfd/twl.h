@@ -69,6 +69,8 @@ enum twl6030_module_ids {
 	TWL6030_MODULE_GPADC,
 	TWL6030_MODULE_GASGAUGE,
 
+	/* A few extra registers before the registers shared with the 6030 */
+	TWL6032_MODULE_CHARGE,
 	TWL6030_MODULE_LAST,
 };
 
@@ -459,6 +461,7 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 
 #define TWL4030_PM_MASTER_GLOBAL_TST		0xb6
 
+#define TWL6030_PHOENIX_DEV_ON                  0x06
 /*----------------------------------------------------------------------*/
 
 /* Power bus message definitions */
@@ -591,9 +594,6 @@ struct twl4030_gpio_platform_data {
 	 */
 	u32		pullups;
 	u32		pulldowns;
-
-	int		(*setup)(struct device *dev,
-				unsigned gpio, unsigned ngpio);
 };
 
 struct twl4030_madc_platform_data {

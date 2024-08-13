@@ -10,7 +10,7 @@ maintainers:
   - Amelie Delaunay <amelie.delaunay@foss.st.com>
 
 allOf:
-  - $ref: "dma-router.yaml#"
+  - $ref: dma-router.yaml#
 
 properties:
   "#dma-cells":
@@ -27,6 +27,10 @@ properties:
 
   resets:
     maxItems: 1
+
+  access-controllers:
+    minItems: 1
+    maxItems: 2
 
 required:
   - compatible

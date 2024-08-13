@@ -8,7 +8,7 @@ Dynamic DMA mapping Guide
 
 This is a guide to device driver writers on how to use the DMA API
 with example pseudo-code.  For a concise description of the API, see
-DMA-API.txt.
+Documentation/core-api/dma-api.rst.
 
 CPU and DMA addresses
 =====================
@@ -185,7 +185,7 @@ device struct of your device is embedded in the bus-specific device struct of
 your device.  For example, &pdev->dev is a pointer to the device struct of a
 PCI device (pdev is a pointer to the PCI device struct of your device).
 
-These calls usually return zero to indicated your device can perform DMA
+These calls usually return zero to indicate your device can perform DMA
 properly on the machine given the address mask you provided, but they might
 return an error if the mask is too small to be supportable on the given
 system.  If it returns non-zero, your device cannot perform DMA properly on
@@ -203,12 +203,32 @@ setting the DMA mask fails.  In this manner, if a user of your driver reports
 that performance is bad or that the device is not even detected, you can ask
 them for the kernel messages to find out exactly why.
 
-The standard 64-bit addressing device would do something like this::
+The 24-bit addressing device would do something like this::
 
-	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64))) {
+	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(24))) {
 		dev_warn(dev, "mydev: No suitable DMA available\n");
 		goto ignore_this_device;
 	}
+
+The standard 64-bit addressing device would do something like this::
+
+	dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64))
+
+dma_set_mask_and_coherent() never return fail when DMA_BIT_MASK(64). Typical
+error code like::
+
+	/* Wrong code */
+	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)))
+		dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32))
+
+dma_set_mask_and_coherent() will never return failure when bigger than 32.
+So typical code like::
+
+	/* Recommended code */
+	if (support_64bit)
+		dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64));
+	else
+		dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
 
 If the device only supports 32-bit addressing for descriptors in the
 coherent allocations, but supports full 64-bits for streaming mappings

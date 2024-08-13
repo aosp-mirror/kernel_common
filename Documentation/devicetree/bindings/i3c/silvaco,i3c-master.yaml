@@ -10,7 +10,7 @@ maintainers:
   - Conor Culhane <conor.culhane@silvaco.com>
 
 allOf:
-  - $ref: "i3c.yaml#"
+  - $ref: i3c.yaml#
 
 properties:
   compatible:
@@ -44,11 +44,11 @@ required:
   - clock-names
   - clocks
 
-additionalProperties: true
+unevaluatedProperties: false
 
 examples:
   - |
-    i3c-master@a0000000 {
+    i3c@a0000000 {
         compatible = "silvaco,i3c-master-v1";
         clocks = <&zynqmp_clk 71>, <&fclk>, <&sclk>;
         clock-names = "pclk", "fast_clk", "slow_clk";

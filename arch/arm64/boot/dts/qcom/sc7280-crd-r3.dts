@@ -27,7 +27,7 @@
 };
 
 &apps_rsc {
-	pmg1110-regulators {
+	regulators-2 {
 		compatible = "qcom,pmg1110-rpmh-regulators";
 		qcom,pmic-id = "k";
 
@@ -36,6 +36,10 @@
 			regulator-max-microvolt = <1170000>;
 		};
 	};
+};
+
+&bluetooth {
+	vddio-supply = <&vreg_l18b_1p8>;
 };
 
 ap_tp_i2c: &i2c0 {

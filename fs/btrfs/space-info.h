@@ -3,7 +3,17 @@
 #ifndef BTRFS_SPACE_INFO_H
 #define BTRFS_SPACE_INFO_H
 
+#include <trace/events/btrfs.h>
+#include <linux/spinlock.h>
+#include <linux/list.h>
+#include <linux/kobject.h>
+#include <linux/lockdep.h>
+#include <linux/wait.h>
+#include <linux/rwsem.h>
 #include "volumes.h"
+
+struct btrfs_fs_info;
+struct btrfs_block_group;
 
 /*
  * Different levels for to flush space when doing space reservations.
@@ -27,6 +37,7 @@ enum btrfs_reserve_flush_enum {
 	 * - Running delayed refs
 	 * - Running delalloc and waiting for ordered extents
 	 * - Allocating a new chunk
+	 * - Committing transaction
 	 */
 	BTRFS_RESERVE_FLUSH_EVICT,
 
@@ -96,8 +107,6 @@ struct btrfs_space_info {
 	u64 bytes_may_use;	/* number of bytes that may be used for
 				   delalloc/allocations */
 	u64 bytes_readonly;	/* total bytes that are read only */
-	/* Total bytes in the space, but only accounts active block groups. */
-	u64 active_total_bytes;
 	u64 bytes_zone_unusable;	/* total bytes that are unusable until
 					   resetting the device zone */
 
@@ -213,7 +222,7 @@ void btrfs_dump_space_info(struct btrfs_fs_info *fs_info,
 			   struct btrfs_space_info *info, u64 bytes,
 			   int dump_block_groups);
 int btrfs_reserve_metadata_bytes(struct btrfs_fs_info *fs_info,
-				 struct btrfs_block_rsv *block_rsv,
+				 struct btrfs_space_info *space_info,
 				 u64 orig_bytes,
 				 enum btrfs_reserve_flush_enum flush);
 void btrfs_try_granting_tickets(struct btrfs_fs_info *fs_info,

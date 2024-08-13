@@ -59,7 +59,6 @@ static inline void decode_ctrl_reg(u32 reg,
 /* Watchpoints */
 #define ARM_BREAKPOINT_LOAD	1
 #define ARM_BREAKPOINT_STORE	2
-#define AARCH64_ESR_ACCESS_MASK	(1 << 6)
 
 /* Lengths */
 #define ARM_BREAKPOINT_LEN_1	0x1
@@ -153,5 +152,13 @@ static inline int get_num_wrps(void)
 		cpuid_feature_extract_unsigned_field(dfr0,
 						ID_AA64DFR0_EL1_WRPs_SHIFT);
 }
+
+#ifdef CONFIG_CPU_PM
+extern void cpu_suspend_set_dbg_restorer(int (*hw_bp_restore)(unsigned int));
+#else
+static inline void cpu_suspend_set_dbg_restorer(int (*hw_bp_restore)(unsigned int))
+{
+}
+#endif
 
 #endif	/* __ASM_BREAKPOINT_H */

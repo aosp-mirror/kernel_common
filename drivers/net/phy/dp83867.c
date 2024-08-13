@@ -26,6 +26,8 @@
 #define MII_DP83867_MICR	0x12
 #define MII_DP83867_ISR		0x13
 #define DP83867_CFG2		0x14
+#define DP83867_LEDCR1		0x18
+#define DP83867_LEDCR2		0x19
 #define DP83867_CFG3		0x1e
 #define DP83867_CTRL		0x1f
 
@@ -42,6 +44,7 @@
 #define DP83867_STRAP_STS1	0x006E
 #define DP83867_STRAP_STS2	0x006f
 #define DP83867_RGMIIDCTL	0x0086
+#define DP83867_DSP_FFE_CFG	0x012c
 #define DP83867_RXFCFG		0x0134
 #define DP83867_RXFPMD1	0x0136
 #define DP83867_RXFPMD2	0x0137
@@ -149,6 +152,30 @@
 
 /* FLD_THR_CFG */
 #define DP83867_FLD_THR_CFG_ENERGY_LOST_THR_MASK	0x7
+
+#define DP83867_LED_COUNT	4
+
+/* LED_DRV bits */
+#define DP83867_LED_DRV_EN(x)	BIT((x) * 4)
+#define DP83867_LED_DRV_VAL(x)	BIT((x) * 4 + 1)
+#define DP83867_LED_POLARITY(x)	BIT((x) * 4 + 2)
+
+#define DP83867_LED_FN(idx, val)	(((val) & 0xf) << ((idx) * 4))
+#define DP83867_LED_FN_MASK(idx)	(0xf << ((idx) * 4))
+#define DP83867_LED_FN_RX_ERR		0xe /* Receive Error */
+#define DP83867_LED_FN_RX_TX_ERR	0xd /* Receive Error or Transmit Error */
+#define DP83867_LED_FN_LINK_RX_TX	0xb /* Link established, blink for rx or tx activity */
+#define DP83867_LED_FN_FULL_DUPLEX	0xa /* Full duplex */
+#define DP83867_LED_FN_LINK_100_1000_BT	0x9 /* 100/1000BT link established */
+#define DP83867_LED_FN_LINK_10_100_BT	0x8 /* 10/100BT link established */
+#define DP83867_LED_FN_LINK_10_BT	0x7 /* 10BT link established */
+#define DP83867_LED_FN_LINK_100_BTX	0x6 /* 100 BTX link established */
+#define DP83867_LED_FN_LINK_1000_BT	0x5 /* 1000 BT link established */
+#define DP83867_LED_FN_COLLISION	0x4 /* Collision detected */
+#define DP83867_LED_FN_RX		0x3 /* Receive activity */
+#define DP83867_LED_FN_TX		0x2 /* Transmit activity */
+#define DP83867_LED_FN_RX_TX		0x1 /* Receive or Transmit activity */
+#define DP83867_LED_FN_LINK		0x0 /* Link established */
 
 enum {
 	DP83867_PORT_MIRROING_KEEP,
@@ -468,8 +495,7 @@ static int dp83867_set_tunable(struct phy_device *phydev,
 
 static int dp83867_config_port_mirroring(struct phy_device *phydev)
 {
-	struct dp83867_private *dp83867 =
-		(struct dp83867_private *)phydev->priv;
+	struct dp83867_private *dp83867 = phydev->priv;
 
 	if (dp83867->port_mirroring == DP83867_PORT_MIRROING_EN)
 		phy_set_bits_mmd(phydev, DP83867_DEVADDR, DP83867_CFG4,
@@ -693,6 +719,30 @@ static int dp83867_of_init(struct phy_device *phydev)
 }
 #endif /* CONFIG_OF_MDIO */
 
+static int dp83867_suspend(struct phy_device *phydev)
+{
+	/* Disable PHY Interrupts */
+	if (phy_interrupt_is_valid(phydev)) {
+		phydev->interrupts = PHY_INTERRUPT_DISABLED;
+		dp83867_config_intr(phydev);
+	}
+
+	return genphy_suspend(phydev);
+}
+
+static int dp83867_resume(struct phy_device *phydev)
+{
+	/* Enable PHY Interrupts */
+	if (phy_interrupt_is_valid(phydev)) {
+		phydev->interrupts = PHY_INTERRUPT_ENABLED;
+		dp83867_config_intr(phydev);
+	}
+
+	genphy_resume(phydev);
+
+	return 0;
+}
+
 static int dp83867_probe(struct phy_device *phydev)
 {
 	struct dp83867_private *dp83867;
@@ -904,14 +954,33 @@ static int dp83867_phy_reset(struct phy_device *phydev)
 {
 	int err;
 
+	err = phy_write(phydev, DP83867_CTRL, DP83867_SW_RESET);
+	if (err < 0)
+		return err;
+
+	usleep_range(10, 20);
+
+	err = phy_modify(phydev, MII_DP83867_PHYCTRL,
+			 DP83867_PHYCR_FORCE_LINK_GOOD, 0);
+	if (err < 0)
+		return err;
+
+	/* Configure the DSP Feedforward Equalizer Configuration register to
+	 * improve short cable (< 1 meter) performance. This will not affect
+	 * long cable performance.
+	 */
+	err = phy_write_mmd(phydev, DP83867_DEVADDR, DP83867_DSP_FFE_CFG,
+			    0x0e81);
+	if (err < 0)
+		return err;
+
 	err = phy_write(phydev, DP83867_CTRL, DP83867_SW_RESTART);
 	if (err < 0)
 		return err;
 
 	usleep_range(10, 20);
 
-	return phy_modify(phydev, MII_DP83867_PHYCTRL,
-			 DP83867_PHYCR_FORCE_LINK_GOOD, 0);
+	return 0;
 }
 
 static void dp83867_link_change_notify(struct phy_device *phydev)
@@ -946,6 +1015,164 @@ static int dp83867_loopback(struct phy_device *phydev, bool enable)
 			  enable ? BMCR_LOOPBACK : 0);
 }
 
+static int
+dp83867_led_brightness_set(struct phy_device *phydev,
+			   u8 index, enum led_brightness brightness)
+{
+	u32 val;
+
+	if (index >= DP83867_LED_COUNT)
+		return -EINVAL;
+
+	/* DRV_EN==1: output is DRV_VAL */
+	val = DP83867_LED_DRV_EN(index);
+
+	if (brightness)
+		val |= DP83867_LED_DRV_VAL(index);
+
+	return phy_modify(phydev, DP83867_LEDCR2,
+			  DP83867_LED_DRV_VAL(index) |
+			  DP83867_LED_DRV_EN(index),
+			  val);
+}
+
+static int dp83867_led_mode(u8 index, unsigned long rules)
+{
+	if (index >= DP83867_LED_COUNT)
+		return -EINVAL;
+
+	switch (rules) {
+	case BIT(TRIGGER_NETDEV_LINK):
+		return DP83867_LED_FN_LINK;
+	case BIT(TRIGGER_NETDEV_LINK_10):
+		return DP83867_LED_FN_LINK_10_BT;
+	case BIT(TRIGGER_NETDEV_LINK_100):
+		return DP83867_LED_FN_LINK_100_BTX;
+	case BIT(TRIGGER_NETDEV_FULL_DUPLEX):
+		return DP83867_LED_FN_FULL_DUPLEX;
+	case BIT(TRIGGER_NETDEV_TX):
+		return DP83867_LED_FN_TX;
+	case BIT(TRIGGER_NETDEV_RX):
+		return DP83867_LED_FN_RX;
+	case BIT(TRIGGER_NETDEV_LINK_1000):
+		return DP83867_LED_FN_LINK_1000_BT;
+	case BIT(TRIGGER_NETDEV_TX) | BIT(TRIGGER_NETDEV_RX):
+		return DP83867_LED_FN_RX_TX;
+	case BIT(TRIGGER_NETDEV_LINK_100) | BIT(TRIGGER_NETDEV_LINK_1000):
+		return DP83867_LED_FN_LINK_100_1000_BT;
+	case BIT(TRIGGER_NETDEV_LINK_10) | BIT(TRIGGER_NETDEV_LINK_100):
+		return DP83867_LED_FN_LINK_10_100_BT;
+	case BIT(TRIGGER_NETDEV_LINK) | BIT(TRIGGER_NETDEV_TX) | BIT(TRIGGER_NETDEV_RX):
+		return DP83867_LED_FN_LINK_RX_TX;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int dp83867_led_hw_is_supported(struct phy_device *phydev, u8 index,
+				       unsigned long rules)
+{
+	int ret;
+
+	ret = dp83867_led_mode(index, rules);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static int dp83867_led_hw_control_set(struct phy_device *phydev, u8 index,
+				      unsigned long rules)
+{
+	int mode, ret;
+
+	mode = dp83867_led_mode(index, rules);
+	if (mode < 0)
+		return mode;
+
+	ret = phy_modify(phydev, DP83867_LEDCR1, DP83867_LED_FN_MASK(index),
+			 DP83867_LED_FN(index, mode));
+	if (ret)
+		return ret;
+
+	return phy_modify(phydev, DP83867_LEDCR2, DP83867_LED_DRV_EN(index), 0);
+}
+
+static int dp83867_led_hw_control_get(struct phy_device *phydev, u8 index,
+				      unsigned long *rules)
+{
+	int val;
+
+	val = phy_read(phydev, DP83867_LEDCR1);
+	if (val < 0)
+		return val;
+
+	val &= DP83867_LED_FN_MASK(index);
+	val >>= index * 4;
+
+	switch (val) {
+	case DP83867_LED_FN_LINK:
+		*rules = BIT(TRIGGER_NETDEV_LINK);
+		break;
+	case DP83867_LED_FN_LINK_10_BT:
+		*rules = BIT(TRIGGER_NETDEV_LINK_10);
+		break;
+	case DP83867_LED_FN_LINK_100_BTX:
+		*rules = BIT(TRIGGER_NETDEV_LINK_100);
+		break;
+	case DP83867_LED_FN_FULL_DUPLEX:
+		*rules = BIT(TRIGGER_NETDEV_FULL_DUPLEX);
+		break;
+	case DP83867_LED_FN_TX:
+		*rules = BIT(TRIGGER_NETDEV_TX);
+		break;
+	case DP83867_LED_FN_RX:
+		*rules = BIT(TRIGGER_NETDEV_RX);
+		break;
+	case DP83867_LED_FN_LINK_1000_BT:
+		*rules = BIT(TRIGGER_NETDEV_LINK_1000);
+		break;
+	case DP83867_LED_FN_RX_TX:
+		*rules = BIT(TRIGGER_NETDEV_TX) | BIT(TRIGGER_NETDEV_RX);
+		break;
+	case DP83867_LED_FN_LINK_100_1000_BT:
+		*rules = BIT(TRIGGER_NETDEV_LINK_100) | BIT(TRIGGER_NETDEV_LINK_1000);
+		break;
+	case DP83867_LED_FN_LINK_10_100_BT:
+		*rules = BIT(TRIGGER_NETDEV_LINK_10) | BIT(TRIGGER_NETDEV_LINK_100);
+		break;
+	case DP83867_LED_FN_LINK_RX_TX:
+		*rules = BIT(TRIGGER_NETDEV_LINK) | BIT(TRIGGER_NETDEV_TX) |
+			 BIT(TRIGGER_NETDEV_RX);
+		break;
+	default:
+		*rules = 0;
+		break;
+	}
+
+	return 0;
+}
+
+static int dp83867_led_polarity_set(struct phy_device *phydev, int index,
+				    unsigned long modes)
+{
+	/* Default active high */
+	u16 polarity = DP83867_LED_POLARITY(index);
+	u32 mode;
+
+	for_each_set_bit(mode, &modes, __PHY_LED_MODES_NUM) {
+		switch (mode) {
+		case PHY_LED_ACTIVE_LOW:
+			polarity = 0;
+			break;
+		default:
+			return -EINVAL;
+		}
+	}
+	return phy_modify(phydev, DP83867_LEDCR2,
+			  DP83867_LED_POLARITY(index), polarity);
+}
+
 static struct phy_driver dp83867_driver[] = {
 	{
 		.phy_id		= DP83867_PHY_ID,
@@ -968,11 +1195,17 @@ static struct phy_driver dp83867_driver[] = {
 		.config_intr	= dp83867_config_intr,
 		.handle_interrupt = dp83867_handle_interrupt,
 
-		.suspend	= genphy_suspend,
-		.resume		= genphy_resume,
+		.suspend	= dp83867_suspend,
+		.resume		= dp83867_resume,
 
 		.link_change_notify = dp83867_link_change_notify,
 		.set_loopback	= dp83867_loopback,
+
+		.led_brightness_set = dp83867_led_brightness_set,
+		.led_hw_is_supported = dp83867_led_hw_is_supported,
+		.led_hw_control_set = dp83867_led_hw_control_set,
+		.led_hw_control_get = dp83867_led_hw_control_get,
+		.led_polarity_set = dp83867_led_polarity_set,
 	},
 };
 module_phy_driver(dp83867_driver);

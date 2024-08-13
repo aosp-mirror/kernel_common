@@ -5,7 +5,7 @@ menu "UML-specific options"
 config UML
 	bool
 	default y
-	select ARCH_EPHEMERAL_INODES
+	select ARCH_HAS_CPU_FINALIZE_INIT
 	select ARCH_HAS_FORTIFY_SOURCE
 	select ARCH_HAS_GCOV_PROFILE_ALL
 	select ARCH_HAS_KCOV
@@ -20,14 +20,18 @@ config UML
 	select HAVE_UID16
 	select HAVE_DEBUG_KMEMLEAK
 	select HAVE_DEBUG_BUGVERBOSE
+	select HAVE_PAGE_SIZE_4KB
 	select NO_DMA if !UML_DMA_EMULATION
 	select OF_EARLY_FLATTREE if OF
 	select GENERIC_IRQ_SHOW
 	select GENERIC_CPU_DEVICES
 	select HAVE_GCC_PLUGINS
+	select ARCH_SUPPORTS_LTO_CLANG
+	select ARCH_SUPPORTS_LTO_CLANG_THIN
 	select TRACE_IRQFLAGS_SUPPORT
 	select TTY # Needed for line.c
 	select HAVE_ARCH_VMAP_STACK
+	select HAVE_RUST			if X86_64
 
 config MMU
 	bool
@@ -242,4 +246,8 @@ source "arch/um/drivers/Kconfig"
 config ARCH_SUSPEND_POSSIBLE
 	def_bool y
 
+menu "Power management options"
+
 source "kernel/power/Kconfig"
+
+endmenu

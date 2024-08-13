@@ -9,6 +9,8 @@
  * axial sliders presented by the device.
  */
 
+#include <linux/bits.h>
+#include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/err.h>
@@ -16,15 +18,17 @@
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include <linux/of_device.h>
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
 
 #define IQS269_VER_INFO				0x00
 #define IQS269_VER_INFO_PROD_NUM		0x4F
+#define IQS269_VER_INFO_FW_NUM_2		0x03
+#define IQS269_VER_INFO_FW_NUM_3		0x10
 
 #define IQS269_SYS_FLAGS			0x02
 #define IQS269_SYS_FLAGS_SHOW_RESET		BIT(15)
@@ -52,6 +56,7 @@
 #define IQS269_SYS_SETTINGS_ULP_UPDATE_MASK	GENMASK(10, 8)
 #define IQS269_SYS_SETTINGS_ULP_UPDATE_SHIFT	8
 #define IQS269_SYS_SETTINGS_ULP_UPDATE_MAX	7
+#define IQS269_SYS_SETTINGS_SLIDER_SWIPE	BIT(7)
 #define IQS269_SYS_SETTINGS_RESEED_OFFSET	BIT(6)
 #define IQS269_SYS_SETTINGS_EVENT_MODE		BIT(5)
 #define IQS269_SYS_SETTINGS_EVENT_MODE_LP	BIT(4)
@@ -68,6 +73,7 @@
 #define IQS269_FILT_STR_MAX			3
 
 #define IQS269_EVENT_MASK_SYS			BIT(6)
+#define IQS269_EVENT_MASK_GESTURE		BIT(3)
 #define IQS269_EVENT_MASK_DEEP			BIT(2)
 #define IQS269_EVENT_MASK_TOUCH			BIT(1)
 #define IQS269_EVENT_MASK_PROX			BIT(0)
@@ -96,7 +102,14 @@
 #define IQS269_MISC_B_TRACKING_UI_ENABLE	BIT(4)
 #define IQS269_MISC_B_FILT_STR_SLIDER		GENMASK(1, 0)
 
-#define IQS269_CHx_SETTINGS			0x8C
+#define IQS269_TOUCH_HOLD_SLIDER_SEL		0x89
+#define IQS269_TOUCH_HOLD_DEFAULT		0x14
+#define IQS269_TOUCH_HOLD_MS_MIN		256
+#define IQS269_TOUCH_HOLD_MS_MAX		65280
+
+#define IQS269_TIMEOUT_TAP_MS_MAX		4080
+#define IQS269_TIMEOUT_SWIPE_MS_MAX		4080
+#define IQS269_THRESH_SWIPE_MAX			255
 
 #define IQS269_CHx_ENG_A_MEAS_CAP_SIZE		BIT(15)
 #define IQS269_CHx_ENG_A_RX_GND_INACTIVE	BIT(13)
@@ -143,17 +156,14 @@
 
 #define IQS269_MAX_REG				0xFF
 
+#define IQS269_OTP_OPTION_DEFAULT		0x00
+#define IQS269_OTP_OPTION_TWS			0xD0
+#define IQS269_OTP_OPTION_HOLD			BIT(7)
+
 #define IQS269_NUM_CH				8
 #define IQS269_NUM_SL				2
 
-#define IQS269_ATI_POLL_SLEEP_US		(iqs269->delay_mult * 10000)
-#define IQS269_ATI_POLL_TIMEOUT_US		(iqs269->delay_mult * 500000)
-#define IQS269_ATI_STABLE_DELAY_MS		(iqs269->delay_mult * 150)
-
-#define IQS269_PWR_MODE_POLL_SLEEP_US		IQS269_ATI_POLL_SLEEP_US
-#define IQS269_PWR_MODE_POLL_TIMEOUT_US		IQS269_ATI_POLL_TIMEOUT_US
-
-#define iqs269_irq_wait()			usleep_range(100, 150)
+#define iqs269_irq_wait()			usleep_range(200, 250)
 
 enum iqs269_local_cap_size {
 	IQS269_LOCAL_CAP_SIZE_0,
@@ -181,6 +191,20 @@ enum iqs269_event_id {
 	IQS269_EVENT_TOUCH_UP,
 	IQS269_EVENT_DEEP_DN,
 	IQS269_EVENT_DEEP_UP,
+};
+
+enum iqs269_slider_id {
+	IQS269_SLIDER_NONE,
+	IQS269_SLIDER_KEY,
+	IQS269_SLIDER_RAW,
+};
+
+enum iqs269_gesture_id {
+	IQS269_GESTURE_TAP,
+	IQS269_GESTURE_HOLD,
+	IQS269_GESTURE_FLICK_POS,
+	IQS269_GESTURE_FLICK_NEG,
+	IQS269_NUM_GESTURES,
 };
 
 struct iqs269_switch_desc {
@@ -242,7 +266,19 @@ struct iqs269_ver_info {
 	u8 prod_num;
 	u8 sw_num;
 	u8 hw_num;
-	u8 padding;
+	u8 fw_num;
+} __packed;
+
+struct iqs269_ch_reg {
+	u8 rx_enable;
+	u8 tx_enable;
+	__be16 engine_a;
+	__be16 engine_b;
+	__be16 ati_comp;
+	u8 thresh[3];
+	u8 hyst;
+	u8 assoc_select;
+	u8 assoc_weight;
 } __packed;
 
 struct iqs269_sys_reg {
@@ -266,18 +302,7 @@ struct iqs269_sys_reg {
 	u8 timeout_swipe;
 	u8 thresh_swipe;
 	u8 redo_ati;
-} __packed;
-
-struct iqs269_ch_reg {
-	u8 rx_enable;
-	u8 tx_enable;
-	__be16 engine_a;
-	__be16 engine_b;
-	__be16 ati_comp;
-	u8 thresh[3];
-	u8 hyst;
-	u8 assoc_select;
-	u8 assoc_weight;
+	struct iqs269_ch_reg ch_reg[IQS269_NUM_CH];
 } __packed;
 
 struct iqs269_flags {
@@ -292,21 +317,46 @@ struct iqs269_private {
 	struct regmap *regmap;
 	struct mutex lock;
 	struct iqs269_switch_desc switches[ARRAY_SIZE(iqs269_events)];
-	struct iqs269_ch_reg ch_reg[IQS269_NUM_CH];
+	struct iqs269_ver_info ver_info;
 	struct iqs269_sys_reg sys_reg;
+	struct completion ati_done;
 	struct input_dev *keypad;
 	struct input_dev *slider[IQS269_NUM_SL];
 	unsigned int keycode[ARRAY_SIZE(iqs269_events) * IQS269_NUM_CH];
-	unsigned int suspend_mode;
-	unsigned int delay_mult;
+	unsigned int sl_code[IQS269_NUM_SL][IQS269_NUM_GESTURES];
+	unsigned int otp_option;
 	unsigned int ch_num;
 	bool hall_enable;
 	bool ati_current;
 };
 
+static enum iqs269_slider_id iqs269_slider_type(struct iqs269_private *iqs269,
+						int slider_num)
+{
+	int i;
+
+	/*
+	 * Slider 1 is unavailable if the touch-and-hold option is enabled via
+	 * OTP. In that case, the channel selection register is repurposed for
+	 * the touch-and-hold timer ceiling.
+	 */
+	if (slider_num && (iqs269->otp_option & IQS269_OTP_OPTION_HOLD))
+		return IQS269_SLIDER_NONE;
+
+	if (!iqs269->sys_reg.slider_select[slider_num])
+		return IQS269_SLIDER_NONE;
+
+	for (i = 0; i < IQS269_NUM_GESTURES; i++)
+		if (iqs269->sl_code[slider_num][i] != KEY_RESERVED)
+			return IQS269_SLIDER_KEY;
+
+	return IQS269_SLIDER_RAW;
+}
+
 static int iqs269_ati_mode_set(struct iqs269_private *iqs269,
 			       unsigned int ch_num, unsigned int mode)
 {
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 	u16 engine_a;
 
 	if (ch_num >= IQS269_NUM_CH)
@@ -317,12 +367,12 @@ static int iqs269_ati_mode_set(struct iqs269_private *iqs269,
 
 	mutex_lock(&iqs269->lock);
 
-	engine_a = be16_to_cpu(iqs269->ch_reg[ch_num].engine_a);
+	engine_a = be16_to_cpu(ch_reg[ch_num].engine_a);
 
 	engine_a &= ~IQS269_CHx_ENG_A_ATI_MODE_MASK;
 	engine_a |= (mode << IQS269_CHx_ENG_A_ATI_MODE_SHIFT);
 
-	iqs269->ch_reg[ch_num].engine_a = cpu_to_be16(engine_a);
+	ch_reg[ch_num].engine_a = cpu_to_be16(engine_a);
 	iqs269->ati_current = false;
 
 	mutex_unlock(&iqs269->lock);
@@ -333,13 +383,14 @@ static int iqs269_ati_mode_set(struct iqs269_private *iqs269,
 static int iqs269_ati_mode_get(struct iqs269_private *iqs269,
 			       unsigned int ch_num, unsigned int *mode)
 {
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 	u16 engine_a;
 
 	if (ch_num >= IQS269_NUM_CH)
 		return -EINVAL;
 
 	mutex_lock(&iqs269->lock);
-	engine_a = be16_to_cpu(iqs269->ch_reg[ch_num].engine_a);
+	engine_a = be16_to_cpu(ch_reg[ch_num].engine_a);
 	mutex_unlock(&iqs269->lock);
 
 	engine_a &= IQS269_CHx_ENG_A_ATI_MODE_MASK;
@@ -351,6 +402,7 @@ static int iqs269_ati_mode_get(struct iqs269_private *iqs269,
 static int iqs269_ati_base_set(struct iqs269_private *iqs269,
 			       unsigned int ch_num, unsigned int base)
 {
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 	u16 engine_b;
 
 	if (ch_num >= IQS269_NUM_CH)
@@ -379,12 +431,12 @@ static int iqs269_ati_base_set(struct iqs269_private *iqs269,
 
 	mutex_lock(&iqs269->lock);
 
-	engine_b = be16_to_cpu(iqs269->ch_reg[ch_num].engine_b);
+	engine_b = be16_to_cpu(ch_reg[ch_num].engine_b);
 
 	engine_b &= ~IQS269_CHx_ENG_B_ATI_BASE_MASK;
 	engine_b |= base;
 
-	iqs269->ch_reg[ch_num].engine_b = cpu_to_be16(engine_b);
+	ch_reg[ch_num].engine_b = cpu_to_be16(engine_b);
 	iqs269->ati_current = false;
 
 	mutex_unlock(&iqs269->lock);
@@ -395,13 +447,14 @@ static int iqs269_ati_base_set(struct iqs269_private *iqs269,
 static int iqs269_ati_base_get(struct iqs269_private *iqs269,
 			       unsigned int ch_num, unsigned int *base)
 {
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 	u16 engine_b;
 
 	if (ch_num >= IQS269_NUM_CH)
 		return -EINVAL;
 
 	mutex_lock(&iqs269->lock);
-	engine_b = be16_to_cpu(iqs269->ch_reg[ch_num].engine_b);
+	engine_b = be16_to_cpu(ch_reg[ch_num].engine_b);
 	mutex_unlock(&iqs269->lock);
 
 	switch (engine_b & IQS269_CHx_ENG_B_ATI_BASE_MASK) {
@@ -429,6 +482,7 @@ static int iqs269_ati_base_get(struct iqs269_private *iqs269,
 static int iqs269_ati_target_set(struct iqs269_private *iqs269,
 				 unsigned int ch_num, unsigned int target)
 {
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 	u16 engine_b;
 
 	if (ch_num >= IQS269_NUM_CH)
@@ -439,12 +493,12 @@ static int iqs269_ati_target_set(struct iqs269_private *iqs269,
 
 	mutex_lock(&iqs269->lock);
 
-	engine_b = be16_to_cpu(iqs269->ch_reg[ch_num].engine_b);
+	engine_b = be16_to_cpu(ch_reg[ch_num].engine_b);
 
 	engine_b &= ~IQS269_CHx_ENG_B_ATI_TARGET_MASK;
 	engine_b |= target / 32;
 
-	iqs269->ch_reg[ch_num].engine_b = cpu_to_be16(engine_b);
+	ch_reg[ch_num].engine_b = cpu_to_be16(engine_b);
 	iqs269->ati_current = false;
 
 	mutex_unlock(&iqs269->lock);
@@ -455,13 +509,14 @@ static int iqs269_ati_target_set(struct iqs269_private *iqs269,
 static int iqs269_ati_target_get(struct iqs269_private *iqs269,
 				 unsigned int ch_num, unsigned int *target)
 {
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 	u16 engine_b;
 
 	if (ch_num >= IQS269_NUM_CH)
 		return -EINVAL;
 
 	mutex_lock(&iqs269->lock);
-	engine_b = be16_to_cpu(iqs269->ch_reg[ch_num].engine_b);
+	engine_b = be16_to_cpu(ch_reg[ch_num].engine_b);
 	mutex_unlock(&iqs269->lock);
 
 	*target = (engine_b & IQS269_CHx_ENG_B_ATI_TARGET_MASK) * 32;
@@ -528,16 +583,11 @@ static int iqs269_parse_chan(struct iqs269_private *iqs269,
 	if (fwnode_property_present(ch_node, "azoteq,slider0-select"))
 		iqs269->sys_reg.slider_select[0] |= BIT(reg);
 
-	if (fwnode_property_present(ch_node, "azoteq,slider1-select"))
+	if (fwnode_property_present(ch_node, "azoteq,slider1-select") &&
+	    !(iqs269->otp_option & IQS269_OTP_OPTION_HOLD))
 		iqs269->sys_reg.slider_select[1] |= BIT(reg);
 
-	ch_reg = &iqs269->ch_reg[reg];
-
-	error = regmap_raw_read(iqs269->regmap,
-				IQS269_CHx_SETTINGS + reg * sizeof(*ch_reg) / 2,
-				ch_reg, sizeof(*ch_reg));
-	if (error)
-		return error;
+	ch_reg = &iqs269->sys_reg.ch_reg[reg];
 
 	error = iqs269_parse_mask(ch_node, "azoteq,rx-enable",
 				  &ch_reg->rx_enable);
@@ -694,6 +744,7 @@ static int iqs269_parse_chan(struct iqs269_private *iqs269,
 				dev_err(&client->dev,
 					"Invalid channel %u threshold: %u\n",
 					reg, val);
+				fwnode_handle_put(ev_node);
 				return -EINVAL;
 			}
 
@@ -707,6 +758,7 @@ static int iqs269_parse_chan(struct iqs269_private *iqs269,
 				dev_err(&client->dev,
 					"Invalid channel %u hysteresis: %u\n",
 					reg, val);
+				fwnode_handle_put(ev_node);
 				return -EINVAL;
 			}
 
@@ -721,8 +773,16 @@ static int iqs269_parse_chan(struct iqs269_private *iqs269,
 			}
 		}
 
-		if (fwnode_property_read_u32(ev_node, "linux,code", &val))
+		error = fwnode_property_read_u32(ev_node, "linux,code", &val);
+		fwnode_handle_put(ev_node);
+		if (error == -EINVAL) {
 			continue;
+		} else if (error) {
+			dev_err(&client->dev,
+				"Failed to read channel %u code: %d\n", reg,
+				error);
+			return error;
+		}
 
 		switch (reg) {
 		case IQS269_CHx_HALL_ACTIVE:
@@ -758,17 +818,6 @@ static int iqs269_parse_prop(struct iqs269_private *iqs269)
 
 	iqs269->hall_enable = device_property_present(&client->dev,
 						      "azoteq,hall-enable");
-
-	if (!device_property_read_u32(&client->dev, "azoteq,suspend-mode",
-				      &val)) {
-		if (val > IQS269_SYS_SETTINGS_PWR_MODE_MAX) {
-			dev_err(&client->dev, "Invalid suspend mode: %u\n",
-				val);
-			return -EINVAL;
-		}
-
-		iqs269->suspend_mode = val;
-	}
 
 	error = regmap_raw_read(iqs269->regmap, IQS269_SYS_SETTINGS, sys_reg,
 				sizeof(*sys_reg));
@@ -960,7 +1009,43 @@ static int iqs269_parse_prop(struct iqs269_private *iqs269)
 	sys_reg->blocking = 0;
 
 	sys_reg->slider_select[0] = 0;
-	sys_reg->slider_select[1] = 0;
+
+	/*
+	 * If configured via OTP to do so, the device asserts a pulse on the
+	 * GPIO4 pin for approximately 60 ms once a selected channel is held
+	 * in a state of touch for a configurable length of time.
+	 *
+	 * In that case, the register used for slider 1 channel selection is
+	 * repurposed for the touch-and-hold timer ceiling.
+	 */
+	if (iqs269->otp_option & IQS269_OTP_OPTION_HOLD) {
+		if (!device_property_read_u32(&client->dev,
+					      "azoteq,touch-hold-ms", &val)) {
+			if (val < IQS269_TOUCH_HOLD_MS_MIN ||
+			    val > IQS269_TOUCH_HOLD_MS_MAX) {
+				dev_err(&client->dev,
+					"Invalid touch-and-hold ceiling: %u\n",
+					val);
+				return -EINVAL;
+			}
+
+			sys_reg->slider_select[1] = val / 256;
+		} else if (iqs269->ver_info.fw_num < IQS269_VER_INFO_FW_NUM_3) {
+			/*
+			 * The default touch-and-hold timer ceiling initially
+			 * read from early revisions of silicon is invalid if
+			 * the device experienced a soft reset between power-
+			 * on and the read operation.
+			 *
+			 * To protect against this case, explicitly cache the
+			 * default value so that it is restored each time the
+			 * device is re-initialized.
+			 */
+			sys_reg->slider_select[1] = IQS269_TOUCH_HOLD_DEFAULT;
+		}
+	} else {
+		sys_reg->slider_select[1] = 0;
+	}
 
 	sys_reg->event_mask = ~((u8)IQS269_EVENT_MASK_SYS);
 
@@ -980,13 +1065,8 @@ static int iqs269_parse_prop(struct iqs269_private *iqs269)
 
 	general = be16_to_cpu(sys_reg->general);
 
-	if (device_property_present(&client->dev, "azoteq,clk-div")) {
+	if (device_property_present(&client->dev, "azoteq,clk-div"))
 		general |= IQS269_SYS_SETTINGS_CLK_DIV;
-		iqs269->delay_mult = 4;
-	} else {
-		general &= ~IQS269_SYS_SETTINGS_CLK_DIV;
-		iqs269->delay_mult = 1;
-	}
 
 	/*
 	 * Configure the device to automatically switch between normal and low-
@@ -996,6 +1076,17 @@ static int iqs269_parse_prop(struct iqs269_private *iqs269)
 	general &= ~IQS269_SYS_SETTINGS_ULP_AUTO;
 	general &= ~IQS269_SYS_SETTINGS_DIS_AUTO;
 	general &= ~IQS269_SYS_SETTINGS_PWR_MODE_MASK;
+
+	if (!device_property_read_u32(&client->dev, "azoteq,suspend-mode",
+				      &val)) {
+		if (val > IQS269_SYS_SETTINGS_PWR_MODE_MAX) {
+			dev_err(&client->dev, "Invalid suspend mode: %u\n",
+				val);
+			return -EINVAL;
+		}
+
+		general |= (val << IQS269_SYS_SETTINGS_PWR_MODE_SHIFT);
+	}
 
 	if (!device_property_read_u32(&client->dev, "azoteq,ulp-update",
 				      &val)) {
@@ -1008,6 +1099,76 @@ static int iqs269_parse_prop(struct iqs269_private *iqs269)
 		general |= (val << IQS269_SYS_SETTINGS_ULP_UPDATE_SHIFT);
 	}
 
+	if (device_property_present(&client->dev, "linux,keycodes")) {
+		int scale = 1;
+		int count = device_property_count_u32(&client->dev,
+						      "linux,keycodes");
+		if (count > IQS269_NUM_GESTURES * IQS269_NUM_SL) {
+			dev_err(&client->dev, "Too many keycodes present\n");
+			return -EINVAL;
+		} else if (count < 0) {
+			dev_err(&client->dev, "Failed to count keycodes: %d\n",
+				count);
+			return count;
+		}
+
+		error = device_property_read_u32_array(&client->dev,
+						       "linux,keycodes",
+						       *iqs269->sl_code, count);
+		if (error) {
+			dev_err(&client->dev, "Failed to read keycodes: %d\n",
+				error);
+			return error;
+		}
+
+		if (device_property_present(&client->dev,
+					    "azoteq,gesture-swipe"))
+			general |= IQS269_SYS_SETTINGS_SLIDER_SWIPE;
+
+		/*
+		 * Early revisions of silicon use a more granular step size for
+		 * tap and swipe gesture timeouts; scale them appropriately.
+		 */
+		if (iqs269->ver_info.fw_num < IQS269_VER_INFO_FW_NUM_3)
+			scale = 4;
+
+		if (!device_property_read_u32(&client->dev,
+					      "azoteq,timeout-tap-ms", &val)) {
+			if (val > IQS269_TIMEOUT_TAP_MS_MAX / scale) {
+				dev_err(&client->dev, "Invalid timeout: %u\n",
+					val);
+				return -EINVAL;
+			}
+
+			sys_reg->timeout_tap = val / (16 / scale);
+		}
+
+		if (!device_property_read_u32(&client->dev,
+					      "azoteq,timeout-swipe-ms",
+					      &val)) {
+			if (val > IQS269_TIMEOUT_SWIPE_MS_MAX / scale) {
+				dev_err(&client->dev, "Invalid timeout: %u\n",
+					val);
+				return -EINVAL;
+			}
+
+			sys_reg->timeout_swipe = val / (16 / scale);
+		}
+
+		if (!device_property_read_u32(&client->dev,
+					      "azoteq,thresh-swipe", &val)) {
+			if (val > IQS269_THRESH_SWIPE_MAX) {
+				dev_err(&client->dev, "Invalid threshold: %u\n",
+					val);
+				return -EINVAL;
+			}
+
+			sys_reg->thresh_swipe = val;
+		}
+
+		sys_reg->event_mask &= ~IQS269_EVENT_MASK_GESTURE;
+	}
+
 	general &= ~IQS269_SYS_SETTINGS_RESEED_OFFSET;
 	if (device_property_present(&client->dev, "azoteq,reseed-offset"))
 		general |= IQS269_SYS_SETTINGS_RESEED_OFFSET;
@@ -1016,10 +1177,11 @@ static int iqs269_parse_prop(struct iqs269_private *iqs269)
 
 	/*
 	 * As per the datasheet, enable streaming during normal-power mode if
-	 * either slider is in use. In that case, the device returns to event
-	 * mode during low-power mode.
+	 * raw coordinates will be read from either slider. In that case, the
+	 * device returns to event mode during low-power mode.
 	 */
-	if (sys_reg->slider_select[0] || sys_reg->slider_select[1])
+	if (iqs269_slider_type(iqs269, 0) == IQS269_SLIDER_RAW ||
+	    iqs269_slider_type(iqs269, 1) == IQS269_SLIDER_RAW)
 		general |= IQS269_SYS_SETTINGS_EVENT_MODE_LP;
 
 	general |= IQS269_SYS_SETTINGS_REDO_ATI;
@@ -1030,14 +1192,29 @@ static int iqs269_parse_prop(struct iqs269_private *iqs269)
 	return 0;
 }
 
+static const struct reg_sequence iqs269_tws_init[] = {
+	{ IQS269_TOUCH_HOLD_SLIDER_SEL, IQS269_TOUCH_HOLD_DEFAULT },
+	{ 0xF0, 0x580F },
+	{ 0xF0, 0x59EF },
+};
+
 static int iqs269_dev_init(struct iqs269_private *iqs269)
 {
-	struct iqs269_sys_reg *sys_reg = &iqs269->sys_reg;
-	struct iqs269_ch_reg *ch_reg;
-	unsigned int val;
-	int error, i;
+	int error;
 
 	mutex_lock(&iqs269->lock);
+
+	/*
+	 * Early revisions of silicon require the following workaround in order
+	 * to restore any OTP-enabled functionality after a soft reset.
+	 */
+	if (iqs269->otp_option == IQS269_OTP_OPTION_TWS &&
+	    iqs269->ver_info.fw_num < IQS269_VER_INFO_FW_NUM_3) {
+		error = regmap_multi_reg_write(iqs269->regmap, iqs269_tws_init,
+					       ARRAY_SIZE(iqs269_tws_init));
+		if (error)
+			goto err_mutex;
+	}
 
 	error = regmap_update_bits(iqs269->regmap, IQS269_HALL_UI,
 				   IQS269_HALL_UI_ENABLE,
@@ -1045,38 +1222,17 @@ static int iqs269_dev_init(struct iqs269_private *iqs269)
 	if (error)
 		goto err_mutex;
 
-	for (i = 0; i < IQS269_NUM_CH; i++) {
-		if (!(sys_reg->active & BIT(i)))
-			continue;
-
-		ch_reg = &iqs269->ch_reg[i];
-
-		error = regmap_raw_write(iqs269->regmap,
-					 IQS269_CHx_SETTINGS + i *
-					 sizeof(*ch_reg) / 2, ch_reg,
-					 sizeof(*ch_reg));
-		if (error)
-			goto err_mutex;
-	}
+	error = regmap_raw_write(iqs269->regmap, IQS269_SYS_SETTINGS,
+				 &iqs269->sys_reg, sizeof(iqs269->sys_reg));
+	if (error)
+		goto err_mutex;
 
 	/*
-	 * The REDO-ATI and ATI channel selection fields must be written in the
-	 * same block write, so every field between registers 0x80 through 0x8B
-	 * (inclusive) must be written as well.
+	 * The following delay gives the device time to deassert its RDY output
+	 * so as to prevent an interrupt from being serviced prematurely.
 	 */
-	error = regmap_raw_write(iqs269->regmap, IQS269_SYS_SETTINGS, sys_reg,
-				 sizeof(*sys_reg));
-	if (error)
-		goto err_mutex;
+	usleep_range(2000, 2100);
 
-	error = regmap_read_poll_timeout(iqs269->regmap, IQS269_SYS_FLAGS, val,
-					!(val & IQS269_SYS_FLAGS_IN_ATI),
-					 IQS269_ATI_POLL_SLEEP_US,
-					 IQS269_ATI_POLL_TIMEOUT_US);
-	if (error)
-		goto err_mutex;
-
-	msleep(IQS269_ATI_STABLE_DELAY_MS);
 	iqs269->ati_current = true;
 
 err_mutex:
@@ -1088,10 +1244,8 @@ err_mutex:
 static int iqs269_input_init(struct iqs269_private *iqs269)
 {
 	struct i2c_client *client = iqs269->client;
-	struct iqs269_flags flags;
 	unsigned int sw_code, keycode;
 	int error, i, j;
-	u8 dir_mask, state;
 
 	iqs269->keypad = devm_input_allocate_device(&client->dev);
 	if (!iqs269->keypad)
@@ -1104,23 +1258,7 @@ static int iqs269_input_init(struct iqs269_private *iqs269)
 	iqs269->keypad->name = "iqs269a_keypad";
 	iqs269->keypad->id.bustype = BUS_I2C;
 
-	if (iqs269->hall_enable) {
-		error = regmap_raw_read(iqs269->regmap, IQS269_SYS_FLAGS,
-					&flags, sizeof(flags));
-		if (error) {
-			dev_err(&client->dev,
-				"Failed to read initial status: %d\n", error);
-			return error;
-		}
-	}
-
 	for (i = 0; i < ARRAY_SIZE(iqs269_events); i++) {
-		dir_mask = flags.states[IQS269_ST_OFFS_DIR];
-		if (!iqs269_events[i].dir_up)
-			dir_mask = ~dir_mask;
-
-		state = flags.states[iqs269_events[i].st_offs] & dir_mask;
-
 		sw_code = iqs269->switches[i].code;
 
 		for (j = 0; j < IQS269_NUM_CH; j++) {
@@ -1133,13 +1271,9 @@ static int iqs269_input_init(struct iqs269_private *iqs269)
 			switch (j) {
 			case IQS269_CHx_HALL_ACTIVE:
 				if (iqs269->hall_enable &&
-				    iqs269->switches[i].enabled) {
+				    iqs269->switches[i].enabled)
 					input_set_capability(iqs269->keypad,
 							     EV_SW, sw_code);
-					input_report_switch(iqs269->keypad,
-							    sw_code,
-							    state & BIT(j));
-				}
 				fallthrough;
 
 			case IQS269_CHx_HALL_INACTIVE:
@@ -1155,28 +1289,38 @@ static int iqs269_input_init(struct iqs269_private *iqs269)
 		}
 	}
 
-	input_sync(iqs269->keypad);
-
-	error = input_register_device(iqs269->keypad);
-	if (error) {
-		dev_err(&client->dev, "Failed to register keypad: %d\n", error);
-		return error;
-	}
-
 	for (i = 0; i < IQS269_NUM_SL; i++) {
-		if (!iqs269->sys_reg.slider_select[i])
+		if (iqs269_slider_type(iqs269, i) == IQS269_SLIDER_NONE)
 			continue;
 
 		iqs269->slider[i] = devm_input_allocate_device(&client->dev);
 		if (!iqs269->slider[i])
 			return -ENOMEM;
 
+		iqs269->slider[i]->keycodemax = ARRAY_SIZE(iqs269->sl_code[i]);
+		iqs269->slider[i]->keycode = iqs269->sl_code[i];
+		iqs269->slider[i]->keycodesize = sizeof(**iqs269->sl_code);
+
 		iqs269->slider[i]->name = i ? "iqs269a_slider_1"
 					    : "iqs269a_slider_0";
 		iqs269->slider[i]->id.bustype = BUS_I2C;
 
-		input_set_capability(iqs269->slider[i], EV_KEY, BTN_TOUCH);
-		input_set_abs_params(iqs269->slider[i], ABS_X, 0, 255, 0, 0);
+		for (j = 0; j < IQS269_NUM_GESTURES; j++)
+			if (iqs269->sl_code[i][j] != KEY_RESERVED)
+				input_set_capability(iqs269->slider[i], EV_KEY,
+						     iqs269->sl_code[i][j]);
+
+		/*
+		 * Present the slider as a narrow trackpad if one or more chan-
+		 * nels have been selected to participate, but no gestures have
+		 * been mapped to a keycode.
+		 */
+		if (iqs269_slider_type(iqs269, i) == IQS269_SLIDER_RAW) {
+			input_set_capability(iqs269->slider[i],
+					     EV_KEY, BTN_TOUCH);
+			input_set_abs_params(iqs269->slider[i],
+					     ABS_X, 0, 255, 0, 0);
+		}
 
 		error = input_register_device(iqs269->slider[i]);
 		if (error) {
@@ -1222,28 +1366,65 @@ static int iqs269_report(struct iqs269_private *iqs269)
 		return error;
 	}
 
-	error = regmap_raw_read(iqs269->regmap, IQS269_SLIDER_X, slider_x,
-				sizeof(slider_x));
-	if (error) {
-		dev_err(&client->dev, "Failed to read slider position: %d\n",
-			error);
-		return error;
+	if (be16_to_cpu(flags.system) & IQS269_SYS_FLAGS_IN_ATI)
+		return 0;
+
+	if (iqs269_slider_type(iqs269, 0) == IQS269_SLIDER_RAW ||
+	    iqs269_slider_type(iqs269, 1) == IQS269_SLIDER_RAW) {
+		error = regmap_raw_read(iqs269->regmap, IQS269_SLIDER_X,
+					slider_x, sizeof(slider_x));
+		if (error) {
+			dev_err(&client->dev,
+				"Failed to read slider position: %d\n", error);
+			return error;
+		}
 	}
 
 	for (i = 0; i < IQS269_NUM_SL; i++) {
-		if (!iqs269->sys_reg.slider_select[i])
+		flags.gesture >>= (i * IQS269_NUM_GESTURES);
+
+		switch (iqs269_slider_type(iqs269, i)) {
+		case IQS269_SLIDER_NONE:
 			continue;
 
-		/*
-		 * Report BTN_TOUCH if any channel that participates in the
-		 * slider is in a state of touch.
-		 */
-		if (flags.states[IQS269_ST_OFFS_TOUCH] &
-		    iqs269->sys_reg.slider_select[i]) {
-			input_report_key(iqs269->slider[i], BTN_TOUCH, 1);
-			input_report_abs(iqs269->slider[i], ABS_X, slider_x[i]);
-		} else {
-			input_report_key(iqs269->slider[i], BTN_TOUCH, 0);
+		case IQS269_SLIDER_KEY:
+			for (j = 0; j < IQS269_NUM_GESTURES; j++)
+				input_report_key(iqs269->slider[i],
+						 iqs269->sl_code[i][j],
+						 flags.gesture & BIT(j));
+
+			if (!(flags.gesture & (BIT(IQS269_GESTURE_FLICK_NEG) |
+					       BIT(IQS269_GESTURE_FLICK_POS) |
+					       BIT(IQS269_GESTURE_TAP))))
+				break;
+
+			input_sync(iqs269->slider[i]);
+
+			/*
+			 * Momentary gestures are followed by a complementary
+			 * release cycle so as to emulate a full keystroke.
+			 */
+			for (j = 0; j < IQS269_NUM_GESTURES; j++)
+				if (j != IQS269_GESTURE_HOLD)
+					input_report_key(iqs269->slider[i],
+							 iqs269->sl_code[i][j],
+							 0);
+			break;
+
+		case IQS269_SLIDER_RAW:
+			/*
+			 * The slider is considered to be in a state of touch
+			 * if any selected channels are in a state of touch.
+			 */
+			state = flags.states[IQS269_ST_OFFS_TOUCH];
+			state &= iqs269->sys_reg.slider_select[i];
+
+			input_report_key(iqs269->slider[i], BTN_TOUCH, state);
+
+			if (state)
+				input_report_abs(iqs269->slider[i],
+						 ABS_X, slider_x[i]);
+			break;
 		}
 
 		input_sync(iqs269->slider[i]);
@@ -1284,6 +1465,12 @@ static int iqs269_report(struct iqs269_private *iqs269)
 
 	input_sync(iqs269->keypad);
 
+	/*
+	 * The following completion signals that ATI has finished, any initial
+	 * switch states have been reported and the keypad can be registered.
+	 */
+	complete_all(&iqs269->ati_done);
+
 	return 0;
 }
 
@@ -1315,6 +1502,9 @@ static ssize_t counts_show(struct device *dev,
 	if (!iqs269->ati_current || iqs269->hall_enable)
 		return -EPERM;
 
+	if (!completion_done(&iqs269->ati_done))
+		return -EBUSY;
+
 	/*
 	 * Unsolicited I2C communication prompts the device to assert its RDY
 	 * pin, so disable the interrupt line until the operation is finished
@@ -1332,13 +1522,14 @@ static ssize_t counts_show(struct device *dev,
 	if (error)
 		return error;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", le16_to_cpu(counts));
+	return sysfs_emit(buf, "%u\n", le16_to_cpu(counts));
 }
 
 static ssize_t hall_bin_show(struct device *dev,
 			     struct device_attribute *attr, char *buf)
 {
 	struct iqs269_private *iqs269 = dev_get_drvdata(dev);
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 	struct i2c_client *client = iqs269->client;
 	unsigned int val;
 	int error;
@@ -1353,8 +1544,8 @@ static ssize_t hall_bin_show(struct device *dev,
 	if (error)
 		return error;
 
-	switch (iqs269->ch_reg[IQS269_CHx_HALL_ACTIVE].rx_enable &
-		iqs269->ch_reg[IQS269_CHx_HALL_INACTIVE].rx_enable) {
+	switch (ch_reg[IQS269_CHx_HALL_ACTIVE].rx_enable &
+		ch_reg[IQS269_CHx_HALL_INACTIVE].rx_enable) {
 	case IQS269_HALL_PAD_R:
 		val &= IQS269_CAL_DATA_A_HALL_BIN_R_MASK;
 		val >>= IQS269_CAL_DATA_A_HALL_BIN_R_SHIFT;
@@ -1369,7 +1560,7 @@ static ssize_t hall_bin_show(struct device *dev,
 		return -EINVAL;
 	}
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", val);
+	return sysfs_emit(buf, "%u\n", val);
 }
 
 static ssize_t hall_enable_show(struct device *dev,
@@ -1377,7 +1568,7 @@ static ssize_t hall_enable_show(struct device *dev,
 {
 	struct iqs269_private *iqs269 = dev_get_drvdata(dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", iqs269->hall_enable);
+	return sysfs_emit(buf, "%u\n", iqs269->hall_enable);
 }
 
 static ssize_t hall_enable_store(struct device *dev,
@@ -1407,7 +1598,7 @@ static ssize_t ch_number_show(struct device *dev,
 {
 	struct iqs269_private *iqs269 = dev_get_drvdata(dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", iqs269->ch_num);
+	return sysfs_emit(buf, "%u\n", iqs269->ch_num);
 }
 
 static ssize_t ch_number_store(struct device *dev,
@@ -1434,9 +1625,9 @@ static ssize_t rx_enable_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
 	struct iqs269_private *iqs269 = dev_get_drvdata(dev);
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 iqs269->ch_reg[iqs269->ch_num].rx_enable);
+	return sysfs_emit(buf, "%u\n", ch_reg[iqs269->ch_num].rx_enable);
 }
 
 static ssize_t rx_enable_store(struct device *dev,
@@ -1444,6 +1635,7 @@ static ssize_t rx_enable_store(struct device *dev,
 			       size_t count)
 {
 	struct iqs269_private *iqs269 = dev_get_drvdata(dev);
+	struct iqs269_ch_reg *ch_reg = iqs269->sys_reg.ch_reg;
 	unsigned int val;
 	int error;
 
@@ -1456,7 +1648,7 @@ static ssize_t rx_enable_store(struct device *dev,
 
 	mutex_lock(&iqs269->lock);
 
-	iqs269->ch_reg[iqs269->ch_num].rx_enable = val;
+	ch_reg[iqs269->ch_num].rx_enable = val;
 	iqs269->ati_current = false;
 
 	mutex_unlock(&iqs269->lock);
@@ -1475,7 +1667,7 @@ static ssize_t ati_mode_show(struct device *dev,
 	if (error)
 		return error;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", val);
+	return sysfs_emit(buf, "%u\n", val);
 }
 
 static ssize_t ati_mode_store(struct device *dev,
@@ -1508,7 +1700,7 @@ static ssize_t ati_base_show(struct device *dev,
 	if (error)
 		return error;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", val);
+	return sysfs_emit(buf, "%u\n", val);
 }
 
 static ssize_t ati_base_store(struct device *dev,
@@ -1541,7 +1733,7 @@ static ssize_t ati_target_show(struct device *dev,
 	if (error)
 		return error;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", val);
+	return sysfs_emit(buf, "%u\n", val);
 }
 
 static ssize_t ati_target_store(struct device *dev,
@@ -1568,7 +1760,9 @@ static ssize_t ati_trigger_show(struct device *dev,
 {
 	struct iqs269_private *iqs269 = dev_get_drvdata(dev);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", iqs269->ati_current);
+	return sysfs_emit(buf, "%u\n",
+			  iqs269->ati_current &&
+			  completion_done(&iqs269->ati_done));
 }
 
 static ssize_t ati_trigger_store(struct device *dev,
@@ -1588,6 +1782,7 @@ static ssize_t ati_trigger_store(struct device *dev,
 		return count;
 
 	disable_irq(client->irq);
+	reinit_completion(&iqs269->ati_done);
 
 	error = iqs269_dev_init(iqs269);
 
@@ -1596,6 +1791,10 @@ static ssize_t ati_trigger_store(struct device *dev,
 
 	if (error)
 		return error;
+
+	if (!wait_for_completion_timeout(&iqs269->ati_done,
+					 msecs_to_jiffies(2000)))
+		return -ETIMEDOUT;
 
 	return count;
 }
@@ -1622,10 +1821,7 @@ static struct attribute *iqs269_attrs[] = {
 	&dev_attr_ati_trigger.attr,
 	NULL,
 };
-
-static const struct attribute_group iqs269_attr_group = {
-	.attrs = iqs269_attrs,
-};
+ATTRIBUTE_GROUPS(iqs269);
 
 static const struct regmap_config iqs269_regmap_config = {
 	.reg_bits = 8,
@@ -1635,7 +1831,6 @@ static const struct regmap_config iqs269_regmap_config = {
 
 static int iqs269_probe(struct i2c_client *client)
 {
-	struct iqs269_ver_info ver_info;
 	struct iqs269_private *iqs269;
 	int error;
 
@@ -1655,15 +1850,18 @@ static int iqs269_probe(struct i2c_client *client)
 	}
 
 	mutex_init(&iqs269->lock);
+	init_completion(&iqs269->ati_done);
 
-	error = regmap_raw_read(iqs269->regmap, IQS269_VER_INFO, &ver_info,
-				sizeof(ver_info));
+	iqs269->otp_option = (uintptr_t)device_get_match_data(&client->dev);
+
+	error = regmap_raw_read(iqs269->regmap, IQS269_VER_INFO,
+				&iqs269->ver_info, sizeof(iqs269->ver_info));
 	if (error)
 		return error;
 
-	if (ver_info.prod_num != IQS269_VER_INFO_PROD_NUM) {
+	if (iqs269->ver_info.prod_num != IQS269_VER_INFO_PROD_NUM) {
 		dev_err(&client->dev, "Unrecognized product number: 0x%02X\n",
-			ver_info.prod_num);
+			iqs269->ver_info.prod_num);
 		return -EINVAL;
 	}
 
@@ -1690,123 +1888,94 @@ static int iqs269_probe(struct i2c_client *client)
 		return error;
 	}
 
-	error = devm_device_add_group(&client->dev, &iqs269_attr_group);
-	if (error)
-		dev_err(&client->dev, "Failed to add attributes: %d\n", error);
+	if (!wait_for_completion_timeout(&iqs269->ati_done,
+					 msecs_to_jiffies(2000))) {
+		dev_err(&client->dev, "Failed to complete ATI\n");
+		return -ETIMEDOUT;
+	}
+
+	/*
+	 * The keypad may include one or more switches and is not registered
+	 * until ATI is complete and the initial switch states are read.
+	 */
+	error = input_register_device(iqs269->keypad);
+	if (error) {
+		dev_err(&client->dev, "Failed to register keypad: %d\n", error);
+		return error;
+	}
 
 	return error;
 }
 
-static int __maybe_unused iqs269_suspend(struct device *dev)
+static u16 iqs269_general_get(struct iqs269_private *iqs269)
+{
+	u16 general = be16_to_cpu(iqs269->sys_reg.general);
+
+	general &= ~IQS269_SYS_SETTINGS_REDO_ATI;
+	general &= ~IQS269_SYS_SETTINGS_ACK_RESET;
+
+	return general | IQS269_SYS_SETTINGS_DIS_AUTO;
+}
+
+static int iqs269_suspend(struct device *dev)
 {
 	struct iqs269_private *iqs269 = dev_get_drvdata(dev);
 	struct i2c_client *client = iqs269->client;
-	unsigned int val;
 	int error;
+	u16 general = iqs269_general_get(iqs269);
 
-	if (!iqs269->suspend_mode)
+	if (!(general & IQS269_SYS_SETTINGS_PWR_MODE_MASK))
 		return 0;
 
 	disable_irq(client->irq);
 
-	/*
-	 * Automatic power mode switching must be disabled before the device is
-	 * forced into any particular power mode. In this case, the device will
-	 * transition into normal-power mode.
-	 */
-	error = regmap_update_bits(iqs269->regmap, IQS269_SYS_SETTINGS,
-				   IQS269_SYS_SETTINGS_DIS_AUTO, ~0);
-	if (error)
-		goto err_irq;
+	error = regmap_write(iqs269->regmap, IQS269_SYS_SETTINGS, general);
 
-	/*
-	 * The following check ensures the device has completed its transition
-	 * into normal-power mode before a manual mode switch is performed.
-	 */
-	error = regmap_read_poll_timeout(iqs269->regmap, IQS269_SYS_FLAGS, val,
-					!(val & IQS269_SYS_FLAGS_PWR_MODE_MASK),
-					 IQS269_PWR_MODE_POLL_SLEEP_US,
-					 IQS269_PWR_MODE_POLL_TIMEOUT_US);
-	if (error)
-		goto err_irq;
-
-	error = regmap_update_bits(iqs269->regmap, IQS269_SYS_SETTINGS,
-				   IQS269_SYS_SETTINGS_PWR_MODE_MASK,
-				   iqs269->suspend_mode <<
-				   IQS269_SYS_SETTINGS_PWR_MODE_SHIFT);
-	if (error)
-		goto err_irq;
-
-	/*
-	 * This last check ensures the device has completed its transition into
-	 * the desired power mode to prevent any spurious interrupts from being
-	 * triggered after iqs269_suspend has already returned.
-	 */
-	error = regmap_read_poll_timeout(iqs269->regmap, IQS269_SYS_FLAGS, val,
-					 (val & IQS269_SYS_FLAGS_PWR_MODE_MASK)
-					 == (iqs269->suspend_mode <<
-					     IQS269_SYS_FLAGS_PWR_MODE_SHIFT),
-					 IQS269_PWR_MODE_POLL_SLEEP_US,
-					 IQS269_PWR_MODE_POLL_TIMEOUT_US);
-
-err_irq:
 	iqs269_irq_wait();
 	enable_irq(client->irq);
 
 	return error;
 }
 
-static int __maybe_unused iqs269_resume(struct device *dev)
+static int iqs269_resume(struct device *dev)
 {
 	struct iqs269_private *iqs269 = dev_get_drvdata(dev);
 	struct i2c_client *client = iqs269->client;
-	unsigned int val;
 	int error;
+	u16 general = iqs269_general_get(iqs269);
 
-	if (!iqs269->suspend_mode)
+	if (!(general & IQS269_SYS_SETTINGS_PWR_MODE_MASK))
 		return 0;
 
 	disable_irq(client->irq);
 
-	error = regmap_update_bits(iqs269->regmap, IQS269_SYS_SETTINGS,
-				   IQS269_SYS_SETTINGS_PWR_MODE_MASK, 0);
-	if (error)
-		goto err_irq;
+	error = regmap_write(iqs269->regmap, IQS269_SYS_SETTINGS,
+			     general & ~IQS269_SYS_SETTINGS_PWR_MODE_MASK);
+	if (!error)
+		error = regmap_write(iqs269->regmap, IQS269_SYS_SETTINGS,
+				     general & ~IQS269_SYS_SETTINGS_DIS_AUTO);
 
-	/*
-	 * This check ensures the device has returned to normal-power mode
-	 * before automatic power mode switching is re-enabled.
-	 */
-	error = regmap_read_poll_timeout(iqs269->regmap, IQS269_SYS_FLAGS, val,
-					!(val & IQS269_SYS_FLAGS_PWR_MODE_MASK),
-					 IQS269_PWR_MODE_POLL_SLEEP_US,
-					 IQS269_PWR_MODE_POLL_TIMEOUT_US);
-	if (error)
-		goto err_irq;
-
-	error = regmap_update_bits(iqs269->regmap, IQS269_SYS_SETTINGS,
-				   IQS269_SYS_SETTINGS_DIS_AUTO, 0);
-	if (error)
-		goto err_irq;
-
-	/*
-	 * This step reports any events that may have been "swallowed" as a
-	 * result of polling PWR_MODE (which automatically acknowledges any
-	 * pending interrupts).
-	 */
-	error = iqs269_report(iqs269);
-
-err_irq:
 	iqs269_irq_wait();
 	enable_irq(client->irq);
 
 	return error;
 }
 
-static SIMPLE_DEV_PM_OPS(iqs269_pm, iqs269_suspend, iqs269_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(iqs269_pm, iqs269_suspend, iqs269_resume);
 
 static const struct of_device_id iqs269_of_match[] = {
-	{ .compatible = "azoteq,iqs269a" },
+	{
+		.compatible = "azoteq,iqs269a",
+		.data = (void *)IQS269_OTP_OPTION_DEFAULT,
+	},
+	{
+		.compatible = "azoteq,iqs269a-00",
+		.data = (void *)IQS269_OTP_OPTION_DEFAULT,
+	},
+	{
+		.compatible = "azoteq,iqs269a-d0",
+		.data = (void *)IQS269_OTP_OPTION_TWS,
+	},
 	{ }
 };
 MODULE_DEVICE_TABLE(of, iqs269_of_match);
@@ -1814,10 +1983,11 @@ MODULE_DEVICE_TABLE(of, iqs269_of_match);
 static struct i2c_driver iqs269_i2c_driver = {
 	.driver = {
 		.name = "iqs269a",
+		.dev_groups = iqs269_groups,
 		.of_match_table = iqs269_of_match,
-		.pm = &iqs269_pm,
+		.pm = pm_sleep_ptr(&iqs269_pm),
 	},
-	.probe_new = iqs269_probe,
+	.probe = iqs269_probe,
 };
 module_i2c_driver(iqs269_i2c_driver);
 

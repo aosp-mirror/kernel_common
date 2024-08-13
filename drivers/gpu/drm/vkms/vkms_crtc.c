@@ -61,9 +61,7 @@ static enum hrtimer_restart vkms_vblank_simulate(struct hrtimer *timer)
 
 static int vkms_enable_vblank(struct drm_crtc *crtc)
 {
-	struct drm_device *dev = crtc->dev;
-	unsigned int pipe = drm_crtc_index(crtc);
-	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
+	struct drm_vblank_crtc *vblank = drm_crtc_vblank_crtc(crtc);
 	struct vkms_output *out = drm_crtc_to_vkms_output(crtc);
 
 	drm_calc_timestamping_constants(crtc, &crtc->mode);
@@ -88,10 +86,9 @@ static bool vkms_get_vblank_timestamp(struct drm_crtc *crtc,
 				      bool in_vblank_irq)
 {
 	struct drm_device *dev = crtc->dev;
-	unsigned int pipe = crtc->index;
 	struct vkms_device *vkmsdev = drm_device_to_vkms_device(dev);
 	struct vkms_output *output = &vkmsdev->output;
-	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
+	struct drm_vblank_crtc *vblank = drm_crtc_vblank_crtc(crtc);
 
 	if (!READ_ONCE(vblank->enabled)) {
 		*vblank_time = ktime_get();
@@ -161,7 +158,6 @@ static void vkms_atomic_crtc_reset(struct drm_crtc *crtc)
 
 static const struct drm_crtc_funcs vkms_crtc_funcs = {
 	.set_config             = drm_atomic_helper_set_config,
-	.destroy                = drm_crtc_cleanup,
 	.page_flip              = drm_atomic_helper_page_flip,
 	.reset                  = vkms_atomic_crtc_reset,
 	.atomic_duplicate_state = vkms_atomic_crtc_duplicate_state,
@@ -282,14 +278,17 @@ int vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 	struct vkms_output *vkms_out = drm_crtc_to_vkms_output(crtc);
 	int ret;
 
-	ret = drm_crtc_init_with_planes(dev, crtc, primary, cursor,
-					&vkms_crtc_funcs, NULL);
+	ret = drmm_crtc_init_with_planes(dev, crtc, primary, cursor,
+					 &vkms_crtc_funcs, NULL);
 	if (ret) {
 		DRM_ERROR("Failed to init CRTC\n");
 		return ret;
 	}
 
 	drm_crtc_helper_add(crtc, &vkms_crtc_helper_funcs);
+
+	drm_mode_crtc_set_gamma_size(crtc, VKMS_LUT_SIZE);
+	drm_crtc_enable_color_mgmt(crtc, 0, false, VKMS_LUT_SIZE);
 
 	spin_lock_init(&vkms_out->lock);
 	spin_lock_init(&vkms_out->composer_lock);

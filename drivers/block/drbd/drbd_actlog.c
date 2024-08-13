@@ -735,8 +735,9 @@ static bool update_rs_extent(struct drbd_device *device,
 	return false;
 }
 
-void drbd_advance_rs_marks(struct drbd_device *device, unsigned long still_to_go)
+void drbd_advance_rs_marks(struct drbd_peer_device *peer_device, unsigned long still_to_go)
 {
+	struct drbd_device *device = peer_device->device;
 	unsigned long now = jiffies;
 	unsigned long last = device->rs_mark_time[device->rs_last_mark];
 	int next = (device->rs_last_mark + 1) % DRBD_SYNC_MARKS;
@@ -819,7 +820,7 @@ static int update_sync_bits(struct drbd_device *device,
 		if (mode == SET_IN_SYNC) {
 			unsigned long still_to_go = drbd_bm_total_weight(device);
 			bool rs_is_done = (still_to_go <= device->rs_failed);
-			drbd_advance_rs_marks(device, still_to_go);
+			drbd_advance_rs_marks(first_peer_device(device), still_to_go);
 			if (cleared || rs_is_done)
 				maybe_schedule_on_disk_bitmap_update(device, rs_is_done);
 		} else if (mode == RECORD_RS_FAILED)
@@ -837,16 +838,17 @@ static bool plausible_request_size(int size)
 }
 
 /* clear the bit corresponding to the piece of storage in question:
- * size byte of data starting from sector.  Only clear a bits of the affected
- * one ore more _aligned_ BM_BLOCK_SIZE blocks.
+ * size byte of data starting from sector.  Only clear bits of the affected
+ * one or more _aligned_ BM_BLOCK_SIZE blocks.
  *
  * called by worker on C_SYNC_TARGET and receiver on SyncSource.
  *
  */
-int __drbd_change_sync(struct drbd_device *device, sector_t sector, int size,
+int __drbd_change_sync(struct drbd_peer_device *peer_device, sector_t sector, int size,
 		enum update_sync_bits_mode mode)
 {
 	/* Is called from worker and receiver context _only_ */
+	struct drbd_device *device = peer_device->device;
 	unsigned long sbnr, ebnr, lbnr;
 	unsigned long count = 0;
 	sector_t esector, nr_sectors;
@@ -955,7 +957,9 @@ static int _is_in_al(struct drbd_device *device, unsigned int enr)
  * @device:	DRBD device.
  * @sector:	The sector number.
  *
- * This functions sleeps on al_wait. Returns 0 on success, -EINTR if interrupted.
+ * This functions sleeps on al_wait.
+ *
+ * Returns: %0 on success, -EINTR if interrupted.
  */
 int drbd_rs_begin_io(struct drbd_device *device, sector_t sector)
 {
@@ -1002,21 +1006,24 @@ retry:
 
 /**
  * drbd_try_rs_begin_io() - Gets an extent in the resync LRU cache, does not sleep
- * @device:	DRBD device.
+ * @peer_device: DRBD device.
  * @sector:	The sector number.
  *
  * Gets an extent in the resync LRU cache, sets it to BME_NO_WRITES, then
- * tries to set it to BME_LOCKED. Returns 0 upon success, and -EAGAIN
+ * tries to set it to BME_LOCKED.
+ *
+ * Returns: %0 upon success, and -EAGAIN
  * if there is still application IO going on in this area.
  */
-int drbd_try_rs_begin_io(struct drbd_device *device, sector_t sector)
+int drbd_try_rs_begin_io(struct drbd_peer_device *peer_device, sector_t sector)
 {
+	struct drbd_device *device = peer_device->device;
 	unsigned int enr = BM_SECT_TO_EXT(sector);
 	const unsigned int al_enr = enr*AL_EXT_PER_BM_SECT;
 	struct lc_element *e;
 	struct bm_extent *bm_ext;
 	int i;
-	bool throttle = drbd_rs_should_slow_down(device, sector, true);
+	bool throttle = drbd_rs_should_slow_down(peer_device, sector, true);
 
 	/* If we need to throttle, a half-locked (only marked BME_NO_WRITES,
 	 * not yet BME_LOCKED) extent needs to be kicked out explicitly if we
@@ -1187,7 +1194,7 @@ void drbd_rs_cancel_all(struct drbd_device *device)
  * drbd_rs_del_all() - Gracefully remove all extents from the resync LRU
  * @device:	DRBD device.
  *
- * Returns 0 upon success, -EAGAIN if at least one reference count was
+ * Returns: %0 upon success, -EAGAIN if at least one reference count was
  * not zero.
  */
 int drbd_rs_del_all(struct drbd_device *device)

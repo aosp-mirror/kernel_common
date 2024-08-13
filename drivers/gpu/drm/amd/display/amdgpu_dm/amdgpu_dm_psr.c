@@ -24,6 +24,7 @@
  */
 
 #include "amdgpu_dm_psr.h"
+#include "dc_dmub_srv.h"
 #include "dc.h"
 #include "dm_helpers.h"
 #include "amdgpu_dm.h"
@@ -50,7 +51,10 @@ static bool link_supports_psrsu(struct dc_link *link)
 	    !link->dpcd_caps.psr_info.psr2_su_y_granularity_cap)
 		return false;
 
-	return true;
+	if (amdgpu_dc_debug_mask & DC_DISABLE_PSR_SU)
+		return false;
+
+	return dc_dmub_check_min_version(dc->ctx->dmub_srv->dmub);
 }
 
 /*
@@ -122,6 +126,9 @@ bool amdgpu_dm_link_setup_psr(struct dc_stream_state *stream)
 		psr_config.allow_multi_disp_optimizations =
 			(amdgpu_dc_feature_mask & DC_PSR_ALLOW_MULTI_DISP_OPT);
 
+		if (!psr_su_set_dsc_slice_height(dc, link, stream, &psr_config))
+			return false;
+
 		ret = dc_link_setup_psr(link, stream, &psr_config, &psr_context);
 
 	}
@@ -134,9 +141,8 @@ bool amdgpu_dm_link_setup_psr(struct dc_stream_state *stream)
  * amdgpu_dm_psr_enable() - enable psr f/w
  * @stream: stream state
  *
- * Return: true if success
  */
-bool amdgpu_dm_psr_enable(struct dc_stream_state *stream)
+void amdgpu_dm_psr_enable(struct dc_stream_state *stream)
 {
 	struct dc_link *link = stream->link;
 	unsigned int vsync_rate_hz = 0;
@@ -162,6 +168,7 @@ bool amdgpu_dm_psr_enable(struct dc_stream_state *stream)
 	 */
 	if (vsync_rate_hz != 0) {
 		unsigned int frame_time_microsec = 1000000 / vsync_rate_hz;
+
 		num_frames_static = (30000 / frame_time_microsec) + 1;
 	}
 
@@ -182,7 +189,10 @@ bool amdgpu_dm_psr_enable(struct dc_stream_state *stream)
 	if (link->psr_settings.psr_version < DC_PSR_VERSION_SU_1)
 		power_opt |= psr_power_opt_z10_static_screen;
 
-	return dc_link_set_psr_allow_active(link, &psr_enable, false, false, &power_opt);
+	dc_link_set_psr_allow_active(link, &psr_enable, false, false, &power_opt);
+
+	if (link->ctx->dc->caps.ips_support)
+		dc_allow_idle_optimizations(link->ctx->dc, true);
 }
 
 /*
@@ -202,7 +212,7 @@ bool amdgpu_dm_psr_disable(struct dc_stream_state *stream)
 }
 
 /*
- * amdgpu_dm_psr_disable() - disable psr f/w
+ * amdgpu_dm_psr_disable_all() - disable psr f/w for all streams
  * if psr is enabled on any stream
  *
  * Return: true if success

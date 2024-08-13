@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0
 #include "builtin.h"
-#include "perf.h"
 #include "color.h"
+#include "util/debug.h"
+#include "util/header.h"
 #include <tools/config.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <subcmd/parse-options.h>
-
-int version_verbose;
 
 struct version {
 	bool	build_options;
@@ -59,7 +58,6 @@ static void library_status(void)
 {
 	STATUS(HAVE_DWARF_SUPPORT, dwarf);
 	STATUS(HAVE_DWARF_GETLOCATIONS_SUPPORT, dwarf_getlocations);
-	STATUS(HAVE_GLIBC_SUPPORT, glibc);
 #ifndef HAVE_SYSCALL_TABLE_SUPPORT
 	STATUS(HAVE_LIBAUDIT_SUPPORT, libaudit);
 #endif
@@ -75,6 +73,7 @@ static void library_status(void)
 	STATUS(HAVE_LIBCRYPTO_SUPPORT, libcrypto);
 	STATUS(HAVE_LIBUNWIND_SUPPORT, libunwind);
 	STATUS(HAVE_DWARF_SUPPORT, libdw-dwarf-unwind);
+	STATUS(HAVE_LIBCAPSTONE_SUPPORT, libcapstone);
 	STATUS(HAVE_ZLIB_SUPPORT, zlib);
 	STATUS(HAVE_LZMA_SUPPORT, lzma);
 	STATUS(HAVE_AUXTRACE_SUPPORT, get_cpuid);
@@ -83,6 +82,9 @@ static void library_status(void)
 	STATUS(HAVE_ZSTD_SUPPORT, zstd);
 	STATUS(HAVE_LIBPFM, libpfm4);
 	STATUS(HAVE_LIBTRACEEVENT, libtraceevent);
+	STATUS(HAVE_BPF_SKEL, bpf_skeletons);
+	STATUS(HAVE_DWARF_UNWIND_SUPPORT, dwarf-unwind-support);
+	STATUS(HAVE_CSTRACE_SUPPORT, libopencsd);
 }
 
 int cmd_version(int argc, const char **argv)
@@ -92,7 +94,7 @@ int cmd_version(int argc, const char **argv)
 
 	printf("perf version %s\n", perf_version_string);
 
-	if (version.build_options || version_verbose == 1)
+	if (version.build_options || verbose > 0)
 		library_status();
 
 	return 0;

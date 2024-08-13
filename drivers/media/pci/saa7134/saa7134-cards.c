@@ -2116,7 +2116,6 @@ struct saa7134_board saa7134_boards[] = {
 		- Remote control doesn't initialize properly.
 		- Audio volume starts muted,
 		then gradually increases after channel change.
-		- Overlay scaling problems (application error?)
 		- Composite S-Video untested.
 		From: Konrad Rzepecki <hannibal@megapolis.pl>
 		*/
@@ -5153,7 +5152,7 @@ struct saa7134_board saa7134_boards[] = {
 		},
 	},
 	[SAA7134_BOARD_AVERMEDIA_STUDIO_507UA] = {
-		/* Andy Shevchenko <andy@smile.org.ua> */
+		/* Andy Shevchenko <andy@kernel.org> */
 		.name           = "Avermedia AVerTV Studio 507UA",
 		.audio_clock    = 0x00187de7,
 		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3, /* Should be MK5 */

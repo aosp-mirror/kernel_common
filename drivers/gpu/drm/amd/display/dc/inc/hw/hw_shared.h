@@ -43,10 +43,12 @@
  * to be used inside loops and for determining array sizes.
  */
 #define MAX_PIPES 6
+#define MAX_PHANTOM_PIPES (MAX_PIPES / 2)
+#define MAX_LINKS (MAX_PIPES * 2)
 #define MAX_DIG_LINK_ENCODERS 7
 #define MAX_DWB_PIPES	1
 #define MAX_HPO_DP2_ENCODERS	4
-#define MAX_HPO_DP2_LINK_ENCODERS	2
+#define MAX_HPO_DP2_LINK_ENCODERS	4
 
 struct gamma_curve {
 	uint32_t offset;
@@ -273,20 +275,6 @@ enum dc_lut_mode {
 	LUT_BYPASS,
 	LUT_RAM_A,
 	LUT_RAM_B
-};
-
-enum symclk_state {
-	SYMCLK_OFF_TX_OFF,
-	SYMCLK_ON_TX_ON,
-	SYMCLK_ON_TX_OFF,
-};
-
-struct phy_state {
-	struct {
-		uint8_t otg		: 1;
-		uint8_t reserved	: 7;
-	} symclk_ref_cnts;
-	enum symclk_state symclk_state;
 };
 
 /**

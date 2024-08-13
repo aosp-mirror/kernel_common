@@ -7,6 +7,7 @@
 #include <linux/soundwire/sdw.h>
 #include <linux/soundwire/sdw_type.h>
 #include "bus.h"
+#include "irq.h"
 #include "sysfs_local.h"
 
 /**
@@ -58,9 +59,9 @@ int sdw_slave_modalias(const struct sdw_slave *slave, char *buf, size_t size)
 			slave->id.sdw_version, slave->id.class_id);
 }
 
-int sdw_slave_uevent(struct device *dev, struct kobj_uevent_env *env)
+int sdw_slave_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	struct sdw_slave *slave = dev_to_sdw_dev(dev);
+	const struct sdw_slave *slave = dev_to_sdw_dev(dev);
 	char modalias[32];
 
 	sdw_slave_modalias(slave, modalias, sizeof(modalias));
@@ -71,7 +72,7 @@ int sdw_slave_uevent(struct device *dev, struct kobj_uevent_env *env)
 	return 0;
 }
 
-struct bus_type sdw_bus_type = {
+const struct bus_type sdw_bus_type = {
 	.name = "soundwire",
 	.match = sdw_bus_match,
 };
@@ -105,26 +106,28 @@ static int sdw_drv_probe(struct device *dev)
 	if (ret)
 		return ret;
 
-	mutex_lock(&slave->sdw_dev_lock);
-
 	ret = drv->probe(slave, id);
 	if (ret) {
 		name = drv->name;
 		if (!name)
 			name = drv->driver.name;
-		mutex_unlock(&slave->sdw_dev_lock);
 
 		dev_err(dev, "Probe of %s failed: %d\n", name, ret);
 		dev_pm_domain_detach(dev, false);
 		return ret;
 	}
 
+	mutex_lock(&slave->sdw_dev_lock);
+
 	/* device is probed so let's read the properties now */
 	if (drv->ops && drv->ops->read_prop)
 		drv->ops->read_prop(slave);
 
-	/* init the sysfs as we have properties now */
-	ret = sdw_slave_sysfs_init(slave);
+	if (slave->prop.use_domain_irq)
+		sdw_irq_create_mapping(slave);
+
+	/* init the dynamic sysfs attributes we need */
+	ret = sdw_slave_sysfs_dpn_init(slave);
 	if (ret < 0)
 		dev_warn(dev, "Slave sysfs init failed:%d\n", ret);
 
@@ -170,10 +173,13 @@ static int sdw_drv_remove(struct device *dev)
 
 	slave->probed = false;
 
-	if (drv->remove)
-		ret = drv->remove(slave);
+	if (slave->prop.use_domain_irq)
+		sdw_irq_dispose_mapping(slave);
 
 	mutex_unlock(&slave->sdw_dev_lock);
+
+	if (drv->remove)
+		ret = drv->remove(slave);
 
 	dev_pm_domain_detach(dev, false);
 
@@ -215,6 +221,7 @@ int __sdw_register_driver(struct sdw_driver *drv, struct module *owner)
 	drv->driver.probe = sdw_drv_probe;
 	drv->driver.remove = sdw_drv_remove;
 	drv->driver.shutdown = sdw_drv_shutdown;
+	drv->driver.dev_groups = sdw_attr_groups;
 
 	return driver_register(&drv->driver);
 }

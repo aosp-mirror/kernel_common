@@ -75,14 +75,9 @@ config VT_CONSOLE_SLEEP
 	def_bool y
 	depends on VT_CONSOLE && PM_SLEEP
 
-config HW_CONSOLE
-	bool
-	depends on VT
-	default y
-
 config VT_HW_CONSOLE_BINDING
 	bool "Support for binding and unbinding console drivers"
-	depends on HW_CONSOLE
+	depends on VT
 	help
 	  The virtual terminal is the device that interacts with the physical
 	  terminal through console drivers. On these systems, at least one
@@ -160,9 +155,12 @@ config LEGACY_TIOCSTI
 	  a dangerous legacy operation, and can be disabled on most
 	  systems.
 
-	  Say 'Y here only if you have confirmed that your system's
+	  Say Y here only if you have confirmed that your system's
 	  userspace depends on this functionality to continue operating
 	  normally.
+
+	  Processes which run with CAP_SYS_ADMIN, such as BRLTTY, can
+	  use TIOCSTI even when this is set to N.
 
 	  This functionality can be changed at runtime with the
 	  dev.tty.legacy_tiocsti sysctl. This configuration option sets
@@ -236,6 +234,7 @@ config MOXA_SMARTIO
 config SYNCLINK_GT
 	tristate "SyncLink GT/AC support"
 	depends on SERIAL_NONSTANDARD && PCI
+	depends on BROKEN
 	help
 	  Support for SyncLink GT and SyncLink AC families of
 	  synchronous and asynchronous serial adapters
@@ -300,6 +299,15 @@ config GOLDFISH_TTY_EARLY_CONSOLE
 	bool
 	default y if GOLDFISH_TTY=y
 	select SERIAL_EARLYCON
+
+config IPWIRELESS
+	tristate "IPWireless 3G UMTS PCMCIA card support"
+	depends on PCMCIA && NETDEVICES
+	select PPP
+	help
+	  This is a driver for 3G UMTS PCMCIA card from IPWireless company. In
+	  some countries (for example Czech Republic, T-Mobile ISP) this card
+	  is shipped for service called UMTS 4G.
 
 config N_GSM
 	tristate "GSM MUX line discipline support (EXPERIMENTAL)"

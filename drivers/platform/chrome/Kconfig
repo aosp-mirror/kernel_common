@@ -132,6 +132,7 @@ config CROS_EC_UART
 config CROS_EC_LPC
 	tristate "ChromeOS Embedded Controller (LPC)"
 	depends on CROS_EC && ACPI && (X86 || COMPILE_TEST)
+	depends on HAS_IOPORT
 	help
 	  If you say Y here, you get support for talking to the ChromeOS EC
 	  over an LPC bus, including the LPC Microchip EC (MEC) variant.
@@ -299,12 +300,12 @@ config CROS_TYPEC_SWITCH
 source "drivers/platform/chrome/wilco_ec/Kconfig"
 
 # Kunit test cases
-config CROS_KUNIT
-	tristate "Kunit tests for ChromeOS" if !KUNIT_ALL_TESTS
+config CROS_KUNIT_EC_PROTO_TEST
+	tristate "Kunit tests for ChromeOS EC protocol" if !KUNIT_ALL_TESTS
 	depends on KUNIT && CROS_EC
 	default KUNIT_ALL_TESTS
 	select CROS_EC_PROTO
 	help
-	  ChromeOS Kunit tests.
+	  Kunit tests for ChromeOS EC protocol.
 
 endif # CHROMEOS_PLATFORMS

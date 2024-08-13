@@ -1951,7 +1951,7 @@ static int tda998x_create(struct device *dev)
 	 * offset.
 	 */
 	memset(&cec_info, 0, sizeof(cec_info));
-	strlcpy(cec_info.type, "tda9950", sizeof(cec_info.type));
+	strscpy(cec_info.type, "tda9950", sizeof(cec_info.type));
 	cec_info.addr = priv->cec_addr;
 	cec_info.platform_data = &priv->cec_glue;
 	cec_info.irq = client->irq;
@@ -2059,7 +2059,7 @@ static const struct component_ops tda998x_ops = {
 };
 
 static int
-tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
+tda998x_probe(struct i2c_client *client)
 {
 	int ret;
 

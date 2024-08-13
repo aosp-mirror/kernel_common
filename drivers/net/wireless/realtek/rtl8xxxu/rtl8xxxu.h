@@ -5,7 +5,9 @@
  * Register definitions taken from original Realtek rtl8723au driver
  */
 
-#include <asm/byteorder.h>
+#include <linux/average.h>
+#include <linux/usb.h>
+#include <net/mac80211.h>
 
 #define RTL8XXXU_DEBUG_REG_WRITE	0x01
 #define RTL8XXXU_DEBUG_REG_READ		0x02
@@ -27,7 +29,7 @@
 #define RTL8XXXU_MAX_REG_POLL		500
 #define	USB_INTR_CONTENT_LENGTH		56
 
-#define RTL8XXXU_OUT_ENDPOINTS		4
+#define RTL8XXXU_OUT_ENDPOINTS		6
 
 #define REALTEK_USB_READ		0xc0
 #define REALTEK_USB_WRITE		0x40
@@ -39,6 +41,7 @@
 #define TX_TOTAL_PAGE_NUM_8188E		0xa9
 #define TX_TOTAL_PAGE_NUM_8192E		0xf3
 #define TX_TOTAL_PAGE_NUM_8723B		0xf7
+#define TX_TOTAL_PAGE_NUM_8192F		0xf7
 /* (HPQ + LPQ + NPQ + PUBQ) = TX_TOTAL_PAGE_NUM */
 #define TX_PAGE_NUM_PUBQ		0xe7
 #define TX_PAGE_NUM_HI_PQ		0x0c
@@ -65,6 +68,11 @@
 #define TX_PAGE_NUM_LO_PQ_8723B		0x02
 #define TX_PAGE_NUM_NORM_PQ_8723B	0x02
 
+#define TX_PAGE_NUM_PUBQ_8192F		0xde
+#define TX_PAGE_NUM_HI_PQ_8192F		0x08
+#define TX_PAGE_NUM_LO_PQ_8192F		0x08
+#define TX_PAGE_NUM_NORM_PQ_8192F	0x08
+
 #define RTL_FW_PAGE_SIZE		4096
 #define RTL8XXXU_FIRMWARE_POLL_MAX	1000
 
@@ -81,6 +89,7 @@
 #define EFUSE_REAL_CONTENT_LEN_8723A	512
 #define EFUSE_BT_MAP_LEN_8723A		1024
 #define EFUSE_MAX_WORD_UNIT		4
+#define EFUSE_UNDEFINED			0xff
 
 enum rtl8xxxu_rtl_chip {
 	RTL8192S = 0x81920,
@@ -103,13 +112,24 @@ enum rtl8xxxu_rtl_chip {
 	RTL8822B = 0x8822b,
 	RTL8703B = 0x8703b,
 	RTL8195A = 0x8195a,
-	RTL8188F = 0x8188f
+	RTL8188F = 0x8188f,
+	RTL8710B = 0x8710b,
+	RTL8192F = 0x8192f,
 };
 
 enum rtl8xxxu_rx_type {
 	RX_TYPE_DATA_PKT = 0,
 	RX_TYPE_C2H = 1,
 	RX_TYPE_ERROR = -1
+};
+
+enum rtl8xxxu_rx_desc_enc {
+	RX_DESC_ENC_NONE	= 0,
+	RX_DESC_ENC_WEP40	= 1,
+	RX_DESC_ENC_TKIP_WO_MIC	= 2,
+	RX_DESC_ENC_TKIP_MIC	= 3,
+	RX_DESC_ENC_AES		= 4,
+	RX_DESC_ENC_WEP104	= 5,
 };
 
 struct rtl8xxxu_rxdesc16 {
@@ -489,6 +509,7 @@ struct rtl8xxxu_txdesc40 {
 #define DESC_RATE_ID_SHIFT		16
 #define DESC_RATE_ID_MASK		0xf
 #define TXDESC_NAVUSEHDR		BIT(20)
+#define TXDESC_EN_DESC_ID		BIT(21)
 #define TXDESC_SEC_RC4			0x00400000
 #define TXDESC_SEC_AES			0x00c00000
 #define TXDESC_PKT_OFFSET_SHIFT		26
@@ -617,6 +638,265 @@ struct rtl8723au_phy_stats {
 	u8	antsel_rx_keep_2:1;	/* ex_intf_flg:1; */
 #endif
 };
+
+struct jaguar2_phy_stats_type0 {
+	/* DW0 */
+	u8		page_num;
+	u8		pwdb;
+#ifdef __LITTLE_ENDIAN
+	u8		gain: 6;
+	u8		rsvd_0: 1;
+	u8		trsw: 1;
+#else
+	u8		trsw: 1;
+	u8		rsvd_0: 1;
+	u8		gain: 6;
+#endif
+	u8		rsvd_1;
+
+	/* DW1 */
+	u8		rsvd_2;
+#ifdef __LITTLE_ENDIAN
+	u8		rxsc: 4;
+	u8		agc_table: 4;
+#else
+	u8		agc_table: 4;
+	u8		rxsc: 4;
+#endif
+	u8		channel;
+	u8		band;
+
+	/* DW2 */
+	u16		length;
+#ifdef __LITTLE_ENDIAN
+	u8		antidx_a: 3;
+	u8		antidx_b: 3;
+	u8		rsvd_3: 2;
+	u8		antidx_c: 3;
+	u8		antidx_d: 3;
+	u8		rsvd_4:2;
+#else
+	u8		rsvd_3: 2;
+	u8		antidx_b: 3;
+	u8		antidx_a: 3;
+	u8		rsvd_4:2;
+	u8		antidx_d: 3;
+	u8		antidx_c: 3;
+#endif
+
+	/* DW3 */
+	u8		signal_quality;
+#ifdef __LITTLE_ENDIAN
+	u8		vga:5;
+	u8		lna_l:3;
+	u8		bb_power:6;
+	u8		rsvd_9:1;
+	u8		lna_h:1;
+#else
+	u8		lna_l:3;
+	u8		vga:5;
+	u8		lna_h:1;
+	u8		rsvd_9:1;
+	u8		bb_power:6;
+#endif
+	u8		rsvd_5;
+
+	/* DW4 */
+	u32		rsvd_6;
+
+	/* DW5 */
+	u32		rsvd_7;
+
+	/* DW6 */
+	u32		rsvd_8;
+} __packed;
+
+struct jaguar2_phy_stats_type1 {
+	/* DW0 and DW1 */
+	u8		page_num;
+	u8		pwdb[4];
+#ifdef __LITTLE_ENDIAN
+	u8		l_rxsc: 4;
+	u8		ht_rxsc: 4;
+#else
+	u8		ht_rxsc: 4;
+	u8		l_rxsc: 4;
+#endif
+	u8		channel;
+#ifdef __LITTLE_ENDIAN
+	u8		band: 2;
+	u8		rsvd_0: 1;
+	u8		hw_antsw_occu: 1;
+	u8		gnt_bt: 1;
+	u8		ldpc: 1;
+	u8		stbc: 1;
+	u8		beamformed: 1;
+#else
+	u8		beamformed: 1;
+	u8		stbc: 1;
+	u8		ldpc: 1;
+	u8		gnt_bt: 1;
+	u8		hw_antsw_occu: 1;
+	u8		rsvd_0: 1;
+	u8		band: 2;
+#endif
+
+	/* DW2 */
+	u16		lsig_length;
+#ifdef __LITTLE_ENDIAN
+	u8		antidx_a: 3;
+	u8		antidx_b: 3;
+	u8		rsvd_1: 2;
+	u8		antidx_c: 3;
+	u8		antidx_d: 3;
+	u8		rsvd_2: 2;
+#else
+	u8		rsvd_1: 2;
+	u8		antidx_b: 3;
+	u8		antidx_a: 3;
+	u8		rsvd_2: 2;
+	u8		antidx_d: 3;
+	u8		antidx_c: 3;
+#endif
+
+	/* DW3 */
+	u8		paid;
+#ifdef __LITTLE_ENDIAN
+	u8		paid_msb: 1;
+	u8		gid: 6;
+	u8		rsvd_3: 1;
+#else
+	u8		rsvd_3: 1;
+	u8		gid: 6;
+	u8		paid_msb: 1;
+#endif
+	u8		intf_pos;
+#ifdef __LITTLE_ENDIAN
+	u8		intf_pos_msb: 1;
+	u8		rsvd_4: 2;
+	u8		nb_intf_flag: 1;
+	u8		rf_mode: 2;
+	u8		rsvd_5: 2;
+#else
+	u8		rsvd_5: 2;
+	u8		rf_mode: 2;
+	u8		nb_intf_flag: 1;
+	u8		rsvd_4: 2;
+	u8		intf_pos_msb: 1;
+#endif
+
+	/* DW4 */
+	s8		rxevm[4];			/* s(8,1) */
+
+	/* DW5 */
+	s8		cfo_tail[4];			/* s(8,7) */
+
+	/* DW6 */
+	s8		rxsnr[4];			/* s(8,1) */
+} __packed;
+
+struct jaguar2_phy_stats_type2 {
+	/* DW0 ane DW1 */
+	u8		page_num;
+	u8		pwdb[4];
+#ifdef __LITTLE_ENDIAN
+	u8		l_rxsc: 4;
+	u8		ht_rxsc: 4;
+#else
+	u8		ht_rxsc: 4;
+	u8		l_rxsc: 4;
+#endif
+	u8		channel;
+#ifdef __LITTLE_ENDIAN
+	u8		band: 2;
+	u8		rsvd_0: 1;
+	u8		hw_antsw_occu: 1;
+	u8		gnt_bt: 1;
+	u8		ldpc: 1;
+	u8		stbc: 1;
+	u8		beamformed: 1;
+#else
+	u8		beamformed: 1;
+	u8		stbc: 1;
+	u8		ldpc: 1;
+	u8		gnt_bt: 1;
+	u8		hw_antsw_occu: 1;
+	u8		rsvd_0: 1;
+	u8		band: 2;
+#endif
+
+	/* DW2 */
+#ifdef __LITTLE_ENDIAN
+	u8		shift_l_map: 6;
+	u8		rsvd_1: 2;
+#else
+	u8		rsvd_1: 2;
+	u8		shift_l_map: 6;
+#endif
+	u8		cnt_pw2cca;
+#ifdef __LITTLE_ENDIAN
+	u8		agc_table_a: 4;
+	u8		agc_table_b: 4;
+	u8		agc_table_c: 4;
+	u8		agc_table_d: 4;
+#else
+	u8		agc_table_b: 4;
+	u8		agc_table_a: 4;
+	u8		agc_table_d: 4;
+	u8		agc_table_c: 4;
+#endif
+
+	/* DW3 ~ DW6*/
+	u8		cnt_cca2agc_rdy;
+#ifdef __LITTLE_ENDIAN
+	u8		gain_a: 6;
+	u8		rsvd_2: 1;
+	u8		trsw_a: 1;
+	u8		gain_b: 6;
+	u8		rsvd_3: 1;
+	u8		trsw_b: 1;
+	u8		gain_c: 6;
+	u8		rsvd_4: 1;
+	u8		trsw_c: 1;
+	u8		gain_d: 6;
+	u8		rsvd_5: 1;
+	u8		trsw_d: 1;
+	u8		aagc_step_a: 2;
+	u8		aagc_step_b: 2;
+	u8		aagc_step_c: 2;
+	u8		aagc_step_d: 2;
+#else
+	u8		trsw_a: 1;
+	u8		rsvd_2: 1;
+	u8		gain_a: 6;
+	u8		trsw_b: 1;
+	u8		rsvd_3: 1;
+	u8		gain_b: 6;
+	u8		trsw_c: 1;
+	u8		rsvd_4: 1;
+	u8		gain_c: 6;
+	u8		trsw_d: 1;
+	u8		rsvd_5: 1;
+	u8		gain_d: 6;
+	u8		aagc_step_d: 2;
+	u8		aagc_step_c: 2;
+	u8		aagc_step_b: 2;
+	u8		aagc_step_a: 2;
+#endif
+	u8		ht_aagc_gain[4];
+	u8		dagc_gain[4];
+#ifdef __LITTLE_ENDIAN
+	u8		counter: 6;
+	u8		rsvd_6: 2;
+	u8		syn_count: 5;
+	u8		rsvd_7:3;
+#else
+	u8		rsvd_6: 2;
+	u8		counter: 6;
+	u8		rsvd_7:3;
+	u8		syn_count: 5;
+#endif
+} __packed;
 
 /*
  * Regs to backup
@@ -963,6 +1243,63 @@ struct rtl8188eu_efuse {
 	u8 res12[0xc3];
 } __packed;
 
+struct rtl8710bu_efuse {
+	__le16 rtl_id;
+	u8 res0[0x1e];
+	struct rtl8188fu_efuse_tx_power tx_power_index_A;	/* 0x20 */
+	u8 res1[0x9c];			/* 0x2c */
+	u8 channel_plan;		/* 0xc8 */
+	u8 xtal_k;			/* 0xc9 */
+	u8 thermal_meter;		/* 0xca */
+	u8 res2[0x4f];
+	u8 mac_addr[ETH_ALEN];		/* 0x11a */
+	u8 res3[0x11];
+	u8 rf_board_option;		/* 0x131 */
+	u8 res4[2];
+	u8 eeprom_version;		/* 0x134 */
+	u8 eeprom_customer_id;		/* 0x135 */
+	u8 res5[5];
+	u8 country_code;		/* 0x13b */
+	u8 res6[0x84];
+	u8 vid[2];			/* 0x1c0 */
+	u8 pid[2];			/* 0x1c2 */
+	u8 res7[0x3c];
+} __packed;
+
+struct rtl8192fu_efuse {
+	__le16 rtl_id;
+	u8 res0[0x0e];
+	struct rtl8192eu_efuse_tx_power tx_power_index_A;	/* 0x10 */
+	struct rtl8192eu_efuse_tx_power tx_power_index_B;	/* 0x3a */
+	u8 res2[0x54];
+	u8 channel_plan;		/* 0xb8 */
+	u8 xtal_k;			/* 0xb9 */
+	u8 thermal_meter;		/* 0xba */
+	u8 iqk_lck;			/* 0xbb */
+	u8 pa_type;			/* 0xbc */
+	u8 lna_type_2g;			/* 0xbd */
+	u8 res3[1];
+	u8 lna_type_5g;			/* 0xbf */
+	u8 res4[1];
+	u8 rf_board_option;		/* 0xc1 */
+	u8 rf_feature_option;		/* 0xc2 */
+	u8 rf_bt_setting;		/* 0xc3 */
+	u8 eeprom_version;		/* 0xc4 */
+	u8 eeprom_customer_id;		/* 0xc5 */
+	u8 res5[3];
+	u8 rf_antenna_option;		/* 0xc9 */
+	u8 rfe_option;			/* 0xca */
+	u8 country_code;		/* 0xcb */
+	u8 res6[52];
+	u8 vid[2];			/* 0x100 */
+	u8 pid[2];			/* 0x102 */
+	u8 usb_optional_function;	/* 0x104 */
+	u8 res7[2];
+	u8 mac_addr[ETH_ALEN];		/* 0x107 */
+	u8 device_info[80];		/* 0x10d */
+	u8 res9[163];
+} __packed;
+
 struct rtl8xxxu_reg8val {
 	u16 reg;
 	u8 val;
@@ -996,6 +1333,9 @@ struct rtl8xxxu_rfregs {
 #define H2C_EXT				BIT(7)
 #define  H2C_JOIN_BSS_DISCONNECT	0
 #define  H2C_JOIN_BSS_CONNECT		1
+
+#define H2C_MACID_ROLE_STA		1
+#define H2C_MACID_ROLE_AP		2
 
 /*
  * H2C (firmware) commands differ between the older generation chips
@@ -1444,6 +1784,10 @@ struct rtl8xxxu_cfo_tracking {
 };
 
 #define RTL8XXXU_HW_LED_CONTROL	2
+#define RTL8XXXU_MAX_MAC_ID_NUM	128
+#define RTL8XXXU_BC_MC_MACID	0
+#define RTL8XXXU_BC_MC_MACID1	1
+#define RTL8XXXU_MAX_SEC_CAM_NUM	64
 
 struct rtl8xxxu_priv {
 	struct ieee80211_hw *hw;
@@ -1486,6 +1830,7 @@ struct rtl8xxxu_priv {
 	struct rtl8723au_idx ht20_tx_power_diff[RTL8723B_TX_COUNT];
 	struct rtl8723au_idx ht40_tx_power_diff[RTL8723B_TX_COUNT];
 	struct rtl8xxxu_power_base *power_base;
+	u8 package_type;
 	u32 chip_cut:4;
 	u32 rom_rev:4;
 	u32 is_multi_func:1;
@@ -1505,7 +1850,9 @@ struct rtl8xxxu_priv {
 	u32 ep_tx_low_queue:1;
 	u32 rx_buf_aggregation:1;
 	u32 cck_agc_report_type:1;
+	u32 cck_new_agc:1;
 	u8 default_crystal_cap;
+	u8 rfe_type;
 	unsigned int pipe_interrupt;
 	unsigned int pipe_in;
 	unsigned int pipe_out[TXDESC_QUEUE_MAX];
@@ -1518,10 +1865,15 @@ struct rtl8xxxu_priv {
 	u32 rege9c;
 	u32 regeb4;
 	u32 regebc;
+	u32 regrcr;
 	int next_mbox;
 	int nr_out_eps;
 
+	/* Ensure no added or deleted stas while iterating */
+	struct mutex sta_mutex;
 	struct mutex h2c_mutex;
+	/* Protect the indirect register accesses of RTL8710BU. */
+	struct mutex syson_indirect_access_mutex;
 
 	struct usb_anchor rx_anchor;
 	struct usb_anchor tx_anchor;
@@ -1542,6 +1894,8 @@ struct rtl8xxxu_priv {
 		struct rtl8192eu_efuse efuse8192eu;
 		struct rtl8188fu_efuse efuse8188fu;
 		struct rtl8188eu_efuse efuse8188eu;
+		struct rtl8710bu_efuse efuse8710bu;
+		struct rtl8192fu_efuse efuse8192fu;
 	} efuse_wifi;
 	u32 adda_backup[RTL8XXXU_ADDA_REGS];
 	u32 mac_backup[RTL8XXXU_MAC_REGS];
@@ -1551,17 +1905,14 @@ struct rtl8xxxu_priv {
 	u8 pi_enabled:1;
 	u8 no_pape:1;
 	u8 int_buf[USB_INTR_CONTENT_LENGTH];
-	u8 rssi_level;
 	DECLARE_BITMAP(tx_aggr_started, IEEE80211_NUM_TIDS);
 	DECLARE_BITMAP(tid_tx_operational, IEEE80211_NUM_TIDS);
-	/*
-	 * Only one virtual interface permitted because only STA mode
-	 * is supported and no iface_combinations are provided.
-	 */
-	struct ieee80211_vif *vif;
+
+	struct ieee80211_vif *vifs[2];
 	struct delayed_work ra_watchdog;
 	struct work_struct c2hcmd_work;
 	struct sk_buff_head c2hcmd_queue;
+	struct delayed_work update_beacon_work;
 	struct rtl8xxxu_btcoex bt_coex;
 	struct rtl8xxxu_ra_report ra_report;
 	struct rtl8xxxu_cfo_tracking cfo_tracking;
@@ -1570,6 +1921,24 @@ struct rtl8xxxu_priv {
 	bool led_registered;
 	char led_name[32];
 	struct led_classdev led_cdev;
+	DECLARE_BITMAP(mac_id_map, RTL8XXXU_MAX_MAC_ID_NUM);
+	DECLARE_BITMAP(cam_map, RTL8XXXU_MAX_SEC_CAM_NUM);
+};
+
+DECLARE_EWMA(rssi, 10, 16);
+
+struct rtl8xxxu_sta_info {
+	struct ieee80211_sta *sta;
+	struct ieee80211_vif *vif;
+
+	u8 macid;
+	struct ewma_rssi avg_rssi;
+	u8 rssi_level;
+};
+
+struct rtl8xxxu_vif {
+	int port_num;
+	u8 hw_key_idx;
 };
 
 struct rtl8xxxu_rx_urb {
@@ -1586,6 +1955,7 @@ struct rtl8xxxu_tx_urb {
 
 struct rtl8xxxu_fileops {
 	int (*identify_chip) (struct rtl8xxxu_priv *priv);
+	int (*read_efuse) (struct rtl8xxxu_priv *priv);
 	int (*parse_efuse) (struct rtl8xxxu_priv *priv);
 	int (*load_firmware) (struct rtl8xxxu_priv *priv);
 	int (*power_on) (struct rtl8xxxu_priv *priv);
@@ -1599,6 +1969,11 @@ struct rtl8xxxu_fileops {
 	void (*phy_iq_calibrate) (struct rtl8xxxu_priv *priv);
 	void (*config_channel) (struct ieee80211_hw *hw);
 	int (*parse_rx_desc) (struct rtl8xxxu_priv *priv, struct sk_buff *skb);
+	void (*parse_phystats) (struct rtl8xxxu_priv *priv,
+				struct ieee80211_rx_status *rx_status,
+				struct rtl8723au_phy_stats *phy_stats,
+				u32 rxmcs, struct ieee80211_hdr *hdr,
+				bool crc_icv_err);
 	void (*init_aggregation) (struct rtl8xxxu_priv *priv);
 	void (*init_statistics) (struct rtl8xxxu_priv *priv);
 	void (*init_burst) (struct rtl8xxxu_priv *priv);
@@ -1608,17 +1983,18 @@ struct rtl8xxxu_fileops {
 	void (*set_tx_power) (struct rtl8xxxu_priv *priv, int channel,
 			      bool ht40);
 	void (*update_rate_mask) (struct rtl8xxxu_priv *priv,
-				  u32 ramask, u8 rateid, int sgi, int txbw_40mhz);
+				  u32 ramask, u8 rateid, int sgi, int txbw_40mhz,
+				  u8 macid);
 	void (*report_connect) (struct rtl8xxxu_priv *priv,
-				u8 macid, bool connect);
+				u8 macid, u8 role, bool connect);
 	void (*report_rssi) (struct rtl8xxxu_priv *priv, u8 macid, u8 rssi);
 	void (*fill_txdesc) (struct ieee80211_hw *hw, struct ieee80211_hdr *hdr,
 			     struct ieee80211_tx_info *tx_info,
 			     struct rtl8xxxu_txdesc32 *tx_desc, bool sgi,
 			     bool short_preamble, bool ampdu_enable,
-			     u32 rts_rate);
+			     u32 rts_rate, u8 macid);
 	void (*set_crystal_cap) (struct rtl8xxxu_priv *priv, u8 crystal_cap);
-	s8 (*cck_rssi) (struct rtl8xxxu_priv *priv, u8 cck_agc_rpt);
+	s8 (*cck_rssi) (struct rtl8xxxu_priv *priv, struct rtl8723au_phy_stats *phy_stats);
 	int (*led_classdev_brightness_set) (struct led_classdev *led_cdev,
 					    enum led_brightness brightness);
 	int writeN_block_size;
@@ -1629,6 +2005,16 @@ struct rtl8xxxu_fileops {
 	u8 has_tx_report:1;
 	u8 gen2_thermal_meter:1;
 	u8 needs_full_init:1;
+	u8 init_reg_rxfltmap:1;
+	u8 init_reg_pkt_life_time:1;
+	u8 init_reg_hmtfr:1;
+	u8 supports_concurrent:1;
+	u8 ampdu_max_time;
+	u8 ustime_tsf_edca;
+	u16 max_aggr_num;
+	u8 supports_ap:1;
+	u16 max_macid_num;
+	u16 max_sec_cam_num;
 	u32 adda_1t_init;
 	u32 adda_1t_path_on;
 	u32 adda_2t_path_on_a;
@@ -1646,7 +2032,6 @@ struct rtl8xxxu_fileops {
 
 extern int rtl8xxxu_debug;
 
-extern const struct rtl8xxxu_reg8val rtl8xxxu_gen1_mac_init_table[];
 extern const u32 rtl8xxxu_iqk_phy_iq_bb_reg[];
 u8 rtl8xxxu_read8(struct rtl8xxxu_priv *priv, u16 addr);
 u16 rtl8xxxu_read16(struct rtl8xxxu_priv *priv, u16 addr);
@@ -1654,10 +2039,22 @@ u32 rtl8xxxu_read32(struct rtl8xxxu_priv *priv, u16 addr);
 int rtl8xxxu_write8(struct rtl8xxxu_priv *priv, u16 addr, u8 val);
 int rtl8xxxu_write16(struct rtl8xxxu_priv *priv, u16 addr, u16 val);
 int rtl8xxxu_write32(struct rtl8xxxu_priv *priv, u16 addr, u32 val);
+int rtl8xxxu_write8_set(struct rtl8xxxu_priv *priv, u16 addr, u8 bits);
+int rtl8xxxu_write8_clear(struct rtl8xxxu_priv *priv, u16 addr, u8 bits);
+int rtl8xxxu_write16_set(struct rtl8xxxu_priv *priv, u16 addr, u16 bits);
+int rtl8xxxu_write16_clear(struct rtl8xxxu_priv *priv, u16 addr, u16 bits);
+int rtl8xxxu_write32_set(struct rtl8xxxu_priv *priv, u16 addr, u32 bits);
+int rtl8xxxu_write32_clear(struct rtl8xxxu_priv *priv, u16 addr, u32 bits);
+int rtl8xxxu_write32_mask(struct rtl8xxxu_priv *priv, u16 addr,
+			  u32 mask, u32 val);
+
 u32 rtl8xxxu_read_rfreg(struct rtl8xxxu_priv *priv,
 			enum rtl8xxxu_rfpath path, u8 reg);
 int rtl8xxxu_write_rfreg(struct rtl8xxxu_priv *priv,
 			 enum rtl8xxxu_rfpath path, u8 reg, u32 data);
+int rtl8xxxu_write_rfreg_mask(struct rtl8xxxu_priv *priv,
+			      enum rtl8xxxu_rfpath path, u8 reg,
+			      u32 mask, u32 val);
 void rtl8xxxu_save_regs(struct rtl8xxxu_priv *priv, const u32 *regs,
 			u32 *backup, int count);
 void rtl8xxxu_restore_regs(struct rtl8xxxu_priv *priv, const u32 *regs,
@@ -1687,10 +2084,12 @@ void rtl8xxxu_identify_vendor_2bits(struct rtl8xxxu_priv *priv, u32 vendor);
 void rtl8xxxu_config_endpoints_sie(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_config_endpoints_no_sie(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_read_efuse8(struct rtl8xxxu_priv *priv, u16 offset, u8 *data);
+int rtl8xxxu_read_efuse(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_reset_8051(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_auto_llt_table(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen2_prepare_calibrate(struct rtl8xxxu_priv *priv, u8 start);
 void rtl8723a_phy_lc_calibrate(struct rtl8xxxu_priv *priv);
+void rtl8188f_phy_lc_calibrate(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_flush_fifo(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_gen2_h2c_cmd(struct rtl8xxxu_priv *priv,
 			  struct h2c_cmd *h2c, int len);
@@ -1701,6 +2100,7 @@ void rtl8xxxu_gen1_phy_iq_calibrate(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen1_init_phy_bb(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen1_set_tx_power(struct rtl8xxxu_priv *priv,
 				int channel, bool ht40);
+void rtl8188f_channel_to_group(int channel, int *group, int *cck_group);
 void rtl8188f_set_tx_power(struct rtl8xxxu_priv *priv,
 			   int channel, bool ht40);
 void rtl8xxxu_gen1_config_channel(struct ieee80211_hw *hw);
@@ -1708,13 +2108,13 @@ void rtl8xxxu_gen2_config_channel(struct ieee80211_hw *hw);
 void rtl8xxxu_gen1_usb_quirks(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_gen2_usb_quirks(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_update_rate_mask(struct rtl8xxxu_priv *priv,
-			       u32 ramask, u8 rateid, int sgi, int txbw_40mhz);
+			       u32 ramask, u8 rateid, int sgi, int txbw_40mhz, u8 macid);
 void rtl8xxxu_gen2_update_rate_mask(struct rtl8xxxu_priv *priv,
-				    u32 ramask, u8 rateid, int sgi, int txbw_40mhz);
+				    u32 ramask, u8 rateid, int sgi, int txbw_40mhz, u8 macid);
 void rtl8xxxu_gen1_report_connect(struct rtl8xxxu_priv *priv,
-				  u8 macid, bool connect);
+				  u8 macid, u8 role, bool connect);
 void rtl8xxxu_gen2_report_connect(struct rtl8xxxu_priv *priv,
-				  u8 macid, bool connect);
+				  u8 macid, u8 role, bool connect);
 void rtl8xxxu_gen1_report_rssi(struct rtl8xxxu_priv *priv, u8 macid, u8 rssi);
 void rtl8xxxu_gen2_report_rssi(struct rtl8xxxu_priv *priv, u8 macid, u8 rssi);
 void rtl8xxxu_gen1_init_aggregation(struct rtl8xxxu_priv *priv);
@@ -1724,6 +2124,16 @@ void rtl8xxxu_gen2_disable_rf(struct rtl8xxxu_priv *priv);
 void rtl8xxxu_init_burst(struct rtl8xxxu_priv *priv);
 int rtl8xxxu_parse_rxdesc16(struct rtl8xxxu_priv *priv, struct sk_buff *skb);
 int rtl8xxxu_parse_rxdesc24(struct rtl8xxxu_priv *priv, struct sk_buff *skb);
+void rtl8723au_rx_parse_phystats(struct rtl8xxxu_priv *priv,
+				 struct ieee80211_rx_status *rx_status,
+				 struct rtl8723au_phy_stats *phy_stats,
+				 u32 rxmcs, struct ieee80211_hdr *hdr,
+				 bool crc_icv_err);
+void jaguar2_rx_parse_phystats(struct rtl8xxxu_priv *priv,
+			       struct ieee80211_rx_status *rx_status,
+			       struct rtl8723au_phy_stats *phy_stats,
+			       u32 rxmcs, struct ieee80211_hdr *hdr,
+			       bool crc_icv_err);
 int rtl8xxxu_gen2_channel_to_group(int channel);
 bool rtl8xxxu_simularity_compare(struct rtl8xxxu_priv *priv,
 				 int result[][8], int c1, int c2);
@@ -1733,28 +2143,30 @@ void rtl8xxxu_fill_txdesc_v1(struct ieee80211_hw *hw, struct ieee80211_hdr *hdr,
 			     struct ieee80211_tx_info *tx_info,
 			     struct rtl8xxxu_txdesc32 *tx_desc, bool sgi,
 			     bool short_preamble, bool ampdu_enable,
-			     u32 rts_rate);
+			     u32 rts_rate, u8 macid);
 void rtl8xxxu_fill_txdesc_v2(struct ieee80211_hw *hw, struct ieee80211_hdr *hdr,
 			     struct ieee80211_tx_info *tx_info,
 			     struct rtl8xxxu_txdesc32 *tx_desc32, bool sgi,
 			     bool short_preamble, bool ampdu_enable,
-			     u32 rts_rate);
+			     u32 rts_rate, u8 macid);
 void rtl8xxxu_fill_txdesc_v3(struct ieee80211_hw *hw, struct ieee80211_hdr *hdr,
 			     struct ieee80211_tx_info *tx_info,
 			     struct rtl8xxxu_txdesc32 *tx_desc32, bool sgi,
 			     bool short_preamble, bool ampdu_enable,
-			     u32 rts_rate);
+			     u32 rts_rate, u8 macid);
 void rtl8723bu_set_ps_tdma(struct rtl8xxxu_priv *priv,
 			   u8 arg1, u8 arg2, u8 arg3, u8 arg4, u8 arg5);
 void rtl8723bu_phy_init_antenna_selection(struct rtl8xxxu_priv *priv);
 void rtl8723a_set_crystal_cap(struct rtl8xxxu_priv *priv, u8 crystal_cap);
 void rtl8188f_set_crystal_cap(struct rtl8xxxu_priv *priv, u8 crystal_cap);
-s8 rtl8723a_cck_rssi(struct rtl8xxxu_priv *priv, u8 cck_agc_rpt);
+s8 rtl8723a_cck_rssi(struct rtl8xxxu_priv *priv, struct rtl8723au_phy_stats *phy_stats);
 void rtl8xxxu_update_ra_report(struct rtl8xxxu_ra_report *rarpt,
 			       u8 rate, u8 sgi, u8 bw);
 void rtl8188e_ra_info_init_all(struct rtl8xxxu_ra_info *ra);
 void rtl8188e_handle_ra_tx_report2(struct rtl8xxxu_priv *priv, struct sk_buff *skb);
 
+extern struct rtl8xxxu_fileops rtl8192fu_fops;
+extern struct rtl8xxxu_fileops rtl8710bu_fops;
 extern struct rtl8xxxu_fileops rtl8188fu_fops;
 extern struct rtl8xxxu_fileops rtl8188eu_fops;
 extern struct rtl8xxxu_fileops rtl8192cu_fops;

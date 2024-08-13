@@ -6,6 +6,7 @@
  */
 
 #include <linux/lsm_hooks.h>
+#include <uapi/linux/lsm.h>
 #include "common.h"
 
 /**
@@ -52,7 +53,7 @@ static int tomoyo_cred_prepare(struct cred *new, const struct cred *old,
  *
  * @bprm: Pointer to "struct linux_binprm".
  */
-static void tomoyo_bprm_committed_creds(struct linux_binprm *bprm)
+static void tomoyo_bprm_committed_creds(const struct linux_binprm *bprm)
 {
 	/* Clear old_domain_info saved by execve() request. */
 	struct tomoyo_task *s = tomoyo_task(current);
@@ -327,7 +328,8 @@ static int tomoyo_file_fcntl(struct file *file, unsigned int cmd,
 static int tomoyo_file_open(struct file *f)
 {
 	/* Don't check read permission here if called from execve(). */
-	if (current->in_execve)
+	/* Illogically, FMODE_EXEC is in f_flags, not f_mode. */
+	if (f->f_flags & __FMODE_EXEC)
 		return 0;
 	return tomoyo_check_open_permission(tomoyo_domain(), &f->f_path,
 					    f->f_flags);
@@ -499,7 +501,7 @@ static int tomoyo_socket_sendmsg(struct socket *sock, struct msghdr *msg,
 	return tomoyo_socket_sendmsg_permission(sock, msg, size);
 }
 
-struct lsm_blob_sizes tomoyo_blob_sizes __lsm_ro_after_init = {
+struct lsm_blob_sizes tomoyo_blob_sizes __ro_after_init = {
 	.lbs_task = sizeof(struct tomoyo_task),
 };
 
@@ -542,11 +544,16 @@ static void tomoyo_task_free(struct task_struct *task)
 	}
 }
 
+static const struct lsm_id tomoyo_lsmid = {
+	.name = "tomoyo",
+	.id = LSM_ID_TOMOYO,
+};
+
 /*
  * tomoyo_security_ops is a "struct security_operations" which is used for
  * registering TOMOYO.
  */
-static struct security_hook_list tomoyo_hooks[] __lsm_ro_after_init = {
+static struct security_hook_list tomoyo_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(cred_prepare, tomoyo_cred_prepare),
 	LSM_HOOK_INIT(bprm_committed_creds, tomoyo_bprm_committed_creds),
 	LSM_HOOK_INIT(task_alloc, tomoyo_task_alloc),
@@ -568,6 +575,7 @@ static struct security_hook_list tomoyo_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(path_rename, tomoyo_path_rename),
 	LSM_HOOK_INIT(inode_getattr, tomoyo_inode_getattr),
 	LSM_HOOK_INIT(file_ioctl, tomoyo_file_ioctl),
+	LSM_HOOK_INIT(file_ioctl_compat, tomoyo_file_ioctl),
 	LSM_HOOK_INIT(path_chmod, tomoyo_path_chmod),
 	LSM_HOOK_INIT(path_chown, tomoyo_path_chown),
 	LSM_HOOK_INIT(path_chroot, tomoyo_path_chroot),
@@ -583,7 +591,7 @@ static struct security_hook_list tomoyo_hooks[] __lsm_ro_after_init = {
 /* Lock for GC. */
 DEFINE_SRCU(tomoyo_ss);
 
-int tomoyo_enabled __lsm_ro_after_init = 1;
+int tomoyo_enabled __ro_after_init = 1;
 
 /**
  * tomoyo_init - Register TOMOYO Linux as a LSM module.
@@ -595,7 +603,8 @@ static int __init tomoyo_init(void)
 	struct tomoyo_task *s = tomoyo_task(current);
 
 	/* register ourselves with the security framework */
-	security_add_hooks(tomoyo_hooks, ARRAY_SIZE(tomoyo_hooks), "tomoyo");
+	security_add_hooks(tomoyo_hooks, ARRAY_SIZE(tomoyo_hooks),
+			   &tomoyo_lsmid);
 	pr_info("TOMOYO Linux initialized\n");
 	s->domain_info = &tomoyo_kernel_domain;
 	atomic_inc(&tomoyo_kernel_domain.users);

@@ -40,9 +40,9 @@ static struct kmem_cache *ntfs_enode_cachep;
 
 int __init ntfs3_init_bitmap(void)
 {
-	ntfs_enode_cachep =
-		kmem_cache_create("ntfs3_enode_cache", sizeof(struct e_node), 0,
-				  SLAB_RECLAIM_ACCOUNT, NULL);
+	ntfs_enode_cachep = kmem_cache_create("ntfs3_enode_cache",
+					      sizeof(struct e_node), 0,
+					      SLAB_RECLAIM_ACCOUNT, NULL);
 	return ntfs_enode_cachep ? 0 : -ENOMEM;
 }
 
@@ -124,7 +124,8 @@ void wnd_close(struct wnd_bitmap *wnd)
 {
 	struct rb_node *node, *next;
 
-	kfree(wnd->free_bits);
+	kvfree(wnd->free_bits);
+	wnd->free_bits = NULL;
 	run_close(&wnd->run);
 
 	node = rb_first(&wnd->start_tree);
@@ -286,9 +287,9 @@ static void wnd_add_free_ext(struct wnd_bitmap *wnd, size_t bit, size_t len,
 		if (wnd->uptodated != 1) {
 			/* Check bits before 'bit'. */
 			ib = wnd->zone_bit == wnd->zone_end ||
-					     bit < wnd->zone_end
-				     ? 0
-				     : wnd->zone_end;
+					     bit < wnd->zone_end ?
+				     0 :
+				     wnd->zone_end;
 
 			while (bit > ib && wnd_is_free_hlp(wnd, bit - 1, 1)) {
 				bit -= 1;
@@ -297,9 +298,9 @@ static void wnd_add_free_ext(struct wnd_bitmap *wnd, size_t bit, size_t len,
 
 			/* Check bits after 'end_in'. */
 			ib = wnd->zone_bit == wnd->zone_end ||
-					     end_in > wnd->zone_bit
-				     ? wnd->nbits
-				     : wnd->zone_bit;
+					     end_in > wnd->zone_bit ?
+				     wnd->nbits :
+				     wnd->zone_bit;
 
 			while (end_in < ib && wnd_is_free_hlp(wnd, end_in, 1)) {
 				end_in += 1;
@@ -417,8 +418,8 @@ static void wnd_remove_free_ext(struct wnd_bitmap *wnd, size_t bit, size_t len)
 			return;
 		n3 = rb_first(&wnd->count_tree);
 		wnd->extent_max =
-			n3 ? rb_entry(n3, struct e_node, count.node)->count.key
-			   : 0;
+			n3 ? rb_entry(n3, struct e_node, count.node)->count.key :
+			     0;
 		return;
 	}
 
@@ -653,12 +654,14 @@ int wnd_init(struct wnd_bitmap *wnd, struct super_block *sb, size_t nbits)
 	wnd->total_zeroes = nbits;
 	wnd->extent_max = MINUS_ONE_T;
 	wnd->zone_bit = wnd->zone_end = 0;
-	wnd->nwnd = bytes_to_block(sb, bitmap_size(nbits));
+	wnd->nwnd = bytes_to_block(sb, ntfs3_bitmap_size(nbits));
 	wnd->bits_last = nbits & (wbits - 1);
 	if (!wnd->bits_last)
 		wnd->bits_last = wbits;
 
-	wnd->free_bits = kcalloc(wnd->nwnd, sizeof(u16), GFP_NOFS | __GFP_NOWARN);
+	wnd->free_bits =
+		kvmalloc_array(wnd->nwnd, sizeof(u16), GFP_KERNEL | __GFP_ZERO);
+
 	if (!wnd->free_bits)
 		return -ENOMEM;
 
@@ -1344,7 +1347,7 @@ int wnd_extend(struct wnd_bitmap *wnd, size_t new_bits)
 		return -EINVAL;
 
 	/* Align to 8 byte boundary. */
-	new_wnd = bytes_to_block(sb, bitmap_size(new_bits));
+	new_wnd = bytes_to_block(sb, ntfs3_bitmap_size(new_bits));
 	new_last = new_bits & (wbits - 1);
 	if (!new_last)
 		new_last = wbits;
@@ -1357,7 +1360,7 @@ int wnd_extend(struct wnd_bitmap *wnd, size_t new_bits)
 		memcpy(new_free, wnd->free_bits, wnd->nwnd * sizeof(short));
 		memset(new_free + wnd->nwnd, 0,
 		       (new_wnd - wnd->nwnd) * sizeof(short));
-		kfree(wnd->free_bits);
+		kvfree(wnd->free_bits);
 		wnd->free_bits = new_free;
 	}
 

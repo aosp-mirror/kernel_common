@@ -782,7 +782,7 @@ static int uda1380_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id uda1380_i2c_id[] = {
-	{ "uda1380", 0 },
+	{ "uda1380" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, uda1380_i2c_id);
@@ -798,7 +798,7 @@ static struct i2c_driver uda1380_i2c_driver = {
 		.name =  "uda1380-codec",
 		.of_match_table = uda1380_of_match,
 	},
-	.probe_new = uda1380_i2c_probe,
+	.probe = uda1380_i2c_probe,
 	.id_table = uda1380_i2c_id,
 };
 

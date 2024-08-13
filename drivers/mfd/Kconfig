@@ -15,6 +15,7 @@ config MFD_CS5535
 	tristate "AMD CS5535 and CS5536 southbridge core functions"
 	select MFD_CORE
 	depends on PCI && (X86_32 || (X86 && COMPILE_TEST))
+	depends on !UML
 	help
 	  This is the core driver for CS5535/CS5536 MFD functions.  This is
 	  necessary for using the board's GPIO and MFGPT functionality.
@@ -236,6 +237,30 @@ config MFD_CROS_EC_DEV
 	  To compile this driver as a module, choose M here: the module will be
 	  called cros-ec-dev.
 
+config MFD_CS42L43
+	tristate
+	select MFD_CORE
+	select REGMAP
+	select REGMAP_IRQ
+
+config MFD_CS42L43_I2C
+	tristate "Cirrus Logic CS42L43 (I2C)"
+	depends on I2C
+	select REGMAP_I2C
+	select MFD_CS42L43
+	help
+	  Select this to support the Cirrus Logic CS42L43 PC CODEC with
+	  headphone and class D speaker drivers over I2C.
+
+config MFD_CS42L43_SDW
+	tristate "Cirrus Logic CS42L43 (SoundWire)"
+	depends on SOUNDWIRE
+	select REGMAP_SOUNDWIRE
+	select MFD_CS42L43
+	help
+	  Select this to support the Cirrus Logic CS42L43 PC CODEC with
+	  headphone and class D speaker drivers over SoundWire.
+
 config MFD_MADERA
 	tristate "Cirrus Logic Madera codecs"
 	select MFD_CORE
@@ -264,6 +289,16 @@ config MFD_MADERA_SPI
 	help
 	  Support for the Cirrus Logic Madera platform audio SoC
 	  core functionality controlled via SPI.
+
+config MFD_MAX5970
+	tristate "Maxim 5970/5978 power switch and monitor"
+	depends on I2C && OF
+	select MFD_SIMPLE_MFD_I2C
+	help
+	  This driver controls a Maxim 5970/5978 switch via I2C bus.
+	  The MAX5970/5978 is a smart switch with no output regulation, but
+	  fault protection and voltage and current monitoring capabilities.
+	  Also it supports upto 4 indication leds.
 
 config MFD_CS47L15
 	bool "Cirrus Logic CS47L15"
@@ -352,9 +387,6 @@ config MFD_DA9055
 	  Additional drivers must be enabled in order to use the functionality
 	  of the device.
 
-	  This driver can be built as a module. If built as a module it will be
-	  called "da9055"
-
 config MFD_DA9062
 	tristate "Dialog Semiconductor DA9062/61 PMIC Support"
 	select MFD_CORE
@@ -426,7 +458,7 @@ config MFD_EXYNOS_LPASS
 
 config MFD_GATEWORKS_GSC
 	tristate "Gateworks System Controller"
-	depends on (I2C && OF)
+	depends on I2C && OF
 	select MFD_CORE
 	select REGMAP_I2C
 	select REGMAP_IRQ
@@ -441,7 +473,7 @@ config MFD_GATEWORKS_GSC
 
 config MFD_MC13XXX
 	tristate
-	depends on (SPI_MASTER || I2C)
+	depends on SPI_MASTER || I2C
 	select MFD_CORE
 	select REGMAP_IRQ
 	help
@@ -776,6 +808,19 @@ config MFD_MAX14577
 	  additional drivers must be enabled in order to use the functionality
 	  of the device.
 
+config MFD_MAX77541
+	tristate "Analog Devices MAX77541/77540 PMIC Support"
+	depends on I2C=y
+	select MFD_CORE
+	select REGMAP_I2C
+	select REGMAP_IRQ
+	help
+	  Say yes here to add support for Analog Devices MAX77541 and
+	  MAX77540 Power Management ICs. This driver provides
+	  common support for accessing the device; additional drivers
+	  must be enabled in order to use the functionality of the device.
+	  There are regulators and adc.
+
 config MFD_MAX77620
 	bool "Maxim Semiconductor MAX77620 and MAX20024 PMIC Support"
 	depends on I2C=y
@@ -1064,7 +1109,7 @@ config PCF50633_GPIO
 
 config MFD_PM8XXX
 	tristate "Qualcomm PM8xxx PMIC chips driver"
-	depends on (ARM || HEXAGON || COMPILE_TEST)
+	depends on ARM || HEXAGON || COMPILE_TEST
 	select IRQ_DOMAIN_HIERARCHY
 	select MFD_CORE
 	select REGMAP
@@ -1175,18 +1220,37 @@ config MFD_RC5T583
 	  Additional drivers must be enabled in order to use the
 	  different functionality of the device.
 
-config MFD_RK808
-	tristate "Rockchip RK805/RK808/RK809/RK817/RK818 Power Management Chip"
+config MFD_RK8XX
+	tristate
+	select MFD_CORE
+
+config MFD_RK8XX_I2C
+	tristate "Rockchip RK805/RK808/RK809/RK816/RK817/RK818 Power Management Chip"
 	depends on I2C && OF
 	select MFD_CORE
 	select REGMAP_I2C
 	select REGMAP_IRQ
+	select MFD_RK8XX
 	help
 	  If you say yes here you get support for the RK805, RK808, RK809,
-	  RK817 and RK818 Power Management chips.
+	  RK816, RK817 and RK818 Power Management chips.
 	  This driver provides common support for accessing the device
 	  through I2C interface. The device supports multiple sub-devices
 	  including interrupts, RTC, LDO & DCDC regulators, and onkey.
+
+config MFD_RK8XX_SPI
+	tristate "Rockchip RK806 Power Management Chip"
+	depends on SPI && OF
+	select MFD_CORE
+	select REGMAP_SPI
+	select REGMAP_IRQ
+	select MFD_RK8XX
+	help
+	  If you say yes here you get support for the RK806 Power Management
+	  chip.
+	  This driver provides common support for accessing the device
+	  through an SPI interface. The device supports multiple sub-devices
+	  including interrupts, LDO & DCDC regulators, and power on-key.
 
 config MFD_RN5T618
 	tristate "Ricoh RN5T567/618 PMIC"
@@ -1307,6 +1371,17 @@ config MFD_SC27XX_PMIC
 	  This driver provides common support for accessing the SC27xx PMICs,
 	  and it also adds the irq_chip parts for handling the PMIC chip events.
 
+config RZ_MTU3
+	tristate "Renesas RZ/G2L MTU3a core driver"
+	depends on (ARCH_RZG2L && OF) || COMPILE_TEST
+	select MFD_CORE
+	help
+	  Select this option to enable Renesas RZ/G2L MTU3a core driver for
+	  the Multi-Function Timer Pulse Unit 3 (MTU3a) hardware available
+	  on SoCs from Renesas. The core driver shares the clk and channel
+	  register access for the other child devices like Counter, PWM,
+	  Clock Source, and Clock event.
+
 config ABX500_CORE
 	bool "ST-Ericsson ABX500 Mixed Signal Circuit register functions"
 	depends on ARCH_U8500 || COMPILE_TEST
@@ -1343,7 +1418,7 @@ config MFD_DB8500_PRCMU
 
 config MFD_STMPE
 	bool "STMicroelectronics STMPE"
-	depends on (I2C=y || SPI_MASTER=y)
+	depends on I2C=y || SPI_MASTER=y
 	depends on OF
 	select MFD_CORE
 	help
@@ -1408,6 +1483,7 @@ config MFD_SYSCON
 
 config MFD_TI_AM335X_TSCADC
 	tristate "TI ADC / Touch Screen chip support"
+	depends on ARCH_OMAP2PLUS || ARCH_K3 || COMPILE_TEST
 	select MFD_CORE
 	select REGMAP
 	select REGMAP_MMIO
@@ -1661,10 +1737,43 @@ config MFD_TPS65912_SPI
 	  If you say yes here you get support for the TPS65912 series of
 	  PM chips with SPI interface.
 
+config MFD_TPS6594
+	tristate
+	select MFD_CORE
+	select REGMAP
+	select REGMAP_IRQ
+
+config MFD_TPS6594_I2C
+	tristate "TI TPS6594 Power Management chip with I2C"
+	select MFD_TPS6594
+	select REGMAP_I2C
+	select CRC8
+	depends on I2C
+	help
+	  If you say yes here you get support for the TPS6594 series of
+	  PM chips with I2C interface.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called tps6594-i2c.
+
+config MFD_TPS6594_SPI
+	tristate "TI TPS6594 Power Management chip with SPI"
+	select MFD_TPS6594
+	select REGMAP_SPI
+	select CRC8
+	depends on SPI_MASTER
+	help
+	  If you say yes here you get support for the TPS6594 series of
+	  PM chips with SPI interface.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called tps6594-spi.
+
 config TWL4030_CORE
 	bool "TI TWL4030/TWL5030/TWL6030/TPS659x0 Support"
 	depends on I2C=y
 	select IRQ_DOMAIN
+	select MFD_CORE
 	select REGMAP_I2C
 	help
 	  Say yes here if you have TWL4030 / TWL6030 family chip on your board.
@@ -2007,7 +2116,7 @@ config MFD_STM32_TIMERS
 
 config MFD_STPMIC1
 	tristate "Support for STPMIC1 PMIC"
-	depends on (I2C=y && OF)
+	depends on I2C=y && OF
 	select REGMAP_I2C
 	select REGMAP_IRQ
 	select MFD_CORE
@@ -2148,7 +2257,7 @@ config MFD_VEXPRESS_SYSREG
 config RAVE_SP_CORE
 	tristate "RAVE SP MCU core driver"
 	depends on SERIAL_DEV_BUS
-	select CRC_CCITT
+	select CRC_ITU_T
 	help
 	  Select this to get support for the Supervisory Processor
 	  device found on several devices in RAVE line of hardware.
@@ -2166,14 +2275,32 @@ config SGI_MFD_IOC3
 	  If you have an SGI Origin, Octane, or a PCI IOC3 card,
 	  then say Y. Otherwise say N.
 
-config MFD_INTEL_M10_BMC
-	tristate "Intel MAX 10 Board Management Controller"
-	depends on SPI_MASTER
-	select REGMAP_SPI_AVMM
-	select MFD_CORE
+config MFD_INTEL_M10_BMC_CORE
+        tristate
+        select MFD_CORE
+        select REGMAP
+        default n
+
+config MFD_INTEL_M10_BMC_SPI
+        tristate "Intel MAX 10 Board Management Controller with SPI"
+        depends on SPI_MASTER
+        select MFD_INTEL_M10_BMC_CORE
+        select REGMAP_SPI_AVMM
+        help
+          Support for the Intel MAX 10 board management controller using the
+          SPI interface.
+
+          This driver provides common support for accessing the device,
+          additional drivers must be enabled in order to use the functionality
+          of the device.
+
+config MFD_INTEL_M10_BMC_PMCI
+	tristate "Intel MAX 10 Board Management Controller with PMCI"
+	depends on FPGA_DFL
+	select MFD_INTEL_M10_BMC_CORE
+	select REGMAP
 	help
-	  Support for the Intel MAX 10 board management controller using the
-	  SPI interface.
+	  Support for the Intel MAX 10 board management controller via PMCI.
 
 	  This driver provides common support for accessing the device,
 	  additional drivers must be enabled in order to use the functionality

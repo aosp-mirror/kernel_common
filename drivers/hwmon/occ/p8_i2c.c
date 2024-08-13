@@ -241,12 +241,11 @@ static const struct of_device_id p8_i2c_occ_of_match[] = {
 MODULE_DEVICE_TABLE(of, p8_i2c_occ_of_match);
 
 static struct i2c_driver p8_i2c_occ_driver = {
-	.class = I2C_CLASS_HWMON,
 	.driver = {
 		.name = "occ-hwmon",
 		.of_match_table = p8_i2c_occ_of_match,
 	},
-	.probe_new = p8_i2c_occ_probe,
+	.probe = p8_i2c_occ_probe,
 	.remove = p8_i2c_occ_remove,
 };
 

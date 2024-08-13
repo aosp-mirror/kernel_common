@@ -12,10 +12,16 @@ maintainers:
 
 properties:
   compatible:
-    enum:
-      - fsl,imx6q-tempmon
-      - fsl,imx6sx-tempmon
-      - fsl,imx7d-tempmon
+    oneOf:
+      - enum:
+          - fsl,imx6q-tempmon
+          - fsl,imx6sx-tempmon
+          - fsl,imx7d-tempmon
+      - items:
+          - enum:
+              - fsl,imx6sll-tempmon
+              - fsl,imx6ul-tempmon
+          - const: fsl,imx6sx-tempmon
 
   interrupts:
     description: |
@@ -40,11 +46,11 @@ properties:
       - const: temp_grade
 
   fsl,tempmon:
-    $ref: '/schemas/types.yaml#/definitions/phandle'
+    $ref: /schemas/types.yaml#/definitions/phandle
     description: Phandle to anatop system controller node.
 
   fsl,tempmon-data:
-    $ref: '/schemas/types.yaml#/definitions/phandle'
+    $ref: /schemas/types.yaml#/definitions/phandle
     description: |
       Deprecated property, phandle pointer to fuse controller that contains
       TEMPMON calibration data, e.g. OCOTP on imx6q. The details about
@@ -54,12 +60,18 @@ properties:
   clocks:
     maxItems: 1
 
+  "#thermal-sensor-cells":
+    const: 0
+
 required:
   - compatible
   - interrupts
   - fsl,tempmon
   - nvmem-cells
   - nvmem-cell-names
+
+allOf:
+  - $ref: thermal-sensor.yaml#
 
 additionalProperties: false
 
@@ -98,5 +110,6 @@ examples:
              nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
              nvmem-cell-names = "calib", "temp_grade";
              clocks = <&clks IMX6SX_CLK_PLL3_USB_OTG>;
+             #thermal-sensor-cells = <0>;
         };
     };

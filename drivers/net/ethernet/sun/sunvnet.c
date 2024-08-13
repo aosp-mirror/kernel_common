@@ -44,7 +44,7 @@
 
 static char version[] =
 	DRV_MODULE_NAME " " DRV_MODULE_VERSION " (" DRV_MODULE_RELDATE ")";
-MODULE_AUTHOR("David S. Miller (davem@davemloft.net)");
+MODULE_AUTHOR("David S. Miller <davem@davemloft.net>");
 MODULE_DESCRIPTION("Sun LDOM virtual network driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(DRV_MODULE_VERSION);
@@ -432,6 +432,9 @@ static int vnet_port_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 	int len, i, err, switch_port;
 
 	hp = mdesc_grab();
+
+	if (!hp)
+		return -ENODEV;
 
 	vp = vnet_find_parent(hp, vdev->mp, vdev);
 	if (IS_ERR(vp)) {

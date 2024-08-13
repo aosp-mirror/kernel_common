@@ -5,6 +5,7 @@
 #include <linux/kobject.h>
 #include <linux/memory.h>
 #include <linux/memory-tiers.h>
+#include <linux/notifier.h>
 
 #include "internal.h"
 
@@ -35,10 +36,15 @@ struct node_memory_type_map {
 
 static DEFINE_MUTEX(memory_tier_lock);
 static LIST_HEAD(memory_tiers);
+/*
+ * The list is used to store all memory types that are not created
+ * by a device driver.
+ */
+static LIST_HEAD(default_memory_types);
 static struct node_memory_type_map node_memory_types[MAX_NUMNODES];
-static struct memory_dev_type *default_dram_type;
+struct memory_dev_type *default_dram_type;
 
-static struct bus_type memory_tier_subsys = {
+static const struct bus_type memory_tier_subsys = {
 	.name = "memory_tiering",
 	.dev_name = "memory_tier",
 };
@@ -105,6 +111,15 @@ static int top_tier_adistance;
 static struct demotion_nodes *node_demotion __read_mostly;
 #endif /* CONFIG_MIGRATION */
 
+static BLOCKING_NOTIFIER_HEAD(mt_adistance_algorithms);
+
+/* The lock is used to protect `default_dram_perf*` info and nid. */
+static DEFINE_MUTEX(default_dram_perf_lock);
+static bool default_dram_perf_error;
+static struct access_coordinate default_dram_perf;
+static int default_dram_perf_ref_nid = NUMA_NO_NODE;
+static const char *default_dram_perf_ref_source;
+
 static inline struct memory_tier *to_memory_tier(struct device *device)
 {
 	return container_of(device, struct memory_tier, dev);
@@ -115,7 +130,7 @@ static __always_inline nodemask_t get_memtier_nodemask(struct memory_tier *memti
 	nodemask_t nodes = NODE_MASK_NONE;
 	struct memory_dev_type *memtype;
 
-	list_for_each_entry(memtype, &memtier->memory_types, tier_sibiling)
+	list_for_each_entry(memtype, &memtier->memory_types, tier_sibling)
 		nodes_or(nodes, nodes, memtype->nodes);
 
 	return nodes;
@@ -174,7 +189,7 @@ static struct memory_tier *find_create_memory_tier(struct memory_dev_type *memty
 	 * If the memtype is already part of a memory tier,
 	 * just return that.
 	 */
-	if (!list_empty(&memtype->tier_sibiling)) {
+	if (!list_empty(&memtype->tier_sibling)) {
 		list_for_each_entry(memtier, &memory_tiers, list) {
 			if (adistance == memtier->adistance_start)
 				return memtier;
@@ -211,14 +226,14 @@ static struct memory_tier *find_create_memory_tier(struct memory_dev_type *memty
 
 	ret = device_register(&new_memtier->dev);
 	if (ret) {
-		list_del(&memtier->list);
-		put_device(&memtier->dev);
+		list_del(&new_memtier->list);
+		put_device(&new_memtier->dev);
 		return ERR_PTR(ret);
 	}
 	memtier = new_memtier;
 
 link_memtype:
-	list_add(&memtype->tier_sibiling, &memtier->memory_types);
+	list_add(&memtype->tier_sibling, &memtier->memory_types);
 	return memtier;
 }
 
@@ -351,6 +366,26 @@ static void disable_all_demotion_targets(void)
 	synchronize_rcu();
 }
 
+static void dump_demotion_targets(void)
+{
+	int node;
+
+	for_each_node_state(node, N_MEMORY) {
+		struct memory_tier *memtier = __node_get_memory_tier(node);
+		nodemask_t preferred = node_demotion[node].preferred;
+
+		if (!memtier)
+			continue;
+
+		if (nodes_empty(preferred))
+			pr_info("Demotion targets for Node %d: null\n", node);
+		else
+			pr_info("Demotion targets for Node %d: preferred: %*pbl, fallback: %*pbl\n",
+				node, nodemask_pr_args(&preferred),
+				nodemask_pr_args(&memtier->lower_tier_mask));
+	}
+}
+
 /*
  * Find an automatic demotion target for all memory
  * nodes. Failing here is OK.  It might just indicate
@@ -366,7 +401,7 @@ static void establish_demotion_targets(void)
 
 	lockdep_assert_held_once(&memory_tier_lock);
 
-	if (!node_demotion || !IS_ENABLED(CONFIG_MIGRATION))
+	if (!node_demotion)
 		return;
 
 	disable_all_demotion_targets();
@@ -435,7 +470,7 @@ static void establish_demotion_targets(void)
 	 * Now build the lower_tier mask for each node collecting node mask from
 	 * all memory tier below it. This allows us to fallback demotion page
 	 * allocation to a set of nodes that is closer the above selected
-	 * perferred node.
+	 * preferred node.
 	 */
 	lower_tier = node_states[N_MEMORY];
 	list_for_each_entry(memtier, &memory_tiers, list) {
@@ -448,10 +483,11 @@ static void establish_demotion_targets(void)
 		nodes_andnot(lower_tier, lower_tier, tier_nodes);
 		memtier->lower_tier_mask = lower_tier;
 	}
+
+	dump_demotion_targets();
 }
 
 #else
-static inline void disable_all_demotion_targets(void) {}
 static inline void establish_demotion_targets(void) {}
 #endif /* CONFIG_MIGRATION */
 
@@ -476,7 +512,8 @@ static inline void __init_node_memory_type(int node, struct memory_dev_type *mem
 static struct memory_tier *set_node_memory_tier(int node)
 {
 	struct memory_tier *memtier;
-	struct memory_dev_type *memtype;
+	struct memory_dev_type *memtype = default_dram_type;
+	int adist = MEMTIER_ADISTANCE_DRAM;
 	pg_data_t *pgdat = NODE_DATA(node);
 
 
@@ -485,7 +522,16 @@ static struct memory_tier *set_node_memory_tier(int node)
 	if (!node_state(node, N_MEMORY))
 		return ERR_PTR(-EINVAL);
 
-	__init_node_memory_type(node, default_dram_type);
+	mt_calc_adistance(node, &adist);
+	if (!node_memory_types[node].memtype) {
+		memtype = mt_find_alloc_memory_type(adist, &default_memory_types);
+		if (IS_ERR(memtype)) {
+			memtype = default_dram_type;
+			pr_info("Failed to allocate a memory type. Fall back.\n");
+		}
+	}
+
+	__init_node_memory_type(node, memtype);
 
 	memtype = node_memory_types[node].memtype;
 	node_set(node, memtype->nodes);
@@ -528,7 +574,7 @@ static bool clear_node_memory_tier(int node)
 		memtype = node_memory_types[node].memtype;
 		node_clear(node, memtype->nodes);
 		if (nodes_empty(memtype->nodes)) {
-			list_del_init(&memtype->tier_sibiling);
+			list_del_init(&memtype->tier_sibling);
 			if (list_empty(&memtier->memory_types))
 				destroy_memory_tier(memtier);
 		}
@@ -554,18 +600,18 @@ struct memory_dev_type *alloc_memory_type(int adistance)
 		return ERR_PTR(-ENOMEM);
 
 	memtype->adistance = adistance;
-	INIT_LIST_HEAD(&memtype->tier_sibiling);
+	INIT_LIST_HEAD(&memtype->tier_sibling);
 	memtype->nodes  = NODE_MASK_NONE;
 	kref_init(&memtype->kref);
 	return memtype;
 }
 EXPORT_SYMBOL_GPL(alloc_memory_type);
 
-void destroy_memory_type(struct memory_dev_type *memtype)
+void put_memory_type(struct memory_dev_type *memtype)
 {
 	kref_put(&memtype->kref, release_memtype);
 }
-EXPORT_SYMBOL_GPL(destroy_memory_type);
+EXPORT_SYMBOL_GPL(put_memory_type);
 
 void init_node_memory_type(int node, struct memory_dev_type *memtype)
 {
@@ -579,19 +625,221 @@ EXPORT_SYMBOL_GPL(init_node_memory_type);
 void clear_node_memory_type(int node, struct memory_dev_type *memtype)
 {
 	mutex_lock(&memory_tier_lock);
-	if (node_memory_types[node].memtype == memtype)
+	if (node_memory_types[node].memtype == memtype || !memtype)
 		node_memory_types[node].map_count--;
 	/*
 	 * If we umapped all the attached devices to this node,
 	 * clear the node memory type.
 	 */
 	if (!node_memory_types[node].map_count) {
+		memtype = node_memory_types[node].memtype;
 		node_memory_types[node].memtype = NULL;
-		kref_put(&memtype->kref, release_memtype);
+		put_memory_type(memtype);
 	}
 	mutex_unlock(&memory_tier_lock);
 }
 EXPORT_SYMBOL_GPL(clear_node_memory_type);
+
+struct memory_dev_type *mt_find_alloc_memory_type(int adist, struct list_head *memory_types)
+{
+	struct memory_dev_type *mtype;
+
+	list_for_each_entry(mtype, memory_types, list)
+		if (mtype->adistance == adist)
+			return mtype;
+
+	mtype = alloc_memory_type(adist);
+	if (IS_ERR(mtype))
+		return mtype;
+
+	list_add(&mtype->list, memory_types);
+
+	return mtype;
+}
+EXPORT_SYMBOL_GPL(mt_find_alloc_memory_type);
+
+void mt_put_memory_types(struct list_head *memory_types)
+{
+	struct memory_dev_type *mtype, *mtn;
+
+	list_for_each_entry_safe(mtype, mtn, memory_types, list) {
+		list_del(&mtype->list);
+		put_memory_type(mtype);
+	}
+}
+EXPORT_SYMBOL_GPL(mt_put_memory_types);
+
+/*
+ * This is invoked via `late_initcall()` to initialize memory tiers for
+ * CPU-less memory nodes after driver initialization, which is
+ * expected to provide `adistance` algorithms.
+ */
+static int __init memory_tier_late_init(void)
+{
+	int nid;
+
+	guard(mutex)(&memory_tier_lock);
+	for_each_node_state(nid, N_MEMORY) {
+		/*
+		 * Some device drivers may have initialized memory tiers
+		 * between `memory_tier_init()` and `memory_tier_late_init()`,
+		 * potentially bringing online memory nodes and
+		 * configuring memory tiers. Exclude them here.
+		 */
+		if (node_memory_types[nid].memtype)
+			continue;
+
+		set_node_memory_tier(nid);
+	}
+
+	establish_demotion_targets();
+
+	return 0;
+}
+late_initcall(memory_tier_late_init);
+
+static void dump_hmem_attrs(struct access_coordinate *coord, const char *prefix)
+{
+	pr_info(
+"%sread_latency: %u, write_latency: %u, read_bandwidth: %u, write_bandwidth: %u\n",
+		prefix, coord->read_latency, coord->write_latency,
+		coord->read_bandwidth, coord->write_bandwidth);
+}
+
+int mt_set_default_dram_perf(int nid, struct access_coordinate *perf,
+			     const char *source)
+{
+	guard(mutex)(&default_dram_perf_lock);
+	if (default_dram_perf_error)
+		return -EIO;
+
+	if (perf->read_latency + perf->write_latency == 0 ||
+	    perf->read_bandwidth + perf->write_bandwidth == 0)
+		return -EINVAL;
+
+	if (default_dram_perf_ref_nid == NUMA_NO_NODE) {
+		default_dram_perf = *perf;
+		default_dram_perf_ref_nid = nid;
+		default_dram_perf_ref_source = kstrdup(source, GFP_KERNEL);
+		return 0;
+	}
+
+	/*
+	 * The performance of all default DRAM nodes is expected to be
+	 * same (that is, the variation is less than 10%).  And it
+	 * will be used as base to calculate the abstract distance of
+	 * other memory nodes.
+	 */
+	if (abs(perf->read_latency - default_dram_perf.read_latency) * 10 >
+	    default_dram_perf.read_latency ||
+	    abs(perf->write_latency - default_dram_perf.write_latency) * 10 >
+	    default_dram_perf.write_latency ||
+	    abs(perf->read_bandwidth - default_dram_perf.read_bandwidth) * 10 >
+	    default_dram_perf.read_bandwidth ||
+	    abs(perf->write_bandwidth - default_dram_perf.write_bandwidth) * 10 >
+	    default_dram_perf.write_bandwidth) {
+		pr_info(
+"memory-tiers: the performance of DRAM node %d mismatches that of the reference\n"
+"DRAM node %d.\n", nid, default_dram_perf_ref_nid);
+		pr_info("  performance of reference DRAM node %d:\n",
+			default_dram_perf_ref_nid);
+		dump_hmem_attrs(&default_dram_perf, "    ");
+		pr_info("  performance of DRAM node %d:\n", nid);
+		dump_hmem_attrs(perf, "    ");
+		pr_info(
+"  disable default DRAM node performance based abstract distance algorithm.\n");
+		default_dram_perf_error = true;
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int mt_perf_to_adistance(struct access_coordinate *perf, int *adist)
+{
+	guard(mutex)(&default_dram_perf_lock);
+	if (default_dram_perf_error)
+		return -EIO;
+
+	if (perf->read_latency + perf->write_latency == 0 ||
+	    perf->read_bandwidth + perf->write_bandwidth == 0)
+		return -EINVAL;
+
+	if (default_dram_perf_ref_nid == NUMA_NO_NODE)
+		return -ENOENT;
+
+	/*
+	 * The abstract distance of a memory node is in direct proportion to
+	 * its memory latency (read + write) and inversely proportional to its
+	 * memory bandwidth (read + write).  The abstract distance, memory
+	 * latency, and memory bandwidth of the default DRAM nodes are used as
+	 * the base.
+	 */
+	*adist = MEMTIER_ADISTANCE_DRAM *
+		(perf->read_latency + perf->write_latency) /
+		(default_dram_perf.read_latency + default_dram_perf.write_latency) *
+		(default_dram_perf.read_bandwidth + default_dram_perf.write_bandwidth) /
+		(perf->read_bandwidth + perf->write_bandwidth);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mt_perf_to_adistance);
+
+/**
+ * register_mt_adistance_algorithm() - Register memory tiering abstract distance algorithm
+ * @nb: The notifier block which describe the algorithm
+ *
+ * Return: 0 on success, errno on error.
+ *
+ * Every memory tiering abstract distance algorithm provider needs to
+ * register the algorithm with register_mt_adistance_algorithm().  To
+ * calculate the abstract distance for a specified memory node, the
+ * notifier function will be called unless some high priority
+ * algorithm has provided result.  The prototype of the notifier
+ * function is as follows,
+ *
+ *   int (*algorithm_notifier)(struct notifier_block *nb,
+ *                             unsigned long nid, void *data);
+ *
+ * Where "nid" specifies the memory node, "data" is the pointer to the
+ * returned abstract distance (that is, "int *adist").  If the
+ * algorithm provides the result, NOTIFY_STOP should be returned.
+ * Otherwise, return_value & %NOTIFY_STOP_MASK == 0 to allow the next
+ * algorithm in the chain to provide the result.
+ */
+int register_mt_adistance_algorithm(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&mt_adistance_algorithms, nb);
+}
+EXPORT_SYMBOL_GPL(register_mt_adistance_algorithm);
+
+/**
+ * unregister_mt_adistance_algorithm() - Unregister memory tiering abstract distance algorithm
+ * @nb: the notifier block which describe the algorithm
+ *
+ * Return: 0 on success, errno on error.
+ */
+int unregister_mt_adistance_algorithm(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&mt_adistance_algorithms, nb);
+}
+EXPORT_SYMBOL_GPL(unregister_mt_adistance_algorithm);
+
+/**
+ * mt_calc_adistance() - Calculate abstract distance with registered algorithms
+ * @node: the node to calculate abstract distance for
+ * @adist: the returned abstract distance
+ *
+ * Return: if return_value & %NOTIFY_STOP_MASK != 0, then some
+ * abstract distance algorithm provides the result, and return it via
+ * @adist.  Otherwise, no algorithm can provide the result and @adist
+ * will be kept as it is.
+ */
+int mt_calc_adistance(int node, int *adist)
+{
+	return blocking_notifier_call_chain(&mt_adistance_algorithms, node, adist);
+}
+EXPORT_SYMBOL_GPL(mt_calc_adistance);
 
 static int __meminit memtier_hotplug_callback(struct notifier_block *self,
 					      unsigned long action, void *_arg)
@@ -644,7 +892,8 @@ static int __init memory_tier_init(void)
 	 * For now we can have 4 faster memory tiers with smaller adistance
 	 * than default DRAM tier.
 	 */
-	default_dram_type = alloc_memory_type(MEMTIER_ADISTANCE_DRAM);
+	default_dram_type = mt_find_alloc_memory_type(MEMTIER_ADISTANCE_DRAM,
+						      &default_memory_types);
 	if (IS_ERR(default_dram_type))
 		panic("%s() failed to allocate default DRAM tier\n", __func__);
 
@@ -654,6 +903,14 @@ static int __init memory_tier_init(void)
 	 * types assigned.
 	 */
 	for_each_node_state(node, N_MEMORY) {
+		if (!node_state(node, N_CPU))
+			/*
+			 * Defer memory tier initialization on
+			 * CPUless numa nodes. These will be initialized
+			 * after firmware and devices are initialized.
+			 */
+			continue;
+
 		memtier = set_node_memory_tier(node);
 		if (IS_ERR(memtier))
 			/*
@@ -673,16 +930,16 @@ bool numa_demotion_enabled = false;
 
 #ifdef CONFIG_MIGRATION
 #ifdef CONFIG_SYSFS
-static ssize_t numa_demotion_enabled_show(struct kobject *kobj,
-					  struct kobj_attribute *attr, char *buf)
+static ssize_t demotion_enabled_show(struct kobject *kobj,
+				     struct kobj_attribute *attr, char *buf)
 {
 	return sysfs_emit(buf, "%s\n",
 			  numa_demotion_enabled ? "true" : "false");
 }
 
-static ssize_t numa_demotion_enabled_store(struct kobject *kobj,
-					   struct kobj_attribute *attr,
-					   const char *buf, size_t count)
+static ssize_t demotion_enabled_store(struct kobject *kobj,
+				      struct kobj_attribute *attr,
+				      const char *buf, size_t count)
 {
 	ssize_t ret;
 
@@ -694,8 +951,7 @@ static ssize_t numa_demotion_enabled_store(struct kobject *kobj,
 }
 
 static struct kobj_attribute numa_demotion_enabled_attr =
-	__ATTR(demotion_enabled, 0644, numa_demotion_enabled_show,
-	       numa_demotion_enabled_store);
+	__ATTR_RW(demotion_enabled);
 
 static struct attribute *numa_attrs[] = {
 	&numa_demotion_enabled_attr.attr,

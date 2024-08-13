@@ -978,24 +978,23 @@ static int idt82p33_enable(struct ptp_clock_info *ptp,
 	return err;
 }
 
+static s32 idt82p33_getmaxphase(__always_unused struct ptp_clock_info *ptp)
+{
+	return WRITE_PHASE_OFFSET_LIMIT;
+}
+
 static int idt82p33_adjwritephase(struct ptp_clock_info *ptp, s32 offset_ns)
 {
 	struct idt82p33_channel *channel =
 		container_of(ptp, struct idt82p33_channel, caps);
 	struct idt82p33 *idt82p33 = channel->idt82p33;
-	s64 offset_regval, offset_fs;
+	s64 offset_regval;
 	u8 val[4] = {0};
 	int err;
 
-	offset_fs = (s64)(-offset_ns) * 1000000;
-
-	if (offset_fs > WRITE_PHASE_OFFSET_LIMIT)
-		offset_fs = WRITE_PHASE_OFFSET_LIMIT;
-	else if (offset_fs < -WRITE_PHASE_OFFSET_LIMIT)
-		offset_fs = -WRITE_PHASE_OFFSET_LIMIT;
-
 	/* Convert from phaseoffset_fs to register value */
-	offset_regval = div_s64(offset_fs * 1000, IDT_T0DPLL_PHASE_RESOL);
+	offset_regval = div_s64((s64)(-offset_ns) * 1000000000ll,
+				IDT_T0DPLL_PHASE_RESOL);
 
 	val[0] = offset_regval & 0xFF;
 	val[1] = (offset_regval >> 8) & 0xFF;
@@ -1175,6 +1174,7 @@ static void idt82p33_caps_init(u32 index, struct ptp_clock_info *caps,
 	caps->n_ext_ts = MAX_PHC_PLL,
 	caps->n_pins = max_pins,
 	caps->adjphase = idt82p33_adjwritephase,
+	caps->getmaxphase = idt82p33_getmaxphase,
 	caps->adjfine = idt82p33_adjfine;
 	caps->adjtime = idt82p33_adjtime;
 	caps->gettime64 = idt82p33_gettime;
@@ -1447,15 +1447,13 @@ static int idt82p33_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int idt82p33_remove(struct platform_device *pdev)
+static void idt82p33_remove(struct platform_device *pdev)
 {
 	struct idt82p33 *idt82p33 = platform_get_drvdata(pdev);
 
 	cancel_delayed_work_sync(&idt82p33->extts_work);
 
 	idt82p33_ptp_clock_unregister_all(idt82p33);
-
-	return 0;
 }
 
 static struct platform_driver idt82p33_driver = {
@@ -1463,7 +1461,7 @@ static struct platform_driver idt82p33_driver = {
 		.name = "82p33x1x-phc",
 	},
 	.probe = idt82p33_probe,
-	.remove	= idt82p33_remove,
+	.remove_new = idt82p33_remove,
 };
 
 module_platform_driver(idt82p33_driver);

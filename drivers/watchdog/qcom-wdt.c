@@ -11,7 +11,6 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/watchdog.h>
-#include <linux/of_device.h>
 
 enum wdt_reg {
 	WDT_RST,
@@ -42,6 +41,7 @@ static const u32 reg_offset_data_kpss[] = {
 struct qcom_wdt_match_data {
 	const u32 *offset;
 	bool pretimeout;
+	u32 max_tick_count;
 };
 
 struct qcom_wdt {
@@ -175,19 +175,16 @@ static const struct watchdog_info qcom_wdt_pt_info = {
 	.identity	= KBUILD_MODNAME,
 };
 
-static void qcom_clk_disable_unprepare(void *data)
-{
-	clk_disable_unprepare(data);
-}
-
 static const struct qcom_wdt_match_data match_data_apcs_tmr = {
 	.offset = reg_offset_data_apcs_tmr,
 	.pretimeout = false,
+	.max_tick_count = 0x10000000U,
 };
 
 static const struct qcom_wdt_match_data match_data_kpss = {
 	.offset = reg_offset_data_kpss,
 	.pretimeout = true,
+	.max_tick_count = 0xFFFFFU,
 };
 
 static int qcom_wdt_probe(struct platform_device *pdev)
@@ -226,20 +223,11 @@ static int qcom_wdt_probe(struct platform_device *pdev)
 	if (IS_ERR(wdt->base))
 		return PTR_ERR(wdt->base);
 
-	clk = devm_clk_get(dev, NULL);
+	clk = devm_clk_get_enabled(dev, NULL);
 	if (IS_ERR(clk)) {
 		dev_err(dev, "failed to get input clock\n");
 		return PTR_ERR(clk);
 	}
-
-	ret = clk_prepare_enable(clk);
-	if (ret) {
-		dev_err(dev, "failed to setup clock\n");
-		return ret;
-	}
-	ret = devm_add_action_or_reset(dev, qcom_clk_disable_unprepare, clk);
-	if (ret)
-		return ret;
 
 	/*
 	 * We use the clock rate to calculate the max timeout, so ensure it's
@@ -251,7 +239,7 @@ static int qcom_wdt_probe(struct platform_device *pdev)
 	 */
 	wdt->rate = clk_get_rate(clk);
 	if (wdt->rate == 0 ||
-	    wdt->rate > 0x10000000U) {
+	    wdt->rate > data->max_tick_count) {
 		dev_err(dev, "invalid clock rate\n");
 		return -EINVAL;
 	}
@@ -275,7 +263,7 @@ static int qcom_wdt_probe(struct platform_device *pdev)
 
 	wdt->wdd.ops = &qcom_wdt_ops;
 	wdt->wdd.min_timeout = 1;
-	wdt->wdd.max_timeout = 0x10000000U / wdt->rate;
+	wdt->wdd.max_timeout = data->max_tick_count / wdt->rate;
 	wdt->wdd.parent = dev;
 	wdt->layout = data->offset;
 

@@ -8,6 +8,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/platform_device.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/of_address.h>
@@ -20,7 +21,7 @@
 
 #define ERR_BYTE		0xFF /* Value returned for read
 					bytes when read failed	*/
-#define IFC_TIMEOUT_MSECS	500  /* Maximum number of mSecs to wait
+#define IFC_TIMEOUT_MSECS	1000 /* Maximum timeout to wait
 					for IFC NAND Machine	*/
 
 struct fsl_ifc_ctrl;
@@ -1094,7 +1095,7 @@ err:
 	return ret;
 }
 
-static int fsl_ifc_nand_remove(struct platform_device *dev)
+static void fsl_ifc_nand_remove(struct platform_device *dev)
 {
 	struct fsl_ifc_mtd *priv = dev_get_drvdata(&dev->dev);
 	struct nand_chip *chip = &priv->chip;
@@ -1113,8 +1114,6 @@ static int fsl_ifc_nand_remove(struct platform_device *dev)
 		kfree(ifc_nand_ctrl);
 	}
 	mutex_unlock(&fsl_ifc_nand_mutex);
-
-	return 0;
 }
 
 static const struct of_device_id fsl_ifc_nand_match[] = {
@@ -1131,7 +1130,7 @@ static struct platform_driver fsl_ifc_nand_driver = {
 		.of_match_table = fsl_ifc_nand_match,
 	},
 	.probe       = fsl_ifc_nand_probe,
-	.remove      = fsl_ifc_nand_remove,
+	.remove_new  = fsl_ifc_nand_remove,
 };
 
 module_platform_driver(fsl_ifc_nand_driver);

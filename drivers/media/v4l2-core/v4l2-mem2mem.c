@@ -301,9 +301,12 @@ static void __v4l2_m2m_try_queue(struct v4l2_m2m_dev *m2m_dev,
 
 	dprintk("Trying to schedule a job for m2m_ctx: %p\n", m2m_ctx);
 
-	if (!m2m_ctx->out_q_ctx.q.streaming
-	    || !m2m_ctx->cap_q_ctx.q.streaming) {
-		dprintk("Streaming needs to be on for both queues\n");
+	if (!m2m_ctx->out_q_ctx.q.streaming ||
+	    (!m2m_ctx->cap_q_ctx.q.streaming && !m2m_ctx->ignore_cap_streaming)) {
+		if (!m2m_ctx->ignore_cap_streaming)
+			dprintk("Streaming needs to be on for both queues\n");
+		else
+			dprintk("Streaming needs to be on for the OUTPUT queue\n");
 		return;
 	}
 
@@ -922,9 +925,9 @@ static __poll_t v4l2_m2m_poll_for_data(struct file *file,
 	 * means either in driver already or waiting for driver to claim it
 	 * and start processing.
 	 */
-	if ((!src_q->streaming || src_q->error ||
+	if ((!vb2_is_streaming(src_q) || src_q->error ||
 	     list_empty(&src_q->queued_list)) &&
-	    (!dst_q->streaming || dst_q->error ||
+	    (!vb2_is_streaming(dst_q) || dst_q->error ||
 	     (list_empty(&dst_q->queued_list) && !dst_q->last_buffer_dequeued)))
 		return EPOLLERR;
 
@@ -1084,11 +1087,17 @@ static int v4l2_m2m_register_entity(struct media_device *mdev,
 	entity->function = function;
 
 	ret = media_entity_pads_init(entity, num_pads, pads);
-	if (ret)
+	if (ret) {
+		kfree(entity->name);
+		entity->name = NULL;
 		return ret;
+	}
 	ret = media_device_register_entity(mdev, entity);
-	if (ret)
+	if (ret) {
+		kfree(entity->name);
+		entity->name = NULL;
 		return ret;
+	}
 
 	return 0;
 }
@@ -1376,6 +1385,21 @@ int v4l2_m2m_ioctl_create_bufs(struct file *file, void *priv,
 	return v4l2_m2m_create_bufs(file, fh->m2m_ctx, create);
 }
 EXPORT_SYMBOL_GPL(v4l2_m2m_ioctl_create_bufs);
+
+int v4l2_m2m_ioctl_remove_bufs(struct file *file, void *priv,
+			       struct v4l2_remove_buffers *remove)
+{
+	struct v4l2_fh *fh = file->private_data;
+	struct vb2_queue *q = v4l2_m2m_get_vq(fh->m2m_ctx, remove->type);
+
+	if (!q)
+		return -EINVAL;
+	if (q->type != remove->type)
+		return -EINVAL;
+
+	return vb2_core_remove_bufs(q, remove->index, remove->count);
+}
+EXPORT_SYMBOL_GPL(v4l2_m2m_ioctl_remove_bufs);
 
 int v4l2_m2m_ioctl_querybuf(struct file *file, void *priv,
 				struct v4l2_buffer *buf)

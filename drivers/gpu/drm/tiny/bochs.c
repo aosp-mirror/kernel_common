@@ -545,7 +545,6 @@ static int bochs_kms_init(struct bochs_device *bochs)
 
 	bochs->dev->mode_config.preferred_depth = 24;
 	bochs->dev->mode_config.prefer_shadow = 0;
-	bochs->dev->mode_config.prefer_shadow_fbdev = 1;
 	bochs->dev->mode_config.quirk_addfb_prefer_host_byte_order = true;
 
 	bochs->dev->mode_config.funcs = &bochs_mode_funcs;
@@ -691,6 +690,11 @@ static void bochs_pci_remove(struct pci_dev *pdev)
 	drm_dev_put(dev);
 }
 
+static void bochs_pci_shutdown(struct pci_dev *pdev)
+{
+	drm_atomic_helper_shutdown(pci_get_drvdata(pdev));
+}
+
 static const struct pci_device_id bochs_pci_tbl[] = {
 	{
 		.vendor      = 0x1234,
@@ -721,6 +725,7 @@ static struct pci_driver bochs_pci_driver = {
 	.id_table =	bochs_pci_tbl,
 	.probe =	bochs_pci_probe,
 	.remove =	bochs_pci_remove,
+	.shutdown =	bochs_pci_shutdown,
 	.driver.pm =    &bochs_pm_ops,
 };
 

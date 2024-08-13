@@ -42,7 +42,7 @@ static int tps546d24_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id tps546d24_id[] = {
-	{"tps546d24", 0},
+	{"tps546d24"},
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, tps546d24_id);
@@ -59,7 +59,7 @@ static struct i2c_driver tps546d24_driver = {
 		   .name = "tps546d24",
 		   .of_match_table = of_match_ptr(tps546d24_of_match),
 	   },
-	.probe_new = tps546d24_probe,
+	.probe = tps546d24_probe,
 	.id_table = tps546d24_id,
 };
 

@@ -99,9 +99,6 @@ static void __init linkstation_init_IRQ(void)
 	mpic_init(mpic);
 }
 
-extern void avr_uart_configure(void);
-extern void avr_uart_send(const char);
-
 static void __noreturn linkstation_restart(char *cmd)
 {
 	local_irq_disable();
@@ -143,9 +140,6 @@ static void linkstation_show_cpuinfo(struct seq_file *m)
 
 static int __init linkstation_probe(void)
 {
-	if (!of_machine_is_compatible("linkstation"))
-		return 0;
-
 	pm_power_off = linkstation_power_off;
 
 	return 1;
@@ -153,6 +147,7 @@ static int __init linkstation_probe(void)
 
 define_machine(linkstation){
 	.name 			= "Buffalo Linkstation",
+	.compatible		= "linkstation",
 	.probe 			= linkstation_probe,
 	.setup_arch 		= linkstation_setup_arch,
 	.discover_phbs		= linkstation_setup_pci,
@@ -161,5 +156,4 @@ define_machine(linkstation){
 	.get_irq 		= mpic_get_irq,
 	.restart 		= linkstation_restart,
 	.halt	 		= linkstation_halt,
-	.calibrate_decr 	= generic_calibrate_decr,
 };

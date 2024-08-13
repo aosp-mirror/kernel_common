@@ -377,7 +377,7 @@ static int cryptd_create_skcipher(struct crypto_template *tmpl,
 {
 	struct skcipherd_instance_ctx *ctx;
 	struct skcipher_instance *inst;
-	struct skcipher_alg *alg;
+	struct skcipher_alg_common *alg;
 	u32 type;
 	u32 mask;
 	int err;
@@ -396,17 +396,17 @@ static int cryptd_create_skcipher(struct crypto_template *tmpl,
 	if (err)
 		goto err_free_inst;
 
-	alg = crypto_spawn_skcipher_alg(&ctx->spawn);
+	alg = crypto_spawn_skcipher_alg_common(&ctx->spawn);
 	err = cryptd_init_instance(skcipher_crypto_instance(inst), &alg->base);
 	if (err)
 		goto err_free_inst;
 
 	inst->alg.base.cra_flags |= CRYPTO_ALG_ASYNC |
 		(alg->base.cra_flags & CRYPTO_ALG_INTERNAL);
-	inst->alg.ivsize = crypto_skcipher_alg_ivsize(alg);
-	inst->alg.chunksize = crypto_skcipher_alg_chunksize(alg);
-	inst->alg.min_keysize = crypto_skcipher_alg_min_keysize(alg);
-	inst->alg.max_keysize = crypto_skcipher_alg_max_keysize(alg);
+	inst->alg.ivsize = alg->ivsize;
+	inst->alg.chunksize = alg->chunksize;
+	inst->alg.min_keysize = alg->min_keysize;
+	inst->alg.max_keysize = alg->max_keysize;
 
 	inst->alg.base.cra_ctxsize = sizeof(struct cryptd_skcipher_ctx);
 
@@ -427,12 +427,12 @@ err_free_inst:
 	return err;
 }
 
-static int cryptd_hash_init_tfm(struct crypto_tfm *tfm)
+static int cryptd_hash_init_tfm(struct crypto_ahash *tfm)
 {
-	struct crypto_instance *inst = crypto_tfm_alg_instance(tfm);
-	struct hashd_instance_ctx *ictx = crypto_instance_ctx(inst);
+	struct ahash_instance *inst = ahash_alg_instance(tfm);
+	struct hashd_instance_ctx *ictx = ahash_instance_ctx(inst);
 	struct crypto_shash_spawn *spawn = &ictx->spawn;
-	struct cryptd_hash_ctx *ctx = crypto_tfm_ctx(tfm);
+	struct cryptd_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct crypto_shash *hash;
 
 	hash = crypto_spawn_shash(spawn);
@@ -440,15 +440,30 @@ static int cryptd_hash_init_tfm(struct crypto_tfm *tfm)
 		return PTR_ERR(hash);
 
 	ctx->child = hash;
-	crypto_ahash_set_reqsize(__crypto_ahash_cast(tfm),
+	crypto_ahash_set_reqsize(tfm,
 				 sizeof(struct cryptd_hash_request_ctx) +
 				 crypto_shash_descsize(hash));
 	return 0;
 }
 
-static void cryptd_hash_exit_tfm(struct crypto_tfm *tfm)
+static int cryptd_hash_clone_tfm(struct crypto_ahash *ntfm,
+				 struct crypto_ahash *tfm)
 {
-	struct cryptd_hash_ctx *ctx = crypto_tfm_ctx(tfm);
+	struct cryptd_hash_ctx *nctx = crypto_ahash_ctx(ntfm);
+	struct cryptd_hash_ctx *ctx = crypto_ahash_ctx(tfm);
+	struct crypto_shash *hash;
+
+	hash = crypto_clone_shash(ctx->child);
+	if (IS_ERR(hash))
+		return PTR_ERR(hash);
+
+	nctx->child = hash;
+	return 0;
+}
+
+static void cryptd_hash_exit_tfm(struct crypto_ahash *tfm)
+{
+	struct cryptd_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 
 	crypto_free_shash(ctx->child);
 }
@@ -677,8 +692,9 @@ static int cryptd_create_hash(struct crypto_template *tmpl, struct rtattr **tb,
 	inst->alg.halg.statesize = alg->statesize;
 	inst->alg.halg.base.cra_ctxsize = sizeof(struct cryptd_hash_ctx);
 
-	inst->alg.halg.base.cra_init = cryptd_hash_init_tfm;
-	inst->alg.halg.base.cra_exit = cryptd_hash_exit_tfm;
+	inst->alg.init_tfm = cryptd_hash_init_tfm;
+	inst->alg.clone_tfm = cryptd_hash_clone_tfm;
+	inst->alg.exit_tfm = cryptd_hash_exit_tfm;
 
 	inst->alg.init   = cryptd_hash_init_enqueue;
 	inst->alg.update = cryptd_hash_update_enqueue;
@@ -913,7 +929,7 @@ static int cryptd_create(struct crypto_template *tmpl, struct rtattr **tb)
 		return PTR_ERR(algt);
 
 	switch (algt->type & algt->mask & CRYPTO_ALG_TYPE_MASK) {
-	case CRYPTO_ALG_TYPE_SKCIPHER:
+	case CRYPTO_ALG_TYPE_LSKCIPHER:
 		return cryptd_create_skcipher(tmpl, tb, algt, &queue);
 	case CRYPTO_ALG_TYPE_HASH:
 		return cryptd_create_hash(tmpl, tb, algt, &queue);

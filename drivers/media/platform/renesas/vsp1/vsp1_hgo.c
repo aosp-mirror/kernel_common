@@ -140,9 +140,9 @@ static void hgo_configure_stream(struct vsp1_entity *entity,
 	unsigned int hratio;
 	unsigned int vratio;
 
-	crop = vsp1_entity_get_pad_selection(entity, entity->config,
+	crop = vsp1_entity_get_pad_selection(entity, entity->state,
 					     HISTO_PAD_SINK, V4L2_SEL_TGT_CROP);
-	compose = vsp1_entity_get_pad_selection(entity, entity->config,
+	compose = vsp1_entity_get_pad_selection(entity, entity->state,
 						HISTO_PAD_SINK,
 						V4L2_SEL_TGT_COMPOSE);
 
@@ -196,10 +196,10 @@ struct vsp1_hgo *vsp1_hgo_create(struct vsp1_device *vsp1)
 
 	/* Initialize the control handler. */
 	v4l2_ctrl_handler_init(&hgo->ctrls.handler,
-			       vsp1->info->gen == 3 ? 2 : 1);
+			       vsp1->info->gen >= 3 ? 2 : 1);
 	hgo->ctrls.max_rgb = v4l2_ctrl_new_custom(&hgo->ctrls.handler,
 						  &hgo_max_rgb_control, NULL);
-	if (vsp1->info->gen == 3)
+	if (vsp1->info->gen >= 3)
 		hgo->ctrls.num_bins =
 			v4l2_ctrl_new_custom(&hgo->ctrls.handler,
 					     &hgo_num_bins_control, NULL);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 //
-// Copyright(c) 2019-2022 Intel Corporation. All rights reserved.
+// Copyright(c) 2019-2022 Intel Corporation
 //
 // Author: Cezary Rojewski <cezary.rojewski@intel.com>
 //
@@ -218,12 +218,7 @@ static ssize_t sof_probes_dfs_points_read(struct file *file, char __user *to,
 
 	ret = ipc->points_info(cdev, &desc, &num_desc);
 	if (ret < 0)
-		goto exit;
-
-	pm_runtime_mark_last_busy(dev);
-	err = pm_runtime_put_autosuspend(dev);
-	if (err < 0)
-		dev_err_ratelimited(dev, "debugfs read failed to idle %d\n", err);
+		goto pm_error;
 
 	for (i = 0; i < num_desc; i++) {
 		offset = strlen(buf);
@@ -241,6 +236,13 @@ static ssize_t sof_probes_dfs_points_read(struct file *file, char __user *to,
 	ret = simple_read_from_buffer(to, count, ppos, buf, strlen(buf));
 
 	kfree(desc);
+
+pm_error:
+	pm_runtime_mark_last_busy(dev);
+	err = pm_runtime_put_autosuspend(dev);
+	if (err < 0)
+		dev_err_ratelimited(dev, "debugfs read failed to idle %d\n", err);
+
 exit:
 	kfree(buf);
 	return ret;
@@ -352,10 +354,14 @@ static const struct file_operations sof_probes_points_remove_fops = {
 	.owner = THIS_MODULE,
 };
 
+static const struct snd_soc_dai_ops sof_probes_dai_ops = {
+	.compress_new = snd_soc_new_compress,
+};
+
 static struct snd_soc_dai_driver sof_probes_dai_drv[] = {
 {
 	.name = "Probe Extraction CPU DAI",
-	.compress_new = snd_soc_new_compress,
+	.ops  = &sof_probes_dai_ops,
 	.cops = &sof_probes_compr_ops,
 	.capture = {
 		.stream_name = "Probe Extraction",
@@ -374,8 +380,6 @@ static const struct snd_soc_component_driver sof_probes_component = {
 	.module_get_upon_open = 1,
 	.legacy_dai_naming = 1,
 };
-
-SND_SOC_DAILINK_DEF(dummy, DAILINK_COMP_ARRAY(COMP_DUMMY()));
 
 static int sof_probes_client_probe(struct auxiliary_device *auxdev,
 				   const struct auxiliary_device_id *id)
@@ -417,13 +421,13 @@ static int sof_probes_client_probe(struct auxiliary_device *auxdev,
 	priv->host_ops = ops;
 
 	switch (sof_client_get_ipc_type(cdev)) {
-#ifdef CONFIG_SND_SOC_SOF_INTEL_IPC4
-	case SOF_INTEL_IPC4:
+#ifdef CONFIG_SND_SOC_SOF_IPC4
+	case SOF_IPC_TYPE_4:
 		priv->ipc_ops = &ipc4_probe_ops;
 		break;
 #endif
 #ifdef CONFIG_SND_SOC_SOF_IPC3
-	case SOF_IPC:
+	case SOF_IPC_TYPE_3:
 		priv->ipc_ops = &ipc3_probe_ops;
 		break;
 #endif
@@ -469,7 +473,7 @@ static int sof_probes_client_probe(struct auxiliary_device *auxdev,
 	links[0].cpus = &cpus[0];
 	links[0].num_cpus = 1;
 	links[0].cpus->dai_name = "Probe Extraction CPU DAI";
-	links[0].codecs = dummy;
+	links[0].codecs = &snd_soc_dummy_dlc;
 	links[0].num_codecs = 1;
 	links[0].platforms = platform_component;
 	links[0].num_platforms = ARRAY_SIZE(platform_component);
@@ -521,6 +525,7 @@ static void sof_probes_client_remove(struct auxiliary_device *auxdev)
 
 static const struct auxiliary_device_id sof_probes_client_id_table[] = {
 	{ .name = "snd_sof.hda-probes", },
+	{ .name = "snd_sof.acp-probes", },
 	{},
 };
 MODULE_DEVICE_TABLE(auxiliary, sof_probes_client_id_table);
@@ -535,6 +540,6 @@ static struct auxiliary_driver sof_probes_client_drv = {
 
 module_auxiliary_driver(sof_probes_client_drv);
 
-MODULE_DESCRIPTION("SOF Probes Client Driver");
 MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("SOF Probes Client Driver");
 MODULE_IMPORT_NS(SND_SOC_SOF_CLIENT);

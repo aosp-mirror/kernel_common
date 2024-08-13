@@ -285,7 +285,7 @@ static const struct hwmon_ops max127_hwmon_ops = {
 	.write = max127_write,
 };
 
-static const struct hwmon_channel_info *max127_info[] = {
+static const struct hwmon_channel_info * const max127_info[] = {
 	HWMON_CHANNEL_INFO(in,
 			   HWMON_I_INPUT | HWMON_I_MIN | HWMON_I_MAX,
 			   HWMON_I_INPUT | HWMON_I_MIN | HWMON_I_MAX,
@@ -329,17 +329,16 @@ static int max127_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id max127_id[] = {
-	{ "max127", 0 },
+	{ "max127" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, max127_id);
 
 static struct i2c_driver max127_driver = {
-	.class		= I2C_CLASS_HWMON,
 	.driver = {
 		.name	= "max127",
 	},
-	.probe_new	= max127_probe,
+	.probe		= max127_probe,
 	.id_table	= max127_id,
 };
 

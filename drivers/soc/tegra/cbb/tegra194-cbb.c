@@ -15,15 +15,12 @@
 #include <linux/debugfs.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
+#include <linux/of_address.h>
 #include <linux/platform_device.h>
 #include <linux/device.h>
 #include <linux/io.h>
-#include <linux/of_irq.h>
-#include <linux/of_address.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
-#include <linux/version.h>
 #include <soc/tegra/fuse.h>
 #include <soc/tegra/tegra-cbb.h>
 
@@ -2191,7 +2188,6 @@ MODULE_DEVICE_TABLE(of, tegra194_cbb_match);
 static int tegra194_cbb_get_bridges(struct tegra194_cbb *cbb, struct device_node *np)
 {
 	struct tegra_cbb *entry;
-	struct resource res;
 	unsigned long flags;
 	unsigned int i;
 	int err;
@@ -2211,8 +2207,7 @@ static int tegra194_cbb_get_bridges(struct tegra194_cbb *cbb, struct device_node
 	spin_unlock_irqrestore(&cbb_lock, flags);
 
 	if (!cbb->bridges) {
-		while (of_address_to_resource(np, cbb->num_bridges, &res) == 0)
-			cbb->num_bridges++;
+		cbb->num_bridges = of_address_count(np);
 
 		cbb->bridges = devm_kcalloc(cbb->base.dev, cbb->num_bridges,
 					    sizeof(*cbb->bridges), GFP_KERNEL);
@@ -2298,7 +2293,7 @@ static int tegra194_cbb_probe(struct platform_device *pdev)
 	return tegra_cbb_register(&cbb->base);
 }
 
-static int tegra194_cbb_remove(struct platform_device *pdev)
+static void tegra194_cbb_remove(struct platform_device *pdev)
 {
 	struct tegra194_cbb *cbb = platform_get_drvdata(pdev);
 	struct tegra_cbb *noc, *tmp;
@@ -2316,8 +2311,6 @@ static int tegra194_cbb_remove(struct platform_device *pdev)
 	}
 
 	spin_unlock_irqrestore(&cbb_lock, flags);
-
-	return 0;
 }
 
 static int __maybe_unused tegra194_cbb_resume_noirq(struct device *dev)
@@ -2337,7 +2330,7 @@ static const struct dev_pm_ops tegra194_cbb_pm = {
 
 static struct platform_driver tegra194_cbb_driver = {
 	.probe = tegra194_cbb_probe,
-	.remove = tegra194_cbb_remove,
+	.remove_new = tegra194_cbb_remove,
 	.driver = {
 		.name = "tegra194-cbb",
 		.of_match_table = of_match_ptr(tegra194_cbb_match),
@@ -2359,4 +2352,3 @@ module_exit(tegra194_cbb_exit);
 
 MODULE_AUTHOR("Sumit Gupta <sumitg@nvidia.com>");
 MODULE_DESCRIPTION("Control Backbone error handling driver for Tegra194");
-MODULE_LICENSE("GPL");

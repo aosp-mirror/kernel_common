@@ -111,7 +111,7 @@ properties:
       - description: RZ/G1C (R8A77470)
         items:
           - enum:
-              - iwave,g23s #iWave Systems RZ/G1C Single Board Computer (iW-RainboW-G23S)
+              - iwave,g23s # iWave Systems RZ/G1C Single Board Computer (iW-RainboW-G23S)
           - const: renesas,r8a77470
 
       - description: RZ/G2M (R8A774A1)
@@ -212,12 +212,12 @@ properties:
               - renesas,silk # SILK (RTP0RC7794LCB00011S)
           - const: renesas,r8a7794
 
-      - description: R-Car H3 (R8A77950)
+      # Note: R-Car H3 ES1.* (R8A77950) is not supported upstream anymore!
+
+      - description: R-Car H3 ES2.0 and later (R8A77951)
         items:
           - enum:
-                # H3ULCB (R-Car Starter Kit Premier, RTP0RC7795SKBX0010SA00 (H3 ES1.1))
-                # H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
-              - renesas,h3ulcb
+              - renesas,h3ulcb # H3ULCB (R-Car Starter Kit Premier, RTP0RC77951SKBX010SA00 (H3 ES2.0))
               - renesas,salvator-x # Salvator-X (RTP0RC7795SIPB0010S)
               - renesas,salvator-xs # Salvator-XS (Salvator-X 2nd version, RTP0RC7795SIPB0012S)
           - const: renesas,r8a7795
@@ -302,7 +302,7 @@ properties:
       - description: R-Car E3 (R8A77990)
         items:
           - enum:
-              - renesas,ebisu # Ebisu (RTP0RC77990SEB0010S)
+              - renesas,ebisu # Ebisu (RTP0RC77990SEB0010S), Ebisu-4D (RTP0RC77990SEB0020S)
           - const: renesas,r8a77990
 
       - description: R-Car D3 (R8A77995)
@@ -335,10 +335,24 @@ properties:
           - const: renesas,spider-cpu
           - const: renesas,r8a779f0
 
+      - description: R-Car S4-8 (R8A779F4)
+        items:
+          - enum:
+              - renesas,s4sk # R-Car S4 Starter Kit board (Y-ASK-RCAR-S4-1000BASE-T#WS12)
+          - const: renesas,r8a779f4
+          - const: renesas,r8a779f0
+
       - description: R-Car V4H (R8A779G0)
         items:
           - enum:
               - renesas,white-hawk-cpu # White Hawk CPU board (RTP8A779G0ASKB0FC0SA000)
+          - const: renesas,r8a779g0
+
+      - description: R-Car V4H (R8A779G2)
+        items:
+          - enum:
+              - renesas,white-hawk-single # White Hawk Single board (RTP8A779G2ASKB0F10SA001)
+          - const: renesas,r8a779g2
           - const: renesas,r8a779g0
 
       - items:
@@ -346,6 +360,12 @@ properties:
               - renesas,white-hawk-breakout # White Hawk BreakOut board (RTP8A779G0ASKB0SB0SA000)
           - const: renesas,white-hawk-cpu
           - const: renesas,r8a779g0
+
+      - description: R-Car V4M (R8A779H0)
+        items:
+          - enum:
+              - renesas,gray-hawk-single # Gray Hawk Single board (RTP8A779H0ASKB0F10S)
+          - const: renesas,r8a779h0
 
       - description: R-Car H3e (R8A779M0)
         items:
@@ -431,6 +451,13 @@ properties:
               - renesas,rzn1d400-db # RZN1D-DB (RZ/N1D Demo Board for the RZ/N1D 400 pins package)
           - const: renesas,r9a06g032
 
+      - description: RZ/N1{D,S} EB
+        items:
+          - enum:
+              - renesas,rzn1d400-eb # RZN1D-EB (Expansion Board when using a RZN1D-DB)
+          - const: renesas,rzn1d400-db
+          - const: renesas,r9a06g032
+
       - description: RZ/Five and RZ/G2UL (R9A07G043)
         items:
           - enum:
@@ -461,11 +488,38 @@ properties:
               - renesas,r9a07g054l2 # Dual Cortex-A55 RZ/V2L
           - const: renesas,r9a07g054
 
+      - description: RZ/G3S (R9A08G045)
+        items:
+          - enum:
+              - renesas,r9a08g045s33 # PCIe support
+          - const: renesas,r9a08g045
+
+      - description: RZ/G3S SMARC Module (SoM)
+        items:
+          - const: renesas,rzg3s-smarcm # RZ/G3S SMARC Module (SoM)
+          - const: renesas,r9a08g045s33 # PCIe support
+          - const: renesas,r9a08g045
+
+      - description: RZ SMARC Carrier-II Evaluation Kit
+        items:
+          - const: renesas,smarc2-evk # RZ SMARC Carrier-II EVK
+          - const: renesas,rzg3s-smarcm # RZ/G3S SMARC SoM
+          - const: renesas,r9a08g045s33 # PCIe support
+          - const: renesas,r9a08g045
+
       - description: RZ/V2M (R9A09G011)
         items:
           - enum:
               - renesas,rzv2mevk2   # RZ/V2M Eval Board v2.0
           - const: renesas,r9a09g011
+
+      - description: RZ/V2H(P) (R9A09G057)
+        items:
+          - enum:
+              - renesas,r9a09g057h41 # RZ/V2H
+              - renesas,r9a09g057h42 # RZ/V2H with Mali-G31 support
+              - renesas,r9a09g057h44 # RZ/V2HP with Mali-G31 + Mali-C55 support
+          - const: renesas,r9a09g057
 
 additionalProperties: true
 

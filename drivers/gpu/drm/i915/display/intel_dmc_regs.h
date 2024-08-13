@@ -11,6 +11,16 @@
 #define DMC_PROGRAM(addr, i)	_MMIO((addr) + (i) * 4)
 #define DMC_SSP_BASE_ADDR_GEN9	0x00002FC0
 
+#define _PIPEDMC_CONTROL_A		0x45250
+#define _PIPEDMC_CONTROL_B		0x45254
+#define PIPEDMC_CONTROL(pipe)		_MMIO_PIPE(pipe, \
+						   _PIPEDMC_CONTROL_A, \
+						   _PIPEDMC_CONTROL_B)
+#define  PIPEDMC_ENABLE			REG_BIT(0)
+
+#define MTL_PIPEDMC_CONTROL		_MMIO(0x45250)
+#define  PIPEDMC_ENABLE_MTL(pipe)	REG_BIT(((pipe) - PIPE_A) * 4)
+
 #define _ADLP_PIPEDMC_REG_MMIO_BASE_A	0x5f000
 #define _TGL_PIPEDMC_REG_MMIO_BASE_A	0x92000
 
@@ -50,6 +60,7 @@
 
 #define DMC_EVT_CTL_EVENT_ID_MASK	REG_GENMASK(15, 8)
 #define DMC_EVT_CTL_EVENT_ID_FALSE	0x01
+#define DMC_EVT_CTL_EVENT_ID_VBLANK_A	0x32 /* main DMC */
 /* An event handler scheduled to run at a 1 kHz frequency. */
 #define DMC_EVT_CTL_EVENT_ID_CLK_MSEC	0xbf
 
@@ -85,5 +96,11 @@
 
 #define TGL_DMC_DEBUG3		_MMIO(0x101090)
 #define DG1_DMC_DEBUG3		_MMIO(0x13415c)
+
+#define DMC_WAKELOCK_CFG	_MMIO(0x8F1B0)
+#define  DMC_WAKELOCK_CFG_ENABLE REG_BIT(31)
+#define DMC_WAKELOCK1_CTL	_MMIO(0x8F140)
+#define  DMC_WAKELOCK_CTL_REQ	 REG_BIT(31)
+#define  DMC_WAKELOCK_CTL_ACK	 REG_BIT(15)
 
 #endif /* __INTEL_DMC_REGS_H__ */

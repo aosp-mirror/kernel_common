@@ -2,11 +2,10 @@
 #ifndef BUILTIN_H
 #define BUILTIN_H
 
-extern const char perf_usage_string[];
-extern const char perf_more_info_string[];
+struct cmdnames;
 
 void list_common_cmds_help(void);
-const char *help_unknown_cmd(const char *cmd);
+const char *help_unknown_cmd(const char *cmd, struct cmdnames *main_cmds);
 
 int cmd_annotate(int argc, const char **argv);
 int cmd_bench(int argc, const char **argv);

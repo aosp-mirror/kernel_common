@@ -1708,7 +1708,6 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 	struct sta_info *sta_info;
 	bool ldpc, erp;
 	int use_vht;
-	int n_supported = 0;
 	int ack_dur;
 	int stbc;
 	int i;
@@ -1726,16 +1725,15 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 	mi->band = sband->band;
 	mi->last_stats_update = jiffies;
 
-	ack_dur = ieee80211_frame_duration(sband->band, 10, 60, 1, 1, 0);
-	mi->overhead = ieee80211_frame_duration(sband->band, 0, 60, 1, 1, 0);
+	ack_dur = ieee80211_frame_duration(sband->band, 10, 60, 1, 1);
+	mi->overhead = ieee80211_frame_duration(sband->band, 0, 60, 1, 1);
 	mi->overhead += ack_dur;
 	mi->overhead_rtscts = mi->overhead + 2 * ack_dur;
 
 	ctl_rate = &sband->bitrates[rate_lowest_index(sband, sta)];
 	erp = ctl_rate->flags & IEEE80211_RATE_ERP_G;
 	ack_dur = ieee80211_frame_duration(sband->band, 10,
-					   ctl_rate->bitrate, erp, 1,
-					   ieee80211_chandef_get_shift(chandef));
+					   ctl_rate->bitrate, erp, 1);
 	mi->overhead_legacy = ack_dur;
 	mi->overhead_legacy_rtscts = mi->overhead_legacy + 2 * ack_dur;
 
@@ -1791,8 +1789,6 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 				continue;
 
 			mi->supported[i] = mcs->rx_mask[nss - 1];
-			if (mi->supported[i])
-				n_supported++;
 			continue;
 		}
 
@@ -1819,9 +1815,6 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 
 		mi->supported[i] = minstrel_get_valid_vht_rates(bw, nss,
 				vht_cap->vht_mcs.tx_mcs_map);
-
-		if (mi->supported[i])
-			n_supported++;
 	}
 
 	sta_info = container_of(sta, struct sta_info, sta);

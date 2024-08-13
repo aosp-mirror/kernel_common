@@ -95,7 +95,7 @@ static int sgx_mmap(struct file *file, struct vm_area_struct *vma)
 		return ret;
 
 	vma->vm_ops = &sgx_vm_ops;
-	vma->vm_flags |= VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP | VM_IO;
+	vm_flags_set(vma, VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP | VM_IO);
 	vma->vm_private_data = encl;
 
 	return 0;
@@ -113,7 +113,7 @@ static unsigned long sgx_get_unmapped_area(struct file *file,
 	if (flags & MAP_FIXED)
 		return addr;
 
-	return current->mm->get_unmapped_area(file, addr, len, pgoff, flags);
+	return mm_get_unmapped_area(current->mm, file, addr, len, pgoff, flags);
 }
 
 #ifdef CONFIG_COMPAT

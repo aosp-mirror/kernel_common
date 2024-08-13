@@ -5,7 +5,8 @@
 
 # Please keep it alphabetically sorted by directory
 # (e. g. LC_ALL=C sort Makefile)
-obj-y        +=	b2c2/		\
+obj-y        +=	ttpci/		\
+		b2c2/		\
 		pluto2/		\
 		dm1105/		\
 		pt1/		\
@@ -13,6 +14,7 @@ obj-y        +=	b2c2/		\
 		mantis/		\
 		ngene/		\
 		ddbridge/	\
+		saa7146/	\
 		smipcie/	\
 		netup_unidvb/	\
 		intel/
@@ -30,6 +32,7 @@ obj-$(CONFIG_VIDEO_CX25821) += cx25821/
 obj-$(CONFIG_VIDEO_CX88) += cx88/
 obj-$(CONFIG_VIDEO_DT3155) += dt3155/
 obj-$(CONFIG_VIDEO_IVTV) += ivtv/
+obj-$(CONFIG_VIDEO_MGB4) += mgb4/
 obj-$(CONFIG_VIDEO_SAA7134) += saa7134/
 obj-$(CONFIG_VIDEO_SAA7164) += saa7164/
 obj-$(CONFIG_VIDEO_SOLO6X10) += solo6x10/

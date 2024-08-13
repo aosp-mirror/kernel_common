@@ -15,7 +15,7 @@ maintainers:
   - Fabrice Gasnier <fabrice.gasnier@foss.st.com>
 
 allOf:
-  - $ref: "regulator.yaml#"
+  - $ref: regulator.yaml#
 
 properties:
   compatible:
@@ -29,6 +29,10 @@ properties:
 
   vdda-supply:
     description: phandle to the vdda input analog voltage.
+
+  access-controllers:
+    minItems: 1
+    maxItems: 2
 
 required:
   - compatible

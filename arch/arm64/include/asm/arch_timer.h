@@ -15,7 +15,7 @@
 #include <linux/bug.h>
 #include <linux/init.h>
 #include <linux/jump_label.h>
-#include <linux/smp.h>
+#include <linux/percpu.h>
 #include <linux/types.h>
 
 #include <clocksource/arm_arch_timer.h>
@@ -88,13 +88,7 @@ static inline notrace u64 arch_timer_read_cntvct_el0(void)
 
 #define arch_timer_reg_read_stable(reg)					\
 	({								\
-		u64 _val;						\
-									\
-		preempt_disable_notrace();				\
-		_val = erratum_handler(read_ ## reg)();			\
-		preempt_enable_notrace();				\
-									\
-		_val;							\
+		erratum_handler(read_ ## reg)();			\
 	})
 
 /*

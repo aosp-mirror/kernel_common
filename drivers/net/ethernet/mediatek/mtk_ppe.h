@@ -55,8 +55,10 @@ enum {
 #define MTK_FOE_IB2_PSE_QOS		BIT(4)
 #define MTK_FOE_IB2_DEST_PORT		GENMASK(7, 5)
 #define MTK_FOE_IB2_MULTICAST		BIT(8)
+#define MTK_FOE_IB2_MIB_CNT		BIT(10)
 
 #define MTK_FOE_IB2_WDMA_QID2		GENMASK(13, 12)
+#define MTK_FOE_IB2_MIB_CNT_V2		BIT(15)
 #define MTK_FOE_IB2_WDMA_DEVIDX		BIT(16)
 #define MTK_FOE_IB2_WDMA_WINFO		BIT(17)
 
@@ -83,6 +85,17 @@ enum {
 #define MTK_FOE_WINFO_BSS		GENMASK(5, 0)
 #define MTK_FOE_WINFO_WCID		GENMASK(15, 6)
 
+#define MTK_FOE_WINFO_BSS_V3		GENMASK(23, 16)
+#define MTK_FOE_WINFO_WCID_V3		GENMASK(15, 0)
+
+#define MTK_FOE_WINFO_AMSDU_USR_INFO	GENMASK(15, 0)
+#define MTK_FOE_WINFO_AMSDU_TID		GENMASK(19, 16)
+#define MTK_FOE_WINFO_AMSDU_IS_FIXEDRATE	BIT(20)
+#define MTK_FOE_WINFO_AMSDU_IS_PRIOR	BIT(21)
+#define MTK_FOE_WINFO_AMSDU_IS_SP	BIT(22)
+#define MTK_FOE_WINFO_AMSDU_HF		BIT(23)
+#define MTK_FOE_WINFO_AMSDU_EN		BIT(24)
+
 enum {
 	MTK_FOE_STATE_INVALID,
 	MTK_FOE_STATE_UNBIND,
@@ -104,8 +117,13 @@ struct mtk_foe_mac_info {
 	u16 pppoe_id;
 	u16 src_mac_lo;
 
+	/* netsys_v2 */
 	u16 minfo;
 	u16 winfo;
+
+	/* netsys_v3 */
+	u32 w3info;
+	u32 amsdu;
 };
 
 /* software-only entry type */
@@ -214,6 +232,10 @@ struct mtk_foe_ipv6_6rd {
 	struct mtk_foe_mac_info l2;
 };
 
+#define MTK_FOE_ENTRY_V1_SIZE	80
+#define MTK_FOE_ENTRY_V2_SIZE	96
+#define MTK_FOE_ENTRY_V3_SIZE	128
+
 struct mtk_foe_entry {
 	u32 ib1;
 
@@ -223,7 +245,7 @@ struct mtk_foe_entry {
 		struct mtk_foe_ipv4_dslite dslite;
 		struct mtk_foe_ipv6 ipv6;
 		struct mtk_foe_ipv6_6rd ipv6_6rd;
-		u32 data[23];
+		u32 data[31];
 	};
 };
 
@@ -285,15 +307,33 @@ struct mtk_flow_entry {
 	unsigned long cookie;
 };
 
+struct mtk_mib_entry {
+	u32	byt_cnt_l;
+	u16	byt_cnt_h;
+	u32	pkt_cnt_l;
+	u8	pkt_cnt_h;
+	u8	_rsv0;
+	u32	_rsv1;
+} __packed;
+
+struct mtk_foe_accounting {
+	u64	bytes;
+	u64	packets;
+};
+
 struct mtk_ppe {
 	struct mtk_eth *eth;
 	struct device *dev;
 	void __iomem *base;
 	int version;
 	char dirname[5];
+	bool accounting;
 
 	void *foe_table;
 	dma_addr_t foe_phys;
+
+	struct mtk_mib_entry *mib_table;
+	dma_addr_t mib_phys;
 
 	u16 foe_check_time[MTK_PPE_ENTRIES];
 	struct hlist_head *foe_flow;
@@ -303,8 +343,8 @@ struct mtk_ppe {
 	void *acct_table;
 };
 
-struct mtk_ppe *mtk_ppe_init(struct mtk_eth *eth, void __iomem *base,
-			     int version, int index);
+struct mtk_ppe *mtk_ppe_init(struct mtk_eth *eth, void __iomem *base, int index);
+
 void mtk_ppe_deinit(struct mtk_eth *eth);
 void mtk_ppe_start(struct mtk_ppe *ppe);
 int mtk_ppe_stop(struct mtk_ppe *ppe);
@@ -352,12 +392,15 @@ int mtk_foe_entry_set_vlan(struct mtk_eth *eth, struct mtk_foe_entry *entry,
 int mtk_foe_entry_set_pppoe(struct mtk_eth *eth, struct mtk_foe_entry *entry,
 			    int sid);
 int mtk_foe_entry_set_wdma(struct mtk_eth *eth, struct mtk_foe_entry *entry,
-			   int wdma_idx, int txq, int bss, int wcid);
+			   int wdma_idx, int txq, int bss, int wcid,
+			   bool amsdu_en);
 int mtk_foe_entry_set_queue(struct mtk_eth *eth, struct mtk_foe_entry *entry,
 			    unsigned int queue);
 int mtk_foe_entry_commit(struct mtk_ppe *ppe, struct mtk_flow_entry *entry);
 void mtk_foe_entry_clear(struct mtk_ppe *ppe, struct mtk_flow_entry *entry);
 int mtk_foe_entry_idle_time(struct mtk_ppe *ppe, struct mtk_flow_entry *entry);
 int mtk_ppe_debugfs_init(struct mtk_ppe *ppe, int index);
+struct mtk_foe_accounting *mtk_foe_entry_get_mib(struct mtk_ppe *ppe, u32 index,
+						 struct mtk_foe_accounting *diff);
 
 #endif

@@ -19,7 +19,6 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
@@ -304,6 +303,7 @@ static int tegra30_i2s_probe(struct snd_soc_dai *dai)
 }
 
 static const struct snd_soc_dai_ops tegra30_i2s_dai_ops = {
+	.probe		= tegra30_i2s_probe,
 	.set_fmt	= tegra30_i2s_set_fmt,
 	.hw_params	= tegra30_i2s_hw_params,
 	.trigger	= tegra30_i2s_trigger,
@@ -311,7 +311,6 @@ static const struct snd_soc_dai_ops tegra30_i2s_dai_ops = {
 };
 
 static const struct snd_soc_dai_driver tegra30_i2s_dai_template = {
-	.probe = tegra30_i2s_probe,
 	.playback = {
 		.stream_name = "Playback",
 		.channels_min = 2,
@@ -531,7 +530,7 @@ err:
 	return ret;
 }
 
-static int tegra30_i2s_platform_remove(struct platform_device *pdev)
+static void tegra30_i2s_platform_remove(struct platform_device *pdev)
 {
 	struct tegra30_i2s *i2s = dev_get_drvdata(&pdev->dev);
 
@@ -545,8 +544,6 @@ static int tegra30_i2s_platform_remove(struct platform_device *pdev)
 	tegra30_ahub_free_tx_fifo(i2s->playback_fifo_cif);
 
 	pm_runtime_disable(&pdev->dev);
-
-	return 0;
 }
 
 static const struct dev_pm_ops tegra30_i2s_pm_ops = {
@@ -563,7 +560,7 @@ static struct platform_driver tegra30_i2s_driver = {
 		.pm = &tegra30_i2s_pm_ops,
 	},
 	.probe = tegra30_i2s_platform_probe,
-	.remove = tegra30_i2s_platform_remove,
+	.remove_new = tegra30_i2s_platform_remove,
 };
 module_platform_driver(tegra30_i2s_driver);
 

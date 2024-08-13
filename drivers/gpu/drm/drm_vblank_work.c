@@ -73,6 +73,9 @@ void drm_vblank_cancel_pending_works(struct drm_vblank_crtc *vblank)
 
 	assert_spin_locked(&vblank->dev->event_lock);
 
+	drm_WARN_ONCE(vblank->dev, !list_empty(&vblank->pending_work),
+		      "Cancelling pending vblank works!\n");
+
 	list_for_each_entry_safe(work, next, &vblank->pending_work, node) {
 		list_del_init(&work->node);
 		drm_vblank_put(vblank->dev, vblank->pipe);
@@ -242,7 +245,7 @@ void drm_vblank_work_init(struct drm_vblank_work *work, struct drm_crtc *crtc,
 {
 	kthread_init_work(&work->base, func);
 	INIT_LIST_HEAD(&work->node);
-	work->vblank = &crtc->dev->vblank[drm_crtc_index(crtc)];
+	work->vblank = drm_crtc_vblank_crtc(crtc);
 }
 EXPORT_SYMBOL(drm_vblank_work_init);
 

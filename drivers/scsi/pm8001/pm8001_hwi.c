@@ -1180,65 +1180,6 @@ void pm8001_chip_iounmap(struct pm8001_hba_info *pm8001_ha)
 	}
 }
 
-#ifndef PM8001_USE_MSIX
-/**
- * pm8001_chip_intx_interrupt_enable - enable PM8001 chip interrupt
- * @pm8001_ha: our hba card information
- */
-static void
-pm8001_chip_intx_interrupt_enable(struct pm8001_hba_info *pm8001_ha)
-{
-	pm8001_cw32(pm8001_ha, 0, MSGU_ODMR, ODMR_CLEAR_ALL);
-	pm8001_cw32(pm8001_ha, 0, MSGU_ODCR, ODCR_CLEAR_ALL);
-}
-
-/**
- * pm8001_chip_intx_interrupt_disable - disable PM8001 chip interrupt
- * @pm8001_ha: our hba card information
- */
-static void
-pm8001_chip_intx_interrupt_disable(struct pm8001_hba_info *pm8001_ha)
-{
-	pm8001_cw32(pm8001_ha, 0, MSGU_ODMR, ODMR_MASK_ALL);
-}
-
-#else
-
-/**
- * pm8001_chip_msix_interrupt_enable - enable PM8001 chip interrupt
- * @pm8001_ha: our hba card information
- * @int_vec_idx: interrupt number to enable
- */
-static void
-pm8001_chip_msix_interrupt_enable(struct pm8001_hba_info *pm8001_ha,
-	u32 int_vec_idx)
-{
-	u32 msi_index;
-	u32 value;
-	msi_index = int_vec_idx * MSIX_TABLE_ELEMENT_SIZE;
-	msi_index += MSIX_TABLE_BASE;
-	pm8001_cw32(pm8001_ha, 0, msi_index, MSIX_INTERRUPT_ENABLE);
-	value = (1 << int_vec_idx);
-	pm8001_cw32(pm8001_ha, 0,  MSGU_ODCR, value);
-
-}
-
-/**
- * pm8001_chip_msix_interrupt_disable - disable PM8001 chip interrupt
- * @pm8001_ha: our hba card information
- * @int_vec_idx: interrupt number to disable
- */
-static void
-pm8001_chip_msix_interrupt_disable(struct pm8001_hba_info *pm8001_ha,
-	u32 int_vec_idx)
-{
-	u32 msi_index;
-	msi_index = int_vec_idx * MSIX_TABLE_ELEMENT_SIZE;
-	msi_index += MSIX_TABLE_BASE;
-	pm8001_cw32(pm8001_ha, 0,  msi_index, MSIX_INTERRUPT_DISABLE);
-}
-#endif
-
 /**
  * pm8001_chip_interrupt_enable - enable PM8001 chip interrupt
  * @pm8001_ha: our hba card information
@@ -1247,11 +1188,14 @@ pm8001_chip_msix_interrupt_disable(struct pm8001_hba_info *pm8001_ha,
 static void
 pm8001_chip_interrupt_enable(struct pm8001_hba_info *pm8001_ha, u8 vec)
 {
-#ifdef PM8001_USE_MSIX
-	pm8001_chip_msix_interrupt_enable(pm8001_ha, 0);
-#else
-	pm8001_chip_intx_interrupt_enable(pm8001_ha);
-#endif
+	if (pm8001_ha->use_msix) {
+		pm8001_cw32(pm8001_ha, 0, MSIX_TABLE_BASE,
+			    MSIX_INTERRUPT_ENABLE);
+		pm8001_cw32(pm8001_ha, 0,  MSGU_ODCR, 1);
+	} else {
+		pm8001_cw32(pm8001_ha, 0, MSGU_ODMR, ODMR_CLEAR_ALL);
+		pm8001_cw32(pm8001_ha, 0, MSGU_ODCR, ODCR_CLEAR_ALL);
+	}
 }
 
 /**
@@ -1262,11 +1206,11 @@ pm8001_chip_interrupt_enable(struct pm8001_hba_info *pm8001_ha, u8 vec)
 static void
 pm8001_chip_interrupt_disable(struct pm8001_hba_info *pm8001_ha, u8 vec)
 {
-#ifdef PM8001_USE_MSIX
-	pm8001_chip_msix_interrupt_disable(pm8001_ha, 0);
-#else
-	pm8001_chip_intx_interrupt_disable(pm8001_ha);
-#endif
+	if (pm8001_ha->use_msix)
+		pm8001_cw32(pm8001_ha, 0, MSIX_TABLE_BASE,
+			    MSIX_INTERRUPT_DISABLE);
+	else
+		pm8001_cw32(pm8001_ha, 0, MSGU_ODMR, ODMR_MASK_ALL);
 }
 
 /**
@@ -3362,8 +3306,9 @@ int pm8001_mpi_reg_resp(struct pm8001_hba_info *pm8001_ha, void *piomb)
 	pm8001_dev = ccb->device;
 	status = le32_to_cpu(registerRespPayload->status);
 	device_id = le32_to_cpu(registerRespPayload->device_id);
-	pm8001_dbg(pm8001_ha, MSG, " register device is status = %d\n",
-		   status);
+	pm8001_dbg(pm8001_ha, INIT,
+		   "register device status %d phy_id 0x%x device_id %d\n",
+		   status, pm8001_dev->attached_phy, device_id);
 	switch (status) {
 	case DEVREG_SUCCESS:
 		pm8001_dbg(pm8001_ha, MSG, "DEVREG_SUCCESS\n");
@@ -4052,9 +3997,6 @@ static int pm8001_chip_ssp_io_req(struct pm8001_hba_info *pm8001_ha,
 	ssp_cmd.data_len = cpu_to_le32(task->total_xfer_len);
 	ssp_cmd.device_id = cpu_to_le32(pm8001_dev->device_id);
 	ssp_cmd.tag = cpu_to_le32(tag);
-	if (task->ssp_task.enable_first_burst)
-		ssp_cmd.ssp_iu.efb_prio_attr |= 0x80;
-	ssp_cmd.ssp_iu.efb_prio_attr |= (task->ssp_task.task_prio << 3);
 	ssp_cmd.ssp_iu.efb_prio_attr |= (task->ssp_task.task_attr & 7);
 	memcpy(ssp_cmd.ssp_iu.cdb, task->ssp_task.cmd->cmnd,
 	       task->ssp_task.cmd->cmd_len);
@@ -4094,7 +4036,7 @@ static int pm8001_chip_sata_req(struct pm8001_hba_info *pm8001_ha,
 	u32 hdr_tag, ncg_tag = 0;
 	u64 phys_addr;
 	u32 ATAP = 0x0;
-	u32 dir;
+	u32 dir, retfis = 0;
 	u32  opc = OPC_INB_SATA_HOST_OPSTART;
 
 	memset(&sata_cmd, 0, sizeof(sata_cmd));
@@ -4123,8 +4065,11 @@ static int pm8001_chip_sata_req(struct pm8001_hba_info *pm8001_ha,
 	sata_cmd.tag = cpu_to_le32(tag);
 	sata_cmd.device_id = cpu_to_le32(pm8001_ha_dev->device_id);
 	sata_cmd.data_len = cpu_to_le32(task->total_xfer_len);
-	sata_cmd.ncqtag_atap_dir_m =
-		cpu_to_le32(((ncg_tag & 0xff)<<16)|((ATAP & 0x3f) << 10) | dir);
+	if (task->ata_task.return_fis_on_success)
+		retfis = 1;
+	sata_cmd.retfis_ncqtag_atap_dir_m =
+		cpu_to_le32((retfis << 24) | ((ncg_tag & 0xff) << 16) |
+			    ((ATAP & 0x3f) << 10) | dir);
 	sata_cmd.sata_fis = task->ata_task.fis;
 	if (likely(!task->ata_task.device_control_reg_update))
 		sata_cmd.sata_fis.flags |= 0x80;/* C=1: update ATA cmd reg */
@@ -4179,7 +4124,7 @@ pm8001_chip_phy_start_req(struct pm8001_hba_info *pm8001_ha, u8 phy_id)
 	payload.sas_identify.dev_type = SAS_END_DEVICE;
 	payload.sas_identify.initiator_bits = SAS_PROTOCOL_ALL;
 	memcpy(payload.sas_identify.sas_addr,
-		pm8001_ha->sas_addr, SAS_ADDR_SIZE);
+		&pm8001_ha->phy[phy_id].dev_sas_addr, SAS_ADDR_SIZE);
 	payload.sas_identify.phy_id = phy_id;
 
 	return pm8001_mpi_build_cmd(pm8001_ha, 0, opcode, &payload,
@@ -4278,7 +4223,7 @@ int pm8001_chip_dereg_dev_req(struct pm8001_hba_info *pm8001_ha,
 	memset(&payload, 0, sizeof(payload));
 	payload.tag = cpu_to_le32(1);
 	payload.device_id = cpu_to_le32(device_id);
-	pm8001_dbg(pm8001_ha, MSG, "unregister device device_id = %d\n",
+	pm8001_dbg(pm8001_ha, INIT, "unregister device device_id %d\n",
 		   device_id);
 
 	return pm8001_mpi_build_cmd(pm8001_ha, 0, opc, &payload,
@@ -4308,16 +4253,15 @@ static int pm8001_chip_phy_ctl_req(struct pm8001_hba_info *pm8001_ha,
 
 static u32 pm8001_chip_is_our_interrupt(struct pm8001_hba_info *pm8001_ha)
 {
-#ifdef PM8001_USE_MSIX
-	return 1;
-#else
 	u32 value;
+
+	if (pm8001_ha->use_msix)
+		return 1;
 
 	value = pm8001_cr32(pm8001_ha, 0, MSGU_ODR);
 	if (value)
 		return 1;
 	return 0;
-#endif
 }
 
 /**

@@ -12,7 +12,7 @@ allOf:
 maintainers:
   - Alessandro Zummo <a.zummo@towertech.it>
   - Alexandre Belloni <alexandre.belloni@bootlin.com>
-  - Rob Herring <robh+dt@kernel.org>
+  - Rob Herring <robh@kernel.org>
 
 properties:
   compatible:
@@ -34,8 +34,8 @@ properties:
 
   interrupt-names:
     items:
-      - const: 'rtc 1Hz'
-      - const: 'rtc alarm'
+      - const: rtc 1Hz
+      - const: rtc alarm
 
 required:
   - compatible

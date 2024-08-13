@@ -294,10 +294,10 @@ static void batch_clear_carry(struct pfn_batch *batch, unsigned int keep_pfns)
 			batch->npfns[batch->end - 1] < keep_pfns);
 
 	batch->total_pfns = keep_pfns;
-	batch->npfns[0] = keep_pfns;
 	batch->pfns[0] = batch->pfns[batch->end - 1] +
 			 (batch->npfns[batch->end - 1] - keep_pfns);
-	batch->end = 0;
+	batch->npfns[0] = keep_pfns;
+	batch->end = 1;
 }
 
 static void batch_skip_carry(struct pfn_batch *batch, unsigned int skip_pfns)
@@ -456,7 +456,8 @@ static int batch_iommu_map_small(struct iommu_domain *domain,
 			size % PAGE_SIZE);
 
 	while (size) {
-		rc = iommu_map(domain, iova, paddr, PAGE_SIZE, prot);
+		rc = iommu_map(domain, iova, paddr, PAGE_SIZE, prot,
+			       GFP_KERNEL_ACCOUNT);
 		if (rc)
 			goto err_unmap;
 		iova += PAGE_SIZE;
@@ -500,7 +501,8 @@ static int batch_to_domain(struct pfn_batch *batch, struct iommu_domain *domain,
 		else
 			rc = iommu_map(domain, iova,
 				       PFN_PHYS(batch->pfns[cur]) + page_offset,
-				       next_iova - iova, area->iommu_prot);
+				       next_iova - iova, area->iommu_prot,
+				       GFP_KERNEL_ACCOUNT);
 		if (rc)
 			goto err_unmap;
 		iova = next_iova;
@@ -784,7 +786,7 @@ static int pfn_reader_user_pin(struct pfn_reader_user *user,
 			user->locked = 1;
 		}
 		rc = pin_user_pages_remote(pages->source_mm, uptr, npages,
-					   user->gup_flags, user->upages, NULL,
+					   user->gup_flags, user->upages,
 					   &user->locked);
 	}
 	if (rc <= 0) {
@@ -1140,6 +1142,7 @@ struct iopt_pages *iopt_alloc_pages(void __user *uptr, unsigned long length,
 				    bool writable)
 {
 	struct iopt_pages *pages;
+	unsigned long end;
 
 	/*
 	 * The iommu API uses size_t as the length, and protect the DIV_ROUND_UP
@@ -1147,6 +1150,9 @@ struct iopt_pages *iopt_alloc_pages(void __user *uptr, unsigned long length,
 	 */
 	if (length > SIZE_MAX - PAGE_SIZE || length == 0)
 		return ERR_PTR(-EINVAL);
+
+	if (check_add_overflow((unsigned long)uptr, length, &end))
+		return ERR_PTR(-EOVERFLOW);
 
 	pages = kzalloc(sizeof(*pages), GFP_KERNEL_ACCOUNT);
 	if (!pages)
@@ -1201,12 +1207,20 @@ iopt_area_unpin_domain(struct pfn_batch *batch, struct iopt_area *area,
 			unsigned long start =
 				max(start_index, *unmapped_end_index);
 
+			if (IS_ENABLED(CONFIG_IOMMUFD_TEST) &&
+			    batch->total_pfns)
+				WARN_ON(*unmapped_end_index -
+						batch->total_pfns !=
+					start_index);
 			batch_from_domain(batch, domain, area, start,
 					  last_index);
-			batch_last_index = start + batch->total_pfns - 1;
+			batch_last_index = start_index + batch->total_pfns - 1;
 		} else {
 			batch_last_index = last_index;
 		}
+
+		if (IS_ENABLED(CONFIG_IOMMUFD_TEST))
+			WARN_ON(batch_last_index > real_last_index);
 
 		/*
 		 * unmaps must always 'cut' at a place where the pfns are not
@@ -1493,6 +1507,8 @@ void iopt_area_unfill_domains(struct iopt_area *area, struct iopt_pages *pages)
 				area, domain, iopt_area_index(area),
 				iopt_area_last_index(area));
 
+	if (IS_ENABLED(CONFIG_IOMMUFD_TEST))
+		WARN_ON(RB_EMPTY_NODE(&area->pages_node.rb));
 	interval_tree_remove(&area->pages_node, &pages->domains_itree);
 	iopt_area_unfill_domain(area, pages, area->storage_domain);
 	area->storage_domain = NULL;
@@ -1785,7 +1801,7 @@ static int iopt_pages_rw_page(struct iopt_pages *pages, unsigned long index,
 	rc = pin_user_pages_remote(
 		pages->source_mm, (uintptr_t)(pages->uptr + index * PAGE_SIZE),
 		1, (flags & IOMMUFD_ACCESS_RW_WRITE) ? FOLL_WRITE : 0, &page,
-		NULL, NULL);
+		NULL);
 	mmap_read_unlock(pages->source_mm);
 	if (rc != 1) {
 		if (WARN_ON(rc >= 0))

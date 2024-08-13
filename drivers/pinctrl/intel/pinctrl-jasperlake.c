@@ -9,6 +9,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pm.h>
 
 #include <linux/pinctrl/pinctrl.h>
 
@@ -29,18 +30,7 @@
 	}
 
 #define JSL_COMMUNITY(b, s, e, g)			\
-	{						\
-		.barno = (b),				\
-		.padown_offset = JSL_PAD_OWN,		\
-		.padcfglock_offset = JSL_PADCFGLOCK,	\
-		.hostown_offset = JSL_HOSTSW_OWN,	\
-		.is_offset = JSL_GPI_IS,		\
-		.ie_offset = JSL_GPI_IE,		\
-		.pin_base = (s),			\
-		.npins = ((e) - (s) + 1),		\
-		.gpps = (g),				\
-		.ngpps = ARRAY_SIZE(g),			\
-	}
+	INTEL_COMMUNITY_GPPS(b, s, e, g, JSL)
 
 /* Jasper Lake */
 static const struct pinctrl_pin_desc jsl_pins[] = {
@@ -337,14 +327,12 @@ static const struct acpi_device_id jsl_pinctrl_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, jsl_pinctrl_acpi_match);
 
-static INTEL_PINCTRL_PM_OPS(jsl_pinctrl_pm_ops);
-
 static struct platform_driver jsl_pinctrl_driver = {
 	.probe = intel_pinctrl_probe_by_hid,
 	.driver = {
 		.name = "jasperlake-pinctrl",
 		.acpi_match_table = jsl_pinctrl_acpi_match,
-		.pm = &jsl_pinctrl_pm_ops,
+		.pm = pm_sleep_ptr(&intel_pinctrl_pm_ops),
 	},
 };
 module_platform_driver(jsl_pinctrl_driver);
@@ -352,3 +340,4 @@ module_platform_driver(jsl_pinctrl_driver);
 MODULE_AUTHOR("Andy Shevchenko <andriy.shevchenko@linux.intel.com>");
 MODULE_DESCRIPTION("Intel Jasper Lake PCH pinctrl/GPIO driver");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PINCTRL_INTEL);

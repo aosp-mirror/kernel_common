@@ -89,7 +89,7 @@ struct lm3697 {
 	int bank_cfg;
 	int num_banks;
 
-	struct lm3697_led leds[];
+	struct lm3697_led leds[] __counted_by(num_banks);
 };
 
 static const struct reg_default lm3697_reg_defs[] = {
@@ -299,8 +299,7 @@ child_out:
 	return ret;
 }
 
-static int lm3697_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int lm3697_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
 	struct lm3697 *led;

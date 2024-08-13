@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2017-2022 Broadcom. All Rights Reserved. The term *
+ * Copyright (C) 2017-2024 Broadcom. All Rights Reserved. The term *
  * “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.  *
  * Copyright (C) 2009-2016 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
@@ -395,9 +395,6 @@ struct lpfc_cqe {
 #define CQE_STATUS_NEED_BUFF_ENTRY	0xf
 #define CQE_STATUS_DI_ERROR		0x16
 
-/* Used when mapping CQE status to IOCB */
-#define LPFC_IOCB_STATUS_MASK		0xf
-
 /* Status returned by hardware (valid only if status = CQE_STATUS_SUCCESS). */
 #define CQE_HW_STATUS_NO_ERR		0x0
 #define CQE_HW_STATUS_UNDERRUN		0x1
@@ -536,9 +533,9 @@ struct sli4_wcqe_xri_aborted {
 /* completion queue entry structure for rqe completion */
 struct lpfc_rcqe {
 	uint32_t word0;
-#define lpfc_rcqe_bindex_SHIFT		16
-#define lpfc_rcqe_bindex_MASK		0x0000FFF
-#define lpfc_rcqe_bindex_WORD		word0
+#define lpfc_rcqe_iv_SHIFT		31
+#define lpfc_rcqe_iv_MASK		0x00000001
+#define lpfc_rcqe_iv_WORD		word0
 #define lpfc_rcqe_status_SHIFT		8
 #define lpfc_rcqe_status_MASK		0x000000FF
 #define lpfc_rcqe_status_WORD		word0
@@ -546,6 +543,7 @@ struct lpfc_rcqe {
 #define FC_STATUS_RQ_BUF_LEN_EXCEEDED 	0x11 /* payload truncated */
 #define FC_STATUS_INSUFF_BUF_NEED_BUF 	0x12 /* Insufficient buffers */
 #define FC_STATUS_INSUFF_BUF_FRM_DISC 	0x13 /* Frame Discard */
+#define FC_STATUS_RQ_DMA_FAILURE	0x14 /* DMA failure */
 	uint32_t word1;
 #define lpfc_rcqe_fcf_id_v1_SHIFT	0
 #define lpfc_rcqe_fcf_id_v1_MASK	0x0000003F
@@ -2146,6 +2144,14 @@ struct sli4_sge {	/* SLI-4 */
 #define lpfc_sli4_sge_last_MASK		0x00000001
 #define lpfc_sli4_sge_last_WORD		word2
 	uint32_t sge_len;
+};
+
+struct sli4_sge_le {
+	__le32 addr_hi;
+	__le32 addr_lo;
+
+	__le32 word2;
+	__le32 sge_len;
 };
 
 struct sli4_hybrid_sgl {
@@ -4071,7 +4077,6 @@ struct lpfc_mcqe {
 #define LPFC_TRAILER_CODE_GRP5	0x5
 #define LPFC_TRAILER_CODE_FC	0x10
 #define LPFC_TRAILER_CODE_SLI	0x11
-#define LPFC_TRAILER_CODE_CMSTAT        0x13
 };
 
 struct lpfc_acqe_link {
@@ -4201,6 +4206,8 @@ struct lpfc_acqe_fc_la {
 #define LPFC_FC_LA_TYPE_MDS_LOOPBACK	0x5
 #define LPFC_FC_LA_TYPE_UNEXP_WWPN	0x6
 #define LPFC_FC_LA_TYPE_TRUNKING_EVENT  0x7
+#define LPFC_FC_LA_TYPE_ACTIVATE_FAIL		0x8
+#define LPFC_FC_LA_TYPE_LINK_RESET_PRTCL_EVT	0x9
 #define lpfc_acqe_fc_la_port_type_SHIFT		6
 #define lpfc_acqe_fc_la_port_type_MASK		0x00000003
 #define lpfc_acqe_fc_la_port_type_WORD		word0
@@ -4242,6 +4249,9 @@ struct lpfc_acqe_fc_la {
 #define lpfc_acqe_fc_la_fault_SHIFT		0
 #define lpfc_acqe_fc_la_fault_MASK		0x000000FF
 #define lpfc_acqe_fc_la_fault_WORD		word1
+#define lpfc_acqe_fc_la_link_status_SHIFT	8
+#define lpfc_acqe_fc_la_link_status_MASK	0x0000007F
+#define lpfc_acqe_fc_la_link_status_WORD	word1
 #define lpfc_acqe_fc_la_trunk_fault_SHIFT		0
 #define lpfc_acqe_fc_la_trunk_fault_MASK		0x0000000F
 #define lpfc_acqe_fc_la_trunk_fault_WORD		word1
@@ -4336,6 +4346,7 @@ struct lpfc_acqe_sli {
 #define LPFC_SLI_EVENT_TYPE_EEPROM_FAILURE	0x10
 #define LPFC_SLI_EVENT_TYPE_CGN_SIGNAL		0x11
 #define LPFC_SLI_EVENT_TYPE_RD_SIGNAL           0x12
+#define LPFC_SLI_EVENT_TYPE_RESET_CM_STATS      0x13
 };
 
 /*
@@ -4808,8 +4819,8 @@ struct cmf_sync_wqe {
 #define cmf_sync_cqid_WORD	word11
 	uint32_t read_bytes;
 	uint32_t word13;
-#define cmf_sync_period_SHIFT	16
-#define cmf_sync_period_MASK	0x0000ffff
+#define cmf_sync_period_SHIFT	24
+#define cmf_sync_period_MASK	0x000000ff
 #define cmf_sync_period_WORD	word13
 	uint32_t word14;
 	uint32_t word15;

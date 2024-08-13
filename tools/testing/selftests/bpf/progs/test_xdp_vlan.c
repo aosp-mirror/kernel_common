@@ -160,7 +160,7 @@ int  xdp_prognum1(struct xdp_md *ctx)
 
 		/* Modifying VLAN, preserve top 4 bits */
 		vlan_hdr->h_vlan_TCI =
-			bpf_htons((bpf_ntohs(vlan_hdr->h_vlan_TCI) & 0xf000)
+			bpf_htons((bpf_ntohs(vlan_hdr->h_vlan_TCI) & 0xf000U)
 				  | TO_VLAN);
 	}
 
@@ -207,19 +207,6 @@ int  xdp_prognum2(struct xdp_md *ctx)
 	bpf_xdp_adjust_head(ctx, VLAN_HDR_SZ);
 
 	return XDP_PASS;
-}
-
-static __always_inline
-void shift_mac_4bytes_16bit(void *data)
-{
-	__u16 *p = data;
-
-	p[7] = p[5]; /* delete p[7] was vlan_hdr->h_vlan_TCI */
-	p[6] = p[4]; /* delete p[6] was ethhdr->h_proto */
-	p[5] = p[3];
-	p[4] = p[2];
-	p[3] = p[1];
-	p[2] = p[0];
 }
 
 static __always_inline

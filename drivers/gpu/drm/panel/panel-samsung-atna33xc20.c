@@ -36,7 +36,7 @@ struct atana33xc20_panel {
 	struct gpio_desc *el_on3_gpio;
 	struct drm_dp_aux *aux;
 
-	struct edid *edid;
+	const struct drm_edid *drm_edid;
 
 	ktime_t powered_off_time;
 	ktime_t powered_on_time;
@@ -53,7 +53,7 @@ static void atana33xc20_wait(ktime_t start_ktime, unsigned int min_ms)
 	ktime_t now_ktime, min_ktime;
 
 	min_ktime = ktime_add(start_ktime, ms_to_ktime(min_ms));
-	now_ktime = ktime_get();
+	now_ktime = ktime_get_boottime();
 
 	if (ktime_before(now_ktime, min_ktime))
 		msleep(ktime_to_ms(ktime_sub(min_ktime, now_ktime)) + 1);
@@ -72,10 +72,11 @@ static int atana33xc20_suspend(struct device *dev)
 	if (p->el3_was_on)
 		atana33xc20_wait(p->el_on3_off_time, 150);
 
+	drm_dp_dpcd_set_powered(p->aux, false);
 	ret = regulator_disable(p->supply);
 	if (ret)
 		return ret;
-	p->powered_off_time = ktime_get();
+	p->powered_off_time = ktime_get_boottime();
 	p->el3_was_on = false;
 
 	return 0;
@@ -93,7 +94,8 @@ static int atana33xc20_resume(struct device *dev)
 	ret = regulator_enable(p->supply);
 	if (ret)
 		return ret;
-	p->powered_on_time = ktime_get();
+	drm_dp_dpcd_set_powered(p->aux, true);
+	p->powered_on_time = ktime_get_boottime();
 
 	if (p->no_hpd) {
 		msleep(HPD_MAX_MS);
@@ -107,19 +109,17 @@ static int atana33xc20_resume(struct device *dev)
 		if (hpd_asserted < 0)
 			ret = hpd_asserted;
 
-		if (ret)
+		if (ret) {
 			dev_warn(dev, "Error waiting for HPD GPIO: %d\n", ret);
-
-		return ret;
-	}
-
-	if (p->aux->wait_hpd_asserted) {
+			goto error;
+		}
+	} else if (p->aux->wait_hpd_asserted) {
 		ret = p->aux->wait_hpd_asserted(p->aux, HPD_MAX_US);
 
-		if (ret)
+		if (ret) {
 			dev_warn(dev, "Controller error waiting for HPD: %d\n", ret);
-
-		return ret;
+			goto error;
+		}
 	}
 
 	/*
@@ -131,6 +131,12 @@ static int atana33xc20_resume(struct device *dev)
 	 * right times.
 	 */
 	return 0;
+
+error:
+	drm_dp_dpcd_set_powered(p->aux, false);
+	regulator_disable(p->supply);
+
+	return ret;
 }
 
 static int atana33xc20_disable(struct drm_panel *panel)
@@ -142,7 +148,7 @@ static int atana33xc20_disable(struct drm_panel *panel)
 		return 0;
 
 	gpiod_set_value_cansleep(p->el_on3_gpio, 0);
-	p->el_on3_off_time = ktime_get();
+	p->el_on3_off_time = ktime_get_boottime();
 	p->enabled = false;
 
 	/*
@@ -247,9 +253,12 @@ static int atana33xc20_get_modes(struct drm_panel *panel,
 
 	pm_runtime_get_sync(panel->dev);
 
-	if (!p->edid)
-		p->edid = drm_get_edid(connector, &aux_ep->aux->ddc);
-	num = drm_add_edid_modes(connector, p->edid);
+	if (!p->drm_edid)
+		p->drm_edid = drm_edid_read_ddc(connector, &aux_ep->aux->ddc);
+
+	drm_edid_connector_update(connector, p->drm_edid);
+
+	num = drm_edid_connector_add_modes(connector);
 
 	pm_runtime_mark_last_busy(panel->dev);
 	pm_runtime_put_autosuspend(panel->dev);
@@ -310,7 +319,7 @@ static int atana33xc20_probe(struct dp_aux_ep_device *aux_ep)
 	ret = devm_add_action_or_reset(dev,  atana33xc20_runtime_disable, dev);
 	if (ret)
 		return ret;
-	pm_runtime_set_autosuspend_delay(dev, 1000);
+	pm_runtime_set_autosuspend_delay(dev, 2000);
 	pm_runtime_use_autosuspend(dev);
 	ret = devm_add_action_or_reset(dev,  atana33xc20_dont_use_autosuspend, dev);
 	if (ret)
@@ -322,9 +331,14 @@ static int atana33xc20_probe(struct dp_aux_ep_device *aux_ep)
 	ret = drm_panel_dp_aux_backlight(&panel->base, aux_ep->aux);
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_put_autosuspend(dev);
+
+	/*
+	 * Warn if we get an error, but don't consider it fatal. Having
+	 * a panel where we can't control the backlight is better than
+	 * no panel.
+	 */
 	if (ret)
-		return dev_err_probe(dev, ret,
-				     "failed to register dp aux backlight\n");
+		dev_warn(dev, "failed to register dp aux backlight: %d\n", ret);
 
 	drm_panel_add(&panel->base);
 
@@ -340,7 +354,7 @@ static void atana33xc20_remove(struct dp_aux_ep_device *aux_ep)
 	drm_panel_disable(&panel->base);
 	drm_panel_unprepare(&panel->base);
 
-	kfree(panel->edid);
+	drm_edid_free(panel->drm_edid);
 }
 
 static void atana33xc20_shutdown(struct dp_aux_ep_device *aux_ep)

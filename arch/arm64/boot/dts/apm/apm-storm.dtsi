@@ -81,15 +81,23 @@
 		};
 		xgene_L2_0: l2-cache-0 {
 			compatible = "cache";
+			cache-level = <2>;
+			cache-unified;
 		};
 		xgene_L2_1: l2-cache-1 {
 			compatible = "cache";
+			cache-level = <2>;
+			cache-unified;
 		};
 		xgene_L2_2: l2-cache-2 {
 			compatible = "cache";
+			cache-level = <2>;
+			cache-unified;
 		};
 		xgene_L2_3: l2-cache-3 {
 			compatible = "cache";
+			cache-level = <2>;
+			cache-unified;
 		};
 	};
 
@@ -104,6 +112,13 @@
 		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
 	};
 
+	refclk: refclk {
+		compatible = "fixed-clock";
+		#clock-cells = <1>;
+		clock-frequency = <100000000>;
+		clock-output-names = "refclk";
+	};
+
 	timer {
 		compatible = "arm,armv8-timer";
 		interrupts = <1 0 0xff08>,	/* Secure Phys IRQ */
@@ -114,7 +129,7 @@
 	};
 
 	pmu {
-		compatible = "apm,potenza-pmu", "arm,armv8-pmuv3";
+		compatible = "apm,potenza-pmu";
 		interrupts = <1 12 0xff04>;
 	};
 
@@ -129,12 +144,6 @@
 			#address-cells = <2>;
 			#size-cells = <2>;
 			ranges;
-			refclk: refclk {
-				compatible = "fixed-clock";
-				#clock-cells = <1>;
-				clock-frequency = <100000000>;
-				clock-output-names = "refclk";
-			};
 
 			pcppll: pcppll@17000100 {
 				compatible = "apm,xgene-pcppll-clock";
@@ -938,7 +947,7 @@
 			dr_mode = "host";
 		};
 
-		sbgpio: gpio@17001000{
+		sbgpio: gpio@17001000 {
 			compatible = "apm,xgene-gpio-sb";
 			reg = <0x0 0x17001000 0x0 0x400>;
 			#gpio-cells = <2>;

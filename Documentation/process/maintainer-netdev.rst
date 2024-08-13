@@ -98,7 +98,7 @@ If you aren't subscribed to netdev and/or are simply unsure if
 repository link above for any new networking-related commits.  You may
 also check the following website for the current status:
 
-  http://vger.kernel.org/~davem/net-next.html
+  https://netdev.bots.linux.dev/net-next.html
 
 The ``net`` tree continues to collect fixes for the vX.Y content, and is
 fed back to Linus at regular (~weekly) intervals.  Meaning that the
@@ -109,6 +109,8 @@ Finally, the vX.Y gets released, and the whole cycle starts over.
 netdev patch review
 -------------------
 
+.. _patch_status:
+
 Patch status
 ~~~~~~~~~~~~
 
@@ -118,20 +120,72 @@ queue for netdev:
   https://patchwork.kernel.org/project/netdevbpf/list/
 
 The "State" field will tell you exactly where things are at with your
-patch. Patches are indexed by the ``Message-ID`` header of the emails
+patch:
+
+================== =============================================================
+Patch state        Description
+================== =============================================================
+New, Under review  pending review, patch is in the maintainer’s queue for
+                   review; the two states are used interchangeably (depending on
+                   the exact co-maintainer handling patchwork at the time)
+Accepted           patch was applied to the appropriate networking tree, this is
+                   usually set automatically by the pw-bot
+Needs ACK          waiting for an ack from an area expert or testing
+Changes requested  patch has not passed the review, new revision is expected
+                   with appropriate code and commit message changes
+Rejected           patch has been rejected and new revision is not expected
+Not applicable     patch is expected to be applied outside of the networking
+                   subsystem
+Awaiting upstream  patch should be reviewed and handled by appropriate
+                   sub-maintainer, who will send it on to the networking trees;
+                   patches set to ``Awaiting upstream`` in netdev's patchwork
+                   will usually remain in this state, whether the sub-maintainer
+                   requested changes, accepted or rejected the patch
+Deferred           patch needs to be reposted later, usually due to dependency
+                   or because it was posted for a closed tree
+Superseded         new version of the patch was posted, usually set by the
+                   pw-bot
+RFC                not to be applied, usually not in maintainer’s review queue,
+                   pw-bot can automatically set patches to this state based
+                   on subject tags
+================== =============================================================
+
+Patches are indexed by the ``Message-ID`` header of the emails
 which carried them so if you have trouble finding your patch append
 the value of ``Message-ID`` to the URL above.
 
 Updating patch status
 ~~~~~~~~~~~~~~~~~~~~~
 
-It may be tempting to help the maintainers and update the state of your
-own patches when you post a new version or spot a bug. Please **do not**
-do that.
-Interfering with the patch status on patchwork will only cause confusion. Leave
-it to the maintainer to figure out what is the most recent and current
-version that should be applied. If there is any doubt, the maintainer
-will reply and ask what should be done.
+Contributors and reviewers do not have the permissions to update patch
+state directly in patchwork. Patchwork doesn't expose much information
+about the history of the state of patches, therefore having multiple
+people update the state leads to confusion.
+
+Instead of delegating patchwork permissions netdev uses a simple mail
+bot which looks for special commands/lines within the emails sent to
+the mailing list. For example to mark a series as Changes Requested
+one needs to send the following line anywhere in the email thread::
+
+  pw-bot: changes-requested
+
+As a result the bot will set the entire series to Changes Requested.
+This may be useful when author discovers a bug in their own series
+and wants to prevent it from getting applied.
+
+The use of the bot is entirely optional, if in doubt ignore its existence
+completely. Maintainers will classify and update the state of the patches
+themselves. No email should ever be sent to the list with the main purpose
+of communicating with the bot, the bot commands should be seen as metadata.
+
+The use of the bot is restricted to authors of the patches (the ``From:``
+header on patch submission and command must match!), maintainers of
+the modified code according to the MAINTAINERS file (again, ``From:``
+must match the MAINTAINERS entry) and a handful of senior reviewers.
+
+Bot records its activity here:
+
+  https://netdev.bots.linux.dev/pw-bot.html
 
 Review timelines
 ~~~~~~~~~~~~~~~~
@@ -139,9 +193,52 @@ Review timelines
 Generally speaking, the patches get triaged quickly (in less than
 48h). But be patient, if your patch is active in patchwork (i.e. it's
 listed on the project's patch list) the chances it was missed are close to zero.
-Asking the maintainer for status updates on your
-patch is a good way to ensure your patch is ignored or pushed to the
-bottom of the priority list.
+
+The high volume of development on netdev makes reviewers move on
+from discussions relatively quickly. New comments and replies
+are very unlikely to arrive after a week of silence. If a patch
+is no longer active in patchwork and the thread went idle for more
+than a week - clarify the next steps and/or post the next version.
+
+For RFC postings specifically, if nobody responded in a week - reviewers
+either missed the posting or have no strong opinions. If the code is ready,
+repost as a PATCH.
+
+Emails saying just "ping" or "bump" are considered rude. If you can't figure
+out the status of the patch from patchwork or where the discussion has
+landed - describe your best guess and ask if it's correct. For example::
+
+  I don't understand what the next steps are. Person X seems to be unhappy
+  with A, should I do B and repost the patches?
+
+.. _Changes requested:
+
+Changes requested
+~~~~~~~~~~~~~~~~~
+
+Patches :ref:`marked<patch_status>` as ``Changes Requested`` need
+to be revised. The new version should come with a change log,
+preferably including links to previous postings, for example::
+
+  [PATCH net-next v3] net: make cows go moo
+
+  Even users who don't drink milk appreciate hearing the cows go "moo".
+
+  The amount of mooing will depend on packet rate so should match
+  the diurnal cycle quite well.
+
+  Signed-off-by: Joe Defarmer <joe@barn.org>
+  ---
+  v3:
+    - add a note about time-of-day mooing fluctuation to the commit message
+  v2: https://lore.kernel.org/netdev/123themessageid@barn.org/
+    - fix missing argument in kernel doc for netif_is_bovine()
+    - fix memory leak in netdev_register_cow()
+  v1: https://lore.kernel.org/netdev/456getstheclicks@barn.org/
+
+The commit message should be revised to answer any questions reviewers
+had to ask in previous discussions. Occasionally the update of
+the commit message will be the only change in the new version.
 
 Partial resends
 ~~~~~~~~~~~~~~~
@@ -155,10 +252,17 @@ Handling misapplied patches
 
 Occasionally a patch series gets applied before receiving critical feedback,
 or the wrong version of a series gets applied.
-There is no revert possible, once it is pushed out, it stays like that.
+
+Making the patch disappear once it is pushed out is not possible, the commit
+history in netdev trees is immutable.
 Please send incremental versions on top of what has been merged in order to fix
 the patches the way they would look like if your latest patch series was to be
 merged.
+
+In cases where full revert is needed the revert has to be submitted
+as a patch to the list with a commit message explaining the technical
+problems with the reverted commit. Reverts should be used as a last resort,
+when original change is completely wrong; incremental fixes are preferred.
 
 Stable tree
 ~~~~~~~~~~~
@@ -301,6 +405,10 @@ Make sure you address all the feedback in your new posting. Do not post a new
 version of the code if the discussion about the previous version is still
 ongoing, unless directly instructed by a reviewer.
 
+The new version of patches should be posted as a separate thread,
+not as a reply to the previous posting. Change log should include a link
+to the previous posting (see :ref:`Changes requested`).
+
 Testing
 -------
 
@@ -323,7 +431,7 @@ patchwork checks
 Checks in patchwork are mostly simple wrappers around existing kernel
 scripts, the sources are available at:
 
-https://github.com/kuba-moo/nipa/tree/master/tests
+https://github.com/linux-netdev/nipa/tree/master/tests
 
 **Do not** post your patches just to run them through the checks.
 You must ensure that your patches are ready by testing them locally
@@ -346,6 +454,21 @@ in a way which would break what would normally be considered uAPI.
 ``netdevsim`` is reserved for use by upstream tests only, so any
 new ``netdevsim`` features must be accompanied by selftests under
 ``tools/testing/selftests/``.
+
+Reviewer guidance
+-----------------
+
+Reviewing other people's patches on the list is highly encouraged,
+regardless of the level of expertise. For general guidance and
+helpful tips please see :ref:`development_advancedtopics_reviews`.
+
+It's safe to assume that netdev maintainers know the community and the level
+of expertise of the reviewers. The reviewers should not be concerned about
+their comments impeding or derailing the patch flow.
+
+Less experienced reviewers are highly encouraged to do more in-depth
+review of submissions and not focus exclusively on trivial or subjective
+matters like code formatting, tags etc.
 
 Testimonials / feedback
 -----------------------

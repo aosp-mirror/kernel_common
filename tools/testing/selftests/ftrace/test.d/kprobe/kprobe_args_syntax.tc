@@ -40,6 +40,14 @@ mips*)
   GOODREG=%r4
   BADREG=%r12
 ;;
+loongarch*)
+  GOODREG=%r4
+  BADREG=%r12
+;;
+riscv*)
+  GOODREG=%a0
+  BADREG=%a8
+;;
 *)
   echo "Please implement other architecture here"
   exit_untested

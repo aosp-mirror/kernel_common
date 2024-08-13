@@ -351,6 +351,9 @@ static void rproc_virtio_dev_release(struct device *dev)
 
 	kfree(vdev);
 
+	of_reserved_mem_device_release(&rvdev->pdev->dev);
+	dma_release_coherent_memory(&rvdev->pdev->dev);
+
 	put_device(&rvdev->pdev->dev);
 }
 
@@ -569,7 +572,7 @@ unwind_vring_allocations:
 	return ret;
 }
 
-static int rproc_virtio_remove(struct platform_device *pdev)
+static void rproc_virtio_remove(struct platform_device *pdev)
 {
 	struct rproc_vdev *rvdev = dev_get_drvdata(&pdev->dev);
 	struct rproc *rproc = rvdev->rproc;
@@ -584,18 +587,13 @@ static int rproc_virtio_remove(struct platform_device *pdev)
 	rproc_remove_subdev(rproc, &rvdev->subdev);
 	rproc_remove_rvdev(rvdev);
 
-	of_reserved_mem_device_release(&pdev->dev);
-	dma_release_coherent_memory(&pdev->dev);
-
 	put_device(&rproc->dev);
-
-	return 0;
 }
 
 /* Platform driver */
 static struct platform_driver rproc_virtio_driver = {
 	.probe		= rproc_virtio_probe,
-	.remove		= rproc_virtio_remove,
+	.remove_new	= rproc_virtio_remove,
 	.driver		= {
 		.name	= "rproc-virtio",
 	},

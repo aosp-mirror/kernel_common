@@ -2,6 +2,7 @@
 config CSKY
 	def_bool y
 	select ARCH_32BIT_OFF_T
+	select ARCH_HAS_CPU_CACHE_ALIASING
 	select ARCH_HAS_DMA_PREP_COHERENT
 	select ARCH_HAS_GCOV_PROFILE_ALL
 	select ARCH_HAS_SYNC_DMA_FOR_CPU
@@ -36,6 +37,7 @@ config CSKY
 	select ARCH_INLINE_SPIN_UNLOCK_BH if !PREEMPTION
 	select ARCH_INLINE_SPIN_UNLOCK_IRQ if !PREEMPTION
 	select ARCH_INLINE_SPIN_UNLOCK_IRQRESTORE if !PREEMPTION
+	select ARCH_NEED_CMPXCHG_1_EMU
 	select ARCH_WANT_FRAME_POINTERS if !CPU_CK610 && $(cc-option,-mbacktrace)
 	select ARCH_WANT_DEFAULT_TOPDOWN_MMAP_LAYOUT
 	select COMMON_CLK
@@ -89,6 +91,7 @@ config CSKY
 	select HAVE_KPROBES if !CPU_CK610
 	select HAVE_KPROBES_ON_FTRACE if !CPU_CK610
 	select HAVE_KRETPROBES if !CPU_CK610
+	select HAVE_PAGE_SIZE_4KB
 	select HAVE_PERF_EVENTS
 	select HAVE_PERF_REGS
 	select HAVE_PERF_USER_STACK_DUMP
@@ -96,6 +99,8 @@ config CSKY
 	select HAVE_REGS_AND_STACK_ACCESS_API
 	select HAVE_STACKPROTECTOR
 	select HAVE_SYSCALL_TRACEPOINTS
+	select HOTPLUG_CORE_SYNC_DEAD if HOTPLUG_CPU
+	select LOCK_MM_AND_FIND_VMA
 	select MAY_HAVE_SPARSE_IRQ
 	select MODULES_USE_ELF_RELA if MODULES
 	select OF
@@ -165,11 +170,6 @@ config STACKTRACE_SUPPORT
 
 config TIME_LOW_RES
 	def_bool y
-
-config CPU_TLB_SIZE
-	int
-	default "128"	if (CPU_CK610 || CPU_CK807 || CPU_CK810)
-	default "1024"	if (CPU_CK860)
 
 config CPU_ASID_BITS
 	int
@@ -331,10 +331,6 @@ config HIGHMEM
 	depends on !CPU_CK610
 	select KMAP_LOCAL
 	default y
-
-config ARCH_FORCE_MAX_ORDER
-	int "Maximum zone order"
-	default "11"
 
 config DRAM_BASE
 	hex "DRAM start addr (the same with memory-section in dts)"

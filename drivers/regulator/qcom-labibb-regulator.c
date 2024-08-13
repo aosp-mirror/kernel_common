@@ -764,7 +764,6 @@ static int qcom_labibb_regulator_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct regulator_config cfg = {};
 	struct device_node *reg_node;
-	const struct of_device_id *match;
 	const struct labibb_regulator_data *reg_data;
 	struct regmap *reg_regmap;
 	unsigned int type;
@@ -776,11 +775,11 @@ static int qcom_labibb_regulator_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	match = of_match_device(qcom_labibb_match, &pdev->dev);
-	if (!match)
+	reg_data = device_get_match_data(&pdev->dev);
+	if (!reg_data)
 		return -ENODEV;
 
-	for (reg_data = match->data; reg_data->name; reg_data++) {
+	for (; reg_data->name; reg_data++) {
 		char *sc_irq_name;
 		int irq = 0;
 
@@ -894,6 +893,7 @@ static int qcom_labibb_regulator_probe(struct platform_device *pdev)
 static struct platform_driver qcom_labibb_regulator_driver = {
 	.driver	= {
 		.name = "qcom-lab-ibb-regulator",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.of_match_table	= qcom_labibb_match,
 	},
 	.probe = qcom_labibb_regulator_probe,

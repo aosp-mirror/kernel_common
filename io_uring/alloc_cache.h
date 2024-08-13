@@ -4,50 +4,58 @@
 /*
  * Don't allow the cache to grow beyond this size.
  */
-#define IO_ALLOC_CACHE_MAX	512
-
-struct io_cache_entry {
-	struct hlist_node	node;
-};
+#define IO_ALLOC_CACHE_MAX	128
 
 static inline bool io_alloc_cache_put(struct io_alloc_cache *cache,
-				      struct io_cache_entry *entry)
+				      void *entry)
 {
-	if (cache->nr_cached < IO_ALLOC_CACHE_MAX) {
-		cache->nr_cached++;
-		hlist_add_head(&entry->node, &cache->list);
+	if (cache->nr_cached < cache->max_cached) {
+		if (!kasan_mempool_poison_object(entry))
+			return false;
+		cache->entries[cache->nr_cached++] = entry;
 		return true;
 	}
 	return false;
 }
 
-static inline struct io_cache_entry *io_alloc_cache_get(struct io_alloc_cache *cache)
+static inline void *io_alloc_cache_get(struct io_alloc_cache *cache)
 {
-	if (!hlist_empty(&cache->list)) {
-		struct hlist_node *node = cache->list.first;
+	if (cache->nr_cached) {
+		void *entry = cache->entries[--cache->nr_cached];
 
-		hlist_del(node);
-		return container_of(node, struct io_cache_entry, node);
+		kasan_mempool_unpoison_object(entry, cache->elem_size);
+		return entry;
 	}
 
 	return NULL;
 }
 
-static inline void io_alloc_cache_init(struct io_alloc_cache *cache)
+/* returns false if the cache was initialized properly */
+static inline bool io_alloc_cache_init(struct io_alloc_cache *cache,
+				       unsigned max_nr, size_t size)
 {
-	INIT_HLIST_HEAD(&cache->list);
-	cache->nr_cached = 0;
+	cache->entries = kvmalloc_array(max_nr, sizeof(void *), GFP_KERNEL);
+	if (cache->entries) {
+		cache->nr_cached = 0;
+		cache->max_cached = max_nr;
+		cache->elem_size = size;
+		return false;
+	}
+	return true;
 }
 
 static inline void io_alloc_cache_free(struct io_alloc_cache *cache,
-					void (*free)(struct io_cache_entry *))
+				       void (*free)(const void *))
 {
-	while (!hlist_empty(&cache->list)) {
-		struct hlist_node *node = cache->list.first;
+	void *entry;
 
-		hlist_del(node);
-		free(container_of(node, struct io_cache_entry, node));
-	}
-	cache->nr_cached = 0;
+	if (!cache->entries)
+		return;
+
+	while ((entry = io_alloc_cache_get(cache)) != NULL)
+		free(entry);
+
+	kvfree(cache->entries);
+	cache->entries = NULL;
 }
 #endif

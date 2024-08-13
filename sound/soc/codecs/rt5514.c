@@ -17,7 +17,6 @@
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
 #include <linux/firmware.h>
-#include <linux/gpio.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -1055,9 +1054,6 @@ static int rt5514_set_bias_level(struct snd_soc_component *component,
 
 	switch (level) {
 	case SND_SOC_BIAS_PREPARE:
-		if (IS_ERR(rt5514->mclk))
-			break;
-
 		if (snd_soc_component_get_bias_level(component) == SND_SOC_BIAS_ON) {
 			clk_disable_unprepare(rt5514->mclk);
 		} else {
@@ -1098,9 +1094,9 @@ static int rt5514_probe(struct snd_soc_component *component)
 	struct platform_device *pdev = container_of(component->dev,
 						   struct platform_device, dev);
 
-	rt5514->mclk = devm_clk_get(component->dev, "mclk");
-	if (PTR_ERR(rt5514->mclk) == -EPROBE_DEFER)
-		return -EPROBE_DEFER;
+	rt5514->mclk = devm_clk_get_optional(component->dev, "mclk");
+	if (IS_ERR(rt5514->mclk))
+		return PTR_ERR(rt5514->mclk);
 
 	if (rt5514->pdata.dsp_calib_clk_name) {
 		rt5514->dsp_calib_clk = devm_clk_get(&pdev->dev,
@@ -1195,7 +1191,7 @@ static const struct regmap_config rt5514_regmap = {
 	.reg_read = rt5514_i2c_read,
 	.reg_write = rt5514_i2c_write,
 
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 	.reg_defaults = rt5514_reg,
 	.num_reg_defaults = ARRAY_SIZE(rt5514_reg),
 	.use_single_read = true,
@@ -1203,7 +1199,7 @@ static const struct regmap_config rt5514_regmap = {
 };
 
 static const struct i2c_device_id rt5514_i2c_id[] = {
-	{ "rt5514", 0 },
+	{ "rt5514" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, rt5514_i2c_id);
@@ -1328,7 +1324,7 @@ static struct i2c_driver rt5514_i2c_driver = {
 		.of_match_table = of_match_ptr(rt5514_of_match),
 		.pm = &rt5514_i2_pm_ops,
 	},
-	.probe_new = rt5514_i2c_probe,
+	.probe = rt5514_i2c_probe,
 	.id_table = rt5514_i2c_id,
 };
 module_i2c_driver(rt5514_i2c_driver);

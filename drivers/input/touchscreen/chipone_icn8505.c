@@ -68,7 +68,6 @@ struct icn8505_touch_data {
 struct icn8505_data {
 	struct i2c_client *client;
 	struct input_dev *input;
-	struct gpio_desc *wake_gpio;
 	struct touchscreen_properties prop;
 	char firmware_name[32];
 };
@@ -460,7 +459,7 @@ static int icn8505_probe(struct i2c_client *client)
 	return 0;
 }
 
-static int __maybe_unused icn8505_suspend(struct device *dev)
+static int icn8505_suspend(struct device *dev)
 {
 	struct icn8505_data *icn8505 = i2c_get_clientdata(to_i2c_client(dev));
 
@@ -471,7 +470,7 @@ static int __maybe_unused icn8505_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused icn8505_resume(struct device *dev)
+static int icn8505_resume(struct device *dev)
 {
 	struct icn8505_data *icn8505 = i2c_get_clientdata(to_i2c_client(dev));
 	int error;
@@ -484,7 +483,7 @@ static int __maybe_unused icn8505_resume(struct device *dev)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(icn8505_pm_ops, icn8505_suspend, icn8505_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(icn8505_pm_ops, icn8505_suspend, icn8505_resume);
 
 static const struct acpi_device_id icn8505_acpi_match[] = {
 	{ "CHPN0001" },
@@ -495,10 +494,10 @@ MODULE_DEVICE_TABLE(acpi, icn8505_acpi_match);
 static struct i2c_driver icn8505_driver = {
 	.driver = {
 		.name	= "chipone_icn8505",
-		.pm	= &icn8505_pm_ops,
+		.pm	= pm_sleep_ptr(&icn8505_pm_ops),
 		.acpi_match_table = icn8505_acpi_match,
 	},
-	.probe_new = icn8505_probe,
+	.probe = icn8505_probe,
 };
 
 module_i2c_driver(icn8505_driver);

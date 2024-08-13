@@ -109,7 +109,7 @@ const char *get_branch_type(struct branch_entry *e)
 	return branch_type_name(e->flags.type);
 }
 
-void branch_type_stat_display(FILE *fp, struct branch_type_stat *st)
+void branch_type_stat_display(FILE *fp, const struct branch_type_stat *st)
 {
 	u64 total = 0;
 	int i;
@@ -171,7 +171,7 @@ static int count_str_scnprintf(int idx, const char *str, char *bf, int size)
 	return scnprintf(bf, size, "%s%s", (idx) ? " " : " (", str);
 }
 
-int branch_type_str(struct branch_type_stat *st, char *bf, int size)
+int branch_type_str(const struct branch_type_stat *st, char *bf, int size)
 {
 	int i, j = 0, printed = 0;
 	u64 total = 0;
@@ -211,4 +211,19 @@ int branch_type_str(struct branch_type_stat *st, char *bf, int size)
 		printed += count_str_scnprintf(j++, "CROSS_2M", bf + printed, size - printed);
 
 	return printed;
+}
+
+const char *branch_spec_desc(int spec)
+{
+	const char *branch_spec_outcomes[PERF_BR_SPEC_MAX] = {
+		"N/A",
+		"SPEC_WRONG_PATH",
+		"NON_SPEC_CORRECT_PATH",
+		"SPEC_CORRECT_PATH",
+	};
+
+	if (spec >= 0 && spec < PERF_BR_SPEC_MAX)
+		return branch_spec_outcomes[spec];
+
+	return NULL;
 }

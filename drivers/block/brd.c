@@ -19,7 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/mutex.h>
 #include <linux/pagemap.h>
-#include <linux/radix-tree.h>
+#include <linux/xarray.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/backing-dev.h>
@@ -28,11 +28,8 @@
 #include <linux/uaccess.h>
 
 /*
- * Each block ramdisk device has a radix_tree brd_pages of pages that stores
- * the pages containing the block device's contents. A brd page's ->index is
- * its offset in PAGE_SIZE units. This is similar to, but in no way connected
- * with, the kernel's pagecache or buffer cache (which sit above our block
- * device).
+ * Each block ramdisk device has a xarray brd_pages of pages that stores
+ * the pages containing the block device's contents.
  */
 struct brd_device {
 	int			brd_number;
@@ -40,11 +37,9 @@ struct brd_device {
 	struct list_head	brd_list;
 
 	/*
-	 * Backing store of pages and lock to protect it. This is the contents
-	 * of the block device.
+	 * Backing store of pages. This is the contents of the block device.
 	 */
-	spinlock_t		brd_lock;
-	struct radix_tree_root	brd_pages;
+	struct xarray	        brd_pages;
 	u64			brd_nr_pages;
 };
 
@@ -53,28 +48,7 @@ struct brd_device {
  */
 static struct page *brd_lookup_page(struct brd_device *brd, sector_t sector)
 {
-	pgoff_t idx;
-	struct page *page;
-
-	/*
-	 * The page lifetime is protected by the fact that we have opened the
-	 * device node -- brd pages will never be deleted under us, so we
-	 * don't need any further locking or refcounting.
-	 *
-	 * This is strictly true for the radix-tree nodes as well (ie. we
-	 * don't actually need the rcu_read_lock()), however that is not a
-	 * documented feature of the radix-tree API so it is better to be
-	 * safe here (we don't have total exclusion from radix tree updates
-	 * here, only deletes).
-	 */
-	rcu_read_lock();
-	idx = sector >> PAGE_SECTORS_SHIFT; /* sector to page index */
-	page = radix_tree_lookup(&brd->brd_pages, idx);
-	rcu_read_unlock();
-
-	BUG_ON(page && page->index != idx);
-
-	return page;
+	return xa_load(&brd->brd_pages, sector >> PAGE_SECTORS_SHIFT);
 }
 
 /*
@@ -82,7 +56,7 @@ static struct page *brd_lookup_page(struct brd_device *brd, sector_t sector)
  */
 static int brd_insert_page(struct brd_device *brd, sector_t sector, gfp_t gfp)
 {
-	pgoff_t idx;
+	pgoff_t idx = sector >> PAGE_SECTORS_SHIFT;
 	struct page *page;
 	int ret = 0;
 
@@ -94,71 +68,35 @@ static int brd_insert_page(struct brd_device *brd, sector_t sector, gfp_t gfp)
 	if (!page)
 		return -ENOMEM;
 
-	if (radix_tree_maybe_preload(gfp)) {
-		__free_page(page);
-		return -ENOMEM;
-	}
-
-	spin_lock(&brd->brd_lock);
-	idx = sector >> PAGE_SECTORS_SHIFT;
-	page->index = idx;
-	if (radix_tree_insert(&brd->brd_pages, idx, page)) {
-		__free_page(page);
-		page = radix_tree_lookup(&brd->brd_pages, idx);
-		if (!page)
-			ret = -ENOMEM;
-		else if (page->index != idx)
-			ret = -EIO;
-	} else {
+	xa_lock(&brd->brd_pages);
+	ret = __xa_insert(&brd->brd_pages, idx, page, gfp);
+	if (!ret)
 		brd->brd_nr_pages++;
-	}
-	spin_unlock(&brd->brd_lock);
+	xa_unlock(&brd->brd_pages);
 
-	radix_tree_preload_end();
+	if (ret < 0) {
+		__free_page(page);
+		if (ret == -EBUSY)
+			ret = 0;
+	}
 	return ret;
 }
 
 /*
- * Free all backing store pages and radix tree. This must only be called when
+ * Free all backing store pages and xarray. This must only be called when
  * there are no other users of the device.
  */
-#define FREE_BATCH 16
 static void brd_free_pages(struct brd_device *brd)
 {
-	unsigned long pos = 0;
-	struct page *pages[FREE_BATCH];
-	int nr_pages;
+	struct page *page;
+	pgoff_t idx;
 
-	do {
-		int i;
-
-		nr_pages = radix_tree_gang_lookup(&brd->brd_pages,
-				(void **)pages, pos, FREE_BATCH);
-
-		for (i = 0; i < nr_pages; i++) {
-			void *ret;
-
-			BUG_ON(pages[i]->index < pos);
-			pos = pages[i]->index;
-			ret = radix_tree_delete(&brd->brd_pages, pos);
-			BUG_ON(!ret || ret != pages[i]);
-			__free_page(pages[i]);
-		}
-
-		pos++;
-
-		/*
-		 * It takes 3.4 seconds to remove 80GiB ramdisk.
-		 * So, we need cond_resched to avoid stalling the CPU.
-		 */
+	xa_for_each(&brd->brd_pages, idx, page) {
+		__free_page(page);
 		cond_resched();
+	}
 
-		/*
-		 * This assumes radix_tree_gang_lookup always returns as
-		 * many pages as possible. If the radix-tree code changes,
-		 * so will this have to.
-		 */
-	} while (nr_pages == FREE_BATCH);
+	xa_destroy(&brd->brd_pages);
 }
 
 /*
@@ -284,12 +222,35 @@ out:
 	return err;
 }
 
+static void brd_do_discard(struct brd_device *brd, sector_t sector, u32 size)
+{
+	sector_t aligned_sector = (sector + PAGE_SECTORS) & ~PAGE_SECTORS;
+	struct page *page;
+
+	size -= (aligned_sector - sector) * SECTOR_SIZE;
+	xa_lock(&brd->brd_pages);
+	while (size >= PAGE_SIZE && aligned_sector < rd_size * 2) {
+		page = __xa_erase(&brd->brd_pages, aligned_sector >> PAGE_SECTORS_SHIFT);
+		if (page)
+			__free_page(page);
+		aligned_sector += PAGE_SECTORS;
+		size -= PAGE_SIZE;
+	}
+	xa_unlock(&brd->brd_pages);
+}
+
 static void brd_submit_bio(struct bio *bio)
 {
 	struct brd_device *brd = bio->bi_bdev->bd_disk->private_data;
 	sector_t sector = bio->bi_iter.bi_sector;
 	struct bio_vec bvec;
 	struct bvec_iter iter;
+
+	if (unlikely(op_is_discard(bio->bi_opf))) {
+		brd_do_discard(brd, sector, bio->bi_iter.bi_size);
+		bio_endio(bio);
+		return;
+	}
 
 	bio_for_each_segment(bvec, bio, iter) {
 		unsigned int len = bvec.bv_len;
@@ -315,23 +276,9 @@ static void brd_submit_bio(struct bio *bio)
 	bio_endio(bio);
 }
 
-static int brd_rw_page(struct block_device *bdev, sector_t sector,
-		       struct page *page, enum req_op op)
-{
-	struct brd_device *brd = bdev->bd_disk->private_data;
-	int err;
-
-	if (PageTransHuge(page))
-		return -ENOTSUPP;
-	err = brd_do_bvec(brd, page, PAGE_SIZE, 0, op, sector);
-	page_endio(page, op_is_write(op), err);
-	return err;
-}
-
 static const struct block_device_operations brd_fops = {
 	.owner =		THIS_MODULE,
 	.submit_bio =		brd_submit_bio,
-	.rw_page =		brd_rw_page,
 };
 
 /*
@@ -349,6 +296,7 @@ static int max_part = 1;
 module_param(max_part, int, 0444);
 MODULE_PARM_DESC(max_part, "Num Minors to reserve between devices");
 
+MODULE_DESCRIPTION("Ram backed block device driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_BLOCKDEV_MAJOR(RAMDISK_MAJOR);
 MODULE_ALIAS("rd");
@@ -376,6 +324,21 @@ static int brd_alloc(int i)
 	struct gendisk *disk;
 	char buf[DISK_NAME_LEN];
 	int err = -ENOMEM;
+	struct queue_limits lim = {
+		/*
+		 * This is so fdisk will align partitions on 4k, because of
+		 * direct_access API needing 4k alignment, returning a PFN
+		 * (This is only a problem on very small devices <= 4M,
+		 *  otherwise fdisk will align on 1M. Regardless this call
+		 *  is harmless)
+		 */
+		.physical_block_size	= PAGE_SIZE,
+		.max_hw_discard_sectors	= UINT_MAX,
+		.max_discard_segments	= 1,
+		.discard_granularity	= PAGE_SIZE,
+		.features		= BLK_FEAT_SYNCHRONOUS |
+					  BLK_FEAT_NOWAIT,
+	};
 
 	list_for_each_entry(brd, &brd_devices, brd_list)
 		if (brd->brd_number == i)
@@ -386,18 +349,18 @@ static int brd_alloc(int i)
 	brd->brd_number		= i;
 	list_add_tail(&brd->brd_list, &brd_devices);
 
-	spin_lock_init(&brd->brd_lock);
-	INIT_RADIX_TREE(&brd->brd_pages, GFP_ATOMIC);
+	xa_init(&brd->brd_pages);
 
 	snprintf(buf, DISK_NAME_LEN, "ram%d", i);
 	if (!IS_ERR_OR_NULL(brd_debugfs_dir))
 		debugfs_create_u64(buf, 0444, brd_debugfs_dir,
 				&brd->brd_nr_pages);
 
-	disk = brd->brd_disk = blk_alloc_disk(NUMA_NO_NODE);
-	if (!disk)
+	disk = brd->brd_disk = blk_alloc_disk(&lim, NUMA_NO_NODE);
+	if (IS_ERR(disk)) {
+		err = PTR_ERR(disk);
 		goto out_free_dev;
-
+	}
 	disk->major		= RAMDISK_MAJOR;
 	disk->first_minor	= i * max_part;
 	disk->minors		= max_part;
@@ -406,19 +369,6 @@ static int brd_alloc(int i)
 	strscpy(disk->disk_name, buf, DISK_NAME_LEN);
 	set_capacity(disk, rd_size * 2);
 	
-	/*
-	 * This is so fdisk will align partitions on 4k, because of
-	 * direct_access API needing 4k alignment, returning a PFN
-	 * (This is only a problem on very small devices <= 4M,
-	 *  otherwise fdisk will align on 1M. Regardless this call
-	 *  is harmless)
-	 */
-	blk_queue_physical_block_size(disk->queue, PAGE_SIZE);
-
-	/* Tell the block layer that this is not a rotational device */
-	blk_queue_flag_set(QUEUE_FLAG_NONROT, disk->queue);
-	blk_queue_flag_clear(QUEUE_FLAG_ADD_RANDOM, disk->queue);
-	blk_queue_flag_set(QUEUE_FLAG_NOWAIT, disk->queue);
 	err = add_disk(disk);
 	if (err)
 		goto out_cleanup_disk;

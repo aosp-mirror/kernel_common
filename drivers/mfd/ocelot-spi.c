@@ -125,11 +125,12 @@ static int ocelot_spi_initialize(struct device *dev)
 static const struct regmap_config ocelot_spi_regmap_config = {
 	.reg_bits = 24,
 	.reg_stride = 4,
-	.reg_downshift = 2,
+	.reg_shift = REGMAP_DOWNSHIFT(2),
 	.val_bits = 32,
 
 	.write_flag_mask = 0x80,
 
+	.use_single_read = true,
 	.use_single_write = true,
 	.can_multi_write = false,
 
@@ -144,7 +145,6 @@ static int ocelot_spi_regmap_bus_read(void *context, const void *reg, size_t reg
 	struct device *dev = context;
 	struct ocelot_ddata *ddata;
 	struct spi_device *spi;
-	struct spi_message msg;
 	unsigned int index = 0;
 
 	ddata = dev_get_drvdata(dev);
@@ -165,9 +165,7 @@ static int ocelot_spi_regmap_bus_read(void *context, const void *reg, size_t reg
 	xfers[index].len = val_size;
 	index++;
 
-	spi_message_init_with_transfers(&msg, xfers, index);
-
-	return spi_sync(spi, &msg);
+	return spi_sync_transfer(spi, xfers, index);
 }
 
 static int ocelot_spi_regmap_bus_write(void *context, const void *data, size_t count)

@@ -33,7 +33,7 @@
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
-#include <linux/string_helpers.h>
+#include <linux/string_choices.h>
 #include <linux/units.h>
 
 #include <linux/iio/buffer.h>
@@ -951,7 +951,7 @@ static irqreturn_t msa311_irq_thread(int irq, void *p)
 	}
 
 	if (new_data_int_enabled)
-		iio_trigger_poll_chained(msa311->new_data_trig);
+		iio_trigger_poll_nested(msa311->new_data_trig);
 
 	return IRQ_HANDLED;
 }
@@ -1294,7 +1294,7 @@ static struct i2c_driver msa311_driver = {
 		.of_match_table = msa311_of_match,
 		.pm = pm_ptr(&msa311_pm_ops),
 	},
-	.probe_new	= msa311_probe,
+	.probe		= msa311_probe,
 	.id_table	= msa311_i2c_id,
 };
 module_i2c_driver(msa311_driver);

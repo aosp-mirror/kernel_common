@@ -21,6 +21,8 @@ struct dlm_config_node {
 	uint32_t comm_seq;
 };
 
+extern const struct rhashtable_params dlm_rhash_rsb_params;
+
 #define DLM_MAX_ADDR_COUNT 3
 
 #define DLM_PROTO_TCP	0
@@ -37,9 +39,6 @@ struct dlm_config_info {
 	int ci_log_info;
 	int ci_protocol;
 	int ci_mark;
-#ifdef CONFIG_DLM_DEPRECATED_API
-	int ci_timewarn_cs;
-#endif
 	int ci_new_rsb_count;
 	int ci_recover_callbacks;
 	char ci_cluster_name[DLM_LOCKSPACE_LEN];

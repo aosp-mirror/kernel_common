@@ -163,7 +163,7 @@ static void zpci_handle_cpu_local_irq(bool rescan)
 			if (!rescan || irqs_on++)
 				/* End of second scan with interrupts on. */
 				break;
-			/* First scan complete, reenable interrupts. */
+			/* First scan complete, re-enable interrupts. */
 			if (zpci_set_irq_ctrl(SIC_IRQ_MODE_D_SINGLE, PCI_ISC, &iib))
 				break;
 			bit = 0;
@@ -202,7 +202,7 @@ static void zpci_handle_fallback_irq(void)
 			if (irqs_on++)
 				/* End of second scan with interrupts on. */
 				break;
-			/* First scan complete, reenable interrupts. */
+			/* First scan complete, re-enable interrupts. */
 			if (zpci_set_irq_ctrl(SIC_IRQ_MODE_SINGLE, PCI_ISC, &iib))
 				break;
 			cpu = 0;
@@ -247,7 +247,7 @@ static void zpci_floating_irq_handler(struct airq_struct *airq,
 			if (irqs_on++)
 				/* End of second scan with interrupts on. */
 				break;
-			/* First scan complete, reenable interrupts. */
+			/* First scan complete, re-enable interrupts. */
 			if (zpci_set_irq_ctrl(SIC_IRQ_MODE_SINGLE, PCI_ISC, &iib))
 				break;
 			si = 0;
@@ -410,7 +410,7 @@ static void __init cpu_enable_directed_irq(void *unused)
 	union zpci_sic_iib iib = {{0}};
 	union zpci_sic_iib ziib = {{0}};
 
-	iib.cdiib.dibv_addr = (u64) zpci_ibv[smp_processor_id()]->vector;
+	iib.cdiib.dibv_addr = virt_to_phys(zpci_ibv[smp_processor_id()]->vector);
 
 	zpci_set_irq_ctrl(SIC_IRQ_MODE_SET_CPU, 0, &iib);
 	zpci_set_irq_ctrl(SIC_IRQ_MODE_D_SINGLE, PCI_ISC, &ziib);

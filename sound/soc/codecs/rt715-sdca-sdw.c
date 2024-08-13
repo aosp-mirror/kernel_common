@@ -97,7 +97,7 @@ static const struct regmap_config rt715_sdca_regmap = {
 	.max_register = 0x43ffffff,
 	.reg_defaults = rt715_reg_defaults_sdca,
 	.num_reg_defaults = ARRAY_SIZE(rt715_reg_defaults_sdca),
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 	.use_single_read = true,
 	.use_single_write = true,
 };
@@ -111,7 +111,7 @@ static const struct regmap_config rt715_sdca_mbq_regmap = {
 	.max_register = 0x43ffffff,
 	.reg_defaults = rt715_mbq_reg_defaults_sdca,
 	.num_reg_defaults = ARRAY_SIZE(rt715_mbq_reg_defaults_sdca),
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 	.use_single_read = true,
 	.use_single_write = true,
 };
@@ -121,14 +121,11 @@ static int rt715_sdca_update_status(struct sdw_slave *slave,
 {
 	struct rt715_sdca_priv *rt715 = dev_get_drvdata(&slave->dev);
 
-	/* Update the status */
-	rt715->status = status;
-
 	/*
 	 * Perform initialization only if slave status is present and
 	 * hw_init flag is false
 	 */
-	if (rt715->hw_init || rt715->status != SDW_SLAVE_ATTACHED)
+	if (rt715->hw_init || status != SDW_SLAVE_ATTACHED)
 		return 0;
 
 	/* perform I/O transfers required for Slave initialization */
@@ -196,10 +193,7 @@ static int rt715_sdca_sdw_probe(struct sdw_slave *slave,
 
 static int rt715_sdca_sdw_remove(struct sdw_slave *slave)
 {
-	struct rt715_sdca_priv *rt715 = dev_get_drvdata(&slave->dev);
-
-	if (rt715->first_hw_init)
-		pm_runtime_disable(&slave->dev);
+	pm_runtime_disable(&slave->dev);
 
 	return 0;
 }
@@ -240,10 +234,10 @@ static int __maybe_unused rt715_dev_resume(struct device *dev)
 	if (!slave->unattach_request)
 		goto regmap_sync;
 
-	time = wait_for_completion_timeout(&slave->enumeration_complete,
+	time = wait_for_completion_timeout(&slave->initialization_complete,
 					   msecs_to_jiffies(RT715_PROBE_TIMEOUT));
 	if (!time) {
-		dev_err(&slave->dev, "Enumeration not complete, timed out\n");
+		dev_err(&slave->dev, "%s: Initialization not complete, timed out\n", __func__);
 		sdw_show_ping_status(slave->bus, true);
 
 		return -ETIMEDOUT;
@@ -276,7 +270,6 @@ static const struct dev_pm_ops rt715_pm = {
 static struct sdw_driver rt715_sdw_driver = {
 	.driver = {
 		.name = "rt715-sdca",
-		.owner = THIS_MODULE,
 		.pm = &rt715_pm,
 	},
 	.probe = rt715_sdca_sdw_probe,

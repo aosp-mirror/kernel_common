@@ -34,9 +34,9 @@ gma500_gfx-y += \
 	  psb_intel_lvds.o \
 	  psb_intel_modes.o \
 	  psb_intel_sdvo.o \
-	  psb_lid.o \
 	  psb_irq.o
 
 gma500_gfx-$(CONFIG_ACPI) +=  opregion.o
+gma500_gfx-$(CONFIG_DRM_FBDEV_EMULATION) +=  fbdev.o
 
 obj-$(CONFIG_DRM_GMA500) += gma500_gfx.o

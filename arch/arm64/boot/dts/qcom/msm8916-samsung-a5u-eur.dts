@@ -15,7 +15,7 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 
-		gpio = <&msmgpio 97 GPIO_ACTIVE_HIGH>;
+		gpio = <&tlmm 97 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 
 		pinctrl-names = "default";
@@ -29,6 +29,12 @@
 			"0", "0", "1";
 };
 
+&battery {
+	charge-term-current-microamp = <200000>;
+	constant-charge-current-max-microamp = <1500000>;
+	constant-charge-voltage-max-microvolt = <4350000>;
+};
+
 &blsp_i2c5 {
 	status = "okay";
 
@@ -36,7 +42,7 @@
 		compatible = "melfas,mms345l";
 
 		reg = <0x48>;
-		interrupt-parent = <&msmgpio>;
+		interrupt-parent = <&tlmm>;
 		interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
 
 		touchscreen-size-x = <720>;
@@ -54,12 +60,6 @@
 	status = "okay";
 };
 
-&pronto {
-	iris {
-		compatible = "qcom,wcn3660b";
-	};
-};
-
 &touchkey {
 	vcc-supply = <&reg_touch_key>;
 	vdd-supply = <&reg_touch_key>;
@@ -69,7 +69,19 @@
 	status = "okay";
 };
 
-&msmgpio {
+&wcnss {
+	status = "okay";
+};
+
+&wcnss_iris {
+	compatible = "qcom,wcn3660b";
+};
+
+&wcnss_mem {
+	status = "okay";
+};
+
+&tlmm {
 	tkey_en_default: tkey-en-default-state {
 		pins = "gpio97";
 		function = "gpio";

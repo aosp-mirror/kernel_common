@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 //
-// Copyright(c) 2019-2022 Intel Corporation. All rights reserved.
+// Copyright(c) 2019-2022 Intel Corporation
 //
 // Author: Jyri Sarha <jyri.sarha@intel.com>
 //
@@ -129,7 +129,7 @@ static int ipc4_probes_init(struct sof_client_dev *cdev, u32 stream_tag,
 	msg.data_size = sizeof(cfg);
 	msg.data_ptr = &cfg;
 
-	return sof_client_ipc_tx_message(cdev, &msg, NULL, 0);
+	return sof_client_ipc_tx_message_no_reply(cdev, &msg);
 }
 
 /**
@@ -146,6 +146,9 @@ static int ipc4_probes_deinit(struct sof_client_dev *cdev)
 	struct sof_man4_module *mentry = sof_ipc4_probe_get_module_info(cdev);
 	struct sof_ipc4_msg msg;
 
+	if (!mentry)
+		return -ENODEV;
+
 	msg.primary = mentry->id;
 	msg.primary |= SOF_IPC4_MSG_TYPE_SET(SOF_IPC4_MOD_DELETE_INSTANCE);
 	msg.primary |= SOF_IPC4_MSG_DIR(SOF_IPC4_MSG_REQUEST);
@@ -156,7 +159,7 @@ static int ipc4_probes_deinit(struct sof_client_dev *cdev)
 	msg.data_size = 0;
 	msg.data_ptr = NULL;
 
-	return sof_client_ipc_tx_message(cdev, &msg, NULL, 0);
+	return sof_client_ipc_tx_message_no_reply(cdev, &msg);
 }
 
 /**
@@ -196,6 +199,9 @@ static int ipc4_probes_points_add(struct sof_client_dev *cdev,
 	struct sof_ipc4_probe_point *points;
 	struct sof_ipc4_msg msg;
 	int i, ret;
+
+	if (!mentry)
+		return -ENODEV;
 
 	/* The sof_probe_point_desc and sof_ipc4_probe_point structs
 	 * are of same size and even the integers are the same in the
@@ -246,6 +252,9 @@ static int ipc4_probes_points_remove(struct sof_client_dev *cdev,
 	struct sof_ipc4_msg msg;
 	u32 *probe_point_ids;
 	int i, ret;
+
+	if (!mentry)
+		return -ENODEV;
 
 	probe_point_ids = kcalloc(num_buffer_id, sizeof(*probe_point_ids),
 				  GFP_KERNEL);

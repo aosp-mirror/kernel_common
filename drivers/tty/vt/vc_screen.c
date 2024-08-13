@@ -51,7 +51,7 @@
 #include <asm/unaligned.h>
 
 #define HEADER_SIZE	4u
-#define CON_BUF_SIZE (CONFIG_BASE_SMALL ? 256 : PAGE_SIZE)
+#define CON_BUF_SIZE (IS_ENABLED(CONFIG_BASE_SMALL) ? 256 : PAGE_SIZE)
 
 /*
  * Our minor space:
@@ -174,7 +174,7 @@ vcs_poll_data_get(struct file *file)
 }
 
 /**
- * vcs_vc -- return VC for @inode
+ * vcs_vc - return VC for @inode
  * @inode: inode for which to return a VC
  * @viewed: returns whether this console is currently foreground (viewed)
  *
@@ -199,7 +199,7 @@ static struct vc_data *vcs_vc(struct inode *inode, bool *viewed)
 }
 
 /**
- * vcs_size -- return size for a VC in @vc
+ * vcs_size - return size for a VC in @vc
  * @vc: which VC
  * @attr: does it use attributes?
  * @unicode: is it unicode?
@@ -403,10 +403,11 @@ vcs_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		unsigned int this_round, skip = 0;
 		int size;
 
-		ret = -ENXIO;
 		vc = vcs_vc(inode, &viewed);
-		if (!vc)
-			goto unlock_out;
+		if (!vc) {
+			ret = -ENXIO;
+			break;
+		}
 
 		/* Check whether we are above size each round,
 		 * as copy_to_user at the end of this loop
@@ -414,10 +415,8 @@ vcs_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		 */
 		size = vcs_size(vc, attr, uni_mode);
 		if (size < 0) {
-			if (read)
-				break;
 			ret = size;
-			goto unlock_out;
+			break;
 		}
 		if (pos >= size)
 			break;
@@ -657,10 +656,17 @@ vcs_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 			}
 		}
 
-		/* The vcs_size might have changed while we slept to grab
-		 * the user buffer, so recheck.
+		/* The vc might have been freed or vcs_size might have changed
+		 * while we slept to grab the user buffer, so recheck.
 		 * Return data written up to now on failure.
 		 */
+		vc = vcs_vc(inode, &viewed);
+		if (!vc) {
+			if (written)
+				break;
+			ret = -ENXIO;
+			goto unlock_out;
+		}
 		size = vcs_size(vc, attr, false);
 		if (size < 0) {
 			if (written)
@@ -780,23 +786,22 @@ static const struct file_operations vcs_fops = {
 	.release	= vcs_release,
 };
 
-static struct class *vc_class;
+static const struct class vc_class = {
+	.name = "vc",
+};
 
 void vcs_make_sysfs(int index)
 {
-	device_create(vc_class, NULL, MKDEV(VCS_MAJOR, index + 1), NULL,
-		      "vcs%u", index + 1);
-	device_create(vc_class, NULL, MKDEV(VCS_MAJOR, index + 65), NULL,
-		      "vcsu%u", index + 1);
-	device_create(vc_class, NULL, MKDEV(VCS_MAJOR, index + 129), NULL,
-		      "vcsa%u", index + 1);
+	device_create(&vc_class, NULL, MKDEV(VCS_MAJOR, index + 1), NULL, "vcs%u", index + 1);
+	device_create(&vc_class, NULL, MKDEV(VCS_MAJOR, index + 65), NULL, "vcsu%u", index + 1);
+	device_create(&vc_class, NULL, MKDEV(VCS_MAJOR, index + 129), NULL, "vcsa%u", index + 1);
 }
 
 void vcs_remove_sysfs(int index)
 {
-	device_destroy(vc_class, MKDEV(VCS_MAJOR, index + 1));
-	device_destroy(vc_class, MKDEV(VCS_MAJOR, index + 65));
-	device_destroy(vc_class, MKDEV(VCS_MAJOR, index + 129));
+	device_destroy(&vc_class, MKDEV(VCS_MAJOR, index + 1));
+	device_destroy(&vc_class, MKDEV(VCS_MAJOR, index + 65));
+	device_destroy(&vc_class, MKDEV(VCS_MAJOR, index + 129));
 }
 
 int __init vcs_init(void)
@@ -805,11 +810,12 @@ int __init vcs_init(void)
 
 	if (register_chrdev(VCS_MAJOR, "vcs", &vcs_fops))
 		panic("unable to get major %d for vcs device", VCS_MAJOR);
-	vc_class = class_create(THIS_MODULE, "vc");
+	if (class_register(&vc_class))
+		panic("unable to create vc_class");
 
-	device_create(vc_class, NULL, MKDEV(VCS_MAJOR, 0), NULL, "vcs");
-	device_create(vc_class, NULL, MKDEV(VCS_MAJOR, 64), NULL, "vcsu");
-	device_create(vc_class, NULL, MKDEV(VCS_MAJOR, 128), NULL, "vcsa");
+	device_create(&vc_class, NULL, MKDEV(VCS_MAJOR, 0), NULL, "vcs");
+	device_create(&vc_class, NULL, MKDEV(VCS_MAJOR, 64), NULL, "vcsu");
+	device_create(&vc_class, NULL, MKDEV(VCS_MAJOR, 128), NULL, "vcsa");
 	for (i = 0; i < MIN_NR_CONSOLES; i++)
 		vcs_make_sysfs(i);
 	return 0;

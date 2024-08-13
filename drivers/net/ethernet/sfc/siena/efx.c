@@ -18,7 +18,6 @@
 #include <linux/ethtool.h>
 #include <linux/topology.h>
 #include <linux/gfp.h>
-#include <linux/aer.h>
 #include <linux/interrupt.h>
 #include "net_driver.h"
 #include <net/gre.h>
@@ -496,11 +495,6 @@ static int efx_ioctl(struct net_device *net_dev, struct ifreq *ifr, int cmd)
 	struct efx_nic *efx = netdev_priv(net_dev);
 	struct mii_ioctl_data *data = if_mii(ifr);
 
-	if (cmd == SIOCSHWTSTAMP)
-		return efx_siena_ptp_set_ts_config(efx, ifr);
-	if (cmd == SIOCGHWTSTAMP)
-		return efx_siena_ptp_get_ts_config(efx, ifr);
-
 	/* Convert phy_id from older PRTAD/DEVAD format */
 	if ((cmd == SIOCGMIIREG || cmd == SIOCSMIIREG) &&
 	    (data->phy_id & 0xfc00) == 0x0400)
@@ -580,6 +574,23 @@ static int efx_vlan_rx_kill_vid(struct net_device *net_dev, __be16 proto, u16 vi
 		return -EOPNOTSUPP;
 }
 
+static int efx_siena_hwtstamp_set(struct net_device *net_dev,
+				  struct kernel_hwtstamp_config *config,
+				  struct netlink_ext_ack *extack)
+{
+	struct efx_nic *efx = netdev_priv(net_dev);
+
+	return efx_siena_ptp_set_ts_config(efx, config, extack);
+}
+
+static int efx_siena_hwtstamp_get(struct net_device *net_dev,
+				  struct kernel_hwtstamp_config *config)
+{
+	struct efx_nic *efx = netdev_priv(net_dev);
+
+	return efx_siena_ptp_get_ts_config(efx, config);
+}
+
 static const struct net_device_ops efx_netdev_ops = {
 	.ndo_open		= efx_net_open,
 	.ndo_stop		= efx_net_stop,
@@ -595,6 +606,8 @@ static const struct net_device_ops efx_netdev_ops = {
 	.ndo_features_check	= efx_siena_features_check,
 	.ndo_vlan_rx_add_vid	= efx_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= efx_vlan_rx_kill_vid,
+	.ndo_hwtstamp_set	= efx_siena_hwtstamp_set,
+	.ndo_hwtstamp_get	= efx_siena_hwtstamp_get,
 #ifdef CONFIG_SFC_SIENA_SRIOV
 	.ndo_set_vf_mac		= efx_sriov_set_vf_mac,
 	.ndo_set_vf_vlan	= efx_sriov_set_vf_vlan,
@@ -874,8 +887,6 @@ static void efx_pci_remove(struct pci_dev *pci_dev)
 
 	efx_siena_fini_struct(efx);
 	free_netdev(efx->net_dev);
-
-	pci_disable_pcie_error_reporting(pci_dev);
 };
 
 /* NIC VPD information
@@ -1093,8 +1104,6 @@ static int efx_pci_probe(struct pci_dev *pci_dev,
 	if (rc && rc != -EPERM)
 		netif_warn(efx, probe, efx->net_dev,
 			   "failed to create MTDs (%d)\n", rc);
-
-	(void)pci_enable_pcie_error_reporting(pci_dev);
 
 	if (efx->type->udp_tnl_push_ports)
 		efx->type->udp_tnl_push_ports(efx);

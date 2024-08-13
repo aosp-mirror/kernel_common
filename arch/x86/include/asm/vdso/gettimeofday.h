@@ -231,14 +231,19 @@ static u64 vread_pvclock(void)
 		ret = __pvclock_read_cycles(pvti, rdtsc_ordered());
 	} while (pvclock_read_retry(pvti, version));
 
-	return ret;
+	return ret & S64_MAX;
 }
 #endif
 
 #ifdef CONFIG_HYPERV_TIMER
 static u64 vread_hvclock(void)
 {
-	return hv_read_tsc_page(&hvclock_page);
+	u64 tsc, time;
+
+	if (hv_read_tsc_page_tsc(&hvclock_page, &tsc, &time))
+		return time & S64_MAX;
+
+	return U64_MAX;
 }
 #endif
 
@@ -246,7 +251,7 @@ static inline u64 __arch_get_hw_counter(s32 clock_mode,
 					const struct vdso_data *vd)
 {
 	if (likely(clock_mode == VDSO_CLOCKMODE_TSC))
-		return (u64)rdtsc_ordered();
+		return (u64)rdtsc_ordered() & S64_MAX;
 	/*
 	 * For any memory-mapped vclock type, we need to make sure that gcc
 	 * doesn't cleverly hoist a load before the mode check.  Otherwise we
@@ -284,6 +289,9 @@ static inline bool arch_vdso_clocksource_ok(const struct vdso_data *vd)
  * which can be invalidated asynchronously and indicate invalidation by
  * returning U64_MAX, which can be effectively tested by checking for a
  * negative value after casting it to s64.
+ *
+ * This effectively forces a S64_MAX mask on the calculations, unlike the
+ * U64_MAX mask normally used by x86 clocksources.
  */
 static inline bool arch_vdso_cycles_ok(u64 cycles)
 {
@@ -292,7 +300,7 @@ static inline bool arch_vdso_cycles_ok(u64 cycles)
 #define vdso_cycles_ok arch_vdso_cycles_ok
 
 /*
- * x86 specific delta calculation.
+ * x86 specific calculation of nanoseconds for the current cycle count
  *
  * The regular implementation assumes that clocksource reads are globally
  * monotonic. The TSC can be slightly off across sockets which can cause
@@ -300,25 +308,45 @@ static inline bool arch_vdso_cycles_ok(u64 cycles)
  * jump.
  *
  * Therefore it needs to be verified that @cycles are greater than
- * @last. If not then use @last, which is the base time of the current
- * conversion period.
+ * @vd->cycles_last. If not then use @vd->cycles_last, which is the base
+ * time of the current conversion period.
  *
- * This variant also removes the masking of the subtraction because the
- * clocksource mask of all VDSO capable clocksources on x86 is U64_MAX
- * which would result in a pointless operation. The compiler cannot
- * optimize it away as the mask comes from the vdso data and is not compile
- * time constant.
+ * This variant also uses a custom mask because while the clocksource mask of
+ * all the VDSO capable clocksources on x86 is U64_MAX, the above code uses
+ * U64_MASK as an exception value, additionally arch_vdso_cycles_ok() above
+ * declares everything with the MSB/Sign-bit set as invalid. Therefore the
+ * effective mask is S64_MAX.
  */
-static __always_inline
-u64 vdso_calc_delta(u64 cycles, u64 last, u64 mask, u32 mult)
+static __always_inline u64 vdso_calc_ns(const struct vdso_data *vd, u64 cycles, u64 base)
 {
-	if (cycles > last)
-		return (cycles - last) * mult;
-	return 0;
-}
-#define vdso_calc_delta vdso_calc_delta
+	u64 delta = cycles - vd->cycle_last;
 
-int __vdso_clock_gettime64(clockid_t clock, struct __kernel_timespec *ts);
+	/*
+	 * Negative motion and deltas which can cause multiplication
+	 * overflow require special treatment. This check covers both as
+	 * negative motion is guaranteed to be greater than @vd::max_cycles
+	 * due to unsigned comparison.
+	 *
+	 * Due to the MSB/Sign-bit being used as invalid marker (see
+	 * arch_vdso_cycles_ok() above), the effective mask is S64_MAX, but that
+	 * case is also unlikely and will also take the unlikely path here.
+	 */
+	if (unlikely(delta > vd->max_cycles)) {
+		/*
+		 * Due to the above mentioned TSC wobbles, filter out
+		 * negative motion.  Per the above masking, the effective
+		 * sign bit is now bit 62.
+		 */
+		if (delta & (1ULL << 62))
+			return base >> vd->shift;
+
+		/* Handle multiplication overflow gracefully */
+		return mul_u64_u32_add_u64_shr(delta & S64_MAX, vd->mult, base, vd->shift);
+	}
+
+	return ((delta * vd->mult) + base) >> vd->shift;
+}
+#define vdso_calc_ns vdso_calc_ns
 
 #endif /* !__ASSEMBLY__ */
 

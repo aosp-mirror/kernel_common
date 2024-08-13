@@ -6,6 +6,8 @@
  */
 
 #include <linux/module.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
 #include "soundbus.h"
 
 MODULE_AUTHOR("Johannes Berg <johannes@sipsolutions.net>");
@@ -55,10 +57,10 @@ static int soundbus_probe(struct device *dev)
 }
 
 
-static int soundbus_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int soundbus_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	struct soundbus_dev * soundbus_dev;
-	struct platform_device * of;
+	const struct soundbus_dev * soundbus_dev;
+	const struct platform_device * of;
 	const char *compat;
 	int retval = 0;
 	int cplen, seen = 0;
@@ -125,7 +127,7 @@ static void soundbus_device_shutdown(struct device *dev)
 
 /* soundbus_dev_attrs is declared in sysfs.c */
 ATTRIBUTE_GROUPS(soundbus_dev);
-static struct bus_type soundbus_bus_type = {
+static const struct bus_type soundbus_bus_type = {
 	.name		= "aoa-soundbus",
 	.probe		= soundbus_probe,
 	.uevent		= soundbus_uevent,

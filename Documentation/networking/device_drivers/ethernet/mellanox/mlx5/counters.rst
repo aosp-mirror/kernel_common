@@ -300,6 +300,11 @@ the software port.
        in the beginning of the queue. This is a normal condition.
      - Informative
 
+   * - `tx[i]_timestamps`
+     - Transmitted packets that were hardware timestamped at the device's DMA
+       layer.
+     - Informative
+
    * - `tx[i]_added_vlan_packets`
      - The number of packets sent where vlan tag insertion was offloaded to the
        hardware.
@@ -346,30 +351,22 @@ the software port.
      - The number of receive packets with CQE compression on ring i [#accel]_.
      - Acceleration
 
-   * - `rx[i]_cache_reuse`
-     - The number of events of successful reuse of a page from a driver's
-       internal page cache.
+   * - `rx[i]_arfs_add`
+     - The number of aRFS flow rules added to the device for direct RQ steering
+       on ring i [#accel]_.
      - Acceleration
 
-   * - `rx[i]_cache_full`
-     - The number of events of full internal page cache where driver can't put a
-       page back to the cache for recycling (page will be freed).
+   * - `rx[i]_arfs_request_in`
+     - Number of flow rules that have been requested to move into ring i for
+       direct RQ steering [#accel]_.
      - Acceleration
 
-   * - `rx[i]_cache_empty`
-     - The number of events where cache was empty - no page to give. Driver
-       shall allocate new page.
+   * - `rx[i]_arfs_request_out`
+     - Number of flow rules that have been requested to move out of ring i [#accel]_.
      - Acceleration
 
-   * - `rx[i]_cache_busy`
-     - The number of events where cache head was busy and cannot be recycled.
-       Driver allocated new page.
-     - Acceleration
-
-   * - `rx[i]_cache_waive`
-     - The number of cache evacuation. This can occur due to page move to
-       another NUMA node or page was pfmemalloc-ed and should be freed as soon
-       as possible.
+   * - `rx[i]_arfs_expired`
+     - Number of flow rules that have been expired and removed [#accel]_.
      - Acceleration
 
    * - `rx[i]_arfs_err`
@@ -469,11 +466,6 @@ the software port.
    * - `rx[i]_xsk_buff_alloc_err`
      - The number of times allocating an skb or XSK buffer failed in the XSK RQ
        context.
-     - Error
-
-   * - `rx[i]_xsk_arfs_err`
-     - aRFS (accelerated Receive Flow Steering) does not occur in the XSK RQ
-       context, so this counter should never increment.
      - Error
 
    * - `rx[i]_xdp_tx_xmit`
@@ -709,6 +701,18 @@ the software port.
        time protocol.
      - Error
 
+   * - `ptp_cq[i]_late_cqe`
+     - Number of times a CQE has been delivered on the PTP timestamping CQ when
+       the CQE was not expected since a certain amount of time had elapsed where
+       the device typically ensures not posting the CQE.
+     - Error
+
+   * - `ptp_cq[i]_lost_cqe`
+     - Number of times a CQE is expected to not be delivered on the PTP
+       timestamping CQE by the device due to a time delta elapsing. If such a
+       CQE is somehow delivered, `ptp_cq[i]_late_cqe` is incremented.
+     - Error
+
 .. [#ring_global] The corresponding ring and global counters do not share the
                   same name (i.e. do not follow the common naming scheme).
 
@@ -821,6 +825,16 @@ Counters on the NIC port that is connected to a eSwitch.
    * - `tx_vport_rdma_multicast_bytes`
      - RDMA multicast bytes transmitted, steered from a port (counters counts
        RoCE/UD/RC traffic) [#accel]_.
+     - Acceleration
+
+   * - `vport_loopback_packets`
+     - Unicast, multicast and broadcast packets that were loop-back (received
+       and transmitted), IB/Eth  [#accel]_.
+     - Acceleration
+
+   * - `vport_loopback_bytes`
+     - Unicast, multicast and broadcast bytes that were loop-back (received
+       and transmitted), IB/Eth  [#accel]_.
      - Acceleration
 
    * - `rx_steer_missed_packets`

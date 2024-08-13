@@ -67,7 +67,7 @@ static const struct regmap_access_table bd9571mwv_volatile_table = {
 static const struct regmap_config bd9571mwv_regmap_config = {
 	.reg_bits	= 8,
 	.val_bits	= 8,
-	.cache_type	= REGCACHE_RBTREE,
+	.cache_type	= REGCACHE_MAPLE,
 	.rd_table	= &bd9571mwv_readable_table,
 	.wr_table	= &bd9571mwv_writable_table,
 	.volatile_table	= &bd9571mwv_volatile_table,
@@ -152,7 +152,7 @@ static const struct regmap_access_table bd9574mwf_volatile_table = {
 static const struct regmap_config bd9574mwf_regmap_config = {
 	.reg_bits	= 8,
 	.val_bits	= 8,
-	.cache_type	= REGCACHE_RBTREE,
+	.cache_type	= REGCACHE_MAPLE,
 	.rd_table	= &bd9574mwf_readable_table,
 	.wr_table	= &bd9574mwf_writable_table,
 	.volatile_table	= &bd9574mwf_volatile_table,
@@ -278,7 +278,7 @@ static struct i2c_driver bd9571mwv_driver = {
 		.name	= "bd9571mwv",
 		.of_match_table = bd9571mwv_of_match_table,
 	},
-	.probe_new	= bd9571mwv_probe,
+	.probe		= bd9571mwv_probe,
 	.id_table       = bd9571mwv_id_table,
 };
 module_i2c_driver(bd9571mwv_driver);

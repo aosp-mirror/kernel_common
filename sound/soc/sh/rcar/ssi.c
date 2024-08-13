@@ -17,6 +17,8 @@
  */
 
 #include <sound/simple_card_utils.h>
+#include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/delay.h>
 #include "rsnd.h"
 #define RSND_SSI_NAME_SIZE 16
@@ -1047,7 +1049,7 @@ static void rsnd_ssi_debug_info(struct seq_file *m,
 	seq_printf(m, "chan:            %d\n",		ssi->chan);
 	seq_printf(m, "user:            %d\n",		ssi->usrcnt);
 
-	rsnd_debugfs_mod_reg_show(m, mod, RSND_GEN2_SSI,
+	rsnd_debugfs_mod_reg_show(m, mod, RSND_BASE_SSI,
 				  rsnd_mod_id(mod) * 0x40, 0x40);
 }
 #define DEBUG_INFO .debug_info = rsnd_ssi_debug_info
@@ -1211,10 +1213,10 @@ int rsnd_ssi_probe(struct rsnd_priv *priv)
 			goto rsnd_ssi_probe_done;
 		}
 
-		if (of_get_property(np, "shared-pin", NULL))
+		if (of_property_read_bool(np, "shared-pin"))
 			rsnd_flags_set(ssi, RSND_SSI_CLK_PIN_SHARE);
 
-		if (of_get_property(np, "no-busif", NULL))
+		if (of_property_read_bool(np, "no-busif"))
 			rsnd_flags_set(ssi, RSND_SSI_NO_BUSIF);
 
 		ssi->irq = irq_of_parse_and_map(np, 0);

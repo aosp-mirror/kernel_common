@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 or BSD-3-Clause */
+/* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
 * Copyright(c) 2015 - 2018 Intel Corporation.
 */
@@ -22,19 +22,26 @@
 
 #define MAX_MSG_LEN 512
 
+#pragma GCC diagnostic push
+#ifndef __clang__
+#pragma GCC diagnostic ignored "-Wsuggest-attribute=format"
+#endif
+
 DECLARE_EVENT_CLASS(hfi1_trace_template,
 		    TP_PROTO(const char *function, struct va_format *vaf),
 		    TP_ARGS(function, vaf),
 		    TP_STRUCT__entry(__string(function, function)
 				     __vstring(msg, vaf->fmt, vaf->va)
 				     ),
-		    TP_fast_assign(__assign_str(function, function);
+		    TP_fast_assign(__assign_str(function);
 				   __assign_vstr(msg, vaf->fmt, vaf->va);
 				   ),
 		    TP_printk("(%s) %s",
 			      __get_str(function),
 			      __get_str(msg))
 );
+
+#pragma GCC diagnostic pop
 
 /*
  * It may be nice to macroize the __hfi1_trace but the va_* stuff requires an

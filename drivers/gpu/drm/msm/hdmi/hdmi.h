@@ -115,17 +115,17 @@ void msm_hdmi_set_mode(struct hdmi *hdmi, bool power_on);
 
 static inline void hdmi_write(struct hdmi *hdmi, u32 reg, u32 data)
 {
-	msm_writel(data, hdmi->mmio + reg);
+	writel(data, hdmi->mmio + reg);
 }
 
 static inline u32 hdmi_read(struct hdmi *hdmi, u32 reg)
 {
-	return msm_readl(hdmi->mmio + reg);
+	return readl(hdmi->mmio + reg);
 }
 
 static inline u32 hdmi_qfprom_read(struct hdmi *hdmi, u32 reg)
 {
-	return msm_readl(hdmi->qfprom_mmio + reg);
+	return readl(hdmi->qfprom_mmio + reg);
 }
 
 /*
@@ -166,12 +166,12 @@ struct hdmi_phy {
 
 static inline void hdmi_phy_write(struct hdmi_phy *phy, u32 reg, u32 data)
 {
-	msm_writel(data, phy->mmio + reg);
+	writel(data, phy->mmio + reg);
 }
 
 static inline u32 hdmi_phy_read(struct hdmi_phy *phy, u32 reg)
 {
-	return msm_readl(phy->mmio + reg);
+	return readl(phy->mmio + reg);
 }
 
 int msm_hdmi_phy_resource_enable(struct hdmi_phy *phy);
@@ -224,14 +224,13 @@ void msm_hdmi_audio_set_sample_rate(struct hdmi *hdmi, int rate);
  * hdmi bridge:
  */
 
-struct drm_bridge *msm_hdmi_bridge_init(struct hdmi *hdmi);
-void msm_hdmi_bridge_destroy(struct drm_bridge *bridge);
+int msm_hdmi_bridge_init(struct hdmi *hdmi);
 
 void msm_hdmi_hpd_irq(struct drm_bridge *bridge);
 enum drm_connector_status msm_hdmi_bridge_detect(
 		struct drm_bridge *bridge);
 int msm_hdmi_hpd_enable(struct drm_bridge *bridge);
-void msm_hdmi_hpd_disable(struct hdmi_bridge *hdmi_bridge);
+void msm_hdmi_hpd_disable(struct hdmi *hdmi);
 
 /*
  * i2c adapter for ddc:

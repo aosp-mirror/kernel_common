@@ -120,7 +120,6 @@ static int mt7663u_probe(struct usb_interface *usb_intf,
 		.tx_status_data = mt7663_usb_sdio_tx_status_data,
 		.rx_skb = mt7615_queue_rx_skb,
 		.rx_check = mt7615_rx_check,
-		.sta_ps = mt7615_sta_ps,
 		.sta_add = mt7615_mac_sta_add,
 		.sta_remove = mt7615_mac_sta_remove,
 		.update_survey = mt7615_update_channel,
@@ -282,4 +281,5 @@ module_usb_driver(mt7663u_driver);
 
 MODULE_AUTHOR("Sean Wang <sean.wang@mediatek.com>");
 MODULE_AUTHOR("Lorenzo Bianconi <lorenzo@kernel.org>");
+MODULE_DESCRIPTION("MediaTek MT7663U (USB) wireless driver");
 MODULE_LICENSE("Dual BSD/GPL");

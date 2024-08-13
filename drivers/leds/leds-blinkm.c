@@ -561,12 +561,11 @@ static int blinkm_detect(struct i2c_client *client, struct i2c_board_info *info)
 		return -ENODEV;
 	}
 
-	strlcpy(info->type, "blinkm", I2C_NAME_SIZE);
+	strscpy(info->type, "blinkm", I2C_NAME_SIZE);
 	return 0;
 }
 
-static int blinkm_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int blinkm_probe(struct i2c_client *client)
 {
 	struct blinkm_data *data;
 	struct blinkm_led *led[3];

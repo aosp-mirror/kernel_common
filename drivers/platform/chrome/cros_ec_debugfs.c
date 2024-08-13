@@ -7,6 +7,7 @@
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/platform_data/cros_ec_commands.h>
@@ -24,6 +25,10 @@
 #define LOG_POLL_SEC		10
 
 #define CIRC_ADD(idx, size, value)	(((idx) + (value)) & ((size) - 1))
+
+static unsigned int log_poll_period_ms = LOG_POLL_SEC * MSEC_PER_SEC;
+module_param(log_poll_period_ms, uint, 0644);
+MODULE_PARM_DESC(log_poll_period_ms, "EC log polling period(ms)");
 
 /* waitqueue for log readers */
 static DECLARE_WAIT_QUEUE_HEAD(cros_ec_debugfs_log_wq);
@@ -56,7 +61,7 @@ struct cros_ec_debugfs {
 
 /*
  * We need to make sure that the EC log buffer on the UART is large enough,
- * so that it is unlikely enough to overlow within LOG_POLL_SEC.
+ * so that it is unlikely enough to overlow within log_poll_period_ms.
  */
 static void cros_ec_console_log_work(struct work_struct *__work)
 {
@@ -118,7 +123,7 @@ static void cros_ec_console_log_work(struct work_struct *__work)
 
 resched:
 	schedule_delayed_work(&debug_info->log_poll_work,
-			      msecs_to_jiffies(LOG_POLL_SEC * 1000));
+			      msecs_to_jiffies(log_poll_period_ms));
 }
 
 static int cros_ec_console_log_open(struct inode *inode, struct file *file)
@@ -329,6 +334,7 @@ static int ec_read_version_supported(struct cros_ec_dev *ec)
 	if (!msg)
 		return 0;
 
+	msg->version = 1;
 	msg->command = EC_CMD_GET_CMD_VERSIONS + ec->cmd_offset;
 	msg->outsize = sizeof(*params);
 	msg->insize = sizeof(*response);
@@ -400,24 +406,48 @@ static void cros_ec_cleanup_console_log(struct cros_ec_debugfs *debug_info)
 	}
 }
 
-static int cros_ec_create_panicinfo(struct cros_ec_debugfs *debug_info)
+/*
+ * Returns the size of the panicinfo data fetched from the EC
+ */
+static int cros_ec_get_panicinfo(struct cros_ec_device *ec_dev, uint8_t *data,
+				 int data_size)
 {
-	struct cros_ec_device *ec_dev = debug_info->ec->ec_dev;
 	int ret;
 	struct cros_ec_command *msg;
-	int insize;
 
-	insize = ec_dev->max_response;
+	if (!data || data_size <= 0 || data_size > ec_dev->max_response)
+		return -EINVAL;
 
-	msg = devm_kzalloc(debug_info->ec->dev,
-			sizeof(*msg) + insize, GFP_KERNEL);
+	msg = kzalloc(sizeof(*msg) + data_size, GFP_KERNEL);
 	if (!msg)
 		return -ENOMEM;
 
 	msg->command = EC_CMD_GET_PANIC_INFO;
-	msg->insize = insize;
+	msg->insize = data_size;
 
 	ret = cros_ec_cmd_xfer_status(ec_dev, msg);
+	if (ret < 0)
+		goto free;
+
+	memcpy(data, msg->data, data_size);
+
+free:
+	kfree(msg);
+	return ret;
+}
+
+static int cros_ec_create_panicinfo(struct cros_ec_debugfs *debug_info)
+{
+	struct cros_ec_device *ec_dev = debug_info->ec->ec_dev;
+	int ret;
+	void *data;
+
+	data = devm_kzalloc(debug_info->ec->dev, ec_dev->max_response,
+			    GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+
+	ret = cros_ec_get_panicinfo(ec_dev, data, ec_dev->max_response);
 	if (ret < 0) {
 		ret = 0;
 		goto free;
@@ -427,16 +457,16 @@ static int cros_ec_create_panicinfo(struct cros_ec_debugfs *debug_info)
 	if (ret == 0)
 		goto free;
 
-	debug_info->panicinfo_blob.data = msg->data;
+	debug_info->panicinfo_blob.data = data;
 	debug_info->panicinfo_blob.size = ret;
 
-	debugfs_create_blob("panicinfo", S_IFREG | 0444, debug_info->dir,
+	debugfs_create_blob("panicinfo", 0444, debug_info->dir,
 			    &debug_info->panicinfo_blob);
 
 	return 0;
 
 free:
-	devm_kfree(debug_info->ec->dev, msg);
+	devm_kfree(debug_info->ec->dev, data);
 	return ret;
 }
 
@@ -509,14 +539,12 @@ remove_debugfs:
 	return ret;
 }
 
-static int cros_ec_debugfs_remove(struct platform_device *pd)
+static void cros_ec_debugfs_remove(struct platform_device *pd)
 {
 	struct cros_ec_dev *ec = dev_get_drvdata(pd->dev.parent);
 
 	debugfs_remove_recursive(ec->debug_info->dir);
 	cros_ec_cleanup_console_log(ec->debug_info);
-
-	return 0;
 }
 
 static int __maybe_unused cros_ec_debugfs_suspend(struct device *dev)
@@ -542,6 +570,12 @@ static int __maybe_unused cros_ec_debugfs_resume(struct device *dev)
 static SIMPLE_DEV_PM_OPS(cros_ec_debugfs_pm_ops,
 			 cros_ec_debugfs_suspend, cros_ec_debugfs_resume);
 
+static const struct platform_device_id cros_ec_debugfs_id[] = {
+	{ DRV_NAME, 0 },
+	{}
+};
+MODULE_DEVICE_TABLE(platform, cros_ec_debugfs_id);
+
 static struct platform_driver cros_ec_debugfs_driver = {
 	.driver = {
 		.name = DRV_NAME,
@@ -549,11 +583,11 @@ static struct platform_driver cros_ec_debugfs_driver = {
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe = cros_ec_debugfs_probe,
-	.remove = cros_ec_debugfs_remove,
+	.remove_new = cros_ec_debugfs_remove,
+	.id_table = cros_ec_debugfs_id,
 };
 
 module_platform_driver(cros_ec_debugfs_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Debug logs for ChromeOS EC");
-MODULE_ALIAS("platform:" DRV_NAME);

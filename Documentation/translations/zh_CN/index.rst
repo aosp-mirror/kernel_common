@@ -24,8 +24,8 @@
 上的linux-doc邮件列表。
 
 顺便说下，中文文档也需要遵守内核编码风格，风格中中文和英文的主要不同就是中文
-的字符标点占用两个英文字符宽度， 所以，当英文要求不要超过每行100个字符时，
-中文就不要超过50个字符。另外，也要注意'-'，'=' 等符号与相关标题的对齐。在将
+的字符标点占用两个英文字符宽度，所以，当英文要求不要超过每行100个字符时，
+中文就不要超过50个字符。另外，也要注意'-'，'='等符号与相关标题的对齐。在将
 补丁提交到社区之前，一定要进行必要的 ``checkpatch.pl`` 检查和编译测试。
 
 与Linux 内核社区一起工作
@@ -52,11 +52,8 @@
 
    core-api/index
    driver-api/index
+   subsystem-apis
    内核中的锁 <locking/index>
-
-TODOList:
-
-* subsystem-apis
 
 开发工具和流程
 --------------
@@ -120,7 +117,7 @@ TODOList:
 .. toctree::
    :maxdepth: 2
 
-   arch
+   arch/index
 
 其他文档
 --------
@@ -132,6 +129,15 @@ TODOList:
    :maxdepth: 2
 
    staging/index
+
+术语表
+------
+
+.. toctree::
+   :maxdepth: 1
+
+   glossary
+
 
 索引和表格
 ----------

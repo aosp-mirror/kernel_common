@@ -28,7 +28,7 @@ static int tlv320aic23_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id tlv320aic23_id[] = {
-	{"tlv320aic23", 0},
+	{"tlv320aic23"},
 	{}
 };
 
@@ -47,7 +47,7 @@ static struct i2c_driver tlv320aic23_i2c_driver = {
 		   .name = "tlv320aic23-codec",
 		   .of_match_table = of_match_ptr(tlv320aic23_of_match),
 		   },
-	.probe_new = tlv320aic23_i2c_probe,
+	.probe = tlv320aic23_i2c_probe,
 	.id_table = tlv320aic23_id,
 };
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c)  2018 Intel Corporation */
 
+#include <linux/bitfield.h>
 #include <linux/delay.h>
 
 #include "igc_hw.h"
@@ -578,9 +579,8 @@ s32 igc_set_ltr_i225(struct igc_hw *hw, bool link)
 
 			/* Calculate tw_system (nsec). */
 			if (speed == SPEED_100) {
-				tw_system = ((rd32(IGC_EEE_SU) &
-					     IGC_TW_SYSTEM_100_MASK) >>
-					     IGC_TW_SYSTEM_100_SHIFT) * 500;
+				tw_system = FIELD_GET(IGC_TW_SYSTEM_100_MASK,
+						      rd32(IGC_EEE_SU)) * 500;
 			} else {
 				tw_system = (rd32(IGC_EEE_SU) &
 					     IGC_TW_SYSTEM_1000_MASK) * 500;
@@ -593,20 +593,11 @@ s32 igc_set_ltr_i225(struct igc_hw *hw, bool link)
 		size = rd32(IGC_RXPBS) &
 		       IGC_RXPBS_SIZE_I225_MASK;
 
-		/* Calculations vary based on DMAC settings. */
-		if (rd32(IGC_DMACR) & IGC_DMACR_DMAC_EN) {
-			size -= (rd32(IGC_DMACR) &
-				 IGC_DMACR_DMACTHR_MASK) >>
-				 IGC_DMACR_DMACTHR_SHIFT;
-			/* Convert size to bits. */
-			size *= 1024 * 8;
-		} else {
-			/* Convert size to bytes, subtract the MTU, and then
-			 * convert the size to bits.
-			 */
-			size *= 1024;
-			size *= 8;
-		}
+		/* Convert size to bytes, subtract the MTU, and then
+		 * convert the size to bits.
+		 */
+		size *= 1024;
+		size *= 8;
 
 		if (size < 0) {
 			hw_dbg("Invalid effective Rx buffer size %d\n",

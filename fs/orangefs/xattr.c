@@ -554,9 +554,7 @@ static const struct xattr_handler orangefs_xattr_default_handler = {
 	.set = orangefs_xattr_set_default,
 };
 
-const struct xattr_handler *orangefs_xattr_handlers[] = {
-	&posix_acl_access_xattr_handler,
-	&posix_acl_default_xattr_handler,
+const struct xattr_handler * const orangefs_xattr_handlers[] = {
 	&orangefs_xattr_default_handler,
 	NULL
 };

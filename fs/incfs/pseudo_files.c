@@ -265,8 +265,8 @@ static int dir_relative_path_resolve(
 		goto out;
 	}
 
-	error = user_path_at_empty(dir_fd, relative_path,
-		LOOKUP_FOLLOW | LOOKUP_DIRECTORY, result_path, NULL);
+	error = user_path_at(dir_fd, relative_path,
+		LOOKUP_FOLLOW | LOOKUP_DIRECTORY, result_path);
 
 out:
 	close_fd(dir_fd);
@@ -919,10 +919,10 @@ static long ioctl_get_read_timeouts(struct mount_info *mi, void __user *arg)
 	if (copy_from_user(&args, args_usr_ptr, sizeof(args)))
 		return -EINVAL;
 
-	if (args.timeouts_array_size_out > INCFS_DATA_FILE_BLOCK_SIZE)
+	if (args.timeouts_array_size > INCFS_DATA_FILE_BLOCK_SIZE)
 		return -EINVAL;
 
-	buffer = kzalloc(args.timeouts_array_size_out, GFP_NOFS);
+	buffer = kzalloc(args.timeouts_array_size, GFP_NOFS);
 	if (!buffer)
 		return -ENOMEM;
 
@@ -1074,7 +1074,7 @@ static ssize_t log_read(struct file *f, char __user *buf, size_t len,
 	int rl_size;
 	ssize_t result = 0;
 	bool report_uid;
-	unsigned long page = 0;
+	void *page = 0;
 	struct incfs_pending_read_info *reads_buf = NULL;
 	struct incfs_pending_read_info2 *reads_buf2 = NULL;
 	size_t record_size;
@@ -1087,13 +1087,13 @@ static ssize_t log_read(struct file *f, char __user *buf, size_t len,
 	report_uid = mi->mi_options.report_uid;
 	record_size = report_uid ? sizeof(*reads_buf2) : sizeof(*reads_buf);
 	reads_to_collect = len / record_size;
-	reads_per_page = PAGE_SIZE / record_size;
+	reads_per_page = INCFS_DATA_FILE_BLOCK_SIZE / record_size;
 
 	rl_size = READ_ONCE(mi->mi_log.rl_size);
 	if (rl_size == 0)
 		return 0;
 
-	page = __get_free_page(GFP_NOFS);
+	page = kzalloc(INCFS_DATA_FILE_BLOCK_SIZE, GFP_NOFS);
 	if (!page)
 		return -ENOMEM;
 
@@ -1117,7 +1117,7 @@ static ssize_t log_read(struct file *f, char __user *buf, size_t len,
 				       reads_collected;
 			goto out;
 		}
-		if (copy_to_user(buf, (void *)page,
+		if (copy_to_user(buf, page,
 				 reads_collected * record_size)) {
 			result = total_reads_collected ?
 				       total_reads_collected * record_size :
@@ -1134,7 +1134,7 @@ static ssize_t log_read(struct file *f, char __user *buf, size_t len,
 	result = total_reads_collected * record_size;
 	*ppos = 0;
 out:
-	free_page(page);
+	kfree(page);
 	return result;
 }
 
@@ -1303,9 +1303,9 @@ static bool get_pseudo_inode(int ino, struct inode *inode)
 	if (i == ARRAY_SIZE(incfs_pseudo_file_inodes))
 		return false;
 
-	inode->i_ctime = (struct timespec64){};
-	inode->i_mtime = inode->i_ctime;
-	inode->i_atime = inode->i_ctime;
+	inode_set_mtime(inode, 0, 0);
+	inode_set_atime(inode, 0, 0);
+	inode_set_ctime(inode, 0, 0);
 	inode->i_size = 0;
 	inode->i_ino = ino;
 	inode->i_private = NULL;

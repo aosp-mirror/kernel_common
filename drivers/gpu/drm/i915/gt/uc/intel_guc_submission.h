@@ -15,7 +15,7 @@ struct intel_engine_cs;
 
 void intel_guc_submission_init_early(struct intel_guc *guc);
 int intel_guc_submission_init(struct intel_guc *guc);
-void intel_guc_submission_enable(struct intel_guc *guc);
+int intel_guc_submission_enable(struct intel_guc *guc);
 void intel_guc_submission_disable(struct intel_guc *guc);
 void intel_guc_submission_fini(struct intel_guc *guc);
 int intel_guc_preempt_work_create(struct intel_guc *guc);
@@ -37,6 +37,8 @@ int intel_guc_wait_for_pending_msg(struct intel_guc *guc,
 				   atomic_t *wait_var,
 				   bool interruptible,
 				   long timeout);
+
+void intel_guc_submission_flush_work(struct intel_guc *guc);
 
 static inline bool intel_guc_submission_is_supported(struct intel_guc *guc)
 {

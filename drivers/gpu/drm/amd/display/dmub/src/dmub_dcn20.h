@@ -197,10 +197,13 @@ void dmub_dcn20_setup_windows(struct dmub_srv *dmub,
 			      const struct dmub_window *cw3,
 			      const struct dmub_window *cw4,
 			      const struct dmub_window *cw5,
-			      const struct dmub_window *cw6);
+			      const struct dmub_window *cw6,
+			      const struct dmub_window *region6);
 
 void dmub_dcn20_setup_mailbox(struct dmub_srv *dmub,
 			      const struct dmub_region *inbox1);
+
+uint32_t dmub_dcn20_get_inbox1_wptr(struct dmub_srv *dmub);
 
 uint32_t dmub_dcn20_get_inbox1_rptr(struct dmub_srv *dmub);
 

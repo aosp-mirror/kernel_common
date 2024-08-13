@@ -43,12 +43,14 @@ mixed-build-prefix = $(if $(KBUILD_MIXED_TREE),$(KBUILD_MIXED_TREE)/)
 MODPOST = scripts/mod/modpost
 
 modpost-args =										\
+	$(if $(CONFIG_MODULES),-M)							\
 	$(if $(CONFIG_MODVERSIONS),-m)							\
 	$(if $(CONFIG_MODULE_SRCVERSION_ALL),-a)					\
 	$(if $(CONFIG_SECTION_MISMATCH_WARN_ONLY),,-E)					\
 	$(if $(KBUILD_MODPOST_WARN),-w)							\
 	$(if $(KBUILD_NSDEPS),-d $(MODULES_NSDEPS))					\
 	$(if $(CONFIG_MODULE_ALLOW_MISSING_NAMESPACE_IMPORTS)$(KBUILD_NSDEPS),-N)	\
+	$(if $(findstring 1, $(KBUILD_EXTRA_WARN)),-W)					\
 	-o $@
 
 modpost-deps := $(MODPOST)
@@ -63,6 +65,33 @@ endif
 ifdef KBUILD_MODULES
 modpost-args += -T $(MODORDER)
 modpost-deps += $(MODORDER)
+endif
+
+ifeq ($(CONFIG_MODULE_SCMVERSION),y)
+ifeq ($(KBUILD_EXTMOD),)
+module_srcpath := $(srctree)
+else
+# Get the external module's source path. KBUILD_EXTMOD could either be an
+# absolute path or relative path from $(srctree). This makes sure that we
+# aren't using a relative path from a separate working directory (O= or
+# KBUILD_OUTPUT) since that may not be the actual module's SCM project path. So
+# check the path relative to $(srctree) first.
+ifneq ($(realpath $(srctree)/$(KBUILD_EXTMOD) 2>/dev/null),)
+	module_srcpath := $(srctree)/$(KBUILD_EXTMOD)
+else
+	module_srcpath := $(KBUILD_EXTMOD)
+endif
+endif
+
+# Get the SCM version of the module. Sed verifies setlocalversion returns
+# a proper revision based on the SCM type, e.g. git, mercurial, or svn.
+# Note: relative M= paths are not supported when building the kernel out of the
+# srctree since setlocalversion won't be able to find the module srctree.
+module_scmversion := $(shell $(srctree)/scripts/setlocalversion $(module_srcpath) | \
+	sed -n 's/.*-\(\(g\|hg\)[a-fA-F0-9]\+\(-dirty\)\?\|svn[0-9]\+\).*/\1/p')
+ifneq ($(module_scmversion),)
+modpost-args += -v $(module_scmversion)
+endif
 endif
 
 ifeq ($(KBUILD_EXTMOD),)
@@ -100,6 +129,13 @@ ifndef KBUILD_MIXED_TREE
 targets += .vmlinux.objs
 .vmlinux.objs: vmlinux.a $(KBUILD_VMLINUX_LIBS) FORCE
 	$(call if_changed,vmlinux_objs)
+endif
+
+ifdef CONFIG_TRIM_UNUSED_KSYMS
+ksym-wl := $(CONFIG_UNUSED_KSYMS_WHITELIST)
+ksym-wl := $(if $(filter-out /%, $(ksym-wl)),$(if $(wildcard $(ksym-wl)),,$(srctree)/))$(ksym-wl)
+modpost-args += -t $(addprefix -u , $(ksym-wl))
+modpost-deps += $(ksym-wl)
 endif
 
 ifeq ($(wildcard vmlinux.o),)
@@ -142,7 +178,7 @@ else
 
 # set src + obj - they may be used in the modules's Makefile
 obj := $(KBUILD_EXTMOD)
-src := $(obj)
+src := $(if $(VPATH),$(VPATH)/)$(obj)
 
 # Include the module's Makefile to find KBUILD_EXTRA_SYMBOLS
 include $(kbuild-file)
@@ -160,16 +196,14 @@ modpost-args += -e $(addprefix -i , $(KBUILD_EXTRA_SYMBOLS))
 
 endif # ($(KBUILD_EXTMOD),)
 
-ifneq ($(missing-input),)
-modpost-args += -w
-endif
-
 quiet_cmd_modpost = MODPOST $@
       cmd_modpost = \
 	$(if $(missing-input), \
 		echo >&2 "WARNING: $(missing-input) is missing."; \
 		echo >&2 "         Modules may not have dependencies or modversions."; \
-		echo >&2 "         You may get many unresolved symbol warnings.";) \
+		echo >&2 "         You may get many unresolved symbol errors."; \
+		echo >&2 "         You can set KBUILD_MODPOST_WARN=1 to turn errors into warning"; \
+		echo >&2 "         if you want to proceed at your own risk.";) \
 	$(MODPOST) $(modpost-args)
 
 targets += $(output-symdump)

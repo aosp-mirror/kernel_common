@@ -40,7 +40,7 @@ static int rockchip_gem_iommu_map(struct rockchip_gem_object *rk_obj)
 
 	ret = iommu_map_sgtable(private->domain, rk_obj->dma_addr, rk_obj->sgt,
 				prot);
-	if (ret < rk_obj->base.size) {
+	if (ret < (ssize_t)rk_obj->base.size) {
 		DRM_ERROR("failed to map buffer: size=%zd request_size=%zd\n",
 			  ret, rk_obj->base.size);
 		ret = -ENOMEM;
@@ -251,8 +251,7 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
 	 * We allocated a struct page table for rk_obj, so clear
 	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
 	 */
-	vma->vm_flags |= VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
-	vma->vm_flags &= ~VM_PFNMAP;
+	vm_flags_mod(vma, VM_IO | VM_DONTEXPAND | VM_DONTDUMP, VM_PFNMAP);
 
 	vma->vm_page_prot = pgprot_writecombine(vm_get_page_prot(vma->vm_flags));
 	vma->vm_page_prot = pgprot_decrypted(vma->vm_page_prot);
@@ -261,9 +260,6 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
 		ret = rockchip_drm_gem_object_mmap_iommu(obj, vma);
 	else
 		ret = rockchip_drm_gem_object_mmap_dma(obj, vma);
-
-	if (ret)
-		drm_gem_vm_close(vma);
 
 	return ret;
 }
@@ -519,8 +515,14 @@ int rockchip_gem_prime_vmap(struct drm_gem_object *obj, struct iosys_map *map)
 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
 
 	if (rk_obj->pages) {
-		void *vaddr = vmap(rk_obj->pages, rk_obj->num_pages, VM_MAP,
-				  pgprot_writecombine(PAGE_KERNEL));
+		void *vaddr;
+
+		if (rk_obj->kvaddr)
+			vaddr = rk_obj->kvaddr;
+		else
+			vaddr = vmap(rk_obj->pages, rk_obj->num_pages, VM_MAP,
+				     pgprot_writecombine(PAGE_KERNEL));
+
 		if (!vaddr)
 			return -ENOMEM;
 		iosys_map_set_vaddr(map, vaddr);
@@ -540,7 +542,8 @@ void rockchip_gem_prime_vunmap(struct drm_gem_object *obj,
 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
 
 	if (rk_obj->pages) {
-		vunmap(map->vaddr);
+		if (map->vaddr != rk_obj->kvaddr)
+			vunmap(map->vaddr);
 		return;
 	}
 

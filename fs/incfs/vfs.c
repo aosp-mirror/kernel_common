@@ -101,10 +101,11 @@ static const struct inode_operations incfs_dir_inode_ops = {
 	.setattr = incfs_setattr,
 };
 
+WRAP_DIR_ITER(iterate_incfs_dir) // FIXME!
 static const struct file_operations incfs_dir_fops = {
 	.llseek = generic_file_llseek,
 	.read = generic_read_dir,
-	.iterate = iterate_incfs_dir,
+	.iterate_shared	= shared_iterate_incfs_dir,
 	.open = file_open,
 	.release = file_release,
 };
@@ -149,7 +150,7 @@ const struct file_operations incfs_file_ops = {
 	.release = file_release,
 	.read_iter = generic_file_read_iter,
 	.mmap = incfs_file_mmap,
-	.splice_read = generic_file_splice_read,
+	.splice_read = filemap_splice_read,
 	.llseek = generic_file_llseek,
 	.unlocked_ioctl = dispatch_ioctl,
 #ifdef CONFIG_COMPAT
@@ -359,9 +360,9 @@ static int inode_set(struct inode *inode, void *opaque)
 	ihold(backing_inode);
 	node->n_backing_inode = backing_inode;
 	node->n_mount_info = get_mount_info(inode->i_sb);
-	inode->i_ctime = backing_inode->i_ctime;
-	inode->i_mtime = backing_inode->i_mtime;
-	inode->i_atime = backing_inode->i_atime;
+	inode_set_ctime_to_ts(inode, inode_get_ctime(backing_inode));
+	inode_set_mtime_to_ts(inode, inode_get_mtime(backing_inode));
+	inode_set_atime_to_ts(inode, inode_get_atime(backing_inode));
 	inode->i_ino = backing_inode->i_ino;
 	if (backing_inode->i_ino < INCFS_START_INO_RANGE) {
 		pr_warn("incfs: ino conflict with backing FS %ld\n",
@@ -541,13 +542,15 @@ static int read_folio(struct file *f, struct folio *folio)
 	struct page *page = &folio->page;
 	loff_t offset = 0;
 	loff_t size = 0;
-	ssize_t bytes_to_read = 0;
-	ssize_t read_result = 0;
+	ssize_t total_read = 0;
 	struct data_file *df = get_incfs_data_file(f);
 	int result = 0;
 	void *page_start;
 	int block_index;
 	unsigned int delayed_min_us = 0;
+	struct mem_range tmp = {
+		.len = 2 * INCFS_DATA_FILE_BLOCK_SIZE
+	};
 
 	if (!df) {
 		SetPageError(page);
@@ -561,32 +564,39 @@ static int read_folio(struct file *f, struct folio *folio)
 		INCFS_DATA_FILE_BLOCK_SIZE;
 	size = df->df_size;
 
-	if (offset < size) {
-		struct mem_range tmp = {
-			.len = 2 * INCFS_DATA_FILE_BLOCK_SIZE
-		};
-		tmp.data = (u8 *)__get_free_pages(GFP_NOFS, get_order(tmp.len));
-		if (!tmp.data) {
-			read_result = -ENOMEM;
-			goto err;
-		}
-		bytes_to_read = min_t(loff_t, size - offset, PAGE_SIZE);
-
-		read_result = read_single_page_timeouts(df, f, block_index,
-					range(page_start, bytes_to_read), tmp,
-					&delayed_min_us);
-
-		free_pages((unsigned long)tmp.data, get_order(tmp.len));
-	} else {
-		bytes_to_read = 0;
-		read_result = 0;
+	tmp.data = kzalloc(tmp.len, GFP_NOFS);
+	if (!tmp.data) {
+		result = -ENOMEM;
+		goto err;
 	}
 
+	while (offset + total_read < size) {
+		ssize_t bytes_to_read = min_t(loff_t,
+					      size - offset - total_read,
+					      INCFS_DATA_FILE_BLOCK_SIZE);
+
+		result = read_single_page_timeouts(df, f, block_index,
+				range(page_start + total_read, bytes_to_read),
+				tmp, &delayed_min_us);
+		if (result < 0)
+			break;
+
+		total_read += result;
+		block_index++;
+
+		if (result < INCFS_DATA_FILE_BLOCK_SIZE)
+			break;
+		if (total_read == PAGE_SIZE)
+			break;
+	}
+	kfree(tmp.data);
 err:
-	if (read_result < 0)
-		result = read_result;
-	else if (read_result < PAGE_SIZE)
-		zero_user(page, read_result, PAGE_SIZE - read_result);
+	if (result < 0)
+		total_read = 0;
+	else
+		result = 0;
+	if (total_read < PAGE_SIZE)
+		zero_user(page, total_read, PAGE_SIZE - total_read);
 
 	if (result == 0)
 		SetPageUptodate(page);
@@ -770,8 +780,7 @@ static long ioctl_fill_blocks(struct file *f, void __user *arg)
 		return -EFAULT;
 
 	usr_fill_block_array = u64_to_user_ptr(fill_blocks.fill_blocks);
-	data_buf = (u8 *)__get_free_pages(GFP_NOFS | __GFP_COMP,
-					  get_order(data_buf_size));
+	data_buf = (u8 *)kzalloc(data_buf_size, GFP_NOFS);
 	if (!data_buf)
 		return -ENOMEM;
 
@@ -806,8 +815,7 @@ static long ioctl_fill_blocks(struct file *f, void __user *arg)
 			break;
 	}
 
-	if (data_buf)
-		free_pages((unsigned long)data_buf, get_order(data_buf_size));
+	kfree(data_buf);
 
 	if (complete)
 		handle_file_completed(f, df);
@@ -1669,7 +1677,7 @@ static int incfs_getattr(struct mnt_idmap *idmap, const struct path *path,
 {
 	struct inode *inode = d_inode(path->dentry);
 
-	generic_fillattr(idmap, inode, stat);
+	generic_fillattr(idmap, request_mask, inode, stat);
 
 	if (inode->i_ino < INCFS_START_INO_RANGE)
 		return 0;
@@ -1806,8 +1814,6 @@ struct dentry *incfs_mount_fs(struct file_system_type *type, int flags,
 	sb->s_blocksize = INCFS_DATA_FILE_BLOCK_SIZE;
 	sb->s_blocksize_bits = blksize_bits(sb->s_blocksize);
 	sb->s_xattr = incfs_xattr_ops;
-
-	BUILD_BUG_ON(PAGE_SIZE != INCFS_DATA_FILE_BLOCK_SIZE);
 
 	if (!dev_name) {
 		pr_err("incfs: Backing dir is not set, filesystem can't be mounted.\n");
@@ -1946,6 +1952,13 @@ void incfs_kill_sb(struct super_block *sb)
 
 	pr_debug("incfs: unmount\n");
 
+	/*
+	 * We must kill the super before freeing mi, since killing the super
+	 * triggers inode eviction, which triggers the final update of the
+	 * backing file, which uses certain information for mi
+	 */
+	kill_anon_super(sb);
+
 	if (mi) {
 		if (mi->mi_backing_dir_path.dentry)
 			dinode = d_inode(mi->mi_backing_dir_path.dentry);
@@ -1963,7 +1976,6 @@ void incfs_kill_sb(struct super_block *sb)
 		incfs_free_mount_info(mi);
 		sb->s_fs_info = NULL;
 	}
-	kill_anon_super(sb);
 }
 
 static int show_options(struct seq_file *m, struct dentry *root)

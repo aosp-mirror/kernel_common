@@ -28,7 +28,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
-#include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include <asm/dcr.h>
 #include <asm/dcr-regs.h>
 #include "adma.h"
@@ -4230,7 +4230,7 @@ out:
 /**
  * ppc440spe_adma_remove - remove the asynch device
  */
-static int ppc440spe_adma_remove(struct platform_device *ofdev)
+static void ppc440spe_adma_remove(struct platform_device *ofdev)
 {
 	struct ppc440spe_adma_device *adev = platform_get_drvdata(ofdev);
 	struct device_node *np = ofdev->dev.of_node;
@@ -4278,7 +4278,6 @@ static int ppc440spe_adma_remove(struct platform_device *ofdev)
 	of_address_to_resource(np, 0, &res);
 	release_mem_region(res.start, resource_size(&res));
 	kfree(adev);
-	return 0;
 }
 
 /*
@@ -4299,9 +4298,8 @@ static ssize_t devices_show(struct device_driver *dev, char *buf)
 	for (i = 0; i < PPC440SPE_ADMA_ENGINES_NUM; i++) {
 		if (ppc440spe_adma_devices[i] == -1)
 			continue;
-		size += scnprintf(buf + size, PAGE_SIZE - size,
-				 "PPC440SP(E)-ADMA.%d: %s\n", i,
-				 ppc_adma_errors[ppc440spe_adma_devices[i]]);
+		size += sysfs_emit_at(buf, size, "PPC440SP(E)-ADMA.%d: %s\n",
+				     i, ppc_adma_errors[ppc440spe_adma_devices[i]]);
 	}
 	return size;
 }
@@ -4309,9 +4307,8 @@ static DRIVER_ATTR_RO(devices);
 
 static ssize_t enable_show(struct device_driver *dev, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE,
-			"PPC440SP(e) RAID-6 capabilities are %sABLED.\n",
-			ppc440spe_r6_enabled ? "EN" : "DIS");
+	return sysfs_emit(buf, "PPC440SP(e) RAID-6 capabilities are %sABLED.\n",
+			  ppc440spe_r6_enabled ? "EN" : "DIS");
 }
 
 static ssize_t enable_store(struct device_driver *dev, const char *buf,
@@ -4362,7 +4359,7 @@ static ssize_t poly_show(struct device_driver *dev, char *buf)
 	reg &= 0xFF;
 #endif
 
-	size = snprintf(buf, PAGE_SIZE, "PPC440SP(e) RAID-6 driver "
+	size = sysfs_emit(buf, "PPC440SP(e) RAID-6 driver "
 			"uses 0x1%02x polynomial.\n", reg);
 	return size;
 }
@@ -4552,7 +4549,7 @@ MODULE_DEVICE_TABLE(of, ppc440spe_adma_of_match);
 
 static struct platform_driver ppc440spe_adma_driver = {
 	.probe = ppc440spe_adma_probe,
-	.remove = ppc440spe_adma_remove,
+	.remove_new = ppc440spe_adma_remove,
 	.driver = {
 		.name = "PPC440SP(E)-ADMA",
 		.of_match_table = ppc440spe_adma_of_match,

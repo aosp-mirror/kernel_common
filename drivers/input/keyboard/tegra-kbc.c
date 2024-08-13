@@ -14,7 +14,7 @@
 #include <linux/io.h>
 #include <linux/interrupt.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
+#include <linux/property.h>
 #include <linux/clk.h>
 #include <linux/slab.h>
 #include <linux/input/matrix_keypad.h>
@@ -504,8 +504,7 @@ static int tegra_kbc_parse_dt(struct tegra_kbc *kbc)
 	if (!of_property_read_u32(np, "nvidia,repeat-delay-ms", &prop))
 		kbc->repeat_cnt = prop;
 
-	if (of_find_property(np, "nvidia,needs-ghost-filter", NULL))
-		kbc->use_ghost_filter = true;
+	kbc->use_ghost_filter = of_property_present(np, "nvidia,needs-ghost-filter");
 
 	if (of_property_read_bool(np, "wakeup-source") ||
 	    of_property_read_bool(np, "nvidia,wakeup-source")) /* legacy */
@@ -598,15 +597,11 @@ MODULE_DEVICE_TABLE(of, tegra_kbc_of_match);
 static int tegra_kbc_probe(struct platform_device *pdev)
 {
 	struct tegra_kbc *kbc;
-	struct resource *res;
 	int err;
 	int num_rows = 0;
 	unsigned int debounce_cnt;
 	unsigned int scan_time_rows;
 	unsigned int keymap_rows;
-	const struct of_device_id *match;
-
-	match = of_match_device(tegra_kbc_of_match, &pdev->dev);
 
 	kbc = devm_kzalloc(&pdev->dev, sizeof(*kbc), GFP_KERNEL);
 	if (!kbc) {
@@ -615,7 +610,7 @@ static int tegra_kbc_probe(struct platform_device *pdev)
 	}
 
 	kbc->dev = &pdev->dev;
-	kbc->hw_support = match->data;
+	kbc->hw_support = device_get_match_data(&pdev->dev);
 	kbc->max_keys = kbc->hw_support->max_rows *
 				kbc->hw_support->max_columns;
 	kbc->num_rows_and_columns = kbc->hw_support->max_rows +
@@ -642,8 +637,7 @@ static int tegra_kbc_probe(struct platform_device *pdev)
 
 	timer_setup(&kbc->timer, tegra_kbc_keypress_timer, 0);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	kbc->mmio = devm_ioremap_resource(&pdev->dev, res);
+	kbc->mmio = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(kbc->mmio))
 		return PTR_ERR(kbc->mmio);
 

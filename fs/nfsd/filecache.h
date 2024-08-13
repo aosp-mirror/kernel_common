@@ -29,9 +29,8 @@ struct nfsd_file_mark {
  * never be dereferenced, only used for comparison.
  */
 struct nfsd_file {
-	struct rhash_head	nf_rhash;
-	struct list_head	nf_lru;
-	struct rcu_head		nf_rcu;
+	struct rhlist_head	nf_rlist;
+	void			*nf_inode;
 	struct file		*nf_file;
 	const struct cred	*nf_cred;
 	struct net		*nf_net;
@@ -40,10 +39,12 @@ struct nfsd_file {
 #define NFSD_FILE_REFERENCED	(2)
 #define NFSD_FILE_GC		(3)
 	unsigned long		nf_flags;
-	struct inode		*nf_inode;	/* don't deref */
 	refcount_t		nf_ref;
 	unsigned char		nf_may;
+
 	struct nfsd_file_mark	*nf_mark;
+	struct list_head	nf_lru;
+	struct rcu_head		nf_rcu;
 	ktime_t			nf_birthtime;
 };
 
@@ -55,6 +56,7 @@ void nfsd_file_cache_shutdown_net(struct net *net);
 void nfsd_file_put(struct nfsd_file *nf);
 struct nfsd_file *nfsd_file_get(struct nfsd_file *nf);
 void nfsd_file_close_inode_sync(struct inode *inode);
+void nfsd_file_net_dispose(struct nfsd_net *nn);
 bool nfsd_file_is_cached(struct inode *inode);
 __be32 nfsd_file_acquire_gc(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		  unsigned int may_flags, struct nfsd_file **nfp);

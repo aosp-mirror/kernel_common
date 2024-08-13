@@ -168,7 +168,7 @@ static umode_t adm1177_is_visible(const void *data,
 	return 0;
 }
 
-static const struct hwmon_channel_info *adm1177_info[] = {
+static const struct hwmon_channel_info * const adm1177_info[] = {
 	HWMON_CHANNEL_INFO(curr,
 			   HWMON_C_INPUT | HWMON_C_MAX_ALARM),
 	HWMON_CHANNEL_INFO(in,
@@ -238,7 +238,7 @@ static int adm1177_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id adm1177_id[] = {
-	{"adm1177", 0},
+	{"adm1177"},
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, adm1177_id);
@@ -250,12 +250,11 @@ static const struct of_device_id adm1177_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, adm1177_dt_ids);
 
 static struct i2c_driver adm1177_driver = {
-	.class = I2C_CLASS_HWMON,
 	.driver = {
 		.name = "adm1177",
 		.of_match_table = adm1177_dt_ids,
 	},
-	.probe_new = adm1177_probe,
+	.probe = adm1177_probe,
 	.id_table = adm1177_id,
 };
 module_i2c_driver(adm1177_driver);

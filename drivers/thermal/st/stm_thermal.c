@@ -14,8 +14,6 @@
 #include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_address.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/thermal.h>
 
@@ -303,7 +301,7 @@ static int stm_disable_irq(struct stm_thermal_sensor *sensor)
 
 static int stm_thermal_set_trips(struct thermal_zone_device *tz, int low, int high)
 {
-	struct stm_thermal_sensor *sensor = tz->devdata;
+	struct stm_thermal_sensor *sensor = thermal_zone_device_priv(tz);
 	u32 itr1, th;
 	int ret;
 
@@ -351,7 +349,7 @@ static int stm_thermal_set_trips(struct thermal_zone_device *tz, int low, int hi
 /* Callback to get temperature from HW */
 static int stm_thermal_get_temp(struct thermal_zone_device *tz, int *temp)
 {
-	struct stm_thermal_sensor *sensor = tz->devdata;
+	struct stm_thermal_sensor *sensor = thermal_zone_device_priv(tz);
 	u32 periods;
 	int freqM, ret;
 
@@ -558,7 +556,6 @@ static int stm_thermal_probe(struct platform_device *pdev)
 	 * Thermal_zone doesn't enable hwmon as default,
 	 * enable it here
 	 */
-	sensor->th_dev->tzp->no_hwmon = false;
 	ret = thermal_add_hwmon_sysfs(sensor->th_dev);
 	if (ret)
 		goto err_tz;
@@ -572,14 +569,12 @@ err_tz:
 	return ret;
 }
 
-static int stm_thermal_remove(struct platform_device *pdev)
+static void stm_thermal_remove(struct platform_device *pdev)
 {
 	struct stm_thermal_sensor *sensor = platform_get_drvdata(pdev);
 
 	stm_thermal_sensor_off(sensor);
 	thermal_remove_hwmon_sysfs(sensor->th_dev);
-
-	return 0;
 }
 
 static struct platform_driver stm_thermal_driver = {
@@ -589,7 +584,7 @@ static struct platform_driver stm_thermal_driver = {
 		.of_match_table = stm_thermal_of_match,
 	},
 	.probe		= stm_thermal_probe,
-	.remove		= stm_thermal_remove,
+	.remove_new	= stm_thermal_remove,
 };
 module_platform_driver(stm_thermal_driver);
 

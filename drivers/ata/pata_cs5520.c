@@ -94,7 +94,7 @@ static void cs5520_set_piomode(struct ata_port *ap, struct ata_device *adev)
 	cs5520_set_timings(ap, adev, adev->pio_mode);
 }
 
-static struct scsi_host_template cs5520_sht = {
+static const struct scsi_host_template cs5520_sht = {
 	ATA_BASE_SHT(DRV_NAME),
 	.sg_tablesize		= LIBATA_DUMB_MAX_PRD,
 	.dma_boundary		= ATA_DMA_BOUNDARY,
@@ -151,12 +151,6 @@ static int cs5520_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!host)
 		return -ENOMEM;
 
-	/* Perform set up for DMA */
-	if (pci_enable_device_io(pdev)) {
-		dev_err(&pdev->dev, "unable to configure BAR2.\n");
-		return -ENODEV;
-	}
-
 	if (dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32))) {
 		dev_err(&pdev->dev, "unable to configure DMA mask.\n");
 		return -ENODEV;
@@ -212,7 +206,7 @@ static int cs5520_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		if (rc)
 			return rc;
 
-		ata_port_desc(ap, "irq %d", irq[i]);
+		ata_port_desc_misc(ap, irq[i]);
 	}
 
 	return ata_host_register(host, &cs5520_sht);

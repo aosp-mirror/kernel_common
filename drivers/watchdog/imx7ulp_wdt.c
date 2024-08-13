@@ -9,7 +9,6 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
 #include <linux/watchdog.h>
@@ -24,6 +23,7 @@
 #define LPO_CLK_SHIFT		8
 #define WDOG_CS_CLK		(LPO_CLK << LPO_CLK_SHIFT)
 #define WDOG_CS_EN		BIT(7)
+#define WDOG_CS_INT_EN		BIT(6)
 #define WDOG_CS_UPDATE		BIT(5)
 #define WDOG_CS_WAIT		BIT(1)
 #define WDOG_CS_STOP		BIT(0)
@@ -63,6 +63,7 @@ struct imx7ulp_wdt_device {
 	void __iomem *base;
 	struct clk *clk;
 	bool post_rcs_wait;
+	bool ext_reset;
 	const struct imx_wdt_hw_feature *hw;
 };
 
@@ -286,6 +287,9 @@ static int imx7ulp_wdt_init(struct imx7ulp_wdt_device *wdt, unsigned int timeout
 	if (wdt->hw->prescaler_enable)
 		val |= WDOG_CS_PRES;
 
+	if (wdt->ext_reset)
+		val |= WDOG_CS_INT_EN;
+
 	do {
 		ret = _imx7ulp_wdt_init(wdt, timeout, val);
 		toval = readl(wdt->base + WDOG_TOVAL);
@@ -297,11 +301,6 @@ static int imx7ulp_wdt_init(struct imx7ulp_wdt_device *wdt, unsigned int timeout
 		return -EBUSY;
 
 	return ret;
-}
-
-static void imx7ulp_wdt_action(void *data)
-{
-	clk_disable_unprepare(data);
 }
 
 static int imx7ulp_wdt_probe(struct platform_device *pdev)
@@ -321,11 +320,14 @@ static int imx7ulp_wdt_probe(struct platform_device *pdev)
 	if (IS_ERR(imx7ulp_wdt->base))
 		return PTR_ERR(imx7ulp_wdt->base);
 
-	imx7ulp_wdt->clk = devm_clk_get(dev, NULL);
+	imx7ulp_wdt->clk = devm_clk_get_enabled(dev, NULL);
 	if (IS_ERR(imx7ulp_wdt->clk)) {
 		dev_err(dev, "Failed to get watchdog clock\n");
 		return PTR_ERR(imx7ulp_wdt->clk);
 	}
+
+	/* The WDOG may need to do external reset through dedicated pin */
+	imx7ulp_wdt->ext_reset = of_property_read_bool(dev->of_node, "fsl,ext-reset-output");
 
 	imx7ulp_wdt->post_rcs_wait = true;
 	if (of_device_is_compatible(dev->of_node,
@@ -335,14 +337,6 @@ static int imx7ulp_wdt_probe(struct platform_device *pdev)
 	} else {
 		dev_info(dev, "imx7ulp wdt probe\n");
 	}
-
-	ret = clk_prepare_enable(imx7ulp_wdt->clk);
-	if (ret)
-		return ret;
-
-	ret = devm_add_action_or_reset(dev, imx7ulp_wdt_action, imx7ulp_wdt->clk);
-	if (ret)
-		return ret;
 
 	wdog = &imx7ulp_wdt->wdd;
 	wdog->info = &imx7ulp_wdt_info;

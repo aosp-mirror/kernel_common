@@ -49,7 +49,6 @@
  */
 #define DEFAULT_DURATION_JIFFIES (6)
 
-static unsigned int target_mwait;
 static struct dentry *debug_dir;
 static bool poll_pkg_cstate_enable;
 
@@ -235,6 +234,12 @@ static int max_idle_set(const char *arg, const struct kernel_param *kp)
 		goto skip_limit_set;
 	}
 
+	if (!cpumask_available(idle_injection_cpu_mask)) {
+		ret = allocate_copy_idle_injection_mask(cpu_present_mask);
+		if (ret)
+			goto skip_limit_set;
+	}
+
 	if (check_invalid(idle_injection_cpu_mask, new_max_idle)) {
 		ret = -EINVAL;
 		goto skip_limit_set;
@@ -250,7 +255,7 @@ skip_limit_set:
 
 static const struct kernel_param_ops max_idle_ops = {
 	.set = max_idle_set,
-	.get = param_get_int,
+	.get = param_get_byte,
 };
 
 module_param_cb(max_idle, &max_idle_ops, &max_idle, 0644);
@@ -305,34 +310,6 @@ MODULE_PARM_DESC(window_size, "sliding window in number of clamping cycles\n"
 	"\tpowerclamp controls idle ratio within this window. larger\n"
 	"\twindow size results in slower response time but more smooth\n"
 	"\tclamping results. default to 2.");
-
-static void find_target_mwait(void)
-{
-	unsigned int eax, ebx, ecx, edx;
-	unsigned int highest_cstate = 0;
-	unsigned int highest_subcstate = 0;
-	int i;
-
-	if (boot_cpu_data.cpuid_level < CPUID_MWAIT_LEAF)
-		return;
-
-	cpuid(CPUID_MWAIT_LEAF, &eax, &ebx, &ecx, &edx);
-
-	if (!(ecx & CPUID5_ECX_EXTENSIONS_SUPPORTED) ||
-	    !(ecx & CPUID5_ECX_INTERRUPT_BREAK))
-		return;
-
-	edx >>= MWAIT_SUBSTATE_SIZE;
-	for (i = 0; i < 7 && edx; i++, edx >>= MWAIT_SUBSTATE_SIZE) {
-		if (edx & MWAIT_SUBSTATE_MASK) {
-			highest_cstate = i;
-			highest_subcstate = edx & MWAIT_SUBSTATE_MASK;
-		}
-	}
-	target_mwait = (highest_cstate << MWAIT_SUBSTATE_SIZE) |
-		(highest_subcstate - 1);
-
-}
 
 struct pkg_cstate_info {
 	bool skip;
@@ -610,7 +587,7 @@ static int powerclamp_idle_injection_register(void)
 	poll_pkg_cstate_enable = false;
 	if (cpumask_equal(cpu_present_mask, idle_injection_cpu_mask)) {
 		ii_dev = idle_inject_register_full(idle_injection_cpu_mask, idle_inject_update);
-		if (topology_max_packages() == 1 && topology_max_die_per_package() == 1)
+		if (topology_max_packages() == 1 && topology_max_dies_per_package() == 1)
 			poll_pkg_cstate_enable = true;
 	} else {
 		ii_dev = idle_inject_register(idle_injection_cpu_mask);
@@ -697,6 +674,10 @@ static int powerclamp_set_cur_state(struct thermal_cooling_device *cdev,
 
 	new_target_ratio = clamp(new_target_ratio, 0UL,
 				(unsigned long) (max_idle - 1));
+
+	if (powerclamp_data.target_ratio == new_target_ratio)
+		goto exit_set;
+
 	if (!powerclamp_data.target_ratio && new_target_ratio > 0) {
 		pr_info("Start idle injection to reduce power\n");
 		powerclamp_data.target_ratio = new_target_ratio;
@@ -749,9 +730,6 @@ static int __init powerclamp_probe(void)
 		return -ENODEV;
 	}
 
-	/* find the deepest mwait value */
-	find_target_mwait();
-
 	return 0;
 }
 
@@ -791,7 +769,8 @@ static int __init powerclamp_init(void)
 		return retval;
 
 	mutex_lock(&powerclamp_lock);
-	retval = allocate_copy_idle_injection_mask(cpu_present_mask);
+	if (!cpumask_available(idle_injection_cpu_mask))
+		retval = allocate_copy_idle_injection_mask(cpu_present_mask);
 	mutex_unlock(&powerclamp_lock);
 
 	if (retval)

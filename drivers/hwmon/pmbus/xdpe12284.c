@@ -164,9 +164,9 @@ static int xdpe122_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id xdpe122_id[] = {
-	{"xdpe11280", 0},
-	{"xdpe12254", 0},
-	{"xdpe12284", 0},
+	{"xdpe11280"},
+	{"xdpe12254"},
+	{"xdpe12284"},
 	{}
 };
 
@@ -185,7 +185,7 @@ static struct i2c_driver xdpe122_driver = {
 		.name = "xdpe12284",
 		.of_match_table = of_match_ptr(xdpe122_of_match),
 	},
-	.probe_new = xdpe122_probe,
+	.probe = xdpe122_probe,
 	.id_table = xdpe122_id,
 };
 

@@ -87,10 +87,8 @@ static int socfpga_clk_set_parent(struct clk_hw *hwclk, u8 parent)
 	return 0;
 }
 
-static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
-	unsigned long parent_rate)
+static u32 socfpga_clk_get_div(struct socfpga_gate_clk *socfpgaclk)
 {
-	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
 	u32 div = 1, val;
 
 	if (socfpgaclk->fixed_div)
@@ -105,11 +103,33 @@ static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
 			div = (1 << val);
 	}
 
+	return div;
+}
+
+static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
+					     unsigned long parent_rate)
+{
+	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
+	u32 div = socfpga_clk_get_div(socfpgaclk);
+
 	return parent_rate / div;
+}
+
+
+static int socfpga_clk_determine_rate(struct clk_hw *hwclk,
+				      struct clk_rate_request *req)
+{
+	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
+	u32 div = socfpga_clk_get_div(socfpgaclk);
+
+	req->rate = req->best_parent_rate / div;
+
+	return 0;
 }
 
 static struct clk_ops gateclk_ops = {
 	.recalc_rate = socfpga_clk_recalc_rate,
+	.determine_rate = socfpga_clk_determine_rate,
 	.get_parent = socfpga_clk_get_parent,
 	.set_parent = socfpga_clk_set_parent,
 };
@@ -126,17 +146,14 @@ void __init socfpga_gate_init(struct device_node *node)
 	struct clk_init_data init;
 	struct clk_ops *ops;
 	int rc;
-	int err;
 
 	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
 	if (WARN_ON(!socfpga_clk))
 		return;
 
 	ops = kmemdup(&gateclk_ops, sizeof(gateclk_ops), GFP_KERNEL);
-	if (WARN_ON(!ops)) {
-		kfree(socfpga_clk);
-		return;
-	}
+	if (WARN_ON(!ops))
+		goto err_kmemdup;
 
 	rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
 	if (rc)
@@ -182,13 +199,25 @@ void __init socfpga_gate_init(struct device_node *node)
 
 	hw_clk = &socfpga_clk->hw.hw;
 
-	err = clk_hw_register(NULL, hw_clk);
-	if (err) {
-		kfree(ops);
-		kfree(socfpga_clk);
-		return;
+	rc = clk_hw_register(NULL, hw_clk);
+	if (rc) {
+		pr_err("Could not register clock:%s\n", clk_name);
+		goto err_clk_hw_register;
 	}
-	rc = of_clk_add_provider(node, of_clk_src_simple_get, hw_clk);
-	if (WARN_ON(rc))
-		return;
+
+	rc = of_clk_add_hw_provider(node, of_clk_hw_simple_get, hw_clk);
+	if (rc) {
+		pr_err("Could not register clock provider for node:%s\n",
+		       clk_name);
+		goto err_of_clk_add_hw_provider;
+	}
+
+	return;
+
+err_of_clk_add_hw_provider:
+	clk_hw_unregister(hw_clk);
+err_clk_hw_register:
+	kfree(ops);
+err_kmemdup:
+	kfree(socfpga_clk);
 }

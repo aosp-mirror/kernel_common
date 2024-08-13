@@ -4,13 +4,49 @@
 #define BTRFS_FS_H
 
 #include <linux/blkdev.h>
-#include <linux/fs.h>
-#include <linux/btrfs_tree.h>
 #include <linux/sizes.h>
+#include <linux/time64.h>
+#include <linux/compiler.h>
+#include <linux/math.h>
+#include <linux/atomic.h>
+#include <linux/percpu_counter.h>
+#include <linux/completion.h>
+#include <linux/lockdep.h>
+#include <linux/spinlock.h>
+#include <linux/mutex.h>
+#include <linux/rwlock_types.h>
+#include <linux/rwsem.h>
+#include <linux/semaphore.h>
+#include <linux/list.h>
+#include <linux/radix-tree.h>
+#include <linux/workqueue.h>
+#include <linux/wait.h>
+#include <linux/wait_bit.h>
+#include <linux/sched.h>
+#include <linux/rbtree.h>
+#include <uapi/linux/btrfs.h>
+#include <uapi/linux/btrfs_tree.h>
 #include "extent-io-tree.h"
-#include "extent_map.h"
 #include "async-thread.h"
 #include "block-rsv.h"
+#include "fs.h"
+
+struct inode;
+struct super_block;
+struct kobject;
+struct reloc_control;
+struct crypto_shash;
+struct ulist;
+struct btrfs_device;
+struct btrfs_block_group;
+struct btrfs_root;
+struct btrfs_fs_devices;
+struct btrfs_transaction;
+struct btrfs_delayed_root;
+struct btrfs_balance_control;
+struct btrfs_subpage_info;
+struct btrfs_stripe_hash_table;
+struct btrfs_space_info;
 
 #define BTRFS_MAX_EXTENT_SIZE SZ_128M
 
@@ -25,6 +61,18 @@
 static_assert(sizeof(struct btrfs_super_block) == BTRFS_SUPER_INFO_SIZE);
 
 /*
+ * Number of metadata items necessary for an unlink operation:
+ *
+ * 1 for the possible orphan item
+ * 1 for the dir item
+ * 1 for the dir index
+ * 1 for the inode ref
+ * 1 for the inode
+ * 1 for the parent inode
+ */
+#define BTRFS_UNLINK_METADATA_UNITS		6
+
+/*
  * The reserved space at the beginning of each device.  It covers the primary
  * super block and leaves space for potential use by other tools like
  * bootloaders or to lower potential damage of accidental overwrite.
@@ -34,8 +82,6 @@ static_assert(sizeof(struct btrfs_super_block) == BTRFS_SUPER_INFO_SIZE);
  * Runtime (in-memory) states of filesystem
  */
 enum {
-	/* Global indicator of serious filesystem errors */
-	BTRFS_FS_STATE_ERROR,
 	/*
 	 * Filesystem is being remounted, allow to skip some operations, like
 	 * defrag
@@ -120,17 +166,20 @@ enum {
 	/* Indicate that we want to commit the transaction. */
 	BTRFS_FS_NEED_TRANS_COMMIT,
 
-	/*
-	 * Indicate metadata over-commit is disabled. This is set when active
-	 * zone tracking is needed.
-	 */
-	BTRFS_FS_NO_OVERCOMMIT,
+	/* This is set when active zone tracking is needed. */
+	BTRFS_FS_ACTIVE_ZONE_TRACKING,
 
 	/*
 	 * Indicate if we have some features changed, this is mostly for
 	 * cleaner thread to update the sysfs interface.
 	 */
 	BTRFS_FS_FEATURE_CHANGED,
+
+	/*
+	 * Indicate that we have found a tree block which is only aligned to
+	 * sectorsize, but not to nodesize.  This should be rare nowadays.
+	 */
+	BTRFS_FS_UNALIGNED_TREE_BLOCK,
 
 #if BITS_PER_LONG == 32
 	/* Indicate if we have error/warn message printed on 32bit systems */
@@ -164,19 +213,18 @@ enum {
 	BTRFS_MOUNT_AUTO_DEFRAG			= (1UL << 16),
 	BTRFS_MOUNT_USEBACKUPROOT		= (1UL << 17),
 	BTRFS_MOUNT_SKIP_BALANCE		= (1UL << 18),
-	BTRFS_MOUNT_CHECK_INTEGRITY		= (1UL << 19),
-	BTRFS_MOUNT_CHECK_INTEGRITY_DATA	= (1UL << 20),
-	BTRFS_MOUNT_PANIC_ON_FATAL_ERROR	= (1UL << 21),
-	BTRFS_MOUNT_RESCAN_UUID_TREE		= (1UL << 22),
-	BTRFS_MOUNT_FRAGMENT_DATA		= (1UL << 23),
-	BTRFS_MOUNT_FRAGMENT_METADATA		= (1UL << 24),
-	BTRFS_MOUNT_FREE_SPACE_TREE		= (1UL << 25),
-	BTRFS_MOUNT_NOLOGREPLAY			= (1UL << 26),
-	BTRFS_MOUNT_REF_VERIFY			= (1UL << 27),
-	BTRFS_MOUNT_DISCARD_ASYNC		= (1UL << 28),
-	BTRFS_MOUNT_IGNOREBADROOTS		= (1UL << 29),
-	BTRFS_MOUNT_IGNOREDATACSUMS		= (1UL << 30),
-	BTRFS_MOUNT_NODISCARD			= (1UL << 31),
+	BTRFS_MOUNT_PANIC_ON_FATAL_ERROR	= (1UL << 19),
+	BTRFS_MOUNT_RESCAN_UUID_TREE		= (1UL << 20),
+	BTRFS_MOUNT_FRAGMENT_DATA		= (1UL << 21),
+	BTRFS_MOUNT_FRAGMENT_METADATA		= (1UL << 22),
+	BTRFS_MOUNT_FREE_SPACE_TREE		= (1UL << 23),
+	BTRFS_MOUNT_NOLOGREPLAY			= (1UL << 24),
+	BTRFS_MOUNT_REF_VERIFY			= (1UL << 25),
+	BTRFS_MOUNT_DISCARD_ASYNC		= (1UL << 26),
+	BTRFS_MOUNT_IGNOREBADROOTS		= (1UL << 27),
+	BTRFS_MOUNT_IGNOREDATACSUMS		= (1UL << 28),
+	BTRFS_MOUNT_NODISCARD			= (1UL << 29),
+	BTRFS_MOUNT_NOSPACECACHE		= (1UL << 30),
 };
 
 /*
@@ -196,11 +244,7 @@ enum {
 #define BTRFS_FEATURE_COMPAT_RO_SAFE_SET	0ULL
 #define BTRFS_FEATURE_COMPAT_RO_SAFE_CLEAR	0ULL
 
-#ifdef CONFIG_BTRFS_DEBUG
-/*
- * Extent tree v2 supported only with CONFIG_BTRFS_DEBUG
- */
-#define BTRFS_FEATURE_INCOMPAT_SUPP			\
+#define BTRFS_FEATURE_INCOMPAT_SUPP_STABLE		\
 	(BTRFS_FEATURE_INCOMPAT_MIXED_BACKREF |		\
 	 BTRFS_FEATURE_INCOMPAT_DEFAULT_SUBVOL |	\
 	 BTRFS_FEATURE_INCOMPAT_MIXED_GROUPS |		\
@@ -214,22 +258,23 @@ enum {
 	 BTRFS_FEATURE_INCOMPAT_METADATA_UUID	|	\
 	 BTRFS_FEATURE_INCOMPAT_RAID1C34	|	\
 	 BTRFS_FEATURE_INCOMPAT_ZONED		|	\
+	 BTRFS_FEATURE_INCOMPAT_SIMPLE_QUOTA)
+
+#ifdef CONFIG_BTRFS_DEBUG
+	/*
+	 * Features under developmen like Extent tree v2 support is enabled
+	 * only under CONFIG_BTRFS_DEBUG.
+	 */
+#define BTRFS_FEATURE_INCOMPAT_SUPP		\
+	(BTRFS_FEATURE_INCOMPAT_SUPP_STABLE |	\
+	 BTRFS_FEATURE_INCOMPAT_RAID_STRIPE_TREE | \
 	 BTRFS_FEATURE_INCOMPAT_EXTENT_TREE_V2)
+
 #else
-#define BTRFS_FEATURE_INCOMPAT_SUPP			\
-	(BTRFS_FEATURE_INCOMPAT_MIXED_BACKREF |		\
-	 BTRFS_FEATURE_INCOMPAT_DEFAULT_SUBVOL |	\
-	 BTRFS_FEATURE_INCOMPAT_MIXED_GROUPS |		\
-	 BTRFS_FEATURE_INCOMPAT_BIG_METADATA |		\
-	 BTRFS_FEATURE_INCOMPAT_COMPRESS_LZO |		\
-	 BTRFS_FEATURE_INCOMPAT_COMPRESS_ZSTD |		\
-	 BTRFS_FEATURE_INCOMPAT_RAID56 |		\
-	 BTRFS_FEATURE_INCOMPAT_EXTENDED_IREF |		\
-	 BTRFS_FEATURE_INCOMPAT_SKINNY_METADATA |	\
-	 BTRFS_FEATURE_INCOMPAT_NO_HOLES	|	\
-	 BTRFS_FEATURE_INCOMPAT_METADATA_UUID	|	\
-	 BTRFS_FEATURE_INCOMPAT_RAID1C34	|	\
-	 BTRFS_FEATURE_INCOMPAT_ZONED)
+
+#define BTRFS_FEATURE_INCOMPAT_SUPP		\
+	(BTRFS_FEATURE_INCOMPAT_SUPP_STABLE)
+
 #endif
 
 #define BTRFS_FEATURE_INCOMPAT_SAFE_SET			\
@@ -367,6 +412,7 @@ struct btrfs_fs_info {
 	struct btrfs_root *uuid_root;
 	struct btrfs_root *data_reloc_root;
 	struct btrfs_root *block_group_root;
+	struct btrfs_root *stripe_root;
 
 	/* The log root tree is a directory of all the other log roots */
 	struct btrfs_root *log_root_tree;
@@ -389,7 +435,8 @@ struct btrfs_fs_info {
 	struct extent_io_tree excluded_extents;
 
 	/* logical->physical extent mapping */
-	struct extent_map_tree mapping_tree;
+	struct rb_root_cached mapping_tree;
+	rwlock_t mapping_tree_lock;
 
 	/*
 	 * Block reservation for extent, checksum, root tree and delayed dir
@@ -407,7 +454,17 @@ struct btrfs_fs_info {
 
 	struct btrfs_block_rsv empty_block_rsv;
 
+	/*
+	 * Updated while holding the lock 'trans_lock'. Due to the life cycle of
+	 * a transaction, it can be directly read while holding a transaction
+	 * handle, everywhere else must be read with btrfs_get_fs_generation().
+	 * Should always be updated using btrfs_set_fs_generation().
+	 */
 	u64 generation;
+	/*
+	 * Always use btrfs_get_last_trans_committed() and
+	 * btrfs_set_last_trans_committed() to read and update this field.
+	 */
 	u64 last_trans_committed;
 	/*
 	 * Generation of the last transaction used for block group relocation
@@ -415,7 +472,6 @@ struct btrfs_fs_info {
 	 * Must be written and read while holding btrfs_fs_info::commit_root_sem.
 	 */
 	u64 last_reloc_trans;
-	u64 avg_delayed_ref_runtime;
 
 	/*
 	 * This is updated to the current trans every time a full commit is
@@ -540,7 +596,6 @@ struct btrfs_fs_info {
 	 * A third pool does submit_bio to avoid deadlocking with the other two.
 	 */
 	struct btrfs_workqueue *workers;
-	struct btrfs_workqueue *hipri_workers;
 	struct btrfs_workqueue *delalloc_workers;
 	struct btrfs_workqueue *flush_workers;
 	struct workqueue_struct *endio_workers;
@@ -574,6 +629,12 @@ struct btrfs_fs_info {
 	s32 dirty_metadata_batch;
 	s32 delalloc_batch;
 
+	struct percpu_counter evictable_extent_maps;
+	spinlock_t extent_map_shrinker_lock;
+	u64 extent_map_shrinker_last_root;
+	u64 extent_map_shrinker_last_ino;
+
+	/* Protected by 'trans_lock'. */
 	struct list_head dirty_cowonly_roots;
 
 	struct btrfs_fs_devices *fs_devices;
@@ -640,15 +701,10 @@ struct btrfs_fs_info {
 	 */
 	refcount_t scrub_workers_refcnt;
 	struct workqueue_struct *scrub_workers;
-	struct workqueue_struct *scrub_wr_completion_workers;
-	struct workqueue_struct *scrub_parity_workers;
 	struct btrfs_subpage_info *subpage_info;
 
 	struct btrfs_discard_ctl discard_ctl;
 
-#ifdef CONFIG_BTRFS_FS_CHECK_INTEGRITY
-	u32 check_integrity_print_mask;
-#endif
 	/* Is qgroup tracking in a consistent state? */
 	u64 qgroup_flags;
 
@@ -684,6 +740,13 @@ struct btrfs_fs_info {
 	/* Protected by qgroup_rescan_lock */
 	bool qgroup_rescan_running;
 	u8 qgroup_drop_subtree_thres;
+	u64 qgroup_enable_gen;
+
+	/*
+	 * If this is not 0, then it indicates a serious filesystem error has
+	 * happened and it contains that error (negative errno value).
+	 */
+	int fs_error;
 
 	/* Filesystem state */
 	unsigned long fs_state;
@@ -710,10 +773,13 @@ struct btrfs_fs_info {
 
 	/* Reclaim partially filled block groups in the background */
 	struct work_struct reclaim_bgs_work;
+	/* Protected by unused_bgs_lock. */
 	struct list_head reclaim_bgs;
 	int bg_reclaim_threshold;
 
+	/* Protects the lists unused_bgs and reclaim_bgs. */
 	spinlock_t unused_bgs_lock;
+	/* Protected by unused_bgs_lock. */
 	struct list_head unused_bgs;
 	struct mutex unused_bg_unpin_mutex;
 	/* Protect block groups that are going to be deleted */
@@ -765,6 +831,9 @@ struct btrfs_fs_info {
 	u64 data_reloc_bg;
 	struct mutex zoned_data_reloc_io_lock;
 
+	struct btrfs_block_group *active_meta_bg;
+	struct btrfs_block_group *active_system_bg;
+
 	u64 nr_global_roots;
 
 	spinlock_t zone_active_bgs_lock;
@@ -804,6 +873,37 @@ struct btrfs_fs_info {
 #endif
 };
 
+#define page_to_inode(_page)	(BTRFS_I(_Generic((_page),			\
+					  struct page *: (_page))->mapping->host))
+#define folio_to_inode(_folio)	(BTRFS_I(_Generic((_folio),			\
+					  struct folio *: (_folio))->mapping->host))
+
+#define page_to_fs_info(_page)	 (page_to_inode(_page)->root->fs_info)
+#define folio_to_fs_info(_folio) (folio_to_inode(_folio)->root->fs_info)
+
+#define inode_to_fs_info(_inode) (BTRFS_I(_Generic((_inode),			\
+					   struct inode *: (_inode)))->root->fs_info)
+
+static inline u64 btrfs_get_fs_generation(const struct btrfs_fs_info *fs_info)
+{
+	return READ_ONCE(fs_info->generation);
+}
+
+static inline void btrfs_set_fs_generation(struct btrfs_fs_info *fs_info, u64 gen)
+{
+	WRITE_ONCE(fs_info->generation, gen);
+}
+
+static inline u64 btrfs_get_last_trans_committed(const struct btrfs_fs_info *fs_info)
+{
+	return READ_ONCE(fs_info->last_trans_committed);
+}
+
+static inline void btrfs_set_last_trans_committed(struct btrfs_fs_info *fs_info, u64 gen)
+{
+	WRITE_ONCE(fs_info->last_trans_committed, gen);
+}
+
 static inline void btrfs_set_last_root_drop_gen(struct btrfs_fs_info *fs_info,
 						u64 gen)
 {
@@ -831,7 +931,7 @@ static inline u64 btrfs_csum_bytes_to_leaves(
  * Use this if we would be adding new items, as we could split nodes as we cow
  * down the tree.
  */
-static inline u64 btrfs_calc_insert_metadata_size(struct btrfs_fs_info *fs_info,
+static inline u64 btrfs_calc_insert_metadata_size(const struct btrfs_fs_info *fs_info,
 						  unsigned num_items)
 {
 	return (u64)fs_info->nodesize * BTRFS_MAX_LEVEL * 2 * num_items;
@@ -841,7 +941,7 @@ static inline u64 btrfs_calc_insert_metadata_size(struct btrfs_fs_info *fs_info,
  * Doing a truncate or a modification won't result in new nodes or leaves, just
  * what we need for COW.
  */
-static inline u64 btrfs_calc_metadata_size(struct btrfs_fs_info *fs_info,
+static inline u64 btrfs_calc_metadata_size(const struct btrfs_fs_info *fs_info,
 						 unsigned num_items)
 {
 	return (u64)fs_info->nodesize * BTRFS_MAX_LEVEL * num_items;
@@ -852,7 +952,7 @@ static inline u64 btrfs_calc_metadata_size(struct btrfs_fs_info *fs_info,
 
 static inline bool btrfs_is_zoned(const struct btrfs_fs_info *fs_info)
 {
-	return fs_info->zone_size > 0;
+	return IS_ENABLED(CONFIG_BLK_DEV_ZONED) && fs_info->zone_size > 0;
 }
 
 /*
@@ -876,6 +976,8 @@ void btrfs_exclop_start_unlock(struct btrfs_fs_info *fs_info);
 void btrfs_exclop_finish(struct btrfs_fs_info *fs_info);
 void btrfs_exclop_balance(struct btrfs_fs_info *fs_info,
 			  enum btrfs_exclusive_operation op);
+
+int btrfs_check_ioctl_vol_args_path(const struct btrfs_ioctl_vol_args *vol_args);
 
 /* Compatibility and incompatibility defines */
 void __btrfs_set_fs_incompat(struct btrfs_fs_info *fs_info, u64 flag,
@@ -917,20 +1019,6 @@ void __btrfs_clear_fs_compat_ro(struct btrfs_fs_info *fs_info, u64 flag,
 #define btrfs_test_opt(fs_info, opt)	((fs_info)->mount_opt & \
 					 BTRFS_MOUNT_##opt)
 
-#define btrfs_set_and_info(fs_info, opt, fmt, args...)			\
-do {									\
-	if (!btrfs_test_opt(fs_info, opt))				\
-		btrfs_info(fs_info, fmt, ##args);			\
-	btrfs_set_opt(fs_info->mount_opt, opt);				\
-} while (0)
-
-#define btrfs_clear_and_info(fs_info, opt, fmt, args...)		\
-do {									\
-	if (btrfs_test_opt(fs_info, opt))				\
-		btrfs_info(fs_info, fmt, ##args);			\
-	btrfs_clear_opt(fs_info->mount_opt, opt);			\
-} while (0)
-
 static inline int btrfs_fs_closing(struct btrfs_fs_info *fs_info)
 {
 	/* Do it this way so we only ever do one test_bit in the normal case. */
@@ -961,8 +1049,8 @@ static inline void btrfs_wake_unfinished_drop(struct btrfs_fs_info *fs_info)
 	clear_and_wake_up_bit(BTRFS_FS_UNFINISHED_DROPS, &fs_info->flags);
 }
 
-#define BTRFS_FS_ERROR(fs_info)	(unlikely(test_bit(BTRFS_FS_STATE_ERROR, \
-						   &(fs_info)->fs_state)))
+#define BTRFS_FS_ERROR(fs_info)	(READ_ONCE((fs_info)->fs_error))
+
 #define BTRFS_FS_LOG_CLEANUP_ERROR(fs_info)				\
 	(unlikely(test_bit(BTRFS_FS_STATE_LOG_CLEANUP_ERROR,		\
 			   &(fs_info)->fs_state)))

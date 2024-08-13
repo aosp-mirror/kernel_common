@@ -14,52 +14,24 @@ properties:
   compatible:
     oneOf:
       # Deprecated compatible strings
-      - items:
-          - enum:
-              - solomon,ssd1305fb-i2c
-              - solomon,ssd1306fb-i2c
-              - solomon,ssd1307fb-i2c
-              - solomon,ssd1309fb-i2c
+      - enum:
+          - solomon,ssd1305fb-i2c
+          - solomon,ssd1306fb-i2c
+          - solomon,ssd1307fb-i2c
+          - solomon,ssd1309fb-i2c
         deprecated: true
-      - items:
-          - enum:
-              - sinowealth,sh1106
-              - solomon,ssd1305
-              - solomon,ssd1306
-              - solomon,ssd1307
-              - solomon,ssd1309
-
-  reg:
-    maxItems: 1
+      - enum:
+          - sinowealth,sh1106
+          - solomon,ssd1305
+          - solomon,ssd1306
+          - solomon,ssd1307
+          - solomon,ssd1309
 
   pwms:
     maxItems: 1
 
-  reset-gpios:
-    maxItems: 1
-
-  # Only required for SPI
-  dc-gpios:
-    description:
-      GPIO connected to the controller's D/C# (Data/Command) pin,
-      that is needed for 4-wire SPI to tell the controller if the
-      data sent is for a command register or the display data RAM
-    maxItems: 1
-
   vbat-supply:
     description: The supply for VBAT
-
-  solomon,height:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    default: 16
-    description:
-      Height in pixel of the screen driven by the controller
-
-  solomon,width:
-    $ref: /schemas/types.yaml#/definitions/uint32
-    default: 96
-    description:
-      Width in pixel of the screen driven by the controller
 
   solomon,page-offset:
     $ref: /schemas/types.yaml#/definitions/uint32
@@ -150,7 +122,7 @@ required:
   - reg
 
 allOf:
-  - $ref: /schemas/spi/spi-peripheral-props.yaml#
+  - $ref: solomon,ssd-common.yaml#
 
   - if:
       properties:
@@ -159,6 +131,10 @@ allOf:
             const: sinowealth,sh1106
     then:
       properties:
+        solomon,width:
+          default: 132
+        solomon,height:
+          default: 64
         solomon,dclk-div:
           default: 1
         solomon,dclk-frq:
@@ -173,6 +149,10 @@ allOf:
               - solomon,ssd1305
     then:
       properties:
+        solomon,width:
+          default: 132
+        solomon,height:
+          default: 64
         solomon,dclk-div:
           default: 1
         solomon,dclk-frq:
@@ -187,6 +167,10 @@ allOf:
               - solomon,ssd1306
     then:
       properties:
+        solomon,width:
+          default: 128
+        solomon,height:
+          default: 64
         solomon,dclk-div:
           default: 1
         solomon,dclk-frq:
@@ -201,6 +185,10 @@ allOf:
               - solomon,ssd1307
     then:
       properties:
+        solomon,width:
+          default: 128
+        solomon,height:
+          default: 39
         solomon,dclk-div:
           default: 2
         solomon,dclk-frq:
@@ -217,6 +205,10 @@ allOf:
               - solomon,ssd1309
     then:
       properties:
+        solomon,width:
+          default: 128
+        solomon,height:
+          default: 64
         solomon,dclk-div:
           default: 1
         solomon,dclk-frq:
@@ -226,7 +218,7 @@ unevaluatedProperties: false
 
 examples:
   - |
-    i2c1 {
+    i2c {
             #address-cells = <1>;
             #size-cells = <0>;
 
@@ -239,7 +231,7 @@ examples:
 
             ssd1306_i2c: oled@3d {
                     compatible = "solomon,ssd1306";
-                    reg = <0x3c>;
+                    reg = <0x3d>;
                     pwms = <&pwm 4 3000>;
                     reset-gpios = <&gpio2 7>;
                     solomon,com-lrremap;

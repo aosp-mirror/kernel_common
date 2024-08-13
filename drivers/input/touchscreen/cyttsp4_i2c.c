@@ -50,7 +50,7 @@ static void cyttsp4_i2c_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id cyttsp4_i2c_id[] = {
-	{ CYTTSP4_I2C_NAME, 0 },
+	{ CYTTSP4_I2C_NAME },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, cyttsp4_i2c_id);
@@ -58,9 +58,9 @@ MODULE_DEVICE_TABLE(i2c, cyttsp4_i2c_id);
 static struct i2c_driver cyttsp4_i2c_driver = {
 	.driver = {
 		.name	= CYTTSP4_I2C_NAME,
-		.pm	= &cyttsp4_pm_ops,
+		.pm	= pm_ptr(&cyttsp4_pm_ops),
 	},
-	.probe_new	= cyttsp4_i2c_probe,
+	.probe		= cyttsp4_i2c_probe,
 	.remove		= cyttsp4_i2c_remove,
 	.id_table	= cyttsp4_i2c_id,
 };

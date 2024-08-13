@@ -193,7 +193,6 @@ struct ssam_device_driver {
 
 #ifdef CONFIG_SURFACE_AGGREGATOR_BUS
 
-extern struct bus_type ssam_bus_type;
 extern const struct device_type ssam_device_type;
 
 /**
@@ -229,10 +228,7 @@ static inline bool is_ssam_device(struct device *d)
  * Return: Returns a pointer to the &struct ssam_device wrapping the given
  * device @d.
  */
-static inline struct ssam_device *to_ssam_device(struct device *d)
-{
-	return container_of(d, struct ssam_device, dev);
-}
+#define to_ssam_device(d)	container_of_const(d, struct ssam_device, dev)
 
 /**
  * to_ssam_device_driver() - Casts the given device driver to a SSAM client
@@ -246,11 +242,7 @@ static inline struct ssam_device *to_ssam_device(struct device *d)
  * Return: Returns the pointer to the &struct ssam_device_driver wrapping the
  * given device driver @d.
  */
-static inline
-struct ssam_device_driver *to_ssam_device_driver(struct device_driver *d)
-{
-	return container_of(d, struct ssam_device_driver, driver);
-}
+#define to_ssam_device_driver(d)	container_of_const(d, struct ssam_device_driver, driver)
 
 const struct ssam_device_id *ssam_device_id_match(const struct ssam_device_id *table,
 						  const struct ssam_device_uid uid);

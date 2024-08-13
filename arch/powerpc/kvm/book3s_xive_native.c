@@ -324,7 +324,7 @@ static int kvmppc_xive_native_mmap(struct kvm_device *dev,
 		return -EINVAL;
 	}
 
-	vma->vm_flags |= VM_IO | VM_PFNMAP;
+	vm_flags_set(vma, VM_IO | VM_PFNMAP);
 	vma->vm_page_prot = pgprot_noncached_wc(vma->vm_page_prot);
 
 	/*
@@ -567,7 +567,7 @@ static int kvmppc_xive_native_set_queue_config(struct kvmppc_xive *xive,
 	u8 priority;
 	struct kvm_ppc_xive_eq kvm_eq;
 	int rc;
-	__be32 *qaddr = 0;
+	__be32 *qaddr = NULL;
 	struct page *page;
 	struct xive_q *q;
 	gfn_t gfn;

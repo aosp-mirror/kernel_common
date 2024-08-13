@@ -191,9 +191,8 @@ static int sa1100dog_probe(struct platform_device *pdev)
 	if (!res)
 		return -ENXIO;
 	reg_base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-	ret = PTR_ERR_OR_ZERO(reg_base);
-	if (ret)
-		return ret;
+	if (!reg_base)
+		return -ENOMEM;
 
 	clk = clk_get(NULL, "OSTIMER0");
 	if (IS_ERR(clk)) {
@@ -229,19 +228,17 @@ err:
 	return ret;
 }
 
-static int sa1100dog_remove(struct platform_device *pdev)
+static void sa1100dog_remove(struct platform_device *pdev)
 {
 	misc_deregister(&sa1100dog_miscdev);
 	clk_disable_unprepare(clk);
 	clk_put(clk);
-
-	return 0;
 }
 
 static struct platform_driver sa1100dog_driver = {
 	.driver.name = "sa1100_wdt",
 	.probe	  = sa1100dog_probe,
-	.remove	  = sa1100dog_remove,
+	.remove_new	  = sa1100dog_remove,
 };
 module_platform_driver(sa1100dog_driver);
 

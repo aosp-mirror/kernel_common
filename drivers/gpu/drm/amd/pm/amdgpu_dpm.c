@@ -36,6 +36,8 @@
 #define amdgpu_dpm_enable_bapm(adev, e) \
 		((adev)->powerplay.pp_funcs->enable_bapm((adev)->powerplay.pp_handle, (e)))
 
+#define amdgpu_dpm_is_legacy_dpm(adev) ((adev)->powerplay.pp_handle == (adev))
+
 int amdgpu_dpm_get_sclk(struct amdgpu_device *adev, bool low)
 {
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
@@ -91,6 +93,7 @@ int amdgpu_dpm_set_powergating_by_smu(struct amdgpu_device *adev, uint32_t block
 	case AMD_IP_BLOCK_TYPE_JPEG:
 	case AMD_IP_BLOCK_TYPE_GMC:
 	case AMD_IP_BLOCK_TYPE_ACP:
+	case AMD_IP_BLOCK_TYPE_VPE:
 		if (pp_funcs && pp_funcs->set_powergating_by_smu)
 			ret = (pp_funcs->set_powergating_by_smu(
 				(adev)->powerplay.pp_handle, block_type, gate));
@@ -178,15 +181,32 @@ int amdgpu_dpm_set_mp1_state(struct amdgpu_device *adev,
 	return ret;
 }
 
-bool amdgpu_dpm_is_baco_supported(struct amdgpu_device *adev)
+int amdgpu_dpm_notify_rlc_state(struct amdgpu_device *adev, bool en)
+{
+	int ret = 0;
+	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+
+	if (pp_funcs && pp_funcs->notify_rlc_state) {
+		mutex_lock(&adev->pm.mutex);
+
+		ret = pp_funcs->notify_rlc_state(
+				adev->powerplay.pp_handle,
+				en);
+
+		mutex_unlock(&adev->pm.mutex);
+	}
+
+	return ret;
+}
+
+int amdgpu_dpm_is_baco_supported(struct amdgpu_device *adev)
 {
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
 	void *pp_handle = adev->powerplay.pp_handle;
-	bool baco_cap;
-	int ret = 0;
+	int ret;
 
 	if (!pp_funcs || !pp_funcs->get_asic_baco_capability)
-		return false;
+		return 0;
 	/* Don't use baco for reset in S3.
 	 * This is a workaround for some platforms
 	 * where entering BACO during suspend
@@ -197,16 +217,15 @@ bool amdgpu_dpm_is_baco_supported(struct amdgpu_device *adev)
 	 * devices.  Needs more investigation.
 	 */
 	if (adev->in_s3)
-		return false;
+		return 0;
 
 	mutex_lock(&adev->pm.mutex);
 
-	ret = pp_funcs->get_asic_baco_capability(pp_handle,
-						 &baco_cap);
+	ret = pp_funcs->get_asic_baco_capability(pp_handle);
 
 	mutex_unlock(&adev->pm.mutex);
 
-	return ret ? false : baco_cap;
+	return ret;
 }
 
 int amdgpu_dpm_mode2_reset(struct amdgpu_device *adev)
@@ -221,6 +240,24 @@ int amdgpu_dpm_mode2_reset(struct amdgpu_device *adev)
 	mutex_lock(&adev->pm.mutex);
 
 	ret = pp_funcs->asic_reset_mode_2(pp_handle);
+
+	mutex_unlock(&adev->pm.mutex);
+
+	return ret;
+}
+
+int amdgpu_dpm_enable_gfx_features(struct amdgpu_device *adev)
+{
+	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+	void *pp_handle = adev->powerplay.pp_handle;
+	int ret = 0;
+
+	if (!pp_funcs || !pp_funcs->asic_reset_enable_gfx_features)
+		return -ENOENT;
+
+	mutex_lock(&adev->pm.mutex);
+
+	ret = pp_funcs->asic_reset_enable_gfx_features(pp_handle);
 
 	mutex_unlock(&adev->pm.mutex);
 
@@ -331,14 +368,43 @@ int amdgpu_dpm_set_df_cstate(struct amdgpu_device *adev,
 	return ret;
 }
 
-int amdgpu_dpm_allow_xgmi_power_down(struct amdgpu_device *adev, bool en)
+int amdgpu_dpm_get_xgmi_plpd_mode(struct amdgpu_device *adev, char **mode_desc)
 {
 	struct smu_context *smu = adev->powerplay.pp_handle;
-	int ret = 0;
+	int mode = XGMI_PLPD_NONE;
+
+	if (is_support_sw_smu(adev)) {
+		mode = smu->plpd_mode;
+		if (mode_desc == NULL)
+			return mode;
+		switch (smu->plpd_mode) {
+		case XGMI_PLPD_DISALLOW:
+			*mode_desc = "disallow";
+			break;
+		case XGMI_PLPD_DEFAULT:
+			*mode_desc = "default";
+			break;
+		case XGMI_PLPD_OPTIMIZED:
+			*mode_desc = "optimized";
+			break;
+		case XGMI_PLPD_NONE:
+		default:
+			*mode_desc = "none";
+			break;
+		}
+	}
+
+	return mode;
+}
+
+int amdgpu_dpm_set_xgmi_plpd_mode(struct amdgpu_device *adev, int mode)
+{
+	struct smu_context *smu = adev->powerplay.pp_handle;
+	int ret = -EOPNOTSUPP;
 
 	if (is_support_sw_smu(adev)) {
 		mutex_lock(&adev->pm.mutex);
-		ret = smu_allow_xgmi_power_down(smu, en);
+		ret = smu_set_xgmi_plpd_mode(smu, mode);
 		mutex_unlock(&adev->pm.mutex);
 	}
 
@@ -438,6 +504,34 @@ int amdgpu_dpm_read_sensor(struct amdgpu_device *adev, enum amd_pp_sensors senso
 	return ret;
 }
 
+int amdgpu_dpm_get_apu_thermal_limit(struct amdgpu_device *adev, uint32_t *limit)
+{
+	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+	int ret = -EOPNOTSUPP;
+
+	if (pp_funcs && pp_funcs->get_apu_thermal_limit) {
+		mutex_lock(&adev->pm.mutex);
+		ret = pp_funcs->get_apu_thermal_limit(adev->powerplay.pp_handle, limit);
+		mutex_unlock(&adev->pm.mutex);
+	}
+
+	return ret;
+}
+
+int amdgpu_dpm_set_apu_thermal_limit(struct amdgpu_device *adev, uint32_t limit)
+{
+	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+	int ret = -EOPNOTSUPP;
+
+	if (pp_funcs && pp_funcs->set_apu_thermal_limit) {
+		mutex_lock(&adev->pm.mutex);
+		ret = pp_funcs->set_apu_thermal_limit(adev->powerplay.pp_handle, limit);
+		mutex_unlock(&adev->pm.mutex);
+	}
+
+	return ret;
+}
+
 void amdgpu_dpm_compute_clocks(struct amdgpu_device *adev)
 {
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
@@ -522,6 +616,16 @@ void amdgpu_dpm_enable_jpeg(struct amdgpu_device *adev, bool enable)
 			  enable ? "enable" : "disable", ret);
 }
 
+void amdgpu_dpm_enable_vpe(struct amdgpu_device *adev, bool enable)
+{
+	int ret = 0;
+
+	ret = amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_VPE, !enable);
+	if (ret)
+		DRM_ERROR("Dpm %s vpe failed, ret = %d.\n",
+			  enable ? "enable" : "disable", ret);
+}
+
 int amdgpu_pm_load_smu_firmware(struct amdgpu_device *adev, uint32_t *smu_version)
 {
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
@@ -584,6 +688,21 @@ int amdgpu_dpm_send_hbm_bad_channel_flag(struct amdgpu_device *adev, uint32_t si
 
 	mutex_lock(&adev->pm.mutex);
 	ret = smu_send_hbm_bad_channel_flag(smu, size);
+	mutex_unlock(&adev->pm.mutex);
+
+	return ret;
+}
+
+int amdgpu_dpm_send_rma_reason(struct amdgpu_device *adev)
+{
+	struct smu_context *smu = adev->powerplay.pp_handle;
+	int ret;
+
+	if (!is_support_sw_smu(adev))
+		return -EOPNOTSUPP;
+
+	mutex_lock(&adev->pm.mutex);
+	ret = smu_send_rma_reason(smu);
 	mutex_unlock(&adev->pm.mutex);
 
 	return ret;
@@ -1104,7 +1223,7 @@ int amdgpu_dpm_get_sclk_od(struct amdgpu_device *adev)
 	int ret = 0;
 
 	if (!pp_funcs->get_sclk_od)
-		return 0;
+		return -EOPNOTSUPP;
 
 	mutex_lock(&adev->pm.mutex);
 	ret = pp_funcs->get_sclk_od(adev->powerplay.pp_handle);
@@ -1118,7 +1237,7 @@ int amdgpu_dpm_set_sclk_od(struct amdgpu_device *adev, uint32_t value)
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
 
 	if (is_support_sw_smu(adev))
-		return 0;
+		return -EOPNOTSUPP;
 
 	mutex_lock(&adev->pm.mutex);
 	if (pp_funcs->set_sclk_od)
@@ -1141,7 +1260,7 @@ int amdgpu_dpm_get_mclk_od(struct amdgpu_device *adev)
 	int ret = 0;
 
 	if (!pp_funcs->get_mclk_od)
-		return 0;
+		return -EOPNOTSUPP;
 
 	mutex_lock(&adev->pm.mutex);
 	ret = pp_funcs->get_mclk_od(adev->powerplay.pp_handle);
@@ -1155,7 +1274,7 @@ int amdgpu_dpm_set_mclk_od(struct amdgpu_device *adev, uint32_t value)
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
 
 	if (is_support_sw_smu(adev))
-		return 0;
+		return -EOPNOTSUPP;
 
 	mutex_lock(&adev->pm.mutex);
 	if (pp_funcs->set_mclk_od)
@@ -1218,6 +1337,23 @@ int amdgpu_dpm_get_gpu_metrics(struct amdgpu_device *adev, void **table)
 	mutex_lock(&adev->pm.mutex);
 	ret = pp_funcs->get_gpu_metrics(adev->powerplay.pp_handle,
 					table);
+	mutex_unlock(&adev->pm.mutex);
+
+	return ret;
+}
+
+ssize_t amdgpu_dpm_get_pm_metrics(struct amdgpu_device *adev, void *pm_metrics,
+				  size_t size)
+{
+	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+	int ret = 0;
+
+	if (!pp_funcs->get_pm_metrics)
+		return -EOPNOTSUPP;
+
+	mutex_lock(&adev->pm.mutex);
+	ret = pp_funcs->get_pm_metrics(adev->powerplay.pp_handle, pm_metrics,
+				       size);
 	mutex_unlock(&adev->pm.mutex);
 
 	return ret;
@@ -1414,15 +1550,24 @@ int amdgpu_dpm_get_smu_prv_buf_details(struct amdgpu_device *adev,
 
 int amdgpu_dpm_is_overdrive_supported(struct amdgpu_device *adev)
 {
-	struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
-	struct smu_context *smu = adev->powerplay.pp_handle;
+	if (is_support_sw_smu(adev)) {
+		struct smu_context *smu = adev->powerplay.pp_handle;
 
-	if ((is_support_sw_smu(adev) && smu->od_enabled) ||
-	    (is_support_sw_smu(adev) && smu->is_apu) ||
-		(!is_support_sw_smu(adev) && hwmgr->od_enabled))
-		return true;
+		return (smu->od_enabled || smu->is_apu);
+	} else {
+		struct pp_hwmgr *hwmgr;
 
-	return false;
+		/*
+		 * dpm on some legacy asics don't carry od_enabled member
+		 * as its pp_handle is casted directly from adev.
+		 */
+		if (amdgpu_dpm_is_legacy_dpm(adev))
+			return false;
+
+		hwmgr = (struct pp_hwmgr *)adev->powerplay.pp_handle;
+
+		return hwmgr->od_enabled;
+	}
 }
 
 int amdgpu_dpm_set_pp_table(struct amdgpu_device *adev,

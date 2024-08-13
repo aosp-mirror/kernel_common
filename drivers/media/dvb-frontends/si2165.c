@@ -19,7 +19,7 @@
 #include <linux/regmap.h>
 
 #include <media/dvb_frontend.h>
-#include <media/dvb_math.h>
+#include <linux/int_log.h>
 #include "si2165_priv.h"
 #include "si2165.h"
 
@@ -513,10 +513,8 @@ static int si2165_upload_firmware(struct si2165_state *state)
 	ret = 0;
 	state->firmware_loaded = true;
 error:
-	if (fw) {
-		release_firmware(fw);
-		fw = NULL;
-	}
+	release_firmware(fw);
+	fw = NULL;
 
 	return ret;
 }
@@ -1292,7 +1290,7 @@ static struct i2c_driver si2165_driver = {
 	.driver = {
 		.name	= "si2165",
 	},
-	.probe_new	= si2165_probe,
+	.probe		= si2165_probe,
 	.remove		= si2165_remove,
 	.id_table	= si2165_id_table,
 };

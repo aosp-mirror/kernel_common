@@ -423,7 +423,7 @@ static int translate_temp(u16 val)
 
 static int tegra_thermctl_get_temp(struct thermal_zone_device *tz, int *out_temp)
 {
-	struct tegra_thermctl_zone *zone = tz->devdata;
+	struct tegra_thermctl_zone *zone = thermal_zone_device_priv(tz);
 	u32 val;
 
 	val = readl(zone->reg);
@@ -582,23 +582,18 @@ static int tsensor_group_thermtrip_get(struct tegra_soctherm *ts, int id)
 	return temp;
 }
 
-static int tegra_thermctl_set_trip_temp(struct thermal_zone_device *tz, int trip_id, int temp)
+static int tegra_thermctl_set_trip_temp(struct thermal_zone_device *tz,
+					const struct thermal_trip *trip, int temp)
 {
-	struct tegra_thermctl_zone *zone = tz->devdata;
+	struct tegra_thermctl_zone *zone = thermal_zone_device_priv(tz);
 	struct tegra_soctherm *ts = zone->ts;
-	struct thermal_trip trip;
 	const struct tegra_tsensor_group *sg = zone->sg;
 	struct device *dev = zone->dev;
-	int ret;
 
 	if (!tz)
 		return -EINVAL;
 
-	ret = __thermal_zone_get_trip(tz, trip_id, &trip);
-	if (ret)
-		return ret;
-
-	if (trip.type == THERMAL_TRIP_CRITICAL) {
+	if (trip->type == THERMAL_TRIP_CRITICAL) {
 		/*
 		 * If thermtrips property is set in DT,
 		 * doesn't need to program critical type trip to HW,
@@ -609,7 +604,7 @@ static int tegra_thermctl_set_trip_temp(struct thermal_zone_device *tz, int trip
 		else
 			return 0;
 
-	} else if (trip.type == THERMAL_TRIP_HOT) {
+	} else if (trip->type == THERMAL_TRIP_HOT) {
 		int i;
 
 		for (i = 0; i < THROTTLE_SIZE; i++) {
@@ -620,7 +615,7 @@ static int tegra_thermctl_set_trip_temp(struct thermal_zone_device *tz, int trip
 				continue;
 
 			cdev = ts->throt_cfgs[i].cdev;
-			if (get_thermal_instance(tz, cdev, trip_id))
+			if (thermal_trip_is_bound_to_cdev(tz, trip, cdev))
 				stc = find_throttle_cfg_by_name(ts, cdev->type);
 			else
 				continue;
@@ -658,7 +653,7 @@ static void thermal_irq_disable(struct tegra_thermctl_zone *zn)
 
 static int tegra_thermctl_set_trips(struct thermal_zone_device *tz, int lo, int hi)
 {
-	struct tegra_thermctl_zone *zone = tz->devdata;
+	struct tegra_thermctl_zone *zone = thermal_zone_device_priv(tz);
 	u32 r;
 
 	thermal_irq_disable(zone);
@@ -2219,15 +2214,13 @@ disable_clocks:
 	return err;
 }
 
-static int tegra_soctherm_remove(struct platform_device *pdev)
+static void tegra_soctherm_remove(struct platform_device *pdev)
 {
 	struct tegra_soctherm *tegra = platform_get_drvdata(pdev);
 
 	debugfs_remove_recursive(tegra->debugfs_dir);
 
 	soctherm_clk_enable(pdev, false);
-
-	return 0;
 }
 
 static int __maybe_unused soctherm_suspend(struct device *dev)
@@ -2274,7 +2267,7 @@ static SIMPLE_DEV_PM_OPS(tegra_soctherm_pm, soctherm_suspend, soctherm_resume);
 
 static struct platform_driver tegra_soctherm_driver = {
 	.probe = tegra_soctherm_probe,
-	.remove = tegra_soctherm_remove,
+	.remove_new = tegra_soctherm_remove,
 	.driver = {
 		.name = "tegra_soctherm",
 		.pm = &tegra_soctherm_pm,

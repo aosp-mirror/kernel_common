@@ -40,7 +40,7 @@ void intel_pps_vdd_off_sync(struct intel_dp *intel_dp);
 bool intel_pps_have_panel_power_or_vdd(struct intel_dp *intel_dp);
 void intel_pps_wait_power_cycle(struct intel_dp *intel_dp);
 
-void intel_pps_init(struct intel_dp *intel_dp);
+bool intel_pps_init(struct intel_dp *intel_dp);
 void intel_pps_init_late(struct intel_dp *intel_dp);
 void intel_pps_encoder_reset(struct intel_dp *intel_dp);
 void intel_pps_reset_all(struct drm_i915_private *i915);
@@ -50,6 +50,8 @@ void vlv_pps_init(struct intel_encoder *encoder,
 
 void intel_pps_unlock_regs_wa(struct drm_i915_private *i915);
 void intel_pps_setup(struct drm_i915_private *i915);
+
+void intel_pps_connector_debugfs_add(struct intel_connector *connector);
 
 void assert_pps_unlocked(struct drm_i915_private *i915, enum pipe pipe);
 

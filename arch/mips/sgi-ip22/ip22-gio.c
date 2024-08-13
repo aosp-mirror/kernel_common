@@ -12,7 +12,7 @@
 #include <asm/sgi/mc.h>
 #include <asm/sgi/ip22.h>
 
-static struct bus_type gio_bus_type;
+static const struct bus_type gio_bus_type;
 
 static struct {
 	const char *name;
@@ -199,9 +199,9 @@ static struct attribute *gio_dev_attrs[] = {
 };
 ATTRIBUTE_GROUPS(gio_dev);
 
-static int gio_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int gio_device_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	struct gio_device *gio_dev = to_gio_device(dev);
+	const struct gio_device *gio_dev = to_gio_device(dev);
 
 	add_uevent_var(env, "MODALIAS=gio:%x", gio_dev->id.id);
 	return 0;
@@ -378,7 +378,7 @@ static void ip22_check_gio(int slotno, unsigned long addr, int irq)
 		printk(KERN_INFO "GIO: slot %d : Empty\n", slotno);
 }
 
-static struct bus_type gio_bus_type = {
+static const struct bus_type gio_bus_type = {
 	.name	   = "gio",
 	.dev_groups = gio_dev_groups,
 	.match	   = gio_bus_match,

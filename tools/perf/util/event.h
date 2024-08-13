@@ -89,7 +89,8 @@ enum {
 	 PERF_MEM_S(LVL, NA) |\
 	 PERF_MEM_S(SNOOP, NA) |\
 	 PERF_MEM_S(LOCK, NA) |\
-	 PERF_MEM_S(TLB, NA))
+	 PERF_MEM_S(TLB, NA) |\
+	 PERF_MEM_S(LVLNUM, NA))
 
 /* Attribute type for custom synthesized events */
 #define PERF_TYPE_SYNTH		(INT_MAX + 1U)
@@ -359,6 +360,8 @@ size_t perf_event__fprintf(union perf_event *event, struct machine *machine, FIL
 
 int kallsyms__get_function_start(const char *kallsyms_filename,
 				 const char *symbol_name, u64 *addr);
+int kallsyms__get_symbol_start(const char *kallsyms_filename,
+			       const char *symbol_name, u64 *addr);
 
 void event_attr_init(struct perf_event_attr *attr);
 

@@ -12,8 +12,7 @@
 #include <linux/mailbox_client.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
-#include <linux/of_address.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/platform_device.h>
 #include <linux/pm_domain.h>
@@ -27,6 +26,14 @@
 #include "remoteproc_internal.h"
 
 #define DSP_RPROC_CLK_MAX			5
+
+/*
+ * Module parameters
+ */
+static unsigned int no_mailboxes;
+module_param_named(no_mailboxes, no_mailboxes, int, 0644);
+MODULE_PARM_DESC(no_mailboxes,
+		 "There is no mailbox between cores, so ignore remote proc reply after start, default is 0 (off).");
 
 #define REMOTE_IS_READY				BIT(0)
 #define REMOTE_READY_WAIT_MAX_RETRIES		500
@@ -96,12 +103,10 @@ enum imx_dsp_rp_mbox_messages {
  * @tx_ch: mailbox tx channel handle
  * @rx_ch: mailbox rx channel handle
  * @rxdb_ch: mailbox rx doorbell channel handle
- * @pd_dev: power domain device
- * @pd_dev_link: power domain device link
+ * @pd_list: power domain list
  * @ipc_handle: System Control Unit ipc handle
  * @rproc_work: work for processing virtio interrupts
  * @pm_comp: completion primitive to sync for suspend response
- * @num_domains: power domain number
  * @flags: control flags
  */
 struct imx_dsp_rproc {
@@ -114,12 +119,10 @@ struct imx_dsp_rproc {
 	struct mbox_chan			*tx_ch;
 	struct mbox_chan			*rx_ch;
 	struct mbox_chan			*rxdb_ch;
-	struct device				**pd_dev;
-	struct device_link			**pd_dev_link;
+	struct dev_pm_domain_list		*pd_list;
 	struct imx_sc_ipc			*ipc_handle;
 	struct work_struct			rproc_work;
 	struct completion			pm_comp;
-	int					num_domains;
 	u32					flags;
 };
 
@@ -171,6 +174,9 @@ static const struct imx_rproc_att imx_dsp_rproc_att_imx8ulp[] = {
 	{ 0x0c000000, 0x80000000, 0x10000000, 0},
 	{ 0x30000000, 0x90000000, 0x10000000, 0},
 };
+
+/* Initialize the mailboxes between cores, if exists */
+static int (*imx_dsp_rproc_mbox_init)(struct imx_dsp_rproc *priv);
 
 /* Reset function for DSP on i.MX8MP */
 static int imx8mp_dsp_reset(struct imx_dsp_rproc *priv)
@@ -492,12 +498,12 @@ static void imx_dsp_rproc_rxdb_callback(struct mbox_client *cl, void *data)
 }
 
 /**
- * imx_dsp_rproc_mbox_init() - request mailbox channels
+ * imx_dsp_rproc_mbox_alloc() - request mailbox channels
  * @priv: private data pointer
  *
  * Request three mailbox channels (tx, rx, rxdb).
  */
-static int imx_dsp_rproc_mbox_init(struct imx_dsp_rproc *priv)
+static int imx_dsp_rproc_mbox_alloc(struct imx_dsp_rproc *priv)
 {
 	struct device *dev = priv->rproc->dev.parent;
 	struct mbox_client *cl;
@@ -519,7 +525,7 @@ static int imx_dsp_rproc_mbox_init(struct imx_dsp_rproc *priv)
 		ret = PTR_ERR(priv->tx_ch);
 		dev_dbg(cl->dev, "failed to request tx mailbox channel: %d\n",
 			ret);
-		goto err_out;
+		return ret;
 	}
 
 	/* Channel for receiving message */
@@ -528,7 +534,7 @@ static int imx_dsp_rproc_mbox_init(struct imx_dsp_rproc *priv)
 		ret = PTR_ERR(priv->rx_ch);
 		dev_dbg(cl->dev, "failed to request rx mailbox channel: %d\n",
 			ret);
-		goto err_out;
+		goto free_channel_tx;
 	}
 
 	cl = &priv->cl_rxdb;
@@ -544,20 +550,28 @@ static int imx_dsp_rproc_mbox_init(struct imx_dsp_rproc *priv)
 		ret = PTR_ERR(priv->rxdb_ch);
 		dev_dbg(cl->dev, "failed to request mbox chan rxdb, ret %d\n",
 			ret);
-		goto err_out;
+		goto free_channel_rx;
 	}
 
 	return 0;
 
-err_out:
-	if (!IS_ERR(priv->tx_ch))
-		mbox_free_channel(priv->tx_ch);
-	if (!IS_ERR(priv->rx_ch))
-		mbox_free_channel(priv->rx_ch);
-	if (!IS_ERR(priv->rxdb_ch))
-		mbox_free_channel(priv->rxdb_ch);
-
+free_channel_rx:
+	mbox_free_channel(priv->rx_ch);
+free_channel_tx:
+	mbox_free_channel(priv->tx_ch);
 	return ret;
+}
+
+/*
+ * imx_dsp_rproc_mbox_no_alloc()
+ *
+ * Empty function for no mailbox between cores
+ *
+ * Always return 0
+ */
+static int imx_dsp_rproc_mbox_no_alloc(struct imx_dsp_rproc *priv)
+{
+	return 0;
 }
 
 static void imx_dsp_rproc_free_mbox(struct imx_dsp_rproc *priv)
@@ -627,15 +641,19 @@ static int imx_dsp_rproc_add_carveout(struct imx_dsp_rproc *priv)
 
 		rmem = of_reserved_mem_lookup(it.node);
 		if (!rmem) {
+			of_node_put(it.node);
 			dev_err(dev, "unable to acquire memory-region\n");
 			return -EINVAL;
 		}
 
-		if (imx_dsp_rproc_sys_to_da(priv, rmem->base, rmem->size, &da))
+		if (imx_dsp_rproc_sys_to_da(priv, rmem->base, rmem->size, &da)) {
+			of_node_put(it.node);
 			return -EINVAL;
+		}
 
 		cpu_addr = devm_ioremap_wc(dev, rmem->base, rmem->size);
 		if (!cpu_addr) {
+			of_node_put(it.node);
 			dev_err(dev, "failed to map memory %p\n", &rmem->base);
 			return -ENOMEM;
 		}
@@ -644,10 +662,12 @@ static int imx_dsp_rproc_add_carveout(struct imx_dsp_rproc *priv)
 		mem = rproc_mem_entry_init(dev, (void __force *)cpu_addr, (dma_addr_t)rmem->base,
 					   rmem->size, da, NULL, NULL, it.node->name);
 
-		if (mem)
+		if (mem) {
 			rproc_coredump_add_segment(rproc, da, rmem->size);
-		else
+		} else {
+			of_node_put(it.node);
 			return -ENOMEM;
+		}
 
 		rproc_add_carveout(rproc, mem);
 	}
@@ -715,6 +735,191 @@ static void imx_dsp_rproc_kick(struct rproc *rproc, int vqid)
 		dev_err(dev, "%s: failed (%d, err:%d)\n", __func__, vqid, err);
 }
 
+/*
+ * Custom memory copy implementation for i.MX DSP Cores
+ *
+ * The IRAM is part of the HiFi DSP.
+ * According to hw specs only 32-bits writes are allowed.
+ */
+static int imx_dsp_rproc_memcpy(void *dst, const void *src, size_t size)
+{
+	void __iomem *dest = (void __iomem *)dst;
+	const u8 *src_byte = src;
+	const u32 *source = src;
+	u32 affected_mask;
+	int i, q, r;
+	u32 tmp;
+
+	/* destination must be 32bit aligned */
+	if (!IS_ALIGNED((uintptr_t)dest, 4))
+		return -EINVAL;
+
+	q = size / 4;
+	r = size % 4;
+
+	/* copy data in units of 32 bits at a time */
+	for (i = 0; i < q; i++)
+		writel(source[i], dest + i * 4);
+
+	if (r) {
+		affected_mask = GENMASK(8 * r, 0);
+
+		/*
+		 * first read the 32bit data of dest, then change affected
+		 * bytes, and write back to dest.
+		 * For unaffected bytes, it should not be changed
+		 */
+		tmp = readl(dest + q * 4);
+		tmp &= ~affected_mask;
+
+		/* avoid reading after end of source */
+		for (i = 0; i < r; i++)
+			tmp |= (src_byte[q * 4 + i] << (8 * i));
+
+		writel(tmp, dest + q * 4);
+	}
+
+	return 0;
+}
+
+/*
+ * Custom memset implementation for i.MX DSP Cores
+ *
+ * The IRAM is part of the HiFi DSP.
+ * According to hw specs only 32-bits writes are allowed.
+ */
+static int imx_dsp_rproc_memset(void *addr, u8 value, size_t size)
+{
+	void __iomem *tmp_dst = (void __iomem *)addr;
+	u32 tmp_val = value;
+	u32 affected_mask;
+	int q, r;
+	u32 tmp;
+
+	/* destination must be 32bit aligned */
+	if (!IS_ALIGNED((uintptr_t)addr, 4))
+		return -EINVAL;
+
+	tmp_val |= tmp_val << 8;
+	tmp_val |= tmp_val << 16;
+
+	q = size / 4;
+	r = size % 4;
+
+	while (q--)
+		writel(tmp_val, tmp_dst++);
+
+	if (r) {
+		affected_mask = GENMASK(8 * r, 0);
+
+		/*
+		 * first read the 32bit data of addr, then change affected
+		 * bytes, and write back to addr.
+		 * For unaffected bytes, it should not be changed
+		 */
+		tmp = readl(tmp_dst);
+		tmp &= ~affected_mask;
+
+		tmp |= (tmp_val & affected_mask);
+		writel(tmp, tmp_dst);
+	}
+
+	return 0;
+}
+
+/*
+ * imx_dsp_rproc_elf_load_segments() - load firmware segments to memory
+ * @rproc: remote processor which will be booted using these fw segments
+ * @fw: the ELF firmware image
+ *
+ * This function loads the firmware segments to memory, where the remote
+ * processor expects them.
+ *
+ * Return: 0 on success and an appropriate error code otherwise
+ */
+static int imx_dsp_rproc_elf_load_segments(struct rproc *rproc, const struct firmware *fw)
+{
+	struct device *dev = &rproc->dev;
+	const void *ehdr, *phdr;
+	int i, ret = 0;
+	u16 phnum;
+	const u8 *elf_data = fw->data;
+	u8 class = fw_elf_get_class(fw);
+	u32 elf_phdr_get_size = elf_size_of_phdr(class);
+
+	ehdr = elf_data;
+	phnum = elf_hdr_get_e_phnum(class, ehdr);
+	phdr = elf_data + elf_hdr_get_e_phoff(class, ehdr);
+
+	/* go through the available ELF segments */
+	for (i = 0; i < phnum; i++, phdr += elf_phdr_get_size) {
+		u64 da = elf_phdr_get_p_paddr(class, phdr);
+		u64 memsz = elf_phdr_get_p_memsz(class, phdr);
+		u64 filesz = elf_phdr_get_p_filesz(class, phdr);
+		u64 offset = elf_phdr_get_p_offset(class, phdr);
+		u32 type = elf_phdr_get_p_type(class, phdr);
+		void *ptr;
+
+		if (type != PT_LOAD || !memsz)
+			continue;
+
+		dev_dbg(dev, "phdr: type %d da 0x%llx memsz 0x%llx filesz 0x%llx\n",
+			type, da, memsz, filesz);
+
+		if (filesz > memsz) {
+			dev_err(dev, "bad phdr filesz 0x%llx memsz 0x%llx\n",
+				filesz, memsz);
+			ret = -EINVAL;
+			break;
+		}
+
+		if (offset + filesz > fw->size) {
+			dev_err(dev, "truncated fw: need 0x%llx avail 0x%zx\n",
+				offset + filesz, fw->size);
+			ret = -EINVAL;
+			break;
+		}
+
+		if (!rproc_u64_fit_in_size_t(memsz)) {
+			dev_err(dev, "size (%llx) does not fit in size_t type\n",
+				memsz);
+			ret = -EOVERFLOW;
+			break;
+		}
+
+		/* grab the kernel address for this device address */
+		ptr = rproc_da_to_va(rproc, da, memsz, NULL);
+		if (!ptr) {
+			dev_err(dev, "bad phdr da 0x%llx mem 0x%llx\n", da,
+				memsz);
+			ret = -EINVAL;
+			break;
+		}
+
+		/* put the segment where the remote processor expects it */
+		if (filesz) {
+			ret = imx_dsp_rproc_memcpy(ptr, elf_data + offset, filesz);
+			if (ret) {
+				dev_err(dev, "memory copy failed for da 0x%llx memsz 0x%llx\n",
+					da, memsz);
+				break;
+			}
+		}
+
+		/* zero out remaining memory for this segment */
+		if (memsz > filesz) {
+			ret = imx_dsp_rproc_memset(ptr + filesz, 0, memsz - filesz);
+			if (ret) {
+				dev_err(dev, "memset failed for da 0x%llx memsz 0x%llx\n",
+					da, memsz);
+				break;
+			}
+		}
+	}
+
+	return ret;
+}
+
 static int imx_dsp_rproc_parse_fw(struct rproc *rproc, const struct firmware *fw)
 {
 	if (rproc_elf_load_rsc_table(rproc, fw))
@@ -729,8 +934,9 @@ static const struct rproc_ops imx_dsp_rproc_ops = {
 	.start		= imx_dsp_rproc_start,
 	.stop		= imx_dsp_rproc_stop,
 	.kick		= imx_dsp_rproc_kick,
-	.load		= rproc_elf_load_segments,
+	.load		= imx_dsp_rproc_elf_load_segments,
 	.parse_fw	= imx_dsp_rproc_parse_fw,
+	.find_loaded_rsc_table = rproc_elf_find_loaded_rsc_table,
 	.sanity_check	= rproc_elf_sanity_check,
 	.get_boot_addr	= rproc_elf_get_boot_addr,
 };
@@ -745,74 +951,14 @@ static const struct rproc_ops imx_dsp_rproc_ops = {
 static int imx_dsp_attach_pm_domains(struct imx_dsp_rproc *priv)
 {
 	struct device *dev = priv->rproc->dev.parent;
-	int ret, i;
+	int ret;
 
-	priv->num_domains = of_count_phandle_with_args(dev->of_node,
-						       "power-domains",
-						       "#power-domain-cells");
-
-	/* If only one domain, then no need to link the device */
-	if (priv->num_domains <= 1)
+	/* A single PM domain is already attached. */
+	if (dev->pm_domain)
 		return 0;
 
-	priv->pd_dev = devm_kmalloc_array(dev, priv->num_domains,
-					  sizeof(*priv->pd_dev),
-					  GFP_KERNEL);
-	if (!priv->pd_dev)
-		return -ENOMEM;
-
-	priv->pd_dev_link = devm_kmalloc_array(dev, priv->num_domains,
-					       sizeof(*priv->pd_dev_link),
-					       GFP_KERNEL);
-	if (!priv->pd_dev_link)
-		return -ENOMEM;
-
-	for (i = 0; i < priv->num_domains; i++) {
-		priv->pd_dev[i] = dev_pm_domain_attach_by_id(dev, i);
-		if (IS_ERR(priv->pd_dev[i])) {
-			ret = PTR_ERR(priv->pd_dev[i]);
-			goto detach_pm;
-		}
-
-		/*
-		 * device_link_add will check priv->pd_dev[i], if it is
-		 * NULL, then will break.
-		 */
-		priv->pd_dev_link[i] = device_link_add(dev,
-						       priv->pd_dev[i],
-						       DL_FLAG_STATELESS |
-						       DL_FLAG_PM_RUNTIME);
-		if (!priv->pd_dev_link[i]) {
-			dev_pm_domain_detach(priv->pd_dev[i], false);
-			ret = -EINVAL;
-			goto detach_pm;
-		}
-	}
-
-	return 0;
-
-detach_pm:
-	while (--i >= 0) {
-		device_link_del(priv->pd_dev_link[i]);
-		dev_pm_domain_detach(priv->pd_dev[i], false);
-	}
-
-	return ret;
-}
-
-static int imx_dsp_detach_pm_domains(struct imx_dsp_rproc *priv)
-{
-	int i;
-
-	if (priv->num_domains <= 1)
-		return 0;
-
-	for (i = 0; i < priv->num_domains; i++) {
-		device_link_del(priv->pd_dev_link[i]);
-		dev_pm_domain_detach(priv->pd_dev[i], false);
-	}
-
-	return 0;
+	ret = dev_pm_domain_attach_list(dev, NULL, &priv->pd_list);
+	return ret < 0 ? ret : 0;
 }
 
 /**
@@ -894,14 +1040,19 @@ static int imx_dsp_rproc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	rproc = rproc_alloc(dev, "imx-dsp-rproc", &imx_dsp_rproc_ops, fw_name,
-			    sizeof(*priv));
+	rproc = devm_rproc_alloc(dev, "imx-dsp-rproc", &imx_dsp_rproc_ops,
+				 fw_name, sizeof(*priv));
 	if (!rproc)
 		return -ENOMEM;
 
 	priv = rproc->priv;
 	priv->rproc = rproc;
 	priv->dsp_dcfg = dsp_dcfg;
+
+	if (no_mailboxes)
+		imx_dsp_rproc_mbox_init = imx_dsp_rproc_mbox_no_alloc;
+	else
+		imx_dsp_rproc_mbox_init = imx_dsp_rproc_mbox_alloc;
 
 	dev_set_drvdata(dev, rproc);
 
@@ -910,14 +1061,14 @@ static int imx_dsp_rproc_probe(struct platform_device *pdev)
 	ret = imx_dsp_rproc_detect_mode(priv);
 	if (ret) {
 		dev_err(dev, "failed on imx_dsp_rproc_detect_mode\n");
-		goto err_put_rproc;
+		return ret;
 	}
 
 	/* There are multiple power domains required by DSP on some platform */
 	ret = imx_dsp_attach_pm_domains(priv);
 	if (ret) {
 		dev_err(dev, "failed on imx_dsp_attach_pm_domains\n");
-		goto err_put_rproc;
+		return ret;
 	}
 	/* Get clocks */
 	ret = imx_dsp_rproc_clk_get(priv);
@@ -939,24 +1090,19 @@ static int imx_dsp_rproc_probe(struct platform_device *pdev)
 	return 0;
 
 err_detach_domains:
-	imx_dsp_detach_pm_domains(priv);
-err_put_rproc:
-	rproc_free(rproc);
+	dev_pm_domain_detach_list(priv->pd_list);
 
 	return ret;
 }
 
-static int imx_dsp_rproc_remove(struct platform_device *pdev)
+static void imx_dsp_rproc_remove(struct platform_device *pdev)
 {
 	struct rproc *rproc = platform_get_drvdata(pdev);
 	struct imx_dsp_rproc *priv = rproc->priv;
 
 	pm_runtime_disable(&pdev->dev);
 	rproc_del(rproc);
-	imx_dsp_detach_pm_domains(priv);
-	rproc_free(rproc);
-
-	return 0;
+	dev_pm_domain_detach_list(priv->pd_list);
 }
 
 /* pm runtime functions */
@@ -1028,7 +1174,7 @@ out:
 	release_firmware(fw);
 }
 
-static __maybe_unused int imx_dsp_suspend(struct device *dev)
+static int imx_dsp_suspend(struct device *dev)
 {
 	struct rproc *rproc = dev_get_drvdata(dev);
 	struct imx_dsp_rproc *priv = rproc->priv;
@@ -1063,7 +1209,7 @@ out:
 	return pm_runtime_force_suspend(dev);
 }
 
-static __maybe_unused int imx_dsp_resume(struct device *dev)
+static int imx_dsp_resume(struct device *dev)
 {
 	struct rproc *rproc = dev_get_drvdata(dev);
 	int ret = 0;
@@ -1097,9 +1243,8 @@ err:
 }
 
 static const struct dev_pm_ops imx_dsp_rproc_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(imx_dsp_suspend, imx_dsp_resume)
-	SET_RUNTIME_PM_OPS(imx_dsp_runtime_suspend,
-			   imx_dsp_runtime_resume, NULL)
+	SYSTEM_SLEEP_PM_OPS(imx_dsp_suspend, imx_dsp_resume)
+	RUNTIME_PM_OPS(imx_dsp_runtime_suspend, imx_dsp_runtime_resume, NULL)
 };
 
 static const struct of_device_id imx_dsp_rproc_of_match[] = {
@@ -1113,11 +1258,11 @@ MODULE_DEVICE_TABLE(of, imx_dsp_rproc_of_match);
 
 static struct platform_driver imx_dsp_rproc_driver = {
 	.probe = imx_dsp_rproc_probe,
-	.remove = imx_dsp_rproc_remove,
+	.remove_new = imx_dsp_rproc_remove,
 	.driver = {
 		.name = "imx-dsp-rproc",
 		.of_match_table = imx_dsp_rproc_of_match,
-		.pm = &imx_dsp_rproc_pm_ops,
+		.pm = pm_ptr(&imx_dsp_rproc_pm_ops),
 	},
 };
 module_platform_driver(imx_dsp_rproc_driver);

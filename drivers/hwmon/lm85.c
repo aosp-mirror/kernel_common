@@ -12,7 +12,7 @@
  */
 
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/jiffies.h>
@@ -1544,8 +1544,6 @@ static int lm85_detect(struct i2c_client *client, struct i2c_board_info *info)
 	return 0;
 }
 
-static const struct i2c_device_id lm85_id[];
-
 static int lm85_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
@@ -1558,10 +1556,7 @@ static int lm85_probe(struct i2c_client *client)
 		return -ENOMEM;
 
 	data->client = client;
-	if (client->dev.of_node)
-		data->type = (enum chips)of_device_get_match_data(&client->dev);
-	else
-		data->type = i2c_match_id(lm85_id, client)->driver_data;
+	data->type = (uintptr_t)i2c_get_match_data(client);
 	mutex_init(&data->update_lock);
 
 	/* Fill in the chip specific driver values */
@@ -1698,7 +1693,7 @@ static struct i2c_driver lm85_driver = {
 		.name   = "lm85",
 		.of_match_table = of_match_ptr(lm85_of_match),
 	},
-	.probe_new	= lm85_probe,
+	.probe		= lm85_probe,
 	.id_table	= lm85_id,
 	.detect		= lm85_detect,
 	.address_list	= normal_i2c,

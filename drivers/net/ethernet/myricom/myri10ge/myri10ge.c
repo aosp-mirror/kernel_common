@@ -66,6 +66,7 @@
 #include <linux/slab.h>
 #include <linux/prefetch.h>
 #include <net/checksum.h>
+#include <net/gso.h>
 #include <net/ip.h>
 #include <net/tcp.h>
 #include <asm/byteorder.h>
@@ -3035,11 +3036,11 @@ static int myri10ge_change_mtu(struct net_device *dev, int new_mtu)
 		/* if we change the mtu on an active device, we must
 		 * reset the device so the firmware sees the change */
 		myri10ge_close(dev);
-		dev->mtu = new_mtu;
+		WRITE_ONCE(dev->mtu, new_mtu);
 		myri10ge_open(dev);
-	} else
-		dev->mtu = new_mtu;
-
+	} else {
+		WRITE_ONCE(dev->mtu, new_mtu);
+	}
 	return 0;
 }
 

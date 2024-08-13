@@ -71,6 +71,15 @@ config I2C_MUX
 
 source "drivers/i2c/muxes/Kconfig"
 
+config I2C_ATR
+	tristate "I2C Address Translator (ATR) support" if COMPILE_TEST
+	help
+	  Enable support for I2C Address Translator (ATR) chips.
+
+	  An ATR allows accessing multiple I2C busses from a single
+	  physical bus via address translation instead of bus selection as
+	  i2c-muxes do.
+
 config I2C_HELPER_AUTO
 	bool "Autoselect pertinent helper modules"
 	default y
@@ -126,7 +135,7 @@ config I2C_SLAVE_EEPROM
 	  Documentation/i2c/slave-eeprom-backend.rst for further details.
 
 config I2C_SLAVE_TESTUNIT
-	tristate "I2C eeprom testunit driver"
+	tristate "I2C testunit driver"
 	help
 	  This backend can be used to trigger test cases for I2C bus masters
 	  which require a remote device with certain capabilities, e.g.

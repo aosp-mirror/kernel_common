@@ -128,15 +128,17 @@ static void output_sample_callchain_entry(struct perf_tool *tool,
 	output_json_key_format(out, false, 5, "ip", "\"0x%" PRIx64 "\"", ip);
 
 	if (al && al->sym && al->sym->namelen) {
+		struct dso *dso = al->map ? map__dso(al->map) : NULL;
+
 		fputc(',', out);
 		output_json_key_string(out, false, 5, "symbol", al->sym->name);
 
-		if (al->map && al->map->dso) {
-			const char *dso = al->map->dso->short_name;
+		if (dso) {
+			const char *dso_name = dso__short_name(dso);
 
-			if (dso && strlen(dso) > 0) {
+			if (dso_name && strlen(dso_name) > 0) {
 				fputc(',', out);
-				output_json_key_string(out, false, 5, "dso", dso);
+				output_json_key_string(out, false, 5, "dso", dso_name);
 			}
 		}
 	}
@@ -152,12 +154,14 @@ static int process_sample_event(struct perf_tool *tool,
 {
 	struct convert_json *c = container_of(tool, struct convert_json, tool);
 	FILE *out = c->out;
-	struct addr_location al, tal;
+	struct addr_location al;
 	u64 sample_type = __evlist__combined_sample_type(evsel->evlist);
 	u8 cpumode = PERF_RECORD_MISC_USER;
 
+	addr_location__init(&al);
 	if (machine__resolve(machine, &al, sample) < 0) {
 		pr_err("Sample resolution failed!\n");
+		addr_location__exit(&al);
 		return -1;
 	}
 
@@ -170,13 +174,13 @@ static int process_sample_event(struct perf_tool *tool,
 	output_json_format(out, false, 2, "{");
 
 	output_json_key_format(out, false, 3, "timestamp", "%" PRIi64, sample->time);
-	output_json_key_format(out, true, 3, "pid", "%i", al.thread->pid_);
-	output_json_key_format(out, true, 3, "tid", "%i", al.thread->tid);
+	output_json_key_format(out, true, 3, "pid", "%i", thread__pid(al.thread));
+	output_json_key_format(out, true, 3, "tid", "%i", thread__tid(al.thread));
 
 	if ((sample_type & PERF_SAMPLE_CPU))
 		output_json_key_format(out, true, 3, "cpu", "%i", sample->cpu);
-	else if (al.thread->cpu >= 0)
-		output_json_key_format(out, true, 3, "cpu", "%i", al.thread->cpu);
+	else if (thread__cpu(al.thread) >= 0)
+		output_json_key_format(out, true, 3, "cpu", "%i", thread__cpu(al.thread));
 
 	output_json_key_string(out, true, 3, "comm", thread__comm_str(al.thread));
 
@@ -188,6 +192,7 @@ static int process_sample_event(struct perf_tool *tool,
 
 		for (i = 0; i < sample->callchain->nr; ++i) {
 			u64 ip = sample->callchain->ips[i];
+			struct addr_location tal;
 
 			if (ip >= PERF_CONTEXT_MAX) {
 				switch (ip) {
@@ -213,8 +218,10 @@ static int process_sample_event(struct perf_tool *tool,
 			else
 				fputc(',', out);
 
+			addr_location__init(&tal);
 			ok = thread__find_symbol(al.thread, cpumode, ip, &tal);
 			output_sample_callchain_entry(tool, ip, ok ? &tal : NULL);
+			addr_location__exit(&tal);
 		}
 	} else {
 		output_sample_callchain_entry(tool, sample->ip, &al);
@@ -243,6 +250,7 @@ static int process_sample_event(struct perf_tool *tool,
 	}
 #endif
 	output_json_format(out, false, 2, "}");
+	addr_location__exit(&al);
 	return 0;
 }
 
@@ -276,7 +284,9 @@ static void output_headers(struct perf_session *session, struct convert_json *c)
 	output_json_key_string(out, true, 2, "os-release", header->env.os_release);
 	output_json_key_string(out, true, 2, "arch", header->env.arch);
 
-	output_json_key_string(out, true, 2, "cpu-desc", header->env.cpu_desc);
+	if (header->env.cpu_desc)
+		output_json_key_string(out, true, 2, "cpu-desc", header->env.cpu_desc);
+
 	output_json_key_string(out, true, 2, "cpuid", header->env.cpuid);
 	output_json_key_format(out, true, 2, "nrcpus-online", "%u", header->env.nr_cpus_online);
 	output_json_key_format(out, true, 2, "nrcpus-avail", "%u", header->env.nr_cpus_avail);

@@ -37,10 +37,12 @@ static ssize_t bw_name_read(struct file *fp, char __user *userbuf,
 			    size_t count, loff_t *ppos)
 {
 	struct icc_path *path = fp->private_data;
+	const char *name = icc_get_name(path);
 	char buf[64];
-	int i;
+	int i = 0;
 
-	i = scnprintf(buf, sizeof(buf), "%.62s\n", icc_get_name(path));
+	if (name)
+		i = scnprintf(buf, sizeof(buf), "%.62s\n", name);
 
 	return simple_read_from_buffer(userbuf, count, ppos, buf, i);
 }
@@ -56,11 +58,11 @@ static void opp_debug_create_bw(struct dev_pm_opp *opp,
 				struct dentry *pdentry)
 {
 	struct dentry *d;
-	char name[11];
+	char name[] = "icc-path-XXXXXXXXXXX"; /* Integers can take 11 chars max */
 	int i;
 
 	for (i = 0; i < opp_table->path_count; i++) {
-		snprintf(name, sizeof(name), "icc-path-%.1d", i);
+		snprintf(name, sizeof(name), "icc-path-%d", i);
 
 		/* Create per-path directory */
 		d = debugfs_create_dir(name, pdentry);
@@ -78,7 +80,7 @@ static void opp_debug_create_clks(struct dev_pm_opp *opp,
 				  struct opp_table *opp_table,
 				  struct dentry *pdentry)
 {
-	char name[12];
+	char name[] = "rate_hz_XXXXXXXXXXX"; /* Integers can take 11 chars max */
 	int i;
 
 	if (opp_table->clk_count == 1) {
@@ -100,7 +102,7 @@ static void opp_debug_create_supplies(struct dev_pm_opp *opp,
 	int i;
 
 	for (i = 0; i < opp_table->regulator_count; i++) {
-		char name[15];
+		char name[] = "supply-XXXXXXXXXXX"; /* Integers can take 11 chars max */
 
 		snprintf(name, sizeof(name), "supply-%d", i);
 
@@ -152,7 +154,6 @@ void opp_debug_create_one(struct dev_pm_opp *opp, struct opp_table *opp_table)
 	debugfs_create_bool("dynamic", S_IRUGO, d, &opp->dynamic);
 	debugfs_create_bool("turbo", S_IRUGO, d, &opp->turbo);
 	debugfs_create_bool("suspend", S_IRUGO, d, &opp->suspend);
-	debugfs_create_u32("performance_state", S_IRUGO, d, &opp->pstate);
 	debugfs_create_u32("level", S_IRUGO, d, &opp->level);
 	debugfs_create_ulong("clock_latency_ns", S_IRUGO, d,
 			     &opp->clock_latency_ns);

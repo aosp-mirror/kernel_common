@@ -192,7 +192,7 @@ static void apanel_shutdown(struct i2c_client *client)
 }
 
 static const struct i2c_device_id apanel_id[] = {
-	{ "fujitsu_apanel", 0 },
+	{ "fujitsu_apanel" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, apanel_id);
@@ -201,7 +201,7 @@ static struct i2c_driver apanel_driver = {
 	.driver = {
 		.name = APANEL,
 	},
-	.probe_new	= apanel_probe,
+	.probe		= apanel_probe,
 	.shutdown	= apanel_shutdown,
 	.id_table	= apanel_id,
 };

@@ -8,12 +8,13 @@
 
 / {
 	model = "Google Hanawl";
+	chassis-type = "laptop";
 	compatible = "google,hana-rev7", "mediatek,mt8173";
 };
 
 &cpu_thermal {
 	trips {
-		cpu_crit: cpu_crit0 {
+		cpu_crit: cpu-crit0 {
 			temperature = <100000>;
 			type = "critical";
 		};

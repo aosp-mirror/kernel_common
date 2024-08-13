@@ -52,10 +52,6 @@
  * buffer objects
  * @mem_size_left: Free memory left in the last page in @page_list
  * @page_address: Kernel virtual address of the last page in @page_list
- * @vm: A pointer to the memory reservation interface or NULL if no
- * memory reservation is needed.
- * @vm_size_left: Amount of reserved memory that so far has not been allocated.
- * @total_mem: Amount of reserved memory.
  */
 struct vmw_validation_context {
 	struct vmw_sw_context *sw_context;
@@ -68,12 +64,9 @@ struct vmw_validation_context {
 	unsigned int merge_dups;
 	unsigned int mem_size_left;
 	u8 *page_address;
-	struct vmw_validation_mem *vm;
-	size_t vm_size_left;
-	size_t total_mem;
 };
 
-struct vmw_buffer_object;
+struct vmw_bo;
 struct vmw_resource;
 struct vmw_fence_obj;
 
@@ -159,11 +152,7 @@ static inline unsigned int vmw_validation_align(unsigned int val)
 }
 
 int vmw_validation_add_bo(struct vmw_validation_context *ctx,
-			  struct vmw_buffer_object *vbo,
-			  bool as_mob, bool cpu_blit);
-int vmw_validation_bo_validate_single(struct ttm_buffer_object *bo,
-				      bool interruptible,
-				      bool validate_as_mob);
+			  struct vmw_bo *vbo);
 int vmw_validation_bo_validate(struct vmw_validation_context *ctx, bool intr);
 void vmw_validation_unref_lists(struct vmw_validation_context *ctx);
 int vmw_validation_add_resource(struct vmw_validation_context *ctx,
@@ -179,7 +168,7 @@ void vmw_validation_res_unreserve(struct vmw_validation_context *ctx,
 				  bool backoff);
 void vmw_validation_res_switch_backup(struct vmw_validation_context *ctx,
 				      void *val_private,
-				      struct vmw_buffer_object *vbo,
+				      struct vmw_bo *vbo,
 				      unsigned long backup_offset);
 int vmw_validation_res_validate(struct vmw_validation_context *ctx, bool intr);
 

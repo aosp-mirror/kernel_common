@@ -64,7 +64,6 @@ static void cma3000_i2c_remove(struct i2c_client *client)
 	cma3000_exit(data);
 }
 
-#ifdef CONFIG_PM
 static int cma3000_i2c_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -89,24 +88,21 @@ static const struct dev_pm_ops cma3000_i2c_pm_ops = {
 	.suspend	= cma3000_i2c_suspend,
 	.resume		= cma3000_i2c_resume,
 };
-#endif
 
 static const struct i2c_device_id cma3000_i2c_id[] = {
-	{ "cma3000_d01", 0 },
-	{ },
+	{ "cma3000_d01" },
+	{ }
 };
 
 MODULE_DEVICE_TABLE(i2c, cma3000_i2c_id);
 
 static struct i2c_driver cma3000_i2c_driver = {
-	.probe_new	= cma3000_i2c_probe,
+	.probe		= cma3000_i2c_probe,
 	.remove		= cma3000_i2c_remove,
 	.id_table	= cma3000_i2c_id,
 	.driver = {
 		.name	= "cma3000_i2c_accl",
-#ifdef CONFIG_PM
-		.pm	= &cma3000_i2c_pm_ops,
-#endif
+		.pm	= pm_sleep_ptr(&cma3000_i2c_pm_ops),
 	},
 };
 

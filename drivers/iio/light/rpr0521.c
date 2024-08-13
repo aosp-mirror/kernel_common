@@ -10,11 +10,11 @@
  */
 
 #include <linux/module.h>
+#include <linux/mod_devicetable.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/regmap.h>
 #include <linux/delay.h>
-#include <linux/acpi.h>
 
 #include <linux/iio/iio.h>
 #include <linux/iio/buffer.h>
@@ -431,7 +431,7 @@ static irqreturn_t rpr0521_drdy_irq_thread(int irq, void *private)
 	struct rpr0521_data *data = iio_priv(indio_dev);
 
 	if (rpr0521_is_triggered(data)) {
-		iio_trigger_poll_chained(data->drdy_trigger0);
+		iio_trigger_poll_nested(data->drdy_trigger0);
 		return IRQ_HANDLED;
 	}
 
@@ -1119,9 +1119,9 @@ static struct i2c_driver rpr0521_driver = {
 	.driver = {
 		.name	= RPR0521_DRV_NAME,
 		.pm	= pm_ptr(&rpr0521_pm_ops),
-		.acpi_match_table = ACPI_PTR(rpr0521_acpi_match),
+		.acpi_match_table = rpr0521_acpi_match,
 	},
-	.probe_new	= rpr0521_probe,
+	.probe		= rpr0521_probe,
 	.remove		= rpr0521_remove,
 	.id_table	= rpr0521_id,
 };

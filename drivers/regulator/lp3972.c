@@ -537,7 +537,7 @@ static int lp3972_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id lp3972_i2c_id[] = {
-	{ "lp3972", 0 },
+	{ "lp3972" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, lp3972_i2c_id);
@@ -545,8 +545,9 @@ MODULE_DEVICE_TABLE(i2c, lp3972_i2c_id);
 static struct i2c_driver lp3972_i2c_driver = {
 	.driver = {
 		.name = "lp3972",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
-	.probe_new = lp3972_i2c_probe,
+	.probe = lp3972_i2c_probe,
 	.id_table = lp3972_i2c_id,
 };
 

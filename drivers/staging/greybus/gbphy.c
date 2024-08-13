@@ -46,7 +46,7 @@ static void gbphy_dev_release(struct device *dev)
 {
 	struct gbphy_device *gbphy_dev = to_gbphy_dev(dev);
 
-	ida_simple_remove(&gbphy_id, gbphy_dev->id);
+	ida_free(&gbphy_id, gbphy_dev->id);
 	kfree(gbphy_dev);
 }
 
@@ -71,14 +71,14 @@ static const struct device_type greybus_gbphy_dev_type = {
 	.pm	=	&gb_gbphy_pm_ops,
 };
 
-static int gbphy_dev_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int gbphy_dev_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	struct gbphy_device *gbphy_dev = to_gbphy_dev(dev);
-	struct greybus_descriptor_cport *cport_desc = gbphy_dev->cport_desc;
-	struct gb_bundle *bundle = gbphy_dev->bundle;
-	struct gb_interface *intf = bundle->intf;
-	struct gb_module *module = intf->module;
-	struct gb_host_device *hd = intf->hd;
+	const struct gbphy_device *gbphy_dev = to_gbphy_dev(dev);
+	const struct greybus_descriptor_cport *cport_desc = gbphy_dev->cport_desc;
+	const struct gb_bundle *bundle = gbphy_dev->bundle;
+	const struct gb_interface *intf = bundle->intf;
+	const struct gb_module *module = intf->module;
+	const struct gb_host_device *hd = intf->hd;
 
 	if (add_uevent_var(env, "BUS=%u", hd->bus_id))
 		return -ENOMEM;
@@ -182,7 +182,7 @@ static void gbphy_dev_remove(struct device *dev)
 	pm_runtime_dont_use_autosuspend(dev);
 }
 
-static struct bus_type gbphy_bus_type = {
+static const struct bus_type gbphy_bus_type = {
 	.name =		"gbphy",
 	.match =	gbphy_dev_match,
 	.probe =	gbphy_dev_probe,
@@ -225,13 +225,13 @@ static struct gbphy_device *gb_gbphy_create_dev(struct gb_bundle *bundle,
 	int retval;
 	int id;
 
-	id = ida_simple_get(&gbphy_id, 1, 0, GFP_KERNEL);
+	id = ida_alloc_min(&gbphy_id, 1, GFP_KERNEL);
 	if (id < 0)
 		return ERR_PTR(id);
 
 	gbphy_dev = kzalloc(sizeof(*gbphy_dev), GFP_KERNEL);
 	if (!gbphy_dev) {
-		ida_simple_remove(&gbphy_id, id);
+		ida_free(&gbphy_id, id);
 		return ERR_PTR(-ENOMEM);
 	}
 

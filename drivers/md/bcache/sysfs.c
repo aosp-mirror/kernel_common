@@ -660,7 +660,7 @@ static unsigned int bch_root_usage(struct cache_set *c)
 	unsigned int bytes = 0;
 	struct bkey *k;
 	struct btree *b;
-	struct btree_iter iter;
+	struct btree_iter_stack iter;
 
 	goto lock_root;
 
@@ -702,13 +702,7 @@ static unsigned int bch_cache_max_chain(struct cache_set *c)
 	for (h = c->bucket_hash;
 	     h < c->bucket_hash + (1 << BUCKET_HASH_BITS);
 	     h++) {
-		unsigned int i = 0;
-		struct hlist_node *p;
-
-		hlist_for_each(p, h)
-			i++;
-
-		ret = max(ret, i);
+		ret = max(ret, hlist_count_nodes(h));
 	}
 
 	mutex_unlock(&c->bucket_lock);
@@ -866,7 +860,8 @@ STORE(__bch_cache_set)
 
 		sc.gfp_mask = GFP_KERNEL;
 		sc.nr_to_scan = strtoul_or_return(buf);
-		c->shrink.scan_objects(&c->shrink, &sc);
+		if (c->shrink)
+			c->shrink->scan_objects(c->shrink, &sc);
 	}
 
 	sysfs_strtoul_clamp(congested_read_threshold_us,
@@ -1103,7 +1098,7 @@ SHOW(__bch_cache)
 			sum += INITIAL_PRIO - cached[i];
 
 		if (n)
-			do_div(sum, n);
+			sum = div64_u64(sum, n);
 
 		for (i = 0; i < ARRAY_SIZE(q); i++)
 			q[i] = INITIAL_PRIO - cached[n * (i + 1) /
@@ -1111,26 +1106,25 @@ SHOW(__bch_cache)
 
 		vfree(p);
 
-		ret = scnprintf(buf, PAGE_SIZE,
-				"Unused:		%zu%%\n"
-				"Clean:		%zu%%\n"
-				"Dirty:		%zu%%\n"
-				"Metadata:	%zu%%\n"
-				"Average:	%llu\n"
-				"Sectors per Q:	%zu\n"
-				"Quantiles:	[",
-				unused * 100 / (size_t) ca->sb.nbuckets,
-				available * 100 / (size_t) ca->sb.nbuckets,
-				dirty * 100 / (size_t) ca->sb.nbuckets,
-				meta * 100 / (size_t) ca->sb.nbuckets, sum,
-				n * ca->sb.bucket_size / (ARRAY_SIZE(q) + 1));
+		ret = sysfs_emit(buf,
+				 "Unused:		%zu%%\n"
+				 "Clean:		%zu%%\n"
+				 "Dirty:		%zu%%\n"
+				 "Metadata:	%zu%%\n"
+				 "Average:	%llu\n"
+				 "Sectors per Q:	%zu\n"
+				 "Quantiles:	[",
+				 unused * 100 / (size_t) ca->sb.nbuckets,
+				 available * 100 / (size_t) ca->sb.nbuckets,
+				 dirty * 100 / (size_t) ca->sb.nbuckets,
+				 meta * 100 / (size_t) ca->sb.nbuckets, sum,
+				 n * ca->sb.bucket_size / (ARRAY_SIZE(q) + 1));
 
 		for (i = 0; i < ARRAY_SIZE(q); i++)
-			ret += scnprintf(buf + ret, PAGE_SIZE - ret,
-					 "%u ", q[i]);
+			ret += sysfs_emit_at(buf, ret, "%u ", q[i]);
 		ret--;
 
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "]\n");
+		ret += sysfs_emit_at(buf, ret, "]\n");
 
 		return ret;
 	}

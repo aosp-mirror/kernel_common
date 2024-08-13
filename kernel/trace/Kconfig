@@ -31,6 +31,9 @@ config HAVE_FUNCTION_GRAPH_TRACER
 	help
 	  See Documentation/trace/ftrace-design.rst
 
+config HAVE_FUNCTION_GRAPH_RETVAL
+	bool
+
 config HAVE_DYNAMIC_FTRACE
 	bool
 	help
@@ -160,7 +163,7 @@ config TRACING
 	select BINARY_PRINTF
 	select EVENT_TRACING
 	select TRACE_CLOCK
-	select TASKS_RCU if PREEMPTION
+	select NEED_TASKS_RCU
 
 config GENERIC_TRACER
 	bool
@@ -201,7 +204,7 @@ config FUNCTION_TRACER
 	select GENERIC_TRACER
 	select CONTEXT_SWITCH_TRACER
 	select GLOB
-	select TASKS_RCU if PREEMPTION
+	select NEED_TASKS_RCU
 	select TASKS_RUDE_RCU
 	help
 	  Enable the kernel to trace every kernel function. This is done
@@ -227,6 +230,18 @@ config FUNCTION_GRAPH_TRACER
 	  the return value. This is done by setting the current return
 	  address on the current task structure into a stack of calls.
 
+config FUNCTION_GRAPH_RETVAL
+	bool "Kernel Function Graph Return Value"
+	depends on HAVE_FUNCTION_GRAPH_RETVAL
+	depends on FUNCTION_GRAPH_TRACER
+	default n
+	help
+	  Support recording and printing the function return value when
+	  using function graph tracer. It can be helpful to locate functions
+	  that return errors. This feature is off by default, and you can
+	  enable it via the trace option funcgraph-retval.
+	  See Documentation/trace/ftrace.rst
+
 config DYNAMIC_FTRACE
 	bool "enable/disable function tracing dynamically"
 	depends on FUNCTION_TRACER
@@ -242,7 +257,7 @@ config DYNAMIC_FTRACE
 	  enabled, and the functions not enabled will not affect
 	  performance of the system.
 
-	  See the files in /sys/kernel/debug/tracing:
+	  See the files in /sys/kernel/tracing:
 	    available_filter_functions
 	    set_ftrace_filter
 	    set_ftrace_notrace
@@ -257,7 +272,7 @@ config DYNAMIC_FTRACE_WITH_REGS
 
 config DYNAMIC_FTRACE_WITH_DIRECT_CALLS
 	def_bool y
-	depends on DYNAMIC_FTRACE_WITH_REGS
+	depends on DYNAMIC_FTRACE_WITH_REGS || DYNAMIC_FTRACE_WITH_ARGS
 	depends on HAVE_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
 
 config DYNAMIC_FTRACE_WITH_CALL_OPS
@@ -306,7 +321,7 @@ config STACK_TRACER
 	select KALLSYMS
 	help
 	  This special tracer records the maximum stack footprint of the
-	  kernel and displays it in /sys/kernel/debug/tracing/stack_trace.
+	  kernel and displays it in /sys/kernel/tracing/stack_trace.
 
 	  This tracer works by hooking into every function call that the
 	  kernel executes, and keeping a maximum stack depth value and
@@ -346,7 +361,7 @@ config IRQSOFF_TRACER
 	  disabled by default and can be runtime (re-)started
 	  via:
 
-	      echo 0 > /sys/kernel/debug/tracing/tracing_max_latency
+	      echo 0 > /sys/kernel/tracing/tracing_max_latency
 
 	  (Note that kernel size and overhead increase with this option
 	  enabled. This option and the preempt-off timing option can be
@@ -370,7 +385,7 @@ config PREEMPT_TRACER
 	  disabled by default and can be runtime (re-)started
 	  via:
 
-	      echo 0 > /sys/kernel/debug/tracing/tracing_max_latency
+	      echo 0 > /sys/kernel/tracing/tracing_max_latency
 
 	  (Note that kernel size and overhead increase with this option
 	  enabled. This option and the irqs-off timing option can be
@@ -522,7 +537,7 @@ config TRACER_SNAPSHOT
 	  Allow tracing users to take snapshot of the current buffer using the
 	  ftrace interface, e.g.:
 
-	      echo 1 > /sys/kernel/debug/tracing/snapshot
+	      echo 1 > /sys/kernel/tracing/snapshot
 	      cat snapshot
 
 config TRACER_SNAPSHOT_PER_CPU_SWAP
@@ -534,7 +549,7 @@ config TRACER_SNAPSHOT_PER_CPU_SWAP
 	  full swap (all buffers). If this is set, then the following is
 	  allowed:
 
-	      echo 1 > /sys/kernel/debug/tracing/per_cpu/cpu2/snapshot
+	      echo 1 > /sys/kernel/tracing/per_cpu/cpu2/snapshot
 
 	  After which, only the tracing buffer for CPU 2 was swapped with
 	  the main tracing buffer, and the other CPU buffers remain the same.
@@ -581,7 +596,7 @@ config PROFILE_ANNOTATED_BRANCHES
 	  This tracer profiles all likely and unlikely macros
 	  in the kernel. It will display the results in:
 
-	  /sys/kernel/debug/tracing/trace_stat/branch_annotated
+	  /sys/kernel/tracing/trace_stat/branch_annotated
 
 	  Note: this will add a significant overhead; only turn this
 	  on if you need to profile the system's use of these macros.
@@ -594,7 +609,7 @@ config PROFILE_ALL_BRANCHES
 	  taken in the kernel is recorded whether it hit or miss.
 	  The results will be displayed in:
 
-	  /sys/kernel/debug/tracing/trace_stat/branch_all
+	  /sys/kernel/tracing/trace_stat/branch_all
 
 	  This option also enables the likely/unlikely profiler.
 
@@ -645,10 +660,36 @@ config BLK_DEV_IO_TRACE
 	  Tracing also is possible using the ftrace interface, e.g.:
 
 	    echo 1 > /sys/block/sda/sda1/trace/enable
-	    echo blk > /sys/kernel/debug/tracing/current_tracer
-	    cat /sys/kernel/debug/tracing/trace_pipe
+	    echo blk > /sys/kernel/tracing/current_tracer
+	    cat /sys/kernel/tracing/trace_pipe
 
 	  If unsure, say N.
+
+config FPROBE_EVENTS
+	depends on FPROBE
+	depends on HAVE_REGS_AND_STACK_ACCESS_API
+	bool "Enable fprobe-based dynamic events"
+	select TRACING
+	select PROBE_EVENTS
+	select DYNAMIC_EVENTS
+	default y
+	help
+	  This allows user to add tracing events on the function entry and
+	  exit via ftrace interface. The syntax is same as the kprobe events
+	  and the kprobe events on function entry and exit will be
+	  transparently converted to this fprobe events.
+
+config PROBE_EVENTS_BTF_ARGS
+	depends on HAVE_FUNCTION_ARG_ACCESS_API
+	depends on FPROBE_EVENTS || KPROBE_EVENTS
+	depends on DEBUG_INFO_BTF && BPF_SYSCALL
+	bool "Support BTF function arguments for probe events"
+	default y
+	help
+	  The user can specify the arguments of the probe event using the names
+	  of the arguments of the probed function, when the probe location is a
+	  kernel function entry or a tracepoint.
+	  This is available only if BTF (BPF Type Format) support is enabled.
 
 config KPROBE_EVENTS
 	depends on KPROBES
@@ -792,15 +833,15 @@ config USER_EVENTS
 	bool "User trace events"
 	select TRACING
 	select DYNAMIC_EVENTS
-	depends on BROKEN || COMPILE_TEST # API needs to be straighten out
 	help
 	  User trace events are user-defined trace events that
 	  can be used like an existing kernel trace event.  User trace
 	  events are generated by writing to a tracefs file.  User
 	  processes can determine if their tracing events should be
-	  generated by memory mapping a tracefs file and checking for
-	  an associated byte being non-zero.
+	  generated by registering a value and bit with the kernel
+	  that reflects when it is enabled or not.
 
+	  See Documentation/trace/user_events.rst.
 	  If in doubt, say N.
 
 config HIST_TRIGGERS
@@ -924,7 +965,7 @@ config FTRACE_RECORD_RECURSION
 
 config FTRACE_RECORD_RECURSION_SIZE
 	int "Max number of recursed functions to record"
-	default	128
+	default 128
 	depends on FTRACE_RECORD_RECURSION
 	help
 	  This defines the limit of number of functions that can be
@@ -932,6 +973,19 @@ config FTRACE_RECORD_RECURSION_SIZE
 	  the functions that caused a recursion to happen.
 	  This file can be reset, but the limit can not change in
 	  size at runtime.
+
+config FTRACE_VALIDATE_RCU_IS_WATCHING
+	bool "Validate RCU is on during ftrace execution"
+	depends on FUNCTION_TRACER
+	depends on ARCH_WANTS_NO_INSTR
+	help
+	  All callbacks that attach to the function tracing have some sort of
+	  protection against recursion. This option is only to verify that
+	  ftrace (and other users of ftrace_test_recursion_trylock()) are not
+	  called outside of RCU, as if they are, it can cause a race. But it
+	  also has a noticeable overhead when enabled.
+
+	  If unsure, say N
 
 config RING_BUFFER_RECORD_RECURSION
 	bool "Record functions that recurse in the ring buffer"
@@ -1082,7 +1136,7 @@ config PREEMPTIRQ_DELAY_TEST
 
 config SYNTH_EVENT_GEN_TEST
 	tristate "Test module for in-kernel synthetic event generation"
-	depends on SYNTH_EVENTS
+	depends on SYNTH_EVENTS && m
 	help
           This option creates a test module to check the base
           functionality of in-kernel synthetic event definition and
@@ -1095,7 +1149,7 @@ config SYNTH_EVENT_GEN_TEST
 
 config KPROBE_EVENT_GEN_TEST
 	tristate "Test module for in-kernel kprobe event generation"
-	depends on KPROBE_EVENTS
+	depends on KPROBE_EVENTS && m
 	help
           This option creates a test module to check the base
           functionality of in-kernel kprobe event definition.

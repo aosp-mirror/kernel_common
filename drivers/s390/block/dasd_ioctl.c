@@ -10,8 +10,6 @@
  * i/o controls for the dasd driver.
  */
 
-#define KMSG_COMPONENT "dasd"
-
 #include <linux/interrupt.h>
 #include <linux/compat.h>
 #include <linux/major.h>
@@ -24,11 +22,7 @@
 #include <linux/uaccess.h>
 #include <linux/dasd_mod.h>
 
-/* This is ugly... */
-#define PRINTK_HEADER "dasd_ioctl:"
-
 #include "dasd_int.h"
-
 
 static int
 dasd_ioctl_api_version(void __user *argp)
@@ -131,6 +125,7 @@ static int dasd_ioctl_resume(struct dasd_block *block)
 	spin_unlock_irqrestore(get_ccwdev_lock(base->cdev), flags);
 
 	dasd_schedule_block_bh(block);
+	dasd_schedule_device_bh(base);
 	return 0;
 }
 
@@ -220,7 +215,7 @@ dasd_format(struct dasd_block *block, struct format_data_t *fdata)
 	 * enabling the device later.
 	 */
 	if (fdata->start_unit == 0) {
-		block->gdp->part0->bd_inode->i_blkbits =
+		block->gdp->part0->bd_mapping->host->i_blkbits =
 			blksize_bits(fdata->blksize);
 	}
 
@@ -536,7 +531,7 @@ static int __dasd_ioctl_information(struct dasd_block *block,
 	 * This must be hidden from user-space.
 	 */
 	dasd_info->open_count = atomic_read(&block->open_count);
-	if (!block->bdev)
+	if (!block->bdev_file)
 		dasd_info->open_count++;
 
 	/*
@@ -552,10 +547,10 @@ static int __dasd_ioctl_information(struct dasd_block *block,
 
 	memcpy(dasd_info->type, base->discipline->name, 4);
 
-	spin_lock_irqsave(&block->queue_lock, flags);
+	spin_lock_irqsave(get_ccwdev_lock(base->cdev), flags);
 	list_for_each(l, &base->ccw_queue)
 		dasd_info->chanq_len++;
-	spin_unlock_irqrestore(&block->queue_lock, flags);
+	spin_unlock_irqrestore(get_ccwdev_lock(base->cdev), flags);
 	return 0;
 }
 
@@ -612,7 +607,7 @@ static int dasd_ioctl_readall_cmb(struct dasd_block *block, unsigned int cmd,
 	return ret;
 }
 
-int dasd_ioctl(struct block_device *bdev, fmode_t mode,
+int dasd_ioctl(struct block_device *bdev, blk_mode_t mode,
 	       unsigned int cmd, unsigned long arg)
 {
 	struct dasd_block *block;

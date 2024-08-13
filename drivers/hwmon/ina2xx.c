@@ -31,7 +31,6 @@
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/jiffies.h>
-#include <linux/of_device.h>
 #include <linux/of.h>
 #include <linux/delay.h>
 #include <linux/util_macros.h>
@@ -73,6 +72,11 @@
 
 #define INA226_READ_AVG(reg)		(((reg) & INA226_AVG_RD_MASK) >> 9)
 #define INA226_SHIFT_AVG(val)		((val) << 9)
+
+#define INA226_ALERT_POLARITY_MASK		0x0002
+#define INA226_SHIFT_ALERT_POLARITY(val)	((val) << 1)
+#define INA226_ALERT_POL_LOW			0
+#define INA226_ALERT_POL_HIGH			1
 
 /* bit number of alert functions in Mask/Enable Register */
 #define INA226_SHUNT_OVER_VOLTAGE_BIT	15
@@ -177,6 +181,14 @@ static u16 ina226_interval_to_reg(int interval)
 				ARRAY_SIZE(ina226_avg_tab));
 
 	return INA226_SHIFT_AVG(avg_bits);
+}
+
+static int ina2xx_set_alert_polarity(struct ina2xx_data *data,
+				     unsigned long val)
+{
+	return regmap_update_bits(data->regmap, INA226_MASK_ENABLE,
+				 INA226_ALERT_POLARITY_MASK,
+				 INA226_SHIFT_ALERT_POLARITY(val));
 }
 
 /*
@@ -613,8 +625,6 @@ static const struct attribute_group ina226_group = {
 	.attrs = ina226_attrs,
 };
 
-static const struct i2c_device_id ina2xx_id[];
-
 static int ina2xx_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
@@ -624,10 +634,7 @@ static int ina2xx_probe(struct i2c_client *client)
 	int ret, group = 0;
 	enum ina2xx_ids chip;
 
-	if (client->dev.of_node)
-		chip = (enum ina2xx_ids)of_device_get_match_data(&client->dev);
-	else
-		chip = i2c_match_id(ina2xx_id, client)->driver_data;
+	chip = (uintptr_t)i2c_get_match_data(client);
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
@@ -654,6 +661,29 @@ static int ina2xx_probe(struct i2c_client *client)
 	if (IS_ERR(data->regmap)) {
 		dev_err(dev, "failed to allocate register map\n");
 		return PTR_ERR(data->regmap);
+	}
+
+	ret = devm_regulator_get_enable(dev, "vs");
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to enable vs regulator\n");
+
+	if (chip == ina226) {
+		if (of_property_read_bool(dev->of_node, "ti,alert-polarity-active-high")) {
+			ret = ina2xx_set_alert_polarity(data,
+							INA226_ALERT_POL_HIGH);
+			if (ret < 0) {
+				return dev_err_probe(dev, ret,
+					"failed to set alert polarity active high\n");
+			}
+		} else {
+			/* Set default value i.e active low */
+			ret = ina2xx_set_alert_polarity(data,
+							INA226_ALERT_POL_LOW);
+			if (ret < 0) {
+				return dev_err_probe(dev, ret,
+					"failed to set alert polarity active low\n");
+			}
+		}
 	}
 
 	ret = ina2xx_init(data);
@@ -717,7 +747,7 @@ static struct i2c_driver ina2xx_driver = {
 		.name	= "ina2xx",
 		.of_match_table = of_match_ptr(ina2xx_of_match),
 	},
-	.probe_new	= ina2xx_probe,
+	.probe		= ina2xx_probe,
 	.id_table	= ina2xx_id,
 };
 

@@ -71,7 +71,7 @@
 
 		sdhi0: mmc@85000000 {
 			compatible = "renesas,sdhi-r9a09g011",
-				     "renesas,rcar-gen3-sdhi";
+				     "renesas,rzg2l-sdhi";
 			reg = <0x0 0x85000000 0 0x2000>;
 			interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
@@ -87,7 +87,7 @@
 
 		sdhi1: mmc@85010000  {
 			compatible = "renesas,sdhi-r9a09g011",
-				     "renesas,rcar-gen3-sdhi";
+				     "renesas,rzg2l-sdhi";
 			reg = <0x0 0x85010000 0 0x2000>;
 			interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
@@ -103,7 +103,7 @@
 
 		emmc: mmc@85020000  {
 			compatible = "renesas,sdhi-r9a09g011",
-				     "renesas,rcar-gen3-sdhi";
+				     "renesas,rzg2l-sdhi";
 			reg = <0x0 0x85020000 0 0x2000>;
 			interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
@@ -117,8 +117,53 @@
 			status = "disabled";
 		};
 
+		usb3drd: usb3drd@85070400 {
+			compatible = "renesas,r9a09g011-usb3drd",
+				     "renesas,rzv2m-usb3drd";
+			reg = <0x0 0x85070400 0x0 0x100>;
+			interrupts = <GIC_SPI 242 IRQ_TYPE_LEVEL_HIGH>,
+				      <GIC_SPI 243 IRQ_TYPE_LEVEL_HIGH>,
+				      <GIC_SPI 244 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "drd", "bc", "gpi";
+			clocks = <&cpg CPG_MOD R9A09G011_USB_ACLK_P>,
+				 <&cpg CPG_MOD R9A09G011_USB_PCLK>;
+			clock-names = "axi", "reg";
+			resets = <&cpg R9A09G011_USB_DRD_RESET>;
+			power-domains = <&cpg>;
+			ranges;
+			#address-cells = <2>;
+			#size-cells = <2>;
+			status = "disabled";
+
+			usb3host: usb@85060000 {
+				compatible = "renesas,r9a09g011-xhci",
+					     "renesas,rzv2m-xhci";
+				reg = <0 0x85060000 0 0x2000>;
+				interrupts = <GIC_SPI 245 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&cpg CPG_MOD R9A09G011_USB_ACLK_H>,
+					 <&cpg CPG_MOD R9A09G011_USB_PCLK>;
+				clock-names = "axi", "reg";
+				resets = <&cpg R9A09G011_USB_ARESETN_H>;
+				power-domains = <&cpg>;
+				status = "disabled";
+			};
+
+			usb3peri: usb3peri@85070000 {
+				compatible = "renesas,r9a09g011-usb3-peri",
+					     "renesas,rzv2m-usb3-peri";
+				reg = <0x0 0x85070000 0x0 0x400>;
+				interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&cpg CPG_MOD R9A09G011_USB_ACLK_P>,
+					 <&cpg CPG_MOD R9A09G011_USB_PCLK>;
+				clock-names = "axi", "reg";
+				resets = <&cpg R9A09G011_USB_ARESETN_P>;
+				power-domains = <&cpg>;
+				status = "disabled";
+			};
+		};
+
 		avb: ethernet@a3300000 {
-			compatible = "renesas,etheravb-r9a09g011","renesas,etheravb-rzv2m";
+			compatible = "renesas,etheravb-r9a09g011", "renesas,etheravb-rzv2m";
 			reg = <0 0xa3300000 0 0x800>;
 			interrupts = <GIC_SPI 251 IRQ_TYPE_LEVEL_HIGH>, /* ch0: Rx0 BE */
 				     <GIC_SPI 252 IRQ_TYPE_LEVEL_HIGH>, /* ch1: Rx1 NC */
@@ -189,6 +234,34 @@
 		sys: system-controller@a3f03000 {
 			compatible = "renesas,r9a09g011-sys";
 			reg = <0 0xa3f03000 0 0x400>;
+		};
+
+		csi0: spi@a4020000 {
+			compatible = "renesas,rzv2m-csi";
+			reg = <0 0xa4020000 0 0x80>;
+			interrupts = <GIC_SPI 226 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&cpg CPG_MOD R9A09G011_CSI0_CLK>,
+				 <&cpg CPG_MOD R9A09G011_CPERI_GRPG_PCLK>;
+			clock-names = "csiclk", "pclk";
+			resets = <&cpg R9A09G011_CSI_GPG_PRESETN>;
+			power-domains = <&cpg>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
+
+		csi4: spi@a4020200 {
+			compatible = "renesas,rzv2m-csi";
+			reg = <0 0xa4020200 0 0x80>;
+			interrupts = <GIC_SPI 230 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&cpg CPG_MOD R9A09G011_CSI4_CLK>,
+				 <&cpg CPG_MOD R9A09G011_CPERI_GRPH_PCLK>;
+			clock-names = "csiclk", "pclk";
+			resets = <&cpg R9A09G011_CSI_GPH_PRESETN>;
+			power-domains = <&cpg>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
 		};
 
 		i2c0: i2c@a4030000 {
@@ -299,5 +372,6 @@
 				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
 				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
 				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
+		interrupt-names = "sec-phys", "phys", "virt", "hyp-phys";
 	};
 };

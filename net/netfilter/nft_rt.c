@@ -73,14 +73,14 @@ void nft_rt_get_eval(const struct nft_expr *expr,
 		if (nft_pf(pkt) != NFPROTO_IPV4)
 			goto err;
 
-		*dest = (__force u32)rt_nexthop((const struct rtable *)dst,
+		*dest = (__force u32)rt_nexthop(dst_rtable(dst),
 						ip_hdr(skb)->daddr);
 		break;
 	case NFT_RT_NEXTHOP6:
 		if (nft_pf(pkt) != NFPROTO_IPV6)
 			goto err;
 
-		memcpy(dest, rt6_nexthop((struct rt6_info *)dst,
+		memcpy(dest, rt6_nexthop(dst_rt6_info(dst),
 					 &ipv6_hdr(skb)->daddr),
 		       sizeof(struct in6_addr));
 		break;
@@ -104,7 +104,7 @@ err:
 
 static const struct nla_policy nft_rt_policy[NFTA_RT_MAX + 1] = {
 	[NFTA_RT_DREG]		= { .type = NLA_U32 },
-	[NFTA_RT_KEY]		= { .type = NLA_U32 },
+	[NFTA_RT_KEY]		= NLA_POLICY_MAX(NLA_BE32, 255),
 };
 
 static int nft_rt_get_init(const struct nft_ctx *ctx,
@@ -165,6 +165,11 @@ static int nft_rt_validate(const struct nft_ctx *ctx, const struct nft_expr *exp
 {
 	const struct nft_rt *priv = nft_expr_priv(expr);
 	unsigned int hooks;
+
+	if (ctx->family != NFPROTO_IPV4 &&
+	    ctx->family != NFPROTO_IPV6 &&
+	    ctx->family != NFPROTO_INET)
+		return -EOPNOTSUPP;
 
 	switch (priv->key) {
 	case NFT_RT_NEXTHOP4:

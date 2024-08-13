@@ -1,6 +1,6 @@
-==================================
-Linux GPU Driver Developer's Guide
-==================================
+============================
+GPU Driver Developer's Guide
+============================
 
 .. toctree::
 
@@ -17,6 +17,8 @@ Linux GPU Driver Developer's Guide
    backlight
    vga-switcheroo
    vgaarbiter
+   automated_testing
+   implementation_guidelines
    todo
    rfc/index
 

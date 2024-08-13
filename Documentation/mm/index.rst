@@ -1,6 +1,6 @@
-=====================================
-Linux Memory Management Documentation
-=====================================
+===============================
+Memory Management Documentation
+===============================
 
 Memory Management Guide
 =======================
@@ -26,6 +26,7 @@ see the :doc:`admin guide <../admin-guide/mm/index>`.
    page_cache
    shmfs
    oom
+   allocation-profiling
 
 Legacy Documentation
 ====================
@@ -44,7 +45,6 @@ above structured documentation, or deleted if it has served its purpose.
    balance
    damon/index
    free_page_reporting
-   frontswap
    hmm
    hwpoison
    hugetlbfs_reserv

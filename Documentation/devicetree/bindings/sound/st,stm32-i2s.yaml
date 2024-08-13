@@ -61,6 +61,14 @@ properties:
     description: Configure the I2S device as MCLK clock provider.
     const: 0
 
+  port:
+    $ref: audio-graph-port.yaml#
+    unevaluatedProperties: false
+
+  access-controllers:
+    minItems: 1
+    maxItems: 2
+
 required:
   - compatible
   - "#sound-dai-cells"
@@ -89,6 +97,13 @@ examples:
         dma-names = "rx", "tx";
         pinctrl-names = "default";
         pinctrl-0 = <&i2s2_pins_a>;
+
+        /* assume audio-graph */
+        port {
+            codec_endpoint: endpoint {
+                remote-endpoint = <&codec_endpoint>;
+            };
+        };
     };
 
 ...

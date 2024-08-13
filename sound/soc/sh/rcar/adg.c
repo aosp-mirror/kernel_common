@@ -39,10 +39,10 @@ struct rsnd_adg {
 	int clkin_size;
 	int clkout_size;
 	u32 ckr;
-	u32 rbga;
-	u32 rbgb;
+	u32 brga;
+	u32 brgb;
 
-	int rbg_rate[ADG_HZ_SIZE]; /* RBGA / RBGB */
+	int brg_rate[ADG_HZ_SIZE]; /* BRGA / BRGB */
 };
 
 #define for_each_rsnd_clkin(pos, adg, i)	\
@@ -75,7 +75,7 @@ static const char * const clkout_name_gen2[] = {
 	[CLKOUT3] = "audio_clkout3",
 };
 
-static u32 rsnd_adg_calculate_rbgx(unsigned long div)
+static u32 rsnd_adg_calculate_brgx(unsigned long div)
 {
 	int i;
 
@@ -111,6 +111,13 @@ static u32 rsnd_adg_ssi_ws_timing_gen2(struct rsnd_dai_stream *io)
 			ws = 7;
 			break;
 		}
+	} else {
+		/*
+		 * SSI8 is not connected to ADG.
+		 * Thus SSI9 is using ws = 8
+		 */
+		if (id == 9)
+			ws = 8;
 	}
 
 	return (0x6 + ws) << 8;
@@ -131,8 +138,8 @@ static void __rsnd_adg_get_timesel_ratio(struct rsnd_priv *priv,
 		adg->clkin_rate[CLKA],	/* 0000: CLKA */
 		adg->clkin_rate[CLKB],	/* 0001: CLKB */
 		adg->clkin_rate[CLKC],	/* 0010: CLKC */
-		adg->rbg_rate[ADG_HZ_441],	/* 0011: RBGA */
-		adg->rbg_rate[ADG_HZ_48],	/* 0100: RBGB */
+		adg->brg_rate[ADG_HZ_441],	/* 0011: BRGA */
+		adg->brg_rate[ADG_HZ_48],	/* 0100: BRGB */
 	};
 
 	min = ~0;
@@ -323,10 +330,10 @@ int rsnd_adg_clk_query(struct rsnd_priv *priv, unsigned int rate)
 	/*
 	 * find divided clock from BRGA/BRGB
 	 */
-	if (rate == adg->rbg_rate[ADG_HZ_441])
+	if (rate == adg->brg_rate[ADG_HZ_441])
 		return 0x10;
 
-	if (rate == adg->rbg_rate[ADG_HZ_48])
+	if (rate == adg->brg_rate[ADG_HZ_48])
 		return 0x20;
 
 	return -EIO;
@@ -358,13 +365,11 @@ int rsnd_adg_ssi_clk_try_start(struct rsnd_mod *ssi_mod, unsigned int rate)
 		ckr = 0x80000000; /* BRGB output = 48kHz */
 
 	rsnd_mod_bset(adg_mod, BRGCKR, 0x80770000, adg->ckr | ckr);
-	rsnd_mod_write(adg_mod, BRRA,  adg->rbga);
-	rsnd_mod_write(adg_mod, BRRB,  adg->rbgb);
 
 	dev_dbg(dev, "CLKOUT is based on BRG%c (= %dHz)\n",
 		(ckr) ? 'B' : 'A',
-		(ckr) ?	adg->rbg_rate[ADG_HZ_48] :
-			adg->rbg_rate[ADG_HZ_441]);
+		(ckr) ?	adg->brg_rate[ADG_HZ_48] :
+			adg->brg_rate[ADG_HZ_441]);
 
 	return 0;
 }
@@ -372,8 +377,15 @@ int rsnd_adg_ssi_clk_try_start(struct rsnd_mod *ssi_mod, unsigned int rate)
 void rsnd_adg_clk_control(struct rsnd_priv *priv, int enable)
 {
 	struct rsnd_adg *adg = rsnd_priv_to_adg(priv);
+	struct rsnd_mod *adg_mod = rsnd_mod_get(adg);
 	struct clk *clk;
 	int i;
+
+	if (enable) {
+		rsnd_mod_bset(adg_mod, BRGCKR, 0x80770000, adg->ckr);
+		rsnd_mod_write(adg_mod, BRRA,  adg->brga);
+		rsnd_mod_write(adg_mod, BRRB,  adg->brgb);
+	}
 
 	for_each_rsnd_clkin(clk, adg, i) {
 		if (enable) {
@@ -484,13 +496,13 @@ static int rsnd_adg_get_clkout(struct rsnd_priv *priv)
 	struct device *dev = rsnd_priv_to_dev(priv);
 	struct device_node *np = dev->of_node;
 	struct property *prop;
-	u32 ckr, rbgx, rbga, rbgb;
-	u32 rate, div;
+	u32 ckr, brgx, brga, brgb;
 	u32 req_rate[ADG_HZ_SIZE] = {};
 	uint32_t count = 0;
 	unsigned long req_Hz[ADG_HZ_SIZE];
 	int clkout_size;
 	int i, req_size;
+	int approximate = 0;
 	const char *parent_clk_name = NULL;
 	const char * const *clkout_name;
 	int brg_table[] = {
@@ -501,8 +513,8 @@ static int rsnd_adg_get_clkout(struct rsnd_priv *priv)
 	};
 
 	ckr = 0;
-	rbga = 2; /* default 1/6 */
-	rbgb = 2; /* default 1/6 */
+	brga = 0xff; /* default */
+	brgb = 0xff; /* default */
 
 	/*
 	 * ADG supports BRRA/BRRB output only
@@ -537,42 +549,79 @@ static int rsnd_adg_get_clkout(struct rsnd_priv *priv)
 	 *	rsnd_adg_ssi_clk_try_start()
 	 *	rsnd_ssi_master_clk_start()
 	 */
+
+	/*
+	 * [APPROXIMATE]
+	 *
+	 * clk_i (internal clock) can't create accurate rate, it will be approximate rate.
+	 *
+	 * <Note>
+	 *
+	 * clk_i needs x2 of required maximum rate.
+	 * see
+	 *	- Minimum division of BRRA/BRRB
+	 *	- rsnd_ssi_clk_query()
+	 *
+	 * Sample Settings for TDM 8ch, 32bit width
+	 *
+	 *	8(ch) x 32(bit) x 44100(Hz) x 2<Note> = 22579200
+	 *	8(ch) x 32(bit) x 48000(Hz) x 2<Note> = 24576000
+	 *
+	 *	clock-frequency = <22579200 24576000>;
+	 */
 	for_each_rsnd_clkin(clk, adg, i) {
+		u32 rate, div;
+
 		rate = clk_get_rate(clk);
 
 		if (0 == rate) /* not used */
 			continue;
 
-		/* RBGA */
-		if (!adg->rbg_rate[ADG_HZ_441] && (0 == rate % 44100)) {
-			div = 6;
-			if (req_Hz[ADG_HZ_441])
-				div = rate / req_Hz[ADG_HZ_441];
-			rbgx = rsnd_adg_calculate_rbgx(div);
-			if (BRRx_MASK(rbgx) == rbgx) {
-				rbga = rbgx;
-				adg->rbg_rate[ADG_HZ_441] = rate / div;
+		/* BRGA */
+
+		if (i == CLKI)
+			/* see [APPROXIMATE] */
+			rate = (clk_get_rate(clk) / req_Hz[ADG_HZ_441]) * req_Hz[ADG_HZ_441];
+		if (!adg->brg_rate[ADG_HZ_441] && req_Hz[ADG_HZ_441] && (0 == rate % 44100)) {
+			div = rate / req_Hz[ADG_HZ_441];
+			brgx = rsnd_adg_calculate_brgx(div);
+			if (BRRx_MASK(brgx) == brgx) {
+				brga = brgx;
+				adg->brg_rate[ADG_HZ_441] = rate / div;
 				ckr |= brg_table[i] << 20;
 				if (req_Hz[ADG_HZ_441])
 					parent_clk_name = __clk_get_name(clk);
+				if (i == CLKI)
+					approximate = 1;
 			}
 		}
 
-		/* RBGB */
-		if (!adg->rbg_rate[ADG_HZ_48] && (0 == rate % 48000)) {
-			div = 6;
-			if (req_Hz[ADG_HZ_48])
-				div = rate / req_Hz[ADG_HZ_48];
-			rbgx = rsnd_adg_calculate_rbgx(div);
-			if (BRRx_MASK(rbgx) == rbgx) {
-				rbgb = rbgx;
-				adg->rbg_rate[ADG_HZ_48] = rate / div;
+		/* BRGB */
+
+		if (i == CLKI)
+			/* see [APPROXIMATE] */
+			rate = (clk_get_rate(clk) / req_Hz[ADG_HZ_48]) * req_Hz[ADG_HZ_48];
+		if (!adg->brg_rate[ADG_HZ_48] && req_Hz[ADG_HZ_48] && (0 == rate % 48000)) {
+			div = rate / req_Hz[ADG_HZ_48];
+			brgx = rsnd_adg_calculate_brgx(div);
+			if (BRRx_MASK(brgx) == brgx) {
+				brgb = brgx;
+				adg->brg_rate[ADG_HZ_48] = rate / div;
 				ckr |= brg_table[i] << 16;
 				if (req_Hz[ADG_HZ_48])
 					parent_clk_name = __clk_get_name(clk);
+				if (i == CLKI)
+					approximate = 1;
 			}
 		}
 	}
+
+	if (!(adg->brg_rate[ADG_HZ_48]  && req_Hz[ADG_HZ_48]) &&
+	    !(adg->brg_rate[ADG_HZ_441] && req_Hz[ADG_HZ_441]))
+		goto rsnd_adg_get_clkout_end;
+
+	if (approximate)
+		dev_info(dev, "It uses CLK_I as approximate rate");
 
 	clkout_name = clkout_name_gen2;
 	clkout_size = ARRAY_SIZE(clkout_name_gen2);
@@ -620,8 +669,8 @@ static int rsnd_adg_get_clkout(struct rsnd_priv *priv)
 
 rsnd_adg_get_clkout_end:
 	adg->ckr = ckr;
-	adg->rbga = rbga;
-	adg->rbgb = rbgb;
+	adg->brga = brga;
+	adg->brgb = brgb;
 
 	return 0;
 
@@ -663,9 +712,9 @@ void rsnd_adg_clk_dbg_info(struct rsnd_priv *priv, struct seq_file *m)
 			__clk_get_name(clk), clk, clk_get_rate(clk));
 
 	dbg_msg(dev, m, "BRGCKR = 0x%08x, BRRA/BRRB = 0x%x/0x%x\n",
-		adg->ckr, adg->rbga, adg->rbgb);
-	dbg_msg(dev, m, "BRGA (for 44100 base) = %d\n", adg->rbg_rate[ADG_HZ_441]);
-	dbg_msg(dev, m, "BRGB (for 48000 base) = %d\n", adg->rbg_rate[ADG_HZ_48]);
+		adg->ckr, adg->brga, adg->brgb);
+	dbg_msg(dev, m, "BRGA (for 44100 base) = %d\n", adg->brg_rate[ADG_HZ_441]);
+	dbg_msg(dev, m, "BRGB (for 48000 base) = %d\n", adg->brg_rate[ADG_HZ_48]);
 
 	/*
 	 * Actual CLKOUT will be exchanged in rsnd_adg_ssi_clk_try_start()

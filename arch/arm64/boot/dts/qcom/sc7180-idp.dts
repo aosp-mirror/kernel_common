@@ -11,6 +11,7 @@
 #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
 #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
 #include "sc7180.dtsi"
+#include "sc7180-firmware-tfa.dtsi"
 #include "pm6150.dtsi"
 #include "pm6150l.dtsi"
 
@@ -295,7 +296,11 @@
 	};
 };
 
-&dsi0 {
+&mdss {
+	status = "okay";
+};
+
+&mdss_dsi0 {
 	status = "okay";
 
 	vdda-supply = <&vreg_l3c_1p2>;
@@ -312,14 +317,9 @@
 
 		reset-gpios = <&pm6150l_gpios 3 GPIO_ACTIVE_HIGH>;
 
-		ports {
-			#address-cells = <1>;
-			#size-cells = <0>;
-			port@0 {
-				reg = <0>;
-				panel0_in: endpoint {
-					remote-endpoint = <&dsi0_out>;
-				};
+		port {
+			panel0_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
 			};
 		};
 	};
@@ -334,17 +334,9 @@
 	};
 };
 
-&dsi_phy {
+&mdss_dsi0_phy {
 	status = "okay";
 	vdds-supply = <&vreg_l4a_0p8>;
-};
-
-&mdp {
-	status = "okay";
-};
-
-&mdss {
-	status = "okay";
 };
 
 &qfprom {
@@ -354,7 +346,7 @@
 &qspi {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&qspi_clk &qspi_cs0 &qspi_data01>;
+	pinctrl-0 = <&qspi_clk>, <&qspi_cs0>, <&qspi_data0>, <&qspi_data1>;
 
 	flash@0 {
 		compatible = "jedec,spi-nor";
@@ -396,6 +388,11 @@
 
 	qcom,halt-regs = <&tcsr_regs_1 0x3000 0x5000 0x4000>;
 	qcom,spare-regs = <&tcsr_regs_2 0xb3e4>;
+};
+
+&scm {
+	/* TF-A firmware maps memory cached so mark dma-coherent to match. */
+	dma-coherent;
 };
 
 &sdhc_1 {
@@ -512,8 +509,11 @@
 	bias-disable;
 };
 
-&qspi_data01 {
-	/* High-Z when no transfers; nice to park the lines */
+&qspi_data0 {
+	bias-pull-up;
+};
+
+&qspi_data1 {
 	bias-pull-up;
 };
 

@@ -15,7 +15,7 @@ struct switchdev_obj_port_mdb;
 struct switchdev_vlan_msti;
 struct phy_device;
 
-bool dsa_port_supports_hwtstamp(struct dsa_port *dp, struct ifreq *ifr);
+bool dsa_port_supports_hwtstamp(struct dsa_port *dp);
 void dsa_port_set_tag_protocol(struct dsa_port *cpu_dp,
 			       const struct dsa_device_ops *tag_ops);
 int dsa_port_set_state(struct dsa_port *dp, u8 state, bool do_fast_age);
@@ -103,12 +103,13 @@ int dsa_port_phylink_create(struct dsa_port *dp);
 void dsa_port_phylink_destroy(struct dsa_port *dp);
 int dsa_shared_port_link_register_of(struct dsa_port *dp);
 void dsa_shared_port_link_unregister_of(struct dsa_port *dp);
-int dsa_port_hsr_join(struct dsa_port *dp, struct net_device *hsr);
+int dsa_port_hsr_join(struct dsa_port *dp, struct net_device *hsr,
+		      struct netlink_ext_ack *extack);
 void dsa_port_hsr_leave(struct dsa_port *dp, struct net_device *hsr);
 int dsa_port_tag_8021q_vlan_add(struct dsa_port *dp, u16 vid, bool broadcast);
 void dsa_port_tag_8021q_vlan_del(struct dsa_port *dp, u16 vid, bool broadcast);
 void dsa_port_set_host_flood(struct dsa_port *dp, bool uc, bool mc);
-int dsa_port_change_master(struct dsa_port *dp, struct net_device *master,
-			   struct netlink_ext_ack *extack);
+int dsa_port_change_conduit(struct dsa_port *dp, struct net_device *conduit,
+			    struct netlink_ext_ack *extack);
 
 #endif

@@ -173,7 +173,6 @@ static bool sync_rcu_exp_done_unlocked(struct rcu_node *rnp)
 	return ret;
 }
 
-
 /*
  * Report the exit from RCU read-side critical section for the last task
  * that queued itself during or before the current expedited preemptible-RCU
@@ -199,10 +198,9 @@ static void __rcu_report_exp_rnp(struct rcu_node *rnp,
 		}
 		if (rnp->parent == NULL) {
 			raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
-			if (wake) {
-				smp_mb(); /* EGP done before wake_up(). */
-				swake_up_one(&rcu_state.expedited_wq);
-			}
+			if (wake)
+				swake_up_one_online(&rcu_state.expedited_wq);
+
 			break;
 		}
 		mask = rnp->grpmask;
@@ -267,7 +265,12 @@ static bool sync_exp_work_done(unsigned long s)
 {
 	if (rcu_exp_gp_seq_done(s)) {
 		trace_rcu_exp_grace_period(rcu_state.name, s, TPS("done"));
-		smp_mb(); /* Ensure test happens before caller kfree(). */
+		/*
+		 * Order GP completion with preceding accesses. Order also GP
+		 * completion with post GP update side accesses. Pairs with
+		 * rcu_seq_end().
+		 */
+		smp_mb();
 		return true;
 	}
 	return false;
@@ -359,7 +362,21 @@ static void __sync_rcu_exp_select_node_cpus(struct rcu_exp_work *rewp)
 		    !(rnp->qsmaskinitnext & mask)) {
 			mask_ofl_test |= mask;
 		} else {
-			snap = rcu_dynticks_snap(cpu);
+			/*
+			 * Full ordering between remote CPU's post idle accesses
+			 * and updater's accesses prior to current GP (and also
+			 * the started GP sequence number) is enforced by
+			 * rcu_seq_start() implicit barrier, relayed by kworkers
+			 * locking and even further by smp_mb__after_unlock_lock()
+			 * barriers chained all the way throughout the rnp locking
+			 * tree since sync_exp_reset_tree() and up to the current
+			 * leaf rnp locking.
+			 *
+			 * Ordering between remote CPU's pre idle accesses and
+			 * post grace period updater's accesses is enforced by the
+			 * below acquire semantic.
+			 */
+			snap = ct_dynticks_cpu_acquire(cpu);
 			if (rcu_dynticks_in_eqs(snap))
 				mask_ofl_test |= mask;
 			else
@@ -420,7 +437,6 @@ retry_ipi:
 
 static void rcu_exp_sel_wait_wake(unsigned long s);
 
-#ifdef CONFIG_RCU_EXP_KTHREAD
 static void sync_rcu_exp_select_node_cpus(struct kthread_work *wp)
 {
 	struct rcu_exp_work *rewp =
@@ -429,9 +445,14 @@ static void sync_rcu_exp_select_node_cpus(struct kthread_work *wp)
 	__sync_rcu_exp_select_node_cpus(rewp);
 }
 
-static inline bool rcu_gp_par_worker_started(void)
+static inline bool rcu_exp_worker_started(void)
 {
-	return !!READ_ONCE(rcu_exp_par_gp_kworker);
+	return !!READ_ONCE(rcu_exp_gp_kworker);
+}
+
+static inline bool rcu_exp_par_worker_started(struct rcu_node *rnp)
+{
+	return !!READ_ONCE(rnp->exp_kworker);
 }
 
 static inline void sync_rcu_exp_select_cpus_queue_work(struct rcu_node *rnp)
@@ -442,7 +463,7 @@ static inline void sync_rcu_exp_select_cpus_queue_work(struct rcu_node *rnp)
 	 * another work item on the same kthread worker can result in
 	 * deadlock.
 	 */
-	kthread_queue_work(rcu_exp_par_gp_kworker, &rnp->rew.rew_work);
+	kthread_queue_work(READ_ONCE(rnp->exp_kworker), &rnp->rew.rew_work);
 }
 
 static inline void sync_rcu_exp_select_cpus_flush_work(struct rcu_node *rnp)
@@ -467,64 +488,6 @@ static inline void synchronize_rcu_expedited_queue_work(struct rcu_exp_work *rew
 	kthread_queue_work(rcu_exp_gp_kworker, &rew->rew_work);
 }
 
-static inline void synchronize_rcu_expedited_destroy_work(struct rcu_exp_work *rew)
-{
-}
-#else /* !CONFIG_RCU_EXP_KTHREAD */
-static void sync_rcu_exp_select_node_cpus(struct work_struct *wp)
-{
-	struct rcu_exp_work *rewp =
-		container_of(wp, struct rcu_exp_work, rew_work);
-
-	__sync_rcu_exp_select_node_cpus(rewp);
-}
-
-static inline bool rcu_gp_par_worker_started(void)
-{
-	return !!READ_ONCE(rcu_par_gp_wq);
-}
-
-static inline void sync_rcu_exp_select_cpus_queue_work(struct rcu_node *rnp)
-{
-	int cpu = find_next_bit(&rnp->ffmask, BITS_PER_LONG, -1);
-
-	INIT_WORK(&rnp->rew.rew_work, sync_rcu_exp_select_node_cpus);
-	/* If all offline, queue the work on an unbound CPU. */
-	if (unlikely(cpu > rnp->grphi - rnp->grplo))
-		cpu = WORK_CPU_UNBOUND;
-	else
-		cpu += rnp->grplo;
-	queue_work_on(cpu, rcu_par_gp_wq, &rnp->rew.rew_work);
-}
-
-static inline void sync_rcu_exp_select_cpus_flush_work(struct rcu_node *rnp)
-{
-	flush_work(&rnp->rew.rew_work);
-}
-
-/*
- * Work-queue handler to drive an expedited grace period forward.
- */
-static void wait_rcu_exp_gp(struct work_struct *wp)
-{
-	struct rcu_exp_work *rewp;
-
-	rewp = container_of(wp, struct rcu_exp_work, rew_work);
-	rcu_exp_sel_wait_wake(rewp->rew_s);
-}
-
-static inline void synchronize_rcu_expedited_queue_work(struct rcu_exp_work *rew)
-{
-	INIT_WORK_ONSTACK(&rew->rew_work, wait_rcu_exp_gp);
-	queue_work(rcu_gp_wq, &rew->rew_work);
-}
-
-static inline void synchronize_rcu_expedited_destroy_work(struct rcu_exp_work *rew)
-{
-	destroy_work_on_stack(&rew->rew_work);
-}
-#endif /* CONFIG_RCU_EXP_KTHREAD */
-
 /*
  * Select the nodes that the upcoming expedited grace period needs
  * to wait for.
@@ -542,7 +505,7 @@ static void sync_rcu_exp_select_cpus(void)
 		rnp->exp_need_flush = false;
 		if (!READ_ONCE(rnp->expmask))
 			continue; /* Avoid early boot non-existent wq. */
-		if (!rcu_gp_par_worker_started() ||
+		if (!rcu_exp_par_worker_started(rnp) ||
 		    rcu_scheduler_active != RCU_SCHEDULER_RUNNING ||
 		    rcu_is_last_leaf_node(rnp)) {
 			/* No worker started yet or last leaf, do direct call. */
@@ -594,6 +557,7 @@ static void synchronize_rcu_expedited_wait(void)
 	struct rcu_data *rdp;
 	struct rcu_node *rnp;
 	struct rcu_node *rnp_root = rcu_get_root();
+	unsigned long flags;
 
 	trace_rcu_exp_grace_period(rcu_state.name, rcu_exp_gp_seq_endval(), TPS("startwait"));
 	jiffies_stall = rcu_exp_jiffies_till_stall_check();
@@ -602,17 +566,17 @@ static void synchronize_rcu_expedited_wait(void)
 		if (synchronize_rcu_expedited_wait_once(1))
 			return;
 		rcu_for_each_leaf_node(rnp) {
+			raw_spin_lock_irqsave_rcu_node(rnp, flags);
 			mask = READ_ONCE(rnp->expmask);
 			for_each_leaf_node_cpu_mask(rnp, cpu, mask) {
 				rdp = per_cpu_ptr(&rcu_data, cpu);
 				if (rdp->rcu_forced_tick_exp)
 					continue;
 				rdp->rcu_forced_tick_exp = true;
-				preempt_disable();
 				if (cpu_online(cpu))
 					tick_dep_set_cpu(cpu, TICK_DEP_BIT_RCU_EXP);
-				preempt_enable();
 			}
+			raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 		}
 		j = READ_ONCE(jiffies_till_first_fqs);
 		if (synchronize_rcu_expedited_wait_once(j + HZ))
@@ -620,10 +584,14 @@ static void synchronize_rcu_expedited_wait(void)
 	}
 
 	for (;;) {
+		unsigned long j;
+
 		if (synchronize_rcu_expedited_wait_once(jiffies_stall))
 			return;
 		if (rcu_stall_is_suppressed())
 			continue;
+		j = jiffies;
+		rcu_stall_notifier_call_chain(RCU_STALL_NOTIFY_EXP, (void *)(j - jiffies_start));
 		trace_rcu_stall_warning(rcu_state.name, TPS("ExpeditedStall"));
 		pr_err("INFO: %s detected expedited stalls on CPUs/tasks: {",
 		       rcu_state.name);
@@ -642,11 +610,11 @@ static void synchronize_rcu_expedited_wait(void)
 					"O."[!!cpu_online(cpu)],
 					"o."[!!(rdp->grpmask & rnp->expmaskinit)],
 					"N."[!!(rdp->grpmask & rnp->expmaskinitnext)],
-					"D."[!!(rdp->cpu_no_qs.b.exp)]);
+					"D."[!!data_race(rdp->cpu_no_qs.b.exp)]);
 			}
 		}
 		pr_cont(" } %lu jiffies s: %lu root: %#lx/%c\n",
-			jiffies - jiffies_start, rcu_state.expedited_sequence,
+			j - jiffies_start, rcu_state.expedited_sequence,
 			data_race(rnp_root->expmask),
 			".T"[!!data_race(rnp_root->exp_tasks)]);
 		if (ndetected) {
@@ -802,9 +770,11 @@ static int rcu_print_task_exp_stall(struct rcu_node *rnp)
 	int ndetected = 0;
 	struct task_struct *t;
 
-	if (!READ_ONCE(rnp->exp_tasks))
-		return 0;
 	raw_spin_lock_irqsave_rcu_node(rnp, flags);
+	if (!rnp->exp_tasks) {
+		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
+		return 0;
+	}
 	t = list_entry(rnp->exp_tasks->prev,
 		       struct task_struct, rcu_node_entry);
 	list_for_each_entry_continue(t, &rnp->blkd_tasks, rcu_node_entry) {
@@ -950,7 +920,6 @@ static void rcu_exp_print_detail_task_stall_rnp(struct rcu_node *rnp)
  */
 void synchronize_rcu_expedited(void)
 {
-	bool boottime = (rcu_scheduler_active == RCU_SCHEDULER_INIT);
 	unsigned long flags;
 	struct rcu_exp_work rew;
 	struct rcu_node *rnp;
@@ -980,7 +949,7 @@ void synchronize_rcu_expedited(void)
 
 	/* If expedited grace periods are prohibited, fall back to normal. */
 	if (rcu_gp_is_normal()) {
-		wait_rcu_gp(call_rcu_hurry);
+		synchronize_rcu_normal();
 		return;
 	}
 
@@ -990,7 +959,7 @@ void synchronize_rcu_expedited(void)
 		return;  /* Someone else did our work for us. */
 
 	/* Ensure that load happens before action based on it. */
-	if (unlikely(boottime)) {
+	if (unlikely((rcu_scheduler_active == RCU_SCHEDULER_INIT) || !rcu_exp_worker_started())) {
 		/* Direct call during scheduler init and early_initcalls(). */
 		rcu_exp_sel_wait_wake(s);
 	} else {
@@ -1003,13 +972,9 @@ void synchronize_rcu_expedited(void)
 	rnp = rcu_get_root();
 	wait_event(rnp->exp_wq[rcu_seq_ctr(s) & 0x3],
 		   sync_exp_work_done(s));
-	smp_mb(); /* Work actions happen before return. */
 
 	/* Let the next expedited grace period start. */
 	mutex_unlock(&rcu_state.exp_mutex);
-
-	if (likely(!boottime))
-		synchronize_rcu_expedited_destroy_work(&rew);
 }
 EXPORT_SYMBOL_GPL(synchronize_rcu_expedited);
 
@@ -1065,9 +1030,10 @@ unsigned long start_poll_synchronize_rcu_expedited(void)
 	if (rcu_init_invoked())
 		raw_spin_lock_irqsave(&rnp->exp_poll_lock, flags);
 	if (!poll_state_synchronize_rcu(s)) {
-		rnp->exp_seq_poll_rq = s;
-		if (rcu_init_invoked())
+		if (rcu_init_invoked()) {
+			rnp->exp_seq_poll_rq = s;
 			queue_work(rcu_gp_wq, &rnp->exp_poll_wq);
+		}
 	}
 	if (rcu_init_invoked())
 		raw_spin_unlock_irqrestore(&rnp->exp_poll_lock, flags);

@@ -70,12 +70,11 @@ enum lm3601x_type {
 };
 
 /**
- * struct lm3601x_led -
+ * struct lm3601x_led - private lm3601x LED data
  * @fled_cdev: flash LED class device pointer
  * @client: Pointer to the I2C client
  * @regmap: Devices register map
  * @lock: Lock for reading/writing the device
- * @led_name: LED label for the Torch or IR LED
  * @flash_timeout: the timeout for the flash
  * @last_flag: last known flags register value
  * @torch_current_max: maximum current for the torch
@@ -123,7 +122,7 @@ static const struct regmap_config lm3601x_regmap = {
 	.max_register = LM3601X_DEV_ID_REG,
 	.reg_defaults = lm3601x_regmap_defs,
 	.num_reg_defaults = ARRAY_SIZE(lm3601x_regmap_defs),
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 	.volatile_reg = lm3601x_volatile_reg,
 };
 
@@ -471,7 +470,7 @@ static struct i2c_driver lm3601x_i2c_driver = {
 		.name = "lm3601x",
 		.of_match_table = of_lm3601x_leds_match,
 	},
-	.probe_new = lm3601x_probe,
+	.probe = lm3601x_probe,
 	.remove = lm3601x_remove,
 	.id_table = lm3601x_id,
 };

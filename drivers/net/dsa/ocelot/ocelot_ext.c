@@ -4,7 +4,6 @@
  */
 
 #include <linux/mfd/ocelot.h>
-#include <linux/phylink.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <soc/mscc/ocelot.h>
@@ -21,13 +20,13 @@ static const u32 vsc7512_port_modes[VSC7514_NUM_PORTS] = {
 	OCELOT_PORT_MODE_INTERNAL,
 	OCELOT_PORT_MODE_INTERNAL,
 	OCELOT_PORT_MODE_INTERNAL,
-	OCELOT_PORT_MODE_NONE,
-	OCELOT_PORT_MODE_NONE,
-	OCELOT_PORT_MODE_NONE,
-	OCELOT_PORT_MODE_NONE,
-	OCELOT_PORT_MODE_NONE,
-	OCELOT_PORT_MODE_NONE,
-	OCELOT_PORT_MODE_NONE,
+	OCELOT_PORT_MODE_SERDES,
+	OCELOT_PORT_MODE_SERDES,
+	OCELOT_PORT_MODE_SERDES,
+	OCELOT_PORT_MODE_SERDES,
+	OCELOT_PORT_MODE_SERDES,
+	OCELOT_PORT_MODE_SGMII,
+	OCELOT_PORT_MODE_SERDES,
 };
 
 static const struct ocelot_ops ocelot_ext_ops = {
@@ -60,6 +59,8 @@ static const struct felix_info vsc7512_info = {
 	.num_ports			= VSC7514_NUM_PORTS,
 	.num_tx_queues			= OCELOT_NUM_TC,
 	.port_modes			= vsc7512_port_modes,
+	.phylink_mac_config		= ocelot_phylink_mac_config,
+	.configure_serdes		= ocelot_port_configure_serdes,
 };
 
 static int ocelot_ext_probe(struct platform_device *pdev)
@@ -114,19 +115,17 @@ err_free_felix:
 	return err;
 }
 
-static int ocelot_ext_remove(struct platform_device *pdev)
+static void ocelot_ext_remove(struct platform_device *pdev)
 {
 	struct felix *felix = dev_get_drvdata(&pdev->dev);
 
 	if (!felix)
-		return 0;
+		return;
 
 	dsa_unregister_switch(felix->ds);
 
 	kfree(felix->ds);
 	kfree(felix);
-
-	return 0;
 }
 
 static void ocelot_ext_shutdown(struct platform_device *pdev)
@@ -149,11 +148,11 @@ MODULE_DEVICE_TABLE(of, ocelot_ext_switch_of_match);
 
 static struct platform_driver ocelot_ext_switch_driver = {
 	.driver = {
-		.name = "ocelot-switch",
-		.of_match_table = of_match_ptr(ocelot_ext_switch_of_match),
+		.name = "ocelot-ext-switch",
+		.of_match_table = ocelot_ext_switch_of_match,
 	},
 	.probe = ocelot_ext_probe,
-	.remove = ocelot_ext_remove,
+	.remove_new = ocelot_ext_remove,
 	.shutdown = ocelot_ext_shutdown,
 };
 module_platform_driver(ocelot_ext_switch_driver);

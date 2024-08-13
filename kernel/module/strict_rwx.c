@@ -11,115 +11,71 @@
 #include <linux/set_memory.h>
 #include "internal.h"
 
-/*
- * LKM RO/NX protection: protect module's text/ro-data
- * from modification and any data from execution.
- *
- * General layout of module is:
- *          [text] [read-only-data] [ro-after-init] [writable data]
- * text_size -----^                ^               ^               ^
- * ro_size ------------------------|               |               |
- * ro_after_init_size -----------------------------|               |
- * size -----------------------------------------------------------|
- *
- * These values are always page-aligned (as is base) when
- * CONFIG_STRICT_MODULE_RWX is set.
- */
+static int module_set_memory(const struct module *mod, enum mod_mem_type type,
+			     int (*set_memory)(unsigned long start, int num_pages))
+{
+	const struct module_memory *mod_mem = &mod->mem[type];
+
+	if (!mod_mem->base)
+		return 0;
+
+	set_vm_flush_reset_perms(mod_mem->base);
+	return set_memory((unsigned long)mod_mem->base, mod_mem->size >> PAGE_SHIFT);
+}
 
 /*
  * Since some arches are moving towards PAGE_KERNEL module allocations instead
- * of PAGE_KERNEL_EXEC, keep frob_text() and module_enable_x() independent of
+ * of PAGE_KERNEL_EXEC, keep module_enable_x() independent of
  * CONFIG_STRICT_MODULE_RWX because they are needed regardless of whether we
  * are strict.
  */
-static void frob_text(const struct module_layout *layout,
-		      int (*set_memory)(unsigned long start, int num_pages))
+int module_enable_text_rox(const struct module *mod)
 {
-	set_memory((unsigned long)layout->base,
-		   PAGE_ALIGN(layout->text_size) >> PAGE_SHIFT);
+	for_class_mod_mem_type(type, text) {
+		int ret;
+
+		if (IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
+			ret = module_set_memory(mod, type, set_memory_rox);
+		else
+			ret = module_set_memory(mod, type, set_memory_x);
+		if (ret)
+			return ret;
+	}
+	return 0;
 }
 
-static void frob_rodata(const struct module_layout *layout,
-		 int (*set_memory)(unsigned long start, int num_pages))
+int module_enable_rodata_ro(const struct module *mod, bool after_init)
 {
-	set_memory((unsigned long)layout->base + layout->text_size,
-		   (layout->ro_size - layout->text_size) >> PAGE_SHIFT);
-}
+	int ret;
 
-static void frob_ro_after_init(const struct module_layout *layout,
-			int (*set_memory)(unsigned long start, int num_pages))
-{
-	set_memory((unsigned long)layout->base + layout->ro_size,
-		   (layout->ro_after_init_size - layout->ro_size) >> PAGE_SHIFT);
-}
+	if (!IS_ENABLED(CONFIG_STRICT_MODULE_RWX) || !rodata_enabled)
+		return 0;
 
-static void frob_writable_data(const struct module_layout *layout,
-			int (*set_memory)(unsigned long start, int num_pages))
-{
-	set_memory((unsigned long)layout->base + layout->ro_after_init_size,
-		   (layout->size - layout->ro_after_init_size) >> PAGE_SHIFT);
-}
-
-static bool layout_check_misalignment(const struct module_layout *layout)
-{
-	return WARN_ON(!PAGE_ALIGNED(layout->base)) ||
-	       WARN_ON(!PAGE_ALIGNED(layout->text_size)) ||
-	       WARN_ON(!PAGE_ALIGNED(layout->ro_size)) ||
-	       WARN_ON(!PAGE_ALIGNED(layout->ro_after_init_size)) ||
-	       WARN_ON(!PAGE_ALIGNED(layout->size));
-}
-
-bool module_check_misalignment(const struct module *mod)
-{
-	if (!IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
-		return false;
-
-	return layout_check_misalignment(&mod->core_layout) ||
-	       layout_check_misalignment(&mod->data_layout) ||
-	       layout_check_misalignment(&mod->init_layout);
-}
-
-void module_enable_x(const struct module *mod)
-{
-	if (!PAGE_ALIGNED(mod->core_layout.base) ||
-	    !PAGE_ALIGNED(mod->init_layout.base))
-		return;
-
-	frob_text(&mod->core_layout, set_memory_x);
-	frob_text(&mod->init_layout, set_memory_x);
-}
-
-void module_enable_ro(const struct module *mod, bool after_init)
-{
-	if (!IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
-		return;
-#ifdef CONFIG_STRICT_MODULE_RWX
-	if (!rodata_enabled)
-		return;
-#endif
-
-	set_vm_flush_reset_perms(mod->core_layout.base);
-	set_vm_flush_reset_perms(mod->init_layout.base);
-	frob_text(&mod->core_layout, set_memory_ro);
-
-	frob_rodata(&mod->data_layout, set_memory_ro);
-	frob_text(&mod->init_layout, set_memory_ro);
-	frob_rodata(&mod->init_layout, set_memory_ro);
+	ret = module_set_memory(mod, MOD_RODATA, set_memory_ro);
+	if (ret)
+		return ret;
+	ret = module_set_memory(mod, MOD_INIT_RODATA, set_memory_ro);
+	if (ret)
+		return ret;
 
 	if (after_init)
-		frob_ro_after_init(&mod->data_layout, set_memory_ro);
+		return module_set_memory(mod, MOD_RO_AFTER_INIT, set_memory_ro);
+
+	return 0;
 }
 
-void module_enable_nx(const struct module *mod)
+int module_enable_data_nx(const struct module *mod)
 {
 	if (!IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
-		return;
+		return 0;
 
-	frob_rodata(&mod->data_layout, set_memory_nx);
-	frob_ro_after_init(&mod->data_layout, set_memory_nx);
-	frob_writable_data(&mod->data_layout, set_memory_nx);
-	frob_rodata(&mod->init_layout, set_memory_nx);
-	frob_writable_data(&mod->init_layout, set_memory_nx);
+	for_class_mod_mem_type(type, data) {
+		int ret = module_set_memory(mod, type, set_memory_nx);
+
+		if (ret)
+			return ret;
+	}
+	return 0;
 }
 
 int module_enforce_rwx_sections(Elf_Ehdr *hdr, Elf_Shdr *sechdrs,

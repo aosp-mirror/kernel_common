@@ -28,11 +28,11 @@ cleanup_files()
 	rm -f ${perfdata}
 	rm -f ${file}
 	rm -f "${perfdata}.old"
-	trap - exit term int
+	trap - EXIT TERM INT
 	exit $glb_err
 }
 
-trap cleanup_files exit term int
+trap cleanup_files EXIT TERM INT
 
 record_touch_file() {
 	echo "Recording trace (only user mode) with path: CPU$2 => $1"
@@ -89,7 +89,7 @@ is_device_sink() {
 	# cannot support perf PMU.
 	echo "$1" | grep -E -q -v "tpiu"
 
-	if [ $? -eq 0 -a -e "$1/enable_sink" ]; then
+	if [ $? -eq 0 ] && [ -e "$1/enable_sink" ]; then
 
 		pmu_dev="/sys/bus/event_source/devices/cs_etm/sinks/$2"
 
@@ -136,7 +136,9 @@ arm_cs_iterate_devices() {
 
 arm_cs_etm_traverse_path_test() {
 	# Iterate for every ETM device
-	for dev in /sys/bus/coresight/devices/etm*; do
+	for dev in /sys/bus/event_source/devices/cs_etm/cpu*; do
+		# Canonicalize the path
+		dev=`readlink -f $dev`
 
 		# Find the ETM device belonging to which CPU
 		cpu=`cat $dev/cpu`
@@ -150,6 +152,8 @@ arm_cs_etm_system_wide_test() {
 	echo "Recording trace with system wide mode"
 	perf record -o ${perfdata} -e cs_etm// -a -- ls > /dev/null 2>&1
 
+	# System-wide mode should include perf samples so test for that
+	# instead of ls
 	perf_script_branch_samples perf &&
 	perf_report_branch_samples perf &&
 	perf_report_instruction_samples perf
@@ -182,7 +186,29 @@ arm_cs_etm_snapshot_test() {
 	arm_cs_report "CoreSight snapshot testing" $err
 }
 
+arm_cs_etm_basic_test() {
+	echo "Recording trace with '$*'"
+	perf record -o ${perfdata} "$@" -m,8M -- ls > /dev/null 2>&1
+
+	perf_script_branch_samples ls &&
+	perf_report_branch_samples ls &&
+	perf_report_instruction_samples ls
+
+	err=$?
+	arm_cs_report "CoreSight basic testing with '$*'" $err
+}
+
 arm_cs_etm_traverse_path_test
 arm_cs_etm_system_wide_test
 arm_cs_etm_snapshot_test
+
+# Test all combinations of per-thread, system-wide and normal mode with
+# and without timestamps
+arm_cs_etm_basic_test -e cs_etm/timestamp=0/ --per-thread
+arm_cs_etm_basic_test -e cs_etm/timestamp=1/ --per-thread
+arm_cs_etm_basic_test -e cs_etm/timestamp=0/ -a
+arm_cs_etm_basic_test -e cs_etm/timestamp=1/ -a
+arm_cs_etm_basic_test -e cs_etm/timestamp=0/
+arm_cs_etm_basic_test -e cs_etm/timestamp=1/
+
 exit $glb_err

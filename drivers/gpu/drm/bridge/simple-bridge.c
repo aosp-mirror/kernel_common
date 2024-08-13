@@ -8,8 +8,9 @@
 
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/of_graph.h>
+#include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 
 #include <drm/drm_atomic_helper.h>
@@ -50,18 +51,20 @@ drm_connector_to_simple_bridge(struct drm_connector *connector)
 static int simple_bridge_get_modes(struct drm_connector *connector)
 {
 	struct simple_bridge *sbridge = drm_connector_to_simple_bridge(connector);
-	struct edid *edid;
+	const struct drm_edid *drm_edid;
 	int ret;
 
 	if (sbridge->next_bridge->ops & DRM_BRIDGE_OP_EDID) {
-		edid = drm_bridge_get_edid(sbridge->next_bridge, connector);
-		if (!edid)
+		drm_edid = drm_bridge_edid_read(sbridge->next_bridge, connector);
+		if (!drm_edid)
 			DRM_INFO("EDID read failed. Fallback to standard modes\n");
 	} else {
-		edid = NULL;
+		drm_edid = NULL;
 	}
 
-	if (!edid) {
+	drm_edid_connector_update(connector, drm_edid);
+
+	if (!drm_edid) {
 		/*
 		 * In case we cannot retrieve the EDIDs (missing or broken DDC
 		 * bus from the next bridge), fallback on the XGA standards and
@@ -72,9 +75,8 @@ static int simple_bridge_get_modes(struct drm_connector *connector)
 		return ret;
 	}
 
-	drm_connector_update_edid_property(connector, edid);
-	ret = drm_add_edid_modes(connector, edid);
-	kfree(edid);
+	ret = drm_edid_connector_add_modes(connector);
+	drm_edid_free(drm_edid);
 
 	return ret;
 }
@@ -202,11 +204,9 @@ static int simple_bridge_probe(struct platform_device *pdev)
 
 	sbridge->enable = devm_gpiod_get_optional(&pdev->dev, "enable",
 						  GPIOD_OUT_LOW);
-	if (IS_ERR(sbridge->enable)) {
-		if (PTR_ERR(sbridge->enable) != -EPROBE_DEFER)
-			dev_err(&pdev->dev, "Unable to retrieve enable GPIO\n");
-		return PTR_ERR(sbridge->enable);
-	}
+	if (IS_ERR(sbridge->enable))
+		return dev_err_probe(&pdev->dev, PTR_ERR(sbridge->enable),
+				     "Unable to retrieve enable GPIO\n");
 
 	/* Register the bridge. */
 	sbridge->bridge.funcs = &simple_bridge_bridge_funcs;
@@ -218,13 +218,11 @@ static int simple_bridge_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int simple_bridge_remove(struct platform_device *pdev)
+static void simple_bridge_remove(struct platform_device *pdev)
 {
 	struct simple_bridge *sbridge = platform_get_drvdata(pdev);
 
 	drm_bridge_remove(&sbridge->bridge);
-
-	return 0;
 }
 
 /*
@@ -301,7 +299,7 @@ MODULE_DEVICE_TABLE(of, simple_bridge_match);
 
 static struct platform_driver simple_bridge_driver = {
 	.probe	= simple_bridge_probe,
-	.remove	= simple_bridge_remove,
+	.remove_new = simple_bridge_remove,
 	.driver		= {
 		.name		= "simple-bridge",
 		.of_match_table	= simple_bridge_match,

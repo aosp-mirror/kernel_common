@@ -10,36 +10,23 @@
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pm.h>
 
 #include <linux/pinctrl/pinctrl.h>
 
 #include "pinctrl-intel.h"
 
-#define SPT_PAD_OWN		0x020
+#define SPT_H_PAD_OWN		0x020
 #define SPT_H_PADCFGLOCK	0x090
+#define SPT_H_HOSTSW_OWN	0x0d0
+#define SPT_H_GPI_IS		0x100
+#define SPT_H_GPI_IE		0x120
+
+#define SPT_LP_PAD_OWN		0x020
 #define SPT_LP_PADCFGLOCK	0x0a0
-#define SPT_HOSTSW_OWN		0x0d0
-#define SPT_GPI_IS		0x100
-#define SPT_GPI_IE		0x120
-
-#define SPT_COMMUNITY(b, s, e, g, n, v, gs, gn)			\
-	{							\
-		.barno = (b),					\
-		.padown_offset = SPT_PAD_OWN,			\
-		.padcfglock_offset = SPT_##v##_PADCFGLOCK,	\
-		.hostown_offset = SPT_HOSTSW_OWN,		\
-		.is_offset = SPT_GPI_IS,			\
-		.ie_offset = SPT_GPI_IE,			\
-		.gpp_size = (gs),				\
-		.gpp_num_padown_regs = (gn),			\
-		.pin_base = (s),				\
-		.npins = ((e) - (s) + 1),			\
-		.gpps = (g),					\
-		.ngpps = (n),					\
-	}
-
-#define SPT_LP_COMMUNITY(b, s, e)			\
-	SPT_COMMUNITY(b, s, e, NULL, 0, LP, 24, 4)
+#define SPT_LP_HOSTSW_OWN	0x0d0
+#define SPT_LP_GPI_IS		0x100
+#define SPT_LP_GPI_IE		0x120
 
 #define SPT_H_GPP(r, s, e, g)				\
 	{						\
@@ -50,7 +37,10 @@
 	}
 
 #define SPT_H_COMMUNITY(b, s, e, g)			\
-	SPT_COMMUNITY(b, s, e, g, ARRAY_SIZE(g), H, 0, 0)
+	INTEL_COMMUNITY_GPPS(b, s, e, g, SPT_H)
+
+#define SPT_LP_COMMUNITY(b, s, e)			\
+	INTEL_COMMUNITY_SIZE(b, s, e, 24, 4, SPT_LP)
 
 /* Sunrisepoint-LP */
 static const struct pinctrl_pin_desc sptlp_pins[] = {
@@ -590,14 +580,12 @@ static const struct acpi_device_id spt_pinctrl_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, spt_pinctrl_acpi_match);
 
-static INTEL_PINCTRL_PM_OPS(spt_pinctrl_pm_ops);
-
 static struct platform_driver spt_pinctrl_driver = {
 	.probe = intel_pinctrl_probe_by_hid,
 	.driver = {
 		.name = "sunrisepoint-pinctrl",
 		.acpi_match_table = spt_pinctrl_acpi_match,
-		.pm = &spt_pinctrl_pm_ops,
+		.pm = pm_sleep_ptr(&intel_pinctrl_pm_ops),
 	},
 };
 
@@ -617,3 +605,4 @@ MODULE_AUTHOR("Mathias Nyman <mathias.nyman@linux.intel.com>");
 MODULE_AUTHOR("Mika Westerberg <mika.westerberg@linux.intel.com>");
 MODULE_DESCRIPTION("Intel Sunrisepoint PCH pinctrl/GPIO driver");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PINCTRL_INTEL);

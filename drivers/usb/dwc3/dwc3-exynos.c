@@ -128,7 +128,7 @@ vdd33_err:
 	return ret;
 }
 
-static int dwc3_exynos_remove(struct platform_device *pdev)
+static void dwc3_exynos_remove(struct platform_device *pdev)
 {
 	struct dwc3_exynos	*exynos = platform_get_drvdata(pdev);
 	int i;
@@ -143,8 +143,6 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
 
 	regulator_disable(exynos->vdd33);
 	regulator_disable(exynos->vdd10);
-
-	return 0;
 }
 
 static const struct dwc3_exynos_driverdata exynos5250_drvdata = {
@@ -165,6 +163,18 @@ static const struct dwc3_exynos_driverdata exynos7_drvdata = {
 	.suspend_clk_idx = 1,
 };
 
+static const struct dwc3_exynos_driverdata exynos850_drvdata = {
+	.clk_names = { "bus_early", "ref" },
+	.num_clks = 2,
+	.suspend_clk_idx = -1,
+};
+
+static const struct dwc3_exynos_driverdata gs101_drvdata = {
+	.clk_names = { "bus_early", "susp_clk", "link_aclk", "link_pclk" },
+	.num_clks = 4,
+	.suspend_clk_idx = 1,
+};
+
 static const struct of_device_id exynos_dwc3_match[] = {
 	{
 		.compatible = "samsung,exynos5250-dwusb3",
@@ -176,11 +186,16 @@ static const struct of_device_id exynos_dwc3_match[] = {
 		.compatible = "samsung,exynos7-dwusb3",
 		.data = &exynos7_drvdata,
 	}, {
+		.compatible = "samsung,exynos850-dwusb3",
+		.data = &exynos850_drvdata,
+	}, {
+		.compatible = "google,gs101-dwusb3",
+		.data = &gs101_drvdata,
+	}, {
 	}
 };
 MODULE_DEVICE_TABLE(of, exynos_dwc3_match);
 
-#ifdef CONFIG_PM_SLEEP
 static int dwc3_exynos_suspend(struct device *dev)
 {
 	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
@@ -223,22 +238,16 @@ static int dwc3_exynos_resume(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops dwc3_exynos_dev_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(dwc3_exynos_suspend, dwc3_exynos_resume)
-};
-
-#define DEV_PM_OPS	(&dwc3_exynos_dev_pm_ops)
-#else
-#define DEV_PM_OPS	NULL
-#endif /* CONFIG_PM_SLEEP */
+static DEFINE_SIMPLE_DEV_PM_OPS(dwc3_exynos_dev_pm_ops,
+				dwc3_exynos_suspend, dwc3_exynos_resume);
 
 static struct platform_driver dwc3_exynos_driver = {
 	.probe		= dwc3_exynos_probe,
-	.remove		= dwc3_exynos_remove,
+	.remove_new	= dwc3_exynos_remove,
 	.driver		= {
 		.name	= "exynos-dwc3",
 		.of_match_table = exynos_dwc3_match,
-		.pm	= DEV_PM_OPS,
+		.pm	= pm_sleep_ptr(&dwc3_exynos_dev_pm_ops),
 	},
 };
 

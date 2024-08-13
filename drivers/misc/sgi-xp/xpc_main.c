@@ -93,7 +93,7 @@ int xpc_disengage_timelimit = XPC_DISENGAGE_DEFAULT_TIMELIMIT;
 static int xpc_disengage_min_timelimit;	/* = 0 */
 static int xpc_disengage_max_timelimit = 120;
 
-static struct ctl_table xpc_sys_xpc_hb_dir[] = {
+static struct ctl_table xpc_sys_xpc_hb[] = {
 	{
 	 .procname = "hb_interval",
 	 .data = &xpc_hb_interval,
@@ -110,13 +110,8 @@ static struct ctl_table xpc_sys_xpc_hb_dir[] = {
 	 .proc_handler = proc_dointvec_minmax,
 	 .extra1 = &xpc_hb_check_min_interval,
 	 .extra2 = &xpc_hb_check_max_interval},
-	{}
 };
-static struct ctl_table xpc_sys_xpc_dir[] = {
-	{
-	 .procname = "hb",
-	 .mode = 0555,
-	 .child = xpc_sys_xpc_hb_dir},
+static struct ctl_table xpc_sys_xpc[] = {
 	{
 	 .procname = "disengage_timelimit",
 	 .data = &xpc_disengage_timelimit,
@@ -125,16 +120,10 @@ static struct ctl_table xpc_sys_xpc_dir[] = {
 	 .proc_handler = proc_dointvec_minmax,
 	 .extra1 = &xpc_disengage_min_timelimit,
 	 .extra2 = &xpc_disengage_max_timelimit},
-	{}
 };
-static struct ctl_table xpc_sys_dir[] = {
-	{
-	 .procname = "xpc",
-	 .mode = 0555,
-	 .child = xpc_sys_xpc_dir},
-	{}
-};
+
 static struct ctl_table_header *xpc_sysctl;
+static struct ctl_table_header *xpc_sysctl_hb;
 
 /* non-zero if any remote partition disengage was timed out */
 int xpc_disengage_timedout;
@@ -1041,6 +1030,8 @@ xpc_do_exit(enum xp_retval reason)
 
 	if (xpc_sysctl)
 		unregister_sysctl_table(xpc_sysctl);
+	if (xpc_sysctl_hb)
+		unregister_sysctl_table(xpc_sysctl_hb);
 
 	xpc_teardown_partitions();
 
@@ -1162,36 +1153,6 @@ xpc_die_deactivate(void)
 static int
 xpc_system_die(struct notifier_block *nb, unsigned long event, void *_die_args)
 {
-#ifdef CONFIG_IA64		/* !!! temporary kludge */
-	switch (event) {
-	case DIE_MACHINE_RESTART:
-	case DIE_MACHINE_HALT:
-		xpc_die_deactivate();
-		break;
-
-	case DIE_KDEBUG_ENTER:
-		/* Should lack of heartbeat be ignored by other partitions? */
-		if (!xpc_kdebug_ignore)
-			break;
-
-		fallthrough;
-	case DIE_MCA_MONARCH_ENTER:
-	case DIE_INIT_MONARCH_ENTER:
-		xpc_arch_ops.offline_heartbeat();
-		break;
-
-	case DIE_KDEBUG_LEAVE:
-		/* Is lack of heartbeat being ignored by other partitions? */
-		if (!xpc_kdebug_ignore)
-			break;
-
-		fallthrough;
-	case DIE_MCA_MONARCH_LEAVE:
-	case DIE_INIT_MONARCH_LEAVE:
-		xpc_arch_ops.online_heartbeat();
-		break;
-	}
-#else
 	struct die_args *die_args = _die_args;
 
 	switch (event) {
@@ -1213,7 +1174,6 @@ xpc_system_die(struct notifier_block *nb, unsigned long event, void *_die_args)
 	default:
 		xpc_die_deactivate();
 	}
-#endif
 
 	return NOTIFY_DONE;
 }
@@ -1243,7 +1203,8 @@ xpc_init(void)
 		goto out_1;
 	}
 
-	xpc_sysctl = register_sysctl_table(xpc_sys_dir);
+	xpc_sysctl = register_sysctl("xpc", xpc_sys_xpc);
+	xpc_sysctl_hb = register_sysctl("xpc/hb", xpc_sys_xpc_hb);
 
 	/*
 	 * Fill the partition reserved page with the information needed by
@@ -1308,6 +1269,8 @@ out_3:
 	(void)unregister_die_notifier(&xpc_die_notifier);
 	(void)unregister_reboot_notifier(&xpc_reboot_notifier);
 out_2:
+	if (xpc_sysctl_hb)
+		unregister_sysctl_table(xpc_sysctl_hb);
 	if (xpc_sysctl)
 		unregister_sysctl_table(xpc_sysctl);
 

@@ -9,11 +9,11 @@
 #define pr_fmt(fmt) "ACPI: AGDI: " fmt
 
 #include <linux/acpi.h>
-#include <linux/acpi_agdi.h>
 #include <linux/arm_sdei.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include "init.h"
 
 struct agdi_data {
 	int sdei_event;
@@ -58,14 +58,17 @@ static int agdi_probe(struct platform_device *pdev)
 	return agdi_sdei_probe(pdev, adata);
 }
 
-static int agdi_remove(struct platform_device *pdev)
+static void agdi_remove(struct platform_device *pdev)
 {
 	struct agdi_data *adata = dev_get_platdata(&pdev->dev);
 	int err, i;
 
 	err = sdei_event_disable(adata->sdei_event);
-	if (err)
-		return err;
+	if (err) {
+		dev_err(&pdev->dev, "Failed to disable sdei-event #%d (%pe)\n",
+			adata->sdei_event, ERR_PTR(err));
+		return;
+	}
 
 	for (i = 0; i < 3; i++) {
 		err = sdei_event_unregister(adata->sdei_event);
@@ -75,7 +78,9 @@ static int agdi_remove(struct platform_device *pdev)
 		schedule();
 	}
 
-	return err;
+	if (err)
+		dev_err(&pdev->dev, "Failed to unregister sdei-event #%d (%pe)\n",
+			adata->sdei_event, ERR_PTR(err));
 }
 
 static struct platform_driver agdi_driver = {
@@ -83,7 +88,7 @@ static struct platform_driver agdi_driver = {
 		.name = "agdi",
 	},
 	.probe = agdi_probe,
-	.remove = agdi_remove,
+	.remove_new = agdi_remove,
 };
 
 void __init acpi_agdi_init(void)

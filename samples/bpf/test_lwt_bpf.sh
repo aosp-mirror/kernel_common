@@ -21,7 +21,7 @@ IP_LOCAL="192.168.99.1"
 
 PROG_SRC="test_lwt_bpf.c"
 BPF_PROG="test_lwt_bpf.o"
-TRACE_ROOT=/sys/kernel/debug/tracing
+TRACE_ROOT=/sys/kernel/tracing
 CONTEXT_INFO=$(cat ${TRACE_ROOT}/trace_options | grep context)
 
 function lookup_mac()
@@ -376,7 +376,7 @@ DST_MAC=$(lookup_mac $VETH1 $NS1)
 SRC_MAC=$(lookup_mac $VETH0)
 DST_IFINDEX=$(cat /sys/class/net/$VETH0/ifindex)
 
-CLANG_OPTS="-O2 -target bpf -I ../include/"
+CLANG_OPTS="-O2 --target=bpf -I ../include/"
 CLANG_OPTS+=" -DSRC_MAC=$SRC_MAC -DDST_MAC=$DST_MAC -DDST_IFINDEX=$DST_IFINDEX"
 clang $CLANG_OPTS -c $PROG_SRC -o $BPF_PROG
 

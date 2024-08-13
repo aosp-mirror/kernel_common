@@ -838,7 +838,7 @@ static int rtl2830_probe(struct i2c_client *client)
 		goto err_regmap_exit;
 	}
 	dev->muxc->priv = client;
-	ret = i2c_mux_add_adapter(dev->muxc, 0, 0, 0);
+	ret = i2c_mux_add_adapter(dev->muxc, 0, 0);
 	if (ret)
 		goto err_regmap_exit;
 
@@ -886,7 +886,7 @@ static struct i2c_driver rtl2830_driver = {
 		.name			= "rtl2830",
 		.suppress_bind_attrs	= true,
 	},
-	.probe_new	= rtl2830_probe,
+	.probe		= rtl2830_probe,
 	.remove		= rtl2830_remove,
 	.id_table	= rtl2830_id_table,
 };

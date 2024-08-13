@@ -16,6 +16,7 @@
 
 #define pr_fmt(fmt)	"OF: " fmt
 
+#include <linux/cleanup.h>
 #include <linux/console.h>
 #include <linux/ctype.h>
 #include <linux/cpu.h>
@@ -167,6 +168,7 @@ void __init of_core_init(void)
 {
 	struct device_node *np;
 
+	of_platform_register_reconfig_notifier();
 
 	/* Create the kset, and register existing nodes */
 	mutex_lock(&of_mutex);
@@ -287,193 +289,6 @@ const void *of_get_property(const struct device_node *np, const char *name,
 EXPORT_SYMBOL(of_get_property);
 
 /**
- * of_get_cpu_hwid - Get the hardware ID from a CPU device node
- *
- * @cpun: CPU number(logical index) for which device node is required
- * @thread: The local thread number to get the hardware ID for.
- *
- * Return: The hardware ID for the CPU node or ~0ULL if not found.
- */
-u64 of_get_cpu_hwid(struct device_node *cpun, unsigned int thread)
-{
-	const __be32 *cell;
-	int ac, len;
-
-	ac = of_n_addr_cells(cpun);
-	cell = of_get_property(cpun, "reg", &len);
-	if (!cell || !ac || ((sizeof(*cell) * ac * (thread + 1)) > len))
-		return ~0ULL;
-
-	cell += ac * thread;
-	return of_read_number(cell, ac);
-}
-
-/*
- * arch_match_cpu_phys_id - Match the given logical CPU and physical id
- *
- * @cpu: logical cpu index of a core/thread
- * @phys_id: physical identifier of a core/thread
- *
- * CPU logical to physical index mapping is architecture specific.
- * However this __weak function provides a default match of physical
- * id to logical cpu index. phys_id provided here is usually values read
- * from the device tree which must match the hardware internal registers.
- *
- * Returns true if the physical identifier and the logical cpu index
- * correspond to the same core/thread, false otherwise.
- */
-bool __weak arch_match_cpu_phys_id(int cpu, u64 phys_id)
-{
-	return (u32)phys_id == cpu;
-}
-
-/*
- * Checks if the given "prop_name" property holds the physical id of the
- * core/thread corresponding to the logical cpu 'cpu'. If 'thread' is not
- * NULL, local thread number within the core is returned in it.
- */
-static bool __of_find_n_match_cpu_property(struct device_node *cpun,
-			const char *prop_name, int cpu, unsigned int *thread)
-{
-	const __be32 *cell;
-	int ac, prop_len, tid;
-	u64 hwid;
-
-	ac = of_n_addr_cells(cpun);
-	cell = of_get_property(cpun, prop_name, &prop_len);
-	if (!cell && !ac && arch_match_cpu_phys_id(cpu, 0))
-		return true;
-	if (!cell || !ac)
-		return false;
-	prop_len /= sizeof(*cell) * ac;
-	for (tid = 0; tid < prop_len; tid++) {
-		hwid = of_read_number(cell, ac);
-		if (arch_match_cpu_phys_id(cpu, hwid)) {
-			if (thread)
-				*thread = tid;
-			return true;
-		}
-		cell += ac;
-	}
-	return false;
-}
-
-/*
- * arch_find_n_match_cpu_physical_id - See if the given device node is
- * for the cpu corresponding to logical cpu 'cpu'.  Return true if so,
- * else false.  If 'thread' is non-NULL, the local thread number within the
- * core is returned in it.
- */
-bool __weak arch_find_n_match_cpu_physical_id(struct device_node *cpun,
-					      int cpu, unsigned int *thread)
-{
-	/* Check for non-standard "ibm,ppc-interrupt-server#s" property
-	 * for thread ids on PowerPC. If it doesn't exist fallback to
-	 * standard "reg" property.
-	 */
-	if (IS_ENABLED(CONFIG_PPC) &&
-	    __of_find_n_match_cpu_property(cpun,
-					   "ibm,ppc-interrupt-server#s",
-					   cpu, thread))
-		return true;
-
-	return __of_find_n_match_cpu_property(cpun, "reg", cpu, thread);
-}
-
-/**
- * of_get_cpu_node - Get device node associated with the given logical CPU
- *
- * @cpu: CPU number(logical index) for which device node is required
- * @thread: if not NULL, local thread number within the physical core is
- *          returned
- *
- * The main purpose of this function is to retrieve the device node for the
- * given logical CPU index. It should be used to initialize the of_node in
- * cpu device. Once of_node in cpu device is populated, all the further
- * references can use that instead.
- *
- * CPU logical to physical index mapping is architecture specific and is built
- * before booting secondary cores. This function uses arch_match_cpu_phys_id
- * which can be overridden by architecture specific implementation.
- *
- * Return: A node pointer for the logical cpu with refcount incremented, use
- * of_node_put() on it when done. Returns NULL if not found.
- */
-struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
-{
-	struct device_node *cpun;
-
-	for_each_of_cpu_node(cpun) {
-		if (arch_find_n_match_cpu_physical_id(cpun, cpu, thread))
-			return cpun;
-	}
-	return NULL;
-}
-EXPORT_SYMBOL(of_get_cpu_node);
-
-/**
- * of_cpu_node_to_id: Get the logical CPU number for a given device_node
- *
- * @cpu_node: Pointer to the device_node for CPU.
- *
- * Return: The logical CPU number of the given CPU device_node or -ENODEV if the
- * CPU is not found.
- */
-int of_cpu_node_to_id(struct device_node *cpu_node)
-{
-	int cpu;
-	bool found = false;
-	struct device_node *np;
-
-	for_each_possible_cpu(cpu) {
-		np = of_cpu_device_node_get(cpu);
-		found = (cpu_node == np);
-		of_node_put(np);
-		if (found)
-			return cpu;
-	}
-
-	return -ENODEV;
-}
-EXPORT_SYMBOL(of_cpu_node_to_id);
-
-/**
- * of_get_cpu_state_node - Get CPU's idle state node at the given index
- *
- * @cpu_node: The device node for the CPU
- * @index: The index in the list of the idle states
- *
- * Two generic methods can be used to describe a CPU's idle states, either via
- * a flattened description through the "cpu-idle-states" binding or via the
- * hierarchical layout, using the "power-domains" and the "domain-idle-states"
- * bindings. This function check for both and returns the idle state node for
- * the requested index.
- *
- * Return: An idle state node if found at @index. The refcount is incremented
- * for it, so call of_node_put() on it when done. Returns NULL if not found.
- */
-struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
-					  int index)
-{
-	struct of_phandle_args args;
-	int err;
-
-	err = of_parse_phandle_with_args(cpu_node, "power-domains",
-					"#power-domain-cells", 0, &args);
-	if (!err) {
-		struct device_node *state_node =
-			of_parse_phandle(args.np, "domain-idle-states", index);
-
-		of_node_put(args.np);
-		if (state_node)
-			return state_node;
-	}
-
-	return of_parse_phandle(cpu_node, "cpu-idle-states", index);
-}
-EXPORT_SYMBOL(of_get_cpu_state_node);
-
-/**
  * __of_device_is_compatible() - Check if the node matches given constraints
  * @device: pointer to node
  * @compat: required compatible string, NULL or "" for any match
@@ -581,25 +396,57 @@ int of_device_compatible_match(const struct device_node *device,
 EXPORT_SYMBOL_GPL(of_device_compatible_match);
 
 /**
- * of_machine_is_compatible - Test root of device tree for a given compatible value
- * @compat: compatible string to look for in root node's compatible property.
+ * of_machine_compatible_match - Test root of device tree against a compatible array
+ * @compats: NULL terminated array of compatible strings to look for in root node's compatible property.
  *
- * Return: A positive integer if the root node has the given value in its
+ * Returns true if the root node has any of the given compatible values in its
  * compatible property.
  */
-int of_machine_is_compatible(const char *compat)
+bool of_machine_compatible_match(const char *const *compats)
 {
 	struct device_node *root;
 	int rc = 0;
 
 	root = of_find_node_by_path("/");
 	if (root) {
-		rc = of_device_is_compatible(root, compat);
+		rc = of_device_compatible_match(root, compats);
 		of_node_put(root);
 	}
-	return rc;
+
+	return rc != 0;
 }
-EXPORT_SYMBOL(of_machine_is_compatible);
+EXPORT_SYMBOL(of_machine_compatible_match);
+
+static bool __of_device_is_status(const struct device_node *device,
+				  const char * const*strings)
+{
+	const char *status;
+	int statlen;
+
+	if (!device)
+		return false;
+
+	status = __of_get_property(device, "status", &statlen);
+	if (status == NULL)
+		return false;
+
+	if (statlen > 0) {
+		while (*strings) {
+			unsigned int len = strlen(*strings);
+
+			if ((*strings)[len - 1] == '-') {
+				if (!strncmp(status, *strings, len))
+					return true;
+			} else {
+				if (!strcmp(status, *strings))
+					return true;
+			}
+			strings++;
+		}
+	}
+
+	return false;
+}
 
 /**
  *  __of_device_is_available - check if a device is available for use
@@ -611,22 +458,27 @@ EXPORT_SYMBOL(of_machine_is_compatible);
  */
 static bool __of_device_is_available(const struct device_node *device)
 {
-	const char *status;
-	int statlen;
+	static const char * const ok[] = {"okay", "ok", NULL};
 
 	if (!device)
 		return false;
 
-	status = __of_get_property(device, "status", &statlen);
-	if (status == NULL)
-		return true;
+	return !__of_get_property(device, "status", NULL) ||
+		__of_device_is_status(device, ok);
+}
 
-	if (statlen > 0) {
-		if (!strcmp(status, "okay") || !strcmp(status, "ok"))
-			return true;
-	}
+/**
+ *  __of_device_is_reserved - check if a device is reserved
+ *
+ *  @device: Node to check for availability, with locks already held
+ *
+ *  Return: True if the status property is set to "reserved", false otherwise
+ */
+static bool __of_device_is_reserved(const struct device_node *device)
+{
+	static const char * const reserved[] = {"reserved", NULL};
 
-	return false;
+	return __of_device_is_status(device, reserved);
 }
 
 /**
@@ -660,16 +512,9 @@ EXPORT_SYMBOL(of_device_is_available);
  */
 static bool __of_device_is_fail(const struct device_node *device)
 {
-	const char *status;
+	static const char * const fail[] = {"fail", "fail-", NULL};
 
-	if (!device)
-		return false;
-
-	status = __of_get_property(device, "status", NULL);
-	if (status == NULL)
-		return false;
-
-	return !strcmp(status, "fail") || !strncmp(status, "fail-", 5);
+	return __of_device_is_status(device, fail);
 }
 
 /**
@@ -783,6 +628,29 @@ struct device_node *of_get_next_child(const struct device_node *node,
 }
 EXPORT_SYMBOL(of_get_next_child);
 
+static struct device_node *of_get_next_status_child(const struct device_node *node,
+						    struct device_node *prev,
+						    bool (*checker)(const struct device_node *))
+{
+	struct device_node *next;
+	unsigned long flags;
+
+	if (!node)
+		return NULL;
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+	next = prev ? prev->sibling : node->child;
+	for (; next; next = next->sibling) {
+		if (!checker(next))
+			continue;
+		if (of_node_get(next))
+			break;
+	}
+	of_node_put(prev);
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+	return next;
+}
+
 /**
  * of_get_next_available_child - Find the next available child node
  * @node:	parent node
@@ -794,25 +662,24 @@ EXPORT_SYMBOL(of_get_next_child);
 struct device_node *of_get_next_available_child(const struct device_node *node,
 	struct device_node *prev)
 {
-	struct device_node *next;
-	unsigned long flags;
-
-	if (!node)
-		return NULL;
-
-	raw_spin_lock_irqsave(&devtree_lock, flags);
-	next = prev ? prev->sibling : node->child;
-	for (; next; next = next->sibling) {
-		if (!__of_device_is_available(next))
-			continue;
-		if (of_node_get(next))
-			break;
-	}
-	of_node_put(prev);
-	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-	return next;
+	return of_get_next_status_child(node, prev, __of_device_is_available);
 }
 EXPORT_SYMBOL(of_get_next_available_child);
+
+/**
+ * of_get_next_reserved_child - Find the next reserved child node
+ * @node:	parent node
+ * @prev:	previous child of the parent node, or NULL to get first
+ *
+ * This function is like of_get_next_child(), except that it
+ * automatically skips any disabled nodes (i.e. status = "disabled").
+ */
+struct device_node *of_get_next_reserved_child(const struct device_node *node,
+						struct device_node *prev)
+{
+	return of_get_next_status_child(node, prev, __of_device_is_reserved);
+}
+EXPORT_SYMBOL(of_get_next_reserved_child);
 
 /**
  * of_get_next_cpu_node - Iterate on cpu nodes
@@ -1208,19 +1075,23 @@ struct device_node *of_find_matching_node_and_match(struct device_node *from,
 EXPORT_SYMBOL(of_find_matching_node_and_match);
 
 /**
- * of_modalias_node - Lookup appropriate modalias for a device node
+ * of_alias_from_compatible - Lookup appropriate alias for a device node
+ *			      depending on compatible
  * @node:	pointer to a device tree node
- * @modalias:	Pointer to buffer that modalias value will be copied into
- * @len:	Length of modalias value
+ * @alias:	Pointer to buffer that alias value will be copied into
+ * @len:	Length of alias value
  *
  * Based on the value of the compatible property, this routine will attempt
- * to choose an appropriate modalias value for a particular device tree node.
+ * to choose an appropriate alias value for a particular device tree node.
  * It does this by stripping the manufacturer prefix (as delimited by a ',')
  * from the first entry in the compatible list property.
  *
+ * Note: The matching on just the "product" side of the compatible is a relic
+ * from I2C and SPI. Please do not add any new user.
+ *
  * Return: This routine returns 0 on success, <0 on failure.
  */
-int of_modalias_node(struct device_node *node, char *modalias, int len)
+int of_alias_from_compatible(const struct device_node *node, char *alias, int len)
 {
 	const char *compatible, *p;
 	int cplen;
@@ -1229,10 +1100,10 @@ int of_modalias_node(struct device_node *node, char *modalias, int len)
 	if (!compatible || strlen(compatible) > cplen)
 		return -ENODEV;
 	p = strchr(compatible, ',');
-	strscpy(modalias, p ? p + 1 : compatible, len);
+	strscpy(alias, p ? p + 1 : compatible, len);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(of_modalias_node);
+EXPORT_SYMBOL_GPL(of_alias_from_compatible);
 
 /**
  * of_find_node_by_phandle - Find a node given a phandle
@@ -1523,12 +1394,14 @@ int of_parse_phandle_with_args_map(const struct device_node *np,
 				   const char *stem_name,
 				   int index, struct of_phandle_args *out_args)
 {
-	char *cells_name, *map_name = NULL, *mask_name = NULL;
-	char *pass_name = NULL;
+	char *cells_name __free(kfree) = kasprintf(GFP_KERNEL, "#%s-cells", stem_name);
+	char *map_name __free(kfree) = kasprintf(GFP_KERNEL, "%s-map", stem_name);
+	char *mask_name __free(kfree) = kasprintf(GFP_KERNEL, "%s-map-mask", stem_name);
+	char *pass_name __free(kfree) = kasprintf(GFP_KERNEL, "%s-map-pass-thru", stem_name);
 	struct device_node *cur, *new = NULL;
 	const __be32 *map, *mask, *pass;
-	static const __be32 dummy_mask[] = { [0 ... MAX_PHANDLE_ARGS] = ~0 };
-	static const __be32 dummy_pass[] = { [0 ... MAX_PHANDLE_ARGS] = 0 };
+	static const __be32 dummy_mask[] = { [0 ... MAX_PHANDLE_ARGS] = cpu_to_be32(~0) };
+	static const __be32 dummy_pass[] = { [0 ... MAX_PHANDLE_ARGS] = cpu_to_be32(0) };
 	__be32 initial_match_array[MAX_PHANDLE_ARGS];
 	const __be32 *match_array = initial_match_array;
 	int i, ret, map_len, match;
@@ -1537,27 +1410,13 @@ int of_parse_phandle_with_args_map(const struct device_node *np,
 	if (index < 0)
 		return -EINVAL;
 
-	cells_name = kasprintf(GFP_KERNEL, "#%s-cells", stem_name);
-	if (!cells_name)
+	if (!cells_name || !map_name || !mask_name || !pass_name)
 		return -ENOMEM;
-
-	ret = -ENOMEM;
-	map_name = kasprintf(GFP_KERNEL, "%s-map", stem_name);
-	if (!map_name)
-		goto free;
-
-	mask_name = kasprintf(GFP_KERNEL, "%s-map-mask", stem_name);
-	if (!mask_name)
-		goto free;
-
-	pass_name = kasprintf(GFP_KERNEL, "%s-map-pass-thru", stem_name);
-	if (!pass_name)
-		goto free;
 
 	ret = __of_parse_phandle_with_args(np, list_name, cells_name, -1, index,
 					   out_args);
 	if (ret)
-		goto free;
+		return ret;
 
 	/* Get the #<list>-cells property */
 	cur = out_args->np;
@@ -1574,8 +1433,7 @@ int of_parse_phandle_with_args_map(const struct device_node *np,
 		/* Get the <list>-map property */
 		map = of_get_property(cur, map_name, &map_len);
 		if (!map) {
-			ret = 0;
-			goto free;
+			return 0;
 		}
 		map_len /= sizeof(u32);
 
@@ -1646,16 +1504,11 @@ int of_parse_phandle_with_args_map(const struct device_node *np,
 		out_args->np = new;
 		of_node_put(cur);
 		cur = new;
+		new = NULL;
 	}
 put:
 	of_node_put(cur);
 	of_node_put(new);
-free:
-	kfree(mask_name);
-	kfree(map_name);
-	kfree(cells_name);
-	kfree(pass_name);
-
 	return ret;
 }
 EXPORT_SYMBOL(of_parse_phandle_with_args_map);
@@ -1712,6 +1565,20 @@ int of_count_phandle_with_args(const struct device_node *np, const char *list_na
 }
 EXPORT_SYMBOL(of_count_phandle_with_args);
 
+static struct property *__of_remove_property_from_list(struct property **list, struct property *prop)
+{
+	struct property **next;
+
+	for (next = list; *next; next = &(*next)->next) {
+		if (*next == prop) {
+			*next = prop->next;
+			prop->next = NULL;
+			return prop;
+		}
+	}
+	return NULL;
+}
+
 /**
  * __of_add_property - Add a property to a node without lock operations
  * @np:		Caller's Device Node
@@ -1719,19 +1586,32 @@ EXPORT_SYMBOL(of_count_phandle_with_args);
  */
 int __of_add_property(struct device_node *np, struct property *prop)
 {
+	int rc = 0;
+	unsigned long flags;
 	struct property **next;
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+
+	__of_remove_property_from_list(&np->deadprops, prop);
 
 	prop->next = NULL;
 	next = &np->properties;
 	while (*next) {
-		if (strcmp(prop->name, (*next)->name) == 0)
+		if (strcmp(prop->name, (*next)->name) == 0) {
 			/* duplicate ! don't insert it */
-			return -EEXIST;
-
+			rc = -EEXIST;
+			goto out_unlock;
+		}
 		next = &(*next)->next;
 	}
 	*next = prop;
 
+out_unlock:
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+	if (rc)
+		return rc;
+
+	__of_add_property_sysfs(np, prop);
 	return 0;
 }
 
@@ -1742,18 +1622,10 @@ int __of_add_property(struct device_node *np, struct property *prop)
  */
 int of_add_property(struct device_node *np, struct property *prop)
 {
-	unsigned long flags;
 	int rc;
 
 	mutex_lock(&of_mutex);
-
-	raw_spin_lock_irqsave(&devtree_lock, flags);
 	rc = __of_add_property(np, prop);
-	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-
-	if (!rc)
-		__of_add_property_sysfs(np, prop);
-
 	mutex_unlock(&of_mutex);
 
 	if (!rc)
@@ -1765,20 +1637,23 @@ EXPORT_SYMBOL_GPL(of_add_property);
 
 int __of_remove_property(struct device_node *np, struct property *prop)
 {
-	struct property **next;
+	unsigned long flags;
+	int rc = -ENODEV;
 
-	for (next = &np->properties; *next; next = &(*next)->next) {
-		if (*next == prop)
-			break;
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+
+	if (__of_remove_property_from_list(&np->properties, prop)) {
+		/* Found the property, add it to deadprops list */
+		prop->next = np->deadprops;
+		np->deadprops = prop;
+		rc = 0;
 	}
-	if (*next == NULL)
-		return -ENODEV;
 
-	/* found the node */
-	*next = prop->next;
-	prop->next = np->deadprops;
-	np->deadprops = prop;
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+	if (rc)
+		return rc;
 
+	__of_remove_property_sysfs(np, prop);
 	return 0;
 }
 
@@ -1794,21 +1669,13 @@ int __of_remove_property(struct device_node *np, struct property *prop)
  */
 int of_remove_property(struct device_node *np, struct property *prop)
 {
-	unsigned long flags;
 	int rc;
 
 	if (!prop)
 		return -ENODEV;
 
 	mutex_lock(&of_mutex);
-
-	raw_spin_lock_irqsave(&devtree_lock, flags);
 	rc = __of_remove_property(np, prop);
-	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-
-	if (!rc)
-		__of_remove_property_sysfs(np, prop);
-
 	mutex_unlock(&of_mutex);
 
 	if (!rc)
@@ -1822,6 +1689,11 @@ int __of_update_property(struct device_node *np, struct property *newprop,
 		struct property **oldpropp)
 {
 	struct property **next, *oldprop;
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+
+	__of_remove_property_from_list(&np->deadprops, newprop);
 
 	for (next = &np->properties; *next; next = &(*next)->next) {
 		if (of_prop_cmp((*next)->name, newprop->name) == 0)
@@ -1841,6 +1713,10 @@ int __of_update_property(struct device_node *np, struct property *newprop,
 		*next = newprop;
 	}
 
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+
+	__of_update_property_sysfs(np, newprop, oldprop);
+
 	return 0;
 }
 
@@ -1856,21 +1732,13 @@ int __of_update_property(struct device_node *np, struct property *newprop,
 int of_update_property(struct device_node *np, struct property *newprop)
 {
 	struct property *oldprop;
-	unsigned long flags;
 	int rc;
 
 	if (!newprop->name)
 		return -EINVAL;
 
 	mutex_lock(&of_mutex);
-
-	raw_spin_lock_irqsave(&devtree_lock, flags);
 	rc = __of_update_property(np, newprop, &oldprop);
-	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-
-	if (!rc)
-		__of_update_property_sysfs(np, newprop, oldprop);
-
 	mutex_unlock(&of_mutex);
 
 	if (!rc)
@@ -1884,8 +1752,7 @@ static void of_alias_add(struct alias_prop *ap, struct device_node *np,
 {
 	ap->np = np;
 	ap->id = id;
-	strncpy(ap->stem, stem, stem_len);
-	ap->stem[stem_len] = 0;
+	strscpy(ap->stem, stem, stem_len + 1);
 	list_add_tail(&ap->link, &aliases_lookup);
 	pr_debug("adding DT alias:%s: stem=%s id=%i node=%pOF\n",
 		 ap->alias, ap->stem, ap->id, np);

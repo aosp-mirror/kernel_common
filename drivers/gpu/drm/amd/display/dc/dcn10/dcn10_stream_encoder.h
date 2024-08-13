@@ -127,7 +127,6 @@ struct dcn10_stream_enc_registers {
 	uint32_t AFMT_60958_1;
 	uint32_t AFMT_60958_2;
 	uint32_t DIG_FE_CNTL;
-	uint32_t DIG_FE_CNTL2;
 	uint32_t DIG_FIFO_STATUS;
 	uint32_t DP_MSE_RATE_CNTL;
 	uint32_t DP_MSE_RATE_UPDATE;
@@ -188,6 +187,9 @@ struct dcn10_stream_enc_registers {
 	uint32_t HDMI_GENERIC_PACKET_CONTROL10;
 	uint32_t DIG_CLOCK_PATTERN;
 	uint32_t DIG_FIFO_CTRL0;
+	uint32_t DIG_FE_CLK_CNTL;
+	uint32_t DIG_FE_EN_CNTL;
+	uint32_t STREAM_MAPPER_CONTROL;
 };
 
 
@@ -567,22 +569,37 @@ struct dcn10_stream_enc_registers {
 	type DP_SEC_GSP11_ENABLE;\
 	type DP_SEC_GSP11_LINE_NUM
 
-#define SE_REG_FIELD_LIST_DCN3_2(type) \
+#define SE_REG_FIELD_LIST_DCN3_1_COMMON(type) \
 	type DIG_FIFO_OUTPUT_PIXEL_MODE;\
 	type DP_PIXEL_PER_CYCLE_PROCESSING_MODE;\
 	type DIG_SYMCLK_FE_ON;\
 	type DIG_FIFO_READ_START_LEVEL;\
 	type DIG_FIFO_ENABLE;\
 	type DIG_FIFO_RESET;\
-	type DIG_FIFO_RESET_DONE
+	type DIG_FIFO_RESET_DONE;\
+	type PIXEL_ENCODING_TYPE;\
+	type UNCOMPRESSED_PIXEL_FORMAT;\
+	type UNCOMPRESSED_COMPONENT_DEPTH
+
+#define SE_REG_FIELD_LIST_DCN3_5_COMMON(type) \
+	type DIG_FE_CLK_EN;\
+	type DIG_FE_MODE;\
+	type DIG_FE_SOFT_RESET;\
+	type DIG_FE_ENABLE;\
+	type DIG_FE_SYMCLK_FE_G_CLOCK_ON;\
+	type DIG_FE_DISPCLK_G_CLOCK_ON;\
+	type DIG_FE_SYMCLK_FE_G_AFMT_CLOCK_ON;\
+	type DIG_FE_SYMCLK_FE_G_TMDS_CLOCK_ON;\
+	type DIG_FE_SOCCLK_G_AFMT_CLOCK_ON;\
+	type DIG_STREAM_LINK_TARGET
 
 struct dcn10_stream_encoder_shift {
 	SE_REG_FIELD_LIST_DCN1_0(uint8_t);
 	uint8_t HDMI_ACP_SEND;
 	SE_REG_FIELD_LIST_DCN2_0(uint8_t);
 	SE_REG_FIELD_LIST_DCN3_0(uint8_t);
-	SE_REG_FIELD_LIST_DCN3_2(uint8_t);
-
+	SE_REG_FIELD_LIST_DCN3_1_COMMON(uint8_t);
+	SE_REG_FIELD_LIST_DCN3_5_COMMON(uint8_t);
 };
 
 struct dcn10_stream_encoder_mask {
@@ -590,8 +607,8 @@ struct dcn10_stream_encoder_mask {
 	uint32_t HDMI_ACP_SEND;
 	SE_REG_FIELD_LIST_DCN2_0(uint32_t);
 	SE_REG_FIELD_LIST_DCN3_0(uint32_t);
-	SE_REG_FIELD_LIST_DCN3_2(uint32_t);
-
+	SE_REG_FIELD_LIST_DCN3_1_COMMON(uint32_t);
+	SE_REG_FIELD_LIST_DCN3_5_COMMON(uint32_t);
 };
 
 struct dcn10_stream_encoder {
@@ -647,9 +664,6 @@ void enc1_stream_encoder_send_immediate_sdp_message(
 				unsigned int sdp_message_size);
 
 void enc1_stream_encoder_stop_dp_info_packets(
-	struct stream_encoder *enc);
-
-void enc1_stream_encoder_reset_fifo(
 	struct stream_encoder *enc);
 
 void enc1_stream_encoder_dp_blank(

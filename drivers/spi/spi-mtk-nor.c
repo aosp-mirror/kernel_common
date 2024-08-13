@@ -13,7 +13,8 @@
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/spi-mem.h>
@@ -274,7 +275,7 @@ static void mtk_nor_adj_prg_size(struct spi_mem_op *op)
 
 static int mtk_nor_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op)
 {
-	struct mtk_nor *sp = spi_controller_get_devdata(mem->spi->master);
+	struct mtk_nor *sp = spi_controller_get_devdata(mem->spi->controller);
 
 	if (!op->data.nbytes)
 		return 0;
@@ -597,7 +598,7 @@ static int mtk_nor_spi_mem_prg(struct mtk_nor *sp, const struct spi_mem_op *op)
 
 static int mtk_nor_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 {
-	struct mtk_nor *sp = spi_controller_get_devdata(mem->spi->master);
+	struct mtk_nor *sp = spi_controller_get_devdata(mem->spi->controller);
 	int ret;
 
 	if ((op->data.nbytes == 0) ||
@@ -638,7 +639,7 @@ static int mtk_nor_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 
 static int mtk_nor_setup(struct spi_device *spi)
 {
-	struct mtk_nor *sp = spi_controller_get_devdata(spi->master);
+	struct mtk_nor *sp = spi_controller_get_devdata(spi->controller);
 
 	if (spi->max_speed_hz && (spi->max_speed_hz < sp->spi_freq)) {
 		dev_err(&spi->dev, "spi clock should be %u Hz.\n",
@@ -650,10 +651,10 @@ static int mtk_nor_setup(struct spi_device *spi)
 	return 0;
 }
 
-static int mtk_nor_transfer_one_message(struct spi_controller *master,
+static int mtk_nor_transfer_one_message(struct spi_controller *host,
 					struct spi_message *m)
 {
-	struct mtk_nor *sp = spi_controller_get_devdata(master);
+	struct mtk_nor *sp = spi_controller_get_devdata(host);
 	struct spi_transfer *t = NULL;
 	unsigned long trx_len = 0;
 	int stat = 0;
@@ -695,7 +696,7 @@ static int mtk_nor_transfer_one_message(struct spi_controller *master,
 	m->actual_length = trx_len;
 msg_done:
 	m->status = stat;
-	spi_finalize_current_message(master);
+	spi_finalize_current_message(host);
 
 	return 0;
 }
@@ -843,7 +844,7 @@ static int mtk_nor_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ctlr = devm_spi_alloc_master(&pdev->dev, sizeof(*sp));
+	ctlr = devm_spi_alloc_host(&pdev->dev, sizeof(*sp));
 	if (!ctlr) {
 		dev_err(&pdev->dev, "failed to allocate spi controller\n");
 		return -ENOMEM;
@@ -934,7 +935,7 @@ err_probe:
 	return ret;
 }
 
-static int mtk_nor_remove(struct platform_device *pdev)
+static void mtk_nor_remove(struct platform_device *pdev)
 {
 	struct spi_controller *ctlr = dev_get_drvdata(&pdev->dev);
 	struct mtk_nor *sp = spi_controller_get_devdata(ctlr);
@@ -944,8 +945,6 @@ static int mtk_nor_remove(struct platform_device *pdev)
 	pm_runtime_dont_use_autosuspend(&pdev->dev);
 
 	mtk_nor_disable_clk(sp);
-
-	return 0;
 }
 
 static int __maybe_unused mtk_nor_runtime_suspend(struct device *dev)
@@ -999,7 +998,7 @@ static struct platform_driver mtk_nor_driver = {
 		.pm = &mtk_nor_pm_ops,
 	},
 	.probe = mtk_nor_probe,
-	.remove = mtk_nor_remove,
+	.remove_new = mtk_nor_remove,
 };
 
 module_platform_driver(mtk_nor_driver);

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
 
 readonly ksft_skip=4
@@ -33,6 +33,10 @@ chk_rps() {
 
 	rps_mask=$($cmd /sys/class/net/$dev_name/queues/rx-0/rps_cpus)
 	printf "%-60s" "$msg"
+
+	# In case there is more than 32 CPUs we need to remove commas from masks
+	rps_mask=${rps_mask//,}
+	expected_rps_mask=${expected_rps_mask//,}
 	if [ $rps_mask -eq $expected_rps_mask ]; then
 		echo "[ ok ]"
 	else
@@ -60,6 +64,7 @@ ip link set dev $VETH up
 ip -n $NETNS link set dev $VETH up
 chk_rps "changing rps_default_mask affect newly created devices" "" $VETH 3
 chk_rps "changing rps_default_mask don't affect newly child netns[II]" $NETNS $VETH 0
+ip link del dev $VETH
 ip netns del $NETNS
 
 setup

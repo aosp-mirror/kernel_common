@@ -1,9 +1,26 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <linux/efi.h>
+#include <linux/screen_info.h>
+
 #include <asm/efi.h>
 
 #include "efistub.h"
+
+static unsigned long screen_info_offset;
+
+struct screen_info *alloc_screen_info(void)
+{
+	if (IS_ENABLED(CONFIG_ARM))
+		return __alloc_screen_info();
+
+	if (IS_ENABLED(CONFIG_X86) ||
+	    IS_ENABLED(CONFIG_EFI_EARLYCON) ||
+	    IS_ENABLED(CONFIG_SYSFB))
+		return (void *)&screen_info + screen_info_offset;
+
+	return NULL;
+}
 
 /*
  * EFI entry point for the generic EFI stub used by ARM, arm64, RISC-V and
@@ -55,6 +72,8 @@ efi_status_t __efiapi efi_pe_entry(efi_handle_t handle,
 		efi_err("Failed to relocate kernel\n");
 		return status;
 	}
+
+	screen_info_offset = image_addr - (unsigned long)image->image_base;
 
 	status = efi_stub_common(handle, image, image_addr, cmdline_ptr);
 

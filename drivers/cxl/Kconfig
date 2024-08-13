@@ -2,7 +2,11 @@
 menuconfig CXL_BUS
 	tristate "CXL (Compute Express Link) Devices Support"
 	depends on PCI
+	select FW_LOADER
+	select FW_UPLOAD
 	select PCI_DOE
+	select FIRMWARE_TABLE
+	select NUMA_KEEP_MEMINFO if (NUMA && X86)
 	help
 	  CXL is a bus that is electrically compatible with PCI Express, but
 	  layers three protocols on that signalling (CXL.io, CXL.cache, and
@@ -52,8 +56,10 @@ config CXL_MEM_RAW_COMMANDS
 config CXL_ACPI
 	tristate "CXL ACPI: Platform Support"
 	depends on ACPI
+	depends on ACPI_NUMA
 	default CXL_BUS
 	select ACPI_TABLE_LIB
+	select ACPI_HMAT
 	help
 	  Enable support for host managed device memory (HDM) resources
 	  published by a platform's ACPI CXL memory layout description.  See
@@ -104,19 +110,29 @@ config CXL_SUSPEND
 	depends on SUSPEND && CXL_MEM
 
 config CXL_REGION
-	bool
+	bool "CXL: Region Support"
 	default CXL_BUS
 	# For MAX_PHYSMEM_BITS
 	depends on SPARSEMEM
 	select MEMREGION
 	select GET_FREE_REGION
+	help
+	  Enable the CXL core to enumerate and provision CXL regions. A CXL
+	  region is defined by one or more CXL expanders that decode a given
+	  system-physical address range. For CXL regions established by
+	  platform-firmware this option enables memory error handling to
+	  identify the devices participating in a given interleaved memory
+	  range. Otherwise, platform-firmware managed CXL is enabled by being
+	  placed in the system address map and does not need a driver.
+
+	  If unsure say 'y'
 
 config CXL_REGION_INVALIDATION_TEST
 	bool "CXL: Region Cache Management Bypass (TEST)"
 	depends on CXL_REGION
 	help
 	  CXL Region management and security operations potentially invalidate
-	  the content of CPU caches without notifiying those caches to
+	  the content of CPU caches without notifying those caches to
 	  invalidate the affected cachelines. The CXL Region driver attempts
 	  to invalidate caches when those events occur.  If that invalidation
 	  fails the region will fail to enable.  Reasons for cache

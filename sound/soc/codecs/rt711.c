@@ -37,8 +37,8 @@ static int rt711_index_write(struct regmap *regmap,
 
 	ret = regmap_write(regmap, addr, value);
 	if (ret < 0)
-		pr_err("Failed to set private value: %06x <= %04x ret=%d\n",
-			addr, value, ret);
+		pr_err("%s: Failed to set private value: %06x <= %04x ret=%d\n",
+		       __func__, addr, value, ret);
 
 	return ret;
 }
@@ -52,8 +52,8 @@ static int rt711_index_read(struct regmap *regmap,
 	*value = 0;
 	ret = regmap_read(regmap, addr, value);
 	if (ret < 0)
-		pr_err("Failed to get private value: %06x => %04x ret=%d\n",
-			addr, *value, ret);
+		pr_err("%s: Failed to get private value: %06x => %04x ret=%d\n",
+		       __func__, addr, *value, ret);
 
 	return ret;
 }
@@ -428,7 +428,7 @@ static void rt711_jack_init(struct rt711_priv *rt711)
 				RT711_HP_JD_FINAL_RESULT_CTL_JD12);
 			break;
 		default:
-			dev_warn(rt711->component->dev, "Wrong JD source\n");
+			dev_warn(rt711->component->dev, "%s: Wrong JD source\n", __func__);
 			break;
 		}
 
@@ -461,6 +461,10 @@ static int rt711_set_jack_detect(struct snd_soc_component *component,
 	int ret;
 
 	rt711->hs_jack = hs_jack;
+
+	/* we can only resume if the device was initialized at least once */
+	if (!rt711->first_hw_init)
+		return 0;
 
 	ret = pm_runtime_resume_and_get(component->dev);
 	if (ret < 0) {
@@ -941,6 +945,9 @@ static int rt711_probe(struct snd_soc_component *component)
 	rt711_parse_dt(rt711, &rt711->slave->dev);
 	rt711->component = component;
 
+	if (!rt711->first_hw_init)
+		return 0;
+
 	ret = pm_runtime_resume(component->dev);
 	if (ret < 0 && ret != -EACCES)
 		return ret;
@@ -964,19 +971,7 @@ static const struct snd_soc_component_driver soc_codec_dev_rt711 = {
 static int rt711_set_sdw_stream(struct snd_soc_dai *dai, void *sdw_stream,
 				int direction)
 {
-	struct sdw_stream_data *stream;
-
-	if (!sdw_stream)
-		return 0;
-
-	stream = kzalloc(sizeof(*stream), GFP_KERNEL);
-	if (!stream)
-		return -ENOMEM;
-
-	stream->sdw_stream = sdw_stream;
-
-	/* Use tx_mask or rx_mask to configure stream tag and set dma_data */
-	snd_soc_dai_dma_data_set(dai, direction, stream);
+	snd_soc_dai_dma_data_set(dai, direction, sdw_stream);
 
 	return 0;
 }
@@ -984,11 +979,7 @@ static int rt711_set_sdw_stream(struct snd_soc_dai *dai, void *sdw_stream,
 static void rt711_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
-	struct sdw_stream_data *stream;
-
-	stream = snd_soc_dai_get_dma_data(dai, substream);
 	snd_soc_dai_set_dma_data(dai, substream, NULL);
-	kfree(stream);
 }
 
 static int rt711_pcm_hw_params(struct snd_pcm_substream *substream,
@@ -999,14 +990,14 @@ static int rt711_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct rt711_priv *rt711 = snd_soc_component_get_drvdata(component);
 	struct sdw_stream_config stream_config = {0};
 	struct sdw_port_config port_config = {0};
-	struct sdw_stream_data *stream;
+	struct sdw_stream_runtime *sdw_stream;
 	int retval;
 	unsigned int val = 0;
 
 	dev_dbg(dai->dev, "%s %s", __func__, dai->name);
-	stream = snd_soc_dai_get_dma_data(dai, substream);
+	sdw_stream = snd_soc_dai_get_dma_data(dai, substream);
 
-	if (!stream)
+	if (!sdw_stream)
 		return -EINVAL;
 
 	if (!rt711->slave)
@@ -1027,9 +1018,9 @@ static int rt711_pcm_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	retval = sdw_stream_add_slave(rt711->slave, &stream_config,
-					&port_config, 1, stream->sdw_stream);
+					&port_config, 1, sdw_stream);
 	if (retval) {
-		dev_err(dai->dev, "Unable to configure port\n");
+		dev_err(dai->dev, "%s: Unable to configure port\n", __func__);
 		return retval;
 	}
 
@@ -1037,8 +1028,8 @@ static int rt711_pcm_hw_params(struct snd_pcm_substream *substream,
 		/* bit 3:0 Number of Channel */
 		val |= (params_channels(params) - 1);
 	} else {
-		dev_err(component->dev, "Unsupported channels %d\n",
-			params_channels(params));
+		dev_err(component->dev, "%s: Unsupported channels %d\n",
+			__func__, params_channels(params));
 		return -EINVAL;
 	}
 
@@ -1075,13 +1066,13 @@ static int rt711_pcm_hw_free(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_component *component = dai->component;
 	struct rt711_priv *rt711 = snd_soc_component_get_drvdata(component);
-	struct sdw_stream_data *stream =
+	struct sdw_stream_runtime *sdw_stream =
 		snd_soc_dai_get_dma_data(dai, substream);
 
 	if (!rt711->slave)
 		return -EINVAL;
 
-	sdw_stream_remove_slave(rt711->slave, stream->sdw_stream);
+	sdw_stream_remove_slave(rt711->slave, sdw_stream);
 	return 0;
 }
 
@@ -1199,6 +1190,8 @@ int rt711_init(struct device *dev, struct regmap *sdw_regmap,
 	rt711->sdw_regmap = sdw_regmap;
 	rt711->regmap = regmap;
 
+	regcache_cache_only(rt711->regmap, true);
+
 	mutex_init(&rt711->calibrate_mutex);
 	mutex_init(&rt711->disable_irq_lock);
 
@@ -1220,8 +1213,25 @@ int rt711_init(struct device *dev, struct regmap *sdw_regmap,
 				&soc_codec_dev_rt711,
 				rt711_dai,
 				ARRAY_SIZE(rt711_dai));
+	if (ret < 0)
+		return ret;
 
-	dev_dbg(&slave->dev, "%s\n", __func__);
+	/* set autosuspend parameters */
+	pm_runtime_set_autosuspend_delay(dev, 3000);
+	pm_runtime_use_autosuspend(dev);
+
+	/* make sure the device does not suspend immediately */
+	pm_runtime_mark_last_busy(dev);
+
+	pm_runtime_enable(dev);
+
+	/* important note: the device is NOT tagged as 'active' and will remain
+	 * 'suspended' until the hardware is enumerated/initialized. This is required
+	 * to make sure the ASoC framework use of pm_runtime_get_sync() does not silently
+	 * fail with -EACCESS because of race conditions between card creation and enumeration
+	 */
+
+	dev_dbg(dev, "%s\n", __func__);
 
 	return ret;
 }
@@ -1235,27 +1245,16 @@ int rt711_io_init(struct device *dev, struct sdw_slave *slave)
 	if (rt711->hw_init)
 		return 0;
 
-	if (rt711->first_hw_init) {
-		regcache_cache_only(rt711->regmap, false);
+	regcache_cache_only(rt711->regmap, false);
+	if (rt711->first_hw_init)
 		regcache_cache_bypass(rt711->regmap, true);
-	}
 
 	/*
-	 * PM runtime is only enabled when a Slave reports as Attached
+	 * PM runtime status is marked as 'active' only when a Slave reports as Attached
 	 */
-	if (!rt711->first_hw_init) {
-		/* set autosuspend parameters */
-		pm_runtime_set_autosuspend_delay(&slave->dev, 3000);
-		pm_runtime_use_autosuspend(&slave->dev);
-
+	if (!rt711->first_hw_init)
 		/* update count of parent 'active' children */
 		pm_runtime_set_active(&slave->dev);
-
-		/* make sure the device does not suspend immediately */
-		pm_runtime_mark_last_busy(&slave->dev);
-
-		pm_runtime_enable(&slave->dev);
-	}
 
 	pm_runtime_get_noresume(&slave->dev);
 

@@ -33,15 +33,13 @@
 
 #include "ast_drv.h"
 
-static u32 ast_get_vram_size(struct ast_private *ast)
+static u32 ast_get_vram_size(struct ast_device *ast)
 {
 	u8 jreg;
 	u32 vram_size;
 
-	ast_open_key(ast);
-
 	vram_size = AST_VIDMEM_DEFAULT_SIZE;
-	jreg = ast_get_index_reg_mask(ast, AST_IO_CRTC_PORT, 0xaa, 0xff);
+	jreg = ast_get_index_reg_mask(ast, AST_IO_VGACRI, 0xaa, 0xff);
 	switch (jreg & 3) {
 	case 0:
 		vram_size = AST_VIDMEM_SIZE_8M;
@@ -57,7 +55,7 @@ static u32 ast_get_vram_size(struct ast_private *ast)
 		break;
 	}
 
-	jreg = ast_get_index_reg_mask(ast, AST_IO_CRTC_PORT, 0x99, 0xff);
+	jreg = ast_get_index_reg_mask(ast, AST_IO_VGACRI, 0x99, 0xff);
 	switch (jreg & 0x03) {
 	case 1:
 		vram_size -= 0x100000;
@@ -73,7 +71,7 @@ static u32 ast_get_vram_size(struct ast_private *ast)
 	return vram_size;
 }
 
-int ast_mm_init(struct ast_private *ast)
+int ast_mm_init(struct ast_device *ast)
 {
 	struct drm_device *dev = &ast->base;
 	struct pci_dev *pdev = to_pci_dev(dev->dev);

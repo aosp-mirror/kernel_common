@@ -28,6 +28,11 @@
 #include "signaling.h"
 #include "addr.h"
 
+#ifdef CONFIG_COMPAT
+/* It actually takes struct sockaddr_atmsvc, not struct atm_iobuf */
+#define COMPAT_ATM_ADDPARTY _IOW('a', ATMIOC_SPECIAL + 4, struct compat_atm_iobuf)
+#endif
+
 static int svc_create(struct net *net, struct socket *sock, int protocol,
 		      int kern);
 
@@ -319,8 +324,8 @@ out:
 	return error;
 }
 
-static int svc_accept(struct socket *sock, struct socket *newsock, int flags,
-		      bool kern)
+static int svc_accept(struct socket *sock, struct socket *newsock,
+		      struct proto_accept_arg *arg)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
@@ -331,7 +336,7 @@ static int svc_accept(struct socket *sock, struct socket *newsock, int flags,
 
 	lock_sock(sk);
 
-	error = svc_create(sock_net(sk), newsock, 0, kern);
+	error = svc_create(sock_net(sk), newsock, 0, arg->kern);
 	if (error)
 		goto out;
 
@@ -350,7 +355,7 @@ static int svc_accept(struct socket *sock, struct socket *newsock, int flags,
 				error = -sk->sk_err;
 				break;
 			}
-			if (flags & O_NONBLOCK) {
+			if (arg->flags & O_NONBLOCK) {
 				error = -EAGAIN;
 				break;
 			}
@@ -649,7 +654,6 @@ static const struct proto_ops svc_proto_ops = {
 	.sendmsg =	vcc_sendmsg,
 	.recvmsg =	vcc_recvmsg,
 	.mmap =		sock_no_mmap,
-	.sendpage =	sock_no_sendpage,
 };
 
 

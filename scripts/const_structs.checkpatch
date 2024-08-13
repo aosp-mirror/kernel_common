@@ -2,11 +2,13 @@ acpi_dock_ops
 address_space_operations
 backlight_ops
 block_device_operations
+bus_type
 clk_ops
 comedi_lrange
 component_ops
 dentry_operations
 dev_pm_ops
+device_type
 dma_map_ops
 driver_info
 drm_connector_funcs
@@ -35,7 +37,9 @@ iwl_ops
 kernel_param_ops
 kgdb_arch
 kgdb_io
+kobj_type
 kset_uevent_ops
+lcd_ops
 lock_manager_operations
 machine_desc
 microcode_ops
@@ -60,7 +64,17 @@ platform_suspend_ops
 proc_ops
 proto_ops
 pwm_ops
+reg_default
+reg_field
+reg_sequence
 regmap_access_table
+regmap_bus
+regmap_config
+regmap_irq
+regmap_irq_chip
+regmap_irq_sub_irq_map
+regmap_range
+regmap_range_cfg
 regulator_ops
 reset_control_ops
 rpc_pipe_ops
@@ -93,3 +107,4 @@ vm_operations_struct
 wacom_features
 watchdog_ops
 wd_ops
+xattr_handler

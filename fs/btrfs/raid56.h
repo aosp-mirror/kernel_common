@@ -7,14 +7,22 @@
 #ifndef BTRFS_RAID56_H
 #define BTRFS_RAID56_H
 
+#include <linux/types.h>
+#include <linux/list.h>
+#include <linux/spinlock.h>
+#include <linux/bio.h>
+#include <linux/refcount.h>
 #include <linux/workqueue.h>
 #include "volumes.h"
+
+struct page;
+struct sector_ptr;
+struct btrfs_fs_info;
 
 enum btrfs_rbio_ops {
 	BTRFS_RBIO_WRITE,
 	BTRFS_RBIO_READ_REBUILD,
 	BTRFS_RBIO_PARITY_SCRUB,
-	BTRFS_RBIO_REBUILD_MISSING,
 };
 
 struct btrfs_raid_bio {
@@ -165,9 +173,14 @@ struct raid56_bio_trace_info {
 	u8 stripe_nr;
 };
 
-static inline int nr_data_stripes(const struct map_lookup *map)
+static inline int nr_data_stripes(const struct btrfs_chunk_map *map)
 {
 	return map->num_stripes - btrfs_nr_parity_stripes(map->type);
+}
+
+static inline int nr_bioc_data_stripes(const struct btrfs_io_context *bioc)
+{
+	return bioc->num_stripes - btrfs_nr_parity_stripes(bioc->map_type);
 }
 
 #define RAID5_P_STRIPE ((u64)-2)
@@ -182,18 +195,14 @@ void raid56_parity_recover(struct bio *bio, struct btrfs_io_context *bioc,
 			   int mirror_num);
 void raid56_parity_write(struct bio *bio, struct btrfs_io_context *bioc);
 
-void raid56_add_scrub_pages(struct btrfs_raid_bio *rbio, struct page *page,
-			    unsigned int pgoff, u64 logical);
-
 struct btrfs_raid_bio *raid56_parity_alloc_scrub_rbio(struct bio *bio,
 				struct btrfs_io_context *bioc,
 				struct btrfs_device *scrub_dev,
 				unsigned long *dbitmap, int stripe_nsectors);
 void raid56_parity_submit_scrub_rbio(struct btrfs_raid_bio *rbio);
 
-struct btrfs_raid_bio *
-raid56_alloc_missing_rbio(struct bio *bio, struct btrfs_io_context *bioc);
-void raid56_submit_missing_rbio(struct btrfs_raid_bio *rbio);
+void raid56_parity_cache_data_pages(struct btrfs_raid_bio *rbio,
+				    struct page **data_pages, u64 data_logical);
 
 int btrfs_alloc_stripe_hash_table(struct btrfs_fs_info *info);
 void btrfs_free_stripe_hash_table(struct btrfs_fs_info *info);

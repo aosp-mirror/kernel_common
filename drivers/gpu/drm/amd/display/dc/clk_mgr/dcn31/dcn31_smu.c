@@ -23,7 +23,6 @@
  *
  */
 
-#include <linux/delay.h>
 #include "core_types.h"
 #include "clk_mgr_internal.h"
 #include "reg_helper.h"
@@ -130,7 +129,7 @@ static int dcn31_smu_send_msg_with_param(struct clk_mgr_internal *clk_mgr,
 	if (result == VBIOSSMC_Result_Failed) {
 		if (msg_id == VBIOSSMC_MSG_TransferTableDram2Smu &&
 		    param == TABLE_WATERMARKS)
-			DC_LOG_WARNING("Watermarks table not configured properly by SMU");
+			DC_LOG_DEBUG("Watermarks table not configured properly by SMU");
 		else
 			ASSERT(0);
 		REG_WRITE(MP1_SMN_C2PMSG_91, VBIOSSMC_Result_OK);
@@ -201,10 +200,6 @@ int dcn31_smu_set_hard_min_dcfclk(struct clk_mgr_internal *clk_mgr, int requeste
 			clk_mgr,
 			VBIOSSMC_MSG_SetHardMinDcfclkByFreq,
 			khz_to_mhz_ceil(requested_dcfclk_khz));
-
-#ifdef DBG
-	smu_print("actual_dcfclk_set_mhz %d is set to : %d\n", actual_dcfclk_set_mhz, actual_dcfclk_set_mhz * 1000);
-#endif
 
 	return actual_dcfclk_set_mhz * 1000;
 }

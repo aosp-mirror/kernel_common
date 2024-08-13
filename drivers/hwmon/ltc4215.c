@@ -245,7 +245,7 @@ static int ltc4215_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id ltc4215_id[] = {
-	{ "ltc4215", 0 },
+	{ "ltc4215" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ltc4215_id);
@@ -255,7 +255,7 @@ static struct i2c_driver ltc4215_driver = {
 	.driver = {
 		.name	= "ltc4215",
 	},
-	.probe_new	= ltc4215_probe,
+	.probe		= ltc4215_probe,
 	.id_table	= ltc4215_id,
 };
 

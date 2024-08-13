@@ -245,6 +245,7 @@ static int __rv_disable_monitor(struct rv_monitor_def *mdef, bool sync)
 
 /**
  * rv_disable_monitor - disable a given runtime monitor
+ * @mdef: Pointer to the monitor definition structure.
  *
  * Returns 0 on success.
  */
@@ -256,6 +257,7 @@ int rv_disable_monitor(struct rv_monitor_def *mdef)
 
 /**
  * rv_enable_monitor - enable a given runtime monitor
+ * @mdef: Pointer to the monitor definition structure.
  *
  * Returns 0 on success, error otherwise.
  */
@@ -289,8 +291,6 @@ static ssize_t monitor_enable_write_data(struct file *filp, const char __user *u
 	retval = kstrtobool_from_user(user_buf, count, &val);
 	if (retval)
 		return retval;
-
-	retval = count;
 
 	mutex_lock(&rv_interface_lock);
 

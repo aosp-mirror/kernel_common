@@ -13,6 +13,7 @@
 #include <asm/kvm_asm.h>
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_nested.h>
 
 /*
  * VHE: Host and guest must save mdscr_el1 and sp_el0 (and the PC and
@@ -51,7 +52,7 @@ void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
 NOKPROBE_SYMBOL(sysreg_restore_guest_state_vhe);
 
 /**
- * kvm_vcpu_load_sysregs_vhe - Load guest system registers to the physical CPU
+ * __vcpu_load_switch_sysregs - Load guest system registers to the physical CPU
  *
  * @vcpu: The VCPU pointer
  *
@@ -61,13 +62,24 @@ NOKPROBE_SYMBOL(sysreg_restore_guest_state_vhe);
  * and loading system register state early avoids having to load them on
  * every entry to the VM.
  */
-void kvm_vcpu_load_sysregs_vhe(struct kvm_vcpu *vcpu)
+void __vcpu_load_switch_sysregs(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
 	struct kvm_cpu_context *host_ctxt;
 
-	host_ctxt = &this_cpu_ptr(&kvm_host_data)->host_ctxt;
+	host_ctxt = host_data_ptr(host_ctxt);
 	__sysreg_save_user_state(host_ctxt);
+
+	/*
+	 * When running a normal EL1 guest, we only load a new vcpu
+	 * after a context switch, which imvolves a DSB, so all
+	 * speculative EL1&0 walks will have already completed.
+	 * If running NV, the vcpu may transition between vEL1 and
+	 * vEL2 without a context switch, so make sure we complete
+	 * those walks before loading a new context.
+	 */
+	if (vcpu_has_nv(vcpu))
+		dsb(nsh);
 
 	/*
 	 * Load guest EL1 and user state
@@ -80,12 +92,10 @@ void kvm_vcpu_load_sysregs_vhe(struct kvm_vcpu *vcpu)
 	__sysreg_restore_el1_state(guest_ctxt);
 
 	vcpu_set_flag(vcpu, SYSREGS_ON_CPU);
-
-	activate_traps_vhe_load(vcpu);
 }
 
 /**
- * kvm_vcpu_put_sysregs_vhe - Restore host system registers to the physical CPU
+ * __vcpu_put_switch_sysregs - Restore host system registers to the physical CPU
  *
  * @vcpu: The VCPU pointer
  *
@@ -95,13 +105,12 @@ void kvm_vcpu_load_sysregs_vhe(struct kvm_vcpu *vcpu)
  * and deferring saving system register state until we're no longer running the
  * VCPU avoids having to save them on every exit from the VM.
  */
-void kvm_vcpu_put_sysregs_vhe(struct kvm_vcpu *vcpu)
+void __vcpu_put_switch_sysregs(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
 	struct kvm_cpu_context *host_ctxt;
 
-	host_ctxt = &this_cpu_ptr(&kvm_host_data)->host_ctxt;
-	deactivate_traps_vhe_put(vcpu);
+	host_ctxt = host_data_ptr(host_ctxt);
 
 	__sysreg_save_el1_state(guest_ctxt);
 	__sysreg_save_user_state(guest_ctxt);

@@ -2650,7 +2650,7 @@ net2272_plat_probe(struct platform_device *pdev)
 		goto err_req;
 	}
 
-	ret = net2272_probe_fin(dev, IRQF_TRIGGER_LOW);
+	ret = net2272_probe_fin(dev, irqflags);
 	if (ret)
 		goto err_io;
 
@@ -2670,7 +2670,7 @@ net2272_plat_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int
+static void
 net2272_plat_remove(struct platform_device *pdev)
 {
 	struct net2272 *dev = platform_get_drvdata(pdev);
@@ -2681,13 +2681,11 @@ net2272_plat_remove(struct platform_device *pdev)
 		resource_size(&pdev->resource[0]));
 
 	usb_put_gadget(&dev->gadget);
-
-	return 0;
 }
 
 static struct platform_driver net2272_plat_driver = {
 	.probe   = net2272_plat_probe,
-	.remove  = net2272_plat_remove,
+	.remove_new = net2272_plat_remove,
 	.driver  = {
 		.name  = driver_name,
 	},

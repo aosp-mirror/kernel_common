@@ -28,11 +28,6 @@ static const u32 fixed_plts[] = {
 #endif
 };
 
-static bool in_init(const struct module *mod, unsigned long loc)
-{
-	return loc - (u32)mod->init_layout.base < mod->init_layout.size;
-}
-
 static void prealloc_fixed(struct mod_plt_sec *pltsec, struct plt_entries *plt)
 {
 	int i;
@@ -50,8 +45,8 @@ static void prealloc_fixed(struct mod_plt_sec *pltsec, struct plt_entries *plt)
 
 u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
 {
-	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
-							  &mod->arch.init;
+	struct mod_plt_sec *pltsec = !within_module_init(loc, mod) ?
+						&mod->arch.core : &mod->arch.init;
 	struct plt_entries *plt;
 	int idx;
 
@@ -256,7 +251,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
 		/* sort by type and symbol index */
 		sort(rels, numrels, sizeof(Elf32_Rel), cmp_rel, NULL);
 
-		if (strncmp(secstrings + dstsec->sh_name, ".init", 5) != 0)
+		if (!module_init_layout_section(secstrings + dstsec->sh_name))
 			core_plts += count_plts(syms, dstsec->sh_addr, rels,
 						numrels, s->sh_info);
 		else

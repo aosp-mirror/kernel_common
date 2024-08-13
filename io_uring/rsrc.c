@@ -13,8 +13,10 @@
 #include <uapi/linux/io_uring.h>
 
 #include "io_uring.h"
+#include "alloc_cache.h"
 #include "openclose.h"
 #include "rsrc.h"
+#include "memmap.h"
 
 struct io_rsrc_update {
 	struct file			*file;
@@ -23,24 +25,20 @@ struct io_rsrc_update {
 	u32				offset;
 };
 
+static void io_rsrc_buf_put(struct io_ring_ctx *ctx, struct io_rsrc_put *prsrc);
 static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 				  struct io_mapped_ubuf **pimu,
 				  struct page **last_hpage);
-
-#define IO_RSRC_REF_BATCH	100
 
 /* only define max */
 #define IORING_MAX_FIXED_FILES	(1U << 20)
 #define IORING_MAX_REG_BUFFERS	(1U << 14)
 
-void io_rsrc_refs_drop(struct io_ring_ctx *ctx)
-	__must_hold(&ctx->uring_lock)
-{
-	if (ctx->rsrc_cached_refs) {
-		io_rsrc_put_node(ctx->rsrc_node, ctx->rsrc_cached_refs);
-		ctx->rsrc_cached_refs = 0;
-	}
-}
+static const struct io_mapped_ubuf dummy_ubuf = {
+	/* set invalid range, so io_import_fixed() fails meeting it */
+	.ubuf = -1UL,
+	.ubuf_end = 0,
+};
 
 int __io_account_mem(struct user_struct *user, unsigned long nr_pages)
 {
@@ -87,31 +85,6 @@ static int io_account_mem(struct io_ring_ctx *ctx, unsigned long nr_pages)
 	return 0;
 }
 
-static int io_copy_iov(struct io_ring_ctx *ctx, struct iovec *dst,
-		       void __user *arg, unsigned index)
-{
-	struct iovec __user *src;
-
-#ifdef CONFIG_COMPAT
-	if (ctx->compat) {
-		struct compat_iovec __user *ciovs;
-		struct compat_iovec ciov;
-
-		ciovs = (struct compat_iovec __user *) arg;
-		if (copy_from_user(&ciov, &ciovs[index], sizeof(ciov)))
-			return -EFAULT;
-
-		dst->iov_base = u64_to_user_ptr((u64)ciov.iov_base);
-		dst->iov_len = ciov.iov_len;
-		return 0;
-	}
-#endif
-	src = (struct iovec __user *) arg;
-	if (copy_from_user(dst, &src[index], sizeof(*dst)))
-		return -EFAULT;
-	return 0;
-}
-
 static int io_buffer_validate(struct iovec *iov)
 {
 	unsigned long tmp, acct_len = iov->iov_len + (PAGE_SIZE - 1);
@@ -141,7 +114,7 @@ static void io_buffer_unmap(struct io_ring_ctx *ctx, struct io_mapped_ubuf **slo
 	struct io_mapped_ubuf *imu = *slot;
 	unsigned int i;
 
-	if (imu != ctx->dummy_ubuf) {
+	if (imu != &dummy_ubuf) {
 		for (i = 0; i < imu->nr_bvecs; i++)
 			unpin_user_page(imu->bvec[i].bv_page);
 		if (imu->acct_pages)
@@ -151,216 +124,126 @@ static void io_buffer_unmap(struct io_ring_ctx *ctx, struct io_mapped_ubuf **slo
 	*slot = NULL;
 }
 
-void io_rsrc_refs_refill(struct io_ring_ctx *ctx)
-	__must_hold(&ctx->uring_lock)
+static void io_rsrc_put_work(struct io_rsrc_node *node)
 {
-	ctx->rsrc_cached_refs += IO_RSRC_REF_BATCH;
-	percpu_ref_get_many(&ctx->rsrc_node->refs, IO_RSRC_REF_BATCH);
-}
+	struct io_rsrc_put *prsrc = &node->item;
 
-static void __io_rsrc_put_work(struct io_rsrc_node *ref_node)
-{
-	struct io_rsrc_data *rsrc_data = ref_node->rsrc_data;
-	struct io_ring_ctx *ctx = rsrc_data->ctx;
-	struct io_rsrc_put *prsrc, *tmp;
+	if (prsrc->tag)
+		io_post_aux_cqe(node->ctx, prsrc->tag, 0, 0);
 
-	list_for_each_entry_safe(prsrc, tmp, &ref_node->rsrc_list, list) {
-		list_del(&prsrc->list);
-
-		if (prsrc->tag) {
-			if (ctx->flags & IORING_SETUP_IOPOLL) {
-				mutex_lock(&ctx->uring_lock);
-				io_post_aux_cqe(ctx, prsrc->tag, 0, 0);
-				mutex_unlock(&ctx->uring_lock);
-			} else {
-				io_post_aux_cqe(ctx, prsrc->tag, 0, 0);
-			}
-		}
-
-		rsrc_data->do_put(ctx, prsrc);
-		kfree(prsrc);
-	}
-
-	io_rsrc_node_destroy(ref_node);
-	if (atomic_dec_and_test(&rsrc_data->refs))
-		complete(&rsrc_data->done);
-}
-
-void io_rsrc_put_work(struct work_struct *work)
-{
-	struct io_ring_ctx *ctx;
-	struct llist_node *node;
-
-	ctx = container_of(work, struct io_ring_ctx, rsrc_put_work.work);
-	node = llist_del_all(&ctx->rsrc_put_llist);
-
-	while (node) {
-		struct io_rsrc_node *ref_node;
-		struct llist_node *next = node->next;
-
-		ref_node = llist_entry(node, struct io_rsrc_node, llist);
-		__io_rsrc_put_work(ref_node);
-		node = next;
+	switch (node->type) {
+	case IORING_RSRC_FILE:
+		fput(prsrc->file);
+		break;
+	case IORING_RSRC_BUFFER:
+		io_rsrc_buf_put(node->ctx, prsrc);
+		break;
+	default:
+		WARN_ON_ONCE(1);
+		break;
 	}
 }
 
-void io_rsrc_put_tw(struct callback_head *cb)
+void io_rsrc_node_destroy(struct io_ring_ctx *ctx, struct io_rsrc_node *node)
 {
-	struct io_ring_ctx *ctx = container_of(cb, struct io_ring_ctx,
-					       rsrc_put_tw);
-
-	io_rsrc_put_work(&ctx->rsrc_put_work.work);
+	if (!io_alloc_cache_put(&ctx->rsrc_node_cache, node))
+		kfree(node);
 }
 
-void io_wait_rsrc_data(struct io_rsrc_data *data)
+void io_rsrc_node_ref_zero(struct io_rsrc_node *node)
+	__must_hold(&node->ctx->uring_lock)
 {
-	if (data && !atomic_dec_and_test(&data->refs))
-		wait_for_completion(&data->done);
-}
-
-void io_rsrc_node_destroy(struct io_rsrc_node *ref_node)
-{
-	percpu_ref_exit(&ref_node->refs);
-	kfree(ref_node);
-}
-
-static __cold void io_rsrc_node_ref_zero(struct percpu_ref *ref)
-{
-	struct io_rsrc_node *node = container_of(ref, struct io_rsrc_node, refs);
-	struct io_ring_ctx *ctx = node->rsrc_data->ctx;
-	unsigned long flags;
-	bool first_add = false;
-	unsigned long delay = HZ;
-
-	spin_lock_irqsave(&ctx->rsrc_ref_lock, flags);
-	node->done = true;
-
-	/* if we are mid-quiesce then do not delay */
-	if (node->rsrc_data->quiesce)
-		delay = 0;
+	struct io_ring_ctx *ctx = node->ctx;
 
 	while (!list_empty(&ctx->rsrc_ref_list)) {
 		node = list_first_entry(&ctx->rsrc_ref_list,
 					    struct io_rsrc_node, node);
 		/* recycle ref nodes in order */
-		if (!node->done)
+		if (node->refs)
 			break;
 		list_del(&node->node);
-		first_add |= llist_add(&node->llist, &ctx->rsrc_put_llist);
-	}
-	spin_unlock_irqrestore(&ctx->rsrc_ref_lock, flags);
 
-	if (!first_add)
-		return;
-
-	if (ctx->submitter_task) {
-		if (!task_work_add(ctx->submitter_task, &ctx->rsrc_put_tw,
-				   ctx->notify_method))
-			return;
+		if (likely(!node->empty))
+			io_rsrc_put_work(node);
+		io_rsrc_node_destroy(ctx, node);
 	}
-	mod_delayed_work(system_wq, &ctx->rsrc_put_work, delay);
+	if (list_empty(&ctx->rsrc_ref_list) && unlikely(ctx->rsrc_quiesce))
+		wake_up_all(&ctx->rsrc_quiesce_wq);
 }
 
-static struct io_rsrc_node *io_rsrc_node_alloc(void)
+struct io_rsrc_node *io_rsrc_node_alloc(struct io_ring_ctx *ctx)
 {
 	struct io_rsrc_node *ref_node;
 
-	ref_node = kzalloc(sizeof(*ref_node), GFP_KERNEL);
-	if (!ref_node)
-		return NULL;
-
-	if (percpu_ref_init(&ref_node->refs, io_rsrc_node_ref_zero,
-			    0, GFP_KERNEL)) {
-		kfree(ref_node);
-		return NULL;
+	ref_node = io_alloc_cache_get(&ctx->rsrc_node_cache);
+	if (!ref_node) {
+		ref_node = kzalloc(sizeof(*ref_node), GFP_KERNEL);
+		if (!ref_node)
+			return NULL;
 	}
-	INIT_LIST_HEAD(&ref_node->node);
-	INIT_LIST_HEAD(&ref_node->rsrc_list);
-	ref_node->done = false;
+
+	ref_node->ctx = ctx;
+	ref_node->empty = 0;
+	ref_node->refs = 1;
 	return ref_node;
-}
-
-void io_rsrc_node_switch(struct io_ring_ctx *ctx,
-			 struct io_rsrc_data *data_to_kill)
-	__must_hold(&ctx->uring_lock)
-{
-	WARN_ON_ONCE(!ctx->rsrc_backup_node);
-	WARN_ON_ONCE(data_to_kill && !ctx->rsrc_node);
-
-	io_rsrc_refs_drop(ctx);
-
-	if (data_to_kill) {
-		struct io_rsrc_node *rsrc_node = ctx->rsrc_node;
-
-		rsrc_node->rsrc_data = data_to_kill;
-		spin_lock_irq(&ctx->rsrc_ref_lock);
-		list_add_tail(&rsrc_node->node, &ctx->rsrc_ref_list);
-		spin_unlock_irq(&ctx->rsrc_ref_lock);
-
-		atomic_inc(&data_to_kill->refs);
-		percpu_ref_kill(&rsrc_node->refs);
-		ctx->rsrc_node = NULL;
-	}
-
-	if (!ctx->rsrc_node) {
-		ctx->rsrc_node = ctx->rsrc_backup_node;
-		ctx->rsrc_backup_node = NULL;
-	}
-}
-
-int io_rsrc_node_switch_start(struct io_ring_ctx *ctx)
-{
-	if (ctx->rsrc_backup_node)
-		return 0;
-	ctx->rsrc_backup_node = io_rsrc_node_alloc();
-	return ctx->rsrc_backup_node ? 0 : -ENOMEM;
 }
 
 __cold static int io_rsrc_ref_quiesce(struct io_rsrc_data *data,
 				      struct io_ring_ctx *ctx)
 {
+	struct io_rsrc_node *backup;
+	DEFINE_WAIT(we);
 	int ret;
 
-	/* As we may drop ->uring_lock, other task may have started quiesce */
+	/* As We may drop ->uring_lock, other task may have started quiesce */
 	if (data->quiesce)
 		return -ENXIO;
-	ret = io_rsrc_node_switch_start(ctx);
-	if (ret)
-		return ret;
-	io_rsrc_node_switch(ctx, data);
 
-	/* kill initial ref, already quiesced if zero */
-	if (atomic_dec_and_test(&data->refs))
+	backup = io_rsrc_node_alloc(ctx);
+	if (!backup)
+		return -ENOMEM;
+	ctx->rsrc_node->empty = true;
+	ctx->rsrc_node->type = -1;
+	list_add_tail(&ctx->rsrc_node->node, &ctx->rsrc_ref_list);
+	io_put_rsrc_node(ctx, ctx->rsrc_node);
+	ctx->rsrc_node = backup;
+
+	if (list_empty(&ctx->rsrc_ref_list))
 		return 0;
 
+	if (ctx->flags & IORING_SETUP_DEFER_TASKRUN) {
+		atomic_set(&ctx->cq_wait_nr, 1);
+		smp_mb();
+	}
+
+	ctx->rsrc_quiesce++;
 	data->quiesce = true;
-	mutex_unlock(&ctx->uring_lock);
 	do {
+		prepare_to_wait(&ctx->rsrc_quiesce_wq, &we, TASK_INTERRUPTIBLE);
+		mutex_unlock(&ctx->uring_lock);
+
 		ret = io_run_task_work_sig(ctx);
 		if (ret < 0) {
-			atomic_inc(&data->refs);
-			/* wait for all works potentially completing data->done */
-			flush_delayed_work(&ctx->rsrc_put_work);
-			reinit_completion(&data->done);
+			finish_wait(&ctx->rsrc_quiesce_wq, &we);
 			mutex_lock(&ctx->uring_lock);
+			if (list_empty(&ctx->rsrc_ref_list))
+				ret = 0;
 			break;
 		}
 
-		flush_delayed_work(&ctx->rsrc_put_work);
-		ret = wait_for_completion_interruptible(&data->done);
-		if (!ret) {
-			mutex_lock(&ctx->uring_lock);
-			if (atomic_read(&data->refs) <= 0)
-				break;
-			/*
-			 * it has been revived by another thread while
-			 * we were unlocked
-			 */
-			mutex_unlock(&ctx->uring_lock);
-		}
-	} while (1);
-	data->quiesce = false;
+		schedule();
+		mutex_lock(&ctx->uring_lock);
+		ret = 0;
+	} while (!list_empty(&ctx->rsrc_ref_list));
 
+	finish_wait(&ctx->rsrc_quiesce_wq, &we);
+	data->quiesce = false;
+	ctx->rsrc_quiesce--;
+
+	if (ctx->flags & IORING_SETUP_DEFER_TASKRUN) {
+		atomic_set(&ctx->cq_wait_nr, 0);
+		smp_mb();
+	}
 	return ret;
 }
 
@@ -405,12 +288,12 @@ static __cold void **io_alloc_page_table(size_t size)
 	return table;
 }
 
-__cold static int io_rsrc_data_alloc(struct io_ring_ctx *ctx,
-				     rsrc_put_fn *do_put, u64 __user *utags,
+__cold static int io_rsrc_data_alloc(struct io_ring_ctx *ctx, int type,
+				     u64 __user *utags,
 				     unsigned nr, struct io_rsrc_data **pdata)
 {
 	struct io_rsrc_data *data;
-	int ret = -ENOMEM;
+	int ret = 0;
 	unsigned i;
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
@@ -424,7 +307,7 @@ __cold static int io_rsrc_data_alloc(struct io_ring_ctx *ctx,
 
 	data->nr = nr;
 	data->ctx = ctx;
-	data->do_put = do_put;
+	data->rsrc_type = type;
 	if (utags) {
 		ret = -EFAULT;
 		for (i = 0; i < nr; i++) {
@@ -435,9 +318,6 @@ __cold static int io_rsrc_data_alloc(struct io_ring_ctx *ctx,
 				goto fail;
 		}
 	}
-
-	atomic_set(&data->refs, 1);
-	init_completion(&data->done);
 	*pdata = data;
 	return 0;
 fail:
@@ -453,10 +333,8 @@ static int __io_sqe_files_update(struct io_ring_ctx *ctx,
 	__s32 __user *fds = u64_to_user_ptr(up->data);
 	struct io_rsrc_data *data = ctx->file_data;
 	struct io_fixed_file *file_slot;
-	struct file *file;
 	int fd, i, err = 0;
 	unsigned int done;
-	bool needs_switch = false;
 
 	if (!ctx->file_data)
 		return -ENXIO;
@@ -482,36 +360,26 @@ static int __io_sqe_files_update(struct io_ring_ctx *ctx,
 		file_slot = io_fixed_file_slot(&ctx->file_table, i);
 
 		if (file_slot->file_ptr) {
-			file = (struct file *)(file_slot->file_ptr & FFS_MASK);
-			err = io_queue_rsrc_removal(data, i, ctx->rsrc_node, file);
+			err = io_queue_rsrc_removal(data, i,
+						    io_slot_file(file_slot));
 			if (err)
 				break;
 			file_slot->file_ptr = 0;
 			io_file_bitmap_clear(&ctx->file_table, i);
-			needs_switch = true;
 		}
 		if (fd != -1) {
-			file = fget(fd);
+			struct file *file = fget(fd);
+
 			if (!file) {
 				err = -EBADF;
 				break;
 			}
 			/*
-			 * Don't allow io_uring instances to be registered. If
-			 * UNIX isn't enabled, then this causes a reference
-			 * cycle and this instance can never get freed. If UNIX
-			 * is enabled we'll handle it just fine, but there's
-			 * still no point in allowing a ring fd as it doesn't
-			 * support regular read/write anyway.
+			 * Don't allow io_uring instances to be registered.
 			 */
 			if (io_is_uring_fops(file)) {
 				fput(file);
 				err = -EBADF;
-				break;
-			}
-			err = io_scm_file_account(ctx, file);
-			if (err) {
-				fput(file);
 				break;
 			}
 			*io_get_tag_slot(data, i) = tag;
@@ -519,9 +387,6 @@ static int __io_sqe_files_update(struct io_ring_ctx *ctx,
 			io_file_bitmap_set(&ctx->file_table, i);
 		}
 	}
-
-	if (needs_switch)
-		io_rsrc_node_switch(ctx, data);
 	return done ? done : err;
 }
 
@@ -529,10 +394,10 @@ static int __io_sqe_buffers_update(struct io_ring_ctx *ctx,
 				   struct io_uring_rsrc_update2 *up,
 				   unsigned int nr_args)
 {
+	struct iovec __user *uvec = u64_to_user_ptr(up->data);
 	u64 __user *tags = u64_to_user_ptr(up->tags);
-	struct iovec iov, __user *iovs = u64_to_user_ptr(up->data);
+	struct iovec fast_iov, *iov;
 	struct page *last_hpage = NULL;
-	bool needs_switch = false;
 	__u32 done;
 	int i, err;
 
@@ -543,45 +408,42 @@ static int __io_sqe_buffers_update(struct io_ring_ctx *ctx,
 
 	for (done = 0; done < nr_args; done++) {
 		struct io_mapped_ubuf *imu;
-		int offset = up->offset + done;
 		u64 tag = 0;
 
-		err = io_copy_iov(ctx, &iov, iovs, done);
-		if (err)
+		iov = iovec_from_user(&uvec[done], 1, 1, &fast_iov, ctx->compat);
+		if (IS_ERR(iov)) {
+			err = PTR_ERR(iov);
 			break;
+		}
 		if (tags && copy_from_user(&tag, &tags[done], sizeof(tag))) {
 			err = -EFAULT;
 			break;
 		}
-		err = io_buffer_validate(&iov);
+		err = io_buffer_validate(iov);
 		if (err)
 			break;
-		if (!iov.iov_base && tag) {
+		if (!iov->iov_base && tag) {
 			err = -EINVAL;
 			break;
 		}
-		err = io_sqe_buffer_register(ctx, &iov, &imu, &last_hpage);
+		err = io_sqe_buffer_register(ctx, iov, &imu, &last_hpage);
 		if (err)
 			break;
 
-		i = array_index_nospec(offset, ctx->nr_user_bufs);
-		if (ctx->user_bufs[i] != ctx->dummy_ubuf) {
+		i = array_index_nospec(up->offset + done, ctx->nr_user_bufs);
+		if (ctx->user_bufs[i] != &dummy_ubuf) {
 			err = io_queue_rsrc_removal(ctx->buf_data, i,
-						    ctx->rsrc_node, ctx->user_bufs[i]);
+						    ctx->user_bufs[i]);
 			if (unlikely(err)) {
 				io_buffer_unmap(ctx, &imu);
 				break;
 			}
-			ctx->user_bufs[i] = ctx->dummy_ubuf;
-			needs_switch = true;
+			ctx->user_bufs[i] = (struct io_mapped_ubuf *)&dummy_ubuf;
 		}
 
 		ctx->user_bufs[i] = imu;
-		*io_get_tag_slot(ctx->buf_data, offset) = tag;
+		*io_get_tag_slot(ctx->buf_data, i) = tag;
 	}
-
-	if (needs_switch)
-		io_rsrc_node_switch(ctx, ctx->buf_data);
 	return done ? done : err;
 }
 
@@ -590,13 +452,11 @@ static int __io_register_rsrc_update(struct io_ring_ctx *ctx, unsigned type,
 				     unsigned nr_args)
 {
 	__u32 tmp;
-	int err;
+
+	lockdep_assert_held(&ctx->uring_lock);
 
 	if (check_add_overflow(up->offset, nr_args, &tmp))
 		return -EOVERFLOW;
-	err = io_rsrc_node_switch_start(ctx);
-	if (err)
-		return err;
 
 	switch (type) {
 	case IORING_RSRC_FILE:
@@ -753,20 +613,24 @@ int io_files_update(struct io_kiocb *req, unsigned int issue_flags)
 	return IOU_OK;
 }
 
-int io_queue_rsrc_removal(struct io_rsrc_data *data, unsigned idx,
-			  struct io_rsrc_node *node, void *rsrc)
+int io_queue_rsrc_removal(struct io_rsrc_data *data, unsigned idx, void *rsrc)
 {
+	struct io_ring_ctx *ctx = data->ctx;
+	struct io_rsrc_node *node = ctx->rsrc_node;
 	u64 *tag_slot = io_get_tag_slot(data, idx);
-	struct io_rsrc_put *prsrc;
 
-	prsrc = kzalloc(sizeof(*prsrc), GFP_KERNEL);
-	if (!prsrc)
+	ctx->rsrc_node = io_rsrc_node_alloc(ctx);
+	if (unlikely(!ctx->rsrc_node)) {
+		ctx->rsrc_node = node;
 		return -ENOMEM;
+	}
 
-	prsrc->tag = *tag_slot;
+	node->item.rsrc = rsrc;
+	node->type = data->rsrc_type;
+	node->item.tag = *tag_slot;
 	*tag_slot = 0;
-	prsrc->rsrc = rsrc;
-	list_add(&prsrc->list, &node->rsrc_list);
+	list_add_tail(&node->node, &ctx->rsrc_ref_list);
+	io_put_rsrc_node(ctx, node);
 	return 0;
 }
 
@@ -777,23 +641,14 @@ void __io_sqe_files_unregister(struct io_ring_ctx *ctx)
 	for (i = 0; i < ctx->nr_user_files; i++) {
 		struct file *file = io_file_from_index(&ctx->file_table, i);
 
-		/* skip scm accounted files, they'll be freed by ->ring_sock */
-		if (!file || io_file_need_scm(file))
+		if (!file)
 			continue;
 		io_file_bitmap_clear(&ctx->file_table, i);
 		fput(file);
 	}
 
-#if defined(CONFIG_UNIX)
-	if (ctx->ring_sock) {
-		struct sock *sock = ctx->ring_sock->sk;
-		struct sk_buff *skb;
-
-		while ((skb = skb_dequeue(&sock->sk_receive_queue)) != NULL)
-			kfree_skb(skb);
-	}
-#endif
 	io_free_file_tables(&ctx->file_table);
+	io_file_table_set_alloc_range(ctx, 0, 0);
 	io_rsrc_data_free(ctx->file_data);
 	ctx->file_data = NULL;
 	ctx->nr_user_files = 0;
@@ -819,136 +674,6 @@ int io_sqe_files_unregister(struct io_ring_ctx *ctx)
 	return ret;
 }
 
-/*
- * Ensure the UNIX gc is aware of our file set, so we are certain that
- * the io_uring can be safely unregistered on process exit, even if we have
- * loops in the file referencing. We account only files that can hold other
- * files because otherwise they can't form a loop and so are not interesting
- * for GC.
- */
-int __io_scm_file_account(struct io_ring_ctx *ctx, struct file *file)
-{
-#if defined(CONFIG_UNIX)
-	struct sock *sk = ctx->ring_sock->sk;
-	struct sk_buff_head *head = &sk->sk_receive_queue;
-	struct scm_fp_list *fpl;
-	struct sk_buff *skb;
-
-	if (likely(!io_file_need_scm(file)))
-		return 0;
-
-	/*
-	 * See if we can merge this file into an existing skb SCM_RIGHTS
-	 * file set. If there's no room, fall back to allocating a new skb
-	 * and filling it in.
-	 */
-	spin_lock_irq(&head->lock);
-	skb = skb_peek(head);
-	if (skb && UNIXCB(skb).fp->count < SCM_MAX_FD)
-		__skb_unlink(skb, head);
-	else
-		skb = NULL;
-	spin_unlock_irq(&head->lock);
-
-	if (!skb) {
-		fpl = kzalloc(sizeof(*fpl), GFP_KERNEL);
-		if (!fpl)
-			return -ENOMEM;
-
-		skb = alloc_skb(0, GFP_KERNEL);
-		if (!skb) {
-			kfree(fpl);
-			return -ENOMEM;
-		}
-
-		fpl->user = get_uid(current_user());
-		fpl->max = SCM_MAX_FD;
-		fpl->count = 0;
-
-		UNIXCB(skb).fp = fpl;
-		skb->sk = sk;
-		skb->scm_io_uring = 1;
-		skb->destructor = unix_destruct_scm;
-		refcount_add(skb->truesize, &sk->sk_wmem_alloc);
-	}
-
-	fpl = UNIXCB(skb).fp;
-	fpl->fp[fpl->count++] = get_file(file);
-	unix_inflight(fpl->user, file);
-	skb_queue_head(head, skb);
-	fput(file);
-#endif
-	return 0;
-}
-
-static void io_rsrc_file_put(struct io_ring_ctx *ctx, struct io_rsrc_put *prsrc)
-{
-	struct file *file = prsrc->file;
-#if defined(CONFIG_UNIX)
-	struct sock *sock = ctx->ring_sock->sk;
-	struct sk_buff_head list, *head = &sock->sk_receive_queue;
-	struct sk_buff *skb;
-	int i;
-
-	if (!io_file_need_scm(file)) {
-		fput(file);
-		return;
-	}
-
-	__skb_queue_head_init(&list);
-
-	/*
-	 * Find the skb that holds this file in its SCM_RIGHTS. When found,
-	 * remove this entry and rearrange the file array.
-	 */
-	skb = skb_dequeue(head);
-	while (skb) {
-		struct scm_fp_list *fp;
-
-		fp = UNIXCB(skb).fp;
-		for (i = 0; i < fp->count; i++) {
-			int left;
-
-			if (fp->fp[i] != file)
-				continue;
-
-			unix_notinflight(fp->user, fp->fp[i]);
-			left = fp->count - 1 - i;
-			if (left) {
-				memmove(&fp->fp[i], &fp->fp[i + 1],
-						left * sizeof(struct file *));
-			}
-			fp->count--;
-			if (!fp->count) {
-				kfree_skb(skb);
-				skb = NULL;
-			} else {
-				__skb_queue_tail(&list, skb);
-			}
-			fput(file);
-			file = NULL;
-			break;
-		}
-
-		if (!file)
-			break;
-
-		__skb_queue_tail(&list, skb);
-
-		skb = skb_dequeue(head);
-	}
-
-	if (skb_peek(&list)) {
-		spin_lock_irq(&head->lock);
-		while ((skb = __skb_dequeue(&list)) != NULL)
-			__skb_queue_tail(head, skb);
-		spin_unlock_irq(&head->lock);
-	}
-#else
-	fput(file);
-#endif
-}
-
 int io_sqe_files_register(struct io_ring_ctx *ctx, void __user *arg,
 			  unsigned nr_args, u64 __user *tags)
 {
@@ -965,10 +690,7 @@ int io_sqe_files_register(struct io_ring_ctx *ctx, void __user *arg,
 		return -EMFILE;
 	if (nr_args > rlimit(RLIMIT_NOFILE))
 		return -EMFILE;
-	ret = io_rsrc_node_switch_start(ctx);
-	if (ret)
-		return ret;
-	ret = io_rsrc_data_alloc(ctx, io_rsrc_file_put, tags, nr_args,
+	ret = io_rsrc_data_alloc(ctx, IORING_RSRC_FILE, tags, nr_args,
 				 &ctx->file_data);
 	if (ret)
 		return ret;
@@ -1000,18 +722,9 @@ int io_sqe_files_register(struct io_ring_ctx *ctx, void __user *arg,
 			goto fail;
 
 		/*
-		 * Don't allow io_uring instances to be registered. If UNIX
-		 * isn't enabled, then this causes a reference cycle and this
-		 * instance can never get freed. If UNIX is enabled we'll
-		 * handle it just fine, but there's still no point in allowing
-		 * a ring fd as it doesn't support regular read/write anyway.
+		 * Don't allow io_uring instances to be registered.
 		 */
 		if (io_is_uring_fops(file)) {
-			fput(file);
-			goto fail;
-		}
-		ret = io_scm_file_account(ctx, file);
-		if (ret) {
 			fput(file);
 			goto fail;
 		}
@@ -1022,7 +735,6 @@ int io_sqe_files_register(struct io_ring_ctx *ctx, void __user *arg,
 
 	/* default it to the whole table */
 	io_file_table_set_alloc_range(ctx, 0, ctx->nr_user_files);
-	io_rsrc_node_switch(ctx, NULL);
 	return 0;
 fail:
 	__io_sqe_files_unregister(ctx);
@@ -1137,67 +849,6 @@ static int io_buffer_account_pin(struct io_ring_ctx *ctx, struct page **pages,
 	return ret;
 }
 
-struct page **io_pin_pages(unsigned long ubuf, unsigned long len, int *npages)
-{
-	unsigned long start, end, nr_pages;
-	struct vm_area_struct **vmas = NULL;
-	struct page **pages = NULL;
-	int i, pret, ret = -ENOMEM;
-
-	end = (ubuf + len + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	start = ubuf >> PAGE_SHIFT;
-	nr_pages = end - start;
-
-	pages = kvmalloc_array(nr_pages, sizeof(struct page *), GFP_KERNEL);
-	if (!pages)
-		goto done;
-
-	vmas = kvmalloc_array(nr_pages, sizeof(struct vm_area_struct *),
-			      GFP_KERNEL);
-	if (!vmas)
-		goto done;
-
-	ret = 0;
-	mmap_read_lock(current->mm);
-	pret = pin_user_pages(ubuf, nr_pages, FOLL_WRITE | FOLL_LONGTERM,
-			      pages, vmas);
-	if (pret == nr_pages) {
-		/* don't support file backed memory */
-		for (i = 0; i < nr_pages; i++) {
-			struct vm_area_struct *vma = vmas[i];
-
-			if (vma_is_shmem(vma))
-				continue;
-			if (vma->vm_file &&
-			    !is_file_hugepages(vma->vm_file)) {
-				ret = -EOPNOTSUPP;
-				break;
-			}
-		}
-		*npages = nr_pages;
-	} else {
-		ret = pret < 0 ? pret : -EFAULT;
-	}
-	mmap_read_unlock(current->mm);
-	if (ret) {
-		/*
-		 * if we did partial map, or found file backed vmas,
-		 * release any pages we did get
-		 */
-		if (pret > 0)
-			unpin_user_pages(pages, pret);
-		goto done;
-	}
-	ret = 0;
-done:
-	kvfree(vmas);
-	if (ret < 0) {
-		kvfree(pages);
-		pages = ERR_PTR(ret);
-	}
-	return pages;
-}
-
 static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 				  struct io_mapped_ubuf **pimu,
 				  struct page **last_hpage)
@@ -1207,8 +858,9 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 	unsigned long off;
 	size_t size;
 	int ret, nr_pages, i;
+	struct folio *folio = NULL;
 
-	*pimu = ctx->dummy_ubuf;
+	*pimu = (struct io_mapped_ubuf *)&dummy_ubuf;
 	if (!iov->iov_base)
 		return 0;
 
@@ -1219,6 +871,32 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 		ret = PTR_ERR(pages);
 		pages = NULL;
 		goto done;
+	}
+
+	/* If it's a huge page, try to coalesce them into a single bvec entry */
+	if (nr_pages > 1) {
+		folio = page_folio(pages[0]);
+		for (i = 1; i < nr_pages; i++) {
+			/*
+			 * Pages must be consecutive and on the same folio for
+			 * this to work
+			 */
+			if (page_folio(pages[i]) != folio ||
+			    pages[i] != pages[i - 1] + 1) {
+				folio = NULL;
+				break;
+			}
+		}
+		if (folio) {
+			/*
+			 * The pages are bound to the folio, it doesn't
+			 * actually unpin them but drops all but one reference,
+			 * which is usually put down by io_buffer_unmap().
+			 * Note, needs a better helper.
+			 */
+			unpin_user_pages(&pages[1], nr_pages - 1);
+			nr_pages = 1;
+		}
 	}
 
 	imu = kvmalloc(struct_size(imu, bvec, nr_pages), GFP_KERNEL);
@@ -1233,6 +911,17 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 
 	off = (unsigned long) iov->iov_base & ~PAGE_MASK;
 	size = iov->iov_len;
+	/* store original address for later verification */
+	imu->ubuf = (unsigned long) iov->iov_base;
+	imu->ubuf_end = imu->ubuf + iov->iov_len;
+	imu->nr_bvecs = nr_pages;
+	*pimu = imu;
+	ret = 0;
+
+	if (folio) {
+		bvec_set_page(&imu->bvec[0], pages[0], size, off);
+		goto done;
+	}
 	for (i = 0; i < nr_pages; i++) {
 		size_t vec_len;
 
@@ -1241,12 +930,6 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, struct iovec *iov,
 		off = 0;
 		size -= vec_len;
 	}
-	/* store original address for later verification */
-	imu->ubuf = (unsigned long) iov->iov_base;
-	imu->ubuf_end = imu->ubuf + iov->iov_len;
-	imu->nr_bvecs = nr_pages;
-	*pimu = imu;
-	ret = 0;
 done:
 	if (ret)
 		kvfree(imu);
@@ -1265,8 +948,9 @@ int io_sqe_buffers_register(struct io_ring_ctx *ctx, void __user *arg,
 {
 	struct page *last_hpage = NULL;
 	struct io_rsrc_data *data;
+	struct iovec fast_iov, *iov = &fast_iov;
+	const struct iovec __user *uvec = (struct iovec * __user) arg;
 	int i, ret;
-	struct iovec iov;
 
 	BUILD_BUG_ON(IORING_MAX_REG_BUFFERS >= (1u << 16));
 
@@ -1274,10 +958,7 @@ int io_sqe_buffers_register(struct io_ring_ctx *ctx, void __user *arg,
 		return -EBUSY;
 	if (!nr_args || nr_args > IORING_MAX_REG_BUFFERS)
 		return -EINVAL;
-	ret = io_rsrc_node_switch_start(ctx);
-	if (ret)
-		return ret;
-	ret = io_rsrc_data_alloc(ctx, io_rsrc_buf_put, tags, nr_args, &data);
+	ret = io_rsrc_data_alloc(ctx, IORING_RSRC_BUFFER, tags, nr_args, &data);
 	if (ret)
 		return ret;
 	ret = io_buffers_map_alloc(ctx, nr_args);
@@ -1286,24 +967,27 @@ int io_sqe_buffers_register(struct io_ring_ctx *ctx, void __user *arg,
 		return ret;
 	}
 
+	if (!arg)
+		memset(iov, 0, sizeof(*iov));
+
 	for (i = 0; i < nr_args; i++, ctx->nr_user_bufs++) {
 		if (arg) {
-			ret = io_copy_iov(ctx, &iov, arg, i);
+			iov = iovec_from_user(&uvec[i], 1, 1, &fast_iov, ctx->compat);
+			if (IS_ERR(iov)) {
+				ret = PTR_ERR(iov);
+				break;
+			}
+			ret = io_buffer_validate(iov);
 			if (ret)
 				break;
-			ret = io_buffer_validate(&iov);
-			if (ret)
-				break;
-		} else {
-			memset(&iov, 0, sizeof(iov));
 		}
 
-		if (!iov.iov_base && *io_get_tag_slot(data, i)) {
+		if (!iov->iov_base && *io_get_tag_slot(data, i)) {
 			ret = -EINVAL;
 			break;
 		}
 
-		ret = io_sqe_buffer_register(ctx, &iov, &ctx->user_bufs[i],
+		ret = io_sqe_buffer_register(ctx, iov, &ctx->user_bufs[i],
 					     &last_hpage);
 		if (ret)
 			break;
@@ -1314,8 +998,6 @@ int io_sqe_buffers_register(struct io_ring_ctx *ctx, void __user *arg,
 	ctx->buf_data = data;
 	if (ret)
 		__io_sqe_buffers_unregister(ctx);
-	else
-		io_rsrc_node_switch(ctx, NULL);
 	return ret;
 }
 
@@ -1335,7 +1017,7 @@ int io_import_fixed(int ddir, struct iov_iter *iter,
 		return -EFAULT;
 
 	/*
-	 * May not be a start of buffer, set size appropriately
+	 * Might not be a start of buffer, set size appropriately
 	 * and advance us to the beginning.
 	 */
 	offset = buf_addr - imu->ubuf;
@@ -1360,8 +1042,15 @@ int io_import_fixed(int ddir, struct iov_iter *iter,
 		 */
 		const struct bio_vec *bvec = imu->bvec;
 
-		if (offset <= bvec->bv_len) {
-			iov_iter_advance(iter, offset);
+		if (offset < bvec->bv_len) {
+			/*
+			 * Note, huge pages buffers consists of one large
+			 * bvec entry and should always go this way. The other
+			 * branch doesn't expect non PAGE_SIZE'd chunks.
+			 */
+			iter->bvec = bvec;
+			iter->count -= offset;
+			iter->iov_offset = offset;
 		} else {
 			unsigned long seg_skip;
 

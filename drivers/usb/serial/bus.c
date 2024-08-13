@@ -113,7 +113,7 @@ static ssize_t new_id_store(struct device_driver *driver,
 	if (retval >= 0 && usb_drv->usb_driver != NULL)
 		retval = usb_store_new_id(&usb_drv->usb_driver->dynids,
 					  usb_drv->usb_driver->id_table,
-					  &usb_drv->usb_driver->drvwrap.driver,
+					  &usb_drv->usb_driver->driver,
 					  buf, count);
 	return retval;
 }
@@ -144,7 +144,7 @@ static void free_dynids(struct usb_serial_driver *drv)
 	spin_unlock(&drv->dynids.lock);
 }
 
-struct bus_type usb_serial_bus_type = {
+const struct bus_type usb_serial_bus_type = {
 	.name =		"usb-serial",
 	.match =	usb_serial_device_match,
 	.probe =	usb_serial_device_probe,

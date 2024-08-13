@@ -155,6 +155,10 @@ static const struct hclge_comm_caps_bit_map hclge_pf_cmd_caps[] = {
 	{HCLGE_COMM_CAP_FD_B, HNAE3_DEV_SUPPORT_FD_B},
 	{HCLGE_COMM_CAP_FEC_STATS_B, HNAE3_DEV_SUPPORT_FEC_STATS_B},
 	{HCLGE_COMM_CAP_LANE_NUM_B, HNAE3_DEV_SUPPORT_LANE_NUM_B},
+	{HCLGE_COMM_CAP_WOL_B, HNAE3_DEV_SUPPORT_WOL_B},
+	{HCLGE_COMM_CAP_TM_FLUSH_B, HNAE3_DEV_SUPPORT_TM_FLUSH_B},
+	{HCLGE_COMM_CAP_VF_FAULT_B, HNAE3_DEV_SUPPORT_VF_FAULT_B},
+	{HCLGE_COMM_CAP_ERR_MOD_GEN_REG_B, HNAE3_DEV_SUPPORT_ERR_MOD_GEN_REG_B},
 };
 
 static const struct hclge_comm_caps_bit_map hclge_vf_cmd_caps[] = {
@@ -171,6 +175,20 @@ static const struct hclge_comm_caps_bit_map hclge_vf_cmd_caps[] = {
 };
 
 static void
+hclge_comm_capability_to_bitmap(unsigned long *bitmap, __le32 *caps)
+{
+	const unsigned int words = HCLGE_COMM_QUERY_CAP_LENGTH;
+	u32 val[HCLGE_COMM_QUERY_CAP_LENGTH];
+	unsigned int i;
+
+	for (i = 0; i < words; i++)
+		val[i] = __le32_to_cpu(caps[i]);
+
+	bitmap_from_arr32(bitmap, val,
+			  HCLGE_COMM_QUERY_CAP_LENGTH * BITS_PER_TYPE(u32));
+}
+
+static void
 hclge_comm_parse_capability(struct hnae3_ae_dev *ae_dev, bool is_pf,
 			    struct hclge_comm_query_version_cmd *cmd)
 {
@@ -178,11 +196,12 @@ hclge_comm_parse_capability(struct hnae3_ae_dev *ae_dev, bool is_pf,
 				is_pf ? hclge_pf_cmd_caps : hclge_vf_cmd_caps;
 	u32 size = is_pf ? ARRAY_SIZE(hclge_pf_cmd_caps) :
 				ARRAY_SIZE(hclge_vf_cmd_caps);
-	u32 caps, i;
+	DECLARE_BITMAP(caps, HCLGE_COMM_QUERY_CAP_LENGTH * BITS_PER_TYPE(u32));
+	u32 i;
 
-	caps = __le32_to_cpu(cmd->caps[0]);
+	hclge_comm_capability_to_bitmap(caps, cmd->caps);
 	for (i = 0; i < size; i++)
-		if (hnae3_get_bit(caps, caps_map[i].imp_bit))
+		if (test_bit(caps_map[i].imp_bit, caps))
 			set_bit(caps_map[i].local_bit, ae_dev->caps);
 }
 
@@ -330,9 +349,25 @@ static int hclge_comm_cmd_csq_done(struct hclge_comm_hw *hw)
 	return head == hw->cmq.csq.next_to_use;
 }
 
-static void hclge_comm_wait_for_resp(struct hclge_comm_hw *hw,
+static u32 hclge_get_cmdq_tx_timeout(u16 opcode, u32 tx_timeout)
+{
+	static const struct hclge_cmdq_tx_timeout_map cmdq_tx_timeout_map[] = {
+		{HCLGE_OPC_CFG_RST_TRIGGER, HCLGE_COMM_CMDQ_CFG_RST_TIMEOUT},
+	};
+	u32 i;
+
+	for (i = 0; i < ARRAY_SIZE(cmdq_tx_timeout_map); i++)
+		if (cmdq_tx_timeout_map[i].opcode == opcode)
+			return cmdq_tx_timeout_map[i].tx_timeout;
+
+	return tx_timeout;
+}
+
+static void hclge_comm_wait_for_resp(struct hclge_comm_hw *hw, u16 opcode,
 				     bool *is_completed)
 {
+	u32 cmdq_tx_timeout = hclge_get_cmdq_tx_timeout(opcode,
+							hw->cmq.tx_timeout);
 	u32 timeout = 0;
 
 	do {
@@ -342,7 +377,7 @@ static void hclge_comm_wait_for_resp(struct hclge_comm_hw *hw,
 		}
 		udelay(1);
 		timeout++;
-	} while (timeout < hw->cmq.tx_timeout);
+	} while (timeout < cmdq_tx_timeout);
 }
 
 static int hclge_comm_cmd_convert_err_code(u16 desc_ret)
@@ -406,7 +441,8 @@ static int hclge_comm_cmd_check_result(struct hclge_comm_hw *hw,
 	 * if multi descriptors to be sent, use the first one to check
 	 */
 	if (HCLGE_COMM_SEND_SYNC(le16_to_cpu(desc->flag)))
-		hclge_comm_wait_for_resp(hw, &is_completed);
+		hclge_comm_wait_for_resp(hw, le16_to_cpu(desc->opcode),
+					 &is_completed);
 
 	if (!is_completed)
 		ret = -EBADE;
@@ -435,9 +471,13 @@ static int hclge_comm_cmd_check_result(struct hclge_comm_hw *hw,
 int hclge_comm_cmd_send(struct hclge_comm_hw *hw, struct hclge_desc *desc,
 			int num)
 {
+	bool is_special = hclge_comm_is_special_opcode(le16_to_cpu(desc->opcode));
 	struct hclge_comm_cmq_ring *csq = &hw->cmq.csq;
 	int ret;
 	int ntc;
+
+	if (hw->cmq.ops.trace_cmd_send)
+		hw->cmq.ops.trace_cmd_send(hw, desc, num, is_special);
 
 	spin_lock_bh(&hw->cmq.csq.lock);
 
@@ -471,6 +511,9 @@ int hclge_comm_cmd_send(struct hclge_comm_hw *hw, struct hclge_desc *desc,
 	ret = hclge_comm_cmd_check_result(hw, desc, num, ntc);
 
 	spin_unlock_bh(&hw->cmq.csq.lock);
+
+	if (hw->cmq.ops.trace_cmd_get)
+		hw->cmq.ops.trace_cmd_get(hw, desc, num, is_special);
 
 	return ret;
 }
@@ -528,7 +571,7 @@ int hclge_comm_cmd_queue_init(struct pci_dev *pdev, struct hclge_comm_hw *hw)
 	cmdq->crq.desc_num = HCLGE_COMM_NIC_CMQ_DESC_NUM;
 
 	/* Setup Tx write back timeout */
-	cmdq->tx_timeout = HCLGE_COMM_CMDQ_TX_TIMEOUT;
+	cmdq->tx_timeout = HCLGE_COMM_CMDQ_TX_TIMEOUT_DEFAULT;
 
 	/* Setup queue rings */
 	ret = hclge_comm_alloc_cmd_queue(hw, HCLGE_COMM_TYPE_CSQ);
@@ -547,6 +590,17 @@ int hclge_comm_cmd_queue_init(struct pci_dev *pdev, struct hclge_comm_hw *hw)
 err_csq:
 	hclge_comm_free_cmd_desc(&hw->cmq.csq);
 	return ret;
+}
+
+void hclge_comm_cmd_init_ops(struct hclge_comm_hw *hw,
+			     const struct hclge_comm_cmq_ops *ops)
+{
+	struct hclge_comm_cmq *cmdq = &hw->cmq;
+
+	if (ops) {
+		cmdq->ops.trace_cmd_send = ops->trace_cmd_send;
+		cmdq->ops.trace_cmd_get = ops->trace_cmd_get;
+	}
 }
 
 int hclge_comm_cmd_init(struct hnae3_ae_dev *ae_dev, struct hclge_comm_hw *hw,

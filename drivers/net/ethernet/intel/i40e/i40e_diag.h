@@ -4,7 +4,11 @@
 #ifndef _I40E_DIAG_H_
 #define _I40E_DIAG_H_
 
-#include "i40e_type.h"
+#include <linux/types.h>
+#include "i40e_adminq_cmd.h"
+
+/* forward-declare the HW struct for the compiler */
+struct i40e_hw;
 
 enum i40e_lb_mode {
 	I40E_LB_MODE_NONE       = 0x0,
@@ -20,7 +24,7 @@ struct i40e_diag_reg_test_info {
 	u32 stride;	/* bytes between each element */
 };
 
-extern struct i40e_diag_reg_test_info i40e_reg_list[];
+extern const struct i40e_diag_reg_test_info i40e_reg_list[];
 
 int i40e_diag_reg_test(struct i40e_hw *hw);
 int i40e_diag_eeprom_test(struct i40e_hw *hw);

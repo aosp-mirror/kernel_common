@@ -42,7 +42,7 @@ KASAN有三种模式:
 体系架构
 ~~~~~~~~
 
-在x86_64、arm、arm64、powerpc、riscv、s390和xtensa上支持通用KASAN，
+在x86_64、arm、arm64、powerpc、riscv、s390、xtensa和loongarch上支持通用KASAN，
 而基于标签的KASAN模式只在arm64上支持。
 
 编译器
@@ -90,13 +90,54 @@ KASAN只支持SLUB。
 ``CONFIG_STACKTRACE`` 。要包括受影响物理页面的分配和释放堆栈跟踪的话，
 请启用 ``CONFIG_PAGE_OWNER`` 并使用 ``page_owner=on`` 进行引导。
 
+启动参数
+~~~~~~~~
+
+KASAN受到通用 ``panic_on_warn`` 命令行参数的影响。当它被启用时，KASAN
+在打印出错误报告后会使内核恐慌。
+
+默认情况下，KASAN只对第一个无效的内存访问打印错误报告。使用
+``kasan_multi_shot``，KASAN对每一个无效的访问都打印一份报告。这会禁用
+了KASAN报告的 ``panic_on_warn``。
+
+另外，独立于 ``panic_on_warn`` 、 ``kasan.fault=`` boot参数可以用
+来控制恐慌和报告行为。
+
+- ``kasan.fault=report`` 或 ``=panic`` 控制是否只打印KASAN report或
+  同时使内核恐慌（默认： ``report`` ）。即使 ``kasan_multi_shot`` 被
+  启用，恐慌也会发生。
+
+基于软件和硬件标签的KASAN模式（见下面关于各种模式的部分）支持改变堆栈跟
+踪收集行为：
+
+- ``kasan.stacktrace=off`` 或 ``=on`` 禁用或启用分配和释放堆栈痕
+  迹的收集（默认： ``on`` ）。
+
+- ``kasan.stack_ring_size=<number of entries>`` 指定堆栈环的条
+  目数（默认： ``32768`` ）。
+
+基于硬件标签的KASAN模式是为了在生产中作为一种安全缓解措施使用。因此，它
+支持额外的启动参数，允许完全禁用KASAN或控制其功能。
+
+- ``kasan=off`` 或 ``=on`` 控制KASAN是否被启用（默认： ``on`` ）。
+
+- ``kasan.mode=sync``, ``=async`` or ``=asymm`` 控制KASAN是否
+  被配置为同步、异步或非对称的执行模式（默认： ``同步`` ）。
+  同步模式：当标签检查异常发生时，会立即检测到不良访问。
+  异步模式：不良访问的检测是延迟的。当标签检查异常发生时，信息被存储在硬
+  件中（对于arm64来说是在TFSR_EL1寄存器中）。内核周期性地检查硬件，并\
+  且只在这些检查中报告标签异常。
+  非对称模式：读取时同步检测不良访问，写入时异步检测。
+
+- ``kasan.vmalloc=off`` or ``=on`` 禁用或启用vmalloc分配的标记（默认： ``on`` ）。
+
 错误报告
 ~~~~~~~~
 
 典型的KASAN报告如下所示::
 
     ==================================================================
-    BUG: KASAN: slab-out-of-bounds in kmalloc_oob_right+0xa8/0xbc [test_kasan]
+    BUG: KASAN: slab-out-of-bounds in kmalloc_oob_right+0xa8/0xbc [kasan_test]
     Write of size 1 at addr ffff8801f44ec37b by task insmod/2760
 
     CPU: 1 PID: 2760 Comm: insmod Not tainted 4.19.0-rc3+ #698
@@ -106,8 +147,8 @@ KASAN只支持SLUB。
      print_address_description+0x73/0x280
      kasan_report+0x144/0x187
      __asan_report_store1_noabort+0x17/0x20
-     kmalloc_oob_right+0xa8/0xbc [test_kasan]
-     kmalloc_tests_init+0x16/0x700 [test_kasan]
+     kmalloc_oob_right+0xa8/0xbc [kasan_test]
+     kmalloc_tests_init+0x16/0x700 [kasan_test]
      do_one_initcall+0xa5/0x3ae
      do_init_module+0x1b6/0x547
      load_module+0x75df/0x8070
@@ -127,8 +168,8 @@ KASAN只支持SLUB。
      save_stack+0x43/0xd0
      kasan_kmalloc+0xa7/0xd0
      kmem_cache_alloc_trace+0xe1/0x1b0
-     kmalloc_oob_right+0x56/0xbc [test_kasan]
-     kmalloc_tests_init+0x16/0x700 [test_kasan]
+     kmalloc_oob_right+0x56/0xbc [kasan_test]
+     kmalloc_tests_init+0x16/0x700 [kasan_test]
      do_one_initcall+0xa5/0x3ae
      do_init_module+0x1b6/0x547
      load_module+0x75df/0x8070
@@ -193,39 +234,6 @@ slab对象的描述以及关于访问的内存页的信息。
 
 通用KASAN还报告两个辅助调用堆栈跟踪。这些堆栈跟踪指向代码中与对象交互但不直接
 出现在错误访问堆栈跟踪中的位置。目前，这包括 call_rcu() 和排队的工作队列。
-
-启动参数
-~~~~~~~~
-
-KASAN受通用 ``panic_on_warn`` 命令行参数的影响。启用该功能后，KASAN在打印错误
-报告后会引起内核恐慌。
-
-默认情况下，KASAN只为第一次无效内存访问打印错误报告。使用 ``kasan_multi_shot`` ，
-KASAN会针对每个无效访问打印报告。这有效地禁用了KASAN报告的 ``panic_on_warn`` 。
-
-另外，独立于 ``panic_on_warn`` , ``kasan.fault=`` 引导参数可以用来控制恐慌和报
-告行为:
-
-- ``kasan.fault=report`` 或 ``=panic`` 控制是只打印KASAN报告还是同时使内核恐慌
-  (默认: ``report`` )。即使启用了 ``kasan_multi_shot`` ，也会发生内核恐慌。
-
-基于硬件标签的KASAN模式（请参阅下面有关各种模式的部分）旨在在生产中用作安全缓解
-措施。因此，它支持允许禁用KASAN或控制其功能的附加引导参数。
-
-- ``kasan=off`` 或 ``=on`` 控制KASAN是否启用 (默认: ``on`` )。
-
-- ``kasan.mode=sync`` 、 ``=async`` 或 ``=asymm`` 控制KASAN是否配置
-  为同步或异步执行模式(默认:``sync`` )。
-  同步模式：当标签检查错误发生时，立即检测到错误访问。
-  异步模式：延迟错误访问检测。当标签检查错误发生时，信息存储在硬件中（在arm64的
-  TFSR_EL1寄存器中）。内核会定期检查硬件，并且仅在这些检查期间报告标签错误。
-  非对称模式：读取时同步检测不良访问，写入时异步检测。
-
-- ``kasan.vmalloc=off`` 或 ``=on`` 禁用或启用vmalloc分配的标记（默认：``on`` ）。
-
-- ``kasan.stacktrace=off`` 或 ``=on`` 禁用或启用alloc和free堆栈跟踪收集
-  (默认: ``on`` )。
-
 
 实施细则
 --------
@@ -413,15 +421,15 @@ KASAN连接到vmap基础架构以懒清理未使用的影子内存。
 
 当由于 ``kmalloc`` 失败而导致测试失败时::
 
-        # kmalloc_large_oob_right: ASSERTION FAILED at lib/test_kasan.c:163
+        # kmalloc_large_oob_right: ASSERTION FAILED at mm/kasan/kasan_test.c:245
         Expected ptr is not null, but is
-        not ok 4 - kmalloc_large_oob_right
+        not ok 5 - kmalloc_large_oob_right
 
 当由于缺少KASAN报告而导致测试失败时::
 
-        # kmalloc_double_kzfree: EXPECTATION FAILED at lib/test_kasan.c:974
+        # kmalloc_double_kzfree: EXPECTATION FAILED at mm/kasan/kasan_test.c:709
         KASAN failure expected in "kfree_sensitive(ptr)", but none occurred
-        not ok 44 - kmalloc_double_kzfree
+        not ok 28 - kmalloc_double_kzfree
 
 
 最后打印所有KASAN测试的累积状态。成功::
@@ -437,7 +445,7 @@ KASAN连接到vmap基础架构以懒清理未使用的影子内存。
 1. 可加载模块
 
    启用 ``CONFIG_KUNIT`` 后，KASAN-KUnit测试可以构建为可加载模块，并通过使用
-   ``insmod`` 或 ``modprobe`` 加载 ``test_kasan.ko`` 来运行。
+   ``insmod`` 或 ``modprobe`` 加载 ``kasan_test.ko`` 来运行。
 
 2. 内置
 

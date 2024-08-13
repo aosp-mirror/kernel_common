@@ -20,6 +20,7 @@
 #include <asm/pvclock.h>
 #include <asm/xen/hypervisor.h>
 #include <asm/xen/hypercall.h>
+#include <asm/xen/cpuid.h>
 
 #include <xen/events.h>
 #include <xen/features.h>
@@ -29,7 +30,7 @@
 #include "xen-ops.h"
 
 /* Minimum amount of time until next clock event fires */
-#define TIMER_SLOP	100000
+#define TIMER_SLOP	1
 
 static u64 xen_sched_clock_offset __read_mostly;
 
@@ -65,11 +66,10 @@ static noinstr u64 xen_sched_clock(void)
         struct pvclock_vcpu_time_info *src;
 	u64 ret;
 
-	preempt_disable_notrace();
 	src = &__this_cpu_read(xen_vcpu)->time;
 	ret = pvclock_clocksource_read_nowd(src);
 	ret -= xen_sched_clock_offset;
-	preempt_enable_notrace();
+
 	return ret;
 }
 
@@ -503,11 +503,7 @@ static int __init xen_tsc_safe_clocksource(void)
 	/* Leaf 4, sub-leaf 0 (0x40000x03) */
 	cpuid_count(xen_cpuid_base() + 3, 0, &eax, &ebx, &ecx, &edx);
 
-	/* tsc_mode = no_emulate (2) */
-	if (ebx != 2)
-		return 0;
-
-	return 1;
+	return ebx == XEN_CPUID_TSC_MODE_NEVER_EMULATE;
 }
 
 static void __init xen_time_init(void)

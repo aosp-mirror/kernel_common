@@ -22,6 +22,14 @@ struct regmap;
 
 struct pinctrl_dev;
 
+struct mcp23s08_info {
+	const struct regmap_config *regmap;
+	const char *label;
+	unsigned int type;
+	u16 ngpio;
+	bool reg_shift;
+};
+
 struct mcp23s08 {
 	u8			addr;
 	bool			irq_active_high;
@@ -36,7 +44,6 @@ struct mcp23s08 {
 	struct mutex		lock;
 
 	struct gpio_chip	chip;
-	struct irq_chip		irq_chip;
 
 	struct regmap		*regmap;
 	struct device		*dev;

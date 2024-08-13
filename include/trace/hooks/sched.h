@@ -68,7 +68,7 @@ DECLARE_RESTRICTED_HOOK(android_rvh_get_nohz_timer_target,
 	TP_PROTO(int *cpu, bool *done),
 	TP_ARGS(cpu, done), 1);
 
-DECLARE_RESTRICTED_HOOK(android_rvh_set_user_nice,
+DECLARE_RESTRICTED_HOOK(android_rvh_set_user_nice_locked,
 	TP_PROTO(struct task_struct *p, long *nice, bool *allowed),
 	TP_ARGS(p, nice, allowed), 1);
 
@@ -166,12 +166,6 @@ DECLARE_RESTRICTED_HOOK(android_rvh_replace_next_task_fair,
 DECLARE_RESTRICTED_HOOK(android_rvh_sched_balance_rt,
 	TP_PROTO(struct rq *rq, struct task_struct *p, int *done),
 	TP_ARGS(rq, p, done), 1);
-
-struct cfs_rq;
-DECLARE_RESTRICTED_HOOK(android_rvh_pick_next_entity,
-	TP_PROTO(struct cfs_rq *cfs_rq, struct sched_entity *curr,
-		 struct sched_entity **se),
-	TP_ARGS(cfs_rq, curr, se), 1);
 
 DECLARE_RESTRICTED_HOOK(android_rvh_check_preempt_wakeup,
 	TP_PROTO(struct rq *rq, struct task_struct *p, bool *preempt, bool *nopreempt,

@@ -23,7 +23,7 @@ struct fscrypt_mode fscrypt_modes[] = {
 		.blk_crypto_mode = BLK_ENCRYPTION_MODE_AES_256_XTS,
 	},
 	[FSCRYPT_MODE_AES_256_CTS] = {
-		.friendly_name = "AES-256-CTS-CBC",
+		.friendly_name = "AES-256-CBC-CTS",
 		.cipher_str = "cts(cbc(aes))",
 		.keysize = 32,
 		.security_strength = 32,
@@ -38,7 +38,7 @@ struct fscrypt_mode fscrypt_modes[] = {
 		.blk_crypto_mode = BLK_ENCRYPTION_MODE_AES_128_CBC_ESSIV,
 	},
 	[FSCRYPT_MODE_AES_128_CTS] = {
-		.friendly_name = "AES-128-CTS-CBC",
+		.friendly_name = "AES-128-CBC-CTS",
 		.cipher_str = "cts(cbc(aes))",
 		.keysize = 16,
 		.security_strength = 16,
@@ -53,7 +53,7 @@ struct fscrypt_mode fscrypt_modes[] = {
 		.blk_crypto_mode = BLK_ENCRYPTION_MODE_SM4_XTS,
 	},
 	[FSCRYPT_MODE_SM4_CTS] = {
-		.friendly_name = "SM4-CTS-CBC",
+		.friendly_name = "SM4-CBC-CTS",
 		.cipher_str = "cts(cbc(sm4))",
 		.keysize = 16,
 		.security_strength = 16,
@@ -125,7 +125,7 @@ fscrypt_allocate_skcipher(struct fscrypt_mode *mode, const u8 *raw_key,
 		pr_info("fscrypt: %s using implementation \"%s\"\n",
 			mode->friendly_name, crypto_skcipher_driver_name(tfm));
 	}
-	if (WARN_ON(crypto_skcipher_ivsize(tfm) != mode->ivsize)) {
+	if (WARN_ON_ONCE(crypto_skcipher_ivsize(tfm) != mode->ivsize)) {
 		err = -EINVAL;
 		goto err_free_tfm;
 	}
@@ -148,7 +148,7 @@ err_free_tfm:
  * and IV generation method (@ci->ci_policy.flags).
  */
 int fscrypt_prepare_key(struct fscrypt_prepared_key *prep_key,
-			const u8 *raw_key, const struct fscrypt_info *ci)
+			const u8 *raw_key, const struct fscrypt_inode_info *ci)
 {
 	struct crypto_skcipher *tfm;
 
@@ -180,13 +180,14 @@ void fscrypt_destroy_prepared_key(struct super_block *sb,
 }
 
 /* Given a per-file encryption key, set up the file's crypto transform object */
-int fscrypt_set_per_file_enc_key(struct fscrypt_info *ci, const u8 *raw_key)
+int fscrypt_set_per_file_enc_key(struct fscrypt_inode_info *ci,
+				 const u8 *raw_key)
 {
 	ci->ci_owns_key = true;
 	return fscrypt_prepare_key(&ci->ci_enc_key, raw_key, ci);
 }
 
-static int setup_per_mode_enc_key(struct fscrypt_info *ci,
+static int setup_per_mode_enc_key(struct fscrypt_inode_info *ci,
 				  struct fscrypt_master_key *mk,
 				  struct fscrypt_prepared_key *keys,
 				  u8 hkdf_context, bool include_fs_uuid)
@@ -202,7 +203,7 @@ static int setup_per_mode_enc_key(struct fscrypt_info *ci,
 	bool use_hw_wrapped_key = false;
 	int err;
 
-	if (WARN_ON(mode_num > FSCRYPT_MODE_MAX))
+	if (WARN_ON_ONCE(mode_num > FSCRYPT_MODE_MAX))
 		return -EINVAL;
 
 	if (mk->mk_secret.is_hw_wrapped && S_ISREG(inode->i_mode)) {
@@ -292,7 +293,7 @@ static int fscrypt_derive_siphash_key(const struct fscrypt_master_key *mk,
 	return 0;
 }
 
-int fscrypt_derive_dirhash_key(struct fscrypt_info *ci,
+int fscrypt_derive_dirhash_key(struct fscrypt_inode_info *ci,
 			       const struct fscrypt_master_key *mk)
 {
 	int err;
@@ -306,17 +307,17 @@ int fscrypt_derive_dirhash_key(struct fscrypt_info *ci,
 	return 0;
 }
 
-void fscrypt_hash_inode_number(struct fscrypt_info *ci,
+void fscrypt_hash_inode_number(struct fscrypt_inode_info *ci,
 			       const struct fscrypt_master_key *mk)
 {
-	WARN_ON(ci->ci_inode->i_ino == 0);
-	WARN_ON(!mk->mk_ino_hash_key_initialized);
+	WARN_ON_ONCE(ci->ci_inode->i_ino == 0);
+	WARN_ON_ONCE(!mk->mk_ino_hash_key_initialized);
 
 	ci->ci_hashed_ino = (u32)siphash_1u64(ci->ci_inode->i_ino,
 					      &mk->mk_ino_hash_key);
 }
 
-static int fscrypt_setup_iv_ino_lblk_32_key(struct fscrypt_info *ci,
+static int fscrypt_setup_iv_ino_lblk_32_key(struct fscrypt_inode_info *ci,
 					    struct fscrypt_master_key *mk)
 {
 	int err;
@@ -356,7 +357,7 @@ unlock:
 	return 0;
 }
 
-static int fscrypt_setup_v2_file_key(struct fscrypt_info *ci,
+static int fscrypt_setup_v2_file_key(struct fscrypt_inode_info *ci,
 				     struct fscrypt_master_key *mk,
 				     bool need_dirhash_key)
 {
@@ -439,7 +440,7 @@ static int fscrypt_setup_v2_file_key(struct fscrypt_info *ci,
  * still allow 512-bit master keys if the user chooses to use them, though.)
  */
 static bool fscrypt_valid_master_key_size(const struct fscrypt_master_key *mk,
-					  const struct fscrypt_info *ci)
+					  const struct fscrypt_inode_info *ci)
 {
 	unsigned int min_keysize;
 
@@ -465,11 +466,12 @@ static bool fscrypt_valid_master_key_size(const struct fscrypt_master_key *mk,
  *
  * If the master key is found in the filesystem-level keyring, then it is
  * returned in *mk_ret with its semaphore read-locked.  This is needed to ensure
- * that only one task links the fscrypt_info into ->mk_decrypted_inodes (as
- * multiple tasks may race to create an fscrypt_info for the same inode), and to
- * synchronize the master key being removed with a new inode starting to use it.
+ * that only one task links the fscrypt_inode_info into ->mk_decrypted_inodes
+ * (as multiple tasks may race to create an fscrypt_inode_info for the same
+ * inode), and to synchronize the master key being removed with a new inode
+ * starting to use it.
  */
-static int setup_file_encryption_key(struct fscrypt_info *ci,
+static int setup_file_encryption_key(struct fscrypt_inode_info *ci,
 				     bool need_dirhash_key,
 				     struct fscrypt_master_key **mk_ret)
 {
@@ -519,8 +521,8 @@ static int setup_file_encryption_key(struct fscrypt_info *ci,
 	}
 	down_read(&mk->mk_sem);
 
-	/* Has the secret been removed (via FS_IOC_REMOVE_ENCRYPTION_KEY)? */
-	if (!is_master_key_secret_present(&mk->mk_secret)) {
+	if (!mk->mk_present) {
+		/* FS_IOC_REMOVE_ENCRYPTION_KEY has been executed on this key */
 		err = -ENOKEY;
 		goto out_release_key;
 	}
@@ -550,7 +552,7 @@ static int setup_file_encryption_key(struct fscrypt_info *ci,
 		err = fscrypt_setup_v2_file_key(ci, mk, need_dirhash_key);
 		break;
 	default:
-		WARN_ON(1);
+		WARN_ON_ONCE(1);
 		err = -EINVAL;
 		break;
 	}
@@ -566,7 +568,7 @@ out_release_key:
 	return err;
 }
 
-static void put_crypt_info(struct fscrypt_info *ci)
+static void put_crypt_info(struct fscrypt_inode_info *ci)
 {
 	struct fscrypt_master_key *mk;
 
@@ -584,8 +586,8 @@ static void put_crypt_info(struct fscrypt_info *ci)
 		/*
 		 * Remove this inode from the list of inodes that were unlocked
 		 * with the master key.  In addition, if we're removing the last
-		 * inode from a master key struct that already had its secret
-		 * removed, then complete the full removal of the struct.
+		 * inode from an incompletely removed key, then complete the
+		 * full removal of the key.
 		 */
 		spin_lock(&mk->mk_decrypted_inodes_lock);
 		list_del(&ci->ci_master_key_link);
@@ -593,7 +595,7 @@ static void put_crypt_info(struct fscrypt_info *ci)
 		fscrypt_put_master_key_activeref(ci->ci_inode->i_sb, mk);
 	}
 	memzero_explicit(ci, sizeof(*ci));
-	kmem_cache_free(fscrypt_info_cachep, ci);
+	kmem_cache_free(fscrypt_inode_info_cachep, ci);
 }
 
 static int
@@ -602,16 +604,16 @@ fscrypt_setup_encryption_info(struct inode *inode,
 			      const u8 nonce[FSCRYPT_FILE_NONCE_SIZE],
 			      bool need_dirhash_key)
 {
-	struct fscrypt_info *crypt_info;
+	struct fscrypt_inode_info *crypt_info;
 	struct fscrypt_mode *mode;
 	struct fscrypt_master_key *mk = NULL;
 	int res;
 
-	res = fscrypt_initialize(inode->i_sb->s_cop->flags);
+	res = fscrypt_initialize(inode->i_sb);
 	if (res)
 		return res;
 
-	crypt_info = kmem_cache_zalloc(fscrypt_info_cachep, GFP_KERNEL);
+	crypt_info = kmem_cache_zalloc(fscrypt_inode_info_cachep, GFP_KERNEL);
 	if (!crypt_info)
 		return -ENOMEM;
 
@@ -624,8 +626,13 @@ fscrypt_setup_encryption_info(struct inode *inode,
 		res = PTR_ERR(mode);
 		goto out;
 	}
-	WARN_ON(mode->ivsize > FSCRYPT_MAX_IV_SIZE);
+	WARN_ON_ONCE(mode->ivsize > FSCRYPT_MAX_IV_SIZE);
 	crypt_info->ci_mode = mode;
+
+	crypt_info->ci_data_unit_bits =
+		fscrypt_policy_du_bits(&crypt_info->ci_policy, inode);
+	crypt_info->ci_data_units_per_block_bits =
+		inode->i_blkbits - crypt_info->ci_data_unit_bits;
 
 	res = setup_file_encryption_key(crypt_info, need_dirhash_key, &mk);
 	if (res)
@@ -634,8 +641,8 @@ fscrypt_setup_encryption_info(struct inode *inode,
 	/*
 	 * For existing inodes, multiple tasks may race to set ->i_crypt_info.
 	 * So use cmpxchg_release().  This pairs with the smp_load_acquire() in
-	 * fscrypt_get_info().  I.e., here we publish ->i_crypt_info with a
-	 * RELEASE barrier so that other tasks can ACQUIRE it.
+	 * fscrypt_get_inode_info().  I.e., here we publish ->i_crypt_info with
+	 * a RELEASE barrier so that other tasks can ACQUIRE it.
 	 */
 	if (cmpxchg_release(&inode->i_crypt_info, NULL, crypt_info) == NULL) {
 		/*
@@ -727,7 +734,7 @@ int fscrypt_get_encryption_info(struct inode *inode, bool allow_unsupported)
 /**
  * fscrypt_prepare_new_inode() - prepare to create a new inode in a directory
  * @dir: a possibly-encrypted directory
- * @inode: the new inode.  ->i_mode must be set already.
+ * @inode: the new inode.  ->i_mode and ->i_blkbits must be set already.
  *	   ->i_ino doesn't need to be set yet.
  * @encrypt_ret: (output) set to %true if the new inode will be encrypted
  *
@@ -757,6 +764,9 @@ int fscrypt_prepare_new_inode(struct inode *dir, struct inode *inode,
 	if (IS_ERR(policy))
 		return PTR_ERR(policy);
 
+	if (WARN_ON_ONCE(inode->i_blkbits == 0))
+		return -EINVAL;
+
 	if (WARN_ON_ONCE(inode->i_mode == 0))
 		return -EINVAL;
 
@@ -782,8 +792,8 @@ EXPORT_SYMBOL_GPL(fscrypt_prepare_new_inode);
  * fscrypt_put_encryption_info() - free most of an inode's fscrypt data
  * @inode: an inode being evicted
  *
- * Free the inode's fscrypt_info.  Filesystems must call this when the inode is
- * being evicted.  An RCU grace period need not have elapsed yet.
+ * Free the inode's fscrypt_inode_info.  Filesystems must call this when the
+ * inode is being evicted.  An RCU grace period need not have elapsed yet.
  */
 void fscrypt_put_encryption_info(struct inode *inode)
 {
@@ -820,7 +830,7 @@ EXPORT_SYMBOL(fscrypt_free_inode);
  */
 int fscrypt_drop_inode(struct inode *inode)
 {
-	const struct fscrypt_info *ci = fscrypt_get_info(inode);
+	const struct fscrypt_inode_info *ci = fscrypt_get_inode_info(inode);
 
 	/*
 	 * If ci is NULL, then the inode doesn't have an encryption key set up
@@ -841,13 +851,14 @@ int fscrypt_drop_inode(struct inode *inode)
 		return 0;
 
 	/*
-	 * Note: since we aren't holding the key semaphore, the result here can
+	 * We can't take ->mk_sem here, since this runs in atomic context.
+	 * Therefore, ->mk_present can change concurrently, and our result may
 	 * immediately become outdated.  But there's no correctness problem with
 	 * unnecessarily evicting.  Nor is there a correctness problem with not
 	 * evicting while iput() is racing with the key being removed, since
 	 * then the thread removing the key will either evict the inode itself
 	 * or will correctly detect that it wasn't evicted due to the race.
 	 */
-	return !is_master_key_secret_present(&ci->ci_master_key->mk_secret);
+	return !READ_ONCE(ci->ci_master_key->mk_present);
 }
 EXPORT_SYMBOL_GPL(fscrypt_drop_inode);

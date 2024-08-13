@@ -342,6 +342,12 @@ enum {
 	SFP_ENCODING			= 11,
 	SFP_BR_NOMINAL			= 12,
 	SFP_RATE_ID			= 13,
+	SFF_RID_8079			= 0x01,
+	SFF_RID_8431_RX_ONLY		= 0x02,
+	SFF_RID_8431_TX_ONLY		= 0x04,
+	SFF_RID_8431			= 0x06,
+	SFF_RID_10G8G			= 0x0e,
+
 	SFP_LINK_LEN_SM_KM		= 14,
 	SFP_LINK_LEN_SM_100M		= 15,
 	SFP_LINK_LEN_50UM_OM2_10M	= 16,
@@ -465,6 +471,7 @@ enum {
 	SFP_STATUS			= 110,
 	SFP_STATUS_TX_DISABLE		= BIT(7),
 	SFP_STATUS_TX_DISABLE_FORCE	= BIT(6),
+	SFP_STATUS_RS0_SELECT		= BIT(3),
 	SFP_STATUS_TX_FAULT		= BIT(2),
 	SFP_STATUS_RX_LOS		= BIT(1),
 	SFP_ALARM0			= 112,
@@ -496,6 +503,7 @@ enum {
 	SFP_WARN1_RXPWR_LOW		= BIT(6),
 
 	SFP_EXT_STATUS			= 118,
+	SFP_EXT_STATUS_RS1_SELECT	= BIT(3),
 	SFP_EXT_STATUS_PWRLVL_SELECT	= BIT(0),
 
 	SFP_VSL				= 120,
@@ -546,7 +554,7 @@ bool sfp_may_have_phy(struct sfp_bus *bus, const struct sfp_eeprom_id *id);
 void sfp_parse_support(struct sfp_bus *bus, const struct sfp_eeprom_id *id,
 		       unsigned long *support, unsigned long *interfaces);
 phy_interface_t sfp_select_interface(struct sfp_bus *bus,
-				     unsigned long *link_modes);
+				     const unsigned long *link_modes);
 
 int sfp_get_module_info(struct sfp_bus *bus, struct ethtool_modinfo *modinfo);
 int sfp_get_module_eeprom(struct sfp_bus *bus, struct ethtool_eeprom *ee,
@@ -556,8 +564,9 @@ int sfp_get_module_eeprom_by_page(struct sfp_bus *bus,
 				  struct netlink_ext_ack *extack);
 void sfp_upstream_start(struct sfp_bus *bus);
 void sfp_upstream_stop(struct sfp_bus *bus);
+void sfp_upstream_set_signal_rate(struct sfp_bus *bus, unsigned int rate_kbd);
 void sfp_bus_put(struct sfp_bus *bus);
-struct sfp_bus *sfp_bus_find_fwnode(struct fwnode_handle *fwnode);
+struct sfp_bus *sfp_bus_find_fwnode(const struct fwnode_handle *fwnode);
 int sfp_bus_add_upstream(struct sfp_bus *bus, void *upstream,
 			 const struct sfp_upstream_ops *ops);
 void sfp_bus_del_upstream(struct sfp_bus *bus);
@@ -583,7 +592,7 @@ static inline void sfp_parse_support(struct sfp_bus *bus,
 }
 
 static inline phy_interface_t sfp_select_interface(struct sfp_bus *bus,
-						   unsigned long *link_modes)
+						const unsigned long *link_modes)
 {
 	return PHY_INTERFACE_MODE_NA;
 }
@@ -615,11 +624,17 @@ static inline void sfp_upstream_stop(struct sfp_bus *bus)
 {
 }
 
+static inline void sfp_upstream_set_signal_rate(struct sfp_bus *bus,
+						unsigned int rate_kbd)
+{
+}
+
 static inline void sfp_bus_put(struct sfp_bus *bus)
 {
 }
 
-static inline struct sfp_bus *sfp_bus_find_fwnode(struct fwnode_handle *fwnode)
+static inline struct sfp_bus *
+sfp_bus_find_fwnode(const struct fwnode_handle *fwnode)
 {
 	return NULL;
 }

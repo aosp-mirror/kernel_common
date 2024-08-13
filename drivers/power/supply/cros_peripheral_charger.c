@@ -5,6 +5,7 @@
  * Copyright 2020 Google LLC.
  */
 
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/notifier.h>
 #include <linux/platform_data/cros_ec_commands.h>
@@ -227,8 +228,7 @@ static int cros_pchg_get_prop(struct power_supply *psy,
 	return 0;
 }
 
-static int cros_pchg_event(const struct charger_data *charger,
-			   unsigned long host_event)
+static int cros_pchg_event(const struct charger_data *charger)
 {
 	int i;
 
@@ -256,7 +256,7 @@ static int cros_ec_notify(struct notifier_block *nb,
 	if (!(host_event & EC_MKBP_PCHG_DEVICE_EVENT))
 		return NOTIFY_DONE;
 
-	return cros_pchg_event(charger, host_event);
+	return cros_pchg_event(charger);
 }
 
 static int cros_pchg_probe(struct platform_device *pdev)
@@ -280,6 +280,8 @@ static int cros_pchg_probe(struct platform_device *pdev)
 	charger->dev = dev;
 	charger->ec_dev = ec_dev;
 	charger->ec_device = ec_device;
+
+	platform_set_drvdata(pdev, charger);
 
 	ret = cros_pchg_port_count(charger);
 	if (ret <= 0) {
@@ -349,15 +351,39 @@ static int cros_pchg_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int __maybe_unused cros_pchg_resume(struct device *dev)
+{
+	struct charger_data *charger = dev_get_drvdata(dev);
+
+	/*
+	 * Sync all ports on resume in case reports from EC are lost during
+	 * the last suspend.
+	 */
+	cros_pchg_event(charger);
+
+	return 0;
+}
+#endif
+
+static SIMPLE_DEV_PM_OPS(cros_pchg_pm_ops, NULL, cros_pchg_resume);
+
+static const struct platform_device_id cros_pchg_id[] = {
+	{ DRV_NAME, 0 },
+	{}
+};
+MODULE_DEVICE_TABLE(platform, cros_pchg_id);
+
 static struct platform_driver cros_pchg_driver = {
 	.driver = {
 		.name = DRV_NAME,
+		.pm = &cros_pchg_pm_ops,
 	},
-	.probe = cros_pchg_probe
+	.probe = cros_pchg_probe,
+	.id_table = cros_pchg_id,
 };
 
 module_platform_driver(cros_pchg_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("ChromeOS EC peripheral device charger");
-MODULE_ALIAS("platform:" DRV_NAME);

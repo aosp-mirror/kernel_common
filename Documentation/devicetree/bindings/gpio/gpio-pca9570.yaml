@@ -24,6 +24,13 @@ properties:
   '#gpio-cells':
     const: 2
 
+  gpio-line-names:
+    minItems: 4
+    maxItems: 8
+
+  label:
+    description: A descriptive name for this device.
+
 required:
   - compatible
   - reg
@@ -34,7 +41,7 @@ additionalProperties: false
 
 examples:
   - |
-    i2c0 {
+    i2c {
         #address-cells = <1>;
         #size-cells = <0>;
 

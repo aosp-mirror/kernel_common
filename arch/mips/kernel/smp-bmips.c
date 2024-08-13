@@ -54,6 +54,8 @@ static void bmips_set_reset_vec(int cpu, u32 val);
 
 #ifdef CONFIG_SMP
 
+#include <asm/smp.h>
+
 /* initial $sp, $gp - used by arch/mips/kernel/bmips_vec.S */
 unsigned long bmips_smp_boot_sp;
 unsigned long bmips_smp_boot_gp;
@@ -390,6 +392,7 @@ static void bmips_cpu_die(unsigned int cpu)
 void __ref play_dead(void)
 {
 	idle_task_exit();
+	cpuhp_ap_report_dead();
 
 	/* flush data cache */
 	_dma_cache_wback_inv(0, ~0);
@@ -413,6 +416,8 @@ void __ref play_dead(void)
 	"	wait\n"
 	"	j	bmips_secondary_reentry\n"
 	: : : "memory");
+
+	BUG();
 }
 
 #endif /* CONFIG_HOTPLUG_CPU */
@@ -429,7 +434,7 @@ const struct plat_smp_ops bmips43xx_smp_ops = {
 	.cpu_disable		= bmips_cpu_disable,
 	.cpu_die		= bmips_cpu_die,
 #endif
-#ifdef CONFIG_KEXEC
+#ifdef CONFIG_KEXEC_CORE
 	.kexec_nonboot_cpu	= kexec_nonboot_cpu_jump,
 #endif
 };
@@ -446,7 +451,7 @@ const struct plat_smp_ops bmips5000_smp_ops = {
 	.cpu_disable		= bmips_cpu_disable,
 	.cpu_die		= bmips_cpu_die,
 #endif
-#ifdef CONFIG_KEXEC
+#ifdef CONFIG_KEXEC_CORE
 	.kexec_nonboot_cpu	= kexec_nonboot_cpu_jump,
 #endif
 };

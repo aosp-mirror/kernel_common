@@ -78,7 +78,7 @@ DEFINE_BINDER_FUNCTION_RETURN_EVENT(binder_read_done);
 
 TRACE_EVENT(binder_set_priority,
 	TP_PROTO(int proc, int thread, unsigned int old_prio,
-		 unsigned int desired_prio, unsigned int new_prio),
+		 unsigned int new_prio, unsigned int desired_prio),
 	TP_ARGS(proc, thread, old_prio, new_prio, desired_prio),
 
 	TP_STRUCT__entry(
@@ -341,7 +341,7 @@ DEFINE_EVENT(binder_buffer_class, binder_transaction_update_buffer_release,
 
 TRACE_EVENT(binder_update_page_range,
 	TP_PROTO(struct binder_alloc *alloc, bool allocate,
-		 void __user *start, void __user *end),
+		 unsigned long start, unsigned long end),
 	TP_ARGS(alloc, allocate, start, end),
 	TP_STRUCT__entry(
 		__field(int, proc)

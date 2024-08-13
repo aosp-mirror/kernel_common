@@ -6,6 +6,7 @@
 boot	:= arch/loongarch/boot
 
 KBUILD_DEFCONFIG := loongson3_defconfig
+KBUILD_DTBS      := dtbs
 
 image-name-y			:= vmlinux
 image-name-$(CONFIG_EFI_ZBOOT)	:= vmlinuz
@@ -24,6 +25,21 @@ endif
 64bit-bfd		= elf64-loongarch
 32bit-emul		= elf32loongarch
 64bit-emul		= elf64loongarch
+
+CC_FLAGS_FPU		:= -mfpu=64
+CC_FLAGS_NO_FPU		:= -msoft-float
+
+ifdef CONFIG_UNWINDER_ORC
+orc_hash_h := arch/$(SRCARCH)/include/generated/asm/orc_hash.h
+orc_hash_sh := $(srctree)/scripts/orc_hash.sh
+targets += $(orc_hash_h)
+quiet_cmd_orc_hash = GEN     $@
+      cmd_orc_hash = mkdir -p $(dir $@); \
+		     $(CONFIG_SHELL) $(orc_hash_sh) < $< > $@
+$(orc_hash_h): $(srctree)/arch/loongarch/include/asm/orc_types.h $(orc_hash_sh) FORCE
+	$(call if_changed,orc_hash)
+archprepare: $(orc_hash_h)
+endif
 
 ifdef CONFIG_DYNAMIC_FTRACE
 KBUILD_CPPFLAGS += -DCC_USING_PATCHABLE_FUNCTION_ENTRY
@@ -46,8 +62,8 @@ ld-emul			= $(64bit-emul)
 cflags-y		+= -mabi=lp64s
 endif
 
-cflags-y			+= -G0 -pipe -msoft-float
-LDFLAGS_vmlinux			+= -G0 -static -n -nostdlib
+cflags-y			+= -pipe $(CC_FLAGS_NO_FPU)
+LDFLAGS_vmlinux			+= -static -n -nostdlib
 
 # When the assembler supports explicit relocation hint, we must use it.
 # GCC may have -mexplicit-relocs off by default if it was built with an old
@@ -56,13 +72,21 @@ LDFLAGS_vmlinux			+= -G0 -static -n -nostdlib
 # When the assembler does not supports explicit relocation hint, we can't use
 # it.  Disable it if the compiler supports it.
 #
-# If you've seen "unknown reloc hint" message building the kernel and you are
-# now wondering why "-mexplicit-relocs" is not wrapped with cc-option: the
-# combination of a "new" assembler and "old" compiler is not supported.  Either
-# upgrade the compiler or downgrade the assembler.
+# The combination of a "new" assembler and "old" GCC is not supported, given
+# the rarity of this combo and the extra complexity needed to make it work.
+# Either upgrade the compiler or downgrade the assembler; the build will error
+# out if it is the case (by probing for the model attribute; all supported
+# compilers in this case would have support).
+#
+# Also, -mdirect-extern-access is useful in case of building with explicit
+# relocs, for avoiding unnecessary GOT accesses. It is harmless to not have
+# support though.
 ifdef CONFIG_AS_HAS_EXPLICIT_RELOCS
-cflags-y			+= -mexplicit-relocs
-KBUILD_CFLAGS_KERNEL		+= -mdirect-extern-access
+cflags-y			+= $(call cc-option,-mexplicit-relocs)
+KBUILD_CFLAGS_KERNEL		+= $(call cc-option,-mdirect-extern-access)
+KBUILD_CFLAGS_KERNEL		+= $(call cc-option,-fdirect-access-external-data)
+KBUILD_AFLAGS_MODULE		+= $(call cc-option,-fno-direct-access-external-data)
+KBUILD_CFLAGS_MODULE		+= $(call cc-option,-fno-direct-access-external-data)
 else
 cflags-y			+= $(call cc-option,-mno-explicit-relocs)
 KBUILD_AFLAGS_KERNEL		+= -Wa,-mla-global-with-pcrel
@@ -71,14 +95,31 @@ KBUILD_AFLAGS_MODULE		+= -Wa,-mla-global-with-abs
 KBUILD_CFLAGS_MODULE		+= -fplt -Wa,-mla-global-with-abs,-mla-local-with-abs
 endif
 
-cflags-y += -ffreestanding
+KBUILD_AFLAGS			+= $(call cc-option,-mno-relax) $(call cc-option,-Wa$(comma)-mno-relax)
+KBUILD_CFLAGS			+= $(call cc-option,-mno-relax) $(call cc-option,-Wa$(comma)-mno-relax)
+KBUILD_AFLAGS			+= $(call cc-option,-mthin-add-sub) $(call cc-option,-Wa$(comma)-mthin-add-sub)
+KBUILD_CFLAGS			+= $(call cc-option,-mthin-add-sub) $(call cc-option,-Wa$(comma)-mthin-add-sub)
+
+ifdef CONFIG_OBJTOOL
+KBUILD_CFLAGS			+= -fno-jump-tables
+endif
+
+KBUILD_RUSTFLAGS		+= --target=loongarch64-unknown-none-softfloat
+KBUILD_RUSTFLAGS_MODULE		+= -Crelocation-model=pic
+
+ifeq ($(CONFIG_RELOCATABLE),y)
+KBUILD_CFLAGS_KERNEL		+= -fPIE
+KBUILD_RUSTFLAGS_KERNEL		+= -Crelocation-model=pie
+LDFLAGS_vmlinux			+= -static -pie --no-dynamic-linker -z notext $(call ld-option, --apply-dynamic-relocs)
+endif
+
 cflags-y += $(call cc-option, -mno-check-zero-division)
 
-ifndef CONFIG_PHYSICAL_START
-load-y		= 0x9000000000200000
-else
-load-y		= $(CONFIG_PHYSICAL_START)
+ifndef CONFIG_KASAN
+cflags-y += -fno-builtin-memcpy -fno-builtin-memmove -fno-builtin-memset
 endif
+
+load-y		= 0x9000000000200000
 bootvars-y	= VMLINUX_LOAD_ADDRESS=$(load-y)
 
 drivers-$(CONFIG_PCI)		+= arch/loongarch/pci/
@@ -91,23 +132,30 @@ KBUILD_CPPFLAGS += -DVMLINUX_LOAD_ADDRESS=$(load-y)
 # instead of .eh_frame so we don't discard them.
 KBUILD_CFLAGS += -fno-asynchronous-unwind-tables
 
+ifdef CONFIG_ARCH_STRICT_ALIGN
 # Don't emit unaligned accesses.
 # Not all LoongArch cores support unaligned access, and as kernel we can't
 # rely on others to provide emulation for these accesses.
 KBUILD_CFLAGS += $(call cc-option,-mstrict-align)
+else
+# Optimise for performance on hardware supports unaligned access.
+KBUILD_CFLAGS += $(call cc-option,-mno-strict-align)
+endif
 
 KBUILD_CFLAGS += -isystem $(shell $(CC) -print-file-name=include)
 
 KBUILD_LDFLAGS	+= -m $(ld-emul)
 
-ifdef CONFIG_LOONGARCH
-CHECKFLAGS += $(shell $(CC) $(KBUILD_CFLAGS) -dM -E -x c /dev/null | \
+ifdef need-compiler
+CHECKFLAGS += $(shell $(CC) $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) -dM -E -x c /dev/null | \
 	grep -E -vw '__GNUC_(MINOR_|PATCHLEVEL_)?_' | \
 	sed -e "s/^\#define /-D'/" -e "s/ /'='/" -e "s/$$/'/" -e 's/\$$/&&/g')
 endif
 
 libs-y += arch/loongarch/lib/
 libs-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
+
+drivers-y		+= arch/loongarch/crypto/
 
 # suspend and hibernation support
 drivers-$(CONFIG_PM)	+= arch/loongarch/power/
@@ -118,11 +166,11 @@ vdso_prepare: prepare0
 	$(Q)$(MAKE) $(build)=arch/loongarch/vdso include/generated/vdso-offsets.h
 endif
 
-PHONY += vdso_install
-vdso_install:
-	$(Q)$(MAKE) $(build)=arch/loongarch/vdso $@
+vdso-install-y += arch/loongarch/vdso/vdso.so.dbg
 
-all:	$(notdir $(KBUILD_IMAGE))
+all:	$(notdir $(KBUILD_IMAGE)) $(KBUILD_DTBS)
+
+vmlinuz.efi: vmlinux.efi
 
 vmlinux.elf vmlinux.efi vmlinuz.efi: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(bootvars-y) $(boot)/$@

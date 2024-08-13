@@ -28,7 +28,7 @@ static int i40e_diag_reg_pattern_test(struct i40e_hw *hw,
 			i40e_debug(hw, I40E_DEBUG_DIAG,
 				   "%s: reg pattern test failed - reg 0x%08x pat 0x%08x val 0x%08x\n",
 				   __func__, reg, pat, val);
-			return I40E_ERR_DIAG_TEST_FAILED;
+			return -EIO;
 		}
 	}
 
@@ -38,13 +38,13 @@ static int i40e_diag_reg_pattern_test(struct i40e_hw *hw,
 		i40e_debug(hw, I40E_DEBUG_DIAG,
 			   "%s: reg restore test failed - reg 0x%08x orig_val 0x%08x val 0x%08x\n",
 			   __func__, reg, orig_val, val);
-		return I40E_ERR_DIAG_TEST_FAILED;
+		return -EIO;
 	}
 
 	return 0;
 }
 
-struct i40e_diag_reg_test_info i40e_reg_list[] = {
+const struct i40e_diag_reg_test_info i40e_reg_list[] = {
 	/* offset               mask         elements   stride */
 	{I40E_QTX_CTL(0),       0x0000FFBF, 1,
 		I40E_QTX_CTL(1) - I40E_QTX_CTL(0)},
@@ -78,27 +78,28 @@ int i40e_diag_reg_test(struct i40e_hw *hw)
 {
 	int ret_code = 0;
 	u32 reg, mask;
+	u32 elements;
 	u32 i, j;
 
 	for (i = 0; i40e_reg_list[i].offset != 0 &&
 					     !ret_code; i++) {
 
+		elements = i40e_reg_list[i].elements;
 		/* set actual reg range for dynamically allocated resources */
 		if (i40e_reg_list[i].offset == I40E_QTX_CTL(0) &&
 		    hw->func_caps.num_tx_qp != 0)
-			i40e_reg_list[i].elements = hw->func_caps.num_tx_qp;
+			elements = hw->func_caps.num_tx_qp;
 		if ((i40e_reg_list[i].offset == I40E_PFINT_ITRN(0, 0) ||
 		     i40e_reg_list[i].offset == I40E_PFINT_ITRN(1, 0) ||
 		     i40e_reg_list[i].offset == I40E_PFINT_ITRN(2, 0) ||
 		     i40e_reg_list[i].offset == I40E_QINT_TQCTL(0) ||
 		     i40e_reg_list[i].offset == I40E_QINT_RQCTL(0)) &&
 		    hw->func_caps.num_msix_vectors != 0)
-			i40e_reg_list[i].elements =
-				hw->func_caps.num_msix_vectors - 1;
+			elements = hw->func_caps.num_msix_vectors - 1;
 
 		/* test register access */
 		mask = i40e_reg_list[i].mask;
-		for (j = 0; j < i40e_reg_list[i].elements && !ret_code; j++) {
+		for (j = 0; j < elements && !ret_code; j++) {
 			reg = i40e_reg_list[i].offset +
 			      (j * i40e_reg_list[i].stride);
 			ret_code = i40e_diag_reg_pattern_test(hw, reg, mask);
@@ -126,5 +127,5 @@ int i40e_diag_eeprom_test(struct i40e_hw *hw)
 	     BIT(I40E_SR_CONTROL_WORD_1_SHIFT)))
 		return i40e_validate_nvm_checksum(hw, NULL);
 	else
-		return I40E_ERR_DIAG_TEST_FAILED;
+		return -EIO;
 }

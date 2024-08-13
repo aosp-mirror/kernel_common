@@ -49,7 +49,7 @@
 #define DBG(fmt...)
 #endif
 
-struct bus_type mpic_subsys = {
+const struct bus_type mpic_subsys = {
 	.name = "mpic",
 	.dev_name = "mpic",
 };
@@ -355,7 +355,7 @@ static void __init mpic_test_broken_ipi(struct mpic *mpic)
 	mpic_write(mpic->gregs, MPIC_INFO(GREG_IPI_VECTOR_PRI_0), MPIC_VECPRI_MASK);
 	r = mpic_read(mpic->gregs, MPIC_INFO(GREG_IPI_VECTOR_PRI_0));
 
-	if (r == le32_to_cpu(MPIC_VECPRI_MASK)) {
+	if (r == swab32(MPIC_VECPRI_MASK)) {
 		printk(KERN_INFO "mpic: Detected reversed IPI registers\n");
 		mpic->flags |= MPIC_BROKEN_IPI;
 	}
@@ -1260,11 +1260,11 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	}
 
 	/* Read extra device-tree properties into the flags variable */
-	if (of_get_property(node, "big-endian", NULL))
+	if (of_property_read_bool(node, "big-endian"))
 		flags |= MPIC_BIG_ENDIAN;
-	if (of_get_property(node, "pic-no-reset", NULL))
+	if (of_property_read_bool(node, "pic-no-reset"))
 		flags |= MPIC_NO_RESET;
-	if (of_get_property(node, "single-cpu-affinity", NULL))
+	if (of_property_read_bool(node, "single-cpu-affinity"))
 		flags |= MPIC_SINGLE_DEST_CPU;
 	if (of_device_is_compatible(node, "fsl,mpic")) {
 		flags |= MPIC_FSL | MPIC_LARGE_VECTORS;

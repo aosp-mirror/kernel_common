@@ -58,7 +58,6 @@ static struct tty_ldisc_ops *tty_ldiscs[NR_LDISCS];
 int tty_register_ldisc(struct tty_ldisc_ops *new_ldisc)
 {
 	unsigned long flags;
-	int ret = 0;
 
 	if (new_ldisc->num < N_TTY || new_ldisc->num >= NR_LDISCS)
 		return -EINVAL;
@@ -67,7 +66,7 @@ int tty_register_ldisc(struct tty_ldisc_ops *new_ldisc)
 	tty_ldiscs[new_ldisc->num] = new_ldisc;
 	raw_spin_unlock_irqrestore(&tty_ldiscs_lock, flags);
 
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(tty_register_ldisc);
 
@@ -544,6 +543,12 @@ int tty_set_ldisc(struct tty_struct *tty, int disc)
 		/* We were raced by hangup */
 		retval = -EIO;
 		goto out;
+	}
+
+	if (tty->ops->ldisc_ok) {
+		retval = tty->ops->ldisc_ok(tty, disc);
+		if (retval)
+			goto out;
 	}
 
 	old_ldisc = tty->ldisc;

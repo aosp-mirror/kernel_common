@@ -72,7 +72,7 @@ static const int stts751_intervals[] = {
 };
 
 static const struct i2c_device_id stts751_id[] = {
-	{ "stts751", 0 },
+	{ "stts751" },
 	{ }
 };
 
@@ -91,7 +91,6 @@ struct stts751_priv {
 	int event_max, event_min;
 	int therm;
 	int hyst;
-	bool smbus_timeout;
 	int temp;
 	unsigned long last_update, last_alert_update;
 	u8 config;
@@ -821,7 +820,7 @@ static struct i2c_driver stts751_driver = {
 		.name	= DEVNAME,
 		.of_match_table = of_match_ptr(stts751_of_match),
 	},
-	.probe_new	= stts751_probe,
+	.probe		= stts751_probe,
 	.id_table	= stts751_id,
 	.detect		= stts751_detect,
 	.alert		= stts751_alert,

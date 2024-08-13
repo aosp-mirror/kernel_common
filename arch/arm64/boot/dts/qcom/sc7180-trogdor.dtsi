@@ -13,6 +13,7 @@
 #include <dt-bindings/sound/sc7180-lpass.h>
 
 #include "sc7180.dtsi"
+#include "sc7180-firmware-tfa.dtsi"
 /* PMICs depend on spmi_bus label and so must come after sc7180.dtsi */
 #include "pm6150.dtsi"
 #include "pm6150l.dtsi"
@@ -20,9 +21,6 @@
 / {
 	thermal-zones {
 		charger_thermal: charger-thermal {
-			polling-delay-passive = <0>;
-			polling-delay = <0>;
-
 			thermal-sensors = <&pm6150_adc_tm 0>;
 
 			trips {
@@ -358,10 +356,11 @@
 		#sound-dai-cells = <0>;
 	};
 
-	pwmleds {
+	pwmleds: pwmleds {
 		compatible = "pwm-leds";
+		status = "disabled";
+
 		keyboard_backlight: led-0 {
-			status = "disabled";
 			label = "cros_ec::kbd_backlight";
 			function = LED_FUNCTION_KBD_BACKLIGHT;
 			pwms = <&cros_ec_pwm 0>;
@@ -371,7 +370,6 @@
 
 	sound: sound {
 		compatible = "google,sc7180-trogdor";
-		model = "sc7180-rt5682-max98357a-1mic";
 
 		audio-routing =
 			"Headphone Jack", "HPOL",
@@ -424,8 +422,9 @@
 
 &qspi {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&qspi_clk>, <&qspi_cs0>, <&qspi_data01>;
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&qspi_clk>, <&qspi_cs0>, <&qspi_data0>, <&qspi_data1>;
+	pinctrl-1 = <&qspi_sleep>;
 
 	flash@0 {
 		compatible = "jedec,spi-nor";
@@ -512,6 +511,8 @@
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+			regulator-always-on;
+			regulator-boot-on;
 		};
 
 		pp1800_prox:
@@ -646,6 +647,7 @@ ap_ec_spi: &spi6 {
 		pinctrl-names = "default";
 		pinctrl-0 = <&ap_ec_int_l>;
 		spi-max-frequency = <3000000>;
+		wakeup-source;
 
 		cros_ec_pwm: pwm {
 			compatible = "google,cros-ec-pwm";
@@ -702,20 +704,6 @@ ap_h1_spi: &spi0 {
 	status = "disabled";
 };
 
-&dsi0 {
-	status = "okay";
-	vdda-supply = <&vdda_mipi_dsi0_1p2>;
-};
-
-&dsi0_out {
-	data-lanes = <0 1 2 3>;
-};
-
-&dsi_phy {
-	status = "okay";
-	vdds-supply = <&vdda_mipi_dsi0_pll>;
-};
-
 ap_sar_sensor_i2c: &i2c5 {
 	clock-frequency = <400000>;
 
@@ -757,32 +745,10 @@ ap_tp_i2c: &i2c7 {
 hp_i2c: &i2c9 {
 	status = "okay";
 	clock-frequency = <400000>;
+};
 
-	alc5682: codec@1a {
-		compatible = "realtek,rt5682i";
-		reg = <0x1a>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&hp_irq>;
-
-		#sound-dai-cells = <1>;
-
-		interrupt-parent = <&tlmm>;
-		/*
-		 * This will get ignored because the interrupt type
-		 * is set in rt5682.c.
-		 */
-		interrupts = <28 IRQ_TYPE_EDGE_BOTH>;
-
-		AVDD-supply = <&pp1800_alc5682>;
-		DBVDD-supply = <&pp1800_alc5682>;
-		LDO1-IN-supply = <&pp1800_alc5682>;
-		MICVDD-supply = <&pp3300_codec>;
-		VBAT-supply = <&pp3300_audio>;
-
-		realtek,dmic1-data-pin = <1>;
-		realtek,dmic1-clk-pin = <1>;
-		realtek,jd-src = <1>;
-	};
+&lpasscc {
+	status = "okay";
 };
 
 &lpass_cpu {
@@ -810,7 +776,7 @@ hp_i2c: &i2c9 {
 	};
 };
 
-&mdp {
+&lpass_hm {
 	status = "okay";
 };
 
@@ -829,11 +795,26 @@ hp_i2c: &i2c9 {
 	link-frequencies = /bits/ 64 <1620000000 2700000000 5400000000>;
 };
 
+&mdss_dsi0 {
+	status = "okay";
+	vdda-supply = <&vdda_mipi_dsi0_1p2>;
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+};
+
+&mdss_dsi0_phy {
+	status = "okay";
+	vdds-supply = <&vdda_mipi_dsi0_pll>;
+};
+
 &pm6150_adc {
-	charger-thermistor@4f {
+	channel@4f {
 		reg = <ADC5_AMUX_THM3_100K_PU>;
 		qcom,ratiometric;
 		qcom,hw-settle-time = <200>;
+		label = "charger_therm";
 	};
 };
 
@@ -887,6 +868,11 @@ hp_i2c: &i2c9 {
 
 	qcom,halt-regs = <&tcsr_regs_1 0x3000 0x5000 0x4000>;
 	qcom,spare-regs = <&tcsr_regs_2 0xb3e4>;
+};
+
+&scm {
+	/* TF-A firmware maps memory cached so mark dma-coherent to match. */
+	dma-coherent;
 };
 
 &sdhc_1 {
@@ -956,6 +942,8 @@ ap_spi_fp: &spi10 {
 		vddrf-supply = <&pp1300_l2c>;
 		vddch0-supply = <&pp3300_l10c>;
 		max-speed = <3200000>;
+
+		qcom,local-bd-address-broken;
 	};
 };
 
@@ -1044,17 +1032,20 @@ ap_spi_fp: &spi10 {
 };
 
 &qspi_cs0 {
-	bias-disable;
+	bias-disable;		/* External pullup */
 };
 
 &qspi_clk {
 	drive-strength = <8>;
-	bias-disable;
+	bias-disable;		/* Rely on Cr50 internal pulldown */
 };
 
-&qspi_data01 {
-	/* High-Z when no transfers; nice to park the lines */
-	bias-pull-up;
+&qspi_data0 {
+	bias-disable;		/* Rely on Cr50 internal pulldown */
+};
+
+&qspi_data1 {
+	bias-pull-down;
 };
 
 &qup_i2c2_default {
@@ -1174,6 +1165,7 @@ ap_spi_fp: &spi10 {
 };
 
 &pm6150l_gpios {
+	status = "disabled"; /* No GPIOs are consumed or configured */
 	gpio-line-names = "AP_SUSPEND",
 			  "",
 			  "",
@@ -1204,7 +1196,6 @@ ap_spi_fp: &spi10 {
 	ap_ec_int_l: ap-ec-int-l-state {
 		pins = "gpio94";
 		function = "gpio";
-		input-enable;
 		bias-pull-up;
 	};
 
@@ -1227,7 +1218,6 @@ ap_spi_fp: &spi10 {
 	bios_flash_wp_l: bios-flash-wp-l-state {
 		pins = "gpio66";
 		function = "gpio";
-		input-enable;
 		bias-disable;
 	};
 
@@ -1269,7 +1259,6 @@ ap_spi_fp: &spi10 {
 	fp_to_ap_irq_l: fp-to-ap-irq-l-state {
 		pins = "gpio4";
 		function = "gpio";
-		input-enable;
 
 		/* Has external pullup */
 		bias-disable;
@@ -1284,7 +1273,6 @@ ap_spi_fp: &spi10 {
 	h1_ap_int_odl: h1-ap-int-odl-state {
 		pins = "gpio42";
 		function = "gpio";
-		input-enable;
 		bias-pull-up;
 	};
 
@@ -1333,10 +1321,25 @@ ap_spi_fp: &spi10 {
 	p_sensor_int_l: p-sensor-int-l-state {
 		pins = "gpio24";
 		function = "gpio";
-		input-enable;
 
 		/* Has external pullup */
 		bias-disable;
+	};
+
+	qspi_sleep: qspi-sleep-state {
+		pins = "gpio63", "gpio64", "gpio65", "gpio68";
+
+		/*
+		 * When we're not actively transferring we want pins as GPIOs
+		 * with output disabled so that the quad SPI IP block stops
+		 * driving them. We rely on the normal pulls configured in
+		 * the active state and don't redefine them here. Also note
+		 * that we don't need the reverse (output-enable) in the
+		 * normal mode since the "output-enable" only matters for
+		 * GPIO function.
+		 */
+		function = "gpio";
+		output-disable;
 	};
 
 	qup_uart3_sleep: qup-uart3-sleep-state {

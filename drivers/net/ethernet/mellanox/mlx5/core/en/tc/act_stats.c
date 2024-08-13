@@ -25,8 +25,8 @@ struct mlx5e_tc_act_stats {
 
 static const struct rhashtable_params act_counters_ht_params = {
 	.head_offset = offsetof(struct mlx5e_tc_act_stats, hash),
-	.key_offset = 0,
-	.key_len = offsetof(struct mlx5e_tc_act_stats, counter),
+	.key_offset = offsetof(struct mlx5e_tc_act_stats, tc_act_cookie),
+	.key_len = sizeof_field(struct mlx5e_tc_act_stats, tc_act_cookie),
 	.automatic_shrinking = true,
 };
 
@@ -37,7 +37,7 @@ mlx5e_tc_act_stats_create(void)
 	int err;
 
 	handle = kvzalloc(sizeof(*handle), GFP_KERNEL);
-	if (IS_ERR(handle))
+	if (!handle)
 		return ERR_PTR(-ENOMEM);
 
 	err = rhashtable_init(&handle->ht, &act_counters_ht_params);
@@ -64,6 +64,7 @@ mlx5e_tc_act_stats_add(struct mlx5e_tc_act_stats_handle *handle,
 {
 	struct mlx5e_tc_act_stats *act_stats, *old_act_stats;
 	struct rhashtable *ht = &handle->ht;
+	u64 lastused;
 	int err = 0;
 
 	act_stats = kvzalloc(sizeof(*act_stats), GFP_KERNEL);
@@ -72,6 +73,10 @@ mlx5e_tc_act_stats_add(struct mlx5e_tc_act_stats_handle *handle,
 
 	act_stats->tc_act_cookie = act_cookie;
 	act_stats->counter = counter;
+
+	mlx5_fc_query_cached_raw(counter,
+				 &act_stats->lastbytes,
+				 &act_stats->lastpackets, &lastused);
 
 	rcu_read_lock();
 	old_act_stats = rhashtable_lookup_get_insert_fast(ht,
@@ -164,14 +169,11 @@ mlx5e_tc_act_stats_fill_stats(struct mlx5e_tc_act_stats_handle *handle,
 {
 	struct rhashtable *ht = &handle->ht;
 	struct mlx5e_tc_act_stats *item;
-	struct mlx5e_tc_act_stats key;
 	u64 pkts, bytes, lastused;
 	int err = 0;
 
-	key.tc_act_cookie = fl_act->cookie;
-
 	rcu_read_lock();
-	item = rhashtable_lookup(ht, &key, act_counters_ht_params);
+	item = rhashtable_lookup(ht, &fl_act->cookie, act_counters_ht_params);
 	if (!item) {
 		rcu_read_unlock();
 		err = -ENOENT;

@@ -87,17 +87,17 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q);
 
 /**
  * v4l2_create_fwnode_links_to_pad - Create fwnode-based links from a
- *                                   source subdev to a sink subdev pad.
+ *                                   source subdev to a sink pad.
  *
  * @src_sd: pointer to a source subdev
- * @sink:  pointer to a subdev sink pad
+ * @sink:  pointer to a sink pad
  * @flags: the link flags
  *
  * This function searches for fwnode endpoint connections from a source
  * subdevice to a single sink pad, and if suitable connections are found,
  * translates them into media links to that pad. The function can be
- * called by the sink subdevice, in its v4l2-async notifier subdev bound
- * callback, to create links from a bound source subdevice.
+ * called by the sink, in its v4l2-async notifier bound callback, to create
+ * links from a bound source subdevice.
  *
  * The @flags argument specifies the link flags. The caller shall ensure that
  * the flags are valid regardless of the number of links that may be created.
@@ -143,6 +143,9 @@ int v4l2_create_fwnode_links(struct v4l2_subdev *src_sd,
  * v4l2_pipeline_pm_get - Increase the use count of a pipeline
  * @entity: The root entity of a pipeline
  *
+ * THIS FUNCTION IS DEPRECATED. DO NOT USE IN NEW DRIVERS. USE RUNTIME PM
+ * ON SUB-DEVICE DRIVERS INSTEAD.
+ *
  * Update the use count of all entities in the pipeline and power entities on.
  *
  * This function is intended to be called in video node open. It uses
@@ -156,6 +159,9 @@ int v4l2_pipeline_pm_get(struct media_entity *entity);
 /**
  * v4l2_pipeline_pm_put - Decrease the use count of a pipeline
  * @entity: The root entity of a pipeline
+ *
+ * THIS FUNCTION IS DEPRECATED. DO NOT USE IN NEW DRIVERS. USE RUNTIME PM
+ * ON SUB-DEVICE DRIVERS INSTEAD.
  *
  * Update the use count of all entities in the pipeline and power entities off.
  *

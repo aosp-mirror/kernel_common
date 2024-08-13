@@ -98,6 +98,8 @@
 #define ST_EPOF				0x80
 /* Status transfer size, 16 bytes status, 16 byte result flags */
 #define ST_SIZE				0x20
+/* 1-wire data i/o fifo size, 128 bytes */
+#define FIFO_SIZE			0x80
 
 /* Result Register flags */
 #define RR_DETECT			0xA5 /* New device detected */
@@ -304,6 +306,7 @@ static void ds_reset_device(struct ds_device *dev)
 	if (dev->spu_sleep) {
 		/* lower 4 bits are 0, see ds_set_pullup */
 		u8 del = dev->spu_sleep>>4;
+
 		if (ds_send_control(dev, COMM_SET_DURATION | COMM_IM, del))
 			dev_err(&dev->udev->dev,
 				"%s: Error setting duration\n", __func__);
@@ -613,13 +616,10 @@ static int ds_read_byte(struct ds_device *dev, u8 *byte)
 	return 0;
 }
 
-static int ds_read_block(struct ds_device *dev, u8 *buf, int len)
+static int read_block_chunk(struct ds_device *dev, u8 *buf, int len)
 {
 	struct ds_status st;
 	int err;
-
-	if (len > 64*1024)
-		return -E2BIG;
 
 	memset(buf, 0xFF, len);
 
@@ -635,6 +635,24 @@ static int ds_read_block(struct ds_device *dev, u8 *buf, int len)
 
 	memset(buf, 0x00, len);
 	err = ds_recv_data(dev, buf, len);
+
+	return err;
+}
+
+static int ds_read_block(struct ds_device *dev, u8 *buf, int len)
+{
+	int err, to_read, rem = len;
+
+	if (len > 64 * 1024)
+		return -E2BIG;
+
+	do {
+		to_read = rem <= FIFO_SIZE ? rem : FIFO_SIZE;
+		err = read_block_chunk(dev, &buf[len - rem], to_read);
+		if (err < 0)
+			return err;
+		rem -= to_read;
+	} while (rem);
 
 	return err;
 }
@@ -731,7 +749,8 @@ static void ds9490r_search(void *data, struct w1_master *master,
 			break;
 
 		if (st.data_in_buffer_status) {
-			/* Bulk in can receive partial ids, but when it does
+			/*
+			 * Bulk in can receive partial ids, but when it does
 			 * they fail crc and will be discarded anyway.
 			 * That has only been seen when status in buffer
 			 * is 0 and bulk is read anyway, so don't read
@@ -743,8 +762,10 @@ static void ds9490r_search(void *data, struct w1_master *master,
 				break;
 			for (i = 0; i < err/8; ++i) {
 				found_ids[found++] = buf[i];
-				/* can't know if there will be a discrepancy
-				 * value after until the next id */
+				/*
+				 * can't know if there will be a discrepancy
+				 * value after until the next id
+				 */
 				if (found == search_limit) {
 					master->search_id = buf[i];
 					break;
@@ -760,7 +781,8 @@ static void ds9490r_search(void *data, struct w1_master *master,
 	if (found <= search_limit) {
 		master->search_id = 0;
 	} else if (!test_bit(W1_WARN_MAX_COUNT, &master->flags)) {
-		/* Only max_slave_count will be scanned in a search,
+		/*
+		 * Only max_slave_count will be scanned in a search,
 		 * but it will start where it left off next search
 		 * until all ids are identified and then it will start
 		 * over.  A continued search will report the previous

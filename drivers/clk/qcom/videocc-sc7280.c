@@ -236,7 +236,7 @@ static struct gdsc mvs0_gdsc = {
 		.name = "mvs0_gdsc",
 	},
 	.pwrsts = PWRSTS_OFF_ON,
-	.flags = HW_CTRL | RETAIN_FF_ENABLE,
+	.flags = HW_CTRL_TRIGGER | RETAIN_FF_ENABLE,
 };
 
 static struct gdsc mvsc_gdsc = {
@@ -309,17 +309,7 @@ static struct platform_driver video_cc_sc7280_driver = {
 	},
 };
 
-static int __init video_cc_sc7280_init(void)
-{
-	return platform_driver_register(&video_cc_sc7280_driver);
-}
-subsys_initcall(video_cc_sc7280_init);
-
-static void __exit video_cc_sc7280_exit(void)
-{
-	platform_driver_unregister(&video_cc_sc7280_driver);
-}
-module_exit(video_cc_sc7280_exit);
+module_platform_driver(video_cc_sc7280_driver);
 
 MODULE_DESCRIPTION("QTI VIDEO_CC sc7280 Driver");
 MODULE_LICENSE("GPL v2");

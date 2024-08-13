@@ -80,7 +80,7 @@ static void altera_spi_set_cs(struct spi_device *spi, bool is_high)
 		altr_spi_writel(hw, ALTERA_SPI_TARGET_SEL, 0);
 	} else {
 		altr_spi_writel(hw, ALTERA_SPI_TARGET_SEL,
-				BIT(spi->chip_select));
+				BIT(spi_get_chipselect(spi, 0)));
 		hw->imr |= ALTERA_SPI_CONTROL_SSO_MSK;
 		altr_spi_writel(hw, ALTERA_SPI_CONTROL, hw->imr);
 	}
@@ -219,4 +219,5 @@ void altera_spi_init_host(struct spi_controller *host)
 }
 EXPORT_SYMBOL_GPL(altera_spi_init_host);
 
+MODULE_DESCRIPTION("Altera SPI Controller driver core");
 MODULE_LICENSE("GPL");

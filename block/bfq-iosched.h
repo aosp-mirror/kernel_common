@@ -20,7 +20,6 @@
 
 #define BFQ_DEFAULT_QUEUE_IOPRIO	4
 
-#define BFQ_WEIGHT_LEGACY_DFL	100
 #define BFQ_DEFAULT_GRP_IOPRIO	0
 #define BFQ_DEFAULT_GRP_CLASS	IOPRIO_CLASS_BE
 
@@ -1003,9 +1002,6 @@ struct bfq_group_data {
 struct bfq_group {
 	/* must be the first member */
 	struct blkg_policy_data pd;
-
-	/* cached path for this blkg (see comments in bfq_bic_update_cgroup) */
-	char blkg_path[128];
 
 	/* reference counter (see comments in bfq_bic_update_cgroup) */
 	refcount_t ref;

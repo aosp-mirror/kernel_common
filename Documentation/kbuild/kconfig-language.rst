@@ -150,6 +150,12 @@ applicable everywhere (see syntax).
 	That will limit the usefulness but on the other hand avoid
 	the illegal configurations all over.
 
+	If "select" <symbol> is followed by "if" <expr>, <symbol> will be
+	selected by the logical AND of the value of the current menu symbol
+	and <expr>. This means, the lower limit can be downgraded due to the
+	presence of "if" <expr>. This behavior may seem weird, but we rely on
+	it. (The future of this behavior is undecided.)
+
 - weak reverse dependencies: "imply" <symbol> ["if" <expr>]
 
   This is similar to "select" as it enforces a lower limit on another
@@ -184,7 +190,7 @@ applicable everywhere (see syntax).
   ability to hook into a secondary subsystem while allowing the user to
   configure that subsystem out without also having to unset these drivers.
 
-  Note: If the combination of FOO=y and BAR=m causes a link error,
+  Note: If the combination of FOO=y and BAZ=m causes a link error,
   you can guard the function call with IS_REACHABLE()::
 
 	foo_init()
@@ -201,6 +207,10 @@ applicable everywhere (see syntax).
 	tristate "foo"
 	imply BAR
 	imply BAZ
+
+  Note: If "imply" <symbol> is followed by "if" <expr>, the default of <symbol>
+  will be the logical AND of the value of the current menu symbol and <expr>.
+  (The future of this behavior is undecided.)
 
 - limiting menu display: "visible if" <expr>
 
@@ -393,7 +403,7 @@ of C0, which doesn't depend on M::
 
 choices::
 
-	"choice" [symbol]
+	"choice"
 	<choice options>
 	<choice block>
 	"endchoice"
@@ -409,13 +419,6 @@ selected, a tristate choice also allows any number of config entries
 to be set to 'm'. This can be used if multiple drivers for a single
 hardware exists and only a single driver can be compiled/loaded into
 the kernel, but all drivers can be compiled as modules.
-
-A choice accepts another option "optional", which allows to set the
-choice to 'n' and no entry needs to be selected.
-If no [symbol] is associated with a choice, then you can not have multiple
-definitions of that choice. If a [symbol] is associated to the choice,
-then you may define the same choice (i.e. with the same entries) in another
-place.
 
 comment::
 
@@ -572,6 +575,32 @@ above, leading to:
   config FOO
 	bool "Support for foo hardware"
 	depends on ARCH_FOO_VENDOR || COMPILE_TEST
+
+Optional dependencies
+~~~~~~~~~~~~~~~~~~~~~
+
+Some drivers are able to optionally use a feature from another module
+or build cleanly with that module disabled, but cause a link failure
+when trying to use that loadable module from a built-in driver.
+
+The most common way to express this optional dependency in Kconfig logic
+uses the slightly counterintuitive::
+
+  config FOO
+	tristate "Support for foo hardware"
+	depends on BAR || !BAR
+
+This means that there is either a dependency on BAR that disallows
+the combination of FOO=y with BAR=m, or BAR is completely disabled.
+For a more formalized approach if there are multiple drivers that have
+the same dependency, a helper symbol can be used, like::
+
+  config FOO
+	tristate "Support for foo hardware"
+	depends on BAR_OPTIONAL
+
+  config BAR_OPTIONAL
+	def_tristate BAR || !BAR
 
 Kconfig recursive dependency limitations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

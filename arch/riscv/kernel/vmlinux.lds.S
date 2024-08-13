@@ -5,6 +5,7 @@
  */
 
 #define RO_EXCEPTION_TABLE_ALIGN	4
+#define RUNTIME_DISCARD_EXIT
 
 #ifdef CONFIG_XIP_KERNEL
 #include "vmlinux-xip.lds.S"
@@ -25,9 +26,6 @@ OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
 jiffies = jiffies_64;
-
-PECOFF_SECTION_ALIGNMENT = 0x1000;
-PECOFF_FILE_ALIGNMENT = 0x200;
 
 SECTIONS
 {
@@ -71,10 +69,12 @@ SECTIONS
 		__soc_builtin_dtb_table_end = .;
 	}
 	/* we have to discard exit text and such at runtime, not link time */
+	__exittext_begin = .;
 	.exit.text :
 	{
 		EXIT_TEXT
 	}
+	__exittext_end = .;
 
 	__init_text_end = .;
 	. = ALIGN(SECTION_ALIGN);
@@ -85,6 +85,14 @@ SECTIONS
 	/* Start of init data section */
 	__init_data_begin = .;
 	INIT_DATA_SECTION(16)
+
+	.init.pi : {
+		KEEP(*(.init.pi*))
+	}
+
+	.init.bss : {
+		KEEP(*(.init.bss*))	/* from the EFI stub */
+	}
 	.exit.data :
 	{
 		EXIT_DATA
@@ -95,12 +103,18 @@ SECTIONS
 		*(.rel.dyn*)
 	}
 
+	.rela.dyn : ALIGN(8) {
+		__rela_dyn_start = .;
+		*(.rela .rela*)
+		__rela_dyn_end = .;
+	}
+
 	__init_data_end = .;
 
 	. = ALIGN(8);
 	.alternative : {
 		__alt_start = .;
-		*(.alternative)
+		KEEP(*(.alternative))
 		__alt_end = .;
 	}
 	__init_end = .;
@@ -121,9 +135,22 @@ SECTIONS
 		*(.sdata*)
 	}
 
+	.got : { *(.got*) }
+
+#ifdef CONFIG_RELOCATABLE
+	.data.rel : { *(.data.rel*) }
+	.plt : { *(.plt) }
+	.dynamic : { *(.dynamic) }
+	.dynsym : { *(.dynsym) }
+	.dynstr : { *(.dynstr) }
+	.hash : { *(.hash) }
+	.gnu.hash : { *(.gnu.hash) }
+#endif
+
 #ifdef CONFIG_EFI
 	.pecoff_edata_padding : { BYTE(0); . = ALIGN(PECOFF_FILE_ALIGNMENT); }
 	__pecoff_data_raw_size = ABSOLUTE(. - __pecoff_text_end);
+	__pecoff_data_raw_end = ABSOLUTE(.);
 #endif
 
 	/* End of data section */
@@ -134,12 +161,14 @@ SECTIONS
 #ifdef CONFIG_EFI
 	. = ALIGN(PECOFF_SECTION_ALIGNMENT);
 	__pecoff_data_virt_size = ABSOLUTE(. - __pecoff_text_end);
+	__pecoff_data_virt_end = ABSOLUTE(.);
 #endif
 	_end = .;
 
 	STABS_DEBUG
 	DWARF_DEBUG
 	ELF_DETAILS
+	.riscv.attributes 0 : { *(.riscv.attributes) }
 
 	DISCARDS
 }

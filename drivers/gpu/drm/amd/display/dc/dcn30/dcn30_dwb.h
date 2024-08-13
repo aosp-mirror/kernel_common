@@ -712,7 +712,7 @@
 	type DWB_OGAM_RAMB_EXP_REGION32_LUT_OFFSET;\
 	type DWB_OGAM_RAMB_EXP_REGION32_NUM_SEGMENTS;\
 	type DWB_OGAM_RAMB_EXP_REGION33_LUT_OFFSET;\
-	type DWB_OGAM_RAMB_EXP_REGION33_NUM_SEGMENTS;
+	type DWB_OGAM_RAMB_EXP_REGION33_NUM_SEGMENTS
 
 struct dcn30_dwbc_registers {
 	/* DCN3AG */
@@ -735,6 +735,10 @@ struct dcn30_dwbc_registers {
 	uint32_t DWB_MMHUBBUB_BACKPRESSURE_CNT;
 	uint32_t DWB_HOST_READ_CONTROL;
 	uint32_t DWB_SOFT_RESET;
+	uint32_t DWB_DEBUG_CTRL;
+	uint32_t DWB_DEBUG;
+	uint32_t DWB_TEST_DEBUG_INDEX;
+	uint32_t DWB_TEST_DEBUG_DATA;
 
 	/* DWBSCL */
 	uint32_t DWBSCL_COEF_RAM_TAP_SELECT;
@@ -749,6 +753,9 @@ struct dcn30_dwbc_registers {
 	uint32_t DWBSCL_DEST_SIZE;
 	uint32_t DWBSCL_OVERFLOW_STATUS;
 	uint32_t DWBSCL_OVERFLOW_COUNTER;
+	uint32_t DWBSCL_DEBUG;
+	uint32_t DWBSCL_TEST_DEBUG_INDEX;
+	uint32_t DWBSCL_TEST_DEBUG_DATA;
 
 	/* DWBCP */
 	uint32_t DWB_HDR_MULT_COEF;
@@ -840,6 +847,9 @@ struct dcn30_dwbc_registers {
 	uint32_t DWB_OGAM_RAMB_REGION_28_29;
 	uint32_t DWB_OGAM_RAMB_REGION_30_31;
 	uint32_t DWB_OGAM_RAMB_REGION_32_33;
+	uint32_t DWBCP_DEBUG;
+	uint32_t DWBCP_TEST_DEBUG_INDEX;
+	uint32_t DWBCP_TEST_DEBUG_DATA;
 };
 
 /* Internal enums / structs */
@@ -878,6 +888,8 @@ bool dwb3_disable(struct dwbc *dwbc);
 bool dwb3_update(struct dwbc *dwbc, struct dc_dwb_params *params);
 
 bool dwb3_is_enabled(struct dwbc *dwbc);
+
+void dwb3_set_fc_enable(struct dwbc *dwbc, enum dwb_frame_capture_enable enable);
 
 void dwb3_set_stereo(struct dwbc *dwbc,
 	struct dwb_stereo_params *stereo_params);

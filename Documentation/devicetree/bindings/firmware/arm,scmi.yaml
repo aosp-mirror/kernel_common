@@ -34,6 +34,13 @@ properties:
       - description: SCMI compliant firmware with ARM SMC/HVC transport
         items:
           - const: arm,scmi-smc
+      - description: SCMI compliant firmware with ARM SMC/HVC transport
+                     with shmem address(4KB-page, offset) as parameters
+        items:
+          - const: arm,scmi-smc-param
+      - description: SCMI compliant firmware with Qualcomm SMC/HVC transport
+        items:
+          - const: qcom,scmi-smc
       - description: SCMI compliant firmware with SCMI Virtio transport.
                      The virtio transport only supports a single device.
         items:
@@ -56,17 +63,42 @@ properties:
     description:
       Specifies the mailboxes used to communicate with SCMI compliant
       firmware.
-    items:
-      - const: tx
-      - const: rx
+    oneOf:
+      - items:
+          - const: tx
+          - const: rx
+        minItems: 1
+      - items:
+          - const: tx
+          - const: tx_reply
+          - const: rx
+          - const: rx_reply
+        minItems: 2
 
   mboxes:
     description:
       List of phandle and mailbox channel specifiers. It should contain
-      exactly one or two mailboxes, one for transmitting messages("tx")
-      and another optional for receiving the notifications("rx") if supported.
+      exactly one, two, three or four mailboxes; the first one or two for
+      transmitting messages ("tx") and another optional ("rx") for receiving
+      notifications and delayed responses, if supported by the platform.
+      The optional ("rx_reply") is for notifications completion interrupt,
+      if supported by the platform.
+      The number of mailboxes needed for transmitting messages depends on the
+      type of channels exposed by the specific underlying mailbox controller;
+      one single channel descriptor is enough if such channel is bidirectional,
+      while two channel descriptors are needed to represent the SCMI ("tx")
+      channel if the underlying mailbox channels are of unidirectional type.
+      The effective combination in numbers of mboxes and shmem descriptors let
+      the SCMI subsystem determine unambiguosly which type of SCMI channels are
+      made available by the underlying mailbox controller and how to use them.
+       1 mbox / 1 shmem => SCMI TX over 1 mailbox bidirectional channel
+       2 mbox / 2 shmem => SCMI TX and RX over 2 mailbox bidirectional channels
+       2 mbox / 1 shmem => SCMI TX over 2 mailbox unidirectional channels
+       3 mbox / 2 shmem => SCMI TX and RX over 3 mailbox unidirectional channels
+       4 mbox / 2 shmem => SCMI TX and RX over 4 mailbox unidirectional channels
+      Any other combination of mboxes and shmem is invalid.
     minItems: 1
-    maxItems: 2
+    maxItems: 4
 
   shmem:
     description:
@@ -100,7 +132,9 @@ properties:
       Channel specifier required when using OP-TEE transport.
 
   protocol@11:
-    type: object
+    $ref: '#/$defs/protocol-node'
+    unevaluatedProperties: false
+
     properties:
       reg:
         const: 0x11
@@ -112,7 +146,9 @@ properties:
       - '#power-domain-cells'
 
   protocol@13:
-    type: object
+    $ref: '#/$defs/protocol-node'
+    unevaluatedProperties: false
+
     properties:
       reg:
         const: 0x13
@@ -120,11 +156,20 @@ properties:
       '#clock-cells':
         const: 1
 
-    required:
-      - '#clock-cells'
+      '#power-domain-cells':
+        const: 1
+
+    oneOf:
+      - required:
+          - '#clock-cells'
+
+      - required:
+          - '#power-domain-cells'
 
   protocol@14:
-    type: object
+    $ref: '#/$defs/protocol-node'
+    unevaluatedProperties: false
+
     properties:
       reg:
         const: 0x14
@@ -136,7 +181,9 @@ properties:
       - '#clock-cells'
 
   protocol@15:
-    type: object
+    $ref: '#/$defs/protocol-node'
+    unevaluatedProperties: false
+
     properties:
       reg:
         const: 0x15
@@ -148,7 +195,9 @@ properties:
       - '#thermal-sensor-cells'
 
   protocol@16:
-    type: object
+    $ref: '#/$defs/protocol-node'
+    unevaluatedProperties: false
+
     properties:
       reg:
         const: 0x16
@@ -160,20 +209,31 @@ properties:
       - '#reset-cells'
 
   protocol@17:
-    type: object
+    $ref: '#/$defs/protocol-node'
+    unevaluatedProperties: false
+
     properties:
       reg:
         const: 0x17
 
       regulators:
         type: object
+        additionalProperties: false
         description:
           The list of all regulators provided by this SCMI controller.
 
+        properties:
+          '#address-cells':
+            const: 1
+
+          '#size-cells':
+            const: 0
+
         patternProperties:
-          '^regulators@[0-9a-f]+$':
+          '^regulator@[0-9a-f]+$':
             type: object
-            $ref: "../regulator/regulator.yaml#"
+            $ref: /schemas/regulator/regulator.yaml#
+            unevaluatedProperties: false
 
             properties:
               reg:
@@ -184,15 +244,48 @@ properties:
               - reg
 
   protocol@18:
-    type: object
+    $ref: '#/$defs/protocol-node'
+    unevaluatedProperties: false
+
     properties:
       reg:
         const: 0x18
 
+  protocol@19:
+    type: object
+    allOf:
+      - $ref: '#/$defs/protocol-node'
+      - $ref: /schemas/pinctrl/pinctrl.yaml
+
+    unevaluatedProperties: false
+
+    properties:
+      reg:
+        const: 0x19
+
+    patternProperties:
+      '-pins$':
+        type: object
+        allOf:
+          - $ref: /schemas/pinctrl/pincfg-node.yaml#
+          - $ref: /schemas/pinctrl/pinmux-node.yaml#
+        unevaluatedProperties: false
+
+        description:
+          A pin multiplexing sub-node describes how to configure a
+          set of pins in some desired function.
+          A single sub-node may define several pin configurations.
+          This sub-node is using the default pinctrl bindings to configure
+          pin multiplexing and using SCMI protocol to apply a specified
+          configuration.
+
+    required:
+      - reg
+
 additionalProperties: false
 
-patternProperties:
-  '^protocol@[0-9a-f]+$':
+$defs:
+  protocol-node:
     type: object
     description:
       Each sub-node represents a protocol supported. If the platform
@@ -205,13 +298,20 @@ patternProperties:
         maxItems: 1
 
       mbox-names:
-        items:
-          - const: tx
-          - const: rx
+        oneOf:
+          - items:
+              - const: tx
+              - const: rx
+            minItems: 1
+          - items:
+              - const: tx
+              - const: tx_reply
+              - const: rx
+            minItems: 2
 
       mboxes:
         minItems: 1
-        maxItems: 2
+        maxItems: 3
 
       shmem:
         minItems: 1
@@ -248,7 +348,10 @@ else:
     properties:
       compatible:
         contains:
-          const: arm,scmi-smc
+          enum:
+            - arm,scmi-smc
+            - arm,scmi-smc-param
+            - qcom,scmi-smc
   then:
     required:
       - arm,smc-id
@@ -287,7 +390,7 @@ examples:
 
             scmi_dvfs: protocol@13 {
                 reg = <0x13>;
-                #clock-cells = <1>;
+                #power-domain-cells = <1>;
 
                 mboxes = <&mhuB 1 0>,
                          <&mhuB 1 1>;
@@ -332,6 +435,25 @@ examples:
 
             scmi_powercap: protocol@18 {
                 reg = <0x18>;
+            };
+
+            scmi_pinctrl: protocol@19 {
+                reg = <0x19>;
+
+                i2c2-pins {
+                    groups = "g_i2c2_a", "g_i2c2_b";
+                    function = "f_i2c2";
+                };
+
+                mdio-pins {
+                    groups = "g_avb_mdio";
+                    drive-strength = <24>;
+                };
+
+                keys_pins: keys-pins {
+                    pins = "gpio_5_17", "gpio_5_20", "gpio_5_22", "gpio_2_1";
+                    bias-pull-up;
+                };
             };
         };
     };
@@ -400,7 +522,7 @@ examples:
                 reg = <0x13>;
                 linaro,optee-channel-id = <1>;
                 shmem = <&cpu_optee_lpri0>;
-                #clock-cells = <1>;
+                #power-domain-cells = <1>;
             };
 
             scmi_clk0: protocol@14 {

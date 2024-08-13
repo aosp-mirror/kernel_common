@@ -450,14 +450,14 @@ static int am33xx_pm_rtc_setup(void)
 
 		rtc_base_virt = of_iomap(np, 0);
 		if (!rtc_base_virt) {
-			pr_warn("PM: could not iomap rtc");
+			pr_warn("PM: could not iomap rtc\n");
 			error = -ENODEV;
 			goto err_clk_put;
 		}
 
 		omap_rtc = rtc_class_open("rtc0");
 		if (!omap_rtc) {
-			pr_warn("PM: rtc0 not available");
+			pr_warn("PM: rtc0 not available\n");
 			error = -EPROBE_DEFER;
 			goto err_iounmap;
 		}
@@ -527,7 +527,7 @@ static int am33xx_pm_probe(struct platform_device *pdev)
 
 	ret = am33xx_pm_alloc_sram();
 	if (ret)
-		return ret;
+		goto err_wkup_m3_ipc_put;
 
 	ret = am33xx_pm_rtc_setup();
 	if (ret)
@@ -572,17 +572,18 @@ err_pm_runtime_put:
 	pm_runtime_put_sync(dev);
 err_pm_runtime_disable:
 	pm_runtime_disable(dev);
-	wkup_m3_ipc_put(m3_ipc);
 err_unsetup_rtc:
 	iounmap(rtc_base_virt);
 	clk_put(rtc_fck);
 err_free_sram:
 	am33xx_pm_free_sram();
 	pm33xx_dev = NULL;
+err_wkup_m3_ipc_put:
+	wkup_m3_ipc_put(m3_ipc);
 	return ret;
 }
 
-static int am33xx_pm_remove(struct platform_device *pdev)
+static void am33xx_pm_remove(struct platform_device *pdev)
 {
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
@@ -593,7 +594,6 @@ static int am33xx_pm_remove(struct platform_device *pdev)
 	am33xx_pm_free_sram();
 	iounmap(rtc_base_virt);
 	clk_put(rtc_fck);
-	return 0;
 }
 
 static struct platform_driver am33xx_pm_driver = {
@@ -601,7 +601,7 @@ static struct platform_driver am33xx_pm_driver = {
 		.name   = "pm33xx",
 	},
 	.probe = am33xx_pm_probe,
-	.remove = am33xx_pm_remove,
+	.remove_new = am33xx_pm_remove,
 };
 module_platform_driver(am33xx_pm_driver);
 

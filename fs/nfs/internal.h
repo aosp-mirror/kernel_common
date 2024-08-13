@@ -81,6 +81,9 @@ struct nfs_client_initdata {
 	struct net *net;
 	const struct rpc_timeout *timeparms;
 	const struct cred *cred;
+	struct xprtsec_parms xprtsec;
+	unsigned long connect_timeout;
+	unsigned long reconnect_timeout;
 };
 
 /*
@@ -101,6 +104,7 @@ struct nfs_fs_context {
 	unsigned int		bsize;
 	struct nfs_auth_info	auth_info;
 	rpc_authflavor_t	selected_flavor;
+	struct xprtsec_parms	xprtsec;
 	char			*client_address;
 	unsigned int		version;
 	unsigned int		minorversion;
@@ -108,6 +112,7 @@ struct nfs_fs_context {
 	unsigned short		protofamily;
 	unsigned short		mountfamily;
 	bool			has_sec_mnt_opts;
+	int			lock_status;
 
 	struct {
 		union {
@@ -147,6 +152,12 @@ struct nfs_fs_context {
 		struct nfs_fattr	*fattr;
 		unsigned int		inherited_bsize;
 	} clone_data;
+};
+
+enum nfs_lock_status {
+	NFS_LOCK_NOT_SET	= 0,
+	NFS_LOCK_LOCK		= 1,
+	NFS_LOCK_NOLOCK		= 2,
 };
 
 #define nfs_errorf(fc, fmt, ...) ((fc)->log.log ?		\
@@ -416,6 +427,8 @@ static inline __u32 nfs_access_xattr_mask(const struct nfs_server *server)
 int nfs_file_fsync(struct file *file, loff_t start, loff_t end, int datasync);
 loff_t nfs_file_llseek(struct file *, loff_t, int);
 ssize_t nfs_file_read(struct kiocb *, struct iov_iter *);
+ssize_t nfs_file_splice_read(struct file *in, loff_t *ppos, struct pipe_inode_info *pipe,
+			     size_t len, unsigned int flags);
 int nfs_file_mmap(struct file *, struct vm_area_struct *);
 ssize_t nfs_file_write(struct kiocb *, struct iov_iter *);
 int nfs_file_release(struct inode *, struct file *);
@@ -443,8 +456,6 @@ int nfs_try_get_tree(struct fs_context *);
 int nfs_get_tree_common(struct fs_context *);
 void nfs_kill_super(struct super_block *);
 
-extern struct rpc_stat nfs_rpcstat;
-
 extern int __init register_nfs_fs(void);
 extern void __exit unregister_nfs_fs(void);
 extern bool nfs_sb_active(struct super_block *sb);
@@ -452,6 +463,10 @@ extern void nfs_sb_deactive(struct super_block *sb);
 extern int nfs_client_for_each_server(struct nfs_client *clp,
 				      int (*fn)(struct nfs_server *, void *),
 				      void *data);
+#ifdef CONFIG_NFS_FSCACHE
+extern const struct netfs_request_ops nfs_netfs_ops;
+#endif
+
 /* io.c */
 extern void nfs_start_io_read(struct inode *inode);
 extern void nfs_end_io_read(struct inode *inode);
@@ -481,9 +496,15 @@ extern int nfs4_get_rootfh(struct nfs_server *server, struct nfs_fh *mntfh, bool
 
 struct nfs_pgio_completion_ops;
 /* read.c */
+extern const struct nfs_pgio_completion_ops nfs_async_read_completion_ops;
 extern void nfs_pageio_init_read(struct nfs_pageio_descriptor *pgio,
 			struct inode *inode, bool force_mds,
 			const struct nfs_pgio_completion_ops *compl_ops);
+extern bool nfs_read_alloc_scratch(struct nfs_pgio_header *hdr, size_t size);
+extern int nfs_read_add_folio(struct nfs_pageio_descriptor *pgio,
+			       struct nfs_open_context *ctx,
+			       struct folio *folio);
+extern void nfs_pageio_complete_read(struct nfs_pageio_descriptor *pgio);
 extern void nfs_read_prepare(struct rpc_task *task, void *calldata);
 extern void nfs_pageio_reset_read_mds(struct nfs_pageio_descriptor *pgio);
 
@@ -639,7 +660,7 @@ extern int nfs_sillyrename(struct inode *dir, struct dentry *dentry);
 /* direct.c */
 void nfs_init_cinfo_from_dreq(struct nfs_commit_info *cinfo,
 			      struct nfs_direct_req *dreq);
-extern ssize_t nfs_dreq_bytes_left(struct nfs_direct_req *dreq);
+extern ssize_t nfs_dreq_bytes_left(struct nfs_direct_req *dreq, loff_t offset);
 
 /* nfs4proc.c */
 extern struct nfs_client *nfs4_init_client(struct nfs_client *clp,
@@ -696,9 +717,9 @@ unsigned long nfs_block_bits(unsigned long bsize, unsigned char *nrbitsp)
 	if ((bsize & (bsize - 1)) || nrbitsp) {
 		unsigned char	nrbits;
 
-		for (nrbits = 31; nrbits && !(bsize & (1 << nrbits)); nrbits--)
+		for (nrbits = 31; nrbits && !(bsize & (1UL << nrbits)); nrbits--)
 			;
-		bsize = 1 << nrbits;
+		bsize = 1UL << nrbits;
 		if (nrbitsp)
 			*nrbitsp = nrbits;
 	}
@@ -760,17 +781,18 @@ void nfs_super_set_maxbytes(struct super_block *sb, __u64 maxfilesize)
  * Record the page as unstable (an extra writeback period) and mark its
  * inode as dirty.
  */
-static inline
-void nfs_mark_page_unstable(struct page *page, struct nfs_commit_info *cinfo)
+static inline void nfs_folio_mark_unstable(struct folio *folio,
+					   struct nfs_commit_info *cinfo)
 {
-	if (!cinfo->dreq) {
-		struct inode *inode = page_file_mapping(page)->host;
+	if (folio && !cinfo->dreq) {
+		struct inode *inode = folio_file_mapping(folio)->host;
+		long nr = folio_nr_pages(folio);
 
 		/* This page is really still in write-back - just that the
 		 * writeback is happening on the server now.
 		 */
-		inc_node_page_state(page, NR_WRITEBACK);
-		inc_wb_stat(&inode_to_bdi(inode)->wb, WB_WRITEBACK);
+		node_stat_mod_folio(folio, NR_WRITEBACK, nr);
+		wb_stat_mod(&inode_to_bdi(inode)->wb, WB_WRITEBACK, nr);
 		__mark_inode_dirty(inode, I_DIRTY_DATASYNC);
 	}
 }
@@ -795,6 +817,24 @@ unsigned int nfs_page_length(struct page *page)
 }
 
 /*
+ * Determine the number of bytes of data the page contains
+ */
+static inline size_t nfs_folio_length(struct folio *folio)
+{
+	loff_t i_size = i_size_read(folio_file_mapping(folio)->host);
+
+	if (i_size > 0) {
+		pgoff_t index = folio_index(folio) >> folio_order(folio);
+		pgoff_t end_index = (i_size - 1) >> folio_shift(folio);
+		if (index < end_index)
+			return folio_size(folio);
+		if (index == end_index)
+			return offset_in_folio(folio, i_size - 1) + 1;
+	}
+	return 0;
+}
+
+/*
  * Convert a umode to a dirent->d_type
  */
 static inline
@@ -807,11 +847,10 @@ unsigned char nfs_umode_to_dtype(umode_t mode)
  * Determine the number of pages in an array of length 'len' and
  * with a base offset of 'base'
  */
-static inline
-unsigned int nfs_page_array_len(unsigned int base, size_t len)
+static inline unsigned int nfs_page_array_len(unsigned int base, size_t len)
 {
-	return ((unsigned long)len + (unsigned long)base +
-		PAGE_SIZE - 1) >> PAGE_SHIFT;
+	return ((unsigned long)len + (unsigned long)base + PAGE_SIZE - 1) >>
+	       PAGE_SHIFT;
 }
 
 /*
@@ -828,27 +867,12 @@ u64 nfs_timespec_to_change_attr(const struct timespec64 *ts)
 }
 
 #ifdef CONFIG_CRC32
-/**
- * nfs_fhandle_hash - calculate the crc32 hash for the filehandle
- * @fh - pointer to filehandle
- *
- * returns a crc32 hash for the filehandle that is compatible with
- * the one displayed by "wireshark".
- */
-static inline u32 nfs_fhandle_hash(const struct nfs_fh *fh)
-{
-	return ~crc32_le(0xFFFFFFFF, &fh->data[0], fh->size);
-}
 static inline u32 nfs_stateid_hash(const nfs4_stateid *stateid)
 {
 	return ~crc32_le(0xFFFFFFFF, &stateid->other[0],
 				NFS4_STATEID_OTHER_SIZE);
 }
 #else
-static inline u32 nfs_fhandle_hash(const struct nfs_fh *fh)
-{
-	return 0;
-}
 static inline u32 nfs_stateid_hash(nfs4_stateid *stateid)
 {
 	return 0;
@@ -917,7 +941,6 @@ struct nfs_direct_req {
 	loff_t			io_start;	/* Start offset for I/O */
 	ssize_t			count,		/* bytes actually processed */
 				max_count,	/* max expected count */
-				bytes_left,	/* bytes left to be sent */
 				error;		/* any reported error */
 	struct completion	completion;	/* wait for i/o completion */
 

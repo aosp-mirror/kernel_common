@@ -210,7 +210,7 @@ struct rnand_chip {
 	u32 tim_gen_seq1;
 	u32 tim_gen_seq2;
 	u32 tim_gen_seq3;
-	struct rnand_chip_sel sels[];
+	struct rnand_chip_sel sels[] __counted_by(nsels);
 };
 
 struct rnandc {
@@ -1386,15 +1386,13 @@ dis_runtime_pm:
 	return ret;
 }
 
-static int rnandc_remove(struct platform_device *pdev)
+static void rnandc_remove(struct platform_device *pdev)
 {
 	struct rnandc *rnandc = platform_get_drvdata(pdev);
 
 	rnandc_chips_cleanup(rnandc);
 
 	pm_runtime_put(&pdev->dev);
-
-	return 0;
 }
 
 static const struct of_device_id rnandc_id_table[] = {
@@ -1410,7 +1408,7 @@ static struct platform_driver rnandc_driver = {
 		.of_match_table = rnandc_id_table,
 	},
 	.probe = rnandc_probe,
-	.remove = rnandc_remove,
+	.remove_new = rnandc_remove,
 };
 module_platform_driver(rnandc_driver);
 

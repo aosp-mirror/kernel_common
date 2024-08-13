@@ -23,9 +23,9 @@
 #include <linux/swab.h>		/* for swab16 */
 #include <uapi/linux/i2c.h>
 
-extern struct bus_type i2c_bus_type;
-extern struct device_type i2c_adapter_type;
-extern struct device_type i2c_client_type;
+extern const struct bus_type i2c_bus_type;
+extern const struct device_type i2c_adapter_type;
+extern const struct device_type i2c_client_type;
 
 /* --- General options ------------------------------------------------	*/
 
@@ -236,8 +236,7 @@ enum i2c_driver_flags {
 /**
  * struct i2c_driver - represent an I2C device driver
  * @class: What kind of i2c device we instantiate (for detect)
- * @probe: Callback for device binding - soon to be deprecated
- * @probe_new: New callback for device binding
+ * @probe: Callback for device binding
  * @remove: Callback for device unbinding
  * @shutdown: Callback for device shutdown
  * @alert: Alert callback, for example for the SMBus alert protocol
@@ -273,13 +272,9 @@ struct i2c_driver {
 	unsigned int class;
 
 	/* Standard driver model interfaces */
-	int (*probe)(struct i2c_client *client, const struct i2c_device_id *id);
+	int (*probe)(struct i2c_client *client);
 	void (*remove)(struct i2c_client *client);
 
-	/* New driver model interface to aid the seamless removal of the
-	 * current probe()'s, more commonly unused than used second parameter.
-	 */
-	int (*probe_new)(struct i2c_client *client);
 
 	/* driver model interfaces that don't relate to enumeration  */
 	void (*shutdown)(struct i2c_client *client);
@@ -363,6 +358,8 @@ struct i2c_adapter *i2c_verify_adapter(struct device *dev);
 const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
 					 const struct i2c_client *client);
 
+const void *i2c_get_match_data(const struct i2c_client *client);
+
 static inline struct i2c_client *kobj_to_i2c_client(struct kobject *kobj)
 {
 	struct device * const dev = kobj_to_dev(kobj);
@@ -381,7 +378,6 @@ static inline void i2c_set_clientdata(struct i2c_client *client, void *data)
 
 /* I2C slave support */
 
-#if IS_ENABLED(CONFIG_I2C_SLAVE)
 enum i2c_slave_event {
 	I2C_SLAVE_READ_REQUESTED,
 	I2C_SLAVE_WRITE_REQUESTED,
@@ -392,9 +388,10 @@ enum i2c_slave_event {
 
 int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb);
 int i2c_slave_unregister(struct i2c_client *client);
-bool i2c_detect_slave_mode(struct device *dev);
 int i2c_slave_event(struct i2c_client *client,
 		    enum i2c_slave_event event, u8 *val);
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+bool i2c_detect_slave_mode(struct device *dev);
 #else
 static inline bool i2c_detect_slave_mode(struct device *dev) { return false; }
 #endif
@@ -749,6 +746,8 @@ struct i2c_adapter {
 
 	struct irq_domain *host_notify_domain;
 	struct regulator *bus_regulator;
+
+	struct dentry *debugfs;
 };
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 
@@ -853,8 +852,6 @@ static inline void i2c_mark_adapter_resumed(struct i2c_adapter *adap)
 
 /* i2c adapter classes (bitmask) */
 #define I2C_CLASS_HWMON		(1<<0)	/* lm_sensors, ... */
-#define I2C_CLASS_DDC		(1<<3)	/* DDC bus on graphics adapters */
-#define I2C_CLASS_SPD		(1<<7)	/* Memory modules */
 /* Warn users that the adapter doesn't support classes anymore */
 #define I2C_CLASS_DEPRECATED	(1<<8)
 
@@ -933,7 +930,7 @@ static inline int i2c_adapter_id(struct i2c_adapter *adap)
 
 static inline u8 i2c_8bit_addr_from_msg(const struct i2c_msg *msg)
 {
-	return (msg->addr << 1) | (msg->flags & I2C_M_RD ? 1 : 0);
+	return (msg->addr << 1) | (msg->flags & I2C_M_RD);
 }
 
 u8 *i2c_get_dma_safe_msg_buf(struct i2c_msg *msg, unsigned int threshold);
@@ -963,8 +960,6 @@ int i2c_handle_smbus_host_notify(struct i2c_adapter *adap, unsigned short addr);
 #define builtin_i2c_driver(__i2c_driver) \
 	builtin_driver(__i2c_driver, i2c_add_driver)
 
-#endif /* I2C */
-
 /* must call put_device() when done with returned i2c_client device */
 struct i2c_client *i2c_find_device_by_fwnode(struct fwnode_handle *fwnode);
 
@@ -973,6 +968,28 @@ struct i2c_adapter *i2c_find_adapter_by_fwnode(struct fwnode_handle *fwnode);
 
 /* must call i2c_put_adapter() when done with returned i2c_adapter device */
 struct i2c_adapter *i2c_get_adapter_by_fwnode(struct fwnode_handle *fwnode);
+
+#else /* I2C */
+
+static inline struct i2c_client *
+i2c_find_device_by_fwnode(struct fwnode_handle *fwnode)
+{
+	return NULL;
+}
+
+static inline struct i2c_adapter *
+i2c_find_adapter_by_fwnode(struct fwnode_handle *fwnode)
+{
+	return NULL;
+}
+
+static inline struct i2c_adapter *
+i2c_get_adapter_by_fwnode(struct fwnode_handle *fwnode)
+{
+	return NULL;
+}
+
+#endif /* !I2C */
 
 #if IS_ENABLED(CONFIG_OF)
 /* must call put_device() when done with returned i2c_client device */

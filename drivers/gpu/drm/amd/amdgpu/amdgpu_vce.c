@@ -99,7 +99,7 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 {
 	const char *fw_name;
 	const struct common_firmware_header *hdr;
-	unsigned ucode_version, version_major, version_minor, binary_id;
+	unsigned int ucode_version, version_major, version_minor, binary_id;
 	int i, r;
 
 	switch (adev->asic_type) {
@@ -158,19 +158,11 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 		return -EINVAL;
 	}
 
-	r = request_firmware(&adev->vce.fw, fw_name, adev->dev);
-	if (r) {
-		dev_err(adev->dev, "amdgpu_vce: Can't load firmware \"%s\"\n",
-			fw_name);
-		return r;
-	}
-
-	r = amdgpu_ucode_validate(adev->vce.fw);
+	r = amdgpu_ucode_request(adev, &adev->vce.fw, fw_name);
 	if (r) {
 		dev_err(adev->dev, "amdgpu_vce: Can't validate firmware \"%s\"\n",
 			fw_name);
-		release_firmware(adev->vce.fw);
-		adev->vce.fw = NULL;
+		amdgpu_ucode_release(&adev->vce.fw);
 		return r;
 	}
 
@@ -186,7 +178,9 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 				(binary_id << 8));
 
 	r = amdgpu_bo_create_kernel(adev, size, PAGE_SIZE,
-				    AMDGPU_GEM_DOMAIN_VRAM, &adev->vce.vcpu_bo,
+				    AMDGPU_GEM_DOMAIN_VRAM |
+				    AMDGPU_GEM_DOMAIN_GTT,
+				    &adev->vce.vcpu_bo,
 				    &adev->vce.gpu_addr, &adev->vce.cpu_addr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate VCE bo\n", r);
@@ -213,7 +207,7 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
  */
 int amdgpu_vce_sw_fini(struct amdgpu_device *adev)
 {
-	unsigned i;
+	unsigned int i;
 
 	if (adev->vce.vcpu_bo == NULL)
 		return 0;
@@ -226,7 +220,7 @@ int amdgpu_vce_sw_fini(struct amdgpu_device *adev)
 	for (i = 0; i < adev->vce.num_rings; i++)
 		amdgpu_ring_fini(&adev->vce.ring[i]);
 
-	release_firmware(adev->vce.fw);
+	amdgpu_ucode_release(&adev->vce.fw);
 	mutex_destroy(&adev->vce.idle_mutex);
 
 	return 0;
@@ -236,21 +230,22 @@ int amdgpu_vce_sw_fini(struct amdgpu_device *adev)
  * amdgpu_vce_entity_init - init entity
  *
  * @adev: amdgpu_device pointer
+ * @ring: amdgpu_ring pointer to check
  *
+ * Initialize the entity used for handle management in the kernel driver.
  */
-int amdgpu_vce_entity_init(struct amdgpu_device *adev)
+int amdgpu_vce_entity_init(struct amdgpu_device *adev, struct amdgpu_ring *ring)
 {
-	struct amdgpu_ring *ring;
-	struct drm_gpu_scheduler *sched;
-	int r;
+	if (ring == &adev->vce.ring[0]) {
+		struct drm_gpu_scheduler *sched = &ring->sched;
+		int r;
 
-	ring = &adev->vce.ring[0];
-	sched = &ring->sched;
-	r = drm_sched_entity_init(&adev->vce.entity, DRM_SCHED_PRIORITY_NORMAL,
-				  &sched, 1, NULL);
-	if (r != 0) {
-		DRM_ERROR("Failed setting up VCE run queue.\n");
-		return r;
+		r = drm_sched_entity_init(&adev->vce.entity, DRM_SCHED_PRIORITY_NORMAL,
+					  &sched, 1, NULL);
+		if (r != 0) {
+			DRM_ERROR("Failed setting up VCE run queue.\n");
+			return r;
+		}
 	}
 
 	return 0;
@@ -292,7 +287,7 @@ int amdgpu_vce_resume(struct amdgpu_device *adev)
 {
 	void *cpu_addr;
 	const struct common_firmware_header *hdr;
-	unsigned offset;
+	unsigned int offset;
 	int r, idx;
 
 	if (adev->vce.vcpu_bo == NULL)
@@ -338,7 +333,7 @@ static void amdgpu_vce_idle_work_handler(struct work_struct *work)
 {
 	struct amdgpu_device *adev =
 		container_of(work, struct amdgpu_device, vce.idle_work.work);
-	unsigned i, count = 0;
+	unsigned int i, count = 0;
 
 	for (i = 0; i < adev->vce.num_rings; i++)
 		count += amdgpu_fence_count_emitted(&adev->vce.ring[i]);
@@ -415,6 +410,7 @@ void amdgpu_vce_free_handles(struct amdgpu_device *adev, struct drm_file *filp)
 {
 	struct amdgpu_ring *ring = &adev->vce.ring[0];
 	int i, r;
+
 	for (i = 0; i < AMDGPU_MAX_VCE_HANDLES; ++i) {
 		uint32_t handle = atomic_read(&adev->vce.handles[i]);
 
@@ -442,7 +438,7 @@ void amdgpu_vce_free_handles(struct amdgpu_device *adev, struct drm_file *filp)
 static int amdgpu_vce_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 				     struct dma_fence **fence)
 {
-	const unsigned ib_size_dw = 1024;
+	const unsigned int ib_size_dw = 1024;
 	struct amdgpu_job *job;
 	struct amdgpu_ib *ib;
 	struct amdgpu_ib ib_msg;
@@ -534,7 +530,7 @@ err:
 static int amdgpu_vce_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 				      bool direct, struct dma_fence **fence)
 {
-	const unsigned ib_size_dw = 1024;
+	const unsigned int ib_size_dw = 1024;
 	struct amdgpu_job *job;
 	struct amdgpu_ib *ib;
 	struct dma_fence *f = NULL;
@@ -591,6 +587,7 @@ err:
 /**
  * amdgpu_vce_validate_bo - make sure not to cross 4GB boundary
  *
+ * @p: cs parser
  * @ib: indirect buffer to use
  * @lo: address of lower dword
  * @hi: address of higher dword
@@ -601,12 +598,12 @@ err:
  */
 static int amdgpu_vce_validate_bo(struct amdgpu_cs_parser *p,
 				  struct amdgpu_ib *ib, int lo, int hi,
-				  unsigned size, int32_t index)
+				  unsigned int size, int32_t index)
 {
 	int64_t offset = ((uint64_t)size) * ((int64_t)index);
 	struct ttm_operation_ctx ctx = { false, false };
 	struct amdgpu_bo_va_mapping *mapping;
-	unsigned i, fpfn, lpfn;
+	unsigned int i, fpfn, lpfn;
 	struct amdgpu_bo *bo;
 	uint64_t addr;
 	int r;
@@ -624,7 +621,7 @@ static int amdgpu_vce_validate_bo(struct amdgpu_cs_parser *p,
 
 	r = amdgpu_cs_find_mapping(p, addr, &bo, &mapping);
 	if (r) {
-		DRM_ERROR("Can't find BO for addr 0x%010Lx %d %d %d %d\n",
+		DRM_ERROR("Can't find BO for addr 0x%010llx %d %d %d %d\n",
 			  addr, lo, hi, size, index);
 		return r;
 	}
@@ -651,7 +648,7 @@ static int amdgpu_vce_validate_bo(struct amdgpu_cs_parser *p,
  * Patch relocation inside command stream with real buffer address
  */
 static int amdgpu_vce_cs_reloc(struct amdgpu_cs_parser *p, struct amdgpu_ib *ib,
-			       int lo, int hi, unsigned size, uint32_t index)
+			       int lo, int hi, unsigned int size, uint32_t index)
 {
 	struct amdgpu_bo_va_mapping *mapping;
 	struct amdgpu_bo *bo;
@@ -667,14 +664,14 @@ static int amdgpu_vce_cs_reloc(struct amdgpu_cs_parser *p, struct amdgpu_ib *ib,
 
 	r = amdgpu_cs_find_mapping(p, addr, &bo, &mapping);
 	if (r) {
-		DRM_ERROR("Can't find BO for addr 0x%010Lx %d %d %d %d\n",
+		DRM_ERROR("Can't find BO for addr 0x%010llx %d %d %d %d\n",
 			  addr, lo, hi, size, index);
 		return r;
 	}
 
 	if ((addr + (uint64_t)size) >
 	    (mapping->last + 1) * AMDGPU_GPU_PAGE_SIZE) {
-		DRM_ERROR("BO too small for addr 0x%010Lx %d %d\n",
+		DRM_ERROR("BO too small for addr 0x%010llx %d %d\n",
 			  addr, lo, hi);
 		return -EINVAL;
 	}
@@ -697,12 +694,12 @@ static int amdgpu_vce_cs_reloc(struct amdgpu_cs_parser *p, struct amdgpu_ib *ib,
  * @allocated: allocated a new handle?
  *
  * Validates the handle and return the found session index or -EINVAL
- * we we don't have another free session index.
+ * we don't have another free session index.
  */
 static int amdgpu_vce_validate_handle(struct amdgpu_cs_parser *p,
 				      uint32_t handle, uint32_t *allocated)
 {
-	unsigned i;
+	unsigned int i;
 
 	/* validate the handle */
 	for (i = 0; i < AMDGPU_MAX_VCE_HANDLES; ++i) {
@@ -740,14 +737,15 @@ int amdgpu_vce_ring_parse_cs(struct amdgpu_cs_parser *p,
 			     struct amdgpu_job *job,
 			     struct amdgpu_ib *ib)
 {
-	unsigned fb_idx = 0, bs_idx = 0;
+	unsigned int fb_idx = 0, bs_idx = 0;
 	int session_idx = -1;
 	uint32_t destroyed = 0;
 	uint32_t created = 0;
 	uint32_t allocated = 0;
 	uint32_t tmp, handle = 0;
-	uint32_t *size = &tmp;
-	unsigned idx;
+	uint32_t dummy = 0xffffffff;
+	uint32_t *size = &dummy;
+	unsigned int idx;
 	int i, r = 0;
 
 	job->vm = NULL;
@@ -1089,7 +1087,7 @@ void amdgpu_vce_ring_emit_ib(struct amdgpu_ring *ring,
  *
  */
 void amdgpu_vce_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
-				unsigned flags)
+				unsigned int flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
 
@@ -1111,7 +1109,7 @@ int amdgpu_vce_ring_test_ring(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	uint32_t rptr;
-	unsigned i;
+	unsigned int i;
 	int r, timeout = adev->usec_timeout;
 
 	/* skip ring test for sriov*/
@@ -1176,7 +1174,7 @@ error:
 
 enum amdgpu_ring_priority_level amdgpu_vce_get_ring_prio(int ring)
 {
-	switch(ring) {
+	switch (ring) {
 	case 0:
 		return AMDGPU_RING_PRIO_0;
 	case 1:

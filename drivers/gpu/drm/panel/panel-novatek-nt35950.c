@@ -8,7 +8,7 @@
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/of_graph.h>
 #include <linux/regulator/consumer.h>
 
@@ -59,7 +59,6 @@ struct nt35950 {
 
 	int cur_mode;
 	u8 last_page;
-	bool prepared;
 };
 
 struct nt35950_panel_mode {
@@ -88,14 +87,6 @@ static inline struct nt35950 *to_nt35950(struct drm_panel *panel)
 {
 	return container_of(panel, struct nt35950, panel);
 }
-
-#define dsi_dcs_write_seq(dsi, seq...) do {				\
-		static const u8 d[] = { seq };				\
-		int ret;						\
-		ret = mipi_dsi_dcs_write_buffer(dsi, d, ARRAY_SIZE(d));	\
-		if (ret < 0)						\
-			return ret;					\
-	} while (0)
 
 static void nt35950_reset(struct nt35950 *nt)
 {
@@ -338,7 +329,7 @@ static int nt35950_on(struct nt35950 *nt)
 		return ret;
 
 	/* Unknown command */
-	dsi_dcs_write_seq(dsi, 0xd4, 0x88, 0x88);
+	mipi_dsi_dcs_write_seq(dsi, 0xd4, 0x88, 0x88);
 
 	/* CMD2 Page 7 */
 	ret = nt35950_set_cmd2_page(nt, 7);
@@ -346,10 +337,10 @@ static int nt35950_on(struct nt35950 *nt)
 		return ret;
 
 	/* Enable SubPixel Rendering */
-	dsi_dcs_write_seq(dsi, MCS_PARAM_SPR_EN, 0x01);
+	mipi_dsi_dcs_write_seq(dsi, MCS_PARAM_SPR_EN, 0x01);
 
 	/* SPR Mode: YYG Rainbow-RGB */
-	dsi_dcs_write_seq(dsi, MCS_PARAM_SPR_MODE, MCS_SPR_MODE_YYG_RAINBOW_RGB);
+	mipi_dsi_dcs_write_seq(dsi, MCS_PARAM_SPR_MODE, MCS_SPR_MODE_YYG_RAINBOW_RGB);
 
 	/* CMD3 */
 	ret = nt35950_inject_black_image(nt);
@@ -439,9 +430,6 @@ static int nt35950_prepare(struct drm_panel *panel)
 	struct device *dev = &nt->dsi[0]->dev;
 	int ret;
 
-	if (nt->prepared)
-		return 0;
-
 	ret = regulator_enable(nt->vregs[0].consumer);
 	if (ret)
 		return ret;
@@ -468,7 +456,6 @@ static int nt35950_prepare(struct drm_panel *panel)
 		dev_err(dev, "Failed to initialize panel: %d\n", ret);
 		goto end;
 	}
-	nt->prepared = true;
 
 end:
 	if (ret < 0) {
@@ -485,9 +472,6 @@ static int nt35950_unprepare(struct drm_panel *panel)
 	struct device *dev = &nt->dsi[0]->dev;
 	int ret;
 
-	if (!nt->prepared)
-		return 0;
-
 	ret = nt35950_off(nt);
 	if (ret < 0)
 		dev_err(dev, "Failed to deinitialize panel: %d\n", ret);
@@ -495,7 +479,6 @@ static int nt35950_unprepare(struct drm_panel *panel)
 	gpiod_set_value_cansleep(nt->reset_gpio, 0);
 	regulator_bulk_disable(ARRAY_SIZE(nt->vregs), nt->vregs);
 
-	nt->prepared = false;
 	return 0;
 }
 
@@ -573,10 +556,8 @@ static int nt35950_probe(struct mipi_dsi_device *dsi)
 		}
 		dsi_r_host = of_find_mipi_dsi_host_by_node(dsi_r);
 		of_node_put(dsi_r);
-		if (!dsi_r_host) {
-			dev_err(dev, "Cannot get secondary DSI host\n");
-			return -EPROBE_DEFER;
-		}
+		if (!dsi_r_host)
+			return dev_err_probe(dev, -EPROBE_DEFER, "Cannot get secondary DSI host\n");
 
 		nt->dsi[1] = mipi_dsi_device_register_full(dsi_r_host, info);
 		if (!nt->dsi[1]) {
@@ -593,8 +574,12 @@ static int nt35950_probe(struct mipi_dsi_device *dsi)
 		       DRM_MODE_CONNECTOR_DSI);
 
 	ret = drm_panel_of_backlight(&nt->panel);
-	if (ret)
+	if (ret) {
+		if (num_dsis == 2)
+			mipi_dsi_device_unregister(nt->dsi[1]);
+
 		return dev_err_probe(dev, ret, "Failed to get backlight\n");
+	}
 
 	drm_panel_add(&nt->panel);
 
@@ -610,6 +595,10 @@ static int nt35950_probe(struct mipi_dsi_device *dsi)
 
 		ret = mipi_dsi_attach(nt->dsi[i]);
 		if (ret < 0) {
+			/* If we fail to attach to either host, we're done */
+			if (num_dsis == 2)
+				mipi_dsi_device_unregister(nt->dsi[1]);
+
 			return dev_err_probe(dev, ret,
 					     "Cannot attach to DSI%d host.\n", i);
 		}

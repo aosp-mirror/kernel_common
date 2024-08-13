@@ -178,18 +178,19 @@ int platform_get_irq_optional(struct platform_device *dev, unsigned int num)
 	ret = dev->archdata.irqs[num];
 	goto out;
 #else
+	struct fwnode_handle *fwnode = dev_fwnode(&dev->dev);
 	struct resource *r;
 
-	if (IS_ENABLED(CONFIG_OF_IRQ) && dev->dev.of_node) {
-		ret = of_irq_get(dev->dev.of_node, num);
+	if (is_of_node(fwnode)) {
+		ret = of_irq_get(to_of_node(fwnode), num);
 		if (ret > 0 || ret == -EPROBE_DEFER)
 			goto out;
 	}
 
 	r = platform_get_resource(dev, IORESOURCE_IRQ, num);
-	if (has_acpi_companion(&dev->dev)) {
+	if (is_acpi_device_node(fwnode)) {
 		if (r && r->flags & IORESOURCE_DISABLED) {
-			ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
+			ret = acpi_irq_get(ACPI_HANDLE_FWNODE(fwnode), num, r);
 			if (ret)
 				goto out;
 		}
@@ -222,8 +223,8 @@ int platform_get_irq_optional(struct platform_device *dev, unsigned int num)
 	 * the device will only expose one IRQ, and this fallback
 	 * allows a common code path across either kind of resource.
 	 */
-	if (num == 0 && has_acpi_companion(&dev->dev)) {
-		ret = acpi_dev_gpio_irq_get(ACPI_COMPANION(&dev->dev), num);
+	if (num == 0 && is_acpi_device_node(fwnode)) {
+		ret = acpi_dev_gpio_irq_get(to_acpi_device_node(fwnode), num);
 		/* Our callers expect -ENXIO for missing IRQs. */
 		if (ret >= 0 || ret == -EPROBE_DEFER)
 			goto out;
@@ -291,7 +292,7 @@ EXPORT_SYMBOL_GPL(platform_irq_count);
 
 struct irq_affinity_devres {
 	unsigned int count;
-	unsigned int irq[];
+	unsigned int irq[] __counted_by(count);
 };
 
 static void platform_disable_acpi_irq(struct platform_device *pdev, int index)
@@ -312,7 +313,7 @@ static void devm_platform_get_irqs_affinity_release(struct device *dev,
 	for (i = 0; i < ptr->count; i++) {
 		irq_dispose_mapping(ptr->irq[i]);
 
-		if (has_acpi_companion(dev))
+		if (is_acpi_device_node(dev_fwnode(dev)))
 			platform_disable_acpi_irq(to_platform_device(dev), i);
 	}
 }
@@ -441,11 +442,9 @@ static int __platform_get_irq_byname(struct platform_device *dev,
 	struct resource *r;
 	int ret;
 
-	if (!dev->dev.of_node || IS_ENABLED(CONFIG_OF_IRQ)) {
-		ret = fwnode_irq_get_byname(dev_fwnode(&dev->dev), name);
-		if (ret > 0 || ret == -EPROBE_DEFER)
-			return ret;
-	}
+	ret = fwnode_irq_get_byname(dev_fwnode(&dev->dev), name);
+	if (ret > 0 || ret == -EPROBE_DEFER)
+		return ret;
 
 	r = platform_get_resource_byname(dev, IORESOURCE_IRQ, name);
 	if (r) {
@@ -499,6 +498,8 @@ EXPORT_SYMBOL_GPL(platform_get_irq_byname_optional);
  * platform_add_devices - add a numbers of platform devices
  * @devs: array of platform devices to add
  * @num: number of platform devices in array
+ *
+ * Return: 0 on success, negative error number on failure.
  */
 int platform_add_devices(struct platform_device **devs, int num)
 {
@@ -655,23 +656,21 @@ EXPORT_SYMBOL_GPL(platform_device_add_data);
  */
 int platform_device_add(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	u32 i;
 	int ret;
 
-	if (!pdev)
-		return -EINVAL;
+	if (!dev->parent)
+		dev->parent = &platform_bus;
 
-	if (!pdev->dev.parent)
-		pdev->dev.parent = &platform_bus;
-
-	pdev->dev.bus = &platform_bus_type;
+	dev->bus = &platform_bus_type;
 
 	switch (pdev->id) {
 	default:
-		dev_set_name(&pdev->dev, "%s.%d", pdev->name,  pdev->id);
+		dev_set_name(dev, "%s.%d", pdev->name,  pdev->id);
 		break;
 	case PLATFORM_DEVID_NONE:
-		dev_set_name(&pdev->dev, "%s", pdev->name);
+		dev_set_name(dev, "%s", pdev->name);
 		break;
 	case PLATFORM_DEVID_AUTO:
 		/*
@@ -681,10 +680,10 @@ int platform_device_add(struct platform_device *pdev)
 		 */
 		ret = ida_alloc(&platform_devid_ida, GFP_KERNEL);
 		if (ret < 0)
-			goto err_out;
+			return ret;
 		pdev->id = ret;
 		pdev->id_auto = true;
-		dev_set_name(&pdev->dev, "%s.%d.auto", pdev->name, pdev->id);
+		dev_set_name(dev, "%s.%d.auto", pdev->name, pdev->id);
 		break;
 	}
 
@@ -692,7 +691,7 @@ int platform_device_add(struct platform_device *pdev)
 		struct resource *p, *r = &pdev->resource[i];
 
 		if (r->name == NULL)
-			r->name = dev_name(&pdev->dev);
+			r->name = dev_name(dev);
 
 		p = r->parent;
 		if (!p) {
@@ -705,18 +704,20 @@ int platform_device_add(struct platform_device *pdev)
 		if (p) {
 			ret = insert_resource(p, r);
 			if (ret) {
-				dev_err(&pdev->dev, "failed to claim resource %d: %pR\n", i, r);
+				dev_err(dev, "failed to claim resource %d: %pR\n", i, r);
 				goto failed;
 			}
 		}
 	}
 
-	pr_debug("Registering platform device '%s'. Parent at %s\n",
-		 dev_name(&pdev->dev), dev_name(pdev->dev.parent));
+	pr_debug("Registering platform device '%s'. Parent at %s\n", dev_name(dev),
+		 dev_name(dev->parent));
 
-	ret = device_add(&pdev->dev);
-	if (ret == 0)
-		return ret;
+	ret = device_add(dev);
+	if (ret)
+		goto failed;
+
+	return 0;
 
  failed:
 	if (pdev->id_auto) {
@@ -730,7 +731,6 @@ int platform_device_add(struct platform_device *pdev)
 			release_resource(r);
 	}
 
- err_out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(platform_device_add);
@@ -883,6 +883,13 @@ static int platform_probe_fail(struct platform_device *pdev)
 	return -ENXIO;
 }
 
+static int is_bound_to_driver(struct device *dev, void *driver)
+{
+	if (dev->driver == driver)
+		return 1;
+	return 0;
+}
+
 /**
  * __platform_driver_probe - register driver for non-hotpluggable device
  * @drv: platform driver structure
@@ -906,7 +913,7 @@ static int platform_probe_fail(struct platform_device *pdev)
 int __init_or_module __platform_driver_probe(struct platform_driver *drv,
 		int (*probe)(struct platform_device *), struct module *module)
 {
-	int retval, code;
+	int retval;
 
 	if (drv->driver.probe_type == PROBE_PREFER_ASYNCHRONOUS) {
 		pr_err("%s: drivers registered with %s can not be probed asynchronously\n",
@@ -932,24 +939,21 @@ int __init_or_module __platform_driver_probe(struct platform_driver *drv,
 
 	/* temporary section violation during probe() */
 	drv->probe = probe;
-	retval = code = __platform_driver_register(drv, module);
+	retval = __platform_driver_register(drv, module);
 	if (retval)
 		return retval;
 
-	/*
-	 * Fixup that section violation, being paranoid about code scanning
-	 * the list of drivers in order to probe new devices.  Check to see
-	 * if the probe was successful, and make sure any forced probes of
-	 * new devices fail.
-	 */
-	spin_lock(&drv->driver.bus->p->klist_drivers.k_lock);
+	/* Force all new probes of this driver to fail */
 	drv->probe = platform_probe_fail;
-	if (code == 0 && list_empty(&drv->driver.p->klist_devices.k_list))
-		retval = -ENODEV;
-	spin_unlock(&drv->driver.bus->p->klist_drivers.k_lock);
 
-	if (code != retval)
+	/* Walk all platform devices and see if any actually bound to this driver.
+	 * If not, return an error as the device should have done so by now.
+	 */
+	if (!bus_for_each_dev(&platform_bus_type, NULL, &drv->driver, is_bound_to_driver)) {
+		retval = -ENODEV;
 		platform_driver_unregister(drv);
+	}
+
 	return retval;
 }
 EXPORT_SYMBOL_GPL(__platform_driver_probe);
@@ -1353,9 +1357,9 @@ static int platform_match(struct device *dev, struct device_driver *drv)
 	return (strcmp(pdev->name, drv->name) == 0);
 }
 
-static int platform_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int platform_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	struct platform_device	*pdev = to_platform_device(dev);
+	const struct platform_device *pdev = to_platform_device(dev);
 	int rc;
 
 	/* Some devices have extra OF data and an OF-style MODALIAS */
@@ -1416,7 +1420,9 @@ static void platform_remove(struct device *_dev)
 	struct platform_driver *drv = to_platform_driver(_dev->driver);
 	struct platform_device *dev = to_platform_device(_dev);
 
-	if (drv->remove) {
+	if (drv->remove_new) {
+		drv->remove_new(dev);
+	} else if (drv->remove) {
 		int ret = drv->remove(dev);
 
 		if (ret)
@@ -1441,21 +1447,22 @@ static void platform_shutdown(struct device *_dev)
 static int platform_dma_configure(struct device *dev)
 {
 	struct platform_driver *drv = to_platform_driver(dev->driver);
+	struct fwnode_handle *fwnode = dev_fwnode(dev);
 	enum dev_dma_attr attr;
 	int ret = 0;
 
-	if (dev->of_node) {
-		ret = of_dma_configure(dev, dev->of_node, true);
-	} else if (has_acpi_companion(dev)) {
-		attr = acpi_get_dma_attr(to_acpi_device_node(dev->fwnode));
+	if (is_of_node(fwnode)) {
+		ret = of_dma_configure(dev, to_of_node(fwnode), true);
+	} else if (is_acpi_device_node(fwnode)) {
+		attr = acpi_get_dma_attr(to_acpi_device_node(fwnode));
 		ret = acpi_dma_configure(dev, attr);
 	}
+	if (ret || drv->driver_managed_dma)
+		return ret;
 
-	if (!ret && !drv->driver_managed_dma) {
-		ret = iommu_device_use_default_domain(dev);
-		if (ret)
-			arch_teardown_dma_ops(dev);
-	}
+	ret = iommu_device_use_default_domain(dev);
+	if (ret)
+		arch_teardown_dma_ops(dev);
 
 	return ret;
 }
@@ -1522,6 +1529,6 @@ int __init platform_bus_init(void)
 	error =  bus_register(&platform_bus_type);
 	if (error)
 		device_unregister(&platform_bus);
-	of_platform_register_reconfig_notifier();
+
 	return error;
 }

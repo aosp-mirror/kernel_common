@@ -499,13 +499,6 @@ static int hisi_ddrc_pmu_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_HISI_DDRC_ONLINE,
-				       &ddrc_pmu->node);
-	if (ret) {
-		dev_err(&pdev->dev, "Error %d registering hotplug;\n", ret);
-		return ret;
-	}
-
 	if (ddrc_pmu->identifier >= HISI_PMU_V2)
 		name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
 				      "hisi_sccl%u_ddrc%u_%u",
@@ -516,7 +509,17 @@ static int hisi_ddrc_pmu_probe(struct platform_device *pdev)
 				      "hisi_sccl%u_ddrc%u", ddrc_pmu->sccl_id,
 				      ddrc_pmu->index_id);
 
-	hisi_pmu_init(ddrc_pmu, name, THIS_MODULE);
+	if (!name)
+		return -ENOMEM;
+
+	ret = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_HISI_DDRC_ONLINE,
+				       &ddrc_pmu->node);
+	if (ret) {
+		dev_err(&pdev->dev, "Error %d registering hotplug;\n", ret);
+		return ret;
+	}
+
+	hisi_pmu_init(ddrc_pmu, THIS_MODULE);
 
 	ret = perf_pmu_register(&ddrc_pmu->pmu, name, -1);
 	if (ret) {
@@ -528,14 +531,13 @@ static int hisi_ddrc_pmu_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int hisi_ddrc_pmu_remove(struct platform_device *pdev)
+static void hisi_ddrc_pmu_remove(struct platform_device *pdev)
 {
 	struct hisi_pmu *ddrc_pmu = platform_get_drvdata(pdev);
 
 	perf_pmu_unregister(&ddrc_pmu->pmu);
 	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_HISI_DDRC_ONLINE,
 					    &ddrc_pmu->node);
-	return 0;
 }
 
 static struct platform_driver hisi_ddrc_pmu_driver = {
@@ -545,7 +547,7 @@ static struct platform_driver hisi_ddrc_pmu_driver = {
 		.suppress_bind_attrs = true,
 	},
 	.probe = hisi_ddrc_pmu_probe,
-	.remove = hisi_ddrc_pmu_remove,
+	.remove_new = hisi_ddrc_pmu_remove,
 };
 
 static int __init hisi_ddrc_pmu_module_init(void)

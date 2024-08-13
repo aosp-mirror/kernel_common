@@ -9,6 +9,29 @@
 
 void arch_handle_alternative(unsigned short feature, struct special_alt *alt)
 {
+	static struct special_alt *group, *prev;
+
+	/*
+	 * Recompute orig_len for nested ALTERNATIVE()s.
+	 */
+	if (group && group->orig_sec == alt->orig_sec &&
+	             group->orig_off == alt->orig_off) {
+
+		struct special_alt *iter = group;
+		for (;;) {
+			unsigned int len = max(iter->orig_len, alt->orig_len);
+			iter->orig_len = alt->orig_len = len;
+
+			if (iter == prev)
+				break;
+
+			iter = list_next_entry(iter, list);
+		}
+
+	} else group = alt;
+
+	prev = alt;
+
 	switch (feature) {
 	case X86_FEATURE_SMAP:
 		/*
@@ -42,13 +65,7 @@ bool arch_support_alt_relocation(struct special_alt *special_alt,
 				 struct instruction *insn,
 				 struct reloc *reloc)
 {
-	/*
-	 * The x86 alternatives code adjusts the offsets only when it
-	 * encounters a branch instruction at the very beginning of the
-	 * replacement group.
-	 */
-	return insn->offset == special_alt->new_off &&
-	       (insn->type == INSN_CALL || is_jump(insn));
+	return true;
 }
 
 /*
@@ -89,7 +106,7 @@ bool arch_support_alt_relocation(struct special_alt *special_alt,
  *    TODO: Once we have DWARF CFI and smarter instruction decoding logic,
  *    ensure the same register is used in the mov and jump instructions.
  *
- *    NOTE: RETPOLINE made it harder still to decode dynamic jumps.
+ *    NOTE: MITIGATION_RETPOLINE made it harder still to decode dynamic jumps.
  */
 struct reloc *arch_find_switch_table(struct objtool_file *file,
 				    struct instruction *insn)
@@ -105,10 +122,10 @@ struct reloc *arch_find_switch_table(struct objtool_file *file,
 	    !text_reloc->sym->sec->rodata)
 		return NULL;
 
-	table_offset = text_reloc->addend;
+	table_offset = reloc_addend(text_reloc);
 	table_sec = text_reloc->sym->sec;
 
-	if (text_reloc->type == R_X86_64_PC32)
+	if (reloc_type(text_reloc) == R_X86_64_PC32)
 		table_offset += 4;
 
 	/*
@@ -138,7 +155,7 @@ struct reloc *arch_find_switch_table(struct objtool_file *file,
 	 * indicates a rare GCC quirk/bug which can leave dead
 	 * code behind.
 	 */
-	if (text_reloc->type == R_X86_64_PC32)
+	if (reloc_type(text_reloc) == R_X86_64_PC32)
 		file->ignore_unreachables = true;
 
 	return rodata_reloc;

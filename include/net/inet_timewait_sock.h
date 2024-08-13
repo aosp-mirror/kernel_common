@@ -67,19 +67,16 @@ struct inet_timewait_sock {
 	/* And these are ours. */
 	unsigned int		tw_transparent  : 1,
 				tw_flowlabel	: 20,
-				tw_pad		: 3,	/* 3 bits hole */
+				tw_usec_ts	: 1,
+				tw_pad		: 2,	/* 2 bits hole */
 				tw_tos		: 8;
 	u32			tw_txhash;
 	u32			tw_priority;
 	struct timer_list	tw_timer;
 	struct inet_bind_bucket	*tw_tb;
 	struct inet_bind2_bucket	*tw_tb2;
-	struct hlist_node		tw_bind2_node;
 };
 #define tw_tclass tw_tos
-
-#define twsk_for_each_bound_bhash2(__tw, list) \
-	hlist_for_each_entry(__tw, list, tw_bind2_node)
 
 static inline struct inet_timewait_sock *inet_twsk(const struct sock *sk)
 {
@@ -114,7 +111,7 @@ static inline void inet_twsk_reschedule(struct inet_timewait_sock *tw, int timeo
 
 void inet_twsk_deschedule_put(struct inet_timewait_sock *tw);
 
-void inet_twsk_purge(struct inet_hashinfo *hashinfo, int family);
+void inet_twsk_purge(struct inet_hashinfo *hashinfo);
 
 static inline
 struct net *twsk_net(const struct inet_timewait_sock *twsk)

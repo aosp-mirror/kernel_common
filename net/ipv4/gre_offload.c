@@ -11,6 +11,7 @@
 #include <net/protocol.h>
 #include <net/gre.h>
 #include <net/gro.h>
+#include <net/gso.h>
 
 static struct sk_buff *gre_gso_segment(struct sk_buff *skb,
 				       netdev_features_t features)
@@ -173,7 +174,7 @@ static struct sk_buff *gre_gro_receive(struct list_head *head,
 		grehlen += GRE_HEADER_SECTION;
 
 	hlen = off + grehlen;
-	if (skb_gro_header_hard(skb, hlen)) {
+	if (!skb_gro_may_pull(skb, hlen)) {
 		greh = skb_gro_header_slow(skb, hlen, off);
 		if (unlikely(!greh))
 			goto out;

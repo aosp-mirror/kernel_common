@@ -11,7 +11,6 @@
 #include <linux/err.h>
 #include <linux/gpio.h>
 #include <linux/init.h>
-#include <linux/irqchip/mxs.h>
 #include <linux/reboot.h>
 #include <linux/micrel_phy.h>
 #include <linux/of_address.h>
@@ -174,7 +173,7 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
 
 		from = np;
 
-		if (of_get_property(np, "local-mac-address", NULL))
+		if (of_property_present(np, "local-mac-address"))
 			continue;
 
 		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
@@ -357,7 +356,9 @@ static int __init mxs_restart_init(void)
 {
 	struct device_node *np;
 
-	np = of_find_compatible_node(NULL, NULL, "fsl,clkctrl");
+	np = of_find_compatible_node(NULL, NULL, "fsl,imx23-clkctrl");
+	if (!np)
+		np = of_find_compatible_node(NULL, NULL, "fsl,imx28-clkctrl");
 	reset_addr = of_iomap(np, 0);
 	if (!reset_addr)
 		return -ENODEV;
@@ -472,7 +473,6 @@ static const char *const mxs_dt_compat[] __initconst = {
 };
 
 DT_MACHINE_START(MXS, "Freescale MXS (Device Tree)")
-	.handle_irq	= icoll_handle_irq,
 	.init_machine	= mxs_machine_init,
 	.init_late      = mxs_pm_init,
 	.dt_compat	= mxs_dt_compat,

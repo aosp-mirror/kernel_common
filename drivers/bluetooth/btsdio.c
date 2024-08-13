@@ -32,9 +32,6 @@ static const struct sdio_device_id btsdio_table[] = {
 	/* Generic Bluetooth Type-B SDIO device */
 	{ SDIO_DEVICE_CLASS(SDIO_CLASS_BT_B) },
 
-	/* Generic Bluetooth AMP controller */
-	{ SDIO_DEVICE_CLASS(SDIO_CLASS_BT_AMP) },
-
 	{ }	/* Terminating entry */
 };
 
@@ -319,11 +316,6 @@ static int btsdio_probe(struct sdio_func *func,
 	hdev->bus = HCI_SDIO;
 	hci_set_drvdata(hdev, data);
 
-	if (id->class == SDIO_CLASS_BT_AMP)
-		hdev->dev_type = HCI_AMP;
-	else
-		hdev->dev_type = HCI_PRIMARY;
-
 	data->hdev = hdev;
 
 	SET_HCIDEV_DEV(hdev, &func->dev);
@@ -357,6 +349,7 @@ static void btsdio_remove(struct sdio_func *func)
 	if (!data)
 		return;
 
+	cancel_work_sync(&data->work);
 	hdev = data->hdev;
 
 	sdio_set_drvdata(func, NULL);

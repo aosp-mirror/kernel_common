@@ -20,6 +20,7 @@ properties:
       - ti,bq24192
       - ti,bq24192i
       - ti,bq24196
+      - ti,bq24296
 
   reg:
     maxItems: 1
@@ -75,7 +76,7 @@ examples:
       charge-term-current-microamp = <128000>;
     };
 
-    i2c0 {
+    i2c {
       #address-cells = <1>;
       #size-cells = <0>;
 

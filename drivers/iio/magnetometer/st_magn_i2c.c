@@ -50,6 +50,10 @@ static const struct of_device_id st_magn_of_match[] = {
 		.compatible = "st,iis2mdc",
 		.data = IIS2MDC_MAGN_DEV_NAME,
 	},
+	{
+		.compatible = "st,lsm303c-magn",
+		.data = LSM303C_MAGN_DEV_NAME,
+	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, st_magn_of_match);
@@ -97,6 +101,7 @@ static const struct i2c_device_id st_magn_id_table[] = {
 	{ LIS2MDL_MAGN_DEV_NAME },
 	{ LSM9DS1_MAGN_DEV_NAME },
 	{ IIS2MDC_MAGN_DEV_NAME },
+	{ LSM303C_MAGN_DEV_NAME },
 	{},
 };
 MODULE_DEVICE_TABLE(i2c, st_magn_id_table);
@@ -106,7 +111,7 @@ static struct i2c_driver st_magn_driver = {
 		.name = "st-magn-i2c",
 		.of_match_table = st_magn_of_match,
 	},
-	.probe_new = st_magn_i2c_probe,
+	.probe = st_magn_i2c_probe,
 	.id_table = st_magn_id_table,
 };
 module_i2c_driver(st_magn_driver);

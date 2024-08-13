@@ -93,6 +93,8 @@
 		resets = <&tegra_car 28>;
 		reset-names = "host1x";
 
+		iommus = <&mc TEGRA_SWGROUP_HC>;
+
 		#address-cells = <2>;
 		#size-cells = <2>;
 
@@ -338,9 +340,7 @@
 		reg-shift = <2>;
 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&tegra_car TEGRA124_CLK_UARTA>;
-		clock-names = "serial";
 		resets = <&tegra_car 6>;
-		reset-names = "serial";
 		dmas = <&apbdma 8>, <&apbdma 8>;
 		dma-names = "rx", "tx";
 		status = "disabled";
@@ -352,9 +352,7 @@
 		reg-shift = <2>;
 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&tegra_car TEGRA124_CLK_UARTB>;
-		clock-names = "serial";
 		resets = <&tegra_car 7>;
-		reset-names = "serial";
 		dmas = <&apbdma 9>, <&apbdma 9>;
 		dma-names = "rx", "tx";
 		status = "disabled";
@@ -366,9 +364,7 @@
 		reg-shift = <2>;
 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&tegra_car TEGRA124_CLK_UARTC>;
-		clock-names = "serial";
 		resets = <&tegra_car 55>;
-		reset-names = "serial";
 		dmas = <&apbdma 10>, <&apbdma 10>;
 		dma-names = "rx", "tx";
 		status = "disabled";
@@ -380,9 +376,7 @@
 		reg-shift = <2>;
 		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&tegra_car TEGRA124_CLK_UARTD>;
-		clock-names = "serial";
 		resets = <&tegra_car 65>;
-		reset-names = "serial";
 		dmas = <&apbdma 19>, <&apbdma 19>;
 		dma-names = "rx", "tx";
 		status = "disabled";
@@ -578,7 +572,7 @@
 		status = "disabled";
 	};
 
-	rtc@7000e000 {
+	tegra_rtc: rtc@7000e000 {
 		compatible = "nvidia,tegra124-rtc", "nvidia,tegra20-rtc";
 		reg = <0x0 0x7000e000 0x0 0x100>;
 		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;

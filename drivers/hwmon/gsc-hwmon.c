@@ -39,7 +39,7 @@ struct gsc_hwmon_data {
 	struct hwmon_chip_info chip;
 };
 
-static struct regmap_bus gsc_hwmon_regmap_bus = {
+static const struct regmap_bus gsc_hwmon_regmap_bus = {
 	.reg_read = gsc_read,
 	.reg_write = gsc_write,
 };
@@ -82,8 +82,8 @@ static ssize_t pwm_auto_point_temp_store(struct device *dev,
 	if (kstrtol(buf, 10, &temp))
 		return -EINVAL;
 
-	temp = clamp_val(temp, 0, 10000);
-	temp = DIV_ROUND_CLOSEST(temp, 10);
+	temp = clamp_val(temp, 0, 100000);
+	temp = DIV_ROUND_CLOSEST(temp, 100);
 
 	regs[0] = temp & 0xff;
 	regs[1] = (temp >> 8) & 0xff;
@@ -100,7 +100,7 @@ static ssize_t pwm_auto_point_pwm_show(struct device *dev,
 {
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 
-	return sprintf(buf, "%d\n", 255 * (50 + (attr->index * 10)) / 100);
+	return sprintf(buf, "%d\n", 255 * (50 + (attr->index * 10)));
 }
 
 static SENSOR_DEVICE_ATTR_RO(pwm1_auto_point1_pwm, pwm_auto_point_pwm, 0);
@@ -249,7 +249,6 @@ gsc_hwmon_get_devtree_pdata(struct device *dev)
 {
 	struct gsc_hwmon_platform_data *pdata;
 	struct gsc_hwmon_channel *ch;
-	struct fwnode_handle *child;
 	struct device_node *fan;
 	int nchannels;
 
@@ -276,25 +275,21 @@ gsc_hwmon_get_devtree_pdata(struct device *dev)
 
 	ch = pdata->channels;
 	/* allocate structures for channels and count instances of each type */
-	device_for_each_child_node(dev, child) {
+	device_for_each_child_node_scoped(dev, child) {
 		if (fwnode_property_read_string(child, "label", &ch->name)) {
 			dev_err(dev, "channel without label\n");
-			fwnode_handle_put(child);
 			return ERR_PTR(-EINVAL);
 		}
 		if (fwnode_property_read_u32(child, "reg", &ch->reg)) {
 			dev_err(dev, "channel without reg\n");
-			fwnode_handle_put(child);
 			return ERR_PTR(-EINVAL);
 		}
 		if (fwnode_property_read_u32(child, "gw,mode", &ch->mode)) {
 			dev_err(dev, "channel without mode\n");
-			fwnode_handle_put(child);
 			return ERR_PTR(-EINVAL);
 		}
 		if (ch->mode > mode_max) {
 			dev_err(dev, "invalid channel mode\n");
-			fwnode_handle_put(child);
 			return ERR_PTR(-EINVAL);
 		}
 

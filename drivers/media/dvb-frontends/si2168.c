@@ -744,7 +744,7 @@ static int si2168_probe(struct i2c_client *client)
 		goto err_kfree;
 	}
 	dev->muxc->priv = client;
-	ret = i2c_mux_add_adapter(dev->muxc, 0, 0, 0);
+	ret = i2c_mux_add_adapter(dev->muxc, 0, 0);
 	if (ret)
 		goto err_kfree;
 
@@ -798,7 +798,7 @@ static struct i2c_driver si2168_driver = {
 		.name                = "si2168",
 		.suppress_bind_attrs = true,
 	},
-	.probe_new	= si2168_probe,
+	.probe		= si2168_probe,
 	.remove		= si2168_remove,
 	.id_table	= si2168_id_table,
 };

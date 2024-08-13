@@ -128,7 +128,7 @@ static int lm4857_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id lm4857_i2c_id[] = {
-	{ "lm4857", 0 },
+	{ "lm4857" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, lm4857_i2c_id);
@@ -137,7 +137,7 @@ static struct i2c_driver lm4857_i2c_driver = {
 	.driver = {
 		.name = "lm4857",
 	},
-	.probe_new = lm4857_i2c_probe,
+	.probe = lm4857_i2c_probe,
 	.id_table = lm4857_i2c_id,
 };
 

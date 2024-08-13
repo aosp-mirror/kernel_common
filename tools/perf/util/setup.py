@@ -36,6 +36,10 @@ if cc_is_clang:
             vars[var] = sub("-fno-semantic-interposition", "", vars[var])
         if not clang_has_option("-ffat-lto-objects"):
             vars[var] = sub("-ffat-lto-objects", "", vars[var])
+        if not clang_has_option("-ftree-loop-distribute-patterns"):
+            vars[var] = sub("-ftree-loop-distribute-patterns", "", vars[var])
+        if not clang_has_option("-gno-variable-location-views"):
+            vars[var] = sub("-gno-variable-location-views", "", vars[var])
 
 from setuptools import setup, Extension
 
@@ -62,6 +66,9 @@ if cc_is_clang:
 else:
     cflags += ['-Wno-cast-function-type' ]
 
+# The python headers have mixed code with declarations (decls after asserts, for instance)
+cflags += [ "-Wno-declaration-after-statement" ]
+
 src_perf  = getenv('srctree') + '/tools/perf'
 build_lib = getenv('PYTHON_EXTBUILD_LIB')
 build_tmp = getenv('PYTHON_EXTBUILD_TMP')
@@ -78,6 +85,7 @@ if '-DHAVE_LIBTRACEEVENT' in cflags:
     extra_libraries += [ 'traceevent' ]
 else:
     ext_sources.remove('util/trace-event.c')
+    ext_sources.remove('util/trace-event-parse.c')
 
 # use full paths with source files
 ext_sources = list(map(lambda x: '%s/%s' % (src_perf, x) , ext_sources))

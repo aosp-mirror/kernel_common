@@ -230,14 +230,14 @@ static const struct drm_connector_funcs ch7033_connector_funcs = {
 static int ch7033_connector_get_modes(struct drm_connector *connector)
 {
 	struct ch7033_priv *priv = conn_to_ch7033_priv(connector);
-	struct edid *edid;
+	const struct drm_edid *drm_edid;
 	int ret;
 
-	edid = drm_bridge_get_edid(priv->next_bridge, connector);
-	drm_connector_update_edid_property(connector, edid);
-	if (edid) {
-		ret = drm_add_edid_modes(connector, edid);
-		kfree(edid);
+	drm_edid = drm_bridge_edid_read(priv->next_bridge, connector);
+	drm_edid_connector_update(connector, drm_edid);
+	if (drm_edid) {
+		ret = drm_edid_connector_add_modes(connector);
+		drm_edid_free(drm_edid);
 	} else {
 		ret = drm_add_modes_noedid(connector, 1920, 1080);
 		drm_set_preferred_mode(connector, 1024, 768);
@@ -528,8 +528,7 @@ static const struct regmap_config ch7033_regmap_config = {
 	.max_register = 0x7f,
 };
 
-static int ch7033_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int ch7033_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
 	struct ch7033_priv *priv;
@@ -608,7 +607,7 @@ static struct i2c_driver ch7033_driver = {
 	.remove = ch7033_remove,
 	.driver = {
 		.name = "ch7033",
-		.of_match_table = of_match_ptr(ch7033_dt_ids),
+		.of_match_table = ch7033_dt_ids,
 	},
 	.id_table = ch7033_ids,
 };

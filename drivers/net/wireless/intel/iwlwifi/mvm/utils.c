@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2012-2014, 2018-2022 Intel Corporation
+ * Copyright (C) 2012-2014, 2018-2024 Intel Corporation
  * Copyright (C) 2013-2014 Intel Mobile Communications GmbH
  * Copyright (C) 2015-2017 Intel Deutschland GmbH
  */
@@ -249,6 +249,8 @@ u8 iwl_mvm_next_antenna(struct iwl_mvm *mvm, u8 valid, u8 last_idx)
  * This is the special case in which init is set and we call a callback in
  * this case to clear the state indicating that station creation is in
  * progress.
+ *
+ * Returns: an error code indicating success or failure
  */
 int iwl_mvm_send_lq_cmd(struct iwl_mvm *mvm, struct iwl_lq_cmd *lq)
 {
@@ -272,13 +274,15 @@ int iwl_mvm_send_lq_cmd(struct iwl_mvm *mvm, struct iwl_lq_cmd *lq)
  * @vif: Pointer to the ieee80211_vif structure
  * @req_type: The part of the driver who call for a change.
  * @smps_request: The request to change the SMPS mode.
+ * @link_id: for MLO link_id, otherwise 0 (deflink)
  *
  * Get a requst to change the SMPS mode,
  * and change it according to all other requests in the driver.
  */
 void iwl_mvm_update_smps(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 			 enum iwl_mvm_smps_type_request req_type,
-			 enum ieee80211_smps_mode smps_request)
+			 enum ieee80211_smps_mode smps_request,
+			 unsigned int link_id)
 {
 	struct iwl_mvm_vif *mvmvif;
 	enum ieee80211_smps_mode smps_mode = IEEE80211_SMPS_AUTOMATIC;
@@ -294,17 +298,42 @@ void iwl_mvm_update_smps(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		return;
 
 	mvmvif = iwl_mvm_vif_from_mac80211(vif);
-	mvmvif->smps_requests[req_type] = smps_request;
+
+	if (WARN_ON_ONCE(!mvmvif->link[link_id]))
+		return;
+
+	mvmvif->link[link_id]->smps_requests[req_type] = smps_request;
 	for (i = 0; i < NUM_IWL_MVM_SMPS_REQ; i++) {
-		if (mvmvif->smps_requests[i] == IEEE80211_SMPS_STATIC) {
+		if (mvmvif->link[link_id]->smps_requests[i] ==
+		    IEEE80211_SMPS_STATIC) {
 			smps_mode = IEEE80211_SMPS_STATIC;
 			break;
 		}
-		if (mvmvif->smps_requests[i] == IEEE80211_SMPS_DYNAMIC)
+		if (mvmvif->link[link_id]->smps_requests[i] ==
+		    IEEE80211_SMPS_DYNAMIC)
 			smps_mode = IEEE80211_SMPS_DYNAMIC;
 	}
 
-	ieee80211_request_smps(vif, 0, smps_mode);
+	/* SMPS is disabled in eSR */
+	if (mvmvif->esr_active)
+		smps_mode = IEEE80211_SMPS_OFF;
+
+	ieee80211_request_smps(vif, link_id, smps_mode);
+}
+
+void iwl_mvm_update_smps_on_active_links(struct iwl_mvm *mvm,
+					 struct ieee80211_vif *vif,
+					 enum iwl_mvm_smps_type_request req_type,
+					 enum ieee80211_smps_mode smps_request)
+{
+	struct ieee80211_bss_conf *link_conf;
+	unsigned int link_id;
+
+	rcu_read_lock();
+	for_each_vif_active_link(vif, link_conf, link_id)
+		iwl_mvm_update_smps(mvm, vif, req_type, smps_request,
+				    link_id);
+	rcu_read_unlock();
 }
 
 static bool iwl_wait_stats_complete(struct iwl_notif_wait_data *notif_wait,
@@ -313,6 +342,80 @@ static bool iwl_wait_stats_complete(struct iwl_notif_wait_data *notif_wait,
 	WARN_ON(pkt->hdr.cmd != STATISTICS_NOTIFICATION);
 
 	return true;
+}
+
+#define PERIODIC_STAT_RATE 5
+
+int iwl_mvm_request_periodic_system_statistics(struct iwl_mvm *mvm, bool enable)
+{
+	u32 flags = enable ? 0 : IWL_STATS_CFG_FLG_DISABLE_NTFY_MSK;
+	u32 type = enable ? (IWL_STATS_NTFY_TYPE_ID_OPER |
+			     IWL_STATS_NTFY_TYPE_ID_OPER_PART1) : 0;
+	struct iwl_system_statistics_cmd system_cmd = {
+		.cfg_mask = cpu_to_le32(flags),
+		.config_time_sec = cpu_to_le32(enable ?
+					       PERIODIC_STAT_RATE : 0),
+		.type_id_mask = cpu_to_le32(type),
+	};
+
+	return iwl_mvm_send_cmd_pdu(mvm,
+				    WIDE_ID(SYSTEM_GROUP,
+					    SYSTEM_STATISTICS_CMD),
+				    0, sizeof(system_cmd), &system_cmd);
+}
+
+static int iwl_mvm_request_system_statistics(struct iwl_mvm *mvm, bool clear,
+					     u8 cmd_ver)
+{
+	struct iwl_system_statistics_cmd system_cmd = {
+		.cfg_mask = clear ?
+			    cpu_to_le32(IWL_STATS_CFG_FLG_ON_DEMAND_NTFY_MSK) :
+			    cpu_to_le32(IWL_STATS_CFG_FLG_RESET_MSK |
+					IWL_STATS_CFG_FLG_ON_DEMAND_NTFY_MSK),
+		.type_id_mask = cpu_to_le32(IWL_STATS_NTFY_TYPE_ID_OPER |
+					    IWL_STATS_NTFY_TYPE_ID_OPER_PART1),
+	};
+	struct iwl_host_cmd cmd = {
+		.id = WIDE_ID(SYSTEM_GROUP, SYSTEM_STATISTICS_CMD),
+		.len[0] = sizeof(system_cmd),
+		.data[0] = &system_cmd,
+	};
+	struct iwl_notification_wait stats_wait;
+	static const u16 stats_complete[] = {
+		WIDE_ID(SYSTEM_GROUP, SYSTEM_STATISTICS_END_NOTIF),
+	};
+	int ret;
+
+	if (cmd_ver != 1) {
+		IWL_FW_CHECK_FAILED(mvm,
+				    "Invalid system statistics command version:%d\n",
+				    cmd_ver);
+		return -EOPNOTSUPP;
+	}
+
+	iwl_init_notification_wait(&mvm->notif_wait, &stats_wait,
+				   stats_complete, ARRAY_SIZE(stats_complete),
+				   NULL, NULL);
+
+	mvm->statistics_clear = clear;
+	ret = iwl_mvm_send_cmd(mvm, &cmd);
+	if (ret) {
+		iwl_remove_notification(&mvm->notif_wait, &stats_wait);
+		return ret;
+	}
+
+	/* 500ms for OPERATIONAL, PART1 and END notification should be enough
+	 * for FW to collect data from all LMACs and send
+	 * STATISTICS_NOTIFICATION to host
+	 */
+	ret = iwl_wait_notification(&mvm->notif_wait, &stats_wait, HZ / 2);
+	if (ret)
+		return ret;
+
+	if (clear)
+		iwl_mvm_accu_radio_stats(mvm);
+
+	return ret;
 }
 
 int iwl_mvm_request_statistics(struct iwl_mvm *mvm, bool clear)
@@ -326,7 +429,21 @@ int iwl_mvm_request_statistics(struct iwl_mvm *mvm, bool clear)
 		.len[0] = sizeof(scmd),
 		.data[0] = &scmd,
 	};
+	u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw,
+					   WIDE_ID(SYSTEM_GROUP,
+						   SYSTEM_STATISTICS_CMD),
+					   IWL_FW_CMD_VER_UNKNOWN);
 	int ret;
+
+	/*
+	 * Don't request statistics during restart, they'll not have any useful
+	 * information right after restart, nor is clearing needed
+	 */
+	if (test_bit(IWL_MVM_STATUS_IN_HW_RESTART, &mvm->status))
+		return 0;
+
+	if (cmd_ver != IWL_FW_CMD_VER_UNKNOWN)
+		return iwl_mvm_request_system_statistics(mvm, clear, cmd_ver);
 
 	/* From version 15 - STATISTICS_NOTIFICATION, the reply for
 	 * STATISTICS_CMD is empty, and the response is with
@@ -390,16 +507,20 @@ static void iwl_mvm_diversity_iter(void *_data, u8 *mac,
 {
 	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 	struct iwl_mvm_diversity_iter_data *data = _data;
-	int i;
+	int i, link_id;
 
-	if (mvmvif->phy_ctxt != data->ctxt)
-		return;
+	for_each_mvm_vif_valid_link(mvmvif, link_id) {
+		struct iwl_mvm_vif_link_info *link_info = mvmvif->link[link_id];
 
-	for (i = 0; i < NUM_IWL_MVM_SMPS_REQ; i++) {
-		if (mvmvif->smps_requests[i] == IEEE80211_SMPS_STATIC ||
-		    mvmvif->smps_requests[i] == IEEE80211_SMPS_DYNAMIC) {
-			data->result = false;
-			break;
+		if (link_info->phy_ctxt != data->ctxt)
+			continue;
+
+		for (i = 0; i < NUM_IWL_MVM_SMPS_REQ; i++) {
+			if (link_info->smps_requests[i] == IEEE80211_SMPS_STATIC ||
+			    link_info->smps_requests[i] == IEEE80211_SMPS_DYNAMIC) {
+				data->result = false;
+				break;
+			}
 		}
 	}
 }
@@ -495,10 +616,10 @@ static void iwl_mvm_ll_iter(void *_data, u8 *mac, struct ieee80211_vif *vif)
 	if (iwl_mvm_vif_low_latency(mvmvif)) {
 		result->result = true;
 
-		if (!mvmvif->phy_ctxt)
+		if (!mvmvif->deflink.phy_ctxt)
 			return;
 
-		band = mvmvif->phy_ctxt->channel->band;
+		band = mvmvif->deflink.phy_ctxt->channel->band;
 		result->result_per_band[band] = true;
 	}
 }
@@ -819,10 +940,10 @@ static void iwl_mvm_uapsd_agg_disconnect(struct iwl_mvm *mvm,
 	if (!vif->cfg.assoc)
 		return;
 
-	if (!mvmvif->queue_params[IEEE80211_AC_VO].uapsd &&
-	    !mvmvif->queue_params[IEEE80211_AC_VI].uapsd &&
-	    !mvmvif->queue_params[IEEE80211_AC_BE].uapsd &&
-	    !mvmvif->queue_params[IEEE80211_AC_BK].uapsd)
+	if (!mvmvif->deflink.queue_params[IEEE80211_AC_VO].uapsd &&
+	    !mvmvif->deflink.queue_params[IEEE80211_AC_VI].uapsd &&
+	    !mvmvif->deflink.queue_params[IEEE80211_AC_BE].uapsd &&
+	    !mvmvif->deflink.queue_params[IEEE80211_AC_BK].uapsd)
 		return;
 
 	if (mvm->tcm.data[mvmvif->id].uapsd_nonagg_detect.detected)
@@ -831,7 +952,8 @@ static void iwl_mvm_uapsd_agg_disconnect(struct iwl_mvm *mvm,
 	mvm->tcm.data[mvmvif->id].uapsd_nonagg_detect.detected = true;
 	IWL_INFO(mvm,
 		 "detected AP should do aggregation but isn't, likely due to U-APSD\n");
-	schedule_delayed_work(&mvmvif->uapsd_nonagg_detected_wk, 15 * HZ);
+	schedule_delayed_work(&mvmvif->uapsd_nonagg_detected_wk,
+			      15 * HZ);
 }
 
 static void iwl_mvm_check_uapsd_agg_expected_tpt(struct iwl_mvm *mvm,
@@ -883,10 +1005,10 @@ static void iwl_mvm_tcm_iterator(void *_data, u8 *mac,
 	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 	u32 *band = _data;
 
-	if (!mvmvif->phy_ctxt)
+	if (!mvmvif->deflink.phy_ctxt)
 		return;
 
-	band[mvmvif->id] = mvmvif->phy_ctxt->channel->band;
+	band[mvmvif->id] = mvmvif->deflink.phy_ctxt->channel->band;
 }
 
 static unsigned long iwl_mvm_calc_tcm_stats(struct iwl_mvm *mvm,
@@ -1136,4 +1258,37 @@ void iwl_mvm_get_sync_time(struct iwl_mvm *mvm, int clock_type,
 		mvm->ps_disabled = ps_disabled;
 		iwl_mvm_power_update_device(mvm);
 	}
+}
+
+/* Find if at least two links from different vifs use same channel
+ * FIXME: consider having a refcount array in struct iwl_mvm_vif for
+ * used phy_ctxt ids.
+ */
+bool iwl_mvm_have_links_same_channel(struct iwl_mvm_vif *vif1,
+				     struct iwl_mvm_vif *vif2)
+{
+	unsigned int i, j;
+
+	for_each_mvm_vif_valid_link(vif1, i) {
+		for_each_mvm_vif_valid_link(vif2, j) {
+			if (vif1->link[i]->phy_ctxt == vif2->link[j]->phy_ctxt)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+bool iwl_mvm_vif_is_active(struct iwl_mvm_vif *mvmvif)
+{
+	unsigned int i;
+
+	/* FIXME: can it fail when phy_ctxt is assigned? */
+	for_each_mvm_vif_valid_link(mvmvif, i) {
+		if (mvmvif->link[i]->phy_ctxt &&
+		    mvmvif->link[i]->phy_ctxt->id < NUM_PHY_CTX)
+			return true;
+	}
+
+	return false;
 }

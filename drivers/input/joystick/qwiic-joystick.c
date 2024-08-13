@@ -126,8 +126,8 @@ MODULE_DEVICE_TABLE(of, of_qwiic_match);
 #endif /* CONFIG_OF */
 
 static const struct i2c_device_id qwiic_id_table[] = {
-	{ KBUILD_MODNAME, 0 },
-	{ },
+	{ KBUILD_MODNAME },
+	{ }
 };
 MODULE_DEVICE_TABLE(i2c, qwiic_id_table);
 
@@ -137,7 +137,7 @@ static struct i2c_driver qwiic_driver = {
 		.of_match_table	= of_match_ptr(of_qwiic_match),
 	},
 	.id_table	= qwiic_id_table,
-	.probe_new	= qwiic_probe,
+	.probe		= qwiic_probe,
 };
 module_i2c_driver(qwiic_driver);
 

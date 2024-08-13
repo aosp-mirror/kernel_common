@@ -77,7 +77,7 @@ ipu3-cio2         Intel ipu3-cio2 driver
 ivtv              Conexant cx23416/cx23415 MPEG encoder/decoder
 ivtvfb            Conexant cx23415 framebuffer
 mantis            MANTIS based cards
-meye              Sony Vaio Picturebook Motion Eye
+mgb4              Digiteq Automotive MGB4 frame grabber
 mxb               Siemens-Nixdorf 'Multimedia eXtension Board'
 netup-unidvb      NetUP Universal DVB card
 ngene             Micronas nGene

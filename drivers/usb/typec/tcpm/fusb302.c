@@ -15,7 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/proc_fs.h>
 #include <linux/regulator/consumer.h>
@@ -190,7 +190,7 @@ static void fusb302_log(struct fusb302_chip *chip, const char *fmt, ...)
 
 static int fusb302_debug_show(struct seq_file *s, void *v)
 {
-	struct fusb302_chip *chip = (struct fusb302_chip *)s->private;
+	struct fusb302_chip *chip = s->private;
 	int tail;
 
 	mutex_lock(&chip->logbuffer_lock);
@@ -1467,7 +1467,7 @@ static int fusb302_pd_read_message(struct fusb302_chip *chip,
 	if ((!len) && (pd_header_type_le(msg->header) == PD_CTRL_GOOD_CRC))
 		tcpm_pd_transmit_complete(chip->tcpm_port, TCPC_TX_SUCCESS);
 	else
-		tcpm_pd_receive(chip->tcpm_port, msg);
+		tcpm_pd_receive(chip->tcpm_port, msg, TCPC_TX_SOP);
 
 	return ret;
 }
@@ -1813,7 +1813,7 @@ static int fusb302_pm_resume(struct device *dev)
 	return 0;
 }
 
-static const struct of_device_id fusb302_dt_match[] = {
+static const struct of_device_id fusb302_dt_match[] __maybe_unused = {
 	{.compatible = "fcs,fusb302"},
 	{},
 };
@@ -1836,7 +1836,7 @@ static struct i2c_driver fusb302_driver = {
 		   .pm = &fusb302_pm_ops,
 		   .of_match_table = of_match_ptr(fusb302_dt_match),
 		   },
-	.probe_new = fusb302_probe,
+	.probe = fusb302_probe,
 	.remove = fusb302_remove,
 	.id_table = fusb302_i2c_device_id,
 };

@@ -559,7 +559,7 @@ static const struct of_device_id __maybe_unused mt6660_of_id[] = {
 MODULE_DEVICE_TABLE(of, mt6660_of_id);
 
 static const struct i2c_device_id mt6660_i2c_id[] = {
-	{"mt6660", 0 },
+	{"mt6660" },
 	{},
 };
 MODULE_DEVICE_TABLE(i2c, mt6660_i2c_id);
@@ -570,7 +570,7 @@ static struct i2c_driver mt6660_i2c_driver = {
 		.of_match_table = of_match_ptr(mt6660_of_id),
 		.pm = &mt6660_dev_pm_ops,
 	},
-	.probe_new = mt6660_i2c_probe,
+	.probe = mt6660_i2c_probe,
 	.remove = mt6660_i2c_remove,
 	.id_table = mt6660_i2c_id,
 };

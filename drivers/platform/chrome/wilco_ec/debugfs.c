@@ -10,6 +10,7 @@
 #include <linux/ctype.h>
 #include <linux/debugfs.h>
 #include <linux/fs.h>
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_data/wilco-ec.h>
 #include <linux/platform_device.h>
@@ -251,8 +252,6 @@ static int wilco_ec_debugfs_probe(struct platform_device *pdev)
 		return 0;
 	debug_info->ec = ec;
 	debug_info->dir = debugfs_create_dir("wilco_ec", NULL);
-	if (!debug_info->dir)
-		return 0;
 	debugfs_create_file("raw", 0644, debug_info->dir, NULL, &fops_raw);
 	debugfs_create_file("h1_gpio", 0444, debug_info->dir, ec,
 			    &fops_h1_gpio);
@@ -262,24 +261,28 @@ static int wilco_ec_debugfs_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int wilco_ec_debugfs_remove(struct platform_device *pdev)
+static void wilco_ec_debugfs_remove(struct platform_device *pdev)
 {
 	debugfs_remove_recursive(debug_info->dir);
-
-	return 0;
 }
+
+static const struct platform_device_id wilco_ec_debugfs_id[] = {
+	{ DRV_NAME, 0 },
+	{}
+};
+MODULE_DEVICE_TABLE(platform, wilco_ec_debugfs_id);
 
 static struct platform_driver wilco_ec_debugfs_driver = {
 	.driver = {
 		.name = DRV_NAME,
 	},
 	.probe = wilco_ec_debugfs_probe,
-	.remove = wilco_ec_debugfs_remove,
+	.remove_new = wilco_ec_debugfs_remove,
+	.id_table = wilco_ec_debugfs_id,
 };
 
 module_platform_driver(wilco_ec_debugfs_driver);
 
-MODULE_ALIAS("platform:" DRV_NAME);
 MODULE_AUTHOR("Nick Crews <ncrews@chromium.org>");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Wilco EC debugfs driver");

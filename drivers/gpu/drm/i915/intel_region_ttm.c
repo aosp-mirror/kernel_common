@@ -2,7 +2,6 @@
 /*
  * Copyright © 2021 Intel Corporation
  */
-#include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_device.h>
 #include <drm/ttm/ttm_range_manager.h>
 
@@ -88,7 +87,7 @@ int intel_region_ttm_init(struct intel_memory_region *mem)
 
 	ret = i915_ttm_buddy_man_init(bdev, mem_type, false,
 				      resource_size(&mem->region),
-				      mem->io_size,
+				      resource_size(&mem->io),
 				      mem->min_page_size, PAGE_SIZE);
 	if (ret)
 		return ret;
@@ -132,7 +131,7 @@ int intel_region_ttm_fini(struct intel_memory_region *mem)
 			break;
 
 		msleep(20);
-		flush_delayed_work(&mem->i915->bdev.wq);
+		drain_workqueue(mem->i915->bdev.wq);
 	}
 
 	/* If we leaked objects, Don't free the region causing use after free */
@@ -182,6 +181,7 @@ intel_region_ttm_resource_to_rsgt(struct intel_memory_region *mem,
 /**
  * intel_region_ttm_resource_alloc - Allocate memory resources from a region
  * @mem: The memory region,
+ * @offset: BO offset
  * @size: The requested size in bytes
  * @flags: Allocation flags
  *
@@ -209,14 +209,26 @@ intel_region_ttm_resource_alloc(struct intel_memory_region *mem,
 	if (flags & I915_BO_ALLOC_CONTIGUOUS)
 		place.flags |= TTM_PL_FLAG_CONTIGUOUS;
 	if (offset != I915_BO_INVALID_OFFSET) {
+		if (WARN_ON(overflows_type(offset >> PAGE_SHIFT, place.fpfn))) {
+			ret = -E2BIG;
+			goto out;
+		}
 		place.fpfn = offset >> PAGE_SHIFT;
+		if (WARN_ON(overflows_type(place.fpfn + (size >> PAGE_SHIFT), place.lpfn))) {
+			ret = -E2BIG;
+			goto out;
+		}
 		place.lpfn = place.fpfn + (size >> PAGE_SHIFT);
-	} else if (mem->io_size && mem->io_size < mem->total) {
+	} else if (resource_size(&mem->io) && resource_size(&mem->io) < mem->total) {
 		if (flags & I915_BO_ALLOC_GPU_ONLY) {
 			place.flags |= TTM_PL_FLAG_TOPDOWN;
 		} else {
 			place.fpfn = 0;
-			place.lpfn = mem->io_size >> PAGE_SHIFT;
+			if (WARN_ON(overflows_type(resource_size(&mem->io) >> PAGE_SHIFT, place.lpfn))) {
+				ret = -E2BIG;
+				goto out;
+			}
+			place.lpfn = resource_size(&mem->io) >> PAGE_SHIFT;
 		}
 	}
 
@@ -224,6 +236,8 @@ intel_region_ttm_resource_alloc(struct intel_memory_region *mem,
 	mock_bo.bdev = &mem->i915->bdev;
 
 	ret = man->func->alloc(man, &mock_bo, &place, &res);
+
+out:
 	if (ret == -ENOSPC)
 		ret = -ENXIO;
 	if (!ret)

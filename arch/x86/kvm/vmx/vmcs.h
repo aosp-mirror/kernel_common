@@ -75,7 +75,7 @@ struct loaded_vmcs {
 	struct vmcs_controls_shadow controls_shadow;
 };
 
-static inline bool is_intr_type(u32 intr_info, u32 type)
+static __always_inline bool is_intr_type(u32 intr_info, u32 type)
 {
 	const u32 mask = INTR_INFO_VALID_MASK | INTR_INFO_INTR_TYPE_MASK;
 
@@ -140,13 +140,18 @@ static inline bool is_nm_fault(u32 intr_info)
 	return is_exception_n(intr_info, NM_VECTOR);
 }
 
+static inline bool is_ve_fault(u32 intr_info)
+{
+	return is_exception_n(intr_info, VE_VECTOR);
+}
+
 /* Undocumented: icebp/int1 */
 static inline bool is_icebp(u32 intr_info)
 {
 	return is_intr_type(intr_info, INTR_TYPE_PRIV_SW_EXCEPTION);
 }
 
-static inline bool is_nmi(u32 intr_info)
+static __always_inline bool is_nmi(u32 intr_info)
 {
 	return is_intr_type(intr_info, INTR_TYPE_NMI_INTR);
 }

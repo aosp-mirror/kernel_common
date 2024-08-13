@@ -683,6 +683,7 @@ static int ux500_msp_dai_of_probe(struct snd_soc_dai *dai)
 
 static const struct snd_soc_dai_ops ux500_msp_dai_ops[] = {
 	{
+		.probe = ux500_msp_dai_of_probe,
 		.set_sysclk = ux500_msp_dai_set_dai_sysclk,
 		.set_fmt = ux500_msp_dai_set_dai_fmt,
 		.set_tdm_slot = ux500_msp_dai_set_tdm_slot,
@@ -695,7 +696,6 @@ static const struct snd_soc_dai_ops ux500_msp_dai_ops[] = {
 };
 
 static struct snd_soc_dai_driver ux500_msp_dai_drv = {
-	.probe                 = ux500_msp_dai_of_probe,
 	.playback.channels_min = UX500_MSP_MIN_CHANNELS,
 	.playback.channels_max = UX500_MSP_MAX_CHANNELS,
 	.playback.rates        = UX500_I2S_RATES,
@@ -791,7 +791,7 @@ err_reg_plat:
 	return ret;
 }
 
-static int ux500_msp_drv_remove(struct platform_device *pdev)
+static void ux500_msp_drv_remove(struct platform_device *pdev)
 {
 	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(&pdev->dev);
 
@@ -802,8 +802,6 @@ static int ux500_msp_drv_remove(struct platform_device *pdev)
 	prcmu_qos_remove_requirement(PRCMU_QOS_APE_OPP, "ux500_msp_i2s");
 
 	ux500_msp_i2s_cleanup_msp(pdev, drvdata->msp);
-
-	return 0;
 }
 
 static const struct of_device_id ux500_msp_i2s_match[] = {
@@ -818,8 +816,9 @@ static struct platform_driver msp_i2s_driver = {
 		.of_match_table = ux500_msp_i2s_match,
 	},
 	.probe = ux500_msp_drv_probe,
-	.remove = ux500_msp_drv_remove,
+	.remove_new = ux500_msp_drv_remove,
 };
 module_platform_driver(msp_i2s_driver);
 
+MODULE_DESCRIPTION("ASoC Ux500 I2S driver");
 MODULE_LICENSE("GPL v2");

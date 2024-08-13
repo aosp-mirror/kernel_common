@@ -56,16 +56,18 @@ properties:
     items:
       items:
         - description: value for DS line
+          enum: [0, 1]
         - description: value for sampling edge
-      anyOf:
-        - enum:
-            - [0, 0]
-            - [0, 1]
-            - [1, 0]
-            - [1, 1]
+          enum: [0, 1]
     minItems: 1
     maxItems: 4
     uniqueItems: true
+
+  microchip,startup-delay-us:
+    description: |
+      Specifies the delay in microseconds that needs to be applied after
+      enabling the PDMC microphones to avoid unwanted noise due to microphones
+      not being ready.
 
 required:
   - compatible

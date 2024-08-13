@@ -14,7 +14,8 @@ description: |
   file systems on embedded devices.
 
 allOf:
-  - $ref: "mtd.yaml#"
+  - $ref: mtd.yaml#
+  - $ref: /schemas/memory-controllers/mc-peripheral-props.yaml#
 
 properties:
   compatible:
@@ -163,7 +164,7 @@ examples:
             reg = <0 0xf80000>;
         };
         firmware@f80000 {
-            label ="firmware";
+            label = "firmware";
             reg = <0xf80000 0x80000>;
             read-only;
         };

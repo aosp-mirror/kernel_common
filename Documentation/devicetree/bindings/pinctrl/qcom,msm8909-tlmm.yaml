@@ -22,20 +22,10 @@ properties:
   reg:
     maxItems: 1
 
-  interrupts: true
-  interrupt-controller: true
-  "#interrupt-cells": true
-  gpio-controller: true
+  interrupts:
+    maxItems: 1
+
   gpio-reserved-ranges: true
-  "#gpio-cells": true
-  gpio-ranges: true
-  wakeup-parent: true
-
-required:
-  - compatible
-  - reg
-
-additionalProperties: false
 
 patternProperties:
   "-state$":
@@ -53,6 +43,7 @@ $defs:
       Pinctrl node's client devices use subnodes for desired pin configuration.
       Client device subnodes use below standard properties.
     $ref: qcom,tlmm-common.yaml#/$defs/qcom-tlmm-state
+    unevaluatedProperties: false
 
     properties:
       pins:
@@ -61,7 +52,7 @@ $defs:
           subnode.
         items:
           oneOf:
-            - pattern: "^gpio([0-9]|[1-9][0-9]|10[0-9]|11[0-7])$"
+            - pattern: "^gpio([0-9]|[1-9][0-9]|10[0-9]|11[0-2])$"
             - enum: [ sdc1_clk, sdc1_cmd, sdc1_data, sdc2_clk, sdc2_cmd,
                       sdc2_data, qdsd_clk, qdsd_cmd, qdsd_data0, qdsd_data1,
                       qdsd_data2, qdsd_data3 ]
@@ -102,18 +93,14 @@ $defs:
                 uim3_clk, uim3_data, uim3_present, uim3_reset, uim_batt,
                 wcss_bt, wcss_fm, wcss_wlan ]
 
-      bias-disable: true
-      bias-pull-down: true
-      bias-pull-up: true
-      drive-strength: true
-      input-enable: true
-      output-high: true
-      output-low: true
-
     required:
       - pins
 
-    additionalProperties: false
+required:
+  - compatible
+  - reg
+
+unevaluatedProperties: false
 
 examples:
   - |
@@ -125,7 +112,7 @@ examples:
         interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
         gpio-controller;
         #gpio-cells = <2>;
-        gpio-ranges = <&tlmm 0 0 117>;
+        gpio-ranges = <&tlmm 0 0 113>;
         interrupt-controller;
         #interrupt-cells = <2>;
 

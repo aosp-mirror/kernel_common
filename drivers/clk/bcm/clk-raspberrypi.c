@@ -356,9 +356,9 @@ static int raspberrypi_discover_clocks(struct raspberrypi_clk *rpi,
 	while (clks->id) {
 		struct raspberrypi_clk_variant *variant;
 
-		if (clks->id > RPI_FIRMWARE_NUM_CLK_ID) {
+		if (clks->id >= RPI_FIRMWARE_NUM_CLK_ID) {
 			dev_err(rpi->dev, "Unknown clock id: %u (max: %u)\n",
-					   clks->id, RPI_FIRMWARE_NUM_CLK_ID);
+					   clks->id, RPI_FIRMWARE_NUM_CLK_ID - 1);
 			return -EINVAL;
 		}
 
@@ -371,8 +371,8 @@ static int raspberrypi_discover_clocks(struct raspberrypi_clk *rpi,
 			if (IS_ERR(hw))
 				return PTR_ERR(hw);
 
-			data->hws[clks->id] = hw;
 			data->num = clks->id + 1;
+			data->hws[clks->id] = hw;
 		}
 
 		clks++;
@@ -439,13 +439,11 @@ static int raspberrypi_clk_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int raspberrypi_clk_remove(struct platform_device *pdev)
+static void raspberrypi_clk_remove(struct platform_device *pdev)
 {
 	struct raspberrypi_clk *rpi = platform_get_drvdata(pdev);
 
 	platform_device_unregister(rpi->cpufreq);
-
-	return 0;
 }
 
 static const struct of_device_id raspberrypi_clk_match[] = {
@@ -460,7 +458,7 @@ static struct platform_driver raspberrypi_clk_driver = {
 		.of_match_table = raspberrypi_clk_match,
 	},
 	.probe          = raspberrypi_clk_probe,
-	.remove		= raspberrypi_clk_remove,
+	.remove_new	= raspberrypi_clk_remove,
 };
 module_platform_driver(raspberrypi_clk_driver);
 

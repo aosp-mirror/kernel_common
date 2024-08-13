@@ -44,7 +44,7 @@ static int irps5401_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id irps5401_id[] = {
-	{"irps5401", 0},
+	{"irps5401"},
 	{}
 };
 
@@ -54,7 +54,7 @@ static struct i2c_driver irps5401_driver = {
 	.driver = {
 		   .name = "irps5401",
 		   },
-	.probe_new = irps5401_probe,
+	.probe = irps5401_probe,
 	.id_table = irps5401_id,
 };
 

@@ -29,8 +29,7 @@ v4l2_mbus_framefmt *__csi2_get_format(struct atomisp_mipi_csi2_device *csi2,
 				      unsigned int pad)
 {
 	if (which == V4L2_SUBDEV_FORMAT_TRY)
-		return v4l2_subdev_get_try_format(&csi2->subdev, sd_state,
-						  pad);
+		return v4l2_subdev_state_get_format(sd_state, pad);
 	else
 		return &csi2->formats[pad];
 }
@@ -108,9 +107,12 @@ int atomisp_csi2_set_ffmt(struct v4l2_subdev *sd,
 		actual_ffmt->height = clamp_t(u32, ffmt->height,
 					      ATOM_ISP_MIN_HEIGHT,
 					      ATOM_ISP_MAX_HEIGHT);
+		actual_ffmt->field = ffmt->field;
 
 		tmp_ffmt = *ffmt = *actual_ffmt;
 
+		/* Always use V4L2_FIELD_ANY to match the ISP sink pad */
+		tmp_ffmt.field = V4L2_FIELD_ANY;
 		return atomisp_csi2_set_ffmt(sd, sd_state, which,
 					     CSI2_PAD_SOURCE,
 					     &tmp_ffmt);
@@ -139,27 +141,6 @@ static int csi2_set_format(struct v4l2_subdev *sd,
 				     &fmt->format);
 }
 
-/*
- * csi2_set_stream - Enable/Disable streaming on the CSI2 module
- * @sd: ISP CSI2 V4L2 subdevice
- * @enable: Enable/disable stream (1/0)
- *
- * Return 0 on success or a negative error code otherwise.
- */
-static int csi2_set_stream(struct v4l2_subdev *sd, int enable)
-{
-	return 0;
-}
-
-/* subdev core operations */
-static const struct v4l2_subdev_core_ops csi2_core_ops = {
-};
-
-/* subdev video operations */
-static const struct v4l2_subdev_video_ops csi2_video_ops = {
-	.s_stream = csi2_set_stream,
-};
-
 /* subdev pad operations */
 static const struct v4l2_subdev_pad_ops csi2_pad_ops = {
 	.enum_mbus_code = csi2_enum_mbus_code,
@@ -170,52 +151,11 @@ static const struct v4l2_subdev_pad_ops csi2_pad_ops = {
 
 /* subdev operations */
 static const struct v4l2_subdev_ops csi2_ops = {
-	.core = &csi2_core_ops,
-	.video = &csi2_video_ops,
 	.pad = &csi2_pad_ops,
 };
 
-/*
- * csi2_link_setup - Setup CSI2 connections.
- * @entity : Pointer to media entity structure
- * @local  : Pointer to local pad array
- * @remote : Pointer to remote pad array
- * @flags  : Link flags
- * return -EINVAL or zero on success
- */
-static int csi2_link_setup(struct media_entity *entity,
-			   const struct media_pad *local,
-			   const struct media_pad *remote, u32 flags)
-{
-	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
-	struct atomisp_mipi_csi2_device *csi2 = v4l2_get_subdevdata(sd);
-	u32 result = local->index | is_media_entity_v4l2_subdev(remote->entity);
-
-	switch (result) {
-	case CSI2_PAD_SOURCE | MEDIA_ENT_F_OLD_BASE:
-		/* not supported yet */
-		return -EINVAL;
-
-	case CSI2_PAD_SOURCE | MEDIA_ENT_F_V4L2_SUBDEV_UNKNOWN:
-		if (flags & MEDIA_LNK_FL_ENABLED) {
-			if (csi2->output & ~CSI2_OUTPUT_ISP_SUBDEV)
-				return -EBUSY;
-			csi2->output |= CSI2_OUTPUT_ISP_SUBDEV;
-		} else {
-			csi2->output &= ~CSI2_OUTPUT_ISP_SUBDEV;
-		}
-		break;
-
-	default:
-		/* Link from camera to CSI2 is fixed... */
-		return -EINVAL;
-	}
-	return 0;
-}
-
 /* media operations */
 static const struct media_entity_operations csi2_media_ops = {
-	.link_setup = csi2_link_setup,
 	.link_validate = v4l2_subdev_link_validate,
 };
 
@@ -242,7 +182,7 @@ static int mipi_csi2_init_entities(struct atomisp_mipi_csi2_device *csi2,
 	pads[CSI2_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
 
 	me->ops = &csi2_media_ops;
-	me->function = MEDIA_ENT_F_V4L2_SUBDEV_UNKNOWN;
+	me->function = MEDIA_ENT_F_VID_IF_BRIDGE;
 	ret = media_entity_pads_init(me, CSI2_PADS_NUM, pads);
 	if (ret < 0)
 		return ret;
@@ -361,15 +301,11 @@ static void atomisp_csi2_configure_isp2401(struct atomisp_sub_device *asd)
 
 	struct v4l2_control ctrl;
 	struct atomisp_device *isp = asd->isp;
-	struct camera_mipi_info *mipi_info;
 	int mipi_freq = 0;
 	enum atomisp_camera_port port;
-
 	int n;
 
-	mipi_info = atomisp_to_sensor_mipi_info(
-			isp->inputs[asd->input_curr].camera);
-	port = mipi_info->port;
+	port = isp->inputs[asd->input_curr].port;
 
 	ctrl.id = V4L2_CID_LINK_FREQ;
 	if (v4l2_g_ctrl
@@ -413,6 +349,10 @@ int atomisp_mipi_csi2_init(struct atomisp_device *isp)
 	struct atomisp_mipi_csi2_device *csi2_port;
 	unsigned int i;
 	int ret;
+
+	ret = atomisp_csi2_bridge_init(isp);
+	if (ret < 0)
+		return ret;
 
 	for (i = 0; i < ATOMISP_CAMERA_NR_PORTS; i++) {
 		csi2_port = &isp->csi2_port[i];

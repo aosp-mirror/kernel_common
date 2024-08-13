@@ -7,6 +7,7 @@
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleloader.h>
 #include <linux/sort.h>
 
 static struct plt_entry __get_adrp_add_pair(u64 dst, u64 pc,
@@ -65,17 +66,12 @@ static bool plt_entries_equal(const struct plt_entry *a,
 	       (q + aarch64_insn_adrp_get_offset(le32_to_cpu(b->adrp)));
 }
 
-static bool in_init(const struct module *mod, void *loc)
-{
-	return (u64)loc - (u64)mod->init_layout.base < mod->init_layout.size;
-}
-
 u64 module_emit_plt_entry(struct module *mod, Elf64_Shdr *sechdrs,
 			  void *loc, const Elf64_Rela *rela,
 			  Elf64_Sym *sym)
 {
-	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
-							  &mod->arch.init;
+	struct mod_plt_sec *pltsec = !within_module_init((unsigned long)loc, mod) ?
+						&mod->arch.core : &mod->arch.init;
 	struct plt_entry *plt = (struct plt_entry *)sechdrs[pltsec->plt_shndx].sh_addr;
 	int i = pltsec->plt_num_entries;
 	int j = i - 1;
@@ -105,8 +101,8 @@ u64 module_emit_plt_entry(struct module *mod, Elf64_Shdr *sechdrs,
 u64 module_emit_veneer_for_adrp(struct module *mod, Elf64_Shdr *sechdrs,
 				void *loc, u64 val)
 {
-	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
-							  &mod->arch.init;
+	struct mod_plt_sec *pltsec = !within_module_init((unsigned long)loc, mod) ?
+						&mod->arch.core : &mod->arch.init;
 	struct plt_entry *plt = (struct plt_entry *)sechdrs[pltsec->plt_shndx].sh_addr;
 	int i = pltsec->plt_num_entries++;
 	u32 br;
@@ -171,9 +167,6 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
 		switch (ELF64_R_TYPE(rela[i].r_info)) {
 		case R_AARCH64_JUMP26:
 		case R_AARCH64_CALL26:
-			if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
-				break;
-
 			/*
 			 * We only have to consider branch targets that resolve
 			 * to symbols that are defined in a different section.
@@ -207,8 +200,7 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
 			break;
 		case R_AARCH64_ADR_PREL_PG_HI21_NC:
 		case R_AARCH64_ADR_PREL_PG_HI21:
-			if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
-			    !cpus_have_const_cap(ARM64_WORKAROUND_843419))
+			if (!cpus_have_final_cap(ARM64_WORKAROUND_843419))
 				break;
 
 			/*
@@ -243,13 +235,13 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
 		}
 	}
 
-	if (IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) &&
-	    cpus_have_const_cap(ARM64_WORKAROUND_843419))
+	if (cpus_have_final_cap(ARM64_WORKAROUND_843419)) {
 		/*
 		 * Add some slack so we can skip PLT slots that may trigger
 		 * the erratum due to the placement of the ADRP instruction.
 		 */
 		ret += DIV_ROUND_UP(ret, (SZ_4K / sizeof(struct plt_entry)));
+	}
 
 	return ret;
 }
@@ -272,9 +264,6 @@ static int partition_branch_plt_relas(Elf64_Sym *syms, Elf64_Rela *rela,
 				      int numrels, Elf64_Word dstidx)
 {
 	int i = 0, j = numrels - 1;
-
-	if (!IS_ENABLED(CONFIG_RANDOMIZE_BASE))
-		return 0;
 
 	while (i < j) {
 		if (branch_rela_needs_plt(syms, &rela[i], dstidx))
@@ -343,7 +332,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
 		if (nents)
 			sort(rels, nents, sizeof(Elf64_Rela), cmp_rela, NULL);
 
-		if (!str_has_prefix(secstrings + dstsec->sh_name, ".init"))
+		if (!module_init_layout_section(secstrings + dstsec->sh_name))
 			core_plts += count_plts(syms, rels, numrels,
 						sechdrs[i].sh_info, dstsec);
 		else

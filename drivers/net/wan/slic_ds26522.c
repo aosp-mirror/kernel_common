@@ -28,6 +28,7 @@
 
 static struct spi_device *g_spi;
 
+MODULE_DESCRIPTION("Slic Maxim DS26522 driver");
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Zhao Qiang<B45475@freescale.com>");
 
@@ -211,7 +212,7 @@ static int slic_ds26522_probe(struct spi_device *spi)
 
 	ret = slic_ds26522_init_configure(spi);
 	if (ret == 0)
-		pr_info("DS26522 cs%d configured\n", spi->chip_select);
+		pr_info("DS26522 cs%d configured\n", spi_get_chipselect(spi, 0));
 
 	return ret;
 }

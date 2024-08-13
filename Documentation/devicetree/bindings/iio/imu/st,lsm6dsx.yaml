@@ -35,7 +35,9 @@ properties:
           - st,lsm6dsv
           - st,lsm6dso16is
       - items:
-          - const: st,asm330lhhx
+          - enum:
+              - st,asm330lhhx
+              - st,asm330lhhxg1
           - const: st,lsm6dsr
       - items:
           - const: st,lsm6dstx
@@ -46,6 +48,9 @@ properties:
       - items:
           - const: st,ism330is
           - const: st,lsm6dso16is
+      - items:
+          - const: st,asm330lhb
+          - const: st,asm330lhh
 
   reg:
     maxItems: 1
@@ -63,7 +68,7 @@ properties:
     description: if defined provides VDD IO power to the sensor.
 
   st,drdy-int-pin:
-    $ref: '/schemas/types.yaml#/definitions/uint32'
+    $ref: /schemas/types.yaml#/definitions/uint32
     description: |
       The pin on the package that will be used to signal data ready
     enum:
@@ -90,11 +95,15 @@ properties:
   wakeup-source:
     $ref: /schemas/types.yaml#/definitions/flag
 
+  mount-matrix:
+    description: an optional 3x3 mounting rotation matrix
+
 required:
   - compatible
   - reg
 
 allOf:
+  - $ref: /schemas/iio/iio.yaml#
   - $ref: /schemas/spi/spi-peripheral-props.yaml#
 
 unevaluatedProperties: false

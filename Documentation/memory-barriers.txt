@@ -396,6 +396,11 @@ Memory barriers come in four basic varieties:
 
 
  (2) Address-dependency barriers (historical).
+     [!] This section is marked as HISTORICAL: it covers the long-obsolete
+     smp_read_barrier_depends() macro, the semantics of which are now
+     implicit in all marked accesses.  For more up-to-date information,
+     including how compiler transformations can sometimes break address
+     dependencies, see Documentation/RCU/rcu_dereference.rst.
 
      An address-dependency barrier is a weaker form of read barrier.  In the
      case where two loads are performed such that the second depends on the
@@ -556,6 +561,11 @@ There are certain things that the Linux kernel memory barriers do not guarantee:
 
 ADDRESS-DEPENDENCY BARRIERS (HISTORICAL)
 ----------------------------------------
+[!] This section is marked as HISTORICAL: it covers the long-obsolete
+smp_read_barrier_depends() macro, the semantics of which are now implicit
+in all marked accesses.  For more up-to-date information, including
+how compiler transformations can sometimes break address dependencies,
+see Documentation/RCU/rcu_dereference.rst.
 
 As of v4.15 of the Linux kernel, an smp_mb() was added to READ_ONCE() for
 DEC Alpha, which means that about the only people who need to pay attention
@@ -1910,7 +1920,8 @@ There are some more advanced barrier functions:
 
      These are for use with consistent memory to guarantee the ordering
      of writes or reads of shared memory accessible to both the CPU and a
-     DMA capable device.
+     DMA capable device. See Documentation/core-api/dma-api.rst file for more
+     information about consistent memory.
 
      For example, consider a device driver that shares memory with a device
      and uses a descriptor status value to indicate if the descriptor belongs
@@ -1931,22 +1942,21 @@ There are some more advanced barrier functions:
 		/* assign ownership */
 		desc->status = DEVICE_OWN;
 
-		/* notify device of new descriptors */
+		/* Make descriptor status visible to the device followed by
+		 * notify device of new descriptor
+		 */
 		writel(DESC_NOTIFY, doorbell);
 	}
 
-     The dma_rmb() allows us guarantee the device has released ownership
+     The dma_rmb() allows us to guarantee that the device has released ownership
      before we read the data from the descriptor, and the dma_wmb() allows
      us to guarantee the data is written to the descriptor before the device
      can see it now has ownership.  The dma_mb() implies both a dma_rmb() and
-     a dma_wmb().  Note that, when using writel(), a prior wmb() is not needed
-     to guarantee that the cache coherent memory writes have completed before
-     writing to the MMIO region.  The cheaper writel_relaxed() does not provide
-     this guarantee and must not be used here.
+     a dma_wmb().
 
-     See the subsection "Kernel I/O barrier effects" for more information on
-     relaxed I/O accessors and the Documentation/core-api/dma-api.rst file for
-     more information on consistent memory.
+     Note that the dma_*() barriers do not provide any ordering guarantees for
+     accesses to MMIO regions.  See the later "KERNEL I/O BARRIER EFFECTS"
+     subsection for more information about I/O accessors and MMIO ordering.
 
  (*) pmem_wmb();
 

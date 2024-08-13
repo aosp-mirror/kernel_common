@@ -130,9 +130,9 @@ static int zorro_bus_match(struct device *dev, struct device_driver *drv)
 	return !!zorro_match_device(ids, z);
 }
 
-static int zorro_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int zorro_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	struct zorro_dev *z;
+	const struct zorro_dev *z;
 
 	if (!dev)
 		return -ENODEV;
@@ -150,7 +150,7 @@ static int zorro_uevent(struct device *dev, struct kobj_uevent_env *env)
 	return 0;
 }
 
-struct bus_type zorro_bus_type = {
+const struct bus_type zorro_bus_type = {
 	.name		= "zorro",
 	.dev_name	= "zorro",
 	.dev_groups	= zorro_device_attribute_groups,

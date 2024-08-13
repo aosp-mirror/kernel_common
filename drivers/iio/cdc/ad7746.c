@@ -285,8 +285,7 @@ static int ad7746_select_channel(struct iio_dev *indio_dev,
 		if (ret < 0)
 			return ret;
 
-		if (chip->capdac_set != chan->channel)
-			chip->capdac_set = chan->channel;
+		chip->capdac_set = chan->channel;
 		break;
 	case IIO_VOLTAGE:
 	case IIO_TEMP:
@@ -810,7 +809,7 @@ static struct i2c_driver ad7746_driver = {
 		.name = KBUILD_MODNAME,
 		.of_match_table = ad7746_of_match,
 	},
-	.probe_new = ad7746_probe,
+	.probe = ad7746_probe,
 	.id_table = ad7746_id,
 };
 module_i2c_driver(ad7746_driver);

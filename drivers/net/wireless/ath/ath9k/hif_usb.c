@@ -42,8 +42,6 @@ static const struct usb_device_id ath9k_hif_usb_ids[] = {
 
 	{ USB_DEVICE(0x0cf3, 0x7015),
 	  .driver_info = AR9287_USB },  /* Atheros */
-	{ USB_DEVICE(0x1668, 0x1200),
-	  .driver_info = AR9287_USB },  /* Verizon */
 
 	{ USB_DEVICE(0x0cf3, 0x7010),
 	  .driver_info = AR9280_USB },  /* Atheros */
@@ -72,7 +70,7 @@ static int __hif_usb_tx(struct hif_device_usb *hif_dev);
 
 static void hif_usb_regout_cb(struct urb *urb)
 {
-	struct cmd_buf *cmd = (struct cmd_buf *)urb->context;
+	struct cmd_buf *cmd = urb->context;
 
 	switch (urb->status) {
 	case 0:
@@ -136,7 +134,7 @@ static int hif_usb_send_regout(struct hif_device_usb *hif_dev,
 
 static void hif_usb_mgmt_cb(struct urb *urb)
 {
-	struct cmd_buf *cmd = (struct cmd_buf *)urb->context;
+	struct cmd_buf *cmd = urb->context;
 	struct hif_device_usb *hif_dev;
 	unsigned long flags;
 	bool txok = true;
@@ -254,7 +252,7 @@ static inline void ath9k_skb_queue_complete(struct hif_device_usb *hif_dev,
 
 static void hif_usb_tx_cb(struct urb *urb)
 {
-	struct tx_buf *tx_buf = (struct tx_buf *) urb->context;
+	struct tx_buf *tx_buf = urb->context;
 	struct hif_device_usb *hif_dev;
 	bool txok = true;
 
@@ -534,6 +532,24 @@ static struct ath9k_htc_hif hif_usb = {
 	.send = hif_usb_send,
 };
 
+/* Need to free remain_skb allocated in ath9k_hif_usb_rx_stream
+ * in case ath9k_hif_usb_rx_stream wasn't called next time to
+ * process the buffer and subsequently free it.
+ */
+static void ath9k_hif_usb_free_rx_remain_skb(struct hif_device_usb *hif_dev)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&hif_dev->rx_lock, flags);
+	if (hif_dev->remain_skb) {
+		dev_kfree_skb_any(hif_dev->remain_skb);
+		hif_dev->remain_skb = NULL;
+		hif_dev->rx_remain_len = 0;
+		RX_STAT_INC(hif_dev, skb_dropped);
+	}
+	spin_unlock_irqrestore(&hif_dev->rx_lock, flags);
+}
+
 static void ath9k_hif_usb_rx_stream(struct hif_device_usb *hif_dev,
 				    struct sk_buff *skb)
 {
@@ -671,7 +687,7 @@ invalid_pkt:
 
 static void ath9k_hif_usb_rx_cb(struct urb *urb)
 {
-	struct rx_buf *rx_buf = (struct rx_buf *)urb->context;
+	struct rx_buf *rx_buf = urb->context;
 	struct hif_device_usb *hif_dev = rx_buf->hif_dev;
 	struct sk_buff *skb = rx_buf->skb;
 	int ret;
@@ -718,7 +734,7 @@ free:
 
 static void ath9k_hif_usb_reg_in_cb(struct urb *urb)
 {
-	struct rx_buf *rx_buf = (struct rx_buf *)urb->context;
+	struct rx_buf *rx_buf = urb->context;
 	struct hif_device_usb *hif_dev = rx_buf->hif_dev;
 	struct sk_buff *skb = rx_buf->skb;
 	int ret;
@@ -868,6 +884,7 @@ err:
 static void ath9k_hif_usb_dealloc_rx_urbs(struct hif_device_usb *hif_dev)
 {
 	usb_kill_anchored_urbs(&hif_dev->rx_submitted);
+	ath9k_hif_usb_free_rx_remain_skb(hif_dev);
 }
 
 static int ath9k_hif_usb_alloc_rx_urbs(struct hif_device_usb *hif_dev)
@@ -1415,7 +1432,7 @@ static void ath9k_hif_usb_disconnect(struct usb_interface *interface)
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
 	struct hif_device_usb *hif_dev = usb_get_intfdata(interface);
-	bool unplugged = (udev->state == USB_STATE_NOTATTACHED) ? true : false;
+	bool unplugged = udev->state == USB_STATE_NOTATTACHED;
 
 	if (!hif_dev)
 		return;
@@ -1464,30 +1481,30 @@ static int ath9k_hif_usb_resume(struct usb_interface *interface)
 {
 	struct hif_device_usb *hif_dev = usb_get_intfdata(interface);
 	struct htc_target *htc_handle = hif_dev->htc_handle;
-	int ret;
 	const struct firmware *fw;
+	int ret;
 
 	ret = ath9k_hif_usb_alloc_urbs(hif_dev);
 	if (ret)
 		return ret;
 
-	if (hif_dev->flags & HIF_USB_READY) {
-		/* request cached firmware during suspend/resume cycle */
-		ret = request_firmware(&fw, hif_dev->fw_name,
-				       &hif_dev->udev->dev);
-		if (ret)
-			goto fail_resume;
-
-		hif_dev->fw_data = fw->data;
-		hif_dev->fw_size = fw->size;
-		ret = ath9k_hif_usb_download_fw(hif_dev);
-		release_firmware(fw);
-		if (ret)
-			goto fail_resume;
-	} else {
-		ath9k_hif_usb_dealloc_urbs(hif_dev);
-		return -EIO;
+	if (!(hif_dev->flags & HIF_USB_READY)) {
+		ret = -EIO;
+		goto fail_resume;
 	}
+
+	/* request cached firmware during suspend/resume cycle */
+	ret = request_firmware(&fw, hif_dev->fw_name,
+			       &hif_dev->udev->dev);
+	if (ret)
+		goto fail_resume;
+
+	hif_dev->fw_data = fw->data;
+	hif_dev->fw_size = fw->size;
+	ret = ath9k_hif_usb_download_fw(hif_dev);
+	release_firmware(fw);
+	if (ret)
+		goto fail_resume;
 
 	mdelay(100);
 

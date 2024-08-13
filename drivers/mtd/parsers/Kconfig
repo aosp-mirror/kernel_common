@@ -1,9 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0-only
-config MTD_AR7_PARTS
-	tristate "TI AR7 partitioning parser"
-	help
-	  TI AR7 partitioning parser support
-
 config MTD_BCM47XX_PARTS
 	tristate "BCM47XX partitioning parser"
 	depends on BCM47XX || ARCH_BCM_5301X
@@ -149,7 +144,7 @@ config MTD_PARSER_TRX
 
 config MTD_SHARPSL_PARTS
 	tristate "Sharp SL Series NAND flash partition parser"
-	depends on MTD_NAND_SHARPSL || MTD_NAND_TMIO || COMPILE_TEST
+	depends on MTD_NAND_SHARPSL || COMPILE_TEST
 	help
 	  This provides the read-only FTL logic necessary to read the partition
 	  table from the NAND flash of Sharp SL Series (Zaurus) and the MTD

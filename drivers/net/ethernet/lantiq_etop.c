@@ -217,9 +217,9 @@ ltq_etop_free_channel(struct net_device *dev, struct ltq_etop_chan *ch)
 	if (ch->dma.irq)
 		free_irq(ch->dma.irq, priv);
 	if (IS_RX(ch->idx)) {
-		int desc;
+		struct ltq_dma_channel *dma = &ch->dma;
 
-		for (desc = 0; desc < LTQ_DESC_NUM; desc++)
+		for (dma->desc = 0; dma->desc < LTQ_DESC_NUM; dma->desc++)
 			dev_kfree_skb_any(ch->skb[ch->dma.desc]);
 	}
 }
@@ -519,7 +519,7 @@ ltq_etop_change_mtu(struct net_device *dev, int new_mtu)
 	struct ltq_etop_priv *priv = netdev_priv(dev);
 	unsigned long flags;
 
-	dev->mtu = new_mtu;
+	WRITE_ONCE(dev->mtu, new_mtu);
 
 	spin_lock_irqsave(&priv->lock, flags);
 	ltq_etop_w32((ETOP_PLEN_UNDER << 16) | new_mtu, LTQ_ETOP_IGPLEN);
@@ -721,8 +721,7 @@ err_out:
 	return err;
 }
 
-static int
-ltq_etop_remove(struct platform_device *pdev)
+static void ltq_etop_remove(struct platform_device *pdev)
 {
 	struct net_device *dev = platform_get_drvdata(pdev);
 
@@ -732,11 +731,10 @@ ltq_etop_remove(struct platform_device *pdev)
 		ltq_etop_mdio_cleanup(dev);
 		unregister_netdev(dev);
 	}
-	return 0;
 }
 
 static struct platform_driver ltq_mii_driver = {
-	.remove = ltq_etop_remove,
+	.remove_new = ltq_etop_remove,
 	.driver = {
 		.name = "ltq_etop",
 	},

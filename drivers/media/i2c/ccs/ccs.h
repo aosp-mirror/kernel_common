@@ -13,6 +13,7 @@
 #define __CCS_H__
 
 #include <linux/mutex.h>
+#include <linux/regmap.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-subdev.h>
 
@@ -57,17 +58,6 @@
 #define CCS_LIM_AT(sensor, limit, offset)	\
 	ccs_get_limit(sensor, CCS_L_##limit, CCS_L_##limit##_OFFSET(offset))
 
-/*
- * Sometimes due to board layout considerations the camera module can be
- * mounted rotated. The typical rotation used is 180 degrees which can be
- * corrected by giving a default H-FLIP and V-FLIP in the sensor readout.
- * FIXME: rotation also changes the bayer pattern.
- */
-enum ccs_module_board_orient {
-	CCS_MODULE_BOARD_ORIENT_0 = 0,
-	CCS_MODULE_BOARD_ORIENT_180,
-};
-
 struct ccs_flash_strobe_parms {
 	u8 mode;
 	u32 strobe_width_high_us;
@@ -89,8 +79,6 @@ struct ccs_hwconfig {
 	unsigned int lanes;		/* Number of CSI-2 lanes */
 	u32 csi_signalling_mode;	/* CCS_CSI_SIGNALLING_MODE_* */
 	u64 *op_sys_clock;
-
-	enum ccs_module_board_orient module_board_orient;
 
 	struct ccs_flash_strobe_parms *strobe_setup;
 };
@@ -195,9 +183,6 @@ struct ccs_binning_subtype {
 struct ccs_subdev {
 	struct v4l2_subdev sd;
 	struct media_pad pads[CCS_PADS];
-	struct v4l2_rect sink_fmt;
-	struct v4l2_rect crop[CCS_PADS];
-	struct v4l2_rect compose; /* compose on sink */
 	unsigned short sink_pad;
 	unsigned short source_pad;
 	int npads;
@@ -227,12 +212,14 @@ struct ccs_sensor {
 	struct clk *ext_clk;
 	struct gpio_desc *xshutdown;
 	struct gpio_desc *reset;
+	struct regmap *regmap;
 	void *ccs_limits;
 	u8 nbinning_subtypes;
 	struct ccs_binning_subtype binning_subtypes[CCS_LIM_BINNING_SUB_TYPE_MAX_N + 1];
 	u32 mbus_frame_fmts;
 	const struct ccs_csi_data_format *csi_format;
 	const struct ccs_csi_data_format *internal_csi_format;
+	struct v4l2_rect pa_src, scaler_sink, src_src;
 	u32 default_mbus_frame_fmts;
 	int default_pixel_order;
 	struct ccs_data_container sdata, mdata;
@@ -243,7 +230,6 @@ struct ccs_sensor {
 	u8 scale_m;
 	u8 scaling_mode;
 
-	u8 hvflip_inv_mask; /* H/VFLIP inversion due to sensor orientation */
 	u8 frame_skip;
 	u16 embedded_start; /* embedded data start line */
 	u16 embedded_end;
@@ -252,6 +238,7 @@ struct ccs_sensor {
 
 	bool streaming;
 	bool dev_init_done;
+	bool handler_setup_needed;
 	u8 compressed_min_bpp;
 
 	struct ccs_module_info minfo;

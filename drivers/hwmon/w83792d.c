@@ -296,7 +296,7 @@ static void w83792d_print_debug(struct w83792d_data *data, struct device *dev);
 static void w83792d_init_client(struct i2c_client *client);
 
 static const struct i2c_device_id w83792d_id[] = {
-	{ "w83792d", 0 },
+	{ "w83792d" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, w83792d_id);
@@ -306,7 +306,7 @@ static struct i2c_driver w83792d_driver = {
 	.driver = {
 		.name = "w83792d",
 	},
-	.probe_new	= w83792d_probe,
+	.probe		= w83792d_probe,
 	.remove		= w83792d_remove,
 	.id_table	= w83792d_id,
 	.detect		= w83792d_detect,

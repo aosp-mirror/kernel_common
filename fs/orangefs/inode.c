@@ -56,7 +56,6 @@ static int orangefs_writepage_locked(struct page *page,
 	ret = wait_for_direct_io(ORANGEFS_IO_WRITE, inode, &off, &iter, wlen,
 	    len, wr, NULL, NULL);
 	if (ret < 0) {
-		SetPageError(page);
 		mapping_set_error(page->mapping, ret);
 	} else {
 		ret = 0;
@@ -119,7 +118,6 @@ static int orangefs_writepages_work(struct orangefs_writepages *ow,
 	    0, &wr, NULL, NULL);
 	if (ret < 0) {
 		for (i = 0; i < ow->npages; i++) {
-			SetPageError(ow->pages[i]);
 			mapping_set_error(ow->pages[i]->mapping, ret);
 			if (PagePrivate(ow->pages[i])) {
 				wrp = (struct orangefs_write_range *)
@@ -148,21 +146,20 @@ static int orangefs_writepages_work(struct orangefs_writepages *ow,
 	return ret;
 }
 
-static int orangefs_writepages_callback(struct page *page,
-    struct writeback_control *wbc, void *data)
+static int orangefs_writepages_callback(struct folio *folio,
+		struct writeback_control *wbc, void *data)
 {
 	struct orangefs_writepages *ow = data;
-	struct orangefs_write_range *wr;
+	struct orangefs_write_range *wr = folio->private;
 	int ret;
 
-	if (!PagePrivate(page)) {
-		unlock_page(page);
+	if (!wr) {
+		folio_unlock(folio);
 		/* It's not private so there's nothing to write, right? */
 		printk("writepages_callback not private!\n");
 		BUG();
 		return 0;
 	}
-	wr = (struct orangefs_write_range *)page_private(page);
 
 	ret = -1;
 	if (ow->npages == 0) {
@@ -170,7 +167,7 @@ static int orangefs_writepages_callback(struct page *page,
 		ow->len = wr->len;
 		ow->uid = wr->uid;
 		ow->gid = wr->gid;
-		ow->pages[ow->npages++] = page;
+		ow->pages[ow->npages++] = &folio->page;
 		ret = 0;
 		goto done;
 	}
@@ -182,7 +179,7 @@ static int orangefs_writepages_callback(struct page *page,
 	}
 	if (ow->off + ow->len == wr->pos) {
 		ow->len += wr->len;
-		ow->pages[ow->npages++] = page;
+		ow->pages[ow->npages++] = &folio->page;
 		ret = 0;
 		goto done;
 	}
@@ -192,10 +189,10 @@ done:
 			orangefs_writepages_work(ow, wbc);
 			ow->npages = 0;
 		}
-		ret = orangefs_writepage_locked(page, wbc);
-		mapping_set_error(page->mapping, ret);
-		unlock_page(page);
-		end_page_writeback(page);
+		ret = orangefs_writepage_locked(&folio->page, wbc);
+		mapping_set_error(folio->mapping, ret);
+		folio_unlock(folio);
+		folio_end_writeback(folio);
 	} else {
 		if (ow->npages == ow->maxpages) {
 			orangefs_writepages_work(ow, wbc);
@@ -245,7 +242,7 @@ static void orangefs_readahead(struct readahead_control *rac)
 	struct iov_iter iter;
 	struct inode *inode = rac->mapping->host;
 	struct xarray *i_pages;
-	struct page *page;
+	struct folio *folio;
 	loff_t new_start = readahead_pos(rac);
 	int ret;
 	size_t new_len = 0;
@@ -276,9 +273,10 @@ static void orangefs_readahead(struct readahead_control *rac)
 		ret = 0;
 
 	/* clean up. */
-	while ((page = readahead_page(rac))) {
-		page_endio(page, false, ret);
-		put_page(page);
+	while ((folio = readahead_folio(rac))) {
+		if (!ret)
+			folio_mark_uptodate(folio);
+		folio_unlock(folio);
 	}
 }
 
@@ -303,15 +301,10 @@ static int orangefs_read_folio(struct file *file, struct folio *folio)
 	iov_iter_zero(~0U, &iter);
 	/* takes care of potential aliasing */
 	flush_dcache_folio(folio);
-	if (ret < 0) {
-		folio_set_error(folio);
-	} else {
-		folio_mark_uptodate(folio);
+	if (ret > 0)
 		ret = 0;
-	}
-	/* unlock the folio after the ->read_folio() routine completes */
-	folio_unlock(folio);
-        return ret;
+	folio_end_read(folio, ret == 0);
+	return ret;
 }
 
 static int orangefs_write_begin(struct file *file,
@@ -871,7 +864,7 @@ int orangefs_getattr(struct mnt_idmap *idmap, const struct path *path,
 	ret = orangefs_inode_getattr(inode,
 	    request_mask & STATX_SIZE ? ORANGEFS_GETATTR_SIZE : 0);
 	if (ret == 0) {
-		generic_fillattr(&nop_mnt_idmap, inode, stat);
+		generic_fillattr(&nop_mnt_idmap, request_mask, inode, stat);
 
 		/* override block size reported to stat */
 		if (!(request_mask & STATX_SIZE))
@@ -900,12 +893,13 @@ int orangefs_permission(struct mnt_idmap *idmap,
 	return generic_permission(&nop_mnt_idmap, inode, mask);
 }
 
-int orangefs_update_time(struct inode *inode, struct timespec64 *time, int flags)
+int orangefs_update_time(struct inode *inode, int flags)
 {
 	struct iattr iattr;
+
 	gossip_debug(GOSSIP_INODE_DEBUG, "orangefs_update_time: %pU\n",
 	    get_khandle_from_ino(inode));
-	generic_update_time(inode, time, flags);
+	flags = generic_update_time(inode, flags);
 	memset(&iattr, 0, sizeof iattr);
         if (flags & S_ATIME)
 		iattr.ia_valid |= ATTR_ATIME;

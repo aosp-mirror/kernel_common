@@ -1546,7 +1546,7 @@ err:
 }
 
 static const struct i2c_device_id da732x_i2c_id[] = {
-	{ "da7320", 0},
+	{ "da7320"},
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, da732x_i2c_id);
@@ -1555,7 +1555,7 @@ static struct i2c_driver da732x_i2c_driver = {
 	.driver		= {
 		.name	= "da7320",
 	},
-	.probe_new	= da732x_i2c_probe,
+	.probe		= da732x_i2c_probe,
 	.id_table	= da732x_i2c_id,
 };
 

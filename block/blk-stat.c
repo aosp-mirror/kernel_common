@@ -6,7 +6,6 @@
  */
 #include <linux/kernel.h>
 #include <linux/rculist.h>
-#include <linux/blk-mq.h>
 
 #include "blk-stat.h"
 #include "blk-mq.h"
@@ -28,7 +27,7 @@ void blk_rq_stat_init(struct blk_rq_stat *stat)
 /* src is a per-cpu stat, mean isn't initialized */
 void blk_rq_stat_sum(struct blk_rq_stat *dst, struct blk_rq_stat *src)
 {
-	if (!src->nr_samples)
+	if (dst->nr_samples + src->nr_samples <= dst->nr_samples)
 		return;
 
 	dst->min = min(dst->min, src->min);
@@ -57,9 +56,6 @@ void blk_stat_add(struct request *rq, u64 now)
 	u64 value;
 
 	value = (now >= rq->io_start_time_ns) ? now - rq->io_start_time_ns : 0;
-
-	if (req_op(rq) == REQ_OP_READ || req_op(rq) == REQ_OP_WRITE)
-		blk_throtl_stat_add(rq, value);
 
 	rcu_read_lock();
 	cpu = get_cpu();
@@ -190,7 +186,7 @@ void blk_stat_disable_accounting(struct request_queue *q)
 	unsigned long flags;
 
 	spin_lock_irqsave(&q->stats->lock, flags);
-	if (!--q->stats->accounting)
+	if (!--q->stats->accounting && list_empty(&q->stats->callbacks))
 		blk_queue_flag_clear(QUEUE_FLAG_STATS, q);
 	spin_unlock_irqrestore(&q->stats->lock, flags);
 }
@@ -201,7 +197,7 @@ void blk_stat_enable_accounting(struct request_queue *q)
 	unsigned long flags;
 
 	spin_lock_irqsave(&q->stats->lock, flags);
-	if (!q->stats->accounting++)
+	if (!q->stats->accounting++ && list_empty(&q->stats->callbacks))
 		blk_queue_flag_set(QUEUE_FLAG_STATS, q);
 	spin_unlock_irqrestore(&q->stats->lock, flags);
 }
@@ -230,22 +226,4 @@ void blk_free_queue_stats(struct blk_queue_stats *stats)
 	WARN_ON(!list_empty(&stats->callbacks));
 
 	kfree(stats);
-}
-
-bool blk_stats_alloc_enable(struct request_queue *q)
-{
-	struct blk_rq_stat *poll_stat;
-
-	poll_stat = kcalloc(BLK_MQ_POLL_STATS_BKTS, sizeof(*poll_stat),
-				GFP_ATOMIC);
-	if (!poll_stat)
-		return false;
-
-	if (cmpxchg(&q->poll_stat, NULL, poll_stat) != NULL) {
-		kfree(poll_stat);
-		return true;
-	}
-
-	blk_stat_add_callback(q, q->poll_cb);
-	return false;
 }

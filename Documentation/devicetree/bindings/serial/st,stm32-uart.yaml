@@ -35,8 +35,6 @@ properties:
     description: enable hardware flow control (deprecated)
     $ref: /schemas/types.yaml#/definitions/flag
 
-  uart-has-rtscts: true
-
   rx-tx-swap: true
 
   dmas:
@@ -60,10 +58,8 @@ properties:
 
   wakeup-source: true
 
-  rs485-rts-delay: true
-  rs485-rts-active-low: true
-  linux,rs485-enabled-at-boot-time: true
-  rs485-rx-during-tx: true
+  power-domains:
+    maxItems: 1
 
   rx-threshold:
     description:
@@ -76,6 +72,10 @@ properties:
       If value is set to 1, TX FIFO threshold is disabled.
     enum: [1, 2, 4, 8, 12, 14, 16]
     default: 8
+
+  access-controllers:
+    minItems: 1
+    maxItems: 2
 
 allOf:
   - $ref: rs485.yaml#

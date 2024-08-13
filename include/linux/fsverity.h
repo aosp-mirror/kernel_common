@@ -143,8 +143,8 @@ int fsverity_ioctl_enable(struct file *filp, const void __user *arg);
 
 int fsverity_ioctl_measure(struct file *filp, void __user *arg);
 int fsverity_get_digest(struct inode *inode,
-			u8 digest[FS_VERITY_MAX_DIGEST_SIZE],
-			enum hash_algo *alg);
+			u8 raw_digest[FS_VERITY_MAX_DIGEST_SIZE],
+			u8 *alg, enum hash_algo *halg);
 
 /* open.c */
 
@@ -197,10 +197,14 @@ static inline int fsverity_ioctl_measure(struct file *filp, void __user *arg)
 }
 
 static inline int fsverity_get_digest(struct inode *inode,
-				      u8 digest[FS_VERITY_MAX_DIGEST_SIZE],
-				      enum hash_algo *alg)
+				      u8 raw_digest[FS_VERITY_MAX_DIGEST_SIZE],
+				      u8 *alg, enum hash_algo *halg)
 {
-	return -EOPNOTSUPP;
+	/*
+	 * fsverity is not enabled in the kernel configuration, so always report
+	 * that the file doesn't have fsverity enabled (digest size 0).
+	 */
+	return 0;
 }
 
 /* open.c */
@@ -233,18 +237,18 @@ static inline int fsverity_ioctl_read_metadata(struct file *filp,
 static inline bool fsverity_verify_blocks(struct folio *folio, size_t len,
 					  size_t offset)
 {
-	WARN_ON(1);
+	WARN_ON_ONCE(1);
 	return false;
 }
 
 static inline void fsverity_verify_bio(struct bio *bio)
 {
-	WARN_ON(1);
+	WARN_ON_ONCE(1);
 }
 
 static inline void fsverity_enqueue_verify_work(struct work_struct *work)
 {
-	WARN_ON(1);
+	WARN_ON_ONCE(1);
 }
 
 #endif	/* !CONFIG_FS_VERITY */
@@ -314,19 +318,5 @@ static inline int fsverity_prepare_setattr(struct dentry *dentry,
 		return __fsverity_prepare_setattr(dentry, attr);
 	return 0;
 }
-
-#ifdef CONFIG_FS_VERITY_BUILTIN_SIGNATURES
-int __fsverity_verify_signature(const struct inode *inode, const u8 *signature,
-				size_t sig_size, const u8 *file_digest,
-				unsigned int digest_algorithm);
-#else /* !CONFIG_FS_VERITY_BUILTIN_SIGNATURES */
-static inline int __fsverity_verify_signature(const struct inode *inode,
-				const u8 *signature, size_t sig_size,
-				const u8 *file_digest,
-				unsigned int digest_algorithm)
-{
-	return 0;
-}
-#endif /* !CONFIG_FS_VERITY_BUILTIN_SIGNATURES */
 
 #endif	/* _LINUX_FSVERITY_H */

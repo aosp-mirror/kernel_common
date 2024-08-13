@@ -51,8 +51,8 @@ static int led_pwm_mc_set(struct led_classdev *cdev,
 
 		priv->leds[i].state.duty_cycle = duty;
 		priv->leds[i].state.enabled = duty > 0;
-		ret = pwm_apply_state(priv->leds[i].pwm,
-				      &priv->leds[i].state);
+		ret = pwm_apply_might_sleep(priv->leds[i].pwm,
+					    &priv->leds[i].state);
 		if (ret)
 			break;
 	}
@@ -158,8 +158,8 @@ static int led_pwm_mc_probe(struct platform_device *pdev)
 	ret = led_pwm_mc_set(cdev, cdev->brightness);
 	if (ret)
 		return dev_err_probe(&pdev->dev, ret,
-				     "failed to set led PWM value for %s: %d",
-				     cdev->name, ret);
+				     "failed to set led PWM value for %s\n",
+				     cdev->name);
 
 	platform_set_drvdata(pdev, priv);
 	return 0;

@@ -172,7 +172,7 @@ static int __sigp_set_prefix(struct kvm_vcpu *vcpu, struct kvm_vcpu *dst_vcpu,
 	 * first page, since address is 8k aligned and memory pieces are always
 	 * at least 1MB aligned and have at least a size of 1MB.
 	 */
-	if (kvm_is_error_gpa(vcpu->kvm, irq.u.prefix.address)) {
+	if (!kvm_is_gpa_in_memslot(vcpu->kvm, irq.u.prefix.address)) {
 		*reg &= 0xffffffff00000000UL;
 		*reg |= SIGP_STATUS_INVALID_PARAMETER;
 		return SIGP_CC_STATUS_STORED;
@@ -469,7 +469,7 @@ int kvm_s390_handle_sigp(struct kvm_vcpu *vcpu)
  *
  * This interception will occur at the source cpu when a source cpu sends an
  * external call to a target cpu and the target cpu has the WAIT bit set in
- * its cpuflags. Interception will occurr after the interrupt indicator bits at
+ * its cpuflags. Interception will occur after the interrupt indicator bits at
  * the target cpu have been set. All error cases will lead to instruction
  * interception, therefore nothing is to be checked or prepared.
  */

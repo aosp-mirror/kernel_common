@@ -85,7 +85,7 @@ xlog_add_buffer_cancelled(
 		return false;
 	}
 
-	bcp = kmem_alloc(sizeof(struct xfs_buf_cancel), 0);
+	bcp = kmalloc(sizeof(struct xfs_buf_cancel), GFP_KERNEL | __GFP_NOFAIL);
 	bcp->bc_blkno = blkno;
 	bcp->bc_len = len;
 	bcp->bc_refcount = 1;
@@ -129,7 +129,7 @@ xlog_put_buffer_cancelled(
 
 	if (--bcp->bc_refcount == 0) {
 		list_del(&bcp->bc_list);
-		kmem_free(bcp);
+		kfree(bcp);
 	}
 	return true;
 }
@@ -943,6 +943,16 @@ xlog_recover_buf_commit_pass2(
 	if (lsn && lsn != -1 && XFS_LSN_CMP(lsn, current_lsn) >= 0) {
 		trace_xfs_log_recover_buf_skip(log, buf_f);
 		xlog_recover_validate_buf_type(mp, bp, buf_f, NULLCOMMITLSN);
+
+		/*
+		 * We're skipping replay of this buffer log item due to the log
+		 * item LSN being behind the ondisk buffer.  Verify the buffer
+		 * contents since we aren't going to run the write verifier.
+		 */
+		if (bp->b_ops) {
+			bp->b_ops->verify_read(bp);
+			error = bp->b_error;
+		}
 		goto out_release;
 	}
 
@@ -1052,10 +1062,10 @@ xlog_free_buf_cancel_table(
 				&log->l_buf_cancel_table[i],
 				struct xfs_buf_cancel, bc_list))) {
 			list_del(&bc->bc_list);
-			kmem_free(bc);
+			kfree(bc);
 		}
 	}
 
-	kmem_free(log->l_buf_cancel_table);
+	kfree(log->l_buf_cancel_table);
 	log->l_buf_cancel_table = NULL;
 }

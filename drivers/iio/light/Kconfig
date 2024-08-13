@@ -73,6 +73,18 @@ config APDS9300
 	  To compile this driver as a module, choose M here: the
 	  module will be called apds9300.
 
+config APDS9306
+	tristate "Avago APDS9306 Ambient Light Sensor"
+	depends on I2C
+	select REGMAP_I2C
+	select IIO_GTS_HELPER
+	help
+	  If you say Y or M here, you get support for Avago APDS9306
+	  Ambient Light Sensor.
+
+	  If built as a dynamically linked module, it will be called
+	  apds9306.
+
 config APDS9960
 	tristate "Avago APDS9960 gesture/RGB/ALS/proximity sensor"
 	select REGMAP_I2C
@@ -87,13 +99,14 @@ config APDS9960
 	  module will be called apds9960
 
 config AS73211
-	tristate "AMS AS73211 XYZ color sensor"
+	tristate "AMS AS73211 XYZ color sensor and AMS AS7331 UV sensor"
 	depends on I2C
 	select IIO_BUFFER
 	select IIO_TRIGGERED_BUFFER
 	help
 	 If you say yes here you get support for the AMS AS73211
-	 JENCOLOR(R) Digital XYZ Sensor.
+	 JENCOLOR(R) Digital XYZ and the AMS AS7331 UVA, UVB and UVC
+	 ultraviolet sensors.
 
 	 For triggered measurements, you will need an additional trigger driver
 	 like IIO_HRTIMER_TRIGGER or IIO_SYSFS_TRIGGER.
@@ -252,6 +265,21 @@ config ISL29125
 	  To compile this driver as a module, choose M here: the module will be
 	  called isl29125.
 
+config ISL76682
+	tristate "Intersil ISL76682 Light Sensor"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  Say Y here if you want to build a driver for the Intersil ISL76682
+	  Ambient Light Sensor and IR Intensity sensor. This driver provides
+	  the readouts via standard IIO sysfs and device interface. Both ALS
+	  illuminance and IR illuminance are provided raw with separate scale
+	  setting which can be configured via sysfs, the default scale is 1000
+	  lux, other options are 4000/16000/64000 lux.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called isl76682.
+
 config HID_SENSOR_ALS
 	depends on HID_SENSOR_HUB
 	select IIO_BUFFER
@@ -289,6 +317,34 @@ config JSA1212
 	  To compile this driver as a module, choose M here:
 	  the module will be called jsa1212.
 
+config ROHM_BU27008
+	tristate "ROHM BU27008 color (RGB+C/IR) sensor"
+	depends on I2C
+	select REGMAP_I2C
+	select IIO_GTS_HELPER
+	help
+	  Enable support for the ROHM BU27008 color sensor.
+	  The ROHM BU27008 is a sensor with 5 photodiodes (red, green,
+	  blue, clear and IR) with four configurable channels. Red and
+	  green being always available and two out of the rest three
+	  (blue, clear, IR) can be selected to be simultaneously measured.
+	  Typical application is adjusting LCD backlight of TVs,
+	  mobile phones and tablet PCs.
+
+config ROHM_BU27034
+	tristate "ROHM BU27034 ambient light sensor"
+	depends on I2C
+	select REGMAP_I2C
+	select IIO_GTS_HELPER
+	select IIO_BUFFER
+	select IIO_KFIFO_BUF
+	help
+	  Enable support for the ROHM BU27034 ambient light sensor. ROHM BU27034
+	  is an ambient light sesnor with 3 channels and 3 photo diodes capable
+	  of detecting a very wide range of illuminance.
+	  Typical application is adjusting LCD and backlight power of TVs and
+	  mobile phones.
+
 config RPR0521
 	tristate "ROHM RPR0521 ALS and proximity sensor driver"
 	depends on I2C
@@ -318,6 +374,17 @@ config SENSORS_LM3533
 	  light zone through sysfs. A threshold event can be generated on zone
 	  changes. The ALS-control output values can be set per zone for the
 	  three current output channels.
+
+config LTR390
+	tristate "LTR-390UV-01 ambient light and UV sensor"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  If you say yes here you get support for the Lite-On LTR-390UV-01
+	  ambient light and UV sensor.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called ltr390.
 
 config LTR501
 	tristate "LTR-501ALS-01 light sensor"
@@ -398,6 +465,17 @@ config OPT3001
 
 	  If built as a dynamically linked module, it will be called
 	  opt3001.
+
+config OPT4001
+	tristate "Texas Instruments OPT4001 Light Sensor"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  If you say Y or M here, you get support for Texas Instruments
+	  OPT4001 Ambient Light Sensor.
+
+	  If built as a dynamically linked module, it will be called
+	  opt4001.
 
 config PA12203001
 	tristate "TXC PA12203001 light and proximity sensor"
@@ -597,6 +675,17 @@ config VEML6070
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called veml6070.
+
+config VEML6075
+	tristate "VEML6075 UVA and UVB light sensor"
+	select REGMAP_I2C
+	depends on I2C
+	help
+	  Say Y here if you want to build a driver for the Vishay VEML6075 UVA
+	  and UVB light sensor.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called veml6075.
 
 config VL6180
 	tristate "VL6180 ALS, range and proximity sensor"

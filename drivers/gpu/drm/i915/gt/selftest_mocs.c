@@ -131,13 +131,14 @@ static int read_mocs_table(struct i915_request *rq,
 			   const struct drm_i915_mocs_table *table,
 			   u32 *offset)
 {
+	struct intel_gt *gt = rq->engine->gt;
 	u32 addr;
 
 	if (!table)
 		return 0;
 
-	if (HAS_GLOBAL_MOCS_REGISTERS(rq->engine->i915))
-		addr = global_mocs_offset();
+	if (HAS_GLOBAL_MOCS_REGISTERS(rq->i915))
+		addr = global_mocs_offset() + gt->uncore->gsi_offset;
 	else
 		addr = mocs_offset(rq->engine);
 
@@ -228,9 +229,7 @@ static int check_mocs_engine(struct live_mocs *arg,
 	if (IS_ERR(rq))
 		return PTR_ERR(rq);
 
-	i915_vma_lock(vma);
-	err = i915_vma_move_to_active(vma, rq, EXEC_OBJECT_WRITE);
-	i915_vma_unlock(vma);
+	err = igt_vma_move_to_active_unlocked(vma, rq, EXEC_OBJECT_WRITE);
 
 	/* Read the mocs tables back using SRM */
 	offset = i915_ggtt_offset(vma);

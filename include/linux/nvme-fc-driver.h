@@ -185,7 +185,6 @@ enum nvmefc_fcp_datadir {
  * @first_sgl: memory for 1st scatter/gather list segment for payload data
  * @sg_cnt:    number of elements in the scatter/gather list
  * @io_dir:    direction of the FCP request (see NVMEFC_FCP_xxx)
- * @sqid:      The nvme SQID the command is being issued on
  * @done:      The callback routine the LLDD is to invoke upon completion of
  *             the FCP operation. req argument is the pointer to the original
  *             FCP IO operation.
@@ -194,12 +193,13 @@ enum nvmefc_fcp_datadir {
  *             while processing the operation. The length of the buffer
  *             corresponds to the fcprqst_priv_sz value specified in the
  *             nvme_fc_port_template supplied by the LLDD.
+ * @sqid:      The nvme SQID the command is being issued on
  *
  * Values set by the LLDD indicating completion status of the FCP operation.
  * Must be set prior to calling the done() callback.
+ * @rcv_rsplen: length, in bytes, of the FCP RSP IU received.
  * @transferred_length: amount of payload data, in bytes, that were
  *             transferred. Should equal payload_length on success.
- * @rcv_rsplen: length, in bytes, of the FCP RSP IU received.
  * @status:    Completion status of the FCP operation. must be 0 upon success,
  *             negative errno value upon failure (ex: -EIO). Note: this is
  *             NOT a reflection of the NVME CQE completion status. Only the
@@ -219,14 +219,14 @@ struct nvmefc_fcp_req {
 	int			sg_cnt;
 	enum nvmefc_fcp_datadir	io_dir;
 
-	__le16			sqid;
-
 	void (*done)(struct nvmefc_fcp_req *req);
 
 	void			*private;
 
-	u32			transferred_length;
+	__le16			sqid;
+
 	u16			rcv_rsplen;
+	u32			transferred_length;
 	u32			status;
 } __aligned(sizeof(u64));	/* alignment for other things alloc'd with */
 
@@ -920,6 +920,9 @@ struct nvmet_fc_target_port {
  *       further references to hosthandle.
  *       Entrypoint is Mandatory if the lldd calls nvmet_fc_invalidate_host().
  *
+ * @host_traddr: called by the transport to retrieve the node name and
+ *       port name of the host port address.
+ *
  * @max_hw_queues:  indicates the maximum number of hw queues the LLDD
  *       supports for cpu affinitization.
  *       Value is Mandatory. Must be at least 1.
@@ -975,6 +978,7 @@ struct nvmet_fc_target_template {
 	void (*ls_abort)(struct nvmet_fc_target_port *targetport,
 				void *hosthandle, struct nvmefc_ls_req *lsreq);
 	void (*host_release)(void *hosthandle);
+	int (*host_traddr)(void *hosthandle, u64 *wwnn, u64 *wwpn);
 
 	u32	max_hw_queues;
 	u16	max_sgl_segments;

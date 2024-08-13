@@ -21,13 +21,13 @@
 #include <linux/ioport.h>
 #include <linux/serial_core.h>
 #include <linux/serial_s3c.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
 #include <linux/io.h>
 #include <linux/clk/samsung.h>
 #include <linux/dma-mapping.h>
 #include <linux/irq.h>
-#include <linux/gpio.h>
 #include <linux/irqchip/arm-vic.h>
 #include <clocksource/samsung_pwm.h>
 
@@ -149,7 +149,7 @@ static struct map_desc s3c_iodesc[] __initdata = {
 	},
 };
 
-static struct bus_type s3c64xx_subsys = {
+static const struct bus_type s3c64xx_subsys = {
 	.name		= "s3c64xx-core",
 	.dev_name	= "s3c64xx-core",
 };

@@ -1,32 +1,36 @@
 # SPDX-License-Identifier: GPL-2.0
-snd-soc-core-objs := soc-core.o soc-dapm.o soc-jack.o soc-utils.o soc-dai.o soc-component.o
-snd-soc-core-objs += soc-pcm.o soc-devres.o soc-ops.o soc-link.o soc-card.o
+snd-soc-core-y := soc-core.o soc-dapm.o soc-jack.o soc-utils.o soc-dai.o soc-component.o
+snd-soc-core-y += soc-pcm.o soc-devres.o soc-ops.o soc-link.o soc-card.o
 snd-soc-core-$(CONFIG_SND_SOC_COMPRESS) += soc-compress.o
 
 ifneq ($(CONFIG_SND_SOC_TOPOLOGY),)
-snd-soc-core-objs += soc-topology.o
+snd-soc-core-y += soc-topology.o
 endif
 
 ifneq ($(CONFIG_SND_SOC_TOPOLOGY_KUNIT_TEST),)
-# snd-soc-test-objs := soc-topology-test.o
+# snd-soc-test-y := soc-topology-test.o
 obj-$(CONFIG_SND_SOC_TOPOLOGY_KUNIT_TEST) += soc-topology-test.o
 endif
 
+ifneq ($(CONFIG_SND_SOC_CARD_KUNIT_TEST),)
+obj-$(CONFIG_SND_SOC_CARD_KUNIT_TEST) += soc-card-test.o
+endif
+
 ifneq ($(CONFIG_SND_SOC_UTILS_KUNIT_TEST),)
-# snd-soc-test-objs := soc-utils-test.o
+# snd-soc-test-y := soc-utils-test.o
 obj-$(CONFIG_SND_SOC_UTILS_KUNIT_TEST) += soc-utils-test.o
 endif
 
 ifneq ($(CONFIG_SND_SOC_GENERIC_DMAENGINE_PCM),)
-snd-soc-core-objs += soc-generic-dmaengine-pcm.o
+snd-soc-core-y += soc-generic-dmaengine-pcm.o
 endif
 
 ifneq ($(CONFIG_SND_SOC_AC97_BUS),)
-snd-soc-core-objs += soc-ac97.o
+snd-soc-core-y += soc-ac97.o
 endif
 
 ifneq ($(CONFIG_SND_SOC_ACPI),)
-snd-soc-acpi-objs := soc-acpi.o
+snd-soc-acpi-y := soc-acpi.o
 endif
 
 obj-$(CONFIG_SND_SOC_ACPI) += snd-soc-acpi.o
@@ -43,8 +47,10 @@ obj-$(CONFIG_SND_SOC)	+= bcm/
 obj-$(CONFIG_SND_SOC)	+= cirrus/
 obj-$(CONFIG_SND_SOC)	+= dwc/
 obj-$(CONFIG_SND_SOC)	+= fsl/
+obj-$(CONFIG_SND_SOC)	+= google/
 obj-$(CONFIG_SND_SOC)	+= hisilicon/
 obj-$(CONFIG_SND_SOC)	+= jz4740/
+obj-$(CONFIG_SND_SOC)	+= loongson/
 obj-$(CONFIG_SND_SOC)	+= img/
 obj-$(CONFIG_SND_SOC)	+= intel/
 obj-$(CONFIG_SND_SOC)	+= mediatek/
@@ -59,6 +65,7 @@ obj-$(CONFIG_SND_SOC)	+= sh/
 obj-$(CONFIG_SND_SOC)	+= sof/
 obj-$(CONFIG_SND_SOC)	+= spear/
 obj-$(CONFIG_SND_SOC)	+= sprd/
+obj-$(CONFIG_SND_SOC)	+= starfive/
 obj-$(CONFIG_SND_SOC)	+= sti/
 obj-$(CONFIG_SND_SOC)	+= stm/
 obj-$(CONFIG_SND_SOC)	+= sunxi/

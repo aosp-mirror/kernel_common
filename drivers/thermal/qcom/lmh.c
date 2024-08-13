@@ -10,7 +10,7 @@
 #include <linux/platform_device.h>
 #include <linux/of_platform.h>
 #include <linux/slab.h>
-#include <linux/qcom_scm.h>
+#include <linux/firmware/qcom/qcom_scm.h>
 
 #define LMH_NODE_DCVS			0x44435653
 #define LMH_CLUSTER0_NODE_ID		0x6370302D
@@ -94,6 +94,9 @@ static int lmh_probe(struct platform_device *pdev)
 	int temp_low, temp_high, temp_arm, cpu_id, ret;
 	unsigned int enable_alg;
 	u32 node_id;
+
+	if (!qcom_scm_is_available())
+		return -EPROBE_DEFER;
 
 	lmh_data = devm_kzalloc(dev, sizeof(*lmh_data), GFP_KERNEL);
 	if (!lmh_data)

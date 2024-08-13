@@ -1367,7 +1367,7 @@ err_pm_dis:
 	return ret;
 }
 
-static int fimc_remove(struct platform_device *pdev)
+static void fimc_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct fimc_context *ctx = get_fimc_context(dev);
@@ -1377,11 +1377,8 @@ static int fimc_remove(struct platform_device *pdev)
 	pm_runtime_disable(dev);
 
 	fimc_put_clocks(ctx);
-
-	return 0;
 }
 
-#ifdef CONFIG_PM
 static int fimc_runtime_suspend(struct device *dev)
 {
 	struct fimc_context *ctx = get_fimc_context(dev);
@@ -1398,13 +1395,9 @@ static int fimc_runtime_resume(struct device *dev)
 	DRM_DEV_DEBUG_KMS(dev, "id[%d]\n", ctx->id);
 	return clk_prepare_enable(ctx->clocks[FIMC_CLK_GATE]);
 }
-#endif
 
-static const struct dev_pm_ops fimc_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-				pm_runtime_force_resume)
-	SET_RUNTIME_PM_OPS(fimc_runtime_suspend, fimc_runtime_resume, NULL)
-};
+static DEFINE_RUNTIME_DEV_PM_OPS(fimc_pm_ops, fimc_runtime_suspend,
+				 fimc_runtime_resume, NULL);
 
 static const struct of_device_id fimc_of_match[] = {
 	{ .compatible = "samsung,exynos4210-fimc" },
@@ -1415,11 +1408,10 @@ MODULE_DEVICE_TABLE(of, fimc_of_match);
 
 struct platform_driver fimc_driver = {
 	.probe		= fimc_probe,
-	.remove		= fimc_remove,
+	.remove_new	= fimc_remove,
 	.driver		= {
 		.of_match_table = fimc_of_match,
 		.name	= "exynos-drm-fimc",
-		.owner	= THIS_MODULE,
-		.pm	= &fimc_pm_ops,
+		.pm	= pm_ptr(&fimc_pm_ops),
 	},
 };

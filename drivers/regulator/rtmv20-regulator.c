@@ -312,7 +312,7 @@ static bool rtmv20_is_volatile_reg(struct device *dev, unsigned int reg)
 static const struct regmap_config rtmv20_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 	.max_register = RTMV20_REG_LDMASK,
 	.num_reg_defaults_raw = RTMV20_MAX_REGS,
 
@@ -425,10 +425,11 @@ MODULE_DEVICE_TABLE(of, rtmv20_of_id);
 static struct i2c_driver rtmv20_driver = {
 	.driver = {
 		.name = "rtmv20",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.of_match_table = of_match_ptr(rtmv20_of_id),
 		.pm = &rtmv20_pm,
 	},
-	.probe_new = rtmv20_probe,
+	.probe = rtmv20_probe,
 };
 module_i2c_driver(rtmv20_driver);
 

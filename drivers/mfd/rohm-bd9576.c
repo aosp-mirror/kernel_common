@@ -13,7 +13,7 @@
 #include <linux/mfd/rohm-bd957x.h>
 #include <linux/mfd/rohm-generic.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/regmap.h>
 #include <linux/types.h>
 
@@ -62,7 +62,7 @@ static struct regmap_config bd957x_regmap = {
 	.val_bits = 8,
 	.volatile_table = &volatile_regs,
 	.max_register = BD957X_MAX_REGISTER,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 };
 
 static struct regmap_irq bd9576_irqs[] = {
@@ -178,7 +178,7 @@ static struct i2c_driver bd957x_drv = {
 		.name = "rohm-bd957x",
 		.of_match_table = bd957x_of_match,
 	},
-	.probe_new = &bd957x_i2c_probe,
+	.probe = bd957x_i2c_probe,
 };
 module_i2c_driver(bd957x_drv);
 

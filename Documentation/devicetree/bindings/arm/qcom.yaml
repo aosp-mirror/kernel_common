@@ -10,17 +10,10 @@ maintainers:
   - Bjorn Andersson <bjorn.andersson@linaro.org>
 
 description: |
-  Some qcom based bootloaders identify the dtb blob based on a set of
-  device properties like SoC and platform and revisions of those components.
-  To support this scheme, we encode this information into the board compatible
-  string.
-
-  Each board must specify a top-level board compatible string with the following
-  format:
-
-  	compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
-
-  The 'SoC' and 'board' elements are required. All other elements are optional.
+  For devices using the Qualcomm SoC the "compatible" properties consists of
+  one or several "manufacturer,model" strings, describing the device itself,
+  followed by one or several "qcom,<SoC>" strings, describing the SoC used in
+  the device.
 
   The 'SoC' element must be one of the following strings:
 
@@ -30,14 +23,18 @@ description: |
         apq8084
         apq8096
         ipq4018
+        ipq5018
+        ipq5332
         ipq6018
         ipq8074
+        ipq9574
         mdm9615
         msm8226
         msm8916
         msm8939
         msm8953
         msm8956
+        msm8960
         msm8974
         msm8976
         msm8992
@@ -45,7 +42,12 @@ description: |
         msm8996
         msm8998
         qcs404
+        qcs8550
+        qcm2290
+        qcm6490
         qdu1000
+        qrb2210
+        qrb4210
         qru1000
         sa8155p
         sa8540p
@@ -64,59 +66,28 @@ description: |
         sdm845
         sdx55
         sdx65
+        sdx75
         sm4250
+        sm4450
         sm6115
         sm6115p
         sm6125
         sm6350
         sm6375
+        sm7125
         sm7225
         sm8150
         sm8250
         sm8350
         sm8450
         sm8550
-
-  The 'board' element must be one of the following strings:
-
-        adp
-        cdp
-        cp01-c1
-        dragonboard
-        hk01
-        hk10-c1
-        hk10-c2
-        idp
-        liquid
-        mtp
-        qrd
-        ride
-        sbc
-        x100
-
-  The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
-  where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
-  as v1. If all versions of the 'board_version' elements match, then a
-  wildcard '*' should be used, e.g. 'v*'.
-
-  The 'foundry_id' and 'subtype' elements are one or more digits from 0 to 9.
-
-  Examples:
-
-  	"qcom,msm8916-v1-cdp-pm8916-v2.1"
-
-  A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
-  2.1.
-
-  	"qcom,apq8074-v2.0-2-dragonboard/1-v0.1"
-
-  A dragonboard board v0.1 of subtype 1 with an apq8074 SoC version 2, made in
-  foundry 2.
+        sm8650
+        x1e80100
 
   There are many devices in the list below that run the standard ChromeOS
   bootloader setup and use the open source depthcharge bootloader to boot the
-  OS. These devices do not use the scheme described above. For details, see:
-  https://docs.kernel.org/arm/google/chromebook-boot-flow.html
+  OS. These devices use the bootflow explained at
+  https://docs.kernel.org/arch/arm/google/chromebook-boot-flow.html
 
 properties:
   $nodename:
@@ -126,6 +97,7 @@ properties:
       - items:
           - enum:
               - qcom,apq8016-sbc
+              - schneider,apq8016-hmibsc
           - const: qcom,apq8016
 
       - items:
@@ -134,6 +106,7 @@ properties:
               - huawei,sturgeon
               - lg,lenok
               - samsung,matisse-wifi
+              - samsung,milletwifi
           - const: qcom,apq8026
 
       - items:
@@ -164,11 +137,29 @@ properties:
 
       - items:
           - enum:
+              - microsoft,dempsey
+              - microsoft,makepeace
+              - microsoft,moneypenny
+              - motorola,falcon
+              - samsung,ms013g
               - samsung,s3ve3g
           - const: qcom,msm8226
 
       - items:
           - enum:
+              - htc,memul
+              - microsoft,superman-lte
+              - microsoft,tesla
+              - motorola,peregrine
+              - samsung,matisselte
+          - const: qcom,msm8926
+          - const: qcom,msm8226
+
+      - items:
+          - enum:
+              - huawei,kiwi
+              - longcheer,l9100
+              - samsung,a7
               - sony,kanuti-tulip
               - square,apq8039-t2
           - const: qcom,msm8939
@@ -182,11 +173,13 @@ properties:
       - items:
           - enum:
               - qcom,msm8960-cdp
+              - samsung,expressatt
           - const: qcom,msm8960
 
       - items:
           - enum:
               - lge,hammerhead
+              - samsung,hlte
               - sony,xperia-amami
               - sony,xperia-honami
           - const: qcom,msm8974
@@ -194,16 +187,21 @@ properties:
       - items:
           - enum:
               - fairphone,fp2
+              - htc,m8
               - oneplus,bacon
               - samsung,klte
+              - sony,xperia-aries
               - sony,xperia-castor
+              - sony,xperia-leo
           - const: qcom,msm8974pro
           - const: qcom,msm8974
 
       - items:
-          - const: qcom,msm8916-mtp
-          - const: qcom,msm8916-mtp/1
-          - const: qcom,msm8916
+          - enum:
+              - samsung,kltechn
+          - const: samsung,klte
+          - const: qcom,msm8974pro
+          - const: qcom,msm8974
 
       - items:
           - enum:
@@ -212,25 +210,32 @@ properties:
               - asus,z00l
               - gplus,fl8005a
               - huawei,g7
+              - lg,c50
+              - lg,m216
               - longcheer,l8910
+              - longcheer,l8150
+              - motorola,harpia
+              - motorola,osprey
+              - motorola,surnia
+              - qcom,msm8916-mtp
               - samsung,a3u-eur
               - samsung,a5u-eur
               - samsung,e5
               - samsung,e7
+              - samsung,fortuna3g
+              - samsung,gprimeltecan
               - samsung,grandmax
+              - samsung,grandprimelte
               - samsung,gt510
               - samsung,gt58
               - samsung,j5
               - samsung,j5x
+              - samsung,rossa
               - samsung,serranove
               - thwc,uf896
               - thwc,ufi001c
               - wingtech,wt88047
-          - const: qcom,msm8916
-
-      - items:
-          - const: longcheer,l8150
-          - const: qcom,msm8916-v1-qrd/9-v1
+              - yiming,uz801-v3
           - const: qcom,msm8916
 
       - items:
@@ -322,6 +327,20 @@ properties:
 
       - items:
           - enum:
+              - qcom,ipq5018-rdp432-c2
+              - tplink,archer-ax55-v1
+          - const: qcom,ipq5018
+
+      - items:
+          - enum:
+              - qcom,ipq5332-ap-mi01.2
+              - qcom,ipq5332-ap-mi01.3
+              - qcom,ipq5332-ap-mi01.6
+              - qcom,ipq5332-ap-mi01.9
+          - const: qcom,ipq5332
+
+      - items:
+          - enum:
               - mikrotik,rb3011
               - qcom,ipq8064-ap148
           - const: qcom,ipq8064
@@ -333,11 +352,35 @@ properties:
               - qcom,ipq8074-hk10-c2
           - const: qcom,ipq8074
 
+      - items:
+          - enum:
+              - qcom,ipq9574-ap-al02-c2
+              - qcom,ipq9574-ap-al02-c6
+              - qcom,ipq9574-ap-al02-c7
+              - qcom,ipq9574-ap-al02-c8
+              - qcom,ipq9574-ap-al02-c9
+          - const: qcom,ipq9574
+
       - description: Sierra Wireless MangOH Green with WP8548 Module
         items:
           - const: swir,mangoh-green-wp8548
           - const: swir,wp8548
           - const: qcom,mdm9615
+
+      - description: Qualcomm Technologies, Inc. Robotics RB1
+        items:
+          - enum:
+              - qcom,qrb2210-rb1
+          - const: qcom,qrb2210
+          - const: qcom,qcm2290
+
+      - items:
+          - enum:
+              - fairphone,fp5
+              - qcom,qcm6490-idp
+              - qcom,qcs6490-rb3gen2
+              - shift,otter
+          - const: qcom,qcm6490
 
       - description: Qualcomm Technologies, Inc. Distributed Unit 1000 platform
         items:
@@ -352,9 +395,9 @@ properties:
               - qcom,qru1000-idp
           - const: qcom,qru1000
 
-      - description: Qualcomm Technologies, Inc. SC7180 IDP
-        items:
+      - items:
           - enum:
+              - acer,aspire1
               - qcom,sc7180-idp
           - const: qcom,sc7180
 
@@ -427,6 +470,11 @@ properties:
           - const: google,lazor-rev8
           - const: qcom,sc7180
 
+      - description: Acer Chromebook Spin 513 (rev9)
+        items:
+          - const: google,lazor-rev9
+          - const: qcom,sc7180
+
       - description: Acer Chromebook Spin 513 (newest rev)
         items:
           - const: google,lazor
@@ -446,6 +494,11 @@ properties:
           - const: google,lazor-rev6-sku2
           - const: google,lazor-rev7-sku2
           - const: google,lazor-rev8-sku2
+          - const: qcom,sc7180
+
+      - description: Acer Chromebook Spin 513 with KB Backlight (rev9)
+        items:
+          - const: google,lazor-rev9-sku2
           - const: qcom,sc7180
 
       - description: Acer Chromebook Spin 513 with KB Backlight (newest rev)
@@ -469,9 +522,16 @@ properties:
           - const: google,lazor-rev8-sku0
           - const: qcom,sc7180
 
+      - description: Acer Chromebook Spin 513 with LTE (rev9)
+        items:
+          - const: google,lazor-rev9-sku0
+          - const: google,lazor-rev9-sku10
+          - const: qcom,sc7180
+
       - description: Acer Chromebook Spin 513 with LTE (newest rev)
         items:
           - const: google,lazor-sku0
+          - const: google,lazor-sku10
           - const: qcom,sc7180
 
       - description: Acer Chromebook 511 (rev4 - rev8)
@@ -483,9 +543,16 @@ properties:
           - const: google,lazor-rev8-sku4
           - const: qcom,sc7180
 
+      - description: Acer Chromebook 511 (rev9)
+        items:
+          - const: google,lazor-rev9-sku4
+          - const: google,lazor-rev9-sku15
+          - const: qcom,sc7180
+
       - description: Acer Chromebook 511 (newest rev)
         items:
           - const: google,lazor-sku4
+          - const: google,lazor-sku15
           - const: qcom,sc7180
 
       - description: Acer Chromebook 511 without Touchscreen (rev4)
@@ -502,9 +569,16 @@ properties:
           - const: google,lazor-rev8-sku6
           - const: qcom,sc7180
 
+      - description: Acer Chromebook 511 without Touchscreen (rev9)
+        items:
+          - const: google,lazor-rev9-sku6
+          - const: google,lazor-rev9-sku18
+          - const: qcom,sc7180
+
       - description: Acer Chromebook 511 without Touchscreen (newest rev)
         items:
           - const: google,lazor-sku6
+          - const: google,lazor-sku18
           - const: qcom,sc7180
 
       - description: Google Mrbland with AUO panel (rev0)
@@ -742,6 +816,7 @@ properties:
 
       - items:
           - enum:
+              - lenovo,tbx605f
               - motorola,ali
           - const: qcom,sdm450
 
@@ -793,6 +868,11 @@ properties:
 
       - items:
           - enum:
+              - qcom,sdx75-idp
+          - const: qcom,sdx75
+
+      - items:
+          - enum:
               - qcom,ipq6018-cp01
               - qcom,ipq6018-cp01-c1
           - const: qcom,ipq6018
@@ -818,6 +898,7 @@ properties:
       - items:
           - enum:
               - qcom,sa8775p-ride
+              - qcom,sa8775p-ride-r3
           - const: qcom,sa8775p
 
       - items:
@@ -850,6 +931,22 @@ properties:
 
       - items:
           - enum:
+              - qcom,qrb4210-rb2
+          - const: qcom,qrb4210
+          - const: qcom,sm4250
+
+      - items:
+          - enum:
+              - qcom,sm4450-qrd
+          - const: qcom,sm4450
+
+      - items:
+          - enum:
+              - fxtec,pro1x
+          - const: qcom,sm6115
+
+      - items:
+          - enum:
               - lenovo,j606f
           - const: qcom,sm6115p
           - const: qcom,sm6115
@@ -857,6 +954,7 @@ properties:
       - items:
           - enum:
               - sony,pdx201
+              - xiaomi,laurel-sprout
           - const: qcom,sm6125
 
       - items:
@@ -868,6 +966,12 @@ properties:
           - enum:
               - sony,pdx225
           - const: qcom,sm6375
+
+      - items:
+          - enum:
+              - xiaomi,curtana
+              - xiaomi,joyeuse
+          - const: qcom,sm7125
 
       - items:
           - enum:
@@ -891,6 +995,7 @@ properties:
               - sony,pdx203-generic
               - sony,pdx206-generic
               - xiaomi,elish
+              - xiaomi,pipa
           - const: qcom,sm8250
 
       - items:
@@ -912,8 +1017,34 @@ properties:
 
       - items:
           - enum:
+              - qcom,sm8550-hdk
               - qcom,sm8550-mtp
+              - qcom,sm8550-qrd
+              - samsung,q5q
+              - sony,pdx234
           - const: qcom,sm8550
+
+      - items:
+          - enum:
+              - qcom,qcs8550-aim300-aiot
+          - const: qcom,qcs8550-aim300
+          - const: qcom,qcs8550
+          - const: qcom,sm8550
+
+      - items:
+          - enum:
+              - qcom,sm8650-hdk
+              - qcom,sm8650-mtp
+              - qcom,sm8650-qrd
+          - const: qcom,sm8650
+
+      - items:
+          - enum:
+              - asus,vivobook-s15
+              - lenovo,yoga-slim7x
+              - qcom,x1e80100-crd
+              - qcom,x1e80100-qcp
+          - const: qcom,x1e80100
 
   # Board compatibles go above
 
@@ -1006,10 +1137,12 @@ allOf:
               - qcom,sdm845
               - qcom,sdx55
               - qcom,sdx65
+              - qcom,sdx75
               - qcom,sm4250
               - qcom,sm6115
               - qcom,sm6125
               - qcom,sm6350
+              - qcom,sm7125
               - qcom,sm7225
               - qcom,sm8150
               - qcom,sm8250

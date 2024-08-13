@@ -12,8 +12,9 @@
 #include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/of_platform.h>
+#include <linux/of.h>
 #include <linux/phy/phy.h>
+#include <linux/platform_device.h>
 #include <linux/reset.h>
 #include <linux/units.h>
 
@@ -317,6 +318,9 @@ static int stm32_usbphyc_pll_enable(struct stm32_usbphyc *usbphyc)
 
 	stm32_usbphyc_set_bits(pll_reg, PLLEN);
 
+	/* Wait for maximum lock time */
+	usleep_range(200, 300);
+
 	return 0;
 
 reg_disable:
@@ -570,7 +574,7 @@ static void stm32_usbphyc_switch_setup(struct stm32_usbphyc *usbphyc,
 }
 
 static struct phy *stm32_usbphyc_of_xlate(struct device *dev,
-					  struct of_phandle_args *args)
+					  const struct of_phandle_args *args)
 {
 	struct stm32_usbphyc *usbphyc = dev_get_drvdata(dev);
 	struct stm32_usbphyc_phy *usbphyc_phy = NULL;
@@ -766,7 +770,7 @@ clk_disable:
 	return ret;
 }
 
-static int stm32_usbphyc_remove(struct platform_device *pdev)
+static void stm32_usbphyc_remove(struct platform_device *pdev)
 {
 	struct stm32_usbphyc *usbphyc = dev_get_drvdata(&pdev->dev);
 	int port;
@@ -779,8 +783,6 @@ static int stm32_usbphyc_remove(struct platform_device *pdev)
 	stm32_usbphyc_clk48_unregister(usbphyc);
 
 	clk_disable_unprepare(usbphyc->clk);
-
-	return 0;
 }
 
 static int __maybe_unused stm32_usbphyc_resume(struct device *dev)
@@ -810,7 +812,7 @@ MODULE_DEVICE_TABLE(of, stm32_usbphyc_of_match);
 
 static struct platform_driver stm32_usbphyc_driver = {
 	.probe = stm32_usbphyc_probe,
-	.remove = stm32_usbphyc_remove,
+	.remove_new = stm32_usbphyc_remove,
 	.driver = {
 		.of_match_table = stm32_usbphyc_of_match,
 		.name = "stm32-usbphyc",

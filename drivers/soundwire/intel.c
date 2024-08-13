@@ -19,38 +19,6 @@
 #include "bus.h"
 #include "intel.h"
 
-
-enum intel_pdi_type {
-	INTEL_PDI_IN = 0,
-	INTEL_PDI_OUT = 1,
-	INTEL_PDI_BD = 2,
-};
-
-#define cdns_to_intel(_cdns) container_of(_cdns, struct sdw_intel, cdns)
-
-/*
- * Read, write helpers for HW registers
- */
-static inline int intel_readl(void __iomem *base, int offset)
-{
-	return readl(base + offset);
-}
-
-static inline void intel_writel(void __iomem *base, int offset, int value)
-{
-	writel(value, base + offset);
-}
-
-static inline u16 intel_readw(void __iomem *base, int offset)
-{
-	return readw(base + offset);
-}
-
-static inline void intel_writew(void __iomem *base, int offset, u16 value)
-{
-	writew(value, base + offset);
-}
-
 static int intel_wait_bit(void __iomem *base, int offset, u32 mask, u32 target)
 {
 	int timeout = 10;
@@ -292,7 +260,7 @@ static void intel_shim_init(struct sdw_intel *sdw)
 {
 	void __iomem *shim = sdw->link_res->shim;
 	unsigned int link_id = sdw->instance;
-	u16 ioctl = 0, act = 0;
+	u16 ioctl = 0, act;
 
 	/* Initialize Shim */
 	ioctl |= SDW_SHIM_IOCTL_BKE;
@@ -313,6 +281,7 @@ static void intel_shim_init(struct sdw_intel *sdw)
 
 	intel_shim_glue_to_master_ip(sdw);
 
+	act = intel_readw(shim, SDW_SHIM_CTMCTL(link_id));
 	u16p_replace_bits(&act, 0x1, SDW_SHIM_CTMCTL_DOAIS);
 	act |= SDW_SHIM_CTMCTL_DACTQE;
 	act |= SDW_SHIM_CTMCTL_DODS;
@@ -357,6 +326,15 @@ static void intel_shim_wake(struct sdw_intel *sdw, bool wake_enable)
 	mutex_unlock(sdw->link_res->shim_lock);
 }
 
+static bool intel_check_cmdsync_unlocked(struct sdw_intel *sdw)
+{
+	void __iomem *shim = sdw->link_res->shim;
+	int sync_reg;
+
+	sync_reg = intel_readl(shim, SDW_SHIM_SYNC);
+	return !!(sync_reg & SDW_SHIM_SYNC_CMDSYNC_MASK);
+}
+
 static int intel_link_power_up(struct sdw_intel *sdw)
 {
 	unsigned int link_id = sdw->instance;
@@ -367,8 +345,10 @@ static int intel_link_power_up(struct sdw_intel *sdw)
 	u32 spa_mask, cpa_mask;
 	u32 link_control;
 	int ret = 0;
+	u32 clock_source;
 	u32 syncprd;
 	u32 sync_reg;
+	bool lcap_mlcs;
 
 	mutex_lock(sdw->link_res->shim_lock);
 
@@ -380,12 +360,35 @@ static int intel_link_power_up(struct sdw_intel *sdw)
 	 * is only dependent on the oscillator clock provided to
 	 * the IP, so adjust based on _DSD properties reported in DSDT
 	 * tables. The values reported are based on either 24MHz
-	 * (CNL/CML) or 38.4 MHz (ICL/TGL+).
+	 * (CNL/CML) or 38.4 MHz (ICL/TGL+). On MeteorLake additional
+	 * frequencies are available with the MLCS clock source selection.
 	 */
-	if (prop->mclk_freq % 6000000)
-		syncprd = SDW_SHIM_SYNC_SYNCPRD_VAL_38_4;
-	else
-		syncprd = SDW_SHIM_SYNC_SYNCPRD_VAL_24;
+	lcap_mlcs = intel_readl(shim, SDW_SHIM_LCAP) & SDW_SHIM_LCAP_MLCS_MASK;
+
+	if (prop->mclk_freq % 6000000) {
+		if (prop->mclk_freq % 2400000) {
+			if (lcap_mlcs) {
+				syncprd = SDW_SHIM_SYNC_SYNCPRD_VAL_24_576;
+				clock_source = SDW_SHIM_MLCS_CARDINAL_CLK;
+			} else {
+				dev_err(sdw->cdns.dev, "%s: invalid clock configuration, mclk %d lcap_mlcs %d\n",
+					__func__, prop->mclk_freq, lcap_mlcs);
+				ret = -EINVAL;
+				goto out;
+			}
+		} else {
+			syncprd = SDW_SHIM_SYNC_SYNCPRD_VAL_38_4;
+			clock_source = SDW_SHIM_MLCS_XTAL_CLK;
+		}
+	} else {
+		if (lcap_mlcs) {
+			syncprd = SDW_SHIM_SYNC_SYNCPRD_VAL_96;
+			clock_source = SDW_SHIM_MLCS_AUDIO_PLL_CLK;
+		} else {
+			syncprd = SDW_SHIM_SYNC_SYNCPRD_VAL_24;
+			clock_source = SDW_SHIM_MLCS_XTAL_CLK;
+		}
+	}
 
 	if (!*shim_mask) {
 		dev_dbg(sdw->cdns.dev, "powering up all links\n");
@@ -424,6 +427,13 @@ static int intel_link_power_up(struct sdw_intel *sdw)
 			dev_err(sdw->cdns.dev,
 				"Failed to set SHIM_SYNC: %d\n", ret);
 			goto out;
+		}
+
+		/* update link clock if needed */
+		if (lcap_mlcs) {
+			link_control = intel_readl(shim, SDW_SHIM_LCTL);
+			u32p_replace_bits(&link_control, clock_source, SDW_SHIM_LCTL_MLCS_MASK);
+			intel_writel(shim, SDW_SHIM_LCTL, link_control);
 		}
 	}
 
@@ -507,7 +517,6 @@ static int intel_shim_sync_go_unlocked(struct sdw_intel *sdw)
 {
 	void __iomem *shim = sdw->link_res->shim;
 	u32 sync_reg;
-	int ret;
 
 	/* Read SYNC register */
 	sync_reg = intel_readl(shim, SDW_SHIM_SYNC);
@@ -519,13 +528,9 @@ static int intel_shim_sync_go_unlocked(struct sdw_intel *sdw)
 	 */
 	sync_reg |= SDW_SHIM_SYNC_SYNCGO;
 
-	ret = intel_clear_bit(shim, SDW_SHIM_SYNC, sync_reg,
-			      SDW_SHIM_SYNC_SYNCGO);
+	intel_writel(shim, SDW_SHIM_SYNC, sync_reg);
 
-	if (ret < 0)
-		dev_err(sdw->cdns.dev, "SyncGO clear failed: %d\n", ret);
-
-	return ret;
+	return 0;
 }
 
 static int intel_shim_sync_go(struct sdw_intel *sdw)
@@ -618,13 +623,6 @@ static int intel_pdi_stream_ch_update(struct sdw_intel *sdw,
 	return 0;
 }
 
-static int intel_pdi_ch_update(struct sdw_intel *sdw)
-{
-	intel_pdi_stream_ch_update(sdw, &sdw->cdns.pcm);
-
-	return 0;
-}
-
 static void
 intel_pdi_shim_configure(struct sdw_intel *sdw, struct sdw_cdns_pdi *pdi)
 {
@@ -678,7 +676,7 @@ intel_pdi_alh_configure(struct sdw_intel *sdw, struct sdw_cdns_pdi *pdi)
 }
 
 static int intel_params_stream(struct sdw_intel *sdw,
-			       int stream,
+			       struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai,
 			       struct snd_pcm_hw_params *hw_params,
 			       int link_id, int alh_stream_id)
@@ -686,7 +684,7 @@ static int intel_params_stream(struct sdw_intel *sdw,
 	struct sdw_intel_link_res *res = sdw->link_res;
 	struct sdw_intel_stream_params_data params_data;
 
-	params_data.stream = stream; /* direction */
+	params_data.substream = substream;
 	params_data.dai = dai;
 	params_data.hw_params = hw_params;
 	params_data.link_id = link_id;
@@ -698,99 +696,25 @@ static int intel_params_stream(struct sdw_intel *sdw,
 	return -EIO;
 }
 
+/*
+ * DAI routines
+ */
+
 static int intel_free_stream(struct sdw_intel *sdw,
-			     int stream,
+			     struct snd_pcm_substream *substream,
 			     struct snd_soc_dai *dai,
 			     int link_id)
 {
 	struct sdw_intel_link_res *res = sdw->link_res;
 	struct sdw_intel_stream_free_data free_data;
 
-	free_data.stream = stream; /* direction */
+	free_data.substream = substream;
 	free_data.dai = dai;
 	free_data.link_id = link_id;
 
 	if (res->ops && res->ops->free_stream && res->dev)
-		return res->ops->free_stream(res->dev,
-					     &free_data);
+		return res->ops->free_stream(res->dev, &free_data);
 
-	return 0;
-}
-
-/*
- * bank switch routines
- */
-
-static int intel_pre_bank_switch(struct sdw_intel *sdw)
-{
-	struct sdw_cdns *cdns = &sdw->cdns;
-	struct sdw_bus *bus = &cdns->bus;
-
-	/* Write to register only for multi-link */
-	if (!bus->multi_link)
-		return 0;
-
-	intel_shim_sync_arm(sdw);
-
-	return 0;
-}
-
-static int intel_post_bank_switch(struct sdw_intel *sdw)
-{
-	struct sdw_cdns *cdns = &sdw->cdns;
-	struct sdw_bus *bus = &cdns->bus;
-	void __iomem *shim = sdw->link_res->shim;
-	int sync_reg, ret;
-
-	/* Write to register only for multi-link */
-	if (!bus->multi_link)
-		return 0;
-
-	mutex_lock(sdw->link_res->shim_lock);
-
-	/* Read SYNC register */
-	sync_reg = intel_readl(shim, SDW_SHIM_SYNC);
-
-	/*
-	 * post_bank_switch() ops is called from the bus in loop for
-	 * all the Masters in the steam with the expectation that
-	 * we trigger the bankswitch for the only first Master in the list
-	 * and do nothing for the other Masters
-	 *
-	 * So, set the SYNCGO bit only if CMDSYNC bit is set for any Master.
-	 */
-	if (!(sync_reg & SDW_SHIM_SYNC_CMDSYNC_MASK)) {
-		ret = 0;
-		goto unlock;
-	}
-
-	ret = intel_shim_sync_go_unlocked(sdw);
-unlock:
-	mutex_unlock(sdw->link_res->shim_lock);
-
-	if (ret < 0)
-		dev_err(sdw->cdns.dev, "Post bank switch failed: %d\n", ret);
-
-	return ret;
-}
-
-/*
- * DAI routines
- */
-
-static int intel_startup(struct snd_pcm_substream *substream,
-			 struct snd_soc_dai *dai)
-{
-	struct sdw_cdns *cdns = snd_soc_dai_get_drvdata(dai);
-	int ret;
-
-	ret = pm_runtime_resume_and_get(cdns->dev);
-	if (ret < 0 && ret != -EACCES) {
-		dev_err_ratelimited(cdns->dev,
-				    "pm_runtime_resume_and_get failed in %s, ret %d\n",
-				    __func__, ret);
-		return ret;
-	}
 	return 0;
 }
 
@@ -833,10 +757,9 @@ static int intel_hw_params(struct snd_pcm_substream *substream,
 	dai_runtime->paused = false;
 	dai_runtime->suspended = false;
 	dai_runtime->pdi = pdi;
-	dai_runtime->hw_params = params;
 
 	/* Inform DSP about PDI stream number */
-	ret = intel_params_stream(sdw, substream->stream, dai, params,
+	ret = intel_params_stream(sdw, substream, dai, params,
 				  sdw->instance,
 				  pdi->intel_alh_id);
 	if (ret)
@@ -886,6 +809,11 @@ static int intel_prepare(struct snd_pcm_substream *substream,
 	}
 
 	if (dai_runtime->suspended) {
+		struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
+		struct snd_pcm_hw_params *hw_params;
+
+		hw_params = &rtd->dpcm[substream->stream].hw_params;
+
 		dai_runtime->suspended = false;
 
 		/*
@@ -897,7 +825,7 @@ static int intel_prepare(struct snd_pcm_substream *substream,
 		 */
 
 		/* configure stream */
-		ch = params_channels(dai_runtime->hw_params);
+		ch = params_channels(hw_params);
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 			dir = SDW_DATA_DIR_RX;
 		else
@@ -908,8 +836,8 @@ static int intel_prepare(struct snd_pcm_substream *substream,
 		sdw_cdns_config_stream(cdns, ch, dir, dai_runtime->pdi);
 
 		/* Inform DSP about PDI stream number */
-		ret = intel_params_stream(sdw, substream->stream, dai,
-					  dai_runtime->hw_params,
+		ret = intel_params_stream(sdw, substream, dai,
+					  hw_params,
 					  sdw->instance,
 					  dai_runtime->pdi->intel_alh_id);
 	}
@@ -942,25 +870,15 @@ intel_hw_free(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
 		return ret;
 	}
 
-	ret = intel_free_stream(sdw, substream->stream, dai, sdw->instance);
+	ret = intel_free_stream(sdw, substream, dai, sdw->instance);
 	if (ret < 0) {
 		dev_err(dai->dev, "intel_free_stream: failed %d\n", ret);
 		return ret;
 	}
 
-	dai_runtime->hw_params = NULL;
 	dai_runtime->pdi = NULL;
 
 	return 0;
-}
-
-static void intel_shutdown(struct snd_pcm_substream *substream,
-			   struct snd_soc_dai *dai)
-{
-	struct sdw_cdns *cdns = snd_soc_dai_get_drvdata(dai);
-
-	pm_runtime_mark_last_busy(cdns->dev);
-	pm_runtime_put_autosuspend(cdns->dev);
 }
 
 static int intel_pcm_set_sdw_stream(struct snd_soc_dai *dai,
@@ -985,18 +903,8 @@ static void *intel_get_sdw_stream(struct snd_soc_dai *dai,
 static int intel_trigger(struct snd_pcm_substream *substream, int cmd, struct snd_soc_dai *dai)
 {
 	struct sdw_cdns *cdns = snd_soc_dai_get_drvdata(dai);
-	struct sdw_intel *sdw = cdns_to_intel(cdns);
-	struct sdw_intel_link_res *res = sdw->link_res;
 	struct sdw_cdns_dai_runtime *dai_runtime;
 	int ret = 0;
-
-	/*
-	 * The .trigger callback is used to send required IPC to audio
-	 * firmware. The .free_stream callback will still be called
-	 * by intel_free_stream() in the TRIGGER_SUSPEND case.
-	 */
-	if (res->ops && res->ops->trigger)
-		res->ops->trigger(dai, cmd, substream->stream);
 
 	dai_runtime = cdns->dai_runtime_array[dai->id];
 	if (!dai_runtime) {
@@ -1017,7 +925,6 @@ static int intel_trigger(struct snd_pcm_substream *substream, int cmd, struct sn
 
 		dai_runtime->suspended = true;
 
-		ret = intel_free_stream(sdw, substream->stream, dai, sdw->instance);
 		break;
 
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
@@ -1063,9 +970,7 @@ static int intel_component_dais_suspend(struct snd_soc_component *component)
 	 */
 	for_each_component_dais(component, dai) {
 		struct sdw_cdns *cdns = snd_soc_dai_get_drvdata(dai);
-		struct sdw_intel *sdw = cdns_to_intel(cdns);
 		struct sdw_cdns_dai_runtime *dai_runtime;
-		int ret;
 
 		dai_runtime = cdns->dai_runtime_array[dai->id];
 
@@ -1075,25 +980,18 @@ static int intel_component_dais_suspend(struct snd_soc_component *component)
 		if (dai_runtime->suspended)
 			continue;
 
-		if (dai_runtime->paused) {
+		if (dai_runtime->paused)
 			dai_runtime->suspended = true;
-
-			ret = intel_free_stream(sdw, dai_runtime->direction, dai, sdw->instance);
-			if (ret < 0)
-				return ret;
-		}
 	}
 
 	return 0;
 }
 
 static const struct snd_soc_dai_ops intel_pcm_dai_ops = {
-	.startup = intel_startup,
 	.hw_params = intel_hw_params,
 	.prepare = intel_prepare,
 	.hw_free = intel_hw_free,
 	.trigger = intel_trigger,
-	.shutdown = intel_shutdown,
 	.set_stream = intel_pcm_set_sdw_stream,
 	.get_stream = intel_get_sdw_stream,
 };
@@ -1115,7 +1013,6 @@ static int intel_create_dai(struct sdw_cdns *cdns,
 	if (num == 0)
 		return 0;
 
-	 /* TODO: Read supported rates/formats from hardware */
 	for (i = off; i < (off + num); i++) {
 		dais[i].name = devm_kasprintf(cdns->dev, GFP_KERNEL,
 					      "SDW%d Pin%d",
@@ -1126,15 +1023,11 @@ static int intel_create_dai(struct sdw_cdns *cdns,
 		if (type == INTEL_PDI_BD || type == INTEL_PDI_OUT) {
 			dais[i].playback.channels_min = 1;
 			dais[i].playback.channels_max = max_ch;
-			dais[i].playback.rates = SNDRV_PCM_RATE_48000;
-			dais[i].playback.formats = SNDRV_PCM_FMTBIT_S16_LE;
 		}
 
 		if (type == INTEL_PDI_BD || type == INTEL_PDI_IN) {
 			dais[i].capture.channels_min = 1;
 			dais[i].capture.channels_max = max_ch;
-			dais[i].capture.rates = SNDRV_PCM_RATE_48000;
-			dais[i].capture.formats = SNDRV_PCM_FMTBIT_S16_LE;
 		}
 
 		dais[i].ops = &intel_pcm_dai_ops;
@@ -1158,7 +1051,7 @@ static int intel_register_dai(struct sdw_intel *sdw)
 	if (ret)
 		return ret;
 
-	intel_pdi_ch_update(sdw);
+	intel_pdi_stream_ch_update(sdw, &sdw->cdns.pcm);
 
 	/* DAIs are created based on total number of PDIs supported */
 	num_dai = cdns->pcm.num_pdi;
@@ -1198,205 +1091,6 @@ static int intel_register_dai(struct sdw_intel *sdw)
 					       dais, num_dai);
 }
 
-static int intel_start_bus(struct sdw_intel *sdw)
-{
-	struct device *dev = sdw->cdns.dev;
-	struct sdw_cdns *cdns = &sdw->cdns;
-	struct sdw_bus *bus = &cdns->bus;
-	int ret;
-
-	ret = sdw_cdns_enable_interrupt(cdns, true);
-	if (ret < 0) {
-		dev_err(dev, "%s: cannot enable interrupts: %d\n", __func__, ret);
-		return ret;
-	}
-
-	/*
-	 * follow recommended programming flows to avoid timeouts when
-	 * gsync is enabled
-	 */
-	if (bus->multi_link)
-		intel_shim_sync_arm(sdw);
-
-	ret = sdw_cdns_init(cdns);
-	if (ret < 0) {
-		dev_err(dev, "%s: unable to initialize Cadence IP: %d\n", __func__, ret);
-		goto err_interrupt;
-	}
-
-	ret = sdw_cdns_exit_reset(cdns);
-	if (ret < 0) {
-		dev_err(dev, "%s: unable to exit bus reset sequence: %d\n", __func__, ret);
-		goto err_interrupt;
-	}
-
-	if (bus->multi_link) {
-		ret = intel_shim_sync_go(sdw);
-		if (ret < 0) {
-			dev_err(dev, "%s: sync go failed: %d\n", __func__, ret);
-			goto err_interrupt;
-		}
-	}
-	sdw_cdns_check_self_clearing_bits(cdns, __func__,
-					  true, INTEL_MASTER_RESET_ITERATIONS);
-
-	return 0;
-
-err_interrupt:
-	sdw_cdns_enable_interrupt(cdns, false);
-	return ret;
-}
-
-static int intel_start_bus_after_reset(struct sdw_intel *sdw)
-{
-	struct device *dev = sdw->cdns.dev;
-	struct sdw_cdns *cdns = &sdw->cdns;
-	struct sdw_bus *bus = &cdns->bus;
-	bool clock_stop0;
-	int status;
-	int ret;
-
-	/*
-	 * An exception condition occurs for the CLK_STOP_BUS_RESET
-	 * case if one or more masters remain active. In this condition,
-	 * all the masters are powered on for they are in the same power
-	 * domain. Master can preserve its context for clock stop0, so
-	 * there is no need to clear slave status and reset bus.
-	 */
-	clock_stop0 = sdw_cdns_is_clock_stop(&sdw->cdns);
-
-	if (!clock_stop0) {
-
-		/*
-		 * make sure all Slaves are tagged as UNATTACHED and
-		 * provide reason for reinitialization
-		 */
-
-		status = SDW_UNATTACH_REQUEST_MASTER_RESET;
-		sdw_clear_slave_status(bus, status);
-
-		ret = sdw_cdns_enable_interrupt(cdns, true);
-		if (ret < 0) {
-			dev_err(dev, "cannot enable interrupts during resume\n");
-			return ret;
-		}
-
-		/*
-		 * follow recommended programming flows to avoid
-		 * timeouts when gsync is enabled
-		 */
-		if (bus->multi_link)
-			intel_shim_sync_arm(sdw);
-
-		/*
-		 * Re-initialize the IP since it was powered-off
-		 */
-		sdw_cdns_init(&sdw->cdns);
-
-	} else {
-		ret = sdw_cdns_enable_interrupt(cdns, true);
-		if (ret < 0) {
-			dev_err(dev, "cannot enable interrupts during resume\n");
-			return ret;
-		}
-	}
-
-	ret = sdw_cdns_clock_restart(cdns, !clock_stop0);
-	if (ret < 0) {
-		dev_err(dev, "unable to restart clock during resume\n");
-		goto err_interrupt;
-	}
-
-	if (!clock_stop0) {
-		ret = sdw_cdns_exit_reset(cdns);
-		if (ret < 0) {
-			dev_err(dev, "unable to exit bus reset sequence during resume\n");
-			goto err_interrupt;
-		}
-
-		if (bus->multi_link) {
-			ret = intel_shim_sync_go(sdw);
-			if (ret < 0) {
-				dev_err(sdw->cdns.dev, "sync go failed during resume\n");
-				goto err_interrupt;
-			}
-		}
-	}
-	sdw_cdns_check_self_clearing_bits(cdns, __func__, true, INTEL_MASTER_RESET_ITERATIONS);
-
-	return 0;
-
-err_interrupt:
-	sdw_cdns_enable_interrupt(cdns, false);
-	return ret;
-}
-
-static void intel_check_clock_stop(struct sdw_intel *sdw)
-{
-	struct device *dev = sdw->cdns.dev;
-	bool clock_stop0;
-
-	clock_stop0 = sdw_cdns_is_clock_stop(&sdw->cdns);
-	if (!clock_stop0)
-		dev_err(dev, "%s: invalid configuration, clock was not stopped\n", __func__);
-}
-
-static int intel_start_bus_after_clock_stop(struct sdw_intel *sdw)
-{
-	struct device *dev = sdw->cdns.dev;
-	struct sdw_cdns *cdns = &sdw->cdns;
-	int ret;
-
-	ret = sdw_cdns_enable_interrupt(cdns, true);
-	if (ret < 0) {
-		dev_err(dev, "%s: cannot enable interrupts: %d\n", __func__, ret);
-		return ret;
-	}
-
-	ret = sdw_cdns_clock_restart(cdns, false);
-	if (ret < 0) {
-		dev_err(dev, "%s: unable to restart clock: %d\n", __func__, ret);
-		sdw_cdns_enable_interrupt(cdns, false);
-		return ret;
-	}
-
-	sdw_cdns_check_self_clearing_bits(cdns, "intel_resume_runtime no_quirks",
-					  true, INTEL_MASTER_RESET_ITERATIONS);
-
-	return 0;
-}
-
-static int intel_stop_bus(struct sdw_intel *sdw, bool clock_stop)
-{
-	struct device *dev = sdw->cdns.dev;
-	struct sdw_cdns *cdns = &sdw->cdns;
-	bool wake_enable = false;
-	int ret;
-
-	if (clock_stop) {
-		ret = sdw_cdns_clock_stop(cdns, true);
-		if (ret < 0)
-			dev_err(dev, "%s: cannot stop clock: %d\n", __func__, ret);
-		else
-			wake_enable = true;
-	}
-
-	ret = sdw_cdns_enable_interrupt(cdns, false);
-	if (ret < 0) {
-		dev_err(dev, "%s: cannot disable interrupts: %d\n", __func__, ret);
-		return ret;
-	}
-
-	ret = intel_link_power_down(sdw);
-	if (ret) {
-		dev_err(dev, "%s: Link power down failed: %d\n", __func__, ret);
-		return ret;
-	}
-
-	intel_shim_wake(sdw, wake_enable);
-
-	return 0;
-}
 
 const struct sdw_intel_hw_ops sdw_intel_cnl_hw_ops = {
 	.debugfs_init = intel_debugfs_init,
@@ -1418,6 +1112,10 @@ const struct sdw_intel_hw_ops sdw_intel_cnl_hw_ops = {
 
 	.pre_bank_switch = intel_pre_bank_switch,
 	.post_bank_switch = intel_post_bank_switch,
+
+	.sync_arm = intel_shim_sync_arm,
+	.sync_go_unlocked = intel_shim_sync_go_unlocked,
+	.sync_go = intel_shim_sync_go,
+	.sync_check_cmdsync_unlocked = intel_check_cmdsync_unlocked,
 };
 EXPORT_SYMBOL_NS(sdw_intel_cnl_hw_ops, SOUNDWIRE_INTEL);
-

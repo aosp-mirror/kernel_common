@@ -70,7 +70,7 @@ void (*pm_power_off)(void);
 EXPORT_SYMBOL_GPL(pm_power_off);
 
 #ifdef CONFIG_HOTPLUG_CPU
-void arch_cpu_idle_dead(void)
+void __noreturn arch_cpu_idle_dead(void)
 {
        cpu_die();
 }
@@ -218,7 +218,7 @@ void __show_regs(struct pt_regs *regs)
 
 	if (!user_mode(regs)) {
 		printk("pc : %pS\n", (void *)regs->pc);
-		printk("lr : %pS\n", (void *)ptrauth_strip_insn_pac(lr));
+		printk("lr : %pS\n", (void *)ptrauth_strip_kernel_insn_pac(lr));
 	} else {
 		printk("pc : %016llx\n", regs->pc);
 		printk("lr : %016llx\n", lr);
@@ -291,9 +291,6 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 	if (current->mm)
 		fpsimd_preserve_current_state();
 	*dst = *src;
-
-	/* We rely on the above assignment to initialize dst's thread_flags: */
-	BUILD_BUG_ON(!IS_ENABLED(CONFIG_THREAD_INFO_IN_TASK));
 
 	/*
 	 * Detach src's sve_state (if any) from dst so that it does not
@@ -456,7 +453,7 @@ static void ssbs_thread_switch(struct task_struct *next)
 	 * If all CPUs implement the SSBS extension, then we just need to
 	 * context-switch the PSTATE field.
 	 */
-	if (cpus_have_const_cap(ARM64_SSBS))
+	if (alternative_has_cap_unlikely(ARM64_SSBS))
 		return;
 
 	spectre_v4_enable_task_mitigation(next);
@@ -732,7 +729,6 @@ static struct ctl_table tagged_addr_sysctl_table[] = {
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_ONE,
 	},
-	{ }
 };
 
 static int __init tagged_addr_init(void)

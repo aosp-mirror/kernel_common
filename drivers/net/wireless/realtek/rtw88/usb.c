@@ -24,12 +24,43 @@ struct rtw_usb_txcb {
 static void rtw_usb_fill_tx_checksum(struct rtw_usb *rtwusb,
 				     struct sk_buff *skb, int agg_num)
 {
+	struct rtw_tx_desc *tx_desc = (struct rtw_tx_desc *)skb->data;
 	struct rtw_dev *rtwdev = rtwusb->rtwdev;
 	struct rtw_tx_pkt_info pkt_info;
 
-	SET_TX_DESC_DMA_TXAGG_NUM(skb->data, agg_num);
-	pkt_info.pkt_offset = GET_TX_DESC_PKT_OFFSET(skb->data);
+	le32p_replace_bits(&tx_desc->w7, agg_num, RTW_TX_DESC_W7_DMA_TXAGG_NUM);
+	pkt_info.pkt_offset = le32_get_bits(tx_desc->w1, RTW_TX_DESC_W1_PKT_OFFSET);
 	rtw_tx_fill_txdesc_checksum(rtwdev, &pkt_info, skb->data);
+}
+
+static void rtw_usb_reg_sec(struct rtw_dev *rtwdev, u32 addr, __le32 *data)
+{
+	struct rtw_usb *rtwusb = rtw_get_usb_priv(rtwdev);
+	struct usb_device *udev = rtwusb->udev;
+	bool reg_on_section = false;
+	u16 t_reg = 0x4e0;
+	u8 t_len = 1;
+	int status;
+
+	/* There are three sections:
+	 * 1. on (0x00~0xFF; 0x1000~0x10FF): this section is always powered on
+	 * 2. off (< 0xFE00, excluding "on" section): this section could be
+	 *    powered off
+	 * 3. local (>= 0xFE00): usb specific registers section
+	 */
+	if (addr <= 0xff || (addr >= 0x1000 && addr <= 0x10ff))
+		reg_on_section = true;
+
+	if (!reg_on_section)
+		return;
+
+	status = usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
+				 RTW_USB_CMD_REQ, RTW_USB_CMD_WRITE,
+				 t_reg, 0, data, t_len, 500);
+
+	if (status != t_len && status != -ENODEV)
+		rtw_err(rtwdev, "%s: reg 0x%x, usb write %u fail, status: %d\n",
+			__func__, t_reg, t_len, status);
 }
 
 static u32 rtw_usb_read(struct rtw_dev *rtwdev, u32 addr, u16 len)
@@ -56,6 +87,11 @@ static u32 rtw_usb_read(struct rtw_dev *rtwdev, u32 addr, u16 len)
 	if (ret < 0 && ret != -ENODEV && count++ < 4)
 		rtw_err(rtwdev, "read register 0x%x failed with %d\n",
 			addr, ret);
+
+	if (rtwdev->chip->id == RTW_CHIP_TYPE_8822C ||
+	    rtwdev->chip->id == RTW_CHIP_TYPE_8822B ||
+	    rtwdev->chip->id == RTW_CHIP_TYPE_8821C)
+		rtw_usb_reg_sec(rtwdev, addr, data);
 
 	return le32_to_cpu(*data);
 }
@@ -101,6 +137,11 @@ static void rtw_usb_write(struct rtw_dev *rtwdev, u32 addr, u32 val, int len)
 	if (ret < 0 && ret != -ENODEV && count++ < 4)
 		rtw_err(rtwdev, "write register 0x%x failed with %d\n",
 			addr, ret);
+
+	if (rtwdev->chip->id == RTW_CHIP_TYPE_8822C ||
+	    rtwdev->chip->id == RTW_CHIP_TYPE_8822B ||
+	    rtwdev->chip->id == RTW_CHIP_TYPE_8821C)
+		rtw_usb_reg_sec(rtwdev, addr, data);
 }
 
 static void rtw_usb_write8(struct rtw_dev *rtwdev, u32 addr, u8 val)
@@ -118,6 +159,22 @@ static void rtw_usb_write32(struct rtw_dev *rtwdev, u32 addr, u32 val)
 	rtw_usb_write(rtwdev, addr, val, 4);
 }
 
+static int dma_mapping_to_ep(enum rtw_dma_mapping dma_mapping)
+{
+	switch (dma_mapping) {
+	case RTW_DMA_MAPPING_HIGH:
+		return 0;
+	case RTW_DMA_MAPPING_NORMAL:
+		return 1;
+	case RTW_DMA_MAPPING_LOW:
+		return 2;
+	case RTW_DMA_MAPPING_EXTRA:
+		return 3;
+	default:
+		return -EINVAL;
+	}
+}
+
 static int rtw_usb_parse(struct rtw_dev *rtwdev,
 			 struct usb_interface *interface)
 {
@@ -125,10 +182,11 @@ static int rtw_usb_parse(struct rtw_dev *rtwdev,
 	struct usb_host_interface *host_interface = &interface->altsetting[0];
 	struct usb_interface_descriptor *interface_desc = &host_interface->desc;
 	struct usb_endpoint_descriptor *endpoint;
-	struct usb_device *usbd = interface_to_usbdev(interface);
 	int num_out_pipes = 0;
 	int i;
 	u8 num;
+	const struct rtw_chip_info *chip = rtwdev->chip;
+	const struct rtw_rqpn *rqpn;
 
 	for (i = 0; i < interface_desc->bNumEndpoints; i++) {
 		endpoint = &host_interface->endpoint[i].desc;
@@ -165,48 +223,35 @@ static int rtw_usb_parse(struct rtw_dev *rtwdev,
 		}
 	}
 
-	switch (usbd->speed) {
-	case USB_SPEED_LOW:
-	case USB_SPEED_FULL:
-		rtwusb->bulkout_size = RTW_USB_FULL_SPEED_BULK_SIZE;
-		break;
-	case USB_SPEED_HIGH:
-		rtwusb->bulkout_size = RTW_USB_HIGH_SPEED_BULK_SIZE;
-		break;
-	case USB_SPEED_SUPER:
-		rtwusb->bulkout_size = RTW_USB_SUPER_SPEED_BULK_SIZE;
-		break;
-	default:
-		rtw_err(rtwdev, "failed to detect usb speed\n");
-		return -EINVAL;
-	}
-
 	rtwdev->hci.bulkout_num = num_out_pipes;
 
-	switch (num_out_pipes) {
-	case 4:
-	case 3:
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID0] = 2;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID1] = 2;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID2] = 2;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID3] = 2;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID4] = 1;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID5] = 1;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID6] = 0;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID7] = 0;
-		break;
-	case 2:
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID0] = 1;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID1] = 1;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID2] = 1;
-		rtwusb->qsel_to_ep[TX_DESC_QSEL_TID3] = 1;
-		break;
-	case 1:
-		break;
-	default:
-		rtw_err(rtwdev, "failed to get out_pipes(%d)\n", num_out_pipes);
+	if (num_out_pipes < 1 || num_out_pipes > 4) {
+		rtw_err(rtwdev, "invalid number of endpoints %d\n", num_out_pipes);
 		return -EINVAL;
 	}
+
+	rqpn = &chip->rqpn_table[num_out_pipes];
+
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID0] = dma_mapping_to_ep(rqpn->dma_map_be);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID1] = dma_mapping_to_ep(rqpn->dma_map_bk);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID2] = dma_mapping_to_ep(rqpn->dma_map_bk);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID3] = dma_mapping_to_ep(rqpn->dma_map_be);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID4] = dma_mapping_to_ep(rqpn->dma_map_vi);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID5] = dma_mapping_to_ep(rqpn->dma_map_vi);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID6] = dma_mapping_to_ep(rqpn->dma_map_vo);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID7] = dma_mapping_to_ep(rqpn->dma_map_vo);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID8] = -EINVAL;
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID9] = -EINVAL;
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID10] = -EINVAL;
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID11] = -EINVAL;
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID12] = -EINVAL;
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID13] = -EINVAL;
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID14] = -EINVAL;
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_TID15] = -EINVAL;
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_BEACON] = dma_mapping_to_ep(rqpn->dma_map_hi);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_HIGH] = dma_mapping_to_ep(rqpn->dma_map_hi);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_MGMT] = dma_mapping_to_ep(rqpn->dma_map_mg);
+	rtwusb->qsel_to_ep[TX_DESC_QSEL_H2C] = dma_mapping_to_ep(rqpn->dma_map_hi);
 
 	return 0;
 }
@@ -250,7 +295,7 @@ static void rtw_usb_write_port_tx_complete(struct urb *urb)
 static int qsel_to_ep(struct rtw_usb *rtwusb, unsigned int qsel)
 {
 	if (qsel >= ARRAY_SIZE(rtwusb->qsel_to_ep))
-		return 0;
+		return -EINVAL;
 
 	return rtwusb->qsel_to_ep[qsel];
 }
@@ -264,6 +309,9 @@ static int rtw_usb_write_port(struct rtw_dev *rtwdev, u8 qsel, struct sk_buff *s
 	unsigned int pipe;
 	int ret;
 	int ep = qsel_to_ep(rtwusb, qsel);
+
+	if (ep < 0)
+		return ep;
 
 	pipe = usb_sndbulkpipe(usbd, rtwusb->out_ep[ep]);
 	urb = usb_alloc_urb(0, GFP_ATOMIC);
@@ -282,11 +330,13 @@ static int rtw_usb_write_port(struct rtw_dev *rtwdev, u8 qsel, struct sk_buff *s
 static bool rtw_usb_tx_agg_skb(struct rtw_usb *rtwusb, struct sk_buff_head *list)
 {
 	struct rtw_dev *rtwdev = rtwusb->rtwdev;
+	struct rtw_tx_desc *tx_desc;
 	struct rtw_usb_txcb *txcb;
 	struct sk_buff *skb_head;
 	struct sk_buff *skb_iter;
 	int agg_num = 0;
 	unsigned int align_next = 0;
+	u8 qsel;
 
 	if (skb_queue_empty(list))
 		return false;
@@ -339,9 +389,10 @@ static bool rtw_usb_tx_agg_skb(struct rtw_usb *rtwusb, struct sk_buff_head *list
 
 queue:
 	skb_queue_tail(&txcb->tx_ack_queue, skb_head);
+	tx_desc = (struct rtw_tx_desc *)skb_head->data;
+	qsel = le32_get_bits(tx_desc->w1, RTW_TX_DESC_W1_QSEL);
 
-	rtw_usb_write_port(rtwdev, GET_TX_DESC_QSEL(skb_head->data), skb_head,
-			   rtw_usb_write_port_tx_complete, txcb);
+	rtw_usb_write_port(rtwdev, qsel, skb_head, rtw_usb_write_port_tx_complete, txcb);
 
 	return true;
 }
@@ -441,6 +492,9 @@ static u8 rtw_usb_tx_queue_mapping_to_qsel(struct sk_buff *skb)
 
 	if (unlikely(ieee80211_is_mgmt(fc) || ieee80211_is_ctl(fc)))
 		qsel = TX_DESC_QSEL_MGMT;
+	else if (is_broadcast_ether_addr(hdr->addr1) ||
+		 is_multicast_ether_addr(hdr->addr1))
+		qsel = TX_DESC_QSEL_HIGH;
 	else if (skb_get_queue_mapping(skb) <= IEEE80211_AC_BK)
 		qsel = skb->priority;
 	else
@@ -511,7 +565,7 @@ static void rtw_usb_rx_handler(struct work_struct *work)
 		}
 
 		if (skb_queue_len(&rtwusb->rx_queue) >= RTW_USB_MAX_RXQ_LEN) {
-			rtw_err(rtwdev, "failed to get rx_queue, overflow\n");
+			dev_dbg_ratelimited(rtwdev->dev, "failed to get rx_queue, overflow\n");
 			dev_kfree_skb_any(skb);
 			continue;
 		}
@@ -597,8 +651,7 @@ static void rtw_usb_cancel_rx_bufs(struct rtw_usb *rtwusb)
 
 	for (i = 0; i < RTW_USB_RXCB_NUM; i++) {
 		rxcb = &rtwusb->rx_cb[i];
-		if (rxcb->rx_urb)
-			usb_kill_urb(rxcb->rx_urb);
+		usb_kill_urb(rxcb->rx_urb);
 	}
 }
 
@@ -609,10 +662,8 @@ static void rtw_usb_free_rx_bufs(struct rtw_usb *rtwusb)
 
 	for (i = 0; i < RTW_USB_RXCB_NUM; i++) {
 		rxcb = &rtwusb->rx_cb[i];
-		if (rxcb->rx_urb) {
-			usb_kill_urb(rxcb->rx_urb);
-			usb_free_urb(rxcb->rx_urb);
-		}
+		usb_kill_urb(rxcb->rx_urb);
+		usb_free_urb(rxcb->rx_urb);
 	}
 }
 
@@ -623,7 +674,6 @@ static int rtw_usb_alloc_rx_bufs(struct rtw_usb *rtwusb)
 	for (i = 0; i < RTW_USB_RXCB_NUM; i++) {
 		struct rx_usb_ctrl_block *rxcb = &rtwusb->rx_cb[i];
 
-		rxcb->n = i;
 		rxcb->rtwdev = rtwusb->rtwdev;
 		rxcb->rx_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!rxcb->rx_urb)
@@ -780,6 +830,7 @@ static void rtw_usb_intf_deinit(struct rtw_dev *rtwdev,
 	struct rtw_usb *rtwusb = rtw_get_usb_priv(rtwdev);
 
 	usb_put_dev(rtwusb->udev);
+	kfree(rtwusb->usb_data);
 	usb_set_intfdata(intf, NULL);
 }
 
@@ -808,11 +859,11 @@ int rtw_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	ret = rtw_usb_alloc_rx_bufs(rtwusb);
 	if (ret)
-		return ret;
+		goto err_release_hw;
 
 	ret = rtw_core_init(rtwdev);
 	if (ret)
-		goto err_release_hw;
+		goto err_free_rx_bufs;
 
 	ret = rtw_usb_intf_init(rtwdev, intf);
 	if (ret) {
@@ -858,6 +909,9 @@ err_destroy_usb:
 err_deinit_core:
 	rtw_core_deinit(rtwdev);
 
+err_free_rx_bufs:
+	rtw_usb_free_rx_bufs(rtwusb);
+
 err_release_hw:
 	ieee80211_free_hw(hw);
 
@@ -895,5 +949,5 @@ void rtw_usb_disconnect(struct usb_interface *intf)
 EXPORT_SYMBOL(rtw_usb_disconnect);
 
 MODULE_AUTHOR("Realtek Corporation");
-MODULE_DESCRIPTION("Realtek 802.11ac wireless USB driver");
+MODULE_DESCRIPTION("Realtek USB 802.11ac wireless driver");
 MODULE_LICENSE("Dual BSD/GPL");

@@ -512,12 +512,12 @@ static ssize_t firmware_version_show(struct device *dev,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct ilitek_ts_data *ts = i2c_get_clientdata(client);
 
-	return scnprintf(buf, PAGE_SIZE,
-			 "fw version: [%02X%02X.%02X%02X.%02X%02X.%02X%02X]\n",
-			 ts->firmware_ver[0], ts->firmware_ver[1],
-			 ts->firmware_ver[2], ts->firmware_ver[3],
-			 ts->firmware_ver[4], ts->firmware_ver[5],
-			 ts->firmware_ver[6], ts->firmware_ver[7]);
+	return sysfs_emit(buf,
+			  "fw version: [%02X%02X.%02X%02X.%02X%02X.%02X%02X]\n",
+			  ts->firmware_ver[0], ts->firmware_ver[1],
+			  ts->firmware_ver[2], ts->firmware_ver[3],
+			  ts->firmware_ver[4], ts->firmware_ver[5],
+			  ts->firmware_ver[6], ts->firmware_ver[7]);
 }
 static DEVICE_ATTR_RO(firmware_version);
 
@@ -527,8 +527,8 @@ static ssize_t product_id_show(struct device *dev,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct ilitek_ts_data *ts = i2c_get_clientdata(client);
 
-	return scnprintf(buf, PAGE_SIZE, "product id: [%04X], module: [%s]\n",
-			 ts->mcu_ver, ts->product_id);
+	return sysfs_emit(buf, "product id: [%04X], module: [%s]\n",
+			  ts->mcu_ver, ts->product_id);
 }
 static DEVICE_ATTR_RO(product_id);
 
@@ -537,10 +537,7 @@ static struct attribute *ilitek_sysfs_attrs[] = {
 	&dev_attr_product_id.attr,
 	NULL
 };
-
-static struct attribute_group ilitek_attrs_group = {
-	.attrs = ilitek_sysfs_attrs,
-};
+ATTRIBUTE_GROUPS(ilitek_sysfs);
 
 static int ilitek_ts_i2c_probe(struct i2c_client *client)
 {
@@ -595,16 +592,10 @@ static int ilitek_ts_i2c_probe(struct i2c_client *client)
 		return error;
 	}
 
-	error = devm_device_add_group(dev, &ilitek_attrs_group);
-	if (error) {
-		dev_err(dev, "sysfs create group failed: %d\n", error);
-		return error;
-	}
-
 	return 0;
 }
 
-static int __maybe_unused ilitek_suspend(struct device *dev)
+static int ilitek_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct ilitek_ts_data *ts = i2c_get_clientdata(client);
@@ -621,7 +612,7 @@ static int __maybe_unused ilitek_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused ilitek_resume(struct device *dev)
+static int ilitek_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct ilitek_ts_data *ts = i2c_get_clientdata(client);
@@ -640,11 +631,11 @@ static int __maybe_unused ilitek_resume(struct device *dev)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(ilitek_pm_ops, ilitek_suspend, ilitek_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(ilitek_pm_ops, ilitek_suspend, ilitek_resume);
 
 static const struct i2c_device_id ilitek_ts_i2c_id[] = {
-	{ ILITEK_TS_NAME, 0 },
-	{ },
+	{ ILITEK_TS_NAME },
+	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ilitek_ts_i2c_id);
 
@@ -675,11 +666,12 @@ MODULE_DEVICE_TABLE(of, ilitek_ts_i2c_match);
 static struct i2c_driver ilitek_ts_i2c_driver = {
 	.driver = {
 		.name = ILITEK_TS_NAME,
-		.pm = &ilitek_pm_ops,
+		.dev_groups = ilitek_sysfs_groups,
+		.pm = pm_sleep_ptr(&ilitek_pm_ops),
 		.of_match_table = of_match_ptr(ilitek_ts_i2c_match),
 		.acpi_match_table = ACPI_PTR(ilitekts_acpi_id),
 	},
-	.probe_new = ilitek_ts_i2c_probe,
+	.probe = ilitek_ts_i2c_probe,
 	.id_table = ilitek_ts_i2c_id,
 };
 module_i2c_driver(ilitek_ts_i2c_driver);

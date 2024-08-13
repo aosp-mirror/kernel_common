@@ -11,7 +11,6 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/of_dma.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
@@ -579,7 +578,7 @@ static void sprd_spi_dma_release(struct sprd_spi *ss)
 static int sprd_spi_dma_txrx_bufs(struct spi_device *sdev,
 				  struct spi_transfer *t)
 {
-	struct sprd_spi *ss = spi_master_get_devdata(sdev->master);
+	struct sprd_spi *ss = spi_controller_get_devdata(sdev->controller);
 	u32 trans_len = ss->trans_len;
 	int ret, write_size = 0;
 
@@ -924,13 +923,12 @@ static int sprd_spi_probe(struct platform_device *pdev)
 	int ret;
 
 	pdev->id = of_alias_get_id(pdev->dev.of_node, "spi");
-	sctlr = spi_alloc_master(&pdev->dev, sizeof(*ss));
+	sctlr = spi_alloc_host(&pdev->dev, sizeof(*ss));
 	if (!sctlr)
 		return -ENOMEM;
 
 	ss = spi_controller_get_devdata(sctlr);
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	ss->base = devm_ioremap_resource(&pdev->dev, res);
+	ss->base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
 	if (IS_ERR(ss->base)) {
 		ret = PTR_ERR(ss->base);
 		goto free_controller;
@@ -1002,27 +1000,25 @@ free_controller:
 	return ret;
 }
 
-static int sprd_spi_remove(struct platform_device *pdev)
+static void sprd_spi_remove(struct platform_device *pdev)
 {
 	struct spi_controller *sctlr = platform_get_drvdata(pdev);
 	struct sprd_spi *ss = spi_controller_get_devdata(sctlr);
 	int ret;
 
-	ret = pm_runtime_resume_and_get(ss->dev);
-	if (ret < 0) {
+	ret = pm_runtime_get_sync(ss->dev);
+	if (ret < 0)
 		dev_err(ss->dev, "failed to resume SPI controller\n");
-		return ret;
-	}
 
 	spi_controller_suspend(sctlr);
 
-	if (ss->dma.enable)
-		sprd_spi_dma_release(ss);
-	clk_disable_unprepare(ss->clk);
+	if (ret >= 0) {
+		if (ss->dma.enable)
+			sprd_spi_dma_release(ss);
+		clk_disable_unprepare(ss->clk);
+	}
 	pm_runtime_put_noidle(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
-
-	return 0;
 }
 
 static int __maybe_unused sprd_spi_runtime_suspend(struct device *dev)
@@ -1076,7 +1072,7 @@ static struct platform_driver sprd_spi_driver = {
 		.pm = &sprd_spi_pm_ops,
 	},
 	.probe = sprd_spi_probe,
-	.remove  = sprd_spi_remove,
+	.remove_new = sprd_spi_remove,
 };
 
 module_platform_driver(sprd_spi_driver);

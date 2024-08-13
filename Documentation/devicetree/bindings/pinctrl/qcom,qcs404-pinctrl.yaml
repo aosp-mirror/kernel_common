@@ -26,13 +26,8 @@ properties:
       - const: north
       - const: east
 
-  interrupts: true
-  interrupt-controller: true
-  "#interrupt-cells": true
-  gpio-controller: true
-  "#gpio-cells": true
-  gpio-ranges: true
-  wakeup-parent: true
+  interrupts:
+    maxItems: 1
 
   gpio-reserved-ranges:
     minItems: 1
@@ -57,6 +52,7 @@ $defs:
       Pinctrl node's client devices use subnodes for desired pin configuration.
       Client device subnodes use below standard properties.
     $ref: qcom,tlmm-common.yaml#/$defs/qcom-tlmm-state
+    unevaluatedProperties: false
 
     properties:
       pins:
@@ -117,18 +113,8 @@ $defs:
                 spdifrx_opt, spi_lcd, spkr_dac0, wlan1_adc0, wlan1_adc1,
                 wlan2_adc0, wlan2_adc1, wsa_en ]
 
-      bias-pull-down: true
-      bias-pull-up: true
-      bias-disable: true
-      drive-strength: true
-      input-enable: true
-      output-high: true
-      output-low: true
-
     required:
       - pins
-
-    additionalProperties: false
 
 allOf:
   - $ref: /schemas/pinctrl/qcom,tlmm-common.yaml#
@@ -137,7 +123,7 @@ required:
   - compatible
   - reg
 
-additionalProperties: false
+unevaluatedProperties: false
 
 examples:
   - |

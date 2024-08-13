@@ -35,7 +35,7 @@ static int check_load(const char *file, enum bpf_prog_type type)
 	}
 
 	bpf_program__set_type(prog, type);
-	bpf_program__set_flags(prog, BPF_F_TEST_RND_HI32);
+	bpf_program__set_flags(prog, testing_prog_flags());
 	bpf_program__set_log_level(prog, 4 | extra_prog_load_log_flags);
 
 	err = bpf_object__load(obj);
@@ -142,6 +142,12 @@ void test_verif_scale_pyperf600_nounroll()
 	 * Total of 5 such loops. Total program size ~1500 insns.
 	 */
 	scale_test("pyperf600_nounroll.bpf.o", BPF_PROG_TYPE_RAW_TRACEPOINT, false);
+}
+
+void test_verif_scale_pyperf600_iter()
+{
+	/* open-coded BPF iterator version */
+	scale_test("pyperf600_iter.bpf.o", BPF_PROG_TYPE_RAW_TRACEPOINT, false);
 }
 
 void test_verif_scale_loop1()

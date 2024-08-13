@@ -67,9 +67,9 @@ tree - drivers/accel/.
 The accelerator devices will be exposed to the user space with the dedicated
 261 major number and will have the following convention:
 
-- device char files - /dev/accel/accel*
-- sysfs             - /sys/class/accel/accel*/
-- debugfs           - /sys/kernel/debug/accel/accel*/
+- device char files - /dev/accel/accel\*
+- sysfs             - /sys/class/accel/accel\*/
+- debugfs           - /sys/kernel/debug/accel/\*/
 
 Getting Started
 ===============
@@ -101,8 +101,8 @@ External References
 email threads
 -------------
 
-* `Initial discussion on the New subsystem for acceleration devices <https://lkml.org/lkml/2022/7/31/83>`_ - Oded Gabbay (2022)
-* `patch-set to add the new subsystem <https://lkml.org/lkml/2022/10/22/544>`_ - Oded Gabbay (2022)
+* `Initial discussion on the New subsystem for acceleration devices <https://lore.kernel.org/lkml/CAFCwf11=9qpNAepL7NL+YAV_QO=Wv6pnWPhKHKAepK3fNn+2Dg@mail.gmail.com/>`_ - Oded Gabbay (2022)
+* `patch-set to add the new subsystem <https://lore.kernel.org/lkml/20221022214622.18042-1-ogabbay@kernel.org/>`_ - Oded Gabbay (2022)
 
 Conference talks
 ----------------

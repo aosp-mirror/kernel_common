@@ -19,6 +19,8 @@
 #define FUNCTION_DESCR_SIZE	0
 #endif
 
+#define CTX_NIA(ctx) ((unsigned long)ctx->idx * 4)
+
 #define PLANT_INSTR(d, idx, instr)					      \
 	do { if (d) { (d)[idx] = instr; } idx++; } while (0)
 #define EMIT(instr)		PLANT_INSTR(image, ctx->idx, instr)
@@ -26,7 +28,7 @@
 /* Long jump; (unconditional 'branch') */
 #define PPC_JMP(dest)							      \
 	do {								      \
-		long offset = (long)(dest) - (ctx->idx * 4);		      \
+		long offset = (long)(dest) - CTX_NIA(ctx);		      \
 		if ((dest) != 0 && !is_offset_in_branch_range(offset)) {		      \
 			pr_err_ratelimited("Branch offset 0x%lx (@%u) out of range\n", offset, ctx->idx);			\
 			return -ERANGE;					      \
@@ -34,13 +36,10 @@
 		EMIT(PPC_RAW_BRANCH(offset));				      \
 	} while (0)
 
-/* bl (unconditional 'branch' with link) */
-#define PPC_BL(dest)	EMIT(PPC_RAW_BL((dest) - (unsigned long)(image + ctx->idx)))
-
 /* "cond" here covers BO:BI fields. */
 #define PPC_BCC_SHORT(cond, dest)					      \
 	do {								      \
-		long offset = (long)(dest) - (ctx->idx * 4);		      \
+		long offset = (long)(dest) - CTX_NIA(ctx);		      \
 		if ((dest) != 0 && !is_offset_in_cond_branch_range(offset)) {		      \
 			pr_err_ratelimited("Conditional branch offset 0x%lx (@%u) out of range\n", offset, ctx->idx);		\
 			return -ERANGE;					      \
@@ -92,12 +91,12 @@
  * state.
  */
 #define PPC_BCC(cond, dest)	do {					      \
-		if (is_offset_in_cond_branch_range((long)(dest) - (ctx->idx * 4))) {	\
+		if (is_offset_in_cond_branch_range((long)(dest) - CTX_NIA(ctx))) {	\
 			PPC_BCC_SHORT(cond, dest);			      \
 			EMIT(PPC_RAW_NOP());				      \
 		} else {						      \
 			/* Flip the 'T or F' bit to invert comparison */      \
-			PPC_BCC_SHORT(cond ^ COND_CMP_TRUE, (ctx->idx+2)*4);  \
+			PPC_BCC_SHORT(cond ^ COND_CMP_TRUE, CTX_NIA(ctx) + 2*4);  \
 			PPC_JMP(dest);					      \
 		} } while(0)
 
@@ -145,12 +144,6 @@ struct codegen_context {
 #define BPF_FIXUP_LEN	2 /* Two instructions => 8 bytes */
 #endif
 
-static inline void bpf_flush_icache(void *start, void *end)
-{
-	smp_wmb();	/* smp write barrier */
-	flush_icache_range((unsigned long)start, (unsigned long)end);
-}
-
 static inline bool bpf_is_seen_register(struct codegen_context *ctx, int i)
 {
 	return ctx->seen & (1 << (31 - i));
@@ -167,16 +160,17 @@ static inline void bpf_clear_seen_register(struct codegen_context *ctx, int i)
 }
 
 void bpf_jit_init_reg_mapping(struct codegen_context *ctx);
-int bpf_jit_emit_func_call_rel(u32 *image, struct codegen_context *ctx, u64 func);
-int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *ctx,
-		       u32 *addrs, int pass);
+int bpf_jit_emit_func_call_rel(u32 *image, u32 *fimage, struct codegen_context *ctx, u64 func);
+int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, u32 *fimage, struct codegen_context *ctx,
+		       u32 *addrs, int pass, bool extra_pass);
 void bpf_jit_build_prologue(u32 *image, struct codegen_context *ctx);
 void bpf_jit_build_epilogue(u32 *image, struct codegen_context *ctx);
 void bpf_jit_realloc_regs(struct codegen_context *ctx);
 int bpf_jit_emit_exit_insn(u32 *image, struct codegen_context *ctx, int tmp_reg, long exit_addr);
 
-int bpf_add_extable_entry(struct bpf_prog *fp, u32 *image, int pass, struct codegen_context *ctx,
-			  int insn_idx, int jmp_off, int dst_reg);
+int bpf_add_extable_entry(struct bpf_prog *fp, u32 *image, u32 *fimage, int pass,
+			  struct codegen_context *ctx, int insn_idx,
+			  int jmp_off, int dst_reg);
 
 #endif
 

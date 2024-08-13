@@ -41,7 +41,7 @@ struct packet_router {
 struct apr_rx_buf {
 	struct list_head node;
 	int len;
-	uint8_t buf[];
+	uint8_t buf[] __counted_by(len);
 };
 
 /**
@@ -171,7 +171,7 @@ static int apr_callback(struct rpmsg_device *rpdev, void *buf,
 		return -EINVAL;
 	}
 
-	abuf = kzalloc(sizeof(*abuf) + len, GFP_ATOMIC);
+	abuf = kzalloc(struct_size(abuf, buf, len), GFP_ATOMIC);
 	if (!abuf)
 		return -ENOMEM;
 
@@ -387,9 +387,9 @@ static void apr_device_remove(struct device *dev)
 	spin_unlock(&apr->svcs_lock);
 }
 
-static int apr_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int apr_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	struct apr_device *adev = to_apr_device(dev);
+	const struct apr_device *adev = to_apr_device(dev);
 	int ret;
 
 	ret = of_device_uevent_modalias(dev, env);
@@ -399,7 +399,7 @@ static int apr_uevent(struct device *dev, struct kobj_uevent_env *env)
 	return add_uevent_var(env, "MODALIAS=apr:%s", adev->name);
 }
 
-struct bus_type aprbus = {
+const struct bus_type aprbus = {
 	.name		= "aprbus",
 	.match		= apr_device_match,
 	.probe		= apr_device_probe,

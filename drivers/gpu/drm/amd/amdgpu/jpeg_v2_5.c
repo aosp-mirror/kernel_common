@@ -60,6 +60,7 @@ static int jpeg_v2_5_early_init(void *handle)
 	u32 harvest;
 	int i;
 
+	adev->jpeg.num_jpeg_rings = 1;
 	adev->jpeg.num_jpeg_inst = JPEG25_MAX_HW_INSTANCES_ARCTURUS;
 	for (i = 0; i < adev->jpeg.num_jpeg_inst; i++) {
 		harvest = RREG32_SOC15(JPEG, i, mmCC_UVD_HARVESTING);
@@ -102,13 +103,13 @@ static int jpeg_v2_5_sw_init(void *handle)
 
 		/* JPEG DJPEG POISON EVENT */
 		r = amdgpu_irq_add_id(adev, amdgpu_ih_clientid_jpeg[i],
-			VCN_2_6__SRCID_DJPEG0_POISON, &adev->jpeg.inst[i].irq);
+			VCN_2_6__SRCID_DJPEG0_POISON, &adev->jpeg.inst[i].ras_poison_irq);
 		if (r)
 			return r;
 
 		/* JPEG EJPEG POISON EVENT */
 		r = amdgpu_irq_add_id(adev, amdgpu_ih_clientid_jpeg[i],
-			VCN_2_6__SRCID_EJPEG0_POISON, &adev->jpeg.inst[i].irq);
+			VCN_2_6__SRCID_EJPEG0_POISON, &adev->jpeg.inst[i].ras_poison_irq);
 		if (r)
 			return r;
 	}
@@ -125,8 +126,12 @@ static int jpeg_v2_5_sw_init(void *handle)
 		if (adev->jpeg.harvest_config & (1 << i))
 			continue;
 
-		ring = &adev->jpeg.inst[i].ring_dec;
+		ring = adev->jpeg.inst[i].ring_dec;
 		ring->use_doorbell = true;
+		if (amdgpu_ip_version(adev, UVD_HWIP, 0) == IP_VERSION(2, 5, 0))
+			ring->vm_hub = AMDGPU_MMHUB1(0);
+		else
+			ring->vm_hub = AMDGPU_MMHUB0(0);
 		ring->doorbell_index = (adev->doorbell_index.vcn.vcn_ring0_1 << 1) + 1 + 8 * i;
 		sprintf(ring->name, "jpeg_dec_%d", i);
 		r = amdgpu_ring_init(adev, ring, 512, &adev->jpeg.inst[i].irq,
@@ -134,9 +139,13 @@ static int jpeg_v2_5_sw_init(void *handle)
 		if (r)
 			return r;
 
-		adev->jpeg.internal.jpeg_pitch = mmUVD_JPEG_PITCH_INTERNAL_OFFSET;
-		adev->jpeg.inst[i].external.jpeg_pitch = SOC15_REG_OFFSET(JPEG, i, mmUVD_JPEG_PITCH);
+		adev->jpeg.internal.jpeg_pitch[0] = mmUVD_JPEG_PITCH_INTERNAL_OFFSET;
+		adev->jpeg.inst[i].external.jpeg_pitch[0] = SOC15_REG_OFFSET(JPEG, i, mmUVD_JPEG_PITCH);
 	}
+
+	r = amdgpu_jpeg_ras_sw_init(adev);
+	if (r)
+		return r;
 
 	return 0;
 }
@@ -178,7 +187,7 @@ static int jpeg_v2_5_hw_init(void *handle)
 		if (adev->jpeg.harvest_config & (1 << i))
 			continue;
 
-		ring = &adev->jpeg.inst[i].ring_dec;
+		ring = adev->jpeg.inst[i].ring_dec;
 		adev->nbio.funcs->vcn_doorbell_range(adev, ring->use_doorbell,
 			(adev->doorbell_index.vcn.vcn_ring0_1 << 1) + 8 * i, i);
 
@@ -213,6 +222,9 @@ static int jpeg_v2_5_hw_fini(void *handle)
 		if (adev->jpeg.cur_state != AMD_PG_STATE_GATE &&
 		      RREG32_SOC15(JPEG, i, mmUVD_JRBC_STATUS))
 			jpeg_v2_5_set_powergating_state(adev, AMD_PG_STATE_GATE);
+
+		if (amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__JPEG))
+			amdgpu_irq_put(adev, &adev->jpeg.inst[i].ras_poison_irq, 0);
 	}
 
 	return 0;
@@ -318,7 +330,7 @@ static int jpeg_v2_5_start(struct amdgpu_device *adev)
 		if (adev->jpeg.harvest_config & (1 << i))
 			continue;
 
-		ring = &adev->jpeg.inst[i].ring_dec;
+		ring = adev->jpeg.inst[i].ring_dec;
 		/* disable anti hang mechanism */
 		WREG32_P(SOC15_REG_OFFSET(JPEG, i, mmUVD_JPEG_POWER_STATUS), 0,
 			~UVD_JPEG_POWER_STATUS__JPEG_POWER_STATUS_MASK);
@@ -539,7 +551,7 @@ static int jpeg_v2_5_set_powergating_state(void *handle,
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int ret;
 
-	if(state == adev->jpeg.cur_state)
+	if (state == adev->jpeg.cur_state)
 		return 0;
 
 	if (state == AMD_PG_STATE_GATE)
@@ -547,7 +559,7 @@ static int jpeg_v2_5_set_powergating_state(void *handle,
 	else
 		ret = jpeg_v2_5_start(adev);
 
-	if(!ret)
+	if (!ret)
 		adev->jpeg.cur_state = state;
 
 	return ret;
@@ -556,6 +568,14 @@ static int jpeg_v2_5_set_powergating_state(void *handle,
 static int jpeg_v2_5_set_interrupt_state(struct amdgpu_device *adev,
 					struct amdgpu_irq_src *source,
 					unsigned type,
+					enum amdgpu_interrupt_state state)
+{
+	return 0;
+}
+
+static int jpeg_v2_6_set_ras_interrupt_state(struct amdgpu_device *adev,
+					struct amdgpu_irq_src *source,
+					unsigned int type,
 					enum amdgpu_interrupt_state state)
 {
 	return 0;
@@ -583,11 +603,7 @@ static int jpeg_v2_5_process_interrupt(struct amdgpu_device *adev,
 
 	switch (entry->src_id) {
 	case VCN_2_0__SRCID__JPEG_DECODE:
-		amdgpu_fence_process(&adev->jpeg.inst[ip_instance].ring_dec);
-		break;
-	case VCN_2_6__SRCID_DJPEG0_POISON:
-	case VCN_2_6__SRCID_EJPEG0_POISON:
-		amdgpu_jpeg_process_poison_irq(adev, source, entry);
+		amdgpu_fence_process(adev->jpeg.inst[ip_instance].ring_dec);
 		break;
 	default:
 		DRM_ERROR("Unhandled interrupt: %d %d\n",
@@ -616,6 +632,8 @@ static const struct amd_ip_funcs jpeg_v2_5_ip_funcs = {
 	.post_soft_reset = NULL,
 	.set_clockgating_state = jpeg_v2_5_set_clockgating_state,
 	.set_powergating_state = jpeg_v2_5_set_powergating_state,
+	.dump_ip_state = NULL,
+	.print_ip_state = NULL,
 };
 
 static const struct amd_ip_funcs jpeg_v2_6_ip_funcs = {
@@ -636,12 +654,13 @@ static const struct amd_ip_funcs jpeg_v2_6_ip_funcs = {
 	.post_soft_reset = NULL,
 	.set_clockgating_state = jpeg_v2_5_set_clockgating_state,
 	.set_powergating_state = jpeg_v2_5_set_powergating_state,
+	.dump_ip_state = NULL,
+	.print_ip_state = NULL,
 };
 
 static const struct amdgpu_ring_funcs jpeg_v2_5_dec_ring_vm_funcs = {
 	.type = AMDGPU_RING_TYPE_VCN_JPEG,
 	.align_mask = 0xf,
-	.vmhub = AMDGPU_MMHUB_1,
 	.get_rptr = jpeg_v2_5_dec_ring_get_rptr,
 	.get_wptr = jpeg_v2_5_dec_ring_get_wptr,
 	.set_wptr = jpeg_v2_5_dec_ring_set_wptr,
@@ -671,7 +690,6 @@ static const struct amdgpu_ring_funcs jpeg_v2_5_dec_ring_vm_funcs = {
 static const struct amdgpu_ring_funcs jpeg_v2_6_dec_ring_vm_funcs = {
 	.type = AMDGPU_RING_TYPE_VCN_JPEG,
 	.align_mask = 0xf,
-	.vmhub = AMDGPU_MMHUB_0,
 	.get_rptr = jpeg_v2_5_dec_ring_get_rptr,
 	.get_wptr = jpeg_v2_5_dec_ring_get_wptr,
 	.set_wptr = jpeg_v2_5_dec_ring_set_wptr,
@@ -706,10 +724,10 @@ static void jpeg_v2_5_set_dec_ring_funcs(struct amdgpu_device *adev)
 		if (adev->jpeg.harvest_config & (1 << i))
 			continue;
 		if (adev->asic_type == CHIP_ARCTURUS)
-			adev->jpeg.inst[i].ring_dec.funcs = &jpeg_v2_5_dec_ring_vm_funcs;
+			adev->jpeg.inst[i].ring_dec->funcs = &jpeg_v2_5_dec_ring_vm_funcs;
 		else  /* CHIP_ALDEBARAN */
-			adev->jpeg.inst[i].ring_dec.funcs = &jpeg_v2_6_dec_ring_vm_funcs;
-		adev->jpeg.inst[i].ring_dec.me = i;
+			adev->jpeg.inst[i].ring_dec->funcs = &jpeg_v2_6_dec_ring_vm_funcs;
+		adev->jpeg.inst[i].ring_dec->me = i;
 		DRM_INFO("JPEG(%d) JPEG decode is enabled in VM mode\n", i);
 	}
 }
@@ -717,6 +735,11 @@ static void jpeg_v2_5_set_dec_ring_funcs(struct amdgpu_device *adev)
 static const struct amdgpu_irq_src_funcs jpeg_v2_5_irq_funcs = {
 	.set = jpeg_v2_5_set_interrupt_state,
 	.process = jpeg_v2_5_process_interrupt,
+};
+
+static const struct amdgpu_irq_src_funcs jpeg_v2_6_ras_irq_funcs = {
+	.set = jpeg_v2_6_set_ras_interrupt_state,
+	.process = amdgpu_jpeg_process_poison_irq,
 };
 
 static void jpeg_v2_5_set_irq_funcs(struct amdgpu_device *adev)
@@ -729,11 +752,13 @@ static void jpeg_v2_5_set_irq_funcs(struct amdgpu_device *adev)
 
 		adev->jpeg.inst[i].irq.num_types = 1;
 		adev->jpeg.inst[i].irq.funcs = &jpeg_v2_5_irq_funcs;
+
+		adev->jpeg.inst[i].ras_poison_irq.num_types = 1;
+		adev->jpeg.inst[i].ras_poison_irq.funcs = &jpeg_v2_6_ras_irq_funcs;
 	}
 }
 
-const struct amdgpu_ip_block_version jpeg_v2_5_ip_block =
-{
+const struct amdgpu_ip_block_version jpeg_v2_5_ip_block = {
 		.type = AMD_IP_BLOCK_TYPE_JPEG,
 		.major = 2,
 		.minor = 5,
@@ -741,8 +766,7 @@ const struct amdgpu_ip_block_version jpeg_v2_5_ip_block =
 		.funcs = &jpeg_v2_5_ip_funcs,
 };
 
-const struct amdgpu_ip_block_version jpeg_v2_6_ip_block =
-{
+const struct amdgpu_ip_block_version jpeg_v2_6_ip_block = {
 		.type = AMD_IP_BLOCK_TYPE_JPEG,
 		.major = 2,
 		.minor = 6,
@@ -794,18 +818,17 @@ const struct amdgpu_ras_block_hw_ops jpeg_v2_6_ras_hw_ops = {
 static struct amdgpu_jpeg_ras jpeg_v2_6_ras = {
 	.ras_block = {
 		.hw_ops = &jpeg_v2_6_ras_hw_ops,
+		.ras_late_init = amdgpu_jpeg_ras_late_init,
 	},
 };
 
 static void jpeg_v2_5_set_ras_funcs(struct amdgpu_device *adev)
 {
-	switch (adev->ip_versions[JPEG_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, JPEG_HWIP, 0)) {
 	case IP_VERSION(2, 6, 0):
 		adev->jpeg.ras = &jpeg_v2_6_ras;
 		break;
 	default:
 		break;
 	}
-
-	jpeg_set_ras_funcs(adev);
 }

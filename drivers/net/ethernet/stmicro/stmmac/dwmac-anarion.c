@@ -20,18 +20,18 @@
 #define  GMAC_CONFIG_INTF_RGMII		(0x1 << 0)
 
 struct anarion_gmac {
-	uintptr_t ctl_block;
+	void __iomem *ctl_block;
 	uint32_t phy_intf_sel;
 };
 
 static uint32_t gmac_read_reg(struct anarion_gmac *gmac, uint8_t reg)
 {
-	return readl((void *)(gmac->ctl_block + reg));
+	return readl(gmac->ctl_block + reg);
 };
 
 static void gmac_write_reg(struct anarion_gmac *gmac, uint8_t reg, uint32_t val)
 {
-	writel(val, (void *)(gmac->ctl_block + reg));
+	writel(val, gmac->ctl_block + reg);
 }
 
 static int anarion_gmac_init(struct platform_device *pdev, void *priv)
@@ -68,16 +68,16 @@ static struct anarion_gmac *anarion_config_dt(struct platform_device *pdev)
 
 	ctl_block = devm_platform_ioremap_resource(pdev, 1);
 	if (IS_ERR(ctl_block)) {
-		dev_err(&pdev->dev, "Cannot get reset region (%ld)!\n",
-			PTR_ERR(ctl_block));
-		return ctl_block;
+		err = PTR_ERR(ctl_block);
+		dev_err(&pdev->dev, "Cannot get reset region (%d)!\n", err);
+		return ERR_PTR(err);
 	}
 
 	gmac = devm_kzalloc(&pdev->dev, sizeof(*gmac), GFP_KERNEL);
 	if (!gmac)
 		return ERR_PTR(-ENOMEM);
 
-	gmac->ctl_block = (uintptr_t)ctl_block;
+	gmac->ctl_block = ctl_block;
 
 	err = of_get_phy_mode(pdev->dev.of_node, &phy_mode);
 	if (err)
@@ -115,7 +115,7 @@ static int anarion_dwmac_probe(struct platform_device *pdev)
 	if (IS_ERR(gmac))
 		return PTR_ERR(gmac);
 
-	plat_dat = stmmac_probe_config_dt(pdev, stmmac_res.mac);
+	plat_dat = devm_stmmac_probe_config_dt(pdev, stmmac_res.mac);
 	if (IS_ERR(plat_dat))
 		return PTR_ERR(plat_dat);
 
@@ -124,13 +124,7 @@ static int anarion_dwmac_probe(struct platform_device *pdev)
 	anarion_gmac_init(pdev, gmac);
 	plat_dat->bsp_priv = gmac;
 
-	ret = stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
-	if (ret) {
-		stmmac_remove_config_dt(pdev, plat_dat);
-		return ret;
-	}
-
-	return 0;
+	return stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
 }
 
 static const struct of_device_id anarion_dwmac_match[] = {
@@ -141,7 +135,7 @@ MODULE_DEVICE_TABLE(of, anarion_dwmac_match);
 
 static struct platform_driver anarion_dwmac_driver = {
 	.probe  = anarion_dwmac_probe,
-	.remove = stmmac_pltfr_remove,
+	.remove_new = stmmac_pltfr_remove,
 	.driver = {
 		.name           = "anarion-dwmac",
 		.pm		= &stmmac_pltfr_pm_ops,

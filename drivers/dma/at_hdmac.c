@@ -20,7 +20,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/overflow.h>
-#include <linux/of_device.h>
+#include <linux/of_platform.h>
 #include <linux/of_dma.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -132,7 +132,7 @@
 #define ATC_DST_PIP		BIT(12)		/* Destination Picture-in-Picture enabled */
 #define ATC_SRC_DSCR_DIS	BIT(16)		/* Src Descriptor fetch disable */
 #define ATC_DST_DSCR_DIS	BIT(20)		/* Dst Descriptor fetch disable */
-#define ATC_FC			GENMASK(22, 21)	/* Choose Flow Controller */
+#define ATC_FC			GENMASK(23, 21)	/* Choose Flow Controller */
 #define ATC_FC_MEM2MEM		0x0		/* Mem-to-Mem (DMA) */
 #define ATC_FC_MEM2PER		0x1		/* Mem-to-Periph (DMA) */
 #define ATC_FC_PER2MEM		0x2		/* Periph-to-Mem (DMA) */
@@ -153,8 +153,6 @@
 #define ATC_AUTO		BIT(31)		/* Auto multiple buffer tx enable */
 
 /* Bitfields in CFG */
-#define ATC_PER_MSB(h)	((0x30U & (h)) >> 4)	/* Extract most significant bits of a handshaking identifier */
-
 #define ATC_SRC_PER		GENMASK(3, 0)	/* Channel src rq associated with periph handshaking ifc h */
 #define ATC_DST_PER		GENMASK(7, 4)	/* Channel dst rq associated with periph handshaking ifc h */
 #define ATC_SRC_REP		BIT(8)		/* Source Replay Mod */
@@ -181,10 +179,15 @@
 #define ATC_DPIP_HOLE		GENMASK(15, 0)
 #define ATC_DPIP_BOUNDARY	GENMASK(25, 16)
 
-#define ATC_SRC_PER_ID(id)	(FIELD_PREP(ATC_SRC_PER_MSB, (id)) |	\
-				 FIELD_PREP(ATC_SRC_PER, (id)))
-#define ATC_DST_PER_ID(id)	(FIELD_PREP(ATC_DST_PER_MSB, (id)) |	\
-				 FIELD_PREP(ATC_DST_PER, (id)))
+#define ATC_PER_MSB		GENMASK(5, 4)	/* Extract MSBs of a handshaking identifier */
+#define ATC_SRC_PER_ID(id)					       \
+	({ typeof(id) _id = (id);				       \
+	   FIELD_PREP(ATC_SRC_PER_MSB, FIELD_GET(ATC_PER_MSB, _id)) |  \
+	   FIELD_PREP(ATC_SRC_PER, _id); })
+#define ATC_DST_PER_ID(id)					       \
+	({ typeof(id) _id = (id);				       \
+	   FIELD_PREP(ATC_DST_PER_MSB, FIELD_GET(ATC_PER_MSB, _id)) |  \
+	   FIELD_PREP(ATC_DST_PER, _id); })
 
 
 
@@ -219,8 +222,14 @@ struct atdma_sg {
  * @vd: pointer to the virtual dma descriptor.
  * @atchan: pointer to the atmel dma channel.
  * @total_len: total transaction byte count
- * @sg_len: number of sg entries.
+ * @sglen: number of sg entries.
  * @sg: array of sgs.
+ * @boundary: number of transfers to perform before the automatic address increment operation
+ * @dst_hole: value to add to the destination address when the boundary has been reached
+ * @src_hole: value to add to the source address when the boundary has been reached
+ * @memset_buffer: buffer used for the memset operation
+ * @memset_paddr: physical address of the buffer used for the memset operation
+ * @memset_vaddr: virtual address of the buffer used for the memset operation
  */
 struct at_desc {
 	struct				virt_dma_desc vd;
@@ -236,13 +245,16 @@ struct at_desc {
 	bool				memset_buffer;
 	dma_addr_t			memset_paddr;
 	int				*memset_vaddr;
-	struct atdma_sg			sg[];
+	struct atdma_sg			sg[] __counted_by(sglen);
 };
 
 /*--  Channels  --------------------------------------------------------*/
 
 /**
- * atc_status - information bits stored in channel status flag
+ * enum atc_status - information bits stored in channel status flag
+ *
+ * @ATC_IS_PAUSED: If channel is pauses
+ * @ATC_IS_CYCLIC: If channel is cyclic
  *
  * Manipulated with atomic operations.
  */
@@ -279,7 +291,6 @@ struct at_dma_chan {
 	u32			save_cfg;
 	u32			save_dscr;
 	struct dma_slave_config	dma_sconfig;
-	bool			cyclic;
 	struct at_desc		*desc;
 };
 
@@ -325,12 +336,12 @@ static inline u8 convert_buswidth(enum dma_slave_buswidth addr_width)
 /**
  * struct at_dma - internal representation of an Atmel HDMA Controller
  * @dma_device: dmaengine dma_device object members
- * @atdma_devtype: identifier of DMA controller compatibility
- * @ch_regs: memory mapped register base
+ * @regs: memory mapped register base
  * @clk: dma controller clock
  * @save_imr: interrupt mask register that is saved on suspend/resume cycle
  * @all_chan_mask: all channels availlable in a mask
  * @lli_pool: hw lli table
+ * @memset_pool: hw memset pool
  * @chan: channels table to store at_dma_chan structures
  */
 struct at_dma {
@@ -623,6 +634,9 @@ static inline u32 atc_calc_bytes_left(u32 current_len, u32 ctrla)
 
 /**
  * atc_get_llis_residue - Get residue for a hardware linked list transfer
+ * @atchan: pointer to an atmel hdmac channel.
+ * @desc: pointer to the descriptor for which the residue is calculated.
+ * @residue: residue to be set to dma_tx_state.
  *
  * Calculate the residue by removing the length of the Linked List Item (LLI)
  * already transferred from the total length. To get the current LLI we can use
@@ -658,10 +672,8 @@ static inline u32 atc_calc_bytes_left(u32 current_len, u32 ctrla)
  * two DSCR values are different, we read again the CTRLA then the DSCR till two
  * consecutive read values from DSCR are equal or till the maximum trials is
  * reach. This algorithm is very unlikely not to find a stable value for DSCR.
- * @atchan: pointer to an atmel hdmac channel.
- * @desc: pointer to the descriptor for which the residue is calculated.
- * @residue: residue to be set to dma_tx_state.
- * Returns 0 on success, -errno otherwise.
+ *
+ * Returns: %0 on success, -errno otherwise.
  */
 static int atc_get_llis_residue(struct at_dma_chan *atchan,
 				struct at_desc *desc, u32 *residue)
@@ -728,7 +740,8 @@ static int atc_get_llis_residue(struct at_dma_chan *atchan,
  * @chan: DMA channel
  * @cookie: transaction identifier to check status of
  * @residue: residue to be updated.
- * Return 0 on success, -errono otherwise.
+ *
+ * Return: %0 on success, -errno otherwise.
  */
 static int atc_get_residue(struct dma_chan *chan, dma_cookie_t cookie,
 			   u32 *residue)
@@ -1707,7 +1720,7 @@ static void atc_issue_pending(struct dma_chan *chan)
  * atc_alloc_chan_resources - allocate resources for DMA channel
  * @chan: allocate descriptor resources for this channel
  *
- * return - the number of allocated descriptors
+ * Return: the number of allocated descriptors
  */
 static int atc_alloc_chan_resources(struct dma_chan *chan)
 {
@@ -2097,7 +2110,7 @@ err_irq:
 	return err;
 }
 
-static int at_dma_remove(struct platform_device *pdev)
+static void at_dma_remove(struct platform_device *pdev)
 {
 	struct at_dma		*atdma = platform_get_drvdata(pdev);
 	struct dma_chan		*chan, *_chan;
@@ -2119,8 +2132,6 @@ static int at_dma_remove(struct platform_device *pdev)
 	}
 
 	clk_disable_unprepare(atdma->clk);
-
-	return 0;
 }
 
 static void at_dma_shutdown(struct platform_device *pdev)
@@ -2239,7 +2250,7 @@ static const struct dev_pm_ops __maybe_unused at_dma_dev_pm_ops = {
 };
 
 static struct platform_driver at_dma_driver = {
-	.remove		= at_dma_remove,
+	.remove_new	= at_dma_remove,
 	.shutdown	= at_dma_shutdown,
 	.id_table	= atdma_devtypes,
 	.driver = {

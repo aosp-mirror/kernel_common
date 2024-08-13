@@ -32,7 +32,7 @@ int fsverity_init_merkle_tree_params(struct merkle_tree_params *params,
 				     unsigned int log_blocksize,
 				     const u8 *salt, size_t salt_size)
 {
-	struct fsverity_hash_alg *hash_alg;
+	const struct fsverity_hash_alg *hash_alg;
 	int err;
 	u64 blocks;
 	u64 blocks_in_level[FS_VERITY_MAX_LEVELS];
@@ -83,7 +83,7 @@ int fsverity_init_merkle_tree_params(struct merkle_tree_params *params,
 	params->log_blocks_per_page = PAGE_SHIFT - log_blocksize;
 	params->blocks_per_page = 1 << params->log_blocks_per_page;
 
-	if (WARN_ON(!is_power_of_2(params->digest_size))) {
+	if (WARN_ON_ONCE(!is_power_of_2(params->digest_size))) {
 		err = -EINVAL;
 		goto out_err;
 	}
@@ -156,9 +156,9 @@ out_err:
 
 /*
  * Compute the file digest by hashing the fsverity_descriptor excluding the
- * signature and with the sig_size field set to 0.
+ * builtin signature and with the sig_size field set to 0.
  */
-static int compute_file_digest(struct fsverity_hash_alg *hash_alg,
+static int compute_file_digest(const struct fsverity_hash_alg *hash_alg,
 			       struct fsverity_descriptor *desc,
 			       u8 *file_digest)
 {
@@ -174,7 +174,7 @@ static int compute_file_digest(struct fsverity_hash_alg *hash_alg,
 
 /*
  * Create a new fsverity_info from the given fsverity_descriptor (with optional
- * appended signature), and check the signature if present.  The
+ * appended builtin signature), and check the signature if present.  The
  * fsverity_descriptor must have already undergone basic validation.
  */
 struct fsverity_info *fsverity_create_info(const struct inode *inode,
@@ -239,7 +239,6 @@ struct fsverity_info *fsverity_create_info(const struct inode *inode,
 			err = -ENOMEM;
 			goto fail;
 		}
-		spin_lock_init(&vi->hash_page_init_lock);
 	}
 
 	return vi;
@@ -319,8 +318,8 @@ static bool validate_fsverity_descriptor(struct inode *inode,
 }
 
 /*
- * Read the inode's fsverity_descriptor (with optional appended signature) from
- * the filesystem, and do basic validation of it.
+ * Read the inode's fsverity_descriptor (with optional appended builtin
+ * signature) from the filesystem, and do basic validation of it.
  */
 int fsverity_get_descriptor(struct inode *inode,
 			    struct fsverity_descriptor **desc_ret)
@@ -408,18 +407,10 @@ void __fsverity_cleanup_inode(struct inode *inode)
 }
 EXPORT_SYMBOL_GPL(__fsverity_cleanup_inode);
 
-int __init fsverity_init_info_cache(void)
+void __init fsverity_init_info_cache(void)
 {
-	fsverity_info_cachep = KMEM_CACHE_USERCOPY(fsverity_info,
-						   SLAB_RECLAIM_ACCOUNT,
-						   file_digest);
-	if (!fsverity_info_cachep)
-		return -ENOMEM;
-	return 0;
-}
-
-void __init fsverity_exit_info_cache(void)
-{
-	kmem_cache_destroy(fsverity_info_cachep);
-	fsverity_info_cachep = NULL;
+	fsverity_info_cachep = KMEM_CACHE_USERCOPY(
+					fsverity_info,
+					SLAB_RECLAIM_ACCOUNT | SLAB_PANIC,
+					file_digest);
 }

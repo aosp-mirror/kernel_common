@@ -55,6 +55,13 @@ static const char *dr_action_id_to_str(enum mlx5dr_action_type action_id)
 	return action_type_to_str[action_id];
 }
 
+static bool mlx5dr_action_supp_fwd_fdb_multi_ft(struct mlx5_core_dev *dev)
+{
+	return (MLX5_CAP_GEN(dev, steering_format_version) < MLX5_STEERING_FORMAT_CONNECTX_6DX ||
+		MLX5_CAP_ESW_FLOWTABLE(dev, fdb_multi_path_any_table_limit_regc) ||
+		MLX5_CAP_ESW_FLOWTABLE(dev, fdb_multi_path_any_table));
+}
+
 static const enum dr_action_valid_state
 next_action_state[DR_ACTION_DOMAIN_MAX][DR_ACTION_STATE_MAX][DR_ACTION_TYP_MAX] = {
 	[DR_ACTION_DOMAIN_NIC_INGRESS] = {
@@ -781,6 +788,7 @@ int mlx5dr_actions_build_ste_arr(struct mlx5dr_matcher *matcher,
 		switch (action_type) {
 		case DR_ACTION_TYP_DROP:
 			attr.final_icm_addr = nic_dmn->drop_icm_addr;
+			attr.hit_gvmi = nic_dmn->drop_icm_addr >> 48;
 			break;
 		case DR_ACTION_TYP_FT:
 			dest_action = action;
@@ -819,14 +827,34 @@ int mlx5dr_actions_build_ste_arr(struct mlx5dr_matcher *matcher,
 		case DR_ACTION_TYP_TNL_L2_TO_L2:
 			break;
 		case DR_ACTION_TYP_TNL_L3_TO_L2:
-			attr.decap_index = action->rewrite->index;
-			attr.decap_actions = action->rewrite->num_of_actions;
-			attr.decap_with_vlan =
-				attr.decap_actions == WITH_VLAN_NUM_HW_ACTIONS;
+			if (action->rewrite->ptrn && action->rewrite->arg) {
+				attr.decap_index = mlx5dr_arg_get_obj_id(action->rewrite->arg);
+				attr.decap_actions = action->rewrite->ptrn->num_of_actions;
+				attr.decap_pat_idx = action->rewrite->ptrn->index;
+			} else {
+				attr.decap_index = action->rewrite->index;
+				attr.decap_actions = action->rewrite->num_of_actions;
+				attr.decap_with_vlan =
+					attr.decap_actions == WITH_VLAN_NUM_HW_ACTIONS;
+				attr.decap_pat_idx = MLX5DR_INVALID_PATTERN_INDEX;
+			}
 			break;
 		case DR_ACTION_TYP_MODIFY_HDR:
-			attr.modify_index = action->rewrite->index;
-			attr.modify_actions = action->rewrite->num_of_actions;
+			if (action->rewrite->single_action_opt) {
+				attr.modify_actions = action->rewrite->num_of_actions;
+				attr.single_modify_action = action->rewrite->data;
+			} else {
+				if (action->rewrite->ptrn && action->rewrite->arg) {
+					attr.modify_index =
+						mlx5dr_arg_get_obj_id(action->rewrite->arg);
+					attr.modify_actions = action->rewrite->ptrn->num_of_actions;
+					attr.modify_pat_idx = action->rewrite->ptrn->index;
+				} else {
+					attr.modify_index = action->rewrite->index;
+					attr.modify_actions = action->rewrite->num_of_actions;
+					attr.modify_pat_idx = MLX5DR_INVALID_PATTERN_INDEX;
+				}
+			}
 			if (action->rewrite->modify_ttl)
 				dr_action_modify_ttl_adjust(dmn, &attr, rx_rule,
 							    &recalc_cs_required);
@@ -846,11 +874,17 @@ int mlx5dr_actions_build_ste_arr(struct mlx5dr_matcher *matcher,
 							action->sampler->tx_icm_addr;
 			break;
 		case DR_ACTION_TYP_VPORT:
-			attr.hit_gvmi = action->vport->caps->vhca_gvmi;
-			dest_action = action;
-			attr.final_icm_addr = rx_rule ?
-				action->vport->caps->icm_address_rx :
-				action->vport->caps->icm_address_tx;
+			if (unlikely(rx_rule && action->vport->caps->num == MLX5_VPORT_UPLINK)) {
+				/* can't go to uplink on RX rule - dropping instead */
+				attr.final_icm_addr = nic_dmn->drop_icm_addr;
+				attr.hit_gvmi = nic_dmn->drop_icm_addr >> 48;
+			} else {
+				attr.hit_gvmi = action->vport->caps->vhca_gvmi;
+				dest_action = action;
+				attr.final_icm_addr = rx_rule ?
+						      action->vport->caps->icm_address_rx :
+						      action->vport->caps->icm_address_tx;
+			}
 			break;
 		case DR_ACTION_TYP_POP_VLAN:
 			if (!rx_rule && !(dmn->ste_ctx->actions_caps &
@@ -1147,8 +1181,11 @@ mlx5dr_action_create_mult_dest_tbl(struct mlx5dr_domain *dmn,
 	struct mlx5dr_action **ref_actions;
 	struct mlx5dr_action *action;
 	bool reformat_req = false;
+	bool is_ft_wire = false;
+	u16 num_dst_ft = 0;
 	u32 num_of_ref = 0;
 	u32 ref_act_cnt;
+	u16 last_dest;
 	int ret;
 	int i;
 
@@ -1190,11 +1227,22 @@ mlx5dr_action_create_mult_dest_tbl(struct mlx5dr_domain *dmn,
 			break;
 
 		case DR_ACTION_TYP_FT:
+			if (num_dst_ft &&
+			    !mlx5dr_action_supp_fwd_fdb_multi_ft(dmn->mdev)) {
+				mlx5dr_dbg(dmn, "multiple FT destinations not supported\n");
+				goto free_ref_actions;
+			}
+			num_dst_ft++;
 			hw_dests[i].type = MLX5_FLOW_DESTINATION_TYPE_FLOW_TABLE;
-			if (dest_action->dest_tbl->is_fw_tbl)
+			if (dest_action->dest_tbl->is_fw_tbl) {
 				hw_dests[i].ft_id = dest_action->dest_tbl->fw_tbl.id;
-			else
+			} else {
 				hw_dests[i].ft_id = dest_action->dest_tbl->tbl->table_id;
+				if (dest_action->dest_tbl->is_wire_ft) {
+					is_ft_wire = true;
+					last_dest = i;
+				}
+			}
 			break;
 
 		default:
@@ -1202,6 +1250,13 @@ mlx5dr_action_create_mult_dest_tbl(struct mlx5dr_domain *dmn,
 			goto free_ref_actions;
 		}
 	}
+
+	/* In multidest, the FW does the iterator in the RX except of the last
+	 * one that done in the TX.
+	 * So, if one of the ft target is wire, put it at the end of the dest list.
+	 */
+	if (is_ft_wire && num_dst_ft > 1)
+		swap(hw_dests[last_dest], hw_dests[num_of_dests - 1]);
 
 	action = dr_action_create_generic(DR_ACTION_TYP_FT);
 	if (!action)
@@ -1365,8 +1420,6 @@ out_err:
 	return -EINVAL;
 }
 
-#define ACTION_CACHE_LINE_SIZE 64
-
 static int
 dr_action_create_reformat_action(struct mlx5dr_domain *dmn,
 				 u8 reformat_param_0, u8 reformat_param_1,
@@ -1403,36 +1456,30 @@ dr_action_create_reformat_action(struct mlx5dr_domain *dmn,
 	}
 	case DR_ACTION_TYP_TNL_L3_TO_L2:
 	{
-		u8 hw_actions[ACTION_CACHE_LINE_SIZE] = {};
-		int ret;
+		u8 *hw_actions;
+
+		hw_actions = kzalloc(DR_ACTION_CACHE_LINE_SIZE, GFP_KERNEL);
+		if (!hw_actions)
+			return -ENOMEM;
 
 		ret = mlx5dr_ste_set_action_decap_l3_list(dmn->ste_ctx,
 							  data, data_sz,
 							  hw_actions,
-							  ACTION_CACHE_LINE_SIZE,
+							  DR_ACTION_CACHE_LINE_SIZE,
 							  &action->rewrite->num_of_actions);
 		if (ret) {
 			mlx5dr_dbg(dmn, "Failed creating decap l3 action list\n");
+			kfree(hw_actions);
 			return ret;
 		}
 
-		action->rewrite->chunk = mlx5dr_icm_alloc_chunk(dmn->action_icm_pool,
-								DR_CHUNK_SIZE_8);
-		if (!action->rewrite->chunk) {
-			mlx5dr_dbg(dmn, "Failed allocating modify header chunk\n");
-			return -ENOMEM;
-		}
+		action->rewrite->data = hw_actions;
+		action->rewrite->dmn = dmn;
 
-		action->rewrite->data = (void *)hw_actions;
-		action->rewrite->index = (mlx5dr_icm_pool_get_chunk_icm_addr
-					  (action->rewrite->chunk) -
-					 dmn->info.caps.hdr_modify_icm_addr) /
-					 ACTION_CACHE_LINE_SIZE;
-
-		ret = mlx5dr_send_postsend_action(dmn, action);
+		ret = mlx5dr_ste_alloc_modify_hdr(action);
 		if (ret) {
-			mlx5dr_dbg(dmn, "Writing decap l3 actions to ICM failed\n");
-			mlx5dr_icm_free_chunk(action->rewrite->chunk);
+			mlx5dr_dbg(dmn, "Failed preparing reformat data\n");
+			kfree(hw_actions);
 			return ret;
 		}
 		return 0;
@@ -1963,7 +2010,6 @@ static int dr_action_create_modify_action(struct mlx5dr_domain *dmn,
 					  __be64 actions[],
 					  struct mlx5dr_action *action)
 {
-	struct mlx5dr_icm_chunk *chunk;
 	u32 max_hw_actions;
 	u32 num_hw_actions;
 	u32 num_sw_actions;
@@ -1980,15 +2026,9 @@ static int dr_action_create_modify_action(struct mlx5dr_domain *dmn,
 		return -EINVAL;
 	}
 
-	chunk = mlx5dr_icm_alloc_chunk(dmn->action_icm_pool, DR_CHUNK_SIZE_16);
-	if (!chunk)
-		return -ENOMEM;
-
 	hw_actions = kcalloc(1, max_hw_actions * DR_MODIFY_ACTION_SIZE, GFP_KERNEL);
-	if (!hw_actions) {
-		ret = -ENOMEM;
-		goto free_chunk;
-	}
+	if (!hw_actions)
+		return -ENOMEM;
 
 	ret = dr_actions_convert_modify_header(action,
 					       max_hw_actions,
@@ -2000,24 +2040,24 @@ static int dr_action_create_modify_action(struct mlx5dr_domain *dmn,
 	if (ret)
 		goto free_hw_actions;
 
-	action->rewrite->chunk = chunk;
 	action->rewrite->modify_ttl = modify_ttl;
 	action->rewrite->data = (u8 *)hw_actions;
 	action->rewrite->num_of_actions = num_hw_actions;
-	action->rewrite->index = (mlx5dr_icm_pool_get_chunk_icm_addr(chunk) -
-				  dmn->info.caps.hdr_modify_icm_addr) /
-				  ACTION_CACHE_LINE_SIZE;
 
-	ret = mlx5dr_send_postsend_action(dmn, action);
-	if (ret)
-		goto free_hw_actions;
+	if (num_hw_actions == 1 &&
+	    dmn->info.caps.sw_format_ver >= MLX5_STEERING_FORMAT_CONNECTX_6DX) {
+		action->rewrite->single_action_opt = true;
+	} else {
+		action->rewrite->single_action_opt = false;
+		ret = mlx5dr_ste_alloc_modify_hdr(action);
+		if (ret)
+			goto free_hw_actions;
+	}
 
 	return 0;
 
 free_hw_actions:
 	kfree(hw_actions);
-free_chunk:
-	mlx5dr_icm_free_chunk(chunk);
 	return ret;
 }
 
@@ -2071,8 +2111,9 @@ mlx5dr_action_create_dest_vport(struct mlx5dr_domain *dmn,
 	struct mlx5dr_action *action;
 	u8 peer_vport;
 
-	peer_vport = vhca_id_valid && (vhca_id != dmn->info.caps.gvmi);
-	vport_dmn = peer_vport ? dmn->peer_dmn : dmn;
+	peer_vport = vhca_id_valid && mlx5_core_is_pf(dmn->mdev) &&
+		(vhca_id != dmn->info.caps.gvmi);
+	vport_dmn = peer_vport ? xa_load(&dmn->peer_dmn_xa, vhca_id) : dmn;
 	if (!vport_dmn) {
 		mlx5dr_dbg(dmn, "No peer vport domain for given vhca_id\n");
 		return NULL;
@@ -2129,6 +2170,11 @@ mlx5dr_action_create_aso(struct mlx5dr_domain *dmn, u32 obj_id,
 	return action;
 }
 
+u32 mlx5dr_action_get_pkt_reformat_id(struct mlx5dr_action *action)
+{
+	return action->reformat->id;
+}
+
 int mlx5dr_action_destroy(struct mlx5dr_action *action)
 {
 	if (WARN_ON_ONCE(refcount_read(&action->refcount) > 1))
@@ -2162,7 +2208,8 @@ int mlx5dr_action_destroy(struct mlx5dr_action *action)
 		refcount_dec(&action->reformat->dmn->refcount);
 		break;
 	case DR_ACTION_TYP_TNL_L3_TO_L2:
-		mlx5dr_icm_free_chunk(action->rewrite->chunk);
+		mlx5dr_ste_free_modify_hdr(action);
+		kfree(action->rewrite->data);
 		refcount_dec(&action->rewrite->dmn->refcount);
 		break;
 	case DR_ACTION_TYP_L2_TO_TNL_L2:
@@ -2173,7 +2220,8 @@ int mlx5dr_action_destroy(struct mlx5dr_action *action)
 		refcount_dec(&action->reformat->dmn->refcount);
 		break;
 	case DR_ACTION_TYP_MODIFY_HDR:
-		mlx5dr_icm_free_chunk(action->rewrite->chunk);
+		if (!action->rewrite->single_action_opt)
+			mlx5dr_ste_free_modify_hdr(action);
 		kfree(action->rewrite->data);
 		refcount_dec(&action->rewrite->dmn->refcount);
 		break;

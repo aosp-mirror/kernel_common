@@ -432,7 +432,7 @@ static int exynos_bus_probe(struct platform_device *pdev)
 		goto err;
 
 	/* Create child platform device for the interconnect provider */
-	if (of_get_property(dev->of_node, "#interconnect-cells", NULL)) {
+	if (of_property_present(dev->of_node, "#interconnect-cells")) {
 		bus->icc_pdev = platform_device_register_data(
 						dev, "exynos-generic-icc",
 						PLATFORM_DEVID_AUTO, NULL, 0);
@@ -467,7 +467,6 @@ static void exynos_bus_shutdown(struct platform_device *pdev)
 	devfreq_suspend_device(bus->devfreq);
 }
 
-#ifdef CONFIG_PM_SLEEP
 static int exynos_bus_resume(struct device *dev)
 {
 	struct exynos_bus *bus = dev_get_drvdata(dev);
@@ -495,11 +494,9 @@ static int exynos_bus_suspend(struct device *dev)
 
 	return 0;
 }
-#endif
 
-static const struct dev_pm_ops exynos_bus_pm = {
-	SET_SYSTEM_SLEEP_PM_OPS(exynos_bus_suspend, exynos_bus_resume)
-};
+static DEFINE_SIMPLE_DEV_PM_OPS(exynos_bus_pm,
+				exynos_bus_suspend, exynos_bus_resume);
 
 static const struct of_device_id exynos_bus_of_match[] = {
 	{ .compatible = "samsung,exynos-bus", },
@@ -512,12 +509,13 @@ static struct platform_driver exynos_bus_platdrv = {
 	.shutdown	= exynos_bus_shutdown,
 	.driver = {
 		.name	= "exynos-bus",
-		.pm	= &exynos_bus_pm,
-		.of_match_table = of_match_ptr(exynos_bus_of_match),
+		.pm	= pm_sleep_ptr(&exynos_bus_pm),
+		.of_match_table = exynos_bus_of_match,
 	},
 };
 module_platform_driver(exynos_bus_platdrv);
 
+MODULE_SOFTDEP("pre: exynos_ppmu");
 MODULE_DESCRIPTION("Generic Exynos Bus frequency driver");
 MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>");
 MODULE_LICENSE("GPL v2");

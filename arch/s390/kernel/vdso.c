@@ -25,10 +25,7 @@ extern char vdso32_start[], vdso32_end[];
 
 static struct vm_special_mapping vvar_mapping;
 
-static union {
-	struct vdso_data	data[CS_BASES];
-	u8			page[PAGE_SIZE];
-} vdso_data_store __page_aligned_data;
+static union vdso_data_store vdso_data_store __page_aligned_data;
 
 struct vdso_data *vdso_data = vdso_data_store.data;
 
@@ -59,11 +56,9 @@ int vdso_join_timens(struct task_struct *task, struct time_namespace *ns)
 
 	mmap_read_lock(mm);
 	for_each_vma(vmi, vma) {
-		unsigned long size = vma->vm_end - vma->vm_start;
-
 		if (!vma_is_special_mapping(vma, &vvar_mapping))
 			continue;
-		zap_page_range(vma, vma->vm_start, size);
+		zap_vma_pages(vma);
 		break;
 	}
 	mmap_read_unlock(mm);
@@ -215,15 +210,20 @@ static unsigned long vdso_addr(unsigned long start, unsigned long len)
 	return addr;
 }
 
-unsigned long vdso_size(void)
+unsigned long vdso_text_size(void)
 {
-	unsigned long size = VVAR_NR_PAGES * PAGE_SIZE;
+	unsigned long size;
 
 	if (is_compat_task())
-		size += vdso32_end - vdso32_start;
+		size = vdso32_end - vdso32_start;
 	else
-		size += vdso64_end - vdso64_start;
+		size = vdso64_end - vdso64_start;
 	return PAGE_ALIGN(size);
+}
+
+unsigned long vdso_size(void)
+{
+	return vdso_text_size() + VVAR_NR_PAGES * PAGE_SIZE;
 }
 
 int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)

@@ -213,7 +213,7 @@ out:
 static int dc_i2c_xfer_msg(struct dc_i2c *i2c, struct i2c_msg *msg, int first,
 			   int last)
 {
-	unsigned long timeout = msecs_to_jiffies(TIMEOUT_MS);
+	unsigned long time_left = msecs_to_jiffies(TIMEOUT_MS);
 	unsigned long flags;
 
 	spin_lock_irqsave(&i2c->lock, flags);
@@ -227,9 +227,9 @@ static int dc_i2c_xfer_msg(struct dc_i2c *i2c, struct i2c_msg *msg, int first,
 	dc_i2c_start_msg(i2c, first);
 	spin_unlock_irqrestore(&i2c->lock, flags);
 
-	timeout = wait_for_completion_timeout(&i2c->done, timeout);
+	time_left = wait_for_completion_timeout(&i2c->done, time_left);
 	dc_i2c_set_irq(i2c, 0);
-	if (timeout == 0) {
+	if (time_left == 0) {
 		i2c->state = STATE_IDLE;
 		return -ETIMEDOUT;
 	}
@@ -347,14 +347,12 @@ static int dc_i2c_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int dc_i2c_remove(struct platform_device *pdev)
+static void dc_i2c_remove(struct platform_device *pdev)
 {
 	struct dc_i2c *i2c = platform_get_drvdata(pdev);
 
 	i2c_del_adapter(&i2c->adap);
 	clk_disable_unprepare(i2c->clk);
-
-	return 0;
 }
 
 static const struct of_device_id dc_i2c_match[] = {
@@ -365,7 +363,7 @@ MODULE_DEVICE_TABLE(of, dc_i2c_match);
 
 static struct platform_driver dc_i2c_driver = {
 	.probe   = dc_i2c_probe,
-	.remove  = dc_i2c_remove,
+	.remove_new = dc_i2c_remove,
 	.driver  = {
 		.name  = "digicolor-i2c",
 		.of_match_table = dc_i2c_match,

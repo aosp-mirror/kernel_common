@@ -496,6 +496,7 @@ enum fc_host_event_code  {
 	FCH_EVT_PORT_FABRIC		= 0x204,
 	FCH_EVT_LINK_UNKNOWN		= 0x500,
 	FCH_EVT_LINK_FPIN		= 0x501,
+	FCH_EVT_LINK_FPIN_ACK		= 0x502,
 	FCH_EVT_VENDOR_UNIQUE		= 0xffff,
 };
 
@@ -708,6 +709,7 @@ struct fc_function_template {
 	int  	(*vport_delete)(struct fc_vport *);
 
 	/* bsg support */
+	u32				max_bsg_segments;
 	int	(*bsg_request)(struct bsg_job *);
 	int	(*bsg_timeout)(struct bsg_job *);
 
@@ -769,10 +771,9 @@ struct fc_function_template {
 /**
  * fc_remote_port_chkready - called to validate the remote port state
  *   prior to initiating io to the port.
- *
- * Returns a scsi result code that can be returned by the LLDD.
- *
  * @rport:	remote port to be checked
+ *
+ * Returns: a scsi result code that can be returned by the LLDD.
  **/
 static inline int
 fc_remote_port_chkready(struct fc_rport *rport)
@@ -856,7 +857,8 @@ void fc_host_post_fc_event(struct Scsi_Host *shost, u32 event_number,
 	 * Note: when calling fc_host_post_fc_event(), vendor_id may be
 	 *   specified as 0.
 	 */
-void fc_host_fpin_rcv(struct Scsi_Host *shost, u32 fpin_len, char *fpin_buf);
+void fc_host_fpin_rcv(struct Scsi_Host *shost, u32 fpin_len, char *fpin_buf,
+		u8 event_acknowledge);
 struct fc_vport *fc_vport_create(struct Scsi_Host *shost, int channel,
 		struct fc_vport_identifiers *);
 int fc_vport_terminate(struct fc_vport *vport);

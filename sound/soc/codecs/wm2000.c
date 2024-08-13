@@ -929,7 +929,7 @@ out:
 }
 
 static const struct i2c_device_id wm2000_i2c_id[] = {
-	{ "wm2000", 0 },
+	{ "wm2000" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, wm2000_i2c_id);
@@ -938,7 +938,7 @@ static struct i2c_driver wm2000_i2c_driver = {
 	.driver = {
 		.name = "wm2000",
 	},
-	.probe_new = wm2000_i2c_probe,
+	.probe = wm2000_i2c_probe,
 	.id_table = wm2000_i2c_id,
 };
 

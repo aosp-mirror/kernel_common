@@ -21,6 +21,7 @@
  * @IWL_TLC_MNG_CFG_FLAGS_HE_DCM_NSS_2_MSK: enable HE Dual Carrier Modulation
  *					    for BPSK (MCS 0) with 2 spatial
  *					    streams
+ * @IWL_TLC_MNG_CFG_FLAGS_EHT_EXTRA_LTF_MSK: enable support for EHT extra LTF
  */
 enum iwl_tlc_mng_cfg_flags {
 	IWL_TLC_MNG_CFG_FLAGS_STBC_MSK			= BIT(0),
@@ -28,6 +29,7 @@ enum iwl_tlc_mng_cfg_flags {
 	IWL_TLC_MNG_CFG_FLAGS_HE_STBC_160MHZ_MSK	= BIT(2),
 	IWL_TLC_MNG_CFG_FLAGS_HE_DCM_NSS_1_MSK		= BIT(3),
 	IWL_TLC_MNG_CFG_FLAGS_HE_DCM_NSS_2_MSK		= BIT(4),
+	IWL_TLC_MNG_CFG_FLAGS_EHT_EXTRA_LTF_MSK		= BIT(6),
 };
 
 /**
@@ -373,9 +375,6 @@ enum {
 
 /* Bit 4-5: (0) SISO, (1) MIMO2 (2) MIMO3 */
 #define RATE_VHT_MCS_RATE_CODE_MSK	0xf
-#define RATE_VHT_MCS_NSS_POS		4
-#define RATE_VHT_MCS_NSS_MSK		(3 << RATE_VHT_MCS_NSS_POS)
-#define RATE_VHT_MCS_MIMO2_MSK		BIT(RATE_VHT_MCS_NSS_POS)
 
 /*
  * Legacy OFDM rate format for bits 7:0
@@ -449,11 +448,16 @@ enum {
  *	1			2xLTF+0.8us
  *	2			2xLTF+1.6us
  *	3			4xLTF+3.2us
- * HE TRIG:
+ * HE-EHT TRIG:
  *	0			1xLTF+1.6us
  *	1			2xLTF+1.6us
  *	2			4xLTF+3.2us
  *	3			(does not occur)
+ * EHT MU:
+ *	0			2xLTF+0.8us
+ *	1			2xLTF+1.6us
+ *	2			4xLTF+0.8us
+ *	3			4xLTF+3.2us
  */
 #define RATE_MCS_HE_GI_LTF_POS		20
 #define RATE_MCS_HE_GI_LTF_MSK_V1		(3 << RATE_MCS_HE_GI_LTF_POS)
@@ -546,12 +550,17 @@ enum {
 /*
  * Bits 13-11: (0) 20MHz, (1) 40MHz, (2) 80MHz, (3) 160MHz, (4) 320MHz
  */
-#define RATE_MCS_CHAN_WIDTH_MSK			(0x7 << RATE_MCS_CHAN_WIDTH_POS)
-#define RATE_MCS_CHAN_WIDTH_20			(0 << RATE_MCS_CHAN_WIDTH_POS)
-#define RATE_MCS_CHAN_WIDTH_40			(1 << RATE_MCS_CHAN_WIDTH_POS)
-#define RATE_MCS_CHAN_WIDTH_80			(2 << RATE_MCS_CHAN_WIDTH_POS)
-#define RATE_MCS_CHAN_WIDTH_160			(3 << RATE_MCS_CHAN_WIDTH_POS)
-#define RATE_MCS_CHAN_WIDTH_320			(4 << RATE_MCS_CHAN_WIDTH_POS)
+#define RATE_MCS_CHAN_WIDTH_MSK		(0x7 << RATE_MCS_CHAN_WIDTH_POS)
+#define RATE_MCS_CHAN_WIDTH_20_VAL	0
+#define RATE_MCS_CHAN_WIDTH_20		(RATE_MCS_CHAN_WIDTH_20_VAL << RATE_MCS_CHAN_WIDTH_POS)
+#define RATE_MCS_CHAN_WIDTH_40_VAL	1
+#define RATE_MCS_CHAN_WIDTH_40		(RATE_MCS_CHAN_WIDTH_40_VAL << RATE_MCS_CHAN_WIDTH_POS)
+#define RATE_MCS_CHAN_WIDTH_80_VAL	2
+#define RATE_MCS_CHAN_WIDTH_80		(RATE_MCS_CHAN_WIDTH_80_VAL << RATE_MCS_CHAN_WIDTH_POS)
+#define RATE_MCS_CHAN_WIDTH_160_VAL	3
+#define RATE_MCS_CHAN_WIDTH_160		(RATE_MCS_CHAN_WIDTH_160_VAL << RATE_MCS_CHAN_WIDTH_POS)
+#define RATE_MCS_CHAN_WIDTH_320_VAL	4
+#define RATE_MCS_CHAN_WIDTH_320		(RATE_MCS_CHAN_WIDTH_320_VAL << RATE_MCS_CHAN_WIDTH_POS)
 
 /* Bit 15-14: Antenna selection:
  * Bit 14: Ant A active

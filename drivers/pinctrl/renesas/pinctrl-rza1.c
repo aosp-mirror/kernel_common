@@ -19,11 +19,10 @@
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_address.h>
-#include <linux/of_device.h>
 #include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinmux.h>
+#include <linux/platform_device.h>
 #include <linux/property.h>
 #include <linux/slab.h>
 
@@ -1132,7 +1131,7 @@ static int rza1_set_mux(struct pinctrl_dev *pctldev, unsigned int selector,
 		return -EINVAL;
 
 	mux_confs = (struct rza1_mux_conf *)func->data;
-	for (i = 0; i < grp->num_pins; ++i) {
+	for (i = 0; i < grp->grp.npins; ++i) {
 		int ret;
 
 		ret = rza1_pin_mux_single(rza1_pctl, &mux_confs[i]);
@@ -1388,7 +1387,7 @@ static const struct of_device_id rza1_pinctrl_of_match[] = {
 		.compatible	= "renesas,r7s72102-ports",
 		.data		= &rza1l_pmx_conf,
 	},
-	{ }
+	{ /* sentinel */ }
 };
 
 static struct platform_driver rza1_pinctrl_driver = {
@@ -1407,4 +1406,3 @@ core_initcall(rza1_pinctrl_init);
 
 MODULE_AUTHOR("Jacopo Mondi <jacopo+renesas@jmondi.org");
 MODULE_DESCRIPTION("Pin and gpio controller driver for Reneas RZ/A1 SoC");
-MODULE_LICENSE("GPL v2");

@@ -1,5 +1,3 @@
-.. _numa_memory_policy:
-
 ==================
 NUMA Memory Policy
 ==================
@@ -111,7 +109,7 @@ VMA Policy
 	* A task may install a new VMA policy on a sub-range of a
 	  previously mmap()ed region.  When this happens, Linux splits
 	  the existing virtual memory area into 2 or 3 VMAs, each with
-	  it's own policy.
+	  its own policy.
 
 	* By default, VMA policy applies only to pages allocated after
 	  the policy is installed.  Any pages already faulted into the
@@ -246,11 +244,20 @@ MPOL_INTERLEAVED
 	interleaved system default policy works in this mode.
 
 MPOL_PREFERRED_MANY
-	This mode specifices that the allocation should be preferrably
+	This mode specifies that the allocation should be preferably
 	satisfied from the nodemask specified in the policy. If there is
 	a memory pressure on all nodes in the nodemask, the allocation
 	can fall back to all existing numa nodes. This is effectively
 	MPOL_PREFERRED allowed for a mask rather than a single node.
+
+MPOL_WEIGHTED_INTERLEAVE
+	This mode operates the same as MPOL_INTERLEAVE, except that
+	interleaving behavior is executed based on weights set in
+	/sys/kernel/mm/mempolicy/weighted_interleave/
+
+	Weighted interleave allocates pages on nodes according to a
+	weight.  For example if nodes [0,1] are weighted [5,2], 5 pages
+	will be allocated on node0 for every 2 pages allocated on node1.
 
 NUMA memory policy supports the following optional mode flags:
 
@@ -360,7 +367,7 @@ and NUMA nodes.  "Usage" here means one of the following:
 2) examination of the policy to determine the policy mode and associated node
    or node lists, if any, for page allocation.  This is considered a "hot
    path".  Note that for MPOL_BIND, the "usage" extends across the entire
-   allocation process, which may sleep during page reclaimation, because the
+   allocation process, which may sleep during page reclamation, because the
    BIND policy nodemask is used, by reference, to filter ineligible nodes.
 
 We can avoid taking an extra reference during the usages listed above as

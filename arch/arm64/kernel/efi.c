@@ -9,6 +9,9 @@
 
 #include <linux/efi.h>
 #include <linux/init.h>
+#include <linux/kmemleak.h>
+#include <linux/screen_info.h>
+#include <linux/vmalloc.h>
 
 #include <asm/efi.h>
 #include <asm/stacktrace.h>
@@ -70,10 +73,6 @@ static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
 	return pgprot_val(PAGE_KERNEL_EXEC);
 }
 
-/* we will fill this structure from the stub, so don't put it in .bss */
-struct screen_info screen_info __section(".data");
-EXPORT_SYMBOL(screen_info);
-
 int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
 {
 	pteval_t prot_val = create_mapping_protection(md);
@@ -97,22 +96,33 @@ int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
 	return 0;
 }
 
+struct set_perm_data {
+	const efi_memory_desc_t	*md;
+	bool			has_bti;
+};
+
 static int __init set_permissions(pte_t *ptep, unsigned long addr, void *data)
 {
-	efi_memory_desc_t *md = data;
-	pte_t pte = READ_ONCE(*ptep);
+	struct set_perm_data *spd = data;
+	const efi_memory_desc_t *md = spd->md;
+	pte_t pte = __ptep_get(ptep);
 
 	if (md->attribute & EFI_MEMORY_RO)
 		pte = set_pte_bit(pte, __pgprot(PTE_RDONLY));
 	if (md->attribute & EFI_MEMORY_XP)
 		pte = set_pte_bit(pte, __pgprot(PTE_PXN));
-	set_pte(ptep, pte);
+	else if (system_supports_bti_kernel() && spd->has_bti)
+		pte = set_pte_bit(pte, __pgprot(PTE_GP));
+	__set_pte(ptep, pte);
 	return 0;
 }
 
 int __init efi_set_mapping_permissions(struct mm_struct *mm,
-				       efi_memory_desc_t *md)
+				       efi_memory_desc_t *md,
+				       bool has_bti)
 {
+	struct set_perm_data data = { md, has_bti };
+
 	BUG_ON(md->type != EFI_RUNTIME_SERVICES_CODE &&
 	       md->type != EFI_RUNTIME_SERVICES_DATA);
 
@@ -128,7 +138,7 @@ int __init efi_set_mapping_permissions(struct mm_struct *mm,
 	 */
 	return apply_to_page_range(mm, md->virt_addr,
 				   md->num_pages << EFI_PAGE_SHIFT,
-				   set_permissions, md);
+				   set_permissions, &data);
 }
 
 /*
@@ -146,7 +156,21 @@ asmlinkage efi_status_t efi_handle_corrupted_x18(efi_status_t s, const char *f)
 	return s;
 }
 
-DEFINE_SPINLOCK(efi_rt_lock);
+static DEFINE_RAW_SPINLOCK(efi_rt_lock);
+
+void arch_efi_call_virt_setup(void)
+{
+	efi_virtmap_load();
+	__efi_fpsimd_begin();
+	raw_spin_lock(&efi_rt_lock);
+}
+
+void arch_efi_call_virt_teardown(void)
+{
+	raw_spin_unlock(&efi_rt_lock);
+	__efi_fpsimd_end();
+	efi_virtmap_unload();
+}
 
 asmlinkage u64 *efi_rt_stack_top __ro_after_init;
 
@@ -190,6 +214,7 @@ l:	if (!p) {
 		return -ENOMEM;
 	}
 
+	kmemleak_not_leak(p);
 	efi_rt_stack_top = p + THREAD_SIZE;
 	return 0;
 }

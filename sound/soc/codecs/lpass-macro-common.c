@@ -4,7 +4,7 @@
 #include <linux/export.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/of_platform.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
@@ -16,7 +16,7 @@ struct lpass_macro *lpass_macro_pds_init(struct device *dev)
 	struct lpass_macro *l_pds;
 	int ret;
 
-	if (!of_find_property(dev->of_node, "power-domains", NULL))
+	if (!of_property_present(dev->of_node, "power-domains"))
 		return NULL;
 
 	l_pds = devm_kzalloc(dev, sizeof(*l_pds), GFP_KERNEL);

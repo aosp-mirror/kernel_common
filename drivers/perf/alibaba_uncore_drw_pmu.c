@@ -236,10 +236,29 @@ static const struct attribute_group ali_drw_pmu_cpumask_attr_group = {
 	.attrs = ali_drw_pmu_cpumask_attrs,
 };
 
+static umode_t ali_drw_pmu_identifier_attr_visible(struct kobject *kobj,
+						struct attribute *attr, int n)
+{
+	return attr->mode;
+}
+
+static DEVICE_STRING_ATTR_RO(ali_drw_pmu_identifier, 0444, "ali_drw_pmu");
+
+static struct attribute *ali_drw_pmu_identifier_attrs[] = {
+	&dev_attr_ali_drw_pmu_identifier.attr.attr,
+	NULL
+};
+
+static const struct attribute_group ali_drw_pmu_identifier_attr_group = {
+	.attrs = ali_drw_pmu_identifier_attrs,
+	.is_visible = ali_drw_pmu_identifier_attr_visible
+};
+
 static const struct attribute_group *ali_drw_pmu_attr_groups[] = {
 	&ali_drw_pmu_events_attr_group,
 	&ali_drw_pmu_cpumask_attr_group,
 	&ali_drw_pmu_format_group,
+	&ali_drw_pmu_identifier_attr_group,
 	NULL,
 };
 
@@ -656,8 +675,7 @@ static int ali_drw_pmu_probe(struct platform_device *pdev)
 	drw_pmu->dev = &pdev->dev;
 	platform_set_drvdata(pdev, drw_pmu);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	drw_pmu->cfg_base = devm_ioremap_resource(&pdev->dev, res);
+	drw_pmu->cfg_base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
 	if (IS_ERR(drw_pmu->cfg_base))
 		return PTR_ERR(drw_pmu->cfg_base);
 
@@ -683,6 +701,7 @@ static int ali_drw_pmu_probe(struct platform_device *pdev)
 
 	drw_pmu->pmu = (struct pmu) {
 		.module		= THIS_MODULE,
+		.parent		= &pdev->dev,
 		.task_ctx_nr	= perf_invalid_context,
 		.event_init	= ali_drw_pmu_event_init,
 		.add		= ali_drw_pmu_add,
@@ -703,7 +722,7 @@ static int ali_drw_pmu_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int ali_drw_pmu_remove(struct platform_device *pdev)
+static void ali_drw_pmu_remove(struct platform_device *pdev)
 {
 	struct ali_drw_pmu *drw_pmu = platform_get_drvdata(pdev);
 
@@ -713,8 +732,6 @@ static int ali_drw_pmu_remove(struct platform_device *pdev)
 
 	ali_drw_pmu_uninit_irq(drw_pmu);
 	perf_pmu_unregister(&drw_pmu->pmu);
-
-	return 0;
 }
 
 static int ali_drw_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
@@ -722,18 +739,14 @@ static int ali_drw_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
 	struct ali_drw_pmu_irq *irq;
 	struct ali_drw_pmu *drw_pmu;
 	unsigned int target;
-	int ret;
-	cpumask_t node_online_cpus;
 
 	irq = hlist_entry_safe(node, struct ali_drw_pmu_irq, node);
 	if (cpu != irq->cpu)
 		return 0;
 
-	ret = cpumask_and(&node_online_cpus,
-			  cpumask_of_node(cpu_to_node(cpu)), cpu_online_mask);
-	if (ret)
-		target = cpumask_any_but(&node_online_cpus, cpu);
-	else
+	target = cpumask_any_and_but(cpumask_of_node(cpu_to_node(cpu)),
+				     cpu_online_mask, cpu);
+	if (target >= nr_cpu_ids)
 		target = cpumask_any_but(cpu_online_mask, cpu);
 
 	if (target >= nr_cpu_ids)
@@ -769,7 +782,7 @@ static struct platform_driver ali_drw_pmu_driver = {
 		   .acpi_match_table = ali_drw_acpi_match,
 		   },
 	.probe = ali_drw_pmu_probe,
-	.remove = ali_drw_pmu_remove,
+	.remove_new = ali_drw_pmu_remove,
 };
 
 static int __init ali_drw_pmu_init(void)

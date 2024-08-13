@@ -14,8 +14,6 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
-#include "bpf_tcp_helpers.h"
-
 #define SRC_REWRITE_IP4		0x7f000004U
 #define DST_REWRITE_IP4		0x7f000001U
 #define DST_REWRITE_PORT4	4444
@@ -32,7 +30,11 @@
 #define IFNAMSIZ 16
 #endif
 
-__attribute__ ((noinline))
+#ifndef SOL_TCP
+#define SOL_TCP 6
+#endif
+
+__attribute__ ((noinline)) __weak
 int do_bind(struct bpf_sock_addr *ctx)
 {
 	struct sockaddr_in sa = {};
@@ -195,6 +197,12 @@ int connect_v4_prog(struct bpf_sock_addr *ctx)
 	ctx->user_port = bpf_htons(DST_REWRITE_PORT4);
 
 	return do_bind(ctx) ? 1 : 0;
+}
+
+SEC("cgroup/connect4")
+int connect_v4_deny_prog(struct bpf_sock_addr *ctx)
+{
+	return 0;
 }
 
 char _license[] SEC("license") = "GPL";

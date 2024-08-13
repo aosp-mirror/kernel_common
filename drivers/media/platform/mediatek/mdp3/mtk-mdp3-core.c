@@ -12,52 +12,30 @@
 #include <linux/remoteproc.h>
 #include <linux/remoteproc/mtk_scp.h>
 #include <media/videobuf2-dma-contig.h>
+
 #include "mtk-mdp3-core.h"
+#include "mtk-mdp3-cfg.h"
 #include "mtk-mdp3-m2m.h"
-
-static const struct mdp_platform_config mt8183_plat_cfg = {
-	.rdma_support_10bit		= true,
-	.rdma_rsz1_sram_sharing		= true,
-	.rdma_upsample_repeat_only	= true,
-	.rsz_disable_dcm_small_sample	= false,
-	.wrot_filter_constraint		= false,
-};
-
-static const struct of_device_id mt8183_mdp_probe_infra[MDP_INFRA_MAX] = {
-	[MDP_INFRA_MMSYS] = { .compatible = "mediatek,mt8183-mmsys" },
-	[MDP_INFRA_MUTEX] = { .compatible = "mediatek,mt8183-disp-mutex" },
-	[MDP_INFRA_SCP] = { .compatible = "mediatek,mt8183-scp" }
-};
-
-static const u32 mt8183_mutex_idx[MDP_MAX_COMP_COUNT] = {
-	[MDP_COMP_RDMA0] = MUTEX_MOD_IDX_MDP_RDMA0,
-	[MDP_COMP_RSZ0] = MUTEX_MOD_IDX_MDP_RSZ0,
-	[MDP_COMP_RSZ1] = MUTEX_MOD_IDX_MDP_RSZ1,
-	[MDP_COMP_TDSHP0] = MUTEX_MOD_IDX_MDP_TDSHP0,
-	[MDP_COMP_WROT0] = MUTEX_MOD_IDX_MDP_WROT0,
-	[MDP_COMP_WDMA] = MUTEX_MOD_IDX_MDP_WDMA,
-	[MDP_COMP_AAL0] = MUTEX_MOD_IDX_MDP_AAL0,
-	[MDP_COMP_CCORR0] = MUTEX_MOD_IDX_MDP_CCORR0,
-};
-
-static const struct mtk_mdp_driver_data mt8183_mdp_driver_data = {
-	.mdp_probe_infra = mt8183_mdp_probe_infra,
-	.mdp_cfg = &mt8183_plat_cfg,
-	.mdp_mutex_table_idx = mt8183_mutex_idx,
-};
 
 static const struct of_device_id mdp_of_ids[] = {
 	{ .compatible = "mediatek,mt8183-mdp3-rdma",
 	  .data = &mt8183_mdp_driver_data,
+	},
+	{ .compatible = "mediatek,mt8195-mdp3-rdma",
+	  .data = &mt8195_mdp_driver_data,
+	},
+	{ .compatible = "mediatek,mt8195-mdp3-wrot",
+	  .data = &mt8195_mdp_driver_data,
 	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, mdp_of_ids);
 
 static struct platform_device *__get_pdev_by_id(struct platform_device *pdev,
+						struct platform_device *from,
 						enum mdp_infra_id id)
 {
-	struct device_node *node;
+	struct device_node *node, *f = NULL;
 	struct platform_device *mdp_pdev = NULL;
 	const struct mtk_mdp_driver_data *mdp_data;
 	const char *compat;
@@ -75,9 +53,14 @@ static struct platform_device *__get_pdev_by_id(struct platform_device *pdev,
 		dev_err(&pdev->dev, "have no driver data to find node\n");
 		return NULL;
 	}
-	compat = mdp_data->mdp_probe_infra[id].compatible;
 
-	node = of_find_compatible_node(NULL, NULL, compat);
+	compat = mdp_data->mdp_probe_infra[id].compatible;
+	if (strlen(compat) == 0)
+		return NULL;
+
+	if (from)
+		f = from->dev.of_node;
+	node = of_find_compatible_node(f, NULL, compat);
 	if (WARN_ON(!node)) {
 		dev_err(&pdev->dev, "find node from id %d failed\n", id);
 		return NULL;
@@ -159,6 +142,10 @@ void mdp_video_device_release(struct video_device *vdev)
 	struct mdp_dev *mdp = (struct mdp_dev *)video_get_drvdata(vdev);
 	int i;
 
+	for (i = 0; i < mdp->mdp_data->pp_used; i++)
+		if (mdp->cmdq_clt[i])
+			cmdq_mbox_destroy(mdp->cmdq_clt[i]);
+
 	scp_put(mdp->scp);
 
 	destroy_workqueue(mdp->job_wq);
@@ -169,12 +156,64 @@ void mdp_video_device_release(struct video_device *vdev)
 	vb2_dma_contig_clear_max_seg_size(&mdp->pdev->dev);
 
 	mdp_comp_destroy(mdp);
-	for (i = 0; i < MDP_PIPE_MAX; i++)
-		mtk_mutex_put(mdp->mdp_mutex[i]);
+	for (i = 0; i < mdp->mdp_data->pipe_info_len; i++) {
+		enum mdp_mm_subsys_id idx;
+		struct mtk_mutex *m;
+		u32 m_id;
+
+		idx = mdp->mdp_data->pipe_info[i].sub_id;
+		m_id = mdp->mdp_data->pipe_info[i].mutex_id;
+		m = mdp->mm_subsys[idx].mdp_mutex[m_id];
+		if (!IS_ERR_OR_NULL(m))
+			mtk_mutex_put(m);
+	}
 
 	mdp_vpu_shared_mem_free(&mdp->vpu);
 	v4l2_m2m_release(mdp->m2m_dev);
 	kfree(mdp);
+}
+
+static int mdp_mm_subsys_deploy(struct mdp_dev *mdp, enum mdp_infra_id id)
+{
+	struct platform_device *mm_pdev = NULL;
+	struct device **dev;
+	int i;
+
+	if (!mdp)
+		return -EINVAL;
+
+	for (i = 0; i < MDP_MM_SUBSYS_MAX; i++) {
+		const char *compat;
+		enum mdp_infra_id sub_id = id + i;
+
+		switch (id) {
+		case MDP_INFRA_MMSYS:
+			dev = &mdp->mm_subsys[i].mmsys;
+			break;
+		case MDP_INFRA_MUTEX:
+			dev = &mdp->mm_subsys[i].mutex;
+			break;
+		default:
+			dev_err(&mdp->pdev->dev, "Unknown infra id %d", id);
+			return -EINVAL;
+		}
+
+		/*
+		 * Not every chip has multiple multimedia subsystems, so
+		 * the config may be null.
+		 */
+		compat = mdp->mdp_data->mdp_probe_infra[sub_id].compatible;
+		if (strlen(compat) == 0)
+			continue;
+
+		mm_pdev = __get_pdev_by_id(mdp->pdev, mm_pdev, sub_id);
+		if (WARN_ON(!mm_pdev))
+			return -ENODEV;
+
+		*dev = &mm_pdev->dev;
+	}
+
+	return 0;
 }
 
 static int mdp_probe(struct platform_device *pdev)
@@ -182,7 +221,8 @@ static int mdp_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct mdp_dev *mdp;
 	struct platform_device *mm_pdev;
-	int ret, i;
+	struct resource *res;
+	int ret, i, mutex_id;
 
 	mdp = kzalloc(sizeof(*mdp), GFP_KERNEL);
 	if (!mdp) {
@@ -193,22 +233,34 @@ static int mdp_probe(struct platform_device *pdev)
 	mdp->pdev = pdev;
 	mdp->mdp_data = of_device_get_match_data(&pdev->dev);
 
-	mm_pdev = __get_pdev_by_id(pdev, MDP_INFRA_MMSYS);
-	if (!mm_pdev) {
-		ret = -ENODEV;
-		goto err_destroy_device;
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (res->start != mdp->mdp_data->mdp_con_res) {
+		platform_set_drvdata(pdev, mdp);
+		goto success_return;
 	}
-	mdp->mdp_mmsys = &mm_pdev->dev;
 
-	mm_pdev = __get_pdev_by_id(pdev, MDP_INFRA_MUTEX);
-	if (WARN_ON(!mm_pdev)) {
-		ret = -ENODEV;
+	ret = mdp_mm_subsys_deploy(mdp, MDP_INFRA_MMSYS);
+	if (ret)
 		goto err_destroy_device;
-	}
-	for (i = 0; i < MDP_PIPE_MAX; i++) {
-		mdp->mdp_mutex[i] = mtk_mutex_get(&mm_pdev->dev);
-		if (!mdp->mdp_mutex[i]) {
-			ret = -ENODEV;
+
+	ret = mdp_mm_subsys_deploy(mdp, MDP_INFRA_MUTEX);
+	if (ret)
+		goto err_destroy_device;
+
+	for (i = 0; i < mdp->mdp_data->pipe_info_len; i++) {
+		enum mdp_mm_subsys_id idx;
+		struct mtk_mutex **m;
+
+		idx = mdp->mdp_data->pipe_info[i].sub_id;
+		mutex_id = mdp->mdp_data->pipe_info[i].mutex_id;
+		m = &mdp->mm_subsys[idx].mdp_mutex[mutex_id];
+
+		if (!IS_ERR_OR_NULL(*m))
+			continue;
+
+		*m = mtk_mutex_get(mdp->mm_subsys[idx].mutex);
+		if (IS_ERR(*m)) {
+			ret = PTR_ERR(*m);
 			goto err_free_mutex;
 		}
 	}
@@ -234,23 +286,29 @@ static int mdp_probe(struct platform_device *pdev)
 		goto err_destroy_job_wq;
 	}
 
-	mm_pdev = __get_pdev_by_id(pdev, MDP_INFRA_SCP);
-	if (WARN_ON(!mm_pdev)) {
-		dev_err(&pdev->dev, "Could not get scp device\n");
-		ret = -ENODEV;
-		goto err_destroy_clock_wq;
+	mdp->scp = scp_get(pdev);
+	if (!mdp->scp) {
+		mm_pdev = __get_pdev_by_id(pdev, NULL, MDP_INFRA_SCP);
+		if (WARN_ON(!mm_pdev)) {
+			dev_err(&pdev->dev, "Could not get scp device\n");
+			ret = -ENODEV;
+			goto err_destroy_clock_wq;
+		}
+		mdp->scp = platform_get_drvdata(mm_pdev);
 	}
-	mdp->scp = platform_get_drvdata(mm_pdev);
+
 	mdp->rproc_handle = scp_get_rproc(mdp->scp);
 	dev_dbg(&pdev->dev, "MDP rproc_handle: %pK", mdp->rproc_handle);
 
 	mutex_init(&mdp->vpu_lock);
 	mutex_init(&mdp->m2m_lock);
 
-	mdp->cmdq_clt = cmdq_mbox_create(dev, 0);
-	if (IS_ERR(mdp->cmdq_clt)) {
-		ret = PTR_ERR(mdp->cmdq_clt);
-		goto err_put_scp;
+	for (i = 0; i < mdp->mdp_data->pp_used; i++) {
+		mdp->cmdq_clt[i] = cmdq_mbox_create(dev, i);
+		if (IS_ERR(mdp->cmdq_clt[i])) {
+			ret = PTR_ERR(mdp->cmdq_clt[i]);
+			goto err_mbox_destroy;
+		}
 	}
 
 	init_waitqueue_head(&mdp->callback_wq);
@@ -272,14 +330,15 @@ static int mdp_probe(struct platform_device *pdev)
 		goto err_unregister_device;
 	}
 
+success_return:
 	dev_dbg(dev, "mdp-%d registered successfully\n", pdev->id);
 	return 0;
 
 err_unregister_device:
 	v4l2_device_unregister(&mdp->v4l2_dev);
 err_mbox_destroy:
-	cmdq_mbox_destroy(mdp->cmdq_clt);
-err_put_scp:
+	while (--i >= 0)
+		cmdq_mbox_destroy(mdp->cmdq_clt[i]);
 	scp_put(mdp->scp);
 err_destroy_clock_wq:
 	destroy_workqueue(mdp->clock_wq);
@@ -288,8 +347,16 @@ err_destroy_job_wq:
 err_deinit_comp:
 	mdp_comp_destroy(mdp);
 err_free_mutex:
-	for (i = 0; i < MDP_PIPE_MAX; i++)
-		mtk_mutex_put(mdp->mdp_mutex[i]);
+	for (i = 0; i < mdp->mdp_data->pipe_info_len; i++) {
+		enum mdp_mm_subsys_id idx;
+		struct mtk_mutex *m;
+
+		idx = mdp->mdp_data->pipe_info[i].sub_id;
+		mutex_id = mdp->mdp_data->pipe_info[i].mutex_id;
+		m = mdp->mm_subsys[idx].mdp_mutex[mutex_id];
+		if (!IS_ERR_OR_NULL(m))
+			mtk_mutex_put(m);
+	}
 err_destroy_device:
 	kfree(mdp);
 err_return:
@@ -297,14 +364,13 @@ err_return:
 	return ret;
 }
 
-static int mdp_remove(struct platform_device *pdev)
+static void mdp_remove(struct platform_device *pdev)
 {
 	struct mdp_dev *mdp = platform_get_drvdata(pdev);
 
 	v4l2_device_unregister(&mdp->v4l2_dev);
 
 	dev_dbg(&pdev->dev, "%s driver unloaded\n", pdev->name);
-	return 0;
 }
 
 static int __maybe_unused mdp_suspend(struct device *dev)
@@ -314,14 +380,14 @@ static int __maybe_unused mdp_suspend(struct device *dev)
 
 	atomic_set(&mdp->suspended, 1);
 
-	if (atomic_read(&mdp->job_count)) {
+	if (refcount_read(&mdp->job_count)) {
 		ret = wait_event_timeout(mdp->callback_wq,
-					 !atomic_read(&mdp->job_count),
+					 !refcount_read(&mdp->job_count),
 					 2 * HZ);
 		if (ret == 0) {
 			dev_err(dev,
 				"%s:flushed cmdq task incomplete, count=%d\n",
-				__func__, atomic_read(&mdp->job_count));
+				__func__, refcount_read(&mdp->job_count));
 			return -EBUSY;
 		}
 	}
@@ -344,11 +410,11 @@ static const struct dev_pm_ops mdp_pm_ops = {
 
 static struct platform_driver mdp_driver = {
 	.probe		= mdp_probe,
-	.remove		= mdp_remove,
+	.remove_new	= mdp_remove,
 	.driver = {
 		.name	= MDP_MODULE_NAME,
 		.pm	= &mdp_pm_ops,
-		.of_match_table = of_match_ptr(mdp_of_ids),
+		.of_match_table = mdp_of_ids,
 	},
 };
 

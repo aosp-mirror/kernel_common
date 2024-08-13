@@ -14,7 +14,7 @@
 #include "adav80x.h"
 
 static const struct i2c_device_id adav803_id[] = {
-	{ "adav803", 0 },
+	{ "adav803" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, adav803_id);
@@ -29,7 +29,7 @@ static struct i2c_driver adav803_driver = {
 	.driver = {
 		.name = "adav803",
 	},
-	.probe_new = adav803_probe,
+	.probe = adav803_probe,
 	.id_table = adav803_id,
 };
 module_i2c_driver(adav803_driver);

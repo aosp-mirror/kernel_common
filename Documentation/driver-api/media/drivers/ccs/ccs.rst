@@ -2,59 +2,46 @@
 
 .. include:: <isonum.txt>
 
+.. _media-ccs-driver:
+
 MIPI CCS camera sensor driver
 =============================
 
 The MIPI CCS camera sensor driver is a generic driver for `MIPI CCS
 <https://www.mipi.org/specifications/camera-command-set>`_ compliant
-camera sensors. It exposes three sub-devices representing the pixel array,
-the binner and the scaler.
+camera sensors.
 
-As the capabilities of individual devices vary, the driver exposes
-interfaces based on the capabilities that exist in hardware.
+Also see :ref:`the CCS driver UAPI documentation <media-ccs-uapi>`.
 
-Pixel Array sub-device
-----------------------
+CCS static data
+---------------
 
-The pixel array sub-device represents the camera sensor's pixel matrix, as well
-as analogue crop functionality present in many compliant devices. The analogue
-crop is configured using the ``V4L2_SEL_TGT_CROP`` on the source pad (0) of the
-entity. The size of the pixel matrix can be obtained by getting the
-``V4L2_SEL_TGT_NATIVE_SIZE`` target.
+The MIPI CCS driver supports CCS static data for all compliant devices,
+including not just those compliant with CCS 1.1 but also CCS 1.0 and SMIA(++).
+For CCS the file names are formed as
 
-Binner
-------
+	ccs/ccs-sensor-vvvv-mmmm-rrrr.fw (sensor) and
+	ccs/ccs-module-vvvv-mmmm-rrrr.fw (module).
 
-The binner sub-device represents the binning functionality on the sensor. For
-that purpose, selection target ``V4L2_SEL_TGT_COMPOSE`` is supported on the
-sink pad (0).
+For SMIA++ compliant devices the corresponding file names are
 
-Additionally, if a device has no scaler or digital crop functionality, the
-source pad (1) expses another digital crop selection rectangle that can only
-crop at the end of the lines and frames.
+	ccs/smiapp-sensor-vv-mmmm-rr.fw (sensor) and
+	ccs/smiapp-module-vv-mmmm-rrrr.fw (module).
 
-Scaler
-------
+For SMIA (non-++) compliant devices the static data file name is
 
-The scaler sub-device represents the digital crop and scaling functionality of
-the sensor. The V4L2 selection target ``V4L2_SEL_TGT_CROP`` is used to
-configure the digital crop on the sink pad (0) when digital crop is supported.
-Scaling is configured using selection target ``V4L2_SEL_TGT_COMPOSE`` on the
-sink pad (0) as well.
+	ccs/smia-sensor-vv-mmmm-rr.fw (sensor).
 
-Additionally, if the scaler sub-device exists, its source pad (1) exposes
-another digital crop selection rectangle that can only crop at the end of the
-lines and frames.
+vvvv or vv denotes MIPI and SMIA manufacturer IDs respectively, mmmm model ID
+and rrrr or rr revision number.
 
-Digital and analogue crop
--------------------------
+CCS tools
+~~~~~~~~~
 
-Digital crop functionality is referred to as cropping that effectively works by
-dropping some data on the floor. Analogue crop, on the other hand, means that
-the cropped information is never retrieved. In case of camera sensors, the
-analogue data is never read from the pixel matrix that are outside the
-configured selection rectangle that designates crop. The difference has an
-effect in device timing and likely also in power consumption.
+`CCS tools <https://github.com/MIPI-Alliance/ccs-tools/>`_ is a set of
+tools for working with CCS static data files. CCS tools includes a
+definition of the human-readable CCS static data YAML format and includes a
+program to convert it to a binary.
 
 Register definition generator
 -----------------------------

@@ -64,7 +64,8 @@ static const u8 st7586_lookup[] = { 0x7, 0x4, 0x2, 0x0 };
 
 static void st7586_xrgb8888_to_gray332(u8 *dst, void *vaddr,
 				       struct drm_framebuffer *fb,
-				       struct drm_rect *clip)
+				       struct drm_rect *clip,
+				       struct drm_format_conv_state *fmtcnv_state)
 {
 	size_t len = (clip->x2 - clip->x1) * (clip->y2 - clip->y1);
 	unsigned int x, y;
@@ -77,7 +78,7 @@ static void st7586_xrgb8888_to_gray332(u8 *dst, void *vaddr,
 
 	iosys_map_set_vaddr(&dst_map, buf);
 	iosys_map_set_vaddr(&vmap, vaddr);
-	drm_fb_xrgb8888_to_gray8(&dst_map, NULL, &vmap, fb, clip);
+	drm_fb_xrgb8888_to_gray8(&dst_map, NULL, &vmap, fb, clip, fmtcnv_state);
 	src = buf;
 
 	for (y = clip->y1; y < clip->y2; y++) {
@@ -92,32 +93,28 @@ static void st7586_xrgb8888_to_gray332(u8 *dst, void *vaddr,
 	kfree(buf);
 }
 
-static int st7586_buf_copy(void *dst, struct drm_framebuffer *fb,
-			   struct drm_rect *clip)
+static int st7586_buf_copy(void *dst, struct iosys_map *src, struct drm_framebuffer *fb,
+			   struct drm_rect *clip, struct drm_format_conv_state *fmtcnv_state)
 {
-	struct drm_gem_dma_object *dma_obj = drm_fb_dma_get_gem_obj(fb, 0);
-	void *src = dma_obj->vaddr;
-	int ret = 0;
+	int ret;
 
 	ret = drm_gem_fb_begin_cpu_access(fb, DMA_FROM_DEVICE);
 	if (ret)
 		return ret;
 
-	st7586_xrgb8888_to_gray332(dst, src, fb, clip);
+	st7586_xrgb8888_to_gray332(dst, src->vaddr, fb, clip, fmtcnv_state);
 
 	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
 
 	return 0;
 }
 
-static void st7586_fb_dirty(struct drm_framebuffer *fb, struct drm_rect *rect)
+static void st7586_fb_dirty(struct iosys_map *src, struct drm_framebuffer *fb,
+			    struct drm_rect *rect, struct drm_format_conv_state *fmtcnv_state)
 {
 	struct mipi_dbi_dev *dbidev = drm_to_mipi_dbi_dev(fb->dev);
 	struct mipi_dbi *dbi = &dbidev->dbi;
-	int start, end, idx, ret = 0;
-
-	if (!drm_dev_enter(fb->dev, &idx))
-		return;
+	int start, end, ret = 0;
 
 	/* 3 pixels per byte, so grow clip to nearest multiple of 3 */
 	rect->x1 = rounddown(rect->x1, 3);
@@ -125,7 +122,7 @@ static void st7586_fb_dirty(struct drm_framebuffer *fb, struct drm_rect *rect)
 
 	DRM_DEBUG_KMS("Flushing [FB:%d] " DRM_RECT_FMT "\n", fb->base.id, DRM_RECT_ARG(rect));
 
-	ret = st7586_buf_copy(dbidev->tx_buf, fb, rect);
+	ret = st7586_buf_copy(dbidev->tx_buf, src, fb, rect, fmtcnv_state);
 	if (ret)
 		goto err_msg;
 
@@ -146,21 +143,28 @@ static void st7586_fb_dirty(struct drm_framebuffer *fb, struct drm_rect *rect)
 err_msg:
 	if (ret)
 		dev_err_once(fb->dev->dev, "Failed to update display %d\n", ret);
-
-	drm_dev_exit(idx);
 }
 
 static void st7586_pipe_update(struct drm_simple_display_pipe *pipe,
 			       struct drm_plane_state *old_state)
 {
 	struct drm_plane_state *state = pipe->plane.state;
+	struct drm_shadow_plane_state *shadow_plane_state = to_drm_shadow_plane_state(state);
+	struct drm_framebuffer *fb = state->fb;
 	struct drm_rect rect;
+	int idx;
 
 	if (!pipe->crtc.state->active)
 		return;
 
+	if (!drm_dev_enter(fb->dev, &idx))
+		return;
+
 	if (drm_atomic_helper_damage_merged(old_state, state, &rect))
-		st7586_fb_dirty(state->fb, &rect);
+		st7586_fb_dirty(&shadow_plane_state->data[0], fb, &rect,
+				&shadow_plane_state->fmtcnv_state);
+
+	drm_dev_exit(idx);
 }
 
 static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
@@ -168,6 +172,7 @@ static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 			       struct drm_plane_state *plane_state)
 {
 	struct mipi_dbi_dev *dbidev = drm_to_mipi_dbi_dev(pipe->crtc.dev);
+	struct drm_shadow_plane_state *shadow_plane_state = to_drm_shadow_plane_state(plane_state);
 	struct drm_framebuffer *fb = plane_state->fb;
 	struct mipi_dbi *dbi = &dbidev->dbi;
 	struct drm_rect rect = {
@@ -235,7 +240,8 @@ static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 
 	msleep(100);
 
-	st7586_fb_dirty(fb, &rect);
+	st7586_fb_dirty(&shadow_plane_state->data[0], fb, &rect,
+			&shadow_plane_state->fmtcnv_state);
 
 	mipi_dbi_command(dbi, MIPI_DCS_SET_DISPLAY_ON);
 out_exit:
@@ -263,9 +269,15 @@ static const u32 st7586_formats[] = {
 };
 
 static const struct drm_simple_display_pipe_funcs st7586_pipe_funcs = {
+	.mode_valid	= mipi_dbi_pipe_mode_valid,
 	.enable		= st7586_pipe_enable,
 	.disable	= st7586_pipe_disable,
 	.update		= st7586_pipe_update,
+	.begin_fb_access = mipi_dbi_pipe_begin_fb_access,
+	.end_fb_access	= mipi_dbi_pipe_end_fb_access,
+	.reset_plane	= mipi_dbi_pipe_reset_plane,
+	.duplicate_plane_state = mipi_dbi_pipe_duplicate_plane_state,
+	.destroy_plane_state = mipi_dbi_pipe_destroy_plane_state,
 };
 
 static const struct drm_display_mode st7586_mode = {

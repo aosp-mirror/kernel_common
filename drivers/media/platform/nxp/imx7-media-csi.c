@@ -3,29 +3,46 @@
  * V4L2 Capture CSI Subdev for Freescale i.MX6UL/L / i.MX7 SOC
  *
  * Copyright (c) 2019 Linaro Ltd
- *
  */
 
 #include <linux/clk.h>
+#include <linux/completion.h>
+#include <linux/container_of.h>
 #include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/dma-mapping.h>
+#include <linux/err.h>
 #include <linux/interrupt.h>
-#include <linux/mfd/syscon.h>
+#include <linux/io.h>
+#include <linux/jiffies.h>
+#include <linux/kernel.h>
+#include <linux/list.h>
+#include <linux/math.h>
+#include <linux/minmax.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
-#include <linux/of_graph.h>
-#include <linux/pinctrl/consumer.h>
+#include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
-#include <linux/regmap.h>
+#include <linux/property.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/string.h>
+#include <linux/timekeeping.h>
 #include <linux/types.h>
 
+#include <media/media-device.h>
+#include <media/media-entity.h>
+#include <media/v4l2-async.h>
+#include <media/v4l2-common.h>
+#include <media/v4l2-dev.h>
 #include <media/v4l2-device.h>
-#include <media/v4l2-fwnode.h>
+#include <media/v4l2-fh.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-mc.h>
 #include <media/v4l2-subdev.h>
+#include <media/videobuf2-core.h>
 #include <media/videobuf2-dma-contig.h>
+#include <media/videobuf2-v4l2.h>
 
 #define IMX7_CSI_PAD_SINK		0
 #define IMX7_CSI_PAD_SRC		1
@@ -211,7 +228,6 @@ struct imx7_csi {
 	int irq;
 	struct clk *mclk;
 
-	struct mutex lock; /* Protects is_streaming, format_mbus, cc */
 	spinlock_t irqlock; /* Protects last_eof */
 
 	/* Media and V4L2 device */
@@ -226,9 +242,6 @@ struct imx7_csi {
 	/* V4L2 subdev */
 	struct v4l2_subdev sd;
 	struct media_pad pad[IMX7_CSI_PADS_NUM];
-
-	struct v4l2_mbus_framefmt format_mbus[IMX7_CSI_PADS_NUM];
-	const struct imx7_csi_pixfmt *cc[IMX7_CSI_PADS_NUM];
 
 	/* Video device */
 	struct video_device *vdev;		/* Video device */
@@ -510,7 +523,8 @@ static void imx7_csi_dma_stop(struct imx7_csi *csi)
 	imx7_csi_hw_disable_irq(csi);
 }
 
-static void imx7_csi_configure(struct imx7_csi *csi)
+static void imx7_csi_configure(struct imx7_csi *csi,
+			       struct v4l2_subdev_state *sd_state)
 {
 	struct v4l2_pix_format *out_pix = &csi->vdev_fmt;
 	int width = out_pix->width;
@@ -541,12 +555,17 @@ static void imx7_csi_configure(struct imx7_csi *csi)
 		    out_pix->pixelformat == V4L2_PIX_FMT_YUYV)
 			width *= 2;
 	} else {
+		const struct v4l2_mbus_framefmt *sink_fmt;
+
+		sink_fmt = v4l2_subdev_state_get_format(sd_state,
+							IMX7_CSI_PAD_SINK);
+
 		cr1 = BIT_SOF_POL | BIT_REDGE | BIT_HSYNC_POL | BIT_FCC
 		    | BIT_MCLKDIV(1) | BIT_MCLKEN;
 
 		cr18 |= BIT_DATA_FROM_MIPI;
 
-		switch (csi->format_mbus[IMX7_CSI_PAD_SINK].code) {
+		switch (sink_fmt->code) {
 		case MEDIA_BUS_FMT_Y8_1X8:
 		case MEDIA_BUS_FMT_SBGGR8_1X8:
 		case MEDIA_BUS_FMT_SGBRG8_1X8:
@@ -627,7 +646,8 @@ static void imx7_csi_configure(struct imx7_csi *csi)
 	imx7_csi_reg_write(csi, stride, CSI_CSIFBUF_PARA);
 }
 
-static int imx7_csi_init(struct imx7_csi *csi)
+static int imx7_csi_init(struct imx7_csi *csi,
+			 struct v4l2_subdev_state *sd_state)
 {
 	int ret;
 
@@ -635,11 +655,13 @@ static int imx7_csi_init(struct imx7_csi *csi)
 	if (ret < 0)
 		return ret;
 
-	imx7_csi_configure(csi);
+	imx7_csi_configure(csi, sd_state);
 
 	ret = imx7_csi_dma_setup(csi);
-	if (ret < 0)
+	if (ret < 0) {
+		clk_disable_unprepare(csi->mclk);
 		return ret;
+	}
 
 	return 0;
 }
@@ -1009,39 +1031,6 @@ static int imx7_csi_enum_mbus_formats(u32 *code, u32 index)
 	return -EINVAL;
 }
 
-static int imx7_csi_mbus_fmt_to_pix_fmt(struct v4l2_pix_format *pix,
-					const struct v4l2_mbus_framefmt *mbus,
-					const struct imx7_csi_pixfmt *cc)
-{
-	u32 width;
-	u32 stride;
-
-	if (!cc) {
-		cc = imx7_csi_find_mbus_format(mbus->code);
-		if (!cc)
-			return -EINVAL;
-	}
-
-	/* Round up width for minimum burst size */
-	width = round_up(mbus->width, 8);
-
-	/* Round up stride for IDMAC line start address alignment */
-	stride = round_up((width * cc->bpp) >> 3, 8);
-
-	pix->width = width;
-	pix->height = mbus->height;
-	pix->pixelformat = cc->fourcc;
-	pix->colorspace = mbus->colorspace;
-	pix->xfer_func = mbus->xfer_func;
-	pix->ycbcr_enc = mbus->ycbcr_enc;
-	pix->quantization = mbus->quantization;
-	pix->field = mbus->field;
-	pix->bytesperline = stride;
-	pix->sizeimage = stride * pix->height;
-
-	return 0;
-}
-
 /* -----------------------------------------------------------------------------
  * Video Capture Device - IOCTLs
  */
@@ -1102,6 +1091,7 @@ static int imx7_csi_video_enum_framesizes(struct file *file, void *fh,
 					  struct v4l2_frmsizeenum *fsize)
 {
 	const struct imx7_csi_pixfmt *cc;
+	u32 walign;
 
 	if (fsize->index > 0)
 		return -EINVAL;
@@ -1111,16 +1101,17 @@ static int imx7_csi_video_enum_framesizes(struct file *file, void *fh,
 		return -EINVAL;
 
 	/*
-	 * TODO: The constraints are hardware-specific and may depend on the
-	 * pixel format. This should come from the driver using
-	 * imx_media_capture.
+	 * The width alignment is 8 bytes as indicated by the
+	 * CSI_IMAG_PARA.IMAGE_WIDTH documentation. Convert it to pixels.
 	 */
+	walign = 8 * 8 / cc->bpp;
+
 	fsize->type = V4L2_FRMSIZE_TYPE_CONTINUOUS;
-	fsize->stepwise.min_width = 1;
-	fsize->stepwise.max_width = 65535;
+	fsize->stepwise.min_width = walign;
+	fsize->stepwise.max_width = round_down(65535U, walign);
 	fsize->stepwise.min_height = 1;
 	fsize->stepwise.max_height = 65535;
-	fsize->stepwise.step_width = 1;
+	fsize->stepwise.step_width = walign;
 	fsize->stepwise.step_height = 1;
 
 	return 0;
@@ -1140,8 +1131,13 @@ static const struct imx7_csi_pixfmt *
 __imx7_csi_video_try_fmt(struct v4l2_pix_format *pixfmt,
 			 struct v4l2_rect *compose)
 {
-	struct v4l2_mbus_framefmt fmt_src;
 	const struct imx7_csi_pixfmt *cc;
+	u32 walign;
+
+	if (compose) {
+		compose->width = pixfmt->width;
+		compose->height = pixfmt->height;
+	}
 
 	/*
 	 * Find the pixel format, default to the first supported format if not
@@ -1153,27 +1149,20 @@ __imx7_csi_video_try_fmt(struct v4l2_pix_format *pixfmt,
 		cc = imx7_csi_find_pixel_format(pixfmt->pixelformat);
 	}
 
-	/* Allow IDMAC interweave but enforce field order from source. */
-	if (V4L2_FIELD_IS_INTERLACED(pixfmt->field)) {
-		switch (pixfmt->field) {
-		case V4L2_FIELD_SEQ_TB:
-			pixfmt->field = V4L2_FIELD_INTERLACED_TB;
-			break;
-		case V4L2_FIELD_SEQ_BT:
-			pixfmt->field = V4L2_FIELD_INTERLACED_BT;
-			break;
-		default:
-			break;
-		}
-	}
+	/*
+	 * The width alignment is 8 bytes as indicated by the
+	 * CSI_IMAG_PARA.IMAGE_WIDTH documentation. Convert it to pixels.
+	 *
+	 * TODO: Implement configurable stride support.
+	 */
+	walign = 8 * 8 / cc->bpp;
+	pixfmt->width = clamp(round_up(pixfmt->width, walign), walign,
+			      round_down(65535U, walign));
+	pixfmt->height = clamp(pixfmt->height, 1U, 65535U);
 
-	v4l2_fill_mbus_format(&fmt_src, pixfmt, 0);
-	imx7_csi_mbus_fmt_to_pix_fmt(pixfmt, &fmt_src, cc);
-
-	if (compose) {
-		compose->width = fmt_src.width;
-		compose->height = fmt_src.height;
-	}
+	pixfmt->bytesperline = pixfmt->width * cc->bpp / 8;
+	pixfmt->sizeimage = pixfmt->bytesperline * pixfmt->height;
+	pixfmt->field = V4L2_FIELD_NONE;
 
 	return cc;
 }
@@ -1208,6 +1197,9 @@ static int imx7_csi_video_g_selection(struct file *file, void *fh,
 				      struct v4l2_selection *s)
 {
 	struct imx7_csi *csi = video_drvdata(file);
+
+	if (s->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+		return -EINVAL;
 
 	switch (s->target) {
 	case V4L2_SEL_TGT_COMPOSE:
@@ -1268,6 +1260,7 @@ static int imx7_csi_video_queue_setup(struct vb2_queue *vq,
 				      struct device *alloc_devs[])
 {
 	struct imx7_csi *csi = vb2_get_drv_priv(vq);
+	unsigned int q_num_bufs = vb2_get_num_buffers(vq);
 	struct v4l2_pix_format *pix = &csi->vdev_fmt;
 	unsigned int count = *nbuffers;
 
@@ -1277,14 +1270,14 @@ static int imx7_csi_video_queue_setup(struct vb2_queue *vq,
 	if (*nplanes) {
 		if (*nplanes != 1 || sizes[0] < pix->sizeimage)
 			return -EINVAL;
-		count += vq->num_buffers;
+		count += q_num_bufs;
 	}
 
 	count = min_t(__u32, IMX7_CSI_VIDEO_MEM_LIMIT / pix->sizeimage, count);
 
 	if (*nplanes)
-		*nbuffers = (count < vq->num_buffers) ? 0 :
-			count - vq->num_buffers;
+		*nbuffers = (count < q_num_bufs) ? 0 :
+			count - q_num_bufs;
 	else
 		*nbuffers = count;
 
@@ -1411,14 +1404,15 @@ static void imx7_csi_video_buf_queue(struct vb2_buffer *vb)
 
 static int imx7_csi_video_validate_fmt(struct imx7_csi *csi)
 {
-	struct v4l2_subdev_format fmt_src;
+	struct v4l2_subdev_format fmt_src = {
+		.pad = IMX7_CSI_PAD_SRC,
+		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+	};
 	const struct imx7_csi_pixfmt *cc;
 	int ret;
 
 	/* Retrieve the media bus format on the source subdev. */
-	fmt_src.pad = IMX7_CSI_PAD_SRC;
-	fmt_src.which = V4L2_SUBDEV_FORMAT_ACTIVE;
-	ret = v4l2_subdev_call(&csi->sd, pad, get_fmt, NULL, &fmt_src);
+	ret = v4l2_subdev_call_state_active(&csi->sd, pad, get_fmt, &fmt_src);
 	if (ret)
 		return ret;
 
@@ -1597,23 +1591,14 @@ static struct imx7_csi_vb2_buffer *imx7_csi_video_next_buf(struct imx7_csi *csi)
 	return buf;
 }
 
-static int imx7_csi_video_init_format(struct imx7_csi *csi)
+static void imx7_csi_video_init_format(struct imx7_csi *csi)
 {
-	struct v4l2_subdev_format fmt_src = {
-		.pad = IMX7_CSI_PAD_SRC,
-		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-	};
-	fmt_src.format.code = IMX7_CSI_DEF_MBUS_CODE;
-	fmt_src.format.width = IMX7_CSI_DEF_PIX_WIDTH;
-	fmt_src.format.height = IMX7_CSI_DEF_PIX_HEIGHT;
+	struct v4l2_pix_format *pixfmt = &csi->vdev_fmt;
 
-	imx7_csi_mbus_fmt_to_pix_fmt(&csi->vdev_fmt, &fmt_src.format, NULL);
-	csi->vdev_compose.width = fmt_src.format.width;
-	csi->vdev_compose.height = fmt_src.format.height;
+	pixfmt->width = IMX7_CSI_DEF_PIX_WIDTH;
+	pixfmt->height = IMX7_CSI_DEF_PIX_HEIGHT;
 
-	csi->vdev_cc = imx7_csi_find_pixel_format(csi->vdev_fmt.pixelformat);
-
-	return 0;
+	csi->vdev_cc = __imx7_csi_video_try_fmt(pixfmt, &csi->vdev_compose);
 }
 
 static int imx7_csi_video_register(struct imx7_csi *csi)
@@ -1626,9 +1611,7 @@ static int imx7_csi_video_register(struct imx7_csi *csi)
 	vdev->v4l2_dev = v4l2_dev;
 
 	/* Initialize the default format and compose rectangle. */
-	ret = imx7_csi_video_init_format(csi);
-	if (ret < 0)
-		return ret;
+	imx7_csi_video_init_format(csi);
 
 	/* Register the video device. */
 	ret = video_register_device(vdev, VFL_TYPE_VIDEO, -1);
@@ -1708,7 +1691,7 @@ static int imx7_csi_video_init(struct imx7_csi *csi)
 	vq->mem_ops = &vb2_dma_contig_memops;
 	vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 	vq->lock = &csi->vdev_mutex;
-	vq->min_buffers_needed = 2;
+	vq->min_queued_buffers = 2;
 	vq->dev = csi->dev;
 
 	ret = vb2_queue_init(vq);
@@ -1728,20 +1711,13 @@ static int imx7_csi_video_init(struct imx7_csi *csi)
 static int imx7_csi_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct imx7_csi *csi = v4l2_get_subdevdata(sd);
+	struct v4l2_subdev_state *sd_state;
 	int ret = 0;
 
-	mutex_lock(&csi->lock);
-
-	if (!csi->src_sd) {
-		ret = -EPIPE;
-		goto out_unlock;
-	}
-
-	if (csi->is_streaming == !!enable)
-		goto out_unlock;
+	sd_state = v4l2_subdev_lock_and_get_active_state(sd);
 
 	if (enable) {
-		ret = imx7_csi_init(csi);
+		ret = imx7_csi_init(csi, sd_state);
 		if (ret < 0)
 			goto out_unlock;
 
@@ -1763,29 +1739,14 @@ static int imx7_csi_s_stream(struct v4l2_subdev *sd, int enable)
 	csi->is_streaming = !!enable;
 
 out_unlock:
-	mutex_unlock(&csi->lock);
+	v4l2_subdev_unlock_state(sd_state);
 
 	return ret;
 }
 
-static struct v4l2_mbus_framefmt *
-imx7_csi_get_format(struct imx7_csi *csi,
-		    struct v4l2_subdev_state *sd_state,
-		    unsigned int pad,
-		    enum v4l2_subdev_format_whence which)
+static int imx7_csi_init_state(struct v4l2_subdev *sd,
+			       struct v4l2_subdev_state *sd_state)
 {
-	if (which == V4L2_SUBDEV_FORMAT_TRY)
-		return v4l2_subdev_get_try_format(&csi->sd, sd_state, pad);
-
-	return &csi->format_mbus[pad];
-}
-
-static int imx7_csi_init_cfg(struct v4l2_subdev *sd,
-			     struct v4l2_subdev_state *sd_state)
-{
-	const enum v4l2_subdev_format_whence which =
-		sd_state ? V4L2_SUBDEV_FORMAT_TRY : V4L2_SUBDEV_FORMAT_ACTIVE;
-	struct imx7_csi *csi = v4l2_get_subdevdata(sd);
 	const struct imx7_csi_pixfmt *cc;
 	int i;
 
@@ -1793,7 +1754,7 @@ static int imx7_csi_init_cfg(struct v4l2_subdev *sd,
 
 	for (i = 0; i < IMX7_CSI_PADS_NUM; i++) {
 		struct v4l2_mbus_framefmt *mf =
-			imx7_csi_get_format(csi, sd_state, i, which);
+			v4l2_subdev_state_get_format(sd_state, i);
 
 		mf->code = IMX7_CSI_DEF_MBUS_CODE;
 		mf->width = IMX7_CSI_DEF_PIX_WIDTH;
@@ -1805,8 +1766,6 @@ static int imx7_csi_init_cfg(struct v4l2_subdev *sd,
 		mf->ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(mf->colorspace);
 		mf->quantization = V4L2_MAP_QUANTIZATION_DEFAULT(!cc->yuv,
 					mf->colorspace, mf->ycbcr_enc);
-
-		csi->cc[i] = cc;
 	}
 
 	return 0;
@@ -1816,58 +1775,29 @@ static int imx7_csi_enum_mbus_code(struct v4l2_subdev *sd,
 				   struct v4l2_subdev_state *sd_state,
 				   struct v4l2_subdev_mbus_code_enum *code)
 {
-	struct imx7_csi *csi = v4l2_get_subdevdata(sd);
 	struct v4l2_mbus_framefmt *in_fmt;
 	int ret = 0;
 
-	mutex_lock(&csi->lock);
-
-	in_fmt = imx7_csi_get_format(csi, sd_state, IMX7_CSI_PAD_SINK,
-				     code->which);
+	in_fmt = v4l2_subdev_state_get_format(sd_state, IMX7_CSI_PAD_SINK);
 
 	switch (code->pad) {
 	case IMX7_CSI_PAD_SINK:
 		ret = imx7_csi_enum_mbus_formats(&code->code, code->index);
 		break;
+
 	case IMX7_CSI_PAD_SRC:
 		if (code->index != 0) {
 			ret = -EINVAL;
-			goto out_unlock;
+			break;
 		}
 
 		code->code = in_fmt->code;
 		break;
+
 	default:
 		ret = -EINVAL;
+		break;
 	}
-
-out_unlock:
-	mutex_unlock(&csi->lock);
-
-	return ret;
-}
-
-static int imx7_csi_get_fmt(struct v4l2_subdev *sd,
-			    struct v4l2_subdev_state *sd_state,
-			    struct v4l2_subdev_format *sdformat)
-{
-	struct imx7_csi *csi = v4l2_get_subdevdata(sd);
-	struct v4l2_mbus_framefmt *fmt;
-	int ret = 0;
-
-	mutex_lock(&csi->lock);
-
-	fmt = imx7_csi_get_format(csi, sd_state, sdformat->pad,
-				  sdformat->which);
-	if (!fmt) {
-		ret = -EINVAL;
-		goto out_unlock;
-	}
-
-	sdformat->format = *fmt;
-
-out_unlock:
-	mutex_unlock(&csi->lock);
 
 	return ret;
 }
@@ -1918,19 +1848,16 @@ static void imx7_csi_try_colorimetry(struct v4l2_mbus_framefmt *tryfmt)
 						      tryfmt->ycbcr_enc);
 }
 
-static int imx7_csi_try_fmt(struct imx7_csi *csi,
-			    struct v4l2_subdev_state *sd_state,
-			    struct v4l2_subdev_format *sdformat,
-			    const struct imx7_csi_pixfmt **cc)
+static void imx7_csi_try_fmt(struct v4l2_subdev *sd,
+			     struct v4l2_subdev_state *sd_state,
+			     struct v4l2_subdev_format *sdformat,
+			     const struct imx7_csi_pixfmt **cc)
 {
 	const struct imx7_csi_pixfmt *in_cc;
 	struct v4l2_mbus_framefmt *in_fmt;
 	u32 code;
 
-	in_fmt = imx7_csi_get_format(csi, sd_state, IMX7_CSI_PAD_SINK,
-				     sdformat->which);
-	if (!in_fmt)
-		return -EINVAL;
+	in_fmt = v4l2_subdev_state_get_format(sd_state, IMX7_CSI_PAD_SINK);
 
 	switch (sdformat->pad) {
 	case IMX7_CSI_PAD_SRC:
@@ -1947,6 +1874,7 @@ static int imx7_csi_try_fmt(struct imx7_csi *csi,
 		sdformat->format.quantization = in_fmt->quantization;
 		sdformat->format.ycbcr_enc = in_fmt->ycbcr_enc;
 		break;
+
 	case IMX7_CSI_PAD_SINK:
 		*cc = imx7_csi_find_mbus_format(sdformat->format.code);
 		if (!*cc) {
@@ -1958,13 +1886,9 @@ static int imx7_csi_try_fmt(struct imx7_csi *csi,
 		if (sdformat->format.field != V4L2_FIELD_INTERLACED)
 			sdformat->format.field = V4L2_FIELD_NONE;
 		break;
-	default:
-		return -EINVAL;
 	}
 
 	imx7_csi_try_colorimetry(&sdformat->format);
-
-	return 0;
 }
 
 static int imx7_csi_set_fmt(struct v4l2_subdev *sd,
@@ -1977,28 +1901,13 @@ static int imx7_csi_set_fmt(struct v4l2_subdev *sd,
 	const struct imx7_csi_pixfmt *cc;
 	struct v4l2_mbus_framefmt *fmt;
 	struct v4l2_subdev_format format;
-	int ret = 0;
 
-	if (sdformat->pad >= IMX7_CSI_PADS_NUM)
-		return -EINVAL;
+	if (csi->is_streaming)
+		return -EBUSY;
 
-	mutex_lock(&csi->lock);
+	imx7_csi_try_fmt(sd, sd_state, sdformat, &cc);
 
-	if (csi->is_streaming) {
-		ret = -EBUSY;
-		goto out_unlock;
-	}
-
-	ret = imx7_csi_try_fmt(csi, sd_state, sdformat, &cc);
-	if (ret < 0)
-		goto out_unlock;
-
-	fmt = imx7_csi_get_format(csi, sd_state, sdformat->pad,
-				  sdformat->which);
-	if (!fmt) {
-		ret = -EINVAL;
-		goto out_unlock;
-	}
+	fmt = v4l2_subdev_state_get_format(sd_state, sdformat->pad);
 
 	*fmt = sdformat->format;
 
@@ -2007,25 +1916,14 @@ static int imx7_csi_set_fmt(struct v4l2_subdev *sd,
 		format.pad = IMX7_CSI_PAD_SRC;
 		format.which = sdformat->which;
 		format.format = sdformat->format;
-		if (imx7_csi_try_fmt(csi, sd_state, &format, &outcc)) {
-			ret = -EINVAL;
-			goto out_unlock;
-		}
-		outfmt = imx7_csi_get_format(csi, sd_state, IMX7_CSI_PAD_SRC,
-					     sdformat->which);
-		*outfmt = format.format;
+		imx7_csi_try_fmt(sd, sd_state, &format, &outcc);
 
-		if (sdformat->which == V4L2_SUBDEV_FORMAT_ACTIVE)
-			csi->cc[IMX7_CSI_PAD_SRC] = outcc;
+		outfmt = v4l2_subdev_state_get_format(sd_state,
+						      IMX7_CSI_PAD_SRC);
+		*outfmt = format.format;
 	}
 
-	if (sdformat->which == V4L2_SUBDEV_FORMAT_ACTIVE)
-		csi->cc[sdformat->pad] = cc;
-
-out_unlock:
-	mutex_unlock(&csi->lock);
-
-	return ret;
+	return 0;
 }
 
 static int imx7_csi_pad_link_validate(struct v4l2_subdev *sd,
@@ -2037,9 +1935,6 @@ static int imx7_csi_pad_link_validate(struct v4l2_subdev *sd,
 	struct media_pad *pad = NULL;
 	unsigned int i;
 	int ret;
-
-	if (!csi->src_sd)
-		return -EPIPE;
 
 	/*
 	 * Validate the source link, and record whether the source uses the
@@ -2126,9 +2021,8 @@ static const struct v4l2_subdev_video_ops imx7_csi_video_ops = {
 };
 
 static const struct v4l2_subdev_pad_ops imx7_csi_pad_ops = {
-	.init_cfg	= imx7_csi_init_cfg,
 	.enum_mbus_code	= imx7_csi_enum_mbus_code,
-	.get_fmt	= imx7_csi_get_fmt,
+	.get_fmt	= v4l2_subdev_get_fmt,
 	.set_fmt	= imx7_csi_set_fmt,
 	.link_validate	= imx7_csi_pad_link_validate,
 };
@@ -2139,6 +2033,7 @@ static const struct v4l2_subdev_ops imx7_csi_subdev_ops = {
 };
 
 static const struct v4l2_subdev_internal_ops imx7_csi_internal_ops = {
+	.init_state	= imx7_csi_init_state,
 	.registered	= imx7_csi_registered,
 	.unregistered	= imx7_csi_unregistered,
 };
@@ -2158,7 +2053,7 @@ static const struct media_entity_operations imx7_csi_entity_ops = {
 
 static int imx7_csi_notify_bound(struct v4l2_async_notifier *notifier,
 				 struct v4l2_subdev *sd,
-				 struct v4l2_async_subdev *asd)
+				 struct v4l2_async_connection *asd)
 {
 	struct imx7_csi *csi = imx7_csi_notifier_to_dev(notifier);
 	struct media_pad *sink = &csi->sd.entity.pads[IMX7_CSI_PAD_SINK];
@@ -2183,41 +2078,49 @@ static const struct v4l2_async_notifier_operations imx7_csi_notify_ops = {
 
 static int imx7_csi_async_register(struct imx7_csi *csi)
 {
-	struct v4l2_async_subdev *asd;
+	struct v4l2_async_connection *asd;
 	struct fwnode_handle *ep;
 	int ret;
 
-	v4l2_async_nf_init(&csi->notifier);
+	v4l2_async_nf_init(&csi->notifier, &csi->v4l2_dev);
 
 	ep = fwnode_graph_get_endpoint_by_id(dev_fwnode(csi->dev), 0, 0,
 					     FWNODE_GRAPH_ENDPOINT_NEXT);
-	if (ep) {
-		asd = v4l2_async_nf_add_fwnode_remote(&csi->notifier, ep,
-						      struct v4l2_async_subdev);
+	if (!ep) {
+		ret = dev_err_probe(csi->dev, -ENOTCONN,
+				    "Failed to get remote endpoint\n");
+		goto error;
+	}
 
-		fwnode_handle_put(ep);
+	asd = v4l2_async_nf_add_fwnode_remote(&csi->notifier, ep,
+					      struct v4l2_async_connection);
 
-		if (IS_ERR(asd)) {
-			ret = PTR_ERR(asd);
-			/* OK if asd already exists */
-			if (ret != -EEXIST)
-				return ret;
-		}
+	fwnode_handle_put(ep);
+
+	if (IS_ERR(asd)) {
+		ret = dev_err_probe(csi->dev, PTR_ERR(asd),
+				    "Failed to add remote subdev to notifier\n");
+		goto error;
 	}
 
 	csi->notifier.ops = &imx7_csi_notify_ops;
 
-	ret = v4l2_async_nf_register(&csi->v4l2_dev, &csi->notifier);
+	ret = v4l2_async_nf_register(&csi->notifier);
 	if (ret)
-		return ret;
+		goto error;
 
 	return 0;
+
+error:
+	v4l2_async_nf_cleanup(&csi->notifier);
+	return ret;
 }
 
 static void imx7_csi_media_cleanup(struct imx7_csi *csi)
 {
 	v4l2_device_unregister(&csi->v4l2_dev);
 	media_device_unregister(&csi->mdev);
+	v4l2_subdev_cleanup(&csi->sd);
 	media_device_cleanup(&csi->mdev);
 }
 
@@ -2285,6 +2188,10 @@ static int imx7_csi_media_init(struct imx7_csi *csi)
 	if (ret)
 		goto error;
 
+	ret = v4l2_subdev_init_finalize(&csi->sd);
+	if (ret)
+		goto error;
+
 	ret = v4l2_device_register_subdev(&csi->v4l2_dev, &csi->sd);
 	if (ret)
 		goto error;
@@ -2310,27 +2217,22 @@ static int imx7_csi_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, csi);
 
 	spin_lock_init(&csi->irqlock);
-	mutex_init(&csi->lock);
 
 	/* Acquire resources and install interrupt handler. */
 	csi->mclk = devm_clk_get(&pdev->dev, "mclk");
 	if (IS_ERR(csi->mclk)) {
 		ret = PTR_ERR(csi->mclk);
 		dev_err(dev, "Failed to get mclk: %d", ret);
-		goto destroy_mutex;
+		return ret;
 	}
 
 	csi->irq = platform_get_irq(pdev, 0);
-	if (csi->irq < 0) {
-		ret = csi->irq;
-		goto destroy_mutex;
-	}
+	if (csi->irq < 0)
+		return csi->irq;
 
 	csi->regbase = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(csi->regbase)) {
-		ret = PTR_ERR(csi->regbase);
-		goto destroy_mutex;
-	}
+	if (IS_ERR(csi->regbase))
+		return PTR_ERR(csi->regbase);
 
 	csi->model = (enum imx_csi_model)(uintptr_t)of_device_get_match_data(&pdev->dev);
 
@@ -2338,38 +2240,27 @@ static int imx7_csi_probe(struct platform_device *pdev)
 			       (void *)csi);
 	if (ret < 0) {
 		dev_err(dev, "Request CSI IRQ failed.\n");
-		goto destroy_mutex;
+		return ret;
 	}
 
 	/* Initialize all the media device infrastructure. */
 	ret = imx7_csi_media_init(csi);
 	if (ret)
-		goto destroy_mutex;
-
-	/* Set the default mbus formats. */
-	ret = imx7_csi_init_cfg(&csi->sd, NULL);
-	if (ret)
-		goto media_cleanup;
+		return ret;
 
 	ret = imx7_csi_async_register(csi);
 	if (ret)
-		goto subdev_notifier_cleanup;
+		goto err_media_cleanup;
 
 	return 0;
 
-subdev_notifier_cleanup:
-	v4l2_async_nf_unregister(&csi->notifier);
-	v4l2_async_nf_cleanup(&csi->notifier);
-media_cleanup:
+err_media_cleanup:
 	imx7_csi_media_cleanup(csi);
-
-destroy_mutex:
-	mutex_destroy(&csi->lock);
 
 	return ret;
 }
 
-static int imx7_csi_remove(struct platform_device *pdev)
+static void imx7_csi_remove(struct platform_device *pdev)
 {
 	struct imx7_csi *csi = platform_get_drvdata(pdev);
 
@@ -2378,10 +2269,6 @@ static int imx7_csi_remove(struct platform_device *pdev)
 	v4l2_async_nf_unregister(&csi->notifier);
 	v4l2_async_nf_cleanup(&csi->notifier);
 	v4l2_async_unregister_subdev(&csi->sd);
-
-	mutex_destroy(&csi->lock);
-
-	return 0;
 }
 
 static const struct of_device_id imx7_csi_of_match[] = {
@@ -2394,7 +2281,7 @@ MODULE_DEVICE_TABLE(of, imx7_csi_of_match);
 
 static struct platform_driver imx7_csi_driver = {
 	.probe = imx7_csi_probe,
-	.remove = imx7_csi_remove,
+	.remove_new = imx7_csi_remove,
 	.driver = {
 		.of_match_table = imx7_csi_of_match,
 		.name = "imx7-csi",

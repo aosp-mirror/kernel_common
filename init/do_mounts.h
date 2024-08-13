@@ -9,9 +9,11 @@
 #include <linux/major.h>
 #include <linux/root_dev.h>
 #include <linux/init_syscalls.h>
+#include <linux/task_work.h>
+#include <linux/file.h>
 
-void  mount_block_root(char *name, int flags);
-void  mount_root(void);
+void  mount_root_generic(char *name, char *pretty_name, int flags);
+void  mount_root(char *root_device_name);
 extern int root_mountflags;
 
 static inline __init int create_dev(char *name, dev_t dev)
@@ -33,11 +35,18 @@ static inline int rd_load_image(char *from) { return 0; }
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
-
-bool __init initrd_load(void);
-
+bool __init initrd_load(char *root_device_name);
 #else
-
-static inline bool initrd_load(void) { return false; }
+static inline bool initrd_load(char *root_device_name)
+{
+	return false;
+	}
 
 #endif
+
+/* Ensure that async file closing finished to prevent spurious errors. */
+static inline void init_flush_fput(void)
+{
+	flush_delayed_fput();
+	task_work_run();
+}

@@ -26,7 +26,6 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-mediabus.h>
-#include <media/i2c/s5c73m3.h>
 #include <media/v4l2-fwnode.h>
 
 #include "s5c73m3.h"
@@ -436,7 +435,7 @@ static int __s5c73m3_s_stream(struct s5c73m3 *state, struct v4l2_subdev *sd,
 	state->streaming = !!on;
 
 	if (!on)
-		return ret;
+		return 0;
 
 	if (state->apply_fiv) {
 		ret = s5c73m3_set_frame_rate(state);
@@ -820,7 +819,6 @@ static void s5c73m3_oif_try_format(struct s5c73m3 *state,
 				   struct v4l2_subdev_format *fmt,
 				   const struct s5c73m3_frame_size **fs)
 {
-	struct v4l2_subdev *sd = &state->sensor_sd;
 	u32 code;
 
 	switch (fmt->pad) {
@@ -842,10 +840,8 @@ static void s5c73m3_oif_try_format(struct s5c73m3 *state,
 		if (fmt->which == V4L2_SUBDEV_FORMAT_ACTIVE)
 			*fs = state->oif_pix_size[RES_ISP];
 		else
-			*fs = s5c73m3_find_frame_size(
-						v4l2_subdev_get_try_format(sd, sd_state,
-									   OIF_ISP_PAD),
-						RES_ISP);
+			*fs = s5c73m3_find_frame_size(v4l2_subdev_state_get_format(sd_state, OIF_ISP_PAD),
+						      RES_ISP);
 		break;
 	}
 
@@ -870,10 +866,18 @@ static void s5c73m3_try_format(struct s5c73m3 *state,
 	s5c73m3_fill_mbus_fmt(&fmt->format, *fs, code);
 }
 
-static int s5c73m3_oif_g_frame_interval(struct v4l2_subdev *sd,
-				   struct v4l2_subdev_frame_interval *fi)
+static int s5c73m3_oif_get_frame_interval(struct v4l2_subdev *sd,
+					  struct v4l2_subdev_state *sd_state,
+					  struct v4l2_subdev_frame_interval *fi)
 {
 	struct s5c73m3 *state = oif_sd_to_s5c73m3(sd);
+
+	/*
+	 * FIXME: Implement support for V4L2_SUBDEV_FORMAT_TRY, using the V4L2
+	 * subdev active state API.
+	 */
+	if (fi->which != V4L2_SUBDEV_FORMAT_ACTIVE)
+		return -EINVAL;
 
 	if (fi->pad != OIF_SOURCE_PAD)
 		return -EINVAL;
@@ -919,11 +923,19 @@ static int __s5c73m3_set_frame_interval(struct s5c73m3 *state,
 	return 0;
 }
 
-static int s5c73m3_oif_s_frame_interval(struct v4l2_subdev *sd,
-				   struct v4l2_subdev_frame_interval *fi)
+static int s5c73m3_oif_set_frame_interval(struct v4l2_subdev *sd,
+					  struct v4l2_subdev_state *sd_state,
+					  struct v4l2_subdev_frame_interval *fi)
 {
 	struct s5c73m3 *state = oif_sd_to_s5c73m3(sd);
 	int ret;
+
+	/*
+	 * FIXME: Implement support for V4L2_SUBDEV_FORMAT_TRY, using the V4L2
+	 * subdev active state API.
+	 */
+	if (fi->which != V4L2_SUBDEV_FORMAT_ACTIVE)
+		return -EINVAL;
 
 	if (fi->pad != OIF_SOURCE_PAD)
 		return -EINVAL;
@@ -991,8 +1003,8 @@ static int s5c73m3_get_fmt(struct v4l2_subdev *sd,
 	u32 code;
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-		fmt->format = *v4l2_subdev_get_try_format(sd, sd_state,
-							  fmt->pad);
+		fmt->format = *v4l2_subdev_state_get_format(sd_state,
+							    fmt->pad);
 		return 0;
 	}
 
@@ -1026,8 +1038,8 @@ static int s5c73m3_oif_get_fmt(struct v4l2_subdev *sd,
 	u32 code;
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-		fmt->format = *v4l2_subdev_get_try_format(sd, sd_state,
-							  fmt->pad);
+		fmt->format = *v4l2_subdev_state_get_format(sd_state,
+							    fmt->pad);
 		return 0;
 	}
 
@@ -1070,7 +1082,7 @@ static int s5c73m3_set_fmt(struct v4l2_subdev *sd,
 	s5c73m3_try_format(state, sd_state, fmt, &frame_size);
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-		mf = v4l2_subdev_get_try_format(sd, sd_state, fmt->pad);
+		mf = v4l2_subdev_state_get_format(sd_state, fmt->pad);
 		*mf = fmt->format;
 	} else {
 		switch (fmt->pad) {
@@ -1109,11 +1121,11 @@ static int s5c73m3_oif_set_fmt(struct v4l2_subdev *sd,
 	s5c73m3_oif_try_format(state, sd_state, fmt, &frame_size);
 
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-		mf = v4l2_subdev_get_try_format(sd, sd_state, fmt->pad);
+		mf = v4l2_subdev_state_get_format(sd_state, fmt->pad);
 		*mf = fmt->format;
 		if (fmt->pad == OIF_ISP_PAD) {
-			mf = v4l2_subdev_get_try_format(sd, sd_state,
-							OIF_SOURCE_PAD);
+			mf = v4l2_subdev_state_get_format(sd_state,
+							  OIF_SOURCE_PAD);
 			mf->width = fmt->format.width;
 			mf->height = fmt->format.height;
 		}
@@ -1261,8 +1273,8 @@ static int s5c73m3_oif_enum_frame_size(struct v4l2_subdev *sd,
 			if (fse->which == V4L2_SUBDEV_FORMAT_TRY) {
 				struct v4l2_mbus_framefmt *mf;
 
-				mf = v4l2_subdev_get_try_format(sd, sd_state,
-								OIF_ISP_PAD);
+				mf = v4l2_subdev_state_get_format(sd_state,
+								  OIF_ISP_PAD);
 
 				w = mf->width;
 				h = mf->height;
@@ -1317,11 +1329,11 @@ static int s5c73m3_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct v4l2_mbus_framefmt *mf;
 
-	mf = v4l2_subdev_get_try_format(sd, fh->state, S5C73M3_ISP_PAD);
+	mf = v4l2_subdev_state_get_format(fh->state, S5C73M3_ISP_PAD);
 	s5c73m3_fill_mbus_fmt(mf, &s5c73m3_isp_resolutions[1],
 						S5C73M3_ISP_FMT);
 
-	mf = v4l2_subdev_get_try_format(sd, fh->state, S5C73M3_JPEG_PAD);
+	mf = v4l2_subdev_state_get_format(fh->state, S5C73M3_JPEG_PAD);
 	s5c73m3_fill_mbus_fmt(mf, &s5c73m3_jpeg_resolutions[1],
 					S5C73M3_JPEG_FMT);
 
@@ -1332,15 +1344,15 @@ static int s5c73m3_oif_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct v4l2_mbus_framefmt *mf;
 
-	mf = v4l2_subdev_get_try_format(sd, fh->state, OIF_ISP_PAD);
+	mf = v4l2_subdev_state_get_format(fh->state, OIF_ISP_PAD);
 	s5c73m3_fill_mbus_fmt(mf, &s5c73m3_isp_resolutions[1],
 						S5C73M3_ISP_FMT);
 
-	mf = v4l2_subdev_get_try_format(sd, fh->state, OIF_JPEG_PAD);
+	mf = v4l2_subdev_state_get_format(fh->state, OIF_JPEG_PAD);
 	s5c73m3_fill_mbus_fmt(mf, &s5c73m3_jpeg_resolutions[1],
 					S5C73M3_JPEG_FMT);
 
-	mf = v4l2_subdev_get_try_format(sd, fh->state, OIF_SOURCE_PAD);
+	mf = v4l2_subdev_state_get_format(fh->state, OIF_SOURCE_PAD);
 	s5c73m3_fill_mbus_fmt(mf, &s5c73m3_isp_resolutions[1],
 						S5C73M3_ISP_FMT);
 	return 0;
@@ -1501,6 +1513,8 @@ static const struct v4l2_subdev_pad_ops s5c73m3_oif_pad_ops = {
 	.enum_frame_interval	= s5c73m3_oif_enum_frame_interval,
 	.get_fmt		= s5c73m3_oif_get_fmt,
 	.set_fmt		= s5c73m3_oif_set_fmt,
+	.get_frame_interval	= s5c73m3_oif_get_frame_interval,
+	.set_frame_interval	= s5c73m3_oif_set_frame_interval,
 	.get_frame_desc		= s5c73m3_oif_get_frame_desc,
 	.set_frame_desc		= s5c73m3_oif_set_frame_desc,
 };
@@ -1512,8 +1526,6 @@ static const struct v4l2_subdev_core_ops s5c73m3_oif_core_ops = {
 
 static const struct v4l2_subdev_video_ops s5c73m3_oif_video_ops = {
 	.s_stream		= s5c73m3_oif_s_stream,
-	.g_frame_interval	= s5c73m3_oif_g_frame_interval,
-	.s_frame_interval	= s5c73m3_oif_s_frame_interval,
 };
 
 static const struct v4l2_subdev_ops oif_subdev_ops = {
@@ -1522,25 +1534,16 @@ static const struct v4l2_subdev_ops oif_subdev_ops = {
 	.video	= &s5c73m3_oif_video_ops,
 };
 
-static int s5c73m3_get_platform_data(struct s5c73m3 *state)
+static int s5c73m3_get_dt_data(struct s5c73m3 *state)
 {
-	struct i2c_client *c = state->i2c_client;
-	struct device *dev = &c->dev;
-	const struct s5c73m3_platform_data *pdata = dev->platform_data;
+	struct device *dev = &state->i2c_client->dev;
 	struct device_node *node = dev->of_node;
 	struct device_node *node_ep;
 	struct v4l2_fwnode_endpoint ep = { .bus_type = 0 };
 	int ret;
 
-	if (!node) {
-		if (!pdata) {
-			dev_err(dev, "Platform data not specified\n");
-			return -EINVAL;
-		}
-
-		state->mclk_frequency = pdata->mclk_frequency;
-		return 0;
-	}
+	if (!node)
+		return -EINVAL;
 
 	state->clock = devm_clk_get(dev, S5C73M3_CLK_NAME);
 	if (IS_ERR(state->clock))
@@ -1565,7 +1568,7 @@ static int s5c73m3_get_platform_data(struct s5c73m3 *state)
 				     "failed to request gpio S5C73M3_RST\n");
 	gpiod_set_consumer_name(state->reset, "S5C73M3_RST");
 
-	node_ep = of_graph_get_next_endpoint(node, NULL);
+	node_ep = of_graph_get_endpoint_by_regs(node, 0, -1);
 	if (!node_ep) {
 		dev_warn(dev, "no endpoint defined for node: %pOF\n", node);
 		return 0;
@@ -1603,7 +1606,7 @@ static int s5c73m3_probe(struct i2c_client *client)
 		return -ENOMEM;
 
 	state->i2c_client = client;
-	ret = s5c73m3_get_platform_data(state);
+	ret = s5c73m3_get_dt_data(state);
 	if (ret < 0)
 		return ret;
 
@@ -1739,7 +1742,7 @@ static struct i2c_driver s5c73m3_i2c_driver = {
 		.of_match_table = of_match_ptr(s5c73m3_of_match),
 		.name	= DRIVER_NAME,
 	},
-	.probe_new	= s5c73m3_probe,
+	.probe		= s5c73m3_probe,
 	.remove		= s5c73m3_remove,
 	.id_table	= s5c73m3_id,
 };

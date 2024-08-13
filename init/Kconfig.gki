@@ -64,6 +64,14 @@ config GKI_HIDDEN_SND_SOC_CONFIGS
 	  These are normally selected implicitly when a module
 	  that relies on it is configured.
 
+config GKI_HIDDEN_UFS_CONFIGS
+	bool "Hidden UFS configs needed for GKI"
+	select SCSI_UFS_VARIABLE_SG_ENTRY_SIZE if SCSI_UFS_CRYPTO
+	help
+	  Dummy config option used to enable hidden UFS configs.
+	  These are normally selected implicitly when a module
+	  that relies on it is configured.
+
 config GKI_HIDDEN_MMC_CONFIGS
 	bool "Hidden MMC configs needed for GKI"
 	select MMC_SDHCI_IO_ACCESSORS if (MMC_SDHCI)
@@ -87,6 +95,7 @@ config GKI_HIDDEN_QCOM_CONFIGS
 	select QCOM_GDSC if (ARCH_QCOM)
 	select IOMMU_IO_PGTABLE_LPAE if (ARCH_QCOM)
 	select INTERCONNECT_QCOM if (ARCH_QCOM)
+	select AUXILIARY_BUS if (ARCH_QCOM)
 
 	help
 	  Dummy config option used to enable hidden QCOM configs.
@@ -115,6 +124,7 @@ config GKI_HIDDEN_MEDIA_CONFIGS
 config GKI_HIDDEN_VIRTUAL_CONFIGS
 	bool "Hidden Virtual configs needed for GKI"
 	select HVC_DRIVER
+	select DIMLIB
 	help
 	  Dummy config option used to enable hidden virtual device configs.
 	  These are normally selected implicitly when a module
@@ -140,7 +150,7 @@ config GKI_LEGACY_WEXT_ALLCONFIG
 	  out-of-kernel built wireless modules, say N here.
 
 config GKI_HIDDEN_USB_CONFIGS
-	bool "Hiddel USB configurations needed for GKI"
+	bool "Hidden USB configurations needed for GKI"
 	select USB_PHY
 	help
 	  Dummy config option used to enable all USB related hidden configs.
@@ -201,6 +211,7 @@ config GKI_HIDDEN_NET_CONFIGS
 	bool "Hidden networking configuration needed for GKI"
 	select PAGE_POOL
 	select NET_PTP_CLASSIFY
+	select NET_DEVLINK
 	help
 	  Dummy config option used to enable the networking hidden
 	  config, required by various SoC platforms.
@@ -256,6 +267,7 @@ config GKI_HACKS_TO_FIX
 	select GKI_HIDDEN_REGMAP_CONFIGS
 	select GKI_HIDDEN_SND_CONFIGS
 	select GKI_HIDDEN_SND_SOC_CONFIGS
+	select GKI_HIDDEN_UFS_CONFIGS
 	select GKI_HIDDEN_MMC_CONFIGS
 	select GKI_HIDDEN_GPIO_CONFIGS
 	select GKI_HIDDEN_QCOM_CONFIGS

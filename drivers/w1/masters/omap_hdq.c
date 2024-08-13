@@ -1,12 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
- * drivers/w1/masters/omap_hdq.c
- *
  * Copyright (C) 2007,2012 Texas Instruments, Inc.
- *
- * This file is licensed under the terms of the GNU General Public License
- * version 2. This program is licensed "as is" without any warranty of any
- * kind, whether express or implied.
- *
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -48,7 +42,7 @@
 static DECLARE_WAIT_QUEUE_HEAD(hdq_wait_queue);
 
 static int w1_id;
-module_param(w1_id, int, S_IRUSR);
+module_param(w1_id, int, 0400);
 MODULE_PARM_DESC(w1_id, "1-wire id for the slave detection in HDQ mode");
 
 struct hdq_data {
@@ -579,10 +573,8 @@ static int omap_hdq_probe(struct platform_device *pdev)
 	const char *mode;
 
 	hdq_data = devm_kzalloc(dev, sizeof(*hdq_data), GFP_KERNEL);
-	if (!hdq_data) {
-		dev_dbg(&pdev->dev, "unable to allocate memory\n");
+	if (!hdq_data)
 		return -ENOMEM;
-	}
 
 	hdq_data->dev = dev;
 	platform_set_drvdata(pdev, hdq_data);
@@ -655,7 +647,7 @@ err_w1:
 	return ret;
 }
 
-static int omap_hdq_remove(struct platform_device *pdev)
+static void omap_hdq_remove(struct platform_device *pdev)
 {
 	int active;
 
@@ -669,8 +661,6 @@ static int omap_hdq_remove(struct platform_device *pdev)
 	if (active >= 0)
 		pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
-
-	return 0;
 }
 
 static const struct of_device_id omap_hdq_dt_ids[] = {
@@ -682,7 +672,7 @@ MODULE_DEVICE_TABLE(of, omap_hdq_dt_ids);
 
 static struct platform_driver omap_hdq_driver = {
 	.probe = omap_hdq_probe,
-	.remove = omap_hdq_remove,
+	.remove_new = omap_hdq_remove,
 	.driver = {
 		.name =	"omap_hdq",
 		.of_match_table = omap_hdq_dt_ids,

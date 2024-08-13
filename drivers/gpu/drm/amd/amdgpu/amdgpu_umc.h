@@ -21,7 +21,7 @@
 #ifndef __AMDGPU_UMC_H__
 #define __AMDGPU_UMC_H__
 #include "amdgpu_ras.h"
-
+#include "amdgpu_mca.h"
 /*
  * (addr / 256) * 4096, the higher 26 bits in ErrorAddr
  * is the index of 4KB block
@@ -32,6 +32,11 @@
  * is the index of 8KB block
  */
 #define ADDR_OF_8KB_BLOCK(addr)			(((addr) & ~0xffULL) << 5)
+/*
+ * (addr / 256) * 32768, the higher 26 bits in ErrorAddr
+ * is the index of 8KB block
+ */
+#define ADDR_OF_32KB_BLOCK(addr)			(((addr) & ~0xffULL) << 7)
 /* channel index is the index of 256B block */
 #define ADDR_OF_256B_BLOCK(channel_index)	((channel_index) << 8)
 /* offset in 256B block */
@@ -42,10 +47,16 @@
 #define LOOP_UMC_INST_AND_CH(umc_inst, ch_inst) LOOP_UMC_INST((umc_inst)) LOOP_UMC_CH_INST((ch_inst))
 
 #define LOOP_UMC_NODE_INST(node_inst) \
-		for ((node_inst) = 0; (node_inst) < adev->umc.node_inst_num; (node_inst)++)
+		for_each_set_bit((node_inst), &(adev->umc.active_mask), adev->umc.node_inst_num)
 
 #define LOOP_UMC_EACH_NODE_INST_AND_CH(node_inst, umc_inst, ch_inst) \
 		LOOP_UMC_NODE_INST((node_inst)) LOOP_UMC_INST_AND_CH((umc_inst), (ch_inst))
+
+/* Page retirement tag */
+#define UMC_ECC_NEW_DETECTED_TAG       0x1
+
+typedef int (*umc_func)(struct amdgpu_device *adev, uint32_t node_inst,
+			uint32_t umc_inst, uint32_t ch_inst, void *data);
 
 struct amdgpu_umc_ras {
 	struct amdgpu_ras_block_object ras_block;
@@ -55,6 +66,10 @@ struct amdgpu_umc_ras {
 				      void *ras_error_status);
 	void (*ecc_info_query_ras_error_address)(struct amdgpu_device *adev,
 					void *ras_error_status);
+	bool (*check_ecc_err_status)(struct amdgpu_device *adev,
+			enum amdgpu_mca_error_type type, void *ras_error_status);
+	int (*update_ecc_status)(struct amdgpu_device *adev,
+			uint64_t status, uint64_t ipid, uint64_t addr);
 };
 
 struct amdgpu_umc_funcs {
@@ -69,25 +84,35 @@ struct amdgpu_umc {
 	/* number of umc instance with memory map register access */
 	uint32_t umc_inst_num;
 
-	/*number of umc node instance with memory map register access*/
+	/* Total number of umc node instance including harvest one */
 	uint32_t node_inst_num;
 
 	/* UMC regiser per channel offset */
 	uint32_t channel_offs;
+	/* how many pages are retired in one UE */
+	uint32_t retire_unit;
 	/* channel index table of interleaved memory */
 	const uint32_t *channel_idx_tbl;
 	struct ras_common_if *ras_if;
 
 	const struct amdgpu_umc_funcs *funcs;
 	struct amdgpu_umc_ras *ras;
+
+	/* active mask for umc node instance */
+	unsigned long active_mask;
 };
 
+int amdgpu_umc_ras_sw_init(struct amdgpu_device *adev);
 int amdgpu_umc_ras_late_init(struct amdgpu_device *adev, struct ras_common_if *ras_block);
-int amdgpu_umc_poison_handler(struct amdgpu_device *adev, bool reset);
+int amdgpu_umc_poison_handler(struct amdgpu_device *adev,
+			enum amdgpu_ras_block block, uint32_t reset);
+int amdgpu_umc_pasid_poison_handler(struct amdgpu_device *adev,
+			enum amdgpu_ras_block block, uint16_t pasid,
+			pasid_notify pasid_fn, void *data, uint32_t reset);
 int amdgpu_umc_process_ecc_irq(struct amdgpu_device *adev,
 		struct amdgpu_irq_src *source,
 		struct amdgpu_iv_entry *entry);
-void amdgpu_umc_fill_error_record(struct ras_err_data *err_data,
+int amdgpu_umc_fill_error_record(struct ras_err_data *err_data,
 		uint64_t err_addr,
 		uint64_t retired_page,
 		uint32_t channel_index,
@@ -98,4 +123,20 @@ int amdgpu_umc_process_ras_data_cb(struct amdgpu_device *adev,
 		struct amdgpu_iv_entry *entry);
 int amdgpu_umc_page_retirement_mca(struct amdgpu_device *adev,
 			uint64_t err_addr, uint32_t ch_inst, uint32_t umc_inst);
+
+int amdgpu_umc_loop_channels(struct amdgpu_device *adev,
+			umc_func func, void *data);
+
+int amdgpu_umc_bad_page_polling_timeout(struct amdgpu_device *adev,
+			uint32_t reset, uint32_t timeout_ms);
+
+int amdgpu_umc_update_ecc_status(struct amdgpu_device *adev,
+				uint64_t status, uint64_t ipid, uint64_t addr);
+int amdgpu_umc_build_pages_hash(struct amdgpu_device *adev,
+		uint64_t *pfns, int len, uint64_t *val);
+int amdgpu_umc_logs_ecc_err(struct amdgpu_device *adev,
+		struct radix_tree_root *ecc_tree, struct ras_ecc_err *ecc_err);
+
+void amdgpu_umc_handle_bad_pages(struct amdgpu_device *adev,
+			void *ras_error_status);
 #endif

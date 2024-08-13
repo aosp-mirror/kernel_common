@@ -145,19 +145,21 @@ static const struct of_device_id of_max20411_match_tbl[] = {
 MODULE_DEVICE_TABLE(of, of_max20411_match_tbl);
 
 static const struct i2c_device_id max20411_id[] = {
-	{ "max20411", 0 },
-	{ },
+	{ "max20411" },
+	{ }
 };
 MODULE_DEVICE_TABLE(i2c, max20411_id);
 
 static struct i2c_driver max20411_i2c_driver = {
 	.driver	= {
 		.name = "max20411",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.of_match_table	= of_max20411_match_tbl,
 	},
-	.probe_new = max20411_probe,
+	.probe = max20411_probe,
 	.id_table = max20411_id,
 };
 module_i2c_driver(max20411_i2c_driver);
 
+MODULE_DESCRIPTION("Maxim MAX20411 High-Efficiency Single Step-Down Converter driver");
 MODULE_LICENSE("GPL");

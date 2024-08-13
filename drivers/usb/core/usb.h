@@ -15,6 +15,7 @@ extern int usb_create_sysfs_dev_files(struct usb_device *dev);
 extern void usb_remove_sysfs_dev_files(struct usb_device *dev);
 extern void usb_create_sysfs_intf_files(struct usb_interface *intf);
 extern void usb_remove_sysfs_intf_files(struct usb_interface *intf);
+extern int usb_update_wireless_status_attr(struct usb_interface *intf);
 extern int usb_create_ep_devs(struct device *parent,
 				struct usb_host_endpoint *endpoint,
 				struct usb_device *udev);
@@ -42,8 +43,8 @@ extern bool usb_endpoint_is_ignored(struct usb_device *udev,
 		struct usb_endpoint_descriptor *epd);
 extern int usb_remove_device(struct usb_device *udev);
 
-extern int usb_get_device_descriptor(struct usb_device *dev,
-		unsigned int size);
+extern struct usb_device_descriptor *usb_get_device_descriptor(
+		struct usb_device *udev);
 extern int usb_set_isoch_delay(struct usb_device *dev);
 extern int usb_get_bos_descriptor(struct usb_device *dev);
 extern void usb_release_bos_descriptor(struct usb_device *dev);
@@ -140,12 +141,13 @@ static inline int usb_disable_usb2_hardware_lpm(struct usb_device *udev)
 
 #endif
 
-extern struct bus_type usb_bus_type;
+extern const struct class usbmisc_class;
+extern const struct bus_type usb_bus_type;
 extern struct mutex usb_port_peer_mutex;
-extern struct device_type usb_device_type;
-extern struct device_type usb_if_device_type;
-extern struct device_type usb_ep_device_type;
-extern struct device_type usb_port_device_type;
+extern const struct device_type usb_device_type;
+extern const struct device_type usb_if_device_type;
+extern const struct device_type usb_ep_device_type;
+extern const struct device_type usb_port_device_type;
 extern struct usb_device_driver usb_generic_driver;
 
 static inline int is_usb_device(const struct device *dev)
@@ -173,13 +175,7 @@ static inline int is_root_hub(struct usb_device *udev)
 	return (udev->parent == NULL);
 }
 
-/* Do the same for device drivers and interface drivers. */
-
-static inline int is_usb_device_driver(struct device_driver *drv)
-{
-	return container_of(drv, struct usbdrv_wrap, driver)->
-			for_devices;
-}
+extern bool is_usb_device_driver(const struct device_driver *drv);
 
 /* for labeling diagnostics */
 extern const char *usbcore_name;

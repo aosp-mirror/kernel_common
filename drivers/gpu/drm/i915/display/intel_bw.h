@@ -8,7 +8,7 @@
 
 #include <drm/drm_atomic.h>
 
-#include "intel_display.h"
+#include "intel_display_limits.h"
 #include "intel_display_power.h"
 #include "intel_global_state.h"
 
@@ -35,18 +35,31 @@ struct intel_bw_state {
 	u8 active_pipes;
 
 	/*
+	 * From MTL onwards, to lock a QGV point, punit expects the peak BW of
+	 * the selected QGV point as the parameter in multiples of 100MB/s
+	 */
+	u16 qgv_point_peakbw;
+
+	/*
 	 * Current QGV points mask, which restricts
 	 * some particular SAGV states, not to confuse
 	 * with pipe_sagv_mask.
 	 */
 	u16 qgv_points_mask;
 
+	/*
+	 * Flag to force the QGV comparison in atomic check right after the
+	 * hw state readout
+	 */
+	bool force_check_qgv;
+
 	int min_cdclk[I915_MAX_PIPES];
 	unsigned int data_rate[I915_MAX_PIPES];
 	u8 num_active_planes[I915_MAX_PIPES];
 };
 
-#define to_intel_bw_state(x) container_of((x), struct intel_bw_state, base)
+#define to_intel_bw_state(global_state) \
+	container_of_const((global_state), struct intel_bw_state, base)
 
 struct intel_bw_state *
 intel_atomic_get_old_bw_state(struct intel_atomic_state *state);

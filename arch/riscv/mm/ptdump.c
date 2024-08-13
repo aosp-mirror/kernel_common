@@ -9,7 +9,6 @@
 #include <linux/seq_file.h>
 #include <linux/ptdump.h>
 
-#include <asm/ptdump.h>
 #include <linux/pgtable.h>
 #include <asm/kasan.h>
 
@@ -59,10 +58,6 @@ struct ptd_mm_info {
 };
 
 enum address_markers_idx {
-#ifdef CONFIG_KASAN
-	KASAN_SHADOW_START_NR,
-	KASAN_SHADOW_END_NR,
-#endif
 	FIXMAP_START_NR,
 	FIXMAP_END_NR,
 	PCI_IO_START_NR,
@@ -74,6 +69,10 @@ enum address_markers_idx {
 	VMALLOC_START_NR,
 	VMALLOC_END_NR,
 	PAGE_OFFSET_NR,
+#ifdef CONFIG_KASAN
+	KASAN_SHADOW_START_NR,
+	KASAN_SHADOW_END_NR,
+#endif
 #ifdef CONFIG_64BIT
 	MODULES_MAPPING_NR,
 	KERNEL_MAPPING_NR,
@@ -82,10 +81,6 @@ enum address_markers_idx {
 };
 
 static struct addr_marker address_markers[] = {
-#ifdef CONFIG_KASAN
-	{0, "Kasan shadow start"},
-	{0, "Kasan shadow end"},
-#endif
 	{0, "Fixmap start"},
 	{0, "Fixmap end"},
 	{0, "PCI I/O start"},
@@ -97,6 +92,10 @@ static struct addr_marker address_markers[] = {
 	{0, "vmalloc() area"},
 	{0, "vmalloc() end"},
 	{0, "Linear mapping"},
+#ifdef CONFIG_KASAN
+	{0, "Kasan shadow start"},
+	{0, "Kasan shadow end"},
+#endif
 #ifdef CONFIG_64BIT
 	{0, "Modules/BPF mapping"},
 	{0, "Kernel mapping"},
@@ -129,55 +128,55 @@ static struct ptd_mm_info efi_ptd_info = {
 /* Page Table Entry */
 struct prot_bits {
 	u64 mask;
-	u64 val;
 	const char *set;
 	const char *clear;
 };
 
 static const struct prot_bits pte_bits[] = {
 	{
+#ifdef CONFIG_64BIT
+		.mask = _PAGE_NAPOT,
+		.set = "N",
+		.clear = ".",
+	}, {
+		.mask = _PAGE_MTMASK_SVPBMT,
+		.set = "MT(%s)",
+		.clear = "  ..  ",
+	}, {
+#endif
 		.mask = _PAGE_SOFT,
-		.val = _PAGE_SOFT,
-		.set = "RSW",
-		.clear = "   ",
+		.set = "RSW(%d)",
+		.clear = "  ..  ",
 	}, {
 		.mask = _PAGE_DIRTY,
-		.val = _PAGE_DIRTY,
 		.set = "D",
 		.clear = ".",
 	}, {
 		.mask = _PAGE_ACCESSED,
-		.val = _PAGE_ACCESSED,
 		.set = "A",
 		.clear = ".",
 	}, {
 		.mask = _PAGE_GLOBAL,
-		.val = _PAGE_GLOBAL,
 		.set = "G",
 		.clear = ".",
 	}, {
 		.mask = _PAGE_USER,
-		.val = _PAGE_USER,
 		.set = "U",
 		.clear = ".",
 	}, {
 		.mask = _PAGE_EXEC,
-		.val = _PAGE_EXEC,
 		.set = "X",
 		.clear = ".",
 	}, {
 		.mask = _PAGE_WRITE,
-		.val = _PAGE_WRITE,
 		.set = "W",
 		.clear = ".",
 	}, {
 		.mask = _PAGE_READ,
-		.val = _PAGE_READ,
 		.set = "R",
 		.clear = ".",
 	}, {
 		.mask = _PAGE_PRESENT,
-		.val = _PAGE_PRESENT,
 		.set = "V",
 		.clear = ".",
 	}
@@ -208,15 +207,30 @@ static void dump_prot(struct pg_state *st)
 	unsigned int i;
 
 	for (i = 0; i < ARRAY_SIZE(pte_bits); i++) {
-		const char *s;
+		char s[7];
+		unsigned long val;
 
-		if ((st->current_prot & pte_bits[i].mask) == pte_bits[i].val)
-			s = pte_bits[i].set;
-		else
-			s = pte_bits[i].clear;
+		val = st->current_prot & pte_bits[i].mask;
+		if (val) {
+			if (pte_bits[i].mask == _PAGE_SOFT)
+				sprintf(s, pte_bits[i].set, val >> 8);
+#ifdef CONFIG_64BIT
+			else if (pte_bits[i].mask == _PAGE_MTMASK_SVPBMT) {
+				if (val == _PAGE_NOCACHE_SVPBMT)
+					sprintf(s, pte_bits[i].set, "NC");
+				else if (val == _PAGE_IO_SVPBMT)
+					sprintf(s, pte_bits[i].set, "IO");
+				else
+					sprintf(s, pte_bits[i].set, "??");
+			}
+#endif
+			else
+				sprintf(s, "%s", pte_bits[i].set);
+		} else {
+			sprintf(s, "%s", pte_bits[i].clear);
+		}
 
-		if (s)
-			pt_dump_seq_printf(st->seq, " %s", s);
+		pt_dump_seq_printf(st->seq, " %s", s);
 	}
 }
 
@@ -321,7 +335,7 @@ static void ptdump_walk(struct seq_file *s, struct ptd_mm_info *pinfo)
 	ptdump_walk_pgd(&st.ptdump, pinfo->mm, NULL);
 }
 
-void ptdump_check_wx(void)
+bool ptdump_check_wx(void)
 {
 	struct pg_state st = {
 		.seq = NULL,
@@ -342,11 +356,16 @@ void ptdump_check_wx(void)
 
 	ptdump_walk_pgd(&st.ptdump, &init_mm, NULL);
 
-	if (st.wx_pages)
+	if (st.wx_pages) {
 		pr_warn("Checked W+X mappings: failed, %lu W+X pages found\n",
 			st.wx_pages);
-	else
+
+		return false;
+	} else {
 		pr_info("Checked W+X mappings: passed, no W+X pages found\n");
+
+		return true;
+	}
 }
 
 static int ptdump_show(struct seq_file *m, void *v)
@@ -362,10 +381,6 @@ static int __init ptdump_init(void)
 {
 	unsigned int i, j;
 
-#ifdef CONFIG_KASAN
-	address_markers[KASAN_SHADOW_START_NR].start_address = KASAN_SHADOW_START;
-	address_markers[KASAN_SHADOW_END_NR].start_address = KASAN_SHADOW_END;
-#endif
 	address_markers[FIXMAP_START_NR].start_address = FIXADDR_START;
 	address_markers[FIXMAP_END_NR].start_address = FIXADDR_TOP;
 	address_markers[PCI_IO_START_NR].start_address = PCI_IO_START;
@@ -377,12 +392,19 @@ static int __init ptdump_init(void)
 	address_markers[VMALLOC_START_NR].start_address = VMALLOC_START;
 	address_markers[VMALLOC_END_NR].start_address = VMALLOC_END;
 	address_markers[PAGE_OFFSET_NR].start_address = PAGE_OFFSET;
+#ifdef CONFIG_KASAN
+	address_markers[KASAN_SHADOW_START_NR].start_address = KASAN_SHADOW_START;
+	address_markers[KASAN_SHADOW_END_NR].start_address = KASAN_SHADOW_END;
+#endif
 #ifdef CONFIG_64BIT
 	address_markers[MODULES_MAPPING_NR].start_address = MODULES_VADDR;
 	address_markers[KERNEL_MAPPING_NR].start_address = kernel_map.virt_addr;
 #endif
 
 	kernel_ptd_info.base_addr = KERN_VIRT_START;
+
+	pg_level[1].name = pgtable_l5_enabled ? "P4D" : "PGD";
+	pg_level[2].name = pgtable_l4_enabled ? "PUD" : "PGD";
 
 	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
 		for (j = 0; j < ARRAY_SIZE(pte_bits); j++)

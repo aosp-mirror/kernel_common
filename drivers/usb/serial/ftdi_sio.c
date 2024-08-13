@@ -1033,9 +1033,9 @@ static const struct usb_device_id id_table_combined[] = {
 	{ USB_DEVICE(FTDI_VID, ACTISENSE_USG_PID) },
 	{ USB_DEVICE(FTDI_VID, ACTISENSE_NGT_PID) },
 	{ USB_DEVICE(FTDI_VID, ACTISENSE_NGW_PID) },
-	{ USB_DEVICE(FTDI_VID, ACTISENSE_D9AC_PID) },
-	{ USB_DEVICE(FTDI_VID, ACTISENSE_D9AD_PID) },
-	{ USB_DEVICE(FTDI_VID, ACTISENSE_D9AE_PID) },
+	{ USB_DEVICE(FTDI_VID, ACTISENSE_UID_PID) },
+	{ USB_DEVICE(FTDI_VID, ACTISENSE_USA_PID) },
+	{ USB_DEVICE(FTDI_VID, ACTISENSE_NGX_PID) },
 	{ USB_DEVICE(FTDI_VID, ACTISENSE_D9AF_PID) },
 	{ USB_DEVICE(FTDI_VID, CHETCO_SEAGAUGE_PID) },
 	{ USB_DEVICE(FTDI_VID, CHETCO_SEASWITCH_PID) },
@@ -1077,6 +1077,8 @@ static const struct usb_device_id id_table_combined[] = {
 		.driver_info = (kernel_ulong_t)&ftdi_jtag_quirk },
 	{ USB_DEVICE(FTDI_VID, FTDI_FALCONIA_JTAG_UNBUF_PID),
 		.driver_info = (kernel_ulong_t)&ftdi_jtag_quirk },
+	/* GMC devices */
+	{ USB_DEVICE(GMC_VID, GMC_Z216C_PID) },
 	{ }					/* Terminating entry */
 };
 
@@ -2550,11 +2552,12 @@ static void ftdi_process_read_urb(struct urb *urb)
 		tty_flip_buffer_push(&port->port);
 }
 
-static void ftdi_break_ctl(struct tty_struct *tty, int break_state)
+static int ftdi_break_ctl(struct tty_struct *tty, int break_state)
 {
 	struct usb_serial_port *port = tty->driver_data;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	u16 value;
+	int ret;
 
 	/* break_state = -1 to turn on break, and 0 to turn off break */
 	/* see drivers/char/tty_io.c to see it used */
@@ -2565,19 +2568,22 @@ static void ftdi_break_ctl(struct tty_struct *tty, int break_state)
 	else
 		value = priv->last_set_data_value;
 
-	if (usb_control_msg(port->serial->dev,
+	ret = usb_control_msg(port->serial->dev,
 			usb_sndctrlpipe(port->serial->dev, 0),
 			FTDI_SIO_SET_DATA_REQUEST,
 			FTDI_SIO_SET_DATA_REQUEST_TYPE,
 			value, priv->channel,
-			NULL, 0, WDR_TIMEOUT) < 0) {
+			NULL, 0, WDR_TIMEOUT);
+	if (ret < 0) {
 		dev_err(&port->dev, "%s FAILED to enable/disable break state (state was %d)\n",
 			__func__, break_state);
+		return ret;
 	}
 
 	dev_dbg(&port->dev, "%s break state is %d - urb is %d\n", __func__,
 		break_state, value);
 
+	return 0;
 }
 
 static bool ftdi_tx_empty(struct usb_serial_port *port)
@@ -2606,7 +2612,7 @@ static void ftdi_set_termios(struct tty_struct *tty,
 	struct device *ddev = &port->dev;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	struct ktermios *termios = &tty->termios;
-	unsigned int cflag = termios->c_cflag;
+	unsigned int cflag;
 	u16 value, index;
 	int ret;
 

@@ -6,7 +6,7 @@
 #include <linux/clk-provider.h>
 #include <linux/err.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/platform_device.h>
 #include <linux/pm_clock.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
@@ -93,8 +93,8 @@ static struct clk_alpha_pll_postdiv lpass_lpaaudio_dig_pll_out_odd = {
 	.regs = clk_alpha_pll_regs[CLK_ALPHA_PLL_TYPE_FABIA],
 	.clkr.hw.init = &(struct clk_init_data){
 		.name = "lpass_lpaaudio_dig_pll_out_odd",
-		.parent_data = &(const struct clk_parent_data){
-			.hw = &lpass_lpaaudio_dig_pll.clkr.hw,
+		.parent_hws = (const struct clk_hw*[]) {
+			&lpass_lpaaudio_dig_pll.clkr.hw,
 		},
 		.num_parents = 1,
 		.flags = CLK_SET_RATE_PARENT,
@@ -210,8 +210,8 @@ static struct clk_branch lpass_audio_core_ext_mclk0_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(struct clk_init_data){
 			.name = "lpass_audio_core_ext_mclk0_clk",
-			.parent_data = &(const struct clk_parent_data){
-				.hw = &ext_mclk0_clk_src.clkr.hw,
+			.parent_hws = (const struct clk_hw*[]) {
+				&ext_mclk0_clk_src.clkr.hw,
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
@@ -230,8 +230,8 @@ static struct clk_branch lpass_audio_core_lpaif_pri_ibit_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(struct clk_init_data){
 			.name = "lpass_audio_core_lpaif_pri_ibit_clk",
-			.parent_data = &(const struct clk_parent_data){
-				.hw = &lpaif_pri_clk_src.clkr.hw,
+			.parent_hws = (const struct clk_hw*[]) {
+				&lpaif_pri_clk_src.clkr.hw,
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
@@ -250,8 +250,8 @@ static struct clk_branch lpass_audio_core_lpaif_sec_ibit_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(struct clk_init_data){
 			.name = "lpass_audio_core_lpaif_sec_ibit_clk",
-			.parent_data = &(const struct clk_parent_data){
-				.hw = &lpaif_sec_clk_src.clkr.hw,
+			.parent_hws = (const struct clk_hw*[]) {
+				&lpaif_sec_clk_src.clkr.hw,
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
@@ -270,8 +270,8 @@ static struct clk_branch lpass_audio_core_sysnoc_mport_core_clk = {
 		.enable_mask = BIT(0),
 		.hw.init = &(struct clk_init_data){
 			.name = "lpass_audio_core_sysnoc_mport_core_clk",
-			.parent_data = &(const struct clk_parent_data){
-				.hw = &core_clk_src.clkr.hw,
+			.parent_hws = (const struct clk_hw*[]) {
+				&core_clk_src.clkr.hw,
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
@@ -401,11 +401,8 @@ static int lpass_core_cc_sc7180_probe(struct platform_device *pdev)
 		goto exit;
 	}
 
-	/*
-	 * Keep the CLK always-ON
-	 * LPASS_AUDIO_CORE_SYSNOC_SWAY_CORE_CLK
-	 */
-	regmap_update_bits(regmap, 0x24000, BIT(0), BIT(0));
+	/* Keep some clocks always-on */
+	qcom_branch_set_clk_en(regmap, 0x24000); /* LPASS_AUDIO_CORE_SYSNOC_SWAY_CORE_CLK */
 
 	/* PLL settings */
 	regmap_write(regmap, 0x1008, 0x20);

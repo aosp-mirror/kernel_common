@@ -151,7 +151,7 @@ static int tc74_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id tc74_id[] = {
-	{ "tc74", 0 },
+	{ "tc74" },
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, tc74_id);
@@ -160,7 +160,7 @@ static struct i2c_driver tc74_driver = {
 	.driver = {
 		.name	= "tc74",
 	},
-	.probe_new = tc74_probe,
+	.probe = tc74_probe,
 	.id_table = tc74_id,
 };
 

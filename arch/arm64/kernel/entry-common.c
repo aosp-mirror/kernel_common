@@ -10,6 +10,7 @@
 #include <linux/linkage.h>
 #include <linux/lockdep.h>
 #include <linux/ptrace.h>
+#include <linux/resume_user_mode.h>
 #include <linux/sched.h>
 #include <linux/sched/debug.h>
 #include <linux/thread_info.h>
@@ -126,20 +127,55 @@ static __always_inline void __exit_to_user_mode(void)
 	lockdep_hardirqs_on(CALLER_ADDR0);
 }
 
-static __always_inline void prepare_exit_to_user_mode(struct pt_regs *regs)
+static void do_notify_resume(struct pt_regs *regs, unsigned long thread_flags)
+{
+	do {
+		local_irq_enable();
+
+		if (thread_flags & _TIF_NEED_RESCHED)
+			schedule();
+
+		if (thread_flags & _TIF_UPROBE)
+			uprobe_notify_resume(regs);
+
+		if (thread_flags & _TIF_MTE_ASYNC_FAULT) {
+			clear_thread_flag(TIF_MTE_ASYNC_FAULT);
+			send_sig_fault(SIGSEGV, SEGV_MTEAERR,
+				       (void __user *)NULL, current);
+		}
+
+		if (thread_flags & (_TIF_SIGPENDING | _TIF_NOTIFY_SIGNAL))
+			do_signal(regs);
+
+		if (thread_flags & _TIF_NOTIFY_RESUME)
+			resume_user_mode_work(regs);
+
+		if (thread_flags & _TIF_FOREIGN_FPSTATE)
+			fpsimd_restore_current_state();
+
+		local_irq_disable();
+		thread_flags = read_thread_flags();
+	} while (thread_flags & _TIF_WORK_MASK);
+}
+
+static __always_inline void exit_to_user_mode_prepare(struct pt_regs *regs)
 {
 	unsigned long flags;
 
-	local_daif_mask();
+	local_irq_disable();
 
 	flags = read_thread_flags();
 	if (unlikely(flags & _TIF_WORK_MASK))
 		do_notify_resume(regs, flags);
+
+	local_daif_mask();
+
+	lockdep_sys_exit();
 }
 
 static __always_inline void exit_to_user_mode(struct pt_regs *regs)
 {
-	prepare_exit_to_user_mode(regs);
+	exit_to_user_mode_prepare(regs);
 	mte_check_tfsr_exit();
 	__exit_to_user_mode();
 }
@@ -352,6 +388,35 @@ static bool cortex_a76_erratum_1463225_debug_handler(struct pt_regs *regs)
 	return false;
 }
 #endif /* CONFIG_ARM64_ERRATUM_1463225 */
+
+/*
+ * As per the ABI exit SME streaming mode and clear the SVE state not
+ * shared with FPSIMD on syscall entry.
+ */
+static inline void fp_user_discard(void)
+{
+	/*
+	 * If SME is active then exit streaming mode.  If ZA is active
+	 * then flush the SVE registers but leave userspace access to
+	 * both SVE and SME enabled, otherwise disable SME for the
+	 * task and fall through to disabling SVE too.  This means
+	 * that after a syscall we never have any streaming mode
+	 * register state to track, if this changes the KVM code will
+	 * need updating.
+	 */
+	if (system_supports_sme())
+		sme_smstop_sm();
+
+	if (!system_supports_sve())
+		return;
+
+	if (test_thread_flag(TIF_SVE)) {
+		unsigned int sve_vq_minus_one;
+
+		sve_vq_minus_one = sve_vq_from_vl(task_get_sve_vl(current)) - 1;
+		sve_flush_live(true, sve_vq_minus_one);
+	}
+}
 
 UNHANDLED(el1t, 64, sync)
 UNHANDLED(el1t, 64, irq)
@@ -611,6 +676,14 @@ static void noinstr el0_bti(struct pt_regs *regs)
 	exit_to_user_mode(regs);
 }
 
+static void noinstr el0_mops(struct pt_regs *regs, unsigned long esr)
+{
+	enter_from_user_mode(regs);
+	local_daif_restore(DAIF_PROCCTX);
+	do_el0_mops(regs, esr);
+	exit_to_user_mode(regs);
+}
+
 static void noinstr el0_inv(struct pt_regs *regs, unsigned long esr)
 {
 	enter_from_user_mode(regs);
@@ -634,6 +707,8 @@ static void noinstr el0_svc(struct pt_regs *regs)
 {
 	enter_from_user_mode(regs);
 	cortex_a76_erratum_1463225_svc_handler();
+	fp_user_discard();
+	local_daif_restore(DAIF_PROCCTX);
 	do_el0_svc(regs);
 	exit_to_user_mode(regs);
 }
@@ -687,6 +762,9 @@ asmlinkage void noinstr el0t_64_sync_handler(struct pt_regs *regs)
 		break;
 	case ESR_ELx_EC_BTI:
 		el0_bti(regs);
+		break;
+	case ESR_ELx_EC_MOPS:
+		el0_mops(regs, esr);
 		break;
 	case ESR_ELx_EC_BREAKPT_LOW:
 	case ESR_ELx_EC_SOFTSTP_LOW:
@@ -770,6 +848,7 @@ static void noinstr el0_svc_compat(struct pt_regs *regs)
 {
 	enter_from_user_mode(regs);
 	cortex_a76_erratum_1463225_svc_handler();
+	local_daif_restore(DAIF_PROCCTX);
 	do_el0_svc_compat(regs);
 	exit_to_user_mode(regs);
 }
@@ -840,7 +919,7 @@ UNHANDLED(el0t, 32, error)
 #endif /* CONFIG_COMPAT */
 
 #ifdef CONFIG_VMAP_STACK
-asmlinkage void noinstr handle_bad_stack(struct pt_regs *regs)
+asmlinkage void noinstr __noreturn handle_bad_stack(struct pt_regs *regs)
 {
 	unsigned long esr = read_sysreg(esr_el1);
 	unsigned long far = read_sysreg(far_el1);

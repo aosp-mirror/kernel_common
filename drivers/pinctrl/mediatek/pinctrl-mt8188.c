@@ -1658,7 +1658,7 @@ static struct platform_driver mt8188_pinctrl_driver = {
 	.driver = {
 		.name = "mt8188-pinctrl",
 		.of_match_table = mt8188_pinctrl_of_match,
-		.pm = &mtk_paris_pinctrl_pm_ops
+		.pm = pm_sleep_ptr(&mtk_paris_pinctrl_pm_ops)
 	},
 	.probe = mtk_paris_pinctrl_probe,
 };
@@ -1670,5 +1670,4 @@ static int __init mt8188_pinctrl_init(void)
 
 arch_initcall(mt8188_pinctrl_init);
 
-MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("MediaTek MT8188 Pinctrl Driver");

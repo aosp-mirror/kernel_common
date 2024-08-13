@@ -254,7 +254,7 @@ static void pt_issue_pending(struct dma_chan *dma_chan)
 	spin_unlock_irqrestore(&chan->vc.lock, flags);
 
 	/* If there was nothing active, start processing */
-	if (engine_is_idle)
+	if (engine_is_idle && desc)
 		pt_cmd_callback(desc, 0);
 }
 
@@ -384,8 +384,6 @@ int pt_dmaengine_register(struct pt_device *pt)
 
 	chan->vc.desc_free = pt_do_cleanup;
 	vchan_init(&chan->vc, dma_dev);
-
-	dma_set_mask_and_coherent(pt->dev, DMA_BIT_MASK(64));
 
 	ret = dma_async_device_register(dma_dev);
 	if (ret)

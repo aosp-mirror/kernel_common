@@ -51,16 +51,6 @@
 
 struct tls_rec;
 
-struct tls_cipher_size_desc {
-	unsigned int iv;
-	unsigned int key;
-	unsigned int salt;
-	unsigned int tag;
-	unsigned int rec_seq;
-};
-
-extern const struct tls_cipher_size_desc tls_cipher_size_desc[];
-
 /* Maximum data size carried in a TLS record */
 #define TLS_MAX_PAYLOAD_SIZE		((size_t)1 << 14)
 
@@ -69,11 +59,10 @@ extern const struct tls_cipher_size_desc tls_cipher_size_desc[];
 
 #define TLS_CRYPTO_INFO_READY(info)	((info)->cipher_type)
 
-#define TLS_RECORD_TYPE_DATA		0x17
-
 #define TLS_AAD_SPACE_SIZE		13
 
-#define MAX_IV_SIZE			16
+#define TLS_MAX_IV_SIZE			16
+#define TLS_MAX_SALT_SIZE		4
 #define TLS_TAG_SIZE			16
 #define TLS_MAX_REC_SEQ_SIZE		8
 #define TLS_MAX_AAD_SIZE		TLS_AAD_SPACE_SIZE
@@ -108,9 +97,6 @@ struct tls_sw_context_tx {
 	struct tls_rec *open_rec;
 	struct list_head tx_list;
 	atomic_t encrypt_pending;
-	/* protect crypto_wait with encrypt_pending */
-	spinlock_t encrypt_compl_lock;
-	int async_notify;
 	u8 async_capable:1;
 
 #define BIT_TX_SCHEDULED	0
@@ -124,7 +110,9 @@ struct tls_strparser {
 	u32 mark : 8;
 	u32 stopped : 1;
 	u32 copy_mode : 1;
-	u32 msg_ready : 1;
+	u32 mixed_decrypted : 1;
+
+	bool msg_ready;
 
 	struct strp_msg stm;
 
@@ -146,8 +134,6 @@ struct tls_sw_context_rx {
 	struct tls_strparser strp;
 
 	atomic_t decrypt_pending;
-	/* protect crypto_wait with decrypt_pending*/
-	spinlock_t decrypt_compl_lock;
 	struct sk_buff_head async_hold;
 	struct wait_queue_head wq;
 };
@@ -160,6 +146,7 @@ struct tls_record_info {
 	skb_frag_t frags[MAX_SKB_FRAGS];
 };
 
+#define TLS_DRIVER_STATE_SIZE_TX	16
 struct tls_offload_context_tx {
 	struct crypto_aead *aead_send;
 	spinlock_t lock;	/* protects records list */
@@ -173,16 +160,12 @@ struct tls_offload_context_tx {
 	void (*sk_destruct)(struct sock *sk);
 	struct work_struct destruct_work;
 	struct tls_context *ctx;
-	u8 driver_state[] __aligned(8);
 	/* The TLS layer reserves room for driver specific state
 	 * Currently the belief is that there is not enough
 	 * driver specific state to justify another layer of indirection
 	 */
-#define TLS_DRIVER_STATE_SIZE_TX	16
+	u8 driver_state[TLS_DRIVER_STATE_SIZE_TX] __aligned(8);
 };
-
-#define TLS_OFFLOAD_CONTEXT_SIZE_TX                                            \
-	(sizeof(struct tls_offload_context_tx) + TLS_DRIVER_STATE_SIZE_TX)
 
 enum tls_context_flags {
 	/* tls_device_down was called after the netdev went down, device state
@@ -204,8 +187,8 @@ enum tls_context_flags {
 };
 
 struct cipher_context {
-	char *iv;
-	char *rec_seq;
+	char iv[TLS_MAX_IV_SIZE + TLS_MAX_SALT_SIZE];
+	char rec_seq[TLS_MAX_REC_SEQ_SIZE];
 };
 
 union tls_crypto_context {
@@ -256,7 +239,7 @@ struct tls_context {
 	struct scatterlist *partially_sent_record;
 	u16 partially_sent_offset;
 
-	bool in_tcp_sendpages;
+	bool splicing_pages;
 	bool pending_open_record_frags;
 
 	struct mutex tx_lock; /* protects partially_sent_* fields and
@@ -313,6 +296,7 @@ struct tls_offload_resync_async {
 	u32 log[TLS_DEVICE_RESYNC_ASYNC_LOGMAX];
 };
 
+#define TLS_DRIVER_STATE_SIZE_RX	8
 struct tls_offload_context_rx {
 	/* sw must be the first member of tls_offload_context_rx */
 	struct tls_sw_context_rx sw;
@@ -336,16 +320,12 @@ struct tls_offload_context_rx {
 			struct tls_offload_resync_async *resync_async;
 		};
 	};
-	u8 driver_state[] __aligned(8);
 	/* The TLS layer reserves room for driver specific state
 	 * Currently the belief is that there is not enough
 	 * driver specific state to justify another layer of indirection
 	 */
-#define TLS_DRIVER_STATE_SIZE_RX	8
+	u8 driver_state[TLS_DRIVER_STATE_SIZE_RX] __aligned(8);
 };
-
-#define TLS_OFFLOAD_CONTEXT_SIZE_RX					\
-	(sizeof(struct tls_offload_context_rx) + TLS_DRIVER_STATE_SIZE_RX)
 
 struct tls_record_info *tls_get_record(struct tls_offload_context_tx *context,
 				       u32 seq, u64 *p_record_sn);
@@ -367,10 +347,12 @@ struct sk_buff *
 tls_validate_xmit_skb_sw(struct sock *sk, struct net_device *dev,
 			 struct sk_buff *skb);
 
-static inline bool tls_is_sk_tx_device_offloaded(struct sock *sk)
+static inline bool tls_is_skb_tx_device_offloaded(const struct sk_buff *skb)
 {
-#ifdef CONFIG_SOCK_VALIDATE_XMIT
-	return sk_fullsock(sk) &&
+#ifdef CONFIG_TLS_DEVICE
+	struct sock *sk = skb->sk;
+
+	return sk && sk_fullsock(sk) &&
 	       (smp_load_acquire(&sk->sk_validate_xmit_skb) ==
 	       &tls_validate_xmit_skb);
 #else
@@ -380,7 +362,7 @@ static inline bool tls_is_sk_tx_device_offloaded(struct sock *sk)
 
 static inline struct tls_context *tls_get_ctx(const struct sock *sk)
 {
-	struct inet_connection_sock *icsk = inet_csk(sk);
+	const struct inet_connection_sock *icsk = inet_csk(sk);
 
 	/* Use RCU on icsk_ulp_data only for sock diag code,
 	 * TLS data path doesn't need rcu_dereference().

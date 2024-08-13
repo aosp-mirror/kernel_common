@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause-Clear */
 /*
  * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef ATH11K_HAL_RX_H
@@ -149,7 +150,7 @@ struct hal_rx_mon_ppdu_info {
 	u8 beamformed;
 	u8 rssi_comb;
 	u8 rssi_chain_pri20[HAL_RX_MAX_NSS];
-	u8 tid;
+	u16 tid;
 	u16 ht_flags;
 	u16 vht_flags;
 	u16 he_flags;
@@ -219,11 +220,11 @@ struct hal_rx_ppdu_start {
 #define HAL_RX_PPDU_END_USER_STATS_INFO5_OTHER_MSDU_CNT		GENMASK(15, 0)
 #define HAL_RX_PPDU_END_USER_STATS_INFO5_TCP_ACK_MSDU_CNT	GENMASK(31, 16)
 
-#define HAL_RX_PPDU_END_USER_STATS_INFO6_TID_BITMAP		GENMASK(15, 0)
-#define HAL_RX_PPDU_END_USER_STATS_INFO6_TID_EOSP_BITMAP	GENMASK(31, 16)
+#define HAL_RX_PPDU_END_USER_STATS_INFO7_TID_BITMAP		GENMASK(15, 0)
+#define HAL_RX_PPDU_END_USER_STATS_INFO7_TID_EOSP_BITMAP	GENMASK(31, 16)
 
-#define HAL_RX_PPDU_END_USER_STATS_RSVD2_6_MPDU_OK_BYTE_COUNT	GENMASK(24, 0)
-#define HAL_RX_PPDU_END_USER_STATS_RSVD2_8_MPDU_ERR_BYTE_COUNT	GENMASK(24, 0)
+#define HAL_RX_PPDU_END_USER_STATS_INFO8_MPDU_OK_BYTE_COUNT	GENMASK(24, 0)
+#define HAL_RX_PPDU_END_USER_STATS_INFO9_MPDU_ERR_BYTE_COUNT	GENMASK(24, 0)
 
 struct hal_rx_ppdu_end_user_stats {
 	__le32 rsvd0[2];
@@ -236,7 +237,13 @@ struct hal_rx_ppdu_end_user_stats {
 	__le32 info4;
 	__le32 info5;
 	__le32 info6;
-	__le32 rsvd2[11];
+	__le32 info7;
+	__le32 rsvd2[4];
+	__le32 info8;
+	__le32 rsvd3;
+	__le32 info9;
+	__le32 rsvd4[2];
+	__le32 info10;
 } __packed;
 
 struct hal_rx_ppdu_end_user_stats_ext {
@@ -385,7 +392,7 @@ struct hal_rx_he_sig_b2_ofdma_info {
 	__le32 info0;
 } __packed;
 
-#define HAL_RX_PHYRX_RSSI_LEGACY_INFO_INFO1_RSSI_COMB	GENMASK(15, 8)
+#define HAL_RX_PHYRX_RSSI_LEGACY_INFO_INFO0_RSSI_COMB	GENMASK(15, 8)
 
 #define HAL_RX_PHYRX_RSSI_PREAMBLE_PRI20	GENMASK(7, 0)
 
@@ -405,10 +412,18 @@ struct hal_rx_phyrx_rssi_legacy_info {
 #define HAL_RX_MPDU_INFO_INFO0_PEERID_WCN6855	GENMASK(15, 0)
 #define HAL_RX_MPDU_INFO_INFO1_MPDU_LEN		GENMASK(13, 0)
 
-struct hal_rx_mpdu_info {
+struct hal_rx_mpdu_info_ipq8074 {
 	__le32 rsvd0;
 	__le32 info0;
 	__le32 rsvd1[11];
+	__le32 info1;
+	__le32 rsvd2[9];
+} __packed;
+
+struct hal_rx_mpdu_info_qcn9074 {
+	__le32 rsvd0[10];
+	__le32 info0;
+	__le32 rsvd1[2];
 	__le32 info1;
 	__le32 rsvd2[9];
 } __packed;
@@ -417,6 +432,14 @@ struct hal_rx_mpdu_info_wcn6855 {
 	__le32 rsvd0[8];
 	__le32 info0;
 	__le32 rsvd1[14];
+} __packed;
+
+struct hal_rx_mpdu_info {
+	union {
+		struct hal_rx_mpdu_info_ipq8074 ipq8074;
+		struct hal_rx_mpdu_info_qcn9074 qcn9074;
+		struct hal_rx_mpdu_info_wcn6855 wcn6855;
+	} u;
 } __packed;
 
 #define HAL_RX_PPDU_END_DURATION	GENMASK(23, 0)

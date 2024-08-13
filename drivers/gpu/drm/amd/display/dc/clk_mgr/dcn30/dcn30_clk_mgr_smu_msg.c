@@ -23,7 +23,6 @@
  *
  */
 
-#include <linux/delay.h>
 #include "dcn30_clk_mgr_smu_msg.h"
 
 #include "clk_mgr_internal.h"
@@ -54,6 +53,7 @@
  */
 static uint32_t dcn30_smu_wait_for_response(struct clk_mgr_internal *clk_mgr, unsigned int delay_us, unsigned int max_retries)
 {
+	const uint32_t initial_max_retries = max_retries;
 	uint32_t reg = 0;
 
 	do {
@@ -69,7 +69,7 @@ static uint32_t dcn30_smu_wait_for_response(struct clk_mgr_internal *clk_mgr, un
 
 	/* handle DALSMC_Result_CmdRejectedBusy? */
 
-	/* Log? */
+	TRACE_SMU_DELAY(delay_us * (initial_max_retries - max_retries), clk_mgr->base.ctx);
 
 	return reg;
 }
@@ -88,6 +88,8 @@ static bool dcn30_smu_send_msg_with_param(struct clk_mgr_internal *clk_mgr, uint
 
 	/* Trigger the message transaction by writing the message ID */
 	REG_WRITE(DAL_MSG_REG, msg_id);
+
+	TRACE_SMU_MSG(msg_id, param_in, clk_mgr->base.ctx);
 
 	result = dcn30_smu_wait_for_response(clk_mgr, 10, 200000);
 
@@ -311,6 +313,9 @@ void dcn30_smu_set_display_refresh_from_mall(struct clk_mgr_internal *clk_mgr, b
 {
 	/* bits 8:7 for cache timer scale, bits 6:1 for cache timer delay, bit 0 = 1 for enable, = 0 for disable */
 	uint32_t param = (cache_timer_scale << 7) | (cache_timer_delay << 1) | (enable ? 1 : 0);
+
+	smu_print("SMU Set display refresh from mall: enable = %d, cache_timer_delay = %d, cache_timer_scale = %d\n",
+		enable, cache_timer_delay, cache_timer_scale);
 
 	dcn30_smu_send_msg_with_param(clk_mgr,
 			DALSMC_MSG_SetDisplayRefreshFromMall, param, NULL);

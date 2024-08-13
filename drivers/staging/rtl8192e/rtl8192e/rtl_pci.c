@@ -21,7 +21,7 @@ static void _rtl92e_parse_pci_configuration(struct pci_dev *pdev,
 	pcie_capability_read_word(priv->pdev, PCI_EXP_LNKCTL, &link_ctrl_reg);
 
 	pci_read_config_byte(pdev, 0x98, &tmp);
-	tmp |= BIT4;
+	tmp |= BIT(4);
 	pci_write_config_byte(pdev, 0x98, tmp);
 
 	tmp = 0x17;
@@ -39,7 +39,7 @@ bool rtl92e_check_adapter(struct pci_dev *pdev, struct net_device *dev)
 	revision_id = pdev->revision;
 	pci_read_config_word(pdev, 0x3C, &irq_line);
 
-	priv->card_8192 = priv->ops->nic_type;
+	priv->card_8192 = NIC_8192E;
 
 	if (device_id == 0x8192) {
 		switch (revision_id) {
@@ -64,10 +64,10 @@ bool rtl92e_check_adapter(struct pci_dev *pdev, struct net_device *dev)
 		}
 	}
 
-	if (priv->ops->nic_type != priv->card_8192) {
+	if (priv->card_8192 != NIC_8192E) {
 		dev_info(&pdev->dev,
 			 "Detect info(%x) and hardware info(%x) not match!\n",
-			 priv->ops->nic_type, priv->card_8192);
+			 NIC_8192E, priv->card_8192);
 		dev_info(&pdev->dev,
 			 "Please select proper driver before install!!!!\n");
 		return false;

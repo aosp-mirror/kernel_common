@@ -19,12 +19,8 @@ properties:
   reg:
     maxItems: 1
 
-  interrupts: true
-  interrupt-controller: true
-  "#interrupt-cells": true
-  gpio-controller: true
-  "#gpio-cells": true
-  gpio-ranges: true
+  interrupts:
+    maxItems: 1
 
   gpio-reserved-ranges:
     maxItems: 1
@@ -45,6 +41,7 @@ $defs:
       Pinctrl node's client devices use subnodes for desired pin configuration.
       Client device subnodes use below standard properties.
     $ref: qcom,tlmm-common.yaml#/$defs/qcom-tlmm-state
+    unevaluatedProperties: false
 
     properties:
       pins:
@@ -82,7 +79,7 @@ $defs:
                 qdss_tracectl_a, dac_calib13, qdss_traceclk_a, dac_calib14,
                 dac_calib15, hdmi_rcv, dac_calib16, hdmi_cec, pwr_modem,
                 dac_calib17, hdmi_ddc, pwr_nav, dac_calib18, pwr_crypto,
-                dac_calib19, hdmi_hot, dac_calib20, dac_calib21, pci_e0,
+                dac_calib19, hdmi_hot, dac_calib20, dac_calib21, pci_e0, pcie_clkreq,
                 dac_calib22, dac_calib23, dac_calib24, tsif1_sync, dac_calib25,
                 sd_write, tsif1_error, blsp_spi2, blsp_uart2, blsp_uim2,
                 qdss_cti, blsp_i2c2, blsp_spi3, blsp_uart3, blsp_uim3, blsp_i2c3,
@@ -109,17 +106,8 @@ $defs:
                 qspi_cs, ssbi2, ssbi1, mss_lte, qspi_clk, qspi0, qspi1, qspi2, qspi3,
                 gpio ]
 
-      bias-pull-down: true
-      bias-pull-up: true
-      bias-disable: true
-      drive-strength: true
-      output-high: true
-      output-low: true
-
     required:
       - pins
-
-    additionalProperties: false
 
 allOf:
   - $ref: /schemas/pinctrl/qcom,tlmm-common.yaml#
@@ -128,7 +116,7 @@ required:
   - compatible
   - reg
 
-additionalProperties: false
+unevaluatedProperties: false
 
 examples:
   - |

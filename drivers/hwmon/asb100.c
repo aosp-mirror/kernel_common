@@ -213,7 +213,7 @@ static struct asb100_data *asb100_update_device(struct device *dev);
 static void asb100_init_client(struct i2c_client *client);
 
 static const struct i2c_device_id asb100_id[] = {
-	{ "asb100", 0 },
+	{ "asb100" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, asb100_id);
@@ -223,7 +223,7 @@ static struct i2c_driver asb100_driver = {
 	.driver = {
 		.name	= "asb100",
 	},
-	.probe_new	= asb100_probe,
+	.probe		= asb100_probe,
 	.remove		= asb100_remove,
 	.id_table	= asb100_id,
 	.detect		= asb100_detect,

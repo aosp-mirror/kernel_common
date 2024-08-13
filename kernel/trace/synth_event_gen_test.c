@@ -22,7 +22,7 @@
  * Then:
  *
  * # insmod kernel/trace/synth_event_gen_test.ko
- * # cat /sys/kernel/debug/tracing/trace
+ * # cat /sys/kernel/tracing/trace
  *
  * You should see several events in the trace buffer -
  * "create_synth_test", "empty_synth_test", and several instances of
@@ -477,6 +477,17 @@ static int __init synth_event_gen_test_init(void)
 
 	ret = test_trace_synth_event();
 	WARN_ON(ret);
+
+	/* Disable when done */
+	trace_array_set_clr_event(gen_synth_test->tr,
+				  "synthetic",
+				  "gen_synth_test", false);
+	trace_array_set_clr_event(empty_synth_test->tr,
+				  "synthetic",
+				  "empty_synth_test", false);
+	trace_array_set_clr_event(create_synth_test->tr,
+				  "synthetic",
+				  "create_synth_test", false);
  out:
 	return ret;
 }

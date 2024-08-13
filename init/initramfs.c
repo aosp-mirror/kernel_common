@@ -11,12 +11,14 @@
 #include <linux/syscalls.h>
 #include <linux/utime.h>
 #include <linux/file.h>
+#include <linux/kstrtox.h>
 #include <linux/memblock.h>
 #include <linux/mm.h>
 #include <linux/namei.h>
 #include <linux/init_syscalls.h>
-#include <linux/task_work.h>
 #include <linux/umh.h>
+
+#include "do_mounts.h"
 
 static __initdata bool csum_present;
 static __initdata u32 io_csum;
@@ -59,15 +61,8 @@ static void __init error(char *x)
 		message = x;
 }
 
-static void panic_show_mem(const char *fmt, ...)
-{
-	va_list args;
-
-	show_mem(0, NULL);
-	va_start(args, fmt);
-	panic(fmt, args);
-	va_end(args);
-}
+#define panic_show_mem(fmt, ...) \
+	({ show_mem(); panic(fmt, ##__VA_ARGS__); })
 
 /* link hash */
 
@@ -372,7 +367,7 @@ static int __init do_name(void)
 	if (S_ISREG(mode)) {
 		int ml = maybe_link();
 		if (ml >= 0) {
-			int openflags = O_WRONLY|O_CREAT;
+			int openflags = O_WRONLY|O_CREAT|O_LARGEFILE;
 			if (ml != 1)
 				openflags |= O_TRUNC;
 			wfile = filp_open(collected, openflags, mode);
@@ -571,8 +566,7 @@ __setup("keepinitrd", keepinitrd_setup);
 static bool __initdata initramfs_async = true;
 static int __init initramfs_async_setup(char *str)
 {
-	strtobool(str, &initramfs_async);
-	return 1;
+	return kstrtobool(str, &initramfs_async) == 0;
 }
 __setup("initramfs_async=", initramfs_async_setup);
 
@@ -580,6 +574,8 @@ extern char __initramfs_start[];
 extern unsigned long __initramfs_size;
 #include <linux/initrd.h>
 #include <linux/kexec.h>
+
+static BIN_ATTR(initrd, 0440, sysfs_bin_attr_simple_read, NULL, 0);
 
 void __init reserve_initrd_mem(void)
 {
@@ -639,7 +635,7 @@ void __weak __init free_initrd_mem(unsigned long start, unsigned long end)
 			"initrd");
 }
 
-#ifdef CONFIG_KEXEC_CORE
+#ifdef CONFIG_CRASH_RESERVE
 static bool __init kexec_free_initrd(void)
 {
 	unsigned long crashk_start = (unsigned long)__va(crashk_res.start);
@@ -676,11 +672,9 @@ static void __init populate_initrd_image(char *err)
 	struct file *file;
 	loff_t pos = 0;
 
-	unpack_to_rootfs(__initramfs_start, __initramfs_size);
-
 	printk(KERN_INFO "rootfs image is not initramfs (%s); looks like an initrd\n",
 			err);
-	file = filp_open("/initrd.image", O_WRONLY | O_CREAT, 0700);
+	file = filp_open("/initrd.image", O_WRONLY|O_CREAT|O_LARGEFILE, 0700);
 	if (IS_ERR(file))
 		return;
 
@@ -722,13 +716,18 @@ done:
 	 * If the initrd region is overlapped with crashkernel reserved region,
 	 * free only memory that is not part of crashkernel region.
 	 */
-	if (!do_retain_initrd && initrd_start && !kexec_free_initrd())
+	if (!do_retain_initrd && initrd_start && !kexec_free_initrd()) {
 		free_initrd_mem(initrd_start, initrd_end);
+	} else if (do_retain_initrd && initrd_start) {
+		bin_attr_initrd.size = initrd_end - initrd_start;
+		bin_attr_initrd.private = (void *)initrd_start;
+		if (sysfs_create_bin_file(firmware_kobj, &bin_attr_initrd))
+			pr_err("Failed to create initrd sysfs file");
+	}
 	initrd_start = 0;
 	initrd_end = 0;
 
-	flush_delayed_fput();
-	task_work_run();
+	init_flush_fput();
 }
 
 static ASYNC_DOMAIN_EXCLUSIVE(initramfs_domain);

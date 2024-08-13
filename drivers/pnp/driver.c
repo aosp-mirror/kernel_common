@@ -256,7 +256,7 @@ static const struct dev_pm_ops pnp_bus_dev_pm_ops = {
 	.restore = pnp_bus_resume,
 };
 
-struct bus_type pnp_bus_type = {
+const struct bus_type pnp_bus_type = {
 	.name    = "pnp",
 	.match   = pnp_bus_match,
 	.probe   = pnp_device_probe,
@@ -265,6 +265,12 @@ struct bus_type pnp_bus_type = {
 	.pm	 = &pnp_bus_dev_pm_ops,
 	.dev_groups = pnp_dev_groups,
 };
+
+bool dev_is_pnp(const struct device *dev)
+{
+	return dev->bus == &pnp_bus_type;
+}
+EXPORT_SYMBOL_GPL(dev_is_pnp);
 
 int pnp_register_driver(struct pnp_driver *drv)
 {

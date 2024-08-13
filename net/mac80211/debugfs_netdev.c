@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2006	Jiri Benc <jbenc@suse.cz>
  * Copyright 2007	Johannes Berg <johannes@sipsolutions.net>
- * Copyright (C) 2020-2022 Intel Corporation
+ * Copyright (C) 2020-2023 Intel Corporation
  */
 
 #include <linux/kernel.h>
@@ -22,100 +22,202 @@
 #include "debugfs_netdev.h"
 #include "driver-ops.h"
 
-static ssize_t ieee80211_if_read(
-	struct ieee80211_sub_if_data *sdata,
+struct ieee80211_if_read_sdata_data {
+	ssize_t (*format)(const struct ieee80211_sub_if_data *, char *, int);
+	struct ieee80211_sub_if_data *sdata;
+};
+
+static ssize_t ieee80211_if_read_sdata_handler(struct wiphy *wiphy,
+					       struct file *file,
+					       char *buf,
+					       size_t bufsize,
+					       void *data)
+{
+	struct ieee80211_if_read_sdata_data *d = data;
+
+	return d->format(d->sdata, buf, bufsize);
+}
+
+static ssize_t ieee80211_if_read_sdata(
+	struct file *file,
 	char __user *userbuf,
 	size_t count, loff_t *ppos,
-	ssize_t (*format)(const struct ieee80211_sub_if_data *, char *, int))
+	ssize_t (*format)(const struct ieee80211_sub_if_data *sdata, char *, int))
 {
+	struct ieee80211_sub_if_data *sdata = file->private_data;
+	struct ieee80211_if_read_sdata_data data = {
+		.format = format,
+		.sdata = sdata,
+	};
 	char buf[200];
-	ssize_t ret = -EINVAL;
 
-	read_lock(&dev_base_lock);
-	ret = (*format)(sdata, buf, sizeof(buf));
-	read_unlock(&dev_base_lock);
-
-	if (ret >= 0)
-		ret = simple_read_from_buffer(userbuf, count, ppos, buf, ret);
-
-	return ret;
+	return wiphy_locked_debugfs_read(sdata->local->hw.wiphy,
+					 file, buf, sizeof(buf),
+					 userbuf, count, ppos,
+					 ieee80211_if_read_sdata_handler,
+					 &data);
 }
 
-static ssize_t ieee80211_if_write(
-	struct ieee80211_sub_if_data *sdata,
+struct ieee80211_if_write_sdata_data {
+	ssize_t (*write)(struct ieee80211_sub_if_data *, const char *, int);
+	struct ieee80211_sub_if_data *sdata;
+};
+
+static ssize_t ieee80211_if_write_sdata_handler(struct wiphy *wiphy,
+						struct file *file,
+						char *buf,
+						size_t count,
+						void *data)
+{
+	struct ieee80211_if_write_sdata_data *d = data;
+
+	return d->write(d->sdata, buf, count);
+}
+
+static ssize_t ieee80211_if_write_sdata(
+	struct file *file,
 	const char __user *userbuf,
 	size_t count, loff_t *ppos,
-	ssize_t (*write)(struct ieee80211_sub_if_data *, const char *, int))
+	ssize_t (*write)(struct ieee80211_sub_if_data *sdata, const char *, int))
 {
+	struct ieee80211_sub_if_data *sdata = file->private_data;
+	struct ieee80211_if_write_sdata_data data = {
+		.write = write,
+		.sdata = sdata,
+	};
 	char buf[64];
-	ssize_t ret;
 
-	if (count >= sizeof(buf))
-		return -E2BIG;
-
-	if (copy_from_user(buf, userbuf, count))
-		return -EFAULT;
-	buf[count] = '\0';
-
-	rtnl_lock();
-	ret = (*write)(sdata, buf, count);
-	rtnl_unlock();
-
-	return ret;
+	return wiphy_locked_debugfs_write(sdata->local->hw.wiphy,
+					  file, buf, sizeof(buf),
+					  userbuf, count,
+					  ieee80211_if_write_sdata_handler,
+					  &data);
 }
 
-#define IEEE80211_IF_FMT(name, field, format_string)			\
+struct ieee80211_if_read_link_data {
+	ssize_t (*format)(const struct ieee80211_link_data *, char *, int);
+	struct ieee80211_link_data *link;
+};
+
+static ssize_t ieee80211_if_read_link_handler(struct wiphy *wiphy,
+					      struct file *file,
+					      char *buf,
+					      size_t bufsize,
+					      void *data)
+{
+	struct ieee80211_if_read_link_data *d = data;
+
+	return d->format(d->link, buf, bufsize);
+}
+
+static ssize_t ieee80211_if_read_link(
+	struct file *file,
+	char __user *userbuf,
+	size_t count, loff_t *ppos,
+	ssize_t (*format)(const struct ieee80211_link_data *link, char *, int))
+{
+	struct ieee80211_link_data *link = file->private_data;
+	struct ieee80211_if_read_link_data data = {
+		.format = format,
+		.link = link,
+	};
+	char buf[200];
+
+	return wiphy_locked_debugfs_read(link->sdata->local->hw.wiphy,
+					 file, buf, sizeof(buf),
+					 userbuf, count, ppos,
+					 ieee80211_if_read_link_handler,
+					 &data);
+}
+
+struct ieee80211_if_write_link_data {
+	ssize_t (*write)(struct ieee80211_link_data *, const char *, int);
+	struct ieee80211_link_data *link;
+};
+
+static ssize_t ieee80211_if_write_link_handler(struct wiphy *wiphy,
+					       struct file *file,
+					       char *buf,
+					       size_t count,
+					       void *data)
+{
+	struct ieee80211_if_write_sdata_data *d = data;
+
+	return d->write(d->sdata, buf, count);
+}
+
+static ssize_t ieee80211_if_write_link(
+	struct file *file,
+	const char __user *userbuf,
+	size_t count, loff_t *ppos,
+	ssize_t (*write)(struct ieee80211_link_data *link, const char *, int))
+{
+	struct ieee80211_link_data *link = file->private_data;
+	struct ieee80211_if_write_link_data data = {
+		.write = write,
+		.link = link,
+	};
+	char buf[64];
+
+	return wiphy_locked_debugfs_write(link->sdata->local->hw.wiphy,
+					  file, buf, sizeof(buf),
+					  userbuf, count,
+					  ieee80211_if_write_link_handler,
+					  &data);
+}
+
+#define IEEE80211_IF_FMT(name, type, field, format_string)		\
 static ssize_t ieee80211_if_fmt_##name(					\
-	const struct ieee80211_sub_if_data *sdata, char *buf,		\
+	const type *data, char *buf,					\
 	int buflen)							\
 {									\
-	return scnprintf(buf, buflen, format_string, sdata->field);	\
+	return scnprintf(buf, buflen, format_string, data->field);	\
 }
-#define IEEE80211_IF_FMT_DEC(name, field)				\
-		IEEE80211_IF_FMT(name, field, "%d\n")
-#define IEEE80211_IF_FMT_HEX(name, field)				\
-		IEEE80211_IF_FMT(name, field, "%#x\n")
-#define IEEE80211_IF_FMT_LHEX(name, field)				\
-		IEEE80211_IF_FMT(name, field, "%#lx\n")
+#define IEEE80211_IF_FMT_DEC(name, type, field)				\
+		IEEE80211_IF_FMT(name, type, field, "%d\n")
+#define IEEE80211_IF_FMT_HEX(name, type, field)				\
+		IEEE80211_IF_FMT(name, type, field, "%#x\n")
+#define IEEE80211_IF_FMT_LHEX(name, type, field)			\
+		IEEE80211_IF_FMT(name, type, field, "%#lx\n")
 
-#define IEEE80211_IF_FMT_HEXARRAY(name, field)				\
+#define IEEE80211_IF_FMT_HEXARRAY(name, type, field)			\
 static ssize_t ieee80211_if_fmt_##name(					\
-	const struct ieee80211_sub_if_data *sdata,			\
+	const type *data,						\
 	char *buf, int buflen)						\
 {									\
 	char *p = buf;							\
 	int i;								\
-	for (i = 0; i < sizeof(sdata->field); i++) {			\
+	for (i = 0; i < sizeof(data->field); i++) {			\
 		p += scnprintf(p, buflen + buf - p, "%.2x ",		\
-				 sdata->field[i]);			\
+				 data->field[i]);			\
 	}								\
 	p += scnprintf(p, buflen + buf - p, "\n");			\
 	return p - buf;							\
 }
 
-#define IEEE80211_IF_FMT_ATOMIC(name, field)				\
+#define IEEE80211_IF_FMT_ATOMIC(name, type, field)			\
 static ssize_t ieee80211_if_fmt_##name(					\
-	const struct ieee80211_sub_if_data *sdata,			\
+	const type *data,						\
 	char *buf, int buflen)						\
 {									\
-	return scnprintf(buf, buflen, "%d\n", atomic_read(&sdata->field));\
+	return scnprintf(buf, buflen, "%d\n", atomic_read(&data->field));\
 }
 
-#define IEEE80211_IF_FMT_MAC(name, field)				\
+#define IEEE80211_IF_FMT_MAC(name, type, field)				\
 static ssize_t ieee80211_if_fmt_##name(					\
-	const struct ieee80211_sub_if_data *sdata, char *buf,		\
+	const type *data, char *buf,					\
 	int buflen)							\
 {									\
-	return scnprintf(buf, buflen, "%pM\n", sdata->field);		\
+	return scnprintf(buf, buflen, "%pM\n", data->field);		\
 }
 
-#define IEEE80211_IF_FMT_JIFFIES_TO_MS(name, field)			\
+#define IEEE80211_IF_FMT_JIFFIES_TO_MS(name, type, field)		\
 static ssize_t ieee80211_if_fmt_##name(					\
-	const struct ieee80211_sub_if_data *sdata,			\
+	const type *data,						\
 	char *buf, int buflen)						\
 {									\
 	return scnprintf(buf, buflen, "%d\n",				\
-			 jiffies_to_msecs(sdata->field));		\
+			 jiffies_to_msecs(data->field));		\
 }
 
 #define _IEEE80211_IF_FILE_OPS(name, _read, _write)			\
@@ -131,9 +233,9 @@ static ssize_t ieee80211_if_read_##name(struct file *file,		\
 					char __user *userbuf,		\
 					size_t count, loff_t *ppos)	\
 {									\
-	return ieee80211_if_read(file->private_data,			\
-				 userbuf, count, ppos,			\
-				 ieee80211_if_fmt_##name);		\
+	return ieee80211_if_read_sdata(file,				\
+				       userbuf, count, ppos,		\
+				       ieee80211_if_fmt_##name);	\
 }
 
 #define _IEEE80211_IF_FILE_W_FN(name)					\
@@ -141,8 +243,9 @@ static ssize_t ieee80211_if_write_##name(struct file *file,		\
 					 const char __user *userbuf,	\
 					 size_t count, loff_t *ppos)	\
 {									\
-	return ieee80211_if_write(file->private_data, userbuf, count,	\
-				  ppos, ieee80211_if_parse_##name);	\
+	return ieee80211_if_write_sdata(file, userbuf,			\
+					count, ppos,			\
+					ieee80211_if_parse_##name);	\
 }
 
 #define IEEE80211_IF_FILE_R(name)					\
@@ -160,8 +263,46 @@ static ssize_t ieee80211_if_write_##name(struct file *file,		\
 			       ieee80211_if_write_##name)
 
 #define IEEE80211_IF_FILE(name, field, format)				\
-	IEEE80211_IF_FMT_##format(name, field)				\
+	IEEE80211_IF_FMT_##format(name, struct ieee80211_sub_if_data, field) \
 	IEEE80211_IF_FILE_R(name)
+
+#define _IEEE80211_IF_LINK_R_FN(name)					\
+static ssize_t ieee80211_if_read_##name(struct file *file,		\
+					char __user *userbuf,		\
+					size_t count, loff_t *ppos)	\
+{									\
+	return ieee80211_if_read_link(file,				\
+				      userbuf, count, ppos,		\
+				      ieee80211_if_fmt_##name);	\
+}
+
+#define _IEEE80211_IF_LINK_W_FN(name)					\
+static ssize_t ieee80211_if_write_##name(struct file *file,		\
+					 const char __user *userbuf,	\
+					 size_t count, loff_t *ppos)	\
+{									\
+	return ieee80211_if_write_link(file, userbuf,			\
+				       count, ppos,			\
+				       ieee80211_if_parse_##name);	\
+}
+
+#define IEEE80211_IF_LINK_FILE_R(name)					\
+	_IEEE80211_IF_LINK_R_FN(name)					\
+	_IEEE80211_IF_FILE_OPS(link_##name, ieee80211_if_read_##name, NULL)
+
+#define IEEE80211_IF_LINK_FILE_W(name)					\
+	_IEEE80211_IF_LINK_W_FN(name)					\
+	_IEEE80211_IF_FILE_OPS(link_##name, NULL, ieee80211_if_write_##name)
+
+#define IEEE80211_IF_LINK_FILE_RW(name)					\
+	_IEEE80211_IF_LINK_R_FN(name)					\
+	_IEEE80211_IF_LINK_W_FN(name)					\
+	_IEEE80211_IF_FILE_OPS(link_##name, ieee80211_if_read_##name,	\
+			       ieee80211_if_write_##name)
+
+#define IEEE80211_IF_LINK_FILE(name, field, format)				\
+	IEEE80211_IF_FMT_##format(name, struct ieee80211_link_data, field) \
+	IEEE80211_IF_LINK_FILE_R(name)
 
 /* common attributes */
 IEEE80211_IF_FILE(rc_rateidx_mask_2ghz, rc_rateidx_mask[NL80211_BAND_2GHZ],
@@ -207,9 +348,9 @@ IEEE80211_IF_FILE_R(rc_rateidx_vht_mcs_mask_5ghz);
 
 IEEE80211_IF_FILE(flags, flags, HEX);
 IEEE80211_IF_FILE(state, state, LHEX);
-IEEE80211_IF_FILE(txpower, vif.bss_conf.txpower, DEC);
-IEEE80211_IF_FILE(ap_power_level, deflink.ap_power_level, DEC);
-IEEE80211_IF_FILE(user_power_level, deflink.user_power_level, DEC);
+IEEE80211_IF_LINK_FILE(txpower, conf->txpower, DEC);
+IEEE80211_IF_LINK_FILE(ap_power_level, ap_power_level, DEC);
+IEEE80211_IF_LINK_FILE(user_power_level, user_power_level, DEC);
 
 static ssize_t
 ieee80211_if_fmt_hw_queues(const struct ieee80211_sub_if_data *sdata,
@@ -236,11 +377,17 @@ IEEE80211_IF_FILE(bssid, deflink.u.mgd.bssid, MAC);
 IEEE80211_IF_FILE(aid, vif.cfg.aid, DEC);
 IEEE80211_IF_FILE(beacon_timeout, u.mgd.beacon_timeout, JIFFIES_TO_MS);
 
-static int ieee80211_set_smps(struct ieee80211_sub_if_data *sdata,
+static int ieee80211_set_smps(struct ieee80211_link_data *link,
 			      enum ieee80211_smps_mode smps_mode)
 {
+	struct ieee80211_sub_if_data *sdata = link->sdata;
 	struct ieee80211_local *local = sdata->local;
-	int err;
+
+	/* The driver indicated that EML is enabled for the interface, thus do
+	 * not allow to override the SMPS state.
+	 */
+	if (sdata->vif.driver_flags & IEEE80211_VIF_EML_ACTIVE)
+		return -EOPNOTSUPP;
 
 	if (!(local->hw.wiphy->features & NL80211_FEATURE_STATIC_SMPS) &&
 	    smps_mode == IEEE80211_SMPS_STATIC)
@@ -255,11 +402,7 @@ static int ieee80211_set_smps(struct ieee80211_sub_if_data *sdata,
 	if (sdata->vif.type != NL80211_IFTYPE_STATION)
 		return -EOPNOTSUPP;
 
-	sdata_lock(sdata);
-	err = __ieee80211_request_smps_mgd(sdata, &sdata->deflink, smps_mode);
-	sdata_unlock(sdata);
-
-	return err;
+	return __ieee80211_request_smps_mgd(link->sdata, link, smps_mode);
 }
 
 static const char *smps_modes[IEEE80211_SMPS_NUM_MODES] = {
@@ -269,24 +412,24 @@ static const char *smps_modes[IEEE80211_SMPS_NUM_MODES] = {
 	[IEEE80211_SMPS_DYNAMIC] = "dynamic",
 };
 
-static ssize_t ieee80211_if_fmt_smps(const struct ieee80211_sub_if_data *sdata,
+static ssize_t ieee80211_if_fmt_smps(const struct ieee80211_link_data *link,
 				     char *buf, int buflen)
 {
-	if (sdata->vif.type == NL80211_IFTYPE_STATION)
+	if (link->sdata->vif.type == NL80211_IFTYPE_STATION)
 		return snprintf(buf, buflen, "request: %s\nused: %s\n",
-				smps_modes[sdata->deflink.u.mgd.req_smps],
-				smps_modes[sdata->deflink.smps_mode]);
+				smps_modes[link->u.mgd.req_smps],
+				smps_modes[link->smps_mode]);
 	return -EINVAL;
 }
 
-static ssize_t ieee80211_if_parse_smps(struct ieee80211_sub_if_data *sdata,
+static ssize_t ieee80211_if_parse_smps(struct ieee80211_link_data *link,
 				       const char *buf, int buflen)
 {
 	enum ieee80211_smps_mode mode;
 
 	for (mode = 0; mode < IEEE80211_SMPS_NUM_MODES; mode++) {
 		if (strncmp(buf, smps_modes[mode], buflen) == 0) {
-			int err = ieee80211_set_smps(sdata, mode);
+			int err = ieee80211_set_smps(link, mode);
 			if (!err)
 				return buflen;
 			return err;
@@ -295,7 +438,7 @@ static ssize_t ieee80211_if_parse_smps(struct ieee80211_sub_if_data *sdata,
 
 	return -EINVAL;
 }
-IEEE80211_IF_FILE_RW(smps);
+IEEE80211_IF_LINK_FILE_RW(smps);
 
 static ssize_t ieee80211_if_parse_tkip_mic_test(
 	struct ieee80211_sub_if_data *sdata, const char *buf, int buflen)
@@ -331,16 +474,13 @@ static ssize_t ieee80211_if_parse_tkip_mic_test(
 	case NL80211_IFTYPE_STATION:
 		fc |= cpu_to_le16(IEEE80211_FCTL_TODS);
 		/* BSSID SA DA */
-		sdata_lock(sdata);
 		if (!sdata->u.mgd.associated) {
-			sdata_unlock(sdata);
 			dev_kfree_skb(skb);
 			return -ENOTCONN;
 		}
 		memcpy(hdr->addr1, sdata->deflink.u.mgd.bssid, ETH_ALEN);
 		memcpy(hdr->addr2, sdata->vif.addr, ETH_ALEN);
 		memcpy(hdr->addr3, addr, ETH_ALEN);
-		sdata_unlock(sdata);
 		break;
 	default:
 		dev_kfree_skb(skb);
@@ -595,6 +735,8 @@ static ssize_t ieee80211_if_parse_active_links(struct ieee80211_sub_if_data *sda
 }
 IEEE80211_IF_FILE_RW(active_links);
 
+IEEE80211_IF_LINK_FILE(addr, conf->addr, MAC);
+
 #ifdef CONFIG_MAC80211_MESH
 IEEE80211_IF_FILE(estab_plinks, u.mesh.estab_plinks, ATOMIC);
 
@@ -663,6 +805,19 @@ IEEE80211_IF_FILE(dot11MeshConnectedToAuthServer,
 	debugfs_create_file(#name, mode, sdata->vif.debugfs_dir, \
 			    sdata, &name##_ops)
 
+#define DEBUGFS_ADD_X(_bits, _name, _mode) \
+	debugfs_create_x##_bits(#_name, _mode, sdata->vif.debugfs_dir, \
+				&sdata->vif._name)
+
+#define DEBUGFS_ADD_X8(_name, _mode) \
+	DEBUGFS_ADD_X(8, _name, _mode)
+
+#define DEBUGFS_ADD_X16(_name, _mode) \
+	DEBUGFS_ADD_X(16, _name, _mode)
+
+#define DEBUGFS_ADD_X32(_name, _mode) \
+	DEBUGFS_ADD_X(32, _name, _mode)
+
 #define DEBUGFS_ADD(name) DEBUGFS_ADD_MODE(name, 0400)
 
 static void add_common_files(struct ieee80211_sub_if_data *sdata)
@@ -685,20 +840,19 @@ static void add_sta_files(struct ieee80211_sub_if_data *sdata)
 	DEBUGFS_ADD(bssid);
 	DEBUGFS_ADD(aid);
 	DEBUGFS_ADD(beacon_timeout);
-	DEBUGFS_ADD_MODE(smps, 0600);
 	DEBUGFS_ADD_MODE(tkip_mic_test, 0200);
 	DEBUGFS_ADD_MODE(beacon_loss, 0200);
 	DEBUGFS_ADD_MODE(uapsd_queues, 0600);
 	DEBUGFS_ADD_MODE(uapsd_max_sp_len, 0600);
 	DEBUGFS_ADD_MODE(tdls_wider_bw, 0600);
-	DEBUGFS_ADD_MODE(valid_links, 0200);
+	DEBUGFS_ADD_MODE(valid_links, 0400);
 	DEBUGFS_ADD_MODE(active_links, 0600);
+	DEBUGFS_ADD_X16(dormant_links, 0400);
 }
 
 static void add_ap_files(struct ieee80211_sub_if_data *sdata)
 {
 	DEBUGFS_ADD(num_mcast_sta);
-	DEBUGFS_ADD_MODE(smps, 0600);
 	DEBUGFS_ADD(num_sta_ps);
 	DEBUGFS_ADD(dtim_count);
 	DEBUGFS_ADD(num_buffered_multicast);
@@ -789,9 +943,6 @@ static void add_files(struct ieee80211_sub_if_data *sdata)
 
 	DEBUGFS_ADD(flags);
 	DEBUGFS_ADD(state);
-	DEBUGFS_ADD(txpower);
-	DEBUGFS_ADD(user_power_level);
-	DEBUGFS_ADD(ap_power_level);
 
 	if (sdata->vif.type != NL80211_IFTYPE_MONITOR)
 		add_common_files(sdata);
@@ -821,16 +972,46 @@ static void add_files(struct ieee80211_sub_if_data *sdata)
 	}
 }
 
-void ieee80211_debugfs_add_netdev(struct ieee80211_sub_if_data *sdata)
+#undef DEBUGFS_ADD_MODE
+#undef DEBUGFS_ADD
+
+#define DEBUGFS_ADD_MODE(dentry, name, mode) \
+	debugfs_create_file(#name, mode, dentry, \
+			    link, &link_##name##_ops)
+
+#define DEBUGFS_ADD(dentry, name) DEBUGFS_ADD_MODE(dentry, name, 0400)
+
+static void add_link_files(struct ieee80211_link_data *link,
+			   struct dentry *dentry)
+{
+	DEBUGFS_ADD(dentry, txpower);
+	DEBUGFS_ADD(dentry, user_power_level);
+	DEBUGFS_ADD(dentry, ap_power_level);
+
+	switch (link->sdata->vif.type) {
+	case NL80211_IFTYPE_STATION:
+		DEBUGFS_ADD_MODE(dentry, smps, 0600);
+		break;
+	default:
+		break;
+	}
+}
+
+static void ieee80211_debugfs_add_netdev(struct ieee80211_sub_if_data *sdata,
+					 bool mld_vif)
 {
 	char buf[10+IFNAMSIZ];
 
 	sprintf(buf, "netdev:%s", sdata->name);
 	sdata->vif.debugfs_dir = debugfs_create_dir(buf,
 		sdata->local->hw.wiphy->debugfsdir);
+	/* deflink also has this */
+	sdata->deflink.debugfs_dir = sdata->vif.debugfs_dir;
 	sdata->debugfs.subdir_stations = debugfs_create_dir("stations",
 							sdata->vif.debugfs_dir);
 	add_files(sdata);
+	if (!mld_vif)
+		add_link_files(&sdata->deflink, sdata->vif.debugfs_dir);
 }
 
 void ieee80211_debugfs_remove_netdev(struct ieee80211_sub_if_data *sdata)
@@ -855,4 +1036,81 @@ void ieee80211_debugfs_rename_netdev(struct ieee80211_sub_if_data *sdata)
 
 	sprintf(buf, "netdev:%s", sdata->name);
 	debugfs_rename(dir->d_parent, dir, dir->d_parent, buf);
+}
+
+void ieee80211_debugfs_recreate_netdev(struct ieee80211_sub_if_data *sdata,
+				       bool mld_vif)
+{
+	ieee80211_debugfs_remove_netdev(sdata);
+	ieee80211_debugfs_add_netdev(sdata, mld_vif);
+
+	if (sdata->flags & IEEE80211_SDATA_IN_DRIVER) {
+		drv_vif_add_debugfs(sdata->local, sdata);
+		if (!mld_vif)
+			ieee80211_link_debugfs_drv_add(&sdata->deflink);
+	}
+}
+
+void ieee80211_link_debugfs_add(struct ieee80211_link_data *link)
+{
+	char link_dir_name[10];
+
+	if (WARN_ON(!link->sdata->vif.debugfs_dir || link->debugfs_dir))
+		return;
+
+	/* For now, this should not be called for non-MLO capable drivers */
+	if (WARN_ON(!(link->sdata->local->hw.wiphy->flags & WIPHY_FLAG_SUPPORTS_MLO)))
+		return;
+
+	snprintf(link_dir_name, sizeof(link_dir_name),
+		 "link-%d", link->link_id);
+
+	link->debugfs_dir =
+		debugfs_create_dir(link_dir_name,
+				   link->sdata->vif.debugfs_dir);
+
+	DEBUGFS_ADD(link->debugfs_dir, addr);
+	add_link_files(link, link->debugfs_dir);
+}
+
+void ieee80211_link_debugfs_remove(struct ieee80211_link_data *link)
+{
+	if (!link->sdata->vif.debugfs_dir || !link->debugfs_dir) {
+		link->debugfs_dir = NULL;
+		return;
+	}
+
+	if (link->debugfs_dir == link->sdata->vif.debugfs_dir) {
+		WARN_ON(link != &link->sdata->deflink);
+		link->debugfs_dir = NULL;
+		return;
+	}
+
+	debugfs_remove_recursive(link->debugfs_dir);
+	link->debugfs_dir = NULL;
+}
+
+void ieee80211_link_debugfs_drv_add(struct ieee80211_link_data *link)
+{
+	if (link->sdata->vif.type == NL80211_IFTYPE_MONITOR ||
+	    WARN_ON(!link->debugfs_dir))
+		return;
+
+	drv_link_add_debugfs(link->sdata->local, link->sdata,
+			     link->conf, link->debugfs_dir);
+}
+
+void ieee80211_link_debugfs_drv_remove(struct ieee80211_link_data *link)
+{
+	if (!link || !link->debugfs_dir)
+		return;
+
+	if (WARN_ON(link->debugfs_dir == link->sdata->vif.debugfs_dir))
+		return;
+
+	/* Recreate the directory excluding the driver data */
+	debugfs_remove_recursive(link->debugfs_dir);
+	link->debugfs_dir = NULL;
+
+	ieee80211_link_debugfs_add(link);
 }

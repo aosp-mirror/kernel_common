@@ -17,7 +17,6 @@
 #include <linux/kernel.h>
 #include <linux/hwmon.h>
 #include <linux/kstrtox.h>
-#include <linux/math.h>
 #include <linux/math64.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -96,6 +95,7 @@ struct combined_chip_info {
 };
 
 struct dell_wmi_ddv_sensors {
+	bool active;
 	struct mutex lock;	/* protect caching */
 	unsigned long timestamp;
 	union acpi_object *obj;
@@ -520,6 +520,9 @@ static struct hwmon_channel_info *dell_wmi_ddv_channel_create(struct device *dev
 
 static void dell_wmi_ddv_hwmon_cache_invalidate(struct dell_wmi_ddv_sensors *sensors)
 {
+	if (!sensors->active)
+		return;
+
 	mutex_lock(&sensors->lock);
 	kfree(sensors->obj);
 	sensors->obj = NULL;
@@ -530,6 +533,7 @@ static void dell_wmi_ddv_hwmon_cache_destroy(void *data)
 {
 	struct dell_wmi_ddv_sensors *sensors = data;
 
+	sensors->active = false;
 	mutex_destroy(&sensors->lock);
 	kfree(sensors->obj);
 }
@@ -549,6 +553,7 @@ static struct hwmon_channel_info *dell_wmi_ddv_channel_init(struct wmi_device *w
 		return ERR_PTR(ret);
 
 	mutex_init(&sensors->lock);
+	sensors->active = true;
 
 	ret = devm_add_action_or_reset(&wdev->dev, dell_wmi_ddv_hwmon_cache_destroy, sensors);
 	if (ret < 0)
@@ -611,7 +616,8 @@ static int dell_wmi_ddv_hwmon_add(struct dell_wmi_ddv_data *data)
 	}
 
 	if (index < 2) {
-		ret = -ENODEV;
+		/* Finding no available sensors is not an error */
+		ret = 0;
 
 		goto err_release;
 	}
@@ -659,7 +665,8 @@ static ssize_t temp_show(struct device *dev, struct device_attribute *attr, char
 	if (ret < 0)
 		return ret;
 
-	return sysfs_emit(buf, "%d\n", DIV_ROUND_CLOSEST(value, 10));
+	/* Use 2731 instead of 2731.5 to avoid unnecessary rounding */
+	return sysfs_emit(buf, "%d\n", value - 2731);
 }
 
 static ssize_t eppid_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -835,13 +842,13 @@ static int dell_wmi_ddv_probe(struct wmi_device *wdev, const void *context)
 
 	if (IS_REACHABLE(CONFIG_ACPI_BATTERY)) {
 		ret = dell_wmi_ddv_battery_add(data);
-		if (ret < 0 && ret != -ENODEV)
+		if (ret < 0)
 			dev_warn(&wdev->dev, "Unable to register ACPI battery hook: %d\n", ret);
 	}
 
 	if (IS_REACHABLE(CONFIG_HWMON)) {
 		ret = dell_wmi_ddv_hwmon_add(data);
-		if (ret < 0 && ret != -ENODEV)
+		if (ret < 0)
 			dev_warn(&wdev->dev, "Unable to register hwmon interface: %d\n", ret);
 	}
 
@@ -852,7 +859,7 @@ static int dell_wmi_ddv_resume(struct device *dev)
 {
 	struct dell_wmi_ddv_data *data = dev_get_drvdata(dev);
 
-	/* Force re-reading of all sensors */
+	/* Force re-reading of all active sensors */
 	dell_wmi_ddv_hwmon_cache_invalidate(&data->fans);
 	dell_wmi_ddv_hwmon_cache_invalidate(&data->temps);
 
@@ -875,6 +882,7 @@ static struct wmi_driver dell_wmi_ddv_driver = {
 	},
 	.id_table = dell_wmi_ddv_id_table,
 	.probe = dell_wmi_ddv_probe,
+	.no_singleton = true,
 };
 module_wmi_driver(dell_wmi_ddv_driver);
 

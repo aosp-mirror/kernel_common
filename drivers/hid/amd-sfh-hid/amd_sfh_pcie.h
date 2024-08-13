@@ -23,6 +23,7 @@
 #define V2_STATUS	0x2
 
 #define HPD_IDX		16
+#define ACS_IDX		22
 
 #define SENSOR_DISCOVERY_STATUS_MASK		GENMASK(5, 3)
 #define SENSOR_DISCOVERY_STATUS_SHIFT		3
@@ -89,10 +90,10 @@ enum mem_use_type {
 struct hpd_status {
 	union {
 		struct {
-			u32 human_presence_report : 4;
-			u32 human_presence_actual : 4;
-			u32 probablity		  : 8;
 			u32 object_distance       : 16;
+			u32 probablity		  : 8;
+			u32 human_presence_actual : 4;
+			u32 human_presence_report : 4;
 		} shpd;
 		u32 val;
 	};

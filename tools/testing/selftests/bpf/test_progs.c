@@ -11,13 +11,13 @@
 #include <signal.h>
 #include <string.h>
 #include <execinfo.h> /* backtrace */
-#include <linux/membarrier.h>
 #include <sys/sysinfo.h> /* get_nprocs */
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <bpf/btf.h>
+#include "json_writer.h"
 
 static bool verbose(void)
 {
@@ -255,7 +255,7 @@ static void print_subtest_name(int test_num, int subtest_num,
 			       const char *test_name, char *subtest_name,
 			       char *result)
 {
-	char test_num_str[TEST_NUM_WIDTH + 1];
+	char test_num_str[32];
 
 	snprintf(test_num_str, sizeof(test_num_str), "%d/%d", test_num, subtest_num);
 
@@ -269,10 +269,23 @@ static void print_subtest_name(int test_num, int subtest_num,
 	fprintf(env.stdout, "\n");
 }
 
+static void jsonw_write_log_message(json_writer_t *w, char *log_buf, size_t log_cnt)
+{
+	/* open_memstream (from stdio_hijack_init) ensures that log_bug is terminated by a
+	 * null byte. Yet in parallel mode, log_buf will be NULL if there is no message.
+	 */
+	if (log_cnt) {
+		jsonw_string_field(w, "message", log_buf);
+	} else {
+		jsonw_string_field(w, "message", "");
+	}
+}
+
 static void dump_test_log(const struct prog_test_def *test,
 			  const struct test_state *test_state,
 			  bool skip_ok_subtests,
-			  bool par_exec_result)
+			  bool par_exec_result,
+			  json_writer_t *w)
 {
 	bool test_failed = test_state->error_cnt > 0;
 	bool force_log = test_state->force_log;
@@ -296,6 +309,16 @@ static void dump_test_log(const struct prog_test_def *test,
 	if (test_state->log_cnt && print_test)
 		print_test_log(test_state->log_buf, test_state->log_cnt);
 
+	if (w && print_test) {
+		jsonw_start_object(w);
+		jsonw_string_field(w, "name", test->test_name);
+		jsonw_uint_field(w, "number", test->test_num);
+		jsonw_write_log_message(w, test_state->log_buf, test_state->log_cnt);
+		jsonw_bool_field(w, "failed", test_failed);
+		jsonw_name(w, "subtests");
+		jsonw_start_array(w);
+	}
+
 	for (i = 0; i < test_state->subtest_num; i++) {
 		subtest_state = &test_state->subtest_states[i];
 		subtest_failed = subtest_state->error_cnt;
@@ -314,6 +337,20 @@ static void dump_test_log(const struct prog_test_def *test,
 				   test->test_name, subtest_state->name,
 				   test_result(subtest_state->error_cnt,
 					       subtest_state->skipped));
+
+		if (w && print_subtest) {
+			jsonw_start_object(w);
+			jsonw_string_field(w, "name", subtest_state->name);
+			jsonw_uint_field(w, "number", i+1);
+			jsonw_write_log_message(w, subtest_state->log_buf, subtest_state->log_cnt);
+			jsonw_bool_field(w, "failed", subtest_failed);
+			jsonw_end_object(w);
+		}
+	}
+
+	if (w && print_test) {
+		jsonw_end_array(w);
+		jsonw_end_object(w);
 	}
 
 	print_test_result(test, test_state);
@@ -510,24 +547,6 @@ int bpf_find_map(const char *test, struct bpf_object *obj, const char *name)
 	return bpf_map__fd(map);
 }
 
-static bool is_jit_enabled(void)
-{
-	const char *jit_sysctl = "/proc/sys/net/core/bpf_jit_enable";
-	bool enabled = false;
-	int sysctl_fd;
-
-	sysctl_fd = open(jit_sysctl, 0, O_RDONLY);
-	if (sysctl_fd != -1) {
-		char tmpc;
-
-		if (read(sysctl_fd, &tmpc, sizeof(tmpc)) == 1)
-			enabled = (tmpc != '0');
-		close(sysctl_fd);
-	}
-
-	return enabled;
-}
-
 int compare_map_keys(int map1_fd, int map2_fd)
 {
 	__u32 key, next_key;
@@ -591,93 +610,6 @@ out:
 	return err;
 }
 
-int extract_build_id(char *build_id, size_t size)
-{
-	FILE *fp;
-	char *line = NULL;
-	size_t len = 0;
-
-	fp = popen("readelf -n ./urandom_read | grep 'Build ID'", "r");
-	if (fp == NULL)
-		return -1;
-
-	if (getline(&line, &len, fp) == -1)
-		goto err;
-	pclose(fp);
-
-	if (len > size)
-		len = size;
-	memcpy(build_id, line, len);
-	build_id[len] = '\0';
-	free(line);
-	return 0;
-err:
-	pclose(fp);
-	return -1;
-}
-
-static int finit_module(int fd, const char *param_values, int flags)
-{
-	return syscall(__NR_finit_module, fd, param_values, flags);
-}
-
-static int delete_module(const char *name, int flags)
-{
-	return syscall(__NR_delete_module, name, flags);
-}
-
-/*
- * Trigger synchronize_rcu() in kernel.
- */
-int kern_sync_rcu(void)
-{
-	return syscall(__NR_membarrier, MEMBARRIER_CMD_SHARED, 0, 0);
-}
-
-static void unload_bpf_testmod(void)
-{
-	if (kern_sync_rcu())
-		fprintf(env.stderr, "Failed to trigger kernel-side RCU sync!\n");
-	if (delete_module("bpf_testmod", 0)) {
-		if (errno == ENOENT) {
-			if (verbose())
-				fprintf(stdout, "bpf_testmod.ko is already unloaded.\n");
-			return;
-		}
-		fprintf(env.stderr, "Failed to unload bpf_testmod.ko from kernel: %d\n", -errno);
-		return;
-	}
-	if (verbose())
-		fprintf(stdout, "Successfully unloaded bpf_testmod.ko.\n");
-}
-
-static int load_bpf_testmod(void)
-{
-	int fd;
-
-	/* ensure previous instance of the module is unloaded */
-	unload_bpf_testmod();
-
-	if (verbose())
-		fprintf(stdout, "Loading bpf_testmod.ko...\n");
-
-	fd = open("bpf_testmod.ko", O_RDONLY);
-	if (fd < 0) {
-		fprintf(env.stderr, "Can't find bpf_testmod.ko kernel module: %d\n", -errno);
-		return -ENOENT;
-	}
-	if (finit_module(fd, "", 0)) {
-		fprintf(env.stderr, "Failed to load bpf_testmod.ko into the kernel: %d\n", -errno);
-		close(fd);
-		return -EINVAL;
-	}
-	close(fd);
-
-	if (verbose())
-		fprintf(stdout, "Successfully loaded bpf_testmod.ko.\n");
-	return 0;
-}
-
 /* extern declarations for test funcs */
 #define DEFINE_TEST(name)				\
 	extern void test_##name(void) __weak;		\
@@ -701,7 +633,13 @@ static struct test_state test_states[ARRAY_SIZE(prog_test_defs)];
 
 const char *argp_program_version = "test_progs 0.1";
 const char *argp_program_bug_address = "<bpf@vger.kernel.org>";
-static const char argp_program_doc[] = "BPF selftests test runner";
+static const char argp_program_doc[] =
+"BPF selftests test runner\v"
+"Options accepting the NAMES parameter take either a comma-separated list\n"
+"of test names, or a filename prefixed with @. The file contains one name\n"
+"(or wildcard pattern) per line, and comments beginning with # are ignored.\n"
+"\n"
+"These options can be passed repeatedly to read multiple files.\n";
 
 enum ARG_KEYS {
 	ARG_TEST_NUM = 'n',
@@ -715,6 +653,7 @@ enum ARG_KEYS {
 	ARG_TEST_NAME_GLOB_DENYLIST = 'd',
 	ARG_NUM_WORKERS = 'j',
 	ARG_DEBUG = -1,
+	ARG_JSON_SUMMARY = 'J'
 };
 
 static const struct argp_option opts[] = {
@@ -740,14 +679,73 @@ static const struct argp_option opts[] = {
 	  "Number of workers to run in parallel, default to number of cpus." },
 	{ "debug", ARG_DEBUG, NULL, 0,
 	  "print extra debug information for test_progs." },
+	{ "json-summary", ARG_JSON_SUMMARY, "FILE", 0, "Write report in json format to this file."},
 	{},
 };
+
+static FILE *libbpf_capture_stream;
+
+static struct {
+	char *buf;
+	size_t buf_sz;
+} libbpf_output_capture;
+
+/* Creates a global memstream capturing INFO and WARN level output
+ * passed to libbpf_print_fn.
+ * Returns 0 on success, negative value on failure.
+ * On failure the description is printed using PRINT_FAIL and
+ * current test case is marked as fail.
+ */
+int start_libbpf_log_capture(void)
+{
+	if (libbpf_capture_stream) {
+		PRINT_FAIL("%s: libbpf_capture_stream != NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	libbpf_capture_stream = open_memstream(&libbpf_output_capture.buf,
+					       &libbpf_output_capture.buf_sz);
+	if (!libbpf_capture_stream) {
+		PRINT_FAIL("%s: open_memstream failed errno=%d\n", __func__, errno);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/* Destroys global memstream created by start_libbpf_log_capture().
+ * Returns a pointer to captured data which has to be freed.
+ * Returned buffer is null terminated.
+ */
+char *stop_libbpf_log_capture(void)
+{
+	char *buf;
+
+	if (!libbpf_capture_stream)
+		return NULL;
+
+	fputc(0, libbpf_capture_stream);
+	fclose(libbpf_capture_stream);
+	libbpf_capture_stream = NULL;
+	/* get 'buf' after fclose(), see open_memstream() documentation */
+	buf = libbpf_output_capture.buf;
+	memset(&libbpf_output_capture, 0, sizeof(libbpf_output_capture));
+	return buf;
+}
 
 static int libbpf_print_fn(enum libbpf_print_level level,
 			   const char *format, va_list args)
 {
+	if (libbpf_capture_stream && level != LIBBPF_DEBUG) {
+		va_list args2;
+
+		va_copy(args2, args);
+		vfprintf(libbpf_capture_stream, format, args2);
+	}
+
 	if (env.verbosity < VERBOSE_VERY && level == LIBBPF_DEBUG)
 		return 0;
+
 	vfprintf(stdout, format, args);
 	return 0;
 }
@@ -782,6 +780,7 @@ extern int extra_prog_load_log_flags;
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	struct test_env *env = state->input;
+	int err = 0;
 
 	switch (key) {
 	case ARG_TEST_NUM: {
@@ -806,18 +805,28 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	}
 	case ARG_TEST_NAME_GLOB_ALLOWLIST:
 	case ARG_TEST_NAME: {
-		if (parse_test_list(arg,
-				    &env->test_selector.whitelist,
-				    key == ARG_TEST_NAME_GLOB_ALLOWLIST))
-			return -ENOMEM;
+		if (arg[0] == '@')
+			err = parse_test_list_file(arg + 1,
+						   &env->test_selector.whitelist,
+						   key == ARG_TEST_NAME_GLOB_ALLOWLIST);
+		else
+			err = parse_test_list(arg,
+					      &env->test_selector.whitelist,
+					      key == ARG_TEST_NAME_GLOB_ALLOWLIST);
+
 		break;
 	}
 	case ARG_TEST_NAME_GLOB_DENYLIST:
 	case ARG_TEST_NAME_BLACKLIST: {
-		if (parse_test_list(arg,
-				    &env->test_selector.blacklist,
-				    key == ARG_TEST_NAME_GLOB_DENYLIST))
-			return -ENOMEM;
+		if (arg[0] == '@')
+			err = parse_test_list_file(arg + 1,
+						   &env->test_selector.blacklist,
+						   key == ARG_TEST_NAME_GLOB_DENYLIST);
+		else
+			err = parse_test_list(arg,
+					      &env->test_selector.blacklist,
+					      key == ARG_TEST_NAME_GLOB_DENYLIST);
+
 		break;
 	}
 	case ARG_VERIFIER_STATS:
@@ -870,6 +879,13 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case ARG_DEBUG:
 		env->debug = true;
 		break;
+	case ARG_JSON_SUMMARY:
+		env->json = fopen(arg, "w");
+		if (env->json == NULL) {
+			perror("Failed to open json summary file");
+			return -errno;
+		}
+		break;
 	case ARGP_KEY_ARG:
 		argp_usage(state);
 		break;
@@ -878,7 +894,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
-	return 0;
+	return err;
 }
 
 /*
@@ -1017,7 +1033,7 @@ void crash_handler(int signum)
 		stdio_restore();
 	if (env.test) {
 		env.test_state->error_cnt++;
-		dump_test_log(env.test, env.test_state, true, false);
+		dump_test_log(env.test, env.test_state, true, false, NULL);
 	}
 	if (env.worker_id != -1)
 		fprintf(stderr, "[%d]: ", env.worker_id);
@@ -1123,8 +1139,9 @@ static void run_one_test(int test_num)
 		cleanup_cgroup_environment();
 
 	stdio_restore();
+	free(stop_libbpf_log_capture());
 
-	dump_test_log(test, state, false, false);
+	dump_test_log(test, state, false, false, NULL);
 }
 
 struct dispatch_data {
@@ -1283,7 +1300,7 @@ static void *dispatch_thread(void *ctx)
 		} while (false);
 
 		pthread_mutex_lock(&stdout_output_lock);
-		dump_test_log(test, state, false, true);
+		dump_test_log(test, state, false, true, NULL);
 		pthread_mutex_unlock(&stdout_output_lock);
 	} /* while (true) */
 error:
@@ -1308,6 +1325,7 @@ static void calculate_summary_and_print_errors(struct test_env *env)
 {
 	int i;
 	int succ_cnt = 0, fail_cnt = 0, sub_succ_cnt = 0, skip_cnt = 0;
+	json_writer_t *w = NULL;
 
 	for (i = 0; i < prog_test_cnt; i++) {
 		struct test_state *state = &test_states[i];
@@ -1322,6 +1340,22 @@ static void calculate_summary_and_print_errors(struct test_env *env)
 			fail_cnt++;
 		else
 			succ_cnt++;
+	}
+
+	if (env->json) {
+		w = jsonw_new(env->json);
+		if (!w)
+			fprintf(env->stderr, "Failed to create new JSON stream.");
+	}
+
+	if (w) {
+		jsonw_start_object(w);
+		jsonw_uint_field(w, "success", succ_cnt);
+		jsonw_uint_field(w, "success_subtest", sub_succ_cnt);
+		jsonw_uint_field(w, "skipped", skip_cnt);
+		jsonw_uint_field(w, "failed", fail_cnt);
+		jsonw_name(w, "results");
+		jsonw_start_array(w);
 	}
 
 	/*
@@ -1340,9 +1374,18 @@ static void calculate_summary_and_print_errors(struct test_env *env)
 			if (!state->tested || !state->error_cnt)
 				continue;
 
-			dump_test_log(test, state, true, true);
+			dump_test_log(test, state, true, true, w);
 		}
 	}
+
+	if (w) {
+		jsonw_end_array(w);
+		jsonw_end_object(w);
+		jsonw_destroy(&w);
+	}
+
+	if (env->json)
+		fclose(env->json);
 
 	printf("Summary: %d/%d PASSED, %d SKIPPED, %d FAILED\n",
 	       succ_cnt, sub_succ_cnt, skip_cnt, fail_cnt);
@@ -1655,9 +1698,14 @@ int main(int argc, char **argv)
 	env.stderr = stderr;
 
 	env.has_testmod = true;
-	if (!env.list_test_names && load_bpf_testmod()) {
-		fprintf(env.stderr, "WARNING! Selftests relying on bpf_testmod.ko will be skipped.\n");
-		env.has_testmod = false;
+	if (!env.list_test_names) {
+		/* ensure previous instance of the module is unloaded */
+		unload_bpf_testmod(verbose());
+
+		if (load_bpf_testmod(verbose())) {
+			fprintf(env.stderr, "WARNING! Selftests relying on bpf_testmod.ko will be skipped.\n");
+			env.has_testmod = false;
+		}
 	}
 
 	/* initializing tests */
@@ -1754,7 +1802,7 @@ int main(int argc, char **argv)
 	close(env.saved_netns_fd);
 out:
 	if (!env.list_test_names && env.has_testmod)
-		unload_bpf_testmod();
+		unload_bpf_testmod(verbose());
 
 	free_test_selector(&env.test_selector);
 	free_test_selector(&env.subtest_selector);

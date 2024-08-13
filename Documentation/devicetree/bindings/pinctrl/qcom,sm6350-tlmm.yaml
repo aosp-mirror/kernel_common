@@ -22,20 +22,16 @@ properties:
   reg:
     maxItems: 1
 
-  interrupts: true
-  interrupt-controller: true
-  "#interrupt-cells": true
-  gpio-controller: true
-  gpio-reserved-ranges: true
-  "#gpio-cells": true
-  gpio-ranges: true
-  wakeup-parent: true
+  interrupts:
+    minItems: 9
+    maxItems: 9
 
-required:
-  - compatible
-  - reg
+  gpio-reserved-ranges:
+    minItems: 1
+    maxItems: 78
 
-additionalProperties: false
+  gpio-line-names:
+    maxItems: 156
 
 patternProperties:
   "-state$":
@@ -53,6 +49,7 @@ $defs:
       Pinctrl node's client devices use subnodes for desired pin configuration.
       Client device subnodes use below standard properties.
     $ref: qcom,tlmm-common.yaml#/$defs/qcom-tlmm-state
+    unevaluatedProperties: false
 
     properties:
       pins:
@@ -61,7 +58,7 @@ $defs:
           subnode.
         items:
           oneOf:
-            - pattern: "^gpio([0-9]|[1-9][0-9]|1[0-4][0-9]|15[0-7])$"
+            - pattern: "^gpio([0-9]|[1-9][0-9]|1[0-4][0-9]|15[0-5])$"
             - enum: [ sdc1_clk, sdc1_cmd, sdc1_data, sdc2_clk, sdc2_cmd, sdc2_data ]
         minItems: 1
         maxItems: 36
@@ -98,19 +95,14 @@ $defs:
                 uim2_present, uim2_reset, usb_phy, vfr_1, vsense_trigger, wlan1_adc0, wlan1_adc1,
                 wlan2_adc0, wlan2_adc1, ]
 
-
-      bias-disable: true
-      bias-pull-down: true
-      bias-pull-up: true
-      drive-strength: true
-      input-enable: true
-      output-high: true
-      output-low: true
-
     required:
       - pins
 
-    additionalProperties: false
+required:
+  - compatible
+  - reg
+
+unevaluatedProperties: false
 
 examples:
   - |
@@ -118,7 +110,16 @@ examples:
     pinctrl@f100000 {
         compatible = "qcom,sm6350-tlmm";
         reg = <0x0f100000 0x300000>;
-        interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+        interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH>;
+
         gpio-controller;
         #gpio-cells = <2>;
         interrupt-controller;

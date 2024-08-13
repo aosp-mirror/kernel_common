@@ -27,7 +27,6 @@
 
 #include <linux/acpi.h>
 #include <linux/dmi.h>
-#include <linux/firmware.h>
 #include <acpi/video.h>
 
 #include <drm/drm_edid.h>
@@ -250,11 +249,35 @@ struct opregion_asle_ext {
 
 #define MAX_DSLP	1500
 
+#define OPREGION_SIZE	(8 * 1024)
+
+struct intel_opregion {
+	struct drm_i915_private *i915;
+
+	struct opregion_header *header;
+	struct opregion_acpi *acpi;
+	struct opregion_swsci *swsci;
+	u32 swsci_gbda_sub_functions;
+	u32 swsci_sbcb_sub_functions;
+	struct opregion_asle *asle;
+	struct opregion_asle_ext *asle_ext;
+	void *rvda;
+	const void *vbt;
+	u32 vbt_size;
+	struct work_struct asle_work;
+	struct notifier_block acpi_notifier;
+};
+
 static int check_swsci_function(struct drm_i915_private *i915, u32 function)
 {
-	struct opregion_swsci *swsci = i915->display.opregion.swsci;
+	struct intel_opregion *opregion = i915->display.opregion;
+	struct opregion_swsci *swsci;
 	u32 main_function, sub_function;
 
+	if (!opregion)
+		return -ENODEV;
+
+	swsci = opregion->swsci;
 	if (!swsci)
 		return -ENODEV;
 
@@ -265,11 +288,11 @@ static int check_swsci_function(struct drm_i915_private *i915, u32 function)
 
 	/* Check if we can call the function. See swsci_setup for details. */
 	if (main_function == SWSCI_SBCB) {
-		if ((i915->display.opregion.swsci_sbcb_sub_functions &
+		if ((opregion->swsci_sbcb_sub_functions &
 		     (1 << sub_function)) == 0)
 			return -EINVAL;
 	} else if (main_function == SWSCI_GBDA) {
-		if ((i915->display.opregion.swsci_gbda_sub_functions &
+		if ((opregion->swsci_gbda_sub_functions &
 		     (1 << sub_function)) == 0)
 			return -EINVAL;
 	}
@@ -280,7 +303,7 @@ static int check_swsci_function(struct drm_i915_private *i915, u32 function)
 static int swsci(struct drm_i915_private *dev_priv,
 		 u32 function, u32 parm, u32 *parm_out)
 {
-	struct opregion_swsci *swsci = dev_priv->display.opregion.swsci;
+	struct opregion_swsci *swsci;
 	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
 	u32 scic, dslp;
 	u16 swsci_val;
@@ -289,6 +312,8 @@ static int swsci(struct drm_i915_private *dev_priv,
 	ret = check_swsci_function(dev_priv, function);
 	if (ret)
 		return ret;
+
+	swsci = dev_priv->display.opregion->swsci;
 
 	/* Driver sleep timeout in ms. */
 	dslp = swsci->dslp;
@@ -462,7 +487,7 @@ static u32 asle_set_backlight(struct drm_i915_private *dev_priv, u32 bclp)
 {
 	struct intel_connector *connector;
 	struct drm_connector_list_iter conn_iter;
-	struct opregion_asle *asle = dev_priv->display.opregion.asle;
+	struct opregion_asle *asle = dev_priv->display.opregion->asle;
 
 	drm_dbg(&dev_priv->drm, "bclp = 0x%08x\n", bclp);
 
@@ -584,9 +609,8 @@ static void asle_work(struct work_struct *work)
 {
 	struct intel_opregion *opregion =
 		container_of(work, struct intel_opregion, asle_work);
-	struct drm_i915_private *dev_priv =
-		container_of(opregion, struct drm_i915_private, display.opregion);
-	struct opregion_asle *asle = dev_priv->display.opregion.asle;
+	struct drm_i915_private *dev_priv = opregion->i915;
+	struct opregion_asle *asle = opregion->asle;
 	u32 aslc_stat = 0;
 	u32 aslc_req;
 
@@ -632,10 +656,17 @@ static void asle_work(struct work_struct *work)
 	asle->aslc = aslc_stat;
 }
 
-void intel_opregion_asle_intr(struct drm_i915_private *dev_priv)
+bool intel_opregion_asle_present(struct drm_i915_private *i915)
 {
-	if (dev_priv->display.opregion.asle)
-		schedule_work(&dev_priv->display.opregion.asle_work);
+	return i915->display.opregion && i915->display.opregion->asle;
+}
+
+void intel_opregion_asle_intr(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = i915->display.opregion;
+
+	if (opregion && opregion->asle)
+		queue_work(i915->unordered_wq, &opregion->asle_work);
 }
 
 #define ACPI_EV_DISPLAY_SWITCH (1<<0)
@@ -691,7 +722,7 @@ static void set_did(struct intel_opregion *opregion, int i, u32 val)
 
 static void intel_didl_outputs(struct drm_i915_private *dev_priv)
 {
-	struct intel_opregion *opregion = &dev_priv->display.opregion;
+	struct intel_opregion *opregion = dev_priv->display.opregion;
 	struct intel_connector *connector;
 	struct drm_connector_list_iter conn_iter;
 	int i = 0, max_outputs;
@@ -730,7 +761,7 @@ static void intel_didl_outputs(struct drm_i915_private *dev_priv)
 
 static void intel_setup_cadls(struct drm_i915_private *dev_priv)
 {
-	struct intel_opregion *opregion = &dev_priv->display.opregion;
+	struct intel_opregion *opregion = dev_priv->display.opregion;
 	struct intel_connector *connector;
 	struct drm_connector_list_iter conn_iter;
 	int i = 0;
@@ -760,7 +791,7 @@ static void intel_setup_cadls(struct drm_i915_private *dev_priv)
 
 static void swsci_setup(struct drm_i915_private *dev_priv)
 {
-	struct intel_opregion *opregion = &dev_priv->display.opregion;
+	struct intel_opregion *opregion = dev_priv->display.opregion;
 	bool requested_callbacks = false;
 	u32 tmp;
 
@@ -836,49 +867,9 @@ static const struct dmi_system_id intel_no_opregion_vbt[] = {
 	{ }
 };
 
-static int intel_load_vbt_firmware(struct drm_i915_private *dev_priv)
-{
-	struct intel_opregion *opregion = &dev_priv->display.opregion;
-	const struct firmware *fw = NULL;
-	const char *name = dev_priv->params.vbt_firmware;
-	int ret;
-
-	if (!name || !*name)
-		return -ENOENT;
-
-	ret = request_firmware(&fw, name, dev_priv->drm.dev);
-	if (ret) {
-		drm_err(&dev_priv->drm,
-			"Requesting VBT firmware \"%s\" failed (%d)\n",
-			name, ret);
-		return ret;
-	}
-
-	if (intel_bios_is_valid_vbt(fw->data, fw->size)) {
-		opregion->vbt_firmware = kmemdup(fw->data, fw->size, GFP_KERNEL);
-		if (opregion->vbt_firmware) {
-			drm_dbg_kms(&dev_priv->drm,
-				    "Found valid VBT firmware \"%s\"\n", name);
-			opregion->vbt = opregion->vbt_firmware;
-			opregion->vbt_size = fw->size;
-			ret = 0;
-		} else {
-			ret = -ENOMEM;
-		}
-	} else {
-		drm_dbg_kms(&dev_priv->drm, "Invalid VBT firmware \"%s\"\n",
-			    name);
-		ret = -EINVAL;
-	}
-
-	release_firmware(fw);
-
-	return ret;
-}
-
 int intel_opregion_setup(struct drm_i915_private *dev_priv)
 {
-	struct intel_opregion *opregion = &dev_priv->display.opregion;
+	struct intel_opregion *opregion;
 	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
 	u32 asls, mboxes;
 	char buf[sizeof(OPREGION_SIGNATURE)];
@@ -901,11 +892,20 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 		return -ENOTSUPP;
 	}
 
+	opregion = kzalloc(sizeof(*opregion), GFP_KERNEL);
+	if (!opregion)
+		return -ENOMEM;
+
+	opregion->i915 = dev_priv;
+	dev_priv->display.opregion = opregion;
+
 	INIT_WORK(&opregion->asle_work, asle_work);
 
 	base = memremap(asls, OPREGION_SIZE, MEMREMAP_WB);
-	if (!base)
-		return -ENOMEM;
+	if (!base) {
+		err = -ENOMEM;
+		goto err_memremap;
+	}
 
 	memcpy(buf, base, sizeof(buf));
 
@@ -915,7 +915,6 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 		goto err_out;
 	}
 	opregion->header = base;
-	opregion->lid_state = base + ACPI_CLID;
 
 	drm_dbg(&dev_priv->drm, "ACPI OpRegion version %u.%u.%u\n",
 		opregion->header->over.major,
@@ -965,9 +964,6 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 		drm_dbg(&dev_priv->drm, "Mailbox #2 for backlight present\n");
 	}
 
-	if (intel_load_vbt_firmware(dev_priv) == 0)
-		goto out;
-
 	if (dmi_check_system(intel_no_opregion_vbt))
 		goto out;
 
@@ -993,7 +989,7 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 
 		vbt = opregion->rvda;
 		vbt_size = opregion->asle->rvds;
-		if (intel_bios_is_valid_vbt(vbt, vbt_size)) {
+		if (intel_bios_is_valid_vbt(dev_priv, vbt, vbt_size)) {
 			drm_dbg_kms(&dev_priv->drm,
 				    "Found valid VBT in ACPI OpRegion (RVDA)\n");
 			opregion->vbt = vbt;
@@ -1018,7 +1014,7 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 	vbt_size = (mboxes & MBOX_ASLE_EXT) ?
 		OPREGION_ASLE_EXT_OFFSET : OPREGION_SIZE;
 	vbt_size -= OPREGION_VBT_OFFSET;
-	if (intel_bios_is_valid_vbt(vbt, vbt_size)) {
+	if (intel_bios_is_valid_vbt(dev_priv, vbt, vbt_size)) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "Found valid VBT in ACPI OpRegion (Mailbox #4)\n");
 		opregion->vbt = vbt;
@@ -1033,6 +1029,10 @@ out:
 
 err_out:
 	memunmap(base);
+err_memremap:
+	kfree(opregion);
+	dev_priv->display.opregion = NULL;
+
 	return err;
 }
 
@@ -1101,47 +1101,68 @@ intel_opregion_get_panel_type(struct drm_i915_private *dev_priv)
  * The EDID in the OpRegion, or NULL if there is none or it's invalid.
  *
  */
-struct edid *intel_opregion_get_edid(struct intel_connector *intel_connector)
+const struct drm_edid *intel_opregion_get_edid(struct intel_connector *intel_connector)
 {
 	struct drm_connector *connector = &intel_connector->base;
 	struct drm_i915_private *i915 = to_i915(connector->dev);
-	struct intel_opregion *opregion = &i915->display.opregion;
-	const void *in_edid;
-	const struct edid *edid;
-	struct edid *new_edid;
+	struct intel_opregion *opregion = i915->display.opregion;
+	const struct drm_edid *drm_edid;
+	const void *edid;
 	int len;
 
-	if (!opregion->asle_ext)
+	if (!opregion || !opregion->asle_ext)
 		return NULL;
 
-	in_edid = opregion->asle_ext->bddc;
+	edid = opregion->asle_ext->bddc;
 
 	/* Validity corresponds to number of 128-byte blocks */
 	len = (opregion->asle_ext->phed & ASLE_PHED_EDID_VALID_MASK) * 128;
-	if (!len || !memchr_inv(in_edid, 0, len))
+	if (!len || !memchr_inv(edid, 0, len))
 		return NULL;
 
-	edid = in_edid;
+	drm_edid = drm_edid_alloc(edid, len);
 
-	if (len < EDID_LENGTH * (1 + edid->extensions)) {
-		drm_dbg_kms(&i915->drm, "Invalid EDID in ACPI OpRegion (Mailbox #5): too short\n");
-		return NULL;
-	}
-	new_edid = drm_edid_duplicate(edid);
-	if (!new_edid)
-		return NULL;
-	if (!drm_edid_is_valid(new_edid)) {
-		kfree(new_edid);
+	if (!drm_edid_valid(drm_edid)) {
 		drm_dbg_kms(&i915->drm, "Invalid EDID in ACPI OpRegion (Mailbox #5)\n");
-		return NULL;
+		drm_edid_free(drm_edid);
+		drm_edid = NULL;
 	}
-	return new_edid;
+
+	return drm_edid;
+}
+
+bool intel_opregion_vbt_present(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = i915->display.opregion;
+
+	if (!opregion || !opregion->vbt)
+		return false;
+
+	return true;
+}
+
+const void *intel_opregion_get_vbt(struct drm_i915_private *i915, size_t *size)
+{
+	struct intel_opregion *opregion = i915->display.opregion;
+
+	if (!opregion || !opregion->vbt)
+		return NULL;
+
+	if (size)
+		*size = opregion->vbt_size;
+
+	return kmemdup(opregion->vbt, opregion->vbt_size, GFP_KERNEL);
 }
 
 bool intel_opregion_headless_sku(struct drm_i915_private *i915)
 {
-	struct intel_opregion *opregion = &i915->display.opregion;
-	struct opregion_header *header = opregion->header;
+	struct intel_opregion *opregion = i915->display.opregion;
+	struct opregion_header *header;
+
+	if (!opregion)
+		return false;
+
+	header = opregion->header;
 
 	if (!header || header->over.major < 2 ||
 	    (header->over.major == 2 && header->over.minor < 3))
@@ -1152,9 +1173,9 @@ bool intel_opregion_headless_sku(struct drm_i915_private *i915)
 
 void intel_opregion_register(struct drm_i915_private *i915)
 {
-	struct intel_opregion *opregion = &i915->display.opregion;
+	struct intel_opregion *opregion = i915->display.opregion;
 
-	if (!opregion->header)
+	if (!opregion)
 		return;
 
 	if (opregion->acpi) {
@@ -1166,12 +1187,9 @@ void intel_opregion_register(struct drm_i915_private *i915)
 	intel_opregion_resume(i915);
 }
 
-void intel_opregion_resume(struct drm_i915_private *i915)
+static void intel_opregion_resume_display(struct drm_i915_private *i915)
 {
-	struct intel_opregion *opregion = &i915->display.opregion;
-
-	if (!opregion->header)
-		return;
+	struct intel_opregion *opregion = i915->display.opregion;
 
 	if (opregion->acpi) {
 		intel_didl_outputs(i915);
@@ -1193,57 +1211,93 @@ void intel_opregion_resume(struct drm_i915_private *i915)
 
 	/* Some platforms abuse the _DSM to enable MUX */
 	intel_dsm_get_bios_data_funcs_supported(i915);
+}
+
+void intel_opregion_resume(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = i915->display.opregion;
+
+	if (!opregion)
+		return;
+
+	if (HAS_DISPLAY(i915))
+		intel_opregion_resume_display(i915);
 
 	intel_opregion_notify_adapter(i915, PCI_D0);
 }
 
-void intel_opregion_suspend(struct drm_i915_private *i915, pci_power_t state)
+static void intel_opregion_suspend_display(struct drm_i915_private *i915)
 {
-	struct intel_opregion *opregion = &i915->display.opregion;
-
-	if (!opregion->header)
-		return;
-
-	intel_opregion_notify_adapter(i915, state);
+	struct intel_opregion *opregion = i915->display.opregion;
 
 	if (opregion->asle)
 		opregion->asle->ardy = ASLE_ARDY_NOT_READY;
 
-	cancel_work_sync(&i915->display.opregion.asle_work);
+	cancel_work_sync(&opregion->asle_work);
 
 	if (opregion->acpi)
 		opregion->acpi->drdy = 0;
 }
 
+void intel_opregion_suspend(struct drm_i915_private *i915, pci_power_t state)
+{
+	struct intel_opregion *opregion = i915->display.opregion;
+
+	if (!opregion)
+		return;
+
+	intel_opregion_notify_adapter(i915, state);
+
+	if (HAS_DISPLAY(i915))
+		intel_opregion_suspend_display(i915);
+}
+
 void intel_opregion_unregister(struct drm_i915_private *i915)
 {
-	struct intel_opregion *opregion = &i915->display.opregion;
+	struct intel_opregion *opregion = i915->display.opregion;
 
 	intel_opregion_suspend(i915, PCI_D1);
 
-	if (!opregion->header)
+	if (!opregion)
 		return;
 
 	if (opregion->acpi_notifier.notifier_call) {
 		unregister_acpi_notifier(&opregion->acpi_notifier);
 		opregion->acpi_notifier.notifier_call = NULL;
 	}
+}
 
-	/* just clear all opregion memory pointers now */
+void intel_opregion_cleanup(struct drm_i915_private *i915)
+{
+	struct intel_opregion *opregion = i915->display.opregion;
+
+	if (!opregion)
+		return;
+
 	memunmap(opregion->header);
-	if (opregion->rvda) {
+	if (opregion->rvda)
 		memunmap(opregion->rvda);
-		opregion->rvda = NULL;
-	}
-	if (opregion->vbt_firmware) {
-		kfree(opregion->vbt_firmware);
-		opregion->vbt_firmware = NULL;
-	}
-	opregion->header = NULL;
-	opregion->acpi = NULL;
-	opregion->swsci = NULL;
-	opregion->asle = NULL;
-	opregion->asle_ext = NULL;
-	opregion->vbt = NULL;
-	opregion->lid_state = NULL;
+	kfree(opregion);
+	i915->display.opregion = NULL;
+}
+
+static int intel_opregion_show(struct seq_file *m, void *unused)
+{
+	struct drm_i915_private *i915 = m->private;
+	struct intel_opregion *opregion = i915->display.opregion;
+
+	if (opregion)
+		seq_write(m, opregion->header, OPREGION_SIZE);
+
+	return 0;
+}
+
+DEFINE_SHOW_ATTRIBUTE(intel_opregion);
+
+void intel_opregion_debugfs_register(struct drm_i915_private *i915)
+{
+	struct drm_minor *minor = i915->drm.primary;
+
+	debugfs_create_file("i915_opregion", 0444, minor->debugfs_root,
+			    i915, &intel_opregion_fops);
 }

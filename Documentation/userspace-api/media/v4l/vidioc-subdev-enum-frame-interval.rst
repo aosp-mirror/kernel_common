@@ -92,7 +92,10 @@ multiple pads of the same sub-device is not defined.
       - Frame intervals to be enumerated, from enum
 	:ref:`v4l2_subdev_format_whence <v4l2-subdev-format-whence>`.
     * - __u32
-      - ``reserved``\ [8]
+      - ``stream``
+      - Stream identifier.
+    * - __u32
+      - ``reserved``\ [7]
       - Reserved for future extensions. Applications and drivers must set
 	the array to zero.
 
@@ -104,8 +107,7 @@ appropriately. The generic error codes are described at the
 :ref:`Generic Error Codes <gen-errors>` chapter.
 
 EINVAL
-    The struct
-    :c:type:`v4l2_subdev_frame_interval_enum`
-    ``pad`` references a non-existing pad, one of the ``code``,
-    ``width`` or ``height`` fields are invalid for the given pad or the
-    ``index`` field is out of bounds.
+    The struct :c:type:`v4l2_subdev_frame_interval_enum` ``pad`` references a
+    non-existing pad, the ``which`` field has an unsupported value, one of the
+    ``code``, ``width`` or ``height`` fields are invalid for the given pad, or
+    the ``index`` field is out of bounds.

@@ -132,9 +132,6 @@ The DRM blend mode and its elements are then mapped by AMDGPU display manager
 (MPC), as follows:
 
 .. kernel-doc:: drivers/gpu/drm/amd/display/dc/inc/hw/mpc.h
-   :doc: mpc-overview
-
-.. kernel-doc:: drivers/gpu/drm/amd/display/dc/inc/hw/mpc.h
    :functions: mpcc_blnd_cfg
 
 Therefore, the blending configuration for a single MPCC instance on the MPC
@@ -173,7 +170,7 @@ The alpha blending equation is configured from DRM to DC interface by the
 following path:
 
 1. When updating a :c:type:`drm_plane_state <drm_plane_state>`, DM calls
-   :c:type:`fill_blending_from_plane_state()` that maps
+   :c:type:`amdgpu_dm_plane_fill_blending_from_plane_state()` that maps
    :c:type:`drm_plane_state <drm_plane_state>` attributes to
    :c:type:`dc_plane_info <dc_plane_info>` struct to be handled in the
    OS-agnostic component (DC).

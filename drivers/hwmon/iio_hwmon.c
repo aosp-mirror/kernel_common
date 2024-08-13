@@ -49,16 +49,17 @@ static ssize_t iio_hwmon_read_val(struct device *dev,
 	struct iio_channel *chan = &state->channels[sattr->index];
 	enum iio_chan_type type;
 
-	ret = iio_read_channel_processed(chan, &result);
-	if (ret < 0)
-		return ret;
-
 	ret = iio_get_channel_type(chan, &type);
 	if (ret < 0)
 		return ret;
 
 	if (type == IIO_POWER)
-		result *= 1000; /* mili-Watts to micro-Watts conversion */
+		/* mili-Watts to micro-Watts conversion */
+		ret = iio_read_channel_processed_scale(chan, &result, 1000);
+	else
+		ret = iio_read_channel_processed(chan, &result);
+	if (ret < 0)
+		return ret;
 
 	return sprintf(buf, "%d\n", result);
 }
@@ -77,9 +78,11 @@ static int iio_hwmon_probe(struct platform_device *pdev)
 
 	channels = devm_iio_channel_get_all(dev);
 	if (IS_ERR(channels)) {
-		if (PTR_ERR(channels) == -ENODEV)
-			return -EPROBE_DEFER;
-		return PTR_ERR(channels);
+		ret = PTR_ERR(channels);
+		if (ret == -ENODEV)
+			ret = -EPROBE_DEFER;
+		return dev_err_probe(dev, ret,
+				     "Failed to get channels\n");
 	}
 
 	st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);

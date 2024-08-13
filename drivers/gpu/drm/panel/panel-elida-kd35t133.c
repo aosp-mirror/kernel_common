@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Elida kd35t133 5.5" MIPI-DSI panel driver
+ * Elida kd35t133 3.5" MIPI-DSI panel driver
  * Copyright (C) 2020 Theobroma Systems Design und Consulting GmbH
  *
  * based on
@@ -43,21 +43,12 @@ struct kd35t133 {
 	struct regulator *vdd;
 	struct regulator *iovcc;
 	enum drm_panel_orientation orientation;
-	bool prepared;
 };
 
 static inline struct kd35t133 *panel_to_kd35t133(struct drm_panel *panel)
 {
 	return container_of(panel, struct kd35t133, panel);
 }
-
-#define dsi_dcs_write_seq(dsi, cmd, seq...) do {			\
-		static const u8 b[] = { cmd, seq };			\
-		int ret;						\
-		ret = mipi_dsi_dcs_write_buffer(dsi, b, ARRAY_SIZE(b));	\
-		if (ret < 0)						\
-			return ret;					\
-	} while (0)
 
 static int kd35t133_init_sequence(struct kd35t133 *ctx)
 {
@@ -68,25 +59,25 @@ static int kd35t133_init_sequence(struct kd35t133 *ctx)
 	 * Init sequence was supplied by the panel vendor with minimal
 	 * documentation.
 	 */
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_POSITIVEGAMMA,
-			  0x00, 0x13, 0x18, 0x04, 0x0f, 0x06, 0x3a, 0x56,
-			  0x4d, 0x03, 0x0a, 0x06, 0x30, 0x3e, 0x0f);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_NEGATIVEGAMMA,
-			  0x00, 0x13, 0x18, 0x01, 0x11, 0x06, 0x38, 0x34,
-			  0x4d, 0x06, 0x0d, 0x0b, 0x31, 0x37, 0x0f);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_POWERCONTROL1, 0x18, 0x17);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_POWERCONTROL2, 0x41);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_VCOMCONTROL, 0x00, 0x1a, 0x80);
-	dsi_dcs_write_seq(dsi, MIPI_DCS_SET_ADDRESS_MODE, 0x48);
-	dsi_dcs_write_seq(dsi, MIPI_DCS_SET_PIXEL_FORMAT, 0x55);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_INTERFACEMODECTRL, 0x00);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_FRAMERATECTRL, 0xa0);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_DISPLAYINVERSIONCTRL, 0x02);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_DISPLAYFUNCTIONCTRL,
-			  0x20, 0x02);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_SETIMAGEFUNCTION, 0x00);
-	dsi_dcs_write_seq(dsi, KD35T133_CMD_ADJUSTCONTROL3,
-			  0xa9, 0x51, 0x2c, 0x82);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_POSITIVEGAMMA,
+			       0x00, 0x13, 0x18, 0x04, 0x0f, 0x06, 0x3a, 0x56,
+			       0x4d, 0x03, 0x0a, 0x06, 0x30, 0x3e, 0x0f);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_NEGATIVEGAMMA,
+			       0x00, 0x13, 0x18, 0x01, 0x11, 0x06, 0x38, 0x34,
+			       0x4d, 0x06, 0x0d, 0x0b, 0x31, 0x37, 0x0f);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_POWERCONTROL1, 0x18, 0x17);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_POWERCONTROL2, 0x41);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_VCOMCONTROL, 0x00, 0x1a, 0x80);
+	mipi_dsi_dcs_write_seq(dsi, MIPI_DCS_SET_ADDRESS_MODE, 0x48);
+	mipi_dsi_dcs_write_seq(dsi, MIPI_DCS_SET_PIXEL_FORMAT, 0x55);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_INTERFACEMODECTRL, 0x00);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_FRAMERATECTRL, 0xa0);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_DISPLAYINVERSIONCTRL, 0x02);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_DISPLAYFUNCTIONCTRL,
+			       0x20, 0x02);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_SETIMAGEFUNCTION, 0x00);
+	mipi_dsi_dcs_write_seq(dsi, KD35T133_CMD_ADJUSTCONTROL3,
+			       0xa9, 0x51, 0x2c, 0x82);
 	mipi_dsi_dcs_write(dsi, MIPI_DCS_ENTER_INVERT_MODE, NULL, 0);
 
 	dev_dbg(dev, "Panel init sequence done\n");
@@ -99,9 +90,6 @@ static int kd35t133_unprepare(struct drm_panel *panel)
 	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
 	int ret;
 
-	if (!ctx->prepared)
-		return 0;
-
 	ret = mipi_dsi_dcs_set_display_off(dsi);
 	if (ret < 0)
 		dev_err(ctx->dev, "failed to set display off: %d\n", ret);
@@ -112,10 +100,10 @@ static int kd35t133_unprepare(struct drm_panel *panel)
 		return ret;
 	}
 
+	gpiod_set_value_cansleep(ctx->reset_gpio, 1);
+
 	regulator_disable(ctx->iovcc);
 	regulator_disable(ctx->vdd);
-
-	ctx->prepared = false;
 
 	return 0;
 }
@@ -125,9 +113,6 @@ static int kd35t133_prepare(struct drm_panel *panel)
 	struct kd35t133 *ctx = panel_to_kd35t133(panel);
 	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
 	int ret;
-
-	if (ctx->prepared)
-		return 0;
 
 	dev_dbg(ctx->dev, "Resetting the panel\n");
 	ret = regulator_enable(ctx->vdd);
@@ -172,8 +157,6 @@ static int kd35t133_prepare(struct drm_panel *panel)
 
 	msleep(50);
 
-	ctx->prepared = true;
-
 	return 0;
 
 disable_iovcc:
@@ -217,11 +200,6 @@ static int kd35t133_get_modes(struct drm_panel *panel,
 	connector->display_info.width_mm = mode->width_mm;
 	connector->display_info.height_mm = mode->height_mm;
 	drm_mode_probed_add(connector, mode);
-	/*
-	 * TODO: Remove once all drm drivers call
-	 * drm_connector_set_orientation_from_panel()
-	 */
-	drm_connector_set_panel_orientation(connector, ctx->orientation);
 
 	return 1;
 }
@@ -307,26 +285,10 @@ static int kd35t133_probe(struct mipi_dsi_device *dsi)
 	return 0;
 }
 
-static void kd35t133_shutdown(struct mipi_dsi_device *dsi)
-{
-	struct kd35t133 *ctx = mipi_dsi_get_drvdata(dsi);
-	int ret;
-
-	ret = drm_panel_unprepare(&ctx->panel);
-	if (ret < 0)
-		dev_err(&dsi->dev, "Failed to unprepare panel: %d\n", ret);
-
-	ret = drm_panel_disable(&ctx->panel);
-	if (ret < 0)
-		dev_err(&dsi->dev, "Failed to disable panel: %d\n", ret);
-}
-
 static void kd35t133_remove(struct mipi_dsi_device *dsi)
 {
 	struct kd35t133 *ctx = mipi_dsi_get_drvdata(dsi);
 	int ret;
-
-	kd35t133_shutdown(dsi);
 
 	ret = mipi_dsi_detach(dsi);
 	if (ret < 0)
@@ -348,7 +310,6 @@ static struct mipi_dsi_driver kd35t133_driver = {
 	},
 	.probe	= kd35t133_probe,
 	.remove = kd35t133_remove,
-	.shutdown = kd35t133_shutdown,
 };
 module_mipi_dsi_driver(kd35t133_driver);
 

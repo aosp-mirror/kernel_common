@@ -272,7 +272,8 @@
 #define NIX_AF_DEBUG_NPC_RESP_DATAX(a)          (0x680 | (a) << 3)
 #define NIX_AF_SMQX_CFG(a)                      (0x700 | (a) << 16)
 #define NIX_AF_SQM_DBG_CTL_STATUS               (0x750)
-#define NIX_AF_DWRR_SDP_MTU                     (0x790)
+#define NIX_AF_DWRR_SDP_MTU                     (0x790) /* All CN10K except CN10KB */
+#define NIX_AF_DWRR_MTUX(a)			(0x790 | (a) << 16) /* Only for CN10KB */
 #define NIX_AF_DWRR_RPM_MTU                     (0x7A0)
 #define NIX_AF_PSE_CHANNEL_LEVEL                (0x800)
 #define NIX_AF_PSE_SHAPER_CFG                   (0x810)
@@ -436,6 +437,10 @@
 
 #define NIX_AF_LINKX_BASE_MASK		GENMASK_ULL(11, 0)
 #define NIX_AF_LINKX_RANGE_MASK		GENMASK_ULL(19, 16)
+#define NIX_AF_LINKX_MCS_CNT_MASK	GENMASK_ULL(33, 32)
+
+#define NIX_CONST_MAX_BPIDS		GENMASK_ULL(23, 12)
+#define NIX_CONST_SDP_CHANS		GENMASK_ULL(11, 0)
 
 /* SSO */
 #define SSO_AF_CONST			(0x1000)
@@ -694,6 +699,7 @@
 #define NDC_AF_INTR_ENA_W1S		(0x00068)
 #define NDC_AF_INTR_ENA_W1C		(0x00070)
 #define NDC_AF_ACTIVE_PC		(0x00078)
+#define NDC_AF_CAMS_RD_INTERVAL		(0x00080)
 #define NDC_AF_BP_TEST_ENABLE		(0x001F8)
 #define NDC_AF_BP_TEST(a)		(0x00200 | (a) << 3)
 #define NDC_AF_BLK_RST			(0x002F0)
@@ -709,6 +715,8 @@
 		(0x00F00 | (a) << 5 | (b) << 4)
 #define NDC_AF_BANKX_HIT_PC(a)		(0x01000 | (a) << 3)
 #define NDC_AF_BANKX_MISS_PC(a)		(0x01100 | (a) << 3)
+#define NDC_AF_BANKX_LINEX_METADATA(a, b) \
+		(0x10000 | (a) << 12 | (b) << 3)
 
 /* LBK */
 #define LBK_CONST			(0x10ull)
@@ -729,5 +737,7 @@
 #define APR_LMT_MAP_ENT_DIS_SCH_CMP_SHIFT	23
 #define APR_LMT_MAP_ENT_SCH_ENA_SHIFT		22
 #define APR_LMT_MAP_ENT_DIS_LINE_PREF_SHIFT	21
+#define LMTST_THROTTLE_MASK		GENMASK_ULL(38, 35)
+#define LMTST_WR_PEND_MAX		15
 
 #endif /* RVU_REG_H */

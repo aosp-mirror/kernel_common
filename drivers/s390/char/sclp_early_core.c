@@ -7,10 +7,11 @@
 #include <linux/kernel.h>
 #include <asm/processor.h>
 #include <asm/lowcore.h>
+#include <asm/ctlreg.h>
 #include <asm/ebcdic.h>
 #include <asm/irq.h>
 #include <asm/sections.h>
-#include <asm/mem_detect.h>
+#include <asm/physmem_info.h>
 #include <asm/facility.h>
 #include "sclp.h"
 #include "sclp_rw.h"
@@ -31,11 +32,11 @@ void sclp_early_wait_irq(void)
 	psw_t psw_ext_save, psw_wait;
 	union ctlreg0 cr0, cr0_new;
 
-	__ctl_store(cr0.val, 0, 0);
+	local_ctl_store(0, &cr0.reg);
 	cr0_new.val = cr0.val & ~CR0_IRQ_SUBCLASS_MASK;
 	cr0_new.lap = 0;
 	cr0_new.sssm = 1;
-	__ctl_load(cr0_new.val, 0, 0);
+	local_ctl_load(0, &cr0_new.reg);
 
 	psw_ext_save = S390_lowcore.external_new_psw;
 	psw_mask = __extract_psw();
@@ -58,7 +59,7 @@ void sclp_early_wait_irq(void)
 	} while (S390_lowcore.ext_int_code != EXT_IRQ_SERVICE_SIG);
 
 	S390_lowcore.external_new_psw = psw_ext_save;
-	__ctl_load(cr0.val, 0, 0);
+	local_ctl_load(0, &cr0.reg);
 }
 
 int sclp_early_cmd(sclp_cmdw_t cmd, void *sccb)
@@ -336,7 +337,7 @@ int __init sclp_early_get_hsa_size(unsigned long *hsa_size)
 
 #define SCLP_STORAGE_INFO_FACILITY     0x0000400000000000UL
 
-void __weak __init add_mem_detect_block(u64 start, u64 end) {}
+void __weak __init add_physmem_online_range(u64 start, u64 end) {}
 int __init sclp_early_read_storage_info(void)
 {
 	struct read_storage_sccb *sccb = (struct read_storage_sccb *)sclp_early_sccb;
@@ -369,7 +370,7 @@ int __init sclp_early_read_storage_info(void)
 				if (!sccb->entries[sn])
 					continue;
 				rn = sccb->entries[sn] >> 16;
-				add_mem_detect_block((rn - 1) * rzm, rn * rzm);
+				add_physmem_online_range((rn - 1) * rzm, rn * rzm);
 			}
 			break;
 		case 0x0310:
@@ -382,6 +383,6 @@ int __init sclp_early_read_storage_info(void)
 
 	return 0;
 fail:
-	mem_detect.count = 0;
+	physmem_info.range_count = 0;
 	return -EIO;
 }

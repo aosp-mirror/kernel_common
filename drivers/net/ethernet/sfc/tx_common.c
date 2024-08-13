@@ -12,6 +12,7 @@
 #include "efx.h"
 #include "nic_common.h"
 #include "tx_common.h"
+#include <net/gso.h>
 
 static unsigned int efx_tx_cb_page_count(struct efx_tx_queue *tx_queue)
 {
@@ -249,7 +250,7 @@ void efx_xmit_done_check_empty(struct efx_tx_queue *tx_queue)
 	}
 }
 
-void efx_xmit_done(struct efx_tx_queue *tx_queue, unsigned int index)
+int efx_xmit_done(struct efx_tx_queue *tx_queue, unsigned int index)
 {
 	unsigned int fill_level, pkts_compl = 0, bytes_compl = 0;
 	unsigned int efv_pkts_compl = 0;
@@ -279,6 +280,8 @@ void efx_xmit_done(struct efx_tx_queue *tx_queue, unsigned int index)
 	}
 
 	efx_xmit_done_check_empty(tx_queue);
+
+	return pkts_compl + efv_pkts_compl;
 }
 
 /* Remove buffers put into a tx_queue for the current packet.
@@ -333,11 +336,10 @@ int efx_tx_tso_header_length(struct sk_buff *skb)
 	size_t header_len;
 
 	if (skb->encapsulation)
-		header_len = skb_inner_transport_header(skb) -
-				skb->data +
+		header_len = skb_inner_transport_offset(skb) +
 				(inner_tcp_hdr(skb)->doff << 2u);
 	else
-		header_len = skb_transport_header(skb) - skb->data +
+		header_len = skb_transport_offset(skb) +
 				(tcp_hdr(skb)->doff << 2u);
 	return header_len;
 }

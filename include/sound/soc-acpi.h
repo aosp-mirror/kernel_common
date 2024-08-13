@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only
  *
- * Copyright (C) 2013-15, Intel Corporation. All rights reserved.
+ * Copyright (C) 2013-15, Intel Corporation
  */
 
 #ifndef __LINUX_SND_SOC_ACPI_H
@@ -9,6 +9,7 @@
 #include <linux/stddef.h>
 #include <linux/acpi.h>
 #include <linux/mod_devicetable.h>
+#include <linux/soundwire/sdw.h>
 
 struct snd_soc_acpi_package_context {
 	char *name;           /* package name */
@@ -67,6 +68,10 @@ static inline struct snd_soc_acpi_mach *snd_soc_acpi_codec_list(void *arg)
  * @i2s_link_mask: I2S/TDM links enabled on the board
  * @num_dai_drivers: number of elements in @dai_drivers
  * @dai_drivers: pointer to dai_drivers, used e.g. in nocodec mode
+ * @subsystem_vendor: optional PCI SSID vendor value
+ * @subsystem_device: optional PCI SSID device value
+ * @subsystem_id_set: true if a value has been written to
+ *		      subsystem_vendor and subsystem_device.
  */
 struct snd_soc_acpi_mach_params {
 	u32 acpi_ipc_irq_index;
@@ -79,6 +84,9 @@ struct snd_soc_acpi_mach_params {
 	u32 i2s_link_mask;
 	u32 num_dai_drivers;
 	struct snd_soc_dai_driver *dai_drivers;
+	unsigned short subsystem_vendor;
+	unsigned short subsystem_device;
+	bool subsystem_id_set;
 };
 
 /**
@@ -143,6 +151,18 @@ struct snd_soc_acpi_link_adr {
  */
 #define SND_SOC_ACPI_TPLG_INTEL_DMIC_NUMBER BIT(2)
 
+/*
+ * when set the speaker amplifier name suffix (i.e. "-max98360a") will be
+ * appended to topology file name
+ */
+#define SND_SOC_ACPI_TPLG_INTEL_AMP_NAME BIT(3)
+
+/*
+ * when set the headphone codec name suffix (i.e. "-rt5682") will be appended to
+ * topology file name
+ */
+#define SND_SOC_ACPI_TPLG_INTEL_CODEC_NAME BIT(4)
+
 /**
  * snd_soc_acpi_mach: ACPI-based machine descriptor. Most of the fields are
  * related to the hardware, except for the firmware and topology file names.
@@ -150,6 +170,7 @@ struct snd_soc_acpi_link_adr {
  * all firmware/topology related fields.
  *
  * @id: ACPI ID (usually the codec's) used to find a matching machine driver.
+ * @uid: ACPI Unique ID, can be used to disambiguate matches.
  * @comp_ids: list of compatible audio codecs using the same machine driver,
  * firmware and topology
  * @link_mask: describes required board layout, e.g. for SoundWire.
@@ -170,6 +191,7 @@ struct snd_soc_acpi_link_adr {
 /* Descriptor for SST ASoC machine driver */
 struct snd_soc_acpi_mach {
 	u8 id[ACPI_ID_LEN];
+	const char *uid;
 	const struct snd_soc_acpi_codecs *comp_ids;
 	const u32 link_mask;
 	const struct snd_soc_acpi_link_adr *links;
@@ -206,5 +228,10 @@ static inline bool snd_soc_acpi_sof_parent(struct device *dev)
 	return dev->parent && dev->parent->driver && dev->parent->driver->name &&
 		!strncmp(dev->parent->driver->name, "sof-audio-acpi", strlen("sof-audio-acpi"));
 }
+
+bool snd_soc_acpi_sdw_link_slaves_found(struct device *dev,
+					const struct snd_soc_acpi_link_adr *link,
+					struct sdw_extended_slave_id *ids,
+					int num_slaves);
 
 #endif

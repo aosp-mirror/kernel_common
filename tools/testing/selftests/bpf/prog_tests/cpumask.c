@@ -10,13 +10,15 @@ static const char * const cpumask_success_testcases[] = {
 	"test_set_clear_cpu",
 	"test_setall_clear_cpu",
 	"test_first_firstzero_cpu",
+	"test_firstand_nocpu",
 	"test_test_and_set_clear",
 	"test_and_or_xor",
 	"test_intersects_subset",
 	"test_copy_any_anyand",
 	"test_insert_leave",
 	"test_insert_remove_release",
-	"test_insert_kptr_get_release",
+	"test_global_mask_rcu",
+	"test_cpumask_weight",
 };
 
 static void verify_success(const char *prog_name)
@@ -25,7 +27,7 @@ static void verify_success(const char *prog_name)
 	struct bpf_program *prog;
 	struct bpf_link *link = NULL;
 	pid_t child_pid;
-	int status;
+	int status, err;
 
 	skel = cpumask_success__open();
 	if (!ASSERT_OK_PTR(skel, "cpumask_success__open"))
@@ -34,8 +36,8 @@ static void verify_success(const char *prog_name)
 	skel->bss->pid = getpid();
 	skel->bss->nr_cpus = libbpf_num_possible_cpus();
 
-	cpumask_success__load(skel);
-	if (!ASSERT_OK_PTR(skel, "cpumask_success__load"))
+	err = cpumask_success__load(skel);
+	if (!ASSERT_OK(err, "cpumask_success__load"))
 		goto cleanup;
 
 	prog = bpf_object__find_program_by_name(skel->obj, prog_name);
@@ -70,5 +72,6 @@ void test_cpumask(void)
 		verify_success(cpumask_success_testcases[i]);
 	}
 
+	RUN_TESTS(cpumask_success);
 	RUN_TESTS(cpumask_failure);
 }

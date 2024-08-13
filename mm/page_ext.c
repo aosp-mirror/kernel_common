@@ -10,6 +10,7 @@
 #include <linux/page_idle.h>
 #include <linux/page_table_check.h>
 #include <linux/rcupdate.h>
+#include <linux/pgalloc_tag.h>
 
 /*
  * struct page extension
@@ -71,6 +72,7 @@ static bool need_page_idle(void)
 }
 static struct page_ext_operations page_idle_ops __initdata = {
 	.need = need_page_idle,
+	.need_shared_flags = true,
 };
 #endif
 
@@ -81,17 +83,28 @@ static struct page_ext_operations *page_ext_ops[] __initdata = {
 #if defined(CONFIG_PAGE_IDLE_FLAG) && !defined(CONFIG_64BIT)
 	&page_idle_ops,
 #endif
+#ifdef CONFIG_MEM_ALLOC_PROFILING
+	&page_alloc_tagging_ops,
+#endif
 #ifdef CONFIG_PAGE_TABLE_CHECK
 	&page_table_check_ops,
 #endif
 };
 
-unsigned long page_ext_size = sizeof(struct page_ext);
+unsigned long page_ext_size;
 
 static unsigned long total_usage;
-static struct page_ext *lookup_page_ext(const struct page *page);
 
-bool early_page_ext;
+#ifdef CONFIG_MEM_ALLOC_PROFILING_DEBUG
+/*
+ * To ensure correct allocation tagging for pages, page_ext should be available
+ * before the first page allocation. Otherwise early task stacks will be
+ * allocated before page_ext initialization and missing tags will be flagged.
+ */
+bool early_page_ext __meminitdata = true;
+#else
+bool early_page_ext __meminitdata;
+#endif
 static int __init setup_early_page_ext(char *str)
 {
 	early_page_ext = true;
@@ -106,7 +119,16 @@ static bool __init invoke_need_callbacks(void)
 	bool need = false;
 
 	for (i = 0; i < entries; i++) {
-		if (page_ext_ops[i]->need && page_ext_ops[i]->need()) {
+		if (page_ext_ops[i]->need()) {
+			if (page_ext_ops[i]->need_shared_flags) {
+				page_ext_size = sizeof(struct page_ext);
+				break;
+			}
+		}
+	}
+
+	for (i = 0; i < entries; i++) {
+		if (page_ext_ops[i]->need()) {
 			page_ext_ops[i]->offset = page_ext_size;
 			page_ext_size += page_ext_ops[i]->size;
 			need = true;
@@ -127,62 +149,16 @@ static void __init invoke_init_callbacks(void)
 	}
 }
 
-#ifndef CONFIG_SPARSEMEM
-void __init page_ext_init_flatmem_late(void)
-{
-	invoke_init_callbacks();
-}
-#endif
-
 static inline struct page_ext *get_entry(void *base, unsigned long index)
 {
 	return base + page_ext_size * index;
 }
 
-/**
- * page_ext_get() - Get the extended information for a page.
- * @page: The page we're interested in.
- *
- * Ensures that the page_ext will remain valid until page_ext_put()
- * is called.
- *
- * Return: NULL if no page_ext exists for this page.
- * Context: Any context.  Caller may not sleep until they have called
- * page_ext_put().
- */
-struct page_ext *page_ext_get(struct page *page)
-{
-	struct page_ext *page_ext;
-
-	rcu_read_lock();
-	page_ext = lookup_page_ext(page);
-	if (!page_ext) {
-		rcu_read_unlock();
-		return NULL;
-	}
-
-	return page_ext;
-}
-
-/**
- * page_ext_put() - Working with page extended information is done.
- * @page_ext: Page extended information received from page_ext_get().
- *
- * The page extended information of the page may not be valid after this
- * function is called.
- *
- * Return: None.
- * Context: Any context with corresponding page_ext_get() is called.
- */
-void page_ext_put(struct page_ext *page_ext)
-{
-	if (unlikely(!page_ext))
-		return;
-
-	rcu_read_unlock();
-}
 #ifndef CONFIG_SPARSEMEM
-
+void __init page_ext_init_flatmem_late(void)
+{
+	invoke_init_callbacks();
+}
 
 void __meminit pgdat_page_ext_init(struct pglist_data *pgdat)
 {
@@ -414,13 +390,14 @@ static int __meminit online_page_ext(unsigned long start_pfn,
 		return 0;
 
 	/* rollback */
+	end = pfn - PAGES_PER_SECTION;
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION)
 		__free_page_ext(pfn);
 
 	return -ENOMEM;
 }
 
-static int __meminit offline_page_ext(unsigned long start_pfn,
+static void __meminit offline_page_ext(unsigned long start_pfn,
 				unsigned long nr_pages)
 {
 	unsigned long start, end, pfn;
@@ -444,8 +421,6 @@ static int __meminit offline_page_ext(unsigned long start_pfn,
 
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION)
 		__free_page_ext(pfn);
-	return 0;
-
 }
 
 static int __meminit page_ext_callback(struct notifier_block *self,
@@ -527,3 +502,46 @@ void __meminit pgdat_page_ext_init(struct pglist_data *pgdat)
 }
 
 #endif
+
+/**
+ * page_ext_get() - Get the extended information for a page.
+ * @page: The page we're interested in.
+ *
+ * Ensures that the page_ext will remain valid until page_ext_put()
+ * is called.
+ *
+ * Return: NULL if no page_ext exists for this page.
+ * Context: Any context.  Caller may not sleep until they have called
+ * page_ext_put().
+ */
+struct page_ext *page_ext_get(const struct page *page)
+{
+	struct page_ext *page_ext;
+
+	rcu_read_lock();
+	page_ext = lookup_page_ext(page);
+	if (!page_ext) {
+		rcu_read_unlock();
+		return NULL;
+	}
+
+	return page_ext;
+}
+
+/**
+ * page_ext_put() - Working with page extended information is done.
+ * @page_ext: Page extended information received from page_ext_get().
+ *
+ * The page extended information of the page may not be valid after this
+ * function is called.
+ *
+ * Return: None.
+ * Context: Any context with corresponding page_ext_get() is called.
+ */
+void page_ext_put(struct page_ext *page_ext)
+{
+	if (unlikely(!page_ext))
+		return;
+
+	rcu_read_unlock();
+}

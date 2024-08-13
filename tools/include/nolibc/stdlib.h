@@ -12,6 +12,7 @@
 #include "types.h"
 #include "sys.h"
 #include "string.h"
+#include <linux/auxvec.h>
 
 struct nolibc_heap {
 	size_t	len;
@@ -82,11 +83,10 @@ void free(void *ptr)
  * declared as a char **, and must be terminated by a NULL (it is recommended
  * to set this variable to the "envp" argument of main()). If the requested
  * environment variable exists its value is returned otherwise NULL is
- * returned. getenv() is forcefully inlined so that the reference to "environ"
- * will be dropped if unused, even at -O0.
+ * returned.
  */
 static __attribute__((unused))
-char *_getenv(const char *name, char **environ)
+char *getenv(const char *name)
 {
 	int idx, i;
 
@@ -101,11 +101,30 @@ char *_getenv(const char *name, char **environ)
 	return NULL;
 }
 
-static inline __attribute__((unused,always_inline))
-char *getenv(const char *name)
+static __attribute__((unused))
+unsigned long getauxval(unsigned long type)
 {
-	extern char **environ;
-	return _getenv(name, environ);
+	const unsigned long *auxv = _auxv;
+	unsigned long ret;
+
+	if (!auxv)
+		return 0;
+
+	while (1) {
+		if (!auxv[0] && !auxv[1]) {
+			ret = 0;
+			break;
+		}
+
+		if (auxv[0] == type) {
+			ret = auxv[1];
+			break;
+		}
+
+		auxv += 2;
+	}
+
+	return ret;
 }
 
 static __attribute__((unused))
@@ -166,7 +185,7 @@ void *realloc(void *old_ptr, size_t new_size)
 	if (__builtin_expect(!ret, 0))
 		return NULL;
 
-	memcpy(ret, heap->user_p, heap->len);
+	memcpy(ret, heap->user_p, user_p_len);
 	munmap(heap, heap->len);
 	return ret;
 }
@@ -204,7 +223,7 @@ int utoh_r(unsigned long in, char *buffer)
 /* converts unsigned long <in> to an hex string using the static itoa_buffer
  * and returns the pointer to that string.
  */
-static inline __attribute__((unused))
+static __inline__ __attribute__((unused))
 char *utoh(unsigned long in)
 {
 	utoh_r(in, itoa_buffer);
@@ -266,7 +285,7 @@ int itoa_r(long in, char *buffer)
 /* for historical compatibility, same as above but returns the pointer to the
  * buffer.
  */
-static inline __attribute__((unused))
+static __inline__ __attribute__((unused))
 char *ltoa_r(long in, char *buffer)
 {
 	itoa_r(in, buffer);
@@ -276,7 +295,7 @@ char *ltoa_r(long in, char *buffer)
 /* converts long integer <in> to a string using the static itoa_buffer and
  * returns the pointer to that string.
  */
-static inline __attribute__((unused))
+static __inline__ __attribute__((unused))
 char *itoa(long in)
 {
 	itoa_r(in, itoa_buffer);
@@ -286,7 +305,7 @@ char *itoa(long in)
 /* converts long integer <in> to a string using the static itoa_buffer and
  * returns the pointer to that string. Same as above, for compatibility.
  */
-static inline __attribute__((unused))
+static __inline__ __attribute__((unused))
 char *ltoa(long in)
 {
 	itoa_r(in, itoa_buffer);
@@ -296,7 +315,7 @@ char *ltoa(long in)
 /* converts unsigned long integer <in> to a string using the static itoa_buffer
  * and returns the pointer to that string.
  */
-static inline __attribute__((unused))
+static __inline__ __attribute__((unused))
 char *utoa(unsigned long in)
 {
 	utoa_r(in, itoa_buffer);
@@ -340,7 +359,7 @@ int u64toh_r(uint64_t in, char *buffer)
 /* converts uint64_t <in> to an hex string using the static itoa_buffer and
  * returns the pointer to that string.
  */
-static inline __attribute__((unused))
+static __inline__ __attribute__((unused))
 char *u64toh(uint64_t in)
 {
 	u64toh_r(in, itoa_buffer);
@@ -402,7 +421,7 @@ int i64toa_r(int64_t in, char *buffer)
 /* converts int64_t <in> to a string using the static itoa_buffer and returns
  * the pointer to that string.
  */
-static inline __attribute__((unused))
+static __inline__ __attribute__((unused))
 char *i64toa(int64_t in)
 {
 	i64toa_r(in, itoa_buffer);
@@ -412,11 +431,120 @@ char *i64toa(int64_t in)
 /* converts uint64_t <in> to a string using the static itoa_buffer and returns
  * the pointer to that string.
  */
-static inline __attribute__((unused))
+static __inline__ __attribute__((unused))
 char *u64toa(uint64_t in)
 {
 	u64toa_r(in, itoa_buffer);
 	return itoa_buffer;
+}
+
+static __attribute__((unused))
+uintmax_t __strtox(const char *nptr, char **endptr, int base, intmax_t lower_limit, uintmax_t upper_limit)
+{
+	const char signed_ = lower_limit != 0;
+	unsigned char neg = 0, overflow = 0;
+	uintmax_t val = 0, limit, old_val;
+	char c;
+
+	if (base < 0 || base > 36) {
+		SET_ERRNO(EINVAL);
+		goto out;
+	}
+
+	while (isspace(*nptr))
+		nptr++;
+
+	if (*nptr == '+') {
+		nptr++;
+	} else if (*nptr == '-') {
+		neg = 1;
+		nptr++;
+	}
+
+	if (signed_ && neg)
+		limit = -(uintmax_t)lower_limit;
+	else
+		limit = upper_limit;
+
+	if ((base == 0 || base == 16) &&
+	    (strncmp(nptr, "0x", 2) == 0 || strncmp(nptr, "0X", 2) == 0)) {
+		base = 16;
+		nptr += 2;
+	} else if (base == 0 && strncmp(nptr, "0", 1) == 0) {
+		base = 8;
+		nptr += 1;
+	} else if (base == 0) {
+		base = 10;
+	}
+
+	while (*nptr) {
+		c = *nptr;
+
+		if (c >= '0' && c <= '9')
+			c -= '0';
+		else if (c >= 'a' && c <= 'z')
+			c = c - 'a' + 10;
+		else if (c >= 'A' && c <= 'Z')
+			c = c - 'A' + 10;
+		else
+			goto out;
+
+		if (c >= base)
+			goto out;
+
+		nptr++;
+		old_val = val;
+		val *= base;
+		val += c;
+
+		if (val > limit || val < old_val)
+			overflow = 1;
+	}
+
+out:
+	if (overflow) {
+		SET_ERRNO(ERANGE);
+		val = limit;
+	}
+	if (endptr)
+		*endptr = (char *)nptr;
+	return neg ? -val : val;
+}
+
+static __attribute__((unused))
+long strtol(const char *nptr, char **endptr, int base)
+{
+	return __strtox(nptr, endptr, base, LONG_MIN, LONG_MAX);
+}
+
+static __attribute__((unused))
+unsigned long strtoul(const char *nptr, char **endptr, int base)
+{
+	return __strtox(nptr, endptr, base, 0, ULONG_MAX);
+}
+
+static __attribute__((unused))
+long long strtoll(const char *nptr, char **endptr, int base)
+{
+	return __strtox(nptr, endptr, base, LLONG_MIN, LLONG_MAX);
+}
+
+static __attribute__((unused))
+unsigned long long strtoull(const char *nptr, char **endptr, int base)
+{
+	return __strtox(nptr, endptr, base, 0, ULLONG_MAX);
+}
+
+static __attribute__((unused))
+intmax_t strtoimax(const char *nptr, char **endptr, int base)
+{
+	return __strtox(nptr, endptr, base, INTMAX_MIN, INTMAX_MAX);
+}
+
+static __attribute__((unused))
+uintmax_t strtoumax(const char *nptr, char **endptr, int base)
+{
+	return __strtox(nptr, endptr, base, 0, UINTMAX_MAX);
 }
 
 /* make sure to include all global symbols */

@@ -10,7 +10,7 @@
 #include <linux/irq.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regmap.h>
 
@@ -135,16 +135,6 @@ static int da9210_i2c_probe(struct i2c_client *i2c)
 	struct regulator_dev *rdev = NULL;
 	struct regulator_config config = { };
 	int error;
-	const struct of_device_id *match;
-
-	if (i2c->dev.of_node && !pdata) {
-		match = of_match_device(of_match_ptr(da9210_dt_ids),
-						&i2c->dev);
-		if (!match) {
-			dev_err(&i2c->dev, "Error: No device match found\n");
-			return -ENODEV;
-		}
-	}
 
 	chip = devm_kzalloc(&i2c->dev, sizeof(struct da9210), GFP_KERNEL);
 	if (!chip)
@@ -212,8 +202,8 @@ static int da9210_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id da9210_i2c_id[] = {
-	{"da9210", 0},
-	{},
+	{ "da9210" },
+	{}
 };
 
 MODULE_DEVICE_TABLE(i2c, da9210_i2c_id);
@@ -221,9 +211,10 @@ MODULE_DEVICE_TABLE(i2c, da9210_i2c_id);
 static struct i2c_driver da9210_regulator_driver = {
 	.driver = {
 		.name = "da9210",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.of_match_table = of_match_ptr(da9210_dt_ids),
 	},
-	.probe_new = da9210_i2c_probe,
+	.probe = da9210_i2c_probe,
 	.id_table = da9210_i2c_id,
 };
 

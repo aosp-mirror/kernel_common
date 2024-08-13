@@ -74,7 +74,7 @@ static inline struct rq_qos *wbt_rq_qos(struct request_queue *q)
 	return rq_qos_id(q, RQ_QOS_WBT);
 }
 
-static inline struct rq_qos *blkcg_rq_qos(struct request_queue *q)
+static inline struct rq_qos *iolat_rq_qos(struct request_queue *q)
 {
 	return rq_qos_id(q, RQ_QOS_LATENCY);
 }
@@ -118,7 +118,7 @@ static inline void rq_qos_cleanup(struct request_queue *q, struct bio *bio)
 
 static inline void rq_qos_done(struct request_queue *q, struct request *rq)
 {
-	if (q->rq_qos)
+	if (q->rq_qos && !blk_rq_is_passthrough(rq))
 		__rq_qos_done(q->rq_qos, rq);
 }
 

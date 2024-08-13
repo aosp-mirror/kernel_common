@@ -649,7 +649,7 @@ static int kmx61_chip_update_thresholds(struct kmx61_data *data)
 					KMX61_REG_WUF_TIMER,
 					data->wake_duration);
 	if (ret < 0) {
-		dev_err(&data->client->dev, "Errow writing reg_wuf_timer\n");
+		dev_err(&data->client->dev, "Error writing reg_wuf_timer\n");
 		return ret;
 	}
 
@@ -1514,10 +1514,10 @@ MODULE_DEVICE_TABLE(i2c, kmx61_id);
 static struct i2c_driver kmx61_driver = {
 	.driver = {
 		.name = KMX61_DRV_NAME,
-		.acpi_match_table = ACPI_PTR(kmx61_acpi_match),
+		.acpi_match_table = kmx61_acpi_match,
 		.pm = pm_ptr(&kmx61_pm_ops),
 	},
-	.probe_new	= kmx61_probe,
+	.probe		= kmx61_probe,
 	.remove		= kmx61_remove,
 	.id_table	= kmx61_id,
 };

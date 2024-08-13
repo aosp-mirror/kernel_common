@@ -3,7 +3,6 @@
  * Copyright (C) 2022 Loongson Technology Corporation Limited
  */
 
-#include <asm/export.h>
 #include <asm/ftrace.h>
 #include <asm/regdef.h>
 #include <asm/stackframe.h>
@@ -42,7 +41,6 @@
 	.if \allregs
 	PTR_S		tp, sp, PT_R2
 	PTR_S		t0, sp, PT_R12
-	PTR_S		t1, sp, PT_R13
 	PTR_S		t2, sp, PT_R14
 	PTR_S		t3, sp, PT_R15
 	PTR_S		t4, sp, PT_R16
@@ -64,6 +62,8 @@
 	PTR_S		zero, sp, PT_R0
 	.endif
 	PTR_S		ra, sp, PT_ERA /* Save trace function ra at PT_ERA */
+	move		t1, zero
+	PTR_S		t1, sp, PT_R13
 	PTR_ADDI	t8, sp, PT_SIZE
 	PTR_S		t8, sp, PT_R3
 	.endm
@@ -73,6 +73,7 @@ SYM_FUNC_START(ftrace_stub)
 SYM_FUNC_END(ftrace_stub)
 
 SYM_CODE_START(ftrace_common)
+	UNWIND_HINT_UNDEFINED
 	PTR_ADDI	a0, ra, -8	/* arg0: ip */
 	move		a1, t0		/* arg1: parent_ip */
 	la.pcrel	t1, function_trace_op
@@ -104,17 +105,23 @@ ftrace_common_return:
 	PTR_L		a7, sp, PT_R11
 	PTR_L		fp, sp, PT_R22
 	PTR_L		t0, sp, PT_ERA
+	PTR_L		t1, sp, PT_R13
 	PTR_ADDI	sp, sp, PT_SIZE
+	bnez		t1, .Ldirect
 	jr		t0
+.Ldirect:
+	jr		t1
 SYM_CODE_END(ftrace_common)
 
 SYM_CODE_START(ftrace_caller)
+	UNWIND_HINT_UNDEFINED
 	ftrace_regs_entry allregs=0
 	b		ftrace_common
 SYM_CODE_END(ftrace_caller)
 
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
 SYM_CODE_START(ftrace_regs_caller)
+	UNWIND_HINT_UNDEFINED
 	ftrace_regs_entry allregs=1
 	b		ftrace_common
 SYM_CODE_END(ftrace_regs_caller)
@@ -122,6 +129,7 @@ SYM_CODE_END(ftrace_regs_caller)
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 SYM_CODE_START(ftrace_graph_caller)
+	UNWIND_HINT_UNDEFINED
 	PTR_L		a0, sp, PT_ERA
 	PTR_ADDI	a0, a0, -8	/* arg0: self_addr */
 	PTR_ADDI	a1, sp, PT_R1	/* arg1: parent */
@@ -130,20 +138,29 @@ SYM_CODE_START(ftrace_graph_caller)
 SYM_CODE_END(ftrace_graph_caller)
 
 SYM_CODE_START(return_to_handler)
+	UNWIND_HINT_UNDEFINED
 	/* Save return value regs */
-	PTR_ADDI 	sp, sp, -2 * SZREG
-	PTR_S		a0, sp, 0
-	PTR_S		a1, sp, SZREG
+	PTR_ADDI	sp, sp, -FGRET_REGS_SIZE
+	PTR_S		a0, sp, FGRET_REGS_A0
+	PTR_S		a1, sp, FGRET_REGS_A1
+	PTR_S		zero, sp, FGRET_REGS_FP
 
-	move		a0, zero
+	move		a0, sp
 	bl		ftrace_return_to_handler
 	move		ra, a0
 
 	/* Restore return value regs */
-	PTR_L		a0, sp, 0
-	PTR_L		a1, sp, SZREG
-	PTR_ADDI 	sp, sp, 2 * SZREG
+	PTR_L		a0, sp, FGRET_REGS_A0
+	PTR_L		a1, sp, FGRET_REGS_A1
+	PTR_ADDI	sp, sp, FGRET_REGS_SIZE
 
 	jr		ra
 SYM_CODE_END(return_to_handler)
 #endif
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
+SYM_CODE_START(ftrace_stub_direct_tramp)
+	UNWIND_HINT_UNDEFINED
+	jr		t0
+SYM_CODE_END(ftrace_stub_direct_tramp)
+#endif /* CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS */

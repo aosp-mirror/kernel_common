@@ -991,6 +991,7 @@ static enum power_supply_property bq2415x_power_supply_props[] = {
 	/* TODO: maybe add more power supply properties */
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_MODEL_NAME,
+	POWER_SUPPLY_PROP_ONLINE,
 };
 
 static int bq2415x_power_supply_get_property(struct power_supply *psy,
@@ -1016,6 +1017,15 @@ static int bq2415x_power_supply_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_MODEL_NAME:
 		val->strval = bq->model;
+		break;
+	case POWER_SUPPLY_PROP_ONLINE:
+		/* VBUS is present for all charging and fault states,
+		 * except the 'Ready' state.
+		 */
+		ret = bq2415x_exec_command(bq, BQ2415X_CHARGE_STATUS);
+		if (ret < 0)
+			return ret;
+		val->intval = ret > 0;
 		break;
 	default:
 		return -EINVAL;
@@ -1059,7 +1069,7 @@ static ssize_t bq2415x_sysfs_show_status(struct device *dev,
 	ret = bq2415x_exec_command(bq, command);
 	if (ret < 0)
 		return ret;
-	return sprintf(buf, "%d\n", ret);
+	return sysfs_emit(buf, "%d\n", ret);
 }
 
 /*
@@ -1098,11 +1108,11 @@ static ssize_t bq2415x_sysfs_show_timer(struct device *dev,
 	struct bq2415x_device *bq = power_supply_get_drvdata(psy);
 
 	if (bq->timer_error)
-		return sprintf(buf, "%s\n", bq->timer_error);
+		return sysfs_emit(buf, "%s\n", bq->timer_error);
 
 	if (bq->autotimer)
-		return sprintf(buf, "auto\n");
-	return sprintf(buf, "off\n");
+		return sysfs_emit(buf, "auto\n");
+	return sysfs_emit(buf, "off\n");
 }
 
 /*
@@ -1175,30 +1185,30 @@ static ssize_t bq2415x_sysfs_show_mode(struct device *dev,
 	ssize_t ret = 0;
 
 	if (bq->automode > 0)
-		ret += sprintf(buf+ret, "auto (");
+		ret += sysfs_emit_at(buf, ret, "auto (");
 
 	switch (bq->mode) {
 	case BQ2415X_MODE_OFF:
-		ret += sprintf(buf+ret, "off");
+		ret += sysfs_emit_at(buf, ret, "off");
 		break;
 	case BQ2415X_MODE_NONE:
-		ret += sprintf(buf+ret, "none");
+		ret += sysfs_emit_at(buf, ret, "none");
 		break;
 	case BQ2415X_MODE_HOST_CHARGER:
-		ret += sprintf(buf+ret, "host");
+		ret += sysfs_emit_at(buf, ret, "host");
 		break;
 	case BQ2415X_MODE_DEDICATED_CHARGER:
-		ret += sprintf(buf+ret, "dedicated");
+		ret += sysfs_emit_at(buf, ret, "dedicated");
 		break;
 	case BQ2415X_MODE_BOOST:
-		ret += sprintf(buf+ret, "boost");
+		ret += sysfs_emit_at(buf, ret, "boost");
 		break;
 	}
 
 	if (bq->automode > 0)
-		ret += sprintf(buf+ret, ")");
+		ret += sysfs_emit_at(buf, ret, ")");
 
-	ret += sprintf(buf+ret, "\n");
+	ret += sysfs_emit_at(buf, ret, "\n");
 	return ret;
 }
 
@@ -1215,15 +1225,15 @@ static ssize_t bq2415x_sysfs_show_reported_mode(struct device *dev,
 
 	switch (bq->reported_mode) {
 	case BQ2415X_MODE_OFF:
-		return sprintf(buf, "off\n");
+		return sysfs_emit(buf, "off\n");
 	case BQ2415X_MODE_NONE:
-		return sprintf(buf, "none\n");
+		return sysfs_emit(buf, "none\n");
 	case BQ2415X_MODE_HOST_CHARGER:
-		return sprintf(buf, "host\n");
+		return sysfs_emit(buf, "host\n");
 	case BQ2415X_MODE_DEDICATED_CHARGER:
-		return sprintf(buf, "dedicated\n");
+		return sysfs_emit(buf, "dedicated\n");
 	case BQ2415X_MODE_BOOST:
-		return sprintf(buf, "boost\n");
+		return sysfs_emit(buf, "boost\n");
 	}
 
 	return -EINVAL;
@@ -1261,8 +1271,8 @@ static ssize_t bq2415x_sysfs_print_reg(struct bq2415x_device *bq,
 	int ret = bq2415x_i2c_read(bq, reg);
 
 	if (ret < 0)
-		return sprintf(buf, "%#.2x=error %d\n", reg, ret);
-	return sprintf(buf, "%#.2x=%#.2x\n", reg, ret);
+		return sysfs_emit(buf, "%#.2x=error %d\n", reg, ret);
+	return sysfs_emit(buf, "%#.2x=%#.2x\n", reg, ret);
 }
 
 /* show all raw values of chip register, format per line: 'register=value' */
@@ -1338,7 +1348,7 @@ static ssize_t bq2415x_sysfs_show_limit(struct device *dev,
 
 	if (ret < 0)
 		return ret;
-	return sprintf(buf, "%d\n", ret);
+	return sysfs_emit(buf, "%d\n", ret);
 }
 
 /* set *_enable entries */
@@ -1401,7 +1411,7 @@ static ssize_t bq2415x_sysfs_show_enable(struct device *dev,
 	ret = bq2415x_exec_command(bq, command);
 	if (ret < 0)
 		return ret;
-	return sprintf(buf, "%d\n", ret);
+	return sysfs_emit(buf, "%d\n", ret);
 }
 
 static DEVICE_ATTR(current_limit, S_IWUSR | S_IRUGO,
@@ -1780,7 +1790,7 @@ static struct i2c_driver bq2415x_driver = {
 		.of_match_table = of_match_ptr(bq2415x_of_match_table),
 		.acpi_match_table = ACPI_PTR(bq2415x_i2c_acpi_match),
 	},
-	.probe_new = bq2415x_probe,
+	.probe = bq2415x_probe,
 	.remove = bq2415x_remove,
 	.id_table = bq2415x_i2c_id_table,
 };

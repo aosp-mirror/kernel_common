@@ -45,7 +45,10 @@
 			"AMIC3", "MIC BIAS4",
 			"AMIC4", "MIC BIAS1",
 			"AMIC5", "MIC BIAS3";
+};
 
+&pmi8998_charger {
+	monitored-battery = <&battery>;
 };
 
 /*

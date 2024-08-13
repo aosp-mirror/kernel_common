@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright(c) 2021 Intel Corporation. All rights reserved.
+ * Copyright(c) 2021 Intel Corporation
  *
  * Authors: Cezary Rojewski <cezary.rojewski@intel.com>
  *          Amadeusz Slawinski <amadeuszx.slawinski@linux.intel.com>
@@ -37,7 +37,7 @@ struct avs_path_pipeline {
 
 struct avs_path_module {
 	u16 module_id;
-	u16 instance_id;
+	u8 instance_id;
 	union avs_gtw_attributes gtw_attrs;
 
 	struct avs_tplg_module *template;

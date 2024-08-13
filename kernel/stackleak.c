@@ -27,10 +27,10 @@ static int stack_erasing_sysctl(struct ctl_table *table, int write,
 	int ret = 0;
 	int state = !static_branch_unlikely(&stack_erasing_bypass);
 	int prev_state = state;
+	struct ctl_table table_copy = *table;
 
-	table->data = &state;
-	table->maxlen = sizeof(int);
-	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	table_copy.data = &state;
+	ret = proc_dointvec_minmax(&table_copy, write, buffer, lenp, ppos);
 	state = !!state;
 	if (ret || !write || state == prev_state)
 		return ret;
@@ -54,7 +54,6 @@ static struct ctl_table stackleak_sysctls[] = {
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_ONE,
 	},
-	{}
 };
 
 static int __init stackleak_sysctls_init(void)
@@ -69,6 +68,18 @@ late_initcall(stackleak_sysctls_init);
 #else
 #define skip_erasing()	false
 #endif /* CONFIG_STACKLEAK_RUNTIME_DISABLE */
+
+#ifndef __stackleak_poison
+static __always_inline void __stackleak_poison(unsigned long erase_low,
+					       unsigned long erase_high,
+					       unsigned long poison)
+{
+	while (erase_low < erase_high) {
+		*(unsigned long *)erase_low = poison;
+		erase_low += sizeof(unsigned long);
+	}
+}
+#endif
 
 static __always_inline void __stackleak_erase(bool on_task_stack)
 {
@@ -101,10 +112,7 @@ static __always_inline void __stackleak_erase(bool on_task_stack)
 	else
 		erase_high = task_stack_high;
 
-	while (erase_low < erase_high) {
-		*(unsigned long *)erase_low = STACKLEAK_POISON;
-		erase_low += sizeof(unsigned long);
-	}
+	__stackleak_poison(erase_low, erase_high, STACKLEAK_POISON);
 
 	/* Reset the 'lowest_stack' value for the next syscall */
 	current->lowest_stack = task_stack_high;

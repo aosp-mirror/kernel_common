@@ -11,7 +11,7 @@ maintainers:
   - Chunfeng Yun <chunfeng.yun@mediatek.com>
 
 allOf:
-  - $ref: "usb-drd.yaml"
+  - $ref: usb-drd.yaml
 
 description: |
   The DRD controller has a glue layer IPPC (IP Port Control), and its host is
@@ -28,6 +28,7 @@ properties:
           - mediatek,mt8188-mtu3
           - mediatek,mt8192-mtu3
           - mediatek,mt8195-mtu3
+          - mediatek,mt8365-mtu3
       - const: mediatek,mtu3
 
   reg:
@@ -65,6 +66,8 @@ properties:
       - description: Reference clock used by low power mode etc
       - description: Mcu bus clock for register access
       - description: DMA bus clock for data transfer
+      - description: DRD controller clock
+      - description: Frame count clock
 
   clock-names:
     minItems: 1
@@ -73,6 +76,8 @@ properties:
       - const: ref_ck
       - const: mcu_ck
       - const: dma_ck
+      - const: xhci_ck
+      - const: frmcnt_ck
 
   phys:
     description:
@@ -180,7 +185,10 @@ properties:
             2 - used by mt2712 etc, revision 2 with following IPM rule;
             101 - used by mt8183, specific 1.01;
             102 - used by mt8192, specific 1.02;
-          enum: [1, 2, 101, 102]
+            103 - used by mt8195, IP0, specific 1.03;
+            105 - used by mt8195, IP2, specific 1.05;
+            106 - used by mt8195, IP3, specific 1.06;
+          enum: [1, 2, 101, 102, 103, 105, 106]
 
   mediatek,u3p-dis-msk:
     $ref: /schemas/types.yaml#/definitions/uint32
@@ -203,9 +211,9 @@ patternProperties:
       example if the host mode is enabled.
 
 dependencies:
-  connector: [ 'usb-role-switch' ]
-  port: [ 'usb-role-switch' ]
-  role-switch-default-mode: [ 'usb-role-switch' ]
+  connector: [ usb-role-switch ]
+  port: [ usb-role-switch ]
+  role-switch-default-mode: [ usb-role-switch ]
   wakeup-source: [ 'mediatek,syscon-wakeup' ]
 
 required:
@@ -299,7 +307,7 @@ examples:
   # Dual role switch with type-c
   - |
     usb@11201000 {
-        compatible ="mediatek,mt8183-mtu3", "mediatek,mtu3";
+        compatible = "mediatek,mt8183-mtu3", "mediatek,mtu3";
         reg = <0x11201000 0x2e00>, <0x11203e00 0x0100>;
         reg-names = "mac", "ippc";
         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;

@@ -62,12 +62,12 @@ int cec_get_device(struct cec_devnode *devnode)
 	 */
 	mutex_lock(&devnode->lock);
 	/*
-	 * return ENXIO if the cec device has been removed
+	 * return ENODEV if the cec device has been removed
 	 * already or if it is not registered anymore.
 	 */
 	if (!devnode->registered) {
 		mutex_unlock(&devnode->lock);
-		return -ENXIO;
+		return -ENODEV;
 	}
 	/* and increase the device refcount */
 	get_device(&devnode->dev);
@@ -93,7 +93,7 @@ static void cec_devnode_release(struct device *cd)
 	cec_delete_adapter(to_cec_adapter(devnode));
 }
 
-static struct bus_type cec_bus_type = {
+static const struct bus_type cec_bus_type = {
 	.name = CEC_NAME,
 };
 
@@ -191,6 +191,8 @@ static void cec_devnode_unregister(struct cec_adapter *adap)
 	mutex_lock(&adap->lock);
 	__cec_s_phys_addr(adap, CEC_PHYS_ADDR_INVALID, false);
 	__cec_s_log_addrs(adap, NULL, false);
+	// Disable the adapter (since adap->devnode.unregistered is true)
+	cec_adap_enable(adap);
 	mutex_unlock(&adap->lock);
 
 	cdev_device_del(&devnode->cdev, &devnode->dev);

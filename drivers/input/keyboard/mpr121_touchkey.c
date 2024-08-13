@@ -369,7 +369,7 @@ static int mpr_resume(struct device *dev)
 static DEFINE_SIMPLE_DEV_PM_OPS(mpr121_touchkey_pm_ops, mpr_suspend, mpr_resume);
 
 static const struct i2c_device_id mpr121_id[] = {
-	{ "mpr121_touchkey", 0 },
+	{ "mpr121_touchkey" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, mpr121_id);
@@ -389,7 +389,7 @@ static struct i2c_driver mpr_touchkey_driver = {
 		.of_match_table = of_match_ptr(mpr121_touchkey_dt_match_table),
 	},
 	.id_table	= mpr121_id,
-	.probe_new	= mpr_touchkey_probe,
+	.probe		= mpr_touchkey_probe,
 };
 
 module_i2c_driver(mpr_touchkey_driver);

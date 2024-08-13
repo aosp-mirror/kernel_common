@@ -29,10 +29,10 @@ struct devres {
 	 * Some archs want to perform DMA into kmalloc caches
 	 * and need a guaranteed alignment larger than
 	 * the alignment of a 64-bit integer.
-	 * Thus we use ARCH_KMALLOC_MINALIGN here and get exactly the same
-	 * buffer alignment as if it was allocated by plain kmalloc().
+	 * Thus we use ARCH_DMA_MINALIGN for data[] which will force the same
+	 * alignment for struct devres when allocated by kmalloc().
 	 */
-	u8 __aligned(ARCH_KMALLOC_MINALIGN) data[];
+	u8 __aligned(ARCH_DMA_MINALIGN) data[];
 };
 
 struct devres_group {
@@ -722,20 +722,21 @@ static void devm_action_release(struct device *dev, void *res)
 }
 
 /**
- * devm_add_action() - add a custom action to list of managed resources
+ * __devm_add_action() - add a custom action to list of managed resources
  * @dev: Device that owns the action
  * @action: Function that should be called
  * @data: Pointer to data passed to @action implementation
+ * @name: Name of the resource (for debugging purposes)
  *
  * This adds a custom action to the list of managed resources so that
  * it gets executed as part of standard resource unwinding.
  */
-int devm_add_action(struct device *dev, void (*action)(void *), void *data)
+int __devm_add_action(struct device *dev, void (*action)(void *), void *data, const char *name)
 {
 	struct action_devres *devres;
 
-	devres = devres_alloc(devm_action_release,
-			      sizeof(struct action_devres), GFP_KERNEL);
+	devres = __devres_alloc_node(devm_action_release, sizeof(struct action_devres),
+				     GFP_KERNEL, NUMA_NO_NODE, name);
 	if (!devres)
 		return -ENOMEM;
 
@@ -745,7 +746,7 @@ int devm_add_action(struct device *dev, void (*action)(void *), void *data)
 	devres_add(dev, devres);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(devm_add_action);
+EXPORT_SYMBOL_GPL(__devm_add_action);
 
 /**
  * devm_remove_action() - removes previously added custom action

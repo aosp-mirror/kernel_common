@@ -14,28 +14,17 @@
 #include <linux/io.h>
 #include <linux/list.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
-#include <linux/of_graph.h>
-#include <linux/of_irq.h>
+#include <linux/of.h>
 #include <linux/sh_dma.h>
 #include <linux/workqueue.h>
 #include <sound/soc.h>
 #include <sound/pcm_params.h>
 
-#define RSND_GEN1_SRU	0
-#define RSND_GEN1_ADG	1
-#define RSND_GEN1_SSI	2
-
-#define RSND_GEN2_SCU	0
-#define RSND_GEN2_ADG	1
-#define RSND_GEN2_SSIU	2
-#define RSND_GEN2_SSI	3
-
-#define RSND_GEN4_ADG	0
-#define RSND_GEN4_SSIU	1
-#define RSND_GEN4_SSI	2
-#define RSND_GEN4_SDMC	3
-
+#define RSND_BASE_ADG	0
+#define RSND_BASE_SSI	1
+#define RSND_BASE_SSIU	2
+#define RSND_BASE_SCU	3	// for Gen2/Gen3
+#define RSND_BASE_SDMC	3	// for Gen4	reuse
 #define RSND_BASE_MAX	4
 
 /*
@@ -202,7 +191,6 @@ enum rsnd_reg {
 	SSI_SYS_INT_ENABLE5,
 	SSI_SYS_INT_ENABLE6,
 	SSI_SYS_INT_ENABLE7,
-	SSI_BUSIF,
 	HDMI0_SEL,
 	HDMI1_SEL,
 	SSI9_BUSIF0_MODE,
@@ -545,6 +533,7 @@ struct rsnd_dai {
 	struct rsnd_dai_stream capture;
 	struct rsnd_priv *priv;
 	struct snd_pcm_hw_constraint_list constraint;
+	struct of_phandle_args dai_args;
 
 	int max_channels;	/* 2ch - 16ch */
 	int ssi_lane;		/* 1lane - 4lane */
@@ -702,6 +691,9 @@ struct rsnd_priv {
 	struct snd_soc_dai_driver *daidrv;
 	struct rsnd_dai *rdai;
 	int rdai_nr;
+
+#define RSND_MAX_COMPONENT 3
+	int component_dais[RSND_MAX_COMPONENT];
 };
 
 #define rsnd_priv_to_pdev(priv)	((priv)->pdev)
@@ -711,7 +703,7 @@ struct rsnd_priv {
 #define rsnd_is_gen2(priv)	(((priv)->flags & RSND_GEN_MASK) == RSND_GEN2)
 #define rsnd_is_gen3(priv)	(((priv)->flags & RSND_GEN_MASK) == RSND_GEN3)
 #define rsnd_is_gen4(priv)	(((priv)->flags & RSND_GEN_MASK) == RSND_GEN4)
-#define rsnd_is_e3(priv)	(((priv)->flags & \
+#define rsnd_is_gen3_e3(priv)	(((priv)->flags & \
 					(RSND_GEN_MASK | RSND_SOC_MASK)) == \
 					(RSND_GEN3 | RSND_SOC_E))
 

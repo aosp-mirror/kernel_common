@@ -8,16 +8,23 @@
 #include <linux/dma-mapping.h>
 #include <linux/firmware/xlnx-zynqmp.h>
 #include <linux/kernel.h>
+#include <linux/mailbox_client.h>
+#include <linux/mailbox/zynqmp-ipi-message.h>
 #include <linux/module.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/platform_device.h>
 #include <linux/remoteproc.h>
-#include <linux/slab.h>
 
 #include "remoteproc_internal.h"
 
+/* IPI buffer MAX length */
+#define IPI_BUF_LEN_MAX	32U
+
+/* RX mailbox client buffer max length */
+#define MBOX_CLIENT_BUF_MAX	(IPI_BUF_LEN_MAX + \
+				 sizeof(struct zynqmp_ipi_message))
 /*
  * settings for RPU cluster mode which
  * reflects possible values of xlnx,cluster-mode dt-property
@@ -32,26 +39,57 @@ enum zynqmp_r5_cluster_mode {
  * struct mem_bank_data - Memory Bank description
  *
  * @addr: Start address of memory bank
+ * @da: device address
  * @size: Size of Memory bank
  * @pm_domain_id: Power-domains id of memory bank for firmware to turn on/off
  * @bank_name: name of the bank for remoteproc framework
  */
 struct mem_bank_data {
 	phys_addr_t addr;
+	u32 da;
 	size_t size;
 	u32 pm_domain_id;
 	char *bank_name;
 };
 
-/*
- * Hardcoded TCM bank values. This will be removed once TCM bindings are
- * accepted for system-dt specifications and upstreamed in linux kernel
+/**
+ * struct mbox_info
+ *
+ * @rx_mc_buf: to copy data from mailbox rx channel
+ * @tx_mc_buf: to copy data to mailbox tx channel
+ * @r5_core: this mailbox's corresponding r5_core pointer
+ * @mbox_work: schedule work after receiving data from mailbox
+ * @mbox_cl: mailbox client
+ * @tx_chan: mailbox tx channel
+ * @rx_chan: mailbox rx channel
  */
-static const struct mem_bank_data zynqmp_tcm_banks[] = {
-	{0xffe00000UL, 0x10000UL, PD_R5_0_ATCM, "atcm0"}, /* TCM 64KB each */
-	{0xffe20000UL, 0x10000UL, PD_R5_0_BTCM, "btcm0"},
-	{0xffe90000UL, 0x10000UL, PD_R5_1_ATCM, "atcm1"},
-	{0xffeb0000UL, 0x10000UL, PD_R5_1_BTCM, "btcm1"},
+struct mbox_info {
+	unsigned char rx_mc_buf[MBOX_CLIENT_BUF_MAX];
+	unsigned char tx_mc_buf[MBOX_CLIENT_BUF_MAX];
+	struct zynqmp_r5_core *r5_core;
+	struct work_struct mbox_work;
+	struct mbox_client mbox_cl;
+	struct mbox_chan *tx_chan;
+	struct mbox_chan *rx_chan;
+};
+
+/*
+ * Hardcoded TCM bank values. This will stay in driver to maintain backward
+ * compatibility with device-tree that does not have TCM information.
+ */
+static const struct mem_bank_data zynqmp_tcm_banks_split[] = {
+	{0xffe00000UL, 0x0, 0x10000UL, PD_R5_0_ATCM, "atcm0"}, /* TCM 64KB each */
+	{0xffe20000UL, 0x20000, 0x10000UL, PD_R5_0_BTCM, "btcm0"},
+	{0xffe90000UL, 0x0, 0x10000UL, PD_R5_1_ATCM, "atcm1"},
+	{0xffeb0000UL, 0x20000, 0x10000UL, PD_R5_1_BTCM, "btcm1"},
+};
+
+/* In lockstep mode cluster uses each 64KB TCM from second core as well */
+static const struct mem_bank_data zynqmp_tcm_banks_lockstep[] = {
+	{0xffe00000UL, 0x0, 0x10000UL, PD_R5_0_ATCM, "atcm0"}, /* TCM 64KB each */
+	{0xffe20000UL, 0x20000, 0x10000UL, PD_R5_0_BTCM, "btcm0"},
+	{0xffe10000UL, 0x10000, 0x10000UL, PD_R5_1_ATCM, "atcm1"},
+	{0xffe30000UL, 0x30000, 0x10000UL, PD_R5_1_BTCM, "btcm1"},
 };
 
 /**
@@ -61,20 +99,18 @@ static const struct mem_bank_data zynqmp_tcm_banks[] = {
  * @np: device node of RPU instance
  * @tcm_bank_count: number TCM banks accessible to this RPU
  * @tcm_banks: array of each TCM bank data
- * @rmem_count: Number of reserved mem regions
- * @rmem: reserved memory region nodes from device tree
  * @rproc: rproc handle
  * @pm_domain_id: RPU CPU power domain id
+ * @ipi: pointer to mailbox information
  */
 struct zynqmp_r5_core {
 	struct device *dev;
 	struct device_node *np;
 	int tcm_bank_count;
 	struct mem_bank_data **tcm_banks;
-	int rmem_count;
-	struct reserved_mem **rmem;
 	struct rproc *rproc;
 	u32 pm_domain_id;
+	struct mbox_info *ipi;
 };
 
 /**
@@ -92,34 +128,176 @@ struct zynqmp_r5_cluster {
 	struct zynqmp_r5_core **r5_cores;
 };
 
-/*
- * zynqmp_r5_set_mode()
+/**
+ * event_notified_idr_cb() - callback for vq_interrupt per notifyid
+ * @id: rproc->notify id
+ * @ptr: pointer to idr private data
+ * @data: data passed to idr_for_each callback
  *
- * set RPU cluster and TCM operation mode
+ * Pass notification to remoteproc virtio
  *
- * @r5_core: pointer to zynqmp_r5_core type object
- * @fw_reg_val: value expected by firmware to configure RPU cluster mode
- * @tcm_mode: value expected by fw to configure TCM mode (lockstep or split)
- *
- * Return: 0 for success and < 0 for failure
- */
-static int zynqmp_r5_set_mode(struct zynqmp_r5_core *r5_core,
-			      enum rpu_oper_mode fw_reg_val,
-			      enum rpu_tcm_comb tcm_mode)
+ * Return: 0. having return is to satisfy the idr_for_each() function
+ *          pointer input argument requirement.
+ **/
+static int event_notified_idr_cb(int id, void *ptr, void *data)
 {
-	int ret;
+	struct rproc *rproc = data;
 
-	ret = zynqmp_pm_set_rpu_mode(r5_core->pm_domain_id, fw_reg_val);
-	if (ret < 0) {
-		dev_err(r5_core->dev, "failed to set RPU mode\n");
-		return ret;
+	if (rproc_vq_interrupt(rproc, id) == IRQ_NONE)
+		dev_dbg(&rproc->dev, "data not found for vqid=%d\n", id);
+
+	return 0;
+}
+
+/**
+ * handle_event_notified() - remoteproc notification work function
+ * @work: pointer to the work structure
+ *
+ * It checks each registered remoteproc notify IDs.
+ */
+static void handle_event_notified(struct work_struct *work)
+{
+	struct mbox_info *ipi;
+	struct rproc *rproc;
+
+	ipi = container_of(work, struct mbox_info, mbox_work);
+	rproc = ipi->r5_core->rproc;
+
+	/*
+	 * We only use IPI for interrupt. The RPU firmware side may or may
+	 * not write the notifyid when it trigger IPI.
+	 * And thus, we scan through all the registered notifyids and
+	 * find which one is valid to get the message.
+	 * Even if message from firmware is NULL, we attempt to get vqid
+	 */
+	idr_for_each(&rproc->notifyids, event_notified_idr_cb, rproc);
+}
+
+/**
+ * zynqmp_r5_mb_rx_cb() - receive channel mailbox callback
+ * @cl: mailbox client
+ * @msg: message pointer
+ *
+ * Receive data from ipi buffer, ack interrupt and then
+ * it will schedule the R5 notification work.
+ */
+static void zynqmp_r5_mb_rx_cb(struct mbox_client *cl, void *msg)
+{
+	struct zynqmp_ipi_message *ipi_msg, *buf_msg;
+	struct mbox_info *ipi;
+	size_t len;
+
+	ipi = container_of(cl, struct mbox_info, mbox_cl);
+
+	/* copy data from ipi buffer to r5_core */
+	ipi_msg = (struct zynqmp_ipi_message *)msg;
+	buf_msg = (struct zynqmp_ipi_message *)ipi->rx_mc_buf;
+	len = ipi_msg->len;
+	if (len > IPI_BUF_LEN_MAX) {
+		dev_warn(cl->dev, "msg size exceeded than %d\n",
+			 IPI_BUF_LEN_MAX);
+		len = IPI_BUF_LEN_MAX;
+	}
+	buf_msg->len = len;
+	memcpy(buf_msg->data, ipi_msg->data, len);
+
+	/* received and processed interrupt ack */
+	if (mbox_send_message(ipi->rx_chan, NULL) < 0)
+		dev_err(cl->dev, "ack failed to mbox rx_chan\n");
+
+	schedule_work(&ipi->mbox_work);
+}
+
+/**
+ * zynqmp_r5_setup_mbox() - Setup mailboxes related properties
+ *			    this is used for each individual R5 core
+ *
+ * @cdev: child node device
+ *
+ * Function to setup mailboxes related properties
+ * return : NULL if failed else pointer to mbox_info
+ */
+static struct mbox_info *zynqmp_r5_setup_mbox(struct device *cdev)
+{
+	struct mbox_client *mbox_cl;
+	struct mbox_info *ipi;
+
+	ipi = kzalloc(sizeof(*ipi), GFP_KERNEL);
+	if (!ipi)
+		return NULL;
+
+	mbox_cl = &ipi->mbox_cl;
+	mbox_cl->rx_callback = zynqmp_r5_mb_rx_cb;
+	mbox_cl->tx_block = false;
+	mbox_cl->knows_txdone = false;
+	mbox_cl->tx_done = NULL;
+	mbox_cl->dev = cdev;
+
+	/* Request TX and RX channels */
+	ipi->tx_chan = mbox_request_channel_byname(mbox_cl, "tx");
+	if (IS_ERR(ipi->tx_chan)) {
+		ipi->tx_chan = NULL;
+		kfree(ipi);
+		dev_warn(cdev, "mbox tx channel request failed\n");
+		return NULL;
 	}
 
-	ret = zynqmp_pm_set_tcm_config(r5_core->pm_domain_id, tcm_mode);
-	if (ret < 0)
-		dev_err(r5_core->dev, "failed to configure TCM\n");
+	ipi->rx_chan = mbox_request_channel_byname(mbox_cl, "rx");
+	if (IS_ERR(ipi->rx_chan)) {
+		mbox_free_channel(ipi->tx_chan);
+		ipi->rx_chan = NULL;
+		ipi->tx_chan = NULL;
+		kfree(ipi);
+		dev_warn(cdev, "mbox rx channel request failed\n");
+		return NULL;
+	}
 
-	return ret;
+	INIT_WORK(&ipi->mbox_work, handle_event_notified);
+
+	return ipi;
+}
+
+static void zynqmp_r5_free_mbox(struct mbox_info *ipi)
+{
+	if (!ipi)
+		return;
+
+	if (ipi->tx_chan) {
+		mbox_free_channel(ipi->tx_chan);
+		ipi->tx_chan = NULL;
+	}
+
+	if (ipi->rx_chan) {
+		mbox_free_channel(ipi->rx_chan);
+		ipi->rx_chan = NULL;
+	}
+
+	kfree(ipi);
+}
+
+/*
+ * zynqmp_r5_core_kick() - kick a firmware if mbox is provided
+ * @rproc: r5 core's corresponding rproc structure
+ * @vqid: virtqueue ID
+ */
+static void zynqmp_r5_rproc_kick(struct rproc *rproc, int vqid)
+{
+	struct zynqmp_r5_core *r5_core = rproc->priv;
+	struct device *dev = r5_core->dev;
+	struct zynqmp_ipi_message *mb_msg;
+	struct mbox_info *ipi;
+	int ret;
+
+	ipi = r5_core->ipi;
+	if (!ipi)
+		return;
+
+	mb_msg = (struct zynqmp_ipi_message *)ipi->tx_mc_buf;
+	memcpy(mb_msg->data, &vqid, sizeof(vqid));
+	mb_msg->len = sizeof(vqid);
+	ret = mbox_send_message(ipi->tx_chan, mb_msg);
+	if (ret < 0)
+		dev_warn(dev, "failed to send message\n");
 }
 
 /*
@@ -239,21 +417,29 @@ static int add_mem_regions_carveout(struct rproc *rproc)
 {
 	struct rproc_mem_entry *rproc_mem;
 	struct zynqmp_r5_core *r5_core;
+	struct of_phandle_iterator it;
 	struct reserved_mem *rmem;
-	int i, num_mem_regions;
+	int i = 0;
 
-	r5_core = (struct zynqmp_r5_core *)rproc->priv;
-	num_mem_regions = r5_core->rmem_count;
+	r5_core = rproc->priv;
 
-	for (i = 0; i < num_mem_regions; i++) {
-		rmem = r5_core->rmem[i];
+	/* Register associated reserved memory regions */
+	of_phandle_iterator_init(&it, r5_core->np, "memory-region", NULL, 0);
 
-		if (!strncmp(rmem->name, "vdev0buffer", strlen("vdev0buffer"))) {
+	while (of_phandle_iterator_next(&it) == 0) {
+		rmem = of_reserved_mem_lookup(it.node);
+		if (!rmem) {
+			of_node_put(it.node);
+			dev_err(&rproc->dev, "unable to acquire memory-region\n");
+			return -EINVAL;
+		}
+
+		if (!strcmp(it.node->name, "vdev0buffer")) {
 			/* Init reserved memory for vdev buffer */
 			rproc_mem = rproc_of_resm_mem_entry_init(&rproc->dev, i,
 								 rmem->size,
 								 rmem->base,
-								 rmem->name);
+								 it.node->name);
 		} else {
 			/* Register associated reserved memory regions */
 			rproc_mem = rproc_mem_entry_init(&rproc->dev, NULL,
@@ -261,16 +447,20 @@ static int add_mem_regions_carveout(struct rproc *rproc)
 							 rmem->size, rmem->base,
 							 zynqmp_r5_mem_region_map,
 							 zynqmp_r5_mem_region_unmap,
-							 rmem->name);
+							 it.node->name);
 		}
 
-		if (!rproc_mem)
+		if (!rproc_mem) {
+			of_node_put(it.node);
 			return -ENOMEM;
+		}
 
 		rproc_add_carveout(rproc, rproc_mem);
+		rproc_coredump_add_segment(rproc, rmem->base, rmem->size);
 
 		dev_dbg(&rproc->dev, "reserved mem carveout %s addr=%llx, size=0x%llx",
-			rmem->name, rmem->base, rmem->size);
+			it.node->name, rmem->base, rmem->size);
+		i++;
 	}
 
 	return 0;
@@ -317,42 +507,18 @@ static int tcm_mem_map(struct rproc *rproc,
 	/* clear TCMs */
 	memset_io(va, 0, mem->len);
 
-	/*
-	 * The R5s expect their TCM banks to be at address 0x0 and 0x2000,
-	 * while on the Linux side they are at 0xffexxxxx.
-	 *
-	 * Zero out the high 12 bits of the address. This will give
-	 * expected values for TCM Banks 0A and 0B (0x0 and 0x20000).
-	 */
-	mem->da &= 0x000fffff;
-
-	/*
-	 * TCM Banks 1A and 1B still have to be translated.
-	 *
-	 * Below handle these two banks' absolute addresses (0xffe90000 and
-	 * 0xffeb0000) and convert to the expected relative addresses
-	 * (0x0 and 0x20000).
-	 */
-	if (mem->da == 0x90000 || mem->da == 0xB0000)
-		mem->da -= 0x90000;
-
-	/* if translated TCM bank address is not valid report error */
-	if (mem->da != 0x0 && mem->da != 0x20000) {
-		dev_err(&rproc->dev, "invalid TCM address: %x\n", mem->da);
-		return -EINVAL;
-	}
 	return 0;
 }
 
 /*
- * add_tcm_carveout_split_mode()
+ * add_tcm_banks()
  * @rproc: single R5 core's corresponding rproc instance
  *
- * allocate and add remoteproc carveout for TCM memory in split mode
+ * allocate and add remoteproc carveout for TCM memory
  *
  * return 0 on success, otherwise non-zero value on failure
  */
-static int add_tcm_carveout_split_mode(struct rproc *rproc)
+static int add_tcm_banks(struct rproc *rproc)
 {
 	struct rproc_mem_entry *rproc_mem;
 	struct zynqmp_r5_core *r5_core;
@@ -362,8 +528,9 @@ static int add_tcm_carveout_split_mode(struct rproc *rproc)
 	u32 pm_domain_id;
 	size_t bank_size;
 	char *bank_name;
+	u32 da;
 
-	r5_core = (struct zynqmp_r5_core *)rproc->priv;
+	r5_core = rproc->priv;
 	dev = r5_core->dev;
 	num_banks = r5_core->tcm_bank_count;
 
@@ -374,6 +541,7 @@ static int add_tcm_carveout_split_mode(struct rproc *rproc)
 	 */
 	for (i = 0; i < num_banks; i++) {
 		bank_addr = r5_core->tcm_banks[i]->addr;
+		da = r5_core->tcm_banks[i]->da;
 		bank_name = r5_core->tcm_banks[i]->bank_name;
 		bank_size = r5_core->tcm_banks[i]->size;
 		pm_domain_id = r5_core->tcm_banks[i]->pm_domain_id;
@@ -383,148 +551,35 @@ static int add_tcm_carveout_split_mode(struct rproc *rproc)
 					     ZYNQMP_PM_REQUEST_ACK_BLOCKING);
 		if (ret < 0) {
 			dev_err(dev, "failed to turn on TCM 0x%x", pm_domain_id);
-			goto release_tcm_split;
+			goto release_tcm;
 		}
 
-		dev_dbg(dev, "TCM carveout split mode %s addr=%llx, size=0x%lx",
-			bank_name, bank_addr, bank_size);
+		dev_dbg(dev, "TCM carveout %s addr=%llx, da=0x%x, size=0x%lx",
+			bank_name, bank_addr, da, bank_size);
 
 		rproc_mem = rproc_mem_entry_init(dev, NULL, bank_addr,
-						 bank_size, bank_addr,
+						 bank_size, da,
 						 tcm_mem_map, tcm_mem_unmap,
 						 bank_name);
 		if (!rproc_mem) {
 			ret = -ENOMEM;
 			zynqmp_pm_release_node(pm_domain_id);
-			goto release_tcm_split;
+			goto release_tcm;
 		}
 
 		rproc_add_carveout(rproc, rproc_mem);
+		rproc_coredump_add_segment(rproc, da, bank_size);
 	}
 
 	return 0;
 
-release_tcm_split:
+release_tcm:
 	/* If failed, Turn off all TCM banks turned on before */
 	for (i--; i >= 0; i--) {
 		pm_domain_id = r5_core->tcm_banks[i]->pm_domain_id;
 		zynqmp_pm_release_node(pm_domain_id);
 	}
 	return ret;
-}
-
-/*
- * add_tcm_carveout_lockstep_mode()
- * @rproc: single R5 core's corresponding rproc instance
- *
- * allocate and add remoteproc carveout for TCM memory in lockstep mode
- *
- * return 0 on success, otherwise non-zero value on failure
- */
-static int add_tcm_carveout_lockstep_mode(struct rproc *rproc)
-{
-	struct rproc_mem_entry *rproc_mem;
-	struct zynqmp_r5_core *r5_core;
-	int i, num_banks, ret;
-	phys_addr_t bank_addr;
-	size_t bank_size = 0;
-	struct device *dev;
-	u32 pm_domain_id;
-	char *bank_name;
-
-	r5_core = (struct zynqmp_r5_core *)rproc->priv;
-	dev = r5_core->dev;
-
-	/* Go through zynqmp banks for r5 node */
-	num_banks = r5_core->tcm_bank_count;
-
-	/*
-	 * In lockstep mode, TCM is contiguous memory block
-	 * However, each TCM block still needs to be enabled individually.
-	 * So, Enable each TCM block individually, but add their size
-	 * to create contiguous memory region.
-	 */
-	bank_addr = r5_core->tcm_banks[0]->addr;
-	bank_name = r5_core->tcm_banks[0]->bank_name;
-
-	for (i = 0; i < num_banks; i++) {
-		bank_size += r5_core->tcm_banks[i]->size;
-		pm_domain_id = r5_core->tcm_banks[i]->pm_domain_id;
-
-		/* Turn on each TCM bank individually */
-		ret = zynqmp_pm_request_node(pm_domain_id,
-					     ZYNQMP_PM_CAPABILITY_ACCESS, 0,
-					     ZYNQMP_PM_REQUEST_ACK_BLOCKING);
-		if (ret < 0) {
-			dev_err(dev, "failed to turn on TCM 0x%x", pm_domain_id);
-			goto release_tcm_lockstep;
-		}
-	}
-
-	dev_dbg(dev, "TCM add carveout lockstep mode %s addr=0x%llx, size=0x%lx",
-		bank_name, bank_addr, bank_size);
-
-	/* Register TCM address range, TCM map and unmap functions */
-	rproc_mem = rproc_mem_entry_init(dev, NULL, bank_addr,
-					 bank_size, bank_addr,
-					 tcm_mem_map, tcm_mem_unmap,
-					 bank_name);
-	if (!rproc_mem) {
-		ret = -ENOMEM;
-		goto release_tcm_lockstep;
-	}
-
-	/* If registration is success, add carveouts */
-	rproc_add_carveout(rproc, rproc_mem);
-
-	return 0;
-
-release_tcm_lockstep:
-	/* If failed, Turn off all TCM banks turned on before */
-	for (i--; i >= 0; i--) {
-		pm_domain_id = r5_core->tcm_banks[i]->pm_domain_id;
-		zynqmp_pm_release_node(pm_domain_id);
-	}
-	return ret;
-}
-
-/*
- * add_tcm_banks()
- * @rproc: single R5 core's corresponding rproc instance
- *
- * allocate and add remoteproc carveouts for TCM memory based on cluster mode
- *
- * return 0 on success, otherwise non-zero value on failure
- */
-static int add_tcm_banks(struct rproc *rproc)
-{
-	struct zynqmp_r5_cluster *cluster;
-	struct zynqmp_r5_core *r5_core;
-	struct device *dev;
-
-	r5_core = (struct zynqmp_r5_core *)rproc->priv;
-	if (!r5_core)
-		return -EINVAL;
-
-	dev = r5_core->dev;
-
-	cluster = dev_get_drvdata(dev->parent);
-	if (!cluster) {
-		dev_err(dev->parent, "Invalid driver data\n");
-		return -EINVAL;
-	}
-
-	/*
-	 * In lockstep mode TCM banks are one contiguous memory region of 256Kb
-	 * In split mode, each TCM bank is 64Kb and not contiguous.
-	 * We add memory carveouts accordingly.
-	 */
-	if (cluster->mode == SPLIT_MODE)
-		return add_tcm_carveout_split_mode(rproc);
-	else if (cluster->mode == LOCKSTEP_MODE)
-		return add_tcm_carveout_lockstep_mode(rproc);
-
-	return -EINVAL;
 }
 
 /*
@@ -595,7 +650,7 @@ static int zynqmp_r5_rproc_unprepare(struct rproc *rproc)
 	u32 pm_domain_id;
 	int i;
 
-	r5_core = (struct zynqmp_r5_core *)rproc->priv;
+	r5_core = rproc->priv;
 
 	for (i = 0; i < r5_core->tcm_bank_count; i++) {
 		pm_domain_id = r5_core->tcm_banks[i]->pm_domain_id;
@@ -617,6 +672,7 @@ static const struct rproc_ops zynqmp_r5_rproc_ops = {
 	.find_loaded_rsc_table = rproc_elf_find_loaded_rsc_table,
 	.sanity_check	= rproc_elf_sanity_check,
 	.get_boot_addr	= rproc_elf_get_boot_addr,
+	.kick		= zynqmp_r5_rproc_kick,
 };
 
 /**
@@ -648,8 +704,10 @@ static struct zynqmp_r5_core *zynqmp_r5_add_rproc_core(struct device *cdev)
 		return ERR_PTR(-ENOMEM);
 	}
 
+	rproc_coredump_set_elf_info(r5_rproc, ELFCLASS32, EM_ARM);
+
 	r5_rproc->auto_boot = false;
-	r5_core = (struct zynqmp_r5_core *)r5_rproc->priv;
+	r5_core = r5_rproc->priv;
 	r5_core->dev = cdev;
 	r5_core->np = dev_of_node(cdev);
 	if (!r5_core->np) {
@@ -673,6 +731,103 @@ free_rproc:
 	return ERR_PTR(ret);
 }
 
+static int zynqmp_r5_get_tcm_node_from_dt(struct zynqmp_r5_cluster *cluster)
+{
+	int i, j, tcm_bank_count, ret, tcm_pd_idx, pd_count;
+	struct of_phandle_args out_args;
+	struct zynqmp_r5_core *r5_core;
+	struct platform_device *cpdev;
+	struct mem_bank_data *tcm;
+	struct device_node *np;
+	struct resource *res;
+	u64 abs_addr, size;
+	struct device *dev;
+
+	for (i = 0; i < cluster->core_count; i++) {
+		r5_core = cluster->r5_cores[i];
+		dev = r5_core->dev;
+		np = r5_core->np;
+
+		pd_count = of_count_phandle_with_args(np, "power-domains",
+						      "#power-domain-cells");
+
+		if (pd_count <= 0) {
+			dev_err(dev, "invalid power-domains property, %d\n", pd_count);
+			return -EINVAL;
+		}
+
+		/* First entry in power-domains list is for r5 core, rest for TCM. */
+		tcm_bank_count = pd_count - 1;
+
+		if (tcm_bank_count <= 0) {
+			dev_err(dev, "invalid TCM count %d\n", tcm_bank_count);
+			return -EINVAL;
+		}
+
+		r5_core->tcm_banks = devm_kcalloc(dev, tcm_bank_count,
+						  sizeof(struct mem_bank_data *),
+						  GFP_KERNEL);
+		if (!r5_core->tcm_banks)
+			return -ENOMEM;
+
+		r5_core->tcm_bank_count = tcm_bank_count;
+		for (j = 0, tcm_pd_idx = 1; j < tcm_bank_count; j++, tcm_pd_idx++) {
+			tcm = devm_kzalloc(dev, sizeof(struct mem_bank_data),
+					   GFP_KERNEL);
+			if (!tcm)
+				return -ENOMEM;
+
+			r5_core->tcm_banks[j] = tcm;
+
+			/* Get power-domains id of TCM. */
+			ret = of_parse_phandle_with_args(np, "power-domains",
+							 "#power-domain-cells",
+							 tcm_pd_idx, &out_args);
+			if (ret) {
+				dev_err(r5_core->dev,
+					"failed to get tcm %d pm domain, ret %d\n",
+					tcm_pd_idx, ret);
+				return ret;
+			}
+			tcm->pm_domain_id = out_args.args[0];
+			of_node_put(out_args.np);
+
+			/* Get TCM address without translation. */
+			ret = of_property_read_reg(np, j, &abs_addr, &size);
+			if (ret) {
+				dev_err(dev, "failed to get reg property\n");
+				return ret;
+			}
+
+			/*
+			 * Remote processor can address only 32 bits
+			 * so convert 64-bits into 32-bits. This will discard
+			 * any unwanted upper 32-bits.
+			 */
+			tcm->da = (u32)abs_addr;
+			tcm->size = (u32)size;
+
+			cpdev = to_platform_device(dev);
+			res = platform_get_resource(cpdev, IORESOURCE_MEM, j);
+			if (!res) {
+				dev_err(dev, "failed to get tcm resource\n");
+				return -EINVAL;
+			}
+
+			tcm->addr = (u32)res->start;
+			tcm->bank_name = (char *)res->name;
+			res = devm_request_mem_region(dev, tcm->addr, tcm->size,
+						      tcm->bank_name);
+			if (!res) {
+				dev_err(dev, "failed to request tcm resource\n");
+				return -EINVAL;
+			}
+		}
+	}
+
+	return 0;
+}
+
 /**
  * zynqmp_r5_get_tcm_node()
  * Ideally this function should parse tcm node and store information
@@ -685,12 +840,19 @@ free_rproc:
  */
 static int zynqmp_r5_get_tcm_node(struct zynqmp_r5_cluster *cluster)
 {
+	const struct mem_bank_data *zynqmp_tcm_banks;
 	struct device *dev = cluster->dev;
 	struct zynqmp_r5_core *r5_core;
 	int tcm_bank_count, tcm_node;
 	int i, j;
 
-	tcm_bank_count = ARRAY_SIZE(zynqmp_tcm_banks);
+	if (cluster->mode == SPLIT_MODE) {
+		zynqmp_tcm_banks = zynqmp_tcm_banks_split;
+		tcm_bank_count = ARRAY_SIZE(zynqmp_tcm_banks_split);
+	} else {
+		zynqmp_tcm_banks = zynqmp_tcm_banks_lockstep;
+		tcm_bank_count = ARRAY_SIZE(zynqmp_tcm_banks_lockstep);
+	}
 
 	/* count per core tcm banks */
 	tcm_bank_count = tcm_bank_count / cluster->core_count;
@@ -726,59 +888,6 @@ static int zynqmp_r5_get_tcm_node(struct zynqmp_r5_cluster *cluster)
 	return 0;
 }
 
-/**
- * zynqmp_r5_get_mem_region_node()
- * parse memory-region property and get reserved mem regions
- *
- * @r5_core: pointer to zynqmp_r5_core type object
- *
- * Return: 0 for success and error code for failure.
- */
-static int zynqmp_r5_get_mem_region_node(struct zynqmp_r5_core *r5_core)
-{
-	struct device_node *np, *rmem_np;
-	struct reserved_mem **rmem;
-	int res_mem_count, i;
-	struct device *dev;
-
-	dev = r5_core->dev;
-	np = r5_core->np;
-
-	res_mem_count = of_property_count_elems_of_size(np, "memory-region",
-							sizeof(phandle));
-	if (res_mem_count <= 0) {
-		dev_warn(dev, "failed to get memory-region property %d\n",
-			 res_mem_count);
-		return 0;
-	}
-
-	rmem = devm_kcalloc(dev, res_mem_count,
-			    sizeof(struct reserved_mem *), GFP_KERNEL);
-	if (!rmem)
-		return -ENOMEM;
-
-	for (i = 0; i < res_mem_count; i++) {
-		rmem_np = of_parse_phandle(np, "memory-region", i);
-		if (!rmem_np)
-			goto release_rmem;
-
-		rmem[i] = of_reserved_mem_lookup(rmem_np);
-		if (!rmem[i]) {
-			of_node_put(rmem_np);
-			goto release_rmem;
-		}
-
-		of_node_put(rmem_np);
-	}
-
-	r5_core->rmem_count = res_mem_count;
-	r5_core->rmem = rmem;
-	return 0;
-
-release_rmem:
-	return -EINVAL;
-}
-
 /*
  * zynqmp_r5_core_init()
  * Create and initialize zynqmp_r5_core type object
@@ -795,20 +904,23 @@ static int zynqmp_r5_core_init(struct zynqmp_r5_cluster *cluster,
 {
 	struct device *dev = cluster->dev;
 	struct zynqmp_r5_core *r5_core;
-	int ret, i;
+	int ret = -EINVAL, i;
 
-	ret = zynqmp_r5_get_tcm_node(cluster);
-	if (ret < 0) {
-		dev_err(dev, "can't get tcm node, err %d\n", ret);
+	r5_core = cluster->r5_cores[0];
+
+	/* Maintain backward compatibility for zynqmp by using hardcode TCM address. */
+	if (of_find_property(r5_core->np, "reg", NULL))
+		ret = zynqmp_r5_get_tcm_node_from_dt(cluster);
+	else if (device_is_compatible(dev, "xlnx,zynqmp-r5fss"))
+		ret = zynqmp_r5_get_tcm_node(cluster);
+
+	if (ret) {
+		dev_err(dev, "can't get tcm, err %d\n", ret);
 		return ret;
 	}
 
 	for (i = 0; i < cluster->core_count; i++) {
 		r5_core = cluster->r5_cores[i];
-
-		ret = zynqmp_r5_get_mem_region_node(r5_core);
-		if (ret)
-			dev_warn(dev, "memory-region prop failed %d\n", ret);
 
 		/* Initialize r5 cores with power-domains parsed from dts */
 		ret = of_property_read_u32_index(r5_core->np, "power-domains",
@@ -818,11 +930,20 @@ static int zynqmp_r5_core_init(struct zynqmp_r5_cluster *cluster,
 			return ret;
 		}
 
-		ret = zynqmp_r5_set_mode(r5_core, fw_reg_val, tcm_mode);
-		if (ret) {
-			dev_err(dev, "failed to set r5 cluster mode %d, err %d\n",
-				cluster->mode, ret);
+		ret = zynqmp_pm_set_rpu_mode(r5_core->pm_domain_id, fw_reg_val);
+		if (ret < 0) {
+			dev_err(r5_core->dev, "failed to set RPU mode\n");
 			return ret;
+		}
+
+		if (of_find_property(dev_of_node(dev), "xlnx,tcm-mode", NULL) ||
+		    device_is_compatible(dev, "xlnx,zynqmp-r5fss")) {
+			ret = zynqmp_pm_set_tcm_config(r5_core->pm_domain_id,
+						       tcm_mode);
+			if (ret < 0) {
+				dev_err(r5_core->dev, "failed to configure TCM\n");
+				return ret;
+			}
 		}
 	}
 
@@ -849,6 +970,7 @@ static int zynqmp_r5_cluster_init(struct zynqmp_r5_cluster *cluster)
 	struct device_node *child;
 	enum rpu_tcm_comb tcm_mode;
 	int core_count, ret, i;
+	struct mbox_info *ipi;
 
 	ret = of_property_read_u32(dev_node, "xlnx,cluster-mode", &cluster_mode);
 
@@ -867,14 +989,25 @@ static int zynqmp_r5_cluster_init(struct zynqmp_r5_cluster *cluster)
 	 * fail driver probe if either of that is not set in dts.
 	 */
 	if (cluster_mode == LOCKSTEP_MODE) {
-		tcm_mode = PM_RPU_TCM_COMB;
 		fw_reg_val = PM_RPU_MODE_LOCKSTEP;
 	} else if (cluster_mode == SPLIT_MODE) {
-		tcm_mode = PM_RPU_TCM_SPLIT;
 		fw_reg_val = PM_RPU_MODE_SPLIT;
 	} else {
 		dev_err(dev, "driver does not support cluster mode %d\n", cluster_mode);
 		return -EINVAL;
+	}
+
+	if (of_find_property(dev_node, "xlnx,tcm-mode", NULL)) {
+		ret = of_property_read_u32(dev_node, "xlnx,tcm-mode", (u32 *)&tcm_mode);
+		if (ret)
+			return ret;
+	} else if (device_is_compatible(dev, "xlnx,zynqmp-r5fss")) {
+		if (cluster_mode == LOCKSTEP_MODE)
+			tcm_mode = PM_RPU_TCM_COMB;
+		else
+			tcm_mode = PM_RPU_TCM_SPLIT;
+	} else {
+		tcm_mode = PM_RPU_TCM_COMB;
 	}
 
 	/*
@@ -929,6 +1062,16 @@ static int zynqmp_r5_cluster_init(struct zynqmp_r5_cluster *cluster)
 		}
 
 		/*
+		 * If mailbox nodes are disabled using "status" property then
+		 * setting up mailbox channels will fail.
+		 */
+		ipi = zynqmp_r5_setup_mbox(&child_pdev->dev);
+		if (ipi) {
+			r5_cores[i]->ipi = ipi;
+			ipi->r5_core = r5_cores[i];
+		}
+
+		/*
 		 * If two child nodes are available in dts in lockstep mode,
 		 * then ignore second child node.
 		 */
@@ -965,6 +1108,7 @@ release_r5_cores:
 	while (i >= 0) {
 		put_device(child_devs[i]);
 		if (r5_cores[i]) {
+			zynqmp_r5_free_mbox(r5_cores[i]->ipi);
 			of_reserved_mem_device_release(r5_cores[i]->dev);
 			rproc_del(r5_cores[i]->rproc);
 			rproc_free(r5_cores[i]->rproc);
@@ -978,17 +1122,18 @@ release_r5_cores:
 
 static void zynqmp_r5_cluster_exit(void *data)
 {
-	struct platform_device *pdev = (struct platform_device *)data;
+	struct platform_device *pdev = data;
 	struct zynqmp_r5_cluster *cluster;
 	struct zynqmp_r5_core *r5_core;
 	int i;
 
-	cluster = (struct zynqmp_r5_cluster *)platform_get_drvdata(pdev);
+	cluster = platform_get_drvdata(pdev);
 	if (!cluster)
 		return;
 
 	for (i = 0; i < cluster->core_count; i++) {
 		r5_core = cluster->r5_cores[i];
+		zynqmp_r5_free_mbox(r5_core->ipi);
 		of_reserved_mem_device_release(r5_core->dev);
 		put_device(r5_core->dev);
 		rproc_del(r5_core->rproc);
@@ -1048,6 +1193,8 @@ static int zynqmp_r5_remoteproc_probe(struct platform_device *pdev)
 
 /* Match table for OF platform binding */
 static const struct of_device_id zynqmp_r5_remoteproc_match[] = {
+	{ .compatible = "xlnx,versal-net-r52fss", },
+	{ .compatible = "xlnx,versal-r5fss", },
 	{ .compatible = "xlnx,zynqmp-r5fss", },
 	{ /* end of list */ },
 };

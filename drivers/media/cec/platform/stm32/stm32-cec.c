@@ -10,7 +10,6 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 
@@ -344,7 +343,7 @@ err_unprepare_cec_clk:
 	return ret;
 }
 
-static int stm32_cec_remove(struct platform_device *pdev)
+static void stm32_cec_remove(struct platform_device *pdev)
 {
 	struct stm32_cec *cec = platform_get_drvdata(pdev);
 
@@ -352,8 +351,6 @@ static int stm32_cec_remove(struct platform_device *pdev)
 	clk_unprepare(cec->clk_hdmi_cec);
 
 	cec_unregister_adapter(cec->adap);
-
-	return 0;
 }
 
 static const struct of_device_id stm32_cec_of_match[] = {
@@ -364,7 +361,7 @@ MODULE_DEVICE_TABLE(of, stm32_cec_of_match);
 
 static struct platform_driver stm32_cec_driver = {
 	.probe  = stm32_cec_probe,
-	.remove = stm32_cec_remove,
+	.remove_new = stm32_cec_remove,
 	.driver = {
 		.name		= CEC_NAME,
 		.of_match_table = stm32_cec_of_match,

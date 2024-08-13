@@ -57,7 +57,6 @@ static int fimc_is_i2c_probe(struct platform_device *pdev)
 	strscpy(i2c_adap->name, "exynos4x12-isp-i2c", sizeof(i2c_adap->name));
 	i2c_adap->owner = THIS_MODULE;
 	i2c_adap->algo = &fimc_is_i2c_algorithm;
-	i2c_adap->class = I2C_CLASS_SPD;
 
 	platform_set_drvdata(pdev, isp_i2c);
 	pm_runtime_enable(&pdev->dev);
@@ -82,14 +81,12 @@ err_pm_dis:
 	return ret;
 }
 
-static int fimc_is_i2c_remove(struct platform_device *pdev)
+static void fimc_is_i2c_remove(struct platform_device *pdev)
 {
 	struct fimc_is_i2c *isp_i2c = platform_get_drvdata(pdev);
 
 	pm_runtime_disable(&pdev->dev);
 	i2c_del_adapter(&isp_i2c->adapter);
-
-	return 0;
 }
 
 #ifdef CONFIG_PM
@@ -140,7 +137,7 @@ static const struct of_device_id fimc_is_i2c_of_match[] = {
 
 static struct platform_driver fimc_is_i2c_driver = {
 	.probe		= fimc_is_i2c_probe,
-	.remove		= fimc_is_i2c_remove,
+	.remove_new	= fimc_is_i2c_remove,
 	.driver = {
 		.of_match_table = fimc_is_i2c_of_match,
 		.name		= "fimc-isp-i2c",

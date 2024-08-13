@@ -127,7 +127,7 @@ static void btf_dumper_ptr(const struct btf_dumper *d,
 
 print_ptr_value:
 	if (d->is_plain_text)
-		jsonw_printf(d->jw, "%p", (void *)value);
+		jsonw_printf(d->jw, "\"%p\"", (void *)value);
 	else
 		jsonw_printf(d->jw, "%lu", value);
 }
@@ -820,4 +820,87 @@ void btf_dump_linfo_json(const struct btf *btf,
 			jsonw_int_field(json_wtr, "line_col",
 					BPF_LINE_INFO_LINE_COL(linfo->line_col));
 	}
+}
+
+static void dotlabel_puts(const char *s)
+{
+	for (; *s; ++s) {
+		switch (*s) {
+		case '\\':
+		case '"':
+		case '{':
+		case '}':
+		case '<':
+		case '>':
+		case '|':
+		case ' ':
+			putchar('\\');
+			fallthrough;
+		default:
+			putchar(*s);
+		}
+	}
+}
+
+static const char *shorten_path(const char *path)
+{
+	const unsigned int MAX_PATH_LEN = 32;
+	size_t len = strlen(path);
+	const char *shortpath;
+
+	if (len <= MAX_PATH_LEN)
+		return path;
+
+	/* Search for last '/' under the MAX_PATH_LEN limit */
+	shortpath = strchr(path + len - MAX_PATH_LEN, '/');
+	if (shortpath) {
+		if (shortpath < path + strlen("..."))
+			/* We removed a very short prefix, e.g. "/w", and we'll
+			 * make the path longer by prefixing with the ellipsis.
+			 * Not worth it, keep initial path.
+			 */
+			return path;
+		return shortpath;
+	}
+
+	/* File base name length is > MAX_PATH_LEN, search for last '/' */
+			shortpath = strrchr(path, '/');
+	if (shortpath)
+		return shortpath;
+
+	return path;
+}
+
+void btf_dump_linfo_dotlabel(const struct btf *btf,
+			     const struct bpf_line_info *linfo, bool linum)
+{
+	const char *line = btf__name_by_offset(btf, linfo->line_off);
+
+	if (!line || !strlen(line))
+		return;
+	line = ltrim(line);
+
+	if (linum) {
+		const char *file = btf__name_by_offset(btf, linfo->file_name_off);
+		const char *shortfile;
+
+		/* More forgiving on file because linum option is
+		 * expected to provide more info than the already
+		 * available src line.
+		 */
+		if (!file)
+			shortfile = "";
+		else
+			shortfile = shorten_path(file);
+
+		printf("; [%s", shortfile > file ? "..." : "");
+		dotlabel_puts(shortfile);
+		printf(" line:%u col:%u]\\l\\\n",
+		       BPF_LINE_INFO_LINE_NUM(linfo->line_col),
+		       BPF_LINE_INFO_LINE_COL(linfo->line_col));
+	}
+
+	printf("; ");
+	dotlabel_puts(line);
+	printf("\\l\\\n");
 }

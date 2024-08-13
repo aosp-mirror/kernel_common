@@ -10,6 +10,46 @@
 	 ((dmn)->info.caps.dmn_type##_sw_owner_v2 &&	\
 	  (dmn)->info.caps.sw_format_ver <= MLX5_STEERING_FORMAT_CONNECTX_7))
 
+bool mlx5dr_domain_is_support_ptrn_arg(struct mlx5dr_domain *dmn)
+{
+	return dmn->info.caps.sw_format_ver >= MLX5_STEERING_FORMAT_CONNECTX_6DX &&
+	       dmn->info.caps.support_modify_argument;
+}
+
+static int dr_domain_init_modify_header_resources(struct mlx5dr_domain *dmn)
+{
+	if (!mlx5dr_domain_is_support_ptrn_arg(dmn))
+		return 0;
+
+	dmn->ptrn_mgr = mlx5dr_ptrn_mgr_create(dmn);
+	if (!dmn->ptrn_mgr) {
+		mlx5dr_err(dmn, "Couldn't create ptrn_mgr\n");
+		return -ENOMEM;
+	}
+
+	/* create argument pool */
+	dmn->arg_mgr = mlx5dr_arg_mgr_create(dmn);
+	if (!dmn->arg_mgr) {
+		mlx5dr_err(dmn, "Couldn't create arg_mgr\n");
+		goto free_modify_header_pattern;
+	}
+
+	return 0;
+
+free_modify_header_pattern:
+	mlx5dr_ptrn_mgr_destroy(dmn->ptrn_mgr);
+	return -ENOMEM;
+}
+
+static void dr_domain_destroy_modify_header_resources(struct mlx5dr_domain *dmn)
+{
+	if (!mlx5dr_domain_is_support_ptrn_arg(dmn))
+		return;
+
+	mlx5dr_arg_mgr_destroy(dmn->arg_mgr);
+	mlx5dr_ptrn_mgr_destroy(dmn->ptrn_mgr);
+}
+
 static void dr_domain_init_csum_recalc_fts(struct mlx5dr_domain *dmn)
 {
 	/* Per vport cached FW FT for checksum recalculation, this
@@ -149,14 +189,22 @@ static int dr_domain_init_resources(struct mlx5dr_domain *dmn)
 		goto clean_uar;
 	}
 
+	ret = dr_domain_init_modify_header_resources(dmn);
+	if (ret) {
+		mlx5dr_err(dmn, "Couldn't create modify-header-resources\n");
+		goto clean_mem_resources;
+	}
+
 	ret = mlx5dr_send_ring_alloc(dmn);
 	if (ret) {
 		mlx5dr_err(dmn, "Couldn't create send-ring\n");
-		goto clean_mem_resources;
+		goto clean_modify_hdr;
 	}
 
 	return 0;
 
+clean_modify_hdr:
+	dr_domain_destroy_modify_header_resources(dmn);
 clean_mem_resources:
 	dr_domain_uninit_mem_resources(dmn);
 clean_uar:
@@ -170,6 +218,7 @@ clean_pd:
 static void dr_domain_uninit_resources(struct mlx5dr_domain *dmn)
 {
 	mlx5dr_send_ring_free(dmn, dmn->send_ring);
+	dr_domain_destroy_modify_header_resources(dmn);
 	dr_domain_uninit_mem_resources(dmn);
 	mlx5_put_uars_page(dmn->mdev, dmn->uar);
 	mlx5_core_dealloc_pd(dmn->mdev, dmn->pdn);
@@ -215,7 +264,7 @@ static int dr_domain_query_vport(struct mlx5dr_domain *dmn,
 	return 0;
 }
 
-static int dr_domain_query_esw_mngr(struct mlx5dr_domain *dmn)
+static int dr_domain_query_esw_mgr(struct mlx5dr_domain *dmn)
 {
 	return dr_domain_query_vport(dmn, 0, false,
 				     &dmn->info.caps.vports.esw_manager_caps);
@@ -321,7 +370,7 @@ static int dr_domain_query_fdb_caps(struct mlx5_core_dev *mdev,
 	 * vports (vport 0, VFs and SFs) will be queried dynamically.
 	 */
 
-	ret = dr_domain_query_esw_mngr(dmn);
+	ret = dr_domain_query_esw_mgr(dmn);
 	if (ret) {
 		mlx5dr_err(dmn, "Failed to query eswitch manager vport caps (err: %d)", ret);
 		goto free_vports_caps_xa;
@@ -426,6 +475,7 @@ mlx5dr_domain_create(struct mlx5_core_dev *mdev, enum mlx5dr_domain_type type)
 	mutex_init(&dmn->info.rx.mutex);
 	mutex_init(&dmn->info.tx.mutex);
 	xa_init(&dmn->definers_xa);
+	xa_init(&dmn->peer_dmn_xa);
 
 	if (dr_domain_caps_init(mdev, dmn)) {
 		mlx5dr_err(dmn, "Failed init domain, no caps\n");
@@ -435,6 +485,9 @@ mlx5dr_domain_create(struct mlx5_core_dev *mdev, enum mlx5dr_domain_type type)
 	dmn->info.max_log_action_icm_sz = DR_CHUNK_SIZE_4K;
 	dmn->info.max_log_sw_icm_sz = min_t(u32, DR_CHUNK_SIZE_1024K,
 					    dmn->info.caps.log_icm_size);
+	dmn->info.max_log_modify_hdr_pattern_icm_sz =
+		min_t(u32, DR_CHUNK_SIZE_4K,
+		      dmn->info.caps.log_modify_pattern_icm_size);
 
 	if (!dmn->info.supp_sw_steering) {
 		mlx5dr_err(dmn, "SW steering is not supported\n");
@@ -455,6 +508,7 @@ mlx5dr_domain_create(struct mlx5_core_dev *mdev, enum mlx5dr_domain_type type)
 uninit_caps:
 	dr_domain_caps_uninit(dmn);
 def_xa_destroy:
+	xa_destroy(&dmn->peer_dmn_xa);
 	xa_destroy(&dmn->definers_xa);
 	kfree(dmn);
 	return NULL;
@@ -495,6 +549,7 @@ int mlx5dr_domain_destroy(struct mlx5dr_domain *dmn)
 	dr_domain_uninit_csum_recalc_fts(dmn);
 	dr_domain_uninit_resources(dmn);
 	dr_domain_caps_uninit(dmn);
+	xa_destroy(&dmn->peer_dmn_xa);
 	xa_destroy(&dmn->definers_xa);
 	mutex_destroy(&dmn->info.tx.mutex);
 	mutex_destroy(&dmn->info.rx.mutex);
@@ -503,17 +558,22 @@ int mlx5dr_domain_destroy(struct mlx5dr_domain *dmn)
 }
 
 void mlx5dr_domain_set_peer(struct mlx5dr_domain *dmn,
-			    struct mlx5dr_domain *peer_dmn)
+			    struct mlx5dr_domain *peer_dmn,
+			    u16 peer_vhca_id)
 {
+	struct mlx5dr_domain *peer;
+
 	mlx5dr_domain_lock(dmn);
 
-	if (dmn->peer_dmn)
-		refcount_dec(&dmn->peer_dmn->refcount);
+	peer = xa_load(&dmn->peer_dmn_xa, peer_vhca_id);
+	if (peer)
+		refcount_dec(&peer->refcount);
 
-	dmn->peer_dmn = peer_dmn;
+	WARN_ON(xa_err(xa_store(&dmn->peer_dmn_xa, peer_vhca_id, peer_dmn, GFP_KERNEL)));
 
-	if (dmn->peer_dmn)
-		refcount_inc(&dmn->peer_dmn->refcount);
+	peer = xa_load(&dmn->peer_dmn_xa, peer_vhca_id);
+	if (peer)
+		refcount_inc(&peer->refcount);
 
 	mlx5dr_domain_unlock(dmn);
 }

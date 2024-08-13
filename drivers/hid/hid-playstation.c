@@ -27,6 +27,11 @@ static DEFINE_IDA(ps_player_id_allocator);
 
 #define HID_PLAYSTATION_VERSION_PATCH 0x8000
 
+enum PS_TYPE {
+	PS_TYPE_PS4_DUALSHOCK4,
+	PS_TYPE_PS5_DUALSENSE,
+};
+
 /* Base class for playstation devices. */
 struct ps_device {
 	struct list_head list;
@@ -287,6 +292,8 @@ struct dualsense_output_report {
 
 #define DS4_INPUT_REPORT_USB			0x01
 #define DS4_INPUT_REPORT_USB_SIZE		64
+#define DS4_INPUT_REPORT_BT_MINIMAL		0x01
+#define DS4_INPUT_REPORT_BT_MINIMAL_SIZE	10
 #define DS4_INPUT_REPORT_BT			0x11
 #define DS4_INPUT_REPORT_BT_SIZE		78
 #define DS4_OUTPUT_REPORT_USB			0x05
@@ -993,19 +1000,22 @@ static int dualsense_get_calibration_data(struct dualsense *ds)
 	 */
 	speed_2x = (gyro_speed_plus + gyro_speed_minus);
 	ds->gyro_calib_data[0].abs_code = ABS_RX;
-	ds->gyro_calib_data[0].bias = gyro_pitch_bias;
+	ds->gyro_calib_data[0].bias = 0;
 	ds->gyro_calib_data[0].sens_numer = speed_2x*DS_GYRO_RES_PER_DEG_S;
-	ds->gyro_calib_data[0].sens_denom = gyro_pitch_plus - gyro_pitch_minus;
+	ds->gyro_calib_data[0].sens_denom = abs(gyro_pitch_plus - gyro_pitch_bias) +
+			abs(gyro_pitch_minus - gyro_pitch_bias);
 
 	ds->gyro_calib_data[1].abs_code = ABS_RY;
-	ds->gyro_calib_data[1].bias = gyro_yaw_bias;
+	ds->gyro_calib_data[1].bias = 0;
 	ds->gyro_calib_data[1].sens_numer = speed_2x*DS_GYRO_RES_PER_DEG_S;
-	ds->gyro_calib_data[1].sens_denom = gyro_yaw_plus - gyro_yaw_minus;
+	ds->gyro_calib_data[1].sens_denom = abs(gyro_yaw_plus - gyro_yaw_bias) +
+			abs(gyro_yaw_minus - gyro_yaw_bias);
 
 	ds->gyro_calib_data[2].abs_code = ABS_RZ;
-	ds->gyro_calib_data[2].bias = gyro_roll_bias;
+	ds->gyro_calib_data[2].bias = 0;
 	ds->gyro_calib_data[2].sens_numer = speed_2x*DS_GYRO_RES_PER_DEG_S;
-	ds->gyro_calib_data[2].sens_denom = gyro_roll_plus - gyro_roll_minus;
+	ds->gyro_calib_data[2].sens_denom = abs(gyro_roll_plus - gyro_roll_bias) +
+			abs(gyro_roll_minus - gyro_roll_bias);
 
 	/*
 	 * Sanity check gyro calibration data. This is needed to prevent crashes
@@ -1388,8 +1398,7 @@ static int dualsense_parse_report(struct ps_device *ps_dev, struct hid_report *r
 	for (i = 0; i < ARRAY_SIZE(ds_report->gyro); i++) {
 		int raw_data = (short)le16_to_cpu(ds_report->gyro[i]);
 		int calib_data = mult_frac(ds->gyro_calib_data[i].sens_numer,
-					   raw_data - ds->gyro_calib_data[i].bias,
-					   ds->gyro_calib_data[i].sens_denom);
+					   raw_data, ds->gyro_calib_data[i].sens_denom);
 
 		input_report_abs(ds->sensors, ds->gyro_calib_data[i].abs_code, calib_data);
 	}
@@ -1776,8 +1785,10 @@ static int dualshock4_get_calibration_data(struct dualshock4 *ds4)
 		int retries;
 
 		buf = kzalloc(DS4_FEATURE_REPORT_CALIBRATION_SIZE, GFP_KERNEL);
-		if (!buf)
-			return -ENOMEM;
+		if (!buf) {
+			ret = -ENOMEM;
+			goto transfer_failed;
+		}
 
 		/* We should normally receive the feature report data we asked
 		 * for, but hidraw applications such as Steam can issue feature
@@ -1792,29 +1803,32 @@ static int dualshock4_get_calibration_data(struct dualshock4 *ds4)
 				if (retries < 2) {
 					hid_warn(hdev, "Retrying DualShock 4 get calibration report (0x02) request\n");
 					continue;
-				} else {
-					ret = -EILSEQ;
-					goto err_free;
 				}
-				hid_err(hdev, "Failed to retrieve DualShock4 calibration info: %d\n", ret);
-				goto err_free;
+
+				hid_warn(hdev, "Failed to retrieve DualShock4 calibration info: %d\n", ret);
+				ret = -EILSEQ;
+				goto transfer_failed;
 			} else {
 				break;
 			}
 		}
 	} else { /* Bluetooth */
 		buf = kzalloc(DS4_FEATURE_REPORT_CALIBRATION_BT_SIZE, GFP_KERNEL);
-		if (!buf)
-			return -ENOMEM;
+		if (!buf) {
+			ret = -ENOMEM;
+			goto transfer_failed;
+		}
 
 		ret = ps_get_report(hdev, DS4_FEATURE_REPORT_CALIBRATION_BT, buf,
 				DS4_FEATURE_REPORT_CALIBRATION_BT_SIZE, true);
+
 		if (ret) {
-			hid_err(hdev, "Failed to retrieve DualShock4 calibration info: %d\n", ret);
-			goto err_free;
+			hid_warn(hdev, "Failed to retrieve DualShock4 calibration info: %d\n", ret);
+			goto transfer_failed;
 		}
 	}
 
+	/* Transfer succeeded - parse the calibration data received. */
 	gyro_pitch_bias  = get_unaligned_le16(&buf[1]);
 	gyro_yaw_bias    = get_unaligned_le16(&buf[3]);
 	gyro_roll_bias   = get_unaligned_le16(&buf[5]);
@@ -1843,40 +1857,31 @@ static int dualshock4_get_calibration_data(struct dualshock4 *ds4)
 	acc_z_plus       = get_unaligned_le16(&buf[31]);
 	acc_z_minus      = get_unaligned_le16(&buf[33]);
 
+	/* Done parsing the buffer, so let's free it. */
+	kfree(buf);
+
 	/*
 	 * Set gyroscope calibration and normalization parameters.
 	 * Data values will be normalized to 1/DS4_GYRO_RES_PER_DEG_S degree/s.
 	 */
 	speed_2x = (gyro_speed_plus + gyro_speed_minus);
 	ds4->gyro_calib_data[0].abs_code = ABS_RX;
-	ds4->gyro_calib_data[0].bias = gyro_pitch_bias;
+	ds4->gyro_calib_data[0].bias = 0;
 	ds4->gyro_calib_data[0].sens_numer = speed_2x*DS4_GYRO_RES_PER_DEG_S;
-	ds4->gyro_calib_data[0].sens_denom = gyro_pitch_plus - gyro_pitch_minus;
+	ds4->gyro_calib_data[0].sens_denom = abs(gyro_pitch_plus - gyro_pitch_bias) +
+			abs(gyro_pitch_minus - gyro_pitch_bias);
 
 	ds4->gyro_calib_data[1].abs_code = ABS_RY;
-	ds4->gyro_calib_data[1].bias = gyro_yaw_bias;
+	ds4->gyro_calib_data[1].bias = 0;
 	ds4->gyro_calib_data[1].sens_numer = speed_2x*DS4_GYRO_RES_PER_DEG_S;
-	ds4->gyro_calib_data[1].sens_denom = gyro_yaw_plus - gyro_yaw_minus;
+	ds4->gyro_calib_data[1].sens_denom = abs(gyro_yaw_plus - gyro_yaw_bias) +
+			abs(gyro_yaw_minus - gyro_yaw_bias);
 
 	ds4->gyro_calib_data[2].abs_code = ABS_RZ;
-	ds4->gyro_calib_data[2].bias = gyro_roll_bias;
+	ds4->gyro_calib_data[2].bias = 0;
 	ds4->gyro_calib_data[2].sens_numer = speed_2x*DS4_GYRO_RES_PER_DEG_S;
-	ds4->gyro_calib_data[2].sens_denom = gyro_roll_plus - gyro_roll_minus;
-
-	/*
-	 * Sanity check gyro calibration data. This is needed to prevent crashes
-	 * during report handling of virtual, clone or broken devices not implementing
-	 * calibration data properly.
-	 */
-	for (i = 0; i < ARRAY_SIZE(ds4->gyro_calib_data); i++) {
-		if (ds4->gyro_calib_data[i].sens_denom == 0) {
-			hid_warn(hdev, "Invalid gyro calibration data for axis (%d), disabling calibration.",
-					ds4->gyro_calib_data[i].abs_code);
-			ds4->gyro_calib_data[i].bias = 0;
-			ds4->gyro_calib_data[i].sens_numer = DS4_GYRO_RANGE;
-			ds4->gyro_calib_data[i].sens_denom = S16_MAX;
-		}
-	}
+	ds4->gyro_calib_data[2].sens_denom = abs(gyro_roll_plus - gyro_roll_bias) +
+			abs(gyro_roll_minus - gyro_roll_bias);
 
 	/*
 	 * Set accelerometer calibration and normalization parameters.
@@ -1900,6 +1905,23 @@ static int dualshock4_get_calibration_data(struct dualshock4 *ds4)
 	ds4->accel_calib_data[2].sens_numer = 2*DS4_ACC_RES_PER_G;
 	ds4->accel_calib_data[2].sens_denom = range_2g;
 
+transfer_failed:
+	/*
+	 * Sanity check gyro calibration data. This is needed to prevent crashes
+	 * during report handling of virtual, clone or broken devices not implementing
+	 * calibration data properly.
+	 */
+	for (i = 0; i < ARRAY_SIZE(ds4->gyro_calib_data); i++) {
+		if (ds4->gyro_calib_data[i].sens_denom == 0) {
+			ds4->gyro_calib_data[i].abs_code = ABS_RX + i;
+			hid_warn(hdev, "Invalid gyro calibration data for axis (%d), disabling calibration.",
+					ds4->gyro_calib_data[i].abs_code);
+			ds4->gyro_calib_data[i].bias = 0;
+			ds4->gyro_calib_data[i].sens_numer = DS4_GYRO_RANGE;
+			ds4->gyro_calib_data[i].sens_denom = S16_MAX;
+		}
+	}
+
 	/*
 	 * Sanity check accelerometer calibration data. This is needed to prevent crashes
 	 * during report handling of virtual, clone or broken devices not implementing calibration
@@ -1907,6 +1929,7 @@ static int dualshock4_get_calibration_data(struct dualshock4 *ds4)
 	 */
 	for (i = 0; i < ARRAY_SIZE(ds4->accel_calib_data); i++) {
 		if (ds4->accel_calib_data[i].sens_denom == 0) {
+			ds4->accel_calib_data[i].abs_code = ABS_X + i;
 			hid_warn(hdev, "Invalid accelerometer calibration data for axis (%d), disabling calibration.",
 					ds4->accel_calib_data[i].abs_code);
 			ds4->accel_calib_data[i].bias = 0;
@@ -1915,8 +1938,6 @@ static int dualshock4_get_calibration_data(struct dualshock4 *ds4)
 		}
 	}
 
-err_free:
-	kfree(buf);
 	return ret;
 }
 
@@ -2033,8 +2054,9 @@ static int dualshock4_led_set_blink(struct led_classdev *led, unsigned long *del
 
 	dualshock4_schedule_work(ds4);
 
-	*delay_on = ds4->lightbar_blink_on;
-	*delay_off = ds4->lightbar_blink_off;
+	/* Report scaled values back to LED subsystem */
+	*delay_on = ds4->lightbar_blink_on * 10;
+	*delay_off = ds4->lightbar_blink_off * 10;
 
 	return 0;
 }
@@ -2061,6 +2083,13 @@ static int dualshock4_led_set_brightness(struct led_classdev *led, enum led_brig
 		break;
 	case 3:
 		ds4->lightbar_enabled = !!value;
+
+		/* brightness = 0 also cancels blinking in Linux. */
+		if (!ds4->lightbar_enabled) {
+			ds4->lightbar_blink_off = 0;
+			ds4->lightbar_blink_on = 0;
+			ds4->update_lightbar_blink = true;
+		}
 	}
 
 	ds4->update_lightbar = true;
@@ -2178,6 +2207,7 @@ static int dualshock4_parse_report(struct ps_device *ps_dev, struct hid_report *
 	int battery_status, i, j;
 	uint16_t sensor_timestamp;
 	unsigned long flags;
+	bool is_minimal = false;
 
 	/*
 	 * DualShock4 in USB uses the full HID report for reportID 1, but
@@ -2205,6 +2235,18 @@ static int dualshock4_parse_report(struct ps_device *ps_dev, struct hid_report *
 		ds4_report = &bt->common;
 		num_touch_reports = bt->num_touch_reports;
 		touch_reports = bt->touch_reports;
+	} else if (hdev->bus == BUS_BLUETOOTH &&
+		   report->id == DS4_INPUT_REPORT_BT_MINIMAL &&
+			 size == DS4_INPUT_REPORT_BT_MINIMAL_SIZE) {
+		/* Some third-party pads never switch to the full 0x11 report.
+		 * The short 0x01 report is 10 bytes long:
+		 *   u8 report_id == 0x01
+		 *   u8 first_bytes_of_full_report[9]
+		 * So let's reuse the full report parser, and stop it after
+		 * parsing the buttons.
+		 */
+		ds4_report = (struct dualshock4_input_report_common *)&data[1];
+		is_minimal = true;
 	} else {
 		hid_err(hdev, "Unhandled reportID=%d\n", report->id);
 		return -1;
@@ -2238,12 +2280,14 @@ static int dualshock4_parse_report(struct ps_device *ps_dev, struct hid_report *
 	input_report_key(ds4->gamepad, BTN_MODE,   ds4_report->buttons[2] & DS_BUTTONS2_PS_HOME);
 	input_sync(ds4->gamepad);
 
+	if (is_minimal)
+		return 0;
+
 	/* Parse and calibrate gyroscope data. */
 	for (i = 0; i < ARRAY_SIZE(ds4_report->gyro); i++) {
 		int raw_data = (short)le16_to_cpu(ds4_report->gyro[i]);
 		int calib_data = mult_frac(ds4->gyro_calib_data[i].sens_numer,
-					   raw_data - ds4->gyro_calib_data[i].bias,
-					   ds4->gyro_calib_data[i].sens_denom);
+					   raw_data, ds4->gyro_calib_data[i].sens_denom);
 
 		input_report_abs(ds4->sensors, ds4->gyro_calib_data[i].abs_code, calib_data);
 	}
@@ -2547,8 +2591,8 @@ static struct ps_device *dualshock4_create(struct hid_device *hdev)
 
 	ret = dualshock4_get_firmware_info(ds4);
 	if (ret) {
-		hid_err(hdev, "Failed to get firmware info from DualShock4\n");
-		return ERR_PTR(ret);
+		hid_warn(hdev, "Failed to get firmware info from DualShock4\n");
+		hid_warn(hdev, "HW/FW version data in sysfs will be invalid.\n");
 	}
 
 	ret = ps_devices_list_add(ps_dev);
@@ -2557,8 +2601,8 @@ static struct ps_device *dualshock4_create(struct hid_device *hdev)
 
 	ret = dualshock4_get_calibration_data(ds4);
 	if (ret) {
-		hid_err(hdev, "Failed to get calibration data from DualShock4\n");
-		goto err;
+		hid_warn(hdev, "Failed to get calibration data from DualShock4\n");
+		hid_warn(hdev, "Gyroscope and accelerometer will be inaccurate.\n");
 	}
 
 	ds4->gamepad = ps_gamepad_create(hdev, dualshock4_play_effect);
@@ -2652,17 +2696,14 @@ static int ps_probe(struct hid_device *hdev, const struct hid_device_id *id)
 		goto err_stop;
 	}
 
-	if (hdev->product == USB_DEVICE_ID_SONY_PS4_CONTROLLER ||
-		hdev->product == USB_DEVICE_ID_SONY_PS4_CONTROLLER_2 ||
-		hdev->product == USB_DEVICE_ID_SONY_PS4_CONTROLLER_DONGLE) {
+	if (id->driver_data == PS_TYPE_PS4_DUALSHOCK4) {
 		dev = dualshock4_create(hdev);
 		if (IS_ERR(dev)) {
 			hid_err(hdev, "Failed to create dualshock4.\n");
 			ret = PTR_ERR(dev);
 			goto err_close;
 		}
-	} else if (hdev->product == USB_DEVICE_ID_SONY_PS5_CONTROLLER ||
-		hdev->product == USB_DEVICE_ID_SONY_PS5_CONTROLLER_2) {
+	} else if (id->driver_data == PS_TYPE_PS5_DUALSENSE) {
 		dev = dualsense_create(hdev);
 		if (IS_ERR(dev)) {
 			hid_err(hdev, "Failed to create dualsense.\n");
@@ -2696,16 +2737,26 @@ static void ps_remove(struct hid_device *hdev)
 
 static const struct hid_device_id ps_devices[] = {
 	/* Sony DualShock 4 controllers for PS4 */
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER) },
-	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER) },
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER_2) },
-	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER_2) },
-	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER_DONGLE) },
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER),
+		.driver_data = PS_TYPE_PS4_DUALSHOCK4 },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER),
+		.driver_data = PS_TYPE_PS4_DUALSHOCK4 },
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER_2),
+		.driver_data = PS_TYPE_PS4_DUALSHOCK4 },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER_2),
+		.driver_data = PS_TYPE_PS4_DUALSHOCK4 },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS4_CONTROLLER_DONGLE),
+		.driver_data = PS_TYPE_PS4_DUALSHOCK4 },
+
 	/* Sony DualSense controllers for PS5 */
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS5_CONTROLLER) },
-	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS5_CONTROLLER) },
-	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS5_CONTROLLER_2) },
-	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS5_CONTROLLER_2) },
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS5_CONTROLLER),
+		.driver_data = PS_TYPE_PS5_DUALSENSE },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS5_CONTROLLER),
+		.driver_data = PS_TYPE_PS5_DUALSENSE },
+	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS5_CONTROLLER_2),
+		.driver_data = PS_TYPE_PS5_DUALSENSE },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_SONY, USB_DEVICE_ID_SONY_PS5_CONTROLLER_2),
+		.driver_data = PS_TYPE_PS5_DUALSENSE },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, ps_devices);

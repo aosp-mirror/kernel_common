@@ -6,6 +6,7 @@
 /* glibc 2.20 deprecates _BSD_SOURCE in favour of _DEFAULT_SOURCE */
 #define _DEFAULT_SOURCE 1
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,6 +15,14 @@
 #ifndef __cplusplus
 #include <internal/cpumap.h>
 #endif
+
+extern const char perf_usage_string[];
+extern const char perf_more_info_string[];
+
+extern const char *input_name;
+
+extern bool perf_host;
+extern bool perf_guest;
 
 /* General helper functions */
 void usage(const char *err) __noreturn;
@@ -46,6 +55,13 @@ int perf_tip(char **strp, const char *dirpath);
 
 #ifndef HAVE_SCHED_GETCPU_SUPPORT
 int sched_getcpu(void);
+#endif
+
+#ifndef HAVE_SCANDIRAT_SUPPORT
+int scandirat(int dirfd, const char *dirp,
+	      struct dirent ***namelist,
+	      int (*filter)(const struct dirent *),
+	      int (*compar)(const struct dirent **, const struct dirent **));
 #endif
 
 extern bool perf_singlethreaded;

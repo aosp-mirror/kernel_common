@@ -1,40 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <test_progs.h>
 #include "cgroup_helpers.h"
+#include "network_helpers.h"
+
+#include "sockopt_inherit.skel.h"
 
 #define SOL_CUSTOM			0xdeadbeef
 #define CUSTOM_INHERIT1			0
 #define CUSTOM_INHERIT2			1
 #define CUSTOM_LISTENER			2
-
-static int connect_to_server(int server_fd)
-{
-	struct sockaddr_storage addr;
-	socklen_t len = sizeof(addr);
-	int fd;
-
-	fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (fd < 0) {
-		log_err("Failed to create client socket");
-		return -1;
-	}
-
-	if (getsockname(server_fd, (struct sockaddr *)&addr, &len)) {
-		log_err("Failed to get server addr");
-		goto out;
-	}
-
-	if (connect(fd, (const struct sockaddr *)&addr, len) < 0) {
-		log_err("Fail to connect to server");
-		goto out;
-	}
-
-	return fd;
-
-out:
-	close(fd);
-	return -1;
-}
 
 static int verify_sockopt(int fd, int optname, const char *msg, char expected)
 {
@@ -96,67 +70,19 @@ static void *server_thread(void *arg)
 	return (void *)(long)err;
 }
 
-static int start_server(void)
+static int custom_cb(int fd, const struct post_socket_opts *opts)
 {
-	struct sockaddr_in addr = {
-		.sin_family = AF_INET,
-		.sin_addr.s_addr = htonl(INADDR_LOOPBACK),
-	};
 	char buf;
 	int err;
-	int fd;
 	int i;
-
-	fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (fd < 0) {
-		log_err("Failed to create server socket");
-		return -1;
-	}
 
 	for (i = CUSTOM_INHERIT1; i <= CUSTOM_LISTENER; i++) {
 		buf = 0x01;
 		err = setsockopt(fd, SOL_CUSTOM, i, &buf, 1);
 		if (err) {
 			log_err("Failed to call setsockopt(%d)", i);
-			close(fd);
 			return -1;
 		}
-	}
-
-	if (bind(fd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		log_err("Failed to bind socket");
-		close(fd);
-		return -1;
-	}
-
-	return fd;
-}
-
-static int prog_attach(struct bpf_object *obj, int cgroup_fd, const char *title,
-		       const char *prog_name)
-{
-	enum bpf_attach_type attach_type;
-	enum bpf_prog_type prog_type;
-	struct bpf_program *prog;
-	int err;
-
-	err = libbpf_prog_type_by_name(title, &prog_type, &attach_type);
-	if (err) {
-		log_err("Failed to deduct types for %s BPF program", prog_name);
-		return -1;
-	}
-
-	prog = bpf_object__find_program_by_name(obj, prog_name);
-	if (!prog) {
-		log_err("Failed to find %s BPF program", prog_name);
-		return -1;
-	}
-
-	err = bpf_prog_attach(bpf_program__fd(prog), cgroup_fd,
-			      attach_type, 0);
-	if (err) {
-		log_err("Failed to attach %s BPF program", prog_name);
-		return -1;
 	}
 
 	return 0;
@@ -164,29 +90,39 @@ static int prog_attach(struct bpf_object *obj, int cgroup_fd, const char *title,
 
 static void run_test(int cgroup_fd)
 {
+	struct bpf_link *link_getsockopt = NULL;
+	struct bpf_link *link_setsockopt = NULL;
+	struct network_helper_opts opts = {
+		.post_socket_cb = custom_cb,
+	};
 	int server_fd = -1, client_fd;
-	struct bpf_object *obj;
+	struct sockaddr_in addr = {
+		.sin_family = AF_INET,
+		.sin_addr.s_addr = htonl(INADDR_LOOPBACK),
+	};
+	struct sockopt_inherit *obj;
 	void *server_err;
 	pthread_t tid;
 	int err;
 
-	obj = bpf_object__open_file("sockopt_inherit.bpf.o", NULL);
-	if (!ASSERT_OK_PTR(obj, "obj_open"))
+	obj = sockopt_inherit__open_and_load();
+	if (!ASSERT_OK_PTR(obj, "skel-load"))
 		return;
 
-	err = bpf_object__load(obj);
-	if (!ASSERT_OK(err, "obj_load"))
+	obj->bss->page_size = sysconf(_SC_PAGESIZE);
+
+	link_getsockopt = bpf_program__attach_cgroup(obj->progs._getsockopt,
+						     cgroup_fd);
+	if (!ASSERT_OK_PTR(link_getsockopt, "cg-attach-getsockopt"))
 		goto close_bpf_object;
 
-	err = prog_attach(obj, cgroup_fd, "cgroup/getsockopt", "_getsockopt");
-	if (!ASSERT_OK(err, "prog_attach _getsockopt"))
+	link_setsockopt = bpf_program__attach_cgroup(obj->progs._setsockopt,
+						     cgroup_fd);
+	if (!ASSERT_OK_PTR(link_setsockopt, "cg-attach-setsockopt"))
 		goto close_bpf_object;
 
-	err = prog_attach(obj, cgroup_fd, "cgroup/setsockopt", "_setsockopt");
-	if (!ASSERT_OK(err, "prog_attach _setsockopt"))
-		goto close_bpf_object;
-
-	server_fd = start_server();
+	server_fd = start_server_addr(SOCK_STREAM, (struct sockaddr_storage *)&addr,
+				      sizeof(addr), &opts);
 	if (!ASSERT_GE(server_fd, 0, "start_server"))
 		goto close_bpf_object;
 
@@ -199,7 +135,7 @@ static void run_test(int cgroup_fd)
 	pthread_cond_wait(&server_started, &server_started_mtx);
 	pthread_mutex_unlock(&server_started_mtx);
 
-	client_fd = connect_to_server(server_fd);
+	client_fd = connect_to_fd(server_fd, 0);
 	if (!ASSERT_GE(client_fd, 0, "connect_to_server"))
 		goto close_server_fd;
 
@@ -217,7 +153,10 @@ static void run_test(int cgroup_fd)
 close_server_fd:
 	close(server_fd);
 close_bpf_object:
-	bpf_object__close(obj);
+	bpf_link__destroy(link_getsockopt);
+	bpf_link__destroy(link_setsockopt);
+
+	sockopt_inherit__destroy(obj);
 }
 
 void test_sockopt_inherit(void)

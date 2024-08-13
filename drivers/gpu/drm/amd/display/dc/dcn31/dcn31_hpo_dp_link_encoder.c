@@ -26,7 +26,6 @@
 #include "dc_bios_types.h"
 #include "dcn31_hpo_dp_link_encoder.h"
 #include "reg_helper.h"
-#include "dc_link.h"
 #include "stream_encoder.h"
 
 #define DC_LOGGER \
@@ -242,7 +241,10 @@ void dcn31_hpo_dp_link_enc_set_link_test_pattern(
 		REG_UPDATE(DP_DPHY_SYM32_CONTROL,
 				MODE, DP2_TEST_PATTERN);
 		break;
-	case DP_TEST_PATTERN_SQUARE_PULSE:
+	case DP_TEST_PATTERN_SQUARE:
+	case DP_TEST_PATTERN_SQUARE_PRESHOOT_DISABLED:
+	case DP_TEST_PATTERN_SQUARE_DEEMPHASIS_DISABLED:
+	case DP_TEST_PATTERN_SQUARE_PRESHOOT_DEEMPHASIS_DISABLED:
 		REG_SET(DP_DPHY_SYM32_TP_SQ_PULSE, 0,
 				TP_SQ_PULSE_WIDTH, tp_params->custom_pattern[0]);
 
@@ -375,7 +377,7 @@ void dcn31_hpo_dp_link_enc_update_stream_allocation_table(
 	 */
 	REG_WAIT(DP_DPHY_SYM32_STATUS,
 			SAT_UPDATE_PENDING, 0,
-			10, DP_SAT_UPDATE_MAX_RETRY);
+			100, DP_SAT_UPDATE_MAX_RETRY);
 }
 
 void dcn31_hpo_dp_link_enc_set_throttled_vcp_size(
@@ -392,6 +394,12 @@ void dcn31_hpo_dp_link_enc_set_throttled_vcp_size(
 				avg_time_slots_per_mtp,
 				x),
 			25));
+
+	// If y rounds up to integer, carry it over to x.
+	if (y >> 25) {
+		x += 1;
+		y = 0;
+	}
 
 	switch (stream_encoder_inst) {
 	case 0:

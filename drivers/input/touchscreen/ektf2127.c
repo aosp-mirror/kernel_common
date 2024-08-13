@@ -177,7 +177,7 @@ static void ektf2127_stop(struct input_dev *dev)
 	gpiod_set_value_cansleep(ts->power_gpios, 0);
 }
 
-static int __maybe_unused ektf2127_suspend(struct device *dev)
+static int ektf2127_suspend(struct device *dev)
 {
 	struct ektf2127_ts *ts = i2c_get_clientdata(to_i2c_client(dev));
 
@@ -189,7 +189,7 @@ static int __maybe_unused ektf2127_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused ektf2127_resume(struct device *dev)
+static int ektf2127_resume(struct device *dev)
 {
 	struct ektf2127_ts *ts = i2c_get_clientdata(to_i2c_client(dev));
 
@@ -201,8 +201,8 @@ static int __maybe_unused ektf2127_resume(struct device *dev)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(ektf2127_pm_ops, ektf2127_suspend,
-			 ektf2127_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(ektf2127_pm_ops, ektf2127_suspend,
+				ektf2127_resume);
 
 static int ektf2127_query_dimension(struct i2c_client *client, bool width)
 {
@@ -264,12 +264,8 @@ static int ektf2127_probe(struct i2c_client *client)
 
 	/* This requests the gpio *and* turns on the touchscreen controller */
 	ts->power_gpios = devm_gpiod_get(dev, "power", GPIOD_OUT_HIGH);
-	if (IS_ERR(ts->power_gpios)) {
-		error = PTR_ERR(ts->power_gpios);
-		if (error != -EPROBE_DEFER)
-			dev_err(dev, "Error getting power gpio: %d\n", error);
-		return error;
-	}
+	if (IS_ERR(ts->power_gpios))
+		return dev_err_probe(dev, PTR_ERR(ts->power_gpios), "Error getting power gpio\n");
 
 	input = devm_input_allocate_device(dev);
 	if (!input)
@@ -339,8 +335,8 @@ MODULE_DEVICE_TABLE(of, ektf2127_of_match);
 #endif
 
 static const struct i2c_device_id ektf2127_i2c_id[] = {
-	{ "ektf2127", 0 },
-	{ "ektf2132", 0 },
+	{ "ektf2127" },
+	{ "ektf2132" },
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, ektf2127_i2c_id);
@@ -348,10 +344,10 @@ MODULE_DEVICE_TABLE(i2c, ektf2127_i2c_id);
 static struct i2c_driver ektf2127_driver = {
 	.driver = {
 		.name	= "elan_ektf2127",
-		.pm	= &ektf2127_pm_ops,
+		.pm	= pm_sleep_ptr(&ektf2127_pm_ops),
 		.of_match_table = of_match_ptr(ektf2127_of_match),
 	},
-	.probe_new = ektf2127_probe,
+	.probe = ektf2127_probe,
 	.id_table = ektf2127_i2c_id,
 };
 module_i2c_driver(ektf2127_driver);

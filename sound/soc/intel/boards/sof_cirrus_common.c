@@ -91,7 +91,7 @@ static const struct {
 static int cs35l41_hw_params(struct snd_pcm_substream *substream,
 			     struct snd_pcm_hw_params *params)
 {
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 	struct snd_soc_dai *codec_dai;
 	int clk_freq, i, ret;
 
@@ -168,11 +168,16 @@ static int cs35l41_compute_codec_conf(void)
 			continue;
 		}
 		physdev = get_device(acpi_get_first_physical_node(adev));
+		acpi_dev_put(adev);
+		if (!physdev) {
+			pr_devel("Cannot find physical node for HID %s UID %u (%s)\n", CS35L41_HID,
+					uid, cs35l41_name_prefixes[uid]);
+			return 0;
+		}
 		cs35l41_components[sz].name = dev_name(physdev);
 		cs35l41_components[sz].dai_name = CS35L41_CODEC_DAI;
 		cs35l41_codec_conf[sz].dlc.name = dev_name(physdev);
 		cs35l41_codec_conf[sz].name_prefix = cs35l41_name_prefixes[uid];
-		acpi_dev_put(adev);
 		sz++;
 	}
 

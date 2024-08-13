@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause-Clear
 /*
  * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "debug.h"
@@ -245,7 +246,7 @@ int ath11k_hal_reo_cmd_send(struct ath11k_base *ab, struct hal_srng *srng,
 	case HAL_REO_CMD_UNBLOCK_CACHE:
 	case HAL_REO_CMD_FLUSH_TIMEOUT_LIST:
 		ath11k_warn(ab, "Unsupported reo command %d\n", type);
-		ret = -ENOTSUPP;
+		ret = -EOPNOTSUPP;
 		break;
 	default:
 		ath11k_warn(ab, "Unknown reo command %d\n", type);
@@ -265,7 +266,7 @@ out:
 void ath11k_hal_rx_buf_addr_info_set(void *desc, dma_addr_t paddr,
 				     u32 cookie, u8 manager)
 {
-	struct ath11k_buffer_addr *binfo = (struct ath11k_buffer_addr *)desc;
+	struct ath11k_buffer_addr *binfo = desc;
 	u32 paddr_lo, paddr_hi;
 
 	paddr_lo = lower_32_bits(paddr);
@@ -279,7 +280,7 @@ void ath11k_hal_rx_buf_addr_info_set(void *desc, dma_addr_t paddr,
 void ath11k_hal_rx_buf_addr_info_get(void *desc, dma_addr_t *paddr,
 				     u32 *cookie, u8 *rbm)
 {
-	struct ath11k_buffer_addr *binfo = (struct ath11k_buffer_addr *)desc;
+	struct ath11k_buffer_addr *binfo = desc;
 
 	*paddr =
 		(((u64)FIELD_GET(BUFFER_ADDR_INFO1_ADDR, binfo->info1)) << 32) |
@@ -292,7 +293,7 @@ void ath11k_hal_rx_msdu_link_info_get(void *link_desc, u32 *num_msdus,
 				      u32 *msdu_cookies,
 				      enum hal_rx_buf_return_buf_manager *rbm)
 {
-	struct hal_rx_msdu_link *link = (struct hal_rx_msdu_link *)link_desc;
+	struct hal_rx_msdu_link *link = link_desc;
 	struct hal_rx_msdu_details *msdu;
 	int i;
 
@@ -442,54 +443,54 @@ void ath11k_hal_reo_status_queue_stats(struct ath11k_base *ab, u32 *reo_desc,
 				FIELD_GET(HAL_REO_STATUS_HDR_INFO0_EXEC_STATUS,
 					  desc->hdr.info0);
 
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "Queue stats status:\n");
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "header: cmd_num %d status %d\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "Queue stats status:\n");
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "header: cmd_num %d status %d\n",
 		   status->uniform_hdr.cmd_num,
 		   status->uniform_hdr.cmd_status);
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "ssn %ld cur_idx %ld\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "ssn %ld cur_idx %ld\n",
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO0_SSN,
 			     desc->info0),
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO0_CUR_IDX,
 			     desc->info0));
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "pn = [%08x, %08x, %08x, %08x]\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "pn = [%08x, %08x, %08x, %08x]\n",
 		   desc->pn[0], desc->pn[1], desc->pn[2], desc->pn[3]);
-	ath11k_dbg(ab, ATH11k_DBG_HAL,
+	ath11k_dbg(ab, ATH11K_DBG_HAL,
 		   "last_rx: enqueue_tstamp %08x dequeue_tstamp %08x\n",
 		   desc->last_rx_enqueue_timestamp,
 		   desc->last_rx_dequeue_timestamp);
-	ath11k_dbg(ab, ATH11k_DBG_HAL,
+	ath11k_dbg(ab, ATH11K_DBG_HAL,
 		   "rx_bitmap [%08x %08x %08x %08x %08x %08x %08x %08x]\n",
 		   desc->rx_bitmap[0], desc->rx_bitmap[1], desc->rx_bitmap[2],
 		   desc->rx_bitmap[3], desc->rx_bitmap[4], desc->rx_bitmap[5],
 		   desc->rx_bitmap[6], desc->rx_bitmap[7]);
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "count: cur_mpdu %ld cur_msdu %ld\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "count: cur_mpdu %ld cur_msdu %ld\n",
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO1_MPDU_COUNT,
 			     desc->info1),
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO1_MSDU_COUNT,
 			     desc->info1));
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "fwd_timeout %ld fwd_bar %ld dup_count %ld\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "fwd_timeout %ld fwd_bar %ld dup_count %ld\n",
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO2_TIMEOUT_COUNT,
 			     desc->info2),
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO2_FDTB_COUNT,
 			     desc->info2),
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO2_DUPLICATE_COUNT,
 			     desc->info2));
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "frames_in_order %ld bar_rcvd %ld\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "frames_in_order %ld bar_rcvd %ld\n",
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO3_FIO_COUNT,
 			     desc->info3),
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO3_BAR_RCVD_CNT,
 			     desc->info3));
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "num_mpdus %d num_msdus %d total_bytes %d\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "num_mpdus %d num_msdus %d total_bytes %d\n",
 		   desc->num_mpdu_frames, desc->num_msdu_frames,
 		   desc->total_bytes);
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "late_rcvd %ld win_jump_2k %ld hole_cnt %ld\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "late_rcvd %ld win_jump_2k %ld hole_cnt %ld\n",
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO4_LATE_RX_MPDU,
 			     desc->info4),
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO4_WINDOW_JMP2K,
 			     desc->info4),
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO4_HOLE_COUNT,
 			     desc->info4));
-	ath11k_dbg(ab, ATH11k_DBG_HAL, "looping count %ld\n",
+	ath11k_dbg(ab, ATH11K_DBG_HAL, "looping count %ld\n",
 		   FIELD_GET(HAL_REO_GET_QUEUE_STATS_STATUS_INFO5_LOOPING_CNT,
 			     desc->info5));
 }
@@ -699,7 +700,7 @@ u32 ath11k_hal_reo_qdesc_size(u32 ba_window_size, u8 tid)
 void ath11k_hal_reo_qdesc_setup(void *vaddr, int tid, u32 ba_window_size,
 				u32 start_seq, enum hal_pn_type type)
 {
-	struct hal_rx_reo_queue *qdesc = (struct hal_rx_reo_queue *)vaddr;
+	struct hal_rx_reo_queue *qdesc = vaddr;
 	struct hal_rx_reo_queue_ext *ext_desc;
 
 	memset(qdesc, 0, sizeof(*qdesc));
@@ -809,27 +810,25 @@ static inline void
 ath11k_hal_rx_handle_ofdma_info(void *rx_tlv,
 				struct hal_rx_user_status *rx_user_status)
 {
-	struct hal_rx_ppdu_end_user_stats *ppdu_end_user =
-		(struct hal_rx_ppdu_end_user_stats *)rx_tlv;
+	struct hal_rx_ppdu_end_user_stats *ppdu_end_user = rx_tlv;
 
 	rx_user_status->ul_ofdma_user_v0_word0 = __le32_to_cpu(ppdu_end_user->info6);
 
-	rx_user_status->ul_ofdma_user_v0_word1 = __le32_to_cpu(ppdu_end_user->rsvd2[10]);
+	rx_user_status->ul_ofdma_user_v0_word1 = __le32_to_cpu(ppdu_end_user->info10);
 }
 
 static inline void
 ath11k_hal_rx_populate_byte_count(void *rx_tlv, void *ppduinfo,
 				  struct hal_rx_user_status *rx_user_status)
 {
-	struct hal_rx_ppdu_end_user_stats *ppdu_end_user =
-		(struct hal_rx_ppdu_end_user_stats *)rx_tlv;
+	struct hal_rx_ppdu_end_user_stats *ppdu_end_user = rx_tlv;
 
 	rx_user_status->mpdu_ok_byte_count =
-		FIELD_GET(HAL_RX_PPDU_END_USER_STATS_RSVD2_6_MPDU_OK_BYTE_COUNT,
-			  __le32_to_cpu(ppdu_end_user->rsvd2[6]));
+		FIELD_GET(HAL_RX_PPDU_END_USER_STATS_INFO8_MPDU_OK_BYTE_COUNT,
+			  __le32_to_cpu(ppdu_end_user->info8));
 	rx_user_status->mpdu_err_byte_count =
-		FIELD_GET(HAL_RX_PPDU_END_USER_STATS_RSVD2_8_MPDU_ERR_BYTE_COUNT,
-			  __le32_to_cpu(ppdu_end_user->rsvd2[8]));
+		FIELD_GET(HAL_RX_PPDU_END_USER_STATS_INFO9_MPDU_ERR_BYTE_COUNT,
+			  __le32_to_cpu(ppdu_end_user->info9));
 }
 
 static inline void
@@ -865,6 +864,12 @@ ath11k_hal_rx_populate_mu_user_info(void *rx_tlv, struct hal_rx_mon_ppdu_info *p
 	ath11k_hal_rx_populate_byte_count(rx_tlv, ppdu_info, rx_user_status);
 }
 
+static u16 ath11k_hal_rx_mpduinfo_get_peerid(struct ath11k_base *ab,
+					     struct hal_rx_mpdu_info *mpdu_info)
+{
+	return ab->hw_params.hw_ops->mpdu_info_get_peerid(mpdu_info);
+}
+
 static enum hal_rx_mon_status
 ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 				   struct hal_rx_mon_ppdu_info *ppdu_info,
@@ -897,8 +902,8 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 			FIELD_GET(HAL_RX_PPDU_END_USER_STATS_INFO2_AST_INDEX,
 				  __le32_to_cpu(eu_stats->info2));
 		ppdu_info->tid =
-			ffs(FIELD_GET(HAL_RX_PPDU_END_USER_STATS_INFO6_TID_BITMAP,
-				      __le32_to_cpu(eu_stats->info6))) - 1;
+			ffs(FIELD_GET(HAL_RX_PPDU_END_USER_STATS_INFO7_TID_BITMAP,
+				      __le32_to_cpu(eu_stats->info7))) - 1;
 		ppdu_info->tcp_msdu_count =
 			FIELD_GET(HAL_RX_PPDU_END_USER_STATS_INFO4_TCP_MSDU_CNT,
 				  __le32_to_cpu(eu_stats->info4));
@@ -1023,7 +1028,7 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 		info1 = __le32_to_cpu(vht_sig->info1);
 
 		ppdu_info->ldpc = FIELD_GET(HAL_RX_VHT_SIG_A_INFO_INFO1_SU_MU_CODING,
-					    info0);
+					    info1);
 		ppdu_info->mcs = FIELD_GET(HAL_RX_VHT_SIG_A_INFO_INFO1_MCS,
 					   info1);
 		gi_setting = FIELD_GET(HAL_RX_VHT_SIG_A_INFO_INFO1_GI_SETTING,
@@ -1446,7 +1451,7 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 		 * PHYRX_OTHER_RECEIVE_INFO TLV.
 		 */
 		ppdu_info->rssi_comb =
-			FIELD_GET(HAL_RX_PHYRX_RSSI_LEGACY_INFO_INFO1_RSSI_COMB,
+			FIELD_GET(HAL_RX_PHYRX_RSSI_LEGACY_INFO_INFO0_RSSI_COMB,
 				  __le32_to_cpu(rssi->info0));
 
 		if (db2dbm) {
@@ -1459,9 +1464,11 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 		break;
 	}
 	case HAL_RX_MPDU_START: {
+		struct hal_rx_mpdu_info *mpdu_info =
+				(struct hal_rx_mpdu_info *)tlv_data;
 		u16 peer_id;
 
-		peer_id = ab->hw_params.hw_ops->mpdu_info_get_peerid(tlv_data);
+		peer_id = ath11k_hal_rx_mpduinfo_get_peerid(ab, mpdu_info);
 		if (peer_id)
 			ppdu_info->peer_id = peer_id;
 		break;
@@ -1532,8 +1539,7 @@ void ath11k_hal_rx_reo_ent_buf_paddr_get(void *rx_desc, dma_addr_t *paddr,
 					 u32 *sw_cookie, void **pp_buf_addr,
 					 u8 *rbm, u32 *msdu_cnt)
 {
-	struct hal_reo_entrance_ring *reo_ent_ring =
-		(struct hal_reo_entrance_ring *)rx_desc;
+	struct hal_reo_entrance_ring *reo_ent_ring = rx_desc;
 	struct ath11k_buffer_addr *buf_addr_info;
 	struct rx_mpdu_desc *rx_mpdu_desc_info_details;
 

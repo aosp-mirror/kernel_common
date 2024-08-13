@@ -1238,7 +1238,7 @@ static int da7210_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id da7210_i2c_id[] = {
-	{ "da7210", 0 },
+	{ "da7210" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, da7210_i2c_id);
@@ -1248,7 +1248,7 @@ static struct i2c_driver da7210_i2c_driver = {
 	.driver = {
 		.name = "da7210",
 	},
-	.probe_new	= da7210_i2c_probe,
+	.probe		= da7210_i2c_probe,
 	.id_table	= da7210_i2c_id,
 };
 #endif

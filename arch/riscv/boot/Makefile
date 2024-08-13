@@ -14,9 +14,8 @@
 # Based on the ia64 and arm64 boot/Makefile.
 #
 
-KCOV_INSTRUMENT := n
-
 OBJCOPYFLAGS_Image :=-O binary -R .note -R .note.gnu.build-id -R .comment -S
+OBJCOPYFLAGS_loader.bin :=-O binary
 OBJCOPYFLAGS_xipImage :=-O binary -R .note -R .note.gnu.build-id -R .comment -S
 
 targets := Image Image.* loader loader.o loader.lds loader.bin
@@ -33,7 +32,14 @@ $(obj)/xipImage: vmlinux FORCE
 
 endif
 
+ifdef CONFIG_RELOCATABLE
+vmlinux.relocs: vmlinux
+	@ (! [ -f vmlinux.relocs ] && echo "vmlinux.relocs can't be found, please remove vmlinux and try again") || true
+
+$(obj)/Image: vmlinux.relocs FORCE
+else
 $(obj)/Image: vmlinux FORCE
+endif
 	$(call if_changed,objcopy)
 
 $(obj)/Image.gz: $(obj)/Image FORCE

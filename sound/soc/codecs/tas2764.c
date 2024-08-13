@@ -738,7 +738,7 @@ static int tas2764_i2c_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id tas2764_i2c_id[] = {
-	{ "tas2764", 0},
+	{ "tas2764"},
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, tas2764_i2c_id);
@@ -756,7 +756,7 @@ static struct i2c_driver tas2764_i2c_driver = {
 		.name   = "tas2764",
 		.of_match_table = of_match_ptr(tas2764_of_match),
 	},
-	.probe_new  = tas2764_i2c_probe,
+	.probe      = tas2764_i2c_probe,
 	.id_table   = tas2764_i2c_id,
 };
 module_i2c_driver(tas2764_i2c_driver);

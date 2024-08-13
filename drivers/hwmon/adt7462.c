@@ -1809,7 +1809,7 @@ static int adt7462_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id adt7462_id[] = {
-	{ "adt7462", 0 },
+	{ "adt7462" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, adt7462_id);
@@ -1819,7 +1819,7 @@ static struct i2c_driver adt7462_driver = {
 	.driver = {
 		.name	= "adt7462",
 	},
-	.probe_new	= adt7462_probe,
+	.probe		= adt7462_probe,
 	.id_table	= adt7462_id,
 	.detect		= adt7462_detect,
 	.address_list	= normal_i2c,

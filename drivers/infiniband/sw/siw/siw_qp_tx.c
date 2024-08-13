@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0 or BSD-3-Clause
+// SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 
 /* Authors: Bernard Metzler <bmt@zurich.ibm.com> */
 /* Copyright (c) 2008-2019, IBM Corporation */
@@ -29,9 +29,18 @@ static struct page *siw_get_pblpage(struct siw_mem *mem, u64 addr, int *idx)
 	dma_addr_t paddr = siw_pbl_get_buffer(pbl, offset, NULL, idx);
 
 	if (paddr)
-		return virt_to_page((void *)(uintptr_t)paddr);
+		return ib_virt_dma_to_page(paddr);
 
 	return NULL;
+}
+
+static struct page *siw_get_page(struct siw_mem *mem, struct siw_sge *sge,
+				 unsigned long offset, int *pbl_idx)
+{
+	if (!mem->is_pbl)
+		return siw_get_upage(mem->umem, sge->laddr + offset);
+	else
+		return siw_get_pblpage(mem, sge->laddr + offset, pbl_idx);
 }
 
 /*
@@ -56,8 +65,7 @@ static int siw_try_1seg(struct siw_iwarp_tx *c_tx, void *paddr)
 
 		if (!mem->mem_obj) {
 			/* Kernel client using kva */
-			memcpy(paddr,
-			       (const void *)(uintptr_t)sge->laddr, bytes);
+			memcpy(paddr, ib_virt_dma_to_ptr(sge->laddr), bytes);
 		} else if (c_tx->in_syscall) {
 			if (copy_from_user(paddr, u64_to_user_ptr(sge->laddr),
 					   bytes))
@@ -68,11 +76,7 @@ static int siw_try_1seg(struct siw_iwarp_tx *c_tx, void *paddr)
 			char *buffer;
 			int pbl_idx = 0;
 
-			if (!mem->is_pbl)
-				p = siw_get_upage(mem->umem, sge->laddr);
-			else
-				p = siw_get_pblpage(mem, sge->laddr, &pbl_idx);
-
+			p = siw_get_page(mem, sge, 0, &pbl_idx);
 			if (unlikely(!p))
 				return -EFAULT;
 
@@ -86,13 +90,7 @@ static int siw_try_1seg(struct siw_iwarp_tx *c_tx, void *paddr)
 				memcpy(paddr, buffer + off, part);
 				kunmap_local(buffer);
 
-				if (!mem->is_pbl)
-					p = siw_get_upage(mem->umem,
-							  sge->laddr + part);
-				else
-					p = siw_get_pblpage(mem,
-							    sge->laddr + part,
-							    &pbl_idx);
+				p = siw_get_page(mem, sge, part, &pbl_idx);
 				if (unlikely(!p))
 					return -EFAULT;
 
@@ -250,14 +248,10 @@ static int siw_qp_prepare_tx(struct siw_iwarp_tx *c_tx)
 		/*
 		 * Do complete CRC if enabled and short packet
 		 */
-		if (c_tx->mpa_crc_hd) {
-			crypto_shash_init(c_tx->mpa_crc_hd);
-			if (crypto_shash_update(c_tx->mpa_crc_hd,
-						(u8 *)&c_tx->pkt,
-						c_tx->ctrl_len))
-				return -EINVAL;
-			crypto_shash_final(c_tx->mpa_crc_hd, (u8 *)crc);
-		}
+		if (c_tx->mpa_crc_hd &&
+		    crypto_shash_digest(c_tx->mpa_crc_hd, (u8 *)&c_tx->pkt,
+					c_tx->ctrl_len, (u8 *)crc) != 0)
+			return -EINVAL;
 		c_tx->ctrl_len += MPA_CRC_SIZE;
 
 		return PKT_COMPLETE;
@@ -298,8 +292,7 @@ static int siw_tx_ctrl(struct siw_iwarp_tx *c_tx, struct socket *s,
 				    (char *)&c_tx->pkt.ctrl + c_tx->ctrl_sent,
 			    .iov_len = c_tx->ctrl_len - c_tx->ctrl_sent };
 
-	int rv = kernel_sendmsg(s, &msg, &iov, 1,
-				c_tx->ctrl_len - c_tx->ctrl_sent);
+	int rv = kernel_sendmsg(s, &msg, &iov, 1, iov.iov_len);
 
 	if (rv >= 0) {
 		c_tx->ctrl_sent += rv;
@@ -313,7 +306,7 @@ static int siw_tx_ctrl(struct siw_iwarp_tx *c_tx, struct socket *s,
 }
 
 /*
- * 0copy TCP transmit interface: Use do_tcp_sendpages.
+ * 0copy TCP transmit interface: Use MSG_SPLICE_PAGES.
  *
  * Using sendpage to push page by page appears to be less efficient
  * than using sendmsg, even if data are copied.
@@ -324,20 +317,26 @@ static int siw_tx_ctrl(struct siw_iwarp_tx *c_tx, struct socket *s,
 static int siw_tcp_sendpages(struct socket *s, struct page **page, int offset,
 			     size_t size)
 {
+	struct bio_vec bvec;
+	struct msghdr msg = {
+		.msg_flags = (MSG_MORE | MSG_DONTWAIT | MSG_SPLICE_PAGES),
+	};
 	struct sock *sk = s->sk;
-	int i = 0, rv = 0, sent = 0,
-	    flags = MSG_MORE | MSG_DONTWAIT | MSG_SENDPAGE_NOTLAST;
+	int i = 0, rv = 0, sent = 0;
 
 	while (size) {
 		size_t bytes = min_t(size_t, PAGE_SIZE - offset, size);
 
 		if (size + offset <= PAGE_SIZE)
-			flags = MSG_MORE | MSG_DONTWAIT;
+			msg.msg_flags &= ~MSG_MORE;
 
 		tcp_rate_check_app_limited(sk);
+		bvec_set_page(&bvec, page[i], bytes, offset);
+		iov_iter_bvec(&msg.msg_iter, ITER_SOURCE, &bvec, 1, size);
+
 try_page_again:
 		lock_sock(sk);
-		rv = do_tcp_sendpages(sk, page[i], offset, bytes, flags);
+		rv = tcp_sendmsg_locked(sk, &msg, size);
 		release_sock(sk);
 
 		if (rv > 0) {
@@ -477,7 +476,7 @@ static int siw_tx_hdt(struct siw_iwarp_tx *c_tx, struct socket *s)
 			 * or memory region with assigned kernel buffer
 			 */
 			iov[seg].iov_base =
-				(void *)(uintptr_t)(sge->laddr + sge_off);
+				ib_virt_dma_to_ptr(sge->laddr + sge_off);
 			iov[seg].iov_len = sge_len;
 
 			if (do_crc)
@@ -497,13 +496,7 @@ static int siw_tx_hdt(struct siw_iwarp_tx *c_tx, struct socket *s)
 			if (!is_kva) {
 				struct page *p;
 
-				if (mem->is_pbl)
-					p = siw_get_pblpage(
-						mem, sge->laddr + sge_off,
-						&pbl_idx);
-				else
-					p = siw_get_upage(mem->umem,
-							  sge->laddr + sge_off);
+				p = siw_get_page(mem, sge, sge_off, &pbl_idx);
 				if (unlikely(!p)) {
 					siw_unmap_pages(iov, kmap_mask, seg);
 					wqe->processed -= c_tx->bytes_unsent;
@@ -537,19 +530,13 @@ static int siw_tx_hdt(struct siw_iwarp_tx *c_tx, struct socket *s)
 				 * Cast to an uintptr_t to preserve all 64 bits
 				 * in sge->laddr.
 				 */
-				uintptr_t va = (uintptr_t)(sge->laddr + sge_off);
+				u64 va = sge->laddr + sge_off;
 
-				/*
-				 * virt_to_page() takes a (void *) pointer
-				 * so cast to a (void *) meaning it will be 64
-				 * bits on a 64 bit platform and 32 bits on a
-				 * 32 bit platform.
-				 */
-				page_array[seg] = virt_to_page((void *)(va & PAGE_MASK));
+				page_array[seg] = ib_virt_dma_to_page(va);
 				if (do_crc)
 					crypto_shash_update(
 						c_tx->mpa_crc_hd,
-						(void *)va,
+						ib_virt_dma_to_ptr(va),
 						plen);
 			}
 
@@ -558,7 +545,7 @@ static int siw_tx_hdt(struct siw_iwarp_tx *c_tx, struct socket *s)
 			data_len -= plen;
 			fp_off = 0;
 
-			if (++seg > (int)MAX_ARRAY) {
+			if (++seg >= (int)MAX_ARRAY) {
 				siw_dbg_qp(tx_qp(c_tx), "to many fragments\n");
 				siw_unmap_pages(iov, kmap_mask, seg-1);
 				wqe->processed -= c_tx->bytes_unsent;
@@ -1010,13 +997,12 @@ static int siw_qp_sq_proc_local(struct siw_qp *qp, struct siw_wqe *wqe)
  * MPA FPDUs, each containing a DDP segment.
  *
  * SQ processing may occur in user context as a result of posting
- * new WQE's or from siw_sq_work_handler() context. Processing in
+ * new WQE's or from siw_tx_thread context. Processing in
  * user context is limited to non-kernel verbs users.
  *
  * SQ processing may get paused anytime, possibly in the middle of a WR
  * or FPDU, if insufficient send space is available. SQ processing
- * gets resumed from siw_sq_work_handler(), if send space becomes
- * available again.
+ * gets resumed from siw_tx_thread, if send space becomes available again.
  *
  * Must be called with the QP state read-locked.
  *
@@ -1209,10 +1195,45 @@ struct tx_task_t {
 
 static DEFINE_PER_CPU(struct tx_task_t, siw_tx_task_g);
 
-void siw_stop_tx_thread(int nr_cpu)
+int siw_create_tx_threads(void)
 {
-	kthread_stop(siw_tx_thread[nr_cpu]);
-	wake_up(&per_cpu(siw_tx_task_g, nr_cpu).waiting);
+	int cpu, assigned = 0;
+
+	for_each_online_cpu(cpu) {
+		struct tx_task_t *tx_task;
+
+		/* Skip HT cores */
+		if (cpu % cpumask_weight(topology_sibling_cpumask(cpu)))
+			continue;
+
+		tx_task = &per_cpu(siw_tx_task_g, cpu);
+		init_llist_head(&tx_task->active);
+		init_waitqueue_head(&tx_task->waiting);
+
+		siw_tx_thread[cpu] =
+			kthread_run_on_cpu(siw_run_sq,
+					   (unsigned long *)(long)cpu,
+					   cpu, "siw_tx/%u");
+		if (IS_ERR(siw_tx_thread[cpu])) {
+			siw_tx_thread[cpu] = NULL;
+			continue;
+		}
+		assigned++;
+	}
+	return assigned;
+}
+
+void siw_stop_tx_threads(void)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		if (siw_tx_thread[cpu]) {
+			kthread_stop(siw_tx_thread[cpu]);
+			wake_up(&per_cpu(siw_tx_task_g, cpu).waiting);
+			siw_tx_thread[cpu] = NULL;
+		}
+	}
 }
 
 int siw_run_sq(void *data)
@@ -1221,9 +1242,6 @@ int siw_run_sq(void *data)
 	struct llist_node *active;
 	struct siw_qp *qp;
 	struct tx_task_t *tx_task = &per_cpu(siw_tx_task_g, nr_cpu);
-
-	init_llist_head(&tx_task->active);
-	init_waitqueue_head(&tx_task->waiting);
 
 	while (1) {
 		struct llist_node *fifo_list = NULL;
@@ -1240,13 +1258,7 @@ int siw_run_sq(void *data)
 		 * llist_del_all returns a list with newest entry first.
 		 * Re-order list for fairness among QP's.
 		 */
-		while (active) {
-			struct llist_node *tmp = active;
-
-			active = llist_next(active);
-			tmp->next = fifo_list;
-			fifo_list = tmp;
-		}
+		fifo_list = llist_reverse_order(active);
 		while (fifo_list) {
 			qp = container_of(fifo_list, struct siw_qp, tx_list);
 			fifo_list = llist_next(fifo_list);

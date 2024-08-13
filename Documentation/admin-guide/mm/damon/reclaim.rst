@@ -46,7 +46,7 @@ that is built with ``CONFIG_DAMON_RECLAIM=y``.
 To let sysadmins enable or disable it and tune for the given system,
 DAMON_RECLAIM utilizes module parameters.  That is, you can put
 ``damon_reclaim.<parameter>=<value>`` on the kernel boot command line or write
-proper values to ``/sys/modules/damon_reclaim/parameters/<parameter>`` files.
+proper values to ``/sys/module/damon_reclaim/parameters/<parameter>`` files.
 
 Below are the description of each parameter.
 
@@ -116,6 +116,33 @@ quota_ms milliseconds or quota_sz bytes within quota_reset_interval_ms
 milliseconds.
 
 1 second by default.
+
+quota_mem_pressure_us
+---------------------
+
+Desired level of memory pressure-stall time in microseconds.
+
+While keeping the caps that set by other quotas, DAMON_RECLAIM automatically
+increases and decreases the effective level of the quota aiming this level of
+memory pressure is incurred.  System-wide ``some`` memory PSI in microseconds
+per quota reset interval (``quota_reset_interval_ms``) is collected and
+compared to this value to see if the aim is satisfied.  Value zero means
+disabling this auto-tuning feature.
+
+Disabled by default.
+
+quota_autotune_feedback
+-----------------------
+
+User-specifiable feedback for auto-tuning of the effective quota.
+
+While keeping the caps that set by other quotas, DAMON_RECLAIM automatically
+increases and decreases the effective level of the quota aiming receiving this
+feedback of value ``10,000`` from the user.  DAMON_RECLAIM assumes the feedback
+value and the quota are positively proportional.  Value zero means disabling
+this auto-tuning feature.
+
+Disabled by default.
 
 wmarks_interval
 ---------------
@@ -205,6 +232,15 @@ The end physical address of memory region that DAMON_RECLAIM will do work
 against.  That is, DAMON_RECLAIM will find cold memory regions in this region
 and reclaims.  By default, biggest System RAM is used as the region.
 
+skip_anon
+---------
+
+Skip anonymous pages reclamation.
+
+If this parameter is set as ``Y``, DAMON_RECLAIM does not reclaim anonymous
+pages.  By default, ``N``.
+
+
 kdamond_pid
 -----------
 
@@ -251,7 +287,7 @@ therefore the free memory rate becomes lower than 20%, it asks DAMON_RECLAIM to
 do nothing again, so that we can fall back to the LRU-list based page
 granularity reclamation. ::
 
-    # cd /sys/modules/damon_reclaim/parameters
+    # cd /sys/module/damon_reclaim/parameters
     # echo 30000000 > min_age
     # echo $((1 * 1024 * 1024 * 1024)) > quota_sz
     # echo 1000 > quota_reset_interval_ms

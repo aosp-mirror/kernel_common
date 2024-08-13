@@ -11,7 +11,6 @@
 #include <linux/errno.h>
 #include <linux/device.h>
 #include <linux/i2c.h>
-#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
@@ -793,7 +792,7 @@ static void tas6424_i2c_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id tas6424_i2c_ids[] = {
-	{ "tas6424", 0 },
+	{ "tas6424" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, tas6424_i2c_ids);
@@ -803,7 +802,7 @@ static struct i2c_driver tas6424_i2c_driver = {
 		.name = "tas6424",
 		.of_match_table = of_match_ptr(tas6424_of_ids),
 	},
-	.probe_new = tas6424_i2c_probe,
+	.probe = tas6424_i2c_probe,
 	.remove = tas6424_i2c_remove,
 	.id_table = tas6424_i2c_ids,
 };

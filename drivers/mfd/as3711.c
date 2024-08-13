@@ -106,7 +106,7 @@ static const struct regmap_config as3711_regmap_config = {
 	.precious_reg = as3711_precious_reg,
 	.max_register = AS3711_MAX_REG,
 	.num_reg_defaults_raw = AS3711_NUM_REGS,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 };
 
 #ifdef CONFIG_OF
@@ -201,7 +201,7 @@ static struct i2c_driver as3711_i2c_driver = {
 		   .name = "as3711",
 		   .of_match_table = of_match_ptr(as3711_of_match),
 	},
-	.probe_new = as3711_i2c_probe,
+	.probe = as3711_i2c_probe,
 	.id_table = as3711_i2c_id,
 };
 

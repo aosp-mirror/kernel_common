@@ -270,7 +270,7 @@ static int max7359_resume(struct device *dev)
 static DEFINE_SIMPLE_DEV_PM_OPS(max7359_pm, max7359_suspend, max7359_resume);
 
 static const struct i2c_device_id max7359_ids[] = {
-	{ "max7359", 0 },
+	{ "max7359" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, max7359_ids);
@@ -280,7 +280,7 @@ static struct i2c_driver max7359_i2c_driver = {
 		.name = "max7359",
 		.pm   = pm_sleep_ptr(&max7359_pm),
 	},
-	.probe_new	= max7359_probe,
+	.probe		= max7359_probe,
 	.id_table	= max7359_ids,
 };
 

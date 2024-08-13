@@ -29,35 +29,9 @@ struct mfd_of_node_entry {
 	struct device_node *np;
 };
 
-static struct device_type mfd_dev_type = {
+static const struct device_type mfd_dev_type = {
 	.name	= "mfd_device",
 };
-
-int mfd_cell_enable(struct platform_device *pdev)
-{
-	const struct mfd_cell *cell = mfd_get_cell(pdev);
-
-	if (!cell->enable) {
-		dev_dbg(&pdev->dev, "No .enable() call-back registered\n");
-		return 0;
-	}
-
-	return cell->enable(pdev);
-}
-EXPORT_SYMBOL(mfd_cell_enable);
-
-int mfd_cell_disable(struct platform_device *pdev)
-{
-	const struct mfd_cell *cell = mfd_get_cell(pdev);
-
-	if (!cell->disable) {
-		dev_dbg(&pdev->dev, "No .disable() call-back registered\n");
-		return 0;
-	}
-
-	return cell->disable(pdev);
-}
-EXPORT_SYMBOL(mfd_cell_disable);
 
 #if IS_ENABLED(CONFIG_ACPI)
 struct match_ids_walk_data {
@@ -128,7 +102,6 @@ static int mfd_match_of_node_to_dev(struct platform_device *pdev,
 {
 #if IS_ENABLED(CONFIG_OF)
 	struct mfd_of_node_entry *of_entry;
-	const __be32 *reg;
 	u64 of_node_addr;
 
 	/* Skip if OF node has previously been allocated to a device */
@@ -141,12 +114,9 @@ static int mfd_match_of_node_to_dev(struct platform_device *pdev,
 		goto allocate_of_node;
 
 	/* We only care about each node's first defined address */
-	reg = of_get_address(np, 0, NULL, NULL);
-	if (!reg)
+	if (of_property_read_reg(np, 0, &of_node_addr, NULL))
 		/* OF node does not contatin a 'reg' property to match to */
 		return -EAGAIN;
-
-	of_node_addr = of_read_number(reg, of_n_addr_cells(np));
 
 	if (cell->of_reg != of_node_addr)
 		/* No match */
@@ -176,6 +146,7 @@ static int mfd_add_device(struct device *parent, int id,
 	struct platform_device *pdev;
 	struct device_node *np = NULL;
 	struct mfd_of_node_entry *of_entry, *tmp;
+	bool disabled = false;
 	int ret = -ENOMEM;
 	int platform_id;
 	int r;
@@ -213,11 +184,10 @@ static int mfd_add_device(struct device *parent, int id,
 	if (IS_ENABLED(CONFIG_OF) && parent->of_node && cell->of_compatible) {
 		for_each_child_of_node(parent->of_node, np) {
 			if (of_device_is_compatible(np, cell->of_compatible)) {
-				/* Ignore 'disabled' devices error free */
+				/* Skip 'disabled' devices */
 				if (!of_device_is_available(np)) {
-					of_node_put(np);
-					ret = 0;
-					goto fail_alias;
+					disabled = true;
+					continue;
 				}
 
 				ret = mfd_match_of_node_to_dev(pdev, np, cell);
@@ -227,10 +197,17 @@ static int mfd_add_device(struct device *parent, int id,
 				if (ret)
 					goto fail_alias;
 
-				break;
+				goto match;
 			}
 		}
 
+		if (disabled) {
+			/* Ignore 'disabled' devices error free */
+			ret = 0;
+			goto fail_alias;
+		}
+
+match:
 		if (!pdev->dev.of_node)
 			pr_warn("%s: Failed to locate of_node [id: %d]\n",
 				cell->name, platform_id);

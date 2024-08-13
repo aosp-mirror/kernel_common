@@ -31,16 +31,6 @@ static void exfat_free_iocharset(struct exfat_sb_info *sbi)
 		kfree(sbi->options.iocharset);
 }
 
-static void exfat_delayed_free(struct rcu_head *p)
-{
-	struct exfat_sb_info *sbi = container_of(p, struct exfat_sb_info, rcu);
-
-	unload_nls(sbi->nls_io);
-	exfat_free_iocharset(sbi);
-	exfat_free_upcase_table(sbi);
-	kfree(sbi);
-}
-
 static void exfat_put_super(struct super_block *sb)
 {
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
@@ -49,8 +39,6 @@ static void exfat_put_super(struct super_block *sb)
 	exfat_free_bitmap(sbi);
 	brelse(sbi->boot_bh);
 	mutex_unlock(&sbi->s_lock);
-
-	call_rcu(&sbi->rcu, exfat_delayed_free);
 }
 
 static int exfat_sync_fs(struct super_block *sb, int wait)
@@ -174,6 +162,8 @@ static int exfat_show_options(struct seq_file *m, struct dentry *root)
 		seq_puts(m, ",sys_tz");
 	else if (opts->time_offset)
 		seq_printf(m, ",time_offset=%d", opts->time_offset);
+	if (opts->zero_size_dir)
+		seq_puts(m, ",zero_size_dir");
 	return 0;
 }
 
@@ -218,6 +208,7 @@ enum {
 	Opt_keep_last_dots,
 	Opt_sys_tz,
 	Opt_time_offset,
+	Opt_zero_size_dir,
 
 	/* Deprecated options */
 	Opt_utf8,
@@ -234,8 +225,8 @@ static const struct constant_table exfat_param_enums[] = {
 };
 
 static const struct fs_parameter_spec exfat_parameters[] = {
-	fsparam_u32("uid",			Opt_uid),
-	fsparam_u32("gid",			Opt_gid),
+	fsparam_uid("uid",			Opt_uid),
+	fsparam_gid("gid",			Opt_gid),
 	fsparam_u32oct("umask",			Opt_umask),
 	fsparam_u32oct("dmask",			Opt_dmask),
 	fsparam_u32oct("fmask",			Opt_fmask),
@@ -246,6 +237,7 @@ static const struct fs_parameter_spec exfat_parameters[] = {
 	fsparam_flag("keep_last_dots",		Opt_keep_last_dots),
 	fsparam_flag("sys_tz",			Opt_sys_tz),
 	fsparam_s32("time_offset",		Opt_time_offset),
+	fsparam_flag("zero_size_dir",		Opt_zero_size_dir),
 	__fsparam(NULL, "utf8",			Opt_utf8, fs_param_deprecated,
 		  NULL),
 	__fsparam(NULL, "debug",		Opt_debug, fs_param_deprecated,
@@ -270,10 +262,10 @@ static int exfat_parse_param(struct fs_context *fc, struct fs_parameter *param)
 
 	switch (opt) {
 	case Opt_uid:
-		opts->fs_uid = make_kuid(current_user_ns(), result.uint_32);
+		opts->fs_uid = result.uid;
 		break;
 	case Opt_gid:
-		opts->fs_gid = make_kgid(current_user_ns(), result.uint_32);
+		opts->fs_gid = result.gid;
 		break;
 	case Opt_umask:
 		opts->fs_fmask = result.uint_32;
@@ -313,6 +305,9 @@ static int exfat_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		if (result.int_32 < -24 * 60 || result.int_32 > 24 * 60)
 			return -EINVAL;
 		opts->time_offset = result.int_32;
+		break;
+	case Opt_zero_size_dir:
+		opts->zero_size_dir = true;
 		break;
 	case Opt_utf8:
 	case Opt_debug:
@@ -369,20 +364,18 @@ static int exfat_read_root(struct inode *inode)
 	inode->i_gid = sbi->options.fs_gid;
 	inode_inc_iversion(inode);
 	inode->i_generation = 0;
-	inode->i_mode = exfat_make_mode(sbi, ATTR_SUBDIR, 0777);
+	inode->i_mode = exfat_make_mode(sbi, EXFAT_ATTR_SUBDIR, 0777);
 	inode->i_op = &exfat_dir_inode_operations;
 	inode->i_fop = &exfat_dir_operations;
 
-	inode->i_blocks = round_up(i_size_read(inode), sbi->cluster_size) >>
-				inode->i_blkbits;
+	inode->i_blocks = round_up(i_size_read(inode), sbi->cluster_size) >> 9;
 	ei->i_pos = ((loff_t)sbi->root_dir << 32) | 0xffffffff;
 	ei->i_size_aligned = i_size_read(inode);
 	ei->i_size_ondisk = i_size_read(inode);
 
-	exfat_save_attr(inode, ATTR_SUBDIR);
-	inode->i_mtime = inode->i_atime = inode->i_ctime = ei->i_crtime =
-		current_time(inode);
-	exfat_truncate_atime(&inode->i_atime);
+	exfat_save_attr(inode, EXFAT_ATTR_SUBDIR);
+	ei->i_crtime = simple_inode_init_ts(inode);
+	exfat_truncate_inode_atime(inode);
 	return 0;
 }
 
@@ -604,7 +597,7 @@ static int __exfat_fill_super(struct super_block *sb)
 	ret = exfat_load_bitmap(sb);
 	if (ret) {
 		exfat_err(sb, "failed to load alloc-bitmap");
-		goto free_upcase_table;
+		goto free_bh;
 	}
 
 	ret = exfat_count_used_clusters(sb, &sbi->used_clusters);
@@ -617,8 +610,6 @@ static int __exfat_fill_super(struct super_block *sb)
 
 free_alloc_bitmap:
 	exfat_free_bitmap(sbi);
-free_upcase_table:
-	exfat_free_upcase_table(sbi);
 free_bh:
 	brelse(sbi->boot_bh);
 	return ret;
@@ -705,15 +696,10 @@ put_inode:
 	sb->s_root = NULL;
 
 free_table:
-	exfat_free_upcase_table(sbi);
 	exfat_free_bitmap(sbi);
 	brelse(sbi->boot_bh);
 
 check_nls_io:
-	unload_nls(sbi->nls_io);
-	exfat_free_iocharset(sbi);
-	sb->s_fs_info = NULL;
-	kfree(sbi);
 	return err;
 }
 
@@ -722,14 +708,18 @@ static int exfat_get_tree(struct fs_context *fc)
 	return get_tree_bdev(fc, exfat_fill_super);
 }
 
+static void exfat_free_sbi(struct exfat_sb_info *sbi)
+{
+	exfat_free_iocharset(sbi);
+	kfree(sbi);
+}
+
 static void exfat_free(struct fs_context *fc)
 {
 	struct exfat_sb_info *sbi = fc->s_fs_info;
 
-	if (sbi) {
-		exfat_free_iocharset(sbi);
-		kfree(sbi);
-	}
+	if (sbi)
+		exfat_free_sbi(sbi);
 }
 
 static int exfat_reconfigure(struct fs_context *fc)
@@ -774,12 +764,30 @@ static int exfat_init_fs_context(struct fs_context *fc)
 	return 0;
 }
 
+static void delayed_free(struct rcu_head *p)
+{
+	struct exfat_sb_info *sbi = container_of(p, struct exfat_sb_info, rcu);
+
+	unload_nls(sbi->nls_io);
+	exfat_free_upcase_table(sbi);
+	exfat_free_sbi(sbi);
+}
+
+static void exfat_kill_sb(struct super_block *sb)
+{
+	struct exfat_sb_info *sbi = sb->s_fs_info;
+
+	kill_block_super(sb);
+	if (sbi)
+		call_rcu(&sbi->rcu, delayed_free);
+}
+
 static struct file_system_type exfat_fs_type = {
 	.owner			= THIS_MODULE,
 	.name			= "exfat",
 	.init_fs_context	= exfat_init_fs_context,
 	.parameters		= exfat_parameters,
-	.kill_sb		= kill_block_super,
+	.kill_sb		= exfat_kill_sb,
 	.fs_flags		= FS_REQUIRES_DEV,
 };
 
@@ -805,7 +813,7 @@ static int __init init_exfat_fs(void)
 
 	exfat_inode_cachep = kmem_cache_create("exfat_inode_cache",
 			sizeof(struct exfat_inode_info),
-			0, SLAB_RECLAIM_ACCOUNT | SLAB_MEM_SPREAD,
+			0, SLAB_RECLAIM_ACCOUNT,
 			exfat_inode_init_once);
 	if (!exfat_inode_cachep) {
 		err = -ENOMEM;

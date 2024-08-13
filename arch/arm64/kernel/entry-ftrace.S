@@ -36,6 +36,31 @@
 SYM_CODE_START(ftrace_caller)
 	bti	c
 
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_CALL_OPS
+	/*
+	 * The literal pointer to the ops is at an 8-byte aligned boundary
+	 * which is either 12 or 16 bytes before the BL instruction in the call
+	 * site. See ftrace_call_adjust() for details.
+	 *
+	 * Therefore here the LR points at `literal + 16` or `literal + 20`,
+	 * and we can find the address of the literal in either case by
+	 * aligning to an 8-byte boundary and subtracting 16. We do the
+	 * alignment first as this allows us to fold the subtraction into the
+	 * LDR.
+	 */
+	bic	x11, x30, 0x7
+	ldr	x11, [x11, #-(4 * AARCH64_INSN_SIZE)]		// op
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
+	/*
+	 * If the op has a direct call, handle it immediately without
+	 * saving/restoring registers.
+	 */
+	ldr	x17, [x11, #FTRACE_OPS_DIRECT_CALL]		// op->direct_call
+	cbnz	x17, ftrace_caller_direct
+#endif
+#endif
+
 	/* Save original SP */
 	mov	x10, sp
 
@@ -48,6 +73,10 @@ SYM_CODE_START(ftrace_caller)
 	stp	x4, x5, [sp, #FREGS_X4]
 	stp	x6, x7, [sp, #FREGS_X6]
 	str	x8,     [sp, #FREGS_X8]
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
+	str	xzr, [sp, #FREGS_DIRECT_TRAMP]
+#endif
 
 	/* Save the callsite's FP, LR, SP */
 	str	x29, [sp, #FREGS_FP]
@@ -71,20 +100,7 @@ SYM_CODE_START(ftrace_caller)
 	mov	x3, sp					// regs
 
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_CALL_OPS
-	/*
-	 * The literal pointer to the ops is at an 8-byte aligned boundary
-	 * which is either 12 or 16 bytes before the BL instruction in the call
-	 * site. See ftrace_call_adjust() for details.
-	 *
-	 * Therefore here the LR points at `literal + 16` or `literal + 20`,
-	 * and we can find the address of the literal in either case by
-	 * aligning to an 8-byte boundary and subtracting 16. We do the
-	 * alignment first as this allows us to fold the subtraction into the
-	 * LDR.
-	 */
-	bic	x2, x30, 0x7
-	ldr	x2, [x2, #-16]				// op
-
+	mov	x2, x11					// op
 	ldr	x4, [x2, #FTRACE_OPS_FUNC]		// op->func
 	blr	x4					// op->func(ip, parent_ip, op, regs)
 
@@ -107,8 +123,15 @@ SYM_INNER_LABEL(ftrace_call, SYM_L_GLOBAL)
 	ldp	x6, x7, [sp, #FREGS_X6]
 	ldr	x8,     [sp, #FREGS_X8]
 
-	/* Restore the callsite's FP, LR, PC */
+	/* Restore the callsite's FP */
 	ldr	x29, [sp, #FREGS_FP]
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
+	ldr	x17, [sp, #FREGS_DIRECT_TRAMP]
+	cbnz	x17, ftrace_caller_direct_late
+#endif
+
+	/* Restore the callsite's LR and PC */
 	ldr	x30, [sp, #FREGS_LR]
 	ldr	x9,  [sp, #FREGS_PC]
 
@@ -116,7 +139,44 @@ SYM_INNER_LABEL(ftrace_call, SYM_L_GLOBAL)
 	add	sp, sp, #FREGS_SIZE + 32
 
 	ret	x9
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
+SYM_INNER_LABEL(ftrace_caller_direct_late, SYM_L_LOCAL)
+	/*
+	 * Head to a direct trampoline in x17 after having run other tracers.
+	 * The ftrace_regs are live, and x0-x8 and FP have been restored. The
+	 * LR, PC, and SP have not been restored.
+	 */
+
+	/*
+	 * Restore the callsite's LR and PC matching the trampoline calling
+	 * convention.
+	 */
+	ldr	x9,  [sp, #FREGS_LR]
+	ldr	x30, [sp, #FREGS_PC]
+
+	/* Restore the callsite's SP */
+	add	sp, sp, #FREGS_SIZE + 32
+
+SYM_INNER_LABEL(ftrace_caller_direct, SYM_L_LOCAL)
+	/*
+	 * Head to a direct trampoline in x17.
+	 *
+	 * We use `BR X17` as this can safely land on a `BTI C` or `PACIASP` in
+	 * the trampoline, and will not unbalance any return stack.
+	 */
+	br	x17
+#endif /* CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS */
 SYM_CODE_END(ftrace_caller)
+
+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
+SYM_CODE_START(ftrace_stub_direct_tramp)
+	bti	c
+	mov	x10, x30
+	mov	x30, x9
+	ret	x10
+SYM_CODE_END(ftrace_stub_direct_tramp)
+#endif /* CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS */
 
 #else /* CONFIG_DYNAMIC_FTRACE_WITH_ARGS */
 
@@ -270,22 +330,23 @@ SYM_FUNC_END(ftrace_stub_graph)
  */
 SYM_CODE_START(return_to_handler)
 	/* save return value regs */
-	sub sp, sp, #64
-	stp x0, x1, [sp]
-	stp x2, x3, [sp, #16]
-	stp x4, x5, [sp, #32]
-	stp x6, x7, [sp, #48]
+	sub sp, sp, #FGRET_REGS_SIZE
+	stp x0, x1, [sp, #FGRET_REGS_X0]
+	stp x2, x3, [sp, #FGRET_REGS_X2]
+	stp x4, x5, [sp, #FGRET_REGS_X4]
+	stp x6, x7, [sp, #FGRET_REGS_X6]
+	str x29,    [sp, #FGRET_REGS_FP]	// parent's fp
 
-	mov	x0, x29			//     parent's fp
-	bl	ftrace_return_to_handler// addr = ftrace_return_to_hander(fp);
-	mov	x30, x0			// restore the original return address
+	mov	x0, sp
+	bl	ftrace_return_to_handler	// addr = ftrace_return_to_hander(regs);
+	mov	x30, x0				// restore the original return address
 
 	/* restore return value regs */
-	ldp x0, x1, [sp]
-	ldp x2, x3, [sp, #16]
-	ldp x4, x5, [sp, #32]
-	ldp x6, x7, [sp, #48]
-	add sp, sp, #64
+	ldp x0, x1, [sp, #FGRET_REGS_X0]
+	ldp x2, x3, [sp, #FGRET_REGS_X2]
+	ldp x4, x5, [sp, #FGRET_REGS_X4]
+	ldp x6, x7, [sp, #FGRET_REGS_X6]
+	add sp, sp, #FGRET_REGS_SIZE
 
 	ret
 SYM_CODE_END(return_to_handler)

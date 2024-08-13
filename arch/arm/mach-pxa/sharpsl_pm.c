@@ -216,8 +216,6 @@ void sharpsl_battery_kick(void)
 {
 	schedule_delayed_work(&sharpsl_bat, msecs_to_jiffies(125));
 }
-EXPORT_SYMBOL(sharpsl_battery_kick);
-
 
 static void sharpsl_battery_thread(struct work_struct *private_)
 {
@@ -890,7 +888,7 @@ static int sharpsl_pm_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int sharpsl_pm_remove(struct platform_device *pdev)
+static void sharpsl_pm_remove(struct platform_device *pdev)
 {
 	suspend_set_ops(NULL);
 
@@ -917,13 +915,11 @@ static int sharpsl_pm_remove(struct platform_device *pdev)
 
 	del_timer_sync(&sharpsl_pm.chrg_full_timer);
 	del_timer_sync(&sharpsl_pm.ac_timer);
-
-	return 0;
 }
 
 static struct platform_driver sharpsl_pm_driver = {
 	.probe		= sharpsl_pm_probe,
-	.remove		= sharpsl_pm_remove,
+	.remove_new	= sharpsl_pm_remove,
 	.suspend	= sharpsl_pm_suspend,
 	.resume		= sharpsl_pm_resume,
 	.driver		= {

@@ -9,6 +9,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pm.h>
 
 #include <linux/pinctrl/pinctrl.h>
 
@@ -21,17 +22,7 @@
 #define LBG_GPI_IE	0x110
 
 #define LBG_COMMUNITY(b, s, e)				\
-	{						\
-		.barno = (b),				\
-		.padown_offset = LBG_PAD_OWN,		\
-		.padcfglock_offset = LBG_PADCFGLOCK,	\
-		.hostown_offset = LBG_HOSTSW_OWN,	\
-		.is_offset = LBG_GPI_IS,		\
-		.ie_offset = LBG_GPI_IE,		\
-		.gpp_size = 24,				\
-		.pin_base = (s),			\
-		.npins = ((e) - (s) + 1),		\
-	}
+	INTEL_COMMUNITY_SIZE(b, s, e, 24, 3, LBG)
 
 /* Lewisburg */
 static const struct pinctrl_pin_desc lbg_pins[] = {
@@ -311,8 +302,6 @@ static const struct intel_pinctrl_soc_data lbg_soc_data = {
 	.ncommunities = ARRAY_SIZE(lbg_communities),
 };
 
-static INTEL_PINCTRL_PM_OPS(lbg_pinctrl_pm_ops);
-
 static const struct acpi_device_id lbg_pinctrl_acpi_match[] = {
 	{ "INT3536", (kernel_ulong_t)&lbg_soc_data },
 	{ }
@@ -324,12 +313,12 @@ static struct platform_driver lbg_pinctrl_driver = {
 	.driver = {
 		.name = "lewisburg-pinctrl",
 		.acpi_match_table = lbg_pinctrl_acpi_match,
-		.pm = &lbg_pinctrl_pm_ops,
+		.pm = pm_sleep_ptr(&intel_pinctrl_pm_ops),
 	},
 };
-
 module_platform_driver(lbg_pinctrl_driver);
 
 MODULE_AUTHOR("Mika Westerberg <mika.westerberg@linux.intel.com>");
 MODULE_DESCRIPTION("Intel Lewisburg pinctrl/GPIO driver");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PINCTRL_INTEL);

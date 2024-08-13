@@ -4,9 +4,9 @@
 #ifndef __SOUNDWIRE_TYPES_H
 #define __SOUNDWIRE_TYPES_H
 
-extern struct bus_type sdw_bus_type;
-extern struct device_type sdw_slave_type;
-extern struct device_type sdw_master_type;
+extern const struct bus_type sdw_bus_type;
+extern const struct device_type sdw_slave_type;
+extern const struct device_type sdw_master_type;
 
 static inline int is_sdw_slave(const struct device *dev)
 {
@@ -21,7 +21,7 @@ static inline int is_sdw_slave(const struct device *dev)
 int __sdw_register_driver(struct sdw_driver *drv, struct module *owner);
 void sdw_unregister_driver(struct sdw_driver *drv);
 
-int sdw_slave_uevent(struct device *dev, struct kobj_uevent_env *env);
+int sdw_slave_uevent(const struct device *dev, struct kobj_uevent_env *env);
 
 /**
  * module_sdw_driver() - Helper macro for registering a Soundwire driver

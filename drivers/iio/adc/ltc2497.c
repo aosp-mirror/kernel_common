@@ -28,7 +28,6 @@ struct ltc2497_driverdata {
 	struct ltc2497core_driverdata common_ddata;
 	struct i2c_client *client;
 	u32 recv_size;
-	u32 sub_lsb;
 	/*
 	 * DMA (thus cache coherency maintenance) may require the
 	 * transfer buffers to live in their own cache lines.
@@ -65,10 +64,10 @@ static int ltc2497_result_and_measure(struct ltc2497core_driverdata *ddata,
 		 * equivalent to a sign extension.
 		 */
 		if (st->recv_size == 3) {
-			*val = (get_unaligned_be24(st->data.d8) >> st->sub_lsb)
+			*val = (get_unaligned_be24(st->data.d8) >> 6)
 				- BIT(ddata->chip_info->resolution + 1);
 		} else {
-			*val = (be32_to_cpu(st->data.d32) >> st->sub_lsb)
+			*val = (be32_to_cpu(st->data.d32) >> 6)
 				- BIT(ddata->chip_info->resolution + 1);
 		}
 
@@ -96,7 +95,6 @@ static int ltc2497_result_and_measure(struct ltc2497core_driverdata *ddata,
 
 static int ltc2497_probe(struct i2c_client *client)
 {
-	const struct i2c_device_id *id = i2c_client_get_device_id(client);
 	const struct ltc2497_chip_info *chip_info;
 	struct iio_dev *indio_dev;
 	struct ltc2497_driverdata *st;
@@ -116,13 +114,10 @@ static int ltc2497_probe(struct i2c_client *client)
 	st->client = client;
 	st->common_ddata.result_and_measure = ltc2497_result_and_measure;
 
-	chip_info = device_get_match_data(dev);
-	if (!chip_info)
-		chip_info = (const struct ltc2497_chip_info *)id->driver_data;
+	chip_info = i2c_get_match_data(client);
 	st->common_ddata.chip_info = chip_info;
 
 	resolution = chip_info->resolution;
-	st->sub_lsb = 31 - (resolution + 1);
 	st->recv_size = BITS_TO_BYTES(resolution) + 1;
 
 	return ltc2497core_probe(dev, indio_dev);
@@ -165,7 +160,7 @@ static struct i2c_driver ltc2497_driver = {
 		.name = "ltc2497",
 		.of_match_table = ltc2497_of_match,
 	},
-	.probe_new = ltc2497_probe,
+	.probe = ltc2497_probe,
 	.remove = ltc2497_remove,
 	.id_table = ltc2497_id,
 };

@@ -109,21 +109,25 @@
 		CLUSTER0_L2: l2-cache@0 {
 			compatible = "cache";
 			cache-level = <2>;
+			cache-unified;
 		};
 
 		CLUSTER1_L2: l2-cache@100 {
 			compatible = "cache";
 			cache-level = <2>;
+			cache-unified;
 		};
 
 		CLUSTER2_L2: l2-cache@200 {
 			compatible = "cache";
 			cache-level = <2>;
+			cache-unified;
 		};
 
 		CLUSTER3_L2: l2-cache@300 {
 			compatible = "cache";
 			cache-level = <2>;
+			cache-unified;
 		};
 	};
 
@@ -138,7 +142,7 @@
 	};
 
 	pmu {
-		compatible = "arm,armv8-pmuv3";
+		compatible = "arm,cortex-a72-pmu";
 		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
 	};
 
@@ -178,7 +182,7 @@
 			      <0x02e00000 0x600000>; /* GICR */
 			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
 
-			gic_its: gic-its@63c20000 {
+			gic_its: msi-controller@63c20000 {
 				compatible = "arm,gic-v3-its";
 				msi-controller;
 				#msi-cells = <1>;
@@ -446,6 +450,7 @@
 			#gpio-cells = <2>;
 			gpio-controller;
 			interrupt-controller;
+			#interrupt-cells = <2>;
 			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>;
 			gpio-ranges = <&pinmux 0 0 16>,
 					<&pinmux 16 71 2>,
@@ -561,7 +566,7 @@
 			iommus = <&smmu 0x6000 0x0000>;
 		};
 
-		enet: ethernet@340000{
+		enet: ethernet@340000 {
 			compatible = "brcm,amac";
 			reg = <0x00340000 0x1000>;
 			reg-names = "amac_base";

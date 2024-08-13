@@ -8,7 +8,7 @@ $schema: http://devicetree.org/meta-schemas/core.yaml#
 title: Atmel AT91 RTT
 
 allOf:
-  - $ref: "rtc.yaml#"
+  - $ref: rtc.yaml#
 
 maintainers:
   - Alexandre Belloni <alexandre.belloni@bootlin.com>
@@ -19,7 +19,9 @@ properties:
       - items:
           - const: atmel,at91sam9260-rtt
       - items:
-          - const: microchip,sam9x60-rtt
+          - enum:
+              - microchip,sam9x60-rtt
+              - microchip,sam9x7-rtt
           - const: atmel,at91sam9260-rtt
       - items:
           - const: microchip,sama7g5-rtt

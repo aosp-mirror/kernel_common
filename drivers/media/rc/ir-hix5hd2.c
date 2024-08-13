@@ -9,7 +9,9 @@
 #include <linux/interrupt.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 #include <media/rc-core.h>
 
@@ -251,7 +253,6 @@ static int hix5hd2_ir_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct hix5hd2_ir_priv *priv;
 	struct device_node *node = pdev->dev.of_node;
-	const struct of_device_id *of_id;
 	const char *map_name;
 	int ret;
 
@@ -259,12 +260,11 @@ static int hix5hd2_ir_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
-	of_id = of_match_device(hix5hd2_ir_table, dev);
-	if (!of_id) {
+	priv->socdata = device_get_match_data(dev);
+	if (!priv->socdata) {
 		dev_err(dev, "Unable to initialize IR data\n");
 		return -ENODEV;
 	}
-	priv->socdata = of_id->data;
 
 	priv->regmap = syscon_regmap_lookup_by_phandle(node,
 						       "hisilicon,power-syscon");
@@ -340,13 +340,12 @@ err:
 	return ret;
 }
 
-static int hix5hd2_ir_remove(struct platform_device *pdev)
+static void hix5hd2_ir_remove(struct platform_device *pdev)
 {
 	struct hix5hd2_ir_priv *priv = platform_get_drvdata(pdev);
 
 	clk_disable_unprepare(priv->clock);
 	rc_unregister_device(priv->rdev);
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -395,7 +394,7 @@ static struct platform_driver hix5hd2_ir_driver = {
 		.pm     = &hix5hd2_ir_pm_ops,
 	},
 	.probe = hix5hd2_ir_probe,
-	.remove = hix5hd2_ir_remove,
+	.remove_new = hix5hd2_ir_remove,
 };
 
 module_platform_driver(hix5hd2_ir_driver);

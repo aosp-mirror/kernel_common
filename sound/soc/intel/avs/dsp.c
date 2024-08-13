@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 //
-// Copyright(c) 2021-2022 Intel Corporation. All rights reserved.
+// Copyright(c) 2021-2022 Intel Corporation
 //
 // Authors: Cezary Rojewski <cezary.rojewski@intel.com>
 //          Amadeusz Slawinski <amadeuszx.slawinski@linux.intel.com>
@@ -225,7 +225,7 @@ err:
 
 int avs_dsp_init_module(struct avs_dev *adev, u16 module_id, u8 ppl_instance_id,
 			u8 core_id, u8 domain, void *param, u32 param_size,
-			u16 *instance_id)
+			u8 *instance_id)
 {
 	struct avs_module_entry mentry;
 	bool was_loaded = false;
@@ -272,7 +272,7 @@ err_mod_entry:
 	return ret;
 }
 
-void avs_dsp_delete_module(struct avs_dev *adev, u16 module_id, u16 instance_id,
+void avs_dsp_delete_module(struct avs_dev *adev, u16 module_id, u8 instance_id,
 			   u8 ppl_instance_id, u8 core_id)
 {
 	struct avs_module_entry mentry;

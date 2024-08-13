@@ -65,6 +65,11 @@ struct rtw8821ce_efuse {
 	u8 res7;
 };
 
+struct rtw8821cs_efuse {
+	u8 res4[0x4a];			/* 0xd0 */
+	u8 mac_addr[ETH_ALEN];		/* 0x11a */
+} __packed;
+
 struct rtw8821c_efuse {
 	__le16 rtl_id;
 	u8 res0[0x0e];
@@ -94,6 +99,7 @@ struct rtw8821c_efuse {
 	union {
 		struct rtw8821ce_efuse e;
 		struct rtw8821cu_efuse u;
+		struct rtw8821cs_efuse s;
 	};
 };
 
@@ -232,6 +238,7 @@ extern const struct rtw_chip_info rtw8821c_hw_spec;
 #define REG_RXSB	0xa00
 #define REG_ADCINI	0xa04
 #define REG_PWRTH	0xa08
+#define REG_CCA_FLTR	0xa20
 #define REG_TXSF2	0xa24
 #define REG_TXSF6	0xa28
 #define REG_FA_CCK	0xa5c

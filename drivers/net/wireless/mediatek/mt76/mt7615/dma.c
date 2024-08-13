@@ -26,14 +26,14 @@ mt7622_init_tx_queues_multi(struct mt7615_dev *dev)
 	for (i = 0; i < ARRAY_SIZE(wmm_queue_map); i++) {
 		ret = mt76_init_tx_queue(&dev->mphy, i, wmm_queue_map[i],
 					 MT7615_TX_RING_SIZE / 2,
-					 MT_TX_RING_BASE, 0);
+					 MT_TX_RING_BASE, NULL, 0);
 		if (ret)
 			return ret;
 	}
 
 	ret = mt76_init_tx_queue(&dev->mphy, MT_TXQ_PSD, MT7622_TXQ_MGMT,
 				 MT7615_TX_MGMT_RING_SIZE,
-				 MT_TX_RING_BASE, 0);
+				 MT_TX_RING_BASE, NULL, 0);
 	if (ret)
 		return ret;
 
@@ -55,7 +55,7 @@ mt7615_init_tx_queues(struct mt7615_dev *dev)
 		return mt7622_init_tx_queues_multi(dev);
 
 	ret = mt76_connac_init_tx_queues(&dev->mphy, 0, MT7615_TX_RING_SIZE,
-					 MT_TX_RING_BASE, 0);
+					 MT_TX_RING_BASE, NULL, 0);
 	if (ret)
 		return ret;
 
@@ -76,7 +76,8 @@ static int mt7615_poll_tx(struct napi_struct *napi, int budget)
 
 	mt76_queue_tx_cleanup(dev, dev->mt76.q_mcu[MT_MCUQ_WM], false);
 	if (napi_complete(napi))
-		mt7615_irq_enable(dev, mt7615_tx_mcu_int_mask(dev));
+		mt76_connac_irq_enable(&dev->mt76,
+				       mt7615_tx_mcu_int_mask(dev));
 
 	mt76_connac_pm_unref(&dev->mphy, &dev->pm);
 
@@ -297,7 +298,7 @@ int mt7615_dma_init(struct mt7615_dev *dev)
 	else
 	    mask |= MT_INT_MCU_CMD;
 
-	mt7615_irq_enable(dev, mask);
+	mt76_connac_irq_enable(&dev->mt76, mask);
 
 	mt7615_dma_start(dev);
 

@@ -19,8 +19,8 @@
 #define AFSPATHMAX		1024	/* Maximum length of a pathname plus NUL */
 #define AFSOPAQUEMAX		1024	/* Maximum length of an opaque field */
 
-#define AFS_VL_MAX_LIFESPAN	(120 * HZ)
-#define AFS_PROBE_MAX_LIFESPAN	(30 * HZ)
+#define AFS_VL_MAX_LIFESPAN	120
+#define AFS_PROBE_MAX_LIFESPAN	30
 
 typedef u64			afs_volid_t;
 typedef u64			afs_vnodeid_t;
@@ -165,7 +165,8 @@ struct afs_status_cb {
  * AFS volume synchronisation information
  */
 struct afs_volsync {
-	time64_t		creation;	/* volume creation time */
+	time64_t		creation;	/* Volume creation time (or TIME64_MIN) */
+	time64_t		update;		/* Volume update time (or TIME64_MIN) */
 };
 
 /*

@@ -22,7 +22,7 @@
 #include <linux/iopoll.h>
 #include <linux/slab.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
+#include <linux/of_platform.h>
 
 #include <linux/platform_data/elm.h>
 
@@ -1881,8 +1881,8 @@ static int omap_nand_attach_chip(struct nand_chip *chip)
 
 	case NAND_OMAP_PREFETCH_IRQ:
 		info->gpmc_irq_fifo = platform_get_irq(info->pdev, 0);
-		if (info->gpmc_irq_fifo <= 0)
-			return -ENODEV;
+		if (info->gpmc_irq_fifo < 0)
+			return info->gpmc_irq_fifo;
 		err = devm_request_irq(dev, info->gpmc_irq_fifo,
 				       omap_nand_irq, IRQF_SHARED,
 				       "gpmc-nand-fifo", info);
@@ -1894,8 +1894,8 @@ static int omap_nand_attach_chip(struct nand_chip *chip)
 		}
 
 		info->gpmc_irq_count = platform_get_irq(info->pdev, 1);
-		if (info->gpmc_irq_count <= 0)
-			return -ENODEV;
+		if (info->gpmc_irq_count < 0)
+			return info->gpmc_irq_count;
 		err = devm_request_irq(dev, info->gpmc_irq_count,
 				       omap_nand_irq, IRQF_SHARED,
 				       "gpmc-nand-count", info);
@@ -2219,8 +2219,7 @@ static int omap_nand_probe(struct platform_device *pdev)
 		}
 	}
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	vaddr = devm_ioremap_resource(&pdev->dev, res);
+	vaddr = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
 	if (IS_ERR(vaddr))
 		return PTR_ERR(vaddr);
 
@@ -2273,7 +2272,7 @@ return_error:
 	return err;
 }
 
-static int omap_nand_remove(struct platform_device *pdev)
+static void omap_nand_remove(struct platform_device *pdev)
 {
 	struct mtd_info *mtd = platform_get_drvdata(pdev);
 	struct nand_chip *nand_chip = mtd_to_nand(mtd);
@@ -2285,7 +2284,6 @@ static int omap_nand_remove(struct platform_device *pdev)
 		dma_release_channel(info->dma);
 	WARN_ON(mtd_device_unregister(mtd));
 	nand_cleanup(nand_chip);
-	return 0;
 }
 
 /* omap_nand_ids defined in linux/platform_data/mtd-nand-omap2.h */
@@ -2293,7 +2291,7 @@ MODULE_DEVICE_TABLE(of, omap_nand_ids);
 
 static struct platform_driver omap_nand_driver = {
 	.probe		= omap_nand_probe,
-	.remove		= omap_nand_remove,
+	.remove_new	= omap_nand_remove,
 	.driver		= {
 		.name	= DRIVER_NAME,
 		.of_match_table = omap_nand_ids,

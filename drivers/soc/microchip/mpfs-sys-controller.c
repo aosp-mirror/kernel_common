@@ -11,11 +11,20 @@
 #include <linux/slab.h>
 #include <linux/kref.h>
 #include <linux/module.h>
+#include <linux/jiffies.h>
+#include <linux/mtd/mtd.h>
+#include <linux/spi/spi.h>
 #include <linux/interrupt.h>
-#include <linux/of_platform.h>
+#include <linux/of.h>
 #include <linux/mailbox_client.h>
 #include <linux/platform_device.h>
 #include <soc/microchip/mpfs.h>
+
+/*
+ * This timeout must be long, as some services (example: image authentication)
+ * take significant time to complete
+ */
+#define MPFS_SYS_CTRL_TIMEOUT_MS 30000
 
 static DEFINE_MUTEX(transaction_lock);
 
@@ -23,40 +32,55 @@ struct mpfs_sys_controller {
 	struct mbox_client client;
 	struct mbox_chan *chan;
 	struct completion c;
+	struct mtd_info *flash;
 	struct kref consumers;
 };
 
 int mpfs_blocking_transaction(struct mpfs_sys_controller *sys_controller, struct mpfs_mss_msg *msg)
 {
-	int ret, err;
+	unsigned long timeout = msecs_to_jiffies(MPFS_SYS_CTRL_TIMEOUT_MS);
+	int ret;
 
-	err = mutex_lock_interruptible(&transaction_lock);
-	if (err)
-		return err;
+	ret = mutex_lock_interruptible(&transaction_lock);
+	if (ret)
+		return ret;
 
 	reinit_completion(&sys_controller->c);
 
 	ret = mbox_send_message(sys_controller->chan, msg);
-	if (ret >= 0) {
-		if (wait_for_completion_timeout(&sys_controller->c, HZ)) {
-			ret = 0;
-		} else {
-			ret = -ETIMEDOUT;
-			dev_warn(sys_controller->client.dev,
-				 "MPFS sys controller transaction timeout\n");
-		}
-	} else {
-		dev_err(sys_controller->client.dev,
-			"mpfs sys controller transaction returned %d\n", ret);
+	if (ret < 0) {
+		dev_warn(sys_controller->client.dev, "MPFS sys controller service timeout\n");
+		goto out;
 	}
 
+	/*
+	 * Unfortunately, the system controller will only deliver an interrupt
+	 * if a service succeeds. mbox_send_message() will block until the busy
+	 * flag is gone. If the busy flag is gone but no interrupt has arrived
+	 * to trigger the rx callback then the service can be deemed to have
+	 * failed.
+	 * The caller can then interrogate msg::response::resp_status to
+	 * determine the cause of the failure.
+	 * mbox_send_message() returns positive integers in the success path, so
+	 * ret needs to be cleared if we do get an interrupt.
+	 */
+	if (!wait_for_completion_timeout(&sys_controller->c, timeout)) {
+		ret = -EBADMSG;
+		dev_warn(sys_controller->client.dev,
+			 "MPFS sys controller service failed with status: %d\n",
+			 msg->response->resp_status);
+	} else {
+		ret = 0;
+	}
+
+out:
 	mutex_unlock(&transaction_lock);
 
 	return ret;
 }
 EXPORT_SYMBOL(mpfs_blocking_transaction);
 
-static void rx_callback(struct mbox_client *client, void *msg)
+static void mpfs_sys_controller_rx_callback(struct mbox_client *client, void *msg)
 {
 	struct mpfs_sys_controller *sys_controller =
 		container_of(client, struct mpfs_sys_controller, client);
@@ -66,8 +90,8 @@ static void rx_callback(struct mbox_client *client, void *msg)
 
 static void mpfs_sys_controller_delete(struct kref *kref)
 {
-	struct mpfs_sys_controller *sys_controller = container_of(kref, struct mpfs_sys_controller,
-					       consumers);
+	struct mpfs_sys_controller *sys_controller =
+		container_of(kref, struct mpfs_sys_controller, consumers);
 
 	mbox_free_channel(sys_controller->chan);
 	kfree(sys_controller);
@@ -80,6 +104,12 @@ static void mpfs_sys_controller_put(void *data)
 	kref_put(&sys_controller->consumers, mpfs_sys_controller_delete);
 }
 
+struct mtd_info *mpfs_sys_controller_get_flash(struct mpfs_sys_controller *mpfs_client)
+{
+	return mpfs_client->flash;
+}
+EXPORT_SYMBOL(mpfs_sys_controller_get_flash);
+
 static struct platform_device subdevs[] = {
 	{
 		.name		= "mpfs-rng",
@@ -88,22 +118,38 @@ static struct platform_device subdevs[] = {
 	{
 		.name		= "mpfs-generic-service",
 		.id		= -1,
-	}
+	},
+	{
+		.name		= "mpfs-auto-update",
+		.id		= -1,
+	},
 };
 
 static int mpfs_sys_controller_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct mpfs_sys_controller *sys_controller;
+	struct device_node *np;
 	int i, ret;
 
 	sys_controller = kzalloc(sizeof(*sys_controller), GFP_KERNEL);
 	if (!sys_controller)
 		return -ENOMEM;
 
+	np = of_parse_phandle(dev->of_node, "microchip,bitstream-flash", 0);
+	if (!np)
+		goto no_flash;
+
+	sys_controller->flash = of_get_mtd_device_by_node(np);
+	of_node_put(np);
+	if (IS_ERR(sys_controller->flash))
+		return dev_err_probe(dev, PTR_ERR(sys_controller->flash), "Failed to get flash\n");
+
+no_flash:
 	sys_controller->client.dev = dev;
-	sys_controller->client.rx_callback = rx_callback;
+	sys_controller->client.rx_callback = mpfs_sys_controller_rx_callback;
 	sys_controller->client.tx_block = 1U;
+	sys_controller->client.tx_tout = msecs_to_jiffies(MPFS_SYS_CTRL_TIMEOUT_MS);
 
 	sys_controller->chan = mbox_request_channel(&sys_controller->client, 0);
 	if (IS_ERR(sys_controller->chan)) {
@@ -118,7 +164,6 @@ static int mpfs_sys_controller_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, sys_controller);
 
-	dev_info(&pdev->dev, "Registered MPFS system controller\n");
 
 	for (i = 0; i < ARRAY_SIZE(subdevs); i++) {
 		subdevs[i].dev.parent = dev;
@@ -126,16 +171,16 @@ static int mpfs_sys_controller_probe(struct platform_device *pdev)
 			dev_warn(dev, "Error registering sub device %s\n", subdevs[i].name);
 	}
 
+	dev_info(&pdev->dev, "Registered MPFS system controller\n");
+
 	return 0;
 }
 
-static int mpfs_sys_controller_remove(struct platform_device *pdev)
+static void mpfs_sys_controller_remove(struct platform_device *pdev)
 {
 	struct mpfs_sys_controller *sys_controller = platform_get_drvdata(pdev);
 
 	mpfs_sys_controller_put(sys_controller);
-
-	return 0;
 }
 
 static const struct of_device_id mpfs_sys_controller_of_match[] = {
@@ -187,7 +232,7 @@ static struct platform_driver mpfs_sys_controller_driver = {
 		.of_match_table = mpfs_sys_controller_of_match,
 	},
 	.probe = mpfs_sys_controller_probe,
-	.remove = mpfs_sys_controller_remove,
+	.remove_new = mpfs_sys_controller_remove,
 };
 module_platform_driver(mpfs_sys_controller_driver);
 

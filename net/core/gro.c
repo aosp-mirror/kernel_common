@@ -3,6 +3,7 @@
 #include <net/dst_metadata.h>
 #include <net/busy_poll.h>
 #include <trace/events/net.h>
+#include <linux/skbuff_ref.h>
 
 #define MAX_GRO_SKBS 8
 
@@ -10,9 +11,6 @@
 #define GRO_MAX_HEAD (MAX_HEADER + 128)
 
 static DEFINE_SPINLOCK(offload_lock);
-static struct list_head offload_base __read_mostly = LIST_HEAD_INIT(offload_base);
-/* Maximum number of GRO_NORMAL skbs to batch up for list-RX */
-int gro_normal_batch __read_mostly = 8;
 
 /**
  *	dev_add_offload - register offload handlers
@@ -31,7 +29,7 @@ void dev_add_offload(struct packet_offload *po)
 	struct packet_offload *elem;
 
 	spin_lock(&offload_lock);
-	list_for_each_entry(elem, &offload_base, list) {
+	list_for_each_entry(elem, &net_hotdata.offload_base, list) {
 		if (po->priority < elem->priority)
 			break;
 	}
@@ -55,7 +53,7 @@ EXPORT_SYMBOL(dev_add_offload);
  */
 static void __dev_remove_offload(struct packet_offload *po)
 {
-	struct list_head *head = &offload_base;
+	struct list_head *head = &net_hotdata.offload_base;
 	struct packet_offload *po1;
 
 	spin_lock(&offload_lock);
@@ -92,63 +90,6 @@ void dev_remove_offload(struct packet_offload *po)
 }
 EXPORT_SYMBOL(dev_remove_offload);
 
-/**
- *	skb_eth_gso_segment - segmentation handler for ethernet protocols.
- *	@skb: buffer to segment
- *	@features: features for the output path (see dev->features)
- *	@type: Ethernet Protocol ID
- */
-struct sk_buff *skb_eth_gso_segment(struct sk_buff *skb,
-				    netdev_features_t features, __be16 type)
-{
-	struct sk_buff *segs = ERR_PTR(-EPROTONOSUPPORT);
-	struct packet_offload *ptype;
-
-	rcu_read_lock();
-	list_for_each_entry_rcu(ptype, &offload_base, list) {
-		if (ptype->type == type && ptype->callbacks.gso_segment) {
-			segs = ptype->callbacks.gso_segment(skb, features);
-			break;
-		}
-	}
-	rcu_read_unlock();
-
-	return segs;
-}
-EXPORT_SYMBOL(skb_eth_gso_segment);
-
-/**
- *	skb_mac_gso_segment - mac layer segmentation handler.
- *	@skb: buffer to segment
- *	@features: features for the output path (see dev->features)
- */
-struct sk_buff *skb_mac_gso_segment(struct sk_buff *skb,
-				    netdev_features_t features)
-{
-	struct sk_buff *segs = ERR_PTR(-EPROTONOSUPPORT);
-	struct packet_offload *ptype;
-	int vlan_depth = skb->mac_len;
-	__be16 type = skb_network_protocol(skb, &vlan_depth);
-
-	if (unlikely(!type))
-		return ERR_PTR(-EINVAL);
-
-	__skb_pull(skb, vlan_depth);
-
-	rcu_read_lock();
-	list_for_each_entry_rcu(ptype, &offload_base, list) {
-		if (ptype->type == type && ptype->callbacks.gso_segment) {
-			segs = ptype->callbacks.gso_segment(skb, features);
-			break;
-		}
-	}
-	rcu_read_unlock();
-
-	__skb_push(skb, skb->data - skb_mac_header(skb));
-
-	return segs;
-}
-EXPORT_SYMBOL(skb_mac_gso_segment);
 
 int skb_gro_receive(struct sk_buff *p, struct sk_buff *skb)
 {
@@ -239,9 +180,7 @@ int skb_gro_receive(struct sk_buff *p, struct sk_buff *skb)
 
 		pinfo->nr_frags = nr_frags + 1 + skbinfo->nr_frags;
 
-		__skb_frag_set_page(frag, page);
-		skb_frag_off_set(frag, first_offset);
-		skb_frag_size_set(frag, first_size);
+		skb_frag_fill_page_desc(frag, page, first_offset, first_size);
 
 		memcpy(frag + 1, skbinfo->frags, sizeof(*frag) * skbinfo->nr_frags);
 		/* We dont need to clear skbinfo->nr_frags here */
@@ -254,8 +193,9 @@ int skb_gro_receive(struct sk_buff *p, struct sk_buff *skb)
 	}
 
 merge:
-	/* sk owenrship - if any - completely transferred to the aggregated packet */
+	/* sk ownership - if any - completely transferred to the aggregated packet */
 	skb->destructor = NULL;
+	skb->sk = NULL;
 	delta_truesize = skb->truesize;
 	if (offset > headlen) {
 		unsigned int eat = offset - headlen;
@@ -291,12 +231,39 @@ done:
 	return 0;
 }
 
+int skb_gro_receive_list(struct sk_buff *p, struct sk_buff *skb)
+{
+	if (unlikely(p->len + skb->len >= 65536))
+		return -E2BIG;
+
+	if (NAPI_GRO_CB(p)->last == p)
+		skb_shinfo(p)->frag_list = skb;
+	else
+		NAPI_GRO_CB(p)->last->next = skb;
+
+	skb_pull(skb, skb_gro_offset(skb));
+
+	NAPI_GRO_CB(p)->last = skb;
+	NAPI_GRO_CB(p)->count++;
+	p->data_len += skb->len;
+
+	/* sk ownership - if any - completely transferred to the aggregated packet */
+	skb->destructor = NULL;
+	skb->sk = NULL;
+	p->truesize += skb->truesize;
+	p->len += skb->len;
+
+	NAPI_GRO_CB(skb)->same_flow = 1;
+
+	return 0;
+}
+
 
 static void napi_gro_complete(struct napi_struct *napi, struct sk_buff *skb)
 {
+	struct list_head *head = &net_hotdata.offload_base;
 	struct packet_offload *ptype;
 	__be16 type = skb->protocol;
-	struct list_head *head = &offload_base;
 	int err = -ENOENT;
 
 	BUILD_BUG_ON(sizeof(struct napi_gro_cb) > sizeof(skb->cb));
@@ -363,6 +330,24 @@ void napi_gro_flush(struct napi_struct *napi, bool flush_old)
 }
 EXPORT_SYMBOL(napi_gro_flush);
 
+static unsigned long gro_list_prepare_tc_ext(const struct sk_buff *skb,
+					     const struct sk_buff *p,
+					     unsigned long diffs)
+{
+#if IS_ENABLED(CONFIG_NET_TC_SKB_EXT)
+	struct tc_skb_ext *skb_ext;
+	struct tc_skb_ext *p_ext;
+
+	skb_ext = skb_ext_find(skb, TC_SKB_EXT);
+	p_ext = skb_ext_find(p, TC_SKB_EXT);
+
+	diffs |= (!!p_ext) ^ (!!skb_ext);
+	if (!diffs && unlikely(skb_ext))
+		diffs |= p_ext->chain ^ skb_ext->chain;
+#endif
+	return diffs;
+}
+
 static void gro_list_prepare(const struct list_head *head,
 			     const struct sk_buff *skb)
 {
@@ -372,8 +357,6 @@ static void gro_list_prepare(const struct list_head *head,
 
 	list_for_each_entry(p, head, list) {
 		unsigned long diffs;
-
-		NAPI_GRO_CB(p)->flush = 0;
 
 		if (hash != skb_get_hash_raw(p)) {
 			NAPI_GRO_CB(p)->same_flow = 0;
@@ -397,23 +380,11 @@ static void gro_list_prepare(const struct list_head *head,
 		 * avoid trying too hard to skip each of them individually
 		 */
 		if (!diffs && unlikely(skb->slow_gro | p->slow_gro)) {
-#if IS_ENABLED(CONFIG_SKB_EXTENSIONS) && IS_ENABLED(CONFIG_NET_TC_SKB_EXT)
-			struct tc_skb_ext *skb_ext;
-			struct tc_skb_ext *p_ext;
-#endif
-
 			diffs |= p->sk != skb->sk;
 			diffs |= skb_metadata_dst_cmp(p, skb);
 			diffs |= skb_get_nfct(p) ^ skb_get_nfct(skb);
 
-#if IS_ENABLED(CONFIG_SKB_EXTENSIONS) && IS_ENABLED(CONFIG_NET_TC_SKB_EXT)
-			skb_ext = skb_ext_find(skb, TC_SKB_EXT);
-			p_ext = skb_ext_find(p, TC_SKB_EXT);
-
-			diffs |= (!!p_ext) ^ (!!skb_ext);
-			if (!diffs && unlikely(skb_ext))
-				diffs |= p_ext->chain ^ skb_ext->chain;
-#endif
+			diffs |= gro_list_prepare_tc_ext(skb, p, diffs);
 		}
 
 		NAPI_GRO_CB(p)->same_flow = !diffs;
@@ -422,15 +393,22 @@ static void gro_list_prepare(const struct list_head *head,
 
 static inline void skb_gro_reset_offset(struct sk_buff *skb, u32 nhoff)
 {
-	const struct skb_shared_info *pinfo = skb_shinfo(skb);
-	const skb_frag_t *frag0 = &pinfo->frags[0];
+	const struct skb_shared_info *pinfo;
+	const skb_frag_t *frag0;
+	unsigned int headlen;
 
+	NAPI_GRO_CB(skb)->network_offset = 0;
 	NAPI_GRO_CB(skb)->data_offset = 0;
-	NAPI_GRO_CB(skb)->frag0 = NULL;
-	NAPI_GRO_CB(skb)->frag0_len = 0;
+	headlen = skb_headlen(skb);
+	NAPI_GRO_CB(skb)->frag0 = skb->data;
+	NAPI_GRO_CB(skb)->frag0_len = headlen;
+	if (headlen)
+		return;
 
-	if (!skb_headlen(skb) && pinfo->nr_frags &&
-	    !PageHighMem(skb_frag_page(frag0)) &&
+	pinfo = skb_shinfo(skb);
+	frag0 = &pinfo->frags[0];
+
+	if (pinfo->nr_frags && !PageHighMem(skb_frag_page(frag0)) &&
 	    (!NET_IP_ALIGN || !((skb_frag_off(frag0) + nhoff) & 3))) {
 		NAPI_GRO_CB(skb)->frag0 = skb_frag_address(frag0);
 		NAPI_GRO_CB(skb)->frag0_len = min_t(unsigned int,
@@ -460,6 +438,14 @@ static void gro_pull_from_frag0(struct sk_buff *skb, int grow)
 	}
 }
 
+static void gro_try_pull_from_frag0(struct sk_buff *skb)
+{
+	int grow = skb_gro_offset(skb) - skb_headlen(skb);
+
+	if (grow > 0)
+		gro_pull_from_frag0(skb, grow);
+}
+
 static void gro_flush_oldest(struct napi_struct *napi, struct list_head *head)
 {
 	struct sk_buff *oldest;
@@ -483,13 +469,12 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 {
 	u32 bucket = skb_get_hash_raw(skb) & (GRO_HASH_BUCKETS - 1);
 	struct gro_list *gro_list = &napi->gro_hash[bucket];
-	struct list_head *head = &offload_base;
+	struct list_head *head = &net_hotdata.offload_base;
 	struct packet_offload *ptype;
 	__be16 type = skb->protocol;
 	struct sk_buff *pp = NULL;
 	enum gro_result ret;
 	int same_flow;
-	int grow;
 
 	if (netif_elide_gro(skb->dev))
 		goto normal;
@@ -512,7 +497,6 @@ found_ptype:
 					sizeof(u32))); /* Avoid slow unaligned acc */
 	*(u32 *)&NAPI_GRO_CB(skb)->zeroed = 0;
 	NAPI_GRO_CB(skb)->flush = skb_has_frag_list(skb);
-	NAPI_GRO_CB(skb)->is_atomic = 1;
 	NAPI_GRO_CB(skb)->count = 1;
 	if (unlikely(skb_is_gso(skb))) {
 		NAPI_GRO_CB(skb)->count = skb_shinfo(skb)->gso_segs;
@@ -564,17 +548,14 @@ found_ptype:
 	else
 		gro_list->count++;
 
+	/* Must be called before setting NAPI_GRO_CB(skb)->{age|last} */
+	gro_try_pull_from_frag0(skb);
 	NAPI_GRO_CB(skb)->age = jiffies;
 	NAPI_GRO_CB(skb)->last = skb;
 	if (!skb_is_gso(skb))
 		skb_shinfo(skb)->gso_size = skb_gro_len(skb);
 	list_add(&skb->list, &gro_list->list);
 	ret = GRO_HELD;
-
-pull:
-	grow = skb_gro_offset(skb) - skb_headlen(skb);
-	if (grow > 0)
-		gro_pull_from_frag0(skb, grow);
 ok:
 	if (gro_list->count) {
 		if (!test_bit(bucket, &napi->gro_bitmask))
@@ -587,12 +568,13 @@ ok:
 
 normal:
 	ret = GRO_NORMAL;
-	goto pull;
+	gro_try_pull_from_frag0(skb);
+	goto ok;
 }
 
 struct packet_offload *gro_find_receive_by_type(__be16 type)
 {
-	struct list_head *offload_head = &offload_base;
+	struct list_head *offload_head = &net_hotdata.offload_base;
 	struct packet_offload *ptype;
 
 	list_for_each_entry_rcu(ptype, offload_head, list) {
@@ -606,7 +588,7 @@ EXPORT_SYMBOL(gro_find_receive_by_type);
 
 struct packet_offload *gro_find_complete_by_type(__be16 type)
 {
-	struct list_head *offload_head = &offload_base;
+	struct list_head *offload_head = &net_hotdata.offload_base;
 	struct packet_offload *ptype;
 
 	list_for_each_entry_rcu(ptype, offload_head, list) {
@@ -633,7 +615,7 @@ static gro_result_t napi_skb_finish(struct napi_struct *napi,
 		else if (skb->fclone != SKB_FCLONE_UNAVAILABLE)
 			__kfree_skb(skb);
 		else
-			__kfree_skb_defer(skb);
+			__napi_kfree_skb(skb, SKB_CONSUMED);
 		break;
 
 	case GRO_HELD:
@@ -748,7 +730,7 @@ static struct sk_buff *napi_frags_skb(struct napi_struct *napi)
 	skb_reset_mac_header(skb);
 	skb_gro_reset_offset(skb, hlen);
 
-	if (unlikely(skb_gro_header_hard(skb, hlen))) {
+	if (unlikely(!skb_gro_may_pull(skb, hlen))) {
 		eth = skb_gro_header_slow(skb, hlen, 0);
 		if (unlikely(!eth)) {
 			net_warn_ratelimited("%s: dropping impossible skb from %s\n",
@@ -758,7 +740,10 @@ static struct sk_buff *napi_frags_skb(struct napi_struct *napi)
 		}
 	} else {
 		eth = (const struct ethhdr *)skb->data;
-		gro_pull_from_frag0(skb, hlen);
+
+		if (NAPI_GRO_CB(skb)->frag0 != skb->data)
+			gro_pull_from_frag0(skb, hlen);
+
 		NAPI_GRO_CB(skb)->frag0 += hlen;
 		NAPI_GRO_CB(skb)->frag0_len -= hlen;
 	}

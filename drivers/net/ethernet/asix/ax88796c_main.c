@@ -284,7 +284,7 @@ ax88796c_tx_fixup(struct net_device *ndev, struct sk_buff_head *q)
 	ax88796c_proc_tx_hdr(&info, skb->ip_summed);
 
 	/* SOP and SEG header */
-	memcpy(skb_push(skb, TX_OVERHEAD), &info.sop, TX_OVERHEAD);
+	memcpy(skb_push(skb, TX_OVERHEAD), &info.tx_overhead, TX_OVERHEAD);
 
 	/* Write SPI TXQ header */
 	memcpy(skb_push(skb, spi_len), ax88796c_tx_cmd_buf, spi_len);
@@ -1006,7 +1006,7 @@ static int ax88796c_probe(struct spi_device *spi)
 	ax_local->mdiobus->parent = &spi->dev;
 
 	snprintf(ax_local->mdiobus->id, MII_BUS_ID_SIZE,
-		 "ax88796c-%s.%u", dev_name(&spi->dev), spi->chip_select);
+		 "ax88796c-%s.%u", dev_name(&spi->dev), spi_get_chipselect(spi, 0));
 
 	ret = devm_mdiobus_register(&spi->dev, ax_local->mdiobus);
 	if (ret < 0) {

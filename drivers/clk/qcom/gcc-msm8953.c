@@ -7,7 +7,6 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/clk-provider.h>
 #include <linux/regmap.h>
 #include <linux/reset-controller.h>
@@ -4172,6 +4171,10 @@ static const struct qcom_reset_map gcc_msm8953_resets[] = {
 	[GCC_USB3PHY_PHY_BCR]	= { 0x3f03c },
 	[GCC_USB3_PHY_BCR]	= { 0x3f034 },
 	[GCC_USB_30_BCR]	= { 0x3f070 },
+	[GCC_MDSS_BCR]		= { 0x4d074 },
+	[GCC_CRYPTO_BCR]	= { 0x16000 },
+	[GCC_SDCC1_BCR]		= { 0x42000 },
+	[GCC_SDCC2_BCR]		= { 0x43000 },
 };
 
 static const struct regmap_config gcc_msm8953_regmap_config = {
@@ -4224,6 +4227,7 @@ static const struct of_device_id gcc_msm8953_match_table[] = {
 	{ .compatible = "qcom,gcc-msm8953" },
 	{},
 };
+MODULE_DEVICE_TABLE(of, gcc_msm8953_match_table);
 
 static struct platform_driver gcc_msm8953_driver = {
 	.probe = gcc_msm8953_probe,

@@ -4,8 +4,8 @@
  *
  * Copyright (C) 2022 Microchip Technology Inc. and its subsidiaries
  */
-#include "asm-generic/errno-base.h"
 #include <linux/clk-provider.h>
+#include <linux/errno.h>
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -291,4 +291,3 @@ module_exit(clk_ccc_exit);
 
 MODULE_DESCRIPTION("Microchip PolarFire SoC Clock Conditioning Circuitry Driver");
 MODULE_AUTHOR("Conor Dooley <conor.dooley@microchip.com>");
-MODULE_LICENSE("GPL");

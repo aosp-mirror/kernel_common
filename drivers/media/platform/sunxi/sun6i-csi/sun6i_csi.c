@@ -11,7 +11,6 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
@@ -375,7 +374,7 @@ error_resources:
 	return ret;
 }
 
-static int sun6i_csi_remove(struct platform_device *pdev)
+static void sun6i_csi_remove(struct platform_device *pdev)
 {
 	struct sun6i_csi_device *csi_dev = platform_get_drvdata(pdev);
 
@@ -386,8 +385,6 @@ static int sun6i_csi_remove(struct platform_device *pdev)
 		sun6i_csi_v4l2_cleanup(csi_dev);
 
 	sun6i_csi_resources_cleanup(csi_dev);
-
-	return 0;
 }
 
 static const struct sun6i_csi_variant sun6i_a31_csi_variant = {
@@ -426,10 +423,10 @@ MODULE_DEVICE_TABLE(of, sun6i_csi_of_match);
 
 static struct platform_driver sun6i_csi_platform_driver = {
 	.probe	= sun6i_csi_probe,
-	.remove	= sun6i_csi_remove,
+	.remove_new = sun6i_csi_remove,
 	.driver	= {
 		.name		= SUN6I_CSI_NAME,
-		.of_match_table	= of_match_ptr(sun6i_csi_of_match),
+		.of_match_table	= sun6i_csi_of_match,
 		.pm		= &sun6i_csi_pm_ops,
 	},
 };

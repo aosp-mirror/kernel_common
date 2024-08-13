@@ -1000,6 +1000,8 @@ static int gbefb_mmap(struct fb_info *info,
 	unsigned long phys_addr, phys_size;
 	u16 *tile;
 
+	vma->vm_page_prot = pgprot_decrypted(vma->vm_page_prot);
+
 	/* check range */
 	if (vma->vm_pgoff > (~0UL >> PAGE_SHIFT))
 		return -EINVAL;
@@ -1044,14 +1046,13 @@ static int gbefb_mmap(struct fb_info *info,
 
 static const struct fb_ops gbefb_ops = {
 	.owner		= THIS_MODULE,
+	__FB_DEFAULT_IOMEM_OPS_RDWR,
 	.fb_check_var	= gbefb_check_var,
 	.fb_set_par	= gbefb_set_par,
 	.fb_setcolreg	= gbefb_setcolreg,
-	.fb_mmap	= gbefb_mmap,
 	.fb_blank	= gbefb_blank,
-	.fb_fillrect	= cfb_fillrect,
-	.fb_copyarea	= cfb_copyarea,
-	.fb_imageblit	= cfb_imageblit,
+	__FB_DEFAULT_IOMEM_OPS_DRAW,
+	.fb_mmap	= gbefb_mmap,
 };
 
 /*
@@ -1194,7 +1195,6 @@ static int gbefb_probe(struct platform_device *p_dev)
 
 	info->fbops = &gbefb_ops;
 	info->pseudo_palette = pseudo_palette;
-	info->flags = FBINFO_DEFAULT;
 	info->screen_base = gbe_mem;
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
@@ -1233,7 +1233,7 @@ out_release_framebuffer:
 	return ret;
 }
 
-static int gbefb_remove(struct platform_device* p_dev)
+static void gbefb_remove(struct platform_device* p_dev)
 {
 	struct fb_info *info = platform_get_drvdata(p_dev);
 	struct gbefb_par *par = info->par;
@@ -1243,13 +1243,11 @@ static int gbefb_remove(struct platform_device* p_dev)
 	arch_phys_wc_del(par->wc_cookie);
 	release_mem_region(GBE_BASE, sizeof(struct sgi_gbe));
 	framebuffer_release(info);
-
-	return 0;
 }
 
 static struct platform_driver gbefb_driver = {
 	.probe = gbefb_probe,
-	.remove = gbefb_remove,
+	.remove_new = gbefb_remove,
 	.driver	= {
 		.name = "gbefb",
 		.dev_groups	= gbefb_groups,

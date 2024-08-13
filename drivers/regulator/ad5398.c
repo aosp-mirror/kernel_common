@@ -254,9 +254,10 @@ static int ad5398_probe(struct i2c_client *client)
 }
 
 static struct i2c_driver ad5398_driver = {
-	.probe_new = ad5398_probe,
+	.probe = ad5398_probe,
 	.driver		= {
 		.name	= "ad5398",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.id_table	= ad5398_id,
 };

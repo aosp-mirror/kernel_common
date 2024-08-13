@@ -26,7 +26,7 @@ set_debarch() {
 
 	# Attempt to find the correct Debian architecture
 	case "$UTS_MACHINE" in
-	i386|ia64|alpha|m68k|riscv*)
+	i386|alpha|m68k|riscv*)
 		debarch="$UTS_MACHINE" ;;
 	x86_64)
 		debarch=amd64 ;;
@@ -84,16 +84,75 @@ set_debarch() {
 	fi
 }
 
+# Create debian/source/ if it is a source package build
+gen_source ()
+{
+	mkdir -p debian/source
+
+	echo "3.0 (quilt)" > debian/source/format
+
+	{
+		echo "diff-ignore"
+		echo "extend-diff-ignore = .*"
+	} > debian/source/local-options
+
+	# Add .config as a patch
+	mkdir -p debian/patches
+	{
+		echo "Subject: Add .config"
+		echo "Author: ${maintainer}"
+		echo
+		echo "--- /dev/null"
+		echo "+++ linux/.config"
+		diff -u /dev/null "${KCONFIG_CONFIG}" | tail -n +3
+	} > debian/patches/config.patch
+	echo config.patch > debian/patches/series
+
+	"${srctree}/scripts/package/gen-diff-patch" debian/patches/diff.patch
+	if [ -s debian/patches/diff.patch ]; then
+		sed -i "
+			1iSubject: Add local diff
+			1iAuthor: ${maintainer}
+			1i
+		" debian/patches/diff.patch
+
+		echo diff.patch >> debian/patches/series
+	else
+		rm -f debian/patches/diff.patch
+	fi
+}
+
+rm -rf debian
+mkdir debian
+
+email=${DEBEMAIL-$EMAIL}
+
+# use email string directly if it contains <email>
+if echo "${email}" | grep -q '<.*>'; then
+	maintainer=${email}
+else
+	# or construct the maintainer string
+	user=${KBUILD_BUILD_USER-$(id -nu)}
+	name=${DEBFULLNAME-${user}}
+	if [ -z "${email}" ]; then
+		buildhost=${KBUILD_BUILD_HOST-$(hostname -f 2>/dev/null || hostname)}
+		email="${user}@${buildhost}"
+	fi
+	maintainer="${name} <${email}>"
+fi
+
+if [ "$1" = --need-source ]; then
+	gen_source
+fi
+
 # Some variables and settings used throughout the script
 version=$KERNELRELEASE
 if [ -n "$KDEB_PKGVERSION" ]; then
 	packageversion=$KDEB_PKGVERSION
-	revision=${packageversion##*-}
 else
-	revision=$($srctree/init/build-version)
-	packageversion=$version-$revision
+	packageversion=$(${srctree}/scripts/setlocalversion --no-local ${srctree})-$($srctree/init/build-version)
 fi
-sourcename=$KDEB_SOURCENAME
+sourcename=${KDEB_SOURCENAME:-linux-upstream}
 
 if [ "$ARCH" = "um" ] ; then
 	packagename=user-mode-linux
@@ -103,22 +162,6 @@ fi
 
 debarch=
 set_debarch
-
-email=${DEBEMAIL-$EMAIL}
-
-# use email string directly if it contains <email>
-if echo $email | grep -q '<.*>'; then
-	maintainer=$email
-else
-	# or construct the maintainer string
-	user=${KBUILD_BUILD_USER-$(id -nu)}
-	name=${DEBFULLNAME-$user}
-	if [ -z "$email" ]; then
-		buildhost=${KBUILD_BUILD_HOST-$(hostname -f 2>/dev/null || hostname)}
-		email="$user@$buildhost"
-	fi
-	maintainer="$name <$email>"
-fi
 
 # Try to determine distribution
 if [ -n "$KDEB_CHANGELOG_DIST" ]; then
@@ -132,12 +175,7 @@ else
         echo >&2 "Install lsb-release or set \$KDEB_CHANGELOG_DIST explicitly"
 fi
 
-mkdir -p debian/source/
-echo "1.0" > debian/source/format
-
 echo $debarch > debian/arch
-extra_build_depends=", $(if_enabled_echo CONFIG_UNWINDER_ORC libelf-dev:native)"
-extra_build_depends="$extra_build_depends, $(if_enabled_echo CONFIG_SYSTEM_TRUSTED_KEYRING libssl-dev:native)"
 
 # Generate a simple changelog template
 cat <<EOF > debian/changelog
@@ -148,26 +186,6 @@ $sourcename ($packageversion) $distribution; urgency=low
  -- $maintainer  $(date -R)
 EOF
 
-# Generate copyright file
-cat <<EOF > debian/copyright
-This is a packacked upstream version of the Linux kernel.
-
-The sources may be found at most Linux archive sites, including:
-https://www.kernel.org/pub/linux/kernel
-
-Copyright: 1991 - 2018 Linus Torvalds and others.
-
-The git repository for mainline kernel development is at:
-git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; version 2 dated June, 1991.
-
-On Debian GNU/Linux systems, the complete text of the GNU General Public
-License version 2 can be found in \`/usr/share/common-licenses/GPL-2'.
-EOF
-
 # Generate a control file
 cat <<EOF > debian/control
 Source: $sourcename
@@ -175,7 +193,8 @@ Section: kernel
 Priority: optional
 Maintainer: $maintainer
 Rules-Requires-Root: no
-Build-Depends: bc, rsync, kmod, cpio, bison, flex $extra_build_depends
+Build-Depends: debhelper-compat (= 12)
+Build-Depends-Arch: bc, bison, cpio, flex, kmod, libelf-dev:native, libssl-dev:native, rsync
 Homepage: https://www.kernel.org/
 
 Package: $packagename-$version
@@ -183,6 +202,10 @@ Architecture: $debarch
 Description: Linux kernel, version $version
  This package contains the Linux kernel, modules and corresponding other
  files, version: $version.
+EOF
+
+if [ "${SRCARCH}" != um ]; then
+cat <<EOF >> debian/control
 
 Package: linux-libc-dev
 Section: devel
@@ -205,6 +228,7 @@ Description: Linux kernel headers for $version on $debarch
  This is useful for people who need to build external modules
 EOF
 fi
+fi
 
 if is_enabled CONFIG_DEBUG_INFO; then
 cat <<EOF >> debian/control
@@ -218,29 +242,12 @@ Description: Linux kernel debugging symbols for $version
 EOF
 fi
 
-cat <<EOF > debian/rules
-#!$(command -v $MAKE) -f
-
-srctree ?= .
-
-build-indep:
-build-arch:
-	\$(MAKE) KERNELRELEASE=${version} ARCH=${ARCH} \
-	KBUILD_BUILD_VERSION=${revision} -f \$(srctree)/Makefile
-
-build: build-arch
-
-binary-indep:
-binary-arch: build-arch
-	\$(MAKE) KERNELRELEASE=${version} ARCH=${ARCH} \
-	KBUILD_BUILD_VERSION=${revision} -f \$(srctree)/Makefile intdeb-pkg
-
-clean:
-	rm -rf debian/*tmp debian/files
-	\$(MAKE) clean
-
-binary: binary-arch
+cat <<EOF > debian/rules.vars
+ARCH := ${ARCH}
+KERNELRELEASE := ${KERNELRELEASE}
 EOF
-chmod +x debian/rules
+
+cp "${srctree}/scripts/package/debian/copyright" debian/
+cp "${srctree}/scripts/package/debian/rules" debian/
 
 exit 0

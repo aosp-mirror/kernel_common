@@ -6,6 +6,20 @@
 
 #include "mt76.h"
 
+enum rx_pkt_type {
+	PKT_TYPE_TXS,
+	PKT_TYPE_TXRXV,
+	PKT_TYPE_NORMAL,
+	PKT_TYPE_RX_DUP_RFB,
+	PKT_TYPE_RX_TMR,
+	PKT_TYPE_RETRIEVE,
+	PKT_TYPE_TXRX_NOTIFY,
+	PKT_TYPE_RX_EVENT,
+	PKT_TYPE_NORMAL_MCU,
+	PKT_TYPE_RX_FW_MONITOR	= 0x0c,
+	PKT_TYPE_TXRX_NOTIFY_V0	= 0x18,
+};
+
 #define MT76_CONNAC_SCAN_IE_LEN			600
 #define MT76_CONNAC_MAX_NUM_SCHED_SCAN_INTERVAL	 10
 #define MT76_CONNAC_MAX_TIME_SCHED_SCAN_INTERVAL U16_MAX
@@ -158,6 +172,16 @@ struct mt76_connac_tx_free {
 
 extern const struct wiphy_wowlan_support mt76_connac_wowlan_support;
 
+static inline bool is_mt7925(struct mt76_dev *dev)
+{
+	return mt76_chip(dev) == 0x7925;
+}
+
+static inline bool is_mt7920(struct mt76_dev *dev)
+{
+	return mt76_chip(dev) == 0x7920;
+}
+
 static inline bool is_mt7922(struct mt76_dev *dev)
 {
 	return mt76_chip(dev) == 0x7922;
@@ -165,7 +189,7 @@ static inline bool is_mt7922(struct mt76_dev *dev)
 
 static inline bool is_mt7921(struct mt76_dev *dev)
 {
-	return mt76_chip(dev) == 0x7961 || is_mt7922(dev);
+	return mt76_chip(dev) == 0x7961 || is_mt7922(dev) || is_mt7920(dev);
 }
 
 static inline bool is_mt7663(struct mt76_dev *dev)
@@ -183,14 +207,34 @@ static inline bool is_mt7916(struct mt76_dev *dev)
 	return mt76_chip(dev) == 0x7906;
 }
 
+static inline bool is_mt7981(struct mt76_dev *dev)
+{
+	return mt76_chip(dev) == 0x7981;
+}
+
 static inline bool is_mt7986(struct mt76_dev *dev)
 {
 	return mt76_chip(dev) == 0x7986;
 }
 
+static inline bool is_mt798x(struct mt76_dev *dev)
+{
+	return is_mt7981(dev) || is_mt7986(dev);
+}
+
 static inline bool is_mt7996(struct mt76_dev *dev)
 {
 	return mt76_chip(dev) == 0x7990;
+}
+
+static inline bool is_mt7992(struct mt76_dev *dev)
+{
+	return mt76_chip(dev) == 0x7992;
+}
+
+static inline bool is_mt799x(struct mt76_dev *dev)
+{
+	return is_mt7996(dev) || is_mt7992(dev);
 }
 
 static inline bool is_mt7622(struct mt76_dev *dev)
@@ -220,7 +264,9 @@ static inline bool is_mt76_fw_txp(struct mt76_dev *dev)
 {
 	switch (mt76_chip(dev)) {
 	case 0x7961:
+	case 0x7920:
 	case 0x7922:
+	case 0x7925:
 	case 0x7663:
 	case 0x7622:
 		return false;
@@ -277,6 +323,12 @@ static inline u8 mt76_connac_spe_idx(u8 antenna_mask)
 		return 0;
 
 	return ant_to_spe[antenna_mask];
+}
+
+static inline void mt76_connac_irq_enable(struct mt76_dev *dev, u32 mask)
+{
+	mt76_set_irq_mask(dev, 0, 0, mask);
+	tasklet_schedule(&dev->irq_tasklet);
 }
 
 int mt76_connac_pm_wake(struct mt76_phy *phy, struct mt76_connac_pm *pm);
@@ -353,8 +405,10 @@ mt76_connac_mutex_release(struct mt76_dev *dev, struct mt76_connac_pm *pm)
 	mutex_unlock(&dev->mutex);
 }
 
+void mt76_connac_gen_ppe_thresh(u8 *he_ppet, int nss);
 int mt76_connac_init_tx_queues(struct mt76_phy *phy, int idx, int n_desc,
-			       int ring_base, u32 flags);
+			       int ring_base, void *wed, u32 flags);
+
 void mt76_connac_write_hw_txp(struct mt76_dev *dev,
 			      struct mt76_tx_info *tx_info,
 			      void *txp_ptr, u32 id);
@@ -388,5 +442,15 @@ int mt76_connac2_mac_fill_rx_rate(struct mt76_dev *dev,
 				  struct mt76_rx_status *status,
 				  struct ieee80211_supported_band *sband,
 				  __le32 *rxv, u8 *mode);
+void mt76_connac2_tx_check_aggr(struct ieee80211_sta *sta, __le32 *txwi);
+void mt76_connac2_txwi_free(struct mt76_dev *dev, struct mt76_txwi_cache *t,
+			    struct ieee80211_sta *sta,
+			    struct list_head *free_list);
+void mt76_connac2_tx_token_put(struct mt76_dev *dev);
 
+/* connac3 */
+void mt76_connac3_mac_decode_he_radiotap(struct sk_buff *skb, __le32 *rxv,
+					 u8 mode);
+void mt76_connac3_mac_decode_eht_radiotap(struct sk_buff *skb, __le32 *rxv,
+					  u8 mode);
 #endif /* __MT76_CONNAC_H */

@@ -29,7 +29,7 @@ static DEFINE_MUTEX(of_dma_lock);
  * to the DMA data stored is retuned. A NULL pointer is returned if no match is
  * found.
  */
-static struct of_dma *of_dma_find_controller(struct of_phandle_args *dma_spec)
+static struct of_dma *of_dma_find_controller(const struct of_phandle_args *dma_spec)
 {
 	struct of_dma *ofdma;
 
@@ -264,7 +264,7 @@ struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
 	}
 
 	/* Silently fail if there is not even the "dmas" property */
-	if (!of_find_property(np, "dmas", NULL))
+	if (!of_property_present(np, "dmas"))
 		return ERR_PTR(-ENODEV);
 
 	count = of_property_count_strings(np, "dma-names");

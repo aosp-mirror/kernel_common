@@ -63,6 +63,7 @@ do {											\
 
 #define SCALEOUT_ERRSTRING(s, x...) pr_alert("%s" SCALE_FLAG "!!! " s "\n", scale_type, ## x)
 
+MODULE_DESCRIPTION("Scalability test for object reference mechanisms");
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Joel Fernandes (Google) <joel@joelfernandes.org>");
 
@@ -528,6 +529,38 @@ static struct ref_scale_ops clock_ops = {
 	.name		= "clock"
 };
 
+static void ref_jiffies_section(const int nloops)
+{
+	u64 x = 0;
+	int i;
+
+	preempt_disable();
+	for (i = nloops; i >= 0; i--)
+		x += jiffies;
+	preempt_enable();
+	stopopts = x;
+}
+
+static void ref_jiffies_delay_section(const int nloops, const int udl, const int ndl)
+{
+	u64 x = 0;
+	int i;
+
+	preempt_disable();
+	for (i = nloops; i >= 0; i--) {
+		x += jiffies;
+		un_delay(udl, ndl);
+	}
+	preempt_enable();
+	stopopts = x;
+}
+
+static struct ref_scale_ops jiffies_ops = {
+	.readsection	= ref_jiffies_section,
+	.delaysection	= ref_jiffies_delay_section,
+	.name		= "jiffies"
+};
+
 ////////////////////////////////////////////////////////////////////////
 //
 // Methods leveraging SLAB_TYPESAFE_BY_RCU.
@@ -623,12 +656,12 @@ retry:
 			goto retry;
 		}
 		un_delay(udl, ndl);
+		b = READ_ONCE(rtsp->a);
 		// Remember, seqlock read-side release can fail.
 		if (!rts_release(rtsp, start)) {
 			rcu_read_unlock();
 			goto retry;
 		}
-		b = READ_ONCE(rtsp->a);
 		WARN_ONCE(a != b, "Re-read of ->a changed from %u to %u.\n", a, b);
 		b = rtsp->b;
 		rcu_read_unlock();
@@ -993,8 +1026,8 @@ static void
 ref_scale_print_module_parms(struct ref_scale_ops *cur_ops, const char *tag)
 {
 	pr_alert("%s" SCALE_FLAG
-		 "--- %s:  verbose=%d shutdown=%d holdoff=%d loops=%ld nreaders=%d nruns=%d readdelay=%d\n", scale_type, tag,
-		 verbose, shutdown, holdoff, loops, nreaders, nruns, readdelay);
+		 "--- %s:  verbose=%d verbose_batched=%d shutdown=%d holdoff=%d lookup_instances=%ld loops=%ld nreaders=%d nruns=%d readdelay=%d\n", scale_type, tag,
+		 verbose, verbose_batched, shutdown, holdoff, lookup_instances, loops, nreaders, nruns, readdelay);
 }
 
 static void
@@ -1031,7 +1064,7 @@ ref_scale_cleanup(void)
 static int
 ref_scale_shutdown(void *arg)
 {
-	wait_event(shutdown_wq, shutdown_start);
+	wait_event_idle(shutdown_wq, shutdown_start);
 
 	smp_mb(); // Wake before output.
 	ref_scale_cleanup();
@@ -1047,7 +1080,7 @@ ref_scale_init(void)
 	int firsterr = 0;
 	static struct ref_scale_ops *scale_ops[] = {
 		&rcu_ops, &srcu_ops, RCU_TRACE_OPS RCU_TASKS_OPS &refcnt_ops, &rwlock_ops,
-		&rwsem_ops, &lock_ops, &lock_irq_ops, &acqrel_ops, &clock_ops,
+		&rwsem_ops, &lock_ops, &lock_irq_ops, &acqrel_ops, &clock_ops, &jiffies_ops,
 		&typesafe_ref_ops, &typesafe_lock_ops, &typesafe_seqlock_ops,
 	};
 
@@ -1107,12 +1140,11 @@ ref_scale_init(void)
 	VERBOSE_SCALEOUT("Starting %d reader threads", nreaders);
 
 	for (i = 0; i < nreaders; i++) {
+		init_waitqueue_head(&reader_tasks[i].wq);
 		firsterr = torture_create_kthread(ref_scale_reader, (void *)i,
 						  reader_tasks[i].task);
 		if (torture_init_error(firsterr))
 			goto unwind;
-
-		init_waitqueue_head(&(reader_tasks[i].wq));
 	}
 
 	// Main Task

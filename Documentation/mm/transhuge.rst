@@ -1,5 +1,3 @@
-.. _transhuge:
-
 ============================
 Transparent Hugepage Support
 ============================
@@ -112,20 +110,20 @@ Refcounts and transparent huge pages
 Refcounting on THP is mostly consistent with refcounting on other compound
 pages:
 
-  - get_page()/put_page() and GUP operate on head page's ->_refcount.
+  - get_page()/put_page() and GUP operate on the folio->_refcount.
 
   - ->_refcount in tail pages is always zero: get_page_unless_zero() never
     succeeds on tail pages.
 
-  - map/unmap of PMD entry for the whole compound page increment/decrement
-    ->compound_mapcount, stored in the first tail page of the compound page;
-    and also increment/decrement ->subpages_mapcount (also in the first tail)
-    by COMPOUND_MAPPED when compound_mapcount goes from -1 to 0 or 0 to -1.
+  - map/unmap of a PMD entry for the whole THP increment/decrement
+    folio->_entire_mapcount, increment/decrement folio->_large_mapcount
+    and also increment/decrement folio->_nr_pages_mapped by ENTIRELY_MAPPED
+    when _entire_mapcount goes from -1 to 0 or 0 to -1.
 
-  - map/unmap of sub-pages with PTE entry increment/decrement ->_mapcount
-    on relevant sub-page of the compound page, and also increment/decrement
-    ->subpages_mapcount, stored in first tail page of the compound page, when
-    _mapcount goes from -1 to 0 or 0 to -1: counting sub-pages mapped by PTE.
+  - map/unmap of individual pages with PTE entry increment/decrement
+    page->_mapcount, increment/decrement folio->_large_mapcount and also
+    increment/decrement folio->_nr_pages_mapped when page->_mapcount goes
+    from -1 to 0 or 0 to -1 as this counts the number of pages mapped by PTE.
 
 split_huge_page internally has to distribute the refcounts in the head
 page to the tail pages before clearing all PG_head/tail bits from the page
@@ -153,12 +151,12 @@ clear where references should go after split: it will stay on the head page.
 Note that split_huge_pmd() doesn't have any limitations on refcounting:
 pmd can be split at any point and never fails.
 
-Partial unmap and deferred_split_huge_page()
-============================================
+Partial unmap and deferred_split_folio()
+========================================
 
 Unmapping part of THP (with munmap() or other way) is not going to free
 memory immediately. Instead, we detect that a subpage of THP is not in use
-in page_remove_rmap() and queue the THP for splitting if memory pressure
+in folio_remove_rmap_*() and queue the THP for splitting if memory pressure
 comes. Splitting will free up unused subpages.
 
 Splitting the page right away is not an option due to locking context in
@@ -166,6 +164,6 @@ the place where we can detect partial unmap. It also might be
 counterproductive since in many cases partial unmap happens during exit(2) if
 a THP crosses a VMA boundary.
 
-The function deferred_split_huge_page() is used to queue a page for splitting.
+The function deferred_split_folio() is used to queue a folio for splitting.
 The splitting itself will happen when we get memory pressure via shrinker
 interface.

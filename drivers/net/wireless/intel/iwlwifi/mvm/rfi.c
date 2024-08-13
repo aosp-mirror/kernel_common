@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2020 - 2021 Intel Corporation
+ * Copyright (C) 2020 - 2022 Intel Corporation
  */
 
 #include "mvm.h"
@@ -70,6 +70,16 @@ static const struct iwl_rfi_lut_entry iwl_rfi_table[IWL_RFI_LUT_SIZE] = {
 		PHY_BAND_6, PHY_BAND_6,}},
 };
 
+bool iwl_rfi_supported(struct iwl_mvm *mvm)
+{
+	/* The feature depends on a platform bugfix, so for now
+	 * it's always disabled.
+	 * When the platform support detection is implemented we should
+	 * check FW TLV and platform support instead.
+	 */
+	return false;
+}
+
 int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm, struct iwl_rfi_lut_entry *rfi_table)
 {
 	int ret;
@@ -81,7 +91,7 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm, struct iwl_rfi_lut_entry *rfi_t
 		.len[0] = sizeof(cmd),
 	};
 
-	if (!fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_RFIM_SUPPORT))
+	if (!iwl_rfi_supported(mvm))
 		return -EOPNOTSUPP;
 
 	lockdep_assert_held(&mvm->mutex);
@@ -113,7 +123,7 @@ struct iwl_rfi_freq_table_resp_cmd *iwl_rfi_get_freq_table(struct iwl_mvm *mvm)
 		.flags = CMD_WANT_SKB,
 	};
 
-	if (!fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_RFIM_SUPPORT))
+	if (!iwl_rfi_supported(mvm))
 		return ERR_PTR(-EOPNOTSUPP);
 
 	mutex_lock(&mvm->mutex);
@@ -122,14 +132,18 @@ struct iwl_rfi_freq_table_resp_cmd *iwl_rfi_get_freq_table(struct iwl_mvm *mvm)
 	if (ret)
 		return ERR_PTR(ret);
 
-	if (WARN_ON_ONCE(iwl_rx_packet_payload_len(cmd.resp_pkt) != resp_size))
+	if (WARN_ON_ONCE(iwl_rx_packet_payload_len(cmd.resp_pkt) !=
+			 resp_size)) {
+		iwl_free_resp(&cmd);
 		return ERR_PTR(-EIO);
+	}
 
 	resp = kmemdup(cmd.resp_pkt->data, resp_size, GFP_KERNEL);
+	iwl_free_resp(&cmd);
+
 	if (!resp)
 		return ERR_PTR(-ENOMEM);
 
-	iwl_free_resp(&cmd);
 	return resp;
 }
 

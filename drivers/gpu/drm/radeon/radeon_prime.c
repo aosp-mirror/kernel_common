@@ -29,6 +29,8 @@
 #include <drm/drm_prime.h>
 #include <drm/radeon_drm.h>
 
+#include <drm/ttm/ttm_tt.h>
+
 #include "radeon.h"
 #include "radeon_prime.h"
 
@@ -71,32 +73,21 @@ int radeon_gem_prime_pin(struct drm_gem_object *obj)
 	struct radeon_bo *bo = gem_to_radeon_bo(obj);
 	int ret = 0;
 
-	ret = radeon_bo_reserve(bo, false);
-	if (unlikely(ret != 0))
-		return ret;
-
 	/* pin buffer into GTT */
 	ret = radeon_bo_pin(bo, RADEON_GEM_DOMAIN_GTT, NULL);
 	if (likely(ret == 0))
 		bo->prime_shared_count++;
 
-	radeon_bo_unreserve(bo);
 	return ret;
 }
 
 void radeon_gem_prime_unpin(struct drm_gem_object *obj)
 {
 	struct radeon_bo *bo = gem_to_radeon_bo(obj);
-	int ret = 0;
-
-	ret = radeon_bo_reserve(bo, false);
-	if (unlikely(ret != 0))
-		return;
 
 	radeon_bo_unpin(bo);
 	if (bo->prime_shared_count)
 		bo->prime_shared_count--;
-	radeon_bo_unreserve(bo);
 }
 
 

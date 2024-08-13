@@ -63,7 +63,7 @@ static int sdhci_pci_init_wakeup(struct sdhci_pci_chip *chip)
 	if ((pm_flags & MMC_PM_KEEP_POWER) && (pm_flags & MMC_PM_WAKE_SDIO_IRQ))
 		return device_wakeup_enable(&chip->pdev->dev);
 	else if (!cap_cd_wake)
-		return device_wakeup_disable(&chip->pdev->dev);
+		device_wakeup_disable(&chip->pdev->dev);
 
 	return 0;
 }
@@ -251,13 +251,16 @@ static int ricoh_probe(struct sdhci_pci_chip *chip)
 
 static int ricoh_mmc_probe_slot(struct sdhci_pci_slot *slot)
 {
-	slot->host->caps =
+	u32 caps =
 		FIELD_PREP(SDHCI_TIMEOUT_CLK_MASK, 0x21) |
 		FIELD_PREP(SDHCI_CLOCK_BASE_MASK, 0x21) |
 		SDHCI_TIMEOUT_CLK_UNIT |
 		SDHCI_CAN_VDD_330 |
 		SDHCI_CAN_DO_HISPD |
 		SDHCI_CAN_DO_SDMA;
+	u32 caps1 = 0;
+
+	__sdhci_read_caps(slot->host, NULL, &caps, &caps1);
 	return 0;
 }
 
@@ -286,8 +289,7 @@ static const struct sdhci_pci_fixes sdhci_ricoh_mmc = {
 #endif
 	.quirks		= SDHCI_QUIRK_32BIT_DMA_ADDR |
 			  SDHCI_QUIRK_CLOCK_BEFORE_RESET |
-			  SDHCI_QUIRK_NO_CARD_NO_RESET |
-			  SDHCI_QUIRK_MISSING_CAPS
+			  SDHCI_QUIRK_NO_CARD_NO_RESET,
 };
 
 static void ene_714_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
@@ -481,11 +483,12 @@ static int __intel_dsm(struct intel_host *intel_host, struct device *dev,
 	int err = 0;
 	size_t len;
 
-	obj = acpi_evaluate_dsm(ACPI_HANDLE(dev), &intel_dsm_guid, 0, fn, NULL);
+	obj = acpi_evaluate_dsm_typed(ACPI_HANDLE(dev), &intel_dsm_guid, 0, fn, NULL,
+				      ACPI_TYPE_BUFFER);
 	if (!obj)
 		return -EOPNOTSUPP;
 
-	if (obj->type != ACPI_TYPE_BUFFER || obj->buffer.length < 1) {
+	if (obj->buffer.length < 1) {
 		err = -EINVAL;
 		goto out;
 	}
@@ -1316,6 +1319,23 @@ static const struct sdhci_pci_fixes sdhci_intel_mrfld_mmc = {
 	.probe_slot	= intel_mrfld_mmc_probe_slot,
 };
 
+#define JMB388_SAMPLE_COUNT	5
+
+static int jmicron_jmb388_get_ro(struct mmc_host *mmc)
+{
+	int i, ro_count;
+
+	ro_count = 0;
+	for (i = 0; i < JMB388_SAMPLE_COUNT; i++) {
+		if (sdhci_get_ro(mmc) > 0) {
+			if (++ro_count > JMB388_SAMPLE_COUNT / 2)
+				return 1;
+		}
+		msleep(30);
+	}
+	return 0;
+}
+
 static int jmicron_pmos(struct sdhci_pci_chip *chip, int on)
 {
 	u8 scratch;
@@ -1323,7 +1343,7 @@ static int jmicron_pmos(struct sdhci_pci_chip *chip, int on)
 
 	ret = pci_read_config_byte(chip->pdev, 0xAE, &scratch);
 	if (ret)
-		return ret;
+		goto fail;
 
 	/*
 	 * Turn PMOS on [bit 0], set over current detection to 2.4 V
@@ -1334,7 +1354,10 @@ static int jmicron_pmos(struct sdhci_pci_chip *chip, int on)
 	else
 		scratch &= ~0x47;
 
-	return pci_write_config_byte(chip->pdev, 0xAE, scratch);
+	ret = pci_write_config_byte(chip->pdev, 0xAE, scratch);
+
+fail:
+	return pcibios_err_to_errno(ret);
 }
 
 static int jmicron_probe(struct sdhci_pci_chip *chip)
@@ -1397,11 +1420,6 @@ static int jmicron_probe(struct sdhci_pci_chip *chip)
 		return ret;
 	}
 
-	/* quirk for unsable RO-detection on JM388 chips */
-	if (chip->pdev->device == PCI_DEVICE_ID_JMICRON_JMB388_SD ||
-	    chip->pdev->device == PCI_DEVICE_ID_JMICRON_JMB388_ESD)
-		chip->quirks |= SDHCI_QUIRK_UNSTABLE_RO_DETECT;
-
 	return 0;
 }
 
@@ -1455,6 +1473,11 @@ static int jmicron_probe_slot(struct sdhci_pci_slot *slot)
 		jmicron_enable_mmc(slot->host, 1);
 
 	slot->host->mmc->caps |= MMC_CAP_BUS_WIDTH_TEST;
+
+	/* Handle unstable RO-detection on JM388 chips */
+	if (slot->chip->pdev->device == PCI_DEVICE_ID_JMICRON_JMB388_SD ||
+	    slot->chip->pdev->device == PCI_DEVICE_ID_JMICRON_JMB388_ESD)
+		slot->host->mmc_host_ops.get_ro = jmicron_jmb388_get_ro;
 
 	return 0;
 }
@@ -1896,11 +1919,16 @@ static const struct pci_device_id pci_ids[] = {
 	SDHCI_PCI_DEVICE(O2, SDS1,     o2),
 	SDHCI_PCI_DEVICE(O2, SEABIRD0, o2),
 	SDHCI_PCI_DEVICE(O2, SEABIRD1, o2),
+	SDHCI_PCI_DEVICE(O2, GG8_9860, o2),
+	SDHCI_PCI_DEVICE(O2, GG8_9861, o2),
+	SDHCI_PCI_DEVICE(O2, GG8_9862, o2),
+	SDHCI_PCI_DEVICE(O2, GG8_9863, o2),
 	SDHCI_PCI_DEVICE(ARASAN, PHY_EMMC, arasan),
 	SDHCI_PCI_DEVICE(SYNOPSYS, DWC_MSHC, snps),
 	SDHCI_PCI_DEVICE(GLI, 9750, gl9750),
 	SDHCI_PCI_DEVICE(GLI, 9755, gl9755),
 	SDHCI_PCI_DEVICE(GLI, 9763E, gl9763e),
+	SDHCI_PCI_DEVICE(GLI, 9767, gl9767),
 	SDHCI_PCI_DEVICE_CLASS(AMD, SYSTEM_SDHCI, PCI_CLASS_MASK, amd),
 	/* Generic SD host controller */
 	{PCI_DEVICE_CLASS(SYSTEM_SDHCI, PCI_CLASS_MASK)},
@@ -2194,7 +2222,7 @@ static int sdhci_pci_probe(struct pci_dev *pdev,
 
 	ret = pci_read_config_byte(pdev, PCI_SLOT_INFO, &slots);
 	if (ret)
-		return ret;
+		return pcibios_err_to_errno(ret);
 
 	slots = PCI_SLOT_INFO_SLOTS(slots) + 1;
 	dev_dbg(&pdev->dev, "found %d slot(s)\n", slots);
@@ -2203,7 +2231,7 @@ static int sdhci_pci_probe(struct pci_dev *pdev,
 
 	ret = pci_read_config_byte(pdev, PCI_SLOT_INFO, &first_bar);
 	if (ret)
-		return ret;
+		return pcibios_err_to_errno(ret);
 
 	first_bar &= PCI_SLOT_INFO_FIRST_BAR_MASK;
 

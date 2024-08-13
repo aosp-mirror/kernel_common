@@ -84,7 +84,7 @@ frame_size = frame_WK + WK_SIZE
 
 # Useful QWORD "arrays" for simpler memory references
 # MSG, DIGEST, K_t, W_t are arrays
-# WK_2(t) points to 1 of 2 qwords at frame.WK depdending on t being odd/even
+# WK_2(t) points to 1 of 2 qwords at frame.WK depending on t being odd/even
 
 # Input message (arg1)
 #define MSG(i)    8*i(msg)
@@ -276,7 +276,7 @@ frame_size = frame_WK + WK_SIZE
 ########################################################################
 SYM_TYPED_FUNC_START(sha512_transform_avx)
 	test msglen, msglen
-	je nowork
+	je .Lnowork
 
 	# Save GPRs
 	push	%rbx
@@ -291,7 +291,7 @@ SYM_TYPED_FUNC_START(sha512_transform_avx)
 	sub     $frame_size, %rsp
 	and	$~(0x20 - 1), %rsp
 
-updateblock:
+.Lupdateblock:
 
 	# Load state variables
 	mov     DIGEST(0), a_64
@@ -348,7 +348,7 @@ updateblock:
 	# Advance to next message block
 	add     $16*8, msg
 	dec     msglen
-	jnz     updateblock
+	jnz     .Lupdateblock
 
 	# Restore Stack Pointer
 	mov	%rbp, %rsp
@@ -361,7 +361,7 @@ updateblock:
 	pop	%r12
 	pop	%rbx
 
-nowork:
+.Lnowork:
 	RET
 SYM_FUNC_END(sha512_transform_avx)
 

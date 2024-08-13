@@ -43,7 +43,6 @@ static const void *macvtap_net_namespace(const struct device *d)
 
 static struct class macvtap_class = {
 	.name = "macvtap",
-	.owner = THIS_MODULE,
 	.ns_type = &net_ns_type_operations,
 	.namespace = macvtap_net_namespace,
 };
@@ -251,5 +250,6 @@ static void __exit macvtap_exit(void)
 module_exit(macvtap_exit);
 
 MODULE_ALIAS_RTNL_LINK("macvtap");
+MODULE_DESCRIPTION("MAC-VLAN based tap driver");
 MODULE_AUTHOR("Arnd Bergmann <arnd@arndb.de>");
 MODULE_LICENSE("GPL");

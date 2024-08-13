@@ -67,6 +67,7 @@ if [ -z "$ARCH" ]; then
     case `uname -m` in
 	aarch64*) ARCH=arm64 ;;
 	arm*) ARCH=arm ;;
+	loongarch*) ARCH=loongarch ;;
     esac
 fi
 
@@ -90,6 +91,15 @@ disas() {
 			type=inst
 		fi
 
+		${CROSS_COMPILE}strip $t.o
+	fi
+
+	if [ "$ARCH" = "riscv" ]; then
+		OBJDUMPFLAGS="-M no-aliases --section=.text -D"
+		${CROSS_COMPILE}strip $t.o
+	fi
+
+	if [ "$ARCH" = "loongarch" ]; then
 		${CROSS_COMPILE}strip $t.o
 	fi
 
@@ -126,8 +136,13 @@ get_substr_opcode_bytes_num()
 	do
 		substr+="$opc"
 
+		opcode="$substr"
+		if [ "$ARCH" = "riscv" ]; then
+			opcode=$(echo $opcode | tr ' ' '\n' | tac | tr -d '\n')
+		fi
+
 		# return if opcode bytes do not match @opline anymore
-		if ! echo $opline | grep -q "$substr";
+		if ! echo $opline | grep -q "$opcode";
 		then
 			break
 		fi

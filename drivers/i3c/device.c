@@ -27,6 +27,10 @@
  * This function can sleep and thus cannot be called in atomic context.
  *
  * Return: 0 in case of success, a negative error core otherwise.
+ *	   -EAGAIN: controller lost address arbitration. Target
+ *		    (IBI, HJ or controller role request) win the bus. Client
+ *		    driver needs to resend the 'xfers' some time later.
+ *		    See I3C spec ver 1.1.1 09-Jun-2021. Section: 5.1.2.2.3.
  */
 int i3c_device_do_priv_xfers(struct i3c_device *dev,
 			     struct i3c_priv_xfer *xfers,
@@ -78,7 +82,7 @@ EXPORT_SYMBOL_GPL(i3c_device_do_setdasa);
  *
  * Retrieve I3C dev info.
  */
-void i3c_device_get_info(struct i3c_device *dev,
+void i3c_device_get_info(const struct i3c_device *dev,
 			 struct i3c_device_info *info)
 {
 	if (!info)
@@ -207,18 +211,6 @@ struct device *i3cdev_to_dev(struct i3c_device *i3cdev)
 	return &i3cdev->dev;
 }
 EXPORT_SYMBOL_GPL(i3cdev_to_dev);
-
-/**
- * dev_to_i3cdev() - Returns the I3C device containing @dev
- * @dev: device object
- *
- * Return: a pointer to an I3C device object.
- */
-struct i3c_device *dev_to_i3cdev(struct device *dev)
-{
-	return container_of(dev, struct i3c_device, dev);
-}
-EXPORT_SYMBOL_GPL(dev_to_i3cdev);
 
 /**
  * i3c_device_match_id() - Returns the i3c_device_id entry matching @i3cdev

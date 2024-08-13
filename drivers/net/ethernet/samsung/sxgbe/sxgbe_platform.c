@@ -169,12 +169,11 @@ err_out:
  * Description: this function calls the main to free the net resources
  * and calls the platforms hook and release the resources (e.g. mem).
  */
-static int sxgbe_platform_remove(struct platform_device *pdev)
+static void sxgbe_platform_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
-	int ret = sxgbe_drv_remove(ndev);
 
-	return ret;
+	sxgbe_drv_remove(ndev);
 }
 
 #ifdef CONFIG_PM
@@ -225,11 +224,11 @@ MODULE_DEVICE_TABLE(of, sxgbe_dt_ids);
 
 static struct platform_driver sxgbe_platform_driver = {
 	.probe	= sxgbe_platform_probe,
-	.remove	= sxgbe_platform_remove,
+	.remove_new = sxgbe_platform_remove,
 	.driver	= {
 		.name		= SXGBE_RESOURCE_NAME,
 		.pm		= &sxgbe_platform_pm_ops,
-		.of_match_table	= of_match_ptr(sxgbe_dt_ids),
+		.of_match_table	= sxgbe_dt_ids,
 	},
 };
 

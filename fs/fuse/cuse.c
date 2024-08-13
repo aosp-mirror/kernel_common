@@ -256,7 +256,7 @@ static int cuse_parse_one(char **pp, char *end, char **keyp, char **valp)
 }
 
 /**
- * cuse_parse_dev_info - parse device info
+ * cuse_parse_devinfo - parse device info
  * @p: device info string
  * @len: length of device info string
  * @devinfo: out parameter for parsed device info
@@ -309,6 +309,10 @@ struct cuse_init_args {
 
 /**
  * cuse_process_init_reply - finish initializing CUSE channel
+ *
+ * @fm: The fuse mount information containing the CUSE connection.
+ * @args: The arguments passed to the init reply.
+ * @error: The error code signifying if any error occurred during the process.
  *
  * This function creates the character device and sets up all the
  * required data structures for it.  Please read the comment at the
@@ -474,8 +478,7 @@ err:
 
 static void cuse_fc_release(struct fuse_conn *fc)
 {
-	struct cuse_conn *cc = fc_to_cc(fc);
-	kfree_rcu(cc, fc.rcu);
+	kfree(fc_to_cc(fc));
 }
 
 /**
@@ -623,7 +626,7 @@ static int __init cuse_init(void)
 	/* CUSE is not prepared for FUSE_DEV_IOC_CLONE */
 	cuse_channel_fops.unlocked_ioctl	= NULL;
 
-	cuse_class = class_create(THIS_MODULE, "cuse");
+	cuse_class = class_create("cuse");
 	if (IS_ERR(cuse_class))
 		return PTR_ERR(cuse_class);
 

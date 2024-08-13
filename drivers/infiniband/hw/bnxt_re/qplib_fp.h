@@ -338,6 +338,9 @@ struct bnxt_qplib_qp {
 	dma_addr_t			rq_hdr_buf_map;
 	struct list_head		sq_flush;
 	struct list_head		rq_flush;
+	u32				msn;
+	u32				msn_tbl_sz;
+	u16				dev_cap_flags;
 };
 
 #define BNXT_QPLIB_MAX_CQE_ENTRY_SIZE	sizeof(struct cq_base)
@@ -348,9 +351,21 @@ struct bnxt_qplib_qp {
 #define CQE_IDX(x)		((x) & CQE_MAX_IDX_PER_PG)
 
 #define ROCE_CQE_CMP_V			0
-#define CQE_CMP_VALID(hdr, raw_cons, cp_bit)			\
+#define CQE_CMP_VALID(hdr, pass)			\
 	(!!((hdr)->cqe_type_toggle & CQ_BASE_TOGGLE) ==		\
-	   !((raw_cons) & (cp_bit)))
+	   !((pass) & BNXT_QPLIB_FLAG_EPOCH_CONS_MASK))
+
+static inline u32 __bnxt_qplib_get_avail(struct bnxt_qplib_hwq *hwq)
+{
+	int cons, prod, avail;
+
+	cons = hwq->cons;
+	prod = hwq->prod;
+	avail = cons - prod;
+	if (cons <= prod)
+		avail += hwq->depth;
+	return avail;
+}
 
 static inline bool bnxt_qplib_queue_full(struct bnxt_qplib_q *que,
 					 u8 slots)
@@ -400,11 +415,13 @@ struct bnxt_qplib_cq {
 	u16				count;
 	u16				period;
 	struct bnxt_qplib_hwq		hwq;
+	struct bnxt_qplib_hwq		resize_hwq;
 	u32				cnq_hw_ring_id;
 	struct bnxt_qplib_nq		*nq;
 	bool				resize_in_progress;
 	struct bnxt_qplib_sg_info	sg_info;
 	u64				cq_handle;
+	u8				toggle;
 
 #define CQ_RESIZE_WAIT_TIME_MS		500
 	unsigned long			flags;
@@ -442,9 +459,9 @@ struct bnxt_qplib_cq {
 #define NQE_PG(x)		(((x) & ~NQE_MAX_IDX_PER_PG) / NQE_CNT_PER_PG)
 #define NQE_IDX(x)		((x) & NQE_MAX_IDX_PER_PG)
 
-#define NQE_CMP_VALID(hdr, raw_cons, cp_bit)			\
+#define NQE_CMP_VALID(hdr, pass)			\
 	(!!(le32_to_cpu((hdr)->info63_v[0]) & NQ_BASE_V) ==	\
-	   !((raw_cons) & (cp_bit)))
+	   !((pass) & BNXT_QPLIB_FLAG_EPOCH_CONS_MASK))
 
 #define BNXT_QPLIB_NQE_MAX_CNT		(128 * 1024)
 
@@ -471,7 +488,7 @@ typedef int (*srqn_handler_t)(struct bnxt_qplib_nq *nq,
 struct bnxt_qplib_nq {
 	struct pci_dev			*pdev;
 	struct bnxt_qplib_res		*res;
-	char				name[32];
+	char				*name;
 	struct bnxt_qplib_hwq		hwq;
 	struct bnxt_qplib_nq_db		nq_db;
 	u16				ring_id;
@@ -532,6 +549,10 @@ void bnxt_qplib_post_recv_db(struct bnxt_qplib_qp *qp);
 int bnxt_qplib_post_recv(struct bnxt_qplib_qp *qp,
 			 struct bnxt_qplib_swqe *wqe);
 int bnxt_qplib_create_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq);
+int bnxt_qplib_resize_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq,
+			 int new_cqes);
+void bnxt_qplib_resize_cq_complete(struct bnxt_qplib_res *res,
+				   struct bnxt_qplib_cq *cq);
 int bnxt_qplib_destroy_cq(struct bnxt_qplib_res *res, struct bnxt_qplib_cq *cq);
 int bnxt_qplib_poll_cq(struct bnxt_qplib_cq *cq, struct bnxt_qplib_cqe *cqe,
 		       int num, struct bnxt_qplib_qp **qp);
@@ -548,6 +569,7 @@ int bnxt_qplib_process_flush_list(struct bnxt_qplib_cq *cq,
 				  struct bnxt_qplib_cqe *cqe,
 				  int num_cqes);
 void bnxt_qplib_flush_cqn_wq(struct bnxt_qplib_qp *qp);
+void bnxt_re_synchronize_nq(struct bnxt_qplib_nq *nq);
 
 static inline void *bnxt_qplib_get_swqe(struct bnxt_qplib_q *que, u32 *swq_idx)
 {
@@ -607,5 +629,16 @@ static inline u16 bnxt_qplib_calc_ilsize(struct bnxt_qplib_swqe *wqe, u16 max)
 		size = max;
 
 	return size;
+}
+
+/* MSN table update inlin */
+static inline __le64 bnxt_re_update_msn_tbl(u32 st_idx, u32 npsn, u32 start_psn)
+{
+	return cpu_to_le64((((u64)(st_idx) << SQ_MSN_SEARCH_START_IDX_SFT) &
+		SQ_MSN_SEARCH_START_IDX_MASK) |
+		(((u64)(npsn) << SQ_MSN_SEARCH_NEXT_PSN_SFT) &
+		SQ_MSN_SEARCH_NEXT_PSN_MASK) |
+		(((start_psn) << SQ_MSN_SEARCH_START_PSN_SFT) &
+		SQ_MSN_SEARCH_START_PSN_MASK));
 }
 #endif /* __BNXT_QPLIB_FP_H__ */

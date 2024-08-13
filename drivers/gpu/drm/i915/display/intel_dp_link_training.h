@@ -11,6 +11,7 @@
 struct intel_crtc_state;
 struct intel_dp;
 
+int intel_dp_read_dprx_caps(struct intel_dp *intel_dp, u8 dpcd[DP_RECEIVER_CAP_SIZE]);
 int intel_dp_init_lttpr_and_dprx_caps(struct intel_dp *intel_dp);
 
 void intel_dp_get_adjust_train(struct intel_dp *intel_dp,
@@ -39,4 +40,6 @@ static inline u8 intel_dp_training_pattern_symbol(u8 pattern)
 	return pattern & ~DP_LINK_SCRAMBLING_DISABLE;
 }
 
+void intel_dp_128b132b_sdp_crc16(struct intel_dp *intel_dp,
+				 const struct intel_crtc_state *crtc_state);
 #endif /* __INTEL_DP_LINK_TRAINING_H__ */

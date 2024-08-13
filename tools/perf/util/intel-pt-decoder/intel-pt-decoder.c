@@ -1319,6 +1319,8 @@ static bool intel_pt_fup_event(struct intel_pt_decoder *decoder, bool no_tip)
 	bool ret = false;
 
 	decoder->state.type &= ~INTEL_PT_BRANCH;
+	decoder->state.insn_op = INTEL_PT_OP_OTHER;
+	decoder->state.insn_len = 0;
 
 	if (decoder->set_fup_cfe_ip || decoder->set_fup_cfe) {
 		bool ip = decoder->set_fup_cfe_ip;
@@ -1998,6 +2000,8 @@ static void intel_pt_calc_cbr(struct intel_pt_decoder *decoder)
 
 	decoder->cbr = cbr;
 	decoder->cbr_cyc_to_tsc = decoder->max_non_turbo_ratio_fp / cbr;
+	decoder->cyc_ref_timestamp = decoder->timestamp;
+	decoder->cycle_cnt = 0;
 
 	intel_pt_mtc_cyc_cnt_cbr(decoder);
 }
@@ -3544,7 +3548,7 @@ static int intel_pt_walk_psb(struct intel_pt_decoder *decoder)
 		switch (decoder->packet.type) {
 		case INTEL_PT_TIP_PGD:
 			decoder->continuous_period = false;
-			__fallthrough;
+			fallthrough;
 		case INTEL_PT_TIP_PGE:
 		case INTEL_PT_TIP:
 		case INTEL_PT_PTWRITE:
@@ -3614,7 +3618,7 @@ static int intel_pt_walk_psb(struct intel_pt_decoder *decoder)
 			decoder->pge = false;
 			decoder->continuous_period = false;
 			intel_pt_clear_tx_flags(decoder);
-			__fallthrough;
+			fallthrough;
 
 		case INTEL_PT_TNT:
 			decoder->have_tma = false;
@@ -3978,7 +3982,7 @@ const struct intel_pt_state *intel_pt_decode(struct intel_pt_decoder *decoder)
 			decoder->have_last_ip = false;
 			decoder->last_ip = 0;
 			decoder->ip = 0;
-			__fallthrough;
+			fallthrough;
 		case INTEL_PT_STATE_ERR_RESYNC:
 			err = intel_pt_sync_ip(decoder);
 			break;

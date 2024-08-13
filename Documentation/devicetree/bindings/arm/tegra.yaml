@@ -64,6 +64,14 @@ properties:
       - items:
           - const: asus,tf700t
           - const: nvidia,tegra30
+      - description: LG Optimus 4X P880
+        items:
+          - const: lg,p880
+          - const: nvidia,tegra30
+      - description: LG Optimus Vu P895
+        items:
+          - const: lg,p895
+          - const: nvidia,tegra30
       - items:
           - const: toradex,apalis_t30-eval
           - const: toradex,apalis_t30
@@ -166,6 +174,29 @@ properties:
         items:
           - const: nvidia,p3737-0000+p3701-0000
           - const: nvidia,p3701-0000
+          - const: nvidia,tegra234
+      - description: NVIDIA IGX Orin Development Kit
+        items:
+          - const: nvidia,p3740-0002+p3701-0008
+          - const: nvidia,p3701-0008
+          - const: nvidia,tegra234
+      - description: Jetson Orin NX
+        items:
+          - const: nvidia,p3767-0000
+          - const: nvidia,tegra234
+      - description: Jetson Orin NX Engineering Reference Developer Kit
+        items:
+          - const: nvidia,p3768-0000+p3767-0000
+          - const: nvidia,p3767-0000
+          - const: nvidia,tegra234
+      - description: Jetson Orin Nano
+        items:
+          - const: nvidia,p3767-0005
+          - const: nvidia,tegra234
+      - description: Jetson Orin Nano Developer Kit
+        items:
+          - const: nvidia,p3768-0000+p3767-0005
+          - const: nvidia,p3767-0005
           - const: nvidia,tegra234
 
 additionalProperties: true

@@ -6,6 +6,8 @@
 #include "en/port.h"
 #include "en_accel/en_accel.h"
 #include "en_accel/ipsec.h"
+#include <linux/dim.h>
+#include <net/page_pool/types.h>
 #include <net/xdp_sock_drv.h>
 
 static u8 mlx5e_mpwrq_min_page_shift(struct mlx5_core_dev *mdev)
@@ -239,11 +241,14 @@ static u32 mlx5e_rx_get_linear_sz_xsk(struct mlx5e_params *params,
 	return xsk->headroom + hw_mtu;
 }
 
-static u32 mlx5e_rx_get_linear_sz_skb(struct mlx5e_params *params, bool xsk)
+static u32 mlx5e_rx_get_linear_sz_skb(struct mlx5e_params *params, bool no_head_tail_room)
 {
-	/* SKBs built on XDP_PASS on XSK RQs don't have headroom. */
-	u16 headroom = xsk ? 0 : mlx5e_get_linear_rq_headroom(params, NULL);
 	u32 hw_mtu = MLX5E_SW2HW_MTU(params, params->sw_mtu);
+	u16 headroom;
+
+	if (no_head_tail_room)
+		return SKB_DATA_ALIGN(hw_mtu);
+	headroom = mlx5e_get_linear_rq_headroom(params, NULL);
 
 	return MLX5_SKB_FRAG_SZ(headroom + hw_mtu);
 }
@@ -253,17 +258,27 @@ static u32 mlx5e_rx_get_linear_stride_sz(struct mlx5_core_dev *mdev,
 					 struct mlx5e_xsk_param *xsk,
 					 bool mpwqe)
 {
+	bool no_head_tail_room;
+	u32 sz;
+
 	/* XSK frames are mapped as individual pages, because frames may come in
 	 * an arbitrary order from random locations in the UMEM.
 	 */
 	if (xsk)
 		return mpwqe ? 1 << mlx5e_mpwrq_page_shift(mdev, xsk) : PAGE_SIZE;
 
-	/* XDP in mlx5e doesn't support multiple packets per page. */
-	if (params->xdp_prog)
-		return PAGE_SIZE;
+	no_head_tail_room = params->xdp_prog && mpwqe && !mlx5e_rx_is_linear_skb(mdev, params, xsk);
 
-	return roundup_pow_of_two(mlx5e_rx_get_linear_sz_skb(params, false));
+	/* When no_head_tail_room is set, headroom and tailroom are excluded from skb calculations.
+	 * no_head_tail_room should be set in the case of XDP with Striding RQ
+	 * when SKB is not linear. This is because another page is allocated for the linear part.
+	 */
+	sz = roundup_pow_of_two(mlx5e_rx_get_linear_sz_skb(params, no_head_tail_room));
+
+	/* XDP in mlx5e doesn't support multiple packets per page.
+	 * Do not assume sz <= PAGE_SIZE if params->xdp_prog is set.
+	 */
+	return params->xdp_prog && sz < PAGE_SIZE ? PAGE_SIZE : sz;
 }
 
 static u8 mlx5e_mpwqe_log_pkts_per_wqe(struct mlx5_core_dev *mdev,
@@ -285,7 +300,11 @@ bool mlx5e_rx_is_linear_skb(struct mlx5_core_dev *mdev,
 	if (params->packet_merge.type != MLX5E_PACKET_MERGE_NONE)
 		return false;
 
-	/* Both XSK and non-XSK cases allocate an SKB on XDP_PASS. Packet data
+	/* Call mlx5e_rx_get_linear_sz_skb with the no_head_tail_room parameter set
+	 * to exclude headroom and tailroom from calculations.
+	 * no_head_tail_room is true when SKB is built on XDP_PASS on XSK RQs
+	 * since packet data buffers don't have headroom and tailroom resreved for the SKB.
+	 * Both XSK and non-XSK cases allocate an SKB on XDP_PASS. Packet data
 	 * must fit into a CPU page.
 	 */
 	if (mlx5e_rx_get_linear_sz_skb(params, xsk) > PAGE_SIZE)
@@ -318,6 +337,20 @@ static bool mlx5e_verify_rx_mpwqe_strides(struct mlx5_core_dev *mdev,
 		return log_num_strides >= MLX5_MPWQE_LOG_NUM_STRIDES_EXT_BASE;
 
 	return log_num_strides >= MLX5_MPWQE_LOG_NUM_STRIDES_BASE;
+}
+
+bool mlx5e_verify_params_rx_mpwqe_strides(struct mlx5_core_dev *mdev,
+					  struct mlx5e_params *params,
+					  struct mlx5e_xsk_param *xsk)
+{
+	u8 log_wqe_num_of_strides = mlx5e_mpwqe_get_log_num_strides(mdev, params, xsk);
+	u8 log_wqe_stride_size = mlx5e_mpwqe_get_log_stride_size(mdev, params, xsk);
+	enum mlx5e_mpwrq_umr_mode umr_mode = mlx5e_mpwrq_umr_mode(mdev, xsk);
+	u8 page_shift = mlx5e_mpwrq_page_shift(mdev, xsk);
+
+	return mlx5e_verify_rx_mpwqe_strides(mdev, log_wqe_stride_size,
+					     log_wqe_num_of_strides,
+					     page_shift, umr_mode);
 }
 
 bool mlx5e_rx_mpwqe_is_linear_skb(struct mlx5_core_dev *mdev,
@@ -402,6 +435,10 @@ u8 mlx5e_mpwqe_get_log_stride_size(struct mlx5_core_dev *mdev,
 	if (mlx5e_rx_mpwqe_is_linear_skb(mdev, params, xsk))
 		return order_base_2(mlx5e_rx_get_linear_stride_sz(mdev, params, xsk, true));
 
+	/* XDP in mlx5e doesn't support multiple packets per page. */
+	if (params->xdp_prog)
+		return PAGE_SHIFT;
+
 	return MLX5_MPWRQ_DEF_LOG_STRIDE_SZ(mdev);
 }
 
@@ -477,83 +514,12 @@ int mlx5e_validate_params(struct mlx5_core_dev *mdev, struct mlx5e_params *param
 	return 0;
 }
 
-static struct dim_cq_moder mlx5e_get_def_tx_moderation(u8 cq_period_mode)
-{
-	struct dim_cq_moder moder = {};
-
-	moder.cq_period_mode = cq_period_mode;
-	moder.pkts = MLX5E_PARAMS_DEFAULT_TX_CQ_MODERATION_PKTS;
-	moder.usec = MLX5E_PARAMS_DEFAULT_TX_CQ_MODERATION_USEC;
-	if (cq_period_mode == MLX5_CQ_PERIOD_MODE_START_FROM_CQE)
-		moder.usec = MLX5E_PARAMS_DEFAULT_TX_CQ_MODERATION_USEC_FROM_CQE;
-
-	return moder;
-}
-
-static struct dim_cq_moder mlx5e_get_def_rx_moderation(u8 cq_period_mode)
-{
-	struct dim_cq_moder moder = {};
-
-	moder.cq_period_mode = cq_period_mode;
-	moder.pkts = MLX5E_PARAMS_DEFAULT_RX_CQ_MODERATION_PKTS;
-	moder.usec = MLX5E_PARAMS_DEFAULT_RX_CQ_MODERATION_USEC;
-	if (cq_period_mode == MLX5_CQ_PERIOD_MODE_START_FROM_CQE)
-		moder.usec = MLX5E_PARAMS_DEFAULT_RX_CQ_MODERATION_USEC_FROM_CQE;
-
-	return moder;
-}
-
-static u8 mlx5_to_net_dim_cq_period_mode(u8 cq_period_mode)
-{
-	return cq_period_mode == MLX5_CQ_PERIOD_MODE_START_FROM_CQE ?
-		DIM_CQ_PERIOD_MODE_START_FROM_CQE :
-		DIM_CQ_PERIOD_MODE_START_FROM_EQE;
-}
-
-void mlx5e_reset_tx_moderation(struct mlx5e_params *params, u8 cq_period_mode)
-{
-	if (params->tx_dim_enabled) {
-		u8 dim_period_mode = mlx5_to_net_dim_cq_period_mode(cq_period_mode);
-
-		params->tx_cq_moderation = net_dim_get_def_tx_moderation(dim_period_mode);
-	} else {
-		params->tx_cq_moderation = mlx5e_get_def_tx_moderation(cq_period_mode);
-	}
-}
-
-void mlx5e_reset_rx_moderation(struct mlx5e_params *params, u8 cq_period_mode)
-{
-	if (params->rx_dim_enabled) {
-		u8 dim_period_mode = mlx5_to_net_dim_cq_period_mode(cq_period_mode);
-
-		params->rx_cq_moderation = net_dim_get_def_rx_moderation(dim_period_mode);
-	} else {
-		params->rx_cq_moderation = mlx5e_get_def_rx_moderation(cq_period_mode);
-	}
-}
-
-void mlx5e_set_tx_cq_mode_params(struct mlx5e_params *params, u8 cq_period_mode)
-{
-	mlx5e_reset_tx_moderation(params, cq_period_mode);
-	MLX5E_SET_PFLAG(params, MLX5E_PFLAG_TX_CQE_BASED_MODER,
-			params->tx_cq_moderation.cq_period_mode ==
-				MLX5_CQ_PERIOD_MODE_START_FROM_CQE);
-}
-
-void mlx5e_set_rx_cq_mode_params(struct mlx5e_params *params, u8 cq_period_mode)
-{
-	mlx5e_reset_rx_moderation(params, cq_period_mode);
-	MLX5E_SET_PFLAG(params, MLX5E_PFLAG_RX_CQE_BASED_MODER,
-			params->rx_cq_moderation.cq_period_mode ==
-				MLX5_CQ_PERIOD_MODE_START_FROM_CQE);
-}
-
 bool slow_pci_heuristic(struct mlx5_core_dev *mdev)
 {
 	u32 link_speed = 0;
 	u32 pci_bw = 0;
 
-	mlx5e_port_max_linkspeed(mdev, &link_speed);
+	mlx5_port_max_linkspeed(mdev, &link_speed);
 	pci_bw = pcie_bandwidth_available(mdev->pdev, NULL, NULL, NULL);
 	mlx5_core_dbg_once(mdev, "Max link speed = %d, PCI BW = %d\n",
 			   link_speed, pci_bw);
@@ -571,9 +537,6 @@ int mlx5e_mpwrq_validate_regular(struct mlx5_core_dev *mdev, struct mlx5e_params
 
 	if (!mlx5e_check_fragmented_striding_rq_cap(mdev, page_shift, umr_mode))
 		return -EOPNOTSUPP;
-
-	if (params->xdp_prog && !mlx5e_rx_mpwqe_is_linear_skb(mdev, params, NULL))
-		return -EINVAL;
 
 	return 0;
 }
@@ -650,10 +613,12 @@ void mlx5e_build_rq_params(struct mlx5_core_dev *mdev,
 void mlx5e_build_create_cq_param(struct mlx5e_create_cq_param *ccp, struct mlx5e_channel *c)
 {
 	*ccp = (struct mlx5e_create_cq_param) {
+		.netdev = c->netdev,
+		.wq = c->priv->wq,
 		.napi = &c->napi,
 		.ch_stats = c->stats,
 		.node = cpu_to_node(c->cpu),
-		.ix = c->ix,
+		.ix = c->vec_ix,
 	};
 }
 
@@ -667,12 +632,55 @@ static int mlx5e_max_nonlinear_mtu(int first_frag_size, int frag_size, bool xdp)
 	return first_frag_size + (MLX5E_MAX_RX_FRAGS - 2) * frag_size + PAGE_SIZE;
 }
 
+static void mlx5e_rx_compute_wqe_bulk_params(struct mlx5e_params *params,
+					     struct mlx5e_rq_frags_info *info)
+{
+	u16 bulk_bound_rq_size = (1 << params->log_rq_mtu_frames) / 4;
+	u32 bulk_bound_rq_size_in_bytes;
+	u32 sum_frag_strides = 0;
+	u32 wqe_bulk_in_bytes;
+	u16 split_factor;
+	u32 wqe_bulk;
+	int i;
+
+	for (i = 0; i < info->num_frags; i++)
+		sum_frag_strides += info->arr[i].frag_stride;
+
+	/* For MTUs larger than PAGE_SIZE, align to PAGE_SIZE to reflect
+	 * amount of consumed pages per wqe in bytes.
+	 */
+	if (sum_frag_strides > PAGE_SIZE)
+		sum_frag_strides = ALIGN(sum_frag_strides, PAGE_SIZE);
+
+	bulk_bound_rq_size_in_bytes = bulk_bound_rq_size * sum_frag_strides;
+
+#define MAX_WQE_BULK_BYTES(xdp) ((xdp ? 256 : 512) * 1024)
+
+	/* A WQE bulk should not exceed min(512KB, 1/4 of rq size). For XDP
+	 * keep bulk size smaller to avoid filling the page_pool cache on
+	 * every bulk refill.
+	 */
+	wqe_bulk_in_bytes = min_t(u32, MAX_WQE_BULK_BYTES(params->xdp_prog),
+				  bulk_bound_rq_size_in_bytes);
+	wqe_bulk = DIV_ROUND_UP(wqe_bulk_in_bytes, sum_frag_strides);
+
+	/* Make sure that allocations don't start when the page is still used
+	 * by older WQEs.
+	 */
+	info->wqe_bulk = max_t(u16, info->wqe_index_mask + 1, wqe_bulk);
+
+	split_factor = DIV_ROUND_UP(MAX_WQE_BULK_BYTES(params->xdp_prog),
+				    PP_ALLOC_CACHE_REFILL * PAGE_SIZE);
+	info->refill_unit = DIV_ROUND_UP(info->wqe_bulk, split_factor);
+}
+
 #define DEFAULT_FRAG_SIZE (2048)
 
 static int mlx5e_build_rq_frags_info(struct mlx5_core_dev *mdev,
 				     struct mlx5e_params *params,
 				     struct mlx5e_xsk_param *xsk,
-				     struct mlx5e_rq_frags_info *info)
+				     struct mlx5e_rq_frags_info *info,
+				     u32 *xdp_frag_size)
 {
 	u32 byte_count = MLX5E_SW2HW_MTU(params, params->sw_mtu);
 	int frag_size_max = DEFAULT_FRAG_SIZE;
@@ -774,13 +782,18 @@ static int mlx5e_build_rq_frags_info(struct mlx5_core_dev *mdev,
 	}
 
 out:
-	/* Bulking optimization to skip allocation until at least 8 WQEs can be
-	 * allocated in a row. At the same time, never start allocation when
-	 * the page is still used by older WQEs.
+	/* Bulking optimization to skip allocation until a large enough number
+	 * of WQEs can be allocated in a row. Bulking also influences how well
+	 * deferred page release works.
 	 */
-	info->wqe_bulk = max_t(u8, info->wqe_index_mask + 1, 8);
+	mlx5e_rx_compute_wqe_bulk_params(params, info);
+
+	mlx5_core_dbg(mdev, "%s: wqe_bulk = %u, wqe_bulk_refill_unit = %u\n",
+		      __func__, info->wqe_bulk, info->refill_unit);
 
 	info->log_num_frags = order_base_2(info->num_frags);
+
+	*xdp_frag_size = info->num_frags > 1 && params->xdp_prog ? PAGE_SIZE : 0;
 
 	return 0;
 }
@@ -867,8 +880,7 @@ static void mlx5e_build_rx_cq_param(struct mlx5_core_dev *mdev,
 static u8 rq_end_pad_mode(struct mlx5_core_dev *mdev, struct mlx5e_params *params)
 {
 	bool lro_en = params->packet_merge.type == MLX5E_PACKET_MERGE_LRO;
-	bool ro = pcie_relaxed_ordering_enabled(mdev->pdev) &&
-		MLX5_CAP_GEN(mdev, relaxed_ordering_write);
+	bool ro = MLX5_CAP_GEN(mdev, relaxed_ordering_write);
 
 	return ro && lro_en ?
 		MLX5_WQ_END_PAD_MODE_NONE : MLX5_WQ_END_PAD_MODE_ALIGN;
@@ -877,7 +889,6 @@ static u8 rq_end_pad_mode(struct mlx5_core_dev *mdev, struct mlx5e_params *param
 int mlx5e_build_rq_param(struct mlx5_core_dev *mdev,
 			 struct mlx5e_params *params,
 			 struct mlx5e_xsk_param *xsk,
-			 u16 q_counter,
 			 struct mlx5e_rq_param *param)
 {
 	void *rqc = param->rqc;
@@ -927,7 +938,8 @@ int mlx5e_build_rq_param(struct mlx5_core_dev *mdev,
 	}
 	default: /* MLX5_WQ_TYPE_CYCLIC */
 		MLX5_SET(wq, wq, log_wq_sz, params->log_rq_mtu_frames);
-		err = mlx5e_build_rq_frags_info(mdev, params, xsk, &param->frags_info);
+		err = mlx5e_build_rq_frags_info(mdev, params, xsk, &param->frags_info,
+						&param->xdp_frag_size);
 		if (err)
 			return err;
 		ndsegs = param->frags_info.num_frags;
@@ -938,7 +950,6 @@ int mlx5e_build_rq_param(struct mlx5_core_dev *mdev,
 	MLX5_SET(wq, wq, log_wq_stride,
 		 mlx5e_get_rqwq_log_stride(params->rq_wq_type, ndsegs));
 	MLX5_SET(wq, wq, pd,               mdev->mlx5e_res.hw_objs.pdn);
-	MLX5_SET(rqc, rqc, counter_set_id, q_counter);
 	MLX5_SET(rqc, rqc, vsd,            params->vlan_strip_disable);
 	MLX5_SET(rqc, rqc, scatter_fcs,    params->scatter_fcs_en);
 
@@ -949,7 +960,6 @@ int mlx5e_build_rq_param(struct mlx5_core_dev *mdev,
 }
 
 void mlx5e_build_drop_rq_param(struct mlx5_core_dev *mdev,
-			       u16 q_counter,
 			       struct mlx5e_rq_param *param)
 {
 	void *rqc = param->rqc;
@@ -958,7 +968,6 @@ void mlx5e_build_drop_rq_param(struct mlx5_core_dev *mdev,
 	MLX5_SET(wq, wq, wq_type, MLX5_WQ_TYPE_CYCLIC);
 	MLX5_SET(wq, wq, log_wq_stride,
 		 mlx5e_get_rqwq_log_stride(MLX5_WQ_TYPE_CYCLIC, 1));
-	MLX5_SET(rqc, rqc, counter_set_id, q_counter);
 
 	param->wq.buf_numa_node = dev_to_node(mlx5_core_dma_dev(mdev));
 }
@@ -995,8 +1004,8 @@ void mlx5e_build_sq_param(struct mlx5_core_dev *mdev,
 	void *wq = MLX5_ADDR_OF(sqc, sqc, wq);
 	bool allow_swp;
 
-	allow_swp =
-		mlx5_geneve_tx_allowed(mdev) || !!mlx5_ipsec_device_caps(mdev);
+	allow_swp = mlx5_geneve_tx_allowed(mdev) ||
+		    (mlx5_ipsec_device_caps(mdev) & MLX5_IPSEC_CAP_CRYPTO);
 	mlx5e_build_sq_param_common(mdev, param);
 	MLX5_SET(wq, wq, log_wq_sz, params->log_sq_size);
 	MLX5_SET(sqc, sqc, allow_swp, allow_swp);
@@ -1223,13 +1232,12 @@ void mlx5e_build_xdpsq_param(struct mlx5_core_dev *mdev,
 
 int mlx5e_build_channel_param(struct mlx5_core_dev *mdev,
 			      struct mlx5e_params *params,
-			      u16 q_counter,
 			      struct mlx5e_channel_param *cparam)
 {
 	u8 icosq_log_wq_sz, async_icosq_log_wq_sz;
 	int err;
 
-	err = mlx5e_build_rq_param(mdev, params, NULL, q_counter, &cparam->rq);
+	err = mlx5e_build_rq_param(mdev, params, NULL, &cparam->rq);
 	if (err)
 		return err;
 

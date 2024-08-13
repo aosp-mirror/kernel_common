@@ -7,67 +7,22 @@
  * Author: Will Deacon <will.deacon@arm.com>
  */
 
+#define pr_fmt(fmt) "Modules: " fmt
+
 #include <linux/bitops.h>
 #include <linux/elf.h>
 #include <linux/ftrace.h>
-#include <linux/gfp.h>
 #include <linux/kasan.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/moduleloader.h>
+#include <linux/random.h>
 #include <linux/scs.h>
-#include <linux/vmalloc.h>
+
 #include <asm/alternative.h>
 #include <asm/insn.h>
 #include <asm/scs.h>
 #include <asm/sections.h>
-
-void *module_alloc(unsigned long size)
-{
-	u64 module_alloc_end = module_alloc_base + MODULES_VSIZE;
-	gfp_t gfp_mask = GFP_KERNEL;
-	void *p;
-
-	/* Silence the initial allocation */
-	if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
-		gfp_mask |= __GFP_NOWARN;
-
-	if (IS_ENABLED(CONFIG_KASAN_GENERIC) ||
-	    IS_ENABLED(CONFIG_KASAN_SW_TAGS))
-		/* don't exceed the static module region - see below */
-		module_alloc_end = MODULES_END;
-
-	p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
-				module_alloc_end, gfp_mask, PAGE_KERNEL, VM_DEFER_KMEMLEAK,
-				NUMA_NO_NODE, __builtin_return_address(0));
-
-	if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
-	    (IS_ENABLED(CONFIG_KASAN_VMALLOC) ||
-	     (!IS_ENABLED(CONFIG_KASAN_GENERIC) &&
-	      !IS_ENABLED(CONFIG_KASAN_SW_TAGS))))
-		/*
-		 * KASAN without KASAN_VMALLOC can only deal with module
-		 * allocations being served from the reserved module region,
-		 * since the remainder of the vmalloc region is already
-		 * backed by zero shadow pages, and punching holes into it
-		 * is non-trivial. Since the module region is not randomized
-		 * when KASAN is enabled without KASAN_VMALLOC, it is even
-		 * less likely that the module region gets exhausted, so we
-		 * can simply omit this fallback in that case.
-		 */
-		p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
-				module_alloc_base + SZ_2G, GFP_KERNEL,
-				PAGE_KERNEL, 0, NUMA_NO_NODE,
-				__builtin_return_address(0));
-
-	if (p && (kasan_alloc_module_shadow(p, size, gfp_mask) < 0)) {
-		vfree(p);
-		return NULL;
-	}
-
-	/* Memory is intended to be executable, reset the pointer tag. */
-	return kasan_reset_tag(p);
-}
 
 enum aarch64_reloc_op {
 	RELOC_OP_NONE,
@@ -448,9 +403,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 		case R_AARCH64_CALL26:
 			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
 					     AARCH64_INSN_IMM_26);
-
-			if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
-			    ovf == -ERANGE) {
+			if (ovf == -ERANGE) {
 				val = module_emit_plt_entry(me, sechdrs, loc, &rel[i], sym);
 				if (!val)
 					return -ENOEXEC;
@@ -487,7 +440,7 @@ static int module_init_ftrace_plt(const Elf_Ehdr *hdr,
 				  const Elf_Shdr *sechdrs,
 				  struct module *mod)
 {
-#if defined(CONFIG_ARM64_MODULE_PLTS) && defined(CONFIG_DYNAMIC_FTRACE)
+#if defined(CONFIG_DYNAMIC_FTRACE)
 	const Elf_Shdr *s;
 	struct plt_entry *plts;
 
@@ -516,7 +469,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 	if (scs_is_dynamic()) {
 		s = find_section(hdr, sechdrs, ".init.eh_frame");
 		if (s)
-			scs_patch((void *)s->sh_addr, s->sh_size);
+			__pi_scs_patch((void *)s->sh_addr, s->sh_size);
 	}
 
 	return module_init_ftrace_plt(hdr, sechdrs, me);

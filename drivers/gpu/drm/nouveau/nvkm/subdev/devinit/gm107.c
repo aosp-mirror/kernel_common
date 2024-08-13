@@ -25,22 +25,24 @@
 
 #include <subdev/bios.h>
 #include <subdev/bios/init.h>
+#include <subdev/gsp.h>
 
-u64
+void
 gm107_devinit_disable(struct nvkm_devinit *init)
 {
 	struct nvkm_device *device = init->subdev.device;
 	u32 r021c00 = nvkm_rd32(device, 0x021c00);
 	u32 r021c04 = nvkm_rd32(device, 0x021c04);
 
-	if (r021c00 & 0x00000001)
-		nvkm_subdev_disable(device, NVKM_ENGINE_CE, 0);
-	if (r021c00 & 0x00000004)
-		nvkm_subdev_disable(device, NVKM_ENGINE_CE, 2);
+	/* gsp only wants to enable/disable display */
+	if (!nvkm_gsp_rm(device->gsp)) {
+		if (r021c00 & 0x00000001)
+			nvkm_subdev_disable(device, NVKM_ENGINE_CE, 0);
+		if (r021c00 & 0x00000004)
+			nvkm_subdev_disable(device, NVKM_ENGINE_CE, 2);
+	}
 	if (r021c04 & 0x00000001)
 		nvkm_subdev_disable(device, NVKM_ENGINE_DISP, 0);
-
-	return 0ULL;
 }
 
 static const struct nvkm_devinit_func

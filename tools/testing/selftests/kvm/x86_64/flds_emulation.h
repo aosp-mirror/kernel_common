@@ -24,10 +24,7 @@ static inline void handle_flds_emulation_failure_exit(struct kvm_vcpu *vcpu)
 	uint8_t *insn_bytes;
 	uint64_t flags;
 
-	TEST_ASSERT(run->exit_reason == KVM_EXIT_INTERNAL_ERROR,
-		    "Unexpected exit reason: %u (%s)",
-		    run->exit_reason,
-		    exit_reason_str(run->exit_reason));
+	TEST_ASSERT_KVM_EXIT_REASON(vcpu, KVM_EXIT_INTERNAL_ERROR);
 
 	TEST_ASSERT(run->emulation_failure.suberror == KVM_INTERNAL_ERROR_EMULATION,
 		    "Unexpected suberror: %u",
@@ -44,7 +41,7 @@ static inline void handle_flds_emulation_failure_exit(struct kvm_vcpu *vcpu)
 
 	insn_bytes = run->emulation_failure.insn_bytes;
 	TEST_ASSERT(insn_bytes[0] == 0xd9 && insn_bytes[1] == 0,
-		    "Expected 'flds [eax]', opcode '0xd9 0x00', got opcode 0x%02x 0x%02x\n",
+		    "Expected 'flds [eax]', opcode '0xd9 0x00', got opcode 0x%02x 0x%02x",
 		    insn_bytes[0], insn_bytes[1]);
 
 	vcpu_regs_get(vcpu, &regs);

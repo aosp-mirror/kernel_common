@@ -11,9 +11,9 @@
  *    KVM_SYSTEM_EVENT_SUSPEND UAPI.
  */
 
-#define _GNU_SOURCE
-
+#include <linux/kernel.h>
 #include <linux/psci.h>
+#include <asm/cputype.h>
 
 #include "kvm_util.h"
 #include "processor.h"
@@ -180,9 +180,7 @@ static void host_test_system_suspend(void)
 
 	enter_guest(source);
 
-	TEST_ASSERT(run->exit_reason == KVM_EXIT_SYSTEM_EVENT,
-		    "Unhandled exit reason: %u (%s)",
-		    run->exit_reason, exit_reason_str(run->exit_reason));
+	TEST_ASSERT_KVM_EXIT_REASON(source, KVM_EXIT_SYSTEM_EVENT);
 	TEST_ASSERT(run->system_event.type == KVM_SYSTEM_EVENT_SUSPEND,
 		    "Unhandled system event: %u (expected: %u)",
 		    run->system_event.type, KVM_SYSTEM_EVENT_SUSPEND);

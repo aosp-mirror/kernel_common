@@ -54,7 +54,6 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -71,6 +70,8 @@
 #include <linux/delay.h>
 #include <linux/gfp.h>
 #include <linux/io.h>
+
+#include <net/Space.h>
 
 #include <asm/irq.h>
 #include <linux/atomic.h>
@@ -1853,9 +1854,8 @@ static int __init cs89x0_platform_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	dev->irq = platform_get_irq(pdev, 0);
-	if (dev->irq <= 0) {
-		dev_warn(&dev->dev, "interrupt resource missing\n");
-		err = -ENXIO;
+	if (dev->irq < 0) {
+		err = dev->irq;
 		goto free;
 	}
 
@@ -1879,7 +1879,7 @@ free:
 	return err;
 }
 
-static int cs89x0_platform_remove(struct platform_device *pdev)
+static void cs89x0_platform_remove(struct platform_device *pdev)
 {
 	struct net_device *dev = platform_get_drvdata(pdev);
 
@@ -1889,7 +1889,6 @@ static int cs89x0_platform_remove(struct platform_device *pdev)
 	 */
 	unregister_netdev(dev);
 	free_netdev(dev);
-	return 0;
 }
 
 static const struct of_device_id __maybe_unused cs89x0_match[] = {
@@ -1904,7 +1903,7 @@ static struct platform_driver cs89x0_driver = {
 		.name		= DRV_NAME,
 		.of_match_table	= of_match_ptr(cs89x0_match),
 	},
-	.remove	= cs89x0_platform_remove,
+	.remove_new = cs89x0_platform_remove,
 };
 
 module_platform_driver_probe(cs89x0_driver, cs89x0_platform_probe);

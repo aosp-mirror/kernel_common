@@ -10,9 +10,11 @@
 #include <netinet/tcp.h>
 
 #include <test_progs.h>
+#include "network_helpers.h"
 
 #include "progs/test_cls_redirect.h"
 #include "test_cls_redirect.skel.h"
+#include "test_cls_redirect_dynptr.skel.h"
 #include "test_cls_redirect_subprogs.skel.h"
 
 #define ENCAP_IP INADDR_LOOPBACK
@@ -33,39 +35,6 @@ struct tuple {
 	struct addr_port src;
 	struct addr_port dst;
 };
-
-static int start_server(const struct sockaddr *addr, socklen_t len, int type)
-{
-	int fd = socket(addr->sa_family, type, 0);
-	if (CHECK_FAIL(fd == -1))
-		return -1;
-	if (CHECK_FAIL(bind(fd, addr, len) == -1))
-		goto err;
-	if (type == SOCK_STREAM && CHECK_FAIL(listen(fd, 128) == -1))
-		goto err;
-
-	return fd;
-
-err:
-	close(fd);
-	return -1;
-}
-
-static int connect_to_server(const struct sockaddr *addr, socklen_t len,
-			     int type)
-{
-	int fd = socket(addr->sa_family, type, 0);
-	if (CHECK_FAIL(fd == -1))
-		return -1;
-	if (CHECK_FAIL(connect(fd, addr, len)))
-		goto err;
-
-	return fd;
-
-err:
-	close(fd);
-	return -1;
-}
 
 static bool fill_addr_port(const struct sockaddr *sa, struct addr_port *ap)
 {
@@ -97,14 +66,14 @@ static bool set_up_conn(const struct sockaddr *addr, socklen_t len, int type,
 	socklen_t slen = sizeof(ss);
 	struct sockaddr *sa = (struct sockaddr *)&ss;
 
-	*server = start_server(addr, len, type);
+	*server = start_server_addr(type, (struct sockaddr_storage *)addr, len, NULL);
 	if (*server < 0)
 		return false;
 
 	if (CHECK_FAIL(getsockname(*server, sa, &slen)))
 		goto close_server;
 
-	*conn = connect_to_server(sa, slen, type);
+	*conn = connect_to_addr(type, (struct sockaddr_storage *)sa, slen, NULL);
 	if (*conn < 0)
 		goto close_server;
 
@@ -446,6 +415,28 @@ cleanup:
 	close_fds((int *)conns, sizeof(conns) / sizeof(conns[0][0]));
 }
 
+static void test_cls_redirect_dynptr(void)
+{
+	struct test_cls_redirect_dynptr *skel;
+	int err;
+
+	skel = test_cls_redirect_dynptr__open();
+	if (!ASSERT_OK_PTR(skel, "skel_open"))
+		return;
+
+	skel->rodata->ENCAPSULATION_IP = htonl(ENCAP_IP);
+	skel->rodata->ENCAPSULATION_PORT = htons(ENCAP_PORT);
+
+	err = test_cls_redirect_dynptr__load(skel);
+	if (!ASSERT_OK(err, "skel_load"))
+		goto cleanup;
+
+	test_cls_redirect_common(skel->progs.cls_redirect);
+
+cleanup:
+	test_cls_redirect_dynptr__destroy(skel);
+}
+
 static void test_cls_redirect_inlined(void)
 {
 	struct test_cls_redirect *skel;
@@ -496,4 +487,6 @@ void test_cls_redirect(void)
 		test_cls_redirect_inlined();
 	if (test__start_subtest("cls_redirect_subprogs"))
 		test_cls_redirect_subprogs();
+	if (test__start_subtest("cls_redirect_dynptr"))
+		test_cls_redirect_dynptr();
 }

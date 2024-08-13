@@ -241,7 +241,7 @@ err:
 /* get information of pstore/blk */
 int pstore_blk_get_config(struct pstore_blk_config *info)
 {
-	strncpy(info->device, blkdev, 80);
+	strscpy(info->device, blkdev);
 	info->max_reason = max_reason;
 	info->kmsg_size = check_size(kmsg_size, 4096);
 	info->pmsg_size = check_size(pmsg_size, 4096);
@@ -263,9 +263,9 @@ static __init const char *early_boot_devpath(const char *initial_devname)
 	 * same scheme to find the device that we use for mounting
 	 * the root file system.
 	 */
-	dev_t dev = name_to_dev_t(initial_devname);
+	dev_t dev;
 
-	if (!dev) {
+	if (early_lookup_bdev(initial_devname, &dev)) {
 		pr_err("failed to resolve '%s'!\n", initial_devname);
 		return initial_devname;
 	}

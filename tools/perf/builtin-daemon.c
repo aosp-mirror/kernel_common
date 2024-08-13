@@ -90,7 +90,7 @@ struct daemon {
 	char			*base;
 	struct list_head	 sessions;
 	FILE			*out;
-	char			 perf[PATH_MAX];
+	char			*perf;
 	int			 signal_fd;
 	time_t			 start;
 };
@@ -193,7 +193,7 @@ static int session_config(struct daemon *daemon, const char *var, const char *va
 
 		if (!same) {
 			if (session->run) {
-				free(session->run);
+				zfree(&session->run);
 				pr_debug("reconfig: session %s is changed\n", name);
 			}
 
@@ -523,7 +523,7 @@ static int daemon_session__control(struct daemon_session *session,
 		  session->base, SESSION_CONTROL);
 
 	control = open(control_path, O_WRONLY|O_NONBLOCK);
-	if (!control)
+	if (control < 0)
 		return -1;
 
 	if (do_ack) {
@@ -532,7 +532,7 @@ static int daemon_session__control(struct daemon_session *session,
 			  session->base, SESSION_ACK);
 
 		ack = open(ack_path, O_RDONLY, O_NONBLOCK);
-		if (!ack) {
+		if (ack < 0) {
 			close(control);
 			return -1;
 		}
@@ -924,9 +924,9 @@ static void daemon__signal(struct daemon *daemon, int sig)
 
 static void daemon_session__delete(struct daemon_session *session)
 {
-	free(session->base);
-	free(session->name);
-	free(session->run);
+	zfree(&session->base);
+	zfree(&session->name);
+	zfree(&session->run);
 	free(session);
 }
 
@@ -975,9 +975,9 @@ static void daemon__exit(struct daemon *daemon)
 	list_for_each_entry_safe(session, h, &daemon->sessions, list)
 		daemon_session__remove(session);
 
-	free(daemon->config_real);
-	free(daemon->config_base);
-	free(daemon->base);
+	zfree(&daemon->config_real);
+	zfree(&daemon->config_base);
+	zfree(&daemon->base);
 }
 
 static int daemon__reconfig(struct daemon *daemon)
@@ -1490,6 +1490,14 @@ static int __cmd_ping(struct daemon *daemon, struct option parent_options[],
 	return send_cmd(daemon, &cmd);
 }
 
+static char *alloc_perf_exe_path(void)
+{
+	char path[PATH_MAX];
+
+	perf_exe(path, sizeof(path));
+	return strdup(path);
+}
+
 int cmd_daemon(int argc, const char **argv)
 {
 	struct option daemon_options[] = {
@@ -1502,8 +1510,12 @@ int cmd_daemon(int argc, const char **argv)
 			"field separator", "print counts with custom separator", ","),
 		OPT_END()
 	};
+	int ret = -1;
 
-	perf_exe(__daemon.perf, sizeof(__daemon.perf));
+	__daemon.perf = alloc_perf_exe_path();
+	if (!__daemon.perf)
+		return -ENOMEM;
+
 	__daemon.out = stdout;
 
 	argc = parse_options(argc, argv, daemon_options, daemon_usage,
@@ -1511,22 +1523,22 @@ int cmd_daemon(int argc, const char **argv)
 
 	if (argc) {
 		if (!strcmp(argv[0], "start"))
-			return __cmd_start(&__daemon, daemon_options, argc, argv);
-		if (!strcmp(argv[0], "signal"))
-			return __cmd_signal(&__daemon, daemon_options, argc, argv);
+			ret = __cmd_start(&__daemon, daemon_options, argc, argv);
+		else if (!strcmp(argv[0], "signal"))
+			ret = __cmd_signal(&__daemon, daemon_options, argc, argv);
 		else if (!strcmp(argv[0], "stop"))
-			return __cmd_stop(&__daemon, daemon_options, argc, argv);
+			ret = __cmd_stop(&__daemon, daemon_options, argc, argv);
 		else if (!strcmp(argv[0], "ping"))
-			return __cmd_ping(&__daemon, daemon_options, argc, argv);
-
-		pr_err("failed: unknown command '%s'\n", argv[0]);
-		return -1;
+			ret = __cmd_ping(&__daemon, daemon_options, argc, argv);
+		else
+			pr_err("failed: unknown command '%s'\n", argv[0]);
+	} else {
+		ret = setup_config(&__daemon);
+		if (ret)
+			pr_err("failed: config not found\n");
+		else
+			ret = send_cmd_list(&__daemon);
 	}
-
-	if (setup_config(&__daemon)) {
-		pr_err("failed: config not found\n");
-		return -1;
-	}
-
-	return send_cmd_list(&__daemon);
+	zfree(&__daemon.perf);
+	return ret;
 }

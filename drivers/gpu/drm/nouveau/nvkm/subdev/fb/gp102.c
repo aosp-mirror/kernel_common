@@ -29,18 +29,7 @@
 int
 gp102_fb_vpr_scrub(struct nvkm_fb *fb)
 {
-	struct nvkm_subdev *subdev = &fb->subdev;
-	struct nvkm_falcon_fw fw = {};
-	int ret;
-
-	ret = nvkm_falcon_fw_ctor_hs(&gm200_flcn_fw, "mem-unlock", subdev, NULL,
-				     "nvdec/scrubber", 0, &subdev->device->nvdec[0]->falcon, &fw);
-	if (ret)
-		return ret;
-
-	ret = nvkm_falcon_fw_boot(&fw, subdev, true, NULL, NULL, 0, 0x00000000);
-	nvkm_falcon_fw_dtor(&fw);
-	return ret;
+	return nvkm_falcon_fw_boot(&fb->vpr_scrubber, &fb->subdev, true, NULL, NULL, 0, 0x00000000);
 }
 
 bool
@@ -51,36 +40,49 @@ gp102_fb_vpr_scrub_required(struct nvkm_fb *fb)
 	return (nvkm_rd32(device, 0x100cd0) & 0x00000010) != 0;
 }
 
+u64
+gp102_fb_vidmem_size(struct nvkm_fb *fb)
+{
+	const u32 data = nvkm_rd32(fb->subdev.device, 0x100ce0);
+	const u32 lmag = (data & 0x000003f0) >> 4;
+	const u32 lsca = (data & 0x0000000f);
+	const u64 size = (u64)lmag << (lsca + 20);
+
+	if (data & 0x40000000)
+		return size / 16 * 15;
+
+	return size;
+}
+
+int
+gp102_fb_oneinit(struct nvkm_fb *fb)
+{
+	struct nvkm_subdev *subdev = &fb->subdev;
+
+	nvkm_falcon_fw_ctor_hs(&gm200_flcn_fw, "mem-unlock", subdev, NULL, "nvdec/scrubber",
+			       0, &subdev->device->nvdec[0]->falcon, &fb->vpr_scrubber);
+
+	return gf100_fb_oneinit(fb);
+}
+
 static const struct nvkm_fb_func
 gp102_fb = {
 	.dtor = gf100_fb_dtor,
-	.oneinit = gf100_fb_oneinit,
+	.oneinit = gp102_fb_oneinit,
 	.init = gm200_fb_init,
 	.init_remapper = gp100_fb_init_remapper,
 	.init_page = gm200_fb_init_page,
 	.sysmem.flush_page_init = gf100_fb_sysmem_flush_page_init,
+	.vidmem.size = gp102_fb_vidmem_size,
 	.vpr.scrub_required = gp102_fb_vpr_scrub_required,
 	.vpr.scrub = gp102_fb_vpr_scrub,
-	.ram_new = gp100_ram_new,
+	.ram_new = gp102_ram_new,
 };
-
-int
-gp102_fb_new_(const struct nvkm_fb_func *func, struct nvkm_device *device,
-	      enum nvkm_subdev_type type, int inst, struct nvkm_fb **pfb)
-{
-	int ret = gf100_fb_new_(func, device, type, inst, pfb);
-	if (ret)
-		return ret;
-
-	nvkm_firmware_load_blob(&(*pfb)->subdev, "nvdec/scrubber", "", 0,
-				&(*pfb)->vpr_scrubber);
-	return 0;
-}
 
 int
 gp102_fb_new(struct nvkm_device *device, enum nvkm_subdev_type type, int inst, struct nvkm_fb **pfb)
 {
-	return gp102_fb_new_(&gp102_fb, device, type, inst, pfb);
+	return gf100_fb_new_(&gp102_fb, device, type, inst, pfb);
 }
 
 MODULE_FIRMWARE("nvidia/gp102/nvdec/scrubber.bin");

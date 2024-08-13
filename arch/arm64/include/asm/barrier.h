@@ -40,6 +40,10 @@
  */
 #define dgh()		asm volatile("hint #6" : : : "memory")
 
+#define spec_bar()	asm volatile(ALTERNATIVE("dsb nsh\nisb\n",		\
+						 SB_BARRIER_INSN"nop\n",	\
+						 ARM64_HAS_SB))
+
 #ifdef CONFIG_ARM64_PSEUDO_NMI
 #define pmr_sync()						\
 	do {							\
@@ -131,25 +135,25 @@ do {									\
 	case 1:								\
 		asm volatile ("stlrb %w1, %0"				\
 				: "=Q" (*__p)				\
-				: "r" (*(__u8 *)__u.__c)		\
+				: "rZ" (*(__u8 *)__u.__c)		\
 				: "memory");				\
 		break;							\
 	case 2:								\
 		asm volatile ("stlrh %w1, %0"				\
 				: "=Q" (*__p)				\
-				: "r" (*(__u16 *)__u.__c)		\
+				: "rZ" (*(__u16 *)__u.__c)		\
 				: "memory");				\
 		break;							\
 	case 4:								\
 		asm volatile ("stlr %w1, %0"				\
 				: "=Q" (*__p)				\
-				: "r" (*(__u32 *)__u.__c)		\
+				: "rZ" (*(__u32 *)__u.__c)		\
 				: "memory");				\
 		break;							\
 	case 8:								\
-		asm volatile ("stlr %1, %0"				\
+		asm volatile ("stlr %x1, %0"				\
 				: "=Q" (*__p)				\
-				: "r" (*(__u64 *)__u.__c)		\
+				: "rZ" (*(__u64 *)__u.__c)		\
 				: "memory");				\
 		break;							\
 	}								\

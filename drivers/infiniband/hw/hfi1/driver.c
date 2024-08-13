@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0 or BSD-3-Clause
+// SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
  * Copyright(c) 2015-2020 Intel Corporation.
  * Copyright(c) 2021 Cornelis Networks.
@@ -1597,7 +1597,7 @@ static int hfi1_setup_bypass_packet(struct hfi1_packet *packet)
 
 	return 0;
 drop:
-	hfi1_cdbg(PKT, "%s: packet dropped\n", __func__);
+	hfi1_cdbg(PKT, "%s: packet dropped", __func__);
 	ibp->rvp.n_pkt_drops++;
 	return -EINVAL;
 }

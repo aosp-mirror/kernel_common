@@ -161,7 +161,7 @@ static irqreturn_t st_uvis25_trigger_handler_thread(int irq, void *private)
 	if (!(status & ST_UVIS25_REG_UV_DA_MASK))
 		return IRQ_NONE;
 
-	iio_trigger_poll_chained(hw->trig);
+	iio_trigger_poll_nested(hw->trig);
 
 	return IRQ_HANDLED;
 }
@@ -291,7 +291,7 @@ int st_uvis25_probe(struct device *dev, int irq, struct regmap *regmap)
 	if (!iio_dev)
 		return -ENOMEM;
 
-	dev_set_drvdata(dev, (void *)iio_dev);
+	dev_set_drvdata(dev, iio_dev);
 
 	hw = iio_priv(iio_dev);
 	hw->irq = irq;

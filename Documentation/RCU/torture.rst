@@ -185,7 +185,7 @@ argument.
 Not all changes require that all scenarios be run.  For example, a change
 to Tree SRCU might run only the SRCU-N and SRCU-P scenarios using the
 --configs argument to kvm.sh as follows:  "--configs 'SRCU-N SRCU-P'".
-Large systems can run multiple copies of of the full set of scenarios,
+Large systems can run multiple copies of the full set of scenarios,
 for example, a system with 448 hardware threads can run five instances
 of the full set concurrently.  To make this happen::
 
@@ -216,7 +216,7 @@ Kernel boot arguments can also be supplied, for example, to control
 rcutorture's module parameters.  For example, to test a change to RCU's
 CPU stall-warning code, use "--bootargs 'rcutorture.stall_cpu=30'".
 This will of course result in the scripting reporting a failure, namely
-the resuling RCU CPU stall warning.  As noted above, reducing memory may
+the resulting RCU CPU stall warning.  As noted above, reducing memory may
 require disabling rcutorture's callback-flooding tests::
 
 	kvm.sh --cpus 448 --configs '56*TREE04' --memory 128M \
@@ -318,7 +318,7 @@ Suppose that a previous kvm.sh run left its output in this directory::
 
 	tools/testing/selftests/rcutorture/res/2022.11.03-11.26.28
 
-Then this run can be re-run without rebuilding as follow:
+Then this run can be re-run without rebuilding as follow::
 
 	kvm-again.sh tools/testing/selftests/rcutorture/res/2022.11.03-11.26.28
 
@@ -370,5 +370,5 @@ You can also re-run a previous remote run in a manner similar to kvm.sh:
 		tools/testing/selftests/rcutorture/res/2022.11.03-11.26.28-remote \
 		--duration 24h
 
-In this case, most of the kvm-again.sh parmeters may be supplied following
+In this case, most of the kvm-again.sh parameters may be supplied following
 the pathname of the old run-results directory.

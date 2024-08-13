@@ -17,6 +17,9 @@
 #include "protocols.h"
 #include "notify.h"
 
+/* Updated only after ALL the mandatory features for that version are merged */
+#define SCMI_PROTOCOL_SUPPORTED_VERSION		0x20000
+
 enum scmi_powercap_protocol_cmd {
 	POWERCAP_DOMAIN_ATTRIBUTES = 0x3,
 	POWERCAP_CAP_GET = 0x4,
@@ -108,6 +111,8 @@ struct scmi_powercap_meas_changed_notify_payld {
 };
 
 struct scmi_powercap_state {
+	bool enabled;
+	u32 last_pcap;
 	bool meas_notif_enabled;
 	u64 thresholds;
 #define THRESH_LOW(p, id)				\
@@ -119,6 +124,8 @@ struct scmi_powercap_state {
 struct powercap_info {
 	u32 version;
 	int num_domains;
+	bool notify_cap_cmd;
+	bool notify_measurements_cmd;
 	struct scmi_powercap_state *states;
 	struct scmi_powercap_info *powercaps;
 };
@@ -152,6 +159,18 @@ scmi_powercap_attributes_get(const struct scmi_protocol_handle *ph,
 	}
 
 	ph->xops->xfer_put(ph, t);
+
+	if (!ret) {
+		if (!ph->hops->protocol_msg_check(ph,
+						  POWERCAP_CAP_NOTIFY, NULL))
+			pi->notify_cap_cmd = true;
+
+		if (!ph->hops->protocol_msg_check(ph,
+						  POWERCAP_MEASUREMENTS_NOTIFY,
+						  NULL))
+			pi->notify_measurements_cmd = true;
+	}
+
 	return ret;
 }
 
@@ -195,10 +214,12 @@ scmi_powercap_domain_attributes_get(const struct scmi_protocol_handle *ph,
 		flags = le32_to_cpu(resp->attributes);
 
 		dom_info->id = domain;
-		dom_info->notify_powercap_cap_change =
-			SUPPORTS_POWERCAP_CAP_CHANGE_NOTIFY(flags);
-		dom_info->notify_powercap_measurement_change =
-			SUPPORTS_POWERCAP_MEASUREMENTS_CHANGE_NOTIFY(flags);
+		if (pinfo->notify_cap_cmd)
+			dom_info->notify_powercap_cap_change =
+				SUPPORTS_POWERCAP_CAP_CHANGE_NOTIFY(flags);
+		if (pinfo->notify_measurements_cmd)
+			dom_info->notify_powercap_measurement_change =
+				SUPPORTS_POWERCAP_MEASUREMENTS_CHANGE_NOTIFY(flags);
 		dom_info->async_powercap_cap_set =
 			SUPPORTS_ASYNC_POWERCAP_CAP_SET(flags);
 		dom_info->powercap_cap_config =
@@ -268,7 +289,7 @@ clean:
 	 */
 	if (!ret && SUPPORTS_EXTENDED_NAMES(flags))
 		ph->hops->extended_name_get(ph, POWERCAP_DOMAIN_NAME_GET,
-					    domain, dom_info->name,
+					    domain, NULL, dom_info->name,
 					    SCMI_MAX_STR_SIZE);
 
 	return ret;
@@ -313,24 +334,33 @@ static int scmi_powercap_xfer_cap_get(const struct scmi_protocol_handle *ph,
 	return ret;
 }
 
-static int scmi_powercap_cap_get(const struct scmi_protocol_handle *ph,
-				 u32 domain_id, u32 *power_cap)
+static int __scmi_powercap_cap_get(const struct scmi_protocol_handle *ph,
+				   const struct scmi_powercap_info *dom,
+				   u32 *power_cap)
 {
-	struct scmi_powercap_info *dom;
-	struct powercap_info *pi = ph->get_priv(ph);
-
-	if (!power_cap || domain_id >= pi->num_domains)
-		return -EINVAL;
-
-	dom = pi->powercaps + domain_id;
 	if (dom->fc_info && dom->fc_info[POWERCAP_FC_CAP].get_addr) {
 		*power_cap = ioread32(dom->fc_info[POWERCAP_FC_CAP].get_addr);
 		trace_scmi_fc_call(SCMI_PROTOCOL_POWERCAP, POWERCAP_CAP_GET,
-				   domain_id, *power_cap, 0);
+				   dom->id, *power_cap, 0);
 		return 0;
 	}
 
-	return scmi_powercap_xfer_cap_get(ph, domain_id, power_cap);
+	return scmi_powercap_xfer_cap_get(ph, dom->id, power_cap);
+}
+
+static int scmi_powercap_cap_get(const struct scmi_protocol_handle *ph,
+				 u32 domain_id, u32 *power_cap)
+{
+	const struct scmi_powercap_info *dom;
+
+	if (!power_cap)
+		return -EINVAL;
+
+	dom = scmi_powercap_dom_info_get(ph, domain_id);
+	if (!dom)
+		return -EINVAL;
+
+	return __scmi_powercap_cap_get(ph, dom, power_cap);
 }
 
 static int scmi_powercap_xfer_cap_set(const struct scmi_protocol_handle *ph,
@@ -349,8 +379,8 @@ static int scmi_powercap_xfer_cap_set(const struct scmi_protocol_handle *ph,
 	msg = t->tx.buf;
 	msg->domain = cpu_to_le32(pc->id);
 	msg->flags =
-		cpu_to_le32(FIELD_PREP(CAP_SET_ASYNC, !!pc->async_powercap_cap_set) |
-			    FIELD_PREP(CAP_SET_IGNORE_DRESP, !!ignore_dresp));
+		cpu_to_le32(FIELD_PREP(CAP_SET_ASYNC, pc->async_powercap_cap_set) |
+			    FIELD_PREP(CAP_SET_IGNORE_DRESP, ignore_dresp));
 	msg->value = cpu_to_le32(power_cap);
 
 	if (!pc->async_powercap_cap_set || ignore_dresp) {
@@ -375,17 +405,20 @@ static int scmi_powercap_xfer_cap_set(const struct scmi_protocol_handle *ph,
 	return ret;
 }
 
-static int scmi_powercap_cap_set(const struct scmi_protocol_handle *ph,
-				 u32 domain_id, u32 power_cap,
-				 bool ignore_dresp)
+static int __scmi_powercap_cap_set(const struct scmi_protocol_handle *ph,
+				   struct powercap_info *pi, u32 domain_id,
+				   u32 power_cap, bool ignore_dresp)
 {
+	int ret = -EINVAL;
 	const struct scmi_powercap_info *pc;
 
 	pc = scmi_powercap_dom_info_get(ph, domain_id);
-	if (!pc || !pc->powercap_cap_config || !power_cap ||
-	    power_cap < pc->min_power_cap ||
-	    power_cap > pc->max_power_cap)
-		return -EINVAL;
+	if (!pc || !pc->powercap_cap_config)
+		return ret;
+
+	if (power_cap &&
+	    (power_cap < pc->min_power_cap || power_cap > pc->max_power_cap))
+		return ret;
 
 	if (pc->fc_info && pc->fc_info[POWERCAP_FC_CAP].set_addr) {
 		struct scmi_fc_info *fci = &pc->fc_info[POWERCAP_FC_CAP];
@@ -394,10 +427,41 @@ static int scmi_powercap_cap_set(const struct scmi_protocol_handle *ph,
 		ph->hops->fastchannel_db_ring(fci->set_db);
 		trace_scmi_fc_call(SCMI_PROTOCOL_POWERCAP, POWERCAP_CAP_SET,
 				   domain_id, power_cap, 0);
+		ret = 0;
+	} else {
+		ret = scmi_powercap_xfer_cap_set(ph, pc, power_cap,
+						 ignore_dresp);
+	}
+
+	/* Save the last explicitly set non-zero powercap value */
+	if (PROTOCOL_REV_MAJOR(pi->version) >= 0x2 && !ret && power_cap)
+		pi->states[domain_id].last_pcap = power_cap;
+
+	return ret;
+}
+
+static int scmi_powercap_cap_set(const struct scmi_protocol_handle *ph,
+				 u32 domain_id, u32 power_cap,
+				 bool ignore_dresp)
+{
+	struct powercap_info *pi = ph->get_priv(ph);
+
+	/*
+	 * Disallow zero as a possible explicitly requested powercap:
+	 * there are enable/disable operations for this.
+	 */
+	if (!power_cap)
+		return -EINVAL;
+
+	/* Just log the last set request if acting on a disabled domain */
+	if (PROTOCOL_REV_MAJOR(pi->version) >= 0x2 &&
+	    !pi->states[domain_id].enabled) {
+		pi->states[domain_id].last_pcap = power_cap;
 		return 0;
 	}
 
-	return scmi_powercap_xfer_cap_set(ph, pc, power_cap, ignore_dresp);
+	return __scmi_powercap_cap_set(ph, pi, domain_id,
+				       power_cap, ignore_dresp);
 }
 
 static int scmi_powercap_xfer_pai_get(const struct scmi_protocol_handle *ph,
@@ -564,11 +628,78 @@ scmi_powercap_measurements_threshold_set(const struct scmi_protocol_handle *ph,
 	return ret;
 }
 
+static int scmi_powercap_cap_enable_set(const struct scmi_protocol_handle *ph,
+					u32 domain_id, bool enable)
+{
+	int ret;
+	u32 power_cap;
+	struct powercap_info *pi = ph->get_priv(ph);
+
+	if (PROTOCOL_REV_MAJOR(pi->version) < 0x2)
+		return -EINVAL;
+
+	if (enable == pi->states[domain_id].enabled)
+		return 0;
+
+	if (enable) {
+		/* Cannot enable with a zero powercap. */
+		if (!pi->states[domain_id].last_pcap)
+			return -EINVAL;
+
+		ret = __scmi_powercap_cap_set(ph, pi, domain_id,
+					      pi->states[domain_id].last_pcap,
+					      true);
+	} else {
+		ret = __scmi_powercap_cap_set(ph, pi, domain_id, 0, true);
+	}
+
+	if (ret)
+		return ret;
+
+	/*
+	 * Update our internal state to reflect final platform state: the SCMI
+	 * server could have ignored a disable request and kept enforcing some
+	 * powercap limit requested by other agents.
+	 */
+	ret = scmi_powercap_cap_get(ph, domain_id, &power_cap);
+	if (!ret)
+		pi->states[domain_id].enabled = !!power_cap;
+
+	return ret;
+}
+
+static int scmi_powercap_cap_enable_get(const struct scmi_protocol_handle *ph,
+					u32 domain_id, bool *enable)
+{
+	int ret;
+	u32 power_cap;
+	struct powercap_info *pi = ph->get_priv(ph);
+
+	*enable = true;
+	if (PROTOCOL_REV_MAJOR(pi->version) < 0x2)
+		return 0;
+
+	/*
+	 * Report always real platform state; platform could have ignored
+	 * a previous disable request. Default true on any error.
+	 */
+	ret = scmi_powercap_cap_get(ph, domain_id, &power_cap);
+	if (!ret)
+		*enable = !!power_cap;
+
+	/* Update internal state with current real platform state */
+	pi->states[domain_id].enabled = *enable;
+
+	return 0;
+}
+
 static const struct scmi_powercap_proto_ops powercap_proto_ops = {
 	.num_domains_get = scmi_powercap_num_domains_get,
 	.info_get = scmi_powercap_dom_info_get,
 	.cap_get = scmi_powercap_cap_get,
 	.cap_set = scmi_powercap_cap_set,
+	.cap_enable_set = scmi_powercap_cap_enable_set,
+	.cap_enable_get = scmi_powercap_cap_enable_get,
 	.pai_get = scmi_powercap_pai_get,
 	.pai_set = scmi_powercap_pai_set,
 	.measurements_get = scmi_powercap_measurements_get,
@@ -588,20 +719,24 @@ static void scmi_powercap_domain_init_fc(const struct scmi_protocol_handle *ph,
 	ph->hops->fastchannel_init(ph, POWERCAP_DESCRIBE_FASTCHANNEL,
 				   POWERCAP_CAP_SET, 4, domain,
 				   &fc[POWERCAP_FC_CAP].set_addr,
-				   &fc[POWERCAP_FC_CAP].set_db);
+				   &fc[POWERCAP_FC_CAP].set_db,
+				   &fc[POWERCAP_FC_CAP].rate_limit);
 
 	ph->hops->fastchannel_init(ph, POWERCAP_DESCRIBE_FASTCHANNEL,
 				   POWERCAP_CAP_GET, 4, domain,
-				   &fc[POWERCAP_FC_CAP].get_addr, NULL);
+				   &fc[POWERCAP_FC_CAP].get_addr, NULL,
+				   &fc[POWERCAP_FC_CAP].rate_limit);
 
 	ph->hops->fastchannel_init(ph, POWERCAP_DESCRIBE_FASTCHANNEL,
 				   POWERCAP_PAI_SET, 4, domain,
 				   &fc[POWERCAP_FC_PAI].set_addr,
-				   &fc[POWERCAP_FC_PAI].set_db);
+				   &fc[POWERCAP_FC_PAI].set_db,
+				   &fc[POWERCAP_FC_PAI].rate_limit);
 
 	ph->hops->fastchannel_init(ph, POWERCAP_DESCRIBE_FASTCHANNEL,
 				   POWERCAP_PAI_GET, 4, domain,
-				   &fc[POWERCAP_FC_PAI].get_addr, NULL);
+				   &fc[POWERCAP_FC_PAI].get_addr, NULL,
+				   &fc[POWERCAP_FC_PAI].rate_limit);
 
 	*p_fc = fc;
 }
@@ -671,6 +806,26 @@ static int scmi_powercap_notify(const struct scmi_protocol_handle *ph,
 
 	ph->xops->xfer_put(ph, t);
 	return ret;
+}
+
+static bool
+scmi_powercap_notify_supported(const struct scmi_protocol_handle *ph,
+			       u8 evt_id, u32 src_id)
+{
+	bool supported = false;
+	const struct scmi_powercap_info *dom_info;
+	struct powercap_info *pi = ph->get_priv(ph);
+
+	if (evt_id >= ARRAY_SIZE(evt_2_cmd) || src_id >= pi->num_domains)
+		return false;
+
+	dom_info = pi->powercaps + src_id;
+	if (evt_id == SCMI_EVENT_POWERCAP_CAP_CHANGED)
+		supported = dom_info->notify_powercap_cap_change;
+	else if (evt_id == SCMI_EVENT_POWERCAP_MEASUREMENTS_CHANGED)
+		supported = dom_info->notify_powercap_measurement_change;
+
+	return supported;
 }
 
 static int
@@ -789,6 +944,7 @@ static const struct scmi_event powercap_events[] = {
 };
 
 static const struct scmi_event_ops powercap_event_ops = {
+	.is_notify_supported = scmi_powercap_notify_supported,
 	.get_num_sources = scmi_powercap_get_num_sources,
 	.set_notify_enabled = scmi_powercap_set_notify_enabled,
 	.fill_custom_report = scmi_powercap_fill_custom_report,
@@ -829,6 +985,11 @@ scmi_powercap_protocol_init(const struct scmi_protocol_handle *ph)
 	if (!pinfo->powercaps)
 		return -ENOMEM;
 
+	pinfo->states = devm_kcalloc(ph->dev, pinfo->num_domains,
+				     sizeof(*pinfo->states), GFP_KERNEL);
+	if (!pinfo->states)
+		return -ENOMEM;
+
 	/*
 	 * Note that any failure in retrieving any domain attribute leads to
 	 * the whole Powercap protocol initialization failure: this way the
@@ -843,16 +1004,22 @@ scmi_powercap_protocol_init(const struct scmi_protocol_handle *ph)
 		if (pinfo->powercaps[domain].fastchannels)
 			scmi_powercap_domain_init_fc(ph, domain,
 						     &pinfo->powercaps[domain].fc_info);
+
+		/* Grab initial state when disable is supported. */
+		if (PROTOCOL_REV_MAJOR(version) >= 0x2) {
+			ret = __scmi_powercap_cap_get(ph,
+						      &pinfo->powercaps[domain],
+						      &pinfo->states[domain].last_pcap);
+			if (ret)
+				return ret;
+
+			pinfo->states[domain].enabled =
+				!!pinfo->states[domain].last_pcap;
+		}
 	}
 
-	pinfo->states = devm_kcalloc(ph->dev, pinfo->num_domains,
-				     sizeof(*pinfo->states), GFP_KERNEL);
-	if (!pinfo->states)
-		return -ENOMEM;
-
 	pinfo->version = version;
-
-	return ph->set_priv(ph, pinfo);
+	return ph->set_priv(ph, pinfo, version);
 }
 
 static const struct scmi_protocol scmi_powercap = {
@@ -861,6 +1028,7 @@ static const struct scmi_protocol scmi_powercap = {
 	.instance_init = &scmi_powercap_protocol_init,
 	.ops = &powercap_proto_ops,
 	.events = &powercap_protocol_events,
+	.supported_version = SCMI_PROTOCOL_SUPPORTED_VERSION,
 };
 
 DEFINE_SCMI_PROTOCOL_REGISTER_UNREGISTER(powercap, scmi_powercap)

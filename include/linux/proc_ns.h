@@ -66,13 +66,12 @@ static inline void proc_free_inum(unsigned int inum) {}
 
 static inline int ns_alloc_inum(struct ns_common *ns)
 {
-	atomic_long_set(&ns->stashed, 0);
+	WRITE_ONCE(ns->stashed, NULL);
 	return proc_alloc_inum(&ns->inum);
 }
 
 #define ns_free_inum(ns) proc_free_inum((ns)->inum)
 
-extern struct file *proc_ns_fget(int fd);
 #define get_proc_ns(inode) ((struct ns_common *)(inode)->i_private)
 extern int ns_get_path(struct path *path, struct task_struct *task,
 			const struct proc_ns_operations *ns_ops);

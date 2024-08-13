@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 
-# Absolute relocation type $(ARCH_REL_TYPE_ABS) needs to be defined before
-# the inclusion of generic Makefile.
-ARCH_REL_TYPE_ABS := R_ARM_JUMP_SLOT|R_ARM_GLOB_DAT|R_ARM_ABS32
+# Include the generic Makefile to check the built vdso.
 include $(srctree)/lib/vdso/Makefile
 
 hostprogs := vdsomunge
@@ -35,15 +33,6 @@ else
 CFLAGS_vgettimeofday.o = -O2 -include $(c-gettimeofday-y)
 endif
 
-# Disable gcov profiling for VDSO code
-GCOV_PROFILE := n
-UBSAN_SANITIZE := n
-
-# Prevents link failures: __sanitizer_cov_trace_pc() is not linked in.
-KCOV_INSTRUMENT := n
-
-KASAN_SANITIZE := n
-
 # Force dependency
 $(obj)/vdso.o : $(obj)/vdso.so
 
@@ -65,28 +54,3 @@ quiet_cmd_vdsold_and_vdso_check = LD      $@
 
 quiet_cmd_vdsomunge = MUNGE   $@
       cmd_vdsomunge = $(objtree)/$(obj)/vdsomunge $< $@
-
-#
-# Install the unstripped copy of vdso.so.dbg.  If our toolchain
-# supports build-id, install .build-id links as well.
-#
-# Cribbed from arch/x86/vdso/Makefile.
-#
-quiet_cmd_vdso_install = INSTALL $<
-define cmd_vdso_install
-	cp $< "$(MODLIB)/vdso/vdso.so"; \
-	if readelf -n $< | grep -q 'Build ID'; then \
-	  buildid=`readelf -n $< |grep 'Build ID' |sed -e 's/^.*Build ID: \(.*\)$$/\1/'`; \
-	  first=`echo $$buildid | cut -b-2`; \
-	  last=`echo $$buildid | cut -b3-`; \
-	  mkdir -p "$(MODLIB)/vdso/.build-id/$$first"; \
-	  ln -sf "../../vdso.so" "$(MODLIB)/vdso/.build-id/$$first/$$last.debug"; \
-	fi
-endef
-
-$(MODLIB)/vdso: FORCE
-	@mkdir -p $(MODLIB)/vdso
-
-PHONY += vdso_install
-vdso_install: $(obj)/vdso.so.dbg $(MODLIB)/vdso
-	$(call cmd,vdso_install)

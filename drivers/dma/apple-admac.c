@@ -10,8 +10,9 @@
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/of_dma.h>
+#include <linux/platform_device.h>
 #include <linux/reset.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
@@ -56,6 +57,8 @@
 
 #define REG_BUS_WIDTH(ch)	(0x8040 + (ch) * 0x200)
 
+#define BUS_WIDTH_WORD_SIZE	GENMASK(3, 0)
+#define BUS_WIDTH_FRAME_SIZE	GENMASK(7, 4)
 #define BUS_WIDTH_8BIT		0x00
 #define BUS_WIDTH_16BIT		0x01
 #define BUS_WIDTH_32BIT		0x02
@@ -75,6 +78,7 @@
 
 #define REG_TX_INTSTATE(idx)		(0x0030 + (idx) * 4)
 #define REG_RX_INTSTATE(idx)		(0x0040 + (idx) * 4)
+#define REG_GLOBAL_INTSTATE(idx)	(0x0050 + (idx) * 4)
 #define REG_CHAN_INTSTATUS(ch, idx)	(0x8010 + (ch) * 0x200 + (idx) * 4)
 #define REG_CHAN_INTMASK(ch, idx)	(0x8020 + (ch) * 0x200 + (idx) * 4)
 
@@ -126,7 +130,7 @@ struct admac_data {
 	int irq;
 	int irq_index;
 	int nchannels;
-	struct admac_chan channels[];
+	struct admac_chan channels[] __counted_by(nchannels);
 };
 
 struct admac_tx {
@@ -511,7 +515,10 @@ static int admac_terminate_all(struct dma_chan *chan)
 	admac_stop_chan(adchan);
 	admac_reset_rings(adchan);
 
-	adchan->current_tx = NULL;
+	if (adchan->current_tx) {
+		list_add_tail(&adchan->current_tx->node, &adchan->to_free);
+		adchan->current_tx = NULL;
+	}
 	/*
 	 * Descriptors can only be freed after the tasklet
 	 * has been killed (in admac_synchronize).
@@ -672,13 +679,14 @@ static void admac_handle_chan_int(struct admac_data *ad, int no)
 static irqreturn_t admac_interrupt(int irq, void *devid)
 {
 	struct admac_data *ad = devid;
-	u32 rx_intstate, tx_intstate;
+	u32 rx_intstate, tx_intstate, global_intstate;
 	int i;
 
 	rx_intstate = readl_relaxed(ad->base + REG_RX_INTSTATE(ad->irq_index));
 	tx_intstate = readl_relaxed(ad->base + REG_TX_INTSTATE(ad->irq_index));
+	global_intstate = readl_relaxed(ad->base + REG_GLOBAL_INTSTATE(ad->irq_index));
 
-	if (!tx_intstate && !rx_intstate)
+	if (!tx_intstate && !rx_intstate && !global_intstate)
 		return IRQ_NONE;
 
 	for (i = 0; i < ad->nchannels; i += 2) {
@@ -691,6 +699,12 @@ static irqreturn_t admac_interrupt(int irq, void *devid)
 		if (rx_intstate & 1)
 			admac_handle_chan_int(ad, i);
 		rx_intstate >>= 1;
+	}
+
+	if (global_intstate) {
+		dev_warn(ad->dev, "clearing unknown global interrupt flag: %x\n",
+			 global_intstate);
+		writel_relaxed(~(u32) 0, ad->base + REG_GLOBAL_INTSTATE(ad->irq_index));
 	}
 
 	return IRQ_HANDLED;
@@ -728,7 +742,8 @@ static int admac_device_config(struct dma_chan *chan,
 	struct admac_data *ad = adchan->host;
 	bool is_tx = admac_chan_direction(adchan->no) == DMA_MEM_TO_DEV;
 	int wordsize = 0;
-	u32 bus_width = 0;
+	u32 bus_width = readl_relaxed(ad->base + REG_BUS_WIDTH(adchan->no)) &
+		~(BUS_WIDTH_WORD_SIZE | BUS_WIDTH_FRAME_SIZE);
 
 	switch (is_tx ? config->dst_addr_width : config->src_addr_width) {
 	case DMA_SLAVE_BUSWIDTH_1_BYTE:
@@ -850,6 +865,9 @@ static int admac_probe(struct platform_device *pdev)
 
 	dma->directions = BIT(DMA_MEM_TO_DEV) | BIT(DMA_DEV_TO_MEM);
 	dma->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
+	dma->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+			BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+			BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
 	dma->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
 			BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
 			BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
@@ -910,7 +928,7 @@ free_reset:
 	return err;
 }
 
-static int admac_remove(struct platform_device *pdev)
+static void admac_remove(struct platform_device *pdev)
 {
 	struct admac_data *ad = platform_get_drvdata(pdev);
 
@@ -918,8 +936,6 @@ static int admac_remove(struct platform_device *pdev)
 	dma_async_device_unregister(&ad->dma);
 	free_irq(ad->irq, ad);
 	reset_control_rearm(ad->rstc);
-
-	return 0;
 }
 
 static const struct of_device_id admac_of_match[] = {
@@ -934,7 +950,7 @@ static struct platform_driver apple_admac_driver = {
 		.of_match_table = admac_of_match,
 	},
 	.probe = admac_probe,
-	.remove = admac_remove,
+	.remove_new = admac_remove,
 };
 module_platform_driver(apple_admac_driver);
 

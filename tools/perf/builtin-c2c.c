@@ -38,13 +38,13 @@
 #include "ui/browsers/hists.h"
 #include "thread.h"
 #include "mem2node.h"
+#include "mem-info.h"
 #include "symbol.h"
 #include "ui/ui.h"
 #include "ui/progress.h"
-#include "../perf.h"
-#include "pmu.h"
-#include "pmu-hybrid.h"
+#include "pmus.h"
 #include "string2.h"
+#include "util/util.h"
 
 struct c2c_hists {
 	struct hists		hists;
@@ -165,8 +165,8 @@ static void *c2c_he_zalloc(size_t size)
 	return &c2c_he->he;
 
 out_free:
-	free(c2c_he->nodeset);
-	free(c2c_he->cpuset);
+	zfree(&c2c_he->nodeset);
+	zfree(&c2c_he->cpuset);
 	free(c2c_he);
 	return NULL;
 }
@@ -178,13 +178,13 @@ static void c2c_he_free(void *he)
 	c2c_he = container_of(he, struct c2c_hist_entry, he);
 	if (c2c_he->hists) {
 		hists__delete_entries(&c2c_he->hists->hists);
-		free(c2c_he->hists);
+		zfree(&c2c_he->hists);
 	}
 
-	free(c2c_he->cpuset);
-	free(c2c_he->nodeset);
-	free(c2c_he->nodestr);
-	free(c2c_he->node_stats);
+	zfree(&c2c_he->cpuset);
+	zfree(&c2c_he->nodeset);
+	zfree(&c2c_he->nodestr);
+	zfree(&c2c_he->node_stats);
 	free(c2c_he);
 }
 
@@ -285,25 +285,31 @@ static int process_sample_event(struct perf_tool *tool __maybe_unused,
 	struct hist_entry *he;
 	struct addr_location al;
 	struct mem_info *mi, *mi_dup;
+	struct callchain_cursor *cursor;
 	int ret;
 
+	addr_location__init(&al);
 	if (machine__resolve(machine, &al, sample) < 0) {
 		pr_debug("problem processing %d event, skipping it.\n",
 			 event->header.type);
-		return -1;
+		ret = -1;
+		goto out;
 	}
 
 	if (c2c.stitch_lbr)
-		al.thread->lbr_stitch_enable = true;
+		thread__set_lbr_stitch_enable(al.thread, true);
 
-	ret = sample__resolve_callchain(sample, &callchain_cursor, NULL,
+	cursor = get_tls_callchain_cursor();
+	ret = sample__resolve_callchain(sample, cursor, NULL,
 					evsel, &al, sysctl_perf_event_max_stack);
 	if (ret)
 		goto out;
 
 	mi = sample__resolve_mem(sample, &al);
-	if (mi == NULL)
-		return -ENOMEM;
+	if (mi == NULL) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	/*
 	 * The mi object is released in hists__add_entry_ops,
@@ -315,7 +321,7 @@ static int process_sample_event(struct perf_tool *tool __maybe_unused,
 	c2c_decode_stats(&stats, mi);
 
 	he = hists__add_entry_ops(&c2c_hists->hists, &c2c_entry_ops,
-				  &al, NULL, NULL, mi,
+				  &al, NULL, NULL, mi, NULL,
 				  sample, true);
 	if (he == NULL)
 		goto free_mi;
@@ -349,7 +355,7 @@ static int process_sample_event(struct perf_tool *tool __maybe_unused,
 			goto free_mi;
 
 		he = hists__add_entry_ops(&c2c_hists->hists, &c2c_entry_ops,
-					  &al, NULL, NULL, mi,
+					  &al, NULL, NULL, mi, NULL,
 					  sample, true);
 		if (he == NULL)
 			goto free_mi;
@@ -369,7 +375,7 @@ static int process_sample_event(struct perf_tool *tool __maybe_unused,
 	}
 
 out:
-	addr_location__put(&al);
+	addr_location__exit(&al);
 	return ret;
 
 free_mi:
@@ -524,7 +530,7 @@ static int dcacheline_entry(struct perf_hpp_fmt *fmt, struct perf_hpp *hpp,
 	char buf[20];
 
 	if (he->mem_info)
-		addr = cl_address(he->mem_info->daddr.addr);
+		addr = cl_address(mem_info__daddr(he->mem_info)->addr, chk_double_cl);
 
 	return scnprintf(hpp->buf, hpp->size, "%*s", width, HEX_STR(buf, addr));
 }
@@ -562,7 +568,7 @@ static int offset_entry(struct perf_hpp_fmt *fmt, struct perf_hpp *hpp,
 	char buf[20];
 
 	if (he->mem_info)
-		addr = cl_offset(he->mem_info->daddr.al_addr);
+		addr = cl_offset(mem_info__daddr(he->mem_info)->al_addr, chk_double_cl);
 
 	return scnprintf(hpp->buf, hpp->size, "%*s", width, HEX_STR(buf, addr));
 }
@@ -574,9 +580,10 @@ offset_cmp(struct perf_hpp_fmt *fmt __maybe_unused,
 	uint64_t l = 0, r = 0;
 
 	if (left->mem_info)
-		l = cl_offset(left->mem_info->daddr.addr);
+		l = cl_offset(mem_info__daddr(left->mem_info)->addr, chk_double_cl);
+
 	if (right->mem_info)
-		r = cl_offset(right->mem_info->daddr.addr);
+		r = cl_offset(mem_info__daddr(right->mem_info)->addr, chk_double_cl);
 
 	return (int64_t)(r - l);
 }
@@ -590,7 +597,7 @@ iaddr_entry(struct perf_hpp_fmt *fmt, struct perf_hpp *hpp,
 	char buf[20];
 
 	if (he->mem_info)
-		addr = he->mem_info->iaddr.addr;
+		addr = mem_info__iaddr(he->mem_info)->addr;
 
 	return scnprintf(hpp->buf, hpp->size, "%*s", width, HEX_STR(buf, addr));
 }
@@ -1149,14 +1156,14 @@ pid_entry(struct perf_hpp_fmt *fmt, struct perf_hpp *hpp,
 {
 	int width = c2c_width(fmt, hpp, he->hists);
 
-	return scnprintf(hpp->buf, hpp->size, "%*d", width, he->thread->pid_);
+	return scnprintf(hpp->buf, hpp->size, "%*d", width, thread__pid(he->thread));
 }
 
 static int64_t
 pid_cmp(struct perf_hpp_fmt *fmt __maybe_unused,
 	struct hist_entry *left, struct hist_entry *right)
 {
-	return left->thread->pid_ - right->thread->pid_;
+	return thread__pid(left->thread) - thread__pid(right->thread);
 }
 
 static int64_t
@@ -2044,7 +2051,7 @@ static int hpp_list__parse(struct perf_hpp_list *hpp_list,
 	perf_hpp__setup_output_field(hpp_list);
 
 	/*
-	 * We dont need other sorting keys other than those
+	 * We don't need other sorting keys other than those
 	 * we already specified. It also really slows down
 	 * the processing a lot with big number of output
 	 * fields, so switching this off for c2c.
@@ -2313,11 +2320,7 @@ static int setup_nodes(struct perf_session *session)
 
 		nodes[node] = set;
 
-		/* empty node, skip */
-		if (perf_cpu_map__empty(map))
-			continue;
-
-		perf_cpu_map__for_each_cpu(cpu, idx, map) {
+		perf_cpu_map__for_each_cpu_skip_any(cpu, idx, map) {
 			__set_bit(cpu.cpu, set);
 
 			if (WARN_ONCE(cpu2node[cpu.cpu] != -1, "node/cpu topology bug"))
@@ -2590,7 +2593,7 @@ perf_c2c_cacheline_browser__title(struct hist_browser *browser,
 	he = cl_browser->he;
 
 	if (he->mem_info)
-		addr = cl_address(he->mem_info->daddr.addr);
+		addr = cl_address(mem_info__daddr(he->mem_info)->addr, chk_double_cl);
 
 	scnprintf(bf, size, "Cacheline 0x%lx", addr);
 	return 0;
@@ -2788,15 +2791,16 @@ static int ui_quirks(void)
 	if (!c2c.use_stdio) {
 		dim_offset.width  = 5;
 		dim_offset.header = header_offset_tui;
-		nodestr = "CL";
+		nodestr = chk_double_cl ? "Double-CL" : "CL";
 	}
 
 	dim_percent_costly_snoop.header = percent_costly_snoop_header[c2c.display];
 
 	/* Fix the zero line for dcacheline column. */
-	buf = fill_line("Cacheline", dim_dcacheline.width +
-				     dim_dcacheline_node.width +
-				     dim_dcacheline_count.width + 4);
+	buf = fill_line(chk_double_cl ? "Double-Cacheline" : "Cacheline",
+				dim_dcacheline.width +
+				dim_dcacheline_node.width +
+				dim_dcacheline_count.width + 4);
 	if (!buf)
 		return -ENOMEM;
 
@@ -3037,6 +3041,7 @@ static int perf_c2c__report(int argc, const char **argv)
 	OPT_BOOLEAN('f', "force", &symbol_conf.force, "don't complain, do it"),
 	OPT_BOOLEAN(0, "stitch-lbr", &c2c.stitch_lbr,
 		    "Enable LBR callgraph stitching approach"),
+	OPT_BOOLEAN(0, "double-cl", &chk_double_cl, "Detect adjacent cacheline false sharing"),
 	OPT_PARENT(c2c_options),
 	OPT_END()
 	};
@@ -3207,12 +3212,19 @@ static int parse_record_events(const struct option *opt,
 			       const char *str, int unset __maybe_unused)
 {
 	bool *event_set = (bool *) opt->value;
+	struct perf_pmu *pmu;
+
+	pmu = perf_mem_events_find_pmu();
+	if (!pmu) {
+		pr_err("failed: there is no PMU that supports perf c2c\n");
+		exit(-1);
+	}
 
 	if (!strcmp(str, "list")) {
-		perf_mem_events__list();
+		perf_pmu__mem_events_list(pmu);
 		exit(0);
 	}
-	if (perf_mem_events__parse(str))
+	if (perf_pmu__mem_events_parse(pmu, str))
 		exit(-1);
 
 	*event_set = true;
@@ -3230,13 +3242,13 @@ static const char * const *record_mem_usage = __usage_record;
 
 static int perf_c2c__record(int argc, const char **argv)
 {
-	int rec_argc, i = 0, j, rec_tmp_nr = 0;
+	int rec_argc, i = 0, j;
 	const char **rec_argv;
-	char **rec_tmp;
 	int ret;
 	bool all_user = false, all_kernel = false;
 	bool event_set = false;
 	struct perf_mem_event *e;
+	struct perf_pmu *pmu;
 	struct option options[] = {
 	OPT_CALLBACK('e', "event", &event_set, "event",
 		     "event selector. Use 'perf c2c record -e list' to list available events",
@@ -3248,7 +3260,13 @@ static int perf_c2c__record(int argc, const char **argv)
 	OPT_END()
 	};
 
-	if (perf_mem_events__init()) {
+	pmu = perf_mem_events_find_pmu();
+	if (!pmu) {
+		pr_err("failed: no PMU supports the memory events\n");
+		return -1;
+	}
+
+	if (perf_pmu__mem_events_init(pmu)) {
 		pr_err("failed: memory events not supported\n");
 		return -1;
 	}
@@ -3256,25 +3274,17 @@ static int perf_c2c__record(int argc, const char **argv)
 	argc = parse_options(argc, argv, options, record_mem_usage,
 			     PARSE_OPT_KEEP_UNKNOWN);
 
-	if (!perf_pmu__has_hybrid())
-		rec_argc = argc + 11; /* max number of arguments */
-	else
-		rec_argc = argc + 11 * perf_pmu__hybrid_pmu_num();
+	/* Max number of arguments multiplied by number of PMUs that can support them. */
+	rec_argc = argc + 11 * (perf_pmu__mem_events_num_mem_pmus(pmu) + 1);
 
 	rec_argv = calloc(rec_argc + 1, sizeof(char *));
 	if (!rec_argv)
 		return -1;
 
-	rec_tmp = calloc(rec_argc + 1, sizeof(char *));
-	if (!rec_tmp) {
-		free(rec_argv);
-		return -1;
-	}
-
 	rec_argv[i++] = "record";
 
 	if (!event_set) {
-		e = perf_mem_events__ptr(PERF_MEM_EVENTS__LOAD_STORE);
+		e = perf_pmu__mem_events_ptr(pmu, PERF_MEM_EVENTS__LOAD_STORE);
 		/*
 		 * The load and store operations are required, use the event
 		 * PERF_MEM_EVENTS__LOAD_STORE if it is supported.
@@ -3283,15 +3293,15 @@ static int perf_c2c__record(int argc, const char **argv)
 			e->record = true;
 			rec_argv[i++] = "-W";
 		} else {
-			e = perf_mem_events__ptr(PERF_MEM_EVENTS__LOAD);
+			e = perf_pmu__mem_events_ptr(pmu, PERF_MEM_EVENTS__LOAD);
 			e->record = true;
 
-			e = perf_mem_events__ptr(PERF_MEM_EVENTS__STORE);
+			e = perf_pmu__mem_events_ptr(pmu, PERF_MEM_EVENTS__STORE);
 			e->record = true;
 		}
 	}
 
-	e = perf_mem_events__ptr(PERF_MEM_EVENTS__LOAD);
+	e = perf_pmu__mem_events_ptr(pmu, PERF_MEM_EVENTS__LOAD);
 	if (e->record)
 		rec_argv[i++] = "-W";
 
@@ -3299,7 +3309,7 @@ static int perf_c2c__record(int argc, const char **argv)
 	rec_argv[i++] = "--phys-data";
 	rec_argv[i++] = "--sample-cpu";
 
-	ret = perf_mem_events__record_args(rec_argv, &i, rec_tmp, &rec_tmp_nr);
+	ret = perf_mem_events__record_args(rec_argv, &i);
 	if (ret)
 		goto out;
 
@@ -3326,10 +3336,6 @@ static int perf_c2c__record(int argc, const char **argv)
 
 	ret = cmd_record(i, rec_argv);
 out:
-	for (i = 0; i < rec_tmp_nr; i++)
-		free(rec_tmp[i]);
-
-	free(rec_tmp);
 	free(rec_argv);
 	return ret;
 }

@@ -39,6 +39,9 @@ properties:
               - fsl,imx6sx-flexcan
           - const: fsl,imx6q-flexcan
       - items:
+          - const: fsl,imx95-flexcan
+          - const: fsl,imx93-flexcan
+      - items:
           - enum:
               - fsl,ls1028ar1-flexcan
           - const: fsl,lx2160ar1-flexcan
@@ -62,6 +65,9 @@ properties:
       The oscillator frequency driving the flexcan device, filled in by the
       boot loader. This property should only be used the used operating system
       doesn't support the clocks and clock-names property.
+
+  power-domains:
+    maxItems: 1
 
   xceiver-supply:
     description: Regulator that powers the CAN transceiver.

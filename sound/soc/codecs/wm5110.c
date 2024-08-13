@@ -2073,6 +2073,10 @@ static int wm5110_set_fll(struct snd_soc_component *component, int fll_id,
 #define WM5110_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |\
 			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
 
+static const struct snd_soc_dai_ops wm5110_dai_ops = {
+	.compress_new = snd_soc_new_compress,
+};
+
 static struct snd_soc_dai_driver wm5110_dai[] = {
 	{
 		.name = "wm5110-aif1",
@@ -2206,7 +2210,7 @@ static struct snd_soc_dai_driver wm5110_dai[] = {
 			.rates = WM5110_RATES,
 			.formats = WM5110_FORMATS,
 		},
-		.compress_new = snd_soc_new_compress,
+		.ops = &wm5110_dai_ops,
 	},
 	{
 		.name = "wm5110-dsp-voicectrl",
@@ -2227,7 +2231,7 @@ static struct snd_soc_dai_driver wm5110_dai[] = {
 			.rates = WM5110_RATES,
 			.formats = WM5110_FORMATS,
 		},
-		.compress_new = snd_soc_new_compress,
+		.ops = &wm5110_dai_ops,
 	},
 	{
 		.name = "wm5110-dsp-trace",
@@ -2249,14 +2253,14 @@ static int wm5110_open(struct snd_soc_component *component,
 	struct arizona *arizona = priv->core.arizona;
 	int n_adsp;
 
-	if (strcmp(asoc_rtd_to_codec(rtd, 0)->name, "wm5110-dsp-voicectrl") == 0) {
+	if (strcmp(snd_soc_rtd_to_codec(rtd, 0)->name, "wm5110-dsp-voicectrl") == 0) {
 		n_adsp = 2;
-	} else if (strcmp(asoc_rtd_to_codec(rtd, 0)->name, "wm5110-dsp-trace") == 0) {
+	} else if (strcmp(snd_soc_rtd_to_codec(rtd, 0)->name, "wm5110-dsp-trace") == 0) {
 		n_adsp = 0;
 	} else {
 		dev_err(arizona->dev,
 			"No suitable compressed stream for DAI '%s'\n",
-			asoc_rtd_to_codec(rtd, 0)->name);
+			snd_soc_rtd_to_codec(rtd, 0)->name);
 		return -EINVAL;
 	}
 
@@ -2506,7 +2510,7 @@ err_jack_codec_dev:
 	return ret;
 }
 
-static int wm5110_remove(struct platform_device *pdev)
+static void wm5110_remove(struct platform_device *pdev)
 {
 	struct wm5110_priv *wm5110 = platform_get_drvdata(pdev);
 	struct arizona *arizona = wm5110->core.arizona;
@@ -2523,8 +2527,6 @@ static int wm5110_remove(struct platform_device *pdev)
 	arizona_free_irq(arizona, ARIZONA_IRQ_DSP_IRQ1, wm5110);
 
 	arizona_jack_codec_dev_remove(&wm5110->core);
-
-	return 0;
 }
 
 static struct platform_driver wm5110_codec_driver = {
@@ -2532,7 +2534,7 @@ static struct platform_driver wm5110_codec_driver = {
 		.name = "wm5110-codec",
 	},
 	.probe = wm5110_probe,
-	.remove = wm5110_remove,
+	.remove_new = wm5110_remove,
 };
 
 module_platform_driver(wm5110_codec_driver);

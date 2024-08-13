@@ -1039,7 +1039,6 @@ static int cppi41_dma_probe(struct platform_device *pdev)
 	struct cppi41_dd *cdd;
 	struct device *dev = &pdev->dev;
 	const struct cppi_glue_infos *glue_info;
-	struct resource *mem;
 	int index;
 	int irq;
 	int ret;
@@ -1072,18 +1071,15 @@ static int cppi41_dma_probe(struct platform_device *pdev)
 	if (index < 0)
 		return index;
 
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, index);
-	cdd->ctrl_mem = devm_ioremap_resource(dev, mem);
+	cdd->ctrl_mem = devm_platform_ioremap_resource(pdev, index);
 	if (IS_ERR(cdd->ctrl_mem))
 		return PTR_ERR(cdd->ctrl_mem);
 
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, index + 1);
-	cdd->sched_mem = devm_ioremap_resource(dev, mem);
+	cdd->sched_mem = devm_platform_ioremap_resource(pdev, index + 1);
 	if (IS_ERR(cdd->sched_mem))
 		return PTR_ERR(cdd->sched_mem);
 
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, index + 2);
-	cdd->qmgr_mem = devm_ioremap_resource(dev, mem);
+	cdd->qmgr_mem = devm_platform_ioremap_resource(pdev, index + 2);
 	if (IS_ERR(cdd->qmgr_mem))
 		return PTR_ERR(cdd->qmgr_mem);
 
@@ -1160,7 +1156,7 @@ err_get_sync:
 	return ret;
 }
 
-static int cppi41_dma_remove(struct platform_device *pdev)
+static void cppi41_dma_remove(struct platform_device *pdev)
 {
 	struct cppi41_dd *cdd = platform_get_drvdata(pdev);
 	int error;
@@ -1177,7 +1173,6 @@ static int cppi41_dma_remove(struct platform_device *pdev)
 	pm_runtime_dont_use_autosuspend(&pdev->dev);
 	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
-	return 0;
 }
 
 static int __maybe_unused cppi41_suspend(struct device *dev)
@@ -1248,7 +1243,7 @@ static const struct dev_pm_ops cppi41_pm_ops = {
 
 static struct platform_driver cpp41_dma_driver = {
 	.probe  = cppi41_dma_probe,
-	.remove = cppi41_dma_remove,
+	.remove_new = cppi41_dma_remove,
 	.driver = {
 		.name = "cppi41-dma-engine",
 		.pm = &cppi41_pm_ops,

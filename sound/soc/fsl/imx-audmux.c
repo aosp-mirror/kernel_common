@@ -13,7 +13,6 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
@@ -315,12 +314,10 @@ static int imx_audmux_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int imx_audmux_remove(struct platform_device *pdev)
+static void imx_audmux_remove(struct platform_device *pdev)
 {
 	if (audmux_type == IMX31_AUDMUX)
 		audmux_debugfs_remove();
-
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -359,7 +356,7 @@ static const struct dev_pm_ops imx_audmux_pm = {
 
 static struct platform_driver imx_audmux_driver = {
 	.probe		= imx_audmux_probe,
-	.remove		= imx_audmux_remove,
+	.remove_new	= imx_audmux_remove,
 	.driver	= {
 		.name	= DRIVER_NAME,
 		.pm = &imx_audmux_pm,

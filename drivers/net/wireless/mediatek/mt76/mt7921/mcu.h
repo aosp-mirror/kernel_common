@@ -50,21 +50,10 @@ struct mt7921_mcu_eeprom_info {
 #define MT_RA_RATE_DCM_EN		BIT(4)
 #define MT_RA_RATE_BW			GENMASK(14, 13)
 
-struct mt7921_mcu_uni_event {
-	u8 cid;
-	u8 pad[3];
-	__le32 status; /* 0: success, others: fail */
-} __packed;
-
 enum {
 	MT_EBF = BIT(0),	/* explicit beamforming */
 	MT_IBF = BIT(1)		/* implicit beamforming */
 };
-
-struct mt7921_mcu_reg_event {
-	__le32 reg;
-	__le32 val;
-} __packed;
 
 struct mt7921_mcu_ant_id_config {
 	u8 ant_id[4];
@@ -109,5 +98,18 @@ struct mt7921_rftest_cmd {
 struct mt7921_rftest_evt {
 	__le32 param0;
 	__le32 param1;
+} __packed;
+
+struct mt7921_clc_info_tlv {
+	__le16 tag;
+	__le16 len;
+
+	u8 chan_conf; /* BIT(0) : Enable UNII-4
+		       * BIT(1) : Enable UNII-5
+		       * BIT(2) : Enable UNII-6
+		       * BIT(3) : Enable UNII-7
+		       * BIT(4) : Enable UNII-8
+		       */
+	u8 rsv[63];
 } __packed;
 #endif

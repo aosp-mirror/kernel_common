@@ -181,7 +181,7 @@ b) ORC (Oops Rewind Capability) unwind table generation
    band.  So it doesn't affect runtime performance and it can be
    reliable even when interrupts or exceptions are involved.
 
-   For more details, see Documentation/x86/orc-unwinder.rst.
+   For more details, see Documentation/arch/x86/orc-unwinder.rst.
 
 c) Higher live patching compatibility rate
 
@@ -244,6 +244,11 @@ To achieve the validation, objtool enforces the following rules:
 Objtool warnings
 ----------------
 
+NOTE: When requesting help with an objtool warning, please recreate with
+OBJTOOL_VERBOSE=1 (e.g., "make OBJTOOL_VERBOSE=1") and send the full
+output, including any disassembly or backtrace below the warning, to the
+objtool maintainers.
+
 For asm files, if you're getting an error which doesn't make sense,
 first make sure that the affected code follows the above rules.
 
@@ -279,6 +284,25 @@ the objtool maintainers.
 
    Otherwise the stack frame may not get created before the call.
 
+   objtool can help with pinpointing the exact function where it happens:
+
+   $ OBJTOOL_ARGS="--verbose" make arch/x86/kvm/
+
+   arch/x86/kvm/kvm.o: warning: objtool: .altinstr_replacement+0xc5: call without frame pointer save/setup
+   arch/x86/kvm/kvm.o: warning: objtool:   em_loop.part.0+0x29: (alt)
+   arch/x86/kvm/kvm.o: warning: objtool:   em_loop.part.0+0x0: <=== (sym)
+    LD [M]  arch/x86/kvm/kvm-intel.o
+   0000 0000000000028220 <em_loop.part.0>:
+   0000    28220:  0f b6 47 61             movzbl 0x61(%rdi),%eax
+   0004    28224:  3c e2                   cmp    $0xe2,%al
+   0006    28226:  74 2c                   je     28254 <em_loop.part.0+0x34>
+   0008    28228:  48 8b 57 10             mov    0x10(%rdi),%rdx
+   000c    2822c:  83 f0 05                xor    $0x5,%eax
+   000f    2822f:  48 c1 e0 04             shl    $0x4,%rax
+   0013    28233:  25 f0 00 00 00          and    $0xf0,%eax
+   0018    28238:  81 e2 d5 08 00 00       and    $0x8d5,%edx
+   001e    2823e:  80 ce 02                or     $0x2,%dh
+   ...
 
 2. file.o: warning: objtool: .text+0x53: unreachable instruction
 
@@ -298,6 +322,11 @@ the objtool maintainers.
    If it's not actually in a callable function (e.g. kernel entry code),
    change ENDPROC to END.
 
+3. file.o: warning: objtool: foo+0x48c: bar() is missing a __noreturn annotation
+
+   The call from foo() to bar() doesn't return, but bar() is missing the
+   __noreturn annotation.  NOTE: In addition to annotating the function
+   with __noreturn, please also add it to tools/objtool/noreturns.h.
 
 4. file.o: warning: objtool: func(): can't find starting instruction
    or
@@ -409,6 +438,14 @@ the objtool maintainers.
    is not at the beginning of a function. If this is a legit call, you
    can remove this warning by putting the ANNOTATE_INTRA_FUNCTION_CALL
    directive right before the call.
+
+12. file.o: warning: func(): not an indirect call target
+
+   This means that objtool is running with --ibt and a function expected
+   to be an indirect call target is not. In particular, this happens for
+   init_module() or cleanup_module() if a module relies on these special
+   names and does not use module_init() / module_exit() macros to create
+   them.
 
 
 If the error doesn't seem to make sense, it could be a bug in objtool.

@@ -40,7 +40,6 @@
 # |   + $swp1          $swp3 +                    + $swp4                     |
 # |   | iPOOL1        iPOOL0 |                    | iPOOL2                    |
 # |   | ePOOL4        ePOOL5 |                    | ePOOL4                    |
-# |   |                1Gbps |                    | 1Gbps                     |
 # |   |        PFC:enabled=1 |                    | PFC:enabled=1             |
 # | +-|----------------------|-+                +-|------------------------+  |
 # | | + $swp1.111  $swp3.111 + |                | + $swp4.111              |  |
@@ -79,7 +78,6 @@ lib_dir=$(dirname $0)/../../../net/forwarding
 NUM_NETIFS=6
 source $lib_dir/lib.sh
 source $lib_dir/devlink_lib.sh
-source qos_lib.sh
 
 _1KB=1000
 _100KB=$((100 * _1KB))
@@ -121,6 +119,9 @@ h2_destroy()
 
 switch_create()
 {
+	local lanes_swp4
+	local pg1_size
+
 	# pools
 	# -----
 
@@ -230,7 +231,20 @@ switch_create()
 	dcb pfc set dev $swp4 prio-pfc all:off 1:on
 	# PG0 will get autoconfigured to Xoff, give PG1 arbitrarily 100K, which
 	# is (-2*MTU) about 80K of delay provision.
-	dcb buffer set dev $swp4 buffer-size all:0 1:$_100KB
+	pg1_size=$_100KB
+
+	setup_wait_dev_with_timeout $swp4
+
+	lanes_swp4=$(ethtool $swp4 | grep 'Lanes:')
+	lanes_swp4=${lanes_swp4#*"Lanes: "}
+
+	# 8-lane ports use two buffers among which the configured buffer
+	# is split, so double the size to get twice (20K + 80K).
+	if [[ $lanes_swp4 -eq 8 ]]; then
+		pg1_size=$((pg1_size * 2))
+	fi
+
+	dcb buffer set dev $swp4 buffer-size all:0 1:$pg1_size
 
 	# bridges
 	# -------
@@ -393,7 +407,7 @@ test_qos_pfc()
 	log_test "PFC"
 }
 
-bail_on_lldpad
+bail_on_lldpad "configure DCB" "configure Qdiscs"
 
 trap cleanup EXIT
 setup_prepare

@@ -8,17 +8,22 @@
 #include "cpumap.h"
 #include "cputopo.h"
 #include "debug.h"
+#include "evlist.h"
 #include "expr.h"
-#include "expr-bison.h"
-#include "expr-flex.h"
+#include <util/expr-bison.h>
+#include <util/expr-flex.h>
 #include "util/hashmap.h"
+#include "util/header.h"
+#include "util/pmu.h"
 #include "smt.h"
 #include "tsc.h"
+#include <api/fs/fs.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/zalloc.h>
 #include <ctype.h>
 #include <math.h>
+#include "pmu.h"
 
 #ifdef PARSER_DEBUG
 extern int expr_debug;
@@ -84,8 +89,8 @@ void ids__free(struct hashmap *ids)
 		return;
 
 	hashmap__for_each_entry(ids, cur, bkt) {
-		free((void *)cur->pkey);
-		free((void *)cur->pvalue);
+		zfree(&cur->pkey);
+		zfree(&cur->pvalue);
 	}
 
 	hashmap__free(ids);
@@ -309,8 +314,8 @@ void expr__ctx_clear(struct expr_parse_ctx *ctx)
 	size_t bkt;
 
 	hashmap__for_each_entry(ctx->ids, cur, bkt) {
-		free((void *)cur->pkey);
-		free(cur->pvalue);
+		zfree(&cur->pkey);
+		zfree(&cur->pvalue);
 	}
 	hashmap__clear(ctx->ids);
 }
@@ -323,10 +328,10 @@ void expr__ctx_free(struct expr_parse_ctx *ctx)
 	if (!ctx)
 		return;
 
-	free(ctx->sctx.user_requested_cpu_list);
+	zfree(&ctx->sctx.user_requested_cpu_list);
 	hashmap__for_each_entry(ctx->ids, cur, bkt) {
-		free((void *)cur->pkey);
-		free(cur->pvalue);
+		zfree(&cur->pkey);
+		zfree(&cur->pvalue);
 	}
 	hashmap__free(ctx->ids);
 	free(ctx);
@@ -399,13 +404,34 @@ double arch_get_tsc_freq(void)
 }
 #endif
 
+static double has_pmem(void)
+{
+	static bool has_pmem, cached;
+	const char *sysfs = sysfs__mountpoint();
+	char path[PATH_MAX];
+
+	if (!cached) {
+		snprintf(path, sizeof(path), "%s/firmware/acpi/tables/NFIT", sysfs);
+		has_pmem = access(path, F_OK) == 0;
+		cached = true;
+	}
+	return has_pmem ? 1.0 : 0.0;
+}
+
 double expr__get_literal(const char *literal, const struct expr_scanner_ctx *ctx)
 {
-	static struct cpu_topology *topology;
+	const struct cpu_topology *topology;
 	double result = NAN;
 
 	if (!strcmp("#num_cpus", literal)) {
 		result = cpu__max_present_cpu().cpu;
+		goto out;
+	}
+	if (!strcmp("#num_cpus_online", literal)) {
+		struct perf_cpu_map *online = cpu_map__online();
+
+		if (online)
+			result = perf_cpu_map__nr(online);
 		goto out;
 	}
 
@@ -420,32 +446,36 @@ double expr__get_literal(const char *literal, const struct expr_scanner_ctx *ctx
 	 * these strings gives an indication of the number of packages, dies,
 	 * etc.
 	 */
-	if (!topology) {
-		topology = cpu_topology__new();
-		if (!topology) {
-			pr_err("Error creating CPU topology");
-			goto out;
-		}
-	}
 	if (!strcasecmp("#smt_on", literal)) {
-		result = smt_on(topology) ? 1.0 : 0.0;
+		result = smt_on() ? 1.0 : 0.0;
 		goto out;
 	}
 	if (!strcmp("#core_wide", literal)) {
-		result = core_wide(ctx->system_wide, ctx->user_requested_cpu_list, topology)
+		result = core_wide(ctx->system_wide, ctx->user_requested_cpu_list)
 			? 1.0 : 0.0;
 		goto out;
 	}
 	if (!strcmp("#num_packages", literal)) {
+		topology = online_topology();
 		result = topology->package_cpus_lists;
 		goto out;
 	}
 	if (!strcmp("#num_dies", literal)) {
+		topology = online_topology();
 		result = topology->die_cpus_lists;
 		goto out;
 	}
 	if (!strcmp("#num_cores", literal)) {
+		topology = online_topology();
 		result = topology->core_cpus_lists;
+		goto out;
+	}
+	if (!strcmp("#slots", literal)) {
+		result = perf_pmu__cpu_slots_per_cycle();
+		goto out;
+	}
+	if (!strcmp("#has_pmem", literal)) {
+		result = has_pmem();
 		goto out;
 	}
 
@@ -453,4 +483,58 @@ double expr__get_literal(const char *literal, const struct expr_scanner_ctx *ctx
 out:
 	pr_debug2("literal: %s = %f\n", literal, result);
 	return result;
+}
+
+/* Does the event 'id' parse? Determine via ctx->ids if possible. */
+double expr__has_event(const struct expr_parse_ctx *ctx, bool compute_ids, const char *id)
+{
+	struct evlist *tmp;
+	double ret;
+
+	if (hashmap__find(ctx->ids, id, /*value=*/NULL))
+		return 1.0;
+
+	if (!compute_ids)
+		return 0.0;
+
+	tmp = evlist__new();
+	if (!tmp)
+		return NAN;
+
+	if (strchr(id, '@')) {
+		char *tmp_id, *p;
+
+		tmp_id = strdup(id);
+		if (!tmp_id) {
+			ret = NAN;
+			goto out;
+		}
+		p = strchr(tmp_id, '@');
+		*p = '/';
+		p = strrchr(tmp_id, '@');
+		*p = '/';
+		ret = parse_event(tmp, tmp_id) ? 0 : 1;
+		free(tmp_id);
+	} else {
+		ret = parse_event(tmp, id) ? 0 : 1;
+	}
+out:
+	evlist__delete(tmp);
+	return ret;
+}
+
+double expr__strcmp_cpuid_str(const struct expr_parse_ctx *ctx __maybe_unused,
+		       bool compute_ids __maybe_unused, const char *test_id)
+{
+	double ret;
+	struct perf_pmu *pmu = perf_pmus__find_core_pmu();
+	char *cpuid = perf_pmu__getcpuid(pmu);
+
+	if (!cpuid)
+		return NAN;
+
+	ret = !strcmp_cpuid_str(test_id, cpuid);
+
+	free(cpuid);
+	return ret;
 }

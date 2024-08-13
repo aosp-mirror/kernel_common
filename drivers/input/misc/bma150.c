@@ -536,9 +536,9 @@ static int __maybe_unused bma150_resume(struct device *dev)
 static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
 
 static const struct i2c_device_id bma150_id[] = {
-	{ "bma150", 0 },
-	{ "smb380", 0 },
-	{ "bma023", 0 },
+	{ "bma150" },
+	{ "smb380" },
+	{ "bma023" },
 	{ }
 };
 
@@ -551,7 +551,7 @@ static struct i2c_driver bma150_driver = {
 	},
 	.class		= I2C_CLASS_HWMON,
 	.id_table	= bma150_id,
-	.probe_new	= bma150_probe,
+	.probe		= bma150_probe,
 	.remove		= bma150_remove,
 };
 

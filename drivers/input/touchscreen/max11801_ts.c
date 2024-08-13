@@ -213,7 +213,7 @@ static int max11801_ts_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id max11801_ts_id[] = {
-	{"max11801", 0},
+	{ "max11801" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, max11801_ts_id);
@@ -230,7 +230,7 @@ static struct i2c_driver max11801_ts_driver = {
 		.of_match_table = max11801_ts_dt_ids,
 	},
 	.id_table	= max11801_ts_id,
-	.probe_new	= max11801_ts_probe,
+	.probe		= max11801_ts_probe,
 };
 
 module_i2c_driver(max11801_ts_driver);

@@ -7,13 +7,13 @@
  *   Author(s): Martin Schwidefsky <schwidefsky@de.ibm.com>
  */
 
-#include <linux/moduleloader.h>
 #include <linux/hardirq.h>
 #include <linux/uaccess.h>
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/kprobes.h>
+#include <linux/execmem.h>
 #include <trace/syscall.h>
 #include <asm/asm-offsets.h>
 #include <asm/text-patching.h>
@@ -48,26 +48,6 @@ struct ftrace_insn {
 	u16 opc;
 	s32 disp;
 } __packed;
-
-asm(
-	"	.align 16\n"
-	"ftrace_shared_hotpatch_trampoline_br:\n"
-	"	lmg	%r0,%r1,2(%r1)\n"
-	"	br	%r1\n"
-	"ftrace_shared_hotpatch_trampoline_br_end:\n"
-);
-
-#ifdef CONFIG_EXPOLINE
-asm(
-	"	.align 16\n"
-	"ftrace_shared_hotpatch_trampoline_exrl:\n"
-	"	lmg	%r0,%r1,2(%r1)\n"
-	"	exrl	%r0,0f\n"
-	"	j	.\n"
-	"0:	br	%r1\n"
-	"ftrace_shared_hotpatch_trampoline_exrl_end:\n"
-);
-#endif /* CONFIG_EXPOLINE */
 
 #ifdef CONFIG_MODULES
 static char *ftrace_plt;
@@ -240,13 +220,13 @@ static int __init ftrace_plt_init(void)
 {
 	const char *start, *end;
 
-	ftrace_plt = module_alloc(PAGE_SIZE);
+	ftrace_plt = execmem_alloc(EXECMEM_FTRACE, PAGE_SIZE);
 	if (!ftrace_plt)
 		panic("cannot allocate ftrace plt\n");
 
 	start = ftrace_shared_hotpatch_trampoline(&end);
 	memcpy(ftrace_plt, start, end - start);
-	set_memory_ro((unsigned long)ftrace_plt, 1);
+	set_memory_rox((unsigned long)ftrace_plt, 1);
 	return 0;
 }
 device_initcall(ftrace_plt_init);
@@ -315,6 +295,9 @@ void kprobe_ftrace_handler(unsigned long ip, unsigned long parent_ip,
 	struct pt_regs *regs;
 	struct kprobe *p;
 	int bit;
+
+	if (unlikely(kprobe_ftrace_disabled))
+		return;
 
 	bit = ftrace_test_recursion_trylock(ip, parent_ip);
 	if (bit < 0)

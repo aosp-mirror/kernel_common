@@ -399,7 +399,7 @@ static int drv2667_probe(struct i2c_client *client)
 	return 0;
 }
 
-static int __maybe_unused drv2667_suspend(struct device *dev)
+static int drv2667_suspend(struct device *dev)
 {
 	struct drv2667_data *haptics = dev_get_drvdata(dev);
 	int ret = 0;
@@ -428,7 +428,7 @@ out:
 	return ret;
 }
 
-static int __maybe_unused drv2667_resume(struct device *dev)
+static int drv2667_resume(struct device *dev)
 {
 	struct drv2667_data *haptics = dev_get_drvdata(dev);
 	int ret = 0;
@@ -457,10 +457,10 @@ out:
 	return ret;
 }
 
-static SIMPLE_DEV_PM_OPS(drv2667_pm_ops, drv2667_suspend, drv2667_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(drv2667_pm_ops, drv2667_suspend, drv2667_resume);
 
 static const struct i2c_device_id drv2667_id[] = {
-	{ "drv2667", 0 },
+	{ "drv2667" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, drv2667_id);
@@ -474,11 +474,11 @@ MODULE_DEVICE_TABLE(of, drv2667_of_match);
 #endif
 
 static struct i2c_driver drv2667_driver = {
-	.probe_new	= drv2667_probe,
+	.probe		= drv2667_probe,
 	.driver		= {
 		.name	= "drv2667-haptics",
 		.of_match_table = of_match_ptr(drv2667_of_match),
-		.pm	= &drv2667_pm_ops,
+		.pm	= pm_sleep_ptr(&drv2667_pm_ops),
 	},
 	.id_table = drv2667_id,
 };

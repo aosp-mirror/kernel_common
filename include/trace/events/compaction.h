@@ -64,13 +64,24 @@ DEFINE_EVENT(mm_compaction_isolate_template, mm_compaction_isolate_freepages,
 	TP_ARGS(start_pfn, end_pfn, nr_scanned, nr_taken)
 );
 
+DEFINE_EVENT(mm_compaction_isolate_template, mm_compaction_fast_isolate_freepages,
+
+	TP_PROTO(
+		unsigned long start_pfn,
+		unsigned long end_pfn,
+		unsigned long nr_scanned,
+		unsigned long nr_taken),
+
+	TP_ARGS(start_pfn, end_pfn, nr_scanned, nr_taken)
+);
+
 #ifdef CONFIG_COMPACTION
 TRACE_EVENT(mm_compaction_migratepages,
 
-	TP_PROTO(struct compact_control *cc,
+	TP_PROTO(unsigned int nr_migratepages,
 		unsigned int nr_succeeded),
 
-	TP_ARGS(cc, nr_succeeded),
+	TP_ARGS(nr_migratepages, nr_succeeded),
 
 	TP_STRUCT__entry(
 		__field(unsigned long, nr_migrated)
@@ -79,7 +90,7 @@ TRACE_EVENT(mm_compaction_migratepages,
 
 	TP_fast_assign(
 		__entry->nr_migrated = nr_succeeded;
-		__entry->nr_failed = cc->nr_migratepages - nr_succeeded;
+		__entry->nr_failed = nr_migratepages - nr_succeeded;
 	),
 
 	TP_printk("nr_migrated=%lu nr_failed=%lu",

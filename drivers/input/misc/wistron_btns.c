@@ -1286,16 +1286,13 @@ static int wistron_probe(struct platform_device *dev)
 	return 0;
 }
 
-static int wistron_remove(struct platform_device *dev)
+static void wistron_remove(struct platform_device *dev)
 {
 	wistron_led_remove();
 	input_unregister_device(wistron_idev);
 	bios_detach();
-
-	return 0;
 }
 
-#ifdef CONFIG_PM
 static int wistron_suspend(struct device *dev)
 {
 	if (have_wifi)
@@ -1330,17 +1327,14 @@ static const struct dev_pm_ops wistron_pm_ops = {
 	.poweroff	= wistron_suspend,
 	.restore	= wistron_resume,
 };
-#endif
 
 static struct platform_driver wistron_driver = {
 	.driver		= {
 		.name	= "wistron-bios",
-#ifdef CONFIG_PM
-		.pm	= &wistron_pm_ops,
-#endif
+		.pm	= pm_sleep_ptr(&wistron_pm_ops),
 	},
 	.probe		= wistron_probe,
-	.remove		= wistron_remove,
+	.remove_new	= wistron_remove,
 };
 
 static int __init wb_module_init(void)

@@ -32,8 +32,9 @@ struct erdma_eq {
 	atomic64_t event_num;
 	atomic64_t notify_num;
 
-	u64 __iomem *db_addr;
-	u64 *db_record;
+	void __iomem *db;
+	u64 *dbrec;
+	dma_addr_t dbrec_dma;
 };
 
 struct erdma_cmdq_sq {
@@ -48,7 +49,8 @@ struct erdma_cmdq_sq {
 
 	u16 wqebb_cnt;
 
-	u64 *db_record;
+	u64 *dbrec;
+	dma_addr_t dbrec_dma;
 };
 
 struct erdma_cmdq_cq {
@@ -61,7 +63,8 @@ struct erdma_cmdq_cq {
 	u32 ci;
 	u32 cmdsn;
 
-	u64 *db_record;
+	u64 *dbrec;
+	dma_addr_t dbrec_dma;
 
 	atomic64_t armed_num;
 };
@@ -128,12 +131,7 @@ struct erdma_devattr {
 
 	int numa_node;
 	enum erdma_cc_alg cc;
-	u32 grp_num;
 	u32 irq_num;
-
-	bool disable_dwqe;
-	u16 dwqe_pages;
-	u16 dwqe_entries;
 
 	u32 max_qp;
 	u32 max_send_wr;
@@ -182,9 +180,6 @@ enum {
 	ERDMA_RES_CNT = 2,
 };
 
-#define ERDMA_EXTRA_BUFFER_SIZE ERDMA_DB_SIZE
-#define WARPPED_BUFSIZE(size) ((size) + ERDMA_EXTRA_BUFFER_SIZE)
-
 struct erdma_dev {
 	struct ib_device ibdev;
 	struct net_device *netdev;
@@ -215,17 +210,11 @@ struct erdma_dev {
 	u32 next_alloc_qpn;
 	u32 next_alloc_cqn;
 
-	spinlock_t db_bitmap_lock;
-	/* We provide max 64 uContexts that each has one SQ doorbell Page. */
-	DECLARE_BITMAP(sdb_page, ERDMA_DWQE_TYPE0_CNT);
-	/*
-	 * We provide max 496 uContexts that each has one SQ normal Db,
-	 * and one directWQE db.
-	 */
-	DECLARE_BITMAP(sdb_entry, ERDMA_DWQE_TYPE1_CNT);
-
 	atomic_t num_ctx;
 	struct list_head cep_list;
+
+	struct dma_pool *db_pool;
+	struct dma_pool *resp_pool;
 };
 
 static inline void *get_queue_entry(void *qbuf, u32 idx, u32 depth, u32 shift)
@@ -267,6 +256,8 @@ static inline u32 erdma_reg_read32_filed(struct erdma_dev *dev, u32 reg,
 
 	return FIELD_GET(filed_mask, val);
 }
+
+#define ERDMA_GET(val, name) FIELD_GET(ERDMA_CMD_##name##_MASK, val)
 
 int erdma_cmdq_init(struct erdma_dev *dev);
 void erdma_finish_cmdq_init(struct erdma_dev *dev);

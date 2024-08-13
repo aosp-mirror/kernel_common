@@ -124,6 +124,10 @@ static int ad5592r_gpio_request(struct gpio_chip *chip, unsigned offset)
 	return 0;
 }
 
+static const char * const ad5592r_gpio_names[] = {
+	"GPIO0", "GPIO1", "GPIO2", "GPIO3", "GPIO4", "GPIO5", "GPIO6", "GPIO7",
+};
+
 static int ad5592r_gpio_init(struct ad5592r_state *st)
 {
 	if (!st->gpio_map)
@@ -140,6 +144,7 @@ static int ad5592r_gpio_init(struct ad5592r_state *st)
 	st->gpiochip.set = ad5592r_gpio_set;
 	st->gpiochip.request = ad5592r_gpio_request;
 	st->gpiochip.owner = THIS_MODULE;
+	st->gpiochip.names = ad5592r_gpio_names;
 
 	mutex_init(&st->gpio_lock);
 
@@ -410,7 +415,7 @@ static int ad5592r_read_raw(struct iio_dev *iio_dev,
 			s64 tmp = *val * (3767897513LL / 25LL);
 			*val = div_s64_rem(tmp, 1000000000LL, val2);
 
-			return IIO_VAL_INT_PLUS_MICRO;
+			return IIO_VAL_INT_PLUS_NANO;
 		}
 
 		mutex_lock(&st->lock);

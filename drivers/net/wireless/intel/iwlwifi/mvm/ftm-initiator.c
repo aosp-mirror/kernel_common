@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
  * Copyright (C) 2015-2017 Intel Deutschland GmbH
- * Copyright (C) 2018-2022 Intel Corporation
+ * Copyright (C) 2018-2024 Intel Corporation
  */
 #include <linux/etherdevice.h>
 #include <linux/math64.h>
@@ -25,6 +25,10 @@ struct iwl_mvm_smooth_entry {
 	u64 host_time;
 };
 
+enum iwl_mvm_pasn_flags {
+	IWL_MVM_PASN_FLAG_HAS_HLTK = BIT(0),
+};
+
 struct iwl_mvm_ftm_pasn_entry {
 	struct list_head list;
 	u8 addr[ETH_ALEN];
@@ -33,6 +37,7 @@ struct iwl_mvm_ftm_pasn_entry {
 	u8 cipher;
 	u8 tx_pn[IEEE80211_CCMP_PN_LEN];
 	u8 rx_pn[IEEE80211_CCMP_PN_LEN];
+	u32 flags;
 };
 
 int iwl_mvm_ftm_add_pasn_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
@@ -47,6 +52,8 @@ int iwl_mvm_ftm_add_pasn_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	if (!pasn)
 		return -ENOBUFS;
+
+	iwl_mvm_ftm_remove_pasn_sta(mvm, addr);
 
 	pasn->cipher = iwl_mvm_cipher_to_location_cipher(cipher);
 
@@ -67,26 +74,45 @@ int iwl_mvm_ftm_add_pasn_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	 * the TK is already configured for this station, so it
 	 * shouldn't be set again here.
 	 */
-	if (vif->cfg.assoc &&
-	    !memcmp(addr, vif->bss_conf.bssid, ETH_ALEN)) {
+	if (vif->cfg.assoc) {
 		struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
+		struct ieee80211_bss_conf *link_conf;
+		unsigned int link_id;
 		struct ieee80211_sta *sta;
+		u8 sta_id;
 
 		rcu_read_lock();
-		sta = rcu_dereference(mvm->fw_id_to_mac_id[mvmvif->ap_sta_id]);
-		if (!IS_ERR_OR_NULL(sta) && sta->mfp)
-			expected_tk_len = 0;
+		for_each_vif_active_link(vif, link_conf, link_id) {
+			if (memcmp(addr, link_conf->bssid, ETH_ALEN))
+				continue;
+
+			sta_id = mvmvif->link[link_id]->ap_sta_id;
+			sta = rcu_dereference(mvm->fw_id_to_mac_id[sta_id]);
+			if (!IS_ERR_OR_NULL(sta) && sta->mfp)
+				expected_tk_len = 0;
+			break;
+		}
 		rcu_read_unlock();
 	}
 
-	if (tk_len != expected_tk_len || hltk_len != sizeof(pasn->hltk)) {
+	if (tk_len != expected_tk_len ||
+	    (hltk_len && hltk_len != sizeof(pasn->hltk))) {
 		IWL_ERR(mvm, "Invalid key length: tk_len=%u hltk_len=%u\n",
 			tk_len, hltk_len);
 		goto out;
 	}
 
+	if (!expected_tk_len && !hltk_len) {
+		IWL_ERR(mvm, "TK and HLTK not set\n");
+		goto out;
+	}
+
 	memcpy(pasn->addr, addr, sizeof(pasn->addr));
-	memcpy(pasn->hltk, hltk, sizeof(pasn->hltk));
+
+	if (hltk_len) {
+		memcpy(pasn->hltk, hltk, sizeof(pasn->hltk));
+		pasn->flags |= IWL_MVM_PASN_FLAG_HAS_HLTK;
+	}
 
 	if (tk && tk_len)
 		memcpy(pasn->tk, tk, sizeof(pasn->tk));
@@ -503,20 +529,39 @@ iwl_mvm_ftm_put_target(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	iwl_mvm_ftm_put_target_common(mvm, peer, target);
 
-	if (vif->cfg.assoc &&
-	    !memcmp(peer->addr, vif->bss_conf.bssid, ETH_ALEN)) {
+	if (vif->cfg.assoc) {
 		struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 		struct ieee80211_sta *sta;
+		struct ieee80211_bss_conf *link_conf;
+		unsigned int link_id;
 
 		rcu_read_lock();
+		for_each_vif_active_link(vif, link_conf, link_id) {
+			if (memcmp(peer->addr, link_conf->bssid, ETH_ALEN))
+				continue;
 
-		sta = rcu_dereference(mvm->fw_id_to_mac_id[mvmvif->ap_sta_id]);
-		if (sta->mfp && (peer->ftm.trigger_based || peer->ftm.non_trigger_based))
-			FTM_PUT_FLAG(PMF);
+			target->sta_id = mvmvif->link[link_id]->ap_sta_id;
+			sta = rcu_dereference(mvm->fw_id_to_mac_id[target->sta_id]);
+			if (WARN_ON_ONCE(IS_ERR_OR_NULL(sta))) {
+				rcu_read_unlock();
+				return PTR_ERR_OR_ZERO(sta);
+			}
 
+			if (sta->mfp && (peer->ftm.trigger_based ||
+					 peer->ftm.non_trigger_based))
+				FTM_PUT_FLAG(PMF);
+			break;
+		}
 		rcu_read_unlock();
 
-		target->sta_id = mvmvif->ap_sta_id;
+#ifdef CONFIG_IWLWIFI_DEBUGFS
+		if (mvmvif->ftm_unprotected) {
+			target->sta_id = IWL_MVM_INVALID_STA;
+			target->initiator_ap_flags &=
+				~cpu_to_le32(IWL_INITIATOR_AP_FLAGS_PMF);
+		}
+
+#endif
 	} else {
 		target->sta_id = IWL_MVM_INVALID_STA;
 	}
@@ -679,6 +724,12 @@ iwl_mvm_ftm_set_secured_ranging(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 {
 	struct iwl_mvm_ftm_pasn_entry *entry;
 	u32 flags = le32_to_cpu(target->initiator_ap_flags);
+#ifdef CONFIG_IWLWIFI_DEBUGFS
+	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
+
+	if (mvmvif->ftm_unprotected)
+		return;
+#endif
 
 	if (!(flags & (IWL_INITIATOR_AP_FLAGS_NON_TB |
 		       IWL_INITIATOR_AP_FLAGS_TB)))
@@ -691,7 +742,11 @@ iwl_mvm_ftm_set_secured_ranging(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 			continue;
 
 		target->cipher = entry->cipher;
-		memcpy(target->hltk, entry->hltk, sizeof(target->hltk));
+
+		if (entry->flags & IWL_MVM_PASN_FLAG_HAS_HLTK)
+			memcpy(target->hltk, entry->hltk, sizeof(target->hltk));
+		else
+			memset(target->hltk, 0, sizeof(target->hltk));
 
 		if (vif->cfg.assoc &&
 		    !memcmp(vif->bss_conf.bssid, target->bssid,
@@ -783,9 +838,10 @@ iwl_mvm_ftm_put_target_v8(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	 * If secure LTF is turned off, replace the flag with PMF only
 	 */
 	flags = le32_to_cpu(target->initiator_ap_flags);
-	if ((flags & IWL_INITIATOR_AP_FLAGS_SECURED) &&
-	    !IWL_MVM_FTM_INITIATOR_SECURE_LTF) {
-		flags &= ~IWL_INITIATOR_AP_FLAGS_SECURED;
+	if (flags & IWL_INITIATOR_AP_FLAGS_SECURED) {
+		if (!IWL_MVM_FTM_INITIATOR_SECURE_LTF)
+			flags &= ~IWL_INITIATOR_AP_FLAGS_SECURED;
+
 		flags |= IWL_INITIATOR_AP_FLAGS_PMF;
 		target->initiator_ap_flags = cpu_to_le32(flags);
 	}

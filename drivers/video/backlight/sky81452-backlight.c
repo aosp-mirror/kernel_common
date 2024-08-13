@@ -41,7 +41,7 @@
 #define SKY81452_MAX_BRIGHTNESS	(SKY81452_CS + 1)
 
 /**
- * struct sky81452_platform_data
+ * struct sky81452_bl_platform_data - backlight platform data
  * @name:	backlight driver name.
  *		If it is not defined, default name is lcd-backlight.
  * @gpiod_enable:GPIO descriptor which control EN pin
@@ -182,7 +182,7 @@ static const struct attribute_group sky81452_bl_attr_group = {
 static struct sky81452_bl_platform_data *sky81452_bl_parse_dt(
 							struct device *dev)
 {
-	struct device_node *np = of_node_get(dev->of_node);
+	struct device_node *np = dev->of_node;
 	struct sky81452_bl_platform_data *pdata;
 	int num_entry;
 	unsigned int sources[6];
@@ -194,10 +194,8 @@ static struct sky81452_bl_platform_data *sky81452_bl_parse_dt(
 	}
 
 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata) {
-		of_node_put(np);
+	if (!pdata)
 		return ERR_PTR(-ENOMEM);
-	}
 
 	of_property_read_string(np, "name", &pdata->name);
 	pdata->ignore_pwm = of_property_read_bool(np, "skyworks,ignore-pwm");
@@ -217,7 +215,6 @@ static struct sky81452_bl_platform_data *sky81452_bl_parse_dt(
 					num_entry);
 		if (ret < 0) {
 			dev_err(dev, "led-sources node is invalid.\n");
-			of_node_put(np);
 			return ERR_PTR(-EINVAL);
 		}
 
@@ -237,7 +234,6 @@ static struct sky81452_bl_platform_data *sky81452_bl_parse_dt(
 	if (ret < 0)
 		pdata->boost_current_limit = 2750;
 
-	of_node_put(np);
 	return pdata;
 }
 #else
@@ -311,7 +307,7 @@ static int sky81452_bl_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int sky81452_bl_remove(struct platform_device *pdev)
+static void sky81452_bl_remove(struct platform_device *pdev)
 {
 	const struct sky81452_bl_platform_data *pdata =
 						dev_get_platdata(&pdev->dev);
@@ -325,8 +321,6 @@ static int sky81452_bl_remove(struct platform_device *pdev)
 
 	if (pdata->gpiod_enable)
 		gpiod_set_value_cansleep(pdata->gpiod_enable, 0);
-
-	return 0;
 }
 
 #ifdef CONFIG_OF
@@ -343,7 +337,7 @@ static struct platform_driver sky81452_bl_driver = {
 		.of_match_table = of_match_ptr(sky81452_bl_of_match),
 	},
 	.probe = sky81452_bl_probe,
-	.remove = sky81452_bl_remove,
+	.remove_new = sky81452_bl_remove,
 };
 
 module_platform_driver(sky81452_bl_driver);

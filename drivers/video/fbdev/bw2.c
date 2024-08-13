@@ -17,7 +17,8 @@
 #include <linux/init.h>
 #include <linux/fb.h>
 #include <linux/mm.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
 
 #include <asm/io.h>
 #include <asm/fbio.h>
@@ -30,8 +31,8 @@
 
 static int bw2_blank(int, struct fb_info *);
 
-static int bw2_mmap(struct fb_info *, struct vm_area_struct *);
-static int bw2_ioctl(struct fb_info *, unsigned int, unsigned long);
+static int bw2_sbusfb_mmap(struct fb_info *info, struct vm_area_struct *vma);
+static int bw2_sbusfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg);
 
 /*
  *  Frame buffer operations
@@ -39,15 +40,8 @@ static int bw2_ioctl(struct fb_info *, unsigned int, unsigned long);
 
 static const struct fb_ops bw2_ops = {
 	.owner			= THIS_MODULE,
+	FB_DEFAULT_SBUS_OPS(bw2),
 	.fb_blank		= bw2_blank,
-	.fb_fillrect		= cfb_fillrect,
-	.fb_copyarea		= cfb_copyarea,
-	.fb_imageblit		= cfb_imageblit,
-	.fb_mmap		= bw2_mmap,
-	.fb_ioctl		= bw2_ioctl,
-#ifdef CONFIG_COMPAT
-	.fb_compat_ioctl	= sbusfb_compat_ioctl,
-#endif
 };
 
 /* OBio addresses for the bwtwo registers */
@@ -160,7 +154,7 @@ static struct sbus_mmap_map bw2_mmap_map[] = {
 	{ .size = 0 }
 };
 
-static int bw2_mmap(struct fb_info *info, struct vm_area_struct *vma)
+static int bw2_sbusfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 {
 	struct bw2_par *par = (struct bw2_par *)info->par;
 
@@ -170,7 +164,7 @@ static int bw2_mmap(struct fb_info *info, struct vm_area_struct *vma)
 				  vma);
 }
 
-static int bw2_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
+static int bw2_sbusfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
 {
 	return sbusfb_ioctl_helper(cmd, arg, info,
 				   FBTYPE_SUN2BW, 1, info->fix.smem_len);
@@ -306,7 +300,7 @@ static int bw2_probe(struct platform_device *op)
 	if (!par->regs)
 		goto out_release_fb;
 
-	if (!of_find_property(dp, "width", NULL)) {
+	if (!of_property_present(dp, "width")) {
 		err = bw2_do_default_mode(par, info, &linebytes);
 		if (err)
 			goto out_unmap_regs;
@@ -314,7 +308,6 @@ static int bw2_probe(struct platform_device *op)
 
 	info->fix.smem_len = PAGE_ALIGN(linebytes * info->var.yres);
 
-	info->flags = FBINFO_DEFAULT;
 	info->fbops = &bw2_ops;
 
 	info->screen_base = of_ioremap(&op->resource[0], 0,
@@ -352,7 +345,7 @@ out_err:
 	return err;
 }
 
-static int bw2_remove(struct platform_device *op)
+static void bw2_remove(struct platform_device *op)
 {
 	struct fb_info *info = dev_get_drvdata(&op->dev);
 	struct bw2_par *par = info->par;
@@ -363,8 +356,6 @@ static int bw2_remove(struct platform_device *op)
 	of_iounmap(&op->resource[0], info->screen_base, info->fix.smem_len);
 
 	framebuffer_release(info);
-
-	return 0;
 }
 
 static const struct of_device_id bw2_match[] = {
@@ -381,7 +372,7 @@ static struct platform_driver bw2_driver = {
 		.of_match_table = bw2_match,
 	},
 	.probe		= bw2_probe,
-	.remove		= bw2_remove,
+	.remove_new	= bw2_remove,
 };
 
 static int __init bw2_init(void)

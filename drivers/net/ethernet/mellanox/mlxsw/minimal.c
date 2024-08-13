@@ -417,6 +417,7 @@ static int mlxsw_m_linecards_init(struct mlxsw_m *mlxsw_m)
 err_kmalloc_array:
 	for (i--; i >= 0; i--)
 		kfree(mlxsw_m->line_cards[i]);
+	kfree(mlxsw_m->line_cards);
 err_kcalloc:
 	kfree(mlxsw_m->ports);
 	return err;
@@ -707,7 +708,6 @@ static const struct i2c_device_id mlxsw_m_i2c_id[] = {
 
 static struct i2c_driver mlxsw_m_i2c_driver = {
 	.driver.name = "mlxsw_minimal",
-	.class = I2C_CLASS_HWMON,
 	.id_table = mlxsw_m_i2c_id,
 };
 

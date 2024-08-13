@@ -41,7 +41,7 @@ static int rtas_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	int ret = -1;
 	int rval;
 
-	rval = rtas_call(rtas_token("read-pci-config"), 2, 2, &ret, addr, len);
+	rval = rtas_call(rtas_function_token(RTAS_FN_READ_PCI_CONFIG), 2, 2, &ret, addr, len);
 	*val = ret;
 	return rval ? PCIBIOS_DEVICE_NOT_FOUND : PCIBIOS_SUCCESSFUL;
 }
@@ -55,7 +55,7 @@ static int rtas_write_config(struct pci_bus *bus, unsigned int devfn,
 	    | (hose->global_number << 24);
 	int rval;
 
-	rval = rtas_call(rtas_token("write-pci-config"), 3, 1, NULL,
+	rval = rtas_call(rtas_function_token(RTAS_FN_WRITE_PCI_CONFIG), 3, 1, NULL,
 			 addr, len, val);
 	return rval ? PCIBIOS_DEVICE_NOT_FOUND : PCIBIOS_SUCCESSFUL;
 }
@@ -195,8 +195,10 @@ static void __init efika_setup_arch(void)
 
 static int __init efika_probe(void)
 {
-	const char *model = of_get_property(of_root, "model", NULL);
+	struct device_node *root = of_find_node_by_path("/");
+	const char *model = of_get_property(root, "model", NULL);
 
+	of_node_put(root);
 	if (model == NULL)
 		return 0;
 	if (strcmp(model, "EFIKA5K2"))
@@ -226,7 +228,6 @@ define_machine(efika)
 	.get_rtc_time		= rtas_get_rtc_time,
 	.progress		= rtas_progress,
 	.get_boot_time		= rtas_get_boot_time,
-	.calibrate_decr		= generic_calibrate_decr,
 #ifdef CONFIG_PCI
 	.phys_mem_access_prot	= pci_phys_mem_access_prot,
 #endif

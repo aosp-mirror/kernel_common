@@ -126,9 +126,9 @@ jiffies = jiffies_64;
 #ifdef CONFIG_UNWIND_TABLES
 #define UNWIND_DATA_SECTIONS				\
 	.eh_frame : {					\
-		__eh_frame_start = .;			\
+		__pi___eh_frame_start = .;		\
 		*(.eh_frame)				\
-		__eh_frame_end = .;			\
+		__pi___eh_frame_end = .;		\
 	}
 #else
 #define UNWIND_DATA_SECTIONS
@@ -181,17 +181,7 @@ SECTIONS
 			KPROBES_TEXT
 			HYPERVISOR_TEXT
 			*(.gnu.warning)
-		. = ALIGN(16);
-		*(.got)			/* Global offset table		*/
 	}
-
-	/*
-	 * Make sure that the .got.plt is either completely empty or it
-	 * contains only the lazy dispatch entries.
-	 */
-	.got.plt : { *(.got.plt) }
-	ASSERT(SIZEOF(.got.plt) == 0 || SIZEOF(.got.plt) == 0x18,
-	       "Unexpected GOT/PLT entries detected!")
 
 	. = ALIGN(SEGMENT_ALIGN);
 	_etext = .;			/* End of text section */
@@ -200,6 +190,15 @@ SECTIONS
 	RO_DATA(PAGE_SIZE)
 
 	HYPERVISOR_DATA_SECTIONS
+
+	.got : { *(.got) }
+	/*
+	 * Make sure that the .got.plt is either completely empty or it
+	 * contains only the lazy dispatch entries.
+	 */
+	.got.plt : { *(.got.plt) }
+	ASSERT(SIZEOF(.got.plt) == 0 || SIZEOF(.got.plt) == 0x18,
+	       "Unexpected GOT/PLT entries detected!")
 
 	/* code sections that are never executed via the kernel mapping */
 	.rodata.text : {
@@ -265,21 +264,24 @@ SECTIONS
 		EXIT_DATA
 	}
 
+	RUNTIME_CONST(shift, d_hash_shift)
+	RUNTIME_CONST(ptr, dentry_hashtable)
+
 	PERCPU_SECTION(L1_CACHE_BYTES)
 	HYPERVISOR_PERCPU_SECTION
 
 	HYPERVISOR_RELOC_SECTION
 
 	.rela.dyn : ALIGN(8) {
-		__rela_start = .;
+		__pi_rela_start = .;
 		*(.rela .rela*)
-		__rela_end = .;
+		__pi_rela_end = .;
 	}
 
 	.relr.dyn : ALIGN(8) {
-		__relr_start = .;
+		__pi_relr_start = .;
 		*(.relr.dyn)
-		__relr_end = .;
+		__pi_relr_end = .;
 	}
 
 	. = ALIGN(SEGMENT_ALIGN);
@@ -312,12 +314,17 @@ SECTIONS
 	__pecoff_data_rawsize = ABSOLUTE(. - __initdata_begin);
 	_edata = .;
 
+	/* start of zero-init region */
 	BSS_SECTION(SBSS_ALIGN, 0, 0)
 
 	. = ALIGN(PAGE_SIZE);
 	init_pg_dir = .;
 	. += INIT_DIR_SIZE;
 	init_pg_end = .;
+	/* end of zero-init region */
+
+	. += SZ_4K;		/* stack for the early C runtime */
+	early_init_stack = .;
 
 	. = ALIGN(SEGMENT_ALIGN);
 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);

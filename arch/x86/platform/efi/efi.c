@@ -96,6 +96,9 @@ static const unsigned long * const efi_tables[] = {
 #ifdef CONFIG_EFI_COCO_SECRET
 	&efi.coco_secret,
 #endif
+#ifdef CONFIG_UNACCEPTED_MEMORY
+	&efi.unaccepted,
+#endif
 };
 
 u64 efi_setup;		/* efi setup_data physical address */
@@ -222,8 +225,6 @@ int __init efi_memblock_x86_reserve_range(void)
 
 	if (add_efi_memmap || do_efi_soft_reserve())
 		do_add_efi_memmap();
-
-	efi_fake_memmap_early();
 
 	WARN(efi.memmap.desc_version != 1,
 	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
@@ -380,7 +381,7 @@ static int __init efi_systab_init(unsigned long phys)
 		return -ENOMEM;
 	}
 
-	ret = efi_systab_check_header(hdr, 1);
+	ret = efi_systab_check_header(hdr);
 	if (ret) {
 		early_memunmap(p, size);
 		return ret;
@@ -946,4 +947,9 @@ umode_t efi_attr_is_visible(struct kobject *kobj, struct attribute *attr, int n)
 			return 0;
 	}
 	return attr->mode;
+}
+
+enum efi_secureboot_mode __x86_ima_efi_boot_mode(void)
+{
+	return boot_params.secure_boot;
 }

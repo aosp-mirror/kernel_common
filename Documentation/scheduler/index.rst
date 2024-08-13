@@ -1,12 +1,13 @@
-===============
-Linux Scheduler
-===============
+=========
+Scheduler
+=========
 
 .. toctree::
     :maxdepth: 1
 
 
     completion
+    membarrier
     sched-arch
     sched-bwc
     sched-deadline

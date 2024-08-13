@@ -9,7 +9,8 @@
 
 #ifndef __AARCH64EB__
 
-#include <linux/kernel.h>
+#include <linux/bitops.h>
+#include <linux/wordpart.h>
 
 struct word_at_a_time {
 	const unsigned long one_bits, high_bits;
@@ -26,19 +27,14 @@ static inline unsigned long has_zero(unsigned long a, unsigned long *bits,
 }
 
 #define prep_zero_mask(a, bits, c) (bits)
+#define create_zero_mask(bits) (bits)
+#define find_zero(bits) (__ffs(bits) >> 3)
 
-static inline unsigned long create_zero_mask(unsigned long bits)
+static inline unsigned long zero_bytemask(unsigned long bits)
 {
 	bits = (bits - 1) & ~bits;
 	return bits >> 7;
 }
-
-static inline unsigned long find_zero(unsigned long mask)
-{
-	return fls64(mask) >> 3;
-}
-
-#define zero_bytemask(mask) (mask)
 
 #else	/* __AARCH64EB__ */
 #include <asm-generic/word-at-a-time.h>
@@ -55,7 +51,7 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
 {
 	unsigned long ret;
 
-	__uaccess_enable_tco_async();
+	__mte_enable_tco_async();
 
 	/* Load word from unaligned pointer addr */
 	asm(
@@ -65,7 +61,7 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
 	: "=&r" (ret)
 	: "r" (addr), "Q" (*(unsigned long *)addr));
 
-	__uaccess_disable_tco_async();
+	__mte_disable_tco_async();
 
 	return ret;
 }

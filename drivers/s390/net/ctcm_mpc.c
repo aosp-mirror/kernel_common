@@ -43,13 +43,13 @@
 #include <linux/netdevice.h>
 #include <net/dst.h>
 
-#include <linux/io.h>		/* instead of <asm/io.h> ok ? */
-#include <asm/ccwdev.h>
-#include <asm/ccwgroup.h>
-#include <linux/bitops.h>	/* instead of <asm/bitops.h> ok ? */
-#include <linux/uaccess.h>	/* instead of <asm/uaccess.h> ok ? */
+#include <linux/io.h>
+#include <linux/bitops.h>
+#include <linux/uaccess.h>
 #include <linux/wait.h>
 #include <linux/moduleparam.h>
+#include <asm/ccwdev.h>
+#include <asm/ccwgroup.h>
 #include <asm/idals.h>
 
 #include "ctcm_main.h"
@@ -144,9 +144,9 @@ void ctcmpc_dumpit(char *buf, int len)
 
 	for (ct = 0; ct < len; ct++, ptr++, rptr++) {
 		if (sw == 0) {
-			sprintf(addr, "%16.16llx", (__u64)rptr);
+			scnprintf(addr, sizeof(addr), "%16.16llx", (__u64)rptr);
 
-			sprintf(boff, "%4.4X", (__u32)ct);
+			scnprintf(boff, sizeof(boff), "%4.4X", (__u32)ct);
 			bhex[0] = '\0';
 			basc[0] = '\0';
 		}
@@ -155,7 +155,7 @@ void ctcmpc_dumpit(char *buf, int len)
 		if (sw == 8)
 			strcat(bhex, "	");
 
-		sprintf(tbuf, "%2.2llX", (__u64)*ptr);
+		scnprintf(tbuf, sizeof(tbuf), "%2.2llX", (__u64)*ptr);
 
 		tbuf[2] = '\0';
 		strcat(bhex, tbuf);
@@ -171,8 +171,8 @@ void ctcmpc_dumpit(char *buf, int len)
 			continue;
 		if ((strcmp(duphex, bhex)) != 0) {
 			if (dup != 0) {
-				sprintf(tdup,
-					"Duplicate as above to %s", addr);
+				scnprintf(tdup, sizeof(tdup),
+					  "Duplicate as above to %s", addr);
 				ctcm_pr_debug("		       --- %s ---\n",
 						tdup);
 			}
@@ -197,14 +197,16 @@ void ctcmpc_dumpit(char *buf, int len)
 			strcat(basc, " ");
 		}
 		if (dup != 0) {
-			sprintf(tdup, "Duplicate as above to %s", addr);
+			scnprintf(tdup, sizeof(tdup),
+				  "Duplicate as above to %s", addr);
 			ctcm_pr_debug("		       --- %s ---\n", tdup);
 		}
 		ctcm_pr_debug("   %s (+%s) : %s  [%s]\n",
 					addr, boff, bhex, basc);
 	} else {
 		if (dup >= 1) {
-			sprintf(tdup, "Duplicate as above to %s", addr);
+			scnprintf(tdup, sizeof(tdup),
+				  "Duplicate as above to %s", addr);
 			ctcm_pr_debug("		       --- %s ---\n", tdup);
 		}
 		if (dup != 0) {
@@ -291,7 +293,7 @@ static struct net_device *ctcmpc_get_dev(int port_num)
 	struct net_device *dev;
 	struct ctcm_priv *priv;
 
-	sprintf(device, "%s%i", MPC_DEVICE_NAME, port_num);
+	scnprintf(device, sizeof(device), "%s%i", MPC_DEVICE_NAME, port_num);
 
 	dev = __dev_get_by_name(&init_net, device);
 
@@ -1706,57 +1708,57 @@ static void mpc_action_side_xid(fsm_instance *fsm, void *arg, int side)
 		ch->ccw[9].cmd_code	= CCW_CMD_WRITE;
 		ch->ccw[9].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[9].count	= TH_HEADER_LENGTH;
-		ch->ccw[9].cda		= virt_to_phys(ch->xid_th);
+		ch->ccw[9].cda		= virt_to_dma32(ch->xid_th);
 
 		if (ch->xid == NULL)
 				goto done;
 		ch->ccw[10].cmd_code	= CCW_CMD_WRITE;
 		ch->ccw[10].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[10].count	= XID2_LENGTH;
-		ch->ccw[10].cda		= virt_to_phys(ch->xid);
+		ch->ccw[10].cda		= virt_to_dma32(ch->xid);
 
 		ch->ccw[11].cmd_code	= CCW_CMD_READ;
 		ch->ccw[11].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[11].count	= TH_HEADER_LENGTH;
-		ch->ccw[11].cda		= virt_to_phys(ch->rcvd_xid_th);
+		ch->ccw[11].cda		= virt_to_dma32(ch->rcvd_xid_th);
 
 		ch->ccw[12].cmd_code	= CCW_CMD_READ;
 		ch->ccw[12].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[12].count	= XID2_LENGTH;
-		ch->ccw[12].cda		= virt_to_phys(ch->rcvd_xid);
+		ch->ccw[12].cda		= virt_to_dma32(ch->rcvd_xid);
 
 		ch->ccw[13].cmd_code	= CCW_CMD_READ;
-		ch->ccw[13].cda		= virt_to_phys(ch->rcvd_xid_id);
+		ch->ccw[13].cda		= virt_to_dma32(ch->rcvd_xid_id);
 
 	} else { /* side == YSIDE : mpc_action_yside_xid */
 		ch->ccw[9].cmd_code	= CCW_CMD_READ;
 		ch->ccw[9].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[9].count	= TH_HEADER_LENGTH;
-		ch->ccw[9].cda		= virt_to_phys(ch->rcvd_xid_th);
+		ch->ccw[9].cda		= virt_to_dma32(ch->rcvd_xid_th);
 
 		ch->ccw[10].cmd_code	= CCW_CMD_READ;
 		ch->ccw[10].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[10].count	= XID2_LENGTH;
-		ch->ccw[10].cda		= virt_to_phys(ch->rcvd_xid);
+		ch->ccw[10].cda		= virt_to_dma32(ch->rcvd_xid);
 
 		if (ch->xid_th == NULL)
 				goto done;
 		ch->ccw[11].cmd_code	= CCW_CMD_WRITE;
 		ch->ccw[11].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[11].count	= TH_HEADER_LENGTH;
-		ch->ccw[11].cda		= virt_to_phys(ch->xid_th);
+		ch->ccw[11].cda		= virt_to_dma32(ch->xid_th);
 
 		if (ch->xid == NULL)
 				goto done;
 		ch->ccw[12].cmd_code	= CCW_CMD_WRITE;
 		ch->ccw[12].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[12].count	= XID2_LENGTH;
-		ch->ccw[12].cda		= virt_to_phys(ch->xid);
+		ch->ccw[12].cda		= virt_to_dma32(ch->xid);
 
 		if (ch->xid_id == NULL)
 				goto done;
 		ch->ccw[13].cmd_code	= CCW_CMD_WRITE;
-		ch->ccw[13].cda		= virt_to_phys(ch->xid_id);
+		ch->ccw[13].cda		= virt_to_dma32(ch->xid_id);
 
 	}
 	ch->ccw[13].flags	= CCW_FLAG_SLI | CCW_FLAG_CC;

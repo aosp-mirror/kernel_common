@@ -4,7 +4,8 @@
  *
  * Copyright (C) 2020, Google LLC.
  */
-
+#include <stdio.h>
+#include <stdarg.h>
 #include <assert.h>
 #include <ctype.h>
 #include <limits.h>
@@ -165,26 +166,33 @@ size_t get_trans_hugepagesz(void)
 size_t get_def_hugetlb_pagesz(void)
 {
 	char buf[64];
-	const char *tag = "Hugepagesize:";
+	const char *hugepagesize = "Hugepagesize:";
+	const char *hugepages_total = "HugePages_Total:";
 	FILE *f;
 
 	f = fopen("/proc/meminfo", "r");
 	TEST_ASSERT(f != NULL, "Error in opening /proc/meminfo");
 
 	while (fgets(buf, sizeof(buf), f) != NULL) {
-		if (strstr(buf, tag) == buf) {
+		if (strstr(buf, hugepages_total) == buf) {
+			unsigned long long total = strtoull(buf + strlen(hugepages_total), NULL, 10);
+			if (!total) {
+				fprintf(stderr, "HUGETLB is not enabled in /proc/sys/vm/nr_hugepages\n");
+				exit(KSFT_SKIP);
+			}
+		}
+		if (strstr(buf, hugepagesize) == buf) {
 			fclose(f);
-			return strtoull(buf + strlen(tag), NULL, 10) << 10;
+			return strtoull(buf + strlen(hugepagesize), NULL, 10) << 10;
 		}
 	}
 
-	if (feof(f))
-		TEST_FAIL("HUGETLB is not configured in host kernel");
-	else
-		TEST_FAIL("Error in reading /proc/meminfo");
+	if (feof(f)) {
+		fprintf(stderr, "HUGETLB is not configured in host kernel");
+		exit(KSFT_SKIP);
+	}
 
-	fclose(f);
-	return 0;
+	TEST_FAIL("Error in reading /proc/meminfo");
 }
 
 #define ANON_FLAGS	(MAP_PRIVATE | MAP_ANONYMOUS)
@@ -369,4 +377,41 @@ int atoi_paranoid(const char *num_str)
 		    "%ld not in range of [%d, %d]", num, INT_MIN, INT_MAX);
 
 	return num;
+}
+
+char *strdup_printf(const char *fmt, ...)
+{
+	va_list ap;
+	char *str;
+
+	va_start(ap, fmt);
+	TEST_ASSERT(vasprintf(&str, fmt, ap) >= 0, "vasprintf() failed");
+	va_end(ap);
+
+	return str;
+}
+
+#define CLOCKSOURCE_PATH "/sys/devices/system/clocksource/clocksource0/current_clocksource"
+
+char *sys_get_cur_clocksource(void)
+{
+	char *clk_name;
+	struct stat st;
+	FILE *fp;
+
+	fp = fopen(CLOCKSOURCE_PATH, "r");
+	TEST_ASSERT(fp, "failed to open clocksource file, errno: %d", errno);
+
+	TEST_ASSERT(!fstat(fileno(fp), &st), "failed to stat clocksource file, errno: %d",
+		    errno);
+
+	clk_name = malloc(st.st_size);
+	TEST_ASSERT(clk_name, "failed to allocate buffer to read file");
+
+	TEST_ASSERT(fgets(clk_name, st.st_size, fp), "failed to read clocksource file: %d",
+		    ferror(fp));
+
+	fclose(fp);
+
+	return clk_name;
 }

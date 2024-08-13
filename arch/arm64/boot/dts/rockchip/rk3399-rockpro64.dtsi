@@ -11,6 +11,7 @@
 
 / {
 	aliases {
+		ethernet0 = &gmac;
 		mmc0 = &sdio0;
 		mmc1 = &sdmmc;
 		mmc2 = &sdhci;
@@ -647,16 +648,10 @@
 		avdd-supply = <&avdd>;
 		backlight = <&backlight>;
 		dvdd-supply = <&vcc3v3_s0>;
-		ports {
-			#address-cells = <1>;
-			#size-cells = <0>;
 
-			port@0 {
-				reg = <0>;
-
-				mipi_in_panel: endpoint {
-					remote-endpoint = <&mipi_out_panel>;
-				};
+		port {
+			mipi_in_panel: endpoint {
+				remote-endpoint = <&mipi_out_panel>;
 			};
 		};
 	};

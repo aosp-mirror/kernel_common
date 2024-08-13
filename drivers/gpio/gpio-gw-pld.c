@@ -125,10 +125,11 @@ static struct i2c_driver gw_pld_driver = {
 		.name = "gw_pld",
 		.of_match_table = gw_pld_dt_ids,
 	},
-	.probe_new = gw_pld_probe,
+	.probe = gw_pld_probe,
 	.id_table = gw_pld_id,
 };
 module_i2c_driver(gw_pld_driver);
 
+MODULE_DESCRIPTION("Gateworks I2C PLD GPIO expander");
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");

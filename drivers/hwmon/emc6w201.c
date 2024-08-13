@@ -464,7 +464,7 @@ static int emc6w201_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id emc6w201_id[] = {
-	{ "emc6w201", 0 },
+	{ "emc6w201" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, emc6w201_id);
@@ -474,7 +474,7 @@ static struct i2c_driver emc6w201_driver = {
 	.driver = {
 		.name	= "emc6w201",
 	},
-	.probe_new	= emc6w201_probe,
+	.probe		= emc6w201_probe,
 	.id_table	= emc6w201_id,
 	.detect		= emc6w201_detect,
 	.address_list	= normal_i2c,

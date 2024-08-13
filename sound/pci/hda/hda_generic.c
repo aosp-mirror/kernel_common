@@ -998,7 +998,11 @@ static int add_control_with_pfx(struct hda_gen_spec *spec, int type,
 				const char *sfx, int cidx, unsigned long val)
 {
 	char name[SNDRV_CTL_ELEM_ID_NAME_MAXLEN];
-	snprintf(name, sizeof(name), "%s %s %s", pfx, dir, sfx);
+	int len;
+
+	len = snprintf(name, sizeof(name), "%s %s %s", pfx, dir, sfx);
+	if (snd_BUG_ON(len >= sizeof(name)))
+		return -EINVAL;
 	if (!add_control(spec, type, name, cidx, val))
 		return -ENOMEM;
 	return 0;
@@ -1155,8 +1159,8 @@ static bool path_has_mixer(struct hda_codec *codec, int path_idx, int ctl_type)
 	return path && path->ctls[ctl_type];
 }
 
-static const char * const channel_name[4] = {
-	"Front", "Surround", "CLFE", "Side"
+static const char * const channel_name[] = {
+	"Front", "Surround", "CLFE", "Side", "Back",
 };
 
 /* give some appropriate ctl name prefix for the given line out channel */
@@ -1182,7 +1186,7 @@ static const char *get_line_out_pfx(struct hda_codec *codec, int ch,
 
 	/* multi-io channels */
 	if (ch >= cfg->line_outs)
-		return channel_name[ch];
+		goto fixed_name;
 
 	switch (cfg->line_out_type) {
 	case AUTO_PIN_SPEAKER_OUT:
@@ -1234,6 +1238,7 @@ static const char *get_line_out_pfx(struct hda_codec *codec, int ch,
 	if (cfg->line_outs == 1 && !spec->multi_ios)
 		return "Line Out";
 
+ fixed_name:
 	if (ch >= ARRAY_SIZE(channel_name)) {
 		snd_BUG();
 		return "PCM";
@@ -3941,7 +3946,6 @@ static int create_mute_led_cdev(struct hda_codec *codec,
 	cdev->max_brightness = 1;
 	cdev->default_trigger = micmute ? "audio-micmute" : "audio-mute";
 	cdev->brightness_set_blocking = callback;
-	cdev->brightness = ledtrig_audio_get(idx);
 	cdev->flags = LED_CORE_SUSPENDRESUME;
 
 	err = led_classdev_register(&codec->core.dev, cdev);
@@ -6017,7 +6021,6 @@ void snd_hda_gen_free(struct hda_codec *codec)
 }
 EXPORT_SYMBOL_GPL(snd_hda_gen_free);
 
-#ifdef CONFIG_PM
 /**
  * snd_hda_gen_check_power_status - check the loopback power save state
  * @codec: the HDA codec
@@ -6031,7 +6034,6 @@ int snd_hda_gen_check_power_status(struct hda_codec *codec, hda_nid_t nid)
 	return snd_hda_check_amp_list_power(codec, &spec->loopback, nid);
 }
 EXPORT_SYMBOL_GPL(snd_hda_gen_check_power_status);
-#endif
 
 
 /*
@@ -6044,9 +6046,7 @@ static const struct hda_codec_ops generic_patch_ops = {
 	.init = snd_hda_gen_init,
 	.free = snd_hda_gen_free,
 	.unsol_event = snd_hda_jack_unsol_event,
-#ifdef CONFIG_PM
 	.check_power_status = snd_hda_gen_check_power_status,
-#endif
 };
 
 /*

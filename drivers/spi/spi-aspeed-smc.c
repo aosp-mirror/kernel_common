@@ -295,8 +295,8 @@ static const struct aspeed_spi_data ast2400_spi_data;
 
 static int do_aspeed_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 {
-	struct aspeed_spi *aspi = spi_controller_get_devdata(mem->spi->master);
-	struct aspeed_spi_chip *chip = &aspi->chips[mem->spi->chip_select];
+	struct aspeed_spi *aspi = spi_controller_get_devdata(mem->spi->controller);
+	struct aspeed_spi_chip *chip = &aspi->chips[spi_get_chipselect(mem->spi, 0)];
 	u32 addr_mode, addr_mode_backup;
 	u32 ctl_val;
 	int ret = 0;
@@ -374,10 +374,11 @@ static int aspeed_spi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 
 static const char *aspeed_spi_get_name(struct spi_mem *mem)
 {
-	struct aspeed_spi *aspi = spi_controller_get_devdata(mem->spi->master);
+	struct aspeed_spi *aspi = spi_controller_get_devdata(mem->spi->controller);
 	struct device *dev = aspi->dev;
 
-	return devm_kasprintf(dev, GFP_KERNEL, "%s.%d", dev_name(dev), mem->spi->chip_select);
+	return devm_kasprintf(dev, GFP_KERNEL, "%s.%d", dev_name(dev),
+			      spi_get_chipselect(mem->spi, 0));
 }
 
 struct aspeed_spi_window {
@@ -552,8 +553,8 @@ static int aspeed_spi_do_calibration(struct aspeed_spi_chip *chip);
 
 static int aspeed_spi_dirmap_create(struct spi_mem_dirmap_desc *desc)
 {
-	struct aspeed_spi *aspi = spi_controller_get_devdata(desc->mem->spi->master);
-	struct aspeed_spi_chip *chip = &aspi->chips[desc->mem->spi->chip_select];
+	struct aspeed_spi *aspi = spi_controller_get_devdata(desc->mem->spi->controller);
+	struct aspeed_spi_chip *chip = &aspi->chips[spi_get_chipselect(desc->mem->spi, 0)];
 	struct spi_mem_op *op = &desc->info.op_tmpl;
 	u32 ctl_val;
 	int ret = 0;
@@ -619,8 +620,8 @@ static int aspeed_spi_dirmap_create(struct spi_mem_dirmap_desc *desc)
 static ssize_t aspeed_spi_dirmap_read(struct spi_mem_dirmap_desc *desc,
 				      u64 offset, size_t len, void *buf)
 {
-	struct aspeed_spi *aspi = spi_controller_get_devdata(desc->mem->spi->master);
-	struct aspeed_spi_chip *chip = &aspi->chips[desc->mem->spi->chip_select];
+	struct aspeed_spi *aspi = spi_controller_get_devdata(desc->mem->spi->controller);
+	struct aspeed_spi_chip *chip = &aspi->chips[spi_get_chipselect(desc->mem->spi, 0)];
 
 	/* Switch to USER command mode if mapping window is too small */
 	if (chip->ahb_window_size < offset + len) {
@@ -668,9 +669,9 @@ static void aspeed_spi_chip_enable(struct aspeed_spi *aspi, unsigned int cs, boo
 
 static int aspeed_spi_setup(struct spi_device *spi)
 {
-	struct aspeed_spi *aspi = spi_controller_get_devdata(spi->master);
+	struct aspeed_spi *aspi = spi_controller_get_devdata(spi->controller);
 	const struct aspeed_spi_data *data = aspi->data;
-	unsigned int cs = spi->chip_select;
+	unsigned int cs = spi_get_chipselect(spi, 0);
 	struct aspeed_spi_chip *chip = &aspi->chips[cs];
 
 	chip->aspi = aspi;
@@ -696,8 +697,8 @@ static int aspeed_spi_setup(struct spi_device *spi)
 
 static void aspeed_spi_cleanup(struct spi_device *spi)
 {
-	struct aspeed_spi *aspi = spi_controller_get_devdata(spi->master);
-	unsigned int cs = spi->chip_select;
+	struct aspeed_spi *aspi = spi_controller_get_devdata(spi->controller);
+	unsigned int cs = spi_get_chipselect(spi, 0);
 
 	aspeed_spi_chip_enable(aspi, cs, false);
 
@@ -725,7 +726,7 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	if (!data)
 		return -ENODEV;
 
-	ctlr = devm_spi_alloc_master(dev, sizeof(*aspi));
+	ctlr = devm_spi_alloc_host(dev, sizeof(*aspi));
 	if (!ctlr)
 		return -ENOMEM;
 
@@ -747,7 +748,7 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	aspi->ahb_window_size = resource_size(res);
 	aspi->ahb_base_phy = res->start;
 
-	aspi->clk = devm_clk_get(&pdev->dev, NULL);
+	aspi->clk = devm_clk_get_enabled(&pdev->dev, NULL);
 	if (IS_ERR(aspi->clk)) {
 		dev_err(dev, "missing clock\n");
 		return PTR_ERR(aspi->clk);
@@ -757,12 +758,6 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	if (!aspi->clk_freq) {
 		dev_err(dev, "invalid clock\n");
 		return -EINVAL;
-	}
-
-	ret = clk_prepare_enable(aspi->clk);
-	if (ret) {
-		dev_err(dev, "can not enable the clock\n");
-		return ret;
 	}
 
 	/* IRQ is for DMA, which the driver doesn't support yet */
@@ -776,24 +771,17 @@ static int aspeed_spi_probe(struct platform_device *pdev)
 	ctlr->dev.of_node = dev->of_node;
 
 	ret = devm_spi_register_controller(dev, ctlr);
-	if (ret) {
+	if (ret)
 		dev_err(&pdev->dev, "spi_register_controller failed\n");
-		goto disable_clk;
-	}
-	return 0;
 
-disable_clk:
-	clk_disable_unprepare(aspi->clk);
 	return ret;
 }
 
-static int aspeed_spi_remove(struct platform_device *pdev)
+static void aspeed_spi_remove(struct platform_device *pdev)
 {
 	struct aspeed_spi *aspi = platform_get_drvdata(pdev);
 
 	aspeed_spi_enable(aspi, false);
-	clk_disable_unprepare(aspi->clk);
-	return 0;
 }
 
 /*
@@ -1201,7 +1189,7 @@ MODULE_DEVICE_TABLE(of, aspeed_spi_matches);
 
 static struct platform_driver aspeed_spi_driver = {
 	.probe			= aspeed_spi_probe,
-	.remove			= aspeed_spi_remove,
+	.remove_new		= aspeed_spi_remove,
 	.driver	= {
 		.name		= DEVICE_NAME,
 		.of_match_table = aspeed_spi_matches,

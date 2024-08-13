@@ -68,7 +68,7 @@ static const struct regmap_config da9211_regmap_config = {
 	.val_bits = 8,
 	.max_register = 5 * 128,
 	.volatile_reg = da9211_volatile_reg,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 	.ranges = da9211_regmap_range,
 	.num_ranges = ARRAY_SIZE(da9211_regmap_range),
 };
@@ -552,9 +552,10 @@ MODULE_DEVICE_TABLE(of, da9211_dt_ids);
 static struct i2c_driver da9211_regulator_driver = {
 	.driver = {
 		.name = "da9211",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.of_match_table = of_match_ptr(da9211_dt_ids),
 	},
-	.probe_new = da9211_i2c_probe,
+	.probe = da9211_i2c_probe,
 	.id_table = da9211_i2c_id,
 };
 

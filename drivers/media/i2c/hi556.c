@@ -3,10 +3,13 @@
 
 #include <asm/unaligned.h>
 #include <linux/acpi.h>
+#include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
+#include <linux/regulator/consumer.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-fwnode.h>
@@ -63,6 +66,14 @@
 #define HI556_REG_ISP_TPG_EN		0x01
 #define HI556_REG_TEST_PATTERN		0x0201
 
+/* HI556 native and active pixel array size. */
+#define HI556_NATIVE_WIDTH		2592U
+#define HI556_NATIVE_HEIGHT		1944U
+#define HI556_PIXEL_ARRAY_LEFT		0U
+#define HI556_PIXEL_ARRAY_TOP		0U
+#define HI556_PIXEL_ARRAY_WIDTH	2592U
+#define HI556_PIXEL_ARRAY_HEIGHT	1944U
+
 enum {
 	HI556_LINK_FREQ_437MHZ_INDEX,
 };
@@ -87,6 +98,9 @@ struct hi556_mode {
 
 	/* Frame height in pixels */
 	u32 height;
+
+	/* Analog crop rectangle. */
+	struct v4l2_rect crop;
 
 	/* Horizontal timining size */
 	u32 llp;
@@ -378,6 +392,49 @@ static const struct hi556_reg mode_2592x1944_regs[] = {
 	{0x0958, 0xbb80},
 };
 
+static const struct hi556_reg mode_2592x1444_regs[] = {
+	{0x0a00, 0x0000},
+	{0x0b0a, 0x8252},
+	{0x0f30, 0xe545},
+	{0x0f32, 0x7067},
+	{0x004a, 0x0100},
+	{0x004c, 0x0000},
+	{0x000c, 0x0022},
+	{0x0008, 0x0b00},
+	{0x005a, 0x0202},
+	{0x0012, 0x000e},
+	{0x0018, 0x0a33},
+	{0x0022, 0x0008},
+	{0x0028, 0x0017},
+	{0x0024, 0x0122},
+	{0x002a, 0x0127},
+	{0x0026, 0x012a},
+	{0x002c, 0x06cf},
+	{0x002e, 0x1111},
+	{0x0030, 0x1111},
+	{0x0032, 0x1111},
+	{0x0006, 0x0821},
+	{0x0a22, 0x0000},
+	{0x0a12, 0x0a20},
+	{0x0a14, 0x05a4},
+	{0x003e, 0x0000},
+	{0x0074, 0x081f},
+	{0x0070, 0x040f},
+	{0x0804, 0x0300},
+	{0x0806, 0x0100},
+	{0x0a04, 0x014a},
+	{0x090c, 0x0fdc},
+	{0x090e, 0x002d},
+	{0x0902, 0x4319},
+	{0x0914, 0xc10a},
+	{0x0916, 0x071f},
+	{0x0918, 0x0408},
+	{0x091a, 0x0c0d},
+	{0x091c, 0x0f09},
+	{0x091e, 0x0a00},
+	{0x0958, 0xbb80},
+};
+
 static const struct hi556_reg mode_1296x972_regs[] = {
 	{0x0a00, 0x0000},
 	{0x0b0a, 0x8259},
@@ -423,6 +480,50 @@ static const struct hi556_reg mode_1296x972_regs[] = {
 	{0x0958, 0xbb80},
 };
 
+static const struct hi556_reg mode_1296x722_regs[] = {
+	{0x0a00, 0x0000},
+	{0x0b0a, 0x8259},
+	{0x0f30, 0x5b15},
+	{0x0f32, 0x7167},
+	{0x004a, 0x0100},
+	{0x004c, 0x0000},
+	{0x004e, 0x0100},
+	{0x000c, 0x0122},
+	{0x0008, 0x0b00},
+	{0x005a, 0x0404},
+	{0x0012, 0x000c},
+	{0x0018, 0x0a33},
+	{0x0022, 0x0008},
+	{0x0028, 0x0017},
+	{0x0024, 0x0022},
+	{0x002a, 0x002b},
+	{0x0026, 0x012a},
+	{0x002c, 0x06cf},
+	{0x002e, 0x3311},
+	{0x0030, 0x3311},
+	{0x0032, 0x3311},
+	{0x0006, 0x0814},
+	{0x0a22, 0x0000},
+	{0x0a12, 0x0510},
+	{0x0a14, 0x02d2},
+	{0x003e, 0x0000},
+	{0x0074, 0x0812},
+	{0x0070, 0x0409},
+	{0x0804, 0x0308},
+	{0x0806, 0x0100},
+	{0x0a04, 0x016a},
+	{0x090c, 0x09c0},
+	{0x090e, 0x0010},
+	{0x0902, 0x4319},
+	{0x0914, 0xc106},
+	{0x0916, 0x040e},
+	{0x0918, 0x0304},
+	{0x091a, 0x0708},
+	{0x091c, 0x0e06},
+	{0x091e, 0x0300},
+	{0x0958, 0xbb80},
+};
+
 static const char * const hi556_test_pattern_menu[] = {
 	"Disabled",
 	"Solid Colour",
@@ -450,8 +551,14 @@ static const struct hi556_link_freq_config link_freq_configs[] = {
 
 static const struct hi556_mode supported_modes[] = {
 	{
-		.width = 2592,
-		.height = 1944,
+		.width = HI556_PIXEL_ARRAY_WIDTH,
+		.height = HI556_PIXEL_ARRAY_HEIGHT,
+		.crop = {
+			.left = HI556_PIXEL_ARRAY_LEFT,
+			.top = HI556_PIXEL_ARRAY_TOP,
+			.width = HI556_PIXEL_ARRAY_WIDTH,
+			.height = HI556_PIXEL_ARRAY_HEIGHT
+		},
 		.fll_def = HI556_FLL_30FPS,
 		.fll_min = HI556_FLL_30FPS_MIN,
 		.llp = 0x0b00,
@@ -462,8 +569,32 @@ static const struct hi556_mode supported_modes[] = {
 		.link_freq_index = HI556_LINK_FREQ_437MHZ_INDEX,
 	},
 	{
+		.width = HI556_PIXEL_ARRAY_WIDTH,
+		.height = 1444,
+		.crop = {
+			.left = HI556_PIXEL_ARRAY_LEFT,
+			.top = 250,
+			.width = HI556_PIXEL_ARRAY_WIDTH,
+			.height = 1444
+		},
+		.fll_def = 0x821,
+		.fll_min = 0x821,
+		.llp = 0x0b00,
+		.reg_list = {
+			.num_of_regs = ARRAY_SIZE(mode_2592x1444_regs),
+			.regs = mode_2592x1444_regs,
+		},
+		.link_freq_index = HI556_LINK_FREQ_437MHZ_INDEX,
+	},
+	{
 		.width = 1296,
 		.height = 972,
+		.crop = {
+			.left = HI556_PIXEL_ARRAY_LEFT,
+			.top = HI556_PIXEL_ARRAY_TOP,
+			.width = HI556_PIXEL_ARRAY_WIDTH,
+			.height = HI556_PIXEL_ARRAY_HEIGHT
+		},
 		.fll_def = HI556_FLL_30FPS,
 		.fll_min = HI556_FLL_30FPS_MIN,
 		.llp = 0x0b00,
@@ -472,7 +603,25 @@ static const struct hi556_mode supported_modes[] = {
 			.regs = mode_1296x972_regs,
 		},
 		.link_freq_index = HI556_LINK_FREQ_437MHZ_INDEX,
-	}
+	},
+	{
+		.width = 1296,
+		.height = 722,
+		.crop = {
+			.left = HI556_PIXEL_ARRAY_LEFT,
+			.top = 250,
+			.width = HI556_PIXEL_ARRAY_WIDTH,
+			.height = 1444
+		},
+		.fll_def = HI556_FLL_30FPS,
+		.fll_min = HI556_FLL_30FPS_MIN,
+		.llp = 0x0b00,
+		.reg_list = {
+			.num_of_regs = ARRAY_SIZE(mode_1296x722_regs),
+			.regs = mode_1296x722_regs,
+		},
+		.link_freq_index = HI556_LINK_FREQ_437MHZ_INDEX,
+	},
 };
 
 struct hi556 {
@@ -487,14 +636,16 @@ struct hi556 {
 	struct v4l2_ctrl *hblank;
 	struct v4l2_ctrl *exposure;
 
+	/* GPIOs, clocks, etc. */
+	struct gpio_desc *reset_gpio;
+	struct clk *clk;
+	struct regulator *avdd;
+
 	/* Current mode */
 	const struct hi556_mode *cur_mode;
 
 	/* To serialize asynchronus callbacks */
 	struct mutex mutex;
-
-	/* Streaming on/off */
-	bool streaming;
 
 	/* True if the device has been identified */
 	bool identified;
@@ -785,6 +936,58 @@ static int hi556_identify_module(struct hi556 *hi556)
 	return 0;
 }
 
+static const struct v4l2_rect *
+__hi556_get_pad_crop(struct hi556 *hi556,
+		     struct v4l2_subdev_state *sd_state,
+		     unsigned int pad, enum v4l2_subdev_format_whence which)
+{
+	switch (which) {
+	case V4L2_SUBDEV_FORMAT_TRY:
+		return v4l2_subdev_state_get_crop(sd_state, pad);
+	case V4L2_SUBDEV_FORMAT_ACTIVE:
+		return &hi556->cur_mode->crop;
+	}
+
+	return NULL;
+}
+
+static int hi556_get_selection(struct v4l2_subdev *sd,
+			       struct v4l2_subdev_state *sd_state,
+			       struct v4l2_subdev_selection *sel)
+{
+	switch (sel->target) {
+	case V4L2_SEL_TGT_CROP: {
+		struct hi556 *hi556 = to_hi556(sd);
+
+		mutex_lock(&hi556->mutex);
+		sel->r = *__hi556_get_pad_crop(hi556, sd_state, sel->pad,
+						sel->which);
+		mutex_unlock(&hi556->mutex);
+
+		return 0;
+	}
+
+	case V4L2_SEL_TGT_NATIVE_SIZE:
+		sel->r.top = 0;
+		sel->r.left = 0;
+		sel->r.width = HI556_NATIVE_WIDTH;
+		sel->r.height = HI556_NATIVE_HEIGHT;
+
+		return 0;
+
+	case V4L2_SEL_TGT_CROP_DEFAULT:
+	case V4L2_SEL_TGT_CROP_BOUNDS:
+		sel->r.top = HI556_PIXEL_ARRAY_TOP;
+		sel->r.left = HI556_PIXEL_ARRAY_LEFT;
+		sel->r.width = HI556_PIXEL_ARRAY_WIDTH;
+		sel->r.height = HI556_PIXEL_ARRAY_HEIGHT;
+
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
 static int hi556_start_streaming(struct hi556 *hi556)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&hi556->sd);
@@ -840,9 +1043,6 @@ static int hi556_set_stream(struct v4l2_subdev *sd, int enable)
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	int ret = 0;
 
-	if (hi556->streaming == enable)
-		return 0;
-
 	mutex_lock(&hi556->mutex);
 	if (enable) {
 		ret = pm_runtime_resume_and_get(&client->dev);
@@ -862,47 +1062,8 @@ static int hi556_set_stream(struct v4l2_subdev *sd, int enable)
 		pm_runtime_put(&client->dev);
 	}
 
-	hi556->streaming = enable;
 	mutex_unlock(&hi556->mutex);
 
-	return ret;
-}
-
-static int __maybe_unused hi556_suspend(struct device *dev)
-{
-	struct v4l2_subdev *sd = dev_get_drvdata(dev);
-	struct hi556 *hi556 = to_hi556(sd);
-
-	mutex_lock(&hi556->mutex);
-	if (hi556->streaming)
-		hi556_stop_streaming(hi556);
-
-	mutex_unlock(&hi556->mutex);
-
-	return 0;
-}
-
-static int __maybe_unused hi556_resume(struct device *dev)
-{
-	struct v4l2_subdev *sd = dev_get_drvdata(dev);
-	struct hi556 *hi556 = to_hi556(sd);
-	int ret;
-
-	mutex_lock(&hi556->mutex);
-	if (hi556->streaming) {
-		ret = hi556_start_streaming(hi556);
-		if (ret)
-			goto error;
-	}
-
-	mutex_unlock(&hi556->mutex);
-
-	return 0;
-
-error:
-	hi556_stop_streaming(hi556);
-	hi556->streaming = 0;
-	mutex_unlock(&hi556->mutex);
 	return ret;
 }
 
@@ -922,7 +1083,7 @@ static int hi556_set_format(struct v4l2_subdev *sd,
 	mutex_lock(&hi556->mutex);
 	hi556_assign_pad_format(mode, &fmt->format);
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
-		*v4l2_subdev_get_try_format(sd, sd_state, fmt->pad) = fmt->format;
+		*v4l2_subdev_state_get_format(sd_state, fmt->pad) = fmt->format;
 	} else {
 		hi556->cur_mode = mode;
 		__v4l2_ctrl_s_ctrl(hi556->link_freq, mode->link_freq_index);
@@ -956,9 +1117,8 @@ static int hi556_get_format(struct v4l2_subdev *sd,
 
 	mutex_lock(&hi556->mutex);
 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY)
-		fmt->format = *v4l2_subdev_get_try_format(&hi556->sd,
-							  sd_state,
-							  fmt->pad);
+		fmt->format = *v4l2_subdev_state_get_format(sd_state,
+							    fmt->pad);
 	else
 		hi556_assign_pad_format(hi556->cur_mode, &fmt->format);
 
@@ -1000,10 +1160,19 @@ static int hi556_enum_frame_size(struct v4l2_subdev *sd,
 static int hi556_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct hi556 *hi556 = to_hi556(sd);
+	struct v4l2_rect *try_crop;
 
 	mutex_lock(&hi556->mutex);
 	hi556_assign_pad_format(&supported_modes[0],
-				v4l2_subdev_get_try_format(sd, fh->state, 0));
+				v4l2_subdev_state_get_format(fh->state, 0));
+
+	/* Initialize try_crop rectangle. */
+	try_crop = v4l2_subdev_state_get_crop(fh->state, 0);
+	try_crop->top = HI556_PIXEL_ARRAY_TOP;
+	try_crop->left = HI556_PIXEL_ARRAY_LEFT;
+	try_crop->width = HI556_PIXEL_ARRAY_WIDTH;
+	try_crop->height = HI556_PIXEL_ARRAY_HEIGHT;
+
 	mutex_unlock(&hi556->mutex);
 
 	return 0;
@@ -1016,6 +1185,7 @@ static const struct v4l2_subdev_video_ops hi556_video_ops = {
 static const struct v4l2_subdev_pad_ops hi556_pad_ops = {
 	.set_fmt = hi556_set_format,
 	.get_fmt = hi556_get_format,
+	.get_selection = hi556_get_selection,
 	.enum_mbus_code = hi556_enum_mbus_code,
 	.enum_frame_size = hi556_enum_frame_size,
 };
@@ -1044,8 +1214,18 @@ static int hi556_check_hwcfg(struct device *dev)
 	int ret = 0;
 	unsigned int i, j;
 
-	if (!fwnode)
-		return -ENXIO;
+	/*
+	 * Sometimes the fwnode graph is initialized by the bridge driver,
+	 * wait for this.
+	 */
+	ep = fwnode_graph_get_next_endpoint(fwnode, NULL);
+	if (!ep)
+		return -EPROBE_DEFER;
+
+	ret = v4l2_fwnode_endpoint_alloc_parse(ep, &bus_cfg);
+	fwnode_handle_put(ep);
+	if (ret)
+		return ret;
 
 	ret = fwnode_property_read_u32(fwnode, "clock-frequency", &mclk);
 	if (ret) {
@@ -1057,15 +1237,6 @@ static int hi556_check_hwcfg(struct device *dev)
 		dev_err(dev, "external clock %d is not supported", mclk);
 		return -EINVAL;
 	}
-
-	ep = fwnode_graph_get_next_endpoint(fwnode, NULL);
-	if (!ep)
-		return -ENXIO;
-
-	ret = v4l2_fwnode_endpoint_alloc_parse(ep, &bus_cfg);
-	fwnode_handle_put(ep);
-	if (ret)
-		return ret;
 
 	if (bus_cfg.bus.mipi_csi2.num_data_lanes != 2) {
 		dev_err(dev, "number of CSI2 data lanes %d is not supported",
@@ -1113,6 +1284,47 @@ static void hi556_remove(struct i2c_client *client)
 	mutex_destroy(&hi556->mutex);
 }
 
+static int hi556_suspend(struct device *dev)
+{
+	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+	struct hi556 *hi556 = to_hi556(sd);
+	int ret;
+
+	gpiod_set_value_cansleep(hi556->reset_gpio, 1);
+
+	ret = regulator_disable(hi556->avdd);
+	if (ret) {
+		dev_err(dev, "failed to disable avdd: %d\n", ret);
+		gpiod_set_value_cansleep(hi556->reset_gpio, 0);
+		return ret;
+	}
+
+	clk_disable_unprepare(hi556->clk);
+	return 0;
+}
+
+static int hi556_resume(struct device *dev)
+{
+	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+	struct hi556 *hi556 = to_hi556(sd);
+	int ret;
+
+	ret = clk_prepare_enable(hi556->clk);
+	if (ret)
+		return ret;
+
+	ret = regulator_enable(hi556->avdd);
+	if (ret) {
+		dev_err(dev, "failed to enable avdd: %d\n", ret);
+		clk_disable_unprepare(hi556->clk);
+		return ret;
+	}
+
+	gpiod_set_value_cansleep(hi556->reset_gpio, 0);
+	usleep_range(5000, 5500);
+	return 0;
+}
+
 static int hi556_probe(struct i2c_client *client)
 {
 	struct hi556 *hi556;
@@ -1132,12 +1344,35 @@ static int hi556_probe(struct i2c_client *client)
 
 	v4l2_i2c_subdev_init(&hi556->sd, client, &hi556_subdev_ops);
 
+	hi556->reset_gpio = devm_gpiod_get_optional(&client->dev, "reset",
+						    GPIOD_OUT_HIGH);
+	if (IS_ERR(hi556->reset_gpio))
+		return dev_err_probe(&client->dev, PTR_ERR(hi556->reset_gpio),
+				     "failed to get reset GPIO\n");
+
+	hi556->clk = devm_clk_get_optional(&client->dev, "clk");
+	if (IS_ERR(hi556->clk))
+		return dev_err_probe(&client->dev, PTR_ERR(hi556->clk),
+				     "failed to get clock\n");
+
+	/* The regulator core will provide a "dummy" regulator if necessary */
+	hi556->avdd = devm_regulator_get(&client->dev, "avdd");
+	if (IS_ERR(hi556->avdd))
+		return dev_err_probe(&client->dev, PTR_ERR(hi556->avdd),
+				     "failed to get avdd regulator\n");
+
 	full_power = acpi_dev_state_d0(&client->dev);
 	if (full_power) {
+		/* Ensure non ACPI managed resources are enabled */
+		ret = hi556_resume(&client->dev);
+		if (ret)
+			return dev_err_probe(&client->dev, ret,
+					     "failed to power on sensor\n");
+
 		ret = hi556_identify_module(hi556);
 		if (ret) {
 			dev_err(&client->dev, "failed to find sensor: %d", ret);
-			return ret;
+			goto probe_error_power_off;
 		}
 	}
 
@@ -1182,12 +1417,15 @@ probe_error_v4l2_ctrl_handler_free:
 	v4l2_ctrl_handler_free(hi556->sd.ctrl_handler);
 	mutex_destroy(&hi556->mutex);
 
+probe_error_power_off:
+	if (full_power)
+		hi556_suspend(&client->dev);
+
 	return ret;
 }
 
-static const struct dev_pm_ops hi556_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(hi556_suspend, hi556_resume)
-};
+static DEFINE_RUNTIME_DEV_PM_OPS(hi556_pm_ops, hi556_suspend, hi556_resume,
+				 NULL);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id hi556_acpi_ids[] = {
@@ -1201,16 +1439,16 @@ MODULE_DEVICE_TABLE(acpi, hi556_acpi_ids);
 static struct i2c_driver hi556_i2c_driver = {
 	.driver = {
 		.name = "hi556",
-		.pm = &hi556_pm_ops,
 		.acpi_match_table = ACPI_PTR(hi556_acpi_ids),
+		.pm = pm_sleep_ptr(&hi556_pm_ops),
 	},
-	.probe_new = hi556_probe,
+	.probe = hi556_probe,
 	.remove = hi556_remove,
 	.flags = I2C_DRV_ACPI_WAIVE_D0_PROBE,
 };
 
 module_i2c_driver(hi556_i2c_driver);
 
-MODULE_AUTHOR("Shawn Tu <shawnx.tu@intel.com>");
+MODULE_AUTHOR("Shawn Tu");
 MODULE_DESCRIPTION("Hynix HI556 sensor driver");
 MODULE_LICENSE("GPL v2");

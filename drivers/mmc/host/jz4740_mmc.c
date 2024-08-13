@@ -18,9 +18,11 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/slot-gpio.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/platform_device.h>
+#include <linux/property.h>
+#include <linux/regulator/consumer.h>
 #include <linux/scatterlist.h>
 
 #include <asm/cacheflush.h>
@@ -157,6 +159,8 @@ struct jz4740_mmc_host {
 	struct resource *mem_res;
 	struct mmc_request *req;
 	struct mmc_command *cmd;
+
+	bool vqmmc_enabled;
 
 	unsigned long waiting;
 
@@ -935,6 +939,8 @@ static void jz4740_mmc_request(struct mmc_host *mmc, struct mmc_request *req)
 static void jz4740_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct jz4740_mmc_host *host = mmc_priv(mmc);
+	int ret;
+
 	if (ios->clock)
 		jz4740_mmc_set_clock_rate(host, ios->clock);
 
@@ -947,11 +953,24 @@ static void jz4740_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		clk_prepare_enable(host->clk);
 		break;
 	case MMC_POWER_ON:
+		if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
+			ret = regulator_enable(mmc->supply.vqmmc);
+			if (ret)
+				dev_err(&host->pdev->dev, "Failed to set vqmmc power!\n");
+			else
+				host->vqmmc_enabled = true;
+		}
 		break;
-	default:
+	case MMC_POWER_OFF:
 		if (!IS_ERR(mmc->supply.vmmc))
 			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+		if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled) {
+			regulator_disable(mmc->supply.vqmmc);
+			host->vqmmc_enabled = false;
+		}
 		clk_disable_unprepare(host->clk);
+		break;
+	default:
 		break;
 	}
 
@@ -978,6 +997,23 @@ static void jz4740_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 	jz4740_mmc_set_irq_enabled(host, JZ_MMC_IRQ_SDIO, enable);
 }
 
+static int jz4740_voltage_switch(struct mmc_host *mmc, struct mmc_ios *ios)
+{
+	int ret;
+
+	/* vqmmc regulator is available */
+	if (!IS_ERR(mmc->supply.vqmmc)) {
+		ret = mmc_regulator_set_vqmmc(mmc, ios);
+		return ret < 0 ? ret : 0;
+	}
+
+	/* no vqmmc regulator, assume fixed regulator at 3/3.3V */
+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+		return 0;
+
+	return -EINVAL;
+}
+
 static const struct mmc_host_ops jz4740_mmc_ops = {
 	.request	= jz4740_mmc_request,
 	.pre_req	= jz4740_mmc_pre_request,
@@ -986,6 +1022,7 @@ static const struct mmc_host_ops jz4740_mmc_ops = {
 	.get_ro		= mmc_gpio_get_ro,
 	.get_cd		= mmc_gpio_get_cd,
 	.enable_sdio_irq = jz4740_mmc_enable_sdio_irq,
+	.start_signal_voltage_switch = jz4740_voltage_switch,
 };
 
 static const struct of_device_id jz4740_mmc_of_match[] = {
@@ -1004,7 +1041,6 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 	int ret;
 	struct mmc_host *mmc;
 	struct jz4740_mmc_host *host;
-	const struct of_device_id *match;
 
 	mmc = mmc_alloc_host(sizeof(struct jz4740_mmc_host), &pdev->dev);
 	if (!mmc) {
@@ -1014,13 +1050,8 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 
 	host = mmc_priv(mmc);
 
-	match = of_match_device(jz4740_mmc_of_match, &pdev->dev);
-	if (match) {
-		host->version = (enum jz4740_mmc_version)match->data;
-	} else {
-		/* JZ4740 should be the only one using legacy probe */
-		host->version = JZ_MMC_JZ4740;
-	}
+	/* Default if no match is JZ4740 */
+	host->version = (enum jz4740_mmc_version)device_get_match_data(&pdev->dev);
 
 	ret = mmc_of_parse(mmc);
 	if (ret) {
@@ -1043,8 +1074,7 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 		goto err_free_host;
 	}
 
-	host->mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	host->base = devm_ioremap_resource(&pdev->dev, host->mem_res);
+	host->base = devm_platform_get_and_ioremap_resource(pdev, 0, &host->mem_res);
 	if (IS_ERR(host->base)) {
 		ret = PTR_ERR(host->base);
 		goto err_free_host;
@@ -1128,7 +1158,7 @@ err_free_host:
 	return ret;
 }
 
-static int jz4740_mmc_remove(struct platform_device *pdev)
+static void jz4740_mmc_remove(struct platform_device *pdev)
 {
 	struct jz4740_mmc_host *host = platform_get_drvdata(pdev);
 
@@ -1144,8 +1174,6 @@ static int jz4740_mmc_remove(struct platform_device *pdev)
 		jz4740_mmc_release_dma_channels(host);
 
 	mmc_free_host(host->mmc);
-
-	return 0;
 }
 
 static int jz4740_mmc_suspend(struct device *dev)
@@ -1163,11 +1191,11 @@ static DEFINE_SIMPLE_DEV_PM_OPS(jz4740_mmc_pm_ops, jz4740_mmc_suspend,
 
 static struct platform_driver jz4740_mmc_driver = {
 	.probe = jz4740_mmc_probe,
-	.remove = jz4740_mmc_remove,
+	.remove_new = jz4740_mmc_remove,
 	.driver = {
 		.name = "jz4740-mmc",
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
-		.of_match_table = of_match_ptr(jz4740_mmc_of_match),
+		.of_match_table = jz4740_mmc_of_match,
 		.pm = pm_sleep_ptr(&jz4740_mmc_pm_ops),
 	},
 };

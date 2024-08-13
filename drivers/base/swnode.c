@@ -6,10 +6,21 @@
  * Author: Heikki Krogerus <heikki.krogerus@linux.intel.com>
  */
 
+#include <linux/container_of.h>
 #include <linux/device.h>
-#include <linux/kernel.h>
+#include <linux/err.h>
+#include <linux/export.h>
+#include <linux/idr.h>
+#include <linux/init.h>
+#include <linux/kobject.h>
+#include <linux/kstrtox.h>
+#include <linux/list.h>
 #include <linux/property.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
+#include <linux/string.h>
+#include <linux/sysfs.h>
+#include <linux/types.h>
 
 #include "base.h"
 
@@ -541,6 +552,9 @@ software_node_get_reference_args(const struct fwnode_handle *fwnode,
 	if (nargs > NR_FWNODE_REFERENCE_ARGS)
 		return -EINVAL;
 
+	if (!args)
+		return 0;
+
 	args->fwnode = software_node_get(refnode);
 	args->nargs = nargs;
 
@@ -747,10 +761,10 @@ static void software_node_release(struct kobject *kobj)
 	struct swnode *swnode = kobj_to_swnode(kobj);
 
 	if (swnode->parent) {
-		ida_simple_remove(&swnode->parent->child_ids, swnode->id);
+		ida_free(&swnode->parent->child_ids, swnode->id);
 		list_del(&swnode->entry);
 	} else {
-		ida_simple_remove(&swnode_root_ids, swnode->id);
+		ida_free(&swnode_root_ids, swnode->id);
 	}
 
 	if (swnode->allocated)
@@ -760,7 +774,7 @@ static void software_node_release(struct kobject *kobj)
 	kfree(swnode);
 }
 
-static struct kobj_type software_node_type = {
+static const struct kobj_type software_node_type = {
 	.release = software_node_release,
 	.sysfs_ops = &kobj_sysfs_ops,
 };
@@ -776,8 +790,8 @@ swnode_register(const struct software_node *node, struct swnode *parent,
 	if (!swnode)
 		return ERR_PTR(-ENOMEM);
 
-	ret = ida_simple_get(parent ? &parent->child_ids : &swnode_root_ids,
-			     0, 0, GFP_KERNEL);
+	ret = ida_alloc(parent ? &parent->child_ids : &swnode_root_ids,
+			GFP_KERNEL);
 	if (ret < 0) {
 		kfree(swnode);
 		return ERR_PTR(ret);
@@ -818,67 +832,6 @@ swnode_register(const struct software_node *node, struct swnode *parent,
 	kobject_uevent(&swnode->kobj, KOBJ_ADD);
 	return &swnode->fwnode;
 }
-
-/**
- * software_node_register_nodes - Register an array of software nodes
- * @nodes: Zero terminated array of software nodes to be registered
- *
- * Register multiple software nodes at once. If any node in the array
- * has its .parent pointer set (which can only be to another software_node),
- * then its parent **must** have been registered before it is; either outside
- * of this function or by ordering the array such that parent comes before
- * child.
- */
-int software_node_register_nodes(const struct software_node *nodes)
-{
-	int ret;
-	int i;
-
-	for (i = 0; nodes[i].name; i++) {
-		const struct software_node *parent = nodes[i].parent;
-
-		if (parent && !software_node_to_swnode(parent)) {
-			ret = -EINVAL;
-			goto err_unregister_nodes;
-		}
-
-		ret = software_node_register(&nodes[i]);
-		if (ret)
-			goto err_unregister_nodes;
-	}
-
-	return 0;
-
-err_unregister_nodes:
-	software_node_unregister_nodes(nodes);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(software_node_register_nodes);
-
-/**
- * software_node_unregister_nodes - Unregister an array of software nodes
- * @nodes: Zero terminated array of software nodes to be unregistered
- *
- * Unregister multiple software nodes at once. If parent pointers are set up
- * in any of the software nodes then the array **must** be ordered such that
- * parents come before their children.
- *
- * NOTE: If you are uncertain whether the array is ordered such that
- * parents will be unregistered before their children, it is wiser to
- * remove the nodes individually, in the correct order (child before
- * parent).
- */
-void software_node_unregister_nodes(const struct software_node *nodes)
-{
-	unsigned int i = 0;
-
-	while (nodes[i].name)
-		i++;
-
-	while (i--)
-		software_node_unregister(&nodes[i]);
-}
-EXPORT_SYMBOL_GPL(software_node_unregister_nodes);
 
 /**
  * software_node_register_node_group - Register a group of software nodes

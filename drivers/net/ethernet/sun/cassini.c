@@ -73,6 +73,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/skbuff_ref.h>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
 #include <linux/random.h>
@@ -176,7 +177,7 @@ static char version[] =
 static int cassini_debug = -1;	/* -1 == use CAS_DEF_MSG_ENABLE as value */
 static int link_mode;
 
-MODULE_AUTHOR("Adrian Sun (asun@darksunrising.com)");
+MODULE_AUTHOR("Adrian Sun <asun@darksunrising.com>");
 MODULE_DESCRIPTION("Sun Cassini(+) ethernet driver");
 MODULE_LICENSE("GPL");
 MODULE_FIRMWARE("sun/cassini.bin");
@@ -1998,10 +1999,8 @@ static int cas_rx_process_pkt(struct cas *cp, struct cas_rx_comp *rxc,
 		skb->truesize += hlen - swivel;
 		skb->len      += hlen - swivel;
 
-		__skb_frag_set_page(frag, page->buffer);
+		skb_frag_fill_page_desc(frag, page->buffer, off, hlen - swivel);
 		__skb_frag_ref(frag);
-		skb_frag_off_set(frag, off);
-		skb_frag_size_set(frag, hlen - swivel);
 
 		/* any more data? */
 		if ((words[0] & RX_COMP1_SPLIT_PKT) && ((dlen -= hlen) > 0)) {
@@ -2024,10 +2023,8 @@ static int cas_rx_process_pkt(struct cas *cp, struct cas_rx_comp *rxc,
 			skb->len      += hlen;
 			frag++;
 
-			__skb_frag_set_page(frag, page->buffer);
+			skb_frag_fill_page_desc(frag, page->buffer, 0, hlen);
 			__skb_frag_ref(frag);
-			skb_frag_off_set(frag, 0);
-			skb_frag_size_set(frag, hlen);
 			RX_USED_ADD(page, hlen + cp->crc_size);
 		}
 
@@ -3807,7 +3804,7 @@ static int cas_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct cas *cp = netdev_priv(dev);
 
-	dev->mtu = new_mtu;
+	WRITE_ONCE(dev->mtu, new_mtu);
 	if (!netif_running(dev) || !netif_device_present(dev))
 		return 0;
 
@@ -5076,6 +5073,8 @@ err_out_iounmap:
 	if (cp->hw_running)
 		cas_shutdown(cp);
 	mutex_unlock(&cp->pm_mutex);
+
+	vfree(cp->fw_data);
 
 	pci_iounmap(pdev, cp->regs);
 

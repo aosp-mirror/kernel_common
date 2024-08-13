@@ -65,7 +65,6 @@ static inline void __uaccess_ttbr0_disable(void)
 	ttbr &= ~TTBR_ASID_MASK;
 	/* reserved_pg_dir placed before swapper_pg_dir */
 	write_sysreg(ttbr - RESERVED_SWAPPER_OFFSET, ttbr0_el1);
-	isb();
 	/* Set reserved ASID */
 	write_sysreg(ttbr, ttbr1_el1);
 	isb();
@@ -89,7 +88,6 @@ static inline void __uaccess_ttbr0_enable(void)
 	ttbr1 &= ~TTBR_ASID_MASK;		/* safety measure */
 	ttbr1 |= ttbr0 & TTBR_ASID_MASK;
 	write_sysreg(ttbr1, ttbr1_el1);
-	isb();
 
 	/* Restore user page table */
 	write_sysreg(ttbr0, ttbr0_el1);
@@ -136,55 +134,9 @@ static inline void __uaccess_enable_hw_pan(void)
 			CONFIG_ARM64_PAN));
 }
 
-/*
- * The Tag Check Flag (TCF) mode for MTE is per EL, hence TCF0
- * affects EL0 and TCF affects EL1 irrespective of which TTBR is
- * used.
- * The kernel accesses TTBR0 usually with LDTR/STTR instructions
- * when UAO is available, so these would act as EL0 accesses using
- * TCF0.
- * However futex.h code uses exclusives which would be executed as
- * EL1, this can potentially cause a tag check fault even if the
- * user disables TCF0.
- *
- * To address the problem we set the PSTATE.TCO bit in uaccess_enable()
- * and reset it in uaccess_disable().
- *
- * The Tag check override (TCO) bit disables temporarily the tag checking
- * preventing the issue.
- */
-static inline void __uaccess_disable_tco(void)
-{
-	asm volatile(ALTERNATIVE("nop", SET_PSTATE_TCO(0),
-				 ARM64_MTE, CONFIG_KASAN_HW_TAGS));
-}
-
-static inline void __uaccess_enable_tco(void)
-{
-	asm volatile(ALTERNATIVE("nop", SET_PSTATE_TCO(1),
-				 ARM64_MTE, CONFIG_KASAN_HW_TAGS));
-}
-
-/*
- * These functions disable tag checking only if in MTE async mode
- * since the sync mode generates exceptions synchronously and the
- * nofault or load_unaligned_zeropad can handle them.
- */
-static inline void __uaccess_disable_tco_async(void)
-{
-	if (system_uses_mte_async_or_asymm_mode())
-		 __uaccess_disable_tco();
-}
-
-static inline void __uaccess_enable_tco_async(void)
-{
-	if (system_uses_mte_async_or_asymm_mode())
-		__uaccess_enable_tco();
-}
-
 static inline void uaccess_disable_privileged(void)
 {
-	__uaccess_disable_tco();
+	mte_disable_tco();
 
 	if (uaccess_ttbr0_disable())
 		return;
@@ -194,7 +146,7 @@ static inline void uaccess_disable_privileged(void)
 
 static inline void uaccess_enable_privileged(void)
 {
-	__uaccess_enable_tco();
+	mte_enable_tco();
 
 	if (uaccess_ttbr0_enable())
 		return;
@@ -232,29 +184,40 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
  * The "__xxx_error" versions set the third argument to -EFAULT if an error
  * occurs, and leave it unchanged on success.
  */
-#define __get_mem_asm(load, reg, x, addr, err, type)			\
+#ifdef CONFIG_CC_HAS_ASM_GOTO_OUTPUT
+#define __get_mem_asm(load, reg, x, addr, label, type)			\
+	asm_goto_output(						\
+	"1:	" load "	" reg "0, [%1]\n"			\
+	_ASM_EXTABLE_##type##ACCESS_ERR(1b, %l2, %w0)			\
+	: "=r" (x)							\
+	: "r" (addr) : : label)
+#else
+#define __get_mem_asm(load, reg, x, addr, label, type) do {		\
+	int __gma_err = 0;						\
 	asm volatile(							\
 	"1:	" load "	" reg "1, [%2]\n"			\
 	"2:\n"								\
 	_ASM_EXTABLE_##type##ACCESS_ERR_ZERO(1b, 2b, %w0, %w1)		\
-	: "+r" (err), "=&r" (x)						\
-	: "r" (addr))
+	: "+r" (__gma_err), "=r" (x)					\
+	: "r" (addr));							\
+	if (__gma_err) goto label; } while (0)
+#endif
 
-#define __raw_get_mem(ldr, x, ptr, err, type)					\
+#define __raw_get_mem(ldr, x, ptr, label, type)					\
 do {										\
 	unsigned long __gu_val;							\
 	switch (sizeof(*(ptr))) {						\
 	case 1:									\
-		__get_mem_asm(ldr "b", "%w", __gu_val, (ptr), (err), type);	\
+		__get_mem_asm(ldr "b", "%w", __gu_val, (ptr), label, type);	\
 		break;								\
 	case 2:									\
-		__get_mem_asm(ldr "h", "%w", __gu_val, (ptr), (err), type);	\
+		__get_mem_asm(ldr "h", "%w", __gu_val, (ptr), label, type);	\
 		break;								\
 	case 4:									\
-		__get_mem_asm(ldr, "%w", __gu_val, (ptr), (err), type);		\
+		__get_mem_asm(ldr, "%w", __gu_val, (ptr), label, type);		\
 		break;								\
 	case 8:									\
-		__get_mem_asm(ldr, "%x",  __gu_val, (ptr), (err), type);	\
+		__get_mem_asm(ldr, "%x",  __gu_val, (ptr), label, type);	\
 		break;								\
 	default:								\
 		BUILD_BUG();							\
@@ -267,27 +230,34 @@ do {										\
  * uaccess_ttbr0_disable(). As `x` and `ptr` could contain blocking functions,
  * we must evaluate these outside of the critical section.
  */
-#define __raw_get_user(x, ptr, err)					\
+#define __raw_get_user(x, ptr, label)					\
 do {									\
 	__typeof__(*(ptr)) __user *__rgu_ptr = (ptr);			\
 	__typeof__(x) __rgu_val;					\
 	__chk_user_ptr(ptr);						\
-									\
-	uaccess_ttbr0_enable();						\
-	__raw_get_mem("ldtr", __rgu_val, __rgu_ptr, err, U);		\
-	uaccess_ttbr0_disable();					\
-									\
-	(x) = __rgu_val;						\
+	do {								\
+		__label__ __rgu_failed;					\
+		uaccess_ttbr0_enable();					\
+		__raw_get_mem("ldtr", __rgu_val, __rgu_ptr, __rgu_failed, U);	\
+		uaccess_ttbr0_disable();				\
+		(x) = __rgu_val;					\
+		break;							\
+	__rgu_failed:							\
+		uaccess_ttbr0_disable();				\
+		goto label;						\
+	} while (0);							\
 } while (0)
 
 #define __get_user_error(x, ptr, err)					\
 do {									\
+	__label__ __gu_failed;						\
 	__typeof__(*(ptr)) __user *__p = (ptr);				\
 	might_fault();							\
 	if (access_ok(__p, sizeof(*__p))) {				\
 		__p = uaccess_mask_ptr(__p);				\
-		__raw_get_user((x), __p, (err));			\
+		__raw_get_user((x), __p, __gu_failed);			\
 	} else {							\
+	__gu_failed:							\
 		(x) = (__force __typeof__(x))0; (err) = -EFAULT;	\
 	}								\
 } while (0)
@@ -302,48 +272,50 @@ do {									\
 #define get_user	__get_user
 
 /*
- * We must not call into the scheduler between __uaccess_enable_tco_async() and
- * __uaccess_disable_tco_async(). As `dst` and `src` may contain blocking
+ * We must not call into the scheduler between __mte_enable_tco_async() and
+ * __mte_disable_tco_async(). As `dst` and `src` may contain blocking
  * functions, we must evaluate these outside of the critical section.
  */
 #define __get_kernel_nofault(dst, src, type, err_label)			\
 do {									\
 	__typeof__(dst) __gkn_dst = (dst);				\
 	__typeof__(src) __gkn_src = (src);				\
-	int __gkn_err = 0;						\
+	do { 								\
+		__label__ __gkn_label;					\
 									\
-	__uaccess_enable_tco_async();					\
-	__raw_get_mem("ldr", *((type *)(__gkn_dst)),			\
-		      (__force type *)(__gkn_src), __gkn_err, K);	\
-	__uaccess_disable_tco_async();					\
-									\
-	if (unlikely(__gkn_err))					\
+		__mte_enable_tco_async();				\
+		__raw_get_mem("ldr", *((type *)(__gkn_dst)),		\
+		      (__force type *)(__gkn_src), __gkn_label, K);	\
+		__mte_disable_tco_async();				\
+		break;							\
+	__gkn_label:							\
+		__mte_disable_tco_async();				\
 		goto err_label;						\
+	} while (0);							\
 } while (0)
 
-#define __put_mem_asm(store, reg, x, addr, err, type)			\
-	asm volatile(							\
-	"1:	" store "	" reg "1, [%2]\n"			\
+#define __put_mem_asm(store, reg, x, addr, label, type)			\
+	asm goto(							\
+	"1:	" store "	" reg "0, [%1]\n"			\
 	"2:\n"								\
-	_ASM_EXTABLE_##type##ACCESS_ERR(1b, 2b, %w0)			\
-	: "+r" (err)							\
-	: "r" (x), "r" (addr))
+	_ASM_EXTABLE_##type##ACCESS(1b, %l2)				\
+	: : "rZ" (x), "r" (addr) : : label)
 
-#define __raw_put_mem(str, x, ptr, err, type)					\
+#define __raw_put_mem(str, x, ptr, label, type)					\
 do {										\
 	__typeof__(*(ptr)) __pu_val = (x);					\
 	switch (sizeof(*(ptr))) {						\
 	case 1:									\
-		__put_mem_asm(str "b", "%w", __pu_val, (ptr), (err), type);	\
+		__put_mem_asm(str "b", "%w", __pu_val, (ptr), label, type);	\
 		break;								\
 	case 2:									\
-		__put_mem_asm(str "h", "%w", __pu_val, (ptr), (err), type);	\
+		__put_mem_asm(str "h", "%w", __pu_val, (ptr), label, type);	\
 		break;								\
 	case 4:									\
-		__put_mem_asm(str, "%w", __pu_val, (ptr), (err), type);		\
+		__put_mem_asm(str, "%w", __pu_val, (ptr), label, type);		\
 		break;								\
 	case 8:									\
-		__put_mem_asm(str, "%x", __pu_val, (ptr), (err), type);		\
+		__put_mem_asm(str, "%x", __pu_val, (ptr), label, type);		\
 		break;								\
 	default:								\
 		BUILD_BUG();							\
@@ -355,25 +327,34 @@ do {										\
  * uaccess_ttbr0_disable(). As `x` and `ptr` could contain blocking functions,
  * we must evaluate these outside of the critical section.
  */
-#define __raw_put_user(x, ptr, err)					\
+#define __raw_put_user(x, ptr, label)					\
 do {									\
+	__label__ __rpu_failed;						\
 	__typeof__(*(ptr)) __user *__rpu_ptr = (ptr);			\
 	__typeof__(*(ptr)) __rpu_val = (x);				\
 	__chk_user_ptr(__rpu_ptr);					\
 									\
-	uaccess_ttbr0_enable();						\
-	__raw_put_mem("sttr", __rpu_val, __rpu_ptr, err, U);		\
-	uaccess_ttbr0_disable();					\
+	do {								\
+		uaccess_ttbr0_enable();					\
+		__raw_put_mem("sttr", __rpu_val, __rpu_ptr, __rpu_failed, U);	\
+		uaccess_ttbr0_disable();				\
+		break;							\
+	__rpu_failed:							\
+		uaccess_ttbr0_disable();				\
+		goto label;						\
+	} while (0);							\
 } while (0)
 
 #define __put_user_error(x, ptr, err)					\
 do {									\
+	__label__ __pu_failed;						\
 	__typeof__(*(ptr)) __user *__p = (ptr);				\
 	might_fault();							\
 	if (access_ok(__p, sizeof(*__p))) {				\
 		__p = uaccess_mask_ptr(__p);				\
-		__raw_put_user((x), __p, (err));			\
+		__raw_put_user((x), __p, __pu_failed);			\
 	} else	{							\
+	__pu_failed:							\
 		(err) = -EFAULT;					\
 	}								\
 } while (0)
@@ -388,23 +369,26 @@ do {									\
 #define put_user	__put_user
 
 /*
- * We must not call into the scheduler between __uaccess_enable_tco_async() and
- * __uaccess_disable_tco_async(). As `dst` and `src` may contain blocking
+ * We must not call into the scheduler between __mte_enable_tco_async() and
+ * __mte_disable_tco_async(). As `dst` and `src` may contain blocking
  * functions, we must evaluate these outside of the critical section.
  */
 #define __put_kernel_nofault(dst, src, type, err_label)			\
 do {									\
 	__typeof__(dst) __pkn_dst = (dst);				\
 	__typeof__(src) __pkn_src = (src);				\
-	int __pkn_err = 0;						\
 									\
-	__uaccess_enable_tco_async();					\
-	__raw_put_mem("str", *((type *)(__pkn_src)),			\
-		      (__force type *)(__pkn_dst), __pkn_err, K);	\
-	__uaccess_disable_tco_async();					\
-									\
-	if (unlikely(__pkn_err))					\
+	do {								\
+		__label__ __pkn_err;					\
+		__mte_enable_tco_async();				\
+		__raw_put_mem("str", *((type *)(__pkn_src)),		\
+			      (__force type *)(__pkn_dst), __pkn_err, K);	\
+		__mte_disable_tco_async();				\
+		break;							\
+	__pkn_err:							\
+		__mte_disable_tco_async();				\
 		goto err_label;						\
+	} while (0);							\
 } while(0)
 
 extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
@@ -429,6 +413,51 @@ extern unsigned long __must_check __arch_copy_to_user(void __user *to, const voi
 	__actu_ret;							\
 })
 
+static __must_check __always_inline bool user_access_begin(const void __user *ptr, size_t len)
+{
+	if (unlikely(!access_ok(ptr,len)))
+		return 0;
+	uaccess_ttbr0_enable();
+	return 1;
+}
+#define user_access_begin(a,b)	user_access_begin(a,b)
+#define user_access_end()	uaccess_ttbr0_disable()
+#define unsafe_put_user(x, ptr, label) \
+	__raw_put_mem("sttr", x, uaccess_mask_ptr(ptr), label, U)
+#define unsafe_get_user(x, ptr, label) \
+	__raw_get_mem("ldtr", x, uaccess_mask_ptr(ptr), label, U)
+
+/*
+ * KCSAN uses these to save and restore ttbr state.
+ * We do not support KCSAN with ARM64_SW_TTBR0_PAN, so
+ * they are no-ops.
+ */
+static inline unsigned long user_access_save(void) { return 0; }
+static inline void user_access_restore(unsigned long enabled) { }
+
+/*
+ * We want the unsafe accessors to always be inlined and use
+ * the error labels - thus the macro games.
+ */
+#define unsafe_copy_loop(dst, src, len, type, label)				\
+	while (len >= sizeof(type)) {						\
+		unsafe_put_user(*(type *)(src),(type __user *)(dst),label);	\
+		dst += sizeof(type);						\
+		src += sizeof(type);						\
+		len -= sizeof(type);						\
+	}
+
+#define unsafe_copy_to_user(_dst,_src,_len,label)			\
+do {									\
+	char __user *__ucu_dst = (_dst);				\
+	const char *__ucu_src = (_src);					\
+	size_t __ucu_len = (_len);					\
+	unsafe_copy_loop(__ucu_dst, __ucu_src, __ucu_len, u64, label);	\
+	unsafe_copy_loop(__ucu_dst, __ucu_src, __ucu_len, u32, label);	\
+	unsafe_copy_loop(__ucu_dst, __ucu_src, __ucu_len, u16, label);	\
+	unsafe_copy_loop(__ucu_dst, __ucu_src, __ucu_len, u8, label);	\
+} while (0)
+
 #define INLINE_COPY_TO_USER
 #define INLINE_COPY_FROM_USER
 
@@ -449,8 +478,6 @@ extern long strncpy_from_user(char *dest, const char __user *src, long count);
 extern __must_check long strnlen_user(const char __user *str, long n);
 
 #ifdef CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE
-struct page;
-void memcpy_page_flushcache(char *to, struct page *page, size_t offset, size_t len);
 extern unsigned long __must_check __copy_user_flushcache(void *to, const void __user *from, unsigned long n);
 
 static inline int __copy_from_user_flushcache(void *dst, const void __user *src, unsigned size)

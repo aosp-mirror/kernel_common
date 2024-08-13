@@ -26,7 +26,6 @@
 #include <linux/mnt_idmapping.h>
 #include <linux/iversion.h>
 #include <linux/security.h>
-#include <linux/evm.h>
 #include <linux/fsnotify.h>
 #include <linux/filelock.h>
 
@@ -600,7 +599,7 @@ EXPORT_SYMBOL(__posix_acl_chmod);
  * the vfsmount must be passed through @idmap. This function will then
  * take care to map the inode according to @idmap before checking
  * permissions. On non-idmapped mounts or if permission checking is to be
- * performed on the raw inode simply passs @nop_mnt_idmap.
+ * performed on the raw inode simply pass @nop_mnt_idmap.
  */
 int
  posix_acl_chmod(struct mnt_idmap *idmap, struct dentry *dentry,
@@ -700,7 +699,7 @@ EXPORT_SYMBOL_GPL(posix_acl_create);
  * the vfsmount must be passed through @idmap. This function will then
  * take care to map the inode according to @idmap before checking
  * permissions. On non-idmapped mounts or if permission checking is to be
- * performed on the raw inode simply passs @nop_mnt_idmap.
+ * performed on the raw inode simply pass @nop_mnt_idmap.
  *
  * Called from set_acl inode operations.
  */
@@ -786,12 +785,12 @@ struct posix_acl *posix_acl_from_xattr(struct user_namespace *userns,
 		return ERR_PTR(count);
 	if (count == 0)
 		return NULL;
-	
+
 	acl = posix_acl_alloc(count, GFP_NOFS);
 	if (!acl)
 		return ERR_PTR(-ENOMEM);
 	acl_e = acl->a_entries;
-	
+
 	for (end = entry + count; entry != end; acl_e++, entry++) {
 		acl_e->e_tag  = le16_to_cpu(entry->e_tag);
 		acl_e->e_perm = le16_to_cpu(entry->e_perm);
@@ -957,25 +956,62 @@ set_posix_acl(struct mnt_idmap *idmap, struct dentry *dentry,
 }
 EXPORT_SYMBOL(set_posix_acl);
 
+int posix_acl_listxattr(struct inode *inode, char **buffer,
+			ssize_t *remaining_size)
+{
+	int err;
+
+	if (!IS_POSIXACL(inode))
+		return 0;
+
+	if (inode->i_acl) {
+		err = xattr_list_one(buffer, remaining_size,
+				     XATTR_NAME_POSIX_ACL_ACCESS);
+		if (err)
+			return err;
+	}
+
+	if (inode->i_default_acl) {
+		err = xattr_list_one(buffer, remaining_size,
+				     XATTR_NAME_POSIX_ACL_DEFAULT);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
 static bool
 posix_acl_xattr_list(struct dentry *dentry)
 {
 	return IS_POSIXACL(d_backing_inode(dentry));
 }
 
-const struct xattr_handler posix_acl_access_xattr_handler = {
+/*
+ * nop_posix_acl_access - legacy xattr handler for access POSIX ACLs
+ *
+ * This is the legacy POSIX ACL access xattr handler. It is used by some
+ * filesystems to implement their ->listxattr() inode operation. New code
+ * should never use them.
+ */
+const struct xattr_handler nop_posix_acl_access = {
 	.name = XATTR_NAME_POSIX_ACL_ACCESS,
-	.flags = ACL_TYPE_ACCESS,
 	.list = posix_acl_xattr_list,
 };
-EXPORT_SYMBOL_GPL(posix_acl_access_xattr_handler);
+EXPORT_SYMBOL_GPL(nop_posix_acl_access);
 
-const struct xattr_handler posix_acl_default_xattr_handler = {
+/*
+ * nop_posix_acl_default - legacy xattr handler for default POSIX ACLs
+ *
+ * This is the legacy POSIX ACL default xattr handler. It is used by some
+ * filesystems to implement their ->listxattr() inode operation. New code
+ * should never use them.
+ */
+const struct xattr_handler nop_posix_acl_default = {
 	.name = XATTR_NAME_POSIX_ACL_DEFAULT,
-	.flags = ACL_TYPE_DEFAULT,
 	.list = posix_acl_xattr_list,
 };
-EXPORT_SYMBOL_GPL(posix_acl_default_xattr_handler);
+EXPORT_SYMBOL_GPL(nop_posix_acl_default);
 
 int simple_set_acl(struct mnt_idmap *idmap, struct dentry *dentry,
 		   struct posix_acl *acl, int type)
@@ -990,7 +1026,7 @@ int simple_set_acl(struct mnt_idmap *idmap, struct dentry *dentry,
 			return error;
 	}
 
-	inode->i_ctime = current_time(inode);
+	inode_set_ctime_current(inode);
 	if (IS_I_VERSION(inode))
 		inode_inc_iversion(inode);
 	set_cached_acl(inode, type, acl);
@@ -1094,15 +1130,13 @@ retry_deleg:
 	if (error)
 		goto out_inode_unlock;
 
-	if (inode->i_opflags & IOP_XATTR)
+	if (likely(!is_bad_inode(inode)))
 		error = set_posix_acl(idmap, dentry, acl_type, kacl);
-	else if (unlikely(is_bad_inode(inode)))
-		error = -EIO;
 	else
-		error = -EOPNOTSUPP;
+		error = -EIO;
 	if (!error) {
 		fsnotify_xattr(dentry);
-		evm_inode_post_set_acl(dentry, acl_name, kacl);
+		security_inode_post_set_acl(dentry, acl_name, kacl);
 	}
 
 out_inode_unlock:
@@ -1204,15 +1238,13 @@ retry_deleg:
 	if (error)
 		goto out_inode_unlock;
 
-	if (inode->i_opflags & IOP_XATTR)
+	if (likely(!is_bad_inode(inode)))
 		error = set_posix_acl(idmap, dentry, acl_type, NULL);
-	else if (unlikely(is_bad_inode(inode)))
-		error = -EIO;
 	else
-		error = -EOPNOTSUPP;
+		error = -EIO;
 	if (!error) {
 		fsnotify_xattr(dentry);
-		evm_inode_post_remove_acl(idmap, dentry, acl_name);
+		security_inode_post_remove_acl(idmap, dentry, acl_name);
 	}
 
 out_inode_unlock:

@@ -44,7 +44,7 @@ Procedura per sottomettere patch per i sorgenti -stable
 .. note::
   Una patch di sicurezza non dovrebbe essere gestita (solamente) dal processo
   di revisione -stable, ma dovrebbe seguire le procedure descritte in
-  :ref:`Documentation/translations/it_IT/admin-guide/security-bugs.rst <it_securitybugs>`.
+  :ref:`Documentation/translations/it_IT/process/security-bugs.rst <it_securitybugs>`.
 
 Per tutte le altre sottomissioni, scegliere una delle seguenti procedure
 ------------------------------------------------------------------------
@@ -105,6 +105,12 @@ al messaggio della patch, così:
 .. code-block:: none
 
     commit <sha1> upstream.
+
+o in alternativa:
+
+.. code-block:: none
+
+    [ Upstream commit <sha1>  ]
 
 In aggiunta, alcune patch inviate attraverso l':ref:`it_option_1` potrebbero
 dipendere da altre che devo essere incluse. Questa situazione può essere

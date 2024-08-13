@@ -127,7 +127,7 @@ static void dp_aux_ep_shutdown(struct device *dev)
 		aux_ep_drv->shutdown(to_dp_aux_ep_dev(dev));
 }
 
-static struct bus_type dp_aux_bus_type = {
+static const struct bus_type dp_aux_bus_type = {
 	.name		= "dp-aux",
 	.match		= dp_aux_ep_match,
 	.probe		= dp_aux_ep_probe,
@@ -161,9 +161,14 @@ static void dp_aux_ep_dev_release(struct device *dev)
 	kfree(aux_ep_with_data);
 }
 
+static int dp_aux_ep_dev_modalias(const struct device *dev, struct kobj_uevent_env *env)
+{
+	return of_device_uevent_modalias(dev, env);
+}
+
 static struct device_type dp_aux_device_type_type = {
 	.groups		= dp_aux_ep_dev_groups,
-	.uevent		= of_device_uevent_modalias,
+	.uevent		= dp_aux_ep_dev_modalias,
 	.release	= dp_aux_ep_dev_release,
 };
 

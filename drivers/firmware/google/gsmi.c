@@ -1030,7 +1030,7 @@ static __init int gsmi_init(void)
 	}
 
 #ifdef CONFIG_EFI
-	ret = efivars_register(&efivars, &efivar_ops, gsmi_kobj);
+	ret = efivars_register(&efivars, &efivar_ops);
 	if (ret) {
 		printk(KERN_INFO "gsmi: Failed to register efivars\n");
 		sysfs_remove_files(gsmi_kobj, gsmi_attrs);
@@ -1090,4 +1090,5 @@ module_init(gsmi_init);
 module_exit(gsmi_exit);
 
 MODULE_AUTHOR("Google, Inc.");
+MODULE_DESCRIPTION("EFI SMI interface for Google platforms");
 MODULE_LICENSE("GPL");

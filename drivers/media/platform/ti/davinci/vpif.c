@@ -465,8 +465,7 @@ static int vpif_probe(struct platform_device *pdev)
 	 * so their devices need to be registered manually here
 	 * for their legacy platform_drivers to work.
 	 */
-	endpoint = of_graph_get_next_endpoint(pdev->dev.of_node,
-					      endpoint);
+	endpoint = of_graph_get_endpoint_by_regs(pdev->dev.of_node, 0, -1);
 	if (!endpoint)
 		return 0;
 	of_node_put(endpoint);
@@ -480,7 +479,7 @@ static int vpif_probe(struct platform_device *pdev)
 		ret = irq;
 		goto err_put_rpm;
 	}
-	res_irq = (struct resource)DEFINE_RES_IRQ_NAMED(irq, of_node_full_name(pdev->dev.of_node));
+	res_irq = DEFINE_RES_IRQ_NAMED(irq, of_node_full_name(pdev->dev.of_node));
 	res_irq.flags |= irq_get_trigger_type(irq);
 
 	pdev_capture = kzalloc(sizeof(*pdev_capture), GFP_KERNEL);
@@ -538,7 +537,7 @@ err_put_rpm:
 	return ret;
 }
 
-static int vpif_remove(struct platform_device *pdev)
+static void vpif_remove(struct platform_device *pdev)
 {
 	struct vpif_data *data = platform_get_drvdata(pdev);
 
@@ -551,8 +550,6 @@ static int vpif_remove(struct platform_device *pdev)
 	pm_runtime_disable(&pdev->dev);
 
 	kfree(data);
-
-	return 0;
 }
 
 #ifdef CONFIG_PM
@@ -592,7 +589,7 @@ static struct platform_driver vpif_driver = {
 		.name	= VPIF_DRIVER_NAME,
 		.pm	= vpif_pm_ops,
 	},
-	.remove = vpif_remove,
+	.remove_new = vpif_remove,
 	.probe = vpif_probe,
 };
 

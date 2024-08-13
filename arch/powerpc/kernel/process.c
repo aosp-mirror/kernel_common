@@ -1182,6 +1182,12 @@ static inline void save_sprs(struct thread_struct *t)
 		 */
 		t->tar = mfspr(SPRN_TAR);
 	}
+
+	if (cpu_has_feature(CPU_FTR_DEXCR_NPHIE))
+		t->hashkeyr = mfspr(SPRN_HASHKEYR);
+
+	if (cpu_has_feature(CPU_FTR_ARCH_31))
+		t->dexcr = mfspr(SPRN_DEXCR);
 #endif
 }
 
@@ -1195,11 +1201,11 @@ void kvmppc_save_user_regs(void)
 
 	usermsr = current->thread.regs->msr;
 
+	/* Caller has enabled FP/VEC/VSX/TM in MSR */
 	if (usermsr & MSR_FP)
-		save_fpu(current);
-
+		__giveup_fpu(current);
 	if (usermsr & MSR_VEC)
-		save_altivec(current);
+		__giveup_altivec(current);
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	if (usermsr & MSR_TM) {
@@ -1260,6 +1266,14 @@ static inline void restore_sprs(struct thread_struct *old_thread,
 	if (cpu_has_feature(CPU_FTR_P9_TIDR) &&
 	    old_thread->tidr != new_thread->tidr)
 		mtspr(SPRN_TIDR, new_thread->tidr);
+
+	if (cpu_has_feature(CPU_FTR_DEXCR_NPHIE) &&
+	    old_thread->hashkeyr != new_thread->hashkeyr)
+		mtspr(SPRN_HASHKEYR, new_thread->hashkeyr);
+
+	if (cpu_has_feature(CPU_FTR_ARCH_31) &&
+	    old_thread->dexcr != new_thread->dexcr)
+		mtspr(SPRN_DEXCR, new_thread->dexcr);
 #endif
 
 }
@@ -1405,8 +1419,7 @@ static void show_instructions(struct pt_regs *regs)
 	for (i = 0; i < NR_INSN_TO_PRINT; i++) {
 		int instr;
 
-		if (!__kernel_text_address(pc) ||
-		    get_kernel_nofault(instr, (const void *)pc)) {
+		if (get_kernel_nofault(instr, (const void *)pc)) {
 			pr_cont("XXXXXXXX ");
 		} else {
 			if (nip == pc)
@@ -1628,10 +1641,17 @@ void arch_setup_new_exec(void)
 	current->thread.regs->amr  = default_amr;
 	current->thread.regs->iamr  = default_iamr;
 #endif
+
+#ifdef CONFIG_PPC_BOOK3S_64
+	if (cpu_has_feature(CPU_FTR_ARCH_31)) {
+		current->thread.dexcr = current->thread.dexcr_onexec;
+		mtspr(SPRN_DEXCR, current->thread.dexcr);
+	}
+#endif /* CONFIG_PPC_BOOK3S_64 */
 }
 
 #ifdef CONFIG_PPC64
-/**
+/*
  * Assign a TIDR (thread ID) for task @t and set it in the thread
  * structure. For now, we only support setting TIDR for 'current' task.
  *
@@ -1641,7 +1661,7 @@ void arch_setup_new_exec(void)
  * cases will happen:
  *
  * 1. The correct thread is running, the wrong thread is not
- * In this situation, the correct thread is woken and proceeds to pass it's
+ * In this situation, the correct thread is woken and proceeds to pass its
  * condition check.
  *
  * 2. Neither threads are running
@@ -1651,15 +1671,15 @@ void arch_setup_new_exec(void)
  * for the wrong thread, or they will execute the condition check immediately.
  *
  * 3. The wrong thread is running, the correct thread is not
- * The wrong thread will be woken, but will fail it's condition check and
+ * The wrong thread will be woken, but will fail its condition check and
  * re-execute wait. The correct thread, when scheduled, will execute either
- * it's condition check (which will pass), or wait, which returns immediately
- * when called the first time after the thread is scheduled, followed by it's
+ * its condition check (which will pass), or wait, which returns immediately
+ * when called the first time after the thread is scheduled, followed by its
  * condition check (which will pass).
  *
  * 4. Both threads are running
- * Both threads will be woken. The wrong thread will fail it's condition check
- * and execute another wait, while the correct thread will pass it's condition
+ * Both threads will be woken. The wrong thread will fail its condition check
+ * and execute another wait, while the correct thread will pass its condition
  * check.
  *
  * @t: the task to set the thread ID for
@@ -1739,68 +1759,83 @@ static void setup_ksp_vsid(struct task_struct *p, unsigned long sp)
  */
 int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 {
-	unsigned long clone_flags = args->flags;
-	unsigned long usp = args->stack;
-	unsigned long tls = args->tls;
-	struct pt_regs *childregs, *kregs;
+	struct pt_regs *kregs; /* Switch frame regs */
 	extern void ret_from_fork(void);
 	extern void ret_from_fork_scv(void);
-	extern void ret_from_kernel_thread(void);
+	extern void ret_from_kernel_user_thread(void);
+	extern void start_kernel_thread(void);
 	void (*f)(void);
 	unsigned long sp = (unsigned long)task_stack_page(p) + THREAD_SIZE;
-	struct thread_info *ti = task_thread_info(p);
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
 	int i;
 #endif
 
 	klp_init_thread_info(p);
 
-	/* Create initial stack frame. */
-	sp -= STACK_USER_INT_FRAME_SIZE;
-	*(unsigned long *)(sp + STACK_INT_FRAME_MARKER) = STACK_FRAME_REGS_MARKER;
-
-	/* Copy registers */
-	childregs = (struct pt_regs *)(sp + STACK_INT_FRAME_REGS);
-	if (unlikely(args->fn)) {
+	if (unlikely(p->flags & PF_KTHREAD)) {
 		/* kernel thread */
+
+		/* Create initial minimum stack frame. */
+		sp -= STACK_FRAME_MIN_SIZE;
 		((unsigned long *)sp)[0] = 0;
-		memset(childregs, 0, sizeof(struct pt_regs));
-		childregs->gpr[1] = sp + STACK_USER_INT_FRAME_SIZE;
-		/* function */
-		if (args->fn)
-			childregs->gpr[14] = ppc_function_entry((void *)args->fn);
-#ifdef CONFIG_PPC64
-		clear_tsk_thread_flag(p, TIF_32BIT);
-		childregs->softe = IRQS_ENABLED;
-#endif
-		childregs->gpr[15] = (unsigned long)args->fn_arg;
+
+		f = start_kernel_thread;
 		p->thread.regs = NULL;	/* no user register state */
-		ti->flags |= _TIF_RESTOREALL;
-		f = ret_from_kernel_thread;
+		clear_tsk_compat_task(p);
 	} else {
 		/* user thread */
-		struct pt_regs *regs = current_pt_regs();
-		*childregs = *regs;
-		if (usp)
-			childregs->gpr[1] = usp;
-		((unsigned long *)sp)[0] = childregs->gpr[1];
-		p->thread.regs = childregs;
-		/* 64s sets this in ret_from_fork */
-		if (!IS_ENABLED(CONFIG_PPC_BOOK3S_64))
-			childregs->gpr[3] = 0;  /* Result from fork() */
-		if (clone_flags & CLONE_SETTLS) {
-			if (!is_32bit_task())
-				childregs->gpr[13] = tls;
+		struct pt_regs *childregs;
+
+		/* Create initial user return stack frame. */
+		sp -= STACK_USER_INT_FRAME_SIZE;
+		*(unsigned long *)(sp + STACK_INT_FRAME_MARKER) = STACK_FRAME_REGS_MARKER;
+
+		childregs = (struct pt_regs *)(sp + STACK_INT_FRAME_REGS);
+
+		if (unlikely(args->fn)) {
+			/*
+			 * A user space thread, but it first runs a kernel
+			 * thread, and then returns as though it had called
+			 * execve rather than fork, so user regs will be
+			 * filled in (e.g., by kernel_execve()).
+			 */
+			((unsigned long *)sp)[0] = 0;
+			memset(childregs, 0, sizeof(struct pt_regs));
+#ifdef CONFIG_PPC64
+			childregs->softe = IRQS_ENABLED;
+#endif
+			f = ret_from_kernel_user_thread;
+		} else {
+			struct pt_regs *regs = current_pt_regs();
+			unsigned long clone_flags = args->flags;
+			unsigned long usp = args->stack;
+
+			/* Copy registers */
+			*childregs = *regs;
+			if (usp)
+				childregs->gpr[1] = usp;
+			((unsigned long *)sp)[0] = childregs->gpr[1];
+#ifdef CONFIG_PPC_IRQ_SOFT_MASK_DEBUG
+			WARN_ON_ONCE(childregs->softe != IRQS_ENABLED);
+#endif
+			if (clone_flags & CLONE_SETTLS) {
+				unsigned long tls = args->tls;
+
+				if (!is_32bit_task())
+					childregs->gpr[13] = tls;
+				else
+					childregs->gpr[2] = tls;
+			}
+
+			if (trap_is_scv(regs))
+				f = ret_from_fork_scv;
 			else
-				childregs->gpr[2] = tls;
+				f = ret_from_fork;
 		}
 
-		if (trap_is_scv(regs))
-			f = ret_from_fork_scv;
-		else
-			f = ret_from_fork;
+		childregs->msr &= ~(MSR_FP|MSR_VEC|MSR_VSX);
+		p->thread.regs = childregs;
 	}
-	childregs->msr &= ~(MSR_FP|MSR_VEC|MSR_VSX);
 
 	/*
 	 * The way this works is that at some point in the future
@@ -1814,6 +1849,16 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 	sp -= STACK_SWITCH_FRAME_SIZE;
 	((unsigned long *)sp)[0] = sp + STACK_SWITCH_FRAME_SIZE;
 	kregs = (struct pt_regs *)(sp + STACK_SWITCH_FRAME_REGS);
+	kregs->nip = ppc_function_entry(f);
+	if (unlikely(args->fn)) {
+		/*
+		 * Put kthread fn, arg parameters in non-volatile GPRs in the
+		 * switch frame so they are loaded by _switch before it returns
+		 * to ret_from_kernel_thread.
+		 */
+		kregs->gpr[14] = ppc_function_entry((void *)args->fn);
+		kregs->gpr[15] = (unsigned long)args->fn_arg;
+	}
 	p->thread.ksp = sp;
 
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
@@ -1841,22 +1886,16 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 		p->thread.dscr_inherit = current->thread.dscr_inherit;
 		p->thread.dscr = mfspr(SPRN_DSCR);
 	}
-	if (cpu_has_feature(CPU_FTR_HAS_PPR))
-		childregs->ppr = DEFAULT_PPR;
 
 	p->thread.tidr = 0;
 #endif
-	/*
-	 * Run with the current AMR value of the kernel
-	 */
-#ifdef CONFIG_PPC_PKEY
-	if (mmu_has_feature(MMU_FTR_BOOK3S_KUAP))
-		kregs->amr = AMR_KUAP_BLOCKED;
+#ifdef CONFIG_PPC_BOOK3S_64
+	if (cpu_has_feature(CPU_FTR_DEXCR_NPHIE))
+		p->thread.hashkeyr = current->thread.hashkeyr;
 
-	if (mmu_has_feature(MMU_FTR_BOOK3S_KUEP))
-		kregs->iamr = AMR_KUEP_BLOCKED;
+	if (cpu_has_feature(CPU_FTR_ARCH_31))
+		p->thread.dexcr = mfspr(SPRN_DEXCR);
 #endif
-	kregs->nip = ppc_function_entry(f);
 	return 0;
 }
 
@@ -1973,6 +2012,12 @@ void start_thread(struct pt_regs *regs, unsigned long start, unsigned long sp)
 	current->thread.tm_tfiar = 0;
 	current->thread.load_tm = 0;
 #endif /* CONFIG_PPC_TRANSACTIONAL_MEM */
+#ifdef CONFIG_PPC_BOOK3S_64
+	if (cpu_has_feature(CPU_FTR_DEXCR_NPHIE)) {
+		current->thread.hashkeyr = get_random_long();
+		mtspr(SPRN_HASHKEYR, current->thread.hashkeyr);
+	}
+#endif /* CONFIG_PPC_BOOK3S_64 */
 }
 EXPORT_SYMBOL(start_thread);
 
@@ -2118,6 +2163,9 @@ static inline int valid_irq_stack(unsigned long sp, struct task_struct *p,
 	unsigned long stack_page;
 	unsigned long cpu = task_cpu(p);
 
+	if (!hardirq_ctx[cpu] || !softirq_ctx[cpu])
+		return 0;
+
 	stack_page = (unsigned long)hardirq_ctx[cpu];
 	if (sp >= stack_page && sp <= stack_page + THREAD_SIZE - nbytes)
 		return 1;
@@ -2138,6 +2186,14 @@ static inline int valid_emergency_stack(unsigned long sp, struct task_struct *p,
 
 	if (!paca_ptrs)
 		return 0;
+
+	if (!paca_ptrs[cpu]->emergency_sp)
+		return 0;
+
+# ifdef CONFIG_PPC_BOOK3S_64
+	if (!paca_ptrs[cpu]->nmi_emergency_sp || !paca_ptrs[cpu]->mc_emergency_sp)
+		return 0;
+#endif
 
 	stack_page = (unsigned long)paca_ptrs[cpu]->emergency_sp - THREAD_SIZE;
 	if (sp >= stack_page && sp <= stack_page + THREAD_SIZE - nbytes)
@@ -2219,6 +2275,22 @@ unsigned long __get_wchan(struct task_struct *p)
 	return ret;
 }
 
+static bool empty_user_regs(struct pt_regs *regs, struct task_struct *tsk)
+{
+	unsigned long stack_page;
+
+	// A non-empty pt_regs should never have a zero MSR or TRAP value.
+	if (regs->msr || regs->trap)
+		return false;
+
+	// Check it sits at the very base of the stack
+	stack_page = (unsigned long)task_stack_page(tsk);
+	if ((unsigned long)(regs + 1) != stack_page + THREAD_SIZE)
+		return false;
+
+	return true;
+}
+
 static int kstack_depth_to_print = CONFIG_PRINT_STACK_DEPTH;
 
 void __no_sanitize_address show_stack(struct task_struct *tsk,
@@ -2283,9 +2355,13 @@ void __no_sanitize_address show_stack(struct task_struct *tsk,
 			lr = regs->link;
 			printk("%s--- interrupt: %lx at %pS\n",
 			       loglvl, regs->trap, (void *)regs->nip);
-			__show_regs(regs);
-			printk("%s--- interrupt: %lx\n",
-			       loglvl, regs->trap);
+
+			// Detect the case of an empty pt_regs at the very base
+			// of the stack and suppress showing it in full.
+			if (!empty_user_regs(regs, tsk)) {
+				__show_regs(regs);
+				printk("%s--- interrupt: %lx\n", loglvl, regs->trap);
+			}
 
 			firstframe = 1;
 		}

@@ -147,6 +147,20 @@ mlx5e_rep_setup_tc_cls_flower(struct mlx5e_priv *priv,
 	}
 }
 
+static void mlx5e_tc_stats_matchall(struct mlx5e_priv *priv,
+				    struct tc_cls_matchall_offload *ma)
+{
+	struct mlx5e_rep_priv *rpriv = priv->ppriv;
+	u64 dbytes;
+	u64 dpkts;
+
+	dpkts = priv->stats.rep_stats.vport_rx_packets - rpriv->prev_vf_vport_stats.rx_packets;
+	dbytes = priv->stats.rep_stats.vport_rx_bytes - rpriv->prev_vf_vport_stats.rx_bytes;
+	mlx5e_stats_copy_rep_stats(&rpriv->prev_vf_vport_stats, &priv->stats.rep_stats);
+	flow_stats_update(&ma->stats, dbytes, dpkts, 0, jiffies,
+			  FLOW_ACTION_HW_STATS_DELAYED);
+}
+
 static
 int mlx5e_rep_setup_tc_cls_matchall(struct mlx5e_priv *priv,
 				    struct tc_cls_matchall_offload *ma)
@@ -426,6 +440,46 @@ static bool mlx5e_rep_macvlan_mode_supported(const struct net_device *dev)
 	return macvlan->mode == MACVLAN_MODE_PASSTHRU;
 }
 
+static bool
+mlx5e_rep_check_indr_block_supported(struct mlx5e_rep_priv *rpriv,
+				     struct net_device *netdev,
+				     struct flow_block_offload *f)
+{
+	struct mlx5e_priv *priv = netdev_priv(rpriv->netdev);
+	struct mlx5_eswitch *esw = priv->mdev->priv.eswitch;
+	struct net_device *macvlan_real_dev;
+
+	if (f->binder_type != FLOW_BLOCK_BINDER_TYPE_CLSACT_INGRESS &&
+	    f->binder_type != FLOW_BLOCK_BINDER_TYPE_CLSACT_EGRESS)
+		return false;
+
+	if (mlx5e_tc_tun_device_to_offload(priv, netdev))
+		return true;
+
+	if (is_vlan_dev(netdev) && vlan_dev_real_dev(netdev) == rpriv->netdev)
+		return true;
+
+	if (netif_is_macvlan(netdev)) {
+		if (!mlx5e_rep_macvlan_mode_supported(netdev)) {
+			netdev_warn(netdev, "Offloading ingress filter is supported only with macvlan passthru mode");
+			return false;
+		}
+
+		macvlan_real_dev = macvlan_dev_real_dev(netdev);
+
+		if (macvlan_real_dev == rpriv->netdev)
+			return true;
+		if (netif_is_bond_master(macvlan_real_dev))
+			return true;
+	}
+
+	if (netif_is_ovs_master(netdev) && f->binder_type == FLOW_BLOCK_BINDER_TYPE_CLSACT_EGRESS &&
+	    mlx5e_tc_int_port_supported(esw))
+		return true;
+
+	return false;
+}
+
 static int
 mlx5e_rep_indr_setup_block(struct net_device *netdev, struct Qdisc *sch,
 			   struct mlx5e_rep_priv *rpriv,
@@ -434,31 +488,10 @@ mlx5e_rep_indr_setup_block(struct net_device *netdev, struct Qdisc *sch,
 			   void *data,
 			   void (*cleanup)(struct flow_block_cb *block_cb))
 {
-	struct mlx5e_priv *priv = netdev_priv(rpriv->netdev);
-	struct mlx5_eswitch *esw = priv->mdev->priv.eswitch;
-	bool is_ovs_int_port = netif_is_ovs_master(netdev);
 	struct mlx5e_rep_indr_block_priv *indr_priv;
 	struct flow_block_cb *block_cb;
 
-	if (!mlx5e_tc_tun_device_to_offload(priv, netdev) &&
-	    !(is_vlan_dev(netdev) && vlan_dev_real_dev(netdev) == rpriv->netdev) &&
-	    !is_ovs_int_port) {
-		if (!(netif_is_macvlan(netdev) && macvlan_dev_real_dev(netdev) == rpriv->netdev))
-			return -EOPNOTSUPP;
-		if (!mlx5e_rep_macvlan_mode_supported(netdev)) {
-			netdev_warn(netdev, "Offloading ingress filter is supported only with macvlan passthru mode");
-			return -EOPNOTSUPP;
-		}
-	}
-
-	if (f->binder_type != FLOW_BLOCK_BINDER_TYPE_CLSACT_INGRESS &&
-	    f->binder_type != FLOW_BLOCK_BINDER_TYPE_CLSACT_EGRESS)
-		return -EOPNOTSUPP;
-
-	if (f->binder_type == FLOW_BLOCK_BINDER_TYPE_CLSACT_EGRESS && !is_ovs_int_port)
-		return -EOPNOTSUPP;
-
-	if (is_ovs_int_port && !mlx5e_tc_int_port_supported(esw))
+	if (!mlx5e_rep_check_indr_block_supported(rpriv, netdev, f))
 		return -EOPNOTSUPP;
 
 	f->unlocked_driver_cb = true;
@@ -696,9 +729,20 @@ void mlx5e_rep_tc_receive(struct mlx5_cqe64 *cqe, struct mlx5e_rq *rq,
 	uplink_priv = &uplink_rpriv->uplink_priv;
 	ct_priv = uplink_priv->ct_priv;
 
-	if (!mlx5_ipsec_is_rx_flow(cqe) &&
-	    !mlx5e_tc_update_skb(cqe, skb, mapping_ctx, reg_c0, ct_priv, zone_restore_id, tunnel_id,
-				 &tc_priv))
+#ifdef CONFIG_MLX5_EN_IPSEC
+	if (!(tunnel_id >> ESW_TUN_OPTS_BITS)) {
+		u32 mapped_id;
+		u32 metadata;
+
+		mapped_id = tunnel_id & ESW_IPSEC_RX_MAPPED_ID_MASK;
+		if (mapped_id &&
+		    !mlx5_esw_ipsec_rx_make_metadata(priv, mapped_id, &metadata))
+			mlx5e_ipsec_offload_handle_rx_skb(priv->netdev, skb, metadata);
+	}
+#endif
+
+	if (!mlx5e_tc_update_skb(cqe, skb, mapping_ctx, reg_c0, ct_priv,
+				 zone_restore_id, tunnel_id, &tc_priv))
 		goto free_skb;
 
 forward:
@@ -710,11 +754,11 @@ forward:
 	else
 		napi_gro_receive(rq->cq.napi, skb);
 
-	if (tc_priv.fwd_dev)
-		dev_put(tc_priv.fwd_dev);
+	dev_put(tc_priv.fwd_dev);
 
 	return;
 
 free_skb:
+	dev_put(tc_priv.fwd_dev);
 	dev_kfree_skb_any(skb);
 }

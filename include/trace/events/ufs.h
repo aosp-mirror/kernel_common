@@ -92,7 +92,7 @@ TRACE_EVENT(ufshcd_clk_gating,
 	),
 
 	TP_fast_assign(
-		__assign_str(dev_name, dev_name);
+		__assign_str(dev_name);
 		__entry->state = state;
 	),
 
@@ -117,9 +117,9 @@ TRACE_EVENT(ufshcd_clk_scaling,
 	),
 
 	TP_fast_assign(
-		__assign_str(dev_name, dev_name);
-		__assign_str(state, state);
-		__assign_str(clk, clk);
+		__assign_str(dev_name);
+		__assign_str(state);
+		__assign_str(clk);
 		__entry->prev_state = prev_state;
 		__entry->curr_state = curr_state;
 	),
@@ -141,8 +141,8 @@ TRACE_EVENT(ufshcd_auto_bkops_state,
 	),
 
 	TP_fast_assign(
-		__assign_str(dev_name, dev_name);
-		__assign_str(state, state);
+		__assign_str(dev_name);
+		__assign_str(state);
 	),
 
 	TP_printk("%s: auto bkops - %s",
@@ -163,8 +163,8 @@ DECLARE_EVENT_CLASS(ufshcd_profiling_template,
 	),
 
 	TP_fast_assign(
-		__assign_str(dev_name, dev_name);
-		__assign_str(profile_info, profile_info);
+		__assign_str(dev_name);
+		__assign_str(profile_info);
 		__entry->time_us = time_us;
 		__entry->err = err;
 	),
@@ -206,7 +206,7 @@ DECLARE_EVENT_CLASS(ufshcd_template,
 	TP_fast_assign(
 		__entry->usecs = usecs;
 		__entry->err = err;
-		__assign_str(dev_name, dev_name);
+		__assign_str(dev_name);
 		__entry->dev_state = dev_state;
 		__entry->link_state = link_state;
 	),
@@ -267,43 +267,46 @@ DEFINE_EVENT(ufshcd_template, ufshcd_wl_runtime_resume,
 	     TP_ARGS(dev_name, err, usecs, dev_state, link_state));
 
 TRACE_EVENT(ufshcd_command,
-	TP_PROTO(const char *dev_name, enum ufs_trace_str_t str_t,
-		 unsigned int tag, u32 doorbell, int transfer_len, u32 intr,
-		 u64 lba, u8 opcode, u8 group_id),
+	TP_PROTO(struct scsi_device *sdev, enum ufs_trace_str_t str_t,
+		 unsigned int tag, u32 doorbell, u32 hwq_id, int transfer_len,
+		 u32 intr, u64 lba, u8 opcode, u8 group_id),
 
-	TP_ARGS(dev_name, str_t, tag, doorbell, transfer_len,
-				intr, lba, opcode, group_id),
+	TP_ARGS(sdev, str_t, tag, doorbell, hwq_id, transfer_len, intr, lba,
+		opcode, group_id),
 
 	TP_STRUCT__entry(
-		__string(dev_name, dev_name)
+		__field(struct scsi_device *, sdev)
 		__field(enum ufs_trace_str_t, str_t)
 		__field(unsigned int, tag)
 		__field(u32, doorbell)
-		__field(int, transfer_len)
+		__field(u32, hwq_id)
 		__field(u32, intr)
 		__field(u64, lba)
+		__field(int, transfer_len)
 		__field(u8, opcode)
 		__field(u8, group_id)
 	),
 
 	TP_fast_assign(
-		__assign_str(dev_name, dev_name);
+		__entry->sdev = sdev;
 		__entry->str_t = str_t;
 		__entry->tag = tag;
 		__entry->doorbell = doorbell;
-		__entry->transfer_len = transfer_len;
+		__entry->hwq_id = hwq_id;
 		__entry->intr = intr;
 		__entry->lba = lba;
+		__entry->transfer_len = transfer_len;
 		__entry->opcode = opcode;
 		__entry->group_id = group_id;
 	),
 
 	TP_printk(
-		"%s: %s: tag: %u, DB: 0x%x, size: %d, IS: %u, LBA: %llu, opcode: 0x%x (%s), group_id: 0x%x",
-		show_ufs_cmd_trace_str(__entry->str_t), __get_str(dev_name),
-		__entry->tag, __entry->doorbell, __entry->transfer_len,
-		__entry->intr, __entry->lba, (u32)__entry->opcode,
-		str_opcode(__entry->opcode), (u32)__entry->group_id
+		"%s: %s: tag: %u, DB: 0x%x, size: %d, IS: %u, LBA: %llu, opcode: 0x%x (%s), group_id: 0x%x, hwq_id: %d",
+		show_ufs_cmd_trace_str(__entry->str_t),
+		dev_name(&__entry->sdev->sdev_dev), __entry->tag,
+		__entry->doorbell, __entry->transfer_len, __entry->intr,
+		__entry->lba, (u32)__entry->opcode, str_opcode(__entry->opcode),
+		(u32)__entry->group_id, __entry->hwq_id
 	)
 );
 
@@ -323,7 +326,7 @@ TRACE_EVENT(ufshcd_uic_command,
 	),
 
 	TP_fast_assign(
-		__assign_str(dev_name, dev_name);
+		__assign_str(dev_name);
 		__entry->str_t = str_t;
 		__entry->cmd = cmd;
 		__entry->arg1 = arg1;
@@ -353,7 +356,7 @@ TRACE_EVENT(ufshcd_upiu,
 	),
 
 	TP_fast_assign(
-		__assign_str(dev_name, dev_name);
+		__assign_str(dev_name);
 		__entry->str_t = str_t;
 		memcpy(__entry->hdr, hdr, sizeof(__entry->hdr));
 		memcpy(__entry->tsf, tsf, sizeof(__entry->tsf));
@@ -381,7 +384,7 @@ TRACE_EVENT(ufshcd_exception_event,
 	),
 
 	TP_fast_assign(
-		__assign_str(dev_name, dev_name);
+		__assign_str(dev_name);
 		__entry->status = status;
 	),
 

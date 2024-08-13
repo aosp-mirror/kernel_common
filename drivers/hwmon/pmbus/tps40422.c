@@ -31,7 +31,7 @@ static int tps40422_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id tps40422_id[] = {
-	{"tps40422", 0},
+	{"tps40422"},
 	{}
 };
 
@@ -42,7 +42,7 @@ static struct i2c_driver tps40422_driver = {
 	.driver = {
 		   .name = "tps40422",
 		   },
-	.probe_new = tps40422_probe,
+	.probe = tps40422_probe,
 	.id_table = tps40422_id,
 };
 

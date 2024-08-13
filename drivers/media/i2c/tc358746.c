@@ -406,7 +406,7 @@ tc358746_apply_pll_config(struct tc358746 *tc358746)
 
 	val = PLL_FRS(ilog2(post)) | RESETB | PLL_EN;
 	mask = PLL_FRS_MASK | RESETB | PLL_EN;
-	tc358746_update_bits(tc358746, PLLCTL1_REG, mask, val);
+	err = tc358746_update_bits(tc358746, PLLCTL1_REG, mask, val);
 	if (err)
 		return err;
 
@@ -427,7 +427,7 @@ static int tc358746_apply_misc_config(struct tc358746 *tc358746)
 
 	sink_state = v4l2_subdev_lock_and_get_active_state(sd);
 
-	mbusfmt = v4l2_subdev_get_pad_format(sd, sink_state, TC358746_SINK);
+	mbusfmt = v4l2_subdev_state_get_format(sink_state, TC358746_SINK);
 	fmt = tc358746_get_format_by_code(TC358746_SINK, mbusfmt->code);
 
 	/* Self defined CSI user data type id's are not supported yet */
@@ -740,15 +740,15 @@ err_out:
 	return v4l2_subdev_call(src, video, s_stream, 0);
 }
 
-static int tc358746_init_cfg(struct v4l2_subdev *sd,
-			     struct v4l2_subdev_state *state)
+static int tc358746_init_state(struct v4l2_subdev *sd,
+			       struct v4l2_subdev_state *state)
 {
 	struct v4l2_mbus_framefmt *fmt;
 
-	fmt = v4l2_subdev_get_pad_format(sd, state, TC358746_SINK);
+	fmt = v4l2_subdev_state_get_format(state, TC358746_SINK);
 	*fmt = tc358746_def_fmt;
 
-	fmt = v4l2_subdev_get_pad_format(sd, state, TC358746_SOURCE);
+	fmt = v4l2_subdev_state_get_format(state, TC358746_SOURCE);
 	*fmt = tc358746_def_fmt;
 	fmt->code = tc358746_src_mbus_code(tc358746_def_fmt.code);
 
@@ -781,11 +781,15 @@ static int tc358746_set_fmt(struct v4l2_subdev *sd,
 	if (format->pad == TC358746_SOURCE)
 		return v4l2_subdev_get_fmt(sd, sd_state, format);
 
-	sink_fmt = v4l2_subdev_get_pad_format(sd, sd_state, TC358746_SINK);
+	sink_fmt = v4l2_subdev_state_get_format(sd_state, TC358746_SINK);
 
 	fmt = tc358746_get_format_by_code(format->pad, format->format.code);
-	if (IS_ERR(fmt))
+	if (IS_ERR(fmt)) {
 		fmt = tc358746_get_format_by_code(format->pad, tc358746_def_fmt.code);
+		// Can't happen, but just in case...
+		if (WARN_ON(IS_ERR(fmt)))
+			return -EINVAL;
+	}
 
 	format->format.code = fmt->code;
 	format->format.field = V4L2_FIELD_NONE;
@@ -796,7 +800,7 @@ static int tc358746_set_fmt(struct v4l2_subdev *sd,
 
 	*sink_fmt = format->format;
 
-	src_fmt = v4l2_subdev_get_pad_format(sd, sd_state, TC358746_SOURCE);
+	src_fmt = v4l2_subdev_state_get_format(sd_state, TC358746_SOURCE);
 	*src_fmt = *sink_fmt;
 	src_fmt->code = tc358746_src_mbus_code(sink_fmt->code);
 
@@ -813,8 +817,8 @@ static unsigned long tc358746_find_pll_settings(struct tc358746 *tc358746,
 	u32 min_delta = 0xffffffff;
 	u16 prediv_max = 17;
 	u16 prediv_min = 1;
-	u16 m_best, mul;
-	u16 p_best, p;
+	u16 m_best = 0, mul;
+	u16 p_best = 1, p;
 	u8 postdiv;
 
 	if (fout > 1000 * HZ_PER_MHZ) {
@@ -839,14 +843,13 @@ static unsigned long tc358746_find_pll_settings(struct tc358746 *tc358746,
 		if (fin < 4 * HZ_PER_MHZ || fin > 40 * HZ_PER_MHZ)
 			continue;
 
-		tmp = fout * p * postdiv;
-		do_div(tmp, fin);
-		mul = tmp;
+		tmp = fout * postdiv;
+		mul = div64_ul(tmp, fin);
 		if (mul > 511)
 			continue;
 
 		tmp = mul * fin;
-		do_div(tmp, p * postdiv);
+		do_div(tmp, postdiv);
 
 		delta = abs(fout - tmp);
 		if (delta < min_delta) {
@@ -854,11 +857,11 @@ static unsigned long tc358746_find_pll_settings(struct tc358746 *tc358746,
 			m_best = mul;
 			min_delta = delta;
 			best_freq = tmp;
-		};
+		}
 
 		if (delta == 0)
 			break;
-	};
+	}
 
 	if (!best_freq) {
 		dev_err(dev, "Failed find PLL frequency\n");
@@ -901,7 +904,7 @@ tc358746_link_validate(struct v4l2_subdev *sd, struct media_link *link,
 		return err;
 
 	sink_state = v4l2_subdev_lock_and_get_active_state(sd);
-	mbusfmt = v4l2_subdev_get_pad_format(sd, sink_state, TC358746_SINK);
+	mbusfmt = v4l2_subdev_state_get_format(sink_state, TC358746_SINK);
 
 	/* Check the FIFO settings */
 	fmt = tc358746_get_format_by_code(TC358746_SINK, mbusfmt->code);
@@ -988,6 +991,8 @@ static int __maybe_unused
 tc358746_g_register(struct v4l2_subdev *sd, struct v4l2_dbg_register *reg)
 {
 	struct tc358746 *tc358746 = to_tc358746(sd);
+	u32 val;
+	int err;
 
 	/* 32-bit registers starting from CLW_DPHYCONTTX */
 	reg->size = reg->reg < CLW_DPHYCONTTX_REG ? 2 : 4;
@@ -995,12 +1000,13 @@ tc358746_g_register(struct v4l2_subdev *sd, struct v4l2_dbg_register *reg)
 	if (!pm_runtime_get_if_in_use(sd->dev))
 		return 0;
 
-	tc358746_read(tc358746, reg->reg, (u32 *)&reg->val);
+	err = tc358746_read(tc358746, reg->reg, &val);
+	reg->val = val;
 
 	pm_runtime_mark_last_busy(sd->dev);
 	pm_runtime_put_sync_autosuspend(sd->dev);
 
-	return 0;
+	return err;
 }
 
 static int __maybe_unused
@@ -1031,7 +1037,6 @@ static const struct v4l2_subdev_video_ops tc358746_video_ops = {
 };
 
 static const struct v4l2_subdev_pad_ops tc358746_pad_ops = {
-	.init_cfg = tc358746_init_cfg,
 	.enum_mbus_code = tc358746_enum_mbus_code,
 	.set_fmt = tc358746_set_fmt,
 	.get_fmt = v4l2_subdev_get_fmt,
@@ -1043,6 +1048,10 @@ static const struct v4l2_subdev_ops tc358746_ops = {
 	.core = &tc358746_core_ops,
 	.video = &tc358746_video_ops,
 	.pad = &tc358746_pad_ops,
+};
+
+static const struct v4l2_subdev_internal_ops tc358746_internal_ops = {
+	.init_state = tc358746_init_state,
 };
 
 static const struct media_entity_operations tc358746_entity_ops = {
@@ -1275,6 +1284,7 @@ tc358746_init_subdev(struct tc358746 *tc358746, struct i2c_client *client)
 	int err;
 
 	v4l2_i2c_subdev_init(sd, client, &tc358746_ops);
+	sd->internal_ops = &tc358746_internal_ops;
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	sd->entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
 	sd->entity.ops = &tc358746_entity_ops;
@@ -1423,7 +1433,7 @@ static int tc358746_init_controls(struct tc358746 *tc358746)
 
 static int tc358746_notify_bound(struct v4l2_async_notifier *notifier,
 				 struct v4l2_subdev *sd,
-				 struct v4l2_async_subdev *asd)
+				 struct v4l2_async_connection *asd)
 {
 	struct tc358746 *tc358746 =
 		container_of(notifier, struct tc358746, notifier);
@@ -1442,7 +1452,7 @@ static int tc358746_async_register(struct tc358746 *tc358746)
 	struct v4l2_fwnode_endpoint vep = {
 		.bus_type = V4L2_MBUS_PARALLEL,
 	};
-	struct v4l2_async_subdev *asd;
+	struct v4l2_async_connection *asd;
 	struct fwnode_handle *ep;
 	int err;
 
@@ -1457,9 +1467,9 @@ static int tc358746_async_register(struct tc358746 *tc358746)
 		return err;
 	}
 
-	v4l2_async_nf_init(&tc358746->notifier);
+	v4l2_async_subdev_nf_init(&tc358746->notifier, &tc358746->sd);
 	asd = v4l2_async_nf_add_fwnode_remote(&tc358746->notifier, ep,
-					      struct v4l2_async_subdev);
+					      struct v4l2_async_connection);
 	fwnode_handle_put(ep);
 
 	if (IS_ERR(asd)) {
@@ -1469,12 +1479,9 @@ static int tc358746_async_register(struct tc358746 *tc358746)
 
 	tc358746->notifier.ops = &tc358746_notify_ops;
 
-	err = v4l2_async_subdev_nf_register(&tc358746->sd, &tc358746->notifier);
+	err = v4l2_async_nf_register(&tc358746->notifier);
 	if (err)
 		goto err_cleanup;
-
-	tc358746->sd.fwnode = fwnode_graph_get_endpoint_by_id(
-		dev_fwnode(tc358746->sd.dev), TC358746_SOURCE, 0, 0);
 
 	err = v4l2_async_register_subdev(&tc358746->sd);
 	if (err)
@@ -1483,7 +1490,6 @@ static int tc358746_async_register(struct tc358746 *tc358746)
 	return 0;
 
 err_unregister:
-	fwnode_handle_put(tc358746->sd.fwnode);
 	v4l2_async_nf_unregister(&tc358746->notifier);
 err_cleanup:
 	v4l2_async_nf_cleanup(&tc358746->notifier);
@@ -1602,7 +1608,6 @@ static void tc358746_remove(struct i2c_client *client)
 	v4l2_fwnode_endpoint_free(&tc358746->csi_vep);
 	v4l2_async_nf_unregister(&tc358746->notifier);
 	v4l2_async_nf_cleanup(&tc358746->notifier);
-	fwnode_handle_put(sd->fwnode);
 	v4l2_async_unregister_subdev(sd);
 	media_entity_cleanup(&sd->entity);
 
@@ -1683,7 +1688,7 @@ static struct i2c_driver tc358746_driver = {
 		.pm = pm_ptr(&tc358746_pm_ops),
 		.of_match_table = tc358746_of_match,
 	},
-	.probe_new = tc358746_probe,
+	.probe = tc358746_probe,
 	.remove = tc358746_remove,
 };
 

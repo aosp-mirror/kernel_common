@@ -9,9 +9,13 @@
 #include <linux/pci.h>
 #include <linux/mm.h>
 #include <cxlmem.h>
+
+#include "../watermark.h"
 #include "mock.h"
 
 static int interleave_arithmetic;
+
+#define FAKE_QTG_ID	42
 
 #define NR_CXL_HOST_BRIDGES 2
 #define NR_CXL_SINGLE_HOST 1
@@ -66,15 +70,19 @@ static struct acpi_device acpi0017_mock;
 static struct acpi_device host_bridge[NR_BRIDGES] = {
 	[0] = {
 		.handle = &host_bridge[0],
+		.pnp.unique_id = "0",
 	},
 	[1] = {
 		.handle = &host_bridge[1],
+		.pnp.unique_id = "1",
 	},
 	[2] = {
 		.handle = &host_bridge[2],
+		.pnp.unique_id = "2",
 	},
 	[3] = {
 		.handle = &host_bridge[3],
+		.pnp.unique_id = "3",
 	},
 };
 
@@ -203,7 +211,7 @@ static struct {
 			.granularity = 4,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_VOLATILE,
-			.qtg_id = 0,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M * 4UL,
 		},
 		.target = { 0 },
@@ -218,7 +226,7 @@ static struct {
 			.granularity = 4,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_VOLATILE,
-			.qtg_id = 1,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M * 8UL,
 		},
 		.target = { 0, 1, },
@@ -233,7 +241,7 @@ static struct {
 			.granularity = 4,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_PMEM,
-			.qtg_id = 2,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M * 4UL,
 		},
 		.target = { 0 },
@@ -248,7 +256,7 @@ static struct {
 			.granularity = 4,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_PMEM,
-			.qtg_id = 3,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M * 8UL,
 		},
 		.target = { 0, 1, },
@@ -263,7 +271,7 @@ static struct {
 			.granularity = 4,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_PMEM,
-			.qtg_id = 4,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M * 4UL,
 		},
 		.target = { 2 },
@@ -278,7 +286,7 @@ static struct {
 			.granularity = 4,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_VOLATILE,
-			.qtg_id = 5,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M,
 		},
 		.target = { 3 },
@@ -295,7 +303,7 @@ static struct {
 			.granularity = 4,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_PMEM,
-			.qtg_id = 0,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M * 8UL,
 		},
 		.target = { 0, },
@@ -311,7 +319,7 @@ static struct {
 			.granularity = 0,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_PMEM,
-			.qtg_id = 1,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M * 8UL,
 		},
 		.target = { 0, 1, },
@@ -327,7 +335,7 @@ static struct {
 			.granularity = 0,
 			.restrictions = ACPI_CEDT_CFMWS_RESTRICT_TYPE3 |
 					ACPI_CEDT_CFMWS_RESTRICT_PMEM,
-			.qtg_id = 0,
+			.qtg_id = FAKE_QTG_ID,
 			.window_size = SZ_256M * 16UL,
 		},
 		.target = { 0, 1, 0, 1, },
@@ -618,14 +626,19 @@ static struct acpi_pci_root *mock_acpi_pci_find_root(acpi_handle handle)
 	return &mock_pci_root[host_bridge_index(adev)];
 }
 
-static struct cxl_hdm *mock_cxl_setup_hdm(struct cxl_port *port)
+static struct cxl_hdm *mock_cxl_setup_hdm(struct cxl_port *port,
+					  struct cxl_endpoint_dvsec_info *info)
 {
 	struct cxl_hdm *cxlhdm = devm_kzalloc(&port->dev, sizeof(*cxlhdm), GFP_KERNEL);
+	struct device *dev = &port->dev;
 
 	if (!cxlhdm)
 		return ERR_PTR(-ENOMEM);
 
 	cxlhdm->port = port;
+	cxlhdm->interleave_mask = ~0U;
+	cxlhdm->iw_cap_mask = ~0UL;
+	dev_set_drvdata(dev, cxlhdm);
 	return cxlhdm;
 }
 
@@ -666,10 +679,11 @@ static int mock_decoder_commit(struct cxl_decoder *cxld)
 		return 0;
 
 	dev_dbg(&port->dev, "%s commit\n", dev_name(&cxld->dev));
-	if (port->commit_end + 1 != id) {
+	if (cxl_num_decoders_committed(port) != id) {
 		dev_dbg(&port->dev,
 			"%s: out of order commit, expected decoder%d.%d\n",
-			dev_name(&cxld->dev), port->id, port->commit_end + 1);
+			dev_name(&cxld->dev), port->id,
+			cxl_num_decoders_committed(port));
 		return -EBUSY;
 	}
 
@@ -701,7 +715,144 @@ static int mock_decoder_reset(struct cxl_decoder *cxld)
 	return 0;
 }
 
-static int mock_cxl_enumerate_decoders(struct cxl_hdm *cxlhdm)
+static void default_mock_decoder(struct cxl_decoder *cxld)
+{
+	cxld->hpa_range = (struct range){
+		.start = 0,
+		.end = -1,
+	};
+
+	cxld->interleave_ways = 1;
+	cxld->interleave_granularity = 256;
+	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->commit = mock_decoder_commit;
+	cxld->reset = mock_decoder_reset;
+}
+
+static int first_decoder(struct device *dev, void *data)
+{
+	struct cxl_decoder *cxld;
+
+	if (!is_switch_decoder(dev))
+		return 0;
+	cxld = to_cxl_decoder(dev);
+	if (cxld->id == 0)
+		return 1;
+	return 0;
+}
+
+static void mock_init_hdm_decoder(struct cxl_decoder *cxld)
+{
+	struct acpi_cedt_cfmws *window = mock_cfmws[0];
+	struct platform_device *pdev = NULL;
+	struct cxl_endpoint_decoder *cxled;
+	struct cxl_switch_decoder *cxlsd;
+	struct cxl_port *port, *iter;
+	const int size = SZ_512M;
+	struct cxl_memdev *cxlmd;
+	struct cxl_dport *dport;
+	struct device *dev;
+	bool hb0 = false;
+	u64 base;
+	int i;
+
+	if (is_endpoint_decoder(&cxld->dev)) {
+		cxled = to_cxl_endpoint_decoder(&cxld->dev);
+		cxlmd = cxled_to_memdev(cxled);
+		WARN_ON(!dev_is_platform(cxlmd->dev.parent));
+		pdev = to_platform_device(cxlmd->dev.parent);
+
+		/* check is endpoint is attach to host-bridge0 */
+		port = cxled_to_port(cxled);
+		do {
+			if (port->uport_dev == &cxl_host_bridge[0]->dev) {
+				hb0 = true;
+				break;
+			}
+			if (is_cxl_port(port->dev.parent))
+				port = to_cxl_port(port->dev.parent);
+			else
+				port = NULL;
+		} while (port);
+		port = cxled_to_port(cxled);
+	}
+
+	/*
+	 * The first decoder on the first 2 devices on the first switch
+	 * attached to host-bridge0 mock a fake / static RAM region. All
+	 * other decoders are default disabled. Given the round robin
+	 * assignment those devices are named cxl_mem.0, and cxl_mem.4.
+	 *
+	 * See 'cxl list -BMPu -m cxl_mem.0,cxl_mem.4'
+	 */
+	if (!hb0 || pdev->id % 4 || pdev->id > 4 || cxld->id > 0) {
+		default_mock_decoder(cxld);
+		return;
+	}
+
+	base = window->base_hpa;
+	cxld->hpa_range = (struct range) {
+		.start = base,
+		.end = base + size - 1,
+	};
+
+	cxld->interleave_ways = 2;
+	eig_to_granularity(window->granularity, &cxld->interleave_granularity);
+	cxld->target_type = CXL_DECODER_HOSTONLYMEM;
+	cxld->flags = CXL_DECODER_F_ENABLE;
+	cxled->state = CXL_DECODER_STATE_AUTO;
+	port->commit_end = cxld->id;
+	devm_cxl_dpa_reserve(cxled, 0, size / cxld->interleave_ways, 0);
+	cxld->commit = mock_decoder_commit;
+	cxld->reset = mock_decoder_reset;
+
+	/*
+	 * Now that endpoint decoder is set up, walk up the hierarchy
+	 * and setup the switch and root port decoders targeting @cxlmd.
+	 */
+	iter = port;
+	for (i = 0; i < 2; i++) {
+		dport = iter->parent_dport;
+		iter = dport->port;
+		dev = device_find_child(&iter->dev, NULL, first_decoder);
+		/*
+		 * Ancestor ports are guaranteed to be enumerated before
+		 * @port, and all ports have at least one decoder.
+		 */
+		if (WARN_ON(!dev))
+			continue;
+		cxlsd = to_cxl_switch_decoder(dev);
+		if (i == 0) {
+			/* put cxl_mem.4 second in the decode order */
+			if (pdev->id == 4)
+				cxlsd->target[1] = dport;
+			else
+				cxlsd->target[0] = dport;
+		} else
+			cxlsd->target[0] = dport;
+		cxld = &cxlsd->cxld;
+		cxld->target_type = CXL_DECODER_HOSTONLYMEM;
+		cxld->flags = CXL_DECODER_F_ENABLE;
+		iter->commit_end = 0;
+		/*
+		 * Switch targets 2 endpoints, while host bridge targets
+		 * one root port
+		 */
+		if (i == 0)
+			cxld->interleave_ways = 2;
+		else
+			cxld->interleave_ways = 1;
+		cxld->interleave_granularity = 4096;
+		cxld->hpa_range = (struct range) {
+			.start = base,
+			.end = base + size - 1,
+		};
+		put_device(dev);
+	}
+}
+
+static int mock_cxl_enumerate_decoders(struct cxl_hdm *cxlhdm,
+				       struct cxl_endpoint_dvsec_info *info)
 {
 	struct cxl_port *port = cxlhdm->port;
 	struct cxl_port *parent_port = to_cxl_port(port->dev.parent);
@@ -746,19 +897,10 @@ static int mock_cxl_enumerate_decoders(struct cxl_hdm *cxlhdm)
 			cxld = &cxled->cxld;
 		}
 
-		cxld->hpa_range = (struct range) {
-			.start = 0,
-			.end = -1,
-		};
-
-		cxld->interleave_ways = min_not_zero(target_count, 1);
-		cxld->interleave_granularity = SZ_4K;
-		cxld->target_type = CXL_DECODER_EXPANDER;
-		cxld->commit = mock_decoder_commit;
-		cxld->reset = mock_decoder_reset;
+		mock_init_hdm_decoder(cxld);
 
 		if (target_count) {
-			rc = device_for_each_child(port->uport, &ctx,
+			rc = device_for_each_child(port->uport_dev, &ctx,
 						   map_targets);
 			if (rc) {
 				put_device(&cxld->dev);
@@ -788,29 +930,29 @@ static int mock_cxl_port_enumerate_dports(struct cxl_port *port)
 	int i, array_size;
 
 	if (port->depth == 1) {
-		if (is_multi_bridge(port->uport)) {
+		if (is_multi_bridge(port->uport_dev)) {
 			array_size = ARRAY_SIZE(cxl_root_port);
 			array = cxl_root_port;
-		} else if (is_single_bridge(port->uport)) {
+		} else if (is_single_bridge(port->uport_dev)) {
 			array_size = ARRAY_SIZE(cxl_root_single);
 			array = cxl_root_single;
 		} else {
 			dev_dbg(&port->dev, "%s: unknown bridge type\n",
-				dev_name(port->uport));
+				dev_name(port->uport_dev));
 			return -ENXIO;
 		}
 	} else if (port->depth == 2) {
 		struct cxl_port *parent = to_cxl_port(port->dev.parent);
 
-		if (is_multi_bridge(parent->uport)) {
+		if (is_multi_bridge(parent->uport_dev)) {
 			array_size = ARRAY_SIZE(cxl_switch_dport);
 			array = cxl_switch_dport;
-		} else if (is_single_bridge(parent->uport)) {
+		} else if (is_single_bridge(parent->uport_dev)) {
 			array_size = ARRAY_SIZE(cxl_swd_single);
 			array = cxl_swd_single;
 		} else {
 			dev_dbg(&port->dev, "%s: unknown bridge type\n",
-				dev_name(port->uport));
+				dev_name(port->uport_dev));
 			return -ENXIO;
 		}
 	} else {
@@ -823,9 +965,9 @@ static int mock_cxl_port_enumerate_dports(struct cxl_port *port)
 		struct platform_device *pdev = array[i];
 		struct cxl_dport *dport;
 
-		if (pdev->dev.parent != port->uport) {
+		if (pdev->dev.parent != port->uport_dev) {
 			dev_dbg(&port->dev, "%s: mismatch parent %s\n",
-				dev_name(port->uport),
+				dev_name(port->uport_dev),
 				dev_name(pdev->dev.parent));
 			continue;
 		}
@@ -840,13 +982,55 @@ static int mock_cxl_port_enumerate_dports(struct cxl_port *port)
 	return 0;
 }
 
-resource_size_t mock_cxl_rcrb_to_component(struct device *dev,
-					   resource_size_t rcrb,
-					   enum cxl_rcrb which)
+/*
+ * Faking the cxl_dpa_perf for the memdev when appropriate.
+ */
+static void dpa_perf_setup(struct cxl_port *endpoint, struct range *range,
+			   struct cxl_dpa_perf *dpa_perf)
 {
-	dev_dbg(dev, "rcrb: %pa which: %d\n", &rcrb, which);
+	dpa_perf->qos_class = FAKE_QTG_ID;
+	dpa_perf->dpa_range = *range;
+	for (int i = 0; i < ACCESS_COORDINATE_MAX; i++) {
+		dpa_perf->coord[i].read_latency = 500;
+		dpa_perf->coord[i].write_latency = 500;
+		dpa_perf->coord[i].read_bandwidth = 1000;
+		dpa_perf->coord[i].write_bandwidth = 1000;
+	}
+}
 
-	return (resource_size_t) which + 1;
+static void mock_cxl_endpoint_parse_cdat(struct cxl_port *port)
+{
+	struct cxl_root *cxl_root __free(put_cxl_root) =
+		find_cxl_root(port);
+	struct cxl_memdev *cxlmd = to_cxl_memdev(port->uport_dev);
+	struct cxl_dev_state *cxlds = cxlmd->cxlds;
+	struct cxl_memdev_state *mds = to_cxl_memdev_state(cxlds);
+	struct access_coordinate ep_c[ACCESS_COORDINATE_MAX];
+	struct range pmem_range = {
+		.start = cxlds->pmem_res.start,
+		.end = cxlds->pmem_res.end,
+	};
+	struct range ram_range = {
+		.start = cxlds->ram_res.start,
+		.end = cxlds->ram_res.end,
+	};
+
+	if (!cxl_root)
+		return;
+
+	if (range_len(&ram_range))
+		dpa_perf_setup(port, &ram_range, &mds->ram_perf);
+
+	if (range_len(&pmem_range))
+		dpa_perf_setup(port, &pmem_range, &mds->pmem_perf);
+
+	cxl_memdev_update_perf(cxlmd);
+
+	/*
+	 * This function is here to only test the topology iterator. It serves
+	 * no other purpose.
+	 */
+	cxl_endpoint_get_perf_coordinates(port, ep_c);
 }
 
 static struct cxl_mock_ops cxl_mock_ops = {
@@ -857,12 +1041,12 @@ static struct cxl_mock_ops cxl_mock_ops = {
 	.is_mock_dev = is_mock_dev,
 	.acpi_table_parse_cedt = mock_acpi_table_parse_cedt,
 	.acpi_evaluate_integer = mock_acpi_evaluate_integer,
-	.cxl_rcrb_to_component = mock_cxl_rcrb_to_component,
 	.acpi_pci_find_root = mock_acpi_pci_find_root,
 	.devm_cxl_port_enumerate_dports = mock_cxl_port_enumerate_dports,
 	.devm_cxl_setup_hdm = mock_cxl_setup_hdm,
 	.devm_cxl_add_passthrough_decoder = mock_cxl_add_passthrough_decoder,
 	.devm_cxl_enumerate_decoders = mock_cxl_enumerate_decoders,
+	.cxl_endpoint_parse_cdat = mock_cxl_endpoint_parse_cdat,
 	.list = LIST_HEAD_INIT(cxl_mock_ops.list),
 };
 
@@ -876,10 +1060,6 @@ static void mock_companion(struct acpi_device *adev, struct device *dev)
 
 #ifndef SZ_64G
 #define SZ_64G (SZ_32G * 2)
-#endif
-
-#ifndef SZ_512G
-#define SZ_512G (SZ_64G * 8)
 #endif
 
 static __init int cxl_rch_init(void)
@@ -1119,6 +1299,12 @@ static __init int cxl_test_init(void)
 {
 	int rc, i;
 
+	cxl_acpi_test();
+	cxl_core_test();
+	cxl_mem_test();
+	cxl_pmem_test();
+	cxl_port_test();
+
 	register_cxl_mock_ops(&cxl_mock_ops);
 
 	cxl_mock_pool = gen_pool_create(ilog2(SZ_2M), NUMA_NO_NODE);
@@ -1135,11 +1321,9 @@ static __init int cxl_test_init(void)
 	if (interleave_arithmetic == 1) {
 		cfmws_start = CFMWS_XOR_ARRAY_START;
 		cfmws_end = CFMWS_XOR_ARRAY_END;
-		dev_dbg(NULL, "cxl_test loading xor math option\n");
 	} else {
 		cfmws_start = CFMWS_MOD_ARRAY_START;
 		cfmws_end = CFMWS_MOD_ARRAY_END;
-		dev_dbg(NULL, "cxl_test loading modulo math option\n");
 	}
 
 	rc = populate_cedt();
@@ -1326,7 +1510,7 @@ static __exit void cxl_test_exit(void)
 	unregister_cxl_mock_ops(&cxl_mock_ops);
 }
 
-module_param(interleave_arithmetic, int, 0000);
+module_param(interleave_arithmetic, int, 0444);
 MODULE_PARM_DESC(interleave_arithmetic, "Modulo:0, XOR:1");
 module_init(cxl_test_init);
 module_exit(cxl_test_exit);

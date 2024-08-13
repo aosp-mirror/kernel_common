@@ -466,7 +466,7 @@ static void mip4_report_touch(struct mip4_ts *ts, u8 *packet)
 {
 	int id;
 	bool __always_unused hover;
-	bool __always_unused palm;
+	bool palm;
 	bool state;
 	u16 x, y;
 	u8 __always_unused pressure_stage = 0;
@@ -522,21 +522,21 @@ static void mip4_report_touch(struct mip4_ts *ts, u8 *packet)
 
 	if (unlikely(id < 0 || id >= MIP4_MAX_FINGERS)) {
 		dev_err(&ts->client->dev, "Screen - invalid slot ID: %d\n", id);
-	} else if (state) {
-		/* Press or Move event */
-		input_mt_slot(ts->input, id);
-		input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, true);
+		goto out;
+	}
+
+	input_mt_slot(ts->input, id);
+	if (input_mt_report_slot_state(ts->input,
+				       palm ? MT_TOOL_PALM : MT_TOOL_FINGER,
+				       state)) {
 		input_report_abs(ts->input, ABS_MT_POSITION_X, x);
 		input_report_abs(ts->input, ABS_MT_POSITION_Y, y);
 		input_report_abs(ts->input, ABS_MT_PRESSURE, pressure);
 		input_report_abs(ts->input, ABS_MT_TOUCH_MAJOR, touch_major);
 		input_report_abs(ts->input, ABS_MT_TOUCH_MINOR, touch_minor);
-	} else {
-		/* Release event */
-		input_mt_slot(ts->input, id);
-		input_mt_report_slot_inactive(ts->input);
 	}
 
+out:
 	input_mt_sync_frame(ts->input);
 }
 
@@ -1336,9 +1336,9 @@ static ssize_t mip4_sysfs_read_fw_version(struct device *dev,
 	/* Take lock to prevent racing with firmware update */
 	mutex_lock(&ts->input->mutex);
 
-	count = snprintf(buf, PAGE_SIZE, "%04X %04X %04X %04X\n",
-			 ts->fw_version.boot, ts->fw_version.core,
-			 ts->fw_version.app, ts->fw_version.param);
+	count = sysfs_emit(buf, "%04X %04X %04X %04X\n",
+			   ts->fw_version.boot, ts->fw_version.core,
+			   ts->fw_version.app, ts->fw_version.param);
 
 	mutex_unlock(&ts->input->mutex);
 
@@ -1362,8 +1362,8 @@ static ssize_t mip4_sysfs_read_hw_version(struct device *dev,
 	 * product_name shows the name or version of the hardware
 	 * paired with current firmware in the chip.
 	 */
-	count = snprintf(buf, PAGE_SIZE, "%.*s\n",
-			 (int)sizeof(ts->product_name), ts->product_name);
+	count = sysfs_emit(buf, "%.*s\n",
+			   (int)sizeof(ts->product_name), ts->product_name);
 
 	mutex_unlock(&ts->input->mutex);
 
@@ -1382,7 +1382,7 @@ static ssize_t mip4_sysfs_read_product_id(struct device *dev,
 
 	mutex_lock(&ts->input->mutex);
 
-	count = snprintf(buf, PAGE_SIZE, "%04X\n", ts->product_id);
+	count = sysfs_emit(buf, "%04X\n", ts->product_id);
 
 	mutex_unlock(&ts->input->mutex);
 
@@ -1401,8 +1401,8 @@ static ssize_t mip4_sysfs_read_ic_name(struct device *dev,
 
 	mutex_lock(&ts->input->mutex);
 
-	count = snprintf(buf, PAGE_SIZE, "%.*s\n",
-			 (int)sizeof(ts->ic_name), ts->ic_name);
+	count = sysfs_emit(buf, "%.*s\n",
+			   (int)sizeof(ts->ic_name), ts->ic_name);
 
 	mutex_unlock(&ts->input->mutex);
 
@@ -1419,10 +1419,7 @@ static struct attribute *mip4_attrs[] = {
 	&dev_attr_update_fw.attr,
 	NULL,
 };
-
-static const struct attribute_group mip4_attr_group = {
-	.attrs = mip4_attrs,
-};
+ATTRIBUTE_GROUPS(mip4);
 
 static int mip4_probe(struct i2c_client *client)
 {
@@ -1451,13 +1448,8 @@ static int mip4_probe(struct i2c_client *client)
 
 	ts->gpio_ce = devm_gpiod_get_optional(&client->dev,
 					      "ce", GPIOD_OUT_LOW);
-	if (IS_ERR(ts->gpio_ce)) {
-		error = PTR_ERR(ts->gpio_ce);
-		if (error != -EPROBE_DEFER)
-			dev_err(&client->dev,
-				"Failed to get gpio: %d\n", error);
-		return error;
-	}
+	if (IS_ERR(ts->gpio_ce))
+		return dev_err_probe(&client->dev, PTR_ERR(ts->gpio_ce), "Failed to get gpio\n");
 
 	error = mip4_power_on(ts);
 	if (error)
@@ -1483,6 +1475,7 @@ static int mip4_probe(struct i2c_client *client)
 	input->keycodesize = sizeof(*ts->key_code);
 	input->keycodemax = ts->key_num;
 
+	input_set_abs_params(input, ABS_MT_TOOL_TYPE, 0, MT_TOOL_PALM, 0, 0);
 	input_set_abs_params(input, ABS_MT_POSITION_X, 0, ts->max_x, 0, 0);
 	input_set_abs_params(input, ABS_MT_POSITION_Y, 0, ts->max_y, 0, 0);
 	input_set_abs_params(input, ABS_MT_PRESSURE,
@@ -1518,17 +1511,10 @@ static int mip4_probe(struct i2c_client *client)
 		return error;
 	}
 
-	error = devm_device_add_group(&client->dev, &mip4_attr_group);
-	if (error) {
-		dev_err(&client->dev,
-			"Failed to create sysfs attribute group: %d\n", error);
-		return error;
-	}
-
 	return 0;
 }
 
-static int __maybe_unused mip4_suspend(struct device *dev)
+static int mip4_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mip4_ts *ts = i2c_get_clientdata(client);
@@ -1546,7 +1532,7 @@ static int __maybe_unused mip4_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused mip4_resume(struct device *dev)
+static int mip4_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mip4_ts *ts = i2c_get_clientdata(client);
@@ -1564,7 +1550,7 @@ static int __maybe_unused mip4_resume(struct device *dev)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(mip4_pm_ops, mip4_suspend, mip4_resume);
+static DEFINE_SIMPLE_DEV_PM_OPS(mip4_pm_ops, mip4_suspend, mip4_resume);
 
 #ifdef CONFIG_OF
 static const struct of_device_id mip4_of_match[] = {
@@ -1583,19 +1569,20 @@ MODULE_DEVICE_TABLE(acpi, mip4_acpi_match);
 #endif
 
 static const struct i2c_device_id mip4_i2c_ids[] = {
-	{ MIP4_DEVICE_NAME, 0 },
-	{ },
+	{ MIP4_DEVICE_NAME },
+	{ }
 };
 MODULE_DEVICE_TABLE(i2c, mip4_i2c_ids);
 
 static struct i2c_driver mip4_driver = {
 	.id_table = mip4_i2c_ids,
-	.probe_new = mip4_probe,
+	.probe = mip4_probe,
 	.driver = {
 		.name = MIP4_DEVICE_NAME,
+		.dev_groups = mip4_groups,
 		.of_match_table = of_match_ptr(mip4_of_match),
 		.acpi_match_table = ACPI_PTR(mip4_acpi_match),
-		.pm = &mip4_pm_ops,
+		.pm = pm_sleep_ptr(&mip4_pm_ops),
 	},
 };
 module_i2c_driver(mip4_driver);

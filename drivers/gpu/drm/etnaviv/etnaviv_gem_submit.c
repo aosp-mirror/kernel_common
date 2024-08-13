@@ -362,9 +362,6 @@ static void submit_cleanup(struct kref *kref)
 			container_of(kref, struct etnaviv_gem_submit, refcount);
 	unsigned i;
 
-	if (submit->runtime_resumed)
-		pm_runtime_put_autosuspend(submit->gpu->dev);
-
 	if (submit->cmdbuf.suballoc)
 		etnaviv_cmdbuf_free(&submit->cmdbuf);
 
@@ -393,10 +390,11 @@ static void submit_cleanup(struct kref *kref)
 	wake_up_all(&submit->gpu->fence_event);
 
 	if (submit->out_fence) {
-		/* first remove from IDR, so fence can not be found anymore */
-		mutex_lock(&submit->gpu->fence_lock);
-		idr_remove(&submit->gpu->fence_idr, submit->out_fence_id);
-		mutex_unlock(&submit->gpu->fence_lock);
+		/*
+		 * Remove from user fence array before dropping the reference,
+		 * so fence can not be found in lookup anymore.
+		 */
+		xa_erase(&submit->gpu->user_fences, submit->out_fence_id);
 		dma_fence_put(submit->out_fence);
 	}
 
@@ -537,7 +535,7 @@ int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 
 	ret = drm_sched_job_init(&submit->sched_job,
 				 &ctx->sched_entity[args->pipe],
-				 submit->ctx);
+				 1, submit->ctx);
 	if (ret)
 		goto err_submit_put;
 

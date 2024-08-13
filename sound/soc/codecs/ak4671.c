@@ -646,7 +646,7 @@ static int ak4671_i2c_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id ak4671_i2c_id[] = {
-	{ "ak4671", 0 },
+	{ "ak4671" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ak4671_i2c_id);
@@ -655,7 +655,7 @@ static struct i2c_driver ak4671_i2c_driver = {
 	.driver = {
 		.name = "ak4671-codec",
 	},
-	.probe_new = ak4671_i2c_probe,
+	.probe = ak4671_i2c_probe,
 	.id_table = ak4671_i2c_id,
 };
 

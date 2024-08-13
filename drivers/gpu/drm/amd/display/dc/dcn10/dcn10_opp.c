@@ -23,6 +23,7 @@
  *
  */
 
+#include "core_types.h"
 #include "dm_services.h"
 #include "dcn10_opp.h"
 #include "reg_helper.h"
@@ -37,14 +38,14 @@
 #define CTX \
 	oppn10->base.ctx
 
-
-/************* FORMATTER ************/
-
 /**
- *	set_truncation
+ * opp1_set_truncation():
  *	1) set truncation depth: 0 for 18 bpp or 1 for 24 bpp
  *	2) enable truncation
  *	3) HW remove 12bit FMT support for DCE11 power saving reason.
+ *
+ * @oppn10: output_pixel_processor struct instance for dcn10.
+ * @params: pointer to bit_depth_reduction_params.
  */
 static void opp1_set_truncation(
 		struct dcn10_opp *oppn10,
@@ -149,20 +150,28 @@ void opp1_program_bit_depth_reduction(
 }
 
 /**
- *	set_pixel_encoding
- *
- *	Set Pixel Encoding
+ * opp1_set_pixel_encoding():
  *		0: RGB 4:4:4 or YCbCr 4:4:4 or YOnly
  *		1: YCbCr 4:2:2
+ *
+ * @oppn10: output_pixel_processor struct instance for dcn10.
+ * @params: pointer to clamping_and_pixel_encoding_params.
  */
 static void opp1_set_pixel_encoding(
 	struct dcn10_opp *oppn10,
 	const struct clamping_and_pixel_encoding_params *params)
 {
+	bool force_chroma_subsampling_1tap =
+			oppn10->base.ctx->dc->debug.force_chroma_subsampling_1tap;
+
 	switch (params->pixel_encoding)	{
 
 	case PIXEL_ENCODING_RGB:
 	case PIXEL_ENCODING_YCBCR444:
+		REG_UPDATE_3(FMT_CONTROL,
+				FMT_PIXEL_ENCODING, 0,
+				FMT_SUBSAMPLING_MODE, 0,
+				FMT_CBCR_BIT_REDUCTION_BYPASS, 0);
 		REG_UPDATE(FMT_CONTROL, FMT_PIXEL_ENCODING, 0);
 		break;
 	case PIXEL_ENCODING_YCBCR422:
@@ -172,21 +181,30 @@ static void opp1_set_pixel_encoding(
 				FMT_CBCR_BIT_REDUCTION_BYPASS, 0);
 		break;
 	case PIXEL_ENCODING_YCBCR420:
-		REG_UPDATE(FMT_CONTROL, FMT_PIXEL_ENCODING, 2);
+		REG_UPDATE_3(FMT_CONTROL,
+				FMT_PIXEL_ENCODING, 2,
+				FMT_SUBSAMPLING_MODE, 2,
+				FMT_CBCR_BIT_REDUCTION_BYPASS, 1);
 		break;
 	default:
 		break;
 	}
+
+	if (force_chroma_subsampling_1tap)
+		REG_UPDATE(FMT_CONTROL,	FMT_SUBSAMPLING_MODE, 0);
 }
 
 /**
- *	Set Clamping
+ * opp1_set_clamping():
  *	1) Set clamping format based on bpc - 0 for 6bpc (No clamping)
  *		1 for 8 bpc
  *		2 for 10 bpc
  *		3 for 12 bpc
  *		7 for programable
  *	2) Enable clamp if Limited range requested
+ *
+ * @oppn10: output_pixel_processor struct instance for dcn10.
+ * @params: pointer to clamping_and_pixel_encoding_params.
  */
 static void opp1_set_clamping(
 	struct dcn10_opp *oppn10,
@@ -373,6 +391,7 @@ static const struct opp_funcs dcn10_opp_funcs = {
 		.opp_set_disp_pattern_generator = NULL,
 		.opp_program_dpg_dimensions = NULL,
 		.dpg_is_blanked = NULL,
+		.dpg_is_pending = NULL,
 		.opp_destroy = opp1_destroy
 };
 

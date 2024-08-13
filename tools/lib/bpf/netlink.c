@@ -45,6 +45,7 @@ struct xdp_id_md {
 
 struct xdp_features_md {
 	int ifindex;
+	__u32 xdp_zc_max_segs;
 	__u64 flags;
 };
 
@@ -421,6 +422,9 @@ static int parse_xdp_features(struct nlmsghdr *nh, libbpf_dump_nlmsg_t fn,
 		return NL_CONT;
 
 	md->flags = libbpf_nla_getattr_u64(tb[NETDEV_A_DEV_XDP_FEATURES]);
+	if (tb[NETDEV_A_DEV_XDP_ZC_MAX_SEGS])
+		md->xdp_zc_max_segs =
+			libbpf_nla_getattr_u32(tb[NETDEV_A_DEV_XDP_ZC_MAX_SEGS]);
 	return NL_DONE;
 }
 
@@ -468,8 +472,13 @@ int bpf_xdp_query(int ifindex, int xdp_flags, struct bpf_xdp_query_opts *opts)
 		return 0;
 
 	err = libbpf_netlink_resolve_genl_family_id("netdev", sizeof("netdev"), &id);
-	if (err < 0)
+	if (err < 0) {
+		if (err == -ENOENT) {
+			opts->feature_flags = 0;
+			goto skip_feature_flags;
+		}
 		return libbpf_err(err);
+	}
 
 	memset(&req, 0, sizeof(req));
 	req.nh.nlmsg_len = NLMSG_LENGTH(GENL_HDRLEN);
@@ -487,8 +496,10 @@ int bpf_xdp_query(int ifindex, int xdp_flags, struct bpf_xdp_query_opts *opts)
 	if (err)
 		return libbpf_err(err);
 
-	opts->feature_flags = md.flags;
+	OPTS_SET(opts, feature_flags, md.flags);
+	OPTS_SET(opts, xdp_zc_max_segs, md.xdp_zc_max_segs);
 
+skip_feature_flags:
 	return 0;
 }
 

@@ -38,7 +38,6 @@ static const void *ipvtap_net_namespace(const struct device *d)
 
 static struct class ipvtap_class = {
 	 .name = "ipvtap",
-	 .owner = THIS_MODULE,
 	 .ns_type = &net_ns_type_operations,
 	 .namespace = ipvtap_net_namespace,
 };
@@ -238,4 +237,5 @@ static void __exit ipvtap_exit(void)
 module_exit(ipvtap_exit);
 MODULE_ALIAS_RTNL_LINK("ipvtap");
 MODULE_AUTHOR("Sainath Grandhi <sainath.grandhi@intel.com>");
+MODULE_DESCRIPTION("IP-VLAN based tap driver");
 MODULE_LICENSE("GPL");

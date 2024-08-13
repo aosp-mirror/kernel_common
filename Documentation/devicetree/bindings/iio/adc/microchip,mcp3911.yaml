@@ -2,8 +2,8 @@
 # Copyright 2019 Marcus Folkesson <marcus.folkesson@gmail.com>
 %YAML 1.2
 ---
-$id: "http://devicetree.org/schemas/iio/adc/microchip,mcp3911.yaml#"
-$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+$id: http://devicetree.org/schemas/iio/adc/microchip,mcp3911.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
 
 title: Microchip MCP3911 Dual channel analog front end (ADC)
 
@@ -18,7 +18,13 @@ description: |
 properties:
   compatible:
     enum:
+      - microchip,mcp3910
       - microchip,mcp3911
+      - microchip,mcp3912
+      - microchip,mcp3913
+      - microchip,mcp3914
+      - microchip,mcp3918
+      - microchip,mcp3919
 
   reg:
     maxItems: 1

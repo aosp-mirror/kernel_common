@@ -16,8 +16,9 @@ description:
 properties:
   interrupts:
     description:
-      Specifies the TLMM summary IRQ
-    maxItems: 1
+      TLMM summary IRQ and dirconn interrupts.
+    minItems: 1
+    maxItems: 9
 
   interrupt-controller: true
 
@@ -51,7 +52,7 @@ properties:
       information.
 
 allOf:
-  - $ref: "pinctrl.yaml#"
+  - $ref: pinctrl.yaml#
 
 required:
   - interrupts
@@ -74,7 +75,9 @@ $defs:
       bias-pull-down: true
       bias-pull-up: true
       bias-disable: true
-      input-enable: true
+      input-enable: false
+      output-disable: true
+      output-enable: true
       output-high: true
       output-low: true
 

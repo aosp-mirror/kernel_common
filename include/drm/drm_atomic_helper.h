@@ -49,9 +49,8 @@ struct drm_private_state;
 
 int drm_atomic_helper_check_modeset(struct drm_device *dev,
 				struct drm_atomic_state *state);
-int
-drm_atomic_helper_check_wb_encoder_state(struct drm_encoder *encoder,
-					 struct drm_connector_state *conn_state);
+int drm_atomic_helper_check_wb_connector_state(struct drm_connector *connector,
+					       struct drm_atomic_state *state);
 int drm_atomic_helper_check_plane_state(struct drm_plane_state *plane_state,
 					const struct drm_crtc_state *crtc_state,
 					int min_scale,
@@ -97,6 +96,8 @@ void drm_atomic_helper_commit_modeset_enables(struct drm_device *dev,
 
 int drm_atomic_helper_prepare_planes(struct drm_device *dev,
 				     struct drm_atomic_state *state);
+void drm_atomic_helper_unprepare_planes(struct drm_device *dev,
+					struct drm_atomic_state *state);
 
 #define DRM_PLANE_COMMIT_ACTIVE_ONLY			BIT(0)
 #define DRM_PLANE_COMMIT_NO_DISABLE_AFTER_MODESET	BIT(1)
@@ -208,6 +209,32 @@ int drm_atomic_helper_page_flip_target(
 		for_each_if ((plane_state = \
 			      __drm_atomic_get_current_plane_state((crtc_state)->state, \
 								   plane)))
+
+/**
+ * drm_atomic_plane_enabling - check whether a plane is being enabled
+ * @old_plane_state: old atomic plane state
+ * @new_plane_state: new atomic plane state
+ *
+ * Checks the atomic state of a plane to determine whether it's being enabled
+ * or not. This also WARNs if it detects an invalid state (both CRTC and FB
+ * need to either both be NULL or both be non-NULL).
+ *
+ * RETURNS:
+ * True if the plane is being enabled, false otherwise.
+ */
+static inline bool drm_atomic_plane_enabling(struct drm_plane_state *old_plane_state,
+					     struct drm_plane_state *new_plane_state)
+{
+	/*
+	 * When enabling a plane, CRTC and FB should always be set together.
+	 * Anything else should be considered a bug in the atomic core, so we
+	 * gently warn about it.
+	 */
+	WARN_ON((!new_plane_state->crtc && new_plane_state->fb) ||
+		(new_plane_state->crtc && !new_plane_state->fb));
+
+	return !old_plane_state->crtc && new_plane_state->crtc;
+}
 
 /**
  * drm_atomic_plane_disabling - check whether a plane is being disabled

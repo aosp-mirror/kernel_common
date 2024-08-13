@@ -2,6 +2,8 @@
 #ifndef _VME_H_
 #define _VME_H_
 
+#include <linux/bitops.h>
+
 /* Resource Type */
 enum vme_resource_type {
 	VME_MASTER,
@@ -54,20 +56,20 @@ enum vme_resource_type {
 #define VME_R_ROBIN_MODE	0x1
 #define VME_PRIORITY_MODE	0x2
 
-#define VME_DMA_PATTERN			(1<<0)
-#define VME_DMA_PCI			(1<<1)
-#define VME_DMA_VME			(1<<2)
+#define VME_DMA_PATTERN		BIT(0)
+#define VME_DMA_PCI			BIT(1)
+#define VME_DMA_VME			BIT(2)
 
-#define VME_DMA_PATTERN_BYTE		(1<<0)
-#define VME_DMA_PATTERN_WORD		(1<<1)
-#define VME_DMA_PATTERN_INCREMENT	(1<<2)
+#define VME_DMA_PATTERN_BYTE		BIT(0)
+#define VME_DMA_PATTERN_WORD		BIT(1)
+#define VME_DMA_PATTERN_INCREMENT	BIT(2)
 
-#define VME_DMA_VME_TO_MEM		(1<<0)
-#define VME_DMA_MEM_TO_VME		(1<<1)
-#define VME_DMA_VME_TO_VME		(1<<2)
-#define VME_DMA_MEM_TO_MEM		(1<<3)
-#define VME_DMA_PATTERN_TO_VME		(1<<4)
-#define VME_DMA_PATTERN_TO_MEM		(1<<5)
+#define VME_DMA_VME_TO_MEM		BIT(0)
+#define VME_DMA_MEM_TO_VME		BIT(1)
+#define VME_DMA_VME_TO_VME		BIT(2)
+#define VME_DMA_MEM_TO_MEM		BIT(3)
+#define VME_DMA_PATTERN_TO_VME		BIT(4)
+#define VME_DMA_PATTERN_TO_MEM		BIT(5)
 
 struct vme_dma_attr {
 	u32 type;
@@ -79,13 +81,13 @@ struct vme_resource {
 	struct list_head *entry;
 };
 
-extern struct bus_type vme_bus_type;
+extern const struct bus_type vme_bus_type;
 
 /* Number of VME interrupt vectors */
 #define VME_NUM_STATUSID	256
 
 /* VME_MAX_BRIDGES comes from the type of vme_bus_numbers */
-#define VME_MAX_BRIDGES		(sizeof(unsigned int)*8)
+#define VME_MAX_BRIDGES		(sizeof(unsigned int) * 8)
 #define VME_MAX_SLOTS		32
 
 #define VME_SLOT_CURRENT	-1
@@ -131,8 +133,8 @@ void vme_free_consistent(struct vme_resource *, size_t,  void *,
 	dma_addr_t);
 
 size_t vme_get_size(struct vme_resource *);
-int vme_check_window(u32 aspace, unsigned long long vme_base,
-		     unsigned long long size);
+int vme_check_window(struct vme_bridge *bridge, u32 aspace,
+		     unsigned long long vme_base, unsigned long long size);
 
 struct vme_resource *vme_slave_request(struct vme_dev *, u32, u32);
 int vme_slave_set(struct vme_resource *, int, unsigned long long,

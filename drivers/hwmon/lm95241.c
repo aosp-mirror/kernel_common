@@ -409,7 +409,7 @@ static void lm95241_init_client(struct i2c_client *client,
 				  data->model);
 }
 
-static const struct hwmon_channel_info *lm95241_info[] = {
+static const struct hwmon_channel_info * const lm95241_info[] = {
 	HWMON_CHANNEL_INFO(chip,
 			   HWMON_C_UPDATE_INTERVAL),
 	HWMON_CHANNEL_INFO(temp,
@@ -457,8 +457,8 @@ static int lm95241_probe(struct i2c_client *client)
 
 /* Driver data (common to all clients) */
 static const struct i2c_device_id lm95241_id[] = {
-	{ "lm95231", 0 },
-	{ "lm95241", 0 },
+	{ "lm95231" },
+	{ "lm95241" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, lm95241_id);
@@ -468,7 +468,7 @@ static struct i2c_driver lm95241_driver = {
 	.driver = {
 		.name	= DEVNAME,
 	},
-	.probe_new	= lm95241_probe,
+	.probe		= lm95241_probe,
 	.id_table	= lm95241_id,
 	.detect		= lm95241_detect,
 	.address_list	= normal_i2c,

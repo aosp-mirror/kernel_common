@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0
 
 /* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019-2022 Linaro Ltd.
+ * Copyright (C) 2019-2024 Linaro Ltd.
  */
 
-#include <linux/types.h>
-#include <linux/bits.h>
 #include <linux/bitfield.h>
+#include <linux/bits.h>
+#include <linux/dma-direction.h>
 #include <linux/refcount.h>
 #include <linux/scatterlist.h>
-#include <linux/dma-direction.h>
+#include <linux/types.h>
 
 #include "gsi.h"
 #include "gsi_private.h"
 #include "gsi_trans.h"
-#include "ipa_gsi.h"
-#include "ipa_data.h"
 #include "ipa_cmd.h"
+#include "ipa_data.h"
+#include "ipa_gsi.h"
 
 /**
  * DOC: GSI Transactions
@@ -156,7 +156,7 @@ int gsi_trans_pool_init_dma(struct device *dev, struct gsi_trans_pool *pool,
 	 * gsi_trans_pool_exit_dma() can assume the total allocated
 	 * size is exactly (count * size).
 	 */
-	total_size = get_order(total_size) << PAGE_SHIFT;
+	total_size = PAGE_SIZE << get_order(total_size);
 
 	virt = dma_alloc_coherent(dev, total_size, &addr, GFP_KERNEL);
 	if (!virt)

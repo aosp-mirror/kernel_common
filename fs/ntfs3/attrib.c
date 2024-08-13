@@ -405,8 +405,8 @@ int attr_set_size(struct ntfs_inode *ni, enum ATTR_TYPE type,
 	int err = 0;
 	struct ntfs_sb_info *sbi = ni->mi.sbi;
 	u8 cluster_bits = sbi->cluster_bits;
-	bool is_mft =
-		ni->mi.rno == MFT_REC_MFT && type == ATTR_DATA && !name_len;
+	bool is_mft = ni->mi.rno == MFT_REC_MFT && type == ATTR_DATA &&
+		      !name_len;
 	u64 old_valid, old_size, old_alloc, new_alloc, new_alloc_tmp;
 	struct ATTRIB *attr = NULL, *attr_b;
 	struct ATTR_LIST_ENTRY *le, *le_b;
@@ -531,11 +531,10 @@ add_alloc_in_same_attr_seg:
 			pre_alloc = 0;
 			if (type == ATTR_DATA && !name_len &&
 			    sbi->options->prealloc) {
-				pre_alloc =
-					bytes_to_cluster(
-						sbi,
-						get_pre_allocated(new_size)) -
-					new_alen;
+				pre_alloc = bytes_to_cluster(
+						    sbi, get_pre_allocated(
+								 new_size)) -
+					    new_alen;
 			}
 
 			/* Get the last LCN to allocate from. */
@@ -573,8 +572,8 @@ add_alloc_in_same_attr_seg:
 			err = attr_allocate_clusters(
 				sbi, run, vcn, lcn, to_allocate, &pre_alloc,
 				is_mft ? ALLOCATE_MFT : ALLOCATE_DEF, &alen,
-				is_mft ? 0
-				       : (sbi->record_size -
+				is_mft ? 0 :
+					 (sbi->record_size -
 					  le32_to_cpu(rec->used) + 8) /
 							 3 +
 						 1,
@@ -887,7 +886,7 @@ int attr_data_get_block(struct ntfs_inode *ni, CLST vcn, CLST clen, CLST *lcn,
 	struct runs_tree *run = &ni->file.run;
 	struct ntfs_sb_info *sbi;
 	u8 cluster_bits;
-	struct ATTRIB *attr = NULL, *attr_b;
+	struct ATTRIB *attr, *attr_b;
 	struct ATTR_LIST_ENTRY *le, *le_b;
 	struct mft_inode *mi, *mi_b;
 	CLST hint, svcn, to_alloc, evcn1, next_svcn, asize, end, vcn0, alen;
@@ -905,12 +904,8 @@ int attr_data_get_block(struct ntfs_inode *ni, CLST vcn, CLST clen, CLST *lcn,
 		*len = 0;
 	up_read(&ni->file.run_lock);
 
-	if (*len) {
-		if (*lcn != SPARSE_LCN || !new)
-			return 0; /* Fast normal way without allocation. */
-		else if (clen > *len)
-			clen = *len;
-	}
+	if (*len && (*lcn != SPARSE_LCN || !new))
+		return 0; /* Fast normal way without allocation. */
 
 	/* No cluster in cache or we need to allocate cluster in hole. */
 	sbi = ni->mi.sbi;
@@ -918,6 +913,17 @@ int attr_data_get_block(struct ntfs_inode *ni, CLST vcn, CLST clen, CLST *lcn,
 
 	ni_lock(ni);
 	down_write(&ni->file.run_lock);
+
+	/* Repeat the code above (under write lock). */
+	if (!run_lookup_entry(run, vcn, lcn, len, NULL))
+		*len = 0;
+
+	if (*len) {
+		if (*lcn != SPARSE_LCN || !new)
+			goto out; /* normal way without allocation. */
+		if (clen > *len)
+			clen = *len;
+	}
 
 	le_b = NULL;
 	attr_b = ni_find_attr(ni, NULL, &le_b, ATTR_DATA, NULL, 0, NULL, &mi_b);
@@ -1107,10 +1113,10 @@ repack:
 		}
 	}
 
-	/* 
+	/*
 	 * The code below may require additional cluster (to extend attribute list)
-	 * and / or one MFT record 
-	 * It is too complex to undo operations if -ENOSPC occurs deep inside 
+	 * and / or one MFT record
+	 * It is too complex to undo operations if -ENOSPC occurs deep inside
 	 * in 'ni_insert_nonresident'.
 	 * Return in advance -ENOSPC here if there are no free cluster and no free MFT.
 	 */
@@ -1821,13 +1827,15 @@ ins_ext:
 ok:
 	run_truncate_around(run, vcn);
 out:
-	if (new_valid > data_size)
-		new_valid = data_size;
+	if (attr_b) {
+		if (new_valid > data_size)
+			new_valid = data_size;
 
-	valid_size = le64_to_cpu(attr_b->nres.valid_size);
-	if (new_valid != valid_size) {
-		attr_b->nres.valid_size = cpu_to_le64(valid_size);
-		mi_b->dirty = true;
+		valid_size = le64_to_cpu(attr_b->nres.valid_size);
+		if (new_valid != valid_size) {
+			attr_b->nres.valid_size = cpu_to_le64(valid_size);
+			mi_b->dirty = true;
+		}
 	}
 
 	return err;
@@ -2076,7 +2084,7 @@ next_attr:
 
 	/* Update inode size. */
 	ni->i_valid = valid_size;
-	ni->vfs_inode.i_size = data_size;
+	i_size_write(&ni->vfs_inode, data_size);
 	inode_set_bytes(&ni->vfs_inode, total_size);
 	ni->ni_flags |= NI_FLAG_UPDATE_PARENT;
 	mark_inode_dirty(&ni->vfs_inode);
@@ -2491,7 +2499,7 @@ int attr_insert_range(struct ntfs_inode *ni, u64 vbo, u64 bytes)
 	mi_b->dirty = true;
 
 done:
-	ni->vfs_inode.i_size += bytes;
+	i_size_write(&ni->vfs_inode, ni->vfs_inode.i_size + bytes);
 	ni->ni_flags |= NI_FLAG_UPDATE_PARENT;
 	mark_inode_dirty(&ni->vfs_inode);
 
@@ -2549,4 +2557,36 @@ undo_insert_range:
 	}
 
 	goto out;
+}
+
+/*
+ * attr_force_nonresident
+ *
+ * Convert default data attribute into non resident form.
+ */
+int attr_force_nonresident(struct ntfs_inode *ni)
+{
+	int err;
+	struct ATTRIB *attr;
+	struct ATTR_LIST_ENTRY *le = NULL;
+	struct mft_inode *mi;
+
+	attr = ni_find_attr(ni, NULL, &le, ATTR_DATA, NULL, 0, NULL, &mi);
+	if (!attr) {
+		ntfs_bad_inode(&ni->vfs_inode, "no data attribute");
+		return -ENOENT;
+	}
+
+	if (attr->non_res) {
+		/* Already non resident. */
+		return 0;
+	}
+
+	down_write(&ni->file.run_lock);
+	err = attr_make_nonresident(ni, attr, le, mi,
+				    le32_to_cpu(attr->res.data_size),
+				    &ni->file.run, &attr, NULL);
+	up_write(&ni->file.run_lock);
+
+	return err;
 }

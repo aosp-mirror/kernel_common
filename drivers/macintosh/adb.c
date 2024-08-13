@@ -74,13 +74,15 @@ static struct adb_driver *adb_driver_list[] = {
 	NULL
 };
 
-static struct class *adb_dev_class;
+static const struct class adb_dev_class = {
+	.name = "adb",
+};
 
 static struct adb_driver *adb_controller;
 BLOCKING_NOTIFIER_HEAD(adb_client_list);
 static int adb_got_sleep;
 static int adb_inited;
-static DEFINE_SEMAPHORE(adb_probe_mutex);
+static DEFINE_SEMAPHORE(adb_probe_mutex, 1);
 static int sleepy_trackpad;
 static int autopoll_devs;
 int __adb_probe_sync;
@@ -888,10 +890,10 @@ adbdev_init(void)
 		return;
 	}
 
-	adb_dev_class = class_create(THIS_MODULE, "adb");
-	if (IS_ERR(adb_dev_class))
+	if (class_register(&adb_dev_class))
 		return;
-	device_create(adb_dev_class, NULL, MKDEV(ADB_MAJOR, 0), NULL, "adb");
+
+	device_create(&adb_dev_class, NULL, MKDEV(ADB_MAJOR, 0), NULL, "adb");
 
 	platform_device_register(&adb_pfdev);
 	platform_driver_probe(&adb_pfdrv, adb_dummy_probe);

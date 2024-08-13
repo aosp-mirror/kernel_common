@@ -29,6 +29,7 @@
 #include <asm/hw_irq.h>
 #include <asm/stacktrace.h>
 #include <asm/softirq_stack.h>
+#include <asm/vtime.h>
 #include "entry.h"
 
 DEFINE_PER_CPU_SHARED_ALIGNED(struct irq_stat, irq_stat);
@@ -150,6 +151,7 @@ void noinstr do_io_irq(struct pt_regs *regs)
 	if (from_idle)
 		account_idle_time_irq();
 
+	set_cpu_flag(CIF_NOHZ_DELAY);
 	do {
 		regs->tpi_info = S390_lowcore.tpi_info;
 		if (S390_lowcore.tpi_info.adapter_IO)
@@ -385,7 +387,7 @@ void irq_subclass_register(enum irq_subclass subclass)
 {
 	spin_lock(&irq_subclass_lock);
 	if (!irq_subclass_refcount[subclass])
-		ctl_set_bit(0, subclass);
+		system_ctl_set_bit(0, subclass);
 	irq_subclass_refcount[subclass]++;
 	spin_unlock(&irq_subclass_lock);
 }
@@ -396,7 +398,7 @@ void irq_subclass_unregister(enum irq_subclass subclass)
 	spin_lock(&irq_subclass_lock);
 	irq_subclass_refcount[subclass]--;
 	if (!irq_subclass_refcount[subclass])
-		ctl_clear_bit(0, subclass);
+		system_ctl_clear_bit(0, subclass);
 	spin_unlock(&irq_subclass_lock);
 }
 EXPORT_SYMBOL(irq_subclass_unregister);

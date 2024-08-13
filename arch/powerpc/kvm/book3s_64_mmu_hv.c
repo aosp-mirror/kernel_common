@@ -28,6 +28,7 @@
 #include <asm/pte-walk.h>
 
 #include "book3s.h"
+#include "book3s_hv.h"
 #include "trace_hv.h"
 
 //#define DEBUG_RESIZE_HPT	1
@@ -120,13 +121,13 @@ void kvmppc_set_hpt(struct kvm *kvm, struct kvm_hpt_info *info)
 	kvm->arch.hpt = *info;
 	kvm->arch.sdr1 = __pa(info->virt) | (info->order - 18);
 
-	pr_debug("KVM guest htab at %lx (order %ld), LPID %x\n",
+	pr_debug("KVM guest htab at %lx (order %ld), LPID %llx\n",
 		 info->virt, (long)info->order, kvm->arch.lpid);
 }
 
-long kvmppc_alloc_reset_hpt(struct kvm *kvm, int order)
+int kvmppc_alloc_reset_hpt(struct kvm *kvm, int order)
 {
-	long err = -EBUSY;
+	int err = -EBUSY;
 	struct kvm_hpt_info info;
 
 	mutex_lock(&kvm->arch.mmu_setup_lock);
@@ -182,7 +183,7 @@ void kvmppc_free_hpt(struct kvm_hpt_info *info)
 	vfree(info->rev);
 	info->rev = NULL;
 	if (info->cma)
-		kvm_free_hpt_cma(virt_to_page(info->virt),
+		kvm_free_hpt_cma(virt_to_page((void *)info->virt),
 				 1 << (info->order - PAGE_SHIFT));
 	else if (info->virt)
 		free_pages(info->virt, info->order - PAGE_SHIFT);
@@ -347,7 +348,7 @@ static int kvmppc_mmu_book3s_64_hv_xlate(struct kvm_vcpu *vcpu, gva_t eaddr,
 	unsigned long v, orig_v, gr;
 	__be64 *hptep;
 	long int index;
-	int virtmode = vcpu->arch.shregs.msr & (data ? MSR_DR : MSR_IR);
+	int virtmode = __kvmppc_get_msr_hv(vcpu) & (data ? MSR_DR : MSR_IR);
 
 	if (kvm_is_radix(vcpu->kvm))
 		return kvmppc_mmu_radix_xlate(vcpu, eaddr, gpte, data, iswrite);
@@ -385,7 +386,7 @@ static int kvmppc_mmu_book3s_64_hv_xlate(struct kvm_vcpu *vcpu, gva_t eaddr,
 
 	/* Get PP bits and key for permission check */
 	pp = gr & (HPTE_R_PP0 | HPTE_R_PP);
-	key = (vcpu->arch.shregs.msr & MSR_PR) ? SLB_VSID_KP : SLB_VSID_KS;
+	key = (__kvmppc_get_msr_hv(vcpu) & MSR_PR) ? SLB_VSID_KP : SLB_VSID_KS;
 	key &= slb_v;
 
 	/* Calculate permissions */
@@ -415,20 +416,25 @@ static int kvmppc_mmu_book3s_64_hv_xlate(struct kvm_vcpu *vcpu, gva_t eaddr,
  * embodied here.)  If the instruction isn't a load or store, then
  * this doesn't return anything useful.
  */
-static int instruction_is_store(unsigned int instr)
+static int instruction_is_store(ppc_inst_t instr)
 {
 	unsigned int mask;
+	unsigned int suffix;
 
 	mask = 0x10000000;
-	if ((instr & 0xfc000000) == 0x7c000000)
+	suffix = ppc_inst_val(instr);
+	if (ppc_inst_prefixed(instr))
+		suffix = ppc_inst_suffix(instr);
+	else if ((suffix & 0xfc000000) == 0x7c000000)
 		mask = 0x100;		/* major opcode 31 */
-	return (instr & mask) != 0;
+	return (suffix & mask) != 0;
 }
 
 int kvmppc_hv_emulate_mmio(struct kvm_vcpu *vcpu,
 			   unsigned long gpa, gva_t ea, int is_store)
 {
-	u32 last_inst;
+	ppc_inst_t last_inst;
+	bool is_prefixed = !!(kvmppc_get_msr(vcpu) & SRR1_PREFIXED);
 
 	/*
 	 * Fast path - check if the guest physical address corresponds to a
@@ -443,7 +449,7 @@ int kvmppc_hv_emulate_mmio(struct kvm_vcpu *vcpu,
 				       NULL);
 		srcu_read_unlock(&vcpu->kvm->srcu, idx);
 		if (!ret) {
-			kvmppc_set_pc(vcpu, kvmppc_get_pc(vcpu) + 4);
+			kvmppc_set_pc(vcpu, kvmppc_get_pc(vcpu) + (is_prefixed ? 8 : 4));
 			return RESUME_GUEST;
 		}
 	}
@@ -458,7 +464,16 @@ int kvmppc_hv_emulate_mmio(struct kvm_vcpu *vcpu,
 	/*
 	 * WARNING: We do not know for sure whether the instruction we just
 	 * read from memory is the same that caused the fault in the first
-	 * place.  If the instruction we read is neither an load or a store,
+	 * place.
+	 *
+	 * If the fault is prefixed but the instruction is not or vice
+	 * versa, try again so that we don't advance pc the wrong amount.
+	 */
+	if (ppc_inst_prefixed(last_inst) != is_prefixed)
+		return RESUME_GUEST;
+
+	/*
+	 * If the instruction we read is neither an load or a store,
 	 * then it can't access memory, so we don't need to worry about
 	 * enforcing access permissions.  So, assuming it is a load or
 	 * store, we just check that its direction (load or store) is
@@ -995,18 +1010,6 @@ bool kvm_test_age_gfn_hv(struct kvm *kvm, struct kvm_gfn_range *range)
 		return kvm_test_age_rmapp(kvm, range->slot, range->start);
 }
 
-bool kvm_set_spte_gfn_hv(struct kvm *kvm, struct kvm_gfn_range *range)
-{
-	WARN_ON(range->start + 1 != range->end);
-
-	if (kvm_is_radix(kvm))
-		kvm_unmap_radix(kvm, range->slot, range->start);
-	else
-		kvm_unmap_rmapp(kvm, range->slot, range->start);
-
-	return false;
-}
-
 static int vcpus_running(struct kvm *kvm)
 {
 	return atomic_read(&kvm->arch.vcpus_running) != 0;
@@ -1468,8 +1471,8 @@ static void resize_hpt_prepare_work(struct work_struct *work)
 	mutex_unlock(&kvm->arch.mmu_setup_lock);
 }
 
-long kvm_vm_ioctl_resize_hpt_prepare(struct kvm *kvm,
-				     struct kvm_ppc_resize_hpt *rhpt)
+int kvm_vm_ioctl_resize_hpt_prepare(struct kvm *kvm,
+				    struct kvm_ppc_resize_hpt *rhpt)
 {
 	unsigned long flags = rhpt->flags;
 	unsigned long shift = rhpt->shift;
@@ -1534,13 +1537,13 @@ static void resize_hpt_boot_vcpu(void *opaque)
 	/* Nothing to do, just force a KVM exit */
 }
 
-long kvm_vm_ioctl_resize_hpt_commit(struct kvm *kvm,
-				    struct kvm_ppc_resize_hpt *rhpt)
+int kvm_vm_ioctl_resize_hpt_commit(struct kvm *kvm,
+				   struct kvm_ppc_resize_hpt *rhpt)
 {
 	unsigned long flags = rhpt->flags;
 	unsigned long shift = rhpt->shift;
 	struct kvm_resize_hpt *resize;
-	long ret;
+	int ret;
 
 	if (flags != 0 || kvm_is_radix(kvm))
 		return -EINVAL;

@@ -85,19 +85,17 @@ static int try_to_freeze_tasks(bool user_only)
 	elapsed = ktime_sub(end, start);
 	elapsed_msecs = ktime_to_ms(elapsed);
 
-	if (wakeup) {
-		pr_err("Freezing %s aborted after %d.%03d seconds\n", what,
-		       elapsed_msecs / 1000, elapsed_msecs % 1000);
-	} else if (todo) {
-		pr_err("Freezing %s failed after %d.%03d seconds "
+	if (todo) {
+		pr_err("Freezing %s %s after %d.%03d seconds "
 		       "(%d tasks refusing to freeze, wq_busy=%d):\n", what,
+		       wakeup ? "aborted" : "failed",
 		       elapsed_msecs / 1000, elapsed_msecs % 1000,
 		       todo - wq_busy, wq_busy);
 
 		if (wq_busy)
-			show_all_workqueues();
+			show_freezable_workqueues();
 
-		if (pm_debug_messages_on) {
+		if (!wakeup || pm_debug_messages_on) {
 			read_lock(&tasklist_lock);
 			for_each_process_thread(g, p) {
 				if (p != current && freezing(p) && !frozen(p))
@@ -195,8 +193,6 @@ void thaw_processes(void)
 
 	__usermodehelper_set_disable_depth(UMH_FREEZING);
 	thaw_workqueues();
-
-	cpuset_wait_for_hotplug();
 
 	read_lock(&tasklist_lock);
 	for_each_process_thread(g, p) {

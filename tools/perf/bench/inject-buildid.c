@@ -12,6 +12,7 @@
 #include <linux/time64.h>
 #include <linux/list.h>
 #include <linux/err.h>
+#include <linux/zalloc.h>
 #include <internal/lib.h>
 #include <subcmd/parse-options.h>
 
@@ -122,7 +123,7 @@ static void release_dso(void)
 	for (i = 0; i < nr_dsos; i++) {
 		struct bench_dso *dso = &dsos[i];
 
-		free(dso->name);
+		zfree(&dso->name);
 	}
 	free(dsos);
 }
@@ -361,7 +362,7 @@ static int inject_build_id(struct bench_data *data, u64 *max_rss)
 		return -1;
 
 	for (i = 0; i < nr_mmaps; i++) {
-		int idx = rand() % (nr_dsos - 1);
+		int idx = rand() % nr_dsos;
 		struct bench_dso *dso = &dsos[idx];
 		u64 timestamp = rand() % 1000000;
 

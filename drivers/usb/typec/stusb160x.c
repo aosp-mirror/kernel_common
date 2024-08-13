@@ -234,7 +234,7 @@ static const struct regmap_config stusb1600_regmap_config = {
 	.readable_reg	= stusb160x_reg_readable,
 	.volatile_reg	= stusb160x_reg_volatile,
 	.precious_reg	= stusb160x_reg_precious,
-	.cache_type	= REGCACHE_RBTREE,
+	.cache_type	= REGCACHE_MAPLE,
 };
 
 static bool stusb160x_get_vconn(struct stusb160x *chip)
@@ -870,7 +870,7 @@ static struct i2c_driver stusb160x_driver = {
 		.pm = &stusb160x_pm_ops,
 		.of_match_table = stusb160x_of_match,
 	},
-	.probe_new = stusb160x_probe,
+	.probe = stusb160x_probe,
 	.remove = stusb160x_remove,
 };
 module_i2c_driver(stusb160x_driver);

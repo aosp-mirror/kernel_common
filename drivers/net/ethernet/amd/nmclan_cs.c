@@ -651,7 +651,7 @@ static int nmclan_config(struct pcmcia_device *link)
     } else {
       pr_notice("mace id not found: %x %x should be 0x40 0x?9\n",
 		sig[0], sig[1]);
-      return -ENODEV;
+      goto failed;
     }
   }
 
@@ -760,7 +760,7 @@ static int mace_config(struct net_device *dev, struct ifmap *map)
 {
   if ((map->port != (u_char)(-1)) && (map->port != dev->if_port)) {
     if (map->port <= 2) {
-      dev->if_port = map->port;
+      WRITE_ONCE(dev->if_port, map->port);
       netdev_info(dev, "switched to %s port\n", if_names[dev->if_port]);
     } else
       return -EINVAL;

@@ -233,7 +233,7 @@ static int ds620_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id ds620_id[] = {
-	{"ds620", 0},
+	{"ds620"},
 	{}
 };
 
@@ -241,11 +241,10 @@ MODULE_DEVICE_TABLE(i2c, ds620_id);
 
 /* This is the driver that will be inserted */
 static struct i2c_driver ds620_driver = {
-	.class = I2C_CLASS_HWMON,
 	.driver = {
 		   .name = "ds620",
 	},
-	.probe_new = ds620_probe,
+	.probe = ds620_probe,
 	.id_table = ds620_id,
 };
 

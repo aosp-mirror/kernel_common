@@ -215,7 +215,7 @@ static int acp3x_dma_open(struct snd_soc_component *component,
 	int ret;
 
 	runtime = substream->runtime;
-	prtd = asoc_substream_to_rtd(substream);
+	prtd = snd_soc_substream_to_rtd(substream);
 	component = snd_soc_rtdcom_lookup(prtd, DRV_NAME);
 	adata = dev_get_drvdata(component->dev);
 	i2s_data = kzalloc(sizeof(*i2s_data), GFP_KERNEL);
@@ -252,7 +252,7 @@ static int acp3x_dma_hw_params(struct snd_soc_component *component,
 	struct i2s_dev_data *adata;
 	u64 size;
 
-	prtd = asoc_substream_to_rtd(substream);
+	prtd = snd_soc_substream_to_rtd(substream);
 	card = prtd->card;
 	pinfo = snd_soc_card_get_drvdata(card);
 	adata = dev_get_drvdata(component->dev);
@@ -327,7 +327,7 @@ static int acp3x_dma_close(struct snd_soc_component *component,
 	struct i2s_dev_data *adata;
 	struct i2s_stream_instance *ins;
 
-	prtd = asoc_substream_to_rtd(substream);
+	prtd = snd_soc_substream_to_rtd(substream);
 	component = snd_soc_rtdcom_lookup(prtd, DRV_NAME);
 	adata = dev_get_drvdata(component->dev);
 	ins = substream->runtime->private_data;
@@ -416,15 +416,15 @@ static int acp3x_audio_probe(struct platform_device *pdev)
 
 	pm_runtime_set_autosuspend_delay(&pdev->dev, 2000);
 	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_mark_last_busy(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
-	pm_runtime_allow(&pdev->dev);
 	return 0;
 }
 
-static int acp3x_audio_remove(struct platform_device *pdev)
+static void acp3x_audio_remove(struct platform_device *pdev)
 {
 	pm_runtime_disable(&pdev->dev);
-	return 0;
 }
 
 static int acp3x_resume(struct device *dev)
@@ -509,7 +509,7 @@ static const struct dev_pm_ops acp3x_pm_ops = {
 
 static struct platform_driver acp3x_dma_driver = {
 	.probe = acp3x_audio_probe,
-	.remove = acp3x_audio_remove,
+	.remove_new = acp3x_audio_remove,
 	.driver = {
 		.name = "acp3x_rv_i2s_dma",
 		.pm = &acp3x_pm_ops,

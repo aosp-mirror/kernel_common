@@ -32,8 +32,6 @@
 #include <linux/hsi/hsi.h>
 #include <linux/hsi/ssi_protocol.h>
 
-void ssi_waketest(struct hsi_client *cl, unsigned int enable);
-
 #define SSIP_TXQUEUE_LEN	100
 #define SSIP_MAX_MTU		65535
 #define SSIP_DEFAULT_MTU	4000
@@ -116,9 +114,10 @@ enum {
  * @netdev: Phonet network device
  * @txqueue: TX data queue
  * @cmdqueue: Queue of free commands
+ * @work: &struct work_struct for scheduled work
  * @cl: HSI client own reference
  * @link: Link for ssip_list
- * @tx_usecount: Refcount to keep track the slaves that use the wake line
+ * @tx_usecnt: Refcount to keep track the slaves that use the wake line
  * @channel_id_cmd: HSI channel id for command stream
  * @channel_id_data: HSI channel id for data stream
  */

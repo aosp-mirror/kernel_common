@@ -17,6 +17,79 @@
 #include "phy.h"
 #include "mac.h"
 
+static const struct rtw_hw_reg_desc fw_h2c_regs[] = {
+	{REG_FWIMR, MASKDWORD, "FWIMR"},
+	{REG_FWIMR, BIT_FS_H2CCMD_INT_EN, "FWIMR enable"},
+	{REG_FWISR, MASKDWORD, "FWISR"},
+	{REG_FWISR, BIT_FS_H2CCMD_INT, "FWISR enable"},
+	{REG_HMETFR, BIT_INT_BOX_ALL, "BoxBitMap"},
+	{REG_HMEBOX0, MASKDWORD, "MSG 0"},
+	{REG_HMEBOX0_EX, MASKDWORD, "MSG_EX 0"},
+	{REG_HMEBOX1, MASKDWORD, "MSG 1"},
+	{REG_HMEBOX1_EX, MASKDWORD, "MSG_EX 1"},
+	{REG_HMEBOX2, MASKDWORD, "MSG 2"},
+	{REG_HMEBOX2_EX, MASKDWORD, "MSG_EX 2"},
+	{REG_HMEBOX3, MASKDWORD, "MSG 3"},
+	{REG_HMEBOX3_EX, MASKDWORD, "MSG_EX 3"},
+	{REG_FT1IMR, MASKDWORD, "FT1IMR"},
+	{REG_FT1IMR, BIT_FS_H2C_CMD_OK_INT_EN, "FT1IMR enable"},
+	{REG_FT1ISR, MASKDWORD, "FT1ISR"},
+	{REG_FT1ISR, BIT_FS_H2C_CMD_OK_INT, "FT1ISR enable "},
+};
+
+static const struct rtw_hw_reg_desc fw_c2h_regs[] = {
+	{REG_FWIMR, MASKDWORD, "FWIMR"},
+	{REG_FWIMR, BIT_FS_H2CCMD_INT_EN, "CPWM"},
+	{REG_FWIMR, BIT_FS_HRCV_INT_EN, "HRECV"},
+	{REG_FWISR, MASKDWORD, "FWISR"},
+	{REG_FWISR, BIT_FS_H2CCMD_INT, "CPWM"},
+	{REG_FWISR, BIT_FS_HRCV_INT, "HRECV"},
+	{REG_CPWM, MASKDWORD, "REG_CPWM"},
+};
+
+static const struct rtw_hw_reg_desc fw_core_regs[] = {
+	{REG_ARFR2_V1, MASKDWORD, "EPC"},
+	{REG_ARFRH2_V1, MASKDWORD, "BADADDR"},
+	{REG_ARFR3_V1, MASKDWORD, "CAUSE"},
+	{REG_ARFR3_V1, BIT_EXC_CODE, "ExcCode"},
+	{REG_ARFRH3_V1, MASKDWORD, "Status"},
+	{REG_ARFR4, MASKDWORD, "SP"},
+	{REG_ARFRH4, MASKDWORD, "RA"},
+	{REG_FW_DBG6, MASKDWORD, "DBG 6"},
+	{REG_FW_DBG7, MASKDWORD, "DBG 7"},
+};
+
+static void _rtw_fw_dump_dbg_info(struct rtw_dev *rtwdev,
+				  const struct rtw_hw_reg_desc regs[], u32 size)
+{
+	const struct rtw_hw_reg_desc *reg;
+	u32 val;
+	int i;
+
+	for (i = 0;  i < size; i++) {
+		reg = &regs[i];
+		val = rtw_read32_mask(rtwdev, reg->addr, reg->mask);
+
+		rtw_dbg(rtwdev, RTW_DBG_FW, "[%s]addr:0x%x mask:0x%x value:0x%x\n",
+			reg->desc, reg->addr, reg->mask, val);
+	}
+}
+
+void rtw_fw_dump_dbg_info(struct rtw_dev *rtwdev)
+{
+	int i;
+
+	if (!rtw_dbg_is_enabled(rtwdev, RTW_DBG_FW))
+		return;
+
+	_rtw_fw_dump_dbg_info(rtwdev, fw_h2c_regs, ARRAY_SIZE(fw_h2c_regs));
+	_rtw_fw_dump_dbg_info(rtwdev, fw_c2h_regs, ARRAY_SIZE(fw_c2h_regs));
+	for (i = 0 ; i < RTW_DEBUG_DUMP_TIMES; i++) {
+		rtw_dbg(rtwdev, RTW_DBG_FW, "Firmware Coredump %dth\n", i + 1);
+		_rtw_fw_dump_dbg_info(rtwdev, fw_core_regs, ARRAY_SIZE(fw_core_regs));
+	}
+}
+
 static void rtw_fw_c2h_cmd_handle_ext(struct rtw_dev *rtwdev,
 				      struct sk_buff *skb)
 {
@@ -140,7 +213,7 @@ struct rtw_beacon_filter_iter_data {
 	u8 *payload;
 };
 
-static void rtw_fw_bcn_filter_notify_vif_iter(void *data, u8 *mac,
+static void rtw_fw_bcn_filter_notify_vif_iter(void *data,
 					      struct ieee80211_vif *vif)
 {
 	struct rtw_beacon_filter_iter_data *iter_data = data;
@@ -308,6 +381,58 @@ void rtw_fw_c2h_cmd_isr(struct rtw_dev *rtwdev)
 }
 EXPORT_SYMBOL(rtw_fw_c2h_cmd_isr);
 
+static void rtw_fw_send_h2c_command_register(struct rtw_dev *rtwdev,
+					     struct rtw_h2c_register *h2c)
+{
+	u32 box_reg, box_ex_reg;
+	u8 box_state, box;
+	int ret;
+
+	rtw_dbg(rtwdev, RTW_DBG_FW, "send H2C content %08x %08x\n", h2c->w0,
+		h2c->w1);
+
+	lockdep_assert_held(&rtwdev->mutex);
+
+	box = rtwdev->h2c.last_box_num;
+	switch (box) {
+	case 0:
+		box_reg = REG_HMEBOX0;
+		box_ex_reg = REG_HMEBOX0_EX;
+		break;
+	case 1:
+		box_reg = REG_HMEBOX1;
+		box_ex_reg = REG_HMEBOX1_EX;
+		break;
+	case 2:
+		box_reg = REG_HMEBOX2;
+		box_ex_reg = REG_HMEBOX2_EX;
+		break;
+	case 3:
+		box_reg = REG_HMEBOX3;
+		box_ex_reg = REG_HMEBOX3_EX;
+		break;
+	default:
+		WARN(1, "invalid h2c mail box number\n");
+		return;
+	}
+
+	ret = read_poll_timeout_atomic(rtw_read8, box_state,
+				       !((box_state >> box) & 0x1), 100, 3000,
+				       false, rtwdev, REG_HMETFR);
+
+	if (ret) {
+		rtw_err(rtwdev, "failed to send h2c command\n");
+		rtw_fw_dump_dbg_info(rtwdev);
+		return;
+	}
+
+	rtw_write32(rtwdev, box_ex_reg, h2c->w1);
+	rtw_write32(rtwdev, box_reg, h2c->w0);
+
+	if (++rtwdev->h2c.last_box_num >= 4)
+		rtwdev->h2c.last_box_num = 0;
+}
+
 static void rtw_fw_send_h2c_command(struct rtw_dev *rtwdev,
 				    u8 *h2c)
 {
@@ -466,6 +591,23 @@ void rtw_fw_query_bt_info(struct rtw_dev *rtwdev)
 	SET_QUERY_BT_INFO(h2c_pkt, true);
 
 	rtw_fw_send_h2c_command(rtwdev, h2c_pkt);
+}
+
+void rtw_fw_default_port(struct rtw_dev *rtwdev, struct rtw_vif *rtwvif)
+{
+	struct rtw_h2c_register h2c = {};
+
+	if (rtwvif->net_type != RTW_NET_MGD_LINKED)
+		return;
+
+	/* Leave LPS before default port H2C so FW timer is correct */
+	rtw_leave_lps(rtwdev);
+
+	h2c.w0 = u32_encode_bits(H2C_CMD_DEFAULT_PORT, RTW_H2C_W0_CMDID) |
+		 u32_encode_bits(rtwvif->port, RTW_H2C_DEFAULT_PORT_W0_PORTID) |
+		 u32_encode_bits(rtwvif->mac_id, RTW_H2C_DEFAULT_PORT_W0_MACID);
+
+	rtw_fw_send_h2c_command_register(rtwdev, &h2c);
 }
 
 void rtw_fw_wl_ch_info(struct rtw_dev *rtwdev, u8 link, u8 ch, u8 bw)
@@ -641,11 +783,17 @@ void rtw_fw_beacon_filter_config(struct rtw_dev *rtwdev, bool connect,
 	static const u8 rssi_min = 0, rssi_max = 100, rssi_offset = 100;
 	struct rtw_sta_info *si =
 		sta ? (struct rtw_sta_info *)sta->drv_priv : NULL;
-	s32 threshold = bss_conf->cqm_rssi_thold + rssi_offset;
+	s32 thold = RTW_DEFAULT_CQM_THOLD;
+	u32 hyst = RTW_DEFAULT_CQM_HYST;
 	u8 h2c_pkt[H2C_PKT_SIZE] = {0};
 
 	if (!rtw_fw_feature_check(&rtwdev->fw, FW_FEATURE_BCN_FILTER))
 		return;
+
+	if (bss_conf->cqm_rssi_thold)
+		thold = bss_conf->cqm_rssi_thold;
+	if (bss_conf->cqm_rssi_hyst)
+		hyst = bss_conf->cqm_rssi_hyst;
 
 	if (!connect) {
 		SET_H2C_CMD_ID_CLASS(h2c_pkt, H2C_CMD_BCN_FILTER_OFFLOAD_P1);
@@ -663,15 +811,15 @@ void rtw_fw_beacon_filter_config(struct rtw_dev *rtwdev, bool connect,
 	rtw_fw_send_h2c_command(rtwdev, h2c_pkt);
 
 	memset(h2c_pkt, 0, sizeof(h2c_pkt));
-	threshold = clamp_t(s32, threshold, rssi_min, rssi_max);
+	thold = clamp_t(s32, thold + rssi_offset, rssi_min, rssi_max);
 	SET_H2C_CMD_ID_CLASS(h2c_pkt, H2C_CMD_BCN_FILTER_OFFLOAD_P1);
 	SET_BCN_FILTER_OFFLOAD_P1_ENABLE(h2c_pkt, connect);
 	SET_BCN_FILTER_OFFLOAD_P1_OFFLOAD_MODE(h2c_pkt,
 					       BCN_FILTER_OFFLOAD_MODE_DEFAULT);
-	SET_BCN_FILTER_OFFLOAD_P1_THRESHOLD(h2c_pkt, (u8)threshold);
+	SET_BCN_FILTER_OFFLOAD_P1_THRESHOLD(h2c_pkt, thold);
 	SET_BCN_FILTER_OFFLOAD_P1_BCN_LOSS_CNT(h2c_pkt, BCN_LOSS_CNT);
 	SET_BCN_FILTER_OFFLOAD_P1_MACID(h2c_pkt, si->mac_id);
-	SET_BCN_FILTER_OFFLOAD_P1_HYST(h2c_pkt, bss_conf->cqm_rssi_hyst);
+	SET_BCN_FILTER_OFFLOAD_P1_HYST(h2c_pkt, hyst);
 	SET_BCN_FILTER_OFFLOAD_P1_BCN_INTERVAL(h2c_pkt, bss_conf->beacon_int);
 	rtw_fw_send_h2c_command(rtwdev, h2c_pkt);
 }
@@ -856,7 +1004,7 @@ static u8 rtw_get_rsvd_page_probe_req_location(struct rtw_dev *rtwdev,
 		if (rsvd_pkt->type != RSVD_PROBE_REQ)
 			continue;
 		if ((!ssid && !rsvd_pkt->ssid) ||
-		    rtw_ssid_equal(rsvd_pkt->ssid, ssid))
+		    cfg80211_ssid_eq(rsvd_pkt->ssid, ssid))
 			location = rsvd_pkt->page;
 	}
 
@@ -873,7 +1021,7 @@ static u16 rtw_get_rsvd_page_probe_req_size(struct rtw_dev *rtwdev,
 		if (rsvd_pkt->type != RSVD_PROBE_REQ)
 			continue;
 		if ((!ssid && !rsvd_pkt->ssid) ||
-		    rtw_ssid_equal(rsvd_pkt->ssid, ssid))
+		    cfg80211_ssid_eq(rsvd_pkt->ssid, ssid))
 			size = rsvd_pkt->probe_req_size;
 	}
 
@@ -1393,6 +1541,10 @@ static void rtw_build_rsvd_page_iter(void *data, u8 *mac,
 	struct rtw_vif *rtwvif = (struct rtw_vif *)vif->drv_priv;
 	struct rtw_rsvd_page *rsvd_pkt;
 
+	/* AP not yet started, don't gather its rsvd pages */
+	if (vif->type == NL80211_IFTYPE_AP && !rtwdev->ap_active)
+		return;
+
 	list_for_each_entry(rsvd_pkt, &rtwvif->rsvd_page_list, vif_list) {
 		if (rsvd_pkt->type == RSVD_BEACON)
 			list_add(&rsvd_pkt->build_list,
@@ -1614,6 +1766,7 @@ void rtw_fw_update_beacon_work(struct work_struct *work)
 
 	mutex_lock(&rtwdev->mutex);
 	rtw_fw_download_rsvd_page(rtwdev);
+	rtw_send_rsvd_page_h2c(rtwdev);
 	mutex_unlock(&rtwdev->mutex);
 }
 
@@ -2155,11 +2308,19 @@ int rtw_hw_scan_offload(struct rtw_dev *rtwdev, struct ieee80211_vif *vif,
 	}
 	rtw_fw_set_scan_offload(rtwdev, &cs_option, rtwvif, &chan_list);
 out:
+	if (rtwdev->ap_active) {
+		ret = rtw_download_beacon(rtwdev);
+		if (ret)
+			rtw_err(rtwdev, "HW scan download beacon failed\n");
+	}
+
 	return ret;
 }
 
-void rtw_hw_scan_abort(struct rtw_dev *rtwdev, struct ieee80211_vif *vif)
+void rtw_hw_scan_abort(struct rtw_dev *rtwdev)
 {
+	struct ieee80211_vif *vif = rtwdev->scan_info.scanning_vif;
+
 	if (!rtw_fw_feature_check(&rtwdev->fw, FW_FEATURE_SCAN_OFFLOAD))
 		return;
 
@@ -2244,6 +2405,7 @@ void rtw_hw_scan_chan_switch(struct rtw_dev *rtwdev, struct sk_buff *skb)
 		if (rtw_is_op_chan(rtwdev, chan)) {
 			rtw_store_op_chan(rtwdev, false);
 			ieee80211_wake_queues(rtwdev->hw);
+			rtw_core_enable_beacon(rtwdev, true);
 		}
 	} else if (id == RTW_SCAN_NOTIFY_ID_PRESWITCH) {
 		if (IS_CH_5G_BAND(chan)) {
@@ -2262,8 +2424,10 @@ void rtw_hw_scan_chan_switch(struct rtw_dev *rtwdev, struct sk_buff *skb)
 		 * if next channel is non-op channel.
 		 */
 		if (!rtw_is_op_chan(rtwdev, chan) &&
-		    rtw_is_op_chan(rtwdev, hal->current_channel))
+		    rtw_is_op_chan(rtwdev, hal->current_channel)) {
+			rtw_core_enable_beacon(rtwdev, false);
 			ieee80211_stop_queues(rtwdev->hw);
+		}
 	}
 
 	rtw_dbg(rtwdev, RTW_DBG_HW_SCAN,

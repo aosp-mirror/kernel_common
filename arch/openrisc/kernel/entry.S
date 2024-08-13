@@ -173,7 +173,6 @@ handler:							;\
 	l.sw    PT_GPR28(r1),r28					;\
 	l.sw    PT_GPR29(r1),r29					;\
 	/* r30 already save */					;\
-/*        l.sw    PT_GPR30(r1),r30*/					;\
 	l.sw    PT_GPR31(r1),r31					;\
 	TRACE_IRQS_OFF_ENTRY						;\
 	/* Store -1 in orig_gpr11 for non-syscall exceptions */	;\
@@ -211,9 +210,8 @@ handler:							;\
 	l.sw    PT_GPR27(r1),r27					;\
 	l.sw    PT_GPR28(r1),r28					;\
 	l.sw    PT_GPR29(r1),r29					;\
-	/* r31 already saved */					;\
-	l.sw    PT_GPR30(r1),r30					;\
-/*        l.sw    PT_GPR31(r1),r31	*/				;\
+	/* r30 already saved */						;\
+	l.sw    PT_GPR31(r1),r31					;\
 	/* Store -1 in orig_gpr11 for non-syscall exceptions */	;\
 	l.addi	r30,r0,-1					;\
 	l.sw	PT_ORIG_GPR11(r1),r30				;\
@@ -844,9 +842,17 @@ _syscall_badsys:
 
 /******* END SYSCALL HANDLING *******/
 
-/* ---[ 0xd00: Trap exception ]------------------------------------------ */
+/* ---[ 0xd00: Floating Point exception ]-------------------------------- */
 
-UNHANDLED_EXCEPTION(_vector_0xd00,0xd00)
+EXCEPTION_ENTRY(_fpe_trap_handler)
+	CLEAR_LWA_FLAG(r3)
+
+	/* r4: EA of fault (set by EXCEPTION_HANDLE) */
+	l.jal   do_fpe_trap
+	 l.addi  r3,r1,0 /* pt_regs */
+
+	l.j     _ret_from_exception
+	 l.nop
 
 /* ---[ 0xe00: Trap exception ]------------------------------------------ */
 

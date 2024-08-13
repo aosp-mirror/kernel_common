@@ -7,9 +7,10 @@
  */
 
 #include <linux/list.h>
+#include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
-#include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/export.h>
@@ -116,7 +117,7 @@ static unsigned int mpic_msgr_number_of_blocks(void)
 
 		for (;;) {
 			snprintf(buf, sizeof(buf), "mpic-msgr-block%d", count);
-			if (!of_find_property(aliases, buf, NULL))
+			if (!of_property_present(aliases, buf))
 				break;
 
 			count += 1;

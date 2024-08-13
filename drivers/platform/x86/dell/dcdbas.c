@@ -7,7 +7,7 @@
  *  and Host Control Actions (power cycle or power off after OS shutdown) on
  *  Dell systems.
  *
- *  See Documentation/driver-api/dcdbas.rst for more information.
+ *  See Documentation/userspace-api/dcdbas.rst for more information.
  *
  *  Copyright (C) 1995-2006 Dell Inc.
  */
@@ -698,12 +698,10 @@ static int dcdbas_probe(struct platform_device *dev)
 	return 0;
 }
 
-static int dcdbas_remove(struct platform_device *dev)
+static void dcdbas_remove(struct platform_device *dev)
 {
 	unregister_reboot_notifier(&dcdbas_reboot_nb);
 	sysfs_remove_group(&dev->dev.kobj, &dcdbas_attr_group);
-
-	return 0;
 }
 
 static struct platform_driver dcdbas_driver = {
@@ -711,7 +709,7 @@ static struct platform_driver dcdbas_driver = {
 		.name	= DRIVER_NAME,
 	},
 	.probe		= dcdbas_probe,
-	.remove		= dcdbas_remove,
+	.remove_new	= dcdbas_remove,
 };
 
 static const struct platform_device_info dcdbas_dev_info __initconst = {

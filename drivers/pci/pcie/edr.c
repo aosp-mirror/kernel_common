@@ -32,10 +32,10 @@ static int acpi_enable_dpc(struct pci_dev *pdev)
 	int status = 0;
 
 	/*
-	 * Behavior when calling unsupported _DSM functions is undefined,
-	 * so check whether EDR_PORT_DPC_ENABLE_DSM is supported.
+	 * Per PCI Firmware r3.3, sec 4.6.12, EDR_PORT_DPC_ENABLE_DSM is
+	 * optional. Return success if it's not implemented.
 	 */
-	if (!acpi_check_dsm(adev->handle, &pci_acpi_dsm_guid, 5,
+	if (!acpi_check_dsm(adev->handle, &pci_acpi_dsm_guid, 6,
 			    1ULL << EDR_PORT_DPC_ENABLE_DSM))
 		return 0;
 
@@ -46,12 +46,7 @@ static int acpi_enable_dpc(struct pci_dev *pdev)
 	argv4.package.count = 1;
 	argv4.package.elements = &req;
 
-	/*
-	 * Per Downstream Port Containment Related Enhancements ECN to PCI
-	 * Firmware Specification r3.2, sec 4.6.12, EDR_PORT_DPC_ENABLE_DSM is
-	 * optional.  Return success if it's not implemented.
-	 */
-	obj = acpi_evaluate_dsm(adev->handle, &pci_acpi_dsm_guid, 5,
+	obj = acpi_evaluate_dsm(adev->handle, &pci_acpi_dsm_guid, 6,
 				EDR_PORT_DPC_ENABLE_DSM, &argv4);
 	if (!obj)
 		return 0;
@@ -85,8 +80,9 @@ static struct pci_dev *acpi_dpc_port_get(struct pci_dev *pdev)
 	u16 port;
 
 	/*
-	 * Behavior when calling unsupported _DSM functions is undefined,
-	 * so check whether EDR_PORT_DPC_ENABLE_DSM is supported.
+	 * If EDR_PORT_LOCATE_DSM is not implemented under the target of
+	 * EDR, the target is the port that experienced the containment
+	 * event (PCI Firmware r3.3, sec 4.6.13).
 	 */
 	if (!acpi_check_dsm(adev->handle, &pci_acpi_dsm_guid, 5,
 			    1ULL << EDR_PORT_LOCATE_DSM))
@@ -100,6 +96,16 @@ static struct pci_dev *acpi_dpc_port_get(struct pci_dev *pdev)
 	if (obj->type != ACPI_TYPE_INTEGER) {
 		ACPI_FREE(obj);
 		pci_err(pdev, FW_BUG "Locate Port _DSM returned non integer\n");
+		return NULL;
+	}
+
+	/*
+	 * Bit 31 represents the success/failure of the operation. If bit
+	 * 31 is set, the operation failed.
+	 */
+	if (obj->integer.value & BIT(31)) {
+		ACPI_FREE(obj);
+		pci_err(pdev, "Locate Port _DSM failed\n");
 		return NULL;
 	}
 
@@ -151,9 +157,18 @@ static void edr_handle_event(acpi_handle handle, u32 event, void *data)
 	if (event != ACPI_NOTIFY_DISCONNECT_RECOVER)
 		return;
 
+	/*
+	 * pdev is a Root Port or Downstream Port that is still present and
+	 * has triggered a containment event, e.g., DPC, so its child
+	 * devices have been disconnected (ACPI r6.5, sec 5.6.6).
+	 */
 	pci_info(pdev, "EDR event received\n");
 
-	/* Locate the port which issued EDR event */
+	/*
+	 * Locate the port that experienced the containment event.  pdev
+	 * may be that port or a parent of it (PCI Firmware r3.3, sec
+	 * 4.6.13).
+	 */
 	edev = acpi_dpc_port_get(pdev);
 	if (!edev) {
 		pci_err(pdev, "Firmware failed to locate DPC port\n");
@@ -193,6 +208,7 @@ send_ost:
 	 */
 	if (estate == PCI_ERS_RESULT_RECOVERED) {
 		pci_dbg(edev, "DPC port successfully recovered\n");
+		pcie_clear_device_status(edev);
 		acpi_send_edr_status(pdev, edev, EDR_OST_SUCCESS);
 	} else {
 		pci_dbg(edev, "DPC port recovery failed\n");

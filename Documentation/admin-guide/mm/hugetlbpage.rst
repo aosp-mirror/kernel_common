@@ -1,5 +1,3 @@
-.. _hugetlbpage:
-
 =============
 HugeTLB Pages
 =============
@@ -86,7 +84,7 @@ by increasing or decreasing the value of ``nr_hugepages``.
 
 Note: When the feature of freeing unused vmemmap pages associated with each
 hugetlb page is enabled, we can fail to free the huge pages triggered by
-the user when ths system is under memory pressure.  Please try again later.
+the user when the system is under memory pressure.  Please try again later.
 
 Pages that are used as huge pages are reserved inside the kernel and cannot
 be used for other purposes.  Huge pages cannot be swapped out under
@@ -313,7 +311,7 @@ memory policy mode--bind, preferred, local or interleave--may be used.  The
 resulting effect on persistent huge page allocation is as follows:
 
 #. Regardless of mempolicy mode [see
-   :ref:`Documentation/admin-guide/mm/numa_memory_policy.rst <numa_memory_policy>`],
+   Documentation/admin-guide/mm/numa_memory_policy.rst],
    persistent huge pages will be distributed across the node or nodes
    specified in the mempolicy as if "interleave" had been specified.
    However, if a node in the policy does not contain sufficient contiguous
@@ -377,6 +375,13 @@ resources exist, regardless of the task's mempolicy or cpuset constraints.
 Note that the number of overcommit and reserve pages remain global quantities,
 as we don't know until fault time, when the faulting task's mempolicy is
 applied, from which node the huge page allocation will be attempted.
+
+The hugetlb may be migrated between the per-node hugepages pool in the following
+scenarios: memory offline, memory failure, longterm pinning, syscalls(mbind,
+migrate_pages and move_pages), alloc_contig_range() and alloc_contig_pages().
+Now only memory offline, memory failure and syscalls allow fallbacking to allocate
+a new hugetlb on a different node if the current node is unable to allocate during
+hugetlb migration, that means these 3 cases can break the per-node hugepages pool.
 
 .. _using_huge_pages:
 
@@ -461,13 +466,13 @@ Examples
 .. _map_hugetlb:
 
 ``map_hugetlb``
-	see tools/testing/selftests/vm/map_hugetlb.c
+	see tools/testing/selftests/mm/map_hugetlb.c
 
 ``hugepage-shm``
-	see tools/testing/selftests/vm/hugepage-shm.c
+	see tools/testing/selftests/mm/hugepage-shm.c
 
 ``hugepage-mmap``
-	see tools/testing/selftests/vm/hugepage-mmap.c
+	see tools/testing/selftests/mm/hugepage-mmap.c
 
 The `libhugetlbfs`_  library provides a wide range of userspace tools
 to help with huge page usability, environment setup, and control.

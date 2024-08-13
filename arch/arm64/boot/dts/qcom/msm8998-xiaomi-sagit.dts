@@ -213,7 +213,6 @@
 
 		rmi4-f1a@1a {
 			reg = <0x1a>;
-			syna,codes = <KEY_BACK KEY_APPSELECT>;
 		};
 	};
 };
@@ -528,7 +527,6 @@
 		function = "gpio";
 		drive-strength = <2>;
 		bias-disable;
-		input-enable;
 	};
 
 	mdss_dsi_active_state: mdss-dsi-active-state {
@@ -620,7 +618,6 @@
 		function = "gpio";
 		drive-strength = <16>;
 		bias-pull-up;
-		input-enable;
 	};
 
 	ts_int_suspend_state: ts-int-suspend-state {
@@ -642,7 +639,6 @@
 		function = "gpio";
 		bias-pull-down;
 		drive-strength = <2>;
-		input-enable;
 	};
 
 	wsa_leftspk_pwr_n_state: wsa-leftspk-pwr-n-state {
@@ -671,6 +667,7 @@
 	vcc-supply = <&vreg_l20a_2p95>;
 	vccq-supply = <&vreg_l26a_1p2>;
 	vccq2-supply = <&vreg_s4a_1p8>;
+	vdd-hba-supply = <&vreg_l26a_1p2>;
 	vcc-max-microamp = <750000>;
 	vccq-max-microamp = <560000>;
 	vccq2-max-microamp = <750000>;
@@ -680,7 +677,6 @@
 &ufsphy {
 	vdda-phy-supply = <&vreg_l1a_0p875>;
 	vdda-pll-supply = <&vreg_l2a_1p2>;
-	vddp-ref-clk-supply = <&vreg_l26a_1p2>;
 	status = "okay";
 };
 

@@ -300,7 +300,9 @@ int nvec_write_sync(struct nvec_chip *nvec,
 {
 	mutex_lock(&nvec->sync_write_mutex);
 
-	*msg = NULL;
+	if (msg != NULL)
+		*msg = NULL;
+
 	nvec->sync_write_pending = (data[1] << 8) + data[0];
 
 	if (nvec_write_async(nvec, data, size) < 0) {
@@ -320,7 +322,10 @@ int nvec_write_sync(struct nvec_chip *nvec,
 
 	dev_dbg(nvec->dev, "nvec_sync_write: pong!\n");
 
-	*msg = nvec->last_sync_msg;
+	if (msg != NULL)
+		*msg = nvec->last_sync_msg;
+	else
+		nvec_msg_free(nvec, nvec->last_sync_msg);
 
 	mutex_unlock(&nvec->sync_write_mutex);
 
@@ -709,10 +714,11 @@ static irqreturn_t nvec_interrupt(int irq, void *dev)
 		status & RNW ? " RNW" : "");
 
 	/*
-	 * TODO: A correct fix needs to be found for this.
+	 * TODO: replace the udelay with a read back after each writel above
+	 * in order to work around a hardware issue, see i2c-tegra.c
 	 *
-	 * We experience less incomplete messages with this delay than without
-	 * it, but we don't know why. Help is appreciated.
+	 * Unfortunately, this change causes an initialisation issue with the
+	 * touchpad, which needs to be fixed first.
 	 */
 	udelay(100);
 
@@ -882,7 +888,7 @@ static int tegra_nvec_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int tegra_nvec_remove(struct platform_device *pdev)
+static void tegra_nvec_remove(struct platform_device *pdev)
 {
 	struct nvec_chip *nvec = platform_get_drvdata(pdev);
 
@@ -893,8 +899,6 @@ static int tegra_nvec_remove(struct platform_device *pdev)
 	cancel_work_sync(&nvec->tx_work);
 	/* FIXME: needs check whether nvec is responsible for power off */
 	pm_power_off = NULL;
-
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -942,7 +946,7 @@ MODULE_DEVICE_TABLE(of, nvidia_nvec_of_match);
 
 static struct platform_driver nvec_device_driver = {
 	.probe   = tegra_nvec_probe,
-	.remove  = tegra_nvec_remove,
+	.remove_new = tegra_nvec_remove,
 	.driver  = {
 		.name = "nvec",
 		.pm = &nvec_pm_ops,

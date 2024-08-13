@@ -400,7 +400,7 @@ static int max98371_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct i2c_device_id max98371_i2c_id[] = {
-	{ "max98371", 0 },
+	{ "max98371" },
 	{ }
 };
 
@@ -419,7 +419,7 @@ static struct i2c_driver max98371_i2c_driver = {
 		.name = "max98371",
 		.of_match_table = of_match_ptr(max98371_of_match),
 	},
-	.probe_new  = max98371_i2c_probe,
+	.probe = max98371_i2c_probe,
 	.id_table = max98371_i2c_id,
 };
 

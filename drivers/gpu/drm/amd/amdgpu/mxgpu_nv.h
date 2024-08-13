@@ -39,6 +39,7 @@ enum idh_request {
 
 	IDH_LOG_VF_ERROR	= 200,
 	IDH_READY_TO_RESET 	= 201,
+	IDH_RAS_POISON	= 202,
 };
 
 enum idh_event {
@@ -50,6 +51,7 @@ enum idh_event {
 	IDH_FAIL,
 	IDH_QUERY_ALIVE,
 	IDH_REQ_GPU_INIT_DATA_READY,
+	IDH_RAS_POISON_READY,
 
 	IDH_TEXT_MESSAGE = 255,
 };

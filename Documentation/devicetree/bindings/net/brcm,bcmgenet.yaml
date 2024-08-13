@@ -55,7 +55,7 @@ properties:
 patternProperties:
   "^mdio@[0-9a-f]+$":
     type: object
-    $ref: "brcm,unimac-mdio.yaml"
+    $ref: brcm,unimac-mdio.yaml
 
     description:
       GENET internal UniMAC MDIO bus
@@ -73,8 +73,6 @@ allOf:
 unevaluatedProperties: false
 
 examples:
-  #include <dt-bindings/interrupt-controller/arm-gic.h>
-
   - |
     ethernet@f0b60000 {
         phy-mode = "internal";

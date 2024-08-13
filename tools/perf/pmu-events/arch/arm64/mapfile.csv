@@ -4,7 +4,7 @@
 # where
 #	MIDR	Processor version
 #		Variant[23:20] and Revision [3:0] should be zero.
-#	Version could be used to track version of of JSON file
+#	Version could be used to track version of JSON file
 #		but currently unused.
 #	JSON/file/pathname is the path to JSON file, relative
 #		to tools/perf/pmu-events/arch/arm64/.
@@ -23,8 +23,8 @@
 0x00000000410fd080,v1,arm/cortex-a57-a72,core
 0x00000000410fd090,v1,arm/cortex-a73,core
 0x00000000410fd0a0,v1,arm/cortex-a75,core
-0x00000000410fd0b0,v1,arm/cortex-a76-n1,core
-0x00000000410fd0c0,v1,arm/cortex-a76-n1,core
+0x00000000410fd0b0,v1,arm/cortex-a76,core
+0x00000000410fd0c0,v1,arm/neoverse-n1,core
 0x00000000410fd0d0,v1,arm/cortex-a77,core
 0x00000000410fd400,v1,arm/neoverse-v1,core
 0x00000000410fd410,v1,arm/cortex-a78,core
@@ -41,3 +41,5 @@
 0x00000000460f0010,v1,fujitsu/a64fx,core
 0x00000000480fd010,v1,hisilicon/hip08,core
 0x00000000500f0000,v1,ampere/emag,core
+0x00000000c00fac30,v1,ampere/ampereone,core
+0x00000000c00fac40,v1,ampere/ampereonex,core

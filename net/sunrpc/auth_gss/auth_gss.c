@@ -49,6 +49,22 @@ static unsigned int gss_key_expire_timeo = GSS_KEY_EXPIRE_TIMEO;
 # define RPCDBG_FACILITY	RPCDBG_AUTH
 #endif
 
+/*
+ * This compile-time check verifies that we will not exceed the
+ * slack space allotted by the client and server auth_gss code
+ * before they call gss_wrap().
+ */
+#define GSS_KRB5_MAX_SLACK_NEEDED					\
+	(GSS_KRB5_TOK_HDR_LEN		/* gss token header */		\
+	+ GSS_KRB5_MAX_CKSUM_LEN	/* gss token checksum */	\
+	+ GSS_KRB5_MAX_BLOCKSIZE	/* confounder */		\
+	+ GSS_KRB5_MAX_BLOCKSIZE	/* possible padding */		\
+	+ GSS_KRB5_TOK_HDR_LEN		/* encrypted hdr in v2 token */	\
+	+ GSS_KRB5_MAX_CKSUM_LEN	/* encryption hmac */		\
+	+ XDR_UNIT * 2			/* RPC verifier */		\
+	+ GSS_KRB5_TOK_HDR_LEN						\
+	+ GSS_KRB5_MAX_CKSUM_LEN)
+
 #define GSS_CRED_SLACK		(RPC_MAX_AUTH_SIZE * 2)
 /* length of a krb5 verifier (48), plus data added before arguments when
  * using integrity (two 4-byte integers): */
@@ -1042,6 +1058,7 @@ gss_create_new(const struct rpc_auth_create_args *args, struct rpc_clnt *clnt)
 		goto err_put_mech;
 	auth = &gss_auth->rpc_auth;
 	auth->au_cslack = GSS_CRED_SLACK >> 2;
+	BUILD_BUG_ON(GSS_KRB5_MAX_SLACK_NEEDED > RPC_MAX_AUTH_SIZE);
 	auth->au_rslack = GSS_KRB5_MAX_SLACK_NEEDED >> 2;
 	auth->au_verfsize = GSS_VERF_SLACK >> 2;
 	auth->au_ralign = GSS_VERF_SLACK >> 2;
@@ -1858,8 +1875,10 @@ gss_wrap_req_priv(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
 	offset = (u8 *)p - (u8 *)snd_buf->head[0].iov_base;
 	maj_stat = gss_wrap(ctx->gc_gss_ctx, offset, snd_buf, inpages);
 	/* slack space should prevent this ever happening: */
-	if (unlikely(snd_buf->len > snd_buf->buflen))
+	if (unlikely(snd_buf->len > snd_buf->buflen)) {
+		status = -EIO;
 		goto wrap_failed;
+	}
 	/* We're assuming that when GSS_S_CONTEXT_EXPIRED, the encryption was
 	 * done anyway, so it's safe to put the request on the wire: */
 	if (maj_stat == GSS_S_CONTEXT_EXPIRED)
@@ -2263,6 +2282,7 @@ static void __exit exit_rpcsec_gss(void)
 }
 
 MODULE_ALIAS("rpc-auth-6");
+MODULE_DESCRIPTION("Sun RPC Kerberos RPCSEC_GSS client authentication");
 MODULE_LICENSE("GPL");
 module_param_named(expired_cred_retry_delay,
 		   gss_expired_cred_retry_delay,

@@ -10,7 +10,6 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
-#include <linux/acpi.h>
 #include <linux/i2c.h>
 #include <linux/iio/iio.h>
 
@@ -112,21 +111,27 @@ static const struct of_device_id st_accel_of_match[] = {
 		.data = LIS302DL_ACCEL_DEV_NAME,
 	},
 	{
+		.compatible = "st,lsm303c-accel",
+		.data = LSM303C_ACCEL_DEV_NAME,
+	},
+	{
 		.compatible = "silan,sc7a20",
 		.data = SC7A20_ACCEL_DEV_NAME,
+	},
+	{
+		.compatible = "st,iis328dq",
+		.data = IIS328DQ_ACCEL_DEV_NAME,
 	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, st_accel_of_match);
 
-#ifdef CONFIG_ACPI
 static const struct acpi_device_id st_accel_acpi_match[] = {
 	{"SMO8840", (kernel_ulong_t)LIS2DH12_ACCEL_DEV_NAME},
 	{"SMO8A90", (kernel_ulong_t)LNG2DM_ACCEL_DEV_NAME},
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, st_accel_acpi_match);
-#endif
 
 static const struct i2c_device_id st_accel_id_table[] = {
 	{ LSM303DLH_ACCEL_DEV_NAME },
@@ -151,7 +156,9 @@ static const struct i2c_device_id st_accel_id_table[] = {
 	{ LIS2DE12_ACCEL_DEV_NAME },
 	{ LIS2HH12_ACCEL_DEV_NAME },
 	{ LIS302DL_ACCEL_DEV_NAME },
+	{ LSM303C_ACCEL_DEV_NAME },
 	{ SC7A20_ACCEL_DEV_NAME },
+	{ IIS328DQ_ACCEL_DEV_NAME },
 	{},
 };
 MODULE_DEVICE_TABLE(i2c, st_accel_id_table);
@@ -194,9 +201,9 @@ static struct i2c_driver st_accel_driver = {
 	.driver = {
 		.name = "st-accel-i2c",
 		.of_match_table = st_accel_of_match,
-		.acpi_match_table = ACPI_PTR(st_accel_acpi_match),
+		.acpi_match_table = st_accel_acpi_match,
 	},
-	.probe_new = st_accel_i2c_probe,
+	.probe = st_accel_i2c_probe,
 	.id_table = st_accel_id_table,
 };
 module_i2c_driver(st_accel_driver);

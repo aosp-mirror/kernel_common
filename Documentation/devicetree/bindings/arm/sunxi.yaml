@@ -51,6 +51,26 @@ properties:
           - const: allwinner,parrot
           - const: allwinner,sun8i-a33
 
+      - description: Anbernic RG-Nano
+        items:
+          - const: anbernic,rg-nano
+          - const: allwinner,sun8i-v3s
+
+      - description: Anbernic RG35XX (2024)
+        items:
+          - const: anbernic,rg35xx-2024
+          - const: allwinner,sun50i-h700
+
+      - description: Anbernic RG35XX Plus
+        items:
+          - const: anbernic,rg35xx-plus
+          - const: allwinner,sun50i-h700
+
+      - description: Anbernic RG35XX H
+        items:
+          - const: anbernic,rg35xx-h
+          - const: allwinner,sun50i-h700
+
       - description: Amarula A64 Relic
         items:
           - const: amarula,a64-relic
@@ -150,6 +170,17 @@ properties:
         items:
           - const: roofull,beelink-x2
           - const: allwinner,sun8i-h3
+
+      - description: BigTreeTech Manta M4/8P
+        items:
+          - const: bigtreetech,cb1-manta
+          - const: bigtreetech,cb1
+          - const: allwinner,sun50i-h616
+
+      - description: BigTreeTech Pi
+        items:
+          - const: bigtreetech,pi
+          - const: allwinner,sun50i-h616
 
       - description: Chuwi V7 CW0825
         items:
@@ -305,6 +336,12 @@ properties:
           - const: allwinner,i12-tvbox
           - const: allwinner,sun7i-a20
 
+      - description: ICnova A20 ADB4006
+        items:
+          - const: incircuit,icnova-a20-adb4006
+          - const: incircuit,icnova-a20
+          - const: allwinner,sun7i-a20
+
       - description: ICNova A20 SWAC
         items:
           - const: incircuit,icnova-a20-swac
@@ -365,6 +402,12 @@ properties:
         items:
           - const: lamobo,lamobo-r1
           - const: allwinner,sun7i-a20
+
+      - description: Lctech Pi F1C200s
+        items:
+          - const: lctech,pi-f1c200s
+          - const: allwinner,suniv-f1c200s
+          - const: allwinner,suniv-f1c100s
 
       - description: Libre Computer Board ALL-H3-CC H2+
         items:
@@ -529,13 +572,13 @@ properties:
           - const: msi,primo81
           - const: allwinner,sun6i-a31s
 
-      - description: Emlid Neutis N5 Developper Board
+      - description: Emlid Neutis N5 Developer Board
         items:
           - const: emlid,neutis-n5-devboard
           - const: emlid,neutis-n5
           - const: allwinner,sun50i-h5
 
-      - description: Emlid Neutis N5H3 Developper Board
+      - description: Emlid Neutis N5H3 Developer Board
         items:
           - const: emlid,neutis-n5h3-devboard
           - const: emlid,neutis-n5h3
@@ -665,12 +708,12 @@ properties:
           - const: olimex,a64-teres-i
           - const: allwinner,sun50i-a64
 
-      - description: Pine64
+      - description: Pine64 PINE A64
         items:
           - const: pine64,pine64
           - const: allwinner,sun50i-a64
 
-      - description: Pine64+
+      - description: Pine64 PINE A64+
         items:
           - const: pine64,pine64-plus
           - const: allwinner,sun50i-a64
@@ -681,17 +724,17 @@ properties:
           - const: sochip,s3
           - const: allwinner,sun8i-v3
 
-      - description: Pine64 PineH64 model A
+      - description: Pine64 PINE H64 Model A
         items:
           - const: pine64,pine-h64
           - const: allwinner,sun50i-h6
 
-      - description: Pine64 PineH64 model B
+      - description: Pine64 PINE H64 Model B
         items:
           - const: pine64,pine-h64-model-b
           - const: allwinner,sun50i-h6
 
-      - description: Pine64 LTS
+      - description: Pine64 PINE A64 LTS
         items:
           - const: pine64,pine64-lts
           - const: allwinner,sun50i-r18
@@ -720,17 +763,17 @@ properties:
           - const: pine64,pinephone
           - const: allwinner,sun50i-a64
 
-      - description: Pine64 PineTab, Development Sample
+      - description: Pine64 PineTab Developer Sample
         items:
           - const: pine64,pinetab
           - const: allwinner,sun50i-a64
 
-      - description: Pine64 PineTab, Early Adopter's batch (and maybe later ones)
+      - description: Pine64 PineTab Early Adopter
         items:
           - const: pine64,pinetab-early-adopter
           - const: allwinner,sun50i-a64
 
-      - description: Pine64 SoPine Baseboard
+      - description: Pine64 SOPINE
         items:
           - const: pine64,sopine-baseboard
           - const: pine64,sopine
@@ -744,6 +787,11 @@ properties:
       - description: PocketBook Touch Lux 3
         items:
           - const: pocketbook,touch-lux-3
+          - const: allwinner,sun5i-a13
+
+      - description: PocketBook 614 Plus
+        items:
+          - const: pocketbook,614-plus
           - const: allwinner,sun5i-a13
 
       - description: Point of View Protab2-IPS9
@@ -787,6 +835,12 @@ properties:
           - const: allwinner,r7-tv-dongle
           - const: allwinner,sun5i-a10s
 
+      - description: Remix Mini PC
+        items:
+          - const: jide,remix-mini-pc
+          - const: allwinner,sun50i-h64
+          - const: allwinner,sun50i-a64
+
       - description: RerVision H3-DVK
         items:
           - const: rervision,h3-dvk
@@ -807,11 +861,29 @@ properties:
           - const: sinlinx,sina33
           - const: allwinner,sun8i-a33
 
+      - description: Sipeed Longan Pi 3H board for the Sipeed Longan Module 3H
+        items:
+          - const: sipeed,longan-pi-3h
+          - const: sipeed,longan-module-3h
+          - const: allwinner,sun50i-h618
+
+      - description: SourceParts PopStick v1.1
+        items:
+          - const: sourceparts,popstick-v1.1
+          - const: sourceparts,popstick
+          - const: allwinner,suniv-f1c200s
+          - const: allwinner,suniv-f1c100s
+
       - description: SL631 Action Camera with IMX179
         items:
           - const: allwinner,sl631-imx179
           - const: allwinner,sl631
           - const: allwinner,sun8i-v3
+
+      - description: Tanix TX1
+        items:
+          - const: oranth,tanix-tx1
+          - const: allwinner,sun50i-h616
 
       - description: Tanix TX6
         items:
@@ -833,6 +905,11 @@ properties:
           - const: topwise,a721
           - const: allwinner,sun4i-a10
 
+      - description: Transpeed 8K618-T
+        items:
+          - const: transpeed,8k618-t
+          - const: allwinner,sun50i-h618
+
       - description: Utoo P66
         items:
           - const: utoo,p66
@@ -842,6 +919,11 @@ properties:
         items:
           - const: wexler,tab7200
           - const: allwinner,sun7i-a20
+
+      - description: MangoPi MQ-R board
+        items:
+          - const: widora,mangopi-mq-r-t113
+          - const: allwinner,sun8i-t113s
 
       - description: WITS A31 Colombus Evaluation Board
         items:
@@ -972,5 +1054,15 @@ properties:
         items:
           - const: xunlong,orangepi-zero2
           - const: allwinner,sun50i-h616
+
+      - description: Xunlong OrangePi Zero 2W
+        items:
+          - const: xunlong,orangepi-zero2w
+          - const: allwinner,sun50i-h618
+
+      - description: Xunlong OrangePi Zero 3
+        items:
+          - const: xunlong,orangepi-zero3
+          - const: allwinner,sun50i-h618
 
 additionalProperties: true

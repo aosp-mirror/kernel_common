@@ -544,19 +544,25 @@ static int set_fb_var(struct fb_info *fbi,
 		var->yoffset = var->yres_virtual - var->yres;
 
 	if (plane->color_mode == OMAPFB_COLOR_RGB444) {
-		var->red.offset	  = 8; var->red.length	 = 4;
-						var->red.msb_right   = 0;
-		var->green.offset = 4; var->green.length = 4;
-						var->green.msb_right = 0;
-		var->blue.offset  = 0; var->blue.length  = 4;
-						var->blue.msb_right  = 0;
+		var->red.offset		= 8;
+		var->red.length		= 4;
+		var->red.msb_right	= 0;
+		var->green.offset	= 4;
+		var->green.length	= 4;
+		var->green.msb_right	= 0;
+		var->blue.offset	= 0;
+		var->blue.length	= 4;
+		var->blue.msb_right	= 0;
 	} else {
-		var->red.offset	 = 11; var->red.length	 = 5;
-						var->red.msb_right   = 0;
-		var->green.offset = 5;  var->green.length = 6;
-						var->green.msb_right = 0;
-		var->blue.offset = 0;  var->blue.length  = 5;
-						var->blue.msb_right  = 0;
+		var->red.offset		= 11;
+		var->red.length		= 5;
+		var->red.msb_right	= 0;
+		var->green.offset	= 5;
+		var->green.length	= 6;
+		var->green.msb_right	= 0;
+		var->blue.offset	= 0;
+		var->blue.length	= 5;
+		var->blue.msb_right	= 0;
 	}
 
 	var->height		= -1;
@@ -1197,6 +1203,8 @@ static int omapfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 	struct omapfb_device *fbdev = plane->fbdev;
 	int r;
 
+	vma->vm_page_prot = pgprot_decrypted(vma->vm_page_prot);
+
 	omapfb_rqueue_lock(fbdev);
 	r = fbdev->ctrl->mmap(info, vma);
 	omapfb_rqueue_unlock(fbdev);
@@ -1210,13 +1218,11 @@ static int omapfb_mmap(struct fb_info *info, struct vm_area_struct *vma)
  */
 static struct fb_ops omapfb_ops = {
 	.owner		= THIS_MODULE,
+	FB_DEFAULT_IOMEM_OPS,
 	.fb_open        = omapfb_open,
 	.fb_release     = omapfb_release,
 	.fb_setcolreg	= omapfb_setcolreg,
 	.fb_setcmap	= omapfb_setcmap,
-	.fb_fillrect	= cfb_fillrect,
-	.fb_copyarea	= cfb_copyarea,
-	.fb_imageblit	= cfb_imageblit,
 	.fb_blank       = omapfb_blank,
 	.fb_ioctl	= omapfb_ioctl,
 	.fb_check_var	= omapfb_check_var,
@@ -1445,7 +1451,6 @@ static int fbinfo_init(struct omapfb_device *fbdev, struct fb_info *info)
 	int				r = 0;
 
 	info->fbops = &omapfb_ops;
-	info->flags = FBINFO_FLAG_DEFAULT;
 
 	strscpy(fix->id, MODULE_NAME, sizeof(fix->id));
 
@@ -1640,17 +1645,16 @@ static int omapfb_do_probe(struct platform_device *pdev,
 		r = -ENOMEM;
 		goto cleanup;
 	}
-	fbdev->int_irq = platform_get_irq(pdev, 0);
-	if (fbdev->int_irq < 0) {
-		r = ENXIO;
-		goto cleanup;
-	}
 
-	fbdev->ext_irq = platform_get_irq(pdev, 1);
-	if (fbdev->ext_irq < 0) {
-		r = ENXIO;
+	r = platform_get_irq(pdev, 0);
+	if (r < 0)
 		goto cleanup;
-	}
+	fbdev->int_irq = r;
+
+	r = platform_get_irq(pdev, 1);
+	if (r < 0)
+		goto cleanup;
+	fbdev->ext_irq = r;
 
 	init_state++;
 
@@ -1793,7 +1797,7 @@ void omapfb_register_panel(struct lcd_panel *panel)
 EXPORT_SYMBOL_GPL(omapfb_register_panel);
 
 /* Called when the device is being detached from the driver */
-static int omapfb_remove(struct platform_device *pdev)
+static void omapfb_remove(struct platform_device *pdev)
 {
 	struct omapfb_device *fbdev = platform_get_drvdata(pdev);
 	enum omapfb_state saved_state = fbdev->state;
@@ -1805,8 +1809,6 @@ static int omapfb_remove(struct platform_device *pdev)
 
 	platform_device_unregister(&omapdss_device);
 	fbdev->dssdev = NULL;
-
-	return 0;
 }
 
 /* PM suspend */
@@ -1831,7 +1833,7 @@ static int omapfb_resume(struct platform_device *pdev)
 
 static struct platform_driver omapfb_driver = {
 	.probe		= omapfb_probe,
-	.remove		= omapfb_remove,
+	.remove_new	= omapfb_remove,
 	.suspend	= omapfb_suspend,
 	.resume		= omapfb_resume,
 	.driver		= {
@@ -1856,19 +1858,12 @@ static int __init omapfb_setup(char *options)
 		if (!strncmp(this_opt, "accel", 5))
 			def_accel = 1;
 		else if (!strncmp(this_opt, "vram:", 5)) {
+			unsigned long long vram;
 			char *suffix;
-			unsigned long vram;
-			vram = (simple_strtoul(this_opt + 5, &suffix, 0));
+
+			vram = memparse(this_opt + 5, &suffix);
 			switch (suffix[0]) {
 			case '\0':
-				break;
-			case 'm':
-			case 'M':
-				vram *= 1024;
-				fallthrough;
-			case 'k':
-			case 'K':
-				vram *= 1024;
 				break;
 			default:
 				pr_debug("omapfb: invalid vram suffix %c\n",

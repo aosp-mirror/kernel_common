@@ -17,40 +17,8 @@
 
 static DEFINE_MUTEX(pci_epf_mutex);
 
-static struct bus_type pci_epf_bus_type;
+static const struct bus_type pci_epf_bus_type;
 static const struct device_type pci_epf_type;
-
-/**
- * pci_epf_type_add_cfs() - Help function drivers to expose function specific
- *                          attributes in configfs
- * @epf: the EPF device that has to be configured using configfs
- * @group: the parent configfs group (corresponding to entries in
- *         pci_epf_device_id)
- *
- * Invoke to expose function specific attributes in configfs. If the function
- * driver does not have anything to expose (attributes configured by user),
- * return NULL.
- */
-struct config_group *pci_epf_type_add_cfs(struct pci_epf *epf,
-					  struct config_group *group)
-{
-	struct config_group *epf_type_group;
-
-	if (!epf->driver) {
-		dev_err(&epf->dev, "epf device not bound to driver\n");
-		return NULL;
-	}
-
-	if (!epf->driver->ops->add_cfs)
-		return NULL;
-
-	mutex_lock(&epf->lock);
-	epf_type_group = epf->driver->ops->add_cfs(epf, group);
-	mutex_unlock(&epf->lock);
-
-	return epf_type_group;
-}
-EXPORT_SYMBOL_GPL(pci_epf_type_add_cfs);
 
 /**
  * pci_epf_unbind() - Notify the function driver that the binding between the
@@ -283,14 +251,19 @@ EXPORT_SYMBOL_GPL(pci_epf_free_space);
  * @epf: the EPF device to whom allocate the memory
  * @size: the size of the memory that has to be allocated
  * @bar: the BAR number corresponding to the allocated register space
- * @align: alignment size for the allocation region
+ * @epc_features: the features provided by the EPC specific to this EPF
  * @type: Identifies if the allocation is for primary EPC or secondary EPC
  *
  * Invoke to allocate memory for the PCI EPF register space.
+ * Flag PCI_BASE_ADDRESS_MEM_TYPE_64 will automatically get set if the BAR
+ * can only be a 64-bit BAR, or if the requested size is larger than 2 GB.
  */
 void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar,
-			  size_t align, enum pci_epc_interface_type type)
+			  const struct pci_epc_features *epc_features,
+			  enum pci_epc_interface_type type)
 {
+	u64 bar_fixed_size = epc_features->bar[bar].fixed_size;
+	size_t align = epc_features->align;
 	struct pci_epf_bar *epf_bar;
 	dma_addr_t phys_addr;
 	struct pci_epc *epc;
@@ -299,6 +272,15 @@ void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar,
 
 	if (size < 128)
 		size = 128;
+
+	if (epc_features->bar[bar].type == BAR_FIXED && bar_fixed_size) {
+		if (size > bar_fixed_size) {
+			dev_err(&epf->dev,
+				"requested BAR size is larger than fixed size\n");
+			return NULL;
+		}
+		size = bar_fixed_size;
+	}
 
 	if (align)
 		size = ALIGN(size, align);
@@ -324,9 +306,10 @@ void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar,
 	epf_bar[bar].addr = space;
 	epf_bar[bar].size = size;
 	epf_bar[bar].barno = bar;
-	epf_bar[bar].flags |= upper_32_bits(size) ?
-				PCI_BASE_ADDRESS_MEM_TYPE_64 :
-				PCI_BASE_ADDRESS_MEM_TYPE_32;
+	if (upper_32_bits(size) || epc_features->bar[bar].only_64bit)
+		epf_bar[bar].flags |= PCI_BASE_ADDRESS_MEM_TYPE_64;
+	else
+		epf_bar[bar].flags |= PCI_BASE_ADDRESS_MEM_TYPE_32;
 
 	return space;
 }
@@ -493,16 +476,16 @@ static const struct device_type pci_epf_type = {
 	.release	= pci_epf_dev_release,
 };
 
-static int
+static const struct pci_epf_device_id *
 pci_epf_match_id(const struct pci_epf_device_id *id, const struct pci_epf *epf)
 {
 	while (id->name[0]) {
 		if (strcmp(epf->name, id->name) == 0)
-			return true;
+			return id;
 		id++;
 	}
 
-	return false;
+	return NULL;
 }
 
 static int pci_epf_device_match(struct device *dev, struct device_driver *drv)
@@ -511,7 +494,7 @@ static int pci_epf_device_match(struct device *dev, struct device_driver *drv)
 	struct pci_epf_driver *driver = to_pci_epf_driver(drv);
 
 	if (driver->id_table)
-		return pci_epf_match_id(driver->id_table, epf);
+		return !!pci_epf_match_id(driver->id_table, epf);
 
 	return !strcmp(epf->name, drv->name);
 }
@@ -526,7 +509,7 @@ static int pci_epf_device_probe(struct device *dev)
 
 	epf->driver = driver;
 
-	return driver->probe(epf);
+	return driver->probe(epf, pci_epf_match_id(driver->id_table, epf));
 }
 
 static void pci_epf_device_remove(struct device *dev)
@@ -539,7 +522,7 @@ static void pci_epf_device_remove(struct device *dev)
 	epf->driver = NULL;
 }
 
-static struct bus_type pci_epf_bus_type = {
+static const struct bus_type pci_epf_bus_type = {
 	.name		= "pci-epf",
 	.match		= pci_epf_device_match,
 	.probe		= pci_epf_device_probe,
@@ -568,4 +551,3 @@ module_exit(pci_epf_exit);
 
 MODULE_DESCRIPTION("PCI EPF Library");
 MODULE_AUTHOR("Kishon Vijay Abraham I <kishon@ti.com>");
-MODULE_LICENSE("GPL v2");

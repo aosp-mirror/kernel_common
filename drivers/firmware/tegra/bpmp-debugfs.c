@@ -77,7 +77,7 @@ static const char *get_filename(struct tegra_bpmp *bpmp,
 
 	root_path_buf = kzalloc(root_path_buf_len, GFP_KERNEL);
 	if (!root_path_buf)
-		goto out;
+		return NULL;
 
 	root_path = dentry_path(bpmp->debugfs_mirror, root_path_buf,
 				root_path_buf_len);
@@ -193,7 +193,7 @@ static int mrq_debug_read(struct tegra_bpmp *bpmp, const char *name,
 		},
 	};
 	u32 fd = 0, len = 0;
-	int remaining, err;
+	int remaining, err, close_err;
 
 	mutex_lock(&bpmp_debug_lock);
 	err = mrq_debug_open(bpmp, name, &fd, &len, 0);
@@ -231,7 +231,9 @@ static int mrq_debug_read(struct tegra_bpmp *bpmp, const char *name,
 	*nbytes = len;
 
 close:
-	err = mrq_debug_close(bpmp, fd);
+	close_err = mrq_debug_close(bpmp, fd);
+	if (!err)
+		err = close_err;
 out:
 	mutex_unlock(&bpmp_debug_lock);
 	return err;
@@ -319,7 +321,7 @@ static int bpmp_debug_show(struct seq_file *m, void *p)
 		},
 	};
 	u32 fd = 0, len = 0;
-	int remaining, err;
+	int remaining, err, close_err;
 
 	filename = get_filename(bpmp, file, fnamebuf, sizeof(fnamebuf));
 	if (!filename)
@@ -353,7 +355,9 @@ static int bpmp_debug_show(struct seq_file *m, void *p)
 	}
 
 close:
-	err = mrq_debug_close(bpmp, fd);
+	close_err = mrq_debug_close(bpmp, fd);
+	if (!err)
+		err = close_err;
 out:
 	mutex_unlock(&bpmp_debug_lock);
 	return err;
@@ -606,7 +610,7 @@ static int debugfs_show(struct seq_file *m, void *p)
 	}
 
 	len = strlen(filename);
-	strncpy(namevirt, filename, namesize);
+	strscpy_pad(namevirt, filename, namesize);
 
 	err = mrq_debugfs_read(bpmp, namephys, len, dataphys, datasize,
 			       &nbytes);
@@ -657,7 +661,7 @@ static ssize_t debugfs_store(struct file *file, const char __user *buf,
 	}
 
 	len = strlen(filename);
-	strncpy(namevirt, filename, namesize);
+	strscpy_pad(namevirt, filename, namesize);
 
 	if (copy_from_user(datavirt, buf, count)) {
 		err = -EFAULT;

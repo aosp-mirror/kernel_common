@@ -3,7 +3,7 @@
  * Broadcom BCMBCA High Speed SPI Controller driver
  *
  * Copyright 2000-2010 Broadcom Corporation
- * Copyright 2012-2013 Jonas Gorski <jogo@openwrt.org>
+ * Copyright 2012-2013 Jonas Gorski <jonas.gorski@gmail.com>
  * Copyright 2019-2022 Broadcom Ltd
  */
 
@@ -127,7 +127,7 @@ static ssize_t wait_mode_show(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
 	struct spi_controller *ctrl = dev_get_drvdata(dev);
-	struct bcmbca_hsspi *bs = spi_master_get_devdata(ctrl);
+	struct bcmbca_hsspi *bs = spi_controller_get_devdata(ctrl);
 
 	return sprintf(buf, "%d\n", bs->wait_mode);
 }
@@ -136,7 +136,7 @@ static ssize_t wait_mode_store(struct device *dev, struct device_attribute *attr
 			  const char *buf, size_t count)
 {
 	struct spi_controller *ctrl = dev_get_drvdata(dev);
-	struct bcmbca_hsspi *bs = spi_master_get_devdata(ctrl);
+	struct bcmbca_hsspi *bs = spi_controller_get_devdata(ctrl);
 	u32 val;
 
 	if (kstrtou32(buf, 10, &val))
@@ -193,7 +193,7 @@ static void bcmbca_hsspi_set_cs(struct bcmbca_hsspi *bs, unsigned int cs,
 static void bcmbca_hsspi_set_clk(struct bcmbca_hsspi *bs,
 				  struct spi_device *spi, int hz)
 {
-	unsigned int profile = spi->chip_select;
+	unsigned int profile = spi_get_chipselect(spi, 0);
 	u32 reg;
 
 	reg = DIV_ROUND_UP(2048, DIV_ROUND_UP(bs->speed_hz, hz));
@@ -250,8 +250,8 @@ static int bcmbca_hsspi_wait_cmd(struct bcmbca_hsspi *bs, unsigned int cs)
 static int bcmbca_hsspi_do_txrx(struct spi_device *spi, struct spi_transfer *t,
 								struct spi_message *msg)
 {
-	struct bcmbca_hsspi *bs = spi_master_get_devdata(spi->master);
-	unsigned int chip_select = spi->chip_select;
+	struct bcmbca_hsspi *bs = spi_controller_get_devdata(spi->controller);
+	unsigned int chip_select = spi_get_chipselect(spi, 0);
 	u16 opcode = 0, val;
 	int pending = t->len;
 	int step_size = HSSPI_BUFFER_LEN;
@@ -312,7 +312,7 @@ static int bcmbca_hsspi_do_txrx(struct spi_device *spi, struct spi_transfer *t,
 			    PINGPONG_COMMAND_START_NOW;
 		__raw_writel(reg, bs->regs + HSSPI_PINGPONG_COMMAND_REG(0));
 
-		if (bcmbca_hsspi_wait_cmd(bs, spi->chip_select))
+		if (bcmbca_hsspi_wait_cmd(bs, spi_get_chipselect(spi, 0)))
 			return -ETIMEDOUT;
 
 		pending -= curr_step;
@@ -328,37 +328,37 @@ static int bcmbca_hsspi_do_txrx(struct spi_device *spi, struct spi_transfer *t,
 
 static int bcmbca_hsspi_setup(struct spi_device *spi)
 {
-	struct bcmbca_hsspi *bs = spi_master_get_devdata(spi->master);
+	struct bcmbca_hsspi *bs = spi_controller_get_devdata(spi->controller);
 	u32 reg;
 
 	reg = __raw_readl(bs->regs +
-			  HSSPI_PROFILE_SIGNAL_CTRL_REG(spi->chip_select));
+			  HSSPI_PROFILE_SIGNAL_CTRL_REG(spi_get_chipselect(spi, 0)));
 	reg &= ~(SIGNAL_CTRL_LAUNCH_RISING | SIGNAL_CTRL_LATCH_RISING);
 	if (spi->mode & SPI_CPHA)
 		reg |= SIGNAL_CTRL_LAUNCH_RISING;
 	else
 		reg |= SIGNAL_CTRL_LATCH_RISING;
 	__raw_writel(reg, bs->regs +
-		     HSSPI_PROFILE_SIGNAL_CTRL_REG(spi->chip_select));
+		     HSSPI_PROFILE_SIGNAL_CTRL_REG(spi_get_chipselect(spi, 0)));
 
 	mutex_lock(&bs->bus_mutex);
 	reg = __raw_readl(bs->regs + HSSPI_GLOBAL_CTRL_REG);
 
 	if (spi->mode & SPI_CS_HIGH)
-		reg |= BIT(spi->chip_select);
+		reg |= BIT(spi_get_chipselect(spi, 0));
 	else
-		reg &= ~BIT(spi->chip_select);
+		reg &= ~BIT(spi_get_chipselect(spi, 0));
 	__raw_writel(reg, bs->regs + HSSPI_GLOBAL_CTRL_REG);
 
 	if (spi->mode & SPI_CS_HIGH)
-		bs->cs_polarity |= BIT(spi->chip_select);
+		bs->cs_polarity |= BIT(spi_get_chipselect(spi, 0));
 	else
-		bs->cs_polarity &= ~BIT(spi->chip_select);
+		bs->cs_polarity &= ~BIT(spi_get_chipselect(spi, 0));
 
 	reg = __raw_readl(bs->spim_ctrl);
-	reg &= ~BIT(spi->chip_select + SPIM_CTRL_CS_OVERRIDE_VAL_SHIFT);
+	reg &= ~BIT(spi_get_chipselect(spi, 0) + SPIM_CTRL_CS_OVERRIDE_VAL_SHIFT);
 	if (spi->mode & SPI_CS_HIGH)
-		reg |= BIT(spi->chip_select + SPIM_CTRL_CS_OVERRIDE_VAL_SHIFT);
+		reg |= BIT(spi_get_chipselect(spi, 0) + SPIM_CTRL_CS_OVERRIDE_VAL_SHIFT);
 	__raw_writel(reg, bs->spim_ctrl);
 
 	mutex_unlock(&bs->bus_mutex);
@@ -366,10 +366,10 @@ static int bcmbca_hsspi_setup(struct spi_device *spi)
 	return 0;
 }
 
-static int bcmbca_hsspi_transfer_one(struct spi_master *master,
+static int bcmbca_hsspi_transfer_one(struct spi_controller *host,
 				      struct spi_message *msg)
 {
-	struct bcmbca_hsspi *bs = spi_master_get_devdata(master);
+	struct bcmbca_hsspi *bs = spi_controller_get_devdata(host);
 	struct spi_transfer *t;
 	struct spi_device *spi = msg->spi;
 	int status = -EINVAL;
@@ -388,16 +388,16 @@ static int bcmbca_hsspi_transfer_one(struct spi_master *master,
 				keep_cs = true;
 			} else {
 				if (!t->cs_off)
-					bcmbca_hsspi_set_cs(bs, spi->chip_select, false);
+					bcmbca_hsspi_set_cs(bs, spi_get_chipselect(spi, 0), false);
 
 				spi_transfer_cs_change_delay_exec(msg, t);
 
 				if (!list_next_entry(t, transfer_list)->cs_off)
-					bcmbca_hsspi_set_cs(bs, spi->chip_select, true);
+					bcmbca_hsspi_set_cs(bs, spi_get_chipselect(spi, 0), true);
 			}
 		} else if (!list_is_last(&t->transfer_list, &msg->transfers) &&
 			   t->cs_off != list_next_entry(t, transfer_list)->cs_off) {
-			bcmbca_hsspi_set_cs(bs, spi->chip_select, t->cs_off);
+			bcmbca_hsspi_set_cs(bs, spi_get_chipselect(spi, 0), t->cs_off);
 		}
 
 		msg->actual_length += t->len;
@@ -406,10 +406,10 @@ static int bcmbca_hsspi_transfer_one(struct spi_master *master,
 	mutex_unlock(&bs->msg_mutex);
 
 	if (status || !keep_cs)
-		bcmbca_hsspi_set_cs(bs, spi->chip_select, false);
+		bcmbca_hsspi_set_cs(bs, spi_get_chipselect(spi, 0), false);
 
 	msg->status = status;
-	spi_finalize_current_message(master);
+	spi_finalize_current_message(host);
 
 	return 0;
 }
@@ -431,7 +431,7 @@ static irqreturn_t bcmbca_hsspi_interrupt(int irq, void *dev_id)
 
 static int bcmbca_hsspi_probe(struct platform_device *pdev)
 {
-	struct spi_master *master;
+	struct spi_controller *host;
 	struct bcmbca_hsspi *bs;
 	struct resource *res_mem;
 	void __iomem *spim_ctrl;
@@ -487,13 +487,13 @@ static int bcmbca_hsspi_probe(struct platform_device *pdev)
 		}
 	}
 
-	master = spi_alloc_master(&pdev->dev, sizeof(*bs));
-	if (!master) {
+	host = spi_alloc_host(&pdev->dev, sizeof(*bs));
+	if (!host) {
 		ret = -ENOMEM;
 		goto out_disable_pll_clk;
 	}
 
-	bs = spi_master_get_devdata(master);
+	bs = spi_controller_get_devdata(host);
 	bs->pdev = pdev;
 	bs->clk = clk;
 	bs->pll_clk = pll_clk;
@@ -507,9 +507,9 @@ static int bcmbca_hsspi_probe(struct platform_device *pdev)
 	mutex_init(&bs->msg_mutex);
 	init_completion(&bs->done);
 
-	master->dev.of_node = dev->of_node;
+	host->dev.of_node = dev->of_node;
 	if (!dev->of_node)
-		master->bus_num = HSSPI_BUS_NUM;
+		host->bus_num = HSSPI_BUS_NUM;
 
 	of_property_read_u32(dev->of_node, "num-cs", &num_cs);
 	if (num_cs > 8) {
@@ -517,15 +517,15 @@ static int bcmbca_hsspi_probe(struct platform_device *pdev)
 			 num_cs);
 		num_cs = HSSPI_SPI_MAX_CS;
 	}
-	master->num_chipselect = num_cs;
-	master->setup = bcmbca_hsspi_setup;
-	master->transfer_one_message = bcmbca_hsspi_transfer_one;
-	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH |
-	    SPI_RX_DUAL | SPI_TX_DUAL;
-	master->bits_per_word_mask = SPI_BPW_MASK(8);
-	master->auto_runtime_pm = true;
+	host->num_chipselect = num_cs;
+	host->setup = bcmbca_hsspi_setup;
+	host->transfer_one_message = bcmbca_hsspi_transfer_one;
+	host->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH |
+			  SPI_RX_DUAL | SPI_TX_DUAL;
+	host->bits_per_word_mask = SPI_BPW_MASK(8);
+	host->auto_runtime_pm = true;
 
-	platform_set_drvdata(pdev, master);
+	platform_set_drvdata(pdev, host);
 
 	/* Initialize the hardware */
 	__raw_writel(0, bs->regs + HSSPI_INT_MASK_REG);
@@ -543,7 +543,7 @@ static int bcmbca_hsspi_probe(struct platform_device *pdev)
 		ret = devm_request_irq(dev, irq, bcmbca_hsspi_interrupt, IRQF_SHARED,
 			       pdev->name, bs);
 		if (ret)
-			goto out_put_master;
+			goto out_put_host;
 	}
 
 	pm_runtime_enable(&pdev->dev);
@@ -555,7 +555,7 @@ static int bcmbca_hsspi_probe(struct platform_device *pdev)
 	}
 
 	/* register and we are done */
-	ret = devm_spi_register_master(dev, master);
+	ret = devm_spi_register_controller(dev, host);
 	if (ret)
 		goto out_sysgroup_disable;
 
@@ -567,8 +567,8 @@ out_sysgroup_disable:
 	sysfs_remove_group(&pdev->dev.kobj, &bcmbca_hsspi_group);
 out_pm_disable:
 	pm_runtime_disable(&pdev->dev);
-out_put_master:
-	spi_master_put(master);
+out_put_host:
+	spi_controller_put(host);
 out_disable_pll_clk:
 	clk_disable_unprepare(pll_clk);
 out_disable_clk:
@@ -576,27 +576,25 @@ out_disable_clk:
 	return ret;
 }
 
-static int bcmbca_hsspi_remove(struct platform_device *pdev)
+static void bcmbca_hsspi_remove(struct platform_device *pdev)
 {
-	struct spi_master *master = platform_get_drvdata(pdev);
-	struct bcmbca_hsspi *bs = spi_master_get_devdata(master);
+	struct spi_controller *host = platform_get_drvdata(pdev);
+	struct bcmbca_hsspi *bs = spi_controller_get_devdata(host);
 
 	/* reset the hardware and block queue progress */
 	__raw_writel(0, bs->regs + HSSPI_INT_MASK_REG);
 	clk_disable_unprepare(bs->pll_clk);
 	clk_disable_unprepare(bs->clk);
 	sysfs_remove_group(&pdev->dev.kobj, &bcmbca_hsspi_group);
-
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
 static int bcmbca_hsspi_suspend(struct device *dev)
 {
-	struct spi_master *master = dev_get_drvdata(dev);
-	struct bcmbca_hsspi *bs = spi_master_get_devdata(master);
+	struct spi_controller *host = dev_get_drvdata(dev);
+	struct bcmbca_hsspi *bs = spi_controller_get_devdata(host);
 
-	spi_master_suspend(master);
+	spi_controller_suspend(host);
 	clk_disable_unprepare(bs->pll_clk);
 	clk_disable_unprepare(bs->clk);
 
@@ -605,8 +603,8 @@ static int bcmbca_hsspi_suspend(struct device *dev)
 
 static int bcmbca_hsspi_resume(struct device *dev)
 {
-	struct spi_master *master = dev_get_drvdata(dev);
-	struct bcmbca_hsspi *bs = spi_master_get_devdata(master);
+	struct spi_controller *host = dev_get_drvdata(dev);
+	struct bcmbca_hsspi *bs = spi_controller_get_devdata(host);
 	int ret;
 
 	ret = clk_prepare_enable(bs->clk);
@@ -621,7 +619,7 @@ static int bcmbca_hsspi_resume(struct device *dev)
 		}
 	}
 
-	spi_master_resume(master);
+	spi_controller_resume(host);
 
 	return 0;
 }
@@ -644,7 +642,7 @@ static struct platform_driver bcmbca_hsspi_driver = {
 		   .of_match_table = bcmbca_hsspi_of_match,
 		   },
 	.probe = bcmbca_hsspi_probe,
-	.remove = bcmbca_hsspi_remove,
+	.remove_new = bcmbca_hsspi_remove,
 };
 
 module_platform_driver(bcmbca_hsspi_driver);

@@ -256,8 +256,7 @@ __xtpg_get_pad_format(struct xtpg_device *xtpg,
 {
 	switch (which) {
 	case V4L2_SUBDEV_FORMAT_TRY:
-		return v4l2_subdev_get_try_format(&xtpg->xvip.subdev,
-						  sd_state, pad);
+		return v4l2_subdev_state_get_format(sd_state, pad);
 	case V4L2_SUBDEV_FORMAT_ACTIVE:
 		return &xtpg->formats[pad];
 	default:
@@ -326,7 +325,7 @@ static int xtpg_enum_frame_size(struct v4l2_subdev *subdev,
 {
 	struct v4l2_mbus_framefmt *format;
 
-	format = v4l2_subdev_get_try_format(subdev, sd_state, fse->pad);
+	format = v4l2_subdev_state_get_format(sd_state, fse->pad);
 
 	if (fse->index || fse->code != format->code)
 		return -EINVAL;
@@ -354,11 +353,11 @@ static int xtpg_open(struct v4l2_subdev *subdev, struct v4l2_subdev_fh *fh)
 	struct xtpg_device *xtpg = to_tpg(subdev);
 	struct v4l2_mbus_framefmt *format;
 
-	format = v4l2_subdev_get_try_format(subdev, fh->state, 0);
+	format = v4l2_subdev_state_get_format(fh->state, 0);
 	*format = xtpg->default_format;
 
 	if (xtpg->npads == 2) {
-		format = v4l2_subdev_get_try_format(subdev, fh->state, 1);
+		format = v4l2_subdev_state_get_format(fh->state, 1);
 		*format = xtpg->default_format;
 	}
 
@@ -894,7 +893,7 @@ error_resource:
 	return ret;
 }
 
-static int xtpg_remove(struct platform_device *pdev)
+static void xtpg_remove(struct platform_device *pdev)
 {
 	struct xtpg_device *xtpg = platform_get_drvdata(pdev);
 	struct v4l2_subdev *subdev = &xtpg->xvip.subdev;
@@ -904,8 +903,6 @@ static int xtpg_remove(struct platform_device *pdev)
 	media_entity_cleanup(&subdev->entity);
 
 	xvip_cleanup_resources(&xtpg->xvip);
-
-	return 0;
 }
 
 static SIMPLE_DEV_PM_OPS(xtpg_pm_ops, xtpg_pm_suspend, xtpg_pm_resume);
@@ -923,7 +920,7 @@ static struct platform_driver xtpg_driver = {
 		.of_match_table	= xtpg_of_id_table,
 	},
 	.probe			= xtpg_probe,
-	.remove			= xtpg_remove,
+	.remove_new		= xtpg_remove,
 };
 
 module_platform_driver(xtpg_driver);

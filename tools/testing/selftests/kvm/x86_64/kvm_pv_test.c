@@ -46,10 +46,10 @@ static void test_msr(struct msr_data *msr)
 	PR_MSR(msr);
 
 	vector = rdmsr_safe(msr->idx, &ignored);
-	GUEST_ASSERT_1(vector == GP_VECTOR, vector);
+	GUEST_ASSERT_EQ(vector, GP_VECTOR);
 
 	vector = wrmsr_safe(msr->idx, 0);
-	GUEST_ASSERT_1(vector == GP_VECTOR, vector);
+	GUEST_ASSERT_EQ(vector, GP_VECTOR);
 }
 
 struct hcall_data {
@@ -77,7 +77,7 @@ static void test_hcall(struct hcall_data *hc)
 
 	PR_HCALL(hc);
 	r = kvm_hypercall(hc->nr, 0, 0, 0, 0);
-	GUEST_ASSERT(r == -KVM_ENOSYS);
+	GUEST_ASSERT_EQ(r, -KVM_ENOSYS);
 }
 
 static void guest_main(void)
@@ -111,14 +111,11 @@ static void pr_hcall(struct ucall *uc)
 
 static void enter_guest(struct kvm_vcpu *vcpu)
 {
-	struct kvm_run *run = vcpu->run;
 	struct ucall uc;
 
 	while (true) {
 		vcpu_run(vcpu);
-		TEST_ASSERT(run->exit_reason == KVM_EXIT_IO,
-			    "unexpected exit reason: %u (%s)",
-			    run->exit_reason, exit_reason_str(run->exit_reason));
+		TEST_ASSERT_KVM_EXIT_REASON(vcpu, KVM_EXIT_IO);
 
 		switch (get_ucall(vcpu, &uc)) {
 		case UCALL_PR_MSR:
@@ -128,12 +125,49 @@ static void enter_guest(struct kvm_vcpu *vcpu)
 			pr_hcall(&uc);
 			break;
 		case UCALL_ABORT:
-			REPORT_GUEST_ASSERT_1(uc, "vector = %lu");
+			REPORT_GUEST_ASSERT(uc);
 			return;
 		case UCALL_DONE:
 			return;
 		}
 	}
+}
+
+static void test_pv_unhalt(void)
+{
+	struct kvm_vcpu *vcpu;
+	struct kvm_vm *vm;
+	struct kvm_cpuid_entry2 *ent;
+	u32 kvm_sig_old;
+
+	pr_info("testing KVM_FEATURE_PV_UNHALT\n");
+
+	TEST_REQUIRE(KVM_CAP_X86_DISABLE_EXITS);
+
+	/* KVM_PV_UNHALT test */
+	vm = vm_create_with_one_vcpu(&vcpu, guest_main);
+	vcpu_set_cpuid_feature(vcpu, X86_FEATURE_KVM_PV_UNHALT);
+
+	TEST_ASSERT(vcpu_cpuid_has(vcpu, X86_FEATURE_KVM_PV_UNHALT),
+		    "Enabling X86_FEATURE_KVM_PV_UNHALT had no effect");
+
+	/* Make sure KVM clears vcpu->arch.kvm_cpuid */
+	ent = vcpu_get_cpuid_entry(vcpu, KVM_CPUID_SIGNATURE);
+	kvm_sig_old = ent->ebx;
+	ent->ebx = 0xdeadbeef;
+	vcpu_set_cpuid(vcpu);
+
+	vm_enable_cap(vm, KVM_CAP_X86_DISABLE_EXITS, KVM_X86_DISABLE_EXITS_HLT);
+	ent = vcpu_get_cpuid_entry(vcpu, KVM_CPUID_SIGNATURE);
+	ent->ebx = kvm_sig_old;
+	vcpu_set_cpuid(vcpu);
+
+	TEST_ASSERT(!vcpu_cpuid_has(vcpu, X86_FEATURE_KVM_PV_UNHALT),
+		    "KVM_FEATURE_PV_UNHALT is set with KVM_CAP_X86_DISABLE_EXITS");
+
+	/* FIXME: actually test KVM_FEATURE_PV_UNHALT feature */
+
+	kvm_vm_free(vm);
 }
 
 int main(void)
@@ -149,9 +183,8 @@ int main(void)
 
 	vcpu_clear_cpuid_entry(vcpu, KVM_CPUID_FEATURES);
 
-	vm_init_descriptor_tables(vm);
-	vcpu_init_descriptor_tables(vcpu);
-
 	enter_guest(vcpu);
 	kvm_vm_free(vm);
+
+	test_pv_unhalt();
 }

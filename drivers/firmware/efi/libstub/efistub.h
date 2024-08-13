@@ -33,11 +33,12 @@
 #define EFI_ALLOC_LIMIT		ULONG_MAX
 #endif
 
+extern bool efi_no5lvl;
 extern bool efi_nochunk;
 extern bool efi_nokaslr;
 extern int efi_loglevel;
+extern int efi_mem_encrypt;
 extern bool efi_novamap;
-
 extern const efi_system_table_t *efi_system_table;
 
 typedef union efi_dxe_services_table efi_dxe_services_table_t;
@@ -442,6 +443,26 @@ union efi_dxe_services_table {
 	} mixed_mode;
 };
 
+typedef union efi_memory_attribute_protocol efi_memory_attribute_protocol_t;
+
+union efi_memory_attribute_protocol {
+	struct {
+		efi_status_t (__efiapi *get_memory_attributes)(
+			efi_memory_attribute_protocol_t *, efi_physical_addr_t, u64, u64 *);
+
+		efi_status_t (__efiapi *set_memory_attributes)(
+			efi_memory_attribute_protocol_t *, efi_physical_addr_t, u64, u64);
+
+		efi_status_t (__efiapi *clear_memory_attributes)(
+			efi_memory_attribute_protocol_t *, efi_physical_addr_t, u64, u64);
+	};
+	struct {
+		u32 get_memory_attributes;
+		u32 set_memory_attributes;
+		u32 clear_memory_attributes;
+	} mixed_mode;
+};
+
 typedef union efi_uga_draw_protocol efi_uga_draw_protocol_t;
 
 union efi_uga_draw_protocol {
@@ -822,14 +843,14 @@ struct efi_tcg2_event {
 	/* u8[] event follows here */
 } __packed;
 
-struct efi_tcg2_tagged_event {
-	u32 tagged_event_id;
-	u32 tagged_event_data_size;
-	/* u8  tagged event data follows here */
-} __packed;
+/* from TCG PC Client Platform Firmware Profile Specification */
+typedef struct tdTCG_PCClientTaggedEvent {
+	u32	tagged_event_id;
+	u32	tagged_event_data_size;
+	u8	tagged_event_data[];
+} TCG_PCClientTaggedEvent;
 
 typedef struct efi_tcg2_event efi_tcg2_event_t;
-typedef struct efi_tcg2_tagged_event efi_tcg2_tagged_event_t;
 typedef union efi_tcg2_protocol efi_tcg2_protocol_t;
 
 union efi_tcg2_protocol {
@@ -858,6 +879,87 @@ union efi_tcg2_protocol {
 		u32 get_active_pcr_banks;
 		u32 set_active_pcr_banks;
 		u32 get_result_of_set_active_pcr_banks;
+	} mixed_mode;
+};
+
+typedef struct {
+	u8 major;
+	u8 minor;
+} efi_cc_version_t;
+
+typedef struct {
+	u8 type;
+	u8 sub_type;
+} efi_cc_type_t;
+
+/* EFI CC type/subtype defines */
+#define EFI_CC_TYPE_NONE		0
+#define EFI_CC_TYPE_AMD_SEV		1
+#define EFI_CC_TYPE_INTEL_TDX		2
+
+typedef u32 efi_cc_mr_index_t;
+
+struct efi_cc_event {
+	u32 event_size;
+	struct {
+		u32 header_size;
+		u16 header_version;
+		u32 mr_index;
+		u32 event_type;
+	} __packed event_header;
+	/* u8[] event follows here */
+} __packed;
+
+typedef struct efi_cc_event efi_cc_event_t;
+
+typedef u32 efi_cc_event_log_bitmap_t;
+typedef u32 efi_cc_event_log_format_t;
+typedef u32 efi_cc_event_algorithm_bitmap_t;
+
+typedef struct {
+	u8				size;
+	efi_cc_version_t		structure_version;
+	efi_cc_version_t		protocol_version;
+	efi_cc_event_algorithm_bitmap_t	hash_algorithm_bitmap;
+	efi_cc_event_log_bitmap_t	supported_event_logs;
+	efi_cc_type_t			cc_type;
+} efi_cc_boot_service_cap_t;
+
+#define EFI_CC_EVENT_HEADER_VERSION	1
+
+#define EFI_CC_BOOT_HASH_ALG_SHA384	0x00000004
+
+#define EFI_CC_EVENT_LOG_FORMAT_TCG_2	0x00000002
+
+typedef union efi_cc_protocol efi_cc_protocol_t;
+
+union efi_cc_protocol {
+	struct {
+		efi_status_t
+		(__efiapi *get_capability)(efi_cc_protocol_t *,
+					   efi_cc_boot_service_cap_t *);
+
+		efi_status_t
+		(__efiapi *get_event_log)(efi_cc_protocol_t *,
+					  efi_cc_event_log_format_t,
+					  efi_physical_addr_t *,
+					  efi_physical_addr_t *,
+					  efi_bool_t *);
+
+		efi_status_t
+		(__efiapi *hash_log_extend_event)(efi_cc_protocol_t *, u64,
+						  efi_physical_addr_t, u64,
+						  const efi_cc_event_t *);
+
+		efi_status_t
+		(__efiapi *map_pcr_to_mr_index)(efi_cc_protocol_t *, u32,
+						efi_cc_mr_index_t *);
+	};
+	struct {
+		u32 get_capability;
+		u32 get_event_log;
+		u32 hash_log_extend_event;
+		u32 map_pcr_to_mr_index;
 	} mixed_mode;
 };
 
@@ -935,7 +1037,8 @@ efi_status_t efi_get_random_bytes(unsigned long size, u8 *out);
 
 efi_status_t efi_random_alloc(unsigned long size, unsigned long align,
 			      unsigned long *addr, unsigned long random_seed,
-			      int memory_type);
+			      int memory_type, unsigned long alloc_min,
+			      unsigned long alloc_max);
 
 efi_status_t efi_random_get_seed(void);
 
@@ -1039,20 +1142,22 @@ static inline void
 efi_enable_reset_attack_mitigation(void) { }
 #endif
 
-void efi_retrieve_tpm2_eventlog(void);
+void efi_retrieve_eventlog(void);
 
 struct screen_info *alloc_screen_info(void);
+struct screen_info *__alloc_screen_info(void);
 void free_screen_info(struct screen_info *si);
 
 void efi_cache_sync_image(unsigned long image_base,
-			  unsigned long alloc_size,
-			  unsigned long code_size);
+			  unsigned long alloc_size);
 
 struct efi_smbios_record {
 	u8	type;
 	u8	length;
 	u16	handle;
 };
+
+const struct efi_smbios_record *efi_get_smbios_record(u8 type);
 
 struct efi_smbios_type1_record {
 	struct efi_smbios_record	header;
@@ -1067,13 +1172,64 @@ struct efi_smbios_type1_record {
 	u8				family;
 };
 
-#define efi_get_smbios_string(__type, __name) ({			\
-	int size = sizeof(struct efi_smbios_type ## __type ## _record);	\
-	int off = offsetof(struct efi_smbios_type ## __type ## _record,	\
-			   __name);					\
-	__efi_get_smbios_string(__type, off, size);			\
+struct efi_smbios_type4_record {
+	struct efi_smbios_record	header;
+
+	u8				socket;
+	u8				processor_type;
+	u8				processor_family;
+	u8				processor_manufacturer;
+	u8				processor_id[8];
+	u8				processor_version;
+	u8				voltage;
+	u16				external_clock;
+	u16				max_speed;
+	u16				current_speed;
+	u8				status;
+	u8				processor_upgrade;
+	u16				l1_cache_handle;
+	u16				l2_cache_handle;
+	u16				l3_cache_handle;
+	u8				serial_number;
+	u8				asset_tag;
+	u8				part_number;
+	u8				core_count;
+	u8				enabled_core_count;
+	u8				thread_count;
+	u16				processor_characteristics;
+	u16				processor_family2;
+	u16				core_count2;
+	u16				enabled_core_count2;
+	u16				thread_count2;
+	u16				thread_enabled;
+};
+
+#define efi_get_smbios_string(__record, __field) ({			\
+	__typeof__(__record) __rec = __record;				\
+	__efi_get_smbios_string(&__rec->header, &__rec->__field);	\
 })
 
-const u8 *__efi_get_smbios_string(u8 type, int offset, int recsize);
+const u8 *__efi_get_smbios_string(const struct efi_smbios_record *record,
+				  const u8 *offset);
+
+void efi_remap_image(unsigned long image_base, unsigned alloc_size,
+		     unsigned long code_size);
+efi_status_t efi_kaslr_relocate_kernel(unsigned long *image_addr,
+				       unsigned long *reserve_addr,
+				       unsigned long *reserve_size,
+				       unsigned long kernel_size,
+				       unsigned long kernel_codesize,
+				       unsigned long kernel_memsize,
+				       u32 phys_seed);
+u32 efi_kaslr_get_phys_seed(efi_handle_t image_handle);
+
+asmlinkage efi_status_t __efiapi
+efi_zboot_entry(efi_handle_t handle, efi_system_table_t *systab);
+
+efi_status_t allocate_unaccepted_bitmap(__u32 nr_desc,
+					struct efi_boot_memmap *map);
+void process_unaccepted_memory(u64 start, u64 end);
+void accept_memory(phys_addr_t start, phys_addr_t end);
+void arch_accept_memory(phys_addr_t start, phys_addr_t end);
 
 #endif

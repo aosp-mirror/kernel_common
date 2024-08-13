@@ -61,7 +61,7 @@ static int test_expand_events(struct evlist *evlist,
 
 	i = 0;
 	evlist__for_each_entry(evlist, evsel) {
-		if (strcmp(evsel->name, ev_name[i % nr_events])) {
+		if (!evsel__name_is(evsel, ev_name[i % nr_events])) {
 			pr_debug("event name doesn't match:\n");
 			pr_debug("  evsel[%d]: %s\n  expected: %s\n",
 				 i, evsel->name, ev_name[i % nr_events]);
@@ -127,8 +127,7 @@ static int expand_group_events(void)
 	parse_events_error__init(&err);
 	ret = parse_events(evlist, event_str, &err);
 	if (ret < 0) {
-		pr_debug("failed to parse event '%s', err %d, str '%s'\n",
-			 event_str, ret, err.str);
+		pr_debug("failed to parse event '%s', err %d\n", event_str, ret);
 		parse_events_error__print(&err, event_str);
 		goto out;
 	}
@@ -180,15 +179,14 @@ static int expand_metric_events(void)
 	struct evlist *evlist;
 	struct rblist metric_events;
 	const char metric_str[] = "CPI";
-	const struct pmu_events_table *pme_test;
+	const struct pmu_metrics_table *pme_test;
 
 	evlist = evlist__new();
 	TEST_ASSERT_VAL("failed to get evlist", evlist);
 
 	rblist__init(&metric_events);
-	pme_test = find_core_events_table("testarch", "testcpu");
-	ret = metricgroup__parse_groups_test(evlist, pme_test, metric_str,
-					     false, false, &metric_events);
+	pme_test = find_core_metrics_table("testarch", "testcpu");
+	ret = metricgroup__parse_groups_test(evlist, pme_test, metric_str, &metric_events);
 	if (ret < 0) {
 		pr_debug("failed to parse '%s' metric\n", metric_str);
 		goto out;

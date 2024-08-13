@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
 %YAML 1.2
 ---
-$id: "http://devicetree.org/schemas/phy/phy-cadence-torrent.yaml#"
-$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+$id: http://devicetree.org/schemas/phy/phy-cadence-torrent.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
 
 title: Cadence Torrent SD0801 PHY
 
@@ -20,6 +20,7 @@ properties:
   compatible:
     enum:
       - cdns,torrent-phy
+      - ti,j7200-serdes-10g
       - ti,j721e-serdes-10g
 
   '#address-cells':
@@ -35,20 +36,18 @@ properties:
     minItems: 1
     maxItems: 2
     description:
-      PHY reference clock for 1 item. Must contain an entry in clock-names.
-      Optional Parent to enable output reference clock.
+      PHY input reference clocks - refclk (for PLL0) & pll1_refclk (for PLL1).
+      pll1_refclk is optional and used for multi-protocol configurations requiring
+      separate reference clock for each protocol.
+      Same refclk is used for both PLL0 and PLL1 if no separate pll1_refclk is used.
+      Optional parent clock (phy_en_refclk) to enable a reference clock output feature
+      on some platforms to output either derived or received reference clock.
 
   clock-names:
     minItems: 1
     items:
       - const: refclk
-      - const: phy_en_refclk
-
-  assigned-clocks:
-    maxItems: 3
-
-  assigned-clock-parents:
-    maxItems: 3
+      - enum: [ pll1_refclk, phy_en_refclk ]
 
   reg:
     minItems: 1

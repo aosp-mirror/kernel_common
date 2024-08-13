@@ -114,6 +114,7 @@ struct test_env {
 	FILE *stdout;
 	FILE *stderr;
 	int nr_cpus;
+	FILE *json;
 
 	int succ_cnt; /* successful tests */
 	int sub_succ_cnt; /* successful sub-tests */
@@ -376,6 +377,29 @@ int test__join_cgroup(const char *path);
 	___ok;								\
 })
 
+#define SYS(goto_label, fmt, ...)					\
+	({								\
+		char cmd[1024];						\
+		snprintf(cmd, sizeof(cmd), fmt, ##__VA_ARGS__);		\
+		if (!ASSERT_OK(system(cmd), cmd))			\
+			goto goto_label;				\
+	})
+
+#define ALL_TO_DEV_NULL " >/dev/null 2>&1"
+
+#define SYS_NOFAIL(fmt, ...)						\
+	({								\
+		char cmd[1024];						\
+		int n;							\
+		n = snprintf(cmd, sizeof(cmd), fmt, ##__VA_ARGS__);	\
+		if (n < sizeof(cmd) && sizeof(cmd) - n >= sizeof(ALL_TO_DEV_NULL)) \
+			strcat(cmd, ALL_TO_DEV_NULL);			\
+		system(cmd);						\
+	})
+
+int start_libbpf_log_capture(void);
+char *stop_libbpf_log_capture(void);
+
 static inline __u64 ptr_to_u64(const void *ptr)
 {
 	return (__u64) (unsigned long) ptr;
@@ -389,8 +413,6 @@ static inline void *u64_to_ptr(__u64 ptr)
 int bpf_find_map(const char *test, struct bpf_object *obj, const char *name);
 int compare_map_keys(int map1_fd, int map2_fd);
 int compare_stack_ips(int smap_fd, int amap_fd, int stack_trace_len);
-int extract_build_id(char *build_id, size_t size);
-int kern_sync_rcu(void);
 int trigger_module_test_read(int read_sz);
 int trigger_module_test_write(int write_sz);
 int write_sysctl(const char *sysctl, const char *value);
@@ -403,18 +425,30 @@ int get_bpf_max_tramp_links(void);
 #define SYS_NANOSLEEP_KPROBE_NAME "__s390x_sys_nanosleep"
 #elif defined(__aarch64__)
 #define SYS_NANOSLEEP_KPROBE_NAME "__arm64_sys_nanosleep"
+#elif defined(__riscv)
+#define SYS_NANOSLEEP_KPROBE_NAME "__riscv_sys_nanosleep"
 #else
 #define SYS_NANOSLEEP_KPROBE_NAME "sys_nanosleep"
 #endif
 
 #define BPF_TESTMOD_TEST_FILE "/sys/kernel/bpf_testmod"
 
+typedef int (*pre_execution_cb)(struct bpf_object *obj);
+
 struct test_loader {
 	char *log_buf;
 	size_t log_buf_sz;
+	size_t next_match_pos;
+	pre_execution_cb pre_execution_cb;
 
 	struct bpf_object *obj;
 };
+
+static inline void test_loader__set_pre_execution_cb(struct test_loader *tester,
+						     pre_execution_cb cb)
+{
+	tester->pre_execution_cb = cb;
+}
 
 typedef const void *(*skel_elf_bytes_fn)(size_t *sz);
 

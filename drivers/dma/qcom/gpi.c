@@ -1966,7 +1966,6 @@ error_alloc_ev_ring:
 error_config_int:
 	gpi_free_ring(&gpii->ev_ring, gpii);
 exit_gpi_init:
-	mutex_unlock(&gpii->ctrl_lock);
 	return ret;
 }
 
@@ -2161,8 +2160,7 @@ static int gpi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	gpi_dev->dev = &pdev->dev;
-	gpi_dev->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	gpi_dev->regs = devm_ioremap_resource(gpi_dev->dev, gpi_dev->res);
+	gpi_dev->regs = devm_platform_get_and_ioremap_resource(pdev, 0, &gpi_dev->res);
 	if (IS_ERR(gpi_dev->regs))
 		return PTR_ERR(gpi_dev->regs);
 	gpi_dev->ee_base = gpi_dev->regs;

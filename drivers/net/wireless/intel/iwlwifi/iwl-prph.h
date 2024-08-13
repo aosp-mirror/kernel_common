@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
 /*
- * Copyright (C) 2005-2014, 2018-2022 Intel Corporation
+ * Copyright (C) 2005-2014, 2018-2024 Intel Corporation
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
  * Copyright (C) 2016 Intel Deutschland GmbH
  */
@@ -348,8 +348,13 @@
 #define RFIC_REG_RD			0xAD0470
 #define WFPM_CTRL_REG			0xA03030
 #define WFPM_OTP_CFG1_ADDR		0x00a03098
-#define WFPM_OTP_CFG1_IS_JACKET_BIT	BIT(4)
-#define WFPM_OTP_CFG1_IS_CDB_BIT	BIT(5)
+#define WFPM_OTP_CFG1_IS_JACKET_BIT	BIT(5)
+#define WFPM_OTP_CFG1_IS_CDB_BIT	BIT(4)
+#define WFPM_OTP_BZ_BNJ_JACKET_BIT	5
+#define WFPM_OTP_BZ_BNJ_CDB_BIT		4
+#define WFPM_OTP_CFG1_IS_JACKET(_val)   (((_val) & 0x00000020) >> WFPM_OTP_BZ_BNJ_JACKET_BIT)
+#define WFPM_OTP_CFG1_IS_CDB(_val)      (((_val) & 0x00000010) >> WFPM_OTP_BZ_BNJ_CDB_BIT)
+
 
 #define WFPM_GP2			0xA030B4
 
@@ -360,15 +365,24 @@
 #define DBGI_SRAM_FIFO_POINTERS_WR_PTR_MSK		0x00000FFF
 
 enum {
-	ENABLE_WFPM = BIT(31),
 	WFPM_AUX_CTL_AUX_IF_MAC_OWNER_MSK	= 0x80000000,
 };
 
-#define CNVI_AUX_MISC_CHIP				0xA200B0
+#define CNVI_AUX_MISC_CHIP			0xA200B0
+#define CNVI_AUX_MISC_CHIP_MAC_STEP(_val)	(((_val) & 0xf000000) >> 24)
+#define CNVI_AUX_MISC_CHIP_PROD_TYPE(_val)	((_val) & 0xfff)
+#define CNVI_AUX_MISC_CHIP_PROD_TYPE_GL		0x910
+#define CNVI_AUX_MISC_CHIP_PROD_TYPE_BZ_U	0x930
+#define CNVI_AUX_MISC_CHIP_PROD_TYPE_BZ_I	0x900
+#define CNVI_AUX_MISC_CHIP_PROD_TYPE_BZ_W	0x901
+
 #define CNVR_AUX_MISC_CHIP				0xA2B800
 #define CNVR_SCU_SD_REGS_SD_REG_DIG_DCDC_VTRIM		0xA29890
 #define CNVR_SCU_SD_REGS_SD_REG_ACTIVE_VDIG_MIRROR	0xA29938
 #define CNVI_SCU_SEQ_DATA_DW9				0xA27488
+
+#define CNVI_PMU_STEP_FLOW				0xA2D588
+#define CNVI_PMU_STEP_FLOW_FORCE_URM			BIT(2)
 
 #define PREG_AUX_BUS_WPROT_0		0xA04CC0
 
@@ -378,7 +392,7 @@ enum {
 #define PREG_PRPH_WPROT_22000		0xA04D00
 
 #define SB_MODIFY_CFG_FLAG		0xA03088
-#define SB_CFG_RESIDES_IN_OTP_MASK	0x10
+#define SB_CFG_RESIDES_IN_ROM		0x80
 #define SB_CPU_1_STATUS			0xA01E30
 #define SB_CPU_2_STATUS			0xA01E34
 #define UMAG_SB_CPU_1_STATUS		0xA038C0
@@ -419,14 +433,14 @@ enum {
  * reserved: bits 12-18
  * slave_exist: bit 19
  * dash: bits 20-23
- * step: bits 24-26
- * flavor: bits 27-31
+ * step: bits 24-27
+ * flavor: bits 28-31
  */
 #define REG_CRF_ID_TYPE(val)		(((val) & 0x00000FFF) >> 0)
 #define REG_CRF_ID_SLAVE(val)		(((val) & 0x00080000) >> 19)
 #define REG_CRF_ID_DASH(val)		(((val) & 0x00F00000) >> 20)
-#define REG_CRF_ID_STEP(val)		(((val) & 0x07000000) >> 24)
-#define REG_CRF_ID_FLAVOR(val)		(((val) & 0xF8000000) >> 27)
+#define REG_CRF_ID_STEP(val)		(((val) & 0x0F000000) >> 24)
+#define REG_CRF_ID_FLAVOR(val)		(((val) & 0xF0000000) >> 28)
 
 #define UREG_CHICK		(0xA05C00)
 #define UREG_CHICK_MSI_ENABLE	BIT(24)
@@ -442,9 +456,8 @@ enum {
 #define REG_CRF_ID_TYPE_HR_NONE_CDB_1X1	0x501
 #define REG_CRF_ID_TYPE_HR_NONE_CDB_CCP	0x532
 #define REG_CRF_ID_TYPE_GF			0x410
-#define REG_CRF_ID_TYPE_GF_TC			0xF08
-#define REG_CRF_ID_TYPE_MR			0x810
 #define REG_CRF_ID_TYPE_FM			0x910
+#define REG_CRF_ID_TYPE_WHP			0xA10
 
 #define HPM_DEBUG			0xA03440
 #define PERSISTENCE_BIT			BIT(12)
@@ -479,6 +492,10 @@ enum {
 #define FSEQ_ALIVE_TOKEN		0xA340F0
 #define FSEQ_CNVI_ID			0xA3408C
 #define FSEQ_CNVR_ID			0xA34090
+#define FSEQ_PREV_CNVIO_INIT_VERSION	0xA34084
+#define FSEQ_WIFI_FSEQ_VERSION		0xA34040
+#define FSEQ_BT_FSEQ_VERSION		0xA34044
+#define FSEQ_CLASS_TP_VERSION		0xA34078
 
 #define IWL_D3_SLEEP_STATUS_SUSPEND	0xD3
 #define IWL_D3_SLEEP_STATUS_RESUME	0xD0
@@ -504,5 +521,9 @@ enum {
 
 #define WFPM_LMAC2_PD_NOTIFICATION 0xA033CC
 #define WFPM_LMAC2_PD_RE_READ BIT(31)
+
+#define DPHYIP_INDIRECT			0xA2D800
+#define DPHYIP_INDIRECT_RD_MSK		0xFF000000
+#define DPHYIP_INDIRECT_RD_SHIFT	24
 
 #endif				/* __iwl_prph_h__ */

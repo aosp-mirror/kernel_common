@@ -30,6 +30,9 @@ config IIO_CONFIGFS
 	  (e.g. software triggers). For more info see
 	  Documentation/iio/iio_configfs.rst.
 
+config IIO_GTS_HELPER
+	tristate
+
 config IIO_TRIGGER
 	bool "Enable triggered sampling support"
 	help
@@ -67,6 +70,15 @@ config IIO_TRIGGERED_EVENT
 	select IIO_TRIGGER
 	help
 	  Provides helper functions for setting up triggered events.
+
+config IIO_BACKEND
+	tristate
+	help
+	  Framework to handle complex IIO aggregate devices. The typical
+	  architecture that can make use of this framework is to have one
+	  device as the frontend device which can be "linked" against one or
+	  multiple backend devices. The framework then makes it easy to get
+	  and control such backend devices.
 
 source "drivers/iio/accel/Kconfig"
 source "drivers/iio/adc/Kconfig"

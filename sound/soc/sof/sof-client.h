@@ -39,6 +39,10 @@ struct sof_client_dev {
 
 int sof_client_ipc_tx_message(struct sof_client_dev *cdev, void *ipc_msg,
 			      void *reply_data, size_t reply_bytes);
+static inline int sof_client_ipc_tx_message_no_reply(struct sof_client_dev *cdev, void *ipc_msg)
+{
+	return sof_client_ipc_tx_message(cdev, ipc_msg, NULL, 0);
+}
 int sof_client_ipc_set_get_data(struct sof_client_dev *cdev, void *ipc_msg,
 				bool set);
 
@@ -71,5 +75,6 @@ int sof_client_register_fw_state_handler(struct sof_client_dev *cdev,
 					 sof_client_fw_state_callback callback);
 void sof_client_unregister_fw_state_handler(struct sof_client_dev *cdev);
 enum sof_fw_state sof_client_get_fw_state(struct sof_client_dev *cdev);
+int sof_client_ipc_rx_message(struct sof_client_dev *cdev, void *ipc_msg, void *msg_buf);
 
 #endif /* __SOC_SOF_CLIENT_H */

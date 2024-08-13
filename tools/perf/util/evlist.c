@@ -28,9 +28,11 @@
 #include "util/string2.h"
 #include "util/perf_api_probe.h"
 #include "util/evsel_fprintf.h"
-#include "util/evlist-hybrid.h"
 #include "util/pmu.h"
 #include "util/sample.h"
+#include "util/bpf-filter.h"
+#include "util/stat.h"
+#include "util/util.h"
 #include <signal.h>
 #include <unistd.h>
 #include <sched.h>
@@ -91,10 +93,24 @@ struct evlist *evlist__new(void)
 struct evlist *evlist__new_default(void)
 {
 	struct evlist *evlist = evlist__new();
+	bool can_profile_kernel;
+	int err;
 
-	if (evlist && evlist__add_default(evlist)) {
+	if (!evlist)
+		return NULL;
+
+	can_profile_kernel = perf_event_paranoid_check(1);
+	err = parse_event(evlist, can_profile_kernel ? "cycles:P" : "cycles:Pu");
+	if (err) {
 		evlist__delete(evlist);
-		evlist = NULL;
+		return NULL;
+	}
+
+	if (evlist->core.nr_entries > 1) {
+		struct evsel *evsel;
+
+		evlist__for_each_entry(evlist, evsel)
+			evsel__set_sample_id(evsel, /*can_sample_identifier=*/false);
 	}
 
 	return evlist;
@@ -163,6 +179,7 @@ void evlist__delete(struct evlist *evlist)
 	if (evlist == NULL)
 		return;
 
+	evlist__free_stats(evlist);
 	evlist__munmap(evlist);
 	evlist__close(evlist);
 	evlist__purge(evlist);
@@ -235,25 +252,15 @@ static void evlist__set_leader(struct evlist *evlist)
 	perf_evlist__set_leader(&evlist->core);
 }
 
-int __evlist__add_default(struct evlist *evlist, bool precise)
-{
-	struct evsel *evsel;
-
-	evsel = evsel__new_cycles(precise, PERF_TYPE_HARDWARE,
-				  PERF_COUNT_HW_CPU_CYCLES);
-	if (evsel == NULL)
-		return -ENOMEM;
-
-	evlist__add(evlist, evsel);
-	return 0;
-}
-
 static struct evsel *evlist__dummy_event(struct evlist *evlist)
 {
 	struct perf_event_attr attr = {
 		.type	= PERF_TYPE_SOFTWARE,
 		.config = PERF_COUNT_SW_DUMMY,
 		.size	= sizeof(attr), /* to capture ABI version */
+		/* Avoid frequency mode for dummy events to avoid associated timers. */
+		.freq = 0,
+		.sample_period = 1,
 	};
 
 	return evsel__new_idx(&attr, evlist->core.nr_entries);
@@ -280,8 +287,6 @@ struct evsel *evlist__add_aux_dummy(struct evlist *evlist, bool system_wide)
 	evsel->core.attr.exclude_kernel = 1;
 	evsel->core.attr.exclude_guest = 1;
 	evsel->core.attr.exclude_hv = 1;
-	evsel->core.attr.freq = 0;
-	evsel->core.attr.sample_period = 1;
 	evsel->core.system_wide = system_wide;
 	evsel->no_aux_samples = true;
 	evsel->name = strdup("dummy:u");
@@ -293,7 +298,8 @@ struct evsel *evlist__add_aux_dummy(struct evlist *evlist, bool system_wide)
 #ifdef HAVE_LIBTRACEEVENT
 struct evsel *evlist__add_sched_switch(struct evlist *evlist, bool system_wide)
 {
-	struct evsel *evsel = evsel__newtp_idx("sched", "sched_switch", 0);
+	struct evsel *evsel = evsel__newtp_idx("sched", "sched_switch", 0,
+					       /*format=*/true);
 
 	if (IS_ERR(evsel))
 		return evsel;
@@ -465,7 +471,7 @@ static int evsel__strcmp(struct evsel *pos, char *evsel_name)
 		return 0;
 	if (evsel__is_dummy_event(pos))
 		return 1;
-	return strcmp(pos->name, evsel_name);
+	return !evsel__name_is(pos, evsel_name);
 }
 
 static int evlist__is_enabled(struct evlist *evlist)
@@ -1058,14 +1064,14 @@ int evlist__create_maps(struct evlist *evlist, struct target *target)
 		return -1;
 
 	if (target__uses_dummy_map(target))
-		cpus = perf_cpu_map__dummy_new();
+		cpus = perf_cpu_map__new_any_cpu();
 	else
 		cpus = perf_cpu_map__new(target->cpu_list);
 
 	if (!cpus)
 		goto out_delete_threads;
 
-	evlist->core.has_user_cpus = !!target->cpu_list && !target->hybrid;
+	evlist->core.has_user_cpus = !!target->cpu_list;
 
 	perf_evlist__set_maps(&evlist->core, cpus, threads);
 
@@ -1086,17 +1092,27 @@ int evlist__apply_filters(struct evlist *evlist, struct evsel **err_evsel)
 	int err = 0;
 
 	evlist__for_each_entry(evlist, evsel) {
-		if (evsel->filter == NULL)
-			continue;
-
 		/*
 		 * filters only work for tracepoint event, which doesn't have cpu limit.
 		 * So evlist and evsel should always be same.
 		 */
-		err = perf_evsel__apply_filter(&evsel->core, evsel->filter);
-		if (err) {
-			*err_evsel = evsel;
-			break;
+		if (evsel->filter) {
+			err = perf_evsel__apply_filter(&evsel->core, evsel->filter);
+			if (err) {
+				*err_evsel = evsel;
+				break;
+			}
+		}
+
+		/*
+		 * non-tracepoint events can have BPF filters.
+		 */
+		if (!list_empty(&evsel->bpf_filters)) {
+			err = perf_bpf_filter__prepare(evsel);
+			if (err) {
+				*err_evsel = evsel;
+				break;
+			}
 		}
 	}
 
@@ -1344,7 +1360,7 @@ static int evlist__create_syswide_maps(struct evlist *evlist)
 	 * error, and we may not want to do that fallback to a
 	 * default cpu identity map :-\
 	 */
-	cpus = perf_cpu_map__new(NULL);
+	cpus = perf_cpu_map__new_online_cpus();
 	if (!cpus)
 		goto out;
 
@@ -1687,6 +1703,24 @@ void evlist__set_tracking_event(struct evlist *evlist, struct evsel *tracking_ev
 	tracking_evsel->tracking = true;
 }
 
+struct evsel *evlist__findnew_tracking_event(struct evlist *evlist, bool system_wide)
+{
+	struct evsel *evsel;
+
+	evsel = evlist__get_tracking_event(evlist);
+	if (!evsel__is_dummy_event(evsel)) {
+		evsel = evlist__add_aux_dummy(evlist, system_wide);
+		if (!evsel)
+			return NULL;
+
+		evlist__set_tracking_event(evlist, evsel);
+	} else if (system_wide) {
+		perf_evlist__go_system_wide(&evlist->core, &evsel->core);
+	}
+
+	return evsel;
+}
+
 struct evsel *evlist__find_evsel_by_str(struct evlist *evlist, const char *str)
 {
 	struct evsel *evsel;
@@ -1694,7 +1728,7 @@ struct evsel *evlist__find_evsel_by_str(struct evlist *evlist, const char *str)
 	evlist__for_each_entry(evlist, evsel) {
 		if (!evsel->name)
 			continue;
-		if (strcmp(str, evsel->name) == 0)
+		if (evsel__name_is(evsel, str))
 			return evsel;
 	}
 
@@ -1777,7 +1811,7 @@ bool evlist__exclude_kernel(struct evlist *evlist)
  */
 void evlist__force_leader(struct evlist *evlist)
 {
-	if (!evlist->core.nr_groups) {
+	if (evlist__nr_groups(evlist) == 0) {
 		struct evsel *leader = evlist__first(evlist);
 
 		evlist__set_leader(evlist);
@@ -2262,8 +2296,8 @@ int evlist__parse_event_enable_time(struct evlist *evlist, struct record_opts *o
 	if (unset)
 		return 0;
 
-	opts->initial_delay = str_to_delay(str);
-	if (opts->initial_delay)
+	opts->target.initial_delay = str_to_delay(str);
+	if (opts->target.initial_delay)
 		return 0;
 
 	ret = parse_event_enable_times(str, NULL);
@@ -2306,14 +2340,14 @@ int evlist__parse_event_enable_time(struct evlist *evlist, struct record_opts *o
 
 	eet->evlist = evlist;
 	evlist->eet = eet;
-	opts->initial_delay = eet->times[0].start;
+	opts->target.initial_delay = eet->times[0].start;
 
 	return 0;
 
 close_timerfd:
 	close(eet->timerfd);
 free_eet_times:
-	free(eet->times);
+	zfree(&eet->times);
 free_eet:
 	free(eet);
 	return err;
@@ -2395,7 +2429,7 @@ void event_enable_timer__exit(struct event_enable_timer **ep)
 {
 	if (!ep || !*ep)
 		return;
-	free((*ep)->times);
+	zfree(&(*ep)->times);
 	zfree(ep);
 }
 
@@ -2450,6 +2484,75 @@ void evlist__check_mem_load_aux(struct evlist *evlist)
 				evsel__set_leader(pos, pos);
 				pos->core.nr_members = 0;
 			}
+		}
+	}
+}
+
+/**
+ * evlist__warn_user_requested_cpus() - Check each evsel against requested CPUs
+ *     and warn if the user CPU list is inapplicable for the event's PMU's
+ *     CPUs. Not core PMUs list a CPU in sysfs, but this may be overwritten by a
+ *     user requested CPU and so any online CPU is applicable. Core PMUs handle
+ *     events on the CPUs in their list and otherwise the event isn't supported.
+ * @evlist: The list of events being checked.
+ * @cpu_list: The user provided list of CPUs.
+ */
+void evlist__warn_user_requested_cpus(struct evlist *evlist, const char *cpu_list)
+{
+	struct perf_cpu_map *user_requested_cpus;
+	struct evsel *pos;
+
+	if (!cpu_list)
+		return;
+
+	user_requested_cpus = perf_cpu_map__new(cpu_list);
+	if (!user_requested_cpus)
+		return;
+
+	evlist__for_each_entry(evlist, pos) {
+		struct perf_cpu_map *intersect, *to_test;
+		const struct perf_pmu *pmu = evsel__find_pmu(pos);
+
+		to_test = pmu && pmu->is_core ? pmu->cpus : cpu_map__online();
+		intersect = perf_cpu_map__intersect(to_test, user_requested_cpus);
+		if (!perf_cpu_map__equal(intersect, user_requested_cpus)) {
+			char buf[128];
+
+			cpu_map__snprint(to_test, buf, sizeof(buf));
+			pr_warning("WARNING: A requested CPU in '%s' is not supported by PMU '%s' (CPUs %s) for event '%s'\n",
+				cpu_list, pmu ? pmu->name : "cpu", buf, evsel__name(pos));
+		}
+		perf_cpu_map__put(intersect);
+	}
+	perf_cpu_map__put(user_requested_cpus);
+}
+
+void evlist__uniquify_name(struct evlist *evlist)
+{
+	char *new_name, empty_attributes[2] = ":", *attributes;
+	struct evsel *pos;
+
+	if (perf_pmus__num_core_pmus() == 1)
+		return;
+
+	evlist__for_each_entry(evlist, pos) {
+		if (!evsel__is_hybrid(pos))
+			continue;
+
+		if (strchr(pos->name, '/'))
+			continue;
+
+		attributes = strchr(pos->name, ':');
+		if (attributes)
+			*attributes = '\0';
+		else
+			attributes = empty_attributes;
+
+		if (asprintf(&new_name, "%s/%s/%s", pos->pmu_name, pos->name, attributes + 1)) {
+			free(pos->name);
+			pos->name = new_name;
+		} else {
+			*attributes = ':';
 		}
 	}
 }

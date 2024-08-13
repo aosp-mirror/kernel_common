@@ -100,11 +100,14 @@ enum wcn36xx_ampdu_state {
 #define RF_IRIS_WCN3660	0x3660
 #define RF_IRIS_WCN3680	0x3680
 
-static inline void buff_to_be(u32 *buf, size_t len)
+static inline void buff_to_be(void *buf, size_t len)
 {
+	__be32 *to = buf;
+	u32 *from = buf;
 	int i;
+
 	for (i = 0; i < len; i++)
-		buf[i] = cpu_to_be32(buf[i]);
+		to[i] = cpu_to_be32(from[i]);
 }
 
 struct nv_data {
@@ -217,6 +220,7 @@ struct wcn36xx {
 	u8			fw_major;
 	u32			fw_feat_caps[WCN36XX_HAL_CAPS_SIZE];
 	bool			is_pronto;
+	bool			is_pronto_v3;
 
 	/* extra byte for the NULL termination */
 	u8			crm_version[WCN36XX_HAL_VERSION_LENGTH + 1];

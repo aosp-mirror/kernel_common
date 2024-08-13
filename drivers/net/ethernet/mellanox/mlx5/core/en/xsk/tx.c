@@ -44,7 +44,7 @@ int mlx5e_xsk_wakeup(struct net_device *dev, u32 qid, u32 flags)
  * same.
  */
 static void mlx5e_xsk_tx_post_err(struct mlx5e_xdpsq *sq,
-				  struct mlx5e_xdp_info *xdpi)
+				  union mlx5e_xdp_info *xdpi)
 {
 	u16 pi = mlx5_wq_cyc_ctr2ix(&sq->wq, sq->pc);
 	struct mlx5e_xdp_wqe_info *wi = &sq->db.wqe_info[pi];
@@ -54,15 +54,18 @@ static void mlx5e_xsk_tx_post_err(struct mlx5e_xdpsq *sq,
 	wi->num_pkts = 1;
 
 	nopwqe = mlx5e_post_nop(&sq->wq, sq->sqn, &sq->pc);
-	mlx5e_xdpi_fifo_push(&sq->db.xdpi_fifo, xdpi);
+	mlx5e_xdpi_fifo_push(&sq->db.xdpi_fifo, *xdpi);
+	if (xp_tx_metadata_enabled(sq->xsk_pool))
+		mlx5e_xdpi_fifo_push(&sq->db.xdpi_fifo,
+				     (union mlx5e_xdp_info) { .xsk_meta = {} });
 	sq->doorbell_cseg = &nopwqe->ctrl;
 }
 
 bool mlx5e_xsk_tx(struct mlx5e_xdpsq *sq, unsigned int budget)
 {
 	struct xsk_buff_pool *pool = sq->xsk_pool;
-	struct mlx5e_xmit_data xdptxd;
-	struct mlx5e_xdp_info xdpi;
+	struct xsk_tx_metadata *meta = NULL;
+	union mlx5e_xdp_info xdpi;
 	bool work_done = true;
 	bool flush = false;
 
@@ -73,6 +76,7 @@ bool mlx5e_xsk_tx(struct mlx5e_xdpsq *sq, unsigned int budget)
 						   mlx5e_xmit_xdp_frame_check_mpwqe,
 						   mlx5e_xmit_xdp_frame_check,
 						   sq);
+		struct mlx5e_xmit_data xdptxd = {};
 		struct xdp_desc desc;
 		bool ret;
 
@@ -93,19 +97,30 @@ bool mlx5e_xsk_tx(struct mlx5e_xdpsq *sq, unsigned int budget)
 		xdptxd.dma_addr = xsk_buff_raw_get_dma(pool, desc.addr);
 		xdptxd.data = xsk_buff_raw_get_data(pool, desc.addr);
 		xdptxd.len = desc.len;
+		meta = xsk_buff_get_metadata(pool, desc.addr);
 
 		xsk_buff_raw_dma_sync_for_device(pool, xdptxd.dma_addr, xdptxd.len);
 
 		ret = INDIRECT_CALL_2(sq->xmit_xdp_frame, mlx5e_xmit_xdp_frame_mpwqe,
-				      mlx5e_xmit_xdp_frame, sq, &xdptxd, NULL,
-				      check_result);
+				      mlx5e_xmit_xdp_frame, sq, &xdptxd,
+				      check_result, meta);
 		if (unlikely(!ret)) {
 			if (sq->mpwqe.wqe)
 				mlx5e_xdp_mpwqe_complete(sq);
 
 			mlx5e_xsk_tx_post_err(sq, &xdpi);
 		} else {
-			mlx5e_xdpi_fifo_push(&sq->db.xdpi_fifo, &xdpi);
+			mlx5e_xdpi_fifo_push(&sq->db.xdpi_fifo, xdpi);
+			if (xp_tx_metadata_enabled(sq->xsk_pool)) {
+				struct xsk_tx_metadata_compl compl;
+
+				xsk_tx_metadata_to_compl(meta, &compl);
+				XSK_TX_COMPL_FITS(void *);
+
+				mlx5e_xdpi_fifo_push(&sq->db.xdpi_fifo,
+						     (union mlx5e_xdp_info)
+						     { .xsk_meta = compl });
+			}
 		}
 
 		flush = true;

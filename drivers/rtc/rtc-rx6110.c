@@ -10,11 +10,9 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/of_gpio.h>
 #include <linux/regmap.h>
 #include <linux/rtc.h>
 #include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/spi/spi.h>
 #include <linux/i2c.h>
 
@@ -332,7 +330,7 @@ static int rx6110_probe(struct rx6110_data *rx6110, struct device *dev)
 }
 
 #if IS_ENABLED(CONFIG_SPI_MASTER)
-static struct regmap_config regmap_spi_config = {
+static const struct regmap_config regmap_spi_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 	.max_register = RX6110_REG_IRQ,
@@ -412,7 +410,7 @@ static void rx6110_spi_unregister(void)
 #endif /* CONFIG_SPI_MASTER */
 
 #if IS_ENABLED(CONFIG_I2C)
-static struct regmap_config regmap_i2c_config = {
+static const struct regmap_config regmap_i2c_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 	.max_register = RX6110_REG_IRQ,
@@ -463,7 +461,7 @@ static struct i2c_driver rx6110_i2c_driver = {
 		.name = RX6110_DRIVER_NAME,
 		.acpi_match_table = rx6110_i2c_acpi_match,
 	},
-	.probe_new	= rx6110_i2c_probe,
+	.probe		= rx6110_i2c_probe,
 	.id_table	= rx6110_i2c_id,
 };
 

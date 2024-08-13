@@ -14,14 +14,14 @@
 
 #include <linux/bits.h>
 
+#define CIF_SIE			0	/* CPU needs SIE exit cleanup */
 #define CIF_NOHZ_DELAY		2	/* delay HZ disable for a tick */
-#define CIF_FPU			3	/* restore FPU registers */
 #define CIF_ENABLED_WAIT	5	/* in enabled wait state */
 #define CIF_MCCK_GUEST		6	/* machine check happening in guest */
 #define CIF_DEDICATED_CPU	7	/* this CPU is dedicated */
 
+#define _CIF_SIE		BIT(CIF_SIE)
 #define _CIF_NOHZ_DELAY		BIT(CIF_NOHZ_DELAY)
-#define _CIF_FPU		BIT(CIF_FPU)
 #define _CIF_ENABLED_WAIT	BIT(CIF_ENABLED_WAIT)
 #define _CIF_MCCK_GUEST		BIT(CIF_MCCK_GUEST)
 #define _CIF_DEDICATED_CPU	BIT(CIF_DEDICATED_CPU)
@@ -33,14 +33,14 @@
 #include <linux/cpumask.h>
 #include <linux/linkage.h>
 #include <linux/irqflags.h>
+#include <asm/fpu-types.h>
 #include <asm/cpu.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
 #include <asm/setup.h>
 #include <asm/runtime_instr.h>
-#include <asm/fpu/types.h>
-#include <asm/fpu/internal.h>
 #include <asm/irqflags.h>
+#include <asm/alternative.h>
 
 typedef long (*sys_call_ptr_t)(struct pt_regs *regs);
 
@@ -93,13 +93,21 @@ static inline void get_cpu_id(struct cpuid *ptr)
 	asm volatile("stidp %0" : "=Q" (*ptr));
 }
 
+static __always_inline unsigned long get_cpu_timer(void)
+{
+	unsigned long timer;
+
+	asm volatile("stpt	%[timer]" : [timer] "=Q" (timer));
+	return timer;
+}
+
 void s390_adjust_jiffies(void);
 void s390_update_cpu_mhz(void);
 void cpu_detect_mhz_feature(void);
 
 extern const struct seq_operations cpuinfo_op;
 extern void execve_tail(void);
-extern void __bpon(void);
+unsigned long vdso_text_size(void);
 unsigned long vdso_size(void);
 
 /*
@@ -119,6 +127,41 @@ unsigned long vdso_size(void);
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
+#define __stackleak_poison __stackleak_poison
+static __always_inline void __stackleak_poison(unsigned long erase_low,
+					       unsigned long erase_high,
+					       unsigned long poison)
+{
+	unsigned long tmp, count;
+
+	count = erase_high - erase_low;
+	if (!count)
+		return;
+	asm volatile(
+		"	cghi	%[count],8\n"
+		"	je	2f\n"
+		"	aghi	%[count],-(8+1)\n"
+		"	srlg	%[tmp],%[count],8\n"
+		"	ltgr	%[tmp],%[tmp]\n"
+		"	jz	1f\n"
+		"0:	stg	%[poison],0(%[addr])\n"
+		"	mvc	8(256-8,%[addr]),0(%[addr])\n"
+		"	la	%[addr],256(%[addr])\n"
+		"	brctg	%[tmp],0b\n"
+		"1:	stg	%[poison],0(%[addr])\n"
+		"	larl	%[tmp],3f\n"
+		"	ex	%[count],0(%[tmp])\n"
+		"	j	4f\n"
+		"2:	stg	%[poison],0(%[addr])\n"
+		"	j	4f\n"
+		"3:	mvc	8(1,%[addr]),0(%[addr])\n"
+		"4:\n"
+		: [addr] "+&a" (erase_low), [count] "+&d" (count), [tmp] "=&a" (tmp)
+		: [poison] "d" (poison)
+		: "memory", "cc"
+		);
+}
+
 /*
  * Thread structure
  */
@@ -135,6 +178,8 @@ struct thread_struct {
 	unsigned int gmap_write_flag;		/* gmap fault write indication */
 	unsigned int gmap_int_code;		/* int code of last gmap fault */
 	unsigned int gmap_pfault;		/* signal of a pending guest pfault */
+	int ufpu_flags;				/* user fpu flags */
+	int kfpu_flags;				/* kernel fpu flags */
 
 	/* Per-thread information related to debugging */
 	struct per_regs per_user;		/* User specified PER registers */
@@ -150,11 +195,8 @@ struct thread_struct {
 	struct gs_cb *gs_cb;			/* Current guarded storage cb */
 	struct gs_cb *gs_bc_cb;			/* Broadcast guarded storage cb */
 	struct pgm_tdb trap_tdb;		/* Transaction abort diagnose block */
-	/*
-	 * Warning: 'fpu' is dynamically-sized. It *MUST* be at
-	 * the end.
-	 */
-	struct fpu fpu;			/* FP and VX register save area */
+	struct fpu ufpu;			/* User FP and VX register save area */
+	struct fpu kfpu;			/* Kernel FP and VX register save area */
 };
 
 /* Flag to disable transactions. */
@@ -173,7 +215,6 @@ typedef struct thread_struct thread_struct;
 
 #define INIT_THREAD {							\
 	.ksp = sizeof(init_stack) + (unsigned long) &init_stack,	\
-	.fpu.regs = (void *) init_task.thread.fpu.fprs,			\
 	.last_break = 1,						\
 }
 
@@ -194,7 +235,6 @@ typedef struct thread_struct thread_struct;
 	execve_tail();							\
 } while (0)
 
-/* Forward declaration, a strange C thing */
 struct task_struct;
 struct mm_struct;
 struct seq_file;
@@ -225,6 +265,13 @@ static __always_inline unsigned long __current_stack_pointer(void)
 
 	asm volatile("lgr %0,15" : "=d" (sp));
 	return sp;
+}
+
+static __always_inline bool on_thread_stack(void)
+{
+	unsigned long ksp = S390_lowcore.kernel_stack;
+
+	return !((ksp ^ current_stack_pointer) & ~(THREAD_SIZE - 1));
 }
 
 static __always_inline unsigned short stap(void)
@@ -267,8 +314,8 @@ static inline void __load_psw(psw_t psw)
  */
 static __always_inline void __load_psw_mask(unsigned long mask)
 {
+	psw_t psw __uninitialized;
 	unsigned long addr;
-	psw_t psw;
 
 	psw.mask = mask;
 
@@ -291,14 +338,36 @@ static inline unsigned long __extract_psw(void)
 	return (((unsigned long) reg1) << 32) | ((unsigned long) reg2);
 }
 
-static inline void local_mcck_enable(void)
+static inline unsigned long __local_mcck_save(void)
 {
-	__load_psw_mask(__extract_psw() | PSW_MASK_MCHECK);
+	unsigned long mask = __extract_psw();
+
+	__load_psw_mask(mask & ~PSW_MASK_MCHECK);
+	return mask & PSW_MASK_MCHECK;
+}
+
+#define local_mcck_save(mflags)			\
+do {						\
+	typecheck(unsigned long, mflags);	\
+	mflags = __local_mcck_save();		\
+} while (0)
+
+static inline void local_mcck_restore(unsigned long mflags)
+{
+	unsigned long mask = __extract_psw();
+
+	mask &= ~PSW_MASK_MCHECK;
+	__load_psw_mask(mask | mflags);
 }
 
 static inline void local_mcck_disable(void)
 {
-	__load_psw_mask(__extract_psw() & ~PSW_MASK_MCHECK);
+	__local_mcck_save();
+}
+
+static inline void local_mcck_enable(void)
+{
+	__load_psw_mask(__extract_psw() | PSW_MASK_MCHECK);
 }
 
 /*
@@ -329,12 +398,14 @@ static __always_inline void __noreturn disabled_wait(void)
 
 #define ARCH_LOW_ADDRESS_LIMIT	0x7fffffffUL
 
-extern int s390_isolate_bp(void);
-extern int s390_isolate_bp_guest(void);
-
 static __always_inline bool regs_irqs_disabled(struct pt_regs *regs)
 {
 	return arch_irqs_disabled_flags(regs->psw.mask);
+}
+
+static __always_inline void bpon(void)
+{
+	asm volatile(ALTERNATIVE("nop", ".insn	rrf,0xb2e80000,0,0,13,0", 82));
 }
 
 #endif /* __ASSEMBLY__ */

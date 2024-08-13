@@ -111,11 +111,11 @@ static void quota2_log(unsigned int hooknum,
 		__net_timestamp((struct sk_buff *)skb);
 	pm->hook = hooknum;
 	if (prefix != NULL)
-		strlcpy(pm->prefix, prefix, sizeof(pm->prefix));
+		strscpy(pm->prefix, prefix, sizeof(pm->prefix));
 	if (in)
-		strlcpy(pm->indev_name, in->name, sizeof(pm->indev_name));
+		strscpy(pm->indev_name, in->name, sizeof(pm->indev_name));
 	if (out)
-		strlcpy(pm->outdev_name, out->name, sizeof(pm->outdev_name));
+		strscpy(pm->outdev_name, out->name, sizeof(pm->outdev_name));
 
 	NETLINK_CB(log_skb).dst_group = 1;
 	pr_debug("throwing 1 packets to netlink group 1\n");
@@ -187,7 +187,7 @@ q2_new_counter(const struct xt_quota_mtinfo2 *q, bool anon)
 	if (!anon) {
 		INIT_LIST_HEAD(&e->list);
 		atomic_set(&e->ref, 1);
-		strlcpy(e->name, q->name, sizeof(e->name));
+		strscpy(e->name, q->name, sizeof(e->name));
 	}
 	return e;
 }

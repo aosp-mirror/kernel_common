@@ -149,6 +149,7 @@ static void missing_devices(int card, snd_config_t *card_config)
 static void find_pcms(void)
 {
 	char name[32], key[64];
+	char *card_name, *card_longname;
 	int card, dev, subdev, count, direction, err;
 	snd_pcm_stream_t stream;
 	struct pcm_data *pcm_data;
@@ -174,6 +175,15 @@ static void find_pcms(void)
 				       card, snd_strerror(err));
 			goto next_card;
 		}
+
+		err = snd_card_get_name(card, &card_name);
+		if (err != 0)
+			card_name = "Unknown";
+		err = snd_card_get_longname(card, &card_longname);
+		if (err != 0)
+			card_longname = "Unknown";
+		ksft_print_msg("Card %d - %s (%s)\n", card,
+			       card_name, card_longname);
 
 		card_config = conf_by_card(card);
 
@@ -247,7 +257,9 @@ static void find_pcms(void)
 static void test_pcm_time(struct pcm_data *data, enum test_class class,
 			  const char *test_name, snd_config_t *pcm_cfg)
 {
-	char name[64], key[128], msg[256];
+	char name[64], msg[256];
+	const int duration_s = 2, margin_ms = 100;
+	const int duration_ms = duration_s * 1000;
 	const char *cs;
 	int i, err;
 	snd_pcm_t *handle = NULL;
@@ -371,7 +383,7 @@ __format:
 		goto __close;
 	}
 	if (rrate != rate) {
-		snprintf(msg, sizeof(msg), "rate mismatch %ld != %ld", rate, rrate);
+		snprintf(msg, sizeof(msg), "rate mismatch %ld != %d", rate, rrate);
 		goto __close;
 	}
 	rperiod_size = period_size;
@@ -432,29 +444,29 @@ __format:
 	skip = false;
 
 	timestamp_now(&tstamp);
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < duration_s; i++) {
 		if (data->stream == SND_PCM_STREAM_PLAYBACK) {
 			frames = snd_pcm_writei(handle, samples, rate);
 			if (frames < 0) {
 				snprintf(msg, sizeof(msg),
-					 "Write failed: expected %d, wrote %li", rate, frames);
+					 "Write failed: expected %ld, wrote %li", rate, frames);
 				goto __close;
 			}
 			if (frames < rate) {
 				snprintf(msg, sizeof(msg),
-					 "expected %d, wrote %li", rate, frames);
+					 "expected %ld, wrote %li", rate, frames);
 				goto __close;
 			}
 		} else {
 			frames = snd_pcm_readi(handle, samples, rate);
 			if (frames < 0) {
 				snprintf(msg, sizeof(msg),
-					 "expected %d, wrote %li", rate, frames);
+					 "expected %ld, wrote %li", rate, frames);
 				goto __close;
 			}
 			if (frames < rate) {
 				snprintf(msg, sizeof(msg),
-					 "expected %d, wrote %li", rate, frames);
+					 "expected %ld, wrote %li", rate, frames);
 				goto __close;
 			}
 		}
@@ -462,8 +474,8 @@ __format:
 
 	snd_pcm_drain(handle);
 	ms = timestamp_diff_ms(&tstamp);
-	if (ms < 3900 || ms > 4100) {
-		snprintf(msg, sizeof(msg), "time mismatch: expected 4000ms got %lld", ms);
+	if (ms < duration_ms - margin_ms || ms > duration_ms + margin_ms) {
+		snprintf(msg, sizeof(msg), "time mismatch: expected %dms got %lld", duration_ms, ms);
 		goto __close;
 	}
 
@@ -489,17 +501,18 @@ __close:
 	}
 
 	if (!skip)
-		ksft_test_result(pass, "%s.%s.%d.%d.%d.%s%s%s\n",
+		ksft_test_result(pass, "%s.%s.%d.%d.%d.%s\n",
 				 test_class_name, test_name,
 				 data->card, data->device, data->subdevice,
-				 snd_pcm_stream_name(data->stream),
-				 msg[0] ? " " : "", msg);
+				 snd_pcm_stream_name(data->stream));
 	else
-		ksft_test_result_skip("%s.%s.%d.%d.%d.%s%s%s\n",
+		ksft_test_result_skip("%s.%s.%d.%d.%d.%s\n",
 				 test_class_name, test_name,
 				 data->card, data->device, data->subdevice,
-				 snd_pcm_stream_name(data->stream),
-				 msg[0] ? " " : "", msg);
+				 snd_pcm_stream_name(data->stream));
+
+	if (msg[0])
+		ksft_print_msg("%s\n", msg);
 
 	pthread_mutex_unlock(&results_lock);
 
@@ -553,8 +566,9 @@ void *card_thread(void *data)
 int main(void)
 {
 	struct card_data *card;
+	struct card_cfg_data *conf;
 	struct pcm_data *pcm;
-	snd_config_t *global_config, *cfg, *pcm_cfg;
+	snd_config_t *global_config, *cfg;
 	int num_pcm_tests = 0, num_tests, num_std_pcm_tests;
 	int ret;
 	void *thread_ret;
@@ -570,6 +584,10 @@ int main(void)
 
 	find_pcms();
 
+	for (conf = conf_cards; conf; conf = conf->next)
+		if (conf->card < 0)
+			num_missing++;
+
 	num_std_pcm_tests = conf_get_count(default_pcm_config, "test", NULL);
 
 	for (pcm = pcm_list; pcm != NULL; pcm = pcm->next) {
@@ -584,6 +602,11 @@ int main(void)
 	}
 
 	ksft_set_plan(num_missing + num_pcm_tests);
+
+	for (conf = conf_cards; conf; conf = conf->next)
+		if (conf->card < 0)
+			ksft_test_result_fail("test.missing.%s.%s\n",
+					      conf->filename, conf->config_id);
 
 	for (pcm = pcm_missing; pcm != NULL; pcm = pcm->next) {
 		ksft_test_result(false, "test.missing.%d.%d.%d.%s\n",

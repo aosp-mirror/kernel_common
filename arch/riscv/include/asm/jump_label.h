@@ -17,7 +17,8 @@
 static __always_inline bool arch_static_branch(struct static_key * const key,
 					       const bool branch)
 {
-	asm_volatile_goto(
+	asm goto(
+		"	.align		2			\n\t"
 		"	.option push				\n\t"
 		"	.option norelax				\n\t"
 		"	.option norvc				\n\t"
@@ -38,7 +39,8 @@ label:
 static __always_inline bool arch_static_branch_jump(struct static_key * const key,
 						    const bool branch)
 {
-	asm_volatile_goto(
+	asm goto(
+		"	.align		2			\n\t"
 		"	.option push				\n\t"
 		"	.option norelax				\n\t"
 		"	.option norvc				\n\t"

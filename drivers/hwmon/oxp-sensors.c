@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
- * Platform driver for OXP Handhelds that expose fan reading and control
- * via hwmon sysfs.
+ * Platform driver for OneXPlayer, AOK ZOE, and Aya Neo Handhelds that expose
+ * fan reading and control via hwmon sysfs.
  *
- * Old boards have the same DMI strings and they are told appart by the
- * boot cpu vendor (Intel/AMD). Currently only AMD boards are supported
- * but the code is made to be simple to add other handheld boards in the
- * future.
+ * Old OXP boards have the same DMI strings and they are told apart by
+ * the boot cpu vendor (Intel/AMD). Currently only AMD boards are
+ * supported but the code is made to be simple to add other handheld
+ * boards in the future.
  * Fan control is provided via pwm interface in the range [0-255].
  * Old AMD boards use [0-100] as range in the EC, the written value is
  * scaled to accommodate for that. Newer boards like the mini PRO and
@@ -16,7 +16,6 @@
  */
 
 #include <linux/acpi.h>
-#include <linux/dev_printk.h>
 #include <linux/dmi.h>
 #include <linux/hwmon.h>
 #include <linux/init.h>
@@ -42,15 +41,34 @@ static bool unlock_global_acpi_lock(void)
 
 enum oxp_board {
 	aok_zoe_a1 = 1,
+	aya_neo_2,
+	aya_neo_air,
+	aya_neo_air_plus_mendo,
+	aya_neo_air_pro,
+	aya_neo_geek,
 	oxp_mini_amd,
+	oxp_mini_amd_a07,
 	oxp_mini_amd_pro,
 };
 
 static enum oxp_board board;
 
+/* Fan reading and PWM */
 #define OXP_SENSOR_FAN_REG		0x76 /* Fan reading is 2 registers long */
 #define OXP_SENSOR_PWM_ENABLE_REG	0x4A /* PWM enable is 1 register long */
 #define OXP_SENSOR_PWM_REG		0x4B /* PWM reading is 1 register long */
+
+/* Turbo button takeover function
+ * Older boards have different values and EC registers
+ * for the same function
+ */
+#define OXP_OLD_TURBO_SWITCH_REG	0x1E
+#define OXP_OLD_TURBO_TAKE_VAL		0x01
+#define OXP_OLD_TURBO_RETURN_VAL	0x00
+
+#define OXP_TURBO_SWITCH_REG		0xF1
+#define OXP_TURBO_TAKE_VAL		0x40
+#define OXP_TURBO_RETURN_VAL		0x00
 
 static const struct dmi_system_id dmi_table[] = {
 	{
@@ -58,21 +76,70 @@ static const struct dmi_system_id dmi_table[] = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "AOKZOE"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AOKZOE A1 AR07"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {aok_zoe_a1},
+		.driver_data = (void *)aok_zoe_a1,
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AOKZOE"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AOKZOE A1 Pro"),
+		},
+		.driver_data = (void *)aok_zoe_a1,
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AYANEO 2"),
+		},
+		.driver_data = (void *)aya_neo_2,
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AIR"),
+		},
+		.driver_data = (void *)aya_neo_air,
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AB05-Mendocino"),
+		},
+		.driver_data = (void *)aya_neo_air_plus_mendo,
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "AIR Pro"),
+		},
+		.driver_data = (void *)aya_neo_air_pro,
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "AYANEO"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "GEEK"),
+		},
+		.driver_data = (void *)aya_neo_geek,
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONE XPLAYER"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {oxp_mini_amd},
+		.driver_data = (void *)oxp_mini_amd,
+	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
+			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONEXPLAYER mini A07"),
+		},
+		.driver_data = (void *)oxp_mini_amd_a07,
 	},
 	{
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "ONE-NETBOOK"),
 			DMI_EXACT_MATCH(DMI_BOARD_NAME, "ONEXPLAYER Mini Pro"),
 		},
-		.driver_data = (void *) &(enum oxp_board) {oxp_mini_amd_pro},
+		.driver_data = (void *)oxp_mini_amd_pro,
 	},
 	{},
 };
@@ -102,7 +169,7 @@ static int read_from_ec(u8 reg, int size, long *val)
 	return 0;
 }
 
-static int write_to_ec(const struct device *dev, u8 reg, u8 value)
+static int write_to_ec(u8 reg, u8 value)
 {
 	int ret;
 
@@ -117,14 +184,123 @@ static int write_to_ec(const struct device *dev, u8 reg, u8 value)
 	return ret;
 }
 
-static int oxp_pwm_enable(const struct device *dev)
+/* Turbo button toggle functions */
+static int tt_toggle_enable(void)
 {
-	return write_to_ec(dev, OXP_SENSOR_PWM_ENABLE_REG, 0x01);
+	u8 reg;
+	u8 val;
+
+	switch (board) {
+	case oxp_mini_amd_a07:
+		reg = OXP_OLD_TURBO_SWITCH_REG;
+		val = OXP_OLD_TURBO_TAKE_VAL;
+		break;
+	case oxp_mini_amd_pro:
+	case aok_zoe_a1:
+		reg = OXP_TURBO_SWITCH_REG;
+		val = OXP_TURBO_TAKE_VAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return write_to_ec(reg, val);
 }
 
-static int oxp_pwm_disable(const struct device *dev)
+static int tt_toggle_disable(void)
 {
-	return write_to_ec(dev, OXP_SENSOR_PWM_ENABLE_REG, 0x00);
+	u8 reg;
+	u8 val;
+
+	switch (board) {
+	case oxp_mini_amd_a07:
+		reg = OXP_OLD_TURBO_SWITCH_REG;
+		val = OXP_OLD_TURBO_RETURN_VAL;
+		break;
+	case oxp_mini_amd_pro:
+	case aok_zoe_a1:
+		reg = OXP_TURBO_SWITCH_REG;
+		val = OXP_TURBO_RETURN_VAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return write_to_ec(reg, val);
+}
+
+/* Callbacks for turbo toggle attribute */
+static umode_t tt_toggle_is_visible(struct kobject *kobj,
+				    struct attribute *attr, int n)
+{
+	switch (board) {
+	case aok_zoe_a1:
+	case oxp_mini_amd_a07:
+	case oxp_mini_amd_pro:
+		return attr->mode;
+	default:
+		break;
+	}
+	return 0;
+}
+
+static ssize_t tt_toggle_store(struct device *dev,
+			       struct device_attribute *attr, const char *buf,
+			       size_t count)
+{
+	int rval;
+	bool value;
+
+	rval = kstrtobool(buf, &value);
+	if (rval)
+		return rval;
+
+	if (value) {
+		rval = tt_toggle_enable();
+	} else {
+		rval = tt_toggle_disable();
+	}
+	if (rval)
+		return rval;
+
+	return count;
+}
+
+static ssize_t tt_toggle_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	int retval;
+	u8 reg;
+	long val;
+
+	switch (board) {
+	case oxp_mini_amd_a07:
+		reg = OXP_OLD_TURBO_SWITCH_REG;
+		break;
+	case oxp_mini_amd_pro:
+	case aok_zoe_a1:
+		reg = OXP_TURBO_SWITCH_REG;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	retval = read_from_ec(reg, 1, &val);
+	if (retval)
+		return retval;
+
+	return sysfs_emit(buf, "%d\n", !!val);
+}
+
+static DEVICE_ATTR_RW(tt_toggle);
+
+/* PWM enable/disable functions */
+static int oxp_pwm_enable(void)
+{
+	return write_to_ec(OXP_SENSOR_PWM_ENABLE_REG, 0x01);
+}
+
+static int oxp_pwm_disable(void)
+{
+	return write_to_ec(OXP_SENSOR_PWM_ENABLE_REG, 0x00);
 }
 
 /* Callbacks for hwmon interface */
@@ -161,8 +337,21 @@ static int oxp_platform_read(struct device *dev, enum hwmon_sensor_types type,
 			ret = read_from_ec(OXP_SENSOR_PWM_REG, 1, val);
 			if (ret)
 				return ret;
-			if (board == oxp_mini_amd)
+			switch (board) {
+			case aya_neo_2:
+			case aya_neo_air:
+			case aya_neo_air_plus_mendo:
+			case aya_neo_air_pro:
+			case aya_neo_geek:
+			case oxp_mini_amd:
+			case oxp_mini_amd_a07:
 				*val = (*val * 255) / 100;
+				break;
+			case oxp_mini_amd_pro:
+			case aok_zoe_a1:
+			default:
+				break;
+			}
 			return 0;
 		case hwmon_pwm_enable:
 			return read_from_ec(OXP_SENSOR_PWM_ENABLE_REG, 1, val);
@@ -184,16 +373,29 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 		switch (attr) {
 		case hwmon_pwm_enable:
 			if (val == 1)
-				return oxp_pwm_enable(dev);
+				return oxp_pwm_enable();
 			else if (val == 0)
-				return oxp_pwm_disable(dev);
+				return oxp_pwm_disable();
 			return -EINVAL;
 		case hwmon_pwm_input:
 			if (val < 0 || val > 255)
 				return -EINVAL;
-			if (board == oxp_mini_amd)
+			switch (board) {
+			case aya_neo_2:
+			case aya_neo_air:
+			case aya_neo_air_plus_mendo:
+			case aya_neo_air_pro:
+			case aya_neo_geek:
+			case oxp_mini_amd:
+			case oxp_mini_amd_a07:
 				val = (val * 100) / 255;
-			return write_to_ec(dev, OXP_SENSOR_PWM_REG, val);
+				break;
+			case aok_zoe_a1:
+			case oxp_mini_amd_pro:
+			default:
+				break;
+			}
+			return write_to_ec(OXP_SENSOR_PWM_REG, val);
 		default:
 			break;
 		}
@@ -205,12 +407,27 @@ static int oxp_platform_write(struct device *dev, enum hwmon_sensor_types type,
 }
 
 /* Known sensors in the OXP EC controllers */
-static const struct hwmon_channel_info *oxp_platform_sensors[] = {
+static const struct hwmon_channel_info * const oxp_platform_sensors[] = {
 	HWMON_CHANNEL_INFO(fan,
 			   HWMON_F_INPUT),
 	HWMON_CHANNEL_INFO(pwm,
 			   HWMON_PWM_INPUT | HWMON_PWM_ENABLE),
 	NULL,
+};
+
+static struct attribute *oxp_ec_attrs[] = {
+	&dev_attr_tt_toggle.attr,
+	NULL
+};
+
+static struct attribute_group oxp_ec_attribute_group = {
+	.is_visible = tt_toggle_is_visible,
+	.attrs = oxp_ec_attrs,
+};
+
+static const struct attribute_group *oxp_ec_groups[] = {
+	&oxp_ec_attribute_group,
+	NULL
 };
 
 static const struct hwmon_ops oxp_ec_hwmon_ops = {
@@ -227,22 +444,8 @@ static const struct hwmon_chip_info oxp_ec_chip_info = {
 /* Initialization logic */
 static int oxp_platform_probe(struct platform_device *pdev)
 {
-	const struct dmi_system_id *dmi_entry;
 	struct device *dev = &pdev->dev;
 	struct device *hwdev;
-
-	/*
-	 * Have to check for AMD processor here because DMI strings are the
-	 * same between Intel and AMD boards, the only way to tell them appart
-	 * is the CPU.
-	 * Intel boards seem to have different EC registers and values to
-	 * read/write.
-	 */
-	dmi_entry = dmi_first_match(dmi_table);
-	if (!dmi_entry || boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
-		return -ENODEV;
-
-	board = *((enum oxp_board *) dmi_entry->driver_data);
 
 	hwdev = devm_hwmon_device_register_with_info(dev, "oxpec", NULL,
 						     &oxp_ec_chip_info, NULL);
@@ -253,6 +456,7 @@ static int oxp_platform_probe(struct platform_device *pdev)
 static struct platform_driver oxp_platform_driver = {
 	.driver = {
 		.name = "oxp-platform",
+		.dev_groups = oxp_ec_groups,
 	},
 	.probe = oxp_platform_probe,
 };
@@ -261,6 +465,21 @@ static struct platform_device *oxp_platform_device;
 
 static int __init oxp_platform_init(void)
 {
+	const struct dmi_system_id *dmi_entry;
+
+	/*
+	 * Have to check for AMD processor here because DMI strings are the
+	 * same between Intel and AMD boards, the only way to tell them apart
+	 * is the CPU.
+	 * Intel boards seem to have different EC registers and values to
+	 * read/write.
+	 */
+	dmi_entry = dmi_first_match(dmi_table);
+	if (!dmi_entry || boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
+		return -ENODEV;
+
+	board = (enum oxp_board)(unsigned long)dmi_entry->driver_data;
+
 	oxp_platform_device =
 		platform_create_bundle(&oxp_platform_driver,
 				       oxp_platform_probe, NULL, 0, NULL, 0);

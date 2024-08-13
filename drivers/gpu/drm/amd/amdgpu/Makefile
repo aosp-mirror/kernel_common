@@ -23,7 +23,7 @@
 # Makefile for the drm device driver.  This driver provides support for the
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
-FULL_AMD_PATH=$(srctree)/$(src)/..
+FULL_AMD_PATH=$(src)/..
 DISPLAY_FOLDER_NAME=display
 FULL_AMD_DISPLAY_PATH = $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
 
@@ -34,14 +34,35 @@ ccflags-y := -I$(FULL_AMD_PATH)/include/asic_reg \
 	-I$(FULL_AMD_PATH)/acp/include \
 	-I$(FULL_AMD_DISPLAY_PATH) \
 	-I$(FULL_AMD_DISPLAY_PATH)/include \
+	-I$(FULL_AMD_DISPLAY_PATH)/modules/inc \
 	-I$(FULL_AMD_DISPLAY_PATH)/dc \
 	-I$(FULL_AMD_DISPLAY_PATH)/amdgpu_dm \
 	-I$(FULL_AMD_PATH)/amdkfd
 
+subdir-ccflags-y := -Wextra
+subdir-ccflags-y += -Wunused
+subdir-ccflags-y += -Wmissing-prototypes
+subdir-ccflags-y += -Wmissing-declarations
+subdir-ccflags-y += -Wmissing-include-dirs
+subdir-ccflags-y += -Wold-style-definition
+subdir-ccflags-y += -Wmissing-format-attribute
+# Need this to avoid recursive variable evaluation issues
+cond-flags := $(call cc-option, -Wunused-but-set-variable) \
+	$(call cc-option, -Wunused-const-variable) \
+	$(call cc-option, -Wstringop-truncation) \
+	$(call cc-option, -Wpacked-not-aligned)
+subdir-ccflags-y += $(cond-flags)
+subdir-ccflags-y += -Wno-unused-parameter
+subdir-ccflags-y += -Wno-type-limits
+subdir-ccflags-y += -Wno-sign-compare
+subdir-ccflags-y += -Wno-missing-field-initializers
+subdir-ccflags-y += -Wno-override-init
+subdir-ccflags-$(CONFIG_DRM_AMDGPU_WERROR) += -Werror
+
 amdgpu-y := amdgpu_drv.o
 
 # add KMS driver
-amdgpu-y += amdgpu_device.o amdgpu_kms.o \
+amdgpu-y += amdgpu_device.o amdgpu_doorbell_mgr.o amdgpu_kms.o \
 	amdgpu_atombios.o atombios_crtc.o amdgpu_connectors.o \
 	atom.o amdgpu_fence.o amdgpu_ttm.o amdgpu_object.o amdgpu_gart.o \
 	amdgpu_encoders.o amdgpu_display.o amdgpu_i2c.o \
@@ -49,17 +70,18 @@ amdgpu-y += amdgpu_device.o amdgpu_kms.o \
 	amdgpu_cs.o amdgpu_bios.o amdgpu_benchmark.o \
 	atombios_dp.o amdgpu_afmt.o amdgpu_trace_points.o \
 	atombios_encoders.o amdgpu_sa.o atombios_i2c.o \
-	amdgpu_dma_buf.o amdgpu_vm.o amdgpu_vm_pt.o amdgpu_ib.o amdgpu_pll.o \
+	amdgpu_dma_buf.o amdgpu_vm.o amdgpu_vm_pt.o amdgpu_vm_tlb_fence.o \
+	amdgpu_ib.o amdgpu_pll.o \
 	amdgpu_ucode.o amdgpu_bo_list.o amdgpu_ctx.o amdgpu_sync.o \
 	amdgpu_gtt_mgr.o amdgpu_preempt_mgr.o amdgpu_vram_mgr.o amdgpu_virt.o \
 	amdgpu_atomfirmware.o amdgpu_vf_error.o amdgpu_sched.o \
-	amdgpu_debugfs.o amdgpu_ids.o amdgpu_gmc.o \
+	amdgpu_debugfs.o amdgpu_ids.o amdgpu_gmc.o amdgpu_mmhub.o amdgpu_hdp.o \
 	amdgpu_xgmi.o amdgpu_csa.o amdgpu_ras.o amdgpu_vm_cpu.o \
 	amdgpu_vm_sdma.o amdgpu_discovery.o amdgpu_ras_eeprom.o amdgpu_nbio.o \
 	amdgpu_umc.o smu_v11_0_i2c.o amdgpu_fru_eeprom.o amdgpu_rap.o \
 	amdgpu_fw_attestation.o amdgpu_securedisplay.o \
 	amdgpu_eeprom.o amdgpu_mca.o amdgpu_psp_ta.o amdgpu_lsdma.o \
-	amdgpu_ring_mux.o
+	amdgpu_ring_mux.o amdgpu_xcp.o amdgpu_seq64.o amdgpu_aca.o amdgpu_dev_coredump.o
 
 amdgpu-$(CONFIG_PROC_FS) += amdgpu_fdinfo.o
 
@@ -76,12 +98,15 @@ amdgpu-y += \
 	vi.o mxgpu_vi.o nbio_v6_1.o soc15.o emu_soc.o mxgpu_ai.o nbio_v7_0.o vega10_reg_init.o \
 	vega20_reg_init.o nbio_v7_4.o nbio_v2_3.o nv.o arct_reg_init.o mxgpu_nv.o \
 	nbio_v7_2.o hdp_v4_0.o hdp_v5_0.o aldebaran_reg_init.o aldebaran.o soc21.o \
-	sienna_cichlid.o nbio_v4_3.o hdp_v6_0.o nbio_v7_7.o hdp_v5_2.o lsdma_v6_0.o
+	sienna_cichlid.o smu_v13_0_10.o nbio_v4_3.o hdp_v6_0.o nbio_v7_7.o hdp_v5_2.o lsdma_v6_0.o \
+	nbio_v7_9.o aqua_vanjaram.o nbio_v7_11.o lsdma_v7_0.o hdp_v7_0.o nbif_v6_3_1.o
 
 # add DF block
 amdgpu-y += \
 	df_v1_7.o \
-	df_v3_6.o
+	df_v3_6.o \
+	df_v4_3.o \
+	df_v4_6_2.o
 
 # add GMC block
 amdgpu-y += \
@@ -90,11 +115,12 @@ amdgpu-y += \
 	gfxhub_v1_0.o mmhub_v1_0.o gmc_v9_0.o gfxhub_v1_1.o mmhub_v9_4.o \
 	gfxhub_v2_0.o mmhub_v2_0.o gmc_v10_0.o gfxhub_v2_1.o mmhub_v2_3.o \
 	mmhub_v1_7.o gfxhub_v3_0.o mmhub_v3_0.o mmhub_v3_0_2.o gmc_v11_0.o \
-	mmhub_v3_0_1.o gfxhub_v3_0_3.o
+	mmhub_v3_0_1.o gfxhub_v3_0_3.o gfxhub_v1_2.o mmhub_v1_8.o mmhub_v3_3.o \
+	gfxhub_v11_5_0.o
 
 # add UMC block
 amdgpu-y += \
-	umc_v6_0.o umc_v6_1.o umc_v6_7.o umc_v8_7.o umc_v8_10.o
+	umc_v6_0.o umc_v6_1.o umc_v6_7.o umc_v8_7.o umc_v8_10.o umc_v12_0.o
 
 # add IH block
 amdgpu-y += \
@@ -106,7 +132,9 @@ amdgpu-y += \
 	vega10_ih.o \
 	vega20_ih.o \
 	navi10_ih.o \
-	ih_v6_0.o
+	ih_v6_0.o \
+	ih_v6_1.o \
+	ih_v7_0.o
 
 # add PSP block
 amdgpu-y += \
@@ -117,7 +145,8 @@ amdgpu-y += \
 	psp_v11_0_8.o \
 	psp_v12_0.o \
 	psp_v13_0.o \
-	psp_v13_0_4.o
+	psp_v13_0_4.o \
+	psp_v14_0.o
 
 # add DCE block
 amdgpu-y += \
@@ -133,9 +162,11 @@ amdgpu-y += \
 	gfx_v9_0.o \
 	gfx_v9_4.o \
 	gfx_v9_4_2.o \
+	gfx_v9_4_3.o \
 	gfx_v10_0.o \
 	imu_v11_0.o \
 	gfx_v11_0.o \
+	gfx_v11_0_3.o \
 	imu_v11_0_3.o
 
 # add async DMA block
@@ -145,6 +176,7 @@ amdgpu-y += \
 	sdma_v3_0.o \
 	sdma_v4_0.o \
 	sdma_v4_4.o \
+	sdma_v4_4_2.o \
 	sdma_v5_0.o \
 	sdma_v5_2.o \
 	sdma_v6_0.o
@@ -177,19 +209,37 @@ amdgpu-y += \
 	vcn_v2_5.o \
 	vcn_v3_0.o \
 	vcn_v4_0.o \
+	vcn_v4_0_3.o \
+	vcn_v4_0_5.o \
+	vcn_v5_0_0.o \
 	amdgpu_jpeg.o \
 	jpeg_v1_0.o \
 	jpeg_v2_0.o \
 	jpeg_v2_5.o \
 	jpeg_v3_0.o \
-	jpeg_v4_0.o
+	jpeg_v4_0.o \
+	jpeg_v4_0_3.o \
+	jpeg_v4_0_5.o \
+	jpeg_v5_0_0.o
 
+# add VPE block
+amdgpu-y += \
+	amdgpu_vpe.o \
+	vpe_v6_1.o
+
+# add UMSCH block
+amdgpu-y += \
+	amdgpu_umsch_mm.o \
+	umsch_mm_v4_0.o
+
+#
 # add ATHUB block
 amdgpu-y += \
 	athub_v1_0.o \
 	athub_v2_0.o \
 	athub_v2_1.o \
-	athub_v3_0.o
+	athub_v3_0.o \
+	athub_v4_1_0.o
 
 # add SMUIO block
 amdgpu-y += \
@@ -197,7 +247,9 @@ amdgpu-y += \
 	smuio_v11_0.o \
 	smuio_v11_0_6.o \
 	smuio_v13_0.o \
-	smuio_v13_0_6.o
+	smuio_v13_0_3.o \
+	smuio_v13_0_6.o \
+	smuio_v14_0_2.o
 
 # add reset block
 amdgpu-y += \
@@ -222,6 +274,7 @@ amdgpu-y += \
 	amdgpu_amdkfd_gfx_v9.o \
 	amdgpu_amdkfd_arcturus.o \
 	amdgpu_amdkfd_aldebaran.o \
+	amdgpu_amdkfd_gc_9_4_3.o \
 	amdgpu_amdkfd_gfx_v10.o \
 	amdgpu_amdkfd_gfx_v10_3.o \
 	amdgpu_amdkfd_gfx_v11.o

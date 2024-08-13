@@ -59,6 +59,7 @@ properties:
           - const: fsl,imx6sx-fec
       - items:
           - enum:
+              - fsl,imx8dxl-fec
               - fsl,imx8qxp-fec
           - const: fsl,imx8qm-fec
           - const: fsl,imx6sx-fec
@@ -144,6 +145,9 @@ properties:
     description:
       Regulator that powers the Ethernet PHY.
 
+  power-domains:
+    maxItems: 1
+
   fsl,num-tx-queues:
     $ref: /schemas/types.yaml#/definitions/uint32
     description:
@@ -219,6 +223,9 @@ properties:
       milliseconds will be observed after the phy-reset-gpios has been toggled.
       Can be omitted thus no delay is observed. Delay is in range of 1ms to 1000ms.
       Other delays are invalid.
+
+  iommus:
+    maxItems: 1
 
 required:
   - compatible

@@ -1,3 +1,5 @@
+.. SPDX-License-Identifier: GPL-2.0
+
 ===============
 XDP RX Metadata
 ===============
@@ -18,15 +20,24 @@ Currently, the following kfuncs are supported. In the future, as more
 metadata is supported, this set will grow:
 
 .. kernel-doc:: net/core/xdp.c
-   :identifiers: bpf_xdp_metadata_rx_timestamp bpf_xdp_metadata_rx_hash
+   :identifiers: bpf_xdp_metadata_rx_timestamp
+
+.. kernel-doc:: net/core/xdp.c
+   :identifiers: bpf_xdp_metadata_rx_hash
+
+.. kernel-doc:: net/core/xdp.c
+   :identifiers: bpf_xdp_metadata_rx_vlan_tag
 
 An XDP program can use these kfuncs to read the metadata into stack
 variables for its own consumption. Or, to pass the metadata on to other
 consumers, an XDP program can store it into the metadata area carried
-ahead of the packet.
+ahead of the packet. Not all packets will necessary have the requested
+metadata available in which case the driver returns ``-ENODATA``.
 
 Not all kfuncs have to be implemented by the device driver; when not
-implemented, the default ones that return ``-EOPNOTSUPP`` will be used.
+implemented, the default ones that return ``-EOPNOTSUPP`` will be used
+to indicate the device driver have not implemented this kfunc.
+
 
 Within an XDP frame, the metadata layout (accessed via ``xdp_buff``) is
 as follows::
@@ -101,6 +112,13 @@ bpf_tail_call
 
 Adding programs that access metadata kfuncs to the ``BPF_MAP_TYPE_PROG_ARRAY``
 is currently not supported.
+
+Supported Devices
+=================
+
+It is possible to query which kfunc the particular netdev implements via
+netlink. See ``xdp-rx-metadata-features`` attribute set in
+``Documentation/netlink/specs/netdev.yaml``.
 
 Example
 =======

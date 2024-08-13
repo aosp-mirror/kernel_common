@@ -3,7 +3,7 @@
  * A sample program to run a User VM on the ACRN hypervisor
  *
  * This sample runs in a Service VM, which is a privileged VM of ACRN.
- * CONFIG_ACRN_HSM need to be enabled in the Service VM.
+ * CONFIG_ACRN_HSM needs to be enabled in the Service VM.
  *
  * Guest VM code in guest16.s will be executed after the VM launched.
  *
@@ -13,7 +13,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <malloc.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
@@ -54,9 +53,9 @@ int main(int argc, char **argv)
 	argc = argc;
 	argv = argv;
 
-	guest_memory = memalign(4096, GUEST_MEMORY_SIZE);
-	if (!guest_memory) {
-		printf("No enough memory!\n");
+	ret = posix_memalign(&guest_memory, 4096, GUEST_MEMORY_SIZE);
+	if (ret < 0) {
+		printf("Not enough memory!\n");
 		return -1;
 	}
 	hsm_fd = open("/dev/acrn_hsm", O_RDWR|O_CLOEXEC);

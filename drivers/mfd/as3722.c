@@ -299,7 +299,7 @@ static const struct regmap_config as3722_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 	.max_register = AS3722_MAX_REGISTER,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 	.rd_table = &as3722_readable_table,
 	.wr_table = &as3722_writable_table,
 	.volatile_table = &as3722_volatile_table,
@@ -445,7 +445,7 @@ static struct i2c_driver as3722_i2c_driver = {
 		.of_match_table = as3722_of_match,
 		.pm = &as3722_pm_ops,
 	},
-	.probe_new = as3722_i2c_probe,
+	.probe = as3722_i2c_probe,
 	.id_table = as3722_i2c_id,
 };
 

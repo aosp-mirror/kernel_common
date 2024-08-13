@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2017-2022 Broadcom. All Rights Reserved. The term *
+ * Copyright (C) 2017-2024 Broadcom. All Rights Reserved. The term *
  * “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.     *
  * Copyright (C) 2004-2016 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
@@ -33,6 +33,7 @@
 struct lpfc_sli2_slim;
 
 #define ELX_MODEL_NAME_SIZE	80
+#define ELX_FW_NAME_SIZE	84
 
 #define LPFC_PCI_DEV_LP		0x1
 #define LPFC_PCI_DEV_OC		0x2
@@ -309,7 +310,6 @@ struct lpfc_hba;
 #define LPFC_VMID_TIMER   300	/* timer interval in seconds */
 
 #define LPFC_MAX_VMID_SIZE      256
-#define LPFC_COMPRESS_VMID_SIZE 16
 
 union lpfc_vmid_io_tag {
 	u32 app_id;	/* App Id vmid */
@@ -393,6 +393,37 @@ enum hba_state {
 	LPFC_HBA_ERROR       =  -1
 };
 
+enum lpfc_hba_flag { /* hba generic flags */
+	HBA_ERATT_HANDLED	= 0, /* This flag is set when eratt handled */
+	DEFER_ERATT		= 1, /* Deferred error attn in progress */
+	HBA_FCOE_MODE		= 2, /* HBA function in FCoE Mode */
+	HBA_SP_QUEUE_EVT	= 3, /* Slow-path qevt posted to worker thread*/
+	HBA_POST_RECEIVE_BUFFER = 4, /* Rcv buffers need to be posted */
+	HBA_PERSISTENT_TOPO	= 5, /* Persistent topology support in hba */
+	ELS_XRI_ABORT_EVENT	= 6, /* ELS_XRI abort event was queued */
+	ASYNC_EVENT		= 7,
+	LINK_DISABLED		= 8, /* Link disabled by user */
+	FCF_TS_INPROG           = 9, /* FCF table scan in progress */
+	FCF_RR_INPROG           = 10, /* FCF roundrobin flogi in progress */
+	HBA_FIP_SUPPORT		= 11, /* FIP support in HBA */
+	HBA_DEVLOSS_TMO         = 13, /* HBA in devloss timeout */
+	HBA_RRQ_ACTIVE		= 14, /* process the rrq active list */
+	HBA_IOQ_FLUSH		= 15, /* I/O queues being flushed */
+	HBA_RECOVERABLE_UE	= 17, /* FW supports recoverable UE */
+	HBA_FORCED_LINK_SPEED	= 18, /*
+				       * Firmware supports Forced Link
+				       * Speed capability
+				       */
+	HBA_FLOGI_ISSUED	= 20, /* FLOGI was issued */
+	HBA_DEFER_FLOGI		= 23, /* Defer FLOGI till read_sparm cmpl */
+	HBA_SETUP		= 24, /* HBA setup completed */
+	HBA_NEEDS_CFG_PORT	= 25, /* SLI3: CONFIG_PORT mbox needed */
+	HBA_HBEAT_INP		= 26, /* mbox HBEAT is in progress */
+	HBA_HBEAT_TMO		= 27, /* HBEAT initiated after timeout */
+	HBA_FLOGI_OUTSTANDING	= 28, /* FLOGI is outstanding */
+	HBA_RHBA_CMPL		= 29, /* RHBA FDMI cmd is successful */
+};
+
 struct lpfc_trunk_link_state {
 	enum hba_state state;
 	uint8_t fault;
@@ -429,6 +460,15 @@ struct lpfc_cgn_param {
 /* Max number of days of congestion data */
 #define LPFC_MAX_CGN_DAYS 10
 
+struct lpfc_cgn_ts {
+	uint8_t month;
+	uint8_t day;
+	uint8_t year;
+	uint8_t hour;
+	uint8_t minute;
+	uint8_t second;
+};
+
 /* Format of congestion buffer info
  * This structure defines memory thats allocated and registered with
  * the HBA firmware. When adding or removing fields from this structure
@@ -442,6 +482,7 @@ struct lpfc_cgn_info {
 #define LPFC_CGN_INFO_V1	1
 #define LPFC_CGN_INFO_V2	2
 #define LPFC_CGN_INFO_V3	3
+#define LPFC_CGN_INFO_V4	4
 	uint8_t  cgn_info_mode;		/* 0=off 1=managed 2=monitor only */
 	uint8_t  cgn_info_detect;
 	uint8_t  cgn_info_action;
@@ -450,12 +491,7 @@ struct lpfc_cgn_info {
 	uint8_t  cgn_info_level2;
 
 	/* Start Time */
-	uint8_t  cgn_info_month;
-	uint8_t  cgn_info_day;
-	uint8_t  cgn_info_year;
-	uint8_t  cgn_info_hour;
-	uint8_t  cgn_info_minute;
-	uint8_t  cgn_info_second;
+	struct lpfc_cgn_ts base_time;
 
 	/* minute / hours / daily indices */
 	uint8_t  cgn_index_minute;
@@ -496,45 +532,17 @@ struct lpfc_cgn_info {
 		uint8_t  cgn_stat_npm;		/* Notifications per minute */
 
 		/* Start Time */
-		uint8_t  cgn_stat_month;
-		uint8_t  cgn_stat_day;
-		uint8_t  cgn_stat_year;
-		uint8_t  cgn_stat_hour;
-		uint8_t  cgn_stat_minute;
-		uint8_t  cgn_pad2[2];
+		struct lpfc_cgn_ts stat_start;	/* Base time */
+		uint8_t cgn_pad2;
 
 		__le32   cgn_notification;
 		__le32   cgn_peer_notification;
 		__le32   link_integ_notification;
 		__le32   delivery_notification;
-
-		uint8_t  cgn_stat_cgn_month; /* Last congestion notification FPIN */
-		uint8_t  cgn_stat_cgn_day;
-		uint8_t  cgn_stat_cgn_year;
-		uint8_t  cgn_stat_cgn_hour;
-		uint8_t  cgn_stat_cgn_min;
-		uint8_t  cgn_stat_cgn_sec;
-
-		uint8_t  cgn_stat_peer_month; /* Last peer congestion FPIN */
-		uint8_t  cgn_stat_peer_day;
-		uint8_t  cgn_stat_peer_year;
-		uint8_t  cgn_stat_peer_hour;
-		uint8_t  cgn_stat_peer_min;
-		uint8_t  cgn_stat_peer_sec;
-
-		uint8_t  cgn_stat_lnk_month; /* Last link integrity FPIN */
-		uint8_t  cgn_stat_lnk_day;
-		uint8_t  cgn_stat_lnk_year;
-		uint8_t  cgn_stat_lnk_hour;
-		uint8_t  cgn_stat_lnk_min;
-		uint8_t  cgn_stat_lnk_sec;
-
-		uint8_t  cgn_stat_del_month; /* Last delivery notification FPIN */
-		uint8_t  cgn_stat_del_day;
-		uint8_t  cgn_stat_del_year;
-		uint8_t  cgn_stat_del_hour;
-		uint8_t  cgn_stat_del_min;
-		uint8_t  cgn_stat_del_sec;
+		struct lpfc_cgn_ts stat_fpin;	/* Last congestion notification FPIN */
+		struct lpfc_cgn_ts stat_peer;	/* Last peer congestion FPIN */
+		struct lpfc_cgn_ts stat_lnk;	/* Last link integrity FPIN */
+		struct lpfc_cgn_ts stat_delivery;	/* Last delivery notification FPIN */
 	);
 
 	__le32   cgn_info_crc;
@@ -558,6 +566,44 @@ struct lpfc_cgn_acqe_stat {
 	atomic64_t warn;
 };
 
+enum lpfc_fc_flag {
+	/* Several of these flags are HBA centric and should be moved to
+	 * phba->link_flag (e.g. FC_PTP, FC_PUBLIC_LOOP)
+	 */
+	FC_PT2PT,			/* pt2pt with no fabric */
+	FC_PT2PT_PLOGI,			/* pt2pt initiate PLOGI */
+	FC_DISC_TMO,			/* Discovery timer running */
+	FC_PUBLIC_LOOP,			/* Public loop */
+	FC_LBIT,			/* LOGIN bit in loopinit set */
+	FC_RSCN_MODE,			/* RSCN cmd rcv'ed */
+	FC_NLP_MORE,			/* More node to process in node tbl */
+	FC_OFFLINE_MODE,		/* Interface is offline for diag */
+	FC_FABRIC,			/* We are fabric attached */
+	FC_VPORT_LOGO_RCVD,		/* LOGO received on vport */
+	FC_RSCN_DISCOVERY,		/* Auth all devices after RSCN */
+	FC_LOGO_RCVD_DID_CHNG,		/* FDISC on phys port detect DID chng */
+	FC_PT2PT_NO_NVME,		/* Don't send NVME PRLI */
+	FC_SCSI_SCAN_TMO,		/* scsi scan timer running */
+	FC_ABORT_DISCOVERY,		/* we want to abort discovery */
+	FC_NDISC_ACTIVE,		/* NPort discovery active */
+	FC_BYPASSED_MODE,		/* NPort is in bypassed mode */
+	FC_VPORT_NEEDS_REG_VPI,		/* Needs to have its vpi registered */
+	FC_RSCN_DEFERRED,		/* A deferred RSCN being processed */
+	FC_VPORT_NEEDS_INIT_VPI,	/* Need to INIT_VPI before FDISC */
+	FC_VPORT_CVL_RCVD,		/* VLink failed due to CVL */
+	FC_VFI_REGISTERED,		/* VFI is registered */
+	FC_FDISC_COMPLETED,		/* FDISC completed */
+	FC_DISC_DELAYED,		/* Delay NPort discovery */
+};
+
+enum lpfc_load_flag {
+	FC_LOADING,			/* HBA in process of loading drvr */
+	FC_UNLOADING,			/* HBA in process of unloading drvr */
+	FC_ALLOW_FDMI,			/* port is ready for FDMI requests */
+	FC_ALLOW_VMID,			/* Allow VMID I/Os */
+	FC_DEREGISTER_ALL_APP_ID	/* Deregister all VMIDs */
+};
+
 struct lpfc_vport {
 	struct lpfc_hba *phba;
 	struct list_head listentry;
@@ -572,34 +618,7 @@ struct lpfc_vport {
 	uint8_t vpi_state;
 #define LPFC_VPI_REGISTERED	0x1
 
-	uint32_t fc_flag;	/* FC flags */
-/* Several of these flags are HBA centric and should be moved to
- * phba->link_flag (e.g. FC_PTP, FC_PUBLIC_LOOP)
- */
-#define FC_PT2PT                0x1	 /* pt2pt with no fabric */
-#define FC_PT2PT_PLOGI          0x2	 /* pt2pt initiate PLOGI */
-#define FC_DISC_TMO             0x4	 /* Discovery timer running */
-#define FC_PUBLIC_LOOP          0x8	 /* Public loop */
-#define FC_LBIT                 0x10	 /* LOGIN bit in loopinit set */
-#define FC_RSCN_MODE            0x20	 /* RSCN cmd rcv'ed */
-#define FC_NLP_MORE             0x40	 /* More node to process in node tbl */
-#define FC_OFFLINE_MODE         0x80	 /* Interface is offline for diag */
-#define FC_FABRIC               0x100	 /* We are fabric attached */
-#define FC_VPORT_LOGO_RCVD      0x200    /* LOGO received on vport */
-#define FC_RSCN_DISCOVERY       0x400	 /* Auth all devices after RSCN */
-#define FC_LOGO_RCVD_DID_CHNG   0x800    /* FDISC on phys port detect DID chng*/
-#define FC_PT2PT_NO_NVME        0x1000   /* Don't send NVME PRLI */
-#define FC_SCSI_SCAN_TMO        0x4000	 /* scsi scan timer running */
-#define FC_ABORT_DISCOVERY      0x8000	 /* we want to abort discovery */
-#define FC_NDISC_ACTIVE         0x10000	 /* NPort discovery active */
-#define FC_BYPASSED_MODE        0x20000	 /* NPort is in bypassed mode */
-#define FC_VPORT_NEEDS_REG_VPI	0x80000  /* Needs to have its vpi registered */
-#define FC_RSCN_DEFERRED	0x100000 /* A deferred RSCN being processed */
-#define FC_VPORT_NEEDS_INIT_VPI 0x200000 /* Need to INIT_VPI before FDISC */
-#define FC_VPORT_CVL_RCVD	0x400000 /* VLink failed due to CVL	 */
-#define FC_VFI_REGISTERED	0x800000 /* VFI is registered */
-#define FC_FDISC_COMPLETED	0x1000000/* FDISC completed */
-#define FC_DISC_DELAYED		0x2000000/* Delay NPort discovery */
+	unsigned long fc_flag;	/* FC flags */
 
 	uint32_t ct_flags;
 #define FC_CT_RFF_ID		0x1	 /* RFF_ID accepted by switch */
@@ -610,16 +629,18 @@ struct lpfc_vport {
 #define FC_CT_RPRT_DEFER	0x20	 /* Defer issuing FDMI RPRT */
 
 	struct list_head fc_nodes;
+	spinlock_t fc_nodes_list_lock; /* spinlock for fc_nodes list */
 
 	/* Keep counters for the number of entries in each list. */
-	uint16_t fc_plogi_cnt;
-	uint16_t fc_adisc_cnt;
-	uint16_t fc_reglogin_cnt;
-	uint16_t fc_prli_cnt;
-	uint16_t fc_unmap_cnt;
-	uint16_t fc_map_cnt;
-	uint16_t fc_npr_cnt;
-	uint16_t fc_unused_cnt;
+	atomic_t fc_plogi_cnt;
+	atomic_t fc_adisc_cnt;
+	atomic_t fc_reglogin_cnt;
+	atomic_t fc_prli_cnt;
+	atomic_t fc_unmap_cnt;
+	atomic_t fc_map_cnt;
+	atomic_t fc_npr_cnt;
+	atomic_t fc_unused_cnt;
+
 	struct serv_parm fc_sparam;	/* buffer for our service parameters */
 
 	uint32_t fc_myDID;	/* fibre channel S_ID */
@@ -665,12 +686,7 @@ struct lpfc_vport {
 	struct timer_list els_tmofunc;
 	struct timer_list delayed_disc_tmo;
 
-	uint8_t load_flag;
-#define FC_LOADING		0x1	/* HBA in process of loading drvr */
-#define FC_UNLOADING		0x2	/* HBA in process of unloading drvr */
-#define FC_ALLOW_FDMI		0x4	/* port is ready for FDMI requests */
-#define FC_ALLOW_VMID		0x8	/* Allow VMID I/Os */
-#define FC_DEREGISTER_ALL_APP_ID	0x10	/* Deregister all VMIDs */
+	unsigned long load_flag;
 	/* Vport Config Parameters */
 	uint32_t cfg_scan_down;
 	uint32_t cfg_lun_queue_depth;
@@ -690,7 +706,7 @@ struct lpfc_vport {
 	uint32_t cfg_first_burst_size;
 	uint32_t dev_loss_tmo_changed;
 	/* VMID parameters */
-	u8 lpfc_vmid_host_uuid[LPFC_COMPRESS_VMID_SIZE];
+	u8 lpfc_vmid_host_uuid[16];
 	u32 max_vmid;	/* maximum VMIDs allowed per port */
 	u32 cur_vmid_cnt;	/* Current VMID count */
 #define LPFC_MIN_VMID	4
@@ -895,6 +911,7 @@ enum lpfc_irq_chann_mode {
 enum lpfc_hba_bit_flags {
 	FABRIC_COMANDS_BLOCKED,
 	HBA_PCI_ERR,
+	MBX_TMO_ERR,
 };
 
 struct lpfc_hba {
@@ -932,8 +949,6 @@ struct lpfc_hba {
 	void (*__lpfc_sli_release_iocbq)(struct lpfc_hba *,
 			 struct lpfc_iocbq *);
 	int (*lpfc_hba_down_post)(struct lpfc_hba *phba);
-	void (*lpfc_scsi_cmd_iocb_cmpl)
-		(struct lpfc_hba *, struct lpfc_iocbq *, struct lpfc_iocbq *);
 
 	/* MBOX interface function jump table entries */
 	int (*lpfc_sli_issue_mbox)
@@ -1023,38 +1038,7 @@ struct lpfc_hba {
 #define LS_CT_VEN_RPA         0x20	/* Vendor RPA sent to switch */
 #define LS_EXTERNAL_LOOPBACK  0x40	/* External loopback plug inserted */
 
-	uint32_t hba_flag;	/* hba generic flags */
-#define HBA_ERATT_HANDLED	0x1 /* This flag is set when eratt handled */
-#define DEFER_ERATT		0x2 /* Deferred error attention in progress */
-#define HBA_FCOE_MODE		0x4 /* HBA function in FCoE Mode */
-#define HBA_SP_QUEUE_EVT	0x8 /* Slow-path qevt posted to worker thread*/
-#define HBA_POST_RECEIVE_BUFFER 0x10 /* Rcv buffers need to be posted */
-#define HBA_PERSISTENT_TOPO	0x20 /* Persistent topology support in hba */
-#define ELS_XRI_ABORT_EVENT	0x40 /* ELS_XRI abort event was queued */
-#define ASYNC_EVENT		0x80
-#define LINK_DISABLED		0x100 /* Link disabled by user */
-#define FCF_TS_INPROG           0x200 /* FCF table scan in progress */
-#define FCF_RR_INPROG           0x400 /* FCF roundrobin flogi in progress */
-#define HBA_FIP_SUPPORT		0x800 /* FIP support in HBA */
-#define HBA_AER_ENABLED		0x1000 /* AER enabled with HBA */
-#define HBA_DEVLOSS_TMO         0x2000 /* HBA in devloss timeout */
-#define HBA_RRQ_ACTIVE		0x4000 /* process the rrq active list */
-#define HBA_IOQ_FLUSH		0x8000 /* FCP/NVME I/O queues being flushed */
-#define HBA_RECOVERABLE_UE	0x20000 /* Firmware supports recoverable UE */
-#define HBA_FORCED_LINK_SPEED	0x40000 /*
-					 * Firmware supports Forced Link Speed
-					 * capability
-					 */
-#define HBA_FLOGI_ISSUED	0x100000 /* FLOGI was issued */
-#define HBA_SHORT_CMF		0x200000 /* shorter CMF timer routine */
-#define HBA_CGN_DAY_WRAP	0x400000 /* HBA Congestion info day wraps */
-#define HBA_DEFER_FLOGI		0x800000 /* Defer FLOGI till read_sparm cmpl */
-#define HBA_SETUP		0x1000000 /* Signifies HBA setup is completed */
-#define HBA_NEEDS_CFG_PORT	0x2000000 /* SLI3 - needs a CONFIG_PORT mbox */
-#define HBA_HBEAT_INP		0x4000000 /* mbox HBEAT is in progress */
-#define HBA_HBEAT_TMO		0x8000000 /* HBEAT initiated after timeout */
-#define HBA_FLOGI_OUTSTANDING	0x10000000 /* FLOGI is outstanding */
-#define HBA_RHBA_CMPL		0x20000000 /* RHBA FDMI command is successful */
+	unsigned long hba_flag;	/* hba generic flags */
 
 	struct completion *fw_dump_cmpl; /* cmpl event tracker for fw_dump */
 	uint32_t fcp_ring_in_use; /* When polling test if intr-hndlr active*/
@@ -1190,7 +1174,6 @@ struct lpfc_hba {
 #define LPFC_MAX_ENBL_FC4_TYPE LPFC_ENABLE_FCP
 #define LPFC_DEF_ENBL_FC4_TYPE LPFC_ENABLE_FCP
 #endif
-	uint32_t cfg_aer_support;
 	uint32_t cfg_sriov_nr_virtfn;
 	uint32_t cfg_request_firmware_upgrade;
 	uint32_t cfg_suppress_link_up;
@@ -1304,6 +1287,7 @@ struct lpfc_hba {
 	uint32_t total_scsi_bufs;
 	struct list_head lpfc_iocb_list;
 	uint32_t total_iocbq_bufs;
+	spinlock_t rrq_list_lock;       /* lock for active_rrq_list */
 	struct list_head active_rrq_list;
 	spinlock_t hbalock;
 	struct work_struct  unblock_request_work; /* SCSI layer unblock IOs */
@@ -1353,7 +1337,6 @@ struct lpfc_hba {
 	struct timer_list fabric_block_timer;
 	unsigned long bit_flags;
 	atomic_t num_rsrc_err;
-	atomic_t num_cmd_success;
 	unsigned long last_rsrc_error_time;
 	unsigned long last_ramp_down_time;
 #ifdef CONFIG_SCSI_LPFC_DEBUG_FS
@@ -1458,6 +1441,7 @@ struct lpfc_hba {
 	struct timer_list inactive_vmid_poll;
 
 	/* RAS Support */
+	spinlock_t ras_fwlog_lock; /* do not take while holding another lock */
 	struct lpfc_ras_fwlog ras_fwlog;
 
 	uint32_t iocb_cnt;
@@ -1531,6 +1515,7 @@ struct lpfc_hba {
 	uint64_t cmf_last_sync_bw;
 #define  LPFC_CMF_BLK_SIZE 512
 	struct hrtimer cmf_timer;
+	struct hrtimer cmf_stats_timer;	/* 1 minute stats timer  */
 	atomic_t cmf_bw_wait;
 	atomic_t cmf_busy;
 	atomic_t cmf_stop_io;      /* To block request and stop IO's */
@@ -1578,12 +1563,11 @@ struct lpfc_hba {
 	atomic_t cgn_sync_alarm_cnt;    /* Total alarm events for SYNC wqe */
 	atomic_t cgn_driver_evt_cnt;    /* Total driver cgn events for fmw */
 	atomic_t cgn_latency_evt_cnt;
-	struct timespec64 cgn_daily_ts;
 	atomic64_t cgn_latency_evt;     /* Avg latency per minute */
 	unsigned long cgn_evt_timestamp;
 #define LPFC_CGN_TIMER_TO_MIN   60000 /* ms in a minute */
 	uint32_t cgn_evt_minute;
-#define LPFC_SEC_MIN		60
+#define LPFC_SEC_MIN		60UL
 #define LPFC_MIN_HOUR		60
 #define LPFC_HOUR_DAY		24
 #define LPFC_MIN_DAY		(LPFC_MIN_HOUR * LPFC_HOUR_DAY)
@@ -1592,8 +1576,6 @@ struct lpfc_hba {
 	struct timer_list cpuhp_poll_timer;
 	struct list_head poll_list;	/* slowpath eq polling list */
 #define LPFC_POLL_HB	1		/* slowpath heartbeat */
-#define LPFC_POLL_FASTPATH	0	/* called from fastpath */
-#define LPFC_POLL_SLOWPATH	1	/* called from slowpath */
 
 	char os_host_name[MAXHOSTNAMELEN];
 
@@ -1739,6 +1721,25 @@ lpfc_next_online_cpu(const struct cpumask *mask, unsigned int start)
 
 	return cpu_it;
 }
+/**
+ * lpfc_next_present_cpu - Finds next present CPU after n
+ * @n: the cpu prior to search
+ *
+ * Note: If no next present cpu, then fallback to first present cpu.
+ *
+ **/
+static inline unsigned int lpfc_next_present_cpu(int n)
+{
+	unsigned int cpu;
+
+	cpu = cpumask_next(n, cpu_present_mask);
+
+	if (cpu >= nr_cpu_ids)
+		cpu = cpumask_first(cpu_present_mask);
+
+	return cpu;
+}
+
 /**
  * lpfc_sli4_mod_hba_eq_delay - update EQ delay
  * @phba: Pointer to HBA context object.

@@ -36,7 +36,7 @@ rpc_sysfs_object_child_ns_type(const struct kobject *kobj)
 	return &net_ns_type_operations;
 }
 
-static struct kobj_type rpc_sysfs_object_type = {
+static const struct kobj_type rpc_sysfs_object_type = {
 	.release = rpc_sysfs_object_release,
 	.sysfs_ops = &kobj_sysfs_ops,
 	.child_ns_type = rpc_sysfs_object_child_ns_type,
@@ -239,6 +239,7 @@ static ssize_t rpc_sysfs_xprt_dstaddr_store(struct kobject *kobj,
 	if (!xprt)
 		return 0;
 	if (!(xprt->xprt_class->ident == XPRT_TRANSPORT_TCP ||
+	      xprt->xprt_class->ident == XPRT_TRANSPORT_TCP_TLS ||
 	      xprt->xprt_class->ident == XPRT_TRANSPORT_RDMA)) {
 		xprt_put(xprt);
 		return -EOPNOTSUPP;
@@ -427,20 +428,20 @@ static struct attribute *rpc_sysfs_xprt_switch_attrs[] = {
 };
 ATTRIBUTE_GROUPS(rpc_sysfs_xprt_switch);
 
-static struct kobj_type rpc_sysfs_client_type = {
+static const struct kobj_type rpc_sysfs_client_type = {
 	.release = rpc_sysfs_client_release,
 	.sysfs_ops = &kobj_sysfs_ops,
 	.namespace = rpc_sysfs_client_namespace,
 };
 
-static struct kobj_type rpc_sysfs_xprt_switch_type = {
+static const struct kobj_type rpc_sysfs_xprt_switch_type = {
 	.release = rpc_sysfs_xprt_switch_release,
 	.default_groups = rpc_sysfs_xprt_switch_groups,
 	.sysfs_ops = &kobj_sysfs_ops,
 	.namespace = rpc_sysfs_xprt_switch_namespace,
 };
 
-static struct kobj_type rpc_sysfs_xprt_type = {
+static const struct kobj_type rpc_sysfs_xprt_type = {
 	.release = rpc_sysfs_xprt_release,
 	.default_groups = rpc_sysfs_xprt_groups,
 	.sysfs_ops = &kobj_sysfs_ops,

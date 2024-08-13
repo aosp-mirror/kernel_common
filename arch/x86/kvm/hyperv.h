@@ -24,6 +24,8 @@
 #include <linux/kvm_host.h>
 #include "x86.h"
 
+#ifdef CONFIG_KVM_HYPERV
+
 /* "Hv#1" signature */
 #define HYPERV_CPUID_SIGNATURE_EAX 0x31237648
 
@@ -105,6 +107,17 @@ int kvm_hv_synic_set_irq(struct kvm *kvm, u32 vcpu_id, u32 sint);
 void kvm_hv_synic_send_eoi(struct kvm_vcpu *vcpu, int vector);
 int kvm_hv_activate_synic(struct kvm_vcpu *vcpu, bool dont_zero_synic_pages);
 
+static inline bool kvm_hv_synic_has_vector(struct kvm_vcpu *vcpu, int vector)
+{
+	return to_hv_vcpu(vcpu) && test_bit(vector, to_hv_synic(vcpu)->vec_bitmap);
+}
+
+static inline bool kvm_hv_synic_auto_eoi_set(struct kvm_vcpu *vcpu, int vector)
+{
+	return to_hv_vcpu(vcpu) &&
+	       test_bit(vector, to_hv_synic(vcpu)->auto_eoi_bitmap);
+}
+
 void kvm_hv_vcpu_uninit(struct kvm_vcpu *vcpu);
 
 bool kvm_hv_assist_page_enabled(struct kvm_vcpu *vcpu);
@@ -136,11 +149,40 @@ static inline bool kvm_hv_has_stimer_pending(struct kvm_vcpu *vcpu)
 			     HV_SYNIC_STIMER_COUNT);
 }
 
+/*
+ * With HV_ACCESS_TSC_INVARIANT feature, invariant TSC (CPUID.80000007H:EDX[8])
+ * is only observed after HV_X64_MSR_TSC_INVARIANT_CONTROL was written to.
+ */
+static inline bool kvm_hv_invtsc_suppressed(struct kvm_vcpu *vcpu)
+{
+	struct kvm_vcpu_hv *hv_vcpu = to_hv_vcpu(vcpu);
+
+	/*
+	 * If Hyper-V's invariant TSC control is not exposed to the guest,
+	 * the invariant TSC CPUID flag is not suppressed, Windows guests were
+	 * observed to be able to handle it correctly. Going forward, VMMs are
+	 * encouraged to enable Hyper-V's invariant TSC control when invariant
+	 * TSC CPUID flag is set to make KVM's behavior match genuine Hyper-V.
+	 */
+	if (!hv_vcpu ||
+	    !(hv_vcpu->cpuid_cache.features_eax & HV_ACCESS_TSC_INVARIANT))
+		return false;
+
+	/*
+	 * If Hyper-V's invariant TSC control is exposed to the guest, KVM is
+	 * responsible for suppressing the invariant TSC CPUID flag if the
+	 * Hyper-V control is not enabled.
+	 */
+	return !(to_kvm_hv(vcpu->kvm)->hv_invtsc_control & HV_EXPOSE_INVARIANT_TSC);
+}
+
 void kvm_hv_process_stimers(struct kvm_vcpu *vcpu);
 
 void kvm_hv_setup_tsc_page(struct kvm *kvm,
 			   struct pvclock_vcpu_time_info *hv_clock);
 void kvm_hv_request_tsc_page_update(struct kvm *kvm);
+
+void kvm_hv_xsaves_xsavec_maybe_warn(struct kvm_vcpu *vcpu);
 
 void kvm_hv_init_vm(struct kvm *kvm);
 void kvm_hv_destroy_vm(struct kvm *kvm);
@@ -209,6 +251,77 @@ static inline int kvm_hv_verify_vp_assist(struct kvm_vcpu *vcpu)
 	return kvm_hv_get_assist_page(vcpu);
 }
 
-int kvm_hv_vcpu_flush_tlb(struct kvm_vcpu *vcpu);
+static inline void kvm_hv_nested_transtion_tlb_flush(struct kvm_vcpu *vcpu,
+						     bool tdp_enabled)
+{
+	/*
+	 * KVM_REQ_HV_TLB_FLUSH flushes entries from either L1's VP_ID or
+	 * L2's VP_ID upon request from the guest. Make sure we check for
+	 * pending entries in the right FIFO upon L1/L2 transition as these
+	 * requests are put by other vCPUs asynchronously.
+	 */
+	if (to_hv_vcpu(vcpu) && tdp_enabled)
+		kvm_make_request(KVM_REQ_HV_TLB_FLUSH, vcpu);
+}
 
-#endif
+int kvm_hv_vcpu_flush_tlb(struct kvm_vcpu *vcpu);
+#else /* CONFIG_KVM_HYPERV */
+static inline void kvm_hv_setup_tsc_page(struct kvm *kvm,
+					 struct pvclock_vcpu_time_info *hv_clock) {}
+static inline void kvm_hv_request_tsc_page_update(struct kvm *kvm) {}
+static inline void kvm_hv_xsaves_xsavec_maybe_warn(struct kvm_vcpu *vcpu) {}
+static inline void kvm_hv_init_vm(struct kvm *kvm) {}
+static inline void kvm_hv_destroy_vm(struct kvm *kvm) {}
+static inline int kvm_hv_vcpu_init(struct kvm_vcpu *vcpu)
+{
+	return 0;
+}
+static inline void kvm_hv_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+static inline bool kvm_hv_hypercall_enabled(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+static inline int kvm_hv_hypercall(struct kvm_vcpu *vcpu)
+{
+	return HV_STATUS_ACCESS_DENIED;
+}
+static inline void kvm_hv_vcpu_purge_flush_tlb(struct kvm_vcpu *vcpu) {}
+static inline void kvm_hv_free_pa_page(struct kvm *kvm) {}
+static inline bool kvm_hv_synic_has_vector(struct kvm_vcpu *vcpu, int vector)
+{
+	return false;
+}
+static inline bool kvm_hv_synic_auto_eoi_set(struct kvm_vcpu *vcpu, int vector)
+{
+	return false;
+}
+static inline void kvm_hv_synic_send_eoi(struct kvm_vcpu *vcpu, int vector) {}
+static inline bool kvm_hv_invtsc_suppressed(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+static inline void kvm_hv_set_cpuid(struct kvm_vcpu *vcpu, bool hyperv_enabled) {}
+static inline bool kvm_hv_has_stimer_pending(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+static inline bool kvm_hv_is_tlb_flush_hcall(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+static inline bool guest_hv_cpuid_has_l2_tlb_flush(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+static inline int kvm_hv_verify_vp_assist(struct kvm_vcpu *vcpu)
+{
+	return 0;
+}
+static inline u32 kvm_hv_get_vpindex(struct kvm_vcpu *vcpu)
+{
+	return vcpu->vcpu_idx;
+}
+static inline void kvm_hv_nested_transtion_tlb_flush(struct kvm_vcpu *vcpu, bool tdp_enabled) {}
+#endif /* CONFIG_KVM_HYPERV */
+
+#endif /* __ARCH_X86_KVM_HYPERV_H__ */

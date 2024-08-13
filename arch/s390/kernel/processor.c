@@ -201,11 +201,8 @@ static int __init setup_hwcaps(void)
 	if (MACHINE_HAS_TE)
 		elf_hwcap |= HWCAP_TE;
 
-	/*
-	 * Vector extension can be disabled with the "novx" parameter.
-	 * Use MACHINE_HAS_VX instead of facility bit 129.
-	 */
-	if (MACHINE_HAS_VX) {
+	/* vector */
+	if (test_facility(129)) {
 		elf_hwcap |= HWCAP_VXRS;
 		if (test_facility(134))
 			elf_hwcap |= HWCAP_VXRS_BCD;
@@ -364,21 +361,3 @@ const struct seq_operations cpuinfo_op = {
 	.stop	= c_stop,
 	.show	= show_cpuinfo,
 };
-
-int s390_isolate_bp(void)
-{
-	if (!test_facility(82))
-		return -EOPNOTSUPP;
-	set_thread_flag(TIF_ISOLATE_BP);
-	return 0;
-}
-EXPORT_SYMBOL(s390_isolate_bp);
-
-int s390_isolate_bp_guest(void)
-{
-	if (!test_facility(82))
-		return -EOPNOTSUPP;
-	set_thread_flag(TIF_ISOLATE_BP_GUEST);
-	return 0;
-}
-EXPORT_SYMBOL(s390_isolate_bp_guest);

@@ -9,7 +9,7 @@
 
 #include <linux/clk-provider.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
@@ -461,8 +461,7 @@ static void hisi_clk_register_pll(struct hi3559av100_pll_clock *clks,
 	struct clk_init_data init;
 	int i;
 
-	p_clk = devm_kzalloc(dev, sizeof(*p_clk) * nums, GFP_KERNEL);
-
+	p_clk = devm_kcalloc(dev, nums, sizeof(*p_clk), GFP_KERNEL);
 	if (!p_clk)
 		return;
 
@@ -491,7 +490,6 @@ static void hisi_clk_register_pll(struct hi3559av100_pll_clock *clks,
 
 		clk = clk_register(NULL, &p_clk->hw);
 		if (IS_ERR(clk)) {
-			devm_kfree(dev, p_clk);
 			dev_err(dev, "%s: failed to register clock %s\n",
 			       __func__, clks[i].name);
 			continue;
@@ -810,18 +808,17 @@ static int hi3559av100_crg_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int hi3559av100_crg_remove(struct platform_device *pdev)
+static void hi3559av100_crg_remove(struct platform_device *pdev)
 {
 	struct hisi_crg_dev *crg = platform_get_drvdata(pdev);
 
 	hisi_reset_exit(crg->rstc);
 	crg->funcs->unregister_clks(pdev);
-	return 0;
 }
 
 static struct platform_driver hi3559av100_crg_driver = {
 	.probe		= hi3559av100_crg_probe,
-	.remove		= hi3559av100_crg_remove,
+	.remove_new	= hi3559av100_crg_remove,
 	.driver		= {
 		.name	= "hi3559av100-clock",
 		.of_match_table = hi3559av100_crg_match_table,
@@ -841,5 +838,4 @@ static void __exit hi3559av100_crg_exit(void)
 module_exit(hi3559av100_crg_exit);
 
 
-MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("HiSilicon Hi3559AV100 CRG Driver");

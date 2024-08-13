@@ -370,6 +370,7 @@
 			interrupts = <GIC_SPI 512 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 513 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 514 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "tuni0", "tuni1", "tuni2";
 			clocks = <&cpg CPG_MOD 713>;
 			clock-names = "fck";
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
@@ -382,7 +383,9 @@
 			reg = <0 0xe6fc0000 0 0x30>;
 			interrupts = <GIC_SPI 504 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 505 IRQ_TYPE_LEVEL_HIGH>,
-				     <GIC_SPI 506 IRQ_TYPE_LEVEL_HIGH>;
+				     <GIC_SPI 506 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 507 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "tuni0", "tuni1", "tuni2", "ticpi2";
 			clocks = <&cpg CPG_MOD 714>;
 			clock-names = "fck";
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
@@ -395,7 +398,9 @@
 			reg = <0 0xe6fd0000 0 0x30>;
 			interrupts = <GIC_SPI 508 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 509 IRQ_TYPE_LEVEL_HIGH>,
-				     <GIC_SPI 510 IRQ_TYPE_LEVEL_HIGH>;
+				     <GIC_SPI 510 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 511 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "tuni0", "tuni1", "tuni2", "ticpi2";
 			clocks = <&cpg CPG_MOD 715>;
 			clock-names = "fck";
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
@@ -408,7 +413,9 @@
 			reg = <0 0xe6fe0000 0 0x30>;
 			interrupts = <GIC_SPI 472 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 473 IRQ_TYPE_LEVEL_HIGH>,
-				     <GIC_SPI 474 IRQ_TYPE_LEVEL_HIGH>;
+				     <GIC_SPI 474 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 475 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "tuni0", "tuni1", "tuni2", "ticpi2";
 			clocks = <&cpg CPG_MOD 716>;
 			clock-names = "fck";
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
@@ -421,7 +428,9 @@
 			reg = <0 0xffc00000 0 0x30>;
 			interrupts = <GIC_SPI 476 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 477 IRQ_TYPE_LEVEL_HIGH>,
-				     <GIC_SPI 478 IRQ_TYPE_LEVEL_HIGH>;
+				     <GIC_SPI 478 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 479 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "tuni0", "tuni1", "tuni2", "ticpi2";
 			clocks = <&cpg CPG_MOD 717>;
 			clock-names = "fck";
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
@@ -606,7 +615,8 @@
 		};
 
 		canfd: can@e6660000 {
-			compatible = "renesas,r8a779a0-canfd";
+			compatible = "renesas,r8a779a0-canfd",
+				     "renesas,rcar-gen4-canfd";
 			reg = <0 0xe6660000 0 0x8000>;
 			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
 					<GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
@@ -657,7 +667,7 @@
 		avb0: ethernet@e6800000 {
 			compatible = "renesas,etheravb-r8a779a0",
 				     "renesas,etheravb-rcar-gen4";
-			reg = <0 0xe6800000 0 0x800>;
+			reg = <0 0xe6800000 0 0x1000>;
 			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 257 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 258 IRQ_TYPE_LEVEL_HIGH>,
@@ -705,7 +715,7 @@
 		avb1: ethernet@e6810000 {
 			compatible = "renesas,etheravb-r8a779a0",
 				     "renesas,etheravb-rcar-gen4";
-			reg = <0 0xe6810000 0 0x800>;
+			reg = <0 0xe6810000 0 0x1000>;
 			interrupts = <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
@@ -939,6 +949,56 @@
 			tx-internal-delay-ps = <0>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			status = "disabled";
+		};
+
+		pwm0: pwm@e6e30000 {
+			compatible = "renesas,pwm-r8a779a0", "renesas,pwm-rcar";
+			reg = <0 0xe6e30000 0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&cpg CPG_MOD 628>;
+			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
+			resets = <&cpg 628>;
+			status = "disabled";
+		};
+
+		pwm1: pwm@e6e31000 {
+			compatible = "renesas,pwm-r8a779a0", "renesas,pwm-rcar";
+			reg = <0 0xe6e31000 0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&cpg CPG_MOD 628>;
+			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
+			resets = <&cpg 628>;
+			status = "disabled";
+		};
+
+		pwm2: pwm@e6e32000 {
+			compatible = "renesas,pwm-r8a779a0", "renesas,pwm-rcar";
+			reg = <0 0xe6e32000 0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&cpg CPG_MOD 628>;
+			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
+			resets = <&cpg 628>;
+			status = "disabled";
+		};
+
+		pwm3: pwm@e6e33000 {
+			compatible = "renesas,pwm-r8a779a0", "renesas,pwm-rcar";
+			reg = <0 0xe6e33000 0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&cpg CPG_MOD 628>;
+			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
+			resets = <&cpg 628>;
+			status = "disabled";
+		};
+
+		pwm4: pwm@e6e34000 {
+			compatible = "renesas,pwm-r8a779a0", "renesas,pwm-rcar";
+			reg = <0 0xe6e34000 0 0x10>;
+			#pwm-cells = <2>;
+			clocks = <&cpg CPG_MOD 628>;
+			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
+			resets = <&cpg 628>;
 			status = "disabled";
 		};
 
@@ -2097,7 +2157,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xee480000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 10>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2106,7 +2166,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xee4c0000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 19>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2115,7 +2175,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeed00000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 0>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2124,7 +2184,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeed40000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 1>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2133,7 +2193,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeed80000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 3>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_A3IR>;
 			#iommu-cells = <1>;
 		};
@@ -2142,7 +2202,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeedc0000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 12>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2151,7 +2211,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeee80000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 14>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2160,7 +2220,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeeec0000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 15>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2169,7 +2229,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeee00000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 6>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2178,7 +2238,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeef00000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 5>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2187,7 +2247,7 @@
 			compatible = "renesas,ipmmu-r8a779a0",
 				     "renesas,rcar-gen4-ipmmu-vmsa";
 			reg = <0 0xeef40000 0 0x20000>;
-			renesas,ipmmu-main = <&ipmmu_mm 11>;
+			renesas,ipmmu-main = <&ipmmu_mm>;
 			power-domains = <&sysc R8A779A0_PD_ALWAYS_ON>;
 			#iommu-cells = <1>;
 		};
@@ -2209,8 +2269,7 @@
 			interrupt-controller;
 			reg = <0x0 0xf1000000 0 0x20000>,
 			      <0x0 0xf1060000 0 0x110000>;
-			interrupts = <GIC_PPI 9
-				      (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
+			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
 		fcpvd0: fcp@fea10000 {
@@ -2857,9 +2916,12 @@
 
 	timer {
 		compatible = "arm,armv8-timer";
-		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
+		interrupts-extended = <&gic GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
+				      <&gic GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+				      <&gic GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+				      <&gic GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>,
+				      <&gic GIC_PPI 12 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-names = "sec-phys", "phys", "virt", "hyp-phys",
+				  "hyp-virt";
 	};
 };

@@ -21,6 +21,7 @@
  *          Alex Deucher <alexdeucher@gmail.com>
  */
 
+#include <linux/debugfs.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/hwmon.h>
 #include <linux/pci.h>
@@ -587,7 +588,7 @@ static ssize_t radeon_hwmon_set_pwm1_enable(struct device *dev,
 	int err;
 	int value;
 
-	if(!rdev->asic->dpm.fan_ctrl_set_mode)
+	if (!rdev->asic->dpm.fan_ctrl_set_mode)
 		return -EINVAL;
 
 	err = kstrtoint(buf, 10, &value);
@@ -789,7 +790,7 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 		return 0;
 
 	/* Skip vddc attribute if get_current_vddc is not implemented */
-	if(attr == &sensor_dev_attr_in0_input.dev_attr.attr &&
+	if (attr == &sensor_dev_attr_in0_input.dev_attr.attr &&
 		!rdev->asic->dpm.get_current_vddc)
 		return 0;
 
@@ -1853,11 +1854,10 @@ static bool radeon_pm_debug_check_in_vbl(struct radeon_device *rdev, bool finish
 static void radeon_dynpm_idle_work_handler(struct work_struct *work)
 {
 	struct radeon_device *rdev;
-	int resched;
+
 	rdev = container_of(work, struct radeon_device,
 				pm.dynpm_idle_work.work);
 
-	resched = ttm_bo_lock_delayed_workqueue(&rdev->mman.bdev);
 	mutex_lock(&rdev->pm.mutex);
 	if (rdev->pm.dynpm_state == DYNPM_STATE_ACTIVE) {
 		int not_processed = 0;
@@ -1908,7 +1908,6 @@ static void radeon_dynpm_idle_work_handler(struct work_struct *work)
 				      msecs_to_jiffies(RADEON_IDLE_LOOP_MS));
 	}
 	mutex_unlock(&rdev->pm.mutex);
-	ttm_bo_unlock_delayed_workqueue(&rdev->mman.bdev, resched);
 }
 
 /*
@@ -1918,7 +1917,7 @@ static void radeon_dynpm_idle_work_handler(struct work_struct *work)
 
 static int radeon_debugfs_pm_info_show(struct seq_file *m, void *unused)
 {
-	struct radeon_device *rdev = (struct radeon_device *)m->private;
+	struct radeon_device *rdev = m->private;
 	struct drm_device *ddev = rdev->ddev;
 
 	if  ((rdev->flags & RADEON_IS_PX) &&

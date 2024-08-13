@@ -295,17 +295,14 @@ svcxdr_decode_sattr3(struct svc_rqst *rqstp, struct xdr_stream *xdr,
 static bool
 svcxdr_decode_sattrguard3(struct xdr_stream *xdr, struct nfsd3_sattrargs *args)
 {
-	__be32 *p;
 	u32 check;
 
 	if (xdr_stream_decode_bool(xdr, &check) < 0)
 		return false;
 	if (check) {
-		p = xdr_inline_decode(xdr, XDR_UNIT * 2);
-		if (!p)
+		if (!svcxdr_decode_nfstime3(xdr, &args->guardtime))
 			return false;
 		args->check_guard = 1;
-		args->guardtime = be32_to_cpup(p);
 	} else
 		args->check_guard = 0;
 
@@ -828,7 +825,8 @@ nfs3svc_encode_readlinkres(struct svc_rqst *rqstp, struct xdr_stream *xdr)
 			return false;
 		if (xdr_stream_encode_u32(xdr, resp->len) < 0)
 			return false;
-		xdr_write_pages(xdr, resp->pages, 0, resp->len);
+		svcxdr_encode_opaque_pages(rqstp, xdr, resp->pages, 0,
+					   resp->len);
 		if (svc_encode_result_payload(rqstp, head->iov_len, resp->len) < 0)
 			return false;
 		break;
@@ -859,8 +857,9 @@ nfs3svc_encode_readres(struct svc_rqst *rqstp, struct xdr_stream *xdr)
 			return false;
 		if (xdr_stream_encode_u32(xdr, resp->count) < 0)
 			return false;
-		xdr_write_pages(xdr, resp->pages, rqstp->rq_res.page_base,
-				resp->count);
+		svcxdr_encode_opaque_pages(rqstp, xdr, resp->pages,
+					   rqstp->rq_res.page_base,
+					   resp->count);
 		if (svc_encode_result_payload(rqstp, head->iov_len, resp->count) < 0)
 			return false;
 		break;
@@ -961,7 +960,8 @@ nfs3svc_encode_readdirres(struct svc_rqst *rqstp, struct xdr_stream *xdr)
 			return false;
 		if (!svcxdr_encode_cookieverf3(xdr, resp->verf))
 			return false;
-		xdr_write_pages(xdr, dirlist->pages, 0, dirlist->len);
+		svcxdr_encode_opaque_pages(rqstp, xdr, dirlist->pages, 0,
+					   dirlist->len);
 		/* no more entries */
 		if (xdr_stream_encode_item_absent(xdr) < 0)
 			return false;

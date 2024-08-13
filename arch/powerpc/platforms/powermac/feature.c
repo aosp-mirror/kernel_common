@@ -37,6 +37,8 @@
 #include <asm/pci-bridge.h>
 #include <asm/pmac_low_i2c.h>
 
+#include "pmac.h"
+
 #undef DEBUG_FEATURE
 
 #ifdef DEBUG_FEATURE
@@ -132,8 +134,10 @@ static struct pmac_mb_def pmac_mb;
  * Here are the chip specific feature functions
  */
 
-static inline int simple_feature_tweak(struct device_node *node, int type,
-				       int reg, u32 mask, int value)
+#ifndef CONFIG_PPC64
+
+static int simple_feature_tweak(struct device_node *node, int type, int reg,
+				u32 mask, int value)
 {
 	struct macio_chip*	macio;
 	unsigned long		flags;
@@ -151,8 +155,6 @@ static inline int simple_feature_tweak(struct device_node *node, int type,
 
 	return 0;
 }
-
-#ifndef CONFIG_PPC64
 
 static long ohare_htw_scc_enable(struct device_node *node, long param,
 				 long value)
@@ -1053,11 +1055,11 @@ core99_reset_cpu(struct device_node *node, long param, long value)
 		return -ENODEV;
 
 	for_each_of_cpu_node(np) {
-		const u32 *num = of_get_property(np, "reg", NULL);
 		const u32 *rst = of_get_property(np, "soft-reset", NULL);
-		if (num == NULL || rst == NULL)
+		if (!rst)
 			continue;
-		if (param == *num) {
+		if (param == of_get_cpu_hwid(np, 0)) {
+			of_node_put(np);
 			reset_io = *rst;
 			break;
 		}
@@ -1499,11 +1501,11 @@ static long g5_reset_cpu(struct device_node *node, long param, long value)
 		return -ENODEV;
 
 	for_each_of_cpu_node(np) {
-		const u32 *num = of_get_property(np, "reg", NULL);
 		const u32 *rst = of_get_property(np, "soft-reset", NULL);
-		if (num == NULL || rst == NULL)
+		if (!rst)
 			continue;
-		if (param == *num) {
+		if (param == of_get_cpu_hwid(np, 0)) {
+			of_node_put(np);
 			reset_io = *rst;
 			break;
 		}
@@ -2331,7 +2333,6 @@ static struct pmac_mb_def pmac_mb_defs[] = {
 		PMAC_TYPE_POWERMAC_G5,		g5_features,
 		0,
 	},
-#ifdef CONFIG_PPC64
 	{	"PowerMac7,3",			"PowerMac G5",
 		PMAC_TYPE_POWERMAC_G5,		g5_features,
 		0,
@@ -2356,7 +2357,6 @@ static struct pmac_mb_def pmac_mb_defs[] = {
 		PMAC_TYPE_XSERVE_G5,		g5_features,
 		0,
 	},
-#endif /* CONFIG_PPC64 */
 #endif /* CONFIG_PPC64 */
 };
 
@@ -2506,7 +2506,7 @@ found:
 			int cpu_count = 1;
 
 			/* Nap mode not supported on SMP */
-			if (of_get_property(np, "flush-on-lock", NULL) ||
+			if (of_property_read_bool(np, "flush-on-lock") ||
 			    (cpu_count > 1)) {
 				powersave_nap = 0;
 				of_node_put(np);
@@ -2545,8 +2545,7 @@ done:
  */
 static void __init probe_uninorth(void)
 {
-	const u32 *addrp;
-	phys_addr_t address;
+	struct resource res;
 	unsigned long actrl;
 
 	/* Locate core99 Uni-N */
@@ -2568,18 +2567,15 @@ static void __init probe_uninorth(void)
 		return;
 	}
 
-	addrp = of_get_property(uninorth_node, "reg", NULL);
-	if (addrp == NULL)
+	if (of_address_to_resource(uninorth_node, 0, &res))
 		return;
-	address = of_translate_address(uninorth_node, addrp);
-	if (address == 0)
-		return;
-	uninorth_base = ioremap(address, 0x40000);
+
+	uninorth_base = ioremap(res.start, 0x40000);
 	if (uninorth_base == NULL)
 		return;
 	uninorth_rev = in_be32(UN_REG(UNI_N_VERSION));
 	if (uninorth_maj == 3 || uninorth_maj == 4) {
-		u3_ht_base = ioremap(address + U3_HT_CONFIG_BASE, 0x1000);
+		u3_ht_base = ioremap(res.start + U3_HT_CONFIG_BASE, 0x1000);
 		if (u3_ht_base == NULL) {
 			iounmap(uninorth_base);
 			return;
@@ -2589,7 +2585,7 @@ static void __init probe_uninorth(void)
 	printk(KERN_INFO "Found %s memory controller & host bridge"
 	       " @ 0x%08x revision: 0x%02x\n", uninorth_maj == 3 ? "U3" :
 	       uninorth_maj == 4 ? "U4" : "UniNorth",
-	       (unsigned int)address, uninorth_rev);
+	       (unsigned int)res.start, uninorth_rev);
 	printk(KERN_INFO "Mapped at 0x%08lx\n", (unsigned long)uninorth_base);
 
 	/* Set the arbitrer QAck delay according to what Apple does
@@ -2616,7 +2612,8 @@ static void __init probe_one_macio(const char *name, const char *compat, int typ
 	struct device_node*	node;
 	int			i;
 	volatile u32 __iomem	*base;
-	const u32		*addrp, *revp;
+	const __be32		*addrp;
+	const u32		*revp;
 	phys_addr_t		addr;
 	u64			size;
 

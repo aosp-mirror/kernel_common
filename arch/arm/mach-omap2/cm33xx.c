@@ -5,7 +5,7 @@
  * Copyright (C) 2011-2012 Texas Instruments Incorporated - https://www.ti.com/
  * Vaibhav Hiremath <hvaibhav@ti.com>
  *
- * Reference taken from from OMAP4 cminst44xx.c
+ * Reference taken from OMAP4 cminst44xx.c
  */
 
 #include <linux/kernel.h>
@@ -357,7 +357,7 @@ static int am33xx_clkdm_save_context(struct clockdomain *clkdm)
 }
 
 /**
- * am33xx_restore_save_context - Restore the clockdomain transition context
+ * am33xx_clkdm_restore_context - Restore the clockdomain transition context
  * @clkdm: The clockdomain pointer whose context needs to be restored
  *
  * Restore the clockdomain transition context.

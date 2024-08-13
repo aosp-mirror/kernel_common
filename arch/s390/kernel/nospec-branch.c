@@ -14,7 +14,7 @@ static int __init nobp_setup_early(char *str)
 		return rc;
 	if (enabled && test_facility(82)) {
 		/*
-		 * The user explicitely requested nobp=1, enable it and
+		 * The user explicitly requested nobp=1, enable it and
 		 * disable the expoline support.
 		 */
 		__set_facility(82, alt_stfle_fac_list);
@@ -114,10 +114,10 @@ static void __init_or_module __nospec_revert(s32 *start, s32 *end)
 			type = BRASL_EXPOLINE;	/* brasl instruction */
 		else
 			continue;
-		thunk = instr + (*(int *)(instr + 2)) * 2;
+		thunk = instr + (long)(*(int *)(instr + 2)) * 2;
 		if (thunk[0] == 0xc6 && thunk[1] == 0x00)
 			/* exrl %r0,<target-br> */
-			br = thunk + (*(int *)(thunk + 2)) * 2;
+			br = thunk + (long)(*(int *)(thunk + 2)) * 2;
 		else
 			continue;
 		if (br[0] != 0x07 || (br[1] & 0xf0) != 0xf0)

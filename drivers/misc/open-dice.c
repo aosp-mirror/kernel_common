@@ -90,19 +90,17 @@ static int open_dice_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct open_dice_drvdata *drvdata = to_open_dice_drvdata(filp);
 
-	/* Do not allow userspace to modify the underlying data. */
-	if ((vma->vm_flags & VM_WRITE) && (vma->vm_flags & VM_SHARED))
-		return -EPERM;
-
-	/* Ensure userspace cannot acquire VM_WRITE + VM_SHARED later. */
-	if (vma->vm_flags & VM_WRITE)
-		vma->vm_flags &= ~VM_MAYSHARE;
-	else if (vma->vm_flags & VM_SHARED)
-		vma->vm_flags &= ~VM_MAYWRITE;
+	if (vma->vm_flags & VM_MAYSHARE) {
+		/* Do not allow userspace to modify the underlying data. */
+		if (vma->vm_flags & VM_WRITE)
+			return -EPERM;
+		/* Ensure userspace cannot acquire VM_WRITE later. */
+		vm_flags_clear(vma, VM_MAYWRITE);
+	}
 
 	/* Create write-combine mapping so all clients observe a wipe. */
 	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-	vma->vm_flags |= VM_DONTCOPY | VM_DONTDUMP;
+	vm_flags_set(vma, VM_DONTCOPY | VM_DONTDUMP);
 	return vm_iomap_memory(vma, drvdata->rmem->base, drvdata->rmem->size);
 }
 
@@ -142,7 +140,6 @@ static int __init open_dice_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	*drvdata = (struct open_dice_drvdata){
-		.lock = __MUTEX_INITIALIZER(drvdata->lock),
 		.rmem = rmem,
 		.misc = (struct miscdevice){
 			.parent	= dev,
@@ -152,6 +149,7 @@ static int __init open_dice_probe(struct platform_device *pdev)
 			.mode	= 0600,
 		},
 	};
+	mutex_init(&drvdata->lock);
 
 	/* Index overflow check not needed, misc_register() will fail. */
 	snprintf(drvdata->name, sizeof(drvdata->name), DRIVER_NAME"%u", dev_idx++);
@@ -167,12 +165,11 @@ static int __init open_dice_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int open_dice_remove(struct platform_device *pdev)
+static void open_dice_remove(struct platform_device *pdev)
 {
 	struct open_dice_drvdata *drvdata = platform_get_drvdata(pdev);
 
 	misc_deregister(&drvdata->misc);
-	return 0;
 }
 
 static const struct of_device_id open_dice_of_match[] = {
@@ -181,7 +178,7 @@ static const struct of_device_id open_dice_of_match[] = {
 };
 
 static struct platform_driver open_dice_driver = {
-	.remove = open_dice_remove,
+	.remove_new = open_dice_remove,
 	.driver = {
 		.name = DRIVER_NAME,
 		.of_match_table = open_dice_of_match,

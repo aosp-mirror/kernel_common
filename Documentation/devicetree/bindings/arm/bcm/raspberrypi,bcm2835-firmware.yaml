@@ -30,6 +30,7 @@ properties:
 
   clocks:
     type: object
+    additionalProperties: false
 
     properties:
       compatible:
@@ -45,8 +46,33 @@ properties:
       - compatible
       - "#clock-cells"
 
+  gpio:
+    type: object
+    additionalProperties: false
+
+    properties:
+      compatible:
+        const: raspberrypi,firmware-gpio
+
+      gpio-controller: true
+
+      "#gpio-cells":
+        const: 2
+        description:
+          The first cell is the pin number, and the second cell is used to
+          specify the gpio polarity (GPIO_ACTIVE_HIGH or GPIO_ACTIVE_LOW).
+
+      gpio-line-names:
+        minItems: 8
+
+    required:
+      - compatible
+      - gpio-controller
+      - "#gpio-cells"
+
   reset:
     type: object
+    additionalProperties: false
 
     properties:
       compatible:
@@ -63,6 +89,7 @@ properties:
 
   pwm:
     type: object
+    additionalProperties: false
 
     properties:
       compatible:
@@ -75,8 +102,6 @@ properties:
     required:
       - compatible
       - "#pwm-cells"
-
-    additionalProperties: false
 
 required:
   - compatible
@@ -93,6 +118,12 @@ examples:
         firmware_clocks: clocks {
             compatible = "raspberrypi,firmware-clocks";
             #clock-cells = <1>;
+        };
+
+        expgpio: gpio {
+            compatible = "raspberrypi,firmware-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
         };
 
         reset: reset {

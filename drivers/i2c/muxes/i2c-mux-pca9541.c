@@ -314,7 +314,7 @@ static int pca9541_probe(struct i2c_client *client)
 
 	i2c_set_clientdata(client, muxc);
 
-	ret = i2c_mux_add_adapter(muxc, 0, 0, 0);
+	ret = i2c_mux_add_adapter(muxc, 0, 0);
 	if (ret)
 		return ret;
 
@@ -336,7 +336,7 @@ static struct i2c_driver pca9541_driver = {
 		   .name = "pca9541",
 		   .of_match_table = of_match_ptr(pca9541_of_match),
 		   },
-	.probe_new = pca9541_probe,
+	.probe = pca9541_probe,
 	.remove = pca9541_remove,
 	.id_table = pca9541_id,
 };

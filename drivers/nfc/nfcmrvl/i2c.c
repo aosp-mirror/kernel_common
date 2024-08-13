@@ -168,7 +168,7 @@ static int nfcmrvl_i2c_parse_dt(struct device_node *node,
 		return ret;
 	}
 
-	if (of_find_property(node, "i2c-int-falling", NULL))
+	if (of_property_read_bool(node, "i2c-int-falling"))
 		pdata->irq_polarity = IRQF_TRIGGER_FALLING;
 	else
 		pdata->irq_polarity = IRQF_TRIGGER_RISING;
@@ -258,7 +258,7 @@ static const struct i2c_device_id nfcmrvl_i2c_id_table[] = {
 MODULE_DEVICE_TABLE(i2c, nfcmrvl_i2c_id_table);
 
 static struct i2c_driver nfcmrvl_i2c_driver = {
-	.probe_new = nfcmrvl_i2c_probe,
+	.probe = nfcmrvl_i2c_probe,
 	.id_table = nfcmrvl_i2c_id_table,
 	.remove = nfcmrvl_i2c_remove,
 	.driver = {

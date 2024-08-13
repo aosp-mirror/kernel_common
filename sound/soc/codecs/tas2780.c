@@ -39,7 +39,7 @@ static void tas2780_reset(struct tas2780_priv *tas2780)
 		usleep_range(2000, 2050);
 	}
 
-	snd_soc_component_write(tas2780->component, TAS2780_SW_RST,
+	ret = snd_soc_component_write(tas2780->component, TAS2780_SW_RST,
 				TAS2780_RST);
 	if (ret)
 		dev_err(tas2780->dev, "%s:errCode:0x%x Reset error!\n",
@@ -71,7 +71,7 @@ static int tas2780_codec_resume(struct snd_soc_component *component)
 {
 	struct tas2780_priv *tas2780 =
 		snd_soc_component_get_drvdata(component);
-	int ret = 0;
+	int ret;
 
 	ret = snd_soc_component_update_bits(component, TAS2780_PWR_CTRL,
 		TAS2780_PWR_CTRL_MASK, TAS2780_PWR_CTRL_ACTIVE);
@@ -81,7 +81,6 @@ static int tas2780_codec_resume(struct snd_soc_component *component)
 			__func__, ret);
 		goto err;
 	}
-	ret = 0;
 	regcache_cache_only(tas2780->regmap, false);
 	ret = regcache_sync(tas2780->regmap);
 err:
@@ -627,7 +626,7 @@ static int tas2780_i2c_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id tas2780_i2c_id[] = {
-	{ "tas2780", 0},
+	{ "tas2780"},
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, tas2780_i2c_id);
@@ -645,7 +644,7 @@ static struct i2c_driver tas2780_i2c_driver = {
 		.name   = "tas2780",
 		.of_match_table = of_match_ptr(tas2780_of_match),
 	},
-	.probe_new  = tas2780_i2c_probe,
+	.probe      = tas2780_i2c_probe,
 	.id_table   = tas2780_i2c_id,
 };
 module_i2c_driver(tas2780_i2c_driver);

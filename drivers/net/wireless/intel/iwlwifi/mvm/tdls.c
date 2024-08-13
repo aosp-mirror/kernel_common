@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2014 Intel Mobile Communications GmbH
  * Copyright (C) 2017 Intel Deutschland GmbH
- * Copyright (C) 2018-2020, 2022 Intel Corporation
+ * Copyright (C) 2018-2020, 2022-2023 Intel Corporation
  */
 #include <linux/etherdevice.h>
 #include "mvm.h"
@@ -144,7 +144,8 @@ void iwl_mvm_recalc_tdls_state(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 }
 
 void iwl_mvm_mac_mgd_protect_tdls_discover(struct ieee80211_hw *hw,
-					   struct ieee80211_vif *vif)
+					   struct ieee80211_vif *vif,
+					   unsigned int link_id)
 {
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 	u32 duration = 2 * vif->bss_conf.dtim_period * vif->bss_conf.beacon_int;
@@ -154,7 +155,7 @@ void iwl_mvm_mac_mgd_protect_tdls_discover(struct ieee80211_hw *hw,
 	if (fw_has_capa(&mvm->fw->ucode_capa,
 			IWL_UCODE_TLV_CAPA_SESSION_PROT_CMD))
 		iwl_mvm_schedule_session_protection(mvm, vif, duration,
-						    duration, true);
+						    duration, true, link_id);
 	else
 		iwl_mvm_protect_session(mvm, vif, duration,
 					duration, 100, true);
@@ -369,7 +370,7 @@ iwl_mvm_tdls_config_channel_switch(struct iwl_mvm *mvm,
 		goto out;
 	}
 	mvmsta = iwl_mvm_sta_from_mac80211(sta);
-	cmd.peer_sta_id = cpu_to_le32(mvmsta->sta_id);
+	cmd.peer_sta_id = cpu_to_le32(mvmsta->deflink.sta_id);
 
 	if (!chandef) {
 		if (mvm->tdls_cs.state == IWL_MVM_TDLS_SW_REQ_SENT &&
@@ -414,7 +415,7 @@ iwl_mvm_tdls_config_channel_switch(struct iwl_mvm *mvm,
 	}
 
 	iwl_mvm_set_tx_cmd(mvm, skb, &tail->frame.tx_cmd, info,
-			   mvmsta->sta_id);
+			   mvmsta->deflink.sta_id);
 
 	iwl_mvm_set_tx_cmd_rate(mvm, &tail->frame.tx_cmd, info, sta,
 				hdr->frame_control);
@@ -431,7 +432,7 @@ iwl_mvm_tdls_config_channel_switch(struct iwl_mvm *mvm,
 
 	/* channel switch has started, update state */
 	if (type != TDLS_MOVE_CH) {
-		mvm->tdls_cs.cur_sta_id = mvmsta->sta_id;
+		mvm->tdls_cs.cur_sta_id = mvmsta->deflink.sta_id;
 		iwl_mvm_tdls_update_cs_state(mvm,
 					     type == TDLS_SEND_CHAN_SW_REQ ?
 					     IWL_MVM_TDLS_SW_REQ_SENT :
@@ -541,7 +542,7 @@ iwl_mvm_tdls_channel_switch(struct ieee80211_hw *hw,
 	}
 
 	mvmsta = iwl_mvm_sta_from_mac80211(sta);
-	mvm->tdls_cs.peer.sta_id = mvmsta->sta_id;
+	mvm->tdls_cs.peer.sta_id = mvmsta->deflink.sta_id;
 	mvm->tdls_cs.peer.chandef = *chandef;
 	mvm->tdls_cs.peer.initiator = sta->tdls_initiator;
 	mvm->tdls_cs.peer.op_class = oper_class;

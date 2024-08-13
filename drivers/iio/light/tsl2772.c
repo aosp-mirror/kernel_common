@@ -601,6 +601,7 @@ static int tsl2772_read_prox_diodes(struct tsl2772_chip *chip)
 			return -EINVAL;
 		}
 	}
+	chip->settings.prox_diode = prox_diode_mask;
 
 	return 0;
 }
@@ -1931,7 +1932,7 @@ static struct i2c_driver tsl2772_driver = {
 		.pm = &tsl2772_pm_ops,
 	},
 	.id_table = tsl2772_idtable,
-	.probe_new = tsl2772_probe,
+	.probe = tsl2772_probe,
 };
 
 module_i2c_driver(tsl2772_driver);

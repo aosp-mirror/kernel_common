@@ -20,9 +20,40 @@
 #define MAX_ELEMENTS 8
 #define MSG_QUEUE_SIZE 128
 
+#define VCHIQ_DRV_MAX_CALLBACKS 10
+
+struct rpi_firmware;
+struct vchiq_device;
+
 enum USE_TYPE_E {
 	USE_TYPE_SERVICE,
 	USE_TYPE_VCHIQ
+};
+
+struct vchiq_platform_info {
+	unsigned int cache_line_size;
+};
+
+struct vchiq_drv_mgmt {
+	struct rpi_firmware *fw;
+	const struct vchiq_platform_info *info;
+
+	bool connected;
+	int num_deferred_callbacks;
+	/* Protects connected and num_deferred_callbacks */
+	struct mutex connected_mutex;
+
+	void (*deferred_callback[VCHIQ_DRV_MAX_CALLBACKS])(void);
+
+	struct semaphore free_fragments_sema;
+	struct semaphore free_fragments_mutex;
+	char *fragments_base;
+	char *free_fragments;
+	unsigned int fragments_size;
+
+	void __iomem *regs;
+
+	struct vchiq_state state;
 };
 
 struct user_service {
@@ -69,29 +100,13 @@ struct vchiq_instance {
 	struct vchiq_debugfs_node debugfs_node;
 };
 
-struct dump_context {
-	char __user *buf;
-	size_t actual;
-	size_t space;
-	loff_t offset;
-};
-
-extern int vchiq_arm_log_level;
-extern int vchiq_susp_log_level;
-
-extern spinlock_t msg_queue_spinlock;
-extern struct vchiq_state g_state;
-
-extern struct vchiq_state *
-vchiq_get_state(void);
-
-enum vchiq_status
+int
 vchiq_use_service(struct vchiq_instance *instance, unsigned int handle);
 
-extern enum vchiq_status
+extern int
 vchiq_release_service(struct vchiq_instance *instance, unsigned int handle);
 
-extern enum vchiq_status
+extern int
 vchiq_check_service(struct vchiq_service *service);
 
 extern void
@@ -122,6 +137,10 @@ vchiq_instance_get_trace(struct vchiq_instance *instance);
 extern void
 vchiq_instance_set_trace(struct vchiq_instance *instance, int trace);
 
+extern void
+vchiq_add_connected_callback(struct vchiq_device *device,
+			     void (*callback)(void));
+
 #if IS_ENABLED(CONFIG_VCHIQ_CDEV)
 
 extern void
@@ -137,7 +156,7 @@ static inline int vchiq_register_chrdev(struct device *parent) { return 0; }
 
 #endif /* IS_ENABLED(CONFIG_VCHIQ_CDEV) */
 
-extern enum vchiq_status
+extern int
 service_callback(struct vchiq_instance *vchiq_instance, enum vchiq_reason reason,
 		 struct vchiq_header *header, unsigned int handle, void *bulk_userdata);
 

@@ -14,6 +14,7 @@
 #include <linux/err.h>
 #include <linux/gfp.h>
 #include <linux/hwmon.h>
+#include <linux/i2c.h>
 #include <linux/idr.h>
 #include <linux/kstrtox.h>
 #include <linux/list.h>
@@ -136,9 +137,8 @@ static void hwmon_dev_release(struct device *dev)
 	kfree(hwdev);
 }
 
-static struct class hwmon_class = {
+static const struct class hwmon_class = {
 	.name = "hwmon",
-	.owner = THIS_MODULE,
 	.dev_groups = hwmon_dev_attr_groups,
 	.dev_release = hwmon_dev_release,
 };
@@ -154,7 +154,7 @@ static DEFINE_IDA(hwmon_ida);
 #ifdef CONFIG_THERMAL_OF
 static int hwmon_thermal_get_temp(struct thermal_zone_device *tz, int *temp)
 {
-	struct hwmon_thermal_data *tdata = tz->devdata;
+	struct hwmon_thermal_data *tdata = thermal_zone_device_priv(tz);
 	struct hwmon_device *hwdev = to_hwmon_device(tdata->dev);
 	int ret;
 	long t;
@@ -171,10 +171,10 @@ static int hwmon_thermal_get_temp(struct thermal_zone_device *tz, int *temp)
 
 static int hwmon_thermal_set_trips(struct thermal_zone_device *tz, int low, int high)
 {
-	struct hwmon_thermal_data *tdata = tz->devdata;
+	struct hwmon_thermal_data *tdata = thermal_zone_device_priv(tz);
 	struct hwmon_device *hwdev = to_hwmon_device(tdata->dev);
 	const struct hwmon_chip_info *chip = hwdev->chip;
-	const struct hwmon_channel_info **info = chip->info;
+	const struct hwmon_channel_info * const *info = chip->info;
 	unsigned int i;
 	int err;
 
@@ -253,7 +253,7 @@ static int hwmon_thermal_register_sensors(struct device *dev)
 {
 	struct hwmon_device *hwdev = to_hwmon_device(dev);
 	const struct hwmon_chip_info *chip = hwdev->chip;
-	const struct hwmon_channel_info **info = chip->info;
+	const struct hwmon_channel_info * const *info = chip->info;
 	void *drvdata = dev_get_drvdata(dev);
 	int i;
 
@@ -309,6 +309,114 @@ static int hwmon_attr_base(enum hwmon_sensor_types type)
 		return 0;
 	return 1;
 }
+
+#if IS_REACHABLE(CONFIG_I2C)
+
+/*
+ * PEC support
+ *
+ * The 'pec' attribute is attached to I2C client devices. It is only provided
+ * if the i2c controller supports PEC.
+ *
+ * The mutex ensures that PEC configuration between i2c device and the hardware
+ * is consistent. Use a single mutex because attribute writes are supposed to be
+ * rare, and maintaining a separate mutex for each hardware monitoring device
+ * would add substantial complexity to the driver for little if any gain.
+ *
+ * The hardware monitoring device is identified as child of the i2c client
+ * device. This assumes that only a single hardware monitoring device is
+ * attached to an i2c client device.
+ */
+
+static DEFINE_MUTEX(hwmon_pec_mutex);
+
+static int hwmon_match_device(struct device *dev, void *data)
+{
+	return dev->class == &hwmon_class;
+}
+
+static ssize_t pec_show(struct device *dev, struct device_attribute *dummy,
+			char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+
+	return sysfs_emit(buf, "%d\n", !!(client->flags & I2C_CLIENT_PEC));
+}
+
+static ssize_t pec_store(struct device *dev, struct device_attribute *devattr,
+			 const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct hwmon_device *hwdev;
+	struct device *hdev;
+	bool val;
+	int err;
+
+	err = kstrtobool(buf, &val);
+	if (err < 0)
+		return err;
+
+	hdev = device_find_child(dev, NULL, hwmon_match_device);
+	if (!hdev)
+		return -ENODEV;
+
+	mutex_lock(&hwmon_pec_mutex);
+
+	/*
+	 * If there is no write function, we assume that chip specific
+	 * handling is not required.
+	 */
+	hwdev = to_hwmon_device(hdev);
+	if (hwdev->chip->ops->write) {
+		err = hwdev->chip->ops->write(hdev, hwmon_chip, hwmon_chip_pec, 0, val);
+		if (err && err != -EOPNOTSUPP)
+			goto unlock;
+	}
+
+	if (!val)
+		client->flags &= ~I2C_CLIENT_PEC;
+	else
+		client->flags |= I2C_CLIENT_PEC;
+
+	err = count;
+unlock:
+	mutex_unlock(&hwmon_pec_mutex);
+	put_device(hdev);
+
+	return err;
+}
+
+static DEVICE_ATTR_RW(pec);
+
+static void hwmon_remove_pec(void *dev)
+{
+	device_remove_file(dev, &dev_attr_pec);
+}
+
+static int hwmon_pec_register(struct device *hdev)
+{
+	struct i2c_client *client = i2c_verify_client(hdev->parent);
+	int err;
+
+	if (!client)
+		return -EINVAL;
+
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_PEC))
+		return 0;
+
+	err = device_create_file(&client->dev, &dev_attr_pec);
+	if (err)
+		return err;
+
+	return devm_add_action_or_reset(hdev, hwmon_remove_pec, &client->dev);
+}
+
+#else /* CONFIG_I2C */
+static int hwmon_pec_register(struct device *hdev)
+{
+	return -EINVAL;
+}
+#endif /* CONFIG_I2C */
 
 /* sysfs attribute management */
 
@@ -398,10 +506,6 @@ static struct attribute *hwmon_genattr(const void *drvdata,
 	const char *name;
 	bool is_string = is_string_attr(type, attr);
 
-	/* The attribute is invisible if there is no template string */
-	if (!template)
-		return ERR_PTR(-ENOENT);
-
 	mode = ops->is_visible(drvdata, type, attr, index);
 	if (!mode)
 		return ERR_PTR(-ENOENT);
@@ -457,6 +561,7 @@ static const char * const hwmon_chip_attrs[] = {
 	[hwmon_chip_in_samples] = "in_samples",
 	[hwmon_chip_power_samples] = "power_samples",
 	[hwmon_chip_temp_samples] = "temp_samples",
+	[hwmon_chip_beep_enable] = "beep_enable",
 };
 
 static const char * const hwmon_temp_attr_templates[] = {
@@ -487,6 +592,7 @@ static const char * const hwmon_temp_attr_templates[] = {
 	[hwmon_temp_reset_history] = "temp%d_reset_history",
 	[hwmon_temp_rated_min] = "temp%d_rated_min",
 	[hwmon_temp_rated_max] = "temp%d_rated_max",
+	[hwmon_temp_beep] = "temp%d_beep",
 };
 
 static const char * const hwmon_in_attr_templates[] = {
@@ -508,6 +614,8 @@ static const char * const hwmon_in_attr_templates[] = {
 	[hwmon_in_crit_alarm] = "in%d_crit_alarm",
 	[hwmon_in_rated_min] = "in%d_rated_min",
 	[hwmon_in_rated_max] = "in%d_rated_max",
+	[hwmon_in_beep] = "in%d_beep",
+	[hwmon_in_fault] = "in%d_fault",
 };
 
 static const char * const hwmon_curr_attr_templates[] = {
@@ -529,6 +637,7 @@ static const char * const hwmon_curr_attr_templates[] = {
 	[hwmon_curr_crit_alarm] = "curr%d_crit_alarm",
 	[hwmon_curr_rated_min] = "curr%d_rated_min",
 	[hwmon_curr_rated_max] = "curr%d_rated_max",
+	[hwmon_curr_beep] = "curr%d_beep",
 };
 
 static const char * const hwmon_power_attr_templates[] = {
@@ -583,6 +692,8 @@ static const char * const hwmon_humidity_attr_templates[] = {
 	[hwmon_humidity_fault] = "humidity%d_fault",
 	[hwmon_humidity_rated_min] = "humidity%d_rated_min",
 	[hwmon_humidity_rated_max] = "humidity%d_rated_max",
+	[hwmon_humidity_min_alarm] = "humidity%d_min_alarm",
+	[hwmon_humidity_max_alarm] = "humidity%d_max_alarm",
 };
 
 static const char * const hwmon_fan_attr_templates[] = {
@@ -598,6 +709,7 @@ static const char * const hwmon_fan_attr_templates[] = {
 	[hwmon_fan_min_alarm] = "fan%d_min_alarm",
 	[hwmon_fan_max_alarm] = "fan%d_max_alarm",
 	[hwmon_fan_fault] = "fan%d_fault",
+	[hwmon_fan_beep] = "fan%d_beep",
 };
 
 static const char * const hwmon_pwm_attr_templates[] = {
@@ -705,8 +817,8 @@ static int hwmon_genattrs(const void *drvdata,
 
 			attr = __ffs(attr_mask);
 			attr_mask &= ~BIT(attr);
-			if (attr >= template_size)
-				return -EINVAL;
+			if (attr >= template_size || !templates[attr])
+				continue;	/* attribute is invisible */
 			a = hwmon_genattr(drvdata, info->type, attr, i,
 					  templates[attr], ops);
 			if (IS_ERR(a)) {
@@ -757,6 +869,7 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
 	struct hwmon_device *hwdev;
 	const char *label;
 	struct device *hdev;
+	struct device *tdev = dev;
 	int i, err, id;
 
 	/* Complain about invalid characters in hwmon name attribute */
@@ -826,7 +939,9 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
 	hwdev->name = name;
 	hdev->class = &hwmon_class;
 	hdev->parent = dev;
-	hdev->of_node = dev ? dev->of_node : NULL;
+	while (tdev && !tdev->of_node)
+		tdev = tdev->parent;
+	hdev->of_node = tdev ? tdev->of_node : NULL;
 	hwdev->chip = chip;
 	dev_set_drvdata(hdev, drvdata);
 	dev_set_name(hdev, HWMON_ID_FORMAT, id);
@@ -838,17 +953,27 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
 
 	INIT_LIST_HEAD(&hwdev->tzdata);
 
-	if (dev && dev->of_node && chip && chip->ops->read &&
-	    chip->info[0]->type == hwmon_chip &&
-	    (chip->info[0]->config[0] & HWMON_C_REGISTER_TZ)) {
-		err = hwmon_thermal_register_sensors(hdev);
-		if (err) {
-			device_unregister(hdev);
-			/*
-			 * Don't worry about hwdev; hwmon_dev_release(), called
-			 * from device_unregister(), will free it.
-			 */
-			goto ida_remove;
+	if (hdev->of_node && chip && chip->ops->read &&
+	    chip->info[0]->type == hwmon_chip) {
+		u32 config = chip->info[0]->config[0];
+
+		if (config & HWMON_C_REGISTER_TZ) {
+			err = hwmon_thermal_register_sensors(hdev);
+			if (err) {
+				device_unregister(hdev);
+				/*
+				 * Don't worry about hwdev; hwmon_dev_release(),
+				 * called from device_unregister(), will free it.
+				 */
+				goto ida_remove;
+			}
+		}
+		if (config & HWMON_C_PEC) {
+			err = hwmon_pec_register(hdev);
+			if (err) {
+				device_unregister(hdev);
+				goto ida_remove;
+			}
 		}
 	}
 
@@ -1027,7 +1152,7 @@ EXPORT_SYMBOL_GPL(devm_hwmon_device_register_with_groups);
  * @name:	hwmon name attribute
  * @drvdata:	driver data to attach to created device
  * @chip:	pointer to hwmon chip information
- * @groups:	pointer to list of driver specific attribute groups
+ * @extra_groups: pointer to list of driver specific attribute groups
  *
  * Returns the pointer to the new device. The new device is automatically
  * unregistered with the parent device.
@@ -1036,7 +1161,7 @@ struct device *
 devm_hwmon_device_register_with_info(struct device *dev, const char *name,
 				     void *drvdata,
 				     const struct hwmon_chip_info *chip,
-				     const struct attribute_group **groups)
+				     const struct attribute_group **extra_groups)
 {
 	struct device **ptr, *hwdev;
 
@@ -1048,7 +1173,7 @@ devm_hwmon_device_register_with_info(struct device *dev, const char *name,
 		return ERR_PTR(-ENOMEM);
 
 	hwdev = hwmon_device_register_with_info(dev, name, drvdata, chip,
-						groups);
+						extra_groups);
 	if (IS_ERR(hwdev))
 		goto error;
 

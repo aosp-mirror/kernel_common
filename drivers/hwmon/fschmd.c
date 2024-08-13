@@ -241,7 +241,7 @@ static struct i2c_driver fschmd_driver = {
 	.driver = {
 		.name	= "fschmd",
 	},
-	.probe_new	= fschmd_probe,
+	.probe		= fschmd_probe,
 	.remove		= fschmd_remove,
 	.id_table	= fschmd_id,
 	.detect		= fschmd_detect,
@@ -1087,7 +1087,7 @@ static int fschmd_probe(struct i2c_client *client)
 				"Heracles", "Heimdall", "Hades", "Syleus" };
 	static const int watchdog_minors[] = { WATCHDOG_MINOR, 212, 213, 214, 215 };
 	int i, err;
-	enum chips kind = i2c_match_id(fschmd_id, client)->driver_data;
+	enum chips kind = (uintptr_t)i2c_get_match_data(client);
 
 	data = kzalloc(sizeof(struct fschmd_data), GFP_KERNEL);
 	if (!data)

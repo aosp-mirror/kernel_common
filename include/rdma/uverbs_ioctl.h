@@ -436,8 +436,10 @@ struct uapi_definition {
 	},								       \
 		##__VA_ARGS__
 #define UAPI_DEF_CHAIN_OBJ_TREE_NAMED(_object_enum, ...)                       \
-	UAPI_DEF_CHAIN_OBJ_TREE(_object_enum, &UVERBS_OBJECT(_object_enum),    \
-				##__VA_ARGS__)
+	UAPI_DEF_CHAIN_OBJ_TREE(_object_enum,				       \
+		PTR_IF(IS_ENABLED(CONFIG_INFINIBAND_USER_ACCESS),	       \
+		       &UVERBS_OBJECT(_object_enum)),			       \
+		##__VA_ARGS__)
 
 /*
  * =======================================
@@ -627,12 +629,14 @@ struct uverbs_attr {
 };
 
 struct uverbs_attr_bundle {
-	struct ib_udata driver_udata;
-	struct ib_udata ucore;
-	struct ib_uverbs_file *ufile;
-	struct ib_ucontext *context;
-	struct ib_uobject *uobject;
-	DECLARE_BITMAP(attr_present, UVERBS_API_ATTR_BKEY_LEN);
+	struct_group_tagged(uverbs_attr_bundle_hdr, hdr,
+		struct ib_udata driver_udata;
+		struct ib_udata ucore;
+		struct ib_uverbs_file *ufile;
+		struct ib_ucontext *context;
+		struct ib_uobject *uobject;
+		DECLARE_BITMAP(attr_present, UVERBS_API_ATTR_BKEY_LEN);
+	);
 	struct uverbs_attr attrs[];
 };
 

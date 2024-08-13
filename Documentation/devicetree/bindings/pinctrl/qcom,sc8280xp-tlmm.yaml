@@ -22,20 +22,10 @@ properties:
   reg:
     maxItems: 1
 
-  interrupts: true
-  interrupt-controller: true
-  "#interrupt-cells": true
-  gpio-controller: true
+  interrupts:
+    maxItems: 1
+
   gpio-reserved-ranges: true
-  "#gpio-cells": true
-  gpio-ranges: true
-  wakeup-parent: true
-
-required:
-  - compatible
-  - reg
-
-additionalProperties: false
 
 patternProperties:
   "-state$":
@@ -53,6 +43,7 @@ $defs:
       Pinctrl node's client devices use subnodes for desired pin configuration.
       Client device subnodes use below standard properties.
     $ref: qcom,tlmm-common.yaml#/$defs/qcom-tlmm-state
+    unevaluatedProperties: false
 
     properties:
       pins:
@@ -102,18 +93,14 @@ $defs:
                 usb1_phy, usb1_sbrx, usb1_sbtx, usb1_usb4, usb2phy_ac,
                 vsense_trigger ]
 
-      bias-disable: true
-      bias-pull-down: true
-      bias-pull-up: true
-      drive-strength: true
-      input-enable: true
-      output-high: true
-      output-low: true
-
     required:
       - pins
 
-    additionalProperties: false
+required:
+  - compatible
+  - reg
+
+unevaluatedProperties: false
 
 examples:
   - |

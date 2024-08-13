@@ -507,7 +507,7 @@ static void fuel_gauge_external_power_changed(struct power_supply *psy)
 	mutex_lock(&info->lock);
 	info->valid = 0; /* Force updating of the cached registers */
 	mutex_unlock(&info->lock);
-	power_supply_changed(info->bat);
+	power_supply_changed(psy);
 }
 
 static struct power_supply_desc fuel_gauge_desc = {
@@ -550,18 +550,20 @@ static const struct dmi_system_id axp288_quirks[] = {
 		.driver_data = (void *)AXP288_QUIRK_NO_BATTERY,
 	},
 	{
-		/* Intel Cherry Trail Compute Stick, Windows version */
+		/* Intel Bay Trail Compute Stick */
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Intel"),
-			DMI_MATCH(DMI_PRODUCT_NAME, "STK1AW32SC"),
+			/* Partial match for STCK1A32WFC STCK1A32FC, STCK1A8LFC variants */
+			DMI_MATCH(DMI_PRODUCT_NAME, "STCK1A"),
 		},
 		.driver_data = (void *)AXP288_QUIRK_NO_BATTERY,
 	},
 	{
-		/* Intel Cherry Trail Compute Stick, version without an OS */
+		/* Intel Cherry Trail Compute Stick */
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Intel"),
-			DMI_MATCH(DMI_PRODUCT_NAME, "STK1A32SC"),
+			/* Partial match for STK1AW32SC and STK1A32SC variants */
+			DMI_MATCH(DMI_PRODUCT_NAME, "STK1A"),
 		},
 		.driver_data = (void *)AXP288_QUIRK_NO_BATTERY,
 	},
@@ -598,6 +600,14 @@ static const struct dmi_system_id axp288_quirks[] = {
 			DMI_MATCH(DMI_BIOS_DATE, "06/14/2018"),
 		},
 		.driver_data = NULL,
+	},
+	{
+		/* Radxa ROCK Pi X Single Board Computer */
+		.matches = {
+			DMI_MATCH(DMI_BOARD_NAME, "ROCK Pi X"),
+			DMI_MATCH(DMI_BOARD_VENDOR, "Radxa"),
+		},
+		.driver_data = (void *)AXP288_QUIRK_NO_BATTERY,
 	},
 	{
 		/*
@@ -724,6 +734,8 @@ static int axp288_fuel_gauge_probe(struct platform_device *pdev)
 
 	for (i = 0; i < AXP288_FG_INTR_NUM; i++) {
 		pirq = platform_get_irq(pdev, i);
+		if (pirq < 0)
+			continue;
 		ret = regmap_irq_get_virq(axp20x->regmap_irqc, pirq);
 		if (ret < 0)
 			return dev_err_probe(dev, ret, "getting vIRQ %d\n", pirq);

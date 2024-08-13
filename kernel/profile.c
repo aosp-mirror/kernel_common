@@ -136,6 +136,59 @@ int __ref profile_init(void)
 	return -ENOMEM;
 }
 
+/* Profile event notifications */
+
+static BLOCKING_NOTIFIER_HEAD(task_exit_notifier);
+static BLOCKING_NOTIFIER_HEAD(munmap_notifier);
+
+void profile_task_exit(struct task_struct *task)
+{
+	blocking_notifier_call_chain(&task_exit_notifier, 0, task);
+}
+
+void profile_munmap(unsigned long addr)
+{
+	blocking_notifier_call_chain(&munmap_notifier, 0, (void *)addr);
+}
+
+int profile_event_register(enum profile_type type, struct notifier_block *n)
+{
+	int err = -EINVAL;
+
+	switch (type) {
+	case PROFILE_TASK_EXIT:
+		err = blocking_notifier_chain_register(
+				&task_exit_notifier, n);
+		break;
+	case PROFILE_MUNMAP:
+		err = blocking_notifier_chain_register(
+				&munmap_notifier, n);
+		break;
+	}
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(profile_event_register);
+
+int profile_event_unregister(enum profile_type type, struct notifier_block *n)
+{
+	int err = -EINVAL;
+
+	switch (type) {
+	case PROFILE_TASK_EXIT:
+		err = blocking_notifier_chain_unregister(
+				&task_exit_notifier, n);
+		break;
+	case PROFILE_MUNMAP:
+		err = blocking_notifier_chain_unregister(
+				&munmap_notifier, n);
+		break;
+	}
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(profile_event_unregister);
+
 #if defined(CONFIG_SMP) && defined(CONFIG_PROC_FS)
 /*
  * Each cpu has a pair of open-addressed hashtables for pending
@@ -343,49 +396,6 @@ void profile_tick(int type)
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
-
-static int prof_cpu_mask_proc_show(struct seq_file *m, void *v)
-{
-	seq_printf(m, "%*pb\n", cpumask_pr_args(prof_cpu_mask));
-	return 0;
-}
-
-static int prof_cpu_mask_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, prof_cpu_mask_proc_show, NULL);
-}
-
-static ssize_t prof_cpu_mask_proc_write(struct file *file,
-	const char __user *buffer, size_t count, loff_t *pos)
-{
-	cpumask_var_t new_value;
-	int err;
-
-	if (!zalloc_cpumask_var(&new_value, GFP_KERNEL))
-		return -ENOMEM;
-
-	err = cpumask_parse_user(buffer, count, new_value);
-	if (!err) {
-		cpumask_copy(prof_cpu_mask, new_value);
-		err = count;
-	}
-	free_cpumask_var(new_value);
-	return err;
-}
-
-static const struct proc_ops prof_cpu_mask_proc_ops = {
-	.proc_open	= prof_cpu_mask_proc_open,
-	.proc_read	= seq_read,
-	.proc_lseek	= seq_lseek,
-	.proc_release	= single_release,
-	.proc_write	= prof_cpu_mask_proc_write,
-};
-
-void create_prof_cpu_mask(void)
-{
-	/* create /proc/irq/prof_cpu_mask */
-	proc_create("irq/prof_cpu_mask", 0600, NULL, &prof_cpu_mask_proc_ops);
-}
 
 /*
  * This function accesses profiling information. The returned data is

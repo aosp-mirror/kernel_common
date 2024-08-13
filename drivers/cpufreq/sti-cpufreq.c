@@ -13,12 +13,12 @@
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_platform.h>
+#include <linux/platform_device.h>
 #include <linux/pm_opp.h>
 #include <linux/regmap.h>
 
 #define VERSION_ELEMENTS	3
-#define MAX_PCODE_NAME_LEN	7
+#define MAX_PCODE_NAME_LEN	16
 
 #define VERSION_SHIFT		28
 #define HW_INFO_INDEX		1
@@ -293,6 +293,7 @@ module_init(sti_cpufreq_init);
 static const struct of_device_id __maybe_unused sti_cpufreq_of_match[] = {
 	{ .compatible = "st,stih407" },
 	{ .compatible = "st,stih410" },
+	{ .compatible = "st,stih418" },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, sti_cpufreq_of_match);

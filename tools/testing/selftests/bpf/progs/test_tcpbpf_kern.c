@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
-#include <stddef.h>
-#include <string.h>
-#include <netinet/in.h>
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/types.h>
-#include <linux/socket.h>
-#include <linux/tcp.h>
+#include "bpf_tracing_net.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-#include "bpf_tcp_helpers.h"
 #include "test_tcpbpf.h"
 
 struct tcpbpf_globals global = {};
@@ -46,8 +35,6 @@ int bpf_testcb(struct bpf_sock_ops *skops)
 	struct bpf_sock_ops *reuse = skops;
 	struct tcphdr *thdr;
 	int window_clamp = 9216;
-	int good_call_rv = 0;
-	int bad_call_rv = 0;
 	int save_syn = 1;
 	int rv = -1;
 	int v = 0;
@@ -61,7 +48,7 @@ int bpf_testcb(struct bpf_sock_ops *skops)
 
 	asm volatile (
 		"%[op] = *(u32 *)(%[skops] +96)"
-		: [op] "+r"(op)
+		: [op] "=r"(op)
 		: [skops] "r"(skops)
 		:);
 

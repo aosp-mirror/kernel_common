@@ -975,8 +975,8 @@ static int lm87_probe(struct i2c_client *client)
  */
 
 static const struct i2c_device_id lm87_id[] = {
-	{ "lm87", 0 },
-	{ "adm1024", 0 },
+	{ "lm87" },
+	{ "adm1024" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, lm87_id);
@@ -994,7 +994,7 @@ static struct i2c_driver lm87_driver = {
 		.name	= "lm87",
 		.of_match_table = lm87_of_match,
 	},
-	.probe_new	= lm87_probe,
+	.probe		= lm87_probe,
 	.id_table	= lm87_id,
 	.detect		= lm87_detect,
 	.address_list	= normal_i2c,

@@ -558,6 +558,18 @@ static enum mitigation_state spectre_v4_enable_hw_mitigation(void)
 
 	/* SCTLR_EL1.DSSBS was initialised to 0 during boot */
 	set_pstate_ssbs(0);
+
+	/*
+	 * SSBS is self-synchronizing and is intended to affect subsequent
+	 * speculative instructions, but some CPUs can speculate with a stale
+	 * value of SSBS.
+	 *
+	 * Mitigate this with an unconditional speculation barrier, as CPUs
+	 * could mis-speculate branches and bypass a conditional barrier.
+	 */
+	if (IS_ENABLED(CONFIG_ARM64_ERRATUM_3194386))
+		spec_bar();
+
 	return SPECTRE_MITIGATED;
 }
 
@@ -966,16 +978,13 @@ static void this_cpu_set_vectors(enum arm64_bp_harden_el1_vectors slot)
 {
 	const char *v = arm64_get_bp_hardening_vector(slot);
 
-	if (slot < 0)
-		return;
-
 	__this_cpu_write(this_cpu_vector, v);
 
 	/*
 	 * When KPTI is in use, the vectors are switched when exiting to
 	 * user-space.
 	 */
-	if (arm64_kernel_unmapped_at_el0())
+	if (cpus_have_cap(ARM64_UNMAP_KERNEL_AT_EL0))
 		return;
 
 	write_sysreg(v, vbar_el1);

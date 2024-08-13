@@ -43,13 +43,16 @@ properties:
       Clocks driving the watchdog timer hardware. The first clock is used
       for the actual watchdog counter. The second clock drives the register
       interface.
-    minItems: 2
     maxItems: 2
 
   clock-names:
     items:
       - const: wdog_clk
       - const: apb_pclk
+
+  resets:
+    maxItems: 1
+    description: WDOGRESn input reset signal for sp805 module.
 
 required:
   - compatible
@@ -68,4 +71,5 @@ examples:
         interrupts = <GIC_SPI 406 IRQ_TYPE_LEVEL_HIGH>;
         clocks = <&wdt_clk>, <&apb_pclk>;
         clock-names = "wdog_clk", "apb_pclk";
+        resets = <&wdt_rst>;
     };

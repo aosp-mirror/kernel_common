@@ -134,7 +134,7 @@ static const struct regmap_config isl9305_regmap = {
 	.val_bits = 8,
 
 	.max_register = ISL9305_MAX_REG,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 };
 
 static int isl9305_i2c_probe(struct i2c_client *i2c)
@@ -195,9 +195,10 @@ MODULE_DEVICE_TABLE(i2c, isl9305_i2c_id);
 static struct i2c_driver isl9305_regulator_driver = {
 	.driver = {
 		.name = "isl9305",
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		.of_match_table	= of_match_ptr(isl9305_dt_ids),
 	},
-	.probe_new = isl9305_i2c_probe,
+	.probe = isl9305_i2c_probe,
 	.id_table = isl9305_i2c_id,
 };
 

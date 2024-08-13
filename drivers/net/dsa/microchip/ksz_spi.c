@@ -63,7 +63,7 @@ static int ksz_spi_probe(struct spi_device *spi)
 	else
 		regmap_config = ksz9477_regmap_config;
 
-	for (i = 0; i < ARRAY_SIZE(ksz8795_regmap_config); i++) {
+	for (i = 0; i < __KSZ_NUM_REGMAPS; i++) {
 		rc = regmap_config[i];
 		rc.lock_arg = &dev->regmap_mutex;
 		rc.wr_table = chip->wr_table;
@@ -114,10 +114,7 @@ static void ksz_spi_shutdown(struct spi_device *spi)
 	if (!dev)
 		return;
 
-	if (dev->dev_ops->reset)
-		dev->dev_ops->reset(dev);
-
-	dsa_switch_shutdown(dev->ds);
+	ksz_switch_shutdown(dev);
 
 	spi_set_drvdata(spi, NULL);
 }
@@ -168,6 +165,10 @@ static const struct of_device_id ksz_dt_ids[] = {
 		.data = &ksz_switch_chips[KSZ8563]
 	},
 	{
+		.compatible = "microchip,ksz8567",
+		.data = &ksz_switch_chips[KSZ8567]
+	},
+	{
 		.compatible = "microchip,ksz9567",
 		.data = &ksz_switch_chips[KSZ9567]
 	},
@@ -207,6 +208,7 @@ static const struct spi_device_id ksz_spi_ids[] = {
 	{ "ksz9893" },
 	{ "ksz9563" },
 	{ "ksz8563" },
+	{ "ksz8567" },
 	{ "ksz9567" },
 	{ "lan9370" },
 	{ "lan9371" },
@@ -220,7 +222,6 @@ MODULE_DEVICE_TABLE(spi, ksz_spi_ids);
 static struct spi_driver ksz_spi_driver = {
 	.driver = {
 		.name	= "ksz-switch",
-		.owner	= THIS_MODULE,
 		.of_match_table = ksz_dt_ids,
 	},
 	.id_table = ksz_spi_ids,
@@ -231,13 +232,6 @@ static struct spi_driver ksz_spi_driver = {
 
 module_spi_driver(ksz_spi_driver);
 
-MODULE_ALIAS("spi:ksz9477");
-MODULE_ALIAS("spi:ksz9896");
-MODULE_ALIAS("spi:ksz9897");
-MODULE_ALIAS("spi:ksz9893");
-MODULE_ALIAS("spi:ksz9563");
-MODULE_ALIAS("spi:ksz8563");
-MODULE_ALIAS("spi:ksz9567");
 MODULE_ALIAS("spi:lan937x");
 MODULE_AUTHOR("Tristram Ha <Tristram.Ha@microchip.com>");
 MODULE_DESCRIPTION("Microchip ksz Series Switch SPI Driver");

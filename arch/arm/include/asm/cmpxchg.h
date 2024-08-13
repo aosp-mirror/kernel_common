@@ -5,6 +5,7 @@
 #include <linux/irqflags.h>
 #include <linux/prefetch.h>
 #include <asm/barrier.h>
+#include <linux/cmpxchg-emu.h>
 
 #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
 /*
@@ -25,7 +26,8 @@
 #define swp_is_buggy
 #endif
 
-static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
+static inline unsigned long
+__arch_xchg(unsigned long x, volatile void *ptr, int size)
 {
 	extern void __bad_xchg(volatile void *, int);
 	unsigned long ret;
@@ -115,8 +117,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 }
 
 #define arch_xchg_relaxed(ptr, x) ({					\
-	(__typeof__(*(ptr)))__xchg((unsigned long)(x), (ptr),		\
-				   sizeof(*(ptr)));			\
+	(__typeof__(*(ptr)))__arch_xchg((unsigned long)(x), (ptr),	\
+					sizeof(*(ptr)));		\
 })
 
 #include <asm-generic/cmpxchg-local.h>
@@ -161,7 +163,11 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	prefetchw((const void *)ptr);
 
 	switch (size) {
-#ifndef CONFIG_CPU_V6	/* min ARCH >= ARMv6K */
+#ifdef CONFIG_CPU_V6	/* ARCH == ARMv6 */
+	case 1:
+		oldval = cmpxchg_emu_u8((volatile u8 *)ptr, old, new);
+		break;
+#else /* min ARCH > ARMv6 */
 	case 1:
 		do {
 			asm volatile("@ __cmpxchg1\n"

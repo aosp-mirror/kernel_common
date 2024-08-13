@@ -48,7 +48,7 @@ static int cyttsp_i2c_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id cyttsp_i2c_id[] = {
-	{ CY_I2C_NAME, 0 },
+	{ CY_I2C_NAME },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, cyttsp_i2c_id);
@@ -63,10 +63,10 @@ MODULE_DEVICE_TABLE(of, cyttsp_of_i2c_match);
 static struct i2c_driver cyttsp_i2c_driver = {
 	.driver = {
 		.name	= CY_I2C_NAME,
-		.pm	= &cyttsp_pm_ops,
+		.pm	= pm_sleep_ptr(&cyttsp_pm_ops),
 		.of_match_table = cyttsp_of_i2c_match,
 	},
-	.probe_new	= cyttsp_i2c_probe,
+	.probe		= cyttsp_i2c_probe,
 	.id_table	= cyttsp_i2c_id,
 };
 

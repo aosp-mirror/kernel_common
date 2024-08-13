@@ -55,9 +55,9 @@ static int tifm_bus_match(struct device *dev, struct device_driver *drv)
 	return 0;
 }
 
-static int tifm_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int tifm_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
-	struct tifm_dev *sock = container_of(dev, struct tifm_dev, dev);
+	const struct tifm_dev *sock = container_of_const(dev, struct tifm_dev, dev);
 
 	if (add_uevent_var(env, "TIFM_CARD_TYPE=%s", tifm_media_type_name(sock->type, 1)))
 		return -ENOMEM;
@@ -148,7 +148,7 @@ static struct attribute *tifm_dev_attrs[] = {
 };
 ATTRIBUTE_GROUPS(tifm_dev);
 
-static struct bus_type tifm_bus_type = {
+static const struct bus_type tifm_bus_type = {
 	.name      = "tifm",
 	.dev_groups = tifm_dev_groups,
 	.match     = tifm_bus_match,
@@ -166,7 +166,7 @@ static void tifm_free(struct device *dev)
 	kfree(fm);
 }
 
-static struct class tifm_adapter_class = {
+static const struct class tifm_adapter_class = {
 	.name    = "tifm_adapter",
 	.dev_release = tifm_free
 };

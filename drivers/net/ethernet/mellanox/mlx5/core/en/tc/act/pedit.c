@@ -48,7 +48,8 @@ mlx5e_tc_act_pedit_parse_action(struct mlx5e_priv *priv,
 				struct pedit_headers_action *hdrs,
 				struct netlink_ext_ack *extack)
 {
-	u8 cmd = (act->id == FLOW_ACTION_MANGLE) ? 0 : 1;
+	u8 cmd = (act->id == FLOW_ACTION_MANGLE) ? TCA_PEDIT_KEY_EX_CMD_SET :
+						   TCA_PEDIT_KEY_EX_CMD_ADD;
 	u8 htype = act->mangle.htype;
 	int err = -EOPNOTSUPP;
 	u32 mask, val, offset;
@@ -78,15 +79,6 @@ out_err:
 	return err;
 }
 
-static bool
-tc_act_can_offload_pedit(struct mlx5e_tc_act_parse_state *parse_state,
-			 const struct flow_action_entry *act,
-			 int act_index,
-			 struct mlx5_flow_attr *attr)
-{
-	return true;
-}
-
 static int
 tc_act_parse_pedit(struct mlx5e_tc_act_parse_state *parse_state,
 		   const struct flow_action_entry *act,
@@ -107,13 +99,14 @@ tc_act_parse_pedit(struct mlx5e_tc_act_parse_state *parse_state,
 
 	attr->action |= MLX5_FLOW_CONTEXT_ACTION_MOD_HDR;
 
-	if (ns_type == MLX5_FLOW_NAMESPACE_FDB)
+	if (ns_type == MLX5_FLOW_NAMESPACE_FDB) {
 		esw_attr->split_count = esw_attr->out_count;
+		parse_state->if_count = 0;
+	}
 
 	return 0;
 }
 
 struct mlx5e_tc_act mlx5e_tc_act_pedit = {
-	.can_offload = tc_act_can_offload_pedit,
 	.parse_action = tc_act_parse_pedit,
 };

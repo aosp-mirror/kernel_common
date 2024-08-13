@@ -117,13 +117,6 @@ struct bootrom_id_le {
 	__le32 boardrev;	/* Board revision */
 };
 
-struct brcmf_usb_image {
-	struct list_head list;
-	s8 *fwname;
-	u8 *image;
-	int image_len;
-};
-
 struct brcmf_usbdev_info {
 	struct brcmf_usbdev bus_pub; /* MUST BE FIRST */
 	spinlock_t qlock;
@@ -1331,6 +1324,9 @@ brcmf_usb_disconnect_cb(struct brcmf_usbdev_info *devinfo)
 	brcmf_usb_detach(devinfo);
 }
 
+/* Forward declaration for usb_match_id() call */
+static const struct usb_device_id brcmf_usb_devid_table[];
+
 static int
 brcmf_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
@@ -1341,6 +1337,14 @@ brcmf_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	int ret = 0;
 	u32 num_of_eps;
 	u8 endpoint_num, ep;
+
+	if (!id) {
+		id = usb_match_id(intf, brcmf_usb_devid_table);
+		if (!id) {
+			dev_err(&intf->dev, "Error could not find matching usb_device_id\n");
+			return -ENODEV;
+		}
+	}
 
 	brcmf_dbg(USB, "Enter 0x%04x:0x%04x\n", id->idVendor, id->idProduct);
 
@@ -1570,7 +1574,7 @@ static int brcmf_usb_reset_device(struct device *dev, void *notused)
 
 void brcmf_usb_exit(void)
 {
-	struct device_driver *drv = &brcmf_usbdrvr.drvwrap.driver;
+	struct device_driver *drv = &brcmf_usbdrvr.driver;
 	int ret;
 
 	brcmf_dbg(USB, "Enter\n");

@@ -375,8 +375,6 @@ void squashfs_fill_page(struct page *page, struct squashfs_cache_entry *buffer, 
 	flush_dcache_page(page);
 	if (copied == avail)
 		SetPageUptodate(page);
-	else
-		SetPageError(page);
 }
 
 /* Copy data into page cache  */
@@ -471,7 +469,7 @@ static int squashfs_read_folio(struct file *file, struct folio *folio)
 
 		res = read_blocklist(inode, index, &block);
 		if (res < 0)
-			goto error_out;
+			goto out;
 
 		if (res == 0)
 			res = squashfs_readpage_sparse(page, expected);
@@ -483,8 +481,6 @@ static int squashfs_read_folio(struct file *file, struct folio *folio)
 	if (!res)
 		return 0;
 
-error_out:
-	SetPageError(page);
 out:
 	pageaddr = kmap_atomic(page);
 	memset(pageaddr, 0, PAGE_SIZE);
@@ -544,7 +540,8 @@ static void squashfs_readahead(struct readahead_control *ractl)
 	struct squashfs_page_actor *actor;
 	unsigned int nr_pages = 0;
 	struct page **pages;
-	int i, file_end = i_size_read(inode) >> msblk->block_log;
+	int i;
+	loff_t file_end = i_size_read(inode) >> msblk->block_log;
 	unsigned int max_pages = 1UL << shift;
 
 	readahead_expand(ractl, start, (len | mask) + 1);

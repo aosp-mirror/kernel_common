@@ -967,6 +967,11 @@ static __be32 nfs4_callback_compound(struct svc_rqst *rqstp)
 		nops--;
 	}
 
+	if (svc_is_backchannel(rqstp) && cps.clp) {
+		rqstp->bc_to_initval = cps.clp->cl_rpcclient->cl_timeout->to_initval;
+		rqstp->bc_to_retries = cps.clp->cl_rpcclient->cl_timeout->to_retries;
+	}
+
 	*hdr_res.status = status;
 	*hdr_res.nops = htonl(nops);
 	nfs4_cb_free_slot(&cps);
@@ -980,14 +985,11 @@ out_invalidcred:
 }
 
 static int
-nfs_callback_dispatch(struct svc_rqst *rqstp, __be32 *statp)
+nfs_callback_dispatch(struct svc_rqst *rqstp)
 {
 	const struct svc_procedure *procp = rqstp->rq_procinfo;
 
-	svcxdr_init_decode(rqstp);
-	svcxdr_init_encode(rqstp);
-
-	*statp = procp->pc_func(rqstp);
+	*rqstp->rq_accept_statp = procp->pc_func(rqstp);
 	return 1;
 }
 
@@ -1072,7 +1074,8 @@ static const struct svc_procedure nfs4_callback_procedures1[] = {
 	}
 };
 
-static unsigned int nfs4_callback_count1[ARRAY_SIZE(nfs4_callback_procedures1)];
+static DEFINE_PER_CPU_ALIGNED(unsigned long,
+			      nfs4_callback_count1[ARRAY_SIZE(nfs4_callback_procedures1)]);
 const struct svc_version nfs4_callback_version1 = {
 	.vs_vers = 1,
 	.vs_nproc = ARRAY_SIZE(nfs4_callback_procedures1),
@@ -1084,7 +1087,8 @@ const struct svc_version nfs4_callback_version1 = {
 	.vs_need_cong_ctrl = true,
 };
 
-static unsigned int nfs4_callback_count4[ARRAY_SIZE(nfs4_callback_procedures1)];
+static DEFINE_PER_CPU_ALIGNED(unsigned long,
+			      nfs4_callback_count4[ARRAY_SIZE(nfs4_callback_procedures1)]);
 const struct svc_version nfs4_callback_version4 = {
 	.vs_vers = 4,
 	.vs_nproc = ARRAY_SIZE(nfs4_callback_procedures1),

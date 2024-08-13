@@ -9,6 +9,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/pm.h>
 
 #include <linux/pinctrl/pinctrl.h>
 
@@ -27,18 +28,8 @@
 		.size = ((e) - (s) + 1),		\
 	}
 
-#define EHL_COMMUNITY(s, e, g)				\
-	{						\
-		.padown_offset = EHL_PAD_OWN,		\
-		.padcfglock_offset = EHL_PADCFGLOCK,	\
-		.hostown_offset = EHL_HOSTSW_OWN,	\
-		.is_offset = EHL_GPI_IS,		\
-		.ie_offset = EHL_GPI_IE,		\
-		.pin_base = (s),			\
-		.npins = ((e) - (s) + 1),		\
-		.gpps = (g),				\
-		.ngpps = ARRAY_SIZE(g),			\
-	}
+#define EHL_COMMUNITY(b, s, e, g)			\
+	INTEL_COMMUNITY_GPPS(b, s, e, g, EHL)
 
 /* Elkhart Lake */
 static const struct pinctrl_pin_desc ehl_community0_pins[] = {
@@ -121,7 +112,7 @@ static const struct intel_padgroup ehl_community0_gpps[] = {
 };
 
 static const struct intel_community ehl_community0[] = {
-	EHL_COMMUNITY(0, 66, ehl_community0_gpps),
+	EHL_COMMUNITY(0, 0, 66, ehl_community0_gpps),
 };
 
 static const struct intel_pinctrl_soc_data ehl_community0_soc_data = {
@@ -262,7 +253,7 @@ static const struct intel_padgroup ehl_community1_gpps[] = {
 };
 
 static const struct intel_community ehl_community1[] = {
-	EHL_COMMUNITY(0, 112, ehl_community1_gpps),
+	EHL_COMMUNITY(0, 0, 112, ehl_community1_gpps),
 };
 
 static const struct intel_pinctrl_soc_data ehl_community1_soc_data = {
@@ -335,7 +326,7 @@ static const struct intel_padgroup ehl_community3_gpps[] = {
 };
 
 static const struct intel_community ehl_community3[] = {
-	EHL_COMMUNITY(0, 46, ehl_community3_gpps),
+	EHL_COMMUNITY(0, 0, 46, ehl_community3_gpps),
 };
 
 static const struct intel_pinctrl_soc_data ehl_community3_soc_data = {
@@ -441,7 +432,7 @@ static const struct intel_padgroup ehl_community4_gpps[] = {
 };
 
 static const struct intel_community ehl_community4[] = {
-	EHL_COMMUNITY(0, 79, ehl_community4_gpps),
+	EHL_COMMUNITY(0, 0, 79, ehl_community4_gpps),
 };
 
 static const struct intel_pinctrl_soc_data ehl_community4_soc_data = {
@@ -469,7 +460,7 @@ static const struct intel_padgroup ehl_community5_gpps[] = {
 };
 
 static const struct intel_community ehl_community5[] = {
-	EHL_COMMUNITY(0, 7, ehl_community5_gpps),
+	EHL_COMMUNITY(0, 0, 7, ehl_community5_gpps),
 };
 
 static const struct intel_pinctrl_soc_data ehl_community5_soc_data = {
@@ -495,19 +486,17 @@ static const struct acpi_device_id ehl_pinctrl_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, ehl_pinctrl_acpi_match);
 
-static INTEL_PINCTRL_PM_OPS(ehl_pinctrl_pm_ops);
-
 static struct platform_driver ehl_pinctrl_driver = {
 	.probe = intel_pinctrl_probe_by_uid,
 	.driver = {
 		.name = "elkhartlake-pinctrl",
 		.acpi_match_table = ehl_pinctrl_acpi_match,
-		.pm = &ehl_pinctrl_pm_ops,
+		.pm = pm_sleep_ptr(&intel_pinctrl_pm_ops),
 	},
 };
-
 module_platform_driver(ehl_pinctrl_driver);
 
 MODULE_AUTHOR("Andy Shevchenko <andriy.shevchenko@linux.intel.com>");
 MODULE_DESCRIPTION("Intel Elkhart Lake PCH pinctrl/GPIO driver");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(PINCTRL_INTEL);

@@ -230,7 +230,7 @@ static const struct regmap_config rc5t583_regmap_config = {
 	.volatile_reg = volatile_reg,
 	.max_register = RC5T583_MAX_REG,
 	.num_reg_defaults_raw = RC5T583_NUM_REGS,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_MAPLE,
 };
 
 static int rc5t583_i2c_probe(struct i2c_client *i2c)
@@ -288,7 +288,7 @@ static struct i2c_driver rc5t583_i2c_driver = {
 	.driver = {
 		   .name = "rc5t583",
 		   },
-	.probe_new = rc5t583_i2c_probe,
+	.probe = rc5t583_i2c_probe,
 	.id_table = rc5t583_i2c_id,
 };
 

@@ -7,7 +7,6 @@
 
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-#include "bpf_tcp_helpers.h"
 
 enum bpf_linum_array_idx {
 	EGRESS_LINUM_IDX,
@@ -41,6 +40,10 @@ struct {
 	__type(key, int);
 	__type(value, struct bpf_spinlock_cnt);
 } sk_pkt_out_cnt10 SEC(".maps");
+
+struct tcp_sock {
+	__u32	lsndtime;
+} __attribute__((preserve_access_index));
 
 struct bpf_tcp_sock listen_tp = {};
 struct sockaddr_in6 srv_sa6 = {};
@@ -121,7 +124,7 @@ static void tpcpy(struct bpf_tcp_sock *dst,
 SEC("cgroup_skb/egress")
 int egress_read_sock_fields(struct __sk_buff *skb)
 {
-	struct bpf_spinlock_cnt cli_cnt_init = { .lock = 0, .cnt = 0xeB9F };
+	struct bpf_spinlock_cnt cli_cnt_init = { .lock = {}, .cnt = 0xeB9F };
 	struct bpf_spinlock_cnt *pkt_out_cnt, *pkt_out_cnt10;
 	struct bpf_tcp_sock *tp, *tp_ret;
 	struct bpf_sock *sk, *sk_ret;
@@ -265,7 +268,10 @@ static __noinline bool sk_dst_port__load_word(struct bpf_sock *sk)
 
 static __noinline bool sk_dst_port__load_half(struct bpf_sock *sk)
 {
-	__u16 *half = (__u16 *)&sk->dst_port;
+	__u16 *half;
+
+	asm volatile ("");
+	half = (__u16 *)&sk->dst_port;
 	return half[0] == bpf_htons(0xcafe);
 }
 

@@ -30,7 +30,6 @@
 #define ST_AHCI_OOBR_CIMAX_SHIFT	0
 
 struct st_ahci_drv_data {
-	struct platform_device *ahci;
 	struct reset_control *pwr;
 	struct reset_control *sw_rst;
 	struct reset_control *pwr_rst;
@@ -138,7 +137,7 @@ static const struct ata_port_info st_ahci_port_info = {
 	.port_ops       = &st_ahci_port_ops,
 };
 
-static struct scsi_host_template ahci_platform_sht = {
+static const struct scsi_host_template ahci_platform_sht = {
 	AHCI_SHT(DRV_NAME),
 };
 
@@ -239,7 +238,7 @@ static struct platform_driver st_ahci_driver = {
 		.of_match_table = st_ahci_match,
 	},
 	.probe = st_ahci_probe,
-	.remove = ata_platform_remove_one,
+	.remove_new = ata_platform_remove_one,
 };
 module_platform_driver(st_ahci_driver);
 

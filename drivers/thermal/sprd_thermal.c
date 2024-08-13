@@ -6,7 +6,7 @@
 #include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/nvmem-consumer.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/thermal.h>
@@ -206,7 +206,7 @@ static int sprd_thm_temp_to_rawdata(int temp, struct sprd_thermal_sensor *sen)
 
 static int sprd_thm_read_temp(struct thermal_zone_device *tz, int *temp)
 {
-	struct sprd_thermal_sensor *sen = tz->devdata;
+	struct sprd_thermal_sensor *sen = thermal_zone_device_priv(tz);
 	u32 data;
 
 	data = readl(sen->data->base + SPRD_THM_TEMP(sen->id)) &
@@ -516,7 +516,7 @@ disable_clk:
 }
 #endif
 
-static int sprd_thm_remove(struct platform_device *pdev)
+static void sprd_thm_remove(struct platform_device *pdev)
 {
 	struct sprd_thermal_data *thm = platform_get_drvdata(pdev);
 	int i;
@@ -528,7 +528,6 @@ static int sprd_thm_remove(struct platform_device *pdev)
 	}
 
 	clk_disable_unprepare(thm->clk);
-	return 0;
 }
 
 static const struct of_device_id sprd_thermal_of_match[] = {
@@ -543,7 +542,7 @@ static const struct dev_pm_ops sprd_thermal_pm_ops = {
 
 static struct platform_driver sprd_thermal_driver = {
 	.probe = sprd_thm_probe,
-	.remove = sprd_thm_remove,
+	.remove_new = sprd_thm_remove,
 	.driver = {
 		.name = "sprd-thermal",
 		.pm = &sprd_thermal_pm_ops,

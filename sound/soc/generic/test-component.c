@@ -6,7 +6,7 @@
 // Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
 #include <linux/slab.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/of_graph.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
@@ -352,7 +352,7 @@ static const struct snd_pcm_hardware test_component_hardware = {
 static int test_component_open(struct snd_soc_component *component,
 			       struct snd_pcm_substream *substream)
 {
-	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_pcm_runtime *rtd = snd_soc_substream_to_rtd(substream);
 
 	mile_stone(component);
 
@@ -635,11 +635,9 @@ static int test_driver_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int test_driver_remove(struct platform_device *pdev)
+static void test_driver_remove(struct platform_device *pdev)
 {
 	mile_stone_x(&pdev->dev);
-
-	return 0;
 }
 
 static struct platform_driver test_driver = {
@@ -648,7 +646,7 @@ static struct platform_driver test_driver = {
 		.of_match_table = test_of_match,
 	},
 	.probe  = test_driver_probe,
-	.remove = test_driver_remove,
+	.remove_new = test_driver_remove,
 };
 module_platform_driver(test_driver);
 

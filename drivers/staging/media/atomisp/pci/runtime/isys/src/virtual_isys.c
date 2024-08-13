@@ -17,7 +17,6 @@
 
 #include "system_global.h"
 
-#ifdef ISP2401
 
 #include "ia_css_isys.h"
 #include "ia_css_debug.h"
@@ -96,12 +95,6 @@ static void release_be_lut_entry(
     csi_rx_backend_ID_t		backend,
     csi_mipi_packet_type_t		packet_type,
     csi_rx_backend_lut_entry_t	*entry);
-
-static bool calculate_tpg_cfg(
-    input_system_channel_t		*channel,
-    input_system_input_port_t	*input_port,
-    isp2401_input_system_cfg_t		*isys_cfg,
-    pixelgen_tpg_cfg_t		*cfg);
 
 static bool calculate_prbs_cfg(
     input_system_channel_t		*channel,
@@ -518,13 +511,6 @@ static bool calculate_input_system_input_port_cfg(
 			rc &= calculate_be_cfg(input_port, isys_cfg, true,
 					       &input_port_cfg->csi_rx_cfg.md_backend_cfg);
 		break;
-	case INPUT_SYSTEM_SOURCE_TYPE_TPG:
-		rc = calculate_tpg_cfg(
-			 channel,
-			 input_port,
-			 isys_cfg,
-			 &input_port_cfg->pixelgen_cfg.tpg_cfg);
-		break;
 	case INPUT_SYSTEM_SOURCE_TYPE_PRBS:
 		rc = calculate_prbs_cfg(
 			 channel,
@@ -634,17 +620,6 @@ static void release_be_lut_entry(
 	ia_css_isys_csi_rx_lut_rmgr_release(backend, packet_type, entry);
 }
 
-static bool calculate_tpg_cfg(
-    input_system_channel_t		*channel,
-    input_system_input_port_t	*input_port,
-    isp2401_input_system_cfg_t		*isys_cfg,
-    pixelgen_tpg_cfg_t		*cfg)
-{
-	memcpy(cfg, &isys_cfg->tpg_port_attr, sizeof(pixelgen_tpg_cfg_t));
-
-	return true;
-}
-
 static bool calculate_prbs_cfg(
     input_system_channel_t		*channel,
     input_system_input_port_t	*input_port,
@@ -689,7 +664,7 @@ static bool calculate_be_cfg(
 		cfg->csi_mipi_cfg.comp_scheme = isys_cfg->csi_port_attr.comp_scheme;
 		cfg->csi_mipi_cfg.comp_predictor = isys_cfg->csi_port_attr.comp_predictor;
 		cfg->csi_mipi_cfg.comp_bit_idx = cfg->csi_mipi_cfg.data_type -
-						 MIPI_FORMAT_CUSTOM0;
+						 MIPI_FORMAT_2401_CUSTOM0;
 	}
 
 	return true;
@@ -704,9 +679,7 @@ static bool calculate_stream2mmio_cfg(
 	cfg->bits_per_pixel = metadata ? isys_cfg->metadata.bits_per_pixel :
 			      isys_cfg->input_port_resolution.bits_per_pixel;
 
-	cfg->enable_blocking =
-	    ((isys_cfg->mode == INPUT_SYSTEM_SOURCE_TYPE_TPG) ||
-	     (isys_cfg->mode == INPUT_SYSTEM_SOURCE_TYPE_PRBS));
+	cfg->enable_blocking = isys_cfg->mode == INPUT_SYSTEM_SOURCE_TYPE_PRBS;
 
 	return true;
 }
@@ -856,14 +829,13 @@ static csi_mipi_packet_type_t get_csi_mipi_packet_type(
 
 	packet_type = CSI_MIPI_PACKET_TYPE_RESERVED;
 
-	if (data_type >= 0 && data_type <= MIPI_FORMAT_SHORT8)
+	if (data_type >= 0 && data_type <= MIPI_FORMAT_2401_SHORT8)
 		packet_type = CSI_MIPI_PACKET_TYPE_SHORT;
 
-	if (data_type > MIPI_FORMAT_SHORT8 && data_type <= N_MIPI_FORMAT)
+	if (data_type > MIPI_FORMAT_2401_SHORT8 && data_type <= N_MIPI_FORMAT_2401)
 		packet_type = CSI_MIPI_PACKET_TYPE_LONG;
 
 	return packet_type;
 }
 
 /* end of Private Methods */
-#endif

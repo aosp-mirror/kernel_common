@@ -33,7 +33,7 @@ TRACE_EVENT(cdns3_halt,
 		__field(u8, flush)
 	),
 	TP_fast_assign(
-		__assign_str(name, ep_priv->name);
+		__assign_str(name);
 		__entry->halt = halt;
 		__entry->flush = flush;
 	),
@@ -49,8 +49,8 @@ TRACE_EVENT(cdns3_wa1,
 		__string(msg, msg)
 	),
 	TP_fast_assign(
-		__assign_str(ep_name, ep_priv->name);
-		__assign_str(msg, msg);
+		__assign_str(ep_name);
+		__assign_str(msg);
 	),
 	TP_printk("WA1: %s %s", __get_str(ep_name), __get_str(msg))
 );
@@ -63,8 +63,8 @@ TRACE_EVENT(cdns3_wa2,
 		__string(msg, msg)
 	),
 	TP_fast_assign(
-		__assign_str(ep_name, ep_priv->name);
-		__assign_str(msg, msg);
+		__assign_str(ep_name);
+		__assign_str(msg);
 	),
 	TP_printk("WA2: %s %s", __get_str(ep_name), __get_str(msg))
 );
@@ -77,7 +77,7 @@ DECLARE_EVENT_CLASS(cdns3_log_doorbell,
 		__field(u32, ep_trbaddr)
 	),
 	TP_fast_assign(
-		__assign_str(name, ep_name);
+		__assign_str(name);
 		__entry->ep_trbaddr = ep_trbaddr;
 	),
 	TP_printk("%s, ep_trbaddr %08x", __get_str(name),
@@ -100,13 +100,12 @@ DECLARE_EVENT_CLASS(cdns3_log_usb_irq,
 	TP_STRUCT__entry(
 		__field(enum usb_device_speed, speed)
 		__field(u32, usb_ists)
-		__dynamic_array(char, str, CDNS3_MSG_MAX)
 	),
 	TP_fast_assign(
 		__entry->speed = cdns3_get_speed(priv_dev);
 		__entry->usb_ists = usb_ists;
 	),
-	TP_printk("%s", cdns3_decode_usb_irq(__get_str(str), __entry->speed,
+	TP_printk("%s", cdns3_decode_usb_irq(__get_buf(CDNS3_MSG_MAX), __entry->speed,
 					     __entry->usb_ists))
 );
 
@@ -124,17 +123,16 @@ DECLARE_EVENT_CLASS(cdns3_log_epx_irq,
 		__field(u32, ep_traddr)
 		__field(u32, ep_last_sid)
 		__field(u32, use_streams)
-		__dynamic_array(char, str, CDNS3_MSG_MAX)
 	),
 	TP_fast_assign(
-		__assign_str(ep_name, priv_ep->name);
+		__assign_str(ep_name);
 		__entry->ep_sts = readl(&priv_dev->regs->ep_sts);
 		__entry->ep_traddr = readl(&priv_dev->regs->ep_traddr);
 		__entry->ep_last_sid = priv_ep->last_stream_id;
 		__entry->use_streams = priv_ep->use_streams;
 	),
 	TP_printk("%s, ep_traddr: %08x ep_last_sid: %08x use_streams: %d",
-		  cdns3_decode_epx_irq(__get_str(str),
+		  cdns3_decode_epx_irq(__get_buf(CDNS3_MSG_MAX),
 				       __get_str(ep_name),
 				       __entry->ep_sts),
 		  __entry->ep_traddr,
@@ -153,13 +151,12 @@ DECLARE_EVENT_CLASS(cdns3_log_ep0_irq,
 	TP_STRUCT__entry(
 		__field(int, ep_dir)
 		__field(u32, ep_sts)
-		__dynamic_array(char, str, CDNS3_MSG_MAX)
 	),
 	TP_fast_assign(
 		__entry->ep_dir = priv_dev->selected_ep;
 		__entry->ep_sts = ep_sts;
 	),
-	TP_printk("%s", cdns3_decode_ep0_irq(__get_str(str),
+	TP_printk("%s", cdns3_decode_ep0_irq(__get_buf(CDNS3_MSG_MAX),
 					     __entry->ep_dir,
 					     __entry->ep_sts))
 );
@@ -178,7 +175,6 @@ DECLARE_EVENT_CLASS(cdns3_log_ctrl,
 		__field(u16, wValue)
 		__field(u16, wIndex)
 		__field(u16, wLength)
-		__dynamic_array(char, str, CDNS3_MSG_MAX)
 	),
 	TP_fast_assign(
 		__entry->bRequestType = ctrl->bRequestType;
@@ -187,7 +183,7 @@ DECLARE_EVENT_CLASS(cdns3_log_ctrl,
 		__entry->wIndex = le16_to_cpu(ctrl->wIndex);
 		__entry->wLength = le16_to_cpu(ctrl->wLength);
 	),
-	TP_printk("%s", usb_decode_ctrl(__get_str(str), CDNS3_MSG_MAX,
+	TP_printk("%s", usb_decode_ctrl(__get_buf(CDNS3_MSG_MAX), CDNS3_MSG_MAX,
 					__entry->bRequestType,
 					__entry->bRequest, __entry->wValue,
 					__entry->wIndex, __entry->wLength)
@@ -218,7 +214,7 @@ DECLARE_EVENT_CLASS(cdns3_log_request,
 		__field(unsigned int, stream_id)
 	),
 	TP_fast_assign(
-		__assign_str(name, req->priv_ep->name);
+		__assign_str(name);
 		__entry->req = req;
 		__entry->buf = req->request.buf;
 		__entry->actual = req->request.actual;
@@ -298,7 +294,7 @@ DECLARE_EVENT_CLASS(cdns3_stream_split_transfer_len,
 		__field(unsigned int, stream_id)
 	),
 	TP_fast_assign(
-		__assign_str(name, req->priv_ep->name);
+		__assign_str(name);
 		__entry->req = req;
 		__entry->actual = req->request.length;
 		__entry->length = req->request.actual;
@@ -333,7 +329,7 @@ DECLARE_EVENT_CLASS(cdns3_log_aligned_request,
 		__field(u32, aligned_buf_size)
 	),
 	TP_fast_assign(
-		__assign_str(name, priv_req->priv_ep->name);
+		__assign_str(name);
 		__entry->req = &priv_req->request;
 		__entry->buf = priv_req->request.buf;
 		__entry->dma = priv_req->request.dma;
@@ -368,7 +364,7 @@ DECLARE_EVENT_CLASS(cdns3_log_map_request,
 		__field(dma_addr_t, dma)
 	),
 	TP_fast_assign(
-		__assign_str(name, priv_req->priv_ep->name);
+		__assign_str(name);
 		__entry->req = &priv_req->request;
 		__entry->buf = priv_req->request.buf;
 		__entry->dma = priv_req->request.dma;
@@ -399,7 +395,7 @@ DECLARE_EVENT_CLASS(cdns3_log_trb,
 		__field(unsigned int, last_stream_id)
 	),
 	TP_fast_assign(
-		__assign_str(name, priv_ep->name);
+		__assign_str(name);
 		__entry->trb = trb;
 		__entry->buffer = le32_to_cpu(trb->buffer);
 		__entry->length = le32_to_cpu(trb->length);
@@ -438,22 +434,16 @@ DECLARE_EVENT_CLASS(cdns3_log_ring,
 	TP_PROTO(struct cdns3_endpoint *priv_ep),
 	TP_ARGS(priv_ep),
 	TP_STRUCT__entry(
-		__dynamic_array(u8, ring, TRB_RING_SIZE)
-		__dynamic_array(u8, priv_ep, sizeof(struct cdns3_endpoint))
 		__dynamic_array(char, buffer,
-				(TRBS_PER_SEGMENT * 65) + CDNS3_MSG_MAX)
+				GET_TRBS_PER_SEGMENT(priv_ep->type) > TRBS_PER_SEGMENT ?
+				CDNS3_MSG_MAX :
+				(GET_TRBS_PER_SEGMENT(priv_ep->type) * 65) + CDNS3_MSG_MAX)
 	),
 	TP_fast_assign(
-		memcpy(__get_dynamic_array(priv_ep), priv_ep,
-		       sizeof(struct cdns3_endpoint));
-		memcpy(__get_dynamic_array(ring), priv_ep->trb_pool,
-		       TRB_RING_SIZE);
+		cdns3_dbg_ring(priv_ep, __get_str(buffer));
 	),
 
-	TP_printk("%s",
-		  cdns3_dbg_ring((struct cdns3_endpoint *)__get_str(priv_ep),
-				 (struct cdns3_trb *)__get_str(ring),
-				 __get_str(buffer)))
+	TP_printk("%s", __get_str(buffer))
 );
 
 DEFINE_EVENT(cdns3_log_ring, cdns3_ring,
@@ -477,7 +467,7 @@ DECLARE_EVENT_CLASS(cdns3_log_ep,
 		__field(u8, dequeue)
 	),
 	TP_fast_assign(
-		__assign_str(name, priv_ep->name);
+		__assign_str(name);
 		__entry->maxpacket = priv_ep->endpoint.maxpacket;
 		__entry->maxpacket_limit = priv_ep->endpoint.maxpacket_limit;
 		__entry->max_streams = priv_ep->endpoint.max_streams;

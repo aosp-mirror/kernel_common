@@ -7,7 +7,7 @@
 #include <linux/in6.h>
 #include <linux/rbtree_types.h>
 #include <linux/refcount.h>
-#include <net/dropreason.h>
+#include <net/dropreason-core.h>
 
 /* Per netns frag queues directory */
 struct fqdir {
@@ -29,7 +29,7 @@ struct fqdir {
 };
 
 /**
- * fragment queue flags
+ * enum: fragment queue flags
  *
  * @INET_FRAG_FIRST_IN: first fragment has arrived
  * @INET_FRAG_LAST_IN: final fragment has arrived

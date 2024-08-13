@@ -171,7 +171,13 @@ struct dcn_hubbub_registers {
 	uint32_t DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_B;
 	uint32_t DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_C;
 	uint32_t DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_D;
+	uint32_t DCHUBBUB_ARB_MALL_CNTL;
 	uint32_t SDPIF_REQUEST_RATE_LIMIT;
+	uint32_t DCHUBBUB_SDPIF_CFG0;
+	uint32_t DCHUBBUB_SDPIF_CFG1;
+	uint32_t DCHUBBUB_CLOCK_CNTL;
+	uint32_t DCHUBBUB_MEM_PWR_MODE_CTRL;
+	uint32_t DCHUBBUB_ARB_QOS_FORCE;
 };
 
 #define HUBBUB_REG_FIELD_LIST_DCN32(type) \
@@ -190,7 +196,13 @@ struct dcn_hubbub_registers {
 		type DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_A;\
 		type DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_B;\
 		type DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_C;\
-		type DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_D
+		type DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_D;\
+		type MALL_PREFETCH_COMPLETE;\
+		type MALL_IN_USE
+
+ #define HUBBUB_REG_FIELD_LIST_DCN35(type) \
+		type DCHUBBUB_FGCG_REP_DIS;\
+		type DCHUBBUB_ARB_ALLOW_CSTATE_DEEPSLEEP_LEGACY_MODE
 
 /* set field name */
 #define HUBBUB_SF(reg_name, field_name, post_fix)\
@@ -362,7 +374,13 @@ struct dcn_hubbub_registers {
 		type DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_C;\
 		type DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_D;\
 		type DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_D;\
-		type SDPIF_REQUEST_RATE_LIMIT
+		type SDPIF_REQUEST_RATE_LIMIT;\
+		type DISPCLK_R_DCHUBBUB_GATE_DIS;\
+		type DCFCLK_R_DCHUBBUB_GATE_DIS;\
+		type SDPIF_MAX_NUM_OUTSTANDING;\
+		type DCHUBBUB_ARB_MAX_REQ_OUTSTAND;\
+		type SDPIF_PORT_CONTROL;\
+		type DET_MEM_PWR_LS_MODE
 
 
 struct dcn_hubbub_shift {
@@ -371,6 +389,7 @@ struct dcn_hubbub_shift {
 	HUBBUB_HVM_REG_FIELD_LIST(uint8_t);
 	HUBBUB_RET_REG_FIELD_LIST(uint8_t);
 	HUBBUB_REG_FIELD_LIST_DCN32(uint8_t);
+	HUBBUB_REG_FIELD_LIST_DCN35(uint8_t);
 };
 
 struct dcn_hubbub_mask {
@@ -379,6 +398,7 @@ struct dcn_hubbub_mask {
 	HUBBUB_HVM_REG_FIELD_LIST(uint32_t);
 	HUBBUB_RET_REG_FIELD_LIST(uint32_t);
 	HUBBUB_REG_FIELD_LIST_DCN32(uint32_t);
+	HUBBUB_REG_FIELD_LIST_DCN35(uint32_t);
 };
 
 struct dc;
@@ -389,7 +409,7 @@ struct dcn10_hubbub {
 	const struct dcn_hubbub_shift *shifts;
 	const struct dcn_hubbub_mask *masks;
 	unsigned int debug_test_index_pstate;
-	struct dcn_watermark_set watermarks;
+	union dcn_watermark_set watermarks;
 };
 
 void hubbub1_update_dchub(
@@ -403,7 +423,7 @@ void hubbub1_wm_change_req_wa(struct hubbub *hubbub);
 
 bool hubbub1_program_watermarks(
 		struct hubbub *hubbub,
-		struct dcn_watermark_set *watermarks,
+		union dcn_watermark_set *watermarks,
 		unsigned int refclk_mhz,
 		bool safe_to_lower);
 
@@ -426,17 +446,17 @@ void hubbub1_construct(struct hubbub *hubbub,
 
 bool hubbub1_program_urgent_watermarks(
 		struct hubbub *hubbub,
-		struct dcn_watermark_set *watermarks,
+		union dcn_watermark_set *watermarks,
 		unsigned int refclk_mhz,
 		bool safe_to_lower);
 bool hubbub1_program_stutter_watermarks(
 		struct hubbub *hubbub,
-		struct dcn_watermark_set *watermarks,
+		union dcn_watermark_set *watermarks,
 		unsigned int refclk_mhz,
 		bool safe_to_lower);
 bool hubbub1_program_pstate_watermarks(
 		struct hubbub *hubbub,
-		struct dcn_watermark_set *watermarks,
+		union dcn_watermark_set *watermarks,
 		unsigned int refclk_mhz,
 		bool safe_to_lower);
 

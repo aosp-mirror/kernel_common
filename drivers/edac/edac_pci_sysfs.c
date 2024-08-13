@@ -337,8 +337,9 @@ static struct kobj_type ktype_edac_pci_main_kobj = {
  */
 static int edac_pci_main_kobj_setup(void)
 {
-	int err;
-	struct bus_type *edac_subsys;
+	int err = -ENODEV;
+	const struct bus_type *edac_subsys;
+	struct device *dev_root;
 
 	edac_dbg(0, "\n");
 
@@ -357,7 +358,6 @@ static int edac_pci_main_kobj_setup(void)
 	 */
 	if (!try_module_get(THIS_MODULE)) {
 		edac_dbg(1, "try_module_get() failed\n");
-		err = -ENODEV;
 		goto decrement_count_fail;
 	}
 
@@ -369,9 +369,13 @@ static int edac_pci_main_kobj_setup(void)
 	}
 
 	/* Instanstiate the pci object */
-	err = kobject_init_and_add(edac_pci_top_main_kobj,
-				   &ktype_edac_pci_main_kobj,
-				   &edac_subsys->dev_root->kobj, "pci");
+	dev_root = bus_get_dev_root(edac_subsys);
+	if (dev_root) {
+		err = kobject_init_and_add(edac_pci_top_main_kobj,
+					   &ktype_edac_pci_main_kobj,
+					   &dev_root->kobj, "pci");
+		put_device(dev_root);
+	}
 	if (err) {
 		edac_dbg(1, "Failed to register '.../edac/pci'\n");
 		goto kobject_init_and_add_fail;
@@ -517,7 +521,7 @@ static void edac_pci_dev_parity_clear(struct pci_dev *dev)
 	/* read the device TYPE, looking for bridges */
 	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
 
-	if ((header_type & 0x7F) == PCI_HEADER_TYPE_BRIDGE)
+	if ((header_type & PCI_HEADER_TYPE_MASK) == PCI_HEADER_TYPE_BRIDGE)
 		get_pci_parity_status(dev, 1);
 }
 
@@ -579,7 +583,7 @@ static void edac_pci_dev_parity_test(struct pci_dev *dev)
 	edac_dbg(4, "PCI HEADER TYPE= 0x%02x %s\n",
 		 header_type, dev_name(&dev->dev));
 
-	if ((header_type & 0x7F) == PCI_HEADER_TYPE_BRIDGE) {
+	if ((header_type & PCI_HEADER_TYPE_MASK) == PCI_HEADER_TYPE_BRIDGE) {
 		/* On bridges, need to examine secondary status register  */
 		status = get_pci_parity_status(dev, 1);
 

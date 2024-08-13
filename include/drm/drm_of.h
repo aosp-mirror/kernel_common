@@ -2,6 +2,7 @@
 #ifndef __DRM_OF_H__
 #define __DRM_OF_H__
 
+#include <linux/err.h>
 #include <linux/of_graph.h>
 #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_DRM_PANEL_BRIDGE)
 #include <drm/drm_bridge.h>
@@ -15,6 +16,8 @@ struct drm_encoder;
 struct drm_panel;
 struct drm_bridge;
 struct device_node;
+struct mipi_dsi_device_info;
+struct mipi_dsi_host;
 
 /**
  * enum drm_lvds_dual_link_pixels - Pixel order of an LVDS dual-link connection
@@ -128,6 +131,16 @@ drm_of_get_data_lanes_count_ep(const struct device_node *port,
 	return -EINVAL;
 }
 #endif
+
+#if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_DRM_MIPI_DSI)
+struct mipi_dsi_host *drm_of_get_dsi_bus(struct device *dev);
+#else
+static inline struct
+mipi_dsi_host *drm_of_get_dsi_bus(struct device *dev)
+{
+	return ERR_PTR(-EINVAL);
+}
+#endif /* CONFIG_OF && CONFIG_DRM_MIPI_DSI */
 
 /*
  * drm_of_panel_bridge_remove - remove panel bridge

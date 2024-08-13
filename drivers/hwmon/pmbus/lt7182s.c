@@ -168,7 +168,7 @@ static int lt7182s_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id lt7182s_id[] = {
-	{ "lt7182s", 0 },
+	{ "lt7182s" },
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, lt7182s_id);
@@ -183,7 +183,7 @@ static struct i2c_driver lt7182s_driver = {
 		.name = "lt7182s",
 		.of_match_table = of_match_ptr(lt7182s_of_match),
 	},
-	.probe_new = lt7182s_probe,
+	.probe = lt7182s_probe,
 	.id_table = lt7182s_id,
 };
 
