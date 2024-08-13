@@ -368,29 +368,58 @@ def get_kernel_repo_dir() -> str:
   return get_parent_path(this_script_full_path, 6)
 
 
-def build_config(llvm_cov_path: str, tmp_dir: str) -> {}:
-  """Build configuration.
+class Config:
+  """The input and output paths of this script."""
 
-  Returns:
-    A dictionary containing the configuration.
-  """
-  config = {}
-  config["repo_dir"] = get_kernel_repo_dir()
-  config["output_dir"] = f'{config["repo_dir"]}/out'
-  config["output_cov_dir"] = (
-      os.path.abspath(tmp_dir) if tmp_dir else
-      os.path.join(config["repo_dir"], OUTPUT_COV_DIR)
-  )
+  def __init__(self, repo_dir: str, llvm_cov_path: str, tmp_dir: str):
+    """Each argument can be empty."""
+    self._repo_dir = os.path.abspath(repo_dir) if repo_dir else None
+    self._llvm_cov_path = (
+        os.path.abspath(llvm_cov_path) if llvm_cov_path else None
+    )
+    self._tmp_dir = os.path.abspath(tmp_dir) if tmp_dir else None
+    self._repo_out_dir = None
 
-  config["llvm_cov_filename"] = (
-      os.path.abspath(llvm_cov_path) if llvm_cov_path else
-      os.path.join(config["repo_dir"], PREBUILT_LLVM_COV_PATH)
-  )
+  @property
+  def repo_dir(self) -> str:
+    if not self._repo_dir:
+      self._repo_dir = get_kernel_repo_dir()
+    return self._repo_dir
 
-  config["llvm_gcov_sh_filename"] = (
-      f'{config["output_cov_dir"]}/tmp/llvm-gcov.sh'
-  )
-  return config
+  def _get_repo_path(self, rel_path: str) -> str:
+    repo_path = os.path.join(self.repo_dir, rel_path)
+    if not os.path.exists(repo_path):
+      logging.error(
+          "%s does not exist. If this script is not in the source directory,"
+          " specify --repo-dir. If you do not have full kernel source,"
+          " specify --llvm-cov, --gcno-dir, and --tmp-dir.",
+          repo_path,
+      )
+      sys.exit(-1)
+    return repo_path
+
+  @property
+  def llvm_cov_path(self) -> str:
+    if not self._llvm_cov_path:
+      self._llvm_cov_path = self._get_repo_path(PREBUILT_LLVM_COV_PATH)
+    return self._llvm_cov_path
+
+  @property
+  def repo_out_dir(self) -> str:
+    if not self._repo_out_dir:
+      self._repo_out_dir = self._get_repo_path("out")
+    return self._repo_out_dir
+
+  @property
+  def tmp_dir(self) -> str:
+    if not self._tmp_dir:
+      # Temporary directory does not have to exist.
+      self._tmp_dir = os.path.join(self.repo_dir, OUTPUT_COV_DIR)
+    return self._tmp_dir
+
+  @property
+  def llvm_gcov_sh_path(self) -> str:
+    return os.path.join(self.tmp_dir, "tmp", "llvm-gcov.sh")
 
 
 def main() -> None:
@@ -428,6 +457,11 @@ def main() -> None:
           " command line switches. If no includes are specified all source is"
           " included."
       ),
+  )
+  arg_parser.add_argument(
+      "--repo-dir",
+      required=False,
+      help="Root directory of kernel source"
   )
   arg_parser.add_argument(
       "--gcno-dir",
@@ -475,6 +509,10 @@ def main() -> None:
     logging.critical("       https://github.com/linux-test-project/lcov")
     sys.exit(-1)
 
+  if args.repo_dir and not os.path.isdir(args.repo_dir):
+    logging.error("%s is not a directory.", args.repo_dir)
+    sys.exit(-1)
+
   if args.llvm_cov and not os.path.isfile(args.llvm_cov):
     logging.error("%s is not a file.", args.llvm_cov)
     sys.exit(-1)
@@ -484,21 +522,20 @@ def main() -> None:
       logging.error("%s is not a directory.", gcno_dir)
       sys.exit(-1)
 
-  config = build_config(args.llvm_cov, args.tmp_dir)
+  config = Config(args.repo_dir, args.llvm_cov, args.tmp_dir)
 
   if args.gcno_dirs:
     gcno_mappings = read_gcno_dirs(args.gcno_dirs)
+    if not gcno_mappings:
+      logging.error("No gcno mapping files in %s", " ".join(args.gcno_dirs))
+      sys.exit(-1)
   else:
     gcno_mappings = read_gcno_mapping_files(
-        config["output_dir"], config["repo_dir"]
+        config.repo_out_dir, config.repo_dir
     )
-
-  if not gcno_mappings:
-    logging.error(
-        "Either 'to' or 'from' fields not found in the %s.",
-        config["output_dir"],
-    )
-    sys.exit(-1)
+    if not gcno_mappings:
+      logging.error("No gcno mapping files in %s", config.repo_out_dir)
+      sys.exit(-1)
 
   tar_file = find_most_recent_tarfile(
       args.tar_location, pattern="*kernel_coverage_*.tar.gz"
@@ -507,18 +544,18 @@ def main() -> None:
     logging.error("Unable to find a gcov tar under %s", args.tar_location)
     sys.exit(-1)
 
-  gcov_dir = unpack_gcov_tar(tar_file, config["output_cov_dir"])
+  gcov_dir = unpack_gcov_tar(tar_file, config.tmp_dir)
   correct_symlinks_in_directory(gcov_dir, gcno_mappings)
 
   create_llvm_gcov_sh(
-      config["llvm_cov_filename"],
-      config["llvm_gcov_sh_filename"],
+      config.llvm_cov_path,
+      config.llvm_gcov_sh_path,
   )
 
   generate_lcov_tracefile(
       gcov_dir,
-      config["repo_dir"],
-      config["llvm_gcov_sh_filename"],
+      config.repo_dir,
+      config.llvm_gcov_sh_path,
       args.out_file,
       args.include,
   )
