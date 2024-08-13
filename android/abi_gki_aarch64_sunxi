@@ -71,3 +71,8 @@
   clk_unregister_fixed_factor
   clk_unregister_fixed_rate
   clk_unregister_gate
+  __traceiter_dwc3_readl
+  __traceiter_dwc3_writel
+  __tracepoint_dwc3_readl
+  __tracepoint_dwc3_writel
+  pinctrl_gpio_set_config
