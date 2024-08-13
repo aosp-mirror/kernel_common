@@ -279,13 +279,15 @@ static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static void atmel_hlcdc_pwm_remove(struct platform_device *pdev)
+static int atmel_hlcdc_pwm_remove(struct platform_device *pdev)
 {
 	struct atmel_hlcdc_pwm *atmel = platform_get_drvdata(pdev);
 
 	pwmchip_remove(&atmel->chip);
 
 	clk_disable_unprepare(atmel->hlcdc->periph_clk);
+
+	return 0;
 }
 
 static const struct of_device_id atmel_hlcdc_pwm_dt_ids[] = {
@@ -300,7 +302,7 @@ static struct platform_driver atmel_hlcdc_pwm_driver = {
 		.pm = &atmel_hlcdc_pwm_pm_ops,
 	},
 	.probe = atmel_hlcdc_pwm_probe,
-	.remove_new = atmel_hlcdc_pwm_remove,
+	.remove = atmel_hlcdc_pwm_remove,
 };
 module_platform_driver(atmel_hlcdc_pwm_driver);
 
