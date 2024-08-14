@@ -18,9 +18,15 @@ DECLARE_HOOK(android_vh_wq_lockup_pool,
 	TP_PROTO(int cpu, unsigned long pool_ts),
 	TP_ARGS(cpu, pool_ts));
 
+#ifndef __GENKSYMS__
+DECLARE_RESTRICTED_HOOK(android_rvh_alloc_and_link_pwqs,
+	TP_PROTO(struct workqueue_struct *wq, int *ret, bool *skip),
+	TP_ARGS(wq, ret, skip), 1);
+#else
 DECLARE_HOOK(android_rvh_alloc_and_link_pwqs,
 	TP_PROTO(struct workqueue_struct *wq, int *ret, bool *skip),
 	TP_ARGS(wq, ret, skip));
+#endif
 
 #endif /* _TRACE_HOOK_WQLOCKUP_H */
 /* This part must be outside protection */
