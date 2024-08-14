@@ -39,6 +39,7 @@
   __traceiter_android_rvh_alloc_and_link_pwqs
   __traceiter_android_rvh_check_preempt_wakeup
   __traceiter_android_rvh_cpufreq_transition
+  __traceiter_android_rvh_create_worker
   __traceiter_android_rvh_dequeue_task_fair
   __traceiter_android_rvh_enqueue_task_fair
   __traceiter_android_rvh_percpu_rwsem_wait_complete
@@ -139,6 +140,7 @@
   __tracepoint_android_rvh_alloc_and_link_pwqs
   __tracepoint_android_rvh_check_preempt_wakeup
   __tracepoint_android_rvh_cpufreq_transition
+  __tracepoint_android_rvh_create_worker
   __tracepoint_android_rvh_dequeue_task_fair
   __tracepoint_android_rvh_enqueue_task_fair
   __tracepoint_android_rvh_percpu_rwsem_wait_complete
