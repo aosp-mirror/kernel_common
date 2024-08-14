@@ -388,8 +388,8 @@ static struct page *alloc_largest_available(unsigned long size,
 
 static struct dma_buf *system_heap_do_allocate(struct dma_heap *heap,
 					       unsigned long len,
-					       unsigned long fd_flags,
-					       unsigned long heap_flags,
+					       u32 fd_flags,
+					       u64 heap_flags,
 					       bool uncached)
 {
 	struct system_heap_buffer *buffer;
@@ -488,8 +488,8 @@ free_buffer:
 
 static struct dma_buf *system_heap_allocate(struct dma_heap *heap,
 					    unsigned long len,
-					    unsigned long fd_flags,
-					    unsigned long heap_flags)
+					    u32 fd_flags,
+					    u64 heap_flags)
 {
 	return system_heap_do_allocate(heap, len, fd_flags, heap_flags, false);
 }
