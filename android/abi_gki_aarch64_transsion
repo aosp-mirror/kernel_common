@@ -16,6 +16,7 @@
   __traceiter_android_vh_delayacct_freepages_end
   __traceiter_android_vh_delayacct_thrashing_start
   __traceiter_android_vh_delayacct_thrashing_end
+  __traceiter_android_vh_should_end_madvise
   __tracepoint_android_vh_delayacct_set_flag
   __tracepoint_android_vh_delayacct_clear_flag
   __tracepoint_android_rvh_delayacct_init
@@ -30,3 +31,4 @@
   __tracepoint_android_vh_delayacct_freepages_end
   __tracepoint_android_vh_delayacct_thrashing_start
   __tracepoint_android_vh_delayacct_thrashing_end
+  __tracepoint_android_vh_should_end_madvise
