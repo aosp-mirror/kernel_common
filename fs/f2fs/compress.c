@@ -1469,8 +1469,7 @@ continue_unlock:
 				 * from foreground operation.
 				 */
 				if (IS_NOQUOTA(cc->inode))
-					return 0;
-				ret = 0;
+					goto out;
 				f2fs_io_schedule_timeout(DEFAULT_IO_TIMEOUT);
 				goto retry_write;
 			}
@@ -1480,6 +1479,7 @@ continue_unlock:
 		*submitted += _submitted;
 	}
 
+out:
 	f2fs_balance_fs(F2FS_M_SB(mapping), true);
 
 	return 0;
