@@ -29,8 +29,10 @@ enum {
 struct nfsd_stats {
 	struct percpu_counter	counter[NFSD_STATS_COUNTERS_NUM];
 
-	atomic_t	th_cnt;		/* number of available threads */
+	/* Protected by nfsd_mutex */
+	unsigned int	th_cnt;		/* number of available threads */
 };
+
 
 extern struct nfsd_stats	nfsdstats;
 
