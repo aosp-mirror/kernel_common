@@ -5,6 +5,8 @@
 
 #include <linux/device.h>
 #include <linux/soc/mediatek/gzvm_drv.h>
+#include <linux/sched.h>
+#include <linux/rcuwait.h>
 
 /**
  * gzvm_handle_guest_exception() - Handle guest exception
@@ -58,4 +60,53 @@ bool gzvm_handle_guest_hvc(struct gzvm_vcpu *vcpu)
 	default:
 		return gzvm_arch_handle_guest_hvc(vcpu);
 	}
+}
+
+static void vcpu_block_wait(struct gzvm_vcpu *vcpu)
+{
+	struct rcuwait *wait = &vcpu->wait;
+
+	prepare_to_rcuwait(wait);
+
+	while (true) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		if (vcpu->idle_events.virtio_irq) {
+			vcpu->idle_events.virtio_irq = 0;
+			break;
+		}
+		if (vcpu->idle_events.vtimer_irq) {
+			vcpu->idle_events.vtimer_irq = 0;
+			break;
+		}
+		if (signal_pending(current))
+			break;
+		schedule();
+	}
+	finish_rcuwait(wait);
+}
+
+/**
+ * gzvm_handle_guest_idle() - Handle guest vm entering idle
+ * @vcpu: Pointer to struct gzvm_vcpu struct
+ * Return:
+ */
+int gzvm_handle_guest_idle(struct gzvm_vcpu *vcpu)
+{
+	int ret = 0;
+	u64 ns = 0;
+
+	ns = gzvm_vcpu_arch_get_timer_delay_ns(vcpu);
+
+	if (ns) {
+		gzvm_vtimer_set(vcpu, ns);
+		vcpu_block_wait(vcpu);
+		gzvm_vtimer_release(vcpu);
+	}
+
+	return ret;
+}
+
+void gzvm_handle_guest_ipi(struct gzvm_vcpu *vcpu)
+{
+	gzvm_vcpu_wakeup_all(vcpu->gzvm);
 }

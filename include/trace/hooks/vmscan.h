@@ -64,6 +64,25 @@ DECLARE_HOOK(android_vh_rebalance_anon_lru_bypass,
 DECLARE_HOOK(android_vh_use_vm_swappiness,
 	TP_PROTO(bool *use_vm_swappiness),
 	TP_ARGS(use_vm_swappiness));
+DECLARE_HOOK(android_vh_tune_scan_control,
+	TP_PROTO(bool *skip_swap),
+	TP_ARGS(skip_swap));
+DECLARE_HOOK(android_vh_handle_trylock_failed_folio,
+	TP_PROTO(struct list_head *folio_list),
+	TP_ARGS(folio_list));
+DECLARE_HOOK(android_vh_folio_trylock_set,
+	TP_PROTO(struct folio *folio),
+	TP_ARGS(folio));
+DECLARE_HOOK(android_vh_folio_trylock_clear,
+	TP_PROTO(struct folio *folio),
+	TP_ARGS(folio));
+DECLARE_HOOK(android_vh_get_folio_trylock_result,
+	TP_PROTO(struct folio *folio, bool *trylock_failed),
+	TP_ARGS(folio, trylock_failed));
+DECLARE_HOOK(android_vh_do_folio_trylock,
+	TP_PROTO(struct folio *folio, struct rw_semaphore *sem,
+		bool *got_lock, bool *skip),
+	TP_ARGS(folio, sem, got_lock, skip));
 #endif /* _TRACE_HOOK_VMSCAN_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>

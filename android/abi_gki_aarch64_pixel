@@ -297,6 +297,7 @@
   dev_fetch_sw_netstats
   devfreq_add_device
   devfreq_add_governor
+  devfreq_get_devfreq_by_phandle
   devfreq_monitor_resume
   devfreq_monitor_start
   devfreq_monitor_stop
@@ -2199,6 +2200,7 @@
   __traceiter_android_rvh_can_migrate_task
   __traceiter_android_rvh_cgroup_force_kthread_migration
   __traceiter_android_rvh_check_preempt_wakeup
+  __traceiter_android_rvh_check_preempt_wakeup_ignore
   __traceiter_android_rvh_cpu_overutilized
   __traceiter_android_rvh_dequeue_task
   __traceiter_android_rvh_dequeue_task_fair
@@ -2295,6 +2297,7 @@
   __tracepoint_android_rvh_can_migrate_task
   __tracepoint_android_rvh_cgroup_force_kthread_migration
   __tracepoint_android_rvh_check_preempt_wakeup
+  __tracepoint_android_rvh_check_preempt_wakeup_ignore
   __tracepoint_android_rvh_cpu_overutilized
   __tracepoint_android_rvh_dequeue_task
   __tracepoint_android_rvh_dequeue_task_fair

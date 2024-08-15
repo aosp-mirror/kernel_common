@@ -1961,9 +1961,9 @@ static void add_versions(struct buffer *b, struct module *mod)
 			continue;
 		}
 		if (strlen(s->name) >= MODULE_NAME_LEN) {
-			warn("too long symbol \"%s\" [%s.ko]\n",
-				s->name, mod->name);
-			continue;
+			error("too long symbol \"%s\" [%s.ko]\n",
+			      s->name, mod->name);
+			break;
 		}
 		buf_printf(b, "\t{ %#8x, \"%s\" },\n",
 			   s->crc, s->name);

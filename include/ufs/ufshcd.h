@@ -443,6 +443,7 @@ struct ufs_clk_gating {
  * @is_initialized: Indicates whether clock scaling is initialized or not
  * @is_busy_started: tracks if busy period has started or not
  * @is_suspended: tracks if devfreq is suspended or not
+ * @suspend_on_no_request: Flag to suspend clk scaling when there is no request
  */
 struct ufs_clk_scaling {
 	int active_reqs;
@@ -460,6 +461,10 @@ struct ufs_clk_scaling {
 	bool is_initialized;
 	bool is_busy_started;
 	bool is_suspended;
+	/* using hole here would not alter the overall size of the structure. */
+#ifndef __GENKSYMS__
+	bool suspend_on_no_request;
+#endif
 
 	ANDROID_KABI_RESERVE(1);
 };

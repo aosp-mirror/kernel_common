@@ -7,18 +7,40 @@
 
 /* out-of-line parts */
 
-#if !defined(INLINE_COPY_FROM_USER) || defined(CONFIG_RUST)
+#ifndef INLINE_COPY_FROM_USER
 unsigned long _copy_from_user(void *to, const void __user *from, unsigned long n)
 {
-	return _inline_copy_from_user(to, from, n);
+	unsigned long res = n;
+	might_fault();
+	if (!should_fail_usercopy() && likely(access_ok(from, n))) {
+		/*
+		 * Ensure that bad access_ok() speculation will not
+		 * lead to nasty side effects *after* the copy is
+		 * finished:
+		 */
+		barrier_nospec();
+		instrument_copy_from_user_before(to, from, n);
+		res = raw_copy_from_user(to, from, n);
+		instrument_copy_from_user_after(to, from, n, res);
+	}
+	if (unlikely(res))
+		memset(to + (n - res), 0, res);
+	return res;
 }
 EXPORT_SYMBOL(_copy_from_user);
 #endif
 
-#if !defined(INLINE_COPY_TO_USER) || defined(CONFIG_RUST)
+#ifndef INLINE_COPY_TO_USER
 unsigned long _copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	return _inline_copy_to_user(to, from, n);
+	might_fault();
+	if (should_fail_usercopy())
+		return n;
+	if (likely(access_ok(to, n))) {
+		instrument_copy_to_user(to, from, n);
+		n = raw_copy_to_user(to, from, n);
+	}
+	return n;
 }
 EXPORT_SYMBOL(_copy_to_user);
 #endif

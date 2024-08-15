@@ -42,6 +42,12 @@
   free_fs_struct
   freq_qos_add_notifier
   freq_qos_remove_notifier
+  fsnotify_add_mark
+  fsnotify_alloc_group
+  fsnotify_destroy_mark
+  fsnotify_init_mark
+  fsnotify_put_group
+  fsnotify_put_mark
   fsstack_copy_inode_size
   generic_delete_inode
   __generic_file_fsync
@@ -480,6 +486,7 @@
   page_mapping
   __trace_puts
   truncate_inode_pages
+  try_to_del_timer_sync
   try_to_free_mem_cgroup_pages
   typec_mux_get_drvdata
   __udp4_lib_lookup
@@ -503,6 +510,7 @@
   vfs_rmdir
   vfs_statfs
   vfs_unlink
+  __vmalloc_array
   wait_for_completion_io_timeout
   wait_for_completion_killable_timeout
   wakeup_source_remove

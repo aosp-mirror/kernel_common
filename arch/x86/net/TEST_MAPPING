@@ -12,6 +12,17 @@
  ],
  "presubmit": [
     {
+      "name": "CtsAppEnumerationTestCases",
+      "options": [
+        {
+          "exclude-annotation": "com.android.testutils.SkipPresubmit"
+        },
+        {
+          "include-filter": "android.appenumeration.cts.AppEnumerationTests"
+        }
+      ]
+    },
+    {
       "name": "CtsNetTestCases",
       "options": [
         {

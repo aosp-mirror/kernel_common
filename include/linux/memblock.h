@@ -604,4 +604,14 @@ static inline void memtest_report_meminfo(struct seq_file *m) { }
 #endif
 
 
+extern void __init_memblock memblock_memsize_record(const char *name,
+		phys_addr_t base, phys_addr_t size, bool nomap, bool reusable);
+extern void __init memblock_memsize_detect_hole(void);
+extern void __init memblock_memsize_enable_tracking(void);
+extern void __init memblock_memsize_disable_tracking(void);
+extern void memblock_memsize_mod_kernel_size(long size);
+extern void __init memblock_memsize_mod_memmap_size(long size);
+extern void __init memblock_memsize_kernel_code_data(unsigned long code,
+		unsigned long data, unsigned long ro, unsigned long bss);
+extern void memblock_memsize_mod_reusable_size(long size);
 #endif /* _LINUX_MEMBLOCK_H */

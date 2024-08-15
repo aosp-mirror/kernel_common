@@ -460,6 +460,7 @@ struct page *__cma_alloc(struct cma *cma, unsigned long count,
 	if (!count)
 		goto out;
 
+	trace_android_vh_cma_alloc_set_max_retries(&max_retries);
 	trace_cma_alloc_start(cma->name, count, align);
 
 	mask = cma_bitmap_aligned_mask(cma, align);

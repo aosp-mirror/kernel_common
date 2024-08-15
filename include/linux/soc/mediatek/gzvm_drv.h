@@ -107,6 +107,12 @@ struct gzvm_vcpu {
 	struct mutex lock;
 	struct gzvm_vcpu_run *run;
 	struct gzvm_vcpu_hwstate *hwstate;
+	struct hrtimer gzvm_vtimer;
+	struct {
+		u32 vtimer_irq;
+		u32 virtio_irq;
+	} idle_events;
+	struct rcuwait wait;
 };
 
 struct gzvm_pinned_page {
@@ -214,10 +220,16 @@ int gzvm_vm_allocate_guest_page(struct gzvm *gzvm, struct gzvm_memslot *slot,
 int gzvm_vm_ioctl_create_vcpu(struct gzvm *gzvm, u32 cpuid);
 int gzvm_arch_vcpu_update_one_reg(struct gzvm_vcpu *vcpu, __u64 reg_id,
 				  bool is_write, __u64 *data);
+int gzvm_arch_drv_init(void);
 int gzvm_arch_create_vcpu(u16 vm_id, int vcpuid, void *run);
 int gzvm_arch_vcpu_run(struct gzvm_vcpu *vcpu, __u64 *exit_reason);
 int gzvm_arch_destroy_vcpu(u16 vm_id, int vcpuid);
 int gzvm_arch_inform_exit(u16 vm_id);
+
+u64 gzvm_vcpu_arch_get_timer_delay_ns(struct gzvm_vcpu *vcpu);
+
+void gzvm_vtimer_set(struct gzvm_vcpu *vcpu, u64 ns);
+void gzvm_vtimer_release(struct gzvm_vcpu *vcpu);
 
 int gzvm_drv_debug_init(void);
 void gzvm_drv_debug_exit(void);
@@ -228,6 +240,9 @@ bool gzvm_handle_guest_exception(struct gzvm_vcpu *vcpu);
 int gzvm_handle_relinquish(struct gzvm_vcpu *vcpu, phys_addr_t ipa);
 bool gzvm_handle_guest_hvc(struct gzvm_vcpu *vcpu);
 bool gzvm_arch_handle_guest_hvc(struct gzvm_vcpu *vcpu);
+int gzvm_handle_guest_idle(struct gzvm_vcpu *vcpu);
+void gzvm_handle_guest_ipi(struct gzvm_vcpu *vcpu);
+void gzvm_vcpu_wakeup_all(struct gzvm *gzvm);
 
 int gzvm_arch_create_device(u16 vm_id, struct gzvm_create_device *gzvm_dev);
 int gzvm_arch_inject_irq(struct gzvm *gzvm, unsigned int vcpu_idx,

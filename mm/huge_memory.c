@@ -3428,7 +3428,11 @@ static unsigned long deferred_split_count(struct shrinker *shrink,
 {
 	struct pglist_data *pgdata = NODE_DATA(sc->nid);
 	struct deferred_split *ds_queue = &pgdata->deferred_split_queue;
+	bool bypass = false;
 
+	trace_android_vh_split_large_folio_bypass(&bypass);
+	if (bypass)
+		return 0;
 #ifdef CONFIG_MEMCG
 	if (sc->memcg)
 		ds_queue = &sc->memcg->deferred_split_queue;

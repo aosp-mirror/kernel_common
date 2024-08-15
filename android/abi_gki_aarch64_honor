@@ -47,6 +47,14 @@
   drop_super
   filp_open_block
   mm_trace_rss_stat
+  get_slabinfo
+  xas_find
+  contpte_ptep_test_and_clear_young
+  tty_dev_name_to_number
+  tty_kopen_exclusive
+  tty_unlock
+  tty_set_ldisc
+  tty_kclose
   __kfifo_len_r
   __traceiter_android_vh_rwsem_write_wait_finish
   __tracepoint_android_vh_rwsem_write_wait_finish
@@ -76,17 +84,43 @@
   __tracepoint_android_vh_tcp_connect
   __traceiter_android_vh_tcp_write_timeout_estab_retrans
   __tracepoint_android_vh_tcp_write_timeout_estab_retrans
+  __traceiter_android_vh_inet_csk_clone_lock
+  __tracepoint_android_vh_inet_csk_clone_lock
+  __traceiter_android_vh_tcp_clean_rtx_queue
+  __tracepoint_android_vh_tcp_clean_rtx_queue
+  __traceiter_android_vh_tcp_rcv_synack
+  __tracepoint_android_vh_tcp_rcv_synack
   __tracepoint_android_vh_si_mem_available_adjust
   __traceiter_android_vh_si_mem_available_adjust
   __tracepoint_android_vh_si_meminfo_adjust
   __traceiter_android_vh_si_meminfo_adjust
   __traceiter_android_vh_rwsem_write_finished
   __tracepoint_android_vh_rwsem_write_finished
+  __traceiter_android_vh_tcp_v4_connect
+  __tracepoint_android_vh_tcp_v4_connect
+  __traceiter_android_vh_tcp_v6_connect
+  __tracepoint_android_vh_tcp_v6_connect
+  __traceiter_android_vh_udp_v4_connect
+  __tracepoint_android_vh_udp_v4_connect
+  __traceiter_android_vh_udp_v6_connect
+  __tracepoint_android_vh_udp_v6_connect
   __traceiter_android_rvh_hw_protection_shutdown
   __tracepoint_android_rvh_hw_protection_shutdown
   __traceiter_android_rvh_bpf_int_jit_compile_ro
   __tracepoint_android_rvh_bpf_int_jit_compile_ro
+  __traceiter_android_vh_tcp_sock_error
+  __tracepoint_android_vh_tcp_sock_error
+  __traceiter_android_vh_tcp_select_window
+  __tracepoint_android_vh_tcp_select_window
+  __traceiter_android_vh_tcp_fastsyn
+  __tracepoint_android_vh_tcp_fastsyn
+  __traceiter_android_vh_tcp_state_change
+  __tracepoint_android_vh_tcp_state_change
+  __traceiter_android_vh_tcp_update_rtt
+  __tracepoint_android_vh_tcp_update_rtt
   __traceiter_android_vh_sk_alloc
   __tracepoint_android_vh_sk_alloc
   __traceiter_android_vh_sk_free
   __tracepoint_android_vh_sk_free
+  __traceiter_android_vh_sk_clone_lock
+  __tracepoint_android_vh_sk_clone_lock

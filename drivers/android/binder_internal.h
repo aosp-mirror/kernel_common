@@ -15,6 +15,7 @@
 #include <linux/android_vendor.h>
 #include <uapi/linux/android/binderfs.h>
 #include "binder_alloc.h"
+#include "dbitmap.h"
 
 struct binder_context {
 	struct binder_node *binder_context_mgr_node;
@@ -447,7 +448,6 @@ struct binder_proc {
 	bool sync_recv;
 	bool async_recv;
 	wait_queue_head_t freeze_wait;
-
 	struct list_head todo;
 	struct binder_stats stats;
 	struct list_head delivered_death;
@@ -465,6 +465,23 @@ struct binder_proc {
 	bool oneway_spam_detection_enabled;
 	ANDROID_OEM_DATA(1);
 };
+
+/**
+ * struct binder_proc_wrap - wrapper to preserve KMI in binder_proc
+ * @proc:                    binder_proc being wrapped
+ * @dmap                     dbitmap to manage available reference descriptors
+ *                           (protected by @proc.outer_lock)
+ */
+struct binder_proc_wrap {
+	struct binder_proc proc;
+	struct dbitmap dmap;
+};
+
+static inline
+struct binder_proc_wrap *proc_wrapper(struct binder_proc *proc)
+{
+	return container_of(proc, struct binder_proc_wrap, proc);
+}
 
 /**
  * struct binder_thread - binder thread bookkeeping

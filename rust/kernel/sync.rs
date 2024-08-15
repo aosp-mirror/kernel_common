@@ -11,10 +11,9 @@ mod arc;
 mod condvar;
 pub mod lock;
 mod locked_by;
-pub mod poll;
 
 pub use arc::{Arc, ArcBorrow, UniqueArc};
-pub use condvar::{CondVar, CondVarTimeoutResult};
+pub use condvar::CondVar;
 pub use lock::{mutex::Mutex, spinlock::SpinLock};
 pub use locked_by::LockedBy;
 

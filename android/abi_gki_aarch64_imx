@@ -327,6 +327,18 @@
   device_wakeup_enable
   _dev_info
   dev_kfree_skb_any_reason
+  devl_assert_locked
+  devlink_alloc_ns
+  devlink_free
+  devlink_params_register
+  devlink_params_unregister
+  devlink_priv
+  devlink_register
+  devlink_unregister
+  devl_lock
+  devl_param_driverinit_value_get
+  devl_param_driverinit_value_set
+  devl_unlock
   __devm_add_action
   devm_alloc_etherdev_mqs
   __devm_alloc_percpu
@@ -588,6 +600,7 @@
   dpcm_end_walk_at_be
   dql_completed
   dql_reset
+  drain_workqueue
   driver_create_file
   driver_find_device
   driver_register
@@ -788,6 +801,7 @@
   drm_of_find_possible_crtcs
   drm_of_get_data_lanes_count
   drm_of_get_data_lanes_count_ep
+  drm_of_lvds_get_data_mapping
   drm_of_lvds_get_dual_link_pixel_order
   drm_open
   drm_panel_add
@@ -901,6 +915,8 @@
   free_pages_exact
   free_percpu
   free_percpu_irq
+  freezer_active
+  freezing_slow_path
   fwnode_device_is_available
   fwnode_get_named_child_node
   fwnode_get_next_available_child_node
@@ -1010,6 +1026,8 @@
   hdmi_avi_infoframe_pack
   hdmi_drm_infoframe_init
   hdmi_drm_infoframe_pack
+  hdmi_spd_infoframe_init
+  hdmi_spd_infoframe_pack
   hdmi_vendor_infoframe_pack
   hex_dump_to_buffer
   hrtimer_active
@@ -1511,6 +1529,7 @@
   of_get_child_by_name
   of_get_compatible_child
   of_get_display_timing
+  of_get_drm_panel_display_mode
   of_get_mac_address
   of_get_named_gpio
   of_get_next_available_child
@@ -1837,6 +1856,7 @@
   prepare_to_wait_event
   print_hex_dump
   _printk
+  priv_to_devlink
   proc_create_data
   proc_create_seq_private
   proc_create_single_data
@@ -1896,6 +1916,7 @@
   rdev_get_id
   reboot_mode
   refcount_warn_saturate
+  __refrigerator
   regcache_cache_bypass
   regcache_cache_only
   regcache_mark_dirty
@@ -1930,6 +1951,8 @@
   __regmap_init_mmio_clk
   regmap_irq_get_virq
   regmap_multi_reg_write
+  regmap_noinc_read
+  regmap_noinc_write
   regmap_raw_read
   regmap_raw_write
   regmap_read
@@ -1958,6 +1981,7 @@
   regulator_map_voltage_ascend
   regulator_put
   regulator_set_current_limit
+  regulator_set_load
   regulator_set_ramp_delay_regmap
   regulator_set_voltage
   regulator_set_voltage_sel_regmap
@@ -2379,6 +2403,7 @@
   timer_delete
   timer_delete_sync
   timer_of_init
+  timer_shutdown_sync
   _totalram_pages
   touchscreen_parse_properties
   touchscreen_report_pos
@@ -2559,6 +2584,7 @@
   v4l2_get_link_freq
   v4l2_g_parm_cap
   v4l2_i2c_subdev_init
+  v4l2_i2c_subdev_set_name
   v4l2_m2m_buf_copy_metadata
   v4l2_m2m_buf_queue
   v4l2_m2m_buf_remove

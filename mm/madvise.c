@@ -372,11 +372,18 @@ static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
 	struct folio *folio = NULL;
 	LIST_HEAD(folio_list);
 	bool pageout_anon_only_filter;
+	bool abort_madvise = false;
 	int nr;
 	swp_entry_t entry;
+	int ret = 0;
 
-	if (fatal_signal_pending(current))
+	trace_android_vh_madvise_cold_or_pageout_abort(vma, &abort_madvise);
+	if (fatal_signal_pending(current) || abort_madvise)
 		return -EINTR;
+
+	trace_android_vh_madvise_pageout_bypass(mm, pageout, &ret);
+	if (ret)
+		return ret;
 
 	pageout_anon_only_filter = pageout && !vma_is_anonymous(vma) &&
 					!can_do_file_pageout(vma);
@@ -497,12 +504,17 @@ regular_folio:
 
 			nr = madvise_folio_pte_batch(addr, end, folio, pte,
 						     ptent, &any_young, NULL);
+
 			if (any_young)
 				ptent = pte_mkyoung(ptent);
 
 			if (nr < folio_nr_pages(folio)) {
 				int err;
+				bool bypass = false;
 
+				trace_android_vh_split_large_folio_bypass(&bypass);
+				if (bypass)
+					continue;
 				if (folio_likely_mapped_shared(folio))
 					continue;
 				if (pageout_anon_only_filter && !folio_test_anon(folio))
@@ -621,7 +633,7 @@ static long madvise_cold(struct vm_area_struct *vma,
 	return 0;
 }
 
-static void madvise_pageout_page_range(struct mmu_gather *tlb,
+static int madvise_pageout_page_range(struct mmu_gather *tlb,
 			     struct vm_area_struct *vma,
 			     unsigned long addr, unsigned long end)
 {
@@ -629,10 +641,13 @@ static void madvise_pageout_page_range(struct mmu_gather *tlb,
 		.pageout = true,
 		.tlb = tlb,
 	};
+	int ret;
 
 	tlb_start_vma(tlb, vma);
-	walk_page_range(vma->vm_mm, addr, end, &cold_walk_ops, &walk_private);
+	ret = walk_page_range(vma->vm_mm, addr, end, &cold_walk_ops, &walk_private);
 	tlb_end_vma(tlb, vma);
+
+	return ret;
 }
 
 static long madvise_pageout(struct vm_area_struct *vma,
@@ -641,6 +656,8 @@ static long madvise_pageout(struct vm_area_struct *vma,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct mmu_gather tlb;
+	int ret;
+	bool return_error = false;
 
 	*prev = vma;
 	if (!can_madv_lru_vma(vma))
@@ -658,8 +675,12 @@ static long madvise_pageout(struct vm_area_struct *vma,
 
 	lru_add_drain();
 	tlb_gather_mmu(&tlb, mm);
-	madvise_pageout_page_range(&tlb, vma, start_addr, end_addr);
+	ret = madvise_pageout_page_range(&tlb, vma, start_addr, end_addr);
 	tlb_finish_mmu(&tlb);
+
+	trace_android_vh_madvise_pageout_return_error(ret, &return_error);
+	if (return_error)
+		return (long)ret;
 
 	return 0;
 }
@@ -1442,6 +1463,7 @@ int madvise_set_anon_name(struct mm_struct *mm, unsigned long start,
  *  -EIO    - an I/O error occurred while paging in data.
  *  -EBADF  - map exists, but area maps something that isn't a file.
  *  -EAGAIN - a kernel resource was temporarily unavailable.
+ *  -EPERM  - memory is sealed.
  */
 int do_madvise(struct mm_struct *mm, unsigned long start, size_t len_in, int behavior)
 {
@@ -1485,10 +1507,21 @@ int do_madvise(struct mm_struct *mm, unsigned long start, size_t len_in, int beh
 	start = untagged_addr_remote(mm, start);
 	end = start + len;
 
+	/*
+	 * Check if the address range is sealed for do_madvise().
+	 * can_modify_mm_madv assumes we have acquired the lock on MM.
+	 */
+	if (unlikely(!can_modify_mm_madv(mm, start, end, behavior))) {
+		error = -EPERM;
+		goto out;
+	}
+
 	blk_start_plug(&plug);
 	error = madvise_walk_vmas(mm, start, end, behavior,
 			madvise_vma_behavior);
 	blk_finish_plug(&plug);
+
+out:
 	if (write)
 		mmap_write_unlock(mm);
 	else
@@ -1513,6 +1546,13 @@ SYSCALL_DEFINE5(process_madvise, int, pidfd, const struct iovec __user *, vec,
 	struct mm_struct *mm;
 	size_t total_len;
 	unsigned int f_flags;
+	bool bypass = false;
+	bool return_error = false;
+
+	trace_android_rvh_process_madvise_bypass(pidfd, vec,
+			vlen, behavior, flags, &ret, &bypass);
+	if (bypass)
+		return ret;
 
 	if (flags != 0) {
 		ret = -EINVAL;
@@ -1559,6 +1599,9 @@ SYSCALL_DEFINE5(process_madvise, int, pidfd, const struct iovec __user *, vec,
 			break;
 		iov_iter_advance(&iter, iter_iov_len(&iter));
 	}
+	trace_android_vh_process_madvise_return_error(behavior, ret, &return_error);
+	if (return_error)
+		goto release_mm;
 
 	ret = (total_len - iov_iter_count(&iter)) ? : ret;
 

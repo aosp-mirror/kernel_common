@@ -11,6 +11,22 @@
 #include <linux/soc/mediatek/gzvm_drv.h>
 #include "gzvm_arch_common.h"
 
+u64 gzvm_vcpu_arch_get_timer_delay_ns(struct gzvm_vcpu *vcpu)
+{
+	u64 ns;
+
+	if (vcpu->hwstate->vtimer_migrate) {
+		ns = clocksource_cyc2ns(le64_to_cpu(vcpu->hwstate->vtimer_delay),
+					gzvm_vtimer_get_clock_mult(),
+					gzvm_vtimer_get_clock_shift());
+	} else {
+		ns = 0;
+	}
+
+	/* 0: no migrate, otherwise: migrate  */
+	return ns;
+}
+
 int gzvm_arch_vcpu_update_one_reg(struct gzvm_vcpu *vcpu, __u64 reg_id,
 				  bool is_write, __u64 *data)
 {

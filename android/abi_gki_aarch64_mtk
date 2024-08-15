@@ -828,6 +828,7 @@
   drm_connector_list_iter_end
   drm_connector_list_iter_next
   drm_connector_register
+  drm_connector_set_path_property
   drm_connector_unregister
   drm_connector_update_edid_property
   drm_crtc_add_crc_entry
@@ -2555,6 +2556,8 @@
   set_capacity
   set_capacity_and_notify
   set_cpus_allowed_ptr
+  set_direct_map_default_noflush
+  set_direct_map_invalid_noflush
   set_disk_ro
   set_freezable
   set_next_entity

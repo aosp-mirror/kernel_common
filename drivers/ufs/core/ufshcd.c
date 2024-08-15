@@ -53,8 +53,10 @@
 
 
 /* UIC command timeout, unit: ms */
-#define UIC_CMD_TIMEOUT	500
-
+enum {
+	UIC_CMD_TIMEOUT_DEFAULT	= 500,
+	UIC_CMD_TIMEOUT_MAX	= 2000,
+};
 /* NOP OUT retries waiting for NOP IN response */
 #define NOP_OUT_RETRIES    10
 /* Timeout after 50 msecs if NOP OUT hangs without response */
@@ -111,6 +113,23 @@ static bool is_mcq_supported(struct ufs_hba *hba)
 
 module_param(use_mcq_mode, bool, 0644);
 MODULE_PARM_DESC(use_mcq_mode, "Control MCQ mode for controllers starting from UFSHCI 4.0. 1 - enable MCQ, 0 - disable MCQ. MCQ is enabled by default");
+
+static unsigned int uic_cmd_timeout = UIC_CMD_TIMEOUT_DEFAULT;
+
+static int uic_cmd_timeout_set(const char *val, const struct kernel_param *kp)
+{
+	return param_set_uint_minmax(val, kp, UIC_CMD_TIMEOUT_DEFAULT,
+				     UIC_CMD_TIMEOUT_MAX);
+}
+
+static const struct kernel_param_ops uic_cmd_timeout_ops = {
+	.set = uic_cmd_timeout_set,
+	.get = param_get_uint,
+};
+
+module_param_cb(uic_cmd_timeout, &uic_cmd_timeout_ops, &uic_cmd_timeout, 0644);
+MODULE_PARM_DESC(uic_cmd_timeout,
+		 "UFS UIC command timeout in milliseconds. Defaults to 500ms. Supported values range from 500ms to 2 seconds inclusively");
 
 #define ufshcd_toggle_vreg(_dev, _vreg, _on)				\
 	({                                                              \
@@ -427,15 +446,15 @@ static void ufshcd_add_command_trace(struct ufs_hba *hba, unsigned int tag,
 
 	opcode = cmd->cmnd[0];
 
-	if (opcode == READ_10 || opcode == WRITE_10) {
-		/*
-		 * Currently we only fully trace read(10) and write(10) commands
-		 */
+	if (opcode == READ_10 || opcode == WRITE_10 ||
+				opcode == READ_16 || opcode == WRITE_16) {
 		transfer_len =
 		       be32_to_cpu(lrbp->ucd_req_ptr->sc.exp_data_transfer_len);
 		lba = scsi_get_lba(cmd);
 		if (opcode == WRITE_10)
 			group_id = lrbp->cmd->cmnd[6];
+		if (opcode == WRITE_16)
+			group_id = lrbp->cmd->cmnd[14];
 	} else if (opcode == UNMAP) {
 		/*
 		 * The number of Bytes to be unmapped beginning with the lba.
@@ -1444,7 +1463,8 @@ static int ufshcd_devfreq_target(struct device *dev,
 		ktime_to_us(ktime_sub(ktime_get(), start)), ret);
 
 out:
-	if (sched_clk_scaling_suspend_work && !scale_up)
+	if (sched_clk_scaling_suspend_work &&
+			(!scale_up || hba->clk_scaling.suspend_on_no_request))
 		queue_work(hba->clk_scaling.workq,
 			   &hba->clk_scaling.suspend_work);
 
@@ -2311,7 +2331,7 @@ static inline bool ufshcd_ready_for_uic_cmd(struct ufs_hba *hba)
 {
 	u32 val;
 	int ret = read_poll_timeout(ufshcd_readl, val, val & UIC_COMMAND_READY,
-				    500, UIC_CMD_TIMEOUT * 1000, false, hba,
+				    500, uic_cmd_timeout * 1000, false, hba,
 				    REG_CONTROLLER_STATUS);
 	return ret == 0 ? true : false;
 }
@@ -2371,7 +2391,7 @@ ufshcd_wait_for_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 	lockdep_assert_held(&hba->uic_cmd_mutex);
 
 	if (wait_for_completion_timeout(&uic_cmd->done,
-					msecs_to_jiffies(UIC_CMD_TIMEOUT))) {
+					msecs_to_jiffies(uic_cmd_timeout))) {
 		ret = uic_cmd->argument2 & MASK_UIC_COMMAND_RESULT;
 	} else {
 		ret = -ETIMEDOUT;
@@ -4168,7 +4188,7 @@ static int ufshcd_uic_pwr_ctrl(struct ufs_hba *hba, struct uic_command *cmd)
 	}
 
 	if (!wait_for_completion_timeout(hba->uic_async_done,
-					 msecs_to_jiffies(UIC_CMD_TIMEOUT))) {
+					 msecs_to_jiffies(uic_cmd_timeout))) {
 		dev_err(hba->dev,
 			"pwr ctrl cmd 0x%x with mode 0x%x completion timeout\n",
 			cmd->command, cmd->argument3);

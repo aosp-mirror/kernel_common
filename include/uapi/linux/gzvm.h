@@ -21,6 +21,7 @@
 /* query hypervisor supported block-based demand page */
 #define GZVM_CAP_BLOCK_BASED_DEMAND_PAGING	0x9201
 #define GZVM_CAP_ENABLE_DEMAND_PAGING	0x9202
+#define GZVM_CAP_ENABLE_IDLE		0x9203
 
 /* sub-commands put in args[0] for GZVM_CAP_PROTECTED_VM */
 #define GZVM_CAP_PVM_SET_PVMFW_GPA		0
@@ -187,6 +188,8 @@ enum {
 	GZVM_EXIT_SYSTEM_EVENT = 0x92920008,
 	GZVM_EXIT_SHUTDOWN = 0x92920009,
 	GZVM_EXIT_GZ = 0x9292000a,
+	GZVM_EXIT_IDLE = 0x9292000b,
+	GZVM_EXIT_IPI = 0x9292000d,
 };
 
 /* exception definitions of GZVM_EXIT_EXCEPTION */

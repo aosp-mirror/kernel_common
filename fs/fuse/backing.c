@@ -987,6 +987,22 @@ ssize_t fuse_splice_read_backing(struct file *in, loff_t *ppos,
 	return ret;
 }
 
+ssize_t fuse_splice_write_backing(struct pipe_inode_info *pipe,
+		struct file *out, loff_t *ppos, size_t len, unsigned long flags)
+{
+	ssize_t ret;
+	struct fuse_file *ff = out->private_data;
+
+	inode_lock(file_inode(out));
+	file_start_write(ff->backing_file);
+	ret = iter_file_splice_write(pipe, ff->backing_file, ppos, len, flags);
+	file_end_write(ff->backing_file);
+	if (ret > 0)
+		fuse_copyattr(out, ff->backing_file);
+	inode_unlock(file_inode(out));
+	return ret;
+}
+
 long fuse_backing_ioctl(struct file *file, unsigned int command, unsigned long arg, int flags)
 {
 	struct fuse_file *ff = file->private_data;
@@ -1135,7 +1151,6 @@ int fuse_lookup_backing(struct fuse_bpf_args *fa, struct inode *dir,
 	struct kstat stat;
 	int err;
 
-	/* TODO this will not handle lookups over mount points */
 	inode_lock_nested(dir_backing_inode, I_MUTEX_PARENT);
 	backing_entry = lookup_one_len(entry->d_name.name, dir_backing_entry,
 					strlen(entry->d_name.name));
@@ -1154,16 +1169,22 @@ int fuse_lookup_backing(struct fuse_bpf_args *fa, struct inode *dir,
 		return 0;
 	}
 
+	err = follow_down(&fuse_entry->backing_path, 0);
+	if (err)
+		goto err_out;
+
 	err = vfs_getattr(&fuse_entry->backing_path, &stat,
 				  STATX_BASIC_STATS, 0);
-	if (err) {
-		path_put_init(&fuse_entry->backing_path);
-		return err;
-	}
+	if (err)
+		goto err_out;
 
 	fuse_stat_to_attr(get_fuse_conn(dir),
 			  backing_entry->d_inode, &stat, &feo->attr);
 	return 0;
+
+err_out:
+	path_put_init(&fuse_entry->backing_path);
+	return err;
 }
 
 int fuse_handle_backing(struct fuse_entry_bpf *feb, struct inode **backing_inode,

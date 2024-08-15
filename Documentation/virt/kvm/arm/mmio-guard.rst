@@ -27,6 +27,12 @@ will result in an exception being delivered to the guest.
 This relies on a set of hypercalls defined in the KVM-specific range,
 using the HVC64 calling convention.
 
+When operating on a range of contiguous IPA space, it is recommended
+to use ARM_SMCCC_KVM_FUNC_MMIO_RGUARD_MAP and
+ARM_SMCCC_KVM_FUNC_MMIO_RGUARD_UNMAP. Those HVCs take a number of
+granules as an argument. See ``KVM_FUNC_HAS_RANGE`` in hypercalls.rst
+for a complete description.
+
 * ARM_SMCCC_KVM_FUNC_MMIO_GUARD_INFO
 
     ==============    ========    ================================
@@ -34,7 +40,9 @@ using the HVC64 calling convention.
     Arguments:        r1-r3       Reserved / Must be zero
     Return Values:    (int64)     NOT_SUPPORTED(-1) on error, or
                       (uint64)    Protection Granule (PG) size in
-                                  bytes (r0)
+                                  bytes (r0). KVM_FUNC_HAS_RANGE(1)
+                                  is set (r1) if RGUARD_MAP and
+                                  RGUARD_UNMAP HVCs are available.
     ==============    ========    ================================
 
 * ARM_SMCCC_KVM_FUNC_MMIO_GUARD_ENROLL
@@ -71,4 +79,36 @@ using the HVC64 calling convention.
                                   have been previously mapped (r1)
     Return Values:    (int64)     NOT_SUPPORTED(-1) on error, or
                                   RET_SUCCESS(0) (r0)
+    ==============    ========    ======================================
+
+* ARM_SMCCC_KVM_FUNC_MMIO_RGUARD_MAP
+
+    ==============    ========    ====================================
+    Function ID:      (uint32)    0xC600000A
+    Arguments:        (uint64)    The base of the PG-sized IPA range
+                                  that is allowed to be accessed as
+                                  MMIO. Must be aligned to the PG size
+                                  (r1)
+                      (uint64)    Number of granules to guard (r2). See
+                                  ``KVM_FUNC_HAS_RANGE`` in
+                                  hypercalls.rst for more details
+    Return Values:    (int64)     NOT_SUPPORTED(-1) on error, or
+                                  RET_SUCCESS(0) (r0)
+                      (uint64)     Number of shared granules (r1)
+    ==============    ========    ====================================
+
+* ARM_SMCCC_KVM_FUNC_MMIO_RGUARD_UNMAP
+
+    ==============    ========    ======================================
+    Function ID:      (uint32)    0xC600000B
+    Arguments:        (uint64)    PG-sized IPA range aligned to the PG
+                                  size which has been previously mapped.
+                                  Must be aligned to the PG size and
+                                  have been previously mapped (r1)
+                      (uint64)    Number of granules to unguard (r2). See
+                                  ``KVM_FUNC_HAS_RANGE`` in
+                                  hypercalls.rst for more details
+    Return Values:    (int64)     NOT_SUPPORTED(-1) on error, or
+                                  RET_SUCCESS(0) (r0)
+                      (uint64)     Number of shared granules (r1)
     ==============    ========    ======================================

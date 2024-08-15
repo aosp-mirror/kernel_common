@@ -4648,8 +4648,9 @@ vm_fault_t do_set_pmd(struct vm_fault *vmf, struct page *page)
 	if (!thp_vma_suitable_order(vma, haddr, PMD_ORDER))
 		return ret;
 
-	if (page != &folio->page || folio_order(folio) != HPAGE_PMD_ORDER)
+	if (folio_order(folio) != HPAGE_PMD_ORDER)
 		return ret;
+	page = &folio->page;
 
 	/*
 	 * Just backoff if any subpage of a THP is corrupted otherwise
@@ -4949,6 +4950,8 @@ static vm_fault_t do_read_fault(struct vm_fault *vmf)
 		ret = do_fault_around(vmf);
 		if (ret)
 			return ret;
+	} else {
+		trace_android_vh_do_read_fault(vmf, fault_around_pages);
 	}
 
 	ret = vmf_can_call_fault(vmf);

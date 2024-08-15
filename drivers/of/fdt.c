@@ -615,6 +615,8 @@ static void __init fdt_reserve_elfcorehdr(void)
 	}
 
 	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
+	memblock_memsize_record("elfcorehdr", elfcorehdr_addr, elfcorehdr_size,
+				false, false);
 
 	pr_info("Reserving %llu KiB of memory at 0x%llx for elfcorehdr\n",
 		elfcorehdr_size >> 10, elfcorehdr_addr);
@@ -635,6 +637,9 @@ void __init early_init_fdt_scan_reserved_mem(void)
 	if (!initial_boot_params)
 		return;
 
+	memblock_memsize_detect_hole();
+	memblock_memsize_disable_tracking();
+
 	fdt_scan_reserved_mem();
 	fdt_reserve_elfcorehdr();
 
@@ -644,9 +649,12 @@ void __init early_init_fdt_scan_reserved_mem(void)
 		if (!size)
 			break;
 		memblock_reserve(base, size);
+		memblock_memsize_record("memreserve", base, size, false, false);
 	}
 
 	fdt_init_reserved_mem();
+
+	memblock_memsize_enable_tracking();
 }
 
 /**

@@ -2188,7 +2188,7 @@ static int synchronous_wake_function(wait_queue_entry_t *wait, unsigned mode, in
 	return ret;
 }
 
-static vm_fault_t shmem_fault(struct vm_fault *vmf)
+vm_fault_t shmem_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct inode *inode = file_inode(vma->vm_file);
