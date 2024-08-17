@@ -53,14 +53,15 @@ static struct inode *tracefs_alloc_inode(struct super_block *sb)
 	return &ti->vfs_inode;
 }
 
-static void tracefs_free_inode(struct inode *inode)
+static void tracefs_free_inode_rcu(struct rcu_head *rcu)
 {
-	struct tracefs_inode *ti = get_tracefs(inode);
+	struct tracefs_inode *ti;
 
+	ti = container_of(rcu, struct tracefs_inode, rcu);
 	kmem_cache_free(tracefs_inode_cachep, ti);
 }
 
-static void tracefs_destroy_inode(struct inode *inode)
+static void tracefs_free_inode(struct inode *inode)
 {
 	struct tracefs_inode *ti = get_tracefs(inode);
 	unsigned long flags;
@@ -68,6 +69,8 @@ static void tracefs_destroy_inode(struct inode *inode)
 	spin_lock_irqsave(&tracefs_inode_lock, flags);
 	list_del_rcu(&ti->list);
 	spin_unlock_irqrestore(&tracefs_inode_lock, flags);
+
+	call_rcu(&ti->rcu, tracefs_free_inode_rcu);
 }
 
 static ssize_t default_read_file(struct file *file, char __user *buf,
@@ -455,7 +458,6 @@ static int tracefs_drop_inode(struct inode *inode)
 static const struct super_operations tracefs_super_operations = {
 	.alloc_inode    = tracefs_alloc_inode,
 	.free_inode     = tracefs_free_inode,
-	.destroy_inode  = tracefs_destroy_inode,
 	.drop_inode     = tracefs_drop_inode,
 	.statfs		= simple_statfs,
 	.remount_fs	= tracefs_remount,
