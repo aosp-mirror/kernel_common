@@ -1440,20 +1440,40 @@ static int ucsi_pr_swap(struct typec_port *port, enum typec_role role)
 	if (ret < 0)
 		goto out_unlock;
 
-	mutex_unlock(&con->lock);
+	command = UCSI_GET_CONNECTOR_STATUS | UCSI_CONNECTOR_NUMBER(con->num);
+	ret = ucsi_send_command(con->ucsi, command, &con->status, sizeof(con->status));
+	if (ret < 0)
+		goto out_unlock;
 
-	if (!wait_for_completion_timeout(&con->complete,
-					 msecs_to_jiffies(UCSI_SWAP_TIMEOUT_MS)))
-		return -ETIMEDOUT;
+	cur_role = !!(con->status.flags & UCSI_CONSTAT_PWR_DIR);
 
-	mutex_lock(&con->lock);
+	/* Execution of SET_PDR should not result in connector status
+	 * notifications. However, some legacy implementations may still defer
+	 * the actual role swap and return immediately. Thus, check the
+	 * connector status in case it immediately succeeded or wait for a later
+	 * connector status change.
+	 */
+	if (cur_role != role) {
+		mutex_unlock(&con->lock);
+
+		if (!wait_for_completion_timeout(
+			    &con->complete,
+			    msecs_to_jiffies(UCSI_SWAP_TIMEOUT_MS)))
+			return -ETIMEDOUT;
+
+		mutex_lock(&con->lock);
+	}
 
 	/* Something has gone wrong while swapping the role */
 	if (UCSI_CONSTAT_PWR_OPMODE(con->status.flags) !=
 	    UCSI_CONSTAT_PWR_OPMODE_PD) {
 		ucsi_reset_connector(con, true);
 		ret = -EPROTO;
+		goto out_unlock;
 	}
+
+	/* Indicate successful power role swap */
+	typec_set_pwr_role(con->port, role);
 
 out_unlock:
 	mutex_unlock(&con->lock);
