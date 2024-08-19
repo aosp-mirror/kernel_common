@@ -40,13 +40,17 @@
   __dev_kfree_skb_any
   devm_kmalloc
   _dev_warn
+  dma_buf_export
   dma_fence_context_alloc
   dma_fence_free
   dma_fence_init
   dma_fence_release
   dma_fence_signal_locked
+  dma_map_sgtable
   dma_set_coherent_mask
   dma_set_mask
+  dma_sync_sg_for_device
+  dma_unmap_sg_attrs
   down_read
   down_write
   ethtool_op_get_link
@@ -76,6 +80,7 @@
   __init_waitqueue_head
   iput
   is_vmalloc_addr
+  jiffies
   kasan_flag_enabled
   kern_mount
   kern_unmount
@@ -92,6 +97,7 @@
   kobject_uevent
   kstrdup
   kvfree
+  kvmalloc_node
   __list_add_valid
   __list_del_entry_valid
   __local_bh_enable_ip
@@ -180,6 +186,7 @@
   strscpy
   sync_file_create
   sync_file_get_fence
+  sysfs_create_file_ns
   sysfs_create_group
   sysfs_remove_group
   system_wq
@@ -190,6 +197,7 @@
   trace_event_raw_init
   trace_event_reg
   trace_handle_return
+  tracepoint_probe_register
   trace_raw_output_prep
   __ubsan_handle_cfi_check_fail_abort
   unlock_page
@@ -200,6 +208,7 @@
   up_read
   up_write
   vabits_actual
+  vfree
   virtio_break_device
   virtio_check_driver_offered_feature
   virtqueue_add_inbuf
@@ -214,6 +223,7 @@
   virtqueue_kick
   virtqueue_kick_prepare
   virtqueue_notify
+  vmalloc
   vmalloc_to_page
   wait_for_completion
   __wake_up
@@ -362,12 +372,10 @@
   iov_iter_advance
   iov_iter_get_pages_alloc
   iov_iter_single_seg_count
-  jiffies
   nr_free_buffer_pages
   p9_client_cb
   p9_release_pages
   p9_req_put
-  sysfs_create_file_ns
   sysfs_remove_file_ns
   v9fs_register_trans
   v9fs_unregister_trans
@@ -394,7 +402,6 @@
   __tracepoint_android_vh_tmpfile_create_check_inode
   __tracepoint_android_vh_tmpfile_secctx
   __tracepoint_android_vh_tmpfile_send_open
-  tracepoint_probe_register
 
 # required by goldfish_battery.ko
   devm_ioremap
@@ -407,6 +414,18 @@
   power_supply_get_drvdata
   power_supply_register
   power_supply_unregister
+
+# required by mglru_sysfs.ko
+  css_next_descendant_pre
+  jiffies_to_msecs
+  kernfs_find_and_get_ns
+  kernfs_notify
+  kernfs_path_from_node
+  memory_cgrp_subsys_enabled_key
+  mm_kobj
+  root_mem_cgroup
+  __traceiter_android_vh_mglru_new_gen
+  __tracepoint_android_vh_mglru_new_gen
 
 # required by nd_virtio.ko
   bio_alloc_bioset
@@ -445,6 +464,21 @@
   rb_insert_color
   rb_next
 
+# required by system_heap.ko
+  arm64_use_ng_mappings
+  dmabuf_page_pool_alloc
+  dmabuf_page_pool_create
+  dmabuf_page_pool_destroy
+  dmabuf_page_pool_free
+  dma_heap_add
+  dma_heap_get_dev
+  dma_heap_get_name
+  dma_sync_sg_for_cpu
+  __sg_page_iter_next
+  __sg_page_iter_start
+  vmap
+  vunmap
+
 # required by virtio-gpu.ko
   bpf_trace_run3
   __devm_request_region
@@ -455,13 +489,10 @@
   dma_fence_match_context
   dma_fence_wait_timeout
   dma_map_resource
-  dma_map_sgtable
   dma_resv_add_excl_fence
   dma_resv_test_signaled
   dma_resv_wait_timeout
-  dma_sync_sg_for_device
   dma_unmap_resource
-  dma_unmap_sg_attrs
   drm_add_edid_modes
   drm_add_modes_noedid
   drm_aperture_remove_conflicting_pci_framebuffers
@@ -578,7 +609,6 @@
   iomem_resource
   is_virtio_device
   kmalloc_order_trace
-  kvmalloc_node
   memdup_user
   noop_llseek
   __traceiter_dma_fence_emit
@@ -682,11 +712,11 @@
   blk_mq_complete_request
   blk_mq_end_request
   blk_mq_free_tag_set
-  blk_mq_quiesce_queue
+  blk_mq_freeze_queue
   blk_mq_start_request
   blk_mq_start_stopped_hw_queues
   blk_mq_stop_hw_queue
-  blk_mq_unquiesce_queue
+  blk_mq_unfreeze_queue
   blk_mq_virtio_map_queues
   blk_put_request
   blk_queue_alignment_offset
@@ -742,9 +772,6 @@
   __splice_from_pipe
   system_freezing_cnt
   __unregister_chrdev
-
-# required by virtio_dma_buf.ko
-  dma_buf_export
 
 # required by virtio_input.ko
   input_alloc_absinfo
@@ -902,7 +929,6 @@
   dma_buf_put
   dma_fence_signal
   __fdget
-  vmalloc
 
 # required by vmw_vsock_virtio_transport.ko
   mutex_lock_interruptible
@@ -977,7 +1003,6 @@
   scnprintf
   set_capacity
   sysfs_streq
-  vfree
   vzalloc
   zs_compact
   zs_create_pool
