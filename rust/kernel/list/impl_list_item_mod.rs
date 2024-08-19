@@ -9,13 +9,14 @@ use crate::list::ListLinks;
 /// Declares that this type has a `ListLinks<ID>` field at a fixed offset.
 ///
 /// This trait is only used to help implement `ListItem` safely. If `ListItem` is implemented
-/// manually, then this trait is not needed.
+/// manually, then this trait is not needed. Use the [`impl_has_list_links!`] macro to implement
+/// this trait.
 ///
 /// # Safety
 ///
 /// All values of this type must have a `ListLinks<ID>` field at the given offset.
 ///
-/// The implementation of `raw_get_list_links` must not be changed.
+/// The behavior of `raw_get_list_links` must not be changed.
 pub unsafe trait HasListLinks<const ID: u64 = 0> {
     /// The offset of the `ListLinks` field.
     const OFFSET: usize;
@@ -28,7 +29,7 @@ pub unsafe trait HasListLinks<const ID: u64 = 0> {
     ///
     /// [`ListLinks<T, ID>`]: ListLinks
     // We don't really need this method, but it's necessary for the implementation of
-    // `impl_has_work!` to be correct.
+    // `impl_has_list_links!` to be correct.
     #[inline]
     unsafe fn raw_get_list_links(ptr: *mut Self) -> *mut ListLinks<ID> {
         // SAFETY: The caller promises that the pointer is valid. The implementer promises that the
@@ -48,8 +49,8 @@ macro_rules! impl_has_list_links {
         // SAFETY: The implementation of `raw_get_list_links` only compiles if the field has the
         // right type.
         //
-        // The implementation of `raw_get_list_links` is not changed since the `addr_of_mut!` macro
-        // is equivalent to the pointer offset operation in the trait definition.
+        // The behavior of `raw_get_list_links` is not changed since the `addr_of_mut!` macro is
+        // equivalent to the pointer offset operation in the trait definition.
         unsafe impl$(<$($implarg),*>)? $crate::list::HasListLinks$(<$id>)? for
             $self $(<$($selfarg),*>)?
         {
@@ -112,16 +113,17 @@ pub use impl_has_list_links_self_ptr;
 
 /// Implements the [`ListItem`] trait for the given type.
 ///
-/// Assumes that the type implements [`HasListLinks`].
+/// Requires that the type implements [`HasListLinks`]. Use the [`impl_has_list_links!`] macro to
+/// implement that trait.
 ///
 /// [`ListItem`]: crate::list::ListItem
 #[macro_export]
 macro_rules! impl_list_item {
     (
-        impl$({$($generics:tt)*})? ListItem<$num:tt> for $t:ty {
+        $(impl$({$($generics:tt)*})? ListItem<$num:tt> for $t:ty {
             using ListLinks;
-        } $($rest:tt)*
-    ) => {
+        })*
+    ) => {$(
         // SAFETY: See GUARANTEES comment on each method.
         unsafe impl$(<$($generics)*>)? $crate::list::ListItem<$num> for $t {
             // GUARANTEES:
@@ -167,23 +169,25 @@ macro_rules! impl_list_item {
             }
 
             // GUARANTEES:
-            // The first guarantee of `view_value` is exactly what `post_remove` guarantees.
+            // * `me` originates from the most recent call to `prepare_to_insert`, which just added
+            //   `offset` to the pointer passed to `prepare_to_insert`. This method subtracts
+            //   `offset` from `me` so it returns the pointer originally passed to
+            //   `prepare_to_insert`.
             unsafe fn post_remove(me: *mut $crate::list::ListLinks<$num>) -> *const Self {
-                // SAFETY: This violates the safety requirement that `post_remove` has not been
-                // called since the most recent call to `prepare_to_insert`, but that is okay
-                // because the concrete implementation of `view_value` above does not rely on that
-                // requirement anywhere except for its second guarantee, and we don't need its
-                // second guarantee.
-                unsafe { <Self as $crate::list::ListItem<$num>>::view_value(me) }
+                let offset = <Self as $crate::list::HasListLinks<$num>>::OFFSET;
+                // SAFETY: `me` originates from the most recent call to `prepare_to_insert`, so it
+                // points at the field at offset `offset` in a value of type `Self`. Thus,
+                // subtracting `offset` from `me` is still in-bounds of the allocation.
+                unsafe { (me as *const u8).sub(offset) as *const Self }
             }
         }
-    };
+    )*};
 
     (
-        impl$({$($generics:tt)*})? ListItem<$num:tt> for $t:ty {
+        $(impl$({$($generics:tt)*})? ListItem<$num:tt> for $t:ty {
             using ListLinksSelfPtr;
-        } $($rest:tt)*
-    ) => {
+        })*
+    ) => {$(
         // SAFETY: See GUARANTEES comment on each method.
         unsafe impl$(<$($generics)*>)? $crate::list::ListItem<$num> for $t {
             // GUARANTEES:
@@ -199,11 +203,13 @@ macro_rules! impl_list_item {
                 let links_field = unsafe { <Self as $crate::list::ListItem<$num>>::view_links(me) };
 
                 let spoff = $crate::list::ListLinksSelfPtr::<Self, $num>::LIST_LINKS_SELF_PTR_OFFSET;
+                // Goes via the offset as the field is private.
+                //
                 // SAFETY: The constant is equal to `offset_of!(ListLinksSelfPtr, self_ptr)`, so
                 // the pointer stays in bounds of the allocation.
                 let self_ptr = unsafe { (links_field as *const u8).add(spoff) }
-                    as *const ::core::cell::UnsafeCell<*const Self>;
-                let cell_inner = ::core::cell::UnsafeCell::raw_get(self_ptr);
+                    as *const $crate::types::Opaque<*const Self>;
+                let cell_inner = $crate::types::Opaque::raw_get(self_ptr);
 
                 // SAFETY: This value is not accessed in any other places than `prepare_to_insert`,
                 // `post_remove`, or `view_value`. By the safety requirements of those methods,
@@ -229,13 +235,13 @@ macro_rules! impl_list_item {
             // may choose to satisfy the safety requirements of `post_remove` instead of the safety
             // requirements for `view_value`.
             //
-            // GUARANTEES:
+            // GUARANTEES: (always)
             // * This returns the same pointer as the one passed to the most recent call to
             //   `prepare_to_insert` since that call wrote that pointer to this location. The value
             //   is only modified in `prepare_to_insert`, so it has not been modified since the
             //   most recent call.
             //
-            // GUARANTEES: (when using the `view_value` safety requirements)
+            // GUARANTEES: (only when using the `view_value` safety requirements)
             // * The pointer remains valid until the next call to `post_remove` because the caller
             //   of the most recent call to `prepare_to_insert` promised to retain ownership of the
             //   `ListArc` containing `Self` until the next call to `post_remove`. The value cannot
@@ -263,6 +269,6 @@ macro_rules! impl_list_item {
                 unsafe { <Self as $crate::list::ListItem<$num>>::view_value(me) }
             }
         }
-    };
+    )*};
 }
 pub use impl_list_item;

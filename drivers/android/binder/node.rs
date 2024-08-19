@@ -3,7 +3,7 @@
 // Copyright (C) 2024 Google LLC.
 
 use kernel::{
-    list::{AtomicListArcTracker, List, ListArc, ListLinks, TryNewListArc},
+    list::{AtomicTracker, List, ListArc, ListLinks, TryNewListArc},
     prelude::*,
     seq_file::SeqFile,
     seq_print,
@@ -192,12 +192,12 @@ pub(crate) struct Node {
     pub(crate) owner: Arc<Process>,
     inner: LockedBy<NodeInner, ProcessInner>,
     #[pin]
-    links_track: AtomicListArcTracker,
+    links_track: AtomicTracker,
 }
 
 kernel::list::impl_list_arc_safe! {
     impl ListArcSafe<0> for Node {
-        tracked_by links_track: AtomicListArcTracker;
+        tracked_by links_track: AtomicTracker;
     }
 }
 
@@ -242,7 +242,7 @@ impl Node {
             cookie,
             flags,
             owner,
-            links_track <- AtomicListArcTracker::new(),
+            links_track <- AtomicTracker::new(),
         })
     }
 
@@ -884,7 +884,7 @@ pub(crate) struct NodeDeath {
     process: Arc<Process>,
     pub(crate) cookie: usize,
     #[pin]
-    links_track: AtomicListArcTracker<0>,
+    links_track: AtomicTracker<0>,
     /// Used by the owner `Node` to store a list of registered death notifications.
     ///
     /// # Invariants
@@ -901,7 +901,7 @@ pub(crate) struct NodeDeath {
     #[pin]
     delivered_links: ListLinks<2>,
     #[pin]
-    delivered_links_track: AtomicListArcTracker<2>,
+    delivered_links_track: AtomicTracker<2>,
     #[pin]
     inner: SpinLock<NodeDeathInner>,
 }
@@ -918,10 +918,10 @@ impl NodeDeath {
                 node,
                 process,
                 cookie,
-                links_track <- AtomicListArcTracker::new(),
+                links_track <- AtomicTracker::new(),
                 death_links <- ListLinks::new(),
                 delivered_links <- ListLinks::new(),
-                delivered_links_track <- AtomicListArcTracker::new(),
+                delivered_links_track <- AtomicTracker::new(),
                 inner <- kernel::new_spinlock!(NodeDeathInner {
                     dead: false,
                     cleared: false,
@@ -1002,7 +1002,7 @@ impl NodeDeath {
 
 kernel::list::impl_list_arc_safe! {
     impl ListArcSafe<0> for NodeDeath {
-        tracked_by links_track: AtomicListArcTracker;
+        tracked_by links_track: AtomicTracker;
     }
 }
 
@@ -1028,7 +1028,7 @@ kernel::list::impl_list_arc_safe! {
 }
 kernel::list::impl_list_arc_safe! {
     impl ListArcSafe<2> for NodeDeath {
-        tracked_by delivered_links_track: AtomicListArcTracker<2>;
+        tracked_by delivered_links_track: AtomicTracker<2>;
     }
 }
 kernel::list::impl_list_item! {

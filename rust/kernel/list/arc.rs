@@ -22,7 +22,8 @@ use core::sync::atomic::{AtomicBool, Ordering};
 /// there isn't a [`ListArc`]. However, we do not allow the opposite situation where a [`ListArc`]
 /// exists, but the tracking thinks it doesn't. This is because the former can at most result in us
 /// failing to create a [`ListArc`] when the operation could succeed, whereas the latter can result
-/// in the creation of two [`ListArc`] references.
+/// in the creation of two [`ListArc`] references. Only the latter situation can lead to memory
+/// safety issues.
 ///
 /// A consequence of the above is that you may implement the tracking inside `T` by not actually
 /// keeping track of anything. To do this, you always claim that a [`ListArc`] exists, even if
@@ -52,11 +53,18 @@ pub trait ListArcSafe<const ID: u64 = 0> {
 ///
 /// # Safety
 ///
-/// Implementers must ensure that `try_new_list_arc` does not return `true` if a `ListArc` already
-/// exists.
+/// The guarantees of `try_new_list_arc` must be upheld.
 pub unsafe trait TryNewListArc<const ID: u64 = 0>: ListArcSafe<ID> {
     /// Attempts to convert an `Arc<Self>` into an `ListArc<Self>`. Returns `true` if the
     /// conversion was successful.
+    ///
+    /// This method should not be called directly. Use [`ListArc::try_from_arc`] instead.
+    ///
+    /// # Guarantees
+    ///
+    /// If this call returns `true`, then there is no [`ListArc`] pointing to this value.
+    /// Additionally, this call will have transitioned the tracking inside `Self` from not thinking
+    /// that a [`ListArc`] exists, to thinking that a [`ListArc`] exists.
     fn try_new_list_arc(&self) -> bool;
 }
 
@@ -67,10 +75,11 @@ pub unsafe trait TryNewListArc<const ID: u64 = 0>: ListArcSafe<ID> {
 /// * The `untracked` strategy does not actually keep track of whether a [`ListArc`] exists. When
 ///   using this strategy, the only way to create a [`ListArc`] is using a [`UniqueArc`].
 /// * The `tracked_by` strategy defers the tracking to a field of the struct. The user much specify
-///   which field to defer the tracking to. The field must implement [`ListArcSafe`].
+///   which field to defer the tracking to. The field must implement [`ListArcSafe`]. If the field
+///   implements [`TryNewListArc`], then the type will also implement [`TryNewListArc`].
 ///
 /// The `tracked_by` strategy is usually used by deferring to a field of type
-/// [`AtomicListArcTracker`]. However, it is also possible to defer the tracking to another struct
+/// [`AtomicTracker`]. However, it is also possible to defer the tracking to another struct
 /// using also using this macro.
 #[macro_export]
 macro_rules! impl_list_arc_safe {
@@ -139,6 +148,9 @@ pub use impl_list_arc_safe;
 /// `ListArc` exists, but the tracking thinks it doesn't. This is because the former can at most
 /// result in us failing to create a `ListArc` when the operation could succeed, whereas the latter
 /// can result in the creation of two `ListArc` references.
+///
+/// While this `ListArc` is unique for the given id, there still might exist normal `Arc`
+/// references to the object.
 ///
 /// # Invariants
 ///
@@ -266,8 +278,8 @@ where
         T: TryNewListArc<ID>,
     {
         if arc.try_new_list_arc() {
-            // SAFETY: The `try_new_list_arc` method returned true, so the tracking now thinks that
-            // a `ListArc` exists, so we can create one.
+            // SAFETY: The `try_new_list_arc` method returned true, so we made the tracking think
+            // that a `ListArc` exists. This lets us create a `ListArc`.
             Ok(unsafe { Self::transmute_from_arc(arc) })
         } else {
             Err(arc)
@@ -282,8 +294,8 @@ where
         T: TryNewListArc<ID>,
     {
         if arc.try_new_list_arc() {
-            // SAFETY: The `try_new_list_arc` method returned true, so the tracking now thinks that
-            // a `ListArc` exists, so we can create one.
+            // SAFETY: The `try_new_list_arc` method returned true, so we made the tracking think
+            // that a `ListArc` exists. This lets us create a `ListArc`.
             Some(unsafe { Self::transmute_from_arc(Arc::from(arc)) })
         } else {
             None
@@ -456,12 +468,13 @@ where
 ///
 /// If the boolean is `false`, then there is no [`ListArc`] for this value.
 #[repr(transparent)]
-pub struct AtomicListArcTracker<const ID: u64 = 0> {
+pub struct AtomicTracker<const ID: u64 = 0> {
     inner: AtomicBool,
+    // This value needs to be pinned to justify the INVARIANT: comment in `AtomicTracker::new`.
     _pin: PhantomPinned,
 }
 
-impl<const ID: u64> AtomicListArcTracker<ID> {
+impl<const ID: u64> AtomicTracker<ID> {
     /// Creates a new initializer for this type.
     pub fn new() -> impl PinInit<Self> {
         // INVARIANT: Pin-init initializers can't be used on an existing `Arc`, so this value will
@@ -479,7 +492,7 @@ impl<const ID: u64> AtomicListArcTracker<ID> {
     }
 }
 
-impl<const ID: u64> ListArcSafe<ID> for AtomicListArcTracker<ID> {
+impl<const ID: u64> ListArcSafe<ID> for AtomicTracker<ID> {
     unsafe fn on_create_list_arc_from_unique(self: Pin<&mut Self>) {
         // INVARIANT: We just created a ListArc, so the boolean should be true.
         *self.project_inner().get_mut() = true;
@@ -497,7 +510,7 @@ impl<const ID: u64> ListArcSafe<ID> for AtomicListArcTracker<ID> {
 // The acquire ordering will synchronize with the release store from the destruction of any
 // previous `ListArc`, so if there was a previous `ListArc`, then the destruction of the previous
 // `ListArc` happens-before the creation of the new `ListArc`.
-unsafe impl<const ID: u64> TryNewListArc<ID> for AtomicListArcTracker<ID> {
+unsafe impl<const ID: u64> TryNewListArc<ID> for AtomicTracker<ID> {
     fn try_new_list_arc(&self) -> bool {
         // INVARIANT: If this method returns true, then the boolean used to be false, and is no
         // longer false, so it is okay for the caller to create a new [`ListArc`].

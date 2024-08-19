@@ -7,10 +7,8 @@
 use crate::init::PinInit;
 use crate::sync::ArcBorrow;
 use crate::types::Opaque;
-use core::cell::UnsafeCell;
 use core::iter::{DoubleEndedIterator, FusedIterator};
 use core::marker::PhantomData;
-use core::mem::MaybeUninit;
 use core::ptr;
 
 mod impl_list_item_mod;
@@ -19,9 +17,7 @@ pub use self::impl_list_item_mod::{
 };
 
 mod arc;
-pub use self::arc::{
-    impl_list_arc_safe, AtomicListArcTracker, ListArc, ListArcSafe, TryNewListArc,
-};
+pub use self::arc::{impl_list_arc_safe, AtomicTracker, ListArc, ListArcSafe, TryNewListArc};
 
 mod arc_field;
 pub use self::arc_field::{define_list_arc_field_getter, ListArcField};
@@ -148,10 +144,14 @@ struct ListLinksFields {
 /// The fields are null if and only if this item is not in a list.
 #[repr(transparent)]
 pub struct ListLinks<const ID: u64 = 0> {
+    // This type is `!Unpin` for aliasing reasons as the pointers are part of an intrusive linked
+    // list.
     inner: Opaque<ListLinksFields>,
 }
 
-// SAFETY: The next/prev fields of a ListLinks can be moved across thread boundaries.
+// SAFETY: The only way to access/modify the pointers inside of `ListLinks<ID>` is via holding the
+// associated `ListArc<T, ID>`. Since that type correctly implements `Send`, it is impossible to
+// move this an instance of this type to a different thread if the pointees are `!Send`.
 unsafe impl<const ID: u64> Send for ListLinks<ID> {}
 // SAFETY: The type is opaque so immutable references to a ListLinks are useless. Therefore, it's
 // okay to have immutable access to a ListLinks from several threads at once.
@@ -197,7 +197,9 @@ pub struct ListLinksSelfPtr<T: ?Sized, const ID: u64 = 0> {
     ///
     /// This is public so that it can be used with `impl_has_list_links!`.
     pub inner: ListLinks<ID>,
-    self_ptr: UnsafeCell<MaybeUninit<*const T>>,
+    // UnsafeCell is not enough here because we use `Opaque::uninit` as a dummy value, and
+    // `ptr::null()` doesn't work for `T: ?Sized`.
+    self_ptr: Opaque<*const T>,
 }
 
 // SAFETY: The fields of a ListLinksSelfPtr can be moved across thread boundaries.
@@ -224,7 +226,7 @@ impl<T: ?Sized, const ID: u64> ListLinksSelfPtr<T, ID> {
                     next: ptr::null_mut(),
                 }),
             },
-            self_ptr: UnsafeCell::new(MaybeUninit::zeroed()),
+            self_ptr: Opaque::uninit(),
         }
     }
 }
@@ -248,9 +250,8 @@ impl<T: ?Sized + ListItem<ID>, const ID: u64> List<T, ID> {
         let raw_item = ListArc::into_raw(item);
         // SAFETY:
         // * We just got `raw_item` from a `ListArc`, so it's in an `Arc`.
-        // * If this requirement is violated, then the previous caller of `prepare_to_insert`
-        //   violated the safety requirement that they can't give up ownership of the `ListArc`
-        //   until they call `post_remove`.
+        // * Since we have ownership of the `ListArc`, `post_remove` must have been called after
+        //   the most recent call to `prepare_to_insert`, if any.
         // * We own the `ListArc`.
         // * Removing items from this list is always done using `remove_internal_inner`, which
         //   calls `post_remove` before giving up ownership.

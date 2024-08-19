@@ -10,7 +10,7 @@
 use kernel::{
     bindings,
     fs::{File, LocalFile},
-    list::{AtomicListArcTracker, List, ListArc, ListLinks, TryNewListArc},
+    list::{AtomicTracker, List, ListArc, ListLinks, TryNewListArc},
     prelude::*,
     security,
     seq_file::SeqFile,
@@ -435,7 +435,7 @@ pub(crate) struct Thread {
     #[pin]
     links: ListLinks,
     #[pin]
-    links_track: AtomicListArcTracker,
+    links_track: AtomicTracker,
 }
 
 kernel::list::impl_has_list_links! {
@@ -443,7 +443,7 @@ kernel::list::impl_has_list_links! {
 }
 kernel::list::impl_list_arc_safe! {
     impl ListArcSafe<0> for Thread {
-        tracked_by links_track: AtomicListArcTracker;
+        tracked_by links_track: AtomicTracker;
     }
 }
 kernel::list::impl_list_item! {
@@ -470,7 +470,7 @@ impl Thread {
                 prio_lock <- kernel::new_spinlock!(prio, "Thread::prio_lock"),
                 work_condvar <- kernel::new_poll_condvar!("Thread::work_condvar"),
                 links <- ListLinks::new(),
-                links_track <- AtomicListArcTracker::new(),
+                links_track <- AtomicTracker::new(),
             }),
             GFP_KERNEL,
         )
@@ -1659,14 +1659,14 @@ impl Thread {
 struct ThreadError {
     error_code: AtomicU32,
     #[pin]
-    links_track: AtomicListArcTracker,
+    links_track: AtomicTracker,
 }
 
 impl ThreadError {
     fn try_new() -> Result<DArc<Self>> {
         DTRWrap::arc_pin_init(pin_init!(Self {
             error_code: AtomicU32::new(BR_OK),
-            links_track <- AtomicListArcTracker::new(),
+            links_track <- AtomicTracker::new(),
         }))
         .map(ListArc::into_arc)
     }
@@ -1712,6 +1712,6 @@ impl DeliverToRead for ThreadError {
 
 kernel::list::impl_list_arc_safe! {
     impl ListArcSafe<0> for ThreadError {
-        tracked_by links_track: AtomicListArcTracker;
+        tracked_by links_track: AtomicTracker;
     }
 }
