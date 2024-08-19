@@ -7,7 +7,7 @@ use alloc::boxed::Box;
 use core::{
     cell::UnsafeCell,
     marker::{PhantomData, PhantomPinned},
-    mem::MaybeUninit,
+    mem::{ManuallyDrop, MaybeUninit},
     ops::{Deref, DerefMut},
     ptr::NonNull,
 };
@@ -367,12 +367,12 @@ impl<T: AlwaysRefCounted> ARef<T> {
         }
     }
 
-    /// Convert this [`ARef`] into a raw pointer.
+    /// Consumes the `ARef`, returning a raw pointer.
     ///
-    /// The caller retains ownership of the refcount that this `ARef` used to own.
+    /// This function does not change the refcount. After calling this function, the caller is
+    /// responsible for the refcount previously managed by the `ARef`.
     pub fn into_raw(me: Self) -> NonNull<T> {
-        let me = core::mem::ManuallyDrop::new(me);
-        me.ptr
+        ManuallyDrop::new(me).ptr
     }
 }
 

@@ -11,6 +11,8 @@ use crate::{
     types::Opaque,
 };
 
+use core::pin::Pin;
+
 /// A wrapper for the kernel's `struct vm_area_struct`.
 ///
 /// It represents an area of virtual memory.
@@ -32,7 +34,7 @@ impl VmArea {
     /// Callers must ensure that `vma` is valid for the duration of 'a, and that the mmap read lock
     /// (or write lock) is held for at least the duration of 'a.
     #[inline]
-    pub unsafe fn from_raw_vma<'a>(vma: *const bindings::vm_area_struct) -> &'a Self {
+    pub unsafe fn from_raw<'a>(vma: *const bindings::vm_area_struct) -> &'a Self {
         // SAFETY: The caller ensures that the invariants are satisfied for the duration of 'a.
         unsafe { &*vma.cast() }
     }
@@ -44,9 +46,9 @@ impl VmArea {
     /// Callers must ensure that `vma` is valid for the duration of 'a, and that the mmap write
     /// lock is held for at least the duration of 'a.
     #[inline]
-    pub unsafe fn from_raw_vma_mut<'a>(vma: *mut bindings::vm_area_struct) -> &'a mut Self {
+    pub unsafe fn from_raw_mut<'a>(vma: *mut bindings::vm_area_struct) -> Pin<&'a mut Self> {
         // SAFETY: The caller ensures that the invariants are satisfied for the duration of 'a.
-        unsafe { &mut *vma.cast() }
+        unsafe { Pin::new_unchecked(&mut *vma.cast()) }
     }
 
     /// Returns a raw pointer to this area.
@@ -69,7 +71,7 @@ impl VmArea {
     ///
     /// The possible flags are a combination of the constants in [`flags`].
     #[inline]
-    pub fn set_flags(&mut self, flags: usize) {
+    pub fn set_flags(self: Pin<&mut Self>, flags: usize) {
         // SAFETY: By the type invariants, the caller holds the mmap write lock, so this access is
         // not a data race.
         unsafe { (*self.as_ptr()).__bindgen_anon_2.vm_flags = flags as _ };
@@ -93,7 +95,7 @@ impl VmArea {
 
     /// Make this vma anonymous.
     #[inline]
-    pub fn set_anonymous(&mut self) {
+    pub fn set_anonymous(self: Pin<&mut Self>) {
         // SAFETY: By the type invariants, the caller holds the mmap write lock, so this access is
         // not a data race.
         unsafe { (*self.as_ptr()).vm_ops = core::ptr::null() };
@@ -103,7 +105,7 @@ impl VmArea {
     ///
     /// This operation does not take ownership of the page.
     #[inline]
-    pub fn vm_insert_page(&mut self, address: usize, page: &Page) -> Result {
+    pub fn vm_insert_page(self: Pin<&mut Self>, address: usize, page: &Page) -> Result {
         // SAFETY: By the type invariants, the caller holds the mmap write lock, so this access is
         // not a data race. The page is guaranteed to be valid and of order 0. The range of
         // `address` is already checked by `vm_insert_page`.

@@ -46,7 +46,7 @@ use crate::{
     DArc, DLArc, DTRWrap, DeliverToRead,
 };
 
-use core::mem::take;
+use core::{mem::take, pin::Pin};
 
 struct Mapping {
     address: usize,
@@ -1037,7 +1037,7 @@ impl Process {
         }
     }
 
-    fn create_mapping(&self, vma: &mut mm::virt::VmArea) -> Result {
+    fn create_mapping(&self, vma: &mm::virt::VmArea) -> Result {
         use kernel::page::PAGE_SIZE;
         let size = usize::min(vma.end() - vma.start(), bindings::SZ_4M as usize);
         let mapping = Mapping::new(vma.start(), size)?;
@@ -1563,7 +1563,7 @@ impl Process {
     pub(crate) fn mmap(
         this: ArcBorrow<'_, Process>,
         _file: &File,
-        vma: &mut mm::virt::VmArea,
+        mut vma: Pin<&mut mm::virt::VmArea>,
     ) -> Result {
         // We don't allow mmap to be used in a different process.
         if !core::ptr::eq(kernel::current!().group_leader(), &*this.task) {
@@ -1579,9 +1579,9 @@ impl Process {
         }
         flags |= DONTCOPY | MIXEDMAP;
         flags &= !MAYWRITE;
-        vma.set_flags(flags);
+        vma.as_mut().set_flags(flags);
         // TODO: Set ops. We need to learn when the user unmaps so that we can stop using it.
-        this.create_mapping(vma)
+        this.create_mapping(&vma)
     }
 
     pub(crate) fn poll(

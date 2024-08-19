@@ -399,7 +399,7 @@ unsafe extern "C" fn rust_binder_mmap(
     // SAFETY: We previously set `private_data` in `rust_binder_open`.
     let f = unsafe { Arc::<Process>::borrow((*file).private_data) };
     // SAFETY: The caller ensures that the vma is valid.
-    let area = unsafe { kernel::mm::virt::VmArea::from_raw_vma_mut(vma) };
+    let area = unsafe { kernel::mm::virt::VmArea::from_raw_mut(vma) };
     // SAFETY: The caller ensures that the file is valid.
     match Process::mmap(f, unsafe { File::from_raw_file(file) }, area) {
         Ok(()) => 0,

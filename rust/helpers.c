@@ -327,6 +327,34 @@ unsigned long rust_helper_task_rlimit(const struct task_struct *task,
 }
 EXPORT_SYMBOL_GPL(rust_helper_task_rlimit);
 
+void rust_helper_rb_link_node(struct rb_node *node, struct rb_node *parent,
+			      struct rb_node **rb_link)
+{
+	rb_link_node(node, parent, rb_link);
+}
+EXPORT_SYMBOL_GPL(rust_helper_rb_link_node);
+
+void rust_helper_init_task_work(struct callback_head *twork,
+				task_work_func_t func)
+{
+	init_task_work(twork, func);
+}
+EXPORT_SYMBOL_GPL(rust_helper_init_task_work);
+
+unsigned long rust_helper_list_lru_count(struct list_lru *lru)
+{
+	return list_lru_count(lru);
+}
+EXPORT_SYMBOL_GPL(rust_helper_list_lru_count);
+
+unsigned long rust_helper_list_lru_walk(struct list_lru *lru,
+					list_lru_walk_cb isolate, void *cb_arg,
+					unsigned long nr_to_walk)
+{
+	return list_lru_walk(lru, isolate, cb_arg, nr_to_walk);
+}
+EXPORT_SYMBOL_GPL(rust_helper_list_lru_walk);
+
 void rust_helper_mmgrab(struct mm_struct *mm)
 {
 	mmgrab(mm);
@@ -387,34 +415,6 @@ struct vm_area_struct *rust_helper_vma_lookup(struct mm_struct *mm,
 	return vma_lookup(mm, addr);
 }
 EXPORT_SYMBOL_GPL(rust_helper_vma_lookup);
-
-void rust_helper_rb_link_node(struct rb_node *node, struct rb_node *parent,
-			      struct rb_node **rb_link)
-{
-	rb_link_node(node, parent, rb_link);
-}
-EXPORT_SYMBOL_GPL(rust_helper_rb_link_node);
-
-void rust_helper_init_task_work(struct callback_head *twork,
-				task_work_func_t func)
-{
-	init_task_work(twork, func);
-}
-EXPORT_SYMBOL_GPL(rust_helper_init_task_work);
-
-unsigned long rust_helper_list_lru_count(struct list_lru *lru)
-{
-	return list_lru_count(lru);
-}
-EXPORT_SYMBOL_GPL(rust_helper_list_lru_count);
-
-unsigned long rust_helper_list_lru_walk(struct list_lru *lru,
-					list_lru_walk_cb isolate, void *cb_arg,
-					unsigned long nr_to_walk)
-{
-	return list_lru_walk(lru, isolate, cb_arg, nr_to_walk);
-}
-EXPORT_SYMBOL_GPL(rust_helper_list_lru_walk);
 
 /*
  * `bindgen` binds the C `size_t` type as the Rust `usize` type, so we can

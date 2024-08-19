@@ -4,7 +4,7 @@
 
 //! Memory management.
 //!
-//! C header: [`include/linux/mm.h`](../../../../include/linux/mm.h)
+//! C header: [`include/linux/mm.h`](srctree/include/linux/mm.h)
 
 use crate::{
     bindings,
@@ -13,6 +13,7 @@ use crate::{
 
 use core::{
     ops::Deref,
+    pin::Pin,
     ptr::{self, NonNull},
 };
 
@@ -20,14 +21,14 @@ pub mod virt;
 
 /// A wrapper for the kernel's `struct mm_struct`.
 ///
-/// Since `mm_users` may be zero, the associated address space may not exist anymore. You must use
-/// [`mmget_not_zero`] before accessing the address space.
+/// Since `mm_users` may be zero, the associated address space may not exist anymore. You can use
+/// [`mmget_not_zero`] to be able to access the address space.
 ///
 /// The `ARef<Mm>` smart pointer holds an `mmgrab` refcount. Its destructor may sleep.
 ///
 /// # Invariants
 ///
-/// Values of this type are always refcounted.
+/// Values of this type are always refcounted using `mmgrab`.
 ///
 /// [`mmget_not_zero`]: Mm::mmget_not_zero
 pub struct Mm {
@@ -54,15 +55,16 @@ unsafe impl AlwaysRefCounted for Mm {
 
 /// A wrapper for the kernel's `struct mm_struct`.
 ///
-/// This type is used only when `mm_users` is known to be non-zero at compile-time. It can be used
-/// to access the associated address space.
+/// This type is like [`Mm`], but with non-zero `mm_users`. It can only be used when `mm_users` can
+/// be proven to be non-zero at compile-time, usually because the relevant code holds an `mmget`
+/// refcount. It can be used to access the associated address space.
 ///
 /// The `ARef<MmWithUser>` smart pointer holds an `mmget` refcount. Its destructor may sleep.
 ///
 /// # Invariants
 ///
-/// Values of this type are always refcounted. The value of `mm_users` is non-zero.
-#[repr(transparent)]
+/// Values of this type are always refcounted using `mmget`. The value of `mm_users` is non-zero.
+/// #[repr(transparent)]
 pub struct MmWithUser {
     mm: Mm,
 }
@@ -100,6 +102,11 @@ impl Deref for MmWithUser {
 /// This type is identical to `MmWithUser` except that it uses `mmput_async` when dropping a
 /// refcount. This means that the destructor of `ARef<MmWithUserAsync>` is safe to call in atomic
 /// context.
+///
+/// # Invariants
+///
+/// Values of this type are always refcounted using `mmget`. The value of `mm_users` is non-zero.
+/// #[repr(transparent)]
 #[repr(transparent)]
 pub struct MmWithUserAsync {
     mm: MmWithUser,
@@ -144,14 +151,17 @@ impl Mm {
             (*current).mm
         };
 
-        let mm = NonNull::new(mm)?;
+        if mm.is_null() {
+            return None;
+        }
 
-        // SAFETY: We just checked that `mm` is not null.
-        unsafe { bindings::mmgrab(mm.as_ptr()) };
+        // SAFETY: The value of `current->mm` is guaranteed to be null or a valid `mm_struct`. We
+        // just checked that it's not null. Furthermore, the returned `&Mm` is valid only for the
+        // duration of this function, and `current->mm` will stay valid for that long.
+        let mm = unsafe { Mm::from_raw(mm) };
 
-        // SAFETY: We just created an `mmgrab` refcount. Layouts are compatible due to
-        // repr(transparent).
-        Some(unsafe { ARef::from_raw(mm.cast()) })
+        // This increments the refcount using `mmgrab`.
+        Some(ARef::from(mm))
     }
 
     /// Returns a raw pointer to the inner `mm_struct`.
@@ -167,7 +177,7 @@ impl Mm {
     /// The caller must ensure that `ptr` points at an `mm_struct`, and that it is not deallocated
     /// during the lifetime 'a.
     #[inline]
-    pub unsafe fn from_raw_mm<'a>(ptr: *const bindings::mm_struct) -> &'a Mm {
+    pub unsafe fn from_raw<'a>(ptr: *const bindings::mm_struct) -> &'a Mm {
         // SAFETY: Caller promises that the pointer is valid for 'a. Layouts are compatible due to
         // repr(transparent).
         unsafe { &*ptr.cast() }
@@ -207,7 +217,7 @@ impl MmWithUser {
     /// The caller must ensure that `ptr` points at an `mm_struct`, and that `mm_users` remains
     /// non-zero for the duration of the lifetime 'a.
     #[inline]
-    pub unsafe fn from_raw_mm<'a>(ptr: *const bindings::mm_struct) -> &'a MmWithUser {
+    pub unsafe fn from_raw<'a>(ptr: *const bindings::mm_struct) -> &'a MmWithUser {
         // SAFETY: Caller promises that the pointer is valid for 'a. The layout is compatible due
         // to repr(transparent).
         unsafe { &*ptr.cast() }
@@ -286,7 +296,7 @@ impl<'a> MmapReadLock<'a> {
             // the returned area will borrow from this read lock guard, so it can only be used
             // while the read lock is still held. The returned reference is immutable, so the
             // reference cannot be used to modify the area.
-            unsafe { Some(virt::VmArea::from_raw_vma(vma)) }
+            unsafe { Some(virt::VmArea::from_raw(vma)) }
         }
     }
 }
@@ -311,7 +321,7 @@ pub struct MmapWriteLock<'a> {
 impl<'a> MmapWriteLock<'a> {
     /// Look up a vma at the given address.
     #[inline]
-    pub fn vma_lookup(&mut self, vma_addr: usize) -> Option<&mut virt::VmArea> {
+    pub fn vma_lookup(&mut self, vma_addr: usize) -> Option<Pin<&mut virt::VmArea>> {
         // SAFETY: We hold a reference to the mm, so the pointer must be valid. Any value is okay
         // for `vma_addr`.
         let vma = unsafe { bindings::vma_lookup(self.mm.as_raw(), vma_addr as _) };
@@ -323,7 +333,7 @@ impl<'a> MmapWriteLock<'a> {
             // the returned area will borrow from this write lock guard, so it can only be used
             // while the write lock is still held. We hold the write lock, so mutable operations on
             // the area are okay.
-            unsafe { Some(virt::VmArea::from_raw_vma_mut(vma)) }
+            unsafe { Some(virt::VmArea::from_raw_mut(vma)) }
         }
     }
 }
