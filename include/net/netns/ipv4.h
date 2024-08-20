@@ -117,7 +117,6 @@ struct netns_ipv4 {
 #ifdef CONFIG_NET_L3_MASTER_DEV
 	u8 sysctl_tcp_l3mdev_accept;
 #endif
-	int sysctl_tcp_default_init_rwnd;
 	u8 sysctl_tcp_mtu_probing;
 	int sysctl_tcp_mtu_probe_floor;
 	int sysctl_tcp_base_mss;
