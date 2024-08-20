@@ -12,6 +12,12 @@
 		"google,skitty", "google,corsola", "mediatek,mt8186";
 };
 
-&touchscreen {
-	compatible = "elan,ekth3500";
+&i2c1 {
+	/delete-node/ touchscreen@10;
+	touchscreen: touchscreen@10 {
+		compatible = "elan,ekth3500";
+		reg = <0x10>;
+		interrupts-extended = <&pio 12 IRQ_TYPE_LEVEL_LOW>;
+		status = "okay";
+	};
 };
