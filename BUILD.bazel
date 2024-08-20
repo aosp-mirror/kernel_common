@@ -24,7 +24,9 @@ load(
     "ddk_headers",
     "ddk_headers_archive",
     "kernel_build",
+    "kernel_compile_commands",
     "kernel_images",
+    "kernel_kythe",
     "kernel_modules_install",
     "merge_kzip",
     "merged_kernel_uapi_headers",
@@ -292,9 +294,53 @@ alias(
     visibility = ["//visibility:public"],
 )
 
+kernel_compile_commands(
+    name = "kernel_aarch64_compile_commands",
+    visibility = ["//visibility:public"],
+    deps = [":kernel_aarch64"],
+)
+
+kernel_compile_commands(
+    name = "kernel_x86_64_compile_commands",
+    visibility = ["//visibility:public"],
+    deps = [":kernel_x86_64"],
+)
+
 string_flag(
     name = "kernel_kythe_corpus",
     build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+kernel_kythe(
+    name = "kernel_aarch64_kythe",
+    corpus = ":kernel_kythe_corpus",
+    kernel_build = ":kernel_aarch64",
+    visibility = ["//visibility:public"],
+)
+
+copy_to_dist_dir(
+    name = "kernel_aarch64_kythe_dist",
+    data = [
+        ":kernel_aarch64_kythe",
+    ],
+    flat = True,
+    visibility = ["//visibility:public"],
+)
+
+kernel_kythe(
+    name = "kernel_x86_64_kythe",
+    corpus = ":kernel_kythe_corpus",
+    kernel_build = ":kernel_x86_64",
+    visibility = ["//visibility:public"],
+)
+
+copy_to_dist_dir(
+    name = "kernel_x86_64_kythe_dist",
+    data = [
+        ":kernel_x86_64_kythe",
+    ],
+    flat = True,
     visibility = ["//visibility:public"],
 )
 
