@@ -3097,8 +3097,7 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 	bool do_notify = false;
 
 	if (current->nsproxy->net_ns->core.sysctl_android_paranoid &&
-	    cmd != TUNGETIFF &&
-	    !ns_capable(sock_net(&tfile->sk)->user_ns, CAP_NET_ADMIN)) {
+	    cmd != TUNGETIFF && !capable(CAP_NET_ADMIN)) {
 		return -EPERM;
 	}
 
