@@ -72,6 +72,10 @@
   __tracepoint_android_vh_sock_create
   __traceiter_android_vh_modify_scan_control
   __traceiter_android_vh_should_continue_reclaim
+  __tracepoint_android_vh_process_madvise_begin
+  __traceiter_android_vh_process_madvise_begin
+  __tracepoint_android_vh_process_madvise_iter
+  __traceiter_android_vh_process_madvise_iter
   __traceiter_android_vh_file_is_tiny_bypass
   __tracepoint_android_vh_modify_scan_control
   __tracepoint_android_vh_should_continue_reclaim
