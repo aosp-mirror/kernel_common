@@ -145,12 +145,12 @@ static int smc_send_message(struct scmi_chan_info *cinfo,
 
 	shmem_tx_prepare(scmi_info->shmem, xfer);
 
-	if (scmi_info->irq)
+	if (scmi_info->irq > 0)
 		reinit_completion(&scmi_info->tx_complete);
 
 	arm_smccc_1_1_invoke(scmi_info->func_id, 0, 0, 0, 0, 0, 0, 0, &res);
 
-	if (scmi_info->irq)
+	if (scmi_info->irq > 0)
 		wait_for_completion(&scmi_info->tx_complete);
 
 	scmi_rx_callback(scmi_info->cinfo, shmem_read_header(scmi_info->shmem));
