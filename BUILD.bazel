@@ -109,6 +109,7 @@ define_common_kernels(target_configs = {
     "kernel_aarch64": {
         "module_implicit_outs": get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
         "make_goals": _GKI_AARCH64_MAKE_GOALS,
+        "ddk_module_headers": [":all_headers_aarch64"],
         "ddk_headers_archive": ":kernel_aarch64_ddk_headers_archive",
         "extra_dist": [
             ":test_mappings_zip",
@@ -122,6 +123,7 @@ define_common_kernels(target_configs = {
     },
     "kernel_x86_64": {
         "kmi_symbol_list_strict_mode": False,
+        "ddk_module_headers": [":all_headers_x86_64"],
         "module_implicit_outs": get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
         "make_goals": _GKI_X86_64_MAKE_GOALS,
         "extra_dist": [
