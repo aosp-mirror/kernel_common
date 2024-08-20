@@ -306,12 +306,18 @@ static int ucsi_psy_set_charge_control_limit_max(struct ucsi_connector *con,
 	int ret;
 	bool sink_path = false;
 
+
+	if (!con->typec_cap.ops || !con->typec_cap.ops->pr_set)
+		return -EINVAL;
+
 	if (val->intval >= 0) {
 		sink_path = true;
-		if (!con->typec_cap.ops || !con->typec_cap.ops->pr_set)
-			return -EINVAL;
 
 		ret = con->typec_cap.ops->pr_set(con->port, TYPEC_SINK);
+		if (ret < 0)
+			return ret;
+	} else if (con->typec_cap.type == TYPEC_PORT_DRP) {
+		ret = con->typec_cap.ops->pr_set(con->port, TYPEC_SOURCE);
 		if (ret < 0)
 			return ret;
 	}
