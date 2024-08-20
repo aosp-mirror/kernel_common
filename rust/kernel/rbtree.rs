@@ -12,17 +12,12 @@ use core::{
     cmp::{Ord, Ordering},
     marker::PhantomData,
     mem::MaybeUninit,
-    ptr::{addr_of_mut, NonNull},
+    ptr::{addr_of_mut, from_mut, NonNull},
 };
 
 /// A red-black tree with owned nodes.
 ///
 /// It is backed by the kernel C red-black trees.
-///
-/// # Invariants
-///
-/// Non-null parent/children pointers stored in instances of the `rb_node` C struct are always
-/// valid, and pointing to a field of our internal representation of a node.
 ///
 /// # Examples
 ///
@@ -169,6 +164,11 @@ use core::{
 ///
 /// # Ok::<(), Error>(())
 /// ```
+///
+/// # Invariants
+///
+/// Non-null parent/children pointers stored in instances of the `rb_node` C struct are always
+/// valid, and pointing to a field of our internal representation of a node.
 pub struct RBTree<K, V> {
     root: bindings::rb_root,
     _p: PhantomData<Node<K, V>>,
@@ -194,9 +194,11 @@ impl<K, V> RBTree<K, V> {
 
     /// Returns an iterator over the tree nodes, sorted by key.
     pub fn iter(&self) -> Iter<'_, K, V> {
-        // INVARIANT: `bindings::rb_first` returns a valid pointer to a tree node given a valid pointer to a tree root.
         Iter {
             _tree: PhantomData,
+            // INVARIANT:
+            //   - `self.root` is a valid pointer to a tree root.
+            //   - `bindings::rb_first` produces a valid pointer to a node given `root` is valid.
             iter_raw: IterRaw {
                 // SAFETY: by the invariants, all pointers are valid.
                 next: unsafe { bindings::rb_first(&self.root) },
@@ -214,7 +216,7 @@ impl<K, V> RBTree<K, V> {
             //   - `bindings::rb_first` produces a valid pointer to a node given `root` is valid.
             iter_raw: IterRaw {
                 // SAFETY: by the invariants, all pointers are valid.
-                next: unsafe { bindings::rb_first(&self.root) },
+                next: unsafe { bindings::rb_first(from_mut(&mut self.root)) },
                 _phantom: PhantomData,
             },
         }
@@ -236,16 +238,16 @@ impl<K, V> RBTree<K, V> {
     }
 
     /// Returns a cursor over the tree nodes, starting with the smallest key.
-    pub fn cursor_front(&mut self) -> Option<RBTreeCursor<'_, K, V>> {
+    pub fn cursor_front(&mut self) -> Option<Cursor<'_, K, V>> {
         let root = addr_of_mut!(self.root);
         // SAFETY: `self.root` is always a valid root node
         let current = unsafe { bindings::rb_first(root) };
         NonNull::new(current).map(|current| {
             // INVARIANT:
             // - `current` is a valid node in the [`RBTree`] pointed to by `self`.
-            // - Due to the type signature of this function, the returned [`RBTreeCursor`]
+            // - Due to the type signature of this function, the returned [`Cursor`]
             //   borrows mutably from `self`.
-            RBTreeCursor {
+            Cursor {
                 current,
                 tree: self,
             }
@@ -253,16 +255,16 @@ impl<K, V> RBTree<K, V> {
     }
 
     /// Returns a cursor over the tree nodes, starting with the largest key.
-    pub fn cursor_back(&mut self) -> Option<RBTreeCursor<'_, K, V>> {
+    pub fn cursor_back(&mut self) -> Option<Cursor<'_, K, V>> {
         let root = addr_of_mut!(self.root);
         // SAFETY: `self.root` is always a valid root node
         let current = unsafe { bindings::rb_last(root) };
         NonNull::new(current).map(|current| {
             // INVARIANT:
             // - `current` is a valid node in the [`RBTree`] pointed to by `self`.
-            // - Due to the type signature of this function, the returned [`RBTreeCursor`]
+            // - Due to the type signature of this function, the returned [`Cursor`]
             //   borrows mutably from `self`.
-            RBTreeCursor {
+            Cursor {
                 current,
                 tree: self,
             }
@@ -308,7 +310,7 @@ where
     fn raw_entry(&mut self, key: &K) -> RawEntry<'_, K, V> {
         let raw_self: *mut RBTree<K, V> = self;
         // The returned `RawEntry` is used to call either `rb_link_node` or `rb_replace_node`.
-        // The parameters of `rb_link_node` are as follows:
+        // The parameters of `bindings::rb_link_node` are as follows:
         // - `node`: A pointer to an uninitialized node being inserted.
         // - `parent`: A pointer to an existing node in the tree. One of its child pointers must be
         //          null, and `node` will become a child of `parent` by replacing that child pointer
@@ -418,7 +420,7 @@ where
     /// If the given key exists, the cursor starts there.
     /// Otherwise it starts with the first larger key in sort order.
     /// If there is no larger key, it returns [`None`].
-    pub fn cursor_lower_bound(&mut self, key: &K) -> Option<RBTreeCursor<'_, K, V>>
+    pub fn cursor_lower_bound(&mut self, key: &K) -> Option<Cursor<'_, K, V>>
     where
         K: Ord,
     {
@@ -438,9 +440,9 @@ where
                 return NonNull::new(node).map(|current| {
                     // INVARIANT:
                     // - `node` is a valid node in the [`RBTree`] pointed to by `self`.
-                    // - Due to the type signature of this function, the returned [`RBTreeCursor`]
+                    // - Due to the type signature of this function, the returned [`Cursor`]
                     //   borrows mutably from `self`.
-                    RBTreeCursor {
+                    Cursor {
                         current,
                         tree: self,
                     }
@@ -473,9 +475,9 @@ where
         NonNull::new(links).map(|current| {
             // INVARIANT:
             // - `current` is a valid node in the [`RBTree`] pointed to by `self`.
-            // - Due to the type signature of this function, the returned [`RBTreeCursor`]
+            // - Due to the type signature of this function, the returned [`Cursor`]
             //   borrows mutably from `self`.
-            RBTreeCursor {
+            Cursor {
                 current,
                 tree: self,
             }
@@ -726,23 +728,26 @@ impl<K, V> Drop for RBTree<K, V> {
 /// assert_eq!(cursor.remove_next().unwrap().to_key_value(), (30, 300));
 ///
 /// # Ok::<(), Error>(())
+///
 /// ```
+///
 /// # Invariants
 /// - `current` points to a node that is in the same [`RBTree`] as `tree`.
-pub struct RBTreeCursor<'a, K, V> {
+pub struct Cursor<'a, K, V> {
     tree: &'a mut RBTree<K, V>,
     current: NonNull<bindings::rb_node>,
 }
 
-// SAFETY: The [`RBTreeCursor`] gives out immutable references to K and mutable references to V,
-// so it has the same thread safety requirements as mutable references.
-unsafe impl<'a, K: Send, V: Send> Send for RBTreeCursor<'a, K, V> {}
+// SAFETY: The [`Cursor`] has exclusive access to both `K` and `V`, so it is sufficient to require them to be `Send`.
+// The cursor only gives out immutable references to the keys, but since it has excusive access to those same
+// keys, `Send` is sufficient. `Sync` would be okay, but it is more restrictive to the user.
+unsafe impl<'a, K: Send, V: Send> Send for Cursor<'a, K, V> {}
 
-// SAFETY: The [`RBTreeCursor`] gives out immutable references to K and mutable references to V,
+// SAFETY: The [`Cursor`] gives out immutable references to K and mutable references to V,
 // so it has the same thread safety requirements as mutable references.
-unsafe impl<'a, K: Sync, V: Sync> Sync for RBTreeCursor<'a, K, V> {}
+unsafe impl<'a, K: Sync, V: Sync> Sync for Cursor<'a, K, V> {}
 
-impl<'a, K, V> RBTreeCursor<'a, K, V> {
+impl<'a, K, V> Cursor<'a, K, V> {
     /// The current node
     pub fn current(&self) -> (&K, &V) {
         // SAFETY:
@@ -788,8 +793,8 @@ impl<'a, K, V> RBTreeCursor<'a, K, V> {
         (
             // INVARIANT:
             // - `current` is a valid node in the [`RBTree`] pointed to by `self.tree`.
-            // - Due to the function signature, `self` is an owned [`RBTreeCursor`],
-            //   and [`RBTreeCursor`]s are only created via functions with a mutable reference
+            // - Due to the function signature, `self` is an owned [`Cursor`],
+            //   and [`Cursor`]s are only created via functions with a mutable reference
             //   to an [`RBTree`].
             Some(Self {
                 current,
@@ -838,8 +843,8 @@ impl<'a, K, V> RBTreeCursor<'a, K, V> {
     fn mv(self, direction: Direction) -> Option<Self> {
         // INVARIANT:
         // - `neighbor` is a valid node in the [`RBTree`] pointed to by `self.tree`.
-        // - Due to the function signature, `self` is an owned [`RBTreeCursor`],
-        //   and [`RBTreeCursor`]s are only created via functions with a mutable reference
+        // - Due to the function signature, `self` is an owned [`Cursor`],
+        //   and [`Cursor`]s are only created via functions with a mutable reference
         //   to an [`RBTree`].
         self.get_neighbor_raw(direction).map(|neighbor| Self {
             tree: self.tree,
@@ -858,11 +863,12 @@ impl<'a, K, V> RBTreeCursor<'a, K, V> {
     }
 
     fn peek(&self, direction: Direction) -> Option<(&K, &V)> {
-        self.get_neighbor_raw(direction)
+        self.get_neighbor_raw(direction).map(|neighbor| {
             // SAFETY:
             // - `neighbor` is a valid tree node.
             // - By the function signature, we have an immutable reference to `self`.
-            .map(|neighbor| unsafe { Self::to_key_value(neighbor) })
+            unsafe { Self::to_key_value(neighbor) }
+        })
     }
 
     /// Access the previous node mutably without moving the cursor.
@@ -876,11 +882,12 @@ impl<'a, K, V> RBTreeCursor<'a, K, V> {
     }
 
     fn peek_mut(&mut self, direction: Direction) -> Option<(&K, &mut V)> {
-        self.get_neighbor_raw(direction)
+        self.get_neighbor_raw(direction).map(|neighbor| {
             // SAFETY:
             // - `neighbor` is a valid tree node.
             // - By the function signature, we have a mutable reference to `self`.
-            .map(|neighbor| unsafe { Self::to_key_value_mut(neighbor) })
+            unsafe { Self::to_key_value_mut(neighbor) }
+        })
     }
 
     fn get_neighbor_raw(&self, direction: Direction) -> Option<NonNull<bindings::rb_node>> {
@@ -932,7 +939,7 @@ impl<'a, K, V> RBTreeCursor<'a, K, V> {
     }
 }
 
-/// Direction for [`RBTreeCursor`] operations.
+/// Direction for [`Cursor`] operations.
 enum Direction {
     /// the node immediately before, in sort order
     Prev,
@@ -969,9 +976,8 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter_raw.next().map(|(k, v)|
-            // SAFETY: Due to `self._tree`, `k` and `v` are valid for the lifetime of `'a`.
-            unsafe { (&*k, &*v) })
+        // SAFETY: Due to `self._tree`, `k` and `v` are valid for the lifetime of `'a`.
+        self.iter_raw.next().map(|(k, v)| unsafe { (&*k, &*v) })
     }
 }
 
@@ -992,8 +998,9 @@ pub struct IterMut<'a, K, V> {
     iter_raw: IterRaw<K, V>,
 }
 
-// SAFETY: The [`IterMut`] gives out immutable references to K and mutable references to V, so it has the same
-// thread safety requirements as mutable references.
+// SAFETY: The [`IterMut`] has exclusive access to both `K` and `V`, so it is sufficient to require them to be `Send`.
+// The iterator only gives out immutable references to the keys, but since the iterator has excusive access to those same
+// keys, `Send` is sufficient. `Sync` would be okay, but it is more restrictive to the user.
 unsafe impl<'a, K: Send, V: Send> Send for IterMut<'a, K, V> {}
 
 // SAFETY: The [`IterMut`] gives out immutable references to K and mutable references to V, so it has the same
@@ -1055,7 +1062,7 @@ impl<K, V> RBTreeNodeReservation<K, V> {
     /// call to [`RBTree::insert`].
     pub fn new(flags: Flags) -> Result<RBTreeNodeReservation<K, V>> {
         Ok(RBTreeNodeReservation {
-            node: Box::new_uninit(flags)?,
+            node: <Box<_> as BoxExt<_>>::new_uninit(flags)?,
         })
     }
 }
@@ -1152,7 +1159,7 @@ pub struct VacantEntry<'a, K, V> {
     raw: RawVacantEntry<'a, K, V>,
 }
 
-/// Like [`VacantEntry`], but doesn't hold on to the key.a
+/// Like [`VacantEntry`], but doesn't hold on to the key.
 ///
 /// # Invariants
 /// - `parent` may be null if the new node becomes the root.
@@ -1211,30 +1218,34 @@ pub struct OccupiedEntry<'a, K, V> {
 }
 
 impl<'a, K, V> OccupiedEntry<'a, K, V> {
-    fn node_ptr(&self) -> *mut Node<K, V> {
-        // SAFETY: By the type invariant of `Self`, all `node_links` pointers stored in `self`
-        // point to the links field of `Node<K, V>` objects.
-        unsafe { container_of!(self.node_links, Node<K, V>, links) }.cast_mut()
-    }
-
     /// Gets a reference to the value in the entry.
     pub fn get(&self) -> &V {
-        // SAFETY: `self.node_ptr` produces a valid pointer to a node in the tree.
-        unsafe { &(*self.node_ptr()).value }
+        // SAFETY:
+        // - `self.node_links` is a valid pointer to a node in the tree.
+        // - We have shared access to the underlying tree, and can thus give out a shared reference.
+        unsafe { &(*container_of!(self.node_links, Node<K, V>, links)).value }
     }
 
     /// Gets a mutable reference to the value in the entry.
     pub fn get_mut(&mut self) -> &mut V {
-        // SAFETY: `self.node_ptr` produces a valid pointer to a node in the tree.
-        unsafe { &mut (*self.node_ptr()).value }
+        // SAFETY:
+        // - `self.node_links` is a valid pointer to a node in the tree.
+        // - We have exclusive access to the underlying tree, and can thus give out a mutable reference.
+        unsafe {
+            &mut (*(container_of!(self.node_links, Node<K, V>, links) as *mut Node<K, V>)).value
+        }
     }
 
     /// Converts the entry into a mutable reference to its value.
     ///
     /// If you need multiple references to the `OccupiedEntry`, see [`self#get_mut`].
     pub fn into_mut(self) -> &'a mut V {
-        // SAFETY: `self.node_ptr` produces a valid pointer to a node in the tree.
-        unsafe { &mut (*self.node_ptr()).value }
+        // SAFETY:
+        // - `self.node_links` is a valid pointer to a node in the tree.
+        // - This consumes the `&'a mut RBTree<K, V>`, therefore it can give out a mutable reference that lives for `'a`.
+        unsafe {
+            &mut (*(container_of!(self.node_links, Node<K, V>, links) as *mut Node<K, V>)).value
+        }
     }
 
     /// Remove this entry from the [`RBTree`].
@@ -1247,7 +1258,9 @@ impl<'a, K, V> OccupiedEntry<'a, K, V> {
         RBTreeNode {
             // SAFETY: The node was a node in the tree, but we removed it, so we can convert it
             // back into a box.
-            node: unsafe { Box::from_raw(self.node_ptr()) },
+            node: unsafe {
+                Box::from_raw(container_of!(self.node_links, Node<K, V>, links) as *mut Node<K, V>)
+            },
         }
     }
 
@@ -1275,7 +1288,9 @@ impl<'a, K, V> OccupiedEntry<'a, K, V> {
         // SAFETY:
         // - `self.node_ptr` produces a valid pointer to a node in the tree.
         // - Now that we removed this entry from the tree, we can convert the node to a box.
-        let old_node = unsafe { Box::from_raw(self.node_ptr()) };
+        let old_node = unsafe {
+            Box::from_raw(container_of!(self.node_links, Node<K, V>, links) as *mut Node<K, V>)
+        };
 
         RBTreeNode { node: old_node }
     }
