@@ -3096,11 +3096,6 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 	int ret;
 	bool do_notify = false;
 
-	if (current->nsproxy->net_ns->core.sysctl_android_paranoid &&
-	    cmd != TUNGETIFF && !capable(CAP_NET_ADMIN)) {
-		return -EPERM;
-	}
-
 	if (cmd == TUNSETIFF || cmd == TUNSETQUEUE ||
 	    (_IOC_TYPE(cmd) == SOCK_IOC_TYPE && cmd != SIOCGSKNS)) {
 		if (copy_from_user(&ifr, argp, ifreq_len))

@@ -85,7 +85,6 @@
 #include <linux/netfilter_ipv4.h>
 #include <linux/random.h>
 #include <linux/slab.h>
-#include <linux/android_aid.h>
 
 #include <linux/uaccess.h>
 
@@ -263,9 +262,6 @@ static int inet_create(struct net *net, struct socket *sock, int protocol,
 
 	if (protocol < 0 || protocol >= IPPROTO_MAX)
 		return -EINVAL;
-
-	if (!inet_sk_allowed(net, AID_INET))
-		return -EACCES;
 
 	sock->state = SS_UNCONNECTED;
 
