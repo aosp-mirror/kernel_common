@@ -531,6 +531,13 @@ S: Kopmansg 2
 S: 411 13  Goteborg
 S: Sweden
 
+N: Daniel Bristot de Oliveira
+D: Scheduler contributions, notably: SCHED_DEADLINE
+D: Real-time Linux Analysis
+D: Runtime Verification
+D: OS Noise and Latency Tracers
+S: Brazil and Italy
+
 N: Paul Bristow
 E: paul@paulbristow.net
 W: https://paulbristow.net/linux/idefloppy.html

@@ -23,8 +23,8 @@ struct dma_heap;
 struct dma_heap_ops {
 	struct dma_buf *(*allocate)(struct dma_heap *heap,
 				    unsigned long len,
-				    unsigned long fd_flags,
-				    unsigned long heap_flags);
+				    u32 fd_flags,
+				    u64 heap_flags);
 };
 
 /**
@@ -99,8 +99,8 @@ struct dma_heap *dma_heap_find(const char *name);
  * This is for internal dma-buf allocations only.
  */
 struct dma_buf *dma_heap_buffer_alloc(struct dma_heap *heap, size_t len,
-				      unsigned int fd_flags,
-				      unsigned int heap_flags);
+				      u32 fd_flags,
+				      u64 heap_flags);
 
 /** dma_heap_buffer_free - Free dma_buf allocated by dma_heap_buffer_alloc
  * @dma_buf:	dma_buf to free

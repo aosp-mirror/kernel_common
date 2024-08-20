@@ -2024,7 +2024,7 @@ static void netdev_release(struct device *d)
 	 * device is dead and about to be freed.
 	 */
 	kfree(rcu_access_pointer(dev->ifalias));
-	netdev_freemem(dev);
+	kvfree(dev);
 }
 
 static const void *net_namespace(const struct device *d)

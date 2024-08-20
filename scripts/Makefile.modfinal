@@ -43,7 +43,7 @@ quiet_cmd_btf_ko = BTF [M] $@
 	if [ ! -f $(mixed-build-prefix)vmlinux ]; then					\
 		printf "Skipping BTF generation for %s due to unavailability of $(mixed-build-prefix)vmlinux\n" $@ 1>&2; \
 	else								\
-		LLVM_OBJCOPY="$(OBJCOPY)" $(PAHOLE) -J $(PAHOLE_FLAGS) --btf_base $(mixed-build-prefix)vmlinux $@; \
+		LLVM_OBJCOPY="$(OBJCOPY)" $(PAHOLE) -J $(PAHOLE_FLAGS) $(MODULE_PAHOLE_FLAGS) --btf_base $(mixed-build-prefix)vmlinux $@; \
 		$(RESOLVE_BTFIDS) -b $(mixed-build-prefix)vmlinux $@; 			\
 	fi;
 

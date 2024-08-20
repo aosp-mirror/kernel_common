@@ -31,6 +31,14 @@ import tarfile
 
 LCOV = "lcov"
 
+# Relative to the root of the source tree..
+OUTPUT_COV_DIR = os.path.join("out", "coverage")
+
+PREBUILT_LLVM_COV_PATH = os.path.join(
+    "prebuilts", "clang", "host", "linux-x86", "llvm-binutils-stable",
+    "llvm-cov"
+)
+
 EXCLUDED_FILES = [
     "*/security/selinux/av_permissions.h",
     "*/security/selinux/flask.h",
@@ -45,42 +53,47 @@ OMITTED_GCNO_FILES = [
 ]
 
 
+def create_llvm_gcov_sh(
+    llvm_cov_filename: str,
+    llvm_gcov_sh_filename: str,
+) -> None:
+  """Create a shell script that is compatible with gcov.
+
+  Args:
+    llvm_cov_filename: The absolute path to llvm-cov.
+    llvm_gcov_sh_filename: The path to the script to be created.
+  """
+  file_path = pathlib.Path(llvm_gcov_sh_filename)
+  file_path.parent.mkdir(parents=True, exist_ok=True)
+  file_path.write_text(f'#!/bin/bash\nexec {llvm_cov_filename} gcov "$@"')
+  os.chmod(llvm_gcov_sh_filename, 0o755)
+
+
 def generate_lcov_tracefile(
     gcov_dir: str,
     kernel_source: str,
-    llvm_gcov_sh_filename: str,
-    llvm_gcov_sh: str,
+    gcov_filename: str,
     tracefile_filename: str,
     included_files: [],
 ) -> None:
   """Call lcov to create tracefile based on gcov data files.
-
-  A temporay helper script, 'llvm_gcov.sh', is created that points to llvm-cov.
 
   Args:
     gcov_dir: Directory that contains the extracted gcov data files as retreived
       from debugfs.
     kernel_source: Directory containing the kernel source same as what was used
       to build system under test.
-    llvm_gcov_sh_filename: The full filename of temp llvm_gcov.sh helper script.
-    llvm_gcov_sh: The contents of what should be put into llvm_gcov.sh.
+    gcov_filename: The absolute path to gcov or a compatible script.
     tracefile_filename: The name of tracefile to create.
     included_files: List of source file pattern to include in tracefile. Can be
       empty in which case include allo source.
   """
-
   exclude_args = " ".join([f'--exclude "{f}"' for f in EXCLUDED_FILES])
   include_args = (
       " ".join([f'--include "{f[0]}"' for f in included_files])
       if included_files is not None
       else ""
   )
-
-  # Create helper script to be used during the `lcov` call
-  file_path = pathlib.Path(llvm_gcov_sh_filename)
-  file_path.parent.mkdir(parents=True, exist_ok=True)
-  file_path.write_text(llvm_gcov_sh)
-  os.chmod(llvm_gcov_sh_filename, 0o755)
 
   logging.info("Running lcov on %s", gcov_dir)
   lcov_cmd = (
@@ -89,7 +102,7 @@ def generate_lcov_tracefile(
       "--rc branch_coverage=1 "
       f"-b {kernel_source} "
       f"-d {gcov_dir} "
-      f"--gcov-tool {llvm_gcov_sh_filename} "
+      f"--gcov-tool {gcov_filename} "
       f"{exclude_args} "
       f"{include_args} "
       "--ignore-errors gcov,gcov,unused,unused "
@@ -355,7 +368,7 @@ def get_kernel_repo_dir() -> str:
   return get_parent_path(this_script_full_path, 6)
 
 
-def build_config(llvm_cov_path: str) -> {}:
+def build_config(llvm_cov_path: str, tmp_dir: str) -> {}:
   """Build configuration.
 
   Returns:
@@ -364,13 +377,16 @@ def build_config(llvm_cov_path: str) -> {}:
   config = {}
   config["repo_dir"] = get_kernel_repo_dir()
   config["output_dir"] = f'{config["repo_dir"]}/out'
-  config["output_cov_dir"] = f'{config["output_dir"]}/coverage'
+  config["output_cov_dir"] = (
+      os.path.abspath(tmp_dir) if tmp_dir else
+      os.path.join(config["repo_dir"], OUTPUT_COV_DIR)
+  )
 
-  llvm_cov_path = (os.path.abspath(llvm_cov_path) if llvm_cov_path else
-                   f'{config["repo_dir"]}/prebuilts/clang/host/linux-x86/'
-                   'llvm-binutils-stable/llvm-cov')
+  config["llvm_cov_filename"] = (
+      os.path.abspath(llvm_cov_path) if llvm_cov_path else
+      os.path.join(config["repo_dir"], PREBUILT_LLVM_COV_PATH)
+  )
 
-  config["llvm_gcov_sh"] = f'#!/bin/bash\nexec {llvm_cov_path} gcov "$@"'
   config["llvm_gcov_sh_filename"] = (
       f'{config["output_cov_dir"]}/tmp/llvm-gcov.sh'
   )
@@ -424,7 +440,18 @@ def main() -> None:
   arg_parser.add_argument(
       "--llvm-cov",
       required=False,
-      help="Path to llvm-cov",
+      help=(
+          "Path to llvm-cov. Default: " +
+          os.path.join("<repo dir>", PREBUILT_LLVM_COV_PATH)
+      )
+  )
+  arg_parser.add_argument(
+      "--tmp-dir",
+      required=False,
+      help=(
+          "Path to the directory where the temporary files are created."
+          " Default: " + os.path.join("<repo dir>", OUTPUT_COV_DIR)
+      )
   )
   arg_parser.add_argument(
       "--verbose",
@@ -457,7 +484,7 @@ def main() -> None:
       logging.error("%s is not a directory.", gcno_dir)
       sys.exit(-1)
 
-  config = build_config(args.llvm_cov)
+  config = build_config(args.llvm_cov, args.tmp_dir)
 
   if args.gcno_dirs:
     gcno_mappings = read_gcno_dirs(args.gcno_dirs)
@@ -482,11 +509,16 @@ def main() -> None:
 
   gcov_dir = unpack_gcov_tar(tar_file, config["output_cov_dir"])
   correct_symlinks_in_directory(gcov_dir, gcno_mappings)
+
+  create_llvm_gcov_sh(
+      config["llvm_cov_filename"],
+      config["llvm_gcov_sh_filename"],
+  )
+
   generate_lcov_tracefile(
       gcov_dir,
       config["repo_dir"],
       config["llvm_gcov_sh_filename"],
-      config["llvm_gcov_sh"],
       args.out_file,
       args.include,
   )
