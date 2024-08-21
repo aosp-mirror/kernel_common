@@ -1722,10 +1722,10 @@
 				regulator-allowed-modes = <0 1>;
 			};
 
-			mt6366_vcn33_bt_reg: ldo_vcn33_bt {
-				regulator-name = "vcn33_bt";
+			mt6366_vcn33_reg: ldo_vcn33 {
+				regulator-name = "pp3300_vcn33_x";
 				regulator-min-microvolt = <3300000>;
-				regulator-max-microvolt = <3500000>;
+				regulator-max-microvolt = <3300000>;
 				regulator-enable-ramp-delay = <270>;
 			};
 

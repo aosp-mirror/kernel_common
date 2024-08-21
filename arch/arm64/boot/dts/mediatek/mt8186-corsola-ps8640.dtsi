@@ -18,7 +18,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&ps8640_pins>;
 		vdd12-supply = <&mt6366_vrf12_reg>;
-		vdd33-supply = <&mt6366_vcn33_bt_reg>;
+		vdd33-supply = <&mt6366_vcn33_reg>;
 
 		ports {
 			#address-cells = <1>;
@@ -43,7 +43,7 @@
 
 		aux-bus {
 			panel {
-				compatible = "auo,b116xw03";
+				compatible = "edp-panel";
 				power-supply = <&pp3300_disp_x>;
 				backlight = <&backlight_lcd0>;
 
