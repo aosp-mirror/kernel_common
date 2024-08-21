@@ -267,6 +267,7 @@ _DB845C_MODULE_OUTS = [
     "drivers/iio/adc/qcom-spmi-adc5.ko",
     "drivers/iio/adc/qcom-vadc-common.ko",
     "drivers/input/misc/pm8941-pwrkey.ko",
+    "drivers/interconnect/icc-clk.ko",
     "drivers/interconnect/qcom/icc-bcm-voter.ko",
     "drivers/interconnect/qcom/icc-osm-l3.ko",
     "drivers/interconnect/qcom/icc-rpmh.ko",
