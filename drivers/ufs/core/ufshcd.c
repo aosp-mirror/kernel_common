@@ -2459,6 +2459,7 @@ int ufshcd_send_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 	ufshcd_hold(hba);
 	mutex_lock(&hba->uic_cmd_mutex);
 	ufshcd_add_delay_before_dme_cmd(hba);
+	WARN_ON(hba->uic_async_done);
 
 	ret = __ufshcd_send_uic_cmd(hba, uic_cmd, true);
 	if (!ret)
@@ -4156,7 +4157,6 @@ static int ufshcd_uic_pwr_ctrl(struct ufs_hba *hba, struct uic_command *cmd)
 	unsigned long flags;
 	u8 status;
 	int ret;
-	bool reenable_intr = false;
 
 	mutex_lock(&hba->uic_cmd_mutex);
 	ufshcd_add_delay_before_dme_cmd(hba);
@@ -4167,15 +4167,6 @@ static int ufshcd_uic_pwr_ctrl(struct ufs_hba *hba, struct uic_command *cmd)
 		goto out_unlock;
 	}
 	hba->uic_async_done = &uic_async_done;
-	if (ufshcd_readl(hba, REG_INTERRUPT_ENABLE) & UIC_COMMAND_COMPL) {
-		ufshcd_disable_intr(hba, UIC_COMMAND_COMPL);
-		/*
-		 * Make sure UIC command completion interrupt is disabled before
-		 * issuing UIC command.
-		 */
-		wmb();
-		reenable_intr = true;
-	}
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
 	ret = __ufshcd_send_uic_cmd(hba, cmd, false);
 	if (ret) {
@@ -4219,8 +4210,6 @@ out:
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	hba->active_uic_cmd = NULL;
 	hba->uic_async_done = NULL;
-	if (reenable_intr)
-		ufshcd_enable_intr(hba, UIC_COMMAND_COMPL);
 	if (ret) {
 		ufshcd_set_link_broken(hba);
 		ufshcd_schedule_eh_work(hba);
@@ -5387,11 +5376,12 @@ static irqreturn_t ufshcd_uic_cmd_compl(struct ufs_hba *hba, u32 intr_status)
 		hba->errors |= (UFSHCD_UIC_HIBERN8_MASK & intr_status);
 
 	if (intr_status & UIC_COMMAND_COMPL && cmd) {
-		cmd->argument2 |= ufshcd_get_uic_cmd_result(hba);
-		cmd->argument3 = ufshcd_get_dme_attr_val(hba);
-		if (!hba->uic_async_done)
+		if (!hba->uic_async_done) {
+			cmd->argument2 |= ufshcd_get_uic_cmd_result(hba);
+			cmd->argument3 = ufshcd_get_dme_attr_val(hba);
 			cmd->cmd_active = 0;
-		complete(&cmd->done);
+			complete(&cmd->done);
+		}
 		retval = IRQ_HANDLED;
 	}
 
