@@ -2647,8 +2647,8 @@ static int btintel_send_sar_ddc(struct hci_dev *hdev, struct btintel_cp_ddc_writ
 
 	skb = __hci_cmd_sync(hdev, 0xfc8b, len, data, HCI_CMD_TIMEOUT);
 	if (IS_ERR(skb)) {
-		bt_dev_warn(hdev, "Failed to send Intel Write SAR DDC ID:%d (%ld)", data->id,
-			    PTR_ERR(skb));
+		bt_dev_warn(hdev, "Failed to send sar ddc id:0x%4.4x (%ld)",
+			    le16_to_cpu(data->id), PTR_ERR(skb));
 		return PTR_ERR(skb);
 	}
 	kfree_skb(skb);
@@ -2724,10 +2724,10 @@ static int btintel_set_legacy_sar(struct hci_dev *hdev,
 static int btintel_set_mutual_sar(struct hci_dev *hdev,
 				  struct btintel_sar_inc_pwr *sar)
 {
-	u8 buffer[64];
 	struct btintel_cp_ddc_write *cmd;
-	bool enable;
 	struct sk_buff *skb;
+	u8 buffer[64];
+	bool enable;
 	int ret;
 
 	cmd = (void *)buffer;
@@ -2798,26 +2798,26 @@ static int btintel_set_mutual_sar(struct hci_dev *hdev,
 static int btintel_sar_send_to_device(struct hci_dev *hdev, struct btintel_sar_inc_pwr *sar,
 				      struct intel_version_tlv *ver)
 {
-	int ret = 0;
+	u16 cnvi, cnvr;
+	int ret;
 
-	bt_dev_info(hdev, "Applying legacy Bluetooth SAR");
+	cnvi = ver->cnvi_top & 0xfff;
+	cnvr = ver->cnvr_top & 0xfff;
 
-	ret = btintel_set_legacy_sar(hdev, sar);
-	if (ret)
-		return ret;
-
-	/* set for FMP */
-	if ((ver->cnvr_top & 0xfff) == 0x910) {
+	if (cnvi < BTINTEL_CNVI_BLAZARI && cnvr < BTINTEL_CNVR_FMP2) {
+		bt_dev_info(hdev, "Applying legacy Bluetooth SAR");
+		ret = btintel_set_legacy_sar(hdev, sar);
+	} else if (cnvi == BTINTEL_CNVI_GAP || cnvr == BTINTEL_CNVR_FMP2) {
 		bt_dev_info(hdev, "Applying  Mutual Bluetooth SAR");
 		ret = btintel_set_mutual_sar(hdev, sar);
-		if (ret)
-			return ret;
+	} else {
+		ret = -EOPNOTSUPP;
 	}
 
 	return ret;
 }
 
-static acpi_status btintel_acpi_set_sar(struct hci_dev *hdev,
+static int btintel_acpi_set_sar(struct hci_dev *hdev,
 					struct intel_version_tlv *ver)
 {
 	union acpi_object *bt_pkg, *buffer = NULL;
@@ -2828,20 +2828,20 @@ static acpi_status btintel_acpi_set_sar(struct hci_dev *hdev,
 
 	status = btintel_evaluate_acpi_method(hdev, "BRDS", &buffer, 2);
 	if (ACPI_FAILURE(status))
-		return status;
-
-	revision = buffer->package.elements[0].integer.value;
-
-	if (revision > BTINTEL_SAR_INC_PWR) {
-		bt_dev_dbg(hdev, "BT_SAR: revision: %d not supported", revision);
-		ret = -EOPNOTSUPP;
-		goto error;
-	}
+		return -ENOENT;
 
 	bt_pkg = btintel_acpi_get_bt_pkg(buffer);
 
 	if (IS_ERR(bt_pkg)) {
 		ret = PTR_ERR(bt_pkg);
+		goto error;
+	}
+
+	revision = buffer->package.elements[0].integer.value;
+
+	if (revision > BTINTEL_SAR_INC_PWR) {
+		bt_dev_dbg(hdev, "BT_SAR: revision: 0x%2.2x not supported", revision);
+		ret = -EOPNOTSUPP;
 		goto error;
 	}
 
@@ -2889,19 +2889,7 @@ static int btintel_set_specific_absorption_rate(struct hci_dev *hdev,
 						struct intel_version_tlv *ver)
 {
 #ifdef CONFIG_ACPI
-	acpi_status status;
-
-	/* This feature is applicable for GaP2 only */
-	if ((ver->cnvi_top & 0xfff) != 0x910)
-		return 0;
-
-	if ((ver->cnvr_top & 0xfff) != 0x810 && /* MsP2 */
-	    (ver->cnvr_top & 0xfff) != 0x910)	/* FmP2 */
-		return 0;
-
-	status = btintel_acpi_set_sar(hdev, ver);
-	if (ACPI_FAILURE(status))
-		return status;
+	return btintel_acpi_set_sar(hdev, ver);
 #endif
 	return 0;
 }

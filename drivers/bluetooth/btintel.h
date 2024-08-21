@@ -6,6 +6,13 @@
  *  Copyright (C) 2015  Intel Corporation
  */
 
+/* List of CNVIs */
+#define BTINTEL_CNVI_BLAZARI	0x900
+#define BTINTEL_CNVI_GAP	0x910
+
+/* CNVR */
+#define BTINTEL_CNVR_FMP2	0x910
+
 /* List of tlv type */
 enum {
 	INTEL_TLV_CNVI_TOP = 0x10,
