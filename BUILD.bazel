@@ -119,6 +119,7 @@ define_common_kernels(target_configs = {
     "kernel_riscv64": {
         "module_implicit_outs": get_gki_modules_list("riscv64"),
         "make_goals": _GKI_RISCV64_MAKE_GOALS,
+        "ddk_module_headers": [":all_headers_riscv64"],
         "extra_dist": [":test_mappings_zip"],
     },
     "kernel_x86_64": {
