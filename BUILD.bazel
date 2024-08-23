@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (C) 2021 The Android Open Source Project
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_pkg//pkg:install.bzl", "pkg_install")
 load(
@@ -10,8 +12,12 @@ load(
 )
 load("@rules_pkg//pkg:pkg.bzl", "pkg_zip")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
-load("//build/kernel/kleaf:common_kernels.bzl", "define_common_kernels")
-load("//build/kernel/kleaf:constants.bzl", "X86_64_OUTS")
+load(
+    "//build/kernel/kleaf:common_kernels.bzl",
+    "common_kernel",
+    "define_prebuilts",
+)
+load("//build/kernel/kleaf:constants.bzl", "DEFAULT_GKI_OUTS", "X86_64_OUTS")
 load(
     "//build/kernel/kleaf:kernel.bzl",
     "checkpatch",
@@ -20,6 +26,7 @@ load(
     "kernel_build",
     "kernel_images",
     "kernel_modules_install",
+    "merge_kzip",
     "merged_kernel_uapi_headers",
 )
 load(":abi.bzl", "cc_binary_with_abi")
@@ -49,6 +56,16 @@ _GKI_X86_64_MAKE_GOALS = [
     "bzImage",
     "modules",
 ]
+
+_GKI_AARCH64_BOOT_IMAGE_SIZES = {
+    "": "67108864",
+    "lz4": "53477376",
+    "gz": "47185920",
+}
+
+_GKI_X86_64_BOOT_IMAGE_SIZES = {
+    "": "67108864",
+}
 
 checkpatch(
     name = "checkpatch",
@@ -105,34 +122,215 @@ write_file(
     ],
 )
 
-define_common_kernels(target_configs = {
-    "kernel_aarch64": {
-        "module_implicit_outs": get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
-        "make_goals": _GKI_AARCH64_MAKE_GOALS,
-        "ddk_module_headers": [":all_headers_aarch64"],
-        "ddk_headers_archive": ":kernel_aarch64_ddk_headers_archive",
-        "extra_dist": [
-            ":test_mappings_zip",
-            ":tests_zip_arm64",
+_SET_KERNEL_DIR_CMD = "KERNEL_DIR=\"{kernel_dir}\"".format(
+    kernel_dir = paths.join(
+        package_relative_label(":x").workspace_root,
+        package_relative_label(":x").package,
+    ),
+)
+
+write_file(
+    name = "set_kernel_dir_build_config",
+    out = "set_kernel_dir_build_config/build.config",
+    content = [
+        _SET_KERNEL_DIR_CMD,
+        "",
+    ],
+    visibility = ["//visibility:public"],  # TODO: This should be private
+)
+
+filegroup(
+    name = "common_kernel_sources",
+    srcs = glob(
+        ["**"],
+        exclude = [
+            "BUILD.bazel",
+            "**/*.bzl",
+            ".git/**",
+
+            # ctag files
+            "tags",
+            "TAGS",
+
+            # temporary ctag files
+            "tags.temp",
+            "tags.lock",
+
+            # cscope files
+            "cscope.*",
+            "ncscope.*",
         ],
-    },
-    "kernel_riscv64": {
-        "module_implicit_outs": get_gki_modules_list("riscv64"),
-        "make_goals": _GKI_RISCV64_MAKE_GOALS,
-        "ddk_module_headers": [":all_headers_riscv64"],
-        "extra_dist": [":test_mappings_zip"],
-    },
-    "kernel_x86_64": {
-        "kmi_symbol_list_strict_mode": False,
-        "ddk_module_headers": [":all_headers_x86_64"],
-        "module_implicit_outs": get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
-        "make_goals": _GKI_X86_64_MAKE_GOALS,
-        "extra_dist": [
-            ":test_mappings_zip",
-            ":tests_zip_x86_64",
-        ],
-    },
-})
+    ),
+    visibility = ["//visibility:public"],
+)
+
+common_kernel(
+    name = "kernel_aarch64",
+    outs = DEFAULT_GKI_OUTS,
+    arch = "arm64",
+    build_config = "build.config.gki.aarch64",
+    build_gki_artifacts = True,
+    ddk_headers_archive = ":kernel_aarch64_ddk_headers_archive",
+    ddk_module_headers = [":all_headers_aarch64"],
+    extra_dist = [
+        ":test_mappings_zip",
+        ":tests_zip_arm64",
+    ],
+    gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
+    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
+    make_goals = _GKI_AARCH64_MAKE_GOALS,
+    module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
+    visibility = ["//visibility:public"],
+
+    # Symbol lists and module lists
+    # kmi_symbol_list = None,
+    # additional_kmi_symbol_lists = [],
+    # kmi_symbol_list_strict_mode = False,
+    # protected_exports_list = None,
+    # protected_modules_list = None,
+    # trim_nonlisted_kmi = False,
+
+    # ABI
+    # abi_definition_stg = None,
+    # kmi_enforced = False,
+)
+
+common_kernel(
+    name = "kernel_aarch64_16k",
+    outs = DEFAULT_GKI_OUTS,
+    arch = "arm64",
+    build_config = "build.config.gki.aarch64",
+    build_gki_artifacts = True,
+    ddk_headers_archive = ":kernel_aarch64_ddk_headers_archive",
+    ddk_module_headers = [":all_headers_aarch64"],
+    extra_dist = [
+        ":test_mappings_zip",
+        ":tests_zip_arm64",
+    ],
+    gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
+    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
+    make_goals = _GKI_AARCH64_MAKE_GOALS,
+    module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
+    page_size = "16k",
+    visibility = ["//visibility:public"],
+)
+
+common_kernel(
+    name = "kernel_aarch64_debug",
+    outs = DEFAULT_GKI_OUTS,
+    arch = "arm64",
+    build_config = "build.config.gki.aarch64",
+    build_gki_artifacts = True,
+    ddk_headers_archive = ":kernel_aarch64_ddk_headers_archive",
+    ddk_module_headers = [":all_headers_aarch64"],
+    deprecation = """\
+Consider building @@//common:kernel_aarch64 with:
+    * --notrim to disable trimming, or
+    * --debug to enable additional debug options.""",
+    extra_dist = [
+        ":test_mappings_zip",
+        ":tests_zip_arm64",
+    ],
+    gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
+    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
+    make_goals = _GKI_AARCH64_MAKE_GOALS,
+    module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
+    visibility = ["//visibility:public"],
+)
+
+common_kernel(
+    name = "kernel_aarch64_interceptor",
+    outs = DEFAULT_GKI_OUTS,
+    arch = "arm64",
+    build_config = "build.config.gki.aarch64",
+    ddk_headers_archive = ":kernel_aarch64_ddk_headers_archive",
+    ddk_module_headers = [":all_headers_aarch64"],
+    enable_interceptor = True,
+    extra_dist = [
+        ":test_mappings_zip",
+        ":tests_zip_arm64",
+    ],
+    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
+    make_goals = _GKI_AARCH64_MAKE_GOALS,
+    module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
+    visibility = ["//visibility:public"],
+)
+
+common_kernel(
+    name = "kernel_x86_64_debug",
+    outs = X86_64_OUTS,
+    arch = "x86_64",
+    build_config = "build.config.gki.x86_64",
+    build_gki_artifacts = True,
+    ddk_module_headers = [":all_headers_x86_64"],
+    deprecation = """\
+Consider building @@//common:kernel_x86_64 with:
+    * --notrim to disable trimming, or
+    * --debug to enable additional debug options.""",
+    extra_dist = [
+        ":test_mappings_zip",
+        ":tests_zip_x86_64",
+    ],
+    gki_boot_img_sizes = _GKI_X86_64_BOOT_IMAGE_SIZES,
+    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_x86_64",
+    make_goals = _GKI_X86_64_MAKE_GOALS,
+    module_implicit_outs = get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
+    visibility = ["//visibility:public"],
+)
+
+common_kernel(
+    name = "kernel_x86_64",
+    outs = X86_64_OUTS,
+    arch = "x86_64",
+    build_config = "build.config.gki.x86_64",
+    build_gki_artifacts = True,
+    ddk_module_headers = [":all_headers_x86_64"],
+    extra_dist = [
+        ":test_mappings_zip",
+        ":tests_zip_x86_64",
+    ],
+    gki_boot_img_sizes = {"": "67108864"},
+    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_x86_64",
+    make_goals = _GKI_X86_64_MAKE_GOALS,
+    module_implicit_outs = get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "kernel",
+    actual = ":kernel_aarch64",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "kernel_dist",
+    actual = ":kernel_aarch64_dist",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "kernel_kythe_corpus",
+    build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+merge_kzip(
+    name = "kernel_kythe",
+    srcs = [
+        ":kernel_aarch64_kythe",
+        ":kernel_x86_64_kythe",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+copy_to_dist_dir(
+    name = "kernel_kythe_dist",
+    data = [":kernel_kythe"],
+    flat = True,
+    visibility = ["//visibility:public"],
+)
+
+define_prebuilts(visibility = ["//visibility:public"])
 
 # Microdroid is not a real device. The kernel image is built with special
 #  configs to reduce the size. Hence, not using mixed build.
