@@ -63,6 +63,12 @@ _GKI_AARCH64_BOOT_IMAGE_SIZES = {
     "gz": "47185920",
 }
 
+_GKI_RISCV64_BOOT_IMAGE_SIZES = {
+    "": "67108864",
+    "lz4": "53477376",
+    "gz": "47185920",
+}
+
 _GKI_X86_64_BOOT_IMAGE_SIZES = {
     "": "67108864",
 }
@@ -253,6 +259,21 @@ common_kernel(
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
+    visibility = ["//visibility:public"],
+)
+
+common_kernel(
+    name = "kernel_riscv64",
+    outs = DEFAULT_GKI_OUTS,
+    arch = "riscv64",
+    build_config = "build.config.gki.riscv64",
+    build_gki_artifacts = True,
+    ddk_module_headers = [":all_headers_riscv64"],
+    extra_dist = [":test_mappings_zip"],
+    gki_boot_img_sizes = _GKI_RISCV64_BOOT_IMAGE_SIZES,
+    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_riscv64",
+    make_goals = _GKI_RISCV64_MAKE_GOALS,
+    module_implicit_outs = get_gki_modules_list("riscv64"),
     visibility = ["//visibility:public"],
 )
 
