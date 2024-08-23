@@ -349,10 +349,10 @@ int cam_sync_get_obj_ref(int32_t sync_obj)
 
 	row = sync_dev->sync_table + sync_obj;
 
-	spin_lock(&sync_dev->row_spinlocks[sync_obj]);
+	spin_lock_bh(&sync_dev->row_spinlocks[sync_obj]);
 
 	if (row->state != CAM_SYNC_STATE_ACTIVE) {
-		spin_unlock(&sync_dev->row_spinlocks[sync_obj]);
+		spin_unlock_bh(&sync_dev->row_spinlocks[sync_obj]);
 		CAM_ERR_RATE_LIMIT_CUSTOM(CAM_SYNC, 1, 5,
 			"accessing an uninitialized sync obj = %d state = %d",
 			sync_obj, row->state);
@@ -360,7 +360,7 @@ int cam_sync_get_obj_ref(int32_t sync_obj)
 	}
 
 	atomic_inc(&row->ref_cnt);
-	spin_unlock(&sync_dev->row_spinlocks[sync_obj]);
+	spin_unlock_bh(&sync_dev->row_spinlocks[sync_obj]);
 	CAM_DBG(CAM_SYNC, "get ref for obj %d", sync_obj);
 
 	return 0;
