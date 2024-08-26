@@ -1819,10 +1819,9 @@
 			power-domains = <&spm MT8186_POWER_DOMAIN_DIS>;
 		};
 
-		dpi0: dpi@1400a000 {
+		dpi: dpi@1400a000 {
 			compatible = "mediatek,mt8186-dpi";
 			reg = <0 0x1400a000 0 0x1000>;
-			power-domains = <&spm MT8186_POWER_DOMAIN_DIS>;
 			clocks = <&topckgen CLK_TOP_DPI>,
 				 <&mmsys CLK_MM_DISP_DPI>,
 				 <&apmixedsys CLK_APMIXED_TVDPLL>;
