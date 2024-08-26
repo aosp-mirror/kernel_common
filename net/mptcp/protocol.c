@@ -1664,7 +1664,7 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 			return NULL;
 		}
 
-		if (subflow->backup) {
+		if (subflow->backup || subflow->request_bkup) {
 			if (!backup)
 				backup = ssk;
 			continue;
