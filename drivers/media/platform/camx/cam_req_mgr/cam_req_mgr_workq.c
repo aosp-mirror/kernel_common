@@ -259,25 +259,27 @@ int cam_req_mgr_workq_create(char *name, int32_t num_tasks,
 
 void cam_req_mgr_workq_destroy(struct cam_req_mgr_core_workq **crm_workq)
 {
+	struct workqueue_struct *job = NULL;
 	unsigned long flags = 0;
-	struct workqueue_struct   *job;
-	CAM_DBG(CAM_CRM, "destroy workque %pK", crm_workq);
-	if (*crm_workq) {
-		WORKQ_ACQUIRE_LOCK(*crm_workq, flags);
-		if ((*crm_workq)->job) {
-			job = (*crm_workq)->job;
-			(*crm_workq)->job = NULL;
-			WORKQ_RELEASE_LOCK(*crm_workq, flags);
-			destroy_workqueue(job);
-		} else {
-			WORKQ_RELEASE_LOCK(*crm_workq, flags);
-		}
 
-		/* Destroy workq payload data */
-		kfree((*crm_workq)->task.pool[0].payload);
-		(*crm_workq)->task.pool[0].payload = NULL;
-		kfree((*crm_workq)->task.pool);
-		kfree(*crm_workq);
-		*crm_workq = NULL;
+	CAM_DBG(CAM_CRM, "destroy workque %pK", crm_workq);
+	if (*crm_workq == NULL)
+		return;
+
+	WORKQ_ACQUIRE_LOCK(*crm_workq, flags);
+	job = (*crm_workq)->job;
+	(*crm_workq)->job = NULL;
+	WORKQ_RELEASE_LOCK(*crm_workq, flags);
+
+	if (job) {
+		flush_workqueue(job);
+		destroy_workqueue(job);
 	}
+
+	/* Destroy workq payload data */
+	kfree((*crm_workq)->task.pool[0].payload);
+	(*crm_workq)->task.pool[0].payload = NULL;
+	kfree((*crm_workq)->task.pool);
+	kfree(*crm_workq);
+	*crm_workq = NULL;
 }

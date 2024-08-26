@@ -2842,10 +2842,12 @@ static int __cam_req_mgr_unlink(struct cam_req_mgr_core_link *link)
 	if (link->watchdog)
 		crm_timer_exit(&link->watchdog);
 	spin_unlock_bh(&link->link_state_spin_lock);
+	mutex_unlock(&link->lock);
 
 	/* Destroy workq of link */
 	cam_req_mgr_workq_destroy(&link->workq);
 
+	mutex_lock(&link->lock);
 	/* Cleanup request tables and unlink devices */
 	__cam_req_mgr_destroy_link_info(link);
 
