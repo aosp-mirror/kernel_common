@@ -1295,6 +1295,18 @@ int kvm_pgtable_stage2_unmap(struct kvm_pgtable *pgt, u64 addr, u64 size)
 		.flags	= KVM_PGTABLE_WALK_LEAF | KVM_PGTABLE_WALK_TABLE_POST,
 	};
 
+	/*
+	 * stage2_unmap_walker's TLBI logic is unsafe for the pKVM host stage-2
+	 * table because a child table may have a refcount of 1 while still
+	 * containing valid mappings. The use of __kvm_tlb_flush_vmid_ipa in
+	 * stage2_unmap_clear_pte is then insufficient to invalidate all leaf
+	 * mappings reachable from the child table. All other stage-2 tables
+	 * hold a reference for every non-zero PTE, and are thus guaranteed to
+	 * be completely empty when refcount is 1.
+	 */
+	if (WARN_ON(pgt->flags & KVM_PGTABLE_S2_IDMAP))
+		return -EINVAL;
+
 	ret = kvm_pgtable_walk(pgt, addr, size, &walker);
 	if (stage2_unmap_defer_tlb_flush(pgt))
 		/* Perform the deferred TLB invalidations */
