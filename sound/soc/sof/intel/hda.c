@@ -931,6 +931,8 @@ static int check_dmic_num(struct snd_sof_dev *sdev)
 	if (nhlt)
 		dmic_num = intel_nhlt_get_dmic_geo(sdev->dev, nhlt);
 
+	dev_info(sdev->dev, "DMICs detected in NHLT tables: %d\n", dmic_num);
+
 	/* allow for module parameter override */
 	if (dmic_num_override != -1) {
 		dev_dbg(sdev->dev,
@@ -977,82 +979,6 @@ static int check_nhlt_ssp_mclk_mask(struct snd_sof_dev *sdev, int ssp_num)
 
 	return intel_nhlt_ssp_mclk_mask(nhlt, ssp_num);
 }
-
-#if IS_ENABLED(CONFIG_SND_SOC_SOF_INTEL_SOUNDWIRE)
-
-static const char *fixup_tplg_name(struct snd_sof_dev *sdev,
-				   const char *sof_tplg_filename,
-				   const char *idisp_str,
-				   const char *dmic_str)
-{
-	const char *tplg_filename = NULL;
-	char *filename, *tmp;
-	const char *split_ext;
-
-	filename = kstrdup(sof_tplg_filename, GFP_KERNEL);
-	if (!filename)
-		return NULL;
-
-	/* this assumes a .tplg extension */
-	tmp = filename;
-	split_ext = strsep(&tmp, ".");
-	if (split_ext)
-		tplg_filename = devm_kasprintf(sdev->dev, GFP_KERNEL,
-					       "%s%s%s.tplg",
-					       split_ext, idisp_str, dmic_str);
-	kfree(filename);
-
-	return tplg_filename;
-}
-
-static int dmic_detect_topology_fixup(struct snd_sof_dev *sdev,
-				      const char **tplg_filename,
-				      const char *idisp_str,
-				      int *dmic_found,
-				      bool tplg_fixup)
-{
-	const char *dmic_str;
-	int dmic_num;
-
-	/* first check for DMICs (using NHLT or module parameter) */
-	dmic_num = check_dmic_num(sdev);
-
-	switch (dmic_num) {
-	case 1:
-		dmic_str = "-1ch";
-		break;
-	case 2:
-		dmic_str = "-2ch";
-		break;
-	case 3:
-		dmic_str = "-3ch";
-		break;
-	case 4:
-		dmic_str = "-4ch";
-		break;
-	default:
-		dmic_num = 0;
-		dmic_str = "";
-		break;
-	}
-
-	if (tplg_fixup) {
-		const char *default_tplg_filename = *tplg_filename;
-		const char *fixed_tplg_filename;
-
-		fixed_tplg_filename = fixup_tplg_name(sdev, default_tplg_filename,
-						      idisp_str, dmic_str);
-		if (!fixed_tplg_filename)
-			return -ENOMEM;
-		*tplg_filename = fixed_tplg_filename;
-	}
-
-	dev_info(sdev->dev, "DMICs detected in NHLT tables: %d\n", dmic_num);
-	*dmic_found = dmic_num;
-
-	return 0;
-}
-#endif
 
 static int hda_init_caps(struct snd_sof_dev *sdev)
 {
@@ -1599,44 +1525,9 @@ static struct snd_soc_acpi_mach *hda_sdw_machine_select(struct snd_sof_dev *sdev
 			break;
 	}
 	if (mach && mach->link_mask) {
-		int dmic_num = 0;
-		bool tplg_fixup;
-		const char *tplg_filename;
-
 		mach->mach_params.links = mach->links;
 		mach->mach_params.link_mask = mach->link_mask;
 		mach->mach_params.platform = dev_name(sdev->dev);
-
-		if (pdata->tplg_filename) {
-			tplg_fixup = false;
-		} else {
-			tplg_fixup = true;
-			tplg_filename = mach->sof_tplg_filename;
-		}
-
-		/*
-		 * DMICs use up to 4 pins and are typically pin-muxed with SoundWire
-		 * link 2 and 3, or link 1 and 2, thus we only try to enable dmics
-		 * if all conditions are true:
-		 * a) 2 or fewer links are used by SoundWire
-		 * b) the NHLT table reports the presence of microphones
-		 */
-		if (hweight_long(mach->link_mask) <= 2) {
-			int ret;
-
-			ret = dmic_detect_topology_fixup(sdev, &tplg_filename, "",
-							 &dmic_num, tplg_fixup);
-			if (ret < 0)
-				return NULL;
-		}
-		if (tplg_fixup)
-			pdata->tplg_filename = tplg_filename;
-		mach->mach_params.dmic_num = dmic_num;
-
-		dev_dbg(sdev->dev,
-			"SoundWire machine driver %s topology %s\n",
-			mach->drv_name,
-			pdata->tplg_filename);
 
 		return mach;
 	}
@@ -1694,6 +1585,19 @@ static int check_tplg_quirk_mask(struct snd_soc_acpi_mach *mach)
 	return 0;
 }
 
+static char *remove_file_ext(const char *tplg_filename)
+{
+	char *filename, *tmp;
+
+	filename = kstrdup(tplg_filename, GFP_KERNEL);
+	if (!filename)
+		return NULL;
+
+	/* remove file extension if exist */
+	tmp = filename;
+	return strsep(&tmp, ".");
+}
+
 struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 {
 	u32 interface_mask = hda_get_interface_mask(sdev);
@@ -1706,6 +1610,7 @@ struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 	const char *tplg_suffix;
 	bool amp_name_valid;
 	bool i2s_mach_found = false;
+	bool sdw_mach_found = false;
 
 	/* Try I2S or DMIC if it is supported */
 	if (interface_mask & (BIT(SOF_DAI_INTEL_SSP) | BIT(SOF_DAI_INTEL_DMIC))) {
@@ -1719,8 +1624,11 @@ struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 	 * try SoundWire if it is supported
 	 */
 	if (!mach && !HDA_EXT_CODEC(bus->codec_mask) &&
-	    (interface_mask & BIT(SOF_DAI_INTEL_ALH)))
+	    (interface_mask & BIT(SOF_DAI_INTEL_ALH))) {
 		mach = hda_sdw_machine_select(sdev);
+		if (mach)
+			sdw_mach_found = true;
+	}
 
 	/*
 	 * Choose HDA generic machine driver if mach is NULL.
@@ -1735,15 +1643,20 @@ struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 	 * name string if quirk flag is set.
 	 */
 	if (mach) {
-		bool add_extension = false;
 		bool tplg_fixup = false;
+		bool dmic_fixup = false;
 
 		/*
 		 * If tplg file name is overridden, use it instead of
 		 * the one set in mach table
 		 */
 		if (!sof_pdata->tplg_filename) {
-			sof_pdata->tplg_filename = mach->sof_tplg_filename;
+			/* remove file extension if it exists */
+			tplg_filename = remove_file_ext(mach->sof_tplg_filename);
+			if (!tplg_filename)
+				return NULL;
+
+			sof_pdata->tplg_filename = tplg_filename;
 			tplg_fixup = true;
 		}
 
@@ -1761,8 +1674,25 @@ struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 		/* report to machine driver if any DMICs are found */
 		mach->mach_params.dmic_num = check_dmic_num(sdev);
 
+		if (sdw_mach_found) {
+			/*
+			 * DMICs use up to 4 pins and are typically pin-muxed with SoundWire
+			 * link 2 and 3, or link 1 and 2, thus we only try to enable dmics
+			 * if all conditions are true:
+			 * a) 2 or fewer links are used by SoundWire
+			 * b) the NHLT table reports the presence of microphones
+			 */
+			if (hweight_long(mach->link_mask) <= 2)
+				dmic_fixup = true;
+			else
+				mach->mach_params.dmic_num = 0;
+		} else {
+			if (mach->tplg_quirk_mask & SND_SOC_ACPI_TPLG_INTEL_DMIC_NUMBER)
+				dmic_fixup = true;
+		}
+
 		if (tplg_fixup &&
-		    mach->tplg_quirk_mask & SND_SOC_ACPI_TPLG_INTEL_DMIC_NUMBER &&
+		    dmic_fixup &&
 		    mach->mach_params.dmic_num) {
 			tplg_filename = devm_kasprintf(sdev->dev, GFP_KERNEL,
 						       "%s%s%d%s",
@@ -1774,7 +1704,6 @@ struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 				return NULL;
 
 			sof_pdata->tplg_filename = tplg_filename;
-			add_extension = true;
 		}
 
 		if (mach->link_mask) {
@@ -1814,7 +1743,6 @@ struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 				return NULL;
 
 			sof_pdata->tplg_filename = tplg_filename;
-			add_extension = true;
 
 			mclk_mask = check_nhlt_ssp_mclk_mask(sdev, ssp_num);
 
@@ -1853,7 +1781,6 @@ struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 				return NULL;
 
 			sof_pdata->tplg_filename = tplg_filename;
-			add_extension = true;
 		}
 
 
@@ -1875,10 +1802,9 @@ struct snd_soc_acpi_mach *hda_machine_select(struct snd_sof_dev *sdev)
 				return NULL;
 
 			sof_pdata->tplg_filename = tplg_filename;
-			add_extension = true;
 		}
 
-		if (tplg_fixup && add_extension) {
+		if (tplg_fixup) {
 			tplg_filename = devm_kasprintf(sdev->dev, GFP_KERNEL,
 						       "%s%s",
 						       sof_pdata->tplg_filename,
