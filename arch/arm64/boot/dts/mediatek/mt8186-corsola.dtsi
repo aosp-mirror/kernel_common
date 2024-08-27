@@ -439,6 +439,47 @@
 
 			port@1 {
 				reg = <1>;
+				it6505_out: endpoint {
+					data-lanes = <0 1>;
+				};
+			};
+		};
+
+		switches {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			switch@0 {
+				compatible = "typec-switch";
+				reg = <0>;
+				mode-switch;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						ite_typec0: endpoint {
+							remote-endpoint = <&typec_port0>;
+						};
+					};
+				};
+			};
+
+			switch@1 {
+				compatible = "typec-switch";
+				reg = <1>;
+				mode-switch;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						ite_typec1: endpoint {
+							remote-endpoint = <&typec_port1>;
+						};
+					};
+				};
 			};
 		};
 	};
@@ -1644,6 +1685,19 @@
 				power-role = "dual";
 				data-role = "host";
 				try-power-role = "source";
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@1 {
+						reg = <1>;
+
+						typec_port0: endpoint {
+							remote-endpoint = <&ite_typec0>;
+						};
+					};
+				};
 			};
 
 			usb_c1: connector@1 {
@@ -1653,6 +1707,19 @@
 				power-role = "dual";
 				data-role = "host";
 				try-power-role = "source";
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@1 {
+						reg = <1>;
+
+						typec_port1: endpoint {
+							remote-endpoint = <&ite_typec1>;
+						};
+					};
+				};
 			};
 		};
 	};
