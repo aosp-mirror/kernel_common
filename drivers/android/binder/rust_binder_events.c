@@ -8,7 +8,7 @@
 
 #include <linux/rust_binder.h>
 
-static const char * const binder_command_strings[] = {
+const char * const binder_command_strings[] = {
 	"BC_TRANSACTION",
 	"BC_REPLY",
 	"BC_ACQUIRE_RESULT",
@@ -30,7 +30,7 @@ static const char * const binder_command_strings[] = {
 	"BC_REPLY_SG",
 };
 
-static const char * const binder_return_strings[] = {
+const char * const binder_return_strings[] = {
 	"BR_ERROR",
 	"BR_OK",
 	"BR_TRANSACTION",

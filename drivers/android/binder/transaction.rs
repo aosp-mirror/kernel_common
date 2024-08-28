@@ -385,7 +385,11 @@ impl Transaction {
 }
 
 impl DeliverToRead for Transaction {
-    fn do_work(self: DArc<Self>, thread: &Thread, writer: &mut BinderReturnWriter) -> Result<bool> {
+    fn do_work(
+        self: DArc<Self>,
+        thread: &Thread,
+        writer: &mut BinderReturnWriter<'_>,
+    ) -> Result<bool> {
         let send_failed_reply = ScopeGuard::new(|| {
             if self.target_node.is_some() && self.flags & TF_ONE_WAY == 0 {
                 let reply = Err(BR_FAILED_REPLY);

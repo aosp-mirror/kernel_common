@@ -544,7 +544,7 @@ impl Node {
         inner.weak.has_count = true;
     }
 
-    fn write(&self, writer: &mut BinderReturnWriter, code: u32) -> Result {
+    fn write(&self, writer: &mut BinderReturnWriter<'_>, code: u32) -> Result {
         writer.write_code(code)?;
         writer.write_payload(&self.ptr)?;
         writer.write_payload(&self.cookie)?;
@@ -631,7 +631,7 @@ impl Node {
     /// `NodeWrapper::do_work`.
     fn do_work_locked(
         &self,
-        writer: &mut BinderReturnWriter,
+        writer: &mut BinderReturnWriter<'_>,
         mut guard: Guard<'_, ProcessInner, SpinLockBackend>,
     ) -> Result<bool> {
         let inner = self.inner.access_mut(&mut guard);
@@ -686,7 +686,7 @@ impl DeliverToRead for Node {
     fn do_work(
         self: DArc<Self>,
         _thread: &Thread,
-        writer: &mut BinderReturnWriter,
+        writer: &mut BinderReturnWriter<'_>,
     ) -> Result<bool> {
         let mut owner_inner = self.owner.inner.lock();
         let inner = self.inner.access_mut(&mut owner_inner);
@@ -1041,7 +1041,7 @@ impl DeliverToRead for NodeDeath {
     fn do_work(
         self: DArc<Self>,
         _thread: &Thread,
-        writer: &mut BinderReturnWriter,
+        writer: &mut BinderReturnWriter<'_>,
     ) -> Result<bool> {
         let done = {
             let inner = self.inner.lock();

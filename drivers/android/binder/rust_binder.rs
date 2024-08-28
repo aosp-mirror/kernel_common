@@ -32,6 +32,7 @@ mod page_range;
 mod prio;
 mod process;
 mod range_alloc;
+mod stats;
 mod thread;
 mod trace;
 mod transaction;
@@ -61,19 +62,22 @@ fn next_debug_id() -> usize {
 
 /// Provides a single place to write Binder return values via the
 /// supplied `UserSliceWriter`.
-pub(crate) struct BinderReturnWriter {
+pub(crate) struct BinderReturnWriter<'a> {
     writer: UserSliceWriter,
+    thread: &'a Thread,
 }
 
-impl BinderReturnWriter {
-    fn new(writer: UserSliceWriter) -> Self {
-        BinderReturnWriter { writer }
+impl<'a> BinderReturnWriter<'a> {
+    fn new(writer: UserSliceWriter, thread: &'a Thread) -> Self {
+        BinderReturnWriter { writer, thread }
     }
 
     /// Write a return code back to user space.
     /// Should be a `BR_` constant from [`defs`] e.g. [`defs::BR_TRANSACTION_COMPLETE`].
     fn write_code(&mut self, code: u32) -> Result {
         crate::trace::trace_return(code);
+        stats::GLOBAL_STATS.inc_br(code);
+        self.thread.process.stats.inc_br(code);
         self.writer.write(&code)
     }
 
@@ -97,7 +101,11 @@ trait DeliverToRead: ListArcSafe + Send + Sync {
     /// Performs work. Returns true if remaining work items in the queue should be processed
     /// immediately, or false if it should return to caller before processing additional work
     /// items.
-    fn do_work(self: DArc<Self>, thread: &Thread, writer: &mut BinderReturnWriter) -> Result<bool>;
+    fn do_work(
+        self: DArc<Self>,
+        thread: &Thread,
+        writer: &mut BinderReturnWriter<'_>,
+    ) -> Result<bool>;
 
     /// Cancels the given work item. This is called instead of [`DeliverToRead::do_work`] when work
     /// won't be delivered.
@@ -210,7 +218,7 @@ impl DeliverToRead for DeliverCode {
     fn do_work(
         self: DArc<Self>,
         _thread: &Thread,
-        writer: &mut BinderReturnWriter,
+        writer: &mut BinderReturnWriter<'_>,
     ) -> Result<bool> {
         if !self.skip.load(Ordering::Relaxed) {
             writer.write_code(self.code)?;
@@ -498,7 +506,8 @@ fn rust_binder_transactions_show_impl(m: &mut SeqFile) -> Result<()> {
 }
 
 fn rust_binder_stats_show_impl(m: &mut SeqFile) -> Result<()> {
-    seq_print!(m, "binder state:\n");
+    seq_print!(m, "binder stats:\n");
+    stats::GLOBAL_STATS.debug_print("", m);
     let contexts = context::get_all_contexts()?;
     for ctx in contexts {
         let procs = ctx.get_all_procs()?;

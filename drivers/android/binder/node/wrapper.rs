@@ -41,7 +41,7 @@ impl DeliverToRead for NodeWrapper {
     fn do_work(
         self: DArc<Self>,
         _thread: &Thread,
-        writer: &mut BinderReturnWriter,
+        writer: &mut BinderReturnWriter<'_>,
     ) -> Result<bool> {
         let node = &self.node;
         let mut owner_inner = node.owner.inner.lock();

@@ -42,6 +42,7 @@ use crate::{
     page_range::ShrinkablePageRange,
     prio::{self, BinderPriority},
     range_alloc::{self, RangeAllocator},
+    stats::BinderStats,
     thread::{PushWorkRes, Thread},
     DArc, DLArc, DTRWrap, DeliverToRead,
 };
@@ -424,6 +425,8 @@ pub(crate) struct Process {
     // Links for process list in Context.
     #[pin]
     links: ListLinks,
+
+    pub(crate) stats: BinderStats,
 }
 
 kernel::impl_has_work! {
@@ -477,6 +480,7 @@ impl Process {
                 task: current.group_leader().into(),
                 defer_work <- kernel::new_work!("Process::defer_work"),
                 links <- ListLinks::new(),
+                stats: BinderStats::new(),
             }),
             GFP_KERNEL,
         )?;
@@ -529,6 +533,8 @@ impl Process {
             }
             seq_print!(m, "  refs: {count} s {strong} w {weak}\n");
         }
+
+        self.stats.debug_print("  ", m);
 
         Ok(())
     }

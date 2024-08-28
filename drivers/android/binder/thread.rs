@@ -29,6 +29,7 @@ use crate::{
     prio::{self, BinderPriority, PriorityState},
     process::Process,
     ptr_align,
+    stats::GLOBAL_STATS,
     transaction::Transaction,
     BinderReturnWriter, DArc, DLArc, DTRWrap, DeliverCode, DeliverToRead,
 };
@@ -1414,6 +1415,8 @@ impl Thread {
             let before = reader.len();
             let cmd = reader.read::<u32>()?;
             crate::trace::trace_command(cmd);
+            GLOBAL_STATS.inc_bc(cmd);
+            self.process.stats.inc_bc(cmd);
             match cmd {
                 BC_TRANSACTION => {
                     let tr = reader.read::<BinderTransactionData>()?.with_buffers_size(0);
@@ -1495,8 +1498,10 @@ impl Thread {
     fn read(self: &Arc<Self>, req: &mut BinderWriteRead, wait: bool) -> Result {
         let read_start = req.read_buffer.wrapping_add(req.read_consumed);
         let read_len = req.read_size - req.read_consumed;
-        let mut writer =
-            BinderReturnWriter::new(UserSlice::new(read_start as _, read_len as _).writer());
+        let mut writer = BinderReturnWriter::new(
+            UserSlice::new(read_start as _, read_len as _).writer(),
+            self,
+        );
         let (in_pool, has_transaction, thread_todo, use_proc_queue) = {
             let inner = self.inner.lock();
             (
@@ -1684,7 +1689,7 @@ impl DeliverToRead for ThreadError {
     fn do_work(
         self: DArc<Self>,
         _thread: &Thread,
-        writer: &mut BinderReturnWriter,
+        writer: &mut BinderReturnWriter<'_>,
     ) -> Result<bool> {
         let code = self.error_code.load(Ordering::Relaxed);
         self.error_code.store(BR_OK, Ordering::Relaxed);
