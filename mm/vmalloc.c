@@ -1994,7 +1994,15 @@ static DEFINE_PER_CPU(struct vmap_block_queue, vmap_block_queue);
 static struct xarray *
 addr_to_vb_xa(unsigned long addr)
 {
-	int index = (addr / VMAP_BLOCK_SIZE) % num_possible_cpus();
+	int index = (addr / VMAP_BLOCK_SIZE) % nr_cpu_ids;
+
+	/*
+	 * Please note, nr_cpu_ids points on a highest set
+	 * possible bit, i.e. we never invoke cpumask_next()
+	 * if an index points on it which is nr_cpu_ids - 1.
+	 */
+	if (!cpu_possible(index))
+		index = cpumask_next(index, cpu_possible_mask);
 
 	return &per_cpu(vmap_block_queue, index).vmap_blocks;
 }
@@ -2077,14 +2085,13 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
 		free_vmap_area(va);
 		return ERR_PTR(err);
 	}
-
 	/*
-	* list_add_tail_rcu could happened in another core
-	* rather than vb->cpu due to task migration, which
-	* is safe as list_add_tail_rcu will ensure the list's
-	* integrity together with list_for_each_rcu from read
-	* side.
-	*/
+	 * list_add_tail_rcu could happened in another core
+	 * rather than vb->cpu due to task migration, which
+	 * is safe as list_add_tail_rcu will ensure the list's
+	 * integrity together with list_for_each_rcu from read
+	 * side.
+	 */
 	vb->cpu = raw_smp_processor_id();
 	vbq = per_cpu_ptr(&vmap_block_queue, vb->cpu);
 	spin_lock(&vbq->lock);
@@ -2114,8 +2121,7 @@ static void free_vmap_block(struct vmap_block *vb)
 static bool purge_fragmented_block(struct vmap_block *vb,
 		struct list_head *purge_list, bool force_purge)
 {
-	struct vmap_block_queue *vbq = &per_cpu(vmap_block_queue,
-					vb->cpu);
+	struct vmap_block_queue *vbq = &per_cpu(vmap_block_queue, vb->cpu);
 
 	if (vb->free + vb->dirty != VMAP_BBMAP_BITS ||
 	    vb->dirty == VMAP_BBMAP_BITS)
