@@ -479,14 +479,19 @@
   regmap_del_irq_chip
   regmap_irq_chip_get_base
 
-# required by da9062-regulator.ko
+# required by da9063-regulator.ko
   devm_regmap_field_alloc
+  of_regulator_match
   regmap_field_read
   regmap_field_update_bits_base
   regulator_get_current_limit_regmap
   regulator_map_voltage_linear
   regulator_mode_to_status
   regulator_set_current_limit_regmap
+
+# required by da9063.ko
+  devm_mfd_add_devices
+  devm_regmap_add_irq_chip
 
 # required by dvb-core.ko
   add_uevent_var
@@ -1248,3 +1253,12 @@
 # required by sdhci-tcc.ko
   sdhci_execute_tuning
   sdhci_set_uhs_signaling
+
+# required by tccvin.ko
+  media_pipeline_start
+  media_pipeline_stop
+
+# required by v4l2-fwnode.ko
+  v4l2_async_notifier_register
+  v4l2_async_unregister_subdev
+  v4l2_fill_pixfmt_mp
