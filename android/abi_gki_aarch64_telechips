@@ -274,6 +274,7 @@
   get_user_pages
   gic_nonsecure_priorities
   gpiochip_get_data
+  gpiod_direction_input
   gpiod_direction_output_raw
   gpiod_set_raw_value
   gpiod_set_raw_value_cansleep
@@ -715,9 +716,15 @@
   usb_remove_phy
   __usecs_to_jiffies
   usleep_range
+  v4l2_device_register
+  v4l2_device_unregister
   vabits_actual
   vfree
   videomode_from_timings
+  video_devdata
+  video_ioctl2
+  __video_register_device
+  video_unregister_device
   vmalloc
   vmalloc_user
   vmap
@@ -973,6 +980,14 @@
   regulator_set_active_discharge_regmap
   regulator_set_soft_start_regmap
 
+# required by m_can.ko
+  alloc_canfd_skb
+  can_bus_off
+  can_dlc2len
+  can_len2dlc
+  of_can_transceiver
+  of_irq_to_resource
+
 # required by ohci-hcd.ko
   gen_pool_dma_alloc_align
   gen_pool_dma_zalloc_align
@@ -1174,7 +1189,6 @@
 
 # required by spi-tcc.ko
   devm_spi_register_controller
-  gpiod_direction_input
   __spi_alloc_controller
   spi_controller_resume
   spi_controller_suspend
@@ -1288,6 +1302,20 @@
   dmabuf_page_pool_destroy
   dmabuf_page_pool_free
   dma_heap_get_dev
+
+# required by tcc-arxxxx.ko
+  v4l2_ctrl_handler_free
+  v4l2_ctrl_handler_init_class
+  v4l2_ctrl_new_std
+  v4l2_ctrl_new_std_menu
+
+# required by tcc-cap-media.ko
+  media_create_pad_link
+  media_device_cleanup
+  media_device_init
+  __media_device_register
+  media_device_unregister
+  media_entity_find_link
 
 # required by tcc-amba-pl011.ko
   amba_driver_unregister
@@ -1412,14 +1440,8 @@
   devm_thermal_zone_of_sensor_unregister
 
 # required by tcc_v4l2_vout.ko
-  v4l2_device_register
-  v4l2_device_unregister
-  video_devdata
   video_device_alloc
   video_device_release
-  video_ioctl2
-  __video_register_device
-  video_unregister_device
 
 # required by tcc_viqe_interface.ko
   memmove
@@ -1427,6 +1449,34 @@
 # required by tcc_wdma.ko
   iov_iter_init
   vfs_fsync
+
+# required by tccvin.ko
+  media_entity_remote_pad
+  media_pipeline_start
+  media_pipeline_stop
+  of_graph_get_endpoint_by_regs
+  of_reserved_mem_device_init_by_idx
+  __trace_bprintk
+  v4l2_async_notifier_register
+  __v4l2_device_register_subdev_nodes
+  v4l2_fh_open
+  v4l2_fill_pixfmt_mp
+  vb2_buffer_done
+  vb2_dma_contig_memops
+  vb2_fop_mmap
+  vb2_fop_poll
+  vb2_fop_release
+  vb2_ioctl_dqbuf
+  vb2_ioctl_expbuf
+  vb2_ioctl_qbuf
+  vb2_ioctl_reqbufs
+  vb2_ioctl_streamoff
+  vb2_ioctl_streamon
+  vb2_ops_wait_finish
+  vb2_ops_wait_prepare
+  vb2_plane_cookie
+  vb2_querybuf
+  vb2_queue_init
 
 # required by tccdrm.ko
   bus_find_device
@@ -1542,3 +1592,7 @@
   __of_reset_control_get
   platform_device_register
   reset_control_put
+
+# required by bd96801.regulator.ko
+  linear_range_get_value_array
+  regulator_desc_list_voltage_linear_range
