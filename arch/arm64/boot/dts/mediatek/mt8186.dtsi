@@ -2024,7 +2024,6 @@
 		imgsys1: clock-controller@15020000 {
 			compatible = "mediatek,mt8186-imgsys1";
 			reg = <0 0x15020000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1502XXXX 0 0x1000>;
 			#clock-cells = <1>;
 		};
 
@@ -2227,16 +2226,7 @@
 		mdpsys: clock-controller@1b000000 {
 			compatible = "mediatek,mt8186-mdpsys";
 			reg = <0 0x1b000000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0 0x1000>;
 			#clock-cells = <1>;
-			mboxes = <&gce 2 CMDQ_THR_PRIO_HIGHEST>;
-		};
-
-		mdp3_mutex0: mdp3-mutex@1b001000 {
-			compatible = "mediatek,mt8186-mdp3-mutex";
-			reg = <0 0x1b001000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0x1000 0x1000>;
-			clocks = <&mdpsys CLK_MDP_MUTEX0>;
 		};
 
 		larb2: smi@1b002000 {
@@ -2247,94 +2237,6 @@
 			mediatek,larb-id = <2>;
 			mediatek,smi = <&smi_common>;
 			power-domains = <&spm MT8186_POWER_DOMAIN_DIS>;
-		};
-
-		mdp3_rdma0: mdp3-rdma@1b003000 {
-			compatible = "mediatek,mt8186-mdp3-rdma";
-			reg = <0 0x1b003000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0x3000 0x1000>;
-			power-domains = <&spm MT8186_POWER_DOMAIN_DIS>;
-			clocks = <&mdpsys CLK_MDP_RDMA0>;
-			iommus = <&iommu_mm IOMMU_PORT_L2_MDP_RDMA0>;
-			mboxes = <&gce 20 CMDQ_THR_PRIO_LOWEST>,
-				 <&gce 21 CMDQ_THR_PRIO_LOWEST>;
-			mediatek,gce-events = <CMDQ_EVENT_MDP_RDMA0_SOF>,
-					      <CMDQ_EVENT_MDP_RDMA0_FRAME_DONE>;
-		};
-
-		mdp3_aal0: mdp3-aal@1b005000 {
-			compatible = "mediatek,mt8186-mdp3-aal";
-			reg = <0 0x1b005000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0x5000 0x1000>;
-			clocks = <&mdpsys CLK_MDP_AAL0>;
-		};
-
-		mdp3_hdr0: mdp3-hdr@1b007000 {
-			compatible = "mediatek,mt8186-mdp3-hdr";
-			reg = <0 0x1b007000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0x7000 0x1000>;
-			clocks = <&mdpsys CLK_MDP_HDR0>;
-		};
-
-		mdp3_rsz0: mdp3-rsz@1b008000 {
-			compatible = "mediatek,mt8183-mdp3-rsz";
-			reg = <0 0x1b008000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0x8000 0x1000>;
-			clocks = <&mdpsys CLK_MDP_RSZ0>;
-			mediatek,gce-events = <CMDQ_EVENT_MDP_RSZ0_SOF>,
-					      <CMDQ_EVENT_MDP_RSZ0_FRAME_DONE>;
-		};
-
-		mdp3_rsz1: mdp3-rsz@1b009000 {
-			compatible = "mediatek,mt8183-mdp3-rsz";
-			reg = <0 0x1b009000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0x9000 0x1000>;
-			clocks = <&mdpsys CLK_MDP_RSZ0>;
-			mediatek,gce-events = <CMDQ_EVENT_MDP_RSZ1_SOF>,
-					      <CMDQ_EVENT_MDP_RSZ1_FRAME_DONE>;
-		};
-
-		mdp3_wrot0: mdp3-wrot@1b00a000 {
-			compatible = "mediatek,mt8183-mdp3-wrot";
-			reg = <0 0x1b00a000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0xa000 0x1000>;
-			power-domains = <&spm MT8186_POWER_DOMAIN_DIS>;
-			clocks = <&mdpsys CLK_MDP_WROT0>;
-			iommus = <&iommu_mm IOMMU_PORT_L2_MDP_WROT0>;
-			mediatek,gce-events = <CMDQ_EVENT_MDP_WROT0_SOF>,
-					      <CMDQ_EVENT_MDP_WROT0_FRAME_DONE>;
-		};
-
-		mdp3_wrot1: mdp3-wrot@1b00b000 {
-			compatible = "mediatek,mt8183-mdp3-wrot";
-			reg = <0 0x1b00b000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0xb000 0x1000>;
-			power-domains = <&spm MT8186_POWER_DOMAIN_DIS>;
-			clocks = <&mdpsys CLK_MDP_WROT1>;
-			iommus = <&iommu_mm IOMMU_PORT_L2_MDP_WROT1>;
-			mediatek,gce-events = <CMDQ_EVENT_MDP_WROT1_SOF>,
-					      <CMDQ_EVENT_MDP_WROT1_FRAME_DONE>;
-		};
-
-		mdp3_mdpot0: mdp3-mdpot@1b00b000 {
-			compatible = "mediatek,mt8186-mdp3-mdpot";
-			reg = <0 0x1b00b000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0xb000 0x1000>;
-		};
-
-		mdp3_tdshp0: mdp3-tdshp@1b00c000 {
-			compatible = "mediatek,mt8186-mdp3-tdshp";
-			reg = <0 0x1b00c000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0xc000 0x1000>;
-			clocks = <&mdpsys CLK_MDP_TDSHP0>;
-			mediatek,gce-events = <CMDQ_EVENT_MDP_TDSHP0_SOF>;
-		};
-
-		mdp3_color0: mdp3-color@1b00e000 {
-			compatible = "mediatek,mt8186-mdp3-color";
-			reg = <0 0x1b00e000 0 0x1000>;
-			mediatek,gce-client-reg = <&gce SUBSYS_1B00XXXX 0xe000 0x1000>;
-			clocks = <&mdpsys CLK_MDP_COLOR>;
 		};
 
 		ipesys: clock-controller@1c000000 {
