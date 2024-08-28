@@ -251,6 +251,14 @@
       ]
     },
     {
+      "name": "CtsLibcoreLegacy22TestCases",
+      "options": [
+        {
+          "include-filter": "android.util.cts.FloatMathTest"
+        }
+      ]
+    },
+    {
       "name": "libdm_test"
     },
     {
