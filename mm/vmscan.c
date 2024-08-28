@@ -4199,6 +4199,7 @@ restart:
 	spin_unlock_irq(&lruvec->lru_lock);
 
 	kernfs_notify(lru_gen_admin_node);
+	trace_android_vh_mglru_new_gen(NULL);
 }
 
 static bool try_to_inc_max_seq(struct lruvec *lruvec, unsigned long max_seq,
