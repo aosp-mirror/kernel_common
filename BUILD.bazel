@@ -533,8 +533,6 @@ _DB845C_MODULE_OUTS = [
     "drivers/power/reset/qcom-pon.ko",
     "drivers/power/reset/reboot-mode.ko",
     "drivers/power/reset/syscon-reboot-mode.ko",
-    "drivers/power/sequencing/pwrseq-core.ko",
-    "drivers/power/sequencing/pwrseq-qcom-wcn.ko",
     "drivers/power/supply/qcom_battmgr.ko",
     "drivers/regulator/gpio-regulator.ko",
     "drivers/regulator/qcom-rpmh-regulator.ko",
