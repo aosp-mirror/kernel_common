@@ -5,6 +5,7 @@ BAZEL=tools/bazel
 BIN_DIR=common/tools/testing/android/bin
 ACLOUD=$BIN_DIR/acloudb.sh
 TRADEFED=prebuilts/tradefed/filegroups/tradefed/tradefed.sh
+DEFAULT_DIST_DIR=out/virtual_device_x86_64/dist
 TESTSDIR=/tmp/kselftests
 LOG_DIR=$PWD/out/test_logs/$(date +%Y%m%d_%H%M%S)
 JDK_PATH=prebuilts/jdk/jdk11/linux-x86
@@ -21,7 +22,7 @@ print_help() {
     echo "  --skip-kernel-build   Skip the kernel building step"
     echo "  --skip-cvd-launch     Skip the CVD launch step"
     echo "  --skip-cvd-kill       Do not kill CVD launched by running this script"
-    echo "  -d, --dist-dir=DIR    The kernel dist dir (default is /tmp/kernel_dist)"
+    echo "  -d, --dist-dir=DIR    The kernel dist dir (default is $DEFAULT_DIST_DIR)"
     echo "  -s, --serial=SERIAL   The device serial number."
     echo "                        If serial is specified, virtual device launch will be skipped"
     echo "  -t, --test=TEST_NAME  The test target name. Can be repeated"
@@ -40,12 +41,13 @@ print_help() {
 BUILD_KERNEL=true
 LAUNCH_CVD=true
 KILL_CVD=true
-DIST_DIR=/tmp/kernel_dist
+DIST_DIR=$DEFAULT_DIST_DIR
 SERIAL_NUMBER=
 MODULE_NAME="selftests"
 TEST_FILTERS=
 SELECTED_TESTS=
 GCOV=false
+GCOV_DIST_DIR=
 
 while test $# -gt 0; do
     case "$1" in
@@ -68,6 +70,7 @@ while test $# -gt 0; do
             shift
             if test $# -gt 0; then
                 DIST_DIR=$1
+                GCOV_DIST_DIR=$DIST_DIR
             else
                 echo "kernel distribution directory is not specified"
                 exit 1
@@ -76,6 +79,7 @@ while test $# -gt 0; do
             ;;
         --dist-dir*)
             DIST_DIR=$(echo $1 | sed -e "s/^[^=]*=//g")
+            GCOV_DIST_DIR=$DIST_DIR
             shift
             ;;
         -s)
@@ -135,7 +139,7 @@ if $BUILD_KERNEL; then
     echo "Building kernel..."
     # TODO: add support to build kernel for physical device
     $BAZEL run $BUILD_FLAGS //common-modules/virtual-device:virtual_device_x86_64_dist -- \
-     --dist_dir=$DIST_DIR
+    --dist_dir=$DIST_DIR
     exit_code=$?
     if [ $exit_code -eq 0 ]; then
         echo "Build kernel succeeded"
@@ -213,7 +217,11 @@ if $LAUNCH_CVD && $KILL_CVD; then
 fi
 
 if $GCOV; then
+    CREATE_TRACEFILE_CLI="common/tools/testing/android/bin/create-tracefile.py \
+    -t $LOG_DIR -o $LOG_DIR/cov.info"
+    if [ -n "$GCOV_DIST_DIR" ]; then
+        CREATE_TRACEFILE_CLI+=" --dist-dir $GCOV_DIST_DIR"
+    fi
     echo "Creating tracefile ..."
-    common/tools/testing/android/bin/create-tracefile.py -t $LOG_DIR -o $LOG_DIR/cov.info && \
-    echo "Created tracefile at $LOG_DIR/cov.info"
+    $CREATE_TRACEFILE_CLI && echo "Created tracefile at $LOG_DIR/cov.info"
 fi
