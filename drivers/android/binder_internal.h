@@ -133,13 +133,12 @@ enum binder_stat_types {
 	BINDER_STAT_DEATH,
 	BINDER_STAT_TRANSACTION,
 	BINDER_STAT_TRANSACTION_COMPLETE,
-	BINDER_STAT_FREEZE,
 	BINDER_STAT_COUNT
 };
 
 struct binder_stats {
-	atomic_t br[_IOC_NR(BR_CLEAR_FREEZE_NOTIFICATION_DONE) + 1];
-	atomic_t bc[_IOC_NR(BC_FREEZE_NOTIFICATION_DONE) + 1];
+	atomic_t br[_IOC_NR(BR_TRANSACTION_PENDING_FROZEN) + 1];
+	atomic_t bc[_IOC_NR(BC_REPLY_SG) + 1];
 	atomic_t obj_created[BINDER_STAT_COUNT];
 	atomic_t obj_deleted[BINDER_STAT_COUNT];
 };
@@ -164,8 +163,10 @@ struct binder_work {
 		BINDER_WORK_DEAD_BINDER,
 		BINDER_WORK_DEAD_BINDER_AND_CLEAR,
 		BINDER_WORK_CLEAR_DEATH_NOTIFICATION,
+#ifndef __GENKSYMS__
 		BINDER_WORK_FROZEN_BINDER,
 		BINDER_WORK_CLEAR_FREEZE_NOTIFICATION,
+#endif
 	} type;
 };
 
@@ -420,8 +421,6 @@ enum binder_prio_state {
  *                        (atomics, no lock needed)
  * @delivered_death:      list of delivered death notification
  *                        (protected by @inner_lock)
- * @delivered_freeze:     list of delivered freeze notification
- *                        (protected by @inner_lock)
  * @max_threads:          cap on number of binder threads
  *                        (protected by @inner_lock)
  * @requested_threads:    number of binder threads requested but not
@@ -469,7 +468,6 @@ struct binder_proc {
 	struct list_head todo;
 	struct binder_stats stats;
 	struct list_head delivered_death;
-	struct list_head delivered_freeze;
 	int max_threads;
 	int requested_threads;
 	int requested_threads_started;
@@ -484,10 +482,24 @@ struct binder_proc {
 	bool oneway_spam_detection_enabled;
 };
 
+/**
+ * struct binder_proc_wrap - wrapper to preserve KMI in binder_proc
+ * @proc:                    binder_proc being wrapped
+ * @lock:                    protects @proc->alloc fields
+ * @delivered_freeze:        list of delivered freeze notification
+ *                           (protected by @inner_lock)
+ */
 struct binder_proc_wrap {
 	struct binder_proc proc;
 	spinlock_t lock;
+	struct list_head delivered_freeze;
 };
+
+static inline
+struct binder_proc_wrap *proc_wrapper(struct binder_proc *proc)
+{
+	return container_of(proc, struct binder_proc_wrap, proc);
+}
 
 static inline struct binder_proc *
 binder_proc_entry(struct binder_alloc *alloc)
@@ -496,15 +508,9 @@ binder_proc_entry(struct binder_alloc *alloc)
 }
 
 static inline struct binder_proc_wrap *
-binder_proc_wrap_entry(struct binder_proc *proc)
-{
-	return container_of(proc, struct binder_proc_wrap, proc);
-}
-
-static inline struct binder_proc_wrap *
 binder_alloc_to_proc_wrap(struct binder_alloc *alloc)
 {
-	return binder_proc_wrap_entry(binder_proc_entry(alloc));
+	return proc_wrapper(binder_proc_entry(alloc));
 }
 
 static inline void binder_alloc_lock_init(struct binder_alloc *alloc)
