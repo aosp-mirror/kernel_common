@@ -1,4 +1,3 @@
-KERNEL_DIR=common
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.common
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.aarch64
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.microdroid
