@@ -121,6 +121,8 @@ while test $# -gt 0; do
             shift
             ;;
         *)
+            echo "unknown argument: $1"
+            exit 1
             ;;
     esac
 done
