@@ -11,6 +11,7 @@
 
 #include <linux/err.h>
 #include <linux/printk.h>
+#include <linux/android_kabi.h>
 
 struct kunit;
 struct string_stream;
@@ -36,6 +37,8 @@ enum kunit_assert_type {
 struct kunit_loc {
 	int line;
 	const char *file;
+
+	ANDROID_KABI_RESERVE(1);
 };
 
 #define KUNIT_CURRENT_LOC { .file = __FILE__, .line = __LINE__ }
@@ -46,7 +49,9 @@ struct kunit_loc {
  * Represents a failed expectation/assertion. Contains all the data necessary to
  * format a string to a user reporting the failure.
  */
-struct kunit_assert {};
+struct kunit_assert {
+	ANDROID_KABI_RESERVE(1);
+};
 
 typedef void (*assert_format_t)(const struct kunit_assert *assert,
 				const struct va_format *message,
