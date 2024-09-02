@@ -7954,7 +7954,7 @@ tracing_buffers_read(struct file *filp, char __user *ubuf,
 	trace_access_unlock(iter->cpu_file);
 
 	if (ret < 0) {
-		if (trace_empty(iter)) {
+		if (trace_empty(iter) && !iter->closed) {
 			if ((filp->f_flags & O_NONBLOCK))
 				return -EAGAIN;
 
