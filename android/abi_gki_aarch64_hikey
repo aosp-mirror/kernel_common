@@ -437,3 +437,41 @@
   devm_pinctrl_get
   pinctrl_lookup_state
   pinctrl_select_state
+
+# required by btqca.ko
+  __hci_cmd_send
+  __hci_cmd_sync_ev
+
+# required by clk-hi655x.ko
+  devm_clk_hw_register
+  devm_of_clk_add_hw_provider
+  of_clk_hw_simple_get
+
+# required by cpufreq-dt.ko
+  arch_set_freq_scale
+  cpufreq_enable_boost_support
+  cpufreq_freq_attr_scaling_available_freqs
+  cpufreq_freq_attr_scaling_boost_freqs
+  cpufreq_generic_frequency_table_verify
+  cpufreq_generic_get
+  cpufreq_generic_suspend
+  cpufreq_register_driver
+  cpufreq_unregister_driver
+  dev_pm_opp_free_cpufreq_table
+  dev_pm_opp_get_max_transition_latency
+  dev_pm_opp_get_opp_count
+  dev_pm_opp_get_sharing_cpus
+  dev_pm_opp_get_suspend_opp_freq
+  dev_pm_opp_init_cpufreq_table
+  dev_pm_opp_of_cpumask_add_table
+  dev_pm_opp_of_cpumask_remove_table
+  dev_pm_opp_of_get_sharing_cpus
+  dev_pm_opp_of_register_em
+  dev_pm_opp_put_regulators
+  dev_pm_opp_set_rate
+  dev_pm_opp_set_regulators
+  dev_pm_opp_set_sharing_cpus
+  get_cpu_device
+  policy_has_boost_freq
+  regulator_get_optional
+  regulator_put
