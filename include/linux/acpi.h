@@ -259,6 +259,12 @@ static inline void
 acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
 #endif
 
+#ifdef CONFIG_RISCV
+void acpi_numa_rintc_affinity_init(struct acpi_srat_rintc_affinity *pa);
+#else
+static inline void acpi_numa_rintc_affinity_init(struct acpi_srat_rintc_affinity *pa) { }
+#endif
+
 #ifndef PHYS_CPUID_INVALID
 typedef u32 phys_cpuid_t;
 #define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
@@ -273,6 +279,9 @@ static inline bool invalid_phys_cpuid(phys_cpuid_t phys_id)
 {
 	return phys_id == PHYS_CPUID_INVALID;
 }
+
+
+int __init acpi_get_madt_revision(void);
 
 /* Validate the processor object's proc_id */
 bool acpi_duplicate_processor_id(int proc_id);
@@ -759,6 +768,7 @@ static inline u64 acpi_arch_get_root_pointer(void)
 }
 #endif
 
+int acpi_get_local_u64_address(acpi_handle handle, u64 *addr);
 int acpi_get_local_address(acpi_handle handle, u32 *addr);
 const char *acpi_get_subsystem_id(acpi_handle handle);
 

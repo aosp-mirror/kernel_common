@@ -246,6 +246,8 @@ patternProperties:
     description: CALAO Systems SAS
   "^calxeda,.*":
     description: Calxeda
+  "^cameo,.*":
+    description: Cameo Communications, Inc
   "^canaan,.*":
     description: Canaan, Inc.
   "^caninos,.*":
@@ -1270,6 +1272,8 @@ patternProperties:
     description: Schindler
   "^schneider,.*":
     description: Schneider Electric
+  "^sciosense,.*":
+    description: ScioSense B.V.
   "^seagate,.*":
     description: Seagate Technology PLC
   "^seeed,.*":

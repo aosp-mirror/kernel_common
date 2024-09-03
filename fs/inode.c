@@ -107,7 +107,7 @@ long get_nr_dirty_inodes(void)
  */
 static struct inodes_stat_t inodes_stat;
 
-static int proc_nr_inodes(struct ctl_table *table, int write, void *buffer,
+static int proc_nr_inodes(const struct ctl_table *table, int write, void *buffer,
 			  size_t *lenp, loff_t *ppos)
 {
 	inodes_stat.nr_inodes = get_nr_inodes();
@@ -488,6 +488,39 @@ static void inode_lru_list_del(struct inode *inode)
 		this_cpu_dec(nr_unused);
 }
 
+static void inode_pin_lru_isolating(struct inode *inode)
+{
+	lockdep_assert_held(&inode->i_lock);
+	WARN_ON(inode->i_state & (I_LRU_ISOLATING | I_FREEING | I_WILL_FREE));
+	inode->i_state |= I_LRU_ISOLATING;
+}
+
+static void inode_unpin_lru_isolating(struct inode *inode)
+{
+	spin_lock(&inode->i_lock);
+	WARN_ON(!(inode->i_state & I_LRU_ISOLATING));
+	inode->i_state &= ~I_LRU_ISOLATING;
+	smp_mb();
+	wake_up_bit(&inode->i_state, __I_LRU_ISOLATING);
+	spin_unlock(&inode->i_lock);
+}
+
+static void inode_wait_for_lru_isolating(struct inode *inode)
+{
+	spin_lock(&inode->i_lock);
+	if (inode->i_state & I_LRU_ISOLATING) {
+		DEFINE_WAIT_BIT(wq, &inode->i_state, __I_LRU_ISOLATING);
+		wait_queue_head_t *wqh;
+
+		wqh = bit_waitqueue(&inode->i_state, __I_LRU_ISOLATING);
+		spin_unlock(&inode->i_lock);
+		__wait_on_bit(wqh, &wq, bit_wait, TASK_UNINTERRUPTIBLE);
+		spin_lock(&inode->i_lock);
+		WARN_ON(inode->i_state & I_LRU_ISOLATING);
+	}
+	spin_unlock(&inode->i_lock);
+}
+
 /**
  * inode_sb_list_add - add inode to the superblock list of inodes
  * @inode: inode to add
@@ -657,6 +690,8 @@ static void evict(struct inode *inode)
 
 	inode_sb_list_del(inode);
 
+	inode_wait_for_lru_isolating(inode);
+
 	/*
 	 * Wait for flusher thread to be done with the inode so that filesystem
 	 * does not start destroying it while writeback is still running. Since
@@ -676,6 +711,16 @@ static void evict(struct inode *inode)
 
 	remove_inode_hash(inode);
 
+	/*
+	 * Wake up waiters in __wait_on_freeing_inode().
+	 *
+	 * Lockless hash lookup may end up finding the inode before we removed
+	 * it above, but only lock it *after* we are done with the wakeup below.
+	 * In this case the potential waiter cannot safely block.
+	 *
+	 * The inode being unhashed after the call to remove_inode_hash() is
+	 * used as an indicator whether blocking on it is safe.
+	 */
 	spin_lock(&inode->i_lock);
 	wake_up_bit(&inode->i_state, __I_NEW);
 	BUG_ON(inode->i_state != (I_FREEING | I_CLEAR));
@@ -845,7 +890,7 @@ static enum lru_status inode_lru_isolate(struct list_head *item,
 	 * be under pressure before the cache inside the highmem zone.
 	 */
 	if (inode_has_buffers(inode) || !mapping_empty(&inode->i_data)) {
-		__iget(inode);
+		inode_pin_lru_isolating(inode);
 		spin_unlock(&inode->i_lock);
 		spin_unlock(lru_lock);
 		if (remove_inode_buffers(inode)) {
@@ -857,7 +902,7 @@ static enum lru_status inode_lru_isolate(struct list_head *item,
 				__count_vm_events(PGINODESTEAL, reap);
 			mm_account_reclaimed_pages(reap);
 		}
-		iput(inode);
+		inode_unpin_lru_isolating(inode);
 		spin_lock(lru_lock);
 		return LRU_RETRY;
 	}
@@ -888,18 +933,18 @@ long prune_icache_sb(struct super_block *sb, struct shrink_control *sc)
 	return freed;
 }
 
-static void __wait_on_freeing_inode(struct inode *inode, bool locked);
+static void __wait_on_freeing_inode(struct inode *inode, bool is_inode_hash_locked);
 /*
  * Called with the inode lock held.
  */
 static struct inode *find_inode(struct super_block *sb,
 				struct hlist_head *head,
 				int (*test)(struct inode *, void *),
-				void *data, bool locked)
+				void *data, bool is_inode_hash_locked)
 {
 	struct inode *inode = NULL;
 
-	if (locked)
+	if (is_inode_hash_locked)
 		lockdep_assert_held(&inode_hash_lock);
 	else
 		lockdep_assert_not_held(&inode_hash_lock);
@@ -913,7 +958,7 @@ repeat:
 			continue;
 		spin_lock(&inode->i_lock);
 		if (inode->i_state & (I_FREEING|I_WILL_FREE)) {
-			__wait_on_freeing_inode(inode, locked);
+			__wait_on_freeing_inode(inode, is_inode_hash_locked);
 			goto repeat;
 		}
 		if (unlikely(inode->i_state & I_CREATING)) {
@@ -936,11 +981,11 @@ repeat:
  */
 static struct inode *find_inode_fast(struct super_block *sb,
 				struct hlist_head *head, unsigned long ino,
-				bool locked)
+				bool is_inode_hash_locked)
 {
 	struct inode *inode = NULL;
 
-	if (locked)
+	if (is_inode_hash_locked)
 		lockdep_assert_held(&inode_hash_lock);
 	else
 		lockdep_assert_not_held(&inode_hash_lock);
@@ -954,7 +999,7 @@ repeat:
 			continue;
 		spin_lock(&inode->i_lock);
 		if (inode->i_state & (I_FREEING|I_WILL_FREE)) {
-			__wait_on_freeing_inode(inode, locked);
+			__wait_on_freeing_inode(inode, is_inode_hash_locked);
 			goto repeat;
 		}
 		if (unlikely(inode->i_state & I_CREATING)) {
@@ -2287,19 +2332,29 @@ EXPORT_SYMBOL(inode_needs_sync);
  * wake_up_bit(&inode->i_state, __I_NEW) after removing from the hash list
  * will DTRT.
  */
-static void __wait_on_freeing_inode(struct inode *inode, bool locked)
+static void __wait_on_freeing_inode(struct inode *inode, bool is_inode_hash_locked)
 {
 	wait_queue_head_t *wq;
 	DEFINE_WAIT_BIT(wait, &inode->i_state, __I_NEW);
+
+	/*
+	 * Handle racing against evict(), see that routine for more details.
+	 */
+	if (unlikely(inode_unhashed(inode))) {
+		WARN_ON(is_inode_hash_locked);
+		spin_unlock(&inode->i_lock);
+		return;
+	}
+
 	wq = bit_waitqueue(&inode->i_state, __I_NEW);
 	prepare_to_wait(wq, &wait.wq_entry, TASK_UNINTERRUPTIBLE);
 	spin_unlock(&inode->i_lock);
 	rcu_read_unlock();
-	if (locked)
+	if (is_inode_hash_locked)
 		spin_unlock(&inode_hash_lock);
 	schedule();
 	finish_wait(wq, &wait.wq_entry);
-	if (locked)
+	if (is_inode_hash_locked)
 		spin_lock(&inode_hash_lock);
 	rcu_read_lock();
 }

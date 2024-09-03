@@ -599,7 +599,11 @@ static void mana_get_rxbuf_cfg(int mtu, u32 *datasize, u32 *alloc_size,
 	else
 		*headroom = XDP_PACKET_HEADROOM;
 
-	*alloc_size = mtu + MANA_RXBUF_PAD + *headroom;
+	*alloc_size = SKB_DATA_ALIGN(mtu + MANA_RXBUF_PAD + *headroom);
+
+	/* Using page pool in this case, so alloc_size is PAGE_SIZE */
+	if (*alloc_size < PAGE_SIZE)
+		*alloc_size = PAGE_SIZE;
 
 	*datasize = mtu + ETH_HLEN;
 }
@@ -1788,7 +1792,6 @@ static void mana_poll_rx_cq(struct mana_cq *cq)
 static int mana_cq_handler(void *context, struct gdma_queue *gdma_queue)
 {
 	struct mana_cq *cq = context;
-	u8 arm_bit;
 	int w;
 
 	WARN_ON_ONCE(cq->gdma_cq != gdma_queue);
@@ -1799,15 +1802,22 @@ static int mana_cq_handler(void *context, struct gdma_queue *gdma_queue)
 		mana_poll_tx_cq(cq);
 
 	w = cq->work_done;
+	cq->work_done_since_doorbell += w;
 
-	if (w < cq->budget &&
-	    napi_complete_done(&cq->napi, w)) {
-		arm_bit = SET_ARM_BIT;
-	} else {
-		arm_bit = 0;
+	if (w < cq->budget) {
+		mana_gd_ring_cq(gdma_queue, SET_ARM_BIT);
+		cq->work_done_since_doorbell = 0;
+		napi_complete_done(&cq->napi, w);
+	} else if (cq->work_done_since_doorbell >
+		   cq->gdma_cq->queue_size / COMP_ENTRY_SIZE * 4) {
+		/* MANA hardware requires at least one doorbell ring every 8
+		 * wraparounds of CQ even if there is no need to arm the CQ.
+		 * This driver rings the doorbell as soon as we have exceeded
+		 * 4 wraparounds.
+		 */
+		mana_gd_ring_cq(gdma_queue, 0);
+		cq->work_done_since_doorbell = 0;
 	}
-
-	mana_gd_ring_cq(gdma_queue, arm_bit);
 
 	return w;
 }
@@ -3007,3 +3017,22 @@ out:
 	gd->gdma_context = NULL;
 	kfree(ac);
 }
+
+struct net_device *mana_get_primary_netdev_rcu(struct mana_context *ac, u32 port_index)
+{
+	struct net_device *ndev;
+
+	RCU_LOCKDEP_WARN(!rcu_read_lock_held(),
+			 "Taking primary netdev without holding the RCU read lock");
+	if (port_index >= ac->num_ports)
+		return NULL;
+
+	/* When mana is used in netvsc, the upper netdevice should be returned. */
+	if (ac->ports[port_index]->flags & IFF_SLAVE)
+		ndev = netdev_master_upper_dev_get_rcu(ac->ports[port_index]);
+	else
+		ndev = ac->ports[port_index];
+
+	return ndev;
+}
+EXPORT_SYMBOL_NS(mana_get_primary_netdev_rcu, NET_MANA);

@@ -16,6 +16,7 @@
 #include <linux/ethtool.h>
 #include <linux/fdtable.h>
 #include <linux/file.h>
+#include <linux/firmware.h>
 #include <linux/fs.h>
 #include <linux/jiffies.h>
 #include <linux/list_lru.h>

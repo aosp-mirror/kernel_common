@@ -94,10 +94,17 @@ Check dmesg for load errors. If undefined symbol errors are shown, you're
 likely running with a trimmed kernel where the symbols are not available.
 Run with a "no trim" kernel.
 
+Check the test module dependency with `modinfo <module_name>.ko` on your local host machine or on the Android device with `adb shell modinfo /data/kunit-example-test.ko`. All dependent modules need to be installed before the test module can be installed successfully.
+
+Check if the module is already installed with `adb shell lsmod`. `adb shell rmmod` can be used to remove the already installed test module, and installing the test module again will trigger the test rerun.
+
+`adb shell lsmod` will also show the module dependency for your test module in the `Used by` column. You can not remove a module with `adb shell rmmod` if it is being used by another module. Other modules that are using it need to be removed first.
+
 2. Test module loaded but no test results
 
 Check dmesg for KUnit errors.
  $ dmesg | grep kunit
 
-If "kunit: disabled" is shown then `kunit.enable=1` has not been set.
+If "kunit: disabled" is shown then kunit.ko is not installed with `enable=1`.
 
+If kunit.ko or kunit_<*test>.ko fails to install, check for whether they are already installed with `adb shell lsmod`.

@@ -12,6 +12,8 @@
 #include <linux/types.h>
 #include <asm/asm.h>
 
+#define HAVE_JUMP_LABEL_BATCH
+
 #define JUMP_LABEL_NOP_SIZE 4
 
 /* Changes to this asm must be reflected in `rust/kernel/arch/riscv/jump_label.rs` */
@@ -45,7 +47,7 @@ static __always_inline bool arch_static_branch_jump(struct static_key * const ke
 		"	.option push				\n\t"
 		"	.option norelax				\n\t"
 		"	.option norvc				\n\t"
-		"1:	jal		zero, %l[label]		\n\t"
+		"1:	j		%l[label]		\n\t"
 		"	.option pop				\n\t"
 		"	.pushsection	__jump_table, \"aw\"	\n\t"
 		"	.align		" RISCV_LGPTR "		\n\t"

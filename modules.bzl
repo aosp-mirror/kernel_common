@@ -36,6 +36,7 @@ _COMMON_GKI_MODULES_LIST = [
     "drivers/net/usb/rtl8150.ko",
     "drivers/net/usb/usbnet.ko",
     "drivers/net/wwan/wwan.ko",
+    "drivers/power/sequencing/pwrseq-core.ko",
     "drivers/pps/pps_core.ko",
     "drivers/ptp/ptp.ko",
     "drivers/usb/class/cdc-acm.ko",

@@ -4052,6 +4052,7 @@ static void bnxt_reset_rx_ring_struct(struct bnxt *bp,
 
 	rxr->page_pool->p.napi = NULL;
 	rxr->page_pool = NULL;
+	memset(&rxr->xdp_rxq, 0, sizeof(struct xdp_rxq_info));
 
 	ring = &rxr->rx_ring_struct;
 	rmem = &ring->ring_mem;
@@ -5055,7 +5056,7 @@ void bnxt_del_one_usr_fltr(struct bnxt *bp, struct bnxt_filter_base *fltr)
 		list_del_init(&fltr->list);
 }
 
-void bnxt_clear_usr_fltrs(struct bnxt *bp, bool all)
+static void bnxt_clear_usr_fltrs(struct bnxt *bp, bool all)
 {
 	struct bnxt_filter_base *usr_fltr, *tmp;
 
@@ -7590,19 +7591,20 @@ static bool bnxt_need_reserve_rings(struct bnxt *bp)
 	int rx = bp->rx_nr_rings, stat;
 	int vnic, grp = rx;
 
-	if (hw_resc->resv_tx_rings != bp->tx_nr_rings &&
-	    bp->hwrm_spec_code >= 0x10601)
-		return true;
-
 	/* Old firmware does not need RX ring reservations but we still
 	 * need to setup a default RSS map when needed.  With new firmware
 	 * we go through RX ring reservations first and then set up the
 	 * RSS map for the successfully reserved RX rings when needed.
 	 */
-	if (!BNXT_NEW_RM(bp)) {
+	if (!BNXT_NEW_RM(bp))
 		bnxt_check_rss_tbl_no_rmgr(bp);
+
+	if (hw_resc->resv_tx_rings != bp->tx_nr_rings &&
+	    bp->hwrm_spec_code >= 0x10601)
+		return true;
+
+	if (!BNXT_NEW_RM(bp))
 		return false;
-	}
 
 	vnic = bnxt_get_total_vnics(bp, rx);
 
@@ -7648,8 +7650,8 @@ static int bnxt_get_avail_msix(struct bnxt *bp, int num);
 static int __bnxt_reserve_rings(struct bnxt *bp)
 {
 	struct bnxt_hw_rings hwr = {0};
+	int rx_rings, old_rx_rings, rc;
 	int cp = bp->cp_nr_rings;
-	int rx_rings, rc;
 	int ulp_msix = 0;
 	bool sh = false;
 	int tx_cp;
@@ -7683,6 +7685,7 @@ static int __bnxt_reserve_rings(struct bnxt *bp)
 	hwr.grp = bp->rx_nr_rings;
 	hwr.rss_ctx = bnxt_get_total_rss_ctxs(bp, &hwr);
 	hwr.stat = bnxt_get_func_stat_ctxs(bp);
+	old_rx_rings = bp->hw_resc.resv_rx_rings;
 
 	rc = bnxt_hwrm_reserve_rings(bp, &hwr);
 	if (rc)
@@ -7737,7 +7740,8 @@ static int __bnxt_reserve_rings(struct bnxt *bp)
 	if (!bnxt_rings_ok(bp, &hwr))
 		return -ENOMEM;
 
-	if (!netif_is_rxfh_configured(bp->dev))
+	if (old_rx_rings != bp->hw_resc.resv_rx_rings &&
+	    !netif_is_rxfh_configured(bp->dev))
 		bnxt_set_dflt_rss_indir_tbl(bp, NULL);
 
 	if (!bnxt_ulp_registered(bp->edev) && BNXT_NEW_RM(bp)) {
@@ -10244,7 +10248,7 @@ static void bnxt_hwrm_realloc_rss_ctx_vnic(struct bnxt *bp)
 	}
 }
 
-void bnxt_clear_rss_ctxs(struct bnxt *bp)
+static void bnxt_clear_rss_ctxs(struct bnxt *bp)
 {
 	struct ethtool_rxfh_context *ctx;
 	unsigned long context;
@@ -15018,6 +15022,16 @@ static int bnxt_queue_mem_alloc(struct net_device *dev, void *qmem, int idx)
 	if (rc)
 		return rc;
 
+	rc = xdp_rxq_info_reg(&clone->xdp_rxq, bp->dev, idx, 0);
+	if (rc < 0)
+		goto err_page_pool_destroy;
+
+	rc = xdp_rxq_info_reg_mem_model(&clone->xdp_rxq,
+					MEM_TYPE_PAGE_POOL,
+					clone->page_pool);
+	if (rc)
+		goto err_rxq_info_unreg;
+
 	ring = &clone->rx_ring_struct;
 	rc = bnxt_alloc_ring(bp, &ring->ring_mem);
 	if (rc)
@@ -15047,6 +15061,9 @@ err_free_rx_agg_ring:
 	bnxt_free_ring(bp, &clone->rx_agg_ring_struct.ring_mem);
 err_free_rx_ring:
 	bnxt_free_ring(bp, &clone->rx_ring_struct.ring_mem);
+err_rxq_info_unreg:
+	xdp_rxq_info_unreg(&clone->xdp_rxq);
+err_page_pool_destroy:
 	clone->page_pool->p.napi = NULL;
 	page_pool_destroy(clone->page_pool);
 	clone->page_pool = NULL;
@@ -15061,6 +15078,8 @@ static void bnxt_queue_mem_free(struct net_device *dev, void *qmem)
 
 	bnxt_free_one_rx_ring(bp, rxr);
 	bnxt_free_one_rx_agg_ring(bp, rxr);
+
+	xdp_rxq_info_unreg(&rxr->xdp_rxq);
 
 	page_pool_destroy(rxr->page_pool);
 	rxr->page_pool = NULL;
@@ -15145,6 +15164,7 @@ static int bnxt_queue_start(struct net_device *dev, void *qmem, int idx)
 	rxr->rx_sw_agg_prod = clone->rx_sw_agg_prod;
 	rxr->rx_next_cons = clone->rx_next_cons;
 	rxr->page_pool = clone->page_pool;
+	rxr->xdp_rxq = clone->xdp_rxq;
 
 	bnxt_copy_rx_ring(bp, rxr, clone);
 

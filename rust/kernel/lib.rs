@@ -32,7 +32,10 @@ pub mod arch;
 pub mod block;
 mod build_assert;
 pub mod cred;
+pub mod device;
 pub mod error;
+#[cfg(CONFIG_RUST_FW_LOADER_ABSTRACTIONS)]
+pub mod firmware;
 pub mod fs;
 pub mod init;
 pub mod ioctl;

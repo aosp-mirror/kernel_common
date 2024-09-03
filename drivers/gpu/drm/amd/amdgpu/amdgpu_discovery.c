@@ -37,6 +37,7 @@
 #include "df_v3_6.h"
 #include "df_v4_3.h"
 #include "df_v4_6_2.h"
+#include "df_v4_15.h"
 #include "nbio_v6_1.h"
 #include "nbio_v7_0.h"
 #include "nbio_v7_4.h"
@@ -277,7 +278,7 @@ static int amdgpu_discovery_read_binary_from_mem(struct amdgpu_device *adev,
 			msg = RREG32(mmMP0_SMN_C2PMSG_33);
 			if (msg & 0x80000000)
 				break;
-			usleep_range(1000, 1100);
+			msleep(1);
 		}
 	}
 
@@ -2802,6 +2803,10 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 		break;
 	case IP_VERSION(4, 6, 2):
 		adev->df.funcs = &df_v4_6_2_funcs;
+		break;
+	case IP_VERSION(4, 15, 0):
+	case IP_VERSION(4, 15, 1):
+		adev->df.funcs = &df_v4_15_funcs;
 		break;
 	default:
 		break;

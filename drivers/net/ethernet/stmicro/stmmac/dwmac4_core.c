@@ -786,7 +786,7 @@ static void dwmac4_phystatus(void __iomem *ioaddr, struct stmmac_extra_stats *x)
 		else
 			x->pcs_speed = SPEED_10;
 
-		x->pcs_duplex = (status & GMAC_PHYIF_CTRLSTATUS_LNKMOD_MASK);
+		x->pcs_duplex = (status & GMAC_PHYIF_CTRLSTATUS_LNKMOD);
 
 		pr_info("Link is Up - %d/%s\n", (int)x->pcs_speed,
 			x->pcs_duplex ? "Full" : "Half");
@@ -977,7 +977,7 @@ static void dwmac4_set_mac_loopback(void __iomem *ioaddr, bool enable)
 }
 
 static void dwmac4_update_vlan_hash(struct mac_device_info *hw, u32 hash,
-				    __le16 perfect_match, bool is_double)
+				    u16 perfect_match, bool is_double)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value;

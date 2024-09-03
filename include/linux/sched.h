@@ -13,7 +13,7 @@
 #include <asm/processor.h>
 #include <linux/thread_info.h>
 #include <linux/preempt.h>
-#include <linux/cpumask.h>
+#include <linux/cpumask_types.h>
 
 #include <linux/cache.h>
 #include <linux/irqflags_types.h>
@@ -945,7 +945,7 @@ struct task_struct {
 #ifndef TIF_RESTORE_SIGMASK
 	unsigned			restore_sigmask:1;
 #endif
-#ifdef CONFIG_MEMCG
+#ifdef CONFIG_MEMCG_V1
 	unsigned			in_user_fault:1;
 #endif
 #ifdef CONFIG_LRU_GEN
@@ -1466,17 +1466,18 @@ struct task_struct {
 	unsigned int			kcov_softirq;
 #endif
 
-#ifdef CONFIG_MEMCG
+#ifdef CONFIG_MEMCG_V1
 	struct mem_cgroup		*memcg_in_oom;
+#endif
 
+#ifdef CONFIG_MEMCG
 	/* Number of pages to reclaim on returning to userland: */
 	unsigned int			memcg_nr_pages_over_high;
 
 	/* Used by memcontrol for targeted memcg charge: */
 	struct mem_cgroup		*active_memcg;
-#endif
 
-#ifdef CONFIG_MEMCG_KMEM
+	/* Cache for current->cgroups->memcg->objcg lookups: */
 	struct obj_cgroup		*objcg;
 #endif
 
@@ -1627,7 +1628,7 @@ static inline char task_index_to_char(unsigned int state)
 {
 	static const char state_char[] = "RSDTtXZPI";
 
-	BUILD_BUG_ON(1 + ilog2(TASK_REPORT_MAX) != sizeof(state_char) - 1);
+	BUILD_BUG_ON(TASK_REPORT_MAX * 2 != 1 << (sizeof(state_char) - 1));
 
 	return state_char[state];
 }
@@ -1801,7 +1802,8 @@ static inline void do_set_cpus_allowed(struct task_struct *p, const struct cpuma
 }
 static inline int set_cpus_allowed_ptr(struct task_struct *p, const struct cpumask *new_mask)
 {
-	if (!cpumask_test_cpu(0, new_mask))
+	/* Opencoded cpumask_test_cpu(0, new_mask) to avoid dependency on cpumask.h */
+	if ((*cpumask_bits(new_mask) & 1) == 0)
 		return -EINVAL;
 	return 0;
 }

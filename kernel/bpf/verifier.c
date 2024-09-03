@@ -16884,8 +16884,9 @@ static bool stacksafe(struct bpf_verifier_env *env, struct bpf_func_state *old,
 		spi = i / BPF_REG_SIZE;
 
 		if (exact != NOT_EXACT &&
-		    old->stack[spi].slot_type[i % BPF_REG_SIZE] !=
-		    cur->stack[spi].slot_type[i % BPF_REG_SIZE])
+		    (i >= cur->allocated_stack ||
+		     old->stack[spi].slot_type[i % BPF_REG_SIZE] !=
+		     cur->stack[spi].slot_type[i % BPF_REG_SIZE]))
 			return false;
 
 		if (!(old->stack[spi].spilled_ptr.live & REG_LIVE_READ)
@@ -21132,8 +21133,12 @@ BTF_SET_START(btf_non_sleepable_error_inject)
  * Assume non-sleepable from bpf safety point of view.
  */
 BTF_ID(func, __filemap_add_folio)
+#ifdef CONFIG_FAIL_PAGE_ALLOC
 BTF_ID(func, should_fail_alloc_page)
+#endif
+#ifdef CONFIG_FAILSLAB
 BTF_ID(func, should_failslab)
+#endif
 BTF_SET_END(btf_non_sleepable_error_inject)
 
 static int check_non_sleepable_error_inject(u32 btf_id)

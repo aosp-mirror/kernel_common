@@ -77,7 +77,7 @@ static bool needs_swiotlb_bounce(struct device *dev, struct sg_table *table)
 			phys_addr_t paddr = domain ?
 					    iommu_iova_to_phys(domain, sg_dma_address(sg)) :
 					    dma_to_phys(dev, sg_dma_address(sg));
-			if (is_swiotlb_buffer(dev, paddr))
+			if (swiotlb_find_pool(dev, paddr))
 				return true;
 		}
 	}

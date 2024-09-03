@@ -9,24 +9,12 @@
  */
 #include <linux/cleanup.h>
 #include <linux/kernel.h>
-#include <linux/threads.h>
 #include <linux/bitmap.h>
+#include <linux/cpumask_types.h>
 #include <linux/atomic.h>
 #include <linux/bug.h>
 #include <linux/gfp_types.h>
 #include <linux/numa.h>
-
-/* Don't assign or return these: may not be this big! */
-typedef struct cpumask { DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
-
-/**
- * cpumask_bits - get the bits in a cpumask
- * @maskp: the struct cpumask *
- *
- * You should only assume nr_cpu_ids bits of this mask are valid.  This is
- * a macro so it's const-correct.
- */
-#define cpumask_bits(maskp) ((maskp)->bits)
 
 /**
  * cpumask_pr_args - printf args to output a cpumask
@@ -925,48 +913,7 @@ static inline unsigned int cpumask_size(void)
 	return bitmap_size(large_cpumask_bits);
 }
 
-/*
- * cpumask_var_t: struct cpumask for stack usage.
- *
- * Oh, the wicked games we play!  In order to make kernel coding a
- * little more difficult, we typedef cpumask_var_t to an array or a
- * pointer: doing &mask on an array is a noop, so it still works.
- *
- * i.e.
- *	cpumask_var_t tmpmask;
- *	if (!alloc_cpumask_var(&tmpmask, GFP_KERNEL))
- *		return -ENOMEM;
- *
- *	  ... use 'tmpmask' like a normal struct cpumask * ...
- *
- *	free_cpumask_var(tmpmask);
- *
- *
- * However, one notable exception is there. alloc_cpumask_var() allocates
- * only nr_cpumask_bits bits (in the other hand, real cpumask_t always has
- * NR_CPUS bits). Therefore you don't have to dereference cpumask_var_t.
- *
- *	cpumask_var_t tmpmask;
- *	if (!alloc_cpumask_var(&tmpmask, GFP_KERNEL))
- *		return -ENOMEM;
- *
- *	var = *tmpmask;
- *
- * This code makes NR_CPUS length memcopy and brings to a memory corruption.
- * cpumask_copy() provide safe copy functionality.
- *
- * Note that there is another evil here: If you define a cpumask_var_t
- * as a percpu variable then the way to obtain the address of the cpumask
- * structure differently influences what this_cpu_* operation needs to be
- * used. Please use this_cpu_cpumask_var_t in those cases. The direct use
- * of this_cpu_ptr() or this_cpu_read() will lead to failures when the
- * other type of cpumask_var_t implementation is configured.
- *
- * Please also note that __cpumask_var_read_mostly can be used to declare
- * a cpumask_var_t variable itself (not its content) as read mostly.
- */
 #ifdef CONFIG_CPUMASK_OFFSTACK
-typedef struct cpumask *cpumask_var_t;
 
 #define this_cpu_cpumask_var_ptr(x)	this_cpu_read(x)
 #define __cpumask_var_read_mostly	__read_mostly
@@ -1013,7 +960,6 @@ static inline bool cpumask_available(cpumask_var_t mask)
 }
 
 #else
-typedef struct cpumask cpumask_var_t[1];
 
 #define this_cpu_cpumask_var_ptr(x) this_cpu_ptr(x)
 #define __cpumask_var_read_mostly
@@ -1087,52 +1033,16 @@ void init_cpu_present(const struct cpumask *src);
 void init_cpu_possible(const struct cpumask *src);
 void init_cpu_online(const struct cpumask *src);
 
-static inline void
-set_cpu_possible(unsigned int cpu, bool possible)
-{
-	if (possible)
-		cpumask_set_cpu(cpu, &__cpu_possible_mask);
-	else
-		cpumask_clear_cpu(cpu, &__cpu_possible_mask);
-}
+#define assign_cpu(cpu, mask, val)	\
+	assign_bit(cpumask_check(cpu), cpumask_bits(mask), (val))
 
-static inline void
-set_cpu_enabled(unsigned int cpu, bool can_be_onlined)
-{
-	if (can_be_onlined)
-		cpumask_set_cpu(cpu, &__cpu_enabled_mask);
-	else
-		cpumask_clear_cpu(cpu, &__cpu_enabled_mask);
-}
-
-static inline void
-set_cpu_present(unsigned int cpu, bool present)
-{
-	if (present)
-		cpumask_set_cpu(cpu, &__cpu_present_mask);
-	else
-		cpumask_clear_cpu(cpu, &__cpu_present_mask);
-}
+#define set_cpu_possible(cpu, possible)	assign_cpu((cpu), &__cpu_possible_mask, (possible))
+#define set_cpu_enabled(cpu, enabled)	assign_cpu((cpu), &__cpu_enabled_mask, (enabled))
+#define set_cpu_present(cpu, present)	assign_cpu((cpu), &__cpu_present_mask, (present))
+#define set_cpu_active(cpu, active)	assign_cpu((cpu), &__cpu_active_mask, (active))
+#define set_cpu_dying(cpu, dying)	assign_cpu((cpu), &__cpu_dying_mask, (dying))
 
 void set_cpu_online(unsigned int cpu, bool online);
-
-static inline void
-set_cpu_active(unsigned int cpu, bool active)
-{
-	if (active)
-		cpumask_set_cpu(cpu, &__cpu_active_mask);
-	else
-		cpumask_clear_cpu(cpu, &__cpu_active_mask);
-}
-
-static inline void
-set_cpu_dying(unsigned int cpu, bool dying)
-{
-	if (dying)
-		cpumask_set_cpu(cpu, &__cpu_dying_mask);
-	else
-		cpumask_clear_cpu(cpu, &__cpu_dying_mask);
-}
 
 /**
  * to_cpumask - convert a NR_CPUS bitmap to a struct cpumask *

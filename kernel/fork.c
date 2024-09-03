@@ -44,6 +44,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/mm_inline.h>
+#include <linux/memblock.h>
 #include <linux/nsproxy.h>
 #include <linux/capability.h>
 #include <linux/cpu.h>
@@ -213,9 +214,10 @@ static bool try_release_thread_stack_to_cache(struct vm_struct *vm)
 	unsigned int i;
 
 	for (i = 0; i < NR_CACHED_STACKS; i++) {
-		if (this_cpu_cmpxchg(cached_stacks[i], NULL, vm) != NULL)
-			continue;
-		return true;
+		struct vm_struct *tmp = NULL;
+
+		if (this_cpu_try_cmpxchg(cached_stacks[i], &tmp, vm))
+			return true;
 	}
 	return false;
 }
@@ -1006,10 +1008,10 @@ void __init __weak arch_task_cache_init(void) { }
 /*
  * set_max_threads
  */
-static void set_max_threads(unsigned int max_threads_suggested)
+static void __init set_max_threads(unsigned int max_threads_suggested)
 {
 	u64 threads;
-	unsigned long nr_pages = totalram_pages();
+	unsigned long nr_pages = PHYS_PFN(memblock_phys_mem_size() - memblock_reserved_size());
 
 	/*
 	 * The number of threads shall be limited such that the thread
@@ -1032,7 +1034,7 @@ static void set_max_threads(unsigned int max_threads_suggested)
 int arch_task_struct_size __read_mostly;
 #endif
 
-static void task_struct_whitelist(unsigned long *offset, unsigned long *size)
+static void __init task_struct_whitelist(unsigned long *offset, unsigned long *size)
 {
 	/* Fetch thread_struct whitelist for the architecture. */
 	arch_thread_struct_whitelist(offset, size);
@@ -1550,14 +1552,13 @@ struct mm_struct *get_task_mm(struct task_struct *task)
 {
 	struct mm_struct *mm;
 
+	if (task->flags & PF_KTHREAD)
+		return NULL;
+
 	task_lock(task);
 	mm = task->mm;
-	if (mm) {
-		if (task->flags & PF_KTHREAD)
-			mm = NULL;
-		else
-			mmget(mm);
-	}
+	if (mm)
+		mmget(mm);
 	task_unlock(task);
 	return mm;
 }
@@ -2083,10 +2084,23 @@ static int __pidfd_prepare(struct pid *pid, unsigned int flags, struct file **re
  */
 int pidfd_prepare(struct pid *pid, unsigned int flags, struct file **ret)
 {
-	bool thread = flags & PIDFD_THREAD;
-
-	if (!pid || !pid_has_task(pid, thread ? PIDTYPE_PID : PIDTYPE_TGID))
+	if (!pid)
 		return -EINVAL;
+
+	scoped_guard(rcu) {
+		struct task_struct *tsk;
+
+		if (flags & PIDFD_THREAD)
+			tsk = pid_task(pid, PIDTYPE_PID);
+		else
+			tsk = pid_task(pid, PIDTYPE_TGID);
+		if (!tsk)
+			return -EINVAL;
+
+		/* Don't create pidfds for kernel threads for now. */
+		if (tsk->flags & PF_KTHREAD)
+			return -EINVAL;
+	}
 
 	return __pidfd_prepare(pid, flags, ret);
 }
@@ -2434,6 +2448,12 @@ __latent_entropy struct task_struct *copy_process(
 	 */
 	if (clone_flags & CLONE_PIDFD) {
 		int flags = (clone_flags & CLONE_THREAD) ? PIDFD_THREAD : 0;
+
+		/* Don't create pidfds for kernel threads for now. */
+		if (args->kthread) {
+			retval = -EINVAL;
+			goto bad_fork_free_pid;
+		}
 
 		/* Note that no task has been attached to @pid yet. */
 		retval = __pidfd_prepare(pid, flags, &pidfile);
@@ -3438,7 +3458,7 @@ int unshare_files(void)
 	return 0;
 }
 
-int sysctl_max_threads(struct ctl_table *table, int write,
+int sysctl_max_threads(const struct ctl_table *table, int write,
 		       void *buffer, size_t *lenp, loff_t *ppos)
 {
 	struct ctl_table t;

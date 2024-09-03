@@ -3548,7 +3548,7 @@ EXPORT_SYMBOL(neigh_app_ns);
 #ifdef CONFIG_SYSCTL
 static int unres_qlen_max = INT_MAX / SKB_TRUESIZE(ETH_FRAME_LEN);
 
-static int proc_unres_qlen(struct ctl_table *ctl, int write,
+static int proc_unres_qlen(const struct ctl_table *ctl, int write,
 			   void *buffer, size_t *lenp, loff_t *ppos)
 {
 	int size, ret;
@@ -3600,7 +3600,7 @@ static void neigh_proc_update(const struct ctl_table *ctl, int write)
 		neigh_copy_dflt_parms(net, p, index);
 }
 
-static int neigh_proc_dointvec_zero_intmax(struct ctl_table *ctl, int write,
+static int neigh_proc_dointvec_zero_intmax(const struct ctl_table *ctl, int write,
 					   void *buffer, size_t *lenp,
 					   loff_t *ppos)
 {
@@ -3615,7 +3615,7 @@ static int neigh_proc_dointvec_zero_intmax(struct ctl_table *ctl, int write,
 	return ret;
 }
 
-static int neigh_proc_dointvec_ms_jiffies_positive(struct ctl_table *ctl, int write,
+static int neigh_proc_dointvec_ms_jiffies_positive(const struct ctl_table *ctl, int write,
 						   void *buffer, size_t *lenp, loff_t *ppos)
 {
 	struct ctl_table tmp = *ctl;
@@ -3631,7 +3631,7 @@ static int neigh_proc_dointvec_ms_jiffies_positive(struct ctl_table *ctl, int wr
 	return ret;
 }
 
-int neigh_proc_dointvec(struct ctl_table *ctl, int write, void *buffer,
+int neigh_proc_dointvec(const struct ctl_table *ctl, int write, void *buffer,
 			size_t *lenp, loff_t *ppos)
 {
 	int ret = proc_dointvec(ctl, write, buffer, lenp, ppos);
@@ -3641,7 +3641,7 @@ int neigh_proc_dointvec(struct ctl_table *ctl, int write, void *buffer,
 }
 EXPORT_SYMBOL(neigh_proc_dointvec);
 
-int neigh_proc_dointvec_jiffies(struct ctl_table *ctl, int write, void *buffer,
+int neigh_proc_dointvec_jiffies(const struct ctl_table *ctl, int write, void *buffer,
 				size_t *lenp, loff_t *ppos)
 {
 	int ret = proc_dointvec_jiffies(ctl, write, buffer, lenp, ppos);
@@ -3651,7 +3651,7 @@ int neigh_proc_dointvec_jiffies(struct ctl_table *ctl, int write, void *buffer,
 }
 EXPORT_SYMBOL(neigh_proc_dointvec_jiffies);
 
-static int neigh_proc_dointvec_userhz_jiffies(struct ctl_table *ctl, int write,
+static int neigh_proc_dointvec_userhz_jiffies(const struct ctl_table *ctl, int write,
 					      void *buffer, size_t *lenp,
 					      loff_t *ppos)
 {
@@ -3661,7 +3661,7 @@ static int neigh_proc_dointvec_userhz_jiffies(struct ctl_table *ctl, int write,
 	return ret;
 }
 
-int neigh_proc_dointvec_ms_jiffies(struct ctl_table *ctl, int write,
+int neigh_proc_dointvec_ms_jiffies(const struct ctl_table *ctl, int write,
 				   void *buffer, size_t *lenp, loff_t *ppos)
 {
 	int ret = proc_dointvec_ms_jiffies(ctl, write, buffer, lenp, ppos);
@@ -3671,7 +3671,7 @@ int neigh_proc_dointvec_ms_jiffies(struct ctl_table *ctl, int write,
 }
 EXPORT_SYMBOL(neigh_proc_dointvec_ms_jiffies);
 
-static int neigh_proc_dointvec_unres_qlen(struct ctl_table *ctl, int write,
+static int neigh_proc_dointvec_unres_qlen(const struct ctl_table *ctl, int write,
 					  void *buffer, size_t *lenp,
 					  loff_t *ppos)
 {
@@ -3681,7 +3681,7 @@ static int neigh_proc_dointvec_unres_qlen(struct ctl_table *ctl, int write,
 	return ret;
 }
 
-static int neigh_proc_base_reachable_time(struct ctl_table *ctl, int write,
+static int neigh_proc_base_reachable_time(const struct ctl_table *ctl, int write,
 					  void *buffer, size_t *lenp,
 					  loff_t *ppos)
 {

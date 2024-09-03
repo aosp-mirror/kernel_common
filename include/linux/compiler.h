@@ -208,10 +208,8 @@ void ftrace_likely_update(struct ftrace_likely_data *f, int val,
  */
 #define data_race(expr)							\
 ({									\
-	__unqual_scalar_typeof(({ expr; })) __v = ({			\
-		__kcsan_disable_current();				\
-		expr;							\
-	});								\
+	__kcsan_disable_current();					\
+	__auto_type __v = (expr);					\
 	__kcsan_enable_current();					\
 	__v;								\
 })
@@ -297,6 +295,15 @@ static inline void *offset_to_ptr(const int *off)
  */
 #define is_signed_type(type) (((type)(-1)) < (__force type)1)
 #define is_unsigned_type(type) (!is_signed_type(type))
+
+/*
+ * Useful shorthand for "is this condition known at compile-time?"
+ *
+ * Note that the condition may involve non-constant values,
+ * but the compiler may know enough about the details of the
+ * values to determine that the condition is statically true.
+ */
+#define statically_true(x) (__builtin_constant_p(x) && (x))
 
 /*
  * This is needed in functions which generate the stack canary, see
