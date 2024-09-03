@@ -380,3 +380,60 @@
   wake_up_process
   __warn_printk
   woken_wake_function
+
+# required by 8250_dw.ko
+  dw8250_setup_port
+  of_device_is_big_endian
+  platform_get_resource_byname
+  serial8250_clear_and_reinit_fifos
+  serial8250_do_pm
+  serial8250_do_set_ldisc
+  serial8250_do_set_termios
+  serial8250_handle_irq
+  serial8250_register_8250_port
+  serial8250_resume_port
+  serial8250_suspend_port
+  serial8250_unregister_port
+
+# required by adv7511.ko
+  cec_allocate_adapter
+  cec_delete_adapter
+  cec_received_msg_ts
+  cec_register_adapter
+  cec_s_phys_addr
+  cec_s_phys_addr_from_edid
+  cec_transmit_attempt_done_ts
+  cec_transmit_done_ts
+  cec_unregister_adapter
+  __devm_regmap_init_i2c
+  drm_add_edid_modes
+  drm_bridge_add
+  drm_bridge_remove
+  drm_connector_update_edid_property
+  drm_detect_hdmi_monitor
+  drm_do_get_edid
+  hdmi_avi_infoframe_init
+  hdmi_avi_infoframe_pack
+  i2c_del_driver
+  i2c_new_ancillary_device
+  i2c_register_driver
+  i2c_transfer
+  i2c_unregister_device
+  mipi_dsi_attach
+  mipi_dsi_detach
+  mipi_dsi_device_register_full
+  mipi_dsi_device_unregister
+  mipi_dsi_driver_register_full
+  mipi_dsi_driver_unregister
+  of_find_mipi_dsi_host_by_node
+  of_property_read_string
+  platform_device_register_full
+  regcache_mark_dirty
+  regcache_sync
+  regmap_bulk_write
+  regmap_register_patch
+
+# required by armmmci.ko
+  devm_pinctrl_get
+  pinctrl_lookup_state
+  pinctrl_select_state
