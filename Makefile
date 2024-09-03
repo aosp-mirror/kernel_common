@@ -666,10 +666,11 @@ endif
 
 # The expansion should be delayed until arch/$(SRCARCH)/Makefile is included.
 # Some architectures define CROSS_COMPILE in arch/$(SRCARCH)/Makefile.
-# CC_VERSION_TEXT and RUSTC_VERSION_TEXT are referenced from Kconfig (so they need export),
-# and from include/config/auto.conf.cmd to detect the compiler upgrade.
+# CC_VERSION_TEXT and RUSTC_VERSION_TEXT are referenced from Kconfig (so they
+# need export), and from include/config/auto.conf.cmd to detect the compiler
+# upgrade.
 CC_VERSION_TEXT = $(subst $(pound),,$(shell LC_ALL=C $(CC) --version 2>/dev/null | head -n 1))
-RUSTC_VERSION_TEXT = $(subst $(pound),,$(shell LC_ALL=C $(RUSTC) --version 2>/dev/null | head -n 1))
+RUSTC_VERSION_TEXT = $(subst $(pound),,$(shell $(RUSTC) --version 2>/dev/null))
 
 ifneq ($(findstring clang,$(CC_VERSION_TEXT)),)
 include $(srctree)/scripts/Makefile.clang
@@ -1842,13 +1843,19 @@ clean: private rm-files := $(KBUILD_EXTMOD)/Module.symvers $(KBUILD_EXTMOD)/modu
 	$(KBUILD_EXTMOD)/compile_commands.json
 
 PHONY += prepare
-# now expand this into a simple variable to reduce the cost of shell evaluations
+# now expand these into simple variables to reduce the cost of shell evaluations
 prepare: CC_VERSION_TEXT := $(CC_VERSION_TEXT)
+prepare: RUSTC_VERSION_TEXT := $(RUSTC_VERSION_TEXT)
 prepare:
 	@if [ "$(CC_VERSION_TEXT)" != "$(CONFIG_CC_VERSION_TEXT)" ]; then \
-		echo >&2 "warning: the compiler differs from the one used to build the kernel"; \
+		echo >&2 "warning: the C compiler differs from the one used to build the kernel"; \
 		echo >&2 "  The kernel was built by: $(CONFIG_CC_VERSION_TEXT)"; \
 		echo >&2 "  You are using:           $(CC_VERSION_TEXT)"; \
+	fi
+	@if [ "$(CONFIG_RUST)" = "y" -a "$(RUSTC_VERSION_TEXT)" != "$(CONFIG_RUSTC_VERSION_TEXT)" ]; then \
+		echo >&2 "warning: the Rust compiler differs from the one used to build the kernel"; \
+		echo >&2 "  The kernel was built by: $(CONFIG_RUSTC_VERSION_TEXT)"; \
+		echo >&2 "  You are using:           $(RUSTC_VERSION_TEXT)"; \
 	fi
 
 PHONY += help
