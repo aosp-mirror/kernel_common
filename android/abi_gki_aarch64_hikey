@@ -754,3 +754,21 @@
   drm_universal_plane_init
   drm_vblank_init
   noop_llseek
+
+# required by kirin-dsi.ko
+  component_add
+  component_del
+  drm_bridge_attach
+  drm_encoder_cleanup
+  drm_encoder_init
+  drm_of_find_panel_or_bridge
+  drm_of_find_possible_crtcs
+  drm_panel_attach
+  drm_panel_disable
+  drm_panel_enable
+  drm_panel_get_modes
+  drm_panel_prepare
+  drm_panel_unprepare
+  drm_sysfs_hotplug_event
+  mipi_dsi_host_register
+  mipi_dsi_host_unregister
