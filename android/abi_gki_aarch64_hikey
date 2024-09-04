@@ -663,3 +663,13 @@
 
 # required by hisi_powerkey.ko
   platform_get_irq_byname
+
+# required by i2c-designware-core.ko
+  i2c_add_numbered_adapter
+  i2c_generic_scl_recovery
+  i2c_recover_bus
+
+# required by i2c-designware-platform.ko
+  i2c_del_adapter
+  i2c_parse_fw_timings
+  pm_suspend_global_flags
