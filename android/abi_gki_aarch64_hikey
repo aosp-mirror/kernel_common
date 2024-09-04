@@ -561,3 +561,48 @@
   of_fwnode_ops
   pm_relax
   pm_stay_awake
+
+# required by hci_uart.ko
+  baswap
+  bit_wait_timeout
+  bt_warn
+  clk_is_match
+  debugfs_create_bool
+  debugfs_create_u64
+  debugfs_create_u8
+  devm_clk_put
+  hci_alloc_dev
+  hci_free_dev
+  hci_recv_diag
+  hci_register_dev
+  hci_unregister_dev
+  n_tty_ioctl_helper
+  nvmem_cell_get
+  nvmem_cell_put
+  nvmem_cell_read
+  out_of_line_wait_on_bit_timeout
+  __percpu_down_read
+  percpu_down_write
+  percpu_free_rwsem
+  __percpu_init_rwsem
+  __percpu_up_read
+  percpu_up_write
+  regulator_set_load
+  serdev_device_close
+  __serdev_device_driver_register
+  serdev_device_get_tiocm
+  serdev_device_open
+  serdev_device_set_baudrate
+  serdev_device_set_flow_control
+  serdev_device_set_tiocm
+  serdev_device_wait_until_sent
+  serdev_device_write_buf
+  serdev_device_write_flush
+  tty_driver_flush_buffer
+  tty_ldisc_flush
+  tty_register_ldisc
+  tty_set_termios
+  tty_termios_encode_baud_rate
+  tty_unregister_ldisc
+  tty_unthrottle
+  wake_up_bit
