@@ -832,3 +832,12 @@
   vm_zone_stat
   vprintk
   zap_vma_ptes
+
+# required by mmc_spi.ko
+  mmc_gpiod_request_cd_irq
+  spi_bus_lock
+  spi_bus_unlock
+  spi_sync_locked
+
+# required by of_mmc_spi.ko
+  mmc_of_parse_voltage
