@@ -772,3 +772,63 @@
   drm_sysfs_hotplug_event
   mipi_dsi_host_register
   mipi_dsi_host_unregister
+
+# required by mali.ko
+  add_timer
+  __alloc_pages_nodemask
+  cpu_number
+  dma_buf_attach
+  dma_buf_detach
+  dma_buf_get
+  dma_buf_map_attachment
+  dma_buf_put
+  dma_buf_unmap_attachment
+  dma_fence_add_callback
+  dma_fence_array_create
+  dma_fence_array_ops
+  dma_fence_context_alloc
+  dma_fence_default_wait
+  dma_fence_free
+  dma_fence_init
+  dma_fence_release
+  dma_fence_remove_callback
+  dma_fence_signal
+  dma_fence_signal_locked
+  dump_stack
+  fd_install
+  fget
+  __free_pages
+  get_unused_fd_flags
+  idr_alloc
+  idr_find
+  idr_remove
+  __ioremap
+  kimage_vaddr
+  krealloc
+  kstrtoll
+  ktime_get_real_ts64
+  __lock_page
+  memstart_addr
+  misc_deregister
+  misc_register
+  mutex_is_locked
+  ns_to_timespec64
+  platform_bus_type
+  pm_runtime_barrier
+  probe_irq_off
+  probe_irq_on
+  __put_page
+  rb_erase
+  rb_insert_color
+  rb_last
+  register_shrinker
+  set_page_dirty
+  shmem_file_setup
+  shmem_read_mapping_page_gfp
+  shmem_truncate_range
+  sync_file_create
+  unregister_shrinker
+  vmf_insert_pfn
+  vm_zone_stat
+  vprintk
+  zap_vma_ptes
