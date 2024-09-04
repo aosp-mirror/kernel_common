@@ -657,3 +657,9 @@
   sock_no_shutdown
   strscpy
   up_read
+
+# required by hisi-reboot.ko
+  of_iomap
+
+# required by hisi_powerkey.ko
+  platform_get_irq_byname
