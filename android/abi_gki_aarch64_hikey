@@ -606,3 +606,23 @@
   tty_unregister_ldisc
   tty_unthrottle
   wake_up_bit
+
+# required by hi6210-i2s.ko
+  devm_snd_dmaengine_pcm_register
+
+# required by hi655x-pmic.ko
+  __devm_regmap_init_mmio_clk
+  mfd_add_devices
+  mfd_remove_devices
+  regmap_add_irq_chip
+  regmap_del_irq_chip
+  regmap_irq_get_domain
+
+# required by hi655x-regulator.ko
+  devm_regulator_register
+  rdev_get_drvdata
+  regulator_enable_regmap
+  regulator_get_voltage_sel_regmap
+  regulator_list_voltage_linear
+  regulator_list_voltage_table
+  regulator_set_voltage_sel_regmap
