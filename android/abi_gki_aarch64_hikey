@@ -1024,3 +1024,93 @@
 
 # required by syscon-reboot-mode.ko
   syscon_node_to_regmap
+
+# required by wl18xx.ko
+  __cfg80211_alloc_event_skb
+  __cfg80211_send_event_skb
+  get_random_bytes
+  ieee80211_radar_detected
+  kstrtou8_from_user
+  nla_put
+
+# required by wlcore.ko
+  bcmp
+  cfg80211_find_elem_match
+  cfg80211_find_vendor_elem
+  complete_all
+  consume_skb
+  device_create_bin_file
+  device_remove_bin_file
+  dev_pm_clear_wake_irq
+  dev_pm_set_dedicated_wake_irq
+  disable_irq_nosync
+  __get_free_pages
+  get_random_u32
+  ieee80211_alloc_hw_nm
+  ieee80211_ap_probereq_get
+  ieee80211_beacon_get_tim
+  ieee80211_chswitch_done
+  ieee80211_cqm_beacon_loss_notify
+  ieee80211_cqm_rssi_notify
+  ieee80211_csa_finish
+  ieee80211_free_hw
+  ieee80211_free_txskb
+  ieee80211_freq_khz_to_channel
+  ieee80211_hdrlen
+  ieee80211_iterate_active_interfaces_atomic
+  ieee80211_iterate_interfaces
+  ieee80211_nullfunc_get
+  ieee80211_probereq_get
+  ieee80211_proberesp_get
+  ieee80211_pspoll_get
+  ieee80211_queue_work
+  ieee80211_ready_on_channel
+  ieee80211_register_hw
+  ieee80211_remain_on_channel_expired
+  ieee80211_report_low_ack
+  ieee80211_restart_hw
+  ieee80211_rx_napi
+  ieee80211_scan_completed
+  ieee80211_sched_scan_results
+  ieee80211_sched_scan_stopped
+  ieee80211_sta_ps_transition
+  ieee80211_stop_queue
+  ieee80211_stop_queues
+  ieee80211_tx_status
+  ieee80211_unregister_hw
+  ieee80211_wake_queue
+  ieee80211_wake_queues
+  jiffies_to_usecs
+  __local_bh_enable_ip
+  __netdev_alloc_skb
+  __nla_parse
+  no_seek_end_llseek
+  request_firmware_nowait
+  rfc1042_header
+  skb_trim
+  wait_for_completion
+  wiphy_to_ieee80211_hw
+
+# required by wlcore_sdio.ko
+  mmc_hw_reset
+  platform_device_add
+  platform_device_add_data
+  platform_device_add_resources
+  platform_device_alloc
+  platform_device_put
+  print_hex_dump
+  sdio_claim_host
+  sdio_disable_func
+  sdio_enable_func
+  sdio_f0_readb
+  sdio_f0_writeb
+  sdio_get_host_pm_caps
+  sdio_memcpy_fromio
+  sdio_memcpy_toio
+  sdio_readsb
+  sdio_register_driver
+  sdio_release_host
+  sdio_set_block_size
+  sdio_set_host_pm_flags
+  sdio_unregister_driver
+  sdio_writesb
