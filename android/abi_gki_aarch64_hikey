@@ -475,3 +475,46 @@
   policy_has_boost_freq
   regulator_get_optional
   regulator_put
+
+# required by dw_mmc-k3.ko
+  mmc_send_tuning
+
+# required by dw_mmc.ko
+  debugfs_create_x32
+  device_property_read_string_array
+  dma_direct_sync_sg_for_cpu
+  dma_direct_sync_sg_for_device
+  mmc_can_gpio_cd
+  _raw_spin_lock_bh
+  _raw_spin_unlock_bh
+  sdio_signal_irq
+
+# required by dwc2.ko
+  debugfs_create_regset32
+  devm_phy_get
+  devm_regulator_get_optional
+  devm_usb_get_phy
+  dmam_free_coherent
+  gcd
+  kmem_cache_alloc
+  kmem_cache_create
+  kmem_cache_destroy
+  kmem_cache_free
+  phy_exit
+  phy_init
+  phy_power_off
+  phy_power_on
+  phy_reset
+  usb_add_gadget_udc
+  usb_del_gadget_udc
+  usb_ep_set_maxpacket_limit
+  usb_gadget_giveback_request
+  usb_gadget_map_request
+  usb_gadget_set_state
+  usb_gadget_unmap_request
+  usb_get_dr_mode
+  usb_hcd_map_urb_for_dma
+  usb_hcd_unmap_urb_for_dma
+  usb_phy_set_charger_current
+  usb_speed_string
+  usb_wakeup_enabled_descendants
