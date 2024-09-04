@@ -853,3 +853,8 @@
   pci_dev_put
   pci_get_slot
   usb_amd_prefetch_quirk
+
+# required by phy-hi6220-usb.ko
+  __devm_of_phy_provider_register
+  devm_phy_create
+  of_phy_simple_xlate
