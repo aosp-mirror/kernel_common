@@ -673,3 +673,12 @@
   i2c_del_adapter
   i2c_parse_fw_timings
   pm_suspend_global_flags
+
+# required by ion_cma_heap.ko
+  cma_alloc
+  cma_for_each_area
+  cma_get_name
+  cma_release
+  ion_buffer_prep_noncached
+  __ion_device_add_heap
+  ion_device_remove_heap
