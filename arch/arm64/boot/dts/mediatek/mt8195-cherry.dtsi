@@ -1174,7 +1174,6 @@
 		"DL10_FE", "DPTX_BE", "ETDM1_IN_BE", "ETDM2_IN_BE",
 		"ETDM1_OUT_BE", "ETDM2_OUT_BE","UL_SRC1_BE",
 		"AFE_SOF_DL2", "AFE_SOF_DL3", "AFE_SOF_UL4", "AFE_SOF_UL5";
-	mediatek,dptx-codec = <&dp_tx>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&aud_pins_default>;
 };
