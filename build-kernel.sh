@@ -93,6 +93,13 @@ if [[ "$CMD" == "menuconfig" ]] || [[ "$CMD" == "savedefconfig" ]]; then
     exit
 fi
 
+if [ "$ARCH" == "arm64" ] ; then
+    # XXX: Under arm64 arch, in a later step we replace kernel image with a FIT
+    # image, which extends the kernel with devices trees. Running the script
+    # twice results in nested FIT FIT image, which does not boot. Hence, we
+    # remove it before building.
+    rm -rf arch/$ARCH/boot/$ZIMAGE
+fi
 # Do the build
 #
 rm -f include/asm &&
