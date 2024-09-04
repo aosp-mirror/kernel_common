@@ -858,3 +858,24 @@
   __devm_of_phy_provider_register
   devm_phy_create
   of_phy_simple_xlate
+
+# required by pwrseq_emmc.ko
+  _dev_notice
+  gpiod_cansleep
+  gpiod_set_value
+  unregister_restart_handler
+
+# required by pwrseq_simple.ko
+  bitmap_alloc
+  devm_gpiod_get_array
+  gpiod_set_array_value_cansleep
+
+# required by reboot-mode.ko
+  devres_add
+  devres_alloc_node
+  devres_free
+  devres_release
+  kfree_const
+  kstrdup_const
+  register_reboot_notifier
+  unregister_reboot_notifier
