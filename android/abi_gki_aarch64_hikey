@@ -542,3 +542,22 @@
   device_release_driver
   soc_device_match
   usb_of_get_companion_dev
+
+# required by gpio_keys.ko
+  bitmap_free
+  bitmap_parselist
+  __bitmap_subset
+  bitmap_zalloc
+  device_get_child_node_count
+  device_get_next_child_node
+  devm_add_action
+  devm_fwnode_get_index_gpiod_from_child
+  fwnode_handle_put
+  fwnode_property_present
+  fwnode_property_read_string
+  fwnode_property_read_u32_array
+  irq_set_irq_type
+  mod_delayed_work_on
+  of_fwnode_ops
+  pm_relax
+  pm_stay_awake
