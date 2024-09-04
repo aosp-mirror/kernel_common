@@ -879,3 +879,68 @@
   kstrdup_const
   register_reboot_notifier
   unregister_reboot_notifier
+
+# required by rfcomm.ko
+  add_wait_queue_exclusive
+  bt_accept_dequeue
+  bt_accept_enqueue
+  bt_accept_unlink
+  bt_debugfs
+  bt_sock_ioctl
+  bt_sock_poll
+  bt_sock_reclassify_lock
+  bt_sock_stream_recvmsg
+  bt_sock_wait_ready
+  bt_sock_wait_state
+  _copy_from_iter_full
+  device_move
+  hci_conn_check_secure
+  hci_conn_security
+  hci_conn_switch_role
+  hci_get_route
+  hci_register_cb
+  hci_unregister_cb
+  kernel_accept
+  kernel_bind
+  kernel_connect
+  kernel_listen
+  kthread_should_stop
+  kthread_stop
+  lock_sock_nested
+  put_tty_driver
+  release_sock
+  security_sk_clone
+  sock_alloc_send_skb
+  sock_create_kern
+  sock_gettstamp
+  sock_release
+  sprintf
+  try_module_get
+  __tty_alloc_driver
+  tty_flip_buffer_push
+  tty_insert_flip_string_fixed_flag
+  tty_kref_put
+  tty_port_close
+  tty_port_hangup
+  tty_port_init
+  tty_port_install
+  tty_port_open
+  tty_port_put
+  tty_port_register_device
+  tty_port_tty_get
+  tty_port_tty_hangup
+  tty_port_tty_wakeup
+  tty_register_driver
+  tty_set_operations
+  tty_std_termios
+  tty_unregister_device
+  tty_unregister_driver
+  tty_vhangup
+  tty_wakeup
+
+# required by rfkill-gpio.ko
+  rfkill_alloc
+  rfkill_destroy
+  rfkill_find_type
+  rfkill_register
+  rfkill_unregister
