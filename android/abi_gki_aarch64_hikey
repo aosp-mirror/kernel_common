@@ -951,3 +951,46 @@
   __platform_driver_probe
   rtc_valid_tm
   rtc_year_days
+
+# required by snd-soc-audio-graph-card.ko
+  of_graph_get_endpoint_count
+  of_graph_get_next_endpoint
+  of_graph_get_port_parent
+  of_graph_get_remote_endpoint
+  of_phandle_iterator_init
+  of_phandle_iterator_next
+  snd_soc_get_dai_id
+  snd_soc_get_dai_name
+
+# required by snd-soc-hdmi-codec.ko
+  hdmi_audio_infoframe_init
+  snd_ctl_add
+  snd_ctl_new1
+  snd_pcm_add_chmap_ctls
+  snd_pcm_create_iec958_consumer_hw_params
+  snd_pcm_format_width
+  snd_pcm_hw_constraint_eld
+  snd_soc_dapm_add_routes
+  snd_soc_jack_report
+
+# required by snd-soc-simple-card-utils.ko
+  devm_get_clk_from_child
+  devm_kasprintf
+  devm_kvasprintf
+  snd_soc_card_jack_new
+  snd_soc_dai_set_sysclk
+  snd_soc_dai_set_tdm_slot
+  snd_soc_dapm_get_pin_switch
+  snd_soc_dapm_info_pin_switch
+  snd_soc_dapm_put_pin_switch
+  snd_soc_jack_add_gpios
+  snd_soc_of_parse_audio_routing
+  snd_soc_of_parse_audio_simple_widgets
+  snd_soc_of_parse_card_name
+  snd_soc_of_parse_daifmt
+
+# required by snd-soc-simple-card.ko
+  of_device_is_available
+  of_parse_phandle
+  of_parse_phandle_with_args
+  snd_soc_of_get_dai_name
