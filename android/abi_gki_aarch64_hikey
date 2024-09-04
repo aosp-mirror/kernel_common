@@ -841,3 +841,15 @@
 
 # required by of_mmc_spi.ko
   mmc_of_parse_voltage
+
+# required by ohci-hcd.ko
+  gen_pool_dma_alloc_align
+  gen_pool_dma_zalloc_align
+  gen_pool_free_owner
+  sb800_prefetch
+  usb_debug_root
+
+# required by ohci-pci.ko
+  pci_dev_put
+  pci_get_slot
+  usb_amd_prefetch_quirk
