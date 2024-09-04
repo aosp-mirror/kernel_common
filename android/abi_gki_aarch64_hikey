@@ -1021,3 +1021,6 @@
   __register_chrdev
   stream_open
   __unregister_chrdev
+
+# required by syscon-reboot-mode.ko
+  syscon_node_to_regmap
