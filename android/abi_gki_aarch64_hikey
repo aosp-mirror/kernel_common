@@ -682,3 +682,13 @@
   ion_buffer_prep_noncached
   __ion_device_add_heap
   ion_device_remove_heap
+
+# required by k3dma.ko
+  dma_async_device_register
+  dma_async_device_unregister
+  dma_async_tx_descriptor_init
+  dma_get_slave_channel
+  dmam_pool_create
+  of_dma_controller_free
+  of_dma_controller_register
+  tasklet_kill
