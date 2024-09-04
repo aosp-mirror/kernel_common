@@ -944,3 +944,10 @@
   rfkill_find_type
   rfkill_register
   rfkill_unregister
+
+# required by rtc-efi.ko
+  devm_rtc_device_register
+  efi
+  __platform_driver_probe
+  rtc_valid_tm
+  rtc_year_days
