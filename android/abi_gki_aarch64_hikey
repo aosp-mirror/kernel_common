@@ -518,3 +518,27 @@
   usb_phy_set_charger_current
   usb_speed_string
   usb_wakeup_enabled_descendants
+
+# required by ehci-hcd.ko
+  ehci_cf_port_reset_rwsem
+  kstrtouint
+  usb_for_each_dev
+  usb_hcd_end_port_resume
+  usb_hcd_start_port_resume
+
+# required by ehci-pci.ko
+  pci_clear_mwi
+  pci_find_capability
+  pci_read_config_byte
+  pci_read_config_dword
+  pci_read_config_word
+  pci_set_mwi
+  pci_write_config_byte
+  usb_amd_hang_symptom_quirk
+
+# required by ehci-platform.ko
+  device_attach
+  device_pm_wait_for_dev
+  device_release_driver
+  soc_device_match
+  usb_of_get_companion_dev
