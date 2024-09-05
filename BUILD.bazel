@@ -183,6 +183,7 @@ common_kernel(
     gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     visibility = ["//visibility:public"],
 
@@ -214,6 +215,7 @@ common_kernel(
     gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     page_size = "16k",
     visibility = ["//visibility:public"],
@@ -238,6 +240,7 @@ Consider building @@//common:kernel_aarch64 with:
     gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     visibility = ["//visibility:public"],
 )
@@ -256,6 +259,7 @@ common_kernel(
     ],
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     visibility = ["//visibility:public"],
 )
@@ -293,6 +297,7 @@ Consider building @@//common:kernel_x86_64 with:
     gki_boot_img_sizes = _GKI_X86_64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_x86_64",
     make_goals = _GKI_X86_64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
     visibility = ["//visibility:public"],
 )
@@ -311,6 +316,7 @@ common_kernel(
     gki_boot_img_sizes = {"": "67108864"},
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_x86_64",
     make_goals = _GKI_X86_64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
     visibility = ["//visibility:public"],
 )
@@ -432,6 +438,7 @@ kernel_build(
     make_goals = [
         "Image",
     ],
+    makefile = ":Makefile",
 )
 
 copy_to_dist_dir(
@@ -455,6 +462,7 @@ kernel_build(
     make_goals = [
         "bzImage",
     ],
+    makefile = ":Makefile",
 )
 
 copy_to_dist_dir(
@@ -477,6 +485,7 @@ kernel_build(
     make_goals = [
         "Image",
     ],
+    makefile = ":Makefile",
 )
 
 copy_to_dist_dir(
@@ -498,6 +507,7 @@ kernel_build(
     make_goals = [
         "bzImage",
     ],
+    makefile = ":Makefile",
 )
 
 copy_to_dist_dir(
@@ -776,6 +786,7 @@ kernel_build(
         "qcom/sm8650-hdk.dtb",
         "qcom/sm8650-qrd.dtb",
     ],
+    makefile = ":Makefile",
     module_outs = _DB845C_MODULE_OUTS + _DB845C_WATCHDOG_MODULE_OUTS,
     strip_modules = True,
 )
@@ -807,6 +818,7 @@ kernel_build(
         "qcom/sm8650-hdk.dtb",
         "qcom/sm8650-qrd.dtb",
     ],
+    makefile = ":Makefile",
     module_outs = _DB845C_MODULE_OUTS,
     strip_modules = True,
 )
@@ -931,6 +943,7 @@ kernel_build(
         "modules",
         "rk3399-rock-pi-4b.dtb",
     ],
+    makefile = ":Makefile",
     module_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64") + _ROCKPI4_MODULE_OUTS + _ROCKPI4_WATCHDOG_MODULE_OUTS,
     visibility = ["//visibility:private"],
 )
@@ -955,6 +968,7 @@ kernel_build(
         "modules",
         "rk3399-rock-pi-4b.dtb",
     ],
+    makefile = ":Makefile",
     module_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64") + _ROCKPI4_MODULE_OUTS,
     visibility = ["//visibility:private"],
 )
@@ -1008,6 +1022,7 @@ kernel_build(
         "Image",
         "modules",
     ],
+    makefile = ":Makefile",
     visibility = ["//visibility:private"],
 )
 
@@ -1024,6 +1039,7 @@ kernel_build(
         "bzImage",
         "modules",
     ],
+    makefile = ":Makefile",
     visibility = ["//visibility:private"],
 )
 
@@ -1041,6 +1057,7 @@ kernel_build(
         "zImage",
         "modules",
     ],
+    makefile = ":Makefile",
     visibility = ["//visibility:private"],
 )
 
@@ -2697,3 +2714,7 @@ pkg_zip(
     out = "test_mappings.zip",
     visibility = ["//visibility:public"],
 )
+
+exports_files([
+    "Makefile",
+])
