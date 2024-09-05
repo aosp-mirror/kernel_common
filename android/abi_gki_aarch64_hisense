@@ -1,0 +1,4 @@
+[abi_symbol_list]
+  task_cputime_adjusted
+  profile_event_register
+
