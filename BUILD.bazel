@@ -2653,18 +2653,30 @@ pkg_zip(
     visibility = ["//visibility:public"],
 )
 
-copy_to_dist_dir(
-    name = "tests_zip_x86_64_dist",
-    data = [":tests_zip_x86_64"],
-    dist_dir = "out/tests_x86_64/dist",
-    flat = True,
+pkg_files(
+    name = "tests_zip_x86_64_files",
+    srcs = [":tests_zip_x86_64"],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
 )
 
-copy_to_dist_dir(
+pkg_install(
+    name = "tests_zip_x86_64_dist",
+    srcs = [":tests_zip_x86_64_files"],
+    destdir = "out/tests_x86_64/dist",
+)
+
+pkg_files(
+    name = "tests_zip_arm64_files",
+    srcs = [":tests_zip_arm64"],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
     name = "tests_zip_arm64_dist",
-    data = [":tests_zip_arm64"],
-    dist_dir = "out/tests_arm64/dist",
-    flat = True,
+    srcs = [":tests_zip_arm64_files"],
+    destdir = "out/tests_arm64/dist",
 )
 
 _TEST_MAPPINGS = glob(["**/TEST_MAPPING"])
