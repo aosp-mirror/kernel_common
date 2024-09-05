@@ -230,11 +230,28 @@ properties:
           - const: google,steelix-sku196608
           - const: google,steelix
           - const: mediatek,mt8186
+      - description: Google Rusty (Lenovo 100e Chromebook Gen 4)
+        items:
+          - const: google,steelix-rev0-sku196609
+          - const: google,steelix-rev1-sku196609
+          - const: google,steelix-rev0-sku196608
+          - const: google,steelix-rev1-sku196608
+          - const: google,steelix
+          - const: mediatek,mt8186
       - description: Google Steelix (Lenovo 300e Yoga Chromebook Gen 4)
         items:
           - enum:
               - google,steelix-sku131072
               - google,steelix-sku131073
+          - const: google,steelix
+          - const: mediatek,mt8186
+      - description: Google Steelix (Lenovo 300e Yoga Chromebook Gen 4)
+        items:
+          - enum:
+              - google,steelix-rev0-sku131072
+              - google,steelix-rev1-sku131072
+              - google,steelix-rev0-sku131073
+              - google,steelix-rev1-sku131073
           - const: google,steelix
           - const: mediatek,mt8186
       - description: Google Tentacruel (ASUS Chromebook CM14 Flip CM1402F)
