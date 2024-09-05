@@ -1272,6 +1272,7 @@
   mdiobus_write
   mdio_device_create
   mdio_device_free
+  mdio_device_reset
   memblock_end_of_DRAM
   memblock_free
   __memcat_p
@@ -1870,6 +1871,7 @@
   regulator_get_voltage_rdev
   regulator_is_enabled
   regulator_is_supported_voltage
+  regulator_list_voltage_table
   regulator_put
   regulator_register_notifier
   regulator_set_current_limit
