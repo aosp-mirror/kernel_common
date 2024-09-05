@@ -5,11 +5,7 @@ load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_pkg//pkg:install.bzl", "pkg_install")
-load(
-    "@rules_pkg//pkg:mappings.bzl",
-    "pkg_filegroup",
-    "pkg_files",
-)
+load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_zip")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load(
@@ -356,12 +352,18 @@ kernel_kythe(
     visibility = ["//visibility:public"],
 )
 
-copy_to_dist_dir(
-    name = "kernel_aarch64_kythe_dist",
-    data = [
+pkg_files(
+    name = "kernel_aarch64_kythe_files",
+    srcs = [
         ":kernel_aarch64_kythe",
     ],
-    flat = True,
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kernel_aarch64_kythe_dist",
+    srcs = [":kernel_aarch64_kythe_files"],
     visibility = ["//visibility:public"],
 )
 
@@ -372,12 +374,18 @@ kernel_kythe(
     visibility = ["//visibility:public"],
 )
 
-copy_to_dist_dir(
-    name = "kernel_x86_64_kythe_dist",
-    data = [
-        ":kernel_x86_64_kythe",
+pkg_files(
+    name = "kernel_x86_64_kythe_files",
+    srcs = [
+        ":kernel_aarch64_kythe",
     ],
-    flat = True,
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kernel_x86_64_kythe_dist",
+    srcs = [":kernel_x86_64_kythe_files"],
     visibility = ["//visibility:public"],
 )
 
@@ -390,10 +398,18 @@ merge_kzip(
     visibility = ["//visibility:public"],
 )
 
-copy_to_dist_dir(
+pkg_files(
+    name = "kernel_kythe_files",
+    srcs = [
+        ":kernel_kythe",
+    ],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
     name = "kernel_kythe_dist",
-    data = [":kernel_kythe"],
-    flat = True,
+    srcs = [":kernel_kythe_files"],
     visibility = ["//visibility:public"],
 )
 
