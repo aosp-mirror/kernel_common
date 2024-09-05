@@ -96,6 +96,7 @@ filegroup(
         "android/abi_gki_aarch64_db845c",
         "android/abi_gki_aarch64_exynos",
         "android/abi_gki_aarch64_fips140",
+        "android/abi_gki_aarch64_hisense",
         "android/abi_gki_aarch64_lenovo",
         "android/abi_gki_aarch64_mtkott",
         "android/abi_gki_aarch64_mtktv",
