@@ -5,11 +5,7 @@ load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_pkg//pkg:install.bzl", "pkg_install")
-load(
-    "@rules_pkg//pkg:mappings.bzl",
-    "pkg_filegroup",
-    "pkg_files",
-)
+load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_zip")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load(
@@ -24,7 +20,9 @@ load(
     "ddk_headers",
     "ddk_headers_archive",
     "kernel_build",
+    "kernel_compile_commands",
     "kernel_images",
+    "kernel_kythe",
     "kernel_modules_install",
     "merge_kzip",
     "merged_kernel_uapi_headers",
@@ -163,6 +161,7 @@ common_kernel(
     gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     visibility = ["//visibility:public"],
 
@@ -194,6 +193,7 @@ common_kernel(
     gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     page_size = "16k",
     visibility = ["//visibility:public"],
@@ -218,6 +218,7 @@ Consider building @@//common:kernel_aarch64 with:
     gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     visibility = ["//visibility:public"],
 )
@@ -236,6 +237,7 @@ common_kernel(
     ],
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
     make_goals = _GKI_AARCH64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     visibility = ["//visibility:public"],
 )
@@ -258,6 +260,7 @@ Consider building @@//common:kernel_x86_64 with:
     gki_boot_img_sizes = _GKI_X86_64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_x86_64",
     make_goals = _GKI_X86_64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
     visibility = ["//visibility:public"],
 )
@@ -276,6 +279,7 @@ common_kernel(
     gki_boot_img_sizes = {"": "67108864"},
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_x86_64",
     make_goals = _GKI_X86_64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
     visibility = ["//visibility:public"],
 )
@@ -292,9 +296,65 @@ alias(
     visibility = ["//visibility:public"],
 )
 
+kernel_compile_commands(
+    name = "kernel_aarch64_compile_commands",
+    visibility = ["//visibility:public"],
+    deps = [":kernel_aarch64"],
+)
+
+kernel_compile_commands(
+    name = "kernel_x86_64_compile_commands",
+    visibility = ["//visibility:public"],
+    deps = [":kernel_x86_64"],
+)
+
 string_flag(
     name = "kernel_kythe_corpus",
     build_setting_default = "",
+    visibility = ["//visibility:public"],
+)
+
+kernel_kythe(
+    name = "kernel_aarch64_kythe",
+    corpus = ":kernel_kythe_corpus",
+    kernel_build = ":kernel_aarch64",
+    visibility = ["//visibility:public"],
+)
+
+pkg_files(
+    name = "kernel_aarch64_kythe_files",
+    srcs = [
+        ":kernel_aarch64_kythe",
+    ],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kernel_aarch64_kythe_dist",
+    srcs = [":kernel_aarch64_kythe_files"],
+    visibility = ["//visibility:public"],
+)
+
+kernel_kythe(
+    name = "kernel_x86_64_kythe",
+    corpus = ":kernel_kythe_corpus",
+    kernel_build = ":kernel_x86_64",
+    visibility = ["//visibility:public"],
+)
+
+pkg_files(
+    name = "kernel_x86_64_kythe_files",
+    srcs = [
+        ":kernel_aarch64_kythe",
+    ],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kernel_x86_64_kythe_dist",
+    srcs = [":kernel_x86_64_kythe_files"],
     visibility = ["//visibility:public"],
 )
 
@@ -307,10 +367,18 @@ merge_kzip(
     visibility = ["//visibility:public"],
 )
 
-copy_to_dist_dir(
+pkg_files(
+    name = "kernel_kythe_files",
+    srcs = [
+        ":kernel_kythe",
+    ],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
     name = "kernel_kythe_dist",
-    data = [":kernel_kythe"],
-    flat = True,
+    srcs = [":kernel_kythe_files"],
     visibility = ["//visibility:public"],
 )
 
@@ -333,6 +401,7 @@ kernel_build(
     make_goals = [
         "Image",
     ],
+    makefile = ":Makefile",
 )
 
 copy_to_dist_dir(
@@ -356,6 +425,7 @@ kernel_build(
     make_goals = [
         "bzImage",
     ],
+    makefile = ":Makefile",
 )
 
 copy_to_dist_dir(
@@ -378,6 +448,7 @@ kernel_build(
     make_goals = [
         "Image",
     ],
+    makefile = ":Makefile",
 )
 
 copy_to_dist_dir(
@@ -399,6 +470,7 @@ kernel_build(
     make_goals = [
         "bzImage",
     ],
+    makefile = ":Makefile",
 )
 
 copy_to_dist_dir(
@@ -677,6 +749,7 @@ kernel_build(
         "qcom/sm8650-hdk.dtb",
         "qcom/sm8650-qrd.dtb",
     ],
+    makefile = ":Makefile",
     module_outs = _DB845C_MODULE_OUTS + _DB845C_WATCHDOG_MODULE_OUTS,
     strip_modules = True,
 )
@@ -708,6 +781,7 @@ kernel_build(
         "qcom/sm8650-hdk.dtb",
         "qcom/sm8650-qrd.dtb",
     ],
+    makefile = ":Makefile",
     module_outs = _DB845C_MODULE_OUTS,
     strip_modules = True,
 )
@@ -832,6 +906,7 @@ kernel_build(
         "modules",
         "rk3399-rock-pi-4b.dtb",
     ],
+    makefile = ":Makefile",
     module_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64") + _ROCKPI4_MODULE_OUTS + _ROCKPI4_WATCHDOG_MODULE_OUTS,
     visibility = ["//visibility:private"],
 )
@@ -856,6 +931,7 @@ kernel_build(
         "modules",
         "rk3399-rock-pi-4b.dtb",
     ],
+    makefile = ":Makefile",
     module_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64") + _ROCKPI4_MODULE_OUTS,
     visibility = ["//visibility:private"],
 )
@@ -909,6 +985,7 @@ kernel_build(
         "Image",
         "modules",
     ],
+    makefile = ":Makefile",
     visibility = ["//visibility:private"],
 )
 
@@ -925,6 +1002,7 @@ kernel_build(
         "bzImage",
         "modules",
     ],
+    makefile = ":Makefile",
     visibility = ["//visibility:private"],
 )
 
@@ -942,6 +1020,7 @@ kernel_build(
         "zImage",
         "modules",
     ],
+    makefile = ":Makefile",
     visibility = ["//visibility:private"],
 )
 
@@ -2520,18 +2599,30 @@ pkg_zip(
     visibility = ["//visibility:public"],
 )
 
-copy_to_dist_dir(
-    name = "tests_zip_x86_64_dist",
-    data = [":tests_zip_x86_64"],
-    dist_dir = "out/tests_x86_64/dist",
-    flat = True,
+pkg_files(
+    name = "tests_zip_x86_64_files",
+    srcs = [":tests_zip_x86_64"],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
 )
 
-copy_to_dist_dir(
+pkg_install(
+    name = "tests_zip_x86_64_dist",
+    srcs = [":tests_zip_x86_64_files"],
+    destdir = "out/tests_x86_64/dist",
+)
+
+pkg_files(
+    name = "tests_zip_arm64_files",
+    srcs = [":tests_zip_arm64"],
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
     name = "tests_zip_arm64_dist",
-    data = [":tests_zip_arm64"],
-    dist_dir = "out/tests_arm64/dist",
-    flat = True,
+    srcs = [":tests_zip_arm64_files"],
+    destdir = "out/tests_arm64/dist",
 )
 
 _TEST_MAPPINGS = glob(["**/TEST_MAPPING"])
@@ -2552,3 +2643,7 @@ pkg_zip(
     out = "test_mappings.zip",
     visibility = ["//visibility:public"],
 )
+
+exports_files([
+    "Makefile",
+])

@@ -233,7 +233,7 @@ def append_slash(path: str) -> str:
 
 
 def update_multimap_from_json(
-    json_file: str, base_dir: str, result_multimap: {}
+    json_file: str, base_dir: str, result_multimap: collections.defaultdict
 ) -> None:
   """Reads 'to' and 'from' fields from a JSON file and updates a multimap.
 
@@ -264,7 +264,6 @@ def update_multimap_from_json(
   Returns:
     The updated dictionary.
   """
-
   with open(json_file, "r") as file:
     data = json.load(file)
 
@@ -274,41 +273,36 @@ def update_multimap_from_json(
     if to_value and from_value:
       to_value = make_absolute(to_value, base_dir)
       from_value = make_absolute(from_value, base_dir)
-      if from_value not in result_multimap:
-        result_multimap[from_value] = []
       result_multimap[from_value].append(to_value)
 
 
-def read_gcno_mapping_files(search_dir: str, base_dir: str) -> {}:
-  pattern = os.path.join(search_dir, "**", "dist", "gcno_mapping.*")
-  result_multimap = {}
+def read_gcno_mapping_files(
+    search_dir_pattern: str,
+    base_dir: str,
+    result_multimap: collections.defaultdict
+) -> None:
+  """Search a directory for gcno_mapping."""
+  found = False
+  pattern = os.path.join(search_dir_pattern, "gcno_mapping.*.json")
   for filepath in glob.iglob(pattern, recursive=False):
+    found = True
     logging.info("Reading %s", filepath)
     update_multimap_from_json(filepath, base_dir, result_multimap)
-  return result_multimap
+
+  if not found:
+    logging.error("No gcno_mapping in %s", search_dir_pattern)
 
 
-def read_gcno_dir(gcno_dir: str,
-                  result_multimap: collections.defaultdict) -> None:
+def read_gcno_dir(
+    gcno_dir: str, result_multimap: collections.defaultdict
+) -> None:
   """Read a directory containing gcno_mapping and gcno files."""
-  pattern = os.path.join(gcno_dir, "gcno_mapping.*.json")
-  multimap = {}
-  for filepath in glob.iglob(pattern):
-    logging.info("Reading %s", filepath)
-    update_multimap_from_json(filepath, gcno_dir, multimap)
-  if not multimap:
-    logging.error("No gcno_mapping in %s", gcno_dir)
+  multimap = collections.defaultdict(list)
+  read_gcno_mapping_files(gcno_dir, gcno_dir, multimap)
 
   to_value = append_slash(os.path.abspath(gcno_dir))
   for from_value in multimap:
     result_multimap[from_value].append(to_value)
-
-
-def read_gcno_dirs(gcno_dirs: list) -> collections.defaultdict:
-  result_multimap = collections.defaultdict(list)
-  for gcno_dir in gcno_dirs:
-    read_gcno_dir(gcno_dir, result_multimap)
-  return result_multimap
 
 
 def get_testname_from_filename(file_path: str) -> str:
@@ -464,6 +458,14 @@ def main() -> None:
       help="Root directory of kernel source"
   )
   arg_parser.add_argument(
+      "--dist-dir",
+      dest="dist_dirs",
+      action="append",
+      default=[],
+      required=False,
+      help="Dist directory containing gcno mapping files"
+  )
+  arg_parser.add_argument(
       "--gcno-dir",
       dest="gcno_dirs",
       action="append",
@@ -517,25 +519,27 @@ def main() -> None:
     logging.error("%s is not a file.", args.llvm_cov)
     sys.exit(-1)
 
-  for gcno_dir in args.gcno_dirs:
+  for gcno_dir in args.gcno_dirs + args.dist_dirs:
     if not os.path.isdir(gcno_dir):
       logging.error("%s is not a directory.", gcno_dir)
       sys.exit(-1)
 
   config = Config(args.repo_dir, args.llvm_cov, args.tmp_dir)
 
-  if args.gcno_dirs:
-    gcno_mappings = read_gcno_dirs(args.gcno_dirs)
-    if not gcno_mappings:
-      logging.error("No gcno mapping files in %s", " ".join(args.gcno_dirs))
-      sys.exit(-1)
-  else:
-    gcno_mappings = read_gcno_mapping_files(
-        config.repo_out_dir, config.repo_dir
-    )
-    if not gcno_mappings:
-      logging.error("No gcno mapping files in %s", config.repo_out_dir)
-      sys.exit(-1)
+  gcno_mappings = collections.defaultdict(list)
+  if not args.gcno_dirs and not args.dist_dirs:
+    dist_dir_pattern = os.path.join(config.repo_out_dir, "**", "dist")
+    read_gcno_mapping_files(dist_dir_pattern, config.repo_dir, gcno_mappings)
+
+  for dist_dir in args.dist_dirs:
+    read_gcno_mapping_files(dist_dir, config.repo_dir, gcno_mappings)
+
+  for gcno_dir in args.gcno_dirs:
+    read_gcno_dir(gcno_dir, gcno_mappings)
+
+  if not gcno_mappings:
+    # read_gcno_mapping_files prints the error messages
+    sys.exit(-1)
 
   tar_file = find_most_recent_tarfile(
       args.tar_location, pattern="*kernel_coverage_*.tar.gz"
