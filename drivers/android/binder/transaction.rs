@@ -475,7 +475,8 @@ impl DeliverToRead for Transaction {
     }
 
     fn cancel(self: DArc<Self>) {
-        drop(self.allocation.lock().take());
+        let allocation = self.allocation.lock().take();
+        drop(allocation);
 
         // If this is not a reply or oneway transaction, then send a dead reply.
         if self.target_node.is_some() && self.flags & TF_ONE_WAY == 0 {
