@@ -18,15 +18,16 @@
 
 	/delete-node/touchscreen@10;
 	touchscreen1: touchscreen@5D {
-		compatible = "goodix,gt7375p";
+		compatible = "hid-over-i2c";
 		reg = <0x5D>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&open_touch>;
 
 		interrupt-parent = <&pio>;
-		interrupts = <155 IRQ_TYPE_LEVEL_LOW>;
+		interrupts = <155 IRQ_TYPE_EDGE_FALLING>;
 
-		reset-gpios = <&pio 156 GPIO_ACTIVE_LOW>;
+		post-power-on-delay-ms = <10>;
+		hid-descr-addr = <0x0001>;
 	};
 };
 
