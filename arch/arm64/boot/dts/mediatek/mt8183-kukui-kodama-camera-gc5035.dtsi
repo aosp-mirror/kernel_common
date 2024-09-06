@@ -6,7 +6,7 @@
  */
 
  &i2c2 {
-	sensor_main: sensor_main@37 {
+	sensor_main: sensor_main {
 		compatible = "galaxycore,gc5035";
 		reg = <0x37>;
 

@@ -6,7 +6,7 @@
  */
 
 &i2c2 {
-	sensor_main: sensor_main@36 {
+	sensor_main: sensor_main {
 		compatible = "ovti,ov5695";
 		reg = <0x36>;
 
