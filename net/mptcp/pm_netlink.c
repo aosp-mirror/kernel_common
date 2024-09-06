@@ -371,15 +371,12 @@ void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 	struct sock *sk = (struct sock *)msk;
 	struct mptcp_addr_info remote;
 	struct mptcp_addr_info local;
+	int err;
 
 	pr_debug("accepted %d:%d remote family %d",
 		 msk->pm.add_addr_accepted, msk->pm.add_addr_accept_max,
 		 msk->pm.remote.family);
-	msk->pm.add_addr_accepted++;
 	msk->pm.subflows++;
-	if (msk->pm.add_addr_accepted >= msk->pm.add_addr_accept_max ||
-	    msk->pm.subflows >= msk->pm.subflows_max)
-		WRITE_ONCE(msk->pm.accept_addr, false);
 
 	/* connect to the specified remote address, using whatever
 	 * local address the routing configuration will pick.
@@ -391,8 +388,15 @@ void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 	local.family = remote.family;
 
 	spin_unlock_bh(&msk->pm.lock);
-	__mptcp_subflow_connect((struct sock *)msk, &local, &remote);
+	err = __mptcp_subflow_connect((struct sock *)msk, &local, &remote);
 	spin_lock_bh(&msk->pm.lock);
+
+	if (!err) {
+		msk->pm.add_addr_accepted++;
+		if (msk->pm.add_addr_accepted >= msk->pm.add_addr_accept_max ||
+		    msk->pm.subflows >= msk->pm.subflows_max)
+			WRITE_ONCE(msk->pm.accept_addr, false);
+	}
 
 	mptcp_pm_announce_addr(msk, &remote, true);
 }
@@ -427,10 +431,10 @@ void mptcp_pm_nl_rm_addr_received(struct mptcp_sock *msk)
 		msk->pm.subflows--;
 		WRITE_ONCE(msk->pm.accept_addr, true);
 
-		__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RMADDR);
-
 		break;
 	}
+
+	__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RMADDR);
 }
 
 void mptcp_pm_nl_rm_subflow_received(struct mptcp_sock *msk, u8 rm_id)
