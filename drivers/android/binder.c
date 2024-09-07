@@ -5963,9 +5963,9 @@ static int binder_open(struct inode *nodp, struct file *filp)
 		     current->group_leader->pid, current->pid);
 
 	eproc = kzalloc(sizeof(*eproc), GFP_KERNEL);
-	proc = &eproc->proc;
-	if (proc == NULL)
+	if (eproc == NULL)
 		return -ENOMEM;
+	proc = &eproc->proc;
 	spin_lock_init(&proc->inner_lock);
 	spin_lock_init(&proc->outer_lock);
 	get_task_struct(current->group_leader);
