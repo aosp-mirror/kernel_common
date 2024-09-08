@@ -350,6 +350,18 @@ impl<'a> AllocationView<'a> {
         self.alloc.write(offset, obj)
     }
 
+    pub(crate) fn copy_into(
+        &self,
+        reader: &mut UserSliceReader,
+        offset: usize,
+        size: usize,
+    ) -> Result {
+        if offset.checked_add(size).ok_or(EINVAL)? > self.limit {
+            return Err(EINVAL);
+        }
+        self.alloc.copy_into(reader, offset, size)
+    }
+
     pub(crate) fn transfer_binder_object(
         &self,
         offset: usize,

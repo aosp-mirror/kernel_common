@@ -1144,7 +1144,7 @@ impl Thread {
 
                 // Copy data between two objects.
                 if end_of_previous_object < offset {
-                    view.alloc.copy_into(
+                    view.copy_into(
                         &mut buffer_reader,
                         end_of_previous_object,
                         offset - end_of_previous_object,
