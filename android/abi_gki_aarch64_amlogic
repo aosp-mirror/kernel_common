@@ -2033,6 +2033,7 @@
   sock_release
   sock_wfree
   sort
+  spi_add_device
   __spi_alloc_controller
   spi_alloc_device
   spi_busnum_to_master
@@ -2047,6 +2048,7 @@
   __spi_register_driver
   spi_setup
   spi_sync
+  spi_unregister_device
   split_page
   sprintf
   sprint_symbol
@@ -2189,6 +2191,7 @@
   __traceiter_android_vh_kvmalloc_node_use_vmalloc
   __traceiter_android_vh_look_around_migrate_page
   __traceiter_android_vh_mem_cgroup_alloc
+  __traceiter_android_vh_oom_check_panic
   __traceiter_android_vh_printk_caller
   __traceiter_android_vh_printk_caller_id
   __traceiter_android_vh_rmqueue
@@ -2244,6 +2247,7 @@
   __tracepoint_android_vh_kvmalloc_node_use_vmalloc
   __tracepoint_android_vh_look_around_migrate_page
   __tracepoint_android_vh_mem_cgroup_alloc
+  __tracepoint_android_vh_oom_check_panic
   __tracepoint_android_vh_printk_caller
   __tracepoint_android_vh_printk_caller_id
   __tracepoint_android_vh_rmqueue
