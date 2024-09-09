@@ -1779,11 +1779,11 @@
 };
 
 &ssusb0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &ssusb1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &u3phy0 {
@@ -1800,12 +1800,26 @@
 
 &usb_host0 {
 	vbus-supply = <&pp3300_s3>;
-	status = "okay";
+	status = "disabled";
 };
 
 &usb_host1 {
 	vbus-supply = <&usb_p1_vbus>;
+	status = "disabled";
+};
+
+&xhci0 {
 	status = "okay";
+
+	vbus-supply = <&pp3300_s3>;
+};
+
+&xhci1 {
+	status = "okay";
+
+	#address-cells = <2>;
+	#size-cells = <2>;
+	vbus-supply = <&usb_p1_vbus>;
 };
 
 &watchdog {
