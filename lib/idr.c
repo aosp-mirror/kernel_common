@@ -471,7 +471,7 @@ static void ida_remove(struct ida *ida, int id)
 	} else {
 		btmp = bitmap->bitmap;
 	}
-	if (!test_bit(offset, btmp))
+	if (!bitmap || !test_bit(offset, btmp))
 		goto err;
 
 	__clear_bit(offset, btmp);
