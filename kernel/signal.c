@@ -63,6 +63,8 @@
  * SLAB caches for signal bits.
  */
 
+EXPORT_TRACEPOINT_SYMBOL_GPL(signal_generate);
+
 static struct kmem_cache *sigqueue_cachep;
 
 int print_fatal_signals __read_mostly;
