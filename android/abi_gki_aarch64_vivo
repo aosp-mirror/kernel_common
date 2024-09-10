@@ -1725,6 +1725,8 @@
   __traceiter_android_vh_binder_trans
   __traceiter_android_vh_binder_wakeup_ilocked
   __traceiter_android_vh_blk_alloc_rqs
+  __traceiter_android_vh_clear_rwsem_reader_owned
+  __traceiter_android_vh_clear_rwsem_writer_owned
   __traceiter_android_vh_blk_rq_ctx_init
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
@@ -1752,6 +1754,7 @@
   __traceiter_android_vh_mm_dirty_limits
   __traceiter_android_vh_printk_hotplug
   __traceiter_android_vh_queue_request_and_unlock
+  __traceiter_android_vh_record_rwsem_reader_owned
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_sdhci_get_cd
   __traceiter_android_vh_sd_update_bus_speed_mode
@@ -1846,6 +1849,8 @@
   __tracepoint_android_vh_binder_wakeup_ilocked
   __tracepoint_android_vh_blk_alloc_rqs
   __tracepoint_android_vh_blk_rq_ctx_init
+  __tracepoint_android_vh_clear_rwsem_reader_owned
+  __tracepoint_android_vh_clear_rwsem_writer_owned
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
   __tracepoint_android_vh_do_anonymous_page
@@ -1872,6 +1877,7 @@
   __tracepoint_android_vh_mm_dirty_limits
   __tracepoint_android_vh_printk_hotplug
   __tracepoint_android_vh_queue_request_and_unlock
+  __tracepoint_android_vh_record_rwsem_reader_owned
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_sdhci_get_cd
   __tracepoint_android_vh_sd_update_bus_speed_mode
