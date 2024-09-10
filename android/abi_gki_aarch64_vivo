@@ -123,6 +123,7 @@
   __traceiter_android_vh_free_unref_page_bypass
   __traceiter_android_vh_kvmalloc_node_use_vmalloc
   __traceiter_android_vh_should_alloc_pages_retry
+  __traceiter_android_vh_throttle_direct_reclaim_bypass
   __traceiter_android_vh_unreserve_highatomic_bypass
   __traceiter_android_vh_rmqueue_bulk_bypass
   __traceiter_android_vh_tune_mmap_readaround
@@ -229,6 +230,7 @@
   __tracepoint_android_vh_free_unref_page_bypass
   __tracepoint_android_vh_kvmalloc_node_use_vmalloc
   __tracepoint_android_vh_should_alloc_pages_retry
+  __tracepoint_android_vh_throttle_direct_reclaim_bypass
   __tracepoint_android_vh_unreserve_highatomic_bypass
   __tracepoint_android_vh_rmqueue_bulk_bypass
   __tracepoint_android_vh_tune_mmap_readaround
