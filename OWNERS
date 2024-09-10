@@ -9,9 +9,10 @@ gregkh@google.com
 joneslee@google.com
 maennich@google.com
 saravanak@google.com
-smuckle@google.com
 surenb@google.com
 tkjos@google.com
+vmartensson@google.com
+willdeacon@google.com
 
 # Test mapping changes can be made by anyone
 per-file */TEST_MAPPING = *
