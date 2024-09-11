@@ -61,7 +61,7 @@ case $ARCH in
         ;;
     arm64)
         ZIMAGE=Image
-        CONFIG=corsola_cros
+        CONFIG=android-arm64
         ;;
     mips)
         ZIMAGE=
