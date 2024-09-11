@@ -58,6 +58,9 @@ DECLARE_HOOK(android_vh_should_continue_reclaim,
 DECLARE_HOOK(android_vh_file_is_tiny_bypass,
 	TP_PROTO(bool file_is_tiny, bool *bypass),
 	TP_ARGS(file_is_tiny, bypass));
+DECLARE_HOOK(android_vh_mglru_should_abort_scan_order,
+	TP_PROTO(unsigned int order, bool *bypass),
+	TP_ARGS(order, bypass));
 DECLARE_HOOK(android_vh_shrink_node_memcgs,
 	TP_PROTO(struct mem_cgroup *memcg, bool *skip),
 	TP_ARGS(memcg, skip));
