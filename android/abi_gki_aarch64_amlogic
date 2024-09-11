@@ -353,6 +353,7 @@
   devm_add_action
   devm_alloc_etherdev_mqs
   devm_blk_crypto_profile_init
+  devm_clk_bulk_get
   devm_clk_bulk_get_all
   devm_clk_get
   devm_clk_get_optional
@@ -431,6 +432,7 @@
   dev_pm_domain_attach_by_id
   dev_pm_domain_attach_by_name
   dev_pm_domain_detach
+  dev_pm_genpd_set_performance_state
   dev_pm_opp_find_freq_ceil
   dev_pm_opp_free_cpufreq_table
   dev_pm_opp_get_opp_count
@@ -811,6 +813,7 @@
   fs_param_is_string
   fs_param_is_u32
   __fs_parse
+  fs_umode_to_dtype
   fsync_bdev
   fwnode_device_is_available
   fwnode_get_name
@@ -1156,6 +1159,7 @@
   kset_unregister
   kstrdup
   kstrdup_const
+  kstrndup
   kstrtobool
   kstrtobool_from_user
   kstrtoint
@@ -1417,6 +1421,7 @@
   of_get_phy_mode
   of_get_property
   of_get_regulator_init_data
+  of_get_required_opp_performance_state
   of_graph_get_remote_node
   of_graph_get_remote_port_parent
   of_graph_is_present
@@ -1758,6 +1763,7 @@
   register_restart_handler
   register_shrinker
   register_syscore_ops
+  register_sysctl
   register_sysctl_table
   register_wide_hw_breakpoint
   regmap_bulk_write
@@ -2027,6 +2033,7 @@
   sock_release
   sock_wfree
   sort
+  spi_add_device
   __spi_alloc_controller
   spi_alloc_device
   spi_busnum_to_master
@@ -2041,6 +2048,7 @@
   __spi_register_driver
   spi_setup
   spi_sync
+  spi_unregister_device
   split_page
   sprintf
   sprint_symbol
@@ -2183,6 +2191,7 @@
   __traceiter_android_vh_kvmalloc_node_use_vmalloc
   __traceiter_android_vh_look_around_migrate_page
   __traceiter_android_vh_mem_cgroup_alloc
+  __traceiter_android_vh_oom_check_panic
   __traceiter_android_vh_printk_caller
   __traceiter_android_vh_printk_caller_id
   __traceiter_android_vh_rmqueue
@@ -2238,6 +2247,7 @@
   __tracepoint_android_vh_kvmalloc_node_use_vmalloc
   __tracepoint_android_vh_look_around_migrate_page
   __tracepoint_android_vh_mem_cgroup_alloc
+  __tracepoint_android_vh_oom_check_panic
   __tracepoint_android_vh_printk_caller
   __tracepoint_android_vh_printk_caller_id
   __tracepoint_android_vh_rmqueue
@@ -2274,6 +2284,8 @@
   try_module_get
   try_wait_for_completion
   tty_flip_buffer_push
+  tty_get_char_size
+  tty_put_char
   tty_termios_hw_change
   uart_add_one_port
   uart_console_device
@@ -2335,7 +2347,9 @@
   usb_anchor_urb
   usb_autopm_get_interface
   usb_autopm_put_interface
+  usb_clear_halt
   usb_control_msg
+  usb_control_msg_recv
   __usb_create_hcd
   usb_create_hcd
   usb_debug_root
@@ -2402,8 +2416,11 @@
   usb_serial_generic_close
   usb_serial_generic_get_icount
   usb_serial_generic_open
+  usb_serial_generic_resume
   usb_serial_generic_throttle
+  usb_serial_generic_tiocmiwait
   usb_serial_generic_unthrottle
+  usb_serial_handle_dcd_change
   usb_serial_register_drivers
   usb_set_interface
   usb_submit_urb
@@ -2537,6 +2554,8 @@
   wireless_send_event
   work_busy
   write_inode_now
+  ww_mutex_lock
+  ww_mutex_unlock
   __xa_cmpxchg
   __xa_erase
   xa_find

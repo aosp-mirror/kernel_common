@@ -328,6 +328,7 @@ static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
 	spinlock_t *ptl;
 	struct page *page = NULL;
 	LIST_HEAD(page_list);
+	bool skip = false;
 
 	if (fatal_signal_pending(current))
 		return -EINTR;
@@ -421,6 +422,10 @@ regular_page:
 		page = vm_normal_page(vma, addr, ptent);
 		if (!page)
 			continue;
+
+		trace_android_vh_should_end_madvise(mm, &skip, &pageout);
+		if (skip)
+			break;
 
 		/*
 		 * Creating a THP page is expensive so split it only if we

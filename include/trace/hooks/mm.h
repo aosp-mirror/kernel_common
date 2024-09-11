@@ -180,6 +180,9 @@ DECLARE_HOOK(android_vh_do_swap_page_spf,
 DECLARE_HOOK(android_vh_look_around_migrate_page,
 	TP_PROTO(struct page *old_page, struct page *new_page),
 	TP_ARGS(old_page, new_page));
+DECLARE_HOOK(android_vh_should_end_madvise,
+	TP_PROTO(struct mm_struct *mm, bool *skip, bool *pageout),
+	TP_ARGS(mm, skip, pageout));
 #endif /* _TRACE_HOOK_MM_H */
 
 /* This part must be outside protection */
