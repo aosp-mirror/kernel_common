@@ -1797,6 +1797,7 @@
   __traceiter_rwmmio_read
   __traceiter_rwmmio_write
   __traceiter_suspend_resume
+  __traceiter_sys_exit
   __traceiter_usb_gadget_connect
   __traceiter_usb_gadget_disconnect
   __tracepoint_android_rvh_account_irq
@@ -1926,6 +1927,7 @@
   __tracepoint_rwmmio_read
   __tracepoint_rwmmio_write
   __tracepoint_suspend_resume
+  __tracepoint_sys_exit
   __tracepoint_usb_gadget_connect
   __tracepoint_usb_gadget_disconnect
   trace_print_array_seq
