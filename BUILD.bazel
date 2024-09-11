@@ -275,6 +275,7 @@ common_kernel(
     gki_boot_img_sizes = _GKI_RISCV64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_riscv64",
     make_goals = _GKI_RISCV64_MAKE_GOALS,
+    makefile = ":Makefile",
     module_implicit_outs = get_gki_modules_list("riscv64"),
     visibility = ["//visibility:public"],
 )
