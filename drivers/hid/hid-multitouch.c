@@ -2317,9 +2317,14 @@ static const struct hid_device_id mt_devices[] = {
 	{ .driver_data = MT_CLS_WIN_8_FORCE_MULTI_INPUT,
 		HID_DEVICE(BUS_I2C, HID_GROUP_MULTITOUCH_WIN_8,
 			USB_VENDOR_ID_ELAN, 0x3148) },
+
 	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
 		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
 			USB_VENDOR_ID_ELAN, 0x30cd) },
+
+	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
+		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
+			USB_VENDOR_ID_ELAN, 0x30c1) },
 
 	/* Zinitix devices */
 	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
