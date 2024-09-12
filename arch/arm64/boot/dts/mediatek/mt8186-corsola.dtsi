@@ -470,14 +470,9 @@
 				reg = <0>;
 				mode-switch;
 
-				ports {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					port@0 {
-						reg = <0>;
-						ite_typec0: endpoint {
-							remote-endpoint = <&typec_port0>;
-						};
+				port {
+					ite_typec0: endpoint {
+						remote-endpoint = <&typec_port0>;
 					};
 				};
 			};
@@ -487,14 +482,9 @@
 				reg = <1>;
 				mode-switch;
 
-				ports {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					port@0 {
-						reg = <0>;
-						ite_typec1: endpoint {
-							remote-endpoint = <&typec_port1>;
-						};
+				port {
+					ite_typec1: endpoint {
+						remote-endpoint = <&typec_port1>;
 					};
 				};
 			};
