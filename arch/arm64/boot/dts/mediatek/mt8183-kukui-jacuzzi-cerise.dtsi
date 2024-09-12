@@ -15,7 +15,3 @@
 		drive-strength = <MTK_DRIVE_6mA>;
 	};
 };
-
-&i2c2 {
-    i2c-scl-internal-delay-ns = <13200>;
-};
