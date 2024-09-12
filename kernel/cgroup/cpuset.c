@@ -22,7 +22,9 @@
  *  distribution for more details.
  */
 
+#ifndef __GENKSYMS__
 #include "cgroup-internal.h"
+#endif
 #include <linux/cpu.h>
 #include <linux/cpumask.h>
 #include <linux/cpuset.h>
