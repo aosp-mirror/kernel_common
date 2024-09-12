@@ -98,7 +98,7 @@ write_file(
     name = "gki_system_dlkm_modules_x86_64",
     out = "android/gki_system_dlkm_modules_x86_64",
     # Do not built kunit modules into system_dlkm
-    content = get_gki_modules_list("arm64") + [
+    content = get_gki_modules_list("x86_64") + [
         # Ensure new line at the end.
         "",
     ],
