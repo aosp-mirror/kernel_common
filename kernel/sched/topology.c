@@ -432,11 +432,12 @@ static bool build_perf_domains(const struct cpumask *cpu_map)
 	struct perf_domain *pd = NULL, *tmp;
 	int cpu = cpumask_first(cpu_map);
 	struct root_domain *rd = cpu_rq(cpu)->rd;
+	bool eas_check = false;
 
 	if (!sysctl_sched_energy_aware)
 		goto free;
-
-	if (!sched_is_eas_possible(cpu_map))
+	trace_android_rvh_build_perf_domains(&eas_check);
+	if (!sched_is_eas_possible(cpu_map) && !eas_check)
 		goto free;
 
 	for_each_cpu(i, cpu_map) {
