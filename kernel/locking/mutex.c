@@ -47,6 +47,7 @@ __mutex_init(struct mutex *lock, const char *name, struct lock_class_key *key)
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
 	osq_lock_init(&lock->osq);
 #endif
+	android_init_oem_data(lock, 1);
 
 	debug_mutex_init(lock, name, key);
 }

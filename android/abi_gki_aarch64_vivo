@@ -1687,6 +1687,7 @@
   __traceiter_android_rvh_flush_task
   __traceiter_android_rvh_migrate_queued_task
   __traceiter_android_rvh_new_task_stats
+  __traceiter_android_rvh_percpu_rwsem_wait_complete
   __traceiter_android_rvh_refrigerator
   __traceiter_android_rvh_replace_next_task_fair
   __traceiter_android_rvh_resume_cpus
@@ -1725,9 +1726,14 @@
   __traceiter_android_vh_binder_trans
   __traceiter_android_vh_binder_wakeup_ilocked
   __traceiter_android_vh_blk_alloc_rqs
+  __traceiter_android_vh_clear_rwsem_reader_owned
+  __traceiter_android_vh_clear_rwsem_writer_owned
   __traceiter_android_vh_blk_rq_ctx_init
   __traceiter_android_vh_cpu_idle_enter
   __traceiter_android_vh_cpu_idle_exit
+  __traceiter_android_vh_do_anonymous_page
+  __traceiter_android_vh_do_swap_page
+  __traceiter_android_vh_do_wp_page
   __traceiter_android_vh_dup_task_struct
   __traceiter_android_vh_filemap_fault_cache_page
   __traceiter_android_vh_filemap_fault_get_page
@@ -1736,6 +1742,7 @@
   __traceiter_android_vh_ftrace_oops_enter
   __traceiter_android_vh_ftrace_oops_exit
   __traceiter_android_vh_ftrace_size_check
+  __traceiter_android_vh_fuse_request_end
   __traceiter_android_vh_iommu_setup_dma_ops
   __traceiter_android_vh_ipi_stop
   __traceiter_android_vh_irqtime_account_process_tick
@@ -1746,10 +1753,15 @@
   __traceiter_android_vh_mmc_blk_reset
   __traceiter_android_vh_mmc_gpio_cd_irqt
   __traceiter_android_vh_mm_dirty_limits
+  __traceiter_android_vh_percpu_rwsem_down_read
+  __traceiter_android_vh_percpu_rwsem_up_write
   __traceiter_android_vh_printk_hotplug
+  __traceiter_android_vh_queue_request_and_unlock
+  __traceiter_android_vh_record_rwsem_reader_owned
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_sdhci_get_cd
   __traceiter_android_vh_sd_update_bus_speed_mode
+  __traceiter_android_vh_shmem_swapin_page
   __traceiter_android_vh_show_max_freq
   __traceiter_android_vh_show_resume_epoch_val
   __traceiter_android_vh_show_suspend_epoch_val
@@ -1762,6 +1774,7 @@
   __traceiter_android_vh_ufs_compl_command
   __traceiter_android_vh_ufs_send_command
   __traceiter_android_vh_ufs_update_sdev
+  __traceiter_android_vh_uprobes_replace_page
   __traceiter_android_vh_vmpressure
   __traceiter_binder_transaction_received
   __traceiter_block_bio_complete
@@ -1784,6 +1797,7 @@
   __traceiter_rwmmio_read
   __traceiter_rwmmio_write
   __traceiter_suspend_resume
+  __traceiter_sys_exit
   __traceiter_usb_gadget_connect
   __traceiter_usb_gadget_disconnect
   __tracepoint_android_rvh_account_irq
@@ -1800,6 +1814,7 @@
   __tracepoint_android_rvh_flush_task
   __tracepoint_android_rvh_migrate_queued_task
   __tracepoint_android_rvh_new_task_stats
+  __tracepoint_android_rvh_percpu_rwsem_wait_complete
   __tracepoint_android_rvh_refrigerator
   __tracepoint_android_rvh_replace_next_task_fair
   __tracepoint_android_rvh_resume_cpus
@@ -1839,8 +1854,13 @@
   __tracepoint_android_vh_binder_wakeup_ilocked
   __tracepoint_android_vh_blk_alloc_rqs
   __tracepoint_android_vh_blk_rq_ctx_init
+  __tracepoint_android_vh_clear_rwsem_reader_owned
+  __tracepoint_android_vh_clear_rwsem_writer_owned
   __tracepoint_android_vh_cpu_idle_enter
   __tracepoint_android_vh_cpu_idle_exit
+  __tracepoint_android_vh_do_anonymous_page
+  __tracepoint_android_vh_do_swap_page
+  __tracepoint_android_vh_do_wp_page
   __tracepoint_android_vh_dup_task_struct
   __tracepoint_android_vh_filemap_fault_cache_page
   __tracepoint_android_vh_filemap_fault_get_page
@@ -1849,6 +1869,7 @@
   __tracepoint_android_vh_ftrace_oops_enter
   __tracepoint_android_vh_ftrace_oops_exit
   __tracepoint_android_vh_ftrace_size_check
+  __tracepoint_android_vh_fuse_request_end
   __tracepoint_android_vh_iommu_setup_dma_ops
   __tracepoint_android_vh_ipi_stop
   __tracepoint_android_vh_irqtime_account_process_tick
@@ -1859,10 +1880,15 @@
   __tracepoint_android_vh_mmc_blk_reset
   __tracepoint_android_vh_mmc_gpio_cd_irqt
   __tracepoint_android_vh_mm_dirty_limits
+  __tracepoint_android_vh_percpu_rwsem_down_read
+  __tracepoint_android_vh_percpu_rwsem_up_write
   __tracepoint_android_vh_printk_hotplug
+  __tracepoint_android_vh_queue_request_and_unlock
+  __tracepoint_android_vh_record_rwsem_reader_owned
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_sdhci_get_cd
   __tracepoint_android_vh_sd_update_bus_speed_mode
+  __tracepoint_android_vh_shmem_swapin_page
   __tracepoint_android_vh_show_max_freq
   __tracepoint_android_vh_show_resume_epoch_val
   __tracepoint_android_vh_show_suspend_epoch_val
@@ -1875,6 +1901,7 @@
   __tracepoint_android_vh_ufs_compl_command
   __tracepoint_android_vh_ufs_send_command
   __tracepoint_android_vh_ufs_update_sdev
+  __tracepoint_android_vh_uprobes_replace_page
   __tracepoint_android_vh_vmpressure
   __tracepoint_binder_transaction_received
   __tracepoint_block_bio_complete
@@ -1900,6 +1927,7 @@
   __tracepoint_rwmmio_read
   __tracepoint_rwmmio_write
   __tracepoint_suspend_resume
+  __tracepoint_sys_exit
   __tracepoint_usb_gadget_connect
   __tracepoint_usb_gadget_disconnect
   trace_print_array_seq
