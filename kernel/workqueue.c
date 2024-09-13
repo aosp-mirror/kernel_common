@@ -2713,7 +2713,6 @@ static void detach_worker(struct worker *worker)
 
 	unbind_worker(worker);
 	list_del(&worker->node);
-	worker->pool = NULL;
 }
 
 /**
@@ -2733,6 +2732,7 @@ static void worker_detach_from_pool(struct worker *worker)
 
 	mutex_lock(&wq_pool_attach_mutex);
 	detach_worker(worker);
+	worker->pool = NULL;
 	mutex_unlock(&wq_pool_attach_mutex);
 
 	/* clear leftover flags without pool->lock after it is detached */
@@ -3353,7 +3353,11 @@ woke_up:
 	if (unlikely(worker->flags & WORKER_DIE)) {
 		raw_spin_unlock_irq(&pool->lock);
 		set_pf_worker(false);
-
+		/*
+		 * The worker is dead and PF_WQ_WORKER is cleared, worker->pool
+		 * shouldn't be accessed, reset it to NULL in case otherwise.
+		 */
+		worker->pool = NULL;
 		ida_free(&pool->worker_ida, worker->id);
 		return 0;
 	}
