@@ -37,6 +37,9 @@
 #include <linux/falloc.h>
 #include <linux/slab.h>
 #include <linux/kthread.h>
+#include <linux/namei.h>
+#include <linux/freezer.h>
+
 #include <linux/sunrpc/addr.h>
 #include <linux/nfs_ssc.h>
 
@@ -1205,7 +1208,7 @@ try_again:
 
 			/* allow 20secs for mount/unmount for now - revisit */
 			if (kthread_should_stop() ||
-					(schedule_timeout(20*HZ) == 0)) {
+					(freezable_schedule_timeout(20*HZ) == 0)) {
 				finish_wait(&nn->nfsd_ssc_waitq, &wait);
 				kfree(work);
 				return nfserr_eagain;
