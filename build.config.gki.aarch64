@@ -2,11 +2,6 @@
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.aarch64
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.gki
 
-FILES="${FILES}
-arch/arm64/boot/Image.lz4
-arch/arm64/boot/Image.gz
-"
-
 BUILD_SYSTEM_DLKM=1
 
 BUILD_GKI_CERTIFICATION_TOOLS=1

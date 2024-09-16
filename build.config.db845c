@@ -8,14 +8,3 @@ PRE_DEFCONFIG_CMDS="KCONFIG_CONFIG=${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/
 POST_DEFCONFIG_CMDS="rm ${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/${DEFCONFIG}"
 
 DTC_FLAGS="${DTC_FLAGS} -@"
-
-FILES="
-arch/arm64/boot/dts/qcom/sdm845-db845c.dtb
-arch/arm64/boot/dts/qcom/qrb5165-rb5.dtb
-arch/arm64/boot/dts/qcom/sm8450-hdk.dtb
-arch/arm64/boot/dts/qcom/sm8450-qrd.dtb
-arch/arm64/boot/dts/qcom/sm8550-hdk.dtb
-arch/arm64/boot/dts/qcom/sm8550-qrd.dtb
-arch/arm64/boot/dts/qcom/sm8650-hdk.dtb
-arch/arm64/boot/dts/qcom/sm8650-qrd.dtb
-"
