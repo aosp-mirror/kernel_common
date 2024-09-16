@@ -17,14 +17,6 @@ Image.gz
 dtbs
 "
 
-FILES="${FILES}
-arch/arm64/boot/Image.lz4
-arch/arm64/boot/dts/amlogic/meson-g12a-sei510*.dtb
-arch/arm64/boot/dts/amlogic/meson-sm1-sei610*.dtb
-arch/arm64/boot/dts/amlogic/meson-sm1-khadas-vim3l*.dtb
-arch/arm64/boot/dts/amlogic/meson-g12b-a311d-khadas-vim3*.dtb
-"
-
 #
 # NOTE: Using Image.lz4 in MAKE_GOALS does not work because
 #   kernel build passes legacy option (-l) to lz4 command
