@@ -40,6 +40,7 @@ MODULE_PARM_DESC(async_fw_init, "Enable asynchronous firmware initialization");
 
 #define IPU_PSYS_NUM_DEVICES		4
 
+#define IPU_PSYS_INVALID_DESC_ID	(-1)
 #define IPU_PSYS_MAX_NUM_DESCS		1024
 #define IPU_PSYS_MAX_NUM_BUFS		1024
 #define IPU_PSYS_MAX_NUM_BUFS_LRU	12
@@ -126,7 +127,7 @@ static struct ipu_psys_kbuffer *ipu_psys_kbuffer_alloc(void)
 	if (!kbuf)
 		return NULL;
 
-	atomic_set(&kbuf->map_count, 0);
+	atomic_set(&kbuf->desc_count, 0);
 	INIT_LIST_HEAD(&kbuf->list);
 	return kbuf;
 }
@@ -569,7 +570,11 @@ static inline void ipu_psys_kbuf_unmap(struct ipu_psys_kbuffer *kbuf)
 	if (!kbuf)
 		return;
 
-	kbuf->valid = false;
+	/* map ref-count */
+	if (kbuf->valid) {
+		dma_buf_put(kbuf->dbuf);
+		kbuf->valid = false;
+	}
 	if (kbuf->kaddr) {
 		struct iosys_map dmap;
 
@@ -582,6 +587,8 @@ static inline void ipu_psys_kbuf_unmap(struct ipu_psys_kbuffer *kbuf)
 						  DMA_BIDIRECTIONAL);
 	if (!IS_ERR_OR_NULL(kbuf->db_attach))
 		dma_buf_detach(kbuf->dbuf, kbuf->db_attach);
+
+	/* ownership ref-count */
 	dma_buf_put(kbuf->dbuf);
 
 	kbuf->db_attach = NULL;
@@ -623,7 +630,7 @@ static int ipu_psys_unmapbuf_locked(int fd, struct ipu_psys_fh *fh)
 	}
 
 	/* Wait for final UNMAP */
-	if (!atomic_dec_and_test(&kbuf->map_count))
+	if (!atomic_dec_and_test(&kbuf->desc_count))
 		return 0;
 
 	__ipu_psys_unmapbuf(fh, kbuf);
@@ -714,6 +721,13 @@ static int ipu_psys_getbuf(struct ipu_psys_buffer *buf, struct ipu_psys_fh *fh)
 	if (!kbuf)
 		return -ENOMEM;
 
+	/* Set invalid desc fd here and update to a real one once we have it */
+	desc = ipu_psys_desc_alloc(IPU_PSYS_INVALID_DESC_ID);
+	if (!desc) {
+		kfree(kbuf);
+		return -EINVAL;
+	}
+
 	kbuf->len = buf->len;
 	kbuf->userptr = buf->base.userptr;
 	kbuf->flags = buf->flags;
@@ -726,26 +740,29 @@ static int ipu_psys_getbuf(struct ipu_psys_buffer *buf, struct ipu_psys_fh *fh)
 	dbuf = dma_buf_export(&exp_info);
 	if (IS_ERR(dbuf)) {
 		kfree(kbuf);
+		kfree(desc);
 		return PTR_ERR(dbuf);
 	}
 
+	/* Extra ref-count for driver ownership */
+	get_dma_buf(dbuf);
+
 	ret = dma_buf_fd(dbuf, 0);
 	if (ret < 0) {
+		/* Extra ref-count */
 		dma_buf_put(dbuf);
+		/* Final put */
+		dma_buf_put(dbuf);
+		kfree(kbuf);
+		kfree(desc);
 		return ret;
 	}
 
+	desc->fd = ret;
 	buf->base.fd = ret;
 	buf->flags &= ~IPU_BUFFER_FLAG_USERPTR;
 	buf->flags |= IPU_BUFFER_FLAG_DMA_HANDLE;
 	kbuf->flags = buf->flags;
-
-	desc = ipu_psys_desc_alloc(ret);
-	if (!desc) {
-		dma_buf_put(dbuf);
-		return -ENOMEM;
-	}
-
 	kbuf->dbuf = dbuf;
 
 	mutex_lock(&fh->mutex);
@@ -805,6 +822,10 @@ struct ipu_psys_kbuffer *ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 		kbuf = ipu_psys_kbuffer_alloc();
 		if (!kbuf)
 			goto buf_alloc_fail;
+		/* Grab extra ref-count for driver ownership */
+		get_dma_buf(dbuf);
+		kbuf->valid = true;
+		kbuf->dbuf = dbuf;
 		ipu_buffer_add(fh, kbuf);
 	}
 
@@ -815,23 +836,20 @@ struct ipu_psys_kbuffer *ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 			 * Un-reference old buffer and possibly put it on
 			 * the LRU list
 			 */
-			if (atomic_dec_and_test(&desc->kbuf->map_count))
+			if (atomic_dec_and_test(&desc->kbuf->desc_count))
 				ipu_psys_kbuffer_lru(fh, desc->kbuf);
 		}
 
 		/* Grab reference of the new buffer */
-		atomic_inc(&kbuf->map_count);
+		atomic_inc(&kbuf->desc_count);
+		desc->kbuf = kbuf;
 	}
-
-	desc->kbuf = kbuf;
 
 	if (kbuf->sgt) {
 		dev_dbg(&psys->adev->dev, "fd %d has been mapped!\n", fd);
 		dma_buf_put(dbuf);
 		goto mapbuf_end;
 	}
-
-	kbuf->dbuf = dbuf;
 
 	if (kbuf->len == 0)
 		kbuf->len = kbuf->dbuf->size;
@@ -862,7 +880,6 @@ struct ipu_psys_kbuffer *ipu_psys_mapbuf_locked(int fd, struct ipu_psys_fh *fh)
 		__func__, kbuf, fd, kbuf->len);
 
 mapbuf_end:
-	kbuf->valid = true;
 	return kbuf;
 
 kbuf_map_fail:
