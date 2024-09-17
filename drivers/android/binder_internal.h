@@ -158,6 +158,10 @@ struct binder_work {
 		BINDER_WORK_DEAD_BINDER,
 		BINDER_WORK_DEAD_BINDER_AND_CLEAR,
 		BINDER_WORK_CLEAR_DEATH_NOTIFICATION,
+#ifndef __GENKSYMS__
+		BINDER_WORK_FROZEN_BINDER,
+		BINDER_WORK_CLEAR_FREEZE_NOTIFICATION,
+#endif
 	} type;
 };
 
@@ -279,6 +283,14 @@ struct binder_ref_death {
 	binder_uintptr_t cookie;
 };
 
+struct binder_ref_freeze {
+	struct binder_work work;
+	binder_uintptr_t cookie;
+	bool is_frozen:1;
+	bool sent:1;
+	bool resend:1;
+};
+
 /**
  * struct binder_ref_data - binder_ref counts and id
  * @debug_id:        unique ID for the ref
@@ -311,6 +323,8 @@ struct binder_ref_data {
  *               @node indicates the node must be freed
  * @death:       pointer to death notification (ref_death) if requested
  *               (protected by @node->lock)
+ * @freeze:      pointer to freeze notification (ref_freeze) if requested
+ *               (protected by @node->lock)
  *
  * Structure to track references from procA to target node (on procB). This
  * structure is unsafe to access without holding @proc->outer_lock.
@@ -327,6 +341,7 @@ struct binder_ref {
 	struct binder_proc *proc;
 	struct binder_node *node;
 	struct binder_ref_death *death;
+	struct binder_ref_freeze *freeze;
 };
 
 /**
@@ -460,6 +475,23 @@ struct binder_proc {
 	struct dentry *binderfs_entry;
 	bool oneway_spam_detection_enabled;
 };
+
+/**
+ * struct binder_proc_wrap - wrapper to preserve KMI in binder_proc
+ * @proc:                    binder_proc being wrapped
+ * @delivered_freeze:        list of delivered freeze notification
+ *                           (protected by @inner_lock)
+ */
+struct binder_proc_wrap {
+	struct binder_proc proc;
+	struct list_head delivered_freeze;
+};
+
+static inline
+struct binder_proc_wrap *proc_wrapper(struct binder_proc *proc)
+{
+	return container_of(proc, struct binder_proc_wrap, proc);
+}
 
 /**
  * struct binder_thread - binder thread bookkeeping
