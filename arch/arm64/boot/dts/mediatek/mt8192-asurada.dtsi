@@ -446,16 +446,9 @@
 				reg = <0>;
 				mode-switch;
 
-				ports {
-					#address-cells = <1>;
-					#size-cells = <0>;
-
-					port@0 {
-						reg = <0>;
-
-						anx_typec0: endpoint {
-							remote-endpoint = <&typec_port0>;
-						};
+				port {
+					anx_typec0: endpoint {
+						remote-endpoint = <&typec_port0>;
 					};
 				};
 			};
@@ -465,16 +458,9 @@
 				reg = <1>;
 				mode-switch;
 
-				ports {
-					#address-cells = <1>;
-					#size-cells = <0>;
-
-					port@0 {
-						reg = <0>;
-
-						anx_typec1: endpoint {
-							remote-endpoint = <&typec_port1>;
-						};
+				port {
+					anx_typec1: endpoint {
+						remote-endpoint = <&typec_port1>;
 					};
 				};
 			};
