@@ -831,9 +831,9 @@ kernel_images(
     kernel_modules_install = ":db845c_modules_install",
 )
 
-copy_to_dist_dir(
-    name = "db845c_dist",
-    data = [
+pkg_files(
+    name = "db845c_dist_files",
+    srcs = [
         ":db845c",
         ":db845c_images",
         ":db845c_modules_install",
@@ -843,9 +843,14 @@ copy_to_dist_dir(
         ":kernel_aarch64_modules",
         ":kernel_aarch64_additional_artifacts",
     ],
-    dist_dir = "out/db845/dist",
-    flat = True,
-    log = "info",
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "db845c_dist",
+    srcs = [":db845c_dist_files"],
+    destdir = "out/db845/dist",
 )
 
 _ROCKPI4_MODULE_OUTS = [
