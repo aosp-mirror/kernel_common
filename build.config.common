@@ -3,8 +3,6 @@
 BRANCH=android-mainline
 LLVM=1
 DEPMOD=depmod
-CLANG_PREBUILT_BIN=prebuilts/clang/host/linux-x86/clang-${CLANG_VERSION}/bin
-BUILDTOOLS_PREBUILT_BIN=build/kernel/build-tools/path/linux-x86
 
 # TODO(b/296265825): Turn this into a proper error
 DTC=$(command -v dtc || { echo "WARNING: $BUILD_CONFIG loaded without Kleaf hermetic tools.
