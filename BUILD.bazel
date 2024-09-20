@@ -1019,15 +1019,21 @@ kernel_images(
     kernel_modules_install = ":rockpi4_modules_install",
 )
 
-copy_to_dist_dir(
-    name = "rockpi4_dist",
-    data = [
+pkg_files(
+    name = "rockpi4_dist_files",
+    srcs = [
         ":rockpi4",
         ":rockpi4_images",
         ":rockpi4_modules_install",
     ],
-    dist_dir = "out/rockpi4/dist",
-    flat = True,
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "rockpi4_dist",
+    srcs = [":rockpi4_dist_files"],
+    destdir = "out/rockpi4/dist",
 )
 
 # allmodconfig build tests.
