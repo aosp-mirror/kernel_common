@@ -486,6 +486,7 @@ void do_el1_undef(struct pt_regs *regs, unsigned long esr)
 		return;
 
 out_err:
+	trace_android_rvh_do_undefinstr(regs);
 	die("Oops - Undefined instruction", regs, esr);
 }
 
@@ -511,6 +512,7 @@ void do_el1_fpac(struct pt_regs *regs, unsigned long esr)
 	 * Unexpected FPAC exception in the kernel: kill the task before it
 	 * does any more harm.
 	 */
+	trace_android_rvh_do_ptrauth_fault(regs, esr);
 	die("Oops - FPAC", regs, esr);
 }
 
