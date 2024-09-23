@@ -98,7 +98,7 @@ write_file(
     name = "gki_system_dlkm_modules_x86_64",
     out = "android/gki_system_dlkm_modules_x86_64",
     # Do not built kunit modules into system_dlkm
-    content = get_gki_modules_list("arm64") + [
+    content = get_gki_modules_list("x86_64") + [
         # Ensure new line at the end.
         "",
     ],
@@ -404,14 +404,19 @@ kernel_build(
     makefile = ":Makefile",
 )
 
-copy_to_dist_dir(
-    name = "kernel_aarch64_microdroid_dist",
-    data = [
+pkg_files(
+    name = "kernel_aarch64_microdroid_dist_files",
+    srcs = [
         ":kernel_aarch64_microdroid",
     ],
-    dist_dir = "out/kernel_aarch64_microdroid/dist",
-    flat = True,
-    log = "info",
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kernel_aarch64_microdroid_dist",
+    srcs = ["kernel_aarch64_microdroid_dist_files"],
+    destdir = "out/kernel_aarch64_microdroid/dist",
 )
 
 # Microdroid is not a real device. The kernel image is built with special
@@ -428,14 +433,19 @@ kernel_build(
     makefile = ":Makefile",
 )
 
-copy_to_dist_dir(
-    name = "kernel_x86_64_microdroid_dist",
-    data = [
+pkg_files(
+    name = "kernel_x86_64_microdroid_dist_files",
+    srcs = [
         ":kernel_x86_64_microdroid",
     ],
-    dist_dir = "out/kernel_x86_64_microdroid/dist",
-    flat = True,
-    log = "info",
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kernel_x86_64_microdroid_dist",
+    srcs = ["kernel_x86_64_microdroid_dist_files"],
+    destdir = "out/kernel_x86_64_microdroid/dist",
 )
 
 kernel_build(
@@ -451,14 +461,19 @@ kernel_build(
     makefile = ":Makefile",
 )
 
-copy_to_dist_dir(
-    name = "kernel_aarch64_crashdump_dist",
-    data = [
+pkg_files(
+    name = "kernel_aarch64_crashdump_dist_files",
+    srcs = [
         ":kernel_aarch64_crashdump",
     ],
-    dist_dir = "out/kernel_aarch64_crashdump/dist",
-    flat = True,
-    log = "info",
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kernel_aarch64_crashdump_dist",
+    srcs = ["kernel_aarch64_crashdump_dist_files"],
+    destdir = "out/kernel_aarch64_crashdump/dist",
 )
 
 kernel_build(
@@ -473,14 +488,19 @@ kernel_build(
     makefile = ":Makefile",
 )
 
-copy_to_dist_dir(
-    name = "kernel_x86_64_crashdump_dist",
-    data = [
+pkg_files(
+    name = "kernel_x86_64_crashdump_dist_files",
+    srcs = [
         ":kernel_x86_64_crashdump",
     ],
-    dist_dir = "out/kernel_x86_64_crashdump/dist",
-    flat = True,
-    log = "info",
+    strip_prefix = strip_prefix.files_only(),
+    visibility = ["//visibility:private"],
+)
+
+pkg_install(
+    name = "kernel_x86_64_crashdump_dist",
+    srcs = ["kernel_x86_64_crashdump_dist_files"],
+    destdir = "out/kernel_x86_64_crashdump/dist",
 )
 
 _DB845C_MODULE_OUTS = [
