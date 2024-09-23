@@ -2,7 +2,7 @@
 VERSION = 6
 PATCHLEVEL = 11
 SUBLEVEL = 0
-EXTRAVERSION = -rc6
+EXTRAVERSION = -rc7
 NAME = Baby Opossum Posse
 
 # *DOCUMENTATION*
@@ -463,6 +463,7 @@ KBUILD_USERLDFLAGS := $(USERLDFLAGS)
 # host programs.
 export rust_common_flags := --edition=2021 \
 			    -Zbinary_dep_depinfo=y \
+			    -Astable_features \
 			    -Dunsafe_op_in_unsafe_fn \
 			    -Dnon_ascii_idents \
 			    -Wrust_2018_idioms \
