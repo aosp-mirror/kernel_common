@@ -180,7 +180,7 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 	unsigned long trapnr, int signr, int sicode, void __user *addr)
 {
 	if (unlikely(kiwi_fault_logging)) {
-	    printk(KERN_ALERT "%s[%d]: do_error_trap for %s at %lx trapnr %lx signr %lx sicode %lx ip %px sp %px error %lx",
+	    printk(KERN_ALERT "%s[%d]: do_error_trap for %s at %px trapnr %lx signr %x sicode %x ip %px sp %px error %lx",
 			current->comm, task_pid_nr(current), str, addr, trapnr, signr,
 			sicode, (void *)regs->ip, (void *)regs->sp, error_code);
 	}
