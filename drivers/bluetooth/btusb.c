@@ -854,6 +854,9 @@ struct btusb_data {
 
 	int (*setup_on_usb)(struct hci_dev *hdev);
 
+	int (*suspend)(struct hci_dev *hdev);
+	int (*resume)(struct hci_dev *hdev);
+
 	int oob_wake_irq;   /* irq for out-of-band wake-on-bt */
 
 	struct qca_dump_info qca_dump;
@@ -4716,6 +4719,9 @@ static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
 
 	cancel_work_sync(&data->work);
 
+	if (data->suspend)
+		data->suspend(data->hdev);
+
 	btusb_stop_traffic(data);
 	usb_kill_anchored_urbs(&data->tx_anchor);
 
@@ -4825,6 +4831,9 @@ static int btusb_resume(struct usb_interface *intf)
 		else
 			btusb_submit_isoc_urb(hdev, GFP_NOIO);
 	}
+
+	if (data->resume)
+		data->resume(hdev);
 
 	spin_lock_irq(&data->txlock);
 	play_deferred(data);
