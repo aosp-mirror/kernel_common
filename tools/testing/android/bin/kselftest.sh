@@ -139,7 +139,7 @@ if $BUILD_KERNEL; then
     echo "Building kernel..."
     # TODO: add support to build kernel for physical device
     $BAZEL run $BUILD_FLAGS //common-modules/virtual-device:virtual_device_x86_64_dist -- \
-    --dist_dir=$DIST_DIR
+    --destdir=$DIST_DIR
     exit_code=$?
     if [ $exit_code -eq 0 ]; then
         echo "Build kernel succeeded"
