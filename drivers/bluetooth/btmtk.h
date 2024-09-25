@@ -199,7 +199,6 @@ int btmtk_register_coredump(struct hci_dev *hdev, const char *name,
 
 int btmtk_process_coredump(struct hci_dev *hdev, struct sk_buff *skb);
 
-#if IS_ENABLED(CONFIG_BT_HCIBTUSB_MTK)
 int btmtk_usb_uhw_reg_write(struct hci_dev *hdev, u32 reg, u32 val);
 
 int btmtk_usb_uhw_reg_read(struct hci_dev *hdev, u32 reg, u32 *val);
@@ -222,7 +221,6 @@ int btmtk_usb_suspend(struct hci_dev *hdev);
 int btmtk_usb_setup(struct hci_dev *hdev);
 
 int btmtk_usb_shutdown(struct hci_dev *hdev);
-#endif
 #else
 
 static inline int btmtk_set_bdaddr(struct hci_dev *hdev,
