@@ -229,85 +229,85 @@ static inline int btmtk_set_bdaddr(struct hci_dev *hdev,
 	return -EOPNOTSUPP;
 }
 
-static int btmtk_setup_firmware_79xx(struct hci_dev *hdev, const char *fwname,
+static inline int btmtk_setup_firmware_79xx(struct hci_dev *hdev, const char *fwname,
 				     wmt_cmd_sync_func_t wmt_cmd_sync)
 {
 	return -EOPNOTSUPP;
 }
 
-static int btmtk_setup_firmware(struct hci_dev *hdev, const char *fwname,
+static inline int btmtk_setup_firmware(struct hci_dev *hdev, const char *fwname,
 				wmt_cmd_sync_func_t wmt_cmd_sync)
 {
 	return -EOPNOTSUPP;
 }
 
-static void btmtk_reset_sync(struct hci_dev *hdev)
+static inline void btmtk_reset_sync(struct hci_dev *hdev)
 {
 }
 
-static int btmtk_register_coredump(struct hci_dev *hdev, const char *name,
+static inline int btmtk_register_coredump(struct hci_dev *hdev, const char *name,
 				   u32 fw_version)
 {
 	return -EOPNOTSUPP;
 }
 
-static int btmtk_process_coredump(struct hci_dev *hdev, struct sk_buff *skb)
+static inline int btmtk_process_coredump(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	return -EOPNOTSUPP;
 }
 
-static int btmtk_usb_uhw_reg_write(struct hci_dev *hdev, u32 reg, u32 val)
+static inline int btmtk_usb_uhw_reg_write(struct hci_dev *hdev, u32 reg, u32 val)
 {
         return -EOPNOTSUPP;
 }
 
-static int btmtk_usb_uhw_reg_read(struct hci_dev *hdev, u32 reg, u32 *val)
+static inline int btmtk_usb_uhw_reg_read(struct hci_dev *hdev, u32 reg, u32 *val)
 {
         return -EOPNOTSUPP;
 }
 
-static int btmtk_usb_reg_read(struct hci_dev *hdev, u32 reg, u32 *val)
+static inline int btmtk_usb_reg_read(struct hci_dev *hdev, u32 reg, u32 *val)
 {
         return -EOPNOTSUPP;
 }
 
-static int btmtk_usb_id_get(struct hci_dev *hdev, u32 reg, u32 *id)
+static inline int btmtk_usb_id_get(struct hci_dev *hdev, u32 reg, u32 *id)
 {
         return -EOPNOTSUPP;
 }
 
-static u32 btmtk_usb_reset_done(struct hci_dev *hdev)
+static inline u32 btmtk_usb_reset_done(struct hci_dev *hdev)
 {
         return -EOPNOTSUPP;
 }
 
-static int btmtk_usb_recv_acl(struct hci_dev *hdev, struct sk_buff *skb)
+static inline int btmtk_usb_recv_acl(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	return -EOPNOTSUPP;
 }
 
-static struct urb *alloc_mtk_intr_urb(struct hci_dev *hdev, struct sk_buff *skb,
+static inline struct urb *alloc_mtk_intr_urb(struct hci_dev *hdev, struct sk_buff *skb,
 				      usb_complete_t tx_complete)
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }
 
-static int btmtk_usb_resume(struct hci_dev *hdev)
+static inline int btmtk_usb_resume(struct hci_dev *hdev)
 {
 	return -EOPNOTSUPP;
 }
 
-static int btmtk_usb_suspend(struct hci_dev *hdev)
+static inline int btmtk_usb_suspend(struct hci_dev *hdev)
 {
 	return -EOPNOTSUPP;
 }
 
-static int btmtk_usb_setup(struct hci_dev *hdev)
+static inline int btmtk_usb_setup(struct hci_dev *hdev)
 {
 	return -EOPNOTSUPP;
 }
 
-static int btmtk_usb_shutdown(struct hci_dev *hdev)
+static inline int btmtk_usb_shutdown(struct hci_dev *hdev)
 {
 	return -EOPNOTSUPP;
 }
