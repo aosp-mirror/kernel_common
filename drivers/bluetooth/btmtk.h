@@ -196,6 +196,8 @@ int btmtk_usb_id_get(struct hci_dev *hdev, u32 reg, u32 *id);
 
 u32 btmtk_usb_reset_done(struct hci_dev *hdev);
 
+int btmtk_usb_recv_acl(struct hci_dev *hdev, struct sk_buff *skb);
+
 int btmtk_usb_setup(struct hci_dev *hdev);
 
 int btmtk_usb_shutdown(struct hci_dev *hdev);
@@ -257,6 +259,11 @@ static int btmtk_usb_id_get(struct hci_dev *hdev, u32 reg, u32 *id)
 static u32 btmtk_usb_reset_done(struct hci_dev *hdev)
 {
         return -EOPNOTSUPP;
+}
+
+static int btmtk_usb_recv_acl(struct hci_dev *hdev, struct sk_buff *skb)
+{
+	return -EOPNOTSUPP;
 }
 
 static int btmtk_usb_setup(struct hci_dev *hdev)
