@@ -250,6 +250,8 @@ static void *ignore_thread(void *arg)
 	return NULL;
 }
 
+// TODO: b/369330443 - broken due to missing pthread_cancel in sysroot
+#if 0
 static void check_sig_ign(int thread)
 {
 	struct tmrsig tsig = { };
@@ -335,6 +337,7 @@ static void check_sig_ign(int thread)
 				 "check_sig_ign SIGEV_THREAD_ID\n");
 	}
 }
+#endif
 
 static void check_rearm(void)
 {
@@ -599,7 +602,7 @@ static void check_overrun(int which, const char *name)
 int main(int argc, char **argv)
 {
 	ksft_print_header();
-	ksft_set_plan(18);
+	ksft_set_plan(14);
 
 	ksft_print_msg("Testing posix timers. False negative may happen on CPU execution \n");
 	ksft_print_msg("based timers if other threads run on the CPU...\n");
@@ -621,10 +624,13 @@ int main(int argc, char **argv)
 	check_timer_create(CLOCK_PROCESS_CPUTIME_ID, "CLOCK_PROCESS_CPUTIME_ID");
 	check_timer_distribution();
 
+// TODO: b/369330443 - broken due to missing pthread_cancel in sysroot
+#if 0
 	check_sig_ign(0);
 	check_sig_ign(1);
 	check_rearm();
 	check_delete();
+#endif
 	check_sigev_none(CLOCK_MONOTONIC, "CLOCK_MONOTONIC");
 	check_sigev_none(CLOCK_PROCESS_CPUTIME_ID, "CLOCK_PROCESS_CPUTIME_ID");
 	check_gettime(CLOCK_MONOTONIC, "CLOCK_MONOTONIC");
