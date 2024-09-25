@@ -12,6 +12,8 @@
 //! several binder contexts have several `Process` objects. This ensures that the contexts are
 //! fully separated.
 
+use core::{mem::take, pin::Pin};
+
 use kernel::{
     bindings,
     cred::Credential,
@@ -46,8 +48,6 @@ use crate::{
     thread::{PushWorkRes, Thread},
     DArc, DLArc, DTRWrap, DeliverToRead,
 };
-
-use core::{mem::take, pin::Pin};
 
 struct Mapping {
     address: usize,

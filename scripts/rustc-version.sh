@@ -3,7 +3,7 @@
 #
 # Usage: $ ./rustc-version.sh rustc
 #
-# Print the Rust compiler name and its version in a 6 or 7-digit form.
+# Print the Rust compiler version in a 6 or 7-digit form.
 
 # Convert the version string x.y.z to a canonical up-to-7-digits form.
 #

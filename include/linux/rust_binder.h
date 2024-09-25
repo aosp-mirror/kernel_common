@@ -98,19 +98,23 @@ static inline rust_binder_process rust_binder_thread_proc(rust_binder_thread t)
 	return p + RUST_BINDER_LAYOUT.p.arc_offset;
 }
 
-static inline s32 rust_binder_thread_id(rust_binder_thread t) {
+static inline s32 rust_binder_thread_id(rust_binder_thread t)
+{
 	return * (s32 *) (t + RUST_BINDER_LAYOUT.th.id);
 }
 
-static inline struct task_struct *rust_binder_process_task(rust_binder_process t) {
+static inline struct task_struct *rust_binder_process_task(rust_binder_process t)
+{
 	return * (struct task_struct **) (t + RUST_BINDER_LAYOUT.p.task);
 }
 
-static inline size_t rust_binder_node_debug_id(rust_binder_node t) {
+static inline size_t rust_binder_node_debug_id(rust_binder_node t)
+{
 	return * (size_t *) (t + RUST_BINDER_LAYOUT.n.debug_id);
 }
 
-static inline binder_uintptr_t rust_binder_node_ptr(rust_binder_node t) {
+static inline binder_uintptr_t rust_binder_node_ptr(rust_binder_node t)
+{
 	return * (binder_uintptr_t *) (t + RUST_BINDER_LAYOUT.n.ptr);
 }
 

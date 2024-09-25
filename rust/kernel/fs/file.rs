@@ -180,6 +180,31 @@ pub struct File {
     inner: Opaque<bindings::file>,
 }
 
+// SAFETY: This file is known to not have any active `fdget_pos` calls that did not take the
+// `f_pos_lock` mutex, so it is safe to transfer it between threads.
+unsafe impl Send for File {}
+
+// SAFETY: This file is known to not have any active `fdget_pos` calls that did not take the
+// `f_pos_lock` mutex, so it is safe to access its methods from several threads in parallel.
+unsafe impl Sync for File {}
+
+// SAFETY: The type invariants guarantee that `File` is always ref-counted. This implementation
+// makes `ARef<File>` own a normal refcount.
+unsafe impl AlwaysRefCounted for File {
+    #[inline]
+    fn inc_ref(&self) {
+        // SAFETY: The existence of a shared reference means that the refcount is nonzero.
+        unsafe { bindings::get_file(self.as_ptr()) };
+    }
+
+    #[inline]
+    unsafe fn dec_ref(obj: ptr::NonNull<File>) {
+        // SAFETY: To call this method, the caller passes us ownership of a normal refcount, so we
+        // may drop it. The cast is okay since `File` has the same representation as `struct file`.
+        unsafe { bindings::fput(obj.cast().as_ptr()) }
+    }
+}
+
 /// Wraps the kernel's `struct file`. Not thread safe.
 ///
 /// This type represents a file that is not known to be safe to transfer across thread boundaries.
@@ -191,20 +216,29 @@ pub struct File {
 ///
 /// * All instances of this type are refcounted using the `f_count` field.
 /// * If there is an active call to `fdget_pos` that did not take the `f_pos_lock` mutex, then it
-///   must be on the same thread as this `File`.
+///   must be on the same thread as this file.
 ///
 /// [`assume_no_fdget_pos`]: LocalFile::assume_no_fdget_pos
 pub struct LocalFile {
     inner: Opaque<bindings::file>,
 }
 
-// SAFETY: This file is known to not have any active `fdget_pos` calls that did not take the
-// `f_pos_lock` mutex, so it is safe to transfer it between threads.
-unsafe impl Send for File {}
+// SAFETY: The type invariants guarantee that `LocalFile` is always ref-counted. This implementation
+// makes `ARef<File>` own a normal refcount.
+unsafe impl AlwaysRefCounted for LocalFile {
+    #[inline]
+    fn inc_ref(&self) {
+        // SAFETY: The existence of a shared reference means that the refcount is nonzero.
+        unsafe { bindings::get_file(self.as_ptr()) };
+    }
 
-// SAFETY: This file is known to not have any active `fdget_pos` calls that did not take the
-// `f_pos_lock` mutex, so it is safe to access its methods from several threads in parallel.
-unsafe impl Sync for File {}
+    #[inline]
+    unsafe fn dec_ref(obj: ptr::NonNull<LocalFile>) {
+        // SAFETY: To call this method, the caller passes us ownership of a normal refcount, so we
+        // may drop it. The cast is okay since `File` has the same representation as `struct file`.
+        unsafe { bindings::fput(obj.cast().as_ptr()) }
+    }
+}
 
 impl LocalFile {
     /// Constructs a new `struct file` wrapper from a file descriptor.
@@ -331,40 +365,6 @@ impl core::ops::Deref for File {
         // By the type invariants, there are no `fdget_pos` calls that did not take the
         // `f_pos_lock` mutex.
         unsafe { LocalFile::from_raw_file(self as *const File as *const bindings::file) }
-    }
-}
-
-// SAFETY: The type invariants guarantee that `LocalFile` is always ref-counted. This implementation
-// makes `ARef<File>` own a normal refcount.
-unsafe impl AlwaysRefCounted for LocalFile {
-    #[inline]
-    fn inc_ref(&self) {
-        // SAFETY: The existence of a shared reference means that the refcount is nonzero.
-        unsafe { bindings::get_file(self.as_ptr()) };
-    }
-
-    #[inline]
-    unsafe fn dec_ref(obj: ptr::NonNull<LocalFile>) {
-        // SAFETY: To call this method, the caller passes us ownership of a normal refcount, so we
-        // may drop it. The cast is okay since `File` has the same representation as `struct file`.
-        unsafe { bindings::fput(obj.cast().as_ptr()) }
-    }
-}
-
-// SAFETY: The type invariants guarantee that `File` is always ref-counted. This implementation
-// makes `ARef<File>` own a normal refcount.
-unsafe impl AlwaysRefCounted for File {
-    #[inline]
-    fn inc_ref(&self) {
-        // SAFETY: The existence of a shared reference means that the refcount is nonzero.
-        unsafe { bindings::get_file(self.as_ptr()) };
-    }
-
-    #[inline]
-    unsafe fn dec_ref(obj: ptr::NonNull<File>) {
-        // SAFETY: To call this method, the caller passes us ownership of a normal refcount, so we
-        // may drop it. The cast is okay since `File` has the same representation as `struct file`.
-        unsafe { bindings::fput(obj.cast().as_ptr()) }
     }
 }
 

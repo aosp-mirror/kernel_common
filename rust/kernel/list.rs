@@ -172,7 +172,7 @@ impl<const ID: u64> ListLinks<ID> {
 
     /// # Safety
     ///
-    /// `me` must be dereferencable.
+    /// `me` must be dereferenceable.
     #[inline]
     unsafe fn fields(me: *mut Self) -> *mut ListLinksFields {
         // SAFETY: The caller promises that the pointer is valid.
@@ -181,7 +181,7 @@ impl<const ID: u64> ListLinks<ID> {
 
     /// # Safety
     ///
-    /// `me` must be dereferencable.
+    /// `me` must be dereferenceable.
     #[inline]
     unsafe fn from_fields(me: *mut ListLinksFields) -> *mut Self {
         me.cast()
@@ -369,7 +369,7 @@ impl<T: ?Sized + ListItem<ID>, const ID: u64> List<T, ID> {
         debug_assert_eq!(next.is_null(), prev.is_null());
         if !next.is_null() {
             // This is really a no-op, but this ensures that `item` is a raw pointer that was
-            // obtained without going through a pointer->reference->pointer conversion rountrip.
+            // obtained without going through a pointer->reference->pointer conversion roundtrip.
             // This ensures that the list is valid under the more restrictive strict provenance
             // ruleset.
             //
@@ -447,7 +447,7 @@ impl<T: ?Sized + ListItem<ID>, const ID: u64> List<T, ID> {
             self.first = unsafe { (*prev).next };
         }
 
-        // SAFETY: `item` used to be in the list, so it is dereferencable by the type invariants
+        // SAFETY: `item` used to be in the list, so it is dereferenceable by the type invariants
         // of `List`.
         let list_links = unsafe { ListLinks::from_fields(item) };
         // SAFETY: Any pointer in the list originates from a `prepare_to_insert` call.
