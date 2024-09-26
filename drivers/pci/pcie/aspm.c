@@ -7,7 +7,6 @@
  * Copyright (C) Shaohua Li (shaohua.li@intel.com)
  */
 
-#include <linux/dmi.h>
 #include <linux/kernel.h>
 #include <linux/math.h>
 #include <linux/module.h>
@@ -706,114 +705,6 @@ static void pcie_config_aspm_l1ss(struct pcie_link_state *link, u32 state)
 				       PCI_L1SS_CTL1_L1SS_MASK, val);
 	pci_clear_and_set_config_dword(child, child->l1ss + PCI_L1SS_CTL1,
 				       PCI_L1SS_CTL1_L1SS_MASK, val);
-}
-
-void pci_save_aspm_state(struct pci_dev *pdev)
-{
-	struct pci_cap_saved_state *save_state;
-	u16 l1ss = pdev->l1ss;
-	u32 *cap;
-
-	/*
-	 * Save L1 substate configuration. The ASPM L0s/L1 configuration
-	 * is already saved in pci_save_pcie_state().
-	 */
-	if (!l1ss)
-		return;
-
-	save_state = pci_find_saved_ext_cap(pdev, PCI_EXT_CAP_ID_L1SS);
-	if (!save_state)
-		return;
-
-	cap = (u32 *)&save_state->cap.data[0];
-	pci_read_config_dword(pdev, l1ss + PCI_L1SS_CTL2, cap++);
-	pci_read_config_dword(pdev, l1ss + PCI_L1SS_CTL1, cap++);
-}
-
-/*
- * Do not restore L1 substates for the below systems even if BIOS has
- * enabled it initially. This breaks resume from suspend otherwise on
- * these.
- */
-static const struct dmi_system_id aspm_l1ss_denylist[] = {
-	{
-		/* https://bugzilla.kernel.org/show_bug.cgi?id=216782 */
-		.ident = "ASUS UX305FA",
-		.matches = {
-			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC."),
-			DMI_MATCH(DMI_BOARD_NAME, "UX305FA"),
-		},
-	},
-	{ }
-};
-
-static void pcie_restore_aspm_l1ss(struct pci_dev *pdev)
-{
-	struct pci_cap_saved_state *save_state;
-	u32 *cap, ctl1, ctl2, l1_2_enable;
-	u16 l1ss = pdev->l1ss;
-
-	if (!l1ss)
-		return;
-
-	if (dmi_check_system(aspm_l1ss_denylist)) {
-		pci_dbg(pdev, "skipping restoring L1 substates on this system\n");
-		return;
-	}
-
-	save_state = pci_find_saved_ext_cap(pdev, PCI_EXT_CAP_ID_L1SS);
-	if (!save_state)
-		return;
-
-	cap = (u32 *)&save_state->cap.data[0];
-	ctl2 = *cap++;
-	ctl1 = *cap;
-
-	/*
-	 * In addition, Common_Mode_Restore_Time and LTR_L1.2_THRESHOLD
-	 * in PCI_L1SS_CTL1 must be programmed *before* setting the L1.2
-	 * enable bits, even though they're all in PCI_L1SS_CTL1.
-	 */
-	l1_2_enable = ctl1 & PCI_L1SS_CTL1_L1_2_MASK;
-	ctl1 &= ~PCI_L1SS_CTL1_L1_2_MASK;
-
-	/* Write back without enables first (above we cleared them in ctl1) */
-	pci_write_config_dword(pdev, l1ss + PCI_L1SS_CTL1, ctl1);
-	pci_write_config_dword(pdev, l1ss + PCI_L1SS_CTL2, ctl2);
-
-	/* Then write back the enables */
-	if (l1_2_enable)
-		pci_write_config_dword(pdev, l1ss + PCI_L1SS_CTL1,
-				       ctl1 | l1_2_enable);
-}
-
-void pci_restore_aspm_state(struct pci_dev *pdev)
-{
-	struct pci_cap_saved_state *save_state;
-	u16 *cap, val, tmp;
-
-	save_state = pci_find_saved_cap(pdev, PCI_CAP_ID_EXP);
-	if (!save_state)
-		return;
-
-	cap = (u16 *)&save_state->cap.data[0];
-	/*
-	 * Must match the ordering in pci_save/restore_pcie_state().
-	 * This is PCI_EXP_LNKCTL.
-	 */
-	val = cap[1] & PCI_EXP_LNKCTL_ASPMC;
-	if (!val)
-		return;
-
-	/*
-	 * We restore L1 substate configuration first before enabling L1
-	 * as the PCIe spec 6.0 sec 5.5.4 suggests.
-	 * */
-	pcie_restore_aspm_l1ss(pdev);
-
-	pcie_capability_read_word(pdev, PCI_EXP_LNKCTL, &tmp);
-	/* Re-enable L0s/L1 */
-	pcie_capability_write_word(pdev, PCI_EXP_LNKCTL, tmp | val);
 }
 
 static void pcie_config_aspm_dev(struct pci_dev *pdev, u32 val)
