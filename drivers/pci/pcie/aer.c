@@ -1342,22 +1342,6 @@ static int aer_probe(struct pcie_device *dev)
 	return 0;
 }
 
-static int aer_suspend(struct pcie_device *dev)
-{
-	struct aer_rpc *rpc = get_service_data(dev);
-
-	aer_disable_rootport(rpc);
-	return 0;
-}
-
-static int aer_resume(struct pcie_device *dev)
-{
-	struct aer_rpc *rpc = get_service_data(dev);
-
-	aer_enable_rootport(rpc);
-	return 0;
-}
-
 /**
  * aer_root_reset - reset Root Port hierarchy, RCEC, or RCiEP
  * @dev: pointer to Root Port, RCEC, or RCiEP
@@ -1424,15 +1408,12 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
 }
 
 static struct pcie_port_service_driver aerdriver = {
-	.name			= "aer",
-	.port_type		= PCIE_ANY_PORT,
-	.service		= PCIE_PORT_SERVICE_AER,
-	.probe			= aer_probe,
-	.suspend		= aer_suspend,
-	.resume			= aer_resume,
-	.runtime_suspend	= aer_suspend,
-	.runtime_resume		= aer_resume,
-	.remove			= aer_remove,
+	.name		= "aer",
+	.port_type	= PCIE_ANY_PORT,
+	.service	= PCIE_PORT_SERVICE_AER,
+
+	.probe		= aer_probe,
+	.remove		= aer_remove,
 };
 
 /**
