@@ -1,3 +1,8 @@
+# Note: This file is no longer used by the GKI to build. The file is kept
+# here because of external usages.
+# TODO(b/236012223): Deprecate and remove this file once build-config-less
+#   builds are fully supported.
+
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.common
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.aarch64
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.gki
