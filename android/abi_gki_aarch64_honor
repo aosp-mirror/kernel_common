@@ -17,3 +17,4 @@
  __traceiter_android_vh_modify_scan_control
  __traceiter_android_vh_should_continue_reclaim
  __traceiter_android_vh_tune_fault_around_bytes
+ __show_mem
