@@ -2138,7 +2138,6 @@ static int mt_resume(struct hid_device *hdev)
 
 	return 0;
 }
-#endif
 
 static int mt_reset(struct hid_device *hdev)
 {
@@ -2150,14 +2149,15 @@ static int mt_reset(struct hid_device *hdev)
 	if (td->mtclass.quirks & MT_QUIRK_SKIP_RESET)
 		return 0;
 
-	mt_release_contacts(hdev);
-	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
-
-	if (td->is_haptic_touchpad)
+	if (td->is_haptic_touchpad) {
+		mt_release_contacts(hdev);
+		mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
 		hid_haptic_reset(hdev, td->haptic);
+	}
 
 	return 0;
 }
+#endif
 
 static void mt_remove(struct hid_device *hdev)
 {
