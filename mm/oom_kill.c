@@ -52,6 +52,8 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/oom.h>
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/mm.h>
 
 static int sysctl_panic_on_oom;
 static int sysctl_oom_kill_allocating_task;
@@ -522,6 +524,7 @@ static bool __oom_reap_task_mm(struct mm_struct *mm)
 	 */
 	set_bit(MMF_UNSTABLE, &mm->flags);
 
+	trace_android_vh_oom_swapmem_gather_init(mm);
 	for_each_vma(vmi, vma) {
 		if (vma->vm_flags & (VM_HUGETLB|VM_PFNMAP))
 			continue;
@@ -554,6 +557,7 @@ static bool __oom_reap_task_mm(struct mm_struct *mm)
 			tlb_finish_mmu(&tlb);
 		}
 	}
+	trace_android_vh_oom_swapmem_gather_finish(mm);
 
 	return ret;
 }
@@ -745,6 +749,19 @@ static inline void queue_oom_reaper(struct task_struct *tsk)
 #endif /* CONFIG_MMU */
 
 /**
+ * tsk->mm has to be non NULL and caller has to guarantee it is stable (either
+ * under task_lock or operate on the current).
+ */
+static void __mark_oom_victim(struct task_struct *tsk)
+{
+	struct mm_struct *mm = tsk->mm;
+
+	if (!cmpxchg(&tsk->signal->oom_mm, NULL, mm)) {
+		mmgrab(tsk->signal->oom_mm);
+	}
+}
+
+/**
  * mark_oom_victim - mark the given task as OOM victim
  * @tsk: task to mark
  *
@@ -757,7 +774,6 @@ static inline void queue_oom_reaper(struct task_struct *tsk)
 static void mark_oom_victim(struct task_struct *tsk)
 {
 	const struct cred *cred;
-	struct mm_struct *mm = tsk->mm;
 
 	WARN_ON(oom_killer_disabled);
 	/* OOM killer might race with memcg OOM */
@@ -765,8 +781,7 @@ static void mark_oom_victim(struct task_struct *tsk)
 		return;
 
 	/* oom_mm is bound to the signal struct life time. */
-	if (!cmpxchg(&tsk->signal->oom_mm, NULL, mm))
-		mmgrab(tsk->signal->oom_mm);
+	__mark_oom_victim(tsk);
 
 	/*
 	 * Make sure that the task is woken up from uninterruptible sleep
@@ -1258,4 +1273,17 @@ put_task:
 #else
 	return -ENOSYS;
 #endif /* CONFIG_MMU */
+}
+
+void add_to_oom_reaper(struct task_struct *p)
+{
+	p = find_lock_task_mm(p);
+	if (!p)
+		return;
+
+	if (task_will_free_mem(p)) {
+		__mark_oom_victim(p);
+		queue_oom_reaper(p);
+	}
+	task_unlock(p);
 }

@@ -12,16 +12,20 @@ JDK_PATH=prebuilts/jdk/jdk11/linux-x86
 print_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
-    echo "This script builds kernel, launches cvd and runs selftests on it."
+    echo "This script runs KUnit tests on an Android device."
+    echo "Please run the script with full path common/tools/testing/android/bin/."
+    echo "Building kernel and launching virtual device are enabled by default;"
+    echo "use options to skip the workflow."
+    echo ""
     echo "Available options:"
     echo "  --skip-kernel-build   Skip the kernel building step"
     echo "  --skip-cvd-launch     Skip the CVD launch step"
     echo "  --skip-cvd-kill       Do not kill CVD launched by running this script"
     echo "  -d, --dist-dir=DIR    The kernel dist dir (default is /tmp/kernel_dist)"
     echo "  -s, --serial=SERIAL   The device serial number."
-    echo "                        If serial is specified, cuttlefish device launch will be skipped"
+    echo "                        If serial is specified, virtual device launch will be skipped"
     echo "  -t, --test=TEST_NAME  The test target name. Can be repeated"
-    echo "                        If test is not specified, all kselftests will be run"
+    echo "                        If test is not specified, all tests will be run"
     echo "  -h, --help            Display this help message and exit"
     echo ""
     echo "Examples:"
@@ -154,13 +158,14 @@ fi
 
 echo "Get abi from device $SERIAL_NUMBER"
 ABI=$(adb -s $SERIAL_NUMBER shell getprop ro.product.cpu.abi)
-echo "Building kunit tests according to device $SERIAL_NUMBER ro.product.cpu.abi $ABI ..."
-# $ tools/bazel run -- //common:kunit_tests_x86_64_install -v --destdir /tmp/kunit_tests
+echo "Building KUnit tests according to device $SERIAL_NUMBER ro.product.cpu.abi $ABI ..."
 case $ABI in
 	arm64*)
+        TESTSDIR+="_arm64"
 		$BAZEL run //common:kunit_tests_arm64 -- -v --destdir $TESTSDIR
 		;;
 	x86_64*)
+        TESTSDIR+="_x86_64"
 		$BAZEL run //common:kunit_tests_x86_64 -- -v --destdir $TESTSDIR
 		;;
 	*)

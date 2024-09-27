@@ -1055,7 +1055,7 @@ static void fill_contig_page_info(struct zone *zone,
 	info->free_blocks_total = 0;
 	info->free_blocks_suitable = 0;
 
-	for (order = 0; order <= MAX_ORDER; order++) {
+	for (order = 0; order < NR_PAGE_ORDERS; order++) {
 		unsigned long blocks;
 
 		/*
@@ -1163,6 +1163,7 @@ int fragmentation_index(struct zone *zone, unsigned int order)
 
 #define TEXTS_FOR_ZONES(xx) TEXT_FOR_DMA(xx) TEXT_FOR_DMA32(xx) xx "_normal", \
 					TEXT_FOR_HIGHMEM(xx) xx "_movable", \
+					xx "_nosplit", xx "_nomerge", \
 					TEXT_FOR_DEVICE(xx)
 
 const char * const vmstat_text[] = {
@@ -1357,6 +1358,9 @@ const char * const vmstat_text[] = {
 	"thp_split_page_failed",
 	"thp_deferred_split_page",
 	"thp_split_pmd",
+	"thp_shatter_page",
+	"thp_shatter_page_failed",
+	"thp_shatter_page_discarded",
 	"thp_scan_exceed_none_pte",
 	"thp_scan_exceed_swap_pte",
 	"thp_scan_exceed_share_pte",
@@ -1469,7 +1473,7 @@ static void frag_show_print(struct seq_file *m, pg_data_t *pgdat,
 	int order;
 
 	seq_printf(m, "Node %d, zone %8s ", pgdat->node_id, zone->name);
-	for (order = 0; order <= MAX_ORDER; ++order)
+	for (order = 0; order < NR_PAGE_ORDERS; ++order)
 		/*
 		 * Access to nr_free is lockless as nr_free is used only for
 		 * printing purposes. Use data_race to avoid KCSAN warning.
@@ -1498,7 +1502,7 @@ static void pagetypeinfo_showfree_print(struct seq_file *m,
 					pgdat->node_id,
 					zone->name,
 					migratetype_names[mtype]);
-		for (order = 0; order <= MAX_ORDER; ++order) {
+		for (order = 0; order < NR_PAGE_ORDERS; ++order) {
 			unsigned long freecount = 0;
 			struct free_area *area;
 			struct list_head *curr;
@@ -1538,7 +1542,7 @@ static void pagetypeinfo_showfree(struct seq_file *m, void *arg)
 
 	/* Print header */
 	seq_printf(m, "%-43s ", "Free pages count per migrate type at order");
-	for (order = 0; order <= MAX_ORDER; ++order)
+	for (order = 0; order < NR_PAGE_ORDERS; ++order)
 		seq_printf(m, "%6d ", order);
 	seq_putc(m, '\n');
 
@@ -1692,7 +1696,8 @@ static void zoneinfo_show_print(struct seq_file *m, pg_data_t *pgdat,
 		   "\n        spanned  %lu"
 		   "\n        present  %lu"
 		   "\n        managed  %lu"
-		   "\n        cma      %lu",
+		   "\n        cma      %lu"
+		   "\n        order    %u",
 		   zone_page_state(zone, NR_FREE_PAGES),
 		   zone->watermark_boost,
 		   min_wmark_pages(zone),
@@ -1701,7 +1706,8 @@ static void zoneinfo_show_print(struct seq_file *m, pg_data_t *pgdat,
 		   zone->spanned_pages,
 		   zone->present_pages,
 		   zone_managed_pages(zone),
-		   zone_cma_pages(zone));
+		   zone_cma_pages(zone),
+		   zone->order);
 
 	seq_printf(m,
 		   "\n        protection: (%ld",
@@ -2174,7 +2180,7 @@ static void unusable_show_print(struct seq_file *m,
 	seq_printf(m, "Node %d, zone %8s ",
 				pgdat->node_id,
 				zone->name);
-	for (order = 0; order <= MAX_ORDER; ++order) {
+	for (order = 0; order < NR_PAGE_ORDERS; ++order) {
 		fill_contig_page_info(zone, order, &info);
 		index = unusable_free_index(order, &info);
 		seq_printf(m, "%d.%03d ", index / 1000, index % 1000);
@@ -2226,7 +2232,7 @@ static void extfrag_show_print(struct seq_file *m,
 	seq_printf(m, "Node %d, zone %8s ",
 				pgdat->node_id,
 				zone->name);
-	for (order = 0; order <= MAX_ORDER; ++order) {
+	for (order = 0; order < NR_PAGE_ORDERS; ++order) {
 		fill_contig_page_info(zone, order, &info);
 		index = __fragmentation_index(order, &info);
 		seq_printf(m, "%2d.%03d ", index / 1000, index % 1000);

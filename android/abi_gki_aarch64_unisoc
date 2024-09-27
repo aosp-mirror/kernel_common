@@ -4,6 +4,7 @@
   alt_cb_patch_nops
   __arch_copy_from_user
   __arch_copy_to_user
+  blk_crypto_reprogram_all_keys
   capable
   __check_object_size
   class_create
@@ -16,8 +17,14 @@
   devm_extcon_register_notifier_all
   devm_hwspin_lock_request_specific
   _dev_info
+  dev_pm_opp_calc_power
+  dev_pm_opp_of_register_em
   dev_set_name
   __dynamic_netdev_dbg
+  em_dev_update_chip_binning
+  em_dev_update_perf_domain
+  em_pd_get
+  em_update_performance_limits
   finish_wait
   fortify_panic
   idr_alloc
@@ -26,10 +33,15 @@
   init_timer_key
   init_wait_entry
   __init_waitqueue_head
+  irq_to_desc
+  kernel_cpustat
   kfree
   __kmalloc
   kmalloc_caches
   kmalloc_trace
+  kstat
+  kstat_irqs_cpu
+  kstat_irqs_usr
   ktime_get_boot_fast_ns
   __list_add_valid_or_report
   __list_del_entry_valid_or_report
@@ -42,7 +54,11 @@
   __mutex_init
   mutex_lock
   mutex_unlock
+  nr_cpu_ids
+  nr_ipi_get
+  nr_irqs
   __per_cpu_offset
+  perf_aux_output_skip
   prepare_to_wait_event
   _printk
   put_device
@@ -105,6 +121,7 @@
   __traceiter_android_rvh_update_misfit_status
   __traceiter_android_rvh_wake_up_new_task
   __traceiter_android_vh_alloc_pages_slowpath
+  __traceiter_android_vh_alter_mutex_list_add
   __traceiter_android_vh_alter_rwsem_list_add
   __traceiter_android_vh_binder_proc_transaction_finish
   __traceiter_android_vh_binder_restore_priority
@@ -120,6 +137,8 @@
   __traceiter_android_vh_ftrace_oops_exit
   __traceiter_android_vh_ftrace_size_check
   __traceiter_android_vh_ipi_stop
+  __traceiter_android_vh_mutex_unlock_slowpath
+  __traceiter_android_vh_mutex_wait_start
   __traceiter_android_vh_rwsem_downgrade_wake_finish
   __traceiter_android_vh_rwsem_read_wait_start
   __traceiter_android_vh_rwsem_read_wait_finish
@@ -175,6 +194,7 @@
   __tracepoint_android_rvh_update_misfit_status
   __tracepoint_android_rvh_wake_up_new_task
   __tracepoint_android_vh_alloc_pages_slowpath
+  __tracepoint_android_vh_alter_mutex_list_add
   __tracepoint_android_vh_alter_rwsem_list_add
   __tracepoint_android_vh_binder_proc_transaction_finish
   __tracepoint_android_vh_binder_restore_priority
@@ -190,6 +210,8 @@
   __tracepoint_android_vh_ftrace_oops_exit
   __tracepoint_android_vh_ftrace_size_check
   __tracepoint_android_vh_ipi_stop
+  __tracepoint_android_vh_mutex_unlock_slowpath
+  __tracepoint_android_vh_mutex_wait_start
   __tracepoint_android_vh_rwsem_downgrade_wake_finish
   __tracepoint_android_vh_rwsem_read_wait_start
   __tracepoint_android_vh_rwsem_read_wait_finish
@@ -221,15 +243,76 @@
 # required by apsys-dvfs.ko
   devfreq_update_status
 
+# required by audio-card.ko
+  devm_snd_soc_register_card
+  snd_info_free_entry
+  snd_info_register
+  snd_interval_refine
+  snd_soc_daifmt_parse_clock_provider_raw
+  snd_soc_daifmt_parse_format
+  snd_soc_dapm_disable_pin
+  snd_soc_dapm_enable_pin
+  snd_soc_dapm_sync
+  snd_soc_of_get_dai_name
+  snd_soc_of_parse_audio_routing
+  snd_soc_of_parse_audio_simple_widgets
+  snd_soc_of_parse_card_name
+  snd_soc_of_parse_tdm_slot
+  snd_soc_pm_ops
+
 # required by audio-codec.ko
+  dapm_regulator_event
+  desc_to_gpio
+  iio_channel_get
+  iio_read_channel_raw
+  regulator_get_mode
   regulator_register
+  regulator_set_mode
+  regulator_unregister
+  snd_jack_set_key
+  snd_soc_card_jack_new
+  snd_soc_component_read
+  snd_soc_component_update_bits
+  snd_soc_dapm_get_enum_double
+  snd_soc_dapm_get_volsw
+  snd_soc_dapm_put_enum_double
+  snd_soc_dapm_put_volsw
+  snd_soc_jack_report
+
+# required by audio-dai.ko
+  snd_soc_dapm_add_routes
+  snd_soc_new_compress
 
 # required by audio-platform.ko
+  snd_pcm_hw_constraint_integer
+  snd_pcm_hw_constraint_step
+  snd_pcm_period_elapsed
   snd_pcm_rate_bit_to_rate
+  snd_soc_dapm_mixer_update_power
+  snd_soc_rtdcom_lookup
+  snd_soc_set_runtime_hwparams
 
 # required by audio-misc.ko
   __kfifo_from_user_r
+  __kfifo_init
   __kfifo_to_user_r
+  pm_runtime_barrier
+  pm_runtime_irq_safe
+  snd_ctl_add
+  snd_ctl_new1
+  snd_hwdep_new
+  snd_pcm_format_name
+  snd_soc_add_card_controls
+  snd_soc_bytes_info_ext
+  snd_usb_autoresume
+  snd_usb_autosuspend
+  snd_usb_endpoint_prepare
+  snd_usb_hw_free
+  snd_usb_hw_params
+  snd_usb_lock_shutdown
+  snd_usb_register_platform_ops
+  snd_usb_unlock_shutdown
+  snd_usb_unregister_platform_ops
 
 # required by gzvm.ko
   __traceiter_android_vh_gzvm_vcpu_exit_reason
@@ -253,6 +336,12 @@
   blkcg_policy_register
   __traceiter_android_rvh_ctl_dirty_rate
   __tracepoint_android_rvh_ctl_dirty_rate
+
+# required by kprobe_dmverity_debug.ko
+  dm_bio_from_per_bio_data
+  dm_bufio_read
+  dm_disk
+  dm_table_get_md
 
 # required by ledtrig-pattern.ko
   led_get_default_pattern
@@ -605,6 +694,10 @@
   __tracepoint_mm_filemap_delete_from_page_cache
   __tracepoint_mm_filemap_add_to_page_cache
 
+# required printk_cpuid.ko
+  __traceiter_android_vh_printk_ext_header
+  __tracepoint_android_vh_printk_ext_header
+
 # required by mali_gondul.ko
   anon_inode_getfd
   __arch_clear_user
@@ -656,7 +749,6 @@
   of_clk_get_parent_count
   of_devfreq_cooling_register_power
   of_dma_is_coherent
-  of_machine_is_compatible
   of_property_read_variable_u64_array
   of_property_read_variable_u8_array
   param_array_ops

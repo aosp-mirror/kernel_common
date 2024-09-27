@@ -124,7 +124,7 @@ static int inet6_create(struct net *net, struct socket *sock, int protocol,
 {
 	struct inet_sock *inet;
 	struct ipv6_pinfo *np;
-	struct sock *sk;
+	struct sock *sk = NULL;
 	struct inet_protosw *answer;
 	struct proto *answer_prot;
 	unsigned char answer_flags;
@@ -280,6 +280,7 @@ lookup_protocol:
 	trace_android_rvh_inet_sock_create(sk);
 
 out:
+	trace_android_vh_inet_create(sk, err);
 	return err;
 out_rcu_unlock:
 	rcu_read_unlock();

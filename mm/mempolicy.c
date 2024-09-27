@@ -1836,22 +1836,20 @@ bool vma_policy_mof(struct vm_area_struct *vma)
 
 bool apply_policy_zone(struct mempolicy *policy, enum zone_type zone)
 {
-	enum zone_type dynamic_policy_zone = policy_zone;
-
-	BUG_ON(dynamic_policy_zone == ZONE_MOVABLE);
+	WARN_ON_ONCE(zid_is_virt(policy_zone));
 
 	/*
-	 * if policy->nodes has movable memory only,
-	 * we apply policy when gfp_zone(gfp) = ZONE_MOVABLE only.
+	 * If policy->nodes has memory in virtual zones only, we apply policy
+	 * only if gfp_zone(gfp) can allocate from those zones.
 	 *
 	 * policy->nodes is intersect with node_states[N_MEMORY].
 	 * so if the following test fails, it implies
-	 * policy->nodes has movable memory only.
+	 * policy->nodes has memory in virtual zones only.
 	 */
 	if (!nodes_intersects(policy->nodes, node_states[N_HIGH_MEMORY]))
-		dynamic_policy_zone = ZONE_MOVABLE;
+		return zone > LAST_PHYS_ZONE;
 
-	return zone >= dynamic_policy_zone;
+	return zone >= policy_zone;
 }
 
 /*
@@ -3134,8 +3132,9 @@ out:
  * @pol:  pointer to mempolicy to be formatted
  *
  * Convert @pol into a string.  If @buffer is too short, truncate the string.
- * Recommend a @maxlen of at least 32 for the longest mode, "interleave", the
- * longest flag, "relative", and to display at least a few node ids.
+ * Recommend a @maxlen of at least 51 for the longest mode, "weighted
+ * interleave", plus the longest flag flags, "relative|balancing", and to
+ * display at least a few node ids.
  */
 void mpol_to_str(char *buffer, int maxlen, struct mempolicy *pol)
 {
@@ -3144,7 +3143,10 @@ void mpol_to_str(char *buffer, int maxlen, struct mempolicy *pol)
 	unsigned short mode = MPOL_DEFAULT;
 	unsigned short flags = 0;
 
-	if (pol && pol != &default_policy && !(pol->flags & MPOL_F_MORON)) {
+	if (pol &&
+	    pol != &default_policy &&
+	    !(pol >= &preferred_node_policy[0] &&
+	      pol <= &preferred_node_policy[ARRAY_SIZE(preferred_node_policy) - 1])) {
 		mode = pol->mode;
 		flags = pol->flags;
 	}
@@ -3171,12 +3173,18 @@ void mpol_to_str(char *buffer, int maxlen, struct mempolicy *pol)
 		p += snprintf(p, buffer + maxlen - p, "=");
 
 		/*
-		 * Currently, the only defined flags are mutually exclusive
+		 * Static and relative are mutually exclusive.
 		 */
 		if (flags & MPOL_F_STATIC_NODES)
 			p += snprintf(p, buffer + maxlen - p, "static");
 		else if (flags & MPOL_F_RELATIVE_NODES)
 			p += snprintf(p, buffer + maxlen - p, "relative");
+
+		if (flags & MPOL_F_NUMA_BALANCING) {
+			if (!is_power_of_2(flags & MPOL_MODE_FLAGS))
+				p += snprintf(p, buffer + maxlen - p, "|");
+			p += snprintf(p, buffer + maxlen - p, "balancing");
+		}
 	}
 
 	if (!nodes_empty(nodes))

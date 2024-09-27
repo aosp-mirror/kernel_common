@@ -837,7 +837,7 @@ void replace_page_cache_folio(struct folio *old, struct folio *new)
 	new->mapping = mapping;
 	new->index = offset;
 
-	mem_cgroup_migrate(old, new);
+	mem_cgroup_replace_folio(old, new);
 
 	xas_lock_irq(&xas);
 	xas_store(&xas, new);
@@ -1849,7 +1849,7 @@ repeat:
 	if (!folio || xa_is_value(folio))
 		goto out;
 
-	if (!folio_try_get_rcu(folio))
+	if (!folio_try_get(folio))
 		goto repeat;
 
 	if (unlikely(folio != xas_reload(&xas))) {
@@ -2005,7 +2005,7 @@ retry:
 	if (!folio || xa_is_value(folio))
 		return folio;
 
-	if (!folio_try_get_rcu(folio))
+	if (!folio_try_get(folio))
 		goto reset;
 
 	if (unlikely(folio != xas_reload(xas))) {
@@ -2223,7 +2223,7 @@ unsigned filemap_get_folios_contig(struct address_space *mapping,
 		if (xa_is_value(folio))
 			goto update_start;
 
-		if (!folio_try_get_rcu(folio))
+		if (!folio_try_get(folio))
 			goto retry;
 
 		if (unlikely(folio != xas_reload(&xas)))
@@ -2358,7 +2358,7 @@ static void filemap_get_read_batch(struct address_space *mapping,
 			break;
 		if (xa_is_sibling(folio))
 			break;
-		if (!folio_try_get_rcu(folio))
+		if (!folio_try_get(folio))
 			goto retry;
 
 		if (unlikely(folio != xas_reload(&xas)))
@@ -2442,6 +2442,8 @@ static int filemap_update_page(struct kiocb *iocb,
 		struct folio *folio, bool need_uptodate)
 {
 	int error;
+
+	trace_android_vh_filemap_update_page(mapping, folio, iocb->ki_filp);
 
 	if (iocb->ki_flags & IOCB_NOWAIT) {
 		if (!filemap_invalidate_trylock_shared(mapping))
@@ -2652,6 +2654,7 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
 
 	iov_iter_truncate(iter, inode->i_sb->s_maxbytes);
 	folio_batch_init(&fbatch);
+	trace_android_vh_filemap_read(filp, iocb->ki_pos, iov_iter_count(iter));
 
 	do {
 		cond_resched();
@@ -3126,33 +3129,39 @@ unlock:
 static int lock_folio_maybe_drop_mmap(struct vm_fault *vmf, struct folio *folio,
 				     struct file **fpin)
 {
+	struct task_struct *tsk = NULL;
+
 	if (folio_trylock(folio))
 		return 1;
 
 	/*
 	 * NOTE! This will make us return with VM_FAULT_RETRY, but with
-	 * the mmap_lock still held. That's how FAULT_FLAG_RETRY_NOWAIT
+	 * the fault lock still held. That's how FAULT_FLAG_RETRY_NOWAIT
 	 * is supposed to work. We have way too many special cases..
 	 */
 	if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 		return 0;
 
 	*fpin = maybe_unlock_mmap_for_io(vmf, *fpin);
+	trace_android_vh_lock_folio_drop_mmap_start(&tsk, vmf, folio, *fpin);
 	if (vmf->flags & FAULT_FLAG_KILLABLE) {
 		if (__folio_lock_killable(folio)) {
 			/*
-			 * We didn't have the right flags to drop the mmap_lock,
-			 * but all fault_handlers only check for fatal signals
-			 * if we return VM_FAULT_RETRY, so we need to drop the
-			 * mmap_lock here and return 0 if we don't have a fpin.
+			 * We didn't have the right flags to drop the
+			 * fault lock, but all fault_handlers only check
+			 * for fatal signals if we return VM_FAULT_RETRY,
+			 * so we need to drop the fault lock here and
+			 * return 0 if we don't have a fpin.
 			 */
 			if (*fpin == NULL)
-				mmap_read_unlock(vmf->vma->vm_mm);
+				release_fault_lock(vmf);
+			trace_android_vh_lock_folio_drop_mmap_end(false, &tsk, vmf, folio, *fpin);
 			return 0;
 		}
 	} else
 		__folio_lock(folio);
 
+	trace_android_vh_lock_folio_drop_mmap_end(true, &tsk, vmf, folio, *fpin);
 	return 1;
 }
 
@@ -3175,7 +3184,7 @@ static struct file *do_sync_mmap_readahead(struct vm_fault *vmf)
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	/* Use the readahead code, even if readahead is disabled */
-	if (vm_flags & VM_HUGEPAGE) {
+	if ((vm_flags & VM_HUGEPAGE) && HPAGE_PMD_ORDER <= MAX_PAGECACHE_ORDER) {
 		fpin = maybe_unlock_mmap_for_io(vmf, fpin);
 		ractl._index &= ~((unsigned long)HPAGE_PMD_NR - 1);
 		ra->size = HPAGE_PMD_NR;
@@ -3199,7 +3208,10 @@ static struct file *do_sync_mmap_readahead(struct vm_fault *vmf)
 
 	if (vm_flags & VM_SEQ_READ) {
 		fpin = maybe_unlock_mmap_for_io(vmf, fpin);
+		trace_android_vh_page_cache_readahead_start(file, vmf->pgoff,
+				ra->ra_pages, true);
 		page_cache_sync_ra(&ractl, ra->ra_pages);
+		trace_android_vh_page_cache_readahead_end(file, vmf->pgoff);
 		return fpin;
 	}
 
@@ -3225,7 +3237,10 @@ static struct file *do_sync_mmap_readahead(struct vm_fault *vmf)
 	trace_android_vh_tune_mmap_readaround(ra->ra_pages, vmf->pgoff,
 			&ra->start, &ra->size, &ra->async_size);
 	ractl._index = ra->start;
+	trace_android_vh_page_cache_readahead_start(file, vmf->pgoff,
+			ra->size, true);
 	page_cache_ra_order(&ractl, ra, 0);
+	trace_android_vh_page_cache_readahead_end(file, vmf->pgoff);
 	return fpin;
 }
 
@@ -3253,7 +3268,10 @@ static struct file *do_async_mmap_readahead(struct vm_fault *vmf,
 
 	if (folio_test_readahead(folio)) {
 		fpin = maybe_unlock_mmap_for_io(vmf, fpin);
+		trace_android_vh_page_cache_readahead_start(file, vmf->pgoff,
+				ra->ra_pages, false);
 		page_cache_async_ra(&ractl, folio, ra->ra_pages);
+		trace_android_vh_page_cache_readahead_end(file, vmf->pgoff);
 	}
 	return fpin;
 }
@@ -3402,7 +3420,9 @@ page_not_uptodate:
 	 * and we need to check for errors.
 	 */
 	fpin = maybe_unlock_mmap_for_io(vmf, fpin);
+	trace_android_vh_filemap_fault_start(file, vmf->pgoff);
 	error = filemap_read_folio(file, mapping->a_ops->read_folio, folio);
+	trace_android_vh_filemap_fault_end(file, vmf->pgoff);
 	if (fpin)
 		goto out_retry;
 	folio_put(folio);
@@ -3472,7 +3492,7 @@ static struct folio *next_uptodate_folio(struct xa_state *xas,
 			continue;
 		if (folio_test_locked(folio))
 			continue;
-		if (!folio_try_get_rcu(folio))
+		if (!folio_try_get(folio))
 			continue;
 		/* Has the page moved or been split? */
 		if (unlikely(folio != xas_reload(xas)))
@@ -3596,11 +3616,13 @@ vm_fault_t filemap_map_pages(struct vm_fault *vmf,
 	struct folio *folio;
 	vm_fault_t ret = 0;
 	unsigned int nr_pages = 0, mmap_miss = 0, mmap_miss_saved;
+	pgoff_t first_pgoff = 0;
 
 	rcu_read_lock();
 	folio = next_uptodate_folio(&xas, mapping, end_pgoff);
 	if (!folio)
 		goto out;
+	first_pgoff = xas.xa_index;
 
 	if (filemap_map_pmd(vmf, folio, start_pgoff)) {
 		ret = VM_FAULT_NOPAGE;
@@ -3643,6 +3665,7 @@ out:
 		WRITE_ONCE(file->f_ra.mmap_miss, 0);
 	else
 		WRITE_ONCE(file->f_ra.mmap_miss, mmap_miss_saved - mmap_miss);
+	trace_android_vh_filemap_map_pages(file, first_pgoff, last_pgoff, ret);
 
 	return ret;
 }

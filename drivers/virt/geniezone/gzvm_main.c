@@ -102,6 +102,10 @@ static int gzvm_drv_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	ret = gzvm_arch_drv_init();
+	if (ret)
+		return ret;
+
 	ret = misc_register(&gzvm_dev);
 	if (ret)
 		return ret;
@@ -127,7 +131,7 @@ static int gzvm_drv_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id gzvm_of_match[] = {
-	{ .compatible = "mediatek,geniezone-hyp" },
+	{ .compatible = "mediatek,geniezone" },
 	{/* sentinel */},
 };
 
@@ -136,7 +140,6 @@ static struct platform_driver gzvm_driver = {
 	.remove = gzvm_drv_remove,
 	.driver = {
 		.name = KBUILD_MODNAME,
-		.owner = THIS_MODULE,
 		.of_match_table = gzvm_of_match,
 	},
 };

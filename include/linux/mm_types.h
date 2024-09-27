@@ -352,14 +352,19 @@ struct folio {
 		struct {
 			unsigned long _flags_1;
 			unsigned long _head_1;
-			unsigned long _folio_avail;
 	/* public: */
 			atomic_t _entire_mapcount;
 			atomic_t _nr_pages_mapped;
 			atomic_t _pincount;
 #ifdef CONFIG_64BIT
+			unsigned int __padding;
 			unsigned int _folio_nr_pages;
 #endif
+			union {
+				unsigned long _private_1;
+				unsigned long *_dst_ul;
+				struct page **_dst_pp;
+			};
 	/* private: the union with struct page is transitional */
 		};
 		struct page __page_1;
@@ -405,6 +410,7 @@ FOLIO_MATCH(memcg_data, memcg_data);
 			offsetof(struct page, pg) + sizeof(struct page))
 FOLIO_MATCH(flags, _flags_1);
 FOLIO_MATCH(compound_head, _head_1);
+FOLIO_MATCH(private, _private_1);
 #undef FOLIO_MATCH
 #define FOLIO_MATCH(pg, fl)						\
 	static_assert(offsetof(struct folio, fl) ==			\
@@ -615,6 +621,9 @@ struct vm_area_struct {
 	};
 
 #ifdef CONFIG_PER_VMA_LOCK
+	/* Flag to indicate areas detached from the mm->mm_mt tree */
+	bool detached;
+
 	/*
 	 * Can only be written (using WRITE_ONCE()) while holding both:
 	 *  - mmap_lock (in write mode)
@@ -631,9 +640,6 @@ struct vm_area_struct {
 	 */
 	int vm_lock_seq;
 	struct vma_lock *vm_lock;
-
-	/* Flag to indicate areas detached from the mm->mm_mt tree */
-	bool detached;
 #endif
 
 	/*
@@ -930,7 +936,7 @@ struct mm_struct {
 		 * Represent how many empty pages are merged with kernel zero
 		 * pages when enabling KSM use_zero_pages.
 		 */
-		unsigned long ksm_zero_pages;
+		atomic_long_t ksm_zero_pages;
 #endif /* CONFIG_KSM */
 #ifdef CONFIG_LRU_GEN
 		struct {
@@ -950,6 +956,7 @@ struct mm_struct {
 #endif /* CONFIG_LRU_GEN */
 
 		ANDROID_KABI_RESERVE(1);
+		ANDROID_BACKPORT_RESERVE(1);
 	} __randomize_layout;
 
 	/*

@@ -21,6 +21,9 @@
  *  License.  See the file COPYING in the main directory of the Linux
  *  distribution for more details.
  */
+#ifndef __GENKSYMS__
+#include "cgroup-internal.h"
+#endif
 
 #include <linux/cpu.h>
 #include <linux/cpumask.h>
@@ -45,6 +48,7 @@
 #include <linux/wait.h>
 
 #include <trace/hooks/cgroup.h>
+#include <trace/hooks/sched.h>
 
 DEFINE_STATIC_KEY_FALSE(cpusets_pre_enable_key);
 DEFINE_STATIC_KEY_FALSE(cpusets_enabled_key);
@@ -1216,6 +1220,18 @@ void rebuild_sched_domains(void)
 }
 EXPORT_SYMBOL_GPL(rebuild_sched_domains);
 
+static int update_cpus_allowed(struct cpuset *cs, struct task_struct *p,
+				const struct cpumask *new_mask)
+{
+	int ret = -EINVAL;
+
+	trace_android_rvh_update_cpus_allowed(p, cs->cpus_requested, new_mask, &ret);
+	if (!ret)
+		return ret;
+
+	return set_cpus_allowed_ptr(p, new_mask);
+}
+
 /**
  * update_tasks_cpumask - Update the cpumasks of tasks in the cpuset.
  * @cs: the cpuset in which each task's cpus_allowed mask needs to be changed
@@ -1247,7 +1263,7 @@ static void update_tasks_cpumask(struct cpuset *cs, struct cpumask *new_cpus)
 		} else {
 			cpumask_and(new_cpus, possible_mask, cs->effective_cpus);
 		}
-		set_cpus_allowed_ptr(task, new_cpus);
+		update_cpus_allowed(cs, task, new_cpus);
 	}
 	css_task_iter_end(&it);
 }
@@ -2242,7 +2258,7 @@ bool current_cpuset_is_being_rebound(void)
 static int update_relax_domain_level(struct cpuset *cs, s64 val)
 {
 #ifdef CONFIG_SMP
-	if (val < -1 || val >= sched_domain_level_max)
+	if (val < -1 || val > sched_domain_level_max + 1)
 		return -EINVAL;
 #endif
 
@@ -2667,7 +2683,7 @@ static void cpuset_attach_task(struct cpuset *cs, struct task_struct *task)
 	 * can_attach beforehand should guarantee that this doesn't
 	 * fail.  TODO: have a better way to handle failure here
 	 */
-	WARN_ON_ONCE(set_cpus_allowed_ptr(task, cpus_attach));
+	WARN_ON_ONCE(update_cpus_allowed(cs, task, cpus_attach));
 
 	cpuset_change_task_nodemask(task, &cpuset_attach_nodemask_to);
 	cpuset_update_task_spread_flags(cs, task);
@@ -4309,11 +4325,15 @@ int proc_cpuset_show(struct seq_file *m, struct pid_namespace *ns,
 	if (!buf)
 		goto out;
 
-	css = task_get_css(tsk, cpuset_cgrp_id);
-	retval = cgroup_path_ns(css->cgroup, buf, PATH_MAX,
-				current->nsproxy->cgroup_ns);
-	css_put(css);
-	if (retval >= PATH_MAX)
+	rcu_read_lock();
+	spin_lock_irq(&css_set_lock);
+	css = task_css(tsk, cpuset_cgrp_id);
+	retval = cgroup_path_ns_locked(css->cgroup, buf, PATH_MAX,
+				       current->nsproxy->cgroup_ns);
+	spin_unlock_irq(&css_set_lock);
+	rcu_read_unlock();
+
+	if (retval == -E2BIG)
 		retval = -ENAMETOOLONG;
 	if (retval < 0)
 		goto out_free;

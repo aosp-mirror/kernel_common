@@ -20,6 +20,7 @@
 #include <linux/highmem.h>
 #include <linux/interrupt.h>
 #include <linux/jiffies.h>
+#include <linux/memblock.h>
 #include <linux/compiler.h>
 #include <linux/kernel.h>
 #include <linux/kasan.h>
@@ -67,6 +68,9 @@
 
 #undef CREATE_TRACE_POINTS
 #include <trace/hooks/mm.h>
+
+EXPORT_TRACEPOINT_SYMBOL_GPL(mm_page_alloc);
+EXPORT_TRACEPOINT_SYMBOL_GPL(mm_page_free);
 
 /* Free Page Internal flags: for internal, non-pcp variants of free_pages(). */
 typedef int __bitwise fpi_t;
@@ -315,6 +319,8 @@ char * const zone_names[MAX_NR_ZONES] = {
 	 "HighMem",
 #endif
 	 "Movable",
+	 "NoSplit",
+	 "NoMerge",
 #ifdef CONFIG_ZONE_DEVICE
 	 "Device",
 #endif
@@ -338,9 +344,9 @@ int user_min_free_kbytes = -1;
 static int watermark_boost_factor __read_mostly = 15000;
 static int watermark_scale_factor = 10;
 
-/* movable_zone is the "real" zone pages in ZONE_MOVABLE are taken from */
-int movable_zone;
-EXPORT_SYMBOL(movable_zone);
+/* virt_zone is the "real" zone pages in virtual zones are taken from */
+int virt_zone;
+EXPORT_SYMBOL(virt_zone);
 
 #if MAX_NUMNODES > 1
 unsigned int nr_node_ids __read_mostly = MAX_NUMNODES;
@@ -597,7 +603,10 @@ static inline unsigned int order_to_pindex(int migratetype, int order)
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	if (order > PAGE_ALLOC_COSTLY_ORDER) {
-		VM_BUG_ON(order != pageblock_order);
+		unsigned int expected_order = pageblock_order;
+
+		trace_android_vh_customize_thp_pcp_order(&expected_order);
+		VM_BUG_ON(order != expected_order);
 		return NR_LOWORDER_PCP_LISTS;
 	}
 #else
@@ -612,8 +621,10 @@ static inline int pindex_to_order(unsigned int pindex)
 	int order = pindex / MIGRATE_PCPTYPES;
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	if (pindex == NR_LOWORDER_PCP_LISTS)
+	if (pindex == NR_LOWORDER_PCP_LISTS) {
 		order = pageblock_order;
+		trace_android_vh_customize_thp_pcp_order(&order);
+	}
 #else
 	VM_BUG_ON(order > PAGE_ALLOC_COSTLY_ORDER);
 #endif
@@ -623,10 +634,14 @@ static inline int pindex_to_order(unsigned int pindex)
 
 static inline bool pcp_allowed_order(unsigned int order)
 {
+	unsigned int __maybe_unused allowed_order;
+
 	if (order <= PAGE_ALLOC_COSTLY_ORDER)
 		return true;
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	if (order == pageblock_order)
+	allowed_order = pageblock_order;
+	trace_android_vh_customize_thp_pcp_order(&allowed_order);
+	if (order == allowed_order)
 		return true;
 #endif
 	return false;
@@ -663,6 +678,7 @@ void prep_compound_page(struct page *page, unsigned int order)
 
 	prep_compound_head(page, order);
 }
+EXPORT_SYMBOL_GPL(prep_compound_page);
 
 void destroy_large_folio(struct folio *folio)
 {
@@ -802,14 +818,16 @@ buddy_merge_likely(unsigned long pfn, unsigned long buddy_pfn,
 	unsigned long higher_page_pfn;
 	struct page *higher_page;
 
-	if (order >= MAX_ORDER - 1)
-		return false;
-
 	higher_page_pfn = buddy_pfn & pfn;
 	higher_page = page + (higher_page_pfn - pfn);
 
 	return find_buddy_page_pfn(higher_page, higher_page_pfn, order + 1,
 			NULL) != NULL;
+}
+
+static int zone_max_order(struct zone *zone)
+{
+	return zone->order && zone_idx(zone) == ZONE_NOMERGE ? zone->order : MAX_ORDER;
 }
 
 /*
@@ -846,6 +864,7 @@ static inline void __free_one_page(struct page *page,
 	unsigned long combined_pfn;
 	struct page *buddy;
 	bool to_tail;
+	int max_order = zone_max_order(zone);
 
 	VM_BUG_ON(!zone_is_initialized(zone));
 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
@@ -857,7 +876,7 @@ static inline void __free_one_page(struct page *page,
 	VM_BUG_ON_PAGE(pfn & ((1 << order) - 1), page);
 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
 
-	while (order < MAX_ORDER) {
+	while (order < max_order) {
 		if (compaction_capture(capc, page, order, migratetype)) {
 			__mod_zone_freepage_state(zone, -(1 << order),
 								migratetype);
@@ -904,6 +923,8 @@ done_merging:
 		to_tail = true;
 	else if (is_shuffle_order(order))
 		to_tail = shuffle_pick_tail();
+	else if (order + 1 >= max_order)
+		to_tail = false;
 	else
 		to_tail = buddy_merge_likely(pfn, buddy_pfn, page, order);
 
@@ -940,6 +961,8 @@ int split_free_page(struct page *free_page,
 	int free_page_order;
 	int mt;
 	int ret = 0;
+
+	VM_WARN_ON_ONCE_PAGE(!page_can_split(free_page), free_page);
 
 	if (split_pfn_offset == 0)
 		return ret;
@@ -1069,6 +1092,10 @@ static int free_tail_page_prepare(struct page *head_page, struct page *page)
 		}
 		if (unlikely(atomic_read(&folio->_pincount))) {
 			bad_page(page, "nonzero pincount");
+			goto out;
+		}
+		if (unlikely(folio->_private_1)) {
+			bad_page(page, "nonzero _private_1");
 			goto out;
 		}
 		break;
@@ -1341,10 +1368,21 @@ static void __free_pages_ok(struct page *page, unsigned int order,
 	unsigned long pfn = page_to_pfn(page);
 	struct zone *zone = page_zone(page);
 	bool skip_free_unref_page = false;
+	bool skip_free_pages_prepare = false;
+	bool skip_free_pages_ok = false;
+
+	trace_android_vh_free_pages_prepare_bypass(page, order,
+			fpi_flags, &skip_free_pages_prepare);
+	if (skip_free_pages_prepare)
+		goto skip_prepare;
 
 	if (!free_pages_prepare(page, order, fpi_flags))
 		return;
-
+skip_prepare:
+	trace_android_vh_free_pages_ok_bypass(page, order,
+			fpi_flags, &skip_free_pages_ok);
+	if (skip_free_pages_ok)
+		return;
 	/*
 	 * Calling get_pfnblock_migratetype() without spin_lock_irqsave() here
 	 * is used to avoid calling get_pfnblock_migratetype() under the lock.
@@ -1365,6 +1403,14 @@ static void __free_pages_ok(struct page *page, unsigned int order,
 
 	__count_vm_events(PGFREE, 1 << order);
 }
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+void free_hpage(struct page *page, fpi_t fpi_flags)
+{
+	__free_pages_ok(page, HPAGE_PMD_ORDER, fpi_flags);
+}
+EXPORT_SYMBOL_GPL(free_hpage);
+#endif
 
 void __free_pages_core(struct page *page, unsigned int order)
 {
@@ -1640,6 +1686,14 @@ static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags
 	trace_android_vh_test_clear_look_around_ref(page);
 }
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+void prep_new_hpage(struct page *page, gfp_t gfp_flags, unsigned int alloc_flags)
+{
+	return prep_new_page(page, HPAGE_PMD_ORDER, gfp_flags, alloc_flags);
+}
+EXPORT_SYMBOL_GPL(prep_new_hpage);
+#endif
+
 /*
  * Go through the free lists for the given migratetype and remove
  * the smallest available page from the freelists
@@ -1652,8 +1706,10 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 	struct free_area *area;
 	struct page *page;
 
+	VM_WARN_ON_ONCE(!zone_is_suitable(zone, order));
+
 	/* Find a page of the appropriate size in the preferred list */
-	for (current_order = order; current_order <= MAX_ORDER; ++current_order) {
+	for (current_order = order; current_order < NR_PAGE_ORDERS; ++current_order) {
 		area = &(zone->free_area[current_order]);
 		page = get_page_from_free_area(area, migratetype);
 		if (!page)
@@ -2033,7 +2089,7 @@ static bool unreserve_highatomic_pageblock(const struct alloc_context *ac,
 			continue;
 
 		spin_lock_irqsave(&zone->lock, flags);
-		for (order = 0; order <= MAX_ORDER; order++) {
+		for (order = 0; order < NR_PAGE_ORDERS; order++) {
 			struct free_area *area = &(zone->free_area[order]);
 
 			page = get_page_from_free_area(area, MIGRATE_HIGHATOMIC);
@@ -2143,8 +2199,7 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype,
 	return false;
 
 find_smallest:
-	for (current_order = order; current_order <= MAX_ORDER;
-							current_order++) {
+	for (current_order = order; current_order < NR_PAGE_ORDERS; current_order++) {
 		area = &(zone->free_area[current_order]);
 		fallback_mt = find_suitable_fallback(area, current_order,
 				start_migratetype, false, &can_steal);
@@ -2284,14 +2339,21 @@ void drain_zone_pages(struct zone *zone, struct per_cpu_pages *pcp)
  */
 static void drain_pages_zone(unsigned int cpu, struct zone *zone)
 {
-	struct per_cpu_pages *pcp;
+	struct per_cpu_pages *pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
+	int count;
 
-	pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
-	if (pcp->count) {
+	do {
 		spin_lock(&pcp->lock);
-		free_pcppages_bulk(zone, pcp->count, pcp, 0);
+		count = pcp->count;
+		if (count) {
+			int to_drain = min(count,
+				pcp->batch << CONFIG_PCP_BATCH_SCALE_MAX);
+
+			free_pcppages_bulk(zone, to_drain, pcp, 0);
+			count -= to_drain;
+		}
 		spin_unlock(&pcp->lock);
-	}
+	} while (count);
 }
 
 /*
@@ -2442,7 +2504,7 @@ static int nr_pcp_free(struct per_cpu_pages *pcp, int high, bool free_high)
 	 * freeing of pages without any allocation.
 	 */
 	batch <<= pcp->free_factor;
-	if (batch < max_nr_free)
+	if (batch < max_nr_free && pcp->free_factor < CONFIG_PCP_BATCH_SCALE_MAX)
 		pcp->free_factor++;
 	batch = clamp(batch, min_nr_free, max_nr_free);
 
@@ -2988,6 +3050,9 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 	long min = mark;
 	int o;
 
+	if (!zone_is_suitable(z, order))
+		return false;
+
 	/* free_pages may go negative - that's OK */
 	free_pages -= __zone_watermark_unusable_free(z, order, alloc_flags);
 
@@ -3033,7 +3098,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 		return true;
 
 	/* For a high-order request, check at least one suitable page is free */
-	for (o = order; o <= MAX_ORDER; o++) {
+	for (o = order; o < NR_PAGE_ORDERS; o++) {
 		struct free_area *area = &z->free_area[o];
 		int mt;
 
@@ -3079,6 +3144,9 @@ static inline bool zone_watermark_fast(struct zone *z, unsigned int order,
 				unsigned int alloc_flags, gfp_t gfp_mask)
 {
 	long free_pages;
+
+	if (!zone_is_suitable(z, order))
+		return false;
 
 	free_pages = zone_page_state(z, NR_FREE_PAGES);
 
@@ -3228,6 +3296,9 @@ retry:
 		struct page *page;
 		unsigned long mark;
 
+		if (!zone_is_suitable(zone, order))
+			continue;
+
 		if (cpusets_enabled() &&
 			(alloc_flags & ALLOC_CPUSET) &&
 			!__cpuset_zone_allowed(zone, gfp_mask))
@@ -3371,7 +3442,11 @@ try_this_zone:
 static void warn_alloc_show_mem(gfp_t gfp_mask, nodemask_t *nodemask)
 {
 	unsigned int filter = SHOW_MEM_FILTER_NODES;
+	bool bypass = false;
 
+	trace_android_vh_warn_alloc_show_mem_bypass(&bypass);
+	if (bypass)
+		return;
 	/*
 	 * This documents exceptions given to allocations in certain
 	 * contexts that are allowed to allocate outside current's set
@@ -3393,6 +3468,7 @@ void warn_alloc(gfp_t gfp_mask, nodemask_t *nodemask, const char *fmt, ...)
 	va_list args;
 	static DEFINE_RATELIMIT_STATE(nopage_rs, 10*HZ, 1);
 
+	trace_android_vh_warn_alloc_tune_ratelimit(&nopage_rs);
 	if ((gfp_mask & __GFP_NOWARN) ||
 	     !__ratelimit(&nopage_rs) ||
 	     ((gfp_mask & __GFP_DMA) && !has_managed_dma()))
@@ -3810,6 +3886,7 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
 	struct page *page = NULL;
 	unsigned long pflags;
 	bool drained = false;
+	bool skip_pcp_drain = false;
 
 	trace_android_vh_mm_direct_reclaim_enter(order);
 	psi_memstall_enter(&pflags);
@@ -3827,7 +3904,10 @@ retry:
 	 */
 	if (!page && !drained) {
 		unreserve_highatomic_pageblock(ac, false);
-		drain_all_pages(NULL);
+		trace_android_vh_drain_all_pages_bypass(gfp_mask, order,
+			alloc_flags, ac->migratetype, *did_some_progress, &skip_pcp_drain);
+		if (!skip_pcp_drain)
+			drain_all_pages(NULL);
 		drained = true;
 		++retry_times;
 		goto retry;
@@ -3902,6 +3982,9 @@ gfp_to_alloc_flags(gfp_t gfp_mask, unsigned int order)
 		alloc_flags |= ALLOC_MIN_RESERVE;
 
 	alloc_flags = gfp_to_alloc_flags_cma(gfp_mask, alloc_flags);
+
+	if (!(gfp_mask & __GFP_DIRECT_RECLAIM) && gfp_order_zone(gfp_mask, order) > ZONE_MOVABLE)
+		alloc_flags |= ALLOC_KSWAPD;
 
 	return alloc_flags;
 }
@@ -4072,7 +4155,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	const bool costly_order = order > PAGE_ALLOC_COSTLY_ORDER;
 	struct page *page = NULL;
 	unsigned int alloc_flags;
-	unsigned long did_some_progress;
+	unsigned long did_some_progress = 0;
 	enum compact_priority compact_priority;
 	enum compact_result compact_result;
 	int compaction_retries;
@@ -4082,7 +4165,12 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	int reserve_flags;
 	unsigned long alloc_start = jiffies;
 	bool should_alloc_retry = false;
+	unsigned long direct_reclaim_retries = 0;
+	unsigned long pages_reclaimed = 0;
+	int retry_loop_count = 0;
+	u64 stime = 0;
 
+	trace_android_vh_alloc_pages_slowpath_start(&stime);
 restart:
 	compaction_retries = 0;
 	no_progress_loops = 0;
@@ -4123,6 +4211,9 @@ restart:
 
 	if (alloc_flags & ALLOC_KSWAPD)
 		wake_all_kswapds(order, gfp_mask, ac);
+
+	if (can_direct_reclaim && !direct_reclaim_retries && !(current->flags & PF_MEMALLOC))
+		trace_android_vh_alloc_pages_adjust_wmark(gfp_mask, order, &alloc_flags);
 
 	/*
 	 * The adjusted alloc_flags might result in immediate success, so try
@@ -4188,6 +4279,7 @@ restart:
 	}
 
 retry:
+	retry_loop_count++;
 	/* Ensure kswapd doesn't accidentally go to sleep as long as we loop */
 	if (alloc_flags & ALLOC_KSWAPD)
 		wake_all_kswapds(order, gfp_mask, ac);
@@ -4232,9 +4324,13 @@ retry:
 	if (page)
 		goto got_pg;
 
+	if (direct_reclaim_retries < ULONG_MAX)
+		direct_reclaim_retries++;
+
 	/* Try direct reclaim and then allocating */
 	page = __alloc_pages_direct_reclaim(gfp_mask, order, alloc_flags, ac,
 							&did_some_progress);
+	pages_reclaimed += did_some_progress;
 	if (page)
 		goto got_pg;
 
@@ -4255,6 +4351,9 @@ retry:
 	if (costly_order && (!can_compact ||
 			     !(gfp_mask & __GFP_RETRY_MAYFAIL)))
 		goto nopage;
+
+	trace_android_vh_alloc_pages_reset_wmark(gfp_mask, order,
+		&alloc_flags, &did_some_progress, &no_progress_loops, direct_reclaim_retries);
 
 	if (should_reclaim_retry(gfp_mask, order, ac, alloc_flags,
 				 did_some_progress > 0, &no_progress_loops))
@@ -4358,6 +4457,8 @@ fail:
 			"page allocation failure: order:%u", order);
 got_pg:
 	trace_android_vh_alloc_pages_slowpath(gfp_mask, order, alloc_start);
+	trace_android_vh_alloc_pages_slowpath_end(&gfp_mask, order, alloc_start,
+			stime, did_some_progress, pages_reclaimed, retry_loop_count);
 	return page;
 }
 
@@ -4579,7 +4680,7 @@ EXPORT_SYMBOL_GPL(__alloc_pages_bulk);
 struct page *__alloc_pages(gfp_t gfp, unsigned int order, int preferred_nid,
 							nodemask_t *nodemask)
 {
-	struct page *page;
+	struct page *page = NULL;
 	unsigned int alloc_flags = ALLOC_WMARK_LOW;
 	gfp_t alloc_gfp; /* The gfp_t that was actually used for allocation */
 	struct alloc_context ac = { };
@@ -4605,6 +4706,9 @@ struct page *__alloc_pages(gfp_t gfp, unsigned int order, int preferred_nid,
 			&alloc_gfp, &alloc_flags))
 		return NULL;
 
+	trace_android_rvh_try_alloc_pages_gfp(&page, order, gfp, gfp_zone(gfp));
+	if (page)
+		goto out;
 	/*
 	 * Forbid the first pass from falling back to types that fragment
 	 * memory until all local zones are considered.
@@ -5693,8 +5797,15 @@ unsigned long free_reserved_area(void *start, void *end, int poison, const char 
 		free_reserved_page(page);
 	}
 
-	if (pages && s)
+	if (pages && s) {
 		pr_info("Freeing %s memory: %ldK\n", s, K(pages));
+		if (!strcmp(s, "initrd") || !strcmp(s, "unused kernel")) {
+			long size;
+
+			size = -1 * (long)(pages << PAGE_SHIFT);
+			memblock_memsize_mod_kernel_size(size);
+		}
+	}
 
 	return pages;
 }
@@ -5831,9 +5942,9 @@ static void __setup_per_zone_wmarks(void)
 	struct zone *zone;
 	unsigned long flags;
 
-	/* Calculate total number of !ZONE_HIGHMEM and !ZONE_MOVABLE pages */
+	/* Calculate total number of pages below ZONE_HIGHMEM */
 	for_each_zone(zone) {
-		if (!is_highmem(zone) && zone_idx(zone) != ZONE_MOVABLE)
+		if (zone_idx(zone) <= ZONE_NORMAL)
 			lowmem_pages += zone_managed_pages(zone);
 	}
 
@@ -5843,11 +5954,11 @@ static void __setup_per_zone_wmarks(void)
 		spin_lock_irqsave(&zone->lock, flags);
 		tmp = (u64)pages_min * zone_managed_pages(zone);
 		do_div(tmp, lowmem_pages);
-		if (is_highmem(zone) || zone_idx(zone) == ZONE_MOVABLE) {
+		if (zone_idx(zone) > ZONE_NORMAL) {
 			/*
 			 * __GFP_HIGH and PF_MEMALLOC allocations usually don't
-			 * need highmem and movable zones pages, so cap pages_min
-			 * to a small  value here.
+			 * need pages from zones above ZONE_NORMAL, so cap
+			 * pages_min to a small value here.
 			 *
 			 * The WMARK_HIGH-WMARK_LOW and (WMARK_LOW-WMARK_MIN)
 			 * deltas control async page reclaim, and so should
@@ -6416,6 +6527,8 @@ int alloc_contig_range(unsigned long start, unsigned long end,
 
 	/* Make sure the range is really isolated. */
 	if (test_pages_isolated(outer_start, end, 0)) {
+		trace_android_vh_alloc_contig_range_not_isolated(outer_start,
+								end);
 		ret = -EBUSY;
 		goto done;
 	}
@@ -6647,7 +6760,7 @@ bool is_free_buddy_page(struct page *page)
 	unsigned long pfn = page_to_pfn(page);
 	unsigned int order;
 
-	for (order = 0; order <= MAX_ORDER; order++) {
+	for (order = 0; order < NR_PAGE_ORDERS; order++) {
 		struct page *page_head = page - (pfn & ((1 << order) - 1));
 
 		if (PageBuddy(page_head) &&
@@ -6706,7 +6819,7 @@ bool take_page_off_buddy(struct page *page)
 	bool ret = false;
 
 	spin_lock_irqsave(&zone->lock, flags);
-	for (order = 0; order <= MAX_ORDER; order++) {
+	for (order = 0; order < NR_PAGE_ORDERS; order++) {
 		struct page *page_head = page - (pfn & ((1 << order) - 1));
 		int page_order = buddy_order(page_head);
 

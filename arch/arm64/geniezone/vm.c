@@ -15,6 +15,18 @@
 
 #define PAR_PA47_MASK GENMASK_ULL(47, 12)
 
+static struct timecycle clock_scale_factor;
+
+u32 gzvm_vtimer_get_clock_mult(void)
+{
+	return clock_scale_factor.mult;
+}
+
+u32 gzvm_vtimer_get_clock_shift(void)
+{
+	return clock_scale_factor.shift;
+}
+
 /**
  * gzvm_hypcall_wrapper() - the wrapper for hvc calls
  * @a0: arguments passed in registers 0
@@ -77,6 +89,18 @@ int gzvm_arch_probe(void)
 	ret = gzvm_hypcall_wrapper(MT_HVC_GZVM_PROBE, 0, 0, 0, 0, 0, 0, 0, &res);
 	if (ret)
 		return -ENXIO;
+
+	return 0;
+}
+
+int gzvm_arch_drv_init(void)
+{
+	/* timecycle init mult shift */
+	clocks_calc_mult_shift(&clock_scale_factor.mult,
+			       &clock_scale_factor.shift,
+			       arch_timer_get_cntfrq(),
+			       NSEC_PER_SEC,
+			       30);
 
 	return 0;
 }
@@ -387,36 +411,14 @@ int gzvm_vm_ioctl_arch_enable_cap(struct gzvm *gzvm,
 	case GZVM_CAP_BLOCK_BASED_DEMAND_PAGING:
 		ret = gzvm_vm_arch_enable_cap(gzvm, cap, &res);
 		return ret;
+	case GZVM_CAP_ENABLE_IDLE:
+		ret = gzvm_vm_arch_enable_cap(gzvm, cap, &res);
+		return ret;
 	default:
 		break;
 	}
 
 	return -EINVAL;
-}
-
-/**
- * gzvm_hva_to_pa_arch() - converts hva to pa with arch-specific way
- * @hva: Host virtual address.
- *
- * Return: GZVM_PA_ERR_BAD for translation error
- */
-u64 gzvm_hva_to_pa_arch(u64 hva)
-{
-	unsigned long flags;
-	u64 par;
-
-	local_irq_save(flags);
-	asm volatile("at s1e1r, %0" :: "r" (hva));
-	isb();
-	par = read_sysreg_par();
-	local_irq_restore(flags);
-
-	if (par & SYS_PAR_EL1_F)
-		return GZVM_PA_ERR_BAD;
-	par = par & PAR_PA47_MASK;
-	if (!par)
-		return GZVM_PA_ERR_BAD;
-	return par;
 }
 
 int gzvm_arch_map_guest(u16 vm_id, int memslot_id, u64 pfn, u64 gfn,

@@ -24,7 +24,10 @@
 #include "protocols.h"
 #include "notify.h"
 
-#define MAX_OPPS		16
+/* Updated only after ALL the mandatory features for that version are merged */
+#define SCMI_PROTOCOL_SUPPORTED_VERSION		0x40000
+
+#define MAX_OPPS		32
 
 enum scmi_performance_protocol_cmd {
 	PERF_DOMAIN_ATTRIBUTES = 0x3,
@@ -796,28 +799,13 @@ static void scmi_perf_domain_init_fc(const struct scmi_protocol_handle *ph,
 	*p_fc = fc;
 }
 
-/* Device specific ops */
-static int scmi_dev_domain_id(struct device *dev)
-{
-	struct of_phandle_args clkspec;
-
-	if (of_parse_phandle_with_args(dev->of_node, "clocks", "#clock-cells",
-				       0, &clkspec))
-		return -EINVAL;
-
-	return clkspec.args[0];
-}
-
 static int scmi_dvfs_device_opps_add(const struct scmi_protocol_handle *ph,
-				     struct device *dev)
+				     struct device *dev, u32 domain)
 {
-	int idx, ret, domain;
+	int idx, ret;
 	unsigned long freq;
+	struct dev_pm_opp_data data = {};
 	struct perf_dom_info *dom;
-
-	domain = scmi_dev_domain_id(dev);
-	if (domain < 0)
-		return -EINVAL;
 
 	dom = scmi_perf_domain_lookup(ph, domain);
 	if (IS_ERR(dom))
@@ -829,7 +817,10 @@ static int scmi_dvfs_device_opps_add(const struct scmi_protocol_handle *ph,
 		else
 			freq = dom->opp[idx].indicative_freq * dom->mult_factor;
 
-		ret = dev_pm_opp_add(dev, freq, 0);
+		data.level = dom->opp[idx].perf;
+		data.freq = freq;
+
+		ret = dev_pm_opp_add_dynamic(dev, &data);
 		if (ret) {
 			dev_warn(dev, "failed to add opp %luHz\n", freq);
 			dev_pm_opp_remove_all_dynamic(dev);
@@ -844,14 +835,9 @@ static int scmi_dvfs_device_opps_add(const struct scmi_protocol_handle *ph,
 
 static int
 scmi_dvfs_transition_latency_get(const struct scmi_protocol_handle *ph,
-				 struct device *dev)
+				 u32 domain)
 {
-	int domain;
 	struct perf_dom_info *dom;
-
-	domain = scmi_dev_domain_id(dev);
-	if (domain < 0)
-		return -EINVAL;
 
 	dom = scmi_perf_domain_lookup(ph, domain);
 	if (IS_ERR(dom))
@@ -949,14 +935,9 @@ static int scmi_dvfs_est_power_get(const struct scmi_protocol_handle *ph,
 }
 
 static bool scmi_fast_switch_possible(const struct scmi_protocol_handle *ph,
-				      struct device *dev)
+				      u32 domain)
 {
-	int domain;
 	struct perf_dom_info *dom;
-
-	domain = scmi_dev_domain_id(dev);
-	if (domain < 0)
-		return false;
 
 	dom = scmi_perf_domain_lookup(ph, domain);
 	if (IS_ERR(dom))
@@ -980,7 +961,6 @@ static const struct scmi_perf_proto_ops perf_proto_ops = {
 	.limits_get = scmi_perf_limits_get,
 	.level_set = scmi_perf_level_set,
 	.level_get = scmi_perf_level_get,
-	.device_domain_id = scmi_dev_domain_id,
 	.transition_latency_get = scmi_dvfs_transition_latency_get,
 	.device_opps_add = scmi_dvfs_device_opps_add,
 	.freq_set = scmi_dvfs_freq_set,
@@ -1134,7 +1114,7 @@ static int scmi_perf_protocol_init(const struct scmi_protocol_handle *ph)
 	if (ret)
 		return ret;
 
-	return ph->set_priv(ph, pinfo);
+	return ph->set_priv(ph, pinfo, version);
 }
 
 static const struct scmi_protocol scmi_perf = {
@@ -1143,6 +1123,7 @@ static const struct scmi_protocol scmi_perf = {
 	.instance_init = &scmi_perf_protocol_init,
 	.ops = &perf_proto_ops,
 	.events = &perf_protocol_events,
+	.supported_version = SCMI_PROTOCOL_SUPPORTED_VERSION,
 };
 
 DEFINE_SCMI_PROTOCOL_REGISTER_UNREGISTER(perf, scmi_perf)

@@ -540,8 +540,9 @@ static bool shmem_confirm_swap(struct address_space *mapping,
 
 static int shmem_huge __read_mostly = SHMEM_HUGE_NEVER;
 
-bool shmem_is_huge(struct inode *inode, pgoff_t index, bool shmem_huge_force,
-		   struct mm_struct *mm, unsigned long vm_flags)
+static bool __shmem_is_huge(struct inode *inode, pgoff_t index,
+			    bool shmem_huge_force, struct mm_struct *mm,
+			    unsigned long vm_flags)
 {
 	loff_t i_size;
 
@@ -570,6 +571,16 @@ bool shmem_is_huge(struct inode *inode, pgoff_t index, bool shmem_huge_force,
 	default:
 		return false;
 	}
+}
+
+bool shmem_is_huge(struct inode *inode, pgoff_t index,
+		   bool shmem_huge_force, struct mm_struct *mm,
+		   unsigned long vm_flags)
+{
+	if (HPAGE_PMD_ORDER > MAX_PAGECACHE_ORDER)
+		return false;
+
+	return __shmem_is_huge(inode, index, shmem_huge_force, mm, vm_flags);
 }
 
 #if defined(CONFIG_SYSFS)
@@ -701,7 +712,7 @@ next:
 		folio_put(folio);
 
 		/* If split failed move the inode on the list back to shrinklist */
-		if (ret)
+		if (ret < 0)
 			goto move_back;
 
 		split++;
@@ -1469,7 +1480,7 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 	if (folio_test_large(folio)) {
 		/* Ensure the subpages are still dirty */
 		folio_test_set_dirty(folio);
-		if (split_huge_page(page) < 0)
+		if (split_huge_page(page))
 			goto redirty;
 		folio = page_folio(page);
 		folio_clear_dirty(folio);
@@ -2177,7 +2188,7 @@ static int synchronous_wake_function(wait_queue_entry_t *wait, unsigned mode, in
 	return ret;
 }
 
-static vm_fault_t shmem_fault(struct vm_fault *vmf)
+vm_fault_t shmem_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct inode *inode = file_inode(vma->vm_file);

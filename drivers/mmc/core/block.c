@@ -46,7 +46,6 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
-#include <trace/hooks/mmc.h>
 
 #include <linux/uaccess.h>
 
@@ -1559,7 +1558,7 @@ void mmc_blk_cqe_recovery(struct mmc_queue *mq)
 	pr_debug("%s: CQE recovery start\n", mmc_hostname(host));
 
 	err = mmc_cqe_recovery(host);
-	if (err)
+	if (err || host->cqe_recovery_reset_always)
 		mmc_blk_reset(mq->blkdata, host, MMC_BLK_CQE_RECOVERY);
 	mmc_blk_reset_success(mq->blkdata, MMC_BLK_CQE_RECOVERY);
 
@@ -3030,7 +3029,6 @@ static int mmc_blk_probe(struct mmc_card *card)
 		ret = PTR_ERR(md);
 		goto out_free;
 	}
-	trace_android_vh_mmc_update_mmc_queue(card, &md->queue);
 
 	ret = mmc_blk_alloc_parts(card, md);
 	if (ret)

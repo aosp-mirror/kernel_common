@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/gfp.h>
 #include <net/tcp.h>
+#include <trace/hooks/net.h>
 
 static u32 tcp_clamp_rto_to_user_timeout(const struct sock *sk)
 {
@@ -69,11 +70,7 @@ u32 tcp_clamp_probe0_to_user_timeout(const struct sock *sk, u32 when)
 
 static void tcp_write_err(struct sock *sk)
 {
-	WRITE_ONCE(sk->sk_err, READ_ONCE(sk->sk_err_soft) ? : ETIMEDOUT);
-	sk_error_report(sk);
-
-	tcp_write_queue_purge(sk);
-	tcp_done(sk);
+	tcp_done_with_error(sk, READ_ONCE(sk->sk_err_soft) ? : ETIMEDOUT);
 	__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPABORTONTIMEOUT);
 }
 
@@ -254,6 +251,7 @@ static int tcp_write_timeout(struct sock *sk)
 		if (retransmits_timed_out(sk, READ_ONCE(net->ipv4.sysctl_tcp_retries1), 0)) {
 			/* Black hole detection */
 			tcp_mtu_probing(icsk, sk);
+			trace_android_vh_tcp_write_timeout_estab_retrans(sk);
 
 			__dst_negative_advice(sk);
 		}
@@ -282,9 +280,14 @@ static int tcp_write_timeout(struct sock *sk)
 
 	if (expired) {
 		/* Has it gone just too far? */
+
+		trace_android_vh_tcp_state_change(sk, TCP_STATE_CHANGE_REASON_SYN_TIMEOUT, 0);
+
 		tcp_write_err(sk);
 		return 1;
 	}
+
+	trace_android_vh_tcp_state_change(sk, TCP_STATE_CHANGE_REASON_RETRANSMIT, 0);
 
 	if (sk_rethink_txhash(sk)) {
 		tp->timeout_rehash++;
@@ -457,16 +460,33 @@ static void tcp_fastopen_synack_timer(struct sock *sk, struct request_sock *req)
 static bool tcp_rtx_probe0_timed_out(const struct sock *sk,
 				     const struct sk_buff *skb)
 {
+	const struct inet_connection_sock *icsk = inet_csk(sk);
+	u32 user_timeout = READ_ONCE(icsk->icsk_user_timeout);
 	const struct tcp_sock *tp = tcp_sk(sk);
-	const int timeout = TCP_RTO_MAX * 2;
-	u32 rcv_delta, rtx_delta;
-
-	rcv_delta = inet_csk(sk)->icsk_timeout - tp->rcv_tstamp;
-	if (rcv_delta <= timeout)
-		return false;
+	int timeout = TCP_RTO_MAX * 2;
+	u32 rtx_delta;
+	s32 rcv_delta;
 
 	rtx_delta = (u32)msecs_to_jiffies(tcp_time_stamp(tp) -
 			(tp->retrans_stamp ?: tcp_skb_timestamp(skb)));
+
+	if (user_timeout) {
+		/* If user application specified a TCP_USER_TIMEOUT,
+		 * it does not want win 0 packets to 'reset the timer'
+		 * while retransmits are not making progress.
+		 */
+		if (rtx_delta > user_timeout)
+			return true;
+		timeout = min_t(u32, timeout, msecs_to_jiffies(user_timeout));
+	}
+
+	/* Note: timer interrupt might have been delayed by at least one jiffy,
+	 * and tp->rcv_tstamp might very well have been written recently.
+	 * rcv_delta can thus be negative.
+	 */
+	rcv_delta = icsk->icsk_timeout - tp->rcv_tstamp;
+	if (rcv_delta <= timeout)
+		return false;
 
 	return rtx_delta > timeout;
 }
@@ -508,8 +528,6 @@ void tcp_retransmit_timer(struct sock *sk)
 	skb = tcp_rtx_queue_head(sk);
 	if (WARN_ON_ONCE(!skb))
 		return;
-
-	tp->tlp_high_seq = 0;
 
 	if (!tp->snd_wnd && !sock_flag(sk, SOCK_DEAD) &&
 	    !((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV))) {
@@ -628,6 +646,8 @@ out_reset_timer:
 		 * activated.
 		 */
 		icsk->icsk_rto = min(icsk->icsk_rto << 1, TCP_RTO_MAX);
+
+		trace_android_vh_tcp_fastsyn(sk);
 	}
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
 				  tcp_clamp_rto_to_user_timeout(sk), TCP_RTO_MAX);

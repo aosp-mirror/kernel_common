@@ -592,7 +592,7 @@ __poll_t tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 		 */
 		mask |= EPOLLOUT | EPOLLWRNORM;
 	}
-	/* This barrier is coupled with smp_wmb() in tcp_reset() */
+	/* This barrier is coupled with smp_wmb() in tcp_done_with_error() */
 	smp_rmb();
 	if (READ_ONCE(sk->sk_err) ||
 	    !skb_queue_empty_lockless(&sk->sk_error_queue))
@@ -1119,6 +1119,8 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 		}
 	}
 
+	trace_android_vh_uplink_send_msg(sk);
+
 	/* This should be in poll */
 	sk_clear_bit(SOCKWQ_ASYNC_NOSPACE, sk);
 
@@ -1159,6 +1161,9 @@ new_segment:
 
 			process_backlog++;
 
+#ifdef CONFIG_SKB_DECRYPTED
+			skb->decrypted = !!(flags & MSG_SENDPAGE_DECRYPTED);
+#endif
 			tcp_skb_entail(sk, skb);
 			copy = size_goal;
 
@@ -1722,7 +1727,7 @@ int tcp_set_rcvlowat(struct sock *sk, int val)
 	space = tcp_space_from_win(sk, val);
 	if (space > sk->sk_rcvbuf) {
 		WRITE_ONCE(sk->sk_rcvbuf, space);
-		tcp_sk(sk)->window_clamp = val;
+		WRITE_ONCE(tcp_sk(sk)->window_clamp, val);
 	}
 	return 0;
 }
@@ -2602,6 +2607,8 @@ void tcp_set_state(struct sock *sk, int state)
 {
 	int oldstate = sk->sk_state;
 
+	trace_android_vh_tcp_state_change(sk, TCP_STATE_CHANGE_REASON_NORMAL, state);
+
 	/* We defined a new enum for TCP states that are exported in BPF
 	 * so as not force the internal TCP states to be frozen. The
 	 * following checks will detect if an internal state value ever
@@ -2642,6 +2649,10 @@ void tcp_set_state(struct sock *sk, int state)
 		if (oldstate != TCP_ESTABLISHED)
 			TCP_INC_STATS(sock_net(sk), TCP_MIB_CURRESTAB);
 		break;
+	case TCP_CLOSE_WAIT:
+		if (oldstate == TCP_SYN_RECV)
+			TCP_INC_STATS(sock_net(sk), TCP_MIB_CURRESTAB);
+		break;
 
 	case TCP_CLOSE:
 		if (oldstate == TCP_CLOSE_WAIT || oldstate == TCP_ESTABLISHED)
@@ -2653,7 +2664,7 @@ void tcp_set_state(struct sock *sk, int state)
 			inet_put_port(sk);
 		fallthrough;
 	default:
-		if (oldstate == TCP_ESTABLISHED)
+		if (oldstate == TCP_ESTABLISHED || oldstate == TCP_CLOSE_WAIT)
 			TCP_DEC_STATS(sock_net(sk), TCP_MIB_CURRESTAB);
 	}
 
@@ -2715,7 +2726,7 @@ void tcp_shutdown(struct sock *sk, int how)
 	/* If we've already sent a FIN, or it's a closed state, skip this. */
 	if ((1 << sk->sk_state) &
 	    (TCPF_ESTABLISHED | TCPF_SYN_SENT |
-	     TCPF_SYN_RECV | TCPF_CLOSE_WAIT)) {
+	     TCPF_CLOSE_WAIT)) {
 		/* Clear out any half completed packets.  FIN if needed. */
 		if (tcp_close_state(sk))
 			tcp_send_fin(sk);
@@ -2824,7 +2835,7 @@ void __tcp_close(struct sock *sk, long timeout)
 		 * machine. State transitions:
 		 *
 		 * TCP_ESTABLISHED -> TCP_FIN_WAIT1
-		 * TCP_SYN_RECV	-> TCP_FIN_WAIT1 (forget it, it's impossible)
+		 * TCP_SYN_RECV	-> TCP_FIN_WAIT1 (it is difficult)
 		 * TCP_CLOSE_WAIT -> TCP_LAST_ACK
 		 *
 		 * are legal only when FIN has been sent (i.e. in window),
@@ -3384,7 +3395,7 @@ int tcp_set_window_clamp(struct sock *sk, int val)
 	if (!val) {
 		if (sk->sk_state != TCP_CLOSE)
 			return -EINVAL;
-		tp->window_clamp = 0;
+		WRITE_ONCE(tp->window_clamp, 0);
 	} else {
 		u32 new_rcv_ssthresh, old_window_clamp = tp->window_clamp;
 		u32 new_window_clamp = val < SOCK_MIN_RCVBUF / 2 ?
@@ -3393,7 +3404,7 @@ int tcp_set_window_clamp(struct sock *sk, int val)
 		if (new_window_clamp == old_window_clamp)
 			return 0;
 
-		tp->window_clamp = new_window_clamp;
+		WRITE_ONCE(tp->window_clamp, new_window_clamp);
 		if (new_window_clamp < old_window_clamp) {
 			/* need to apply the reserved mem provisioning only
 			 * when shrinking the window clamp
@@ -4018,7 +4029,7 @@ int do_tcp_getsockopt(struct sock *sk, int level,
 				      TCP_RTO_MAX / HZ);
 		break;
 	case TCP_WINDOW_CLAMP:
-		val = tp->window_clamp;
+		val = READ_ONCE(tp->window_clamp);
 		break;
 	case TCP_INFO: {
 		struct tcp_info info;

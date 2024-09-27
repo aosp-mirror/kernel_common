@@ -42,7 +42,7 @@ static int __init early_page_shift_compat(char *buf)
 
 	return 0;
 }
-early_param("androidboot.page_shift", early_page_shift_compat);
+early_param("page_shift", early_page_shift_compat);
 
 static int __init init_mmap_rnd_bits(void)
 {
@@ -96,6 +96,29 @@ unsigned long ___filemap_len(struct inode *inode, unsigned long pgoff, unsigned 
 	return len;
 }
 
+static inline bool is_shmem_fault(const struct vm_operations_struct *vm_ops)
+{
+#ifdef CONFIG_SHMEM
+	return vm_ops->fault == shmem_fault;
+#else
+	return false;
+#endif
+}
+
+static inline bool is_f2fs_filemap_fault(const struct vm_operations_struct *vm_ops)
+{
+#ifdef CONFIG_F2FS_FS
+	return vm_ops->fault == f2fs_filemap_fault;
+#else
+	return false;
+#endif
+}
+
+static inline bool is_filemap_fault(const struct vm_operations_struct *vm_ops)
+{
+	return vm_ops->fault == filemap_fault;
+}
+
 /*
  * This is called to fill any holes created by ___filemap_len()
  * with an anonymous mapping.
@@ -108,6 +131,7 @@ void ___filemap_fixup(unsigned long addr, unsigned long prot, unsigned long old_
 	struct mm_struct *mm = current->mm;
 	unsigned long populate = 0;
 	struct vm_area_struct *vma;
+	const struct vm_operations_struct *vm_ops;
 
 	if (!anon_len)
 		return;
@@ -126,8 +150,22 @@ void ___filemap_fixup(unsigned long addr, unsigned long prot, unsigned long old_
 	 */
 	BUG_ON(!vma);
 
-	/* Only handle fixups for filemap faults */
-	if (vma->vm_ops && vma->vm_ops->fault != filemap_fault)
+	vm_ops = vma->vm_ops;
+	if (!vm_ops)
+		return;
+
+	/*
+	 * Insert fixup vmas for file backed and shmem backed VMAs.
+	 *
+	 * Faulting off the end of a file will result in SIGBUS since there is no
+	 * file page for the given file offset.
+	 *
+	 * shmem pages live in page cache or swap cache. Looking up a page cache
+	 * page with an index (pgoff) beyond the file is invalid and will result
+	 * in shmem_get_folio_gfp() returning -EINVAL.
+	 */
+	if (!is_filemap_fault(vm_ops) && !is_f2fs_filemap_fault(vm_ops) &&
+	    !is_shmem_fault(vm_ops))
 		return;
 
 	/*
@@ -137,4 +175,30 @@ void ___filemap_fixup(unsigned long addr, unsigned long prot, unsigned long old_
 	anon_addr = do_mmap(NULL, anon_addr, anon_len, prot,
 					MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED|__MAP_NO_COMPAT,
 					0, 0, &populate, NULL);
+}
+
+/*
+ * Folds any anon fixup entries created by ___filemap_fixup()
+ * into the previous mapping so that /proc/<pid>/[s]maps don't
+ * show unaliged entries.
+ */
+void __fold_filemap_fixup_entry(struct vma_iterator *iter, unsigned long *end)
+{
+	struct vm_area_struct *next_vma;
+
+	/* Not emulating page size? */
+	if (!static_branch_unlikely(&page_shift_compat_enabled))
+		return;
+
+	/* Advance iterator */
+	next_vma = vma_next(iter);
+
+	/* If fixup VMA, adjust the end to cover its extent */
+	if (next_vma && (next_vma->vm_flags & __VM_NO_COMPAT)) {
+		*end = next_vma->vm_end;
+		return;
+	}
+
+	/* Rewind iterator */
+	vma_prev(iter);
 }

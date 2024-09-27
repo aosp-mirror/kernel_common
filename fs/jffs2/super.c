@@ -58,6 +58,7 @@ static void jffs2_i_init_once(void *foo)
 	struct jffs2_inode_info *f = foo;
 
 	mutex_init(&f->sem);
+	f->target = NULL;
 	inode_init_once(&f->vfs_inode);
 }
 
@@ -439,3 +440,4 @@ MODULE_DESCRIPTION("The Journalling Flash File System, v2");
 MODULE_AUTHOR("Red Hat, Inc.");
 MODULE_LICENSE("GPL"); // Actually dual-licensed, but it doesn't matter for
 		       // the sake of this tag. It's Free Software.
+MODULE_IMPORT_NS(ANDROID_GKI_VFS_EXPORT_ONLY);

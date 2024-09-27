@@ -2114,6 +2114,104 @@ out:
 	return result;
 }
 
+static int splice_test(const char *mount_dir)
+{
+	const char *in_name = "in";
+	const char *out_name = "out";
+	const int splice_size = 4096;
+
+	int result = TEST_FAILURE;
+	int file_fd = -1;
+	int src_fd = -1;
+	int fuse_dev = -1;
+	int in_fd = -1;
+	int out_fd = -1;
+	int pipefd[2] = {-1, -1};
+
+	TEST(file_fd = s_creat(s_path(s(ft_src), s(in_name)), 0777),
+	     file_fd != -1);
+	TESTSYSCALL(fallocate(file_fd, 0, 0, splice_size));
+	TESTSYSCALL(close(file_fd));
+	file_fd = -1;
+
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TEST(fuse_dev = open("/dev/fuse", O_RDWR | O_CLOEXEC), fuse_dev != -1);
+	TESTEQUAL(mount_fuse(mount_dir, -1, src_fd, &fuse_dev), 0);
+
+	TESTSYSCALL(pipe(pipefd));
+	TEST(in_fd = s_open(s_path(s(mount_dir), s(in_name)), O_RDONLY),
+	     in_fd != -1);
+	TEST(out_fd = s_creat(s_path(s(mount_dir), s(out_name)), 0777),
+	     out_fd != -1);
+	TESTEQUAL(splice(in_fd, NULL, pipefd[1], NULL, splice_size, 0),
+		splice_size);
+	TESTEQUAL(splice(pipefd[0], NULL, out_fd, NULL, splice_size, 0),
+		splice_size);
+	TESTSYSCALL(close(in_fd));
+	in_fd = -1;
+	TESTSYSCALL(close(out_fd));
+	out_fd = -1;
+	TESTSYSCALL(close(pipefd[0]));
+	pipefd[0] = -1;
+	TESTSYSCALL(close(pipefd[1]));
+	pipefd[1] = -1;
+	result = TEST_SUCCESS;
+out:
+	umount(mount_dir);
+	close(fuse_dev);
+	close(src_fd);
+	close(in_fd);
+	close(out_fd);
+	close(pipefd[0]);
+	close(pipefd[1]);
+	return result;
+}
+
+/**
+ * Test that fuse passthrough correctly traverses a mount point on the lower fs
+ */
+static int bpf_test_follow_mounts(const char *mount_dir)
+{
+	const char *bind_src = "bind_src";
+	const char *bind_dst = "bind_dst";
+	const char *file = "file";
+	int fd = -1;
+	int src_fd = -1;
+	int result = TEST_FAILURE;
+
+	TESTSYSCALL(s_mkdir(s_path(s(ft_src), s(bind_src)), 0777));
+	TESTSYSCALL(s_mkdir(s_path(s(ft_src), s(bind_dst)), 0777));
+	TEST(fd = s_creat(s_pathn(3, s(ft_src), s(bind_src), s(file)), 0777),
+	     fd != -1);
+	TESTSYSCALL(close(fd));
+	fd = -1;
+	TESTSYSCALL(s_mount(s_path(s(ft_src), s(bind_src)),
+			    s_path(s(ft_src), s(bind_dst)),
+			    s(NULL), MS_BIND, s(NULL)));
+	TEST(src_fd = open(ft_src, O_DIRECTORY | O_RDONLY | O_CLOEXEC),
+	     src_fd != -1);
+	TESTEQUAL(mount_fuse_no_init(mount_dir, -1, src_fd, NULL), 0);
+	TEST(fd = s_open(s_pathn(3, s(mount_dir), s(bind_src), s(file)),
+			 O_RDONLY),
+	     fd != -1);
+	TESTSYSCALL(close(fd));
+	fd = -1;
+	TEST(fd = s_open(s_pathn(3, s(mount_dir), s(bind_dst), s(file)),
+			 O_RDONLY),
+	     fd != -1);
+	TESTSYSCALL(close(fd));
+	fd = -1;
+
+	result = TEST_SUCCESS;
+out:
+	umount(mount_dir);
+	close(src_fd);
+	s_umount(s_path(s(ft_src), s(bind_dst)));
+	close(fd);
+	return result;
+}
+
 static void parse_range(const char *ranges, bool *run_test, size_t tests)
 {
 	size_t i;
@@ -2244,6 +2342,8 @@ int main(int argc, char *argv[])
 		MAKE_TEST(bpf_test_create_and_remove_bpf),
 		MAKE_TEST(bpf_test_mkdir_and_remove_bpf),
 		MAKE_TEST(bpf_test_readahead),
+		MAKE_TEST(splice_test),
+		MAKE_TEST(bpf_test_follow_mounts),
 	};
 #undef MAKE_TEST
 

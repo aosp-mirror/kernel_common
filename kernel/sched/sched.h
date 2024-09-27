@@ -623,6 +623,9 @@ struct cfs_rq {
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 #endif /* CONFIG_SMP */
 
+	 /* Unused, only kept here to preserve the KMI after revert. */
+	bool			decayed;
+
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	struct rq		*rq;	/* CPU runqueue to which this cfs_rq is attached */
 
@@ -973,6 +976,10 @@ struct balance_callback {
 	void (*func)(struct rq *rq);
 };
 
+typedef enum misfit_reason {
+	MISFIT_PERF,		/* Requires moving to a more performant CPU */
+} misfit_reason_t;
+
 /*
  * This is the main, per-CPU runqueue data structure.
  *
@@ -1187,6 +1194,10 @@ struct rq {
 #if defined(CONFIG_CFS_BANDWIDTH) && defined(CONFIG_SMP)
 	call_single_data_t	cfsb_csd;
 	struct list_head	cfsb_csd_list;
+#endif
+
+#ifdef CONFIG_SMP
+	misfit_reason_t		misfit_reason;
 #endif
 
 	ANDROID_OEM_DATA_ARRAY(1, 16);
@@ -2197,6 +2208,8 @@ static inline int task_on_rq_migrating(struct task_struct *p)
 #define WF_SYNC         0x10 /* Waker goes to sleep after wakeup */
 #define WF_MIGRATED     0x20 /* Internal use, task got migrated */
 #define WF_CURRENT_CPU  0x40 /* Prefer to move the wakee to the current CPU. */
+
+#define WF_ANDROID_VENDOR	0x1000 /* Vendor specific for Android */
 
 #ifdef CONFIG_SMP
 static_assert(WF_EXEC == SD_BALANCE_EXEC);

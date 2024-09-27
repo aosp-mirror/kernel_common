@@ -99,6 +99,7 @@
 #include <linux/ksm.h>
 #include <linux/cpufreq_times.h>
 #include <trace/events/oom.h>
+#include <trace/hooks/sched.h>
 #include "internal.h"
 #include "fd.h"
 
@@ -351,13 +352,24 @@ static ssize_t get_task_cmdline(struct task_struct *tsk, char __user *buf,
 				size_t count, loff_t *pos)
 {
 	struct mm_struct *mm;
+	bool prio_inherited = false;
+	int saved_prio;
 	ssize_t ret;
 
 	mm = get_task_mm(tsk);
 	if (!mm)
 		return 0;
 
+	/*
+	 * access_remote_vm() holds the hot mmap_sem lock which can cause the
+	 * task for which we read cmdline etc for by some debug deamon to slow
+	 * down and suffer a performance hit. Especially if the reader task has
+	 * a low nice value.
+	 */
+	trace_android_vh_prio_inheritance(tsk, &saved_prio, &prio_inherited);
 	ret = get_mm_cmdline(mm, buf, count, pos);
+	if (prio_inherited)
+		trace_android_vh_prio_restore(saved_prio);
 	mmput(mm);
 	return ret;
 }
@@ -1892,8 +1904,6 @@ void proc_pid_evict_inode(struct proc_inode *ei)
 		hlist_del_init_rcu(&ei->sibling_inodes);
 		spin_unlock(&pid->lock);
 	}
-
-	put_pid(pid);
 }
 
 struct inode *proc_pid_make_inode(struct super_block *sb,
@@ -3218,7 +3228,7 @@ static int proc_pid_ksm_stat(struct seq_file *m, struct pid_namespace *ns,
 	mm = get_task_mm(task);
 	if (mm) {
 		seq_printf(m, "ksm_rmap_items %lu\n", mm->ksm_rmap_items);
-		seq_printf(m, "ksm_zero_pages %lu\n", mm->ksm_zero_pages);
+		seq_printf(m, "ksm_zero_pages %ld\n", mm_ksm_zero_pages(mm));
 		seq_printf(m, "ksm_merging_pages %lu\n", mm->ksm_merging_pages);
 		seq_printf(m, "ksm_process_profit %ld\n", ksm_process_profit(mm));
 		mmput(mm);

@@ -12,6 +12,9 @@
 #include <linux/freezer.h>
 #include <linux/kthread.h>
 
+#undef CREATE_TRACE_POINT
+#include <trace/hooks/cgroup.h>
+
 /* total number of freezing conditions in effect */
 DEFINE_STATIC_KEY_FALSE(freezer_active);
 EXPORT_SYMBOL(freezer_active);
@@ -79,6 +82,7 @@ bool __refrigerator(bool check_kthr_stop)
 
 		spin_lock_irq(&freezer_lock);
 		freeze = freezing(current) && !(check_kthr_stop && kthread_should_stop());
+		trace_android_rvh_refrigerator(pm_nosig_freezing);
 		spin_unlock_irq(&freezer_lock);
 
 		if (!freeze)
@@ -187,6 +191,7 @@ static int __restore_freezer_state(struct task_struct *p, void *arg)
 
 	if (state != TASK_RUNNING) {
 		WRITE_ONCE(p->__state, state);
+		p->saved_state = TASK_RUNNING;
 		return 1;
 	}
 
@@ -201,7 +206,7 @@ void __thaw_task(struct task_struct *p)
 	if (WARN_ON_ONCE(freezing(p)))
 		goto unlock;
 
-	if (task_call_func(p, __restore_freezer_state, NULL))
+	if (!frozen(p) || task_call_func(p, __restore_freezer_state, NULL))
 		goto unlock;
 
 	wake_up_state(p, TASK_FROZEN);

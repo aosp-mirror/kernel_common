@@ -37,6 +37,7 @@
 #include <linux/page_owner.h>
 #include <linux/sched/sysctl.h>
 #include <linux/memory-tiers.h>
+#include <linux/compat.h>
 
 #include <asm/tlb.h>
 #include <asm/pgalloc.h>
@@ -75,10 +76,13 @@ unsigned long huge_anon_orders_madvise __read_mostly;
 unsigned long huge_anon_orders_inherit __read_mostly;
 
 unsigned long __thp_vma_allowable_orders(struct vm_area_struct *vma,
-					 unsigned long vm_flags, bool smaps,
-					 bool in_pf, bool enforce_sysfs,
+					 unsigned long vm_flags,
+					 unsigned long tva_flags,
 					 unsigned long orders)
 {
+	bool smaps = tva_flags & TVA_SMAPS;
+	bool in_pf = tva_flags & TVA_IN_PF;
+	bool enforce_sysfs = tva_flags & TVA_ENFORCE_SYSFS;
 	/* Check the intersection of requested and supported orders. */
 	orders &= vma_is_anonymous(vma) ?
 			THP_ORDERS_ALL_ANON : THP_ORDERS_ALL_FILE;
@@ -553,15 +557,15 @@ static struct kobj_attribute _name##_attr = __ATTR_RO(_name)
 DEFINE_MTHP_STAT_ATTR(anon_fault_alloc, MTHP_STAT_ANON_FAULT_ALLOC);
 DEFINE_MTHP_STAT_ATTR(anon_fault_fallback, MTHP_STAT_ANON_FAULT_FALLBACK);
 DEFINE_MTHP_STAT_ATTR(anon_fault_fallback_charge, MTHP_STAT_ANON_FAULT_FALLBACK_CHARGE);
-DEFINE_MTHP_STAT_ATTR(anon_swpout, MTHP_STAT_ANON_SWPOUT);
-DEFINE_MTHP_STAT_ATTR(anon_swpout_fallback, MTHP_STAT_ANON_SWPOUT_FALLBACK);
+DEFINE_MTHP_STAT_ATTR(swpout, MTHP_STAT_SWPOUT);
+DEFINE_MTHP_STAT_ATTR(swpout_fallback, MTHP_STAT_SWPOUT_FALLBACK);
 
 static struct attribute *stats_attrs[] = {
 	&anon_fault_alloc_attr.attr,
 	&anon_fault_fallback_attr.attr,
 	&anon_fault_fallback_charge_attr.attr,
-	&anon_swpout_attr.attr,
-	&anon_swpout_fallback_attr.attr,
+	&swpout_attr.attr,
+	&swpout_fallback_attr.attr,
 	NULL,
 };
 
@@ -836,6 +840,9 @@ static unsigned long __thp_get_unmapped_area(struct file *filp,
 	loff_t off_align = round_up(off, size);
 	unsigned long len_pad, ret;
 
+	if (!IS_ENABLED(CONFIG_64BIT) || in_compat_syscall())
+		return 0;
+
 	if (off_end <= off_align || (off_end - off_align) < size)
 		return 0;
 
@@ -935,7 +942,7 @@ static vm_fault_t __do_huge_pmd_anonymous_page(struct vm_fault *vmf,
 
 		entry = mk_huge_pmd(page, vma->vm_page_prot);
 		entry = maybe_pmd_mkwrite(pmd_mkdirty(entry), vma);
-		folio_add_new_anon_rmap(folio, vma, haddr);
+		folio_add_new_anon_rmap(folio, vma, haddr, RMAP_EXCLUSIVE);
 		folio_add_lru_vma(folio, vma);
 		pgtable_trans_huge_deposit(vma->vm_mm, vmf->pmd, pgtable);
 		set_pmd_at(vma->vm_mm, haddr, vmf->pmd, entry);
@@ -1015,11 +1022,13 @@ vm_fault_t do_huge_pmd_anonymous_page(struct vm_fault *vmf)
 	gfp_t gfp;
 	struct folio *folio;
 	unsigned long haddr = vmf->address & HPAGE_PMD_MASK;
+	vm_fault_t ret;
 
 	if (!thp_vma_suitable_order(vma, haddr, PMD_ORDER))
 		return VM_FAULT_FALLBACK;
-	if (unlikely(anon_vma_prepare(vma)))
-		return VM_FAULT_OOM;
+	ret = vmf_anon_prepare(vmf);
+	if (ret)
+		return ret;
 	khugepaged_enter_vma(vma, vma->vm_flags);
 
 	if (!(vmf->flags & FAULT_FLAG_WRITE) &&
@@ -1627,7 +1636,7 @@ static inline bool can_change_pmd_writable(struct vm_area_struct *vma,
 		return false;
 
 	/* Do we need write faults for softdirty tracking? */
-	if (vma_soft_dirty_enabled(vma) && !pmd_soft_dirty(pmd))
+	if (pmd_needs_soft_dirty_wp(vma, pmd))
 		return false;
 
 	/* Do we need write faults for uffd-wp tracking? */
@@ -1677,7 +1686,7 @@ static inline bool can_follow_write_pmd(pmd_t pmd, struct page *page,
 		return false;
 
 	/* ... and a write-fault isn't required for other reasons. */
-	if (vma_soft_dirty_enabled(vma) && !pmd_soft_dirty(pmd))
+	if (pmd_needs_soft_dirty_wp(vma, pmd))
 		return false;
 	return !userfaultfd_huge_pmd_wp(vma, pmd);
 }
@@ -2330,6 +2339,7 @@ spinlock_t *__pmd_trans_huge_lock(pmd_t *pmd, struct vm_area_struct *vma)
 	spin_unlock(ptl);
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(__pmd_trans_huge_lock);
 
 /*
  * Returns page table lock pointer if a given pud maps a thp, NULL otherwise.
@@ -2509,32 +2519,11 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		return __split_huge_zero_page_pmd(vma, haddr, pmd);
 	}
 
-	/*
-	 * Up to this point the pmd is present and huge and userland has the
-	 * whole access to the hugepage during the split (which happens in
-	 * place). If we overwrite the pmd with the not-huge version pointing
-	 * to the pte here (which of course we could if all CPUs were bug
-	 * free), userland could trigger a small page size TLB miss on the
-	 * small sized TLB while the hugepage TLB entry is still established in
-	 * the huge TLB. Some CPU doesn't like that.
-	 * See http://support.amd.com/TechDocs/41322_10h_Rev_Gd.pdf, Erratum
-	 * 383 on page 105. Intel should be safe but is also warns that it's
-	 * only safe if the permission and cache attributes of the two entries
-	 * loaded in the two TLB is identical (which should be the case here).
-	 * But it is generally safer to never allow small and huge TLB entries
-	 * for the same virtual address to be loaded simultaneously. So instead
-	 * of doing "pmd_populate(); flush_pmd_tlb_range();" we first mark the
-	 * current pmd notpresent (atomically because here the pmd_trans_huge
-	 * must remain set at all times on the pmd until the split is complete
-	 * for this pmd), then we flush the SMP TLB and finally we write the
-	 * non-huge version of the pmd entry with pmd_populate.
-	 */
-	old_pmd = pmdp_invalidate(vma, haddr, pmd);
-
-	pmd_migration = is_pmd_migration_entry(old_pmd);
+	pmd_migration = is_pmd_migration_entry(*pmd);
 	if (unlikely(pmd_migration)) {
 		swp_entry_t entry;
 
+		old_pmd = *pmd;
 		entry = pmd_to_swp_entry(old_pmd);
 		page = pfn_swap_entry_to_page(entry);
 		write = is_writable_migration_entry(entry);
@@ -2545,6 +2534,30 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 		soft_dirty = pmd_swp_soft_dirty(old_pmd);
 		uffd_wp = pmd_swp_uffd_wp(old_pmd);
 	} else {
+		/*
+		 * Up to this point the pmd is present and huge and userland has
+		 * the whole access to the hugepage during the split (which
+		 * happens in place). If we overwrite the pmd with the not-huge
+		 * version pointing to the pte here (which of course we could if
+		 * all CPUs were bug free), userland could trigger a small page
+		 * size TLB miss on the small sized TLB while the hugepage TLB
+		 * entry is still established in the huge TLB. Some CPU doesn't
+		 * like that. See
+		 * http://support.amd.com/TechDocs/41322_10h_Rev_Gd.pdf, Erratum
+		 * 383 on page 105. Intel should be safe but is also warns that
+		 * it's only safe if the permission and cache attributes of the
+		 * two entries loaded in the two TLB is identical (which should
+		 * be the case here). But it is generally safer to never allow
+		 * small and huge TLB entries for the same virtual address to be
+		 * loaded simultaneously. So instead of doing "pmd_populate();
+		 * flush_pmd_tlb_range();" we first mark the current pmd
+		 * notpresent (atomically because here the pmd_trans_huge must
+		 * remain set at all times on the pmd until the split is
+		 * complete for this pmd), then we flush the SMP TLB and finally
+		 * we write the non-huge version of the pmd entry with
+		 * pmd_populate.
+		 */
+		old_pmd = pmdp_invalidate(vma, haddr, pmd);
 		page = pmd_page(old_pmd);
 		folio = page_folio(page);
 		if (pmd_dirty(old_pmd)) {
@@ -2626,6 +2639,10 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 				entry = pte_swp_mksoft_dirty(entry);
 			if (uffd_wp)
 				entry = pte_swp_mkuffd_wp(entry);
+			if (vma->vm_flags & VM_LOCKED)
+				set_src_usage(page + i, SRC_PAGE_MLOCKED);
+			else
+				set_src_usage(page + i, SRC_PAGE_MAPPED);
 
 			VM_WARN_ON(!pte_none(ptep_get(pte + i)));
 			set_pte_at(mm, addr, pte + i, entry);
@@ -2777,6 +2794,156 @@ static void remap_page(struct folio *folio, unsigned long nr)
 	}
 }
 
+static int prep_to_unmap(struct folio *src)
+{
+	int nr_pages = folio_nr_pages(src);
+
+	if (folio_can_split(src))
+		return 0;
+
+	WARN_ON_ONCE(src->_dst_pp);
+
+	src->_dst_pp = kcalloc(nr_pages, sizeof(struct page *), GFP_ATOMIC);
+
+	return src->_dst_pp ? 0 : -ENOMEM;
+}
+
+static bool try_to_discard(struct folio *src, int i)
+{
+	int usage;
+	void *addr;
+	struct page *page = folio_page(src, i);
+
+	if (!folio_test_anon(src))
+		return false;
+
+	if (folio_test_swapcache(src))
+		return false;
+
+	usage = src_page_usage(page);
+	if (usage & SRC_PAGE_MLOCKED)
+		return false;
+
+	if (!(usage & SRC_PAGE_MAPPED))
+		return true;
+
+	addr = kmap_local_page(page);
+	if (!memchr_inv(addr, 0, PAGE_SIZE))
+		set_src_usage(page, SRC_PAGE_CLEAN);
+	kunmap_local(addr);
+
+	return can_discard_src(page);
+}
+
+static int prep_dst_pages(struct folio *src)
+{
+	int i;
+	int nr_pages = folio_nr_pages(src);
+
+	if (folio_can_split(src))
+		return 0;
+
+	if (WARN_ON_ONCE(!src->_dst_pp))
+		return -ENOMEM;
+
+	for (i = 0; i < nr_pages; i++) {
+		struct page *dst = NULL;
+
+		if (try_to_discard(src, i)) {
+			count_vm_event(THP_SHATTER_PAGE_DISCARDED);
+			continue;
+		}
+
+		do {
+			int nid = folio_nid(src);
+			gfp_t gfp = (GFP_HIGHUSER_MOVABLE & ~__GFP_RECLAIM) |
+				    GFP_NOWAIT | __GFP_THISNODE;
+
+			if (dst)
+				__free_page(dst);
+
+			dst = alloc_pages_node(nid, gfp, 0);
+			if (!dst)
+				return -ENOMEM;
+		} while (!page_ref_freeze(dst, 1));
+
+		copy_highpage(dst, folio_page(src, i));
+		src->_dst_ul[i] |= (unsigned long)dst;
+
+		cond_resched();
+	}
+
+	return 0;
+}
+
+static void free_dst_pages(struct folio *src)
+{
+	int i;
+	int nr_pages = folio_nr_pages(src);
+
+	if (folio_can_split(src))
+		return;
+
+	for (i = 0; i < nr_pages; i++) {
+		struct page *dst = folio_dst_page(src, i);
+
+		if (!dst)
+			continue;
+
+		page_ref_unfreeze(dst, 1);
+		__free_page(dst);
+	}
+
+	kfree(src->_dst_pp);
+	src->_dst_pp = NULL;
+}
+
+static void reset_src_folio(struct folio *src)
+{
+	if (folio_can_split(src))
+		return;
+
+	if (WARN_ON_ONCE(!src->_dst_pp))
+		return;
+
+	if (!folio_mapping_flags(src))
+		src->mapping = NULL;
+
+	if (folio_test_anon(src) && folio_test_swapcache(src)) {
+		folio_clear_swapcache(src);
+		src->swap.val = 0;
+	}
+
+	kfree(src->_dst_pp);
+	src->_dst_pp = NULL;
+}
+
+static bool lru_add_dst(struct lruvec *lruvec, struct folio *src, struct folio *dst)
+{
+	if (folio_can_split(src))
+		return false;
+
+	VM_WARN_ON_ONCE_FOLIO(!folio_test_lru(src), src);
+	VM_WARN_ON_ONCE_FOLIO(folio_test_lru(dst), dst);
+	VM_WARN_ON_ONCE_FOLIO(folio_lruvec(dst) != folio_lruvec(src), dst);
+
+	if (!lru_gen_add_dst(lruvec, dst)) {
+		enum lru_list lru = folio_lru_list(dst);
+		int zone = folio_zonenum(dst);
+		int delta = folio_nr_pages(dst);
+
+		if (folio_test_unevictable(dst))
+			dst->mlock_count = 0;
+		else
+			list_add_tail(&dst->lru, &src->lru);
+		update_lru_size(lruvec, lru, zone, delta);
+	}
+
+	folio_set_lru(dst);
+
+	return true;
+}
+
 static void lru_add_page_tail(struct page *head, struct page *tail,
 		struct lruvec *lruvec, struct list_head *list)
 {
@@ -2790,7 +2957,7 @@ static void lru_add_page_tail(struct page *head, struct page *tail,
 		VM_WARN_ON(PageLRU(head));
 		get_page(tail);
 		list_add_tail(&tail->lru, list);
-	} else {
+	} else if (!lru_add_dst(lruvec, page_folio(head), page_folio(tail))) {
 		/* head is still on lru (and we have it frozen) */
 		VM_WARN_ON(!PageLRU(head));
 		if (PageUnevictable(tail))
@@ -2805,7 +2972,7 @@ static void __split_huge_page_tail(struct folio *folio, int tail,
 		struct lruvec *lruvec, struct list_head *list)
 {
 	struct page *head = &folio->page;
-	struct page *page_tail = head + tail;
+	struct page *page_tail = folio_dst_page(folio, tail);
 	/*
 	 * Careful: new_folio is not a "real" folio before we cleared PageTail.
 	 * Don't pass it around before clear_compound_head().
@@ -2846,8 +3013,8 @@ static void __split_huge_page_tail(struct folio *folio, int tail,
 			 LRU_GEN_MASK | LRU_REFS_MASK));
 
 	/* ->mapping in first and second tail page is replaced by other uses */
-	VM_BUG_ON_PAGE(tail > 2 && page_tail->mapping != TAIL_MAPPING,
-			page_tail);
+	VM_BUG_ON_PAGE(folio_can_split(folio) && tail > 2 &&
+		       page_tail->mapping != TAIL_MAPPING, page_tail);
 	page_tail->mapping = head->mapping;
 	page_tail->index = head->index + tail;
 
@@ -2902,9 +3069,13 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 	unsigned long offset = 0;
 	unsigned int nr = thp_nr_pages(head);
 	int i, nr_dropped = 0;
+	bool can_split = folio_can_split(folio);
 
 	/* complete memcg works before add pages to LRU */
-	split_page_memcg(head, nr);
+	if (can_split)
+		split_page_memcg(head, nr);
+	else
+		folio_copy_memcg(folio);
 
 	if (folio_test_anon(folio) && folio_test_swapcache(folio)) {
 		offset = swp_offset(folio->swap);
@@ -2917,46 +3088,51 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 
 	ClearPageHasHWPoisoned(head);
 
-	for (i = nr - 1; i >= 1; i--) {
+	for (i = nr - 1; i >= can_split; i--) {
+		struct page *dst = folio_dst_page(folio, i);
+
+		if (!dst)
+			continue;
+
 		__split_huge_page_tail(folio, i, lruvec, list);
 		/* Some pages can be beyond EOF: drop them from page cache */
-		if (head[i].index >= end) {
-			struct folio *tail = page_folio(head + i);
+		if (dst->index >= end) {
+			struct folio *tail = page_folio(dst);
 
-			if (shmem_mapping(head->mapping))
+			if (shmem_mapping(tail->mapping))
 				nr_dropped++;
 			else if (folio_test_clear_dirty(tail))
 				folio_account_cleaned(tail,
-					inode_to_wb(folio->mapping->host));
+					inode_to_wb(tail->mapping->host));
 			__filemap_remove_folio(tail, NULL);
 			folio_put(tail);
-		} else if (!PageAnon(page)) {
-			__xa_store(&head->mapping->i_pages, head[i].index,
-					head + i, 0);
+		} else if (!PageAnon(dst)) {
+			__xa_store(&dst->mapping->i_pages, dst->index, dst, 0);
 		} else if (swap_cache) {
-			__xa_store(&swap_cache->i_pages, offset + i,
-					head + i, 0);
+			__xa_store(&swap_cache->i_pages, offset + i, dst, 0);
 		}
 	}
 
-	ClearPageCompound(head);
+	if (can_split)
+		ClearPageCompound(head);
 	unlock_page_lruvec(lruvec);
 	/* Caller disabled irqs, so they are still disabled here */
 
-	split_page_owner(head, nr);
+	if (can_split)
+		split_page_owner(head, nr);
 
 	/* See comment in __split_huge_page_tail() */
 	if (PageAnon(head)) {
 		/* Additional pin to swap cache */
 		if (PageSwapCache(head)) {
-			page_ref_add(head, 2);
+			page_ref_add(head, 2 - !can_split);
 			xa_unlock(&swap_cache->i_pages);
 		} else {
 			page_ref_inc(head);
 		}
 	} else {
 		/* Additional pin to page cache */
-		page_ref_add(head, 2);
+		page_ref_add(head, 2 - !can_split);
 		xa_unlock(&head->mapping->i_pages);
 	}
 	local_irq_enable();
@@ -2966,8 +3142,9 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 	remap_page(folio, nr);
 
 	for (i = 0; i < nr; i++) {
-		struct page *subpage = head + i;
-		if (subpage == page)
+		struct page *subpage = folio_dst_page(folio, i);
+
+		if (!subpage || subpage == page)
 			continue;
 		unlock_page(subpage);
 
@@ -2980,10 +3157,12 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 		 */
 		free_page_and_swap_cache(subpage);
 	}
+
+	reset_src_folio(folio);
 }
 
 /* Racy check whether the huge page can be split */
-bool can_split_folio(struct folio *folio, int *pextra_pins)
+static bool can_split_folio(struct folio *folio, int *pextra_pins)
 {
 	int extra_pins;
 
@@ -3106,7 +3285,20 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
 		goto out_unlock;
 	}
 
+	ret = prep_to_unmap(folio);
+	if (ret)
+		goto out_unlock;
+
 	unmap_folio(folio);
+
+	if (!folio_ref_freeze(folio, 1 + extra_pins)) {
+		ret = -EAGAIN;
+		goto remap;
+	}
+
+	ret = prep_dst_pages(folio);
+	if (ret)
+		goto unfreeze;
 
 	/* block interrupt reentry in xa_lock and spinlock */
 	local_irq_disable();
@@ -3117,44 +3309,44 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
 		 */
 		xas_lock(&xas);
 		xas_reset(&xas);
-		if (xas_load(&xas) != folio)
+		if (xas_load(&xas) != folio) {
+			ret = -EAGAIN;
 			goto fail;
+		}
 	}
 
 	/* Prevent deferred_split_scan() touching ->_refcount */
 	spin_lock(&ds_queue->split_queue_lock);
-	if (folio_ref_freeze(folio, 1 + extra_pins)) {
-		if (!list_empty(&folio->_deferred_list)) {
-			ds_queue->split_queue_len--;
-			list_del(&folio->_deferred_list);
-		}
-		spin_unlock(&ds_queue->split_queue_lock);
-		if (mapping) {
-			int nr = folio_nr_pages(folio);
+	if (!list_empty(&folio->_deferred_list)) {
+		ds_queue->split_queue_len--;
+		list_del_init(&folio->_deferred_list);
+	}
+	spin_unlock(&ds_queue->split_queue_lock);
+	if (mapping) {
+		int nr = folio_nr_pages(folio);
 
-			xas_split(&xas, folio, folio_order(folio));
-			if (folio_test_pmd_mappable(folio)) {
-				if (folio_test_swapbacked(folio)) {
-					__lruvec_stat_mod_folio(folio,
-							NR_SHMEM_THPS, -nr);
-				} else {
-					__lruvec_stat_mod_folio(folio,
-							NR_FILE_THPS, -nr);
-					filemap_nr_thps_dec(mapping);
-				}
+		xas_split(&xas, folio, folio_order(folio));
+		if (folio_test_pmd_mappable(folio)) {
+			if (folio_test_swapbacked(folio)) {
+				__lruvec_stat_mod_folio(folio, NR_SHMEM_THPS, -nr);
+			} else {
+				__lruvec_stat_mod_folio(folio, NR_FILE_THPS, -nr);
+				filemap_nr_thps_dec(mapping);
 			}
 		}
+	}
 
-		__split_huge_page(page, list, end);
-		ret = 0;
-	} else {
-		spin_unlock(&ds_queue->split_queue_lock);
+	__split_huge_page(page, list, end);
+	if (ret) {
 fail:
 		if (mapping)
 			xas_unlock(&xas);
 		local_irq_enable();
+unfreeze:
+		folio_ref_unfreeze(folio, 1 + extra_pins);
+remap:
+		free_dst_pages(folio);
 		remap_page(folio, folio_nr_pages(folio));
-		ret = -EAGAIN;
 	}
 
 out_unlock:
@@ -3166,6 +3358,12 @@ out_unlock:
 		i_mmap_unlock_read(mapping);
 out:
 	xas_destroy(&xas);
+
+	if (!folio_can_split(folio)) {
+		count_vm_event(!ret ? THP_SHATTER_PAGE : THP_SHATTER_PAGE_FAILED);
+		return ret ? : 1;
+	}
+
 	count_vm_event(!ret ? THP_SPLIT_PAGE : THP_SPLIT_PAGE_FAILED);
 	return ret;
 }
@@ -3187,7 +3385,7 @@ void folio_undo_large_rmappable(struct folio *folio)
 	spin_lock_irqsave(&ds_queue->split_queue_lock, flags);
 	if (!list_empty(&folio->_deferred_list)) {
 		ds_queue->split_queue_len--;
-		list_del(&folio->_deferred_list);
+		list_del_init(&folio->_deferred_list);
 	}
 	spin_unlock_irqrestore(&ds_queue->split_queue_lock, flags);
 }
@@ -3237,7 +3435,11 @@ static unsigned long deferred_split_count(struct shrinker *shrink,
 {
 	struct pglist_data *pgdata = NODE_DATA(sc->nid);
 	struct deferred_split *ds_queue = &pgdata->deferred_split_queue;
+	bool bypass = false;
 
+	trace_android_vh_split_large_folio_bypass(&bypass);
+	if (bypass)
+		return 0;
 #ifdef CONFIG_MEMCG
 	if (sc->memcg)
 		ds_queue = &sc->memcg->deferred_split_queue;

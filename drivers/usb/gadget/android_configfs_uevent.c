@@ -8,6 +8,7 @@
 #include <linux/err.h>
 #include <linux/kdev_t.h>
 #include <linux/spinlock.h>
+#include <trace/hooks/usb.h>
 
 static struct android_uevent_opts *android_opts;
 
@@ -117,6 +118,9 @@ static void android_work(struct work_struct *data)
 		 */
 		dev_dbg(dev, "did not send uevent\n");
 	}
+
+	trace_android_vh_configfs_uevent_work(connected,
+		disconnected, configured, uevent_sent);
 }
 
 static ssize_t state_show(struct device *pdev,
@@ -151,13 +155,11 @@ int android_class_create(void)
 {
 	return class_register(&android_usb_class);
 }
-EXPORT_SYMBOL_GPL(android_class_create);
 
 void android_class_destroy(void)
 {
 	class_unregister(&android_usb_class);
 }
-EXPORT_SYMBOL_GPL(android_class_destroy);
 
 int android_device_create(struct android_uevent_opts *opts)
 {
@@ -191,7 +193,6 @@ int android_device_create(struct android_uevent_opts *opts)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(android_device_create);
 
 void android_device_destroy(struct android_uevent_opts *opts)
 {
@@ -226,7 +227,6 @@ void android_device_destroy(struct android_uevent_opts *opts)
 	device_destroy(dev->class, dev->devt);
 	spin_unlock_irqrestore(&opts_lock, flags);
 }
-EXPORT_SYMBOL_GPL(android_device_destroy);
 
 void __android_set_connected(struct android_uevent_opts *opts,
 		bool connected)
@@ -260,25 +260,21 @@ void android_set_connected(struct android_uevent_opts *opts)
 {
 	__android_set_connected(opts, true);
 }
-EXPORT_SYMBOL_GPL(android_set_connected);
 
 void android_set_disconnected(struct android_uevent_opts *opts)
 {
 	__android_set_connected(opts, false);
 }
-EXPORT_SYMBOL_GPL(android_set_disconnected);
 
 void android_set_configured(struct android_uevent_opts *opts)
 {
 	__android_set_configured(opts, true);
 }
-EXPORT_SYMBOL_GPL(android_set_configured);
 
 void android_set_unconfigured(struct android_uevent_opts *opts)
 {
 	__android_set_configured(opts, false);
 }
-EXPORT_SYMBOL_GPL(android_set_unconfigured);
 
 struct device *android_create_function_device(char *name, void *drvdata,
 	       const struct attribute_group **groups)

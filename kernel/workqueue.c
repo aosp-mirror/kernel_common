@@ -1146,8 +1146,12 @@ static bool kick_pool(struct worker_pool *pool)
 	    !cpumask_test_cpu(p->wake_cpu, pool->attrs->__pod_cpumask)) {
 		struct work_struct *work = list_first_entry(&pool->worklist,
 						struct work_struct, entry);
-		p->wake_cpu = cpumask_any_distribute(pool->attrs->__pod_cpumask);
-		get_work_pwq(work)->stats[PWQ_STAT_REPATRIATED]++;
+		int wake_cpu = cpumask_any_and_distribute(pool->attrs->__pod_cpumask,
+							  cpu_online_mask);
+		if (wake_cpu < nr_cpu_ids) {
+			p->wake_cpu = wake_cpu;
+			get_work_pwq(work)->stats[PWQ_STAT_REPATRIATED]++;
+		}
 	}
 #endif
 	wake_up_process(p);
@@ -2216,6 +2220,7 @@ static struct worker *create_worker(struct worker_pool *pool)
 	}
 
 	set_user_nice(worker->task, pool->attrs->nice);
+	trace_android_rvh_create_worker(worker->task, pool->attrs);
 	kthread_bind_mask(worker->task, pool_allowed_cpus(pool));
 
 	/* successful, attach the worker to the pool */
@@ -3726,6 +3731,7 @@ void free_workqueue_attrs(struct workqueue_attrs *attrs)
 		kfree(attrs);
 	}
 }
+EXPORT_SYMBOL_GPL(free_workqueue_attrs);
 
 /**
  * alloc_workqueue_attrs - allocate a workqueue_attrs
@@ -3754,6 +3760,7 @@ fail:
 	free_workqueue_attrs(attrs);
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(alloc_workqueue_attrs);
 
 static void copy_workqueue_attrs(struct workqueue_attrs *to,
 				 const struct workqueue_attrs *from)
@@ -4495,6 +4502,7 @@ int apply_workqueue_attrs(struct workqueue_struct *wq,
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(apply_workqueue_attrs);
 
 /**
  * wq_update_pod - update pod affinity of a wq for CPU hot[un]plug
@@ -4575,6 +4583,7 @@ static int alloc_and_link_pwqs(struct workqueue_struct *wq)
 {
 	bool highpri = wq->flags & WQ_HIGHPRI;
 	int cpu, ret;
+	bool skip = false;
 
 	wq->cpu_pwq = alloc_percpu(struct pool_workqueue *);
 	if (!wq->cpu_pwq)
@@ -4601,6 +4610,10 @@ static int alloc_and_link_pwqs(struct workqueue_struct *wq)
 		return 0;
 	}
 
+	trace_android_rvh_alloc_and_link_pwqs(wq, &ret, &skip);
+	if (skip)
+		goto oem_skip;
+
 	cpus_read_lock();
 	if (wq->flags & __WQ_ORDERED) {
 		ret = apply_workqueue_attrs(wq, ordered_wq_attrs[highpri]);
@@ -4613,6 +4626,7 @@ static int alloc_and_link_pwqs(struct workqueue_struct *wq)
 	}
 	cpus_read_unlock();
 
+oem_skip:
 	/* for unbound pwq, flush the pwq_release_worker ensures that the
 	 * pwq_release_workfn() completes before calling kfree(wq).
 	 */
@@ -6340,6 +6354,9 @@ static struct timer_list wq_watchdog_timer;
 static unsigned long wq_watchdog_touched = INITIAL_JIFFIES;
 static DEFINE_PER_CPU(unsigned long, wq_watchdog_touched_cpu) = INITIAL_JIFFIES;
 
+static unsigned int wq_panic_on_stall;
+module_param_named(panic_on_stall, wq_panic_on_stall, uint, 0644);
+
 /*
  * Show workers that might prevent the processing of pending work items.
  * The only candidates are CPU-bound workers in the running state.
@@ -6389,6 +6406,16 @@ static void show_cpu_pools_hogs(void)
 	}
 
 	rcu_read_unlock();
+}
+
+static void panic_on_wq_watchdog(void)
+{
+	static unsigned int wq_stall;
+
+	if (wq_panic_on_stall) {
+		wq_stall++;
+		BUG_ON(wq_stall >= wq_panic_on_stall);
+	}
 }
 
 static void wq_watchdog_reset_touched(void)
@@ -6463,6 +6490,9 @@ static void wq_watchdog_timer_fn(struct timer_list *unused)
 
 	if (cpu_pool_stall)
 		show_cpu_pools_hogs();
+
+	if (lockup_detected)
+		panic_on_wq_watchdog();
 
 	wq_watchdog_reset_touched();
 	mod_timer(&wq_watchdog_timer, jiffies + thresh);

@@ -75,6 +75,12 @@ struct gzvm_memory_region_ranges {
 	struct mem_region_addr_range constituents[];
 };
 
+/*
+ * A reasonable and large enough limit for the maximum number of pages a
+ * guest can use.
+ */
+#define GZVM_MEM_MAX_NR_PAGES		((1UL << 31) - 1)
+
 /**
  * struct gzvm_memslot: VM's memory slot descriptor
  * @base_gfn: begin of guest page frame
@@ -101,6 +107,12 @@ struct gzvm_vcpu {
 	struct mutex lock;
 	struct gzvm_vcpu_run *run;
 	struct gzvm_vcpu_hwstate *hwstate;
+	struct hrtimer gzvm_vtimer;
+	struct {
+		u32 vtimer_irq;
+		u32 virtio_irq;
+	} idle_events;
+	struct rcuwait wait;
 };
 
 struct gzvm_pinned_page {
@@ -123,19 +135,20 @@ struct gzvm_vm_stat {
  * @lock: lock for list_add
  * @irqfds: the data structure is used to keep irqfds's information
  * @ioevents: list head for ioevents
+ * @ioevent_lock: lock for ioevent list
  * @vm_list: list head for vm list
  * @vm_id: vm id
  * @irq_ack_notifier_list: list head for irq ack notifier
  * @irq_srcu: structure data for SRCU(sleepable rcu)
  * @irq_lock: lock for irq injection
+ * @pinned_pages: use rb-tree to record pin/unpin page
+ * @mem_lock: lock for memory operations
  * @mem_alloc_mode: memory allocation mode - fully allocated or demand paging
  * @demand_page_gran: demand page granularity: how much memory we allocate for
  * VM in a single page fault
  * @demand_page_buffer: the mailbox for transferring large portion pages
  * @demand_paging_lock: lock for preventing multiple cpu using the same demand
  * page mailbox at the same time
- * @pinned_pages: use rb-tree to record pin/unpin page
- * @mem_lock: lock for memory operations
  * @stat: information for VM memory statistics
  * @debug_dir: debugfs directory node for VM memory statistics
  */
@@ -153,6 +166,7 @@ struct gzvm {
 	} irqfds;
 
 	struct list_head ioevents;
+	struct mutex ioevent_lock;
 
 	struct list_head vm_list;
 	u16 vm_id;
@@ -162,12 +176,12 @@ struct gzvm {
 	struct mutex irq_lock;
 	u32 mem_alloc_mode;
 
+	struct rb_root pinned_pages;
+	struct mutex mem_lock;
+
 	u32 demand_page_gran;
 	u64 *demand_page_buffer;
 	struct mutex  demand_paging_lock;
-
-	struct rb_root pinned_pages;
-	struct mutex mem_lock;
 
 	struct gzvm_vm_stat stat;
 	struct dentry *debug_dir;
@@ -197,10 +211,6 @@ int gzvm_vm_ioctl_arch_enable_cap(struct gzvm *gzvm,
 				  struct gzvm_enable_cap *cap,
 				  void __user *argp);
 
-u64 gzvm_hva_to_pa_arch(u64 hva);
-u64 hva_to_pa_fast(u64 hva);
-u64 hva_to_pa_slow(u64 hva);
-int gzvm_gfn_to_pfn_memslot(struct gzvm_memslot *memslot, u64 gfn, u64 *pfn);
 int gzvm_gfn_to_hva_memslot(struct gzvm_memslot *memslot, u64 gfn,
 			    u64 *hva_memslot);
 int gzvm_vm_populate_mem_region(struct gzvm *gzvm, int slot_id);
@@ -210,10 +220,16 @@ int gzvm_vm_allocate_guest_page(struct gzvm *gzvm, struct gzvm_memslot *slot,
 int gzvm_vm_ioctl_create_vcpu(struct gzvm *gzvm, u32 cpuid);
 int gzvm_arch_vcpu_update_one_reg(struct gzvm_vcpu *vcpu, __u64 reg_id,
 				  bool is_write, __u64 *data);
+int gzvm_arch_drv_init(void);
 int gzvm_arch_create_vcpu(u16 vm_id, int vcpuid, void *run);
 int gzvm_arch_vcpu_run(struct gzvm_vcpu *vcpu, __u64 *exit_reason);
 int gzvm_arch_destroy_vcpu(u16 vm_id, int vcpuid);
 int gzvm_arch_inform_exit(u16 vm_id);
+
+u64 gzvm_vcpu_arch_get_timer_delay_ns(struct gzvm_vcpu *vcpu);
+
+void gzvm_vtimer_set(struct gzvm_vcpu *vcpu, u64 ns);
+void gzvm_vtimer_release(struct gzvm_vcpu *vcpu);
 
 int gzvm_drv_debug_init(void);
 void gzvm_drv_debug_exit(void);
@@ -224,6 +240,9 @@ bool gzvm_handle_guest_exception(struct gzvm_vcpu *vcpu);
 int gzvm_handle_relinquish(struct gzvm_vcpu *vcpu, phys_addr_t ipa);
 bool gzvm_handle_guest_hvc(struct gzvm_vcpu *vcpu);
 bool gzvm_arch_handle_guest_hvc(struct gzvm_vcpu *vcpu);
+int gzvm_handle_guest_idle(struct gzvm_vcpu *vcpu);
+void gzvm_handle_guest_ipi(struct gzvm_vcpu *vcpu);
+void gzvm_vcpu_wakeup_all(struct gzvm *gzvm);
 
 int gzvm_arch_create_device(u16 vm_id, struct gzvm_create_device *gzvm_dev);
 int gzvm_arch_inject_irq(struct gzvm *gzvm, unsigned int vcpu_idx,

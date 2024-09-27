@@ -35,6 +35,7 @@
 
 #include "pnode.h"
 #include "internal.h"
+#include <trace/hooks/blk.h>
 
 /* Maximum number of mounts in a mount namespace */
 static unsigned int sysctl_mount_max __read_mostly = 100000;
@@ -450,7 +451,7 @@ int mnt_want_write_file(struct file *file)
 		sb_end_write(file_inode(file)->i_sb);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(mnt_want_write_file);
+EXPORT_SYMBOL_NS_GPL(mnt_want_write_file, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 /**
  * __mnt_drop_write - give up write access to a mount
@@ -493,7 +494,7 @@ void mnt_drop_write_file(struct file *file)
 	__mnt_drop_write_file(file);
 	sb_end_write(file_inode(file)->i_sb);
 }
-EXPORT_SYMBOL(mnt_drop_write_file);
+EXPORT_SYMBOL_NS(mnt_drop_write_file, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 /**
  * mnt_hold_writers - prevent write access to the given mount
@@ -1364,7 +1365,7 @@ struct vfsmount *mntget(struct vfsmount *mnt)
 		mnt_add_count(real_mount(mnt), 1);
 	return mnt;
 }
-EXPORT_SYMBOL(mntget);
+EXPORT_SYMBOL_NS_GPL(mntget, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 /*
  * Make a mount point inaccessible to new lookups.
@@ -3295,6 +3296,8 @@ static int do_new_mount_fc(struct fs_context *fc, struct path *mountpoint,
 	unlock_mount(mp);
 	if (error < 0)
 		mntput(mnt);
+	else
+		trace_android_vh_do_new_mount_fc(mountpoint, mnt);
 	return error;
 }
 

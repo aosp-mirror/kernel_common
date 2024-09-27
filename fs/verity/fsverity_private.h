@@ -29,6 +29,11 @@ struct fsverity_hash_alg {
 	 * FS_VERITY_HASH_ALG_*, which uses a different numbering scheme.
 	 */
 	enum hash_algo algo_id;
+	/*
+	 * The maximum supported interleaving factor for multibuffer hashing, or
+	 * 1 if the algorithm doesn't support multibuffer hashing
+	 */
+	int mb_max_msgs;
 };
 
 /* Merkle tree parameters: hash algorithm, initial hash state, and topology */
@@ -69,7 +74,6 @@ struct fsverity_info {
 	u8 file_digest[FS_VERITY_MAX_DIGEST_SIZE];
 	const struct inode *inode;
 	unsigned long *hash_block_verified;
-	spinlock_t hash_page_init_lock;
 };
 
 #define FS_VERITY_MAX_SIGNATURE_SIZE	(FS_VERITY_MAX_DESCRIPTOR_SIZE - \
@@ -142,6 +146,8 @@ static inline void fsverity_init_signature(void)
 #endif /* !CONFIG_FS_VERITY_BUILTIN_SIGNATURES */
 
 /* verify.c */
+
+#define FS_VERITY_MAX_PENDING_DATA_BLOCKS	2
 
 void __init fsverity_init_workqueue(void);
 

@@ -135,6 +135,10 @@ static struct fips140_alg {
 	{ .cra_name = "sha256", .approved = true },
 	{ .cra_name = "sha384", .approved = true },
 	{ .cra_name = "sha512", .approved = true },
+	{ .cra_name = "sha3-224", .approved = true },
+	{ .cra_name = "sha3-256", .approved = true },
+	{ .cra_name = "sha3-384", .approved = true },
+	{ .cra_name = "sha3-512", .approved = true },
 	{ .cra_name = "stdrng", .approved = true },
 	{ .cra_name = "xts(aes)", .approved = true },
 
@@ -692,18 +696,8 @@ static bool update_fips140_library_routines(void)
 	return ret == 0;
 }
 
-/*
- * Initialize the FIPS 140 module.
- *
- * Note: this routine iterates over the contents of the initcall section, which
- * consists of an array of function pointers that was emitted by the linker
- * rather than the compiler. This means that these function pointers lack the
- * usual CFI stubs that the compiler emits when CFI codegen is enabled. So
- * let's disable CFI locally when handling the initcall array, to avoid
- * surpises.
- */
-static int __init __attribute__((__no_sanitize__("cfi")))
-fips140_init(void)
+/* Initialize the FIPS 140 module */
+static int __init fips140_init(void)
 {
 	const initcall_entry_t *initcall;
 
@@ -716,7 +710,7 @@ fips140_init(void)
 	for (initcall = fips140_initcalls_start + 1;
 	     initcall < &__fips140_initcalls_end;
 	     initcall++) {
-		int (*init)(void) = offset_to_ptr(initcall);
+		initcall_t init = offset_to_ptr(initcall);
 		int err = init();
 
 		/*

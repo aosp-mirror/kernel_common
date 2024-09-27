@@ -1576,6 +1576,12 @@ static int thermal_pm_notify(struct notifier_block *nb,
 		list_for_each_entry(tz, &thermal_tz_list, node) {
 			mutex_lock(&tz->lock);
 
+			trace_android_vh_thermal_pm_notify_suspend(tz, &irq_wakeable);
+			if (irq_wakeable) {
+				mutex_unlock(&tz->lock);
+				continue;
+			}
+
 			tz->suspended = true;
 
 			mutex_unlock(&tz->lock);
@@ -1591,11 +1597,13 @@ static int thermal_pm_notify(struct notifier_block *nb,
 		list_for_each_entry(tz, &thermal_tz_list, node) {
 			mutex_lock(&tz->lock);
 
-			tz->suspended = false;
-
 			trace_android_vh_thermal_pm_notify_suspend(tz, &irq_wakeable);
-			if (irq_wakeable)
+			if (irq_wakeable) {
+				mutex_unlock(&tz->lock);
 				continue;
+			}
+
+			tz->suspended = false;
 
 			thermal_zone_device_init(tz);
 			__thermal_zone_device_update(tz, THERMAL_EVENT_UNSPECIFIED);

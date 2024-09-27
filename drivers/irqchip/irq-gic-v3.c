@@ -19,7 +19,6 @@
 #include <linux/percpu.h>
 #include <linux/refcount.h>
 #include <linux/slab.h>
-#include <linux/syscore_ops.h>
 #include <trace/hooks/gic_v3.h>
 
 #include <linux/irqchip.h>
@@ -267,11 +266,10 @@ static void gic_do_wait_for_rwp(void __iomem *base, u32 bit)
 }
 
 /* Wait for completion of a distributor change */
-void gic_v3_dist_wait_for_rwp(void)
+static void gic_dist_wait_for_rwp(void)
 {
 	gic_do_wait_for_rwp(gic_data.dist_base, GICD_CTLR_RWP);
 }
-EXPORT_SYMBOL_GPL(gic_v3_dist_wait_for_rwp);
 
 /* Wait for completion of a redistributor change */
 static void gic_redist_wait_for_rwp(void)
@@ -418,7 +416,7 @@ static void gic_mask_irq(struct irq_data *d)
 	if (gic_irq_in_rdist(d))
 		gic_redist_wait_for_rwp();
 	else
-		gic_v3_dist_wait_for_rwp();
+		gic_dist_wait_for_rwp();
 }
 
 static void gic_eoimode1_mask_irq(struct irq_data *d)
@@ -929,7 +927,7 @@ static bool gic_has_group0(void)
 	return val != 0;
 }
 
-void gic_v3_dist_init(void)
+static void __init gic_dist_init(void)
 {
 	unsigned int i;
 	u64 affinity;
@@ -938,7 +936,7 @@ void gic_v3_dist_init(void)
 
 	/* Disable the distributor */
 	writel_relaxed(0, base + GICD_CTLR);
-	gic_v3_dist_wait_for_rwp();
+	gic_dist_wait_for_rwp();
 
 	/*
 	 * Configure SPIs as non-secure Group-1. This will only matter
@@ -975,7 +973,7 @@ void gic_v3_dist_init(void)
 
 	/* Enable distributor with ARE, Group1, and wait for it to drain */
 	writel_relaxed(val, base + GICD_CTLR);
-	gic_v3_dist_wait_for_rwp();
+	gic_dist_wait_for_rwp();
 
 	/*
 	 * Set all global interrupts to the boot CPU only. ARE must be
@@ -992,7 +990,6 @@ void gic_v3_dist_init(void)
 		gic_write_irouter(affinity, base + GICD_IROUTERnE + i * 8);
 	}
 }
-EXPORT_SYMBOL_GPL(gic_v3_dist_init);
 
 static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
 {
@@ -1290,7 +1287,7 @@ static int gic_dist_supports_lpis(void)
 		!gicv3_nolpi);
 }
 
-void gic_v3_cpu_init(void)
+static void gic_cpu_init(void)
 {
 	void __iomem *rbase;
 	int i;
@@ -1317,7 +1314,6 @@ void gic_v3_cpu_init(void)
 	/* initialise system registers */
 	gic_cpu_sys_reg_init();
 }
-EXPORT_SYMBOL_GPL(gic_v3_cpu_init);
 
 #ifdef CONFIG_SMP
 
@@ -1326,7 +1322,7 @@ EXPORT_SYMBOL_GPL(gic_v3_cpu_init);
 
 static int gic_starting_cpu(unsigned int cpu)
 {
-	gic_v3_cpu_init();
+	gic_cpu_init();
 
 	if (gic_dist_supports_lpis())
 		its_cpu_init();
@@ -1510,27 +1506,6 @@ static void gic_cpu_pm_init(void)
 #else
 static inline void gic_cpu_pm_init(void) { }
 #endif /* CONFIG_CPU_PM */
-
-#ifdef CONFIG_PM
-static int gic_v3_suspend(void)
-{
-	trace_android_vh_gic_v3_suspend(&gic_data);
-	return 0;
-}
-
-static struct syscore_ops gic_syscore_ops = {
-	.suspend = gic_v3_suspend,
-};
-
-static void gic_syscore_init(void)
-{
-	register_syscore_ops(&gic_syscore_ops);
-}
-
-#else
-static inline void gic_syscore_init(void) { }
-static int gic_v3_suspend(void) { return 0; }
-#endif /* CONFIG_PM */
 
 static struct irq_chip gic_chip = {
 	.name			= "GICv3",
@@ -2109,12 +2084,11 @@ static int __init gic_init_bases(phys_addr_t dist_phys_base,
 
 	gic_update_rdist_properties();
 
-	gic_v3_dist_init();
-	gic_v3_cpu_init();
+	gic_dist_init();
+	gic_cpu_init();
 	gic_enable_nmi_support();
 	gic_smp_init();
 	gic_cpu_pm_init();
-	gic_syscore_init();
 
 	if (gic_dist_supports_lpis()) {
 		its_init(handle, &gic_data.rdists, gic_data.domain);

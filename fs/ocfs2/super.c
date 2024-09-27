@@ -69,6 +69,7 @@ static struct dentry *ocfs2_debugfs_root;
 
 MODULE_AUTHOR("Oracle");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(ANDROID_GKI_VFS_EXPORT_ONLY);
 MODULE_DESCRIPTION("OCFS2 cluster file system");
 
 struct mount_options
@@ -1076,9 +1077,11 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	debugfs_create_file("fs_state", S_IFREG|S_IRUSR, osb->osb_debug_root,
 			    osb, &ocfs2_osb_debug_fops);
 
-	if (ocfs2_meta_ecc(osb))
+	if (ocfs2_meta_ecc(osb)) {
+		ocfs2_initialize_journal_triggers(sb, osb->s_journal_triggers);
 		ocfs2_blockcheck_stats_debugfs_install( &osb->osb_ecc_stats,
 							osb->osb_debug_root);
+	}
 
 	status = ocfs2_mount_volume(sb);
 	if (status < 0)

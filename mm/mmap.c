@@ -62,6 +62,8 @@
 
 #include "internal.h"
 
+EXPORT_TRACEPOINT_SYMBOL_GPL(vm_unmapped_area);
+
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
 #endif
@@ -1274,6 +1276,16 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 			return -EEXIST;
 	}
 
+	/*
+	 * addr is returned from get_unmapped_area,
+	 * There are two cases:
+	 * 1> MAP_FIXED == false
+	 *	unallocated memory, no need to check sealing.
+	 * 1> MAP_FIXED == true
+	 *	sealing is checked inside mmap_region when
+	 *	do_vmi_munmap is called.
+	 */
+
 	if (prot == PROT_EXEC) {
 		pkey = execute_only_pkey(mm);
 		if (pkey < 0)
@@ -2084,7 +2096,7 @@ int expand_downwards(struct vm_area_struct *vma, unsigned long address)
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		return -EFAULT;
 
-	address &= PAGE_MASK;
+	address &= __PAGE_MASK;
 	if (address < mmap_min_addr || address < FIRST_USER_ADDRESS)
 		return -EPERM;
 
@@ -2656,6 +2668,14 @@ int do_vmi_munmap(struct vma_iterator *vmi, struct mm_struct *mm,
 	if (end == start)
 		return -EINVAL;
 
+	/*
+	 * Check if memory is sealed before arch_unmap.
+	 * Prevent unmapping a sealed VMA.
+	 * can_modify_mm assumes we have acquired the lock on MM.
+	 */
+	if (unlikely(!can_modify_mm(mm, start, end)))
+		return -EPERM;
+
 	 /* arch_unmap() might do unmaps itself.  */
 	arch_unmap(mm, start, end);
 
@@ -2717,7 +2737,10 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 	}
 
 	/* Unmap any existing mapping in the area */
-	if (do_vmi_munmap(&vmi, mm, addr, len, uf, false))
+	error = do_vmi_munmap(&vmi, mm, addr, len, uf, false);
+	if (error == -EPERM)
+		return error;
+	else if (error)
 		return -ENOMEM;
 
 	/*
@@ -3086,6 +3109,14 @@ int do_vma_munmap(struct vma_iterator *vmi, struct vm_area_struct *vma,
 {
 	struct mm_struct *mm = vma->vm_mm;
 
+	/*
+	 * Check if memory is sealed before arch_unmap.
+	 * Prevent unmapping a sealed VMA.
+	 * can_modify_mm assumes we have acquired the lock on MM.
+	 */
+	if (unlikely(!can_modify_mm(mm, start, end)))
+		return -EPERM;
+
 	arch_unmap(mm, start, end);
 	return do_vmi_align_munmap(vmi, vma, mm, start, end, uf, unlock);
 }
@@ -3262,9 +3293,11 @@ void exit_mmap(struct mm_struct *mm)
 	lru_add_drain();
 	flush_cache_mm(mm);
 	tlb_gather_mmu_fullmm(&tlb, mm);
+	trace_android_vh_swapmem_gather_init(mm);
 	/* update_hiwater_rss(mm) here? but nobody should be looking */
 	/* Use ULONG_MAX here to ensure all VMAs in the mm are unmapped */
 	unmap_vmas(&tlb, &mas, vma, 0, ULONG_MAX, ULONG_MAX, false);
+	trace_android_vh_swapmem_gather_finish(mm);
 	mmap_read_unlock(mm);
 
 	/*

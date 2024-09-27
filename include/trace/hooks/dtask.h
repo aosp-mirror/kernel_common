@@ -97,6 +97,9 @@ DECLARE_HOOK(android_vh_alter_mutex_list_add,
 DECLARE_HOOK(android_vh_mutex_unlock_slowpath,
 	TP_PROTO(struct mutex *lock),
 	TP_ARGS(lock));
+DECLARE_HOOK(android_vh_mutex_unlock_slowpath_before_wakeq,
+	TP_PROTO(struct mutex *lock),
+	TP_ARGS(lock));
 
 DECLARE_HOOK(android_vh_exit_signal_whether_wake,
 	TP_PROTO(struct task_struct *p, bool *wake),
@@ -132,6 +135,14 @@ DECLARE_HOOK(android_vh_record_rwsem_lock_starttime,
 DECLARE_HOOK(android_vh_record_pcpu_rwsem_starttime,
 	TP_PROTO(struct percpu_rw_semaphore *sem, unsigned long settime_jiffies),
 	TP_ARGS(sem, settime_jiffies));
+
+DECLARE_HOOK(android_vh_read_lazy_flag,
+	TP_PROTO(int *thread_lazy_flag, unsigned long *thread_flags),
+	TP_ARGS(thread_lazy_flag, thread_flags));
+
+DECLARE_HOOK(android_vh_set_tsk_need_resched_lazy,
+	TP_PROTO(struct task_struct *p, struct rq *rq, int *need_lazy),
+	TP_ARGS(p, rq, need_lazy));
 #endif /* _TRACE_HOOK_DTASK_H */
 
 /* This part must be outside protection */

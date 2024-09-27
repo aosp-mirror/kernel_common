@@ -19,7 +19,6 @@
 //! [`compiler_builtins`]: https://github.com/rust-lang/compiler-builtins
 //! [`compiler-rt`]: https://compiler-rt.llvm.org/
 
-#![allow(internal_features)]
 #![feature(compiler_builtins)]
 #![compiler_builtins]
 #![no_builtins]

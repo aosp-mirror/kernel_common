@@ -607,6 +607,9 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		&connector->base,
 		dev->mode_config.tile_property,
 		0);
+	connector->colorspace_property = master->base.colorspace_property;
+	if (connector->colorspace_property)
+		drm_connector_attach_colorspace_property(connector);
 
 	drm_connector_set_path_property(connector, pathprop);
 
@@ -1263,6 +1266,9 @@ static bool is_dsc_need_re_compute(
 				return true;
 		}
 	}
+
+	if (new_stream_on_link_num == 0)
+		return false;
 
 	/* check current_state if there stream on link but it is not in
 	 * new request state

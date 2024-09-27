@@ -204,13 +204,13 @@ out:
 	return error;
 }
 
-SYSCALL_DEFINE2(ftruncate, unsigned int, fd, unsigned long, length)
+SYSCALL_DEFINE2(ftruncate, unsigned int, fd, off_t, length)
 {
 	return do_sys_ftruncate(fd, length, 1);
 }
 
 #ifdef CONFIG_COMPAT
-COMPAT_SYSCALL_DEFINE2(ftruncate, unsigned int, fd, compat_ulong_t, length)
+COMPAT_SYSCALL_DEFINE2(ftruncate, unsigned int, fd, compat_off_t, length)
 {
 	return do_sys_ftruncate(fd, length, 1);
 }
@@ -1087,7 +1087,7 @@ struct file *dentry_open(const struct path *path, int flags,
 	}
 	return f;
 }
-EXPORT_SYMBOL(dentry_open);
+EXPORT_SYMBOL_NS(dentry_open, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 /**
  * dentry_create - Create and open a file
@@ -1391,7 +1391,7 @@ struct file *filp_open(const char *filename, int flags, umode_t mode)
 	}
 	return file;
 }
-EXPORT_SYMBOL(filp_open);
+EXPORT_SYMBOL_NS(filp_open, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 
 /* ANDROID: Allow drivers to open only block files from kernel mode */
@@ -1648,7 +1648,7 @@ int generic_file_open(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-EXPORT_SYMBOL(generic_file_open);
+EXPORT_SYMBOL_NS(generic_file_open, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 /*
  * This is used by subsystems that don't want seekable

@@ -81,11 +81,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/tlb.h>
 #include <trace/events/migrate.h>
-#undef CREATE_TRACE_POINTS
-#include <trace/hooks/mm.h>
 
 #undef CREATE_TRACE_POINTS
 #include <trace/hooks/mm.h>
+#include <trace/hooks/vmscan.h>
 
 #include "internal.h"
 
@@ -187,8 +186,6 @@ static void anon_vma_chain_link(struct vm_area_struct *vma,
  * for the new allocation. At the same time, we do not want
  * to do any locking for the common case of already having
  * an anon_vma.
- *
- * This must be called with the mmap_lock held for reading.
  */
 int __anon_vma_prepare(struct vm_area_struct *vma)
 {
@@ -196,6 +193,7 @@ int __anon_vma_prepare(struct vm_area_struct *vma)
 	struct anon_vma *anon_vma, *allocated;
 	struct anon_vma_chain *avc;
 
+	mmap_assert_locked(mm);
 	might_sleep();
 
 	avc = anon_vma_chain_alloc(GFP_KERNEL);
@@ -1163,6 +1161,7 @@ int folio_total_mapcount(struct folio *folio)
 	mapcount += nr_pages;
 	return mapcount;
 }
+EXPORT_SYMBOL_GPL(folio_total_mapcount);
 
 static __always_inline unsigned int __folio_add_rmap(struct folio *folio,
 		struct page *page, int nr_pages, enum rmap_level level,
@@ -1170,13 +1169,16 @@ static __always_inline unsigned int __folio_add_rmap(struct folio *folio,
 {
 	atomic_t *mapped = &folio->_nr_pages_mapped;
 	int first, nr = 0;
-
+	bool success = false;
 	__folio_rmap_sanity_checks(folio, page, nr_pages, level);
 
 	switch (level) {
 	case RMAP_LEVEL_PTE:
 		do {
-			first = atomic_inc_and_test(&page->_mapcount);
+			trace_android_vh_update_page_mapcount(page, true,
+				false, &first, &success);
+			if (!success)
+				first = atomic_inc_and_test(&page->_mapcount);
 			if (first && folio_test_large(folio)) {
 				first = atomic_inc_return_relaxed(mapped);
 				first = (first < ENTIRELY_MAPPED);
@@ -1280,9 +1282,9 @@ static void __page_check_anon_rmap(struct folio *folio, struct page *page,
 	 * We have exclusion against folio_add_anon_rmap_*() because the caller
 	 * always holds the page locked.
 	 *
-	 * We have exclusion against page_add_new_anon_rmap because those pages
+	 * We have exclusion against folio_add_new_anon_rmap because those pages
 	 * are initially only visible via the pagetables, and the pte is locked
-	 * over the call to page_add_new_anon_rmap.
+	 * over the call to folio_add_new_anon_rmap.
 	 */
 	VM_BUG_ON_FOLIO(folio_anon_vma(folio)->root != vma->anon_vma->root,
 			folio);
@@ -1296,27 +1298,16 @@ static __always_inline void __folio_add_anon_rmap(struct folio *folio,
 {
 	int i, nr, nr_pmdmapped = 0;
 
+	VM_WARN_ON_FOLIO(!folio_test_anon(folio), folio);
+
 	nr = __folio_add_rmap(folio, page, nr_pages, level, &nr_pmdmapped);
 	if (nr_pmdmapped)
 		__lruvec_stat_mod_folio(folio, NR_ANON_THPS, nr_pmdmapped);
 	if (nr)
 		__lruvec_stat_mod_folio(folio, NR_ANON_MAPPED, nr);
 
-	if (unlikely(!folio_test_anon(folio))) {
-		VM_WARN_ON_FOLIO(!folio_test_locked(folio), folio);
-		/*
-		 * For a PTE-mapped large folio, we only know that the single
-		 * PTE is exclusive. Further, __folio_set_anon() might not get
-		 * folio->index right when not given the address of the head
-		 * page.
-		 */
-		VM_WARN_ON_FOLIO(folio_test_large(folio) &&
-				 level != RMAP_LEVEL_PMD, folio);
-		__folio_set_anon(folio, vma, address,
-				 !!(flags & RMAP_EXCLUSIVE));
-	} else if (likely(!folio_test_ksm(folio))) {
+	if (likely(!folio_test_ksm(folio)))
 		__page_check_anon_rmap(folio, page, vma, address);
-	}
 
 	if (flags & RMAP_EXCLUSIVE) {
 		switch (level) {
@@ -1402,29 +1393,37 @@ void folio_add_anon_rmap_pmd(struct folio *folio, struct page *page,
  * @folio:	The folio to add the mapping to.
  * @vma:	the vm area in which the mapping is added
  * @address:	the user virtual address mapped
+ * @flags:	The rmap flags
  *
  * Like folio_add_anon_rmap_*() but must only be called on *new* folios.
  * This means the inc-and-test can be bypassed.
- * The folio does not have to be locked.
+ * The folio doesn't necessarily need to be locked while it's exclusive
+ * unless two threads map it concurrently. However, the folio must be
+ * locked if it's shared.
  *
- * If the folio is pmd-mappable, it is accounted as a THP.  As the folio
  * is new, it's assumed to be mapped exclusively by a single process.
+ * If the folio is pmd-mappable, it is accounted as a THP.
  */
 void folio_add_new_anon_rmap(struct folio *folio, struct vm_area_struct *vma,
-		unsigned long address)
+		unsigned long address, rmap_t flags)
 {
-	int nr = folio_nr_pages(folio);
+	const int nr = folio_nr_pages(folio);
+	const bool exclusive = flags & RMAP_EXCLUSIVE;
 
 	VM_WARN_ON_FOLIO(folio_test_hugetlb(folio), folio);
+	VM_WARN_ON_FOLIO(!exclusive && !folio_test_locked(folio), folio);
 	VM_BUG_ON_VMA(address < vma->vm_start ||
 			address + (nr << PAGE_SHIFT) > vma->vm_end, vma);
-	__folio_set_swapbacked(folio);
-	__folio_set_anon(folio, vma, address, true);
+
+	if (!folio_test_swapbacked(folio))
+		__folio_set_swapbacked(folio);
+	__folio_set_anon(folio, vma, address, exclusive);
 
 	if (likely(!folio_test_large(folio))) {
 		/* increment count (starts at -1) */
 		atomic_set(&folio->_mapcount, 0);
-		SetPageAnonExclusive(&folio->page);
+		if (exclusive)
+			SetPageAnonExclusive(&folio->page);
 	} else if (!folio_test_pmd_mappable(folio)) {
 		int i;
 
@@ -1433,7 +1432,8 @@ void folio_add_new_anon_rmap(struct folio *folio, struct vm_area_struct *vma,
 
 			/* increment count (starts at -1) */
 			atomic_set(&page->_mapcount, 0);
-			SetPageAnonExclusive(page);
+			if (exclusive)
+				SetPageAnonExclusive(page);
 		}
 
 		atomic_set(&folio->_nr_pages_mapped, nr);
@@ -1441,7 +1441,8 @@ void folio_add_new_anon_rmap(struct folio *folio, struct vm_area_struct *vma,
 		/* increment count (starts at -1) */
 		atomic_set(&folio->_entire_mapcount, 0);
 		atomic_set(&folio->_nr_pages_mapped, ENTIRELY_MAPPED);
-		SetPageAnonExclusive(&folio->page);
+		if (exclusive)
+			SetPageAnonExclusive(&folio->page);
 		__lruvec_stat_mod_folio(folio, NR_ANON_THPS, nr);
 	}
 
@@ -1513,13 +1514,17 @@ static __always_inline void __folio_remove_rmap(struct folio *folio,
 	atomic_t *mapped = &folio->_nr_pages_mapped;
 	int last, nr = 0, nr_pmdmapped = 0;
 	enum node_stat_item idx;
+	bool success = false;
 
 	__folio_rmap_sanity_checks(folio, page, nr_pages, level);
 
 	switch (level) {
 	case RMAP_LEVEL_PTE:
 		do {
-			last = atomic_add_negative(-1, &page->_mapcount);
+			trace_android_vh_update_page_mapcount(page, false,
+				false, &last, &success);
+			if (!success)
+				last = atomic_add_negative(-1, &page->_mapcount);
 			if (last && folio_test_large(folio)) {
 				last = atomic_dec_return_relaxed(mapped);
 				last = (last < ENTIRELY_MAPPED);
@@ -2269,6 +2274,10 @@ static bool try_to_migrate_one(struct folio *folio, struct vm_area_struct *vma,
 						hsz);
 			else
 				set_pte_at(mm, address, pvmw.pte, swp_pte);
+			if (vma->vm_flags & VM_LOCKED)
+				set_src_usage(subpage, SRC_PAGE_MLOCKED);
+			else
+				set_src_usage(subpage, SRC_PAGE_MAPPED);
 			trace_set_migration_pte(address, pte_val(swp_pte),
 						compound_order(&folio->page));
 			/*
@@ -2645,6 +2654,18 @@ static void rmap_walk_file(struct folio *folio,
 	pgoff_start = folio_pgoff(folio);
 	pgoff_end = pgoff_start + folio_nr_pages(folio) - 1;
 	if (!locked) {
+		bool got_lock = false;
+		bool skip = false;
+
+		trace_android_vh_do_folio_trylock(folio,
+			&mapping->i_mmap_rwsem, &got_lock, &skip);
+		if (skip) {
+			if (!got_lock)
+				return;
+			else
+				goto lookup;
+		}
+
 		if (i_mmap_trylock_read(mapping))
 			goto lookup;
 

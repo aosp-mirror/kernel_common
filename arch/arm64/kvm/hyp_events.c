@@ -278,7 +278,7 @@ struct hyp_event *hyp_trace_find_event(int id)
 		table = rcu_dereference(mod_event_tables.tables);
 
 		for (int i = 0; i < mod_event_tables.nr_tables; i++) {
-			if (table->nr_events < id) {
+			if (table->nr_events <= id) {
 				id -= table->nr_events;
 				table++;
 				continue;

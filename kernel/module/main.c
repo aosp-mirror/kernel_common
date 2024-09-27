@@ -1113,6 +1113,8 @@ static const struct kernel_symbol *resolve_symbol(struct module *mod,
 						  const char *name,
 						  char ownername[])
 {
+	bool is_vendor_module;
+	bool is_vendor_exported_symbol;
 	struct find_symbol_arg fsa = {
 		.name	= name,
 		.gplok	= !(mod->taints & (1 << TAINT_PROPRIETARY_MODULE)),
@@ -1150,16 +1152,19 @@ static const struct kernel_symbol *resolve_symbol(struct module *mod,
 	}
 
 	/*
-	 * ANDROID: GKI:
-	 * In case of an unsigned module symbol resolves only if:
-	 * 1. Symbol is in the list of unprotected symbol list OR
-	 * 2. If symbol owner is not NULL i.e. owner is another module;
-	 *    it has to be an unsigned module and not signed GKI module
-	 *    to protect symbols exported by signed GKI modules.
+	 * ANDROID GKI
+	 *
+	 * Vendor (i.e., unsigned) modules are only permitted to use:
+	 *
+	 * 1. symbols exported by other vendor (unsigned) modules
+	 * 2. unprotected symbols
 	 */
-	if (!mod->sig_ok &&
-	    !gki_is_module_unprotected_symbol(name) &&
-	    fsa.owner && fsa.owner->sig_ok) {
+	is_vendor_module = !mod->sig_ok;
+	is_vendor_exported_symbol = fsa.owner && !fsa.owner->sig_ok;
+
+	if (is_vendor_module &&
+	    !is_vendor_exported_symbol &&
+	    !gki_is_module_unprotected_symbol(name)) {
 		fsa.sym = ERR_PTR(-EACCES);
 		goto getname;
 	}
@@ -3114,7 +3119,7 @@ static bool idempotent(struct idempotent *u, const void *cookie)
 	struct idempotent *existing;
 	bool first;
 
-	u->ret = 0;
+	u->ret = -EINTR;
 	u->cookie = cookie;
 	init_completion(&u->complete);
 
@@ -3150,12 +3155,34 @@ static int idempotent_complete(struct idempotent *u, int ret)
 	hlist_for_each_entry_safe(pos, next, head, entry) {
 		if (pos->cookie != cookie)
 			continue;
-		hlist_del(&pos->entry);
+		hlist_del_init(&pos->entry);
 		pos->ret = ret;
 		complete(&pos->complete);
 	}
 	spin_unlock(&idem_lock);
 	return ret;
+}
+
+/*
+ * Wait for the idempotent worker.
+ *
+ * If we get interrupted, we need to remove ourselves from the
+ * the idempotent list, and the completion may still come in.
+ *
+ * The 'idem_lock' protects against the race, and 'idem.ret' was
+ * initialized to -EINTR and is thus always the right return
+ * value even if the idempotent work then completes between
+ * the wait_for_completion and the cleanup.
+ */
+static int idempotent_wait_for_completion(struct idempotent *u)
+{
+	if (wait_for_completion_interruptible(&u->complete)) {
+		spin_lock(&idem_lock);
+		if (!hlist_unhashed(&u->entry))
+			hlist_del(&u->entry);
+		spin_unlock(&idem_lock);
+	}
+	return u->ret;
 }
 
 static int init_module_from_file(struct file *f, const char __user * uargs, int flags)
@@ -3193,15 +3220,16 @@ static int idempotent_init_module(struct file *f, const char __user * uargs, int
 	if (!f || !(f->f_mode & FMODE_READ))
 		return -EBADF;
 
-	/* See if somebody else is doing the operation? */
-	if (idempotent(&idem, file_inode(f))) {
-		wait_for_completion(&idem.complete);
-		return idem.ret;
+	/* Are we the winners of the race and get to do this? */
+	if (!idempotent(&idem, file_inode(f))) {
+		int ret = init_module_from_file(f, uargs, flags);
+		return idempotent_complete(&idem, ret);
 	}
 
-	/* Otherwise, we'll do it and complete others */
-	return idempotent_complete(&idem,
-		init_module_from_file(f, uargs, flags));
+	/*
+	 * Somebody else won the race and is loading the module.
+	 */
+	return idempotent_wait_for_completion(&idem);
 }
 
 SYSCALL_DEFINE3(finit_module, int, fd, const char __user *, uargs, int, flags)

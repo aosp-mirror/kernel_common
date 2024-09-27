@@ -13,6 +13,12 @@
 #include <asm/stacktrace.h>
 #include <linux/memblock.h>
 #include <linux/mm_types.h>
+#include <linux/oom.h>
+#include <linux/fs.h>
+#include <linux/swap.h>
+#include <linux/compaction.h>
+#include <linux/cma.h>
+#include "../mm/slab.h"
 
 struct ads_entry {
 	char *name;
@@ -39,6 +45,14 @@ static const struct ads_entry ads_entries[ADS_END] = {
 	ADS_ENTRY(ADS_SEND, _end),
 	ADS_ENTRY(ADS_MEM_BLOCK, &memblock),
 	ADS_ENTRY(ADS_INIT_MM, &init_mm),
+	ADS_ENTRY(ADS_ITERATE_SUPERS, iterate_supers),
+	ADS_ENTRY(ADS_DROP_SLAB, drop_slab),
+	ADS_ENTRY(ADS_FREE_PAGES, try_to_free_pages),
+	ADS_ENTRY(ADS_COMPACT_PAGES, try_to_compact_pages),
+	ADS_ENTRY(ADS_SHOW_MEM, __show_mem),
+	ADS_ENTRY(ADS_TOTAL_CMA, &totalcma_pages),
+	ADS_ENTRY(ADS_SLAB_CACHES, &slab_caches),
+	ADS_ENTRY(ADS_SLAB_MUTEX, &slab_mutex),
 };
 
 /*

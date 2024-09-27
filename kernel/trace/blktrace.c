@@ -23,6 +23,7 @@
 #include "../../block/blk.h"
 
 #include <trace/events/block.h>
+#include <trace/hooks/blk.h>
 
 #include "trace_output.h"
 
@@ -1911,6 +1912,7 @@ void blk_fill_rwbs(char *rwbs, blk_opf_t opf)
 		rwbs[i++] = 'M';
 
 	rwbs[i] = '\0';
+	trace_android_vh_blk_fill_rwbs(rwbs, opf);
 }
 EXPORT_SYMBOL_GPL(blk_fill_rwbs);
 

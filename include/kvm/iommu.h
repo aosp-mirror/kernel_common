@@ -5,11 +5,6 @@
 #include <asm/kvm_host.h>
 #include <kvm/power_domain.h>
 #include <linux/io-pgtable.h>
-#ifdef __KVM_NVHE_HYPERVISOR__
-#include <nvhe/spinlock.h>
-#endif
-
-#define HYP_SPINLOCK_SIZE	4
 
 /*
  * Domain ID for identity mapped domain that the host can attach
@@ -22,37 +17,42 @@
 
 #define KVM_IOMMU_DOMAIN_NR_START		(KVM_IOMMU_DOMAIN_IDMAP_ID + 1)
 
-/*
- * Parameters from the trusted host:
- * @pgtable_cfg:	page table configuration
- * @power_domain:	power domain information
- *
+/**
+ * struct kvm_hyp_iommu - Parameters from the trusted host:
+ * @power_domain:	Power domain information
+ * @lock:		Per iommu lock.
+ * @power_is_off:	Current power status of the IOMMU.
  * Other members are filled and used at runtime by the IOMMU driver.
  */
 struct kvm_hyp_iommu {
 	struct kvm_power_domain		power_domain;
-#ifdef __KVM_NVHE_HYPERVISOR__
-	hyp_spinlock_t			lock;
+#ifndef __GENKSYMS__
+	u32				lock;   /* lock size verified in kvm_iommu_get_lock.  */
 #else
-	u32						unused; /* This is verified in kvm_iommu_init_device() */
+	u32				unused;
 #endif
 	bool				power_is_off;
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
+	ANDROID_KABI_RESERVE(3);
+	ANDROID_KABI_RESERVE(4);
 };
 
 extern void **kvm_nvhe_sym(kvm_hyp_iommu_domains);
 #define kvm_hyp_iommu_domains kvm_nvhe_sym(kvm_hyp_iommu_domains)
 
+/**
+ * struct kvm_hyp_iommu_domain - KVM IOMMU domain:
+ * @refs:		Refcount for the domain.
+ * @domain_id:		ID for the domain (assigned from the kernel).
+ * @priv:		Private pointer, typically points to driver specific struct.
+ */
 struct kvm_hyp_iommu_domain {
-	struct io_pgtable	*pgtable;
-	unsigned int		refs;
+	atomic_t		refs;
 	pkvm_handle_t		domain_id;
 	void			*priv;
-#ifdef __KVM_NVHE_HYPERVISOR__
-	hyp_spinlock_t		lock;
-#else
-	/* see kvm_hyp_iommu.lock */
-	u32			unused;
-#endif
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
 };
 
 /*

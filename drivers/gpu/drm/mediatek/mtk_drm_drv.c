@@ -758,6 +758,8 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
 	  .data = (void *)MTK_DISP_OVL },
 	{ .compatible = "mediatek,mt8192-disp-ovl",
 	  .data = (void *)MTK_DISP_OVL },
+	{ .compatible = "mediatek,mt8195-disp-ovl",
+	  .data = (void *)MTK_DISP_OVL },
 	{ .compatible = "mediatek,mt8183-disp-ovl-2l",
 	  .data = (void *)MTK_DISP_OVL_2L },
 	{ .compatible = "mediatek,mt8192-disp-ovl-2l",
@@ -969,8 +971,11 @@ static void mtk_drm_remove(struct platform_device *pdev)
 
 static void mtk_drm_shutdown(struct platform_device *pdev)
 {
+	struct mtk_drm_private *private = platform_get_drvdata(pdev);
+
 	component_master_del(&pdev->dev, &mtk_drm_ops);
 	pm_runtime_disable(&pdev->dev);
+	drm_atomic_helper_shutdown(private->drm);
 }
 
 static int mtk_drm_sys_prepare(struct device *dev)

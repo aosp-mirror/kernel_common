@@ -269,7 +269,8 @@ static void udf_sb_free_bitmap(struct udf_bitmap *bitmap)
 	int nr_groups = bitmap->s_nr_groups;
 
 	for (i = 0; i < nr_groups; i++)
-		brelse(bitmap->s_block_bitmap[i]);
+		if (!IS_ERR_OR_NULL(bitmap->s_block_bitmap[i]))
+			brelse(bitmap->s_block_bitmap[i]);
 
 	kvfree(bitmap);
 }
@@ -2505,5 +2506,6 @@ static unsigned int udf_count_free(struct super_block *sb)
 MODULE_AUTHOR("Ben Fennema");
 MODULE_DESCRIPTION("Universal Disk Format Filesystem");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(ANDROID_GKI_VFS_EXPORT_ONLY);
 module_init(init_udf_fs)
 module_exit(exit_udf_fs)

@@ -12,8 +12,6 @@
   __arch_copy_to_user
   arm64_use_ng_mappings
   bcmp
-  blk_mq_freeze_queue
-  blk_mq_unfreeze_queue
   bpf_trace_run1
   bpf_trace_run2
   bpf_trace_run3
@@ -39,6 +37,9 @@
   complete
   __const_udelay
   consume_skb
+  cpufreq_generic_attr
+  cpufreq_register_driver
+  cpufreq_unregister_driver
   cpu_number
   __cpu_online_mask
   crc32_le
@@ -176,6 +177,7 @@
   get_unused_fd_flags
   gpiod_put
   hci_alloc_dev_priv
+  __hci_cmd_send
   __hci_cmd_sync
   __hci_cmd_sync_ev
   hci_devcd_append
@@ -232,6 +234,7 @@
   kthread_park
   kthread_should_stop
   kthread_stop
+  kthread_stop_put
   kthread_unpark
   ktime_get
   ktime_get_ts64
@@ -304,8 +307,6 @@
   page_pool_alloc_frag
   page_pool_destroy
   page_pool_put_defragged_page
-  page_shift_compat
-  page_shift_compat_enabled
   param_ops_bool
   param_ops_charp
   param_ops_int
@@ -323,6 +324,7 @@
   pci_release_region
   pci_request_region
   pci_unregister_driver
+  __per_cpu_offset
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   platform_device_add
@@ -536,6 +538,22 @@
   clk_put
   serio_unregister_port
 
+# required by android-v-virt-cpufreq.ko
+  arch_freq_scale
+  cpufreq_cpu_get
+  cpufreq_cpu_put
+  cpufreq_frequency_table_verify
+  cpufreq_get_hw_max_freq
+  cpu_scale
+  dev_pm_opp_free_cpufreq_table
+  dev_pm_opp_get_opp_count
+  dev_pm_opp_init_cpufreq_table
+  dev_pm_opp_of_add_table
+  get_cpu_device
+  topology_clear_scale_freq_source
+  topology_set_scale_freq_source
+  topology_update_thermal_pressure
+
 # required by armmmci.ko
   clk_round_rate
   devm_of_iomap
@@ -586,9 +604,6 @@
   out_of_line_wait_on_bit_timeout
   request_firmware_direct
   wake_up_bit
-
-# required by btrtl.ko
-  __hci_cmd_send
 
 # required by btusb.ko
   btbcm_set_bdaddr
@@ -700,11 +715,6 @@
   drm_prime_gem_destroy
   drm_prime_get_contiguous_size
   drm_printf
-
-# required by dummy-cpufreq.ko
-  cpufreq_generic_attr
-  cpufreq_register_driver
-  cpufreq_unregister_driver
 
 # required by dummy_hcd.ko
   strstr
@@ -828,7 +838,6 @@
   ktime_get_seconds
   netdev_set_default_ethtool_ops
   netif_receive_skb
-  __per_cpu_offset
   pskb_expand_head
   rcu_barrier
   register_inet6addr_notifier
@@ -1248,13 +1257,13 @@
   blk_mq_end_request_batch
   blk_mq_free_request
   blk_mq_free_tag_set
+  blk_mq_freeze_queue
   blk_mq_map_queues
-  blk_mq_quiesce_queue
   blk_mq_requeue_request
   blk_mq_start_request
   blk_mq_start_stopped_hw_queues
   blk_mq_stop_hw_queue
-  blk_mq_unquiesce_queue
+  blk_mq_unfreeze_queue
   blk_mq_virtio_map_queues
   blk_queue_alignment_offset
   blk_queue_chunk_sectors
@@ -1514,3 +1523,9 @@
   vsock_core_register
   vsock_core_unregister
   vsock_for_each_connected_socket
+
+# preserved by --additions-only
+  blk_mq_quiesce_queue
+  blk_mq_unquiesce_queue
+  page_shift_compat
+  page_shift_compat_enabled

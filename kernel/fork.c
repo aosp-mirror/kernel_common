@@ -762,7 +762,6 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		 */
 		if (is_vm_hugetlb_page(tmp))
 			hugetlb_dup_vma_private(tmp);
-
 		/*
 		 * Link the vma into the MT. After using __mt_dup(), memory
 		 * allocation is not necessary here, so it cannot fail.
@@ -1398,8 +1397,10 @@ void mmput(struct mm_struct *mm)
 {
 	might_sleep();
 
-	if (atomic_dec_and_test(&mm->mm_users))
+	if (atomic_dec_and_test(&mm->mm_users)) {
+		trace_android_vh_mmput(NULL);
 		__mmput(mm);
+	}
 }
 EXPORT_SYMBOL_GPL(mmput);
 
@@ -1597,6 +1598,7 @@ struct mm_struct *mm_access(struct task_struct *task, unsigned int mode)
 
 	return mm;
 }
+EXPORT_SYMBOL_GPL(mm_access);
 
 static void complete_vfork_done(struct task_struct *tsk)
 {

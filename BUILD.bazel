@@ -98,6 +98,7 @@ filegroup(
     srcs = [
         # keep sorted
         "android/abi_gki_aarch64_amlogic",
+        "android/abi_gki_aarch64_asus",
         "android/abi_gki_aarch64_db845c",
         "android/abi_gki_aarch64_exynos",
         "android/abi_gki_aarch64_exynosauto",
@@ -105,12 +106,16 @@ filegroup(
         "android/abi_gki_aarch64_galaxy",
         "android/abi_gki_aarch64_honor",
         "android/abi_gki_aarch64_imx",
+        "android/abi_gki_aarch64_kunit",
+        "android/abi_gki_aarch64_lenovo",
         "android/abi_gki_aarch64_mtk",
         "android/abi_gki_aarch64_nothing",
         "android/abi_gki_aarch64_oplus",
         "android/abi_gki_aarch64_pixel",
         "android/abi_gki_aarch64_qcom",
+        "android/abi_gki_aarch64_sunxi",
         "android/abi_gki_aarch64_tcl",
+        "android/abi_gki_aarch64_tuxera",
         "android/abi_gki_aarch64_type_visibility",
         "android/abi_gki_aarch64_unisoc",
         "android/abi_gki_aarch64_virtual_device",
@@ -534,11 +539,11 @@ copy_to_dist_dir(
 
 _ROCKPI4_MODULE_OUTS = [
     # keep sorted
-    "drivers/block/virtio_blk.ko",
     "drivers/char/hw_random/virtio-rng.ko",
     "drivers/clk/clk-rk808.ko",
     "drivers/cpufreq/cpufreq-dt.ko",
     "drivers/cpufreq/cpufreq-dt-platdev.ko",
+    "drivers/cpufreq/tegra20-cpufreq.ko",
     "drivers/dma/pl330.ko",
     "drivers/gpu/drm/bridge/analogix/analogix_dp.ko",
     "drivers/gpu/drm/bridge/synopsys/dw-hdmi.ko",
@@ -579,9 +584,7 @@ _ROCKPI4_MODULE_OUTS = [
     "drivers/thermal/rockchip_thermal.ko",
     "drivers/usb/host/ohci-hcd.ko",
     "drivers/usb/host/ohci-platform.ko",
-    "drivers/virtio/virtio_pci.ko",
     "drivers/virtio/virtio_pci_legacy_dev.ko",
-    "drivers/virtio/virtio_pci_modern_dev.ko",
     "net/core/failover.ko",
 ]
 
@@ -874,13 +877,36 @@ ddk_headers(
 # Implementation details for DDK headers. The targets below cannot be directly
 # depended on by DDK modules.
 
+# Headers needed to include drivers/usb/host/xhci.h.
+ddk_headers(
+    name = "xhci_headers",
+    hdrs = [
+        "drivers/usb/core/hub.h",
+        "drivers/usb/core/usb.h",
+        "drivers/usb/host/pci-quirks.h",
+        "drivers/usb/host/xhci.h",
+        "drivers/usb/host/xhci-ext-caps.h",
+        "drivers/usb/host/xhci-plat.h",
+    ],
+    linux_includes = [
+        "drivers/usb",
+        "drivers/usb/host",
+    ],
+    visibility = ["//visibility:private"],
+)
+
 # DDK headers allowlist. This is the list of all headers and include
 # directories that are safe to use in DDK modules.
 ddk_headers(
     name = "all_headers_allowlist_aarch64",
     hdrs = [
+        "drivers/thermal/thermal_core.h",
+        "drivers/thermal/thermal_netlink.h",
+        "sound/usb/card.h",
+        "sound/usb/usbaudio.h",
         ":all_headers_allowlist_aarch64_globs",
         ":all_headers_allowlist_common_globs",
+        ":xhci_headers",
     ],
     # The list of include directories where source files can #include headers
     # from. In other words, these are the `-I` option to the C compiler.
@@ -888,6 +914,8 @@ ddk_headers(
     linux_includes = [
         "arch/arm64/include",
         "arch/arm64/include/uapi",
+        "drivers/thermal",
+        "sound/usb",
         "include",
         "include/uapi",
     ],
@@ -1456,8 +1484,15 @@ cc_binary_with_abi(
 cc_library(
     name = "kselftest_mm_vm_util",
     srcs = ["tools/testing/selftests/mm/vm_util.c"],
-    hdrs = ["tools/testing/selftests/mm/vm_util.h"],
+    hdrs = [
+        "include/uapi/linux/fs.h",
+        "tools/testing/selftests/mm/vm_util.h",
+    ],
     copts = _KSELFTEST_COPTS,
+    includes = [
+        "include/uapi/",
+        "tools/testing/selftests",
+    ],
     visibility = ["//visibility:private"],
     deps = [
         ":kselftest_headers_lib",
@@ -1467,7 +1502,6 @@ cc_library(
 cc_binary_with_abi(
     name = "kselftest_mm_thuge_gen",
     srcs = [
-        "tools/testing/selftests/mm/mlock2.h",
         "tools/testing/selftests/mm/thuge-gen.c",
     ],
     copts = _KSELFTEST_COPTS + [
@@ -1487,7 +1521,6 @@ cc_binary_with_abi(
 cc_binary_with_abi(
     name = "kselftest_mm_transhuge_stress",
     srcs = [
-        "tools/testing/selftests/mm/mlock2.h",
         "tools/testing/selftests/mm/transhuge-stress.c",
     ],
     copts = _KSELFTEST_COPTS,
@@ -1911,7 +1944,7 @@ cc_binary_with_abi(
         "x86_64",
         "x86",
     ],
-    copts = _KSELFTEST_COPTS,
+    copts = _KSELFTEST_COPTS + ["-fomit-frame-pointer"],
     includes = ["tools/testing/selftests"],
     linkopts = ["-static"],
     path_prefix = _KSELFTEST_DIR,
@@ -1957,8 +1990,7 @@ cc_binary_with_abi(
     includes = ["tools/testing/selftests"],
     linkopts = [
         "-static",
-        "-Wl",
-        "-ereal_start",
+        "-Wl,-ereal_start",
     ],
     path_prefix = _KSELFTEST_DIR,
     target_compatible_with = ["@platforms//os:android"],

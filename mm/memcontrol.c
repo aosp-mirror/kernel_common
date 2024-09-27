@@ -74,6 +74,7 @@
 
 #include <trace/events/vmscan.h>
 #include <trace/hooks/mm.h>
+#include <trace/hooks/vmscan.h>
 
 struct cgroup_subsys memory_cgrp_subsys __read_mostly;
 EXPORT_SYMBOL(memory_cgrp_subsys);
@@ -249,6 +250,16 @@ struct vmpressure *memcg_to_vmpressure(struct mem_cgroup *memcg)
 struct mem_cgroup *vmpressure_to_memcg(struct vmpressure *vmpr)
 {
 	return container_of(vmpr, struct mem_cgroup, vmpressure);
+}
+
+/*
+ * trace_android_vh_use_vm_swappiness is called in include/linux/swap.h by
+ * including include/trace/hooks/vmscan.h, which will result to build-err.
+ * So we create func: _trace_android_vh_use_vm_swappiness.
+ */
+void _trace_android_vh_use_vm_swappiness(bool *use_vm_swappiness)
+{
+	trace_android_vh_use_vm_swappiness(use_vm_swappiness);
 }
 
 #ifdef CONFIG_MEMCG_KMEM
@@ -572,116 +583,6 @@ mem_cgroup_largest_soft_limit_node(struct mem_cgroup_tree_per_node *mctz)
 	return mz;
 }
 
-/*
- * memcg and lruvec stats flushing
- *
- * Many codepaths leading to stats update or read are performance sensitive and
- * adding stats flushing in such codepaths is not desirable. So, to optimize the
- * flushing the kernel does:
- *
- * 1) Periodically and asynchronously flush the stats every 2 seconds to not let
- *    rstat update tree grow unbounded.
- *
- * 2) Flush the stats synchronously on reader side only when there are more than
- *    (MEMCG_CHARGE_BATCH * nr_cpus) update events. Though this optimization
- *    will let stats be out of sync by atmost (MEMCG_CHARGE_BATCH * nr_cpus) but
- *    only for 2 seconds due to (1).
- */
-static void flush_memcg_stats_dwork(struct work_struct *w);
-static DECLARE_DEFERRABLE_WORK(stats_flush_dwork, flush_memcg_stats_dwork);
-static DEFINE_PER_CPU(unsigned int, stats_updates);
-static atomic_t stats_flush_ongoing = ATOMIC_INIT(0);
-static atomic_t stats_flush_threshold = ATOMIC_INIT(0);
-static u64 flush_next_time;
-
-#define FLUSH_TIME (2UL*HZ)
-
-/*
- * Accessors to ensure that preemption is disabled on PREEMPT_RT because it can
- * not rely on this as part of an acquired spinlock_t lock. These functions are
- * never used in hardirq context on PREEMPT_RT and therefore disabling preemtion
- * is sufficient.
- */
-static void memcg_stats_lock(void)
-{
-	preempt_disable_nested();
-	VM_WARN_ON_IRQS_ENABLED();
-}
-
-static void __memcg_stats_lock(void)
-{
-	preempt_disable_nested();
-}
-
-static void memcg_stats_unlock(void)
-{
-	preempt_enable_nested();
-}
-
-static inline void memcg_rstat_updated(struct mem_cgroup *memcg, int val)
-{
-	unsigned int x;
-
-	if (!val)
-		return;
-
-	cgroup_rstat_updated(memcg->css.cgroup, smp_processor_id());
-
-	x = __this_cpu_add_return(stats_updates, abs(val));
-	if (x > MEMCG_CHARGE_BATCH) {
-		/*
-		 * If stats_flush_threshold exceeds the threshold
-		 * (>num_online_cpus()), cgroup stats update will be triggered
-		 * in __mem_cgroup_flush_stats(). Increasing this var further
-		 * is redundant and simply adds overhead in atomic update.
-		 */
-		if (atomic_read(&stats_flush_threshold) <= num_online_cpus())
-			atomic_add(x / MEMCG_CHARGE_BATCH, &stats_flush_threshold);
-		__this_cpu_write(stats_updates, 0);
-	}
-}
-
-static void do_flush_stats(void)
-{
-	/*
-	 * We always flush the entire tree, so concurrent flushers can just
-	 * skip. This avoids a thundering herd problem on the rstat global lock
-	 * from memcg flushers (e.g. reclaim, refault, etc).
-	 */
-	if (atomic_read(&stats_flush_ongoing) ||
-	    atomic_xchg(&stats_flush_ongoing, 1))
-		return;
-
-	WRITE_ONCE(flush_next_time, jiffies_64 + 2*FLUSH_TIME);
-
-	cgroup_rstat_flush(root_mem_cgroup->css.cgroup);
-
-	atomic_set(&stats_flush_threshold, 0);
-	atomic_set(&stats_flush_ongoing, 0);
-}
-
-void mem_cgroup_flush_stats(void)
-{
-	if (atomic_read(&stats_flush_threshold) > num_online_cpus())
-		do_flush_stats();
-}
-
-void mem_cgroup_flush_stats_ratelimited(void)
-{
-	if (time_after64(jiffies_64, READ_ONCE(flush_next_time)))
-		mem_cgroup_flush_stats();
-}
-
-static void flush_memcg_stats_dwork(struct work_struct *w)
-{
-	/*
-	 * Always flush here so that flushing in latency-sensitive paths is
-	 * as cheap as possible.
-	 */
-	do_flush_stats();
-	queue_delayed_work(system_unbound_wq, &stats_flush_dwork, FLUSH_TIME);
-}
-
 /* Subset of vm_event_item to report for memcg event stats */
 static const unsigned int memcg_vm_event_stat[] = {
 	PGPGIN,
@@ -726,6 +627,15 @@ static inline int memcg_events_index(enum vm_event_item idx)
 }
 
 struct memcg_vmstats_percpu {
+	/* Stats updates since the last flush */
+	unsigned int			stats_updates;
+
+	/* Cached pointers for fast iteration in memcg_rstat_updated() */
+	struct memcg_vmstats_percpu	*parent;
+	struct memcg_vmstats		*vmstats;
+
+	/* The above should fit a single cacheline for memcg_rstat_updated() */
+
 	/* Local (CPU and cgroup) page state & events */
 	long			state[MEMCG_NR_STAT];
 	unsigned long		events[NR_MEMCG_EVENTS];
@@ -737,7 +647,7 @@ struct memcg_vmstats_percpu {
 	/* Cgroup1: threshold notifications & softlimit tree updates */
 	unsigned long		nr_page_events;
 	unsigned long		targets[MEM_CGROUP_NTARGETS];
-};
+} ____cacheline_aligned;
 
 struct memcg_vmstats {
 	/* Aggregated (CPU and subtree) page state & events */
@@ -751,7 +661,132 @@ struct memcg_vmstats {
 	/* Pending child counts during tree propagation */
 	long			state_pending[MEMCG_NR_STAT];
 	unsigned long		events_pending[NR_MEMCG_EVENTS];
+
+	/* Stats updates since the last flush */
+	atomic64_t		stats_updates;
 };
+
+/*
+ * memcg and lruvec stats flushing
+ *
+ * Many codepaths leading to stats update or read are performance sensitive and
+ * adding stats flushing in such codepaths is not desirable. So, to optimize the
+ * flushing the kernel does:
+ *
+ * 1) Periodically and asynchronously flush the stats every 2 seconds to not let
+ *    rstat update tree grow unbounded.
+ *
+ * 2) Flush the stats synchronously on reader side only when there are more than
+ *    (MEMCG_CHARGE_BATCH * nr_cpus) update events. Though this optimization
+ *    will let stats be out of sync by atmost (MEMCG_CHARGE_BATCH * nr_cpus) but
+ *    only for 2 seconds due to (1).
+ */
+static void flush_memcg_stats_dwork(struct work_struct *w);
+static DECLARE_DEFERRABLE_WORK(stats_flush_dwork, flush_memcg_stats_dwork);
+static u64 flush_last_time;
+
+#define FLUSH_TIME (2UL*HZ)
+
+/*
+ * Accessors to ensure that preemption is disabled on PREEMPT_RT because it can
+ * not rely on this as part of an acquired spinlock_t lock. These functions are
+ * never used in hardirq context on PREEMPT_RT and therefore disabling preemtion
+ * is sufficient.
+ */
+static void memcg_stats_lock(void)
+{
+	preempt_disable_nested();
+	VM_WARN_ON_IRQS_ENABLED();
+}
+
+static void __memcg_stats_lock(void)
+{
+	preempt_disable_nested();
+}
+
+static void memcg_stats_unlock(void)
+{
+	preempt_enable_nested();
+}
+
+
+static bool memcg_vmstats_needs_flush(struct memcg_vmstats *vmstats)
+{
+	return atomic64_read(&vmstats->stats_updates) >
+		MEMCG_CHARGE_BATCH * num_online_cpus();
+}
+
+static inline void memcg_rstat_updated(struct mem_cgroup *memcg, int val)
+{
+	struct memcg_vmstats_percpu *statc;
+	int cpu = smp_processor_id();
+
+	if (!val)
+		return;
+
+	cgroup_rstat_updated(memcg->css.cgroup, cpu);
+	statc = this_cpu_ptr(memcg->vmstats_percpu);
+	for (; statc; statc = statc->parent) {
+		statc->stats_updates += abs(val);
+		if (statc->stats_updates < MEMCG_CHARGE_BATCH)
+			continue;
+
+		/*
+		 * If @memcg is already flush-able, increasing stats_updates is
+		 * redundant. Avoid the overhead of the atomic update.
+		 */
+		if (!memcg_vmstats_needs_flush(statc->vmstats))
+			atomic64_add(statc->stats_updates,
+				     &statc->vmstats->stats_updates);
+		statc->stats_updates = 0;
+	}
+}
+
+static void do_flush_stats(struct mem_cgroup *memcg)
+{
+	if (mem_cgroup_is_root(memcg))
+		WRITE_ONCE(flush_last_time, jiffies_64);
+
+	cgroup_rstat_flush(memcg->css.cgroup);
+}
+
+/*
+ * mem_cgroup_flush_stats - flush the stats of a memory cgroup subtree
+ * @memcg: root of the subtree to flush
+ *
+ * Flushing is serialized by the underlying global rstat lock. There is also a
+ * minimum amount of work to be done even if there are no stat updates to flush.
+ * Hence, we only flush the stats if the updates delta exceeds a threshold. This
+ * avoids unnecessary work and contention on the underlying lock.
+ */
+void mem_cgroup_flush_stats(struct mem_cgroup *memcg)
+{
+	if (mem_cgroup_disabled())
+		return;
+
+	if (!memcg)
+		memcg = root_mem_cgroup;
+
+	if (memcg_vmstats_needs_flush(memcg->vmstats))
+		do_flush_stats(memcg);
+}
+
+void mem_cgroup_flush_stats_ratelimited(struct mem_cgroup *memcg)
+{
+	/* Only flush if the periodic flusher is one full cycle late */
+	if (time_after64(jiffies_64, READ_ONCE(flush_last_time) + 2*FLUSH_TIME))
+		mem_cgroup_flush_stats(memcg);
+}
+
+static void flush_memcg_stats_dwork(struct work_struct *w)
+{
+	/*
+	 * Deliberately ignore memcg_vmstats_needs_flush() here so that flushing
+	 * in latency-sensitive paths is as cheap as possible.
+	 */
+	do_flush_stats(root_mem_cgroup);
+	queue_delayed_work(system_unbound_wq, &stats_flush_dwork, FLUSH_TIME);
+}
 
 unsigned long memcg_page_state(struct mem_cgroup *memcg, int idx)
 {
@@ -1374,6 +1409,25 @@ struct lruvec *folio_lruvec_lock_irqsave(struct folio *folio,
 	return lruvec;
 }
 
+void do_traversal_all_lruvec(void)
+{
+	pg_data_t *pgdat;
+
+	for_each_online_pgdat(pgdat) {
+		struct mem_cgroup *memcg = NULL;
+
+		memcg = mem_cgroup_iter(NULL, NULL, NULL);
+		do {
+			struct lruvec *lruvec = mem_cgroup_lruvec(memcg, pgdat);
+
+			trace_android_vh_do_traversal_lruvec(lruvec);
+
+			memcg = mem_cgroup_iter(NULL, memcg, NULL);
+		} while (memcg);
+	}
+}
+EXPORT_SYMBOL_GPL(do_traversal_all_lruvec);
+
 /**
  * mem_cgroup_update_lru_size - account for adding or removing an lru page
  * @lruvec: mem_cgroup per zone lru vector
@@ -1580,7 +1634,7 @@ static void memcg_stat_format(struct mem_cgroup *memcg, struct seq_buf *s)
 	 *
 	 * Current memory state:
 	 */
-	mem_cgroup_flush_stats();
+	mem_cgroup_flush_stats(memcg);
 
 	for (i = 0; i < ARRAY_SIZE(memory_stats); i++) {
 		u64 size;
@@ -3433,6 +3487,53 @@ void split_page_memcg(struct page *head, unsigned int nr)
 		css_get_many(&memcg->css, nr - 1);
 }
 
+void folio_copy_memcg(struct folio *src)
+{
+	int i;
+	unsigned long flags;
+	int delta = 0;
+	int nr_pages = folio_nr_pages(src);
+	struct mem_cgroup *memcg = folio_memcg(src);
+
+	if (folio_can_split(src))
+		return;
+
+	if (WARN_ON_ONCE(!src->_dst_pp))
+		return;
+
+	if (mem_cgroup_disabled())
+		return;
+
+	if (WARN_ON_ONCE(!memcg))
+		return;
+
+	VM_WARN_ON_ONCE_FOLIO(!folio_test_large(src), src);
+	VM_WARN_ON_ONCE_FOLIO(folio_ref_count(src), src);
+
+	for (i = 0; i < nr_pages; i++) {
+		struct page *dst = folio_dst_page(src, i);
+
+		if (!dst)
+			continue;
+
+		commit_charge(page_folio(dst), memcg);
+		delta++;
+	}
+
+	if (!mem_cgroup_is_root(memcg)) {
+		page_counter_charge(&memcg->memory, delta);
+		if (do_memsw_account())
+			page_counter_charge(&memcg->memsw, delta);
+	}
+
+	css_get_many(&memcg->css, delta);
+
+	local_irq_save(flags);
+	mem_cgroup_charge_statistics(memcg, delta);
+	memcg_check_events(memcg, folio_nid(src));
+	local_irq_restore(flags);
+}
+
 #ifdef CONFIG_SWAP
 /**
  * mem_cgroup_move_swap_account - move swap charge and swap_cgroup's record.
@@ -4030,7 +4131,7 @@ static int memcg_numa_stat_show(struct seq_file *m, void *v)
 	int nid;
 	struct mem_cgroup *memcg = mem_cgroup_from_seq(m);
 
-	mem_cgroup_flush_stats();
+	mem_cgroup_flush_stats(memcg);
 
 	for (stat = stats; stat < stats + ARRAY_SIZE(stats); stat++) {
 		seq_printf(m, "%s=%lu", stat->name,
@@ -4105,7 +4206,7 @@ static void memcg1_stat_format(struct mem_cgroup *memcg, struct seq_buf *s)
 
 	BUILD_BUG_ON(ARRAY_SIZE(memcg1_stat_names) != ARRAY_SIZE(memcg1_stats));
 
-	mem_cgroup_flush_stats();
+	mem_cgroup_flush_stats(memcg);
 
 	for (i = 0; i < ARRAY_SIZE(memcg1_stats); i++) {
 		unsigned long nr;
@@ -4607,7 +4708,7 @@ void mem_cgroup_wb_stats(struct bdi_writeback *wb, unsigned long *pfilepages,
 	struct mem_cgroup *memcg = mem_cgroup_from_css(wb->memcg_css);
 	struct mem_cgroup *parent;
 
-	mem_cgroup_flush_stats();
+	mem_cgroup_flush_stats(memcg);
 
 	*pdirty = memcg_page_state(memcg, NR_FILE_DIRTY);
 	*pwriteback = memcg_page_state(memcg, NR_WRITEBACK);
@@ -5171,12 +5272,29 @@ static struct cftype mem_cgroup_legacy_files[] = {
 
 #define MEM_CGROUP_ID_MAX	((1UL << MEM_CGROUP_ID_SHIFT) - 1)
 static DEFINE_IDR(mem_cgroup_idr);
+static DEFINE_SPINLOCK(memcg_idr_lock);
+
+static int mem_cgroup_alloc_id(void)
+{
+	int ret;
+
+	idr_preload(GFP_KERNEL);
+	spin_lock(&memcg_idr_lock);
+	ret = idr_alloc(&mem_cgroup_idr, NULL, 1, MEM_CGROUP_ID_MAX + 1,
+			GFP_NOWAIT);
+	spin_unlock(&memcg_idr_lock);
+	idr_preload_end();
+	return ret;
+}
 
 static void mem_cgroup_id_remove(struct mem_cgroup *memcg)
 {
 	if (memcg->id.id > 0) {
 		trace_android_vh_mem_cgroup_id_remove(memcg);
+		spin_lock(&memcg_idr_lock);
 		idr_remove(&mem_cgroup_idr, memcg->id.id);
+		spin_unlock(&memcg_idr_lock);
+
 		memcg->id.id = 0;
 	}
 }
@@ -5290,10 +5408,11 @@ static void mem_cgroup_free(struct mem_cgroup *memcg)
 	__mem_cgroup_free(memcg);
 }
 
-static struct mem_cgroup *mem_cgroup_alloc(void)
+static struct mem_cgroup *mem_cgroup_alloc(struct mem_cgroup *parent)
 {
+	struct memcg_vmstats_percpu *statc, *pstatc;
 	struct mem_cgroup *memcg;
-	int node;
+	int node, cpu;
 	int __maybe_unused i;
 	long error = -ENOMEM;
 
@@ -5301,8 +5420,7 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 	if (!memcg)
 		return ERR_PTR(error);
 
-	memcg->id.id = idr_alloc(&mem_cgroup_idr, NULL,
-				 1, MEM_CGROUP_ID_MAX + 1, GFP_KERNEL);
+	memcg->id.id = mem_cgroup_alloc_id();
 	if (memcg->id.id < 0) {
 		error = memcg->id.id;
 		goto fail;
@@ -5316,6 +5434,14 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 						 GFP_KERNEL_ACCOUNT);
 	if (!memcg->vmstats_percpu)
 		goto fail;
+
+	for_each_possible_cpu(cpu) {
+		if (parent)
+			pstatc = per_cpu_ptr(parent->vmstats_percpu, cpu);
+		statc = per_cpu_ptr(memcg->vmstats_percpu, cpu);
+		statc->parent = parent ? pstatc : NULL;
+		statc->vmstats = memcg->vmstats;
+	}
 
 	for_each_node(node)
 		if (alloc_mem_cgroup_per_node_info(memcg, node))
@@ -5363,7 +5489,7 @@ mem_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 	struct mem_cgroup *memcg, *old_memcg;
 
 	old_memcg = set_active_memcg(parent);
-	memcg = mem_cgroup_alloc();
+	memcg = mem_cgroup_alloc(parent);
 	set_active_memcg(old_memcg);
 	if (IS_ERR(memcg))
 		return ERR_CAST(memcg);
@@ -5438,7 +5564,9 @@ static int mem_cgroup_css_online(struct cgroup_subsys_state *css)
 	 * publish it here at the end of onlining. This matches the
 	 * regular ID destruction during offlining.
 	 */
+	spin_lock(&memcg_idr_lock);
 	idr_replace(&mem_cgroup_idr, memcg, memcg->id.id);
+	spin_unlock(&memcg_idr_lock);
 
 	trace_android_vh_mem_cgroup_css_online(css, memcg);
 	return 0;
@@ -5640,6 +5768,10 @@ static void mem_cgroup_css_rstat_flush(struct cgroup_subsys_state *css, int cpu)
 			}
 		}
 	}
+	statc->stats_updates = 0;
+	/* We are in a per-cpu loop here, only do the atomic write once */
+	if (atomic64_read(&memcg->vmstats->stats_updates))
+		atomic64_set(&memcg->vmstats->stats_updates, 0);
 }
 
 #ifdef CONFIG_MMU
@@ -6645,7 +6777,7 @@ static int memory_numa_stat_show(struct seq_file *m, void *v)
 	int i;
 	struct mem_cgroup *memcg = mem_cgroup_from_seq(m);
 
-	mem_cgroup_flush_stats();
+	mem_cgroup_flush_stats(memcg);
 
 	for (i = 0; i < ARRAY_SIZE(memory_stats); i++) {
 		int nid;
@@ -7232,16 +7364,17 @@ void __mem_cgroup_uncharge_list(struct list_head *page_list)
 }
 
 /**
- * mem_cgroup_migrate - Charge a folio's replacement.
+ * mem_cgroup_replace_folio - Charge a folio's replacement.
  * @old: Currently circulating folio.
  * @new: Replacement folio.
  *
  * Charge @new as a replacement folio for @old. @old will
- * be uncharged upon free.
+ * be uncharged upon free. This is only used by the page cache
+ * (in replace_page_cache_folio()).
  *
  * Both folios must be locked, @new->mapping must be set up.
  */
-void mem_cgroup_migrate(struct folio *old, struct folio *new)
+void mem_cgroup_replace_folio(struct folio *old, struct folio *new)
 {
 	struct mem_cgroup *memcg;
 	long nr_pages = folio_nr_pages(new);
@@ -7278,6 +7411,39 @@ void mem_cgroup_migrate(struct folio *old, struct folio *new)
 	mem_cgroup_charge_statistics(memcg, nr_pages);
 	memcg_check_events(memcg, folio_nid(new));
 	local_irq_restore(flags);
+}
+
+/**
+ * mem_cgroup_migrate - Transfer the memcg data from the old to the new folio.
+ * @old: Currently circulating folio.
+ * @new: Replacement folio.
+ *
+ * Transfer the memcg data from the old folio to the new folio for migration.
+ * The old folio's data info will be cleared. Note that the memory counters
+ * will remain unchanged throughout the process.
+ *
+ * Both folios must be locked, @new->mapping must be set up.
+ */
+void mem_cgroup_migrate(struct folio *old, struct folio *new)
+{
+	struct mem_cgroup *memcg;
+
+	VM_BUG_ON_FOLIO(!folio_test_locked(old), old);
+	VM_BUG_ON_FOLIO(!folio_test_locked(new), new);
+	VM_BUG_ON_FOLIO(folio_test_anon(old) != folio_test_anon(new), new);
+	VM_BUG_ON_FOLIO(folio_nr_pages(old) != folio_nr_pages(new), new);
+
+	if (mem_cgroup_disabled())
+		return;
+
+	memcg = folio_memcg(old);
+	VM_WARN_ON_ONCE_FOLIO(!memcg, old);
+	if (!memcg)
+		return;
+
+	/* Transfer the charge and the css ref */
+	commit_charge(new, memcg);
+	old->memcg_data = 0;
 }
 
 DEFINE_STATIC_KEY_FALSE(memcg_sockets_enabled_key);
@@ -7808,7 +7974,11 @@ bool obj_cgroup_may_zswap(struct obj_cgroup *objcg)
 			break;
 		}
 
-		cgroup_rstat_flush(memcg->css.cgroup);
+		/*
+		 * mem_cgroup_flush_stats() ignores small changes. Use
+		 * do_flush_stats() directly to get accurate stats for charging.
+		 */
+		do_flush_stats(memcg);
 		pages = memcg_page_state(memcg, MEMCG_ZSWAP_B) / PAGE_SIZE;
 		if (pages < max)
 			continue;
@@ -7873,8 +8043,10 @@ void obj_cgroup_uncharge_zswap(struct obj_cgroup *objcg, size_t size)
 static u64 zswap_current_read(struct cgroup_subsys_state *css,
 			      struct cftype *cft)
 {
-	cgroup_rstat_flush(css->cgroup);
-	return memcg_page_state(mem_cgroup_from_css(css), MEMCG_ZSWAP_B);
+	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
+
+	mem_cgroup_flush_stats(memcg);
+	return memcg_page_state(memcg, MEMCG_ZSWAP_B);
 }
 
 static int zswap_max_show(struct seq_file *m, void *v)

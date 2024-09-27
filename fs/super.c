@@ -784,6 +784,17 @@ struct super_block *sget_fc(struct fs_context *fc,
 	struct user_namespace *user_ns = fc->global ? &init_user_ns : fc->user_ns;
 	int err;
 
+	/*
+	 * Never allow s_user_ns != &init_user_ns when FS_USERNS_MOUNT is
+	 * not set, as the filesystem is likely unprepared to handle it.
+	 * This can happen when fsconfig() is called from init_user_ns with
+	 * an fs_fd opened in another user namespace.
+	 */
+	if (user_ns != &init_user_ns && !(fc->fs_type->fs_flags & FS_USERNS_MOUNT)) {
+		errorfc(fc, "VFS: Mounting from non-initial user namespace is not allowed");
+		return ERR_PTR(-EPERM);
+	}
+
 retry:
 	spin_lock(&sb_lock);
 	if (test) {
@@ -1640,7 +1651,7 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 
 	return dget(s->s_root);
 }
-EXPORT_SYMBOL(mount_bdev);
+EXPORT_SYMBOL_NS(mount_bdev, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 void kill_block_super(struct super_block *sb)
 {
@@ -1653,7 +1664,7 @@ void kill_block_super(struct super_block *sb)
 	}
 }
 
-EXPORT_SYMBOL(kill_block_super);
+EXPORT_SYMBOL_NS(kill_block_super, ANDROID_GKI_VFS_EXPORT_ONLY);
 #endif
 
 struct dentry *mount_nodev(struct file_system_type *fs_type,
@@ -1674,7 +1685,7 @@ struct dentry *mount_nodev(struct file_system_type *fs_type,
 	s->s_flags |= SB_ACTIVE;
 	return dget(s->s_root);
 }
-EXPORT_SYMBOL(mount_nodev);
+EXPORT_SYMBOL_NS(mount_nodev, ANDROID_GKI_VFS_EXPORT_ONLY);
 
 int reconfigure_single(struct super_block *s,
 		       int flags, void *data)

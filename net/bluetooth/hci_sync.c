@@ -280,6 +280,19 @@ int __hci_cmd_sync_status(struct hci_dev *hdev, u16 opcode, u32 plen,
 }
 EXPORT_SYMBOL(__hci_cmd_sync_status);
 
+int hci_cmd_sync_status(struct hci_dev *hdev, u16 opcode, u32 plen,
+			const void *param, u32 timeout)
+{
+	int err;
+
+	hci_req_sync_lock(hdev);
+	err = __hci_cmd_sync_status(hdev, opcode, plen, param, timeout);
+	hci_req_sync_unlock(hdev);
+
+	return err;
+}
+EXPORT_SYMBOL(hci_cmd_sync_status);
+
 static void hci_cmd_sync_work(struct work_struct *work)
 {
 	struct hci_dev *hdev = container_of(work, struct hci_dev, cmd_sync_work);
@@ -1321,7 +1334,7 @@ int hci_start_ext_adv_sync(struct hci_dev *hdev, u8 instance)
 	return hci_enable_ext_advertising_sync(hdev, instance);
 }
 
-static int hci_disable_per_advertising_sync(struct hci_dev *hdev, u8 instance)
+int hci_disable_per_advertising_sync(struct hci_dev *hdev, u8 instance)
 {
 	struct hci_cp_le_set_per_adv_enable cp;
 	struct adv_info *adv = NULL;
@@ -2857,6 +2870,27 @@ static int hci_passive_scan_sync(struct hci_dev *hdev)
 	 */
 	filter_policy = hci_update_accept_list_sync(hdev);
 
+	/* If suspended and filter_policy set to 0x00 (no acceptlist) then
+	 * passive scanning cannot be started since that would require the host
+	 * to be woken up to process the reports.
+	 */
+	if (hdev->suspended && !filter_policy) {
+		/* Check if accept list is empty then there is no need to scan
+		 * while suspended.
+		 */
+		if (list_empty(&hdev->le_accept_list))
+			return 0;
+
+		/* If there are devices is the accept_list that means some
+		 * devices could not be programmed which in non-suspended case
+		 * means filter_policy needs to be set to 0x00 so the host needs
+		 * to filter, but since this is treating suspended case we
+		 * can ignore device needing host to filter to allow devices in
+		 * the acceptlist to be able to wakeup the system.
+		 */
+		filter_policy = 0x01;
+	}
+
 	/* When the controller is using random resolvable addresses and
 	 * with that having LE privacy enabled, then controllers with
 	 * Extended Scanner Filter Policies support can now enable support
@@ -3462,10 +3496,6 @@ static int hci_unconf_init_sync(struct hci_dev *hdev)
 /* Read Local Supported Features. */
 static int hci_read_local_features_sync(struct hci_dev *hdev)
 {
-	 /* Not all AMP controllers support this command */
-	if (hdev->dev_type == HCI_AMP && !(hdev->commands[14] & 0x20))
-		return 0;
-
 	return __hci_cmd_sync_status(hdev, HCI_OP_READ_LOCAL_FEATURES,
 				     0, NULL, HCI_CMD_TIMEOUT);
 }
@@ -3500,51 +3530,6 @@ static int hci_read_local_cmds_sync(struct hci_dev *hdev)
 	return 0;
 }
 
-/* Read Local AMP Info */
-static int hci_read_local_amp_info_sync(struct hci_dev *hdev)
-{
-	return __hci_cmd_sync_status(hdev, HCI_OP_READ_LOCAL_AMP_INFO,
-				     0, NULL, HCI_CMD_TIMEOUT);
-}
-
-/* Read Data Blk size */
-static int hci_read_data_block_size_sync(struct hci_dev *hdev)
-{
-	return __hci_cmd_sync_status(hdev, HCI_OP_READ_DATA_BLOCK_SIZE,
-				     0, NULL, HCI_CMD_TIMEOUT);
-}
-
-/* Read Flow Control Mode */
-static int hci_read_flow_control_mode_sync(struct hci_dev *hdev)
-{
-	return __hci_cmd_sync_status(hdev, HCI_OP_READ_FLOW_CONTROL_MODE,
-				     0, NULL, HCI_CMD_TIMEOUT);
-}
-
-/* Read Location Data */
-static int hci_read_location_data_sync(struct hci_dev *hdev)
-{
-	return __hci_cmd_sync_status(hdev, HCI_OP_READ_LOCATION_DATA,
-				     0, NULL, HCI_CMD_TIMEOUT);
-}
-
-/* AMP Controller init stage 1 command sequence */
-static const struct hci_init_stage amp_init1[] = {
-	/* HCI_OP_READ_LOCAL_VERSION */
-	HCI_INIT(hci_read_local_version_sync),
-	/* HCI_OP_READ_LOCAL_COMMANDS */
-	HCI_INIT(hci_read_local_cmds_sync),
-	/* HCI_OP_READ_LOCAL_AMP_INFO */
-	HCI_INIT(hci_read_local_amp_info_sync),
-	/* HCI_OP_READ_DATA_BLOCK_SIZE */
-	HCI_INIT(hci_read_data_block_size_sync),
-	/* HCI_OP_READ_FLOW_CONTROL_MODE */
-	HCI_INIT(hci_read_flow_control_mode_sync),
-	/* HCI_OP_READ_LOCATION_DATA */
-	HCI_INIT(hci_read_location_data_sync),
-	{}
-};
-
 static int hci_init1_sync(struct hci_dev *hdev)
 {
 	int err;
@@ -3558,27 +3543,8 @@ static int hci_init1_sync(struct hci_dev *hdev)
 			return err;
 	}
 
-	switch (hdev->dev_type) {
-	case HCI_PRIMARY:
-		hdev->flow_ctl_mode = HCI_FLOW_CTL_MODE_PACKET_BASED;
-		return hci_init_stage_sync(hdev, br_init1);
-	case HCI_AMP:
-		hdev->flow_ctl_mode = HCI_FLOW_CTL_MODE_BLOCK_BASED;
-		return hci_init_stage_sync(hdev, amp_init1);
-	default:
-		bt_dev_err(hdev, "Unknown device type %d", hdev->dev_type);
-		break;
-	}
-
-	return 0;
+	return hci_init_stage_sync(hdev, br_init1);
 }
-
-/* AMP Controller init stage 2 command sequence */
-static const struct hci_init_stage amp_init2[] = {
-	/* HCI_OP_READ_LOCAL_FEATURES */
-	HCI_INIT(hci_read_local_features_sync),
-	{}
-};
 
 /* Read Buffer Size (ACL mtu, max pkt, etc.) */
 static int hci_read_buffer_size_sync(struct hci_dev *hdev)
@@ -3836,9 +3802,6 @@ static int hci_init2_sync(struct hci_dev *hdev)
 	int err;
 
 	bt_dev_dbg(hdev, "");
-
-	if (hdev->dev_type == HCI_AMP)
-		return hci_init_stage_sync(hdev, amp_init2);
 
 	err = hci_init_stage_sync(hdev, hci_init2);
 	if (err)
@@ -4681,13 +4644,6 @@ static int hci_init_sync(struct hci_dev *hdev)
 	if (err < 0)
 		return err;
 
-	/* HCI_PRIMARY covers both single-mode LE, BR/EDR and dual-mode
-	 * BR/EDR/LE type controllers. AMP controllers only need the
-	 * first two stages of init.
-	 */
-	if (hdev->dev_type != HCI_PRIMARY)
-		return 0;
-
 	err = hci_init3_sync(hdev);
 	if (err < 0)
 		return err;
@@ -4938,12 +4894,8 @@ int hci_dev_open_sync(struct hci_dev *hdev)
 		 * In case of user channel usage, it is not important
 		 * if a public address or static random address is
 		 * available.
-		 *
-		 * This check is only valid for BR/EDR controllers
-		 * since AMP controllers do not have an address.
 		 */
 		if (!hci_dev_test_flag(hdev, HCI_USER_CHANNEL) &&
-		    hdev->dev_type == HCI_PRIMARY &&
 		    !bacmp(&hdev->bdaddr, BDADDR_ANY) &&
 		    !bacmp(&hdev->static_addr, BDADDR_ANY)) {
 			ret = -EADDRNOTAVAIL;
@@ -4978,8 +4930,7 @@ int hci_dev_open_sync(struct hci_dev *hdev)
 		    !hci_dev_test_flag(hdev, HCI_CONFIG) &&
 		    !hci_dev_test_flag(hdev, HCI_UNCONFIGURED) &&
 		    !hci_dev_test_flag(hdev, HCI_USER_CHANNEL) &&
-		    hci_dev_test_flag(hdev, HCI_MGMT) &&
-		    hdev->dev_type == HCI_PRIMARY) {
+		    hci_dev_test_flag(hdev, HCI_MGMT)) {
 			ret = hci_powered_update_sync(hdev);
 			mgmt_power_on(hdev, ret);
 		}
@@ -5136,8 +5087,7 @@ int hci_dev_close_sync(struct hci_dev *hdev)
 
 	auto_off = hci_dev_test_and_clear_flag(hdev, HCI_AUTO_OFF);
 
-	if (!auto_off && hdev->dev_type == HCI_PRIMARY &&
-	    !hci_dev_test_flag(hdev, HCI_USER_CHANNEL) &&
+	if (!auto_off && !hci_dev_test_flag(hdev, HCI_USER_CHANNEL) &&
 	    hci_dev_test_flag(hdev, HCI_MGMT))
 		__mgmt_power_off(hdev);
 
@@ -5200,9 +5150,6 @@ int hci_dev_close_sync(struct hci_dev *hdev)
 	hdev->flags &= BIT(HCI_RAW);
 	hci_dev_clear_volatile_flags(hdev);
 
-	/* Controller radio is available but is currently powered down */
-	hdev->amp_status = AMP_STATUS_POWERED_DOWN;
-
 	memset(hdev->eir, 0, sizeof(hdev->eir));
 	memset(hdev->dev_class, 0, sizeof(hdev->dev_class));
 	bacpy(&hdev->random_addr, BDADDR_ANY);
@@ -5239,8 +5186,7 @@ static int hci_power_on_sync(struct hci_dev *hdev)
 	 */
 	if (hci_dev_test_flag(hdev, HCI_RFKILLED) ||
 	    hci_dev_test_flag(hdev, HCI_UNCONFIGURED) ||
-	    (hdev->dev_type == HCI_PRIMARY &&
-	     !bacmp(&hdev->bdaddr, BDADDR_ANY) &&
+	    (!bacmp(&hdev->bdaddr, BDADDR_ANY) &&
 	     !bacmp(&hdev->static_addr, BDADDR_ANY))) {
 		hci_dev_clear_flag(hdev, HCI_AUTO_OFF);
 		hci_dev_close_sync(hdev);
@@ -5346,26 +5292,21 @@ int hci_stop_discovery_sync(struct hci_dev *hdev)
 	return 0;
 }
 
-static int hci_disconnect_phy_link_sync(struct hci_dev *hdev, u16 handle,
-					u8 reason)
-{
-	struct hci_cp_disconn_phy_link cp;
-
-	memset(&cp, 0, sizeof(cp));
-	cp.phy_handle = HCI_PHY_HANDLE(handle);
-	cp.reason = reason;
-
-	return __hci_cmd_sync_status(hdev, HCI_OP_DISCONN_PHY_LINK,
-				     sizeof(cp), &cp, HCI_CMD_TIMEOUT);
-}
-
 static int hci_disconnect_sync(struct hci_dev *hdev, struct hci_conn *conn,
 			       u8 reason)
 {
 	struct hci_cp_disconnect cp;
 
-	if (conn->type == AMP_LINK)
-		return hci_disconnect_phy_link_sync(hdev, conn->handle, reason);
+	if (test_bit(HCI_CONN_BIG_CREATED, &conn->flags)) {
+		/* This is a BIS connection, hci_conn_del will
+		 * do the necessary cleanup.
+		 */
+		hci_dev_lock(hdev);
+		hci_conn_failed(conn, reason);
+		hci_dev_unlock(hdev);
+
+		return 0;
+	}
 
 	memset(&cp, 0, sizeof(cp));
 	cp.handle = cpu_to_le16(conn->handle);
@@ -5519,21 +5460,6 @@ int hci_abort_conn_sync(struct hci_dev *hdev, struct hci_conn *conn, u8 reason)
 		err = hci_reject_conn_sync(hdev, conn, reason);
 		break;
 	case BT_OPEN:
-		hci_dev_lock(hdev);
-
-		/* Cleanup bis or pa sync connections */
-		if (test_and_clear_bit(HCI_CONN_BIG_SYNC_FAILED, &conn->flags) ||
-		    test_and_clear_bit(HCI_CONN_PA_SYNC_FAILED, &conn->flags)) {
-			hci_conn_failed(conn, reason);
-		} else if (test_bit(HCI_CONN_PA_SYNC, &conn->flags) ||
-			   test_bit(HCI_CONN_BIG_SYNC, &conn->flags)) {
-			conn->state = BT_CLOSED;
-			hci_disconn_cfm(conn, reason);
-			hci_conn_del(conn);
-		}
-
-		hci_dev_unlock(hdev);
-		return 0;
 	case BT_BOUND:
 		break;
 	default:

@@ -84,8 +84,12 @@ extern struct kobj_attribute shmem_enabled_attr;
  */
 #define THP_ORDERS_ALL		(THP_ORDERS_ALL_ANON | THP_ORDERS_ALL_FILE)
 
-#define thp_vma_allowable_order(vma, vm_flags, smaps, in_pf, enforce_sysfs, order) \
-	(!!thp_vma_allowable_orders(vma, vm_flags, smaps, in_pf, enforce_sysfs, BIT(order)))
+#define TVA_SMAPS		(1 << 0)	/* Will be used for procfs */
+#define TVA_IN_PF		(1 << 1)	/* Page fault handler */
+#define TVA_ENFORCE_SYSFS	(1 << 2)	/* Obey sysfs configuration */
+
+#define thp_vma_allowable_order(vma, vm_flags, tva_flags, order) \
+	(!!thp_vma_allowable_orders(vma, vm_flags, tva_flags, BIT(order)))
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 #define HPAGE_PMD_SHIFT PMD_SHIFT
@@ -211,17 +215,15 @@ static inline bool file_thp_enabled(struct vm_area_struct *vma)
 }
 
 unsigned long __thp_vma_allowable_orders(struct vm_area_struct *vma,
-					 unsigned long vm_flags, bool smaps,
-					 bool in_pf, bool enforce_sysfs,
+					 unsigned long vm_flags,
+					 unsigned long tva_flags,
 					 unsigned long orders);
 
 /**
  * thp_vma_allowable_orders - determine hugepage orders that are allowed for vma
  * @vma:  the vm area to check
  * @vm_flags: use these vm_flags instead of vma->vm_flags
- * @smaps: whether answer will be used for smaps file
- * @in_pf: whether answer will be used by page fault handler
- * @enforce_sysfs: whether sysfs config should be taken into account
+ * @tva_flags: Which TVA flags to honour
  * @orders: bitfield of all orders to consider
  *
  * Calculates the intersection of the requested hugepage orders and the allowed
@@ -234,12 +236,12 @@ unsigned long __thp_vma_allowable_orders(struct vm_area_struct *vma,
  */
 static inline
 unsigned long thp_vma_allowable_orders(struct vm_area_struct *vma,
-				       unsigned long vm_flags, bool smaps,
-				       bool in_pf, bool enforce_sysfs,
+				       unsigned long vm_flags,
+				       unsigned long tva_flags,
 				       unsigned long orders)
 {
 	/* Optimization to check if required orders are enabled early. */
-	if (enforce_sysfs && vma_is_anonymous(vma)) {
+	if ((tva_flags & TVA_ENFORCE_SYSFS) && vma_is_anonymous(vma)) {
 		unsigned long mask = READ_ONCE(huge_anon_orders_always);
 
 		if (vm_flags & VM_HUGEPAGE)
@@ -253,16 +255,15 @@ unsigned long thp_vma_allowable_orders(struct vm_area_struct *vma,
 			return 0;
 	}
 
-	return __thp_vma_allowable_orders(vma, vm_flags, smaps, in_pf,
-					  enforce_sysfs, orders);
+	return __thp_vma_allowable_orders(vma, vm_flags, tva_flags, orders);
 }
 
 enum mthp_stat_item {
 	MTHP_STAT_ANON_FAULT_ALLOC,
 	MTHP_STAT_ANON_FAULT_FALLBACK,
 	MTHP_STAT_ANON_FAULT_FALLBACK_CHARGE,
-	MTHP_STAT_ANON_SWPOUT,
-	MTHP_STAT_ANON_SWPOUT_FALLBACK,
+	MTHP_STAT_SWPOUT,
+	MTHP_STAT_SWPOUT_FALLBACK,
 	__MTHP_STAT_COUNT
 };
 
@@ -270,6 +271,7 @@ struct mthp_stat {
 	unsigned long stats[ilog2(MAX_PTRS_PER_PTE) + 1][__MTHP_STAT_COUNT];
 };
 
+#ifdef CONFIG_SYSFS
 DECLARE_PER_CPU(struct mthp_stat, mthp_stats);
 
 static inline void count_mthp_stat(int order, enum mthp_stat_item item)
@@ -279,6 +281,11 @@ static inline void count_mthp_stat(int order, enum mthp_stat_item item)
 
 	this_cpu_inc(mthp_stats.stats[order][item]);
 }
+#else
+static inline void count_mthp_stat(int order, enum mthp_stat_item item)
+{
+}
+#endif
 
 #define transparent_hugepage_use_zero_page()				\
 	(transparent_hugepage_flags &					\
@@ -288,7 +295,6 @@ unsigned long thp_get_unmapped_area(struct file *filp, unsigned long addr,
 		unsigned long len, unsigned long pgoff, unsigned long flags);
 
 void folio_prep_large_rmappable(struct folio *folio);
-bool can_split_folio(struct folio *folio, int *pextra_pins);
 int split_huge_page_to_list(struct page *page, struct list_head *list);
 static inline int split_huge_page(struct page *page)
 {
@@ -427,8 +433,8 @@ static inline unsigned long thp_vma_suitable_orders(struct vm_area_struct *vma,
 }
 
 static inline unsigned long thp_vma_allowable_orders(struct vm_area_struct *vma,
-					unsigned long vm_flags, bool smaps,
-					bool in_pf, bool enforce_sysfs,
+					unsigned long vm_flags,
+					unsigned long tva_flags,
 					unsigned long orders)
 {
 	return 0;
@@ -440,11 +446,6 @@ static inline void folio_prep_large_rmappable(struct folio *folio) {}
 
 #define thp_get_unmapped_area	NULL
 
-static inline bool
-can_split_folio(struct folio *folio, int *pextra_pins)
-{
-	return false;
-}
 static inline int
 split_huge_page_to_list(struct page *page, struct list_head *list)
 {

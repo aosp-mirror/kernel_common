@@ -14,6 +14,9 @@
 #include <linux/pagemap.h>
 #include <linux/memremap.h>
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/mm.h>
+
 extern bool isolate_lru_page(struct page *page);
 extern void putback_lru_page(struct page *page);
 
@@ -243,10 +246,8 @@ void folio_add_anon_rmap_ptes(struct folio *, struct page *, int nr_pages,
 	folio_add_anon_rmap_ptes(folio, page, 1, vma, address, flags)
 void folio_add_anon_rmap_pmd(struct folio *, struct page *,
 		struct vm_area_struct *, unsigned long address, rmap_t flags);
-void page_add_new_anon_rmap(struct page *, struct vm_area_struct *,
-		unsigned long address);
 void folio_add_new_anon_rmap(struct folio *, struct vm_area_struct *,
-		unsigned long address);
+		unsigned long address, rmap_t flags);
 void folio_add_file_rmap_ptes(struct folio *, struct page *, int nr_pages,
 		struct vm_area_struct *);
 #define folio_add_file_rmap_pte(folio, page, vma) \
@@ -323,12 +324,15 @@ static inline void hugetlb_remove_rmap(struct folio *folio)
 static __always_inline void __folio_dup_file_rmap(struct folio *folio,
 		struct page *page, int nr_pages, enum rmap_level level)
 {
+	bool success = false;
 	__folio_rmap_sanity_checks(folio, page, nr_pages, level);
 
 	switch (level) {
 	case RMAP_LEVEL_PTE:
 		do {
-			atomic_inc(&page->_mapcount);
+			trace_android_vh_update_page_mapcount(page, true, false, NULL, &success);
+			if (!success)
+				atomic_inc(&page->_mapcount);
 		} while (page++, --nr_pages > 0);
 		break;
 	case RMAP_LEVEL_PMD:
@@ -380,6 +384,7 @@ static __always_inline int __folio_try_dup_anon_rmap(struct folio *folio,
 {
 	bool maybe_pinned;
 	int i;
+	bool success = false;
 
 	VM_WARN_ON_FOLIO(!folio_test_anon(folio), folio);
 	__folio_rmap_sanity_checks(folio, page, nr_pages, level);
@@ -409,7 +414,9 @@ static __always_inline int __folio_try_dup_anon_rmap(struct folio *folio,
 		do {
 			if (PageAnonExclusive(page))
 				ClearPageAnonExclusive(page);
-			atomic_inc(&page->_mapcount);
+			trace_android_vh_update_page_mapcount(page, true, false, NULL, &success);
+			if (!success)
+				atomic_inc(&page->_mapcount);
 		} while (page++, --nr_pages > 0);
 		break;
 	case RMAP_LEVEL_PMD:

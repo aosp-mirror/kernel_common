@@ -24,6 +24,9 @@
 #include <linux/rmap.h>
 #include "internal.h"
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/vmscan.h>
+
 /*
  * Regular page slots are stabilized by the page lock even without the tree
  * itself locked.  These unlocked entries need verification under the tree
@@ -210,6 +213,7 @@ int truncate_inode_folio(struct address_space *mapping, struct folio *folio)
  */
 bool truncate_inode_partial_folio(struct folio *folio, loff_t start, loff_t end)
 {
+	int err;
 	loff_t pos = folio_pos(folio);
 	unsigned int offset, length;
 
@@ -241,8 +245,11 @@ bool truncate_inode_partial_folio(struct folio *folio, loff_t start, loff_t end)
 		folio_invalidate(folio, offset, length);
 	if (!folio_test_large(folio))
 		return true;
-	if (split_folio(folio) == 0)
+	err = split_folio(folio);
+	if (!err)
 		return true;
+	if (err > 0)
+		return false;
 	if (folio_test_dirty(folio))
 		return false;
 	truncate_inode_folio(folio->mapping, folio);
@@ -512,6 +519,11 @@ unsigned long mapping_try_invalidate(struct address_space *mapping,
 	unsigned long ret;
 	unsigned long count = 0;
 	int i;
+	bool skip = false;
+
+	trace_android_vh_invalidate_mapping_pagevec(mapping, &skip);
+	if (skip)
+		return count;
 
 	folio_batch_init(&fbatch);
 	while (find_lock_entries(mapping, &index, end, &fbatch, indices)) {

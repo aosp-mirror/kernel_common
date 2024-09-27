@@ -85,9 +85,9 @@ static void pvm_init_traps_aa64pfr0(struct kvm_vcpu *vcpu)
 
 	/* Protected KVM does not support AArch32 guests. */
 	BUILD_BUG_ON(FIELD_GET(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_EL0),
-		PVM_ID_AA64PFR0_RESTRICT_UNSIGNED) != ID_AA64PFR0_EL1_ELx_64BIT_ONLY);
+		PVM_ID_AA64PFR0_ALLOW) != ID_AA64PFR0_EL1_ELx_64BIT_ONLY);
 	BUILD_BUG_ON(FIELD_GET(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_EL1),
-		PVM_ID_AA64PFR0_RESTRICT_UNSIGNED) != ID_AA64PFR0_EL1_ELx_64BIT_ONLY);
+		PVM_ID_AA64PFR0_ALLOW) != ID_AA64PFR0_EL1_ELx_64BIT_ONLY);
 
 	/*
 	 * Linux guests assume support for floating-point and Advanced SIMD. Do
@@ -200,6 +200,10 @@ static void pvm_init_traps_aa64dfr0(struct kvm_vcpu *vcpu)
 		else
 			cptr_set |= CPTR_EL2_TTA;
 	}
+
+	/* Trap External Trace */
+	if (!FIELD_GET(ARM64_FEATURE_MASK(ID_AA64DFR0_EL1_ExtTrcBuff), feature_ids))
+		mdcr_clear |= MDCR_EL2_E2TB_MASK << MDCR_EL2_E2TB_SHIFT;
 
 	vcpu->arch.mdcr_el2 |= mdcr_set;
 	vcpu->arch.mdcr_el2 &= ~mdcr_clear;
@@ -373,7 +377,7 @@ static struct pkvm_hyp_vm *get_vm_by_handle(pkvm_handle_t handle)
 	return vm_table[idx];
 }
 
-int __pkvm_reclaim_dying_guest_page(pkvm_handle_t handle, u64 pfn, u64 ipa)
+int __pkvm_reclaim_dying_guest_page(pkvm_handle_t handle, u64 pfn, u64 gfn, u8 order)
 {
 	struct pkvm_hyp_vm *hyp_vm;
 	int ret = -EINVAL;
@@ -383,7 +387,7 @@ int __pkvm_reclaim_dying_guest_page(pkvm_handle_t handle, u64 pfn, u64 ipa)
 	if (!hyp_vm || !hyp_vm->is_dying)
 		goto unlock;
 
-	ret = __pkvm_host_reclaim_page(hyp_vm, pfn, ipa);
+	ret = __pkvm_host_reclaim_page(hyp_vm, pfn, gfn << PAGE_SHIFT, order);
 	if (ret)
 		goto unlock;
 
@@ -506,7 +510,7 @@ static void pkvm_vcpu_init_features_from_host(struct pkvm_hyp_vcpu *hyp_vcpu)
 	if (FIELD_GET(ARM64_FEATURE_MASK(ID_AA64DFR0_EL1_PMUVer), PVM_ID_AA64DFR0_ALLOW))
 		set_bit(KVM_ARM_VCPU_PMU_V3, allowed_features);
 
-	if (FIELD_GET(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_SVE), PVM_ID_AA64PFR0_RESTRICT_UNSIGNED))
+	if (FIELD_GET(ARM64_FEATURE_MASK(ID_AA64PFR0_EL1_SVE), PVM_ID_AA64PFR0_ALLOW))
 		set_bit(KVM_ARM_VCPU_SVE, allowed_features);
 
 	if (FIELD_GET(ARM64_FEATURE_MASK(ID_AA64ISAR1_EL1_API), PVM_ID_AA64ISAR1_ALLOW) &&
@@ -1600,7 +1604,8 @@ out_guest_err:
 	return true;
 }
 
-static bool pkvm_memrelinquish_call(struct pkvm_hyp_vcpu *hyp_vcpu)
+static bool pkvm_memrelinquish_call(struct pkvm_hyp_vcpu *hyp_vcpu,
+				    u64 *exit_code)
 {
 	struct kvm_vcpu *vcpu = &hyp_vcpu->vcpu;
 	u64 ipa = smccc_get_arg1(vcpu);
@@ -1613,8 +1618,14 @@ static bool pkvm_memrelinquish_call(struct pkvm_hyp_vcpu *hyp_vcpu)
 		goto out_guest_err;
 
 	ret = __pkvm_guest_relinquish_to_host(hyp_vcpu, ipa, &pa);
-	if (ret)
+	if (ret == -ENOMEM) {
+		if (pkvm_handle_empty_memcache(hyp_vcpu, exit_code))
+			goto out_guest_err;
+
+		return false;
+	} else if (ret) {
 		goto out_guest_err;
+	}
 
 	if (pa != 0) {
 		/* Now pass to host. */
@@ -1715,7 +1726,7 @@ bool kvm_handle_pvm_hvc64(struct kvm_vcpu *vcpu, u64 *exit_code)
 	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_UNSHARE_FUNC_ID:
 		return pkvm_memunshare_call(hyp_vcpu);
 	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_RELINQUISH_FUNC_ID:
-		return pkvm_memrelinquish_call(hyp_vcpu);
+		return pkvm_memrelinquish_call(hyp_vcpu, exit_code);
 	case ARM_SMCCC_TRNG_VERSION ... ARM_SMCCC_TRNG_RND32:
 	case ARM_SMCCC_TRNG_RND64:
 		if (smccc_trng_available)
@@ -1746,7 +1757,7 @@ bool kvm_hyp_handle_hvc64(struct kvm_vcpu *vcpu, u64 *exit_code)
 	case ARM_SMCCC_VENDOR_HYP_KVM_HYP_MEMINFO_FUNC_ID:
 		return pkvm_meminfo_call(hyp_vcpu);
 	case ARM_SMCCC_VENDOR_HYP_KVM_MEM_RELINQUISH_FUNC_ID:
-		return pkvm_memrelinquish_call(hyp_vcpu);
+		return pkvm_memrelinquish_call(hyp_vcpu, exit_code);
 	}
 
 	return false;
