@@ -77,7 +77,6 @@ MODULE_LICENSE("GPL");
 #define MT_QUIRK_FORCE_MULTI_INPUT	BIT(20)
 #define MT_QUIRK_DISABLE_WAKEUP		BIT(21)
 #define MT_QUIRK_ORIENTATION_INVERT	BIT(22)
-#define MT_QUIRK_SKIP_RESET		BIT(23)
 
 #define MT_INPUTMODE_TOUCHSCREEN	0x02
 #define MT_INPUTMODE_TOUCHPAD		0x03
@@ -212,7 +211,6 @@ static void mt_post_parse(struct mt_device *td, struct mt_application *app);
 #define MT_CLS_WIN_8_DISABLE_WAKEUP		0x0016
 #define MT_CLS_WIN_8_NO_STICKY_FINGERS		0x0017
 #define MT_CLS_WIN_8_FORCE_MULTI_INPUT_NSMU	0x0018
-#define MT_CLS_WIN_8_SKIP_RESET			0x0019
 
 /* vendor specific classes */
 #define MT_CLS_3M				0x0101
@@ -329,15 +327,6 @@ static const struct mt_class mt_classes[] = {
 			MT_QUIRK_HOVERING |
 			MT_QUIRK_CONTACT_CNT_ACCURATE |
 			MT_QUIRK_WIN8_PTP_BUTTONS,
-		.export_all_inputs = true },
-	{ .name = MT_CLS_WIN_8_SKIP_RESET,
-		.quirks = MT_QUIRK_ALWAYS_VALID |
-			MT_QUIRK_IGNORE_DUPLICATES |
-			MT_QUIRK_HOVERING |
-			MT_QUIRK_CONTACT_CNT_ACCURATE |
-			MT_QUIRK_STICKY_FINGERS |
-			MT_QUIRK_WIN8_PTP_BUTTONS |
-			MT_QUIRK_SKIP_RESET,
 		.export_all_inputs = true },
 
 	/*
@@ -993,7 +982,6 @@ static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 			if ((cls->name == MT_CLS_WIN_8 ||
 			     cls->name == MT_CLS_WIN_8_FORCE_MULTI_INPUT ||
 			     cls->name == MT_CLS_WIN_8_FORCE_MULTI_INPUT_NSMU ||
-			     cls->name == MT_CLS_WIN_8_SKIP_RESET ||
 			     cls->name == MT_CLS_WIN_8_DISABLE_WAKEUP) &&
 				(field->application == HID_DG_TOUCHPAD ||
 				 field->application == HID_DG_TOUCHSCREEN))
@@ -2146,9 +2134,6 @@ static int mt_reset(struct hid_device *hdev)
 	if (!td)
 		return 0;
 
-	if (td->mtclass.quirks & MT_QUIRK_SKIP_RESET)
-		return 0;
-
 	if (td->is_haptic_touchpad) {
 		mt_release_contacts(hdev);
 		mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
@@ -2318,23 +2303,6 @@ static const struct hid_device_id mt_devices[] = {
 		HID_DEVICE(BUS_I2C, HID_GROUP_MULTITOUCH_WIN_8,
 			USB_VENDOR_ID_ELAN, 0x3148) },
 
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_ELAN, 0x30cd) },
-
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_ELAN, 0x30c1) },
-
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_ELAN, 0x3082) },
-
-	/* Zinitix devices */
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_ZINITIX, 0x650e) },
-
 	/* Elitegroup panel */
 	{ .driver_data = MT_CLS_SERIAL,
 		MT_USB_DEVICE(USB_VENDOR_ID_ELITEGROUP,
@@ -2466,23 +2434,6 @@ static const struct hid_device_id mt_devices[] = {
 	{ .driver_data = MT_CLS_PANASONIC,
 		MT_USB_DEVICE(USB_VENDOR_ID_PANASONIC,
 			USB_DEVICE_ID_PANABOARD_UBT880) },
-
-	/* PixArt touchpad keeping resetting */
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_PIXART, 0x0255) },
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_PIXART, 0x1002) },
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_PIXART, 0x200d) },
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_PIXART, 0x4073) },
-	{ .driver_data = MT_CLS_WIN_8_SKIP_RESET,
-		HID_DEVICE(HID_BUS_ANY, HID_GROUP_MULTITOUCH_WIN_8,
-			USB_VENDOR_ID_PIXART, 0x4072) },
 
 	/* PixArt optical touch screen */
 	{ .driver_data = MT_CLS_INRANGE_CONTACTNUMBER,
