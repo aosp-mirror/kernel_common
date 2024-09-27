@@ -420,6 +420,7 @@
   devm_extcon_dev_unregister
   devm_extcon_register_notifier
   devm_free_irq
+  devm_fwnode_pwm_get
   devm_gpiod_get
   devm_gpiod_get_optional
   devm_gpio_request
@@ -876,6 +877,7 @@
   gro_cells_destroy
   gro_cells_init
   gro_cells_receive
+  groups_free
   handle_bad_irq
   handle_edge_irq
   handle_fasteoi_ack_irq
@@ -1271,6 +1273,7 @@
   mdiobus_write
   mdio_device_create
   mdio_device_free
+  mdio_device_reset
   memblock_end_of_DRAM
   memblock_free
   __memcat_p
@@ -1869,6 +1872,7 @@
   regulator_get_voltage_rdev
   regulator_is_enabled
   regulator_is_supported_voltage
+  regulator_list_voltage_table
   regulator_put
   regulator_register_notifier
   regulator_set_current_limit

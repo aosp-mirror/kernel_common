@@ -106,15 +106,17 @@ static inline int fsnotify_file(struct file *file, __u32 mask)
 			int ret;
 
 			path->dentry->d_op->d_canonical_path(path, &lower_path);
-			if (IS_ERR(lower_path.dentry))
-				return PTR_ERR(lower_path.dentry);
+			if (lower_path.dentry != (struct dentry *)-ENOSYS) {
+				if (IS_ERR(lower_path.dentry))
+					return PTR_ERR(lower_path.dentry);
 
-			ret = fsnotify_parent(lower_path.dentry, mask,
-					      &lower_path, FSNOTIFY_EVENT_PATH);
-			path_put(&lower_path);
+				ret = fsnotify_parent(lower_path.dentry, mask,
+						      &lower_path, FSNOTIFY_EVENT_PATH);
+				path_put(&lower_path);
 
-			if (ret)
-				return ret;
+				if (ret)
+					return ret;
+			}
 		}
 	}
 
