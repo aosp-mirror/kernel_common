@@ -1474,6 +1474,7 @@ cc_library(
     srcs = ["tools/testing/selftests/vDSO/parse_vdso.c"],
     hdrs = [
         "tools/testing/selftests/vDSO/parse_vdso.h",
+        "tools/testing/selftests/vDSO/vdso_call.h",
         "tools/testing/selftests/vDSO/vdso_config.h",
     ],
     copts = _KSELFTEST_COPTS,
