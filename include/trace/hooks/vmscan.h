@@ -70,6 +70,9 @@ DECLARE_HOOK(android_vh_shrink_node_memcgs,
 DECLARE_HOOK(android_vh_mglru_should_abort_scan,
 	TP_PROTO(u64 *ext, bool *bypass),
 	TP_ARGS(ext, bypass));
+DECLARE_HOOK(android_vh_should_memcg_bypass,
+	TP_PROTO(struct mem_cgroup *memcg, int priority, bool *bypass),
+	TP_ARGS(memcg, priority, bypass));
 #endif /* _TRACE_HOOK_VMSCAN_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>
