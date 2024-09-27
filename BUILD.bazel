@@ -1367,6 +1367,12 @@ _KSELFTEST_COPTS = [
     "-O3",
     "-pthread",
     "-std=gnu99",
+    "-include",
+    paths.join(
+        package_relative_label(":x").workspace_root,
+        package_relative_label(":x").package,
+        "tools/testing/selftests/android/include/bionic-compat.h",
+    ),
 ] + select({
     ":arm": ["-mcpu=cortex-a8"],
     "//conditions:default": [],
@@ -1398,7 +1404,9 @@ config_setting(
 
 cc_library(
     name = "kselftest_headers_lib",
-    hdrs = glob(["tools/testing/selftests/*.h"]),
+    hdrs = glob(["tools/testing/selftests/*.h"]) + [
+        "tools/testing/selftests/android/include/bionic-compat.h",
+    ],
     copts = _KSELFTEST_COPTS,
     defines = [
         "_GNU_SOURCE=",
@@ -1470,6 +1478,9 @@ cc_library(
     ],
     copts = _KSELFTEST_COPTS,
     visibility = ["//visibility:private"],
+    deps = [
+        ":kselftest_headers_lib",
+    ],
 )
 
 cc_binary_with_abi(
@@ -1480,7 +1491,6 @@ cc_binary_with_abi(
     target_compatible_with = ["@platforms//os:android"],
     visibility = ["//visibility:private"],
     deps = [
-        ":kselftest_headers_lib",
         ":kselftest_vdso",
     ],
 )
@@ -1493,7 +1503,6 @@ cc_binary_with_abi(
     target_compatible_with = ["@platforms//os:android"],
     visibility = ["//visibility:private"],
     deps = [
-        ":kselftest_headers_lib",
         ":kselftest_vdso",
     ],
 )
@@ -1506,7 +1515,6 @@ cc_binary_with_abi(
     target_compatible_with = ["@platforms//os:android"],
     visibility = ["//visibility:private"],
     deps = [
-        ":kselftest_headers_lib",
         ":kselftest_vdso",
     ],
 )
@@ -1519,7 +1527,6 @@ cc_binary_with_abi(
     target_compatible_with = ["@platforms//os:android"],
     visibility = ["//visibility:private"],
     deps = [
-        ":kselftest_headers_lib",
         ":kselftest_vdso",
     ],
 )
