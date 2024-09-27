@@ -17,6 +17,10 @@
 #include <linux/android/binderfs.h>
 #include "../../kselftest.h"
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+#endif
+
 static ssize_t write_nointr(int fd, const void *buf, size_t count)
 {
 	ssize_t ret;
@@ -140,6 +144,11 @@ static void __do_binderfs_test(void)
 	bool keep = false;
 	struct binderfs_device device = { 0 };
 	struct binder_version version = { 0 };
+	char device_path[sizeof("/dev/binderfs/") + BINDERFS_MAX_NAME];
+	static const char * const binder_features[] = {
+		"oneway_spam_detection",
+		"freeze_notification",
+	};
 
 	change_to_mountns();
 
@@ -240,6 +249,20 @@ static void __do_binderfs_test(void)
 
 	/* binder-control device removal failed as expected */
 	ksft_inc_xfail_cnt();
+
+	for (int i = 0; i < ARRAY_SIZE(binder_features); i++) {
+		snprintf(device_path, sizeof(device_path),
+			 "/dev/binderfs/features/%s", binder_features[i]);
+		fd = open(device_path, O_CLOEXEC | O_RDONLY);
+		if (fd < 0) {
+			ksft_exit_fail_msg("%s - Failed to open binder feature: %s",
+				strerror(errno), binder_features[i]);
+		}
+		close(fd);
+	}
+
+	/* success: binder feature files found */
+	ksft_inc_pass_cnt();
 
 on_error:
 	ret = umount2("/dev/binderfs", MNT_DETACH);
