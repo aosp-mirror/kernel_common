@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM ufshcd
+#undef TRACE_INCLUDE_PATH
 #define TRACE_INCLUDE_PATH trace/hooks
 #if !defined(_TRACE_HOOK_UFSHCD_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_HOOK_UFSHCD_H
