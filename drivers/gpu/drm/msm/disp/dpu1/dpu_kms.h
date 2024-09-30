@@ -30,13 +30,15 @@
  * DPU_DEBUG - macro for kms/plane/crtc/encoder/connector logs
  * @fmt: Pointer to format string
  */
-#define DPU_DEBUG(fmt, ...) DRM_DEBUG_KMS(fmt, ##__VA_ARGS__)
+#define DPU_DEBUG(fmt, ...)                                                \
+	DRM_DEBUG_DRIVER(fmt, ##__VA_ARGS__)
 
 /**
  * DPU_DEBUG_DRIVER - macro for hardware driver logging
  * @fmt: Pointer to format string
  */
-#define DPU_DEBUG_DRIVER(fmt, ...) DRM_DEBUG_DRIVER(fmt, ##__VA_ARGS__)
+#define DPU_DEBUG_DRIVER(fmt, ...)                                         \
+	DRM_DEBUG_DRIVER(fmt, ##__VA_ARGS__)
 
 #define DPU_ERROR(fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
 #define DPU_ERROR_RATELIMITED(fmt, ...) DRM_ERROR_RATELIMITED(fmt, ##__VA_ARGS__)
