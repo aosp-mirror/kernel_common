@@ -511,7 +511,7 @@ static void pti_clone_entry_text(bool late)
 	if (IS_ENABLED(CONFIG_CFI_CLANG))
 		pti_clone_pgtable((unsigned long) __cfi_jt_start,
 				  (unsigned long) __cfi_jt_end,
-				  PTI_CLONE_PMD);
+				  PTI_CLONE_PMD, late);
 }
 
 /*
