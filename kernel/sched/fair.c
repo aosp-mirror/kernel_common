@@ -8532,10 +8532,9 @@ struct task_struct *
 pick_next_task_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
 	struct cfs_rq *cfs_rq = &rq->cfs;
-	struct sched_entity *se = NULL;
-	struct task_struct *p = NULL;
+	struct sched_entity *se;
+	struct task_struct *p;
 	int new_tasks;
-	bool repick = false;
 
 again:
 	if (!sched_fair_runnable(rq))
@@ -8589,7 +8588,7 @@ again:
 	} while (cfs_rq);
 
 	p = task_of(se);
-	trace_android_rvh_replace_next_task_fair(rq, &p, &se, &repick, false, prev);
+
 	/*
 	 * Since we haven't yet done put_prev_entity and if the selected task
 	 * is a different task than we started out with, try and touch the
@@ -8621,10 +8620,6 @@ simple:
 #endif
 	if (prev)
 		put_prev_task(rq, prev);
-
-	trace_android_rvh_replace_next_task_fair(rq, &p, &se, &repick, true, prev);
-	if (repick)
-		goto done;
 
 	do {
 		se = pick_next_entity(cfs_rq);
