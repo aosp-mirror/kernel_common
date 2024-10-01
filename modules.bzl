@@ -140,12 +140,14 @@ _KUNIT_COMMON_MODULES_LIST = [
     "drivers/hid/hid-uclogic-test.ko",
     "drivers/iio/test/iio-test-format.ko",
     "drivers/input/tests/input_test.ko",
+    "drivers/of/of_kunit_helpers.ko",
     "drivers/rtc/lib_test.ko",
     "fs/ext4/ext4-inode-test.ko",
     "fs/fat/fat_test.ko",
     "kernel/time/time_test.ko",
     "lib/kunit/kunit-example-test.ko",
     "lib/kunit/kunit-test.ko",
+    "lib/kunit/platform-test.ko",
     # "mm/kfence/kfence_test.ko",
     "net/core/dev_addr_lists_test.ko",
     "sound/soc/soc-topology-test.ko",
@@ -156,6 +158,7 @@ _KUNIT_COMMON_MODULES_LIST = [
 _KUNIT_CLK_MODULES_LIST = [
     "drivers/clk/clk-gate_test.ko",
     "drivers/clk/clk_test.ko",
+    "drivers/clk/clk_kunit_helpers.ko",
 ]
 
 # buildifier: disable=unnamed-macro
