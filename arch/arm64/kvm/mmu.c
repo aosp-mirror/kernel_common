@@ -2058,6 +2058,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 			prot |= KVM_PGTABLE_PROT_DEVICE;
 	} else if (cpus_have_const_cap(ARM64_HAS_CACHE_DIC)) {
 		prot |= KVM_PGTABLE_PROT_X;
+	} else if (memslot->flags & KVM_MEM_NON_COHERENT_DMA) {
+		prot |= KVM_PGTABLE_PROT_S2_NOFWB;
 	}
 
 	if (is_protected_kvm_enabled()) {

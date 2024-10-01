@@ -656,7 +656,8 @@ static int stage2_set_prot_attr(struct kvm_pgtable *pgt, enum kvm_pgtable_prot p
 	kvm_pte_t attr;
 
 	switch (prot & (KVM_PGTABLE_PROT_DEVICE |
-			KVM_PGTABLE_PROT_NORMAL_NC)) {
+			KVM_PGTABLE_PROT_NORMAL_NC |
+			KVM_PGTABLE_PROT_S2_NOFWB)) {
 	case KVM_PGTABLE_PROT_DEVICE | KVM_PGTABLE_PROT_NORMAL_NC:
 		return -EINVAL;
 	case KVM_PGTABLE_PROT_DEVICE:
@@ -668,6 +669,9 @@ static int stage2_set_prot_attr(struct kvm_pgtable *pgt, enum kvm_pgtable_prot p
 		if (prot & KVM_PGTABLE_PROT_X)
 			return -EINVAL;
 		attr = KVM_S2_MEMATTR(pgt, NORMAL_NC);
+		break;
+	case KVM_PGTABLE_PROT_S2_NOFWB:
+		attr = KVM_S2_MEMATTR(pgt, NORMAL_IWB);
 		break;
 	default:
 		attr = KVM_S2_MEMATTR(pgt, NORMAL);
