@@ -695,6 +695,7 @@
   drm_gem_vm_open
   drm_get_format_info
   drm_hdcp_update_content_protection
+  drm_hdmi_avi_infoframe_from_display_mode
   drm_hdmi_infoframe_set_hdr_metadata
   drm_helper_mode_fill_fb_struct
   drm_helper_probe_single_connector_modes
@@ -724,6 +725,7 @@
   drm_modeset_lock
   drm_modeset_lock_all_ctx
   drm_modeset_unlock
+  drm_mode_sort
   drm_mode_vrefresh
   drm_object_attach_property
   drm_open
@@ -823,6 +825,7 @@
   find_vm_area
   find_vpid
   finish_wait
+  firmware_request_nowarn
   flush_dcache_page
   flush_delayed_work
   flush_work
@@ -950,6 +953,7 @@
   handle_sysrq
   hashlen_string
   have_governor_per_policy
+  hdmi_avi_infoframe_pack
   hdmi_drm_infoframe_pack_only
   hex2bin
   hex_dump_to_buffer
@@ -1201,6 +1205,7 @@
   kstrtou8_from_user
   kstrtouint
   kstrtouint_from_user
+  kstrtoul_from_user
   kstrtoull
   kstrtoull_from_user
   kthread_bind
@@ -2215,6 +2220,7 @@
   __traceiter_android_vh_sched_setaffinity_early
   __traceiter_android_vh_scheduler_tick
   __traceiter_android_vh_setscheduler_uclamp
+  __traceiter_android_vh_set_task_comm
   __traceiter_android_vh_shrink_inactive_list_blk_plug
   __traceiter_android_vh_shrink_lruvec_blk_plug
   __traceiter_android_vh_si_meminfo
@@ -2355,6 +2361,7 @@
   __tracepoint_android_vh_sched_setaffinity_early
   __tracepoint_android_vh_scheduler_tick
   __tracepoint_android_vh_setscheduler_uclamp
+  __tracepoint_android_vh_set_task_comm
   __tracepoint_android_vh_shrink_inactive_list_blk_plug
   __tracepoint_android_vh_shrink_lruvec_blk_plug
   __tracepoint_android_vh_si_meminfo
@@ -2626,6 +2633,7 @@
   vring_del_virtqueue
   vring_interrupt
   vring_new_virtqueue
+  vscnprintf
   vsnprintf
   vunmap
   vzalloc

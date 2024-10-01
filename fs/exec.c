@@ -74,6 +74,7 @@
 #include "internal.h"
 
 #include <trace/events/sched.h>
+#include <trace/hooks/sched.h>
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(task_rename);
 
@@ -1237,6 +1238,7 @@ void __set_task_comm(struct task_struct *tsk, const char *buf, bool exec)
 	task_lock(tsk);
 	trace_task_rename(tsk, buf);
 	strlcpy(tsk->comm, buf, sizeof(tsk->comm));
+	trace_android_vh_set_task_comm(tsk);
 	task_unlock(tsk);
 	perf_event_comm(tsk, exec);
 }
