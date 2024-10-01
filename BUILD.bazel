@@ -515,7 +515,6 @@ _DB845C_MODULE_OUTS = [
     "drivers/clk/qcom/dispcc-sdm845.ko",
     "drivers/clk/qcom/dispcc-sm8250.ko",
     "drivers/clk/qcom/dispcc-sm8550.ko",
-    "drivers/clk/qcom/dispcc-sm8650.ko",
     "drivers/clk/qcom/gcc-sdm845.ko",
     "drivers/clk/qcom/gcc-sm8250.ko",
     "drivers/clk/qcom/gcc-sm8450.ko",
