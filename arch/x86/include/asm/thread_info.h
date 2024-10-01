@@ -50,10 +50,6 @@
  */
 #ifndef __ASSEMBLY__
 struct task_struct;
-
-/* same as sys_call_ptr_t from asm/syscall.h */
-typedef asmlinkage long (*ti_sys_call_ptr_t)(const struct pt_regs *);
-
 #include <asm/cpufeature.h>
 #include <linux/atomic.h>
 
@@ -64,42 +60,11 @@ struct thread_info {
 #ifdef CONFIG_SMP
 	u32			cpu;		/* current CPU */
 #endif
-#ifdef CONFIG_ALT_SYSCALL
-	/*
-	 * This uses nr_syscalls instead of nr_syscall_max because we want
-	 * to be able to entirely disable a syscall table (e.g. compat) by
-	 * setting nr_syscalls to 0. This requires some careful work in
-	 * the syscall entry assembly code, most variations use ..._max.
-	 */
-	unsigned int		nr_syscalls;	/* size of below */
-	const ti_sys_call_ptr_t	*sys_call_table;
-# ifdef CONFIG_IA32_EMULATION
-	unsigned int		ia32_nr_syscalls;	/* size of below */
-	const ti_sys_call_ptr_t	*ia32_sys_call_table;
-# endif
-#endif
 };
-
-#ifdef CONFIG_ALT_SYSCALL
-# ifdef CONFIG_IA32_EMULATION
-#  define INIT_THREAD_INFO_SYSCALL_COMPAT			\
-	.ia32_nr_syscalls	= IA32_NR_syscalls,		\
-	.ia32_sys_call_table	= ia32_sys_call_table,
-# else
-#  define INIT_THREAD_INFO_SYSCALL_COMPAT /* */
-# endif
-# define INIT_THREAD_INFO_SYSCALL \
-	.nr_syscalls	= NR_syscalls,		\
-	.sys_call_table	= sys_call_table,	\
-	INIT_THREAD_INFO_SYSCALL_COMPAT
-#else
-# define INIT_THREAD_INFO_SYSCALL /* */
-#endif
 
 #define INIT_THREAD_INFO(tsk)			\
 {						\
 	.flags		= 0,			\
-	INIT_THREAD_INFO_SYSCALL		\
 }
 
 #else /* !__ASSEMBLY__ */

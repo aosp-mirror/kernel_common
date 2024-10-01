@@ -47,6 +47,13 @@ struct drm_dp_mst_topology_ref_history {
 };
 #endif /* IS_ENABLED(CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS) */
 
+enum drm_dp_mst_payload_allocation {
+	DRM_DP_MST_PAYLOAD_ALLOCATION_NONE,
+	DRM_DP_MST_PAYLOAD_ALLOCATION_LOCAL,
+	DRM_DP_MST_PAYLOAD_ALLOCATION_DFP,
+	DRM_DP_MST_PAYLOAD_ALLOCATION_REMOTE,
+};
+
 struct drm_dp_mst_branch;
 
 /**
@@ -538,7 +545,7 @@ struct drm_dp_mst_atomic_payload {
 	 *   drm_dp_mst_atomic_wait_for_dependencies() has been called, which will ensure the
 	 *   previous MST states payload start slots have been copied over to the new state. Note
 	 *   that a new start slot won't be assigned/removed from this payload until
-	 *   drm_dp_add_payload_part1()/drm_dp_remove_payload() have been called.
+	 *   drm_dp_add_payload_part1()/drm_dp_remove_payload_part2() have been called.
 	 * * Acquire the MST modesetting lock, and then wait for any pending MST-related commits to
 	 *   get committed to hardware by calling drm_crtc_commit_wait() on each of the
 	 *   &drm_crtc_commit structs in &drm_dp_mst_topology_state.commit_deps.
@@ -564,6 +571,9 @@ struct drm_dp_mst_atomic_payload {
 	bool delete : 1;
 	/** @dsc_enabled: Whether or not this payload has DSC enabled */
 	bool dsc_enabled : 1;
+
+	/** @payload_allocation_status: The allocation status of this payload */
+	enum drm_dp_mst_payload_allocation payload_allocation_status;
 
 	/** @next: The list node for this payload */
 	struct list_head next;
@@ -808,7 +818,28 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 
 void drm_dp_mst_topology_mgr_destroy(struct drm_dp_mst_topology_mgr *mgr);
 
-bool drm_dp_read_mst_cap(struct drm_dp_aux *aux, const u8 dpcd[DP_RECEIVER_CAP_SIZE]);
+/**
+ * enum drm_dp_mst_mode - sink's MST mode capability
+ */
+enum drm_dp_mst_mode {
+	/**
+	 * @DRM_DP_SST: The sink does not support MST nor single stream sideband
+	 * messaging.
+	 */
+	DRM_DP_SST,
+	/**
+	 * @DRM_DP_MST: Sink supports MST, more than one stream and single
+	 * stream sideband messaging.
+	 */
+	DRM_DP_MST,
+	/**
+	 * @DRM_DP_SST_SIDEBAND_MSG: Sink supports only one stream and single
+	 * stream sideband messaging.
+	 */
+	DRM_DP_SST_SIDEBAND_MSG,
+};
+
+enum drm_dp_mst_mode drm_dp_read_mst_cap(struct drm_dp_aux *aux, const u8 dpcd[DP_RECEIVER_CAP_SIZE]);
 int drm_dp_mst_topology_mgr_set_mst(struct drm_dp_mst_topology_mgr *mgr, bool mst_state);
 
 int drm_dp_mst_hpd_irq_handle_event(struct drm_dp_mst_topology_mgr *mgr,
@@ -841,17 +872,21 @@ int drm_dp_add_payload_part1(struct drm_dp_mst_topology_mgr *mgr,
 			     struct drm_dp_mst_topology_state *mst_state,
 			     struct drm_dp_mst_atomic_payload *payload);
 int drm_dp_add_payload_part2(struct drm_dp_mst_topology_mgr *mgr,
-			     struct drm_atomic_state *state,
 			     struct drm_dp_mst_atomic_payload *payload);
-void drm_dp_remove_payload(struct drm_dp_mst_topology_mgr *mgr,
-			   struct drm_dp_mst_topology_state *mst_state,
-			   const struct drm_dp_mst_atomic_payload *old_payload,
-			   struct drm_dp_mst_atomic_payload *new_payload);
+void drm_dp_remove_payload_part1(struct drm_dp_mst_topology_mgr *mgr,
+				 struct drm_dp_mst_topology_state *mst_state,
+				 struct drm_dp_mst_atomic_payload *payload);
+void drm_dp_remove_payload_part2(struct drm_dp_mst_topology_mgr *mgr,
+				 struct drm_dp_mst_topology_state *mst_state,
+				 const struct drm_dp_mst_atomic_payload *old_payload,
+				 struct drm_dp_mst_atomic_payload *new_payload);
 
 int drm_dp_check_act_status(struct drm_dp_mst_topology_mgr *mgr);
 
 void drm_dp_mst_dump_topology(struct seq_file *m,
 			      struct drm_dp_mst_topology_mgr *mgr);
+
+void drm_dp_mst_topology_queue_probe(struct drm_dp_mst_topology_mgr *mgr);
 
 void drm_dp_mst_topology_mgr_suspend(struct drm_dp_mst_topology_mgr *mgr);
 int __must_check
@@ -915,6 +950,13 @@ int __must_check drm_dp_mst_root_conn_atomic_check(struct drm_connector_state *n
 void drm_dp_mst_get_port_malloc(struct drm_dp_mst_port *port);
 void drm_dp_mst_put_port_malloc(struct drm_dp_mst_port *port);
 
+static inline
+bool drm_dp_mst_port_is_logical(struct drm_dp_mst_port *port)
+{
+	return port->port_num >= DP_MST_LOGICAL_PORT_0;
+}
+
+struct drm_dp_aux *drm_dp_mst_aux_for_parent(struct drm_dp_mst_port *port);
 struct drm_dp_aux *drm_dp_mst_dsc_aux_for_port(struct drm_dp_mst_port *port);
 
 static inline struct drm_dp_mst_topology_state *

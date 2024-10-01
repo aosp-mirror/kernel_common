@@ -122,6 +122,15 @@ bool intel_tc_port_in_legacy_mode(struct intel_digital_port *dig_port)
 	return intel_tc_port_in_mode(dig_port, TC_PORT_LEGACY);
 }
 
+bool intel_tc_port_handles_hpd_glitches(struct intel_digital_port *dig_port)
+{
+	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
+	enum phy phy = intel_port_to_phy(i915, dig_port->base.port);
+	struct intel_tc_port *tc = to_tc_port(dig_port);
+
+	return intel_phy_is_tc(i915, phy) && !tc->legacy_port;
+}
+
 /*
  * The display power domains used for TC ports depending on the
  * platform and TC mode (legacy, DP-alt, TBT):
@@ -1549,7 +1558,7 @@ void intel_tc_port_sanitize_mode(struct intel_digital_port *dig_port,
  * connected ports are usable, and avoids exposing to the users objects they
  * can't really use.
  */
-bool intel_tc_port_connected_locked(struct intel_encoder *encoder)
+bool intel_tc_port_connected(struct intel_encoder *encoder)
 {
 	struct intel_digital_port *dig_port = enc_to_dig_port(encoder);
 	struct drm_i915_private *i915 = to_i915(dig_port->base.base.dev);
@@ -1562,19 +1571,6 @@ bool intel_tc_port_connected_locked(struct intel_encoder *encoder)
 		mask = BIT(tc->mode);
 
 	return tc_phy_hpd_live_status(tc) & mask;
-}
-
-bool intel_tc_port_connected(struct intel_encoder *encoder)
-{
-	struct intel_digital_port *dig_port = enc_to_dig_port(encoder);
-	struct intel_tc_port *tc = to_tc_port(dig_port);
-	bool is_connected;
-
-	mutex_lock(&tc->lock);
-	is_connected = intel_tc_port_connected_locked(encoder);
-	mutex_unlock(&tc->lock);
-
-	return is_connected;
 }
 
 static bool __intel_tc_port_link_needs_reset(struct intel_tc_port *tc)

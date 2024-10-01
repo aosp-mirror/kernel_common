@@ -64,6 +64,7 @@ def check_tech_debt(commit):
             "TEST-ONLY:",
             "BACKPORT:",
             "Revert",
+            "Reapply",
             "Reland",
         )
     ) and not commit_message.startswith("BACKPORT: FROMLIST"):

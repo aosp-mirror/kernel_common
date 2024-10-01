@@ -1753,8 +1753,8 @@
 		compatible = "rockchip,rk3399-vop-lit";
 		reg = <0x0 0xff8f0000 0x0 0x2000>, <0x0 0xff8f2000 0x0 0x400>;
 		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
-		assigned-clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>, <&cru DCLK_VOP1>;
-		assigned-clock-rates = <400000000>, <100000000>, <100000000>;
+		assigned-clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>;
+		assigned-clock-rates = <400000000>, <100000000>;
 		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
 		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
 		iommus = <&vopl_mmu>;
@@ -1809,8 +1809,8 @@
 		compatible = "rockchip,rk3399-vop-big";
 		reg = <0x0 0xff900000 0x0 0x2000>, <0x0 0xff902000 0x0 0x1000>;
 		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH 0>;
-		assigned-clocks = <&cru ACLK_VOP0>, <&cru HCLK_VOP0>, <&cru DCLK_VOP0>;
-		assigned-clock-rates = <400000000>, <100000000>, <100000000>;
+		assigned-clocks = <&cru ACLK_VOP0>, <&cru HCLK_VOP0>;
+		assigned-clock-rates = <400000000>, <100000000>;
 		clocks = <&cru ACLK_VOP0>, <&cru DCLK_VOP0>, <&cru HCLK_VOP0>;
 		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
 		iommus = <&vopb_mmu>;
@@ -2125,14 +2125,6 @@
 		#cooling-cells = <2>;
 		power-domains = <&power RK3399_PD_GPU>;
 		status = "disabled";
-
-		gpu_power_model: power_model {
-			compatible = "arm,mali-simple-power-model";
-			static-coefficient = <411522>;
-			dynamic-coefficient = <977>;
-			ts = <32000 4700 (-80) 2>;
-			thermal-zone = "gpu";
-		};
 	};
 
 	pinctrl: pinctrl {

@@ -185,6 +185,127 @@ config STATIC_USERMODEHELPER_PATH
 	  If you wish for all usermode helper programs to be disabled,
 	  specify an empty string here (i.e. "").
 
+choice
+	prompt "Restrict /proc/pid/mem FOLL_FORCE usage"
+	default PROC_MEM_RESTRICT_FOLL_FORCE_OFF
+	help
+	  Reading and writing of /proc/pid/mem bypasses memory permission
+	  checks due to the internal use of the FOLL_FORCE flag. This can be
+	  used by attackers to manipulate process memory contents that would
+	  have been otherwise protected. However, debuggers, like GDB, use
+	  this to set breakpoints, etc. To force debuggers to fall back to
+	  PEEK/POKE, see PROC_MEM_RESTRICT_OPEN_WRITE_ALL.
+
+	config PROC_MEM_RESTRICT_FOLL_FORCE_OFF
+	bool "Do not restrict FOLL_FORCE usage with /proc/pid/mem (regular)"
+	help
+	  Regular behavior: continue to use the FOLL_FORCE flag for
+	  /proc/pid/mem access.
+
+	config PROC_MEM_RESTRICT_FOLL_FORCE_PTRACE
+	bool "Only allow ptracers to use FOLL_FORCE with /proc/pid/mem (safer)"
+	help
+	  Only use the FOLL_FORCE flag for /proc/pid/mem access when the
+	  current task is the active ptracer of the target task. (Safer,
+	  least disruptive to most usage patterns.)
+
+	config PROC_MEM_RESTRICT_FOLL_FORCE_ALL
+	bool "Do not use FOLL_FORCE with /proc/pid/mem (safest)"
+	help
+	  Remove the FOLL_FORCE flag for all /proc/pid/mem accesses.
+	  (Safest, but may be disruptive to some usage patterns.)
+endchoice
+
+choice
+	prompt "Restrict /proc/pid/mem OPEN_READ usage"
+	default PROC_MEM_RESTRICT_OPEN_READ_OFF
+	help
+	  Reading and writing of /proc/pid/mem bypasses memory permission
+	  checks due to the internal use of the FOLL_FORCE flag. This can be
+	  used by attackers to manipulate process memory contents that would
+	  have been otherwise protected. However, debuggers, like GDB, use
+	  this to set breakpoints, etc. To force debuggers to fall back to
+	  PEEK/POKE, see PROC_MEM_RESTRICT_OPEN_WRITE_ALL.
+
+	config PROC_MEM_RESTRICT_OPEN_READ_OFF
+	bool "Do not restrict /proc/pid/mem open for read (regular)"
+	help
+	  Regular behavior: allow /proc/pid/mem open for read access.
+
+	config PROC_MEM_RESTRICT_OPEN_READ_PTRACE
+	bool "Only allow ptracers to open /proc/pid/mem for read (safer)"
+	help
+	  Only allow opening /proc/pid/mem for reading when the current
+	  task is the active ptracer of the target task. (Safer, least
+	  disruptive to most usage patterns.)
+
+	config PROC_MEM_RESTRICT_OPEN_READ_ALL
+	bool "Do not allow /proc/pid/mem open for read (safest)"
+	help
+	  Do not allow /proc/pid/mem open for reading access.
+	  (Safest, but may be disruptive to some usage patterns.)
+endchoice
+
+choice
+	prompt "Restrict /proc/pid/mem OPEN_WRITE usage"
+	default PROC_MEM_RESTRICT_OPEN_WRITE_OFF
+	help
+	  Reading and writing of /proc/pid/mem bypasses memory permission
+	  checks due to the internal use of the FOLL_FORCE flag. This can be
+	  used by attackers to manipulate process memory contents that would
+	  have been otherwise protected. However, debuggers, like GDB, use
+	  this to set breakpoints, etc. To force debuggers to fall back to
+	  PEEK/POKE, see PROC_MEM_RESTRICT_OPEN_WRITE_ALL.
+
+	config PROC_MEM_RESTRICT_OPEN_WRITE_OFF
+	bool "Do not restrict /proc/pid/mem open for write (regular)"
+	help
+	  Regular behavior: allow /proc/pid/mem open for write access.
+
+	config PROC_MEM_RESTRICT_OPEN_WRITE_PTRACE
+	bool "Only allow ptracers to open /proc/pid/mem for write (safer)"
+	help
+	  Only allow opening /proc/pid/mem for writing when the current
+	  task is the active ptracer of the target task. (Safer, least
+	  disruptive to most usage patterns.)
+
+	config PROC_MEM_RESTRICT_OPEN_WRITE_ALL
+	bool "Do not allow /proc/pid/mem open for write (safest)"
+	help
+	  Do not allow /proc/pid/mem open for writing access.
+	  (Safest, but may be disruptive to some usage patterns.)
+endchoice
+
+choice
+	prompt "Restrict /proc/pid/mem WRITE usage"
+	default PROC_MEM_RESTRICT_WRITE_OFF
+	help
+	  Reading and writing of /proc/pid/mem bypasses memory permission
+	  checks due to the internal use of the FOLL_FORCE flag. This can be
+	  used by attackers to manipulate process memory contents that would
+	  have been otherwise protected. However, debuggers, like GDB, use
+	  this to set breakpoints, etc. To force debuggers to fall back to
+	  PEEK/POKE, see PROC_MEM_RESTRICT_OPEN_WRITE_ALL.
+
+	config PROC_MEM_RESTRICT_WRITE_OFF
+	bool "Do not restrict /proc/pid/mem writes (regular)"
+	help
+	  Regular behavior: allow /proc/pid/mem write access.
+
+	config PROC_MEM_RESTRICT_WRITE_PTRACE
+	bool "Only allow ptracers to write to /proc/pid/mem (safer)"
+	help
+	  Only allow writing to /proc/pid/mem when the current task is
+	  the active ptracer of the target task. (Safer, least disruptive
+	  to most usage patterns.)
+
+	config PROC_MEM_RESTRICT_WRITE_ALL
+	bool "Do not allow writes to /proc/pid/mem (safest)"
+	help
+	  Do not allow writing to /proc/pid/mem.
+	  (Safest, but may be disruptive to some usage patterns.)
+endchoice
+
 source "security/selinux/Kconfig"
 source "security/smack/Kconfig"
 source "security/tomoyo/Kconfig"
@@ -255,13 +376,5 @@ config LSM
 
 source "security/Kconfig.hardening"
 
-config ARCH_HAS_ALT_SYSCALL
-	def_bool n
-
-config ALT_SYSCALL
-	bool "Alternate syscall table support"
-	depends on ARCH_HAS_ALT_SYSCALL
-	help
-	  Allow syscall table to be swapped on a running process.
-
 endmenu
+

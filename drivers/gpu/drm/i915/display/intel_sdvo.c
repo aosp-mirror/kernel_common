@@ -43,6 +43,7 @@
 #include "intel_connector.h"
 #include "intel_crtc.h"
 #include "intel_de.h"
+#include "intel_display_driver.h"
 #include "intel_display_types.h"
 #include "intel_fdi.h"
 #include "intel_fifo_underrun.h"
@@ -1934,9 +1935,6 @@ intel_sdvo_mode_valid(struct drm_connector *connector,
 	if (status != MODE_OK)
 		return status;
 
-	if (mode->flags & DRM_MODE_FLAG_DBLSCAN)
-		return MODE_NO_DBLESCAN;
-
 	if (clock > max_dotclk)
 		return MODE_CLOCK_HIGH;
 
@@ -2133,6 +2131,9 @@ intel_sdvo_detect(struct drm_connector *connector, bool force)
 	if (!intel_display_device_enabled(i915))
 		return connector_status_disconnected;
 
+	if (!intel_display_driver_check_access(i915))
+		return connector->status;
+
 	if (!intel_sdvo_set_target_output(intel_sdvo,
 					  intel_sdvo_connector->output_flag))
 		return connector_status_unknown;
@@ -2178,11 +2179,15 @@ intel_sdvo_detect(struct drm_connector *connector, bool force)
 
 static int intel_sdvo_get_ddc_modes(struct drm_connector *connector)
 {
+	struct drm_i915_private *i915 = to_i915(connector->dev);
 	int num_modes = 0;
 	const struct drm_edid *drm_edid;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",
 		      connector->base.id, connector->name);
+
+	if (!intel_display_driver_check_access(i915))
+		return drm_edid_connector_add_modes(connector);
 
 	/* set the bus switch and get the modes */
 	drm_edid = intel_sdvo_get_edid(connector);
@@ -2798,6 +2803,7 @@ intel_sdvo_dvi_init(struct intel_sdvo *intel_sdvo, u16 type)
 	} else {
 		intel_connector->polled = DRM_CONNECTOR_POLL_CONNECT | DRM_CONNECTOR_POLL_DISCONNECT;
 	}
+	intel_connector->base.polled = intel_connector->polled;
 	encoder->encoder_type = DRM_MODE_ENCODER_TMDS;
 	connector->connector_type = DRM_MODE_CONNECTOR_DVID;
 
@@ -2873,6 +2879,7 @@ intel_sdvo_analog_init(struct intel_sdvo *intel_sdvo, u16 type)
 	intel_connector = &intel_sdvo_connector->base;
 	connector = &intel_connector->base;
 	intel_connector->polled = DRM_CONNECTOR_POLL_CONNECT;
+	intel_connector->base.polled = intel_connector->polled;
 	encoder->encoder_type = DRM_MODE_ENCODER_DAC;
 	connector->connector_type = DRM_MODE_CONNECTOR_VGA;
 

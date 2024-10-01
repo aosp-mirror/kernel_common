@@ -896,7 +896,6 @@ struct dc_debug_options {
 	unsigned int min_prefetch_in_strobe_ns;
 	bool disable_unbounded_requesting;
 	bool dig_fifo_off_in_blank;
-	bool temp_mst_deallocation_sequence;
 	bool override_dispclk_programming;
 	bool disable_fpo_optimizations;
 	bool support_eDP1_5;
@@ -1414,6 +1413,10 @@ bool dc_resource_is_dsc_encoding_supported(const struct dc *dc);
 enum dc_status dc_commit_streams(struct dc *dc,
 				 struct dc_stream_state *streams[],
 				 uint8_t stream_count);
+
+/* TODO: When the transition to the new commit sequence is done, remove this
+ * function in favor of dc_commit_streams. */
+bool dc_commit_state(struct dc *dc, struct dc_state *context);
 
 struct dc_state *dc_create_state(struct dc *dc);
 struct dc_state *dc_copy_state(struct dc_state *src_ctx);

@@ -1727,23 +1727,6 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	/* TODO: Remove after DP2 receiver gets proper support of Cable ID feature */
 	adev->dm.dc->debug.ignore_cable_id = true;
 
-	/* TODO: There is a new drm mst change where the freedom of
-	 * vc_next_start_slot update is revoked/moved into drm, instead of in
-	 * driver. This forces us to make sure to get vc_next_start_slot updated
-	 * in drm function each time without considering if mst_state is active
-	 * or not. Otherwise, next time hotplug will give wrong start_slot
-	 * number. We are implementing a temporary solution to even notify drm
-	 * mst deallocation when link is no longer of MST type when uncommitting
-	 * the stream so we will have more time to work on a proper solution.
-	 * Ideally when dm_helpers_dp_mst_stop_top_mgr message is triggered, we
-	 * should notify drm to do a complete "reset" of its states and stop
-	 * calling further drm mst functions when link is no longer of an MST
-	 * type. This could happen when we unplug an MST hubs/displays. When
-	 * uncommit stream comes later after unplug, we should just reset
-	 * hardware states only.
-	 */
-	adev->dm.dc->debug.temp_mst_deallocation_sequence = true;
-
 	if (adev->dm.dc->caps.dp_hdmi21_pcon_support)
 		DRM_INFO("DP-HDMI FRL PCON supported\n");
 
@@ -2597,7 +2580,7 @@ static enum dc_status amdgpu_dm_commit_zero_streams(struct dc *dc)
 			goto fail;
 	}
 
-	res = dc_commit_streams(dc, context->streams, context->stream_count);
+	res = dc_commit_state(dc, context);
 
 fail:
 	dc_release_state(context);
@@ -2859,7 +2842,7 @@ static int dm_resume(void *handle)
 			dc_enable_dmub_outbox(adev->dm.dc);
 		}
 
-		WARN_ON(!dc_commit_streams(dm->dc, dc_state->streams, dc_state->stream_count));
+		WARN_ON(!dc_commit_state(dm->dc, dc_state));
 
 		dm_gpureset_commit_state(dm->cached_dc_state, dm);
 
@@ -8637,7 +8620,7 @@ static void amdgpu_dm_commit_streams(struct drm_atomic_state *state,
 
 	dm_enable_per_frame_crtc_master_sync(dc_state);
 	mutex_lock(&dm->dc_lock);
-	WARN_ON(!dc_commit_streams(dm->dc, dc_state->streams, dc_state->stream_count));
+	WARN_ON(!dc_commit_state(dm->dc, dc_state));
 
 	/* Allow idle optimization when vblank count is 0 for display off */
 	if (dm->active_vblank_irq_count == 0)

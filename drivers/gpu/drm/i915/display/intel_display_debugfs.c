@@ -23,6 +23,7 @@
 #include "intel_display_types.h"
 #include "intel_dmc.h"
 #include "intel_dp.h"
+#include "intel_dp_link_training.h"
 #include "intel_dp_mst.h"
 #include "intel_drrs.h"
 #include "intel_fbc.h"
@@ -1576,6 +1577,7 @@ void intel_connector_debugfs_add(struct intel_connector *connector)
 
 	intel_drrs_connector_debugfs_add(connector);
 	intel_psr_connector_debugfs_add(connector);
+	intel_dp_link_training_debugfs_add(connector);
 
 	if (connector_type == DRM_MODE_CONNECTOR_eDP)
 		debugfs_create_file("i915_panel_timings", 0444, root,
@@ -1602,6 +1604,13 @@ void intel_connector_debugfs_add(struct intel_connector *connector)
 
 		debugfs_create_file("i915_dsc_fractional_bpp", 0644, root,
 				    connector, &i915_dsc_fractional_bpp_fops);
+	}
+
+	if (DISPLAY_VER(i915) >= 11 &&
+	    (connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
+	     connector_type == DRM_MODE_CONNECTOR_eDP)) {
+		debugfs_create_bool("i915_bigjoiner_force_enable", 0644, root,
+				    &connector->force_bigjoiner_enable);
 	}
 
 	if (connector_type == DRM_MODE_CONNECTOR_DSI ||

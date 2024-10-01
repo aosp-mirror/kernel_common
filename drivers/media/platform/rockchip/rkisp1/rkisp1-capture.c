@@ -35,7 +35,7 @@
 #define RKISP1_SP_DEV_NAME	RKISP1_DRIVER_NAME "_selfpath"
 #define RKISP1_MP_DEV_NAME	RKISP1_DRIVER_NAME "_mainpath"
 
-#define RKISP1_MIN_BUFFERS_NEEDED 0
+#define RKISP1_MIN_BUFFERS_NEEDED 3
 
 enum rkisp1_plane {
 	RKISP1_PLANE_Y	= 0,
@@ -802,15 +802,7 @@ static int rkisp1_vb2_buf_init(struct vb2_buffer *vb)
 
 	memset(ispbuf->buff_addr, 0, sizeof(ispbuf->buff_addr));
 	for (i = 0; i < pixm->num_planes; i++)
-		/*
-		 * TODO (https://issuetracker.google.com/issues/172216855)
-		 * The way to pass an offset with a DmaBuf is not defined
-		 * in V4L2 specification. This is a local hack to abuse
-		 * data_offset for the purpose. Replace it after the
-		 * appropriate way is defined in upstream.
-		 */
-		ispbuf->buff_addr[i] = vb2_dma_contig_plane_dma_addr(vb, i) +
-				       vb->planes[i].data_offset;
+		ispbuf->buff_addr[i] = vb2_dma_contig_plane_dma_addr(vb, i);
 
 	/* Convert to non-MPLANE */
 	if (pixm->num_planes == 1) {

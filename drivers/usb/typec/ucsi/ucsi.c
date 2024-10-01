@@ -117,6 +117,12 @@ static int ucsi_read_error(struct ucsi *ucsi)
 	case UCSI_ERROR_SWAP_REJECTED:
 		dev_warn(ucsi->dev, "Swap rejected\n");
 		break;
+	case UCSI_ERROR_REVERSE_CURRENT_PROTECTION:
+		dev_warn(ucsi->dev, "Reverse Current Protection detected\n");
+		break;
+	case UCSI_ERROR_SET_SINK_PATH_REJECTED:
+		dev_warn(ucsi->dev, "Set Sink Path rejected\n");
+		break;
 	case UCSI_ERROR_UNDEFINED:
 	default:
 		dev_err(ucsi->dev, "unknown error %u\n", error);
@@ -1225,6 +1231,9 @@ static void ucsi_handle_connector_change(struct work_struct *work)
 	if (con->status.change & UCSI_CONSTAT_CAM_CHANGE)
 		ucsi_partner_task(con, ucsi_check_altmodes, 1, HZ);
 
+	if (con->status.change & UCSI_CONSTAT_BC_CHANGE)
+		ucsi_port_psy_changed(con);
+
 out_unlock:
 	mutex_unlock(&con->lock);
 }
@@ -1431,20 +1440,40 @@ static int ucsi_pr_swap(struct typec_port *port, enum typec_role role)
 	if (ret < 0)
 		goto out_unlock;
 
-	mutex_unlock(&con->lock);
+	command = UCSI_GET_CONNECTOR_STATUS | UCSI_CONNECTOR_NUMBER(con->num);
+	ret = ucsi_send_command(con->ucsi, command, &con->status, sizeof(con->status));
+	if (ret < 0)
+		goto out_unlock;
 
-	if (!wait_for_completion_timeout(&con->complete,
-					 msecs_to_jiffies(UCSI_SWAP_TIMEOUT_MS)))
-		return -ETIMEDOUT;
+	cur_role = !!(con->status.flags & UCSI_CONSTAT_PWR_DIR);
 
-	mutex_lock(&con->lock);
+	/* Execution of SET_PDR should not result in connector status
+	 * notifications. However, some legacy implementations may still defer
+	 * the actual role swap and return immediately. Thus, check the
+	 * connector status in case it immediately succeeded or wait for a later
+	 * connector status change.
+	 */
+	if (cur_role != role) {
+		mutex_unlock(&con->lock);
+
+		if (!wait_for_completion_timeout(
+			    &con->complete,
+			    msecs_to_jiffies(UCSI_SWAP_TIMEOUT_MS)))
+			return -ETIMEDOUT;
+
+		mutex_lock(&con->lock);
+	}
 
 	/* Something has gone wrong while swapping the role */
 	if (UCSI_CONSTAT_PWR_OPMODE(con->status.flags) !=
 	    UCSI_CONSTAT_PWR_OPMODE_PD) {
 		ucsi_reset_connector(con, true);
 		ret = -EPROTO;
+		goto out_unlock;
 	}
+
+	/* Indicate successful power role swap */
+	typec_set_pwr_role(con->port, role);
 
 out_unlock:
 	mutex_unlock(&con->lock);
@@ -1456,6 +1485,26 @@ static const struct typec_operations ucsi_ops = {
 	.dr_set = ucsi_dr_swap,
 	.pr_set = ucsi_pr_swap
 };
+
+int ucsi_set_sink_path(struct ucsi_connector *con, bool sink_path)
+{
+	struct ucsi *ucsi = con->ucsi;
+	u64 command;
+	int ret;
+
+	if (ucsi->version < UCSI_VERSION_2_0)
+		return -EOPNOTSUPP;
+
+	command = UCSI_SET_SINK_PATH | UCSI_CONNECTOR_NUMBER(con->num);
+	command |= UCSI_SET_SINK_PATH_SINK_PATH(sink_path);
+	ret = ucsi_send_command(ucsi, command, NULL, 0);
+	if (ret < 0)
+		dev_err(con->ucsi->dev, "SET_SINK_PATH failed (%d)\n", ret);
+	else
+		ucsi_partner_task(con, ucsi_check_connection, 1, HZ);
+
+	return ret;
+}
 
 /* Caller must call fwnode_handle_put() after use */
 static struct fwnode_handle *ucsi_find_fwnode(struct ucsi_connector *con)

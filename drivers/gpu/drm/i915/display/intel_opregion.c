@@ -837,6 +837,60 @@ static const struct dmi_system_id intel_no_opregion_vbt[] = {
 	{ }
 };
 
+static int chromebook_broken_opregion_version_callback(const struct dmi_system_id *id)
+{
+	size_t idx;
+	static const enum dmi_field fields[] = {
+		DMI_BIOS_VENDOR,
+		DMI_BIOS_VERSION,
+		DMI_BIOS_DATE,
+		DMI_BIOS_RELEASE,
+		DMI_SYS_VENDOR,
+		DMI_PRODUCT_NAME,
+		DMI_PRODUCT_VERSION,
+		DMI_PRODUCT_FAMILY
+	};
+	static const char * const strings[] = {
+		"DMI_BIOS_VENDOR",
+		"DMI_BIOS_VERSION",
+		"DMI_BIOS_DATE",
+		"DMI_BIOS_RELEASE",
+		"DMI_SYS_VENDOR",
+		"DMI_PRODUCT_NAME",
+		"DMI_PRODUCT_VERSION",
+		"DMI_PRODUCT_FAMILY"
+	};
+
+	for (idx = 0; idx < ARRAY_SIZE(fields); idx++)
+		DRM_INFO("DMI info: %s %s\n", strings[idx],
+			 dmi_get_system_info(fields[idx]));
+
+	return 1;
+}
+
+static const struct dmi_system_id chromebook_broken_opregion_version[] = {
+	{
+		.callback = chromebook_broken_opregion_version_callback,
+		.ident = "Chromebook Coral",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Google"),
+			DMI_MATCH(DMI_PRODUCT_FAMILY, "Google_Coral"),
+		},
+	},
+	{
+		.callback = chromebook_broken_opregion_version_callback,
+		.ident = "Chromebook baseboard Reef",
+		.matches = {
+			/*
+			 * There are many vendors of the Reef-based devices,
+			 * so it is enough to use the product family wildcard.
+			 */
+			DMI_MATCH(DMI_PRODUCT_FAMILY, "Google_Reef"),
+		},
+	},
+	{ }
+};
+
 static int intel_load_vbt_firmware(struct drm_i915_private *dev_priv)
 {
 	struct intel_opregion *opregion = &dev_priv->display.opregion;
@@ -971,6 +1025,26 @@ int intel_opregion_setup(struct drm_i915_private *dev_priv)
 
 	if (dmi_check_system(intel_no_opregion_vbt))
 		goto out;
+
+	if (dmi_check_system(chromebook_broken_opregion_version)) {
+		typeof(opregion->header->over) *over = &(opregion->header->over);
+		u8 tmp;
+
+		if (over->major == 0 && over->minor == 0 &&
+		    over->revision == 0 && over->rsvd == 2) {
+			drm_info(&dev_priv->drm,
+				 "Quirk: swapping fields in opregion %hhu %hhu %hhu %hhu\n",
+				 over->major, over->minor, over->revision, over->rsvd);
+
+			tmp = over->rsvd;
+			over->rsvd = over->major;
+			over->major = tmp;
+
+			tmp = over->revision;
+			over->revision = over->minor;
+			over->minor = tmp;
+		}
+	}
 
 	if (opregion->header->over.major >= 2 && opregion->asle &&
 	    opregion->asle->rvda && opregion->asle->rvds) {

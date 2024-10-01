@@ -170,6 +170,7 @@ struct venus_format {
  * @core1_usage_count: usage counter for core1
  * @root:	debugfs root directory
  * @venus_ver:	the venus firmware version
+ * @dump_core:	a flag indicating that a core dump is required
  */
 struct venus_core {
 	void __iomem *base;
@@ -273,6 +274,10 @@ struct venc_controls {
 	s32 h264_loop_filter_alpha;
 	s32 h264_loop_filter_beta;
 	u32 h264_8x8_transform;
+
+	u32 h264_hier_enabled;
+	u32 h264_hier_p_layers;
+	u32 h264_hier_p_bitrate[6];
 
 	u32 hevc_i_qp;
 	u32 hevc_p_qp;
@@ -429,7 +434,6 @@ enum venus_inst_modes {
  * @error:	an error returned during last HFI sync operation
  * @session_error:	a flag rised by HFI interface in case of session error
  * @ops:		HFI operations
- * @priv:	a private for HFI operations callbacks
  * @session_type:	the type of the session (decoder or encoder)
  * @hprop:	a union used as a holder by get property
  * @core_acquired:	the Core has been acquired

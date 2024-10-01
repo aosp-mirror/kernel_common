@@ -1076,6 +1076,12 @@ static long evdev_do_ioctl(struct file *file, unsigned int cmd,
 	case EVIOCRMFF:
 		return input_ff_erase(dev, (int)(unsigned long) p, file);
 
+	case EVIOCFFTAKECONTROL:
+		return input_ff_take_control(dev, (int)(unsigned long) p, file);
+
+	case EVIOCFFRELEASECONTROL:
+		return input_ff_release_control(dev, (int)(unsigned long) p, file);
+
 	case EVIOCGEFFECTS:
 		i = test_bit(EV_FF, dev->evbit) ?
 				dev->ff->max_effects : 0;

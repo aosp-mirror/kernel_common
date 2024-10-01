@@ -176,4 +176,11 @@ static __always_inline bool kvm_handle_async_pf(struct pt_regs *regs, u32 token)
 }
 #endif
 
+#ifdef CONFIG_PARAVIRT_SCHED
+static inline void kvm_pv_sched_notify_host(void)
+{
+	wrmsrl(MSR_KVM_PV_SCHED, ULLONG_MAX);
+}
+#endif
+
 #endif /* _ASM_X86_KVM_PARA_H */

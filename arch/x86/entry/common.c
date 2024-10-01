@@ -45,26 +45,13 @@ static __always_inline bool do_syscall_x64(struct pt_regs *regs, int nr)
 	 * numbers for comparisons.
 	 */
 	unsigned int unr = nr;
-#ifdef CONFIG_ALT_SYSCALL
-	struct thread_info *ti;
-#endif
 
-#ifdef CONFIG_ALT_SYSCALL
-	ti = current_thread_info();
-	if (likely(unr < ti->nr_syscalls)) {
-		unr = array_index_nospec(unr, ti->nr_syscalls);
-		regs->ax = ti->sys_call_table[unr](regs);
-		return true;
-	}
-	return false;
-#else
 	if (likely(unr < NR_syscalls)) {
 		unr = array_index_nospec(unr, NR_syscalls);
 		regs->ax = x64_sys_call(regs, unr);
 		return true;
 	}
 	return false;
-#endif
 }
 
 static __always_inline bool do_syscall_x32(struct pt_regs *regs, int nr)
@@ -124,20 +111,13 @@ static __always_inline void do_syscall_32_irqs_on(struct pt_regs *regs, int nr)
 	 * numbers for comparisons.
 	 */
 	unsigned int unr = nr;
-#ifdef CONFIG_ALT_SYSCALL
-	struct thread_info *ti = current_thread_info();
-	if (likely(unr < ti->ia32_nr_syscalls)) {
-		unr = array_index_nospec(unr, ti->ia32_nr_syscalls);
-		regs->ax = ti->ia32_sys_call_table[unr](regs);
-	}
-#else
+
 	if (likely(unr < IA32_NR_syscalls)) {
 		unr = array_index_nospec(unr, IA32_NR_syscalls);
 		regs->ax = ia32_sys_call(regs, unr);
 	} else if (nr != -1) {
 		regs->ax = __ia32_sys_ni_syscall(regs);
 	}
-#endif
 }
 
 #ifdef CONFIG_IA32_EMULATION

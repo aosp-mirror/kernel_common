@@ -92,6 +92,9 @@ config HID_GENERIC
 
 	If unsure, say Y.
 
+config HID_HAPTIC
+	bool
+
 menu "Special HID drivers"
 
 config HID_A4TECH
@@ -403,6 +406,12 @@ config HID_VIVALDI_COMMON
 	  ChromeOS Vivaldi HID parsing support library. This is a hidden
 	  option so that drivers can use common code to parse the HID
 	  descriptors for vivaldi function row keymap.
+
+config HID_GOODIX_SPI
+	tristate "Goodix GT7986U SPI HID touchscreen"
+	depends on SPI_MASTER
+	help
+	  Support for Goodix GT7986U SPI HID touchscreen device.
 
 config HID_GOOGLE_HAMMER
 	tristate "Google Hammer Keyboard"
@@ -759,6 +768,17 @@ config HID_MULTITOUCH
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called hid-multitouch.
+
+config MULTITOUCH_HAPTIC
+	bool "Simple haptic multitouch support"
+	depends on HID_MULTITOUCH
+	select HID_HAPTIC
+	default n
+	help
+	Support for simple multitouch haptic devices.
+	Adds extra parsing and FF device for the hid multitouch driver.
+	It can be used for Elan 2703 haptic touchpad.
+	To enable, say Y.
 
 config HID_NINTENDO
 	tristate "Nintendo Joy-Con and Pro Controller support"

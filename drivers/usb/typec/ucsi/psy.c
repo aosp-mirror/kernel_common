@@ -20,6 +20,7 @@ enum ucsi_psy_online_states {
 };
 
 static enum power_supply_property ucsi_psy_props[] = {
+	POWER_SUPPLY_PROP_CHARGE_TYPE,
 	POWER_SUPPLY_PROP_USB_TYPE,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_MIN,
@@ -28,6 +29,8 @@ static enum power_supply_property ucsi_psy_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_SCOPE,
+	POWER_SUPPLY_PROP_STATUS,
+	POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX,
 };
 
 static int ucsi_psy_get_scope(struct ucsi_connector *con,
@@ -47,6 +50,29 @@ static int ucsi_psy_get_scope(struct ucsi_connector *con,
 			scope = POWER_SUPPLY_SCOPE_DEVICE;
 	}
 	val->intval = scope;
+	return 0;
+}
+
+static int ucsi_psy_get_status(struct ucsi_connector *con,
+			       union power_supply_propval *val)
+{
+	bool is_sink = (con->status.flags & UCSI_CONSTAT_PWR_DIR) == TYPEC_SINK;
+	bool sink_path_enabled = true;
+
+	val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+
+	if (con->ucsi->version >= UCSI_VERSION_2_0)
+		sink_path_enabled =
+			UCSI_CONSTAT_SINK_PATH_STATUS(con->status.pwr_status) ==
+			UCSI_CONSTAT_SINK_PATH_ENABLED;
+
+	if (con->status.flags & UCSI_CONSTAT_CONNECTED) {
+		if (is_sink && sink_path_enabled)
+			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+		else if (!is_sink)
+			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+	}
+
 	return 0;
 }
 
@@ -188,8 +214,46 @@ static int ucsi_psy_get_usb_type(struct ucsi_connector *con,
 
 	val->intval = POWER_SUPPLY_USB_TYPE_C;
 	if (flags & UCSI_CONSTAT_CONNECTED &&
-	    UCSI_CONSTAT_PWR_OPMODE(flags) == UCSI_CONSTAT_PWR_OPMODE_PD)
+	    UCSI_CONSTAT_PWR_OPMODE(flags) == UCSI_CONSTAT_PWR_OPMODE_PD) {
+		for (int i = 0; i < con->num_pdos; i++) {
+			if (pdo_type(con->src_pdos[i]) == PDO_TYPE_FIXED &&
+			    con->src_pdos[i] & PDO_FIXED_DUAL_ROLE) {
+				val->intval = POWER_SUPPLY_USB_TYPE_PD_DRP;
+				return 0;
+			}
+		}
+
 		val->intval = POWER_SUPPLY_USB_TYPE_PD;
+	}
+
+	return 0;
+}
+
+static int ucsi_psy_get_charge_type(struct ucsi_connector *con, union power_supply_propval *val)
+{
+	if (!(con->status.flags & UCSI_CONSTAT_CONNECTED)) {
+		val->intval = POWER_SUPPLY_CHARGE_TYPE_NONE;
+		return 0;
+	}
+
+	/* The Battery Charging Cabability Status field is only valid in sink role. */
+	if ((con->status.flags & UCSI_CONSTAT_PWR_DIR) != TYPEC_SINK) {
+		val->intval = POWER_SUPPLY_CHARGE_TYPE_UNKNOWN;
+		return 0;
+	}
+
+	switch (UCSI_CONSTAT_BC_STATUS(con->status.pwr_status)) {
+	case UCSI_CONSTAT_BC_NOMINAL_CHARGING:
+		val->intval = POWER_SUPPLY_CHARGE_TYPE_STANDARD;
+		break;
+	case UCSI_CONSTAT_BC_SLOW_CHARGING:
+	case UCSI_CONSTAT_BC_TRICKLE_CHARGING:
+		val->intval = POWER_SUPPLY_CHARGE_TYPE_TRICKLE;
+		break;
+	default:
+		val->intval = POWER_SUPPLY_CHARGE_TYPE_NONE;
+		break;
+	}
 
 	return 0;
 }
@@ -201,6 +265,8 @@ static int ucsi_psy_get_prop(struct power_supply *psy,
 	struct ucsi_connector *con = power_supply_get_drvdata(psy);
 
 	switch (psp) {
+	case POWER_SUPPLY_PROP_CHARGE_TYPE:
+		return ucsi_psy_get_charge_type(con, val);
 	case POWER_SUPPLY_PROP_USB_TYPE:
 		return ucsi_psy_get_usb_type(con, val);
 	case POWER_SUPPLY_PROP_ONLINE:
@@ -217,15 +283,73 @@ static int ucsi_psy_get_prop(struct power_supply *psy,
 		return ucsi_psy_get_current_now(con, val);
 	case POWER_SUPPLY_PROP_SCOPE:
 		return ucsi_psy_get_scope(con, val);
+	case POWER_SUPPLY_PROP_STATUS:
+		return ucsi_psy_get_status(con, val);
+	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX:
+		val->intval = 0;
+		return 0;
 	default:
 		return -EINVAL;
 	}
+}
+
+static int ucsi_psy_set_charge_control_limit_max(struct ucsi_connector *con,
+				 const union power_supply_propval *val)
+{
+	/*
+	 * Writing a negative value to the charge control limit max implies the
+	 * port should not accept charge. Disable the sink path for a negative
+	 * charge control limit, and enable the sink path for a positive charge
+	 * control limit. If the requested charge port is a source, update the
+	 * power role.
+	 */
+	int ret;
+	bool sink_path = false;
+
+
+	if (!con->typec_cap.ops || !con->typec_cap.ops->pr_set)
+		return -EINVAL;
+
+	if (val->intval >= 0) {
+		sink_path = true;
+
+		ret = con->typec_cap.ops->pr_set(con->port, TYPEC_SINK);
+		if (ret < 0)
+			return ret;
+	} else if (con->typec_cap.type == TYPEC_PORT_DRP) {
+		ret = con->typec_cap.ops->pr_set(con->port, TYPEC_SOURCE);
+		if (ret < 0)
+			return ret;
+	}
+
+	return ucsi_set_sink_path(con, sink_path);
+}
+
+static int ucsi_psy_set_prop(struct power_supply *psy,
+			     enum power_supply_property psp,
+			     const union power_supply_propval *val)
+{
+	struct ucsi_connector *con = power_supply_get_drvdata(psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX:
+		return ucsi_psy_set_charge_control_limit_max(con, val);
+	default:
+		return -EINVAL;
+	}
+}
+
+static int ucsi_psy_prop_is_writeable(struct power_supply *psy,
+			     enum power_supply_property psp)
+{
+	return psp == POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT_MAX;
 }
 
 static enum power_supply_usb_type ucsi_psy_usb_types[] = {
 	POWER_SUPPLY_USB_TYPE_C,
 	POWER_SUPPLY_USB_TYPE_PD,
 	POWER_SUPPLY_USB_TYPE_PD_PPS,
+	POWER_SUPPLY_USB_TYPE_PD_DRP,
 };
 
 int ucsi_register_port_psy(struct ucsi_connector *con)
@@ -249,6 +373,8 @@ int ucsi_register_port_psy(struct ucsi_connector *con)
 	con->psy_desc.properties = ucsi_psy_props;
 	con->psy_desc.num_properties = ARRAY_SIZE(ucsi_psy_props);
 	con->psy_desc.get_property = ucsi_psy_get_prop;
+	con->psy_desc.set_property = ucsi_psy_set_prop;
+	con->psy_desc.property_is_writeable = ucsi_psy_prop_is_writeable;
 
 	con->psy = power_supply_register(dev, &con->psy_desc, &psy_cfg);
 

@@ -231,27 +231,27 @@ static int drm_bridge_connector_get_modes_edid(struct drm_connector *connector,
 					       struct drm_bridge *bridge)
 {
 	enum drm_connector_status status;
-	struct edid *edid;
+	const struct drm_edid *drm_edid;
 	int n;
 
 	status = drm_bridge_connector_detect(connector, false);
 	if (status != connector_status_connected)
 		goto no_edid;
 
-	edid = bridge->funcs->get_edid(bridge, connector);
-	if (!drm_edid_is_valid(edid)) {
-		kfree(edid);
+	drm_edid = drm_bridge_edid_read(bridge, connector);
+	if (!drm_edid_valid(drm_edid)) {
+		drm_edid_free(drm_edid);
 		goto no_edid;
 	}
 
-	drm_connector_update_edid_property(connector, edid);
-	n = drm_add_edid_modes(connector, edid);
+	drm_edid_connector_update(connector, drm_edid);
+	n = drm_edid_connector_add_modes(connector);
 
-	kfree(edid);
+	drm_edid_free(drm_edid);
 	return n;
 
 no_edid:
-	drm_connector_update_edid_property(connector, NULL);
+	drm_edid_connector_update(connector, NULL);
 	return 0;
 }
 
@@ -364,18 +364,14 @@ struct drm_connector *drm_bridge_connector_init(struct drm_device *drm,
 			panel_bridge = bridge;
 	}
 
-	if (connector_type == DRM_MODE_CONNECTOR_Unknown) {
-		kfree(bridge_connector);
+	if (connector_type == DRM_MODE_CONNECTOR_Unknown)
 		return ERR_PTR(-EINVAL);
-	}
 
 	ret = drm_connector_init_with_ddc(drm, connector,
 					  &drm_bridge_connector_funcs,
 					  connector_type, ddc);
-	if (ret) {
-		kfree(bridge_connector);
+	if (ret)
 		return ERR_PTR(ret);
-	}
 
 	drm_connector_helper_add(connector, &drm_bridge_connector_helper_funcs);
 

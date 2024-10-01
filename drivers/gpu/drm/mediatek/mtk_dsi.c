@@ -26,8 +26,8 @@
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_simple_kms_helper.h>
 
+#include "mtk_ddp_comp.h"
 #include "mtk_disp_drv.h"
-#include "mtk_drm_ddp_comp.h"
 #include "mtk_drm_drv.h"
 
 #define DSI_START		0x00
@@ -690,7 +690,7 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
 
 	/*
 	 * mtk_dsi_stop() and mtk_dsi_start() is asymmetric, since
-	 * mtk_dsi_stop() should be called after mtk_drm_crtc_atomic_disable(),
+	 * mtk_dsi_stop() should be called after mtk_crtc_atomic_disable(),
 	 * which needs irq for vblank, and mtk_dsi_stop() will disable irq.
 	 * mtk_dsi_start() needs to be called in mtk_output_dsi_enable(),
 	 * after dsi is fully set.
@@ -865,7 +865,7 @@ static int mtk_dsi_encoder_init(struct drm_device *drm, struct mtk_dsi *dsi)
 		return ret;
 	}
 
-	dsi->encoder.possible_crtcs = mtk_drm_find_possible_crtc_by_comp(drm, dsi->host.dev);
+	dsi->encoder.possible_crtcs = mtk_find_possible_crtcs(drm, dsi->host.dev);
 
 	ret = drm_bridge_attach(&dsi->encoder, &dsi->bridge, NULL,
 				DRM_BRIDGE_ATTACH_NO_CONNECTOR);

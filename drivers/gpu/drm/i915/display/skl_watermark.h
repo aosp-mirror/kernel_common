@@ -25,7 +25,6 @@ void intel_sagv_pre_plane_update(struct intel_atomic_state *state);
 void intel_sagv_post_plane_update(struct intel_atomic_state *state);
 bool intel_can_enable_sagv(struct drm_i915_private *i915,
 			   const struct intel_bw_state *bw_state);
-bool intel_has_sagv(struct drm_i915_private *i915);
 
 u32 skl_ddb_dbuf_slice_mask(struct drm_i915_private *i915,
 			    const struct skl_ddb_entry *entry);
@@ -57,6 +56,7 @@ struct intel_dbuf_state {
 	u8 slices[I915_MAX_PIPES];
 	u8 enabled_slices;
 	u8 active_pipes;
+	u8 mdclk_cdclk_ratio;
 	bool joined_mbus;
 };
 
@@ -70,9 +70,15 @@ intel_atomic_get_dbuf_state(struct intel_atomic_state *state);
 	to_intel_dbuf_state(intel_atomic_get_new_global_obj_state(state, &to_i915(state->base.dev)->display.dbuf.obj))
 
 int intel_dbuf_init(struct drm_i915_private *i915);
+int intel_dbuf_state_set_mdclk_cdclk_ratio(struct intel_atomic_state *state,
+					   int ratio);
+
 void intel_dbuf_pre_plane_update(struct intel_atomic_state *state);
 void intel_dbuf_post_plane_update(struct intel_atomic_state *state);
-void intel_mbus_dbox_update(struct intel_atomic_state *state);
+void intel_dbuf_mdclk_cdclk_ratio_update(struct drm_i915_private *i915,
+					 int ratio, bool joined_mbus);
+void intel_dbuf_mbus_pre_ddb_update(struct intel_atomic_state *state);
+void intel_dbuf_mbus_post_ddb_update(struct intel_atomic_state *state);
 
 #endif /* __SKL_WATERMARK_H__ */
 

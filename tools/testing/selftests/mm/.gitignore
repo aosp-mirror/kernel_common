@@ -43,3 +43,5 @@ mdwe_test
 gup_longterm
 mkdirty
 va_high_addr_switch
+mseal_test
+seal_elf

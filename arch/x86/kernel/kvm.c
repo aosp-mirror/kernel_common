@@ -377,6 +377,14 @@ static void kvm_guest_cpu_init(void)
 		wrmsrl(MSR_KVM_PV_EOI_EN, pa);
 	}
 
+#ifdef CONFIG_PARAVIRT_SCHED
+	if (pv_sched_enabled()) {
+		unsigned long pa = pv_sched_pa() | KVM_MSR_ENABLED;
+
+		wrmsrl(MSR_KVM_PV_SCHED, pa);
+	}
+#endif
+
 	if (has_steal_clock)
 		kvm_register_steal_time();
 }
@@ -500,13 +508,13 @@ static bool pv_sched_yield_supported(void)
 static void __send_ipi_mask(const struct cpumask *mask, int vector)
 {
 	unsigned long flags;
-	int cpu, apic_id, icr;
-	int min = 0, max = 0;
+	int cpu, min = 0, max = 0;
 #ifdef CONFIG_X86_64
 	__uint128_t ipi_bitmap = 0;
 #else
 	u64 ipi_bitmap = 0;
 #endif
+	u32 apic_id, icr;
 	long ret;
 
 	if (cpumask_empty(mask))
@@ -832,6 +840,14 @@ static void __init kvm_guest_init(void)
 		alloc_intr_gate(HYPERVISOR_CALLBACK_VECTOR, asm_sysvec_kvm_asyncpf_interrupt);
 	}
 
+#ifdef CONFIG_PARAVIRT_SCHED
+	if (kvm_para_has_feature(KVM_FEATURE_PV_SCHED)) {
+		pr_info("KVM host has PV_SCHED!\n");
+		pv_sched_enable();
+	} else
+		pr_info("KVM host does not support PV_SCHED!\n");
+#endif
+
 #ifdef CONFIG_SMP
 	if (pv_tlb_flush_supported()) {
 		pv_ops.mmu.flush_tlb_multi = kvm_flush_tlb_multi;
@@ -1028,8 +1044,8 @@ arch_initcall(activate_jump_labels);
 /* Kick a cpu by its apicid. Used to wake up a halted vcpu */
 static void kvm_kick_cpu(int cpu)
 {
-	int apicid;
 	unsigned long flags = 0;
+	u32 apicid;
 
 	apicid = per_cpu(x86_cpu_to_apicid, cpu);
 	kvm_hypercall2(KVM_HC_KICK_CPU, flags, apicid);

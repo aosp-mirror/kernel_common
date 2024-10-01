@@ -266,7 +266,7 @@ int i9xx_check_plane_surface(struct intel_plane_state *plane_state)
 	 * despite them not using the linear offset anymore.
 	 */
 	if (DISPLAY_VER(dev_priv) >= 4 && fb->modifier == I915_FORMAT_MOD_X_TILED) {
-		u32 alignment = intel_surf_alignment(fb, 0);
+		unsigned int alignment = intel_surf_alignment(fb, 0);
 		int cpp = fb->format->cpp[0];
 
 		while ((src_x + src_w) * cpp > plane_state->view.color_plane[0].mapping_stride) {
@@ -454,6 +454,11 @@ static void i9xx_plane_update_arm(struct intel_plane *plane,
 	u32 dspcntr, dspaddr_offset, linear_offset;
 
 	dspcntr = plane_state->ctl | i9xx_plane_ctl_crtc(crtc_state);
+
+	/* see intel_plane_atomic_calc_changes() */
+	if (plane->need_async_flip_toggle_wa &&
+	    crtc_state->async_flip_planes & BIT(plane->id))
+		dspcntr |= DISP_ASYNC_FLIP;
 
 	linear_offset = intel_fb_xy_to_linear(x, y, plane_state, 0);
 
@@ -736,23 +741,25 @@ i965_plane_max_stride(struct intel_plane *plane,
 }
 
 static unsigned int
-i9xx_plane_max_stride(struct intel_plane *plane,
+i915_plane_max_stride(struct intel_plane *plane,
 		      u32 pixel_format, u64 modifier,
 		      unsigned int rotation)
 {
-	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
+	if (modifier == I915_FORMAT_MOD_X_TILED)
+		return 8 * 1024;
+	else
+		return 16 * 1024;
+}
 
-	if (DISPLAY_VER(dev_priv) >= 3) {
-		if (modifier == I915_FORMAT_MOD_X_TILED)
-			return 8*1024;
-		else
-			return 16*1024;
-	} else {
-		if (plane->i9xx_plane == PLANE_C)
-			return 4*1024;
-		else
-			return 8*1024;
-	}
+static unsigned int
+i8xx_plane_max_stride(struct intel_plane *plane,
+		      u32 pixel_format, u64 modifier,
+		      unsigned int rotation)
+{
+	if (plane->i9xx_plane == PLANE_C)
+		return 4 * 1024;
+	else
+		return 8 * 1024;
 }
 
 static const struct drm_plane_funcs i965_plane_funcs = {
@@ -849,8 +856,10 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 	if (HAS_GMCH(dev_priv)) {
 		if (DISPLAY_VER(dev_priv) >= 4)
 			plane->max_stride = i965_plane_max_stride;
+		else if (DISPLAY_VER(dev_priv) == 3)
+			plane->max_stride = i915_plane_max_stride;
 		else
-			plane->max_stride = i9xx_plane_max_stride;
+			plane->max_stride = i8xx_plane_max_stride;
 	} else {
 		if (IS_BROADWELL(dev_priv) || IS_HASWELL(dev_priv))
 			plane->max_stride = hsw_primary_max_stride;
@@ -873,7 +882,7 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 		plane->enable_flip_done = vlv_primary_enable_flip_done;
 		plane->disable_flip_done = vlv_primary_disable_flip_done;
 	} else if (IS_BROADWELL(dev_priv)) {
-		plane->need_async_flip_disable_wa = true;
+		plane->need_async_flip_toggle_wa = true;
 		plane->async_flip = g4x_primary_async_flip;
 		plane->enable_flip_done = bdw_primary_enable_flip_done;
 		plane->disable_flip_done = bdw_primary_disable_flip_done;

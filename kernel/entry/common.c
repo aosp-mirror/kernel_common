@@ -150,7 +150,7 @@ void noinstr exit_to_user_mode(void)
 /* Workaround to allow gradual conversion of architecture code */
 void __weak arch_do_signal_or_restart(struct pt_regs *regs) { }
 
-static unsigned long exit_to_user_mode_loop(struct pt_regs *regs,
+__always_inline unsigned long exit_to_user_mode_loop(struct pt_regs *regs,
 					    unsigned long ti_work)
 {
 	/*
@@ -194,27 +194,6 @@ static unsigned long exit_to_user_mode_loop(struct pt_regs *regs,
 
 	/* Return the latest work state for arch_exit_to_user_mode() */
 	return ti_work;
-}
-
-static void exit_to_user_mode_prepare(struct pt_regs *regs)
-{
-	unsigned long ti_work;
-
-	lockdep_assert_irqs_disabled();
-
-	/* Flush pending rcuog wakeup before the last need_resched() check */
-	tick_nohz_user_enter_prepare();
-
-	ti_work = read_thread_flags();
-	if (unlikely(ti_work & EXIT_TO_USER_MODE_WORK))
-		ti_work = exit_to_user_mode_loop(regs, ti_work);
-
-	arch_exit_to_user_mode_prepare(regs, ti_work);
-
-	/* Ensure that kernel state is sane for a return to userspace */
-	kmap_assert_nomap();
-	lockdep_assert_irqs_disabled();
-	lockdep_sys_exit();
 }
 
 /*
@@ -323,6 +302,11 @@ noinstr irqentry_state_t irqentry_enter(struct pt_regs *regs)
 		.exit_rcu = false,
 	};
 
+	instrumentation_begin();
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_boost_lazy(PVSCHED_KERNCS_BOOST_IRQ);
+	instrumentation_end();
+
 	if (user_mode(regs)) {
 		irqentry_enter_from_user_mode(regs);
 		return ret;
@@ -413,6 +397,11 @@ noinstr void irqentry_exit(struct pt_regs *regs, irqentry_state_t state)
 {
 	lockdep_assert_irqs_disabled();
 
+	instrumentation_begin();
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_unboost(PVSCHED_KERNCS_BOOST_IRQ, true);
+	instrumentation_end();
+
 	/* Check whether this returns to user mode */
 	if (user_mode(regs)) {
 		irqentry_exit_to_user_mode(regs);
@@ -465,6 +454,10 @@ irqentry_state_t noinstr irqentry_nmi_enter(struct pt_regs *regs)
 	kmsan_unpoison_entry_regs(regs);
 	trace_hardirqs_off_finish();
 	ftrace_nmi_enter();
+
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_boost_lazy(PVSCHED_KERNCS_BOOST_IRQ);
+
 	instrumentation_end();
 
 	return irq_state;
@@ -478,6 +471,10 @@ void noinstr irqentry_nmi_exit(struct pt_regs *regs, irqentry_state_t irq_state)
 		trace_hardirqs_on_prepare();
 		lockdep_hardirqs_on_prepare();
 	}
+
+	if (pv_sched_enabled())
+		pv_sched_vcpu_kerncs_unboost(PVSCHED_KERNCS_BOOST_IRQ, true);
+
 	instrumentation_end();
 
 	ct_nmi_exit();

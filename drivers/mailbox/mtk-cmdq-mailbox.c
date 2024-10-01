@@ -39,7 +39,6 @@
 #define CMDQ_THR_END_ADDR		0x24
 #define CMDQ_THR_WAIT_TOKEN		0x30
 #define CMDQ_THR_PRIORITY		0x40
-#define CMDQ_THR_INSTN_TIMEOUT_CYCLES	0x50
 
 #define GCE_GCTL_VALUE			0x48
 #define GCE_CTRL_BY_SW				GENMASK(2, 0)
@@ -59,15 +58,6 @@
 
 #define CMDQ_JUMP_BY_OFFSET		0x10000000
 #define CMDQ_JUMP_BY_PA			0x10000001
-
-/*
- * instruction time-out
- * cycles to issue instruction time-out interrupt for wait and poll instructions
- * GCE axi_clock 156MHz
- * 1 cycle = 6.41ns
- * instruction time out 2^22*2*6.41ns = 53ms
- */
-#define CMDQ_INSTN_TIMEOUT_CYCLES	22
 
 struct cmdq_thread {
 	struct mbox_chan	*chan;
@@ -433,7 +423,6 @@ static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)
 		writel((task->pa_base + pkt->cmd_buf_size) >> cmdq->pdata->shift,
 		       thread->base + CMDQ_THR_END_ADDR);
 
-		writel(CMDQ_INSTN_TIMEOUT_CYCLES, thread->base + CMDQ_THR_INSTN_TIMEOUT_CYCLES);
 		writel(thread->priority, thread->base + CMDQ_THR_PRIORITY);
 		writel(CMDQ_THR_IRQ_EN, thread->base + CMDQ_THR_IRQ_ENABLE);
 		writel(CMDQ_THR_ENABLED, thread->base + CMDQ_THR_ENABLE_TASK);
@@ -477,7 +466,7 @@ static void cmdq_mbox_shutdown(struct mbox_chan *chan)
 	struct cmdq_task *task, *tmp;
 	unsigned long flags;
 
-	WARN_ON(pm_runtime_get_sync(cmdq->mbox.dev));
+	WARN_ON(pm_runtime_get_sync(cmdq->mbox.dev) < 0);
 
 	spin_lock_irqsave(&thread->chan->lock, flags);
 	if (list_empty(&thread->task_busy_list))
@@ -674,12 +663,6 @@ static int cmdq_probe(struct platform_device *pdev)
 		cmdq->mbox.chans[i].con_priv = (void *)&cmdq->thread[i];
 	}
 
-	err = devm_mbox_controller_register(dev, &cmdq->mbox);
-	if (err < 0) {
-		dev_err(dev, "failed to register mailbox: %d\n", err);
-		return err;
-	}
-
 	platform_set_drvdata(pdev, cmdq);
 
 	WARN_ON(clk_bulk_prepare(cmdq->pdata->gce_num, cmdq->clocks));
@@ -706,6 +689,12 @@ static int cmdq_probe(struct platform_device *pdev)
 
 	pm_runtime_set_autosuspend_delay(dev, CMDQ_MBOX_AUTOSUSPEND_DELAY_MS);
 	pm_runtime_use_autosuspend(dev);
+
+	err = devm_mbox_controller_register(dev, &cmdq->mbox);
+	if (err < 0) {
+		dev_err(dev, "failed to register mailbox: %d\n", err);
+		return err;
+	}
 
 	return 0;
 }

@@ -1453,7 +1453,6 @@ static int  __cam_req_mgr_setup_in_q(struct cam_req_mgr_req_data *req)
 		return -EINVAL;
 	}
 
-	mutex_lock(&req->lock);
 	in_q->num_slots = MAX_REQ_SLOTS;
 
 	for (i = 0; i < in_q->num_slots; i++) {
@@ -1465,7 +1464,6 @@ static int  __cam_req_mgr_setup_in_q(struct cam_req_mgr_req_data *req)
 
 	in_q->wr_idx = 0;
 	in_q->rd_idx = 0;
-	mutex_unlock(&req->lock);
 
 	return 0;
 }
@@ -1489,14 +1487,12 @@ static int __cam_req_mgr_reset_in_q(struct cam_req_mgr_req_data *req)
 		return -EINVAL;
 	}
 
-	mutex_lock(&req->lock);
 	memset(in_q->slot, 0,
 		sizeof(struct cam_req_mgr_slot) * in_q->num_slots);
 	in_q->num_slots = 0;
 
 	in_q->wr_idx = 0;
 	in_q->rd_idx = 0;
-	mutex_unlock(&req->lock);
 
 	return 0;
 }
@@ -1684,7 +1680,6 @@ static void __cam_req_mgr_destroy_link_info(struct cam_req_mgr_core_link *link)
 	__cam_req_mgr_destroy_all_tbl(&link->req.l_tbl);
 	__cam_req_mgr_reset_in_q(&link->req);
 	link->req.num_tbl = 0;
-	mutex_destroy(&link->req.lock);
 
 	link->pd_mask = 0;
 	link->num_devs = 0;
@@ -1874,7 +1869,7 @@ static int cam_req_mgr_process_flush_req(void *priv, void *data)
 
 	trace_cam_flush_req(link, flush_info);
 
-	mutex_lock(&link->req.lock);
+	mutex_lock(&link->lock);
 	if (flush_info->flush_type == CAM_REQ_MGR_FLUSH_TYPE_ALL) {
 		link->last_flush_id = flush_info->req_id;
 		CAM_INFO(CAM_CRM, "Last request id to flush is %lld",
@@ -1903,7 +1898,7 @@ static int cam_req_mgr_process_flush_req(void *priv, void *data)
 				CAM_WARN(CAM_CRM,
 					"req_id %lld can not be cancelled",
 					flush_info->req_id);
-				mutex_unlock(&link->req.lock);
+				mutex_unlock(&link->lock);
 				return -EINVAL;
 			}
 			__cam_req_mgr_in_q_skip_idx(in_q, idx);
@@ -1921,7 +1916,7 @@ static int cam_req_mgr_process_flush_req(void *priv, void *data)
 			rc = device->ops->flush_req(&flush_req);
 	}
 	complete(&link->workq_comp);
-	mutex_unlock(&link->req.lock);
+	mutex_unlock(&link->lock);
 
 end:
 	return rc;
@@ -1963,7 +1958,7 @@ static int cam_req_mgr_process_sched_req(void *priv, void *data)
 		in_q->wr_idx, sched_req->sync_mode,
 		link->is_master);
 
-	mutex_lock(&link->req.lock);
+	mutex_lock(&link->lock);
 	slot = &in_q->slot[in_q->wr_idx];
 
 	if (slot->status != CRM_SLOT_STATUS_NO_REQ &&
@@ -1987,7 +1982,7 @@ static int cam_req_mgr_process_sched_req(void *priv, void *data)
 			link->sync_link->initial_sync_req = -1;
 	}
 
-	mutex_unlock(&link->req.lock);
+	mutex_unlock(&link->lock);
 
 end:
 	return rc;
@@ -2047,14 +2042,14 @@ static int cam_req_mgr_process_add_req(void *priv, void *data)
 	 * 3. mark req_ready_map with this dev_bit.
 	 */
 
-	mutex_lock(&link->req.lock);
+	mutex_lock(&link->lock);
 	idx = __cam_req_mgr_find_slot_for_req(link->req.in_q, add_req->req_id);
 	if (idx < 0) {
 		CAM_ERR(CAM_CRM,
 			"req %lld not found in in_q for dev %s on link 0x%x",
 			add_req->req_id, device->dev_info.name, link->link_hdl);
 		rc = -EBADSLT;
-		mutex_unlock(&link->req.lock);
+		mutex_unlock(&link->lock);
 		goto end;
 	}
 
@@ -2093,7 +2088,7 @@ static int cam_req_mgr_process_add_req(void *priv, void *data)
 			link->link_hdl, idx, add_req->req_id, tbl->pd);
 		slot->state = CRM_REQ_STATE_READY;
 	}
-	mutex_unlock(&link->req.lock);
+	mutex_unlock(&link->lock);
 
 end:
 	return rc;
@@ -2132,7 +2127,7 @@ static int cam_req_mgr_process_error(void *priv, void *data)
 
 	in_q = link->req.in_q;
 
-	mutex_lock(&link->req.lock);
+	mutex_lock(&link->lock);
 	if (err_info->error == CRM_KMD_ERR_BUBBLE) {
 		idx = __cam_req_mgr_find_slot_for_req(in_q, err_info->req_id);
 		if (idx < 0) {
@@ -2147,14 +2142,14 @@ static int cam_req_mgr_process_error(void *priv, void *data)
 				CAM_WARN(CAM_CRM,
 					"err recovery disabled req_id %lld",
 					err_info->req_id);
-				mutex_unlock(&link->req.lock);
+				mutex_unlock(&link->lock);
 				return 0;
 			} else if (slot->status != CRM_SLOT_STATUS_REQ_PENDING
 			&& slot->status != CRM_SLOT_STATUS_REQ_APPLIED) {
 				CAM_WARN(CAM_CRM,
 					"req_id %lld can not be recovered %d",
 					err_info->req_id, slot->status);
-				mutex_unlock(&link->req.lock);
+				mutex_unlock(&link->lock);
 				return -EINVAL;
 			}
 			/* Notify all devices in the link about error */
@@ -2188,7 +2183,7 @@ static int cam_req_mgr_process_error(void *priv, void *data)
 			spin_unlock_bh(&link->link_state_spin_lock);
 		}
 	}
-	mutex_unlock(&link->req.lock);
+	mutex_unlock(&link->lock);
 
 end:
 	return rc;
@@ -2266,7 +2261,7 @@ static int cam_req_mgr_process_trigger(void *priv, void *data)
 
 	in_q = link->req.in_q;
 
-	mutex_lock(&link->req.lock);
+	mutex_lock(&link->lock);
 
 	if (trigger_data->trigger == CAM_TRIGGER_POINT_SOF) {
 		if (link->sync_link &&
@@ -2324,7 +2319,7 @@ static int cam_req_mgr_process_trigger(void *priv, void *data)
 	rc = __cam_req_mgr_process_req(link, trigger_data);
 
 release_lock:
-	mutex_unlock(&link->req.lock);
+	mutex_unlock(&link->lock);
 end:
 	return rc;
 }
@@ -2363,7 +2358,7 @@ static const char *__cam_req_mgr_dev_handle_to_name(
  */
 static int cam_req_mgr_cb_add_req(struct cam_req_mgr_add_request *add_req)
 {
-	int                             rc = 0, idx;
+	int                             rc = 0;
 	struct crm_workq_task          *task = NULL;
 	struct cam_req_mgr_core_link   *link = NULL;
 	struct cam_req_mgr_add_request *dev_req;
@@ -2385,7 +2380,6 @@ static int cam_req_mgr_cb_add_req(struct cam_req_mgr_add_request *add_req)
 		__cam_req_mgr_dev_handle_to_name(add_req->dev_hdl, link),
 		add_req->dev_hdl, add_req->req_id);
 
-	mutex_lock(&link->lock);
 	spin_lock_bh(&link->link_state_spin_lock);
 	if (link->state < CAM_CRM_LINK_STATE_READY) {
 		CAM_WARN(CAM_CRM, "invalid link state:%d", link->state);
@@ -2394,14 +2388,6 @@ static int cam_req_mgr_cb_add_req(struct cam_req_mgr_add_request *add_req)
 		goto end;
 	}
 	spin_unlock_bh(&link->link_state_spin_lock);
-
-	/* Validate if req id is present in input queue */
-	idx = __cam_req_mgr_find_slot_for_req(link->req.in_q, add_req->req_id);
-	if (idx < 0) {
-		CAM_ERR(CAM_CRM, "req %lld not found in in_q", add_req->req_id);
-		rc = -ENOENT;
-		goto end;
-	}
 
 	task = cam_req_mgr_workq_get_task(link->workq);
 	if (!task) {
@@ -2424,7 +2410,6 @@ static int cam_req_mgr_cb_add_req(struct cam_req_mgr_add_request *add_req)
 		add_req->dev_hdl, add_req->req_id);
 
 end:
-	mutex_unlock(&link->lock);
 	return rc;
 }
 
@@ -2609,8 +2594,6 @@ static int __cam_req_mgr_setup_link_info(struct cam_req_mgr_core_link *link,
 			CAM_REQ_MGR_MAX_DEVICES)
 			return -EPERM;
 		}
-	mutex_init(&link->req.lock);
-	CAM_DBG(CAM_CRM, "LOCK_DBG in_q lock %pK", &link->req.lock);
 	link->req.num_tbl = 0;
 
 	rc = __cam_req_mgr_setup_in_q(&link->req);
@@ -2842,10 +2825,12 @@ static int __cam_req_mgr_unlink(struct cam_req_mgr_core_link *link)
 	if (link->watchdog)
 		crm_timer_exit(&link->watchdog);
 	spin_unlock_bh(&link->link_state_spin_lock);
+	mutex_unlock(&link->lock);
 
 	/* Destroy workq of link */
 	cam_req_mgr_workq_destroy(&link->workq);
 
+	mutex_lock(&link->lock);
 	/* Cleanup request tables and unlink devices */
 	__cam_req_mgr_destroy_link_info(link);
 

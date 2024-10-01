@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  *
- * (C) COPYRIGHT 2012-2014, 2016-2018, 2020-2022 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2012-2014, 2016-2018, 2020-2024 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -27,6 +27,11 @@
 #endif
 
 #include <linux/dma-mapping.h>
+
+/* Kernel/CPU page size can be 4/16/64KB whereas GPU page size is fixed as 4KB */
+#define GPU_PAGE_SIZE SZ_4K
+#define GPU_PAGE_MASK (~(SZ_4K - 1))
+#define GPU_PAGES_PER_CPU_PAGE (PAGE_SIZE / GPU_PAGE_SIZE)
 
 /* Flags for kbase_phy_allocator_pages_alloc */
 #define KBASE_PHY_PAGES_FLAG_DEFAULT (0)	/** Default allocation flag */

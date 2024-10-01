@@ -169,6 +169,7 @@ static inline bool is_error_page(struct page *page)
 #define KVM_REQ_UNBLOCK			2
 #define KVM_REQ_DIRTY_RING_SOFT_FULL	3
 #define KVM_REQ_SUSPEND_TIME_ADJ	5
+#define KVM_REQ_VCPU_PV_SCHED		6
 #define KVM_REQUEST_ARCH_BASE		8
 
 /*
@@ -372,6 +373,7 @@ struct kvm_vcpu {
 	u64 suspend_time_ns;
 	spinlock_t suspend_time_ns_lock;
 #endif
+	bool suspended;
 
 #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
 	/*
@@ -820,6 +822,11 @@ struct kvm {
 	u64 suspend_time_ns;
 	spinlock_t suspend_time_ns_lock;
 	u64 base_offs_boot_ns;
+#endif
+	u64 last_suspend_duration;
+	u64 suspended_time;
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+	bool pv_sched_enabled;
 #endif
 };
 
@@ -2414,5 +2421,53 @@ static inline u64 vcpu_suspend_time_injected(struct kvm_vcpu *vcpu)
 	return 0;
 }
 #endif /* CONFIG_KVM_VIRT_SUSPEND_TIMING */
+
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+int kvm_vcpu_set_sched(struct kvm_vcpu *vcpu, union vcpu_sched_attr attr);
+union vcpu_sched_attr kvm_vcpu_get_sched(struct kvm_vcpu *vcpu);
+
+DECLARE_STATIC_KEY_FALSE(kvm_pv_sched);
+
+static inline bool kvm_pv_sched_enabled(struct kvm *kvm)
+{
+	if (static_branch_unlikely(&kvm_pv_sched))
+		return kvm->pv_sched_enabled;
+
+	return false;
+}
+
+static inline void kvm_set_pv_sched_enabled(struct kvm *kvm, bool enabled)
+{
+	unsigned long i;
+	struct kvm_vcpu *vcpu;
+	union vcpu_sched_attr attr = { 0 };
+
+	kvm->pv_sched_enabled = enabled;
+	/*
+	 * After setting vcpu_sched_enabled, we need to unboost each vcpu if boosted
+	 * and update each vcpu's state so that guest knows about the update.
+	 */
+	kvm_for_each_vcpu(i, vcpu, kvm)
+		kvm_vcpu_set_sched(vcpu, attr);
+}
+
+static inline bool kvm_vcpu_sched_enabled(struct kvm_vcpu *vcpu)
+{
+	return kvm_pv_sched_enabled(vcpu->kvm) &&
+		kvm_arch_vcpu_pv_sched_enabled(&vcpu->arch);
+}
+
+void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type);
+
+static inline void kvm_vcpu_kick_boost(struct kvm_vcpu *vcpu)
+{
+	kvm_vcpu_boost(vcpu, PVSCHED_KERNCS_BOOST_IRQ);
+	kvm_vcpu_kick(vcpu);
+}
+#else
+static inline void kvm_vcpu_boost(struct kvm_vcpu *vcpu, enum kerncs_boost_type boost_type) { }
+
+#define kvm_vcpu_kick_boost kvm_vcpu_kick
+#endif
 
 #endif

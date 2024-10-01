@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright(c) 2021-2022 Intel Corporation. All rights reserved.
+ * Copyright(c) 2021-2022 Intel Corporation
  *
  * Author: Cezary Rojewski <cezary.rojewski@intel.com>
  */
@@ -8,7 +8,9 @@
 #ifndef __SOUND_SOC_INTEL_AVS_CLDMA_H
 #define __SOUND_SOC_INTEL_AVS_CLDMA_H
 
-#define AVS_CL_DEFAULT_BUFFER_SIZE	(32 * PAGE_SIZE)
+#include <linux/sizes.h>
+
+#define AVS_CL_DEFAULT_BUFFER_SIZE	SZ_128K
 
 struct hda_cldma;
 extern struct hda_cldma code_loader;

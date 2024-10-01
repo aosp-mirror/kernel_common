@@ -1159,8 +1159,8 @@ int do_clock_adjtime(const clockid_t which_clock, struct __kernel_timex * ktx)
 	return kc->clock_adj(which_clock, ktx);
 }
 
-int ksys_clock_adjtime(const clockid_t which_clock,
-		       struct __kernel_timex __user * utx)
+SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
+		struct __kernel_timex __user *, utx)
 {
 	struct __kernel_timex ktx;
 	int err;
@@ -1249,12 +1249,6 @@ int ksys_clock_adjtime(const clockid_t which_clock,
  *	-ENODEV		Dynamic POSIX clock is not backed by a device
  *	-EOPNOTSUPP	Dynamic POSIX clock does not support getres()
  */
-SYSCALL_DEFINE2(clock_adjtime, const clockid_t, which_clock,
-		struct __kernel_timex __user *, utx)
-{
-	return ksys_clock_adjtime(which_clock, utx);
-}
-
 SYSCALL_DEFINE2(clock_getres, const clockid_t, which_clock,
 		struct __kernel_timespec __user *, tp)
 {
@@ -1308,7 +1302,8 @@ SYSCALL_DEFINE2(clock_gettime32, clockid_t, which_clock,
 	return err;
 }
 
-int ksys_clock_adjtime32(clockid_t which_clock, struct old_timex32 __user * utp)
+SYSCALL_DEFINE2(clock_adjtime32, clockid_t, which_clock,
+		struct old_timex32 __user *, utp)
 {
 	struct __kernel_timex ktx;
 	int err;
@@ -1323,12 +1318,6 @@ int ksys_clock_adjtime32(clockid_t which_clock, struct old_timex32 __user * utp)
 		return -EFAULT;
 
 	return err;
-}
-
-SYSCALL_DEFINE2(clock_adjtime32, clockid_t, which_clock,
-		struct old_timex32 __user *, utp)
-{
-	return ksys_clock_adjtime32(which_clock, utp);
 }
 
 SYSCALL_DEFINE2(clock_getres_time32, clockid_t, which_clock,

@@ -7,8 +7,46 @@
 #define __SOF_INTEL_BOARD_HELPERS_H
 
 #include <sound/soc.h>
+#include <sound/soc-acpi-intel-ssp-common.h>
 #include "sof_hdmi_common.h"
-#include "sof_ssp_common.h"
+
+/*
+ * Common board quirks: from bit 8 to 31, LSB 8 bits reserved for machine
+ *                      drivers
+ */
+
+/* SSP port number for headphone codec: 3 bits */
+#define SOF_SSP_PORT_CODEC_SHIFT		8
+#define SOF_SSP_PORT_CODEC_MASK			(GENMASK(10, 8))
+#define SOF_SSP_PORT_CODEC(quirk)		\
+	(((quirk) << SOF_SSP_PORT_CODEC_SHIFT) & SOF_SSP_PORT_CODEC_MASK)
+
+/* SSP port number for speaker amplifier: 3 bits */
+#define SOF_SSP_PORT_AMP_SHIFT			11
+#define SOF_SSP_PORT_AMP_MASK			(GENMASK(13, 11))
+#define SOF_SSP_PORT_AMP(quirk)			\
+	(((quirk) << SOF_SSP_PORT_AMP_SHIFT) & SOF_SSP_PORT_AMP_MASK)
+
+/* SSP port number for BT audio offload: 3 bits */
+#define SOF_SSP_PORT_BT_OFFLOAD_SHIFT		14
+#define SOF_SSP_PORT_BT_OFFLOAD_MASK		(GENMASK(16, 14))
+#define SOF_SSP_PORT_BT_OFFLOAD(quirk)		\
+	(((quirk) << SOF_SSP_PORT_BT_OFFLOAD_SHIFT) & SOF_SSP_PORT_BT_OFFLOAD_MASK)
+
+/* SSP port mask for HDMI capture: 6 bits */
+#define SOF_SSP_MASK_HDMI_CAPTURE_SHIFT		17
+#define SOF_SSP_MASK_HDMI_CAPTURE_MASK		(GENMASK(22, 17))
+#define SOF_SSP_MASK_HDMI_CAPTURE(quirk)	\
+	(((quirk) << SOF_SSP_MASK_HDMI_CAPTURE_SHIFT) & SOF_SSP_MASK_HDMI_CAPTURE_MASK)
+
+/* Number of idisp HDMI BE link: 3 bits */
+#define SOF_NUM_IDISP_HDMI_SHIFT		23
+#define SOF_NUM_IDISP_HDMI_MASK			(GENMASK(25, 23))
+#define SOF_NUM_IDISP_HDMI(quirk)		\
+	(((quirk) << SOF_NUM_IDISP_HDMI_SHIFT) & SOF_NUM_IDISP_HDMI_MASK)
+
+/* Board uses BT audio offload */
+#define SOF_BT_OFFLOAD_PRESENT			BIT(26)
 
 enum {
 	SOF_LINK_NONE = 0,
@@ -46,14 +84,29 @@ enum {
 	 (((k7) & SOF_LINK_IDS_MASK) << (SOF_LINK_IDS_SHIFT * 6)))
 
 /*
+ * sof_da7219_private: private data for da7219 machine driver
+ *
+ * @is_jsl_board: true for JSL boards
+ * @mclk_en: true for mclk pin is connected
+ * @pll_bypass: true for PLL bypass mode
+ */
+struct sof_da7219_private {
+	bool is_jsl_board;
+	bool mclk_en;
+	bool pll_bypass;
+};
+
+/*
  * sof_rt5682_private: private data for rt5682 machine driver
  *
  * @mclk: mclk clock data
  * @is_legacy_cpu: true for BYT/CHT boards
+ * @mclk_en: true for mclk pin is connected
  */
 struct sof_rt5682_private {
 	struct clk *mclk;
 	bool is_legacy_cpu;
+	bool mclk_en;
 };
 
 /*
@@ -74,14 +127,15 @@ struct sof_rt5682_private {
  * @amp_link: pointer to speaker amplifier dai link
  * @link_order_overwrite: custom DAI link order
  * @link_id_overwrite: custom DAI link ID
+ * @da7219: private data for da7219 machine driver
  * @rt5682: private data for rt5682 machine driver
  */
 struct sof_card_private {
 	struct snd_soc_jack headset_jack;
 	struct sof_hdmi_private hdmi;
 
-	enum sof_ssp_codec codec_type;
-	enum sof_ssp_codec amp_type;
+	enum snd_soc_acpi_intel_codec codec_type;
+	enum snd_soc_acpi_intel_codec amp_type;
 
 	int dmic_be_num;
 	int hdmi_num;
@@ -104,6 +158,7 @@ struct sof_card_private {
 	unsigned long link_id_overwrite;
 
 	union {
+		struct sof_da7219_private da7219;
 		struct sof_rt5682_private rt5682;
 	};
 };
@@ -111,8 +166,7 @@ struct sof_card_private {
 int sof_intel_board_card_late_probe(struct snd_soc_card *card);
 int sof_intel_board_set_dai_link(struct device *dev, struct snd_soc_card *card,
 				 struct sof_card_private *ctx);
-
-struct snd_soc_dai *get_codec_dai_by_name(struct snd_soc_pcm_runtime *rtd,
-					  const char *dai_name[], int num_dais);
+struct sof_card_private *
+sof_intel_board_get_ctx(struct device *dev, unsigned long board_quirk);
 
 #endif /* __SOF_INTEL_BOARD_HELPERS_H */

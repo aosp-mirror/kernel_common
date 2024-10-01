@@ -33,6 +33,7 @@
 
 #include <drm/display/drm_dp_dual_mode_helper.h>
 #include <drm/display/drm_dp_mst_helper.h>
+#include <drm/display/drm_dp_tunnel.h>
 #include <drm/display/drm_dsc.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_crtc.h>
@@ -159,6 +160,11 @@ struct intel_encoder {
 	enum port port;
 	u16 cloneable;
 	u8 pipe_mask;
+
+	/* Check and recover a bad link state. */
+	struct delayed_work link_check_work;
+	void (*link_check)(struct intel_encoder *encoder);
+
 	enum intel_hotplug_state (*hotplug)(struct intel_encoder *encoder,
 					    struct intel_connector *connector);
 	enum intel_output_type (*compute_output_type)(struct intel_encoder *,
@@ -631,6 +637,8 @@ struct intel_connector {
 
 	struct intel_dp *mst_port;
 
+	bool force_bigjoiner_enable;
+
 	struct {
 		struct drm_dp_aux *dsc_decompression_aux;
 		u8 dsc_dpcd[DP_DSC_RECEIVER_CAP_SIZE];
@@ -682,6 +690,8 @@ struct intel_atomic_state {
 
 	struct intel_shared_dpll_state shared_dpll[I915_NUM_PLLS];
 
+	struct intel_dp_tunnel_inherited_state *inherited_dp_tunnels;
+
 	/*
 	 * Current watermarks can't be trusted during hardware readout, so
 	 * don't bother calculating intermediate watermarks.
@@ -722,6 +732,9 @@ struct intel_plane_state {
 
 	struct intel_fb_view view;
 	u32 phys_dma_addr; /* for cursor_needs_physical */
+
+	/* for legacy cursor fb unpin */
+	struct drm_vblank_work unpin_work;
 
 	/* Plane pxp decryption state */
 	bool decrypt;
@@ -1226,6 +1239,7 @@ struct intel_crtc_state {
 	bool has_psr2;
 	bool enable_psr2_sel_fetch;
 	bool req_psr2_sdp_prior_scanline;
+	bool has_panel_replay;
 	bool wm_level_disabled;
 	u32 dc3co_exitline;
 	u16 su_y_granularity;
@@ -1383,6 +1397,9 @@ struct intel_crtc_state {
 		struct drm_dsc_config config;
 	} dsc;
 
+	/* DP tunnel used for BW allocation. */
+	struct drm_dp_tunnel_ref dp_tunnel_ref;
+
 	/* HSW+ linetime watermarks */
 	u16 linetime;
 	u16 ips_linetime;
@@ -1537,7 +1554,7 @@ struct intel_plane {
 	enum i9xx_plane_id i9xx_plane;
 	enum plane_id id;
 	enum pipe pipe;
-	bool need_async_flip_disable_wa;
+	bool need_async_flip_toggle_wa;
 	u32 frontbuffer_bit;
 
 	struct {
@@ -1724,9 +1741,13 @@ struct intel_psr {
 	bool irq_aux_error;
 	u16 su_w_granularity;
 	u16 su_y_granularity;
+	bool source_panel_replay_support;
+	bool sink_panel_replay_support;
+	bool panel_replay_enabled;
 	u32 dc3co_exitline;
 	u32 dc3co_exit_delay;
 	struct delayed_work dc3co_work;
+	u8 entry_setup_frames;
 };
 
 struct intel_dp {
@@ -1736,7 +1757,7 @@ struct intel_dp {
 	u8 lane_count;
 	u8 sink_count;
 	bool link_trained;
-	bool reset_link_params;
+	bool needs_modeset_retry;
 	bool use_max_params;
 	u8 dpcd[DP_RECEIVER_CAP_SIZE];
 	u8 psr_dpcd[EDP_PSR_RECEIVER_CAP_SIZE];
@@ -1757,10 +1778,41 @@ struct intel_dp {
 	/* intersection of source and sink rates */
 	int num_common_rates;
 	int common_rates[DP_MAX_SUPPORTED_RATES];
-	/* Max lane count for the current link */
-	int max_link_lane_count;
-	/* Max rate for the current link */
-	int max_link_rate;
+	struct {
+		/* TODO: move the rest of link specific fields to here */
+		/* common rate,lane_count configs in bw order */
+		int num_configs;
+#define INTEL_DP_MAX_LANE_COUNT			4
+#define INTEL_DP_MAX_SUPPORTED_LANE_CONFIGS	(ilog2(INTEL_DP_MAX_LANE_COUNT) + 1)
+#define INTEL_DP_LANE_COUNT_EXP_BITS		order_base_2(INTEL_DP_MAX_SUPPORTED_LANE_CONFIGS)
+#define INTEL_DP_LINK_RATE_IDX_BITS		(BITS_PER_TYPE(u8) - INTEL_DP_LANE_COUNT_EXP_BITS)
+#define INTEL_DP_MAX_LINK_CONFIGS		(DP_MAX_SUPPORTED_RATES * \
+						 INTEL_DP_MAX_SUPPORTED_LANE_CONFIGS)
+		struct intel_dp_link_config {
+			u8 link_rate_idx:INTEL_DP_LINK_RATE_IDX_BITS;
+			u8 lane_count_exp:INTEL_DP_LANE_COUNT_EXP_BITS;
+		} configs[INTEL_DP_MAX_LINK_CONFIGS];
+		/* Max lane count for the current link */
+		int max_lane_count;
+		/* Max rate for the current link */
+		int max_rate;
+		/*
+		 * Link parameters for which the MST topology was probed.
+		 * Tracking these ensures that the MST path resources are
+		 * re-enumerated whenever the link is retrained with new link
+		 * parameters, as required by the DP standard.
+		 */
+		int mst_probed_lane_count;
+		int mst_probed_rate;
+		int force_lane_count;
+		int force_rate;
+		bool retrain_disabled;
+		/* Sequential link training failures after a passing LT */
+		int seq_train_failures;
+		int force_train_failure;
+		bool force_retrain;
+	} link;
+	bool reset_link_params;
 	int mso_link_count;
 	int mso_pixel_overlap;
 	/* sink or branch descriptor */
@@ -1773,9 +1825,13 @@ struct intel_dp {
 
 	bool is_mst;
 	int active_mst_links;
+	enum drm_dp_mst_mode mst_detect;
 
 	/* connector directly attached - won't be use for modeset in mst world */
 	struct intel_connector *attached_connector;
+
+	struct drm_dp_tunnel *tunnel;
+	bool tunnel_suspended:1;
 
 	/* mst connector list */
 	struct intel_dp_mst_encoder *mst_encoders[I915_MAX_PIPES];
@@ -1894,6 +1950,9 @@ struct intel_digital_port {
 	u32 (*infoframes_enabled)(struct intel_encoder *encoder,
 				  const struct intel_crtc_state *pipe_config);
 	bool (*connected)(struct intel_encoder *encoder);
+
+	void (*lock)(struct intel_digital_port *dig_port);
+	void (*unlock)(struct intel_digital_port *dig_port);
 };
 
 struct intel_dp_mst_encoder {
@@ -2009,17 +2068,6 @@ dp_to_lspcon(struct intel_dp *intel_dp)
 }
 
 #define dp_to_i915(__intel_dp) to_i915(dp_to_dig_port(__intel_dp)->base.base.dev)
-
-#define CAN_PSR(intel_dp) ((intel_dp)->psr.sink_support && \
-			   (intel_dp)->psr.source_support)
-
-static inline bool intel_encoder_can_psr(struct intel_encoder *encoder)
-{
-	if (!intel_encoder_is_dp(encoder))
-		return false;
-
-	return CAN_PSR(enc_to_intel_dp(encoder));
-}
 
 static inline struct intel_digital_port *
 hdmi_to_dig_port(struct intel_hdmi *intel_hdmi)

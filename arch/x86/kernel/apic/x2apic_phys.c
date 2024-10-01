@@ -124,19 +124,9 @@ static int x2apic_phys_probe(void)
 	return apic == &apic_x2apic_phys;
 }
 
-unsigned int x2apic_get_apic_id(unsigned long id)
+u32 x2apic_get_apic_id(u32 id)
 {
 	return id;
-}
-
-u32 x2apic_set_apic_id(unsigned int id)
-{
-	return id;
-}
-
-int x2apic_phys_pkg_id(int initial_apicid, int index_msb)
-{
-	return initial_apicid >> index_msb;
 }
 
 static struct apic apic_x2apic_phys __ro_after_init = {
@@ -151,12 +141,10 @@ static struct apic apic_x2apic_phys __ro_after_init = {
 	.disable_esr			= 0,
 
 	.cpu_present_to_apicid		= default_cpu_present_to_apicid,
-	.phys_pkg_id			= x2apic_phys_pkg_id,
 
 	.max_apic_id			= UINT_MAX,
 	.x2apic_set_max_apicid		= true,
 	.get_apic_id			= x2apic_get_apic_id,
-	.set_apic_id			= x2apic_set_apic_id,
 
 	.calc_dest_apicid		= apic_default_calc_apicid,
 

@@ -38,6 +38,9 @@
 #include "i915_reg.h"
 #include "intel_pci_config.h"
 
+__diag_push();
+__diag_ignore_all("-Woverride-init", "Allow field initialization overrides for device info");
+
 #define PLATFORM(x) .platform = (x)
 #define GEN(x) \
 	.__runtime.graphics.ip.ver = (x), \
@@ -843,6 +846,8 @@ static const struct intel_device_info mtl_info = {
 
 #undef PLATFORM
 
+__diag_pop();
+
 /*
  * Make sure any device matches here are from most specific to most
  * general.  For example, since the Quanta match is based on the subsystem
@@ -1088,7 +1093,10 @@ static struct pci_driver i915_pci_driver = {
 	.probe = i915_pci_probe,
 	.remove = i915_pci_remove,
 	.shutdown = i915_pci_shutdown,
-	.driver.pm = &i915_pm_ops,
+	.driver = {
+		.pm = &i915_pm_ops,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
+	},
 };
 
 int i915_pci_register_driver(void)

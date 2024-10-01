@@ -28,10 +28,6 @@ properties:
       - qcom,wcn6855-bt
       - qcom,wcn7850-bt
 
-  wlan-gpios:
-    maxItems: 1
-    description: gpio specifier used to wlan chip
-
   enable-gpios:
     maxItems: 1
     description: gpio specifier used to enable chip
@@ -146,7 +142,6 @@ allOf:
               - qcom,wcn6750-bt
     then:
       required:
-        - wlan-gpios
         - enable-gpios
         - swctrl-gpios
         - vddio-supply
@@ -222,7 +217,6 @@ examples:
             compatible = "qcom,wcn6750-bt";
             pinctrl-names = "default";
             pinctrl-0 = <&bt_en_default>;
-            wlan-gpios = <&tlmm 84 GPIO_ACTIVE_HIGH>;
             enable-gpios = <&tlmm 85 GPIO_ACTIVE_HIGH>;
             swctrl-gpios = <&tlmm 86 GPIO_ACTIVE_HIGH>;
             vddio-supply = <&vreg_l19b_1p8>;

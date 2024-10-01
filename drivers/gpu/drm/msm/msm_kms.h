@@ -142,6 +142,9 @@ struct msm_kms {
 	int irq;
 	bool irq_requested;
 
+	/* rate limit the snapshot capture to once per attach */
+	int fault_snapshot_capture;
+
 	/* mapper-id used to request GEM buffer mapped for scanout: */
 	struct msm_gem_address_space *aspace;
 
@@ -194,5 +197,8 @@ static inline void msm_kms_destroy(struct msm_kms *kms)
 #define for_each_crtc_mask_reverse(dev, crtc, crtc_mask) \
 	drm_for_each_crtc_reverse(crtc, dev) \
 		for_each_if (drm_crtc_mask(crtc) & (crtc_mask))
+
+int msm_drm_kms_init(struct device *dev, const struct drm_driver *drv);
+void msm_drm_kms_uninit(struct device *dev);
 
 #endif /* __MSM_KMS_H__ */

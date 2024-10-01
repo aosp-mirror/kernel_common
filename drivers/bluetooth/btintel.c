@@ -26,6 +26,11 @@
 #define ECDSA_OFFSET		644
 #define ECDSA_HEADER_LEN	320
 
+#define BTINTEL_BT_DOMAIN		0x12
+#define BTINTEL_SAR_LEGACY		0
+#define BTINTEL_SAR_INC_PWR		1
+#define BTINTEL_SAR_INC_PWR_SUPPORTED	0
+
 enum {
 	DSM_SET_WDISABLE2_DELAY = 1,
 	DSM_SET_RESET_METHOD = 3,
@@ -2565,6 +2570,330 @@ static void btintel_set_dsm_reset_method(struct hci_dev *hdev,
 	data->acpi_reset_method = btintel_acpi_reset_method;
 }
 
+#define BTINTEL_ISODATA_HANDLE_BASE 0x900
+
+static u8 btintel_classify_pkt_type(struct hci_dev *hdev, struct sk_buff *skb)
+{
+	/*
+	 * Distinguish ISO data packets form ACL data packets
+	 * based on their connection handle value range.
+	 */
+	if (hci_skb_pkt_type(skb) == HCI_ACLDATA_PKT) {
+		__u16 handle = __le16_to_cpu(hci_acl_hdr(skb)->handle);
+
+		if (hci_handle(handle) >= BTINTEL_ISODATA_HANDLE_BASE)
+			return HCI_ISODATA_PKT;
+	}
+
+	return hci_skb_pkt_type(skb);
+}
+
+#ifdef CONFIG_ACPI
+static acpi_status btintel_evaluate_acpi_method(struct hci_dev *hdev,
+						acpi_string method,
+						union acpi_object **ptr,
+						u8 pkg_size)
+{
+	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *p;
+	acpi_status status;
+	acpi_handle handle;
+
+	handle = ACPI_HANDLE(GET_HCIDEV_DEV(hdev));
+	if (!handle) {
+		bt_dev_dbg(hdev, "ACPI-BT: No ACPI support for Bluetooth device");
+		return AE_NOT_EXIST;
+	}
+
+	status = acpi_evaluate_object(handle, method, NULL, &buffer);
+
+	if (ACPI_FAILURE(status)) {
+		bt_dev_dbg(hdev, "ACPI-BT: ACPI Failure: %s method: %s",
+			   acpi_format_exception(status), method);
+		return status;
+	}
+
+	p = buffer.pointer;
+
+	if (p->type != ACPI_TYPE_PACKAGE || p->package.count < pkg_size) {
+		bt_dev_warn(hdev, "ACPI-BT: Invalid object type: %d or package count: %d",
+			    p->type, p->package.count);
+		kfree(buffer.pointer);
+		return AE_ERROR;
+	}
+
+	*ptr = buffer.pointer;
+	return 0;
+}
+
+static union acpi_object *btintel_acpi_get_bt_pkg(union acpi_object *buffer)
+{
+	union acpi_object *domain, *bt_pkg;
+	int i;
+
+	for (i = 1; i < buffer->package.count; i++) {
+		bt_pkg = &buffer->package.elements[i];
+		domain = &bt_pkg->package.elements[0];
+		if (domain->type == ACPI_TYPE_INTEGER &&
+		    domain->integer.value == BTINTEL_BT_DOMAIN)
+			return bt_pkg;
+	}
+	return ERR_PTR(-ENOENT);
+}
+
+static int btintel_send_sar_ddc(struct hci_dev *hdev, struct btintel_cp_ddc_write *data, u8 len)
+{
+	struct sk_buff *skb;
+
+	skb = __hci_cmd_sync(hdev, 0xfc8b, len, data, HCI_CMD_TIMEOUT);
+	if (IS_ERR(skb)) {
+		bt_dev_warn(hdev, "Failed to send sar ddc id:0x%4.4x (%ld)",
+			    le16_to_cpu(data->id), PTR_ERR(skb));
+		return PTR_ERR(skb);
+	}
+	kfree_skb(skb);
+	return 0;
+}
+
+static int btintel_set_legacy_sar(struct hci_dev *hdev,
+				  struct btintel_sar_inc_pwr *sar)
+{
+	struct btintel_cp_ddc_write *cmd;
+	u8 buffer[64];
+	int ret;
+
+	cmd = (void *)buffer;
+	cmd->len = 3;
+	cmd->id = cpu_to_le16(0x0131);
+	cmd->data[0] = sar->br >> 3;
+	ret = btintel_send_sar_ddc(hdev, cmd, 4);
+	if (ret)
+		return ret;
+
+	cmd->len = 3;
+	cmd->id = cpu_to_le16(0x0132);
+	cmd->data[0] = sar->br >> 3;
+	ret = btintel_send_sar_ddc(hdev, cmd, 4);
+	if (ret)
+		return ret;
+
+	cmd->len = 3;
+	cmd->id = cpu_to_le16(0x0133);
+	cmd->data[0] = min3(sar->le, sar->le_lr, sar->le_2mhz) >> 3;
+	ret = btintel_send_sar_ddc(hdev, cmd, 4);
+	if (ret)
+		return ret;
+
+	cmd->len = 5;
+	cmd->id = cpu_to_le16(0x0137);
+	cmd->data[0] = sar->br >> 3;
+	cmd->data[1] = sar->edr2 >> 3;
+	cmd->data[2] = sar->edr3 >> 3;
+	ret = btintel_send_sar_ddc(hdev, cmd, 6);
+	if (ret)
+		return ret;
+
+	cmd->len = 5;
+	cmd->id = cpu_to_le16(0x0138);
+	cmd->data[0] = sar->br >> 3;
+	cmd->data[1] = sar->edr2 >> 3;
+	cmd->data[2] = sar->edr3 >> 3;
+	ret = btintel_send_sar_ddc(hdev, cmd, 6);
+	if (ret)
+		return ret;
+
+	cmd->len = 5;
+	cmd->id = cpu_to_le16(0x013b);
+	cmd->data[0] = sar->br >> 3;
+	cmd->data[1] = sar->edr2 >> 3;
+	cmd->data[2] = sar->edr3 >> 3;
+	ret = btintel_send_sar_ddc(hdev, cmd, 6);
+	if (ret)
+		return ret;
+
+	cmd->len = 5;
+	cmd->id = cpu_to_le16(0x013c);
+	cmd->data[0] = sar->br >> 3;
+	cmd->data[1] = sar->edr2 >> 3;
+	cmd->data[2] = sar->edr3 >> 3;
+	ret = btintel_send_sar_ddc(hdev, cmd, 6);
+
+	return ret;
+}
+
+static int btintel_set_mutual_sar(struct hci_dev *hdev,
+				  struct btintel_sar_inc_pwr *sar)
+{
+	struct btintel_cp_ddc_write *cmd;
+	struct sk_buff *skb;
+	u8 buffer[64];
+	bool enable;
+	int ret;
+
+	cmd = (void *)buffer;
+
+	cmd->len = 3;
+	cmd->id = cpu_to_le16(0x019e);
+
+	if (sar->revision == BTINTEL_SAR_INC_PWR &&
+	    sar->inc_power_mode == BTINTEL_SAR_INC_PWR_SUPPORTED)
+		cmd->data[0] = 0x01;
+	else
+		cmd->data[0] = 0x00;
+
+	ret = btintel_send_sar_ddc(hdev, cmd, 4);
+	if (ret)
+		return ret;
+
+	if (sar->revision == BTINTEL_SAR_INC_PWR &&
+	    sar->inc_power_mode == BTINTEL_SAR_INC_PWR_SUPPORTED) {
+		cmd->len = 3;
+		cmd->id = cpu_to_le16(0x019f);
+		cmd->data[0] = sar->sar_2400_chain_a;
+
+		ret = btintel_send_sar_ddc(hdev, cmd, 4);
+		if (ret)
+			return ret;
+	}
+
+	cmd->len = 3;
+	cmd->id = cpu_to_le16(0x01a0);
+	cmd->data[0] = sar->br;
+	ret = btintel_send_sar_ddc(hdev, cmd, 4);
+	if (ret)
+		return ret;
+
+	cmd->len = 3;
+	cmd->id = cpu_to_le16(0x01a1);
+	cmd->data[0] = sar->edr2;
+	ret = btintel_send_sar_ddc(hdev, cmd, 4);
+	if (ret)
+		return ret;
+
+	cmd->len = 3;
+	cmd->id = cpu_to_le16(0x01a2);
+	cmd->data[0] = sar->edr3;
+	ret = btintel_send_sar_ddc(hdev, cmd, 4);
+	if (ret)
+		return ret;
+
+	cmd->len = 3;
+	cmd->id = cpu_to_le16(0x01a3);
+	cmd->data[0] = min3(sar->le, sar->le_lr, sar->le_2mhz);
+	ret = btintel_send_sar_ddc(hdev, cmd, 4);
+	if (ret)
+		return ret;
+
+	enable = true;
+	skb = __hci_cmd_sync(hdev, 0xfe25, 1, &enable, HCI_CMD_TIMEOUT);
+	if (IS_ERR(skb)) {
+		bt_dev_warn(hdev, "Failed to send Intel SAR Enable (%ld)", PTR_ERR(skb));
+		return PTR_ERR(skb);
+	}
+
+	kfree_skb(skb);
+	return 0;
+}
+
+static int btintel_sar_send_to_device(struct hci_dev *hdev, struct btintel_sar_inc_pwr *sar,
+				      struct intel_version_tlv *ver)
+{
+	u16 cnvi, cnvr;
+	int ret;
+
+	cnvi = ver->cnvi_top & 0xfff;
+	cnvr = ver->cnvr_top & 0xfff;
+
+	if (cnvi < BTINTEL_CNVI_BLAZARI && cnvr < BTINTEL_CNVR_FMP2) {
+		bt_dev_info(hdev, "Applying legacy Bluetooth SAR");
+		ret = btintel_set_legacy_sar(hdev, sar);
+	} else if (cnvi == BTINTEL_CNVI_GAP || cnvr == BTINTEL_CNVR_FMP2) {
+		bt_dev_info(hdev, "Applying  Mutual Bluetooth SAR");
+		ret = btintel_set_mutual_sar(hdev, sar);
+	} else {
+		ret = -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+
+static int btintel_acpi_set_sar(struct hci_dev *hdev,
+					struct intel_version_tlv *ver)
+{
+	union acpi_object *bt_pkg, *buffer = NULL;
+	struct btintel_sar_inc_pwr sar;
+	acpi_status status;
+	u8 revision;
+	int ret;
+
+	status = btintel_evaluate_acpi_method(hdev, "BRDS", &buffer, 2);
+	if (ACPI_FAILURE(status))
+		return -ENOENT;
+
+	bt_pkg = btintel_acpi_get_bt_pkg(buffer);
+
+	if (IS_ERR(bt_pkg)) {
+		ret = PTR_ERR(bt_pkg);
+		goto error;
+	}
+
+	revision = buffer->package.elements[0].integer.value;
+
+	if (revision > BTINTEL_SAR_INC_PWR) {
+		bt_dev_dbg(hdev, "BT_SAR: revision: 0x%2.2x not supported", revision);
+		ret = -EOPNOTSUPP;
+		goto error;
+	}
+
+	if (revision == BTINTEL_SAR_LEGACY && bt_pkg->package.count != 7) {
+		sar.revision = revision;
+		sar.bt_sar_bios = (u32)bt_pkg->package.elements[1].integer.value;
+		sar.br = (u8)bt_pkg->package.elements[2].integer.value;
+		sar.edr2 = (u8)bt_pkg->package.elements[3].integer.value;
+		sar.edr3 = (u8)bt_pkg->package.elements[4].integer.value;
+		sar.le = (u8)bt_pkg->package.elements[5].integer.value;
+		sar.le_2mhz = (u8)bt_pkg->package.elements[6].integer.value;
+		sar.le_lr  = (u8)bt_pkg->package.elements[7].integer.value;
+
+	} else if (revision == BTINTEL_SAR_INC_PWR && bt_pkg->package.count != 9) {
+		sar.revision = revision;
+		sar.bt_sar_bios = (u32)bt_pkg->package.elements[1].integer.value;
+		sar.inc_power_mode = (u32)bt_pkg->package.elements[2].integer.value;
+		sar.sar_2400_chain_a = (u8)bt_pkg->package.elements[3].integer.value;
+		sar.br = (u8)bt_pkg->package.elements[4].integer.value;
+		sar.edr2 = (u8)bt_pkg->package.elements[5].integer.value;
+		sar.edr3 = (u8)bt_pkg->package.elements[6].integer.value;
+		sar.le = (u8)bt_pkg->package.elements[7].integer.value;
+		sar.le_2mhz = (u8)bt_pkg->package.elements[8].integer.value;
+		sar.le_lr  = (u8)bt_pkg->package.elements[9].integer.value;
+	} else {
+		ret = -EINVAL;
+		goto error;
+	}
+
+	/* Apply only if it is enabled in BIOS */
+	if (sar.bt_sar_bios != 1) {
+		bt_dev_dbg(hdev, "Bluetooth SAR is not enabled");
+		ret = -EOPNOTSUPP;
+		goto error;
+	}
+
+	ret = btintel_sar_send_to_device(hdev, &sar, ver);
+error:
+	kfree(buffer);
+	return ret;
+}
+#endif /* CONFIG_ACPI */
+
+static int btintel_set_specific_absorption_rate(struct hci_dev *hdev,
+						struct intel_version_tlv *ver)
+{
+#ifdef CONFIG_ACPI
+	return btintel_acpi_set_sar(hdev, ver);
+#endif
+	return 0;
+}
+
 static int btintel_bootloader_setup_tlv(struct hci_dev *hdev,
 					struct intel_version_tlv *ver)
 {
@@ -2610,6 +2939,9 @@ static int btintel_bootloader_setup_tlv(struct hci_dev *hdev,
 	btintel_configure_offload(hdev);
 
 	hci_dev_clear_flag(hdev, HCI_QUALITY_REPORT);
+
+	/* Send sar values to controller */
+	btintel_set_specific_absorption_rate(hdev, ver);
 
 	/* Set PPAG feature */
 	btintel_set_ppag(hdev, ver);
@@ -2874,11 +3206,15 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 		err = btintel_bootloader_setup(hdev, &ver);
 		btintel_register_devcoredump_support(hdev);
 		break;
+	case 0x18: /* GfP2 */
+	case 0x1c: /* GaP */
+		/* Re-classify packet type for controllers with LE audio */
+		hdev->classify_pkt_type = btintel_classify_pkt_type;
+		fallthrough;
 	case 0x17:
-	case 0x18:
 	case 0x19:
 	case 0x1b:
-	case 0x1c:
+	case 0x1e:
 		/* Display version information of TLV type */
 		btintel_version_info_tlv(hdev, &ver_tlv);
 

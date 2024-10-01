@@ -354,11 +354,6 @@ int uvc_queue_streamoff(struct uvc_video_queue *queue, enum v4l2_buf_type type)
 
 int uvc_queue_mmap(struct uvc_video_queue *queue, struct vm_area_struct *vma)
 {
-	struct uvc_streaming *stream = uvc_queue_to_stream(queue);
-
-	if (!video_is_registered(&stream->vdev))
-		return -ENODEV;
-
 	return vb2_mmap(&queue->queue, vma);
 }
 
@@ -366,11 +361,6 @@ int uvc_queue_mmap(struct uvc_video_queue *queue, struct vm_area_struct *vma)
 unsigned long uvc_queue_get_unmapped_area(struct uvc_video_queue *queue,
 		unsigned long pgoff)
 {
-	struct uvc_streaming *stream = uvc_queue_to_stream(queue);
-
-	if (!video_is_registered(&stream->vdev))
-		return -ENODEV;
-
 	return vb2_get_unmapped_area(&queue->queue, 0, 0, pgoff, 0);
 }
 #endif
@@ -378,16 +368,10 @@ unsigned long uvc_queue_get_unmapped_area(struct uvc_video_queue *queue,
 __poll_t uvc_queue_poll(struct uvc_video_queue *queue, struct file *file,
 			    poll_table *wait)
 {
-	struct uvc_streaming *stream = uvc_queue_to_stream(queue);
 	__poll_t ret;
 
 	mutex_lock(&queue->mutex);
-	if (!video_is_registered(&stream->vdev)) {
-		ret = EPOLLERR;
-		goto unlock;
-	}
 	ret = vb2_poll(&queue->queue, file, wait);
-unlock:
 	mutex_unlock(&queue->mutex);
 
 	return ret;

@@ -122,8 +122,10 @@ static int aq_pci_probe_get_hw_by_id(struct pci_dev *pdev,
 	 * However, hw_atl_ops_b1 is an alias for hw_atl_ops_b0 (see
 	 * hw_atl/hw_atl_b0.h). This check enables *both* HW versions.
 	 */
-	if (*ops != &hw_atl_ops_b1)
+	if (*ops != &hw_atl_ops_b1) {
+		pci_err(pdev, "hw version was not fuzz tested");
 		return -EINVAL;
+	}
 
 	return 0;
 }

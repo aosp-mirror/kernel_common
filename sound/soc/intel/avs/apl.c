@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 //
-// Copyright(c) 2021-2022 Intel Corporation. All rights reserved.
+// Copyright(c) 2021-2022 Intel Corporation
 //
 // Authors: Cezary Rojewski <cezary.rojewski@intel.com>
 //          Amadeusz Slawinski <amadeuszx.slawinski@linux.intel.com>
@@ -30,11 +30,11 @@ static irqreturn_t avs_apl_dsp_interrupt(struct avs_dev *adev)
 	return ret;
 }
 
-static int __maybe_unused
-avs_apl_enable_logs(struct avs_dev *adev, enum avs_log_enable enable, u32 aging_period,
-		    u32 fifo_full_period, unsigned long resource_mask, u32 *priorities)
+#ifdef CONFIG_DEBUG_FS
+int avs_apl_enable_logs(struct avs_dev *adev, enum avs_log_enable enable, u32 aging_period,
+			u32 fifo_full_period, unsigned long resource_mask, u32 *priorities)
 {
-	struct avs_apl_log_state_info *info;
+	struct apl_log_state_info *info;
 	u32 size, num_cores = adev->hw_cfg.dsp_cores;
 	int ret, i;
 
@@ -64,10 +64,11 @@ avs_apl_enable_logs(struct avs_dev *adev, enum avs_log_enable enable, u32 aging_
 
 	return 0;
 }
+#endif
 
-static int avs_apl_log_buffer_status(struct avs_dev *adev, union avs_notify_msg *msg)
+int avs_apl_log_buffer_status(struct avs_dev *adev, union avs_notify_msg *msg)
 {
-	struct avs_apl_log_buffer_layout layout;
+	struct apl_log_buffer_layout layout;
 	void __iomem *addr, *buf;
 
 	addr = avs_log_buffer_addr(adev, msg->log.core);
@@ -80,11 +81,11 @@ static int avs_apl_log_buffer_status(struct avs_dev *adev, union avs_notify_msg 
 		/* consume the logs regardless of consumer presence */
 		goto update_read_ptr;
 
-	buf = avs_apl_log_payload_addr(addr);
+	buf = apl_log_payload_addr(addr);
 
 	if (layout.read_ptr > layout.write_ptr) {
 		avs_dump_fw_log(adev, buf + layout.read_ptr,
-				avs_apl_log_payload_size(adev) - layout.read_ptr);
+				apl_log_payload_size(adev) - layout.read_ptr);
 		layout.read_ptr = 0;
 	}
 	avs_dump_fw_log_wakeup(adev, buf + layout.read_ptr, layout.write_ptr - layout.read_ptr);
@@ -94,8 +95,7 @@ update_read_ptr:
 	return 0;
 }
 
-static int avs_apl_wait_log_entry(struct avs_dev *adev, u32 core,
-				  struct avs_apl_log_buffer_layout *layout)
+static int apl_wait_log_entry(struct avs_dev *adev, u32 core, struct apl_log_buffer_layout *layout)
 {
 	unsigned long timeout;
 	void __iomem *addr;
@@ -117,11 +117,11 @@ static int avs_apl_wait_log_entry(struct avs_dev *adev, u32 core,
 }
 
 /* reads log header and tests its type */
-#define avs_apl_is_entry_stackdump(addr) ((readl(addr) >> 30) & 0x1)
+#define apl_is_entry_stackdump(addr) ((readl(addr) >> 30) & 0x1)
 
-static int avs_apl_coredump(struct avs_dev *adev, union avs_notify_msg *msg)
+int avs_apl_coredump(struct avs_dev *adev, union avs_notify_msg *msg)
 {
-	struct avs_apl_log_buffer_layout layout;
+	struct apl_log_buffer_layout layout;
 	void __iomem *addr, *buf;
 	size_t dump_size;
 	u16 offset = 0;
@@ -142,9 +142,9 @@ static int avs_apl_coredump(struct avs_dev *adev, union avs_notify_msg *msg)
 	if (!addr)
 		goto exit;
 
-	buf = avs_apl_log_payload_addr(addr);
+	buf = apl_log_payload_addr(addr);
 	memcpy_fromio(&layout, addr, sizeof(layout));
-	if (!avs_apl_is_entry_stackdump(buf + layout.read_ptr)) {
+	if (!apl_is_entry_stackdump(buf + layout.read_ptr)) {
 		union avs_notify_msg lbs_msg = AVS_NOTIFICATION(LOG_BUFFER_STATUS);
 
 		/*
@@ -160,11 +160,11 @@ static int avs_apl_coredump(struct avs_dev *adev, union avs_notify_msg *msg)
 	do {
 		u32 count;
 
-		if (avs_apl_wait_log_entry(adev, msg->ext.coredump.core_id, &layout))
+		if (apl_wait_log_entry(adev, msg->ext.coredump.core_id, &layout))
 			break;
 
 		if (layout.read_ptr > layout.write_ptr) {
-			count = avs_apl_log_payload_size(adev) - layout.read_ptr;
+			count = apl_log_payload_size(adev) - layout.read_ptr;
 			memcpy_fromio(pos + offset, buf + layout.read_ptr, count);
 			layout.read_ptr = 0;
 			offset += count;
@@ -183,7 +183,7 @@ exit:
 	return 0;
 }
 
-static bool avs_apl_lp_streaming(struct avs_dev *adev)
+static bool apl_lp_streaming(struct avs_dev *adev)
 {
 	struct avs_path *path;
 
@@ -219,7 +219,7 @@ static bool avs_apl_lp_streaming(struct avs_dev *adev)
 	return true;
 }
 
-static bool avs_apl_d0ix_toggle(struct avs_dev *adev, struct avs_ipc_msg *tx, bool wake)
+bool avs_apl_d0ix_toggle(struct avs_dev *adev, struct avs_ipc_msg *tx, bool wake)
 {
 	/* wake in all cases */
 	if (wake)
@@ -233,10 +233,10 @@ static bool avs_apl_d0ix_toggle(struct avs_dev *adev, struct avs_ipc_msg *tx, bo
 	 * Note: for cAVS 1.5+ and 1.8, D0IX is LP-firmware transition,
 	 * not the power-gating mechanism known from cAVS 2.0.
 	 */
-	return avs_apl_lp_streaming(adev);
+	return apl_lp_streaming(adev);
 }
 
-static int avs_apl_set_d0ix(struct avs_dev *adev, bool enable)
+int avs_apl_set_d0ix(struct avs_dev *adev, bool enable)
 {
 	bool streaming = false;
 	int ret;
@@ -249,7 +249,7 @@ static int avs_apl_set_d0ix(struct avs_dev *adev, bool enable)
 	return AVS_IPC_RET(ret);
 }
 
-const struct avs_dsp_ops avs_apl_dsp_ops = {
+const struct avs_dsp_ops apl_dsp_ops = {
 	.power = avs_dsp_core_power,
 	.reset = avs_dsp_core_reset,
 	.stall = avs_dsp_core_stall,
@@ -258,10 +258,10 @@ const struct avs_dsp_ops avs_apl_dsp_ops = {
 	.load_basefw = avs_hda_load_basefw,
 	.load_lib = avs_hda_load_library,
 	.transfer_mods = avs_hda_transfer_modules,
-	.log_buffer_offset = avs_skl_log_buffer_offset,
-	.log_buffer_status = avs_apl_log_buffer_status,
-	.coredump = avs_apl_coredump,
-	.d0ix_toggle = avs_apl_d0ix_toggle,
-	.set_d0ix = avs_apl_set_d0ix,
+	.log_buffer_offset = skl_log_buffer_offset,
+	.log_buffer_status = apl_log_buffer_status,
+	.coredump = apl_coredump,
+	.d0ix_toggle = apl_d0ix_toggle,
+	.set_d0ix = apl_set_d0ix,
 	AVS_SET_ENABLE_LOGS_OP(apl)
 };

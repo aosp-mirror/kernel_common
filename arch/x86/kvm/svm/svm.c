@@ -3673,7 +3673,7 @@ void svm_complete_interrupt_delivery(struct kvm_vcpu *vcpu, int delivery_mode,
 	if (!READ_ONCE(vcpu->arch.apic->apicv_active)) {
 		/* Process the interrupt via kvm_check_and_inject_events(). */
 		kvm_make_request(KVM_REQ_EVENT, vcpu);
-		kvm_vcpu_kick(vcpu);
+		kvm_vcpu_kick_boost(vcpu);
 		return;
 	}
 

@@ -39,6 +39,7 @@
 #include "i915_reg.h"
 #include "intel_atomic_plane.h"
 #include "intel_cdclk.h"
+#include "intel_cursor.h"
 #include "intel_display_rps.h"
 #include "intel_display_trace.h"
 #include "intel_display_types.h"
@@ -139,6 +140,14 @@ intel_plane_destroy_state(struct drm_plane *plane,
 	if (plane_state->hw.fb)
 		drm_framebuffer_put(plane_state->hw.fb);
 	kfree(plane_state);
+}
+
+bool intel_plane_needs_physical(struct intel_plane *plane)
+{
+	struct drm_i915_private *i915 = to_i915(plane->base.dev);
+
+	return plane->id == PLANE_CURSOR &&
+		DISPLAY_INFO(i915)->cursor_needs_physical;
 }
 
 unsigned int intel_adjusted_rate(const struct drm_rect *src,
@@ -426,10 +435,16 @@ static bool intel_plane_do_async_flip(struct intel_plane *plane,
 	 * In platforms after DISPLAY13, we might need to override
 	 * first async flip in order to change watermark levels
 	 * as part of optimization.
-	 * So for those, we are checking if this is a first async flip.
-	 * For platforms earlier than DISPLAY13 we always do async flip.
+	 *
+	 * And let's do this for all skl+ so that we can eg. change the
+	 * modifier as well.
+	 *
+	 * TODO: For older platforms there is less reason to do this as
+	 * only X-tile is supported with async flips, though we could
+	 * extend this so other scanout parameters (stride/etc) could
+	 * be changed as well...
 	 */
-	return DISPLAY_VER(i915) < 13 || old_crtc_state->uapi.async_flip;
+	return DISPLAY_VER(i915) < 9 || old_crtc_state->uapi.async_flip;
 }
 
 static bool i9xx_must_disable_cxsr(const struct intel_crtc_state *new_crtc_state,
@@ -590,6 +605,17 @@ static int intel_plane_atomic_calc_changes(const struct intel_crtc_state *old_cr
 
 	if (intel_plane_do_async_flip(plane, old_crtc_state, new_crtc_state)) {
 		new_crtc_state->do_async_flip = true;
+		new_crtc_state->async_flip_planes |= BIT(plane->id);
+	} else if (plane->need_async_flip_toggle_wa &&
+		   new_crtc_state->uapi.async_flip) {
+		/*
+		 * On platforms with double buffered async flip bit we
+		 * set the bit already one frame early during the sync
+		 * flip (see {i9xx,skl}_plane_update_arm()). The
+		 * hardware will therefore be ready to perform a real
+		 * async flip during the next commit, without having
+		 * to wait yet another frame for the bit to latch.
+		 */
 		new_crtc_state->async_flip_planes |= BIT(plane->id);
 	}
 
@@ -1144,7 +1170,6 @@ intel_cleanup_plane_fb(struct drm_plane *plane,
 
 	intel_display_rps_mark_interactive(dev_priv, state, false);
 
-	/* Should only be called after a successful intel_prepare_plane_fb()! */
 	intel_plane_unpin_fb(old_plane_state);
 }
 
@@ -1156,4 +1181,15 @@ static const struct drm_plane_helper_funcs intel_plane_helper_funcs = {
 void intel_plane_helper_add(struct intel_plane *plane)
 {
 	drm_plane_helper_add(&plane->base, &intel_plane_helper_funcs);
+}
+
+void intel_plane_init_cursor_vblank_work(struct intel_plane_state *old_plane_state,
+					 struct intel_plane_state *new_plane_state)
+{
+	if (!old_plane_state->ggtt_vma ||
+	    old_plane_state->ggtt_vma == new_plane_state->ggtt_vma)
+		return;
+
+	drm_vblank_work_init(&old_plane_state->unpin_work, old_plane_state->uapi.crtc,
+			     intel_cursor_unpin_work);
 }

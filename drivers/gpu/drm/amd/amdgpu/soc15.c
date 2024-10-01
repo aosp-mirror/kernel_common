@@ -1323,10 +1323,6 @@ static int soc15_common_resume(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	if (soc15_need_reset_on_resume(adev)) {
-		dev_info(adev->dev, "S3 suspend abort case, let's reset ASIC.\n");
-		soc15_asic_reset(adev);
-	}
 	return soc15_common_hw_init(adev);
 }
 

@@ -11,7 +11,6 @@
 #include <sound/soc-acpi.h>
 #include <sound/soc-dapm.h>
 #include "sof_sdw_common.h"
-#include "sof_maxim_common.h"
 
 static int maxim_part_id;
 #define SOF_SDW_PART_ID_MAX98363 0x8363
@@ -27,7 +26,12 @@ static const struct snd_kcontrol_new maxim_controls[] = {
 	SOC_DAPM_PIN_SWITCH("Right Spk"),
 };
 
-static int spk_init(struct snd_soc_pcm_runtime *rtd)
+static const struct snd_soc_dapm_route max_98373_dapm_routes[] = {
+	{ "Left Spk", NULL, "Left BE_OUT" },
+	{ "Right Spk", NULL, "Right BE_OUT" },
+};
+
+int maxim_spk_rtd_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_card *card = rtd->card;
 	int ret;
@@ -145,8 +149,6 @@ int sof_sdw_maxim_init(struct snd_soc_card *card,
 		       bool playback)
 {
 	info->amp_num++;
-	if (info->amp_num == 2)
-		dai_links->init = spk_init;
 
 	maxim_part_id = info->part_id;
 	switch (maxim_part_id) {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 /*
  *
- * (C) COPYRIGHT 2010-2023 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2010-2024 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -868,7 +868,7 @@ int kbase_mem_evictable_make(struct kbase_mem_phy_alloc *gpu_alloc)
 	/* Indicate to page migration that the memory can be reclaimed by the shrinker.
 	 */
 	if (kbase_is_page_migration_enabled())
-		kbase_set_phy_alloc_page_status(gpu_alloc, NOT_MOVABLE);
+		kbase_set_phy_alloc_page_status(kctx, gpu_alloc, NOT_MOVABLE);
 
 	mutex_unlock(&kctx->jit_evict_lock);
 	kbase_mem_evictable_mark_reclaim(gpu_alloc);
@@ -929,7 +929,7 @@ bool kbase_mem_evictable_unmake(struct kbase_mem_phy_alloc *gpu_alloc)
 			 * from.
 			 */
 			if (kbase_is_page_migration_enabled())
-				kbase_set_phy_alloc_page_status(gpu_alloc, ALLOCATED_MAPPED);
+				kbase_set_phy_alloc_page_status(kctx, gpu_alloc, ALLOCATED_MAPPED);
 		}
 	}
 

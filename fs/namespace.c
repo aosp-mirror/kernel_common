@@ -3633,24 +3633,6 @@ int path_mount(const char *dev_name, struct path *path,
 	if (!(flags & MS_NOATIME))
 		mnt_flags |= MNT_RELATIME;
 
-	/*
-	 * The nosymfollow option used to be extracted from data_page by an LSM.
-	 * It is now passed in as MS_NOSYMFOLLOW.  We need to also check in
-	 * the old place until all callers have been updated to use the flag.
-	 * Some callers will pass both for cross-kernel compatibility, so
-	 * only check if the new flag isn't already present.
-	 * TODO(b/152074038): Remove this check when all devices are on a kernel
-	 * that supports MS_NOSYMFOLLOW.
-	 */
-	if (data_page && !(flags & MS_NOSYMFOLLOW)) {
-		if (!strncmp((char *)data_page, "nosymfollow", 11) ||
-		    strstr((char *)data_page, ",nosymfollow")) {
-			WARN(1,
-			     "nosymfollow passed in mount data should be changed to the MS_NOSYMFOLLOW flag.");
-			flags |= MS_NOSYMFOLLOW;
-		}
-	}
-
 	/* Separate the per-mountpoint flags */
 	if (flags & MS_NOSUID)
 		mnt_flags |= MNT_NOSUID;

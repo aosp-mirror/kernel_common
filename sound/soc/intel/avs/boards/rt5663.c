@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 //
-// Copyright(c) 2022-2023 Intel Corporation. All rights reserved.
+// Copyright(c) 2022-2023 Intel Corporation
 //
 // Authors: Cezary Rojewski <cezary.rojewski@intel.com>
 //          Amadeusz Slawinski <amadeuszx.slawinski@linux.intel.com>
@@ -246,15 +246,24 @@ static int avs_rt5663_probe(struct platform_device *pdev)
 	return devm_snd_soc_register_card(dev, card);
 }
 
+static const struct platform_device_id avs_rt5663_driver_ids[] = {
+	{
+		.name = "avs_rt5663",
+	},
+	{},
+};
+MODULE_DEVICE_TABLE(platform, avs_rt5663_driver_ids);
+
 static struct platform_driver avs_rt5663_driver = {
 	.probe = avs_rt5663_probe,
 	.driver = {
 		.name = "avs_rt5663",
 		.pm = &snd_soc_pm_ops,
 	},
+	.id_table = avs_rt5663_driver_ids,
 };
 
 module_platform_driver(avs_rt5663_driver);
 
+MODULE_DESCRIPTION("Intel rt5663 machine driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:avs_rt5663");

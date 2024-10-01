@@ -3103,8 +3103,6 @@ int rt5682_parse_dt(struct rt5682_priv *rt5682, struct device *dev)
 	rt5682->pdata.dmic_clk_driving_high = device_property_read_bool(dev,
 		"realtek,dmic-clk-driving-high");
 
-	device_property_read_string(dev, "realtek,mclk-name", &rt5682->pdata.mclk_name);
-
 	return 0;
 }
 EXPORT_SYMBOL_GPL(rt5682_parse_dt);

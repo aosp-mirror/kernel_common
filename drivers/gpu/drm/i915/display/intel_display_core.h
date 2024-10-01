@@ -28,6 +28,8 @@
 #include "intel_opregion.h"
 #include "intel_wm_types.h"
 
+struct task_struct;
+
 struct drm_i915_private;
 struct drm_property;
 struct drm_property_blob;
@@ -174,6 +176,12 @@ struct intel_hotplug {
 	struct work_struct poll_init_work;
 	bool poll_enabled;
 
+	/*
+	 * Queuing of hotplug_work, reenable_work and poll_init_work is
+	 * enabled. Protected by drm_i915_private::irq_lock.
+	 */
+	bool detection_work_enabled;
+
 	unsigned int hpd_storm_threshold;
 	/* Whether or not to count short HPD IRQs in HPD storms */
 	u8 hpd_short_storm_enabled;
@@ -302,6 +310,11 @@ struct intel_display {
 		struct llist_head free_list;
 		struct work_struct free_work;
 	} atomic_helper;
+
+	struct {
+		bool any_task_allowed;
+		struct task_struct *allowed_task;
+	} access;
 
 	struct {
 		/* backlight registers and fields in struct intel_panel */
@@ -513,6 +526,7 @@ struct intel_display {
 	} wq;
 
 	/* Grouping using named structs. Keep sorted. */
+	struct drm_dp_tunnel_mgr *dp_tunnel_mgr;
 	struct intel_audio audio;
 	struct intel_dpll dpll;
 	struct intel_fbc *fbc[I915_MAX_FBCS];

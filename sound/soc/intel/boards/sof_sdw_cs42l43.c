@@ -39,7 +39,18 @@ static const struct snd_soc_dapm_route cs42l43_dmic_map[] = {
 	{ "cs42l43 PDM2_DIN", NULL, "DMIC" },
 };
 
-static int cs42l43_hs_rtd_init(struct snd_soc_pcm_runtime *rtd)
+static struct snd_soc_jack_pin sof_jack_pins[] = {
+	{
+		.pin    = "Headphone",
+		.mask   = SND_JACK_HEADPHONE,
+	},
+	{
+		.pin    = "Headset Mic",
+		.mask   = SND_JACK_MICROPHONE,
+	},
+};
+
+int cs42l43_hs_rtd_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_component *component = snd_soc_rtd_to_codec(rtd, 0)->component;
 	struct mc_private *ctx = snd_soc_card_get_drvdata(rtd->card);
@@ -47,7 +58,8 @@ static int cs42l43_hs_rtd_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_card *card = rtd->card;
 	int ret;
 
-	card->components = devm_kasprintf(card->dev, GFP_KERNEL, "%s hs:cs42l43", card->components);
+	card->components = devm_kasprintf(card->dev, GFP_KERNEL, "%s hs:cs42l43",
+					  card->components);
 	if (!card->components)
 		return -ENOMEM;
 
@@ -60,18 +72,18 @@ static int cs42l43_hs_rtd_init(struct snd_soc_pcm_runtime *rtd)
 
 	ret = snd_soc_dapm_add_routes(&card->dapm, cs42l43_hs_map,
 				      ARRAY_SIZE(cs42l43_hs_map));
-
 	if (ret) {
 		dev_err(card->dev, "cs42l43 hs map addition failed: %d\n", ret);
 		return ret;
 	}
 
-	ret = snd_soc_card_jack_new(card, "Headphone Jack",
-				    SND_JACK_MECHANICAL | SND_JACK_AVOUT |
-				    SND_JACK_HEADSET | SND_JACK_LINEOUT |
-				    SND_JACK_BTN_0 | SND_JACK_BTN_1 |
-				    SND_JACK_BTN_2 | SND_JACK_BTN_3,
-				    jack);
+	ret = snd_soc_card_jack_new_pins(card, "Jack",
+					 SND_JACK_MECHANICAL | SND_JACK_AVOUT |
+					 SND_JACK_HEADSET | SND_JACK_LINEOUT |
+					 SND_JACK_BTN_0 | SND_JACK_BTN_1 |
+					 SND_JACK_BTN_2 | SND_JACK_BTN_3,
+					 jack, sof_jack_pins,
+					 ARRAY_SIZE(sof_jack_pins));
 	if (ret) {
 		dev_err(card->dev, "Failed to create jack: %d\n", ret);
 		return ret;
@@ -96,21 +108,7 @@ static int cs42l43_hs_rtd_init(struct snd_soc_pcm_runtime *rtd)
 	return ret;
 }
 
-int sof_sdw_cs42l43_hs_init(struct snd_soc_card *card, const struct snd_soc_acpi_link_adr *link,
-			    struct snd_soc_dai_link *dai_links, struct sof_sdw_codec_info *info,
-			    bool playback)
-{
-	/*
-	 * No need to test if (!playback) like other codecs as cs42l43 uses separated dai for
-	 * playback and capture, and sof_sdw_cs42l43_init is only linked to the playback dai.
-	 */
-
-	dai_links->init = cs42l43_hs_rtd_init;
-
-	return 0;
-}
-
-static int cs42l43_dmic_rtd_init(struct snd_soc_pcm_runtime *rtd)
+int cs42l43_dmic_rtd_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_card *card = rtd->card;
 	int ret;
@@ -129,17 +127,9 @@ static int cs42l43_dmic_rtd_init(struct snd_soc_pcm_runtime *rtd)
 
 	ret = snd_soc_dapm_add_routes(&card->dapm, cs42l43_dmic_map,
 				      ARRAY_SIZE(cs42l43_dmic_map));
-
 	if (ret)
 		dev_err(card->dev, "cs42l43 dmic map addition failed: %d\n", ret);
 
 	return ret;
 }
 
-int sof_sdw_cs42l43_dmic_init(struct snd_soc_card *card, const struct snd_soc_acpi_link_adr *link,
-			      struct snd_soc_dai_link *dai_links, struct sof_sdw_codec_info *info,
-			      bool playback)
-{
-	dai_links->init = cs42l43_dmic_rtd_init;
-	return 0;
-}

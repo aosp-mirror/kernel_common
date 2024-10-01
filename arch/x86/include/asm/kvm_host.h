@@ -16,6 +16,7 @@
 #include <linux/irq_work.h>
 #include <linux/irq.h>
 #include <linux/workqueue.h>
+#include <linux/sched/deadline.h>
 
 #include <linux/kvm.h>
 #include <linux/kvm_para.h>
@@ -712,6 +713,51 @@ struct kvm_queued_exception {
 	bool has_payload;
 };
 
+/*
+ * PARAVIRT_SCHED info
+ */
+struct vcpu_pv_sched {
+	/*
+	 * Current scheduling attributes for this vcpu.
+	 */
+	union vcpu_sched_attr attr;
+	/*
+	 * Kernel priority : [-1, 140)
+	 * Used for priority comparisons.
+	 */
+	int normal_prio;
+	/*
+	 * Default scheduling attributes for this vcpu,
+	 * when the VM was started.
+	 */
+	union vcpu_sched_attr default_attr;
+	int default_normal_prio;
+	/*
+	 * Policy and priority for guest kernel critical
+	 * sections - nmi, irq, softirq and preemption disabled.
+	 */
+	int kern_cs_prio;
+	int kern_cs_policy;
+	struct hrtimer boost_thr_timer;
+	u8 boosted;
+	u8 throttled;
+	/*
+	 * nanoseconds since last task prio boost or throttle.
+	 */
+	u64 taskprio_ns;
+	/*
+	 * nanoseconds since last kernel critical section
+	 * boost or throttle.
+	 */
+	u64 kerncs_ns;
+	/*
+	 * Timestamp for last VMENTRY.
+	 */
+	ktime_t vmentry_ts;
+	u64 msr_val;
+	struct gfn_to_hva_cache data;
+};
+
 struct kvm_vcpu_arch {
 	/*
 	 * rip and regs accesses must go through
@@ -1004,6 +1050,10 @@ struct kvm_vcpu_arch {
 
 	/* Protected Guests */
 	bool guest_state_protected;
+
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+	struct vcpu_pv_sched pv_sched;
+#endif
 
 	/*
 	 * Set when PDPTS were loaded directly by the userspace without
@@ -2240,5 +2290,147 @@ int memslot_rmap_alloc(struct kvm_memory_slot *slot, unsigned long npages);
  * remaining 31 lower bits must be 0 to preserve ABI.
  */
 #define KVM_EXIT_HYPERCALL_MBZ		GENMASK_ULL(31, 1)
+
+#ifdef CONFIG_PARAVIRT_SCHED_KVM
+/*
+ * Default policy and priority used for boosting
+ * VCPU threads.
+ */
+#define VCPU_KERN_CS_PRIO	8
+#define VCPU_KERN_CS_POLICY	SCHED_RR
+
+/*
+ * Vcpu boosted for servicing kernel critical section.
+ */
+#define KVM_PVSCHED_BOOST_KERNCS	0x1
+/*
+ * Vcpu boosted to match priority of running task in the vcpu.
+ */
+#define KVM_PVSCHED_BOOST_TASKPRIO	0x2
+
+static inline bool kvm_arch_vcpu_pv_sched_enabled(struct kvm_vcpu_arch *arch)
+{
+	return arch->pv_sched.msr_val;
+}
+
+static inline union vcpu_sched_attr kvm_arch_vcpu_default_sched_attr(struct kvm_vcpu_arch *arch)
+{
+	return arch->pv_sched.default_attr;
+}
+
+/*
+ * copied from kernel/sched/core.c:__normal_prio()
+ */
+static inline int __sched_normal_prio(union vcpu_sched_attr attr)
+{
+	int prio;
+
+	if (attr.sched_policy == SCHED_DEADLINE)
+		prio = MAX_DL_PRIO - 1;
+	else if (attr.sched_policy == SCHED_FIFO || attr.sched_policy == SCHED_RR)
+		prio = MAX_RT_PRIO - 1 - attr.rt_priority;
+	else
+		prio = NICE_TO_PRIO(attr.sched_nice);
+
+	return prio;
+}
+
+/*
+ * Returns
+ * 0 if vcpus prio is equal to prio specified by attr
+ * 1 if vcpu prio is greater than prio specified by attr
+ * -1 if vcpu prio is less than prio specified by attr
+ */
+static inline int kvm_arch_vcpu_normalprio_cmp(struct kvm_vcpu_arch *arch,
+		union vcpu_sched_attr attr)
+{
+	int normal_prio = __sched_normal_prio(attr);
+
+	if (normal_prio == arch->pv_sched.normal_prio)
+		return 0;
+	else if (normal_prio > arch->pv_sched.normal_prio)
+		return 1;
+	else
+		return -1;
+}
+
+static inline bool kvm_arch_vcpu_is_throttled(struct kvm_vcpu_arch *arch)
+{
+	return arch->pv_sched.throttled;
+}
+
+static inline bool kvm_arch_vcpu_is_boosted(struct kvm_vcpu_arch *arch)
+{
+	return arch->pv_sched.normal_prio < arch->pv_sched.default_normal_prio;
+}
+
+static inline void kvm_arch_vcpu_set_sched_attr(struct kvm_vcpu_arch *arch,
+		union vcpu_sched_attr attr)
+{
+	u8 boost_type = KVM_PVSCHED_BOOST_TASKPRIO;
+	int normal_prio = __sched_normal_prio(attr);
+
+	/*
+	 * If current priority of the vcpu task is same as its
+	 * previous priority, we need not update arch->pv_sched.
+	 */
+	if (normal_prio == arch->pv_sched.normal_prio)
+		return;
+
+	arch->pv_sched.attr = attr;
+	arch->pv_sched.normal_prio = __sched_normal_prio(attr);
+
+	if (attr.kern_cs)
+		boost_type = KVM_PVSCHED_BOOST_KERNCS;
+
+	if (kvm_arch_vcpu_is_boosted(arch)) {
+		arch->pv_sched.boosted |= boost_type;
+		if (!attr.kern_cs) {
+			arch->pv_sched.boosted &= ~KVM_PVSCHED_BOOST_KERNCS;
+			arch->pv_sched.kerncs_ns = 0;
+		}
+	} else if (arch->pv_sched.boosted) {
+		arch->pv_sched.boosted = 0;
+		arch->pv_sched.taskprio_ns = arch->pv_sched.kerncs_ns = 0;
+	}
+}
+
+static inline void kvm_arch_vcpu_set_default_sched_attr(struct kvm_vcpu_arch *arch,
+		union vcpu_sched_attr attr)
+{
+	arch->pv_sched.default_attr = attr;
+	arch->pv_sched.default_normal_prio = __sched_normal_prio(attr);
+}
+
+static inline int kvm_arch_vcpu_kerncs_prio(struct kvm_vcpu_arch *arch)
+{
+	return arch->pv_sched.kern_cs_prio;
+}
+
+static inline int kvm_arch_vcpu_kerncs_policy(struct kvm_vcpu_arch *arch)
+{
+	return arch->pv_sched.kern_cs_policy;
+}
+
+static inline int kvm_arch_vcpu_set_kerncs_prio(struct kvm_vcpu_arch *arch, int prio)
+{
+	if ((unsigned int)prio > MAX_RT_PRIO)
+		return -EINVAL;
+
+	arch->pv_sched.kern_cs_prio = prio;
+
+	return 0;
+}
+
+static inline int kvm_arch_vcpu_set_kerncs_policy(struct kvm_vcpu_arch *arch, int policy)
+{
+	if (policy != SCHED_FIFO && policy != SCHED_RR)
+		return -EINVAL;
+
+	arch->pv_sched.kern_cs_policy = policy;
+
+	return 0;
+}
+#endif
 
 #endif /* _ASM_X86_KVM_HOST_H */

@@ -62,7 +62,7 @@ static void pic_unlock(struct kvm_pic *s)
 		kvm_for_each_vcpu(i, vcpu, s->kvm) {
 			if (kvm_apic_accept_pic_intr(vcpu)) {
 				kvm_make_request(KVM_REQ_EVENT, vcpu);
-				kvm_vcpu_kick(vcpu);
+				kvm_vcpu_kick_boost(vcpu);
 				return;
 			}
 		}

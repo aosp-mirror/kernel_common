@@ -153,11 +153,76 @@ struct pid_entry {
 		NULL, &proc_pid_attr_operations,	\
 		{ .lsm = LSM })
 
-#ifdef CONFIG_SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
-# define PROC_PID_MEM_MODE S_IRUSR
+#if IS_ENABLED(CONFIG_PROC_MEM_RESTRICT_OPEN_READ_ALL)
+DEFINE_STATIC_KEY_TRUE_RO(proc_mem_restrict_open_read_all);
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_open_read_ptracer);
+#elif IS_ENABLED(CONFIG_PROC_MEM_RESTRICT_OPEN_READ_PTRACE)
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_open_read_all);
+DEFINE_STATIC_KEY_TRUE_RO(proc_mem_restrict_open_read_ptracer);
 #else
-# define PROC_PID_MEM_MODE S_IRUSR|S_IWUSR
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_open_read_all);
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_open_read_ptracer);
 #endif
+
+#if IS_ENABLED(CONFIG_PROC_MEM_RESTRICT_OPEN_WRITE_ALL)
+DEFINE_STATIC_KEY_TRUE_RO(proc_mem_restrict_open_write_all);
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_open_write_ptracer);
+#elif IS_ENABLED(CONFIG_PROC_MEM_RESTRICT_OPEN_WRITE_PTRACE)
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_open_write_all);
+DEFINE_STATIC_KEY_TRUE_RO(proc_mem_restrict_open_write_ptracer);
+#else
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_open_write_all);
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_open_write_ptracer);
+#endif
+
+#if IS_ENABLED(CONFIG_PROC_MEM_RESTRICT_WRITE_ALL)
+DEFINE_STATIC_KEY_TRUE_RO(proc_mem_restrict_write_all);
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_write_ptracer);
+#elif IS_ENABLED(CONFIG_PROC_MEM_RESTRICT_WRITE_PTRACE)
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_write_all);
+DEFINE_STATIC_KEY_TRUE_RO(proc_mem_restrict_write_ptracer);
+#else
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_write_all);
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_write_ptracer);
+#endif
+
+#if IS_ENABLED(CONFIG_PROC_MEM_RESTRICT_FOLL_FORCE_ALL)
+DEFINE_STATIC_KEY_TRUE_RO(proc_mem_restrict_foll_force_all);
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_foll_force_ptracer);
+#elif IS_ENABLED(CONFIG_PROC_MEM_RESTRICT_FOLL_FORCE_PTRACE)
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_foll_force_all);
+DEFINE_STATIC_KEY_TRUE_RO(proc_mem_restrict_foll_force_ptracer);
+#else
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_foll_force_all);
+DEFINE_STATIC_KEY_FALSE_RO(proc_mem_restrict_foll_force_ptracer);
+#endif
+
+#define DEFINE_EARLY_PROC_MEM_RESTRICT(name)					\
+static int __init early_proc_mem_restrict_##name(char *buf)			\
+{										\
+	if (!buf)								\
+		return -EINVAL;							\
+										\
+	if (strcmp(buf, "all") == 0) {						\
+		static_key_enable(&proc_mem_restrict_##name##_all.key);		\
+		static_key_disable(&proc_mem_restrict_##name##_ptracer.key);	\
+	} else if (strcmp(buf, "ptracer") == 0) {				\
+		static_key_disable(&proc_mem_restrict_##name##_all.key);	\
+		static_key_enable(&proc_mem_restrict_##name##_ptracer.key);	\
+	} else if (strcmp(buf, "off") == 0) {					\
+		static_key_disable(&proc_mem_restrict_##name##_all.key);	\
+		static_key_disable(&proc_mem_restrict_##name##_ptracer.key);	\
+	} else									\
+		pr_warn("%s: ignoring unknown option '%s'\n",			\
+			"proc_mem.restrict_" #name, buf);			\
+	return 0;								\
+}										\
+early_param("proc_mem.restrict_" #name, early_proc_mem_restrict_##name)
+
+DEFINE_EARLY_PROC_MEM_RESTRICT(open_read);
+DEFINE_EARLY_PROC_MEM_RESTRICT(open_write);
+DEFINE_EARLY_PROC_MEM_RESTRICT(write);
+DEFINE_EARLY_PROC_MEM_RESTRICT(foll_force);
 
 /*
  * Count the number of hardlinks for the pid_entry table, excluding the .
@@ -812,12 +877,71 @@ static const struct file_operations proc_single_file_operations = {
 };
 
 
-struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
+static void report_mem_rw_reject(const char *action, struct task_struct *task)
 {
-	struct task_struct *task = get_proc_task(inode);
+	pr_warn_ratelimited("Denied %s of /proc/%d/mem (%s) by pid %d (%s)\n",
+			    action, task_pid_nr(task), task->comm,
+			    task_pid_nr(current), current->comm);
+}
+
+static int __mem_open_access_permitted(struct file *file, struct task_struct *task)
+{
+	bool is_ptracer;
+
+	rcu_read_lock();
+	is_ptracer = current == ptrace_parent(task);
+	rcu_read_unlock();
+
+	if (file->f_mode & FMODE_WRITE) {
+		/* Deny if writes are unconditionally disabled via param */
+		if (static_branch_maybe(CONFIG_PROC_MEM_RESTRICT_OPEN_WRITE_DEFAULT,
+					&proc_mem_restrict_open_write_all)) {
+			report_mem_rw_reject("all open-for-write", task);
+			return -EACCES;
+		}
+
+		/* Deny if writes are allowed only for ptracers via param */
+		if (static_branch_maybe(CONFIG_PROC_MEM_RESTRICT_OPEN_WRITE_PTRACE_DEFAULT,
+					&proc_mem_restrict_open_write_ptracer) &&
+		    !is_ptracer) {
+			report_mem_rw_reject("non-ptracer open-for-write", task);
+			return -EACCES;
+		}
+	}
+
+	if (file->f_mode & FMODE_READ) {
+		/* Deny if reads are unconditionally disabled via param */
+		if (static_branch_maybe(CONFIG_PROC_MEM_RESTRICT_OPEN_READ_DEFAULT,
+					&proc_mem_restrict_open_read_all)) {
+			report_mem_rw_reject("all open-for-read", task);
+			return -EACCES;
+		}
+
+		/* Deny if reads are allowed only for ptracers via param */
+		if (static_branch_maybe(CONFIG_PROC_MEM_RESTRICT_OPEN_READ_PTRACE_DEFAULT,
+					&proc_mem_restrict_open_read_ptracer) &&
+		    !is_ptracer) {
+			report_mem_rw_reject("non-ptracer open-for-read", task);
+			return -EACCES;
+		}
+	}
+
+	return 0; /* R/W are not restricted */
+}
+
+struct mm_struct *proc_mem_open(struct file  *file, unsigned int mode)
+{
+	struct task_struct *task = get_proc_task(file_inode(file));
 	struct mm_struct *mm = ERR_PTR(-ESRCH);
+	int ret;
 
 	if (task) {
+		ret = __mem_open_access_permitted(file, task);
+		if (ret) {
+			put_task_struct(task);
+			return ERR_PTR(ret);
+		}
+
 		mm = mm_access(task, mode | PTRACE_MODE_FSCREDS);
 		put_task_struct(task);
 
@@ -834,7 +958,7 @@ struct mm_struct *proc_mem_open(struct inode *inode, unsigned int mode)
 
 static int __mem_open(struct inode *inode, struct file *file, unsigned int mode)
 {
-	struct mm_struct *mm = proc_mem_open(inode, mode);
+	struct mm_struct *mm = proc_mem_open(file, mode);
 
 	if (IS_ERR(mm))
 		return PTR_ERR(mm);
@@ -853,10 +977,67 @@ static int mem_open(struct inode *inode, struct file *file)
 	return ret;
 }
 
+static bool __mem_rw_current_is_ptracer(struct file *file)
+{
+	struct inode *inode = file_inode(file);
+	struct task_struct *task = get_proc_task(inode);
+	struct mm_struct *mm = NULL;
+	int is_ptracer = false, has_mm_access = false;
+
+	if (task) {
+		rcu_read_lock();
+		is_ptracer = current == ptrace_parent(task);
+		rcu_read_unlock();
+
+		mm = mm_access(task, PTRACE_MODE_READ_FSCREDS);
+		if (mm && file->private_data == mm) {
+			has_mm_access = true;
+			mmput(mm);
+		}
+
+		put_task_struct(task);
+	}
+
+	return is_ptracer && has_mm_access;
+}
+
+static unsigned int __mem_rw_get_foll_force_flag(struct file *file)
+{
+	/* Deny if FOLL_FORCE is disabled via param */
+	if (static_branch_maybe(CONFIG_PROC_MEM_RESTRICT_FOLL_FORCE_DEFAULT,
+				&proc_mem_restrict_foll_force_all))
+		return 0;
+
+	/* Deny if FOLL_FORCE is allowed only for ptracers via param */
+	if (static_branch_maybe(CONFIG_PROC_MEM_RESTRICT_FOLL_FORCE_PTRACE_DEFAULT,
+				&proc_mem_restrict_foll_force_ptracer) &&
+	    !__mem_rw_current_is_ptracer(file))
+		return 0;
+
+	return FOLL_FORCE;
+}
+
+static bool __mem_rw_block_writes(struct file *file)
+{
+	/* Block if writes are disabled via param proc_mem.restrict_write=all */
+	if (static_branch_maybe(CONFIG_PROC_MEM_RESTRICT_WRITE_DEFAULT,
+				&proc_mem_restrict_write_all))
+		return true;
+
+	/* Block with an exception only for ptracers */
+	if (static_branch_maybe(CONFIG_PROC_MEM_RESTRICT_WRITE_PTRACE_DEFAULT,
+				&proc_mem_restrict_write_ptracer) &&
+	    !__mem_rw_current_is_ptracer(file))
+		return true;
+
+	return false;
+}
+
 static ssize_t mem_rw(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos, int write)
 {
 	struct mm_struct *mm = file->private_data;
+	struct task_struct *task = NULL;
 	unsigned long addr = *ppos;
 	ssize_t copied;
 	char *page;
@@ -864,6 +1045,13 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
 
 	if (!mm)
 		return 0;
+
+	if (write && __mem_rw_block_writes(file)) {
+		task = get_proc_task(file->f_inode);
+		if (task)
+			report_mem_rw_reject("write call", task);
+		return -EACCES;
+	}
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -873,7 +1061,8 @@ static ssize_t mem_rw(struct file *file, char __user *buf,
 	if (!mmget_not_zero(mm))
 		goto free;
 
-	flags = FOLL_FORCE | (write ? FOLL_WRITE : 0);
+	flags = (write ? FOLL_WRITE : 0);
+	flags |= __mem_rw_get_foll_force_flag(file);
 
 	while (count > 0) {
 		size_t this_len = min_t(size_t, count, PAGE_SIZE);
@@ -917,11 +1106,7 @@ static ssize_t mem_read(struct file *file, char __user *buf,
 static ssize_t mem_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
-#ifdef CONFIG_SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
-	return -EACCES;
-#else
 	return mem_rw(file, (char __user*)buf, count, ppos, 1);
-#endif
 }
 
 loff_t mem_lseek(struct file *file, loff_t offset, int orig)
@@ -3293,7 +3478,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_NUMA
 	REG("numa_maps",  S_IRUGO, proc_pid_numa_maps_operations),
 #endif
-	REG("mem",        PROC_PID_MEM_MODE, proc_mem_operations),
+	REG("mem",        S_IRUSR|S_IWUSR, proc_mem_operations),
 	LNK("cwd",        proc_cwd_link),
 	LNK("root",       proc_root_link),
 	LNK("exe",        proc_exe_link),
@@ -3649,7 +3834,7 @@ static const struct pid_entry tid_base_stuff[] = {
 #ifdef CONFIG_NUMA
 	REG("numa_maps", S_IRUGO, proc_pid_numa_maps_operations),
 #endif
-	REG("mem",       PROC_PID_MEM_MODE, proc_mem_operations),
+	REG("mem",       S_IRUSR|S_IWUSR, proc_mem_operations),
 	LNK("cwd",       proc_cwd_link),
 	LNK("root",      proc_root_link),
 	LNK("exe",       proc_exe_link),

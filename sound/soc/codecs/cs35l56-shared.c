@@ -13,6 +13,15 @@
 #include "cs35l56.h"
 
 static const struct reg_sequence cs35l56_patch[] = {
+	/*
+	 * Firmware can change these to non-defaults to satisfy SDCA.
+	 * Ensure that they are at known defaults.
+	 */
+	{ CS35L56_SWIRE_DP3_CH1_INPUT,		0x00000018 },
+	{ CS35L56_SWIRE_DP3_CH2_INPUT,		0x00000019 },
+	{ CS35L56_SWIRE_DP3_CH3_INPUT,		0x00000029 },
+	{ CS35L56_SWIRE_DP3_CH4_INPUT,		0x00000028 },
+
 	/* These are not reset by a soft-reset, so patch to defaults. */
 	{ CS35L56_MAIN_RENDER_USER_MUTE,	0x00000000 },
 	{ CS35L56_MAIN_RENDER_USER_VOLUME,	0x00000000 },
@@ -42,7 +51,6 @@ static const struct reg_default cs35l56_reg_defaults[] = {
 	{ CS35L56_SWIRE_DP3_CH2_INPUT,		0x00000019 },
 	{ CS35L56_SWIRE_DP3_CH3_INPUT,		0x00000029 },
 	{ CS35L56_SWIRE_DP3_CH4_INPUT,		0x00000028 },
-	{ CS35L56_IRQ1_CFG,			0x00000000 },
 	{ CS35L56_IRQ1_MASK_1,			0x83ffffff },
 	{ CS35L56_IRQ1_MASK_2,			0xffff7fff },
 	{ CS35L56_IRQ1_MASK_4,			0xe0ffffff },
@@ -283,7 +291,7 @@ EXPORT_SYMBOL_NS_GPL(cs35l56_firmware_shutdown, SND_SOC_CS35L56_SHARED);
 int cs35l56_wait_for_firmware_boot(struct cs35l56_base *cs35l56_base)
 {
 	unsigned int reg;
-	unsigned int val;
+	unsigned int val = 0;
 	int read_ret, poll_ret;
 
 	if (cs35l56_base->rev < CS35L56_REVID_B0)
@@ -442,17 +450,6 @@ int cs35l56_is_fw_reload_needed(struct cs35l56_base *cs35l56_base)
 	unsigned int val;
 	int ret;
 
-	/* Nothing to re-patch if we haven't done any patching yet. */
-	if (!cs35l56_base->fw_patched)
-		return false;
-
-	/*
-	 * If we have control of RESET we will have asserted it so the firmware
-	 * will need re-patching.
-	 */
-	if (cs35l56_base->reset_gpio)
-		return true;
-
 	/*
 	 * In secure mode FIRMWARE_MISSING is cleared by the BIOS loader so
 	 * can't be used here to test for memory retention.
@@ -481,12 +478,38 @@ EXPORT_SYMBOL_NS_GPL(cs35l56_is_fw_reload_needed, SND_SOC_CS35L56_SHARED);
 
 static const struct reg_sequence cs35l56_hibernate_seq[] = {
 	/* This must be the last register access */
-	REG_SEQ0(CS35L56_DSP_VIRTUAL1_MBOX_1, CS35L56_MBOX_CMD_HIBERNATE_NOW),
+	REG_SEQ0(CS35L56_DSP_VIRTUAL1_MBOX_1, CS35L56_MBOX_CMD_ALLOW_AUTO_HIBERNATE),
 };
 
 static const struct reg_sequence cs35l56_hibernate_wake_seq[] = {
 	REG_SEQ0(CS35L56_DSP_VIRTUAL1_MBOX_1, CS35L56_MBOX_CMD_WAKEUP),
 };
+
+static void cs35l56_issue_wake_event(struct cs35l56_base *cs35l56_base)
+{
+	/*
+	 * Dummy transactions to trigger I2C/SPI auto-wake. Issue two
+	 * transactions to meet the minimum required time from the rising edge
+	 * to the last falling edge of wake.
+	 *
+	 * It uses bypassed write because we must wake the chip before
+	 * disabling regmap cache-only.
+	 *
+	 * This can NAK on I2C which will terminate the write sequence so the
+	 * single-write sequence is issued twice.
+	 */
+	regmap_multi_reg_write_bypassed(cs35l56_base->regmap,
+					cs35l56_hibernate_wake_seq,
+					ARRAY_SIZE(cs35l56_hibernate_wake_seq));
+
+	usleep_range(CS35L56_WAKE_HOLD_TIME_US, 2 * CS35L56_WAKE_HOLD_TIME_US);
+
+	regmap_multi_reg_write_bypassed(cs35l56_base->regmap,
+					cs35l56_hibernate_wake_seq,
+					ARRAY_SIZE(cs35l56_hibernate_wake_seq));
+
+	cs35l56_wait_control_port_ready();
+}
 
 int cs35l56_runtime_suspend_common(struct cs35l56_base *cs35l56_base)
 {
@@ -516,12 +539,6 @@ int cs35l56_runtime_suspend_common(struct cs35l56_base *cs35l56_base)
 	}
 
 	/*
-	 * Enable auto-hibernate. If it is woken by some other wake source
-	 * it will automatically return to hibernate.
-	 */
-	cs35l56_mbox_send(cs35l56_base, CS35L56_MBOX_CMD_ALLOW_AUTO_HIBERNATE);
-
-	/*
 	 * Must enter cache-only first so there can't be any more register
 	 * accesses other than the controlled hibernate sequence below.
 	 */
@@ -548,17 +565,9 @@ int cs35l56_runtime_resume_common(struct cs35l56_base *cs35l56_base, bool is_sou
 	if (!cs35l56_base->can_hibernate)
 		goto out_sync;
 
-	if (!is_soundwire) {
-		/*
-		 * Dummy transaction to trigger I2C/SPI auto-wake. This will NAK on I2C.
-		 * Must be done before releasing cache-only.
-		 */
-		regmap_multi_reg_write_bypassed(cs35l56_base->regmap,
-						cs35l56_hibernate_wake_seq,
-						ARRAY_SIZE(cs35l56_hibernate_wake_seq));
-
-		cs35l56_wait_control_port_ready();
-	}
+	/* Must be done before releasing cache-only */
+	if (!is_soundwire)
+		cs35l56_issue_wake_event(cs35l56_base);
 
 out_sync:
 	regcache_cache_only(cs35l56_base->regmap, false);
@@ -587,10 +596,11 @@ out_sync:
 	return 0;
 
 err:
-	regmap_write(cs35l56_base->regmap, CS35L56_DSP_VIRTUAL1_MBOX_1,
-		     CS35L56_MBOX_CMD_HIBERNATE_NOW);
-
 	regcache_cache_only(cs35l56_base->regmap, true);
+
+	regmap_multi_reg_write_bypassed(cs35l56_base->regmap,
+					cs35l56_hibernate_seq,
+					ARRAY_SIZE(cs35l56_hibernate_seq));
 
 	return ret;
 }
@@ -619,19 +629,45 @@ void cs35l56_init_cs_dsp(struct cs35l56_base *cs35l56_base, struct cs_dsp *cs_ds
 }
 EXPORT_SYMBOL_NS_GPL(cs35l56_init_cs_dsp, SND_SOC_CS35L56_SHARED);
 
+int cs35l56_read_prot_status(struct cs35l56_base *cs35l56_base,
+			     bool *fw_missing, unsigned int *fw_version)
+{
+	unsigned int prot_status;
+	int ret;
+
+	ret = regmap_read(cs35l56_base->regmap, CS35L56_PROTECTION_STATUS, &prot_status);
+	if (ret) {
+		dev_err(cs35l56_base->dev, "Get PROTECTION_STATUS failed: %d\n", ret);
+		return ret;
+	}
+
+	*fw_missing = !!(prot_status & CS35L56_FIRMWARE_MISSING);
+
+	ret = regmap_read(cs35l56_base->regmap, CS35L56_DSP1_FW_VER, fw_version);
+	if (ret) {
+		dev_err(cs35l56_base->dev, "Get FW VER failed: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_NS_GPL(cs35l56_read_prot_status, SND_SOC_CS35L56_SHARED);
+
 int cs35l56_hw_init(struct cs35l56_base *cs35l56_base)
 {
 	int ret;
-	unsigned int devid, revid, otpid, secured;
+	unsigned int devid, revid, otpid, secured, fw_ver;
+	bool fw_missing;
 
 	/*
-	 * If the system is not using a reset_gpio then issue a
-	 * dummy read to force a wakeup.
+	 * When the system is not using a reset_gpio ensure the device is
+	 * awake, otherwise the device has just been released from reset and
+	 * the driver must wait for the control port to become usable.
 	 */
 	if (!cs35l56_base->reset_gpio)
-		regmap_read(cs35l56_base->regmap, CS35L56_DSP_VIRTUAL1_MBOX_1, &devid);
-
-	cs35l56_wait_control_port_ready();
+		cs35l56_issue_wake_event(cs35l56_base);
+	else
+		cs35l56_wait_control_port_ready();
 
 	/*
 	 * The HALO_STATE register is in different locations on Ax and B0
@@ -680,8 +716,13 @@ int cs35l56_hw_init(struct cs35l56_base *cs35l56_base)
 		return ret;
 	}
 
-	dev_info(cs35l56_base->dev, "Cirrus Logic CS35L56%s Rev %02X OTP%d\n",
-		 cs35l56_base->secured ? "s" : "", cs35l56_base->rev, otpid);
+	ret = cs35l56_read_prot_status(cs35l56_base, &fw_missing, &fw_ver);
+	if (ret)
+		return ret;
+
+	dev_info(cs35l56_base->dev, "Cirrus Logic CS35L56%s Rev %02X OTP%d fw:%d.%d.%d (patched=%u)\n",
+		 cs35l56_base->secured ? "s" : "", cs35l56_base->rev, otpid,
+		 fw_ver >> 16, (fw_ver >> 8) & 0xff, fw_ver & 0xff, !fw_missing);
 
 	/* Wake source and *_BLOCKED interrupts default to unmasked, so mask them */
 	regmap_write(cs35l56_base->regmap, CS35L56_IRQ1_MASK_20, 0xffffffff);

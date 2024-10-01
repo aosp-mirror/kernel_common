@@ -462,41 +462,46 @@ static int icl_plane_max_height(const struct drm_framebuffer *fb,
 }
 
 static unsigned int
+plane_max_stride(struct intel_plane *plane,
+		 u32 pixel_format, u64 modifier,
+		 unsigned int rotation,
+		 unsigned int max_pixels,
+		 unsigned int max_bytes)
+{
+	const struct drm_format_info *info = drm_format_info(pixel_format);
+	int cpp = info->cpp[0];
+
+	if (drm_rotation_90_or_270(rotation))
+		return min(max_pixels, max_bytes / cpp);
+	else
+		return min(max_pixels * cpp, max_bytes);
+}
+
+static unsigned int
+adl_plane_max_stride(struct intel_plane *plane,
+		     u32 pixel_format, u64 modifier,
+		     unsigned int rotation)
+{
+	unsigned int max_pixels = 65536; /* PLANE_OFFSET limit */
+	unsigned int max_bytes = 128 * 1024;
+
+	return plane_max_stride(plane, pixel_format,
+				modifier, rotation,
+				max_pixels, max_bytes);
+}
+
+static unsigned int
 skl_plane_max_stride(struct intel_plane *plane,
 		     u32 pixel_format, u64 modifier,
 		     unsigned int rotation)
 {
-	struct drm_i915_private *i915 = to_i915(plane->base.dev);
-	const struct drm_format_info *info = drm_format_info(pixel_format);
-	int cpp = info->cpp[0];
-	int max_horizontal_pixels = 8192;
-	int max_stride_bytes;
+	unsigned int max_pixels = 8192; /* PLANE_OFFSET limit */
+	unsigned int max_bytes = 32 * 1024;
 
-	if (DISPLAY_VER(i915) >= 13) {
-		/*
-		 * The stride in bytes must not exceed of the size
-		 * of 128K bytes. For pixel formats of 64bpp will allow
-		 * for a 16K pixel surface.
-		 */
-		max_stride_bytes = 131072;
-		if (cpp == 8)
-			max_horizontal_pixels = 16384;
-		else
-			max_horizontal_pixels = 65536;
-	} else {
-		/*
-		 * "The stride in bytes must not exceed the
-		 * of the size of 8K pixels and 32K bytes."
-		 */
-		max_stride_bytes = 32768;
-	}
-
-	if (drm_rotation_90_or_270(rotation))
-		return min(max_horizontal_pixels, max_stride_bytes / cpp);
-	else
-		return min(max_horizontal_pixels * cpp, max_stride_bytes);
+	return plane_max_stride(plane, pixel_format,
+				modifier, rotation,
+				max_pixels, max_bytes);
 }
-
 
 /* Preoffset values for YUV to RGB Conversion */
 #define PREOFF_YUV_TO_RGB_HI		0x1800
@@ -1169,6 +1174,11 @@ skl_plane_update_arm(struct intel_plane *plane,
 	plane_ctl = plane_state->ctl |
 		skl_plane_ctl_crtc(crtc_state);
 
+	/* see intel_plane_atomic_calc_changes() */
+	if (plane->need_async_flip_toggle_wa &&
+	    crtc_state->async_flip_planes & BIT(plane->id))
+		plane_ctl |= PLANE_CTL_ASYNC_FLIP;
+
 	if (DISPLAY_VER(dev_priv) >= 10)
 		plane_color_ctl = plane_state->color_ctl |
 			glk_plane_color_ctl_crtc(crtc_state);
@@ -1604,7 +1614,7 @@ skl_check_main_ccs_coordinates(struct intel_plane_state *plane_state,
 	int aux_x = plane_state->view.color_plane[ccs_plane].x;
 	int aux_y = plane_state->view.color_plane[ccs_plane].y;
 	u32 aux_offset = plane_state->view.color_plane[ccs_plane].offset;
-	u32 alignment = intel_surf_alignment(fb, ccs_plane);
+	unsigned int alignment = intel_surf_alignment(fb, ccs_plane);
 	int hsub;
 	int vsub;
 
@@ -1624,8 +1634,7 @@ skl_check_main_ccs_coordinates(struct intel_plane_state *plane_state,
 							       plane_state,
 							       ccs_plane,
 							       aux_offset,
-							       aux_offset -
-								alignment);
+							       aux_offset - alignment);
 		aux_x = x * hsub + aux_x % hsub;
 		aux_y = y * vsub + aux_y % vsub;
 	}
@@ -1647,10 +1656,10 @@ int skl_calc_main_surface_offset(const struct intel_plane_state *plane_state,
 	struct intel_plane *plane = to_intel_plane(plane_state->uapi.plane);
 	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
 	const struct drm_framebuffer *fb = plane_state->hw.fb;
-	const int aux_plane = skl_main_to_aux_plane(fb, 0);
-	const u32 aux_offset = plane_state->view.color_plane[aux_plane].offset;
-	const u32 alignment = intel_surf_alignment(fb, 0);
-	const int w = drm_rect_width(&plane_state->uapi.src) >> 16;
+	int aux_plane = skl_main_to_aux_plane(fb, 0);
+	u32 aux_offset = plane_state->view.color_plane[aux_plane].offset;
+	unsigned int alignment = intel_surf_alignment(fb, 0);
+	int w = drm_rect_width(&plane_state->uapi.src) >> 16;
 
 	intel_add_fb_offsets(x, y, plane_state, 0);
 	*offset = intel_plane_compute_aligned_offset(x, y, plane_state, 0);
@@ -1697,16 +1706,16 @@ static int skl_check_main_surface(struct intel_plane_state *plane_state)
 	struct intel_plane *plane = to_intel_plane(plane_state->uapi.plane);
 	struct drm_i915_private *dev_priv = to_i915(plane->base.dev);
 	const struct drm_framebuffer *fb = plane_state->hw.fb;
-	const unsigned int rotation = plane_state->hw.rotation;
+	unsigned int rotation = plane_state->hw.rotation;
 	int x = plane_state->uapi.src.x1 >> 16;
 	int y = plane_state->uapi.src.y1 >> 16;
-	const int w = drm_rect_width(&plane_state->uapi.src) >> 16;
-	const int h = drm_rect_height(&plane_state->uapi.src) >> 16;
-	const int min_width = intel_plane_min_width(plane, fb, 0, rotation);
-	const int max_width = intel_plane_max_width(plane, fb, 0, rotation);
-	const int max_height = intel_plane_max_height(plane, fb, 0, rotation);
-	const int aux_plane = skl_main_to_aux_plane(fb, 0);
-	const u32 alignment = intel_surf_alignment(fb, 0);
+	int w = drm_rect_width(&plane_state->uapi.src) >> 16;
+	int h = drm_rect_height(&plane_state->uapi.src) >> 16;
+	int min_width = intel_plane_min_width(plane, fb, 0, rotation);
+	int max_width = intel_plane_max_width(plane, fb, 0, rotation);
+	int max_height = intel_plane_max_height(plane, fb, 0, rotation);
+	unsigned int alignment = intel_surf_alignment(fb, 0);
+	int aux_plane = skl_main_to_aux_plane(fb, 0);
 	u32 offset;
 	int ret;
 
@@ -1794,7 +1803,7 @@ static int skl_check_nv12_aux_surface(struct intel_plane_state *plane_state)
 
 	if (ccs_plane) {
 		u32 aux_offset = plane_state->view.color_plane[ccs_plane].offset;
-		u32 alignment = intel_surf_alignment(fb, uv_plane);
+		unsigned int alignment = intel_surf_alignment(fb, uv_plane);
 
 		if (offset > aux_offset)
 			offset = intel_plane_adjust_aligned_offset(&x, &y,
@@ -2346,7 +2355,11 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 		plane->min_cdclk = skl_plane_min_cdclk;
 	}
 
-	plane->max_stride = skl_plane_max_stride;
+	if (DISPLAY_VER(dev_priv) >= 13)
+		plane->max_stride = adl_plane_max_stride;
+	else
+		plane->max_stride = skl_plane_max_stride;
+
 	if (DISPLAY_VER(dev_priv) >= 11) {
 		plane->update_noarm = icl_plane_update_noarm;
 		plane->update_arm = icl_plane_update_arm;
@@ -2360,8 +2373,7 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 	plane->check_plane = skl_plane_check;
 
 	if (plane_id == PLANE_PRIMARY) {
-		plane->need_async_flip_disable_wa = IS_DISPLAY_VER(dev_priv,
-								   9, 10);
+		plane->need_async_flip_toggle_wa = IS_DISPLAY_VER(dev_priv, 9, 10);
 		plane->async_flip = skl_plane_async_flip;
 		plane->enable_flip_done = skl_plane_enable_flip_done;
 		plane->disable_flip_done = skl_plane_disable_flip_done;

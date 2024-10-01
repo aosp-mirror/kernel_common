@@ -519,6 +519,8 @@ static void i2c_hid_get_input(struct i2c_hid *ihid)
 		/* host or device initiated RESET completed */
 		if (test_and_clear_bit(I2C_HID_RESET_PENDING, &ihid->flags))
 			wake_up(&ihid->wait);
+		if (ihid->hid && ihid->hid->driver && ihid->hid->driver->reset)
+			ihid->hid->driver->reset(ihid->hid);
 		return;
 	}
 

@@ -28,6 +28,7 @@ place where this information is gathered.
    iommu
    iommufd
    media/index
+   mseal
    netlink/index
    sysfs-platform_profile
    vduse

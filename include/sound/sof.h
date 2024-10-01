@@ -57,8 +57,17 @@ enum sof_ipc_type {
 	SOF_IPC_TYPE_COUNT
 };
 
-#define SOF_IPC		SOF_IPC_TYPE_3
-#define SOF_INTEL_IPC4	SOF_IPC_TYPE_4
+struct sof_loadable_file_profile {
+	enum sof_ipc_type ipc_type;
+
+	const char *fw_path;
+	const char *fw_path_postfix;
+	const char *fw_name;
+	const char *fw_lib_path;
+	const char *fw_lib_path_postfix;
+	const char *tplg_path;
+	const char *tplg_name;
+};
 
 /*
  * SOF Platform data.
@@ -88,6 +97,9 @@ struct snd_sof_pdata {
 
 	/* descriptor */
 	const struct sof_dev_desc *desc;
+
+	/* platform's preferred IPC type and path overrides */
+	struct sof_loadable_file_profile ipc_file_profile_base;
 
 	/* firmware and topology filenames */
 	const char *fw_filename_prefix;

@@ -23,11 +23,6 @@ subdir-ccflags-y += $(call cc-option, -Wunused-but-set-variable)
 subdir-ccflags-y += $(call cc-disable-warning, frame-address)
 subdir-ccflags-$(CONFIG_DRM_I915_WERROR) += -Werror
 
-# Fine grained warnings disable
-CFLAGS_i915_pci.o = $(call cc-disable-warning, override-init)
-CFLAGS_display/intel_display_device.o = $(call cc-disable-warning, override-init)
-CFLAGS_display/intel_fbdev.o = $(call cc-disable-warning, override-init)
-
 # Support compiling the display code separately for both i915 and xe
 # drivers. Define I915 when building i915.
 subdir-ccflags-y += -DI915
@@ -341,6 +336,7 @@ i915-y += \
 	display/intel_dsi_dcs_backlight.o \
 	display/intel_dsi_vbt.o \
 	display/intel_dvo.o \
+	display/intel_encoder.o \
 	display/intel_gmbus.o \
 	display/intel_hdmi.o \
 	display/intel_lspcon.o \
@@ -355,6 +351,9 @@ i915-y += \
 	display/intel_vrr.o \
 	display/vlv_dsi.o \
 	display/vlv_dsi_pll.o
+
+i915-$(CONFIG_DRM_I915_DP_TUNNEL) += \
+	display/intel_dp_tunnel.o
 
 i915-y += \
 	i915_perf.o

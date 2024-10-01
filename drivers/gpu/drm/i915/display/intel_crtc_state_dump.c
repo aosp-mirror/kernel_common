@@ -44,7 +44,7 @@ static void
 intel_dump_infoframe(struct drm_i915_private *i915,
 		     const union hdmi_infoframe *frame)
 {
-	if (!drm_debug_enabled(DRM_UT_KMS))
+	if (!drm_debug_syslog_enabled(DRM_UT_KMS))
 		return;
 
 	hdmi_infoframe_log(KERN_DEBUG, i915->drm.dev, frame);
@@ -54,7 +54,7 @@ static void
 intel_dump_dp_vsc_sdp(struct drm_i915_private *i915,
 		      const struct drm_dp_vsc_sdp *vsc)
 {
-	if (!drm_debug_enabled(DRM_UT_KMS))
+	if (!drm_debug_syslog_enabled(DRM_UT_KMS))
 		return;
 
 	drm_dp_vsc_sdp_log(KERN_DEBUG, i915->drm.dev, vsc);
@@ -64,7 +64,7 @@ static void
 intel_dump_buffer(struct drm_i915_private *i915,
 		  const char *prefix, const u8 *buf, size_t len)
 {
-	if (!drm_debug_enabled(DRM_UT_KMS))
+	if (!drm_debug_syslog_enabled(DRM_UT_KMS))
 		return;
 
 	print_hex_dump(KERN_DEBUG, prefix, DUMP_PREFIX_NONE,

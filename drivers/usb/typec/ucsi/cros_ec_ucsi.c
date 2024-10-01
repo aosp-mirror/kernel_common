@@ -26,7 +26,7 @@
 /* WRITE_TMO_MS is the time within which a cmd complete or ack notification must
  * arrive after a command is sent to the PPM.
  */
-#define WRITE_TMO_MS	500
+#define WRITE_TMO_MS	5000
 
 struct cros_ucsi_data {
 	struct device *dev;
@@ -239,15 +239,18 @@ static int __maybe_unused cros_ucsi_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused cros_ucsi_resume(struct device *dev)
+static void __maybe_unused cros_ucsi_complete(struct device *dev)
 {
 	struct cros_ucsi_data *udata = dev_get_drvdata(dev);
-
-	return ucsi_resume(udata->ucsi);
+	ucsi_resume(udata->ucsi);
 }
 
-static SIMPLE_DEV_PM_OPS(cros_ucsi_pm_ops, cros_ucsi_suspend,
-			 cros_ucsi_resume);
+static const struct dev_pm_ops cros_ucsi_pm_ops = {
+#ifdef CONFIG_PM_SLEEP
+	.suspend = cros_ucsi_suspend,
+	.complete = cros_ucsi_complete,
+#endif
+};
 
 static const struct platform_device_id cros_ucsi_id[] = {
 	{ KBUILD_MODNAME, 0 },

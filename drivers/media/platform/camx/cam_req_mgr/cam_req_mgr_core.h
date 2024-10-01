@@ -258,14 +258,12 @@ struct cam_req_mgr_req_queue {
  * @l_tbl       : unique pd request tables.
  * @num_tbl     : how many unique pd value devices are present
  * @apply_data	: Holds information about request id for a request
- * @lock        : mutex lock protecting request data ops.
  */
 struct cam_req_mgr_req_data {
 	struct cam_req_mgr_req_queue *in_q;
 	struct cam_req_mgr_req_tbl   *l_tbl;
 	int32_t                       num_tbl;
 	struct cam_req_mgr_apply      apply_data[CAM_PIPELINE_DELAY_MAX];
-	struct mutex                  lock;
 };
 
 /**

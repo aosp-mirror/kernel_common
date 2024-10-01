@@ -266,22 +266,14 @@ static int rt5682_i2c_probe(struct i2c_client *i2c)
 		if (!ret)
 			rt5682->irq = i2c->irq;
 		else
-			dev_err(&i2c->dev, "Failed to reguest IRQ: %d\n", ret);
+			dev_err(&i2c->dev, "Failed to request IRQ: %d\n", ret);
 	}
 
 #ifdef CONFIG_COMMON_CLK
 	/* Check if MCLK provided */
-	if (rt5682->pdata.mclk_name)
-		rt5682->mclk = clk_get(NULL, rt5682->pdata.mclk_name);
-	if (!rt5682->mclk)
-		rt5682->mclk = devm_clk_get(&i2c->dev, "mclk");
-	if (IS_ERR(rt5682->mclk)) {
-		if (PTR_ERR(rt5682->mclk) != -ENOENT) {
-			ret = PTR_ERR(rt5682->mclk);
-			return ret;
-		}
-		rt5682->mclk = NULL;
-	}
+	rt5682->mclk = devm_clk_get_optional(&i2c->dev, "mclk");
+	if (IS_ERR(rt5682->mclk))
+		return PTR_ERR(rt5682->mclk);
 
 	/* Register CCF DAI clock control */
 	ret = rt5682_register_dai_clks(rt5682);

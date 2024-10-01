@@ -305,7 +305,6 @@ config X86
 	select FUNCTION_ALIGNMENT_4B
 	imply IMA_SECURE_AND_OR_TRUSTED_BOOT    if EFI
 	select HAVE_DYNAMIC_FTRACE_NO_PATCHABLE
-	select ARCH_HAS_ALT_SYSCALL		if X86_64
 
 config INSTRUCTION_DECODER
 	def_bool y
@@ -830,6 +829,19 @@ config KVM_GUEST
 	  of relying on a PIT (or probably other) emulation by the
 	  underlying device model, the host provides the guest with
 	  timing infrastructure such as time of day, and system time
+
+config PARAVIRT_SCHED
+	bool "Enable paravirt scheduling capability for guests"
+	depends on KVM_GUEST
+	default n
+	help
+	  Paravirtualized scheduling facilitates the exchange of scheduling
+	  related information between the host and guest through shared memory,
+	  enhancing the efficiency of vCPU thread scheduling by the hypervisor.
+	  An illustrative use case involves dynamically boosting the priority of
+	  a vCPU thread when the guest is executing a latency-sensitive workload
+	  on that specific vCPU.
+	  This config enables paravirt scheduling in guest(VM).
 
 config ARCH_CPUIDLE_HALTPOLL
 	def_bool n
