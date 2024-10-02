@@ -3,7 +3,6 @@
 
 #include <linux/delay.h>
 #include <linux/spinlock.h>
-#include <media/ipu-isys.h>
 #include "ipu.h"
 #include "ipu-buttress.h"
 #include "ipu-isys.h"
