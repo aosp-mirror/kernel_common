@@ -75,15 +75,7 @@ static struct i2c_client *of_i2c_register_device(struct i2c_adapter *adap,
 	if (ret)
 		return ERR_PTR(ret);
 
-	/* Allow device property to enable probing before init */
-	if (of_get_property(node, "linux,probed", NULL)) {
-		unsigned short addrs[] = { info.addr, I2C_CLIENT_END };
-
-		client = i2c_new_scanned_device(adap, &info, addrs, NULL);
-	} else {
-		client = i2c_new_client_device(adap, &info);
-	}
-
+	client = i2c_new_client_device(adap, &info);
 	if (IS_ERR(client))
 		dev_err(&adap->dev, "of_i2c: Failure registering %pOF\n", node);
 
