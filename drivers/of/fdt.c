@@ -34,7 +34,7 @@
 
 /*
  * __dtb_empty_root_begin[] and __dtb_empty_root_end[] magically created by
- * cmd_wrap_S_dtb in scripts/Makefile.dtbs
+ * cmd_dt_S_dtb in scripts/Makefile.lib
  */
 extern uint8_t __dtb_empty_root_begin[];
 extern uint8_t __dtb_empty_root_end[];
