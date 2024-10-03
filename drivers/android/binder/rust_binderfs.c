@@ -46,7 +46,6 @@
 DEFINE_SHOW_ATTRIBUTE(rust_binder_stats);
 DEFINE_SHOW_ATTRIBUTE(rust_binder_state);
 DEFINE_SHOW_ATTRIBUTE(rust_binder_transactions);
-DEFINE_SHOW_ATTRIBUTE(rust_binder_transaction_log);
 
 char *rust_binder_devices_param = CONFIG_ANDROID_BINDER_DEVICES;
 module_param_named(rust_devices, rust_binder_devices_param, charp, 0444);
@@ -640,24 +639,6 @@ static int init_binder_logs(struct super_block *sb)
 
 	dentry = rust_binderfs_create_file(binder_logs_root_dir, "transactions",
 				      &rust_binder_transactions_fops, NULL);
-	if (IS_ERR(dentry)) {
-		ret = PTR_ERR(dentry);
-		goto out;
-	}
-
-	dentry = rust_binderfs_create_file(binder_logs_root_dir,
-				      "transaction_log",
-				      &rust_binder_transaction_log_fops,
-				      NULL);
-	if (IS_ERR(dentry)) {
-		ret = PTR_ERR(dentry);
-		goto out;
-	}
-
-	dentry = rust_binderfs_create_file(binder_logs_root_dir,
-				      "failed_transaction_log",
-				      &rust_binder_transaction_log_fops,
-				      NULL);
 	if (IS_ERR(dentry)) {
 		ret = PTR_ERR(dentry);
 		goto out;

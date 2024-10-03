@@ -484,14 +484,6 @@ unsafe extern "C" fn rust_binder_transactions_show(
     0
 }
 
-#[no_mangle]
-unsafe extern "C" fn rust_binder_transaction_log_show(
-    _: *mut seq_file,
-    _: *mut core::ffi::c_void,
-) -> core::ffi::c_int {
-    0
-}
-
 fn rust_binder_transactions_show_impl(m: &mut SeqFile) -> Result<()> {
     seq_print!(m, "binder transactions:\n");
     let contexts = context::get_all_contexts()?;
