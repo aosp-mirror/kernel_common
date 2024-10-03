@@ -46,6 +46,7 @@
 DEFINE_SHOW_ATTRIBUTE(rust_binder_stats);
 DEFINE_SHOW_ATTRIBUTE(rust_binder_state);
 DEFINE_SHOW_ATTRIBUTE(rust_binder_transactions);
+DEFINE_SHOW_ATTRIBUTE(rust_binder_proc);
 
 char *rust_binder_devices_param = CONFIG_ANDROID_BINDER_DEVICES;
 module_param_named(rust_devices, rust_binder_devices_param, charp, 0444);
@@ -540,6 +541,17 @@ struct dentry *rust_binderfs_create_file(struct dentry *parent, const char *name
 out:
 	inode_unlock(parent_inode);
 	return dentry;
+}
+
+struct dentry *rust_binderfs_create_proc_file(struct inode *nodp, int pid)
+{
+	struct binderfs_info *info = nodp->i_sb->s_fs_info;
+	struct dentry *dir = info->proc_log_dir;
+	char strbuf[20 + 1];
+	void *data = (void *)(unsigned long) pid;
+
+	snprintf(strbuf, sizeof(strbuf), "%u", pid);
+	return rust_binderfs_create_file(dir, strbuf, &rust_binder_proc_fops, data);
 }
 
 static struct dentry *binderfs_create_dir(struct dentry *parent,

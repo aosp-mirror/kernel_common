@@ -14,13 +14,17 @@ use kernel::{
     seq_print,
     sync::poll::PollTable,
     sync::Arc,
+    task::Pid,
     types::{AsBytes, ForeignOwnable},
     uaccess::UserSliceWriter,
 };
 
 use crate::{context::Context, page_range::Shrinker, process::Process, thread::Thread};
 
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::{
+    ptr::NonNull,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 mod allocation;
 mod context;
@@ -355,6 +359,13 @@ unsafe extern "C" fn rust_binder_open(
         Err(err) => return err.to_errno(),
     };
 
+    // SAFETY: This is an `inode` for a newly created binder file.
+    match unsafe { BinderfsProcFile::new(inode, process.task.pid()) } {
+        Ok(Some(file)) => process.inner.lock().binderfs_file = Some(file),
+        Ok(None) => { /* pid already exists */ }
+        Err(err) => return err.to_errno(),
+    }
+
     // SAFETY: This file is associated with Rust binder, so we own the `private_data` field.
     unsafe { (*file_ptr).private_data = process.into_foreign().cast_mut() };
     0
@@ -471,6 +482,22 @@ unsafe extern "C" fn rust_binder_state_show(
 }
 
 #[no_mangle]
+unsafe extern "C" fn rust_binder_proc_show(
+    ptr: *mut seq_file,
+    _: *mut core::ffi::c_void,
+) -> core::ffi::c_int {
+    // SAFETY: Accessing the private field of `seq_file` is okay.
+    let pid = (unsafe { (*ptr).private }) as usize as Pid;
+    // SAFETY: The caller ensures that the pointer is valid and exclusive for the duration in which
+    // this method is called.
+    let m = unsafe { SeqFile::from_raw(ptr) };
+    if let Err(err) = rust_binder_proc_show_impl(m, pid) {
+        seq_print!(m, "failed to generate state: {:?}\n", err);
+    }
+    0
+}
+
+#[no_mangle]
 unsafe extern "C" fn rust_binder_transactions_show(
     ptr: *mut seq_file,
     _: *mut core::ffi::c_void,
@@ -510,6 +537,7 @@ fn rust_binder_stats_show_impl(m: &mut SeqFile) -> Result<()> {
     }
     Ok(())
 }
+
 fn rust_binder_state_show_impl(m: &mut SeqFile) -> Result<()> {
     seq_print!(m, "binder state:\n");
     let contexts = context::get_all_contexts()?;
@@ -521,4 +549,44 @@ fn rust_binder_state_show_impl(m: &mut SeqFile) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn rust_binder_proc_show_impl(m: &mut SeqFile, pid: Pid) -> Result<()> {
+    seq_print!(m, "binder proc state:\n");
+    let contexts = context::get_all_contexts()?;
+    for ctx in contexts {
+        let procs = ctx.get_procs_with_pid(pid)?;
+        for proc in procs {
+            proc.debug_print(m, &ctx, true)?;
+            seq_print!(m, "\n");
+        }
+    }
+    Ok(())
+}
+
+struct BinderfsProcFile(NonNull<bindings::dentry>);
+
+// SAFETY: Safe to drop any thread.
+unsafe impl Send for BinderfsProcFile {}
+
+impl BinderfsProcFile {
+    /// # Safety
+    ///
+    /// Takes an inode from a newly created binder file.
+    unsafe fn new(nodp: *mut bindings::inode, pid: i32) -> Result<Option<Self>> {
+        // SAFETY: The caller passes an `inode` for a newly created binder file.
+        let dentry = unsafe { bindings::rust_binderfs_create_proc_file(nodp, pid) };
+        match kernel::error::from_err_ptr(dentry) {
+            Ok(dentry) => Ok(NonNull::new(dentry).map(Self)),
+            Err(err) if err == EEXIST => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl Drop for BinderfsProcFile {
+    fn drop(&mut self) {
+        // SAFETY: This is a dentry from `rust_binderfs_remove_file` that has not been deleted yet.
+        unsafe { bindings::rust_binderfs_remove_file(self.0.as_ptr()) };
+    }
 }

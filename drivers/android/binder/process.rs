@@ -46,7 +46,7 @@ use crate::{
     range_alloc::{self, RangeAllocator},
     stats::BinderStats,
     thread::{PushWorkRes, Thread},
-    DArc, DLArc, DTRWrap, DeliverToRead,
+    BinderfsProcFile, DArc, DLArc, DTRWrap, DeliverToRead,
 };
 
 struct Mapping {
@@ -96,6 +96,7 @@ pub(crate) struct ProcessInner {
     pub(crate) sync_recv: bool,
     /// Process received async transactions since last frozen.
     pub(crate) async_recv: bool,
+    pub(crate) binderfs_file: Option<BinderfsProcFile>,
     /// Check for oneway spam
     oneway_spam_detection_enabled: bool,
 }
@@ -119,6 +120,7 @@ impl ProcessInner {
             is_frozen: false,
             sync_recv: false,
             async_recv: false,
+            binderfs_file: None,
             oneway_spam_detection_enabled: false,
         }
     }
@@ -1249,6 +1251,9 @@ impl Process {
         }
 
         self.ctx.deregister_process(&self);
+
+        let binderfs_file = self.inner.lock().binderfs_file.take();
+        drop(binderfs_file);
 
         // Move oneway_todo into the process todolist.
         {

@@ -6,10 +6,15 @@
 #include <uapi/linux/android/binderfs.h>
 
 /*
- * This symbol is exposed by `rust_binderfs.c` and exists here so that Rust
- * Binder can call it.
+ * These symbols are exposed by `rust_binderfs.c` and exist here so that Rust
+ * Binder can call them.
  */
 int init_rust_binderfs(void);
+
+struct dentry;
+struct inode;
+struct dentry *rust_binderfs_create_proc_file(struct inode *nodp, int pid);
+void rust_binderfs_remove_file(struct dentry *dentry);
 
 /*
  * The internal data types in the Rust Binder driver are opaque to C, so we use
