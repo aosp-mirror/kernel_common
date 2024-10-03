@@ -23,6 +23,7 @@
 
 #include <hashtable.h>
 #include <list.h>
+#include <xalloc.h>
 #include "modpost.h"
 #include "../../include/linux/license.h"
 
@@ -52,6 +53,9 @@ static bool error_occurred;
 
 static bool extra_warn;
 
+bool target_is_big_endian;
+bool host_is_big_endian;
+
 /*
  * Cut off the warnings when there are too many. This typically occurs when
  * vmlinux is missing. ('make modules' without building vmlinux.)
@@ -65,20 +69,15 @@ static unsigned int nr_unresolved;
 
 #define MODULE_NAME_LEN (64 - sizeof(Elf_Addr))
 
-void modpost_log(enum loglevel loglevel, const char *fmt, ...)
+void modpost_log(bool is_error, const char *fmt, ...)
 {
 	va_list arglist;
 
-	switch (loglevel) {
-	case LOG_WARN:
-		fprintf(stderr, "WARNING: ");
-		break;
-	case LOG_ERROR:
+	if (is_error) {
 		fprintf(stderr, "ERROR: ");
 		error_occurred = true;
-		break;
-	default: /* invalid loglevel, ignore */
-		break;
+	} else {
+		fprintf(stderr, "WARNING: ");
 	}
 
 	fprintf(stderr, "modpost: ");
@@ -94,14 +93,6 @@ static inline bool strends(const char *str, const char *postfix)
 		return false;
 
 	return strcmp(str + strlen(str) - strlen(postfix), postfix) == 0;
-}
-
-void *do_nofail(void *ptr, const char *expr)
-{
-	if (!ptr)
-		fatal("Memory allocation failure: %s.\n", expr);
-
-	return ptr;
 }
 
 char *read_text_file(const char *filename)
@@ -122,7 +113,7 @@ char *read_text_file(const char *filename)
 		exit(1);
 	}
 
-	buf = NOFAIL(malloc(st.st_size + 1));
+	buf = xmalloc(st.st_size + 1);
 
 	nbytes = st.st_size;
 
@@ -180,7 +171,7 @@ static struct module *new_module(const char *name, size_t namelen)
 {
 	struct module *mod;
 
-	mod = NOFAIL(malloc(sizeof(*mod) + namelen + 1));
+	mod = xmalloc(sizeof(*mod) + namelen + 1);
 	memset(mod, 0, sizeof(*mod));
 
 	INIT_LIST_HEAD(&mod->exported_symbols);
@@ -239,7 +230,7 @@ static inline unsigned int tdb_hash(const char *name)
  **/
 static struct symbol *alloc_symbol(const char *name)
 {
-	struct symbol *s = NOFAIL(malloc(sizeof(*s) + strlen(name) + 1));
+	struct symbol *s = xmalloc(sizeof(*s) + strlen(name) + 1);
 
 	memset(s, 0, sizeof(*s));
 	strcpy(s->name, name);
@@ -312,8 +303,7 @@ static void add_namespace(struct list_head *head, const char *namespace)
 	struct namespace_list *ns_entry;
 
 	if (!contains_namespace(head, namespace)) {
-		ns_entry = NOFAIL(malloc(sizeof(*ns_entry) +
-					 strlen(namespace) + 1));
+		ns_entry = xmalloc(sizeof(*ns_entry) + strlen(namespace) + 1);
 		strcpy(ns_entry->namespace, namespace);
 		list_add_tail(&ns_entry->list, head);
 	}
@@ -368,7 +358,7 @@ static struct symbol *sym_add_exported(const char *name, struct module *mod,
 	s = alloc_symbol(name);
 	s->module = mod;
 	s->is_gpl_only = gpl_only;
-	s->namespace = NOFAIL(strdup(namespace));
+	s->namespace = xstrdup(namespace);
 	list_add_tail(&s->list, &mod->exported_symbols);
 	hash_add_symbol(s);
 
@@ -440,6 +430,18 @@ static int parse_elf(struct elf_info *info, const char *filename)
 		/* Not an ELF file - silently ignore it */
 		return 0;
 	}
+
+	switch (hdr->e_ident[EI_DATA]) {
+	case ELFDATA2LSB:
+		target_is_big_endian = false;
+		break;
+	case ELFDATA2MSB:
+		target_is_big_endian = true;
+		break;
+	default:
+		fatal("target endian is unknown\n");
+	}
+
 	/* Fix endianness in ELF header */
 	hdr->e_type      = TO_NATIVE(hdr->e_type);
 	hdr->e_machine   = TO_NATIVE(hdr->e_machine);
@@ -624,7 +626,7 @@ static void handle_symbol(struct module *mod, struct elf_info *info,
 			if (ELF_ST_TYPE(sym->st_info) == STT_SPARC_REGISTER)
 				break;
 			if (symname[0] == '.') {
-				char *munged = NOFAIL(strdup(symname));
+				char *munged = xstrdup(symname);
 				munged[0] = '_';
 				munged[1] = toupper(munged[1]);
 				symname = munged;
@@ -692,10 +694,7 @@ static char *get_modinfo(struct elf_info *info, const char *tag)
 
 static const char *sym_name(struct elf_info *elf, Elf_Sym *sym)
 {
-	if (sym)
-		return elf->strtab + sym->st_name;
-	else
-		return "(unknown)";
+	return sym ? elf->strtab + sym->st_name : "";
 }
 
 /*
@@ -1008,6 +1007,7 @@ static void default_mismatch_handler(const char *modname, struct elf_info *elf,
 	Elf_Sym *from;
 	const char *tosym;
 	const char *fromsym;
+	char taddr_str[16];
 
 	from = find_fromsym(elf, faddr, fsecndx);
 	fromsym = sym_name(elf, from);
@@ -1021,10 +1021,17 @@ static void default_mismatch_handler(const char *modname, struct elf_info *elf,
 
 	sec_mismatch_count++;
 
-	warn("%s: section mismatch in reference: %s+0x%x (section: %s) -> %s (section: %s)\n",
-	     modname, fromsym,
-	     (unsigned int)(faddr - (from ? from->st_value : 0)),
-	     fromsec, tosym, tosec);
+	if (!tosym[0])
+		snprintf(taddr_str, sizeof(taddr_str), "0x%x", (unsigned int)taddr);
+
+	/*
+	 * The format for the reference source:      <symbol_name>+<offset> or <address>
+	 * The format for the reference destination: <symbol_name>          or <address>
+	 */
+	warn("%s: section mismatch in reference: %s%s0x%x (section: %s) -> %s (section: %s)\n",
+	     modname, fromsym, fromsym[0] ? "+" : "",
+	     (unsigned int)(faddr - (fromsym[0] ? from->st_value : 0)),
+	     fromsec, tosym[0] ? tosym : taddr_str, tosec);
 
 	if (mismatch->mismatch == EXTABLE_TO_NON_TEXT) {
 		if (match(tosec, mismatch->bad_tosec))
@@ -1664,7 +1671,7 @@ void buf_write(struct buffer *buf, const char *s, int len)
 {
 	if (buf->size - buf->pos < len) {
 		buf->size += len + SZ;
-		buf->p = NOFAIL(realloc(buf->p, buf->size));
+		buf->p = xrealloc(buf->p, buf->size);
 	}
 	strncpy(buf->p + buf->pos, s, len);
 	buf->pos += len;
@@ -1679,7 +1686,7 @@ static void check_exports(struct module *mod)
 		exp = find_symbol(s->name);
 		if (!exp) {
 			if (!s->weak && nr_unresolved++ < MAX_UNRESOLVED_REPORTS)
-				modpost_log(warn_unresolved ? LOG_WARN : LOG_ERROR,
+				modpost_log(!warn_unresolved,
 					    "\"%s\" [%s.ko] undefined!\n",
 					    s->name, mod->name);
 			continue;
@@ -1702,7 +1709,7 @@ static void check_exports(struct module *mod)
 			basename = mod->name;
 
 		if (!contains_namespace(&mod->imported_namespaces, exp->namespace)) {
-			modpost_log(allow_missing_ns_imports ? LOG_WARN : LOG_ERROR,
+			modpost_log(!allow_missing_ns_imports,
 				    "module %s uses symbol %s from namespace %s, but does not import it.\n",
 				    basename, exp->name, exp->namespace);
 			add_namespace(&mod->missing_namespaces, exp->namespace);
@@ -1750,26 +1757,9 @@ static void check_modname_len(struct module *mod)
 static void add_header(struct buffer *b, struct module *mod)
 {
 	buf_printf(b, "#include <linux/module.h>\n");
-	/*
-	 * Include build-salt.h after module.h in order to
-	 * inherit the definitions.
-	 */
-	buf_printf(b, "#define INCLUDE_VERMAGIC\n");
-	buf_printf(b, "#include <linux/build-salt.h>\n");
-	buf_printf(b, "#include <linux/elfnote-lto.h>\n");
 	buf_printf(b, "#include <linux/export-internal.h>\n");
-	buf_printf(b, "#include <linux/vermagic.h>\n");
 	buf_printf(b, "#include <linux/compiler.h>\n");
 	buf_printf(b, "\n");
-	buf_printf(b, "#ifdef CONFIG_UNWINDER_ORC\n");
-	buf_printf(b, "#include <asm/orc_header.h>\n");
-	buf_printf(b, "ORC_HEADER;\n");
-	buf_printf(b, "#endif\n");
-	buf_printf(b, "\n");
-	buf_printf(b, "BUILD_SALT;\n");
-	buf_printf(b, "BUILD_LTO_INFO;\n");
-	buf_printf(b, "\n");
-	buf_printf(b, "MODULE_INFO(vermagic, VERMAGIC_STRING);\n");
 	buf_printf(b, "MODULE_INFO(name, KBUILD_MODNAME);\n");
 	buf_printf(b, "\n");
 	buf_printf(b, "__visible struct module __this_module\n");
@@ -1789,12 +1779,6 @@ static void add_header(struct buffer *b, struct module *mod)
 
 	if (module_scmversion[0] != '\0')
 		buf_printf(b, "\nMODULE_INFO(scmversion, \"%s\");\n", module_scmversion);
-
-	buf_printf(b,
-		   "\n"
-		   "#ifdef CONFIG_MITIGATION_RETPOLINE\n"
-		   "MODULE_INFO(retpoline, \"Y\");\n"
-		   "#endif\n");
 
 	if (strstarts(mod->name, "drivers/staging"))
 		buf_printf(b, "\nMODULE_INFO(staging, \"Y\");\n");
@@ -1952,7 +1936,7 @@ static void write_if_changed(struct buffer *b, const char *fname)
 	if (st.st_size != b->pos)
 		goto close_write;
 
-	tmp = NOFAIL(malloc(b->pos));
+	tmp = xmalloc(b->pos);
 	if (fread(tmp, 1, b->pos, file) != b->pos)
 		goto free_write;
 
@@ -2122,6 +2106,25 @@ struct dump_list {
 	const char *file;
 };
 
+static void check_host_endian(void)
+{
+	static const union {
+		short s;
+		char c[2];
+	} endian_test = { .c = {0x01, 0x02} };
+
+	switch (endian_test.s) {
+	case 0x0102:
+		host_is_big_endian = true;
+		break;
+	case 0x0201:
+		host_is_big_endian = false;
+		break;
+	default:
+		fatal("Unknown host endian\n");
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct module *mod;
@@ -2138,7 +2141,7 @@ int main(int argc, char **argv)
 			external_module = true;
 			break;
 		case 'i':
-			dl = NOFAIL(malloc(sizeof(*dl)));
+			dl = xmalloc(sizeof(*dl));
 			dl->file = optarg;
 			list_add_tail(&dl->list, &dump_lists);
 			break;
@@ -2188,6 +2191,8 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
+
+	check_host_endian();
 
 	list_for_each_entry_safe(dl, dl2, &dump_lists, list) {
 		read_dump(dl->file);
