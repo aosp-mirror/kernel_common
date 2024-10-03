@@ -233,21 +233,6 @@ static int ec_device_probe(struct platform_device *pdev)
 	}
 
 	/*
-	 * UCSI provides power supply information so we don't need to separately
-	 * load the cros_usbpd_charger driver.
-	 */
-	if (cros_ec_check_features(ec, EC_FEATURE_USB_PD) &&
-	    !cros_ec_check_features(ec, EC_FEATURE_UCSI_PPM)) {
-		retval = mfd_add_hotplug_devices(ec->dev,
-						 cros_usbpd_charger_cells,
-						 ARRAY_SIZE(cros_usbpd_charger_cells));
-
-		if (retval)
-			dev_warn(ec->dev, "failed to add usbpd-charger: %d\n",
-				 retval);
-	}
-
-	/*
 	 * Lightbar is a special case. Newer devices support autodetection,
 	 * but older ones do not.
 	 */
