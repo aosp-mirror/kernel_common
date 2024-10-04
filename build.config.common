@@ -1,6 +1,6 @@
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.constants
 
-BRANCH=android-mainline
+BRANCH=android16-6.12
 LLVM=1
 DEPMOD=depmod
 
