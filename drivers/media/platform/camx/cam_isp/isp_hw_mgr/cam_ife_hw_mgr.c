@@ -2039,7 +2039,6 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	uint32_t                           num_pix_port_per_in = 0;
 	uint32_t                           num_rdi_port_per_in = 0;
 	uint32_t                           total_pix_port = 0;
-	uint32_t                           total_rdi_port = 0;
 	uint32_t                           in_port_length = 0;
 	uint32_t                           total_in_port_length = 0;
 	struct cam_isp_acquire_hw_info    *acquire_hw_info = NULL;
@@ -2129,7 +2128,6 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 		rc = cam_ife_mgr_acquire_hw_for_ctx(ife_ctx, in_port,
 			&num_pix_port_per_in, &num_rdi_port_per_in);
 		total_pix_port += num_pix_port_per_in;
-		total_rdi_port += num_rdi_port_per_in;
 
 		if (rc) {
 			CAM_ERR(CAM_ISP, "can not acquire resource");
@@ -2187,7 +2185,6 @@ static int cam_ife_mgr_acquire_dev(void *hw_mgr_priv, void *acquire_hw_args)
 	uint32_t                           num_pix_port_per_in = 0;
 	uint32_t                           num_rdi_port_per_in = 0;
 	uint32_t                           total_pix_port = 0;
-	uint32_t                           total_rdi_port = 0;
 	uint32_t                           in_port_length = 0;
 
 	CAM_DBG(CAM_ISP, "Enter...");
@@ -2284,7 +2281,6 @@ static int cam_ife_mgr_acquire_dev(void *hw_mgr_priv, void *acquire_hw_args)
 			rc = cam_ife_mgr_acquire_hw_for_ctx(ife_ctx, in_port,
 				&num_pix_port_per_in, &num_rdi_port_per_in);
 			total_pix_port += num_pix_port_per_in;
-			total_rdi_port += num_rdi_port_per_in;
 
 			kfree(in_port);
 			if (rc) {
