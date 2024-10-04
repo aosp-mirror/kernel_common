@@ -124,13 +124,13 @@ if [ "$ARCH" == "arm64" ] ; then
 fi
 
 # Copy over the built artifacts
-# Zip modules into one file. Avoid build path in compressed file by using
-# pushd/popd.
+# Clean module destination dir before copying, to prevent stale
+# modules from getting left behind.
 #
 cp -f arch/$ARCH/boot/$ZIMAGE $OUTPUT/ &&
-(cd $TMP_MODULES/lib/modules/$(cat include/config/kernel.release) &&
- rm -f $OUTPUT/modules.zip &&
- zip -rq $OUTPUT/modules.zip kernel)
+rm -f "${OUTPUT}/vendor_dlkm/"* &&
+find $TMP_MODULES/lib/modules/$(cat include/config/kernel.release)/kernel/ \
+    -type f -print0 | xargs -0 -I {} cp {} "$OUTPUT/vendor_dlkm/"
 
 if [ $? != 0 ] ; then
     echo "Could not copy the kernel artifacts. Aborting !"
