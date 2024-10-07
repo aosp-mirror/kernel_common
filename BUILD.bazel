@@ -127,6 +127,14 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "x86_64_additional_kmi_symbol_lists",
+    srcs = [
+        "android/abi_gki_x86_64_desktop",
+    ],
+    visibility = ["//visibility:private"],
+)
+
 define_common_kernels(target_configs = {
     "kernel_aarch64": {
         "kmi_symbol_list_strict_mode": True,
@@ -159,9 +167,16 @@ define_common_kernels(target_configs = {
         ],
     },
     "kernel_x86_64": {
-        "kmi_symbol_list_strict_mode": False,
+        "abi_definition_stg": "android/abi_gki_x86_64.stg",
+        "kmi_symbol_list_strict_mode": True,
+        "kmi_symbol_list": "android/abi_gki_x86_64",
+        "additional_kmi_symbol_lists": [":x86_64_additional_kmi_symbol_lists"],
+        "trim_nonlisted_kmi": True,
+        "protected_exports_list": "android/abi_gki_protected_exports_x86_64",
+        "protected_modules_list": "android/gki_x86_64_protected_modules",
         "module_implicit_outs": get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
         "make_goals": _GKI_X86_64_MAKE_GOALS,
+        "ddk_headers_archive": ":kernel_x86_64_ddk_headers_archive",
         "extra_dist": [
             ":test_mappings_zip",
             ":tests_zip_x86_64",
