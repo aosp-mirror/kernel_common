@@ -1,4 +1,3 @@
-ARCH=arm
 MAKE_GOALS="
 zImage
 modules
