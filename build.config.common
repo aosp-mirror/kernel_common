@@ -1,5 +1,7 @@
 . ${ROOT_DIR}/${KERNEL_DIR}/build.config.constants
 
+KMI_GENERATION=0
+
 BRANCH=android16-6.12
 LLVM=1
 DEPMOD=depmod
