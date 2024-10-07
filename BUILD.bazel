@@ -18,6 +18,7 @@ load(
     "checkpatch",
     "ddk_headers",
     "ddk_headers_archive",
+    "initramfs",
     "kernel_build",
     "kernel_compile_commands",
     "kernel_images",
@@ -1010,18 +1011,17 @@ kernel_modules_install(
     kernel_build = ":rockpi4",
 )
 
-kernel_images(
-    name = "rockpi4_images",
-    build_initramfs = True,
-    kernel_build = ":rockpi4",
+initramfs(
+    name = "rockpi4_initramfs",
     kernel_modules_install = ":rockpi4_modules_install",
+    visibility = ["//visibility:private"],
 )
 
 pkg_files(
     name = "rockpi4_dist_files",
     srcs = [
         ":rockpi4",
-        ":rockpi4_images",
+        ":rockpi4_initramfs",
         ":rockpi4_modules_install",
     ],
     strip_prefix = strip_prefix.files_only(),
