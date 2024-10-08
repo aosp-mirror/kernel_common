@@ -15,6 +15,7 @@
   __getblk_gfp
   get_dup_sched_clock
   __irq_regs
+  kblockd_mod_delayed_work_on
   kernfs_path_from_node
   __lock_buffer
   mipi_dsi_dcs_write
@@ -59,6 +60,8 @@
   __traceiter_android_vh_binder_special_task
   __traceiter_android_vh_binder_wait_for_work
   __traceiter_android_vh_blk_fill_rwbs
+  __traceiter_android_vh_blk_mq_delay_run_hw_queue
+  __traceiter_android_vh_blk_mq_kick_requeue_list
   __traceiter_android_vh_cgroup_attach
   __traceiter_android_vh_check_folio_look_around_ref
   __traceiter_android_vh_check_nanosleep_syscall
@@ -166,6 +169,8 @@
   __tracepoint_android_vh_binder_special_task
   __tracepoint_android_vh_binder_wait_for_work
   __tracepoint_android_vh_blk_fill_rwbs
+  __tracepoint_android_vh_blk_mq_delay_run_hw_queue
+  __tracepoint_android_vh_blk_mq_kick_requeue_list
   __tracepoint_android_vh_cgroup_attach
   __tracepoint_android_vh_check_folio_look_around_ref
   __tracepoint_android_vh_check_nanosleep_syscall
