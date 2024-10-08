@@ -1032,14 +1032,6 @@ void fuse_conn_init(struct fuse_conn *fc, struct fuse_mount *fm,
 }
 EXPORT_SYMBOL_GPL(fuse_conn_init);
 
-static void delayed_release(struct rcu_head *p)
-{
-	struct fuse_conn *fc = container_of(p, struct fuse_conn, rcu);
-
-	put_user_ns(fc->user_ns);
-	fc->release(fc);
-}
-
 void fuse_conn_put(struct fuse_conn *fc)
 {
 	if (refcount_dec_and_test(&fc->count)) {
@@ -1051,12 +1043,13 @@ void fuse_conn_put(struct fuse_conn *fc)
 		if (fiq->ops->release)
 			fiq->ops->release(fiq);
 		put_pid_ns(fc->pid_ns);
+		put_user_ns(fc->user_ns);
 		bucket = rcu_dereference_protected(fc->curr_bucket, 1);
 		if (bucket) {
 			WARN_ON(atomic_read(&bucket->count) != 1);
 			kfree(bucket);
 		}
-		call_rcu(&fc->rcu, delayed_release);
+		fc->release(fc);
 	}
 }
 EXPORT_SYMBOL_GPL(fuse_conn_put);
@@ -2029,7 +2022,7 @@ static void fuse_sb_destroy(struct super_block *sb)
 void fuse_mount_destroy(struct fuse_mount *fm)
 {
 	fuse_conn_put(fm->fc);
-	kfree_rcu(fm, rcu);
+	kfree(fm);
 }
 EXPORT_SYMBOL(fuse_mount_destroy);
 
