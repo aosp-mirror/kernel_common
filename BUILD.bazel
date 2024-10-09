@@ -13,6 +13,7 @@ load(
     "define_prebuilts",
 )
 load("//build/kernel/kleaf:constants.bzl", "DEFAULT_GKI_OUTS", "X86_64_OUTS")
+load("//build/kernel/kleaf:fail.bzl", "fail_rule")
 load(
     "//build/kernel/kleaf:kernel.bzl",
     "checkpatch",
@@ -63,20 +64,18 @@ checkpatch(
 )
 
 # Deprecated - Use arch specific files from below.
-alias(
+fail_rule(
     name = "gki_system_dlkm_modules",
-    actual = "gki_system_dlkm_modules_arm64",
-    deprecation = """
+    message = """
     Common list for all architectures is deprecated.
     Instead use the file corresponding to the architecture used:
     i.e. `gki_system_dlkm_modules_{arch}`
     """,
 )
 
-alias(
+fail_rule(
     name = "android/gki_system_dlkm_modules",
-    actual = "android/gki_system_dlkm_modules_arm64",
-    deprecation = """
+    message = """
     Common list for all architectures is deprecated.
     Instead use the file corresponding to the architecture used:
     i.e. `gki_system_dlkm_modules_{arch}`
@@ -198,27 +197,12 @@ common_kernel(
     visibility = ["//visibility:public"],
 )
 
-common_kernel(
+fail_rule(
     name = "kernel_aarch64_debug",
-    outs = DEFAULT_GKI_OUTS,
-    arch = "arm64",
-    build_config = "build.config.gki.aarch64",
-    build_gki_artifacts = True,
-    ddk_headers_archive = ":kernel_aarch64_ddk_headers_archive",
-    ddk_module_headers = [":all_headers_aarch64"],
-    deprecation = """\
+    message = """\
 Consider building @@//common:kernel_aarch64 with:
     * --notrim to disable trimming, or
     * --debug to enable additional debug options.""",
-    extra_dist = [
-        ":test_mappings_zip",
-        ":tests_zip_arm64",
-    ],
-    gki_boot_img_sizes = _GKI_AARCH64_BOOT_IMAGE_SIZES,
-    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_arm64",
-    make_goals = _GKI_AARCH64_MAKE_GOALS,
-    makefile = ":Makefile",
-    module_implicit_outs = get_gki_modules_list("arm64") + get_kunit_modules_list("arm64"),
     visibility = ["//visibility:public"],
 )
 
@@ -241,26 +225,12 @@ common_kernel(
     visibility = ["//visibility:public"],
 )
 
-common_kernel(
+fail_rule(
     name = "kernel_x86_64_debug",
-    outs = X86_64_OUTS,
-    arch = "x86_64",
-    build_config = "build.config.gki.x86_64",
-    build_gki_artifacts = True,
-    ddk_module_headers = [":all_headers_x86_64"],
-    deprecation = """\
+    message = """\
 Consider building @@//common:kernel_x86_64 with:
     * --notrim to disable trimming, or
     * --debug to enable additional debug options.""",
-    extra_dist = [
-        ":test_mappings_zip",
-        ":tests_zip_x86_64",
-    ],
-    gki_boot_img_sizes = _GKI_X86_64_BOOT_IMAGE_SIZES,
-    gki_system_dlkm_modules = "android/gki_system_dlkm_modules_x86_64",
-    make_goals = _GKI_X86_64_MAKE_GOALS,
-    makefile = ":Makefile",
-    module_implicit_outs = get_gki_modules_list("x86_64") + get_kunit_modules_list("x86_64"),
     visibility = ["//visibility:public"],
 )
 
@@ -275,7 +245,7 @@ common_kernel(
         ":test_mappings_zip",
         ":tests_zip_x86_64",
     ],
-    gki_boot_img_sizes = {"": "67108864"},
+    gki_boot_img_sizes = _GKI_X86_64_BOOT_IMAGE_SIZES,
     gki_system_dlkm_modules = "android/gki_system_dlkm_modules_x86_64",
     make_goals = _GKI_X86_64_MAKE_GOALS,
     makefile = ":Makefile",
