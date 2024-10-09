@@ -40,6 +40,7 @@ struct kernel_info {
 	__u64 _token_table_pa;
 	__u64 _token_index_pa;
 	__u64 _markers_pa;
+	__u64 _seqs_of_names_pa;
 
 	/* For frame pointer */
 	__u32 thread_size;
