@@ -653,6 +653,7 @@ _DB845C_MODULE_OUTS = [
     "drivers/usb/host/ohci-hcd.ko",
     "drivers/usb/host/ohci-pci.ko",
     "drivers/usb/host/ohci-platform.ko",
+    "drivers/usb/host/xhci-pci-renesas.ko",
     "drivers/usb/typec/mux/fsa4480.ko",
     "drivers/usb/typec/mux/nb7vpq904m.ko",
     "drivers/usb/typec/mux/wcd939x-usbss.ko",
