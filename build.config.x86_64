@@ -2,5 +2,3 @@ MAKE_GOALS="
 bzImage
 modules
 "
-
-NDK_TRIPLE=${X86_64_NDK_TRIPLE}
