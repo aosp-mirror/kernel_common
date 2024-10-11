@@ -2,5 +2,3 @@ MAKE_GOALS="
 Image
 modules
 "
-
-NDK_TRIPLE=${AARCH64_NDK_TRIPLE}
