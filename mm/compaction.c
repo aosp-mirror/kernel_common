@@ -1377,6 +1377,8 @@ static bool suitable_migration_source(struct compact_control *cc,
 static bool suitable_migration_target(struct compact_control *cc,
 							struct page *page)
 {
+	bool bypass = false;
+
 	/* If the page is a large free page, then disallow migration */
 	if (PageBuddy(page)) {
 		/*
@@ -1387,6 +1389,10 @@ static bool suitable_migration_target(struct compact_control *cc,
 		if (buddy_order_unsafe(page) >= pageblock_order)
 			return false;
 	}
+
+	trace_android_vh_suitable_migration_target_bypass(page, &bypass);
+	if (bypass)
+		return false;
 
 	if (cc->ignore_block_suitable)
 		return true;
@@ -3241,6 +3247,7 @@ static int kcompactd_cpu_online(unsigned int cpu)
 			if (pgdat->kcompactd)
 				set_cpus_allowed_ptr(pgdat->kcompactd, mask);
 	}
+	trace_android_vh_mm_kcompactd_cpu_online(cpu);
 	return 0;
 }
 
