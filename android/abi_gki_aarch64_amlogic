@@ -858,7 +858,6 @@
   fwnode_graph_get_remote_port_parent
   fwnode_graph_parse_endpoint
   fwnode_handle_get
-  fwnode_handle_put
   fwnode_property_get_reference_args
   fwnode_property_present
   fwnode_property_read_string

@@ -1101,8 +1101,6 @@
   _find_first_zero_bit
 
 # required by pcie-exynosauto-rc.ko
-  bitmap_find_free_region
-  bitmap_release_region
   dmam_alloc_attrs
   dw_pcie_host_init
   dw_pcie_own_conf_map_bus
@@ -1134,7 +1132,6 @@
   device_get_next_child_node
   devm_gpiochip_add_data_with_key
   devm_pinctrl_register
-  fwnode_handle_put
   fwnode_property_present
   gpiochip_generic_free
   gpiochip_generic_request

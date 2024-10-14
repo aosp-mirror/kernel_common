@@ -33,13 +33,11 @@
   bio_end_io_acct_remapped
   bio_start_io_acct
   __bitmap_clear
-  bitmap_find_free_region
   bitmap_find_next_zero_area_off
   bitmap_free
   bitmap_from_arr32
   bitmap_parse
   bitmap_print_to_pagebuf
-  bitmap_release_region
   __bitmap_set
   bitmap_to_arr32
   __bitmap_weight
@@ -624,7 +622,6 @@
   fsnotify
   __fsnotify_parent
   full_name_hash
-  fwnode_handle_put
   fwnode_property_present
   fwnode_property_read_string
   fwnode_property_read_u32_array

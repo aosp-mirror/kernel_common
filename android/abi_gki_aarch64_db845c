@@ -1788,7 +1788,6 @@
   device_get_next_child_node
   devm_iio_device_alloc
   __devm_iio_device_register
-  fwnode_handle_put
   fwnode_property_read_string
   strchrnul
 
