@@ -1,7 +1,4 @@
-ARCH=arm
 MAKE_GOALS="
 zImage
 modules
 "
-
-NDK_TRIPLE=${ARM_NDK_TRIPLE}
