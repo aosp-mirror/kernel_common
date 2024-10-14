@@ -109,6 +109,7 @@
   inode_init_once
   inode_init_owner
   inode_newsize_ok
+  inode_set_ctime_current
   inode_set_flags
   __insert_inode_hash
   invalidate_bdev
