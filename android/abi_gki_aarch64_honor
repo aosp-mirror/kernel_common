@@ -24,3 +24,5 @@
   __tracepoint_android_vh_do_swap_page_spf
   __tracepoint_android_vh_tune_fault_around_bytes
   next_arg
+  netdev_get_name
+  tcp_send_active_reset
