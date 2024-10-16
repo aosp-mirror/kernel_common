@@ -3,12 +3,31 @@
  * Copyright 2022 Google LLC
  */
 
-/dts-v1/;
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/spmi/spmi.h>
+
 #include "mt8186-corsola-steelix.dtsi"
-#include "mt6315.dtsi"
 
 / {
-	/delete-node/ gpio-keys;
+	chassis-type = "laptop";
+
+	max98360a: max98360a {
+		compatible = "maxim,max98360a";
+		sdmode-gpios = <&pio 150 GPIO_ACTIVE_HIGH>;
+		#sound-dai-cells = <0>;
+	};
+};
+
+&cpu6 {
+	proc-supply = <&mt6319_buck1>;
+};
+
+&cpu7 {
+	proc-supply = <&mt6319_buck1>;
+};
+
+&gpio_keys {
+	status = "disabled";
 };
 
 &keyboard_controller {
@@ -27,18 +46,8 @@
 	>;
 };
 
-&touchscreen {
+&mt6366_vproc11_reg {
 	status = "disabled";
-};
-
-&cpu6 {
-	proc-supply = <&mt6315_6_vbuck1>;
-	sram-supply = <&mt6366_vsram_proc11_reg>;
-};
-
-&cpu7 {
-	proc-supply = <&mt6315_6_vbuck1>;
-	sram-supply = <&mt6366_vsram_proc11_reg>;
 };
 
 &cluster1_opp_14 {
@@ -48,4 +57,47 @@
 
 &cluster1_opp_15 {
 	opp-hz = /bits/ 64 <2200000000>;
+};
+
+&rt1019p{
+	status = "disabled";
+};
+
+&sound {
+	compatible = "mediatek,mt8186-mt6366-rt5682s-max98360-sound";
+	status = "okay";
+
+	spk-hdmi-playback-dai-link {
+		codec {
+			sound-dai = <&it6505dptx>, <&max98360a>;
+		};
+	};
+};
+
+&spmi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spmi_pins>;
+	#address-cells = <2>;
+	#size-cells = <0>;
+	status = "okay";
+
+	pmic@6 {
+		compatible = "mediatek,mt6319-regulator", "mediatek,mt6315-regulator";
+		reg = <0x6 SPMI_USID>;
+
+		regulators {
+			mt6319_buck1: vbuck1 {
+					regulator-name = "ppvar_dvdd_proc_bc_mt6319";
+					regulator-min-microvolt = <600000>;
+					regulator-max-microvolt = <1193750>;
+					regulator-enable-ramp-delay = <256>;
+					regulator-allowed-modes = <0 1 2>;
+					regulator-always-on;
+			};
+		};
+	};
+};
+
+&touchscreen {
+	status = "disabled";
 };

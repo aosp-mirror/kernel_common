@@ -118,8 +118,6 @@
 #include <linux/mroute.h>
 #include <linux/mroute6.h>
 #include <linux/icmpv6.h>
-#include <linux/cred.h>
-#include <linux/uidgid.h>
 
 #include <linux/uaccess.h>
 
@@ -205,24 +203,6 @@ bool sk_net_capable(const struct sock *sk, int cap)
 	return sk_ns_capable(sk, sock_net(sk)->user_ns, cap);
 }
 EXPORT_SYMBOL(sk_net_capable);
-
-static bool in_android_group(struct user_namespace *user, gid_t gid)
-{
-	kgid_t kgid = make_kgid(user, gid);
-
-	if (!gid_valid(kgid))
-		return false;
-	return in_egroup_p(kgid);
-}
-
-bool inet_sk_allowed(struct net *net, gid_t gid)
-{
-	if (!net->core.sysctl_android_paranoid ||
-	    ns_capable(net->user_ns, CAP_NET_RAW))
-		return true;
-	return in_android_group(net->user_ns, gid);
-}
-EXPORT_SYMBOL(inet_sk_allowed);
 
 /*
  * Each address family might have different locking rules, so we have

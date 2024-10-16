@@ -7,13 +7,17 @@
 #include "mt8186-corsola-steelix.dtsi"
 
 / {
-	model = "Google Rusty sku196608/196609/196610/196611 board";
-	compatible = "google,steelix-sku196608", "google,steelix-sku196609",
-		     "google,steelix-sku196610", "google,steelix-sku196611",
+	model = "Google Rusty board";
+	compatible = "google,steelix-sku196609", "google,steelix-sku196608",
 		     "google,steelix", "mediatek,mt8186";
+	chassis-type = "laptop";
 };
 
 &gpio_keys {
+	status = "disabled";
+};
+
+&i2c1 {
 	status = "disabled";
 };
 

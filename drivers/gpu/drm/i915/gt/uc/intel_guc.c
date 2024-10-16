@@ -240,6 +240,12 @@ static u32 guc_ctl_debug_flags(struct intel_guc *guc)
 static u32 guc_ctl_feature_flags(struct intel_guc *guc)
 {
 	u32 flags = 0;
+	struct intel_gt *gt = guc_to_gt(guc);
+	struct drm_i915_private *i915 = gt->i915;
+
+	/* Enable PAVP GuC autoteardown flow for non-MTL platforms */
+	if (!IS_METEORLAKE(i915))
+		flags |= GUC_CTL_ENABLE_GUC_PAVP_CTL;
 
 	if (!intel_guc_submission_is_used(guc))
 		flags |= GUC_CTL_DISABLE_SCHEDULER;

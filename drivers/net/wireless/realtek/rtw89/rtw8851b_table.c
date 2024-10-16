@@ -3321,6 +3321,7 @@ static const s8 _txpwr_track_delta_swingidx_2g_cck_a_p[] = {
 	 0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4
 };
 
+static
 const u8 rtw89_8851b_tx_shape[RTW89_BAND_NUM][RTW89_RS_TX_SHAPE_NUM]
 			     [RTW89_REGD_NUM] = {
 	[0][0][RTW89_ACMA] = 0,
@@ -14794,6 +14795,7 @@ const struct rtw89_phy_table rtw89_8851b_phy_nctl_table = {
 	.rf_path	= 0, /* don't care */
 };
 
+static
 const struct rtw89_txpwr_table rtw89_8851b_byr_table = {
 	.data = rtw89_8851b_txpwr_byrate,
 	.size = ARRAY_SIZE(rtw89_8851b_txpwr_byrate),
@@ -14810,6 +14812,7 @@ const struct rtw89_txpwr_track_cfg rtw89_8851b_trk_cfg = {
 };
 
 const struct rtw89_rfe_parms rtw89_8851b_dflt_parms = {
+	.byr_tbl = &rtw89_8851b_byr_table,
 	.rule_2ghz = {
 		.lmt = &rtw89_8851b_txpwr_lmt_2g,
 		.lmt_ru = &rtw89_8851b_txpwr_lmt_ru_2g,
@@ -14818,9 +14821,11 @@ const struct rtw89_rfe_parms rtw89_8851b_dflt_parms = {
 		.lmt = &rtw89_8851b_txpwr_lmt_5g,
 		.lmt_ru = &rtw89_8851b_txpwr_lmt_ru_5g,
 	},
+	.tx_shape = &rtw89_8851b_tx_shape,
 };
 
 static const struct rtw89_rfe_parms rtw89_8851b_rfe_parms_type2 = {
+	.byr_tbl = &rtw89_8851b_byr_table,
 	.rule_2ghz = {
 		.lmt = &rtw89_8851b_txpwr_lmt_2g_type2,
 		.lmt_ru = &rtw89_8851b_txpwr_lmt_ru_2g_type2,
@@ -14829,6 +14834,7 @@ static const struct rtw89_rfe_parms rtw89_8851b_rfe_parms_type2 = {
 		.lmt = &rtw89_8851b_txpwr_lmt_5g_type2,
 		.lmt_ru = &rtw89_8851b_txpwr_lmt_ru_5g_type2,
 	},
+	.tx_shape = &rtw89_8851b_tx_shape,
 };
 
 const struct rtw89_rfe_parms_conf rtw89_8851b_rfe_parms_conf[] = {

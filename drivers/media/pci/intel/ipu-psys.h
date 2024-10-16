@@ -188,9 +188,10 @@ struct ipu_psys_kbuffer {
 	struct dma_buf_attachment *db_attach;
 	struct dma_buf *dbuf;
 	u32 flags;
-	/* The number of times this buffer is mapped */
-	atomic_t map_count;
-	bool valid;	/* True when buffer is usable */
+	/* The number of descriptors that point to this buffer */
+	atomic_t desc_count;
+	/* Set if kbuf is mapped */
+	bool valid;
 };
 
 struct ipu_psys_desc {

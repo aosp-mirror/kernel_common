@@ -50,6 +50,7 @@
 #define BUTTRESS_CSE_IPC_RESET_RETRY	4
 
 #define BUTTRESS_IPC_CMD_SEND_RETRY	1
+#define BUTTRESS_AUTH_RETRY		1
 
 static const u32 ipu_adev_irq_mask[] = {
 	BUTTRESS_ISR_IS_IRQ, BUTTRESS_ISR_PS_IRQ
@@ -785,6 +786,7 @@ int ipu_buttress_authenticate(struct ipu_device *isp)
 	struct ipu_buttress *b = &isp->buttress;
 	u32 data, mask, done, fail;
 	int rval;
+	unsigned int retry = BUTTRESS_AUTH_RETRY;
 
 	if (!isp->secure_mode) {
 		dev_dbg(&isp->pdev->dev,
@@ -811,6 +813,7 @@ int ipu_buttress_authenticate(struct ipu_device *isp)
 	data = upper_32_bits(isp->pkg_dir_dma_addr);
 	writel(data, isp->base + BUTTRESS_REG_FW_SOURCE_BASE_HI);
 
+auth:
 	/*
 	 * Write boot_load into IU2CSEDATA0
 	 * Write sizeof(boot_load) | 0x2 << CLIENT_ID to
@@ -864,8 +867,11 @@ int ipu_buttress_authenticate(struct ipu_device *isp)
 				     BUTTRESS_IU2CSEDATA0_IPC_AUTH_RUN,
 				     1, 1,
 				     BUTTRESS_CSE2IUDATA0_IPC_AUTH_RUN_DONE);
-	if (rval) {
-		dev_err(&isp->pdev->dev, "CSE authenticate_run failed\n");
+	if (rval == -EIO && retry--) {
+		dev_info(&isp->pdev->dev, "Try authentication again\n");
+		goto auth;
+	} else if (rval) {
+		dev_err(&isp->pdev->dev, "CSE authentication failed\n");
 		goto iunit_power_off;
 	}
 

@@ -1651,12 +1651,7 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 		dev->power.direct_complete = false;
 
 	if (dev->power.direct_complete) {
-		/*
-		 * Check if we're runtime suspended. If not, try to runtime
-		 * suspend for autosuspend cases.
-		 */
-		if (pm_runtime_status_suspended(dev) ||
-		    !pm_runtime_suspend(dev)) {
+		if (pm_runtime_status_suspended(dev)) {
 			pm_runtime_disable(dev);
 			if (pm_runtime_status_suspended(dev)) {
 				pm_dev_dbg(dev, state, "direct-complete ");

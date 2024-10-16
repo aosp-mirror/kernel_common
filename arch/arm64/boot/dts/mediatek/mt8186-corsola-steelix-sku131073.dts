@@ -7,9 +7,10 @@
 #include "mt8186-corsola-steelix.dtsi"
 
 / {
-	model = "Google Steelix sku131073/131075 board";
-	compatible = "google,steelix-sku131073", "google,steelix-sku131075",
-		     "google,steelix", "mediatek,mt8186";
+	model = "Google Steelix board";
+	compatible = "google,steelix-sku131073", "google,steelix",
+		     "mediatek,mt8186";
+	chassis-type = "convertible";
 };
 
 &mt6366codec {

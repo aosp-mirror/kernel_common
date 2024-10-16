@@ -82,6 +82,9 @@ static struct ieee80211_channel rtw89_channels_5ghz[] = {
 	RTW89_DEF_CHAN_5G(5885, 177),
 };
 
+static_assert(RTW89_5GHZ_UNII4_START_INDEX + RTW89_5GHZ_UNII4_CHANNEL_NUM ==
+	      ARRAY_SIZE(rtw89_channels_5ghz));
+
 static struct ieee80211_channel rtw89_channels_6ghz[] = {
 	RTW89_DEF_CHAN_6G(5955, 1),
 	RTW89_DEF_CHAN_6G(5975, 5),
@@ -2710,6 +2713,7 @@ static void rtw89_track_work(struct work_struct *work)
 	rtw89_phy_tx_path_div_track(rtwdev);
 	rtw89_phy_antdiv_track(rtwdev);
 	rtw89_phy_ul_tb_ctrl_track(rtwdev);
+	rtw89_phy_edcca_track(rtwdev);
 	rtw89_tas_track(rtwdev);
 
 	if (rtwdev->lps_enabled && !rtwdev->btc.lps)
@@ -3062,6 +3066,8 @@ int rtw89_core_sta_assoc(struct rtw89_dev *rtwdev,
 			rtw89_warn(rtwdev, "failed to send h2c general packet\n");
 			return ret;
 		}
+
+		rtw89_fw_h2c_set_bcn_fltr_cfg(rtwdev, vif, true);
 	}
 
 	return ret;
@@ -4018,9 +4024,10 @@ struct rtw89_dev *rtw89_alloc_ieee80211_hw(struct device *device,
 		     !RTW89_CHK_FW_FEATURE(BEACON_FILTER, &early_fw);
 
 	if (no_chanctx) {
-		ops->add_chanctx = NULL;
-		ops->remove_chanctx = NULL;
-		ops->change_chanctx = NULL;
+		ops->add_chanctx = ieee80211_emulate_add_chanctx;
+		ops->remove_chanctx = ieee80211_emulate_remove_chanctx;
+		ops->change_chanctx = ieee80211_emulate_change_chanctx;
+		ops->switch_vif_chanctx = ieee80211_emulate_switch_vif_chanctx;
 		ops->assign_vif_chanctx = NULL;
 		ops->unassign_vif_chanctx = NULL;
 		ops->remain_on_channel = NULL;

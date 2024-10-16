@@ -28,21 +28,13 @@ properties:
     type: boolean
     description: Specify that this switch can handle orientation switching.
 
-  ports:
-    $ref: /schemas/graph.yaml#/properties/ports
-    description: OF graph binding modelling data lines to the Type-C switch.
-
-    properties:
-      port@0:
-        $ref: /schemas/graph.yaml#/properties/port
-        description: Link between the switch and a Type-C connector.
-
-    required:
-      - port@0
+  port:
+    $ref: /schemas/graph.yaml#/properties/port
+    description: Link between the switch and a Type-C connector.
 
 required:
   - compatible
-  - ports
+  - port
 
 anyOf:
   - required:

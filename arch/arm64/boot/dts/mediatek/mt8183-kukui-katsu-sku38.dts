@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (GPL-2.0 OR MIT)
 /*
- * Copyright 2021 Google LLC
+ * Copyright 2023 Google LLC
  */
 
 /dts-v1/;
@@ -8,30 +8,31 @@
 #include "mt8183-kukui-audio-rt1015p.dtsi"
 
 / {
-	model = "MediaTek katsu sku38 board";
-	compatible = "google,katsu-sku38", "google,katsu",
-				"mediatek,mt8183";
+	model = "Google katsu sku38 board";
+	chassis-type = "tablet";
+	compatible = "google,katsu-sku38", "google,katsu", "mediatek,mt8183";
 };
 
 &i2c0 {
-	status = "okay";
-
-	/delete-node/touchscreen@10;
 	touchscreen1: touchscreen@5d {
 		compatible = "goodix,gt7375p";
 		reg = <0x5d>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&open_touch>;
 
-		interrupt-parent = <&pio>;
-		interrupts = <155 IRQ_TYPE_LEVEL_LOW>;
+		interrupts-extended = <&pio 155 IRQ_TYPE_LEVEL_LOW>;
 
 		reset-gpios = <&pio 156 GPIO_ACTIVE_LOW>;
+		vdd-supply = <&lcd_pp3300>;
 	};
 };
 
 &panel {
 	compatible = "starry,2081101qfh032011-53g";
+};
+
+&qca_wifi {
+	qcom,ath10k-calibration-variant = "GO_KATSU";
 };
 
 &sound {

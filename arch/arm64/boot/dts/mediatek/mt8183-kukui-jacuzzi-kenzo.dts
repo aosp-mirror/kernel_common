@@ -27,7 +27,3 @@
 		hid-descr-addr = <0x0001>;
 	};
 };
-
-&i2c2 {
-	mediatek,default-timing-adjust;
-};

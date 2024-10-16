@@ -1425,10 +1425,67 @@ static bool ath11k_mac_set_nontx_vif_params(struct ath11k_vif *tx_arvif,
 	return false;
 }
 
-static void ath11k_mac_set_vif_params(struct ath11k_vif *arvif,
-				      struct sk_buff *bcn)
+static int ath11k_mac_setup_bcn_p2p_ie(struct ath11k_vif *arvif,
+				       struct sk_buff *bcn)
 {
+	struct ath11k *ar = arvif->ar;
 	struct ieee80211_mgmt *mgmt;
+	const u8 *p2p_ie;
+	int ret;
+
+	mgmt = (void *)bcn->data;
+	p2p_ie = cfg80211_find_vendor_ie(WLAN_OUI_WFA, WLAN_OUI_TYPE_WFA_P2P,
+					 mgmt->u.beacon.variable,
+					 bcn->len - (mgmt->u.beacon.variable -
+						     bcn->data));
+	if (!p2p_ie)
+		return -ENOENT;
+
+	ret = ath11k_wmi_p2p_go_bcn_ie(ar, arvif->vdev_id, p2p_ie);
+	if (ret) {
+		ath11k_warn(ar->ab, "failed to submit P2P GO bcn ie for vdev %i: %d\n",
+			    arvif->vdev_id, ret);
+		return ret;
+	}
+
+	return ret;
+}
+
+static int ath11k_mac_remove_vendor_ie(struct sk_buff *skb, unsigned int oui,
+				       u8 oui_type, size_t ie_offset)
+{
+	size_t len;
+	const u8 *next, *end;
+	u8 *ie;
+
+	if (WARN_ON(skb->len < ie_offset))
+		return -EINVAL;
+
+	ie = (u8 *)cfg80211_find_vendor_ie(oui, oui_type,
+					   skb->data + ie_offset,
+					   skb->len - ie_offset);
+	if (!ie)
+		return -ENOENT;
+
+	len = ie[1] + 2;
+	end = skb->data + skb->len;
+	next = ie + len;
+
+	if (WARN_ON(next > end))
+		return -EINVAL;
+
+	memmove(ie, next, end - next);
+	skb_trim(skb, skb->len - len);
+
+	return 0;
+}
+
+static int ath11k_mac_set_vif_params(struct ath11k_vif *arvif,
+				     struct sk_buff *bcn)
+{
+	struct ath11k_base *ab = arvif->ar->ab;
+	struct ieee80211_mgmt *mgmt;
+	int ret = 0;
 	u8 *ies;
 
 	ies = bcn->data + ieee80211_get_hdrlen_from_skb(bcn);
@@ -1446,6 +1503,32 @@ static void ath11k_mac_set_vif_params(struct ath11k_vif *arvif,
 		arvif->wpaie_present = true;
 	else
 		arvif->wpaie_present = false;
+
+	if (arvif->vdev_subtype != WMI_VDEV_SUBTYPE_P2P_GO)
+		return ret;
+
+	ret = ath11k_mac_setup_bcn_p2p_ie(arvif, bcn);
+	if (ret) {
+		ath11k_warn(ab, "failed to setup P2P GO bcn ie: %d\n",
+			    ret);
+		return ret;
+	}
+
+	/* P2P IE is inserted by firmware automatically (as
+	 * configured above) so remove it from the base beacon
+	 * template to avoid duplicate P2P IEs in beacon frames.
+	 */
+	ret = ath11k_mac_remove_vendor_ie(bcn, WLAN_OUI_WFA,
+					  WLAN_OUI_TYPE_WFA_P2P,
+					  offsetof(struct ieee80211_mgmt,
+						   u.beacon.variable));
+	if (ret) {
+		ath11k_warn(ab, "failed to remove P2P vendor ie: %d\n",
+			    ret);
+		return ret;
+	}
+
+	return ret;
 }
 
 static int ath11k_mac_setup_bcn_tmpl_ema(struct ath11k_vif *arvif)
@@ -1467,10 +1550,12 @@ static int ath11k_mac_setup_bcn_tmpl_ema(struct ath11k_vif *arvif)
 		return -EPERM;
 	}
 
-	if (tx_arvif == arvif)
-		ath11k_mac_set_vif_params(tx_arvif, beacons->bcn[0].skb);
-	else
+	if (tx_arvif == arvif) {
+		if (ath11k_mac_set_vif_params(tx_arvif, beacons->bcn[0].skb))
+			return -EINVAL;
+	} else {
 		arvif->wpaie_present = tx_arvif->wpaie_present;
+	}
 
 	for (i = 0; i < beacons->cnt; i++) {
 		if (tx_arvif != arvif && !nontx_vif_params_set)
@@ -1529,10 +1614,12 @@ static int ath11k_mac_setup_bcn_tmpl_mbssid(struct ath11k_vif *arvif)
 		return -EPERM;
 	}
 
-	if (tx_arvif == arvif)
-		ath11k_mac_set_vif_params(tx_arvif, bcn);
-	else if (!ath11k_mac_set_nontx_vif_params(tx_arvif, arvif, bcn))
+	if (tx_arvif == arvif) {
+		if (ath11k_mac_set_vif_params(tx_arvif, bcn))
+			return -EINVAL;
+	} else if (!ath11k_mac_set_nontx_vif_params(tx_arvif, arvif, bcn)) {
 		return -EINVAL;
+	}
 
 	ret = ath11k_wmi_bcn_tmpl(ar, arvif->vdev_id, &offs, bcn, 0);
 	kfree_skb(bcn);
@@ -3991,6 +4078,9 @@ static int ath11k_mac_op_hw_scan(struct ieee80211_hw *hw,
 	arg->vdev_id = arvif->vdev_id;
 	arg->scan_id = ATH11K_SCAN_ID;
 
+	if (ar->ab->hw_params.single_pdev_only)
+		arg->scan_f_filter_prb_req = 1;
+
 	if (req->ie_len) {
 		arg->extraie.ptr = kmemdup(req->ie, req->ie_len, GFP_KERNEL);
 		if (!arg->extraie.ptr) {
@@ -6420,6 +6510,7 @@ static void ath11k_mac_op_stop(struct ieee80211_hw *hw)
 {
 	struct ath11k *ar = hw->priv;
 	struct htt_ppdu_stats_info *ppdu_stats, *tmp;
+	struct scan_chan_list_params *params;
 	int ret;
 
 	ath11k_mac_drain_tx(ar);
@@ -6435,6 +6526,7 @@ static void ath11k_mac_op_stop(struct ieee80211_hw *hw)
 	mutex_unlock(&ar->conf_mutex);
 
 	cancel_delayed_work_sync(&ar->scan.timeout);
+	cancel_work_sync(&ar->channel_update_work);
 	cancel_work_sync(&ar->regd_update_work);
 	cancel_work_sync(&ar->ab->update_11d_work);
 
@@ -6449,6 +6541,15 @@ static void ath11k_mac_op_stop(struct ieee80211_hw *hw)
 		kfree(ppdu_stats);
 	}
 	spin_unlock_bh(&ar->data_lock);
+
+	spin_lock_bh(&ar->channel_update_lock);
+	while ((params = list_first_entry_or_null(&ar->channel_update_queue,
+						  struct scan_chan_list_params,
+						  list))) {
+		list_del(&params->list);
+		kfree(params);
+	}
+	spin_unlock_bh(&ar->channel_update_lock);
 
 	rcu_assign_pointer(ar->ab->pdevs_active[ar->pdev_idx], NULL);
 
@@ -6730,6 +6831,16 @@ static int ath11k_mac_vdev_delete(struct ath11k *ar, struct ath11k_vif *arvif)
 	return ret;
 }
 
+static void ath11k_mac_bcn_tx_work(struct work_struct *work)
+{
+	struct ath11k_vif *arvif = container_of(work, struct ath11k_vif,
+						bcn_tx_work);
+
+	mutex_lock(&arvif->ar->conf_mutex);
+	ath11k_mac_bcn_tx_event(arvif);
+	mutex_unlock(&arvif->ar->conf_mutex);
+}
+
 static int ath11k_mac_op_add_interface(struct ieee80211_hw *hw,
 				       struct ieee80211_vif *vif)
 {
@@ -6775,6 +6886,7 @@ static int ath11k_mac_op_add_interface(struct ieee80211_hw *hw,
 	arvif->vif = vif;
 
 	INIT_LIST_HEAD(&arvif->list);
+	INIT_WORK(&arvif->bcn_tx_work, ath11k_mac_bcn_tx_work);
 	INIT_DELAYED_WORK(&arvif->connection_loss_work,
 			  ath11k_mac_vif_sta_connection_loss_work);
 
@@ -6798,17 +6910,26 @@ static int ath11k_mac_op_add_interface(struct ieee80211_hw *hw,
 	case NL80211_IFTYPE_UNSPECIFIED:
 	case NL80211_IFTYPE_STATION:
 		arvif->vdev_type = WMI_VDEV_TYPE_STA;
+		if (vif->p2p)
+			arvif->vdev_subtype = WMI_VDEV_SUBTYPE_P2P_CLIENT;
 		break;
 	case NL80211_IFTYPE_MESH_POINT:
 		arvif->vdev_subtype = WMI_VDEV_SUBTYPE_MESH_11S;
 		fallthrough;
 	case NL80211_IFTYPE_AP:
 		arvif->vdev_type = WMI_VDEV_TYPE_AP;
+		if (vif->p2p)
+			arvif->vdev_subtype = WMI_VDEV_SUBTYPE_P2P_GO;
 		break;
 	case NL80211_IFTYPE_MONITOR:
 		arvif->vdev_type = WMI_VDEV_TYPE_MONITOR;
 		ar->monitor_vdev_id = bit;
 		break;
+	case NL80211_IFTYPE_P2P_DEVICE:
+		arvif->vdev_type = WMI_VDEV_TYPE_STA;
+		arvif->vdev_subtype = WMI_VDEV_SUBTYPE_P2P_DEVICE;
+		break;
+
 	default:
 		WARN_ON(1);
 		break;
@@ -7010,6 +7131,7 @@ static void ath11k_mac_op_remove_interface(struct ieee80211_hw *hw,
 	int i;
 
 	cancel_delayed_work_sync(&arvif->connection_loss_work);
+	cancel_work_sync(&arvif->bcn_tx_work);
 
 	mutex_lock(&ar->conf_mutex);
 
@@ -9485,8 +9607,10 @@ static int ath11k_mac_op_remain_on_channel(struct ieee80211_hw *hw,
 	arg->dwell_time_passive = scan_time_msec;
 	arg->max_scan_time = scan_time_msec;
 	arg->scan_flags |= WMI_SCAN_FLAG_PASSIVE;
-	arg->scan_flags |= WMI_SCAN_FILTER_PROBE_REQ;
 	arg->burst_duration = duration;
+
+	if (!ar->ab->hw_params.single_pdev_only)
+		arg->scan_f_filter_prb_req = 1;
 
 	ret = ath11k_start_scan(ar, arg);
 	if (ret) {
@@ -9809,18 +9933,51 @@ static int ath11k_mac_setup_channels_rates(struct ath11k *ar,
 	return 0;
 }
 
+static void ath11k_mac_setup_mac_address_list(struct ath11k *ar)
+{
+	struct mac_address *addresses;
+	u16 n_addresses;
+	int i;
+
+	if (!ar->ab->hw_params.support_dual_stations)
+		return;
+
+	n_addresses = ar->ab->hw_params.num_vdevs;
+	addresses = kcalloc(n_addresses, sizeof(*addresses), GFP_KERNEL);
+	if (!addresses)
+		return;
+
+	memcpy(addresses[0].addr, ar->mac_addr, ETH_ALEN);
+	for (i = 1; i < n_addresses; i++) {
+		memcpy(addresses[i].addr, ar->mac_addr, ETH_ALEN);
+		/* set Local Administered Address bit */
+		addresses[i].addr[0] |= 0x2;
+
+		addresses[i].addr[0] += (i - 1) << 4;
+	}
+
+	ar->hw->wiphy->addresses = addresses;
+	ar->hw->wiphy->n_addresses = n_addresses;
+}
+
 static int ath11k_mac_setup_iface_combinations(struct ath11k *ar)
 {
 	struct ath11k_base *ab = ar->ab;
 	struct ieee80211_iface_combination *combinations;
 	struct ieee80211_iface_limit *limits;
 	int n_limits;
+	bool p2p;
+
+	p2p = ab->hw_params.interface_modes & BIT(NL80211_IFTYPE_P2P_DEVICE);
 
 	combinations = kzalloc(sizeof(*combinations), GFP_KERNEL);
 	if (!combinations)
 		return -ENOMEM;
 
-	n_limits = 2;
+	if (p2p)
+		n_limits = 3;
+	else
+		n_limits = 2;
 
 	limits = kcalloc(n_limits, sizeof(*limits), GFP_KERNEL);
 	if (!limits) {
@@ -9828,28 +9985,43 @@ static int ath11k_mac_setup_iface_combinations(struct ath11k *ar)
 		return -ENOMEM;
 	}
 
-	limits[0].max = 1;
 	limits[0].types |= BIT(NL80211_IFTYPE_STATION);
-
-	limits[1].max = 16;
 	limits[1].types |= BIT(NL80211_IFTYPE_AP);
-
 	if (IS_ENABLED(CONFIG_MAC80211_MESH) &&
 	    ab->hw_params.interface_modes & BIT(NL80211_IFTYPE_MESH_POINT))
 		limits[1].types |= BIT(NL80211_IFTYPE_MESH_POINT);
 
 	combinations[0].limits = limits;
 	combinations[0].n_limits = n_limits;
-	combinations[0].max_interfaces = 16;
-	combinations[0].num_different_channels = 1;
 	combinations[0].beacon_int_infra_match = true;
 	combinations[0].beacon_int_min_gcd = 100;
-	combinations[0].radar_detect_widths = BIT(NL80211_CHAN_WIDTH_20_NOHT) |
-						BIT(NL80211_CHAN_WIDTH_20) |
-						BIT(NL80211_CHAN_WIDTH_40) |
-						BIT(NL80211_CHAN_WIDTH_80) |
-						BIT(NL80211_CHAN_WIDTH_80P80) |
-						BIT(NL80211_CHAN_WIDTH_160);
+
+	if (ab->hw_params.support_dual_stations) {
+		limits[0].max = 2;
+		limits[1].max = 1;
+
+		combinations[0].max_interfaces = ab->hw_params.num_vdevs;
+		combinations[0].num_different_channels = 2;
+	} else {
+		limits[0].max = 1;
+		limits[1].max = 16;
+
+		combinations[0].max_interfaces = 16;
+		combinations[0].num_different_channels = 1;
+		combinations[0].radar_detect_widths = BIT(NL80211_CHAN_WIDTH_20_NOHT) |
+							BIT(NL80211_CHAN_WIDTH_20) |
+							BIT(NL80211_CHAN_WIDTH_40) |
+							BIT(NL80211_CHAN_WIDTH_80) |
+							BIT(NL80211_CHAN_WIDTH_80P80) |
+							BIT(NL80211_CHAN_WIDTH_160);
+	}
+
+	if (p2p) {
+		limits[1].types |= BIT(NL80211_IFTYPE_P2P_CLIENT) |
+			BIT(NL80211_IFTYPE_P2P_GO);
+		limits[2].max = 1;
+		limits[2].types |= BIT(NL80211_IFTYPE_P2P_DEVICE);
+	}
 
 	ar->hw->wiphy->iface_combinations = combinations;
 	ar->hw->wiphy->n_iface_combinations = 1;
@@ -9900,6 +10072,7 @@ static const struct wiphy_iftype_ext_capab ath11k_iftypes_ext_capa[] = {
 
 static void __ath11k_mac_unregister(struct ath11k *ar)
 {
+	cancel_work_sync(&ar->channel_update_work);
 	cancel_work_sync(&ar->regd_update_work);
 
 	ieee80211_unregister_hw(ar->hw);
@@ -9913,6 +10086,8 @@ static void __ath11k_mac_unregister(struct ath11k *ar)
 
 	kfree(ar->hw->wiphy->iface_combinations[0].limits);
 	kfree(ar->hw->wiphy->iface_combinations);
+
+	kfree(ar->hw->wiphy->addresses);
 
 	SET_IEEE80211_DEV(ar->hw, NULL);
 }
@@ -9956,6 +10131,7 @@ static int __ath11k_mac_register(struct ath11k *ar)
 	ath11k_pdev_caps_update(ar);
 
 	SET_IEEE80211_PERM_ADDR(ar->hw, ar->mac_addr);
+	ath11k_mac_setup_mac_address_list(ar);
 
 	SET_IEEE80211_DEV(ar->hw, ab->dev);
 
@@ -10298,6 +10474,9 @@ int ath11k_mac_allocate(struct ath11k_base *ab)
 		init_completion(&ar->thermal.wmi_sync);
 
 		INIT_DELAYED_WORK(&ar->scan.timeout, ath11k_scan_timeout_work);
+		INIT_WORK(&ar->channel_update_work, ath11k_regd_update_chan_list_work);
+		INIT_LIST_HEAD(&ar->channel_update_queue);
+		spin_lock_init(&ar->channel_update_lock);
 		INIT_WORK(&ar->regd_update_work, ath11k_regd_update_work);
 
 		INIT_WORK(&ar->wmi_mgmt_tx_work, ath11k_mgmt_over_wmi_tx_work);

@@ -1174,7 +1174,6 @@
 		"DL10_FE", "DPTX_BE", "ETDM1_IN_BE", "ETDM2_IN_BE",
 		"ETDM1_OUT_BE", "ETDM2_OUT_BE","UL_SRC1_BE",
 		"AFE_SOF_DL2", "AFE_SOF_DL3", "AFE_SOF_UL4", "AFE_SOF_UL5";
-	mediatek,dptx-codec = <&dp_tx>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&aud_pins_default>;
 };
@@ -1383,6 +1382,11 @@
 		MATRIX_KEY(0x02, 0x09, 0)	/* T8 */
 		MATRIX_KEY(0x01, 0x09, 0)	/* T9 */
 		MATRIX_KEY(0x00, 0x04, 0)	/* T10 */
+
+		/* T11 to T13 are present only on Dojo */
+		MATRIX_KEY(0x00, 0x01, 0)	/* T11 */
+		MATRIX_KEY(0x01, 0x05, 0)	/* T12 */
+		MATRIX_KEY(0x03, 0x05, 0)	/* T13 */
 	>;
 
 	linux,keymap = <

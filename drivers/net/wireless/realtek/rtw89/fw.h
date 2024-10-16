@@ -149,6 +149,7 @@ enum rtw89_fw_log_comp {
 	RTW89_FW_LOG_COMP_TWT,
 	RTW89_FW_LOG_COMP_RF,
 	RTW89_FW_LOG_COMP_MCC = 20,
+	RTW89_FW_LOG_COMP_SCAN = 28,
 };
 
 enum rtw89_pkt_offload_op {
@@ -169,6 +170,10 @@ enum rtw89_scanofld_notify_reason {
 	RTW89_SCAN_ENTER_CH_NOTIFY,
 	RTW89_SCAN_LEAVE_CH_NOTIFY,
 	RTW89_SCAN_END_SCAN_NOTIFY,
+	RTW89_SCAN_REPORT_NOTIFY,
+	RTW89_SCAN_CHKPT_NOTIFY,
+	RTW89_SCAN_ENTER_OP_NOTIFY,
+	RTW89_SCAN_LEAVE_OP_NOTIFY,
 };
 
 enum rtw89_chan_type {
@@ -183,6 +188,9 @@ enum rtw89_p2pps_action {
 	RTW89_P2P_ACT_REMOVE = 2,
 	RTW89_P2P_ACT_TERMINATE = 3,
 };
+
+#define RTW89_DEFAULT_CQM_HYST 4
+#define RTW89_DEFAULT_CQM_THOLD -70
 
 enum rtw89_bcn_fltr_offload_mode {
 	RTW89_BCN_FLTR_OFFLOAD_MODE_0 = 0,
@@ -2122,9 +2130,15 @@ enum rtw89_btc_btf_set {
 	SET_BT_IGNORE_WLAN_ACT,
 	SET_BT_TX_PWR,
 	SET_BT_LNA_CONSTRAIN,
-	SET_BT_GOLDEN_RX_RANGE,
+	SET_BT_QUERY_DEV_LIST,
+	SET_BT_QUERY_DEV_INFO,
 	SET_BT_PSD_REPORT,
 	SET_H2C_TEST,
+	SET_IOFLD_RF,
+	SET_IOFLD_BB,
+	SET_IOFLD_MAC,
+	SET_IOFLD_SCBD,
+	SET_H2C_MACRO,
 	SET_MAX1,
 };
 
@@ -2138,6 +2152,10 @@ enum rtw89_btc_cxdrvinfo {
 	CXDRVINFO_CTRL,
 	CXDRVINFO_SCAN,
 	CXDRVINFO_TRX,  /* WL traffic to WL fw */
+	CXDRVINFO_TXPWR,
+	CXDRVINFO_FDDT,
+	CXDRVINFO_MLO,
+	CXDRVINFO_OSI,
 	CXDRVINFO_MAX,
 };
 
@@ -2164,7 +2182,45 @@ struct rtw89_h2c_cxhdr {
 	u8 len;
 } __packed;
 
+struct rtw89_h2c_cxhdr_v7 {
+	u8 type;
+	u8 ver;
+	u8 len;
+} __packed;
+
+struct rtw89_h2c_cxctrl_v7 {
+	struct rtw89_h2c_cxhdr_v7 hdr;
+	struct rtw89_btc_ctrl_v7 ctrl;
+} __packed;
+
 #define H2C_LEN_CXDRVHDR sizeof(struct rtw89_h2c_cxhdr)
+#define H2C_LEN_CXDRVHDR_V7 sizeof(struct rtw89_h2c_cxhdr_v7)
+
+struct rtw89_btc_wl_role_info_v8_u8 {
+	u8 connect_cnt;
+	u8 link_mode;
+	u8 link_mode_chg;
+	u8 p2p_2g;
+
+	u8 pta_req_band;
+	u8 dbcc_en;
+	u8 dbcc_chg;
+	u8 dbcc_2g_phy;
+
+	struct rtw89_btc_wl_rlink rlink[RTW89_BE_BTC_WL_MAX_ROLE_NUMBER][RTW89_MAC_NUM];
+} __packed;
+
+struct rtw89_btc_wl_role_info_v8_u32 {
+	__le32 role_map;
+	__le32 mrole_type;
+	__le32 mrole_noa_duration;
+} __packed;
+
+struct rtw89_h2c_cxrole_v8 {
+	struct rtw89_h2c_cxhdr hdr;
+	struct rtw89_btc_wl_role_info_v8_u8 _u8;
+	struct rtw89_btc_wl_role_info_v8_u32 _u32;
+} __packed;
 
 struct rtw89_h2c_cxinit {
 	struct rtw89_h2c_cxhdr hdr;
@@ -2197,6 +2253,11 @@ struct rtw89_h2c_cxinit {
 #define RTW89_H2C_CXINIT_INFO_DBCC_EN BIT(2)
 #define RTW89_H2C_CXINIT_INFO_CX_OTHER BIT(3)
 #define RTW89_H2C_CXINIT_INFO_BT_ONLY BIT(4)
+
+struct rtw89_h2c_cxinit_v7 {
+	struct rtw89_h2c_cxhdr_v7 hdr;
+	struct rtw89_btc_init_info_v7 init;
+} __packed;
 
 static inline void RTW89_SET_FWCMD_CXROLE_CONNECT_CNT(void *cmd, u8 val)
 {
@@ -3264,20 +3325,24 @@ struct rtw89_c2h_ra_rpt {
 #define RTW89_GET_MAC_C2H_PKTOFLD_LEN(c2h) \
 	le32_get_bits(*((const __le32 *)(c2h) + 2), GENMASK(31, 16))
 
-#define RTW89_GET_MAC_C2H_SCANOFLD_PRI_CH(c2h) \
-	le32_get_bits(*((const __le32 *)(c2h) + 2), GENMASK(7, 0))
-#define RTW89_GET_MAC_C2H_SCANOFLD_RSP(c2h) \
-	le32_get_bits(*((const __le32 *)(c2h) + 2), GENMASK(19, 16))
-#define RTW89_GET_MAC_C2H_SCANOFLD_STATUS(c2h) \
-	le32_get_bits(*((const __le32 *)(c2h) + 2), GENMASK(23, 20))
-#define RTW89_GET_MAC_C2H_ACTUAL_PERIOD(c2h) \
-	le32_get_bits(*((const __le32 *)(c2h) + 2), GENMASK(31, 24))
-#define RTW89_GET_MAC_C2H_SCANOFLD_TX_FAIL(c2h) \
-	le32_get_bits(*((const __le32 *)(c2h) + 5), GENMASK(3, 0))
-#define RTW89_GET_MAC_C2H_SCANOFLD_AIR_DENSITY(c2h) \
-	le32_get_bits(*((const __le32 *)(c2h) + 5), GENMASK(7, 4))
-#define RTW89_GET_MAC_C2H_SCANOFLD_BAND(c2h) \
-	le32_get_bits(*((const __le32 *)(c2h) + 5), GENMASK(25, 24))
+struct rtw89_c2h_scanofld {
+	__le32 w0;
+	__le32 w1;
+	__le32 w2;
+	__le32 w3;
+	__le32 w4;
+	__le32 w5;
+	__le32 w6;
+	__le32 w7;
+} __packed;
+
+#define RTW89_C2H_SCANOFLD_W2_PRI_CH GENMASK(7, 0)
+#define RTW89_C2H_SCANOFLD_W2_RSN GENMASK(19, 16)
+#define RTW89_C2H_SCANOFLD_W2_STATUS GENMASK(23, 20)
+#define RTW89_C2H_SCANOFLD_W2_PERIOD GENMASK(31, 24)
+#define RTW89_C2H_SCANOFLD_W5_TX_FAIL GENMASK(3, 0)
+#define RTW89_C2H_SCANOFLD_W5_AIR_DENSITY GENMASK(7, 4)
+#define RTW89_C2H_SCANOFLD_W5_BAND GENMASK(25, 24)
 
 #define RTW89_GET_MAC_C2H_MCC_RCV_ACK_GROUP(c2h) \
 	le32_get_bits(*((const __le32 *)(c2h) + 2), GENMASK(1, 0))
@@ -3671,13 +3736,16 @@ int rtw89_fw_h2c_rssi_offload(struct rtw89_dev *rtwdev,
 			      struct rtw89_rx_phy_ppdu *phy_ppdu);
 int rtw89_fw_h2c_tp_offload(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif);
 int rtw89_fw_h2c_ra(struct rtw89_dev *rtwdev, struct rtw89_ra_info *ra, bool csi);
-int rtw89_fw_h2c_cxdrv_init(struct rtw89_dev *rtwdev);
-int rtw89_fw_h2c_cxdrv_role(struct rtw89_dev *rtwdev);
-int rtw89_fw_h2c_cxdrv_role_v1(struct rtw89_dev *rtwdev);
-int rtw89_fw_h2c_cxdrv_role_v2(struct rtw89_dev *rtwdev);
-int rtw89_fw_h2c_cxdrv_ctrl(struct rtw89_dev *rtwdev);
-int rtw89_fw_h2c_cxdrv_trx(struct rtw89_dev *rtwdev);
-int rtw89_fw_h2c_cxdrv_rfk(struct rtw89_dev *rtwdev);
+int rtw89_fw_h2c_cxdrv_init(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_init_v7(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_role(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_role_v1(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_role_v2(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_role_v8(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_ctrl(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_ctrl_v7(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_trx(struct rtw89_dev *rtwdev, u8 type);
+int rtw89_fw_h2c_cxdrv_rfk(struct rtw89_dev *rtwdev, u8 type);
 int rtw89_fw_h2c_del_pkt_offload(struct rtw89_dev *rtwdev, u8 id);
 int rtw89_fw_h2c_add_pkt_offload(struct rtw89_dev *rtwdev, u8 *id,
 				 struct sk_buff *skb_ofld);

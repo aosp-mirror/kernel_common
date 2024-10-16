@@ -1759,6 +1759,7 @@ struct xhci_port_cap {
 	u8			psi_uid_count;
 	u8			maj_rev;
 	u8			min_rev;
+	u32			protocol_caps;
 };
 
 struct xhci_port {
@@ -1947,9 +1948,6 @@ struct xhci_hcd {
 	unsigned		broken_suspend:1;
 	/* Indicates that omitting hcd is supported if root hub has no ports */
 	unsigned		allow_single_roothub:1;
-	/* cached usb2 extened protocol capabilites */
-	u32                     *ext_caps;
-	unsigned int            num_ext_caps;
 	/* cached extended protocol port capabilities */
 	struct xhci_port_cap	*port_caps;
 	unsigned int		num_port_caps;
@@ -2260,7 +2258,8 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue, u16 wIndex,
 int xhci_hub_status_data(struct usb_hcd *hcd, char *buf);
 int xhci_find_raw_port_number(struct usb_hcd *hcd, int port1);
 struct xhci_hub *xhci_get_rhub(struct usb_hcd *hcd);
-
+enum usb_link_tunnel_mode xhci_port_is_tunneled(struct xhci_hcd *xhci,
+						struct xhci_port *port);
 void xhci_hc_died(struct xhci_hcd *xhci);
 
 #ifdef CONFIG_PM

@@ -84,7 +84,7 @@ void ieee80211_offchannel_stop_vifs(struct ieee80211_local *local)
 {
 	struct ieee80211_sub_if_data *sdata;
 
-	if (WARN_ON(local->use_chanctx))
+	if (WARN_ON(!local->emulate_chanctx))
 		return;
 
 	/*
@@ -134,7 +134,7 @@ void ieee80211_offchannel_return(struct ieee80211_local *local)
 {
 	struct ieee80211_sub_if_data *sdata;
 
-	if (WARN_ON(local->use_chanctx))
+	if (WARN_ON(!local->emulate_chanctx))
 		return;
 
 	mutex_lock(&local->iflist_mtx);
@@ -353,10 +353,13 @@ static void _ieee80211_start_next_roc(struct ieee80211_local *local)
 		 * 20 MHz channel width) don't stop all the operations but still
 		 * treat it as though the ROC operation started properly, so
 		 * other ROC operations won't interfere with this one.
+		 *
+		 * Note: scan can't run, tmp_channel is what we use, so this
+		 * must be the currently active channel.
 		 */
-		roc->on_channel = roc->chan == local->_oper_chandef.chan &&
-				  local->_oper_chandef.width != NL80211_CHAN_WIDTH_5 &&
-				  local->_oper_chandef.width != NL80211_CHAN_WIDTH_10;
+		roc->on_channel = roc->chan == local->hw.conf.chandef.chan &&
+				  local->hw.conf.chandef.width != NL80211_CHAN_WIDTH_5 &&
+				  local->hw.conf.chandef.width != NL80211_CHAN_WIDTH_10;
 
 		/* start this ROC */
 		ieee80211_recalc_idle(local);
@@ -365,7 +368,7 @@ static void _ieee80211_start_next_roc(struct ieee80211_local *local)
 			ieee80211_offchannel_stop_vifs(local);
 
 			local->tmp_channel = roc->chan;
-			ieee80211_hw_config(local, 0);
+			ieee80211_hw_conf_chan(local);
 		}
 
 		wiphy_delayed_work_queue(local->hw.wiphy, &local->roc_work,
@@ -428,7 +431,7 @@ static void __ieee80211_roc_work(struct ieee80211_local *local)
 		return;
 
 	if (!roc->started) {
-		WARN_ON(local->use_chanctx);
+		WARN_ON(!local->emulate_chanctx);
 		_ieee80211_start_next_roc(local);
 	} else {
 		on_channel = roc->on_channel;
@@ -441,7 +444,7 @@ static void __ieee80211_roc_work(struct ieee80211_local *local)
 			ieee80211_flush_queues(local, NULL, false);
 
 			local->tmp_channel = NULL;
-			ieee80211_hw_config(local, 0);
+			ieee80211_hw_conf_chan(local);
 
 			ieee80211_offchannel_return(local);
 		}
@@ -543,7 +546,7 @@ static int ieee80211_start_roc_work(struct ieee80211_local *local,
 		/* this may work, but is untested */
 		return -EOPNOTSUPP;
 
-	if (local->use_chanctx && !local->ops->remain_on_channel)
+	if (!local->emulate_chanctx && !local->ops->remain_on_channel)
 		return -EOPNOTSUPP;
 
 	roc = kzalloc(sizeof(*roc), GFP_KERNEL);

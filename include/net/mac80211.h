@@ -225,6 +225,14 @@ enum ieee80211_chanctx_change {
 };
 
 /**
+ * struct ieee80211_chan_req - A channel "request"
+ * @oper: channel definition to use for operation
+ */
+struct ieee80211_chan_req {
+	struct cfg80211_chan_def oper;
+};
+
+/**
  * struct ieee80211_chanctx_conf - channel context that vifs may be tuned to
  *
  * This is the driver-visible part. The ieee80211_chanctx
@@ -582,7 +590,7 @@ struct ieee80211_fils_discovery {
  * @mcast_rate: per-band multicast rate index + 1 (0: disabled)
  * @bssid: The BSSID for this BSS
  * @enable_beacon: whether beaconing should be enabled or not
- * @chandef: Channel definition for this BSS -- the hardware might be
+ * @chanreq: Channel request for this BSS -- the hardware might be
  *	configured a higher bandwidth than this BSS uses, for example.
  * @mu_group: VHT MU-MIMO group membership data
  * @ht_operation_mode: HT operation mode like in &struct ieee80211_ht_operation.
@@ -719,7 +727,7 @@ struct ieee80211_bss_conf {
 	u32 cqm_rssi_hyst;
 	s32 cqm_rssi_low;
 	s32 cqm_rssi_high;
-	struct cfg80211_chan_def chandef;
+	struct ieee80211_chan_req chanreq;
 	struct ieee80211_mu_group_data mu_group;
 	bool qos;
 	bool hidden_ssid;
@@ -2695,6 +2703,9 @@ struct ieee80211_txq {
  * @IEEE80211_HW_MLO_MCAST_MULTI_LINK_TX: Hardware/driver handles transmitting
  *	multicast frames on all links, mac80211 should not do that.
  *
+ * @IEEE80211_HW_DISALLOW_PUNCTURING: HW requires disabling puncturing in EHT
+ *	and connecting with a lower bandwidth instead
+ *
  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
  */
 enum ieee80211_hw_flags {
@@ -2752,6 +2763,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_SUPPORTS_CONC_MON_RX_DECAP,
 	IEEE80211_HW_DETECTS_COLOR_COLLISION,
 	IEEE80211_HW_MLO_MCAST_MULTI_LINK_TX,
+	IEEE80211_HW_DISALLOW_PUNCTURING,
 
 	/* keep last, obviously */
 	NUM_IEEE80211_HW_FLAGS
@@ -7473,5 +7485,18 @@ int ieee80211_set_active_links(struct ieee80211_vif *vif, u16 active_links);
  */
 void ieee80211_set_active_links_async(struct ieee80211_vif *vif,
 				      u16 active_links);
+
+/* for older drivers - let's not document these ... */
+int ieee80211_emulate_add_chanctx(struct ieee80211_hw *hw,
+				  struct ieee80211_chanctx_conf *ctx);
+void ieee80211_emulate_remove_chanctx(struct ieee80211_hw *hw,
+				      struct ieee80211_chanctx_conf *ctx);
+void ieee80211_emulate_change_chanctx(struct ieee80211_hw *hw,
+				      struct ieee80211_chanctx_conf *ctx,
+				      u32 changed);
+int ieee80211_emulate_switch_vif_chanctx(struct ieee80211_hw *hw,
+					 struct ieee80211_vif_chanctx_switch *vifs,
+					 int n_vifs,
+					 enum ieee80211_chanctx_switch_mode mode);
 
 #endif /* MAC80211_H */

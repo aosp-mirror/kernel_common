@@ -1715,6 +1715,44 @@ out_unlock:
 	return ret;
 }
 
+static u64 ucsi_get_supported_notifications(struct ucsi *ucsi)
+{
+	u16 features = ucsi->cap.features;
+	u64 ntfy = UCSI_ENABLE_NTFY_ALL;
+
+	if (!(features & UCSI_CAP_ALT_MODE_DETAILS))
+		ntfy &= ~UCSI_ENABLE_NTFY_CAM_CHANGE;
+
+	if (!(features & UCSI_CAP_PDO_DETAILS))
+		ntfy &= ~(UCSI_ENABLE_NTFY_PWR_LEVEL_CHANGE |
+			  UCSI_ENABLE_NTFY_CAP_CHANGE);
+
+	if (!(features & UCSI_CAP_EXT_SUPPLY_NOTIFICATIONS))
+		ntfy &= ~UCSI_ENABLE_NTFY_EXT_PWR_SRC_CHANGE;
+
+	if (!(features & UCSI_CAP_PD_RESET))
+		ntfy &= ~UCSI_ENABLE_NTFY_PD_RESET_COMPLETE;
+
+	if (ucsi->version <= UCSI_VERSION_1_2)
+		return ntfy;
+
+	ntfy |= UCSI_ENABLE_NTFY_SINK_PATH_STS_CHANGE;
+
+	if (features & UCSI_CAP_GET_ATTENTION_VDO)
+		ntfy |= UCSI_ENABLE_NTFY_ATTENTION;
+
+	if (features & UCSI_CAP_FW_UPDATE_REQUEST)
+		ntfy |= UCSI_ENABLE_NTFY_LPM_FW_UPDATE_REQ;
+
+	if (features & UCSI_CAP_SECURITY_REQUEST)
+		ntfy |= UCSI_ENABLE_NTFY_SECURITY_REQ_PARTNER;
+
+	if (features & UCSI_CAP_SET_RETIMER_MODE)
+		ntfy |= UCSI_ENABLE_NTFY_SET_RETIMER_MODE;
+
+	return ntfy;
+}
+
 /**
  * ucsi_init - Initialize UCSI interface
  * @ucsi: UCSI to be initialized
@@ -1769,8 +1807,8 @@ static int ucsi_init(struct ucsi *ucsi)
 			goto err_unregister;
 	}
 
-	/* Enable all notifications */
-	ntfy = UCSI_ENABLE_NTFY_ALL;
+	/* Enable all supported notifications */
+	ntfy = ucsi_get_supported_notifications(ucsi);
 	command = UCSI_SET_NOTIFICATION_ENABLE | ntfy;
 	ret = ucsi_send_command(ucsi, command, NULL, 0);
 	if (ret < 0)
