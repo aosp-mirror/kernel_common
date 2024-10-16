@@ -2309,6 +2309,7 @@ static inline int task_on_rq_migrating(struct task_struct *p)
 #define WF_SYNC			0x10 /* Waker goes to sleep after wakeup */
 #define WF_MIGRATED		0x20 /* Internal use, task got migrated */
 #define WF_CURRENT_CPU		0x40 /* Prefer to move the wakee to the current CPU. */
+#define WF_RQ_SELECTED		0x80 /* ->select_task_rq() was called */
 
 #ifdef CONFIG_SMP
 static_assert(WF_EXEC == SD_BALANCE_EXEC);
@@ -2351,6 +2352,7 @@ extern const u32		sched_prio_to_wmult[40];
  * ENQUEUE_HEAD      - place at front of runqueue (tail if not specified)
  * ENQUEUE_REPLENISH - CBS (replenish runtime and postpone deadline)
  * ENQUEUE_MIGRATED  - the task was migrated during wakeup
+ * ENQUEUE_RQ_SELECTED - ->select_task_rq() was called
  *
  */
 
@@ -2377,6 +2379,7 @@ extern const u32		sched_prio_to_wmult[40];
 #define ENQUEUE_INITIAL		0x80
 #define ENQUEUE_MIGRATING	0x100
 #define ENQUEUE_DELAYED		0x200
+#define ENQUEUE_RQ_SELECTED	0x400
 
 #define RETRY_TASK		((void *)-1UL)
 
@@ -3861,5 +3864,13 @@ void sched_enq_and_set_task(struct sched_enq_and_set_ctx *ctx);
 #endif /* CONFIG_SCHED_CLASS_EXT */
 
 #include "ext.h"
+
+static inline void *android_task_vendor_data(struct task_struct *p)
+{
+	if (p == &init_task)
+		return &vendor_data_pad[0];
+
+	return p + 1;
+}
 
 #endif /* _KERNEL_SCHED_SCHED_H */

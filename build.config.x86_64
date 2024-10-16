@@ -1,7 +1,4 @@
-ARCH=x86_64
 MAKE_GOALS="
 bzImage
 modules
 "
-
-NDK_TRIPLE=${X86_64_NDK_TRIPLE}
