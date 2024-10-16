@@ -852,9 +852,8 @@ config CFI_ICALL_NORMALIZE_INTEGERS
 	  This option is necessary for using CFI with Rust. If unsure, say N.
 
 config HAVE_CFI_ICALL_NORMALIZE_INTEGERS
-	bool "Are normalized CFI tags for integers available?"
-	default !GCOV_KERNEL && !KASAN_GENERIC && !KASAN_SW_TAGS
-	depends on EXPERT || (!GCOV_KERNEL && !KASAN_GENERIC && !KASAN_SW_TAGS)
+	def_bool !GCOV_KERNEL && !KASAN
+	depends on CFI_CLANG
 	depends on $(cc-option,-fsanitize=kcfi -fsanitize-cfi-icall-experimental-normalize-integers)
 	help
 	  Is CFI_ICALL_NORMALIZE_INTEGERS supported with the set of compilers
