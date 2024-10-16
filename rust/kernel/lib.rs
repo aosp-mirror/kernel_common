@@ -52,6 +52,7 @@ pub mod rbtree;
 pub mod security;
 pub mod seq_file;
 pub mod sizes;
+pub mod rbtree;
 mod static_assert;
 pub mod static_key;
 #[doc(hidden)]

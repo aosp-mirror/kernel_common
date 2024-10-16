@@ -44,14 +44,6 @@ EXCLUDED_FILES = [
     "*/security/selinux/flask.h",
 ]
 
-# TODO(b/330365583) These gcno files are not currently preserved.
-OMITTED_GCNO_FILES = [
-    "common-modules/virtual-device/v4l2loopback/v4l2loopback.gcno",
-    "common-modules/virtual-device/goldfish_drivers/goldfish_sync.gcno",
-    "common-modules/virtual-device/goldfish_drivers/goldfish_pipe.gcno",
-    "common-modules/virtual-device/goldfish_drivers/goldfish_address_space.gcno",
-]
-
 
 def create_llvm_gcov_sh(
     llvm_cov_filename: str,
@@ -161,15 +153,6 @@ def correct_symlinks_in_directory(directory: str, prefix_mappings: {}) -> None:
   for root, _, files in os.walk(directory):
     for filename in files:
       filepath = os.path.join(root, filename)
-
-      # TODO(b/330365583) These gcno files aren't preserved and can't be used.
-      if any(
-          ommitted_filename in filepath
-          for ommitted_filename in OMITTED_GCNO_FILES
-      ):
-        os.remove(filepath)
-        continue
-
       if os.path.islink(filepath):
         if not update_symlink_from_mapping(filepath, prefix_mappings):
           logging.error(
@@ -332,7 +315,9 @@ def unpack_gcov_tar(file_path: str, output_dir: str) -> str:
   )
 
   test_dest_dir = os.path.join(output_dir, testname)
-  os.makedirs(test_dest_dir, exist_ok=True)
+  if os.path.exists(test_dest_dir):
+    shutil.rmtree(test_dest_dir)
+  os.makedirs(test_dest_dir)
   shutil.unpack_archive(file_path, test_dest_dir, "tar")
   return test_dest_dir
 

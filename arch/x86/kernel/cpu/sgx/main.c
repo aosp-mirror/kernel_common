@@ -733,7 +733,7 @@ out:
 	return 0;
 }
 
-/**
+/*
  * A section metric is concatenated in a way that @low bits 12-31 define the
  * bits 12-31 of the metric and @high bits 0-19 define the bits 32-51 of the
  * metric.
@@ -903,10 +903,10 @@ int sgx_set_attribute(unsigned long *allowed_attributes,
 {
 	struct fd f = fdget(attribute_fd);
 
-	if (!f.file)
+	if (!fd_file(f))
 		return -EINVAL;
 
-	if (f.file->f_op != &sgx_provision_fops) {
+	if (fd_file(f)->f_op != &sgx_provision_fops) {
 		fdput(f);
 		return -EINVAL;
 	}

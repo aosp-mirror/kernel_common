@@ -17,6 +17,7 @@
 #include <linux/blk-mq.h>
 #include <linux/devfreq.h>
 #include <linux/fault-inject.h>
+#include <linux/debugfs.h>
 #include <linux/msi.h>
 #include <linux/pm_runtime.h>
 #include <linux/dma-direction.h>
@@ -1432,7 +1433,7 @@ static inline int ufshcd_disable_host_tx_lcc(struct ufs_hba *hba)
 int ufshcd_query_flag_retry(struct ufs_hba *hba,
 	enum query_opcode opcode, enum flag_idn idn, u8 index, bool *flag_res);
 
-int ufshcd_bkops_ctrl(struct ufs_hba *hba, enum bkops_status status);
+int ufshcd_bkops_ctrl(struct ufs_hba *hba);
 
 void ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit);
 void ufshcd_fixup_dev_quirks(struct ufs_hba *hba,

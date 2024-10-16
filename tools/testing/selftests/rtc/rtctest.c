@@ -412,13 +412,6 @@ TEST_F_TIMEOUT(rtc, alarm_wkalm_set_minute, 65) {
 }
 #endif
 
-static void __attribute__((constructor))
-__constructor_order_last(void)
-{
-	if (!__constructor_order)
-		__constructor_order = _CONSTRUCTOR_ORDER_BACKWARD;
-}
-
 int main(int argc, char **argv)
 {
 	switch (argc) {
