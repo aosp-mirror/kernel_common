@@ -516,3 +516,5 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_cma_alloc_retry);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_group_exit);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_shrink_node_memcgs);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_swap_writepage);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_wq_queue_work);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_wq_wake_idle_worker);
