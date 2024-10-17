@@ -355,6 +355,7 @@
   device_link_add
   device_link_del
   device_match_fwnode
+  device_property_match_string
   device_property_present
   device_property_read_string
   device_property_read_u32_array
