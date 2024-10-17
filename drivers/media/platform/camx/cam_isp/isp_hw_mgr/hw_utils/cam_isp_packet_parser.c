@@ -486,7 +486,6 @@ int cam_isp_add_io_buffers(
 	uint32_t                            io_cfg_used_bytes, num_ent;
 	u32                                 res_id_out, plane_id;
 	size_t                              size;
-	int32_t                             hdl;
 	int                                 mmu_hdl;
 	bool                                mode;
 	uint64_t                            req_id;
@@ -612,7 +611,6 @@ int cam_isp_add_io_buffers(
 				if (!io_cfg[i].mem_handle[plane_id])
 					break;
 
-				hdl = io_cfg[i].mem_handle[plane_id];
 				if (res->process_cmd(res,
 						CAM_ISP_HW_CMD_GET_SECURE_MODE,
 						&mode,
@@ -741,7 +739,6 @@ int cam_isp_add_io_buffers(
 				if (!io_cfg[i].mem_handle[plane_id])
 					break;
 
-				hdl = io_cfg[i].mem_handle[plane_id];
 				if (res->process_cmd(res,
 						CAM_ISP_HW_CMD_GET_SECURE_MODE,
 						&mode,

@@ -422,7 +422,7 @@ static int smmu_init_cmdq(struct hyp_arm_smmu_v3_device *smmu)
 	cmdq_base &= Q_BASE_ADDR_MASK;
 
 	if (!(smmu->features & ARM_SMMU_FEAT_COHERENCY))
-		prot |= KVM_PGTABLE_PROT_NC;
+		prot |= KVM_PGTABLE_PROT_NORMAL_NC;
 
 	ret = ___pkvm_host_donate_hyp_prot(cmdq_base >> PAGE_SHIFT,
 					   PAGE_ALIGN(cmdq_size) >> PAGE_SHIFT,

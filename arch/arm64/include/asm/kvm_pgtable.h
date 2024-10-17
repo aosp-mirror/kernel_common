@@ -225,9 +225,10 @@ enum kvm_pgtable_stage2_flags {
  * @KVM_PGTABLE_PROT_W:		Write permission.
  * @KVM_PGTABLE_PROT_R:		Read permission.
  * @KVM_PGTABLE_PROT_DEVICE:	Device attributes.
- * @KVM_PGTABLE_PROT_NC:	Normal non-cacheable attributes.
+ * @KVM_PGTABLE_PROT_NORMAL_NC:	Normal noncacheable attributes.
  * @KVM_PGTABLE_PROT_PXN:	Privileged execute-never.
  * @KVM_PGTABLE_PROT_UXN:	Unprivileged execute-never.
+ * @KVM_PGTABLE_PROT_S2_NOFWB:	Don't enforce normal WB.
  * @KVM_PGTABLE_PROT_SW0:	Software bit 0.
  * @KVM_PGTABLE_PROT_SW1:	Software bit 1.
  * @KVM_PGTABLE_PROT_SW2:	Software bit 2.
@@ -239,9 +240,10 @@ enum kvm_pgtable_prot {
 	KVM_PGTABLE_PROT_R			= BIT(2),
 
 	KVM_PGTABLE_PROT_DEVICE			= BIT(3),
-	KVM_PGTABLE_PROT_NC			= BIT(4),
+	KVM_PGTABLE_PROT_NORMAL_NC		= BIT(4),
 	KVM_PGTABLE_PROT_PXN			= BIT(5),
 	KVM_PGTABLE_PROT_UXN			= BIT(6),
+	KVM_PGTABLE_PROT_S2_NOFWB		= BIT(7),
 
 	KVM_PGTABLE_PROT_SW0			= BIT(55),
 	KVM_PGTABLE_PROT_SW1			= BIT(56),

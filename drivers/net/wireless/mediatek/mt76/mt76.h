@@ -349,6 +349,8 @@ struct mt76_wcid {
 	u8 sta:1;
 	u8 amsdu:1;
 	u8 phy_idx:2;
+	u8 link_id:4;
+	bool link_valid;
 
 	u8 rx_check_pn;
 	u8 rx_key_pn[IEEE80211_NUM_TIDS + 1][6];
@@ -366,6 +368,8 @@ struct mt76_wcid {
 	struct mt76_sta_stats stats;
 
 	struct list_head poll_list;
+
+	struct mt76_wcid *def_wcid;
 };
 
 struct mt76_txq {
@@ -1256,6 +1260,9 @@ wcid_to_sta(struct mt76_wcid *wcid)
 
 	if (!wcid || !wcid->sta)
 		return NULL;
+
+	if (wcid->def_wcid)
+		ptr = wcid->def_wcid;
 
 	return container_of(ptr, struct ieee80211_sta, drv_priv);
 }

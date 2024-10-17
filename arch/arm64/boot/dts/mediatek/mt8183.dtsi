@@ -1966,22 +1966,22 @@
 			#clock-cells = <1>;
 		};
 
-		vcodec_dec: vcodec@16000000 {
+		vcodec_dec: video-codec@16020000 {
 			compatible = "mediatek,mt8183-vcodec-dec";
-			reg = <0 0x16000000 0 0x1000>,		/* VDEC_SYS */
-				 <0 0x16020000 0 0x1000>,		/* VDEC_MISC */
-				 <0 0x16021000 0 0x800>,		/* VDEC_VLD */
-				 <0 0x16021800 0 0x800>,		/* VDEC_TOP */
-				 <0 0x16022000 0 0x1000>,		/* VDEC_MC */
-				 <0 0x16023000 0 0x1000>,		/* VDEC_AVCVLD */
-				 <0 0x16024000 0 0x1000>,		/* VDEC_AVCMV */
-				 <0 0x16025000 0 0x1000>,		/* VDEC_PP */
-				 <0 0x16026800 0 0x800>,		/* VP8_VD */
-				 <0 0x16027000 0 0x800>,		/* VP6_VD */
-				 <0 0x16027800 0 0x800>,		/* VP8_VL */
-				 <0 0x16028400 0 0x400>;		/* VP9_VD */
+			reg = <0 0x16020000 0 0x1000>,		/* VDEC_MISC */
+			      <0 0x16021000 0 0x800>,		/* VDEC_VLD */
+			      <0 0x16021800 0 0x800>,		/* VDEC_TOP */
+			      <0 0x16022000 0 0x1000>,		/* VDEC_MC */
+			      <0 0x16023000 0 0x1000>,		/* VDEC_AVCVLD */
+			      <0 0x16024000 0 0x1000>,		/* VDEC_AVCMV */
+			      <0 0x16025000 0 0x1000>,		/* VDEC_PP */
+			      <0 0x16026800 0 0x800>,		/* VP8_VD */
+			      <0 0x16027000 0 0x800>,		/* VP6_VD */
+			      <0 0x16027800 0 0x800>,		/* VP8_VL */
+			      <0 0x16028400 0 0x400>;		/* VP9_VD */
+			reg-names = "misc", "ld", "top", "cm", "ad", "av", "pp",
+				    "hwd", "hwq", "hwb", "hwg";
 			interrupts = <GIC_SPI 250 IRQ_TYPE_LEVEL_LOW>;
-			mediatek,larb = <&larb1>;
 			iommus = <&iommu M4U_PORT_HW_VDEC_MC_EXT>,
 				 <&iommu M4U_PORT_HW_VDEC_PP_EXT>,
 				 <&iommu M4U_PORT_HW_VDEC_VLD_EXT>,
@@ -1990,9 +1990,10 @@
 				 <&iommu M4U_PORT_HW_VDEC_PRED_WR_EXT>,
 				 <&iommu M4U_PORT_HW_VDEC_PPWRAP_EXT>;
 			mediatek,scp = <&scp>;
+			mediatek,vdecsys = <&vdecsys>;
 			power-domains = <&spm MT8183_POWER_DOMAIN_VDEC>;
 			clocks = <&vdecsys CLK_VDEC_VDEC>;
-			clock-names = "MT_CG_VDEC";
+			clock-names = "vdec";
 		};
 
 		larb1: larb@16010000 {
@@ -2020,23 +2021,10 @@
 			power-domains = <&spm MT8183_POWER_DOMAIN_VENC>;
 		};
 
-		venc_jpg: venc_jpg@17030000 {
-			compatible = "mediatek,mt8183-jpgenc", "mediatek,mtk-jpgenc";
-			reg = <0 0x17030000 0 0x1000>;
-			interrupts = <GIC_SPI 249 IRQ_TYPE_LEVEL_LOW>;
-			iommus = <&iommu M4U_PORT_JPGENC_RDMA>,
-				 <&iommu M4U_PORT_JPGENC_BSDMA>;
-			power-domains = <&spm MT8183_POWER_DOMAIN_VENC>;
-			clocks = <&vencsys CLK_VENC_JPGENC>;
-			clock-names = "jpgenc";
-		};
-
 		vcodec_enc: vcodec@17020000 {
 			compatible = "mediatek,mt8183-vcodec-enc";
-			reg = <0 0x17020000 0 0x1000>,
-				 <0 0x17000000 0 0x1000>; /* Dummy */
+			reg = <0 0x17020000 0 0x1000>;
 			interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_LOW>;
-			mediatek,larb = <&larb4>;
 			iommus = <&iommu M4U_PORT_VENC_REC>,
 				 <&iommu M4U_PORT_VENC_BSDMA>,
 				 <&iommu M4U_PORT_VENC_RD_COMV>,
@@ -2047,7 +2035,18 @@
 			mediatek,scp = <&scp>;
 			power-domains = <&spm MT8183_POWER_DOMAIN_VENC>;
 			clocks = <&vencsys CLK_VENC_VENC>;
-			clock-names = "MT_CG_VENC";
+			clock-names = "venc_sel";
+		};
+
+		venc_jpg: venc_jpg@17030000 {
+			compatible = "mediatek,mt8183-jpgenc", "mediatek,mtk-jpgenc";
+			reg = <0 0x17030000 0 0x1000>;
+			interrupts = <GIC_SPI 249 IRQ_TYPE_LEVEL_LOW>;
+			iommus = <&iommu M4U_PORT_JPGENC_RDMA>,
+				 <&iommu M4U_PORT_JPGENC_BSDMA>;
+			power-domains = <&spm MT8183_POWER_DOMAIN_VENC>;
+			clocks = <&vencsys CLK_VENC_JPGENC>;
+			clock-names = "jpgenc";
 		};
 
 		ipu_conn: syscon@19000000 {

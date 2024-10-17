@@ -13,7 +13,6 @@
 #include <linux/sched.h>
 #include <linux/version.h>
 
-#include <media/ipu-isys.h>
 #include <media/v4l2-mc.h>
 #include <media/v4l2-subdev.h>
 #include <media/v4l2-fwnode.h>

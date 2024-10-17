@@ -16,11 +16,10 @@
 #include <linux/pci.h>
 #include <linux/pm_runtime.h>
 
-#include <media/ipu-isys.h>
-
 #include "ipu.h"
 #include "ipu-bus.h"
 #include "ipu-buttress.h"
+#include "ipu-isys.h"
 #include "ipu-platform-buttress-regs.h"
 #include "ipu-cpd.h"
 

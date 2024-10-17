@@ -4,7 +4,6 @@
  */
 
 #include <linux/delay.h>
-#include <media/ipu-isys.h>
 #include <media/v4l2-device.h>
 #include "ipu.h"
 #include "ipu-buttress.h"

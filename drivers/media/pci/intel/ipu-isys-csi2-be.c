@@ -4,7 +4,6 @@
 #include <linux/device.h>
 #include <linux/module.h>
 
-#include <media/ipu-isys.h>
 #include <media/media-entity.h>
 #include <media/v4l2-device.h>
 
