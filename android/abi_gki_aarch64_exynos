@@ -1872,7 +1872,6 @@
 
 # required by pinctrl-samsung-ext.ko
   device_get_next_child_node
-  fwnode_handle_put
   fwnode_property_present
   generic_handle_domain_irq
   gpiochip_lock_as_irq

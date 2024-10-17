@@ -933,7 +933,6 @@
   fwnode_get_phy_node
   fwnode_graph_get_endpoint_by_id
   fwnode_graph_get_next_endpoint
-  fwnode_handle_put
   fwnode_irq_get_byname
   fwnode_mdio_find_device
   fwnode_property_match_string

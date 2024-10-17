@@ -861,7 +861,6 @@
   fwnode_get_name
   fwnode_gpiod_get_index
   fwnode_handle_get
-  fwnode_handle_put
   fwnode_property_present
   fwnode_property_read_string
   fwnode_property_read_u32_array

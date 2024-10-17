@@ -1134,7 +1134,6 @@
   device_get_next_child_node
   devm_gpiochip_add_data_with_key
   devm_pinctrl_register
-  fwnode_handle_put
   fwnode_property_present
   gpiochip_generic_free
   gpiochip_generic_request

@@ -487,7 +487,6 @@
   fwnode_find_reference
   fwnode_get_next_child_node
   fwnode_handle_get
-  fwnode_handle_put
   fwnode_property_present
   fwnode_property_read_string
   fwnode_property_read_u16_array

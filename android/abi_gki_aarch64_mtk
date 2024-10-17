@@ -1054,7 +1054,6 @@
   fwnode_graph_get_next_endpoint
   fwnode_graph_get_port_parent
   fwnode_handle_get
-  fwnode_handle_put
   fwnode_property_present
   fwnode_property_read_string
   fwnode_property_read_u32_array
