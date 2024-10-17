@@ -195,7 +195,6 @@ static int ksz9477_wait_alu_sta_ready(struct ksz_device *dev)
 
 static int ksz9477_reset_switch(struct ksz_device *dev)
 {
-	u8 data8;
 	u32 data32;
 
 	/* reset switch */
