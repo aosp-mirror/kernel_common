@@ -73,14 +73,12 @@
   __bitmap_clear
   __bitmap_complement
   __bitmap_equal
-  bitmap_find_free_region
   bitmap_find_next_zero_area_off
   bitmap_free
   bitmap_from_arr32
   __bitmap_or
   bitmap_parse
   bitmap_print_to_pagebuf
-  bitmap_release_region
   __bitmap_set
   bitmap_to_arr32
   __bitmap_weight

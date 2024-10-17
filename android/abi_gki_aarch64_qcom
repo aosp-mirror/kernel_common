@@ -51,14 +51,12 @@
   bio_endio
   bio_end_io_acct_remapped
   bio_start_io_acct
-  bitmap_allocate_region
   __bitmap_andnot
   __bitmap_clear
   bitmap_find_next_zero_area_off
   bitmap_free
   __bitmap_or
   bitmap_print_to_pagebuf
-  bitmap_release_region
   __bitmap_set
   bitmap_zalloc
   __blk_alloc_disk

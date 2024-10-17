@@ -58,7 +58,6 @@
   __bitmap_andnot
   __bitmap_clear
   __bitmap_equal
-  bitmap_find_free_region
   bitmap_find_next_zero_area_off
   bitmap_free
   bitmap_from_arr32
@@ -67,7 +66,6 @@
   bitmap_parselist
   bitmap_parse_user
   bitmap_print_to_pagebuf
-  bitmap_release_region
   __bitmap_set
   bitmap_to_arr32
   __bitmap_weight

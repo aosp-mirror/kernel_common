@@ -1101,8 +1101,6 @@
   _find_first_zero_bit
 
 # required by pcie-exynosauto-rc.ko
-  bitmap_find_free_region
-  bitmap_release_region
   dmam_alloc_attrs
   dw_pcie_host_init
   dw_pcie_own_conf_map_bus

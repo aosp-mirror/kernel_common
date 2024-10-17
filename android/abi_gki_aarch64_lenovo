@@ -31,17 +31,14 @@
   bcmp
   bio_associate_blkg
   bitmap_alloc
-  bitmap_allocate_region
   __bitmap_andnot
   __bitmap_clear
   __bitmap_equal
-  bitmap_find_free_region
   bitmap_free
   bitmap_from_arr32
   __bitmap_or
   bitmap_parse
   bitmap_print_to_pagebuf
-  bitmap_release_region
   __bitmap_weight
   __bitmap_xor
   bitmap_zalloc
