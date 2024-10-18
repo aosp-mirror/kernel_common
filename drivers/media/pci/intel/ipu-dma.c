@@ -303,7 +303,6 @@ static int ipu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 	struct ipu_mmu *mmu = to_ipu_bus_device(dev)->mmu;
 	struct vm_info *info;
 	size_t count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-	size_t i;
 
 	info = get_vm_info(mmu, iova);
 	if (!info)
