@@ -254,8 +254,6 @@ static void *ignore_thread(void *arg)
 	return NULL;
 }
 
-// TODO: b/369330443 - broken due to missing pthread_cancel in sysroot
-#if 0
 static void check_sig_ign(int thread)
 {
 	struct tmrsig tsig = { };
@@ -341,7 +339,6 @@ static void check_sig_ign(int thread)
 				 "check_sig_ign SIGEV_THREAD_ID\n");
 	}
 }
-#endif
 
 static void check_rearm(void)
 {
@@ -628,7 +625,7 @@ int main(int argc, char **argv)
 	check_timer_create(CLOCK_PROCESS_CPUTIME_ID, "CLOCK_PROCESS_CPUTIME_ID");
 	check_timer_distribution();
 
-// TODO: b/369330443 - broken due to missing pthread_cancel in sysroot
+// TODO: b/369693249 - depends on future patches and pthread_cancel replacement
 #if 0
 	check_sig_ign(0);
 	check_sig_ign(1);
