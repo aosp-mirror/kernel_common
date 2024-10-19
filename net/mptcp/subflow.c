@@ -1179,6 +1179,7 @@ int __mptcp_subflow_connect(struct sock *sk, const struct mptcp_addr_info *loc,
 	list_add_tail(&subflow->node, &msk->join_list);
 	spin_unlock_bh(&msk->join_list_lock);
 
+	WRITE_ONCE(msk->allow_infinite_fallback, false);
 	return err;
 
 failed:

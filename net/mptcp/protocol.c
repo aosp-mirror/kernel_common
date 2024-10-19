@@ -1810,9 +1810,11 @@ static void mptcp_worker(struct work_struct *work)
 		if (!mptcp_ext_cache_refill(msk))
 			break;
 	}
-	if (copied)
+	if (copied) {
 		tcp_push(ssk, msg.msg_flags, mss_now, tcp_sk(ssk)->nonagle,
 			 size_goal);
+		WRITE_ONCE(msk->allow_infinite_fallback, false);
+	}
 
 	dfrag->data_seq = orig_write_seq;
 	dfrag->offset = orig_offset;
@@ -1845,6 +1847,7 @@ static int __mptcp_init_sock(struct sock *sk)
 
 	msk->first = NULL;
 	inet_csk(sk)->icsk_sync_mss = mptcp_sync_mss;
+	WRITE_ONCE(msk->allow_infinite_fallback, true);
 
 	mptcp_pm_data_init(msk);
 
@@ -2543,6 +2546,7 @@ bool mptcp_finish_join(struct sock *sk)
 	if (parent_sock && !sk->sk_socket)
 		mptcp_sock_graft(sk, parent_sock);
 	subflow->map_seq = READ_ONCE(msk->ack_seq);
+	WRITE_ONCE(msk->allow_infinite_fallback, false);
 	return true;
 }
 
