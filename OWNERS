@@ -19,3 +19,14 @@ per-file */TEST_MAPPING = *
 
 # Test config xml can be made by anyone
 per-file */*.xml = *
+
+# Owners for the -desktop branch
+allenwebb@google.com
+engeg@google.com
+gredelston@google.com
+jeffxu@google.com
+jorgelo@google.com
+sarthakkukreti@google.com
+timvp@google.com
+tnowicki@google.com
+zland@google.com
