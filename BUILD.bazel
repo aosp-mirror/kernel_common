@@ -131,6 +131,7 @@ filegroup(
     name = "x86_64_additional_kmi_symbol_lists",
     srcs = [
         "android/abi_gki_x86_64_desktop",
+        "android/abi_gki_x86_64_virtual_device",
     ],
     visibility = ["//visibility:private"],
 )
