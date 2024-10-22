@@ -13,6 +13,7 @@
   filp_close
   free_workqueue_attrs
   __getblk_gfp
+  get_dup_sched_clock
   __irq_regs
   kernfs_path_from_node
   __lock_buffer
