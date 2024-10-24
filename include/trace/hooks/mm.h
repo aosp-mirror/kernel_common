@@ -28,6 +28,7 @@ DECLARE_HOOK(android_vh_mem_cgroup_free,
 	TP_PROTO(struct mem_cgroup *memcg),
 	TP_ARGS(memcg));
 
+struct cma;
 DECLARE_HOOK(android_vh_cma_alloc_bypass,
 	TP_PROTO(struct cma *cma, unsigned long count, unsigned int align,
 		gfp_t gfp_mask, struct page **page, bool *bypass),
